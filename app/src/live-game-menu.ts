@@ -9,7 +9,6 @@
 import {
   canStartGame,
   countdownLeft,
-  displayName,
   formatNumber,
   friendsListLine,
   language,
@@ -112,7 +111,6 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   const now = () => host.now?.() ?? new Date();
   const games = host.games;
   const myKey = () => host.net.state().key.publicKey;
-  const label = (key: string, plain: string) => displayName(plain, key);
   /** La pastille d'un joueur, à poser dans sa ligne (ou son titre). */
   const face = (key: string, plain: string): { avatar?: AvatarView } => (host.avatar ? { avatar: host.avatar(key, plain) } : {});
   let flash: Row | undefined;
@@ -147,7 +145,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   function answerRows(game: LiveGame): Row[] {
     const recent = game.players.filter((p) => !p.host && p.answeredAt && now().getTime() - Date.parse(p.answeredAt) < LIVE_ANSWER_SHOW_MS);
     return recent.map((p): Row => {
-      const name = label(p.key, p.name);
+      const name = p.name;
       if (p.state === 'accepted') return { text: t('{name} a accepté votre invitation', { name }), detail: t('Lancez la partie quand vous voulez'), tone: 'ok', icon: 'check' };
       const freed = t('Sa place est libérée : invitez un autre ami, ou changez de table');
       const text =
@@ -166,7 +164,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       const behind = p.key !== myKey() && p.state !== 'invited' && p.state !== 'declined' && liveBehind(p);
       const state = p.state === 'invited' && playingNow(p.key) ? t('Invité, en partie : notifié sur sa table, il peut quitter la sienne pour vous rejoindre') : livePlayerStateLabel(p, game.table.balls);
       return {
-        text: p.key === myKey() ? t('{name} (vous)', { name: label(p.key, p.name) }) : label(p.key, p.name),
+        text: p.key === myKey() ? t('{name} (vous)', { name: p.name }) : p.name,
         ...face(p.key, p.name),
         detail: behind ? `${state} · ${liveBehindLabel(p)}` : state,
         icon: p.host ? 'gamepad' : 'friend-list',
@@ -220,7 +218,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     return {
       title: t('Records du groupe sur cette version'),
       rows: board.length
-        ? board.map((r, i) => ({ text: `${i + 1}. ${label(r.player, r.name)} — ${formatNumber(r.score)}`, detail: new Date(r.at).toLocaleDateString(language() === 'en' ? 'en-GB' : 'fr-FR'), icon: 'star' as const, ...(i === 0 ? { tone: 'ok' as const } : {}) }))
+        ? board.map((r, i) => ({ text: `${i + 1}. ${r.name} — ${formatNumber(r.score)}`, detail: new Date(r.at).toLocaleDateString(language() === 'en' ? 'en-GB' : 'fr-FR'), icon: 'star' as const, ...(i === 0 ? { tone: 'ok' as const } : {}) }))
         : [{ text: t('Aucun score classé pour l’instant'), detail: t('Seuls les scores lisibles comptent : VPReg.stg, ou la mémoire d’une ROM que sa carte décrit'), tone: 'quiet' as const }],
     };
   }
@@ -331,7 +329,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       const index = actions.push({ label: f.name, key: `friend:${f.key}`, icon: 'friend-list', run }) - 1;
       const doing = playingNow(f.key) ? t('En partie : notifié sur sa table') : t('Dans le menu des tables');
       const detail = [doing, liveFitLabel(fit), fetch ? t('Start : récupérer sa version chez {name}', { name: f.name }) : undefined].filter(Boolean).join(' · ');
-      return { text: label(f.key, f.name), ...face(f.key, f.name), detail, icon: 'friend-list', tone: fitTone(fit), action: index, pick: true };
+      return { text: f.name, ...face(f.key, f.name), detail, icon: 'friend-list', tone: fitTone(fit), action: index, pick: true };
     });
     actions.push({ label: t('Retour'), icon: 'back', run: back });
     const sections: Section[] = manual.length ? [{ rows: manual }] : [];
@@ -340,7 +338,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     if (sync) sections.push({ rows: [{ text: sync.text, detail: sync.detail, tone: sync.tone, icon: 'network', ...(sync.busy ? { progress: { tone: 'info', busy: true } } : {}) }] });
     if (rows.length) sections.push({ title: t('En ligne ({n})', { n: online.length }), rows });
     else sections.push({ rows: [{ text: t('Aucun ami en ligne pour l’instant'), detail: t('Ils apparaissent ici dès qu’ils allument leur borne'), tone: 'info' }] });
-    if (offline.length) sections.push({ title: t('Hors ligne ({n})', { n: offline.length }), rows: offline.map((f) => ({ text: label(f.key, f.name), ...face(f.key, f.name), detail: searching() ? t('Hors ligne pour l’instant : la recherche des amis continue') : t('Hors ligne'), icon: 'friend-list', tone: 'quiet' })) });
+    if (offline.length) sections.push({ title: t('Hors ligne ({n})', { n: offline.length }), rows: offline.map((f) => ({ text: f.name, ...face(f.key, f.name), detail: searching() ? t('Hors ligne pour l’instant : la recherche des amis continue') : t('Hors ligne'), icon: 'friend-list', tone: 'quiet' })) });
     return {
       heading: t('Jouer avec un ami'),
       icon: 'gamepad',
@@ -534,9 +532,9 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
         // Sans la même version, il ne pourrait que refuser : grisé, avec sa raison (et sa version à récupérer).
         const fetch = fit?.fit === 'other-version' && table && host.openFriendTable ? () => fetchVersion(f.key, table, () => openAddFriend()) : undefined;
         const run = !fit || fit.fit === 'same' || fit.fit === 'unknown' ? invite : (fetch ?? (() => undefined));
-        const index = actions.push({ label: label(f.key, f.name), key: `friend:${f.key}`, icon: 'friend-add', run }) - 1;
+        const index = actions.push({ label: f.name, key: `friend:${f.key}`, icon: 'friend-add', run }) - 1;
         return {
-          text: label(f.key, f.name),
+          text: f.name,
           ...face(f.key, f.name),
           detail: fit ? [liveFitLabel(fit), fetch ? t('Start : récupérer sa version chez {name}', { name: f.name }) : undefined].filter(Boolean).join(' · ') : t('En ligne'),
           tone: fit ? fitTone(fit) : 'ok',
@@ -581,7 +579,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
    */
   function resultRow(p: LivePlayer, place: number | undefined, compared: boolean, hostBalls: number | undefined): Row {
     const score = liveScore(p);
-    const who = p.key === myKey() ? t('{name} (vous)', { name: label(p.key, p.name) }) : label(p.key, p.name);
+    const who = p.key === myKey() ? t('{name} (vous)', { name: p.name }) : p.name;
     const played = p.seconds !== undefined ? playDuration(p.seconds) : undefined;
     const reason = p.manual && score === undefined
       ? liveManualScoreLabel()
@@ -771,7 +769,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       heading: t('Invitation de {name}', { name: invite.host.name }),
       icon: 'gamepad',
       ...face(invite.host.key, invite.host.name),
-      subheading: label(invite.host.key, invite.host.name),
+      subheading: invite.host.name,
 
       lead: t('Jouez chacun sur votre borne, avec un départ commun.'),
       sections: [...takeFlash(), { rows }],

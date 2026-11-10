@@ -77,7 +77,7 @@ export const messages: Record<string, string> = {
   'Bienvenue ! Choisissez le pseudo et l’avatar que verront les autres joueurs. Rien d’obligatoire : vous pourrez les changer à tout moment.':
     'Welcome! Choose the nickname and avatar other players will see. Nothing is mandatory: you can change them at any time.',
   'Pseudo : {name}': 'Nickname: {name}',
-  'Votre étiquette #{tag} distingue deux joueurs du même nom': 'Your #{tag} tag tells apart two players with the same name',
+  'Vu tel quel par les autres joueurs, à côté de votre avatar': 'Seen as is by other players, next to your avatar',
   'Donné d’office : choisissez le vôtre': 'Given by default: choose your own',
   'Avatar : une image à vous': 'Avatar: a picture of your own',
   'Recadrée en carré, vue à côté de votre pseudo': 'Cropped square, shown next to your nickname',

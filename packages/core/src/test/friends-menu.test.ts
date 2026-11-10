@@ -26,6 +26,7 @@ interface Action {
 }
 interface Built {
   heading: string;
+  subheading?: string;
   sections: { title?: string; rows: { text: string; detail?: string; tone?: string; action?: number }[] }[];
   actions: Action[];
 }
@@ -128,6 +129,15 @@ function uniqueIcons(built: Built, what: string): void {
   assert.equal(new Set(icons).size, icons.length, `${what} : une icône par action`);
 }
 
+/**
+ * Le nom d'un joueur s'affiche seul (listes, scores, amis, titres) : jamais d'étiquette « #A1B2 »
+ * accolée. Son identifiant n'est que sur sa fiche, dans sa ligne « Identifiant : … ».
+ */
+function noTag(built: Built, what: string): void {
+  const texts = [built.heading, built.subheading ?? '', ...built.actions.map((a) => a.label), ...built.sections.flatMap((x) => x.rows.map((r) => r.text))];
+  for (const text of texts) assert.doesNotMatch(text, /#[0-9A-F]{4}\b/, `${what} : « ${text} » porte une étiquette`);
+}
+
 test('chaque entrée de la rubrique Amis ouvre son écran, aux actions toutes différentes', () => {
   const { menu, last } = setup();
   for (const [id, heading] of [['friends', 'Mes amis'], ['game-history', 'Historique des parties'], ['find-player', 'Trouver un joueur'], ['friend-requests', 'Demandes d’amis'], ['badges', 'Mes badges'], ['sharing', 'Partage et réseau']] as const) {
@@ -136,6 +146,7 @@ test('chaque entrée de la rubrique Amis ouvre son écran, aux actions toutes di
     assert.equal(built.heading, heading);
     assert.equal(built.actions.at(-1)!.label, 'Retour', `${id} : Retour en dernier`);
     uniqueIcons(built, id);
+    noTag(built, id);
   }
   assert.equal(menu.items['friend-requests']!.attention, false);
 });
@@ -260,6 +271,10 @@ test('fiche d’un ami et sa bibliothèque : actions uniques, Retour en dernier'
   menu.items.friends!.run();
   await last().build().actions.find((a) => a.label.startsWith('Bruno'))!.run();
   const friend = last().build();
+  assert.equal(friend.heading, 'Bruno', 'le nom seul');
+  noTag(friend, 'fiche d’un ami');
+  // L'identifiant unique : sur la fiche seulement.
+  assert.ok(friend.sections.some((x) => x.rows.some((r) => /^Identifiant : [0-9A-F]{4}(-[0-9A-F]{4}){3}$/.test(r.text))));
   assert.equal(friend.actions.at(-1)!.label, 'Retour');
   uniqueIcons(friend, 'fiche d’un ami');
   await friend.actions.find((a) => a.label === 'Voir sa bibliothèque')!.run();
@@ -305,20 +320,20 @@ test('partie en direct : salon, départ, résultats, invitation ; chaque écran 
     // Le record entré passe devant la partie sans record, qui n'a pas de rang (score inconnu).
     if (game.phase === 'finished') {
       const texts = built.sections.flatMap((s) => s.rows.map((r) => r.text));
-      assert.match(texts.join('|'), /(^|\|)1\. Bruno #[0-9A-F]{4} — 2\s?000\s?000\|Alice #[0-9A-F]{4} \(vous\) — Score non disponible\|Aucun score classé pour l’instant$/u);
+      assert.match(texts.join('|'), /(^|\|)1\. Bruno — 2\s?000\s?000\|Alice \(vous\) — Score non disponible\|Aucun score classé pour l’instant$/u);
       // La même version, mais 5 billes par partie contre 3 : hors classement, avec la raison.
       games.game = { ...game, table: { ...game.table, balls: 3 }, players: game.players.map((p) => (p.host ? { ...p, balls: 3 } : { ...p, balls: 5 })) };
       menu.live.open(() => undefined);
       const balls = last().build().sections.flatMap((s) => s.rows);
       assert.equal(balls[0]!.text, 'Autre nombre de billes : score hors classement');
-      assert.match(balls.map((r) => r.text).join('|'), /\|Bruno #[0-9A-F]{4} — 2\s?000\s?000\|/u);
+      assert.match(balls.map((r) => r.text).join('|'), /\|Bruno — 2\s?000\s?000\|/u);
       assert.match(balls.find((r) => r.text.startsWith('Bruno'))!.detail as string, /Hors classement : 5 billes au lieu de 3/);
       // Le tableau du groupe sur cette version, sous les résultats ; le record à battre, dans le salon.
       games.board = () => [{ player: FRIEND, name: 'Bruno', score: 2_000_000, at: '2026-10-30T20:00:00.000Z', game: 'g' }];
       menu.live.open(() => undefined);
       const boardSection = last().build().sections.at(-1)!;
       assert.equal(boardSection.title, 'Records du groupe sur cette version');
-      assert.match(boardSection.rows[0]!.text, /^1\. Bruno #[0-9A-F]{4} — 2\s?000\s?000$/u);
+      assert.match(boardSection.rows[0]!.text, /^1\. Bruno — 2\s?000\s?000$/u);
       games.game = base;
       menu.live.open(() => undefined);
       assert.ok(last().build().sections.flatMap((s) => s.rows).some((r) => /^Record du groupe à battre : 2\s?000\s?000$/u.test(r.text)));
@@ -408,7 +423,7 @@ test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le
   assert.match(pledge.text, /^J’atteste avoir le droit de détenir ce contenu/);
   assert.equal(pledge.action, 0, 'la ligne de l’engagement mène à la case');
   assert.deepEqual(pledge.badges, ['À cocher']);
-  assert.match(attest().sections.flatMap((x) => x.rows.map((r) => r.text)).join('|'), /la borne de Bruno #[0-9A-F]{4}/);
+  assert.match(attest().sections.flatMap((x) => x.rows.map((r) => r.text)).join('|'), /la borne de Bruno\b/);
   const screens = () => last();
   const before = screens();
   await attest().actions.find((a) => a.label === 'Prendre la ROM')!.run();
@@ -539,7 +554,7 @@ test('« Ajouter une table > Depuis un ami » : les amis qui ont des tables à p
   const friends = last().build() as unknown as Shown;
   assert.equal(friends.heading, 'Depuis un ami');
   const rows = friends.sections.flatMap((s) => s.rows).filter((r) => r.action !== undefined);
-  assert.deepEqual(rows.map((r) => r.text.replace(/ #.*/, '')), ['Émile', 'Bruno'], 'celle qui a des tables à prendre d’abord');
+  assert.deepEqual(rows.map((r) => r.text), ['Émile', 'Bruno'], 'celle qui a des tables à prendre d’abord');
   assert.deepEqual(rows[0]!.badges, ['2 à prendre']);
   assert.match(rows[0]!.detail!, /^3 tables, dont 2 absentes de votre borne$/);
   assert.match(rows[1]!.detail!, /toutes déjà sur votre borne/);

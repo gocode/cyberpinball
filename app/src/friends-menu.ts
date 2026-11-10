@@ -19,7 +19,6 @@ import {
   rateLabel,
   badgeDefinition,
   badgeLabel,
-  displayName,
   eventText,
   firewallBlocksNetwork,
   firewallProblems,
@@ -27,6 +26,7 @@ import {
   NAME_MAX,
   NAME_MIN,
   playDuration,
+  playerId,
   presenceTableLabel,
   relationOf,
   searchDirectory,
@@ -134,7 +134,11 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     return row ? [{ rows: [row] }] : [];
   };
 
-  const name = (key: string, plain: string) => displayName(plain, key);
+  /**
+   * Identifiant unique du joueur, sur sa fiche seulement : jamais accolé à son nom dans les listes,
+   * les scores ou les amis. Deux joueurs du même nom s'y départagent ; il se cherche dans l'annuaire.
+   */
+  const idRow = (key: string): Row => ({ text: t('Identifiant : {id}', { id: playerId(key) }), detail: t('Unique à sa borne : départage deux joueurs du même nom'), icon: 'info', tone: 'quiet' });
   /** Pastille d'un joueur : son avatar s'il est un ami ou en demande et qu'on l'a reçu, sinon ses initiales. */
   const avatar = (key: string, plain: string) => avatarView(key, plain, net.avatarFile(key));
   const live = createLiveMenu({
@@ -241,9 +245,9 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       list.map((f) => {
         const online = net.online(f.key);
         const p = net.presenceOf(f.key);
-        const index = actions.push({ label: name(f.key, f.name), key: `friend:${f.key}`, icon: 'friend-list', run: () => openFriend(f.key) }) - 1;
+        const index = actions.push({ label: f.name, key: `friend:${f.key}`, icon: 'friend-list', run: () => openFriend(f.key) }) - 1;
         return {
-          text: name(f.key, f.name),
+          text: f.name,
           avatar: avatar(f.key, f.name),
           detail: !online && blocked ? t('Sa présence ne vous parvient pas : le pare-feu de Windows bloque le réseau des bornes') : presenceText(p, online, f),
           tone: online ? 'ok' : undefined,
@@ -274,7 +278,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
 
   function sharingSubheading(): string {
     const s = net.state();
-    return t('{name} · {count}', { name: name(s.key.publicKey, s.name), count: tn(s.friends.length, '{n} ami', '{n} amis') });
+    return t('{name} · {count}', { name: s.name, count: tn(s.friends.length, '{n} ami', '{n} amis') });
   }
 
   // ---------- Ajouter une table : depuis un ami ----------
@@ -303,7 +307,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const rank = (v: (typeof view)[number]) => (!v.online ? 3 : v.lib.absent ? 0 : v.lib.absent === undefined ? 1 : 2);
     view.sort((a, b) => rank(a) - rank(b) || (b.lib.absent ?? 0) - (a.lib.absent ?? 0) || a.f.name.localeCompare(b.f.name));
     const rows: Row[] = view.map(({ f, online, lib }) => {
-      const label = name(f.key, f.name);
+      const label = f.name;
       if (!online) {
         // Indisponible : grisé, avec sa raison ; Start ne mène nulle part.
         const reason = blocked ? t('Sa borne ne vous parvient pas : le pare-feu de Windows bloque le réseau des bornes') : t('Hors ligne : sa bibliothèque se voit quand sa borne est allumée');
@@ -344,13 +348,13 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const libraryState = host.content.library(key).state;
     const events: Row[] = f.events.slice(0, 12).map((e) => ({ text: eventText(e, badgeLabel), detail: socialAgo(e.at, now()), icon: e.kind === 'badge' ? (badgeDefinition(e.badge!)?.icon ?? 'medal') : e.kind === 'record' ? 'star' : 'play', tone: e.kind === 'played' ? 'quiet' : 'ok' }));
     return {
-      heading: name(f.key, f.name),
+      heading: f.name,
       icon: 'friend-list',
       avatar: avatar(f.key, f.name),
       subheading: presenceText(p, online, f),
       sections: [
         ...takeFlash(),
-        { rows: [{ text: online ? (p?.status === 'playing' ? t('En partie') : t('En ligne')) : t('Hors ligne'), detail: [t('Amis depuis le {date}', { date: new Date(f.since).toLocaleDateString() }), online ? linksText(key) : undefined].filter(Boolean).join(' · '), tone: online ? 'ok' : 'quiet' }, { text: t('Bibliothèque'), detail: libraryMenu.detail(key), icon: 'tables', tone: libraryState === 'ready' ? 'ok' : 'quiet' }] },
+        { rows: [{ text: online ? (p?.status === 'playing' ? t('En partie') : t('En ligne')) : t('Hors ligne'), detail: [t('Amis depuis le {date}', { date: new Date(f.since).toLocaleDateString() }), online ? linksText(key) : undefined].filter(Boolean).join(' · '), tone: online ? 'ok' : 'quiet' }, { text: t('Bibliothèque'), detail: libraryMenu.detail(key), icon: 'tables', tone: libraryState === 'ready' ? 'ok' : 'quiet' }, idRow(key)] },
         { title: t('Derniers évènements'), rows: events.length ? events : [{ text: t('Rien encore : ses records, badges et parties s’afficheront ici'), tone: 'quiet' }] },
       ],
       actions: [
@@ -403,9 +407,9 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const s = net.state();
     return list.map((d) => {
       const rel = relationOf(s, d.profile.key);
-      const index = actions.push({ label: name(d.profile.key, d.profile.name), key: `player:${d.profile.key}`, icon: 'friend-add', run: () => openPlayer(d.profile.key, from) }) - 1;
+      const index = actions.push({ label: d.profile.name, key: `player:${d.profile.key}`, icon: 'friend-add', run: () => openPlayer(d.profile.key, from) }) - 1;
       return {
-        text: name(d.profile.key, d.profile.name),
+        text: d.profile.name,
         avatar: avatar(d.profile.key, d.profile.name),
         detail: opts.nearby?.has(d.profile.key) ? t('Sur votre réseau local') : t('Vu {ago}', { ago: socialAgo(d.seen, now()) }),
         badges: relationBadge(rel),
@@ -419,7 +423,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   function buildFind(): Built {
     const s = net.state();
     const status = net.status();
-    const actions: Action[] = [{ label: t('Chercher un nom…'), detail: t('Un nom, ou une partie ; « #A1B2 » pour l’étiquette'), icon: 'search', run: () => askSearch() }];
+    const actions: Action[] = [{ label: t('Chercher un nom…'), detail: t('Un nom, ou une partie ; ou l’identifiant vu sur la fiche d’un joueur'), icon: 'search', run: () => askSearch() }];
     const near = nearbyPlayers(s, now());
     const nearKeys = new Set(near.map((d) => d.profile.key));
     const recent = s.directory.filter((d) => !nearKeys.has(d.profile.key) && !s.blocked.includes(d.profile.key)).slice(0, RECENT_SHOWN);
@@ -444,7 +448,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     return {
       heading: t('Trouver un joueur'),
       icon: 'friend-add',
-      lead: t('Cherchez un nom ou une étiquette, par exemple #A1B2. L’annuaire réunit, sans serveur, les bornes dont le partage est activé.'),
+      lead: t('Cherchez un nom, ou l’identifiant vu sur la fiche d’un joueur. L’annuaire réunit, sans serveur, les bornes dont le partage est activé.'),
       sections,
       actions,
       back,
@@ -494,6 +498,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const nearby = nearbyPlayers(s, now()).some((d) => d.profile.key === key);
     const rows: Row[] = [];
     if (entry) rows.push({ text: nearby ? t('Sur votre réseau local') : t('Vu {ago}', { ago: socialAgo(entry.seen, now()) }), tone: nearby ? 'ok' : 'quiet', icon: nearby ? 'network' : 'clock' });
+    rows.push(idRow(key));
     const actions: Action[] = [];
     if (rel === 'none') actions.push({ label: t('Envoyer une demande d’ami'), detail: t('Il la verra dans « Demandes d’amis » et pourra l’accepter'), icon: 'friend-add', tone: 'ok', run: () => { net.request({ key, name: plain }); flash = { text: t('Demande envoyée à {name}', { name: plain }), detail: net.online(key) ? t('Remise à sa borne') : t('Remise dès que sa borne sera en ligne'), tone: 'ok' }; from(); } });
     if (rel === 'outgoing') {
@@ -504,7 +509,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     if (rel === 'friend') actions.push({ label: t('Voir sa fiche'), icon: 'friend-list', run: () => openFriend(key) });
     if (rel !== 'self') actions.push({ label: t('Bloquer'), detail: t('Plus de demande, plus de connexion avec sa borne'), icon: 'lock', run: () => confirmBlock(key, plain, () => openPlayer(key, from), from) });
     actions.push(backAction(from));
-    return { heading: name(key, plain), icon: rel === 'incoming' ? 'friend-request' : 'friend-add', avatar: avatar(key, plain), subheading: rel === 'incoming' ? t('Demande d’amitié reçue') : relationBadge(rel)[0], sections: rows.length ? [{ rows }] : [], actions, back: from };
+    return { heading: plain, icon: rel === 'incoming' ? 'friend-request' : 'friend-add', avatar: avatar(key, plain), subheading: rel === 'incoming' ? t('Demande d’amitié reçue') : relationBadge(rel)[0], sections: rows.length ? [{ rows }] : [], actions, back: from };
   }
 
   function requestActions(key: string, plain: string, after: () => void): Action[] {
@@ -525,9 +530,9 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const s = net.state();
     const actions: Action[] = [];
     const row = (r: FriendRequest, incoming: boolean): Row => {
-      const index = actions.push({ label: name(r.key, r.name), key: `request:${r.key}`, icon: incoming ? 'friend-request' : 'friend-add', run: () => openPlayer(r.key, () => openRequests(requestsBack)) }) - 1;
+      const index = actions.push({ label: r.name, key: `request:${r.key}`, icon: incoming ? 'friend-request' : 'friend-add', run: () => openPlayer(r.key, () => openRequests(requestsBack)) }) - 1;
       return {
-        text: name(r.key, r.name),
+        text: r.name,
         avatar: avatar(r.key, r.name),
         detail: incoming
           ? r.lan
@@ -641,7 +646,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const lanDown = lanProblem();
     const rows: Row[] = [
       s.enabled ? { text: t('Partage activé'), detail: status.mode === 'off' ? t('Réseau coupé pendant les essais sans opérateur') : status.running ? tn(status.peers, 'Relié à {n} borne', 'Relié à {n} bornes') : status.error ? t('Réseau indisponible : {error}', { error: status.error }) : t('Connexion au réseau…'), tone: 'ok', badges: [t('Activé')], icon: 'network' } : { text: t('Partage désactivé'), detail: t('Personne ne vous voit ; vos amis vous voient hors ligne'), tone: 'warning', badges: [t('Désactivé')], icon: 'network' },
-      { text: t('Votre nom : {name}', { name: name(s.key.publicKey, s.name) }), detail: t('Visible dans l’annuaire ; l’étiquette #{tag} vient de la clé de cette borne', { tag: name(s.key.publicKey, '').split('#')[1]! }), icon: 'friend-list' },
+      { text: t('Votre nom : {name}', { name: s.name }), detail: t('Visible dans l’annuaire · votre identifiant : {id}', { id: playerId(s.key.publicKey) }), icon: 'friend-list' },
       { text: s.avatar ? t('Votre avatar : une image à vous') : t('Votre avatar : vos initiales'), detail: t('Vu par vos amis et les joueurs d’une demande en cours ; « Changer d’avatar… » le montre'), icon: 'avatar' },
       s.lan && lanDown
         ? { text: t('Réseau local : indisponible'), detail: t('{reason} · Internet continue sans lui ; nouvel essai tout seul', { reason: lanDown }), tone: 'warning', badges: [t('Indisponible')], icon: 'monitor' }
@@ -692,7 +697,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         {
           title: t('Ce que voient les autres'),
           rows: [
-            { text: t('Réseau : votre nom et son étiquette') },
+            { text: t('Réseau : votre nom') },
             { text: t('Amis : présence, table en cours, records, badges et parties') },
             { text: t('Amis et demandes d’ami en cours : votre avatar'), detail: t('Jamais l’annuaire : les autres joueurs voient vos initiales') },
 
@@ -830,7 +835,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     host.library.openCustom(() => {
       const s = net.state();
       const up = () => host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER);
-      const actions: Action[] = s.blocked.map((key) => ({ label: t('Débloquer {name}', { name: name(key, knownPlain(key)) }), key: `blocked:${key}`, icon: 'unlock', run: () => { net.unblock(key); host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }));
+      const actions: Action[] = s.blocked.map((key) => ({ label: t('Débloquer {name}', { name: knownPlain(key) }), key: `blocked:${key}`, icon: 'unlock', run: () => { net.unblock(key); host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }));
       actions.push(backAction(up));
       return { heading: t('Joueurs bloqués'), icon: 'lock', sections: [], actions, back: up };
     });
@@ -891,7 +896,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       },
       sharing: {
         get detail() {
-          return net.state().enabled ? t('Activé · {name}', { name: name(net.state().key.publicKey, net.state().name) }) : t('Désactivé');
+          return net.state().enabled ? t('Activé · {name}', { name: net.state().name }) : t('Désactivé');
         },
         run: () => openSharing(),
       },

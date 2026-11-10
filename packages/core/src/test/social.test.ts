@@ -13,7 +13,6 @@ import {
   acceptRequest,
   blockPlayer,
   declineRequest,
-  displayName,
   eventText,
   learnProfiles,
   loadSocial,
@@ -28,6 +27,7 @@ import {
   receiveReply,
   relationOf,
   requestFriend,
+  playerId,
   searchDirectory,
   setName,
   signProfile,
@@ -51,7 +51,7 @@ test('noms : nettoyés, bornés, sans caractère de contrôle ni symbole', () =>
   assert.equal(normalizeName('<script>'), undefined);
   assert.equal(normalizeName('-Alexis'), undefined);
   const s = player('Alexis');
-  assert.match(displayName(s.name, s.key.publicKey), /^Alexis #[0-9A-F]{4}$/);
+  assert.match(playerId(s.key.publicKey), /^[0-9A-F]{4}(-[0-9A-F]{4}){3}$/);
 });
 
 test('profil signé : vérifié, et refusé dès qu’on y touche', () => {
@@ -93,8 +93,11 @@ test('annuaire : le profil le plus récent l’emporte, recherche sans accents, 
   const state = { ...me, directory: dir };
   assert.deepEqual(searchDirectory(state, 'ale').map((d) => d.profile.name), ['Alexia']);
   assert.deepEqual(searchDirectory(state, 'ELOISE').map((d) => d.profile.name), ['Éloïse']);
-  const tag = displayName('', alexia.key.publicKey).split('#')[1]!;
-  assert.deepEqual(searchDirectory(state, `#${tag}`).map((d) => d.profile.name), ['Alexia']);
+  // L'identifiant vu sur sa fiche : entier, son début (avec ou sans « # », tirets ou espaces), ou après le nom.
+  const id = playerId(alexia.key.publicKey);
+  for (const query of [id, id.slice(0, 9), `#${id.slice(0, 4)}`, id.slice(0, 9).replace('-', ' ').toLowerCase(), `ale #${id.slice(0, 4)}`]) {
+    assert.deepEqual(searchDirectory(state, query).map((d) => d.profile.name), ['Alexia'], query);
+  }
   // Réseau local : à proximité tant que la balise est récente.
   const near = { ...me, directory: mergeDirectory(dir, [signProfile(eloise)], { self: me.key.publicKey, now, lan: true }) };
   assert.deepEqual(nearbyPlayers(near, now).map((d) => d.profile.name), ['Éloïse']);

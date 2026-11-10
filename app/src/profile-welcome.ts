@@ -9,7 +9,7 @@
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec un réseau coupé.
 
-import { avatarView, displayName, hasDefaultName, NAME_MAX, NAME_MIN, t } from '@cyberpinball/core';
+import { avatarView, hasDefaultName, NAME_MAX, NAME_MIN, t } from '@cyberpinball/core';
 import type { AvatarMenu } from './avatar-menu';
 import type { Action, Built, Row } from './library';
 
@@ -72,7 +72,7 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
     const rows: Row[] = flash ? [flash] : [];
     rows.push(
       named
-        ? { text: t('Pseudo : {name}', { name: s.name }), detail: t('Votre étiquette #{tag} distingue deux joueurs du même nom', { tag: displayName(s.name, s.key.publicKey).split('#')[1]! }), tone: 'ok', badges: [t('Choisi')], icon: 'friend-list' }
+        ? { text: t('Pseudo : {name}', { name: s.name }), detail: t('Vu tel quel par les autres joueurs, à côté de votre avatar'), tone: 'ok', badges: [t('Choisi')], icon: 'friend-list' }
         : { text: t('Pseudo : {name}', { name: s.name }), detail: t('Donné d’office : choisissez le vôtre'), tone: 'info', icon: 'friend-list' },
       pictured
         ? { text: t('Avatar : une image à vous'), detail: t('Recadrée en carré, vue à côté de votre pseudo'), tone: 'ok', badges: [t('Choisi')], icon: 'avatar' }
@@ -95,7 +95,7 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
       heading: t('Votre profil de joueur'),
       icon: 'account',
       avatar: avatarView(s.key.publicKey, s.name, host.net.avatarFile(s.key.publicKey)),
-      subheading: displayName(s.name, s.key.publicKey),
+      subheading: s.name,
       lead: t('Bienvenue ! Choisissez le pseudo et l’avatar que verront les autres joueurs. Rien d’obligatoire : vous pourrez les changer à tout moment.'),
       sections: [{ rows }],
       actions,

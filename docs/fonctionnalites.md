@@ -32,7 +32,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 
 ### Trouver ses amis et les voir en ligne
 
-- **« Trouver un joueur »** : recherche par nom (sans tenir compte des accents ni des majuscules) ou par étiquette « #A1B2 », rubriques « À proximité (réseau local) » et « Vus récemment ».
+- **« Trouver un joueur »** : recherche par nom (sans tenir compte des accents ni des majuscules) ou par l'identifiant affiché sur la fiche du joueur, rubriques « À proximité (réseau local) » et « Vus récemment ».
 - **Un annuaire sans serveur** : les bornes se transmettent les profils (jusqu'à 200 à chaque connexion, signés). Un profil qui n'a pas été revu depuis 60 jours en sort.
 - **Le réseau local marche même sans Internet** : une borne voisine est « À proximité » tant que sa balise date de moins d'une minute.
 - **Demandes d'amis** : envoyées tout de suite, ou à la prochaine connexion de l'autre borne. Une demande faite des deux côtés vous rend amis aussitôt ; un refus est retenu 30 jours. « Bloquer » coupe toute liaison avec une borne.
@@ -40,7 +40,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 - **Une présence stable** : un ami reste en ligne tant qu'une liaison le relie à vous (15 s de tolérance quand elle tombe). La liste dit si elle est sûre : « Recherche des amis… », « Mise à jour en cours… », puis « Liste à jour : 1 ami en ligne ». La fiche d'un ami dit par où il est relié (Internet, réseau local).
 - **Une pastille au menu des tables** : le nombre d'amis en ligne ; un clic ouvre « Mes amis ».
 - **« Mes badges »** : huit badges (Première partie, Dix tables, Cent parties, Une heure sur une table, Dix heures de jeu, Au tableau d'honneur, Grand Champion, Cinq fois champion).
-- **Un nom à soi** : de 2 à 24 caractères, l'étiquette #A1B2 départageant deux joueurs du même nom.
+- **Un nom à soi** : de 2 à 24 caractères, affiché seul, avec l'avatar. Deux joueurs du même nom se départagent par l'identifiant unique de leur fiche.
 
 <p align="center"><img src="images/fr/friends.webp?v=8a30474698" width="760" alt="Mes amis : Bruno en ligne, en partie sur Star Courier avec son nouveau record, et Émile hors ligne ; à côté, la fiche de Bruno avec ses derniers événements et « Voir sa bibliothèque »."></p>
 
@@ -100,7 +100,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 ### Confidentialité, réseau et pare-feu
 
 - **Ce qui ne part jamais** : les programmes (`.exe`, `.dll`, `.bat`, `.ps1`…), les sauvegardes, les fichiers de records, les réglages de PinMAME, les statistiques, et aucun chemin de votre disque.
-- **Ce que voient les autres** : tout le monde, votre nom et votre étiquette ; vos amis, votre présence, votre table en cours, vos records, vos badges, vos parties et votre bibliothèque si vous la partagez.
+- **Ce que voient les autres** : tout le monde, votre nom ; vos amis, votre présence, votre table en cours, vos records, vos badges, vos parties et votre bibliothèque si vous la partagez.
 - **« Partage et réseau »** réunit tout : le partage (activé par défaut), votre nom, le réseau local, la bibliothèque partagée, le débit, le pare-feu, ce que voient les autres, les joueurs bloqués. L'écran s'ouvre sur « Retour », pour qu'un Start par mégarde ne coupe rien.
 - **Le pare-feu de Windows** : l'installeur pose les règles une seule fois, sans invite sur une borne sans souris. Elles sont revérifiées à chaque démarrage et après chaque mise à jour, et reposées d'elles-mêmes si l'une manque. Une règle que Windows bloque est dite en clair (« Réseau des bornes bloqué par le pare-feu de Windows »).
 - **Chiffré de bout en bout**, sur le réseau Hyperswarm de [Holepunch](https://holepunch.to).

@@ -32,7 +32,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 
 ### Find your friends and see who's online
 
-- **"Find a player"**: search by name (accents and case ignored) or by the "#A1B2" tag, with "Nearby (local network)" and "Recently seen" sections.
+- **"Find a player"**: search by name (accents and case ignored) or by the ID shown on the player's page, with "Nearby (local network)" and "Recently seen" sections.
 - **A directory with no server**: cabinets pass profiles to each other (up to 200 per connection, signed). A profile not seen for 60 days drops out.
 - **The local network works even without the Internet**: a neighbouring cabinet is "Nearby" as long as its beacon is less than a minute old.
 - **Friend requests**: sent at once, or at the other cabinet's next connection. A request made on both sides makes you friends straight away; a refusal is remembered for 30 days. "Block" cuts every link with a cabinet.
@@ -40,7 +40,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 - **Stable presence**: a friend stays online as long as a link joins you (15 s of grace when it drops). The list says whether it is settled: "Looking for friends…", "Updating…", then "List up to date: 1 friend online". A friend's page says how you are linked (Internet, local network).
 - **A badge on the table menu**: the number of friends online; a click opens "My friends".
 - **"My badges"**: eight badges (First game, Ten tables, A hundred games, An hour on one table, Ten hours of play, On the high-score board, Grand Champion, Five-time champion).
-- **A name of your own**: 2 to 24 characters, the #A1B2 tag telling apart two players with the same name.
+- **A name of your own**: 2 to 24 characters, shown alone, with the avatar. Two players with the same name are told apart by the unique ID on their page.
 
 <p align="center"><img src="images/en/friends.webp?v=f215598b45" width="760" alt="My friends: Bruno online, playing Star Courier with his new high score, and Émile offline; next to it, Bruno's page with his latest events and See their library."></p>
 
@@ -100,7 +100,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 ### Privacy, network and firewall
 
 - **What never leaves**: programs (`.exe`, `.dll`, `.bat`, `.ps1`…), saves, high-score files, PinMAME settings, statistics, and no path from your disk.
-- **What others see**: everyone, your name and tag; your friends, your presence, your current table, your high scores, your badges, your games and your library if you share it.
+- **What others see**: everyone, your name; your friends, your presence, your current table, your high scores, your badges, your games and your library if you share it.
 - **"Sharing and network"** gathers it all: sharing (on by default), your name, the local network, the shared library, the speed limit, the firewall, what others see, blocked players. The screen opens on "Back", so a stray Start never turns anything off.
 - **The Windows firewall**: the installer sets the rules once, with no prompt on a cabinet without a mouse. They are checked again at every start and after every update, and put back on their own if one is missing. A rule that Windows blocks is reported plainly ("Cabinet network blocked by the Windows firewall").
 - **End-to-end encrypted**, on [Holepunch](https://holepunch.to)'s Hyperswarm network.

@@ -38,7 +38,6 @@ import {
   type DownloadReturn,
   type DownloadScreen,
   defaultPartChoice,
-  displayName,
   fileRefusalLabel,
   formatSize,
   friendParts,
@@ -346,7 +345,6 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     return {
       heading: t('Bibliothèque de {name}', { name: plain }),
       icon: 'tables',
-      subheading: displayName(plain, key),
       lead: forAdd
         ? t('Ses tables absentes de votre borne d’abord : choisissez-en une pour la récupérer. Chaque fichier est vérifié à l’arrivée, puis le plan d’ajout montre tout avant d’installer.')
         : t('Récupérez les médias de {name}. Retrouvez ses autres tables dans le catalogue.', { name: plain }),
@@ -587,7 +585,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       host.library.openCustom(() => buildParts(key, tableId, back), Math.max(0, files ? friendParts(files).findIndex((p) => p.part === part) : 0));
     };
     const build = (): Built => {
-      const text = rightsAttestation(part, displayName(friendName(key), key))!;
+      const text = rightsAttestation(part, friendName(key))!;
       const actions: Action[] = [
         {
           label: t('J’atteste et je m’engage'),
@@ -700,7 +698,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     if (!table || !got.length) return false;
     const key = job.source.key ?? '';
     const plain = job.source.label;
-    const origin: MediaOriginDraft = { origin: t('la borne de {name}', { name: displayName(plain, key) }), url: `cyberpinball:ami/${key}` };
+    const origin: MediaOriginDraft = { origin: t('la borne de {name}', { name: plain }), url: `cyberpinball:ami/${key}` };
     const media = (f: DownloadFile) => f.meta?.media as LibraryMedia;
     const notice = got.length === 1 ? t('{label} reçu de {name} : vérifiez-le, puis enregistrez.', { label: mediaTypeInfo(media(got[0]!).type).label, name: plain }) : t('{n} médias reçus de {name} : vérifiez-les, puis enregistrez.', { n: got.length, name: plain });
     ownedTypes.delete(table.file);

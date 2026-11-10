@@ -208,9 +208,12 @@ export function shortTag(key: string): string {
   return playerFingerprint(key).slice(0, 4).toUpperCase();
 }
 
-/** « Alexis #A1B2 » */
-export function displayName(name: string, key: string): string {
-  return `${name} #${shortTag(key)}`;
+/**
+ * Identifiant unique d'un joueur (« A1B2-C3D4-E5F6-7890 », tiré de sa clé) : montré seulement sur
+ * sa fiche, jamais accolé à son nom (listes, scores, amis : le nom seul, avec l'avatar).
+ */
+export function playerId(key: string): string {
+  return playerFingerprint(key).toUpperCase();
 }
 
 // ---------------------------------------------------------------------------
@@ -551,19 +554,24 @@ export function directorySample(state: SocialState): Profile[] {
 /**
  * Joueurs de l'annuaire dont le nom contient la recherche (sans accents ni casse) : nom exact
  * d'abord, puis commençant par la recherche, puis le reste ; les plus récemment vus d'abord.
- * Une recherche « #A1B2 » ou « nom #A1B2 » filtre aussi sur l'étiquette.
+ * L'identifiant vu sur une fiche (« A1B2-C3D4… », ou son début, au moins quatre caractères, avec
+ * ou sans « # ») trouve aussi son joueur ; « nom #A1B2 » filtre le nom sur le début de l'identifiant.
  */
 export function searchDirectory(state: SocialState, query: string): DirectoryEntry[] {
   const tag = /#\s*([0-9a-f]{1,4})\s*$/i.exec(query)?.[1]?.toUpperCase();
   const q = playerNameKey(query.replace(/#\s*[0-9a-f]{1,4}\s*$/i, ''));
-  if (!q && !tag) return [];
+  // Toute la recherche est un identifiant (ou son début) : chiffres hexadécimaux, tirets, espaces.
+  const id = /^#?[\s0-9a-f-]+$/i.test(query.trim()) ? query.replace(/[^0-9a-f]/gi, '').toUpperCase() : '';
+  const byId = id.length >= 4 ? id : '';
+  if (!q && !tag && !byId) return [];
+  const compact = (key: string) => playerId(key).replace(/-/g, '');
   const rank = (d: DirectoryEntry) => {
     const k = playerNameKey(d.profile.name);
     return k === q ? 0 : k.startsWith(q) ? 1 : 2;
   };
   return state.directory
     .filter((d) => !state.blocked.includes(d.profile.key))
-    .filter((d) => (!q || playerNameKey(d.profile.name).includes(q)) && (!tag || shortTag(d.profile.key).startsWith(tag)))
+    .filter((d) => (byId && compact(d.profile.key).startsWith(byId)) || ((!q || playerNameKey(d.profile.name).includes(q)) && (!tag || shortTag(d.profile.key).startsWith(tag)) && (q || tag)))
     .sort((a, b) => rank(a) - rank(b) || Date.parse(b.seen) - Date.parse(a.seen));
 }
 
