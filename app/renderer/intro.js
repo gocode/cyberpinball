@@ -268,59 +268,110 @@
     }
     c.globalCompositeOperation = 'source-over';
   }
+  /** Un fil sur six est vert signal, comme dans la première ouverture (sarcelle à la taille, vert vers les bords), un peu plus lumineux. */
+  const SPINDLE_GREEN_EVERY = 6;
+  const SPINDLE_GREEN_GAIN = 1.4;
   function makeThreads(n, seed) {
     const r = rng(seed);
-    return Array.from({ length: n }, (_, i) => ({ th: (i / n) * TAU + r() * 0.12, w: 0.55 + r() * 0.8, d: r() }));
+    return Array.from({ length: n }, (_, i) => ({ th: (i / n) * TAU + r() * 0.12, w: 0.55 + r() * 0.8, d: r(), g: i % SPINDLE_GREEN_EVERY === 3 }));
   }
-  /** Les fils en fuseau, resserrés à la taille (cy) : chacun se tisse depuis le bas, puis tourne. */
-  function drawSpindle(c, threads, t, grow, alpha, ign, W, H) {
+  /**
+   * Les fils en fuseau, resserrés à la taille (cy) : chacun se tisse depuis le bas, puis tourne.
+   * visit(xs, ys, a, gs) reçoit les 37 points de chaque fil (unités), son intensité et, pour un fil
+   * vert, sa part de vert à chaque point (null pour un fil sarcelle). La taille du fuseau est plus
+   * serrée et sa torsion plus forte que dans la maquette (11/11/2026) : les fils se croisent au centre.
+   */
+  const SPINDLE_WAIST = 16;
+  const SPINDLE_TWIST = 0.0016;
+  const SPINDLE_X = new Float64Array(37);
+  const SPINDLE_Y = new Float64Array(37);
+  const SPINDLE_G = new Float64Array(37);
+  const smooth = (a, b, x) => {
+    const k = clamp((x - a) / (b - a));
+    return k * k * (3 - 2 * k);
+  };
+  function spindle(threads, t, grow, ign, W, H, visit) {
     const cx = W / 2;
     const cy = H / 2;
-    c.globalCompositeOperation = 'lighter';
     for (const th of threads) {
       const p = grow ? E.out3(seg(t, 0.1 + th.d * 0.7, 1.7 + th.d * 0.7)) : 1;
       if (p <= 0) continue;
       const yEnd = lerp(H + 80, -80, p);
       const base = th.th + t * 0.22;
       const depth = (Math.sin(base) + 1) / 2;
-      c.beginPath();
       for (let j = 0; j <= 36; j++) {
         const y = lerp(H + 80, yEnd, j / 36);
         const k = Math.abs(y - cy) / 1000;
-        const wd = 40 + 560 * Math.pow(k, 1.7) * th.w;
-        const x = cx + Math.cos(base + (y - cy) * 0.0011) * wd;
-        if (j) c.lineTo(x, y);
-        else c.moveTo(x, y);
+        const wd = SPINDLE_WAIST + 560 * Math.pow(k, 1.7) * th.w;
+        SPINDLE_X[j] = cx + Math.cos(base + (y - cy) * SPINDLE_TWIST) * wd;
+        SPINDLE_Y[j] = y;
+        if (th.g) SPINDLE_G[j] = smooth(0.04, 0.5, Math.abs(y - cy) / cy);
       }
-      const a = (0.08 + 0.32 * depth) * (1 + 1.8 * ign) * alpha;
-      c.strokeStyle = rgba(C.teal, a * 0.18);
+      visit(SPINDLE_X, SPINDLE_Y, (0.08 + 0.32 * depth) * (1 + 1.8 * ign) * (th.g ? SPINDLE_GREEN_GAIN : 1), th.g ? SPINDLE_G : null);
+    }
+  }
+  function drawSpindle(c, threads, t, grow, alpha, ign, W, H) {
+    c.globalCompositeOperation = 'lighter';
+    spindle(threads, t, grow, ign, W, H, (xs, ys, a0, gs) => {
+      const a = a0 * alpha;
+      c.beginPath();
+      for (let j = 0; j <= 36; j++) {
+        if (j) c.lineTo(xs[j], ys[j]);
+        else c.moveTo(xs[j], ys[j]);
+      }
+      // Fil vert : un dégradé vertical, sarcelle à la taille, vert vers les bords.
+      const tone = (k) => {
+        if (!gs) return rgba(C.teal, a * k);
+        const g = c.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, rgba(C.sig, a * k));
+        g.addColorStop(0.48, rgba(C.teal, a * k));
+        g.addColorStop(0.52, rgba(C.teal, a * k));
+        g.addColorStop(1, rgba(C.sig, a * k));
+        return g;
+      };
+      c.strokeStyle = tone(0.18);
       c.lineWidth = 8;
       c.stroke();
-      c.strokeStyle = rgba(C.teal, a);
+      c.strokeStyle = tone(1);
       c.lineWidth = 1.8;
       c.stroke();
-    }
+    });
     c.globalCompositeOperation = 'source-over';
+  }
+
+  /** Les valeurs d'un instant t (secondes) : ignition, étincelle, éclair, ligne d'horizon, éclat, poussière. */
+  function soieAt(t, H) {
+    const cy = H / 2;
+    const ign = t > 2.4 ? Math.exp(-(t - 2.4) * 1.5) : 0;
+    const g = t > 2.4 ? E.expo(seg(t, 2.4, 2.8)) : 0;
+    return {
+      ign,
+      halo: 0.16 + 0.3 * ign,
+      spark: t > 1.2 && t < 2.45 ? lerp(H + 40, cy, E.io3(seg(t, 1.2, 2.4))) : undefined,
+      flare: t > 2.4 ? 1400 * g + 1 : 0,
+      horizon: t > 2.4 ? (0.16 + 0.25 * ign) * g : 0,
+      flash: t > 2.4 && t < 2.65 ? 0.14 * (1 - seg(t, 2.4, 2.65)) : 0,
+      dust: seg(t, 2.4, 3.6),
+    };
   }
 
   /** Une image de l'ouverture à l'instant t (secondes), sur le contexte déjà mis à l'échelle (W × H unités). */
   function drawSoie(c, s, t, W, H) {
     const cx = W / 2;
     const cy = H / 2;
+    const f = soieAt(t, H);
     c.fillStyle = C.void;
     c.fillRect(0, 0, W, H);
-    const ign = t > 2.4 ? Math.exp(-(t - 2.4) * 1.5) : 0;
     const bg = c.createRadialGradient(cx, cy, 0, cx, cy, 1000);
-    bg.addColorStop(0, rgba(C.halo, 0.16 + 0.3 * ign));
+    bg.addColorStop(0, rgba(C.halo, f.halo));
     bg.addColorStop(1, rgba(C.halo, 0));
     c.fillStyle = bg;
     c.fillRect(0, 0, W, H);
-    drawSpindle(c, s.threads, t, true, 1, ign, W, H);
+    drawSpindle(c, s.threads, t, true, 1, f.ign, W, H);
     c.globalCompositeOperation = 'lighter';
     // L'étincelle monte du bas jusqu'à la taille du fuseau, sa traînée derrière elle.
-    if (t > 1.2 && t < 2.45) {
-      const q = E.io3(seg(t, 1.2, 2.4));
-      const y = lerp(H + 40, cy, q);
+    if (f.spark !== undefined) {
+      const y = f.spark;
       const tr = c.createLinearGradient(0, y, 0, y + 360);
       tr.addColorStop(0, rgba(C.sig, 0.75));
       tr.addColorStop(1, rgba(C.sig, 0));
@@ -330,36 +381,322 @@
       glowDot(c, cx, y, 18, C.hot, 1);
     }
     // L'ignition : un éclair aplati (anamorphique), la ligne d'horizon, un éclat sur tout l'écran.
-    if (t > 2.4) {
-      const g = E.expo(seg(t, 2.4, 2.8));
-      const R = 1400 * g + 1;
+    if (f.flare > 0) {
+      const R = f.flare;
       c.save();
       c.translate(cx, cy);
       c.scale(1, 0.04);
       const fg = c.createRadialGradient(0, 0, 0, 0, 0, R);
-      fg.addColorStop(0, rgba(C.hot, 0.95 * ign));
-      fg.addColorStop(0.1, rgba(C.sig, 0.7 * ign));
-      fg.addColorStop(0.45, rgba(C.teal, 0.22 * ign));
+      fg.addColorStop(0, rgba(C.hot, 0.95 * f.ign));
+      fg.addColorStop(0.1, rgba(C.sig, 0.7 * f.ign));
+      fg.addColorStop(0.45, rgba(C.teal, 0.22 * f.ign));
       fg.addColorStop(1, rgba(C.teal, 0));
       c.fillStyle = fg;
       c.fillRect(-R, -R, 2 * R, 2 * R);
       c.restore();
       const hl = c.createLinearGradient(0, 0, W, 0);
-      const ha = (0.16 + 0.25 * ign) * g;
       hl.addColorStop(0, rgba(C.teal, 0));
-      hl.addColorStop(0.5, rgba(C.sig, ha));
+      hl.addColorStop(0.5, rgba(C.sig, f.horizon));
       hl.addColorStop(1, rgba(C.teal, 0));
       c.fillStyle = hl;
       c.fillRect(0, cy - 1, W, 2);
-      if (t < 2.65) {
-        c.fillStyle = rgba(C.sig, 0.14 * (1 - seg(t, 2.4, 2.65)));
+      if (f.flash > 0) {
+        c.fillStyle = rgba(C.sig, f.flash);
         c.fillRect(0, 0, W, H);
       }
     }
     c.globalCompositeOperation = 'source-over';
-    drawDust(c, s.dust, t, C.teal, seg(t, 2.4, 3.6), W, H);
+    drawDust(c, s.dust, t, C.teal, f.dust, W, H);
   }
 
+  // ---------- Plateau : le même dessin, tracé par la carte graphique ----------
+  //
+  // Le Canvas 2D trace mal 92 traits larges en addition : 160 ms par image en 4K, la borne saccade.
+  // WebGL2 trace exactement le même dessin (mêmes formules, mêmes instants, mêmes couleurs) en
+  // quelques millisecondes : le fond (noir, halo, étincelle, éclair, ligne d'horizon, éclat) est
+  // calculé au pixel, les fils et la poussière sont des bandes et des disques additionnés, le grain
+  // est la même tuile décalée au hasard à chaque image. Le Canvas 2D reste le secours sans WebGL2.
+
+  const GL_RGB = (h) => `vec3(${[1, 3, 5].map((i) => (parseInt(h.slice(i, i + 2), 16) / 255).toFixed(5)).join(', ')})`;
+  const SOIE_VERTEX_FULL = '#version 300 es\nin vec2 p;\nvoid main() { gl_Position = vec4(p, 0.0, 1.0); }';
+  // Fond au pixel ; glow() reprend glowDot : a au centre, 0,42 a au quart du rayon, rien au bord.
+  const SOIE_FRAGMENT_FULL = `#version 300 es
+precision highp float;
+uniform vec2 u_size;
+uniform float u_k;
+uniform float u_halo;
+uniform vec2 u_spark;
+uniform vec2 u_flare;
+uniform float u_horizon;
+uniform float u_flash;
+out vec4 o;
+const vec3 VOID = ${GL_RGB(C.void)};
+const vec3 HALO = ${GL_RGB(C.halo)};
+const vec3 TEAL = ${GL_RGB(C.teal)};
+const vec3 SIG = ${GL_RGB(C.sig)};
+const vec3 HOT = ${GL_RGB(C.hot)};
+float glow(float d, float a) {
+  return d < 0.25 ? mix(a, a * 0.42, d / 0.25) : d < 1.0 ? mix(a * 0.42, 0.0, (d - 0.25) / 0.75) : 0.0;
+}
+void main() {
+  vec2 q = vec2(gl_FragCoord.x / u_k, u_size.y - gl_FragCoord.y / u_k);
+  vec2 c = u_size * 0.5;
+  vec3 col = mix(VOID, HALO, u_halo * max(0.0, 1.0 - length(q - c) / 1000.0));
+  if (u_spark.y > 0.5) {
+    float y = u_spark.x;
+    if (abs(q.x - c.x) < 3.0 && q.y >= y && q.y < y + 360.0) col += SIG * 0.75 * (1.0 - (q.y - y) / 360.0);
+    float d = length(q - vec2(c.x, y));
+    col += SIG * glow(d / 90.0, 0.55) + HOT * glow(d / 18.0, 1.0);
+  }
+  if (u_flare.x > 0.0) {
+    float ign = u_flare.y;
+    float d = length(vec2(q.x - c.x, (q.y - c.y) / 0.04)) / u_flare.x;
+    vec3 s0 = HOT * 0.95 * ign;
+    vec3 s1 = SIG * 0.7 * ign;
+    vec3 s2 = TEAL * 0.22 * ign;
+    col += d < 0.1 ? mix(s0, s1, d / 0.1) : d < 0.45 ? mix(s1, s2, (d - 0.1) / 0.35) : d < 1.0 ? mix(s2, vec3(0.0), (d - 0.45) / 0.55) : vec3(0.0);
+    if (abs(q.y - c.y) < 1.0) col += SIG * u_horizon * (1.0 - abs(q.x / u_size.x * 2.0 - 1.0));
+    col += SIG * u_flash;
+  }
+  o = vec4(col, 1.0);
+}`;
+  // Bandes (fils) et disques (poussière) : d = (position dans la largeur, ou dans le disque ; intensité ;
+  // demi-largeur en points), g = part de vert signal du fil à ce point.
+  const SOIE_VERTEX_MARKS = `#version 300 es
+in vec2 a_pos;
+in vec4 a_d;
+in float a_g;
+uniform vec2 u_size;
+out vec4 v_d;
+out float v_g;
+void main() {
+  v_d = a_d;
+  v_g = a_g;
+  vec2 p = a_pos / u_size;
+  gl_Position = vec4(p.x * 2.0 - 1.0, 1.0 - p.y * 2.0, 0.0, 1.0);
+}`;
+  const SOIE_FRAGMENT_MARKS = `#version 300 es
+precision highp float;
+in vec4 v_d;
+in float v_g;
+uniform float u_round;
+out vec4 o;
+const vec3 TEAL = ${GL_RGB(C.teal)};
+const vec3 SIG = ${GL_RGB(C.sig)};
+void main() {
+  float r = u_round > 0.5 ? length(v_d.xy) : abs(v_d.x);
+  float cover = clamp((1.0 - r) * v_d.w, 0.0, 1.0);
+  o = vec4(mix(TEAL, SIG, v_g) * v_d.z * cover, 1.0);
+}`;
+  // Grain : « overlay » à 7 % sur un fond sombre, soit le fond multiplié par 0,93 à 1,07.
+  const SOIE_FRAGMENT_GRAIN = `#version 300 es
+precision highp float;
+uniform sampler2D u_noise;
+uniform vec2 u_off;
+out vec4 o;
+void main() {
+  float g = texture(u_noise, (gl_FragCoord.xy + u_off) / 192.0).r;
+  o = vec4(vec3((0.93 + 0.14 * g) * 0.5), 1.0);
+}`;
+
+  function glCompile(gl, vertex, fragment) {
+    const compile = (type, source) => {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return shader;
+      console.error(`Ouverture : shader refusé : ${gl.getShaderInfoLog(shader)}`);
+      return undefined;
+    };
+    const vs = compile(gl.VERTEX_SHADER, vertex);
+    const fs = compile(gl.FRAGMENT_SHADER, fragment);
+    if (!vs || !fs) return undefined;
+    const program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.bindAttribLocation(program, 0, 'p');
+    gl.bindAttribLocation(program, 0, 'a_pos');
+    gl.bindAttribLocation(program, 1, 'a_d');
+    gl.bindAttribLocation(program, 2, 'a_g');
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error(`Ouverture : programme refusé : ${gl.getProgramInfoLog(program)}`);
+      return undefined;
+    }
+    const u = {};
+    const n = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) ?? 0;
+    for (let i = 0; i < n; i++) {
+      const name = gl.getActiveUniform(program, i)?.name;
+      if (name) u[name] = gl.getUniformLocation(program, name);
+    }
+    return { program, u };
+  }
+
+  /** Fils : deux passes par fil (lueur de 8 unités, trait de 1,8), bandes jointes ; poussière : 70 disques. Sept nombres par sommet. */
+  const MARKS_MAX = 46 * 2 * (74 + 2) + 70 * 6;
+
+  /** Le dessin de l'ouverture tracé par WebGL2 sur `canvas` ; undefined si WebGL2 refuse. */
+  function soieGL(canvas) {
+    const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+    if (!gl) return undefined;
+    const full = glCompile(gl, SOIE_VERTEX_FULL, SOIE_FRAGMENT_FULL);
+    const marks = glCompile(gl, SOIE_VERTEX_MARKS, SOIE_FRAGMENT_MARKS);
+    const grainP = glCompile(gl, SOIE_VERTEX_FULL, SOIE_FRAGMENT_GRAIN);
+    if (!full || !marks || !grainP) return undefined;
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    const tri = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, tri);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const fullVao = vao;
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    const marksVao = gl.createVertexArray();
+    gl.bindVertexArray(marksVao);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, MARKS_MAX * 7 * 4, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 28, 0);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 28, 8);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 28, 24);
+    gl.bindVertexArray(null);
+    const data = new Float32Array(MARKS_MAX * 7);
+    // La tuile de grain de la maquette (même graine), en niveaux de gris.
+    const noise = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, noise);
+    const values = new Uint8Array(192 * 192);
+    const r = rng(7);
+    for (let i = 0; i < values.length; i++) values[i] = (r() * 255) | 0;
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 192, 192, 0, gl.RED, gl.UNSIGNED_BYTE, values);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+    /** Une image : W × H unités, k points par unité, s les fils et la poussière ; grain ou non. */
+    function draw(s, t, W, H, k, withGrain) {
+      const f = soieAt(t, H);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.disable(gl.BLEND);
+      gl.useProgram(full.program);
+      gl.uniform2f(full.u.u_size, W, H);
+      gl.uniform1f(full.u.u_k, k);
+      gl.uniform1f(full.u.u_halo, f.halo);
+      gl.uniform2f(full.u.u_spark, f.spark ?? 0, f.spark === undefined ? 0 : 1);
+      gl.uniform2f(full.u.u_flare, f.flare, f.ign);
+      gl.uniform1f(full.u.u_horizon, f.horizon);
+      gl.uniform1f(full.u.u_flash, f.flash);
+      gl.bindVertexArray(fullVao);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      // Fils : bandes jointes en une seule suite de triangles (sommets répétés entre deux bandes).
+      let n = 0;
+      const put = (x, y, a, b, c, d, g) => {
+        const i = n * 7;
+        data[i] = x;
+        data[i + 1] = y;
+        data[i + 2] = a;
+        data[i + 3] = b;
+        data[i + 4] = c;
+        data[i + 5] = d;
+        data[i + 6] = g;
+        n += 1;
+      };
+      const repeat = () => {
+        data.copyWithin(n * 7, (n - 1) * 7, n * 7);
+        n += 1;
+      };
+      const aa = 0.5 / k;
+      spindle(s.threads, t, true, f.ign, W, H, (xs, ys, a, gs) => {
+        for (const [half, alpha] of [
+          [4, a * 0.18],
+          [0.9, a],
+        ]) {
+          const e = half + aa;
+          const px = e * k;
+          for (let j = 0; j <= 36; j++) {
+            const j0 = Math.max(0, j - 1);
+            const j1 = Math.min(36, j + 1);
+            let tx = xs[j1] - xs[j0];
+            let ty = ys[j1] - ys[j0];
+            const len = Math.hypot(tx, ty) || 1;
+            tx /= len;
+            ty /= len;
+            const nx = -ty * e;
+            const ny = tx * e;
+            put(xs[j] + nx, ys[j] + ny, 1, 0, alpha, px, gs ? gs[j] : 0);
+            if (j === 0 && n > 1) repeat();
+            put(xs[j] - nx, ys[j] - ny, -1, 0, alpha, px, gs ? gs[j] : 0);
+          }
+          repeat();
+        }
+      });
+      const strip = n;
+      // Poussière : des disques, deux triangles chacun.
+      if (f.dust > 0.01) {
+        for (const d of s.dust) {
+          const y = (((d.y - t * 38 * d.z) % H) + H) % H;
+          const x = d.x * (W / 1080) + Math.sin(t * 0.3 + d.s * 9) * 20 * d.z;
+          const a = f.dust * (0.12 + 0.45 * d.z) * (0.6 + 0.4 * Math.sin(t * 2 + d.s * 20));
+          const rr = 1.2 + 2.4 * d.z + aa;
+          const px = rr * k;
+          for (const [ox, oy] of [
+            [-1, -1],
+            [1, -1],
+            [1, 1],
+            [-1, -1],
+            [1, 1],
+            [-1, 1],
+          ]) put(x + ox * rr, y + oy * rr, ox, oy, a, px, 0);
+        }
+      }
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+      gl.useProgram(marks.program);
+      gl.uniform2f(marks.u.u_size, W, H);
+      gl.bindVertexArray(marksVao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, n * 7);
+      if (strip > 2) {
+        gl.uniform1f(marks.u.u_round, 0);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, strip);
+      }
+      if (n > strip) {
+        gl.uniform1f(marks.u.u_round, 1);
+        gl.drawArrays(gl.TRIANGLES, strip, n - strip);
+      }
+      if (withGrain) {
+        gl.blendFunc(gl.DST_COLOR, gl.SRC_COLOR);
+        gl.useProgram(grainP.program);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, noise);
+        gl.uniform1i(grainP.u.u_noise, 0);
+        gl.uniform2f(grainP.u.u_off, (Math.random() * 192) | 0, (Math.random() * 192) | 0);
+        gl.bindVertexArray(fullVao);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      }
+      gl.bindVertexArray(null);
+    }
+    return {
+      draw,
+      clear() {
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clearColor(...[1, 3, 5].map((i) => parseInt(C.void.slice(i, i + 2), 16) / 255), 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+      },
+      lost: () => gl.isContextLost(),
+      destroy: () => gl.getExtension('WEBGL_lose_context')?.loseContext(),
+    };
+  }
+
+  /** Grand côté du canevas WebGL : celui de l'écran (4K au plus), réduit d'un quart si la carte ne suit pas. */
+  const PLAYFIELD_LIVE_MAX = 3840;
+  const PLAYFIELD_LIVE_MIN = 1920;
+  /** Grand côté du canevas de secours (Canvas 2D, sans WebGL2). */
+  const PLAYFIELD_FLAT_MAX = 1920;
   /** Écart entre deux images de la boucle (ms), du plus fluide au plus économe. */
   const PLAYFIELD_LOOP_STEPS = [1000 / 30, 1000 / 20, 1000 / 15];
 
@@ -370,26 +707,49 @@
    */
   function playfield(container, game, options) {
     return scene(container, 'playfield', options, (root, tl) => {
-      const canvas = root.appendChild(el('canvas', 'cp-in-canvas'));
-      const title = root.appendChild(el('div', 'cp-in-title'));
+      const title = el('div', 'cp-in-title');
       title.append(el('span', 'cp-ink', 'CYBER'), document.createTextNode(' '), el('span', 'cp-pin', 'PINBALL'));
-      const ctx = canvas.getContext('2d');
-      const s = { threads: makeThreads(46, 11), dust: makeDust(70, 35) };
-      const loopTune = options?.intro?.loop;
       // Mesures : k points du canevas par unité, u pixels CSS par unité, W × H unités.
       let k = 1;
       let u = 1;
       let W = 1080;
       let H = 1920;
+      let size = '';
       let pattern = null;
       let shownTitle = '';
+      let liveMax = PLAYFIELD_LIVE_MAX;
+      root.append(title);
+      let canvas = root.insertBefore(el('canvas', 'cp-in-canvas cp-in-gl'), title);
+      let gl = soieGL(canvas);
+      let ctx = null;
+      /** Sans WebGL2 (ou contexte perdu) : le même dessin en Canvas 2D, sur un canevas plus petit. */
+      const flat = () => {
+        gl?.destroy();
+        gl = undefined;
+        canvas.remove();
+        canvas = root.insertBefore(el('canvas', 'cp-in-canvas cp-in-flat'), title);
+        ctx = canvas.getContext('2d');
+        size = '';
+      };
+      if (!gl) flat();
+      canvas.addEventListener('webglcontextlost', () => {
+        flat();
+        handle.repaint();
+      });
+      const s = { threads: makeThreads(46, 11), dust: makeDust(70, 35) };
+      const loopTune = options?.intro?.loop;
+      const still = () => typeof options?.intro?.at === 'number';
       const fit = () => {
         const cssW = root.clientWidth || 1;
         const cssH = root.clientHeight || 1;
         const dpr = Math.min(2, window.devicePixelRatio || 1);
-        const w = Math.max(2, Math.round(cssW * dpr));
-        const h = Math.max(2, Math.round(cssH * dpr));
-        if (canvas.width !== w || canvas.height !== h) {
+        const most = gl ? liveMax : PLAYFIELD_FLAT_MAX;
+        const scale = Math.min(dpr, most / Math.max(cssW, cssH));
+        const w = Math.max(2, Math.round(cssW * scale));
+        const h = Math.max(2, Math.round(cssH * scale));
+        const key = `${w}x${h}`;
+        if (key !== size) {
+          size = key;
           canvas.width = w;
           canvas.height = h;
           pattern = null;
@@ -398,8 +758,11 @@
         u = Math.min(cssW / 1080, cssH / 1920);
         W = w / k;
         H = h / k;
-        title.style.fontSize = `${(56 * u).toFixed(2)}px`;
-        shownTitle = '';
+        const font = `${(56 * u).toFixed(2)}px`;
+        if (title.style.fontSize !== font) {
+          title.style.fontSize = font;
+          shownTitle = '';
+        }
       };
       /** La marque : elle paraît, s'écarte et se précise (2,5 à 3,4 s). */
       const setTitle = (t) => {
@@ -415,8 +778,8 @@
         st.paddingLeft = `${ls.toFixed(3)}em`;
         st.filter = blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : 'none';
       };
-      const grainOn = (still) => {
-        if (still || !ctx.createPattern) return;
+      const grainOn = () => {
+        if (!ctx.createPattern) return;
         if (!pattern) pattern = ctx.createPattern(grain(), 'repeat');
         if (!pattern) return;
         ctx.save();
@@ -426,6 +789,19 @@
         ctx.fillStyle = pattern;
         ctx.fillRect(0, 0, canvas.width + 192, canvas.height + 192);
         ctx.restore();
+      };
+      /** Six images de suite trop espacées pendant l'animation : le canevas perd un quart de sa taille. */
+      let lastAt = 0;
+      let slow = 0;
+      const pace = () => {
+        const now = performance.now();
+        const dt = now - lastAt;
+        lastAt = now;
+        if (dt > 100 || !gl) return;
+        slow = dt > 26 ? slow + 1 : Math.max(0, slow - 1);
+        if (slow < 6 || liveMax <= PLAYFIELD_LIVE_MIN) return;
+        liveMax = Math.max(PLAYFIELD_LIVE_MIN, Math.round(liveMax * 0.75));
+        slow = 0;
       };
       /**
        * Cadence de la boucle : une image toutes les PLAYFIELD_LOOP_STEPS[step] ms. Huit images de
@@ -449,35 +825,54 @@
       let lastE = -1;
       const draw = (e) => {
         lastE = e;
-        if (!ctx) return;
-        if (e >= end) loopPace();
-        ctx.setTransform(k, 0, 0, k, 0, 0);
-        ctx.globalAlpha = 1;
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        if (!still()) {
+          if (e >= 0 && e < end) pace();
+          else if (e >= end) loopPace();
+        }
+        fit();
         if (e < 0) {
-          ctx.fillStyle = C.void;
-          ctx.fillRect(0, 0, W, H);
           title.style.opacity = '0';
           shownTitle = '';
+          if (gl) gl.clear();
+          else if (ctx) {
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.fillStyle = C.void;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
           return;
         }
         const t = e / 1000;
-        drawSoie(ctx, s, t, W, H);
-        setTitle(t);
         // Instant figé (planche des essais) : sans grain, pour des images comparables.
-        grainOn(typeof options?.intro?.at === 'number');
+        if (gl) gl.draw(s, t, W, H, k, !still());
+        else if (ctx) {
+          ctx.setTransform(k, 0, 0, k, 0, 0);
+          ctx.globalAlpha = 1;
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          drawSoie(ctx, s, t, W, H);
+          if (!still()) grainOn();
+        }
+        setTitle(t);
       };
-      return {
-        resize: fit,
+      const handle = {
+        resize() {
+          size = '';
+        },
         paint: draw,
         /** La boucle tant que le canevas dessine ; options.intro.loop.off la coupe (essais). */
-        loop: () => (ctx && !loopTune?.off ? PLAYFIELD_LOOP_STEPS[step] : 0),
+        loop: () => ((gl || ctx) && !loopTune?.off ? PLAYFIELD_LOOP_STEPS[step] : 0),
+        reset() {
+          size = '';
+        },
         repaint() {
           draw(lastE);
         },
+        destroy() {
+          gl?.destroy();
+        },
       };
+      return handle;
     });
   }
 

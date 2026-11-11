@@ -280,10 +280,11 @@ test('rendu : le fichier de l’utilisateur se joue une fois, garde sa dernière
   assert.deepEqual(p.mounted, [], 'pas d’animation de Cyber Pinball par-dessus');
 });
 
-test('plateau : l’ouverture Soie de la maquette validée, en Canvas 2D à pleine résolution, la marque en texte qui se forme de 2,5 à 3,4 s', async () => {
-  // Le vrai intro.js, dans un document linkedom, avec un faux contexte 2D qui compte les fils
-  // tracés. Le plateau reprend le dessin de la maquette tel quel (aucun shader à réinventer) :
-  // 46 fils (deux traits chacun), la marque « CYBER PINBALL » en texte à la taille du fuseau,
+test('plateau : l’ouverture Soie de la maquette validée, tracée par WebGL2 à pleine résolution (Canvas 2D en secours), la marque en texte qui se forme de 2,5 à 3,4 s', async () => {
+  // Le vrai intro.js, dans un document linkedom, avec un faux WebGL2 qui compte les sommets des
+  // fils et un faux contexte 2D qui compte leurs traits. Le plateau reprend le dessin de la
+  // maquette tel quel, tracé par la carte graphique (le Canvas 2D saccadait en 4K : 160 ms par
+  // image) : 46 fils (deux bandes chacun), la marque « CYBER PINBALL » en texte à la taille du fuseau,
   // dans les unités d'un plateau de 1080 × 1920 ; la même taille de canevas avant et après la fin.
   const vm = await import('node:vm');
   const { window, document } = parseHTML('<html><body><div id="box"></div></body></html>');
@@ -302,7 +303,19 @@ test('plateau : l’ouverture Soie de la maquette validée, en Canvas 2D à plei
   });
   const Canvas = Object.getPrototypeOf(document.createElement('canvas'));
   const ownGetContext = Object.getOwnPropertyDescriptor(Canvas, 'getContext');
-  Canvas.getContext = (kind: string) => (kind === '2d' ? ctx2d : null);
+  let strips = 0;
+  let useGl = true;
+  const gl = new Proxy({} as Record<string, unknown>, {
+    get(target, key: string) {
+      if (key in target) return target[key];
+      if (/^[A-Z_0-9]+$/.test(key)) return key;
+      if (key === 'getShaderParameter' || key === 'getProgramParameter') return () => true;
+      if (key === 'isContextLost' || key === 'getExtension' || key === 'getActiveUniform') return () => undefined;
+      if (key === 'drawArrays') return (mode: string, _first: number, count: number) => mode === 'TRIANGLE_STRIP' && (strips += count);
+      return () => ({});
+    },
+  });
+  Canvas.getContext = (kind: string) => (kind === '2d' ? ctx2d : kind === 'webgl2' && useGl ? gl : null);
   const Html = Object.getPrototypeOf(Object.getPrototypeOf(document.createElement('div')));
   let size = [2160, 3840];
   Object.defineProperty(Html, 'clientWidth', { configurable: true, get: () => size[0] });
@@ -321,14 +334,15 @@ test('plateau : l’ouverture Soie de la maquette validée, en Canvas 2D à plei
   });
   const host = read('app', 'renderer', 'intro.js');
   vm.runInNewContext(host, box);
-  type Node = { width: number; height: number; textContent: string; style: Record<string, string> };
+  type Node = { width: number; height: number; className: string; textContent: string; style: Record<string, string> };
   const intro = (box as { CyberIntro?: { playfield(c: unknown, g: unknown, o: unknown): { element: { querySelector(s: string): Node | null }; destroy(): void } } }).CyberIntro!;
   const at = (ms: number) => {
     strokes = 0;
+    strips = 0;
     const s = intro.playfield(document.getElementById('box')!, {}, { intro: { at: ms, timeline: INTRO_TIMELINE } });
     const canvas = s.element.querySelector('canvas.cp-in-canvas')!;
     const title = s.element.querySelector('.cp-in-title')!;
-    const out = { size: `${canvas.width}x${canvas.height}`, strokes, text: title.textContent, opacity: title.style.opacity, spacing: title.style.letterSpacing, blur: title.style.filter, font: title.style.fontSize };
+    const out = { size: `${canvas.width}x${canvas.height}`, kind: canvas.className, strokes, strips, text: title.textContent, opacity: title.style.opacity, spacing: title.style.letterSpacing, blur: title.style.filter, font: title.style.fontSize };
     s.destroy();
     return out;
   };
@@ -338,6 +352,8 @@ test('plateau : l’ouverture Soie de la maquette validée, en Canvas 2D à plei
   let formed: ReturnType<typeof at>;
   let looping: ReturnType<typeof at>;
   let desk: ReturnType<typeof at>;
+  let flatWeaving: ReturnType<typeof at>;
+  let flatFormed: ReturnType<typeof at>;
   try {
     black = at(-1);
     weaving = at(2400);
@@ -346,15 +362,22 @@ test('plateau : l’ouverture Soie de la maquette validée, en Canvas 2D à plei
     looping = at(INTRO_TIMELINE.end + 7 * 24 * 3600 * 1000);
     size = [1920, 1080];
     desk = at(INTRO_TIMELINE.end);
+    // Sans WebGL2 : le même dessin en Canvas 2D, sur un canevas de 1920 points au plus.
+    useGl = false;
+    size = [2160, 3840];
+    flatWeaving = at(2400);
+    flatFormed = at(INTRO_TIMELINE.end);
   } finally {
     if (ownGetContext) Object.defineProperty(Canvas, 'getContext', ownGetContext);
     else delete Canvas.getContext;
     delete Html.clientWidth;
     delete Html.clientHeight;
   }
-  assert.equal(black.strokes, 0, 'avant le départ, du noir');
+  assert.equal(black.strips, 0, 'avant le départ, du noir');
   assert.equal(black.opacity, '0');
-  assert.equal(weaving.strokes, 92, 'les 46 fils de la maquette, deux traits chacun');
+  assert.match(weaving.kind, /cp-in-gl/, 'tracé par la carte graphique');
+  // 46 fils × 2 bandes de 37 points (74 sommets), jointes par un sommet répété de chaque côté.
+  assert.equal(weaving.strips, 92 * 76 - 1, 'les 46 fils de la maquette, deux bandes chacun');
   assert.equal(weaving.opacity, '0.000', 'la marque attend l’ignition (2,4 s)');
   assert.ok(Number(forming.opacity) > 0 && Number(forming.opacity) < 1, 'elle paraît de 2,5 à 3,4 s');
   assert.match(forming.blur ?? '', /^blur\(/,'floue tant qu’elle se forme');
@@ -364,11 +387,16 @@ test('plateau : l’ouverture Soie de la maquette validée, en Canvas 2D à plei
   assert.equal(formed.blur, 'none');
   assert.equal(formed.size, '2160x3840', 'pleine résolution');
   assert.equal(looping.size, formed.size, 'la boucle garde la taille de l’animation : aucun saut de netteté');
-  assert.equal(looping.strokes, 92, 'après une semaine, les fils tournent encore');
+  assert.equal(looping.strips, weaving.strips, 'après une semaine, les fils tournent encore');
+  assert.match(flatWeaving.kind, /cp-in-flat/);
+  assert.equal(flatWeaving.strokes, 92, 'en secours, les 46 fils en Canvas 2D, deux traits chacun');
+  assert.equal(flatFormed.size, '1080x1920', 'en secours, 1920 points au plus');
+  assert.equal(flatFormed.opacity, '1.000');
   assert.equal(formed.font, '112.00px', '56 unités d’un plateau de 1080 points de large');
   assert.equal(desk.font, '31.50px', 'au bureau, l’unité suit la hauteur (1080 / 1920)');
-  // Aucun shader : le plateau est le dessin de la maquette, en Canvas 2D.
-  assert.doesNotMatch(host, /webgl/i);
+  // Un seul dessin : le tracé WebGL et le Canvas 2D lisent les mêmes fils et les mêmes instants.
+  assert.equal((host.match(/\bspindle\((?:s\.)?threads, t,/g) ?? []).length, 3, 'la fonction et ses deux appels');
+  assert.equal((host.match(/soieAt\(t, H\)/g) ?? []).length, 3, 'la fonction et ses deux appels');
   assert.ok(!fs.existsSync(path.join(REPO_ROOT, 'app', 'renderer', 'intro-shaders.js')));
   // Seul le plateau tourne en boucle, et il s'arrête quand sa couche ne se voit plus (voile de
   // nuit, fenêtre cachée), comme une vidéo.
