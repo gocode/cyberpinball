@@ -110,6 +110,11 @@ function renderLibrary(v) {
       // Dès qu'une ligne a un drapeau, les autres gardent sa case, vide : les textes partent tous du même bord.
       const flagged = section.rows.some((r) => r.flag);
       for (const row of section.rows) {
+        // Fil de la messagerie : une bulle, une carte de la borne ou un séparateur de jour.
+        if (row.bubble) {
+          list.append(chatBubble(row, v.cursor));
+          continue;
+        }
         const li = libEl('li', `lib-row tone-${row.tone ?? 'none'}${row.current ? ' current' : ''}`);
         if (row.action !== undefined) {
           li.classList.add(row.pick ? 'pick' : 'fixable');
@@ -532,6 +537,39 @@ function renderHealth(h, cursor) {
     box.append(group);
   }
   return box;
+}
+
+// ---------- Fil de la messagerie ----------
+
+/**
+ * Une ligne du fil (chat-menu.ts) : bulle reçue à gauche, envoyée à droite (en pointillés tant
+ * qu'elle attend la connexion de l'ami), carte d'un évènement au centre, séparateur de jour. La
+ * bulle choisie prend le vert ; ses réactions sont des pastilles dessous, puis l'heure et l'état.
+ */
+function chatBubble(row, cursor) {
+  if (row.bubble === 'day') return libEl('li', 'chat-day', row.text);
+  const li = libEl('li', `chat-line chat-${row.bubble}`);
+  if (row.action !== undefined) {
+    li.classList.add('pick');
+    if (row.action === cursor) li.classList.add('selected');
+    actOn(li, { type: 'activate', index: row.action });
+  }
+  if (row.bubble === 'card') {
+    if (row.icon) li.append(cyberIcon(row.icon, 'chat-card-icon'));
+    const text = libEl('div', 'chat-card-text');
+    text.append(libEl('div', 'chat-card-title', row.text));
+    if (row.detail) text.append(libEl('div', 'chat-card-detail', row.detail));
+    li.append(text);
+    return li;
+  }
+  li.append(libEl('div', 'chat-bubble', row.text));
+  if (row.badges?.length) {
+    const chips = libEl('div', 'chat-reactions');
+    for (const b of row.badges) chips.append(libEl('span', 'chat-reaction', b));
+    li.append(chips);
+  }
+  if (row.detail) li.append(libEl('div', 'chat-meta', row.detail));
+  return li;
 }
 
 // ---------- Drapeaux ----------
@@ -1174,7 +1212,7 @@ document.addEventListener('drop', (event) => {
 });
 
 /** Défilement du menu (scroll-keeper.js) : capture avant chaque rendu, revealSelection après. */
-const menuScroll = CyberScroll.keeper([['.lib-row.selected, .health-line.selected, .lib-action.current, .key.current, .media-card.selected', 'nearest']]);
+const menuScroll = CyberScroll.keeper([['.lib-row.selected, .chat-line.selected, .health-line.selected, .lib-action.current, .key.current, .media-card.selected', 'nearest']]);
 
 /**
  * Remet chaque liste où elle était, et garde visible l'élément choisi quand la liste dépasse

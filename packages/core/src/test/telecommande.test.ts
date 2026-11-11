@@ -172,6 +172,51 @@ test('accès direct aux menus depuis le téléphone : l’écran de la borne à 
   }
 });
 
+test('classements au téléphone : la table de la borne, les portées et les périodes comme à la borne, les indisponibles grisés, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 240_000 }, () => {
+  // interne/demos/demo-telephone-scores.cjs : le vrai tableau des scores (table-scores.ts,
+  // table-rankings.ts, scoreboard-menu.ts) sur un réseau simulé, la vraie page du téléphone ; la
+  // table choisie ou lancée à la borne, une autre de la liste, les portées et les périodes, les
+  // drapeaux et les pastilles servis par la borne, les classements indisponibles grisés avec leur
+  // raison, hors ligne, le mode invité, une partie, les refus, les petits écrans, la borne coupée.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-telephone-scores-'));
+  try {
+    const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CP_TELECOMMANDE_OUT: dir, CP_TELECOMMANDE_CAPTURES: '0', CYBERPINBALL_LANGUE: 'fr' };
+    delete env.ELECTRON_RUN_AS_NODE;
+    delete env.CYBERPINBALL_A_L_ECRAN;
+    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telephone-scores.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 220_000, cwd: REPO_ROOT });
+    const result = fs.existsSync(path.join(dir, 'resultat.txt')) ? fs.readFileSync(path.join(dir, 'resultat.txt'), 'utf8') : `${run.stdout}\n${run.stderr}`;
+    assert.equal(run.status, 0, result);
+    assert.doesNotMatch(result, /ÉCHEC/, result);
+    assert.ok((result.match(/^OK /gm) ?? []).length >= 40, result);
+    for (const step of [
+      'la table choisie à la borne s’ouvre par défaut',
+      'cette borne, tout temps : exactement le tableau de la borne',
+      'mondial : exactement le classement de la borne',
+      'drapeaux et pastilles s’affichent, servis par la borne',
+      'un ami en partie : la marque de présence sur sa pastille',
+      'le téléphone ne reçoit ni clé de joueur, ni chemin, ni fichier de table',
+      'la borne ne sert qu’une pastille sous un jeton connu',
+      'national, pays non choisi : grisé, avec sa raison',
+      'hors ligne : les scores déjà reçus, et la note le dit',
+      'partage coupé : amis, national et mondial grisés, avec leur raison',
+      'la roue tourne à la borne : la page suit la table choisie',
+      'une table choisie au téléphone reste, même quand la roue tourne',
+      'une table sans partie : ce que dit la borne',
+      'une portée inconnue : demande refusée',
+      'mode invité : les classements restent consultables',
+      'pendant une partie : la vue Scores reste, sur la table lancée',
+      'petit Android (320 × 568), mondial : rien ne déborde',
+      'petit Android, mondial : garde-fou de mise en page',
+      'la vue Scores quittée, la borne ne relit plus les classements',
+      'borne coupée : la page le dit',
+      'aucune clé au journal',
+    ])
+      assert.match(result, new RegExp(`OK +${step.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), step);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
+});
+
 test('réseau : seuls social-net.ts et phone-remote.ts écoutent ; la télécommande, seulement sur le réseau local réel', () => {
   const src = path.join(REPO_ROOT, 'app', 'src');
   const listeners = fs

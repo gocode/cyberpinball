@@ -142,6 +142,11 @@ export interface SocialState {
    * le 09/11/2026) : seul `false` le coupe.
    */
   shareScores?: boolean;
+  /**
+   * Mon profil public (publicprofile.ts) : pseudo, pays, avatar, badges, records et activité
+   * récente, lisibles par les joueurs qui ne sont pas mes amis. Activé par défaut : seul `false` le coupe.
+   */
+  publicProfile?: boolean;
   /** Pays déclaré (ISO 3166-1 alpha-2) ; absent : celui de la région de Windows, s'il se lit. */
   country?: string;
   /**
@@ -288,6 +293,7 @@ export function parseSocialState(raw: unknown): SocialState | undefined {
     shareLibrary: s.shareLibraryChosen === true ? s.shareLibrary === true : true,
     ...(s.shareLibraryChosen === true ? { shareLibraryChosen: true } : {}),
     ...(s.shareScores === false ? { shareScores: false } : {}),
+    ...(s.publicProfile === false ? { publicProfile: false } : {}),
     ...(typeof s.country === 'string' && /^[A-Z]{2}$/.test(s.country) ? { country: s.country } : {}),
     ...(isIso(s.profileOffered) ? { profileOffered: s.profileOffered } : {}),
     ...(parseRate(s.downloadRate) ? { downloadRate: s.downloadRate as ByteRate } : {}),

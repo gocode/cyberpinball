@@ -45,6 +45,13 @@
 // l'identifiant d'un menu (« open ») : le menu (frontend.ts) vérifie tout, portes du mode invité
 // comprises. Pendant une partie, seulement les réglages en partie.
 //
+// Classements (11/11/2026, remote-ranks.ts) : dans la vue Scores, le téléphone demande le tableau
+// d'une table (« ranks » : un rang de la liste envoyée, une portée, une période) ; la borne envoie la
+// liste de ses tables (« ranks-tables »), puis le tableau (« ranks »), et de nouveau quand il change,
+// au menu comme pendant une partie, tant que la vue est ouverte (« ranks-off » à sa sortie). Les
+// pastilles des joueurs sont servies par la borne sous un jeton (/avatars/…), les drapeaux sous
+// /drapeaux/<code>.svg : la page ne joint jamais d'autre hôte.
+//
 // Téléphone gardé (10/11/2026) : accepté une fois, il revient sans QR ni acceptation (remote-kept.ts).
 // Tant que la borne en garde un, elle écoute en continu, au menu comme en partie, sur REMOTE_PORT
 // (fixe : le téléphone range sa clé par adresse et port), mais ne répond qu'à ses clés : un téléphone
@@ -104,11 +111,14 @@ import {
   type RemoteMenus,
   type RemoteNav,
   type RemotePairing,
+  type RankingScope,
+  type ScorePeriod,
   type WebSocketLink,
 } from '@cyberpinball/core';
 import { settleWithin, typeChars } from './page-input';
 import { pointerWindow } from './remote-pointer';
 import { qrRows } from './remote-qr';
+import { RANKS_AVATAR_PATH, type RemoteRanks } from './remote-ranks';
 import { journalIncident } from './uncaught';
 
 /** Où écouter : le réseau local réel, 127.0.0.1 seulement (essais), ou nulle part (réseau coupé). */
@@ -158,6 +168,19 @@ export type MenuEntry = RemoteEntry & { pick?: () => void };
 /** L'écran montré au téléphone (remote-menus.ts), ses entrées avec ce qu'elles font. */
 export type MenuEntries = Omit<RemoteEntries, 'items'> & { items: MenuEntry[] };
 
+/**
+ * La messagerie montrée au téléphone pendant une partie (chat-menu.ts) : le fil d'un ami (ses
+ * derniers messages), les réactions et les phrases rapides. Le téléphone écrit sans toucher aux
+ * boutons, qui restent à VPX.
+ */
+export interface RemoteChat {
+  key: string;
+  name: string;
+  lines: { id: string; text: string; out: boolean; time: string; note?: string }[];
+  reactions: { id: string; label: string }[];
+  phrases: string[];
+}
+
 /** Ce que le menu donne à la télécommande (frontend.ts) : ce qu'il montre, ses boutons, son clavier, le dossier d'import. */
 export interface MenuTarget {
   /** Le menu, ou une partie (VPX a les boutons). */
@@ -187,6 +210,13 @@ export interface MenuTarget {
   menus?(): RemoteMenus;
   /** Ouvrir un menu par son identifiant (remoteMenuTarget) : la borne vérifie tout, et ne fait rien d'un identifiant inconnu ou fermé. */
   open?(id: string): void;
+  /** Classements de chaque table (remote-ranks.ts), en lecture seule ; sans eux, la vue Scores le dit. */
+  ranks?: RemoteRanks;
+  /** Pendant une partie : le fil à montrer au téléphone (undefined : rien, réglage coupé ou aucun message). */
+  chat?(): RemoteChat | undefined;
+  /** Écrire à un ami, ou réagir à un de ses messages, depuis le téléphone ; la messagerie vérifie tout. */
+  chatSend?(key: string, text: string): void;
+  chatReact?(key: string, target: string, kind: string): void;
 }
 
 /** Ce que la fenêtre « Récupérer » donne à la télécommande pendant qu'elle est ouverte. */
@@ -259,6 +289,9 @@ const FILES: Record<string, string> = {
   '/telephone.css': 'telephone/telephone.css',
   '/telephone.js': 'telephone/telephone.js',
   '/telephone-core.js': 'telephone/telephone-core.js',
+  '/telephone-ranks.js': 'telephone/telephone-ranks.js',
+  // La pastille d'un joueur, dessinée comme à la borne (vue Scores).
+  '/avatar.js': 'avatar.js',
   '/theme.css': 'theme.css',
   '/i18n.js': 'i18n.js',
   '/icons.js': 'icons.js',
@@ -266,7 +299,22 @@ const FILES: Record<string, string> = {
   // Icône du raccourci sur l'écran d'accueil (iPhone, Android).
   '/icone.png': '../ressources/icone.png',
 };
-const TYPES: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.ttf': 'font/ttf', '.png': 'image/png' };
+const TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.ttf': 'font/ttf',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+};
+/** Drapeau d'un pays (app/renderer/drapeaux, flagSrc) : deux lettres, rien d'autre. */
+const FLAG_PATH = /^\/drapeaux\/([a-z]{2})\.svg$/;
+/** Pastille d'un joueur classé, sous son jeton (remote-ranks.ts). */
+const AVATAR_PATH = new RegExp(`^${RANKS_AVATAR_PATH}([A-Za-z0-9_-]{22})$`);
+/** Les classements sont relus au plus à ce rythme pendant que la vue Scores est ouverte (sauf demande du téléphone). */
+const RANKS_MS = 1000;
 /** Au plus, connexions ouvertes en même temps (un téléphone, sa reconnexion, un curieux). */
 const MAX_LINKS = 4;
 /** Un geste injecté dans la page rend la main au plus tard après ce délai (page tombée, qui ne répond plus). */
@@ -384,8 +432,23 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   let gameButtons = false;
   /** Arbre des menus envoyé, et quand : relu au plus toutes les MENUS_MS (ses détails comptent tables et téléchargements). */
   let menusSent = '';
+  /** Dernier fil de la messagerie envoyé au téléphone (pendant une partie). */
+  let chatSent = '';
   let menusAt = 0;
   let menusTimer: NodeJS.Timeout | undefined;
+  /**
+   * Vue Scores ouverte au téléphone : la portée, la période, et la table qu'il a choisie (son
+   * fichier, gardé à la borne) ; sans table choisie, il suit celle de la borne.
+   */
+  let ranksWatch: { scope: RankingScope; period: ScorePeriod; file?: string } | undefined;
+  /** Liste des tables envoyée : sa version (change avec ses lignes), ses fichiers dans l'ordre, ce qui est parti. */
+  let ranksVersion = 0;
+  let ranksItems = '';
+  let ranksFiles: string[] = [];
+  let ranksTablesSent = '';
+  let ranksSent = '';
+  let ranksAt = 0;
+  let ranksTimer: NodeJS.Timeout | undefined;
   /** Dernier geste du téléphone (hors ping) : au menu, sans geste pendant REMOTE_IDLE_MS, la liaison se coupe. */
   let lastActivity = Date.now();
   /** Boutons de la borne tenus au téléphone : la répétition, et l'arrêt de sûreté. */
@@ -451,7 +514,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   /** Le catalogue de la langue, réduit aux textes de la page du téléphone. */
   function catalogue(): string {
     const lang = language();
-    const page = ['telephone.js', 'telephone.html'].map((f) => fs.readFileSync(path.join(rendererDir, 'telephone', f), 'utf8')).join('\n');
+    const page = ['telephone.js', 'telephone-ranks.js', 'telephone.html'].map((f) => fs.readFileSync(path.join(rendererDir, 'telephone', f), 'utf8')).join('\n');
     const messages = Object.fromEntries(Object.entries(messagesOf(lang)).filter(([k]) => page.includes(k)));
     return `window.cyberI18n = ${JSON.stringify({ language: lang, locale: localeOf(lang), messages })};\n`;
   }
@@ -474,6 +537,18 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     const headers = securityHeaders(String(req.headers.host));
     if (url === '/catalogue.js') {
       res.writeHead(200, { ...headers, 'Content-Type': TYPES['.js']! }).end(req.method === 'HEAD' ? undefined : catalogue());
+      return;
+    }
+    // Vue Scores : un drapeau (deux lettres), ou la pastille d'un joueur sous son jeton ; rien d'autre du disque.
+    const flag = FLAG_PATH.exec(url);
+    const avatar = AVATAR_PATH.exec(url);
+    const image = flag ? path.join(rendererDir, 'drapeaux', `${flag[1]}.svg`) : avatar ? menu?.ranks?.avatar(avatar[1]!) : undefined;
+    if (image) {
+      fs.readFile(image, (error, body) => {
+        if (error) return void res.writeHead(404, { ...headers, 'Content-Type': 'text/plain; charset=utf-8' }).end();
+        // Une pastille ne change pas sous son jeton : le téléphone la garde le temps de la liaison.
+        res.writeHead(200, { ...headers, 'Content-Type': TYPES[path.extname(image).toLowerCase()] ?? 'application/octet-stream', 'Cache-Control': 'private, max-age=3600' }).end(req.method === 'HEAD' ? undefined : body);
+      });
       return;
     }
     const file = FILES[url];
@@ -593,6 +668,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     // `kept` : la borne garde ce téléphone, il range sa clé pour revenir sans QR.
     sendTo(link, { t: 'ready', kept: Boolean(pairing?.current()?.kept) });
     lastActivity = Date.now();
+    // Une liaison neuve : la vue Scores redemande ce qu'elle montre (« ranks »).
+    ranksWatch = undefined;
     pushState(true);
   }
 
@@ -611,6 +688,9 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       entriesSent = '';
       cursorSent = -2;
       menusSent = '';
+      ranksTablesSent = '';
+      ranksSent = '';
+      chatSent = '';
       sendTo(active, { t: 'mode', mode: m });
       force = true;
     }
@@ -624,6 +704,94 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     pushMenuField(force);
     pushEntries(force);
     pushMenus(force);
+    pushRanks(force);
+    pushChat(force);
+  }
+
+  /**
+   * Vue Scores : la liste des tables, puis le tableau montré, quand ils changent (une partie
+   * finie, un score reçu d'une autre borne, la table choisie à la borne). Relus au plus toutes les
+   * RANKS_MS ; un changement venu entre-temps part à la fin du délai.
+   */
+  function pushRanks(force = false): void {
+    if (!active || !menu || !ranksWatch || pairing?.session() !== 'paired' || mode() === 'browser') return;
+    const now = Date.now();
+    if (!force && now - ranksAt < RANKS_MS) {
+      if (!ranksTimer) {
+        ranksTimer = setTimeout(() => {
+          ranksTimer = undefined;
+          pushRanks();
+        }, RANKS_MS - (now - ranksAt));
+        ranksTimer.unref?.();
+      }
+      return;
+    }
+    clearTimeout(ranksTimer);
+    ranksTimer = undefined;
+    ranksAt = now;
+    const ranks = menu.ranks;
+    if (!ranks) {
+      const text = 'absent';
+      if (text !== ranksSent) sendTo(active, { t: 'ranks', v: ranksVersion, i: -1, follow: true, scope: ranksWatch.scope, period: ranksWatch.period, empty: { title: t('Classements indisponibles'), detail: t('Cette borne ne tient pas de tableau des scores.') } });
+      ranksSent = text;
+      return;
+    }
+    let tables: ReturnType<RemoteRanks['tables']>;
+    let shown: ReturnType<RemoteRanks['board']>;
+    try {
+      tables = ranks.tables();
+      // La table choisie au téléphone a disparu (supprimée à la borne) : il suit de nouveau celle de la borne.
+      if (ranksWatch.file && !tables.files.includes(ranksWatch.file)) ranksWatch = { scope: ranksWatch.scope, period: ranksWatch.period };
+      shown = ranks.board(ranksWatch.file, ranksWatch.scope, ranksWatch.period);
+    } catch (error) {
+      journalIncident('Télécommande : classements illisibles pour le téléphone', error); // i18n-ignore : journal
+      return;
+    }
+    const { files, ...list } = tables;
+    const items = JSON.stringify(list.items);
+    if (items !== ranksItems) {
+      ranksItems = items;
+      ranksVersion++;
+      ranksFiles = files;
+    }
+    const listText = JSON.stringify({ v: ranksVersion, ...list });
+    if (force || listText !== ranksTablesSent) {
+      ranksTablesSent = listText;
+      sendTo(active, { t: 'ranks-tables', v: ranksVersion, ...list });
+    }
+    const i = shown.file ? ranksFiles.indexOf(shown.file) : -1;
+    const content = 'board' in shown ? { board: shown.board } : { empty: shown.empty };
+    const text = JSON.stringify({ v: ranksVersion, i, follow: !ranksWatch.file, scope: ranksWatch.scope, period: ranksWatch.period, ...content });
+    if (!force && text === ranksSent) return;
+    ranksSent = text;
+    sendTo(active, { t: 'ranks', v: ranksVersion, i, follow: !ranksWatch.file, scope: ranksWatch.scope, period: ranksWatch.period, ...content });
+  }
+
+  /** Le téléphone ouvre la vue Scores, ou y change de table, de portée ou de période. */
+  function watchRanks(m: Extract<PhoneMessage, { t: 'ranks' }>): void {
+    if (mode() === 'browser') return;
+    // Un rang de la liste envoyée ; une liste dépassée depuis : la table reste celle d'avant.
+    const picked = m.table && m.table.v === ranksVersion ? ranksFiles[m.table.i] : undefined;
+    const keep = m.table && m.table.v !== ranksVersion ? ranksWatch?.file : undefined;
+    const file = picked ?? keep;
+    ranksWatch = { scope: m.scope, period: m.period, ...(file ? { file } : {}) };
+    pushRanks(true);
+  }
+
+  /** Pendant une partie : le fil de la messagerie, envoyé quand il change (null : plus rien à montrer). */
+  function pushChat(force = false): void {
+    if (!active || !menu?.chat || pairing?.session() !== 'paired') return;
+    let chat: RemoteChat | undefined;
+    try {
+      chat = mode() === 'game' ? menu.chat() : undefined;
+    } catch (error) {
+      journalIncident('Télécommande : fil de la messagerie illisible pour le téléphone', error); // i18n-ignore : journal
+      return;
+    }
+    const text = JSON.stringify(chat ?? null);
+    if (!force && text === chatSent) return;
+    chatSent = text;
+    sendTo(active, { t: 'chat', chat: chat ?? null });
   }
 
   /**
@@ -1012,6 +1180,13 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         releaseButtons();
         menu.open?.(message.id);
         return;
+      case 'chat-send':
+        // Pendant une partie seulement : au menu, le téléphone écrit dans le clavier à l'écran de la borne.
+        if (mode() === 'game') menu.chatSend?.(message.key, message.text);
+        return;
+      case 'chat-react':
+        if (mode() === 'game') menu.chatReact?.(message.key, message.target, message.kind);
+        return;
       case 'set':
         // Le clavier à l'écran n'a qu'une ligne : un saut de ligne (permis pour une zone de texte d'une page) y devient une espace.
         if (mode() === 'menu') menu.setText(message.value.replace(/\n/g, ' '));
@@ -1041,6 +1216,14 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     lastActivity = Date.now();
     // L'envoi ne passe pas par la file des gestes : sa réponse ne doit pas attendre une injection.
     if (message.t === 'up') return void startUpload(link, message);
+    // Les classements non plus : une lecture, sans geste injecté à la borne.
+    if (message.t === 'ranks') return watchRanks(message);
+    if (message.t === 'ranks-off') {
+      ranksWatch = undefined;
+      clearTimeout(ranksTimer);
+      ranksTimer = undefined;
+      return;
+    }
     if (message.t === 'up-cancel') {
       if (upload?.link === link) {
         log('Télécommande : envoi annulé depuis le téléphone.'); // i18n-ignore : journal
@@ -1348,7 +1531,13 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     // L'écran du menu part à chaque redessin (menuChanged) : ici, seulement un changement de mode.
     if (mode() !== modeSent) pushState();
     // Pendant une partie, rien ne redessine le menu : les réglages en partie (ouverts ou non) sont relus ici.
-    else if (mode() === 'game') pushEntries();
+    else if (mode() === 'game') {
+      pushEntries();
+      // Et le fil de la messagerie : un message arrivé pendant la partie se lit au téléphone.
+      pushChat();
+    }
+    // Les classements changent sans redessin du menu (un score reçu d'une autre borne, une présence) : relus ici aussi.
+    if (mode() !== 'browser') pushRanks();
     const now = Date.now();
     if (mode() !== 'menu') lastActivity = now;
     else if (active && pairing?.session() === 'paired' && now - lastActivity > (opts.idleMs ?? REMOTE_IDLE_MS)) {
@@ -1389,6 +1578,11 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     ticker = undefined;
     clearTimeout(menusTimer);
     menusTimer = undefined;
+    clearTimeout(ranksTimer);
+    ranksTimer = undefined;
+    ranksWatch = undefined;
+    // Les jetons des pastilles ne valent plus rien : la prochaine liaison en reçoit d'autres.
+    menu?.ranks?.reset();
     closeServer();
     pairing = undefined;
     unavailable = undefined;

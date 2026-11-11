@@ -92,6 +92,10 @@ export interface FriendsMenuHost {
   root(): string | undefined;
   /** Une progression a avancé : redessiner l'écran. */
   redraw(): void;
+  /** La messagerie (chat-menu.ts) : « Écrire » sur la fiche d'un ami, ouvre son fil. */
+  chat?: { openThread(key: string, back: () => void): void; writeDetail(key: string): string };
+  /** Le profil public d'un joueur (profile-menu.ts) : son activité récente et ses « J'aime ». */
+  profile?: { open(key: string, back: () => void): void };
   now?(): Date;
 }
 
@@ -106,6 +110,8 @@ export interface FriendsMenu {
   openFriend(key: string, back?: () => void): void;
   /** Les demandes d'amis, leur « Retour » vers `back` ; sans lui, le menu système. */
   openRequests(back?: () => void): void;
+  /** « Trouver un joueur » (l'annuaire). */
+  openFind(): void;
   /** Historique des parties : le détail d'une partie, s'il la garde (son « Retour » vers `back`). */
   history: { has(id: string): boolean; openGame(id: string, back: () => void): void };
   items: {
@@ -360,7 +366,10 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       actions: [
         // Toujours là : grisée hors ligne ; en partie, l'ami la reçoit en notification sur sa table.
         live.friendAction(key, () => openFriend(key)),
+        // La messagerie : même hors ligne, le message partira à son retour.
+        ...(host.chat ? [{ label: t('Écrire'), detail: host.chat.writeDetail(key), icon: 'message' as const, run: () => host.chat!.openThread(key, () => openFriend(key)) }] : []),
         { label: t('Voir sa bibliothèque'), detail: libraryMenu.detail(key), icon: 'tables', run: () => libraryMenu.open(key, () => openFriend(key)) },
+        ...(host.profile ? [{ label: t('Voir son profil public'), detail: t('Ce que voient ceux qui ne sont pas ses amis, avec vos « J’aime »'), icon: 'star' as const, run: () => host.profile!.open(key, () => openFriend(key)) }] : []),
         { label: t('Retirer de mes amis'), detail: t('Il ne verra plus votre présence, vous ne verrez plus la sienne'), icon: 'close', run: () => confirm(t('Retirer {name} de vos amis ?', { name: f.name }), t('Retirer'), () => { net.remove(key); flash = { text: t('{name} retiré de vos amis', { name: f.name }), tone: 'ok' }; openFriends(); }, () => openFriend(key)) },
         { label: t('Bloquer'), detail: t('Plus de demande, plus de connexion avec sa borne'), icon: 'lock', run: () => confirmBlock(key, f.name, () => openFriend(key), () => openFriends()) },
         backAction(up),
@@ -507,6 +516,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     }
     if (rel === 'incoming') actions.push(...requestActions(key, plain, from));
     if (rel === 'friend') actions.push({ label: t('Voir sa fiche'), icon: 'friend-list', run: () => openFriend(key) });
+    if (host.profile && rel !== 'self') actions.unshift({ label: t('Voir son profil public'), detail: t('Pays, badges, records et activité récente, avec vos « J’aime »'), icon: 'star', run: () => host.profile!.open(key, () => openPlayer(key, from)) });
     if (rel !== 'self') actions.push({ label: t('Bloquer'), detail: t('Plus de demande, plus de connexion avec sa borne'), icon: 'lock', run: () => confirmBlock(key, plain, () => openPlayer(key, from), from) });
     actions.push(backAction(from));
     return { heading: plain, icon: rel === 'incoming' ? 'friend-request' : 'friend-add', avatar: avatar(key, plain), subheading: rel === 'incoming' ? t('Demande d’amitié reçue') : relationBadge(rel)[0], sections: rows.length ? [{ rows }] : [], actions, back: from };
@@ -676,6 +686,11 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       s.shareScores === false
         ? { label: t('Publier mes scores'), detail: t('Classements des amis, de votre pays et du monde'), icon: 'trophy', run: () => { net.setShareScores(true); flash = { text: t('Vos scores sont publiés aux classements'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
         : { label: t('Ne plus publier mes scores'), detail: t('Vous voyez toujours les classements ; vos parties n’y entrent plus'), icon: 'trophy', run: () => { net.setShareScores(false); flash = { text: t('Vos scores ne sont plus publiés'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
+    );
+    actions.push(
+      s.publicProfile === false
+        ? { label: t('Activer mon profil public'), detail: t('Pays, badges, records et activité récente, visibles de tous'), icon: 'account', run: () => { net.setPublicProfile(true); flash = { text: t('Profil public activé'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
+        : { label: t('Désactiver mon profil public'), detail: t('Les autres ne verront plus que votre pseudo dans l’annuaire'), icon: 'account', run: () => { net.setPublicProfile(false); flash = { text: t('Profil public désactivé'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
     );
     actions.push({ label: t('Choisir mon pays…'), detail: t('Pour le classement national'), icon: 'globe', run: () => openCountry() });
     actions.push({ label: t('Limiter le débit des téléchargements…'), detail: t('Actuellement : {rate}', { rate: rateLabel(s.downloadRate ?? 0) }), icon: 'gauge', run: () => openDownloadRate() });
@@ -849,6 +864,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     addFromFriend: { detail: addFromFriendDetail, open: (back) => openAddFromFriend(back) },
     openFriend,
     openRequests,
+    openFind: () => openFind(),
     history: { has: (id) => host.games.history().some((g) => g.id === id), openGame: (id, back) => historyMenu.openGame(id, back) },
     items: {
       friends: {

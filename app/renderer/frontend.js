@@ -1260,8 +1260,57 @@ function viewOf(s, part) {
   return part === 'topper' ? { role: 'topper', type: 'Topper', source: 'fallback', fallback: 'topper-logo', fit: 'contain', rotation: 0, card: {} } : undefined;
 }
 
+/**
+ * Messagerie (chat-menu.ts) : la carte de l'ami du fil ouvert, sur le fronton, à la place de son
+ * média ; redessinée seulement quand elle change.
+ */
+let friendCardShown;
+function showFriendCard(zone, c) {
+  const key = JSON.stringify(c);
+  if (friendCardShown?.key === key && friendCardShown.node.isConnected) return;
+  hideFriendCard();
+  const card = el('div', 'friend-card');
+  const text = el('div', 'friend-card-text');
+  text.append(el('div', 'friend-card-kicker', t('Votre ami')), el('div', 'friend-card-name', c.name), el('div', 'friend-card-presence', c.presence));
+  for (const f of c.facts) text.append(el('div', 'friend-card-fact', f));
+  card.append(avatarNode(c.avatar, 'friend-card-avatar'), text);
+  zone.append(card);
+  friendCardShown = { node: card, key };
+}
+function hideFriendCard() {
+  friendCardShown?.node.remove();
+  friendCardShown = undefined;
+}
+
+/** Un message arrivé au menu : le DMD l'annonce en points quelques secondes (« MESSAGE DE NOVA »). */
+let dmdMessageShown;
+function showDmdMessage(zone, text) {
+  if (dmdMessageShown?.text === text && dmdMessageShown.node.isConnected) return;
+  hideDmdMessage();
+  const node = el('div', 'dmd-message');
+  zone.append(node);
+  dmdMessageShown = { node, text, handle: window.CyberFallback?.dmd(node, { title: text }, { animate: false }) };
+}
+function hideDmdMessage() {
+  dmdMessageShown?.handle?.destroy();
+  dmdMessageShown?.node.remove();
+  dmdMessageShown = undefined;
+}
+
 function renderZones(s) {
   for (const z of zones) {
+    // Messagerie : la carte de l'ami au fronton, l'annonce d'un message au DMD (par-dessus ses points).
+    if (z.role === 'backglass' && !s.friendCard) hideFriendCard();
+    if (z === dmdZone) {
+      if (s.dmdMessage) showDmdMessage(z.node, s.dmdMessage);
+      else hideDmdMessage();
+    }
+    if (z.role === 'backglass' && s.friendCard) {
+      showFriendCard(z.node, s.friendCard);
+      z.layer.show(undefined);
+      z.layer.setActive(false);
+      continue;
+    }
     // Juke-box : le clip, l'affiche ou le morceau en cours à la place du média du fronton.
     if (window.CyberJukebox?.zone(z.node, z.role, s)) {
       z.layer.show(undefined);

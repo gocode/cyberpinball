@@ -1646,6 +1646,25 @@ html.menu-desktop .status-corner {
   min-height: 5.4cqmin;
 }
 
+/*
+ * À 0,4 cqmin du bord, la glissade d'entrée de 1,11 cqmin la faisait sortir de la fenêtre le temps
+ * de l'animation (le garde-fou de mise en page l'a relevé) : elle glisse ici de la place qu'il y a.
+ */
+.status-corner.on-head .notice-toast:not(.leaving) {
+  animation-name: notice-in-head;
+}
+
+@keyframes notice-in-head {
+  from {
+    opacity: 0;
+    transform: translateY(-0.4cqmin);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* La ligne de la notification : toute la largeur en borne (elle passe à la ligne), sa place au bureau. */
 .notice-line {
   display: flex;
@@ -3543,3 +3562,66 @@ html.jukebox-phase #root:has(> .banner) > .status-corner {
 .headset-prompt-status { font-size: 6vh; color: var(--signal); }
 .headset-prompt-problem { font-size: 6vh; color: var(--warning); max-width: 90vw; }
 .headset-prompt-keys { font-size: 7vh; color: var(--ink-muted); }
+
+/* ---------- Messagerie (chat-menu.ts) ----------
+   Fronton : la carte de l'ami du fil ouvert (grande pastille, nom, présence, faits), sur
+   l'ambiance du menu, à la place du média. DMD : l'arrivée d'un message, en points, par-dessus
+   l'afficheur, quelques secondes. Tailles en cqmin de la zone (petit côté 1080 px : 1 cqmin = 10,8 px). */
+.friend-card {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9cqmin;
+  padding: 8cqmin 10cqmin;
+  background: radial-gradient(ellipse at 28% 50%, #14403a99, transparent 55%), radial-gradient(ellipse at 85% 10%, #102d2a80, transparent 50%), var(--void);
+}
+
+.friend-card .friend-card-avatar {
+  width: 42cqmin;
+  height: 42cqmin;
+  font-size: 14cqmin;
+}
+
+.friend-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2cqmin;
+  min-width: 0;
+}
+
+.friend-card-kicker {
+  color: var(--signal);
+  font-size: 2.6cqmin;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.friend-card-name {
+  font-size: 10cqmin;
+  font-weight: 600;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-card-presence {
+  color: var(--ink-muted);
+  font-size: 3.4cqmin;
+}
+
+.friend-card-fact {
+  font-size: 3cqmin;
+  overflow-wrap: anywhere;
+}
+
+.dmd-message {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  background: #000;
+}

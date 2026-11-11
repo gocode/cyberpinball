@@ -101,6 +101,8 @@ export interface MenuNoticesHost {
    * notification vient de dire en entier.
    */
   activity?: { record(events: readonly NoticeEvent[], quiet: boolean): void; shown(events: readonly NoticeEvent[]): void };
+  /** La messagerie (chat-menu.ts) : un message déjà lu, ou dont le fil est ouvert, ne s'annonce plus. */
+  messages?: { unread(key: string): number; onScreen(key: string): boolean; /** « Son des messages » : false, la notification d'un message entre sans son. */ sound?(): boolean };
   now?: () => number;
   log?: (line: string) => void;
 }
@@ -108,6 +110,8 @@ export interface MenuNoticesHost {
 export interface MenuNotices {
   /** Le réseau ou la file des téléchargements a changé : relever ce qui est nouveau. */
   observe(): void;
+  /** Évènements qui ne viennent pas d'un relevé (un message arrivé, chat-service.ts) : dans la file, comme les autres. */
+  push(events: readonly NoticeEvent[]): void;
   /** Déjà dit ailleurs (le bandeau d'un écran plein) : la notification ne le redira pas. */
   said(kind: NoticeEvent['kind'], key: string): void;
   /** Ce que le menu des tables dessine maintenant (à chaque rendu de la fenêtre du plateau). */
@@ -162,6 +166,9 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
       case 'live-invite-ended':
         // Son écran ouvert dit déjà la fin (« Invitation annulée par … »).
         return !host.live?.inviteOnScreen?.(tagId(e.key));
+      case 'friend-message':
+        // Lu entre-temps, ou son fil à l'écran : plus rien à annoncer.
+        return !!e.player && (host.messages?.unread(e.player) ?? 1) > 0 && !host.messages?.onScreen(e.player);
       default:
         // La partie entre amis : encore la mienne, son écran fermé, la bande pas là (elles le disent déjà).
         if (isLiveNotice(e.kind)) return !!host.live && host.live.game()?.id === e.key.split('|')[0] && !host.live.onScreen() && !host.live.band?.();
@@ -239,7 +246,8 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     else if (!r.view && shown !== 'null') host.log?.('Notifications : plus rien d’affiché'); // i18n-ignore : journal
     if (r.view?.sound && !r.view.leaving && r.view.id !== sounded) {
       sounded = r.view.id;
-      host.sound?.(r.view.sound, r.view);
+      // « Son des messages » coupé (Réglages de la messagerie) : la notification d'un message entre sans son.
+      if (r.view.act?.type !== 'messages' || host.messages?.sound?.() !== false) host.sound?.(r.view.sound, r.view);
     }
     shown = next;
     schedule(r.nextAt);
@@ -254,8 +262,19 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
   // Ce qui est là au démarrage (amis, demandes, téléchargements finis) n'est pas une nouvelle.
   observe();
 
+  function push(events: readonly NoticeEvent[]): void {
+    if (stopped || !events.length) return;
+    host.activity?.record(events, host.mode() !== 'all');
+    const shown = events.filter((e) => host.mode() === 'all' || isLiveNotice(e.kind));
+    if (!shown.length) return;
+    center.push(shown);
+    for (const e of shown) host.log?.(`Notifications : ${e.kind} ${e.who ?? e.subject ?? ''} (priorité ${NOTICE_RULES[e.kind].priority})`); // i18n-ignore : journal
+    poke();
+  }
+
   return {
     observe,
+    push,
     said: (kind, key) => center.said(kind, key, now()),
     view,
     stop: () => {

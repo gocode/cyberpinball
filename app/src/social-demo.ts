@@ -33,6 +33,9 @@
 // la demande, et dès son premier morceau, pendant que le menu système est ouvert (l'écran de
 // réception), Émile (l'ami hors ligne) se connecte, Bruno gagne un badge et lance une autre
 // partie : trois nouveautés, un seul résumé au retour ; la table finit ensuite au menu des tables.
+// CYBERPINBALL_RESEAU_DEMO=messagerie (Menu système > Amis > Messages) : la conversation avec Émile
+// (hors ligne) a déjà son historique et deux messages qui attendent sa connexion ; Bruno, devenu ami,
+// écrit deux messages, puis répond à ce que la borne lui écrit (une réaction, une phrase).
 // Leurs dossiers sont dans <données>\reseau-simule\ (le bac à sable de l'essai).
 // Leurs tables sont inventées, comme celles des captures de la page du projet : les captures
 // de ces démonstrations vont sur la page publique du projet, aucun vrai jeu ne doit y paraître
@@ -40,13 +43,14 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { addEvent, addToHistory, readAvatarImage, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, PUP_FOLDER, readHostSettings, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, type LiveGame, type SocialState, type TableEntry } from '@cyberpinball/core';
+import { acknowledge, addEvent, addToHistory, newChatState, readAvatarImage, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, PUP_FOLDER, readHostSettings, receiveLines, saveChat, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, toWire, verifyWire, writeLine, type LiveGame, type SocialState, type TableEntry } from '@cyberpinball/core';
+import { createChatService, type ChatService } from './chat-service';
 import { createFriendContent, type FriendContent } from './friend-content';
 import { createLiveGames, createTableVersions, type LiveGames } from './live-game';
 import { createSocialNet, type SocialNet } from './social-net';
 
 export function simulatedPlayersWanted(env: NodeJS.ProcessEnv): boolean {
-  return ['1', ...LIVE_DEMOS, 'coupure', 'retour', 'notifications'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
+  return ['1', ...LIVE_DEMOS, 'coupure', 'retour', 'notifications', 'messagerie'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
 }
 
 /** Les démonstrations de la partie en direct : Bruno invite la borne (`en-jeu` : pendant qu'elle joue). */
@@ -112,7 +116,9 @@ function bigTable(bytes: number): Buffer {
 /** Avant le démarrage : un ami hors ligne et son dernier évènement, dans l'état de la borne. */
 export function seedSimulatedFriends(dataDir: string, now = new Date(), env: NodeJS.ProcessEnv = process.env): void {
   if (fs.existsSync(socialFile(dataDir))) return;
-  const me = setName(newSocialState(now), 'Alexis')!;
+  let me = setName(newSocialState(now), 'Alexis')!;
+  // Messagerie et profil public : un record de la borne, que Dora aimera (startSimulatedPlayers).
+  if (env.CYBERPINBALL_RESEAU_DEMO === 'messagerie') me = addEvent(me, { kind: 'record', table: DEMO_TABLES.brunoPlaysAgain, score: 8_902_110, rank: 1, initials: 'ALX' }, new Date(now.getTime() - 2 * 3600_000)).state;
   let emile = setName(newSocialState(now), 'Émile')!; // i18n-ignore : nom d'un joueur fictif
   const threeHours = new Date(now.getTime() - 3 * 3600_000);
   emile = addEvent(emile, { kind: 'record', table: DEMO_TABLES.emileRecord, score: 48_250_110, rank: 2, initials: 'EMI' }, threeHours).state;
@@ -128,6 +134,7 @@ export function seedSimulatedFriends(dataDir: string, now = new Date(), env: Nod
   const since = state.friends[0]!.since;
   saveSocial(dataDir, { ...state, friends: [...state.friends, ...others.map((o) => ({ key: o.key.publicKey, name: o.name, since, lastSeen: threeHours.toISOString(), events: [] }))] });
   if (['partie', 'partie-coupure', 'partie-sans-releve', 'parties-enchainees'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '')) seedHistory(dataDir, me.key.publicKey, emile.key.publicKey, now);
+  if (env.CYBERPINBALL_RESEAU_DEMO === 'messagerie') seedChat(dataDir, me, emile, now);
   if (env.CYBERPINBALL_RESEAU_DEMO === 'notifications') {
     for (const friend of [emile, ...others]) {
       const dir = path.join(dataDir, 'reseau-simule', friend.name);
@@ -135,6 +142,22 @@ export function seedSimulatedFriends(dataDir: string, now = new Date(), env: Nod
       saveSocial(dir, { ...friend, friends: [{ key: me.key.publicKey, name: me.name, since, events: [] }] });
     }
   }
+}
+
+/**
+ * Messagerie : la conversation avec Émile, hier soir (son message, ma réponse reçue), puis deux
+ * messages d'aujourd'hui qui attendent sa connexion. Signés par leurs vraies clés, comme sur le réseau.
+ */
+function seedChat(dataDir: string, me: SocialState, emile: SocialState, now: Date): void {
+  const at = (hoursAgo: number) => new Date(now.getTime() - hoursAgo * 3600_000);
+  const fromEmile = writeLine(newChatState(), emile.key, me.key.publicKey, { text: 'À demain pour la revanche sur Thunder Reef !' }, at(21)).line!; // i18n-ignore : message d'un joueur fictif
+  let chat = receiveLines(newChatState(), emile.key.publicKey, [verifyWire(toWire(fromEmile), emile.key.publicKey, me.key.publicKey, now)!]).state;
+  chat = { ...chat, conversations: { ...chat.conversations, [emile.key.publicKey]: { ...chat.conversations[emile.key.publicKey]!, unread: 0 } } };
+  const reply = writeLine(chat, me.key, emile.key.publicKey, { text: 'Je m’entraîne d’ici là.' }, at(20.9)); // i18n-ignore : message d'un joueur fictif
+  chat = acknowledge(reply.state, emile.key.publicKey, [reply.line!.id]);
+  chat = writeLine(chat, me.key, emile.key.publicKey, { text: 'Je suis prêt pour Thunder Reef.' }, at(2)).state; // i18n-ignore : message d'un joueur fictif
+  chat = writeLine(chat, me.key, emile.key.publicKey, { text: 'Je lance vers 21 h si tu passes.' }, at(1.9)).state; // i18n-ignore : message d'un joueur fictif
+  saveChat(dataDir, chat);
 }
 
 /** Deux parties entre amis déjà jouées avec Émile (hier soir, et trois jours plus tôt), dans <données>\amis\parties.json. */
@@ -259,7 +282,22 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
   const bruno = await bot(dataDir, 'Bruno', false, bootstrap, { shareLibrary: true }, [70, 150, 200]);
   const chloe = await bot(dataDir, 'Chloé', false, bootstrap, {}, [200, 110, 150]); // i18n-ignore : nom d'un joueur fictif
 
+  /** Minuteurs posés avant ceux des scénarios (le « J'aime » de Dora) : arrêtés avec eux. */
+  const timersLater: NodeJS.Timeout[] = [];
   const dora = await bot(dataDir, 'Dora', true, bootstrap);
+  // Profil public (messagerie) : Dora, qui n'est pas une amie, publie un record et un badge, puis aime le record de la borne.
+  if (mode === 'messagerie') {
+    dora.publish({ kind: 'record', table: DEMO_TABLES.emileRecord, score: 14_210_500, rank: 1, initials: 'DOR' });
+    dora.publish({ kind: 'badge', badge: 'five-champion' });
+    const likeTimer = setInterval(() => {
+      const event = dora.publicCard(me.key)?.events[0];
+      if (!event) return;
+      clearInterval(likeTimer);
+      dora.like(me.key, event.id, true);
+      log('Réseau simulé : Dora aime le record de la borne.'); // i18n-ignore : journal
+    }, 500);
+    timersLater.push(likeTimer);
+  }
   const brunoDir = path.join(dataDir, 'reseau-simule', 'Bruno');
   // Sa bibliothèque se fait à l'amitié : les tables de la borne sont lues d'ici là.
   let root: string | undefined;
@@ -302,6 +340,24 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     versionOf: (table) => brunoVersions.of(table),
   });
   const timers: NodeJS.Timeout[] = [];
+  // Messagerie : Bruno répond à ce que la borne lui écrit (une réaction, puis une phrase).
+  let brunoChat: ChatService | undefined;
+  if (mode === 'messagerie') {
+    brunoChat = createChatService({
+      net: bruno,
+      dataDir: brunoDir,
+      resendMs: 3000,
+      log: (line) => log(`Bruno : ${line}`), // i18n-ignore : journal
+      onArrive: (key, lines) => {
+        const last = lines.at(-1)!;
+        timers.push(setTimeout(() => {
+          brunoChat?.react(key, last.id, 'bravo');
+          brunoChat?.send(key, 'Parfait, je lance Star Courier.'); // i18n-ignore : message d'un joueur fictif
+        }, 1500));
+      },
+    });
+    timers.push(setInterval(() => brunoChat?.observe(), 500));
+  }
   // Notifications : David et Fanny se connectent ensemble, Émile plus tard (amis déjà connus, seedSimulatedFriends).
   const pair: SocialNet[] = [];
   let emile: SocialNet | undefined;
@@ -487,6 +543,11 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
         bruno.setPresence({ status: 'playing', table, since: new Date(Date.now() - 12 * 60_000).toISOString() });
         bruno.publish({ kind: 'record', table, score: 3_215_480_250, rank: 1, initials: 'BRU' });
       }
+      // Messagerie : deux messages de Bruno, une fois amis.
+      if (brunoChat) {
+        timers.push(setTimeout(() => brunoChat?.send(me.key, 'Je t’ai repris Star Courier. Revanche ce soir ?'), 3000)); // i18n-ignore : message d'un joueur fictif
+        timers.push(setTimeout(() => brunoChat?.send(me.key, 'Je lance la partie à 21 h, tu viens ?'), 4500)); // i18n-ignore : message d'un joueur fictif
+      }
       // Partie en direct : l'invitation, une fois la borne reliée et le menu affiché ; en-jeu, une
       // fois la borne en partie (sa présence le dit).
       if (games && mode === 'fins-invitation') void endsScript();
@@ -506,7 +567,8 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
   log('Réseau simulé : bornes fictives Bruno, Chloé, Dora démarrées.'); // i18n-ignore : journal
   return async () => {
     clearInterval(accept);
-    for (const timer of timers) clearTimeout(timer);
+    for (const timer of [...timers, ...timersLater]) clearTimeout(timer);
+    brunoChat?.stop();
     content.stop();
     games?.stop();
     await Promise.all([bruno.stop(), chloe.stop(), dora.stop(), ...pair.map((n) => n.stop()), ...(emile ? [emile.stop()] : [])]);

@@ -14,6 +14,9 @@ import {
   STOP_NOTICE_MS,
   arcadeHoursClock,
   badgeLabel,
+  eventText,
+  CHAT_REACTIONS,
+  type ChatReaction,
   downloadReasonText,
   avatarsDir,
   avatarView,
@@ -340,6 +343,9 @@ import { createUpdatesMenu } from './updates-menu';
 import { createGuestMenu } from './guest-menu';
 import { createCollectionsItem, createCollectionsMenu, tableCollectionsAction } from './collections-menu';
 import { createFriendsMenu } from './friends-menu';
+import { createChatService } from './chat-service';
+import { createChatMenu } from './chat-menu';
+import { createProfileMenu } from './profile-menu';
 import { createFirewallRule } from './firewall-rule';
 import { guardFirewall } from './firewall-guard';
 import { createFriendContent } from './friend-content';
@@ -350,6 +356,7 @@ import { startCabinetVolume, type CabinetVolume } from './cabinet-volume';
 import { createBallCounts } from './ball-count';
 import { createTableScores } from './table-scores';
 import { createTableRankings } from './table-rankings';
+import { createRemoteRanks } from './remote-ranks';
 import { createTableDoubles } from './table-double';
 import { inspectorFor, vpxFirewallTargets } from './vpx-inspector';
 import { scriptDmdWatch, simulatedDmdWatch, watchVpxDmd, type DmdWatch } from './dmd-watch';
@@ -1255,6 +1262,23 @@ phoneRemote.setMenu({
   entries: () => remoteEntries(),
   menus: () => library.remoteMenus(),
   open: (id) => remoteOpen(id),
+  // Classements au téléphone (remote-ranks.ts) : le tableau des scores de la borne, en lecture seule ;
+  // la table choisie sur la roue ou lancée d'abord ; en mode invité, la porte et la collection de la borne.
+  ranks: createRemoteRanks({
+    tables: () => (guest.active && collections.locked() ? collections.shelf(false).tables : tables),
+    current: () => playing ?? tables[state.index],
+    scores: (table, period) => tableScores.board(table, period),
+    rankings: (table, scope, period) => tableRankings.view(table, scope, period),
+    closed: () => (guest.allows('sheet.scores') ? undefined : t('Fermés en mode invité.')),
+  }),
+  // Messagerie pendant une partie : lire et répondre au téléphone, sans toucher aux boutons de VPX ; jamais en mode invité.
+  chat: () => (guest.active ? undefined : chatMenu.remoteChat()),
+  chatSend: (key, text) => {
+    if (!guest.active && chatService.state().phoneInGame) chatService.send(key, text);
+  },
+  chatReact: (key, target, kind) => {
+    if (!guest.active && chatService.state().phoneInGame && (CHAT_REACTIONS as readonly string[]).includes(kind)) chatService.react(key, target, kind as ChatReaction);
+  },
   setText: (value) => state.phase === 'library' && library.remoteSet(value),
   enter: () => state.phase === 'library' && library.remoteEnter(),
   uploadDir: () =>
@@ -2046,6 +2070,8 @@ function socialChanged(): void {
   socialRedraw ??= setTimeout(() => {
     socialRedraw = undefined;
     if (closing) return;
+    // Un ami revenu en ligne : la messagerie lui envoie ce qui l'attendait (chat-service.ts).
+    chatService.observe();
     menuNotices.observe();
     broadcast();
   }, 250);
@@ -2057,6 +2083,36 @@ const socialNet = createSocialNet({
   onChange: socialChanged,
   // Le pays par défaut des classements : la région de Windows (format régional, sinon langues préférées).
   systemLocale: () => [app.getSystemLocale(), ...app.getPreferredSystemLanguages()].find((l) => countryOfLocale(l)),
+  // Un « J'aime » sur mon activité publique : la notification, regroupée, au menu.
+  onLike: (likes) => {
+    const mine = socialNet.publicCard(socialNet.state().key.publicKey);
+    menuNotices.push(likes.map((l) => {
+      const e = mine?.events.find((x) => x.id === l.event);
+      return { kind: 'player-like' as const, key: `${l.from}|${l.event}`, at: Date.now(), who: l.name, player: l.from, ...(e ? { subject: eventText(e, badgeLabel) } : {}) };
+    }));
+  },
+});
+// Messagerie entre amis (Menu système > Amis > Messages) : un message pour un ami absent attend et
+// part à son retour ; l'arrivée d'un message passe par les notifications (menu-notices.ts).
+/** Le DMD annonce un message arrivé au menu pendant ce temps (« MESSAGE DE NOVA »), puis reprend son affichage. */
+const DMD_MESSAGE_MS = 4000;
+let dmdMessage: { text: string; until: number } | undefined;
+const chatService = createChatService({
+  net: socialNet,
+  dataDir: loc.dataDir,
+  onChange: () => socialChanged(),
+  // Un message arrivé : la notification (au menu, dans le menu système, et par-dessus VPX en partie).
+  onArrive: (key, lines) => {
+    const who = socialNet.state().friends.find((f) => f.key === key)?.name ?? key.slice(0, 8);
+    // Au menu (jamais en partie : le DMD est au jeu), le DMD l'annonce quelques secondes.
+    if (state.phase !== 'playing' && state.phase !== 'loading' && !guest.active) {
+      dmdMessage = { text: t('Message de {name}', { name: who }), until: Date.now() + DMD_MESSAGE_MS };
+      broadcast();
+      setTimeout(() => !closing && broadcast(), DMD_MESSAGE_MS + 100);
+    }
+    menuNotices.push(lines.map((l) => ({ kind: 'friend-message' as const, key: l.id, at: Date.now(), who, player: key, extra: (l.text ?? '').replace(/\s*\n\s*/g, ' ') })));
+  },
+  log: (line) => console.log(line),
 });
 
 /**
@@ -2180,6 +2236,8 @@ const menuNotices = createMenuNotices({
   },
   sound: (id) => playUiSound(id),
   activity: { record: (events, quiet) => activityMenu.record(events, quiet), shown: (events) => activityMenu.shown(events) },
+  // Le son d'un message suit « Son des messages » (Réglages de la messagerie).
+  messages: { unread: (key) => chatService.state().conversations[key]?.unread ?? 0, onScreen: (key) => chatMenu.threadOnScreen(key), sound: () => chatService.state().sound },
   log: (line) => console.log(line),
 });
 /**
@@ -2387,6 +2445,8 @@ const friendsMenu = createFriendsMenu({
   romsOf,
   root: () => loc.root,
   redraw: socialChanged,
+  chat: { openThread: (key, back) => chatMenu.openThread(key, back), writeDetail: (key) => chatMenu.writeDetail(key) },
+  profile: { open: (key, back) => profileMenu.openProfile(key, back) },
   contents: tableInventory,
   // Une table reçue arrive dans les données avant d'être rangée : la place se compte là.
   freeSpace: () => {
@@ -2398,6 +2458,29 @@ const friendsMenu = createFriendsMenu({
     }
   },
 });
+const chatMenu = createChatMenu({
+  library,
+  net: socialNet,
+  chat: chatService,
+  zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
+  openFriend: (key, back) => friendsMenu.openFriend(key, back),
+  openFind: () => friendsMenu.openFind(),
+  openSharing: () => friendsMenu.items.sharing.run(),
+  block: (key) => socialNet.block(key),
+});
+library.provideSystemItem('messages', chatMenu.item);
+// Profil public et « J'aime » (profile-menu.ts) : celui des autres joueurs, et le mien.
+const profileMenu = createProfileMenu({
+  library,
+  net: socialNet,
+  request: (key, name) => socialNet.request({ key, name }),
+  block: (key) => {
+    socialNet.block(key);
+    chatService.clear(key);
+  },
+  openThread: (key, back) => chatMenu.openThread(key, back),
+});
+library.provideSystemItem('public-profile', profileMenu.item);
 library.provideSystemItem('friends', friendsMenu.items.friends);
 library.provideSystemItem('game-history', friendsMenu.items['game-history']);
 library.provideSystemItem('find-player', friendsMenu.items['find-player']);
@@ -3680,6 +3763,14 @@ export function startFrontend(): void {
     // Pastille des amis en ligne, notification d'un ami ou d'une demande : l'écran qu'elle annonce.
     else if (action.type === 'friends' || action.type === 'friend-requests') {
       if (state.phase === 'menu' && guest.knock('menu.system')) friendsMenu.items[action.type].run();
+    }
+    // « J'aime » sur mon activité : Mon profil public, qui dit qui a aimé.
+    else if (action.type === 'my-profile') {
+      if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) profileMenu.openMine(state.phase === 'menu' ? () => library.leave() : undefined);
+    }
+    // Message d'un ami : son fil (celui du dernier message non lu), sinon la liste des conversations.
+    else if (action.type === 'messages') {
+      if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) chatMenu.openUnread(state.phase === 'menu' ? () => library.leave() : undefined);
     }
     // Nouvelle de la partie entre amis (au menu des tables ou dans le menu système) : l'écran de la partie.
     else if (action.type === 'live-game') {
@@ -5672,6 +5763,9 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
         : undefined,
     // Le son du menu ne sort que d'une fenêtre : celle du playfield.
     sound: role === 'playfield' ? soundView() : undefined,
+    // Messagerie : le fronton montre la carte de l'ami du fil ouvert ; le DMD, quelques secondes, l'arrivée d'un message au menu.
+    friendCard: state.phase === 'library' && !guest.active ? chatMenu.frontonCard() : undefined,
+    dmdMessage: dmdMessage && dmdMessage.until > Date.now() && state.phase !== 'playing' && state.phase !== 'loading' ? dmdMessage.text : undefined,
     // Juke-box : l'affiche du médaillon choisi, ou le lecteur (liste, clip, cartel).
     jukebox: jukeboxPlayer.view(role, (state.phase === 'menu' && !state.help && onJukebox()) || jukeboxManaging()),
     gameKeys: gameKeys(buttons, tilt),

@@ -436,7 +436,7 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
     const s = getComputedStyle(el);
     if ([s.maskImage, s.webkitMaskImage].some((m) => m && m !== 'none')) problems.add('fondu sur une liste qui défile : ' + label(el).slice(0, 60));
   }
-  for (const el of document.querySelectorAll('.lib-action.current, .lib-row.selected, .health-line.selected, .media-card.selected')) {
+  for (const el of document.querySelectorAll('.lib-action.current, .lib-row.selected, .chat-line.selected, .health-line.selected, .media-card.selected')) {
     if (!shown(el)) continue;
     let list = el.parentElement;
     while (list && list !== document.body && !scrollsY(list)) list = list.parentElement;

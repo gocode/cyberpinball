@@ -77,6 +77,12 @@ test('accès direct : le téléphone ne demande que des identifiants, bornés ; 
   assert.deepEqual(parsePhoneMessage({ t: 'open', s: 3, id: 'phone-remote' }), { t: 'open', s: 3, id: 'phone-remote' });
   for (const id of ['../data', 'C:\\Windows', 'Borne', 'phone remote', '', 'x'.repeat(41), 'quit;shutdown', { id: 'borne' }])
     assert.equal(parsePhoneMessage({ t: 'open', s: 3, id }), undefined, String(id));
+  // Classements (vue Scores) : une portée et une période connues, et un rang de la liste avec sa version, ou rien.
+  assert.deepEqual(parsePhoneMessage({ t: 'ranks', s: 3, scope: 'world', period: 'week' }), { t: 'ranks', s: 3, scope: 'world', period: 'week' });
+  assert.deepEqual(parsePhoneMessage({ t: 'ranks', s: 3, scope: 'cabinet', period: 'all', v: 2, i: 7 }), { t: 'ranks', s: 3, scope: 'cabinet', period: 'all', table: { v: 2, i: 7 } });
+  for (const bad of [{ scope: 'galaxie', period: 'all' }, { scope: 'world', period: 'month' }, { scope: 'world' }, { period: 'all' }, { scope: 'world', period: 'all', v: 1 }, { scope: 'world', period: 'all', i: 0 }, { scope: 'world', period: 'all', v: 1, i: -1 }, { scope: 'world', period: 'all', v: 1, i: REMOTE_ENTRIES_MAX }, { scope: 'world', period: 'all', v: 1, i: 'C:\\tables\\x.vpx' }, { scope: '__proto__', period: 'all' }])
+    assert.equal(parsePhoneMessage({ t: 'ranks', s: 3, ...bad }), undefined, JSON.stringify(bad));
+  assert.deepEqual(parsePhoneMessage({ t: 'ranks-off', s: 4 }), { t: 'ranks-off', s: 4 });
   // Lisible mais inconnu : la borne ne l'ouvre pas.
   for (const id of ['unknown', 'all-tables-x', 'constructor', 'toString', '__proto__']) assert.equal(remoteMenuTarget(id), undefined, id);
   assert.deepEqual(remoteMenuTarget('wheel'), { kind: 'wheel' });

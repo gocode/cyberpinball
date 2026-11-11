@@ -59,6 +59,30 @@ import {
   loadSocial,
   parseLibraryMessage,
   parseLiveMessage,
+  parseChatMessage,
+  type ChatMessage,
+  cardOf,
+  cardsSample,
+  giveLike,
+  likedByMe,
+  likersOf,
+  LIKE_TTL,
+  LIKES_BATCH,
+  CARDS_BATCH,
+  loadProfiles,
+  makeCard,
+  markLikeSent,
+  mergeCards,
+  pendingLikes,
+  profilesFile,
+  receiveLike,
+  saveProfiles,
+  setHidden,
+  signLike,
+  verifyCard,
+  verifyLike,
+  type Like,
+  type PublicCard,
   parseSocialMessage,
   peerProfile,
   playerSeed,
@@ -228,20 +252,25 @@ export interface SocialNetOptions {
   retryMs?: number;
   /** Langue du système (« fr-FR ») : le pays par défaut des classements, tant que le joueur n'en a pas choisi. */
   systemLocale?: () => string | undefined;
+  /** De nouveaux « J'aime » sur mes évènements publics (publicprofile.ts) : la notification. */
+  onLike?: (likes: Like[]) => void;
 }
 
 /** Scores des classements national et mondial (rankings.ts) : entre toutes les bornes, pas seulement entre amis. */
 type ScoresMessage = { t: 'scores'; scores: RankedScore[] };
+/** Profils publics et « J'aime » (publicprofile.ts) : entre toutes les bornes, comme les scores. */
+type CardsMessage = { t: 'cards'; cards: PublicCard[] };
+type LikesMessage = { t: 'likes'; likes: Like[]; ttl: number };
 /** Un score à publier : le reste (clé, nom, pays, signature) vient de la borne. */
 /** Ce que la partie donne ; le nom, le pays et l'avatar sont ceux de la borne au moment de signer. */
 export type ScoreToPublish = Omit<RankedScore, 'key' | 'name' | 'country' | 'avatar' | 'sig'>;
 
-/** Messages des services posés sur le réseau des amis : bibliothèque partagée, partie en direct. */
-export type FriendMessage = LibraryMessage | LiveMessage;
+/** Messages des services posés sur le réseau des amis : bibliothèque partagée, partie en direct, messagerie. */
+export type FriendMessage = LibraryMessage | LiveMessage | ChatMessage;
 
 interface Link {
   stream: Duplex;
-  send(message: SocialMessage | FriendMessage | ScoresMessage): void;
+  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage): void;
   /** Morceau de fichier (friendlibrary.ts, chunkFrame) ; false : le flux est plein, attendre « drain ». */
   sendChunk(frame: Buffer): boolean;
   via: 'internet' | 'lan';
@@ -338,6 +367,23 @@ export interface SocialNet {
   markProfileOffered(): void;
   /** Mon pays pour les classements : celui choisi, sinon celui de Windows ; undefined : inconnu. */
   country(): string | undefined;
+  /**
+   * Carte publique d'un joueur (publicprofile.ts) : la dernière reçue, lisible même s'il est hors
+   * ligne ; la mienne pour ma clé (undefined si mon profil public est coupé).
+   */
+  publicCard(key: string): PublicCard | undefined;
+  /** Quand sa carte a été reçue pour la dernière fois (ISO). */
+  cardSeen(key: string): string | undefined;
+  /** Aimer (ou ne plus aimer) un évènement public d'un joueur : remis à sa borne, ou relayé. */
+  like(key: string, event: string, on: boolean): void;
+  likedByMe(key: string, event: string): boolean;
+  /** Qui a aimé un de mes évènements (pour moi seul), le plus récent d'abord. */
+  likers(event: string): Like[];
+  /** Profil public (activé par défaut). */
+  setPublicProfile(on: boolean): void;
+  /** Masquer sur cette borne l'activité d'un joueur (ses évènements, ses « J'aime »). */
+  hideActivity(key: string, hidden: boolean): void;
+  activityHidden(key: string): boolean;
   /** Messages des services reçus d'un ami ; rend de quoi se désabonner. */
   onMessage(listener: (key: string, message: FriendMessage) => void): () => void;
   onChunk(listener: (key: string, frame: Buffer) => void): () => void;
@@ -364,6 +410,17 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       saveOrWarn(rankingsPath, () => saveRankings(rankingsPath, rankings));
     }, 2000);
     rankingsTimer.unref?.();
+  }
+  // Profils publics et « J'aime » (publicprofile.ts) : relus une fois, écrits peu après chaque changement.
+  let profiles = loadProfiles(opts.dataDir, now());
+  let profilesTimer: NodeJS.Timeout | undefined;
+  function saveProfilesSoon(): void {
+    if (profilesTimer) return;
+    profilesTimer = setTimeout(() => {
+      profilesTimer = undefined;
+      saveOrWarn(profilesFile(opts.dataDir), () => saveProfiles(opts.dataDir, profiles));
+    }, 2000);
+    profilesTimer.unref?.();
   }
   const peers = new Map<string, Peer>();
   /** Qui est en ligne : liaisons saluées, tolérance après la dernière (friendpresence.ts). */
@@ -540,7 +597,9 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   /** Empreintes des avatars que portent les scores des classements : publiques. */
   function publicAvatars(): Set<string> {
-    return new Set([...rankingAvatars(rankings).values()].filter((h): h is string => !!h));
+    // Ceux des profils publics aussi : la carte signée porte l'empreinte, comme un score.
+    const own = state.enabled && state.publicProfile !== false ? ownAvatarHash() : undefined;
+    return new Set([...rankingAvatars(rankings).values(), ...profiles.cards.map((c) => c.avatar), own].filter((h): h is string => !!h));
   }
 
   /** Fichier d'avatar de cette empreinte, s'il est dans <données>\avatars. */
@@ -705,11 +764,14 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         }
         // Scores des classements : de toute borne reliée, chacun vérifié par sa signature.
         if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'scores') return receiveScores(key, (raw as { scores?: unknown }).scores);
+        // Profils publics et « J'aime » : de toute borne reliée, chacun vérifié par sa signature.
+        if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'cards') return receiveCards(key, (raw as { cards?: unknown }).cards);
+        if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'likes') return receiveLikes(key, (raw as { likes?: unknown }).likes, (raw as { ttl?: unknown }).ttl);
         const parsed = parseSocialMessage(raw, now());
         if (parsed) return receive(key, parsed, link);
-        // Bibliothèque partagée et partie en direct : entre amis seulement.
+        // Bibliothèque partagée, partie en direct et messagerie : entre amis seulement.
         if (!raw || typeof raw !== 'object' || relationOf(state, key) !== 'friend') return;
-        const extra = parseLibraryMessage(raw as Record<string, unknown>) ?? parseLiveMessage(raw as Record<string, unknown>);
+        const extra = parseLibraryMessage(raw as Record<string, unknown>) ?? parseLiveMessage(raw as Record<string, unknown>) ?? parseChatMessage(raw as Record<string, unknown>);
         if (extra) for (const listener of messageListeners) listener(key, extra);
       },
     });
@@ -753,6 +815,9 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     // Une part des classements connus ; une borne d'avant les classements ignore ce message.
     const sample = rankingsSample(rankings, state.key.publicKey);
     if (sample.length) link.send({ t: 'scores', scores: sample });
+    // Ma carte publique et une part de celles que je connais ; une borne d'avant les profils publics ignore ce message.
+    const cards = cardsSample(profiles, ownCard());
+    if (cards.length) link.send({ t: 'cards', cards });
     changed();
   }
 
@@ -781,6 +846,93 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   // Un pays disparu (choisi avant que la liste ne se limite aux pays d'aujourd'hui) cède à celui de Windows.
   const myCountry = () => (knownCountry(state.country) ? state.country : countryOfLocale(opts.systemLocale?.()));
+
+  // ---------- Profils publics et « J'aime » ----------
+
+  /** Ma carte publique, signée maintenant ; undefined si le partage ou le profil public est coupé. */
+  function ownCard(): PublicCard | undefined {
+    if (!state.enabled || state.publicProfile === false) return undefined;
+    const country = myCountry();
+    const avatar = ownAvatarHash();
+    const records = rankings.scores.filter((s) => s.key === state.key.publicKey).length;
+    return makeCard(state, profiles, { ...(country ? { country } : {}), ...(avatar ? { avatar } : {}), records }, now());
+  }
+
+  const greetedLinks = (except?: string) => [...peers.values()].filter((p) => p.key !== except).map((p) => bestLink(p.key)).filter((l): l is Link => !!l?.greeted);
+
+  /** Ma carte a changé (un record, un badge, un « J'aime » reçu, l'avatar) : à toutes les bornes reliées, un peu plus tard. */
+  let cardTimer: NodeJS.Timeout | undefined;
+  function announceCard(): void {
+    if (cardTimer) return;
+    cardTimer = setTimeout(() => {
+      cardTimer = undefined;
+      const card = ownCard();
+      if (card) for (const link of greetedLinks()) link.send({ t: 'cards', cards: [card] });
+    }, 1000);
+    cardTimer.unref?.();
+  }
+
+  /** Cartes reçues : vérifiées, celles d'un joueur bloqué laissées ; les nouvelles gardées et relayées. */
+  function receiveCards(from: string, raw: unknown): void {
+    if (!Array.isArray(raw) || state.blocked.includes(from)) return;
+    const cards = raw.slice(0, CARDS_BATCH).map((c) => verifyCard(c, now())).filter((c): c is PublicCard => !!c && !state.blocked.includes(c.key));
+    if (!cards.length) return;
+    const before = new Map(profiles.cards.map((c) => [c.key, c.avatar]));
+    const merged = mergeCards(profiles, cards, state.key.publicKey, now());
+    profiles = merged.store;
+    saveProfilesSoon();
+    if (!merged.fresh.length) return;
+    // Un joueur a changé d'avatar : l'ancien n'est plus public, son fichier peut partir.
+    if (merged.fresh.some((c) => before.has(c.key) && before.get(c.key) !== c.avatar)) tidyAvatars();
+    for (const link of greetedLinks(from)) link.send({ t: 'cards', cards: merged.fresh });
+    changed();
+  }
+
+  /** Mes « J'aime » pas encore remis à `to` : directement si sa borne est reliée, sinon relayés (deux bornes au plus). */
+  function deliverLikes(to: string): void {
+    const pending = pendingLikes(profiles, to).slice(0, LIKES_BATCH);
+    if (!pending.length) return;
+    const direct = bestLink(to);
+    if (direct?.greeted) {
+      direct.send({ t: 'likes', likes: pending, ttl: 0 });
+      for (const like of pending) profiles = markLikeSent(profiles, like);
+      saveProfilesSoon();
+      return;
+    }
+    for (const link of greetedLinks(to)) link.send({ t: 'likes', likes: pending, ttl: LIKE_TTL });
+  }
+
+  /** « J'aime » relayés récemment (signature) : un relais ne repasse pas deux fois. */
+  const likesRelayed = new Set<string>();
+  function receiveLikes(from: string, raw: unknown, ttl: unknown): void {
+    if (!Array.isArray(raw) || state.blocked.includes(from)) return;
+    const likes = raw.slice(0, LIKES_BATCH).map((l) => verifyLike(l, now())).filter((l): l is Like => !!l && !state.blocked.includes(l.from));
+    const me = state.key.publicKey;
+    const news: Like[] = [];
+    let mine = false;
+    for (const like of likes) {
+      if (like.to === me) {
+        const r = receiveLike(profiles, like, me, now());
+        if (r.store !== profiles) mine = true;
+        profiles = r.store;
+        if (r.news) news.push(like);
+        continue;
+      }
+      // Pour un autre joueur : à sa borne si elle est reliée, sinon un relais de plus tant qu'il en reste.
+      const hops = typeof ttl === 'number' && Number.isInteger(ttl) ? Math.min(ttl, LIKE_TTL) : 0;
+      if (likesRelayed.has(like.sig)) continue;
+      likesRelayed.add(like.sig);
+      if (likesRelayed.size > 5000) likesRelayed.clear();
+      const direct = bestLink(like.to);
+      if (direct?.greeted) direct.send({ t: 'likes', likes: [like], ttl: 0 });
+      else if (hops > 0) for (const link of greetedLinks(from)) link.send({ t: 'likes', likes: [like], ttl: hops - 1 });
+    }
+    if (!mine) return;
+    saveProfilesSoon();
+    announceCard();
+    if (news.length) opts.onLike?.(news);
+    changed();
+  }
 
   function receive(key: string, message: SocialMessage, link: Link): void {
     const peer = peers.get(key);
@@ -811,6 +963,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
           const sync = syncReply(state, key);
           if (sync) sendTo(key, { t: sync });
           if (relationOf(state, key) === 'friend') greetFriend(key);
+          // Mes « J'aime » pour ce joueur qui attendaient sa borne.
+          deliverLikes(key);
           changed();
         }
         return;
@@ -1089,6 +1243,12 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     retries = 0;
     lanRetries = 0;
     await teardown();
+    // Un « J'aime » donné ou reçu juste avant l'arrêt n'attend pas l'écriture différée.
+    if (profilesTimer) {
+      clearTimeout(profilesTimer);
+      profilesTimer = undefined;
+      saveOrWarn(profilesFile(opts.dataDir), () => saveProfiles(opts.dataDir, profiles));
+    }
     changed();
   }
 
@@ -1171,13 +1331,43 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       const added = addEvent(state, event, now());
       commit(added.state);
       broadcastFriends({ t: 'events', events: [added.event] });
+      // Un record ou un badge : ma carte publique change aussi.
+      if (event.kind !== 'played') announceCard();
     },
     checkBadges(play) {
       const granted = grantBadges(state, play, now());
       commit(granted.state);
-      if (granted.events.length) broadcastFriends({ t: 'events', events: granted.events });
+      if (granted.events.length) {
+        broadcastFriends({ t: 'events', events: granted.events });
+        announceCard();
+      }
       return granted.events;
     },
+    publicCard: (key) => (key === state.key.publicKey ? ownCard() : profiles.hidden.includes(key) ? undefined : cardOf(profiles, key)),
+    cardSeen: (key) => profiles.seen[key],
+    like(key, event, on) {
+      if (key === state.key.publicKey || state.blocked.includes(key)) return;
+      profiles = giveLike(profiles, signLike(state.key, state.name, key, event, on, now()));
+      saveProfilesSoon();
+      deliverLikes(key);
+      changed();
+    },
+    likedByMe: (key, event) => likedByMe(profiles, key, event),
+    likers: (event) => likersOf(profiles, event),
+    setPublicProfile(on) {
+      const { publicProfile: _, ...rest } = state;
+      commit(on ? rest : { ...rest, publicProfile: false });
+      if (on) announceCard();
+    },
+    hideActivity(key, hidden) {
+      const next = setHidden(profiles, key, hidden);
+      if (next === profiles) return;
+      profiles = next;
+      saveProfilesSoon();
+      announceCard();
+      changed();
+    },
+    activityHidden: (key) => profiles.hidden.includes(key),
     request: (profile) => apply(profile.key, requestFriend(state, profile, now())),
     cancel: (key) => apply(key, cancelRequest(state, key)),
     accept: (key) => apply(key, acceptRequest(state, key, now())),
@@ -1233,6 +1423,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       // Toutes les bornes reliées l'apprennent ; seuls mes amis et les demandes en cours le redemandent.
       const notice: SocialMessage = { t: 'avatar', ...(image ? { avatar: image.hash } : {}) };
       for (const peer of peers.values()) for (const link of peer.links) if (link.greeted) link.send(notice);
+      // Ma carte publique porte l'empreinte de mon avatar.
+      announceCard();
     },
     avatarFile(key) {
       const file = avatarFileOf(state, key);

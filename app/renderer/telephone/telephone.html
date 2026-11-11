@@ -42,12 +42,14 @@
         <p class="message-text" id="message-text"></p>
         <button type="button" class="key wide primary message-action" id="message-action" hidden data-i18n>Reprendre</button>
       </div>
-      <!-- Au menu : trois vues. Écran (les entrées de l'écran ouvert à la borne, à toucher), Menus (tous
-           les menus, rangés comme le menu système), Boutons (ceux de la borne). body[data-view]. -->
+      <!-- Au menu et pendant une partie : quatre vues. Écran (les entrées de l'écran ouvert à la borne,
+           à toucher), Menus (tous les menus, rangés comme le menu système), Boutons (ceux de la borne),
+           Scores (le tableau des scores de chaque table, telephone-ranks.js). body[data-view]. -->
       <div class="views" id="views" role="tablist">
         <button type="button" class="view-tab" id="tab-list" role="tab" data-view="list" aria-controls="entries"></button>
         <button type="button" class="view-tab" id="tab-menus" role="tab" data-view="menus" aria-controls="menus"></button>
         <button type="button" class="view-tab" id="tab-buttons" role="tab" data-view="buttons" aria-controls="buttons"></button>
+        <button type="button" class="view-tab" id="tab-ranks" role="tab" data-view="ranks" aria-controls="ranks"></button>
       </div>
       <section class="entries" id="entries" role="tabpanel" aria-labelledby="tab-list">
         <p class="entries-note" id="entries-note"></p>
@@ -70,6 +72,42 @@
           <p class="empty-text" id="menus-empty-text"></p>
         </div>
       </section>
+      <!-- Scores : la table (choisie ou lancée à la borne, ou une autre de la liste), ses portées et ses
+           périodes, puis le tableau en grille commune, comme à la borne. -->
+      <section class="ranks" id="ranks" role="tabpanel" aria-labelledby="tab-ranks">
+        <button type="button" class="ranks-table" id="ranks-table" aria-expanded="false" aria-controls="ranks-picker">
+          <span class="ranks-table-mark" id="ranks-table-mark" aria-hidden="true"></span>
+          <span class="ranks-table-text">
+            <span class="ranks-table-title" id="ranks-table-title"></span>
+            <span class="ranks-table-detail" id="ranks-table-detail"></span>
+          </span>
+          <span class="ranks-table-go" id="ranks-table-go" aria-hidden="true"></span>
+        </button>
+        <div class="ranks-scroll" id="ranks-scroll">
+          <div class="ranks-scopes" id="ranks-scopes" role="tablist"></div>
+          <div class="ranks-periods" id="ranks-periods" role="tablist"></div>
+          <ol class="ranks-lines" id="ranks-lines" data-aligned></ol>
+          <div class="empty" id="ranks-empty" hidden>
+            <span class="empty-mark" id="ranks-empty-mark" aria-hidden="true"></span>
+            <p class="empty-title" id="ranks-empty-title"></p>
+            <p class="empty-text" id="ranks-empty-text"></p>
+          </div>
+          <p class="ranks-position" id="ranks-position" hidden></p>
+          <div class="ranks-foot" id="ranks-foot" hidden>
+            <p class="ranks-note" id="ranks-note"></p>
+            <p class="ranks-legend" id="ranks-legend"></p>
+          </div>
+        </div>
+        <div class="ranks-picker" id="ranks-picker" hidden>
+          <input class="ranks-filter" id="ranks-filter" type="search" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search" hidden />
+          <ul class="entry-list" id="ranks-tables"></ul>
+          <div class="empty" id="ranks-tables-empty" hidden>
+            <span class="empty-mark" id="ranks-tables-empty-mark" aria-hidden="true"></span>
+            <p class="empty-title" id="ranks-tables-empty-title"></p>
+            <p class="empty-text" id="ranks-tables-empty-text"></p>
+          </div>
+        </div>
+      </section>
       <div class="buttons" id="buttons" role="tabpanel" aria-labelledby="tab-buttons">
         <button type="button" class="btn btn-start" data-b="confirm"></button>
         <button type="button" class="btn btn-flip" data-b="previous"></button>
@@ -84,6 +122,17 @@
         <!-- Les réglages en partie, comme les deux MagnaSave : grisé avec sa raison quand ils ne s'ouvrent pas. -->
         <button type="button" class="key wide game-open" id="game-open" hidden></button>
         <p class="game-reason" id="game-reason" hidden></p>
+        <!-- Messagerie pendant la partie : le fil le plus récent, des réactions et des phrases d'un appui,
+             un champ ; rien ne passe par les boutons de la borne, qui restent à VPX. -->
+        <section class="phone-chat" id="phone-chat" hidden>
+          <h2 class="phone-chat-name" id="phone-chat-name"></h2>
+          <ol class="phone-chat-lines" id="phone-chat-lines"></ol>
+          <div class="phone-chat-chips" id="phone-chat-chips"></div>
+          <form class="phone-chat-form" id="phone-chat-form">
+            <input type="text" id="phone-chat-field" maxlength="500" autocomplete="off" enterkeyhint="send">
+            <button type="submit" class="key phone-chat-send" id="phone-chat-send"></button>
+          </form>
+        </section>
       </div>
       <div class="pad" id="pad">
         <div class="pad-hint" id="pad-hint">
@@ -150,7 +199,9 @@
     <script src="catalogue.js"></script>
     <script src="i18n.js"></script>
     <script src="icons.js"></script>
+    <script src="avatar.js"></script>
     <script src="telephone-core.js"></script>
+    <script src="telephone-ranks.js"></script>
     <script src="telephone.js"></script>
   </body>
 </html>

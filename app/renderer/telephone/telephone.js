@@ -2,9 +2,10 @@
 // Deux modes, selon ce que la borne montre (body[data-mode]) :
 // - browser, le navigateur intégré « Récupérer » : un pavé tactile, le clavier du téléphone quand un
 //   champ de la page a le clavier, Retour, Avancer, Fermer ;
-// - menu, le menu de Cyber Pinball, en trois vues (body[data-view]) : Écran, les entrées de l'écran
+// - menu, le menu de Cyber Pinball, en quatre vues (body[data-view]) : Écran, les entrées de l'écran
 //   ouvert à la borne, qu'on touche directement ; Menus, tous les menus rangés comme le menu système,
-//   qu'on ouvre d'un toucher ; Boutons, ceux de la borne (Start, flippers, Exit, MagnaSave). Et le
+//   qu'on ouvre d'un toucher ; Boutons, ceux de la borne (Start, flippers, Exit, MagnaSave) ; Scores,
+//   le tableau des scores de chaque table (telephone-ranks.js), aussi pendant une partie. Et le
 //   clavier du téléphone à la place du clavier à l'écran, l'envoi d'un fichier vers le dossier
 //   d'import ; game pendant une partie (les boutons attendent le retour au menu, sauf dans les
 //   réglages en partie, que la page peut ouvrir). Le téléphone n'envoie que des identifiants
@@ -69,11 +70,12 @@ for (const b of document.querySelectorAll('.btn')) {
   text.append(name, what);
   b.replaceChildren(cyberIcon(def.icon), text);
 }
-/** Vues du menu : l'écran de la borne (ses entrées), tous les menus, les boutons de la borne. */
+/** Vues du menu : l'écran de la borne (ses entrées), tous les menus, les boutons de la borne, les classements. */
 const VIEWS = {
   list: { icon: 'monitor', label: () => t('Écran') },
   menus: { icon: 'gear', label: () => t('Menus') },
   buttons: { icon: 'gamepad', label: () => t('Boutons') },
+  ranks: { icon: 'trophy', label: () => t('Scores') },
 };
 for (const [name, def] of Object.entries(VIEWS)) {
   const tab = $(`tab-${name}`);
@@ -261,12 +263,16 @@ let menuPath = [];
 
 function setView(next) {
   if (!VIEWS[next] || $(`tab-${next}`).disabled) return;
+  const before = document.body.dataset.view;
   view = next;
   store(VIEW_STORE, next);
   // Un bouton tenu reste tenu à la borne tant que le doigt n'est pas levé : changer de vue le relâche.
   releaseButtons();
   syncLayout();
   if (next === 'list') scrollToCurrent();
+  // Scores (telephone-ranks.js) : ouverte, la table de la borne ; quittée, la borne cesse de relire les classements.
+  if (next === 'ranks' && before !== 'ranks') ranksEnter();
+  if (next !== 'ranks' && before === 'ranks') ranksLeave();
 }
 
 /** Une ligne de liste : icône, libellé (et sa pastille), détail ou raison, pastille rouge, chevron d'une rubrique. */
@@ -446,6 +452,57 @@ $('menus-up').addEventListener('click', () => {
 });
 $('game-open').addEventListener('click', () => send({ t: 'open', id: 'in-game' }));
 
+/** Messagerie pendant la partie (la borne l'envoie : chat-menu.ts, remoteChat) ; null : rien à montrer. */
+let chat = null;
+
+/** Le fil le plus récent, ses réactions (sur le dernier message reçu) et ses phrases ; le champ pour écrire. */
+function renderChat() {
+  const box = $('phone-chat');
+  box.hidden = !chat;
+  if (!chat) return;
+  $('phone-chat-name').textContent = t('Messages · {name}', { name: chat.name });
+  const list = $('phone-chat-lines');
+  list.replaceChildren(
+    ...chat.lines.map((l) => {
+      const li = document.createElement('li');
+      li.className = `phone-chat-line${l.out ? ' out' : ''}`;
+      const bubble = document.createElement('div');
+      bubble.className = 'phone-chat-bubble';
+      bubble.textContent = l.text;
+      const meta = document.createElement('div');
+      meta.className = 'phone-chat-meta';
+      meta.textContent = l.note ? `${l.time} · ${l.note}` : l.time;
+      li.append(bubble, meta);
+      return li;
+    }),
+  );
+  list.scrollTop = list.scrollHeight;
+  const lastIn = [...chat.lines].reverse().find((l) => !l.out);
+  const chip = (label, run) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'phone-chat-chip';
+    b.textContent = label;
+    b.addEventListener('click', run);
+    return b;
+  };
+  $('phone-chat-chips').replaceChildren(
+    ...(lastIn ? chat.reactions.map((r) => chip(r.label, () => send({ t: 'chat-react', key: chat.key, target: lastIn.id, kind: r.id }))) : []),
+    ...chat.phrases.map((p) => chip(p, () => send({ t: 'chat-send', key: chat.key, text: p }))),
+  );
+  $('phone-chat-field').placeholder = t('Écrire à {name}…', { name: chat.name });
+  $('phone-chat-send').textContent = t('Envoyer');
+}
+
+$('phone-chat-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const field = $('phone-chat-field');
+  const text = field.value.trim();
+  if (!chat || !text) return;
+  send({ t: 'chat-send', key: chat.key, text });
+  field.value = '';
+});
+
 /** Pendant une partie : les réglages en partie à ouvrir, ou pourquoi ils ne s'ouvrent pas. */
 function renderGame() {
   const can = entries?.inGame;
@@ -565,6 +622,8 @@ function connect(force = false) {
     if (ws !== socket) return;
     socket = undefined;
     releaseButtons(false);
+    // La borne oublie la vue Scores avec la liaison : la suivante la redemande (message « mode »).
+    ranks.live = false;
     // Un envoi est lié à sa connexion : coupée, il s'arrête (la borne efface ce qu'elle avait reçu).
     if (upload && (upload.phase === 'asking' || upload.phase === 'sending')) failUpload(t('La liaison avec la borne a été coupée. Sélectionnez à nouveau le fichier pour réessayer.'), t('Envoi interrompu'));
     // Téléphone gardé et Cyber Pinball fermé : il revient seul quand la borne écoute de nouveau.
@@ -613,6 +672,8 @@ function handle(m) {
     }
     case 'mode':
       setMode(m.mode);
+      // Une liaison neuve (ou une partie qui commence) : la vue Scores ouverte redemande son tableau.
+      if (document.body.dataset.view === 'ranks' && m.mode !== 'browser') ranksAsk();
       if (hintAfterMode && state === 'paired') {
         hintAfterMode = false;
         offerHomeScreen();
@@ -643,6 +704,10 @@ function handle(m) {
       menus = { nodes: Array.isArray(m.nodes) ? m.nodes : [], locked: typeof m.locked === 'string' ? m.locked : '' };
       renderMenus();
       break;
+    case 'ranks-tables':
+    case 'ranks':
+      ranksMessage(m);
+      break;
     case 'up-ready':
       uploadReady(m);
       break;
@@ -656,6 +721,10 @@ function handle(m) {
       showPage(m.page ?? {});
       actions = Array.isArray(m.actions) ? m.actions : [];
       search = m.search;
+      break;
+    case 'chat':
+      chat = m.chat && typeof m.chat === 'object' && typeof m.chat.key === 'string' && Array.isArray(m.chat.lines) ? m.chat : null;
+      renderChat();
       break;
     case 'field':
       showField(m.field);
@@ -880,14 +949,17 @@ function syncLayout() {
   body.dataset.short = String(visible < 440);
   body.dataset.compact = String(visible < 640);
   body.dataset.held = String(held.size > 0);
-  // Pendant une partie, les vues n'ont de sens qu'avec les réglages en partie ouverts (sans Menus : après la partie).
+  // Pendant une partie : Écran (la partie, ou les réglages en partie ouverts), Boutons seulement avec
+  // ces réglages, Scores toujours ; Menus après la partie. Indisponible : grisé, avec sa raison.
   const ingame = mode === 'game' && entries?.kind === 'ingame';
   body.dataset.ingame = String(ingame);
-  const menusOff = mode === 'game';
-  const tabMenus = $('tab-menus');
-  tabMenus.disabled = menusOff;
-  tabMenus.querySelector('.view-reason').textContent = menusOff ? t('Après la partie') : '';
-  const shownView = menusOff && view === 'menus' ? 'list' : view;
+  const off = { menus: mode === 'game', buttons: mode === 'game' && !ingame };
+  for (const name of ['menus', 'buttons']) {
+    const tab = $(`tab-${name}`);
+    tab.disabled = off[name];
+    tab.querySelector('.view-reason').textContent = off[name] ? t('Après la partie') : '';
+  }
+  const shownView = off[view] ? 'list' : view;
   body.dataset.view = shownView;
   for (const v of Object.keys(VIEWS)) $(`tab-${v}`).setAttribute('aria-selected', String(v === shownView));
   // Clavier à l'écran de la borne ouvert : Start y tape la touche choisie, Valider (téléphone) envoie Entrée.

@@ -446,6 +446,10 @@ export type UiAction =
   | { type: 'friend-requests' }
   /** Notification de la partie entre amis (un invité accepte, la partie est finie) : l'écran de la partie. */
   | { type: 'live-game' }
+  /** Notification d'un message : le fil de son auteur (chat-menu.ts). */
+  | { type: 'messages' }
+  /** Notification d'un « J'aime » : Mon profil public (profile-menu.ts). */
+  | { type: 'my-profile' }
   /** Résumé « 4 nouveautés » : Activité récente, qui dit chacune en entier. */
   | { type: 'activity' }
   /** Repère de la liste de contenu (« Sortir de la liste », « Revenir à la liste ») : comme MagnaSave. */
@@ -499,6 +503,12 @@ export interface Row {
   sub?: string;
   /** Case devant la ligne : cochée, vide, ou barrée (sautée, refusée : on ne peut pas la cocher). */
   check?: 'on' | 'off' | 'skip';
+  /**
+   * Fil de la messagerie (chat-menu.ts, section `kind: 'chat'`) : bulle reçue (à gauche), envoyée (à
+   * droite), en attente (pointillés) ou non remise, carte d'un évènement de la borne (au centre), ou
+   * séparateur de jour. Les badges sont les réactions posées sur le message, sous la bulle.
+   */
+  bubble?: 'in' | 'out' | 'pending' | 'expired' | 'card' | 'day';
 }
 export interface Section {
   title?: string;

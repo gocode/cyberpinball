@@ -116,6 +116,7 @@ const CYBER_ICONS = {
   // Amis : réseau des bornes
   friends: '<circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6M15.5 4.5a3.5 3.5 0 0 1 0 7M17 14c2.5.5 4 2.5 4 6"/>', // Deux joueurs : la rubrique Amis.
   'friend-list': '<path d="M11.5 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM4 20v-1a4.5 4.5 0 0 1 9 0v1M16 7h4M16 12h4M16 17h4"/>', // Un joueur et sa liste : mes amis.
+  message: '<path d="M4 5h16v11H10l-5 4v-4H4z"/><path d="M8 9.5h8M8 12.5h5"/>', // Une bulle : la messagerie entre amis.
   'friend-add': '<path d="M11.5 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM4 20v-1a4.5 4.5 0 0 1 7.5-3.35M17 13v7M13.5 16.5h7"/>', // Un joueur et un plus : trouver un joueur, demander.
   'friend-request': '<path d="M11.5 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM4 20v-1a4.5 4.5 0 0 1 7.5-3.35M20 16.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0zM16.5 14.5v2l1.5 1"/>', // Un joueur et une horloge : demandes en attente.
   bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/>', // Cloche : notifications du menu des tables.

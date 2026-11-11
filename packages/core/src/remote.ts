@@ -40,6 +40,8 @@
 
 import * as crypto from 'node:crypto';
 import { aeadOpen, aeadSeal } from './chacha';
+import { RANKING_SCOPES, type RankingScope } from './rankings';
+import { SCORE_PERIODS, type ScorePeriod } from './scoreboard';
 
 /** Durée de validité d'un QR code (sa clé d'appairage), puis il se renouvelle. */
 export const REMOTE_PAIRING_MS = 3 * 60_000;
@@ -401,6 +403,21 @@ export type PhoneMessage =
   | { t: 'pick'; s: number; v: number; i: number }
   /** Au menu : ouvrir directement un menu par son identifiant (remoteMenuTarget), vérifié par la borne. */
   | { t: 'open'; s: number; id: string }
+  /**
+   * Classements (vue Scores) : le tableau d'une table pour une portée et une période. La table est
+   * un rang de la liste envoyée sous la version `v` (« ranks-tables ») ; sans rang, celle que la
+   * borne a choisie ou lancée. Des nombres et deux mots connus, jamais un chemin : la borne lit ses
+   * propres données, en lecture seule.
+   */
+  | { t: 'ranks'; s: number; scope: RankingScope; period: ScorePeriod; table?: { v: number; i: number } }
+  /** La vue Scores est quittée : la borne ne recalcule plus les classements pour le téléphone. */
+  | { t: 'ranks-off'; s: number }
+  /**
+   * Messagerie pendant une partie (chat-menu.ts) : écrire à l'ami du fil montré, ou réagir à un de
+   * ses messages, sans toucher aux boutons de VPX. La borne vérifie l'ami, le texte et la réaction.
+   */
+  | { t: 'chat-send'; s: number; key: string; text: string }
+  | { t: 'chat-react'; s: number; key: string; target: string; kind: string }
   | { t: 'ping'; s: number }
   | { t: 'bye'; s: number };
 
@@ -453,6 +470,19 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       return typeof m.v === 'number' && Number.isSafeInteger(m.v) && m.v >= 0 && typeof m.i === 'number' && Number.isInteger(m.i) && m.i >= 0 && m.i < REMOTE_ENTRIES_MAX ? { t: 'pick', s, v: m.v, i: m.i } : undefined;
     case 'open':
       return typeof m.id === 'string' && /^[a-z0-9-]{1,40}$/.test(m.id) ? { t: 'open', s, id: m.id } : undefined;
+    case 'ranks': {
+      if (!RANKING_SCOPES.includes(m.scope as RankingScope) || !SCORE_PERIODS.includes(m.period as ScorePeriod)) return undefined;
+      const base = { t: 'ranks' as const, s, scope: m.scope as RankingScope, period: m.period as ScorePeriod };
+      if (m.v === undefined && m.i === undefined) return base;
+      const index = (v: unknown, max: number) => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 && v < max;
+      return index(m.v, Number.MAX_SAFE_INTEGER) && index(m.i, REMOTE_ENTRIES_MAX) ? { ...base, table: { v: m.v as number, i: m.i as number } } : undefined;
+    }
+    case 'ranks-off':
+      return { t: 'ranks-off', s };
+    case 'chat-send':
+      return typeof m.key === 'string' && /^[0-9a-f]{64}$/.test(m.key) && typeof m.text === 'string' && m.text.length <= 4000 ? { t: 'chat-send', s, key: m.key, text: m.text } : undefined;
+    case 'chat-react':
+      return typeof m.key === 'string' && /^[0-9a-f]{64}$/.test(m.key) && typeof m.target === 'string' && /^[0-9a-f]{16}$/.test(m.target) && typeof m.kind === 'string' && /^[a-z]{1,20}$/.test(m.kind) ? { t: 'chat-react', s, key: m.key, target: m.target, kind: m.kind } : undefined;
     case 'ping':
       return { t: 'ping', s };
     case 'bye':

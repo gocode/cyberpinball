@@ -473,7 +473,8 @@ body[data-held='true'] .btn[data-b='confirm'].down {
   box-shadow: var(--halo-panel);
 }
 
-body[data-mode='game'] .game-note {
+/* La partie dans la vue Écran ; les Scores restent à un toucher, au-dessus. */
+body[data-mode='game'][data-view='list'] .game-note {
   display: flex;
 }
 
@@ -506,29 +507,34 @@ body[data-mode='game'][data-ingame='true'] .game-note {
   color: var(--ink-muted);
 }
 
-/* --- Vues du menu : Écran, Menus, Boutons --- */
+/* --- Vues du menu : Écran, Menus, Boutons, Scores --- */
 
 .views {
   display: none;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   flex-shrink: 0;
 }
 
+/* Au menu, et pendant une partie : les Scores s'y consultent, Menus et Boutons attendent (grisés). */
 body[data-mode='menu'] .views,
-body[data-mode='game'][data-ingame='true'] .views {
+body[data-mode='game'] .views {
   display: grid;
 }
 
-/* La vue choisie : claire, jamais verte (le vert est au choix courant de la liste, et à Start). */
+/*
+ * La vue choisie : claire, jamais verte (le vert est au choix courant de la liste, et à Start).
+ * Quatre onglets : l'icône au-dessus du libellé, qui garde toute la largeur de l'onglet.
+ */
 .view-tab {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 2px;
   min-width: 0;
   min-height: 52px;
-  padding: 4px 6px;
+  padding: 4px 2px;
   border: 1px solid var(--line-soft);
   border-radius: 12px;
   background: var(--surface);
@@ -544,9 +550,18 @@ body[data-mode='game'][data-ingame='true'] .views {
 .view-text {
   display: flex;
   flex-direction: column;
+  align-items: center;
   min-width: 0;
-  text-align: left;
+  max-width: 100%;
+  text-align: center;
   line-height: 19px;
+}
+
+.view-label {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .view-reason:empty {
@@ -818,6 +833,494 @@ body:not([data-state='paired']) .menus {
   text-overflow: ellipsis;
   font-size: 15px;
   color: var(--ink-muted);
+}
+
+/* --- Scores : le tableau des scores d'une table (telephone-ranks.js) --- */
+
+/*
+ * Comme à la borne (library.css, « lib-scoreboard ») : les portées en onglets soulignés, les quatre
+ * périodes (deux par rangée, comme la borne en portrait), puis une grille commune. La table en tête,
+ * fixe ; le reste défile dans le panneau sur un petit écran, jamais la page.
+ */
+.ranks {
+  --ranks-flag: 24px;
+  --ranks-face: 32px;
+  display: none;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--halo-panel);
+  overflow: hidden;
+}
+
+body:not([data-mode='browser'])[data-view='ranks'] .ranks {
+  display: flex;
+}
+
+body:not([data-state='paired']) .ranks {
+  visibility: hidden;
+}
+
+.ranks-table {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: none;
+  color: var(--ink);
+  text-align: left;
+}
+
+.ranks-table:active:not(:disabled) {
+  background: var(--surface-raised);
+}
+
+.ranks-table-mark {
+  flex: 0 0 28px;
+  display: flex;
+  justify-content: center;
+  font-size: 24px;
+  color: var(--ink-muted);
+}
+
+.ranks-table-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ranks-table-title,
+.ranks-table-detail {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ranks-table-title {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.ranks-table-detail {
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+
+.ranks-table-detail:empty {
+  display: none;
+}
+
+.ranks-table-go {
+  flex: none;
+  display: flex;
+  font-size: 22px;
+  color: var(--ink-muted);
+}
+
+/* Une seule table, ou classements fermés : le titre reste, sans rien à ouvrir. */
+.ranks-table:disabled .ranks-table-go {
+  visibility: hidden;
+}
+
+.ranks-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 10px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+}
+
+/* Hauteur visible modeste (iPhone SE, Android de 568 à 640 px) : la table et les périodes se resserrent, le tableau gagne une ligne. */
+body[data-compact='true'] .ranks-table {
+  min-height: 52px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+body[data-compact='true'] .ranks-period {
+  min-height: 48px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+.ranks-scroll[hidden],
+.ranks-picker[hidden],
+.ranks-foot[hidden],
+.ranks-filter[hidden],
+.ranks-note[hidden],
+.ranks-legend[hidden] {
+  display: none;
+}
+
+.ranks-scopes {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.ranks-scopes:empty,
+.ranks-periods:empty {
+  display: none;
+}
+
+/* Portée : un onglet souligné, sans cadre ; l'ouverte en vert signal. Indisponible : grisée, sa raison dite une fois choisie. */
+.ranks-scope {
+  min-width: 0;
+  min-height: 48px;
+  padding: 4px 2px 6px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 19px;
+  text-align: center;
+  overflow-wrap: break-word;
+}
+
+.ranks-scope.current {
+  border-bottom-color: var(--signal);
+  color: var(--signal);
+}
+
+.ranks-scope.off {
+  color: var(--ink-faint);
+}
+
+.ranks-scope.current.off {
+  border-bottom-color: var(--ink-faint);
+  color: var(--ink-muted);
+}
+
+.ranks-periods {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ranks-period {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 5px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  text-align: center;
+}
+
+.ranks-period-label,
+.ranks-period-count {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 15px;
+  line-height: 19px;
+}
+
+.ranks-period-label {
+  font-weight: 600;
+}
+
+.ranks-period-count {
+  color: var(--ink-muted);
+}
+
+.ranks-period.current {
+  border-color: var(--signal);
+  background: var(--signal-wash);
+  box-shadow: inset 0 -3px 0 var(--signal);
+}
+
+.ranks-period.current .ranks-period-label {
+  color: var(--signal);
+}
+
+.ranks-period.current .ranks-period-count {
+  color: var(--ink);
+}
+
+/*
+ * Le tableau : chaque ligne, une grille aux mêmes colonnes (--ranks-cols, posé par
+ * telephone-ranks.js) : rang et score à la largeur du plus long, en chiffres de même chasse ;
+ * drapeau et pastille de taille fixe ; le nom prend le reste et s'abrège. Une ligne tient sur une
+ * ligne de texte, à 52 px de haut : on la touche pour lire quand, le pays et la présence.
+ */
+.ranks-lines {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ranks-lines:empty {
+  display: none;
+}
+
+.ranks-line {
+  display: grid;
+  grid-template-columns: var(--ranks-cols);
+  column-gap: 8px;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--line-soft);
+  border-left: 3px solid transparent;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+  font-variant-numeric: tabular-nums;
+  touch-action: pan-y;
+}
+
+.ranks-line:active {
+  background: var(--surface-raised);
+}
+
+.ranks-line:focus-visible {
+  outline: 2px solid var(--ink-muted);
+  outline-offset: -2px;
+}
+
+.ranks-line.first {
+  border-left-color: var(--table-tint);
+  background: var(--surface-raised);
+}
+
+/* La ligne du joueur de cette borne : un aplat discret, jamais le vert du choix courant. */
+.ranks-line.mine {
+  background: rgba(54, 201, 180, 0.14);
+  background: color-mix(in oklab, var(--table-tint) 14%, transparent);
+}
+
+/* Ma ligne au-delà des premières places : séparée du tableau par un filet en pointillé. */
+.ranks-line.apart {
+  margin-top: 8px;
+  border-top: 1px dashed var(--line-strong);
+}
+
+.ranks-rank {
+  text-align: right;
+  white-space: nowrap;
+  color: var(--ink-muted);
+}
+
+.ranks-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  letter-spacing: 0.02em;
+}
+
+.ranks-name.anonymous {
+  font-weight: 400;
+  color: var(--ink-faint);
+}
+
+.ranks-score {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Drapeau en 4:3, filet clair pour qu'un drapeau sombre ou blanc se détache ; sans image, son code dans le même cadre. */
+.ranks-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ranks-flag);
+  height: calc(var(--ranks-flag) * 0.75);
+  overflow: hidden;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--line-strong);
+  background: var(--surface-raised);
+  line-height: 1;
+}
+
+.ranks-flag > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ranks-flag.code {
+  font-size: 11px;
+  letter-spacing: 0;
+  color: var(--meta);
+}
+
+/* Sans pays ou sans pastille : la case reste, vide. */
+.ranks-flag.none,
+.ranks-face.none {
+  visibility: hidden;
+}
+
+/*
+ * La pastille du joueur et sa marque de présence en bas à droite, détachée par un liseré de la
+ * couleur du panneau : point vert en ligne ; point et anneau verts en partie ; point creux hors ligne.
+ */
+.ranks-face {
+  position: relative;
+  width: var(--ranks-face);
+  height: var(--ranks-face);
+}
+
+.ranks-avatar {
+  width: 100%;
+  height: 100%;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.ranks .presence-dot {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.ranks .presence-online .presence-dot,
+.ranks .presence-playing .presence-dot {
+  background: var(--signal);
+}
+
+.ranks .presence-offline .presence-dot {
+  border: 2px solid var(--ink-faint);
+  background: var(--surface);
+}
+
+.ranks .presence-playing .ranks-avatar {
+  box-shadow: 0 0 0 2px var(--signal);
+}
+
+/* Ma place dans ce classement, sous le tableau : lisible, sans le vert réservé au choix. */
+.ranks-position {
+  flex: none;
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--table-tint);
+  background: var(--surface-raised);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 21px;
+  overflow-wrap: anywhere;
+}
+
+.ranks-foot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.ranks-note,
+.ranks-legend {
+  margin: 0;
+  font-size: 15px;
+  line-height: 21px;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.ranks-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.ranks-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ranks-legend-face {
+  position: relative;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+
+.ranks-legend-item.presence-playing .ranks-legend-face {
+  box-shadow: 0 0 0 2px var(--signal);
+}
+
+.ranks .ranks-legend-face .presence-dot {
+  right: -3px;
+  bottom: -3px;
+  width: 9px;
+  height: 9px;
+}
+
+/* La liste des tables : un filtre au-delà de huit tables, puis les lignes, comme la vue Menus. */
+.ranks-picker {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ranks-filter {
+  flex: none;
+  height: 48px;
+  margin: 8px 8px 0;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.ranks-filter::placeholder {
+  color: var(--ink-faint);
+}
+
+.ranks-filter:focus {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
 }
 
 /* --- Envoi d'un fichier vers la borne --- */
@@ -1248,6 +1751,34 @@ body[data-short='true'] .page {
   .btn[data-b='zone'] .btn-name {
     font-size: 16px;
   }
+
+  /*
+   * Scores : portées et périodes un peu resserrées (Saira se condense) ; la grille aussi, drapeau et
+   * pastille un peu plus petits, pour que le nom garde sa place à côté d'un score de neuf chiffres.
+   */
+  .ranks {
+    --ranks-flag: 20px;
+    --ranks-face: 28px;
+  }
+
+  .ranks-scope,
+  .ranks-period {
+    font-stretch: 88%;
+  }
+
+  .ranks-line {
+    column-gap: 5px;
+    padding: 0 4px;
+    font-size: 15px;
+  }
+
+  .ranks-avatar {
+    font-size: 12px;
+  }
+
+  .ranks-scroll {
+    padding: 4px 8px 12px;
+  }
 }
 
 /* --- Feuille d'actions --- */
@@ -1355,4 +1886,143 @@ body[data-short='true'] .page {
   .dot {
     animation: none !important;
   }
+}
+
+/* --- Messagerie pendant la partie (chat-menu.ts, remoteChat) ---
+   Le fil le plus récent : bulles reçues à gauche, envoyées à droite ; puis réactions et phrases
+   d'un appui (44 px de haut au moins), et le champ avec « Envoyer ». */
+.phone-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+
+.phone-chat[hidden] {
+  display: none;
+}
+
+.phone-chat-name {
+  margin: 4px 0 0;
+  font-size: 18px;
+  line-height: 24px;
+}
+
+.phone-chat-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 40vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.phone-chat-line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 85%;
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.phone-chat-line.out {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.phone-chat-bubble {
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface-raised);
+  font-size: 16px;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.phone-chat-line.out .phone-chat-bubble {
+  background: #0c2024;
+  border-color: #315665;
+}
+
+.phone-chat-meta {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.phone-chat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.phone-chat-chip {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.phone-chat-form {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.phone-chat-form input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--void);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.phone-chat-send.key {
+  flex: 0 0 auto;
+  min-height: 44px;
+}
+
+/* Le fil présent : la page part du haut, plus serrée, et tout tient à l'écran (le champ jamais
+   repoussé hors de la vue) ; les pastilles sur une rangée qui défile ; l'état de la dernière bulle
+   jamais sous la barre de défilement. */
+.game-note:has(.phone-chat:not([hidden])) {
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 16px;
+  overflow: hidden;
+}
+
+.game-note:has(.phone-chat:not([hidden])) .message-text {
+  display: none;
+}
+
+.phone-chat-lines {
+  max-height: 32vh;
+  padding-right: 10px;
+}
+
+.phone-chat-chips {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.phone-chat-chip {
+  flex: none;
+  white-space: nowrap;
 }

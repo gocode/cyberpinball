@@ -40,13 +40,15 @@ export type NoticeKind =
   | 'live-accepted'
   | 'live-declined'
   | 'live-left'
+  | 'friend-message'
+  | 'player-like'
   | 'friend-request' | 'friend-accepted' | 'download-failed' | 'download-done' | 'friend-online' | 'friend-playing' | 'friend-record' | 'friend-badge';
 
 /** Bleu méta : une information ; vert : une réussite ; ambre : à voir ; rouge : bloqué. */
 export type NoticeTone = 'ok' | 'info' | 'warning' | 'error';
 
 /** Ce qu'un clic sur la notification ouvre (action du menu des tables). */
-export type NoticeAct = { type: 'friends' } | { type: 'friend-requests' } | { type: 'downloads' } | { type: 'live-game' } | { type: 'activity' };
+export type NoticeAct = { type: 'friends' } | { type: 'friend-requests' } | { type: 'downloads' } | { type: 'live-game' } | { type: 'activity' } | { type: 'messages' } | { type: 'my-profile' };
 
 export interface NoticeEvent {
   kind: NoticeKind;
@@ -116,6 +118,10 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   'live-accepted': { priority: 2, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'ok', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
   'live-declined': { priority: 3, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'info', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
   'live-left': { priority: 4, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'warning', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
+  // Un message d'un ami (messagerie, chat.ts) : partout, par-dessus VPX compris ; ceux qui arrivent ensemble n'en font qu'une.
+  'friend-message': { priority: 9, ttlMs: 60 * MIN, quietMs: MIN, icon: 'message', tone: 'info', act: { type: 'messages' }, away: true, sound: 'news' },
+  // Un « J'aime » sur mon activité publique (publicprofile.ts) : au menu, regroupés, jamais un par un.
+  'player-like': { priority: 18, ttlMs: 60 * MIN, quietMs: MIN, icon: 'star', tone: 'ok', act: { type: 'my-profile' } },
   'friend-request': { priority: 10, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friend-request', tone: 'warning', act: { type: 'friend-requests' } },
   'friend-accepted': { priority: 11, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friends', tone: 'ok', act: { type: 'friends' } },
   'download-failed': { priority: 12, ttlMs: 60 * MIN, quietMs: 60 * MIN, icon: 'alert', tone: 'error', act: { type: 'downloads' } },
@@ -323,6 +329,19 @@ export function noticeText(kind: NoticeKind, events: readonly NoticeEvent[], opt
       const place = !last.won && last.place ? t('vous : place {rank} sur {n}', { rank: last.place.rank, n: last.place.of }) : undefined;
       return fit({ title, detail: [t('Résultats : {path}', { path: t('Menu système > Amis') }), place].filter(Boolean).join(' · ') });
     }
+    case 'friend-message': {
+      // Le dernier message en précision : c'est lui qu'on veut lire.
+      const last = events[events.length - 1]!;
+      const same = events.every((e) => e.who === last.who);
+      if (one) return fit({ title: t('Message de {name}', { name: who(one) }), ...(one.extra ? { detail: one.extra } : {}) });
+      return fit(same ? { title: tn(n, '{n} message de {name}', '{n} messages de {name}', { name: who(last) }), ...(last.extra ? { detail: last.extra } : {}) } : { title: tn(n, '{n} message de vos amis', '{n} messages de vos amis'), detail: names() });
+    }
+    case 'player-like': {
+      // `subject` : ce qui est aimé (« Comet Chaser · 14 210 500 », un badge).
+      const last = events[events.length - 1]!;
+      if (one) return fit({ title: t('{name} aime votre activité', { name: who(one) }), ...(one.subject ? { detail: subject(one) } : {}) });
+      return fit({ title: namesTitle((names) => t('{names} aiment votre activité', { names }), () => tn(n, '{n} « J’aime » sur votre activité', '{n} « J’aime » sur votre activité'), events), ...(last.subject ? { detail: subject(last) } : {}) });
+    }
     case 'friend-online':
       return fit(one ? { title: t('{name} vient de se connecter', { name: who(one) }) } : { title: tn(n, '{n} ami vient de se connecter', '{n} amis viennent de se connecter'), detail: names() });
     case 'friend-request':
@@ -361,6 +380,10 @@ function digestPart(kind: NoticeKind, n: number): string {
       return tn(n, '{n} invitation déclinée', '{n} invitations déclinées');
     case 'live-left':
       return tn(n, '{n} joueur parti', '{n} joueurs partis');
+    case 'friend-message':
+      return tn(n, '{n} message', '{n} messages');
+    case 'player-like':
+      return tn(n, '{n} « J’aime »', '{n} « J’aime »');
     case 'friend-online':
       return tn(n, '{n} ami connecté', '{n} amis connectés');
     case 'friend-request':
