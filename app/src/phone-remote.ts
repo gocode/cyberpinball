@@ -393,6 +393,8 @@ const TYPES: Record<string, string> = {
 const FLAG_PATH = /^\/drapeaux\/([a-z]{2})\.svg$/;
 /** Une image sous son jeton (remote-images.ts) : pastille d'un joueur, pochette, miniature d'une table. */
 const IMAGE_PATH = new RegExp(`^${REMOTE_IMAGE_PATH}([A-Za-z0-9_-]{22})$`);
+/** Écoute qui n'a pas pu s'ouvrir : nouveaux essais après 5 s, 15 s, 30 s, puis chaque minute. */
+const LISTEN_RETRY_MS = [5_000, 15_000, 30_000, 60_000];
 /** Au plus, images réduites gardées en mémoire (une miniature se redemande à chaque passage dans la liste). */
 const RESIZED_MAX = 400;
 /** Les classements sont relus au plus à ce rythme pendant que la vue Scores est ouverte (sauf demande du téléphone). */
@@ -522,6 +524,9 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   /** Dernier fil de la messagerie envoyé au téléphone (pendant une partie). */
   let chatSent = '';
   let communitySent = '';
+  /** Nouvel essai d'écoute prévu, et combien déjà depuis le réveil. */
+  let listenRetry: NodeJS.Timeout | undefined;
+  let listenTries = 0;
   /** Ce que fait chaque collection de l'écran envoyé ; le téléphone regarde-t-il la grille (images des frontons) ? */
   let collectionPicks: (undefined | (() => void))[] = [];
   let wantsMedia = false;
@@ -1784,10 +1789,16 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     const port = (s.address() as { port: number }).port;
     server = s;
     address = { host, port };
+    unavailable = undefined;
     log(`Télécommande : page du téléphone servie sur ${host}:${port} (${mode === 'lan' ? 'réseau local' : 'essai, 127.0.0.1'}).`); // i18n-ignore : journal
   }
 
-  /** Un QR va s'afficher : la télécommande se réveille (appairage neuf, écoute). Rien si elle l'est déjà. */
+  /**
+   * Un QR va s'afficher : la télécommande se réveille (appairage neuf, écoute). Rien si elle l'est déjà.
+   * L'écoute qui n'a pas pu s'ouvrir (exception, pas encore de réseau au démarrage, pare-feu pas encore
+   * autorisé) est retentée seule, de plus en plus espacée (LISTEN_RETRY_MS) : jamais figée jusqu'au
+   * prochain redémarrage. L'utilisateur lit une phrase claire ; le détail d'une exception va au journal.
+   */
   function wake(): void {
     if (pairing || closed) return;
     const run = ++wakeRun;
@@ -1795,10 +1806,17 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     unavailable = undefined;
     lastBar = '';
     lastPhase = undefined;
+    listenTries = 0;
+    attemptListen(run);
+  }
+
+  function attemptListen(run: number): void {
+    clearTimeout(listenRetry);
+    listenRetry = undefined;
     void listen(opts.mode())
       .catch((error: Error) => {
-        unavailable = t('Indisponible : {reason}', { reason: error.message });
-        log(`Télécommande : écoute impossible (${error.message}).`); // i18n-ignore : journal
+        unavailable = t('Indisponible : la télécommande n’a pas pu démarrer ; nouvel essai dans un instant.');
+        journalIncident('Télécommande : écoute impossible', error); // i18n-ignore : journal
       })
       .finally(() => {
         if (run !== wakeRun) return closeServer();
@@ -1806,6 +1824,15 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         ticker = setInterval(heartbeat, FIELD_POLL_MS);
         ticker.unref?.();
         tick();
+        // Pas d'écoute (sauf réseau coupé exprès) : nouvel essai, de plus en plus espacé.
+        if (server || closed || opts.mode() === 'off') return;
+        const wait = LISTEN_RETRY_MS[Math.min(listenTries++, LISTEN_RETRY_MS.length - 1)]!;
+        listenRetry = setTimeout(() => {
+          if (run !== wakeRun || server || closed) return;
+          log(`Télécommande : nouvel essai d'écoute (${listenTries}).`); // i18n-ignore : journal
+          attemptListen(run);
+        }, wait);
+        listenRetry.unref?.();
       });
   }
 
@@ -1858,6 +1885,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   function sleep(why: 'closed' | 'quit' = 'closed'): void {
     if (!pairing) return;
     wakeRun++;
+    clearTimeout(listenRetry);
+    listenRetry = undefined;
     generation++;
     if (active) endLink(active, why);
     active = undefined;
@@ -1993,8 +2022,12 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     /** Le menu de Cyber Pinball (frontend.ts) : le téléphone le pilote quand « Récupérer » est fermé. */
     setMenu(next: MenuTarget): void {
       menu = next;
-      // Un téléphone gardé peut revenir dès le démarrage.
-      if (keepListening()) wake();
+      // Un téléphone gardé peut revenir dès le démarrage. Réveil différé : setMenu est appelé pendant
+      // l'initialisation du menu, et l'écoute lit ses options (le pare-feu…) ; jamais avant que tout
+      // le module appelant soit initialisé.
+      setImmediate(() => {
+        if (keepListening()) wake();
+      });
     },
     /** Le menu a changé (écran, choix, clavier, partie) : le téléphone suit. Appelé à chaque redessin. */
     menuChanged: () => pushState(),

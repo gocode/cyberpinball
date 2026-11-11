@@ -1023,6 +1023,14 @@ let downloadsShown: string | undefined;
 // Télécommande du téléphone (phone-remote.ts) : le navigateur intégré, puis tout le menu (setMenu,
 // plus bas) ; réseau local réel en usage normal, si la règle du pare-feu de Cyber Pinball est
 // posée ; 127.0.0.1 pendant un essai.
+// Réseau des bornes (Menu système > Amis) : partage activé par défaut, démarré avec le menu ;
+// jamais le vrai réseau pendant un essai sans opérateur (socialNetMode), ni le vrai pare-feu.
+const socialMode = socialNetMode(process.env);
+// La règle du pare-feu de Cyber Pinball (et celle qui ferme VPX au réseau, l'inspector des parties
+// entre amis, pour sa version active). Déclarée avant la télécommande, qui la lit dès son réveil : un
+// téléphone gardé la réveille au démarrage (0.1.9-essai.66 : lue avant d'exister, `undefined` dans
+// l'application assemblée, et la télécommande restait « Indisponible »). avant-declaration.test.ts.
+const socialFirewall = createFirewallRule({ exe: process.execPath, simulated: socialMode !== 'public', vpx: () => vpxFirewallTargets(vpxInstall(loc)?.exe), log: (line) => console.log(line) });
 /** Fichier qui arrive du téléphone : le bandeau du menu et l'écran de la télécommande le suivent. */
 let phoneUpload: { name: string; received: number; size: number } | undefined;
 const phoneRemote = createPhoneRemote({
@@ -2163,9 +2171,6 @@ library.provideSystemItem(
 library.provideSystemItem('guest-mode', createGuestMenu({
   collections: () => ({ choices: collections.list().filter((c) => c.tables.length).map((c) => ({ id: c.id, label: c.label, count: c.tables.length })), active: collections.current().id }), library, guest, buttons: () => buttons }));
 
-// Réseau des bornes (Menu système > Amis) : partage activé par défaut, démarré avec le menu ;
-// jamais le vrai réseau pendant un essai sans opérateur (socialNetMode), ni le vrai pare-feu.
-const socialMode = socialNetMode(process.env);
 // Démonstration : un ami hors ligne écrit avant le démarrage, des bornes fictives après.
 const socialDemo = socialMode === 'simulated' && simulatedPlayersWanted(process.env);
 if (socialDemo) seedSimulatedFriends(loc.dataDir);
@@ -2238,8 +2243,6 @@ function downloadsChanged(): void {
     }
   }, 250);
 }
-// Et la règle qui ferme VPX au réseau (l'inspector des parties entre amis), pour sa version active.
-const socialFirewall = createFirewallRule({ exe: process.execPath, simulated: socialMode !== 'public', vpx: () => vpxFirewallTargets(vpxInstall(loc)?.exe), log: (line) => console.log(line) });
 const romsOf = (table: TableEntry) => cachedScript(table.file, loc.dataDir)?.roms ?? [];
 // Bibliothèque partagée entre amis : la mienne servie si je la partage, la leur et leurs médias.
 /** L'inventaire du dossier d'une table, celui de « Fichiers de la table » : ses parties, à transmettre ou déjà là. */

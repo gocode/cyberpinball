@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { orphanOutputs, removeOrphanOutputs } from './sorties-orphelines.mjs';
+import { leakedOutputs, orphanOutputs, removeOrphanOutputs } from './sorties-orphelines.mjs';
 
 function write(file, text = '') {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -45,4 +45,22 @@ test('une sortie compilée sans source est retirée, le reste de dist\\ ne bouge
 test('npm run build retire les sorties orphelines avant de compiler', () => {
   const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   assert.match(pkg.scripts.build, /sorties-orphelines\.mjs.*tsc -b/);
+});
+
+test('une sortie de tsc écrite dans src\\ à côté de sa source TypeScript est retirée ; une source .js reste', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sorties-egarees-'));
+  try {
+    write(path.join(root, 'package.json'), JSON.stringify({ workspaces: ['app'] }));
+    const src = path.join(root, 'app', 'src');
+    write(path.join(src, 'telecommande.ts'));
+    write(path.join(src, 'page.js'));
+    const leaked = ['.js', '.js.map', '.d.ts', '.d.ts.map'].map((ext) => path.join(src, `telecommande${ext}`));
+    for (const file of leaked) write(file);
+    assert.deepEqual(leakedOutputs(root), [...leaked].sort());
+    assert.deepEqual(removeOrphanOutputs(root), [...leaked].sort());
+    assert.deepEqual(leakedOutputs(root), []);
+    assert.ok(fs.existsSync(path.join(src, 'telecommande.ts')) && fs.existsSync(path.join(src, 'page.js')), 'les sources restent');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

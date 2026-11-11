@@ -8,6 +8,10 @@
 // 07/11/2026 : huit échecs de gamereturn.test.js après le retrait du retour d'une partie solo).
 // Un module retiré pouvait aussi rester importable par erreur depuis dist\.
 //
+// Et l'inverse : une sortie de tsc écrite dans src\ à côté de sa source TypeScript (une compilation
+// qui a mêlé deux projets, 11/11/2026 : 45 fichiers .js, .d.ts et .js.map dans app\src\, entrés dans
+// un commit). Elle est retirée de même ; --verifier la signale.
+//
 // Seules les sorties de tsc sont visées (.js, .js.map, .d.ts, .d.ts.map) : un fichier de dist\
 // est orphelin quand aucune source de même nom (.ts, .tsx, .mts, .cts, .js) n'existe dans src\.
 // Les espaces de travail sont ceux de package.json, avec rootDir src et outDir dist.
@@ -54,19 +58,33 @@ export function orphanOutputs(root = repo) {
   return orphans.sort();
 }
 
-/** Retire les sorties orphelines ; renvoie leur liste. */
+/** Les sorties de tsc écrites dans src\ : un .js, .d.ts ou .map à côté d'une source TypeScript de même nom. */
+export function leakedOutputs(root = repo) {
+  const { workspaces: dirs = [] } = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const leaked = [];
+  for (const dir of dirs) {
+    for (const file of walk(path.join(root, dir, 'src'))) {
+      if (!OUTPUT.test(file)) continue;
+      const base = file.replace(OUTPUT, '');
+      if (['.ts', '.tsx', '.mts', '.cts'].some((ext) => fs.existsSync(base + ext))) leaked.push(file);
+    }
+  }
+  return leaked.sort();
+}
+
+/** Retire les sorties orphelines (dist\) et les sorties égarées dans src\ ; renvoie leur liste. */
 export function removeOrphanOutputs(root = repo) {
-  const orphans = orphanOutputs(root);
+  const orphans = [...orphanOutputs(root), ...leakedOutputs(root)];
   for (const file of orphans) fs.rmSync(file, { force: true });
   return orphans;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.argv.includes('--verifier')) {
-    const orphans = orphanOutputs();
+    const orphans = [...orphanOutputs(), ...leakedOutputs()];
     for (const file of orphans) console.log(path.relative(repo, file));
     if (orphans.length) {
-      console.error(`${orphans.length} sortie(s) compilée(s) sans source : node scripts/sorties-orphelines.mjs les retire.`);
+      console.error(`${orphans.length} sortie(s) compilée(s) sans source ou égarée(s) dans src : node scripts/sorties-orphelines.mjs les retire.`);
       process.exit(1);
     }
   } else {

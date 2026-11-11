@@ -248,4 +248,5 @@ export const messages: Record<string, string> = {
   'Collection imposée en mode invité': 'Collection set in guest mode',
   'Voir en grille': 'Show as a grid',
   'Voir en liste': 'Show as a list',
+  'Indisponible : la télécommande n’a pas pu démarrer ; nouvel essai dans un instant.': 'Unavailable: the remote could not start; trying again in a moment.',
 };
