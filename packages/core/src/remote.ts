@@ -401,6 +401,10 @@ export type PhoneMessage =
    * Deux nombres, jamais un libellé ni un chemin : la borne retrouve l'entrée, et l'ignore si l'écran a changé.
    */
   | { t: 'pick'; s: number; v: number; i: number }
+  /** Menu des tables : la collection `i` de la liste envoyée avec l'écran de version `v` (deux nombres, comme « pick »). */
+  | { t: 'collection'; s: number; v: number; i: number }
+  /** Menu des tables en grille : la borne joint l'image du fronton de chaque table (lue seulement quand on la regarde). */
+  | { t: 'grid'; s: number; on: boolean }
   /** Au menu : ouvrir directement un menu par son identifiant (remoteMenuTarget), vérifié par la borne. */
   | { t: 'open'; s: number; id: string }
   /**
@@ -483,6 +487,10 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       return { t: 'up-cancel', s };
     case 'pick':
       return typeof m.v === 'number' && Number.isSafeInteger(m.v) && m.v >= 0 && typeof m.i === 'number' && Number.isInteger(m.i) && m.i >= 0 && m.i < REMOTE_ENTRIES_MAX ? { t: 'pick', s, v: m.v, i: m.i } : undefined;
+    case 'collection':
+      return typeof m.v === 'number' && Number.isSafeInteger(m.v) && m.v >= 0 && typeof m.i === 'number' && Number.isInteger(m.i) && m.i >= 0 && m.i < 200 ? { t: 'collection', s, v: m.v, i: m.i } : undefined;
+    case 'grid':
+      return typeof m.on === 'boolean' ? { t: 'grid', s, on: m.on } : undefined;
     case 'open':
       return typeof m.id === 'string' && /^[a-z0-9-]{1,40}$/.test(m.id) ? { t: 'open', s, id: m.id } : undefined;
     case 'ranks': {

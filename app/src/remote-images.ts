@@ -15,7 +15,7 @@ export const REMOTE_IMAGE_PATH = '/images/';
 /** Un jeton : 16 octets au hasard, en base64url (22 caractères). */
 export const REMOTE_IMAGE_TOKEN = /^[A-Za-z0-9_-]{22}$/;
 /** Au plus, images servies (un jeton chacune) ; au-delà, les plus anciennes sont oubliées. */
-const IMAGES_MAX = 1500;
+const IMAGES_MAX = 5000;
 
 /** Un fichier derrière un jeton, et le plus grand côté auquel la borne le réduit avant de l'envoyer. */
 export interface RemoteImage {

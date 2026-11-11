@@ -66,6 +66,10 @@ What notifications announced can be read back in full in “Recent activity” (
 
 A content list (games, media, files) next to the screen actions is a zone of its own (`ListeContenu`): a frame, a header bar that does not scroll with the position of the choice and the marker "Exit · Sortir de la liste" (Leave the list) ("MagnaSave · Revenir à la liste" (Back to the list) outside it). The frame of the zone holding the choice lights up in teal, the other zone goes to 0.8 opacity; green stays on the chosen item. Exit in the list brings back to the actions, MagnaSave switches.
 
+## Wheel medallions
+
+Every medallion Cyber Pinball adds to the menu (the Juke-box first) starts from the same template: the 1,000 × 1,000 px chrome ring, without a glass effect ([src/medaillons/contour.png](src/medaillons/contour.png)), whose round hole (radius 363 to 365 px, centred on pixel 499, 499) takes the medallion’s own inside, painted up to 6 px under the ring. `node` is not enough: `npx electron docs/design-system/src/medaillons.cjs` composes them off screen, in two sizes, into `app/renderer/medaillons`: `<name>.png`, full resolution (920 × 920, centred on the hole, original pixels), for the backglass poster and animations; `<name>-512.webp`, lightweight (512 × 512, WebP at 90 %), for the menu wheel, where a medallion is at most 504 px on a 4K playfield. The square is centred on the hole, not on the ring (thicker towards the bottom right): the medallion sits exactly in the wheel’s green ring. A new medallion is added to the script’s `MEDAILLONS` list: its image and the radius of its disc in its own frame.
+
 ## States and interaction to build into the prototype
 
 `.is-focus` marks the control that a button press acts on; `.is-active` / `.is-current` mark an open view. The product must update them according to the actual navigation. In an interactive integration, use semantic buttons, links and tabs, expose the current state to assistive technologies and keep the DOM focus in sync. The spans in the previews are not interactive components ready to ship.

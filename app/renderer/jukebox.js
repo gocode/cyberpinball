@@ -10,7 +10,7 @@
 //   CyberJukebox.wheelPoster(s, desk)  // affiche du médaillon choisi, derrière la roue
 //   CyberJukebox.backglassPoster(s)    // la même, dans le cadre du fronton du menu au bureau
 //   CyberJukebox.zone(node, role, s)   // zone d'un écran annexe : clip, affiche ou rien (false)
-//   CyberJukebox.logo()                // logo rond du médaillon (disque, note, pistes de son)
+//   CyberJukebox.logo(classe, { wheel }) // médaillon sur le gabarit commun (allégé dans la roue)
 //   CyberJukebox.status()              // ce que joue la fenêtre, pour les essais sans opérateur
 //
 // La lecture se fait dans la fenêtre du clip : le son et la vidéo muette d'un morceau sur la borne,
@@ -42,13 +42,16 @@
   // ---------- Logo du médaillon ----------
 
   /**
-   * Logo rond du médaillon (juke-box.svg, piste « Sillon » du 10/11/2026) : vinyle à sillons, deux
-   * croches vert signal dans un label sarcelle, six pistes de son violettes ; une illustration, pas un
-   * pictogramme du registre (celui-là est « jukebox », icons.js).
+   * Médaillon du Juke-box : le gabarit commun des médaillons de la roue (l'anneau chromé,
+   * docs/design-system/src/medaillons.cjs), son centre rempli par le logo « Sillon » du 10/11/2026
+   * (juke-box.svg : vinyle à sillons, deux croches vert signal dans un label sarcelle, six pistes de
+   * son violettes) ; une illustration, pas un pictogramme du registre (celui-là est « jukebox »,
+   * icons.js). Dans la roue, la version allégée (512 px, WebP) ; en grand (affiche du fronton,
+   * animations), la pleine définition (920 px).
    */
-  function logo(className = 'jb-logo') {
+  function logo(className = 'jb-logo', { wheel = false } = {}) {
     const img = el('img', className);
-    img.src = 'juke-box.svg';
+    img.src = wheel ? 'medaillons/juke-box-512.webp' : 'medaillons/juke-box.png';
     img.alt = t('Juke-box');
     img.draggable = false;
     return img;

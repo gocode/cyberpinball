@@ -66,6 +66,10 @@ Ce que les notifications ont annoncé se relit en entier dans « Activité réce
 
 Une liste de contenu (jeux, médias, fichiers) à côté des actions de l’écran est une zone à part (`ListeContenu`) : un cadre, un bandeau qui ne défile pas avec la position du choix et le repère « Exit · Sortir de la liste » (« MagnaSave · Revenir à la liste » hors d’elle). Le cadre de la zone du choix s’éclaire en sarcelle, l’autre zone passe à 0,8 d’opacité ; le vert reste à l’élément choisi. Exit dans la liste ramène aux actions, MagnaSave bascule.
 
+## Médaillons de la roue
+
+Tout médaillon ajouté au menu par Cyber Pinball (le Juke-box d’abord) part du même gabarit : l’anneau chromé de 1 000 × 1 000 px, sans effet de verre ([src/medaillons/contour.png](src/medaillons/contour.png)), dont le trou rond (rayon de 363 à 365 px, centré au pixel 499, 499) reçoit l’intérieur propre au médaillon, peint jusqu’à 6 px sous l’anneau. `node` ne suffit pas : `npx electron docs/design-system/src/medaillons.cjs` les compose hors écran, en deux tailles, dans `app/renderer/medaillons` : `<nom>.png`, pleine définition (920 × 920, centrée sur le trou, pixels d’origine), pour l’affiche du fronton et les animations ; `<nom>-512.webp`, allégée (512 × 512, WebP à 90 %), pour la roue du menu, où un médaillon fait au plus 504 px sur un plateau 4K. Le carré est centré sur le trou, pas sur l’anneau (plus épais vers le bas à droite) : le médaillon tombe juste dans l’anneau vert de la roue. Un nouveau médaillon s’ajoute à la liste `MEDAILLONS` du script : son image et le rayon de son disque dans son propre repère.
+
 ## États et interaction à intégrer dans le prototype
 
 `.is-focus` représente le contrôle sur lequel agit l’appui ; `.is-active` / `.is-current` représentent une vue ouverte. Le produit doit les mettre à jour selon la navigation réelle. Dans une intégration interactive, employer des boutons, des liens et des onglets sémantiques, exposer l’état courant aux technologies d’assistance et synchroniser le focus DOM. Les spans des aperçus ne sont pas des composants interactifs prêts à livrer.

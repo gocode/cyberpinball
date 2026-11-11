@@ -110,6 +110,7 @@ import {
   type PhoneMessage,
   type RemoteField,
   type RemoteButton,
+  type RemoteCollections,
   type RemoteEntries,
   type RemoteEntry,
   type RemoteMenus,
@@ -170,8 +171,15 @@ export interface MenuField {
 /** Une entrée de l'écran montré au téléphone, et ce qu'elle fait quand on la touche (absent : rien). */
 export type MenuEntry = RemoteEntry & { pick?: () => void };
 
-/** L'écran montré au téléphone (remote-menus.ts), ses entrées avec ce qu'elles font. */
-export type MenuEntries = Omit<RemoteEntries, 'items'> & { items: MenuEntry[] };
+/**
+ * L'écran montré au téléphone (remote-menus.ts), ses entrées avec ce qu'elles font. Les images d'une
+ * table (`art`) arrivent en adresses du protocole des médias : la télécommande les met sous jeton.
+ * Les collections du menu des tables, chacune avec ce qu'elle fait quand on la choisit.
+ */
+export type MenuEntries = Omit<RemoteEntries, 'items' | 'collections'> & {
+  items: MenuEntry[];
+  collections?: Omit<RemoteCollections, 'items'> & { items: (RemoteCollections['items'][number] & { pick?: () => void })[] };
+};
 
 /**
  * La messagerie montrée au téléphone pendant une partie (chat-menu.ts) : le fil d'un ami (ses
@@ -266,7 +274,7 @@ export interface MenuTarget {
    * Accès direct (remote-menus.ts) : l'écran affiché et ses entrées, à toucher au téléphone ; au menu
    * comme pendant une partie (réglages en partie). Sans lui, le téléphone n'a que les boutons.
    */
-  entries?(): MenuEntries;
+  entries?(opts?: { media?: boolean }): MenuEntries;
   /** Tous les menus, rangés comme le menu système (remoteMenuTree), ou pourquoi ils sont fermés. */
   menus?(): RemoteMenus;
   /** Ouvrir un menu par son identifiant (remoteMenuTarget) : la borne vérifie tout, et ne fait rien d'un identifiant inconnu ou fermé. */
@@ -514,6 +522,9 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   /** Dernier fil de la messagerie envoyé au téléphone (pendant une partie). */
   let chatSent = '';
   let communitySent = '';
+  /** Ce que fait chaque collection de l'écran envoyé ; le téléphone regarde-t-il la grille (images des frontons) ? */
+  let collectionPicks: (undefined | (() => void))[] = [];
+  let wantsMedia = false;
   let jukeboxSent = '';
   /** Le temps du morceau envoyé, et quand : le téléphone l'avance seul, la borne ne le renvoie qu'en cas d'écart. */
   let jukeboxTime: { key: string; position: number; paused: boolean; at: number } | undefined;
@@ -654,16 +665,17 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   }
 
   /** Images réduites, par jeton (les plus anciennes oubliées au-delà de RESIZED_MAX). */
-  const resized = new Map<string, Buffer>();
+  const resized = new Map<string, { body: Buffer; type: string }>();
 
   /**
-   * Une image à servir : le fichier tel quel, ou réduit (plus grand côté `max`, en JPEG) par Electron
-   * quand il est plus grand ; sans Electron (essais du cœur), tel quel. Illisible : rien.
+   * Une image à servir : le fichier tel quel, ou réduit (plus grand côté `max`) par Electron quand il
+   * est plus grand : en PNG pour un PNG (un médaillon garde sa transparence), en JPEG sinon ; sans
+   * Electron (essais du cœur), tel quel. Illisible : rien.
    */
   function readImage(image: RemoteImage, token: string | undefined, done: (body: Buffer | undefined, type: string) => void): void {
     const type = TYPES[path.extname(image.file).toLowerCase()] ?? 'application/octet-stream';
     const kept = token ? resized.get(token) : undefined;
-    if (kept) return done(kept, TYPES['.jpg']!);
+    if (kept) return done(kept.body, kept.type);
     fs.readFile(image.file, (error, body) => {
       if (error) return done(undefined, type);
       if (!image.max || type === TYPES['.svg']) return done(body, type);
@@ -673,12 +685,14 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         const picture = native?.createFromBuffer(body);
         const size = picture?.getSize();
         if (!picture || !size || picture.isEmpty() || Math.max(size.width, size.height) <= image.max) return done(body, type);
-        const small = (size.width >= size.height ? picture.resize({ width: image.max, quality: 'good' }) : picture.resize({ height: image.max, quality: 'good' })).toJPEG(82);
+        const reduced = size.width >= size.height ? picture.resize({ width: image.max, quality: 'good' }) : picture.resize({ height: image.max, quality: 'good' });
+        const png = type === TYPES['.png'];
+        const small = { body: png ? reduced.toPNG() : reduced.toJPEG(82), type: png ? type : TYPES['.jpg']! };
         if (token) {
           if (resized.size >= RESIZED_MAX) resized.delete(resized.keys().next().value!);
           resized.set(token, small);
         }
-        done(small, TYPES['.jpg']!);
+        done(small.body, small.type);
       } catch {
         done(body, type);
       }
@@ -794,6 +808,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     // Une liaison neuve : la vue Scores redemande ce qu'elle montre (« ranks »).
     ranksWatch = undefined;
     communityOpen = undefined;
+    wantsMedia = false;
     pushState(true);
   }
 
@@ -1029,20 +1044,32 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     if (!active || !menu?.entries || pairing?.session() !== 'paired') return;
     let e: MenuEntries;
     try {
-      e = menu.entries();
+      e = menu.entries({ media: wantsMedia });
     } catch (error) {
       journalIncident('Télécommande : écran du menu illisible pour le téléphone', error); // i18n-ignore : journal
       return;
     }
     gameButtons = mode() === 'game' && e.kind === 'ingame' && Boolean(e.buttons);
-    // Une entrée sans geste part grisée : le téléphone ne propose rien que la borne ne ferait pas.
-    const shown = remoteEntries({ ...e, items: e.items.map(({ pick, ...rest }) => (pick ? rest : { ...rest, quiet: true })) });
+    // Une entrée sans geste part grisée : le téléphone ne propose rien que la borne ne ferait pas. Les
+    // images d'une table, sous jeton et réduites (médaillon 128 px, fronton 360 px).
+    const art = (a: MenuEntry['art']) => {
+      const wheel = thumb(a?.wheel, 128);
+      const media = thumb(a?.media, 360);
+      return wheel || media ? { art: { ...(wheel ? { wheel } : {}), ...(media ? { media } : {}) } } : {};
+    };
+    const collections = e.collections ? { ...e.collections, items: e.collections.items.map(({ pick: _p, ...c }) => c) } : undefined;
+    const shown = remoteEntries({
+      ...e,
+      items: e.items.map(({ pick, art: a, ...rest }) => ({ ...(pick ? rest : { ...rest, quiet: true }), ...art(a) })),
+      ...(collections ? { collections } : {}),
+    });
     const { current, ...content } = shown;
     const text = JSON.stringify(content);
     if (force || text !== entriesSent) {
       entriesSent = text;
       entriesVersion++;
       entriesPicks = e.items.slice(0, shown.items.length).map((i) => i.pick);
+      collectionPicks = e.collections?.items.map((c) => c.pick) ?? [];
       cursorSent = current;
       sendTo(active, { t: 'entries', v: entriesVersion, ...shown });
       return;
@@ -1400,6 +1427,15 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         pick();
         return;
       }
+      case 'collection': {
+        // Une collection de l'écran reçu ; l'écran a changé depuis : rien.
+        if (message.v !== entriesVersion) return;
+        const pick = collectionPicks[message.i];
+        if (!pick) return;
+        releaseButtons();
+        pick();
+        return;
+      }
       case 'open':
         // L'identifiant est vérifié par le menu (remoteMenuTarget, mode invité) ; jamais pendant « Récupérer ».
         if (mode() === 'browser') return;
@@ -1447,6 +1483,12 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     if (message.t === 'up') return void startUpload(link, message);
     // Les classements non plus : une lecture, sans geste injecté à la borne.
     if (message.t === 'ranks') return watchRanks(message);
+    // Grille du menu des tables : la borne joint (ou cesse de joindre) l'image du fronton de chaque table.
+    if (message.t === 'grid') {
+      wantsMedia = message.on;
+      pushEntries();
+      return;
+    }
     // Juke-box : une commande du lecteur, vérifiée par la borne ; ce qui change part aussitôt.
     if (message.t === 'jb') {
       if (mode() === 'browser') return;

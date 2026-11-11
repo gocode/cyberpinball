@@ -243,4 +243,9 @@ export const messages: Record<string, string> = {
   'Morceau précédent': 'Previous track',
   'Morceau suivant': 'Next track',
   'Le Juke-box se pilote dans l’onglet Juke-box du téléphone, ou avec les boutons : flippers pour choisir, Start pour écouter, Exit pour revenir à la roue.': 'The Juke-box is controlled from the phone\'s Juke-box tab, or with the buttons: flippers to choose, Start to listen, Exit to go back to the wheel.',
+  // Menu des tables au téléphone : collections, liste ou grille
+  'Collection': 'Collection',
+  'Collection imposée en mode invité': 'Collection set in guest mode',
+  'Voir en grille': 'Show as a grid',
+  'Voir en liste': 'Show as a list',
 };

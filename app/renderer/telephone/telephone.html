@@ -107,6 +107,16 @@
         </form>
       </section>
       <section class="entries" id="entries" role="tabpanel" aria-labelledby="tab-list">
+        <!-- Menu des tables : la collection affichée (à choisir, comme MagnaSave à la borne) et liste / grille. -->
+        <div class="entries-tools" id="entries-tools" hidden>
+          <button type="button" class="coll-select" id="coll-select" aria-haspopup="dialog">
+            <span class="coll-lab" id="coll-lab"></span>
+            <span class="coll-name" id="coll-name"></span>
+            <span class="coll-count" id="coll-count"></span>
+            <span class="coll-go" id="coll-go" aria-hidden="true"></span>
+          </button>
+          <button type="button" class="grid-toggle" id="grid-toggle"></button>
+        </div>
         <p class="entries-note" id="entries-note"></p>
         <ul class="entry-list" id="entries-list"></ul>
         <div class="empty" id="entries-empty" hidden>

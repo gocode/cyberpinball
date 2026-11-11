@@ -29,6 +29,19 @@ export interface RemoteEntry {
   badge?: string;
   /** L'entrée qui ramène en arrière (Exit à la borne). */
   back?: boolean;
+  /**
+   * Une table du menu des tables : son médaillon de la roue et l'image de son fronton, sous jeton
+   * (« images/<jeton> », remote-images.ts), jamais un chemin. Lus à la demande dans les médias de la
+   * borne : une table ajoutée a les siens sans rien faire.
+   */
+  art?: { wheel?: string; media?: string };
+}
+
+/** Les collections de la roue, pour le choix du téléphone : leur nom, leur nombre de tables, l'active ; imposée (mode invité) : pourquoi. */
+export interface RemoteCollections {
+  items: { label: string; detail?: string }[];
+  current: number;
+  locked?: string;
 }
 
 /**
@@ -58,6 +71,8 @@ export interface RemoteEntries {
   buttons?: boolean;
   /** Ouvrir les réglages en partie depuis le téléphone (id « in-game ») : vrai, ou pourquoi c'est impossible. */
   inGame?: true | string;
+  /** Le menu des tables : ses collections, à choisir au téléphone. */
+  collections?: RemoteCollections;
 }
 
 /** Un menu de l'arbre envoyé au téléphone : une rubrique a ses entrées, une entrée s'ouvre à la borne. */
@@ -111,9 +126,16 @@ export function toRemoteEntry(a: { label: string; detail?: string; icon?: string
   };
 }
 
-/** Liste bornée (REMOTE_ENTRIES_MAX) ; `current` ramené dans la liste. */
+/** Une image pour le téléphone : un jeton de la borne, rien d'autre (ni chemin, ni autre adresse). */
+const REMOTE_IMAGE = /^images\/[A-Za-z0-9_-]{22}$/;
+
+/** Liste bornée (REMOTE_ENTRIES_MAX) ; `current` ramené dans la liste ; les images, des jetons seulement. */
 export function remoteEntries(e: RemoteEntries): RemoteEntries {
-  const items = e.items.slice(0, REMOTE_ENTRIES_MAX);
+  const items = e.items.slice(0, REMOTE_ENTRIES_MAX).map(({ art, ...item }) => {
+    const wheel = art?.wheel && REMOTE_IMAGE.test(art.wheel) ? art.wheel : undefined;
+    const media = art?.media && REMOTE_IMAGE.test(art.media) ? art.media : undefined;
+    return wheel || media ? { ...item, art: { ...(wheel ? { wheel } : {}), ...(media ? { media } : {}) } } : item;
+  });
   return { ...e, title: remoteText(e.title, LABEL_MAX), ...(e.note ? { note: remoteText(e.note, 300) } : {}), items, current: e.current >= 0 && e.current < items.length ? e.current : -1 };
 }
 

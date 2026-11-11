@@ -318,7 +318,10 @@ function entryRow(item, opts) {
     b.classList.add('current');
     b.setAttribute('aria-current', 'true');
   }
-  if (opts.icons) {
+  if (opts.medals) {
+    // Une table : le médaillon de sa roue (sous jeton, réduit par la borne), sinon son initiale.
+    b.append(tableMedal(item));
+  } else if (opts.icons) {
     const mark = document.createElement('span');
     mark.className = 'entry-icon';
     if (item.icon) mark.append(cyberIcon(item.icon));
@@ -388,23 +391,114 @@ function renderEntries() {
   } else {
     showEmpty('entries');
     const icons = e.items.some((i) => i.icon);
+    const medals = e.kind === 'wheel' && e.items.some((i) => i.art?.wheel);
+    const grid = e.kind === 'wheel' && gridOn;
     const v = e.v;
-    list.replaceChildren(
-      ...e.items.map((item, i) =>
-        entryRow(item, {
-          icons,
-          current: i === e.current,
-          run: (b) => {
-            b.classList.add('sent');
-            send({ t: 'pick', v, i });
-          },
-        }),
-      ),
-    );
+    const run = (i) => (b) => {
+      b.classList.add('sent');
+      send({ t: 'pick', v, i });
+    };
+    list.classList.toggle('grid', grid);
+    list.replaceChildren(...e.items.map((item, i) => (grid ? tableCard(item, i === e.current, run(i)) : entryRow(item, { icons, medals, current: i === e.current, run: run(i) }))));
     scrollToCurrent();
   }
+  renderTools();
   syncLayout();
 }
+
+/** Liste ou grille des tables, gardée sur le téléphone. */
+const GRID_STORE = 'cyberpinball.grille';
+let gridOn = stored(GRID_STORE) === '1';
+
+/** Le médaillon d'une table (sa roue), ou son initiale sur le sarcelle ; le Juke-box garde son disque. */
+function tableMedal(item, className = 'entry-medal') {
+  const medal = document.createElement('span');
+  medal.className = className;
+  if (item.art?.wheel) {
+    const img = document.createElement('img');
+    img.alt = '';
+    img.draggable = false;
+    img.addEventListener('error', () => {
+      img.remove();
+      medal.textContent = (item.label || '?').trim().charAt(0).toUpperCase();
+    });
+    img.src = item.art.wheel;
+    medal.append(img);
+  } else if (item.icon) medal.append(cyberIcon(item.icon));
+  else medal.textContent = (item.label || '?').trim().charAt(0).toUpperCase();
+  return medal;
+}
+
+/** Une table en grille : l'image de son fronton (sinon son médaillon en grand), son médaillon en coin, son titre. */
+function tableCard(item, current, run) {
+  const li = document.createElement('li');
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = `entry card${current ? ' current' : ''}${item.quiet ? ' quiet' : ''}`;
+  if (current) b.setAttribute('aria-current', 'true');
+  const pic = document.createElement('span');
+  pic.className = 'card-media';
+  if (item.art?.media) {
+    const img = document.createElement('img');
+    img.alt = '';
+    img.draggable = false;
+    img.addEventListener('error', () => img.remove());
+    img.src = item.art.media;
+    pic.append(img);
+    pic.append(tableMedal(item, 'card-medal'));
+  } else pic.append(tableMedal(item, 'card-medal big'));
+  const text = document.createElement('span');
+  text.className = 'card-text';
+  const label = document.createElement('span');
+  label.className = 'entry-label';
+  label.textContent = item.label;
+  const detail = document.createElement('span');
+  detail.className = 'entry-detail';
+  detail.textContent = item.detail ?? '';
+  text.append(label, detail);
+  b.append(pic, text);
+  b.addEventListener('click', () => {
+    if (state !== 'paired') return;
+    if (navigator.vibrate) navigator.vibrate(12);
+    run(b);
+  });
+  li.append(b);
+  return li;
+}
+
+/** En tête du menu des tables : la collection affichée (à choisir) et le choix liste / grille. */
+function renderTools() {
+  const e = entries;
+  const tools = $('entries-tools');
+  const c = e?.kind === 'wheel' ? e.collections : undefined;
+  tools.hidden = !c;
+  if (!c) return;
+  const shown = c.items[c.current];
+  $('coll-lab').textContent = t('Collection');
+  $('coll-name').textContent = shown?.label ?? screen.title;
+  $('coll-count').textContent = shown?.detail ?? '';
+  $('coll-go').replaceChildren(cyberIcon(c.locked ? 'lock' : 'chevron-right'));
+  $('coll-select').classList.toggle('locked', Boolean(c.locked));
+  $('grid-toggle').replaceChildren(cyberIcon(gridOn ? 'list' : 'layout'));
+  $('grid-toggle').setAttribute('aria-label', gridOn ? t('Voir en liste') : t('Voir en grille'));
+}
+
+$('coll-select').addEventListener('click', () => {
+  const c = entries?.collections;
+  if (!c) return;
+  const v = entries.v;
+  openSheet(
+    t('Collections'),
+    c.locked ? [] : c.items.map((item, i) => ({ id: `c${i}`, label: item.detail ? `${item.label} · ${item.detail}` : item.label, current: i === c.current, run: () => send({ t: 'collection', v, i }) })),
+    { text: c.locked ?? '', opener: $('coll-select') },
+  );
+});
+$('grid-toggle').addEventListener('click', () => {
+  gridOn = !gridOn;
+  store(GRID_STORE, gridOn ? '1' : '0');
+  send({ t: 'grid', on: gridOn });
+  renderEntries();
+});
 
 /** L'entrée choisie à la borne a changé (flipper) : seulement son repère, la liste ne se redessine pas. */
 function markCurrent() {
@@ -721,6 +815,8 @@ function handle(m) {
     }
     case 'mode':
       setMode(m.mode);
+      // La grille des tables montrée : la borne joint l'image du fronton de chaque table.
+      if (gridOn && m.mode === 'menu') send({ t: 'grid', on: true });
       // Une liaison neuve (ou une partie qui commence) : la vue Scores ouverte redemande son tableau.
       if (document.body.dataset.view === 'ranks' && m.mode !== 'browser') ranksAsk();
       // Et un fil ouvert le redemande (la borne l'oublie à chaque liaison).
@@ -741,6 +837,7 @@ function handle(m) {
         current: Number.isInteger(m.current) ? m.current : -1,
         note: typeof m.note === 'string' ? m.note : '',
         inGame: m.inGame === true || typeof m.inGame === 'string' ? m.inGame : undefined,
+        collections: m.collections && Array.isArray(m.collections.items) ? m.collections : undefined,
       };
       renderEntries();
       renderGame();
@@ -1362,7 +1459,8 @@ function openSheet(title, items, opts = {}) {
     ...list.map((item) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = item.danger ? 'key wide danger' : 'key wide';
+      b.className = item.danger ? 'key wide danger' : item.current ? 'key wide primary' : 'key wide';
+      if (item.current) b.setAttribute('aria-current', 'true');
       b.textContent = item.label;
       b.addEventListener('click', () => {
         closeSheet();
@@ -1480,6 +1578,7 @@ if (demo) {
   if (demo.mode) setMode(demo.mode);
   if (demo.screen) showScreen(demo.screen);
   if (demo.view) view = demo.view;
+  if (demo.grid) gridOn = true;
   if (demo.entries) {
     entries = { v: 1, kind: 'screen', current: -1, ...demo.entries };
     renderEntries();

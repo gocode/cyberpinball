@@ -101,8 +101,8 @@ const WHEEL_STYLES = ['medaillons', 'bandeau', 'minimal', 'arche'];
 /*
  * Médaillons (bandeau de 1080 × 540) : les logos de la communauté VPin sont des médaillons
  * carrés (image ronde cerclée de chrome, nom du jeu en bas). Sept visibles, de −3 à +3, qui
- * se chevauchent ; ±4 hors du bandeau, d'où ils entrent. Le centre est plus haut, sous
- * l'anneau vert (frontend.css, .wheel-ring), les voisins descendent le long de l'arc.
+ * se chevauchent ; ±4 hors du bandeau, d'où ils entrent. Le centre est plus haut, son halo
+ * vert derrière lui (frontend.css, .center), les voisins descendent le long de l'arc.
  */
 const WHEELS = {
   medaillons: {
@@ -193,7 +193,7 @@ function fillWheelItem(item, n) {
   const { node, tilt } = item;
   // Médaillon Juke-box (jukebox.js) : son logo rond, dessiné, toujours prêt.
   if (n.jukebox && window.CyberJukebox) {
-    tilt.replaceChildren(CyberJukebox.logo('wheel-img'));
+    tilt.replaceChildren(CyberJukebox.logo('wheel-img', { wheel: true }));
     node.classList.remove('disc');
     node.classList.add('jukebox');
     item.ratio = 1;
@@ -241,7 +241,7 @@ function placeWheelItem(item, style, hidden = item.leaving) {
   st.setProperty('--o', String(hidden ? 0 : p.o));
   // Place du centre : le nom d'un médaillon sans logo s'y lit, ailleurs son initiale.
   item.node.classList.toggle('center', item.offset === 0 && !hidden);
-  // La table choisie passe devant ses voisines (et l'anneau des Médaillons, z-index 19, entre eux).
+  // La table choisie passe devant ses voisines, son halo vert avec elle (frontend.css, .center).
   st.zIndex = String(20 - 2 * Math.min(4, Math.abs(item.offset)));
   if (p.o > 0 && !hidden) item.hit.dataset.act = JSON.stringify({ type: 'wheel', offset: item.offset });
   else delete item.hit.dataset.act;
@@ -253,15 +253,12 @@ function wheelStage(s, style) {
     const layer = el('div', 'wheel-items');
     // La roue est un arc : ses médaillons voisins sortent de l'écran par construction (contrôles de débordement : data-bleed).
     layer.dataset.bleed = '';
-    // Anneau vert fixe de la table choisie (Médaillons) : les logos glissent dessous et dedans.
-    // Mouvement « Soie » : à l'arrêt, un fil vert s'enroule sur l'anneau et une étincelle en fait
-    // le tour (svg, .wheel-spark) ; une lueur traverse le logo choisi (.wheel-glint) ; à chaque
-    // appui, une onde de lumière court le long de la roue (.wheel-wave).
-    const ring = el('div', 'wheel-ring');
-    ring.innerHTML = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="48.5" pathLength="1"/></svg><i class="wheel-spark"></i>';
-    layer.append(el('div', 'wheel-wave'), ring, el('div', 'wheel-glint'));
+    // Le halo vert de la table choisie vient de derrière son médaillon (frontend.css, .center) :
+    // aucun anneau fixe. Mouvement « Soie » : une lueur traverse le logo choisi à l'arrêt
+    // (.wheel-glint) ; à chaque appui, une onde de lumière court le long de la roue (.wheel-wave).
+    layer.append(el('div', 'wheel-wave'), el('div', 'wheel-glint'));
     stage.append(layer);
-    wheelView = { stage, layer, ring, items: new Map(), style };
+    wheelView = { stage, layer, items: new Map(), style };
   }
   const v = wheelView;
   v.style = style;
@@ -348,15 +345,14 @@ function wheelTime(stage) {
 }
 
 /**
- * Un appui a fait glisser la roue : l'anneau se tait pendant le mouvement, une onde part dans le
- * sens du glissement, et l'arrêt est guetté. Chaque appui repousse l'arrêt : en rafale, ni fil
- * ni lueur ne se rejouent avant que la roue ne se pose (une seule réponse par arrêt).
+ * Un appui a fait glisser la roue : le halo baisse pendant le mouvement, une onde part dans le
+ * sens du glissement, et l'arrêt est guetté. Chaque appui repousse l'arrêt : en rafale, ni
+ * souffle du halo ni lueur ne se rejouent avant que la roue ne se pose (une seule réponse par arrêt).
  */
 function wheelMoved(v, dir) {
   clearTimeout(v.landing);
-  v.ring.classList.remove('landed');
   v.stage.classList.remove('landed');
-  v.ring.classList.add('moving');
+  v.stage.classList.add('moving');
   const wave = v.layer.querySelector(':scope > .wheel-wave'); // i18n-ignore : sélecteur CSS
   const w = v.stage.offsetWidth / 1080;
   if (wave?.animate && !quietMotion() && w > 0) {
@@ -370,11 +366,10 @@ function wheelMoved(v, dir) {
     );
   }
   v.landing = setTimeout(() => {
-    v.ring.classList.remove('moving');
+    v.stage.classList.remove('moving');
     if (quietMotion()) return;
-    // Classe reposée d'un coup : ses animations (fil, étincelle, lueur) repartent de zéro.
-    void v.ring.offsetWidth;
-    v.ring.classList.add('landed');
+    // Classe reposée d'un coup : ses animations (souffle du halo, lueur) repartent de zéro.
+    void v.stage.offsetWidth;
     v.stage.classList.add('landed');
   }, wheelTime(v.stage) + 40);
 }

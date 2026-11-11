@@ -308,6 +308,7 @@ import {
   JUKEBOX_WHEEL_KEY,
   remoteMenuTarget,
   toRemoteEntry,
+  tn,
   REMOTE_ENTRIES_MAX,
   isJukeboxAction,
   type RemoteJukeboxOp,
@@ -1275,7 +1276,7 @@ phoneRemote.setMenu({
   field: () => (state.phase === 'library' ? library.remoteField() : undefined),
   // Pendant une partie, seulement les réglages en partie ouverts (VPX a les boutons sinon).
   button: (b, down, repeat) => (state.phase === 'playing' ? down && inGameMenu.isOpen() && inGameMenu.button(b, repeat) : remoteButton(b, down, repeat)),
-  entries: () => remoteEntries(),
+  entries: (opts) => remoteEntries(opts?.media),
   menus: () => library.remoteMenus(),
   open: (id) => remoteOpen(id),
   // Classements au téléphone (remote-ranks.ts) : le tableau des scores de la borne, en lecture seule ;
@@ -1429,12 +1430,12 @@ function remotePress(b: 'confirm' | 'exit'): void {
 }
 
 /** L'écran que montre la borne, pour la liste du téléphone. */
-function remoteEntries(): MenuEntries {
+function remoteEntries(media = false): MenuEntries {
   const none = (title: string, note: string): MenuEntries => ({ kind: 'none', title, items: [], current: -1, note });
   if (state.phase === 'loading') return none(remoteScreen().title, t('La partie se charge.'));
   if (state.phase === 'playing') return inGameEntries();
   if (state.phase === 'library') return library.remoteEntries() ?? none(t('Menu système'), '');
-  if (state.phase === 'menu') return wheelEntries();
+  if (state.phase === 'menu') return wheelEntries(media);
   if (state.phase === 'jukebox') return none(t('Juke-box'), t('Le Juke-box se pilote dans l’onglet Juke-box du téléphone, ou avec les boutons : flippers pour choisir, Start pour écouter, Exit pour revenir à la roue.'));
   if (state.phase === 'intro') return { kind: 'none', title: t('Ouverture'), items: [{ label: t('Passer l’ouverture'), icon: 'chevron-right', pick: () => void remoteWakes() }], current: -1 };
   if (state.phase === 'confirmQuit') {
@@ -1458,7 +1459,7 @@ function remoteEntries(): MenuEntries {
  * collection montrée. Toucher une table la choisit sur la roue ; la toucher encore fait Start
  * (sa fiche, ou la partie en « jouer directement »).
  */
-function wheelEntries(): MenuEntries {
+function wheelEntries(media = false): MenuEntries {
   const shelf = collections.shelf();
   const choose = guest.allows('menu.choose');
   const items: MenuEntry[] = [];
@@ -1466,11 +1467,35 @@ function wheelEntries(): MenuEntries {
   if (jukebox) items.push({ ...toRemoteEntry({ label: t('Juke-box'), detail: jukeboxCard().subtitle, icon: 'jukebox' }), pick: () => remotePickJukebox() });
   for (const table of shelf.tables) {
     const file = table.file;
-    items.push({ ...toRemoteEntry({ label: table.title, detail: [table.manufacturer, table.year].filter(Boolean).join(' · '), ...(choose ? {} : { tone: 'quiet' }) }), pick: () => remotePickTable(file) });
+    // Les images de la table, lues à la demande dans les médias de la borne (une table ajoutée a les siennes) :
+    // son médaillon toujours ; l'image de son fronton seulement quand le téléphone montre la grille.
+    const wheel = medias?.wheel(table);
+    const backglass = media ? medias?.roleMedia(table, 'backglass') : undefined;
+    const art = { ...(wheel ? { wheel } : {}), ...(backglass?.kind === 'image' && backglass.url ? { media: backglass.url } : {}) };
+    items.push({ ...toRemoteEntry({ label: table.title, detail: [table.manufacturer, table.year].filter(Boolean).join(' · '), ...(choose ? {} : { tone: 'quiet' }) }), ...(art.wheel || art.media ? { art } : {}), pick: () => remotePickTable(file) });
   }
+  // Les collections de la roue, à choisir au téléphone comme MagnaSave à la borne ; imposée en mode invité.
+  const list = collections.list().filter((c) => c.tables.length);
+  const shown = collections.current();
+  const locked = collections.locked() ? t('Collection imposée en mode invité') : undefined;
+  const choices = {
+    items: list.map((c) => ({ label: c.label, detail: tn(c.tables.length, '{n} table', '{n} tables'), ...(locked ? {} : { pick: () => remoteChooseCollection(c.id) }) })),
+    current: list.findIndex((c) => c.id === shown.id),
+    ...(locked ? { locked } : {}),
+  };
   const current = jukebox && onJukebox() ? 0 : shelf.tables.length ? (jukebox ? 1 : 0) + shelf.index : -1;
   const again = wheelPlays() ? t('Touchez une table pour la choisir, puis touchez-la encore pour jouer.') : t('Touchez une table pour la choisir, puis touchez-la encore pour ouvrir sa fiche.');
-  return { kind: 'wheel', title: collections.current().label || t('Menu des tables'), icon: 'tables', items, current, note: items.length ? again : t('Aucune table dans cette collection.') };
+  return { kind: 'wheel', title: collections.current().label || t('Menu des tables'), icon: 'tables', items, current, note: items.length ? again : t('Aucune table dans cette collection.'), collections: choices };
+}
+
+/** Une collection choisie au téléphone : comme un clic sur la ligne de la liste des collections à la borne. */
+function remoteChooseCollection(id: string): void {
+  if (!remoteWakes() || state.phase !== 'menu') return;
+  if (collections.choose(id)) {
+    state = { ...state, jukebox: false };
+    playUiSound('solenoid');
+  }
+  broadcast();
 }
 
 /** Une table touchée au téléphone : choisie sur la roue, ou, déjà choisie, Start. */
