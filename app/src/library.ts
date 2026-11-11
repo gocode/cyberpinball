@@ -456,6 +456,8 @@ export interface ActionShortcut {
 export type UiAction =
   /** `id` : identité de l'action cliquée (focus.ts), pour valider cet élément même si la liste a bougé. */
   | { type: 'activate'; index: number; id?: string }
+  /** Le curseur posé sur cet élément sans l'activer (téléphone : les actions d'une playlist de la gestion). */
+  | { type: 'focus'; index: number; id?: string }
   | { type: 'editor'; index: number }
   | { type: 'drop'; paths: string[] }
   | { type: 'key'; code: string }
@@ -4430,6 +4432,13 @@ export function createLibrary(host: LibraryHost) {
       const ids = actionIds(built.actions);
       cursor = switchZone(zones, ids, followCursor(ids, cursor, screen, anchor), zonesMemory(), backIndex(built));
       host.broadcast();
+    } else if (action.type === 'focus') {
+      const built = build();
+      const index = resolveActivation(actionIds(built.actions), action.index, action.id);
+      if (index === undefined) return host.broadcast();
+      cursor = index;
+      reading.active = false;
+      host.broadcast();
     } else if (action.type === 'activate') {
       const built = build();
       // L'élément cliqué, où qu'il soit maintenant ; disparu entre-temps : rien, l'écran se redessine.
@@ -4698,15 +4707,37 @@ export function createLibrary(host: LibraryHost) {
       return { kind: 'choice', title: built.heading, ...(icon ? { icon } : {}), note: e.label, items: e.choices.map((label, index) => ({ label, pick: () => handleAction({ type: 'editor', index }) })), current: e.cursor };
     }
     const ids = actionIds(built.actions);
+    // Où chaque action est montrée à la borne : la ligne d'une section qui la désigne (réglages en tête,
+    // liste titrée, sa vignette, l'élément choisi) ; sans ligne, une action de l'élément choisi
+    // (actionsTitle). Le téléphone range de même : jamais une liste et ses options mêlées.
+    const rowOf = new Map<number, { row: Row; section: Section }>();
+    for (const sec of built.sections) for (const row of sec.rows) if (row.action !== undefined && !rowOf.has(row.action)) rowOf.set(row.action, { row, section: sec });
+    const placed = (index: number, back: boolean): { zone?: 'options' | 'list' | 'actions'; group?: string; art?: { thumb: string }; chosen?: true } => {
+      const at = rowOf.get(index);
+      if (!at) return !back && built.actionsTitle ? { zone: 'actions', group: built.actionsTitle } : {};
+      const thumb = at.row.thumb?.startsWith('cyber-media:') ? at.row.thumb : undefined;
+      return {
+        ...(at.section.options ? { zone: 'options' as const } : at.section.title ? { zone: 'list' as const, group: at.section.title } : {}),
+        ...(thumb ? { art: { thumb } } : {}),
+        ...(at.row.current ? { chosen: true as const } : {}),
+      };
+    };
     return {
       kind: 'screen',
       title: built.heading,
       ...(icon ? { icon } : {}),
-      items: built.actions.map((a, index) => ({
-        ...toRemoteEntry({ label: shownLabel(a, built.back), detail: a.detail, icon: a.icon, tone: a.tone, attention: a.attention, badge: a.badge ? menuBadgeLabel(a.badge) : undefined, back: a.run === built.back }),
-        // Comme un clic à la borne : l'élément retrouvé par son identité, même si la liste a bougé.
-        pick: () => handleAction({ type: 'activate', index, id: ids[index] }),
-      })),
+      ...(built.variant?.split(' ').includes('jukebox') ? { area: 'jukebox' as const } : {}),
+      items: built.actions.map((a, index) => {
+        const back = a.run === built.back;
+        const entry = toRemoteEntry({ label: shownLabel(a, built.back), detail: a.detail ?? rowOf.get(index)?.row.detail, icon: a.icon, tone: a.tone, attention: a.attention, badge: a.badge ? menuBadgeLabel(a.badge) : undefined, back });
+        return {
+          ...entry,
+          ...placed(index, back),
+          // Comme un clic à la borne : l'élément retrouvé par son identité, même si la liste a bougé.
+          pick: () => handleAction({ type: 'activate', index, id: ids[index] }),
+          focus: () => handleAction({ type: 'focus', index, id: ids[index] }),
+        };
+      }),
       current: followCursor(ids, cursor, screen, anchor),
     };
   }

@@ -3245,14 +3245,14 @@ html.attract-mode #media-bg::after {
 }
 
 /*
- * Ouverture : l'invite paraît quand l'animation du plateau est finie, entre la marque et les
- * batteurs (en borne), en bas de l'écran au bureau (le fronton en plein écran, sa marque à gauche).
+ * Ouverture : l'invite paraît quand l'animation du plateau est finie, en bas de l'écran, sous le
+ * fuseau (maquette validée : la marque au centre, sur l'éclair), en borne comme au bureau.
  */
 .intro-hint-box {
   position: absolute;
   left: 0;
   right: 0;
-  top: 64%;
+  top: 88%;
   display: flex;
   justify-content: center;
   padding: 0 4vmin;

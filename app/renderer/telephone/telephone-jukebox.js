@@ -17,6 +17,10 @@
 
 const jb = {
   data: undefined,
+  /** « Gérer » touché : la gestion s'ouvre à la borne (jusqu'à ce que ses entrées arrivent). */
+  managing: false,
+  /** ⋮ d'une playlist touché : ses options s'ouvrent dès que la borne l'a choisie. */
+  optionsFor: undefined,
   /** Le temps du morceau en cours, et quand il a été reçu. */
   time: undefined,
   /** Le curseur de la barre de progression est tenu : il ne suit plus le temps. */
@@ -134,12 +138,34 @@ function renderJukebox() {
   const list = jbEl('jb-list');
   const acts = jbEl('jb-acts');
   const open = jbEl('jb-open');
-  const tracks = d?.open && d.level === 'tracks';
-  jbEl('jb-seg').hidden = !d?.open;
+  // « Gérer » : l'écran de gestion de la borne est ouvert (ses entrées sont celles du Juke-box), ou demandé.
+  const manageShown = entries?.area === 'jukebox';
+  if (manageShown) jb.managing = false;
+  const managing = manageShown || jb.managing;
+  const tracks = !managing && d?.open && d.level === 'tracks';
+  // Le sélecteur reste toujours là : on revient d'un toucher de « Gérer » à « Écouter ».
+  jbEl('jb-seg').hidden = false;
+  jbEl('jb-listen').setAttribute('aria-selected', String(!managing));
+  jbEl('jb-manage').setAttribute('aria-selected', String(managing));
   // Le nom de la playlist ouverte et son retour ; au niveau des playlists, la barre du haut dit déjà où l'on est.
   jbEl('jb-head').hidden = !tracks;
   jbEl('jb-up').hidden = !tracks;
+  jbEl('jb-manage-box').hidden = !managing;
+  list.hidden = managing;
   open.hidden = true;
+  if (managing) {
+    acts.replaceChildren();
+    acts.hidden = true;
+    if (manageShown) {
+      showEmpty('jb');
+      renderManage(entries);
+    } else {
+      jbEl('jb-manage-box').replaceChildren();
+      showEmpty('jb', 'refresh', t('Ouverture de la gestion…'), t('La borne ouvre la gestion du Juke-box.'));
+    }
+    renderMini();
+    return;
+  }
   if (!d || !d.open) {
     list.replaceChildren();
     acts.replaceChildren();
@@ -165,6 +191,144 @@ function renderJukebox() {
   list.querySelector('.jb-row.playing')?.scrollIntoView({ block: 'nearest' });
   renderMini();
   renderPlayer();
+}
+
+/**
+ * « Gérer » : l'écran de gestion de la borne, rangé en zones comme ses sections. En tête, les ajouts
+ * en tuiles et l'état du compte ; puis chaque liste sous son titre, chaque ligne avec sa vignette (la
+ * pochette, ou le disque) et son ⋮ ; les actions de l'élément choisi ne sont pas à la suite de la
+ * liste : elles s'ouvrent depuis son ⋮, dans une feuille à son nom.
+ */
+function renderManage(e) {
+  const box = jbEl('jb-manage-box');
+  const v = e.v;
+  const pick = (i) => () => {
+    if (state !== 'paired') return;
+    if (navigator.vibrate) navigator.vibrate(12);
+    send({ t: 'pick', v, i });
+  };
+  const parts = [];
+  const head = document.createElement('div');
+  head.className = 'jb-manage-title';
+  head.textContent = e.title ?? '';
+  parts.push(head);
+  const items = e.items.map((item, i) => ({ item, i }));
+  // Ajouts en tuiles (sans détail), état du compte en ligne d'état (avec son détail).
+  const options = items.filter(({ item }) => item.zone === 'options');
+  const tiles = options.filter(({ item }) => !item.detail || item.quiet);
+  const states = options.filter(({ item }) => item.detail && !item.quiet);
+  if (tiles.length) {
+    const grid = document.createElement('div');
+    grid.className = 'jb-tiles';
+    for (const { item, i } of tiles) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `jb-tile${item.quiet ? ' quiet' : ''}`;
+      if (item.icon) b.append(cyberIcon(item.icon));
+      const label = document.createElement('span');
+      label.textContent = item.label;
+      b.append(label);
+      if (item.quiet && item.detail) {
+        const reason = document.createElement('span');
+        reason.className = 'jb-tile-reason';
+        reason.textContent = item.detail;
+        b.append(reason);
+      }
+      b.addEventListener('click', pick(i));
+      grid.append(b);
+    }
+    parts.push(grid);
+  }
+  for (const { item, i } of states) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'jb-state';
+    if (item.icon) b.append(cyberIcon(item.icon));
+    const text = document.createElement('span');
+    text.className = 'entry-text';
+    const label = document.createElement('span');
+    label.className = 'entry-label';
+    label.textContent = item.label;
+    const detail = document.createElement('span');
+    detail.className = 'entry-detail';
+    detail.textContent = item.detail;
+    text.append(label, detail);
+    b.append(text, cyberIcon('chevron-right', 'entry-go'));
+    b.addEventListener('click', pick(i));
+    parts.push(b);
+  }
+  // Les listes, chacune sous son titre ; la vignette, le ⋮ qui ouvre les options de la ligne.
+  const actions = items.filter(({ item }) => item.zone === 'actions');
+  let group;
+  let list;
+  for (const { item, i } of items.filter(({ item }) => item.zone === 'list' || (!item.zone && !item.back))) {
+    if (item.zone === 'list' && item.group !== group) {
+      group = item.group;
+      const title = document.createElement('div');
+      title.className = 'jb-group';
+      title.textContent = group;
+      parts.push(title);
+      list = document.createElement('ul');
+      list.className = 'entry-list jb-manage-list';
+      parts.push(list);
+    }
+    if (!list) {
+      list = document.createElement('ul');
+      list.className = 'entry-list jb-manage-list';
+      parts.push(list);
+    }
+    const li = document.createElement('li');
+    li.className = 'jb-manage-row';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `entry jb-row${item.quiet ? ' off' : ''}${item.chosen ? ' chosen' : ''}`;
+    const text = document.createElement('span');
+    text.className = 'entry-text';
+    const label = document.createElement('span');
+    label.className = 'entry-label';
+    label.textContent = item.label;
+    text.append(label);
+    if (item.detail) {
+      const detail = document.createElement('span');
+      detail.className = 'entry-detail';
+      detail.textContent = item.detail;
+      text.append(detail);
+    }
+    b.append(jbArt({ image: item.art?.thumb }, item.zone === 'list' ? 'jb-art mosaic-box' : 'jb-art'), text);
+    b.addEventListener('click', pick(i));
+    li.append(b);
+    if (item.zone === 'list' && actions.length) {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'jb-more';
+      more.append(cyberIcon('list'));
+      more.setAttribute('aria-label', t('Options de « {name} »', { name: item.label }));
+      more.addEventListener('click', () => {
+        if (state !== 'paired') return;
+        jb.optionsFor = item.label;
+        // Déjà choisie à la borne : ses options tout de suite ; sinon la borne la choisit, puis elles s'ouvrent.
+        if (item.chosen) jbOptions(e);
+        else send({ t: 'focus', v, i });
+      });
+      li.append(more);
+    }
+    list.append(li);
+  }
+  box.replaceChildren(...parts);
+  // ⋮ touché sur une playlist que la borne vient de choisir : ses options.
+  if (jb.optionsFor && items.some(({ item }) => item.zone === 'list' && item.chosen && item.label === jb.optionsFor)) jbOptions(e);
+}
+
+/** Les options de la playlist choisie, dans une feuille à son nom (indisponible : sa raison). */
+function jbOptions(e) {
+  jb.optionsFor = undefined;
+  const v = e.v;
+  const actions = e.items.map((item, i) => ({ item, i })).filter(({ item }) => item.zone === 'actions');
+  if (!actions.length) return;
+  openSheet(
+    actions[0].item.group ?? t('Options'),
+    actions.map(({ item, i }) => ({ id: `o${i}`, label: item.quiet && item.detail ? `${item.label} · ${item.detail}` : item.label, danger: item.icon === 'trash', run: () => send({ t: 'pick', v, i }) })),
+  );
 }
 
 /** Le mini-lecteur au-dessus des onglets : le morceau en cours, pause et suivant ; il ouvre le lecteur. */
@@ -250,10 +414,24 @@ function jukeboxTop(shown) {
 
 jbEl('jb-up').addEventListener('click', () => jbSend('up'));
 jbEl('jb-open').addEventListener('click', () => jbSend('open'));
-// « Gérer » : la gestion s'ouvre à la borne ; ses écrans se touchent dans l'onglet Écran.
+// « Écouter » : le lecteur (au retour de la gestion, il reprend là où il était) ; « Gérer » : la gestion, ici même.
+jbEl('jb-listen').addEventListener('click', () => {
+  if (entries?.area !== 'jukebox' && !jb.managing) return;
+  jb.managing = false;
+  jbSend('open');
+  renderJukebox();
+});
 jbEl('jb-manage').addEventListener('click', () => {
+  if (entries?.area === 'jukebox') return;
+  jb.managing = true;
   jbSend('manage');
-  setView('list');
+  renderJukebox();
+  // La borne n'a rien ouvert (mode invité, une partie) : le sélecteur revient sur « Écouter ».
+  setTimeout(() => {
+    if (!jb.managing || entries?.area === 'jukebox') return;
+    jb.managing = false;
+    renderJukebox();
+  }, 4000);
 });
 jbEl('jb-mini-open').addEventListener('click', () => setView('player'));
 jbEl('jb-mini-pause').addEventListener('click', () => jbSend('pause'));

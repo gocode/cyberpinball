@@ -399,11 +399,27 @@ function renderEntries() {
       send({ t: 'pick', v, i });
     };
     list.classList.toggle('grid', grid);
-    list.replaceChildren(...e.items.map((item, i) => (grid ? tableCard(item, i === e.current, run(i)) : entryRow(item, { icons, medals, current: i === e.current, run: run(i) }))));
+    // Un titre avant chaque groupe, comme les sections de la borne : jamais une liste et ses options mêlées.
+    let group;
+    const rows = [];
+    e.items.forEach((item, i) => {
+      if (!grid && item.group && item.group !== group) rows.push(groupTitle(item.group));
+      group = item.group;
+      rows.push(grid ? tableCard(item, i === e.current, run(i)) : entryRow(item, { icons, medals, current: i === e.current, run: run(i) }));
+    });
+    list.replaceChildren(...rows);
     scrollToCurrent();
   }
   renderTools();
   syncLayout();
+}
+
+/** Le titre d'un groupe d'entrées (« Playlists », « Néon nocturne · YouTube »). */
+function groupTitle(text) {
+  const li = document.createElement('li');
+  li.className = 'entry-group';
+  li.textContent = text;
+  return li;
 }
 
 /** Liste ou grille des tables, gardée sur le téléphone. */
@@ -502,7 +518,7 @@ $('grid-toggle').addEventListener('click', () => {
 
 /** L'entrée choisie à la borne a changé (flipper) : seulement son repère, la liste ne se redessine pas. */
 function markCurrent() {
-  const rows = $('entries-list').querySelectorAll('.entry');
+  const rows = $('entries-list').querySelectorAll('li:not(.entry-group) > .entry');
   rows.forEach((b, i) => {
     const on = i === entries?.current;
     b.classList.toggle('current', on);
@@ -838,7 +854,9 @@ function handle(m) {
         note: typeof m.note === 'string' ? m.note : '',
         inGame: m.inGame === true || typeof m.inGame === 'string' ? m.inGame : undefined,
         collections: m.collections && Array.isArray(m.collections.items) ? m.collections : undefined,
+        area: m.area === 'jukebox' ? 'jukebox' : undefined,
       };
+      if (typeof renderJukebox === 'function') renderJukebox();
       renderEntries();
       renderGame();
       break;

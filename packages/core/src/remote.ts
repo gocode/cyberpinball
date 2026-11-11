@@ -401,6 +401,8 @@ export type PhoneMessage =
    * Deux nombres, jamais un libellé ni un chemin : la borne retrouve l'entrée, et l'ignore si l'écran a changé.
    */
   | { t: 'pick'; s: number; v: number; i: number }
+  /** Au menu : poser le curseur de la borne sur l'entrée `i` de l'écran `v`, sans l'activer (ses actions s'affichent). */
+  | { t: 'focus'; s: number; v: number; i: number }
   /** Menu des tables : la collection `i` de la liste envoyée avec l'écran de version `v` (deux nombres, comme « pick »). */
   | { t: 'collection'; s: number; v: number; i: number }
   /** Menu des tables en grille : la borne joint l'image du fronton de chaque table (lue seulement quand on la regarde). */
@@ -487,6 +489,8 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       return { t: 'up-cancel', s };
     case 'pick':
       return typeof m.v === 'number' && Number.isSafeInteger(m.v) && m.v >= 0 && typeof m.i === 'number' && Number.isInteger(m.i) && m.i >= 0 && m.i < REMOTE_ENTRIES_MAX ? { t: 'pick', s, v: m.v, i: m.i } : undefined;
+    case 'focus':
+      return typeof m.v === 'number' && Number.isSafeInteger(m.v) && m.v >= 0 && typeof m.i === 'number' && Number.isInteger(m.i) && m.i >= 0 && m.i < REMOTE_ENTRIES_MAX ? { t: 'focus', s, v: m.v, i: m.i } : undefined;
     case 'collection':
       return typeof m.v === 'number' && Number.isSafeInteger(m.v) && m.v >= 0 && typeof m.i === 'number' && Number.isInteger(m.i) && m.i >= 0 && m.i < 200 ? { t: 'collection', s, v: m.v, i: m.i } : undefined;
     case 'grid':

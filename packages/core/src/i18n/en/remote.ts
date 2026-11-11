@@ -248,4 +248,9 @@ export const messages: Record<string, string> = {
   'Voir en grille': 'Show as a grid',
   'Voir en liste': 'Show as a list',
   'Indisponible : la télécommande n’a pas pu démarrer ; nouvel essai dans un instant.': 'Unavailable: the remote could not start; trying again in a moment.',
+  // Gestion du Juke-box au téléphone
+  'Ouverture de la gestion…': 'Opening the management…',
+  'La borne ouvre la gestion du Juke-box.': 'The cabinet is opening the Juke-box management.',
+  'Options de « {name} »': 'Options for "{name}"',
+  'Options': 'Options',
 };

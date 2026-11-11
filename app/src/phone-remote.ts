@@ -168,8 +168,8 @@ export interface MenuField {
   value: string;
 }
 
-/** Une entrée de l'écran montré au téléphone, et ce qu'elle fait quand on la touche (absent : rien). */
-export type MenuEntry = RemoteEntry & { pick?: () => void };
+/** Une entrée de l'écran montré au téléphone, ce qu'elle fait quand on la touche (absent : rien), et quand on la choisit sans l'activer. */
+export type MenuEntry = RemoteEntry & { pick?: () => void; focus?: () => void };
 
 /**
  * L'écran montré au téléphone (remote-menus.ts), ses entrées avec ce qu'elles font. Les images d'une
@@ -532,6 +532,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   let listenTries = 0;
   /** Ce que fait chaque collection de l'écran envoyé ; le téléphone regarde-t-il la grille (images des frontons) ? */
   let collectionPicks: (undefined | (() => void))[] = [];
+  let entriesFocus: (undefined | (() => void))[] = [];
   let wantsMedia = false;
   let jukeboxSent = '';
   /** Le temps du morceau envoyé, et quand : le téléphone l'avance seul, la borne ne le renvoie qu'en cas d'écart. */
@@ -1091,12 +1092,13 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     const art = (a: MenuEntry['art']) => {
       const wheel = thumb(a?.wheel, 128);
       const media = thumb(a?.media, 360);
-      return wheel || media ? { art: { ...(wheel ? { wheel } : {}), ...(media ? { media } : {}) } } : {};
+      const small = thumb(a?.thumb, 120);
+      return wheel || media || small ? { art: { ...(wheel ? { wheel } : {}), ...(media ? { media } : {}), ...(small ? { thumb: small } : {}) } } : {};
     };
     const collections = e.collections ? { ...e.collections, items: e.collections.items.map(({ pick: _p, ...c }) => c) } : undefined;
     const shown = remoteEntries({
       ...e,
-      items: e.items.map(({ pick, art: a, ...rest }) => ({ ...(pick ? rest : { ...rest, quiet: true }), ...art(a) })),
+      items: e.items.map(({ pick, focus: _f, art: a, ...rest }) => ({ ...(pick ? rest : { ...rest, quiet: true }), ...art(a) })),
       ...(collections ? { collections } : {}),
     });
     const { current, ...content } = shown;
@@ -1105,6 +1107,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       entriesSent = text;
       entriesVersion++;
       entriesPicks = e.items.slice(0, shown.items.length).map((i) => i.pick);
+      entriesFocus = e.items.slice(0, shown.items.length).map((i) => i.focus);
       collectionPicks = e.collections?.items.map((c) => c.pick) ?? [];
       cursorSent = current;
       sendTo(active, { t: 'entries', v: entriesVersion, ...shown });
@@ -1461,6 +1464,14 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         if (!pick) return;
         releaseButtons();
         pick();
+        return;
+      }
+      case 'focus': {
+        if (message.v !== entriesVersion) return;
+        const focus = entriesFocus[message.i];
+        if (!focus) return;
+        releaseButtons();
+        focus();
         return;
       }
       case 'collection': {

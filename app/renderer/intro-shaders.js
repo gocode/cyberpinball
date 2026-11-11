@@ -26,9 +26,12 @@ const vec3 LIME = vec3(0.545, 0.886, 0.227);
 const vec3 INK = vec3(0.902, 0.941, 0.925);
 const vec3 VOID = vec3(0.010, 0.026, 0.023);
 const int THREADS = 30;
-// Cœur du fuseau (fraction de la hauteur) et bas des fils, au-dessus de l'invite (0,605).
-const float CORE_Y = 0.30;
-const float FAN_END = 0.57;
+// Cœur du fuseau (fraction de la hauteur) et bas des fils : la composition de la maquette validée
+// (11/11/2026), le fuseau sur toute la hauteur, sa taille au centre, la marque posée sur l'éclair
+// (BRAND_Y) ; l'invite en bas, sous les fils.
+const float CORE_Y = 0.5;
+const float FAN_END = 0.97;
+const float BRAND_Y = 0.5;
 
 float sat(float x) { return clamp(x, 0.0, 1.0); }
 float ease(float x) { x = sat(x); return x * x * (3.0 - 2.0 * x); }
@@ -144,7 +147,7 @@ void main() {
 
   // Fond : jamais du noir pur, une colonne de lumière très douce derrière le cœur.
   vec3 col = VOID * alive;
-  col += TEAL * 0.035 * exp(-abs(q.x) * 5.0) * smoothstep(-0.2, 0.9, 1.0 - abs(uv.y - 0.32) * 1.6) * ignite;
+  col += TEAL * 0.035 * exp(-abs(q.x) * 5.0) * smoothstep(-0.2, 0.9, 1.0 - abs(uv.y - CORE_Y) * 1.6) * ignite;
   col += TEAL * 0.10 * exp(-length(q * vec2(1.0, 0.7)) * 4.0) * ignite;
   col += TEAL * 0.025 * noise(q * 3.0 + vec2(0.0, m * 0.08)) * exp(-length(q) * 1.5) * ignite;
 
@@ -235,8 +238,8 @@ void main() {
 
   // Marque : elle se matérialise dans une poussière lumineuse (1 950–2 900 ms), un éclat chromatique
   // sur le front, puis un reflet la parcourt (3 400–4 100 ms). Nette à la fin.
-  // Seulement dans la bande de la marque (centre à 0,79, bloc et lueur entre 0,71 et 0,87).
-  if (uv.y > 0.66 && uv.y < 0.92) {
+  // Seulement dans la bande de la marque (une ligne centrée sur BRAND_Y, lueur comprise).
+  if (abs(uv.y - BRAND_Y) < 0.1) {
   vec3 mask = texture(u_brand, uv).rgb;
   float th = ease((t - 1.95) / 0.95) * 1.6 - 0.15;
   float cover = sat(mask.r + mask.g);
@@ -258,7 +261,7 @@ void main() {
   col = mix(col, letters, cover * shown * (1.0 - u_overlay));
   col += (TEAL * 0.7 + INK * 0.3) * cover * edge * 0.9;
   float sweepX = mix(-0.2, 1.2, ease((t - 3.4) / 0.7));
-  float sweep = exp(-pow((uv.x - sweepX + (uv.y - 0.78) * 0.4) / 0.05, 2.0)) * step(3.4, t) * (1.0 - step(4.1, t));
+  float sweep = exp(-pow((uv.x - sweepX + (uv.y - BRAND_Y) * 0.4) / 0.05, 2.0)) * step(3.4, t) * (1.0 - step(4.1, t));
   col += INK * cover * sweep * 0.35;
   }
 

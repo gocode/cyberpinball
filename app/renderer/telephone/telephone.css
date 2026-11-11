@@ -3196,3 +3196,137 @@ body[data-layout='editing'] .jb-mini {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* --- Juke-box : « Gérer » rangé en zones --- */
+
+.jb-manage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.jb-manage[hidden],
+.jb-list[hidden] {
+  display: none;
+}
+
+.jb-manage-title {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 23px;
+}
+
+.jb-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.jb-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 84px;
+  padding: 8px 6px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 14px;
+  background: none;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 19px;
+  text-align: center;
+}
+
+.jb-tile .icon {
+  color: var(--signal);
+  font-size: 24px;
+}
+
+.jb-tile.quiet {
+  color: var(--ink-muted);
+}
+
+.jb-tile.quiet .icon {
+  color: var(--ink-faint);
+}
+
+.jb-tile-reason {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--warning);
+}
+
+.jb-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: left;
+}
+
+.jb-state > .icon {
+  flex: none;
+  color: var(--signal);
+  font-size: 22px;
+}
+
+.jb-group,
+.entry-group {
+  padding: 6px 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.entry-list li.entry-group {
+  padding: 12px 12px 4px;
+}
+
+.jb-manage-list {
+  flex: none;
+  overflow: visible;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.jb-manage-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.jb-manage-row > .entry {
+  flex: 1;
+  min-width: 0;
+}
+
+.jb-row.chosen {
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+}
+
+.jb-more {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 22px;
+}

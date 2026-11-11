@@ -34,7 +34,16 @@ export interface RemoteEntry {
    * (« images/<jeton> », remote-images.ts), jamais un chemin. Lus à la demande dans les médias de la
    * borne : une table ajoutée a les siens sans rien faire.
    */
-  art?: { wheel?: string; media?: string };
+  art?: { wheel?: string; media?: string; thumb?: string };
+  /**
+   * D'où vient l'entrée sur l'écran de la borne, pour que le téléphone range comme elle : `options`,
+   * les réglages et ajouts en tête ; `list`, une ligne d'une liste titrée (`group`) ; `actions`, les
+   * actions de l'élément choisi dans la liste (`group` : son nom) ; absent, une action seule.
+   */
+  zone?: 'options' | 'list' | 'actions';
+  group?: string;
+  /** L'élément choisi de la liste, celui dont les actions sont dans la zone `actions`. */
+  chosen?: boolean;
 }
 
 /** Les collections de la roue, pour le choix du téléphone : leur nom, leur nombre de tables, l'active ; imposée (mode invité) : pourquoi. */
@@ -73,6 +82,8 @@ export interface RemoteEntries {
   inGame?: true | string;
   /** Le menu des tables : ses collections, à choisir au téléphone. */
   collections?: RemoteCollections;
+  /** L'écran appartient au Juke-box (sa gestion) : le téléphone le montre dans son onglet Juke-box. */
+  area?: 'jukebox';
 }
 
 /** Un menu de l'arbre envoyé au téléphone : une rubrique a ses entrées, une entrée s'ouvre à la borne. */
@@ -128,13 +139,16 @@ export function toRemoteEntry(a: { label: string; detail?: string; icon?: string
 
 /** Une image pour le téléphone : un jeton de la borne, rien d'autre (ni chemin, ni autre adresse). */
 const REMOTE_IMAGE = /^images\/[A-Za-z0-9_-]{22}$/;
+const GROUP_MAX = 120;
 
 /** Liste bornée (REMOTE_ENTRIES_MAX) ; `current` ramené dans la liste ; les images, des jetons seulement. */
 export function remoteEntries(e: RemoteEntries): RemoteEntries {
   const items = e.items.slice(0, REMOTE_ENTRIES_MAX).map(({ art, ...item }) => {
     const wheel = art?.wheel && REMOTE_IMAGE.test(art.wheel) ? art.wheel : undefined;
     const media = art?.media && REMOTE_IMAGE.test(art.media) ? art.media : undefined;
-    return wheel || media ? { ...item, art: { ...(wheel ? { wheel } : {}), ...(media ? { media } : {}) } } : item;
+    const thumb = art?.thumb && REMOTE_IMAGE.test(art.thumb) ? art.thumb : undefined;
+    const bounded = item.group ? { ...item, group: remoteText(item.group, GROUP_MAX) } : item;
+    return wheel || media || thumb ? { ...bounded, art: { ...(wheel ? { wheel } : {}), ...(media ? { media } : {}), ...(thumb ? { thumb } : {}) } } : bounded;
   });
   return { ...e, title: remoteText(e.title, LABEL_MAX), ...(e.note ? { note: remoteText(e.note, 300) } : {}), items, current: e.current >= 0 && e.current < items.length ? e.current : -1 };
 }

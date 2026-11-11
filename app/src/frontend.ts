@@ -1412,6 +1412,15 @@ function remoteJukeboxAct(op: RemoteJukeboxOp, key?: string, fraction?: number):
     if (state.phase === 'menu' && !guest.knock('menu.choose')) return;
     return openJukebox();
   }
+  // La gestion : déjà ouverte, rien ; lecteur fermé, elle s'ouvre comme depuis le menu système.
+  if (op === 'manage' && state.phase === 'library') return;
+  if (op === 'manage' && !jukeboxPlayer.active()) {
+    const menu = jukeboxMenu();
+    if (!menu || !guest.knock('menu.system')) return;
+    cancelWheelPress();
+    menu.open();
+    return void broadcast();
+  }
   if (!jukeboxPlayer.active()) return;
   // Le lecteur en fond pendant sa gestion : il revient d'abord à l'écran, comme au retour de la gestion.
   if (state.phase !== 'jukebox') openJukebox();

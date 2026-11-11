@@ -197,8 +197,11 @@
   // un canevas 2D à pleine résolution posé dessus, et le shader ne garde que leur lueur. Sans WebGL2
   // (ou shader refusé), la marque en HTML, immobile.
 
-  /** Où se pose la marque dans la texture : centre, largeur de PINBALL, hauteur du bloc au plus. */
-  const PLAYFIELD_BRAND = { y: 0.79, width: 0.72, maxHeight: 0.12 };
+  /**
+   * Où se pose la marque dans la texture (maquette validée, 11/11/2026) : « CYBER PINBALL » sur une
+   * ligne, posée sur l'éclair au cœur du fuseau ; largeur de la ligne et hauteur des lettres au plus.
+   */
+  const PLAYFIELD_BRAND = { y: 0.5, width: 0.74, maxHeight: 0.055 };
   /** Grand côté du canevas pendant l'animation, et le plus petit auquel on descend si la carte peine. */
   const PLAYFIELD_LIVE_MAX = 1920;
   const PLAYFIELD_LIVE_MIN = 960;
@@ -260,22 +263,26 @@
       ctx.fontStretch = 'expanded';
       ctx.letterSpacing = `${size * 0.28}px`;
     };
-    // PINBALL sur `width` de la largeur, le bloc des deux lignes sur `maxHeight` de la hauteur au plus.
+    // La ligne « CYBER  PINBALL » sur `width` de la largeur, ses lettres sur `maxHeight` de la hauteur au plus.
     spaced(100);
-    const per = ctx.measureText('PINBALL').width / 100;
-    const size = Math.min((W * PLAYFIELD_BRAND.width) / per, (H * PLAYFIELD_BRAND.maxHeight) / 2.1);
+    const line100 = ctx.measureText('CYBER').width + ctx.measureText('PINBALL').width + 110;
+    const size = Math.min((W * PLAYFIELD_BRAND.width) / (line100 / 100), H * PLAYFIELD_BRAND.maxHeight);
     spaced(size);
-    ctx.textAlign = 'center';
+    ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    // L'espacement suit aussi la dernière lettre : on le rend à gauche pour centrer le mot.
-    const x = W / 2 + size * 0.14;
-    const yC = H * PLAYFIELD_BRAND.y - size * 0.675;
-    const yP = H * PLAYFIELD_BRAND.y + size * 0.675;
+    const wC = ctx.measureText('CYBER').width;
+    const wP = ctx.measureText('PINBALL').width;
+    const gap = size * 1.1;
+    // L'espace entre les deux mots tombe sur le cœur lumineux du fuseau : aucune lettre n'est mangée
+    // par l'éclat. La mesure de CYBER compte l'espacement après sa dernière lettre : on le retire.
+    const y = H * PLAYFIELD_BRAND.y;
+    const xC = W / 2 - gap / 2 - (wC - size * 0.28);
+    const xP = W / 2 + gap / 2;
     const words = (cyber, pinball) => {
       ctx.fillStyle = cyber;
-      ctx.fillText('CYBER', x, yC);
+      ctx.fillText('CYBER', xC, y);
       ctx.fillStyle = pinball;
-      ctx.fillText('PINBALL', x, yP);
+      ctx.fillText('PINBALL', xP, y);
     };
     if (into) {
       words('#e6f0ec', '#8be23a');
