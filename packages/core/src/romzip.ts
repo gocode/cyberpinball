@@ -169,6 +169,59 @@ export function buildZip(members: RomZipMember[]): Buffer {
   return Buffer.concat([...locals, directory, end]);
 }
 
+/**
+ * Un ZIP fait de fichiers en mémoire (rapport de la borne) : chacun compressé s'il y gagne, noms
+ * en UTF-8 (bit 11), dans l'ordre donné, tous datés de `at`.
+ */
+export function zipBuffers(members: readonly { name: string; data: Buffer }[], at = new Date()): Buffer {
+  const { time, date } = dosDateTime(at);
+  const locals: Buffer[] = [];
+  const centrals: Buffer[] = [];
+  let offset = 0;
+  for (const m of members) {
+    const name = Buffer.from(m.name.replace(/\\/g, '/'), 'utf8');
+    const deflated = zlib.deflateRawSync(m.data, { level: 9 });
+    const stored = deflated.length >= m.data.length;
+    const body = stored ? m.data : deflated;
+    const crc = crc32(m.data);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0x800, 6);
+    local.writeUInt16LE(stored ? 0 : 8, 8);
+    local.writeUInt16LE(time, 10);
+    local.writeUInt16LE(date, 12);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(body.length, 18);
+    local.writeUInt32LE(m.data.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(0x800, 8);
+    central.writeUInt16LE(stored ? 0 : 8, 10);
+    central.writeUInt16LE(time, 12);
+    central.writeUInt16LE(date, 14);
+    central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(body.length, 20);
+    central.writeUInt32LE(m.data.length, 24);
+    central.writeUInt16LE(name.length, 28);
+    central.writeUInt32LE(offset, 42);
+    locals.push(local, name, body);
+    centrals.push(central, name);
+    offset += 30 + name.length + body.length;
+  }
+  const directory = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(members.length, 8);
+  end.writeUInt16LE(members.length, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, directory, end]);
+}
+
 /** Écrit une ROM refaite (fichier temporaire, puis renommage), datée comme son original. */
 export function writeZipData(to: string, data: Buffer, mtimeMs?: number): void {
   fs.mkdirSync(path.dirname(to), { recursive: true });

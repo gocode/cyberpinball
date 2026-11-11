@@ -7,7 +7,8 @@
 
 import { execFileSync } from 'node:child_process';
 import * as koffi from 'koffi';
-import { edidFromHex, parseEdid, t, type EdidInfo, type ObservedDisplay, type Rotation } from '@cyberpinball/core';
+import { edidFromHex, edidMaxRefresh, parseEdid, t, type Connection, type EdidInfo, type ObservedDisplay, type Rotation } from '@cyberpinball/core';
+import { displayRefresh } from './orientation';
 import { monitorContainerId } from './audio';
 
 const QDC_ONLY_ACTIVE_PATHS = 0x2;
@@ -123,6 +124,70 @@ export function probeDisplays(): ObservedDisplay[] {
   return displays.sort((a, b) => a.bounds.x - b.bounds.x || a.bounds.y - b.bounds.y);
 }
 
+/** Ce que la fiche technique dit du lien de chaque écran : connexion, fréquences. */
+export interface DisplayLink {
+  gdiName: string;
+  connection?: Connection;
+  hz?: number;
+  /** Plus haute fréquence que Windows propose à la définition en cours. */
+  offeredMaxHz?: number;
+  /** Plus haute fréquence que l'écran annonce (EDID, limites de balayage). */
+  edidMaxHz?: number;
+}
+
+/** DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY -> connexion. */
+function connectionOf(code: number): Connection {
+  if (code === 5) return 'hdmi';
+  if (code === 10 || code === 11) return 'displayport';
+  if (code === 4) return 'dvi';
+  if (code === 0) return 'vga';
+  if (code === 6 || code === 13 || code === 0x80000000) return 'internal';
+  if (code === 15) return 'wireless';
+  if (code === 16) return 'usb';
+  return 'other';
+}
+
+/**
+ * Connexion (HDMI, DisplayPort…) et fréquences de chaque écran actif : celle en cours, la plus
+ * haute que Windows propose, la plus haute que l'écran annonce. Seulement pour la fiche technique.
+ */
+export function probeDisplayLinks(): DisplayLink[] {
+  if (process.platform !== 'win32') return [];
+  const w = loadApi();
+  const { paths, pathCount } = queryActivePaths(w);
+  const links: DisplayLink[] = [];
+  for (let i = 0; i < pathCount; i++) {
+    const p = i * PATH_INFO_SIZE;
+    const sourceAdapter: Luid = { low: paths.readUInt32LE(p), high: paths.readInt32LE(p + 4) };
+    const sourceId = paths.readUInt32LE(p + 8);
+    const t = p + 20;
+    const targetAdapter: Luid = { low: paths.readUInt32LE(t), high: paths.readInt32LE(t + 4) };
+    const targetId = paths.readUInt32LE(t + 8);
+    const technology = paths.readUInt32LE(t + 16);
+    let gdiName: string;
+    let devicePath: string;
+    try {
+      gdiName = getSourceName(w, sourceAdapter, sourceId);
+      devicePath = getTargetName(w, targetAdapter, targetId).devicePath;
+    } catch {
+      continue;
+    }
+    const numerator = paths.readUInt32LE(t + 28);
+    const denominator = paths.readUInt32LE(t + 32);
+    const refresh = displayRefresh(gdiName);
+    const pathHz = denominator ? numerator / denominator : undefined;
+    const bytes = readEdidBytes(devicePath);
+    links.push({
+      gdiName,
+      connection: connectionOf(technology),
+      hz: refresh?.hz ?? (pathHz ? Math.round(pathHz) : undefined),
+      offeredMaxHz: refresh?.maxHz,
+      edidMaxHz: bytes ? edidMaxRefresh(bytes) : undefined,
+    });
+  }
+  return links;
+}
+
 function queryActivePaths(w: Api) {
   // La topologie peut changer entre les deux appels : on recommence si le tampon est trop petit.
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -187,13 +252,18 @@ function readScale(w: Api, cx: number, cy: number): number | undefined {
  * où modèle et instance sont les 2e et 3e segments du chemin de périphérique.
  */
 function readEdid(devicePath: string): EdidInfo | undefined {
+  const bytes = readEdidBytes(devicePath);
+  return bytes ? parseEdid(bytes) : undefined;
+}
+
+function readEdidBytes(devicePath: string): Uint8Array | undefined {
   const parts = devicePath.split('#');
   if (parts.length < 3) return undefined;
   const key = `HKLM\\SYSTEM\\CurrentControlSet\\Enum\\DISPLAY\\${parts[1]}\\${parts[2]}\\Device Parameters`;
   try {
     const out = execFileSync('reg', ['query', key, '/v', 'EDID'], { encoding: 'utf8', windowsHide: true });
     const hex = /EDID\s+REG_BINARY\s+([0-9A-Fa-f]+)/.exec(out)?.[1];
-    return hex ? parseEdid(edidFromHex(hex)) : undefined;
+    return hex ? edidFromHex(hex) : undefined;
   } catch {
     return undefined;
   }

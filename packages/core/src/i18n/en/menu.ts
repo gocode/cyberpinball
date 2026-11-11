@@ -234,6 +234,8 @@ export const messages: Record<string, string> = {
   'Tintement de la partie entre amis': 'Game-with-friends chime',
   'Une nouvelle de la partie entre amis, au menu comme pendant une partie : un invité accepte ou décline, la partie est finie': 'News of a game with friends, in the menu as well as during a game: a guest accepts or declines, the game is over',
   'Signal d’un ami': 'Friend signal',
+  'Souffle de l’ouverture': 'Opening breath',
+  'Ouverture au démarrage, quand les fils s’allument ; pas avec une musique d’ouverture choisie': 'Startup opening, as the threads light up; not with a chosen opening music',
   'Un ami vient de se connecter, au menu comme pendant une partie ; une fois par ami en un quart d’heure': 'A friend just came online, in the menu as well as during a game; once per friend in a quarter of an hour',
   'Mode attente : {delay}': 'Attract mode: {delay}',
   'Tables tirées au hasard avec leurs médias ; n’importe quel bouton revient au menu': 'Random tables with their media; any button returns to the menu',

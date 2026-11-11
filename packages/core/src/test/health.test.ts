@@ -201,6 +201,9 @@ function everyCase(): HealthFacts[] {
     // Casque : Air Link sur un PC en Wi-Fi (la borne, 11/11/2026), puis Air Link sur un PC en Ethernet.
     { at, disks: [], vr: { transport: 'air', network: { adapter: 'Intel(R) Wireless-AC 9560 160MHz', wireless: true } }, vpx: {} },
     { at, disks: [], vr: { transport: 'air', network: { adapter: 'Intel(R) Ethernet Connection (7) I219-V', wireless: false } }, vpx: {} },
+    // PC et Windows (fiche technique) : playfield sous la fréquence annoncée, redémarrage en attente ; puis tout en ordre.
+    { at, disks: [], pc: { displays: [{ role: 'playfield', name: 'XG43UQ', width: 3840, height: 2160, hz: 60, offeredMaxHz: 60, edidMaxHz: 144, connection: 'hdmi', rotation: 0, primary: true }], rebootPending: true, power: { scheme: 'saver' }, gpus: [] }, vpx: {} },
+    { at, disks: [], pc: { displays: [{ name: 'S32', width: 1920, height: 1080, hz: 144, offeredMaxHz: 144, rotation: 0, primary: true }], power: { scheme: 'high' }, gpus: [{ name: 'RTX', driverDate: new Date().toISOString() }] }, vpx: {} },
   ];
 }
 
@@ -215,7 +218,7 @@ test('chaque contrôle passe par ses états, et chaque ligne mène à un écran 
     assert.ok((HEALTH_TARGET_KINDS as readonly string[]).includes(l.target.kind), `${l.check} « ${l.title} » : cible inconnue`);
     assert.ok(targetReachable(l.target), `${l.check} « ${l.title} » : l'entrée ${JSON.stringify(l.target)} n'est dans aucune rubrique du menu système`);
   }
-  const expected: Record<string, HealthState[]> = { disk: ['ok', 'check', 'blocking'], tables: ['ok', 'check', 'blocking'], pup: ['ok', 'check'], media: ['ok', 'check'], screens: ['ok', 'check', 'blocking'], dof: ['ok', 'check'], vr: ['ok', 'check'], vpx: ['ok', 'check', 'blocking'] };
+  const expected: Record<string, HealthState[]> = { disk: ['ok', 'check', 'blocking'], tables: ['ok', 'check', 'blocking'], pup: ['ok', 'check'], media: ['ok', 'check'], screens: ['ok', 'check', 'blocking'], dof: ['ok', 'check'], vr: ['ok', 'check'], pc: ['ok', 'check'], vpx: ['ok', 'check', 'blocking'] };
   for (const check of HEALTH_CHECKS) assert.deepEqual([...(seen.get(check) ?? [])].sort(), [...expected[check]!].sort(), `états du contrôle ${check}`);
   // Chaque sorte de cible sert.
   assert.deepEqual([...new Set(lines.map((l) => l.target.kind))].sort(), [...HEALTH_TARGET_KINDS].sort());

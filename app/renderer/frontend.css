@@ -1114,8 +1114,8 @@ html.menu-desktop .menu.menu-band .menu-nav {
  * transparence du logo ; pour un médaillon sans logo, son disque), quelle que soit sa taille.
  * Mouvement « Soie » (frontend.js, wheelMoved) : pendant le glissement, la lueur baisse ; à l'arrêt
  * (.landed, posée une fois la roue immobile, jamais pendant une rafale), elle souffle une fois puis se
- * pose, et une lueur large et douce traverse le logo (.wheel-glint). Onde (.wheel-wave) : un trait de
- * lumière à la teinte de la table, lancé à chaque appui dans le sens du glissement, derrière les logos.
+ * pose, un fil s'enroule au bord du médaillon (.wheel-rim) et une lueur douce le traverse
+ * (.wheel-glint). À chaque appui, une onde court le long de l'arc des médaillons (.wheel-pulse).
  */
 .wheel-stage {
   --halo-dos:
@@ -1160,8 +1160,110 @@ html.menu-desktop .menu.menu-band .menu-nav {
 }
 
 .wheel-glint,
-.wheel-wave {
+.wheel-aura,
+.wheel-rim {
   display: none;
+}
+
+/* Lueur à la teinte de la table, derrière le médaillon choisi (maquette validée) ; elle suit la teinte en fondu. */
+.menu-band .wheel-aura {
+  display: block;
+  position: absolute;
+  left: calc((var(--ring-x) - 260) * var(--w));
+  top: calc((var(--ring-y) - 260) * var(--w));
+  width: calc(520 * var(--w));
+  height: calc(520 * var(--w));
+  z-index: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in oklab, var(--table-tint) 34%, transparent) 0%, color-mix(in oklab, var(--table-tint) 12%, transparent) 30%, transparent 62%);
+  pointer-events: none;
+}
+
+/*
+ * Fil vert et étincelle (maquette validée), collés au bord du médaillon choisi (disque de 225) : à
+ * l'arrêt seulement, le fil s'enroule en 320 ms depuis le haut, puis reste comme un liseré qui fait
+ * corps avec le halo ; l'étincelle fait le tour en 3,9 s. Jamais pendant le glissement ni en rafale.
+ */
+.menu-band .wheel-stage.landed .wheel-rim {
+  display: block;
+  position: absolute;
+  left: calc((var(--ring-x) - 114) * var(--w));
+  top: calc((var(--ring-y) - 114) * var(--w));
+  width: calc(228 * var(--w));
+  height: calc(228 * var(--w));
+  z-index: 21;
+  pointer-events: none;
+}
+
+.wheel-rim svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+
+.wheel-rim circle {
+  fill: none;
+  stroke: #d8ffb0;
+  stroke-width: 1.6;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 calc(3 * var(--w)) var(--signal)) drop-shadow(0 0 calc(10 * var(--w)) rgba(139, 226, 58, 0.6));
+  animation:
+    rim-wrap 320ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards,
+    rim-pose 600ms ease-out 320ms forwards;
+}
+
+@keyframes rim-wrap {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes rim-pose {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 0.7;
+  }
+}
+
+.wheel-rim .wheel-spark {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  opacity: 0;
+  animation:
+    rim-spark-in 300ms linear 320ms forwards,
+    rim-orbit 3900ms linear 320ms infinite;
+}
+
+.wheel-rim .wheel-spark::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: calc(16 * var(--w));
+  height: calc(16 * var(--w));
+  margin: calc(-8 * var(--w)) 0 0 calc(-8 * var(--w));
+  border-radius: 50%;
+  background: radial-gradient(circle, #f4ffe6 0 22%, rgba(139, 226, 58, 0.65) 42%, rgba(139, 226, 58, 0) 70%);
+}
+
+@keyframes rim-spark-in {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rim-orbit {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Lueur du logo choisi : une bande large et douce qui le traverse une fois, avec un léger halo. */
@@ -1227,24 +1329,27 @@ html.menu-desktop .menu.menu-band .menu-nav {
   }
 }
 
-/* Onde : un trait de lumière à la hauteur des logos, derrière eux (frontend.js l'anime au besoin). */
-.menu-band .wheel-wave {
-  display: block;
+/*
+ * Onde d'un appui (frontend.js, wheelPulse ; maquette validée) : une lueur qui court le long de l'arc
+ * des médaillons, derrière eux ; placée par son centre aux places de la roue.
+ */
+.wheel-pulse {
   position: absolute;
-  left: calc((var(--ring-x) - 160) * var(--w));
-  top: calc((var(--ring-y) - 3) * var(--w));
-  width: calc(320 * var(--w));
-  height: calc(6 * var(--w));
-  z-index: 1;
+  left: 0;
+  top: 0;
+  width: calc(150 * var(--w));
+  height: calc(150 * var(--w));
+  z-index: 2;
   border-radius: 50%;
-  background: radial-gradient(ellipse at center, color-mix(in oklab, var(--table-tint) 40%, #fff) 0%, var(--table-tint) 35%, transparent 70%);
-  filter: blur(calc(1.5 * var(--w)));
+  background: radial-gradient(circle, rgba(232, 255, 248, 0.9) 0%, color-mix(in oklab, var(--table-tint) 70%, transparent) 18%, transparent 62%);
   opacity: 0;
   pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .menu-band .wheel-stage.landed .wheel-item.center .wheel-tilt,
+  .wheel-rim circle,
+  .wheel-rim .wheel-spark,
   .wheel-stage.landed .wheel-glint::before,
   .wheel-stage.landed .wheel-glint::after {
     animation: none;

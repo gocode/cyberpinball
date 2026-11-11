@@ -53,6 +53,20 @@ function readDescriptorText(raw: Uint8Array): string {
   return String.fromCharCode(...raw.subarray(0, end)).trim();
 }
 
+/**
+ * Plus haute fréquence verticale que l'écran annonce : descripteur « limites de balayage »
+ * (0xFD) du bloc de base, avec le décalage de +255 Hz des écrans rapides (octet 4, bit 1).
+ */
+export function edidMaxRefresh(bytes: Uint8Array): number | undefined {
+  if (bytes.length < 128) return undefined;
+  for (const offset of DESCRIPTOR_OFFSETS) {
+    if (bytes[offset] !== 0 || bytes[offset + 1] !== 0 || bytes[offset + 2] !== 0 || bytes[offset + 3] !== 0xfd) continue;
+    const max = bytes[offset + 6]! + (bytes[offset + 4]! & 0x02 ? 255 : 0);
+    return max > 0 ? max : undefined;
+  }
+  return undefined;
+}
+
 /** Convertit la sortie hexadécimale de `reg query` (REG_BINARY) en octets. */
 export function edidFromHex(hex: string): Uint8Array {
   const clean = hex.replace(/[^0-9a-f]/gi, '');

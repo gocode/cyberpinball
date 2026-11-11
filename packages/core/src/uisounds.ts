@@ -14,7 +14,7 @@ import type { MenuMediaSettings } from './mediaview';
 import type { MenuMoment } from './menumoments';
 import { playVolume } from './menumoments';
 
-export const UI_SOUND_IDS = ['solenoid', 'coin', 'knocker', 'coil', 'invite', 'news', 'friend'] as const;
+export const UI_SOUND_IDS = ['solenoid', 'coin', 'knocker', 'coil', 'invite', 'news', 'friend', 'intro'] as const;
 export type UiSoundId = (typeof UI_SOUND_IDS)[number];
 
 export interface UiSoundSpec {
@@ -121,6 +121,16 @@ export const UI_SOUNDS: Readonly<Record<UiSoundId, UiSoundSpec>> = {
     source: SYNTH_SOURCE,
     license: OWN_LICENSE,
     notice: true,
+  },
+  intro: {
+    get label() {
+      return t('Souffle de l’ouverture');
+    },
+    get when() {
+      return t('Ouverture au démarrage, quand les fils s’allument ; pas avec une musique d’ouverture choisie');
+    },
+    source: SYNTH_SOURCE,
+    license: OWN_LICENSE,
   },
 };
 

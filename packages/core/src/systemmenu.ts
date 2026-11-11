@@ -34,6 +34,7 @@ export const SYSTEM_ITEM_IDS = [
   'activity',
   'quiet-in-game',
   'health',
+  'tech-sheet',
   'cabinet',
   'vpx-settings',
   'vision3d',
@@ -131,8 +132,8 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'borne',
     icon: 'cabinet',
     get label() { return t('Borne'); },
-    get detail() { return t('Boutons, écrans, son, réglages de VPX, réalité virtuelle, vision 3D, télécommande du téléphone, bureau Windows, mode invité'); },
-    entries: ['health', 'cabinet', 'vpx-settings', 'vision3d', 'vr', 'vr-calibrate', 'vr-controllers', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'guest-mode'],
+    get detail() { return t('Santé, fiche technique, boutons, écrans, son, réglages de VPX, réalité virtuelle, vision 3D, télécommande du téléphone, bureau Windows, mode invité'); },
+    entries: ['health', 'tech-sheet', 'cabinet', 'vpx-settings', 'vision3d', 'vr', 'vr-calibrate', 'vr-controllers', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'guest-mode'],
   },
   cyberpinball: {
     id: 'cyberpinball',
@@ -178,6 +179,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   // La lune du « ne pas déranger » : la cloche est à Activité récente, dans la même rubrique.
   'quiet-in-game': { icon: 'moon', get label() { return t('Masquer les notifications pendant les parties'); } },
   health: { icon: 'health', get label() { return t('Santé de la borne'); } },
+  // Fiche technique (tech-sheet.ts) : PC, Windows, écrans, contrôleurs, logiciels, rapport à envoyer.
+  'tech-sheet': { icon: 'report', get label() { return t('Fiche technique'); } },
   cabinet: { icon: 'toolbox', get label() { return t('Configuration de la borne'); } },
   'vpx-settings': { icon: 'sliders', get label() { return t('Réglages de VPX'); } },
   // Jouer dans un casque (vr.ts) : désactivée, ou dans le casque quand il est prêt.

@@ -267,10 +267,13 @@ test('menu système : « Redémarrer Cyber Pinball » relance le logiciel seul, 
   const exits = (['quit', 'relaunch', 'sleep', 'restart', 'shutdown'] as const).map((id) => SYSTEM_ITEMS[id].icon);
   assert.equal(new Set(exits).size, exits.length, exits.join(', '));
   const frontend = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
-  // Fourni pour toute borne, et par relaunchMenu (relaunchCovered : jamais le bureau entre les deux).
-  assert.match(frontend, /\nlibrary\.provideSystemItem\('relaunch', \{[\s\S]*?run: \(\) => relaunchMenu\(\),/);
+  // Fourni pour toute borne, et par relaunchMenu (relaunchCovered : jamais le bureau entre les deux),
+  // avec l'ouverture rejouée comme un démarrage (relaunchMenu(true), 11/11/2026).
+  assert.match(frontend, /\nlibrary\.provideSystemItem\('relaunch', \{[\s\S]*?run: \(\) => relaunchMenu\(true\),/);
   // relaunchCovered ferme l'ancien processus par app.exit, sans before-quit : relaunchMenu enregistre d'abord.
-  const relaunchMenu = /\nfunction relaunchMenu\(\): void \{([\s\S]*?)\r?\n\}/.exec(frontend)![1]!;
+  const relaunchMenu = /\nfunction relaunchMenu\(withIntro = false\): void \{([\s\S]*?)\r?\n\}/.exec(frontend)![1]!;
+  // Les autres relances (langue, configuration) sautent l'ouverture : la borne était déjà ouverte.
+  assert.match(relaunchMenu, /withIntro \? args : \[\.\.\.args, INTRO_SKIP_FLAG\]/);
   assert.ok(relaunchMenu.indexOf('saveSettings()') >= 0 && relaunchMenu.indexOf('saveSettings()') < relaunchMenu.indexOf('relaunchCovered('), 'réglages enregistrés avant la relance');
   // Borne dédiée : « Quitter » ne ferait que relancer, il est retiré ; plus de second « Redémarrer Cyber Pinball ».
   assert.match(frontend, /if \(shellSession\(\)\) \{[^}]*library\.withdrawSystemItem\('quit'\);/);

@@ -253,10 +253,12 @@ function wheelStage(s, style) {
     const layer = el('div', 'wheel-items');
     // La roue est un arc : ses médaillons voisins sortent de l'écran par construction (contrôles de débordement : data-bleed).
     layer.dataset.bleed = '';
-    // Le halo vert de la table choisie vient de derrière son médaillon (frontend.css, .center) :
-    // aucun anneau fixe. Mouvement « Soie » : une lueur traverse le logo choisi à l'arrêt
-    // (.wheel-glint) ; à chaque appui, une onde de lumière court le long de la roue (.wheel-wave).
-    layer.append(el('div', 'wheel-wave'), el('div', 'wheel-glint'));
+    // Maquette validée (11/11/2026) : une lueur à la teinte de la table derrière le médaillon choisi
+    // (.wheel-aura) ; à l'arrêt, un fil vert s'enroule au bord du médaillon, collé à lui, et une
+    // étincelle en fait le tour (.wheel-rim) ; la lueur blanche le traverse (.wheel-glint).
+    const rim = el('div', 'wheel-rim');
+    rim.innerHTML = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="49" pathLength="1"/></svg><i class="wheel-spark"></i>';
+    layer.append(el('div', 'wheel-aura'), rim, el('div', 'wheel-glint'));
     stage.append(layer);
     wheelView = { stage, layer, items: new Map(), style };
   }
@@ -353,18 +355,7 @@ function wheelMoved(v, dir) {
   clearTimeout(v.landing);
   v.stage.classList.remove('landed');
   v.stage.classList.add('moving');
-  const wave = v.layer.querySelector(':scope > .wheel-wave'); // i18n-ignore : sélecteur CSS
-  const w = v.stage.offsetWidth / 1080;
-  if (wave?.animate && !quietMotion() && w > 0) {
-    // Onde : du centre vers le côté d'où arrive la table, comme si la roue tirait le fil.
-    wave.animate(
-      [
-        { transform: 'translateX(0) scaleX(0.6)', opacity: 0.9 },
-        { transform: `translateX(${(dir * 430 * w).toFixed(1)}px) scaleX(1.2)`, opacity: 0 },
-      ],
-      { duration: 620, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' },
-    );
-  }
+  wheelPulse(v, dir);
   v.landing = setTimeout(() => {
     v.stage.classList.remove('moving');
     if (quietMotion()) return;
@@ -372,6 +363,26 @@ function wheelMoved(v, dir) {
     void v.stage.offsetWidth;
     v.stage.classList.add('landed');
   }, wheelTime(v.stage) + 40);
+}
+
+/**
+ * Onde d'un appui (maquette validée) : une lueur part du médaillon choisi et court le long de l'arc
+ * des médaillons, dans le sens du glissement, en s'éteignant (800 ms). Chaque appui lance la sienne :
+ * en rafale, elles se suivent et se fondent. Elle passe derrière les logos.
+ */
+function wheelPulse(v, dir) {
+  const w = v.stage.offsetWidth / 1080;
+  if (quietMotion() || w <= 0 || !WHEELS[v.style]) return;
+  const pulse = el('div', 'wheel-pulse');
+  if (!pulse.animate) return;
+  v.layer.append(pulse);
+  // Les places de la roue (wheelPose) : le centre, puis les voisines du côté où partent les logos.
+  const at = (k) => wheelPose(v.style, -dir * k, 1);
+  const frames = [0, 1, 2, 3].map((k, i) => {
+    const p = at(k);
+    return { transform: `translate(${(p.x * w).toFixed(1)}px, ${(p.y * w).toFixed(1)}px) translate(-50%, -50%)`, opacity: [0.95, 0.7, 0.35, 0][i], offset: i / 3 };
+  });
+  pulse.animate(frames, { duration: 800, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' }).onfinish = () => pulse.remove();
 }
 
 /** Liste : sept lignes fixes, la table choisie toujours sur celle du milieu. */
@@ -471,10 +482,13 @@ function menuPanel(s) {
   const newTitle = v.text.textContent !== s.table.title && v.text.textContent !== '';
   v.text.textContent = s.table.title;
   v.text.dataset.size = titleSize(s.table.title);
-  // Soie : le nouveau titre se précise en entrant (flou et opacité seulement : la zone ne bouge pas).
+  // Soie (maquette validée) : le nouveau titre s'écarte en se précisant (360 ms), fabricant · année
+  // en fondu (160 ms). Il part plus serré que sa forme finale, jamais plus large : il ne change pas
+  // de ligne, et sa zone ne bouge pas.
   if (newTitle && v.text.animate && !quietMotion()) {
     const blur = (6 * root.offsetWidth) / 1080;
-    v.text.animate([{ opacity: 0.15, filter: `blur(${blur.toFixed(1)}px)` }, { opacity: 1, filter: 'blur(0px)' }], { duration: 340, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' });
+    v.text.animate([{ opacity: 0, letterSpacing: '-0.06em', filter: `blur(${blur.toFixed(1)}px)` }, { opacity: 1, letterSpacing: getComputedStyle(v.text).letterSpacing || 'normal', filter: 'blur(0px)' }], { duration: 360, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' });
+    v.meta.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'linear' });
   }
   v.node.classList.toggle('jukebox-chosen', Boolean(s.table.jukebox));
   // Médaillon Juke-box choisi au bureau : son affiche dans le cadre du fronton du menu.

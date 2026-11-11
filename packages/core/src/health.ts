@@ -5,7 +5,8 @@
 // réparation) ; les médias que VPinMediaDB peut fournir, d'après l'index déjà
 // téléchargé (mediadb.ts, aucun réseau) ; la configuration de la borne retenue contre les
 // écrans branchés (configurations.ts), et le sens des tables en partie (gameorientation.ts) ; la version de VPX installée contre celle que Cyber
-// Pinball connaît (manifeste de l'installeur, aucun réseau).
+// Pinball connaît (manifeste de l'installeur, aucun réseau) ; le PC et Windows, d'après le relevé de la
+// fiche technique (techsheet.ts : fréquence des écrans, redémarrage en attente, alimentation, pilote).
 //
 // L'application relève les faits en tâche de fond et les garde (app/src/health.ts) ; ce
 // module en tire les lignes, chacune avec son état (OK, À vérifier, Bloquant) et ce qu'elle
@@ -26,13 +27,14 @@ import { ROLES, type ObservedDisplay, type RoleId } from './model';
 import { playBlockers } from './playable';
 import { systemPathOf, type SystemItemId } from './systemmenu';
 import { taskbarMomentLabel, type TaskbarFacts } from './taskbarguard';
+import { pcLines, type PcHealthFacts, type TechBlockId } from './techsheet';
 import { vpxDisplayName, type VpxDisplayIdFormat } from './vpx';
 import { airLinkOverWifi, type LinkTransport, type PcNetwork } from './vr-reseau';
 
 export type HealthState = 'ok' | 'check' | 'blocking';
 
 /** Les contrôles, dans l'ordre de la page. */
-export const HEALTH_CHECKS = ['disk', 'tables', 'pup', 'media', 'screens', 'dof', 'vr', 'vpx'] as const;
+export const HEALTH_CHECKS = ['disk', 'pc', 'tables', 'pup', 'media', 'screens', 'dof', 'vr', 'vpx'] as const;
 export type HealthCheckId = (typeof HEALTH_CHECKS)[number];
 
 /** Où mène une ligne. */
@@ -44,10 +46,12 @@ export type HealthTarget =
   /** Les tables à revoir au-delà de celles que la page montre, chacune vers son médecin. */
   | { kind: 'tables' }
   /** Télécharger et installer la version de VPX que Cyber Pinball connaît. */
-  | { kind: 'install-vpx' };
+  | { kind: 'install-vpx' }
+  /** Un bloc de la fiche technique (PC, Windows, Écrans…). */
+  | { kind: 'sheet'; block: TechBlockId };
 
 /** Chaque sorte de cible : l'application en ouvre une pour chacune (app/src/health.ts). */
-export const HEALTH_TARGET_KINDS = ['system', 'doctor', 'tables', 'install-vpx'] as const satisfies readonly HealthTarget['kind'][];
+export const HEALTH_TARGET_KINDS = ['system', 'doctor', 'tables', 'install-vpx', 'sheet'] as const satisfies readonly HealthTarget['kind'][];
 
 export interface HealthLine {
   check: HealthCheckId;
@@ -167,6 +171,8 @@ export interface HealthFacts {
   dof?: DofFacts;
   /** Le réseau du casque (vr-reseau.ts) ; absent sans casque relevé. */
   vr?: VrNetworkFacts;
+  /** Le PC et Windows, d'après le relevé de la fiche technique ; absent avant le premier. */
+  pc?: PcHealthFacts;
   vpx: VpxFacts;
 }
 
@@ -651,6 +657,7 @@ export function vpxLines(facts: VpxFacts): HealthLine[] {
 export function healthLines(facts: HealthFacts): HealthLine[] {
   return [
     ...diskLines(facts.disks),
+    ...(facts.pc ? pcLines(facts.pc) : []),
     ...(facts.tables ? tableLines(facts.tables) : []),
     ...(facts.pup ? pupLines(facts.pup) : []),
     ...(facts.media ? mediaLines(facts.media) : []),
@@ -685,6 +692,8 @@ export function healthCheckInfo(check: HealthCheckId): { title: string; icon: Ic
       return { title: t('Casque'), icon: 'vr' };
     case 'vpx':
       return { title: 'Visual Pinball X', icon: 'play' }; // i18n-ignore : nom du logiciel
+    case 'pc':
+      return { title: t('PC et Windows'), icon: 'chip' };
   }
 }
 

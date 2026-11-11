@@ -149,7 +149,8 @@ function renderLibrary(v) {
         }
         for (const badge of row.badges ?? []) line.append(libEl('span', 'badge', badge));
         // Case, vignette et valeur à droite (Juke-box) : la ligne en colonnes, le texte dans la sienne.
-        const parts = Boolean(row.check || row.thumb || row.aside);
+        // Libellé à gauche (Fiche technique : « Processeur », « Mémoire ») : sa propre colonne, commune à la section.
+        const parts = Boolean(row.check || row.thumb || row.aside || row.label);
         // Schéma à droite (« Écran du DMD ») ou pastille à gauche : le texte passe dans une colonne à part.
         const main = row.figure || row.avatar || parts ? libEl('div', 'lib-row-main') : li;
         main.append(line);
@@ -162,6 +163,7 @@ function renderLibrary(v) {
         }
         if (parts && !row.figure && !row.avatar) {
           li.classList.add('with-parts');
+          if (row.label) li.append(libEl('span', 'lib-row-label', row.label));
           if (row.check) li.append(rowCheck(row.check));
           if (row.thumb) li.append(rowThumb(row.thumb));
           li.append(main);

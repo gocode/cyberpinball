@@ -38,6 +38,8 @@ import {
   type HealthTarget,
   type Layout,
   type MediaFacts,
+  type PcHealthFacts,
+  type TechBlockId,
   type SystemItemId,
   type TableEntry,
 } from '@cyberpinball/core';
@@ -61,6 +63,10 @@ export interface HealthContext {
   dof?(): DofFacts | undefined;
   /** Le réseau du casque (vr-reseau.ts) : transport de Link et carte réseau du PC ; undefined sans casque. */
   vr?(): VrNetworkFacts | undefined;
+  /** Le PC et Windows, d'après le dernier relevé de la fiche technique ; undefined avant le premier. */
+  pc?(): PcHealthFacts | undefined;
+  /** Un bloc de la fiche technique ; son « Retour » ramène à `back`. */
+  openSheet?(block: TechBlockId, back: () => void): void;
   openCustom(build: () => Built, at?: number): void;
   openSystem(): void;
   /** Ouvre une entrée du menu système ; son « Retour » ramène à `back`. */
@@ -168,7 +174,8 @@ export function createHealth(ctx: HealthContext) {
       console.error(`Santé de la borne, DOF : ${(error as Error).message}`); // i18n-ignore : journal
     }
     const vr = ctx.vr?.();
-    return { at: new Date().toISOString(), disks, tables, pup, media, screens, ...(dof ? { dof } : {}), ...(vr ? { vr } : {}), vpx };
+    const pc = ctx.pc?.();
+    return { at: new Date().toISOString(), disks, ...(pc ? { pc } : {}), tables, pup, media, screens, ...(dof ? { dof } : {}), ...(vr ? { vr } : {}), vpx };
   }
 
   /** Relève tout en arrière-plan ; un relevé en cours n'est pas doublé. */
@@ -216,6 +223,7 @@ export function createHealth(ctx: HealthContext) {
       if (host.installVpx) host.installVpx();
       else ctx.runSystemItem('cabinet', () => open());
     },
+    sheet: (target) => (ctx.openSheet ? ctx.openSheet(target.block, () => open()) : ctx.runSystemItem('tech-sheet', () => open())),
   };
 
   function go(target: HealthTarget): void {
@@ -311,11 +319,27 @@ export function createHealth(ctx: HealthContext) {
     return parts.length ? parts.join(' · ') : t('Tout est en ordre');
   }
 
+  /**
+   * Nouveau relevé de la fiche technique : le groupe « PC et Windows » suit aussitôt, sans refaire
+   * tout le relevé (les tables, les médias).
+   */
+  function updatePc(pc: PcHealthFacts): void {
+    if (!facts || running) return;
+    facts = { ...facts, pc };
+    try {
+      saveHealthFacts(host.dataDir, facts);
+    } catch {
+      // Données en lecture seule : le relevé reste en mémoire.
+    }
+    host.broadcast();
+  }
+
   return {
     open,
     refresh,
     summary,
     watch,
+    updatePc,
     /** Un point bloquant dans le dernier relevé : pastille rouge sur l'entrée, jusqu'à la roue dentée. */
     attention: () => healthAttention(facts),
     /** Dernier relevé (essais). */

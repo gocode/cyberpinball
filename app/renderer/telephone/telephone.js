@@ -866,6 +866,9 @@ function handle(m) {
     case 'up-ready':
       uploadReady(m);
       break;
+    case 'report':
+      reportOffer(m);
+      break;
     case 'up-done':
       doneUpload(m.name);
       break;
@@ -1369,6 +1372,67 @@ async function pump(u) {
   } catch {
     if (upload === u && u.phase === 'sending') failUpload(t('La liaison avec la borne a été coupée. Sélectionnez à nouveau le fichier pour réessayer.'), t('Envoi interrompu'));
   }
+}
+
+// --- Rapport de la borne (Fiche technique > Envoyer un rapport) --------------------------
+// La page est en HTTP : le partage du système (navigator.share) et le presse-papiers moderne n'y sont
+// pas permis. On télécharge donc le fichier par un lien, on prépare un e-mail par mailto: (le résumé
+// dans le message, le fichier à joindre) et on copie le résumé à l'ancienne (execCommand).
+
+/** Un texte dans le presse-papiers ; vrai si le navigateur l'a pris. */
+function copyText(text) {
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.opacity = '0';
+  document.body.append(area);
+  area.select();
+  area.setSelectionRange(0, text.length);
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch {
+    ok = false;
+  }
+  area.remove();
+  return ok;
+}
+
+/** La borne propose son rapport : télécharger, préparer un e-mail, copier le résumé ; la feuille revient après chaque geste. */
+function reportOffer(m, note) {
+  if (typeof m.url !== 'string' || !m.url.startsWith('/rapport/') || typeof m.name !== 'string') return;
+  const again = (text) => setTimeout(() => reportOffer(m, text), 300);
+  const items = [
+    {
+      id: 'report-get',
+      label: t('Télécharger le rapport'),
+      run: () => {
+        const a = document.createElement('a');
+        a.href = m.url;
+        a.download = m.name;
+        document.body.append(a);
+        a.click();
+        a.remove();
+        again(t('Téléchargement lancé : il est dans les téléchargements du téléphone.'));
+      },
+    },
+  ];
+  if (typeof m.mailto === 'string' && m.mailto.startsWith('mailto:')) {
+    items.push({
+      id: 'report-mail',
+      label: t('Préparer un e-mail'),
+      run: () => {
+        location.href = m.mailto;
+        again(t('Joignez-y le fichier téléchargé avant d’envoyer.'));
+      },
+    });
+  }
+  if (typeof m.summary === 'string' && m.summary) {
+    items.push({ id: 'report-copy', label: t('Copier le résumé'), run: () => again(copyText(m.summary) ? t('Résumé copié : collez-le dans un forum ou un message.') : t('Copie refusée par le navigateur.')) });
+  }
+  const size = typeof m.size === 'number' ? ` · ${formatSize(m.size)}` : '';
+  openSheet(t('Rapport de la borne'), items, { text: note ?? `${m.name}${size}\n${t('Téléchargez-le, puis joignez-le à un e-mail ou à un message.')}` });
 }
 
 function failUpload(text, title) {

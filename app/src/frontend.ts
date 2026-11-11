@@ -8,6 +8,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, BrowserWindow, globalShortcut, ipcMain, session, shell, webContents, type Input, type Rectangle, type WebContents } from 'electron';
 import {
+  loadDedicatedRecord,
+  loadPrereleaseSetting,
   createKeptPhones,
   ArcadeHours,
   CONFIG_KEY,
@@ -268,6 +270,7 @@ import {
   type RecordedRole,
   type RecordingSettings,
   IntroRun,
+  type IntroView,
   INTRO_SKIP_FLAG,
   introAtStartup,
   introFiles,
@@ -313,7 +316,7 @@ import {
   isJukeboxAction,
   type RemoteJukeboxOp,
 } from '@cyberpinball/core';
-import { bringToFront, foregroundWindow, listWindows, moveWindow, setCursorPosition, visibleWindowsOf } from '@cyberpinball/win-displays';
+import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, setCursorPosition, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
 import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, whenReadyToShow, windowRect } from './offscreen';
@@ -763,14 +766,23 @@ function beginIntro(returnTo: 'menu' | 'library'): void {
   // Fenêtres déjà prêtes (« Voir l'ouverture ») : les animations partent tout de suite.
   introRun.begin(returnTo, returnTo === 'library');
   state = { ...state, phase: 'intro', help: false };
-  broadcast();
+  // « Voir l'ouverture » : elle part tout de suite, son souffle avec elle.
+  if (returnTo === 'library') introStarted();
+  else broadcast();
 }
 
 /** Une fenêtre est prête : quand toutes le sont, les animations partent ensemble. */
 function introWindowReady(id: number): void {
   introReady.add(id);
   const all = [...windows.values()].every((w) => w.isDestroyed() || introReady.has(w.webContents.id));
-  if (all && introRun.start()) broadcast();
+  if (all && introRun.start()) introStarted();
+}
+
+/** Les animations de l'ouverture partent : l'état aux fenêtres, et le souffle de l'ouverture. */
+function introStarted(): void {
+  broadcast();
+  // Une musique d'ouverture choisie par le joueur a la parole : le souffle se tait.
+  if (introSource(mediaSettings.intro, introFilesNow(), 'music').source !== 'file') playUiSound('intro');
 }
 
 /** Premier bouton pendant l'ouverture : la roue (ou les réglages), et rien d'autre. */
@@ -789,6 +801,14 @@ function leaveIntro(): boolean {
   return true;
 }
 
+/** Ouverture du plateau au bureau : le fichier du fronton choisi par le joueur, sinon l'animation du plateau. */
+function desktopIntro(viewOf: (r: RoleId, desktop?: boolean) => IntroView): IntroView {
+  const own = introSource(mediaSettings.intro, introFilesNow(), 'backglass');
+  if (own.source === 'file' && own.kind !== 'audio') return viewOf('playfield', true);
+  const view = viewOf('playfield');
+  return { ...view, source: 'fallback', url: undefined, kind: undefined, orient: undefined, fallback: 'intro-playfield' };
+}
+
 /** Part de l'ouverture d'une fenêtre : l'écran de chaque rôle qu'elle dessine, et l'invite du plateau. */
 function introFor(role: RoleId) {
   const run = introRun.current;
@@ -805,8 +825,10 @@ function introFor(role: RoleId) {
     id: run.id,
     startedAt: run.startedAt,
     screens: Object.fromEntries(roles.map((r) => [r, viewOf(r)])),
-    // Plateau en largeur (poste de bureau) : l'ouverture du fronton, plein écran.
-    desktop: role === 'playfield' ? viewOf('playfield', true) : undefined,
+    // Plateau en largeur (poste de bureau) : l'ouverture « Soie » du plateau, couchée en largeur
+    // (le shader se plie à toutes les proportions) ; une image ou une vidéo d'ouverture du fronton
+    // choisie par le joueur garde sa place, plein écran.
+    desktop: role === 'playfield' ? desktopIntro(viewOf) : undefined,
     hint: introRun.returnTo === 'library' ? t('Appuyez sur un bouton pour revenir aux réglages') : t('Appuyez sur un bouton pour choisir une table'),
   };
 }
@@ -1131,6 +1153,31 @@ const library = createLibrary({
   setup: () => void relaunchWizard(),
   guest,
   displays: () => observedDisplays(),
+  // Fiche technique : connexion et fréquences des vrais écrans ; aucune avec des écrans simulés (essais).
+  displayLinks: () => (simulatedDisplays() ? [] : probeDisplayLinks()),
+  techApp: () => {
+    const social = socialNet.state();
+    const status = socialNet.status();
+    return {
+      mode: desktop.active ? 'desktop' : 'cabinet',
+      prerelease: loadPrereleaseSetting(loc.dataDir),
+      dedicated: loadDedicatedRecord(loc.dataDir)?.state === 'active',
+      friends: !social.enabled ? 'off' : status.internet || status.lan ? 'connected' : 'offline',
+      phones: phoneRemote.keptPhones().length,
+    };
+  },
+  reportFriends: () => {
+    const social = socialNet.state();
+    if (!social.enabled || guest.active) return undefined;
+    return social.friends.map((f) => ({ key: f.key, name: f.name, online: socialNet.online(f.key) }));
+  },
+  sendFriendReport: (key, text) => chatService.send(key, text),
+  reportNames: () => {
+    const social = socialNet.state();
+    return [social.name, ...social.friends.map((f) => f.name)];
+  },
+  listDrives: () => listDrives(),
+  ejectDrive: (drive) => ejectDrive(drive, OFFSCREEN),
   vpxVersion: () => vpxInstall(loc)?.version,
   // Un téléchargement fini : au menu des tables, la notification du menu (selon son réglage) ; sur
   // un écran plein, le bandeau, et la notification ne le redira pas au retour (un seul mécanisme).
@@ -2147,12 +2194,12 @@ if (shellSession()) {
   run: () => showDesktop(),
 });
 // Ferme et rouvre Cyber Pinball, le PC allumé : la même relance couverte que la langue ou une
-// configuration (aucun écran ne montre le bureau entre les deux), sans l'ouverture du démarrage.
+// configuration (aucun écran ne montre le bureau entre les deux), avec l'ouverture du démarrage.
 library.provideSystemItem('relaunch', {
   get detail() {
     return t('Ferme puis rouvre Cyber Pinball ; le PC reste allumé');
   },
-  run: () => relaunchMenu(),
+  run: () => relaunchMenu(true),
 });
 // Collections de la roue : aussi au menu système, pour une borne dont les MagnaSave ne répondent pas.
 library.provideSystemItem(
@@ -4228,7 +4275,7 @@ export function startFrontend(): void {
   if (!choose && introAtStartup({ settings: mediaSettings.intro, landing: state.phase, argv: process.argv, env: process.env })) {
     beginIntro('menu');
     // Une fenêtre qui ne dit jamais « prête » ne retient pas les autres.
-    setTimeout(() => introRun.start() && broadcast(), INTRO_READY_MAX_MS);
+    setTimeout(() => introRun.start() && introStarted(), INTRO_READY_MAX_MS);
     // Le profil attend la fin de l'ouverture : rien ne se pose sur les animations.
     pendingProfileWelcome = welcome;
   } else if (welcome) openProfileWelcome();
@@ -5772,13 +5819,17 @@ function relaunchWizard(stepFlag?: string, newConfiguration = false): boolean {
   return true;
 }
 
-/** Relance le menu : une autre configuration de la borne rouvre ses fenêtres sur ses écrans. */
-function relaunchMenu(): void {
+/**
+ * Relance le menu : une autre configuration de la borne rouvre ses fenêtres sur ses écrans. Après
+ * une langue ou une configuration, la borne était déjà ouverte : pas d'ouverture. « Redémarrer Cyber
+ * Pinball », demandé par le joueur, la rejoue comme un démarrage (`withIntro`, 11/11/2026).
+ */
+function relaunchMenu(withIntro = false): void {
   // Par le gardien des écrans, comme toute relance : aucun écran ne montre le bureau entre les deux.
-  // La borne était déjà ouverte : pas d'ouverture à la relance.
   // app.exit ferme l'ancien processus sans before-quit : ce qu'il garde est enregistré ici.
   saveSettings();
-  relaunchCovered([...process.argv.slice(1).filter((a) => a !== INTRO_SKIP_FLAG), INTRO_SKIP_FLAG]);
+  const args = process.argv.slice(1).filter((a) => a !== INTRO_SKIP_FLAG);
+  relaunchCovered(withIntro ? args : [...args, INTRO_SKIP_FLAG]);
 }
 
 /** Les règles du pare-feu au démarrage (firewall-guard.ts) ; après une mise à jour, l'écran qui demande de les reposer. */

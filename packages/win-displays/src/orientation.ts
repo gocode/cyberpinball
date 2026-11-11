@@ -154,3 +154,35 @@ export function setDisplayOrientation(gdiName: string, rotation: Rotation, optio
   const state = restored === 0 ? t("orientation d'origine ({before}°) rétablie", { before }) : t("orientation d'origine non rétablie ({reason})", { reason: describe(restored) });
   throw new Error(t("Windows n'a pas tourné l'écran {name} ({reason}) ; {state}.", { name: gdiName, reason, state }));
 }
+
+const OFFSET_DISPLAY_FREQUENCY = 184;
+
+/**
+ * Fréquence en cours d'un écran et la plus haute que Windows propose à sa définition actuelle
+ * (les modes de EnumDisplaySettingsExW, dans un sens ou dans l'autre pour un écran tourné).
+ * undefined : Windows ne donne pas son mode.
+ */
+export function displayRefresh(gdiName: string): { hz: number; maxHz: number } | undefined {
+  if (process.platform !== 'win32') return undefined;
+  const w = loadApi();
+  let current: Buffer;
+  try {
+    current = currentMode(w, gdiName);
+  } catch {
+    return undefined;
+  }
+  const width = current.readUInt32LE(OFFSET_PELS_WIDTH);
+  const height = current.readUInt32LE(OFFSET_PELS_HEIGHT);
+  const hz = current.readUInt32LE(OFFSET_DISPLAY_FREQUENCY);
+  let maxHz = hz;
+  const mode = Buffer.alloc(DEVMODE_SIZE);
+  for (let i = 0; i < 2000; i++) {
+    mode.fill(0);
+    mode.writeUInt16LE(DEVMODE_SIZE, OFFSET_SIZE);
+    if (!w.EnumDisplaySettingsExW(gdiName, i, mode, 0)) break;
+    const mw = mode.readUInt32LE(OFFSET_PELS_WIDTH);
+    const mh = mode.readUInt32LE(OFFSET_PELS_HEIGHT);
+    if ((mw === width && mh === height) || (mw === height && mh === width)) maxHz = Math.max(maxHz, mode.readUInt32LE(OFFSET_DISPLAY_FREQUENCY));
+  }
+  return hz > 1 ? { hz, maxHz } : undefined;
+}

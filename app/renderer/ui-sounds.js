@@ -186,6 +186,41 @@
       tone(ac, out, t + 0.01, { from: 1040, to: 1560, glide: 0.07, peak: 0.04, attack: 0.008, decay: 0.14 });
       return 0.25;
     },
+    // Souffle de l'ouverture (11/11/2026), calé sur l'ouverture « Soie » (INTRO_TIMELINE) : un
+    // souffle filtré monte avec l'étincelle (le filtre glisse de 400 à 5 200 Hz en 1,25 s), puis, à
+    // l'ignition, un accord doux et vitré s'ouvre et tient (la, mi, si, do dièse, chaque note doublée
+    // d'un soupçon de désaccord), posé sur un grave qui descend, avec un voile de poussière aigu.
+    // Léger : aucun choc, aucune attaque sèche ; 3,1 s, sans réverbération.
+    intro(ac, out, t) {
+      const src = ac.createBufferSource();
+      src.buffer = noiseBuffer(ac);
+      src.loop = true;
+      const f = ac.createBiquadFilter();
+      f.type = 'bandpass';
+      f.Q.value = 6;
+      f.frequency.setValueAtTime(400, t);
+      f.frequency.exponentialRampToValueAtTime(5200, t + 1.25);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.16, t + 1.1);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+      src.connect(f).connect(g).connect(out);
+      src.start(t);
+      src.stop(t + 1.55);
+      const at = t + 1.25;
+      for (const [freq, peak] of [
+        [440, 0.1],
+        [659.3, 0.08],
+        [987.8, 0.06],
+        [1318.5, 0.04],
+      ]) {
+        tone(ac, out, at, { from: freq, peak, attack: 0.06, decay: 1.7 });
+        tone(ac, out, at, { from: freq * 1.003, peak: peak * 0.5, attack: 0.09, decay: 1.5 });
+      }
+      tone(ac, out, at, { from: 110, to: 82.4, glide: 0.4, peak: 0.16, attack: 0.02, decay: 0.9 });
+      hiss(ac, out, at, { filter: 'highpass', freq: 7000, peak: 0.05, attack: 0.005, decay: 0.5 });
+      return 3.1;
+    },
     // Tintement de la partie entre amis (un invité accepte ou décline, la partie est finie,
     // notices.ts) : deux notes de cloche douces qui montent d'une quarte, mi puis la, à 120 ms
     // d'écart, deux fois moins fortes que le carillon d'invitation, sans son attaque de métal :

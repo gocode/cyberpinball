@@ -137,6 +137,11 @@ import {
   installationCompanions,
   type CompanionReport,
   language,
+  activeConfiguration,
+  loadCabinetSet,
+  pcHealthFacts,
+  type DriveInfo,
+  type TechFacts,
   playBlockers,
   romBlockers,
   messagesOf,
@@ -212,7 +217,7 @@ import { prepareImport, unpackArchive, type PreparedImport } from './archives';
 import { createDofMenu } from './dof-menu';
 import { dofDir, readDof, vpxWorkDir } from './dof-files';
 import { backupDir, locations } from './paths';
-import { usbDevices } from './vpx-ini';
+import { activeVpxIni, usbDevices } from './vpx-ini';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
 import { LayoutReport } from './layout-check';
 import { createJukeboxLibrary } from './jukebox-library';
@@ -241,7 +246,10 @@ import { createFilePicker, type PickRequest } from './file-picker';
 import { createDownloadsScreen } from './downloads-screen';
 import { createDownloadCenter, type DownloadNextStep } from './download-center';
 import { httpTransport } from './download-sources';
+import { findComponent } from '@cyberpinball/installer';
 import { createHealth, type HealthView } from './health';
+import { collectTechFacts, loadTechFacts, recentErrors, saveTechFacts, type DisplayLinkFacts } from './tech-facts';
+import { createTechSheet, type ReportFriend } from './tech-sheet';
 import { isShown, primaryRect, refuseOffscreen } from './offscreen';
 
 const MANUFACTURERS = [
@@ -278,6 +286,19 @@ function keyLabel(key: string): string {
 export interface LibraryHost {
   /** Le réseau du casque pour la santé de la borne (vr-reseau.ts) ; undefined sans casque relevé. */
   vrNetwork?(): VrNetworkFacts | undefined;
+  /** Fiche technique : ce que l'application sait d'elle-même (mode, borne dédiée, réseau des amis…). */
+  techApp?(): Partial<NonNullable<TechFacts['app']>>;
+  /** Connexion et fréquences des écrans (win-displays, probeDisplayLinks). */
+  displayLinks?(): DisplayLinkFacts[];
+  /** Amis à qui envoyer le résumé d'un rapport ; undefined : réseau des amis coupé. */
+  reportFriends?(): ReportFriend[] | undefined;
+  /** Écrit à un ami dans la messagerie (le résumé d'un rapport). */
+  sendFriendReport?(key: string, text: string): void;
+  /** Noms que le rapport remplace : le joueur, la borne, ses amis. */
+  reportNames?(): string[];
+  /** Lecteurs de la borne (clés USB pour le rapport). */
+  listDrives?(): Promise<DriveInfo[]>;
+  ejectDrive?(drive: DriveInfo): Promise<boolean>;
   root: string | undefined;
   dataDir: string;
   vpxExe(): string | undefined;
@@ -469,6 +490,8 @@ export type UiAction =
 
 export type Tone = 'error' | 'warning' | 'info' | 'ok' | 'quiet';
 export interface Row {
+  /** Libellé à gauche, dans sa colonne (Fiche technique, Section.kind 'spec') : « Processeur ». */
+  label?: string;
   text: string;
   detail?: string;
   tone?: Tone;
@@ -1502,12 +1525,114 @@ export function createLibrary(host: LibraryHost) {
       return dofHealthFacts(setup, detectDofControllers(devices, cabinetJoystickHids(loadCabinet(host.dataDir))), devices);
     },
     vr: () => host.vrNetwork?.(),
+    pc: () => {
+      const facts = techSheet.facts();
+      return facts ? pcHealthFacts(facts) : undefined;
+    },
+    openSheet: (block, back) => techSheet.openBlock(block, back),
     openCustom: (build, at) => openCustom(build, at),
     openSystem: () => openSystem(),
     runSystemItem: (id, back) => runSystemItem(id, back),
     openDoctor: (file, back) => openDoctor(file, [], false, undefined, back),
     showing: (build) => screen?.kind === 'custom' && screen.build === build,
   });
+
+  // Fiche technique (Menu système > Borne) : le relevé du PC et de la borne, et le rapport à envoyer.
+  const techSheet = createTechSheet({
+    dataDir: host.dataDir,
+    collect: () =>
+      collectTechFacts({
+        displays: host.displays,
+        links: host.displayLinks,
+        cabinet: () => {
+          const set = loadCabinetSet(host.dataDir);
+          return set ? activeConfiguration(set) : undefined;
+        },
+        configuration: () => {
+          const active = health.facts()?.screens?.active;
+          return active ? { name: active.name, found: active.found, total: active.total } : undefined;
+        },
+        vpxDir: () => {
+          const exe = host.vpxExe();
+          return exe ? path.dirname(exe) : undefined;
+        },
+        vpxIniText: () => readTextIfExists(activeVpxIni(locations())),
+        vpxVersion: () => host.vpxVersion?.(),
+        vpxKnown: () => {
+          try {
+            return findComponent('vpx').version;
+          } catch {
+            return undefined;
+          }
+        },
+        vcRuntime: () => health.facts()?.vpx.runtime,
+        usbPinscape: () => (usbDevices() ?? []).some((d) => d.vid === 0xfafa || (d.vid === 0x1209 && d.pid === 0xeaea)),
+        dof: () => health.facts()?.dof?.controllers ?? [],
+        pupPacks: () => health.facts()?.pup?.packs,
+        app: () => {
+          const tables = host.tables();
+          const blocked = health.facts()?.tables?.flagged.filter((f) => f.blocking).length ?? 0;
+          return {
+            version: app.getVersion(),
+            mode: 'cabinet',
+            tables: tables.length,
+            ready: tables.length - blocked,
+            data: host.dataDir,
+            errors: recentErrors(host.dataDir),
+            language: language() === 'fr' ? t('Français') : t('Anglais'),
+            ...host.techApp?.(),
+          };
+        },
+      }),
+    health: () => health.facts(),
+    healthChanged: (facts) => health.updatePc(pcHealthFacts(facts)),
+    load: () => loadTechFacts(host.dataDir),
+    save: (facts) => saveTechFacts(host.dataDir, facts),
+    openCustom: (build, at) => openCustom(build, at),
+    openSystem: () => openSystem(),
+    runSystemItem: (id, back) => runSystemItem(id, back),
+    prompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
+    showing: (build) => screen?.kind === 'custom' && screen.build === build,
+    broadcast: () => host.broadcast(),
+    installVpx: host.installVpx ? () => host.installVpx!() : undefined,
+    drives: () => host.listDrives?.() ?? Promise.resolve([]),
+    eject: host.ejectDrive ? (drive) => host.ejectDrive!(drive) : undefined,
+    phone: () => (host.phoneRemote?.connected() === 'menu' ? host.phoneRemote.phoneName() ?? t('Téléphone connecté') : undefined),
+    offerPhone: (report) => host.phoneRemote?.offerReport(report) ?? false,
+    friends: () => host.reportFriends?.(),
+    sendFriend: (key, text) => host.sendFriendReport?.(key, text),
+    names: () => host.reportNames?.() ?? [],
+    attachments: () => reportAttachments(),
+  });
+  provideSystemItem('tech-sheet', {
+    get detail() {
+      return techSheet.summary();
+    },
+    run: () => techSheet.open(),
+  });
+
+  /** Fichiers joints au rapport : journal de VPX de la dernière partie, VPinballX.ini, configurations sans empreintes d'écrans. */
+  function reportAttachments(): { name: string; text: string; about: string }[] {
+    const out: { name: string; text: string; about: string }[] = [];
+    const log = host.vpxLogFile?.();
+    const logText = log ? readTextIfExists(log) : '';
+    if (logText) out.push({ name: 'vpinball.log', text: logText.slice(-1_500_000), about: t('le journal de VPX, dernière partie') }); // i18n-ignore : nom de fichier
+    const ini = readTextIfExists(activeVpxIni(locations()));
+    if (ini) out.push({ name: 'VPinballX.ini', text: ini, about: t('les réglages de VPX') }); // i18n-ignore : nom de fichier
+    const set = loadCabinetSet(host.dataDir);
+    if (set) out.push({ name: 'configurations.json', text: maskScreens(JSON.stringify(set, null, 1)), about: t('les écrans et les boutons de la borne') }); // i18n-ignore : nom de fichier
+    return out;
+  }
+
+  /** Empreintes et numéros de série des écrans : remplacés par « écran 1 », « écran 2 »… */
+  function maskScreens(text: string): string {
+    const seen = new Map<string, string>();
+    return text.replace(/"(fingerprint|serialText|serialNumber|devicePath|containerId)":\s*("(?:[^"\\]|\\.)*"|\d+)/g, (_m, key: string, value: string) => {
+      if (!seen.has(value)) seen.set(value, `écran ${seen.size + 1}`); // i18n-ignore : marque dans un fichier technique
+      return `"${key}": "‹${seen.get(value)}›"`;
+    }).replace(/"(playfield|backglass|dmd|topper)":\s*"([^"]+)"/g, (m, role: string, value: string) => (seen.has(`"${value}"`) ? `"${role}": "‹${seen.get(`"${value}"`)}›"` : m));
+  }
+
   provideSystemItem('health', {
     get detail() {
       return health.summary();
@@ -4827,7 +4952,10 @@ export function createLibrary(host: LibraryHost) {
     withdrawSystemItem,
     provideAddFromFriend,
     /** Santé de la borne : premier relevé peu après le démarrage, puis toutes les 30 minutes, sauf pendant `quiet` (une partie). */
-    watchHealth: (quiet?: () => boolean) => health.watch(quiet),
+    watchHealth: (quiet?: () => boolean) => {
+      health.watch(quiet);
+      techSheet.watch(quiet);
+    },
     /** Santé de la borne : relevé, page (essais). */
     health,
     openSystem,

@@ -34,6 +34,7 @@ export const ICON_NAMES = [
   'refresh',
   'account',
   'chip',
+  'report',
   'link',
   'import',
   'image-download',

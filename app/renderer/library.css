@@ -57,10 +57,9 @@ body.mouse [data-act] {
   flex-direction: column;
   gap: 2.5cqmin;
   padding: var(--pad-top) var(--pad-side) 4cqmin;
-  /* Soie : la vidéo de la table reste devinable derrière l'écran (voile à 86 %), une lueur à la teinte de la table en haut à droite. */
-  background:
-    radial-gradient(ellipse at 92% 8%, color-mix(in oklab, var(--table-deep) 30%, transparent) 0%, transparent 55%),
-    rgba(3, 8, 7, 0.86);
+  /* Fond « verre fumé » de la marque, opaque, en borne comme au bureau (choix du 11/11/2026). */
+  background: var(--fond-ambiance);
+  background-color: var(--bg);
 }
 
 /*
@@ -243,7 +242,8 @@ body.mouse .lib-back:hover {
 
 .lib-body.only-actions > .lib-actions {
   align-self: start;
-  max-height: 100%;
+  /* Toute la zone, plus la marge du halo que la marge négative rend (.lib-actions) : sans elle, une liste qui tenait se mettait à défiler. */
+  max-height: calc(100% + 4.4cqmin);
   box-sizing: border-box;
 }
 
@@ -545,7 +545,13 @@ body.mouse .lib-back:hover {
   gap: 1.2cqmin;
   min-height: 0;
   overflow-y: auto;
-  padding: 0.6cqmin;
+  /*
+   * Marge pour le halo de l'action choisie (2,4 cqmin de flou, .current) : la liste défile, donc
+   * rogne ce qui dépasse ; sans cette marge, le halo était coupé net au lieu de s'estomper. La marge
+   * négative garde les actions à leur place.
+   */
+  padding: 2.8cqmin;
+  margin: -2.2cqmin;
 }
 
 /*
@@ -3492,6 +3498,30 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   white-space: nowrap;
 }
 
+/*
+ * Fiche technique (Section.kind 'spec') : une grille commune à la section, libellé à gauche
+ * (« Processeur »), valeur et détail à droite. Chaque ligne en sous-grille : toutes les valeurs
+ * partent du même bord, quelle que soit la longueur des libellés.
+ */
+.lib-row-label {
+  font-size: 2.1cqmin;
+  color: var(--ink-muted);
+  word-break: break-word;
+}
+
+.kind-spec .lib-rows {
+  display: grid;
+  grid-template-columns: minmax(14cqmin, max-content) minmax(0, 1fr);
+}
+
+.kind-spec .lib-row.with-parts {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: baseline;
+  column-gap: 3cqmin;
+}
+
 /* Case : vide, cochée (coche verte), barrée (croix neutre : sautée, refusée, on ne peut pas la cocher). */
 .lib-check {
   flex: none;
@@ -4141,11 +4171,24 @@ body.mouse button.lib-command:hover .lib-command-text {
 
 /* ---------- Mouvement « Soie » des écrans de menu ---------- */
 
-/* Titre des écrans : capitales larges et espacées, comme la marque. */
+/*
+ * Titre des écrans : en capitales, comme la marque, mais léger : 3,6 % du petit côté (6,5 % en
+ * casse normale avant le mouvement Soie), à peine élargi et espacé. Plus gros, il prenait la place
+ * du contenu et un titre long passait sur deux lignes (retour du 11/11/2026).
+ */
 .lib-head h1 {
-  font-stretch: 112%;
-  letter-spacing: 0.05em;
+  font-size: 3.6cqmin;
+  font-stretch: 105%;
+  letter-spacing: 0.035em;
   text-transform: uppercase;
+}
+
+.lib-head h1.with-icon {
+  gap: 1.5cqmin;
+}
+
+.lib-head .lib-head-icon {
+  font-size: 3.4cqmin;
 }
 
 /* Filet sous l'en-tête ; sa lumière court dans le trait seulement (même hauteur, débord caché). */
@@ -4153,7 +4196,7 @@ body.mouse button.lib-command:hover .lib-command-text {
   position: relative;
   flex: none;
   height: 0.28cqmin;
-  margin-top: 2.2cqmin;
+  margin-top: 1.4cqmin;
   overflow: hidden;
   background: linear-gradient(90deg, rgba(54, 201, 180, 0.75), rgba(54, 201, 180, 0.14));
   box-shadow: 0 0 1.1cqmin rgba(54, 201, 180, 0.45);

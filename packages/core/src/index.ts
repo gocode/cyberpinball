@@ -127,6 +127,7 @@ export * from './wizardsteps';
 export * from './systemmenu';
 export * from './guestmode';
 export * from './health';
+export * from './techsheet';
 export * from './update';
 export * from './i18n';
 export * from './icons';

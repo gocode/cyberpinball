@@ -229,7 +229,8 @@ test('fenêtre : chaque recette tient dans sa durée et sort sur la sortie du me
     assert.equal(w.api.play(id, 1), true);
     assert.ok(w.log.starts > 0, `${id} : des sources`);
     // Les sources s'arrêtent au plus tard 0,2 s après le début du son plus sa durée (ui-sounds.js libère alors le son).
-    assert.ok(Math.max(...w.log.stops) < 0.8, `${id} : ${Math.max(...w.log.stops)} s`);
+    // Des bruits brefs, sous 0,8 s ; seul le souffle de l'ouverture tient plus longtemps (3,1 s, joué une fois au démarrage).
+    assert.ok(Math.max(...w.log.stops) < (id === 'intro' ? 3.3 : 0.8), `${id} : ${Math.max(...w.log.stops)} s`);
     assert.deepEqual(w.log.sinks, ['fronton']);
     w.flush();
     assert.equal(w.api.status().enCours, 0, `${id} : libéré`);

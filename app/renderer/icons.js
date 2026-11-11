@@ -58,6 +58,7 @@ const CYBER_ICONS = {
   pup: '<path d="M6 3h15v13M3 7h14v14H3zM8 11l5 3-5 3z"/>', // Paquet de vidéos, deux plans superposés.
   frame: '<path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6"/>', // Cadrer l’affichage pendant la partie.
   pulse: '<path d="M2 12h5l3-8 4 16 3-8h5"/>', // Diagnostiquer et réparer.
+  report: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 12h1m3 0h4M8 16h1m3 0h4M8 8h2"/>', // Fiche technique : une fiche de relevé, repères et valeurs.
   health: '<path d="M12 5.5C9 1.5 3 2 3 7.5c0 4.5 4.5 9 9 13.5 4.5-4.5 9-9 9-13.5 0-5.5-6-6-9-2z"/><path d="M5.5 10.5h3L10 7.5l2 6.5 2-3.5h4.5"/>', // Santé de la borne : un cœur et son pouls.
   trash: '<path d="M3 7h18M6 7l1 14h10l1-14M8 7V3h8v4M10 11v6M14 11v6"/>', // Supprimer, envoyer à la corbeille.
 

@@ -453,6 +453,9 @@ interface Upload {
   busy: boolean;
 }
 
+/** Un rapport donné au téléphone se télécharge pendant 10 minutes. */
+export const REPORT_MS = 10 * 60_000;
+
 export function createPhoneRemote(opts: PhoneRemoteOptions) {
   /**
    * Les images de la page sous jeton (remote-images.ts) : pastilles, pochettes, miniatures. La
@@ -634,9 +637,37 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     return Boolean(m && address && Number(m[2]) === address.port && ownAddresses(interfaces()).has(m[1]!));
   }
 
+  /**
+   * Rapport de la fiche technique donné au téléphone connecté (offerReport) : servi sous un jeton
+   * tiré au hasard, à l'adresse de ce téléphone seulement, pendant REPORT_MS. Le rapport est déjà
+   * anonymisé ; il passe en clair sur le réseau local (la page est en HTTP), comme un téléchargement.
+   */
+  let report: { token: string; name: string; data: Buffer; address: string; until: number } | undefined;
+
+  function serveReport(req: http.IncomingMessage, res: http.ServerResponse, url: string): void {
+    const m = /^\/rapport\/([A-Za-z0-9_-]{24})\/[^/]+$/.exec(url);
+    const from = String(req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
+    const r = report;
+    const ok = m && r && m[1] === r.token && Date.now() < r.until && from === r.address.replace(/^::ffff:/, '');
+    if (!ok) {
+      res.writeHead(404, { ...securityHeaders(String(req.headers.host)), 'Content-Type': 'text/plain; charset=utf-8' }).end();
+      return;
+    }
+    log(`Télécommande : rapport téléchargé par le téléphone (${formatSize(r.data.length)}).`); // i18n-ignore : journal
+    res
+      .writeHead(200, {
+        ...securityHeaders(String(req.headers.host)),
+        'Content-Type': 'application/zip',
+        'Content-Length': String(r.data.length),
+        'Content-Disposition': `attachment; filename="${r.name.replace(/[^\w.-]/g, '_')}"`,
+      })
+      .end(req.method === 'HEAD' ? undefined : r.data);
+  }
+
   function serve(req: http.IncomingMessage, res: http.ServerResponse): void {
     const url = (req.url ?? '/').split('?')[0]!;
     if (allowed(req) && req.method === 'POST' && url.startsWith('/envoi/')) return void receiveChunk(req, res, url);
+    if (allowed(req) && (req.method === 'GET' || req.method === 'HEAD') && url.startsWith('/rapport/')) return serveReport(req, res, url);
     if (!allowed(req) || (req.method !== 'GET' && req.method !== 'HEAD')) {
       res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8', Connection: 'close' }).end();
       return;
@@ -2103,6 +2134,20 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     },
     /** La page ou ses actions ont changé (téléchargement, page vidéo) : le téléphone suit. */
     pageChanged: () => pushPage(),
+    /** Le téléphone qui pilote : son nom (« Android · Chrome »). */
+    phoneName: (): string | undefined => (active && pairing?.session() === 'paired' ? pairing.current()?.device : undefined),
+    /**
+     * Rapport de la fiche technique : le téléphone connecté reçoit son adresse de téléchargement, le
+     * lien qui prépare un e-mail et le résumé à copier. Faux sans téléphone connecté.
+     */
+    offerReport(r: { name: string; data: Buffer; summary: string; mailto: string }): boolean {
+      if (!active || pairing?.session() !== 'paired') return false;
+      const token = toBase64Url(crypto.randomBytes(18));
+      report = { token, name: r.name, data: r.data, address: active.ws.address, until: Date.now() + REPORT_MS };
+      sendTo(active, { t: 'report', url: `/rapport/${token}/${encodeURIComponent(r.name)}`, name: r.name, size: r.data.length, mailto: r.mailto, summary: r.summary });
+      log(`Télécommande : rapport proposé au téléphone (${formatSize(r.data.length)}).`); // i18n-ignore : journal
+      return true;
+    },
     /** Pour les essais : adresse servie, position du pointeur (contenu de la fenêtre, bandeau compris), sa fenêtre. */
     address: () => address,
     pointerAt: () => ({ ...at }),
