@@ -24,6 +24,15 @@ const SVG = path.join(repo, 'app', 'renderer', 'icone.svg');
 const SIZES = [16, 24, 32, 48, 64, 128, 256];
 /** Taille de l'icône dans le bandeau de l'installeur. */
 const BANNER_ICON = 116;
+/**
+ * Icônes du raccourci de la page du téléphone (app/src/phone-remote.ts), écrites dans son dossier :
+ * le renderer est livré avec l'application et avec chaque mise à jour légère. Opaques et sur le noir
+ * sarcelle, avec une marge : l'iPhone (apple-touch-icon, 180 px) arrondit lui-même les coins et
+ * noircit la transparence ; Chrome pour Android (icône de la page, 192 px, sans manifeste) découpe
+ * la sienne. La plaque reste entière dans les deux cas.
+ */
+const PHONE = path.join(repo, 'app', 'renderer', 'telephone');
+const PHONE_ICONS = [180, 192].map((size) => ({ size, inner: Math.round(size * 0.82) }));
 
 const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
 const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
@@ -49,7 +58,7 @@ function renderAll(sizes) {
   }
 }
 
-const rendered = renderAll([...SIZES, BANNER_ICON]);
+const rendered = renderAll([...SIZES, BANNER_ICON, ...PHONE_ICONS.map((i) => i.inner)]);
 const render = (size) => rendered.get(size);
 
 function png(size, rgba) {
@@ -168,4 +177,29 @@ fs.writeFileSync(path.join(out, 'installeur-bandeau.bmp'), banner());
 fs.writeFileSync(path.join(out, 'icone.ico'), Buffer.concat([dir, ...images.map((i) => i.data)]));
 const big = images.find((i) => i.size === 256);
 fs.writeFileSync(path.join(out, 'icone.png'), png(256, big.rgba));
-console.log(`Icône : ${path.join(out, 'icone.ico')} (${SIZES.join(', ')} px), icone.png et installeur-bandeau.bmp`);
+
+/** Icône opaque du raccourci du téléphone : la plaque centrée sur le noir sarcelle. */
+function phoneIcon({ size, inner }) {
+  const icon = render(inner);
+  const o = Math.round((size - inner) / 2);
+  const rgba = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let c = mix(hex('#0c1a17'), BG_BOTTOM, y / size);
+      const ix = x - o;
+      const iy = y - o;
+      if (ix >= 0 && iy >= 0 && ix < inner && iy < inner) {
+        const p = (iy * inner + ix) * 4;
+        c = mix(c, [icon[p] / 255, icon[p + 1] / 255, icon[p + 2] / 255], icon[p + 3] / 255);
+      }
+      const q = (y * size + x) * 4;
+      rgba[q] = Math.round(c[0] * 255);
+      rgba[q + 1] = Math.round(c[1] * 255);
+      rgba[q + 2] = Math.round(c[2] * 255);
+      rgba[q + 3] = 255;
+    }
+  }
+  return png(size, rgba);
+}
+for (const icon of PHONE_ICONS) fs.writeFileSync(path.join(PHONE, `icone-${icon.size}.png`), phoneIcon(icon));
+console.log(`Icône : ${path.join(out, 'icone.ico')} (${SIZES.join(', ')} px), icone.png et installeur-bandeau.bmp ; téléphone : ${PHONE_ICONS.map((i) => `icone-${i.size}.png`).join(', ')}`);

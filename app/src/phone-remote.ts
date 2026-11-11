@@ -282,9 +282,12 @@ export interface PhoneRemoteOptions {
 
 /**
  * Fichiers servis au téléphone, et rien d'autre : ses pages (app/renderer/telephone, à part des
- * écrans de la borne), le thème, la langue, les icônes et la police de la borne.
+ * écrans de la borne), le thème, la langue, les icônes et la police de la borne. Tous dans
+ * app/renderer, le seul dossier livré tel quel avec l'application et avec chaque mise à jour légère
+ * (scripts/fabriquer.mjs) : un fichier pris ailleurs manquerait sur la borne alors que les essais,
+ * lancés depuis le dépôt, le trouveraient (telecommande.test.ts fixe cet invariant).
  */
-const FILES: Record<string, string> = {
+export const PHONE_FILES: Readonly<Record<string, string>> = {
   '/': 'telephone/telephone.html',
   '/telephone.css': 'telephone/telephone.css',
   '/telephone.js': 'telephone/telephone.js',
@@ -296,8 +299,9 @@ const FILES: Record<string, string> = {
   '/i18n.js': 'i18n.js',
   '/icons.js': 'icons.js',
   '/polices/saira/Saira-wdth-wght.ttf': 'polices/saira/Saira-wdth-wght.ttf',
-  // Icône du raccourci sur l'écran d'accueil (iPhone, Android).
-  '/icone.png': '../ressources/icone.png',
+  // Icônes du raccourci sur l'écran d'accueil, opaques (scripts/icone.mjs) : iPhone (180 px), Android (192 px).
+  '/icone-180.png': 'telephone/icone-180.png',
+  '/icone-192.png': 'telephone/icone-192.png',
 };
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -551,7 +555,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       });
       return;
     }
-    const file = FILES[url];
+    const file = Object.hasOwn(PHONE_FILES, url) ? PHONE_FILES[url] : undefined;
     if (!file) {
       res.writeHead(404, { ...headers, 'Content-Type': 'text/plain; charset=utf-8' }).end();
       return;

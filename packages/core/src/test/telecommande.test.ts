@@ -249,3 +249,82 @@ test('chiffrement : jamais par node:crypto côté borne (Electron, avec BoringSS
     assert.doesNotMatch(code, /createCipheriv|createDecipheriv/, path.basename(file));
   }
 });
+
+/**
+ * Ce que copie scripts/fabriquer.mjs dans l'application : les paires copyTree(path.join(repo, …),
+ * path.join(stage, …)) écrites en chaînes, en chemins relatifs au dépôt et à l'application.
+ */
+function copiedTrees(): { from: string; to: string }[] {
+  const script = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'fabriquer.mjs'), 'utf8');
+  const parts = (args: string) => [...args.matchAll(/'([^']+)'/g)].map((m) => m[1]!).join('/');
+  return [...script.matchAll(/copyTree\(path\.join\(repo, ((?:'[^']+'(?:, )?)+)\), path\.join\(stage, ((?:'[^']+'(?:, )?)+)\)/g)].map((m) => ({ from: parts(m[1]!), to: parts(m[2]!) }));
+}
+
+test('livraison : chaque fichier servi au téléphone est dans l’application fabriquée et dans le paquet de mise à jour légère', () => {
+  const script = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'fabriquer.mjs'), 'utf8');
+  // Le paquet léger (CyberPinball-application.zip) est le dossier de l'application tel quel, que
+  // maj-legere.ts met à la place de l'ancien : ce qui est dans l'application est dans le paquet.
+  assert.match(script, /windowsTar\(\), \['-a', '-c', '-f', zip, '-C', stage, \.\.\.fs\.readdirSync\(stage\)\]/, 'le paquet léger doit rester tout le dossier de l’application');
+  const trees = copiedTrees();
+  assert.ok(trees.some((t) => t.from === 'app/renderer' && t.to === 'renderer'), 'app/renderer copié tel quel en renderer');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { PHONE_FILES } = require(path.join(REPO_ROOT, 'app', 'dist', 'phone-remote.js')) as { PHONE_FILES: Record<string, string> };
+  const renderer = path.join(REPO_ROOT, 'app', 'renderer');
+  const tracked = new Set(
+    require('node:child_process')
+      .execFileSync('git', ['ls-files', '-z', 'app/renderer'], { cwd: REPO_ROOT, encoding: 'utf8' })
+      .split('\0')
+      .filter(Boolean),
+  );
+  assert.ok(Object.keys(PHONE_FILES).length > 5);
+  for (const [url, file] of Object.entries(PHONE_FILES)) {
+    const full = path.resolve(renderer, file);
+    const rel = path.relative(path.join(REPO_ROOT, 'app'), full).split(path.sep).join('/');
+    // Hors du renderer (../ressources/icone.png, 0.1.9-essai.61) : servi depuis le dépôt, absent de la borne.
+    assert.ok(trees.some((t) => rel.startsWith(`${t.from.replace(/^app\//, '')}/`)), `${url} → ${file} : hors de ce que fabriquer.mjs copie`);
+    assert.ok(!path.relative(renderer, full).startsWith('..'), `${url} → ${file} : la page du téléphone ne sert que app/renderer`);
+    assert.ok(fs.existsSync(full), `${url} → ${file} : fichier absent`);
+    assert.ok(tracked.has(`app/${rel}`), `${url} → app/${rel} : pas versionné, absent d’une autre copie du dépôt`);
+  }
+  // Les icônes du raccourci : opaques (l'iPhone noircit la transparence), aux tailles annoncées par la page.
+  const html = fs.readFileSync(path.join(renderer, 'telephone', 'telephone.html'), 'utf8');
+  for (const [rel, size] of [['apple-touch-icon', 180], ['icon', 192]] as const) {
+    const link = new RegExp(`<link rel="${rel}"[^>]*sizes="${size}x${size}" href="([^"]+)"`).exec(html);
+    assert.ok(link, `<link rel="${rel}" sizes="${size}x${size}">`);
+    assert.equal(PHONE_FILES[`/${link[1]}`], `telephone/${link[1]}`, `${link[1]} servi par la borne`);
+    const png = fs.readFileSync(path.join(renderer, 'telephone', link[1]!));
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [size, size], `${link[1]} : ${size} × ${size}`);
+    assert.equal(png[25], 6, `${link[1]} : RGBA`);
+    const raw = require('node:zlib').inflateSync(Buffer.concat(pngChunks(png, 'IDAT'))) as Buffer;
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) assert.equal(raw[y * (size * 4 + 1) + 1 + x * 4 + 3], 255, `${link[1]} : opaque (${x}, ${y})`);
+  }
+});
+
+function pngChunks(png: Buffer, type: string): Buffer[] {
+  const out: Buffer[] = [];
+  for (let at = 8; at < png.length; ) {
+    const length = png.readUInt32BE(at);
+    if (png.toString('ascii', at + 4, at + 8) === type) out.push(png.subarray(at + 8, at + 8 + length));
+    at += 12 + length;
+  }
+  return out;
+}
+
+test('livraison : tout ce que l’application lit dans app/ressources est copié par scripts/fabriquer.mjs', () => {
+  // Même défaut que l'icône du téléphone (0.1.9-essai.61) : app/ressources n'est copié que par
+  // morceaux. Chaque sous-dossier ou fichier qu'un module lit à l'exécution doit en faire partie.
+  const trees = copiedTrees();
+  const read: string[] = [];
+  for (const dir of [path.join(REPO_ROOT, 'app', 'src'), path.join(REPO_ROOT, 'app', 'renderer')]) {
+    for (const entry of fs.readdirSync(dir, { recursive: true }) as string[]) {
+      if (!/\.(ts|js|cjs|mjs|html)$/.test(entry) || /\.test\.ts$/.test(entry)) continue;
+      const code = fs.readFileSync(path.join(dir, entry), 'utf8');
+      for (const m of code.matchAll(/'ressources',\s*'([^']+)'|ressources[\/]([\w.-]+)/g)) read.push(`${entry} → ressources/${m[1] ?? m[2]}`);
+    }
+  }
+  assert.ok(read.length > 0, 'au moins le modèle de Vision 3D');
+  for (const line of read) {
+    const target = line.split(' → ')[1]!;
+    assert.ok(trees.some((t) => target === t.to || target.startsWith(`${t.to}/`)), `${line} : absent de l’application fabriquée`);
+  }
+});
