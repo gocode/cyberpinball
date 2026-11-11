@@ -223,4 +223,15 @@ export const messages: Record<string, string> = {
   'Une table ajoutée à la borne a ici son tableau des scores.': 'A table added to the cabinet has its scoreboard here.',
   'Classements indisponibles': 'Rankings unavailable',
   'Cette borne ne tient pas de tableau des scores.': 'This cabinet keeps no scoreboard.',
+  // Communauté au téléphone (telephone-community.js)
+  'Communauté': 'Community',
+  'Chargement de la messagerie…': 'Loading your messages…',
+  'La borne envoie vos conversations.': 'The cabinet is sending your conversations.',
+  'Messagerie indisponible': 'Messaging unavailable',
+  'À la borne : Amis > Trouver un joueur.': 'At the cabinet: Friends > Find a player.',
+  'Ouverture du fil…': 'Opening the conversation…',
+  'Retour aux conversations': 'Back to conversations',
+  'Clavier : taper dans le champ ouvert à la borne': 'Keyboard: type in the field open at the cabinet',
+  'Envoyer un fichier à la borne': 'Send a file to the cabinet',
+  'Fermée en mode invité.': 'Closed in guest mode.',
 };

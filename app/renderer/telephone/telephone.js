@@ -2,10 +2,12 @@
 // Deux modes, selon ce que la borne montre (body[data-mode]) :
 // - browser, le navigateur intégré « Récupérer » : un pavé tactile, le clavier du téléphone quand un
 //   champ de la page a le clavier, Retour, Avancer, Fermer ;
-// - menu, le menu de Cyber Pinball, en quatre vues (body[data-view]) : Écran, les entrées de l'écran
-//   ouvert à la borne, qu'on touche directement ; Menus, tous les menus rangés comme le menu système,
-//   qu'on ouvre d'un toucher ; Boutons, ceux de la borne (Start, flippers, Exit, MagnaSave) ; Scores,
-//   le tableau des scores de chaque table (telephone-ranks.js), aussi pendant une partie. Et le
+// - menu, le menu de Cyber Pinball, en quatre onglets en bas (body[data-view]) : Écran, les entrées de
+//   l'écran ouvert à la borne, qu'on touche directement ; Menus, tous les menus rangés comme le menu
+//   système, qu'on ouvre d'un toucher ; Communauté, les messages, les amis et les scores
+//   (telephone-community.js, telephone-ranks.js), aussi pendant une partie ; Boutons, ceux de la
+//   borne (Start, flippers, Exit, MagnaSave). Une seule barre en haut : ce que montre la borne, la
+//   liaison, « Clavier » quand la borne attend une saisie, et le menu ⋮ (envoyer un fichier…). Et le
 //   clavier du téléphone à la place du clavier à l'écran, l'envoi d'un fichier vers le dossier
 //   d'import ; game pendant une partie (les boutons attendent le retour au menu, sauf dans les
 //   réglages en partie, que la page peut ouvrir). Le téléphone n'envoie que des identifiants
@@ -70,13 +72,16 @@ for (const b of document.querySelectorAll('.btn')) {
   text.append(name, what);
   b.replaceChildren(cyberIcon(def.icon), text);
 }
-/** Vues du menu : l'écran de la borne (ses entrées), tous les menus, les boutons de la borne, les classements. */
+/** Onglets du menu, en bas : l'écran de la borne (ses entrées), tous les menus, la communauté, les boutons de la borne. */
 const VIEWS = {
   list: { icon: 'monitor', label: () => t('Écran') },
   menus: { icon: 'gear', label: () => t('Menus') },
+  community: { icon: 'friends', label: () => t('Communauté') },
   buttons: { icon: 'gamepad', label: () => t('Boutons') },
-  ranks: { icon: 'trophy', label: () => t('Scores') },
 };
+/** Vues de la Communauté (un même onglet) : les messages, les amis, les scores ; et le fil d'un ami, plein écran. */
+const COMMUNITY_VIEWS = ['messages', 'friends', 'ranks'];
+const tabOf = (v) => (COMMUNITY_VIEWS.includes(v) || v === 'thread' ? 'community' : v);
 for (const [name, def] of Object.entries(VIEWS)) {
   const tab = $(`tab-${name}`);
   const text = document.createElement('span');
@@ -88,8 +93,25 @@ for (const [name, def] of Object.entries(VIEWS)) {
   const reason = document.createElement('span');
   reason.className = 'view-reason';
   text.append(label, reason);
-  tab.replaceChildren(cyberIcon(def.icon), text);
-  tab.addEventListener('click', () => setView(name));
+  // L'icône dans sa pastille (pleine sur l'onglet choisi), et la pastille rouge d'un message non lu.
+  const pill = document.createElement('span');
+  pill.className = 'view-pill';
+  pill.append(cyberIcon(def.icon));
+  const dot = document.createElement('span');
+  dot.className = 'view-dot';
+  dot.hidden = true;
+  pill.append(dot);
+  tab.replaceChildren(pill, text);
+  tab.addEventListener('click', () => setView(name === 'community' ? communityView : name));
+}
+$('top-more').replaceChildren(cyberIcon('list'));
+$('top-more').setAttribute('aria-label', t('Plus'));
+$('top-back').replaceChildren(cyberIcon('chevron-left'));
+$('top-back').setAttribute('aria-label', t('Retour aux conversations'));
+{
+  const label = document.createElement('span');
+  label.textContent = t('Clavier');
+  $('top-keys').replaceChildren(cyberIcon('keyboard'), label);
 }
 $('views').setAttribute('aria-label', t('Vues de la télécommande'));
 $('menus-up').replaceChildren(cyberIcon('chevron-left'));
@@ -252,9 +274,12 @@ function setMode(next) {
 
 // --- Accès direct : l'écran de la borne et tous les menus -------------------------
 
-/** Vue choisie au menu (gardée d'une visite à l'autre) : l'écran de la borne d'abord. */
+/** Vue choisie au menu (gardée d'une visite à l'autre) : l'écran de la borne d'abord. Un fil ne se rouvre pas seul. */
 const VIEW_STORE = 'cyberpinball.vue';
-let view = VIEWS[stored(VIEW_STORE)] ? stored(VIEW_STORE) : 'list';
+const knownView = (v) => Boolean(VIEWS[v] && v !== 'community') || COMMUNITY_VIEWS.includes(v);
+let view = knownView(stored(VIEW_STORE)) ? stored(VIEW_STORE) : 'list';
+/** La vue de la Communauté que son onglet rouvre : la dernière montrée, les messages d'abord. */
+let communityView = COMMUNITY_VIEWS.includes(view) ? view : 'messages';
 /** L'écran de la borne et ses entrées (message « entries »), undefined en attendant ; les menus (message « menus »). */
 let entries;
 let menus;
@@ -262,10 +287,13 @@ let menus;
 let menuPath = [];
 
 function setView(next) {
-  if (!VIEWS[next] || $(`tab-${next}`).disabled) return;
+  if (!(knownView(next) || next === 'thread') || $(`tab-${tabOf(next)}`).disabled) return;
   const before = document.body.dataset.view;
   view = next;
-  store(VIEW_STORE, next);
+  if (next !== 'thread') store(VIEW_STORE, next);
+  if (COMMUNITY_VIEWS.includes(next)) communityView = next;
+  // Un fil quitté : la borne cesse de l'envoyer (et de le marquer lu).
+  if (before === 'thread' && next !== 'thread') communityLeaveThread();
   // Un bouton tenu reste tenu à la borne tant que le doigt n'est pas levé : changer de vue le relâche.
   releaseButtons();
   syncLayout();
@@ -273,6 +301,7 @@ function setView(next) {
   // Scores (telephone-ranks.js) : ouverte, la table de la borne ; quittée, la borne cesse de relire les classements.
   if (next === 'ranks' && before !== 'ranks') ranksEnter();
   if (next !== 'ranks' && before === 'ranks') ranksLeave();
+  if (next === 'messages' || next === 'friends') renderCommunity();
 }
 
 /** Une ligne de liste : icône, libellé (et sa pastille), détail ou raison, pastille rouge, chevron d'une rubrique. */
@@ -521,8 +550,25 @@ function showScreen(sc) {
   const zone = document.querySelector('.btn[data-b="zone"] .btn-what');
   if (zone) zone.textContent = screen.zone || BUTTONS.zone.what();
   if (mode === 'browser') return showPage({});
-  $('page-title').textContent = screen.title;
-  $('page-host').textContent = screen.item;
+  renderTop();
+}
+
+/**
+ * La barre du haut, au menu : l'écran de la borne et ce qui y est choisi ; dans la Communauté, son
+ * titre ; dans un fil, l'ami (son retour, sa pastille, sa présence). « Clavier » quand la borne
+ * attend une saisie (pas dans un fil, qui a son propre champ).
+ */
+function renderTop() {
+  if (mode === 'browser') return;
+  const shown = document.body.dataset.view;
+  const top = communityTop(shown);
+  $('page-title').textContent = top ? top.title : screen.title;
+  $('page-host').textContent = top ? top.detail : screen.item;
+  $('top-back').hidden = shown !== 'thread';
+  $('top-mark').replaceChildren(...(top?.face ? [top.face] : []));
+  $('top-mark').classList.toggle('face', Boolean(top?.face));
+  $('top-keys').hidden = !(mode === 'menu' && fieldShown && shown !== 'thread');
+  $('top-keys').setAttribute('aria-expanded', String(!$('keys').hidden));
 }
 
 // --- Liaison ---------------------------------------------------------------
@@ -674,6 +720,8 @@ function handle(m) {
       setMode(m.mode);
       // Une liaison neuve (ou une partie qui commence) : la vue Scores ouverte redemande son tableau.
       if (document.body.dataset.view === 'ranks' && m.mode !== 'browser') ranksAsk();
+      // Et un fil ouvert le redemande (la borne l'oublie à chaque liaison).
+      if (document.body.dataset.view === 'thread' && community.open && m.mode !== 'browser') send({ t: 'chat-open', key: community.open });
       if (hintAfterMode && state === 'paired') {
         hintAfterMode = false;
         offerHomeScreen();
@@ -707,6 +755,9 @@ function handle(m) {
     case 'ranks-tables':
     case 'ranks':
       ranksMessage(m);
+      break;
+    case 'community':
+      communityMessage(m);
       break;
     case 'up-ready':
       uploadReady(m);
@@ -959,9 +1010,11 @@ function syncLayout() {
     tab.disabled = off[name];
     tab.querySelector('.view-reason').textContent = off[name] ? t('Après la partie') : '';
   }
-  const shownView = off[view] ? 'list' : view;
+  const shownView = off[tabOf(view)] ? 'list' : view;
   body.dataset.view = shownView;
-  for (const v of Object.keys(VIEWS)) $(`tab-${v}`).setAttribute('aria-selected', String(v === shownView));
+  for (const v of Object.keys(VIEWS)) $(`tab-${v}`).setAttribute('aria-selected', String(v === tabOf(shownView)));
+  for (const v of COMMUNITY_VIEWS) $(`seg-${v}`).setAttribute('aria-selected', String(v === shownView));
+  renderTop();
   // Clavier à l'écran de la borne ouvert : Start y tape la touche choisie, Valider (téléphone) envoie Entrée.
   const startWhat = document.querySelector('.btn[data-b="confirm"] .btn-what');
   if (startWhat) startWhat.textContent = mode === 'menu' && fieldShown ? t('Touche choisie') : t('Valider');
@@ -1261,20 +1314,28 @@ $('nav-back').addEventListener('click', () => send({ t: 'nav', action: 'back' })
 $('nav-forward').addEventListener('click', () => send({ t: 'nav', action: 'forward' }));
 // Rouvert sur le même champ : on garde ce qui y a été tapé depuis (le texte reçu à son ouverture est dépassé).
 $('nav-keyboard').addEventListener('click', () => ($('keys').hidden ? openKeys(fieldShown, !fieldShown, sameField(openedField, fieldShown)) : hideKeys()));
-$('nav-more').addEventListener('click', () =>
-  mode === 'browser'
-    ? openSheet(t('Actions de la page'), actions, { search: true, text: page.title || page.host, opener: $('nav-more') })
-    : openSheet(t('Télécommande'), kept && !standalone() ? [{ id: 'home', label: t('Ajouter à l’écran d’accueil'), run: offerHomeScreen }] : [], {
-        search: true,
-        text: [
-          mode === 'game' ? t('Les commandes reviendront à la fin de la partie.') : t('Ce téléphone pilote le menu de la borne.'),
-          upload && (upload.phase === 'asking' || upload.phase === 'sending') ? t('Un envoi est en cours. Déconnecter ce téléphone l’annulera.') : '',
-        ]
-          .filter(Boolean)
-          .join(' '),
-        opener: $('nav-more'),
-      }),
-);
+$('nav-more').addEventListener('click', () => openSheet(t('Actions de la page'), actions, { search: true, text: page.title || page.host, opener: $('nav-more') }));
+// Au menu, le menu ⋮ de la barre du haut : le clavier (si la borne attend une saisie), l'envoi d'un
+// fichier, l'écran d'accueil, puis « Déconnecter ce téléphone ».
+$('top-more').addEventListener('click', () => {
+  const sending = upload && (upload.phase === 'asking' || upload.phase === 'sending');
+  const items = [
+    ...(mode === 'menu' && fieldShown ? [{ id: 'keys', label: t('Clavier : taper dans le champ ouvert à la borne'), run: () => openKeys(fieldShown, false, sameField(openedField, fieldShown)) }] : []),
+    ...(mode === 'menu' || sending ? [{ id: 'send', label: sending && upload.phase === 'sending' ? t('Envoi {pct} %', { pct: uploadPct() }) : t('Envoyer un fichier à la borne'), run: () => $('nav-send').click() }] : []),
+    ...(kept && !standalone() ? [{ id: 'home', label: t('Ajouter à l’écran d’accueil'), run: offerHomeScreen }] : []),
+  ];
+  openSheet(t('Télécommande'), items, {
+    search: true,
+    text: [
+      mode === 'game' ? t('Les commandes reviendront à la fin de la partie.') : t('Ce téléphone pilote le menu de la borne.'),
+      sending ? t('Un envoi est en cours. Déconnecter ce téléphone l’annulera.') : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+    opener: $('top-more'),
+  });
+});
+$('top-keys').addEventListener('click', () => ($('keys').hidden ? openKeys(fieldShown, !fieldShown, sameField(openedField, fieldShown)) : hideKeys()));
 // Fermer coupe la liaison : une feuille le dit et le fait confirmer.
 $('nav-close').addEventListener('click', () =>
   openSheet(t('Fermer le navigateur de la borne ?'), [{ id: 'close', label: t('Fermer le navigateur') }], { text: t('La télécommande reviendra aux commandes du menu.'), opener: $('nav-close'), bye: false }),
@@ -1441,7 +1502,10 @@ if (demo) {
     upload = { ...demo.upload };
     showUpload();
   }
+  if (demo.open) community.open = demo.open;
   syncLayout();
+  if (demo.community) communityMessage({ t: 'community', ...demo.community });
+  if (demo.view === 'thread') renderThread();
   if (demo.touch) {
     pad.classList.add('touching');
     pad.style.setProperty('--touch-x', `${demo.touch.x}px`);
@@ -1450,6 +1514,7 @@ if (demo) {
 } else {
   renderEntries();
   renderMenus();
+  renderCommunity();
   key = readFragment();
   if (!key) setState('invalid');
   else {

@@ -24,15 +24,20 @@
        local (app/src/phone-remote.ts). États : body[data-state] ; ce que la borne montre :
        body[data-mode] (browser : le navigateur intégré, menu : le menu, game : une partie). -->
   <body data-state="connecting" data-mode="browser">
+    <!-- Une seule barre en haut : la marque (ou le retour d'un fil), ce que montre la borne (ou la vue),
+         l'état de la liaison, « Clavier » quand la borne attend une saisie, et le menu ⋮. -->
     <header class="top">
-      <div class="brand" aria-label="Cyber Pinball">CYBER <b>PINBALL</b></div>
-      <div class="link" id="link" role="status"><span class="dot" aria-hidden="true"></span><span id="link-text" data-i18n>Connexion…</span></div>
+      <button type="button" class="top-back" id="top-back" hidden></button>
+      <span class="top-mark" id="top-mark" aria-hidden="true"></span>
+      <section class="page" id="page" aria-live="polite">
+        <span class="brand" aria-label="Cyber Pinball">CYBER <b>PINBALL</b></span>
+        <span class="page-title" id="page-title"></span>
+        <span class="page-host" id="page-host"></span>
+      </section>
+      <div class="link" id="link" role="status"><span class="dot" aria-hidden="true"></span><span class="link-text" id="link-text" data-i18n>Connexion…</span></div>
+      <button type="button" class="top-keys" id="top-keys" aria-controls="keys" hidden></button>
+      <button type="button" class="top-more" id="top-more" aria-controls="sheet" aria-haspopup="dialog"></button>
     </header>
-
-    <section class="page" id="page" aria-live="polite">
-      <span class="page-title" id="page-title"></span>
-      <span class="page-host" id="page-host"></span>
-    </section>
 
     <main class="stage">
       <div class="message" id="message">
@@ -42,15 +47,30 @@
         <p class="message-text" id="message-text"></p>
         <button type="button" class="key wide primary message-action" id="message-action" hidden data-i18n>Reprendre</button>
       </div>
-      <!-- Au menu et pendant une partie : quatre vues. Écran (les entrées de l'écran ouvert à la borne,
-           à toucher), Menus (tous les menus, rangés comme le menu système), Boutons (ceux de la borne),
-           Scores (le tableau des scores de chaque table, telephone-ranks.js). body[data-view]. -->
-      <div class="views" id="views" role="tablist">
-        <button type="button" class="view-tab" id="tab-list" role="tab" data-view="list" aria-controls="entries"></button>
-        <button type="button" class="view-tab" id="tab-menus" role="tab" data-view="menus" aria-controls="menus"></button>
-        <button type="button" class="view-tab" id="tab-buttons" role="tab" data-view="buttons" aria-controls="buttons"></button>
-        <button type="button" class="view-tab" id="tab-ranks" role="tab" data-view="ranks" aria-controls="ranks"></button>
+      <!-- Communauté : Messages, Amis et Scores, sous un même onglet (telephone-community.js). -->
+      <div class="seg" id="community-seg" role="tablist">
+        <button type="button" class="seg-tab" id="seg-messages" role="tab" data-view="messages"></button>
+        <button type="button" class="seg-tab" id="seg-friends" role="tab" data-view="friends"></button>
+        <button type="button" class="seg-tab" id="seg-ranks" role="tab" data-view="ranks"></button>
       </div>
+      <section class="community" id="community" role="tabpanel">
+        <ul class="entry-list conv-list" id="conv-list"></ul>
+        <div class="empty" id="conv-empty" hidden>
+          <span class="empty-mark" id="conv-empty-mark" aria-hidden="true"></span>
+          <p class="empty-title" id="conv-empty-title"></p>
+          <p class="empty-text" id="conv-empty-text"></p>
+        </div>
+      </section>
+      <!-- Le fil d'un ami, plein écran : jours, évènements, bulles des deux côtés ; réponses d'un appui et champ en bas. -->
+      <section class="thread" id="thread" aria-live="polite">
+        <ol class="thread-lines" id="thread-lines"></ol>
+        <p class="thread-status" id="thread-status"></p>
+        <div class="thread-chips" id="thread-chips"></div>
+        <form class="thread-form" id="thread-form" autocomplete="off">
+          <input type="text" id="thread-field" maxlength="500" autocomplete="off" enterkeyhint="send" />
+          <button type="submit" class="thread-send" id="thread-send"></button>
+        </form>
+      </section>
       <section class="entries" id="entries" role="tabpanel" aria-labelledby="tab-list">
         <p class="entries-note" id="entries-note"></p>
         <ul class="entry-list" id="entries-list"></ul>
@@ -173,6 +193,16 @@
     </section>
     <input type="file" id="file-input" hidden />
 
+    <!-- Au menu et pendant une partie, la barre des vues en bas : Écran (les entrées de l'écran ouvert à
+         la borne), Menus (tous les menus), Communauté (messages, amis, scores), Boutons (ceux de la
+         borne). body[data-view]. Au navigateur, la barre d'outils (Retour, Avancer, Clavier, Plus, Fermer). -->
+    <nav class="views" id="views" role="tablist">
+      <button type="button" class="view-tab" id="tab-list" role="tab" data-view="list" aria-controls="entries"></button>
+      <button type="button" class="view-tab" id="tab-menus" role="tab" data-view="menus" aria-controls="menus"></button>
+      <button type="button" class="view-tab" id="tab-community" role="tab" data-view="community" aria-controls="community"></button>
+      <button type="button" class="view-tab" id="tab-buttons" role="tab" data-view="buttons" aria-controls="buttons"></button>
+    </nav>
+
     <nav class="tools" id="tools">
       <button type="button" class="tool" id="nav-back"></button>
       <button type="button" class="tool" id="nav-forward"></button>
@@ -202,6 +232,7 @@
     <script src="avatar.js"></script>
     <script src="telephone-core.js"></script>
     <script src="telephone-ranks.js"></script>
+    <script src="telephone-community.js"></script>
     <script src="telephone.js"></script>
   </body>
 </html>

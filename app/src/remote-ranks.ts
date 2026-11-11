@@ -4,7 +4,7 @@
 // téléphone ne reçoit que ce qui s'affiche : titres, rangs, noms, scores, pays, statut, la pastille
 // d'un joueur (initiales, teinte, et son image par une adresse de la borne). Jamais une clé de
 // joueur, un chemin, ni un identifiant interne : une table est un rang dans la liste envoyée, une
-// image un jeton tiré au hasard, valable tant que la télécommande vit.
+// image un jeton tiré au hasard, valable tant que la télécommande vit (remote-images.ts).
 //
 // Lecture seule : « Masquer un score… » reste à la borne. La table ouverte par défaut est celle que
 // la borne a choisie (roue) ou lancée (partie). En mode invité, les classements suivent la porte
@@ -12,17 +12,12 @@
 //
 // Sans electron à l'exécution : les tests du cœur le chargent avec un tableau d'essai.
 
-import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import { isAvatarFileName, mediaPathFromUrl, REMOTE_ENTRIES_MAX, RANKING_SCOPES, t, type AvatarView, type RankingScope, type ScorePeriod, type TableEntry } from '@cyberpinball/core';
 import { rankingScoreboardView, scoreboardView, type ScoreboardLineView, type ScoreboardView } from './scoreboard-menu';
+import type { RemoteImages } from './remote-images';
 import type { PlayerStatus, RankingView } from './table-rankings';
 import type { TableBoard } from './table-scores';
-
-/** Adresse des pastilles servies au téléphone (phone-remote.ts) : « /avatars/<jeton> ». */
-export const RANKS_AVATAR_PATH = '/avatars/';
-/** Au plus, pastilles servies (un jeton chacune) ; au-delà, les plus anciennes sont oubliées. */
-const AVATARS_MAX = 600;
 
 export interface RemoteRanksHost {
   /** Les tables à proposer (en mode invité, celles de la collection imposée). */
@@ -33,6 +28,11 @@ export interface RemoteRanksHost {
   rankings(table: TableEntry, scope: Exclude<RankingScope, 'cabinet'>, period: ScorePeriod): RankingView;
   /** Pourquoi la borne ne montre pas les classements (porte du mode invité fermée) ; undefined : ouverts. */
   closed?(): string | undefined;
+  /**
+   * Les images sous jeton de la page du téléphone : celles du serveur du téléphone (phone-remote.ts,
+   * `images`), le seul qui les sert. Un magasin à part donnerait des jetons que la borne ne sert pas.
+   */
+  images: RemoteImages;
   now?(): Date;
 }
 
@@ -91,36 +91,26 @@ export interface RemoteRanks {
   reset(): void;
 }
 
+/** L'adresse d'une pastille pour le téléphone (un fichier d'avatar seulement, sous jeton), ou rien. */
+export function remoteAvatarSrc(images: RemoteImages, src: string | undefined): string | undefined {
+  const file = src ? mediaPathFromUrl(src) : undefined;
+  return file && isAvatarFileName(path.basename(file)) ? images.src(file) : undefined;
+}
+
+/** La pastille d'un joueur telle qu'elle part au téléphone : initiales, teinte, image sous jeton. */
+export function remoteAvatar(images: RemoteImages, avatar: AvatarView): AvatarView {
+  const src = remoteAvatarSrc(images, avatar.src);
+  return { initials: avatar.initials, hue: avatar.hue, ...(src ? { src } : {}) };
+}
+
 const tableDetail = (table: TableEntry) => [table.manufacturer, table.year, table.version].filter(Boolean).join(' · ') || undefined;
 
 export function createRemoteRanks(host: RemoteRanksHost): RemoteRanks {
-  /** Jeton de chaque pastille servie, et l'inverse. */
-  const tokens = new Map<string, string>();
-  const files = new Map<string, string>();
-
-  /** L'adresse d'une pastille pour le téléphone : un jeton, jamais le chemin. */
-  function avatarSrc(src: string | undefined): string | undefined {
-    const file = src ? mediaPathFromUrl(src) : undefined;
-    if (!file || !isAvatarFileName(path.basename(file))) return undefined;
-    let token = tokens.get(file);
-    if (!token) {
-      if (tokens.size >= AVATARS_MAX) {
-        const [oldest] = tokens;
-        tokens.delete(oldest![0]);
-        files.delete(oldest![1]);
-      }
-      token = crypto.randomBytes(16).toString('base64url');
-      tokens.set(file, token);
-      files.set(token, file);
-    }
-    return `${RANKS_AVATAR_PATH.slice(1)}${token}`;
-  }
+  const images = host.images;
 
   function line(l: ScoreboardLineView): RanksLine {
     const { avatar, ...rest } = l;
-    if (!avatar) return rest;
-    const src = avatarSrc(avatar.src);
-    return { ...rest, avatar: { initials: avatar.initials, hue: avatar.hue, ...(src ? { src } : {}) } };
+    return avatar ? { ...rest, avatar: remoteAvatar(images, avatar) } : rest;
   }
 
   function listed(): readonly TableEntry[] {
@@ -171,10 +161,7 @@ export function createRemoteRanks(host: RemoteRanksHost): RemoteRanks {
       if (board.scopes.length !== RANKING_SCOPES.length) throw new Error('portées du tableau des scores incomplètes'); // i18n-ignore : erreur interne
       return { file: table.file, board };
     },
-    avatar: (token) => files.get(token),
-    reset() {
-      tokens.clear();
-      files.clear();
-    },
+    avatar: (token) => images.get(token)?.file,
+    reset: () => images.reset(),
   };
 }

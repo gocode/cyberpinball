@@ -40,7 +40,7 @@ import {
   type AvatarView,
 } from '@cyberpinball/core';
 import type { ChatService } from './chat-service';
-import type { RemoteChat } from './phone-remote';
+import type { RemoteChat, RemoteCommunity, RemoteThread } from './phone-remote';
 import { onGesture } from './gesture-flash';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
 import type { SocialNet } from './social-net';
@@ -81,12 +81,21 @@ export interface ChatMenu {
    * derniers messages), les réactions et les phrases ; undefined si le réglage le coupe ou s'il n'y a rien.
    */
   remoteChat(): RemoteChat | undefined;
+  /**
+   * La rubrique Communauté du téléphone : les conversations dans l'ordre de la liste (amis sans
+   * message compris), et le fil ouvert au téléphone (`open`, la clé d'un ami), lu puisqu'il est sous
+   * les yeux ; ou pourquoi la messagerie est fermée.
+   */
+  remoteCommunity(open?: string): RemoteCommunity;
   /** Le fil d'un ami à l'écran : sa carte, pour le fronton (pastille, présence, faits) ; undefined sinon. */
   frontonCard(): { name: string; avatar: AvatarView; presence: string; facts: string[] } | undefined;
 }
 
 /** Messages du fil montrés au plus (les plus anciens restent dans le fichier). */
 const THREAD_SHOWN = 200;
+/** Au téléphone : éléments du fil envoyés au plus (les plus récents), et conversations de la liste. */
+const THREAD_PHONE = 80;
+const COMMUNITY_SHOWN = 100;
 
 export function createChatMenu(host: ChatMenuHost): ChatMenu {
   const now = () => host.now?.() ?? new Date();
@@ -161,45 +170,69 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     lib.openCustom(buildList, at);
   }
 
+  /** Les conversations dans l'ordre de la liste : la plus récente d'abord, puis les amis sans message (en ligne d'abord), puis celles d'anciens amis. */
+  function listKeys(): { key: string; plain: string }[] {
+    const s = net.state();
+    const withLines = s.friends.filter((f) => convOf(f.key)?.lines.length).sort((a, b) => Date.parse(lastAt(b.key)) - Date.parse(lastAt(a.key)));
+    const without = s.friends.filter((f) => !convOf(f.key)?.lines.length).sort((a, b) => Number(net.online(b.key)) - Number(net.online(a.key)) || a.name.localeCompare(b.name));
+    // Les conversations d'anciens amis (retirés par eux) restent lisibles, après.
+    const former = Object.keys(chat.state().conversations).filter((k) => !friendOf(k) && !s.blocked.includes(k) && convOf(k)?.lines.length);
+    return [...withLines.map((f) => ({ key: f.key, plain: f.name })), ...without.map((f) => ({ key: f.key, plain: f.name })), ...former.map((k) => ({ key: k, plain: knownName(k) }))];
+  }
+
+  /** Ce que la liste dit d'une conversation : le dernier message, son moment, les non-lus, une note (refus, attente, ancien ami). */
+  function convFacts(key: string): { sub: string; aside?: string; unread: number; note?: { text: string; sign: string; tone: 'error' | 'quiet' }; tone?: 'quiet' | 'ok' } {
+    const c = convOf(key);
+    const last = c ? lastLine(c) : undefined;
+    const pending = c ? pendingFor(chat.state(), key).length : 0;
+    const refuses = c?.accepts === false;
+    const gone = !friendOf(key);
+    return {
+      sub: last ? `${last.out ? t('Vous : {text}', { text: oneLine(last.text!) }) : oneLine(last.text!)}` : t('Pas encore de message'),
+      ...(last ? { aside: shortWhen(last.at) } : {}),
+      unread: c?.unread ?? 0,
+      ...(refuses
+        ? { note: { text: t('N’accepte pas de messages'), sign: '✕', tone: 'error' as const } }
+        : pending
+          ? { note: { text: tn(pending, '{n} message en attente de sa connexion', '{n} messages en attente de sa connexion'), sign: '◷', tone: 'quiet' as const } }
+          : gone
+            ? { note: { text: t('N’est plus dans vos amis'), sign: '✕', tone: 'quiet' as const } }
+            : {}),
+      ...(gone || refuses ? { tone: 'quiet' as const } : net.online(key) ? { tone: 'ok' as const } : {}),
+    };
+  }
+
+  /** La marque de présence d'un ami sur sa pastille : en ligne, en partie, hors ligne, ou plus un ami. */
+  function presenceState(key: string): RemoteThread['state'] {
+    if (!friendOf(key)) return 'gone';
+    if (!net.online(key)) return 'offline';
+    return net.presenceOf(key)?.status === 'playing' ? 'playing' : 'online';
+  }
+
   function buildList(): Built {
     const s = net.state();
     const actions: Action[] = [];
     const sections: Section[] = [...takeFlash()];
     if (!s.enabled) sections.push({ rows: [{ text: t('Partage désactivé : personne ne vous voit, vous ne voyez personne'), detail: t('Partage et réseau : « Activer le partage »'), tone: 'warning', badges: [t('Désactivé')] }] });
     else if (!chat.state().enabled) sections.push({ rows: [{ text: t('Messagerie désactivée sur cette borne'), detail: t('Vos amis voient « N’accepte pas de messages ». Réglages de la messagerie : « Messagerie »'), tone: 'warning', badges: [t('Désactivée')] }] });
-    // Les conversations, la plus récente d'abord ; puis les amis sans message, en ligne d'abord.
-    const withLines = s.friends.filter((f) => convOf(f.key)?.lines.length).sort((a, b) => Date.parse(lastAt(b.key)) - Date.parse(lastAt(a.key)));
-    const without = s.friends.filter((f) => !convOf(f.key)?.lines.length).sort((a, b) => Number(net.online(b.key)) - Number(net.online(a.key)) || a.name.localeCompare(b.name));
-    // Les conversations d'anciens amis (retirés par eux) restent lisibles, après.
-    const former = Object.keys(chat.state().conversations).filter((k) => !friendOf(k) && !s.blocked.includes(k) && convOf(k)?.lines.length);
+    // Les conversations, la plus récente d'abord ; puis les amis sans message, en ligne d'abord ; puis les anciens amis.
     const row = (key: string, plain: string): Row => {
-      const c = convOf(key);
       const index = actions.push({ label: name(key, plain), key: `conv:${key}`, icon: 'message', run: () => openThread(key, () => openList(index)) }) - 1;
-      const last = c ? lastLine(c) : undefined;
-      const pending = c ? pendingFor(chat.state(), key).length : 0;
-      const refuses = c?.accepts === false;
-      const gone = !friendOf(key);
-      const online = net.online(key);
+      const f = convFacts(key);
       return {
         text: name(key, plain),
         avatar: avatar(key, plain),
         detail: presenceText(key),
-        tone: gone || refuses ? 'quiet' : online ? 'ok' : undefined,
-        sub: last ? `${last.out ? t('Vous : {text}', { text: oneLine(last.text!) }) : oneLine(last.text!)}` : t('Pas encore de message'),
-        ...(last ? { aside: shortWhen(last.at) } : {}),
-        ...(c?.unread ? { unread: true, badges: [tn(c.unread, '{n} non lu', '{n} non lus')] } : {}),
-        ...(refuses
-          ? { note: { text: t('N’accepte pas de messages'), sign: '✕', tone: 'error' as const } }
-          : pending
-            ? { note: { text: tn(pending, '{n} message en attente de sa connexion', '{n} messages en attente de sa connexion'), sign: '◷', tone: 'quiet' as const } }
-            : gone
-              ? { note: { text: t('N’est plus dans vos amis'), sign: '✕', tone: 'quiet' as const } }
-              : {}),
+        tone: f.tone,
+        sub: f.sub,
+        ...(f.aside ? { aside: f.aside } : {}),
+        ...(f.unread ? { unread: true, badges: [tn(f.unread, '{n} non lu', '{n} non lus')] } : {}),
+        ...(f.note ? { note: f.note } : {}),
         action: index,
         pick: true,
       };
     };
-    const rows = [...withLines.map((f) => row(f.key, f.name)), ...without.map((f) => row(f.key, f.name)), ...former.map((k) => row(k, knownName(k)))];
+    const rows = listKeys().map(({ key, plain }) => row(key, plain));
     if (rows.length) sections.push({ rows });
     else sections.push({ rows: [{ text: t('Pas encore d’ami à qui écrire'), detail: t('« Trouver un joueur » : cherchez un nom dans l’annuaire, ou une borne de votre réseau local'), tone: 'info', icon: 'friend-add' }] });
     if (!rows.length && host.openFind) actions.push({ label: t('Trouver un joueur'), detail: t('Chercher un nom, voir les bornes à proximité'), icon: 'friend-add', run: () => host.openFind!() });
@@ -262,32 +295,33 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     return { text: t('{name} est en ligne', { name: f!.name }), detail: t('Vos messages partent tout de suite ; « Reçu » quand sa borne les a'), tone: 'ok', icon: 'check' };
   }
 
-  function buildThread(key: string): Built {
+  /** Un élément du fil : un jour, un évènement de l'ami (record, badge) ou un message ; la borne et le téléphone le dessinent chacun. */
+  type ThreadItem =
+    | { kind: 'day'; text: string }
+    | { kind: 'event'; text: string; time: string; icon: IconName }
+    | { kind: 'line'; line: ChatLine; meta: string; bubble: 'in' | 'out' | 'pending' | 'expired'; chips: string[] };
+
+  /** Les messages et les évènements de l'ami, mêlés par date, un jour en tête de chaque journée. */
+  function threadItems(key: string): ThreadItem[] {
     const f = friendOf(key);
     const plain = f?.name ?? knownName(key);
-    const up = thread?.key === key ? thread.back : () => openList();
-    // Ouvert sous les yeux : ce qui arrive est lu.
-    if (convOf(key)?.unread) chat.markRead(key);
     const c = convOf(key) ?? { lines: [], unread: 0 };
     const reactions = reactionsOf(c);
-    const actions: Action[] = [];
-    const rows: Row[] = [];
-    // Les messages et les évènements de l'ami (records, badges), mêlés par date.
     type Item = { at: string; line?: ChatLine; event?: Friend['events'][number] };
     const items: Item[] = [
       ...threadLines(c).slice(-THREAD_SHOWN).map((line) => ({ at: line.at, line })),
       ...(f?.events ?? []).filter((e) => e.kind !== 'played').slice(0, 20).map((event) => ({ at: event.at, event })),
     ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+    const out: ThreadItem[] = [];
     let day: string | undefined;
-    const blocked = writeBlocked(key);
     for (const item of items) {
       if (dayOf(item.at) !== day) {
         day = dayOf(item.at);
-        rows.push({ text: dayLabel(item.at), bubble: 'day' });
+        out.push({ kind: 'day', text: dayLabel(item.at) });
       }
       if (item.event) {
         const e = item.event;
-        rows.push({ text: eventText(e, badgeLabel), detail: time(e.at), icon: (e.kind === 'badge' ? (badgeDefinition(e.badge!)?.icon ?? 'medal') : 'star') as IconName, bubble: 'card' });
+        out.push({ kind: 'event', text: eventText(e, badgeLabel), time: time(e.at), icon: (e.kind === 'badge' ? (badgeDefinition(e.badge!)?.icon ?? 'medal') : 'star') as IconName });
         continue;
       }
       const line = item.line!;
@@ -302,6 +336,33 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
               ? t('{time} · En attente : il n’accepte pas de messages', { time: time(line.at) })
               : t('{time} · En attente · partira quand {name} sera en ligne', { time: time(line.at), name: plain })
         : time(line.at);
+      out.push({ kind: 'line', line, meta, bubble: line.out ? (line.delivery === 'pending' ? 'pending' : line.delivery === 'expired' ? 'expired' : 'out') : 'in', chips });
+    }
+    return out;
+  }
+
+  function buildThread(key: string): Built {
+    const f = friendOf(key);
+    const plain = f?.name ?? knownName(key);
+    const up = thread?.key === key ? thread.back : () => openList();
+    // Ouvert sous les yeux : ce qui arrive est lu.
+    if (convOf(key)?.unread) chat.markRead(key);
+    const c = convOf(key) ?? { lines: [], unread: 0 };
+    const actions: Action[] = [];
+    const rows: Row[] = [];
+    // Les messages et les évènements de l'ami (records, badges), mêlés par date.
+    const items = threadItems(key);
+    const blocked = writeBlocked(key);
+    for (const item of items) {
+      if (item.kind === 'day') {
+        rows.push({ text: item.text, bubble: 'day' });
+        continue;
+      }
+      if (item.kind === 'event') {
+        rows.push({ text: item.text, detail: item.time, icon: item.icon, bubble: 'card' });
+        continue;
+      }
+      const { line, meta, chips } = item;
       const index = actions.push({
         label: line.text!,
         key: `line:${line.id}`,
@@ -312,7 +373,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
       rows.push({
         text: line.text!,
         detail: meta,
-        bubble: line.out ? (line.delivery === 'pending' ? 'pending' : line.delivery === 'expired' ? 'expired' : 'out') : 'in',
+        bubble: item.bubble,
         ...(chips.length ? { badges: chips } : {}),
         action: index,
         pick: true,
@@ -522,6 +583,49 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
         ...(l.out && l.delivery === 'pending' ? { note: t('En attente') } : l.out && l.delivery === 'received' ? { note: t('Reçu') } : {}),
       }));
       return { key, name: friendOf(key)!.name, lines, reactions: CHAT_REACTIONS.map((r) => ({ id: r, label: reactionLabel(r) })), phrases: chatPhrases() };
+    },
+    remoteCommunity: (open) => {
+      const closed = !net.state().enabled ? t('Partage désactivé : personne ne vous voit, vous ne voyez personne') : !chat.state().enabled ? t('Messagerie désactivée sur cette borne : Réglages de la messagerie') : undefined;
+      const rows = listKeys()
+        .slice(0, COMMUNITY_SHOWN)
+        .map(({ key, plain }) => {
+          const f = convFacts(key);
+          return {
+            key,
+            name: plain,
+            avatar: avatar(key, plain),
+            presence: presenceText(key),
+            state: presenceState(key),
+            last: f.sub,
+            ...(f.aside ? { when: f.aside } : {}),
+            ...(f.unread ? { unread: f.unread } : {}),
+            ...(f.note ? { note: f.note.text } : {}),
+          };
+        });
+      let thread: RemoteThread | undefined;
+      if (open && (friendOf(open) || convOf(open)?.lines.length)) {
+        // Ouvert sous les yeux, au téléphone : ce qui arrive est lu.
+        if (convOf(open)?.unread) chat.markRead(open);
+        const plain = friendOf(open)?.name ?? knownName(open);
+        const status = statusRow(open);
+        const blocked = writeBlocked(open);
+        thread = {
+          key: open,
+          name: plain,
+          avatar: avatar(open, plain),
+          presence: presenceText(open),
+          state: presenceState(open),
+          status: { text: status.text, ...(status.detail ? { detail: status.detail } : {}), tone: status.tone === 'warning' ? 'warning' : status.tone === 'ok' ? 'ok' : 'info' },
+          ...(blocked ? { blocked } : {}),
+          items: threadItems(open)
+            .slice(-THREAD_PHONE)
+            .map((it) => (it.kind === 'line' ? { kind: 'line' as const, id: it.line.id, text: it.line.text!, out: it.line.out, meta: it.meta, bubble: it.bubble, ...(it.chips.length ? { chips: it.chips } : {}) } : it.kind === 'event' ? { kind: 'event' as const, text: it.text, time: it.time } : { kind: 'day' as const, text: it.text })),
+          reactions: CHAT_REACTIONS.map((r) => ({ id: r, label: reactionLabel(r) })),
+          phrases: chatPhrases(),
+        };
+      }
+      const unread = Object.entries(chat.state().conversations).reduce((n, [k, c]) => n + (friendOf(k) ? c.unread : 0), 0);
+      return { ...(closed ? { closed } : {}), unread, rows, ...(thread ? { thread } : {}) };
     },
     openUnread: (back) => {
       const unread = Object.entries(chat.state().conversations).filter(([k, c]) => c.unread > 0 && friendOf(k)).sort(([a], [b]) => Date.parse(lastAt(b)) - Date.parse(lastAt(a)));

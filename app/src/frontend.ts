@@ -1283,14 +1283,17 @@ phoneRemote.setMenu({
     scores: (table, period) => tableScores.board(table, period),
     rankings: (table, scope, period) => tableRankings.view(table, scope, period),
     closed: () => (guest.allows('sheet.scores') ? undefined : t('Fermés en mode invité.')),
+    images: phoneRemote.images,
   }),
   // Messagerie pendant une partie : lire et répondre au téléphone, sans toucher aux boutons de VPX ; jamais en mode invité.
   chat: () => (guest.active ? undefined : chatMenu.remoteChat()),
+  // Communauté au téléphone (messages, amis) : au menu, et pendant une partie si le réglage le permet ; jamais en mode invité.
+  community: (open) => (guest.active ? { closed: t('Fermée en mode invité.'), unread: 0, rows: [] } : chatMenu.remoteCommunity(open)),
   chatSend: (key, text) => {
-    if (!guest.active && chatService.state().phoneInGame) chatService.send(key, text);
+    if (phoneMayWrite()) chatService.send(key, text);
   },
   chatReact: (key, target, kind) => {
-    if (!guest.active && chatService.state().phoneInGame && (CHAT_REACTIONS as readonly string[]).includes(kind)) chatService.react(key, target, kind as ChatReaction);
+    if (phoneMayWrite() && (CHAT_REACTIONS as readonly string[]).includes(kind)) chatService.react(key, target, kind as ChatReaction);
   },
   setText: (value) => state.phase === 'library' && library.remoteSet(value),
   enter: () => state.phase === 'library' && library.remoteEnter(),
@@ -1323,6 +1326,13 @@ phoneRemote.setMenu({
     });
   },
 });
+
+/** Le téléphone peut-il écrire : jamais en mode invité ; pendant une partie, seulement si « Messagerie au téléphone pendant la partie » le permet. */
+function phoneMayWrite(): boolean {
+  if (guest.active) return false;
+  const playing = state.phase === 'loading' || state.phase === 'playing';
+  return !playing || chatService.state().phoneInGame;
+}
 
 /** En tête de la page du téléphone : l'écran du menu affiché et ce qui y est choisi. */
 function remoteScreen(): { title: string; item?: string; zone?: string } {

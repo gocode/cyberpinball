@@ -100,6 +100,7 @@ import {
   toBase64Url,
   fromBase64Url,
   wheelFor,
+  type AvatarView,
   type FirewallState,
   type KeptPhone,
   type KeptPhones,
@@ -118,7 +119,8 @@ import {
 import { settleWithin, typeChars } from './page-input';
 import { pointerWindow } from './remote-pointer';
 import { qrRows } from './remote-qr';
-import { RANKS_AVATAR_PATH, type RemoteRanks } from './remote-ranks';
+import { createRemoteImages, REMOTE_IMAGE_PATH, type RemoteImage } from './remote-images';
+import { remoteAvatar, type RemoteRanks } from './remote-ranks';
 import { journalIncident } from './uncaught';
 
 /** Où écouter : le réseau local réel, 127.0.0.1 seulement (essais), ou nulle part (réseau coupé). */
@@ -181,6 +183,48 @@ export interface RemoteChat {
   phrases: string[];
 }
 
+/** Une conversation de la rubrique Communauté (chat-menu.ts, remoteCommunity) : un ami, ou un ancien ami dont le fil reste lisible. */
+export interface RemoteCommunityRow {
+  /** Clé publique de l'ami (comme le fil de la partie) : de quoi lui écrire, jamais un chemin. */
+  key: string;
+  name: string;
+  avatar: AvatarView;
+  /** « En ligne · Dans le menu des tables », « En partie : … », « Vu il y a… ». */
+  presence: string;
+  state: 'online' | 'playing' | 'offline' | 'gone';
+  /** Le dernier message (« Vous : … »), ou « Pas encore de message ». */
+  last: string;
+  when?: string;
+  unread?: number;
+  /** Refus, messages en attente, ancien ami. */
+  note?: string;
+}
+
+/** Le fil d'un ami ouvert au téléphone : jours, évènements de l'ami et messages, comme à la borne. */
+export interface RemoteThread {
+  key: string;
+  name: string;
+  avatar: AvatarView;
+  presence: string;
+  state: RemoteCommunityRow['state'];
+  /** Ce qui arrive à ce qu'on écrit (en ligne, hors ligne, refus) : la ligne d'état du fil. */
+  status: { text: string; detail?: string; tone: 'ok' | 'info' | 'warning' };
+  /** On ne peut pas écrire : pourquoi (partage coupé, ancien ami…). */
+  blocked?: string;
+  items: ({ kind: 'day'; text: string } | { kind: 'event'; text: string; time: string } | { kind: 'line'; id: string; text: string; out: boolean; meta: string; bubble: 'in' | 'out' | 'pending' | 'expired'; chips?: string[] })[];
+  reactions: { id: string; label: string }[];
+  phrases: string[];
+}
+
+/** La rubrique Communauté du téléphone : les conversations, le fil ouvert, ou pourquoi la messagerie est fermée. */
+export interface RemoteCommunity {
+  closed?: string;
+  /** Messages non lus, pour la pastille de l'onglet. */
+  unread: number;
+  rows: RemoteCommunityRow[];
+  thread?: RemoteThread;
+}
+
 /** Ce que le menu donne à la télécommande (frontend.ts) : ce qu'il montre, ses boutons, son clavier, le dossier d'import. */
 export interface MenuTarget {
   /** Le menu, ou une partie (VPX a les boutons). */
@@ -210,13 +254,15 @@ export interface MenuTarget {
   menus?(): RemoteMenus;
   /** Ouvrir un menu par son identifiant (remoteMenuTarget) : la borne vérifie tout, et ne fait rien d'un identifiant inconnu ou fermé. */
   open?(id: string): void;
-  /** Classements de chaque table (remote-ranks.ts), en lecture seule ; sans eux, la vue Scores le dit. */
+  /** Classements de chaque table (remote-ranks.ts, avec `images` de la télécommande), en lecture seule ; sans eux, la vue Scores le dit. */
   ranks?: RemoteRanks;
   /** Pendant une partie : le fil à montrer au téléphone (undefined : rien, réglage coupé ou aucun message). */
   chat?(): RemoteChat | undefined;
   /** Écrire à un ami, ou réagir à un de ses messages, depuis le téléphone ; la messagerie vérifie tout. */
   chatSend?(key: string, text: string): void;
   chatReact?(key: string, target: string, kind: string): void;
+  /** Communauté : les conversations et le fil ouvert au téléphone (`open`) ; sans elle, l'onglet le dit. */
+  community?(open?: string): RemoteCommunity;
 }
 
 /** Ce que la fenêtre « Récupérer » donne à la télécommande pendant qu'elle est ouverte. */
@@ -293,6 +339,7 @@ export const PHONE_FILES: Readonly<Record<string, string>> = {
   '/telephone.js': 'telephone/telephone.js',
   '/telephone-core.js': 'telephone/telephone-core.js',
   '/telephone-ranks.js': 'telephone/telephone-ranks.js',
+  '/telephone-community.js': 'telephone/telephone-community.js',
   // La pastille d'un joueur, dessinée comme à la borne (vue Scores).
   '/avatar.js': 'avatar.js',
   '/theme.css': 'theme.css',
@@ -315,8 +362,10 @@ const TYPES: Record<string, string> = {
 };
 /** Drapeau d'un pays (app/renderer/drapeaux, flagSrc) : deux lettres, rien d'autre. */
 const FLAG_PATH = /^\/drapeaux\/([a-z]{2})\.svg$/;
-/** Pastille d'un joueur classé, sous son jeton (remote-ranks.ts). */
-const AVATAR_PATH = new RegExp(`^${RANKS_AVATAR_PATH}([A-Za-z0-9_-]{22})$`);
+/** Une image sous son jeton (remote-images.ts) : pastille d'un joueur, pochette, miniature d'une table. */
+const IMAGE_PATH = new RegExp(`^${REMOTE_IMAGE_PATH}([A-Za-z0-9_-]{22})$`);
+/** Au plus, images réduites gardées en mémoire (une miniature se redemande à chaque passage dans la liste). */
+const RESIZED_MAX = 400;
 /** Les classements sont relus au plus à ce rythme pendant que la vue Scores est ouverte (sauf demande du téléphone). */
 const RANKS_MS = 1000;
 /** Au plus, connexions ouvertes en même temps (un téléphone, sa reconnexion, un curieux). */
@@ -374,6 +423,11 @@ interface Upload {
 }
 
 export function createPhoneRemote(opts: PhoneRemoteOptions) {
+  /**
+   * Les images de la page sous jeton (remote-images.ts) : pastilles, pochettes, miniatures. La
+   * télécommande seule les sert (« /images/<jeton> ») : chaque vue de la page reçoit les siennes d'ici.
+   */
+  const images = createRemoteImages();
   const log = opts.log ?? ((line: string) => console.log(line));
   const rendererDir = opts.rendererDir ?? path.join(__dirname, '..', 'renderer');
   const interfaces = opts.interfaces ?? os.networkInterfaces;
@@ -438,6 +492,11 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   let menusSent = '';
   /** Dernier fil de la messagerie envoyé au téléphone (pendant une partie). */
   let chatSent = '';
+  let communitySent = '';
+  let communityAt = 0;
+  let communityTimer: NodeJS.Timeout | undefined;
+  /** Le fil ouvert au téléphone (clé d'un ami), ou la liste. */
+  let communityOpen: string | undefined;
   let menusAt = 0;
   let menusTimer: NodeJS.Timeout | undefined;
   /**
@@ -518,7 +577,11 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   /** Le catalogue de la langue, réduit aux textes de la page du téléphone. */
   function catalogue(): string {
     const lang = language();
-    const page = ['telephone.js', 'telephone-ranks.js', 'telephone.html'].map((f) => fs.readFileSync(path.join(rendererDir, 'telephone', f), 'utf8')).join('\n');
+    // Les pages du téléphone qu'il sert (PHONE_FILES) : un script ajouté a ses textes sans qu'on y pense.
+    const page = Object.values(PHONE_FILES)
+      .filter((f) => /^telephone\/.*\.(js|html)$/.test(f))
+      .map((f) => fs.readFileSync(path.join(rendererDir, f), 'utf8'))
+      .join('\n');
     const messages = Object.fromEntries(Object.entries(messagesOf(lang)).filter(([k]) => page.includes(k)));
     return `window.cyberI18n = ${JSON.stringify({ language: lang, locale: localeOf(lang), messages })};\n`;
   }
@@ -543,15 +606,15 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       res.writeHead(200, { ...headers, 'Content-Type': TYPES['.js']! }).end(req.method === 'HEAD' ? undefined : catalogue());
       return;
     }
-    // Vue Scores : un drapeau (deux lettres), ou la pastille d'un joueur sous son jeton ; rien d'autre du disque.
+    // Un drapeau (deux lettres), ou une image sous son jeton (pastille, pochette, miniature) ; rien d'autre du disque.
     const flag = FLAG_PATH.exec(url);
-    const avatar = AVATAR_PATH.exec(url);
-    const image = flag ? path.join(rendererDir, 'drapeaux', `${flag[1]}.svg`) : avatar ? menu?.ranks?.avatar(avatar[1]!) : undefined;
+    const token = IMAGE_PATH.exec(url)?.[1];
+    const image: RemoteImage | undefined = flag ? { file: path.join(rendererDir, 'drapeaux', `${flag[1]}.svg`) } : token ? images.get(token) : undefined;
     if (image) {
-      fs.readFile(image, (error, body) => {
-        if (error) return void res.writeHead(404, { ...headers, 'Content-Type': 'text/plain; charset=utf-8' }).end();
-        // Une pastille ne change pas sous son jeton : le téléphone la garde le temps de la liaison.
-        res.writeHead(200, { ...headers, 'Content-Type': TYPES[path.extname(image).toLowerCase()] ?? 'application/octet-stream', 'Cache-Control': 'private, max-age=3600' }).end(req.method === 'HEAD' ? undefined : body);
+      readImage(image, token, (body, type) => {
+        if (!body) return void res.writeHead(404, { ...headers, 'Content-Type': 'text/plain; charset=utf-8' }).end();
+        // Une image ne change pas sous son jeton : le téléphone la garde le temps de la liaison.
+        res.writeHead(200, { ...headers, 'Content-Type': type, 'Cache-Control': 'private, max-age=3600' }).end(req.method === 'HEAD' ? undefined : body);
       });
       return;
     }
@@ -563,6 +626,38 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     fs.readFile(path.join(rendererDir, file), (error, body) => {
       if (error) return void res.writeHead(500, headers).end();
       res.writeHead(200, { ...headers, 'Content-Type': TYPES[path.extname(file)] ?? 'application/octet-stream' }).end(req.method === 'HEAD' ? undefined : body);
+    });
+  }
+
+  /** Images réduites, par jeton (les plus anciennes oubliées au-delà de RESIZED_MAX). */
+  const resized = new Map<string, Buffer>();
+
+  /**
+   * Une image à servir : le fichier tel quel, ou réduit (plus grand côté `max`, en JPEG) par Electron
+   * quand il est plus grand ; sans Electron (essais du cœur), tel quel. Illisible : rien.
+   */
+  function readImage(image: RemoteImage, token: string | undefined, done: (body: Buffer | undefined, type: string) => void): void {
+    const type = TYPES[path.extname(image.file).toLowerCase()] ?? 'application/octet-stream';
+    const kept = token ? resized.get(token) : undefined;
+    if (kept) return done(kept, TYPES['.jpg']!);
+    fs.readFile(image.file, (error, body) => {
+      if (error) return done(undefined, type);
+      if (!image.max || type === TYPES['.svg']) return done(body, type);
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const native = (require('electron') as typeof import('electron')).nativeImage;
+        const picture = native?.createFromBuffer(body);
+        const size = picture?.getSize();
+        if (!picture || !size || picture.isEmpty() || Math.max(size.width, size.height) <= image.max) return done(body, type);
+        const small = (size.width >= size.height ? picture.resize({ width: image.max, quality: 'good' }) : picture.resize({ height: image.max, quality: 'good' })).toJPEG(82);
+        if (token) {
+          if (resized.size >= RESIZED_MAX) resized.delete(resized.keys().next().value!);
+          resized.set(token, small);
+        }
+        done(small, TYPES['.jpg']!);
+      } catch {
+        done(body, type);
+      }
     });
   }
 
@@ -674,6 +769,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     lastActivity = Date.now();
     // Une liaison neuve : la vue Scores redemande ce qu'elle montre (« ranks »).
     ranksWatch = undefined;
+    communityOpen = undefined;
     pushState(true);
   }
 
@@ -695,6 +791,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       ranksTablesSent = '';
       ranksSent = '';
       chatSent = '';
+      communitySent = '';
       sendTo(active, { t: 'mode', mode: m });
       force = true;
     }
@@ -710,6 +807,42 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     pushMenus(force);
     pushRanks(force);
     pushChat(force);
+    pushCommunity(force);
+  }
+
+  /**
+   * Communauté : les conversations (et la pastille des non-lus), le fil ouvert ; relues au plus toutes
+   * les MENUS_MS, envoyées quand elles changent. Les pastilles partent sous jeton (remote-images.ts).
+   */
+  function pushCommunity(force = false): void {
+    if (!active || !menu?.community || pairing?.session() !== 'paired' || mode() === 'browser') return;
+    const now = Date.now();
+    if (!force && now - communityAt < MENUS_MS) {
+      if (!communityTimer) {
+        communityTimer = setTimeout(() => {
+          communityTimer = undefined;
+          pushCommunity();
+        }, MENUS_MS - (now - communityAt));
+        communityTimer.unref?.();
+      }
+      return;
+    }
+    clearTimeout(communityTimer);
+    communityTimer = undefined;
+    communityAt = now;
+    let c: RemoteCommunity;
+    try {
+      c = menu.community(communityOpen);
+    } catch (error) {
+      journalIncident('Télécommande : messagerie illisible pour le téléphone', error); // i18n-ignore : journal
+      return;
+    }
+    const face = (a: AvatarView): AvatarView => remoteAvatar(images, a);
+    const shown: RemoteCommunity = { ...c, rows: c.rows.map((r) => ({ ...r, avatar: face(r.avatar) })), ...(c.thread ? { thread: { ...c.thread, avatar: face(c.thread.avatar) } } : {}) };
+    const text = JSON.stringify(shown);
+    if (!force && text === communitySent) return;
+    communitySent = text;
+    sendTo(active, { t: 'community', ...shown });
   }
 
   /**
@@ -1185,11 +1318,13 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         menu.open?.(message.id);
         return;
       case 'chat-send':
-        // Pendant une partie seulement : au menu, le téléphone écrit dans le clavier à l'écran de la borne.
-        if (mode() === 'game') menu.chatSend?.(message.key, message.text);
+        // Au menu (Communauté) comme pendant une partie : la borne vérifie l'ami, le texte, le mode invité et ses réglages.
+        menu.chatSend?.(message.key, message.text);
+        pushCommunity(true);
         return;
       case 'chat-react':
-        if (mode() === 'game') menu.chatReact?.(message.key, message.target, message.kind);
+        menu.chatReact?.(message.key, message.target, message.kind);
+        pushCommunity(true);
         return;
       case 'set':
         // Le clavier à l'écran n'a qu'une ligne : un saut de ligne (permis pour une zone de texte d'une page) y devient une espace.
@@ -1222,6 +1357,12 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     if (message.t === 'up') return void startUpload(link, message);
     // Les classements non plus : une lecture, sans geste injecté à la borne.
     if (message.t === 'ranks') return watchRanks(message);
+    // Communauté : le fil ouvert au téléphone (aucun geste injecté) ; son contenu part aussitôt.
+    if (message.t === 'chat-open') {
+      communityOpen = message.key;
+      pushCommunity(true);
+      return;
+    }
     if (message.t === 'ranks-off') {
       ranksWatch = undefined;
       clearTimeout(ranksTimer);
@@ -1542,6 +1683,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     }
     // Les classements changent sans redessin du menu (un score reçu d'une autre borne, une présence) : relus ici aussi.
     if (mode() !== 'browser') pushRanks();
+    // La messagerie aussi (un message reçu, une présence) : la pastille de l'onglet et le fil ouvert suivent.
+    if (mode() !== 'browser') pushCommunity();
     const now = Date.now();
     if (mode() !== 'menu') lastActivity = now;
     else if (active && pairing?.session() === 'paired' && now - lastActivity > (opts.idleMs ?? REMOTE_IDLE_MS)) {
@@ -1585,8 +1728,12 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     clearTimeout(ranksTimer);
     ranksTimer = undefined;
     ranksWatch = undefined;
-    // Les jetons des pastilles ne valent plus rien : la prochaine liaison en reçoit d'autres.
-    menu?.ranks?.reset();
+    clearTimeout(communityTimer);
+    communityTimer = undefined;
+    communityOpen = undefined;
+    // Les jetons des images ne valent plus rien : la prochaine liaison en reçoit d'autres.
+    images.reset();
+    resized.clear();
     closeServer();
     pairing = undefined;
     unavailable = undefined;
@@ -1694,6 +1841,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   }
 
   return {
+    /** Les images de la page sous jeton : à donner aux classements (et à chaque vue qui montre une image). */
+    images,
     attach,
     detach,
     attachExternal,

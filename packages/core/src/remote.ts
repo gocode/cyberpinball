@@ -418,6 +418,11 @@ export type PhoneMessage =
    */
   | { t: 'chat-send'; s: number; key: string; text: string }
   | { t: 'chat-react'; s: number; key: string; target: string; kind: string }
+  /**
+   * Communauté (messages, amis) : le fil ouvert au téléphone, la clé publique d'un ami, ou aucun
+   * (`key` absent : la liste). La borne envoie ce fil tant qu'il est ouvert, et le marque lu.
+   */
+  | { t: 'chat-open'; s: number; key?: string }
   | { t: 'ping'; s: number }
   | { t: 'bye'; s: number };
 
@@ -483,6 +488,9 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       return typeof m.key === 'string' && /^[0-9a-f]{64}$/.test(m.key) && typeof m.text === 'string' && m.text.length <= 4000 ? { t: 'chat-send', s, key: m.key, text: m.text } : undefined;
     case 'chat-react':
       return typeof m.key === 'string' && /^[0-9a-f]{64}$/.test(m.key) && typeof m.target === 'string' && /^[0-9a-f]{16}$/.test(m.target) && typeof m.kind === 'string' && /^[a-z]{1,20}$/.test(m.kind) ? { t: 'chat-react', s, key: m.key, target: m.target, kind: m.kind } : undefined;
+    case 'chat-open':
+      if (m.key === undefined || m.key === null) return { t: 'chat-open', s };
+      return typeof m.key === 'string' && /^[0-9a-f]{64}$/.test(m.key) ? { t: 'chat-open', s, key: m.key } : undefined;
     case 'ping':
       return { t: 'ping', s };
     case 'bye':

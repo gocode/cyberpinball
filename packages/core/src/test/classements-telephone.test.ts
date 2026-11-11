@@ -24,7 +24,8 @@ interface RemoteRanks {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createRemoteRanks, RANKS_AVATAR_PATH } = require(path.join(REPO_ROOT, 'app', 'dist', 'remote-ranks.js')) as { createRemoteRanks(host: object): RemoteRanks; RANKS_AVATAR_PATH: string };
+const { createRemoteRanks } = require(path.join(REPO_ROOT, 'app', 'dist', 'remote-ranks.js')) as { createRemoteRanks(host: object): RemoteRanks };
+const { createRemoteImages } = require(path.join(REPO_ROOT, 'app', 'dist', 'remote-images.js')) as { createRemoteImages(): object };
 
 const NOW = new Date(2026, 10, 9, 21, 30);
 const KEY = 'b'.repeat(64);
@@ -49,6 +50,7 @@ function host(over: Record<string, unknown> = {}) {
             note: 'Même version de la table que la vôtre',
           },
     now: () => NOW,
+    images: createRemoteImages(),
     ...over,
   };
 }
@@ -70,8 +72,8 @@ test('classements au téléphone : le tableau de la borne, rien d’autre (ni cl
   assert.equal(line.name, 'Bruno');
   assert.equal(line.flag, 'drapeaux/fr.svg');
   assert.equal(line.status?.state, 'playing');
-  const token = line.avatar?.src?.slice(RANKS_AVATAR_PATH.length - 1) ?? '';
-  assert.match(line.avatar?.src ?? '', /^avatars\/[A-Za-z0-9_-]{22}$/, 'une pastille sous un jeton');
+  const token = line.avatar?.src?.slice('images/'.length) ?? '';
+  assert.match(line.avatar?.src ?? '', /^images\/[A-Za-z0-9_-]{22}$/, 'une pastille sous un jeton');
   assert.equal(ranks.avatar(token), AVATAR, 'le jeton mène au fichier, gardé à la borne');
   assert.equal(ranks.avatar('A'.repeat(22)), undefined);
   const sent = JSON.stringify({ items: list.items, current: list.current, board });
