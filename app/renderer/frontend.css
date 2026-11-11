@@ -728,7 +728,8 @@ body.mouse .collections-row:not(.disabled) {
   clip-path: inset(-12% 2.78% 0 2.78%);
 }
 
-.wheel-item {
+.wheel-item,
+.wheel-halo {
   position: absolute;
   left: 0;
   top: 0;
@@ -1109,19 +1110,68 @@ html.menu-desktop .menu.menu-band .menu-nav {
 }
 
 /*
- * Halo vert de la table choisie (maquette validée, roue Soie) : à l'arrêt, une étincelle blanche part
- * du haut et fait le tour du médaillon ; derrière elle, un halo vert se trace et finit par l'entourer
- * (.wheel-rim). Il est collé au bord mesuré du médaillon (--rim-r : les logos n'occupent pas tous leur
- * boîte, frontend.js, fitMedallion), sous lui, donc il semble venir de derrière, mais devant les
- * médaillons voisins. Le cercle fermé, l'étincelle continue de tourner, un tour en 3,9 s
- * (.wheel-orbit). Hors arrêt, il ne reste qu'un fin liseré. Jamais pendant le glissement ni en
- * rafale. Une lueur douce traverse le médaillon (.wheel-glint) ; à chaque appui, une onde court le
- * long de l'arc des médaillons (.wheel-pulse).
+ * Halo vert de la table choisie (11/11/2026) : une lueur collée au médaillon, qui vient de derrière
+ * lui, jamais un cercle posé autour. Elle épouse la forme de ce qu'on voit (drop-shadow suit la
+ * transparence du logo ; pour un médaillon sans logo, son disque), quelle que soit sa taille. Elle
+ * est portée par une copie du médaillon qui le suit, posée derrière toute la roue (.wheel-halo,
+ * frontend.js, haloFollow) : elle ne passe jamais sur un médaillon voisin. Mouvement « Soie »
+ * (wheelMoved) : pendant le glissement, la lueur baisse ; à l'arrêt (.landed, jamais pendant une
+ * rafale), elle souffle une fois puis se pose, un fil s'enroule au bord du médaillon (.wheel-rim) et
+ * une lueur douce le traverse (.wheel-glint), tous deux à la taille du médaillon (--rim-r).
+ * À chaque appui, une onde court le long de l'arc des médaillons (.wheel-pulse).
  */
+.wheel-stage {
+  --halo-dos:
+    drop-shadow(0 0 calc(4 * var(--w)) rgba(139, 226, 58, 0.95))
+    drop-shadow(0 0 calc(16 * var(--w)) rgba(139, 226, 58, 0.55))
+    drop-shadow(0 0 calc(40 * var(--w)) rgba(139, 226, 58, 0.28));
+  --halo-bas:
+    drop-shadow(0 0 calc(3 * var(--w)) rgba(139, 226, 58, 0.5))
+    drop-shadow(0 0 calc(14 * var(--w)) rgba(139, 226, 58, 0.2));
+  --halo-souffle:
+    drop-shadow(0 0 calc(6 * var(--w)) rgba(200, 255, 150, 1))
+    drop-shadow(0 0 calc(26 * var(--w)) rgba(139, 226, 58, 0.75))
+    drop-shadow(0 0 calc(64 * var(--w)) rgba(139, 226, 58, 0.4));
+}
+
+.wheel-halo {
+  pointer-events: none;
+}
+
+/* La copie ne montre que sa lueur : son nom, s'il en a un, reste celui du vrai médaillon. */
+.wheel-halo .wheel-name,
+.wheel-halo .wheel-initial {
+  visibility: hidden;
+}
+
+.menu-band .wheel-halo .wheel-tilt {
+  transition: filter 220ms linear;
+  filter: var(--halo-dos);
+}
+
+.menu-band .wheel-stage.moving .wheel-halo .wheel-tilt {
+  filter: var(--halo-bas);
+}
+
+.menu-band .wheel-stage.landed .wheel-halo .wheel-tilt {
+  animation: halo-souffle 900ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes halo-souffle {
+  0% {
+    filter: var(--halo-bas);
+  }
+  30% {
+    filter: var(--halo-souffle);
+  }
+  100% {
+    filter: var(--halo-dos);
+  }
+}
+
 .wheel-glint,
 .wheel-aura,
-.wheel-rim,
-.wheel-orbit {
+.wheel-rim {
   display: none;
 }
 
@@ -1139,23 +1189,28 @@ html.menu-desktop .menu.menu-band .menu-nav {
   pointer-events: none;
 }
 
-/* Cercle du halo : 2 unités au-delà du bord du médaillon, dans un carré dont il occupe 92 % (r = 46 sur 50). */
-.menu-band .wheel-rim {
-  --rim-box: calc((var(--rim-r, 112.5) + 2) / 0.92);
+/*
+ * Anneau et étincelle (maquette validée) : à l'arrêt, une étincelle blanche part du haut et fait le
+ * tour du médaillon choisi ; derrière elle, l'anneau vert se trace sur son bord, puis l'étincelle
+ * continue seule son tour (3,9 s). Le cercle est celui du bord mesuré du médaillon (--rim-r, centre
+ * décalé de --rim-dx, --rim-dy : media.js, reach), posé dessus. Jamais pendant le glissement ni en
+ * rafale ; chaque nouvelle table au centre le rejoue (frontend.js, wheelStage).
+ */
+.wheel-orbit {
+  display: none;
+}
+
+.menu-band .wheel-stage.landed .wheel-rim {
+  /* Le cercle occupe 92 % de sa boîte (r = 46 sur 50) : son trait tombe sur le bord, 1,5 unité en dedans. */
+  --rim-box: calc((var(--rim-r, 112.5) - 1.5) / 0.92);
   display: block;
   position: absolute;
-  left: calc((var(--ring-x) - var(--rim-box)) * var(--w));
-  top: calc((var(--ring-y) - var(--rim-box)) * var(--w));
+  left: calc((var(--ring-x) + var(--rim-dx, 0) - var(--rim-box)) * var(--w));
+  top: calc((var(--ring-y) + var(--rim-dy, 0) - var(--rim-box)) * var(--w));
   width: calc(var(--rim-box) * 2 * var(--w));
   height: calc(var(--rim-box) * 2 * var(--w));
-  /* Sous le médaillon choisi (20), devant ses voisins (18 et moins). */
-  z-index: 19;
+  z-index: 21;
   pointer-events: none;
-  transition:
-    left 200ms ease-out,
-    top 200ms ease-out,
-    width 200ms ease-out,
-    height 200ms ease-out;
 }
 
 .wheel-rim svg {
@@ -1165,35 +1220,19 @@ html.menu-desktop .menu.menu-band .menu-nav {
   height: 100%;
   overflow: visible;
   transform: rotate(-90deg);
+  filter: drop-shadow(0 0 calc(3 * var(--w)) var(--signal)) drop-shadow(0 0 calc(10 * var(--w)) rgba(139, 226, 58, 0.6));
 }
 
-/* Traits en unités du dessin (viewBox de 100 pour 2 × --rim-box) : le tracé en pointillé (pathLength) reste juste. */
+/* Trait de 3,6 unités, en unités du dessin (viewBox de 100 pour 2 × --rim-box) : le pointillé (pathLength) reste juste. */
 .wheel-rim circle {
   fill: none;
-}
-
-/* Liseré au repos (maquette : 22 %). */
-.wheel-rim .rim-base {
-  stroke: rgba(139, 226, 58, 0.22);
-  stroke-width: calc(75 / var(--rim-box));
-}
-
-/* Le halo vert, tracé derrière l'étincelle. */
-.wheel-rim .rim-draw {
-  stroke: #a6f05a;
-  stroke-width: calc(200 / var(--rim-box));
+  stroke: #d8ffb0;
+  stroke-width: calc(180 / var(--rim-box));
   stroke-dasharray: 1 1;
   stroke-dashoffset: 1;
-  opacity: 0;
-}
-
-.wheel-rim .rim-glow {
-  filter: drop-shadow(0 0 calc(6 * var(--w)) rgba(139, 226, 58, 1)) drop-shadow(0 0 calc(18 * var(--w)) rgba(139, 226, 58, 0.7)) drop-shadow(0 0 calc(40 * var(--w)) rgba(139, 226, 58, 0.35));
-}
-
-.menu-band .wheel-stage.landed .wheel-rim .rim-draw {
-  opacity: 1;
-  animation: rim-wrap 1100ms cubic-bezier(0.37, 0, 0.3, 1) forwards;
+  animation:
+    rim-wrap 1100ms cubic-bezier(0.37, 0, 0.3, 1) forwards,
+    rim-pose 600ms ease-out 1100ms forwards;
 }
 
 @keyframes rim-wrap {
@@ -1202,20 +1241,30 @@ html.menu-desktop .menu.menu-band .menu-nav {
   }
 }
 
-/* L'étincelle, au rayon du halo, devant le bord du médaillon. */
+@keyframes rim-pose {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 0.7;
+  }
+}
+
+/* L'étincelle, sur le même cercle. */
 .menu-band .wheel-stage.landed .wheel-orbit {
-  --orbit-r: calc(var(--rim-r, 112.5) + 2);
+  --orbit-r: calc(var(--rim-r, 112.5) - 1.5);
   display: block;
   position: absolute;
-  left: calc((var(--ring-x) - var(--orbit-r)) * var(--w));
-  top: calc((var(--ring-y) - var(--orbit-r)) * var(--w));
+  left: calc((var(--ring-x) + var(--rim-dx, 0) - var(--orbit-r)) * var(--w));
+  top: calc((var(--ring-y) + var(--rim-dy, 0) - var(--orbit-r)) * var(--w));
   width: calc(var(--orbit-r) * 2 * var(--w));
   height: calc(var(--orbit-r) * 2 * var(--w));
-  z-index: 21;
+  z-index: 22;
   pointer-events: none;
 }
 
-/* Elle mène le tracé du halo (même durée, même courbe), puis continue seule son tour. */
+/* Elle mène le tracé de l'anneau (même durée, même courbe), puis continue seule son tour. */
 .wheel-orbit .wheel-spark {
   position: absolute;
   inset: 0;
@@ -1232,11 +1281,11 @@ html.menu-desktop .menu.menu-band .menu-nav {
   position: absolute;
   left: 50%;
   top: 0;
-  width: calc(34 * var(--w));
-  height: calc(34 * var(--w));
-  margin: calc(-17 * var(--w)) 0 0 calc(-17 * var(--w));
+  width: calc(26 * var(--w));
+  height: calc(26 * var(--w));
+  margin: calc(-13 * var(--w)) 0 0 calc(-13 * var(--w));
   border-radius: 50%;
-  background: radial-gradient(circle, #ffffff 0 14%, rgba(232, 255, 208, 0.9) 24%, rgba(139, 226, 58, 0.4) 46%, rgba(139, 226, 58, 0) 70%);
+  background: radial-gradient(circle, #ffffff 0 16%, rgba(232, 255, 208, 0.85) 26%, rgba(139, 226, 58, 0.4) 46%, rgba(139, 226, 58, 0) 70%);
 }
 
 @keyframes rim-lead {
@@ -1267,8 +1316,8 @@ html.menu-desktop .menu.menu-band .menu-nav {
 .menu-band .wheel-glint {
   display: block;
   position: absolute;
-  left: calc((var(--ring-x) - var(--rim-r, 112.5)) * var(--w));
-  top: calc((var(--ring-y) - var(--rim-r, 112.5)) * var(--w));
+  left: calc((var(--ring-x) + var(--rim-dx, 0) - var(--rim-r, 112.5)) * var(--w));
+  top: calc((var(--ring-y) + var(--rim-dy, 0) - var(--rim-r, 112.5)) * var(--w));
   width: calc(var(--rim-r, 112.5) * 2 * var(--w));
   height: calc(var(--rim-r, 112.5) * 2 * var(--w));
   z-index: 21;
@@ -1343,7 +1392,8 @@ html.menu-desktop .menu.menu-band .menu-nav {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wheel-rim .rim-draw,
+  .menu-band .wheel-stage.landed .wheel-item.center .wheel-tilt,
+  .wheel-rim circle,
   .wheel-orbit .wheel-spark,
   .wheel-stage.landed .wheel-glint::before,
   .wheel-stage.landed .wheel-glint::after {
@@ -1356,12 +1406,14 @@ html.menu-desktop .menu.menu-band .menu-nav {
  * Médaillon dessiné sur le gabarit commun (Juke-box : medaillons/juke-box-512.webp) : son anneau
  * chromé fait le diamètre du disque ci-dessous (225, l'image en a 3 % de marge) ; le halo vert le suit.
  */
-.menu-band .wheel-item.jukebox .wheel-img {
+.menu-band .wheel-item.jukebox .wheel-img,
+.menu-band .wheel-halo.jukebox .wheel-img {
   width: calc(232 * var(--w));
   height: calc(232 * var(--w));
 }
 
-.menu-band .wheel-item.disc .wheel-tilt::before {
+.menu-band .wheel-item.disc .wheel-tilt::before,
+.menu-band .wheel-halo.disc .wheel-tilt::before {
   content: '';
   position: absolute;
   left: calc(50% - 112.5 * var(--w));
@@ -1376,7 +1428,8 @@ html.menu-desktop .menu.menu-band .menu-nav {
   box-shadow: inset 0 0 0 calc(2 * var(--w)) #e6f0ec, 0 calc(6 * var(--w)) calc(16 * var(--w)) rgba(0, 0, 0, 0.7);
 }
 
-.menu-band .wheel-item.disc .wheel-img {
+.menu-band .wheel-item.disc .wheel-img,
+.menu-band .wheel-halo.disc .wheel-img {
   width: 70%;
   height: 70%;
 }
@@ -1595,7 +1648,9 @@ html.menu-desktop .menu-band .menu-frame.fronton {
 
 /* Passage d'un bord à l'autre (peu de tables) : repositionné d'un coup, hors champ (wheelStage). */
 .wheel-item.jump,
-.wheel-item.jump * {
+.wheel-item.jump *,
+.wheel-halo.jump,
+.wheel-halo.jump * {
   transition: none !important;
 }
 

@@ -512,13 +512,55 @@
   }
 
   /**
-   * Jusqu'où va le médaillon dans son image : la plus grande distance au centre d'un point opaque,
-   * en part du demi-grand côté de l'image (1 : il touche le bord). Mesurée une fois par logo, sur
-   * une copie réduite à 128 points ; 1 si l'image ne se lit pas.
+   * Cercle du bord du médaillon dans son image (12/11/2026) : l'anneau chromé du gabarit n'est pas
+   * centré sur l'image (plus épais en bas à droite), le point opaque le plus lointain donnait un
+   * cercle trop large d'un côté. Sur 180 rayons, le dernier point opaque (alpha > 128) depuis le
+   * centre, puis le cercle qui passe au plus près de ces points (moindres carrés). Rendu en part
+   * du demi-grand côté de l'image : { r, dx, dy } (centre décalé de dx, dy). Mesuré une fois par
+   * logo, sur une copie de 256 points ; { r: 1, dx: 0, dy: 0 } si l'image ne se lit pas.
    */
   const medallionReach = new Map();
+  const WHOLE = { r: 1, dx: 0, dy: 0 };
+  function edgeCircle(d, w, h) {
+    const cx = w / 2;
+    const cy = h / 2;
+    const far = Math.hypot(cx, cy);
+    let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, sxz = 0, syz = 0, sz = 0, n = 0;
+    for (let i = 0; i < 180; i++) {
+      const a = (i / 180) * Math.PI * 2;
+      const ux = Math.cos(a);
+      const uy = Math.sin(a);
+      for (let t = far; t > 0; t -= 0.5) {
+        const x = Math.floor(cx + ux * t);
+        const y = Math.floor(cy + uy * t);
+        if (x < 0 || y < 0 || x >= w || y >= h || d[(y * w + x) * 4 + 3] <= 128) continue;
+        const px = cx + ux * t - cx;
+        const py = cy + uy * t - cy;
+        const z = px * px + py * py;
+        sx += px; sy += py; sxx += px * px; syy += py * py; sxy += px * py; sxz += px * z; syz += py * z; sz += z; n++;
+        break;
+      }
+    }
+    if (n < 12) return WHOLE;
+    // x² + y² + D x + E y + F = 0, au sens des moindres carrés (méthode de Kåsa).
+    const m = [[sxx, sxy, sx], [sxy, syy, sy], [sx, sy, n]];
+    const v = [-sxz, -syz, -sz];
+    const det = (q) => q[0][0] * (q[1][1] * q[2][2] - q[1][2] * q[2][1]) - q[0][1] * (q[1][0] * q[2][2] - q[1][2] * q[2][0]) + q[0][2] * (q[1][0] * q[2][1] - q[1][1] * q[2][0]);
+    const base = det(m);
+    if (!base) return WHOLE;
+    const col = (k) => det(m.map((row, r) => row.map((c, j) => (j === k ? v[r] : c))));
+    const D = col(0) / base;
+    const E = col(1) / base;
+    const F = col(2) / base;
+    const ox = -D / 2;
+    const oy = -E / 2;
+    const r = Math.sqrt(Math.max(0, ox * ox + oy * oy - F));
+    const half = Math.max(w, h) / 2;
+    if (!(r > 0)) return WHOLE;
+    return { r: Math.min(1, r / half), dx: ox / half, dy: oy / half };
+  }
   function reach(url) {
-    if (!url) return Promise.resolve(1);
+    if (!url) return Promise.resolve(WHOLE);
     let known = medallionReach.get(url);
     if (known) return known;
     known = new Promise((resolve) => {
@@ -527,7 +569,7 @@
       img.decoding = 'async';
       img.onload = () => {
         try {
-          const k = 128 / Math.max(img.naturalWidth, img.naturalHeight, 1);
+          const k = 256 / Math.max(img.naturalWidth, img.naturalHeight, 1);
           const w = Math.max(1, Math.round(img.naturalWidth * k));
           const h = Math.max(1, Math.round(img.naturalHeight * k));
           const c = document.createElement('canvas');
@@ -535,16 +577,12 @@
           c.height = h;
           const g = c.getContext('2d', { willReadFrequently: true });
           g.drawImage(img, 0, 0, w, h);
-          const d = g.getImageData(0, 0, w, h).data;
-          let far = 0;
-          for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 128) far = Math.max(far, Math.hypot(x + 0.5 - w / 2, y + 0.5 - h / 2));
-          // Image opaque jusqu'aux coins (logo carré) : le cercle s'arrête au bord, pas aux coins.
-          resolve(far > 0 ? Math.min(1, far / (Math.max(w, h) / 2)) : 1);
+          resolve(edgeCircle(g.getImageData(0, 0, w, h).data, w, h));
         } catch {
-          resolve(1);
+          resolve(WHOLE);
         }
       };
-      img.onerror = () => resolve(1);
+      img.onerror = () => resolve(WHOLE);
       img.src = url;
     });
     medallionReach.set(url, known);

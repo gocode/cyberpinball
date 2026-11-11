@@ -12,6 +12,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Wheel: the green ring, its spark and the glow fit each medallion's size, and the halo stays behind the neighbouring medallions.
 - Wheel: the ring, the spark and the halo are back to the mock-up's look and motion; only the halo moves behind the neighbouring medallions. The sheen across the chosen medallion is slower and softer.
 - Wheel: when it stops, a white spark circles the chosen medallion, drawing a green halo behind it until it surrounds the medallion, then keeps circling. The medallion sheen now also shows on the cabinet.
+- Wheel: the green halo around the chosen medallion is back, and the ring drawn by the spark sits exactly on the medallion's chrome edge. The animation replays for every new table in the centre.
 
 ## 0.1.9
 

@@ -240,14 +240,16 @@ function fillWheelItem(item, n) {
 function placeWheelItem(item, style, hidden = item.leaving) {
   const p = wheelPose(style, item.offset, item.ratio);
   const st = item.node.style;
+  const from = { x: st.getPropertyValue('--x'), y: st.getPropertyValue('--y'), s: st.getPropertyValue('--s'), o: st.getPropertyValue('--o') };
   st.setProperty('--x', String(p.x));
   st.setProperty('--y', String(p.y));
   st.setProperty('--s', p.s.toFixed(4));
   st.setProperty('--o', String(hidden ? 0 : p.o));
   // Place du centre : le nom d'un médaillon sans logo s'y lit, ailleurs son initiale.
   item.node.classList.toggle('center', item.offset === 0 && !hidden);
-  // La table choisie passe devant ses voisines ; son halo vert (.wheel-rim, 19) entre elles et elle.
+  // La table choisie passe devant ses voisines ; son halo vert, lui, reste derrière elles (haloFollow).
   st.zIndex = String(20 - 2 * Math.min(4, Math.abs(item.offset)));
+  if (item.offset === 0 && !hidden) haloFollow(item, from);
   if (p.o > 0 && !hidden) item.hit.dataset.act = JSON.stringify({ type: 'wheel', offset: item.offset });
   else delete item.hit.dataset.act;
 }
@@ -262,7 +264,7 @@ function wheelStage(s, style) {
     // (.wheel-aura) ; à l'arrêt, un fil vert s'enroule au bord du médaillon, collé à lui, et une
     // étincelle en fait le tour (.wheel-rim) ; la lueur blanche le traverse (.wheel-glint).
     const rim = el('div', 'wheel-rim');
-    rim.innerHTML = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle class="rim-base" cx="50" cy="50" r="46"/></svg><svg class="rim-glow" viewBox="0 0 100 100" aria-hidden="true"><circle class="rim-draw" cx="50" cy="50" r="46" pathLength="1"/></svg>';
+    rim.innerHTML = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" pathLength="1"/></svg>';
     const orbit = el('div', 'wheel-orbit');
     orbit.append(el('i', 'wheel-spark'));
     layer.append(el('div', 'wheel-aura'), rim, orbit, el('div', 'wheel-glint'));
@@ -339,7 +341,10 @@ function wheelStage(s, style) {
     }, 500);
     placeWheelItem(item, style);
   }
+  const center = [...v.items.entries()].find(([, i]) => i.offset === 0 && !i.leaving)?.[0];
   if (moved) wheelMoved(v, moved);
+  else if (center !== v.center) wheelMoved(v, 0);
+  v.center = center;
   fitMedallion(v);
   return v.stage;
 }
@@ -359,14 +364,57 @@ function fitMedallion(v) {
   if (!item || !WHEELS[v.style]) return;
   const pose = wheelPose(v.style, 0, item.ratio);
   const box = WHEELS[v.style].face[0] * pose.s;
-  const done = (r) => {
-    if (v.fitted === key) v.layer.style.setProperty('--rim-r', r.toFixed(2));
+  const done = (r, dx = 0, dy = 0) => {
+    if (v.fitted !== key) return;
+    const st = v.layer.style;
+    st.setProperty('--rim-r', r.toFixed(2));
+    st.setProperty('--rim-dx', dx.toFixed(2));
+    st.setProperty('--rim-dy', dy.toFixed(2));
   };
   // Disque (logo qui n'est pas un médaillon, ou titre seul) : le cercle de 225 unités.
   if (item.node.classList.contains('disc') || !img) return done(112.5 * pose.s);
   // Le logo ne remplit pas toujours sa place (Juke-box : 232 unités sur 275).
   const part = img.offsetWidth > 0 && item.tilt.offsetWidth > 0 ? img.offsetWidth / item.tilt.offsetWidth : 1;
-  (CyberMedia.reach?.(img.currentSrc || img.src) ?? Promise.resolve(1)).then((k) => done((k * part * box) / 2));
+  const half = (part * box) / 2;
+  (CyberMedia.reach?.(img.currentSrc || img.src) ?? Promise.resolve({ r: 1, dx: 0, dy: 0 })).then((c) => done(c.r * half, c.dx * half, c.dy * half));
+}
+
+/**
+ * Halo vert de la table choisie, derrière toute la roue (11/11/2026) : porté par le médaillon du
+ * centre, il passait sur ses voisins. Une copie du médaillon (.wheel-halo), posée sous les voisins,
+ * le porte : elle suit le médaillon du centre pas à pas (mêmes places, mêmes transitions), et le
+ * vrai médaillon la couvre. Quand une autre table arrive au centre, la copie repart de la place
+ * d'où vient cette table et glisse avec elle, comme le halo d'avant.
+ */
+function haloFollow(item, from) {
+  const v = wheelView;
+  if (!v) return;
+  const look = `${item.node.className}|${item.tilt.innerHTML}`;
+  let halo = v.halo;
+  if (!halo || halo.owner !== item || halo.look !== look) {
+    const copy = item.node.cloneNode(true);
+    copy.classList.add('wheel-halo');
+    copy.classList.remove('center', 'wheel-item');
+    copy.style.zIndex = '1';
+    copy.setAttribute('aria-hidden', 'true');
+    for (const n of copy.querySelectorAll('[data-act]')) delete n.dataset.act;
+    if (halo?.owner !== item && from.x !== '') {
+      // Nouvelle table au centre : la copie part de sa place précédente.
+      copy.classList.add('jump');
+      for (const k of ['--x', '--y', '--s', '--o']) copy.style.setProperty(k, from[k.slice(2)]);
+    }
+    copy.owner = item;
+    copy.look = look;
+    if (halo) halo.replaceWith(copy);
+    else v.layer.insertBefore(copy, v.layer.querySelector('.wheel-rim'));
+    v.halo = halo = copy;
+    if (copy.classList.contains('jump')) {
+      void copy.offsetWidth;
+      copy.classList.remove('jump');
+    }
+  }
+  const st = item.node.style;
+  for (const k of ['--x', '--y', '--s', '--o']) halo.style.setProperty(k, st.getPropertyValue(k));
 }
 
 /** Les mouvements Soie de la roue sont coupés quand le système demande moins d'animations. */
@@ -388,7 +436,7 @@ function wheelMoved(v, dir) {
   clearTimeout(v.landing);
   v.stage.classList.remove('landed');
   v.stage.classList.add('moving');
-  wheelPulse(v, dir);
+  if (dir) wheelPulse(v, dir);
   v.landing = setTimeout(() => {
     v.stage.classList.remove('moving');
     if (quietMotion()) return;
