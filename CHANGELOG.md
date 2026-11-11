@@ -12,6 +12,7 @@ son interface).
 ## 0.1.10
 
 - Roue : l'anneau vert, son étincelle et la lueur épousent la taille de chaque médaillon, et le halo reste derrière les médaillons voisins.
+- Roue : l'anneau, l'étincelle et le halo retrouvent le dessin et le mouvement de la maquette ; seul le halo passe derrière les médaillons voisins. L'éclat qui traverse le médaillon choisi est plus lent et plus discret.
 
 ## 0.1.9
 

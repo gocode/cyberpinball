@@ -10,6 +10,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 ## 0.1.10
 
 - Wheel: the green ring, its spark and the glow fit each medallion's size, and the halo stays behind the neighbouring medallions.
+- Wheel: the ring, the spark and the halo are back to the mock-up's look and motion; only the halo moves behind the neighbouring medallions. The sheen across the chosen medallion is slower and softer.
 
 ## 0.1.9
 
