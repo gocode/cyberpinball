@@ -352,6 +352,8 @@ export interface PhoneRemoteOptions {
   kept?: KeptPhones;
   /** Port d'écoute ; par défaut REMOTE_PORT sur le réseau local, un port libre pendant un essai. */
   port?: number;
+  /** Combien attendre que le port se libère avant d'en prendre un autre (essais) ; par défaut PORT_WAIT_MS. */
+  portWaitMs?: number;
 }
 
 /**
@@ -393,6 +395,9 @@ const TYPES: Record<string, string> = {
 const FLAG_PATH = /^\/drapeaux\/([a-z]{2})\.svg$/;
 /** Une image sous son jeton (remote-images.ts) : pastille d'un joueur, pochette, miniature d'une table. */
 const IMAGE_PATH = new RegExp(`^${REMOTE_IMAGE_PATH}([A-Za-z0-9_-]{22})$`);
+/** Port de la télécommande encore pris (relève, mise à jour) : attendu jusqu'à 45 s, essayé chaque seconde. */
+const PORT_WAIT_MS = 45_000;
+const PORT_RETRY_MS = 1_000;
 /** Écoute qui n'a pas pu s'ouvrir : nouveaux essais après 5 s, 15 s, 30 s, puis chaque minute. */
 const LISTEN_RETRY_MS = [5_000, 15_000, 30_000, 60_000];
 /** Au plus, images réduites gardées en mémoire (une miniature se redemande à chaque passage dans la liste). */
@@ -529,6 +534,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   let communitySent = '';
   /** Nouvel essai d'écoute prévu, et combien déjà depuis le réveil. */
   let listenRetry: NodeJS.Timeout | undefined;
+  /** L'écoute a dû prendre un autre port que le sien (dernier recours) : le QR le dit. */
+  let portElsewhere = false;
   let listenTries = 0;
   /** Ce que fait chaque collection de l'écran envoyé ; le téléphone regarde-t-il la grille (images des frontons) ? */
   let collectionPicks: (undefined | (() => void))[] = [];
@@ -580,7 +587,13 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       const url = remoteUrl(address.host, address.port, view.key);
       // La matrice d'un QR ne change qu'avec lui : le bandeau se redessine quatre fois par seconde pendant un téléchargement.
       if (qr?.url !== url) qr = { url, rows: qrRows(url) };
-      return { phase: 'offer', qr: qr.rows, url, title: t('Télécommande'), line: t('Scannez avec votre téléphone, sur le même Wi-Fi que la borne') };
+      return {
+        phase: 'offer',
+        qr: qr.rows,
+        url,
+        title: t('Télécommande'),
+        line: portElsewhere ? t('Port habituel pris par un autre programme : les téléphones gardés doivent scanner ce QR une fois') : t('Scannez avec votre téléphone, sur le même Wi-Fi que la borne'),
+      };
     }
     const device = view.device === 'Téléphone' ? t('Téléphone') : view.device; // i18n-ignore : nom par défaut (remote.ts, deviceLabel)
     if (view.phase === 'pending') return { phase: 'pending', code: view.code, title: t('Même code ?'), line: device };
@@ -1780,7 +1793,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   // --- Ouverture et fermeture du navigateur intégré ------------------------------
 
-  async function listen(mode: PhoneRemoteMode): Promise<void> {
+  async function listen(mode: PhoneRemoteMode, run: number): Promise<void> {
     if (mode === 'off') {
       unavailable = t('Indisponible : réseau coupé sur cette borne (CYBERPINBALL_RESEAU)');
       return;
@@ -1821,12 +1834,39 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
           resolve();
         });
       });
+    // Une écoute dépassée (endormie ou relancée entre-temps) ne garde rien ouvert et ne touche à rien.
+    const stale = () => run !== wakeRun || closed;
+    portElsewhere = false;
     try {
       await bind(wanted);
     } catch (error) {
       if (!wanted || (error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error;
-      log(`Télécommande : port ${wanted} déjà pris, écoute sur un port libre (un téléphone gardé devra scanner le QR).`); // i18n-ignore : journal
-      await bind(0);
+      // Le port est pris : d'ordinaire l'ancien processus d'une relève (mise à jour, relance) qui finit
+      // de sortir. On attend qu'il le rende : un téléphone gardé y retrouve sa clé (le stockage de son
+      // navigateur va avec l'adresse et le port). Un port libre en dernier recours seulement.
+      log(`Télécommande : port ${wanted} encore pris, attente de sa libération (un ancien Cyber Pinball qui se ferme).`); // i18n-ignore : journal
+      const until = Date.now() + (opts.portWaitMs ?? PORT_WAIT_MS);
+      let bound = false;
+      while (!bound && Date.now() < until) {
+        await new Promise((r) => setTimeout(r, PORT_RETRY_MS));
+        if (stale()) return;
+        try {
+          await bind(wanted);
+          bound = true;
+          log(`Télécommande : port ${wanted} libéré, écoute reprise.`); // i18n-ignore : journal
+        } catch (again) {
+          if ((again as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw again;
+        }
+      }
+      if (!bound) {
+        log(`Télécommande : port ${wanted} toujours pris par un autre programme, écoute sur un port libre en dernier recours (les téléphones gardés devront scanner le QR).`); // i18n-ignore : journal
+        await bind(0);
+        portElsewhere = true;
+      }
+    }
+    if (stale() || server) {
+      s.close();
+      return;
     }
     const port = (s.address() as { port: number }).port;
     server = s;
@@ -1855,7 +1895,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   function attemptListen(run: number): void {
     clearTimeout(listenRetry);
     listenRetry = undefined;
-    void listen(opts.mode())
+    void listen(opts.mode(), run)
       .catch((error: Error) => {
         unavailable = t('Indisponible : la télécommande n’a pas pu démarrer ; nouvel essai dans un instant.');
         journalIncident('Télécommande : écoute impossible', error); // i18n-ignore : journal
@@ -2087,7 +2127,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       if (!pairing?.accept()) return false;
       // Accepté une fois, gardé : il reviendra sans QR (sa clé de session devient la sienne).
       const now = pairing.current();
-      if (kept && now) pairing.markKept(kept.add(now.key, now.device));
+      if (kept && now) pairing.markKept(kept.add(now.key, now.device, now.prev));
       log(`Télécommande : téléphone accepté à la borne${kept ? ', gardé' : ''}.`); // i18n-ignore : journal
       if (active) ready(active);
       tick();

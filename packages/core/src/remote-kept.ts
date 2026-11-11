@@ -11,7 +11,7 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
-import { deviceLabel, fromBase64Url, REMOTE_KEPT_MAX, REMOTE_KEY_BYTES, toBase64Url, type KeptPhoneKey } from './remote';
+import { deviceLabel, fromBase64Url, keptFingerprint, REMOTE_KEPT_MAX, REMOTE_KEY_BYTES, toBase64Url, type KeptPhoneKey } from './remote';
 import { readKeptJson } from './store';
 
 export const KEPT_PHONES_FILE = 'telephones.json';
@@ -86,11 +86,16 @@ export function createKeptPhones(dataDir: string | undefined, opts: KeptPhonesOp
       return entries.map(({ id, device, added, seen }) => ({ id, device, added, seen })).sort((a, b) => b.seen - a.seen);
     },
     size: () => entries.length,
-    /** Un téléphone vient d'être accepté : sa clé est gardée ; son identifiant. */
-    add(key: Uint8Array, device: string): string {
+    /**
+     * Un téléphone vient d'être accepté : sa clé est gardée ; son identifiant. `replaces` : l'empreinte
+     * de sa clé d'avant (keptFingerprint), s'il était déjà gardé et repasse par le QR : son entrée est
+     * remplacée, jamais doublée.
+     */
+    add(key: Uint8Array, device: string, replaces?: string): string {
       const text = toBase64Url(key);
       const same = entries.find((e) => e.key === text);
       if (same) return same.id;
+      if (replaces) entries = entries.filter((e) => keptFingerprint(fromBase64Url(e.key, REMOTE_KEY_BYTES)!) !== replaces);
       const at = now();
       const id = crypto.randomBytes(8).toString('hex');
       entries.push({ id, key: text, device: deviceLabel(device), added: at, seen: at });

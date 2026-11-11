@@ -767,7 +767,11 @@ function connect(force = false) {
       if (hello?.t !== 'challenge' || theirs) return ws.close();
       theirs = core.fromB64(hello.n ?? '');
       if (!theirs || theirs.length !== 16) return ws.close();
-      send({ t: 'hello', c: core.toB64(mine), device: core.deviceName(navigator.userAgent) });
+      // Déjà gardé et venu par un nouveau QR : l'empreinte de son ancienne clé, pour que la borne
+      // remplace son entrée au lieu d'en ajouter une (remote-kept.ts, keptFingerprint).
+      const old = kept ? undefined : core.fromB64(stored(KEPT_STORE));
+      const prev = old && old.length === 32 ? core.toB64(core.aeadSeal(old, new Uint8Array(12), new TextEncoder().encode('cyberpinball:garde'), new Uint8Array(0))) : undefined;
+      send({ t: 'hello', c: core.toB64(mine), device: core.deviceName(navigator.userAgent), ...(prev ? { prev } : {}) });
       return;
     }
     if (!theirs) return ws.close();
@@ -1510,6 +1514,8 @@ $('top-more').addEventListener('click', () => {
     ...(mode === 'menu' && fieldShown ? [{ id: 'keys', label: t('Clavier : taper dans le champ ouvert à la borne'), run: () => openKeys(fieldShown, false, sameField(openedField, fieldShown)) }] : []),
     ...(mode === 'menu' || sending ? [{ id: 'send', label: sending && upload.phase === 'sending' ? t('Envoi {pct} %', { pct: uploadPct() }) : t('Envoyer un fichier à la borne'), run: () => $('nav-send').click() }] : []),
     ...(kept && !standalone() ? [{ id: 'home', label: t('Ajouter à l’écran d’accueil'), run: offerHomeScreen }] : []),
+    // Android : le plein écran, à prendre ou à quitter d'ici (jamais repris de lui-même une fois quitté exprès).
+    ...(document.fullscreenElement || fullscreenPossible() ? [{ id: 'fullscreen', label: document.fullscreenElement ? t('Quitter le plein écran') : t('Plein écran'), run: toggleFullscreen }] : []),
   ];
   openSheet(t('Télécommande'), items, {
     search: true,
@@ -1637,20 +1643,64 @@ if (window.visualViewport) {
 //
 // Chrome pour Android ouvre le raccourci d'une page HTTP dans un onglet, barre d'adresse comprise :
 // seule une page HTTPS installable s'ouvre sans elle. La page demande donc le plein écran au premier
-// toucher (l'API l'exige), et de nouveau au toucher suivant une sortie (geste retour, autre
-// application). Le toucher fait aussi ce qu'il touche : la demande part au relâchement, sans rien
-// empêcher. Rien sur l'iPhone (le raccourci y est déjà plein écran), ni quand le navigateur n'a pas
-// de plein écran ou le refuse. La hauteur suit la zone visible (fit ci-dessus) : rien ne saute, le
+// toucher (l'API l'exige), et de nouveau après une sortie subie (autre application, écran verrouillé :
+// la page passe en arrière-plan). Quitté exprès (le geste « glisser pour quitter » de Chrome, ou
+// « Quitter le plein écran » du menu ⋮), il n'est plus repris de lui-même : le menu ⋮ le rend. Chrome
+// montre son propre avertissement à chaque entrée, que la page ne peut ni masquer ni remplacer : d'où
+// une demande aussi rare que possible. Le toucher fait aussi ce qu'il touche : la demande part au
+// relâchement, sans rien empêcher. Rien sur l'iPhone (le raccourci y est déjà plein écran), ni quand
+// le navigateur n'a pas de plein écran ou le refuse. La hauteur suit la zone visible (fit ci-dessus) : rien ne saute, le
 // clavier du téléphone et les feuilles restent utilisables. Jamais dans Electron (les essais chargent
 // la vraie page dans des fenêtres hors écran : un vrai plein écran les montrerait), sauf essai qui
 // le simule (window.cyberFullscreenTest).
 let fullscreenRefused = false;
-function fullscreenWanted() {
-  const root = document.documentElement;
-  if (fullscreenRefused || document.fullscreenElement || standalone()) return false;
+/** Plein écran quitté exprès : plus repris au toucher (gardé d'une visite à l'autre). */
+const FULLSCREEN_STORE = 'cyberpinball.plein-ecran';
+let fullscreenOff = stored(FULLSCREEN_STORE) === 'non';
+/** Le navigateur sait passer en plein écran, et c'est utile ici (pas l'iPhone, déjà plein écran). */
+function fullscreenPossible() {
+  if (fullscreenRefused || standalone()) return false;
   if (/Electron\//.test(navigator.userAgent) && !window.cyberFullscreenTest) return false;
-  return Boolean(document.fullscreenEnabled && typeof root.requestFullscreen === 'function');
+  return Boolean(document.fullscreenEnabled && typeof document.documentElement.requestFullscreen === 'function');
 }
+function fullscreenWanted() {
+  return !fullscreenOff && !document.fullscreenElement && fullscreenPossible();
+}
+/** Le menu ⋮ : entrer en plein écran (et le garder), ou le quitter (et ne plus le reprendre). */
+function toggleFullscreen() {
+  if (document.fullscreenElement) {
+    leavingOnPurpose = true;
+    setFullscreenOff(true);
+    void document.exitFullscreen?.().catch(() => undefined);
+    return;
+  }
+  setFullscreenOff(false);
+  fullscreenRefused = false;
+  askFullscreen();
+}
+function setFullscreenOff(off) {
+  fullscreenOff = off;
+  store(FULLSCREEN_STORE, off ? 'non' : '');
+}
+/** Sortie du plein écran : subie si la page passe en arrière-plan juste après (autre application), sinon voulue. */
+let leavingOnPurpose = false;
+let hiddenAfterExit = false;
+let exitTimer;
+document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement) return;
+  clearTimeout(exitTimer);
+  if (leavingOnPurpose || document.visibilityState === 'hidden') {
+    leavingOnPurpose = false;
+    return;
+  }
+  hiddenAfterExit = false;
+  exitTimer = setTimeout(() => {
+    if (!hiddenAfterExit) setFullscreenOff(true);
+  }, 700);
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') hiddenAfterExit = true;
+});
 function askFullscreen() {
   if (!fullscreenWanted()) return;
   // Le champ qui a le clavier le garde : la bascule ne le replie pas.

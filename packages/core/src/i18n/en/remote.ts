@@ -253,4 +253,7 @@ export const messages: Record<string, string> = {
   'La borne ouvre la gestion du Juke-box.': 'The cabinet is opening the Juke-box management.',
   'Options de « {name} »': 'Options for "{name}"',
   'Options': 'Options',
+  'Port habituel pris par un autre programme : les téléphones gardés doivent scanner ce QR une fois': 'Usual port taken by another program: kept phones must scan this QR code once',
+  'Quitter le plein écran': 'Exit full screen',
+  'Plein écran': 'Full screen',
 };

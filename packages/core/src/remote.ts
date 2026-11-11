@@ -241,6 +241,17 @@ export function deviceLabel(value: unknown): string {
 }
 
 /** Téléphone gardé, tel que l'appairage le reconnaît. */
+/**
+ * Empreinte d'une clé gardée, que le téléphone envoie avec un nouveau QR (`prev` de hello) : la
+ * borne remplace l'entrée de ce téléphone au lieu d'en ajouter une. L'étiquette ChaCha20-Poly1305
+ * d'un texte fixe sous cette clé (la page n'a pas d'autre primitive en HTTP) : sans la clé, rien ne
+ * la calcule, et elle ne dit rien de la clé. Même calcul dans telephone-core.js.
+ */
+export function keptFingerprint(key: Uint8Array): string {
+  return toBase64Url(Buffer.from(aeadSeal(key, new Uint8Array(12), Buffer.from('cyberpinball:garde', 'utf8'), new Uint8Array(0))));
+}
+const FINGERPRINT = /^[A-Za-z0-9_-]{22}$/;
+
 export interface KeptPhoneKey {
   id: string;
   key: Buffer;
@@ -267,7 +278,7 @@ export function createRemotePairing(opts: RemotePairingOptions = {}) {
   const acceptMs = opts.acceptMs ?? REMOTE_ACCEPT_MS;
   let offer: { key: Buffer; until: number } | undefined;
   /** `kept` : identifiant du téléphone gardé qui pilote (il est venu avec sa clé, sans QR). */
-  let session: { key: Buffer; code: string; device: string; phase: 'pending' | 'paired'; until: number; kept?: string } | undefined;
+  let session: { key: Buffer; code: string; device: string; phase: 'pending' | 'paired'; until: number; kept?: string; prev?: string } | undefined;
   /** Clés d'anciens QR : de quoi dire au téléphone qu'il est périmé ou déjà servi, sous sa propre clé. */
   const stale: { key: Buffer; why: 'expired' | 'used' }[] = [];
   const retire = (key: Buffer, why: 'expired' | 'used') => {
@@ -317,7 +328,9 @@ export function createRemotePairing(opts: RemotePairingOptions = {}) {
           retire(key, 'used');
           offer = undefined;
           if (session) return { kind: 'stale', key, why: 'busy', message };
-          session = { key: random(REMOTE_KEY_BYTES), code: code(), device: deviceLabel(message.device), phase: 'pending', until: now() + acceptMs };
+          // Un téléphone déjà gardé qui repasse par le QR : l'empreinte de son ancienne clé, pour remplacer son entrée.
+          const prev = typeof message.prev === 'string' && FINGERPRINT.test(message.prev) ? message.prev : undefined;
+          session = { key: random(REMOTE_KEY_BYTES), code: code(), device: deviceLabel(message.device), phase: 'pending', until: now() + acceptMs, ...(prev ? { prev } : {}) };
           return { kind: 'claimed', key, session: session.key, code: session.code, message };
         }
       }
@@ -343,9 +356,9 @@ export function createRemotePairing(opts: RemotePairingOptions = {}) {
      * Le téléphone qui pilote : sa clé (à garder, une fois accepté), son nom, et l'identifiant du
      * téléphone gardé s'il est venu avec sa clé.
      */
-    current(): { key: Buffer; device: string; kept?: string } | undefined {
+    current(): { key: Buffer; device: string; kept?: string; prev?: string } | undefined {
       expire();
-      return session?.phase === 'paired' ? { key: session.key, device: session.device, ...(session.kept ? { kept: session.kept } : {}) } : undefined;
+      return session?.phase === 'paired' ? { key: session.key, device: session.device, ...(session.kept ? { kept: session.kept } : {}), ...(session.prev ? { prev: session.prev } : {}) } : undefined;
     },
     /** Le téléphone qui pilote vient d'être gardé sous cet identifiant. */
     markKept(id: string): void {
