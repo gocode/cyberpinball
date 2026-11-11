@@ -156,6 +156,8 @@ body:not([data-state='paired']) .page {
   flex: 1;
   min-height: 0;
   display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .top,
@@ -318,10 +320,10 @@ body[data-state='lost'] .message-mark {
  * dessous. 480 px au plus, en bas de la scène : à portée des pouces.
  */
 .buttons {
-  flex: 1;
-  align-self: flex-end;
+  flex: 1 1 auto;
+  margin-top: auto;
   display: none;
-  height: 100%;
+  min-height: 0;
   max-height: 480px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: 64px minmax(96px, 1fr) 64px;
@@ -333,14 +335,16 @@ body[data-state='lost'] .message-mark {
   touch-action: none;
 }
 
-body[data-mode='menu'] .buttons {
-  display: grid;
-}
-
 body[data-mode='menu'] .pad,
 body[data-mode='game'] .pad,
 body[data-mode='game'] .buttons {
   display: none;
+}
+
+/* Au menu, la vue choisie ; pendant une partie, seulement avec les réglages en partie ouverts. */
+body[data-mode='menu'][data-view='buttons'] .buttons,
+body[data-mode='game'][data-ingame='true'][data-view='buttons'] .buttons {
+  display: grid;
 }
 
 .btn {
@@ -471,6 +475,349 @@ body[data-held='true'] .btn[data-b='confirm'].down {
 
 body[data-mode='game'] .game-note {
   display: flex;
+}
+
+body[data-mode='game'][data-ingame='true'] .game-note {
+  display: none;
+}
+
+/* « Ouvrir les réglages en partie » : la hauteur d'une touche ; grisé avec sa raison dessous. */
+.game-open.key.wide {
+  flex: 0 0 auto;
+  width: min(300px, 100%);
+  margin-top: 4px;
+}
+
+.game-open[hidden],
+.game-reason[hidden] {
+  display: none;
+}
+
+.game-open:disabled {
+  border-color: var(--line-soft);
+  color: var(--ink-faint);
+}
+
+.game-reason {
+  margin: 0;
+  max-width: 30ch;
+  font-size: 15px;
+  line-height: 21px;
+  color: var(--ink-muted);
+}
+
+/* --- Vues du menu : Écran, Menus, Boutons --- */
+
+.views {
+  display: none;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+body[data-mode='menu'] .views,
+body[data-mode='game'][data-ingame='true'] .views {
+  display: grid;
+}
+
+/* La vue choisie : claire, jamais verte (le vert est au choix courant de la liste, et à Start). */
+.view-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 4px 6px;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-size: 15px;
+}
+
+.view-tab .icon {
+  flex: none;
+  font-size: 22px;
+}
+
+.view-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+  line-height: 19px;
+}
+
+.view-reason:empty {
+  display: none;
+}
+
+.view-tab[aria-selected='true'] {
+  border-color: var(--ink-muted);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.view-tab:disabled {
+  color: var(--ink-faint);
+}
+
+.view-tab:disabled .view-reason {
+  font-weight: 400;
+}
+
+/* --- Listes : l'écran de la borne, tous les menus --- */
+
+.entries,
+.menus {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--halo-panel);
+  overflow: hidden;
+}
+
+body[data-mode='menu'][data-view='list'] .entries,
+body[data-mode='game'][data-ingame='true'][data-view='list'] .entries,
+body[data-mode='menu'][data-view='menus'] .menus {
+  display: flex;
+}
+
+body:not([data-state='paired']) .views,
+body:not([data-state='paired']) .entries,
+body:not([data-state='paired']) .menus {
+  visibility: hidden;
+}
+
+.entries-note {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 12px 14px 4px;
+  font-size: 15px;
+  line-height: 21px;
+  color: var(--ink-muted);
+}
+
+.entries-note[hidden] {
+  display: none;
+}
+
+.entry-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.entry-list:empty {
+  display: none;
+}
+
+.entry-list li + li {
+  margin-top: 2px;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  touch-action: pan-y;
+}
+
+.entry:active,
+.entry.sent {
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+}
+
+/* Le choix courant de la borne : le vert, réservé à lui. */
+.entry.current {
+  border-color: var(--signal);
+  background: var(--signal-wash);
+  box-shadow: inset 3px 0 0 var(--signal);
+}
+
+.entry-icon {
+  flex: 0 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: var(--ink-muted);
+}
+
+.entry.current .entry-icon {
+  color: var(--signal);
+}
+
+.entry-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.entry-label {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 21px;
+  overflow-wrap: anywhere;
+}
+
+.entry-detail {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Indisponible : grisée, sa raison reste lisible dessous. */
+.entry.quiet .entry-label,
+.entry.quiet .entry-icon {
+  color: var(--ink-faint);
+}
+
+.entry-badge {
+  display: inline-block;
+  padding: 0 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 19px;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  vertical-align: 1px;
+}
+
+.entry-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+.entry-go {
+  flex: none;
+  font-size: 20px;
+  color: var(--ink-muted);
+}
+
+/* Une liste vide : chargement, opération en cours, rien à toucher, menus fermés. */
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  overflow-y: auto;
+}
+
+.entry-list:not(:empty) + .empty {
+  flex: none;
+  padding-top: 8px;
+}
+
+.empty[hidden] {
+  display: none;
+}
+
+.empty-mark {
+  font-size: 28px;
+  color: var(--ink-muted);
+}
+
+.empty-mark:empty {
+  display: none;
+}
+
+.empty-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.empty-text {
+  margin: 0;
+  max-width: 32ch;
+  font-size: 15px;
+  line-height: 21px;
+  color: var(--ink-muted);
+}
+
+.empty-text:empty {
+  display: none;
+}
+
+.menus-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 48px;
+  padding: 4px 8px 0 4px;
+}
+
+.menus-up {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--ink);
+}
+
+.menus-up .icon {
+  font-size: 24px;
+}
+
+.menus-up[hidden] {
+  display: none;
+}
+
+.menus-up[hidden] + .menus-trail {
+  padding-left: 10px;
+}
+
+.menus-trail {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 15px;
+  color: var(--ink-muted);
 }
 
 /* --- Envoi d'un fichier vers la borne --- */
@@ -829,9 +1176,63 @@ body[data-layout='editing'][data-short='true'] .tool .icon {
   font-size: 20px;
 }
 
+/* Pendant une partie, Menus porte sa raison (« Après la partie ») : l'icône au-dessus, comme les outils. */
+body[data-mode='game'] .view-tab {
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 2px;
+}
+
+body[data-mode='game'] .view-text {
+  align-items: center;
+  text-align: center;
+}
+
+/*
+ * Hauteur visible modeste (iPhone SE, Android de 568 à 640 px) : dans les listes, le choix courant
+ * est déjà en vert ; l'en-tête garde le titre seul, la liste gagne une ligne.
+ */
+body[data-compact='true'][data-mode='menu']:not([data-view='buttons']) .page {
+  min-height: 0;
+}
+
+body[data-compact='true'][data-mode='menu']:not([data-view='buttons']) .page-host {
+  display: none;
+}
+
+/* Petite hauteur visible (iPhone SE dans Safari, téléphone en paysage) : les onglets se resserrent, la liste garde la place. */
+body[data-short='true'] .view-tab {
+  min-height: 48px;
+}
+
+body[data-short='true'] .page {
+  min-height: 46px;
+}
+
 @media (max-width: 374px) {
   .brand {
     letter-spacing: 0.12em;
+  }
+
+  /* Étroit : l'icône au-dessus du libellé, qui garde toute la largeur de l'onglet. */
+  .view-tab {
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
+  }
+
+  .view-tab .icon {
+    font-size: 20px;
+  }
+
+  .view-text {
+    align-items: center;
+    text-align: center;
+  }
+
+  .entry {
+    gap: 10px;
+    padding: 8px 10px;
   }
 
   .btn[data-b='exit'],

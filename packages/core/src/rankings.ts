@@ -306,10 +306,36 @@ export function rankingPlayers(store: RankingStore, q: Omit<RankingQuery, 'limit
 // ---------------------------------------------------------------------------
 // Pays
 
-/** Pays tiré d'une langue du système (« fr-FR » → « FR ») ; undefined sans région. */
+/**
+ * Les pays et territoires d'aujourd'hui (ISO 3166-1, plus le Kosovo et les régions qu'ICU nomme à
+ * part : Ascension, Tristan da Cunha, Ceuta et Melilla, Canaries, Diego Garcia, Clipperton). Chacun
+ * a son drapeau dans app/renderer/drapeaux (`<code>.svg`, de flag-icons, licence MIT). Les codes
+ * disparus qu'ICU sait encore nommer (URSS, RDA, Zaïre…) n'y sont pas : on ne les propose plus.
+ */
+export const COUNTRY_CODES: readonly string[] = (
+  'AC AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ ' + // i18n-ignore : codes de pays
+  'CA CC CD CF CG CH CI CK CL CM CN CO CP CR CU CV CW CX CY CZ DE DG DJ DK DM DO DZ EA EC EE EG EH ER ES ET FI FJ FK FM FO FR ' + // i18n-ignore : codes de pays
+  'GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU IC ID IE IL IM IN IO IQ IR IS IT JE JM JO JP ' + // i18n-ignore : codes de pays
+  'KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ ' + // i18n-ignore : codes de pays
+  'NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW ' + // i18n-ignore : codes de pays
+  'SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TA TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ ' + // i18n-ignore : codes de pays
+  'UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW' // i18n-ignore : codes de pays
+).split(' ');
+const KNOWN_COUNTRIES = new Set(COUNTRY_CODES);
+
+/** Un pays d'aujourd'hui, qui a son drapeau. */
+export const knownCountry = (code: unknown): code is string => typeof code === 'string' && KNOWN_COUNTRIES.has(code);
+
+/**
+ * Drapeau d'un pays, relatif aux pages de app/renderer ; undefined pour un code inconnu (une borne
+ * plus ancienne a pu publier un pays disparu) : l'écran montre alors le code dans le même cadre.
+ */
+export const flagSrc = (code: string | undefined): string | undefined => (knownCountry(code) ? `drapeaux/${code.toLowerCase()}.svg` : undefined);
+
+/** Pays tiré d'une langue du système (« fr-FR » → « FR ») ; undefined sans région, ou si elle n'est pas un pays. */
 export function countryOfLocale(locale: string | undefined): string | undefined {
   const region = locale ? /[-_]([A-Za-z]{2})(?:[-_.@]|$)/.exec(locale)?.[1]?.toUpperCase() : undefined;
-  return isCountry(region) ? region : undefined;
+  return knownCountry(region) ? region : undefined;
 }
 
 /** Nom du pays dans la langue de l'interface ; le code lui-même si la langue ne le connaît pas. */
@@ -321,20 +347,20 @@ export function countryName(code: string, locale: string): string {
   }
 }
 
-/** Drapeau d'un pays (deux lettres en symboles régionaux). */
-export const countryFlag = (code: string) => String.fromCodePoint(...[...code].map((c) => 0x1f1a5 + c.charCodeAt(0)));
+/** Ce que l'écran montre d'un pays : son code, son nom dans la langue de l'interface et son drapeau. */
+export interface FlagView {
+  code: string;
+  name: string;
+  src?: string;
+}
+export function flagView(code: string, locale: string): FlagView {
+  const src = flagSrc(code);
+  return { code, name: countryName(code, locale), ...(src ? { src } : {}) };
+}
 
-/** Codes de pays reconnus, pour le choix du pays : ceux que la langue sait nommer. */
+/** Les pays proposés au choix, par ordre alphabétique de leur nom dans la langue de l'interface. */
 export function countryCodes(locale: string): string[] {
-  const out: string[] = [];
-  for (let a = 65; a <= 90; a++) {
-    for (let b = 65; b <= 90; b++) {
-      const code = String.fromCharCode(a, b);
-      const name = countryName(code, locale);
-      if (name !== code && !['EU', 'EZ', 'UN', 'QO', 'XA', 'XB', 'ZZ'].includes(code)) out.push(code);
-    }
-  }
-  return out.sort((x, y) => countryName(x, locale).localeCompare(countryName(y, locale), locale));
+  return [...COUNTRY_CODES].sort((x, y) => countryName(x, locale).localeCompare(countryName(y, locale), locale));
 }
 
 // ---------------------------------------------------------------------------

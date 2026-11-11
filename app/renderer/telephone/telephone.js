@@ -2,9 +2,14 @@
 // Deux modes, selon ce que la borne montre (body[data-mode]) :
 // - browser, le navigateur intégré « Récupérer » : un pavé tactile, le clavier du téléphone quand un
 //   champ de la page a le clavier, Retour, Avancer, Fermer ;
-// - menu, le menu de Cyber Pinball : les boutons de la borne (Start, flippers, Exit, MagnaSave), le
+// - menu, le menu de Cyber Pinball, en trois vues (body[data-view]) : Écran, les entrées de l'écran
+//   ouvert à la borne, qu'on touche directement ; Menus, tous les menus rangés comme le menu système,
+//   qu'on ouvre d'un toucher ; Boutons, ceux de la borne (Start, flippers, Exit, MagnaSave). Et le
 //   clavier du téléphone à la place du clavier à l'écran, l'envoi d'un fichier vers le dossier
-//   d'import ; game pendant une partie (les boutons attendent le retour au menu). La clé vient du QR code, dans le fragment de l'adresse (#k=…) : le navigateur ne l'envoie
+//   d'import ; game pendant une partie (les boutons attendent le retour au menu, sauf dans les
+//   réglages en partie, que la page peut ouvrir). Le téléphone n'envoie que des identifiants
+//   (rang et version d'une entrée, identifiant d'un menu) : la borne vérifie tout (app/src/phone-remote.ts,
+//   packages/core/src/remote-menus.ts). La clé vient du QR code, dans le fragment de l'adresse (#k=…) : le navigateur ne l'envoie
 // jamais sur le réseau. Acceptée à la borne, la page la remplace par sa clé de session (#s=…), qui
 // la laisse revenir après une coupure (page rechargée, écran verrouillé). Chaque message est scellé
 // (telephone-core.js) et numéroté.
@@ -64,6 +69,29 @@ for (const b of document.querySelectorAll('.btn')) {
   text.append(name, what);
   b.replaceChildren(cyberIcon(def.icon), text);
 }
+/** Vues du menu : l'écran de la borne (ses entrées), tous les menus, les boutons de la borne. */
+const VIEWS = {
+  list: { icon: 'monitor', label: () => t('Écran') },
+  menus: { icon: 'gear', label: () => t('Menus') },
+  buttons: { icon: 'gamepad', label: () => t('Boutons') },
+};
+for (const [name, def] of Object.entries(VIEWS)) {
+  const tab = $(`tab-${name}`);
+  const text = document.createElement('span');
+  text.className = 'view-text';
+  const label = document.createElement('span');
+  label.className = 'view-label';
+  label.textContent = def.label();
+  // Indisponible (Menus pendant une partie) : la raison sous le libellé, l'onglet reste à sa place.
+  const reason = document.createElement('span');
+  reason.className = 'view-reason';
+  text.append(label, reason);
+  tab.replaceChildren(cyberIcon(def.icon), text);
+  tab.addEventListener('click', () => setView(name));
+}
+$('views').setAttribute('aria-label', t('Vues de la télécommande'));
+$('menus-up').replaceChildren(cyberIcon('chevron-left'));
+$('menus-up').setAttribute('aria-label', t('Rubrique précédente'));
 $('game-mark').replaceChildren(cyberIcon('play'));
 $('key-backspace').setAttribute('aria-label', t('Effacer le caractère précédent'));
 $('keys-hide').setAttribute('aria-label', t('Masquer le clavier'));
@@ -213,8 +241,221 @@ function setMode(next) {
   hideKeys();
   closeSheet();
   fieldShown = undefined;
+  // L'écran et les menus de l'autre mode ne valent plus : la borne renvoie les siens (chargement d'ici là).
+  entries = undefined;
   showScreen(screen);
+  renderEntries();
   syncLayout();
+}
+
+// --- Accès direct : l'écran de la borne et tous les menus -------------------------
+
+/** Vue choisie au menu (gardée d'une visite à l'autre) : l'écran de la borne d'abord. */
+const VIEW_STORE = 'cyberpinball.vue';
+let view = VIEWS[stored(VIEW_STORE)] ? stored(VIEW_STORE) : 'list';
+/** L'écran de la borne et ses entrées (message « entries »), undefined en attendant ; les menus (message « menus »). */
+let entries;
+let menus;
+/** Rubriques ouvertes dans la vue Menus (identifiants), de la racine à celle montrée. */
+let menuPath = [];
+
+function setView(next) {
+  if (!VIEWS[next] || $(`tab-${next}`).disabled) return;
+  view = next;
+  store(VIEW_STORE, next);
+  // Un bouton tenu reste tenu à la borne tant que le doigt n'est pas levé : changer de vue le relâche.
+  releaseButtons();
+  syncLayout();
+  if (next === 'list') scrollToCurrent();
+}
+
+/** Une ligne de liste : icône, libellé (et sa pastille), détail ou raison, pastille rouge, chevron d'une rubrique. */
+function entryRow(item, opts) {
+  const li = document.createElement('li');
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'entry';
+  if (item.quiet) b.classList.add('quiet');
+  if (item.back) b.classList.add('back');
+  if (opts.current) {
+    b.classList.add('current');
+    b.setAttribute('aria-current', 'true');
+  }
+  if (opts.icons) {
+    const mark = document.createElement('span');
+    mark.className = 'entry-icon';
+    if (item.icon) mark.append(cyberIcon(item.icon));
+    b.append(mark);
+  }
+  const text = document.createElement('span');
+  text.className = 'entry-text';
+  const label = document.createElement('span');
+  label.className = 'entry-label';
+  label.textContent = item.label;
+  if (item.badge) {
+    const badge = document.createElement('span');
+    badge.className = 'entry-badge';
+    badge.textContent = item.badge;
+    label.append(' ', badge);
+  }
+  text.append(label);
+  if (item.detail) {
+    const detail = document.createElement('span');
+    detail.className = 'entry-detail';
+    detail.textContent = item.detail;
+    text.append(detail);
+  }
+  b.append(text);
+  if (item.attention) {
+    const dot = document.createElement('span');
+    dot.className = 'entry-dot';
+    dot.setAttribute('aria-label', t('À voir'));
+    b.append(dot);
+  }
+  if (opts.group) b.append(cyberIcon('chevron-right', 'entry-go'));
+  b.addEventListener('click', () => {
+    if (state !== 'paired') return;
+    if (navigator.vibrate) navigator.vibrate(12);
+    opts.run(b);
+  });
+  li.append(b);
+  return li;
+}
+
+/** Message d'une liste vide : chargement, opération en cours, rien à toucher, menus fermés. */
+function showEmpty(prefix, icon, title, text) {
+  const box = $(`${prefix}-empty`);
+  box.hidden = !title;
+  if (!title) return;
+  $(`${prefix}-empty-mark`).replaceChildren(...(icon ? [cyberIcon(icon)] : []));
+  $(`${prefix}-empty-title`).textContent = title;
+  $(`${prefix}-empty-text`).textContent = text ?? '';
+}
+
+/** La vue Écran : les entrées de l'écran ouvert à la borne ; toucher en fait une, comme un clic sur la borne. */
+function renderEntries() {
+  const list = $('entries-list');
+  const e = entries;
+  const note = $('entries-note');
+  note.textContent = e?.note && e.items.length ? e.note : '';
+  note.hidden = !note.textContent;
+  if (!e) {
+    list.replaceChildren();
+    showEmpty('entries', 'refresh', t('Chargement de l’écran…'), t('La borne envoie ce qu’elle affiche.'));
+  } else if (e.kind === 'busy') {
+    list.replaceChildren();
+    showEmpty('entries', 'clock', t('Opération en cours'), e.note || t('La borne travaille ; la liste revient ensuite.'));
+  } else if (!e.items.length) {
+    list.replaceChildren();
+    showEmpty('entries', 'info', t('Rien à toucher sur cet écran'), e.note || t('Utilisez la vue Boutons.'));
+  } else {
+    showEmpty('entries');
+    const icons = e.items.some((i) => i.icon);
+    const v = e.v;
+    list.replaceChildren(
+      ...e.items.map((item, i) =>
+        entryRow(item, {
+          icons,
+          current: i === e.current,
+          run: (b) => {
+            b.classList.add('sent');
+            send({ t: 'pick', v, i });
+          },
+        }),
+      ),
+    );
+    scrollToCurrent();
+  }
+  syncLayout();
+}
+
+/** L'entrée choisie à la borne a changé (flipper) : seulement son repère, la liste ne se redessine pas. */
+function markCurrent() {
+  const rows = $('entries-list').querySelectorAll('.entry');
+  rows.forEach((b, i) => {
+    const on = i === entries?.current;
+    b.classList.toggle('current', on);
+    if (on) b.setAttribute('aria-current', 'true');
+    else b.removeAttribute('aria-current');
+  });
+  scrollToCurrent();
+}
+
+function scrollToCurrent() {
+  if (view !== 'list') return;
+  $('entries-list').querySelector('.entry.current')?.scrollIntoView({ block: 'nearest' });
+}
+
+/** La rubrique montrée dans la vue Menus (les rubriques ouvertes qui n'existent plus sont refermées). */
+function menuLevel() {
+  let nodes = menus?.nodes ?? [];
+  const trail = [];
+  for (const id of menuPath) {
+    const node = nodes.find((n) => n.id === id && n.entries);
+    if (!node) break;
+    trail.push(node);
+    nodes = node.entries;
+  }
+  menuPath = trail.map((n) => n.id);
+  return { nodes, trail };
+}
+
+/** La vue Menus : tous les menus de la borne ; une rubrique s'ouvre ici, une entrée s'ouvre à la borne. */
+function renderMenus() {
+  const { nodes, trail } = menuLevel();
+  const root = !trail.length;
+  $('menus-up').hidden = root;
+  $('menus-trail').textContent = [t('Menus'), ...trail.map((n) => n.label)].join(' › ');
+  const list = $('menus-list');
+  if (!menus) {
+    list.replaceChildren();
+    showEmpty('menus', 'refresh', t('Chargement des menus…'), t('La borne envoie la liste de ses menus.'));
+    return;
+  }
+  // À la racine, le menu des tables d'abord : toujours ouvert, même à l'invité.
+  // Son icône, le plateau : celle des tables est à la rubrique Tables, juste dessous.
+  const shown = root ? [{ id: 'wheel', label: t('Menu des tables'), detail: t('La roue des tables, pour choisir et jouer'), icon: 'playfield' }, ...nodes] : nodes;
+  const icons = shown.some((n) => n.icon);
+  list.replaceChildren(
+    ...shown.map((node) =>
+      entryRow(node, {
+        icons,
+        group: Boolean(node.entries),
+        run: () => {
+          if (node.entries) {
+            menuPath = [...trail.map((n) => n.id), node.id];
+            renderMenus();
+            $('menus-list').scrollTop = 0;
+            return;
+          }
+          send({ t: 'open', id: node.id });
+          // Ce qui s'ouvre se voit dans la vue Écran.
+          setView('list');
+        },
+      }),
+    ),
+  );
+  if (menus.locked) showEmpty('menus', 'lock', t('Menu système verrouillé'), menus.locked);
+  else if (!shown.length) showEmpty('menus', 'info', t('Rien dans cette rubrique sur cette borne'));
+  else showEmpty('menus');
+}
+
+$('menus-up').addEventListener('click', () => {
+  menuPath = menuPath.slice(0, -1);
+  renderMenus();
+});
+$('game-open').addEventListener('click', () => send({ t: 'open', id: 'in-game' }));
+
+/** Pendant une partie : les réglages en partie à ouvrir, ou pourquoi ils ne s'ouvrent pas. */
+function renderGame() {
+  const can = entries?.inGame;
+  const open = $('game-open');
+  open.hidden = can === undefined;
+  open.disabled = can !== true;
+  open.classList.toggle('primary', can === true);
+  open.replaceChildren(cyberIcon('sliders'), document.createTextNode(t('Ouvrir les réglages en partie')));
+  $('game-reason').hidden = typeof can !== 'string';
+  $('game-reason').textContent = typeof can === 'string' ? can : '';
 }
 
 function showScreen(sc) {
@@ -379,6 +620,28 @@ function handle(m) {
       break;
     case 'screen':
       showScreen(m);
+      break;
+    case 'entries':
+      entries = {
+        v: Number(m.v),
+        kind: String(m.kind ?? 'none'),
+        items: Array.isArray(m.items) ? m.items : [],
+        current: Number.isInteger(m.current) ? m.current : -1,
+        note: typeof m.note === 'string' ? m.note : '',
+        inGame: m.inGame === true || typeof m.inGame === 'string' ? m.inGame : undefined,
+      };
+      renderEntries();
+      renderGame();
+      break;
+    case 'cursor':
+      if (entries && m.v === entries.v && Number.isInteger(m.current)) {
+        entries.current = m.current;
+        markCurrent();
+      }
+      break;
+    case 'menus':
+      menus = { nodes: Array.isArray(m.nodes) ? m.nodes : [], locked: typeof m.locked === 'string' ? m.locked : '' };
+      renderMenus();
       break;
     case 'up-ready':
       uploadReady(m);
@@ -615,7 +878,18 @@ function syncLayout() {
   const visible = window.visualViewport?.height ?? window.innerHeight;
   body.dataset.layout = typing && mode === 'menu' && visible < 680 ? 'editing' : 'normal';
   body.dataset.short = String(visible < 440);
+  body.dataset.compact = String(visible < 640);
   body.dataset.held = String(held.size > 0);
+  // Pendant une partie, les vues n'ont de sens qu'avec les réglages en partie ouverts (sans Menus : après la partie).
+  const ingame = mode === 'game' && entries?.kind === 'ingame';
+  body.dataset.ingame = String(ingame);
+  const menusOff = mode === 'game';
+  const tabMenus = $('tab-menus');
+  tabMenus.disabled = menusOff;
+  tabMenus.querySelector('.view-reason').textContent = menusOff ? t('Après la partie') : '';
+  const shownView = menusOff && view === 'menus' ? 'list' : view;
+  body.dataset.view = shownView;
+  for (const v of Object.keys(VIEWS)) $(`tab-${v}`).setAttribute('aria-selected', String(v === shownView));
   // Clavier à l'écran de la borne ouvert : Start y tape la touche choisie, Valider (téléphone) envoie Entrée.
   const startWhat = document.querySelector('.btn[data-b="confirm"] .btn-what');
   if (startWhat) startWhat.textContent = mode === 'menu' && fieldShown ? t('Touche choisie') : t('Valider');
@@ -719,7 +993,8 @@ const held = new Map();
 const FAST_MS = 400;
 
 function buttonDown(b, el) {
-  if (held.has(b) || state !== 'paired' || mode !== 'menu') return;
+  // Au menu ; pendant une partie, seulement les réglages en partie ouverts (VPX a les boutons sinon).
+  if (held.has(b) || state !== 'paired' || !(mode === 'menu' || (mode === 'game' && entries?.kind === 'ingame'))) return;
   const what = el.querySelector('.btn-what');
   const fast = b === 'previous' || b === 'next' ? setTimeout(() => held.has(b) && (what.textContent = t('Défilement rapide')), FAST_MS) : undefined;
   held.set(b, { el, fast });
@@ -1063,6 +1338,17 @@ if (demo) {
   // Démonstration hors écran : un état figé, sans borne.
   if (demo.mode) setMode(demo.mode);
   if (demo.screen) showScreen(demo.screen);
+  if (demo.view) view = demo.view;
+  if (demo.entries) {
+    entries = { v: 1, kind: 'screen', current: -1, ...demo.entries };
+    renderEntries();
+    renderGame();
+  }
+  if (demo.menus) {
+    menus = demo.menus;
+    menuPath = demo.menuPath ?? [];
+    renderMenus();
+  }
   if (demo.page) showPage(demo.page);
   actions = demo.actions ?? [];
   search = demo.search;
@@ -1090,6 +1376,8 @@ if (demo) {
     pad.style.setProperty('--touch-y', `${demo.touch.y}px`);
   }
 } else {
+  renderEntries();
+  renderMenus();
   key = readFragment();
   if (!key) setState('invalid');
   else {

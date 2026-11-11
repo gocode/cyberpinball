@@ -52,6 +52,8 @@ export const REMOTE_KEY_BYTES = 32;
 export const REMOTE_CHALLENGE_BYTES = 16;
 /** Plus long texte qu'un message de saisie apporte (une phrase, un mot de passe collé). */
 export const REMOTE_TEXT_MAX = 512;
+/** Au plus, entrées d'un écran envoyées au téléphone (« Toutes les tables » d'une grande bibliothèque comprise). */
+export const REMOTE_ENTRIES_MAX = 1500;
 /** Au menu, sans geste du téléphone pendant ce délai (hors partie), la liaison se coupe. */
 export const REMOTE_IDLE_MS = 20 * 60_000;
 /**
@@ -392,6 +394,13 @@ export type PhoneMessage =
   /** Envoi d'un fichier : son nom (nettoyé à la borne) et sa taille ; puis les morceaux en HTTP. */
   | { t: 'up'; s: number; name: string; size: number }
   | { t: 'up-cancel'; s: number }
+  /**
+   * Au menu : l'entrée `i` de l'écran envoyé sous la version `v` (message « entries », remote-menus.ts).
+   * Deux nombres, jamais un libellé ni un chemin : la borne retrouve l'entrée, et l'ignore si l'écran a changé.
+   */
+  | { t: 'pick'; s: number; v: number; i: number }
+  /** Au menu : ouvrir directement un menu par son identifiant (remoteMenuTarget), vérifié par la borne. */
+  | { t: 'open'; s: number; id: string }
   | { t: 'ping'; s: number }
   | { t: 'bye'; s: number };
 
@@ -440,6 +449,10 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       return typeof m.name === 'string' && m.name.length <= 1024 && typeof m.size === 'number' && Number.isSafeInteger(m.size) && m.size >= 0 ? { t: 'up', s, name: m.name, size: m.size } : undefined;
     case 'up-cancel':
       return { t: 'up-cancel', s };
+    case 'pick':
+      return typeof m.v === 'number' && Number.isSafeInteger(m.v) && m.v >= 0 && typeof m.i === 'number' && Number.isInteger(m.i) && m.i >= 0 && m.i < REMOTE_ENTRIES_MAX ? { t: 'pick', s, v: m.v, i: m.i } : undefined;
+    case 'open':
+      return typeof m.id === 'string' && /^[a-z0-9-]{1,40}$/.test(m.id) ? { t: 'open', s, id: m.id } : undefined;
     case 'ping':
       return { t: 'ping', s };
     case 'bye':

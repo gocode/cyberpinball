@@ -210,6 +210,7 @@ Chacune des étapes ci-dessous est une action de `lanceur.cmd` (rubrique « Fabr
 - Le réseau des bornes repose sur Hyperswarm, HyperDHT, Protomux et secret-stream, de Holepunch, ainsi que sur sodium-native et udx-native (licences MIT et Apache-2.0).
 - Le QR code de la télécommande du téléphone est dessiné par qrcode-generator, de Kazuhiko Arase (licence MIT) ; « QR Code » est une marque déposée de DENSO WAVE INCORPORATED.
 - Pour comparer le nombre de billes par partie des tables à ROM, Cyber Pinball lit les cartes mémoire de PinMAME du projet [Pinball Memory Maps](https://github.com/tomlogic/pinball-memory-maps), téléchargées à la demande : ce programme utilise du contenu du projet Pinball Memory Maps, mis à disposition sous licence Open Database License (ODbL v1.0).
+- Les drapeaux des pays viennent de flag-icons, de Panayiotis Lipiridis (licence MIT) ; sa licence se trouve à côté d'eux, dans `app/renderer/drapeaux`.
 - Les polices (Audiowide, Bebas Neue, Orbitron, Saira) sont sous licence SIL Open Font License ; leurs licences se trouvent à côté d'elles, dans `app/renderer/polices`.
 - Cyber Pinball ne télécharge ni tables ni ROM à votre place. Les tables proviennent des sites de leurs auteurs, et les fabricants de flippers n'autorisent pas la diffusion de leurs ROM.
 

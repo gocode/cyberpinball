@@ -5,7 +5,7 @@
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec un tableau d'essai.
 
-import { formatNumber, language, RANKING_SCOPES, SCORE_PERIODS, t, tn, type AvatarView, type BoardLine, type RankingScope, type ScorePeriod } from '@cyberpinball/core';
+import { countryName, flagSrc, formatNumber, language, RANKING_SCOPES, SCORE_PERIODS, t, tn, type AvatarView, type BoardLine, type RankingScope, type ScorePeriod } from '@cyberpinball/core';
 import type { PlayerStatus, RankingView, RankingViewLine } from './table-rankings';
 import type { TableBoard } from './table-scores';
 
@@ -33,8 +33,11 @@ export interface ScoreboardLineView {
   when: string;
   /** La première place. */
   first?: boolean;
-  /** Pays du joueur (classements en réseau), en deux lettres. */
+  /** Pays du joueur (classements en réseau), en deux lettres ; `countryName` le nomme (bulle, lecteur d'écran). */
   country?: string;
+  countryName?: string;
+  /** Son drapeau (app/renderer/drapeaux) ; absent pour un code inconnu, montré alors dans le même cadre. */
+  flag?: string;
   /** Hors des premières lignes : séparée du tableau par un filet. */
   apart?: boolean;
   /** Classements en réseau : la pastille du joueur (avatar ou initiales). */
@@ -127,6 +130,12 @@ export function scopeTabs(scope: RankingScope): NonNullable<ScoreboardView['scop
   return RANKING_SCOPES.map((s, i) => ({ scope: s, label: scopeLabel(s), current: s === scope, action: SCORE_PERIODS.length + i }));
 }
 
+/** Le pays d'une ligne : code, nom et drapeau. */
+function countryOf(code: string): Pick<ScoreboardLineView, 'country' | 'countryName' | 'flag'> {
+  const flag = flagSrc(code);
+  return { country: code, countryName: countryName(code, locale()), ...(flag ? { flag } : {}) };
+}
+
 function rankingLineView(line: RankingViewLine, now: Date, apart: boolean): ScoreboardLineView {
   return {
     rank: line.beyond ? `${line.beyond}+` : String(line.rank),
@@ -135,7 +144,7 @@ function rankingLineView(line: RankingViewLine, now: Date, apart: boolean): Scor
     score: formatNumber(line.score),
     when: whenLabel({ at: line.at }, now),
     ...(line.rank === 1 ? { first: true } : {}),
-    ...(line.country ? { country: line.country } : {}),
+    ...(line.country ? countryOf(line.country) : {}),
     ...(line.mine ? { mine: true } : {}),
     avatar: line.face,
     ...(line.status ? { status: line.status } : {}),

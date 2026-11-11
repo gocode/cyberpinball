@@ -158,6 +158,53 @@ body.mouse .lib-back:hover {
   align-self: center;
 }
 
+/*
+ * Drapeau d'un pays (app/renderer/drapeaux) : un cadre 4:3 de taille fixe, coins à peine
+ * arrondis, filet clair pour qu'un drapeau sombre ou blanc se détache du fond. Sans image, le
+ * code du pays prend le même cadre.
+ */
+.flag {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: 0.28cqmin;
+  box-shadow: 0 0 0 0.093cqmin var(--line-strong);
+  background: var(--surface-raised);
+  line-height: 1;
+}
+
+.flag > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.flag.code {
+  font-size: 1.9cqmin;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--meta);
+}
+
+.lib-row-flag {
+  align-self: center;
+  width: 3.2cqmin;
+  height: 2.4cqmin;
+}
+
+.lib-row-flag.none {
+  visibility: hidden;
+}
+
+.lib-row-flag + .lib-row-text {
+  min-width: 0;
+  max-width: calc(100% - 4.2cqmin);
+}
+
 .lib-sub {
   margin-top: 1cqmin;
   font-size: 3.2cqmin;
@@ -695,6 +742,13 @@ body.mouse .lib-zone-tag:hover {
 
 .lib-action-icon {
   font-size: 2.78cqmin;
+}
+
+/* Le choix du pays : le drapeau occupe la case de l'icône, centré sur elle (4:3 dans 2,78 cqmin). */
+.lib-action-flag {
+  width: 2.78cqmin;
+  height: 2.085cqmin;
+  margin-top: 0.35cqmin;
 }
 
 .lib-action.tone-error:not(.current) {
@@ -2542,18 +2596,40 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   border-color: var(--halo);
 }
 
+/*
+ * Le tableau : une grille dont chaque ligne est une sous-grille. Rang, drapeau, pastille, nom,
+ * score et date tombent dans les mêmes colonnes sur toutes les lignes, quelles que soient leurs
+ * largeurs : rien ne se décale. Le drapeau et la pastille n'ont de colonne que si une ligne au
+ * moins en a (with-flags, with-avatars). Le rang prend la largeur du plus long (« 100+ »). Le rang porte 1 cqmin de marge à droite, score et date
+ * 1 cqmin à gauche : 2,2 cqmin entre les blocs, 1,2 cqmin entre drapeau, pastille et nom.
+ */
 .lib-scoreboard .scoreboard-lines {
   display: grid;
+  grid-template-columns: minmax(5.4cqmin, max-content) minmax(9cqmin, 1.6fr) max-content minmax(0, 0.9fr);
+  column-gap: 1.2cqmin;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+.lib-scoreboard .scoreboard-lines.with-flags {
+  grid-template-columns: minmax(5.4cqmin, max-content) 3.2cqmin minmax(9cqmin, 1.6fr) max-content minmax(0, 0.9fr);
+}
+
+.lib-scoreboard .scoreboard-lines.with-avatars {
+  grid-template-columns: minmax(5.4cqmin, max-content) 2.8cqmin minmax(9cqmin, 1.6fr) max-content minmax(0, 0.9fr);
+}
+
+.lib-scoreboard .scoreboard-lines.with-flags.with-avatars {
+  grid-template-columns: minmax(5.4cqmin, max-content) 3.2cqmin 2.8cqmin minmax(9cqmin, 1.6fr) max-content minmax(0, 0.9fr);
+}
+
+/* Le texte sur une même ligne de base ; drapeau et pastille centrés sur la ligne. */
 .lib-scoreboard .scoreboard-line {
   display: grid;
-  grid-template-columns: 4.4cqmin minmax(9cqmin, 1.6fr) max-content minmax(0, 0.9fr);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: baseline;
-  column-gap: 2.2cqmin;
   min-width: 0;
   /* Dix lignes tiennent sous les onglets en paysage 16:9 : les flippers changent de période, rien ne défile. */
   padding: 0.45cqmin 1.6cqmin;
@@ -2569,6 +2645,8 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 }
 
 .lib-scoreboard .scoreboard-rank {
+  padding-right: 1cqmin;
+  white-space: nowrap;
   text-align: right;
   font-weight: 600;
   color: var(--ink-muted);
@@ -2588,47 +2666,35 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   overflow-wrap: anywhere;
 }
 
-.lib-scoreboard .scoreboard-country {
-  flex: none;
-  /* Largeur fixe : la pastille et le nom commencent au même endroit sur chaque ligne (« FI » comme « US »). */
-  box-sizing: border-box;
-  min-width: 4.4cqmin;
-  text-align: center;
-  padding: 0.1cqmin 0.6cqmin;
-  border: 0.093cqmin solid var(--line-strong);
-  border-radius: 0.4cqmin;
-  font-size: 1.9cqmin;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--meta);
+/* Drapeau en 4:3, pas plus haut que le texte de la ligne. */
+.lib-scoreboard .scoreboard-flag {
+  align-self: center;
+  width: 3.2cqmin;
+  height: 2.4cqmin;
 }
 
-/*
- * Classements en réseau : la pastille du joueur, à la hauteur d'une ligne. En ligne ou en partie :
- * l'anneau vert de « Mes amis » ; sinon rien autour. Le statut suit le nom, plus petit, et s'efface
- * (points de suspension) avant de pousser le score.
- */
-/* Alignées sur la ligne de base, la pastille et le texte grandiraient la ligne : centrées. */
-.lib-scoreboard .scoreboard-line:has(.scoreboard-avatar),
-.lib-scoreboard .scoreboard-name:has(.scoreboard-avatar) {
-  align-items: center;
-}
-
+/* Classements en réseau : la pastille du joueur, à la hauteur d'une ligne (2,35 × 1,2). */
 .lib-scoreboard .scoreboard-avatar {
-  flex: none;
-  /* Pas plus haute que le texte de la ligne (2,35 × 1,2) : les neuf lignes, ma place et la note tiennent. */
+  align-self: center;
   width: 2.8cqmin;
   height: 2.8cqmin;
-  margin-block: -0.1cqmin;
   font-size: 1.9cqmin;
   letter-spacing: 0;
 }
 
+/* Sans pays ou sans pastille : la case reste, vide. */
+.lib-scoreboard .scoreboard-flag.none,
+.lib-scoreboard .scoreboard-avatar.none {
+  visibility: hidden;
+}
+
+/* En ligne ou en partie : l'anneau vert de « Mes amis » ; sinon rien autour. */
 .lib-scoreboard .scoreboard-avatar.status-online,
 .lib-scoreboard .scoreboard-avatar.status-playing {
   box-shadow: 0 0 0 0.25cqmin var(--ok);
 }
 
+/* Le statut suit le nom, plus petit, et s'efface (points de suspension) avant de pousser le score. */
 .lib-scoreboard .scoreboard-status {
   flex: 0 1 auto;
   min-width: 0;
@@ -2647,11 +2713,6 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   color: var(--ok);
 }
 
-/* Joueur sans pays déclaré : la place de la pastille de pays, vide, garde l'alignement. */
-.lib-scoreboard .scoreboard-country.none {
-  visibility: hidden;
-}
-
 /* La ligne du joueur de cette borne : un aplat discret, jamais le vert du choix courant. */
 .lib-scoreboard .scoreboard-line.mine {
   background: color-mix(in oklab, var(--table-tint) 14%, transparent);
@@ -2664,6 +2725,7 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 }
 
 .lib-scoreboard .scoreboard-score {
+  padding-left: 1cqmin;
   text-align: right;
   font-weight: 600;
   white-space: nowrap;
@@ -2676,6 +2738,7 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 
 .lib-scoreboard .scoreboard-when {
   min-width: 0;
+  padding-left: 1cqmin;
   text-align: right;
   font-size: 2.04cqmin;
   color: var(--ink-muted);

@@ -13,6 +13,7 @@ import {
   avatarView,
   countryCodes,
   countryName,
+  flagView,
   locale,
   BADGES,
   DOWNLOAD_RATE_CHOICES,
@@ -728,7 +729,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const code = net.country();
     const chosen = net.state().country;
     if (!code) return { text: t('Pays : pas choisi'), detail: t('Vous n’apparaissez qu’au classement mondial ; « Choisir mon pays… »'), tone: 'warning', badges: [t('À choisir')], icon: 'globe' };
-    return { text: t('Pays : {country}', { country: countryName(code, locale()) }), detail: chosen ? t('Choisi par vous') : t('D’après la région de Windows'), tone: 'ok', icon: 'globe' };
+    return { text: t('Pays : {country}', { country: countryName(code, locale()) }), detail: chosen ? t('Choisi par vous') : t('D’après la région de Windows'), tone: 'ok', icon: 'globe', flag: flagView(code, locale()) };
   }
 
   /** Choisir le pays : celui de Windows d'abord, puis tous, par ordre alphabétique. */
@@ -750,7 +751,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         sections: [],
         actions: [
           { label: t('D’après la région de Windows'), detail: t('Le pays réglé dans Windows, s’il se lit'), icon: 'refresh', key: 'windows', run: () => choose(undefined) },
-          ...codes.map((code) => ({ label: countryName(code, locale()), detail: code === current ? t('choix actuel') : undefined, tone: code === current ? ('ok' as const) : undefined, key: `country-${code}`, run: () => choose(code) })),
+          ...codes.map((code) => ({ label: countryName(code, locale()), flag: flagView(code, locale()), detail: code === current ? t('choix actuel') : undefined, tone: code === current ? ('ok' as const) : undefined, key: `country-${code}`, run: () => choose(code) })),
           backAction(done),
         ],
         back: done,

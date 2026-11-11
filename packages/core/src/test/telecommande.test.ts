@@ -126,6 +126,52 @@ ${run.stderr}`;
   }
 });
 
+test('accès direct aux menus depuis le téléphone : l’écran de la borne à toucher, tous les menus, la roue, le mode invité, une partie, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 240_000 }, () => {
+  // interne/demos/demo-telephone-menus.cjs : la vraie gestion des tables hors écran, la vraie page du
+  // téléphone ; la vue Écran (entrées touchées, repère qui suit les flippers), la vue Menus (une
+  // rubrique sur le téléphone, une entrée ouverte à la borne), les refus (rang dépassé, menu inconnu,
+  // chemin), la roue, le mode invité, une opération en cours, une partie et ses réglages, les petits
+  // écrans, la borne coupée.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-telephone-menus-'));
+  try {
+    const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CP_TELECOMMANDE_OUT: dir, CP_TELECOMMANDE_CAPTURES: '0', CYBERPINBALL_LANGUE: 'fr' };
+    delete env.ELECTRON_RUN_AS_NODE;
+    delete env.CYBERPINBALL_A_L_ECRAN;
+    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telephone-menus.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 220_000, cwd: REPO_ROOT });
+    const result = fs.existsSync(path.join(dir, 'resultat.txt')) ? fs.readFileSync(path.join(dir, 'resultat.txt'), 'utf8') : `${run.stdout}\n${run.stderr}`;
+    assert.equal(run.status, 0, result);
+    assert.doesNotMatch(result, /ÉCHEC/, result);
+    assert.ok((result.match(/^OK /gm) ?? []).length >= 45, result);
+    for (const step of [
+      'la vue Écran montre les entrées de l’écran de la borne, dans son ordre',
+      'le choix courant de la borne est marqué sur le téléphone',
+      'toucher une entrée fait ce que fait un clic à la borne',
+      'un flipper à la borne déplace le repère du téléphone',
+      'Menus reprend exactement les entrées du menu système de la borne',
+      'la borne ne bouge pas quand on parcourt les rubriques',
+      'Menus : une entrée s’ouvre directement à la borne',
+      'un rang d’un écran dépassé est ignoré',
+      'un chemin à la place d’un identifiant : refusé',
+      'toucher une table la choisit sur la roue',
+      'la toucher encore fait Start',
+      'mode invité : les menus sont verrouillés, avec la raison',
+      'mode invité : le téléphone n’ouvre pas le menu système',
+      'opération en cours : la liste le dit',
+      'partie : les réglages en partie s’ouvrent du téléphone',
+      'Menus grisé pendant la partie, avec sa raison',
+      'les boutons du téléphone pilotent les réglages en partie',
+      'mode invité : réglages en partie grisés, avec la raison',
+      'petit Android (320 × 568) : rien ne déborde',
+      'borne coupée : la page le dit',
+      'aucune clé au journal',
+      'garde-fou de mise en page',
+    ])
+      assert.match(result, new RegExp(`OK +${step.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), step);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
+});
+
 test('réseau : seuls social-net.ts et phone-remote.ts écoutent ; la télécommande, seulement sur le réseau local réel', () => {
   const src = path.join(REPO_ROOT, 'app', 'src');
   const listeners = fs

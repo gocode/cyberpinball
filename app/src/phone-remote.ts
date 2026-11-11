@@ -39,6 +39,12 @@
 // grisé avec la raison. Pendant un essai (réseau simulé ou coupé) :
 // 127.0.0.1 seulement. Sans QR affiché ni téléphone, tout s'arrête : écoute, liaison, clés.
 //
+// Accès direct (11/11/2026, remote-menus.ts) : au menu, le téléphone reçoit l'écran affiché et ses
+// entrées (« entries », puis « cursor » quand seul le choix bouge) et tous les menus rangés comme le
+// menu système (« menus »). Il renvoie le rang d'une entrée et la version de l'écran (« pick »), ou
+// l'identifiant d'un menu (« open ») : le menu (frontend.ts) vérifie tout, portes du mode invité
+// comprises. Pendant une partie, seulement les réglages en partie.
+//
 // Téléphone gardé (10/11/2026) : accepté une fois, il revient sans QR ni acceptation (remote-kept.ts).
 // Tant que la borne en garde un, elle écoute en continu, au menu comme en partie, sur REMOTE_PORT
 // (fixe : le téléphone range sa clé par adresse et port), mais ne répond qu'à ses clés : un téléphone
@@ -73,6 +79,7 @@ import {
   openRemote,
   parsePhoneMessage,
   pickLanAddress,
+  remoteEntries,
   readRemoteField,
   REMOTE_CHALLENGE_BYTES,
   REMOTE_FOCUS_PROBE,
@@ -92,6 +99,9 @@ import {
   type PhoneMessage,
   type RemoteField,
   type RemoteButton,
+  type RemoteEntries,
+  type RemoteEntry,
+  type RemoteMenus,
   type RemoteNav,
   type RemotePairing,
   type WebSocketLink,
@@ -142,6 +152,12 @@ export interface MenuField {
   value: string;
 }
 
+/** Une entrée de l'écran montré au téléphone, et ce qu'elle fait quand on la touche (absent : rien). */
+export type MenuEntry = RemoteEntry & { pick?: () => void };
+
+/** L'écran montré au téléphone (remote-menus.ts), ses entrées avec ce qu'elles font. */
+export type MenuEntries = Omit<RemoteEntries, 'items'> & { items: MenuEntry[] };
+
 /** Ce que le menu donne à la télécommande (frontend.ts) : ce qu'il montre, ses boutons, son clavier, le dossier d'import. */
 export interface MenuTarget {
   /** Le menu, ou une partie (VPX a les boutons). */
@@ -162,6 +178,15 @@ export interface MenuTarget {
   uploaded(name: string): void;
   /** Le bloc de la télécommande a changé (QR renouvelé, téléphone à accepter) : redessiner le menu. */
   changed(): void;
+  /**
+   * Accès direct (remote-menus.ts) : l'écran affiché et ses entrées, à toucher au téléphone ; au menu
+   * comme pendant une partie (réglages en partie). Sans lui, le téléphone n'a que les boutons.
+   */
+  entries?(): MenuEntries;
+  /** Tous les menus, rangés comme le menu système (remoteMenuTree), ou pourquoi ils sont fermés. */
+  menus?(): RemoteMenus;
+  /** Ouvrir un menu par son identifiant (remoteMenuTarget) : la borne vérifie tout, et ne fait rien d'un identifiant inconnu ou fermé. */
+  open?(id: string): void;
 }
 
 /** Ce que la fenêtre « Récupérer » donne à la télécommande pendant qu'elle est ouverte. */
@@ -254,6 +279,8 @@ const FIELD_POLL_MS = 700;
 const MENU_MS = 1500;
 /** Où vont les gestes : la page du site, ou le bandeau au-dessus d'elle. */
 type Zone = 'page' | 'bar';
+/** L'arbre des menus est relu au plus à ce rythme (sauf à la liaison et au changement de mode). */
+const MENUS_MS = 1500;
 /** Flipper tenu au téléphone : après ce délai, l'appui se répète (le menu accélère comme sous un vrai bouton). */
 const HOLD_DELAY_MS = 400;
 const HOLD_REPEAT_MS = 70;
@@ -345,6 +372,20 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   /** Dernier mode, écran et champ envoyés au téléphone. */
   let modeSent: RemoteMode | undefined;
   let screenSent = '';
+  /**
+   * Écran envoyé au téléphone (message « entries ») : son contenu, sa version, ce que fait chaque
+   * entrée. Le téléphone renvoie la version et le rang (« pick ») : un rang d'un écran dépassé est ignoré.
+   */
+  let entriesSent = '';
+  let entriesVersion = 0;
+  let entriesPicks: ((() => void) | undefined)[] = [];
+  let cursorSent = -2;
+  /** Pendant une partie, les boutons du téléphone pilotent les réglages en partie ouverts. */
+  let gameButtons = false;
+  /** Arbre des menus envoyé, et quand : relu au plus toutes les MENUS_MS (ses détails comptent tables et téléchargements). */
+  let menusSent = '';
+  let menusAt = 0;
+  let menusTimer: NodeJS.Timeout | undefined;
   /** Dernier geste du téléphone (hors ping) : au menu, sans geste pendant REMOTE_IDLE_MS, la liaison se coupe. */
   let lastActivity = Date.now();
   /** Boutons de la borne tenus au téléphone : la répétition, et l'arrêt de sûreté. */
@@ -567,6 +608,9 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       pageSent = '';
       fieldSent = 'null';
       screenSent = '';
+      entriesSent = '';
+      cursorSent = -2;
+      menusSent = '';
       sendTo(active, { t: 'mode', mode: m });
       force = true;
     }
@@ -578,6 +622,72 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     }
     pushScreen(force);
     pushMenuField(force);
+    pushEntries(force);
+    pushMenus(force);
+  }
+
+  /**
+   * L'écran affiché et ses entrées (accès direct) : tout l'écran quand son contenu change (nouvelle
+   * version), seulement l'entrée choisie quand elle seule bouge (un flipper sur une longue liste).
+   */
+  function pushEntries(force = false): void {
+    if (!active || !menu?.entries || pairing?.session() !== 'paired') return;
+    let e: MenuEntries;
+    try {
+      e = menu.entries();
+    } catch (error) {
+      journalIncident('Télécommande : écran du menu illisible pour le téléphone', error); // i18n-ignore : journal
+      return;
+    }
+    gameButtons = mode() === 'game' && e.kind === 'ingame' && Boolean(e.buttons);
+    // Une entrée sans geste part grisée : le téléphone ne propose rien que la borne ne ferait pas.
+    const shown = remoteEntries({ ...e, items: e.items.map(({ pick, ...rest }) => (pick ? rest : { ...rest, quiet: true })) });
+    const { current, ...content } = shown;
+    const text = JSON.stringify(content);
+    if (force || text !== entriesSent) {
+      entriesSent = text;
+      entriesVersion++;
+      entriesPicks = e.items.slice(0, shown.items.length).map((i) => i.pick);
+      cursorSent = current;
+      sendTo(active, { t: 'entries', v: entriesVersion, ...shown });
+      return;
+    }
+    if (current === cursorSent) return;
+    cursorSent = current;
+    sendTo(active, { t: 'cursor', v: entriesVersion, current });
+  }
+
+  /**
+   * Tous les menus de la borne (remoteMenuTree) : relus au plus toutes les MENUS_MS, envoyés quand ils
+   * changent. Un changement venu entre-temps (mode invité activé…) part à la fin du délai, jamais perdu.
+   */
+  function pushMenus(force = false): void {
+    if (!active || !menu?.menus || pairing?.session() !== 'paired') return;
+    const now = Date.now();
+    if (!force && now - menusAt < MENUS_MS) {
+      if (!menusTimer) {
+        menusTimer = setTimeout(() => {
+          menusTimer = undefined;
+          pushMenus();
+        }, MENUS_MS - (now - menusAt));
+        menusTimer.unref?.();
+      }
+      return;
+    }
+    clearTimeout(menusTimer);
+    menusTimer = undefined;
+    menusAt = now;
+    let menus: RemoteMenus;
+    try {
+      menus = menu.menus();
+    } catch (error) {
+      journalIncident('Télécommande : arbre des menus illisible pour le téléphone', error); // i18n-ignore : journal
+      return;
+    }
+    const text = JSON.stringify(menus);
+    if (!force && text === menusSent) return;
+    menusSent = text;
+    sendTo(active, { t: 'menus', ...menus });
   }
 
   function pushScreen(force = false): void {
@@ -874,12 +984,33 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     }
   }
 
-  /** Au menu : les boutons, le clavier à l'écran, l'envoi. Les gestes du navigateur arrivés en retard sont ignorés. */
+  /** Les boutons du téléphone pilotent-ils la borne : au menu, ou les réglages en partie ouverts pendant une partie. */
+  function buttonsLive(): boolean {
+    return mode() === 'menu' || (mode() === 'game' && gameButtons);
+  }
+
+  /** Au menu : les boutons, le clavier à l'écran, l'envoi, l'accès direct. Les gestes du navigateur arrivés en retard sont ignorés. */
   function injectMenu(message: PhoneMessage): void {
     if (!menu) return;
     switch (message.t) {
       case 'btn':
-        if (mode() === 'menu') button(message.b, message.down);
+        if (buttonsLive()) button(message.b, message.down);
+        return;
+      case 'pick': {
+        // Une entrée de l'écran que le téléphone a reçu ; l'écran a changé depuis : rien (le nouveau est déjà parti).
+        if (message.v !== entriesVersion) return;
+        const pick = entriesPicks[message.i];
+        if (!pick) return;
+        releaseButtons();
+        pick();
+        return;
+      }
+      case 'open':
+        // L'identifiant est vérifié par le menu (remoteMenuTarget, mode invité) ; jamais pendant « Récupérer ».
+        if (mode() === 'browser') return;
+        log(`Télécommande : menu « ${message.id} » demandé depuis le téléphone.`); // i18n-ignore : journal
+        releaseButtons();
+        menu.open?.(message.id);
         return;
       case 'set':
         // Le clavier à l'écran n'a qu'une ligne : un saut de ligne (permis pour une zone de texte d'une page) y devient une espace.
@@ -942,7 +1073,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     const entry = { timer: undefined as unknown as NodeJS.Timeout, until: Date.now() + HOLD_MAX_MS };
     const again = () => {
       if (holds.get(b) !== entry) return;
-      if (Date.now() > entry.until || mode() !== 'menu') return button(b, false);
+      if (Date.now() > entry.until || !buttonsLive()) return button(b, false);
       if (repeats) menu?.button(b, true, true);
       entry.timer = setTimeout(again, repeats ? HOLD_REPEAT_MS : 1000);
     };
@@ -1216,6 +1347,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     if (target) void probeField();
     // L'écran du menu part à chaque redessin (menuChanged) : ici, seulement un changement de mode.
     if (mode() !== modeSent) pushState();
+    // Pendant une partie, rien ne redessine le menu : les réglages en partie (ouverts ou non) sont relus ici.
+    else if (mode() === 'game') pushEntries();
     const now = Date.now();
     if (mode() !== 'menu') lastActivity = now;
     else if (active && pairing?.session() === 'paired' && now - lastActivity > (opts.idleMs ?? REMOTE_IDLE_MS)) {
@@ -1254,6 +1387,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     releaseButtons();
     clearInterval(ticker);
     ticker = undefined;
+    clearTimeout(menusTimer);
+    menusTimer = undefined;
     closeServer();
     pairing = undefined;
     unavailable = undefined;

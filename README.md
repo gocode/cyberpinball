@@ -210,6 +210,7 @@ Every step below is an action of `lanceur.cmd` (section "Fabrication et publicat
 - The cabinet network uses Holepunch's Hyperswarm, HyperDHT, Protomux and secret-stream, with sodium-native and udx-native (MIT and Apache-2.0 licences).
 - The phone remote's QR code is drawn with Kazuhiko Arase's qrcode-generator (MIT licence); "QR Code" is a registered trademark of DENSO WAVE INCORPORATED.
 - To compare the number of balls per game of ROM tables, Cyber Pinball reads PinMAME memory maps from the [Pinball Memory Maps](https://github.com/tomlogic/pinball-memory-maps) project, downloaded on demand: this program makes use of content from the Pinball Memory Maps project, made available under the Open Database License (ODbL v1.0).
+- Country flags come from Panayiotis Lipiridis's flag-icons (MIT licence); its licence sits next to them in `app/renderer/drapeaux`.
 - Fonts (Audiowide, Bebas Neue, Orbitron, Saira) are under the SIL Open Font License; their licence files sit next to them in `app/renderer/polices`.
 - Cyber Pinball does not download tables or ROMs for you. Tables come from their authors' sites, and pinball manufacturers do not allow their ROMs to be shared.
 

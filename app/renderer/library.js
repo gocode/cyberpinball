@@ -107,6 +107,8 @@ function renderLibrary(v) {
       const box = libEl('section', `lib-section${section.kind ? ` kind-${section.kind}` : ''}${section.options ? ' options' : ''}`);
       if (section.title) box.append(libEl('h2', '', section.title));
       const list = libEl('ul', 'lib-rows');
+      // Dès qu'une ligne a un drapeau, les autres gardent sa case, vide : les textes partent tous du même bord.
+      const flagged = section.rows.some((r) => r.flag);
       for (const row of section.rows) {
         const li = libEl('li', `lib-row tone-${row.tone ?? 'none'}${row.current ? ' current' : ''}`);
         if (row.action !== undefined) {
@@ -116,7 +118,10 @@ function renderLibrary(v) {
         }
         const line = libEl('div', 'lib-row-line');
         // Pastille d'un joueur (son avatar, sinon ses initiales) : à gauche de tout le bloc, à la place de l'icône.
-        if (row.icon && !row.avatar) line.append(cyberIcon(row.icon, 'lib-row-icon'));
+        // Un pays : son drapeau à la place de l'icône.
+        if (row.flag) line.append(flagNode(row.flag.code, row.flag.src, row.flag.name, 'lib-row-flag'));
+        else if (flagged && !row.icon && !row.avatar) line.append(libEl('span', 'flag lib-row-flag none'));
+        else if (row.icon && !row.avatar) line.append(cyberIcon(row.icon, 'lib-row-icon'));
         line.append(libEl('span', 'lib-row-text', row.text));
         // Pas encore lue (Activité récente) : la pastille rouge des entrées du menu, et son mot dans les badges.
         if (row.unread) line.append(libEl('span', 'lib-attention'));
@@ -181,7 +186,7 @@ function renderLibrary(v) {
     actions.append(libEl('li', 'lib-actions-title', v.actionsTitle));
   }
   // Une colonne d'icônes dès qu'une action en a une : les libellés restent alignés.
-  if (v.actions.some((a) => a.icon)) {
+  if (v.actions.some((a) => a.icon || a.flag)) {
     actions.classList.add('with-icons');
     // Deux entrées d'un même menu n'ont jamais la même icône (garde-fou de mise en page).
     actions.dataset.iconMenu = '';
@@ -201,9 +206,10 @@ function renderLibrary(v) {
     // à droite de son icône, sinon après le libellé.
     const dot = a.attention ? libEl('span', 'lib-attention') : undefined;
     if (dot) dot.title = t('Attend votre intervention');
-    if (a.icon) {
+    if (a.icon || a.flag) {
       const glyph = libEl('span', 'lib-action-glyph');
-      glyph.append(cyberIcon(a.icon, 'lib-action-icon'));
+      // Le choix du pays : le drapeau de chacun dans la colonne des icônes.
+      glyph.append(a.flag ? flagNode(a.flag.code, a.flag.src, a.flag.name, 'lib-action-flag') : cyberIcon(a.icon, 'lib-action-icon'));
       if (dot) glyph.append(dot);
       li.append(glyph);
     } else if (dot) label.append(dot);
@@ -528,6 +534,38 @@ function renderHealth(h, cursor) {
   return box;
 }
 
+// ---------- Drapeaux ----------
+
+/**
+ * Drapeau d'un pays (app/renderer/drapeaux, flag-icons) dans un cadre 4:3 de taille fixe. Sans
+ * image (code inconnu, fichier illisible), le code en deux lettres prend le même cadre : rien ne
+ * bouge autour. Le nom du pays en bulle et pour les lecteurs d'écran.
+ */
+function flagNode(code, src, name, className) {
+  const node = libEl('span', `flag ${className}`);
+  node.title = name || code;
+  node.setAttribute('role', 'img');
+  node.setAttribute('aria-label', name || code);
+  const fallback = () => {
+    node.classList.add('code');
+    node.textContent = code;
+  };
+  if (!src) {
+    fallback();
+    return node;
+  }
+  const img = document.createElement('img');
+  img.alt = '';
+  img.draggable = false;
+  img.addEventListener('error', () => {
+    img.remove();
+    fallback();
+  });
+  img.src = src;
+  node.append(img);
+  return node;
+}
+
 // ---------- Tableau des scores d'une table ----------
 
 /**
@@ -561,23 +599,24 @@ function renderScoreboard(b) {
   }
   box.append(tabs);
   if (b.lines.length) {
-    const list = libEl('ol', 'scoreboard-lines');
+    // Une seule grille pour tout le tableau (chaque ligne en sous-grille) : rang, drapeau, pastille,
+    // nom, score et date tombent dans les mêmes colonnes d'une ligne à l'autre, au pixel près. Dès
+    // qu'une ligne a un drapeau ou une pastille, leur colonne existe pour toutes, vide au besoin.
+    const flags = b.lines.some((l) => l.country);
+    const avatars = b.lines.some((l) => l.avatar);
+    const list = libEl('ol', `scoreboard-lines${flags ? ' with-flags' : ''}${avatars ? ' with-avatars' : ''}`);
+    // Garde-fou de mise en page (layout-check.ts) : colonnes, lignes de base et images alignées.
+    list.dataset.aligned = '';
     for (const l of b.lines) {
       const li = libEl('li', `scoreboard-line${l.first ? ' first' : ''}${l.mine ? ' mine' : ''}${l.apart ? ' apart' : ''}`);
-      const name = libEl('span', `scoreboard-name${l.anonymous ? ' anonymous' : ''}`);
-      // Le pays en deux lettres : Windows ne dessine pas les drapeaux.
-      if (l.country) name.append(libEl('span', 'scoreboard-country', l.country));
-      else if (l.avatar) name.append(libEl('span', 'scoreboard-country none', '—'));
+      li.append(libEl('span', 'scoreboard-rank', l.rank));
+      if (flags) li.append(l.country ? flagNode(l.country, l.flag, l.countryName, 'scoreboard-flag') : libEl('span', 'scoreboard-flag none'));
       // Classements en réseau : la pastille du joueur, cerclée de vert quand sa borne est en ligne.
-      if (l.avatar) name.append(avatarNode(l.avatar, `scoreboard-avatar${l.status ? ` status-${l.status.state}` : ''}`));
+      if (avatars) li.append(l.avatar ? avatarNode(l.avatar, `scoreboard-avatar${l.status ? ` status-${l.status.state}` : ''}`) : libEl('span', 'scoreboard-avatar none'));
+      const name = libEl('span', `scoreboard-name${l.anonymous ? ' anonymous' : ''}`);
       name.append(libEl('span', 'scoreboard-name-text', l.name));
       if (l.status) name.append(libEl('span', `scoreboard-status status-${l.status.state}`, l.status.label));
-      li.append(
-        libEl('span', 'scoreboard-rank', l.rank),
-        name,
-        libEl('span', 'scoreboard-score', l.score),
-        libEl('span', 'scoreboard-when', l.when),
-      );
+      li.append(name, libEl('span', 'scoreboard-score', l.score), libEl('span', 'scoreboard-when', l.when));
       list.append(li);
     }
     box.append(list);

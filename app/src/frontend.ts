@@ -290,6 +290,8 @@ import {
   jukeboxWheel,
   jukeboxWheelMove,
   JUKEBOX_WHEEL_KEY,
+  remoteMenuTarget,
+  toRemoteEntry,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, setCursorPosition, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays, simulatedDisplays } from './displays';
@@ -370,7 +372,7 @@ import { createDedicatedSystem } from './dedicated-system';
 import { handOverOnQuit, shellSession } from './dedicated-session';
 import { createPowerMenu } from './power';
 import { readWakeDevices } from './arcade-hours';
-import { createPhoneRemote, phoneRemoteMode } from './phone-remote';
+import { createPhoneRemote, phoneRemoteMode, type MenuEntries, type MenuEntry } from './phone-remote';
 
 /**
  * Touches du menu : celles des boutons de l'interface (étape « Boutons de l'interface »
@@ -1246,7 +1248,11 @@ phoneRemote.setMenu({
   phase: () => (state.phase === 'loading' || state.phase === 'playing' ? 'game' : 'menu'),
   screen: () => remoteScreen(),
   field: () => (state.phase === 'library' ? library.remoteField() : undefined),
-  button: (b, down, repeat) => remoteButton(b, down, repeat),
+  // Pendant une partie, seulement les réglages en partie ouverts (VPX a les boutons sinon).
+  button: (b, down, repeat) => (state.phase === 'playing' ? down && inGameMenu.isOpen() && inGameMenu.button(b, repeat) : remoteButton(b, down, repeat)),
+  entries: () => remoteEntries(),
+  menus: () => library.remoteMenus(),
+  open: (id) => remoteOpen(id),
   setText: (value) => state.phase === 'library' && library.remoteSet(value),
   enter: () => state.phase === 'library' && library.remoteEnter(),
   uploadDir: () =>
@@ -1289,6 +1295,146 @@ function remoteScreen(): { title: string; item?: string; zone?: string } {
   if (state.phase === 'jukebox') return { title: t('Juke-box'), ...(jukeboxPlayer.level() === 'tracks' && collectionKeys().next.length ? { zone: t('Playlist suivante') } : {}) };
   // La roue : la collection active, la table choisie ; MagnaSave y passe à la collection suivante.
   return { title: collections.current().label || t('Menu des tables'), item: tables[state.index]?.title, zone: collections.locked() ? undefined : t('Collection suivante') };
+}
+
+// --- Accès direct depuis le téléphone (remote-menus.ts) ---------------------------------------
+// Le téléphone montre l'écran de la borne et ses entrées, et tous les menus ; chaque geste passe par
+// le même chemin qu'un clic ou un bouton de la borne (portes du mode invité comprises).
+
+/** Un toucher sur la liste du téléphone : comme un clic à la borne, il met d'abord fin au mode attente (et à l'ouverture). */
+function remoteWakes(): boolean {
+  const noticed = hours.activity();
+  if (attract.activity() || noticed) {
+    leaveAttract();
+    return false;
+  }
+  if (state.phase === 'intro') {
+    leaveIntro();
+    return false;
+  }
+  return true;
+}
+
+/** Un appui bref d'un bouton de la borne, pour une entrée du téléphone qui le remplace (Start, Exit d'un message). */
+function remotePress(b: 'confirm' | 'exit'): void {
+  remoteButton(b, true, false);
+  remoteButton(b, false, false);
+}
+
+/** L'écran que montre la borne, pour la liste du téléphone. */
+function remoteEntries(): MenuEntries {
+  const none = (title: string, note: string): MenuEntries => ({ kind: 'none', title, items: [], current: -1, note });
+  if (state.phase === 'loading') return none(remoteScreen().title, t('La partie se charge.'));
+  if (state.phase === 'playing') return inGameEntries();
+  if (state.phase === 'library') return library.remoteEntries() ?? none(t('Menu système'), '');
+  if (state.phase === 'menu') return wheelEntries();
+  if (state.phase === 'jukebox') return none(t('Juke-box'), t('Le Juke-box se pilote avec les boutons : flippers pour choisir, Start pour écouter, Exit pour revenir à la roue.'));
+  if (state.phase === 'intro') return { kind: 'none', title: t('Ouverture'), items: [{ label: t('Passer l’ouverture'), icon: 'chevron-right', pick: () => void remoteWakes() }], current: -1 };
+  if (state.phase === 'confirmQuit') {
+    const items: MenuEntry[] = [
+      { ...toRemoteEntry({ label: t('Quitter Cyber Pinball'), icon: 'exit', ...(guest.allows('shortcut.quit') ? {} : { tone: 'quiet', detail: t('Fermé en mode invité') }) }), pick: () => remotePress('confirm') },
+      { ...toRemoteEntry({ label: t('Annuler'), icon: 'back', back: true }), pick: () => remotePress('exit') },
+    ];
+    return { kind: 'screen', title: t('Quitter Cyber Pinball ?'), items, current: -1 };
+  }
+  // Un message : Start fait son action (si sa porte est ouverte), Exit le ferme ; rien pendant une extinction.
+  const message = state.message;
+  if (!message || message.action === 'power') return none(message?.title ?? '', t('Rien à faire ici depuis le téléphone.'));
+  const items: MenuEntry[] = [];
+  if (message.action && guest.allows(MESSAGE_DOORS[message.action])) items.push({ ...toRemoteEntry({ label: t('Valider (Start)'), detail: message.lines[0], icon: 'start' }), pick: () => remotePress('confirm') });
+  items.push({ ...toRemoteEntry({ label: t('Fermer (Exit)'), icon: 'close', back: true }), pick: () => remotePress('exit') });
+  return { kind: 'screen', title: message.title, items, current: -1 };
+}
+
+/**
+ * Le menu des tables : le médaillon du Juke-box s'il est dans la roue, puis les tables de la
+ * collection montrée. Toucher une table la choisit sur la roue ; la toucher encore fait Start
+ * (sa fiche, ou la partie en « jouer directement »).
+ */
+function wheelEntries(): MenuEntries {
+  const shelf = collections.shelf();
+  const choose = guest.allows('menu.choose');
+  const items: MenuEntry[] = [];
+  const jukebox = jukeboxShown();
+  if (jukebox) items.push({ ...toRemoteEntry({ label: t('Juke-box'), detail: jukeboxCard().subtitle, icon: 'jukebox' }), pick: () => remotePickJukebox() });
+  for (const table of shelf.tables) {
+    const file = table.file;
+    items.push({ ...toRemoteEntry({ label: table.title, detail: [table.manufacturer, table.year].filter(Boolean).join(' · '), ...(choose ? {} : { tone: 'quiet' }) }), pick: () => remotePickTable(file) });
+  }
+  const current = jukebox && onJukebox() ? 0 : shelf.tables.length ? (jukebox ? 1 : 0) + shelf.index : -1;
+  const again = wheelPlays() ? t('Touchez une table pour la choisir, puis touchez-la encore pour jouer.') : t('Touchez une table pour la choisir, puis touchez-la encore pour ouvrir sa fiche.');
+  return { kind: 'wheel', title: collections.current().label || t('Menu des tables'), icon: 'tables', items, current, note: items.length ? again : t('Aucune table dans cette collection.') };
+}
+
+/** Une table touchée au téléphone : choisie sur la roue, ou, déjà choisie, Start. */
+function remotePickTable(file: string): void {
+  if (!remoteWakes() || state.phase !== 'menu') return;
+  const index = tables.findIndex((x) => x.file === file);
+  if (index < 0) return;
+  if (index === state.index && !onJukebox()) {
+    wheelConfirm(tables[index]!, !wheelPlays());
+    return void broadcast();
+  }
+  if (!guest.knock('menu.choose')) return;
+  const shelf = collections.shelf();
+  const at = shelf.tables.findIndex((x) => x.file === file);
+  if (at < 0) return;
+  collections.hidePanel();
+  const picked = collections.move(at - shelf.index);
+  state = { ...state, index: picked ? Math.max(0, tables.indexOf(picked)) : index, jukebox: false };
+  playUiSound('solenoid');
+  broadcast();
+}
+
+/** Le médaillon du Juke-box touché : choisi, ou, déjà choisi, ouvert. */
+function remotePickJukebox(): void {
+  if (!remoteWakes() || state.phase !== 'menu' || !jukeboxShown()) return;
+  if (onJukebox()) return void openJukebox();
+  if (!guest.knock('menu.choose')) return;
+  collections.hidePanel();
+  state = { ...state, jukebox: true };
+  playUiSound('solenoid');
+  broadcast();
+}
+
+/**
+ * Pendant une partie : les réglages en partie, s'ils sont ouverts (lignes à toucher, boutons du
+ * téléphone actifs), sinon de quoi les ouvrir, comme les deux MagnaSave (ou pourquoi c'est impossible).
+ */
+function inGameEntries(): MenuEntries {
+  const title = remoteScreen().title;
+  const open = inGameMenu.remote();
+  if (open) return { kind: 'ingame', title: open.title, note: open.note, items: open.items.map((i) => ({ ...toRemoteEntry({ label: i.label, detail: i.detail, tone: i.quiet ? 'quiet' : undefined }), ...(i.pick ? { pick: i.pick } : {}) })), current: open.current, buttons: true };
+  return { kind: 'none', title, items: [], current: -1, note: t('Les commandes reviennent à la fin de la partie.'), inGame: inGameMenu.openable() };
+}
+
+/**
+ * Un menu ouvert directement depuis le téléphone, par son identifiant : une entrée ou une rubrique
+ * du menu système (fermé à l'invité), le menu des tables, ou les réglages en partie. Un identifiant
+ * inconnu, un menu fermé, une partie en cours (hors réglages en partie) : rien.
+ */
+function remoteOpen(id: string): void {
+  const target = remoteMenuTarget(id);
+  if (!target) return void console.log('Télécommande : menu inconnu demandé, ignoré.'); // i18n-ignore : journal
+  if (target.kind === 'in-game') {
+    if (state.phase === 'playing' && inGameMenu.openable() === true && !inGameMenu.isOpen()) inGameMenu.open();
+    return;
+  }
+  if (state.phase === 'playing' || state.phase === 'loading') return;
+  // Extinction, veille ou redémarrage en cours : rien ne s'ouvre plus (comme la roue dentée).
+  if (state.phase === 'message' && state.message?.action === 'power') return;
+  if (!remoteWakes()) return;
+  if (target.kind === 'wheel') {
+    // La roue, d'où qu'on soit au menu (le Juke-box se ferme au redessin, comme par Exit).
+    if (state.phase === 'library') library.leave();
+    else if (tables.length && (state.phase === 'jukebox' || state.phase === 'confirmQuit' || state.phase === 'message')) state = { ...state, phase: 'menu', message: undefined, help: false };
+    return void broadcast();
+  }
+  // Le menu système : fermé à l'invité ; le téléphone ne déverrouille rien (et la borne ne montre pas de cadenas pour lui).
+  if (!guest.allows('menu.system')) return void console.log('Télécommande : menu système fermé en mode invité, rien d’ouvert.'); // i18n-ignore : journal
+  state = { ...state, help: false };
+  if (!library.openSystemEntry(target.id)) console.log(`Télécommande : « ${id} » non fourni sur cette borne, rien d’ouvert.`); // i18n-ignore : journal
+  broadcast();
 }
 
 /**
@@ -2157,7 +2303,7 @@ const menuDmd = createMenuDmd({
   log: (line) => console.log(line),
 });
 // Les deux MagnaSave pendant la partie : position du DMD, puis le menu de VPX (in-game-menu.ts).
-const inGameMenu = createInGameMenu({ log: (line) => console.log(line), allowed: () => guest.allows('game.settings') });
+const inGameMenu = createInGameMenu({ log: (line) => console.log(line), allowed: () => guest.allows('game.settings'), changed: () => phoneRemote.menuChanged() });
 // Invitation reçue pendant la partie : carte discrète dans le coin du plateau (game-notice.ts).
 const gameNotices = createGameNotices({
   place: playfieldPlace,

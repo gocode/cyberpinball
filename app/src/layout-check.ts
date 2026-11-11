@@ -42,6 +42,7 @@
 // Le lancement en cinéma traverse les écrans : le logo qui en sort n'est pas « coupé ».
 // Une liste ne défile jamais sans geste de l'utilisateur (app/renderer/scroll-keeper.js) : un
 // rendu qui la ramène ailleurs, un tic de progression par exemple, est signalé.
+// Un tableau en colonnes (data-aligned) : cases, lignes de base et images alignées au pixel.
 // Les problèmes vont dans la console et dans <captures>\mise-en-page.txt.
 
 import * as fs from 'node:fs';
@@ -552,6 +553,76 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
       if (seenIcons.has(name)) problems.add('même icône pour deux entrées d’un menu (' + name + ') : ' + label(seenIcons.get(name)) + ' et ' + label(entry));
       else seenIcons.set(name, entry);
     }
+  }
+  // Mesures dans le repère d'une liste : dans une vue pivotée d'un quart de tour, sa gauche est en
+  // haut (ou en bas) de l'écran.
+  const localRect = (r, q) =>
+    [
+      { left: r.left, right: r.right, top: r.top, bottom: r.bottom },
+      { left: r.top, right: r.bottom, top: -r.right, bottom: -r.left },
+      { left: -r.right, right: -r.left, top: -r.bottom, bottom: -r.top },
+      { left: -r.bottom, right: -r.top, top: r.left, bottom: r.right },
+    ][q];
+  // Liste à drapeaux (« Masquer un score ») : chaque texte part du même bord, qu'une ligne ait un
+  // pays ou non.
+  for (const list of document.querySelectorAll('.lib-rows')) {
+    if (!shown(list) || !list.querySelector('.lib-row-flag')) continue;
+    const q = (((Math.round(turn(list) / (Math.PI / 2)) % 4) + 4) % 4);
+    const starts = [...list.querySelectorAll(':scope > .lib-row .lib-row-text')].filter(shown).map((el) => [localRect(el.getBoundingClientRect(), q).left, el]);
+    const first = starts.reduce((a, b) => (b[0] < a[0] ? b : a), starts[0]);
+    const last = starts.reduce((a, b) => (b[0] > a[0] ? b : a), starts[0]);
+    if (starts.length > 1 && last[0] - first[0] > 0.5) problems.add('textes d’une liste qui ne partent pas du même bord (' + (last[0] - first[0]).toFixed(1) + ' px) : ' + label(first[1]) + ' et ' + label(last[1]));
+  }
+  // Tableaux en colonnes (data-aligned, le tableau des scores) : chaque case commence et finit au
+  // même endroit sur toutes les lignes ; le texte d'une ligne partage une même ligne de base (une
+  // sonde de taille nulle devant le premier texte de chaque élément) ; drapeau et pastille sont
+  // centrés sur la ligne. Une demi-unité de pixel d'écart suffit à le signaler.
+  for (const table of document.querySelectorAll('[data-aligned]')) {
+    if (!shown(table)) continue;
+    const q = (((Math.round(turn(table) / (Math.PI / 2)) % 4) + 4) % 4);
+    const rect = (el) => localRect(el.getBoundingClientRect(), q);
+    const rows = [...table.children].filter(shown);
+    const columns = [];
+    for (const row of rows) {
+      if (row.children.length !== rows[0].children.length) problems.add('ligne de tableau sans toutes ses cases (' + row.children.length + ' au lieu de ' + rows[0].children.length + ') : ' + label(row));
+      [...row.children].forEach((cell, i) => {
+        const r = rect(cell);
+        (columns[i] ??= []).push([r.left, r.right]);
+        // Un texte plus large que sa case déborde sur la voisine (« 100+ » sur le drapeau).
+        if (!cell.matches('.flag, .avatar') && cell.scrollWidth > cell.clientWidth + 0.5) problems.add('texte qui déborde de sa case (' + (cell.scrollWidth - cell.clientWidth) + ' px) : ' + label(cell));
+      });
+      const probes = [];
+      const seen = new Set();
+      const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        const host = n.parentElement;
+        if (!n.textContent.trim() || seen.has(host) || host.closest('.flag, .avatar')) continue;
+        seen.add(host);
+        const probe = document.createElement('span');
+        probe.style.cssText = 'display:inline-block;width:0;height:0;margin:0;padding:0;border:0';
+        host.insertBefore(probe, n);
+        probes.push([probe, host]);
+      }
+      const bases = probes.map(([p, host]) => [rect(p).bottom, host]);
+      for (const [p] of probes) p.remove();
+      const low = bases.reduce((a, b) => (b[0] < a[0] ? b : a), bases[0]);
+      const high = bases.reduce((a, b) => (b[0] > a[0] ? b : a), bases[0]);
+      if (bases.length > 1 && high[0] - low[0] > 0.5) problems.add('texte hors de la ligne de base (' + (high[0] - low[0]).toFixed(1) + ' px) : ' + label(low[1]) + ' et ' + label(high[1]));
+      const rr = rect(row);
+      const rs = getComputedStyle(row);
+      const middle = (rr.top + parseFloat(rs.borderTopWidth) + parseFloat(rs.paddingTop) + rr.bottom - parseFloat(rs.borderBottomWidth) - parseFloat(rs.paddingBottom)) / 2;
+      for (const pic of row.querySelectorAll(':scope > .flag, :scope > .avatar')) {
+        const r = rect(pic);
+        if (Math.abs((r.top + r.bottom) / 2 - middle) > 0.5) problems.add('image pas centrée sur sa ligne (' + ((r.top + r.bottom) / 2 - middle).toFixed(1) + ' px) : ' + label(pic));
+      }
+    }
+    columns.forEach((cells, i) => {
+      for (const k of [0, 1]) {
+        const v = cells.map((c) => c[k]);
+        const gap = Math.max(...v) - Math.min(...v);
+        if (gap > 0.5) problems.add('colonne ' + (i + 1) + ' décalée d’une ligne à l’autre (' + gap.toFixed(1) + ' px, bord ' + (k ? 'droit' : 'gauche') + ') : ' + label(table));
+      }
+    });
   }
   return [...problems];
 })()`;

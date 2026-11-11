@@ -19,7 +19,7 @@ import {
   acceptRequest,
   addEvent,
   countryOfLocale,
-  isCountry,
+  knownCountry,
   loadRankings,
   mergeRankings,
   rankedId,
@@ -779,7 +779,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     }
   }
 
-  const myCountry = () => state.country ?? countryOfLocale(opts.systemLocale?.());
+  // Un pays disparu (choisi avant que la liste ne se limite aux pays d'aujourd'hui) cède à celui de Windows.
+  const myCountry = () => (knownCountry(state.country) ? state.country : countryOfLocale(opts.systemLocale?.()));
 
   function receive(key: string, message: SocialMessage, link: Link): void {
     const peer = peers.get(key);
@@ -1223,7 +1224,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     },
     setCountry(code) {
       const { country: _, ...rest } = state;
-      commit(code && isCountry(code) ? { ...rest, country: code } : rest);
+      commit(code && knownCountry(code) ? { ...rest, country: code } : rest);
     },
     country: () => myCountry(),
     setAvatar(image) {

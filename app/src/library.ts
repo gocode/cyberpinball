@@ -5,7 +5,7 @@
 // Pilotage aux boutons de la borne (flippers : choisir, Start : valider, Exit :
 // revenir), au clavier ou à la souris (clics envoyés par le rendu).
 
-import type { MenuField, PhoneRemote, RemoteBar } from './phone-remote';
+import type { MenuEntries, MenuField, PhoneRemote, RemoteBar } from './phone-remote';
 import { createPhoneRemoteMenu, remoteBlock, type RemoteWording } from './phone-remote-menu';
 import { periodLabel, rankingScoreboardView, scopeLabel, scoreboardView, scoresSummary, type ScoreboardView } from './scoreboard-menu';
 import type { RankingView } from './table-rankings';
@@ -24,6 +24,9 @@ import {
   SYSTEM_ROOT,
   systemEntry,
   systemPathOf,
+  remoteMenuTree,
+  toRemoteEntry,
+  type RemoteMenus,
   type SystemEntryId,
   type SystemGroupId,
   type SystemItemId,
@@ -126,6 +129,7 @@ import {
   tableFilter,
   type MediaDb,
   formatDate,
+  flagView,
   formatDateTime,
   formatList,
   formatNumber,
@@ -142,6 +146,7 @@ import {
   type AddScreenId,
   type IconName,
   type AvatarView,
+  type FlagView,
   type ImportPlan,
   type KnownTable,
   type NavigationKeys,
@@ -467,6 +472,8 @@ export interface Row {
   pick?: boolean;
   /** Icône devant le texte (registre app/renderer/icons.js). */
   icon?: IconName;
+  /** Un pays : son drapeau à la place de l'icône. */
+  flag?: FlagView;
   /** Repère neutre (filet clair) : l'emplacement ouvert, un fichier coché ; jamais en vert, réservé au choix courant. */
   current?: boolean;
   /** Seconde ligne, mot et signe : à quoi sert un fichier (« ✓ Installé avec… », « ! À installer… »). */
@@ -513,6 +520,8 @@ export interface Action {
   tone?: Tone;
   /** Icône devant le libellé (registre app/renderer/icons.js) ; dans un même écran, deux actions n'ont jamais la même. */
   icon?: IconName;
+  /** Un pays (« Mon pays ») : son drapeau dans la colonne des icônes. */
+  flag?: FlagView;
   /** Pastille rouge à côté du libellé : cette action attend l'utilisateur. */
   attention?: boolean;
   /** Badge après le libellé (MenuBadge). */
@@ -2415,7 +2424,10 @@ export function createLibrary(host: LibraryHost) {
         sections: [
           {
             title: t('Choisir le score'),
-            rows: lines.map((l, i) => ({ text: t('{rank}. {name} {score}', { rank: l.rank, name: l.name, score: formatNumber(l.score) }), detail: [l.country, formatDateTime(l.at)].filter(Boolean).join(' · '), action: i, pick: true })),
+            rows: lines.map((l, i) => {
+              const flag = l.country ? flagView(l.country, language() === 'en' ? 'en-GB' : 'fr-FR') : undefined;
+              return { text: t('{rank}. {name} {score}', { rank: l.rank, name: l.name, score: formatNumber(l.score) }), detail: [flag?.name, formatDateTime(l.at)].filter(Boolean).join(' · '), ...(flag ? { flag } : {}), action: i, pick: true };
+            }),
           },
         ],
         actions: [
@@ -4335,7 +4347,7 @@ export function createLibrary(host: LibraryHost) {
       back: backLabel(built),
       // Dans la liste d'un écran à deux zones, Exit n'y ramène pas : il passe aux actions, le bouton le dit (et fait de même au clic).
       backTag: zone?.active === 'list' ? { key: 'Exit', text: t('actions') } : undefined,
-      actions: built.actions.map(({ label, detail, tone, icon, web, attention, badge, shortcut, run }, i) => ({ label: shownLabel({ label, run }, built.back), detail, tone, icon: web && !iconMenu ? undefined : icon, attention: attention || undefined, badge: badge ? menuBadgeLabel(badge) : undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
+      actions: built.actions.map(({ label, detail, tone, icon, flag, web, attention, badge, shortcut, run }, i) => ({ label: shownLabel({ label, run }, built.back), detail, tone, icon: web && !iconMenu ? undefined : icon, flag, attention: attention || undefined, badge: badge ? menuBadgeLabel(badge) : undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
       media: built.media,
       variant: built.variant,
       actionsTitle: built.actionsTitle,
@@ -4530,6 +4542,77 @@ export function createLibrary(host: LibraryHost) {
     const at = followCursor(ids, cursor, screen, anchor);
     const action = built.actions[at];
     return { title: built.heading, item: action && shownLabel(action, built.back) };
+  }
+
+  /**
+   * Accès direct au téléphone (remote-menus.ts) : l'écran affiché et ses entrées, celles que la
+   * borne montre (le mode invité les a déjà filtrées), chacune faisant ce que fait un clic à la borne.
+   * Une liste de choix du clavier à l'écran (fabricant) y est aussi ; une opération en cours, rien.
+   */
+  function remoteEntries(): MenuEntries | undefined {
+    if (!screen) return undefined;
+    const built = build();
+    const icon = built.icon ?? (TABLE_SCREENS.includes(screen.kind) ? undefined : section);
+    if (busy) return { kind: 'busy', title: built.heading, ...(icon ? { icon } : {}), items: [], current: -1, note: busy };
+    if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor?.kind === 'choice') {
+      const e = screen.editor;
+      return { kind: 'choice', title: built.heading, ...(icon ? { icon } : {}), note: e.label, items: e.choices.map((label, index) => ({ label, pick: () => handleAction({ type: 'editor', index }) })), current: e.cursor };
+    }
+    const ids = actionIds(built.actions);
+    return {
+      kind: 'screen',
+      title: built.heading,
+      ...(icon ? { icon } : {}),
+      items: built.actions.map((a, index) => ({
+        ...toRemoteEntry({ label: shownLabel(a, built.back), detail: a.detail, icon: a.icon, tone: a.tone, attention: a.attention, badge: a.badge ? menuBadgeLabel(a.badge) : undefined, back: a.run === built.back }),
+        // Comme un clic à la borne : l'élément retrouvé par son identité, même si la liste a bougé.
+        pick: () => handleAction({ type: 'activate', index, id: ids[index] }),
+      })),
+      current: followCursor(ids, cursor, screen, anchor),
+    };
+  }
+
+  /**
+   * Tous les menus, pour le téléphone : l'arbre du menu système avec les entrées fournies sur cette
+   * borne, leur détail et leur indisponibilité. Fermé à l'invité, comme le menu système.
+   */
+  function remoteMenus(): RemoteMenus {
+    if (!host.guest.allows('menu.system')) return { nodes: [], locked: t('Mode invité : seul le menu des tables est ouvert. Le menu système se déverrouille à la borne.') };
+    return {
+      nodes: remoteMenuTree((id) => {
+        const item = systemItems.get(id);
+        if (!item) return undefined;
+        // Le détail d'une entrée se calcule (téléchargements, mises à jour…) : une entrée qui échoue part sans lui.
+        const read = <T>(get: () => T): T | undefined => {
+          try {
+            return get();
+          } catch {
+            return undefined;
+          }
+        };
+        return { label: read(() => item.label), detail: read(() => item.detail), tone: read(() => item.tone), attention: read(() => item.attention), badge: item.badge ? menuBadgeLabel(item.badge) : undefined };
+      }),
+    };
+  }
+
+  /**
+   * Une entrée ou une rubrique du menu système ouverte directement (téléphone) : comme si on l'avait
+   * choisie dans sa rubrique, dont son « Retour » ramène. Rien en mode invité, ni pour une entrée que
+   * l'application ne fournit pas sur cette borne.
+   */
+  function openSystemEntry(id: SystemEntryId): boolean {
+    if (!host.guest.allows('menu.system') || busy) return false;
+    systemReturn = undefined;
+    if (isSystemGroup(id)) {
+      openSystemGroup(id);
+      return true;
+    }
+    if (!systemItems.has(id)) return false;
+    const trail = systemPathOf(id) ?? [];
+    systemChosen = id;
+    openSystemGroup(trail.at(-1), id);
+    runSystemEntry(id);
+    return true;
   }
 
   /** Où le menu montre le QR code maintenant : l'écran de la télécommande, le clavier à l'écran. */
@@ -4748,6 +4831,9 @@ export function createLibrary(host: LibraryHost) {
     remoteEnter,
     remoteScreen,
     remoteSurfaces,
+    remoteEntries,
+    remoteMenus,
+    openSystemEntry,
     /** Essais : ouvrir l'écran de la télécommande. */
     openPhoneRemote: () => remoteMenu?.item.run(),
     /** Sélecteur de fichiers de Cyber Pinball ; undefined à l'abandon, l'écran d'où l'on vient revient tel quel. */

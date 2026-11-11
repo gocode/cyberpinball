@@ -42,7 +42,35 @@
         <p class="message-text" id="message-text"></p>
         <button type="button" class="key wide primary message-action" id="message-action" hidden data-i18n>Reprendre</button>
       </div>
-      <div class="buttons" id="buttons">
+      <!-- Au menu : trois vues. Écran (les entrées de l'écran ouvert à la borne, à toucher), Menus (tous
+           les menus, rangés comme le menu système), Boutons (ceux de la borne). body[data-view]. -->
+      <div class="views" id="views" role="tablist">
+        <button type="button" class="view-tab" id="tab-list" role="tab" data-view="list" aria-controls="entries"></button>
+        <button type="button" class="view-tab" id="tab-menus" role="tab" data-view="menus" aria-controls="menus"></button>
+        <button type="button" class="view-tab" id="tab-buttons" role="tab" data-view="buttons" aria-controls="buttons"></button>
+      </div>
+      <section class="entries" id="entries" role="tabpanel" aria-labelledby="tab-list">
+        <p class="entries-note" id="entries-note"></p>
+        <ul class="entry-list" id="entries-list"></ul>
+        <div class="empty" id="entries-empty" hidden>
+          <span class="empty-mark" id="entries-empty-mark" aria-hidden="true"></span>
+          <p class="empty-title" id="entries-empty-title"></p>
+          <p class="empty-text" id="entries-empty-text"></p>
+        </div>
+      </section>
+      <section class="menus" id="menus" role="tabpanel" aria-labelledby="tab-menus">
+        <div class="menus-head" id="menus-head">
+          <button type="button" class="menus-up" id="menus-up"></button>
+          <span class="menus-trail" id="menus-trail"></span>
+        </div>
+        <ul class="entry-list" id="menus-list"></ul>
+        <div class="empty" id="menus-empty" hidden>
+          <span class="empty-mark" id="menus-empty-mark" aria-hidden="true"></span>
+          <p class="empty-title" id="menus-empty-title"></p>
+          <p class="empty-text" id="menus-empty-text"></p>
+        </div>
+      </section>
+      <div class="buttons" id="buttons" role="tabpanel" aria-labelledby="tab-buttons">
         <button type="button" class="btn btn-start" data-b="confirm"></button>
         <button type="button" class="btn btn-flip" data-b="previous"></button>
         <button type="button" class="btn btn-flip" data-b="next"></button>
@@ -53,6 +81,9 @@
         <span class="message-mark" id="game-mark" aria-hidden="true"></span>
         <h1 class="message-title" data-i18n>Partie en cours</h1>
         <p class="message-text" data-i18n>Les commandes reviennent à la fin de la partie.</p>
+        <!-- Les réglages en partie, comme les deux MagnaSave : grisé avec sa raison quand ils ne s'ouvrent pas. -->
+        <button type="button" class="key wide game-open" id="game-open" hidden></button>
+        <p class="game-reason" id="game-reason" hidden></p>
       </div>
       <div class="pad" id="pad">
         <div class="pad-hint" id="pad-hint">

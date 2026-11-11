@@ -58,6 +58,7 @@ import {
   type DmdScreen,
   type DmdSpot,
   type ObservedDisplay,
+  type RemoteButton,
   type Rect,
   type Rotation,
   type TableEntry,
@@ -109,6 +110,23 @@ export interface InGameMenu {
   /** Essais sans opérateur : ouvre le menu comme la combinaison. */
   open(): void;
   isOpen(): boolean;
+  /**
+   * Le téléphone (phone-remote.ts) peut-il ouvrir le menu, comme la combinaison : vrai, ou pourquoi
+   * pas (aucune partie, mode invité, partie dans le casque, où le menu de VPX prend sa place).
+   */
+  openable(): true | string;
+  /** Ce que le téléphone montre du menu ouvert : ses lignes (ou ses choix), chacune avec son geste ; undefined s'il est fermé. */
+  remote(): InGameRemote | undefined;
+  /** Un bouton tenu au téléphone, comme celui de la borne (flippers, Start, Exit ; MagnaSave : la hauteur). */
+  button(b: RemoteButton, repeat: boolean): void;
+}
+
+/** Le menu ouvert, vu du téléphone. */
+export interface InGameRemote {
+  title: string;
+  note: string;
+  items: { label: string; detail?: string; quiet?: boolean; pick?: () => void }[];
+  current: number;
 }
 
 /** Écrans de la configuration branchés, l'écran du plateau d'abord, chacun nommé par ce qu'il montre. */
@@ -163,7 +181,13 @@ interface ScreenWindow {
   loaded: boolean;
 }
 
-export function createInGameMenu(opts: { log: (line: string) => void; /** La porte game.settings du mode invité est ouverte. */ allowed: () => boolean }): InGameMenu {
+export function createInGameMenu(opts: {
+  log: (line: string) => void;
+  /** La porte game.settings du mode invité est ouverte. */
+  allowed: () => boolean;
+  /** Le menu s'est ouvert, fermé ou a changé : le téléphone suit (phone-remote.ts). */
+  changed?: () => void;
+}): InGameMenu {
   let game: InGameContext | undefined;
   let comboTimer: NodeJS.Timeout | undefined;
   let stopWatch: (() => void) | undefined;
@@ -399,6 +423,7 @@ export function createInGameMenu(opts: { log: (line: string) => void; /** La por
 
   function render(): void {
     if (!menu) return;
+    opts.changed?.();
     const panel = dmdMenuPanel(menu.host, menu.state, dmdMenuKeyNames(menu.host.keys));
     const place = game?.place;
     for (const sw of menu.windows) {
@@ -433,6 +458,48 @@ export function createInGameMenu(opts: { log: (line: string) => void; /** La por
     const vk = vpxMenu ? windowsVk(vpxMenuKeys(IniDocument.parse(readTextIfExists(game?.configurationIni ?? ''))).find((c) => windowsVk(c) !== undefined) ?? '') : undefined;
     if (vk !== undefined && player) setTimeout(() => tapKey(vk), VPX_MENU_DELAY_MS);
     opts.log(`Réglages en partie : menu fermé${vpxMenu ? ', menu de VPX ouvert' : ', la partie reprend'}.`); // i18n-ignore : journal
+    opts.changed?.();
+  }
+
+  /**
+   * Le menu vu du téléphone : la question du départ (réglage non enregistré), les choix d'une ligne
+   * ouverte, ou les lignes du panneau. Une ligne bloquée part grisée avec sa raison, sans geste.
+   */
+  function remote(): InGameRemote | undefined {
+    if (!menu) return undefined;
+    const panel = dmdMenuPanel(menu.host, menu.state, dmdMenuKeyNames(menu.host.keys));
+    const note = panel.notice ?? panel.hint;
+    if (panel.leaving) {
+      return { title: panel.leaving.title, note, items: panel.leaving.choices.map((c, index) => ({ label: c.label, pick: () => act({ op: 'leave', index }) })), current: panel.leaving.choices.findIndex((c) => c.selected) };
+    }
+    const lines = panel.sections.flatMap((s) => s.items);
+    const open = lines.find((l) => l.open);
+    if (panel.choices && open) {
+      const at = panel.choices.findIndex((c) => c.selected);
+      // Un choix touché : la ligne passe dessus (comme les flippers), puis le valide (comme Start).
+      return {
+        title: open.label,
+        note,
+        items: panel.choices.map((c, index) => ({ label: c.label, pick: () => {
+          act({ op: 'step', delta: index - Math.max(0, at) });
+          act({ op: 'confirm' });
+        } })),
+        current: at,
+      };
+    }
+    return {
+      title: panel.title,
+      note,
+      items: lines.map((l) => ({ label: l.label, ...(l.disabled ? { detail: l.disabled, quiet: true } : l.value ? { detail: l.value } : {}), ...(l.disabled ? {} : { pick: () => act({ op: 'item', index: l.index }) }) })),
+      current: lines.findIndex((l) => l.selected),
+    };
+  }
+
+  function openable(): true | string {
+    if (!game) return t('Aucune partie en cours.');
+    if (!opts.allowed()) return t('Fermés en mode invité.');
+    if (game.vr) return t('Partie dans le casque : les réglages s’ouvrent dans le casque (les deux MagnaSave).');
+    return true;
   }
 
   ipcMain.on('in-game:act', (event, action: DmdMenuAction) => {
@@ -457,6 +524,15 @@ export function createInGameMenu(opts: { log: (line: string) => void; /** La por
     },
     open,
     isOpen: () => Boolean(menu),
+    openable,
+    remote,
+    button(b, repeat) {
+      if (!menu) return;
+      const k = menu.host.keys;
+      // MagnaSave du téléphone : le MagnaSave droit de la borne (la hauteur dans les lignes de position).
+      const code = { previous: k.previous, next: k.next, confirm: k.confirm, exit: k.exit, zone: k.down }[b][0];
+      if (code) key({ type: 'keyDown', code, isAutoRepeat: repeat } as Input);
+    },
   };
 }
 

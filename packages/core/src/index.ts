@@ -163,6 +163,7 @@ export * from './gamenotice';
 export * from './dmdscore';
 export * from './remote';
 export * from './remote-kept';
+export * from './remote-menus';
 export * from './websocket';
 export * from './lifetime';
 export * from './plugins';
