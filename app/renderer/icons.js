@@ -20,7 +20,7 @@ const CYBER_ICONS = {
   import: '<path d="M12 4h9v16H3v-5M2 9h12M10 5l4 4-4 4"/>', // Import de médias depuis un autre frontend.
   'image-download': '<path d="M11 4H3v16h18v-5M3 16l5-5 4 4M18 2v9M14 7l4 4 4-4"/>', // Image à récupérer.
   music: '<path d="M9 17V5l11-2v12M9 9l11-2"/><ellipse cx="6" cy="18" rx="3" ry="3"/><ellipse cx="17" cy="16" rx="3" ry="3"/>', // Musique et menu des médias.
-  jukebox: '<circle cx="12" cy="12" r="9"/><path d="M10 15.5V8l6-1.5v7.5M10 10.5 16 9M5.5 10.5v3M18.5 10.5v3"/><ellipse cx="8.5" cy="15.8" rx="1.6" ry="1.15" transform="rotate(-20 8.5 15.8)"/><ellipse cx="14.5" cy="14.3" rx="1.6" ry="1.15" transform="rotate(-20 14.5 14.3)"/>', // Juke-box : son disque, deux croches liées et deux pistes de son (10/11/2026).
+  jukebox: '<circle cx="12" cy="12" r="9"/><path d="M10.5 15.75V8.25l6-1.5v7.5M10.5 10.75 16.5 9.25M5.5 10.5v3M18.5 10.5v3"/><path d="M7.5 16.6A1.6 1.15 -20 0 0 10.5 15.5A1.6 1.15 -20 0 0 7.5 16.6zM13.5 15.1A1.6 1.15 -20 0 0 16.5 14A1.6 1.15 -20 0 0 13.5 15.1z"/>', // Juke-box : son disque, deux croches liées et deux pistes de son (10/11/2026) ; têtes de note penchées en arcs d'ellipse (pas de transform), croches centrées entre les deux pistes (11/11/2026).
   language: '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>', // Langues, sans lettre ni drapeau.
   upgrade: '<path d="M12 21V6M6 12l6-6 6 6M5 2h14"/>', // Nouvelle version de Cyber Pinball.
   desktop: '<rect x="3" y="3" width="14" height="13" rx="1"/><path d="M10 7h3M21 8v13H8"/>', // Fenêtres en cascade et tiret de réduction, sans flèche.
@@ -72,6 +72,7 @@ const CYBER_ICONS = {
   'volume-mute': '<path d="M3 9v6h4l5 4V5L7 9zM16 9l6 6M22 9l-6 6"/>', // Son de la borne coupé (Muet, Volume − maintenu).
   film: '<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M7 3v18M17 3v18M3 9h4M3 15h4M17 9h4M17 15h4"/>', // Médias pendant la partie.
   quality: '<path d="m3 8 4-5h10l4 5-9 13zM3 8h18M8 8l4 13 4-13"/>', // Qualité des médias, diamant.
+  spectrum: '<path d="M4 20v-4M8 20V9M12 20V4M16 20v-8M20 20v-5"/>', // Visualiseur du Juke-box : le spectre en barres que le DMD met en couleurs.
 
   // Onglets et groupes de VPX
   star: '<path d="m12 2 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z"/>', // Réglages essentiels.

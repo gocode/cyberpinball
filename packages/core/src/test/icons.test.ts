@@ -5,9 +5,12 @@
 // même icône. Le garde-fou de mise en page (app/src/layout-check.ts) vérifie le reste à
 // l'écran : icône inconnue, répétée dans une liste, ou plus petite que 20 px.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { copyTree } from '../copytree';
 import { ICON_NAMES } from '../icons';
 import { VPX_ESSENTIALS } from '../vpx-essentials';
 import { WIZARD_STEPS } from '../wizardsteps';
@@ -94,6 +97,40 @@ test('dans un même menu, chaque entrée a son icône à elle', () => {
   assert.equal(new Set(cabinetMenu).size, cabinetMenu.length, `icône répétée : ${cabinetMenu.join(', ')}`);
   const groups = VPX_ESSENTIALS.map((g) => g.icon);
   assert.equal(new Set(groups).size, groups.length, `icône répétée dans les réglages essentiels : ${groups.join(', ')}`);
+});
+
+// Le design system dérive du registre (bundle.css, planche des icônes, page index.html) : un dessin
+// changé dans icons.js sans `node docs/design-system/src/construire.mjs` laissait l'ancien dessin
+// publié (jukebox, repeat, repeat-one, 11/11/2026). On régénère dans une copie et on compare.
+test('le design system est régénéré depuis le registre (construire.mjs)', () => {
+  const ds = path.join(REPO, 'docs', 'design-system');
+  const src = path.join(ds, 'src');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-ds-'));
+  try {
+    copyTree(ds, tmp, { filter: (p) => p !== src && !p.startsWith(src + path.sep) });
+    const run = (script: string, ...args: string[]) => execFileSync(process.execPath, [path.join(src, script), ...args], { stdio: 'pipe' });
+    run('icones.mjs', path.join(src, 'base.css'), path.join(tmp, 'components', 'bundle.css'));
+    run('composants.mjs', tmp);
+    run('tokens-css.mjs', path.join(tmp, 'tokens.json'), path.join(tmp, 'tokens.css'));
+    run('page.mjs', tmp, path.join(tmp, 'index.html'));
+    const stale: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const file = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(file);
+        else if (/\.(css|html|md)$/.test(entry.name)) {
+          const rel = path.relative(tmp, file);
+          const committed = path.join(ds, rel);
+          const text = (f: string) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n') : '');
+          if (text(file) !== text(committed)) stale.push(rel);
+        }
+      }
+    };
+    walk(tmp);
+    assert.deepEqual(stale, [], 'design system en retard sur le registre : node docs/design-system/src/construire.mjs');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 test('le design system n’emploie que des icônes du registre', () => {

@@ -588,8 +588,9 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
       [...row.children].forEach((cell, i) => {
         const r = rect(cell);
         (columns[i] ??= []).push([r.left, r.right]);
-        // Un texte plus large que sa case déborde sur la voisine (« 100+ » sur le drapeau).
-        if (!cell.matches('.flag, .avatar') && cell.scrollWidth > cell.clientWidth + 0.5) problems.add('texte qui déborde de sa case (' + (cell.scrollWidth - cell.clientWidth) + ' px) : ' + label(cell));
+        // Un texte plus large que sa case déborde sur la voisine (« 100+ » sur le drapeau) ; une case
+        // qui masque ce qui dépasse (un nom abrégé par des points de suspension) l'a voulu.
+        if (!cell.matches('.flag, .avatar') && getComputedStyle(cell).overflowX === 'visible' && cell.scrollWidth > cell.clientWidth + 0.5) problems.add('texte qui déborde de sa case (' + (cell.scrollWidth - cell.clientWidth) + ' px) : ' + label(cell));
       });
       const probes = [];
       const seen = new Set();
@@ -598,6 +599,12 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
         const host = n.parentElement;
         if (!n.textContent.trim() || seen.has(host) || host.closest('.flag, .avatar')) continue;
         seen.add(host);
+        // Une ligne de tableau tient sur une ligne : un texte qui passe dessous la grandit, et
+        // drapeau et pastille, centrés, ne sont plus en face du nom.
+        const range = document.createRange();
+        range.selectNodeContents(n);
+        const tops = new Set([...range.getClientRects()].map((r) => Math.round(localRect(r, q).top)));
+        if (tops.size > 1) problems.add('texte sur plusieurs lignes dans un tableau : ' + label(host));
         const probe = document.createElement('span');
         probe.style.cssText = 'display:inline-block;width:0;height:0;margin:0;padding:0;border:0';
         host.insertBefore(probe, n);

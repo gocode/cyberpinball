@@ -133,7 +133,7 @@ function checkPath(parts: string[]): string | undefined {
 
 function textFiles(): string[] {
   const docs = [...['manuel.md', 'manual.md'].map((f) => path.join(REPO, 'docs', f)), ...['tests-manuels.md', 'manual-tests.md'].map((f) => path.join(REPO, 'interne', 'tests-manuels', f))];
-  const readmes = ['README.md', 'README.fr.md'].map((f) => path.join(REPO, f));
+  const readmes = ['README.md', 'README.fr.md', 'CHANGELOG.md', 'CHANGELOG.en.md'].map((f) => path.join(REPO, f));
   const code = [APP, path.join(REPO, 'packages', 'core', 'src'), path.join(REPO, 'packages', 'core', 'src', 'i18n', 'en')].flatMap((dir) =>
     fs
       .readdirSync(dir)
@@ -143,10 +143,23 @@ function textFiles(): string[] {
   return [...docs, ...readmes, ...code].filter((f) => fs.existsSync(f));
 }
 
+/**
+ * Lignes d'un fichier à relire. D'un CHANGELOG, seulement la version en cours (première section
+ * « ## ») : ses notes, encore à publier, décrivent le menu d'aujourd'hui ; les anciennes, celui de
+ * leur version. Les autres lignes restent vides, pour garder leurs numéros.
+ */
+function linesOf(file: string): string[] {
+  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  if (!path.basename(file).startsWith('CHANGELOG')) return lines;
+  const start = lines.findIndex((l) => l.startsWith('## '));
+  const end = lines.findIndex((l, i) => i > start && l.startsWith('## '));
+  return lines.map((l, i) => (start >= 0 && i > start && (end < 0 || i < end) ? l : ''));
+}
+
 test('les chemins « Menu système > … » du manuel et de l’interface existent', () => {
   const problems: string[] = [];
   for (const file of textFiles()) {
-    const lines = fs.readFileSync(file, 'utf8').split('\n');
+    const lines = linesOf(file);
     lines.forEach((line, i) => {
       for (const m of line.matchAll(/(?:menu système|system menu)\s*(?:\*{0,2}\s*\([^)]*\))?\s*\*{0,2}\s*>\s*(.*)/gi)) {
         const parts = segments(m[1]!);
@@ -231,7 +244,7 @@ function checkPlace(sentence: string): string | undefined {
 test('les entrées nommées « dans la rubrique … » du manuel et de l’interface y sont', () => {
   const problems: string[] = [];
   for (const file of textFiles()) {
-    const lines = fs.readFileSync(file, 'utf8').split('\n');
+    const lines = linesOf(file);
     lines.forEach((line, i) => {
       // Une phrase, ou une cellule de tableau.
       for (const sentence of line.split(/(?<=[.!?])\s+(?=[A-ZÀ-Ý«"“])|\s\|\s/)) {

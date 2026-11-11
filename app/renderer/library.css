@@ -2598,14 +2598,17 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 
 /*
  * Le tableau : une grille dont chaque ligne est une sous-grille. Rang, drapeau, pastille, nom,
- * score et date tombent dans les mêmes colonnes sur toutes les lignes, quelles que soient leurs
- * largeurs : rien ne se décale. Le drapeau et la pastille n'ont de colonne que si une ligne au
- * moins en a (with-flags, with-avatars). Le rang prend la largeur du plus long (« 100+ »). Le rang porte 1 cqmin de marge à droite, score et date
- * 1 cqmin à gauche : 2,2 cqmin entre les blocs, 1,2 cqmin entre drapeau, pastille et nom.
+ * statut, score et date tombent dans les mêmes colonnes sur toutes les lignes, quelles que soient
+ * leurs largeurs : rien ne se décale. Drapeau, pastille et statut n'ont de colonne que si une
+ * ligne au moins en a (with-flags, with-avatars, with-status) ; une ligne sans eux garde leur
+ * case, vide. Rang, statut, score et date prennent la largeur du plus long (« 100+ », « Vu il y a
+ * 3 h ») ; le nom prend le reste. Chaque ligne tient sur une seule ligne de texte.
+ * Le rang porte 1 cqmin de marge à droite ; statut, score et date 1 cqmin à gauche : 2,2 cqmin
+ * entre les blocs, 1,2 cqmin entre drapeau, pastille et nom.
  */
 .lib-scoreboard .scoreboard-lines {
   display: grid;
-  grid-template-columns: minmax(5.4cqmin, max-content) minmax(9cqmin, 1.6fr) max-content minmax(0, 0.9fr);
+  grid-template-columns: minmax(5.4cqmin, max-content) var(--flag-col,) var(--avatar-col,) minmax(9cqmin, 1fr) var(--status-col,) max-content max-content;
   column-gap: 1.2cqmin;
   margin: 0;
   padding: 0;
@@ -2613,15 +2616,15 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 }
 
 .lib-scoreboard .scoreboard-lines.with-flags {
-  grid-template-columns: minmax(5.4cqmin, max-content) 3.2cqmin minmax(9cqmin, 1.6fr) max-content minmax(0, 0.9fr);
+  --flag-col: 3.2cqmin;
 }
 
 .lib-scoreboard .scoreboard-lines.with-avatars {
-  grid-template-columns: minmax(5.4cqmin, max-content) 2.8cqmin minmax(9cqmin, 1.6fr) max-content minmax(0, 0.9fr);
+  --avatar-col: 2.8cqmin;
 }
 
-.lib-scoreboard .scoreboard-lines.with-flags.with-avatars {
-  grid-template-columns: minmax(5.4cqmin, max-content) 3.2cqmin 2.8cqmin minmax(9cqmin, 1.6fr) max-content minmax(0, 0.9fr);
+.lib-scoreboard .scoreboard-lines.with-status {
+  --status-col: max-content;
 }
 
 /* Le texte sur une même ligne de base ; drapeau et pastille centrés sur la ligne. */
@@ -2653,17 +2656,13 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 }
 
 .lib-scoreboard .scoreboard-name {
-  display: flex;
-  align-items: baseline;
-  gap: 1cqmin;
   min-width: 0;
+  /* Une ligne du tableau tient sur une ligne : un nom trop long s'abrège, il ne passe pas dessous. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-weight: 600;
   letter-spacing: 0.1em;
-}
-
-.lib-scoreboard .scoreboard-name-text {
-  min-width: 0;
-  overflow-wrap: anywhere;
 }
 
 /* Drapeau en 4:3, pas plus haut que le texte de la ligne. */
@@ -2694,16 +2693,13 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   box-shadow: 0 0 0 0.25cqmin var(--ok);
 }
 
-/* Le statut suit le nom, plus petit, et s'efface (points de suspension) avant de pousser le score. */
+/* Le statut : sa colonne à lui, juste après les noms, en entier, à la taille de la date. */
 .lib-scoreboard .scoreboard-status {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  font-size: 1.9cqmin;
+  padding-left: 1cqmin;
+  font-size: 2.04cqmin;
   font-weight: 400;
   letter-spacing: 0.02em;
   white-space: nowrap;
-  text-overflow: ellipsis;
   color: var(--ink-muted);
 }
 
@@ -2737,12 +2733,11 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 }
 
 .lib-scoreboard .scoreboard-when {
-  min-width: 0;
   padding-left: 1cqmin;
   text-align: right;
+  white-space: nowrap;
   font-size: 2.04cqmin;
   color: var(--ink-muted);
-  overflow-wrap: anywhere;
 }
 
 /* Ma ligne au-delà des premières places : séparée du tableau par un filet en pointillé. */

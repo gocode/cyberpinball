@@ -80,6 +80,7 @@ export const ICON_NAMES = [
   'volume-mute',
   'film',
   'quality',
+  'spectrum',
   // Réglages de VPX
   'star',
   'list',

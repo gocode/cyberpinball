@@ -230,7 +230,7 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         detail: v.jukebox
           ? t('Le médaillon Juke-box ouvre chaque collection de la roue, avant les tables (Start : le masquer)')
           : t('La roue ne montre que les tables ; vos playlists restent dans la gestion du Juke-box (Start : afficher le médaillon)'),
-        icon: 'tables',
+        icon: 'jukebox',
         run: () => set({ jukebox: !v.jukebox }),
       },
       jukeboxVisualizer: {
@@ -241,7 +241,7 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
             : v.jukeboxVisualizer === 'multicolore'
               ? t('Le DMD change doucement de couleur, d’une colonne à l’autre et dans le temps (Start : changer)')
               : t('Le DMD garde sa couleur réglée, sans dégradé (Start : changer)'),
-        icon: 'dmd',
+        icon: 'spectrum',
         run: () => set({ jukeboxVisualizer: JUKEBOX_VISUALIZER_MODES[(JUKEBOX_VISUALIZER_MODES.indexOf(v.jukeboxVisualizer) + 1) % JUKEBOX_VISUALIZER_MODES.length]! }),
       },
       music: {

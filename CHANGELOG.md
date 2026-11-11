@@ -13,7 +13,7 @@ son interface).
 
 - Juke-box plus beau : nouveau disque sur la roue, affiches du fronton et du playfield redessinées et animées.
 - Entrée dans le Juke-box en un geste : le disque quitte le playfield et prend la scène sur les trois écrans ; un bouton l'interrompt.
-- DMD en couleurs pendant la musique : le visualiseur prend les couleurs de la pochette (ou Multicolore, ou la couleur du DMD), réglable dans Menu système > Médias > « Visualiseur du Juke-box ».
+- DMD en couleurs pendant la musique : le visualiseur prend les couleurs de la pochette (ou Multicolore, ou la couleur du DMD), réglable dans Menu système > Médias > « Médias, son et attente » > « Visualiseur du Juke-box ».
 - Annonce du Juke-box sur le DMD : nombres de playlists et de morceaux centrés, jamais collés.
 - Bureau Windows (Ctrl+Maj+D) : plus aucun son de Cyber Pinball tant que vous êtes sur Windows, juke-box compris ; le son revient au retour au menu.
 - Dans le casque : la pause et la sortie d'une partie répondent toujours ; Pause, Échap et le menu de VPX ne sont plus jamais avalés, et Quitter ferme VPX à coup sûr.

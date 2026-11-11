@@ -604,7 +604,8 @@ function renderScoreboard(b) {
     // qu'une ligne a un drapeau ou une pastille, leur colonne existe pour toutes, vide au besoin.
     const flags = b.lines.some((l) => l.country);
     const avatars = b.lines.some((l) => l.avatar);
-    const list = libEl('ol', `scoreboard-lines${flags ? ' with-flags' : ''}${avatars ? ' with-avatars' : ''}`);
+    const statuses = b.lines.some((l) => l.status);
+    const list = libEl('ol', `scoreboard-lines${flags ? ' with-flags' : ''}${avatars ? ' with-avatars' : ''}${statuses ? ' with-status' : ''}`);
     // Garde-fou de mise en page (layout-check.ts) : colonnes, lignes de base et images alignées.
     list.dataset.aligned = '';
     for (const l of b.lines) {
@@ -615,8 +616,10 @@ function renderScoreboard(b) {
       if (avatars) li.append(l.avatar ? avatarNode(l.avatar, `scoreboard-avatar${l.status ? ` status-${l.status.state}` : ''}`) : libEl('span', 'scoreboard-avatar none'));
       const name = libEl('span', `scoreboard-name${l.anonymous ? ' anonymous' : ''}`);
       name.append(libEl('span', 'scoreboard-name-text', l.name));
-      if (l.status) name.append(libEl('span', `scoreboard-status status-${l.status.state}`, l.status.label));
-      li.append(name, libEl('span', 'scoreboard-score', l.score), libEl('span', 'scoreboard-when', l.when));
+      li.append(name);
+      // Le statut dans sa colonne, aligné d'une ligne à l'autre ; vide pour un joueur jamais vu, ou pour soi.
+      if (statuses) li.append(l.status ? libEl('span', `scoreboard-status status-${l.status.state}`, l.status.label) : libEl('span', 'scoreboard-status'));
+      li.append(libEl('span', 'scoreboard-score', l.score), libEl('span', 'scoreboard-when', l.when));
       list.append(li);
     }
     box.append(list);
