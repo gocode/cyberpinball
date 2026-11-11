@@ -13,65 +13,34 @@
 
 /* ---------- Plateau ---------- */
 
-/* L'animation du shader (intro.js, intro-shaders.js), marque comprise, à toute la scène. */
-.cp-in-gl {
+/* L'ouverture Soie (intro.js) : fils, étincelle, ignition et poussière dans un canevas 2D à toute
+   la scène ; la marque en texte par-dessus, à la taille du fuseau (intro.js règle sa taille). */
+.cp-in-canvas {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
 }
 
-/* Sans WebGL2 (ou shader refusé, contexte perdu) : la marque empilée, immobile, à la place du shader. */
-.cp-in-brand {
+.cp-in-title {
   position: absolute;
   left: 0;
   right: 0;
-  top: 42%;
+  top: 50%;
   transform: translateY(-50%);
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  font-size: min(9.4cqw, 5.4cqh);
-}
-
-.cp-in-flat .cp-in-gl,
-.cp-in-flat .cp-in-letters {
-  display: none;
-}
-
-/* Les lettres de la marque, nettes, sur un canevas réduit (écran plus grand que 1920 points) : en
-   fondu à la fin de l'animation, par-dessus le shader qui garde leur lueur (intro.js). */
-.cp-in-letters {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  text-align: center;
+  line-height: 1;
+  font-weight: 600;
+  font-stretch: 125%;
+  letter-spacing: 0.4em;
+  padding-left: 0.4em;
+  white-space: nowrap;
+  color: var(--cp-ink);
   opacity: 0;
-  transition: opacity 450ms ease-out;
-  pointer-events: none;
 }
 
-.cp-in-letters.cp-in-shown {
-  opacity: 1;
-}
-
-.cp-in-letters.cp-in-still {
-  transition: none;
-}
-
-.cp-in-flat .cp-in-brand {
-  display: flex;
-}
-
-.cp-in-mark > span {
-  margin-left: auto;
-  margin-right: auto;
-  /* L'espace après la dernière lettre, rendu à gauche : le mot reste centré. */
-  padding-left: 0.28em;
-}
-
-.cp-in-flat .cp-in-letter {
-  opacity: 1;
+.cp-in-title .cp-pin {
+  color: var(--cp-signal);
 }
 
 .cp-in-letter {

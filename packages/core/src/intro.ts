@@ -235,35 +235,36 @@ export const INTRO_SKIP_FLAG = '--sans-ouverture';
 /**
  * Rythme des animations de Cyber Pinball, en millisecondes depuis le départ de l'ouverture
  * (toutes les fenêtres prêtes). Envoyé aux fenêtres avec leur état : app/renderer/intro.js ne
- * garde aucun temps à lui, sauf le plateau, dont le shader (app/renderer/intro-shaders.js) écrit sa
- * propre partition sur ce rythme : une étincelle monte (250–1 250 ms) pendant que la bille traverse
- * le DMD, l'ignition du plateau tombe avec l'allumage du fronton (1 250 ms), sa marque se forme de
- * 1 950 à 2 900 ms, le reflet passe avec celui des autres marques (sheen), tout est figé à `end`.
+ * garde aucun temps à lui, sauf le plateau, qui joue l'ouverture Soie de la maquette validée à ses
+ * propres instants : les fils se tissent, une étincelle monte (1 200–2 400 ms) pendant que la bille
+ * traverse le DMD, l'ignition du plateau tombe avec l'allumage du fronton et de la marque du DMD
+ * (2 400 ms), sa marque se forme de 2 500 à 3 400 ms comme celle du fronton, l'invite paraît à
+ * 3 900 ms avec le reflet des marques (sheen), tout est figé à `end`.
  */
 export const INTRO_TIMELINE = {
-  /** DMD et FullDMD : mise sous tension des points (ou du cadre de lampes). */
+  /** DMD et FullDMD : mise sous tension des points (ou du cadre de lampes), pendant que les fils se tissent. */
   dmdPower: 250,
-  /** La bille traverse l'afficheur de bas en haut. */
-  dmdPass: 950,
+  /** La bille traverse l'afficheur de bas en haut, avec l'étincelle qui monte sur le plateau. */
+  dmdPass: 2100,
   dmdPassLength: 260,
-  /** La marque se dessine derrière un trait de balayage. */
-  dmdBrand: 1350,
+  /** La marque se dessine derrière un trait de balayage, dès l'ignition. */
+  dmdBrand: 2400,
   dmdBrandLength: 900,
   /** FullDMD : PRESS START sous la marque. */
-  dmdPress: 2500,
-  /** Fronton : ses lampes s'allument en vacillant, puis l'illustration et la marque. */
-  backglassPower: 1250,
-  backglassBrand: 1950,
+  dmdPress: 3500,
+  /** Fronton : ses lampes s'allument en vacillant à l'ignition, puis la marque, avec celle du plateau. */
+  backglassPower: 2400,
+  backglassBrand: 2500,
   /** Topper : un trait de lumière le traverse. */
-  topperSweep: 2300,
+  topperSweep: 2700,
   topperSweepLength: 700,
   /** Reflet qui passe sur chaque marque, une fois. */
-  sheen: 3400,
+  sheen: 3900,
   sheenLength: 700,
   /** Tout est posé : chaque écran garde sa dernière image, le plateau continue en boucle (intro.js). */
-  end: 4100,
+  end: 4600,
   /** L'invite à appuyer sur un bouton paraît sur le plateau. */
-  hint: 4300,
+  hint: 3900,
 } as const;
 
 export type IntroTimeline = typeof INTRO_TIMELINE;

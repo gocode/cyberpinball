@@ -266,7 +266,9 @@
         slot.handle = window.CyberIntro[intro](box, card, { intro: view.intro });
         // Couche déjà coupée (voile de nuit, fenêtre cachée) : la scène ne tourne pas avant d'être vue.
         slot.handle?.setActive?.(active && !document.hidden);
-        opts.onEnd && setTimeout(opts.onEnd, Math.max(0, (view.intro?.timeline?.end ?? 0) - (Date.now() - (view.intro?.startedAt ?? Date.now()))));
+        // Fin de la partie jouée une fois : l'instant de l'invite (timeline.hint) s'il est donné, sinon la fin.
+        const done = view.intro?.timeline?.hint ?? view.intro?.timeline?.end ?? 0;
+        opts.onEnd && setTimeout(opts.onEnd, Math.max(0, done - (Date.now() - (view.intro?.startedAt ?? Date.now()))));
         return box;
       }
       const kit = window.CyberFallback;

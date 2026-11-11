@@ -3245,44 +3245,50 @@ html.attract-mode #media-bg::after {
 }
 
 /*
- * Ouverture : l'invite paraît quand l'animation du plateau est finie, en bas de l'écran, sous le
- * fuseau (maquette validée : la marque au centre, sur l'éclair), en borne comme au bureau.
+ * Ouverture : l'invite de la maquette validée (ouverture Soie), en texte seul sous le fuseau, à
+ * 1 730 unités d'un plateau de 1080 × 1920 (l'unité suit la plus petite des deux échelles, comme
+ * le dessin du plateau, intro.js). Elle paraît en 500 ms à timeline.hint, puis respire entre 40 et
+ * 85 % (2,4 s le souffle), en borne comme au bureau.
  */
 .intro-hint-box {
   position: absolute;
   left: 0;
   right: 0;
-  top: 88%;
+  top: 90.1%;
   display: flex;
   justify-content: center;
-  padding: 0 4vmin;
+  padding: 0 4cqw;
   pointer-events: none;
-  animation: intro-hint-in 600ms ease-out both;
+  font-size: max(1.852cqmin, min(calc(100cqw * 26 / 1080), calc(100cqh * 26 / 1920)));
+  animation: intro-hint-in 500ms linear both;
 }
 
-html.menu-desktop .intro-hint-box {
-  top: auto;
-  bottom: 7%;
-}
-
-.intro-hint {
-  max-width: 80%;
+.intro-hint.attract-hint {
+  max-width: 92%;
+  padding: 0 0 0 0.32em;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-size: 1em;
+  font-weight: 500;
+  letter-spacing: 0.32em;
   text-align: center;
-  background: rgb(3 8 7 / 0.9);
-  /* Deux battements puis l'invite reste allumée : la dernière image ne bouge plus. */
-  animation: intro-pulse 1200ms ease-in-out 2;
+  color: var(--ink);
+  animation: intro-hint-souffle 1208ms cubic-bezier(0.37, 0, 0.63, 1) infinite alternate;
 }
 
-@keyframes intro-pulse {
-  50% {
-    color: rgb(230 240 236 / 0.65);
+@keyframes intro-hint-souffle {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 0.85;
   }
 }
 
 @keyframes intro-hint-in {
   from {
     opacity: 0;
-    transform: translateY(1vmin);
   }
 }
 

@@ -1633,6 +1633,39 @@ if (window.visualViewport) {
   fit();
 }
 
+// --- Plein écran au toucher (Android) -------------------------------------------
+//
+// Chrome pour Android ouvre le raccourci d'une page HTTP dans un onglet, barre d'adresse comprise :
+// seule une page HTTPS installable s'ouvre sans elle. La page demande donc le plein écran au premier
+// toucher (l'API l'exige), et de nouveau au toucher suivant une sortie (geste retour, autre
+// application). Le toucher fait aussi ce qu'il touche : la demande part au relâchement, sans rien
+// empêcher. Rien sur l'iPhone (le raccourci y est déjà plein écran), ni quand le navigateur n'a pas
+// de plein écran ou le refuse. La hauteur suit la zone visible (fit ci-dessus) : rien ne saute, le
+// clavier du téléphone et les feuilles restent utilisables. Jamais dans Electron (les essais chargent
+// la vraie page dans des fenêtres hors écran : un vrai plein écran les montrerait), sauf essai qui
+// le simule (window.cyberFullscreenTest).
+let fullscreenRefused = false;
+function fullscreenWanted() {
+  const root = document.documentElement;
+  if (fullscreenRefused || document.fullscreenElement || standalone()) return false;
+  if (/Electron\//.test(navigator.userAgent) && !window.cyberFullscreenTest) return false;
+  return Boolean(document.fullscreenEnabled && typeof root.requestFullscreen === 'function');
+}
+function askFullscreen() {
+  if (!fullscreenWanted()) return;
+  // Le champ qui a le clavier le garde : la bascule ne le replie pas.
+  const focused = document.activeElement;
+  Promise.resolve(document.documentElement.requestFullscreen({ navigationUI: 'hide' }))
+    .then(() => {
+      if (focused instanceof HTMLElement && focused !== document.body && document.activeElement !== focused) focused.focus({ preventScroll: true });
+    })
+    .catch(() => {
+      // Refusé (réglage du navigateur, page sans geste) : on ne redemande plus pendant cette visite.
+      fullscreenRefused = true;
+    });
+}
+document.addEventListener('pointerup', askFullscreen, { capture: true, passive: true });
+
 /** Nouvelle tentative de liaison, repartie de zéro (« Reprendre », retour de Cyber Pinball). */
 function connectFresh() {
   clearTimeout(retryTimer);

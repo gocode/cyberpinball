@@ -14,7 +14,7 @@
 // restent d'accord. options.intro.at fige la scène à un instant (planche des essais). Au bout,
 // le plateau continue en boucle, discret (ses fils tournent lentement, sa poussière dérive), à
 // cadence réduite ; les autres écrans gardent leur dernière image, sans plus rien calculer.
-// options.intro.loop règle la boucle (essais : vitesses et amplitudes comparées). Les styles sont
+// options.intro.loop.off coupe la boucle (essais). Les styles sont
 // dans intro.css ; couleurs, marque et matière, celles du design system (fallback.css).
 
 (() => {
@@ -184,202 +184,248 @@
 
   // ---------- Plateau ----------
 
-  // Dessinée par un shader WebGL2 plein écran (window.CyberIntroShaders.playfield, intro-shaders.js,
-  // conçu pour Cyber Pinball) : lumière, profondeur et grain calculés au pixel, image fonction du seul
-  // instant. La marque lui est donnée en texture, au cadrage de l'écran : R « CYBER », G
-  // « PINBALL » (nets), B les deux floutés (lueurs) ; les fils, en tableaux uniformes
-  // (CyberIntroShaders.playfieldUniforms). Pendant l'animation, le canevas compte au plus 1920
-  // points sur son grand côté (la moitié d'un écran 4K), moins si la carte graphique ne suit pas
-  // (images espacées de plus de 26 ms). Puis la boucle (CyberIntroShaders.playfieldFrame), à la même
-  // taille, donc sans saut de netteté, à 20 images par seconde au plus, 15 puis 10 si la carte
-  // graphique ne suit pas : le mouvement est assez lent pour rester fluide. Canevas réduit (écran
-  // plus grand que 1920 points) : à la fin, les lettres de la marque paraissent nettes en fondu, dans
-  // un canevas 2D à pleine résolution posé dessus, et le shader ne garde que leur lueur. Sans WebGL2
-  // (ou shader refusé), la marque en HTML, immobile.
+  // L'ouverture « Soie » de la maquette validée (11/11/2026), reprise telle quelle : le même dessin
+  // en Canvas 2D, les mêmes courbes et les mêmes instants (en secondes, comme dans la maquette).
+  // Des fils en fuseau se tissent depuis le bas (0,1 à 2,4 s), une étincelle monte (1,2 à 2,4 s),
+  // l'ignition anamorphique s'ouvre à 2,4 s, la marque s'écarte en se précisant (2,5 à 3,4 s), en
+  // texte posé sur la taille du fuseau. Ensuite, les fils tournent lentement et la poussière dérive
+  // sur trois profondeurs. Le dessin est mesuré en unités d'un plateau de 1080 × 1920 : sur un écran
+  // d'autres proportions (au bureau, en largeur), l'unité suit la plus petite des deux échelles, le
+  // fuseau reste au centre, la ligne d'horizon et la poussière vont d'un bord à l'autre.
 
-  /**
-   * Où se pose la marque dans la texture (maquette validée, 11/11/2026) : « CYBER PINBALL » sur une
-   * ligne, posée sur l'éclair au cœur du fuseau ; largeur de la ligne et hauteur des lettres au plus.
-   */
-  const PLAYFIELD_BRAND = { y: 0.5, width: 0.74, maxHeight: 0.055 };
-  /** Grand côté du canevas pendant l'animation, et le plus petit auquel on descend si la carte peine. */
-  const PLAYFIELD_LIVE_MAX = 1920;
-  const PLAYFIELD_LIVE_MIN = 960;
+  const TAU = Math.PI * 2;
+  const lerp = (a, b, t) => a + (b - a) * t;
+  /** Avancement de 0 à 1 entre les instants a et b (secondes). */
+  const seg = (t, a, b) => clamp((t - a) / (b - a));
+  const E = {
+    out3: (t) => 1 - Math.pow(1 - t, 3),
+    io3: (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
+    expo: (t) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t)),
+  };
+  /** Suite pseudo-aléatoire figée par sa graine : les mêmes fils et la même poussière à chaque fois. */
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a |= 0;
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const RGB = {};
+  function rgba(h, a) {
+    let v = RGB[h];
+    if (!v) v = RGB[h] = [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+    a = a < 0 ? 0 : a > 1 ? 1 : a;
+    return `rgba(${v[0]},${v[1]},${v[2]},${a.toFixed(3)})`;
+  }
+  /** Couleurs du design system : noir sarcelle, sarcelle, halo, vert signal, cœur de l'éclair. */
+  const C = { void: '#030807', teal: '#36c9b4', halo: '#1c8f80', sig: '#8be23a', hot: '#e8ffd0' };
+
+  /** Grain de pellicule, une tuile de 192 points posée en « overlay » à chaque image. */
+  let grainTile;
+  function grain() {
+    if (grainTile) return grainTile;
+    grainTile = document.createElement('canvas');
+    grainTile.width = grainTile.height = 192;
+    const g = grainTile.getContext('2d');
+    if (!g?.createImageData) return grainTile;
+    const d = g.createImageData(192, 192);
+    const r = rng(7);
+    for (let i = 0; i < d.data.length; i += 4) {
+      const v = (r() * 255) | 0;
+      d.data[i] = d.data[i + 1] = d.data[i + 2] = v;
+      d.data[i + 3] = 255;
+    }
+    g.putImageData(d, 0, 0);
+    return grainTile;
+  }
+  function glowDot(c, x, y, r, col, a) {
+    if (a <= 0.005 || r <= 0) return;
+    const g = c.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, rgba(col, a));
+    g.addColorStop(0.25, rgba(col, a * 0.42));
+    g.addColorStop(1, rgba(col, 0));
+    c.fillStyle = g;
+    c.fillRect(x - r, y - r, 2 * r, 2 * r);
+  }
+  function makeDust(n, seed) {
+    const r = rng(seed);
+    return Array.from({ length: n }, () => ({ x: r() * 1080, y: r() * 1920, z: [0.35, 0.6, 1][(r() * 3) | 0], s: r() }));
+  }
+  function drawDust(c, dust, t, col, alpha, W, H) {
+    if (alpha <= 0.01) return;
+    c.globalCompositeOperation = 'lighter';
+    for (const d of dust) {
+      const y = (((d.y - t * 38 * d.z) % H) + H) % H;
+      const x = d.x * (W / 1080) + Math.sin(t * 0.3 + d.s * 9) * 20 * d.z;
+      const a = alpha * (0.12 + 0.45 * d.z) * (0.6 + 0.4 * Math.sin(t * 2 + d.s * 20));
+      c.fillStyle = rgba(col, a);
+      c.beginPath();
+      c.arc(x, y, 1.2 + 2.4 * d.z, 0, TAU);
+      c.fill();
+    }
+    c.globalCompositeOperation = 'source-over';
+  }
+  function makeThreads(n, seed) {
+    const r = rng(seed);
+    return Array.from({ length: n }, (_, i) => ({ th: (i / n) * TAU + r() * 0.12, w: 0.55 + r() * 0.8, d: r() }));
+  }
+  /** Les fils en fuseau, resserrés à la taille (cy) : chacun se tisse depuis le bas, puis tourne. */
+  function drawSpindle(c, threads, t, grow, alpha, ign, W, H) {
+    const cx = W / 2;
+    const cy = H / 2;
+    c.globalCompositeOperation = 'lighter';
+    for (const th of threads) {
+      const p = grow ? E.out3(seg(t, 0.1 + th.d * 0.7, 1.7 + th.d * 0.7)) : 1;
+      if (p <= 0) continue;
+      const yEnd = lerp(H + 80, -80, p);
+      const base = th.th + t * 0.22;
+      const depth = (Math.sin(base) + 1) / 2;
+      c.beginPath();
+      for (let j = 0; j <= 36; j++) {
+        const y = lerp(H + 80, yEnd, j / 36);
+        const k = Math.abs(y - cy) / 1000;
+        const wd = 40 + 560 * Math.pow(k, 1.7) * th.w;
+        const x = cx + Math.cos(base + (y - cy) * 0.0011) * wd;
+        if (j) c.lineTo(x, y);
+        else c.moveTo(x, y);
+      }
+      const a = (0.08 + 0.32 * depth) * (1 + 1.8 * ign) * alpha;
+      c.strokeStyle = rgba(C.teal, a * 0.18);
+      c.lineWidth = 8;
+      c.stroke();
+      c.strokeStyle = rgba(C.teal, a);
+      c.lineWidth = 1.8;
+      c.stroke();
+    }
+    c.globalCompositeOperation = 'source-over';
+  }
+
+  /** Une image de l'ouverture à l'instant t (secondes), sur le contexte déjà mis à l'échelle (W × H unités). */
+  function drawSoie(c, s, t, W, H) {
+    const cx = W / 2;
+    const cy = H / 2;
+    c.fillStyle = C.void;
+    c.fillRect(0, 0, W, H);
+    const ign = t > 2.4 ? Math.exp(-(t - 2.4) * 1.5) : 0;
+    const bg = c.createRadialGradient(cx, cy, 0, cx, cy, 1000);
+    bg.addColorStop(0, rgba(C.halo, 0.16 + 0.3 * ign));
+    bg.addColorStop(1, rgba(C.halo, 0));
+    c.fillStyle = bg;
+    c.fillRect(0, 0, W, H);
+    drawSpindle(c, s.threads, t, true, 1, ign, W, H);
+    c.globalCompositeOperation = 'lighter';
+    // L'étincelle monte du bas jusqu'à la taille du fuseau, sa traînée derrière elle.
+    if (t > 1.2 && t < 2.45) {
+      const q = E.io3(seg(t, 1.2, 2.4));
+      const y = lerp(H + 40, cy, q);
+      const tr = c.createLinearGradient(0, y, 0, y + 360);
+      tr.addColorStop(0, rgba(C.sig, 0.75));
+      tr.addColorStop(1, rgba(C.sig, 0));
+      c.fillStyle = tr;
+      c.fillRect(cx - 3, y, 6, 360);
+      glowDot(c, cx, y, 90, C.sig, 0.55);
+      glowDot(c, cx, y, 18, C.hot, 1);
+    }
+    // L'ignition : un éclair aplati (anamorphique), la ligne d'horizon, un éclat sur tout l'écran.
+    if (t > 2.4) {
+      const g = E.expo(seg(t, 2.4, 2.8));
+      const R = 1400 * g + 1;
+      c.save();
+      c.translate(cx, cy);
+      c.scale(1, 0.04);
+      const fg = c.createRadialGradient(0, 0, 0, 0, 0, R);
+      fg.addColorStop(0, rgba(C.hot, 0.95 * ign));
+      fg.addColorStop(0.1, rgba(C.sig, 0.7 * ign));
+      fg.addColorStop(0.45, rgba(C.teal, 0.22 * ign));
+      fg.addColorStop(1, rgba(C.teal, 0));
+      c.fillStyle = fg;
+      c.fillRect(-R, -R, 2 * R, 2 * R);
+      c.restore();
+      const hl = c.createLinearGradient(0, 0, W, 0);
+      const ha = (0.16 + 0.25 * ign) * g;
+      hl.addColorStop(0, rgba(C.teal, 0));
+      hl.addColorStop(0.5, rgba(C.sig, ha));
+      hl.addColorStop(1, rgba(C.teal, 0));
+      c.fillStyle = hl;
+      c.fillRect(0, cy - 1, W, 2);
+      if (t < 2.65) {
+        c.fillStyle = rgba(C.sig, 0.14 * (1 - seg(t, 2.4, 2.65)));
+        c.fillRect(0, 0, W, H);
+      }
+    }
+    c.globalCompositeOperation = 'source-over';
+    drawDust(c, s.dust, t, C.teal, seg(t, 2.4, 3.6), W, H);
+  }
+
   /** Écart entre deux images de la boucle (ms), du plus fluide au plus économe. */
-  const PLAYFIELD_LOOP_STEPS = [1000 / 20, 1000 / 15, 1000 / 10];
-  /** Fondu des lettres nettes posées sur un canevas réduit, à la fin (intro.css, .cp-in-letters). */
-  const PLAYFIELD_LETTERS_FADE = 450;
-  const BRAND_FONT = "'CP Saira', 'Segoe UI', sans-serif"; // i18n-ignore : pile de polices
-
-  /** Programme du shader sur un triangle plein écran ; undefined si WebGL2 refuse. */
-  function glProgram(gl, fragment) {
-    const vertex = '#version 300 es\nin vec2 p;\nvoid main() { gl_Position = vec4(p, 0.0, 1.0); }';
-    const compile = (type, source) => {
-      const shader = gl.createShader(type);
-      gl.shaderSource(shader, source);
-      gl.compileShader(shader);
-      if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return shader;
-      console.error(`Ouverture : shader refusé : ${gl.getShaderInfoLog(shader)}`);
-      return undefined;
-    };
-    const vs = compile(gl.VERTEX_SHADER, vertex);
-    const fs = compile(gl.FRAGMENT_SHADER, fragment);
-    if (!vs || !fs) return undefined;
-    const program = gl.createProgram();
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.bindAttribLocation(program, 0, 'p');
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error(`Ouverture : programme refusé : ${gl.getProgramInfoLog(program)}`);
-      return undefined;
-    }
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    return program;
-  }
+  const PLAYFIELD_LOOP_STEPS = [1000 / 30, 1000 / 20, 1000 / 15];
 
   /**
-   * Masque de la marque à la taille du canevas (W × H) : la marque du design system
-   * (.cp-wordmark-stack : Saira 300, chasse 125 %, espacement 0,28 em, interligne 1,35). Avec
-   * `into`, les lettres seules dans ce canevas, aux couleurs que le shader leur donne (INK, LIME),
-   * sur fond transparent : la marque nette posée sur un canevas réduit.
-   */
-  function brandMask(W, H, into) {
-    const c = into ?? document.createElement('canvas');
-    c.width = W;
-    c.height = H;
-    const ctx = c.getContext('2d');
-    if (!into) {
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, W, H);
-    }
-    const font = (size) => `300 expanded ${size}px ${BRAND_FONT}`;
-    const spaced = (size) => {
-      ctx.font = font(size);
-      ctx.fontStretch = 'expanded';
-      ctx.letterSpacing = `${size * 0.28}px`;
-    };
-    // La ligne « CYBER  PINBALL » sur `width` de la largeur, ses lettres sur `maxHeight` de la hauteur au plus.
-    spaced(100);
-    const line100 = ctx.measureText('CYBER').width + ctx.measureText('PINBALL').width + 110;
-    const size = Math.min((W * PLAYFIELD_BRAND.width) / (line100 / 100), H * PLAYFIELD_BRAND.maxHeight);
-    spaced(size);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    const wC = ctx.measureText('CYBER').width;
-    const wP = ctx.measureText('PINBALL').width;
-    const gap = size * 1.1;
-    // L'espace entre les deux mots tombe sur le cœur lumineux du fuseau : aucune lettre n'est mangée
-    // par l'éclat. La mesure de CYBER compte l'espacement après sa dernière lettre : on le retire.
-    const y = H * PLAYFIELD_BRAND.y;
-    const xC = W / 2 - gap / 2 - (wC - size * 0.28);
-    const xP = W / 2 + gap / 2;
-    const words = (cyber, pinball) => {
-      ctx.fillStyle = cyber;
-      ctx.fillText('CYBER', xC, y);
-      ctx.fillStyle = pinball;
-      ctx.fillText('PINBALL', xP, y);
-    };
-    if (into) {
-      words('#e6f0ec', '#8be23a');
-      return c;
-    }
-    ctx.globalCompositeOperation = 'lighter';
-    words('#f00', '#0f0');
-    ctx.filter = `blur(${Math.max(1, size * 0.35)}px)`;
-    words('#00f', '#00f');
-    ctx.filter = 'none';
-    return c;
-  }
-
-  /**
-   * Plateau : l'animation du shader, puis sa dernière image, immobile, en pleine résolution.
-   * L'invite de l'application se pose vers 64 % de la hauteur, sur une zone que le shader laisse sombre.
+   * Plateau : l'ouverture Soie, puis sa boucle (les fils tournent, la poussière dérive). L'invite
+   * de l'application se pose en bas de l'écran (frontend.css, .intro-hint-box), à l'instant
+   * timeline.hint.
    */
   function playfield(container, game, options) {
     return scene(container, 'playfield', options, (root, tl) => {
-      const canvas = root.appendChild(el('canvas', 'cp-in-gl'));
-      // Les lettres nettes, sur un canevas réduit, une fois la marque formée (créées au besoin).
-      let crisp;
-      let crispSize = '';
-      const { mark } = stackedLetters('cp-in-mark');
-      const fallback = root.appendChild(el('div', 'cp-in-brand'));
-      fallback.append(mark);
-      const source = window.CyberIntroShaders?.playfield;
-      const gl = source ? canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, preserveDrawingBuffer: true, powerPreference: 'high-performance' }) : null;
-      const program = gl ? glProgram(gl, source) : undefined;
-      let working = Boolean(program);
-      let texture;
-      let size = '';
-      let fontsAsked = false;
-      const uniform = (name) => (program ? gl.getUniformLocation(program, name) : null);
-      const u = { res: uniform('u_res'), time: uniform('u_time'), brand: uniform('u_brand'), thread: uniform('u_thread'), rise: uniform('u_rise'), sway: uniform('u_sway'), overlay: uniform('u_overlay') };
+      const canvas = root.appendChild(el('canvas', 'cp-in-canvas'));
+      const title = root.appendChild(el('div', 'cp-in-title'));
+      title.append(el('span', 'cp-ink', 'CYBER'), document.createTextNode(' '), el('span', 'cp-pin', 'PINBALL'));
+      const ctx = canvas.getContext('2d');
+      const s = { threads: makeThreads(46, 11), dust: makeDust(70, 35) };
       const loopTune = options?.intro?.loop;
-      if (working) {
-        gl.useProgram(program);
-        for (const [name, values] of Object.entries(window.CyberIntroShaders.playfieldUniforms ?? {})) {
-          gl.uniform4fv(gl.getUniformLocation(program, name), new Float32Array(values));
-        }
-        texture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        canvas.addEventListener('webglcontextlost', () => {
-          working = false;
-          root.classList.add('cp-in-flat');
-        });
-      } else {
-        root.classList.add('cp-in-flat');
-      }
-      let liveMax = PLAYFIELD_LIVE_MAX;
-      let lastAt = 0;
-      let slow = 0;
-      /** Six images de suite trop espacées : le canevas de l'animation perd un quart de sa taille. */
-      const pace = () => {
-        const now = performance.now();
-        const dt = now - lastAt;
-        lastAt = now;
-        if (dt > 100) return;
-        slow = dt > 26 ? slow + 1 : Math.max(0, slow - 1);
-        if (slow < 6 || liveMax <= PLAYFIELD_LIVE_MIN) return;
-        liveMax = Math.max(PLAYFIELD_LIVE_MIN, Math.round(liveMax * 0.75));
-        slow = 0;
-      };
-      /** Taille du canevas : la même pendant l'animation et la boucle (au plus PLAYFIELD_LIVE_MAX). */
+      // Mesures : k points du canevas par unité, u pixels CSS par unité, W × H unités.
+      let k = 1;
+      let u = 1;
+      let W = 1080;
+      let H = 1920;
+      let pattern = null;
+      let shownTitle = '';
       const fit = () => {
-        const W = root.clientWidth || 1;
-        const H = root.clientHeight || 1;
-        const dpr = window.devicePixelRatio || 1;
-        const k = Math.min(1, liveMax / Math.max(W, H)) * dpr;
-        const w = Math.max(1, Math.round(W * k));
-        const h = Math.max(1, Math.round(H * k));
-        const key = `${w}x${h}`;
-        if (key === size) return;
-        size = key;
-        canvas.width = w;
-        canvas.height = h;
-        uploadBrand();
-      };
-      const uploadBrand = () => {
-        if (!working) return;
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, brandMask(canvas.width, canvas.height));
-        // La police de la marque peut arriver après le premier tracé : texture refaite, image repeinte.
-        if (!fontsAsked && document.fonts && !document.fonts.check(`300 expanded 100px ${BRAND_FONT}`)) {
-          fontsAsked = true;
-          document.fonts.load(`300 expanded 100px ${BRAND_FONT}`).then(() => {
-            size = '';
-            crispSize = '';
-            handle.repaint();
-          }, () => undefined);
+        const cssW = root.clientWidth || 1;
+        const cssH = root.clientHeight || 1;
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        const w = Math.max(2, Math.round(cssW * dpr));
+        const h = Math.max(2, Math.round(cssH * dpr));
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+          pattern = null;
         }
+        k = Math.min(w / 1080, h / 1920);
+        u = Math.min(cssW / 1080, cssH / 1920);
+        W = w / k;
+        H = h / k;
+        title.style.fontSize = `${(56 * u).toFixed(2)}px`;
+        shownTitle = '';
+      };
+      /** La marque : elle paraît, s'écarte et se précise (2,5 à 3,4 s). */
+      const setTitle = (t) => {
+        const tp = E.out3(seg(t, 2.5, 3.4));
+        const ls = lerp(0.06, 0.4, tp);
+        const blur = (1 - tp) * 10 * u;
+        const key = `${tp.toFixed(3)}:${blur.toFixed(2)}`;
+        if (key === shownTitle) return;
+        shownTitle = key;
+        const st = title.style;
+        st.opacity = tp.toFixed(3);
+        st.letterSpacing = `${ls.toFixed(3)}em`;
+        st.paddingLeft = `${ls.toFixed(3)}em`;
+        st.filter = blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : 'none';
+      };
+      const grainOn = (still) => {
+        if (still || !ctx.createPattern) return;
+        if (!pattern) pattern = ctx.createPattern(grain(), 'repeat');
+        if (!pattern) return;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, -((Math.random() * 192) | 0), -((Math.random() * 192) | 0));
+        ctx.globalAlpha = 0.07;
+        ctx.globalCompositeOperation = 'overlay';
+        ctx.fillStyle = pattern;
+        ctx.fillRect(0, 0, canvas.width + 192, canvas.height + 192);
+        ctx.restore();
       };
       /**
        * Cadence de la boucle : une image toutes les PLAYFIELD_LOOP_STEPS[step] ms. Huit images de
@@ -399,75 +445,39 @@
         step += 1;
         late = 0;
       };
-      /**
-       * Lettres nettes : sur un canevas réduit, à partir de la fin, un canevas 2D à la taille de
-       * l'écran, en fondu ; rend 1 quand le fondu est fini (le shader ne peint plus les lettres).
-       */
-      const letters = (e) => {
-        const dpr = window.devicePixelRatio || 1;
-        const W = Math.round((root.clientWidth || 1) * dpr);
-        const H = Math.round((root.clientHeight || 1) * dpr);
-        const still = typeof options?.intro?.at === 'number';
-        if (!(canvas.width < W - 1 && e >= tl.end)) {
-          crisp?.classList.remove('cp-in-shown');
-          return 0;
-        }
-        if (!crisp) crisp = root.insertBefore(el('canvas', 'cp-in-letters'), canvas.nextSibling);
-        const key = `${W}x${H}`;
-        if (key !== crispSize) {
-          crispSize = key;
-          brandMask(W, H, crisp);
-        }
-        // Instant figé (planche) : posées d'emblée ; sinon en fondu (intro.css).
-        crisp.classList.toggle('cp-in-still', still);
-        crisp.classList.add('cp-in-shown');
-        return still || e >= tl.end + PLAYFIELD_LETTERS_FADE ? 1 : 0;
-      };
+      const end = tl.end ?? 4000;
       let lastE = -1;
       const draw = (e) => {
         lastE = e;
-        if (!working) return;
-        if (e >= 0 && e < tl.end) pace();
-        else if (e >= tl.end) loopPace();
-        fit();
-        gl.viewport(0, 0, canvas.width, canvas.height);
-        gl.useProgram(program);
-        gl.uniform2f(u.res, canvas.width, canvas.height);
-        gl.uniform1f(u.time, clamp(e, 0, tl.end));
-        gl.uniform1f(u.overlay, letters(e));
-        const moving = window.CyberIntroShaders.playfieldFrame?.(Math.max(0, e), loopTune);
-        if (moving) {
-          gl.uniform4fv(u.thread, moving.u_thread);
-          gl.uniform3fv(u.rise, moving.u_rise);
-          gl.uniform3fv(u.sway, moving.u_sway);
-        }
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.uniform1i(u.brand, 0);
+        if (!ctx) return;
+        if (e >= end) loopPace();
+        ctx.setTransform(k, 0, 0, k, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
         if (e < 0) {
-          gl.clearColor(0, 0, 0, 1);
-          gl.clear(gl.COLOR_BUFFER_BIT);
-        } else gl.drawArrays(gl.TRIANGLES, 0, 3);
+          ctx.fillStyle = C.void;
+          ctx.fillRect(0, 0, W, H);
+          title.style.opacity = '0';
+          shownTitle = '';
+          return;
+        }
+        const t = e / 1000;
+        drawSoie(ctx, s, t, W, H);
+        setTitle(t);
+        // Instant figé (planche des essais) : sans grain, pour des images comparables.
+        grainOn(typeof options?.intro?.at === 'number');
       };
-      const handle = {
-        resize() {
-          size = '';
-        },
+      return {
+        resize: fit,
         paint: draw,
-        /** La boucle tant que le shader dessine ; options.intro.loop.off la coupe (essais). */
-        loop: () => (working && !loopTune?.off ? PLAYFIELD_LOOP_STEPS[step] : 0),
-        reset() {
-          size = '';
-          crispSize = '';
-        },
+        /** La boucle tant que le canevas dessine ; options.intro.loop.off la coupe (essais). */
+        loop: () => (ctx && !loopTune?.off ? PLAYFIELD_LOOP_STEPS[step] : 0),
         repaint() {
           draw(lastE);
         },
-        destroy() {
-          gl?.getExtension('WEBGL_lose_context')?.loseContext();
-        },
       };
-      return handle;
     });
   }
 

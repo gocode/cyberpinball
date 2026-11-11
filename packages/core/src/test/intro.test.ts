@@ -232,7 +232,8 @@ const view = (role: string, screen: keyof typeof INTRO_FALLBACKS, extra: Record<
   fallback: INTRO_FALLBACKS[screen],
   card: { title: '' },
   brand: true,
-  intro: { id: 1, startedAt: Date.now(), timeline: { ...INTRO_TIMELINE, end: 30 }, rotation: 0 },
+  // L'invite à timeline.hint, pas à la fin : la fin, plus tardive, ne la retient pas.
+  intro: { id: 1, startedAt: Date.now(), timeline: { ...INTRO_TIMELINE, end: 300, hint: 30 }, rotation: 0 },
   ...extra,
 });
 
@@ -279,123 +280,33 @@ test('rendu : le fichier de l’utilisateur se joue une fois, garde sa dernière
   assert.deepEqual(p.mounted, [], 'pas d’animation de Cyber Pinball par-dessus');
 });
 
-test('plateau : le shader dessine la même image sur toutes les cartes graphiques, sans table lente', async () => {
-  // fract(sin(x)) varie d'une carte à l'autre (précision du sinus) : la borne dessinerait d'autres
-  // fils que ceux validés. Les fils viennent de valeurs figées, fournies en tableaux uniformes ;
-  // une table constante lue avec l'indice d'une boucle est recopiée à chaque pixel par ANGLE sous
-  // Direct3D (trois fois plus lente).
-  const vm = await import('node:vm');
-  const box: { window: { CyberIntroShaders?: { playfield: string; playfieldUniforms: Record<string, number[]> } } } = { window: {} };
-  vm.runInNewContext(read('app', 'renderer', 'intro-shaders.js'), box);
-  const shaders = box.window.CyberIntroShaders;
-  assert.ok(shaders, 'intro-shaders.js déclare window.CyberIntroShaders');
-  assert.match(shaders.playfield, /^#version 300 es\n/);
-  // Le code seul : les commentaires peuvent nommer ce qu'il ne faut pas faire.
-  const frag = shaders.playfield.replace(/\/\/[^\n]*/g, '');
-  assert.doesNotMatch(frag, /fract\s*\(\s*sin\s*\(/, 'aucun hachage fract(sin()) : il dépend de la carte graphique');
-  assert.doesNotMatch(frag, /\bconst\s+\w+\s+\w+\s*\[/, 'aucune table constante : en tableau uniforme');
-  for (const [name, values] of Object.entries(shaders.playfieldUniforms)) {
-    const declared = new RegExp(`uniform vec4 ${name}\\[(\\d+)\\];`).exec(frag);
-    assert.ok(declared, `${name} est déclaré dans le shader`);
-    assert.equal(values.length, Number(declared[1]) * 4, `${name} : quatre valeurs par fil`);
-    assert.ok(values.every(Number.isFinite), `${name} : des nombres`);
-  }
-  for (const [, id = ''] of frag.matchAll(/uniform vec4 (\w+)\[/g)) {
-    assert.ok(id in shaders.playfieldUniforms, `${id} est fourni par l'application`);
-  }
-  // Chargé avant intro.js, qui le lit au montage du plateau.
-  const html = read('app', 'renderer', 'frontend.html');
-  assert.ok(html.indexOf('intro-shaders.js') > 0 && html.indexOf('intro-shaders.js') < html.indexOf('intro.js"'), 'intro-shaders.js avant intro.js');
-});
-
-test('plateau : après l’animation, la boucle continue la dernière image sans saut ni à-coup, même après des jours', async () => {
-  // Les fils tournent encore, lentement, et la poussière dérive sur trois profondeurs : l'hôte
-  // calcule ces mouvements (playfieldFrame) en double précision et les ramène à leur période, le
-  // shader ne reçoit que de petits nombres. Un nombre qui grandit sans fin perdrait sa précision
-  // en simple précision (le GPU) : après quelques jours, les fils avanceraient par sauts.
-  const vm = await import('node:vm');
-  type Frame = { u_thread: Float32Array; u_rise: number[]; u_sway: number[] };
-  const box: { window: { CyberIntroShaders?: { playfield: string; playfieldUniforms: Record<string, number[]>; playfieldLoop: { spin: number; drift: number; sway: number }; playfieldFrame(ms: number, loop?: object): Frame } } } = { window: {} };
-  vm.runInNewContext(read('app', 'renderer', 'intro-shaders.js'), box);
-  const shaders = box.window.CyberIntroShaders!;
-  const frame = (ms: number, loop?: object) => shaders.playfieldFrame(ms, loop);
-  const values = (f: Frame) => [...f.u_thread, ...f.u_rise, ...f.u_sway];
-  const end = INTRO_TIMELINE.end;
-  assert.equal(end, 4100, 'la fin du rythme est celle du shader (clamp de u_time)');
-  // Ce qui ne bouge pas (fréquence, vitesse, profondeur des fils) reste la valeur relevée.
-  const base = shaders.playfieldUniforms.u_thread!;
-  const f0 = frame(0);
-  for (let i = 0; i < base.length; i++) if (i % 4 !== 1) assert.equal(f0.u_thread[i], Math.fround(base[i]!));
-  // Toujours en mouvement : entre deux images de la boucle, les fils et la poussière avancent.
-  const a = frame(end + 60_000);
-  const b = frame(end + 60_000 + 1000);
-  assert.ok(values(a).some((v, i) => Math.abs(v - values(b)[i]!) > 1e-3), 'la boucle bouge');
-  // Sans saut : à la fin de l'animation, la vitesse de chaque valeur ne change pas d'un coup
-  // (différences finies de part et d'autre de la fin, à l'écart près des périodes).
-  const TAU = 2 * Math.PI;
-  const near = (x: number, y: number, period: number) => {
-    const d = Math.abs(x - y) % period;
-    return Math.min(d, period - d);
-  };
-  const periodOf = (i: number, n: number) => (i < n && i % 4 === 1 ? TAU : i >= n && i < n + 3 ? 64 : Infinity);
-  for (const at of [end, end + 4000]) {
-    const [p, c, q] = [frame(at - 16), frame(at), frame(at + 16)].map(values) as [number[], number[], number[]];
-    const n = base.length;
-    for (let i = 0; i < c.length; i++) {
-      const period = periodOf(i, n);
-      const before = near(c[i]!, p[i]!, period);
-      const after = near(q[i]!, c[i]!, period);
-      assert.ok(Math.abs(after - before) < 2e-3, `valeur ${i} à ${at} ms : ${before} puis ${after} en 16 ms`);
-    }
-  }
-  // Les mouvements lents de la boucle : au plus le dixième de la vitesse de l'animation, jamais l'arrêt.
-  const L = shaders.playfieldLoop;
-  for (const k of ['spin', 'drift'] as const) assert.ok(L[k] > 0 && L[k] <= 0.1, `${k} : lent et jamais nul`);
-  assert.ok(L.sway > 0 && L.sway < 0.37, 'le balancement reste sous la taille d’un disque');
-  // Après une semaine : de petits nombres, toujours dans leur période.
-  const week = frame(end + 7 * 24 * 3600 * 1000);
-  for (let i = 1; i < week.u_thread.length; i += 4) assert.ok(week.u_thread[i]! >= 0 && week.u_thread[i]! < TAU + 1e-6);
-  for (const r of week.u_rise) assert.ok(r >= 0 && r < 64);
-  for (const s of week.u_sway) assert.ok(Math.abs(s) < 0.5);
-  // Le shader répète sa poussière sur la même période que celle où l'hôte ramène la montée.
-  assert.match(shaders.playfield, /const float DUST_PERIOD = 64\.0;/);
-  assert.match(shaders.playfield, /mod\(id\.y, DUST_PERIOD\)/);
-  assert.match(shaders.playfield, /uniform vec3 u_rise;/);
-  assert.match(shaders.playfield, /uniform vec3 u_sway;/);
-  // L'hôte envoie ces valeurs à chaque image ; seul le plateau tourne en boucle, et il s'arrête
-  // quand sa couche ne se voit plus (voile de nuit, fenêtre cachée), comme une vidéo.
-  const host = read('app', 'renderer', 'intro.js');
-  assert.match(host, /playfieldFrame\?\.\(/);
-  assert.equal((host.match(/\bloop: \(\) =>/g) ?? []).length, 1, 'une seule scène a une boucle : le plateau');
-  assert.match(read('app', 'renderer', 'media.js'), /slot\.handle\?\.setActive\?\.\(active && !document\.hidden\)/);
-});
-
-test('plateau : même taille de canevas avant et après la fin, lettres nettes posées sur un canevas réduit', async () => {
-  // Le vrai intro.js, dans un document linkedom, avec un faux WebGL qui note ce qu'on lui envoie.
-  // La dernière image était repeinte à pleine résolution : la boucle aurait changé de netteté à
-  // 4,1 s (et coûté le quadruple sur un écran 4K). Sur un écran plus grand que 1920 points, le
-  // canevas reste réduit, et les lettres de la marque sont posées nettes par-dessus.
+test('plateau : l’ouverture Soie de la maquette validée, en Canvas 2D à pleine résolution, la marque en texte qui se forme de 2,5 à 3,4 s', async () => {
+  // Le vrai intro.js, dans un document linkedom, avec un faux contexte 2D qui compte les fils
+  // tracés. Le plateau reprend le dessin de la maquette tel quel (aucun shader à réinventer) :
+  // 46 fils (deux traits chacun), la marque « CYBER PINBALL » en texte à la taille du fuseau,
+  // dans les unités d'un plateau de 1080 × 1920 ; la même taille de canevas avant et après la fin.
   const vm = await import('node:vm');
   const { window, document } = parseHTML('<html><body><div id="box"></div></body></html>');
-  const sent: Record<string, unknown> = {};
-  const gl = new Proxy({} as Record<string, unknown>, {
-    get(target, key: string) {
-      if (key in target) return target[key];
-      if (/^[A-Z_0-9]+$/.test(key)) return key;
-      if (key === 'getShaderParameter' || key === 'getProgramParameter') return () => true;
-      if (key === 'getUniformLocation') return (_p: unknown, name: string) => name;
-      if (key === 'getExtension') return () => undefined;
-      if (key.startsWith('uniform')) return (name: string, ...v: unknown[]) => (sent[name] = v.length === 1 ? v[0] : v);
-      return () => ({});
+  let strokes = 0;
+  const gradient = () => ({ addColorStop() {} });
+  const ctx2d = new Proxy({} as Record<string, unknown>, {
+    get(t, k: string) {
+      if (k in t) return t[k];
+      if (k === 'createRadialGradient' || k === 'createLinearGradient') return gradient;
+      if (k === 'createPattern') return () => ({});
+      if (k === 'createImageData') return (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) });
+      if (k === 'stroke') return () => (strokes += 1);
+      return () => undefined;
     },
+    set: (t, k: string, v) => ((t[k] = v), true),
   });
-  const ctx2d = new Proxy({} as Record<string, unknown>, { get: (t, k: string) => (k === 'measureText' ? () => ({ width: 500 }) : k in t ? t[k] : () => undefined), set: (t, k: string, v) => ((t[k] = v), true) });
   const Canvas = Object.getPrototypeOf(document.createElement('canvas'));
   const ownGetContext = Object.getOwnPropertyDescriptor(Canvas, 'getContext');
-  Canvas.getContext = (kind: string) => (kind === 'webgl2' ? gl : ctx2d);
+  Canvas.getContext = (kind: string) => (kind === '2d' ? ctx2d : null);
   const Html = Object.getPrototypeOf(Object.getPrototypeOf(document.createElement('div')));
-  Object.defineProperty(Html, 'clientWidth', { configurable: true, get: () => 2160 });
-  Object.defineProperty(Html, 'clientHeight', { configurable: true, get: () => 3840 });
+  let size = [2160, 3840];
+  Object.defineProperty(Html, 'clientWidth', { configurable: true, get: () => size[0] });
+  Object.defineProperty(Html, 'clientHeight', { configurable: true, get: () => size[1] });
   const box = Object.assign(window as unknown as Record<string, unknown>, {
     window,
     document,
@@ -408,34 +319,75 @@ test('plateau : même taille de canevas avant et après la fin, lettres nettes p
       disconnect() {}
     },
   });
-  vm.runInNewContext(read('app', 'renderer', 'intro-shaders.js'), box);
-  vm.runInNewContext(read('app', 'renderer', 'intro.js'), box);
-  const intro = (box as { CyberIntro?: { playfield(c: unknown, g: unknown, o: unknown): { element: { querySelector(s: string): { width: number; height: number; className: string } | null }; destroy(): void } } }).CyberIntro!;
+  const host = read('app', 'renderer', 'intro.js');
+  vm.runInNewContext(host, box);
+  type Node = { width: number; height: number; textContent: string; style: Record<string, string> };
+  const intro = (box as { CyberIntro?: { playfield(c: unknown, g: unknown, o: unknown): { element: { querySelector(s: string): Node | null }; destroy(): void } } }).CyberIntro!;
   const at = (ms: number) => {
-    const host = document.getElementById('box')!;
-    const s = intro.playfield(host, {}, { intro: { at: ms, timeline: INTRO_TIMELINE } });
-    const gl = s.element.querySelector('canvas.cp-in-gl')!;
-    const letters = s.element.querySelector('canvas.cp-in-letters');
-    const out = { size: `${gl.width}x${gl.height}`, letters: letters ? `${letters.width}x${letters.height} ${letters.className}` : 'aucune', overlay: sent.u_overlay };
+    strokes = 0;
+    const s = intro.playfield(document.getElementById('box')!, {}, { intro: { at: ms, timeline: INTRO_TIMELINE } });
+    const canvas = s.element.querySelector('canvas.cp-in-canvas')!;
+    const title = s.element.querySelector('.cp-in-title')!;
+    const out = { size: `${canvas.width}x${canvas.height}`, strokes, text: title.textContent, opacity: title.style.opacity, spacing: title.style.letterSpacing, blur: title.style.filter, font: title.style.fontSize };
     s.destroy();
     return out;
   };
-  // Les prototypes de linkedom sont partagés : rendus tels quels après la mesure.
-  let before: ReturnType<typeof at>;
-  let after: ReturnType<typeof at>;
+  let black: ReturnType<typeof at>;
+  let weaving: ReturnType<typeof at>;
+  let forming: ReturnType<typeof at>;
+  let formed: ReturnType<typeof at>;
+  let looping: ReturnType<typeof at>;
+  let desk: ReturnType<typeof at>;
   try {
-    before = at(INTRO_TIMELINE.end - 50);
-    after = at(INTRO_TIMELINE.end + 60_000);
+    black = at(-1);
+    weaving = at(2400);
+    forming = at(2900);
+    formed = at(INTRO_TIMELINE.end);
+    looping = at(INTRO_TIMELINE.end + 7 * 24 * 3600 * 1000);
+    size = [1920, 1080];
+    desk = at(INTRO_TIMELINE.end);
   } finally {
     if (ownGetContext) Object.defineProperty(Canvas, 'getContext', ownGetContext);
     else delete Canvas.getContext;
     delete Html.clientWidth;
     delete Html.clientHeight;
   }
-  assert.equal(before.size, '1080x1920', 'au plus 1920 points pendant l’animation');
-  assert.equal(after.size, before.size, 'la boucle garde la taille de l’animation : aucun saut de netteté');
-  assert.equal(before.letters, 'aucune');
-  assert.equal(before.overlay, 0, 'pendant l’animation, le shader peint les lettres');
-  assert.match(after.letters, /^2160x3840 cp-in-letters .*cp-in-shown/, 'lettres nettes à la taille de l’écran');
-  assert.equal(after.overlay, 1, 'le shader ne peint plus que leur lueur');
+  assert.equal(black.strokes, 0, 'avant le départ, du noir');
+  assert.equal(black.opacity, '0');
+  assert.equal(weaving.strokes, 92, 'les 46 fils de la maquette, deux traits chacun');
+  assert.equal(weaving.opacity, '0.000', 'la marque attend l’ignition (2,4 s)');
+  assert.ok(Number(forming.opacity) > 0 && Number(forming.opacity) < 1, 'elle paraît de 2,5 à 3,4 s');
+  assert.match(forming.blur ?? '', /^blur\(/,'floue tant qu’elle se forme');
+  assert.equal(formed.text, 'CYBER PINBALL');
+  assert.equal(formed.opacity, '1.000');
+  assert.equal(formed.spacing, '0.400em', 'écartée comme dans la maquette');
+  assert.equal(formed.blur, 'none');
+  assert.equal(formed.size, '2160x3840', 'pleine résolution');
+  assert.equal(looping.size, formed.size, 'la boucle garde la taille de l’animation : aucun saut de netteté');
+  assert.equal(looping.strokes, 92, 'après une semaine, les fils tournent encore');
+  assert.equal(formed.font, '112.00px', '56 unités d’un plateau de 1080 points de large');
+  assert.equal(desk.font, '31.50px', 'au bureau, l’unité suit la hauteur (1080 / 1920)');
+  // Aucun shader : le plateau est le dessin de la maquette, en Canvas 2D.
+  assert.doesNotMatch(host, /webgl/i);
+  assert.ok(!fs.existsSync(path.join(REPO_ROOT, 'app', 'renderer', 'intro-shaders.js')));
+  // Seul le plateau tourne en boucle, et il s'arrête quand sa couche ne se voit plus (voile de
+  // nuit, fenêtre cachée), comme une vidéo.
+  assert.equal((host.match(/\bloop: \(\) =>/g) ?? []).length, 1, 'une seule scène a une boucle : le plateau');
+  assert.match(read('app', 'renderer', 'media.js'), /slot\.handle\?\.setActive\?\.\(active && !document\.hidden\)/);
+});
+
+test('rythme : l’ignition du plateau (2,4 s) allume le fronton et la marque du DMD ; l’invite paraît à 3,9 s, tout est posé à la fin', () => {
+  const T = INTRO_TIMELINE;
+  assert.equal(T.backglassPower, 2400);
+  assert.equal(T.dmdBrand, 2400);
+  assert.ok(T.dmdPass + T.dmdPassLength <= 2400, 'la bille traverse le DMD avant l’ignition, avec l’étincelle');
+  assert.equal(T.hint, 3900, 'l’invite de la maquette');
+  // La dernière lettre du fronton (12 lettres, 85 ms d'écart, 120 ms entre les mots, 260 ms d'allumage).
+  assert.ok(T.backglassBrand + 11 * 85 + 120 + 260 <= T.end);
+  for (const [from, length] of [
+    [T.sheen, T.sheenLength],
+    [T.topperSweep, T.topperSweepLength],
+    [T.dmdBrand, T.dmdBrandLength],
+    [T.dmdPress, 800],
+  ] as const) assert.ok(from + length <= T.end, `${from} + ${length} avant la fin`);
 });
