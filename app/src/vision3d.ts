@@ -46,7 +46,8 @@ import {
   type Vision3dSourceKind,
   type WebcamEyes,
 } from '@cyberpinball/core';
-import { ELEVATION_WAIT_MS, elevationNoAnswer } from '@cyberpinball/core';
+import { ELEVATION_WAIT_MS } from '@cyberpinball/core';
+import { CANCELLED, POWERSHELL, powershell, quote, signerOf } from './elevation';
 import { downloadComponent, findComponent } from '@cyberpinball/installer';
 import { deviceStatus, hklmValue, memoryIntegrityEnabled } from '@cyberpinball/win-displays';
 import { createWindow } from './offscreen';
@@ -553,34 +554,6 @@ function startKinect1(onHead: (p: Vec3) => void, onFailure: (reason: string) => 
 
 // --- Pilote de la Kinect ----------------------------------------------------------------------
 
-const POWERSHELL = path.join(SYSTEM32, 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-/** Code de Start-Process quand l'utilisateur refuse l'élévation (ERROR_CANCELLED). */
-const CANCELLED = 1223;
-
-/** `timeoutMs` : une demande de Windows (UAC) sans réponse n'est plus attendue au-delà (front-policy.ts). */
-function powershell(command: string, timeoutMs?: number): Promise<{ status: number | null; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    const child = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command], { windowsHide: true });
-    let stdout = '';
-    let stderr = '';
-    const timer = timeoutMs
-      ? setTimeout(() => {
-          stderr = elevationNoAnswer();
-          child.kill();
-        }, timeoutMs)
-      : undefined;
-    child.stdout.on('data', (d) => (stdout += d));
-    child.stderr.on('data', (d) => (stderr += d));
-    child.on('error', (error) => resolve({ status: -1, stdout, stderr: error.message }));
-    child.on('close', (status) => {
-      clearTimeout(timer);
-      resolve({ status, stdout, stderr });
-    });
-  });
-}
-
-const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
-
 export type DriverInstall = { ok: true } | { ok: false; cancelled?: true; reason: string };
 
 /**
@@ -629,13 +602,6 @@ function run(file: string, args: string[]): Promise<{ status: number | null; std
     child.on('error', (error) => resolve({ status: -1, stderr: error.message }));
     child.on('close', (status) => resolve({ status, stderr }));
   });
-}
-
-/** Sujet du certificat d'un fichier signé, ou la raison du refus. */
-async function signerOf(file: string): Promise<{ status: string; subject: string }> {
-  const r = await powershell(`$s = Get-AuthenticodeSignature -LiteralPath ${quote(file)}; "$($s.Status)|$($s.SignerCertificate.Subject)"`);
-  const [status, subject] = r.stdout.trim().split('|');
-  return { status: status ?? '', subject: subject ?? '' };
 }
 
 /**

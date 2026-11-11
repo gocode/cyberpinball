@@ -22,6 +22,25 @@ export interface ScoreboardView {
   note?: string;
   /** Sous le tableau : où se trouve le joueur dans ce classement (portée et période). */
   position?: string;
+  /** Classements en réseau : ce que dit chaque marque de présence sur les avatars, celles du tableau seulement. */
+  legend?: { presence: Presence; label: string }[];
+}
+
+/** Ce que montre la marque posée sur l'avatar : en partie (point et anneau), en ligne (point), hors ligne (point creux). */
+export type Presence = 'playing' | 'online' | 'offline';
+export const presenceOf = (status: PlayerStatus): Presence => (status.state === 'seen' ? 'offline' : status.state);
+
+const PRESENCE_LABELS: Record<Presence, () => string> = {
+  playing: () => t('En partie'),
+  online: () => t('En ligne'),
+  offline: () => t('Hors ligne'),
+};
+
+/** La légende des marques présentes dans le tableau, dans l'ordre en partie, en ligne, hors ligne. */
+function presenceLegend(lines: ScoreboardLineView[]): ScoreboardView['legend'] {
+  const shown = new Set(lines.flatMap((l) => (l.status ? [presenceOf(l.status)] : [])));
+  const legend = (['playing', 'online', 'offline'] as const).filter((p) => shown.has(p)).map((presence) => ({ presence, label: PRESENCE_LABELS[presence]() }));
+  return legend.length ? legend : undefined;
 }
 
 export interface ScoreboardLineView {
@@ -42,7 +61,7 @@ export interface ScoreboardLineView {
   apart?: boolean;
   /** Classements en réseau : la pastille du joueur (avatar ou initiales). */
   avatar?: AvatarView;
-  /** Classements en réseau : son statut (en partie, en ligne, hors ligne, vu il y a…). */
+  /** Classements en réseau : son statut (en partie, en ligne, hors ligne, vu il y a…), en marque sur l'avatar ; le libellé en bulle. */
   status?: PlayerStatus;
   /** Le joueur de cette borne. */
   mine?: boolean;
@@ -163,7 +182,8 @@ export function rankingScoreboardView(views: (period: ScorePeriod) => RankingVie
   const position = positionText(view, scope, period);
   // Ma ligne en fin de tableau, au-delà des premières places : à part.
   const lines = view.lines.map((l, i) => rankingLineView(l, now, Boolean(l.mine) && i > 0 && view.lines[i - 1]!.rank + 1 < l.rank));
-  if (lines.length) return { ...base, lines, position, ...(view.note ? { note: view.note } : {}) };
+  const legend = presenceLegend(lines);
+  if (lines.length) return { ...base, lines, position, ...(legend ? { legend } : {}), ...(view.note ? { note: view.note } : {}) };
   const where = scope === 'world' ? t('dans le monde') : scope === 'country' ? t('dans votre pays') : t('entre amis');
   return {
     ...base,

@@ -68,6 +68,8 @@ test('toute demande d’autorisation de Windows (UAC) est prévenue avant, et n�
   // s'inscrire ici, avec l'écran qui la déclenche.
   const ELEVATIONS: Record<string, string[]> = {
     'app/src/dedicated-system.ts': ['app/src/dedicated-menu.ts'],
+    // Runtime Visual C++ de VPX (vc-runtime.ts), lancé par l'installation de VPX (askVcRuntime).
+    'app/src/elevation.ts': ['app/src/frontend.ts'],
     'app/src/firewall-rule.ts': ['app/src/friends-menu.ts'],
     'app/src/vision3d.ts': ['app/src/frontend.ts'],
   };

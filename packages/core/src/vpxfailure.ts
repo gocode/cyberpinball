@@ -61,7 +61,21 @@ const EXIT_NAMES: Record<number, () => string> = {
   0xc00000fd: () => t('pile de VPX épuisée'),
   0xc0000017: () => t('mémoire insuffisante'),
   0x80000003: () => t('point d’arrêt atteint'),
+  0xc0000135: () => t('bibliothèque (DLL) introuvable'),
+  0xc0000139: () => t('fonction introuvable dans une bibliothèque (DLL trop ancienne)'),
+  0xc000007b: () => t('bibliothèque (DLL) incompatible'),
 };
+
+/**
+ * Codes d'un VPX qui n'a pas pu démarrer faute d'une bibliothèque : sur un Windows neuf, le runtime
+ * Visual C++ de Microsoft (vc-runtime.ts), que « Santé de la borne » installe.
+ */
+const MISSING_LIBRARY = new Set([0xc0000135, 0xc0000139, 0xc000007b]);
+
+/** VPX s'est-il arrêté faute d'une bibliothèque (DLL absente, trop ancienne ou incompatible) ? */
+export function vpxMissingLibrary(code: number | null | undefined): boolean {
+  return code !== null && code !== undefined && MISSING_LIBRARY.has(code >>> 0);
+}
 
 /** « 0xC0000374, mémoire de VPX abîmée (corruption du tas) » ; undefined pour un code ordinaire. */
 export function vpxExitName(code: number | null | undefined): string | undefined {
@@ -101,6 +115,16 @@ export function diagnoseVpxFailure(logTail: readonly string[], exitCode: number 
     if (error.code) lines.push(t('Ligne en faute : {code}', { code: error.code }));
     if (error.flexActor) lines.push(t('Le script demandait l’élément « {actor} » de son DMD (FlexDMD), absent de la scène à ce moment.', { actor: error.flexActor }));
     journal.push(`erreur du script ligne ${error.line}${error.column ? `, col ${error.column}` : ''} : ${error.message}${error.flexActor ? ` (élément FlexDMD « ${error.flexActor} » introuvable)` : ''}${error.code ? ` ; ligne : ${error.code}` : ''}`); // i18n-ignore : journal
+  }
+  if (!error && vpxMissingLibrary(exitCode)) {
+    return {
+      title: t('Il manque une bibliothèque à VPX'),
+      lines: [
+        t('VPX n’a pas pu démarrer ({exit}).', { exit: exit! }),
+        t('Le plus souvent, c’est le runtime Visual C++ de Microsoft, absent d’un Windows neuf. Menu système > Borne > « Santé de la borne » l’installe, avec l’accord de Windows.'),
+      ],
+      journal: `VPX non démarré (${file}) : ${exit}, runtime Visual C++ à vérifier.`, // i18n-ignore : journal
+    };
   }
   if (exit) {
     lines.push(error ? t('VPX s’est ensuite fermé ({exit}).', { exit }) : t('VPX s’est fermé ({exit}).', { exit }));

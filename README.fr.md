@@ -133,6 +133,7 @@ Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bor
 - Windows 10 ou 11, 64 bits.
 - Un disque local avec quelques Go libres. Program Files, les dossiers de Windows et les lecteurs réseau sont exclus, car VPX et les tables doivent pouvoir écrire dans leur propre dossier.
 - Visual Pinball X 10.8.1, installé pour vous au premier lancement.
+- Le runtime Visual C++ de Microsoft, dont VPX a besoin : installé avec lui si Windows ne l’a pas (Windows demande votre accord une fois).
 
 ## Installation
 
@@ -206,6 +207,7 @@ Chacune des étapes ci-dessous est une action de `lanceur.cmd` (rubrique « Fabr
 ## Composants tiers et licences
 
 - **Visual Pinball X** ne fait pas partie de ce dépôt. Il est téléchargé depuis ses [versions officielles](https://github.com/vpinball/vpinball/releases) et contrôlé avec une empreinte SHA-256 fixe. Sa licence (GPLv3+, et pour certains fichiers une licence dérivée de celle de MAME) n'en autorise la redistribution que gratuite, en dehors de tout produit ou activité commerciale. L'installeur complet **ne doit donc être ni vendu, ni fourni avec une borne vendue ou exploitée commercialement**.
+- Le **runtime Visual C++ de Microsoft**, dont VPX a besoin, s’installe par l’installateur officiel de Microsoft, contrôlé avec une empreinte SHA-256 fixe et la signature de Microsoft ; Microsoft en autorise la redistribution avec une application, et l’installeur complet le contient.
 - La **base VPS** et **VPinMediaDB** n'indiquent aucune licence. Cyber Pinball ne les inclut pas : elles sont téléchargées depuis leurs adresses officielles à la première utilisation. Les médias de VPinMediaDB appartiennent à leurs auteurs, et les visuels des jeux à leurs fabricants : ils sont réservés à un **usage personnel, sur votre propre borne**. Les fichiers de VPForums et de VPUniverse se téléchargent avec votre propre compte, un par un, à votre demande, et restent sur votre borne : ces sites interdisent de les remettre en ligne ou de les redistribuer.
 - Le réseau des bornes repose sur Hyperswarm, HyperDHT, Protomux et secret-stream, de Holepunch, ainsi que sur sodium-native et udx-native (licences MIT et Apache-2.0).
 - Le QR code de la télécommande du téléphone est dessiné par qrcode-generator, de Kazuhiko Arase (licence MIT) ; « QR Code » est une marque déposée de DENSO WAVE INCORPORATED.

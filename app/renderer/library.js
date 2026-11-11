@@ -569,6 +569,25 @@ function flagNode(code, src, name, className) {
 // ---------- Tableau des scores d'une table ----------
 
 /**
+ * Avatar d'un joueur classé et sa marque de présence, posée en bas à droite comme sur toutes les
+ * messageries : point vert en ligne, point vert et anneau vert en partie, point creux hors ligne,
+ * rien pour un joueur jamais vu. Le statut en toutes lettres (« Vu il y a 2 h ») en bulle.
+ */
+function scoreboardFace(l) {
+  const presence = l.status ? (l.status.state === 'seen' ? 'offline' : l.status.state) : '';
+  const face = libEl('span', `scoreboard-face${presence ? ` presence-${presence}` : ''}`);
+  // Garde-fou de mise en page : une image, centrée sur sa ligne.
+  face.dataset.picture = '';
+  face.append(avatarNode(l.avatar, 'scoreboard-avatar'));
+  if (l.status) {
+    face.append(libEl('span', 'presence-dot'));
+    face.title = l.status.label;
+    face.setAttribute('aria-label', l.status.label);
+  }
+  return face;
+}
+
+/**
  * Les quatre périodes en onglets (l'onglet ouvert plein, en vert signal), puis le tableau : place,
  * initiales, score aligné à droite en chiffres tabulaires, et quand. Une période vide le dit.
  */
@@ -604,8 +623,7 @@ function renderScoreboard(b) {
     // qu'une ligne a un drapeau ou une pastille, leur colonne existe pour toutes, vide au besoin.
     const flags = b.lines.some((l) => l.country);
     const avatars = b.lines.some((l) => l.avatar);
-    const statuses = b.lines.some((l) => l.status);
-    const list = libEl('ol', `scoreboard-lines${flags ? ' with-flags' : ''}${avatars ? ' with-avatars' : ''}${statuses ? ' with-status' : ''}`);
+    const list = libEl('ol', `scoreboard-lines${flags ? ' with-flags' : ''}${avatars ? ' with-avatars' : ''}`);
     // Garde-fou de mise en page (layout-check.ts) : colonnes, lignes de base et images alignées.
     list.dataset.aligned = '';
     for (const l of b.lines) {
@@ -613,13 +631,10 @@ function renderScoreboard(b) {
       li.append(libEl('span', 'scoreboard-rank', l.rank));
       if (flags) li.append(l.country ? flagNode(l.country, l.flag, l.countryName, 'scoreboard-flag') : libEl('span', 'scoreboard-flag none'));
       // Classements en réseau : la pastille du joueur, cerclée de vert quand sa borne est en ligne.
-      if (avatars) li.append(l.avatar ? avatarNode(l.avatar, `scoreboard-avatar${l.status ? ` status-${l.status.state}` : ''}`) : libEl('span', 'scoreboard-avatar none'));
+      if (avatars) li.append(l.avatar ? scoreboardFace(l) : libEl('span', 'scoreboard-face none'));
       const name = libEl('span', `scoreboard-name${l.anonymous ? ' anonymous' : ''}`);
       name.append(libEl('span', 'scoreboard-name-text', l.name));
-      li.append(name);
-      // Le statut dans sa colonne, aligné d'une ligne à l'autre ; vide pour un joueur jamais vu, ou pour soi.
-      if (statuses) li.append(l.status ? libEl('span', `scoreboard-status status-${l.status.state}`, l.status.label) : libEl('span', 'scoreboard-status'));
-      li.append(libEl('span', 'scoreboard-score', l.score), libEl('span', 'scoreboard-when', l.when));
+      li.append(name, libEl('span', 'scoreboard-score', l.score), libEl('span', 'scoreboard-when', l.when));
       list.append(li);
     }
     box.append(list);
@@ -630,7 +645,23 @@ function renderScoreboard(b) {
   }
   // Où se trouve le joueur dans ce classement (portée et période), sous le tableau.
   if (b.position) box.append(libEl('p', 'scoreboard-position', b.position));
-  if (b.note) box.append(libEl('p', 'scoreboard-note', b.note));
+  // Une dernière ligne : la note à gauche, et à droite, discrète, ce que dit chaque marque de présence.
+  if (b.note || b.legend?.length) {
+    const foot = libEl('div', 'scoreboard-foot');
+    if (b.note) foot.append(libEl('p', 'scoreboard-note', b.note));
+    if (b.legend?.length) {
+      const legend = libEl('p', 'scoreboard-legend');
+      for (const item of b.legend) {
+        const entry = libEl('span', `scoreboard-legend-item presence-${item.presence}`);
+        const sample = libEl('span', 'scoreboard-legend-face');
+        sample.append(libEl('span', 'presence-dot'));
+        entry.append(sample, libEl('span', '', item.label));
+        legend.append(entry);
+      }
+      foot.append(legend);
+    }
+    box.append(foot);
+  }
   return box;
 }
 

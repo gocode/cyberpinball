@@ -44,6 +44,7 @@ import { findComponent } from '@cyberpinball/installer';
 import type { Action, Built, LibraryHost } from './library';
 import { locations, vpxProfile } from './paths';
 import { taskbarFacts } from './screen-guard';
+import { describeVcRuntime, vcRuntimeReady } from './vc-runtime';
 
 export interface HealthContext {
   host: LibraryHost;
@@ -118,10 +119,21 @@ export function createHealth(ctx: HealthContext) {
     }
   }
 
+  /** Runtime Visual C++ de Windows : sans lui, VPX ne démarre pas. */
+  function runtimeFacts(): { ok: boolean; detail?: string } {
+    try {
+      const status = vcRuntimeReady();
+      return status.ok ? { ok: true } : { ok: false, detail: describeVcRuntime(status) };
+    } catch {
+      return { ok: true }; // Manifeste illisible : rien d'affirmé.
+    }
+  }
+
   async function collect(): Promise<HealthFacts> {
     const layout = ctx.layout();
     const disks = diskFacts({ tables: layout?.tables, downloads: layout?.downloads, data: host.dataDir }, host.diskSpace ?? diskSpace);
-    const vpx = { installed: host.vpxVersion?.(), known: knownVpx() };
+    const installed = host.vpxVersion?.();
+    const vpx = { installed, known: knownVpx(), ...(installed && { runtime: runtimeFacts() }) };
     // Barres des tâches que le gardien des écrans a remises derrière le menu depuis le démarrage.
     const screens = host.displays ? { ...screensFacts(loadCabinetSet(host.dataDir), host.displays(), vpxProfile(locations()).profile.displayIdFormat), taskbars: taskbarFacts() } : undefined;
     let tables: HealthFacts['tables'];

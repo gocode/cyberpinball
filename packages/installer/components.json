@@ -16,6 +16,8 @@
       "size": 172566470,
       "executablePattern": "^VPinballX.*64\\.exe$",
       "executable": "VPinballX_BGFX64.exe",
+      "vcRuntime": "14.51",
+      "requires": ["vc-redist-x64"],
       "adapterSettings": {
         "displayIdFormat": "name",
         "enabledPlugins": ["PinMAME", "AlphaDMD", "B2S", "ScoreView", "PUP", "AltSound", "Serum", "VNI", "FlexDMD", "WMP", "Vision3D"]
@@ -48,6 +50,25 @@
         { "source": "a12", "file": "redist.cab", "companion": true },
         { "source": "a2", "file": "KinectSDK-v1.8-x64.msi" }
       ]
+    },
+    {
+      "id": "vc-redist-x64",
+      "kind": "runtime",
+      "distribution": "automatic",
+      "name": "Microsoft Visual C++ Redistributable (x64)",
+      "homepage": "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist",
+      "version": "14.52.37029.0",
+      "channel": "stable",
+      "platform": "windows-x64",
+      "installDir": "downloads",
+      "url": "https://download.visualstudio.microsoft.com/download/pr/78d061c5-9ef3-42ab-98ed-3309d1095dc4/9C02C9ED120F671B900E6B9471D890E3B2414117A7E53F4AE2E855466FA2B7C9/VC_redist.x64.exe",
+      "sha256": "9c02c9ed120f671b900e6b9471d890e3b2414117a7e53f4ae2e855466fa2b7c9",
+      "size": 18863624,
+      "executablePattern": "^VC_redist\\.x64\\.exe$",
+      "installArguments": ["/install", "/quiet", "/norestart"],
+      "license": "Microsoft Visual C++ Redistributable : installateur officiel et inchangé, que Microsoft autorise à redistribuer avec une application. Windows l'installe pour toute la machine (vcruntime140.dll, msvcp140.dll…), avec son accord.",
+      "source": "https://aka.ms/vc14/vc_redist.x64.exe",
+      "signer": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
     }
   ]
 }

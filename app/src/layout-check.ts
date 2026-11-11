@@ -590,14 +590,14 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
         (columns[i] ??= []).push([r.left, r.right]);
         // Un texte plus large que sa case déborde sur la voisine (« 100+ » sur le drapeau) ; une case
         // qui masque ce qui dépasse (un nom abrégé par des points de suspension) l'a voulu.
-        if (!cell.matches('.flag, .avatar') && getComputedStyle(cell).overflowX === 'visible' && cell.scrollWidth > cell.clientWidth + 0.5) problems.add('texte qui déborde de sa case (' + (cell.scrollWidth - cell.clientWidth) + ' px) : ' + label(cell));
+        if (!cell.matches('.flag, .avatar, [data-picture]') && getComputedStyle(cell).overflowX === 'visible' && cell.scrollWidth > cell.clientWidth + 0.5) problems.add('texte qui déborde de sa case (' + (cell.scrollWidth - cell.clientWidth) + ' px) : ' + label(cell));
       });
       const probes = [];
       const seen = new Set();
       const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
       for (let n = walker.nextNode(); n; n = walker.nextNode()) {
         const host = n.parentElement;
-        if (!n.textContent.trim() || seen.has(host) || host.closest('.flag, .avatar')) continue;
+        if (!n.textContent.trim() || seen.has(host) || host.closest('.flag, .avatar, [data-picture]')) continue;
         seen.add(host);
         // Une ligne de tableau tient sur une ligne : un texte qui passe dessous la grandit, et
         // drapeau et pastille, centrés, ne sont plus en face du nom.
@@ -618,7 +618,7 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
       const rr = rect(row);
       const rs = getComputedStyle(row);
       const middle = (rr.top + parseFloat(rs.borderTopWidth) + parseFloat(rs.paddingTop) + rr.bottom - parseFloat(rs.borderBottomWidth) - parseFloat(rs.paddingBottom)) / 2;
-      for (const pic of row.querySelectorAll(':scope > .flag, :scope > .avatar')) {
+      for (const pic of row.querySelectorAll(':scope > .flag, :scope > .avatar, :scope > [data-picture]')) {
         const r = rect(pic);
         if (Math.abs((r.top + r.bottom) / 2 - middle) > 0.5) problems.add('image pas centrée sur sa ligne (' + ((r.top + r.bottom) / 2 - middle).toFixed(1) + ' px) : ' + label(pic));
       }

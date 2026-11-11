@@ -118,6 +118,7 @@ son interface).
 - Premier démarrage : juste après l'assistant d'écrans, Cyber Pinball propose de choisir votre pseudo (au clavier à l'écran) et de mettre un avatar (une photo ou une image, recadrée aux boutons). Rien d'obligatoire : « Continuer » reprend l'installation, et tout se change ensuite dans Menu système > Amis > « Partage et réseau ».
 - Les pseudos s'affichent seuls, sans l'étiquette « #A1B2 » accolée : listes d'amis, scores, partie en direct, annuaire. L'identifiant unique d'un joueur n'apparaît plus que sur sa fiche, et se cherche toujours dans « Trouver un joueur ».
 - Menu : le message qui suit un geste (« Nom changé », « Avatar enregistré », « Pseudo refusé »…) reste affiché jusqu'au geste suivant, au lieu de s'effacer aussitôt, sur tous les écrans.
+- VPX démarre sur un Windows fraîchement installé : il manquait le runtime Visual C++ de Microsoft. Cyber Pinball le détecte au démarrage et dans Santé de la borne, puis installe la version officielle de Microsoft (19 Mo, sans fenêtre) ; Windows demande votre accord une fois. Si VPX s'arrête faute d'une bibliothèque, l'écran d'échec le dit.
 
 ## 0.1.8
 

@@ -1,6 +1,7 @@
 // Fabrique les installeurs de Cyber Pinball à partir de release\win-unpacked :
 //   release\CyberPinball-Setup.exe          version légère : VPX téléchargé au premier lancement
-//   release\CyberPinball-Setup-complet.exe  version complète : archive officielle de VPX incluse
+//   release\CyberPinball-Setup-complet.exe  version complète : archive officielle de VPX incluse,
+//                                           avec l'installateur du runtime Visual C++ de Microsoft
 //
 // Appelé par « node scripts/fabriquer.mjs --installeur » (option --leger : sans la
 // version complète). Le script NSIS est scripts\installeur\cyberpinball.nsi.
@@ -116,6 +117,20 @@ async function vpxArchive() {
   return { vpx, archive, name, notice };
 }
 
+/**
+ * Installateur officiel du runtime Visual C++ (composant vc-redist-x64), sans lequel VPX ne démarre pas
+ * sur un Windows neuf : dans cache\downloads\, empreinte vérifiée. Microsoft autorise à le redistribuer
+ * avec une application ; l'application le lance, avec l'accord de Windows, s'il manque (app/src/vc-runtime.ts).
+ */
+async function vcRedist() {
+  const installer = path.join(repo, 'packages', 'installer', 'dist');
+  const { findComponent, downloadComponent } = require(path.join(installer, 'index.js'));
+  const redist = findComponent('vc-redist-x64');
+  const file = await downloadComponent(redist, path.join(repo, 'cache', 'downloads'));
+  console.log(`Runtime Visual C++ ${redist.version} : ${file} (empreinte vérifiée)`);
+  return { file, name: path.basename(file), version: redist.version };
+}
+
 export async function buildInstallers({ complete = true } = {}) {
   const exe = path.join(unpacked, 'CyberPinball.exe');
   if (!fs.existsSync(exe)) throw new Error(`${exe} manque : lancez d'abord la fabrication de l'exécutable.`);
@@ -156,12 +171,15 @@ export async function buildInstallers({ complete = true } = {}) {
   if (complete) {
     step('Installeur, version complète (avec Visual Pinball X)');
     const { vpx, archive, name, notice } = await vpxArchive();
+    const runtime = await vcRedist();
     await build('CyberPinball-Setup-complet.exe', {
       COMPLET: true,
       VPX_ARCHIVE: archive,
       VPX_ARCHIVE_NOM: name,
       VPX_NOTICE: notice,
       VPX_VERSION: vpx.version,
+      VCREDIST: runtime.file,
+      VCREDIST_NOM: runtime.name,
     });
   }
 

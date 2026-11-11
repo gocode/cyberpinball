@@ -119,4 +119,9 @@ export const messages: Record<string, string> = {
   'changement d’écrans ou de zone de travail': 'screen or work area change',
   'premier plan rendu au menu': 'foreground given back to the menu',
   'relecture du gardien des écrans': 'screen guard check',
+  // Santé de la borne : runtime Visual C++ de VPX
+  'Il manque le runtime Visual C++ : VPX ne démarre pas': 'The Visual C++ runtime is missing: VPX won’t start',
+  'Runtime de Microsoft : {detail}': 'Microsoft runtime: {detail}',
+  'Runtime de Microsoft absent de Windows': 'Microsoft runtime missing from Windows',
+  'Installer le runtime Visual C++': 'Install the Visual C++ runtime',
 };

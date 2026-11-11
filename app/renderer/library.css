@@ -2598,17 +2598,17 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 
 /*
  * Le tableau : une grille dont chaque ligne est une sous-grille. Rang, drapeau, pastille, nom,
- * statut, score et date tombent dans les mêmes colonnes sur toutes les lignes, quelles que soient
- * leurs largeurs : rien ne se décale. Drapeau, pastille et statut n'ont de colonne que si une
- * ligne au moins en a (with-flags, with-avatars, with-status) ; une ligne sans eux garde leur
- * case, vide. Rang, statut, score et date prennent la largeur du plus long (« 100+ », « Vu il y a
- * 3 h ») ; le nom prend le reste. Chaque ligne tient sur une seule ligne de texte.
- * Le rang porte 1 cqmin de marge à droite ; statut, score et date 1 cqmin à gauche : 2,2 cqmin
+ * score et date tombent dans les mêmes colonnes sur toutes les lignes, quelles que soient
+ * leurs largeurs : rien ne se décale. Drapeau et pastille n'ont de colonne que si une ligne au
+ * moins en a (with-flags, with-avatars) ; une ligne sans eux garde leur case, vide. Rang, score et
+ * date prennent la largeur du plus long (« 100+ ») ; le nom prend le reste. Chaque ligne tient sur
+ * une seule ligne de texte. Le statut est une marque sur l'avatar, pas un texte.
+ * Le rang porte 1 cqmin de marge à droite ; score et date 1 cqmin à gauche : 2,2 cqmin
  * entre les blocs, 1,2 cqmin entre drapeau, pastille et nom.
  */
 .lib-scoreboard .scoreboard-lines {
   display: grid;
-  grid-template-columns: minmax(5.4cqmin, max-content) var(--flag-col,) var(--avatar-col,) minmax(9cqmin, 1fr) var(--status-col,) max-content max-content;
+  grid-template-columns: minmax(5.4cqmin, max-content) var(--flag-col,) var(--avatar-col,) minmax(9cqmin, 1fr) max-content max-content;
   column-gap: 1.2cqmin;
   margin: 0;
   padding: 0;
@@ -2621,10 +2621,6 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 
 .lib-scoreboard .scoreboard-lines.with-avatars {
   --avatar-col: 2.8cqmin;
-}
-
-.lib-scoreboard .scoreboard-lines.with-status {
-  --status-col: max-content;
 }
 
 /* Le texte sur une même ligne de base ; drapeau et pastille centrés sur la ligne. */
@@ -2672,41 +2668,99 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   height: 2.4cqmin;
 }
 
-/* Classements en réseau : la pastille du joueur, à la hauteur d'une ligne (2,35 × 1,2). */
-.lib-scoreboard .scoreboard-avatar {
+/*
+ * Classements en réseau : la pastille du joueur, à la hauteur d'une ligne (2,35 × 1,2), et sa
+ * marque de présence en bas à droite, détachée de la pastille par un liseré de la couleur du fond :
+ * point vert signal en ligne ; point et anneau verts en partie ; point creux hors ligne.
+ */
+.lib-scoreboard .scoreboard-face {
+  position: relative;
   align-self: center;
   width: 2.8cqmin;
   height: 2.8cqmin;
+}
+
+.lib-scoreboard .scoreboard-avatar {
+  width: 100%;
+  height: 100%;
   font-size: 1.9cqmin;
   letter-spacing: 0;
 }
 
 /* Sans pays ou sans pastille : la case reste, vide. */
 .lib-scoreboard .scoreboard-flag.none,
-.lib-scoreboard .scoreboard-avatar.none {
+.lib-scoreboard .scoreboard-face.none {
   visibility: hidden;
 }
 
-/* En ligne ou en partie : l'anneau vert de « Mes amis » ; sinon rien autour. */
-.lib-scoreboard .scoreboard-avatar.status-online,
-.lib-scoreboard .scoreboard-avatar.status-playing {
-  box-shadow: 0 0 0 0.25cqmin var(--ok);
+.lib-scoreboard .presence-dot {
+  position: absolute;
+  /* Hors du cercle autant que dedans : il ne mord pas sur l'initiale. */
+  right: -0.4cqmin;
+  bottom: -0.4cqmin;
+  box-sizing: border-box;
+  width: 1.2cqmin;
+  height: 1.2cqmin;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0.22cqmin var(--void);
 }
 
-/* Le statut : sa colonne à lui, juste après les noms, en entier, à la taille de la date. */
-.lib-scoreboard .scoreboard-status {
-  padding-left: 1cqmin;
-  font-size: 2.04cqmin;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
+.lib-scoreboard .presence-online .presence-dot,
+.lib-scoreboard .presence-playing .presence-dot {
+  background: var(--ok);
+}
+
+.lib-scoreboard .presence-offline .presence-dot {
+  border: 0.2cqmin solid var(--ink-faint);
+  background: var(--void);
+}
+
+.lib-scoreboard .presence-playing .scoreboard-avatar {
+  box-shadow: 0 0 0 0.22cqmin var(--ok);
+}
+
+/* Dernière ligne : la note à gauche, la légende des marques à droite (seule, elle reste à droite). */
+.lib-scoreboard .scoreboard-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6cqmin 3cqmin;
+}
+
+.lib-scoreboard .scoreboard-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6cqmin 2.4cqmin;
+  margin: 0 0 0 auto;
+  padding-right: 1.6cqmin;
+  font-size: 1.9cqmin;
+  line-height: 1.2;
   color: var(--ink-muted);
 }
 
-.lib-scoreboard .scoreboard-status.status-online,
-.lib-scoreboard .scoreboard-status.status-playing {
-  font-weight: 600;
-  color: var(--ok);
+.lib-scoreboard .scoreboard-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9cqmin;
+}
+
+.lib-scoreboard .scoreboard-legend-face {
+  position: relative;
+  flex: none;
+  width: 1.9cqmin;
+  height: 1.9cqmin;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+
+.lib-scoreboard .scoreboard-legend-item.presence-playing .scoreboard-legend-face {
+  box-shadow: 0 0 0 0.22cqmin var(--ok);
+}
+
+.lib-scoreboard .scoreboard-legend-face .presence-dot {
+  right: -0.25cqmin;
+  bottom: -0.25cqmin;
 }
 
 /* La ligne du joueur de cette borne : un aplat discret, jamais le vert du choix courant. */

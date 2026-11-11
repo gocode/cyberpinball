@@ -113,6 +113,8 @@ export function componentStatus(root: string, component: Component) {
  * reste dans son propre dossier : revenir en arrière revient à repointer « current ».
  */
 export async function installComponent(root: string, component: Component, onProgress?: Progress): Promise<InstalledComponent> {
+  // Pilote ou runtime : un installateur de son éditeur, lancé avec l'accord de Windows, jamais une archive à extraire.
+  if (component.kind === 'driver' || component.kind === 'runtime') throw new Error(t('{name} s’installe par l’installateur de son éditeur, pas par extraction.', { name: component.name }));
   const layout = layoutOf(root);
   const status = componentStatus(root, component);
   const { paths } = status;

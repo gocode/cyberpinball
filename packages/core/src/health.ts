@@ -139,6 +139,8 @@ export interface VpxFacts {
   installed?: string;
   /** Version que Cyber Pinball installe (manifeste), sans réseau. */
   known?: string;
+  /** Runtime Visual C++ de Windows (vc-runtime.ts) : absent ou trop ancien, VPX ne démarre pas. */
+  runtime?: { ok: boolean; detail?: string };
 }
 
 /** LED et retours de la borne (dof.ts) : ce que DOF trouve, et ce qui l'empêchera d'allumer. */
@@ -586,6 +588,18 @@ export function vpxLines(facts: VpxFacts): HealthLine[] {
     return [{ check: 'vpx', state: 'blocking', title: t('Visual Pinball X n’est pas installé'), detail: t('Aucune table ne peut démarrer'), go: install(facts.known), target: { kind: 'install-vpx' } }];
   }
   const title = t('VPX {version} installé', { version: facts.installed });
+  if (facts.runtime && !facts.runtime.ok) {
+    return [
+      {
+        check: 'vpx',
+        state: 'blocking',
+        title: t('Il manque le runtime Visual C++ : VPX ne démarre pas'),
+        detail: facts.runtime.detail ? t('Runtime de Microsoft : {detail}', { detail: facts.runtime.detail }) : t('Runtime de Microsoft absent de Windows'),
+        go: t('Installer le runtime Visual C++'),
+        target: { kind: 'install-vpx' },
+      },
+    ];
+  }
   if (facts.known && compareVersions(facts.installed, facts.known) < 0) {
     return [
       {

@@ -116,6 +116,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - First start: right after the screen wizard, Cyber Pinball offers to choose your nickname (with the on-screen keyboard) and to add an avatar (a photo or a picture, cropped with the buttons). Nothing is mandatory: "Continue" resumes the setup, and everything can be changed later in System menu > Friends > "Sharing and network".
 - Nicknames show alone, without the "#A1B2" tag attached: friend lists, scores, live game, directory. A player's unique ID now only appears on their page, and can still be searched in "Find a player".
 - Menu: the message that follows an action ("Name changed", "Avatar saved", "Nickname refused"…) stays on screen until the next action instead of vanishing at once, on every screen.
+- VPX starts on a freshly installed Windows: Microsoft’s Visual C++ runtime was missing. Cyber Pinball detects it at startup and in Cabinet health, then installs Microsoft’s official version (19 MB, no window); Windows asks for your approval once. If VPX stops for lack of a library, the failure screen says so.
 
 ## 0.1.8
 

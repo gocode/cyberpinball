@@ -7,8 +7,10 @@ import { t } from '@cyberpinball/core';
  * tool : un outil annexe (configuration DOF, DMD…).
  * driver : le pilote d'un matériel (Kinect pour la Vision 3D), installé par son propre installateur
  * signé, en silence et avec l'accord de Windows (élévation), jamais extrait.
+ * runtime : une bibliothèque de Windows qu'un autre composant demande (`requires`), comme le runtime
+ * Visual C++ de VPX : installateur officiel, lancé en silence avec l'accord de Windows, jamais extrait.
  */
-export type ComponentKind = 'emulator' | 'tool' | 'driver';
+export type ComponentKind = 'emulator' | 'tool' | 'driver' | 'runtime';
 
 /**
  * automatic : licence compatible, Cyber Pinball le livre ou le télécharge lui-même.
@@ -62,6 +64,15 @@ export interface Component {
    * un fichier que le paquet suivant lit à côté de lui (l'archive externe d'un .msi), pas installé.
    */
   bundlePackages?: { source: string; file: string; arguments?: string[]; companion?: boolean }[];
+  /** Composants « runtime » dont celui-ci a besoin pour démarrer (VPX : le runtime Visual C++). */
+  requires?: string[];
+  /**
+   * VPX : version minimale du runtime Visual C++, celle de l'éditeur de liens le plus récent de ses
+   * fichiers (vpxRuntimeNeeds de @cyberpinball/core ; vérifiée par vc-runtime.test.ts).
+   */
+  vcRuntime?: string;
+  /** Composant « runtime » : arguments de son installateur pour une installation sans fenêtre. */
+  installArguments?: string[];
 }
 
 /** Le manifeste est livré avec le paquet, à côté de dist/. */

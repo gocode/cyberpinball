@@ -1,9 +1,10 @@
 // Installation de VPX depuis l'interface, pour l'utilisateur final qui n'a ni
-// lanceur ni ligne de commande : téléchargement vérifié, puis activation.
+// lanceur ni ligne de commande : téléchargement vérifié, puis activation. Le runtime
+// Visual C++ de Microsoft, s'il manque à Windows, suit (vc-runtime.ts).
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { layoutOf, t, type DownloadManager } from '@cyberpinball/core';
+import { compareVersions, layoutOf, t, vpxRuntimeNeeds, type DownloadManager, type PeFile } from '@cyberpinball/core';
 import { findComponent, installComponent } from '@cyberpinball/installer';
 
 export interface InstallProgress {
@@ -22,14 +23,48 @@ export function vpxArchivePresent(root: string): boolean {
   return fs.existsSync(path.join(layoutOf(root).downloads, path.basename(new URL(component.url).pathname)));
 }
 
+/** Chemins relatifs des exécutables et DLL d'un dossier. */
+function peNames(dir: string): string[] {
+  return (fs.readdirSync(dir, { recursive: true }) as string[]).filter((f) => /\.(dll|exe)$/i.test(f));
+}
+
+/** Ces fichiers, lus un à un au fil de l'analyse (jamais tous en mémoire). */
+function* peFiles(dir: string, names: readonly string[]): Generator<PeFile> {
+  for (const name of names) yield { path: name, buf: fs.readFileSync(path.join(dir, name)) };
+}
+
+/**
+ * Ce que la version installée de VPX demande à Windows, comparé au manifeste : une version de VPX qui
+ * voudrait un runtime plus récent que celui du manifeste, ou une autre bibliothèque de redistribuable,
+ * est écrite au journal (elle ne démarrerait peut-être pas sur un Windows neuf).
+ */
+export function checkVpxRuntimeNeeds(dir: string, required: string | undefined): string[] {
+  const problems: string[] = [];
+  try {
+    const names = peNames(dir);
+    const needs = vpxRuntimeNeeds(peFiles(dir, names), names);
+    if (needs.vcRuntime && (!required || compareVersions(needs.vcRuntime, required) > 0)) {
+      problems.push(`VPX demande le runtime Visual C++ ${needs.vcRuntime}, le manifeste ${required ?? 'aucun'} (vcRuntime)`); // i18n-ignore : journal
+    }
+    for (const u of needs.unknown) problems.push(`VPX importe ${u.dll} sans la fournir (${u.by.slice(0, 3).join(', ')}) : bibliothèque absente d'un Windows neuf`); // i18n-ignore : journal
+  } catch (error) {
+    problems.push(`lecture des bibliothèques de VPX impossible : ${(error as Error).message}`); // i18n-ignore : journal
+  }
+  for (const p of problems) console.error(`Installation de VPX : ${p}.`); // i18n-ignore : journal
+  return problems;
+}
+
 /**
  * Installe la version de VPX prévue par le manifeste dans la racine ; renvoie sa version. Le
  * téléchargement de l'archive est suivi dans le gestionnaire de téléchargements ; une coupure
- * garde son partiel, « Réessayer » le reprend là où il s'était arrêté.
+ * garde son partiel, « Réessayer » le reprend là où il s'était arrêté. VPX déjà là, l'appel
+ * ne fait que repointer la version active. Le runtime Visual C++ s'installe ensuite, après
+ * l'avertissement de la demande de Windows (frontend.ts, askVcRuntime ; vc-runtime.ts).
  */
 export async function installVpx(root: string, onProgress: (p: InstallProgress) => void, downloads?: DownloadManager): Promise<string> {
   const component = findComponent('vpx');
-  const archive = path.join(layoutOf(root).downloads, path.basename(new URL(component.url).pathname));
+  const layout = layoutOf(root);
+  const archive = path.join(layout.downloads, path.basename(new URL(component.url).pathname));
   const job = downloads?.track({
     id: `vpx-${component.version}`,
     kind: 'component',
@@ -40,8 +75,9 @@ export async function installVpx(root: string, onProgress: (p: InstallProgress) 
     resumable: true,
   });
   let lastPercent = -1;
+  let installed;
   try {
-    await installComponent(root, component, (received, total) => {
+    installed = await installComponent(root, component, (received, total) => {
       job?.progress(received, total);
       const percent = Math.floor((received / total) * 100);
       if (percent === lastPercent) return;
@@ -53,5 +89,6 @@ export async function installVpx(root: string, onProgress: (p: InstallProgress) 
     throw error;
   }
   job?.done([{ index: 0, file: archive }]);
+  if (!installed.alreadyInstalled) checkVpxRuntimeNeeds(installed.dir, component.vcRuntime);
   return component.version;
 }

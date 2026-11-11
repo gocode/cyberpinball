@@ -133,6 +133,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 - Windows 10 or 11, 64-bit.
 - A local disk with a few GB free. Program Files, Windows folders and network drives are refused, because VPX and the tables need to write next to themselves.
 - Visual Pinball X 10.8.1: installed for you on first launch.
+- Microsoft’s Visual C++ runtime, which VPX needs: installed with it if Windows lacks it (Windows asks for your approval once).
 
 ## Installation
 
@@ -206,6 +207,7 @@ Every step below is an action of `lanceur.cmd` (section "Fabrication et publicat
 ## Third-party components and licences
 
 - **Visual Pinball X** is not part of this repository. It is downloaded from its [official releases](https://github.com/vpinball/vpinball/releases) and checked against a pinned SHA-256. Its licence (GPLv3+, plus a MAME-derived licence for some files) allows redistribution only free of charge and outside any commercial product or activity. The complete installer therefore **must not be sold, nor shipped with a cabinet that is sold or operated commercially**.
+- **Microsoft’s Visual C++ runtime**, which VPX needs, is installed from Microsoft’s official installer, checked against a pinned SHA-256 and Microsoft’s signature; Microsoft allows it to be redistributed with an application, and the complete installer includes it.
 - The **VPS database** and **VPinMediaDB** declare no licence. Cyber Pinball does not ship them: they are downloaded from their official addresses when first used. Media from VPinMediaDB belong to their authors and the game artwork to its manufacturers, for **personal use on your own cabinet** only. Files from VPForums and VPUniverse are downloaded with your own account, one at a time, at your request, and stay on your cabinet: their sites forbid re-hosting or redistributing them.
 - The cabinet network uses Holepunch's Hyperswarm, HyperDHT, Protomux and secret-stream, with sodium-native and udx-native (MIT and Apache-2.0 licences).
 - The phone remote's QR code is drawn with Kazuhiko Arase's qrcode-generator (MIT licence); "QR Code" is a registered trademark of DENSO WAVE INCORPORATED.

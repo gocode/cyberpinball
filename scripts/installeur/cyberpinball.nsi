@@ -9,7 +9,8 @@
 ; Défines : VERSION, VERSION_WIN (a.b.c.d), ICONE, BANDEAU (164 × 314, pages d’accueil et de fin), puis
 ;   passe 1 : DESINSTALLEUR_ECRIVAIN (exe produit), DESINSTALLEUR_SORTIE (désinstalleur écrit) ;
 ;   passe 2 : SORTIE, APP_DIR (release\win-unpacked), DESINSTALLEUR (désinstalleur signé ou non),
-;             et pour la version complète : COMPLET, VPX_ARCHIVE, VPX_ARCHIVE_NOM, VPX_NOTICE, VPX_VERSION.
+;             et pour la version complète : COMPLET, VPX_ARCHIVE, VPX_ARCHIVE_NOM, VPX_NOTICE, VPX_VERSION,
+;             VCREDIST, VCREDIST_NOM (installateur du runtime Visual C++ de Microsoft).
 ;   SITE : adresse du dépôt (« repository » du package.json racine).
 ;   VPX_PAREFEU_REEL, VPX_PAREFEU_JONCTION : l'exécutable de VPX sous la racine, par le dossier de sa
 ;   version et par la jonction current (règle « Cyber Pinball VPX » du pare-feu).
@@ -589,6 +590,9 @@ Section "Visual Pinball X ${VPX_VERSION}" SEC_VPX
   File "${VPX_ARCHIVE}"
   SetCompress auto
   File "/oname=${VPX_ARCHIVE_NOM}.licence.txt" "${VPX_NOTICE}"
+  ; L'installateur officiel du runtime Visual C++ de Microsoft, sans lequel VPX ne démarre pas sur
+  ; un Windows neuf : l'application le lance, avec l'accord de Windows, seulement s'il manque.
+  File "/oname=${VCREDIST_NOM}" "${VCREDIST}"
 SectionEnd
 !endif
 

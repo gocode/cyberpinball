@@ -211,6 +211,7 @@ import {
   DRESS_COVERED,
   type TableDressing,
   type TableEntry,
+  type VcRuntimeStatus,
   type MediaTarget,
   type MediaType,
   formatList,
@@ -300,6 +301,7 @@ import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, whenRea
 import { quitWithWindow } from './app-lifetime';
 import { handleSecondLaunch } from './single-instance';
 import { installVpx, vpxArchivePresent } from './install-vpx';
+import { describeVcRuntime, ensureVcRuntime, vcRuntimeReady } from './vc-runtime';
 import { armRecording, type RecordingOutcome, type RecordingRun, type RecordingScreen } from './game-recording';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
 import { watchGameLoad, type GameLoadWatch } from './game-load';
@@ -3704,6 +3706,7 @@ export function startFrontend(): void {
   });
 
   const install = vpxInstall(loc);
+  let runtime: VcRuntimeStatus | undefined;
   const { assignments, problem, manual, choose, selection } = syncScreens();
   tables = scanOrdered();
   // Table au démarrage : la première de l'ordre choisi, une au hasard, ou la dernière jouée.
@@ -3953,6 +3956,10 @@ export function startFrontend(): void {
           }
         : { title: t("VPX n'est pas installé"), lines: [t('Lancez « Installer » depuis le lanceur, puis revenez ici.')] },
     };
+  } else if (loc.root && !(runtime = vcRuntimeReady()).ok) {
+    // Windows neuf : VPX est là, mais pas le runtime Visual C++ sans lequel il ne démarre pas (vc-runtime.ts).
+    console.log(`Runtime Visual C++ insuffisant pour VPX au démarrage : ${describeVcRuntime(runtime)}.`); // i18n-ignore : journal
+    state = { ...state, phase: 'message', message: vcRuntimeMessage(runtime) };
   } else if (tables.length === 0) {
     state = { ...state, phase: 'message', message: noTables() };
   }
@@ -5388,23 +5395,81 @@ function startVpxInstall(): boolean {
     state = { ...state, phase: 'message', message: { title: t('Installation de VPX'), lines, action } };
     broadcast();
   };
+  // VPX déjà là sans son runtime (Windows neuf, message du démarrage, Santé de la borne) : le runtime seul.
+  if (vpxInstall(loc) && !vcRuntimeReady().ok) {
+    askVcRuntime();
+    return true;
+  }
   show([t('Préparation…')]);
-  installVpx(root, (p) =>
-    show([t('Téléchargement : {percent} % ({received} / {total} Mo)', { percent: p.percent, received: p.receivedMb, total: p.totalMb }), t('Ne débranchez pas la borne.')]),
+  installVpx(
+    root,
+    (p) => show([t('Téléchargement : {percent} % ({received} / {total} Mo)', { percent: p.percent, received: p.receivedMb, total: p.totalMb }), t('Ne débranchez pas la borne.')]),
     library.downloads.manager,
   )
     .then((version) => {
       reloadTables();
       const done = t('Visual Pinball X {version} est installé et vérifié.', { version });
-      if (tables.length) show([done, t('Start ou Exit : aller aux tables.')]);
-      else {
-        // Pas encore de table : on enchaîne sur l'ajout.
-        state = { ...state, phase: 'message', message: { ...noTables(), lines: [done, ...noTables().lines] } };
-        broadcast();
-      }
+      // Windows neuf : le runtime Visual C++ suit, après l'avertissement de la demande de Windows.
+      if (!vcRuntimeReady().ok) askVcRuntime();
+      else vpxReady(done);
     })
     .catch((error: Error) => show([t('L’installation a échoué : {error}', { error: error.message }), t('Start : réessayer · Exit : plus tard')], 'install-vpx'));
   return true;
+}
+
+/** VPX prêt à jouer : aux tables, ou à l'ajout s'il n'y en a pas encore. */
+function vpxReady(done: string): void {
+  if (tables.length) state = { ...state, phase: 'message', message: { title: t('Installation de VPX'), lines: [done, t('Start ou Exit : aller aux tables.')] } };
+  // Pas encore de table : on enchaîne sur l'ajout.
+  else state = { ...state, phase: 'message', message: { ...noTables(), lines: [done, ...noTables().lines] } };
+  broadcast();
+}
+
+/** Le message « il manque le runtime Visual C++ » ; Start l'installe (startVpxInstall, puis askVcRuntime). */
+function vcRuntimeMessage(status: VcRuntimeStatus): Message {
+  return {
+    title: t('Il manque le runtime Visual C++ à Windows'),
+    lines: [
+      t('VPX ne peut pas démarrer sans le runtime Visual C++ de Microsoft ({detail}).', { detail: describeVcRuntime(status) }),
+      t('Cyber Pinball installe la version officielle de Microsoft (19 Mo) ; Windows demande votre accord une fois.'),
+      t('Start : l’installer maintenant · Exit : plus tard'),
+    ],
+    action: 'install-vpx',
+  };
+}
+
+/**
+ * Le runtime Visual C++ de Microsoft (vc-runtime.ts) : l'avertissement de la demande de Windows d'abord
+ * (uac-confirm.ts, « Plus tard » choisi d'office), puis l'installateur officiel, sans fenêtre.
+ */
+function askVcRuntime(): void {
+  askElevation((build, at) => library.openCustom(build, at), {
+    title: t('Runtime Visual C++'),
+    what: t('Installer le runtime Visual C++ de Microsoft, sans lequel VPX ne démarre pas (19 Mo, sans fenêtre).'),
+    go: () => {
+      library.leave();
+      installVcRuntime();
+    },
+    later: () => {
+      library.leave();
+      state = { ...state, phase: 'message', message: vcRuntimeMessage(vcRuntimeReady()) };
+      broadcast();
+    },
+  });
+}
+
+function installVcRuntime(): void {
+  const show = (lines: string[], action?: Message['action']) => {
+    state = { ...state, phase: 'message', message: { title: t('Runtime Visual C++'), lines, action } };
+    broadcast();
+  };
+  show([t('Préparation…')]);
+  ensureVcRuntime(layoutOf(loc.root!).downloads, { downloads: library.downloads.manager, onStep: (line) => show([line]) })
+    .then((result) => {
+      if (result.ok) vpxReady(t('Le runtime Visual C++ de Microsoft est installé : VPX peut démarrer.'));
+      else show([t('Le runtime Visual C++ n’est pas installé : {reason}.', { reason: result.reason }), t('Start : réessayer · Exit : plus tard')], 'install-vpx');
+    })
+    .catch((error: Error) => show([t('Le runtime Visual C++ n’est pas installé : {reason}.', { reason: error.message }), t('Start : réessayer · Exit : plus tard')], 'install-vpx'));
 }
 
 /**

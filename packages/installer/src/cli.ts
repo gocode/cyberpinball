@@ -25,7 +25,7 @@ async function main(): Promise<number> {
   }
 
   if (command === 'install') {
-    const components = arg ? [findComponent(arg)] : loadManifest().filter((c) => c.distribution === 'automatic');
+    const components = arg ? [findComponent(arg)] : loadManifest().filter((c) => c.distribution === 'automatic' && c.kind !== 'runtime');
     for (const component of components) await install(locations.root, component);
     return 0;
   }
