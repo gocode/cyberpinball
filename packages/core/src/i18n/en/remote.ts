@@ -196,7 +196,6 @@ export const messages: Record<string, string> = {
   'Fermés en mode invité.': 'Closed in guest mode.',
   'Partie dans le casque : les réglages s’ouvrent dans le casque (les deux MagnaSave).': 'Game in the headset: the settings open in the headset (both MagnaSave buttons).',
   'La partie se charge.': 'The game is loading.',
-  'Le Juke-box se pilote avec les boutons : flippers pour choisir, Start pour écouter, Exit pour revenir à la roue.': 'The Jukebox is driven with the buttons: flippers to choose, Start to listen, Exit to go back to the wheel.',
   Ouverture: 'Opening',
   'Passer l’ouverture': 'Skip the opening',
   'Rien à faire ici depuis le téléphone.': 'Nothing to do here from the phone.',
@@ -234,4 +233,14 @@ export const messages: Record<string, string> = {
   'Clavier : taper dans le champ ouvert à la borne': 'Keyboard: type in the field open at the cabinet',
   'Envoyer un fichier à la borne': 'Send a file to the cabinet',
   'Fermée en mode invité.': 'Closed in guest mode.',
+  // Juke-box au téléphone (telephone-jukebox.js)
+  'Avancer dans le morceau': 'Move through the track',
+  'Chargement du Juke-box…': 'Loading the Juke-box…',
+  'La borne envoie ses playlists.': 'The cabinet is sending its playlists.',
+  'Gérer': 'Manage',
+  '« Gérer » : importer de YouTube ou ajouter des fichiers.': '"Manage": import from YouTube or add files.',
+  'Masqué de la roue : réglage « Juke-box dans la roue »': 'Hidden from the wheel: "Juke-box in the wheel" setting',
+  'Morceau précédent': 'Previous track',
+  'Morceau suivant': 'Next track',
+  'Le Juke-box se pilote dans l’onglet Juke-box du téléphone, ou avec les boutons : flippers pour choisir, Start pour écouter, Exit pour revenir à la roue.': 'The Juke-box is controlled from the phone\'s Juke-box tab, or with the buttons: flippers to choose, Start to listen, Exit to go back to the wheel.',
 };

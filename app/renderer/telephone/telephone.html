@@ -47,6 +47,41 @@
         <p class="message-text" id="message-text"></p>
         <button type="button" class="key wide primary message-action" id="message-action" hidden data-i18n>Reprendre</button>
       </div>
+      <!-- Juke-box : le lecteur de la borne (telephone-jukebox.js). « Écouter » (playlists, morceaux) ou
+           « Gérer » (la gestion s'ouvre à la borne, ses entrées dans Écran) ; le lecteur déplié en plein écran. -->
+      <section class="jukebox" id="jukebox" role="tabpanel" aria-labelledby="tab-jukebox">
+        <div class="seg jb-seg" id="jb-seg">
+          <button type="button" class="seg-tab" id="jb-listen" aria-selected="true"></button>
+          <button type="button" class="seg-tab" id="jb-manage"></button>
+        </div>
+        <div class="jb-head" id="jb-head">
+          <button type="button" class="jb-up" id="jb-up" hidden></button>
+          <span class="jb-head-text"><span class="jb-title" id="jb-title"></span><span class="jb-label" id="jb-label"></span></span>
+        </div>
+        <div class="jb-acts" id="jb-acts"></div>
+        <ul class="entry-list jb-list" id="jb-list"></ul>
+        <div class="empty" id="jb-empty" hidden>
+          <span class="empty-mark" id="jb-empty-mark" aria-hidden="true"></span>
+          <p class="empty-title" id="jb-empty-title"></p>
+          <p class="empty-text" id="jb-empty-text"></p>
+          <button type="button" class="key wide primary" id="jb-open" hidden></button>
+        </div>
+      </section>
+      <section class="jb-player" id="jb-player" aria-live="polite">
+        <div class="jb-cover" id="jb-cover"></div>
+        <div class="jb-now"><span class="jb-now-title" id="jb-now-title"></span><span class="jb-now-artist" id="jb-now-artist"></span></div>
+        <div class="jb-track">
+          <input type="range" id="jb-seek" min="0" max="1000" value="0" />
+          <div class="jb-times"><span id="jb-elapsed"></span><span id="jb-total"></span></div>
+        </div>
+        <div class="jb-controls">
+          <button type="button" class="jb-ctl small" id="jb-shuffle"></button>
+          <button type="button" class="jb-ctl" id="jb-prev"></button>
+          <button type="button" class="jb-ctl big" id="jb-pause"></button>
+          <button type="button" class="jb-ctl" id="jb-next"></button>
+          <button type="button" class="jb-ctl small" id="jb-repeat"></button>
+        </div>
+      </section>
       <!-- Communauté : Messages, Amis et Scores, sous un même onglet (telephone-community.js). -->
       <div class="seg" id="community-seg" role="tablist">
         <button type="button" class="seg-tab" id="seg-messages" role="tab" data-view="messages"></button>
@@ -196,9 +231,20 @@
     <!-- Au menu et pendant une partie, la barre des vues en bas : Écran (les entrées de l'écran ouvert à
          la borne), Menus (tous les menus), Communauté (messages, amis, scores), Boutons (ceux de la
          borne). body[data-view]. Au navigateur, la barre d'outils (Retour, Avancer, Clavier, Plus, Fermer). -->
+    <!-- Mini-lecteur du Juke-box, au-dessus des onglets, dès qu'un morceau joue : il ouvre le lecteur. -->
+    <div class="jb-mini" id="jb-mini">
+      <button type="button" class="jb-mini-open" id="jb-mini-open">
+        <span class="jb-mini-cover" id="jb-mini-cover"></span>
+        <span class="jb-mini-text"><span class="jb-mini-title" id="jb-mini-title"></span><span class="jb-mini-label" id="jb-mini-label"></span></span>
+      </button>
+      <button type="button" class="jb-mini-btn" id="jb-mini-pause"></button>
+      <button type="button" class="jb-mini-btn" id="jb-mini-next"></button>
+      <span class="jb-mini-bar" id="jb-mini-bar"></span>
+    </div>
     <nav class="views" id="views" role="tablist">
       <button type="button" class="view-tab" id="tab-list" role="tab" data-view="list" aria-controls="entries"></button>
       <button type="button" class="view-tab" id="tab-menus" role="tab" data-view="menus" aria-controls="menus"></button>
+      <button type="button" class="view-tab" id="tab-jukebox" role="tab" data-view="jukebox" aria-controls="jukebox"></button>
       <button type="button" class="view-tab" id="tab-community" role="tab" data-view="community" aria-controls="community"></button>
       <button type="button" class="view-tab" id="tab-buttons" role="tab" data-view="buttons" aria-controls="buttons"></button>
     </nav>
@@ -233,6 +279,7 @@
     <script src="telephone-core.js"></script>
     <script src="telephone-ranks.js"></script>
     <script src="telephone-community.js"></script>
+    <script src="telephone-jukebox.js"></script>
     <script src="telephone.js"></script>
   </body>
 </html>

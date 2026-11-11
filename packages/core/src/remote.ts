@@ -423,8 +423,18 @@ export type PhoneMessage =
    * (`key` absent : la liste). La borne envoie ce fil tant qu'il est ouvert, et le marque lu.
    */
   | { t: 'chat-open'; s: number; key?: string }
+  /**
+   * Juke-box (onglet du téléphone) : une commande du lecteur de la borne (jukebox-player.ts), comme
+   * un clic ou un bouton à la borne. `key` : une ligne reçue (playlist, morceau, ligne fixe) ;
+   * `fraction` : l'endroit du morceau (0 à 1). La borne vérifie tout.
+   */
+  | { t: 'jb'; s: number; op: RemoteJukeboxOp; key?: string; fraction?: number }
   | { t: 'ping'; s: number }
   | { t: 'bye'; s: number };
+
+/** Commandes du Juke-box au téléphone. */
+export const REMOTE_JUKEBOX_OPS = ['open', 'row', 'play', 'up', 'pause', 'shuffle', 'repeat', 'seek', 'next', 'prev', 'manage', 'exit'] as const;
+export type RemoteJukeboxOp = (typeof REMOTE_JUKEBOX_OPS)[number];
 
 const finite = (v: unknown, max: number): v is number => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= max;
 
@@ -488,6 +498,14 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       return typeof m.key === 'string' && /^[0-9a-f]{64}$/.test(m.key) && typeof m.text === 'string' && m.text.length <= 4000 ? { t: 'chat-send', s, key: m.key, text: m.text } : undefined;
     case 'chat-react':
       return typeof m.key === 'string' && /^[0-9a-f]{64}$/.test(m.key) && typeof m.target === 'string' && /^[0-9a-f]{16}$/.test(m.target) && typeof m.kind === 'string' && /^[a-z]{1,20}$/.test(m.kind) ? { t: 'chat-react', s, key: m.key, target: m.target, kind: m.kind } : undefined;
+    case 'jb': {
+      if (!(REMOTE_JUKEBOX_OPS as readonly unknown[]).includes(m.op)) return undefined;
+      const key = typeof m.key === 'string' && m.key.length > 0 && m.key.length <= 200 && !/[\u0000-\u001f\u007f]/.test(m.key) ? m.key : undefined;
+      if (m.key !== undefined && !key) return undefined;
+      const fraction = typeof m.fraction === 'number' && Number.isFinite(m.fraction) && m.fraction >= 0 && m.fraction <= 1 ? m.fraction : undefined;
+      if (m.fraction !== undefined && fraction === undefined) return undefined;
+      return { t: 'jb', s, op: m.op as RemoteJukeboxOp, ...(key ? { key } : {}), ...(fraction !== undefined ? { fraction } : {}) };
+    }
     case 'chat-open':
       if (m.key === undefined || m.key === null) return { t: 'chat-open', s };
       return typeof m.key === 'string' && /^[0-9a-f]{64}$/.test(m.key) ? { t: 'chat-open', s, key: m.key } : undefined;

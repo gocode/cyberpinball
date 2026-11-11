@@ -76,12 +76,13 @@ for (const b of document.querySelectorAll('.btn')) {
 const VIEWS = {
   list: { icon: 'monitor', label: () => t('Écran') },
   menus: { icon: 'gear', label: () => t('Menus') },
+  jukebox: { icon: 'jukebox', label: () => t('Juke-box') },
   community: { icon: 'friends', label: () => t('Communauté') },
   buttons: { icon: 'gamepad', label: () => t('Boutons') },
 };
 /** Vues de la Communauté (un même onglet) : les messages, les amis, les scores ; et le fil d'un ami, plein écran. */
 const COMMUNITY_VIEWS = ['messages', 'friends', 'ranks'];
-const tabOf = (v) => (COMMUNITY_VIEWS.includes(v) || v === 'thread' ? 'community' : v);
+const tabOf = (v) => (COMMUNITY_VIEWS.includes(v) || v === 'thread' ? 'community' : v === 'player' ? 'jukebox' : v);
 for (const [name, def] of Object.entries(VIEWS)) {
   const tab = $(`tab-${name}`);
   const text = document.createElement('span');
@@ -287,10 +288,10 @@ let menus;
 let menuPath = [];
 
 function setView(next) {
-  if (!(knownView(next) || next === 'thread') || $(`tab-${tabOf(next)}`).disabled) return;
+  if (!(knownView(next) || next === 'thread' || next === 'player') || $(`tab-${tabOf(next)}`).disabled) return;
   const before = document.body.dataset.view;
   view = next;
-  if (next !== 'thread') store(VIEW_STORE, next);
+  if (next !== 'thread' && next !== 'player') store(VIEW_STORE, next);
   if (COMMUNITY_VIEWS.includes(next)) communityView = next;
   // Un fil quitté : la borne cesse de l'envoyer (et de le marquer lu).
   if (before === 'thread' && next !== 'thread') communityLeaveThread();
@@ -302,6 +303,7 @@ function setView(next) {
   if (next === 'ranks' && before !== 'ranks') ranksEnter();
   if (next !== 'ranks' && before === 'ranks') ranksLeave();
   if (next === 'messages' || next === 'friends') renderCommunity();
+  if (next === 'jukebox' || next === 'player') renderJukebox();
 }
 
 /** Une ligne de liste : icône, libellé (et sa pastille), détail ou raison, pastille rouge, chevron d'une rubrique. */
@@ -561,10 +563,11 @@ function showScreen(sc) {
 function renderTop() {
   if (mode === 'browser') return;
   const shown = document.body.dataset.view;
-  const top = communityTop(shown);
+  const top = communityTop(shown) ?? jukeboxTop(shown);
   $('page-title').textContent = top ? top.title : screen.title;
   $('page-host').textContent = top ? top.detail : screen.item;
-  $('top-back').hidden = shown !== 'thread';
+  $('top-back').hidden = shown !== 'thread' && shown !== 'player';
+  $('top-back').setAttribute('aria-label', shown === 'player' ? t('Retour au Juke-box') : t('Retour aux conversations'));
   $('top-mark').replaceChildren(...(top?.face ? [top.face] : []));
   $('top-mark').classList.toggle('face', Boolean(top?.face));
   $('top-keys').hidden = !(mode === 'menu' && fieldShown && shown !== 'thread');
@@ -758,6 +761,10 @@ function handle(m) {
       break;
     case 'community':
       communityMessage(m);
+      break;
+    case 'jukebox':
+    case 'jb-time':
+      jukeboxMessage(m);
       break;
     case 'up-ready':
       uploadReady(m);
@@ -1004,8 +1011,8 @@ function syncLayout() {
   // ces réglages, Scores toujours ; Menus après la partie. Indisponible : grisé, avec sa raison.
   const ingame = mode === 'game' && entries?.kind === 'ingame';
   body.dataset.ingame = String(ingame);
-  const off = { menus: mode === 'game', buttons: mode === 'game' && !ingame };
-  for (const name of ['menus', 'buttons']) {
+  const off = { menus: mode === 'game', buttons: mode === 'game' && !ingame, jukebox: mode === 'game' };
+  for (const name of ['menus', 'buttons', 'jukebox']) {
     const tab = $(`tab-${name}`);
     tab.disabled = off[name];
     tab.querySelector('.view-reason').textContent = off[name] ? t('Après la partie') : '';
@@ -1015,6 +1022,7 @@ function syncLayout() {
   for (const v of Object.keys(VIEWS)) $(`tab-${v}`).setAttribute('aria-selected', String(v === tabOf(shownView)));
   for (const v of COMMUNITY_VIEWS) $(`seg-${v}`).setAttribute('aria-selected', String(v === shownView));
   renderTop();
+  renderMini();
   // Clavier à l'écran de la borne ouvert : Start y tape la touche choisie, Valider (téléphone) envoie Entrée.
   const startWhat = document.querySelector('.btn[data-b="confirm"] .btn-what');
   if (startWhat) startWhat.textContent = mode === 'menu' && fieldShown ? t('Touche choisie') : t('Valider');
@@ -1505,6 +1513,8 @@ if (demo) {
   if (demo.open) community.open = demo.open;
   syncLayout();
   if (demo.community) communityMessage({ t: 'community', ...demo.community });
+  if (demo.jukebox) jukeboxMessage({ t: 'jukebox', ...demo.jukebox });
+  if (demo.jbTime) jukeboxMessage({ t: 'jb-time', ...demo.jbTime });
   if (demo.view === 'thread') renderThread();
   if (demo.touch) {
     pad.classList.add('touching');
@@ -1515,6 +1525,7 @@ if (demo) {
   renderEntries();
   renderMenus();
   renderCommunity();
+  renderJukebox();
   key = readFragment();
   if (!key) setState('invalid');
   else {

@@ -593,7 +593,7 @@ body[data-mode='game'][data-ingame='true'] .game-note {
 .views {
   display: none;
   /* Communauté, le plus long libellé, a un peu plus de place. */
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
   flex-shrink: 0;
   margin: 0 -6px;
   padding-top: 4px;
@@ -2185,6 +2185,14 @@ body[data-layout='editing'][data-short='true'] .tool .icon {
   font-size: 20px;
 }
 
+/* Étroit (iPhone SE, 320 px) : cinq onglets, les libellés resserrés pour tenir en entier. */
+@media (max-width: 360px) {
+  .view-text {
+    font-size: 12px;
+    font-stretch: 80%;
+  }
+}
+
 /* Petite hauteur visible (iPhone SE dans Safari, téléphone en paysage) : les onglets se resserrent, la liste garde la place. */
 body[data-short='true'] .view-tab {
   min-height: 48px;
@@ -2507,4 +2515,469 @@ body[data-short='true'] .top {
 .phone-chat-chip {
   flex: none;
   white-space: nowrap;
+}
+
+/* --- Juke-box : le lecteur de la borne (telephone-jukebox.js) --- */
+
+.jukebox {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 10px;
+}
+
+body:not([data-mode='browser'])[data-view='jukebox'] .jukebox {
+  display: flex;
+}
+
+body:not([data-state='paired']) .jukebox,
+body:not([data-state='paired']) .jb-player {
+  visibility: hidden;
+}
+
+.jb-seg {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.jb-seg[hidden],
+.jb-head[hidden],
+.jb-acts[hidden],
+.jb-up[hidden] {
+  display: none;
+}
+
+.jb-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 48px;
+}
+
+.jb-up {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-left: -6px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--ink);
+  font-size: 24px;
+}
+
+.jb-head-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.jb-title {
+  overflow: hidden;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 23px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.jb-label {
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+
+/* Les lignes fixes d'une playlist : Tout lire sur toute la largeur, puis l'aléatoire et la répétition. */
+.jb-acts {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.jb-act {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 19px;
+  text-align: left;
+}
+
+.jb-act .icon {
+  flex: none;
+  font-size: 20px;
+}
+
+.jb-act.primary {
+  grid-column: 1 / -1;
+  border-color: var(--signal);
+  background: var(--signal);
+  color: var(--on-signal);
+}
+
+.jb-act.on {
+  border-color: var(--signal);
+  background: var(--signal-wash);
+  color: var(--signal);
+}
+
+.jb-list {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--halo-panel);
+}
+
+.jukebox .empty {
+  flex: 1;
+}
+
+.jukebox .empty .key {
+  margin-top: 8px;
+}
+
+.jb-row {
+  min-height: 64px;
+}
+
+.jb-row.playing {
+  border-color: var(--signal);
+  background: linear-gradient(90deg, rgba(139, 226, 58, 0.14), rgba(139, 226, 58, 0.03));
+}
+
+.jb-row.off .entry-label {
+  color: var(--ink-muted);
+}
+
+.jb-row.off .entry-detail {
+  color: var(--warning);
+  white-space: normal;
+}
+
+.jb-row.off .jb-art img {
+  filter: grayscale(1) brightness(0.6);
+}
+
+/* Pochettes : carrées, la mosaïque de quatre pour une playlist ; sans image, le disque. */
+.jb-art {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--surface-raised);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--ink-muted);
+  font-size: 24px;
+}
+
+.jb-art.mosaic-box {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+}
+
+.jb-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.jb-art.mosaic {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.jb-art.small {
+  width: 42px;
+  height: 42px;
+}
+
+.jb-art.big {
+  width: 100%;
+  height: 100%;
+  border-radius: 18px;
+  font-size: 72px;
+}
+
+.jb-duration {
+  flex: none;
+  font-size: 15px;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.jb-eq {
+  flex: none;
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 16px;
+  color: var(--signal);
+}
+
+.jb-eq i {
+  display: block;
+  width: 3px;
+  height: 14px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .jb-eq:not(.paused) i {
+    animation: jb-eq 1.1s ease-in-out infinite alternate;
+  }
+
+  .jb-eq i:nth-child(2) {
+    animation-delay: -0.4s;
+  }
+
+  .jb-eq i:nth-child(3) {
+    animation-delay: -0.8s;
+  }
+}
+
+@keyframes jb-eq {
+  from {
+    height: 4px;
+  }
+
+  to {
+    height: 16px;
+  }
+}
+
+.jb-eq.paused i {
+  height: 6px;
+}
+
+/* Le lecteur déplié : la pochette, le titre, le temps, les commandes. */
+.jb-player {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: 10px;
+  padding: 0 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+body:not([data-mode='browser'])[data-view='player'] .jb-player {
+  display: flex;
+}
+
+.jb-cover {
+  align-self: center;
+  width: min(100%, 32dvh, 320px);
+  aspect-ratio: 1;
+  flex: none;
+}
+
+.jb-now {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.jb-now-title {
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 26px;
+  overflow-wrap: anywhere;
+}
+
+.jb-now-artist {
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+
+.jb-track {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#jb-seek {
+  width: 100%;
+  height: 48px;
+  margin: 0;
+  accent-color: var(--signal);
+}
+
+.jb-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.jb-controls {
+  display: grid;
+  grid-template-columns: 48px 56px 76px 56px 48px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.jb-ctl {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 26px;
+}
+
+.jb-ctl.small {
+  width: 48px;
+  height: 48px;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 24px;
+}
+
+.jb-ctl.small.on {
+  color: var(--signal);
+}
+
+.jb-ctl.big {
+  width: 76px;
+  height: 76px;
+  border: 0;
+  background: var(--signal);
+  color: var(--on-signal);
+  box-shadow: 0 0 22px var(--signal-haze);
+  font-size: 34px;
+}
+
+.jb-ctl:disabled,
+.jb-mini-btn:disabled {
+  color: var(--ink-faint);
+}
+
+@media (max-width: 340px) {
+  .jb-controls {
+    grid-template-columns: 48px 48px 64px 48px 48px;
+  }
+
+  .jb-ctl:not(.small) {
+    width: 48px;
+    height: 48px;
+  }
+
+  .jb-ctl.big {
+    width: 64px;
+    height: 64px;
+  }
+}
+
+/* Le mini-lecteur, au-dessus des onglets, dès qu'un morceau joue (body[data-mini]). */
+.jb-mini {
+  position: relative;
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  min-height: 60px;
+  padding: 0 4px 0 6px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface-raised);
+}
+
+body[data-mini='true']:not([data-mode='browser']) .jb-mini {
+  display: flex;
+}
+
+body[data-layout='editing'] .jb-mini {
+  display: none;
+}
+
+.jb-mini-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.jb-mini-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.jb-mini-title,
+.jb-mini-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.jb-mini-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.jb-mini-label {
+  font-size: 13px;
+  line-height: 17px;
+  color: var(--ink-muted);
+}
+
+.jb-mini-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--ink);
+  font-size: 24px;
+}
+
+.jb-mini-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 0;
+  background: var(--signal);
+  box-shadow: 0 0 8px var(--signal);
 }

@@ -15,6 +15,7 @@ import {
 } from '../dmdscenes';
 import type { TableRecords } from '../highscores';
 import {
+  DMD_ALTERNANCE,
   DMD_HEIGHT,
   DMD_TRANSITIONS,
   DMD_TRANSITION_MS,
@@ -59,17 +60,17 @@ function medallion(width = 200, height = 200, band = [130, 160]): RgbaImage {
 
 const filled = (v: number): DmdDots => new Uint8Array(DMD_WIDTH * DMD_HEIGHT).fill(v);
 
-test('transitions : chacune selon la page d’arrivée, aucune entre deux records', () => {
-  assert.equal(transitionTo('title', 'press-start'), 'push');
-  assert.equal(transitionTo('press-start', 'records'), 'wipe');
-  assert.equal(transitionTo('records', 'records'), undefined);
-  assert.equal(transitionTo('records', 'clock'), 'dissolve');
-  assert.equal(transitionTo('clock', 'credits'), 'dissolve');
-  assert.equal(transitionTo('records', 'interlude'), 'push');
-  assert.equal(transitionTo('title', 'wheel'), 'light');
-  assert.equal(transitionTo('wheel', 'title'), 'push');
-  // Durées du directeur artistique, multiples d'une image (40 ms).
-  assert.deepEqual(DMD_TRANSITION_MS, { push: 160, slide: 240, wipe: 320, dissolve: 320, light: 400 });
+test('transitions : les trois effets Soie en alternance, l’allumage vers la wheel, aucune entre deux records', () => {
+  assert.deepEqual(DMD_ALTERNANCE, ['fils', 'wipe', 'scintille']);
+  assert.equal(transitionTo('title', 'press-start', 0), 'fils');
+  assert.equal(transitionTo('press-start', 'records', 1), 'wipe');
+  assert.equal(transitionTo('records', 'clock', 2), 'scintille');
+  assert.equal(transitionTo('clock', 'credits', 3), 'fils');
+  assert.equal(transitionTo('records', 'records', 1), undefined);
+  assert.equal(transitionTo('title', 'wheel', 2), 'light');
+  // Durées, multiples d'une image (40 ms).
+  assert.deepEqual(DMD_TRANSITION_MS, { push: 160, slide: 240, wipe: 320, dissolve: 320, light: 400, fils: 520, scintille: 440 });
+  for (const ms of Object.values(DMD_TRANSITION_MS)) assert.equal(ms % 40, 0);
   // Chacune part de l'ancienne image et arrive à la nouvelle.
   const a = filled(3);
   const b = filled(9);
@@ -86,20 +87,29 @@ test('transitions : chacune selon la page d’arrivée, aucune entre deux record
   const right = DMD_TRANSITIONS.slide(a, b, 0.5, -1);
   assert.equal(left[DMD_WIDTH - 1], 9, 'vers la suivante : la nouvelle arrive par la droite');
   assert.equal(right[0], 9, 'vers la précédente : par la gauche');
+  // Les fils ont leur tête au plein éclat et une rémanence ; le scintillement, un front au plein éclat.
+  assert.ok(DMD_TRANSITIONS.fils(a, b, 0.5).includes(15));
+  assert.ok(DMD_TRANSITIONS.scintille(a, b, 0.5).includes(15));
 });
 
-test('programme : le volet vers les records, la dissolution vers l’horloge, la poussée ailleurs', () => {
+test('programme : les effets Soie se suivent en boucle, deux records sans mouvement', () => {
   const program = new LiveDmdProgram(liveDmdPages(BTTF));
   const ids = program.pages.map((p) => p.id);
-  const press = ids.indexOf('press-start');
   const r1 = ids.indexOf('records');
-  const clock = ids.indexOf('clock');
-  assert.equal(program.startOf(r1), program.startOf(press) + LIVE_DMD_TIMING.pressStart + LIVE_DMD_TIMING.wipe);
   assert.equal(program.startOf(r1 + 1), program.startOf(r1) + LIVE_DMD_TIMING.record, 'deux records : remplacés sans mouvement');
-  assert.equal(program.startOf(clock), program.startOf(clock - 1) + LIVE_DMD_TIMING.record + LIVE_DMD_TIMING.dissolve);
-  // En plein volet : la page de départ, une image qui bouge, un front au plein éclat.
-  const mid = program.at(program.startOf(r1) - LIVE_DMD_TIMING.wipe / 2);
-  assert.equal(mid.page, 'press-start');
+  // Les transitions de la boucle, dans l'ordre : fils, volet, scintillement, fils…
+  const played = ids.map((_, i) => program.transitionAfter(i)).filter((x) => x !== undefined && x !== 'light');
+  assert.ok(played.length >= 3, `${played.length} transitions`);
+  played.forEach((name, i) => assert.equal(name, DMD_ALTERNANCE[i % 3], `transition ${i}`));
+  // Chaque page commence après la précédente, sa durée et celle de sa transition.
+  for (let i = 1; i < ids.length; i++) {
+    const before = program.transitionAfter(i - 1);
+    assert.equal(program.startOf(i), program.startOf(i - 1) + program.pages[i - 1]!.hold + (before ? DMD_TRANSITION_MS[before] : 0));
+  }
+  // En pleine transition : la page de départ, une image qui bouge, un éclat au plein.
+  const first = program.transitionAfter(0)!;
+  const mid = program.at(program.startOf(1) - DMD_TRANSITION_MS[first] / 2);
+  assert.equal(mid.page, ids[0]);
   assert.ok(mid.moving && mid.dots.includes(15));
 });
 
@@ -149,8 +159,8 @@ test('détail de la wheel : 800 ms après l’arrivée, allumé sur le titre, jo
     if (shine[i]! > v) raised++;
   });
   assert.ok(raised > 10, 'un reflet passe');
-  // Toute l'ouverture : 800 ms de titre, l'allumage, 1 760 ms de wheel, la poussée vers le titre.
-  assert.equal(program.openingLength, after + LIVE_DMD_TIMING.light + page.hold + LIVE_DMD_TIMING.transition);
+  // Toute l'ouverture : 800 ms de titre, l'allumage, 1 760 ms de wheel, les fils (premier effet Soie) vers le titre.
+  assert.equal(program.openingLength, after + LIVE_DMD_TIMING.light + page.hold + LIVE_DMD_TIMING.fils);
   assert.equal(program.at(program.openingLength).page, 'title');
   assert.ok(!program.pages.some((p) => p.id === 'wheel'), 'la boucle ne la rejoue pas');
   // Sans wheel connue : pas d'ouverture.

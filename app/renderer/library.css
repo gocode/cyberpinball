@@ -57,8 +57,10 @@ body.mouse [data-act] {
   flex-direction: column;
   gap: 2.5cqmin;
   padding: var(--pad-top) var(--pad-side) 4cqmin;
-  background: var(--fond-ambiance);
-  background-color: var(--bg);
+  /* Soie : la vidéo de la table reste devinable derrière l'écran (voile à 86 %), une lueur à la teinte de la table en haut à droite. */
+  background:
+    radial-gradient(ellipse at 92% 8%, color-mix(in oklab, var(--table-deep) 30%, transparent) 0%, transparent 55%),
+    rgba(3, 8, 7, 0.86);
 }
 
 /*
@@ -451,10 +453,33 @@ body.mouse .lib-back:hover {
 }
 
 /* Contours tracés à l'intérieur de l'élément (outline-offset négatif) : tracés autour, une liste qui défile les rognerait à gauche, en haut ou en bas. */
+/*
+ * Choix courant, en Soie : une barre verte qui s'éteint vers la droite, son trait plein à gauche
+ * (dans la bordure : une liste qui défile ne le rogne pas). L'éclat (.moved) ne passe que quand le
+ * choix vient de bouger, jamais à un simple rafraîchissement.
+ */
 .lib-row.selected {
-  background: var(--signal-wash);
-  outline: 0.3cqmin solid var(--accent);
-  outline-offset: -0.3cqmin;
+  position: relative;
+  border-left-color: var(--accent);
+  background: linear-gradient(90deg, rgba(139, 226, 58, 0.26), rgba(139, 226, 58, 0.07) 60%, rgba(139, 226, 58, 0.02));
+}
+
+/* L'éclat glisse dans la ligne par la position de son dégradé : rien ne déborde, rien n'est rogné autour. */
+.lib-row.selected.moved::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, rgba(232, 255, 208, 0), rgba(232, 255, 208, 0.14), rgba(232, 255, 208, 0)) no-repeat;
+  background-size: 30% 100%;
+  background-position: -50% 0;
+  animation: lib-eclat 450ms cubic-bezier(0.22, 0.61, 0.36, 1) 120ms both;
+}
+
+@keyframes lib-eclat {
+  to {
+    background-position: 150% 0;
+  }
 }
 
 .badge {
@@ -4113,3 +4138,169 @@ body.mouse button.lib-command:hover .lib-command-text {
   gap: 0.8cqmin;
 }
 .kind-phrases .lib-row { border: 1px solid var(--line); border-radius: 0.6cqmin; }
+
+/* ---------- Mouvement « Soie » des écrans de menu ---------- */
+
+/* Titre des écrans : capitales larges et espacées, comme la marque. */
+.lib-head h1 {
+  font-stretch: 112%;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Filet sous l'en-tête ; sa lumière court dans le trait seulement (même hauteur, débord caché). */
+.lib-rule {
+  position: relative;
+  flex: none;
+  height: 0.28cqmin;
+  margin-top: 2.2cqmin;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(54, 201, 180, 0.75), rgba(54, 201, 180, 0.14));
+  box-shadow: 0 0 1.1cqmin rgba(54, 201, 180, 0.45);
+}
+
+.lib-rule > i,
+.lib-rule > b {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.lib-rule > i {
+  left: -20cqmin;
+  width: 20cqmin;
+  background: linear-gradient(90deg, rgba(232, 255, 248, 0), #e8fff8, rgba(232, 255, 248, 0));
+  animation: lib-filet 5s cubic-bezier(0.45, 0, 0.55, 1) 1.2s infinite;
+}
+
+@keyframes lib-filet {
+  0% {
+    left: -20cqmin;
+  }
+  40%,
+  100% {
+    left: 100%;
+  }
+}
+
+/* Tête du tracé, à l'arrivée : un bout clair au front du trait qui se dessine. */
+.lib-rule > b {
+  left: -13cqmin;
+  width: 13cqmin;
+  opacity: 0;
+  background: linear-gradient(90deg, rgba(232, 255, 248, 0), #ffffff);
+}
+
+/*
+ * Arrivée d'un écran (frontend.js, renderPlayfield ; .lib-arrive à l'ouverture seulement) : le voile
+ * tombe avec un léger recul, le filet se dessine, le titre se resserre en se précisant, les lignes
+ * arrivent de la gauche une à une, la barre du choix se déroule, le bandeau d'aide monte. Environ
+ * une seconde ; un appui pendant ce temps redessine l'écran sans elle. Le titre ne s'élargit jamais
+ * au-delà de sa forme finale : il ne change pas de ligne pendant l'arrivée.
+ */
+.lib.lib-arrive {
+  animation: lib-voile 380ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes lib-voile {
+  from {
+    opacity: 0;
+    transform: scale(1.035);
+  }
+}
+
+.lib-arrive .lib-head h1 {
+  animation: lib-titre 560ms cubic-bezier(0.22, 0.61, 0.36, 1) 120ms both;
+}
+
+@keyframes lib-titre {
+  from {
+    opacity: 0;
+    letter-spacing: 0;
+    filter: blur(1cqmin);
+  }
+}
+
+.lib-arrive .lib-rule {
+  animation: lib-trace 700ms cubic-bezier(0.6, 0, 0.2, 1) 120ms both;
+}
+
+@keyframes lib-trace {
+  from {
+    clip-path: inset(-2cqmin 100% -2cqmin 0);
+  }
+  to {
+    clip-path: inset(-2cqmin 0 -2cqmin 0);
+  }
+}
+
+.lib-arrive .lib-rule > b {
+  animation: lib-tete 700ms cubic-bezier(0.6, 0, 0.2, 1) 120ms;
+}
+
+@keyframes lib-tete {
+  from {
+    left: -13cqmin;
+    opacity: 1;
+  }
+  to {
+    left: calc(100% - 13cqmin);
+    opacity: 1;
+  }
+}
+
+.lib-arrive .lib-row {
+  animation: lib-ligne 440ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: calc(300ms + var(--i, 0) * 55ms);
+}
+
+@keyframes lib-ligne {
+  from {
+    opacity: 0;
+    transform: translateX(-4cqmin);
+    filter: blur(0.6cqmin);
+  }
+}
+
+/* La barre du choix se déroule de gauche à droite, une fois sa ligne arrivée. */
+.lib-arrive .lib-row.selected {
+  background-repeat: no-repeat;
+  animation-name: lib-ligne, lib-deroule;
+  animation-duration: 440ms, 420ms;
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation-delay: calc(300ms + var(--i, 0) * 55ms), calc(500ms + var(--i, 0) * 55ms);
+  animation-fill-mode: both;
+}
+
+@keyframes lib-deroule {
+  from {
+    background-size: 0% 100%;
+  }
+  to {
+    background-size: 100% 100%;
+  }
+}
+
+.lib-arrive > .lib-hint {
+  animation: lib-pied 380ms cubic-bezier(0.22, 0.61, 0.36, 1) 520ms both;
+}
+
+@keyframes lib-pied {
+  from {
+    opacity: 0;
+    transform: translateY(3cqmin);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lib.lib-arrive,
+  .lib-arrive .lib-head h1,
+  .lib-arrive .lib-rule,
+  .lib-arrive .lib-rule > b,
+  .lib-arrive .lib-row,
+  .lib-arrive > .lib-hint,
+  .lib-rule > i,
+  .lib-row.selected.moved::after {
+    animation: none;
+  }
+}

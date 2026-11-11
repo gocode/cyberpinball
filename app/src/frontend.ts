@@ -308,6 +308,9 @@ import {
   JUKEBOX_WHEEL_KEY,
   remoteMenuTarget,
   toRemoteEntry,
+  REMOTE_ENTRIES_MAX,
+  isJukeboxAction,
+  type RemoteJukeboxOp,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, setCursorPosition, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays, simulatedDisplays } from './displays';
@@ -393,7 +396,7 @@ import { createDedicatedSystem } from './dedicated-system';
 import { handOverOnQuit, shellSession } from './dedicated-session';
 import { createPowerMenu } from './power';
 import { readWakeDevices } from './arcade-hours';
-import { createPhoneRemote, phoneRemoteMode, type MenuEntries, type MenuEntry } from './phone-remote';
+import { createPhoneRemote, phoneRemoteMode, type MenuEntries, type MenuEntry, type RemoteJukebox } from './phone-remote';
 
 /**
  * Touches du menu : celles des boutons de l'interface (étape « Boutons de l'interface »
@@ -1287,6 +1290,9 @@ phoneRemote.setMenu({
   }),
   // Messagerie pendant une partie : lire et répondre au téléphone, sans toucher aux boutons de VPX ; jamais en mode invité.
   chat: () => (guest.active ? undefined : chatMenu.remoteChat()),
+  // Juke-box au téléphone : le lecteur de la borne, ses commandes comme des clics à la borne.
+  jukebox: () => remoteJukebox(),
+  jukeboxAct: (op, key, fraction) => remoteJukeboxAct(op, key, fraction),
   // Communauté au téléphone (messages, amis) : au menu, et pendant une partie si le réglage le permet ; jamais en mode invité.
   community: (open) => (guest.active ? { closed: t('Fermée en mode invité.'), unread: 0, rows: [] } : chatMenu.remoteCommunity(open)),
   chatSend: (key, text) => {
@@ -1326,6 +1332,58 @@ phoneRemote.setMenu({
     });
   },
 });
+
+/** Le Juke-box pour l'onglet du téléphone : le lecteur ouvert (même en fond, pendant sa gestion), sinon le médaillon. */
+function remoteJukebox(): RemoteJukebox {
+  const card = jukeboxCard();
+  if (state.phase === 'loading' || state.phase === 'playing') return { open: false, title: card.title, detail: card.subtitle, reason: t('Après la partie') };
+  if (!jukeboxShown()) return { open: false, title: card.title, reason: t('Masqué de la roue : réglage « Juke-box dans la roue »') };
+  const view = jukeboxPlayer.remoteView(REMOTE_ENTRIES_MAX);
+  const time = jukeboxPlayer.time();
+  return { open: Boolean(view), title: card.title, detail: card.subtitle, ...(view ? { view } : {}), ...(time ? { time } : {}) };
+}
+
+/**
+ * Une commande du Juke-box venue du téléphone, comme un clic ou un bouton à la borne : ouvrir le
+ * Juke-box (comme Start sur le médaillon, mêmes portes), une ligne (la choisir, ou l'ouvrir), lire
+ * un morceau d'un toucher, remonter, pause, aléatoire, répétition, avancer, précédent, suivant, la
+ * gestion, quitter.
+ */
+function remoteJukeboxAct(op: RemoteJukeboxOp, key?: string, fraction?: number): void {
+  if (!remoteWakes() || state.phase === 'loading' || state.phase === 'playing' || !jukeboxShown()) return;
+  if (op === 'open') {
+    if (state.phase === 'jukebox') return;
+    if (state.phase === 'menu' && !guest.knock('menu.choose')) return;
+    return openJukebox();
+  }
+  if (!jukeboxPlayer.active()) return;
+  // Le lecteur en fond pendant sa gestion : il revient d'abord à l'écran, comme au retour de la gestion.
+  if (state.phase !== 'jukebox') openJukebox();
+  switch (op) {
+    case 'row':
+      if (key) jukeboxPlayer.click({ op: 'row', key });
+      break;
+    case 'play': {
+      // Un morceau touché au téléphone se lit d'un coup : choisi, puis Start, comme deux touchers à la borne.
+      if (!key) break;
+      const before = jukeboxPlayer.state();
+      const chosen = before?.level === 'tracks' && before.selected[before.shown] === key;
+      jukeboxPlayer.click({ op: 'row', key });
+      if (before?.level === 'tracks' && !chosen && !isJukeboxAction(key)) jukeboxPlayer.click({ op: 'row', key });
+      break;
+    }
+    case 'seek':
+      if (fraction !== undefined) jukeboxPlayer.click({ op: 'seek-to', fraction });
+      break;
+    case 'next':
+    case 'prev':
+      jukeboxPlayer.skip(op === 'next' ? 1 : -1);
+      break;
+    default:
+      jukeboxPlayer.click({ op });
+  }
+  broadcast();
+}
 
 /** Le téléphone peut-il écrire : jamais en mode invité ; pendant une partie, seulement si « Messagerie au téléphone pendant la partie » le permet. */
 function phoneMayWrite(): boolean {
@@ -1377,7 +1435,7 @@ function remoteEntries(): MenuEntries {
   if (state.phase === 'playing') return inGameEntries();
   if (state.phase === 'library') return library.remoteEntries() ?? none(t('Menu système'), '');
   if (state.phase === 'menu') return wheelEntries();
-  if (state.phase === 'jukebox') return none(t('Juke-box'), t('Le Juke-box se pilote avec les boutons : flippers pour choisir, Start pour écouter, Exit pour revenir à la roue.'));
+  if (state.phase === 'jukebox') return none(t('Juke-box'), t('Le Juke-box se pilote dans l’onglet Juke-box du téléphone, ou avec les boutons : flippers pour choisir, Start pour écouter, Exit pour revenir à la roue.'));
   if (state.phase === 'intro') return { kind: 'none', title: t('Ouverture'), items: [{ label: t('Passer l’ouverture'), icon: 'chevron-right', pick: () => void remoteWakes() }], current: -1 };
   if (state.phase === 'confirmQuit') {
     const items: MenuEntry[] = [

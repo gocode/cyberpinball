@@ -54,6 +54,7 @@ import {
   listTop,
   mediaUrl,
   playerStep,
+  playModeOf,
   followTransfer,
   rememberPlayed,
   t,
@@ -1090,7 +1091,8 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     return `${now.playlist} · ${now.position}`;
   }
 
-  function playerView(): JukeboxPlayerView {
+  /** La vue du lecteur ; `whole` (téléphone) : toute la liste du niveau affiché, pas seulement la fenêtre de la borne. */
+  function playerView(whole?: number): JukeboxPlayerView {
     const input = playlistsInput();
     const shown = player?.shown ?? '';
     const topKey = player?.level === 'tracks' ? shown : PLAYLISTS_TOP;
@@ -1099,16 +1101,43 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     return jukeboxPlayerView({
       playlists: input,
       state: player ?? { level: 'playlists', at: '', shown: '', selected: {}, paused: false },
-      top: tops.get(topKey) ?? 0,
+      top: whole ? 0 : (tops.get(topKey) ?? 0),
       // Les MagnaSave ne sont rappelés que si la borne en a pour changer de playlist : en borne, relevés comme
       // MagnaSave (des Ctrl de secours ne disent rien des boutons de la borne) ; au bureau, les flèches ←→.
       magnaSave: Boolean(k.collections.previous.length || k.collections.next.length) && (host.desk() || k.magnaRecorded),
-      rows: rows(),
+      rows: whole ?? rows(),
       ad,
       audioOnly: order?.audioOnly ?? false,
       ...(press && !press.done ? { holdSince: press.since } : {}),
       ...(seek?.press?.seeking || Date.now() < seekShownUntil ? { seeking: true } : {}),
     });
+  }
+
+  /**
+   * Morceau suivant ou précédent de la playlist en cours (téléphone, qui n'a pas d'autre moyen de
+   * sauter un morceau) : suivant, comme la fin du morceau (l'aléatoire tire le suivant), sans répéter
+   * le même ; précédent, le morceau lisible d'avant dans la playlist. Le niveau affiché ne bouge pas.
+   */
+  function skip(dir: 1 | -1): void {
+    if (!player?.playing) return;
+    const input = playlistsInput();
+    const ls = lists(input);
+    const id = player.playing.playlist;
+    const keep = { level: player.level, at: player.at, shown: player.shown, modes: player.modes };
+    let r;
+    if (dir === 1) {
+      const mode = playModeOf(player, id);
+      r = playerStep(mode.repeat === 'track' ? { ...player, modes: { ...player.modes, [id]: { ...mode, repeat: 'playlist' } } } : player, 'ended', ls);
+    } else {
+      const playable = ls.find((l) => l.id === id)?.tracks.filter((tr) => tr.playable).map((tr) => tr.key) ?? [];
+      if (!playable.length) return;
+      const key = playable[(playable.indexOf(player.playing.key) - 1 + playable.length) % playable.length]!;
+      r = playerStep({ ...player, level: 'tracks', shown: id, selected: { ...player.selected, [id]: key } }, 'start', ls);
+    }
+    player = { ...r.state, ...keep };
+    if (r.effect) apply(r.effect);
+    keepSelectionVisible(input);
+    host.redraw();
   }
 
   /** La part du Juke-box dans l'état d'une fenêtre ; onWheel : le médaillon est choisi dans la roue. */
@@ -1168,6 +1197,9 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     previewState: () => (preview ? { youtube: preview.youtube, ...(preview.position !== undefined ? { position: preview.position } : {}), ...(preview.duration !== undefined ? { duration: preview.duration } : {}), ...(preview.error ? { error: preview.error } : {}) } : undefined),
     handleKey,
     click,
+    /** Le lecteur pour le téléphone (phone-remote.ts) : toute la liste du niveau affiché ; undefined : fermé. */
+    remoteView: (max: number): JukeboxPlayerView | undefined => (player ? playerView(max) : undefined),
+    skip,
     message,
     view,
     syncDmd,

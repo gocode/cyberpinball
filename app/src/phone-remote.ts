@@ -102,6 +102,9 @@ import {
   wheelFor,
   type AvatarView,
   type FirewallState,
+  type JukeboxPlayerView,
+  type RemoteJukeboxOp,
+  mediaPathFromUrl,
   type KeptPhone,
   type KeptPhones,
   type PhoneMessage,
@@ -225,6 +228,20 @@ export interface RemoteCommunity {
   thread?: RemoteThread;
 }
 
+/**
+ * Le Juke-box pour l'onglet du téléphone : le lecteur de la borne (jukebox-player.ts, remoteView),
+ * toute la liste du niveau affiché ; fermé, ce que dit le médaillon et s'il s'ouvre.
+ */
+export interface RemoteJukebox {
+  open: boolean;
+  title: string;
+  detail?: string;
+  /** Le Juke-box ne s'ouvre pas d'ici : pourquoi (masqué de la roue, une partie…). */
+  reason?: string;
+  view?: JukeboxPlayerView;
+  time?: { key: string; position: number; duration?: number; paused: boolean };
+}
+
 /** Ce que le menu donne à la télécommande (frontend.ts) : ce qu'il montre, ses boutons, son clavier, le dossier d'import. */
 export interface MenuTarget {
   /** Le menu, ou une partie (VPX a les boutons). */
@@ -263,6 +280,9 @@ export interface MenuTarget {
   chatReact?(key: string, target: string, kind: string): void;
   /** Communauté : les conversations et le fil ouvert au téléphone (`open`) ; sans elle, l'onglet le dit. */
   community?(open?: string): RemoteCommunity;
+  /** Juke-box : le lecteur de la borne pour l'onglet du téléphone, et ses commandes (vérifiées par la borne). */
+  jukebox?(): RemoteJukebox;
+  jukeboxAct?(op: RemoteJukeboxOp, key?: string, fraction?: number): void;
 }
 
 /** Ce que la fenêtre « Récupérer » donne à la télécommande pendant qu'elle est ouverte. */
@@ -340,6 +360,7 @@ export const PHONE_FILES: Readonly<Record<string, string>> = {
   '/telephone-core.js': 'telephone/telephone-core.js',
   '/telephone-ranks.js': 'telephone/telephone-ranks.js',
   '/telephone-community.js': 'telephone/telephone-community.js',
+  '/telephone-jukebox.js': 'telephone/telephone-jukebox.js',
   // La pastille d'un joueur, dessinée comme à la borne (vue Scores).
   '/avatar.js': 'avatar.js',
   '/theme.css': 'theme.css',
@@ -493,6 +514,9 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   /** Dernier fil de la messagerie envoyé au téléphone (pendant une partie). */
   let chatSent = '';
   let communitySent = '';
+  let jukeboxSent = '';
+  /** Le temps du morceau envoyé, et quand : le téléphone l'avance seul, la borne ne le renvoie qu'en cas d'écart. */
+  let jukeboxTime: { key: string; position: number; paused: boolean; at: number } | undefined;
   let communityAt = 0;
   let communityTimer: NodeJS.Timeout | undefined;
   /** Le fil ouvert au téléphone (clé d'un ami), ou la liste. */
@@ -792,6 +816,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       ranksSent = '';
       chatSent = '';
       communitySent = '';
+      jukeboxSent = '';
+      jukeboxTime = undefined;
       sendTo(active, { t: 'mode', mode: m });
       force = true;
     }
@@ -808,6 +834,70 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     pushRanks(force);
     pushChat(force);
     pushCommunity(force);
+    pushJukebox(force);
+  }
+
+  /** Une image du Juke-box (adresse du protocole des médias) sous jeton, réduite à `max` pixels ; rien d'autre. */
+  function thumb(url: string | undefined, max: number): string | undefined {
+    const file = url ? mediaPathFromUrl(url) : undefined;
+    return file ? images.src(file, max) : undefined;
+  }
+
+  /**
+   * Juke-box : le lecteur quand il change (niveau, liste, morceau, modes), et le temps du morceau quand
+   * il s'écarte de ce que le téléphone en déduit (pause, avance, morceau suivant). Les images partent
+   * sous jeton, réduites (miniatures 160 px, pochette 480 px).
+   */
+  function pushJukebox(force = false): void {
+    if (!active || !menu?.jukebox || pairing?.session() !== 'paired' || mode() === 'browser') return;
+    let j: RemoteJukebox;
+    try {
+      j = menu.jukebox();
+    } catch (error) {
+      journalIncident('Télécommande : Juke-box illisible pour le téléphone', error); // i18n-ignore : journal
+      return;
+    }
+    const v = j.view;
+    const shown = {
+      open: j.open,
+      title: j.title,
+      ...(j.detail ? { detail: j.detail } : {}),
+      ...(j.reason ? { reason: j.reason } : {}),
+      ...(v
+        ? {
+            level: v.level,
+            header: v.header,
+            ...(v.empty ? { empty: v.empty } : {}),
+            rows: v.list.rows.map(({ image, mosaic, focus: _f, ...r }) => {
+              const src = thumb(image, 160);
+              const tiles = mosaic?.map((m) => thumb(m, 120)).filter((m): m is string => Boolean(m));
+              return { ...r, ...(src ? { image: src } : {}), ...(tiles?.length ? { mosaic: tiles } : {}) };
+            }),
+            ...(v.now
+              ? (({ image, seeking: _s, ...now }) => {
+                  const src = thumb(image, 480);
+                  return { now: { ...now, ...(src ? { image: src } : {}) } };
+                })(v.now)
+              : {}),
+          }
+        : {}),
+    };
+    const text = JSON.stringify(shown);
+    if (force || text !== jukeboxSent) {
+      jukeboxSent = text;
+      sendTo(active, { t: 'jukebox', ...shown });
+    }
+    const time = v?.now ? j.time : undefined;
+    if (!time || time.key !== v?.now?.key) {
+      if (jukeboxTime) sendTo(active, { t: 'jb-time' });
+      jukeboxTime = undefined;
+      return;
+    }
+    const now = Date.now();
+    const guess = jukeboxTime && jukeboxTime.key === time.key ? jukeboxTime.position + (jukeboxTime.paused ? 0 : (now - jukeboxTime.at) / 1000) : undefined;
+    if (!force && guess !== undefined && jukeboxTime!.paused === time.paused && Math.abs(guess - time.position) < 1.5) return;
+    jukeboxTime = { key: time.key, position: time.position, paused: time.paused, at: now };
+    sendTo(active, { t: 'jb-time', key: time.key, position: time.position, ...(time.duration !== undefined ? { duration: time.duration } : {}), paused: time.paused });
   }
 
   /**
@@ -1357,6 +1447,14 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     if (message.t === 'up') return void startUpload(link, message);
     // Les classements non plus : une lecture, sans geste injecté à la borne.
     if (message.t === 'ranks') return watchRanks(message);
+    // Juke-box : une commande du lecteur, vérifiée par la borne ; ce qui change part aussitôt.
+    if (message.t === 'jb') {
+      if (mode() === 'browser') return;
+      releaseButtons();
+      menu?.jukeboxAct?.(message.op, message.key, message.fraction);
+      pushJukebox();
+      return;
+    }
     // Communauté : le fil ouvert au téléphone (aucun geste injecté) ; son contenu part aussitôt.
     if (message.t === 'chat-open') {
       communityOpen = message.key;
@@ -1685,6 +1783,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     if (mode() !== 'browser') pushRanks();
     // La messagerie aussi (un message reçu, une présence) : la pastille de l'onglet et le fil ouvert suivent.
     if (mode() !== 'browser') pushCommunity();
+    // Et le Juke-box : le temps du morceau, un morceau qui s'enchaîne sans redessin du menu.
+    if (mode() !== 'browser') pushJukebox();
     const now = Date.now();
     if (mode() !== 'menu') lastActivity = now;
     else if (active && pairing?.session() === 'paired' && now - lastActivity > (opts.idleMs ?? REMOTE_IDLE_MS)) {

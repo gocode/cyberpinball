@@ -1140,6 +1140,187 @@ html.menu-desktop .menu.menu-band .menu-nav {
   border: calc(1.5 * var(--w)) solid rgba(225, 255, 190, 0.85);
 }
 
+/*
+ * Mouvement « Soie » de la roue (frontend.js, wheelMoved).
+ * Pendant le glissement, l'anneau se tait (une seule lumière verte, celle de l'arrêt). À l'arrêt
+ * (.landed, posée une fois la roue immobile, jamais pendant une rafale) : un fil clair s'enroule sur
+ * l'anneau en 320 ms puis se fond dedans, une étincelle en fait le tour, et une lueur large et douce
+ * traverse le logo choisi. Onde (.wheel-wave) : un trait de lumière à la teinte de la table, lancé à
+ * chaque appui dans le sens du glissement, derrière les logos.
+ */
+.menu-band .wheel-ring {
+  transition: opacity 120ms linear;
+}
+
+.menu-band .wheel-ring.moving {
+  opacity: 0.35;
+}
+
+.wheel-ring svg,
+.wheel-ring .wheel-spark,
+.wheel-glint,
+.wheel-wave {
+  display: none;
+}
+
+.menu-band .wheel-ring.landed svg {
+  display: block;
+  position: absolute;
+  inset: calc(-5 * var(--w));
+  width: calc(100% + 10 * var(--w));
+  height: calc(100% + 10 * var(--w));
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+
+.menu-band .wheel-ring.landed circle {
+  fill: none;
+  stroke: #e4ffc4;
+  stroke-width: 2.4;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 calc(4 * var(--w)) var(--signal));
+  animation:
+    ring-wrap 320ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards,
+    ring-melt 700ms ease-out 360ms forwards;
+}
+
+@keyframes ring-wrap {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes ring-melt {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Étincelle : un point clair qui fait le tour de l'anneau, un tour en 3,9 s, une fois le fil posé. */
+.menu-band .wheel-ring.landed .wheel-spark {
+  display: block;
+  position: absolute;
+  inset: calc(-2.5 * var(--w));
+  border-radius: 50%;
+  opacity: 0;
+  animation:
+    ring-spark-in 300ms linear 320ms forwards,
+    ring-orbit 3900ms linear 320ms infinite;
+}
+
+.menu-band .wheel-ring.landed .wheel-spark::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: calc(14 * var(--w));
+  height: calc(14 * var(--w));
+  margin: calc(-7 * var(--w)) 0 0 calc(-7 * var(--w));
+  border-radius: 50%;
+  background: radial-gradient(circle, #f4ffe6 0 25%, rgba(139, 226, 58, 0.6) 45%, rgba(139, 226, 58, 0) 70%);
+}
+
+@keyframes ring-spark-in {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ring-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Lueur du logo choisi : une bande large et douce qui le traverse une fois, avec un léger halo. */
+.menu-band .wheel-glint {
+  display: block;
+  position: absolute;
+  left: calc((var(--ring-x) - var(--ring-d) / 2 + 6) * var(--w));
+  top: calc((var(--ring-y) - var(--ring-d) / 2 + 6) * var(--w));
+  width: calc((var(--ring-d) - 12) * var(--w));
+  height: calc((var(--ring-d) - 12) * var(--w));
+  z-index: 21;
+  border-radius: 50%;
+  overflow: hidden;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0;
+}
+
+.menu-band .wheel-glint::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: -70%;
+  width: 60%;
+  transform: rotate(20deg);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0));
+}
+
+.menu-band .wheel-glint::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0) 70%);
+  opacity: 0;
+}
+
+.wheel-stage.landed .wheel-glint {
+  opacity: 1;
+}
+
+.wheel-stage.landed .wheel-glint::before {
+  animation: wheel-glint 650ms cubic-bezier(0.45, 0, 0.55, 1) 200ms forwards;
+}
+
+.wheel-stage.landed .wheel-glint::after {
+  animation: wheel-bloom 700ms ease-out 200ms forwards;
+}
+
+@keyframes wheel-glint {
+  to {
+    left: 120%;
+  }
+}
+
+@keyframes wheel-bloom {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Onde : un trait de lumière à la hauteur des logos, derrière eux (frontend.js l'anime au besoin). */
+.menu-band .wheel-wave {
+  display: block;
+  position: absolute;
+  left: calc((var(--ring-x) - 160) * var(--w));
+  top: calc((var(--ring-y) - 3) * var(--w));
+  width: calc(320 * var(--w));
+  height: calc(6 * var(--w));
+  z-index: 1;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, color-mix(in oklab, var(--table-tint) 40%, #fff) 0%, var(--table-tint) 35%, transparent 70%);
+  filter: blur(calc(1.5 * var(--w)));
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-band .wheel-ring.landed circle,
+  .menu-band .wheel-ring.landed .wheel-spark,
+  .wheel-stage.landed .wheel-glint::before,
+  .wheel-stage.landed .wheel-glint::after {
+    animation: none;
+  }
+}
+
 /* Sans logo, ou logo large détouré : un médaillon sombre cerclé de chrome derrière, le titre ou le logo dedans. */
 .menu-band .wheel-item.disc .wheel-tilt::before {
   content: '';
@@ -2620,6 +2801,25 @@ html.menu-desktop #cinema .cinema-depart {
 /* Sur le fronton, par-dessus son média. */
 .zone > .cinema {
   z-index: 3;
+}
+
+/*
+ * Écran de menu par-dessus le menu des tables (html.menu-screen, posée par renderPlayfield) : son
+ * voile laisse deviner la vidéo de la table (#media-bg, hors de la racine), jamais le menu gardé
+ * dessous ; sa roue, ses textes et son bandeau d'aide se cachent.
+ */
+html.menu-screen #root > .menu,
+html.menu-screen #root > .footer {
+  visibility: hidden;
+}
+
+/* Fils de lumière du lancement (frontend.js, cinemaThreads) : sous le logo, sur toute la scène. */
+.cine-fils {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 .cine-flight {

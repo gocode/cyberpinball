@@ -253,7 +253,7 @@ function communityTop(shown) {
   return { title: t('Communauté'), detail: unread ? tn(unread, '{n} message non lu', '{n} messages non lus') : '' };
 }
 
-document.getElementById('top-back').addEventListener('click', () => setView(communityView));
+document.getElementById('top-back').addEventListener('click', () => setView(document.body.dataset.view === 'player' ? 'jukebox' : communityView));
 document.getElementById('thread-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const field = document.getElementById('thread-field');

@@ -254,9 +254,14 @@ function wheelStage(s, style) {
     // La roue est un arc : ses médaillons voisins sortent de l'écran par construction (contrôles de débordement : data-bleed).
     layer.dataset.bleed = '';
     // Anneau vert fixe de la table choisie (Médaillons) : les logos glissent dessous et dedans.
-    layer.append(el('div', 'wheel-ring'));
+    // Mouvement « Soie » : à l'arrêt, un fil vert s'enroule sur l'anneau et une étincelle en fait
+    // le tour (svg, .wheel-spark) ; une lueur traverse le logo choisi (.wheel-glint) ; à chaque
+    // appui, une onde de lumière court le long de la roue (.wheel-wave).
+    const ring = el('div', 'wheel-ring');
+    ring.innerHTML = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="48.5" pathLength="1"/></svg><i class="wheel-spark"></i>';
+    layer.append(el('div', 'wheel-wave'), ring, el('div', 'wheel-glint'));
     stage.append(layer);
-    wheelView = { stage, layer, items: new Map(), style };
+    wheelView = { stage, layer, ring, items: new Map(), style };
   }
   const v = wheelView;
   v.style = style;
@@ -278,9 +283,12 @@ function wheelStage(s, style) {
     }
   }
   const live = new Set();
+  // Sens du glissement : la nouvelle table du centre venait de la droite (+1) ou de la gauche (-1).
+  let moved = 0;
   for (const n of s.neighbors) {
     live.add(n.key);
     let item = v.items.get(n.key);
+    if (!swap && n.offset === 0 && item && !item.leaving && item.offset !== 0) moved = Math.sign(item.offset);
     if (item?.leaving) {
       clearTimeout(item.leaving);
       item.leaving = undefined;
@@ -325,7 +333,50 @@ function wheelStage(s, style) {
     }, 500);
     placeWheelItem(item, style);
   }
+  if (moved) wheelMoved(v, moved);
   return v.stage;
+}
+
+/** Les mouvements Soie de la roue sont coupés quand le système demande moins d'animations. */
+const quietMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Durée du glissement des logos, lue sur la scène (--wheel-time) ; 320 ms faute de feuille de style. */
+function wheelTime(stage) {
+  const raw = typeof getComputedStyle === 'function' ? getComputedStyle(stage).getPropertyValue?.('--wheel-time') : '';
+  const ms = parseFloat(raw);
+  return Number.isFinite(ms) && ms > 0 ? ms : 320;
+}
+
+/**
+ * Un appui a fait glisser la roue : l'anneau se tait pendant le mouvement, une onde part dans le
+ * sens du glissement, et l'arrêt est guetté. Chaque appui repousse l'arrêt : en rafale, ni fil
+ * ni lueur ne se rejouent avant que la roue ne se pose (une seule réponse par arrêt).
+ */
+function wheelMoved(v, dir) {
+  clearTimeout(v.landing);
+  v.ring.classList.remove('landed');
+  v.stage.classList.remove('landed');
+  v.ring.classList.add('moving');
+  const wave = v.layer.querySelector(':scope > .wheel-wave'); // i18n-ignore : sélecteur CSS
+  const w = v.stage.offsetWidth / 1080;
+  if (wave?.animate && !quietMotion() && w > 0) {
+    // Onde : du centre vers le côté d'où arrive la table, comme si la roue tirait le fil.
+    wave.animate(
+      [
+        { transform: 'translateX(0) scaleX(0.6)', opacity: 0.9 },
+        { transform: `translateX(${(dir * 430 * w).toFixed(1)}px) scaleX(1.2)`, opacity: 0 },
+      ],
+      { duration: 620, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' },
+    );
+  }
+  v.landing = setTimeout(() => {
+    v.ring.classList.remove('moving');
+    if (quietMotion()) return;
+    // Classe reposée d'un coup : ses animations (fil, étincelle, lueur) repartent de zéro.
+    void v.ring.offsetWidth;
+    v.ring.classList.add('landed');
+    v.stage.classList.add('landed');
+  }, wheelTime(v.stage) + 40);
 }
 
 /** Liste : sept lignes fixes, la table choisie toujours sur celle du milieu. */
@@ -422,8 +473,14 @@ function menuPanel(s) {
   } else {
     v.nav.replaceChildren(tableList(s));
   }
+  const newTitle = v.text.textContent !== s.table.title && v.text.textContent !== '';
   v.text.textContent = s.table.title;
   v.text.dataset.size = titleSize(s.table.title);
+  // Soie : le nouveau titre se précise en entrant (flou et opacité seulement : la zone ne bouge pas).
+  if (newTitle && v.text.animate && !quietMotion()) {
+    const blur = (6 * root.offsetWidth) / 1080;
+    v.text.animate([{ opacity: 0.15, filter: `blur(${blur.toFixed(1)}px)` }, { opacity: 1, filter: 'blur(0px)' }], { duration: 340, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' });
+  }
   v.node.classList.toggle('jukebox-chosen', Boolean(s.table.jukebox));
   // Médaillon Juke-box choisi au bureau : son affiche dans le cadre du fronton du menu.
   const front = s.jukebox?.wheel && style && document.documentElement.classList.contains('menu-desktop') && window.CyberJukebox ? CyberJukebox.backglassPoster(s) : undefined;
@@ -935,8 +992,17 @@ function renderPlayfield(s) {
   // Menu des tables retiré (attente, chargement) : la vidéo de son fronton s'arrête.
   if (menuView && !menuView.node.isConnected) menuBackglass.setActive(false);
   const l = s.phase === 'library' ? s.library : undefined;
-  revealSelection(root, l ? ['library', l.screen, l.variant ?? '', l.heading].join('|') : s.attract ? 'attract' : s.phase);
+  const screen = l ? ['library', l.screen, l.variant ?? '', l.heading].join('|') : s.attract ? 'attract' : s.phase;
+  // Arrivée Soie d'un écran de menu (library.css, .lib-arrive) : à son ouverture seulement, pas à
+  // chaque appui ; un appui pendant l'arrivée redessine l'écran sans elle, aussitôt à sa place.
+  if (l && screen !== shownScreen && !quietMotion()) root.querySelector('.lib')?.classList.add('lib-arrive');
+  // Le menu des tables reste dessous ; l'écran de menu, à demi transparent, le fait cacher (frontend.css).
+  document.documentElement.classList.toggle('menu-screen', Boolean(l));
+  shownScreen = screen;
+  revealSelection(root, screen);
 }
+/** Écran montré au dernier tracé (renderPlayfield) : un autre déclenche l'arrivée Soie. */
+let shownScreen;
 
 function drawPlayfield(s) {
   // Mode attente : la table tirée au hasard, sans la liste du menu.
@@ -1219,8 +1285,123 @@ function cinemaStage(view, part) {
     arm.append(logo);
     flight.append(el('div', 'cine-trail'), arm, ring);
   } else flight.append(el('div', 'cine-trail'), logo, ring);
+  const threads = cinemaThreads(view, part);
+  if (threads) stage.append(threads);
   stage.append(flight);
   return stage;
+}
+
+/**
+ * Fils de lumière du lancement (mouvement « Soie ») : sur le plateau, un faisceau part du logo et
+ * le suit hors de l'écran par le haut ; sur le fronton, il remonte du bas et converge sur le logo,
+ * puis une ignition anamorphique s'allume derrière lui à l'impact. Un canevas sous le logo, à
+ * l'horloge du Start (view.startedAt, comme les délais CSS de la chorégraphie) ; il s'arrête seul.
+ */
+function cinemaThreads(view, part) {
+  if (quietMotion() || typeof requestAnimationFrame !== 'function') return undefined;
+  const canvas = el('canvas', 'cine-fils');
+  const g = typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null;
+  if (!g) return undefined;
+  const TAU = Math.PI * 2;
+  const seg = (t, a, b) => Math.min(1, Math.max(0, (t - a) / (b - a)));
+  const io3 = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const in3 = (t) => t * t * t;
+  const out3 = (t) => 1 - Math.pow(1 - t, 3);
+  const end = part === 'depart' ? 1600 : 2400;
+  const bez = (p, u) => {
+    const v = 1 - u;
+    return [v * v * v * p[0][0] + 3 * v * v * u * p[1][0] + 3 * v * u * u * p[2][0] + u * u * u * p[3][0], v * v * v * p[0][1] + 3 * v * v * u * p[1][1] + 3 * v * u * u * p[2][1] + u * u * u * p[3][1]];
+  };
+  const strand = (pts, tail, head, color, alpha, width) => {
+    if (head <= tail) return;
+    g.beginPath();
+    for (let q = 0; q <= 24; q++) {
+      const [x, y] = bez(pts, tail + ((head - tail) * q) / 24);
+      if (q) g.lineTo(x, y);
+      else g.moveTo(x, y);
+    }
+    g.strokeStyle = `rgba(${color},${(alpha * 0.16).toFixed(3)})`;
+    g.lineWidth = width * 5;
+    g.stroke();
+    g.strokeStyle = `rgba(${color},${alpha.toFixed(3)})`;
+    g.lineWidth = width;
+    g.stroke();
+  };
+  const flare = (x, y, R, a) => {
+    if (a <= 0.01 || R <= 1) return;
+    g.save();
+    g.translate(x, y);
+    g.scale(1, 0.045);
+    const f = g.createRadialGradient(0, 0, 0, 0, 0, R);
+    f.addColorStop(0, `rgba(232,255,208,${a.toFixed(3)})`);
+    f.addColorStop(0.14, `rgba(139,226,58,${(0.6 * a).toFixed(3)})`);
+    f.addColorStop(1, 'rgba(54,201,180,0)');
+    g.fillStyle = f;
+    g.fillRect(-R, -R, 2 * R, 2 * R);
+    g.restore();
+  };
+  const GREEN = '139,226,58';
+  const TEAL = '54,201,180';
+  const draw = () => {
+    if (!canvas.isConnected && canvas.dataset.started) return;
+    const e = Date.now() - view.startedAt;
+    const W = canvas.offsetWidth;
+    const H = canvas.offsetHeight;
+    if (W && H) {
+      canvas.dataset.started = '';
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      if (canvas.width !== Math.round(W * dpr)) canvas.width = Math.round(W * dpr);
+      if (canvas.height !== Math.round(H * dpr)) canvas.height = Math.round(H * dpr);
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.clearRect(0, 0, W, H);
+      g.globalCompositeOperation = 'lighter';
+      g.lineCap = 'round';
+      if (part === 'depart') {
+        // Le faisceau part du pourtour du logo, au centre du plateau, et monte avec lui (envol : 340 à 740 ms).
+        const cx = W / 2;
+        const cy = H / 2;
+        const r = Math.min(0.58 * W, 0.24 * H) * 0.42;
+        const head = io3(seg(e, 300, 760));
+        const tail = in3(seg(e, 560, 1040));
+        for (let j = 0; j < 28; j++) {
+          const ph = (j / 28) * TAU + 0.3;
+          const c = Math.cos(ph);
+          const s = Math.sin(ph);
+          const pts = [
+            [cx + r * c, cy + r * 0.9 * s],
+            [cx + 1.9 * r * c, cy - 0.22 * H],
+            [cx + 0.35 * r * c, cy - 0.62 * H],
+            [cx + 0.1 * r * c, -0.04 * H],
+          ];
+          strand(pts, tail, head, j % 3 === 0 ? GREEN : TEAL, 0.75, Math.max(1, W / 540));
+        }
+        const fl = seg(e, 700, 780) * Math.exp(-Math.max(0, e - 780) / 260);
+        flare(cx, 0, 0.95 * W, fl);
+      } else {
+        // Le faisceau remonte du bas du fronton et se referme sur le logo (arrivée : 840 à 1 200 ms) ; ignition à l'impact.
+        const tx = W / 2;
+        const ty = 0.47 * H;
+        const head = out3(seg(e, 660, 1120));
+        const tail = in3(seg(e, 940, 1320));
+        for (let j = 0; j < 22; j++) {
+          const x0 = W * (0.14 + (0.72 * j) / 21);
+          const pts = [
+            [x0, H * 1.02],
+            [x0, H * 0.76],
+            [tx + (x0 - tx) * 0.2, H * 0.6],
+            [tx, ty],
+          ];
+          strand(pts, tail, head, j % 3 === 0 ? GREEN : TEAL, 0.7, Math.max(1, W / 760));
+        }
+        const ig = e > 1200 ? Math.exp(-(e - 1200) / 520) : 0;
+        flare(tx, ty, 0.9 * W * (1 - Math.pow(2, -10 * seg(e, 1190, 1520))), ig);
+      }
+    }
+    if (e < end) requestAnimationFrame(draw);
+    else g.clearRect(0, 0, canvas.width, canvas.height);
+  };
+  requestAnimationFrame(draw);
+  return canvas;
 }
 
 function dropCinema() {

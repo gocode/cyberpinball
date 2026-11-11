@@ -20,7 +20,12 @@ function actOn(node, action) {
 }
 
 function renderLibrary(v) {
+  // Le choix a bougé dans le même écran : la ligne choisie reçoit l'éclat Soie (library.css, .moved).
+  // Un état redessiné pour une autre raison (téléchargement, horloge) ne le rejoue pas.
+  const moved = drawn !== undefined && drawn.screen === v.screen && drawn.heading === v.heading && drawn.cursor !== v.cursor;
   drawn = v;
+  // Rang des lignes, pour leur arrivée en cascade (library.css, .lib-arrive) ; plafonné : une longue liste ne traîne pas.
+  let rank = 0;
   // Page d'un guide du jeu : elle prend la place de l'en-tête (guide.css).
   const guide = v.pages?.help?.kind === 'guide';
   const o = libEl('section', `lib lib-${v.screen}${v.variant ? ` lib-${v.variant}` : ''}${guide ? ' lib-guide' : ''}`);
@@ -56,6 +61,10 @@ function renderLibrary(v) {
   head.append(h1);
   if (v.subheading) head.append(libEl('div', 'lib-sub', v.subheading));
   if (v.lead) head.append(libEl('p', 'lib-lead', v.lead));
+  // Filet Soie sous l'en-tête : il se dessine à l'arrivée de l'écran, puis une lumière le parcourt sans en sortir.
+  const rule = libEl('div', 'lib-rule');
+  rule.append(libEl('i'), libEl('b'));
+  head.append(rule);
   o.append(head);
 
   const body = libEl(
@@ -116,9 +125,11 @@ function renderLibrary(v) {
           continue;
         }
         const li = libEl('li', `lib-row tone-${row.tone ?? 'none'}${row.current ? ' current' : ''}`);
+        li.style.setProperty('--i', String(Math.min(rank++, 12)));
         if (row.action !== undefined) {
           li.classList.add(row.pick ? 'pick' : 'fixable');
           if (row.action === v.cursor) li.classList.add('selected');
+          if (row.action === v.cursor && moved) li.classList.add('moved');
           actOn(li, { type: 'activate', index: row.action });
         }
         const line = libEl('div', 'lib-row-line');

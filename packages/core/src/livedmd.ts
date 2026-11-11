@@ -136,6 +136,10 @@ export const LIVE_DMD_TIMING = {
   dissolve: 320,
   /** Allumage du détail de la wheel, point par point, par-dessus le titre. */
   light: 400,
+  /** Fils (mouvement « Soie ») : un fil clair court sur chaque rangée, décalé d'une rangée à l'autre. */
+  fils: 520,
+  /** Scintillement : dissolution en diagonale, un front de points au plein éclat. */
+  scintille: 440,
   /** Vitesse d'un titre trop long qui défile, en points par seconde. */
   scroll: 24,
   /** Arrêt d'un titre qui défile, au début et à la fin. */
@@ -309,7 +313,9 @@ export function transitionDots(from: DmdDots, to: DmdDots, k: number): DmdDots {
 }
 
 /**
- * Les transitions du DMD (revue du directeur artistique du 09/11/2026), chacune liée à ce
+ * Les transitions du DMD. Entre les pages du menu, depuis le 11/11/2026, trois d'entre elles
+ * alternent (DMD_ALTERNANCE) ; les autres restent liées à ce qu'elles annoncent. Choix d'origine
+ * (revue du directeur artistique du 09/11/2026), chacune liée à ce
  * qu'elle annonce, jamais tirée au hasard : la poussée pour l'alternance courante, le glissement
  * d'une table à l'autre, le volet vers les records, la dissolution vers l'horloge et les crédits,
  * l'allumage vers le détail de la wheel. k va de 0 (l'ancienne image) à 1 (la nouvelle).
@@ -357,7 +363,51 @@ export const DMD_TRANSITIONS = {
     }
     return out;
   },
+  /**
+   * Fils (mouvement « Soie », 11/11/2026) : sur chaque rangée, un fil clair court de gauche à droite
+   * et laisse la nouvelle image derrière lui ; les rangées partent décalées (ondulation figée), et les
+   * points allumés juste derrière le fil gardent un reste d'éclat, comme une rémanence de phosphore.
+   */
+  fils(from: DmdDots, to: DmdDots, k: number): DmdDots {
+    const out = blankDots();
+    for (let y = 0; y < DMD_HEIGHT; y++) {
+      const phase = 0.28 * (Math.sin(y * 0.55) + 1);
+      const head = (k * 1.62 - phase) * (DMD_WIDTH + 6) - 6;
+      for (let x = 0; x < DMD_WIDTH; x++) {
+        const i = y * DMD_WIDTH + x;
+        const d = x - head;
+        let v = d < 0 ? to[i]! : from[i]!;
+        if (d > -2 && d <= 0) v = 15;
+        else if (d > -7 && d <= -2 && to[i]) v = Math.min(15, to[i]! + 6);
+        else if (d > 0 && d < 1) v = Math.max(v, 9);
+        out[i] = v;
+      }
+    }
+    return out;
+  },
+  /** Scintillement : chaque point passe à la nouvelle image le long d'une diagonale tremblée ; le front scintille au plein éclat. */
+  scintille(from: DmdDots, to: DmdDots, k: number): DmdDots {
+    const out = blankDots();
+    for (let y = 0; y < DMD_HEIGHT; y++) {
+      for (let x = 0; x < DMD_WIDTH; x++) {
+        const i = y * DMD_WIDTH + x;
+        const q = 0.55 * (x / (DMD_WIDTH - 1)) + 0.15 * (y / (DMD_HEIGHT - 1)) + 0.3 * dotHash(x, y, 11);
+        const e = k * 1.12 - q;
+        out[i] = e > 0 ? to[i]! : from[i]!;
+        if (e > 0 && e < 0.07) out[i] = from[i] || to[i] ? 15 : 4;
+      }
+    }
+    return out;
+  },
 } satisfies Record<string, (from: DmdDots, to: DmdDots, k: number) => DmdDots>;
+
+/**
+ * Mouvement « Soie » (choix du 11/11/2026) : les pages du DMD alternent trois effets, dans
+ * cet ordre et en boucle (fils à rémanence, volet de balayage, scintillement), au lieu d'un effet
+ * par page d'arrivée. L'allumage reste propre au détail de la wheel, et deux records se remplacent
+ * toujours sans mouvement.
+ */
+export const DMD_ALTERNANCE = ['fils', 'wipe', 'scintille'] as const;
 
 export type DmdTransitionName = keyof typeof DMD_TRANSITIONS;
 
@@ -368,19 +418,19 @@ export const DMD_TRANSITION_MS: Record<DmdTransitionName, number> = {
   wipe: LIVE_DMD_TIMING.wipe,
   dissolve: LIVE_DMD_TIMING.dissolve,
   light: LIVE_DMD_TIMING.light,
+  fils: LIVE_DMD_TIMING.fils,
+  scintille: LIVE_DMD_TIMING.scintille,
 };
 
 /**
- * Transition d'une page à la suivante, selon la page d'arrivée : le volet vers les records, la
- * dissolution vers l'horloge et les crédits, l'allumage vers la wheel, la poussée ailleurs.
- * Aucune entre deux records, qui se remplacent directement.
+ * Transition d'une page à la suivante : aucune entre deux records, qui se remplacent directement ;
+ * l'allumage vers la wheel ; ailleurs, l'effet de rang `n` dans l'alternance Soie (DMD_ALTERNANCE),
+ * `n` comptant les transitions alternées déjà jouées dans le programme.
  */
-export function transitionTo(from: DmdPageId, to: DmdPageId): DmdTransitionName | undefined {
+export function transitionTo(from: DmdPageId, to: DmdPageId, n = 0): DmdTransitionName | undefined {
   if (from === 'records' && to === 'records') return undefined;
-  if (to === 'records') return 'wipe';
-  if (to === 'clock' || to === 'credits') return 'dissolve';
   if (to === 'wheel') return 'light';
-  return 'push';
+  return DMD_ALTERNANCE[((n % DMD_ALTERNANCE.length) + DMD_ALTERNANCE.length) % DMD_ALTERNANCE.length];
 }
 
 /** Une page du programme, à sa place. */
@@ -420,9 +470,12 @@ export class LiveDmdProgram {
     intro?: LiveDmdIntro,
   ) {
     let t = 0;
+    // Rang dans l'alternance : seules les transitions qui en font partie le font avancer.
+    let n = 0;
     for (const [i, page] of pages.entries()) {
       const next = pages[(i + 1) % pages.length]!;
-      const transition = pages.length > 1 ? transitionTo(page.id, next.id) : undefined;
+      const transition = pages.length > 1 ? transitionTo(page.id, next.id, n) : undefined;
+      if (transition && transition !== 'light') n++;
       this.loop.push({ page, start: t, index: i, hold: page.hold, transition, next });
       t += page.hold + (transition ? DMD_TRANSITION_MS[transition] : 0);
     }
@@ -460,6 +513,11 @@ export class LiveDmdProgram {
   /** Début de la page `index` dans la boucle (après l'ouverture), en ms. */
   startOf(index: number): number {
     return this.loop[index]?.start ?? 0;
+  }
+
+  /** Transition jouée après la page `index` de la boucle (aucune : undefined). */
+  transitionAfter(index: number): DmdTransitionName | undefined {
+    return this.loop[index]?.transition;
   }
 }
 
