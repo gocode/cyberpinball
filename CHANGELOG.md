@@ -9,6 +9,10 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.10
+
+- Roue : l'anneau vert, son étincelle et la lueur épousent la taille de chaque médaillon, et le halo reste derrière les médaillons voisins.
+
 ## 0.1.9
 
 - Juke-box plus beau : nouveau disque sur la roue, affiches du fronton et du playfield redessinées et animées.

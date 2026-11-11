@@ -511,5 +511,46 @@
     for (const node of pool.values()) if (node.tagName === 'VIDEO') node.setSinkId(sinkId).catch(() => {});
   }
 
-  window.CyberMedia = { layer, preload, logo, beginRender, measuredRotation, fitTexts, setSink };
+  /**
+   * Jusqu'où va le médaillon dans son image : la plus grande distance au centre d'un point opaque,
+   * en part du demi-grand côté de l'image (1 : il touche le bord). Mesurée une fois par logo, sur
+   * une copie réduite à 128 points ; 1 si l'image ne se lit pas.
+   */
+  const medallionReach = new Map();
+  function reach(url) {
+    if (!url) return Promise.resolve(1);
+    let known = medallionReach.get(url);
+    if (known) return known;
+    known = new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.decoding = 'async';
+      img.onload = () => {
+        try {
+          const k = 128 / Math.max(img.naturalWidth, img.naturalHeight, 1);
+          const w = Math.max(1, Math.round(img.naturalWidth * k));
+          const h = Math.max(1, Math.round(img.naturalHeight * k));
+          const c = document.createElement('canvas');
+          c.width = w;
+          c.height = h;
+          const g = c.getContext('2d', { willReadFrequently: true });
+          g.drawImage(img, 0, 0, w, h);
+          const d = g.getImageData(0, 0, w, h).data;
+          let far = 0;
+          for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 128) far = Math.max(far, Math.hypot(x + 0.5 - w / 2, y + 0.5 - h / 2));
+          // Image opaque jusqu'aux coins (logo carré) : le cercle s'arrête au bord, pas aux coins.
+          resolve(far > 0 ? Math.min(1, far / (Math.max(w, h) / 2)) : 1);
+        } catch {
+          resolve(1);
+        }
+      };
+      img.onerror = () => resolve(1);
+      img.src = url;
+    });
+    medallionReach.set(url, known);
+    if (medallionReach.size > 256) medallionReach.delete(medallionReach.keys().next().value);
+    return known;
+  }
+
+  window.CyberMedia = { layer, preload, logo, reach, beginRender, measuredRotation, fitTexts, setSink };
 })();

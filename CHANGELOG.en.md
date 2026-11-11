@@ -7,6 +7,10 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.1.10
+
+- Wheel: the green ring, its spark and the glow fit each medallion's size, and the halo stays behind the neighbouring medallions.
+
 ## 0.1.9
 
 - A nicer Juke-box: a new disc on the wheel, backglass and playfield posters redesigned and animated.

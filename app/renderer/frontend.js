@@ -197,12 +197,17 @@ function fillWheelItem(item, n) {
     node.classList.remove('disc');
     node.classList.add('jukebox');
     item.ratio = 1;
-    if (wheelView) placeWheelItem(item, wheelView.style);
+    if (wheelView) {
+      placeWheelItem(item, wheelView.style);
+      if (item.offset === 0) fitMedallion(wheelView);
+    }
     return;
   }
   const current = () => item.wheel === n.wheel && item.title === n.title;
   const place = () => {
-    if (wheelView) placeWheelItem(item, wheelView.style);
+    if (!wheelView) return;
+    placeWheelItem(item, wheelView.style);
+    if (item.offset === 0) fitMedallion(wheelView);
   };
   // Le nom au centre ; les petits médaillons, où il passerait sous 20 px, portent l'initiale (frontend.css).
   const named = () => {
@@ -333,7 +338,60 @@ function wheelStage(s, style) {
     placeWheelItem(item, style);
   }
   if (moved) wheelMoved(v, moved);
+  else if (!v.stage.classList.contains('moving')) fitMedallion(v);
   return v.stage;
+}
+
+/**
+ * Anneau, lueur et halo du médaillon choisi, calés sur ce qu'on en voit (11/11/2026) : les logos
+ * n'occupent pas tous leur boîte (marges transparentes, logo posé sur un disque, Juke-box), un
+ * cercle de taille fixe tombait dedans ou à côté. Le rayon vient des pixels opaques du logo
+ * (CyberMedia.reach), ou du disque. Le halo vert est une copie du médaillon posée derrière toute la roue
+ * (.wheel-halo, sous les voisins) : sa lueur vient de derrière lui et ne passe jamais sur un autre
+ * médaillon ; l'anneau et l'étincelle aussi, derrière. Seule la lueur blanche passe sur le logo,
+ * coupée à son cercle. Refait seulement si le médaillon, son logo ou la roue changent.
+ */
+function fitMedallion(v) {
+  const item = [...v.items.values()].find((i) => i.offset === 0 && !i.leaving);
+  const img = item?.tilt.querySelector('img.wheel-img');
+  const key = item ? `${v.style}|${item.node.dataset.key ?? ''}|${item.wheel ?? item.title}|${img?.currentSrc || img?.src || ''}|${item.ratio}|${item.node.className}` : '';
+  if (key === v.fitted) return;
+  v.fitted = key;
+  v.layer.classList.remove('rim-ready');
+  dropHalo(v);
+  if (!item || !WHEELS[v.style]) return;
+  const pose = wheelPose(v.style, 0, item.ratio);
+  const box = WHEELS[v.style].face[0] * pose.s;
+  const done = (r) => {
+    if (v.fitted !== key) return;
+    const st = v.layer.style;
+    st.setProperty('--rim-x', pose.x.toFixed(2));
+    st.setProperty('--rim-y', pose.y.toFixed(2));
+    st.setProperty('--rim-r', r.toFixed(2));
+    const halo = item.node.cloneNode(true);
+    halo.classList.add('wheel-halo');
+    halo.classList.remove('center', 'wheel-item');
+    halo.style.zIndex = '1';
+    halo.setAttribute('aria-hidden', 'true');
+    for (const n of halo.querySelectorAll('[data-act]')) delete n.dataset.act;
+    v.layer.insertBefore(halo, v.layer.querySelector('.wheel-rim'));
+    v.halo = halo;
+    v.layer.classList.add('rim-ready');
+  };
+  // Disque (logo qui n'est pas un médaillon, ou titre seul) : le cercle de 225 unités.
+  if (item.node.classList.contains('disc') || !img) return done(112.5 * pose.s);
+  // Le logo ne remplit pas toujours sa place (Juke-box : 232 unités sur 275).
+  const part = img.offsetWidth > 0 && item.tilt.offsetWidth > 0 ? img.offsetWidth / item.tilt.offsetWidth : 1;
+  (CyberMedia.reach?.(img.currentSrc || img.src) ?? Promise.resolve(1)).then((k) => done((k * part * box) / 2));
+}
+
+/** Le halo s'efface en 160 ms (glissement, autre médaillon), puis sa copie est retirée. */
+function dropHalo(v) {
+  const halo = v.halo;
+  if (!halo) return;
+  v.halo = undefined;
+  halo.classList.add('wheel-halo-out');
+  setTimeout(() => halo.remove(), 200);
 }
 
 /** Les mouvements Soie de la roue sont coupés quand le système demande moins d'animations. */
@@ -355,9 +413,13 @@ function wheelMoved(v, dir) {
   clearTimeout(v.landing);
   v.stage.classList.remove('landed');
   v.stage.classList.add('moving');
+  v.fitted = undefined;
+  v.layer.classList.remove('rim-ready');
+  dropHalo(v);
   wheelPulse(v, dir);
   v.landing = setTimeout(() => {
     v.stage.classList.remove('moving');
+    fitMedallion(v);
     if (quietMotion()) return;
     // Classe reposée d'un coup : ses animations (souffle du halo, lueur) repartent de zéro.
     void v.stage.offsetWidth;
