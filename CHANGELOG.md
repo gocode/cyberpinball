@@ -121,6 +121,7 @@ son interface).
 - Les pseudos s'affichent seuls, sans l'étiquette « #A1B2 » accolée : listes d'amis, scores, partie en direct, annuaire. L'identifiant unique d'un joueur n'apparaît plus que sur sa fiche, et se cherche toujours dans « Trouver un joueur ».
 - Menu : le message qui suit un geste (« Nom changé », « Avatar enregistré », « Pseudo refusé »…) reste affiché jusqu'au geste suivant, au lieu de s'effacer aussitôt, sur tous les écrans.
 - VPX démarre sur un Windows fraîchement installé : il manquait le runtime Visual C++ de Microsoft. Cyber Pinball le détecte au démarrage et dans Santé de la borne, puis installe la version officielle de Microsoft (19 Mo, sans fenêtre) ; Windows demande votre accord une fois. Si VPX s'arrête faute d'une bibliothèque, l'écran d'échec le dit.
+- Dans le casque, Cyber Pinball prévient quand Air Link passe par un PC en Wi-Fi (des images se perdent) et conseille le câble Ethernet ou le câble USB Link ; la santé de la borne a un contrôle « Casque ». Après chaque partie, le journal donne le bilan réseau de Link et un verdict de fluidité (réseau, rendu, ou fluide).
 
 ## 0.1.8
 

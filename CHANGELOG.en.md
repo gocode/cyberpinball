@@ -119,6 +119,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Nicknames show alone, without the "#A1B2" tag attached: friend lists, scores, live game, directory. A player's unique ID now only appears on their page, and can still be searched in "Find a player".
 - Menu: the message that follows an action ("Name changed", "Avatar saved", "Nickname refused"…) stays on screen until the next action instead of vanishing at once, on every screen.
 - VPX starts on a freshly installed Windows: Microsoft’s Visual C++ runtime was missing. Cyber Pinball detects it at startup and in Cabinet health, then installs Microsoft’s official version (19 MB, no window); Windows asks for your approval once. If VPX stops for lack of a library, the failure screen says so.
+- In the headset, Cyber Pinball warns when Air Link goes through a PC on Wi-Fi (frames get lost) and recommends an Ethernet cable or the USB Link cable; the cabinet's health has a "Headset" check. After each game, the log gives Link's network report and a smoothness verdict (network, rendering, or smooth).
 
 ## 0.1.8
 

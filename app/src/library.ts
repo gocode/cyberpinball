@@ -206,6 +206,7 @@ import {
   type ScorePeriod,
   isFullAddress,
   prefixedText,
+  type VrNetworkFacts,
 } from '@cyberpinball/core';
 import { prepareImport, unpackArchive, type PreparedImport } from './archives';
 import { createDofMenu } from './dof-menu';
@@ -275,6 +276,8 @@ function keyLabel(key: string): string {
 }
 
 export interface LibraryHost {
+  /** Le réseau du casque pour la santé de la borne (vr-reseau.ts) ; undefined sans casque relevé. */
+  vrNetwork?(): VrNetworkFacts | undefined;
   root: string | undefined;
   dataDir: string;
   vpxExe(): string | undefined;
@@ -1498,6 +1501,7 @@ export function createLibrary(host: LibraryHost) {
       const devices = usbDevices() ?? [];
       return dofHealthFacts(setup, detectDofControllers(devices, cabinetJoystickHids(loadCabinet(host.dataDir))), devices);
     },
+    vr: () => host.vrNetwork?.(),
     openCustom: (build, at) => openCustom(build, at),
     openSystem: () => openSystem(),
     runSystemItem: (id, back) => runSystemItem(id, back),

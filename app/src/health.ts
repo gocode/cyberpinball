@@ -30,6 +30,7 @@ import {
   tablesFacts,
   tn,
   type DofFacts,
+  type VrNetworkFacts,
   type Finding,
   type HealthFacts,
   type HealthLine,
@@ -58,6 +59,8 @@ export interface HealthContext {
   media(pause: () => Promise<void>): Promise<MediaFacts | undefined>;
   /** LED et retours (DOF) : contrôleurs et constats ; undefined sans VPX. */
   dof?(): DofFacts | undefined;
+  /** Le réseau du casque (vr-reseau.ts) : transport de Link et carte réseau du PC ; undefined sans casque. */
+  vr?(): VrNetworkFacts | undefined;
   openCustom(build: () => Built, at?: number): void;
   openSystem(): void;
   /** Ouvre une entrée du menu système ; son « Retour » ramène à `back`. */
@@ -164,7 +167,8 @@ export function createHealth(ctx: HealthContext) {
     } catch (error) {
       console.error(`Santé de la borne, DOF : ${(error as Error).message}`); // i18n-ignore : journal
     }
-    return { at: new Date().toISOString(), disks, tables, pup, media, screens, ...(dof ? { dof } : {}), vpx };
+    const vr = ctx.vr?.();
+    return { at: new Date().toISOString(), disks, tables, pup, media, screens, ...(dof ? { dof } : {}), ...(vr ? { vr } : {}), vpx };
   }
 
   /** Relève tout en arrière-plan ; un relevé en cours n'est pas doublé. */

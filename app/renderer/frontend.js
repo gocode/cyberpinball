@@ -1604,6 +1604,8 @@ window.cyber.onState((s) => {
     if (prompt?.status) card.append(el('p', 'headset-prompt-status', prompt.status));
     card.append(el('p', 'headset-prompt-text', prompt ? prompt.text : hint));
     if (prompt?.problem) card.append(el('p', 'headset-prompt-problem', prompt.problem));
+    // Chargement d'une partie : l'avertissement du réseau du casque, sous la consigne (Air Link sur un PC en Wi-Fi).
+    if (!prompt && s.headsetNote) card.append(el('p', 'headset-prompt-problem', s.headsetNote));
     if (prompt?.keys) card.append(el('p', 'headset-prompt-keys', prompt.keys));
     root.replaceChildren(card);
     return;

@@ -36,6 +36,7 @@ export const messages: Record<string, string> = {
   'Manettes sur les coins de la barre': 'Controllers on the lockbar corners',
   'Touchez l’autre coin': 'Touch the other corner',
   'Gâchette : placer · A : valider': 'Trigger: place · A: confirm',
+  'Air Link avec un PC en Wi-Fi : des images se perdent. Reliez le PC au routeur par un câble Ethernet, ou utilisez le câble USB Link.': 'Air Link with a PC on Wi-Fi: frames get lost. Connect the PC to the router with an Ethernet cable, or use the USB Link cable.',
   // app/src/frontend.ts : menu du casque (≡ de la manette gauche)
   'Menu du casque': 'Headset menu',
   'Les mêmes boutons partout : A valide, B revient, les joysticks déplacent la sélection.': 'The same buttons everywhere: A confirms, B goes back, the thumbsticks move the selection.',

@@ -3,6 +3,7 @@
 // les fenêtres du menu (qui restent derrière lui, en fond de partie), puis retour au
 // menu avec reprise du premier plan.
 
+import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, BrowserWindow, globalShortcut, ipcMain, session, shell, webContents, type Input, type Rectangle, type WebContents } from 'electron';
@@ -82,6 +83,17 @@ import {
   FULL_BACKGLASS_ZONE,
   parseVrMeasures,
   lastVrMeasuresBlock,
+  airLinkOverWifi,
+  fluidityVerdict,
+  linkMinutesBetween,
+  linkNetworkSummary,
+  linkTransport,
+  parsePcNetwork,
+  PC_NETWORK_COMMAND,
+  type LinkNetworkSummary,
+  type LinkTransport,
+  type PcNetwork,
+  type VrNetworkFacts,
   zoneSetting,
   vrNeedsVpxBackglass,
   type VrBackglassView,
@@ -1016,6 +1028,7 @@ const phoneRemote = createPhoneRemote({
   fromSources: !app.isPackaged,
 });
 const library = createLibrary({
+  vrNetwork: () => vrNetworkFacts(),
   root: loc.root,
   dataDir: loc.dataDir,
   // Essais : le Bureau du sélecteur de fichiers est un dossier du bac à sable (CYBERPINBALL_BUREAU),
@@ -2982,6 +2995,30 @@ function auditPupPacks(): void {
   console.log(`PuP-Packs : ${packs} pack(s) contrôlé(s), ${found.length} incomplet(s)${found.length ? ` : ${found.join(' | ')} ; « Ce qu’il manque pour jouer » propose de les recompléter` : ''}.`); // i18n-ignore : journal
 }
 
+/** Réseau du casque (vr-reseau.ts) : bilan de Link de la dernière partie, transport de Link, carte réseau du PC. */
+let lastLinkNetwork: LinkNetworkSummary | undefined;
+let linkMode: LinkTransport | undefined;
+let pcNetwork: PcNetwork | undefined;
+/** L'avertissement « Air Link sur un PC en Wi-Fi » déjà donné dans cette session du casque. */
+let airLinkWarned = false;
+
+/** Relève, en arrière-plan et sans fenêtre, la carte réseau du PC et le transport de Link. */
+function refreshVrNetwork(): void {
+  linkMode = linkTransport(readOculusPerfLog()) ?? linkMode;
+  execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', PC_NETWORK_COMMAND], { windowsHide: true, timeout: 15_000 }, (error, stdout) => {
+    if (error) return;
+    const net = parsePcNetwork(String(stdout));
+    if (!net) return;
+    if (!pcNetwork || pcNetwork.wireless !== net.wireless) console.log(`Casque, réseau du PC : ${net.adapter} (${net.wireless ? 'sans fil' : 'câble'}) ; Link ${linkMode === 'air' ? 'par Air Link' : linkMode === 'cable' ? 'par câble USB' : 'pas encore relevé'}.`); // i18n-ignore : journal
+    pcNetwork = net;
+  });
+}
+
+/** Le réseau du casque, pour la santé de la borne. */
+function vrNetworkFacts(): VrNetworkFacts | undefined {
+  return linkMode || pcNetwork ? { ...(linkMode ? { transport: linkMode } : {}), ...(pcNetwork ? { network: pcNetwork } : {}) } : undefined;
+}
+
 /** Partie visible du fronton de VPX en VR, gardée par table (fronton-vr.ts). */
 function vrZonesFile(): string {
   return path.join(loc.dataDir, 'vr', 'fronton-zones.json');
@@ -3045,6 +3082,15 @@ function noteVrMeasures(late = false): void {
     return;
   }
   const f = (v: number, d = 1) => v.toFixed(d).replace('.', ',');
+  if (m.samples && !late) {
+    const verdict = fluidityVerdict(lastLinkNetwork, m.vpx.mean);
+    const pct = lastLinkNetwork ? `${(lastLinkNetwork.lostShare * 100).toFixed(1).replace('.', ',')} %` : '';
+    const fps = m.vpx.mean.toFixed(1).replace('.', ',');
+    if (verdict === 'network') console.log(`Casque, verdict : réseau en cause (${pct} d'images perdues par Link alors que VPX tient sa cadence, ${fps} images/s)${airLinkOverWifi(lastLinkNetwork?.transport, pcNetwork) ? ' ; Air Link sur un PC en Wi-Fi : reliez le PC au routeur par un câble Ethernet, ou passez au câble USB Link' : ''}.`); // i18n-ignore : journal
+    else if (verdict === 'render') console.log(`Casque, verdict : rendu en cause (VPX à ${fps} images/s, sous la cadence du casque ; Link perd ${pct} des images).`); // i18n-ignore : journal
+    else if (verdict === 'both') console.log(`Casque, verdict : réseau et rendu en cause (${pct} d'images perdues par Link, VPX à ${fps} images/s).`); // i18n-ignore : journal
+    else if (verdict === 'ok') console.log(`Casque, verdict : fluide (VPX ${fps} images/s, ${pct} d'images perdues par Link).`); // i18n-ignore : journal
+  }
   if (m.samples)
     console.log(
       `Casque, mesures de VPX${when} (${m.samples} relevé(s) de 5 s) : VPX ${f(m.vpx.mean)} images/s (de ${f(m.vpx.min)} à ${f(m.vpx.max)}), plus grand écart entre deux images ${Math.round(m.worstGapMs)} ms ; fronton dessiné ${f(m.backglass)} fois/s ; vidéo de PuP la plus active ${f(m.video.mean)} nouvelles images/s (de ${f(m.video.min)} à ${f(m.video.max)}) ; temps de jeu ${f(m.gameTime, 2)} s par seconde.`, // i18n-ignore : journal
@@ -3095,7 +3141,8 @@ function applyVrProfile(ini: string, details: string[]): string {
  * Après une partie dans le casque : les statistiques de Link minute par minute (journal de performance
  * d'Oculus), et le bilan, avec le profil appliqué ; de quoi comparer un profil à un autre.
  */
-function noteLinkStats(from: number, to: number): void {
+/** Les 4 derniers Mo du journal de performance d'Oculus le plus récent (PerfLog_*.json) ; '' sans journal. */
+function readOculusPerfLog(): string {
   const dir = process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Oculus') : undefined;
   let text = '';
   try {
@@ -3114,10 +3161,23 @@ function noteLinkStats(from: number, to: number): void {
   } catch {
     // Journal d'Oculus illisible : rien à relever.
   }
+  return text;
+}
+
+function noteLinkStats(from: number, to: number): void {
+  const text = readOculusPerfLog();
   const rows = linkStatsBetween(text, from / 1000, to / 1000);
   const time = (s: number) => new Date(s * 1000).toISOString().slice(11, 19);
   for (const r of rows) console.log(`Link pendant la partie (${time(r.at)}) : ${r.presented} images présentées, ${r.lost} perdues, ${r.stale} réaffichées plus de 5 fois, ${r.appFrames} images de l’application${r.encode ? `, encodage ${r.encode}` : ''}.`); // i18n-ignore : journal
   const sum = linkStatsSummary(rows);
+  // Le réseau de la partie : pertes, coupures, débits, aller-retour ; le verdict vient avec les mesures de VPX (noteVrMeasures).
+  lastLinkNetwork = linkNetworkSummary(linkMinutesBetween(text, from / 1000, to / 1000));
+  linkMode = lastLinkNetwork?.transport ?? linkMode;
+  if (lastLinkNetwork) {
+    const n = lastLinkNetwork;
+    const f = (v: number | undefined, d = 0) => (v === undefined ? '?' : v.toFixed(d).replace('.', ','));
+    console.log(`Link, réseau de la partie (${n.transport === 'air' ? 'Air Link' : 'câble USB'}) : ${f(n.lostShare * 100, 1)} % d'images perdues, ${f(n.glitchesPerMinute)} coupures par minute, débit d'encodage ${f(n.bitrate)} Mbit/s, débit utile ${f(n.goodput)} Mbit/s, aller-retour réseau au 99e centile jusqu'à ${f(n.worstRttP99)} ms.`); // i18n-ignore : journal
+  }
   console.log(sum ? `Link, bilan de la partie (profil VR ${vrProfileApplied ?? 'inconnu'}) : ${sum.minutes} minute(s), par minute ${sum.presented} images présentées, ${sum.lost} perdues, ${sum.stale} réaffichées plus de 5 fois (pire minute : ${sum.worstStale}).` : `Link, bilan de la partie (profil VR ${vrProfileApplied ?? 'inconnu'}) : aucune statistique de Link pour cette partie (journal de performance d’Oculus absent ou partie de moins d’une minute).`); // i18n-ignore : journal
 }
 
@@ -3126,6 +3186,9 @@ function noteLinkStats(from: number, to: number): void {
  * partie, en gros sur le fronton (essai du 10 novembre 2026 : impossible de ressortir).
  */
 let headsetExitHint: string | undefined;
+/** Sous la consigne du chargement : l'avertissement du réseau du casque, une fois par session (vr-reseau.ts). */
+let headsetExitNote: string | undefined;
+let headsetWornBefore = false;
 
 /** Le bouton Pause des manettes, et comment quitter, en clair : « B : pause · tenu : quitter ». */
 function exitHintText(): string | undefined {
@@ -3905,6 +3968,11 @@ export function startFrontend(): void {
       // restent sur « Dans le casque » tant que le compagnon le garde (HeadsetMenu.inUse).
       setHeadsetPainting(Boolean(headset?.worn));
       if (!headset?.worn) releaseHeadsetButtons();
+      // Session du casque : le réseau relevé au port ; casque retiré au menu, la session finit, l'avertissement
+      // « Air Link sur un PC en Wi-Fi » pourra revenir à la suivante.
+      if (headset?.worn && !headsetWornBefore) refreshVrNetwork();
+      if (!headset?.worn && headsetWornBefore && !playing && !launch) airLinkWarned = false;
+      headsetWornBefore = Boolean(headset?.worn);
       // Compagnon parti pendant le calage : rien à garder.
       if (calibration && !headset?.running) closeCalibration();
       // Manettes sans réglage pour cette configuration, puis borne pas encore calée : l'assistant et le
@@ -4827,6 +4895,14 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // en « Autodetect » (dans le casque s'il est prêt, sinon sur les écrans). Jamais pour régler l'affichage.
   const vrGame = simulated === undefined && !displayMode ? prepareVr(played.file, double?.ini) : undefined;
   headsetExitHint = vrGame && headset?.inUse ? exitHintText() : undefined;
+  // Air Link alors que le PC est en Wi-Fi : dit une fois par session du casque, sur la carte du chargement.
+  headsetExitNote = undefined;
+  if (vrGame && headset?.inUse && !airLinkWarned && airLinkOverWifi(linkMode, pcNetwork)) {
+    airLinkWarned = true;
+    headsetExitNote = t('Air Link avec un PC en Wi-Fi : des images se perdent. Reliez le PC au routeur par un câble Ethernet, ou utilisez le câble USB Link.');
+    console.log(`Casque : Air Link sur un PC en Wi-Fi (${pcNetwork!.adapter}), avertissement donné au chargement.`); // i18n-ignore : journal
+  }
+  if (vrGame) refreshVrNetwork();
   // Vision 3D (vision3d.ts) : le capteur s'allume quand la table est à l'écran, s'éteint à la fin.
   const vision3dSource = simulated === undefined && !displayMode ? prepareVision3d(install.exe, Boolean(vrGame)) : undefined;
   // Bilan de la Vision 3D : ce que VPX écrira de son module dans vpinball.log, à partir d'ici.
@@ -4939,6 +5015,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (playedVr && vrGame) checkVrRoomAfterGame(vpxLog, vrLogFrom);
   if (playedVr && vrGame && vrGameStart) noteLinkStats(vrGameStart, Date.now());
   headsetExitHint = undefined;
+  headsetExitNote = undefined;
   if (vision3dSource) noteVision3dGame(vision3dLog, vision3dLogFrom);
   if (playedVr && vrGame) noteVrMeasures();
   headTracker.stop();
@@ -6108,7 +6185,7 @@ function broadcast(): void {
   for (const [role, win] of windows) {
     if (!win.isDestroyed()) win.webContents.send('state', inHeadset ? { ...viewFor(role), inHeadset: true } : viewFor(role));
   }
-  sendToHeadsetViews((role) => (headsetExitHint ? { ...viewFor(role, headsetMedias ?? medias), headsetHint: headsetExitHint } : viewFor(role, headsetMedias ?? medias)));
+  sendToHeadsetViews((role) => (headsetExitHint ? { ...viewFor(role, headsetMedias ?? medias), headsetHint: headsetExitHint, ...(headsetExitNote ? { headsetNote: headsetExitNote } : {}) } : viewFor(role, headsetMedias ?? medias)));
   // Télécommande du téléphone : le QR vit tant que l'écran qui le montre est affiché ; le téléphone suit l'écran.
   const surfaces = state.phase === 'library' && !desktop.active ? library.remoteSurfaces() : { menu: false, keyboard: false };
   // Pré-écoute (import du Juke-box) : jamais hors du menu.

@@ -27,11 +27,12 @@ import { playBlockers } from './playable';
 import { systemPathOf, type SystemItemId } from './systemmenu';
 import { taskbarMomentLabel, type TaskbarFacts } from './taskbarguard';
 import { vpxDisplayName, type VpxDisplayIdFormat } from './vpx';
+import { airLinkOverWifi, type LinkTransport, type PcNetwork } from './vr-reseau';
 
 export type HealthState = 'ok' | 'check' | 'blocking';
 
 /** Les contrôles, dans l'ordre de la page. */
-export const HEALTH_CHECKS = ['disk', 'tables', 'pup', 'media', 'screens', 'dof', 'vpx'] as const;
+export const HEALTH_CHECKS = ['disk', 'tables', 'pup', 'media', 'screens', 'dof', 'vr', 'vpx'] as const;
 export type HealthCheckId = (typeof HEALTH_CHECKS)[number];
 
 /** Où mène une ligne. */
@@ -164,7 +165,15 @@ export interface HealthFacts {
   screens?: ScreensFacts;
   /** Absent d'un relevé plus ancien, ou sans dossier de DOF lisible. */
   dof?: DofFacts;
+  /** Le réseau du casque (vr-reseau.ts) ; absent sans casque relevé. */
+  vr?: VrNetworkFacts;
   vpx: VpxFacts;
+}
+
+/** Comment Link passe (dernière minute relevée par Oculus) et la carte réseau du PC. */
+export interface VrNetworkFacts {
+  transport?: LinkTransport;
+  network?: PcNetwork;
 }
 
 // ---------- Seuils ----------
@@ -582,6 +591,29 @@ export function dofLines(facts: DofFacts): HealthLine[] {
   ];
 }
 
+/**
+ * Casque : Air Link alors que le PC est lui-même en Wi-Fi (deux sauts sans fil : le casque perd des images,
+ * diagnostic du 11 novembre 2026), à vérifier ; sinon une ligne « prêt » ; rien tant que Link n'a rien relevé.
+ */
+export function vrLines(facts: VrNetworkFacts): HealthLine[] {
+  if (!facts.transport) return [];
+  const go = t('Ouvrir Réalité virtuelle');
+  const target = SYSTEM('vr');
+  if (airLinkOverWifi(facts.transport, facts.network))
+    return [
+      {
+        check: 'vr',
+        state: 'check',
+        title: t('Air Link sur un PC en Wi-Fi'),
+        detail: t('Le casque perd des images : reliez le PC au routeur par un câble Ethernet, ou passez au câble USB Link ({adapter})', { adapter: facts.network!.adapter }),
+        go,
+        target,
+      },
+    ];
+  const title = facts.transport === 'cable' ? t('Link par câble USB') : facts.network ? t('Air Link, PC relié par câble') : t('Air Link');
+  return [{ check: 'vr', state: 'ok', title, ...(facts.network ? { detail: facts.network.adapter } : {}), go, target }];
+}
+
 export function vpxLines(facts: VpxFacts): HealthLine[] {
   const install = (version: string | undefined) => (version ? t('Installer VPX {version}', { version }) : t('Installer VPX'));
   if (!facts.installed) {
@@ -624,6 +656,7 @@ export function healthLines(facts: HealthFacts): HealthLine[] {
     ...(facts.media ? mediaLines(facts.media) : []),
     ...(facts.screens ? screensLines(facts.screens) : []),
     ...(facts.dof ? dofLines(facts.dof) : []),
+    ...(facts.vr ? vrLines(facts.vr) : []),
     ...vpxLines(facts.vpx),
   ];
 }
@@ -648,6 +681,8 @@ export function healthCheckInfo(check: HealthCheckId): { title: string; icon: Ic
       return { title: t('Écrans'), icon: 'screens' };
     case 'dof':
       return { title: t('LED et retours (DOF)'), icon: 'bulb' };
+    case 'vr':
+      return { title: t('Casque'), icon: 'vr' };
     case 'vpx':
       return { title: 'Visual Pinball X', icon: 'play' }; // i18n-ignore : nom du logiciel
   }

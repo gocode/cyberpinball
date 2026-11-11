@@ -198,6 +198,9 @@ function everyCase(): HealthFacts[] {
     // LED et retours (DOF) : prêt ; puis le cas réel du 04/11/2026, une KL25Z sans configuration ni contrôleur de LED adressables.
     { at, disks: [], dof: { controllers: ['Pinscape (KL25Z) · 51'], ini: 2, problems: [] }, vpx: {} },
     { at, disks: [], dof: { controllers: ['Pinscape (KL25Z) · 51', 'Teensy (TeensyStripController) (COM7) · 30'], ini: 0, problems: ['Aucun fichier directoutputconfig.ini', 'Teensy branché (COM7) mais aucun Cabinet.xml ne le déclare'] }, vpx: {} },
+    // Casque : Air Link sur un PC en Wi-Fi (la borne, 11/11/2026), puis Air Link sur un PC en Ethernet.
+    { at, disks: [], vr: { transport: 'air', network: { adapter: 'Intel(R) Wireless-AC 9560 160MHz', wireless: true } }, vpx: {} },
+    { at, disks: [], vr: { transport: 'air', network: { adapter: 'Intel(R) Ethernet Connection (7) I219-V', wireless: false } }, vpx: {} },
   ];
 }
 
@@ -212,7 +215,7 @@ test('chaque contrôle passe par ses états, et chaque ligne mène à un écran 
     assert.ok((HEALTH_TARGET_KINDS as readonly string[]).includes(l.target.kind), `${l.check} « ${l.title} » : cible inconnue`);
     assert.ok(targetReachable(l.target), `${l.check} « ${l.title} » : l'entrée ${JSON.stringify(l.target)} n'est dans aucune rubrique du menu système`);
   }
-  const expected: Record<string, HealthState[]> = { disk: ['ok', 'check', 'blocking'], tables: ['ok', 'check', 'blocking'], pup: ['ok', 'check'], media: ['ok', 'check'], screens: ['ok', 'check', 'blocking'], dof: ['ok', 'check'], vpx: ['ok', 'check', 'blocking'] };
+  const expected: Record<string, HealthState[]> = { disk: ['ok', 'check', 'blocking'], tables: ['ok', 'check', 'blocking'], pup: ['ok', 'check'], media: ['ok', 'check'], screens: ['ok', 'check', 'blocking'], dof: ['ok', 'check'], vr: ['ok', 'check'], vpx: ['ok', 'check', 'blocking'] };
   for (const check of HEALTH_CHECKS) assert.deepEqual([...(seen.get(check) ?? [])].sort(), [...expected[check]!].sort(), `états du contrôle ${check}`);
   // Chaque sorte de cible sert.
   assert.deepEqual([...new Set(lines.map((l) => l.target.kind))].sort(), [...HEALTH_TARGET_KINDS].sort());
