@@ -286,6 +286,12 @@ test('livraison : chaque fichier servi au téléphone est dans l’application f
     assert.ok(fs.existsSync(full), `${url} → ${file} : fichier absent`);
     assert.ok(tracked.has(`app/${rel}`), `${url} → app/${rel} : pas versionné, absent d’une autre copie du dépôt`);
   }
+  // Chaque image que nomme le CSS de la page (la marque de la barre du haut, l'icône du raccourci) est
+  // servie par la borne : sinon, une pastille vide au téléphone.
+  const css = fs.readFileSync(path.join(renderer, 'telephone', 'telephone.css'), 'utf8');
+  const urls = [...css.matchAll(/url\(['"]?([^'")]+)['"]?\)/g)].map((m) => m[1]!).filter((u) => !u.startsWith('data:'));
+  assert.ok(urls.includes('icone-180.png'), 'la marque de la barre du haut est l’icône de Cyber Pinball');
+  for (const u of urls) assert.ok(PHONE_FILES[`/${u}`], `telephone.css nomme ${u}, que la borne ne sert pas`);
   // Les icônes du raccourci : opaques (l'iPhone noircit la transparence), aux tailles annoncées par la page.
   const html = fs.readFileSync(path.join(renderer, 'telephone', 'telephone.html'), 'utf8');
   for (const [rel, size] of [['apple-touch-icon', 180], ['icon', 192]] as const) {

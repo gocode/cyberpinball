@@ -55,13 +55,12 @@ button {
 
 .top-mark {
   flex: none;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: radial-gradient(circle at 38% 34%, #9fb2ae 0 9%, #1b2422 30%, #050807 62%), var(--surface);
-  box-shadow:
-    inset 0 0 0 1.5px var(--signal),
-    0 0 10px var(--signal-haze);
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  /* L'icône de Cyber Pinball, celle du raccourci de l'écran d'accueil (scripts/icone.mjs) : la plaque
+     cerclée de vert, la bille et sa traînée. Servie par la borne, réduite par le navigateur. */
+  background: url('icone-180.png') center / cover no-repeat;
 }
 
 /* Dans un fil : la pastille de l'ami à la place de la bille. */
