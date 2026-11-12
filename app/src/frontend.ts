@@ -272,6 +272,8 @@ import {
   orientationFacts,
   recordedMediaType,
   type RecordedRole,
+  loadRecordingSettings,
+  saveRecordingSettings,
   type RecordingSettings,
   IntroRun,
   type IntroView,
@@ -2099,6 +2101,18 @@ library.provideSystemItem(
     wakeDevices: () => wakeDevices(),
     sleepAllowed: () => !powerUnavailable('sleep', power.capabilities()),
     intro: introMenu,
+    recording: {
+      quality: () => loadRecordingSettings(loc.dataDir).quality,
+      setQuality: (quality) => {
+        try {
+          saveRecordingSettings(loc.dataDir, { ...loadRecordingSettings(loc.dataDir), quality });
+          console.log(`Enregistrement : qualité ${quality}.`);
+        } catch (error) {
+          console.log(`Enregistrement : qualité non enregistrée (${(error as Error).message}).`);
+        }
+        broadcast();
+      },
+    },
   }),
 );
 // Langue de l'interface : le choix relance le menu, comme un changement de configuration.

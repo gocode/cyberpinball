@@ -33,6 +33,14 @@ export const messages: Record<string, string> = {
   'Son de la partie': 'Game sound',
   'Avec la vidéo du plateau': 'With the playfield video',
   'Vidéo muette': 'Silent video',
+  'Qualité de la vidéo': 'Video quality',
+  '{width} × {height} au plus · environ {size} pour {duration} s': '{width} × {height} at most · about {size} for {duration} s',
+  'Définition de la vidéo du plateau, jamais au-delà de celle de l’écran : un plateau en 1080p reste en 1080p. La 4K montre la table sur la roue aussi nette qu’en partie ; une définition plus basse donne un fichier plus léger et ménage un PC plus modeste pendant la partie.':
+    'Resolution of the playfield video, never above the screen’s: a 1080p playfield stays 1080p. 4K shows the table on the wheel as sharp as in the game; a lower resolution gives a lighter file and spares a more modest PC during the game.',
+  // app/src/menu-settings.ts
+  'Qualité des parties enregistrées : {quality}': 'Recorded game quality: {quality}',
+  'Vidéo du plateau filmée par « Jouer et enregistrer » pour la roue : {width} × {height} au plus, jamais au-delà de l’écran (Start : changer)':
+    'Playfield video filmed by “Play and record” for the wheel: {width} × {height} at most, never above the screen (Start: change)',
   '{delay} s après l’apparition de la table': '{delay} s after the table appears',
   'Dès l’apparition de la table': 'As soon as the table appears',
   'Chaque écran filmé devient le média de cet écran sur la roue. Le plateau l’est toujours ; le fronton et l’afficheur, si vous le voulez.': 'Each filmed screen becomes that screen’s media on the wheel. The playfield always is; the backglass and the display, if you wish.',

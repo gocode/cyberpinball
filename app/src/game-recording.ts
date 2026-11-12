@@ -33,7 +33,9 @@ import {
   recordingUsable,
   RECORDING_FADE_MS,
   RECORDING_FPS,
-  RECORDING_MAX_LONG,
+  h264CodecLevel,
+  recordingBitrate,
+  recordingMaxLong,
   RECORDING_TAIL_MS,
   uprightRotation,
   type CaptureGeometry,
@@ -44,6 +46,7 @@ import {
   type RecordingEvent,
   type RecordingIndicator,
   type RecordingInput,
+  type RecordingQuality,
   type RecordingSettings,
   type Rect,
   type Rotation,
@@ -113,8 +116,6 @@ const DONE_TIMEOUT_MS = 20_000;
 const VERDICT_MS = 3000;
 /** Taille du témoin vu du joueur, pour un petit côté de 1080 px (plancher de 20 px compris : texte à 26). */
 const WITNESS = { width: 420, height: 72, margin: 28 };
-/** Débit de la vidéo du plateau et des autres écrans. */
-const BITRATE: Record<RecordedRole, number> = { playfield: 8_000_000, backglass: 4_000_000, dmd: 3_000_000 };
 
 interface TargetSpec {
   key: RecordedRole;
@@ -124,7 +125,10 @@ interface TargetSpec {
   width: number;
   height: number;
   audio: boolean;
+  /** Débit vidéo, d'après la taille produite (recordingBitrate). */
   bitrate: number;
+  /** Profil et niveau H.264 de la chaîne « avc1.… », d'après la taille produite (h264CodecLevel). */
+  avc: string;
 }
 
 interface SourceSpec {
@@ -147,14 +151,14 @@ const extOfMime = (mime: string) => (/webm/i.test(mime) ? 'webm' : 'mp4');
 
 /**
  * Sources et cibles : une capture par écran (les rôles qui le partagent y prennent chacun leur
- * zone), à la taille juste nécessaire (un 4K capturé à moitié quand la vidéo n'en garde que 1920).
+ * zone), à la taille juste nécessaire (un 4K capturé à moitié quand la vidéo n'en garde que 1920, en qualité 1080p).
  */
-export function recordingPlan(screens: RecordingScreen[], options: { synthetic: boolean; title: string; sound: boolean }): { sources: SourceSpec[]; targets: TargetSpec[] } {
+export function recordingPlan(screens: RecordingScreen[], options: { synthetic: boolean; title: string; sound: boolean; quality: RecordingQuality }): { sources: SourceSpec[]; targets: TargetSpec[] } {
   const displays: Rect[] = [];
   for (const s of screens) if (!displays.some((d) => sameRect(d, s.display))) displays.push(s.display);
   const sources: SourceSpec[] = displays.map((display) => {
     const mine = screens.filter((s) => sameRect(s.display, display));
-    const need = Math.max(...mine.map((s) => RECORDING_MAX_LONG[s.role] / Math.max(s.zone.width, s.zone.height)));
+    const need = Math.max(...mine.map((s) => recordingMaxLong(s.role, options.quality) / Math.max(s.zone.width, s.zone.height)));
     const scale = Math.min(1, need);
     const size = { width: even(display.width * scale), height: even(display.height * scale) };
     if (!options.synthetic) return size;
@@ -174,8 +178,8 @@ export function recordingPlan(screens: RecordingScreen[], options: { synthetic: 
     const sourceIndex = displays.findIndex((d) => sameRect(d, s.display));
     const zone = { x: s.zone.x - s.display.x, y: s.zone.y - s.display.y, width: s.zone.width, height: s.zone.height };
     const rotation = s.role === 'playfield' ? uprightRotation(s.edge ?? 'bottom') : 0;
-    const g: CaptureGeometry = captureGeometry(zone, s.display, sources[sourceIndex]!, rotation, { maxLong: RECORDING_MAX_LONG[s.role], portrait: s.role === 'playfield' });
-    return { key: s.role, sourceIndex, ...g, audio: s.role === 'playfield' && options.sound, bitrate: BITRATE[s.role] };
+    const g: CaptureGeometry = captureGeometry(zone, s.display, sources[sourceIndex]!, rotation, { maxLong: recordingMaxLong(s.role, options.quality), portrait: s.role === 'playfield' });
+    return { key: s.role, sourceIndex, ...g, audio: s.role === 'playfield' && options.sound, bitrate: recordingBitrate(g.width, g.height), avc: h264CodecLevel(g.width, g.height) };
   });
   return { sources, targets };
 }
@@ -189,7 +193,7 @@ export function armRecording(req: RecordingRequest): RecordingRun {
   const events = new EventEmitter();
   const settings = req.settings;
   const dir = recordingDir(req.dataDir, req.table);
-  const plan = recordingPlan(req.screens, { synthetic: req.synthetic, title: req.table.title, sound: settings.sound });
+  const plan = recordingPlan(req.screens, { synthetic: req.synthetic, title: req.table.title, sound: settings.sound, quality: settings.quality });
   let clock: RecordingClock = ARMED_RECORDING;
   let startedAt: Date | undefined;
   /** Fichier en cours d'écriture de chaque cible (.part), puis son extension d'après le format retenu. */
@@ -254,6 +258,8 @@ export function armRecording(req: RecordingRequest): RecordingRun {
     if (event.sender !== recorder.webContents) return;
     if (message.type === 'prepared') {
       for (const t of message.targets) exts.set(t.key, extOfMime(t.mime));
+      // Le format retenu par MediaRecorder : un MP4 au niveau attendu, ou le repli WebM (qualité trop haute pour l'encodeur ?).
+      console.log(`Enregistrement (${req.table.id}) : formats ${message.targets.map((t) => `${t.key} ${t.mime}`).join(', ')}.`);
     } else if (message.type === 'error') {
       console.log(`Enregistrement (${req.table.id}) : ${message.message}`);
       feed({ type: 'failed', at: Date.now(), error: message.message });
@@ -283,7 +289,7 @@ export function armRecording(req: RecordingRequest): RecordingRun {
         fs.writeFileSync(file, '');
         parts.set(t.key, file);
       }
-      console.log(`Enregistrement (${req.table.id}) : début, ${plan.targets.map((t) => `${t.key} ${t.width} × ${t.height}${t.rotation ? ` tourné de ${t.rotation}°` : ''}`).join(', ')}.`);
+      console.log(`Enregistrement (${req.table.id}) : début, ${plan.targets.map((t) => `${t.key} ${t.width} × ${t.height}${t.rotation ? ` tourné de ${t.rotation}°` : ''} (${(t.bitrate / 1e6).toFixed(1)} Mbit/s)`).join(', ')}.`);
       sendAfterPrepare({ type: 'start', durationMs: settings.duration * 1000 });
     } else {
       console.log(`Enregistrement (${req.table.id}) : fin (${e.reason}), ${e.seconds.toFixed(1)} s.`);

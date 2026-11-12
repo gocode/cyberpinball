@@ -9,6 +9,7 @@ import {
   captureGeometry,
   DEFAULT_RECORDING_SETTINGS,
   fadeLevel,
+  h264CodecLevel,
   indicatorBounds,
   keptSeconds,
   listRecordings,
@@ -16,6 +17,11 @@ import {
   MIN_RECORDING_SECONDS,
   normalizeRecordingSettings,
   recordedMediaType,
+  recordingBitrate,
+  recordingBytes,
+  recordingMaxLong,
+  RECORDING_QUALITIES,
+  RECORDING_QUALITY_SIZES,
   recordingDir,
   recordingEndText,
   recordingFileName,
@@ -126,14 +132,17 @@ test('fondu : entrée toujours, sortie seulement quand la fin est connue', () =>
 });
 
 test('réglages : valeurs hors des choix remplacées, plateau toujours filmé, relus tels qu’écrits', () => {
-  assert.deepEqual(normalizeRecordingSettings({ roles: ['dmd'], delay: 7, duration: 30, sound: false }), { roles: ['playfield', 'dmd'], delay: 10, duration: 30, sound: false });
+  assert.deepEqual(normalizeRecordingSettings({ roles: ['dmd'], delay: 7, duration: 30, sound: false, quality: '8k' }), { roles: ['playfield', 'dmd'], delay: 10, duration: 30, sound: false, quality: '4k' });
+  // Réglages d'avant la qualité (plafonnés au 1080p) : la définition par défaut, 4K.
+  assert.equal(normalizeRecordingSettings({ roles: ['playfield'], delay: 10, duration: 30, sound: true }).quality, '4k');
+  assert.equal(DEFAULT_RECORDING_SETTINGS.quality, '4k');
   assert.deepEqual(normalizeRecordingSettings('n’importe quoi'), DEFAULT_RECORDING_SETTINGS);
   assert.deepEqual(toggleRecordedRole(DEFAULT_RECORDING_SETTINGS, 'playfield').roles, ['playfield']);
   assert.deepEqual(toggleRecordedRole(toggleRecordedRole(DEFAULT_RECORDING_SETTINGS, 'dmd'), 'backglass').roles, ['playfield', 'backglass', 'dmd']);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-rec-'));
   try {
     assert.deepEqual(loadRecordingSettings(dir), DEFAULT_RECORDING_SETTINGS);
-    const mine = { roles: ['playfield', 'backglass'] as const, delay: 5, duration: 60, sound: false };
+    const mine = { roles: ['playfield', 'backglass'] as const, delay: 5, duration: 60, sound: false, quality: '1080p' as const };
     saveRecordingSettings(dir, { ...mine, roles: [...mine.roles] });
     assert.deepEqual(loadRecordingSettings(dir), { ...mine, roles: [...mine.roles] });
   } finally {
@@ -155,6 +164,36 @@ test('plateau : la roue montre l’enregistrement comme le joueur voyait la tabl
     assert.equal((g.rotation + shown) % 360, 0, `${edge} : ${g.rotation}° puis ${shown}°`);
     assert.deepEqual([g.width, g.height], [1080, 1920]);
   }
+});
+
+test('qualité : le plateau 4K filmé en 4K par défaut, jamais au-delà de l’écran, au niveau H.264 qui convient', () => {
+  // Plateau 4K couché (flippers à droite) : 2160 × 3840 en 4K, réduit selon la qualité choisie.
+  const screen = { width: 3840, height: 2160 };
+  const sizes = RECORDING_QUALITIES.map((q) => {
+    const g = captureGeometry({ x: 0, y: 0, ...screen }, screen, screen, uprightRotation('right'), { maxLong: recordingMaxLong('playfield', q), portrait: true });
+    assert.deepEqual([g.width, g.height], [RECORDING_QUALITY_SIZES[q].short, RECORDING_QUALITY_SIZES[q].long], q);
+    return g;
+  });
+  assert.deepEqual([sizes[0]!.width, sizes[0]!.height], [2160, 3840]);
+  // Un plateau 1080p n'est jamais agrandi, même en 4K.
+  const hd = { width: 1920, height: 1080 };
+  const small = captureGeometry({ x: 0, y: 0, ...hd }, hd, hd, uprightRotation('right'), { maxLong: recordingMaxLong('playfield', '4k'), portrait: true });
+  assert.deepEqual([small.width, small.height], [1080, 1920]);
+  // Fronton et DMD restent à 1280, quelle que soit la qualité du plateau.
+  for (const q of RECORDING_QUALITIES) assert.equal(recordingMaxLong('backglass', q), 1280);
+  // Niveau H.264 : 4.0 jusqu'au 1080p (le seul d'avant), 5.0 en 1440p, 5.1 en 4K à 30 images/s.
+  assert.equal(h264CodecLevel(1080, 1920), '640028');
+  assert.equal(h264CodecLevel(608, 1080), '640028');
+  assert.equal(h264CodecLevel(1440, 2560), '640032');
+  assert.equal(h264CodecLevel(2160, 3840), '640033');
+  assert.equal(h264CodecLevel(2160, 3840, 60), '640034');
+  // Débit à la taille produite : 35 Mbit/s en 4K, environ 8,7 en 1080p (8 avant), un plancher pour un petit DMD.
+  assert.equal(recordingBitrate(2160, 3840), 34_800_000);
+  assert.equal(recordingBitrate(1080, 1920), 8_700_000);
+  assert.equal(recordingBitrate(1280, 320), 3_000_000);
+  // Poids annoncé : environ 131 Mo pour 30 s de 4K, quatre fois moins en 1080p.
+  assert.equal(Math.round(recordingBytes('4k', 30) / 1e6), 131);
+  assert.ok(recordingBytes('4k', 30) > 3.5 * recordingBytes('1080p', 30));
 });
 
 test('plateau d’un poste de bureau (paysage, flippers en bas) : recadré au centre en 9:16', () => {

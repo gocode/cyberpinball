@@ -48,6 +48,63 @@ export const RECORDING_TAIL_MS = 500;
 /** Cadence de l'enregistrement. */
 export const RECORDING_FPS = 30;
 
+/**
+ * Définition de la vidéo du plateau (demande du 12/11/2026) : son grand côté au plus, jamais
+ * au-delà de l'écran (un plateau en 1080p reste en 1080p). 4K par défaut : sur une borne au
+ * plateau 4K, la roue montre la table à la netteté de la partie.
+ */
+export type RecordingQuality = '4k' | '1440p' | '1080p' | '720p';
+export const RECORDING_QUALITIES: readonly RecordingQuality[] = ['4k', '1440p', '1080p', '720p'];
+/** Grand et petit côtés de chaque définition (la vidéo du plateau est en portrait : petit × grand). */
+export const RECORDING_QUALITY_SIZES: Record<RecordingQuality, { long: number; short: number }> = {
+  '4k': { long: 3840, short: 2160 },
+  '1440p': { long: 2560, short: 1440 },
+  '1080p': { long: 1920, short: 1080 },
+  '720p': { long: 1280, short: 720 },
+};
+export const RECORDING_QUALITY_LABELS: Record<RecordingQuality, string> = { '4k': '4K', '1440p': '1440p', '1080p': '1080p', '720p': '720p' };
+
+/**
+ * Débit vidéo pour une image de `width` × `height` : 0,14 bit par point et par image, la densité
+ * d'un 4K à 35 Mbit/s (ce que YouTube conseille pour du 4K à 30 images/s ; une table en jeu bouge
+ * beaucoup, en détails fins). Un plancher garde un petit DMD net.
+ */
+export const RECORDING_BITS_PER_PIXEL = 0.14;
+export const RECORDING_MIN_BITRATE = 3_000_000;
+export function recordingBitrate(width: number, height: number): number {
+  return Math.max(RECORDING_MIN_BITRATE, Math.round((width * height * RECORDING_FPS * RECORDING_BITS_PER_PIXEL) / 100_000) * 100_000);
+}
+
+/** Poids d'une vidéo du plateau de cette définition (son compris, 160 kbit/s), pour `seconds` secondes. */
+export function recordingBytes(quality: RecordingQuality, seconds: number): number {
+  const { long, short } = RECORDING_QUALITY_SIZES[quality];
+  return Math.round(((recordingBitrate(short, long) + 160_000) * seconds) / 8);
+}
+
+/**
+ * Profil et niveau H.264 (High) de la chaîne de codec « avc1.64xxxx » pour une vidéo de cette
+ * taille à RECORDING_FPS : le niveau 4.0 (« 640028 ») s'arrête au 1080p ; au-delà, l'encodeur
+ * refuserait l'image ou la lecture deviendrait hors norme. Tailles d'image et débits de macroblocs
+ * de la norme (ITU-T H.264, tableau A-1).
+ */
+export function h264CodecLevel(width: number, height: number, fps = RECORDING_FPS): string {
+  const mbW = Math.ceil(width / 16);
+  const mbH = Math.ceil(height / 16);
+  const frame = mbW * mbH;
+  const levels: { id: number; maxFs: number; maxMbps: number }[] = [
+    { id: 0x28, maxFs: 8192, maxMbps: 245_760 },
+    { id: 0x2a, maxFs: 8704, maxMbps: 522_240 },
+    { id: 0x32, maxFs: 22_080, maxMbps: 589_824 },
+    { id: 0x33, maxFs: 36_864, maxMbps: 983_040 },
+    { id: 0x34, maxFs: 36_864, maxMbps: 2_073_600 },
+    { id: 0x3c, maxFs: 139_264, maxMbps: 4_177_920 },
+  ];
+  // Chaque côté, en macroblocs, reste sous √(8 × MaxFS) (A.3.1).
+  const fits = (l: (typeof levels)[number]) => frame <= l.maxFs && frame * fps <= l.maxMbps && Math.max(mbW, mbH) <= Math.sqrt(8 * l.maxFs);
+  const level = levels.find(fits) ?? levels[levels.length - 1]!;
+  return `64${level.id.toString(16).padStart(4, '0')}`;
+}
+
 export interface RecordingSettings {
   /** Écrans filmés ; le plateau l'est toujours. */
   roles: RecordedRole[];
@@ -57,9 +114,11 @@ export interface RecordingSettings {
   duration: number;
   /** Son de la partie avec la vidéo du plateau (la roue le joue selon « Son des vidéos du menu »). */
   sound: boolean;
+  /** Définition de la vidéo du plateau, au plus celle de l'écran. */
+  quality: RecordingQuality;
 }
 
-export const DEFAULT_RECORDING_SETTINGS: RecordingSettings = { roles: ['playfield'], delay: 10, duration: 30, sound: true };
+export const DEFAULT_RECORDING_SETTINGS: RecordingSettings = { roles: ['playfield'], delay: 10, duration: 30, sound: true, quality: '4k' };
 
 /** <données>\enregistrement.json */
 export function recordingSettingsFile(dataDir: string): string {
@@ -76,6 +135,8 @@ export function normalizeRecordingSettings(raw: unknown): RecordingSettings {
     delay: RECORDING_DELAYS.includes(r.delay as number) ? (r.delay as number) : d.delay,
     duration: RECORDING_DURATIONS.includes(r.duration as number) ? (r.duration as number) : d.duration,
     sound: typeof r.sound === 'boolean' ? r.sound : d.sound,
+    // Absente (réglages d'avant le 12/11/2026, alors plafonnés au 1080p) : la définition par défaut, 4K.
+    quality: RECORDING_QUALITIES.includes(r.quality as RecordingQuality) ? (r.quality as RecordingQuality) : d.quality,
   };
 }
 
@@ -243,8 +304,13 @@ export function fadeLevel(ms: number, totalMs: number | undefined, fadeMs = RECO
 // ---------------------------------------------------------------------------
 // Géométrie : ce qui est pris de l'image de l'écran, et comment il est tourné
 
-/** Grand côté de la vidéo produite, par écran (un 4K est réduit : la roue n'a pas besoin de plus). */
-export const RECORDING_MAX_LONG: Record<RecordedRole, number> = { playfield: 1920, backglass: 1280, dmd: 1280 };
+/**
+ * Grand côté de la vidéo produite, par écran : le plateau suit la définition choisie
+ * (RecordingSettings.quality) ; fronton et DMD, petits sur la roue, sont réduits à 1280.
+ */
+export function recordingMaxLong(role: RecordedRole, quality: RecordingQuality): number {
+  return role === 'playfield' ? RECORDING_QUALITY_SIZES[quality].long : 1280;
+}
 
 /** Rotation horaire qui amène les flippers, au bord `edge` de l'image de l'écran, en bas. */
 export function uprightRotation(edge: FlipperEdge): Rotation {

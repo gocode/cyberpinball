@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- Game media, suggestions: "Search more" widens the search on VPUniverse and VPForums (up to 10 pages, every edition of the game, close titles, marked as such).
+- Game media, suggestions: "Animated only" keeps only videos and animated wheels (APNG, GIF); VPUniverse then searches its animated wheels category.
+- Game media, suggestions: "Add words to the search…" narrows the search by a style, an author, a color ("tarcisio", "diagonal", "glass orb"…), on the sites as on the web.
+- Game media, suggestions: the wheels, toppers and packs the VPS database lists under the game are offered right away, even when their title cannot be found, and VPForums ones without an account.
 - Add a table: the catalog responds at once to the buttons. Pages show without waiting for their thumbnails, which arrive right after (the next page is prepared ahead), and the filters screen no longer freezes the cabinet on every press.
 - Add a table: the filters no longer move under the cursor on the cabinet. One line per filter, always in the same place; Start opens its choices, each with its number of games, instead of cycling through the values one by one.
 - Add a table: the catalog opens on the most popular games (those the most authors have made tables, backglasses, PuP-Packs… for). The filters and sort you choose are kept, even after a restart.

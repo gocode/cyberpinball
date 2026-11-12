@@ -13,6 +13,7 @@ import {
   clockLabel,
   emptyMediaDraft,
   formatSize,
+  formatNumber,
   infoFileFor,
   keptSeconds,
   loadRecordingSettings,
@@ -24,6 +25,10 @@ import {
   recordedMediaType,
   RECORDING_DELAYS,
   RECORDING_DURATIONS,
+  RECORDING_QUALITIES,
+  RECORDING_QUALITY_LABELS,
+  RECORDING_QUALITY_SIZES,
+  recordingBytes,
   saveRecordingSettings,
   t,
   tn,
@@ -33,6 +38,7 @@ import {
   type Layout,
   type MediaDraft,
   type RecordedRole,
+  type RecordingQuality,
   type RecordingSettings,
   type TableEntry,
 } from '@cyberpinball/core';
@@ -73,7 +79,7 @@ export function createRecordingMenu(ctx: RecordingMenuContext) {
   /** Ce qui est filmé, en clair : « Plateau et fronton · début à 10 s · 30 s · avec le son ». */
   function summary(s: RecordingSettings): string {
     const roles = s.roles.filter((r) => r === 'playfield' || ctx.roles().includes(r)).map((r) => ROLE_LABELS[r]());
-    return [roles.join(', '), t('début à {delay} s', { delay: s.delay }), t('{duration} s', { duration: s.duration }), s.sound ? t('avec le son') : t('sans le son')].join(' · ');
+    return [roles.join(', '), RECORDING_QUALITY_LABELS[s.quality], t('début à {delay} s', { delay: s.delay }), t('{duration} s', { duration: s.duration }), s.sound ? t('avec le son') : t('sans le son')].join(' · ');
   }
 
   const settings = () => loadRecordingSettings(ctx.dataDir);
@@ -106,6 +112,7 @@ export function createRecordingMenu(ctx: RecordingMenuContext) {
           : []),
         { label: t('Début de l’enregistrement'), detail: delayText(s.delay), icon: 'clock', run: () => ctx.show(() => buildChoice(file, 'delay'), Math.max(0, RECORDING_DELAYS.indexOf(s.delay)), file) },
         { label: t('Durée'), detail: t('{duration} s de vidéo ; la partie continue', { duration: s.duration }), icon: 'gauge', run: () => ctx.show(() => buildChoice(file, 'duration'), Math.max(0, RECORDING_DURATIONS.indexOf(s.duration)), file) },
+        { label: t('Qualité de la vidéo'), detail: qualityText(s.quality, s.duration), icon: 'quality', run: () => ctx.show(() => buildQuality(file), Math.max(0, RECORDING_QUALITIES.indexOf(s.quality)), file) },
         {
           label: t('Son de la partie'),
           detail: s.sound ? t('Avec la vidéo du plateau') : t('Vidéo muette'),
@@ -116,6 +123,44 @@ export function createRecordingMenu(ctx: RecordingMenuContext) {
           },
         },
         { label: t('Retour à la fiche'), icon: 'back', run: back },
+      ],
+      back,
+    };
+  }
+
+  /** « 2160 × 3840 au plus · environ 150 Mo pour 30 s » : la taille du plateau et ce que pèse la prise. */
+  const qualityText = (quality: RecordingQuality, duration: number) =>
+    t('{width} × {height} au plus · environ {size} pour {duration} s', {
+      width: formatNumber(RECORDING_QUALITY_SIZES[quality].short),
+      height: formatNumber(RECORDING_QUALITY_SIZES[quality].long),
+      size: formatSize(recordingBytes(quality, duration)),
+      duration,
+    });
+
+  function buildQuality(file: string): Built {
+    const table = ctx.find(file);
+    if (!table) return lost();
+    const s = settings();
+    const back = () => setup(table, 4 - (ctx.roles().length ? 0 : 1));
+    return {
+      heading: t('Qualité de la vidéo'),
+      icon: 'quality',
+      subheading: table.title,
+      lead: t('Définition de la vidéo du plateau, jamais au-delà de celle de l’écran : un plateau en 1080p reste en 1080p. La 4K montre la table sur la roue aussi nette qu’en partie ; une définition plus basse donne un fichier plus léger et ménage un PC plus modeste pendant la partie.'),
+      sections: [],
+      actions: [
+        ...RECORDING_QUALITIES.map(
+          (q): Action => ({
+            label: RECORDING_QUALITY_LABELS[q],
+            detail: [qualityText(q, s.duration), ...(q === s.quality ? [t('choix actuel')] : [])].join(' · '),
+            tone: q === s.quality ? 'ok' : undefined,
+            run: () => {
+              save({ ...s, quality: q });
+              back();
+            },
+          }),
+        ),
+        { label: t('Retour'), icon: 'back', run: back },
       ],
       back,
     };

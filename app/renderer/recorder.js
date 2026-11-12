@@ -15,8 +15,6 @@
 const api = window.cyberRecorder;
 let session = null;
 
-const MIMES_AUDIO = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/webm;codecs=vp9,opus'];
-const MIMES_VIDEO = ['video/mp4;codecs=avc1.640028', 'video/webm;codecs=vp9'];
 
 function fadeLevel(ms, totalMs, fadeMs) {
   const ramp = (x) => Math.max(0, Math.min(1, x / fadeMs));
@@ -167,8 +165,13 @@ function readTrack(track, onData) {
 // ---------------------------------------------------------------------------
 // Cibles : une vidéo par rôle
 
-function pickMime(audio) {
-  return (audio ? MIMES_AUDIO : MIMES_VIDEO).find((m) => MediaRecorder.isTypeSupported(m));
+/**
+ * MP4 (H.264 High au niveau qu'exige la taille de la cible, spec.avc : 4.0 jusqu'au 1080p, 5.1 en
+ * 4K), sinon WebM (VP9) : le premier que MediaRecorder accepte.
+ */
+function pickMime(audio, avc) {
+  const mimes = audio ? [`video/mp4;codecs=avc1.${avc},mp4a.40.2`, 'video/webm;codecs=vp9,opus'] : [`video/mp4;codecs=avc1.${avc}`, 'video/webm;codecs=vp9'];
+  return mimes.find((m) => MediaRecorder.isTypeSupported(m));
 }
 
 function makeTarget(spec, cmd) {
@@ -189,7 +192,7 @@ function makeTarget(spec, cmd) {
     queue: [],
     recorder: null,
     chunks: Promise.resolve(),
-    mime: pickMime(Boolean(audio)),
+    mime: pickMime(Boolean(audio), spec.avc || '640028'),
     samples: 0,
     audioStart: undefined,
   };

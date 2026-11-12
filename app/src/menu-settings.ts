@@ -21,6 +21,9 @@ import {
   MEDIADB_4K_ABOVE,
   MEDIADB_QUALITY_LABELS,
   MEDIADB_QUALITY_SETTINGS,
+  RECORDING_QUALITIES,
+  RECORDING_QUALITY_LABELS,
+  RECORDING_QUALITY_SIZES,
   START_TABLE_LABELS,
   START_TABLES,
   WHEEL_START_LABELS,
@@ -49,6 +52,7 @@ import {
   type IconName,
   type MenuLayout,
   type MenuMediaSettings,
+  type RecordingQuality,
   type StartTable,
   type TableOrder,
   type UiSoundId,
@@ -79,6 +83,8 @@ export interface MenuSettingsHost {
   sleepAllowed(): boolean;
   /** Ouverture au démarrage (intro-menu.ts) : son écran, et ce qu'en dit la ligne. */
   intro: { open(back: () => void): void; summary(): string };
+  /** Définition des parties enregistrées (« Jouer et enregistrer »), gardée dans <données>\enregistrement.json. */
+  recording: { quality(): RecordingQuality; setQuality(quality: RecordingQuality): void };
 }
 
 const heading = () => t('Médias, son et attente');
@@ -170,6 +176,7 @@ export const MENU_SETTINGS_ROWS = [
   'dmd',
   'dmdColor',
   'downloadQuality',
+  'recordQuality',
 ] as const;
 type Row = (typeof MENU_SETTINGS_ROWS)[number];
 const row = (key: Row) => MENU_SETTINGS_ROWS.indexOf(key);
@@ -367,6 +374,17 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
               : t('Image du plateau en 1k, la plus légère (Start : changer)'),
         run: () => set({ downloadQuality: MEDIADB_QUALITY_SETTINGS[(MEDIADB_QUALITY_SETTINGS.indexOf(v.downloadQuality) + 1) % MEDIADB_QUALITY_SETTINGS.length]! }),
       },
+      recordQuality: (() => {
+        const q = host.recording.quality();
+        const size = RECORDING_QUALITY_SIZES[q];
+        return {
+          label: t('Qualité des parties enregistrées : {quality}', { quality: RECORDING_QUALITY_LABELS[q] }),
+          detail: t('Vidéo du plateau filmée par « Jouer et enregistrer » pour la roue : {width} × {height} au plus, jamais au-delà de l’écran (Start : changer)', { width: formatNumber(size.short), height: formatNumber(size.long) }),
+          icon: 'record',
+          // Basculé sur place, comme la qualité téléchargée : l'hôte redessine l'écran.
+          run: () => host.recording.setQuality(RECORDING_QUALITIES[(RECORDING_QUALITIES.indexOf(q) + 1) % RECORDING_QUALITIES.length]!),
+        } satisfies Action;
+      })(),
     };
     return MENU_SETTINGS_ROWS.map((key) => rows[key]);
   }

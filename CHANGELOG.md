@@ -11,6 +11,10 @@ son interface).
 
 ## 0.1.11
 
+- Médias du jeu, propositions : « Chercher plus » élargit la recherche sur VPUniverse et VPForums (jusqu'à 10 pages, toutes les éditions du jeu, titres approchés, marqués comme tels).
+- Médias du jeu, propositions : « Animés seulement » ne garde que les vidéos et les wheels animées (APNG, GIF) ; VPUniverse cherche alors dans sa catégorie de wheels animées.
+- Médias du jeu, propositions : « Ajouter des mots à la recherche… » précise la recherche par un style, un auteur, une couleur (« tarcisio », « diagonal », « glass orb »…), sur les sites comme sur le web.
+- Médias du jeu, propositions : les wheels, toppers et packs que la base VPS range sous le jeu sont proposés d'office, même introuvables par leur titre, et ceux de VPForums sans compte.
 - Ajouter une table : le catalogue répond aussitôt aux boutons. Les pages s'affichent sans attendre leurs vignettes, qui arrivent juste après (la page suivante est préparée d'avance), et l'écran des filtres ne fige plus la borne à chaque appui.
 - Ajouter une table : les filtres ne bougent plus sous le curseur en borne. Une ligne par filtre, toujours à la même place ; Start ouvre ses choix, chacun avec son nombre de jeux, au lieu de faire défiler les valeurs une à une.
 - Ajouter une table : le catalogue s'ouvre sur les jeux les plus populaires (ceux pour lesquels le plus d'auteurs ont fait des tables, frontons, PuP-Packs…). Les filtres et le tri que vous choisissez sont gardés, même après un redémarrage.

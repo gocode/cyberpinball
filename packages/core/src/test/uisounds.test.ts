@@ -317,6 +317,7 @@ test('réglages du menu : chaque sous-écran revient sur sa propre ligne ; aper�
     wakeDevices: () => [],
     sleepAllowed: () => true,
     intro: { open() {}, summary: () => 'jouée' },
+    recording: { quality: () => '4k', setQuality() {} },
   });
   item.run();
   const main = opened[0]!.build;
