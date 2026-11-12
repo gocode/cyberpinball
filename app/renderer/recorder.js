@@ -285,7 +285,7 @@ function start(cmd) {
   session.endMs = cmd.durationMs;
   for (const target of session.targets) {
     const tracks = [target.video, ...(target.audio ? [target.audio] : [])];
-    target.recorder = new MediaRecorder(new MediaStream(tracks), { mimeType: target.mime, videoBitsPerSecond: target.spec.bitrate, audioBitsPerSecond: 160_000 });
+    target.recorder = new MediaRecorder(new MediaStream(tracks), { mimeType: target.mime, videoBitsPerSecond: target.spec.encoderBitrate ?? target.spec.bitrate, audioBitsPerSecond: 160_000 });
     target.recorder.ondataavailable = (event) => {
       if (!event.data.size) return;
       const data = event.data;

@@ -26,11 +26,13 @@ import {
   edgeRotation,
   indicatorBounds,
   keptSeconds,
+  mediaRecorderBitrate,
   mergeFeatureSwitch,
   readMediaDimensions,
   readVideoCadence,
   recordingCadenceLow,
   RECORDING_CHROMIUM_FEATURES,
+  RECORDING_MAX_BITRATE_RATIO,
   recordingDir,
   recordingEndText,
   recordingFileName,
@@ -138,6 +140,8 @@ interface TargetSpec {
   audio: boolean;
   /** Débit vidéo, d'après la taille produite (recordingBitrate). */
   bitrate: number;
+  /** Débit demandé à MediaRecorder pour l'obtenir (mediaRecorderBitrate : il compte 30 images par seconde). */
+  encoderBitrate: number;
   /** Profil et niveau H.264 de la chaîne « avc1.… », d'après la taille produite (h264CodecLevel). */
   avc: string;
 }
@@ -190,7 +194,8 @@ export function recordingPlan(screens: RecordingScreen[], options: { synthetic: 
     const zone = { x: s.zone.x - s.display.x, y: s.zone.y - s.display.y, width: s.zone.width, height: s.zone.height };
     const rotation = s.role === 'playfield' ? uprightRotation(s.edge ?? 'bottom') : 0;
     const g: CaptureGeometry = captureGeometry(zone, s.display, sources[sourceIndex]!, rotation, { maxLong: recordingMaxLong(s.role, options.quality), portrait: s.role === 'playfield' });
-    return { key: s.role, sourceIndex, ...g, audio: s.role === 'playfield' && options.sound, bitrate: recordingBitrate(g.width, g.height), avc: h264CodecLevel(g.width, g.height) };
+    const bitrate = recordingBitrate(g.width, g.height);
+    return { key: s.role, sourceIndex, ...g, audio: s.role === 'playfield' && options.sound, bitrate, encoderBitrate: mediaRecorderBitrate(bitrate), avc: h264CodecLevel(g.width, g.height) };
   });
   return { sources, targets };
 }
@@ -341,6 +346,10 @@ export function armRecording(req: RecordingRequest): RecordingRun {
       if (cadence) {
         const low = recordingCadenceLow(cadence.fps);
         console.log(`Enregistrement (${req.table.id}) : ${key}, ${cadence.frames} images en ${cadence.seconds.toFixed(1)} s, ${cadence.fps.toFixed(1)} images/s pour ${RECORDING_FPS} demandées, écart max ${Math.round(cadence.maxGapMs)} ms${low ? ' : CADENCE BASSE, la capture ne suit pas (qualité à baisser ?)' : ''}.`);
+        // Débit réel (son compris) contre le débit visé : un encodeur qui en écrit trop se voit ici.
+        const real = (bytes * 8) / cadence.seconds;
+        const heavy = real > target.bitrate * RECORDING_MAX_BITRATE_RATIO;
+        console.log(`Enregistrement (${req.table.id}) : ${key}, débit réel ${(real / 1e6).toFixed(1)} Mbit/s pour ${(target.bitrate / 1e6).toFixed(1)} visés${heavy ? ' : DÉBIT TROP HAUT, vidéo trop lourde (mediaRecorderBitrate à revoir ?)' : ''}.`);
       }
     }
     try {

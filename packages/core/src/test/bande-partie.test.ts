@@ -32,7 +32,6 @@ import {
   type LiveBoardView,
 } from '../gamenotice';
 import type { StackedWindow } from '../screencover';
-import { indicatorBounds } from '../gamerecording';
 import { DMD_HEIGHT, DMD_WIDTH } from '../livedmd';
 import type { Rect, RoleId, Rotation } from '../model';
 import { parseSimulatedDisplays } from '../offscreen';
@@ -122,7 +121,8 @@ test('écrans simulés : le fronton, même pris par la table, sinon le topper, s
             continue;
           }
           // L'encart : au bord des flippers et dans le tiers gauche du joueur, loin du milieu (l'écoulement)
-          // et du couloir de lancement ; jamais sur le témoin d'un enregistrement (coin haut-droit).
+          // et du couloir de lancement. Le témoin d'un enregistrement prend le même coin (bas-gauche) :
+          // ils ne sont jamais ensemble, « Jouer et enregistrer » lançant une partie seule (essai suivant).
           const z = screen;
           const b = band.bounds;
           const short = Math.min(z.width, z.height);
@@ -143,8 +143,6 @@ test('écrans simulés : le fronton, même pris par la table, sinon le topper, s
             assert.ok(across <= 0.2, `${where} : à côté de la table (${(across * 100).toFixed(1)} %)`);
           }
           assert.equal(band.rotation, rotation);
-          const witness = indicatorBounds(z, rotation, { width: Math.round((420 * short) / 1080), height: Math.round((72 * short) / 1080) }, Math.round((28 * short) / 1080));
-          assert.ok(!overlap(b, witness), `${where} : jamais sur le témoin d’enregistrement`);
         }
         }
       }

@@ -108,6 +108,22 @@ export function recordingBitrate(width: number, height: number, fps = RECORDING_
   return Math.max(RECORDING_MIN_BITRATE, Math.round((at30 * Math.pow(fps / 30, 0.585)) / 100_000) * 100_000);
 }
 
+/**
+ * Cadence que l'encodeur de MediaRecorder suppose : il répartit le débit demandé en parts de
+ * 1/30 s par image, quelle que soit la cadence reçue (piste sans cadence déclarée). À 60 images
+ * par seconde, il en écrit donc deux fois trop : 98 Mbit/s pour 52 demandés sur une borne 4K
+ * (12/11/2026), 16,4 pour 8 en essai hors écran (MediaStreamTrackGenerator comme captureStream(60)).
+ */
+export const MEDIARECORDER_ASSUMED_FPS = 30;
+
+/** Débit à demander à MediaRecorder pour obtenir `bitrate` à `fps` images par seconde. */
+export function mediaRecorderBitrate(bitrate: number, fps = RECORDING_FPS): number {
+  return Math.round((bitrate * MEDIARECORDER_ASSUMED_FPS) / fps);
+}
+
+/** Débit réel au-delà duquel le journal signale une vidéo trop lourde : une fois et demie le débit visé. */
+export const RECORDING_MAX_BITRATE_RATIO = 1.5;
+
 /** Poids d'une vidéo du plateau de cette définition (son compris, 160 kbit/s), pour `seconds` secondes. */
 export function recordingBytes(quality: RecordingQuality, seconds: number): number {
   const { long, short } = RECORDING_QUALITY_SIZES[quality];
@@ -400,17 +416,19 @@ export function recordedRoleOf(type: MediaType): RecordedRole | undefined {
 }
 
 /**
- * Place du témoin, en pixels de l'écran : dans le coin du plateau en haut à droite pour le joueur
- * (loin des flippers et de la bille qu'on suit), quel que soit le sens de l'écran. `rotation` :
+ * Place du témoin, en pixels de l'écran : dans le coin du plateau en bas à gauche pour le joueur,
+ * côté flippers, là où le regard est pendant la partie (demande du 12/11/2026 : en haut à droite,
+ * au bout de la table, on ne le voyait pas), quel que soit le sens de l'écran. La vidéo ne le
+ * contient jamais (fenêtre exclue de la capture). `rotation` :
  * celle de la mise en page du plateau (menuRotation), `size` : la taille du témoin vu du joueur.
  */
 export function indicatorBounds(zone: Rect, rotation: Rotation, size: { width: number; height: number }, margin: number): Rect {
   const quarter = rotation === 90 || rotation === 270;
   const w = quarter ? size.height : size.width;
   const h = quarter ? size.width : size.height;
-  // Coin haut-droit du joueur, tourné dans le repère de l'écran : (x, y) → (-y, x) par quart de tour horaire.
-  let cx = 1;
-  let cy = -1;
+  // Coin bas-gauche du joueur, tourné dans le repère de l'écran : (x, y) → (-y, x) par quart de tour horaire.
+  let cx = -1;
+  let cy = 1;
   for (let r = 0; r < rotation; r += 90) [cx, cy] = [-cy, cx];
   const x = cx > 0 ? zone.x + zone.width - margin - w : zone.x + margin;
   const y = cy > 0 ? zone.y + zone.height - margin - h : zone.y + margin;

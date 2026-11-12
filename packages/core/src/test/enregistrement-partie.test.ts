@@ -13,6 +13,9 @@ import {
   indicatorBounds,
   keptSeconds,
   listRecordings,
+  MEDIARECORDER_ASSUMED_FPS,
+  mediaRecorderBitrate,
+  RECORDING_MAX_BITRATE_RATIO,
   mergeFeatureSwitch,
   loadRecordingSettings,
   MIN_RECORDING_SECONDS,
@@ -203,6 +206,12 @@ test('qualité : le plateau 4K filmé en 4K par défaut, jamais au-delà de l’
   assert.equal(recordingBitrate(2160, 3840), 52_300_000);
   assert.equal(recordingBitrate(1080, 1920), 13_100_000);
   assert.equal(recordingBitrate(1280, 320), 3_000_000);
+  // MediaRecorder compte 30 images/s par défaut : à 60, on lui demande la moitié pour obtenir le débit visé
+  // (sans quoi 98 Mbit/s pour 52 sur une borne 4K, 12/11/2026).
+  assert.equal(MEDIARECORDER_ASSUMED_FPS, 30);
+  assert.equal(mediaRecorderBitrate(52_300_000), 26_150_000);
+  assert.equal(mediaRecorderBitrate(8_000_000, 30), 8_000_000);
+  assert.equal(RECORDING_MAX_BITRATE_RATIO, 1.5);
   // Poids annoncé : environ 197 Mo pour 30 s de 4K à 60 images/s, quatre fois moins en 1080p.
   assert.equal(Math.round(recordingBytes('4k', 30) / 1e6), 197);
   assert.ok(recordingBytes('4k', 30) > 3.5 * recordingBytes('1080p', 30));
@@ -313,20 +322,31 @@ test('zones partagées : fronton et DMD pris chacun dans sa zone, ramenés à la
   assert.equal(odd.height % 2, 0);
 });
 
-test('témoin : en haut à droite pour le joueur, dans le plateau, quel que soit le sens', () => {
+test('témoin : en bas à gauche pour le joueur (côté flippers), dans le plateau, quel que soit le sens', () => {
   const zone = { x: 100, y: 0, width: 3840, height: 2160 };
   const size = { width: 360, height: 64 };
+  // Le joueur a les flippers en bas : son bas-gauche est en bas à gauche de l'écran droit, en haut à
+  // gauche d'un écran tourné d'un quart de tour horaire (flippers à droite), etc.
   const cases: Record<Rotation, { x: number; y: number; width: number; height: number }> = {
-    0: { x: 100 + 3840 - 24 - 360, y: 24, width: 360, height: 64 },
-    90: { x: 100 + 3840 - 24 - 64, y: 2160 - 24 - 360, width: 64, height: 360 },
-    180: { x: 100 + 24, y: 2160 - 24 - 64, width: 360, height: 64 },
-    270: { x: 100 + 24, y: 24, width: 64, height: 360 },
+    0: { x: 100 + 24, y: 2160 - 24 - 64, width: 360, height: 64 },
+    90: { x: 100 + 24, y: 24, width: 64, height: 360 },
+    180: { x: 100 + 3840 - 24 - 360, y: 24, width: 360, height: 64 },
+    270: { x: 100 + 3840 - 24 - 64, y: 2160 - 24 - 360, width: 64, height: 360 },
   };
   for (const [rotation, want] of Object.entries(cases)) {
     const r = indicatorBounds(zone, Number(rotation) as Rotation, size, 24);
     assert.deepEqual(r, want, `rotation ${rotation}`);
     assert.ok(r.x >= zone.x && r.y >= zone.y && r.x + r.width <= zone.x + zone.width && r.y + r.height <= zone.y + zone.height);
   }
+});
+
+test('témoin et bande d’une partie entre amis : jamais ensemble, « Jouer et enregistrer » lance une partie seule', () => {
+  // L'encart de la bande (bas-gauche du plateau, sans fronton ni topper) et le témoin prennent le même
+  // coin : l'enregistrement n'est armé que sur une partie lancée sans double (hooks.double absent).
+  const source = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'app', 'src', 'frontend.ts'), 'utf8');
+  const launches = [...source.matchAll(/play\([^)]*\{[^}]*\brecord:[^}]*\}\)/g)].map((m) => m[0]);
+  assert.ok(launches.length > 0, 'un lancement « Jouer et enregistrer »');
+  for (const launch of launches) assert.doesNotMatch(launch, /\bdouble\b/, launch);
 });
 
 test('médias produits : plateau, fronton, et le DMD de l’écran de la borne', () => {

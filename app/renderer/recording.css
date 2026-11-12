@@ -1,5 +1,5 @@
 /* Témoin de l'enregistrement d'une partie (game-recording.ts) : une pastille dans le coin du
-   plateau, en haut à droite pour le joueur, par-dessus VPX. Fenêtre transparente, exclue de la
+   plateau, en bas à gauche pour le joueur (côté flippers), par-dessus VPX. Fenêtre transparente, exclue de la
    capture : la vidéo ne la contient jamais. Discrète : fond de verre fumé, un seul signe coloré
    (point rouge qui bat pendant l'enregistrement, anneau du compte à rebours, coche verte). La
    taille suit la fenêtre (--u : un 72e de sa hauteur vue du joueur), qui suit l'écran.
