@@ -24,6 +24,7 @@ son interface).
 - Relance par Start : Cyber Pinball fermé, ou passé sur le bureau Windows, un appui long (2 s) sur le bouton Start de la borne le rouvre. Pour une borne dont Start est un bouton de joystick (Pinscape, encodeur en mode manette) ; réglable dans Menu système > Borne > « Relance par Start ».
 - Roue : l'anneau se cale sur le chrome du médaillon pour toute wheel ajoutée ou remplacée, sans se laisser tromper par une ombre portée, une lueur autour du médaillon ou un titre qui déborde.
 - Conditions d’utilisation : la borne les présente au démarrage tant qu’elles ne sont pas acceptées, une page par partie, aux boutons (contenus de tiers et droit d’auteur, partage entre bornes, usage commercial, santé, absence de garantie). Elles restent à lire dans Menu système > Cyber Pinball > Conditions d’utilisation ; le prochain installeur les fera accepter avant d’installer.
+- Jouer et enregistrer : la vidéo du plateau est filmée en 4K, à la netteté de la partie (elle s'arrêtait au 1080p). La qualité se règle dans « Jouer et enregistrer » > « Qualité de la vidéo » ou dans Menu système > « Médias, son et attente » : 4K, 1440p, 1080p ou 720p, avec le poids d'une prise ; jamais au-delà de l'écran.
 
 ## 0.1.10
 
