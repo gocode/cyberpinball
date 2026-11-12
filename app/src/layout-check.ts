@@ -697,6 +697,9 @@ export class LayoutReport {
     this.errors.set(contents.id, errors);
     contents.on('console-message', (event) => {
       if (event.level === 'error' && /^Uncaught\b/.test(event.message)) errors.push(`erreur de la page : ${event.message}`); // i18n-ignore : rapport de mise en page, pour le développeur
+      // Contenu refusé par la politique de sécurité de la page (12/11/2026 : les logos animés de la roue
+      // n'étaient jamais figés, la lecture de leur fichier étant refusée) : l'essai échoue.
+      if (/violates (the following|the document's) Content Security Policy/.test(event.message)) errors.push(`politique de sécurité de la page : ${event.message}`); // i18n-ignore : rapport de mise en page, pour le développeur
     });
     return list;
   }

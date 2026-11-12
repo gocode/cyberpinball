@@ -12,6 +12,7 @@ son interface).
 ## 0.1.11
 
 - Roue : tous ses réglages sont réunis dans Menu système > Tables > Roue (présentation, ordre des tables, table au démarrage, Start sur la roue, couleur de chaque table, Juke-box dans la roue) ; « Médias, son et attente » garde le son, l'attente et le DMD.
+- Roue : les logos animés restent fixes hors du centre, comme prévu (dans la préversion précédente, la page refusait de lire leur fichier et tous restaient animés).
 - Roue : les logos animés ne s'animent plus tous à la fois. Seul celui de la table choisie bouge, ses voisins restent sur leur première image ; « Logos animés : tous » (Menu système > Tables > Roue) les anime tous comme avant.
 - Médias du jeu, propositions : sur un écran en largeur, la carte choisie tient toujours entière dans la liste, et le détail en dessous garde la même hauteur d'une carte à l'autre.
 - Médias du jeu, propositions : « Chercher plus » élargit la recherche sur VPUniverse et VPForums (jusqu'à 10 pages, toutes les éditions du jeu, titres approchés, marqués comme tels).

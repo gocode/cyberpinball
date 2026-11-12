@@ -10,6 +10,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 ## 0.1.11
 
 - Wheel: all its settings are gathered in System menu > Tables > Wheel (layout, table order, table at startup, Start on the wheel, colour of each table, Juke-box in the wheel); "Media, sound and attract mode" keeps sound, attract mode and the DMD.
+- Wheel: animated logos stay still away from the centre, as intended (in the previous pre-release, the page refused to read their file and they all kept moving).
 - Wheel: animated logos no longer all move at once. Only the chosen table's logo moves, its neighbours stay on their first frame; "Animated logos: all" (System menu > Tables > Wheel) animates them all as before.
 - Game media, suggestions: on a landscape screen, the selected card always fits whole in the list, and the detail below keeps the same height from one card to the next.
 - Game media, suggestions: "Search more" widens the search on VPUniverse and VPForums (up to 10 pages, every edition of the game, close titles, marked as such).

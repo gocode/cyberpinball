@@ -90,6 +90,28 @@ export function journalProcessesGone(): void {
   });
 }
 
+/** Message de Chromium pour un contenu refusé par la politique de sécurité (CSP) d'une page. */
+export const CSP_VIOLATION = /violates (the following|the document's) Content Security Policy/;
+
+/**
+ * Contenus refusés par la politique de sécurité d'une page de Cyber Pinball (adresse en file:) : notés dans
+ * erreurs.txt, une fois par page et par message. Le 12/11/2026, la page du menu refusait la lecture
+ * des logos animés (connect-src absent) : tous restaient animés, sans la moindre trace. Les pages du
+ * web (navigateur intégré, sites de médias) en ont souvent : pas notées.
+ */
+export function journalPolicyViolations(): void {
+  app.on('web-contents-created', (_event, contents) => {
+    const seen = new Set<string>();
+    contents.on('console-message', (event) => {
+      if (!CSP_VIOLATION.test(event.message) || !contents.getURL().startsWith('file:')) return;
+      const what = event.message.replace(/\s+/g, ' ').slice(0, 300);
+      if (seen.has(what)) return;
+      seen.add(what);
+      journalIncident(`Page de Cyber Pinball (${contents.getTitle() || 'sans titre'}) : contenu refusé par sa politique de sécurité : ${what}`); // i18n-ignore : journal
+    });
+  });
+}
+
 /**
  * Une fenêtre de Cyber Pinball dont le rendu tombe reste noire et couvre son écran : « tous les
  * écrans noirs », sans issue que le gestionnaire des tâches (PinCab, 10/11/2026). Elle est rechargée

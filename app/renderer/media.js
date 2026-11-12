@@ -673,7 +673,10 @@
       image.close();
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
       return blob ? URL.createObjectURL(blob) : null;
-    } catch {
+    } catch (error) {
+      // Jamais en silence (12/11/2026 : la politique de sécurité de la page refusait la lecture, et
+      // tous les logos restaient animés sans la moindre trace) : la raison dans la console.
+      console.warn(`Logo animé : première image impossible (${error?.message ?? error}) : ${decodeURIComponent(url).replace(/^.*[\\/]/, '')}`); // i18n-ignore : journal
       return null;
     } finally {
       decoder?.close();

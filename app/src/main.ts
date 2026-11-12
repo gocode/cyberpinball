@@ -32,7 +32,7 @@ import { beatPulse, superviseCabinet } from './supervisor';
 import { noteAppRunning, runRelaunchWatcher } from './start-relaunch';
 import { noApplicationMenu } from './app-menu';
 import { journalConsole } from './journal';
-import { journalIncidents, journalNativeCrashes, journalProcessesGone, journalUncaught, reviveCrashedWindows } from './uncaught';
+import { journalIncidents, journalNativeCrashes, journalPolicyViolations, journalProcessesGone, journalUncaught, reviveCrashedWindows } from './uncaught';
 import { startWizard } from './wizard';
 
 // Aucun menu d'application : les raccourcis du menu par défaut d'Electron faisaient tomber la borne (app-menu.ts).
@@ -50,6 +50,7 @@ journalIncidents(loc.dataDir);
 if (!OFFSCREEN) journalNativeCrashes(loc.dataDir);
 // Un rendu ou le GPU de Chromium qui s'arrête : noté dans le journal (menu resté invisible, 06/11/2026).
 journalProcessesGone();
+journalPolicyViolations();
 // Une fenêtre dont le rendu tombe ou se fige est rechargée : jamais d'écran noir sans issue.
 reviveCrashedWindows();
 const wantsSettings = process.argv.includes('--reglages');
