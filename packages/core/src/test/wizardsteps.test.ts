@@ -222,7 +222,10 @@ test('wizard.ts : rien n’est écrit hors des enregistrements, et la sortie n�
   assert.deepEqual(quitCallers, ['runAutopilot']);
   // Retour au menu sans question : seulement quand rien n'a été répondu (délai des boutons) ou après l'enregistrement.
   const relaunchers = [...wizard].filter(([name, text]) => name !== 'continueToTables' && /continueToTables\(\)/.test(text)).map(([name]) => name).sort();
-  assert.deepEqual(relaunchers, ['buttonsTimeout', 'handleKey', 'leaveWithoutSaving']);
+  // afterVpx ne fait que reprendre un retour au menu demandé pendant l'installation de VPX (first-run.ts).
+  assert.deepEqual(relaunchers, ['afterVpx', 'buttonsTimeout', 'handleKey', 'leaveWithoutSaving']);
+  assert.match(wizard.get('afterVpx')!, /if \(continueAfterVpx\) \{\s+continueAfterVpx = false;\s+continueToTables\(\);/);
+  assert.equal([...wizard].filter(([, text]) => /continueAfterVpx = true/.test(text)).map(([name]) => name).join(), 'continueToTables');
   assert.match(wizard.get('handleKey')!, /wizard\.phase === 'done'\) return continueToTables\(\)/);
 });
 

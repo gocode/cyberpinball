@@ -78,6 +78,7 @@ export * from './mediaerrors';
 export * from './errorlog';
 export * from './front-policy';
 export * from './vc-runtime';
+export * from './first-run';
 export * from './mediaimport';
 export * from './mediaview';
 export * from './mediawatch';

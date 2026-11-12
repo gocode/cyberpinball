@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- First launch of a cabinet with a Pinscape or an encoder in gamepad mode: Visual Pinball X installs as soon as the wizard opens, and the button setup waits for the installation to finish. The cabinet buttons and plunger are set up directly, without a keyboard.
+- The installer installs Microsoft’s Visual C++ runtime if Windows lacks it (Windows asks for your consent once), while you have the mouse in hand: on a fresh Windows, VPX starts and a Pinscape’s buttons are read from the first launch.
+- VPX or its runtime installed from the menu: a Pinscape seen for the first time is read right away, and the menu says where to set up its buttons.
 - Virtual reality: when a game goes to the headset while it isn't on your head, the cabinet's playfield and backglass say so in large type ("Game in the headset · Put the headset on"), with how to stop or play on the screens. VPX waits for the headset to start the table: without this instruction, loading looked frozen.
 - Wheel: the selected table's ring is fully closed (no more dark gap at the top), and the pointer's halo is no longer cut off.
 - Tables that offer their options at first launch (VPW's The Addams Family: "TABLE OPTIONS MENU"): the options window is accepted as is and the game plays. Before, "The game could not run" came back at every launch and the table could never be played.

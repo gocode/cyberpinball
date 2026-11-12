@@ -163,6 +163,7 @@ import {
   liveReadyOverdue,
   type LiveBoardScreens,
   loadCabinet,
+  joystickButtonsUnrecorded,
   playfieldOrientation,
   readInfo,
   isFavorite,
@@ -363,7 +364,7 @@ import { DmdWheels } from './dmd-wheel';
 import { createConverter } from './media-convert';
 import { RomMusic } from './rom-music';
 import { onKeyInput } from './key-input';
-import { onJoystickInput } from './joystick-input';
+import { onJoystickInput, retryJoysticks } from './joystick-input';
 import { locations, vpxInstall, vpxProfile } from './paths';
 import { loadPlugins } from './plugins';
 import { activeVpxIni, audioOutputs, syncConfiguration } from './vpx-ini';
@@ -6115,9 +6116,16 @@ function startVpxInstall(): boolean {
 
 /** VPX prêt à jouer : aux tables, ou à l'ajout s'il n'y en a pas encore. */
 function vpxReady(done: string): void {
-  if (tables.length) state = { ...state, phase: 'message', message: { title: t('Installation de VPX'), lines: [done, t('Start ou Exit : aller aux tables.')] } };
+  // La bibliothèque SDL de VPX est enfin chargeable : les joysticks (Pinscape…) se relisent tout de
+  // suite. Leurs boutons, que l'assistant n'avait pas pu lire, sont à relever.
+  const joysticks = retryJoysticks();
+  const devices = joysticks.state === 'ready' ? joysticks.devices : [];
+  const redo = joystickButtonsUnrecorded(loadCabinet(loc.dataDir)?.buttons, devices.length)
+    ? [t('Joystick lu : {names}. Relevez ses boutons dans Menu système > « Borne » > « Configuration de la borne » > « Boutons du jeu », puis « Lanceur analogique ».', { names: devices.map((d) => d.name || d.id).join(', ') })]
+    : [];
+  if (tables.length) state = { ...state, phase: 'message', message: { title: t('Installation de VPX'), lines: [done, ...redo, t('Start ou Exit : aller aux tables.')] } };
   // Pas encore de table : on enchaîne sur l'ajout.
-  else state = { ...state, phase: 'message', message: { ...noTables(), lines: [done, ...noTables().lines] } };
+  else state = { ...state, phase: 'message', message: { ...noTables(), lines: [done, ...redo, ...noTables().lines] } };
   broadcast();
 }
 

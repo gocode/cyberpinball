@@ -148,6 +148,7 @@ export const messages: Record<string, string> = {
   'Ne débranchez pas la borne.': 'Don’t unplug the cabinet.',
   'Visual Pinball X {version} est installé et vérifié.': 'Visual Pinball X {version} is installed and verified.',
   'Start ou Exit : aller aux tables.': 'Start or Exit: go to the tables.',
+  'Joystick lu : {names}. Relevez ses boutons dans Menu système > « Borne » > « Configuration de la borne » > « Boutons du jeu », puis « Lanceur analogique ».': 'Joystick found: {names}. Set up its buttons in System menu > “Cabinet” > “Cabinet setup” > “Game buttons”, then “Analog plunger”.',
   'L’installation a échoué : {error}': 'Installation failed: {error}',
   'Start : réessayer · Exit : plus tard': 'Start: retry · Exit: later',
 

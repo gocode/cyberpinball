@@ -11,6 +11,9 @@ son interface).
 
 ## 0.1.11
 
+- Premier lancement d’une borne à Pinscape ou à encodeur en mode manette : Visual Pinball X s’installe dès l’ouverture de l’assistant, et le relevé des boutons attend la fin de l’installation. Les boutons et le lanceur de la borne se relèvent directement, sans clavier.
+- L’installeur installe le runtime Visual C++ de Microsoft s’il manque à Windows (Windows demande votre accord une fois), pendant que vous avez la souris en main : sur un Windows neuf, VPX démarre et les boutons d’un Pinscape sont lus dès le premier lancement.
+- VPX ou son runtime installés depuis le menu : un Pinscape vu pour la première fois est aussitôt lu, et le menu dit où relever ses boutons.
 - Réalité virtuelle : quand une partie part dans le casque alors qu'il n'est pas sur la tête, le playfield et le fronton de la borne le disent en grand (« Partie dans le casque · Mettez le casque »), avec comment arrêter ou jouer sur les écrans. VPX attend le casque pour démarrer la table : sans cette consigne, le chargement semblait bloqué.
 - Roue : l'anneau de la table choisie est bien fermé (plus de fente sombre en haut), et le halo du pointeur n'est plus coupé.
 - Tables qui proposent leurs options au premier lancement (The Addams Family VPW : « TABLE OPTIONS MENU ») : la fenêtre d'options est validée telle quelle et la partie se joue. Avant, « La partie n'a pas pu se dérouler » revenait à chaque lancement et la table ne se jouait jamais.

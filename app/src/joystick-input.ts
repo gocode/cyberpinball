@@ -75,6 +75,20 @@ export function joystickButtonsHeld(): string[] {
   return [...held.keys()];
 }
 
+/**
+ * VPX vient d'être installé, ou le runtime Visual C++ que sa bibliothèque SDL importe : les joysticks
+ * se relisent tout de suite. Sans cela, une bibliothèque qui n'avait pas pu se charger (runtime
+ * absent) le restait jusqu'au redémarrage, et VPX installé n'était vu qu'au sondage suivant.
+ */
+export function retryJoysticks(): JoystickStatus {
+  if (!reader) {
+    status = { state: 'off' };
+    open();
+    start();
+  }
+  return joystickStatus();
+}
+
 /** Ce que l'étape « Boutons » dit des joysticks. */
 export function joystickStatus(): JoystickStatus {
   if (status.state === 'ready' && reader) return { ...status, devices: reader.devices() };

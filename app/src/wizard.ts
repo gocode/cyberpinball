@@ -117,6 +117,10 @@ import {
   formatList,
   t,
   tn,
+  buttonsWaitForVpx,
+  menuWaitsForVpx,
+  wizardInstallsVpx,
+  type WizardVpx,
   type AudioRole,
   type Cabinet,
   type CabinetAudio,
@@ -137,10 +141,12 @@ import { observedDisplays, orientationSimulated } from './displays';
 import { createWindow, isShown, OFFSCREEN, readyToShow, whenReadyToShow, windowRect } from './offscreen';
 import { keyboardFollows, keyboardIncident } from './foreground';
 import { onKeyInput, sendableKey } from './key-input';
-import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton, pressVirtualPinscapeButton } from './joystick-input';
+import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton, pressVirtualPinscapeButton, retryJoysticks } from './joystick-input';
+import { installVpx, vpxArchivePresent } from './install-vpx';
+import { vcRuntimeReady } from './vc-runtime';
 import { plungerClick, plungerKey, plungerTick, plungerView, startPlungerStep, type PlungerAction, type PlungerOutcome, type PlungerStep } from './plunger-step';
 import { analogWithGain, startTiltStep, tiltClick, tiltKey, tiltTick, tiltView, type TiltAction, type TiltOutcome, type TiltStep } from './tilt-step';
-import { locations, vpxProfile } from './paths';
+import { locations, vpxInstall, vpxProfile } from './paths';
 import { activeVpxIni, audioOutputs, syncVpxIni } from './vpx-ini';
 import { coverDisplay } from './cover-display';
 import { LayoutReport } from './layout-check';
@@ -325,6 +331,13 @@ let buttonsOnly = false;
 let interfaceOnly = false;
 /** Mode --disposition : le modèle existe, seules les zones sont refaites. */
 let arrangeOnly = false;
+/**
+ * VPX installé par l'assistant dès son ouverture, quand il manque (premier lancement) : sa
+ * bibliothèque SDL lit les boutons et le lanceur d'un Pinscape (packages/core/src/first-run.ts).
+ */
+let vpxPrep: WizardVpx = { state: 'none' };
+/** Assistant fini pendant l'installation de VPX : le menu s'ouvre à la fin de celle-ci. */
+let continueAfterVpx = false;
 
 /**
  * Touches enfoncées pendant le relevé des boutons : un bouton est relevé quand on le
@@ -367,6 +380,8 @@ export function startWizard(): void {
   buttonsOnly = isOnly('boutons');
   interfaceOnly = isOnly('interface');
   arrangeOnly = isOnly('disposition');
+  // Avant le relevé des boutons : VPX, sans qui les boutons d'un Pinscape ne sont pas lus.
+  prepareVpx();
   startMode();
 
   windows = displays.map((d) => {
@@ -412,6 +427,56 @@ export function startWizard(): void {
 
   const autopilot = process.env.CYBERPINBALL_AUTOPILOT;
   if (autopilot) void runAutopilot(autopilot.split(','), process.env.CYBERPINBALL_CAPTURE);
+}
+
+/**
+ * Premier lancement : VPX installé en arrière-plan dès l'ouverture de l'assistant, sans rien
+ * demander (wizardInstallsVpx). Le relevé des boutons attend la fin avant de garder les touches
+ * par défaut (buttonsWaitForVpx) ; les joysticks se relisent aussitôt VPX installé. Un échec
+ * (pas de connexion) n'arrête rien : le clavier reste, et le menu repropose l'installation.
+ */
+function prepareVpx(): void {
+  if (!wizardInstallsVpx({ step: only?.id, root: loc.root, vpxInstalled: Boolean(vpxInstall(loc)), env: process.env })) return;
+  const root = loc.root!;
+  const offline = vpxArchivePresent(root);
+  vpxPrep = { state: 'installing', percent: 0, offline };
+  console.log(`Assistant : installation de VPX avant le relevé des boutons (${offline ? 'archive déjà sur la borne' : 'téléchargement'}).`); // i18n-ignore : journal
+  installVpx(root, (p) => {
+    if (vpxPrep.state !== 'installing' || vpxPrep.percent === p.percent) return;
+    vpxPrep = { state: 'installing', percent: p.percent, offline };
+    broadcast();
+  })
+    .then((version) => {
+      vpxPrep = { state: 'ready', version };
+      console.log(`Assistant : VPX ${version} installé ; joysticks relus.`); // i18n-ignore : journal
+      retryJoysticks();
+    })
+    .catch((error: Error) => {
+      vpxPrep = { state: 'failed', reason: error.message };
+      console.error(`Assistant : installation de VPX impossible (${error.message}) ; le menu la reproposera.`); // i18n-ignore : journal
+    })
+    .finally(afterVpx);
+}
+
+/** VPX installé ou non : le délai du relevé repart de zéro, et la fin de l'assistant suit si elle attendait. */
+function afterVpx(): void {
+  const capture = wizard.capture;
+  if (capture?.deadline !== undefined) capture.deadline = Date.now() + BUTTONS_TIMEOUT_MS;
+  if (continueAfterVpx) {
+    continueAfterVpx = false;
+    continueToTables();
+    return;
+  }
+  broadcast();
+}
+
+/** Où en est VPX, sous chaque écran de l'assistant, tant qu'il s'installe. */
+function vpxNotice(): string | undefined {
+  if (vpxPrep.state !== 'installing') return undefined;
+  const line = vpxPrep.offline
+    ? t('Installation de Visual Pinball X depuis la borne : {percent} %', { percent: vpxPrep.percent })
+    : t('Téléchargement de Visual Pinball X : {percent} %', { percent: vpxPrep.percent });
+  return continueAfterVpx ? `${line} · ${t('le menu s’ouvre à la fin de l’installation')}` : line;
 }
 
 /** Touche que l'autopilote rejoue en ce moment par le chemin d'une vraie touche (« Clavier:KeyA »). */
@@ -845,7 +910,8 @@ function pendingChanges(): string[] {
 
 /** Bouton, question et sortie : sur chaque écran, à chaque étape. */
 function quitView() {
-  if (wizard.leaving) return { leaving: wizard.leaving };
+  // Retour au menu qui attend la fin de l'installation de VPX : sa progression sous la destination.
+  if (wizard.leaving) return { leaving: continueAfterVpx ? `${wizard.leaving} · ${vpxNotice()}` : wizard.leaving };
   if (wizard.phase === 'done') return undefined;
   const elapsed = held ? Date.now() - held.at : 0;
   const holding = held && elapsed >= HOLD_SHOWN_MS && (held.answering || !wizard.quit) ? Math.max(1, Math.ceil((held.ms - elapsed) / 1000)) : undefined;
@@ -954,7 +1020,11 @@ function startCapture(set: KeySet, initial = false): void {
   buttonsCountdown = setInterval(() => {
     const deadline = wizard.capture?.deadline;
     if (!CAPTURE_PHASES.includes(wizard.phase) || deadline === undefined) stopButtonsCountdown();
-    else if (Date.now() >= deadline) buttonsTimeout();
+    // VPX s'installe : les boutons d'un Pinscape ne sont pas encore lus, le délai attend.
+    else if (buttonsWaitForVpx(vpxPrep)) {
+      wizard.capture!.deadline = Date.now() + BUTTONS_TIMEOUT_MS;
+      broadcast();
+    } else if (Date.now() >= deadline) buttonsTimeout();
     else broadcast();
   }, 1000);
 }
@@ -1503,8 +1573,16 @@ function joystickLine(): string {
     const lost = keyboardIncident();
     return lost ? `${read} · ${lost.back ? t('clavier repris à {holder}', { holder: lost.holder }) : t('clavier retenu par {holder}', { holder: lost.holder })}` : read;
   }
-  if (status.state === 'error') return t('Joysticks illisibles : {error}', { error: status.error });
-  if (status.state === 'no-vpx') return t('Joysticks lus une fois VPX installé');
+  if (status.state === 'error') {
+    // La bibliothèque SDL de VPX importe le runtime Visual C++ : absent, elle ne se charge pas.
+    if (!vcRuntimeReady().ok) return t('Joysticks lus une fois le runtime Visual C++ de Microsoft installé : le menu le propose juste après l’assistant. En attendant, le clavier.');
+    return t('Joysticks illisibles : {error}', { error: status.error });
+  }
+  if (status.state === 'no-vpx') {
+    if (vpxPrep.state === 'installing') return t('Joysticks lus dès que Visual Pinball X est installé ({percent} %) : le relevé attend.', { percent: vpxPrep.percent });
+    if (vpxPrep.state === 'failed') return t('Visual Pinball X n’a pas pu s’installer ({reason}) : boutons du clavier seulement. Le menu repropose l’installation, puis « Boutons du jeu » se refait.', { reason: vpxPrep.reason });
+    return t('Joysticks lus une fois VPX installé');
+  }
   return t('Joysticks en cours de lecture…');
 }
 
@@ -2342,6 +2420,12 @@ function inputLines(changes: VpxChange[]): string[] {
 
 /** Relance l'application sans --assistant : elle ouvre alors le menu des tables. */
 function continueToTables(): boolean {
+  // VPX s'installe encore : relancer le menu couperait le téléchargement. Il s'ouvre à la fin (afterVpx).
+  if (menuWaitsForVpx(vpxPrep)) {
+    continueAfterVpx = true;
+    broadcast();
+    return true;
+  }
   relaunchCovered(process.argv.slice(1).filter((a) => !WIZARD_FLAGS.includes(a)));
   return true;
 }
@@ -2516,7 +2600,7 @@ function viewFor(index: number) {
     assignedLabel: shown.length ? formatList(shown.map(wizardRoleLabel)) : undefined,
     zones: zonesView(index, option),
     phase: wizard.phase,
-    notice: wizard.notice,
+    notice: continueAfterVpx ? vpxNotice() : (wizard.notice ?? vpxNotice()),
     // Dès que le bord des flippers est connu, le playfield s'affiche droit pour le joueur.
     rotation: assignedRole === 'playfield' && wizard.phase !== 'assign' ? edgeRotation(wizard.flipperEdge) : 0,
   };

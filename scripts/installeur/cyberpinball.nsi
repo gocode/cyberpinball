@@ -652,6 +652,41 @@ Section "Visual Pinball X ${VPX_VERSION}" SEC_VPX
 SectionEnd
 !endif
 
+; Runtime Visual C++ de Microsoft, s'il manque à Windows (décidé le 12/11/2026). VPX ne démarre pas
+; sans lui, et sa bibliothèque SDL, qui lit les boutons et le lanceur d'un Pinscape ou d'un encodeur
+; en mode manette, ne se charge pas non plus : sur un Windows neuf, le premier assistant ne pouvait
+; pas relever ces boutons. Son installation demande l'accord de Windows, auquel les boutons de la
+; borne ne peuvent pas répondre : on la fait ici, où l'utilisateur a une souris en main, avant le
+; premier lancement. Cyber Pinball lui-même s'en charge, en mode Node (app/src/runtime-vc.ts) : même
+; téléchargement vérifié et même signature de Microsoft que depuis le menu ; l'installeur complet a
+; déjà déposé le fichier dans downloads\. Rien n'est demandé si le runtime suffit déjà. Jamais en
+; mise à jour (/MAJ), en silence (/S) ni dans un bac à sable d'essai : le menu le propose alors.
+Section "Runtime Visual C++ de Microsoft, pour VPX (s'il manque)" SEC_RUNTIME
+  SectionIn RO
+  ${If} $BacASable != ""
+    DetailPrint "Runtime Visual C++ : bac à sable d'essai, rien n'est installé."
+    Return
+  ${EndIf}
+  ${If} $Maj == "1"
+  ${OrIf} ${Silent}
+    DetailPrint "Runtime Visual C++ : vérifié par Cyber Pinball au démarrage."
+    Return
+  ${EndIf}
+  DetailPrint "Runtime Visual C++ : vérification ; Windows demande votre accord s'il faut l'installer."
+  System::Call 'kernel32::SetEnvironmentVariable(t "ELECTRON_RUN_AS_NODE", t "1")'
+  nsExec::Exec '"$Racine\app\${EXE}" "$Racine\app\resources\app\dist\runtime-vc.js" "$Racine\downloads"'
+  Pop $0
+  ; Jamais hérité par la suite : « Lancer Cyber Pinball » ouvrirait sinon l'exécutable en mode Node.
+  System::Call 'kernel32::SetEnvironmentVariable(t "ELECTRON_RUN_AS_NODE", p 0)'
+  ${If} $0 == "0"
+    DetailPrint "Runtime Visual C++ : prêt."
+  ${ElseIf} $0 == "2"
+    DetailPrint "Runtime Visual C++ : pas d'accord de Windows ; Cyber Pinball le redemandera."
+  ${Else}
+    DetailPrint "Runtime Visual C++ : pas installé (code $0) ; Cyber Pinball le redemandera."
+  ${EndIf}
+SectionEnd
+
 Section "Raccourci sur le bureau" SEC_BUREAU
   SetOutPath "$Racine\app"
   CreateDirectory "$BureauDir"

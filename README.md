@@ -197,7 +197,7 @@ Download an installer from the [links above](#download), or from the [Releases](
 - **Uninstalling removes the application only.** Tables, media, configuration and data stay in the root folder; reinstalling into the same folder finds them as they were.
 - The installers are not code-signed yet, so Windows SmartScreen will warn when you run them.
 
-On first launch, Cyber Pinball offers to install VPX, then walks you through buttons, the analog plunger, screens, playfield, layout and sound, all from the cabinet buttons. Finally, it offers to choose your nickname and avatar.
+On first launch, Cyber Pinball installs VPX while it walks you through buttons, the analog plunger, screens, playfield, layout and sound, all from the cabinet buttons. Finally, it offers to choose your nickname and avatar.
 
 ## Updating
 

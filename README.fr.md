@@ -197,7 +197,7 @@ Téléchargez un installeur par les [liens plus haut](#télécharger), ou sur la
 - **La désinstallation ne retire que l'application.** Vos tables, médias, configuration et données restent dans le dossier racine ; si vous réinstallez au même endroit, vous les retrouvez tels quels.
 - Les installeurs ne sont pas encore signés : Windows SmartScreen affiche un avertissement au lancement.
 
-Au premier lancement, Cyber Pinball propose d'installer VPX, puis vous guide pour régler les boutons, le lanceur analogique, les écrans, le playfield, la disposition et le son, le tout avec les boutons de la borne. Il vous propose enfin de choisir votre pseudo et votre avatar.
+Au premier lancement, Cyber Pinball installe VPX pendant qu'il vous guide pour régler les boutons, le lanceur analogique, les écrans, le playfield, la disposition et le son, le tout avec les boutons de la borne. Il vous propose enfin de choisir votre pseudo et votre avatar.
 
 ## Mise à jour
 
