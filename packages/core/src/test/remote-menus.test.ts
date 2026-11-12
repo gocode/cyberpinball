@@ -63,7 +63,7 @@ test('accès direct : une entrée que la borne ne fournit pas n’y est pas (ses
   assert.deepEqual(new Set(ids(tree)), new Set(['phone-remote', ...SYSTEM_GROUP_IDS, 'vr', 'updates']));
   assert.deepEqual(tree.find((n) => n.id === 'amis')?.entries, [], 'une rubrique sans entrée fournie : vide, pas absente');
   const borne = tree.find((n) => n.id === 'borne')!;
-  const vr = borne.entries!.find((n) => n.id === 'vr')!;
+  const vr = borne.entries!.find((n) => n.id === 'realite-virtuelle')!.entries!.find((n) => n.id === 'vr')!;
   assert.equal(vr.quiet, true, 'indisponible : grisée');
   assert.equal(vr.detail, 'Indisponible : aucun casque', 'avec sa raison');
   assert.equal(tree.find((n) => n.id === 'cyberpinball')?.attention, true, 'la pastille rouge remonte à la rubrique');

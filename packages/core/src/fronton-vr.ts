@@ -164,9 +164,12 @@ export function vrBackglassView(file: string, eye?: Vec3): VrBackglassView | und
     const bg = implicitBackglass({ left: dims.LEFT!, right: dims.RGHT!, glassTop: dims.GLAS! });
     const vpu = 50 / (1.0625 * 2.54); // unités de VPX par centimètre
     const e: Vec3 = eye ?? [0.5 * (dims.RGHT! - dims.LEFT!), dims.BOTM! + 30 * vpu, dims.GLAS! + 45 * vpu];
-    // Objets dont le script change la visibilité (« Cab_FS.visible = 0 »).
+    // Objets dont le script change la visibilité (« Cab_FS.visible = 0 ») ; en mode bureau (celui des parties
+    // en VR), ceux que le script règle selon ShowDT ont une visibilité connue (desktopVisibility).
+    const script = readVpxScript(file) ?? '';
     const toggled = new Set<string>();
-    for (const m of (readVpxScript(file) ?? '').matchAll(/\b(\w+)\s*\.\s*visible\s*=/gi)) toggled.add(m[1]!.toLowerCase());
+    for (const m of script.matchAll(/\b(\w+)\s*\.\s*visible\s*=/gi)) toggled.add(m[1]!.toLowerCase());
+    const desktop = desktopVisibility(script);
     // Objets de la pièce VR par leur collection (« VRCab », « VR_Room »…).
     const vrMembers = new Set<string>();
     for (const item of kids) {
@@ -283,7 +286,9 @@ export function vrBackglassView(file: string, eye?: Vec3): VrBackglassView | und
       const share = n / (GX * GZ);
       // Visible en VR : visible dans le fichier, ou de la pièce VR (le script la montre en VR).
       const vr = /vr/i.test(name) || /vr/i.test(layer) || vrMembers.has(name.toLowerCase());
-      if (vr || (visible && !toggled.has(name.toLowerCase()))) {
+      const known = desktop.get(name.toLowerCase());
+      if (known === false) continue;
+      if (vr || known === true || (visible && !toggled.has(name.toLowerCase()))) {
         grid.forEach((v, i) => {
           if (v) all[i] = 1;
         });
@@ -333,17 +338,97 @@ function raster(grid: Uint8Array, a: [number, number], b: [number, number], c: [
   return hit;
 }
 
+/**
+ * Ce que le script montre ou cache en mode bureau (Table1.ShowDT vrai : le mode des parties en VR, vr.ts
+ * VR_VIEW_MODE) : les « Objet.visible = … » des blocs « If <ShowDT> Then … Else … End If », directs ou par
+ * une variable qui en vient (« DesktopMode = Table1.ShowDT »). Un objet hors de ces blocs, ou dans un bloc
+ * dont la condition n'est pas le mode, reste inconnu (absent de la carte).
+ */
+export function desktopVisibility(script: string): Map<string, boolean> {
+  const code = script.replace(/'.*$/gm, '');
+  const vars = new Set<string>();
+  for (const m of code.matchAll(/^\s*(?:Dim\s+\w+\s*:\s*)?(\w+)\s*=\s*\w+\.ShowDT\b/gim)) vars.add(m[1]!.toLowerCase());
+  /** La condition d'un If : vraie, fausse en mode bureau, ou inconnue. */
+  const evaluate = (cond: string): boolean | undefined => {
+    let c = cond.trim();
+    let not = false;
+    const neg = /^Not\s+(.+)$/i.exec(c);
+    if (neg) {
+      not = true;
+      c = neg[1]!.trim();
+    }
+    let value: boolean | undefined;
+    const cmp = /^(\S+?)\s*=\s*(True|False|1|0|-1)$/i.exec(c);
+    const term = (cmp ? cmp[1]! : c).replace(/^\(|\)$/g, '').trim();
+    const isDt = /\.ShowDT$/i.test(term) || vars.has(term.toLowerCase());
+    if (!isDt) return undefined;
+    value = true;
+    if (cmp) value = /^(True|1|-1)$/i.test(cmp[2]!) ? true : false;
+    return not ? !value : value;
+  };
+  const result = new Map<string, boolean>();
+  const unknown = new Set<string>();
+  // Pile des blocs If : `on` vrai si la branche courante est prise en mode bureau, undefined si on ne sait pas.
+  const stack: { cond: boolean | undefined; inElse: boolean }[] = [];
+  const active = (): boolean | undefined => {
+    let known = true;
+    for (const b of stack) {
+      if (b.cond === undefined) known = false;
+      else if ((b.inElse ? !b.cond : b.cond) === false) return false;
+    }
+    return known ? true : undefined;
+  };
+  const assign = (stmt: string, extra: boolean | undefined) => {
+    for (const m of stmt.matchAll(/\b(\w+)\s*\.\s*visible\s*=\s*(True|False|1|0|-1)\b/gi)) {
+      const name = m[1]!.toLowerCase();
+      const on = active();
+      const where = on === false || extra === false ? false : on === undefined || extra === undefined ? undefined : true;
+      if (where === false) continue;
+      if (where === undefined) {
+        if (!result.has(name)) unknown.add(name);
+        continue;
+      }
+      result.set(name, /^(True|1|-1)$/i.test(m[2]!));
+      unknown.delete(name);
+    }
+  };
+  for (const raw of code.split(/\r?\n/)) {
+    for (const part of raw.split(/:(?![^"]*"[^"]*$)/)) {
+      const line = part.trim();
+      if (!line) continue;
+      const single = /^If\s+(.+?)\s+Then\s+(.+?)(?:\s+Else\s+(.+))?$/i.exec(line);
+      const open = /^If\s+(.+?)\s+Then$/i.exec(line);
+      if (open) stack.push({ cond: evaluate(open[1]!), inElse: false });
+      else if (single) {
+        const cond = evaluate(single[1]!);
+        assign(single[2]!, cond);
+        if (single[3]) assign(single[3], cond === undefined ? undefined : !cond);
+      } else if (/^ElseIf\b/i.test(line)) {
+        if (stack.length) stack[stack.length - 1] = { cond: undefined, inElse: false };
+      } else if (/^Else$/i.test(line)) {
+        if (stack.length) stack[stack.length - 1]!.inElse = true;
+      } else if (/^End\s+If$/i.test(line)) stack.pop();
+      else assign(line, true);
+    }
+  }
+  for (const name of unknown) if (!result.has(name)) result.delete(name);
+  return result;
+}
+
 /** La zone pour le plugin : « gauche,haut,droite,bas » en fractions. */
 export function zoneSetting(zone: BackglassZone): string {
   return [zone.left, zone.top, zone.right, zone.bottom].map((v) => v.toFixed(4)).join(',');
 }
+
+/** Version de la règle du calcul : une règle changée (mode bureau, 12 novembre 2026) refait les zones gardées. */
+export const ZONE_RULE = 'r2';
 
 /** Le calcul gardé par table (chemin, taille, date) : 3 s pour une table de 220 Mo, une seule fois. */
 export function cachedVrBackglassView(file: string, cacheFile: string): VrBackglassView | undefined {
   let key: string;
   try {
     const st = fs.statSync(file);
-    key = `${file}|${st.size}|${Math.round(st.mtimeMs)}`;
+    key = `${ZONE_RULE}|${file}|${st.size}|${Math.round(st.mtimeMs)}`;
   } catch {
     return undefined;
   }
@@ -357,7 +442,7 @@ export function cachedVrBackglassView(file: string, cacheFile: string): VrBackgl
   const view = vrBackglassView(file);
   if (!view) return undefined;
   // Une entrée par table : l'ancienne (fichier changé) est remplacée.
-  for (const k of Object.keys(cache)) if (k.startsWith(`${file}|`)) delete cache[k];
+  for (const k of Object.keys(cache)) if (k.includes(`|${file}|`) || k.startsWith(`${file}|`)) delete cache[k];
   cache[key] = view;
   try {
     fs.writeFileSync(cacheFile, JSON.stringify(cache, null, 1));
@@ -381,6 +466,8 @@ export interface VrMeasures {
   /** Vitesse du temps de jeu (1 : temps réel). */
   gameTime: number;
   captures: { name: string; source: string; brightness: number; ok: boolean }[];
+  /** Ce que le plugin a dessiné en dernier : la source du fronton et celle du DMD (« sources fronton=… dmd=… »). */
+  drawn?: { backglass: string; dmd: string };
 }
 
 /**
@@ -411,7 +498,12 @@ export function parseVrMeasures(text: string): VrMeasures | undefined {
     .filter((l) => l.startsWith('capture '))
     .map(values)
     .map((v) => ({ name: v.nom ?? '?', source: v.source ?? '?', brightness: Number(v.luminosite ?? 0), ok: v.resultat === 'ok' }));
-  if (!rows.length && !captures.length) return undefined;
+  const last = text
+    .split(/\r?\n/)
+    .filter((l) => l.startsWith('sources '))
+    .map(values)
+    .pop();
+  if (!rows.length && !captures.length && !last) return undefined;
   const nums = (key: string) => rows.map((r) => Number(r[key])).filter((n) => Number.isFinite(n));
   const stat = (key: string) => {
     const v = nums(key);
@@ -425,5 +517,6 @@ export function parseVrMeasures(text: string): VrMeasures | undefined {
     video: stat('video'),
     gameTime: stat('jeu').mean,
     captures,
+    ...(last ? { drawn: { backglass: last.fronton ?? '?', dmd: last.dmd ?? '?' } } : {}),
   };
 }

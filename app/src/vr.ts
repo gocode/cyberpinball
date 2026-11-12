@@ -45,8 +45,36 @@ export function readVrMode(dataDir: string): VrMode {
 }
 
 export function writeVrMode(dataDir: string, mode: VrMode): void {
+  writeVrSetting(dataDir, { mode });
+}
+
+/**
+ * « Recopie sur le playfield » : la vue d'un œil du casque sur l'écran du plateau pendant une partie
+ * (vr.ts, VR_NO_MIRROR). Éteinte par défaut : VPX ne sait pas la tourner en portrait, et la copier en 4K
+ * à chaque image prend de la carte graphique pour une image que les spectateurs voient couchée.
+ */
+export function readVrMirror(dataDir: string): boolean {
+  try {
+    return (JSON.parse(fs.readFileSync(settingFile(dataDir), 'utf8')) as { mirror?: unknown }).mirror === true;
+  } catch {
+    return false;
+  }
+}
+
+export function writeVrMirror(dataDir: string, mirror: boolean): void {
+  writeVrSetting(dataDir, { mirror });
+}
+
+/** Un réglage de la VR écrit sans perdre les autres (mode, recopie). */
+function writeVrSetting(dataDir: string, patch: { mode?: VrMode; mirror?: boolean }): void {
+  let current: Record<string, unknown> = {};
+  try {
+    current = JSON.parse(fs.readFileSync(settingFile(dataDir), 'utf8')) as Record<string, unknown>;
+  } catch {
+    // Pas encore de réglage.
+  }
   fs.mkdirSync(folder(dataDir), { recursive: true });
-  writeFileAtomic(settingFile(dataDir), JSON.stringify({ mode }, null, 2) + '\n');
+  writeFileAtomic(settingFile(dataDir), JSON.stringify({ ...current, ...patch }, null, 2) + '\n');
 }
 
 /** Le runtime OpenXR actif et son manifeste, lus maintenant (registre, sans réveiller le casque). */
@@ -74,6 +102,11 @@ export interface VrGame {
   addBackglass: boolean;
   /** Une ligne par clé écrite, pour le journal. */
   changes: string[];
+  /**
+   * L'INI de départ (celui de la borne, ou du double) : casque pas prêt, la partie se joue sur les écrans
+   * avec `ini`, qui doit garder ses fenêtres (screensFallbackGaps, contrôlé au journal).
+   */
+  baseText: string;
   /** Réglages de la VR repris de la partie précédente. */
   carried: number;
 }
@@ -83,7 +116,7 @@ export interface VrGame {
  * double d'une partie entre amis). Le double est déjà une copie à part : il est réécrit sur place
  * (`inPlace`). Sinon, l'INI de la partie est <données>\vr\VPinballX.ini.
  */
-export function prepareVrGame(opts: { dataDir: string; baseIni: string; tableFile: string; inPlace: boolean }): VrGame {
+export function prepareVrGame(opts: { dataDir: string; baseIni: string; tableFile: string; inPlace: boolean; mirror?: boolean }): VrGame {
   const target = opts.inPlace ? opts.baseIni : vrIniFile(opts.dataDir);
   const previous = readTextIfExists(vrIniFile(opts.dataDir)) || undefined;
   const script = readVpxScript(opts.tableFile);
@@ -93,10 +126,11 @@ export function prepareVrGame(opts: { dataDir: string; baseIni: string; tableFil
   // PuP, B2S ou le fond du plugin de la pause remplissent.
   const backglassDisplays = readVpxBackglassDisplays(opts.tableFile);
   const addBackglass = vrNeedsVpxBackglass({ room, backglassDisplays, pupCapture: tableUsesPupCapture(script) });
-  const plan = planVrIni(readTextIfExists(opts.baseIni), previous, { addBackglass });
+  const base = readTextIfExists(opts.baseIni);
+  const plan = planVrIni(base, previous, { addBackglass, mirror: Boolean(opts.mirror) });
   fs.mkdirSync(path.dirname(target), { recursive: true });
   writeFileAtomic(target, plan.text);
-  return { ini: target, room, backglassDisplays, addBackglass, changes: formatChanges(plan.changes), carried: plan.carried };
+  return { ini: target, room, backglassDisplays, addBackglass, changes: formatChanges(plan.changes), carried: plan.carried, baseText: base };
 }
 
 /**

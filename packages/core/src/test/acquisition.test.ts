@@ -89,6 +89,9 @@ test('liens : hôte, compte nécessaire, et clé de la fiche quelle que soit la 
   assert.equal(linkHost('https://www.vpforums.org/index.php?showfile=1').account, true);
   assert.equal(linkHost('https://www.dropbox.com/s/x/a.mp3?dl=0').id, 'dropbox');
   assert.equal(linkHost('https://bit.ly/POVs').label, 'bit.ly');
+  // Code de jeu publié par Stern : téléchargeable sans compte (vérifié le 12/11/2026) ; pinsound en demande un.
+  assert.deepEqual(linkHost('https://wp.sternpinball.com/?post_type=game_code&s=sopranos'), { id: 'stern', label: 'sternpinball.com', account: false });
+  assert.equal(linkHost('https://pinsound-community.org/forum/index.php?/files/category/18-terminator-2/').account, true);
   assert.equal(pageKey('https://vpuniverse.com/files/file/21723-terminator-2-altsound/'), 'vpu:21723');
   assert.equal(pageKey('https://vpuniverse.com/files/file/21723-terminator-2-altsound/?do=download&csrfKey=x'), 'vpu:21723');
   assert.equal(pageKey('https://www.vpforums.org/index.php?app=downloads&showfile=7318'), 'vpf:7318');

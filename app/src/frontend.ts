@@ -102,6 +102,14 @@ import {
   type VrNetworkFacts,
   zoneSetting,
   vrNeedsVpxBackglass,
+  vrSources,
+  missingVrSources,
+  isVrImage,
+  VR_DMD_BAND,
+  resolveMedia,
+  type VrSources,
+  screensFallbackGaps,
+  screensFallbackViewMode,
   type VrBackglassView,
   emptyPlayedPlaylists,
   pupVideosDir,
@@ -388,7 +396,7 @@ import { inspectorFor, vpxFirewallTargets } from './vpx-inspector';
 import { scriptDmdWatch, simulatedDmdWatch, watchVpxDmd, type DmdWatch } from './dmd-watch';
 import { readLiveScoresSettings, writeLiveScoresSettings } from './live-scores-setting';
 import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
-import { centerWhenStarted, prepareVrGame, probeVr, readVrMode, rememberVrSettings, writeIniSettings, writeVrCalibration, writeVrMode, type VrGame } from './vr';
+import { centerWhenStarted, prepareVrGame, probeVr, readVrMirror, readVrMode, rememberVrSettings, writeIniSettings, writeVrCalibration, writeVrMirror, writeVrMode, type VrGame } from './vr';
 import { HEADSET_TRIAL_DIR, HeadsetMenu, readCabinetPlace, type HeadPose } from './casque';
 import { installPausePlugin, pauseSettingsFor, QUIT_HOLD_S } from './pause-vr';
 import { askElevation } from './uac-confirm';
@@ -2751,6 +2759,25 @@ library.provideSystemItem('vr', {
   },
 });
 
+// « Recopie sur le playfield » (Menu système > Borne > Réalité virtuelle) : la vue d'un œil du casque sur l'écran du plateau
+// pendant une partie dans le casque. Éteinte par défaut (vr.ts, VR_NO_MIRROR) : VPX ne la tourne pas en
+// portrait, et la copier en 4K à chaque image coûte à la carte graphique pour une image couchée.
+let vrMirror = readVrMirror(loc.dataDir);
+library.provideSystemItem('vr-mirror', {
+  get detail() {
+    return vrMirror ? t('Oui · la vue d’un œil du casque, en paysage, sur l’écran du plateau') : t('Non · l’écran du plateau garde Cyber Pinball, la carte graphique ne copie rien');
+  },
+  get tone() {
+    return vrMode === 'auto' ? undefined : ('quiet' as const);
+  },
+  run: () => {
+    vrMirror = !vrMirror;
+    writeVrMirror(loc.dataDir, vrMirror);
+    console.log(`Réalité virtuelle : recopie sur le playfield ${vrMirror ? 'activée' : 'désactivée'}.`); // i18n-ignore : journal
+    library.openSystem();
+  },
+});
+
 // « Vision 3D » (Menu système > Borne, vision3d.ts) : la perspective des tables suit la tête du joueur,
 // par une webcam ou une Kinect pour Xbox 360. Sans capteur, l'entrée reste visible, grisée avec sa
 // raison ; une Kinect sans pilote propose de l'installer (chez Microsoft, avec l'accord de Windows).
@@ -3036,7 +3063,7 @@ function prepareVision3d(vpxExe: string, inVr: boolean): Vision3dSourceKind | un
   return readiness.source;
 }
 
-// « Caler la borne » (Menu système > Borne, après « Réalité virtuelle ») : la borne du casque et les
+// « Caler la borne » (Menu système > Borne > Réalité virtuelle, après l'activation) : la borne du casque et les
 // tables de VPX posées sur la vraie barre avant, touchée aux manettes (calage.ts). Grisée, avec sa
 // raison, tant que le menu n'est pas dans le casque. Dans le casque : ≡ de la manette gauche (menu du casque).
 library.provideSystemItem('vr-calibrate', {
@@ -3049,7 +3076,7 @@ library.provideSystemItem('vr-calibrate', {
   run: () => (calibrateUnavailable() ? library.openSystem() : openCalibration()),
 });
 
-// « Manettes du casque » (Menu système > Borne, après « Caler la borne ») : l'assistant des manettes,
+// « Manettes du casque » (Menu système > Borne > Réalité virtuelle, après « Caler la borne ») : l'assistant des manettes,
 // grisé avec sa raison tant que le menu n'est pas dans le casque ou que les manettes ne sont pas connues.
 library.provideSystemItem('vr-controllers', {
   get detail() {
@@ -3153,13 +3180,17 @@ function auditVrBackglass(): void {
   const empty: string[] = [];
   const hidden: string[] = [];
   const uncertain: string[] = [];
+  const noSource: string[] = [];
   for (const table of tables) {
     try {
       const script = readTableScript(table.file);
       const room = tableHasVrRoom(script);
       const displays = readVpxBackglassDisplays(table.file);
       // Le fronton de VPX leur sera ajouté : sa partie visible, calculée d'avance (3 s au plus par table).
-      if (vrNeedsVpxBackglass({ room, backglassDisplays: displays, pupCapture: tableUsesPupCapture(script) })) {
+      const needs = vrNeedsVpxBackglass({ room, backglassDisplays: displays, pupCapture: tableUsesPupCapture(script) });
+      const missing = missingVrSources(vrSourcesOf(table.file, needs).sources);
+      if (missing.length) noSource.push(`${table.title} (${missing.join(', ')})`);
+      if (needs) {
         const view = cachedVrBackglassView(table.file, vrZonesFile());
         if (view && view.hidden >= 0.02) hidden.push(`${table.title} (${Math.round(view.hidden * 100)} %)`);
         if (view?.uncertain.length) uncertain.push(table.title);
@@ -3171,6 +3202,8 @@ function auditVrBackglass(): void {
     }
   }
   console.log(`Réalité virtuelle : ${empty.length} table(s) au fronton vide dans le casque sans correctif (pièce VR, fronton capté par PuP, aucun flasher du fronton)${empty.length ? ` : ${empty.join(', ')} ; le fronton de VPX leur est ajouté à chaque partie` : ''}.`); // i18n-ignore : journal
+  vrSourcesMissing = noSource;
+  console.log(`Réalité virtuelle : ${noSource.length} table(s) sans source de fronton ou de DMD dans le casque${noSource.length ? ` : ${noSource.join(' | ')}` : ''}.`); // i18n-ignore : journal
   console.log(`Réalité virtuelle : fronton de VPX en partie caché par la pièce de la table pour ${hidden.length} table(s)${hidden.length ? ` : ${hidden.join(', ')} ; le fronton et la pause y sont dessinés dans la partie visible` : ''}${uncertain.length ? ` ; selon le script, peut-être aussi caché pour ${uncertain.join(', ')} (capture à la prochaine partie)` : ''}.`); // i18n-ignore : journal
 }
 
@@ -3222,8 +3255,46 @@ function refreshVrNetwork(): void {
 
 /** Le réseau du casque, pour la santé de la borne. */
 function vrNetworkFacts(): VrNetworkFacts | undefined {
-  return linkMode || pcNetwork ? { ...(linkMode ? { transport: linkMode } : {}), ...(pcNetwork ? { network: pcNetwork } : {}) } : undefined;
+  if (!linkMode && !pcNetwork && !vrSourcesMissing.length) return undefined;
+  return { ...(linkMode ? { transport: linkMode } : {}), ...(pcNetwork ? { network: pcNetwork } : {}), ...(vrSourcesMissing.length ? { noSource: vrSourcesMissing } : {}) };
 }
+
+/**
+ * Sources du fronton et du DMD d'une table dans le casque (vr-sources.ts), et les images de secours que le
+ * plugin dessine quand rien d'autre ne le fait : celles des médias de la table, ou par défaut de Cyber Pinball.
+ */
+function vrSourcesOf(tableFile: string, addBackglass: boolean): { sources: VrSources; backglassImage?: string; dmdImage?: string } {
+  const table = tables.find((t) => samePath(t.file, tableFile));
+  const image = (type: 'Backglass' | 'DMD') => {
+    if (!table || !loc.root) return undefined;
+    try {
+      return resolveMedia(table, loc.root, type).files.find(isVrImage);
+    } catch {
+      return undefined;
+    }
+  };
+  const backglassImage = image('Backglass');
+  const dmdImage = image('DMD');
+  const folder = path.dirname(tableFile);
+  let directb2s = false;
+  try {
+    directb2s = fs.readdirSync(folder).some((f) => /\.directb2s$/i.test(f));
+  } catch {
+    // Dossier illisible : pas de directb2s.
+  }
+  const sources = vrSources({
+    ownRoom: !addBackglass,
+    pupPack: activePacks(folder).length > 0,
+    directb2s,
+    backglassImage: Boolean(backglassImage),
+    dmdImage: Boolean(dmdImage),
+    script: readTableScript(tableFile),
+  });
+  return { sources, ...(backglassImage ? { backglassImage } : {}), ...(dmdImage ? { dmdImage } : {}) };
+}
+
+/** Tables sans source de fronton ou de DMD dans le casque (relevé au démarrage), pour la santé de la borne. */
+let vrSourcesMissing: string[] = [];
 
 /** Partie visible du fronton de VPX en VR, gardée par table (fronton-vr.ts). */
 function vrZonesFile(): string {
@@ -3301,6 +3372,7 @@ function noteVrMeasures(late = false): void {
     console.log(
       `Casque, mesures de VPX${when} (${m.samples} relevé(s) de 5 s) : VPX ${f(m.vpx.mean)} images/s (de ${f(m.vpx.min)} à ${f(m.vpx.max)}), plus grand écart entre deux images ${Math.round(m.worstGapMs)} ms ; fronton dessiné ${f(m.backglass)} fois/s ; vidéo de PuP la plus active ${f(m.video.mean)} nouvelles images/s (de ${f(m.video.min)} à ${f(m.video.max)}) ; temps de jeu ${f(m.gameTime, 2)} s par seconde.`, // i18n-ignore : journal
     );
+  if (m.drawn) console.log(`Casque, sources dessinées${when} : fronton ${m.drawn.backglass === 'aucune' ? 'aucune (fond de Cyber Pinball)' : m.drawn.backglass}, DMD ${m.drawn.dmd === 'sans_bande' ? 'celui de la pièce VR de la table' : m.drawn.dmd}.`); // i18n-ignore : journal
   const shots = fs.existsSync(vrCapturesDir())
     ? fs
         .readdirSync(vrCapturesDir())
@@ -3400,6 +3472,11 @@ let headsetWornBefore = false;
 function exitHintText(): string | undefined {
   const el = controllerSetting().functions.retour;
   return el ? t('{bouton} : pause · tenu : quitter', { bouton: CONTROLLER_ELEMENTS[el]?.label ?? el }) : undefined;
+}
+
+/** Le casque est là : le compagnon l'a trouvé (« pret », état « shown ») ou le menu y est. */
+function headsetDetected(): boolean {
+  return Boolean(headset && (headset.state === 'shown' || headset.inUse));
 }
 
 /** Le rappel des touches de la pause dans le casque, avec les vrais boutons : « Joystick : choisir · A : valider ». */
@@ -3673,8 +3750,15 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
     console.log(`Réalité virtuelle : activée mais indisponible (${readiness.reason}) ; partie sur les écrans.`); // i18n-ignore : journal
     return undefined;
   }
+  // Casque éteint ou non relié : le compagnon ne le trouve pas (« casque-absent », casque.ts). La partie se
+  // joue en mode normal, sans attente ni écran de Link ; l'option VR reste cochée pour la suivante.
+  if (headset && !HEADSET_TRIAL_DIR && !headsetDetected()) {
+    console.log(`Réalité virtuelle : casque non détecté (compagnon : ${headset.state}) ; partie en mode normal, l'option reste activée.`); // i18n-ignore : journal
+    showBanner(t('Casque non détecté : partie en mode normal'));
+    return undefined;
+  }
   try {
-    const vr = prepareVrGame({ dataDir: loc.dataDir, baseIni: doubleIni ?? activeVpxIni(loc), tableFile, inPlace: Boolean(doubleIni) });
+    const vr = prepareVrGame({ dataDir: loc.dataDir, baseIni: doubleIni ?? activeVpxIni(loc), tableFile, inPlace: Boolean(doubleIni), mirror: vrMirror });
     const backglass = !vr.room ? 'fronton ajouté par VPX' : vr.addBackglass ? 'pièce VR de la table, fronton capté par PuP sans flasher du fronton : fronton ajouté par VPX' : `pièce VR de la table, ${vr.backglassDisplays ?? '?'} flasher(s) du fronton`; // i18n-ignore : journal
     const details = [backglass, ...(vr.carried ? [`${vr.carried} réglage(s) de la VR repris`] : []), ...vr.changes]; // i18n-ignore : journal
     // La pause dans le casque : le plugin « CyberPinball » dans VPX, activé dans cet INI seulement (pause-vr.ts).
@@ -3688,12 +3772,21 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
       const view = vr.addBackglass ? cachedVrBackglassView(tableFile, vrZonesFile()) : undefined;
       const zone = view?.zone ?? FULL_BACKGLASS_ZONE;
       prepareVrMeasures();
+      const sources = vrSourcesOf(tableFile, vr.addBackglass);
       writeIniSettings(vr.ini, [
+        // Bande DMD sous le fronton que VPX pose (chaîne PuP, ScoreView, B2S), et images de secours.
+        { section: 'Plugin.CyberPinball', key: 'DmdOrder', value: 'PUP,ScoreView,B2S' },
+        { section: 'Plugin.CyberPinball', key: 'DmdBand', value: vr.addBackglass ? String(VR_DMD_BAND) : '0' },
+        { section: 'Plugin.CyberPinball', key: 'BackglassImage', value: sources.backglassImage ?? '' },
+        { section: 'Plugin.CyberPinball', key: 'DmdImage', value: sources.dmdImage ?? '' },
         { section: 'Plugin.CyberPinball', key: 'Zone', value: zoneSetting(zone) },
         { section: 'Plugin.CyberPinball', key: 'LogFile', value: vrMeasuresFile() },
         { section: 'Plugin.CyberPinball', key: 'CaptureDir', value: vrCapturesDir() },
       ]);
       if (view) details.push(describeBackglassView(view)); // i18n-ignore : journal
+      const missing = missingVrSources(sources.sources);
+      const said = (v: string | undefined) => (v === 'room' ? 'celui de la pièce VR de la table' : (v ?? 'aucune')); // i18n-ignore : journal
+      details.push(`sources dans le casque : fronton ${said(sources.sources.backglass)}, DMD ${said(sources.sources.dmd)}${missing.length ? ` ; VR : pas de source ${missing.join(' ni de ')} pour cette table` : ''}`); // i18n-ignore : journal
       details.push(`pause dans le casque : plugin ${pausePlugin === 'installed' ? 'installé' : 'à jour'}, appui court sur Pause ou tenu ${QUIT_HOLD_S} s pour quitter`); // i18n-ignore : journal
     }
     // Une seule pose : la table de VPX où est la borne du casque (calée ou non), à chaque partie.
@@ -5099,6 +5192,12 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     onScreen = true;
     if (liveManual) hooks.gate?.ready({ manual: true });
     if (vrGame) console.log(playedVr ? `Réalité virtuelle (${table.id}) : partie dans le casque.` : `Réalité virtuelle (${table.id}) : casque pas prêt, partie sur les écrans.`); // i18n-ignore : journal
+    // Partie repliée sur les écrans : l'INI de la VR doit garder fronton, DMD et topper (vr.ts, ANCILLARY_OUTPUTS).
+    if (vrGame && !playedVr) {
+      const gaps = screensFallbackGaps(readTextIfExists(vrGame.ini), vrGame.baseText);
+      if (gaps.length) console.log(`[avertissement] Réalité virtuelle (${table.id}) : partie sur les écrans sans ${gaps.join(', ')} (fenêtre de VPX éteinte dans l'INI de la partie, allumée sur la borne).`); // i18n-ignore : journal
+      if (screensFallbackViewMode(readTextIfExists(vrGame.ini), vrGame.baseText)) console.log(`[avertissement] Réalité virtuelle (${table.id}) : partie sur les écrans en vue « bureau » (mode de la VR, BGSet), pas en vue de la borne.`); // i18n-ignore : journal
+    }
     if (vision3dSource && configuration) headTracker.start(vision3dSource, configuration.id, vision3d);
     // Les deux MagnaSave ouvrent désormais les réglages en partie (position du DMD, puis menu de VPX ; en VR, celui de VPX dans le casque).
     if (configuration) inGameMenu.arm({ pid: game.pid, table, cabinet: configuration, displays: observedDisplays(), place: playfieldPlace(), configurationIni: vrGame?.ini ?? activeVpxIni(loc), dataDir: loc.dataDir, vr: playedVr, ...(vision3dSource && {

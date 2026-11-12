@@ -81,6 +81,9 @@ import {
   nameKey,
   pageKey,
   pupMemory,
+  setFindingIgnored,
+  splitIgnoredFindings,
+  writeFileAtomic,
   refreshVpsDb,
   removalTargets,
   romSpace,
@@ -725,7 +728,7 @@ type Screen =
   | { kind: 'edit'; file: string; fields: { Title: string; Manufacturer: string; Year?: number }; editor?: Editor }
   /** `added` : ce que l'ajout a fait en plus de ranger les fichiers (médias de VPinMediaDB), montré à la vérification. */
   /** `back` : l'écran qui l'a ouvert (Santé de la borne), à la place de la fiche. */
-  | { kind: 'doctor'; file: string; findings?: Finding[]; script?: ScriptResult; log: string[]; queue: string[]; afterImport: boolean; added?: Row[]; back?: () => void }
+  | { kind: 'doctor'; file: string; findings?: Finding[]; ignored?: Finding[]; script?: ScriptResult; log: string[]; queue: string[]; afterImport: boolean; added?: Row[]; back?: () => void }
   | { kind: 'remove'; file: string }
   | { kind: 'addSource' }
   | {
@@ -1990,9 +1993,10 @@ export function createLibrary(host: LibraryHost) {
     await task(t('Analyse de la table…'), async () => {
       const table = find(current.file);
       if (!table) throw new Error(t('Cette table n’existe plus.'));
-      const { script, findings } = await analyseTable(table);
+      const { script, findings, ignored } = await analyseTable(table);
       current.script = script;
       current.findings = findings;
+      current.ignored = ignored;
       cursor = 0;
     });
   }
@@ -2004,7 +2008,7 @@ export function createLibrary(host: LibraryHost) {
    * Script de la table (lu par VPX, sinon la dernière lecture gardée) et constats du médecin.
    * Sert au diagnostic et au parcours « Ce qu'il manque pour jouer ».
    */
-  async function analyseTable(table: TableEntry): Promise<{ script?: ScriptResult; findings: Finding[] }> {
+  async function analyseTable(table: TableEntry): Promise<{ script?: ScriptResult; findings: Finding[]; ignored: Finding[] }> {
     const exe = host.vpxExe();
     const script = exe ? await readScript(exe, table.file, host.dataDir) : cachedScript(table.file, host.dataDir);
     // Lire le script a pu faire passer une fenêtre de VPX devant le menu.
@@ -2027,7 +2031,9 @@ export function createLibrary(host: LibraryHost) {
       dmdPlaced: Boolean(cabinet && dmdPlaceOf(readDmdPlaces(host.dataDir), cabinet.id, table.id)),
       dof: readDofQuiet(),
     });
-    return { script, findings };
+    // Constats ignorés par le joueur pour cette table : hors du compte, gardés pour le Diagnostic.
+    const { shown, ignored } = splitIgnoredFindings(findings, table.info);
+    return { script, findings: shown, ignored };
   }
 
   /**
@@ -2057,7 +2063,7 @@ export function createLibrary(host: LibraryHost) {
     return (table) => {
       const script = cachedScript(table.file, host.dataDir);
       if (!script) return undefined;
-      return diagnose(table, {
+      const findings = diagnose(table, {
         tablesDir: tablesDir(),
         script,
         logsDir: path.join(host.dataDir, 'logs'),
@@ -2068,6 +2074,7 @@ export function createLibrary(host: LibraryHost) {
         orientation,
         dof,
       });
+      return splitIgnoredFindings(findings, table.info).shown;
     };
   }
 
@@ -3001,6 +3008,21 @@ export function createLibrary(host: LibraryHost) {
     });
     const fixable = findings.filter((f) => f.fix);
     if (fixable.length > 1) actions.push({ label: t('Tout réparer'), detail: tn(fixable.length, '{n} correction', '{n} corrections'), run: () => repair(s, fixable) });
+    // Chaque constat peut être ignoré pour cette table : il ne compte plus nulle part, et se rétablit d'ici.
+    // Un code n'est proposé qu'une fois (plusieurs constats du même code partent ensemble).
+    const codes = [...new Set(findings.map((f) => f.code))];
+    for (const code of codes) {
+      const same = findings.filter((f) => f.code === code);
+      const index = actions.push({ label: t('Ignorer « {title} »', { title: same[0]!.title }), detail: t('Ne plus le signaler pour cette table'), tone: 'quiet', run: () => setIgnored(s, code, true) }) - 1;
+      // Un constat sans réparation mène à son « Ignorer ».
+      for (const f of same) if (!f.fix) rows[findings.indexOf(f)]!.action = index;
+    }
+    const ignoredRows: Row[] = [];
+    for (const code of [...new Set((s.ignored ?? []).map((f) => f.code))]) {
+      const same = (s.ignored ?? []).filter((f) => f.code === code);
+      const index = actions.push({ label: t('Ne plus ignorer « {title} »', { title: same[0]!.title }), detail: t('Le signaler à nouveau'), run: () => setIgnored(s, code, false) }) - 1;
+      for (const f of same) ignoredRows.push({ text: f.title, detail: f.detail, tone: 'quiet', action: index });
+    }
     actions.push({ label: t('Analyser à nouveau'), run: () => void analyse() });
     actions.push({ label: s.queue.length ? t('Table suivante') : s.back ? t('Retour') : t('Retour à la fiche'), run: next });
     // Hors de son dossier, la ROM n'est pas vérifiée (PinMAME la cherche alors ailleurs).
@@ -3020,6 +3042,7 @@ export function createLibrary(host: LibraryHost) {
     if (s.added?.length) sections.push({ title: t('Ajouté avec la table'), rows: s.added });
     if (s.log.length) sections.push({ title: t('Réparé'), rows: s.log.map((text) => ({ text, tone: 'ok' as const })) });
     sections.push({ title: t('Constats'), rows });
+    if (ignoredRows.length) sections.push({ title: t('Ignorés ({n})', { n: ignoredRows.length }), rows: ignoredRows });
     return {
       heading: s.afterImport ? t('Vérification de la table ajoutée') : t('Diagnostic'),
       subheading: [table.title, path.basename(table.file)].join(' · '),
@@ -3028,6 +3051,16 @@ export function createLibrary(host: LibraryHost) {
       actions,
       back: next,
     };
+  }
+
+  /** Ignore (ou rétablit) une sorte de constat pour cette table : retenu dans son .info, puis nouvelle analyse. */
+  function setIgnored(s: Extract<Screen, { kind: 'doctor' }>, code: Finding['code'], ignored: boolean): void {
+    const table = find(s.file);
+    if (!table) return;
+    const infoFile = infoFileFor(table, tablesDir());
+    writeFileAtomic(infoFile, JSON.stringify(setFindingIgnored(readInfo(infoFile), code, ignored), null, 2) + '\n');
+    host.reload(table.file);
+    void analyse();
   }
 
   function repair(s: Extract<Screen, { kind: 'doctor' }>, findings: Finding[]): void {

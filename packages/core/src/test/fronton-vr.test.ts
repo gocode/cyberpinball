@@ -165,7 +165,7 @@ test('partie dans le casque : la zone, les mesures et les captures réglées pou
   assert.match(frontend, /if \(playedVr && vrGame\) noteVrMeasures\(\);/);
   const cpp = read('packages', 'vpx-vision3d', 'src', 'cyberpinball.cpp');
   // Le fronton (cadré) et la pause dessinés dans la partie visible.
-  assert.match(cpp, /cadre\.zone = zoneVisible\(ctx\);/);
+  assert.match(cpp, /const Rect zone = zoneVisible\(ctx\);\s*Rect fronton = zone, dmd \{\};/);
   assert.match(cpp, /const Rect zone = zoneVisible\(ctx\);\s*const Rect r = cadrer\(L, H, zone\.l, zone\.h/);
   // Deux captures par partie, et les mesures toutes les 5 s.
   assert.match(cpp, /capturer\("debut"\);/);

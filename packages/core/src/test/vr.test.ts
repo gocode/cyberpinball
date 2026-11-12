@@ -7,7 +7,7 @@ import { IniDocument } from '../ini';
 import { SYSTEM_GROUPS, SYSTEM_ITEMS } from '../systemmenu';
 import { VPX_PLAY_SETTINGS } from '../vpx';
 import { VPX_GAME_TITLES } from '../vpxwindows';
-import { openXrRuntimeName, planVrIni, tableHasVrRoom, VR_PREVIEW_TITLE, vrCarriedSettings, vrCenterKey, vrHasSavedPlace, vrMenuText, vrPreviewSettings, vrReadiness } from '../vr';
+import { ANCILLARY_OUTPUTS, openXrRuntimeName, planVrIni, screensFallbackGaps, screensFallbackViewMode, tableHasVrRoom, VR_PREVIEW_TITLE, vrCarriedSettings, vrCenterKey, vrHasSavedPlace, vrMenuText, vrPreviewSettings, vrReadiness } from '../vr';
 
 const CABINET_INI = '[Player]\r\nSecurityLevel = 0\r\nVRPreview = 1\r\n\r\n[PlayerVR]\r\nAskToTurnOn = 2\r\n\r\n[Input]\r\nMapping.InGameUI = F12\r\n';
 
@@ -23,14 +23,41 @@ test('la borne garde la VR éteinte ; une partie en VR la met en « Autodetect �
   assert.ok(plan.text.includes('\r\n'), 'fins de ligne de VPX gardées');
 });
 
-test('en VR, les fenêtres annexes de VPX (créées, jamais dessinées) sont éteintes ; la borne garde les siennes', () => {
-  const cab = ['[Backglass]', 'BackglassOutput = 1', '[ScoreView]', 'ScoreViewOutput = 1', '[Topper]', 'TopperOutput = 1', '[PlayerVR]', 'AskToTurnOn = 2', ''].join('\r\n');
-  const doc = IniDocument.parse(planVrIni(cab, undefined, { addBackglass: true }).text);
-  assert.equal(doc.get('Backglass', 'BackglassOutput'), '0');
-  assert.equal(doc.get('ScoreView', 'ScoreViewOutput'), '0');
-  assert.equal(doc.get('Topper', 'TopperOutput'), '0');
-  // Pas reprises d'une partie à l'autre comme réglages de la VR : recalculées.
-  assert.deepEqual(vrCarriedSettings(planVrIni(cab, undefined, { addBackglass: true }).text).filter((s) => s.section !== 'PlayerVR' && s.section !== 'Player'), []);
+test('casque pas prêt, partie sur les écrans : l’INI de la VR garde le fronton, le DMD et le topper de la borne', () => {
+  // 12 novembre 2026, Aliens et son PuP-Pack : partie repliée sur les écrans avec un INI aux fenêtres
+  // annexes éteintes, les voix du pack sans aucune vidéo. Vrai pour toute table, avec ou sans pièce VR.
+  const cab = ['[Backglass]', 'BackglassOutput = 1', '[ScoreView]', 'ScoreViewOutput = 2', '[Topper]', 'TopperOutput = 1', '[PlayerVR]', 'AskToTurnOn = 2', ''].join('\r\n');
+  // Un INI de la VR écrit par une version précédente (sorties à 0) ne les éteint plus.
+  const old = ['[Backglass]', 'BackglassOutput = 0', '[ScoreView]', 'ScoreViewOutput = 0', '[Topper]', 'TopperOutput = 0', '[PlayerVR]', 'TableX = 3', ''].join('\r\n');
+  for (const addBackglass of [true, false]) {
+    for (const previous of [undefined, old]) {
+      const text = planVrIni(cab, previous, { addBackglass }).text;
+      const doc = IniDocument.parse(text);
+      assert.equal(doc.get('Backglass', 'BackglassOutput'), '1');
+      assert.equal(doc.get('ScoreView', 'ScoreViewOutput'), '2');
+      assert.equal(doc.get('Topper', 'TopperOutput'), '1');
+      assert.deepEqual(screensFallbackGaps(text, cab), []);
+    }
+  }
+  // Le détecteur du journal : une fenêtre de la borne éteinte dans l'INI de la partie.
+  assert.deepEqual(screensFallbackGaps(old, cab), ['backglass', 'dmd', 'topper']);
+  // Une fenêtre que la borne n'a pas n'est pas une perte.
+  assert.deepEqual(screensFallbackGaps(old, '[Backglass]\r\nBackglassOutput = 1\r\n[Topper]\r\nTopperOutput = 0\r\n'), ['backglass']);
+  // Aucune sortie n'est reprise d'une partie à l'autre comme réglage de la VR.
+  assert.deepEqual(vrCarriedSettings(old).filter((s) => ANCILLARY_OUTPUTS.some((o) => o.section === s.section && o.key === s.key)), []);
+});
+
+test('en VR, mode bureau (BGSet = 0) : les scripts ne montrent pas leur meuble de cabine devant le fronton', () => {
+  const cab = ['[Player]', 'BGSet = 1', '[PlayerVR]', 'AskToTurnOn = 2', ''].join('\r\n');
+  const text = planVrIni(cab, undefined, { addBackglass: true }).text;
+  assert.equal(IniDocument.parse(text).get('Player', 'BGSet'), '0');
+  // Repli de VPX sur les écrans avec cet INI : la vue « bureau » sur la borne est dite au journal.
+  assert.equal(screensFallbackViewMode(text, cab), true);
+  assert.equal(screensFallbackViewMode(text, '[Player]\r\nBGSet = 0\r\n'), false);
+  assert.equal(screensFallbackViewMode(text, '[Player]\r\n'), false, 'sans BGSet, VPX est en mode bureau');
+  // Les sorties annexes de la borne restent (session « casque pas prêt ») avec le mode bureau.
+  const withBackglass = ['[Player]', 'BGSet = 1', '[Backglass]', 'BackglassOutput = 1', ''].join('\r\n');
+  assert.deepEqual(screensFallbackGaps(planVrIni(withBackglass, undefined, { addBackglass: true }).text, withBackglass), []);
 });
 
 test('une table avec sa pièce VR garde son fronton : VPX n’en ajoute pas', () => {
@@ -43,13 +70,14 @@ test('les réglages de la VR de la partie précédente reviennent, sauf ceux que
   const carried = vrCarriedSettings(previous);
   assert.deepEqual(
     carried.map((s) => `${s.section}.${s.key}=${s.value}`),
-    ['Player.VRPreview=3', 'PlayerVR.Orientation=12.5', 'PlayerVR.TableX=-3', 'PlayerVR.TableY=40', 'PlayerVR.TableZ=2', 'PlayerVR.LockFeetToGround=0'],
+    ['PlayerVR.Orientation=12.5', 'PlayerVR.TableX=-3', 'PlayerVR.TableY=40', 'PlayerVR.TableZ=2', 'PlayerVR.LockFeetToGround=0'],
   );
   const plan = planVrIni(CABINET_INI, previous, { addBackglass: false });
   const doc = IniDocument.parse(plan.text);
-  assert.equal(plan.carried, 6);
+  assert.equal(plan.carried, 5);
   assert.equal(doc.get('PlayerVR', 'TableY'), '40');
-  assert.equal(doc.get('Player', 'VRPreview'), '3');
+  // La recopie sur le playfield suit l'option de Cyber Pinball, jamais la partie précédente (éteinte par défaut).
+  assert.equal(doc.get('Player', 'VRPreview'), '0');
   // Ce qui n'est pas un réglage de la VR vient de la borne, et Cyber Pinball impose les siens.
   assert.equal(doc.get('Player', 'SecurityLevel'), '0');
   assert.equal(doc.get('PlayerVR', 'AskToTurnOn'), '1');
@@ -59,13 +87,20 @@ test('les réglages de la VR de la partie précédente reviennent, sauf ceux que
 test('l’aperçu du casque prend la place de la fenêtre de jeu : écran du plateau, même mode', () => {
   // Borne : fronton, DMD et topper gardent leurs fenêtres en VR ; l'aperçu va sur le plateau, en plein écran comme lui.
   const cab = ['[Player]', 'PlayfieldDisplay = iiyama 43 [0, 0]', 'PlayfieldFullScreen = 1', '', '[Backglass]', 'BackglassDisplay = iiyama 32 [3840, 0]', '', '[PlayerVR]', 'AskToTurnOn = 2', ''].join('\r\n');
-  const doc = IniDocument.parse(planVrIni(cab, undefined, { addBackglass: true }).text);
+  const doc = IniDocument.parse(planVrIni(cab, undefined, { addBackglass: true, mirror: true }).text);
   assert.equal(doc.get('PlayerVR', 'PreviewDisplay'), 'iiyama 43 [0, 0]');
   assert.equal(doc.get('PlayerVR', 'PreviewFullScreen'), '1');
+  assert.equal(doc.get('Player', 'VRPreview'), '1');
+  // Recopie éteinte (par défaut) : plus rien dessiné, la fenêtre réduite à un timbre dans le coin du plateau.
+  const off = IniDocument.parse(planVrIni(cab, undefined, { addBackglass: true }).text);
+  assert.deepEqual(
+    ['VRPreview', 'PreviewDisplay', 'PreviewFullScreen', 'PreviewWidth', 'PreviewHeight'].map((k) => off.get(k === 'VRPreview' ? 'Player' : 'PlayerVR', k)),
+    ['0', 'iiyama 43 [0, 0]', '0', '320', '180'],
+  );
   // Recalculé à chaque partie : la place d'une partie précédente (écran rebranché, renommé) ne revient pas.
   const previous = ['[PlayerVR]', 'PreviewDisplay = Ancien [0, 0]', 'PreviewFullScreen = 0', 'TableY = 40', ''].join('\n');
   assert.deepEqual(vrCarriedSettings(previous).map((s) => s.key), ['TableY']);
-  const again = IniDocument.parse(planVrIni(cab, previous, { addBackglass: true }).text);
+  const again = IniDocument.parse(planVrIni(cab, previous, { addBackglass: true, mirror: true }).text);
   assert.equal(again.get('PlayerVR', 'PreviewDisplay'), 'iiyama 43 [0, 0]');
   assert.equal(again.get('PlayerVR', 'TableY'), '40');
 });
@@ -124,9 +159,12 @@ test('runtime OpenXR : son nom, ou pourquoi le casque ne peut pas servir', () =>
 });
 
 test('l’entrée « Réalité virtuelle » de la rubrique Borne : grisée avec sa raison sans runtime', () => {
-  assert.ok(SYSTEM_GROUPS.borne.entries.includes('vr'));
+  // Tous les réglages du casque dans Borne > Réalité virtuelle, l'activation en tête (12/11/2026).
+  assert.ok(SYSTEM_GROUPS.borne.entries.includes('realite-virtuelle'));
+  assert.equal(SYSTEM_GROUPS['realite-virtuelle'].entries[0], 'vr');
   assert.equal(SYSTEM_ITEMS.vr.label, 'Réalité virtuelle');
-  assert.equal(SYSTEM_ITEMS.vr.icon, 'vr');
+  assert.equal(SYSTEM_GROUPS['realite-virtuelle'].icon, 'vr');
+  assert.equal(SYSTEM_ITEMS.vr.icon, 'power');
   const off = vrMenuText('off', { ready: true, runtime: 'Meta Quest Link' });
   assert.equal(off.label, 'Réalité virtuelle : désactivée');
   assert.match(off.detail, /^Meta Quest Link installé/);

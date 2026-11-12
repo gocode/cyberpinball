@@ -10,8 +10,8 @@
 //   headset failed / Retry connection ? » (valeur 0) ;
 // - en VR, la fenêtre de jeu « Visual Pinball Player » n'existe pas : VPX ouvre « Visual Pinball VR
 //   Preview » sur le bureau (ce qu'un œil voit). Les fenêtres annexes (fronton, DMD, topper) sont créées
-//   sur leurs écrans (journal de VPX du 9 novembre 2026, Quest 2 par Link), mais jamais dessinées :
-//   Cyber Pinball les éteint dans l'INI de la partie (VR_NO_ANCILLARY) ;
+//   cachées et le restent : leur rendu est sauté en VR, et seul ce rendu les montre. L'INI de la partie
+//   garde donc les sorties de la borne (ANCILLARY_OUTPUTS), qui servent si le casque n'est pas prêt ;
 // - [PlayerVR] AddBackglass = 1 pose dans la scène un panneau au-dessus du plateau qui montre ce que
 //   dessinerait la fenêtre du fronton (plugins B2S, PUP). Faux par défaut. Une table qui a sa propre
 //   pièce VR a déjà le sien (VPX convertit même l'ancien « backglassimage » en panneau de ce type) :
@@ -57,28 +57,81 @@ export const VR_AUTODETECT = '1';
 
 /** Réglages de la VR d'une autre section, gardés d'une partie à l'autre avec [PlayerVR]. */
 const VR_CARRIED_KEYS: readonly { section: string; key: string }[] = [
-  { section: 'Player', key: 'VRPreview' },
   // Barre avant calée aux manettes (calage.ts) : la table de VPX à la taille et à la hauteur de la vraie.
   { section: 'Player', key: 'LockbarWidth' },
   { section: 'Player', key: 'LockbarHeight' },
 ];
 
 /** Clés de [PlayerVR] que Cyber Pinball impose à chaque partie, jamais reprises de la précédente. */
-const VR_FORCED_KEYS = new Set(['asktoturnon', 'addbackglass', 'previewdisplay', 'previewfullscreen']);
+const VR_FORCED_KEYS = new Set(['asktoturnon', 'addbackglass', 'previewdisplay', 'previewfullscreen', 'previewwidth', 'previewheight', 'previewwndx', 'previewwndy']);
 
 /**
- * Fenêtres annexes éteintes en VR ([Backglass] BackglassOutput, [ScoreView] ScoreViewOutput, [Topper]
- * TopperOutput à 0, « Disabled ») : VPX 10.8.1 les crée quand même, mais ne les ajoute jamais au rendu
- * en VR (« Ancillary windows are not yet supported while in VR mode », Player::Player) : des fenêtres
- * vides sur les écrans, qui prennent la place du fond de Cyber Pinball. Le fronton du casque n'en
- * dépend pas : VPX y dessine par les renderers des plugins (OnAuxRendererChanged), quel que soit le
- * mode des fenêtres. L'INI de la borne garde les siens.
+ * Mode de vue d'une partie en VR : bureau ([Player] BGSet = 0, Table1.ShowDT vrai pour les scripts). L'INI
+ * de la borne est en mode cabine (BGSet = 1) : en VR, les scripts se croyaient sur une borne physique et
+ * montraient leur meuble de cabine, qui cachait le fronton de VPX (Terminator 2, Cab_FS, 12 novembre 2026).
+ * Le casque est une borne virtuelle, vue comme sur un bureau : rails et meuble « bureau » des tables.
  */
-export const VR_NO_ANCILLARY: readonly VpxSetting[] = [
-  { section: 'Backglass', key: 'BackglassOutput', value: '0' },
-  { section: 'ScoreView', key: 'ScoreViewOutput', value: '0' },
-  { section: 'Topper', key: 'TopperOutput', value: '0' },
+export const VR_VIEW_MODE: VpxSetting = { section: 'Player', key: 'BGSet', value: '0' };
+
+/**
+ * Recopie de la vue du casque sur l'écran du plateau, éteinte : VPX ne sait pas la tourner (portrait),
+ * et la copier en 4K à chaque image ne sert à rien aux spectateurs. L'aperçu de VPX ([Player] VRPreview
+ * = 0) n'est plus dessiné, sa fenêtre réduite à un timbre de 320 × 180 dans le coin : l'écran du plateau
+ * garde celui de Cyber Pinball.
+ */
+export const VR_NO_MIRROR: readonly VpxSetting[] = [
+  { section: 'Player', key: 'VRPreview', value: '0' },
+  { section: VR_SECTION, key: 'PreviewFullScreen', value: '0' },
+  { section: VR_SECTION, key: 'PreviewWidth', value: '320' },
+  { section: VR_SECTION, key: 'PreviewHeight', value: '180' },
+  { section: VR_SECTION, key: 'PreviewWndX', value: '0' },
+  { section: VR_SECTION, key: 'PreviewWndY', value: '0' },
 ];
+
+/**
+ * Sorties des fenêtres annexes de VPX ([Backglass] BackglassOutput, [ScoreView] ScoreViewOutput,
+ * [Topper] TopperOutput : 0 éteinte, 1 fenêtre, 2 incrustée dans le plateau). L'INI d'une partie en VR
+ * garde celles de la borne, jamais ne les éteint :
+ * - dans le casque, elles ne coûtent rien : VPX 10.8.1 crée ces fenêtres cachées (SDL_WINDOW_HIDDEN,
+ *   Window.cpp), et seul leur rendu les montre (Renderer::RenderAncillaryWindow), rendu sauté en VR
+ *   (SetupAncillaryRenderTarget : « if (g_pplayer->IsVR()) return nullptr ») ; le fronton du casque
+ *   n'en dépend pas, il lit la liste des renderers des plugins quel que soit le mode des fenêtres
+ *   (Flasher, EXT_RENDER ; Player::OnAuxRendererChanged) ;
+ * - casque pas prêt (Autodetect), la partie se joue sur les écrans avec ce même INI : éteintes, le
+ *   fronton, le DMD et le topper disparaissaient de la borne (12 novembre 2026, Aliens et son PuP-Pack :
+ *   les voix du pack, aucune vidéo). `screensFallbackGaps` le surveille.
+ */
+export const ANCILLARY_OUTPUTS: readonly { section: string; key: string; role: 'backglass' | 'dmd' | 'topper' }[] = [
+  { section: 'Backglass', key: 'BackglassOutput', role: 'backglass' },
+  { section: 'ScoreView', key: 'ScoreViewOutput', role: 'dmd' },
+  { section: 'Topper', key: 'TopperOutput', role: 'topper' },
+];
+
+/**
+ * Écrans de la borne qu'une partie lancée avec `gameIni` n'aurait pas si elle se jouait sur les écrans :
+ * fenêtre annexe allumée dans l'INI de la borne (`cabinetIni`), éteinte dans celui de la partie. Vide
+ * quand tout va bien ; sert au journal (partie en VR repliée sur les écrans) et aux tests.
+ */
+export function screensFallbackGaps(gameIni: string, cabinetIni: string): ('backglass' | 'dmd' | 'topper')[] {
+  const game = IniDocument.parse(gameIni);
+  const cabinet = IniDocument.parse(cabinetIni);
+  const on = (doc: IniDocument, section: string, key: string) => {
+    const v = doc.get(section, key)?.trim();
+    return v !== undefined && v !== '' && v !== '0';
+  };
+  return ANCILLARY_OUTPUTS.filter((o) => on(cabinet, o.section, o.key) && !on(game, o.section, o.key)).map((o) => o.role);
+}
+
+/**
+ * Partie en VR repliée sur les écrans (casque pas prêt) : le mode de vue de l'INI de la partie (bureau,
+ * VR_VIEW_MODE) n'est pas celui de la borne (cabine). Vrai : la borne affiche la vue « bureau » de la table
+ * pour cette partie. Le repli de Cyber Pinball (casque non détecté, partie en mode normal) l'évite dans le
+ * cas courant ; celui de VPX (casque vu mais OpenXR pas prêt) le subit, d'où le journal.
+ */
+export function screensFallbackViewMode(gameIni: string, cabinetIni: string): boolean {
+  const mode = (text: string) => IniDocument.parse(text).get('Player', 'BGSet')?.trim() || '0';
+  return mode(gameIni) !== mode(cabinetIni);
+}
 
 /** [PlayerVR] PreviewFullScreen : 1, « Borderless Fullscreen » (0 : fenêtre ; BGFX n'a pas le plein écran exclusif). */
 export const VR_PREVIEW_FULLSCREEN = '1';
@@ -161,14 +214,16 @@ export interface VrIniPlan {
  * VR de `previous` (la partie précédente : orientation et place de la table, aperçu…), puis
  * AskToTurnOn = 1 et AddBackglass selon la table.
  */
-export function planVrIni(base: string, previous: string | undefined, opts: { addBackglass: boolean }): VrIniPlan {
+export function planVrIni(base: string, previous: string | undefined, opts: { addBackglass: boolean; mirror?: boolean }): VrIniPlan {
   const doc = IniDocument.parse(base);
   const kept: VpxSetting[] = previous ? vrCarriedSettings(previous) : [];
   const forced: VpxSetting[] = [
     { section: VR_SECTION, key: 'AskToTurnOn', value: VR_AUTODETECT },
     { section: VR_SECTION, key: 'AddBackglass', value: opts.addBackglass ? '1' : '0' },
-    ...vrPreviewSettings(doc),
-    ...VR_NO_ANCILLARY,
+    VR_VIEW_MODE,
+    // Recopie sur le playfield : la vue d'un œil, en paysage (option « Recopie sur le playfield »), ou rien.
+    ...(opts.mirror ? [{ section: 'Player', key: 'VRPreview', value: '1' }, ...vrPreviewSettings(doc)] : [...vrPreviewSettings(doc).filter((x) => x.key === 'PreviewDisplay'), ...VR_NO_MIRROR]),
+    // Les sorties des fenêtres annexes restent celles de la borne (ANCILLARY_OUTPUTS).
   ];
   const changes = applyVpxSettings(doc, [...kept, ...forced]);
   return { text: doc.toString(), changes, carried: kept.length };

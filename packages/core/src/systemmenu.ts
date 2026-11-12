@@ -41,6 +41,7 @@ export const SYSTEM_ITEM_IDS = [
   'vr',
   'vr-calibrate',
   'vr-controllers',
+  'vr-mirror',
   'controls',
   'phone-remote',
   'dof',
@@ -65,7 +66,7 @@ export const SYSTEM_ITEM_IDS = [
 export type SystemItemId = (typeof SYSTEM_ITEM_IDS)[number];
 
 /** Rubriques (et sous-rubrique) : l'arbre les ouvre lui-même. */
-export const SYSTEM_GROUP_IDS = ['tables', 'medias', 'amis', 'borne', 'cyberpinball', 'migration'] as const;
+export const SYSTEM_GROUP_IDS = ['tables', 'medias', 'amis', 'borne', 'realite-virtuelle', 'cyberpinball', 'migration'] as const;
 export type SystemGroupId = (typeof SYSTEM_GROUP_IDS)[number];
 
 export type SystemEntryId = SystemItemId | SystemGroupId;
@@ -135,7 +136,16 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     icon: 'cabinet',
     get label() { return t('Borne'); },
     get detail() { return t('Santé, fiche technique, boutons, écrans, son, réglages de VPX, réalité virtuelle, vision 3D, télécommande du téléphone, bureau Windows, mode invité'); },
-    entries: ['health', 'tech-sheet', 'cabinet', 'vpx-settings', 'vision3d', 'vr', 'vr-calibrate', 'vr-controllers', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'start-relaunch', 'guest-mode'],
+    entries: ['health', 'tech-sheet', 'cabinet', 'vpx-settings', 'vision3d', 'realite-virtuelle', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'start-relaunch', 'guest-mode'],
+  },
+  // Tous les réglages du casque ensemble, l'activation en tête (12/11/2026 : « les options VR doivent être
+  // dans VR », règle générale : un réglage est dans la rubrique de la fonction qu'il règle).
+  'realite-virtuelle': {
+    id: 'realite-virtuelle',
+    icon: 'vr',
+    get label() { return t('Réalité virtuelle'); },
+    get detail() { return t('Activer le casque, caler la borne, manettes du casque, recopie sur le playfield'); },
+    entries: ['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror'],
   },
   cyberpinball: {
     id: 'cyberpinball',
@@ -186,10 +196,12 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   cabinet: { icon: 'toolbox', get label() { return t('Configuration de la borne'); } },
   'vpx-settings': { icon: 'sliders', get label() { return t('Réglages de VPX'); } },
   // Jouer dans un casque (vr.ts) : désactivée, ou dans le casque quand il est prêt.
-  vr: { icon: 'vr', get label() { return t('Réalité virtuelle'); } },
+  // L'activation, en tête de la rubrique Réalité virtuelle (qui porte l'icône du casque).
+  vr: { icon: 'power', get label() { return t('Réalité virtuelle'); } },
   // Caler la borne du casque et les tables de VPX sur la vraie barre avant, aux manettes (calage.ts).
   'vr-calibrate': { icon: 'layout', get label() { return t('Caler la borne'); } },
   'vr-controllers': { icon: 'button', get label() { return t('Manettes du casque'); } },
+  'vr-mirror': { icon: 'screens', get label() { return t('Recopie sur le playfield'); } },
   // La perspective des tables suit la tête du joueur (vision3d.ts) : webcam ou Kinect.
   vision3d: { icon: 'eye', get label() { return t('Vision 3D'); } },
   controls: { icon: 'gamepad', get label() { return t('Commandes de la borne'); } },

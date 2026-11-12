@@ -281,6 +281,39 @@ export function setPupMemory<T extends { [key: string]: unknown }>(info: T, pack
   return { ...info, CyberPinball: { ...own, pup } };
 }
 
+/**
+ * Constats que le joueur a choisi d'ignorer pour cette table (Diagnostic > « Ignorer… ») : leurs
+ * codes, dans le .info (CyberPinball.doctor.ignored). Un constat ignoré ne compte plus nulle part
+ * (santé de la borne, « Ce qu'il manque pour jouer », pastilles) ; le Diagnostic le garde dans
+ * « Ignorés », d'où il se rétablit. Par code : la même sorte de problème sur cette table.
+ */
+export function ignoredFindingCodes(info: { [key: string]: unknown }): Finding['code'][] {
+  const own = info.CyberPinball as { doctor?: { ignored?: unknown } } | undefined;
+  const list = own?.doctor?.ignored;
+  if (!Array.isArray(list)) return [];
+  return list.filter((c): c is Finding['code'] => typeof c === 'string' && (FINDING_CODES as readonly string[]).includes(c));
+}
+
+/** Le .info avec ce constat ignoré (ou rétabli), les autres champs conservés. */
+export function setFindingIgnored<T extends { [key: string]: unknown }>(info: T, code: Finding['code'], ignored: boolean): T {
+  const own = { ...(info.CyberPinball as { doctor?: { ignored?: string[] } } | undefined) };
+  const rest = ignoredFindingCodes(info).filter((c) => c !== code);
+  const list = ignored ? [...rest, code] : rest;
+  const doctor = { ...own.doctor };
+  if (list.length) doctor.ignored = list;
+  else delete doctor.ignored;
+  const next: Record<string, unknown> = { ...own };
+  if (Object.keys(doctor).length) next.doctor = doctor;
+  else delete next.doctor;
+  return { ...info, CyberPinball: next };
+}
+
+/** Les constats montrés et ceux que le joueur a ignorés pour cette table. */
+export function splitIgnoredFindings(findings: Finding[], info: { [key: string]: unknown }): { shown: Finding[]; ignored: Finding[] } {
+  const codes = new Set<string>(ignoredFindingCodes(info));
+  return { shown: findings.filter((f) => !codes.has(f.code)), ignored: findings.filter((f) => codes.has(f.code)) };
+}
+
 /** Le .info où ce qu'on retient du pack `from` passe sous son nouveau nom `to`. */
 export function renamePupMemory<T extends { [key: string]: unknown }>(info: T, from: string, to: string): T {
   const memory = pupMemory(info, from);
@@ -1680,7 +1713,7 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
           severity: 'info',
           title: t('Écrans du PuP-Pack absents de la borne'),
           detail: t(
-            'Le pack montre des vidéos sur {screens}, que la borne n’a pas : elles ne seront pas vues. Une autre option du pack les place peut-être ailleurs.',
+            'Le pack montre des vidéos sur {screens}, que la borne n’a pas : elles ne seront pas vues, le reste du pack n’en dépend pas. Rien à réparer ; une option du pack nettement mieux faite pour la borne serait proposée ici.',
             { screens: formatList([...lost].map((r) => labels[r])) },
           ),
         });

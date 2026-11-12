@@ -2,6 +2,7 @@
 export const messages: Record<string, string> = {
   // packages/core/src/vr.ts, systemmenu.ts : Menu système > Borne > Réalité virtuelle
   'Réalité virtuelle': 'Virtual reality',
+  'Activer le casque, caler la borne, manettes du casque, recopie sur le playfield': 'Turn the headset on, align the cabinet, headset controllers, mirror on the playfield',
   // app/src/library.ts : badge d'une entrée de menu en plein essai
   BÊTA: 'BETA',
   // app/renderer/frontend.js : écran du PC au repos pendant que le menu est dans le casque
@@ -37,6 +38,10 @@ export const messages: Record<string, string> = {
   'Touchez l’autre coin': 'Touch the other corner',
   'Gâchette : placer · A : valider': 'Trigger: place · A: confirm',
   'Air Link avec un PC en Wi-Fi : des images se perdent. Reliez le PC au routeur par un câble Ethernet, ou utilisez le câble USB Link.': 'Air Link with a PC on Wi-Fi: frames get lost. Connect the PC to the router with an Ethernet cable, or use the USB Link cable.',
+  'Recopie sur le playfield': 'Mirror on the playfield',
+  'Oui · la vue d’un œil du casque, en paysage, sur l’écran du plateau': 'Yes · one eye of the headset, in landscape, on the playfield screen',
+  'Non · l’écran du plateau garde Cyber Pinball, la carte graphique ne copie rien': 'No · the playfield screen keeps Cyber Pinball, the graphics card copies nothing',
+  'Casque non détecté : partie en mode normal': 'Headset not detected: game in normal mode',
   // app/src/frontend.ts : menu du casque (≡ de la manette gauche)
   'Menu du casque': 'Headset menu',
   'Les mêmes boutons partout : A valide, B revient, les joysticks déplacent la sélection.': 'The same buttons everywhere: A confirms, B goes back, the thumbsticks move the selection.',

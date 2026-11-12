@@ -180,6 +180,8 @@ export interface HealthFacts {
 export interface VrNetworkFacts {
   transport?: LinkTransport;
   network?: PcNetwork;
+  /** Tables sans source de fronton ou de DMD dans le casque (vr-sources.ts), « Titre (fronton, DMD) ». */
+  noSource?: string[];
 }
 
 // ---------- Seuils ----------
@@ -602,6 +604,22 @@ export function dofLines(facts: DofFacts): HealthLine[] {
  * diagnostic du 11 novembre 2026), à vérifier ; sinon une ligne « prêt » ; rien tant que Link n'a rien relevé.
  */
 export function vrLines(facts: VrNetworkFacts): HealthLine[] {
+  const sources: HealthLine[] = facts.noSource?.length
+    ? [
+        {
+          check: 'vr',
+          state: 'check',
+          title: tn(facts.noSource.length, 'VR : pas de source DMD ou fronton pour {n} table', 'VR : pas de source DMD ou fronton pour {n} tables'),
+          detail: formatList(facts.noSource.slice(0, 4)),
+          go: t('Ouvrir Médias manquants'),
+          target: SYSTEM('missing-media'),
+        },
+      ]
+    : [];
+  return [...sources, ...vrLinkLines(facts)];
+}
+
+function vrLinkLines(facts: VrNetworkFacts): HealthLine[] {
   if (!facts.transport) return [];
   const go = t('Ouvrir Réalité virtuelle');
   const target = SYSTEM('vr');

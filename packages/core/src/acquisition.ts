@@ -29,10 +29,17 @@ export interface LinkHost {
   id: LinkHostId;
   /** Nom montré : « vpuniverse.com ». */
   label: string;
-  /** Il faut un compte pour télécharger (constaté le 22/10/2026, § 3 de la recherche). */
+  /** Il faut un compte pour télécharger (constaté le 22/10/2026, § 3 de la recherche ; Stern revu le 12/11/2026). */
   account: boolean;
 }
 
+/**
+ * Un drapeau `account` est un constat, pas une supposition : le revoir quand le site change.
+ * sternpinball.com : les pages « game_code » que VPS cite (wp.sternpinball.com/?post_type=game_code&s=…)
+ * donnent des liens directs vers le code de jeu (f002.backblazeb2.com/file/gamecode/…), téléchargeables
+ * sans connexion (vérifié le 12/11/2026 : AVenglish.zip, 24,8 Mo). Le « Login » de la page n'est que
+ * celui du site.
+ */
 const HOSTS: { id: LinkHostId; pattern: RegExp; label: string; account: boolean }[] = [
   { id: 'vpuniverse', pattern: /(^|\.)vpuniverse\.com$/i, label: 'vpuniverse.com', account: true },
   { id: 'vpforums', pattern: /(^|\.)vpforums\.org$/i, label: 'vpforums.org', account: true },
@@ -41,7 +48,7 @@ const HOSTS: { id: LinkHostId; pattern: RegExp; label: string; account: boolean 
   { id: 'mega', pattern: /(^|\.)mega\.(nz|io)$/i, label: 'mega.nz', account: false },
   { id: 'gdrive', pattern: /^drive\.google\.com$/i, label: 'Google Drive', account: false },
   { id: 'dropbox', pattern: /(^|\.)dropbox\.com$/i, label: 'Dropbox', account: false },
-  { id: 'stern', pattern: /(^|\.)sternpinball\.com$/i, label: 'sternpinball.com', account: true },
+  { id: 'stern', pattern: /(^|\.)sternpinball\.com$/i, label: 'sternpinball.com', account: false },
   { id: 'ipdb', pattern: /(^|\.)ipdb\.org$/i, label: 'ipdb.org', account: false },
   { id: 'youtube', pattern: /(^|\.)(youtube\.com|youtu\.be)$/i, label: 'YouTube', account: false },
 ];

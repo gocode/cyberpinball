@@ -61,6 +61,10 @@ MSGPI_STRING_VAL_SETTING(libelleAide, "Help", "Help label", "Keys reminder under
 MSGPI_STRING_VAL_SETTING(libelleRappel, "ResumeHint", "Resume hint", "Shown when resuming did not take", true, "Pause button: resume", 64);
 MSGPI_STRING_VAL_SETTING(ordreFronton, "Order", "Backglass order", "Backglass renderers drawn framed by the plugin, in order (ids, comma separated)", true, "PUP,B2S", 256);
 MSGPI_FLOAT_VAL_SETTING(pupRatio, "PupRatio", "PuP backglass ratio", "Width over height of the PuP backglass", true, 0.5f, 4.f, 0.01f, 1.7778f);
+MSGPI_STRING_VAL_SETTING(ordreDmd, "DmdOrder", "DMD order", "DMD renderers drawn by the plugin under the backglass, in order (ids, comma separated)", true, "PUP,ScoreView,B2S", 256);
+MSGPI_FLOAT_VAL_SETTING(bandeDmd, "DmdBand", "DMD band", "Height of the DMD band under the backglass, part of the visible backglass (0: none)", true, 0.f, 0.5f, 0.01f, 0.f);
+MSGPI_STRING_VAL_SETTING(imageFronton, "BackglassImage", "Backglass image", "Image drawn when no renderer draws the backglass", true, "", 1024);
+MSGPI_STRING_VAL_SETTING(imageDmd, "DmdImage", "DMD image", "Image drawn when no renderer draws the DMD", true, "", 1024);
 MSGPI_STRING_VAL_SETTING(zoneFronton, "Zone", "Visible backglass area", "Left,top,right,bottom fractions of the backglass that the VR room leaves visible", true, "0,0,1,1", 64);
 MSGPI_STRING_VAL_SETTING(fichierMesures, "LogFile", "Measures file", "Where the plugin writes its measures, empty for none", true, "", 1024);
 MSGPI_STRING_VAL_SETTING(dossierCaptures, "CaptureDir", "Captures folder", "Where the plugin saves captures of the VR preview, empty for none", true, "", 1024);
@@ -344,46 +348,55 @@ void MSGPIAPI cadreSegments(VPXRenderContext2D*, VPXSegDisplayRenderStyle style,
       glassAmbientG, glassAmbientB, type, state, dispTintR, dispTintG, dispTintB, brightness, alpha, dispPadL, dispPadT, dispPadR, dispPadB, x, y, w, h);
 }
 
-/** Les rendus du fronton, dans l'ordre écrit par Cyber Pinball (« PUP,B2S »), relus à chaque changement. */
+/**
+ * Une chaîne de rendus d'une fenêtre annexe, dans l'ordre écrit par Cyber Pinball (fronton : « PUP,B2S » ;
+ * DMD : « PUP,ScoreView,B2S »), relue à chaque changement de l'ordre.
+ */
 struct Suivant
 {
    std::string id;
    AncillaryRendererDef def {};
    bool trouve = false;
 };
-std::vector<Suivant> suivants;
-std::string ordreLu;
-double suivantsCherchesA = -10.0;
-
-void chercherSuivants(double t)
+struct Chaine
 {
-   if (ordreLu != ordreFronton_Val)
+   VPXWindowId fenetre;
+   std::vector<Suivant> suivants;
+   std::string lu;
+   double chercheA = -10.0;
+};
+Chaine chaineFronton { VPXWINDOW_Backglass };
+Chaine chaineDmd { VPXWINDOW_ScoreView };
+
+void chercher(Chaine& c, const char* ordre, double t)
+{
+   if (c.lu != ordre)
    {
-      ordreLu = ordreFronton_Val;
-      suivants.clear();
+      c.lu = ordre;
+      c.suivants.clear();
       size_t debut = 0;
-      while (debut < ordreLu.size())
+      while (debut < c.lu.size())
       {
-         const size_t fin = ordreLu.find(',', debut);
-         const std::string id = ordreLu.substr(debut, fin == std::string::npos ? std::string::npos : fin - debut);
+         const size_t fin = c.lu.find(',', debut);
+         const std::string id = c.lu.substr(debut, fin == std::string::npos ? std::string::npos : fin - debut);
          if (!id.empty() && id.rfind("CyberPinball.", 0) != 0)
-            suivants.push_back({ id });
+            c.suivants.push_back({ id });
          if (fin == std::string::npos)
             break;
          debut = fin + 1;
       }
-      suivantsCherchesA = -10.0;
+      c.chercheA = -10.0;
    }
    bool manque = false;
-   for (const Suivant& s : suivants)
+   for (const Suivant& s : c.suivants)
       manque |= !s.trouve;
-   if (!manque || t - suivantsCherchesA < 1.0)
+   if (!manque || t - c.chercheA < 1.0)
       return;
-   suivantsCherchesA = t;
+   c.chercheA = t;
    AncillaryRendererDef entrees[16] {};
-   GetAncillaryRendererMsg m { VPXWINDOW_Backglass, 16, 0, entrees };
+   GetAncillaryRendererMsg m { c.fenetre, 16, 0, entrees };
    msgApi->BroadcastMsg(endpointId, getAuxRendererId, &m);
-   for (Suivant& s : suivants)
+   for (Suivant& s : c.suivants)
       for (unsigned int i = 0; i < m.count && i < 16; i++)
          if (entrees[i].id && s.id == entrees[i].id && entrees[i].Render)
          {
@@ -393,49 +406,182 @@ void chercherSuivants(double t)
 }
 
 /**
- * Le fronton hors de la pause : le premier rendu de l'ordre qui dessine, cadré. 0 si aucun (VPX continue
- * alors sa propre liste, jusqu'au fond opaque).
+ * Le premier rendu de la chaîne qui dessine, cadré dans `cible` (surface du flasher) ; `ctx` nul : essai sans
+ * rien dessiner (fonctions de dessin vides), pour savoir si une source existe. Rend l'id du rendu, ou "".
  */
-int dessinerCadre(VPXRenderContext2D* ctx, double t)
+std::string rendre(VPXRenderContext2D* ctx, Chaine& c, const Rect& cible, double t)
 {
-   chercherSuivants(t);
-   for (const Suivant& s : suivants)
+   for (const Suivant& s : c.suivants)
    {
       if (!s.trouve)
          continue;
-      cadre.dehors = ctx;
-      cadre.dedans = *ctx;
-      cadre.zone = zoneVisible(ctx);
+      VPXRenderContext2D essai {};
+      VPXRenderContext2D* dehors = ctx;
+      if (!ctx)
+      {
+         essai.is2D = 1;
+         essai.outWidth = essai.srcWidth = cible.l;
+         essai.outHeight = essai.srcHeight = cible.h;
+         essai.DrawImage = rienImage;
+         essai.DrawDisplay = rienAfficheur;
+         essai.DrawSegDisplay = rienSegments;
+         dehors = &essai;
+      }
+      cadre.dehors = dehors;
+      cadre.dedans = *dehors;
+      cadre.dedans.window = c.fenetre;
+      cadre.zone = cible;
       cadre.pup = s.id == "PUP";
-      cadre.dedans.outWidth = cadre.zone.l;
-      cadre.dedans.outHeight = cadre.zone.h;
+      cadre.dedans.outWidth = cible.l;
+      cadre.dedans.outHeight = cible.h;
       cadre.dedans.DrawImage = cadreImage;
       cadre.dedans.DrawDisplay = cadreAfficheur;
       cadre.dedans.DrawSegDisplay = cadreSegments;
       // PuP pose son écran racine sur toute sa surface (srcWidth = outWidth) : la forme de son fronton.
-      if (s.id == "PUP")
+      if (cadre.pup && c.fenetre == VPXWINDOW_Backglass)
       {
          const float ratio = pupRatio_Val > 0.1f ? pupRatio_Val : 16.f / 9.f;
-         if (cadre.zone.l / cadre.zone.h < ratio)
-            cadre.dedans.outHeight = cadre.zone.l / ratio;
+         if (cible.l / cible.h < ratio)
+            cadre.dedans.outHeight = cible.l / ratio;
          else
-            cadre.dedans.outWidth = cadre.zone.h * ratio;
+            cadre.dedans.outWidth = cible.h * ratio;
       }
       cadre.dedans.srcWidth = cadre.dedans.outWidth;
       cadre.dedans.srcHeight = cadre.dedans.outHeight;
-      // Le fronton du rendu appelé s'étend sur la surface de VPX telle qu'elle est : srcWidth/srcHeight de dehors.
-      ctx->srcWidth = ctx->outWidth;
-      ctx->srcHeight = ctx->outHeight;
+      if (ctx)
+      {
+         ctx->srcWidth = ctx->outWidth;
+         ctx->srcHeight = ctx->outHeight;
+      }
       const int dessine = s.def.Render(&cadre.dedans, s.def.context);
       cadre.dehors = nullptr;
+      if (cadre.pup)
+         for (Pompe& p : pompes)
+            if (p.fenetre == c.fenetre)
+               p.dessineeA = t; // PuP vient de dessiner cette fenêtre : pas une seconde fois à vide
       if (dessine)
       {
-         if (cadre.pup)
+         if (cadre.pup && ctx && c.fenetre == VPXWINDOW_Backglass)
             mesures.pup++;
-         return 1;
+         return s.id;
       }
    }
-   return 0;
+   return "";
+}
+
+/** Une image de Cyber Pinball (fronton, DMD), lue une fois : [Plugin.CyberPinball] BackglassImage, DmdImage. */
+struct ImageFichier
+{
+   std::string chemin;
+   VPXTexture tex = nullptr;
+   float l = 0.f, h = 0.f;
+};
+ImageFichier imageDuFronton, imageDuDmd;
+
+bool charger(ImageFichier& img, const char* chemin)
+{
+   if (img.chemin != chemin)
+   {
+      if (img.tex && vpxApi)
+         vpxApi->DeleteTexture(img.tex);
+      img = ImageFichier { chemin };
+      if (!chemin[0] || !vpxApi)
+         return false;
+      FILE* f = _wfopen(large(chemin).c_str(), L"rb");
+      if (!f)
+      {
+         ecrire(std::string("image introuvable ") + chemin);
+         return false;
+      }
+      std::vector<uint8_t> octets;
+      uint8_t bloc[65536];
+      size_t n;
+      while ((n = std::fread(bloc, 1, sizeof(bloc), f)) > 0)
+         octets.insert(octets.end(), bloc, bloc + n);
+      std::fclose(f);
+      img.tex = octets.empty() ? nullptr : vpxApi->CreateTexture(octets.data(), static_cast<int>(octets.size()));
+      if (const VPXTextureInfo* info = img.tex ? vpxApi->GetTextureInfo(img.tex) : nullptr)
+      {
+         img.l = static_cast<float>(info->width);
+         img.h = static_cast<float>(info->height);
+      }
+      ecrire(std::string("image ") + (img.tex ? "lue " : "illisible ") + chemin);
+   }
+   return img.tex && img.l > 0.f && img.h > 0.f;
+}
+
+/** Une image posée dans `cible`, proportions gardées, centrée. */
+void dessinerImage(VPXRenderContext2D* ctx, const ImageFichier& img, const Rect& cible)
+{
+   const Rect r = cadrer(img.l, img.h, cible.l, cible.h, { 0.f, 0.f, img.l, img.h });
+   ctx->srcWidth = ctx->outWidth;
+   ctx->srcHeight = ctx->outHeight;
+   ctx->DrawImage(ctx, img.tex, 1.f, 1.f, 1.f, 1.f, 0.f, 0.f, img.l, img.h, 0.f, 0.f, 0.f, cible.x + r.x, cible.y + r.y, r.l, r.h);
+}
+
+/** Le DMD a-t-il une source qui dessine ? Essai à vide toutes les 0,5 s tant qu'aucune n'a été vue. */
+bool dmdVu = false;
+double dmdEssaiA = -10.0;
+std::string dmdSource, frontonSource;
+
+void fondDans(VPXRenderContext2D* ctx, const Rect& r);
+
+/**
+ * Le fronton hors de la pause, toutes sources dans l'ordre (règle du 12 novembre 2026 : toute table en VR
+ * a un fronton et un DMD, quelle que soit sa source) :
+ * - fronton : la chaîne (PuP, B2S…), sinon l'image du fronton de Cyber Pinball, sinon le fond ;
+ * - DMD, quand Cyber Pinball réserve sa bande (DmdBand, fronton posé par VPX) : la chaîne (PuP, ScoreView
+ *   pour PinMAME, FlexDMD, UltraDMD, AlphaDMD ; B2S), sinon l'image du DMD de Cyber Pinball. La bande ne paraît
+ *   que si une source y dessine : jamais de cadre vide.
+ * 0 si rien ne dessine (VPX continue alors sa propre liste, jusqu'au fond opaque).
+ */
+int dessinerCadre(VPXRenderContext2D* ctx, double t)
+{
+   chercher(chaineFronton, ordreFronton_Val, t);
+   chercher(chaineDmd, ordreDmd_Val, t);
+   const Rect zone = zoneVisible(ctx);
+   Rect fronton = zone, dmd {};
+   const bool bande = bandeDmd_Val > 0.01f;
+   const bool imageDmd = bande && charger(imageDuDmd, imageDmd_Val);
+   if (bande && !dmdVu && t - dmdEssaiA >= 0.5)
+   {
+      dmdEssaiA = t;
+      dmdVu = !rendre(nullptr, chaineDmd, { 0.f, 0.f, zone.l, zone.h * bandeDmd_Val }, t).empty();
+   }
+   if (bande && (dmdVu || imageDmd))
+   {
+      const float hd = zone.h * bandeDmd_Val;
+      dmd = { zone.x, zone.y + zone.h - hd, zone.l, hd };
+      fronton.h -= hd;
+   }
+   std::string f = rendre(ctx, chaineFronton, fronton, t);
+   if (f.empty() && charger(imageDuFronton, imageFronton_Val))
+   {
+      dessinerImage(ctx, imageDuFronton, fronton);
+      f = "image";
+   }
+   std::string d;
+   if (dmd.h > 0.f)
+   {
+      d = rendre(ctx, chaineDmd, dmd, t);
+      if (d.empty() && imageDmd)
+      {
+         dessinerImage(ctx, imageDuDmd, dmd);
+         d = "image";
+      }
+      if (!d.empty() && f.empty())
+      {
+         fondDans(ctx, fronton);
+         f = "fond";
+      }
+   }
+   if (f != frontonSource || d != dmdSource)
+   {
+      frontonSource = f;
+      dmdSource = d;
+      ecrire("sources fronton=" + (f.empty() ? std::string("aucune") : f) + " dmd=" + (d.empty() ? std::string(bande ? "aucune" : "sans_bande") : d));
+   }
+   return f.empty() && d.empty() ? 0 : 1;
 }
 
 /** La table des actions (commandeVpx1081) vaut pour VPX 10.8.1 ; une autre version : plugin passif. */
@@ -733,7 +879,12 @@ void MSGPIAPI onGameStart(const unsigned int, void*, void*)
    notifiee = false;
    for (Pompe& p : pompes)
       p = Pompe { p.fenetre };
-   ordreLu.clear();
+   chaineFronton = Chaine { VPXWINDOW_Backglass };
+   chaineDmd = Chaine { VPXWINDOW_ScoreView };
+   dmdVu = false;
+   dmdEssaiA = -10.0;
+   dmdSource.clear();
+   frontonSource.clear();
    mesures = Mesures {};
    ecrire(std::string("debut zone=") + zoneFronton_Val + " ordre=" + ordreFronton_Val);
    enPartie = true;
@@ -887,6 +1038,17 @@ int MSGPIAPI dessinerPause(VPXRenderContext2D* ctx, void*)
    return 1;
 }
 
+/** Le fond opaque et la marque, dans un rectangle de la surface du flasher (fronton sans source, DMD présent). */
+void fondDans(VPXRenderContext2D* ctx, const Rect& r)
+{
+   preparerTout();
+   ctx->srcWidth = ctx->outWidth;
+   ctx->srcHeight = ctx->outHeight;
+   ctx->DrawImage(ctx, blanc, FOND[0], FOND[1], FOND[2], 1.f, 0.f, 0.f, 2.f, 2.f, 1.f, 1.f, 0.f, r.x, r.y, r.l, r.h);
+   const float h = r.h * 0.12f, w = h * static_cast<float>(marque.l) / static_cast<float>(marque.h);
+   ctx->DrawImage(ctx, marque.tex, TERNE[0], TERNE[1], TERNE[2], 1.f, 0.f, 0.f, static_cast<float>(marque.l), static_cast<float>(marque.h), 0.f, 0.f, 0.f, r.x + (r.l - w) / 2.f, r.y + (r.h - h) / 2.f, w, h);
+}
+
 int MSGPIAPI dessinerFond(VPXRenderContext2D* ctx, void*)
 {
    // Dernier recours, dans le casque seulement : un fond opaque plutôt que du vide.
@@ -935,6 +1097,10 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballPluginLoad(const uint32_t sessionId, cons
    msgApi->RegisterSetting(endpointId, &ordreFronton);
    msgApi->RegisterSetting(endpointId, &pupRatio);
    msgApi->RegisterSetting(endpointId, &zoneFronton);
+   msgApi->RegisterSetting(endpointId, &ordreDmd);
+   msgApi->RegisterSetting(endpointId, &bandeDmd);
+   msgApi->RegisterSetting(endpointId, &imageFronton);
+   msgApi->RegisterSetting(endpointId, &imageDmd);
    msgApi->RegisterSetting(endpointId, &fichierMesures);
    msgApi->RegisterSetting(endpointId, &dossierCaptures);
    msgApi->BroadcastMsg(endpointId, getVpxApiId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_MSG_GET_API), &vpxApi);
@@ -957,7 +1123,7 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballPluginUnload()
    msgApi->UnsubscribeMsg(getAuxRendererId, onGetAuxRenderer, nullptr);
    msgApi->BroadcastMsg(endpointId, auxChangedId, nullptr);
    if (vpxApi)
-      for (VPXTexture* t : { &blanc, &titre.tex, &reprendre.tex, &quitter.tex, &marque.tex, &rappel.tex, &aide[0].tex, &aide[1].tex, &aide[2].tex })
+      for (VPXTexture* t : { &blanc, &titre.tex, &reprendre.tex, &quitter.tex, &marque.tex, &rappel.tex, &aide[0].tex, &aide[1].tex, &aide[2].tex, &imageDuFronton.tex, &imageDuDmd.tex })
          if (*t)
          {
             vpxApi->DeleteTexture(*t);

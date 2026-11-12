@@ -113,7 +113,7 @@ export const messages: Record<string, string> = {
   'le backglass': 'the backglass',
   'le DMD': 'the DMD',
   'Écrans du PuP-Pack absents de la borne': 'PuP-Pack screens missing from the cabinet',
-  'Le pack montre des vidéos sur {screens}, que la borne n’a pas : elles ne seront pas vues. Une autre option du pack les place peut-être ailleurs.': 'The pack shows videos on {screens}, which the cabinet doesn’t have: they won’t be seen. Another pack option may place them elsewhere.',
+  'Le pack montre des vidéos sur {screens}, que la borne n’a pas : elles ne seront pas vues, le reste du pack n’en dépend pas. Rien à réparer ; une option du pack nettement mieux faite pour la borne serait proposée ici.': 'The pack shows videos on {screens}, which the cabinet doesn’t have: they won’t be seen, the rest of the pack doesn’t depend on them. Nothing to fix; a pack option clearly better suited to the cabinet would be offered here.',
   'Vidéos sur le plateau non affichées': 'Playfield videos not shown',
   'Le pack utilise l’écran Playfield (3), que le plugin PUP de VPX 10.8.1 n’affiche pas : ces vidéos par-dessus le plateau ne seront pas vues.': 'The pack uses the Playfield screen (3), which the VPX 10.8.1 PUP plugin doesn’t display: these videos over the playfield won’t be seen.',
   'PuP-Pack piloté par le script': 'Script-driven PuP-Pack',

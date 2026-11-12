@@ -185,3 +185,4 @@ export * from './youtube-account';
 export * from './fronton-vr';
 export * from './vr-reseau';
 export * from './terms';
+export * from './vr-sources';
