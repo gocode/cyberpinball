@@ -645,8 +645,15 @@ export interface Built {
   /**
    * Touches propres à l'écran, avant la navigation (DMD sur la roue : une ligne ouverte prend les
    * flippers pour déplacer les points) ; true : la touche est prise, l'écran se redessine.
+   * Les appuis seulement, sauf `keysUp`.
    */
   keys?: (input: Input) => boolean;
+  /**
+   * `keys` reçoit aussi les relâchements (pré-écoute du Juke-box : la fin d'un flipper tenu). À
+   * demander exprès : un écran qui ne les attend pas prendrait le relâchement du Start qui vient
+   * d'ouvrir une ligne pour sa validation (DMD sur la roue, 12/11/2026).
+   */
+  keysUp?: boolean;
 }
 
 /** Ce que le rendu montre d'un recadrage (app/renderer/library.js, renderCrop). */
@@ -4166,10 +4173,13 @@ export function createLibrary(host: LibraryHost) {
   /** Touche relâchée : la bascule de MagnaSave (F6), et la fin d'un flipper tenu (l'initiale montrée s'efface). */
   function handleKeyUp(input: Input): void {
     if (!screen || busy) return;
-    // Touches propres à l'écran (pré-écoute du Juke-box : flipper relâché) : le relâchement aussi.
-    if (screen.kind === 'custom' && build().keys?.(input)) {
-      host.broadcast();
-      return;
+    // Touches propres à l'écran (pré-écoute du Juke-box : flipper relâché) : le relâchement aussi, pour l'écran qui le demande (keysUp).
+    if (screen.kind === 'custom') {
+      const built = build();
+      if (built.keysUp && built.keys?.(input)) {
+        host.broadcast();
+        return;
+      }
     }
     if (hold?.code === input.code) {
       hold = undefined;

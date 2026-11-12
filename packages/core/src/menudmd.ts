@@ -329,10 +329,14 @@ export interface MenuDmdKeys {
  * maintenus : plus vite), les MagnaSave (haut, bas), les flèches et + / − du clavier, Start
  * (valider) et Exit (annuler). Ligne fermée : tout revient à l'écran (choisir une ligne,
  * l'ouvrir, revenir) : 'unhandled'.
+ *
+ * Seul l'appui compte : le relâchement du Start qui vient d'ouvrir la ligne ne doit pas la valider
+ * aussitôt (panne du 12/11/2026, valeurs impossibles à modifier), ni un flipper relâché faire un pas de plus.
  */
-export function menuDmdKey(host: MenuDmdEditorHost, s: MenuDmdEditor, keys: MenuDmdKeys, input: { code: string; isAutoRepeat?: boolean }): MenuDmdOutcome {
+export function menuDmdKey(host: MenuDmdEditorHost, s: MenuDmdEditor, keys: MenuDmdKeys, input: { code: string; isAutoRepeat?: boolean; type?: string }): MenuDmdOutcome {
   const is = (group: string[]) => group.includes(input.code);
   if (s.leaving) return 'unhandled';
+  if (input.type !== undefined && input.type !== 'keyDown') return s.mode ? 'handled' : 'unhandled';
   const arrow = ({ ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] } as Record<string, [number, number]>)[input.code];
   const sizeKey = ({ NumpadAdd: 1, Equal: 1, NumpadSubtract: -1, Minus: -1 } as Record<string, number>)[input.code];
   if (s.mode === 'adjust') {

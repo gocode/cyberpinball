@@ -121,6 +121,50 @@ test('écran de réglage : déplacer aux flippers et aux MagnaSave, au pixel, pl
   assert.equal(menuDmdKey(h, s, KEYS, { code: 'ShiftRight' }), 'unhandled');
 });
 
+test('écran de réglage : le relâchement du Start qui ouvre la ligne ne la valide pas (panne du 12/11/2026)', () => {
+  const h = host(true);
+  const s = startMenuDmdEditor({ zone: { x: 0.25, y: 0.6, width: 0.5, height: 0.2, aspect: 4 }, hidden: false });
+  const start = px(s.spot.zone);
+  for (const id of ['moveX', 'moveY', 'size', 'format'] as const) {
+    openMenuDmdItem(h, s, id);
+    // Start relâché juste après l'ouverture : la ligne reste ouverte.
+    assert.equal(menuDmdKey(h, s, KEYS, { code: 'Digit1', type: 'keyUp' }), 'handled');
+    assert.equal(s.item, id, `${id} reste ouverte`);
+    assert.ok(s.mode, `${id} en réglage`);
+    // Un flipper relâché ne fait pas de pas de plus, un Exit relâché n'annule rien.
+    menuDmdKey(h, s, KEYS, { code: 'ShiftLeft', type: 'keyUp' });
+    menuDmdKey(h, s, KEYS, { code: 'Escape', type: 'keyUp' });
+    assert.equal(s.item, id);
+    menuDmdKey(h, s, KEYS, { code: 'Escape', type: 'keyDown' });
+    assert.equal(s.mode, undefined, 'Exit appuyé ferme la ligne');
+  }
+  assert.deepEqual(px(s.spot.zone), start);
+  // Un pas par appui de flipper, pas un de plus au relâchement.
+  openMenuDmdItem(h, s, 'moveX');
+  menuDmdKey(h, s, KEYS, { code: 'ShiftRight', type: 'keyDown' });
+  menuDmdKey(h, s, KEYS, { code: 'ShiftRight', type: 'keyUp' });
+  assert.equal(px(s.spot.zone).x, start.x + 1);
+  // Ligne fermée : le relâchement revient à l'écran.
+  menuDmdKey(h, s, KEYS, { code: 'Digit1', type: 'keyDown' });
+  assert.equal(menuDmdKey(h, s, KEYS, { code: 'Digit1', type: 'keyUp' }), 'unhandled');
+});
+
+test('menu : les touches propres à un écran ne reçoivent les relâchements que sur demande (keysUp)', () => {
+  const APP = path.join(__dirname, '..', '..', '..', '..', 'app', 'src');
+  const library = fs.readFileSync(path.join(APP, 'library.ts'), 'utf8');
+  const keyUp = library.slice(library.indexOf('function handleKeyUp('), library.indexOf('function readingState('));
+  assert.ok(keyUp.length > 0, 'handleKeyUp trouvé');
+  // Tout appel des touches de l'écran au relâchement passe par keysUp.
+  const calls = keyUp.match(/\.keys\?\.\(input\)/g) ?? [];
+  assert.ok(calls.length >= 1);
+  assert.equal((keyUp.match(/built\.keysUp && built\.keys\?\.\(input\)/g) ?? []).length, calls.length, 'relâchement transmis sans keysUp');
+  // Les écrans qui le demandent savent lire un relâchement (input.type).
+  for (const f of fs.readdirSync(APP).filter((f) => f.endsWith('.ts'))) {
+    const src = fs.readFileSync(path.join(APP, f), 'utf8');
+    if (/keysUp: true/.test(src)) assert.match(src, /input\.type/, `${f} demande les relâchements sans les distinguer`);
+  }
+});
+
 test('écran de réglage : la taille garde le format 4:1, le format se choisit, Start valide', () => {
   const h = host();
   const s = startMenuDmdEditor(menuDmdSpot(h.auto, undefined));

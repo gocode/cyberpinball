@@ -1459,6 +1459,8 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
               ...(canListen() ? [{ key: t('MagnaSave droit'), desk: t('Espace'), text: host.preview.state() ? t('arrêter l’écoute') : t('écouter'), first: true }] : []),
               ...(host.preview.state() ? [{ key: t('Flipper tenu'), desk: t('↑↓ tenues'), text: t('avancer, reculer') }] : []),
             ],
+            // Le relâchement d'un flipper tenu arrête l'avance ou le recul (seekPressStep).
+            keysUp: true,
             keys: (input: Input) =>
               listenKeys(input, importScreen, () => {
                 const key = actions[host.cursor()]?.key;
