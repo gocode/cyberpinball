@@ -1422,16 +1422,22 @@ body.mouse .media-card[data-act]:hover {
 
 /*
  * L'aperçu au format de son écran, plafonné : un plateau en hauteur ne fait pas déborder la
- * tuile. En paysage, une tuile de logo (aperçu carré, titre sur deux lignes, état, détail)
- * doit tenir entière dans la liste même sous une introduction de trois lignes, avec son état
- * (« ≈ 45 s d'attente ») et son détail : à 20vmin, il lui manquait une quinzaine de pixels en
+ * tuile. En paysage, une tuile de logo (aperçu carré, titre sur deux lignes, état, faits)
+ * doit tenir entière dans la liste sous une introduction de trois lignes et le détail de
+ * hauteur fixe (plus bas) : à 20vmin, il lui manquait une cinquantaine de pixels en
  * 1920 × 1080 (contrôle de mise en page, 12/11/2026).
  */
 .media-tile .media-thumb {
   width: 100%;
   height: auto;
   aspect-ratio: var(--thumb-aspect, 16 / 9);
-  max-height: 17vmin;
+  max-height: 15vmin;
+}
+
+@container (orientation: landscape) {
+  .media-card.media-tile {
+    gap: 0.6vmin;
+  }
 }
 
 @container (orientation: portrait) {
@@ -1539,6 +1545,49 @@ body.mouse .media-card[data-act]:hover {
   background: var(--surface);
   outline: 0.2vmin solid var(--line-strong);
   outline-offset: -0.2vmin;
+}
+
+/*
+ * Écran en largeur : le détail sous la galerie a une hauteur fixe (le titre et ses faits sur
+ * une ligne, puis deux lignes d'explication au plus, chacune coupée d'une ellipse). Sinon il
+ * prenait autant de lignes que la carte avait d'explications et rognait la liste sous la
+ * hauteur d'une tuile : la carte choisie n'y tenait plus entière (logo de Terminator 2,
+ * détail de quatre lignes en 1920 × 1080, contrôle de mise en page du 12/11/2026). Fixe, il
+ * ne fait plus non plus changer la galerie de taille d'une tuile à l'autre.
+ */
+@container (orientation: landscape) {
+  .lib-gallery > .media-detail {
+    height: 12vmin;
+    overflow: hidden;
+  }
+
+  .lib-gallery > .media-detail .media-top {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .lib-gallery > .media-detail .media-title,
+  .lib-gallery > .media-detail .media-facts,
+  .lib-gallery > .media-detail .media-extra,
+  .lib-gallery > .media-detail .media-pending {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lib-gallery > .media-detail .media-title {
+    flex: 0 1 auto;
+  }
+
+  .lib-gallery > .media-detail .media-facts {
+    flex: 1 1 0;
+  }
+
+  /* Deux lignes sous le titre : l'état en attente compte pour l'une d'elles. */
+  .lib-gallery > .media-detail > :nth-child(n + 4) {
+    display: none;
+  }
 }
 
 /* ---------- Prospectus et règles : la page en grand, les commandes dessous ---------- */

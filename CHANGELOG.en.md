@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- Game media, suggestions: on a landscape screen, the selected card always fits whole in the list, and the detail below keeps the same height from one card to the next.
 - Game media, suggestions: "Search more" widens the search on VPUniverse and VPForums (up to 10 pages, every edition of the game, close titles, marked as such).
 - Game media, suggestions: "Animated only" keeps only videos and animated wheels (APNG, GIF); VPUniverse then searches its animated wheels category.
 - Game media, suggestions: "Add words to the search…" narrows the search by a style, an author, a color ("tarcisio", "diagonal", "glass orb"…), on the sites as on the web.

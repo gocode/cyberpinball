@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.11
 
+- Médias du jeu, propositions : sur un écran en largeur, la carte choisie tient toujours entière dans la liste, et le détail en dessous garde la même hauteur d'une carte à l'autre.
 - Médias du jeu, propositions : « Chercher plus » élargit la recherche sur VPUniverse et VPForums (jusqu'à 10 pages, toutes les éditions du jeu, titres approchés, marqués comme tels).
 - Médias du jeu, propositions : « Animés seulement » ne garde que les vidéos et les wheels animées (APNG, GIF) ; VPUniverse cherche alors dans sa catégorie de wheels animées.
 - Médias du jeu, propositions : « Ajouter des mots à la recherche… » précise la recherche par un style, un auteur, une couleur (« tarcisio », « diagonal », « glass orb »…), sur les sites comme sur le web.
