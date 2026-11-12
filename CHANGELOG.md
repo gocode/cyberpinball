@@ -34,6 +34,9 @@ son interface).
 - Réalité virtuelle : tous les réglages du casque sont réunis dans Menu système > Borne > Réalité virtuelle : l'activation, « Caler la borne », « Manettes du casque » et la nouvelle « Recopie sur le playfield » (éteinte par défaut : l'écran du plateau garde Cyber Pinball pendant une partie dans le casque).
 - Réalité virtuelle : au menu dans le casque, les écrans prennent place dans une vraie caisse de flipper habillée (flancs CYBER PINBALL, boutons lumineux, porte, pieds), posée dans une capsule ouverte sur un ciel de nébuleuses et d'étoiles. Après « Caler la borne », la caisse prend la largeur de votre barre avant.
 - DMD sur la roue : la position, la taille et le format se règlent de nouveau. La ligne choisie restait ouverte un instant puis se refermait d'elle-même, et un flipper relâché déplaçait le DMD d'un pixel de trop.
+- Crédits de la communauté : la fiche d'une table a une entrée « Crédits » qui dit qui a fait la table, son fronton, son PuP-Pack, ses couleurs et ses sons, ses médias et ses règles, d'après la base VPS. Start sur une ligne montre tous ses auteurs et la page d'où vient la pièce, en QR code à viser au téléphone. Un auteur inconnu reste affiché, grisé, sans nom deviné.
+- Crédits de la communauté : la roue cite l'auteur principal de la table (« Data East · 1990 · par TastyWasps »), et Menu système > Cyber Pinball > « La communauté » rassemble les auteurs de vos tables, du plus présent au moins présent, puis les logiciels et les sites. Les pièces installées depuis le catalogue gardent désormais leurs auteurs.
+- Mode attente : une ligne discrète en bas cite les auteurs de la table montrée. Tous ses réglages sont réunis dans Menu système > Médias > « Médias, son et attente » > « Mode attente » : délai, table suivante, son, crédits (affichés ou masqués) et horaire de la borne.
 
 ## 0.1.10
 

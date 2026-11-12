@@ -840,6 +840,8 @@ export interface MediaOrigin {
   date: string;
   /** Identifiant VPS du jeu dans la source. */
   vpsId?: string;
+  /** Auteur du média, quand le site le donne (fiche de VPUniverse, de VPForums) : pour les crédits. */
+  author?: string;
   /** Clé de l'index : « 1k/table_video », « wheel »… */
   key?: string;
   md5?: string;

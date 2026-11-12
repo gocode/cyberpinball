@@ -927,6 +927,27 @@ Cyber Pinball supplies no table, ROM or media from any commercial game: its term
 
 Safeguard: [terms.test.ts](../packages/core/src/test/terms.test.ts) checks the text in both languages, its form for the installer, and that the application reads back the file written by the installer.
 
+## Community credits
+
+Tables, backglasses, PuP-Packs, DMD colours and sounds, toppers, media and rules are the work of the virtual pinball community. Cyber Pinball names their authors without cluttering the game ([packages/core/src/credits.ts](../packages/core/src/credits.ts); on screen, [app/src/credits-menu.ts](../app/src/credits-menu.ts)):
+
+- **The wheel**: under the title, the main author of the recreation, like a book's author: "Data East · 1990 · par TastyWasps" (by TastyWasps). The first author named (VPS and authors put the main team first); nothing when unknown.
+- **A table's details screen**: the "Crédits" (Credits) entry, after "Prospectus et règles" (Flyer and rules), sums up ("Table de TastyWasps, JPSalas et 12 autres · fronton de HauntFreaks") and opens the **Credits** page: one line per role, in a column shared by the whole page, grouped from the real machine to the rules: **La machine** (The machine: designers and manufacturer from the VPS database; the ROM, played by PinMAME, stays with the manufacturer), **La table** (The table: the VPX recreation), **L'habillage** (Dressing: backglass, PuP-Pack, DMD colours, remastered sounds, music, topper, point of view), **Le menu** (The menu: media whose source is recorded: VPinMediaDB, a site, a friend's cabinet; the others on one "Provenance non notée" (Source not recorded) line), **Règles et explications** (Rules and explanations: game guide, card, author's text, rule sheet, video). A part that is present but unknown is still listed, greyed out, "Auteur non renseigné" (Author unknown) with the reason: never a guessed name.
+- **Start on a line** (those with a page or more than four authors): all its authors, what they made elsewhere on the cabinet, and the page the part comes from as a QR code to scan with a phone (the phone remote's QR block, with its own wording: it pairs nothing).
+- **The community**: System menu > Cyber Pinball > "La communauté" (The community) (also from the Credits page): the cabinet's authors, from most to least present ("HauntFreaks · 8 frontons · 4 tables"; 40 at most, then "… and N more"), each with their tables; then the software and sites without which nothing works (VPX, PinMAME, B2S, Serum, PinUP Player, DOF; VPS, VPinMediaDB, VPUniverse, VPForums, IPDB, The Pinball Primer). This ranking only reads the `.info` files (not the tables themselves), rebuilt at most every 30 s.
+- **Attract mode**: the discreet line described in [Attract mode](#attract-mode).
+
+Where names come from, from most to least reliable (`tableAuthors`):
+
+- **The source recorded at installation** from the catalogue: `CyberPinball.source` in the `.info` for the table (the VPS file, its authors, version and page), `CyberPinball.parts.<kind>` for each dressing part (`b2s`, `pup`, `altcolor`, `altsound`, `music`, `topper`, `pov`: VPS id, version, authors, page, database note, date). A replaced part takes the old one's place.
+- **For the table only**: the recreation recognised in VPS from the author and version written in the table by its author (the author alone is enough only if they made a single recreation of that game), otherwise `Info.Authors` from the `.info` (filled at import), otherwise the author's text as is.
+- **Media**: the author of a VPUniverse or VPForums entry is recorded with the media's source (`MediaOrigin.author`).
+- A part installed before this version, or by hand, has no source: "Auteur non renseigné" (Author unknown). Reinstalling it from the catalogue (details screen > Gérer la table… (Manage table…) > Parties du jeu (Game parts)) records it.
+
+Guest mode: the Credits page can be read (door `sheet.credits`); The community is in the system menu, closed to guests.
+
+Tests: [credits.test.ts](../packages/core/src/test/credits.test.ts) (source read and written without touching the rest of the `.info`, authors from most to least reliable, no guessed name, page groups, summary, attract mode line, community ranking), [uisounds.test.ts](../packages/core/src/test/uisounds.test.ts) ("Mode attente" screen: each line comes back to itself).
+
 ## Interface language
 
 Everything Cyber Pinball displays exists in French and in English: table menu and game pages, system menu, setup wizard, VPX settings, the "Get" window, and the messages and findings of the core (doctor, synchronisation, import, update). Dates and numbers follow the language (`fr-FR` or `en-GB`). Console logs, test reports and files written for other tools stay in French.
@@ -1716,10 +1737,12 @@ After a while with no button pressed on the table menu, the cabinet shows itself
 - **Tables**: a table drawn at random every N seconds ("Table suivante en attente" (Next table in attract mode), 20 s by default), never the table selected in the menu nor one of the last ones shown (about a third of the tables), so that every table eventually comes up. Each screen shows that table's media; the playfield shows its background (less darkened than in the menu), its logo or, failing that, its title as a backup logo (`fallback.js`), manufacturer and year, and "Appuyez sur un bouton pour revenir au menu" (Press any button to return to the menu).
 - **Exit**: the first button, whichever it is, or a click, returns to the menu as it was, with no other effect: the selection does not move, Start does not open the details screen, Exit does not open the system menu.
 - **Sound**: "Son en attente" (Attract mode sound) is off by default; when set to reduced, the music of the table shown (or its video's sound) plays at 30% of its volume.
+- **Credits**: a discreet line at the bottom of the playfield, above the prompt, says who made the table shown: "Table TastyWasps, JPSalas et 12 autres · Fronton HauntFreaks · Couleurs Enthusiast" (the known ones, two lines at most; see [Community credits](#community-credits)). "Crédits de la table" (Table credits): shown by default, or hidden (`<data>\medias.json`, `attractCredits` field).
+- **Its settings, in one place**: System menu > "Médias" (Media) > "Médias, son et attente" (Media, sound and attract mode) > **"Mode attente"** (Attract mode) opens a screen of its own (`ATTRACT_ROWS`, [app/src/menu-settings.ts](../app/src/menu-settings.ts)): delay, next table, sound, table credits, cabinet schedule. The "Médias, son et attente" line sums them up ("une table toutes les 20 s · son coupé · crédits affichés").
 
 ### Cabinet schedule
 
-Like an arcade cabinet, the cabinet lives on its own when nobody is playing (attract mode, above), and a schedule rules its day (`ArcadeHours`, [packages/core/src/arcadehours.ts](../packages/core/src/arcadehours.ts); in the menu, [app/src/frontend.ts](../app/src/frontend.ts) and [app/src/arcade-hours.ts](../app/src/arcade-hours.ts)). System menu > "Médias" (Media) > "Médias, son et attente" (Media, sound and attract mode) > **"Horaire de la borne"** (Cabinet schedule); the settings go into `<data>\medias.json` (`hours` field).
+Like an arcade cabinet, the cabinet lives on its own when nobody is playing (attract mode, above), and a schedule rules its day (`ArcadeHours`, [packages/core/src/arcadehours.ts](../packages/core/src/arcadehours.ts); in the menu, [app/src/frontend.ts](../app/src/frontend.ts) and [app/src/arcade-hours.ts](../app/src/arcade-hours.ts)). System menu > "Médias" (Media) > "Médias, son et attente" (Media, sound and attract mode) > "Mode attente" (Attract mode) > **"Horaire de la borne"** (Cabinet schedule); the settings go into `<data>\medias.json` (`hours` field).
 
 - **Cabinet schedule: off** by default. While off, its settings stay visible and editable ("Settings kept; no effect while the schedule is off").
 - **Night**: "Night starts" (23:00) and "Night ends" (8:00), in whole hours; the night spans midnight. Equal start and end are refused in the list ("choose two different times"), rather than an invented 24-hour night. Local time; a clock change follows the wall clock.

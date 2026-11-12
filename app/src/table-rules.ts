@@ -28,6 +28,7 @@ import {
   type RuleBlock,
   type RuleSheet,
   type RuleVideo,
+  type RulesCredit,
   type SheetPage,
   type TableEntry,
   type VpsGame,
@@ -293,7 +294,25 @@ export function createTableRules(ctx: TableRulesContext) {
     return parts.join(', ');
   }
 
-  return { ensure, pages, summary, sourceLines };
+  /**
+   * Crédits des règles (page « Crédits » de la table) : d'où vient chaque page déjà trouvée. Le
+   * livret n'est pas cherché ici : sans « Prospectus et règles » ouvert, seul le connu est dit.
+   */
+  function credits(table: TableEntry, ownCards: number): RulesCredit[] {
+    const f = stateOf(table);
+    const out: RulesCredit[] = [];
+    if (f?.guide) out.push({ kind: 'rules', label: t('Guide du jeu'), text: 'Cyber Pinball', detail: t('rédigé pour la borne, d’après les règles de la machine') });
+    if (ownCards) out.push({ kind: 'rules', label: t('Carte des règles'), text: t('Rangée avec les médias de la table') });
+    else if (f?.vpxCard) out.push({ kind: 'rules', label: t('Carte des règles'), text: t('L’auteur de la table'), detail: t('rangée dans la table') });
+    if (f?.author.length) out.push({ kind: 'rules', label: t('Texte des règles'), text: t('L’auteur de la table'), detail: t('rangé dans la table') });
+    const sheet = f?.sheet.sheet;
+    if (sheet) out.push({ kind: 'rules', label: t('Feuille de règles'), text: siteLabel(sheet), url: sheet.url });
+    const video = f?.video.video;
+    if (video) out.push({ kind: 'video', label: t('Vidéo d’explication'), authors: video.authors, text: video.title, detail: video.authors?.length ? video.title : 'YouTube', url: video.url });
+    return out;
+  }
+
+  return { ensure, pages, summary, sourceLines, credits };
 }
 
 export type TableRules = ReturnType<typeof createTableRules>;

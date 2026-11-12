@@ -32,6 +32,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Virtual reality: every headset setting is now in System menu > Borne (Cabinet) > “Réalité virtuelle” (Virtual reality): turning it on, “Caler la borne” (Align the cabinet), “Manettes du casque” (Headset controllers) and the new “Recopie sur le playfield” (Mirror on the playfield), off by default: the playfield screen keeps Cyber Pinball during a game in the headset.
 - Virtual reality: in the headset menu, the screens now sit in a real dressed pinball cabinet (CYBER PINBALL sides, lit buttons, coin door, legs), inside a capsule open on a sky of nebulas and stars. After “Caler la borne” (Align the cabinet), the cabinet takes the width of your lockdown bar.
 - DMD on the wheel: position, size and format can be adjusted again. The chosen line stayed open for an instant then closed by itself, and releasing a flipper moved the DMD one pixel too far.
+- Community credits: a table's details screen has a “Crédits” (Credits) entry that says who made the table, its backglass, PuP-Pack, colours and sounds, its media and its rules, from the VPS database. Start on a line shows all its authors and the page the part comes from, as a QR code to scan with your phone. An unknown author is still listed, greyed out, never with a guessed name.
+- Community credits: the wheel names the table's main author (“Data East · 1990 · par TastyWasps”), and System menu > Cyber Pinball > “La communauté” (The community) gathers the authors of your tables, from most to least present, then the software and sites. Parts installed from the catalogue now keep their authors.
+- Attract mode: a discreet line at the bottom names the authors of the table shown. All its settings are now in System menu > Media > “Médias, son et attente” (Media, sound and attract) > “Mode attente” (Attract mode): delay, next table, sound, credits (shown or hidden) and cabinet schedule.
 
 ## 0.1.10
 

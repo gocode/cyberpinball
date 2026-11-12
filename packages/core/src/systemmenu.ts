@@ -55,6 +55,7 @@ export const SYSTEM_ITEM_IDS = [
   'language',
   'updates',
   'terms',
+  'community',
   'backups',
   'media-import',
   'rom-migration',
@@ -153,9 +154,9 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'cyberpinball',
     icon: 'pinball-app',
     label: 'Cyber Pinball', // i18n-ignore : le nom de l'application
-    get detail() { return t('Langue, mise à jour, activité récente, sauvegardes, migration, conditions d’utilisation, quitter ou redémarrer, veille et extinction'); },
+    get detail() { return t('Langue, mise à jour, activité récente, sauvegardes, migration, conditions d’utilisation, la communauté, quitter ou redémarrer, veille et extinction'); },
     // Les sorties à la fin, de la plus légère à la plus lourde : quitter ou relancer Cyber Pinball, veille, redémarrage, arrêt.
-    entries: ['language', 'updates', 'activity', 'backups', 'migration', 'terms', 'quit', 'relaunch', 'sleep', 'restart', 'shutdown'],
+    entries: ['language', 'updates', 'activity', 'backups', 'migration', 'terms', 'community', 'quit', 'relaunch', 'sleep', 'restart', 'shutdown'],
   },
   migration: {
     id: 'migration',
@@ -225,6 +226,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   language: { icon: 'language', label: 'Langue / Language' }, // i18n-ignore
   updates: { icon: 'upgrade', get label() { return t('Mise à jour de Cyber Pinball'); } },
   terms: { icon: 'rules', get label() { return t('Conditions d’utilisation'); } },
+  // Crédits de la communauté (app/src/credits-menu.ts) : les auteurs des tables de la borne, les logiciels, les sites.
+  community: { icon: 'credits', get label() { return t('La communauté'); } },
   backups: { icon: 'drive', get label() { return t('Sauvegardes'); } },
   'media-import': { icon: 'folder-download', get label() { return t('Reprendre les médias'); } },
   'rom-migration': { icon: 'link', get label() { return t('Regrouper les ROM'); } },

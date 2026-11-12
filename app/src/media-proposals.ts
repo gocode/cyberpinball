@@ -879,7 +879,7 @@ export function createProposals(ctx: ProposalsContext) {
     }
     if (choice.site?.received) {
       const hit = choice.site.hit;
-      const text = ctx.place(table, type, { from: choice.file!, mode: 'copy', origin: { origin: mediaSite(hit.site).name, url: hit.url, vpsId: choice.vpsId } });
+      const text = ctx.place(table, type, { from: choice.file!, mode: 'copy', origin: { origin: mediaSite(hit.site).name, url: hit.url, vpsId: choice.vpsId, ...(hit.author ? { author: hit.author } : {}) } });
       return stayAfterPick(type, text);
     }
     if (!choice.offer) {
@@ -1090,7 +1090,7 @@ export function createProposals(ctx: ProposalsContext) {
       return;
     }
     const c = files[0]!;
-    const text = ctx.place(table, wanted.type, { from: c.file!, mode: 'copy', origin: { origin: mediaSite(job.hit.site).name, url: job.hit.url, vpsId: c.vpsId } });
+    const text = ctx.place(table, wanted.type, { from: c.file!, mode: 'copy', origin: { origin: mediaSite(job.hit.site).name, url: job.hit.url, vpsId: c.vpsId, ...(job.hit.author ? { author: job.hit.author } : {}) } });
     state.notice = { text: `${t('Reçu de {site}.', { site: mediaSite(job.hit.site).name })} ${text}`, tone: 'ok' };
   });
 

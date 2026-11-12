@@ -2153,6 +2153,8 @@ library.provideSystemItem('language', createLanguageMenu({ library, relaunch: ()
 // Conditions d'utilisation : à accepter au démarrage tant que la version en cours ne l'est pas, à relire ici.
 const termsMenu = createTermsMenu({ library, dataDir: loc.dataDir, quit: () => void quit() });
 library.provideSystemItem('terms', termsMenu.systemItem);
+// La communauté : les auteurs des tables de la borne, les logiciels, les sites (credits-menu.ts).
+library.provideSystemItem('community', library.credits.systemItem);
 // Mise à jour de Cyber Pinball : recherche discrète en arrière-plan (pastille rouge), installation à la demande.
 const updates = createUpdatesMenu({
   loc,
@@ -6190,17 +6192,21 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
   const table = shown ?? tables[state.index];
   // Le logo n'est cherché que pour la liste, dessinée par le playfield.
   const wheel = (t: TableEntry) => (role === 'playfield' ? m?.wheel(t) : undefined);
-  const describe = (t: TableEntry) => ({
-    title: t.title,
-    manufacturer: t.manufacturer,
-    year: t.year,
-    subtitle: [t.manufacturer, t.year].filter(Boolean).join(' · '),
-    version: t.version,
-    plays: t.info.User?.StartCount ?? 0,
-    lastRun: t.info.User?.LastRun,
-    favorite: isFavorite(t.info),
-    wheel: wheel(t),
-  });
+  // `credit` : la table choisie dans la roue, « Data East · 1990 · par TastyWasps » (l'auteur principal de la recréation).
+  const describe = (entry: TableEntry, credit = false) => {
+    const lead = credit ? library.credits.lead(entry) : undefined;
+    return {
+      title: entry.title,
+      manufacturer: entry.manufacturer,
+      year: entry.year,
+      subtitle: [entry.manufacturer, entry.year, lead ? t('par {name}', { name: lead }) : undefined].filter(Boolean).join(' · '),
+      version: entry.version,
+      plays: entry.info.User?.StartCount ?? 0,
+      lastRun: entry.info.User?.LastRun,
+      favorite: isFavorite(entry.info),
+      wheel: wheel(entry),
+    };
+  };
   // Voisines de la table choisie, pour la liste et la roue : identité stable (le fichier),
   // titre, fabricant et année (logo de repli de la roue), version et logo.
   const neighbor = (t: TableEntry, offset: number) => ({ offset, key: t.file, title: t.title, manufacturer: t.manufacturer, year: t.year, version: t.version, wheel: wheel(t) });
@@ -6229,7 +6235,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     help: state.help,
     count: ring.count,
     position: ring.position,
-    table: !shown && onJukebox() ? jukeboxCard() : table ? describe(table) : undefined,
+    table: !shown && onJukebox() ? jukeboxCard() : table ? describe(table, !shown) : undefined,
     neighbors,
     // Repère de la collection active, partout où le menu des tables est dessiné (sous une fiche aussi :
     // sa zone ne bouge jamais), et la liste des collections quelques secondes après un MagnaSave, au menu seulement
@@ -6275,7 +6281,8 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     ...(role === 'playfield' ? menuCorner() : {}),
     library: state.phase === 'library' ? library.view() : undefined,
     // Mode attente : la table montrée, son logo, et l'invite du playfield.
-    attract: shown ? { ...describe(shown), wheel: m?.wheel(shown) } : undefined,
+    // Ses crédits en une ligne discrète, au-dessus de l'invite (réglage « Crédits de la table » du mode attente).
+    attract: shown ? { ...describe(shown), wheel: m?.wheel(shown), ...(mediaSettings.attractCredits ? { credits: library.credits.attractLine(shown) } : {}) } : undefined,
     // Horaire : voile noir de la nuit (0 à 1) sur chaque écran, en attente seulement.
     night: shown && hours.night() ? mediaSettings.hours.nightDim / 100 : 0,
     // Préavis d'arrêt (dessiné par le playfield) : son heure dans l'horloge de la fenêtre.

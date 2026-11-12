@@ -143,6 +143,8 @@ export const ICON_NAMES = [
   'upload',
   // Réalité virtuelle (Menu système > Borne)
   'vr',
+  // Crédits de la communauté (fiche d'une table, Menu système > Cyber Pinball > La communauté)
+  'credits',
 ] as const;
 
 

@@ -3569,6 +3569,11 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   grid-template-columns: minmax(14cqmin, max-content) minmax(0, 1fr);
 }
 
+/* Crédits (credits-menu.ts) : une colonne de rôles commune à tous les groupes de la page, les noms partent du même bord. */
+.lib-credits .kind-spec .lib-rows {
+  grid-template-columns: 26cqmin minmax(0, 1fr);
+}
+
 .kind-spec .lib-row.with-parts {
   grid-column: 1 / -1;
   display: grid;

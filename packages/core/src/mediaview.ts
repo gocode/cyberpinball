@@ -557,6 +557,8 @@ export interface MenuMediaSettings {
   /** Secondes entre deux tables tirées au hasard en mode attente. */
   attractInterval: number;
   attractSound: AttractSound;
+  /** Crédits de la table montrée (credits.ts) : une ligne discrète au-dessus de l'invite ; affichés par défaut. */
+  attractCredits: boolean;
   /** Roue de logos (une des cinq) ou liste de titres, dans le menu des tables. */
   menuLayout: MenuLayout;
   /** Ordre des tables dans le menu (tableorder.ts) : par titre par défaut. */
@@ -622,6 +624,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   attractDelay: 300,
   attractInterval: 20,
   attractSound: 'muted',
+  attractCredits: true,
   menuLayout: 'medaillons',
   tableOrder: 'title',
   startTable: 'first',
@@ -664,6 +667,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     attractDelay: intIn(r.attractDelay, 0, 24 * 3600, d.attractDelay),
     attractInterval: intIn(r.attractInterval, 3, 3600, d.attractInterval),
     attractSound: r.attractSound === 'reduced' || r.attractSound === 'muted' ? r.attractSound : d.attractSound,
+    attractCredits: typeof r.attractCredits === 'boolean' ? r.attractCredits : d.attractCredits,
     menuLayout: menuLayoutOf(r.menuLayout, d.menuLayout),
     tableOrder: TABLE_ORDERS.includes(r.tableOrder as TableOrder) ? (r.tableOrder as TableOrder) : d.tableOrder,
     startTable: START_TABLES.includes(r.startTable as StartTable) ? (r.startTable as StartTable) : d.startTable,

@@ -3308,6 +3308,29 @@ html.attract-mode #media-bg::after {
   text-shadow: 0 0.2vmin 0.8vmin rgba(0, 0, 0, 0.95);
 }
 
+/* Crédits de la table montrée : une ligne discrète au-dessus de l'invite (deux au plus), lisible sur une vidéo claire. */
+.attract-credits {
+  max-width: min(100%, 110vmin);
+  margin: 0 0 2.4vmin;
+  font-size: 2.1vmin;
+  line-height: 1.45;
+  color: var(--meta);
+  text-shadow: 0 0.2vmin 0.8vmin rgba(0, 0, 0, 0.95);
+  text-wrap: balance;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.attract-credits-role {
+  opacity: 0.75;
+}
+
+.attract-credits-names {
+  color: var(--ink);
+}
+
 .attract-hint {
   padding: 1vmin 3vmin;
   border: 1px solid var(--line-strong);

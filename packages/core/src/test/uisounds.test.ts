@@ -296,14 +296,15 @@ test('knocker : records lus avant la partie et au retour, sonné seulement si un
 
 interface BuiltLike {
   heading: string;
-  actions: { label: string; icon?: string; run: () => void }[];
+  actions: { label: string; detail?: string; icon?: string; run: () => void }[];
   back: () => void;
 }
 
 test('réglages du menu : chaque sous-écran revient sur sa propre ligne ; aperçu des sons', () => {
-  const { createMenuSettings, MENU_SETTINGS_ROWS } = require(path.join(REPO_ROOT, 'app', 'dist', 'menu-settings.js')) as {
+  const { createMenuSettings, MENU_SETTINGS_ROWS, ATTRACT_ROWS } = require(path.join(REPO_ROOT, 'app', 'dist', 'menu-settings.js')) as {
     createMenuSettings(host: unknown): { run(): void };
     MENU_SETTINGS_ROWS: readonly string[];
+    ATTRACT_ROWS: readonly string[];
   };
   let settings: MenuMediaSettings = { ...S };
   const opened: { build: () => BuiltLike; at: number }[] = [];
@@ -327,22 +328,43 @@ test('réglages du menu : chaque sous-écran revient sur sa propre ligne ; aper�
   const icons = main().actions.slice(0, -1).map((a) => a.icon);
   assert.equal(new Set(icons).size, icons.length, icons.join(', '));
 
-  for (let i = 0; i < MENU_SETTINGS_ROWS.length; i++) {
-    const before = opened.length;
-    const snapshot = settings;
-    main().actions[i]!.run();
-    if (opened.length === before) {
-      settings = snapshot; // réglage basculé sur place : on le remet
-      continue;
+  /** Chaque ligne de l'écran `screen` : son sous-écran revient sur elle, par Exit comme par un choix. */
+  function eachRowComesBack(screen: () => BuiltLike, rows: readonly string[], skip: readonly string[] = []): void {
+    for (let i = 0; i < rows.length; i++) {
+      if (skip.includes(rows[i]!)) continue;
+      const before = opened.length;
+      const snapshot = settings;
+      screen().actions[i]!.run();
+      if (opened.length === before) {
+        settings = snapshot; // réglage basculé sur place : on le remet
+        continue;
+      }
+      const sub = opened.at(-1)!.build();
+      sub.back();
+      assert.equal(opened.at(-1)!.at, i, `${rows[i]} : Exit revient sur sa ligne`);
+      // Un choix aussi revient sur la ligne.
+      opened.at(-2)!.build().actions[0]!.run();
+      assert.equal(opened.at(-1)!.at, i, `${rows[i]} : un choix revient sur sa ligne`);
+      settings = snapshot;
     }
-    const sub = opened.at(-1)!.build();
-    sub.back();
-    assert.equal(opened.at(-1)!.at, i, `${MENU_SETTINGS_ROWS[i]} : Exit revient sur sa ligne`);
-    // Un choix aussi revient sur la ligne.
-    opened.at(-2)!.build().actions[0]!.run();
-    assert.equal(opened.at(-1)!.at, i, `${MENU_SETTINGS_ROWS[i]} : un choix revient sur sa ligne`);
-    settings = snapshot;
   }
+  // « Mode attente » est un écran de réglages à lui seul : Exit y revient, puis chacune de ses lignes revient sur elle-même.
+  eachRowComesBack(main, MENU_SETTINGS_ROWS, ['attract']);
+  main().actions[MENU_SETTINGS_ROWS.indexOf('attract')]!.run();
+  const attract = opened.at(-1)!.build;
+  assert.equal(attract().heading, 'Mode attente');
+  assert.equal(attract().actions.length, ATTRACT_ROWS.length + 1, 'une ligne par réglage, plus Retour');
+  const attractIcons = attract().actions.slice(0, -1).map((a) => a.icon);
+  assert.equal(new Set(attractIcons).size, attractIcons.length, attractIcons.join(', '));
+  attract().back();
+  assert.equal(opened.at(-1)!.at, MENU_SETTINGS_ROWS.indexOf('attract'), 'Mode attente : Exit revient sur sa ligne');
+  eachRowComesBack(attract, ATTRACT_ROWS);
+  // Crédits de la table montrée : basculés sur place, affichés par défaut.
+  assert.match(attract().actions[ATTRACT_ROWS.indexOf('attractCredits')]!.label, /Crédits de la table : affichés/);
+  attract().actions[ATTRACT_ROWS.indexOf('attractCredits')]!.run();
+  assert.equal(settings.attractCredits, false);
+  assert.match(main().actions[MENU_SETTINGS_ROWS.indexOf('attract')]!.detail ?? '', /crédits masqués/);
+  settings = { ...S };
   // Basculer les sons fait entendre le clic ; choisir leur volume, la pièce ; rétablir le lancement en cinéma, le coup de bobine.
   assert.ok(previews.includes('solenoid'));
   assert.ok(previews.includes('coin'));

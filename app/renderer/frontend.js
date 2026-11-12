@@ -931,6 +931,15 @@ function attractScreen(s) {
   }
   if (a.subtitle) middle.append(el('div', 'attract-subtitle', a.subtitle));
   box.append(brand(), middle);
+  // Crédits de la table montrée, discrets, au-dessus de l'invite : rôle en retrait, noms en clair (credits.ts, attractCredits).
+  if (a.credits?.length) {
+    const line = el('p', 'attract-credits');
+    a.credits.forEach((c, i) => {
+      if (i) line.append(' · ');
+      line.append(el('span', 'attract-credits-role', c.role), ' ', el('span', 'attract-credits-names', c.names));
+    });
+    box.append(line);
+  }
   // Pendant le préavis d'arrêt de l'horaire, sa propre invite seule : pas deux consignes à la fois.
   if (!s.stop) box.append(el('div', 'attract-hint', t('Appuyez sur un bouton pour revenir au menu')));
   return box;

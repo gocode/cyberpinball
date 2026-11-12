@@ -54,6 +54,8 @@ import {
   readInfo,
   readDmdPlaces,
   setTableSource,
+  setPartSources,
+  partSourcesFrom,
   type WaitItem,
   classifyFile,
   describePupCabinet,
@@ -175,6 +177,7 @@ import {
   type TableEntry,
   type TablePlan,
   type VpsDb,
+  type VpsGame,
   type VpsRefresh,
   type VpsTableFile,
   type GuestDoor,
@@ -215,7 +218,14 @@ import {
   isFullAddress,
   prefixedText,
   type VrNetworkFacts,
+  mediaOriginOf,
+  MEDIADB_NAME,
+  MEDIADB_REPO_URL,
+  partSourcesOf,
+  type MediaCredit,
+  type TableCreditsInput,
 } from '@cyberpinball/core';
+import { createCreditsMenu, type CreditsDepth } from './credits-menu';
 import { prepareImport, unpackArchive, type PreparedImport } from './archives';
 import { createDofMenu } from './dof-menu';
 import { dofDir, readDof, vpxWorkDir } from './dof-files';
@@ -1231,6 +1241,87 @@ export function createLibrary(host: LibraryHost) {
     playfield: (table) => readVpxPlayfield(table.file),
     playfieldImage: (table) => mediaSearch.vpxImages(table).find((i) => i.type === 'Playfield')?.file,
     broadcast: () => host.broadcast(),
+  });
+
+  // ---------- Crédits de la communauté (credits-menu.ts) ----------
+
+  /** Jeu VPS d'une table, d'après sa provenance ou son identifiant VPS, sans rien télécharger (la base déjà là). */
+  function vpsGameOf(table: TableEntry): VpsGame | undefined {
+    const dir = layout()?.downloads;
+    if (dir && !vpsLoaded) {
+      vpsDb = loadVpsDb(dir);
+      vpsLoaded = true;
+    }
+    const id = tableSourceOf(table.info)?.vpsGameId ?? (typeof table.info.Info?.VPSId === 'string' ? table.info.Info.VPSId.trim() : '');
+    return id ? vpsDb?.games.find((g) => g.id === id) : undefined;
+  }
+
+  /** Médias de la table dont la provenance est notée ; les autres regroupés sur une ligne « Provenance non notée ». */
+  function mediaCredits(table: TableEntry): MediaCredit[] {
+    if (!host.root) return [];
+    const out: MediaCredit[] = [];
+    const unknown: string[] = [];
+    for (const type of MANAGED_MEDIA_TYPES) {
+      // La carte des règles est créditée avec les règles.
+      if (type === 'GameHelp') continue;
+      const files = ownMediaPages(table, host.root, type);
+      if (!files.length) continue;
+      const label = mediaTypeInfo(type).label;
+      const origin = mediaOriginOf(table, type, files[0]);
+      if (!origin) {
+        unknown.push(label);
+        continue;
+      }
+      const date = new Date(origin.date);
+      const fromDb = origin.origin === MEDIADB_NAME;
+      out.push({
+        label,
+        origin: origin.origin,
+        ...(origin.author ? { authors: [origin.author] } : {}),
+        ...(fromDb ? { url: MEDIADB_REPO_URL } : /^https?:\/\//.test(origin.url) ? { url: origin.url } : {}),
+        ...(Number.isNaN(date.getTime()) ? {} : { detail: t('téléchargé le {date}', { date: formatDate(date, { day: '2-digit', month: '2-digit', year: 'numeric' }) }) }),
+      });
+    }
+    if (unknown.length) out.push({ label: t('Autres médias'), origin: t('Provenance non notée'), detail: formatList(unknown) });
+    return out;
+  }
+
+  /**
+   * Ce que la borne sait des crédits d'une table : `quick` sans rien lire (classement de la
+   * communauté, mode attente), `table` avec ce que l'auteur a écrit dans la table (résumé de la
+   * fiche), `full` avec les fichiers du dossier, les médias et les règles (page « Crédits »).
+   */
+  function creditsInput(table: TableEntry, depth: CreditsDepth): TableCreditsInput {
+    const input: TableCreditsInput = {
+      game: vpsGameOf(table),
+      source: tableSourceOf(table.info),
+      infoAuthors: table.info.Info?.Authors,
+      manufacturer: table.manufacturer,
+      year: table.year,
+      parts: partSourcesOf(table.info),
+      present: {},
+      medias: [],
+      rules: [],
+    };
+    if (depth === 'quick') return input;
+    const written = mediaSearch.vpxInfo(table.file);
+    input.vpxAuthor = written?.author;
+    input.vpxVersion = written?.version;
+    if (depth === 'table') return input;
+    const inv = inventory(table.file, !samePath(table.folder, tablesDir()));
+    const script = cachedScript(table.file, host.dataDir);
+    if (script?.usesPinmame && script.roms[0]) input.rom = script.roms[0];
+    input.present = { b2s: Boolean(inv.backglass), pup: inv.pup.length > 0, altcolor: inv.serum.length + inv.vni.length > 0, altsound: inv.altsound.length > 0, music: inv.music > 0 };
+    input.medias = mediaCredits(table);
+    input.rules = tableRules.credits(table, pagesOf(table, 'GameHelp').length);
+    return input;
+  }
+
+  const credits = createCreditsMenu({
+    library: { openCustom: (build, at) => openCustom(build, at), openSystem: () => openSystem() },
+    input: creditsInput,
+    tables: () => host.tables(),
+    openSheet: (table) => openSheet(table),
   });
 
   // ---------- Gestionnaire de téléchargements ----------
@@ -2456,6 +2547,7 @@ export function createLibrary(host: LibraryHost) {
       ...(host.playWithFriend ? [{ ...host.playWithFriend(table, () => openSheet(table)), door: 'sheet.friends' as const }] : []),
       ...(host.scores ? [scoresAction(table)] : []),
       pagesAction(table),
+      { label: t('Crédits'), detail: credits.summary(table), icon: 'credits', door: 'sheet.credits', run: () => credits.open(table) },
       ...(host.favorite ? [favoriteAction(table)] : []),
       ...(host.tableCollections ? [{ ...host.tableCollections(table, () => openSheet(table)), door: 'sheet.collections' as const }] : []),
       {
@@ -4046,26 +4138,32 @@ export function createLibrary(host: LibraryHost) {
   /**
    * Après l'installation de fichiers récupérés depuis le catalogue : provenance dans le
    * .info de chaque table du jeu (CyberPinball.source : jeu et fichier VPS, version,
-   * date), pour les mises à jour ; éléments de la liste d'attente marqués installés.
+   * date), pour les mises à jour ; celle de chaque pièce de l'habillage (CyberPinball.parts :
+   * fronton, PuP-Pack, couleurs, sons… avec leurs auteurs), pour les crédits ; éléments de la
+   * liste d'attente marqués installés.
    */
   function noteSource(acquisition: NonNullable<AddPlan['acquisition']>, files: string[]): void {
     const table = acquisition.items.find((i) => i.kind === 'table');
-    if (table) {
+    const parts = partSourcesFrom(acquisition.items, vpsDb?.games.find((g) => g.id === acquisition.gameId));
+    if (table || Object.keys(parts).length) {
       for (const file of files) {
         const entry = find(file);
         if (!entry || (entry.info.Info?.VPSId && entry.info.Info.VPSId !== acquisition.gameId)) continue;
         const infoFile = infoFileFor(entry, tablesDir());
-        const info = readInfo(infoFile);
-        const next = setTableSource(info, {
-          origin: 'VPS',
-          vpsGameId: acquisition.gameId,
-          vpsFileId: table.fileId,
-          version: table.version,
-          authors: table.authors,
-          updatedAt: table.updatedAt,
-          page: table.page,
-          installedAt: new Date().toISOString(),
-        });
+        let next = readInfo(infoFile);
+        if (table) {
+          next = setTableSource(next, {
+            origin: 'VPS',
+            vpsGameId: acquisition.gameId,
+            vpsFileId: table.fileId,
+            version: table.version,
+            authors: table.authors,
+            updatedAt: table.updatedAt,
+            page: table.page,
+            installedAt: new Date().toISOString(),
+          });
+        }
+        if (Object.keys(parts).length) next = setPartSources(next, parts);
         applyOps([{ op: 'write', path: infoFile, content: JSON.stringify(next, null, 2) + '\n' }], { trashDir: trashDirFor(layout()!.trash, 'Remplacé à l’import') }); // i18n-ignore : nom de dossier
       }
       host.reload(files[0]);
@@ -5039,6 +5137,8 @@ export function createLibrary(host: LibraryHost) {
     openSystem,
     openSystemRoot,
     openCustom,
+    /** Crédits de la communauté : page d'une table, La communauté, lignes de la roue et du mode attente. */
+    credits,
     /** Position du curseur de l'écran ouvert (Activité récente : la ligne qu'on regarde est vue). */
     cursor: () => cursor,
     /** Une entrée du menu système ouverte depuis un autre écran : son « Retour » ramène à `back`. */

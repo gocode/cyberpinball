@@ -36,6 +36,7 @@ test('mode invité : les portes ouvertes sont exactement celles-ci, chacune pour
     'message.replay': 'rejouer la table après un arrêt de VPX : la même partie que « Jouer », rien de modifié',
     'sheet.play': 'jouer',
     'sheet.read': 'lire le prospectus et les règles',
+    'sheet.credits': 'lire les crédits de la table et le QR code de la page d’un auteur : rien n’est modifié ni téléchargé',
     'sheet.scores': 'lire le tableau des scores de la table : rien n’est modifié',
     'sheet.back': 'revenir au menu',
   } as Record<GuestDoor, string>;

@@ -191,3 +191,4 @@ export * from './vr-reseau';
 export * from './terms';
 export * from './vr-sources';
 export * from './vr-ecrans';
+export * from './credits';

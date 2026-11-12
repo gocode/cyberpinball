@@ -30,6 +30,8 @@ export interface RemoteBlock {
 /** Ce qu'un écran dit du téléphone à la place des phrases ordinaires (connexion dans Edge : le piloter). */
 export interface RemoteWording {
   offer?: string;
+  /** Phrases sous le titre d'un QR code qui n'appaire pas le téléphone (la page d'un auteur, crédits) : à la place de celles de la télécommande. */
+  offerLines?: string[];
   paired?: string[];
 }
 
@@ -41,9 +43,9 @@ export function remoteBlock(bar: RemoteBar, place: 'screen' | 'keyboard', wordin
         phase: 'offer',
         qr: bar.qr,
         title: wording?.offer ?? (big ? t('Connecter un téléphone') : t('Taper au téléphone')),
-        lines: big
+        lines: wording?.offerLines ?? (big
           ? [t('Scannez avec votre téléphone, connecté au même réseau Wi-Fi que la borne.'), t('Aucune application à installer. Accepté une fois, le téléphone revient ensuite sans QR code.')]
-          : [t('Scannez ce QR sur le même réseau Wi-Fi que la borne.')],
+          : [t('Scannez ce QR sur le même réseau Wi-Fi que la borne.')]),
       };
     case 'pending':
       return {

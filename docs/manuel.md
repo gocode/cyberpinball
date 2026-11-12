@@ -927,6 +927,27 @@ Cyber Pinball ne fournit aucune table, ROM ni média de jeu commercial : ses con
 
 Garde-fou : [terms.test.ts](../packages/core/src/test/terms.test.ts) vérifie le texte dans les deux langues, sa forme pour l'installeur, et que l'application relit le fichier écrit par l'installeur.
 
+## Crédits de la communauté
+
+Les tables, les frontons, les PuP-Packs, les couleurs et les sons du DMD, les toppers, les médias et les règles sont l'œuvre de la communauté du flipper virtuel. Cyber Pinball cite leurs auteurs sans encombrer le jeu ([packages/core/src/credits.ts](../packages/core/src/credits.ts) ; à l'écran, [app/src/credits-menu.ts](../app/src/credits-menu.ts)) :
+
+- **La roue** : sous le titre, l'auteur principal de la recréation, comme l'auteur d'un livre : « Data East · 1990 · par TastyWasps ». Le premier auteur cité (VPS et les auteurs mettent l'équipe principale en tête) ; rien quand on ne le connaît pas.
+- **La fiche d'une table** : l'entrée « Crédits », après « Prospectus et règles », résume (« Table de TastyWasps, JPSalas et 12 autres · fronton de HauntFreaks ») et ouvre la page **Crédits** : une ligne par rôle, dans une colonne commune à toute la page, groupées de la vraie machine aux règles : **La machine** (concepteurs et fabricant d'après la base VPS ; la ROM, jouée par PinMAME, reste au fabricant), **La table** (la recréation VPX), **L'habillage** (fronton, PuP-Pack, couleurs du DMD, sons remasterisés, musique, topper, point de vue), **Le menu** (les médias dont la provenance est notée : VPinMediaDB, un site, la borne d'un ami ; les autres sur une ligne « Provenance non notée »), **Règles et explications** (guide du jeu, carte, texte de l'auteur, feuille de règles, vidéo). Une pièce présente dont on ne sait rien reste dite, grisée, « Auteur non renseigné » avec la raison : jamais un nom deviné.
+- **Start sur une ligne** (celles qui ont une page ou plus de quatre auteurs) : tous ses auteurs, ce qu'ils ont fait d'autre sur la borne, et la page d'où vient la pièce en QR code, à viser au téléphone (le bloc du QR de la télécommande, avec ses propres phrases : il n'appaire rien).
+- **La communauté** : Menu système > Cyber Pinball > « La communauté » (aussi depuis la page Crédits) : les auteurs de la borne, des plus présents aux moins présents (« HauntFreaks · 8 frontons · 4 tables » ; 40 au plus, puis « … et N autres »), chacun avec ses tables ; puis les logiciels et les sites sans lesquels rien ne marche (VPX, PinMAME, B2S, Serum, PinUP Player, DOF ; VPS, VPinMediaDB, VPUniverse, VPForums, IPDB, The Pinball Primer). Ce classement ne lit que les `.info` (pas les tables elles-mêmes), refait au plus toutes les 30 s.
+- **Le mode attente** : la ligne discrète décrite dans [Mode attente](#mode-attente).
+
+D'où viennent les noms, du plus sûr au moins sûr (`tableAuthors`) :
+
+- **La provenance notée à l'installation** depuis le catalogue : `CyberPinball.source` du `.info` pour la table (le fichier VPS, ses auteurs, sa version, sa page), `CyberPinball.parts.<sorte>` pour chaque pièce de l'habillage (`b2s`, `pup`, `altcolor`, `altsound`, `music`, `topper`, `pov` : identifiant VPS, version, auteurs, page, précision de la base, date). Une pièce remplacée prend la place de l'ancienne.
+- **Pour la table seule** : la recréation reconnue chez VPS d'après l'auteur et la version écrits dans la table par son auteur (l'auteur seul ne suffit que s'il n'a fait qu'une recréation de ce jeu), sinon `Info.Authors` du `.info` (rempli à l'import), sinon le texte de l'auteur tel quel.
+- **Les médias** : l'auteur d'une fiche de VPUniverse ou de VPForums est noté avec la provenance du média (`MediaOrigin.author`).
+- Une pièce installée avant cette version, ou à la main, n'a pas de provenance : « Auteur non renseigné ». La réinstaller depuis le catalogue (fiche > Gérer la table… > Parties du jeu) la note.
+
+Mode invité : la page Crédits se lit (porte `sheet.credits`), La communauté est au menu système, fermé à l'invité.
+
+Tests : [credits.test.ts](../packages/core/src/test/credits.test.ts) (provenance lue et écrite sans toucher au reste du `.info`, auteurs du plus sûr au moins sûr, aucun nom deviné, groupes de la page, résumé, ligne du mode attente, classement de la communauté), [uisounds.test.ts](../packages/core/src/test/uisounds.test.ts) (écran « Mode attente » : chaque ligne revient sur elle-même).
+
 ## Langue de l'interface
 
 Tout ce qu'affiche Cyber Pinball existe en français et en anglais : menu des tables et fiches, menu système, assistant, réglages de VPX, fenêtre « Récupérer », messages et constats du cœur (médecin, synchronisation, import, mise à jour). Les dates et les nombres suivent la langue (`fr-FR` ou `en-GB`). Les journaux de la console, les rapports des essais et les fichiers écrits pour d'autres outils restent en français.
@@ -1716,10 +1737,12 @@ Après un temps sans bouton sur le menu des tables, la borne se présente toute 
 - **Tables** : une table tirée au hasard toutes les N secondes (« Table suivante en attente », 20 s par défaut), jamais la table choisie dans le menu ni l'une des dernières montrées (un tiers des tables environ), si bien que toutes finissent par passer. Chaque écran montre les médias de cette table ; le playfield, son fond (moins assombri qu'au menu), son logo ou à défaut son titre en logo de secours (`fallback.js`), fabricant et année, et « Appuyez sur un bouton pour revenir au menu ».
 - **Sortie** : le premier bouton, quel qu'il soit, ou un clic, revient au menu tel qu'il était, sans autre effet : la sélection ne bouge pas, Start n'ouvre pas la fiche, Exit n'ouvre pas le menu système.
 - **Son** : « Son en attente » coupé par défaut ; réduit, la musique de la table montrée (ou le son de sa vidéo) joue à 30 % de son volume.
+- **Crédits** : une ligne discrète en bas du plateau, au-dessus de l'invite, cite qui a fait la table montrée : « Table TastyWasps, JPSalas et 12 autres · Fronton HauntFreaks · Couleurs Enthusiast » (ceux qu'on connaît, deux lignes au plus ; voir [Crédits de la communauté](#crédits-de-la-communauté)). « Crédits de la table » : affichés par défaut, ou masqués (`<données>\medias.json`, champ `attractCredits`).
+- **Ses réglages, au même endroit** : Menu système > « Médias » > « Médias, son et attente » > **« Mode attente »** ouvre un écran à lui (`ATTRACT_ROWS`, [app/src/menu-settings.ts](../app/src/menu-settings.ts)) : délai, table suivante, son, crédits de la table, horaire de la borne. La ligne de « Médias, son et attente » les résume (« une table toutes les 20 s · son coupé · crédits affichés »).
 
 ### Horaire de la borne
 
-Comme une borne de salle d'arcade, la borne vit seule quand personne ne joue (le mode attente, ci-dessus), et un horaire règle sa journée (`ArcadeHours`, [packages/core/src/arcadehours.ts](../packages/core/src/arcadehours.ts) ; dans le menu, [app/src/frontend.ts](../app/src/frontend.ts) et [app/src/arcade-hours.ts](../app/src/arcade-hours.ts)). Menu système > « Médias » > « Médias, son et attente » > **« Horaire de la borne »** ; les réglages vont dans `<données>\medias.json` (champ `hours`).
+Comme une borne de salle d'arcade, la borne vit seule quand personne ne joue (le mode attente, ci-dessus), et un horaire règle sa journée (`ArcadeHours`, [packages/core/src/arcadehours.ts](../packages/core/src/arcadehours.ts) ; dans le menu, [app/src/frontend.ts](../app/src/frontend.ts) et [app/src/arcade-hours.ts](../app/src/arcade-hours.ts)). Menu système > « Médias » > « Médias, son et attente » > « Mode attente » > **« Horaire de la borne »** ; les réglages vont dans `<données>\medias.json` (champ `hours`).
 
 - **Horaire de la borne : désactivé** par défaut. Désactivé, ses réglages restent visibles et modifiables (« Réglages conservés ; aucun effet tant que l'horaire est désactivé »).
 - **Nuit** : « Début de la nuit » (23 h) et « Fin de la nuit » (8 h), en heures pleines ; la nuit traverse minuit. Début et fin égaux sont refusés dans la liste (« choisissez deux heures différentes »), plutôt qu'une nuit de 24 h inventée. Heures locales ; un changement d'heure est suivi par l'horloge murale.

@@ -102,10 +102,7 @@ export const MENU_SETTINGS_ROWS = [
   'uiSounds',
   'uiSoundsVolume',
   'notices',
-  'attractDelay',
-  'attractInterval',
-  'attractSound',
-  'hours',
+  'attract',
   'game',
   'dmd',
   'dmdColor',
@@ -114,6 +111,14 @@ export const MENU_SETTINGS_ROWS = [
 ] as const;
 type Row = (typeof MENU_SETTINGS_ROWS)[number];
 const row = (key: Row) => MENU_SETTINGS_ROWS.indexOf(key);
+
+/**
+ * Écran « Mode attente » (12/11/2026 : tous ses réglages au même endroit), dans l'ordre : délai,
+ * table suivante, son, crédits de la table montrée, horaire (la nuit, l'attente se tait).
+ */
+export const ATTRACT_ROWS = ['attractDelay', 'attractInterval', 'attractSound', 'attractCredits', 'hours'] as const;
+type AttractRow = (typeof ATTRACT_ROWS)[number];
+const attractRow = (key: AttractRow) => ATTRACT_ROWS.indexOf(key);
 
 export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
   const s = () => host.settings();
@@ -212,31 +217,11 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         icon: 'bell',
         run: () => set({ notices: NOTICES_MODES[(NOTICES_MODES.indexOf(v.notices) + 1) % NOTICES_MODES.length]! }),
       },
-      attractDelay: {
+      attract: {
         label: t('Mode attente : {delay}', { delay: attractDelayLabel(v.attractDelay) }),
-        detail: t('Tables tirées au hasard avec leurs médias ; n’importe quel bouton revient au menu'),
+        detail: t('{summary} (Start : régler)', { summary: attractSummary() }),
         icon: 'attract',
-        run: () => openChoice('attractDelay', ATTRACT_DELAY_CHOICES, (x) => (x ? t('Après {duration} sans bouton', { duration: durationLabel(x) }) : t('Jamais'))),
-      },
-      attractInterval: {
-        label: t('Table suivante en attente : toutes les {duration}', { duration: durationLabel(v.attractInterval) }),
-        icon: 'shuffle',
-        run: () => openChoice('attractInterval', ATTRACT_INTERVAL_CHOICES, (x) => t('Toutes les {duration}', { duration: durationLabel(x) })),
-      },
-      attractSound: {
-        label: v.attractSound === 'reduced' ? t('Son en attente : réduit') : t('Son en attente : coupé'),
-        detail: v.attractSound === 'reduced' ? t('Musique et vidéos à 30 % de leur volume (Start : couper)') : t('Rien ne joue en attente (Start : son réduit)'),
-        icon: 'volume-low',
-        run: () => set({ attractSound: v.attractSound === 'reduced' ? 'muted' : 'reduced' }),
-      },
-      hours: {
-        label: t('Horaire de la borne : {summary}', { summary: arcadeHoursSummary(v.hours) }),
-        detail:
-          v.hours.on && v.attractDelay === 0
-            ? t('Mode attente réglé sur « jamais » : pas de voile la nuit ; l’arrêt attend {minutes} min sans bouton (Start : régler)', { minutes: 5 })
-            : t('Attente muette et écrans assombris la nuit, arrêt automatique (Start : régler)'),
-        icon: 'clock',
-        run: () => openHours(),
+        run: () => openAttract(),
       },
       game: { label: t('Médias pendant la partie : {mode}', { mode: GAME_MEDIA_LABELS[v.game] }), detail: gameDetail(), icon: 'film', run: () => set({ game: nextGameMediaMode(v.game) }) },
       dmd: {
@@ -278,6 +263,73 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
       })(),
     };
     return MENU_SETTINGS_ROWS.map((key) => rows[key]);
+  }
+
+  // ---------- Mode attente ----------
+
+  /** « une table toutes les 20 s · son coupé · crédits affichés · horaire activé » : la ligne de l'écran principal. */
+  function attractSummary(): string {
+    const v = s();
+    if (!v.attractDelay) return t('Désactivé : la borne reste sur le menu');
+    return [
+      t('une table toutes les {duration}', { duration: durationLabel(v.attractInterval) }),
+      v.attractSound === 'reduced' ? t('son réduit') : t('son coupé'),
+      v.attractCredits ? t('crédits affichés') : t('crédits masqués'),
+      ...(v.hours.on ? [t('horaire activé')] : []),
+    ].join(' · ');
+  }
+
+  function attractActions(): Action[] {
+    const v = s();
+    const rows: Record<AttractRow, Action> = {
+      attractDelay: {
+        label: t('Mode attente : {delay}', { delay: attractDelayLabel(v.attractDelay) }),
+        detail: t('Tables tirées au hasard avec leurs médias ; n’importe quel bouton revient au menu'),
+        icon: 'attract',
+        run: () => openChoice('attractDelay', ATTRACT_DELAY_CHOICES, (x) => (x ? t('Après {duration} sans bouton', { duration: durationLabel(x) }) : t('Jamais'))),
+      },
+      attractInterval: {
+        label: t('Table suivante en attente : toutes les {duration}', { duration: durationLabel(v.attractInterval) }),
+        icon: 'shuffle',
+        run: () => openChoice('attractInterval', ATTRACT_INTERVAL_CHOICES, (x) => t('Toutes les {duration}', { duration: durationLabel(x) })),
+      },
+      attractSound: {
+        label: v.attractSound === 'reduced' ? t('Son en attente : réduit') : t('Son en attente : coupé'),
+        detail: v.attractSound === 'reduced' ? t('Musique et vidéos à 30 % de leur volume (Start : couper)') : t('Rien ne joue en attente (Start : son réduit)'),
+        icon: 'volume-low',
+        run: () => set({ attractSound: v.attractSound === 'reduced' ? 'muted' : 'reduced' }),
+      },
+      attractCredits: {
+        label: v.attractCredits ? t('Crédits de la table : affichés') : t('Crédits de la table : masqués'),
+        detail: v.attractCredits ? t('Une ligne discrète en bas : table, fronton, couleurs du DMD (Start : masquer)') : t('Rien sous le logo de la table montrée (Start : afficher)'),
+        icon: 'credits',
+        run: () => set({ attractCredits: !v.attractCredits }),
+      },
+      hours: {
+        label: t('Horaire de la borne : {summary}', { summary: arcadeHoursSummary(v.hours) }),
+        detail:
+          v.hours.on && v.attractDelay === 0
+            ? t('Mode attente réglé sur « jamais » : pas de voile la nuit ; l’arrêt attend {minutes} min sans bouton (Start : régler)', { minutes: 5 })
+            : t('Attente muette et écrans assombris la nuit, arrêt automatique (Start : régler)'),
+        icon: 'clock',
+        run: () => openHours(),
+      },
+    };
+    return ATTRACT_ROWS.map((key) => rows[key]);
+  }
+
+  function openAttract(at = 0): void {
+    host.library.openCustom(
+      () => ({
+        heading: t('Mode attente'),
+        icon: 'attract',
+        lead: t('Quand personne ne joue, la borne présente ses tables au hasard. N’importe quel bouton revient au menu.'),
+        sections: [],
+        actions: [...attractActions(), { label: t('Retour'), icon: 'back', run: () => open(row('attract')) }],
+        back: () => open(row('attract')),
+      }),
+      at,
+    );
   }
 
   function build(): Built {
@@ -344,7 +396,7 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
   }
 
   function openChoice(key: ChoiceKey, choices: readonly number[], label: (value: number) => string): void {
-    const back = row(key);
+    const back = attractRow(key);
     const now = s()[key];
     host.library.openCustom(
       () => ({
@@ -357,12 +409,12 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
             tone: value === s()[key] ? ('ok' as const) : undefined,
             run: () => {
               set({ [key]: value });
-              open(back);
+              openAttract(back);
             },
           })),
-          { label: t('Retour'), run: () => open(back) },
+          { label: t('Retour'), run: () => openAttract(back) },
         ],
-        back: () => open(back),
+        back: () => openAttract(back),
       }),
       Math.max(0, choices.indexOf(nearestChoice(choices, now))),
     );
@@ -524,8 +576,8 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         icon: 'clock',
         lead: t('La nuit, l’attente devient muette et les écrans peuvent s’assombrir. Un arrêt automatique laisse 30 s pour garder la borne allumée.'),
         sections: [{ title: t('Réveil depuis la veille'), rows: wakeRows() }],
-        actions: [...hoursActions(), { label: t('Retour'), icon: 'back', run: () => open(row('hours')) }],
-        back: () => open(row('hours')),
+        actions: [...hoursActions(), { label: t('Retour'), icon: 'back', run: () => openAttract(attractRow('hours')) }],
+        back: () => openAttract(attractRow('hours')),
       }),
       at,
     );
