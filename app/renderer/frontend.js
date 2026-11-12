@@ -1665,7 +1665,21 @@ function renderGame(s) {
   const parts = [...(background ? ['playfield'] : []), ...zones.map((z) => z.role)];
   const off = parts.every((part) => (game.play?.[part] ?? (game.mode === 'off' ? 'off' : 'still')) === 'off');
   zoneLayer.classList.toggle('off', off);
+  if (s.vrWear) {
+    zoneLayer.classList.add('off');
+    return root.replaceChildren(vrWearCard(s.vrWear));
+  }
   root.replaceChildren(...(off ? [gameCard(game.table)] : []));
+}
+
+/**
+ * Partie dans le casque, casque pas sur la tête : la consigne en grand, sur le playfield et le fronton de la
+ * borne, du Start à la fin de la partie (VPX attend le casque pour démarrer la table).
+ */
+function vrWearCard(wear) {
+  const card = el('section', 'overlay vr-wear');
+  card.append(el('p', 'vr-wear-status', wear.status), el('p', 'vr-wear-text', wear.text), el('p', 'vr-wear-keys', wear.keys));
+  return card;
 }
 
 // ---------- Ouverture au démarrage (intro.ts, intro.js) ----------
@@ -1911,6 +1925,15 @@ window.cyber.onState((s) => {
   // Dans le casque, au milieu du regard (le fronton) : la consigne du calage en très gros, ou, au
   // chargement d'une partie, le bouton qui la quitte (essai du 10 novembre 2026 : textes illisibles
   // sur le plateau, sortie introuvable).
+  if (s.phase === 'loading' && s.vrWear && (role === 'playfield' || role === 'backglass')) {
+    zoneLayer.classList.add('off');
+    if (role === 'playfield') {
+      dropLoadingFallback();
+      background.show(undefined);
+    }
+    root.replaceChildren(vrWearCard(s.vrWear));
+    return;
+  }
   const prompt = s.phase === 'message' ? s.message?.prompt : undefined;
   const hint = s.phase === 'loading' ? s.headsetHint : undefined;
   if (role === 'backglass' && (prompt || hint)) {

@@ -428,6 +428,7 @@ int renderTest(const std::string& input, const std::string& output)
    // Vue : yeux, tangage et lacet (radians) ; par défaut, le joueur debout un pas en arrière, regard 25° vers le bas.
    float view[5] = { 0.f, 1.65f, 0.35f, -0.436f, 0.f };
    double testTime = 0;
+   int cycles = 0; // allers-retours veille/reprise avant le rendu (décor libéré puis rechargé, comme au casque)
    std::vector<std::pair<int, double>> forced; // passages forcés : nature, début (s)
    while (std::getline(file, line))
    {
@@ -446,6 +447,8 @@ int renderTest(const std::string& input, const std::string& output)
          in >> view[0] >> view[1] >> view[2] >> view[3] >> view[4];
       else if (word == "temps")
          in >> testTime;
+      else if (word == "cycles")
+         in >> cycles;
       else if (word == "passage")
       {
          int kind = 0;
@@ -481,6 +484,22 @@ int renderTest(const std::string& input, const std::string& output)
    {
       say("erreur decor " + error);
       return 4;
+   }
+   // Veille (partie de VPX) puis reprise (retour au menu), autant de fois que demandé.
+   for (int c = 0; c < cycles && !decorFile.empty(); c++)
+   {
+      std::string none;
+      decorRenderer.load("", none);
+      if (!decorRenderer.empty())
+      {
+         say("erreur decor pas libere a la veille " + std::to_string(c + 1));
+         return 5;
+      }
+      if (!decorRenderer.load(decorFile, error) || decorRenderer.empty())
+      {
+         say("erreur decor pas recharge a la reprise " + std::to_string(c + 1) + " " + error);
+         return 5;
+      }
    }
    decorRenderer.setTint(testTint[0], testTint[1], testTint[2]);
    for (const auto& [kind, started] : forced)
@@ -1439,6 +1458,9 @@ int main(int argc, char** argv)
    bool running = false, exitRequested = false, done = false;
    // Veille pendant une partie de VPX dans le casque (après la relève), et perte du casque dite une fois.
    bool standby = false, lostSaid = false;
+   // Écrans à soumettre au casque : porté depuis (ou repris depuis), et l'absence dite une fois par période.
+   ULONGLONG screensSince = 0;
+   bool screensMissingSaid = false;
    // Textures d'Electron copiées, rendues (« libre ») quand le GPU a fini la copie : une requête
    // d'événement relue sans attendre à chaque tour, au lieu de bloquer la boucle des images (gpuFinish
    // y attendait la fin de tout le travail du GPU, mipmaps comprises, à chaque image reçue).
@@ -1491,6 +1513,8 @@ int main(int argc, char** argv)
             {
                worn = state == XR_SESSION_STATE_FOCUSED;
                eyesSaid = false;
+               screensSince = worn ? GetTickCount64() : 0;
+               screensMissingSaid = false;
                say(std::string("porte ") + (worn ? "1" : "0"));
             }
             // La borne reste à sa place dans la pièce, comme un objet : ni la session qui reprend le
@@ -1513,6 +1537,8 @@ int main(int argc, char** argv)
             {
                standby = false;
                say("reprise");
+               screensSince = GetTickCount64();
+               screensMissingSaid = false;
                // De retour au menu : le décor revient.
                decorChanged = true;
             }
@@ -2223,6 +2249,18 @@ int main(int argc, char** argv)
             q.size = p.size;
             quads.push_back(q);
          }
+      }
+      // Garde-fou : porté (ou repris) depuis 6 s, un écran qui n'est toujours pas soumis au casque est dit
+      // une fois au journal (« erreur ecrans … ») : le joueur verrait le décor sans les écrans.
+      if (fs.shouldRender && worn && (!projection || quadScreens) && screensSince && !screensMissingSaid && GetTickCount64() - screensSince > 6000)
+      {
+         screensMissingSaid = true;
+         std::string missing;
+         for (const Panel& p : panels)
+            if (!p.shown || p.swapchain == XR_NULL_HANDLE)
+               missing += (missing.empty() ? "" : ", ") + p.role + (p.surface.empty() ? "" : (surfaces.count(p.surface) && surfaces[p.surface].copy ? " (image recue)" : " (aucune image recue)"));
+         if (!missing.empty())
+            say("erreur ecrans pas soumis au casque 6 s apres " + std::string(standby ? "la veille" : "la prise du casque") + " : " + missing);
       }
       std::vector<const XrCompositionLayerBaseHeader*> layers;
       if (projected)

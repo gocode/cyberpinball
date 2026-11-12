@@ -187,3 +187,37 @@ test('chargement : le garde-fou de mise en page contrôle les deux compositions 
   assert.match(guard, /encart du chargement sur le cadre du média/);
   assert.match(guard, /repli du média de chargement hors du cadre/);
 });
+
+// Partie lancée dans le casque alors qu'il n'est pas sur la tête (12/11/2026, The Addams Family : 3 min de
+// chargement sans rien sur la borne, VPX attendait le casque). La borne le dit en grand, du Start à la fin.
+const WEAR = {
+  status: 'Partie dans le casque',
+  text: 'Mettez le casque : la table démarre quand il est sur la tête',
+  keys: 'Ctrl+Maj+K ou Exit : arrêter · Pour jouer sur les écrans : Menu système > Borne > Réalité virtuelle',
+};
+
+test('partie dans le casque, casque pas sur la tête : la consigne en grand sur le playfield, au chargement comme en partie', () => {
+  for (const shape of ['cab', 'desktop'] as const) {
+    const { send, root } = renderer(shape);
+    send({ ...loadingState({ video: true }), vrWear: WEAR });
+    const card = root.querySelector('.vr-wear');
+    assert.ok(card, `${shape} : consigne au chargement`);
+    assert.equal(card!.querySelector('.vr-wear-text')!.textContent, WEAR.text);
+    assert.equal(root.querySelector('.loading-card'), null, `${shape} : rien d'autre que la consigne`);
+    // La fenêtre de VPX (l'aperçu de la VR) paraît : phase de jeu, la consigne reste.
+    send({ ...loadingState({ video: true }), phase: 'playing', game: { role: 'playfield', table: { title: 'Neon Galaxy' }, mode: 'still', medias: {}, play: {} }, vrWear: WEAR });
+    assert.equal(root.querySelector('.vr-wear-keys')!.textContent, WEAR.keys, `${shape} : consigne en partie`);
+    // Casque mis, partie finie, ou partie sur les écrans : plus de consigne.
+    send({ ...loadingState({ video: true }), phase: 'playing', game: { role: 'playfield', table: { title: 'Neon Galaxy' }, mode: 'still', medias: {}, play: {} } });
+    assert.equal(root.querySelector('.vr-wear'), null, `${shape} : consigne retirée`);
+  }
+});
+
+test('la consigne du casque a son style, lisible de loin, et le processus principal la pose sur le playfield et le fronton', () => {
+  const css = fs.readFileSync(path.join(APP, 'renderer', 'frontend.css'), 'utf8');
+  assert.match(css, /\.vr-wear-text \{ font-size: 9cqmin;/);
+  const main = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
+  assert.match(main, /vrGame && !headset\?\.worn/);
+  assert.match(main, /vrWear: vrWearHint && \(role === 'playfield' \|\| role === 'backglass'\)/);
+  assert.match(main, /if \(!playedVr\) vrWearHint = undefined;/);
+});

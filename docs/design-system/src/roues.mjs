@@ -22,6 +22,16 @@ const suffix = process.argv.includes('--suffixe') ? `-${variant}` : '';
 /** Halo sarcelle par rapport au néon : #1c8f80 / #2ad1b6 en luminance. */
 const HALO_SCALE = 0.62;
 
+/*
+ * Débord (12/11/2026) : la lumière et le dessus s'étendent de DEBORD unités au-dessus et au-dessous
+ * du bandeau (frontend.css, .wheel-stage::before / ::after, même débord). Un halo flou dessiné près
+ * du bord (le pointeur au-dessus de la table choisie, en y = −2) se fondait sinon à une ligne nette,
+ * coupé par le cadre de l'image. Le fond (verre) garde le cadre du bandeau : il s'y arrête.
+ */
+const DEBORD = 60;
+const avecDebord = (svgLine) =>
+  svgLine.replace('height="540" viewBox="0 0 1080 540"', `height="${540 + 2 * DEBORD}" viewBox="0 ${-DEBORD} 1080 ${540 + 2 * DEBORD}"`);
+
 const isHalo = (line) => /stroke="#1c8f80"/.test(line);
 const isNeon = (line) => /stroke="url\(#neon\)"/.test(line);
 const light = (line) => isHalo(line) || (variant === 'b' && isNeon(line));
@@ -35,9 +45,10 @@ for (const name of ['medaillons', 'bandeau', 'minimal', 'arche']) {
   const body = lines.slice(defsEnd + 1, close);
   const first = body.findIndex(light);
   const note = (what) => `<!-- ${what} : couche tirée de docs/design-system/src/roues/${name}.svg par docs/design-system/src/roues.mjs (ne pas modifier ici). -->`;
-  const svg = (what, rows) => [head[0], note(what), ...head.slice(1), ...rows, '</svg>', ''].join('\n');
+  if (!avecDebord(head[0]).includes(`viewBox="0 ${-DEBORD} `)) throw new Error(`${name}.svg : cadre attendu 1080 × 540 (${head[0]})`);
+  const svg = (what, rows, open = head[0]) => [open, note(what), ...head.slice(1), ...rows, '</svg>', ''].join('\n');
   fs.writeFileSync(path.join(out, `${name}${suffix}.svg`), svg('Fond', body.slice(0, first)));
-  fs.writeFileSync(path.join(out, `${name}-dessus${suffix}.svg`), svg('Dessus', body.slice(first).filter((l) => !light(l))));
+  fs.writeFileSync(path.join(out, `${name}-dessus${suffix}.svg`), svg('Dessus', body.slice(first).filter((l) => !light(l)), avecDebord(head[0])));
   // Masque : en blanc, le halo atténué ; le dégradé du néon garde ses bords fondus.
   const mask = body.filter(light).map((l) =>
     isHalo(l)
@@ -52,6 +63,6 @@ for (const name of ['medaillons', 'bandeau', 'minimal', 'arche']) {
     '  </linearGradient>',
     '</defs>',
   ];
-  fs.writeFileSync(path.join(out, `${name}-lumiere${suffix}.svg`), [head[0], note('Lumière (masque)'), ...defs, ...mask, '</svg>', ''].join('\n'));
+  fs.writeFileSync(path.join(out, `${name}-lumiere${suffix}.svg`), [avecDebord(head[0]), note('Lumière (masque)'), ...defs, ...mask, '</svg>', ''].join('\n'));
   console.log(`${name}${suffix} : ${first} éléments de fond, ${mask.length} de lumière, ${body.length - first - mask.length} dessus`);
 }

@@ -12,6 +12,8 @@ export * from './casque';
 export * from './manettes';
 export * from './casque-scene';
 export * from './decor';
+export * from './compagnon-cycle';
+export * from './decor-controle';
 export * from './glb';
 export * from './sync';
 export * from './gameorientation';

@@ -117,3 +117,112 @@ edgeCircle`) as (d: Uint8ClampedArray, w: number, h: number) => { r: number; dx:
     assert.ok(Math.abs(got.r - r) <= 1.5 && Math.hypot(got.x - cx, got.y - cy) <= 1.5, `${name} : cercle attendu r=${r} en (${cx}, ${cy}), mesuré r=${got.r.toFixed(1)} en (${got.x.toFixed(1)}, ${got.y.toFixed(1)})`);
   }
 });
+
+// Anneau et pointeur de la table choisie (12/11/2026, photo du PinCab) : l'anneau vert, tracé en
+// pointillé qui avance, gardait à midi une fente sombre, là où le début et la fin du tiret se
+// touchaient bout à bout ; le halo du pointeur, dessiné au bord haut du bandeau, était coupé net
+// par le cadre de son image. Trois invariants :
+// - une forme fermée tracée par un pointillé animé finit en trait plein (stroke-dasharray: none) ;
+// - aucun halo flou des couches de roue (roues/*.svg) ne sort du cadre de sa couche, en hauteur
+//   (en largeur, les arcs continuent au-delà des bords : la coupe y est voulue) ;
+// - la lumière et le dessus débordent du bandeau d'autant que le cadre de leur image.
+test('roue : une forme fermée tracée en pointillé finit en trait plein, sans fente', () => {
+  const frames = new Map<string, string>();
+  for (const m of css.matchAll(/@keyframes\s+([\w-]+)\s*\{([\s\S]*?)\n\}/g)) frames.set(m[1] ?? '', m[2] ?? '');
+  let seen = 0;
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selector = (m[1] ?? '').trim();
+    const body = m[2] ?? '';
+    if (!/\b(circle|ellipse|rect)\b/.test(selector) || !/stroke-dasharray:\s*(?!none)/.test(body)) continue;
+    const anim = /animation:\s*([^;]+);/.exec(body)?.[1];
+    if (!anim) continue;
+    seen++;
+    const held = anim.split(/,(?![^(]*\))/).map((s) => s.trim().split(/\s+/)).filter((p) => p.includes('forwards') || p.includes('both'));
+    const last = held.at(-1)?.find((p) => frames.has(p));
+    assert.ok(last, `${selector} : pointillé animé sans animation tenue à la fin`);
+    const end = /(?:^|\n)\s*(?:to|100%)\s*\{([^}]*)\}/.exec(frames.get(last) ?? '')?.[1] ?? '';
+    assert.match(end, /stroke-dasharray:\s*none/, `${selector} : « ${last} » doit finir en trait plein (stroke-dasharray: none), sinon une fente reste à la jointure`);
+  }
+  assert.ok(seen > 0, 'tracé de l’anneau (.wheel-rim circle) introuvable');
+});
+
+/** Étendue verticale d'un élément SVG simple (path en commandes absolues, ellipse, circle, rect). */
+function verticalExtent(tag: string, attrs: string, where: string): [number, number] {
+  const num = (name: string) => Number(new RegExp(`\\s${name}="([-\\d.]+)"`).exec(attrs)?.[1] ?? Number.NaN);
+  if (tag === 'ellipse' || tag === 'circle') {
+    const r = tag === 'circle' ? num('r') : num('ry');
+    return [num('cy') - r, num('cy') + r];
+  }
+  if (tag === 'rect') return [num('y'), num('y') + num('height')];
+  assert.equal(tag, 'path', `${where} : élément <${tag}> à halo non pris en charge par ce test`);
+  const d = /\sd="([^"]*)"/.exec(attrs)?.[1] ?? '';
+  const ys: number[] = [];
+  let y = 0;
+  for (const [, cmd, args] of d.matchAll(/([A-Za-z])([^A-Za-z]*)/g)) {
+    const n = (args ?? '').trim().split(/[\s,]+/).filter(Boolean).map(Number);
+    switch (cmd) {
+      case 'M':
+      case 'L':
+        for (let i = 1; i < n.length; i += 2) ys.push((y = n[i] ?? y));
+        break;
+      case 'H':
+      case 'Z':
+        break;
+      case 'V':
+        for (const v of n) ys.push((y = v));
+        break;
+      case 'Q':
+        for (let i = 0; i + 3 < n.length; i += 4) {
+          const [c, e] = [n[i + 1] ?? y, n[i + 3] ?? y];
+          for (let t = 0; t <= 1; t += 1 / 64) ys.push((1 - t) ** 2 * y + 2 * (1 - t) * t * c + t * t * e);
+          y = e;
+        }
+        break;
+      default:
+        assert.fail(`${where} : commande de tracé « ${cmd} » non prise en charge par ce test`);
+    }
+  }
+  return [Math.min(...ys), Math.max(...ys)];
+}
+
+test('roue : aucun halo des couches de roue n’est coupé par le haut ou le bas de son cadre', () => {
+  const dir = path.join(RENDERER, 'roues');
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.svg') && f !== 'cadre.svg');
+  assert.ok(files.length >= 12, 'couches de roue introuvables');
+  for (const file of files) {
+    const svg = fs.readFileSync(path.join(dir, file), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+    const [, top, height] = (/viewBox="[-\d.]+ ([-\d.]+) [-\d.]+ ([-\d.]+)"/.exec(svg) ?? []).map(Number);
+    assert.ok(Number.isFinite(top) && Number.isFinite(height), `${file} : viewBox illisible`);
+    const blur = new Map([...svg.matchAll(/<filter id="(\w+)"[\s\S]*?stdDeviation="([\d.]+)"/g)].map((m) => [m[1], Number(m[2])]));
+    const check = (tag: string, attrs: string, filter: string) => {
+      const sigma = blur.get(filter);
+      assert.ok(sigma !== undefined, `${file} : filtre #${filter} introuvable`);
+      const half = Number(/stroke-width="([\d.]+)"/.exec(attrs)?.[1] ?? 0) / 2;
+      const [lo, hi] = verticalExtent(tag, attrs, file);
+      // À 2,5 écarts types du bord de la forme, le flou ne garde que 0,6 % de son intensité : une
+      // coupe plus loin ne se voit pas (l'ombre du fond de la roue Minimaliste est coupée à 2,9).
+      const reach = half + 2.5 * sigma;
+      assert.ok(lo - reach >= (top as number) - 0.5 && hi + reach <= (top as number) + (height as number) + 0.5,
+        `${file} : le halo de <${tag}${attrs.slice(0, 60)}…> va de y=${(lo - reach).toFixed(0)} à ${(hi + reach).toFixed(0)}, hors du cadre ${top}…${(top as number) + (height as number)} : il serait coupé net`);
+    };
+    for (const m of svg.matchAll(/<(\w+)((?:\s[^>]*?)?)\sfilter="url\(#(\w+)\)"([^>]*)>/g)) {
+      const [, tag, before, filter, after] = m;
+      if (tag === 'filter') continue;
+      if (tag === 'g') {
+        const inner = svg.slice((m.index ?? 0) + m[0].length, svg.indexOf('</g>', m.index));
+        for (const c of inner.matchAll(/<(\w+)(\s[^>]*?)\/?>/g)) check(c[1] ?? '', c[2] ?? '', filter ?? '');
+      } else check(tag ?? '', `${before ?? ''} ${after ?? ''}`, filter ?? '');
+    }
+  }
+});
+
+test('roue : la lumière et le dessus débordent du bandeau autant que le cadre de leur image', () => {
+  const block = /\.menu-band \.wheel-stage::before,\s*\.menu-band \.wheel-stage::after \{([^}]*)\}/.exec(css)?.[1] ?? '';
+  const inset = /inset:\s*calc\(-(\d+) \* var\(--w\)\) 0;/.exec(block);
+  assert.ok(inset, 'débord des couches de lumière et de dessus introuvable (.wheel-stage::before, ::after)');
+  const bleed = Number(inset[1]);
+  for (const file of fs.readdirSync(path.join(RENDERER, 'roues')).filter((f) => /-(dessus|lumiere)\.svg$/.test(f))) {
+    const head = fs.readFileSync(path.join(RENDERER, 'roues', file), 'utf8').split('\n')[0] ?? '';
+    assert.ok(head.includes(`viewBox="0 ${-bleed} 1080 ${540 + 2 * bleed}"`), `${file} : cadre ${head}, attendu un débord de ${bleed} (docs/design-system/src/roues.mjs, DEBORD)`);
+  }
+});

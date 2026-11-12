@@ -1097,7 +1097,9 @@ html[data-menu-band='arche'] #root {
 .menu-band .wheel-stage::after {
   content: '';
   position: absolute;
-  inset: 0;
+  /* Débord de 60 en haut et en bas (docs/design-system/src/roues.mjs, DEBORD) : les halos dessinés
+     près du bord, comme celui du pointeur au-dessus de la table choisie, se fondent au lieu d'être coupés net. */
+  inset: calc(-60 * var(--w)) 0;
   z-index: 0;
   pointer-events: none;
 }
@@ -1121,6 +1123,8 @@ html[data-menu-band='arche'] #root {
 html.menu-desktop .menu-band .wheel-stage {
   -webkit-mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent);
   mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent);
+  /* Le fondu ne coupe que les côtés : le débord des halos, au-dessus et au-dessous, reste visible. */
+  mask-clip: no-clip;
 }
 
 .menu.menu-band .menu-nav,
@@ -1267,11 +1271,15 @@ html.menu-desktop .menu.menu-band .menu-nav {
   }
 }
 
+/* Une fois tracé, l'anneau devient un trait fermé, sans pointillé : bout à bout, le début et la fin
+   du tiret laissaient à midi une fente sombre (anticrénelage des deux bouts carrés). */
 @keyframes rim-pose {
   from {
+    stroke-dasharray: none;
     stroke-dashoffset: 0;
   }
   to {
+    stroke-dasharray: none;
     stroke-dashoffset: 0;
     opacity: 0.7;
   }
@@ -3922,6 +3930,21 @@ html.jukebox-phase #root:has(> .banner) > .status-corner {
 .headset-prompt-status { font-size: 6vh; color: var(--signal); }
 .headset-prompt-problem { font-size: 6vh; color: var(--warning); max-width: 90vw; }
 .headset-prompt-keys { font-size: 7vh; color: var(--ink-muted); }
+
+/* Partie dans le casque, casque pas sur la tête (frontend.js, vrWearCard) : la consigne sur le playfield et le
+   fronton de la borne, lisible de loin. Tailles en cqmin de #root, pivoté ou non. */
+.overlay.vr-wear {
+  justify-content: center;
+  gap: 4cqmin;
+  padding: 6cqmin;
+  background: var(--void);
+  text-align: center;
+  font-family: var(--font-ui);
+}
+.vr-wear p { margin: 0; max-width: 90cqw; }
+.vr-wear-status { font-size: 5cqmin; color: var(--signal); letter-spacing: 0.04em; }
+.vr-wear-text { font-size: 9cqmin; font-weight: 700; line-height: 1.1; color: var(--ink); }
+.vr-wear-keys { font-size: 3.6cqmin; color: var(--ink-muted); }
 
 /* ---------- Messagerie (chat-menu.ts) ----------
    Fronton : la carte de l'ami du fil ouvert (grande pastille, nom, présence, faits), sur

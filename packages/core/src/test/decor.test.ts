@@ -6,6 +6,8 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { headsetPanels, LOCKBAR_HEIGHT_M, rotateVector, type HeadsetPanel, type HeadsetSource, type Quaternion } from '../casque';
 import { buildDecor, DECOR, DECOR_TEXTURES, type Decor, type DecorPart } from '../decor';
+import { coplanarConflicts } from '../decor-controle';
+import { Mesh } from '../decor-maillage';
 import { readGlb, writeGlb } from '../glb';
 import { edgeRotation } from '../model';
 
@@ -93,7 +95,57 @@ for (const [name, panels] of configurations) {
       assert.ok(Math.min(...ex) > dmd.width / 2, 'enceinte sur le DMD');
     }
   });
+
+  // Retours du 12/11/2026 dans le casque : traces noires qui fourmillent entre l'écran et la barre,
+  // inscriptions des flancs qui clignotent. Deux faces tournées du même côté, au même endroit.
+  for (const lockbarWidth of [undefined, 0.7]) {
+    test(`décor (${name}${lockbarWidth ? ', calé sur une barre de 70 cm' : ''}) : aucune surface ne dispute la profondeur à une autre`, () => {
+      const decor = buildDecor(panels, lockbarWidth ? { lockbarWidth } : {})!;
+      const same = coplanarConflicts(decor).filter((c) => c.facing === 'same');
+      assert.deepEqual(same.map((c) => `${c.a} / ${c.b} (écart ${(c.gap * 1000).toFixed(2)} mm, ${(c.area * 1e4).toFixed(2)} cm²)`), []);
+    });
+  }
+
+  test(`décor (${name}) : plateau presque à fleur, tête posée sur la caisse et évasée vers le haut comme une casquette`, () => {
+    const decor = buildDecor(panels)!;
+    const pf = panels.find((p) => p.role === 'playfield')!;
+    // Le dessus du cadre à moins d'un centimètre au-dessus de l'image (devant elle, dans son repère).
+    const cadre = decor.parts.find((p) => p.name === 'cadre')!;
+    const rise = Math.max(...vertices(cadre).map((v) => inPanel(pf, v).z));
+    assert.ok(rise > 0.002 && rise < 0.01, `cadre à ${(rise * 1000).toFixed(1)} mm au-dessus de l'image`);
+    // La tête repose sur la caisse : son bas descend sous le dessus du cadre, la caisse va jusqu'à son dos.
+    const tete = vertices(decor.parts.find((p) => p.name === 'tete')!);
+    const cadreV = vertices(cadre);
+    const headFront = Math.max(...tete.map((v) => v.z)), headBack = Math.min(...tete.map((v) => v.z));
+    const cabinetBack = Math.min(...cadreV.map((v) => v.z));
+    assert.ok(cabinetBack <= headBack + 1e-6 && cabinetBack > headBack - 0.01, `dos de la caisse en ${cabinetBack.toFixed(3)}, de la tête en ${headBack.toFixed(3)}`);
+    // Le bas de l'avant de la tête descend sous le dessus du cadre : aucun jour entre les deux.
+    const headBottom = Math.min(...tete.map((v) => v.y));
+    const lowFront = tete.filter((v) => v.y < headBottom + 0.002);
+    const frontZ = Math.max(...lowFront.map((v) => v.z));
+    const sunk = Math.max(...lowFront.filter((v) => v.z > frontZ - 0.001).map((v) => inPanel(pf, v).z));
+    assert.ok(sunk < rise, `bas de l'avant de la tête ${(sunk * 1000).toFixed(1)} mm au-dessus du plan de l'image, cadre ${(rise * 1000).toFixed(1)} mm`);
+    assert.ok(headFront > frontZ, 'la casquette avance');
+    // Évasement léger : le haut plus large (1 à 3 cm de chaque côté) et plus avancé (2 à 5 cm) que le bas.
+    const low = tete.filter((v) => v.y < headBottom + 0.05), top = Math.max(...tete.map((v) => v.y)), high = tete.filter((v) => v.y > top - 0.03);
+    const flare = Math.max(...high.map((v) => v.x)) - Math.max(...low.map((v) => v.x));
+    const visor = Math.max(...high.map((v) => v.z)) - Math.max(...low.map((v) => v.z));
+    assert.ok(flare > 0.01 && flare < 0.03, `évasement ${(flare * 100).toFixed(1)} cm`);
+    assert.ok(visor > 0.02 && visor < 0.05, `casquette ${(visor * 100).toFixed(1)} cm`);
+  });
 }
+
+test('contrôle des surfaces coplanaires : deux faces du même côté au même endroit sont signalées, un contact dos à dos aussi mais à part', () => {
+  const mk = (name: string, z: number, nz: number) => {
+    const mesh = new Mesh();
+    mesh.quad({ x: -0.1, y: 0, z }, { x: 0.1, y: 0, z }, { x: 0.1, y: 0.1, z }, { x: -0.1, y: 0.1, z }, { x: 0, y: 0, z: nz });
+    return { name, material: 0, mesh, colors: [] };
+  };
+  const pair = (b: DecorPart) => coplanarConflicts({ materials: [], parts: [mk('a', 0, 1), b] });
+  assert.equal(pair(mk('b', 0.0004, 1))[0]?.facing, 'same');
+  assert.equal(pair(mk('b', 0, -1))[0]?.facing, 'opposite');
+  assert.equal(pair(mk('b', 0.003, 1)).length, 0, '3 mm : assez loin');
+});
 
 test('décor : calé sur une vraie barre avant, la caisse en prend la largeur, sans rien poser sur les écrans', () => {
   const panels = configurations[0]![1];

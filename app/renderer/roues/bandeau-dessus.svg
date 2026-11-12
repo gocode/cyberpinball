@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="540" viewBox="0 0 1080 540">
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="660" viewBox="0 -60 1080 660">
 <!-- Dessus : couche tirée de docs/design-system/src/roues/bandeau.svg par docs/design-system/src/roues.mjs (ne pas modifier ici). -->
 <!-- Roue Bandeau : lame de verre droite bordée de néon, les médaillons la débordent. Repère 1080 × 540 du bandeau ; image fixe, rien ne s'anime ici. -->
 <defs>

@@ -11,7 +11,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { anchorHeight, buildDecor, COMPANION_KEY_FILE, companionKeyFolder, DECOR_TEXTURES, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, readCompanionKey, sceneProtocol, writeGlb, type CabinetPlace, type DecorTexture, type HeadsetProfile, type Point3, type VrGpu, type RoomBounds, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
+import { anchorHeight, buildDecor, cadenceWithoutScreens, COMPANION_KEY_FILE, CompanionCycle, companionKeyFolder, DECOR_TEXTURES, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, readCompanionKey, sceneProtocol, writeGlb, type CabinetPlace, type DecorTexture, type HeadsetProfile, type Point3, type VrGpu, type RoomBounds, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
 import { openHandleTarget, type HandleTarget } from '@cyberpinball/win-displays';
 import type { OffscreenSharedTexture } from 'electron';
 import { OFFSCREEN } from './offscreen';
@@ -172,7 +172,13 @@ export class HeadsetMenu {
   private shown: HeadsetMenuState = 'waiting';
   /** Textures d'Electron confiées au compagnon : rendues (release) quand il les a copiées. */
   private target: HandleTarget | undefined;
-  private frames = new Map<string, OffscreenSharedTexture>();
+  private frames = new Map<string, { texture: OffscreenSharedTexture; child: ChildProcessWithoutNullStreams }>();
+  /** Un seul compagnon à la fois : le suivant attend que l'ancien soit sorti (compagnon-cycle.ts). */
+  private readonly cycle = new CompanionCycle<ChildProcessWithoutNullStreams>();
+  /** Écrans rendus pour le casque ouverts pour ce compagnon (« source ») : leurs images sont attendues. */
+  private viewsOpened = false;
+  /** Écrans absents du casque dits une fois par compagnon. */
+  private screensMissingSaid = false;
   private frameCount = 0;
   /** Casque porté, le menu dessiné dedans (compagnon : « porte 1 »). */
   worn = false;
@@ -237,7 +243,8 @@ export class HeadsetMenu {
       if (this.child && !this.handingOver) void this.stop();
       return;
     }
-    if (this.child || Date.now() < this.retryAt) return;
+    // Un ancien compagnon encore en train de sortir : le suivant attend (sa sortie fermerait ses écrans).
+    if (this.child || !this.cycle.canStart() || Date.now() < this.retryAt) return;
     this.start();
   }
 
@@ -285,7 +292,7 @@ export class HeadsetMenu {
     const shared = this.target.share(nt.readBigUInt64LE(0));
     if (shared === undefined) return texture.release();
     const frame = String(++this.frameCount);
-    this.frames.set(frame, texture);
+    this.frames.set(frame, { texture, child });
     try {
       child.stdin.write(`texture ${surface} ${frame} ${shared} ${texture.textureInfo.codedSize.width} ${texture.textureInfo.codedSize.height}\n`);
     } catch {
@@ -294,9 +301,13 @@ export class HeadsetMenu {
     }
   }
 
-  private releaseFrames(): void {
-    for (const texture of this.frames.values()) texture.release();
-    this.frames.clear();
+  /** Rend à Electron les textures confiées à ce compagnon (toutes, sans compagnon précisé). */
+  private releaseFrames(of?: ChildProcessWithoutNullStreams): void {
+    for (const [frame, { texture, child }] of this.frames) {
+      if (of && child !== of) continue;
+      texture.release();
+      this.frames.delete(frame);
+    }
   }
 
   /** La table choisie a changé de teinte : la scène est renvoyée avec le nouveau halo (borne en volume, casque-scene.ts). */
@@ -406,6 +417,9 @@ export class HeadsetMenu {
     if (!panels.length) return;
     const child = spawn(exe, HEADSET_TRIAL_DIR ? ['--essai-surfaces', HEADSET_TRIAL_DIR] : ['--chargeur', loader], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     this.child = child;
+    this.cycle.started(child);
+    this.viewsOpened = false;
+    this.screensMissingSaid = false;
     this.state = 'waiting';
     let buffer = '';
     child.stdout.setEncoding('utf8');
@@ -420,7 +434,7 @@ export class HeadsetMenu {
         // « libre <image> » : le compagnon a copié l'image, Electron reprend sa texture (pas au journal).
         const free = /^libre (\S+)/.exec(line);
         if (free) {
-          this.frames.get(free[1]!)?.release();
+          this.frames.get(free[1]!)?.texture.release();
           this.frames.delete(free[1]!);
           if (!this.viewsFlowing) {
             this.viewsFlowing = true;
@@ -527,6 +541,12 @@ export class HeadsetMenu {
           continue;
         }
         if (!PROTOCOL.test(line)) continue;
+        // Garde-fou : casque porté, écrans rendus pour lui ouverts, et pas une de leurs images arrivée
+        // au compagnon depuis son lancement : le joueur verrait le décor sans les écrans.
+        if (!this.screensMissingSaid && this.worn && this.child === child && cadenceWithoutScreens(line, this.viewsOpened && !this.viewsFlowing)) {
+          this.screensMissingSaid = true;
+          this.opts.log(`[avertissement] Casque : aucune image des écrans n’arrive au compagnon depuis son lancement (${this.target ? 'canal des textures ouvert' : 'canal des textures fermé'}, ${this.frames.size} en attente) : écrans absents du casque.`); // i18n-ignore : journal
+        }
         if (line.startsWith('pret')) this.setState('shown');
         if (line.startsWith('porte ')) {
           this.worn = line === 'porte 1';
@@ -574,7 +594,15 @@ export class HeadsetMenu {
     child.stderr.on('data', () => undefined);
     child.on('error', (error) => this.opts.log(`Casque : lancement impossible (${error.message}).`)); // i18n-ignore : journal
     child.on('exit', (code) => {
+      const owner = this.cycle.exited(child);
       if (this.child === child) this.child = undefined;
+      // Un autre compagnon est déjà en service : il garde ses écrans, ses textures et son canal ; seules
+      // les textures confiées à l'ancien sont rendues.
+      if (!owner) {
+        this.releaseFrames(child);
+        this.opts.log('Casque : un ancien compagnon est sorti après le lancement du suivant ; les écrans du suivant sont gardés.'); // i18n-ignore : journal
+        return;
+      }
       this.handingOver = false;
       this.worn = false;
       this.wornOnce = false;
@@ -603,7 +631,10 @@ export class HeadsetMenu {
     if (this.target) {
       try {
         const f = (v: number) => Math.max(0, Math.min(1, v)).toFixed(6);
-        for (const s of this.opts.openViews?.() ?? []) child.stdin.write(`source ${s.role} ${s.surface} ${f(s.fx)} ${f(s.fy)} ${f(s.fw)} ${f(s.fh)}\n`);
+        for (const s of this.opts.openViews?.() ?? []) {
+          child.stdin.write(`source ${s.role} ${s.surface} ${f(s.fx)} ${f(s.fy)} ${f(s.fw)} ${f(s.fh)}\n`);
+          this.viewsOpened = true;
+        }
       } catch (error) {
         this.opts.log(`Casque : écrans pour le casque pas ouverts (${(error as Error).message}) ; duplication des écrans du PC.`); // i18n-ignore : journal
       }
@@ -663,6 +694,7 @@ export class HeadsetMenu {
     const child = this.child;
     if (!child) return;
     this.child = undefined;
+    this.cycle.stopping(child);
     await new Promise<void>((resolve) => {
       const kill = setTimeout(() => {
         child.kill();

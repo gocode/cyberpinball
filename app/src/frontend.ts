@@ -3555,6 +3555,12 @@ let headsetExitHint: string | undefined;
 /** Sous la consigne du chargement : l'avertissement du réseau du casque, une fois par session (vr-reseau.ts). */
 let headsetExitNote: string | undefined;
 let headsetWornBefore = false;
+/**
+ * Partie lancée dans le casque alors qu'il n'est pas sur la tête : la consigne, en grand sur le playfield et
+ * le fronton de la borne, de l'appui sur Start à la fin de la partie. VPX attend le casque pour démarrer la
+ * table (essai du 12/11/2026, The Addams Family : 3 min sans rien sur la borne, VPX croyait bloqué).
+ */
+let vrWearHint: { status: string; text: string; keys: string } | undefined;
 
 /** Le bouton Pause des manettes, et comment quitter, en clair : « B : pause · tenu : quitter ». */
 function exitHintText(): string | undefined {
@@ -5311,6 +5317,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     state = { ...state, phase: 'playing' };
     // La table à l'écran : le chargement est fini, son cartouche avec lui.
     endLaunch();
+    // VPX n'a pas trouvé le casque et joue sur les écrans (VR en « Autodetect ») : plus rien à mettre.
+    if (!playedVr) vrWearHint = undefined;
     // Journal des écrans : la pile des fenêtres, la fenêtre de jeu de VPX affichée (le gardien des barres n'y touche pas).
     settleScreens('vpx');
     // Les amis voient la table en cours, en temps réel (pas pendant un réglage de l'affichage).
@@ -5360,6 +5368,16 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // en « Autodetect » (dans le casque s'il est prêt, sinon sur les écrans). Jamais pour régler l'affichage.
   const vrGame = simulated === undefined && !displayMode ? prepareVr(played.file, double?.ini) : undefined;
   headsetExitHint = vrGame && headset?.inUse ? exitHintText() : undefined;
+  // Casque pas sur la tête (le compagnon le dit, ou il ne tourne pas) : la borne dit de le mettre.
+  vrWearHint =
+    vrGame && !headset?.worn
+      ? {
+          status: t('Partie dans le casque'),
+          text: t('Mettez le casque : la table démarre quand il est sur la tête'),
+          keys: t('{keys} ou Exit : arrêter · Pour jouer sur les écrans : Menu système > Borne > Réalité virtuelle', { keys: shortcutLabel(SHORTCUTS.forceStop) }),
+        }
+      : undefined;
+  if (vrWearHint) console.log(`Réalité virtuelle (${played.id}) : casque pas sur la tête au lancement ; la borne dit de le mettre.`); // i18n-ignore : journal
   // Air Link alors que le PC est en Wi-Fi : dit une fois par session du casque, sur la carte du chargement.
   headsetExitNote = undefined;
   if (vrGame && headset?.inUse && !airLinkWarned && airLinkOverWifi(linkMode, pcNetwork)) {
@@ -5481,6 +5499,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (playedVr && vrGame && vrGameStart) noteLinkStats(vrGameStart, Date.now());
   headsetExitHint = undefined;
   headsetExitNote = undefined;
+  vrWearHint = undefined;
   if (vision3dSource) noteVision3dGame(vision3dLog, vision3dLogFrom);
   if (playedVr && vrGame) noteVrMeasures();
   headTracker.stop();
@@ -6274,6 +6293,8 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     cinema: state.phase === 'loading' ? cinemaFor(role) : undefined,
     // Chargement : la vidéo Loading du jeu (ou son repli), plein écran en borne, dans le cadre du plateau au bureau.
     loading: state.phase === 'loading' && role === 'playfield' && m && table ? m.typeMedia(playing ?? table, 'playfield', 'Loading') : undefined,
+    // Partie dans le casque, casque pas sur la tête : la consigne sur le playfield et le fronton, du Start à la fin.
+    vrWear: vrWearHint && (role === 'playfield' || role === 'backglass') && (state.phase === 'loading' || state.phase === 'playing') ? vrWearHint : undefined,
     // Chargement qui tarde (loadingprogress.ts) : l'étape vue, l'heure du Start (le rendu compte les secondes), comment arrêter.
     slow:
       state.phase === 'loading' && role === 'playfield' && launch?.slow

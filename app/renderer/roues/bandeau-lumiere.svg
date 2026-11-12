@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="540" viewBox="0 0 1080 540">
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="660" viewBox="0 -60 1080 660">
 <!-- Lumière (masque) : couche tirée de docs/design-system/src/roues/bandeau.svg par docs/design-system/src/roues.mjs (ne pas modifier ici). -->
 <defs>
   <filter id="halo" filterUnits="userSpaceOnUse" x="-100" y="-100" width="1280" height="740"><feGaussianBlur stdDeviation="5"/></filter>

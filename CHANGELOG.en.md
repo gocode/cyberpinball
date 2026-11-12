@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- Virtual reality: when a game goes to the headset while it isn't on your head, the cabinet's playfield and backglass say so in large type ("Game in the headset · Put the headset on"), with how to stop or play on the screens. VPX waits for the headset to start the table: without this instruction, loading looked frozen.
+- Wheel: the selected table's ring is fully closed (no more dark gap at the top), and the pointer's halo is no longer cut off.
 - Tables that offer their options at first launch (VPW's The Addams Family: "TABLE OPTIONS MENU"): the options window is accepted as is and the game plays. Before, "The game could not run" came back at every launch and the table could never be played.
 - Wheel: all its settings are gathered in System menu > Tables > Wheel (layout, table order, table at startup, Start on the wheel, colour of each table, Juke-box in the wheel); "Media, sound and attract mode" keeps sound, attract mode and the DMD.
 - Wheel: animated logos stay still away from the centre, as intended (in the previous pre-release, the page refused to read their file and they all kept moving).

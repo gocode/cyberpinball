@@ -81,16 +81,22 @@ const FLOOR: Surface = { color: '#ffffff', metalness: 0.25 };
 
 /** Géométrie de la caisse et de la capsule (maquette validée). */
 export const DECOR = {
-  rim: { side: 0.03, front: 0.07, back: 0.03, top: 0.046, bottom: -0.012, corner: 0.012 },
-  // Barre avant : son bord arrière s'arrête au bord de l'image du plateau (jamais dessus).
-  lockbar: { thickness: 0.032, depth: 0.1, radius: 0.008, center: 0.03, along: -0.05 },
+  // Plateau presque à fleur : le dessus du cadre 6 mm au-dessus de l'image (retour du 12/11/2026).
+  rim: { side: 0.03, front: 0.07, back: 0.03, top: 0.006, bottom: -0.012, corner: 0.012 },
+  // Barre avant posée sur le cadre, son dessus à la hauteur de la vraie barre calée (0,046 m au-dessus
+  // du bord avant de l'image) ; son bord arrière s'arrête au bord de l'image du plateau (jamais dessus).
+  lockbar: { thickness: 0.04, depth: 0.1, radius: 0.008, center: 0.026, along: -0.05 },
   body: { height: 0.33, drop: 2, panel: 0.018 },
   leg: { flange: 0.065, thickness: 0.004, above: 0.17, tip: 0.09, tipWidth: 0.005, floor: 0.03 },
-  head: { wing: 0.018, depth: 0.12, forward: 0.04, margin: 0.02, top: 0.045 },
+  // Tête posée sur l'arrière de la caisse (enfoncée de `seat`), qui s'évase vers le haut : `flare` de plus
+  // de chaque côté et `visor` de plus vers l'avant au sommet, comme une casquette (retour du 12/11/2026).
+  head: { wing: 0.018, depth: 0.12, forward: 0.04, margin: 0.02, top: 0.045, seat: 0.01, flare: 0.022, visor: 0.035 },
   speaker: { radius: 0.045, beside: 0.075 },
   door: { width: 0.21, height: 0.25, x: 0.02 },
   capsule: { rx: 3.2, rz: 4.8, height: 3.6, ahead: 0.8, base: 0.35, ribs: [55, 105, 155, -55, -105, -155] },
   sky: { radius: 500 },
+  /** Décalcomanies et lueurs : au moins ce décalage de leur support (contrôle des surfaces coplanaires). */
+  decal: 0.0015,
 } as const;
 
 /** Repère du plateau : origine au milieu du bord avant, x en travers, y normal, z vers le joueur (-z le long). */
@@ -157,18 +163,36 @@ export function buildDecor(panels: readonly HeadsetPanel[], opts: { lockbarWidth
   // Demi-largeur de la caisse : le plateau et son cadre, ou la vraie barre avant calée (bornée à 40-120 cm, calage.ts).
   const measured = opts.lockbarWidth !== undefined && Number.isFinite(opts.lockbarWidth) ? Math.min(1.2, Math.max(0.4, opts.lockbarWidth)) : 0;
   const hw = Math.max(W / 2 + R.side, measured / 2);
-  // Dessus des flancs : juste sous le cadre, de l'avant de la bande de la barre au bout du cadre.
-  const sideTop = (along: number) => at(pf, 0, -0.008, along);
-  const TOPF = sideTop(R.front), TOPB = sideTop(-Lp - R.back);
+  // La tête repose sur l'arrière de la caisse : la caisse va jusqu'au dos de la tête, la bande arrière du
+  // cadre la porte. Sans tête, le cadre s'arrête 3 cm après l'image.
+  const H = DECOR.head;
+  const slope = (PLAYFIELD_SLOPE_DEG * Math.PI) / 180;
+  const headZ = head.length ? head[0]!.position.z : undefined;
+  /** Distance le long du plateau, depuis son bord avant, où le dessous du cadre atteint z. */
+  const alongTo = (z: number) => (pf.o.z + R.bottom * Math.sin(slope) - z) / Math.cos(slope);
+  // Le dos de la caisse dépasse celui de la tête de 3 mm : jamais deux dos dans le même plan.
+  const rimBack = headZ === undefined ? R.back : Math.max(R.back, alongTo(headZ - H.depth - 0.003) - Lp);
+  /** Hauteur du dessus du cadre à la profondeur z. */
+  const rimTopAt = (z: number) => {
+    const a = (pf.o.z + R.top * Math.sin(slope) - z) / Math.cos(slope);
+    return at(pf, 0, R.top, -a).y;
+  };
+  // Dessus des flancs : au ras du bas du cadre, de l'avant de la bande de la barre au bout du cadre.
+  const sideTop = (along: number) => at(pf, 0, R.bottom, along);
+  const TOPF = sideTop(R.front), TOPB = sideTop(-Lp - rimBack);
   const frontZ = TOPF.z, backZ = TOPB.z;
+  // L'habillage des flancs garde la longueur de la caisse sans tête : la rallonge sous la tête prend son bord.
+  const artBackZ = sideTop(-Lp - R.back).z;
+  // Façade, dos et dessous entre les flancs : aucune de leurs faces dans le plan des flancs.
+  const innerHw = hw - B.panel;
   const drop = (B.drop * Math.PI) / 180;
   const yBot = (z: number) => TOPF.y - B.height - (TOPF.z - z) * Math.tan(drop);
 
   // --- Cadre de vitre continu : bande du dessus, arête adoucie, retour extérieur et bord intérieur.
   part('cadre', SATIN, lit, (m) => {
     const loop = (x0: number, a0: number, x1: number, a1: number, r: number) => roundRectLoop(x0, a0, x1, a1, r);
-    const outer = loop(-hw, -R.front, hw, Lp + R.back, R.corner);
-    const outerIn = loop(-hw + 0.004, -R.front + 0.004, hw - 0.004, Lp + R.back - 0.004, R.corner - 0.004);
+    const outer = loop(-hw, -R.front, hw, Lp + rimBack, R.corner);
+    const outerIn = loop(-hw + 0.004, -R.front + 0.004, hw - 0.004, Lp + rimBack - 0.004, R.corner - 0.004);
     const inner = loop(-W / 2, 0, W / 2, Lp, 0); // angle vif : exactement le rectangle de l'image
     const N = outer.length;
     // Coordonnées locales : x, y (normale), a (le long, vers le fond) ; z local = -a.
@@ -241,8 +265,9 @@ export function buildDecor(panels: readonly HeadsetPanel[], opts: { lockbarWidth
       const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
       // L'habillage suit le bord du flanc (le liseré du bas n'est jamais coupé) ; v = 0 en haut de l'image.
       // Vu de l'extérieur, l'avant est à droite sur le flanc gauche, à gauche sur le flanc droit : u en miroir.
+      const ext = artBackZ - backZ;
       const uv = (x: number, y: number): [number, number] => {
-        const t = Math.min(1, Math.max(0, x / len));
+        const t = Math.min(1, Math.max(0, (x - ext) / (len - ext)));
         const yb = lerp(yBot(backZ), TOPF.y - B.height, t), yt = lerp(TOPB.y, TOPF.y, t);
         return [s < 0 ? t : 1 - t, 1 - Math.min(1, Math.max(0, (y - yb) / (yt - yb)))];
       };
@@ -251,17 +276,17 @@ export function buildDecor(panels: readonly HeadsetPanel[], opts: { lockbarWidth
   }
 
   // --- Façade, dessous incliné, dos.
-  part('facade', SATIN, lit, (m) => m.box(WORLD, v3(0, TOPF.y - B.height / 2, frontZ - B.panel / 2), v3(hw, B.height / 2, B.panel / 2)));
+  part('facade', SATIN, lit, (m) => m.box(WORLD, v3(0, TOPF.y - B.height / 2, frontZ - B.panel / 2), v3(innerHw, B.height / 2, B.panel / 2)));
   part('dessous', BLACK, lit, (m) => {
     const y0 = TOPF.y - B.height, y1 = yBot(backZ);
     const len = Math.hypot(frontZ - backZ, y0 - y1);
     // Incliné : plus bas vers l'arrière (z local vers l'avant).
     const tilted: Frame = { o: v3(0, (y0 + y1) / 2 + B.panel / 2, (frontZ + backZ) / 2), x: v3(1, 0, 0), y: normalize(v3(0, Math.cos(drop), -Math.sin(drop))), z: normalize(v3(0, Math.sin(drop), Math.cos(drop))) };
-    m.box(tilted, v3(0, 0, 0), v3(hw, B.panel / 2, len / 2));
+    m.box(tilted, v3(0, 0, 0), v3(innerHw, B.panel / 2, len / 2 - B.panel));
   });
   part('dos', SATIN, lit, (m) => {
     const y1 = yBot(backZ), h = TOPB.y - y1;
-    m.box(WORLD, v3(0, y1 + h / 2, backZ + B.panel / 2), v3(hw, h / 2, B.panel / 2));
+    m.box(WORLD, v3(0, y1 + h / 2, backZ + B.panel / 2), v3(innerHw, h / 2, B.panel / 2));
   });
 
   // --- Porte en façade, générique.
@@ -278,7 +303,7 @@ export function buildDecor(panels: readonly HeadsetPanel[], opts: { lockbarWidth
       m.box(f, v3(0, D.height * 0.22, 0.016), v3(0.025, 0.0175, 0.003));
     });
     glow('voyants', '#36c9b4', { name: 'voyant', blend: 'opaque', opacity: 1, toneMapped: true }, (m) => {
-      for (const sx of [-0.045, 0.045]) m.lathe(alongAxis(at(f, sx, D.height * 0.68 - 0.025, 0.017), v3(0, 0, 1)), [[0, 0], [0.006, 0], [0.006, 0.002], [0, 0.002]], 16);
+      for (const sx of [-0.045, 0.045]) m.lathe(alongAxis(at(f, sx, D.height * 0.68 - 0.025, 0.0185), v3(0, 0, 1)), [[0, 0], [0.006, 0], [0.006, 0.002], [0, 0.002]], 16);
     });
     part('serrure', STEEL, lit, (m) => m.lathe(alongAxis(at(f, D.width / 2 - 0.03, D.height * 0.45, 0.013), v3(0, 0, 1)), [[0, 0], [0.007, 0], [0.007, 0.006], [0, 0.006]], 20));
   }
@@ -299,7 +324,7 @@ export function buildDecor(panels: readonly HeadsetPanel[], opts: { lockbarWidth
         ];
         part('pied', LEG, lit, (m) => {
           // Aile contre le flanc : x local vers l'intérieur (z), épaisseur vers l'extérieur (x).
-          m.prism(frameOf(v3(sx * hw, L.floor, zc + fz * L.thickness), v3(0, 0, -fz), v3(sx, 0, 0)), shape, 0, L.thickness);
+          m.prism(frameOf(v3(sx * hw, L.floor, zc), v3(0, 0, -fz), v3(sx, 0, 0)), shape, 0, L.thickness);
           // Aile contre la façade (ou le dos) : x local vers le milieu, épaisseur vers l'extérieur (z).
           m.prism(frameOf(v3(sx * (hw + L.thickness), L.floor, zc), v3(-sx, 0, 0), v3(0, 0, fz)), shape, 0, L.thickness);
         });
@@ -311,8 +336,8 @@ export function buildDecor(panels: readonly HeadsetPanel[], opts: { lockbarWidth
           for (const y of [yTop - 0.125, yTop - 0.165]) bolt(v3(sx * (hw - 0.026), y, zc + fz * L.thickness), v3(0, 0, fz));
           // Platine et vérin dans l'angle.
           const c = v3(sx * (hw - 0.021), L.floor, zc - fz * 0.021);
-          m.box(WORLD, add(c, v3(0, 0.003, 0)), v3(0.025, 0.0025, 0.025));
-          m.lathe(alongAxis(v3(c.x, 0.004, c.z), v3(0, 1, 0)), [[0, 0], [0.0065, 0], [0.0065, 0.026], [0, 0.026]], 12);
+          m.box(WORLD, add(c, v3(0, -0.0025, 0)), v3(0.0235, 0.005, 0.0235)); // platine : en retrait des ailes, dépasse dessous
+          m.lathe(alongAxis(v3(c.x, 0.004, c.z), v3(0, 1, 0)), [[0, 0], [0.0065, 0], [0.0065, 0.024], [0, 0.024]], 12);
         });
         part('patin', RUBBER, lit, (m) => m.lathe(alongAxis(v3(sx * (hw - 0.021), 0, zc - fz * 0.021), v3(0, 1, 0)), [[0, 0], [0.023, 0], [0.02, 0.008], [0, 0.008]], 24));
       }
@@ -331,7 +356,7 @@ export function buildDecor(panels: readonly HeadsetPanel[], opts: { lockbarWidth
     }
     part(`${name}-dome`, { color: dome, metalness: 0, emissive: { color: emissive, intensity: 0.6 } }, lit, (m) => m.lathe(f, S(domePts)));
     glow(`${name}-lueur`, glowColor, { name: 'lueur', texture: 'lueur.png', blend: 'additive', opacity: 0.55, toneMapped: true }, (m) => {
-      const g = moved(f, 0, 0.0008, 0);
+      const g = moved(f, 0, DECOR.decal, 0);
       const r = 0.03 * k;
       m.quad(at(g, -r, 0, -r), at(g, r, 0, -r), at(g, r, 0, r), at(g, -r, 0, r), dir(g, 0, 1, 0));
     });
@@ -358,9 +383,7 @@ export function buildDecor(panels: readonly HeadsetPanel[], opts: { lockbarWidth
   }
 
   // --- Tête : joues droites, dessus, dos, panneau des enceintes, cadre du fronton, filet, lueur de la teinte.
-  if (head.length) {
-    const H = DECOR.head;
-    const headZ = head[0]!.position.z;
+  if (head.length && headZ !== undefined) {
     const widest = Math.max(...head.map((p) => p.width));
     const hx = Math.max(widest / 2 + H.margin, 0.3);
     const dmd = head.find((p) => p.role === 'dmd');
@@ -370,20 +393,34 @@ export function buildDecor(panels: readonly HeadsetPanel[], opts: { lockbarWidth
     // Le dessus de la tête au-dessus du fronton, mais sous le topper s'il y en a un (il est posé dessus).
     const topperBottom = topper ? topper.position.y - topper.height / 2 - 0.003 : Infinity;
     const top = Math.min(Math.max(...main.map((p) => p.position.y + p.height / 2)) + H.top, topperBottom);
-    const zF = headZ + H.forward, zB = headZ - H.depth, y0 = TOPB.y - 0.02;
+    // Posée sur la bande arrière du cadre, enfoncée de `seat` à l'avant (le cadre monte vers l'arrière).
+    const zF = headZ + H.forward, zB = headZ - H.depth, y0 = rimTopAt(zF) - H.seat;
+    const tall = top - y0;
+    /** Face intérieure des joues à la hauteur y : elles s'évasent vers le haut. */
+    const innerX = (y: number) => hx - H.wing + (H.flare * (y - y0)) / tall;
+    /** Panneau plein entre les joues, de ya à yb, de za à zb (trapèze qui suit leur évasement). */
+    const between = (m: Mesh, ya: number, yb: number, za: number, zb: number) =>
+      m.prism(WORLD, [[-innerX(ya), ya], [innerX(ya), ya], [innerX(yb), yb], [-innerX(yb), yb]], za, zb);
+    const lid = 0.018;
     part('tete', SATIN, lit, (m) => {
-      for (const s of [-1, 1]) m.box(WORLD, v3(s * (hx - H.wing / 2), (y0 + top) / 2, (zF + zB) / 2), v3(H.wing / 2, (top - y0) / 2, (zF - zB) / 2));
-      m.box(WORLD, v3(0, top - 0.009, (zF + zB) / 2), v3(hx, 0.009, (zF - zB) / 2));
-      m.box(WORLD, v3(0, (y0 + top) / 2, zB + 0.009), v3(hx, (top - y0) / 2, 0.009));
+      // Joues : plaque inclinée vers l'extérieur (évasement), son bord avant penché vers le joueur (casquette).
+      const slant = Math.hypot(tall, H.flare);
+      for (const s of [-1, 1] as const) {
+        const f: Frame = { o: v3(s * (hx - H.wing), y0, 0), x: v3(0, 0, 1), y: v3((s * H.flare) / slant, tall / slant, 0), z: v3((s * tall) / slant, -H.flare / slant, 0) };
+        m.prism(f, [[zB, 0], [zF, 0], [zF + H.visor, slant], [zB, slant]], 0, H.wing);
+      }
+      // Couvercle entre les joues, avancé jusqu'au bord de la casquette ; dos sous le couvercle.
+      between(m, top - lid, top, zB, zF + H.visor);
+      between(m, y0, top - lid, zB, zB + lid);
     });
     const lowest = Math.min(...main.map((p) => p.position.y - p.height / 2));
-    if (lowest - 0.025 > y0) part('tete-bas', SATIN, lit, (m) => m.box(WORLD, v3(0, (y0 + lowest - 0.025) / 2, headZ - 0.008), v3(hx - H.wing, (lowest - 0.025 - y0) / 2, 0.006)));
+    if (lowest - 0.025 > y0) part('tete-bas', SATIN, lit, (m) => between(m, y0, lowest - 0.025, headZ - 0.014, headZ - 0.002));
     if (dmd) {
-      // Derrière l'écran du DMD (face avant 2 mm en retrait de l'écran).
-      part('panneau-dmd', BLACK, lit, (m) => m.box(WORLD, v3(0, dmd.position.y, headZ - 0.008), v3(hx - H.wing, dmd.height / 2 + 0.025, 0.006)));
+      // Derrière l'écran du DMD (face avant 2 mm en retrait de l'écran), au-dessus du bas de la tête.
+      part('panneau-dmd', BLACK, lit, (m) => between(m, Math.max(lowest - 0.025, dmd.position.y - dmd.height / 2 - 0.025), dmd.position.y + dmd.height / 2 + 0.025, headZ - 0.014, headZ - 0.002));
       const S = DECOR.speaker;
       const offset = dmd.width / 2 + S.beside;
-      if (offset + S.radius <= hx - H.wing - 0.005)
+      if (offset + S.radius <= innerX(dmd.position.y - S.radius) - 0.005)
         for (const s of [-1, 1]) {
           const f = alongAxis(v3(s * offset, dmd.position.y, headZ + 0.002), v3(0, 0, 1));
           part('enceinte', { color: '#2a3331', metalness: 0.8 }, lit, (m) => m.lathe(f, [[0.039, 0], [0.046, 0], [0.0465, 0.003], [0.044, 0.006], [0.04, 0.006]], 40));
@@ -394,11 +431,17 @@ export function buildDecor(panels: readonly HeadsetPanel[], opts: { lockbarWidth
         }
     }
     if (backglass) part('cadre-fronton', BLACK, lit, (m) => m.box(WORLD, v3(0, backglass.position.y, headZ - 0.02), v3(backglass.width / 2 + 0.01, backglass.height / 2 + 0.01, 0.005)));
-    if (topper) part('cadre-topper', SATIN, lit, (m) => m.box(WORLD, v3(0, topper.position.y, headZ - 0.03), v3(topper.width / 2 + 0.02, topper.height / 2 + 0.02, 0.03)));
+    // Cadre du topper posé sur le couvercle (jamais dans son épaisseur).
+    if (topper) {
+      const y1 = topper.position.y + topper.height / 2 + 0.02;
+      part('cadre-topper', SATIN, lit, (m) => m.box(WORLD, v3(0, (top + y1) / 2, headZ - 0.03), v3(topper.width / 2 + 0.02, (y1 - top) / 2, 0.03)));
+    }
     // Filet sarcelle sous le dessus, au-dessus du fronton (jamais sur son image).
     const mainTop = Math.max(...main.map((p) => p.position.y + p.height / 2));
-    const filetY = Math.max(top - 0.02, Math.min(top - 0.006, mainTop + 0.006));
-    if (filetY - 0.002 > mainTop + 0.002) glow('filet-tete', '#36c9b4', { name: 'filet', blend: 'opaque', opacity: 1, toneMapped: false }, (m) => m.box(WORLD, v3(0, filetY, zF - 0.03), v3(hx - 0.02, 0.002, 0.002)));
+    // Juste sous le couvercle, près du bord de la casquette.
+    const filetY = top - lid - 0.003;
+    const filetZ = zF + (H.visor * (filetY - y0)) / tall - 0.012;
+    if (filetY - 0.002 > mainTop + 0.002) glow('filet-tete', '#36c9b4', { name: 'filet', blend: 'opaque', opacity: 1, toneMapped: false }, (m) => m.box(WORLD, v3(0, filetY, filetZ), v3(innerX(filetY) - 0.002, 0.002, 0.002)));
     glow('lueur-tete', '#36c9b4', { name: 'lueur-teinte', texture: 'lueur.png', blend: 'additive', opacity: 0.12, toneMapped: false, tinted: true }, (m) => {
       const w = 0.6, h = 0.45, c = v3(0, (y0 + top) / 2, zB - 0.05);
       m.quad(v3(-w, c.y - h, c.z), v3(w, c.y - h, c.z), v3(w, c.y + h, c.z), v3(-w, c.y + h, c.z), v3(0, 0, 1));
