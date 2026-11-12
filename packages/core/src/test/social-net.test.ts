@@ -249,6 +249,12 @@ test('seul social-net.ts ouvre des sockets réseau, et Hyperswarm n’est charg�
         const sends = [...text.matchAll(/\.send\(([^;]*)\);/g)].map((m) => m[1]!);
         if (/dgram\.createSocket\('udp4'\)/.test(text) && sends.length === 1 && sends[0]!.endsWith("'127.0.0.1'") && !/\.bind\(|\.listen\(|createServer|node:net/.test(text)) continue;
       }
+      // mdns-responder.ts : le nom de la borne (« cyberpinball.local ») sur UDP 5353, partagé avec Windows ;
+      // il ne répond qu'à son nom, par son adresse, et n'ouvre ni serveur ni connexion.
+      if (name === 'mdns-responder.ts' && dir.endsWith(path.join('app', 'src'))) {
+        const binds = [...text.matchAll(/\.bind\(([^,)]*)/g)].map((m) => m[1]);
+        if (binds.length === 1 && binds[0] === 'MDNS_PORT' && !/\.listen\(|createServer|node:net|\.connect\(/.test(text)) continue;
+      }
       if (/node:(dgram|net)['"]|require\(['"](hyperswarm|hyperdht|protomux|@hyperswarm\/secret-stream)/.test(text) || /from ['"](hyperswarm|hyperdht|protomux|@hyperswarm\/secret-stream)['"]/.test(text)) offenders.push(path.relative(REPO_ROOT, path.join(dir, name)));
     }
   }

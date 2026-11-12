@@ -1540,6 +1540,7 @@ export function createLibrary(host: LibraryHost) {
       return dofHealthFacts(setup, detectDofControllers(devices, cabinetJoystickHids(loadCabinet(host.dataDir))), devices);
     },
     vr: () => host.vrNetwork?.(),
+    remote: () => host.phoneRemote?.nameFacts(),
     pc: () => {
       const facts = techSheet.facts();
       return facts ? pcHealthFacts(facts) : undefined;

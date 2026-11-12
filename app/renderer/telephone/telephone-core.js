@@ -510,7 +510,7 @@
 
   /**
    * Adresse par le nom local de la borne, si la page est ouverte par une adresse IP et que la borne
-   * en donne un (« pinup.local ») ; sinon rien. Même port.
+   * en donne un (« cyberpinball.local », son répondeur mDNS) ; sinon rien. Même port.
    */
   function nameUrl(location, name) {
     if (typeof name !== 'string' || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.local$/.test(name)) return null;
@@ -518,5 +518,15 @@
     return `http://${name}:${location.port}`;
   }
 
-  return { chachaBlock, poly1305, aeadSeal, aeadOpen, toB64, fromB64, seal, sealBytes, open, textDiff, deviceName, keptFingerprint, nameProof, nameUrl };
+  /**
+   * Ce que la page a obtenu du nom (remote-name.ts, RemotePhoneNameResult) : `status` undefined, la
+   * requête n'a pas abouti (nom que le téléphone ne résout pas, pare-feu, délai) ; une réponse sans
+   * la bonne preuve vient d'une autre machine (autre borne au même nom), qui n'a pas notre clé.
+   */
+  function nameResult(status, proof, expected) {
+    if (status === undefined) return 'unreachable';
+    return status === 200 && typeof proof === 'string' && proof === expected ? 'ok' : 'other';
+  }
+
+  return { chachaBlock, poly1305, aeadSeal, aeadOpen, toB64, fromB64, seal, sealBytes, open, textDiff, deviceName, keptFingerprint, nameProof, nameUrl, nameResult };
 });

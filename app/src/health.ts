@@ -39,6 +39,7 @@ import {
   type Layout,
   type MediaFacts,
   type PcHealthFacts,
+  type RemoteNameFacts,
   type TechBlockId,
   type SystemItemId,
   type TableEntry,
@@ -65,6 +66,8 @@ export interface HealthContext {
   vr?(): VrNetworkFacts | undefined;
   /** Le PC et Windows, d'après le dernier relevé de la fiche technique ; undefined avant le premier. */
   pc?(): PcHealthFacts | undefined;
+  /** Le nom de la borne sur le réseau pour le téléphone gardé (phone-remote.ts) ; undefined hors réseau local. */
+  remote?(): RemoteNameFacts | undefined;
   /** Un bloc de la fiche technique ; son « Retour » ramène à `back`. */
   openSheet?(block: TechBlockId, back: () => void): void;
   openCustom(build: () => Built, at?: number): void;
@@ -174,8 +177,9 @@ export function createHealth(ctx: HealthContext) {
       console.error(`Santé de la borne, DOF : ${(error as Error).message}`); // i18n-ignore : journal
     }
     const vr = ctx.vr?.();
+    const remote = ctx.remote?.();
     const pc = ctx.pc?.();
-    return { at: new Date().toISOString(), disks, ...(pc ? { pc } : {}), tables, pup, media, screens, ...(dof ? { dof } : {}), ...(vr ? { vr } : {}), vpx };
+    return { at: new Date().toISOString(), disks, ...(pc ? { pc } : {}), tables, pup, media, screens, ...(dof ? { dof } : {}), ...(vr ? { vr } : {}), ...(remote ? { remote } : {}), vpx };
   }
 
   /** Relève tout en arrière-plan ; un relevé en cours n'est pas doublé. */

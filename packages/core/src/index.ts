@@ -168,6 +168,7 @@ export * from './gamerecording';
 export * from './gamenotice';
 export * from './dmdscore';
 export * from './remote';
+export * from './remote-name';
 export * from './remote-kept';
 export * from './remote-menus';
 export * from './websocket';

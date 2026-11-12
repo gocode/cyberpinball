@@ -42,6 +42,7 @@ import * as crypto from 'node:crypto';
 import { aeadOpen, aeadSeal } from './chacha';
 import { RANKING_SCOPES, type RankingScope } from './rankings';
 import { SCORE_PERIODS, type ScorePeriod } from './scoreboard';
+import { REMOTE_PHONE_NAME_RESULTS, type RemotePhoneNameResult } from './remote-name';
 
 /** Durée de validité d'un QR code (sa clé d'appairage), puis il se renouvelle. */
 export const REMOTE_PAIRING_MS = 3 * 60_000;
@@ -252,17 +253,6 @@ export function keptFingerprint(key: Uint8Array): string {
 }
 const FINGERPRINT = /^[A-Za-z0-9_-]{22}$/;
 
-/**
- * Nom de la borne sur le réseau local (mDNS, « pinup.local ») tiré du nom de la machine, ou rien
- * s'il n'en fait pas un (espace, point, accent…). Windows y répond de lui-même. Le téléphone gardé
- * passe par ce nom plutôt que par l'adresse : le DHCP change l'adresse d'une borne redémarrée
- * (incident du 12/11/2026), et le navigateur range la clé gardée par adresse et port.
- */
-export function remoteLocalName(hostname: string): string | undefined {
-  const h = hostname.trim().toLowerCase();
-  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(h) && !/^\d+$/.test(h) ? `${h}.local` : undefined;
-}
-
 /** Ce que le téléphone demande avant de passer par le nom : la preuve que ce nom mène à sa borne. */
 export const REMOTE_NAME_PATH = '/nom';
 
@@ -443,6 +433,8 @@ export type PhoneMessage =
   | { t: 'collection'; s: number; v: number; i: number }
   /** Menu des tables en grille : la borne joint l'image du fronton de chaque table (lue seulement quand on la regarde). */
   | { t: 'grid'; s: number; on: boolean }
+  /** Ce que la page a obtenu du nom local de la borne (remote-name.ts) : la borne le dit dans la Santé. */
+  | { t: 'name'; s: number; r: RemotePhoneNameResult }
   /** Au menu : ouvrir directement un menu par son identifiant (remoteMenuTarget), vérifié par la borne. */
   | { t: 'open'; s: number; id: string }
   /**
@@ -531,6 +523,8 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       return typeof m.v === 'number' && Number.isSafeInteger(m.v) && m.v >= 0 && typeof m.i === 'number' && Number.isInteger(m.i) && m.i >= 0 && m.i < 200 ? { t: 'collection', s, v: m.v, i: m.i } : undefined;
     case 'grid':
       return typeof m.on === 'boolean' ? { t: 'grid', s, on: m.on } : undefined;
+    case 'name':
+      return (REMOTE_PHONE_NAME_RESULTS as readonly unknown[]).includes(m.r) ? { t: 'name', s, r: m.r as RemotePhoneNameResult } : undefined;
     case 'open':
       return typeof m.id === 'string' && /^[a-z0-9-]{1,40}$/.test(m.id) ? { t: 'open', s, id: m.id } : undefined;
     case 'ranks': {

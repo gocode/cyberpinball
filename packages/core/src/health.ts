@@ -27,6 +27,7 @@ import { ROLES, type ObservedDisplay, type RoleId } from './model';
 import { playBlockers } from './playable';
 import { systemPathOf, type SystemItemId } from './systemmenu';
 import { taskbarMomentLabel, type TaskbarFacts } from './taskbarguard';
+import { remoteNameSummary, type RemoteNameFacts } from './remote-name';
 import { pcLines, type PcHealthFacts, type TechBlockId } from './techsheet';
 import { vpxDisplayName, type VpxDisplayIdFormat } from './vpx';
 import { airLinkOverWifi, type LinkTransport, type PcNetwork } from './vr-reseau';
@@ -34,7 +35,7 @@ import { airLinkOverWifi, type LinkTransport, type PcNetwork } from './vr-reseau
 export type HealthState = 'ok' | 'check' | 'blocking';
 
 /** Les contrôles, dans l'ordre de la page. */
-export const HEALTH_CHECKS = ['disk', 'pc', 'tables', 'pup', 'media', 'screens', 'dof', 'vr', 'vpx'] as const;
+export const HEALTH_CHECKS = ['disk', 'pc', 'tables', 'pup', 'media', 'screens', 'dof', 'remote', 'vr', 'vpx'] as const;
 export type HealthCheckId = (typeof HEALTH_CHECKS)[number];
 
 /** Où mène une ligne. */
@@ -171,6 +172,8 @@ export interface HealthFacts {
   dof?: DofFacts;
   /** Le réseau du casque (vr-reseau.ts) ; absent sans casque relevé. */
   vr?: VrNetworkFacts;
+  /** Le nom de la borne sur le réseau pour le téléphone gardé (remote-name.ts) ; absent hors réseau local. */
+  remote?: RemoteNameFacts;
   /** Le PC et Windows, d'après le relevé de la fiche technique ; absent avant le premier. */
   pc?: PcHealthFacts;
   vpx: VpxFacts;
@@ -652,6 +655,16 @@ function vrLinkLines(facts: VrNetworkFacts): HealthLine[] {
   return [{ check: 'vr', state: 'ok', title, ...(facts.network ? { detail: facts.network.adapter } : {}), go, target }];
 }
 
+/**
+ * Télécommande du téléphone : le nom de la borne sur le réseau (remote-name.ts). Un cas qui le fait
+ * tomber, ou un téléphone qui ne le trouve pas, est à vérifier ; tout mène à l'écran de la
+ * télécommande, qui porte la correction possible (« Rouvrir le nom dans le pare-feu »).
+ */
+export function remoteLines(facts: RemoteNameFacts): HealthLine[] {
+  const s = remoteNameSummary(facts);
+  return [{ check: 'remote', state: s.state, title: s.title, detail: s.detail, go: t('Ouvrir Télécommande du téléphone'), target: SYSTEM('phone-remote') }];
+}
+
 export function vpxLines(facts: VpxFacts): HealthLine[] {
   const install = (version: string | undefined) => (version ? t('Installer VPX {version}', { version }) : t('Installer VPX'));
   if (!facts.installed) {
@@ -695,6 +708,7 @@ export function healthLines(facts: HealthFacts): HealthLine[] {
     ...(facts.media ? mediaLines(facts.media) : []),
     ...(facts.screens ? screensLines(facts.screens) : []),
     ...(facts.dof ? dofLines(facts.dof) : []),
+    ...(facts.remote ? remoteLines(facts.remote) : []),
     ...(facts.vr ? vrLines(facts.vr) : []),
     ...vpxLines(facts.vpx),
   ];
@@ -720,6 +734,8 @@ export function healthCheckInfo(check: HealthCheckId): { title: string; icon: Ic
       return { title: t('Écrans'), icon: 'screens' };
     case 'dof':
       return { title: t('LED et retours (DOF)'), icon: 'bulb' };
+    case 'remote':
+      return { title: t('Télécommande du téléphone'), icon: 'phone' };
     case 'vr':
       return { title: t('Casque'), icon: 'vr' };
     case 'vpx':

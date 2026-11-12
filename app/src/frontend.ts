@@ -395,6 +395,7 @@ import { createChatMenu } from './chat-menu';
 import { createProfileMenu } from './profile-menu';
 import { createFirewallRule } from './firewall-rule';
 import { guardFirewall } from './firewall-guard';
+import { createMdnsResponder } from './mdns-responder';
 import { createFriendContent } from './friend-content';
 import { friendTransport } from './download-sources';
 import { createGameNotices } from './game-notice';
@@ -1090,8 +1091,11 @@ const socialMode = socialNetMode(process.env);
 const socialFirewall = createFirewallRule({ exe: process.execPath, simulated: socialMode !== 'public', vpx: () => vpxFirewallTargets(vpxInstall(loc)?.exe), log: (line) => console.log(line) });
 /** Fichier qui arrive du téléphone : le bandeau du menu et l'écran de la télécommande le suivent. */
 let phoneUpload: { name: string; received: number; size: number } | undefined;
+const keptPhones = createKeptPhones(loc.dataDir, { log: (line) => console.log(line) });
 const phoneRemote = createPhoneRemote({
-  kept: createKeptPhones(loc.dataDir, { log: (line) => console.log(line) }),
+  kept: keptPhones,
+  // Le nom de la borne sur le réseau local (« cyberpinball.local »), par le répondeur de Cyber Pinball.
+  names: createMdnsResponder({ log: (line) => console.log(line), preferred: () => keptPhones.localName(), remember: (name) => keptPhones.noteLocalName(name) }),
   mode: () => phoneRemoteMode(process.env),
   firewall: async () => socialFirewall.state() ?? (await socialFirewall.check()),
   fromSources: !app.isPackaged,

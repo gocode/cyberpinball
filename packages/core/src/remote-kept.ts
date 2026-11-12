@@ -63,18 +63,22 @@ export function createKeptPhones(dataDir: string | undefined, opts: KeptPhonesOp
   let entries: Entry[] = [];
   /** Adresse de la borne à sa dernière écoute (celle que connaissent les téléphones gardés par l'adresse). */
   let lastAddress: string | undefined;
+  /** Nom annoncé par la borne sur le réseau local (mdns-responder.ts) : redemandé d'abord au démarrage suivant. */
+  let lastName: string | undefined;
   if (file) {
     const read = readKeptJson(file);
     if (read.setAside) opts.log?.(`Télécommande : liste des téléphones gardés illisible, mise de côté (${path.basename(read.setAside)}).`); // i18n-ignore : journal
     entries = parseKeptPhones(read.value);
     const a = (read.value as { address?: unknown } | undefined)?.address;
     if (typeof a === 'string' && /^[0-9a-f.:]{2,45}$/i.test(a)) lastAddress = a;
+    const n = (read.value as { name?: unknown } | undefined)?.name;
+    if (typeof n === 'string' && /^[a-z0-9-]{1,63}\.local$/.test(n)) lastName = n;
   }
 
   function save(): void {
     if (!file) return;
     try {
-      writeFileAtomic(file, JSON.stringify({ version: 1, phones: entries, ...(lastAddress ? { address: lastAddress } : {}) }, null, 2) + '\n');
+      writeFileAtomic(file, JSON.stringify({ version: 1, phones: entries, ...(lastAddress ? { address: lastAddress } : {}), ...(lastName ? { name: lastName } : {}) }, null, 2) + '\n');
     } catch (error) {
       opts.log?.(`Télécommande : liste des téléphones gardés non enregistrée (${(error as Error).message}).`); // i18n-ignore : journal
     }
@@ -129,6 +133,14 @@ export function createKeptPhones(dataDir: string | undefined, opts: KeptPhonesOp
       lastAddress = host;
       save();
       return before && entries.length ? before : undefined;
+    },
+    /** Le nom local annoncé au démarrage précédent. */
+    localName: (): string | undefined => lastName,
+    /** Retient le nom local annoncé (rien à écrire s'il n'a pas changé). */
+    noteLocalName(name: string): void {
+      if (name === lastName) return;
+      lastName = name;
+      save();
     },
     /** « Oublier » : faux s'il n'était pas gardé. */
     forget(id: string): boolean {

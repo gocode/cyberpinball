@@ -25,9 +25,11 @@
 //
 // Nom de la borne (12/11/2026) : le QR donne son adresse IP, que le DHCP peut changer au
 // redémarrage — et le stockage du navigateur va avec l'adresse. Gardé, le téléphone reçoit le nom
-// local de la borne (« pinup.local ») ; s'il le joint et que la machine nommée prouve garder sa clé
-// (GET /nom), la page passe par ce nom, et le raccourci de l'écran d'accueil à refaire une fois
-// retrouve la borne quelle que soit son adresse. Sinon, la page reste à l'adresse.
+// de la borne (« cyberpinball.local », annoncé par Cyber Pinball) ; s'il le joint et que la machine
+// nommée prouve garder sa clé (GET /nom), la page passe par ce nom, et le raccourci de l'écran
+// d'accueil à refaire une fois retrouve la borne quelle que soit son adresse. Les navigateurs
+// d'Android ne trouvent pas les noms en « .local » : la page reste alors à l'adresse, le dit une
+// fois, et le menu ⋮ dit pourquoi (« Adresse de la borne »).
 //
 // Démonstration hors écran : window.cyberRemoteDemo fixe un état sans borne.
 'use strict';
@@ -748,26 +750,77 @@ function forgetKey() {
 /**
  * Passe par le nom local de la borne (core.nameUrl) si la machine qu'il désigne prouve garder notre
  * clé (GET /nom, défi tiré au hasard) : la clé ne part qu'avec la page, dans le fragment, jamais
- * vers une machine qui ne l'a pas. Nom injoignable (téléphone qui ne résout pas « .local »,
- * pare-feu) : la page reste à l'adresse, sans rien dire.
+ * vers une machine qui ne l'a pas. Rend ce qui s'est passé (core.nameResult) : 'ok' (la page part),
+ * 'unreachable' (téléphone qui ne résout pas « .local », pare-feu), 'other' (une autre borne répond
+ * à ce nom) ; undefined si rien n'a été tenté (page déjà sous le nom, pas de nom).
  */
 async function moveToName(name, fresh) {
   const base = core.nameUrl(location, name);
-  if (!base || !key) return;
+  if (!base || !key) return undefined;
   const nonce = new Uint8Array(12);
   crypto.getRandomValues(nonce);
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 4000);
+  let result;
   try {
     const r = await fetch(`${base}/nom?f=${core.keptFingerprint(key)}&n=${core.toB64(nonce)}`, { cache: 'no-store', signal: ctl.signal });
-    const proof = r.ok ? (await r.json())?.p : undefined;
-    if (proof !== core.nameProof(key, nonce) || !kept) return;
+    const proof = r.ok ? (await r.json().catch(() => undefined))?.p : undefined;
+    result = core.nameResult(r.status, proof, core.nameProof(key, nonce));
   } catch {
-    return;
+    result = core.nameResult(undefined);
   } finally {
     clearTimeout(timer);
   }
-  location.replace(`${base}/#g=${core.toB64(key)}&nom=${fresh ? 2 : 1}`);
+  if (result === 'ok' && kept) location.replace(`${base}/#g=${core.toB64(key)}&nom=${fresh ? 2 : 1}`);
+  return result;
+}
+
+/** Nom de la borne retenu (sous l'adresse IP) : un onglet resté ouvert la cherche par lui si l'adresse change. */
+const NAME_STORE = 'cyberpinball.nom';
+/** Ce que la page a déjà dit du nom (une fois chacun) : 'unreachable', 'other', ou la raison donnée par la borne. */
+const NAME_NOTE_STORE = 'cyberpinball.nom-indice';
+/** Un mot sur le nom attend que la feuille ouverte (astuce de l'écran d'accueil) se ferme. */
+let nameNote;
+
+/**
+ * Dit une fois pourquoi ce téléphone reste sur l'adresse IP de la borne, et ce que cela change : si le
+ * routeur la change, il faudra scanner le QR. `kind` : 'unreachable', 'other', ou la raison de la
+ * borne (« nameIssue » : invalid, mdns-off, firewall, conflict).
+ */
+function noteName(kind, name) {
+  nameStatus = kind;
+  if (stored(NAME_NOTE_STORE) === kind) return;
+  store(NAME_NOTE_STORE, kind);
+  nameNote = nameWhy(kind, name);
+  if ($('sheet').hidden && !hintAfterMode) showNameNote();
+}
+/** Un téléphone Android (navigateur sans les noms en « .local »). */
+const onAndroid = () => /Android/.test(navigator.userAgent);
+/**
+ * Pourquoi la page passe par l'adresse IP, ou par le nom : dit une fois (noteName), et toujours dans le
+ * menu ⋮ (« Adresse de la borne »).
+ */
+function nameWhy(kind, name = stored(NAME_STORE)) {
+  const after = t('Si le routeur change cette adresse, scannez le QR une fois.');
+  switch (kind) {
+    case 'name':
+      return t('Ce téléphone passe par le nom de la borne ({name}) : il la retrouve même si le routeur change son adresse.', { name: location.hostname });
+    case 'unreachable':
+      return `${onAndroid() ? t('Les navigateurs d’Android ne trouvent pas la borne par son nom ({name}) : ce téléphone passe par son adresse IP.', { name }) : t('Ce téléphone ne trouve pas la borne par son nom ({name}) : il passe par son adresse IP.', { name })} ${after}`;
+    case 'other':
+      return `${t('Le nom {name} mène à une autre borne : ce téléphone reste sur l’adresse de la vôtre.', { name })} ${after}`;
+    case 'none':
+      return `${t('La borne n’annonce pas de nom sur le réseau : ce téléphone passe par son adresse IP.')} ${after}`;
+    default:
+      return t('Ce téléphone passe par l’adresse IP de la borne.');
+  }
+}
+/** Où en est le nom pour cette page : 'name', 'unreachable', 'other', 'none' ; '' tant qu'on ne sait pas. */
+let nameStatus = /\.local$/.test(location.hostname) ? 'name' : '';
+function showNameNote() {
+  const text = nameNote;
+  nameNote = undefined;
+  if (text && state === 'paired') openSheet(t('Nom de la borne'), [{ id: 'ok', label: t('Compris'), run: () => undefined }], { text, cancel: false });
 }
 
 function send(message) {
@@ -851,6 +904,9 @@ function connect(force = false) {
     if (MESSAGES[state]?.again) return;
     // Un échec de liaison n'efface jamais la clé : seule la borne qui ne la connaît plus (« unknown ») le fait.
     setState(retry >= UNREACHABLE_AFTER ? 'unreachable' : state === 'connecting' && !retry ? 'connecting' : 'lost');
+    // Injoignable à son adresse IP : le routeur l'a peut-être changée. La page cherche la borne par
+    // son nom retenu, et y passe si elle prouve garder la clé (moveToName) ; de temps en temps, pas à chaque essai.
+    if (kept && retry >= UNREACHABLE_AFTER && (retry - UNREACHABLE_AFTER) % 5 === 0 && stored(NAME_STORE)) void moveToName(stored(NAME_STORE), false);
     retry++;
     retryTimer = setTimeout(connect, Math.min(5000, 600 * retry));
   };
@@ -880,9 +936,21 @@ function handle(m) {
       setState('paired');
       if (navigator.vibrate) navigator.vibrate(30);
       // Gardé et ouvert par l'adresse IP : la page passe par le nom de la borne s'il la mène à elle.
+      // Sinon elle le dit une fois, et à la borne (Santé) ; sous le nom, elle confirme à la borne.
       if (m.kept && !nameTried) {
         nameTried = true;
-        void moveToName(m.name, fresh);
+        if (typeof m.name === 'string' && core.nameUrl(location, m.name)) store(NAME_STORE, m.name);
+        if (/\.local$/.test(location.hostname)) {
+          nameStatus = 'name';
+          send({ t: 'name', r: 'ok' });
+        }
+        else if (m.name)
+          void moveToName(m.name, fresh).then((r) => {
+            if (!r || r === 'ok') return;
+            send({ t: 'name', r });
+            noteName(r, m.name);
+          });
+        else if (typeof m.nameIssue === 'string') noteName(m.nameIssue);
       }
       // Une fois, juste après l'appairage : comment le garder sous la main (après le mode, qui suit).
       // Passée par le nom : une fois aussi sous ce nom, le raccourci d'avant menant à l'adresse.
@@ -903,7 +971,7 @@ function handle(m) {
       if (hintAfterMode && state === 'paired') {
         hintAfterMode = false;
         offerHomeScreen(movedToName === '1');
-      }
+      } else if (nameNote && $('sheet').hidden) showNameNote();
       break;
     case 'screen':
       showScreen(m);
@@ -1573,6 +1641,8 @@ $('top-more').addEventListener('click', () => {
     ...(mode === 'menu' && fieldShown ? [{ id: 'keys', label: t('Clavier : taper dans le champ ouvert à la borne'), run: () => openKeys(fieldShown, false, sameField(openedField, fieldShown)) }] : []),
     ...(mode === 'menu' || sending ? [{ id: 'send', label: sending && upload.phase === 'sending' ? t('Envoi {pct} %', { pct: uploadPct() }) : t('Envoyer un fichier à la borne'), run: () => $('nav-send').click() }] : []),
     ...(kept && !standalone() ? [{ id: 'home', label: t('Ajouter à l’écran d’accueil'), run: offerHomeScreen }] : []),
+    // Par le nom ou par l'adresse IP, et pourquoi (Android : les noms en « .local » ne passent pas).
+    ...(kept ? [{ id: 'address', label: t('Adresse de la borne : {host}', { host: location.hostname }), run: () => openSheet(t('Adresse de la borne'), [{ id: 'ok', label: t('Compris'), run: () => undefined }], { text: nameWhy(nameStatus), cancel: false }) }] : []),
     // Android : le plein écran, à prendre ou à quitter d'ici (jamais repris de lui-même une fois quitté exprès).
     ...(document.fullscreenElement || fullscreenPossible() ? [{ id: 'fullscreen', label: document.fullscreenElement ? t('Quitter le plein écran') : t('Plein écran'), run: toggleFullscreen }] : []),
   ];
@@ -1643,6 +1713,8 @@ function closeSheet() {
   sheetOpener?.setAttribute('aria-expanded', 'false');
   sheetOpener?.focus({ preventScroll: true });
   sheetOpener = undefined;
+  // Un mot sur le nom de la borne attendait cette feuille (l'astuce de l'écran d'accueil).
+  if (nameNote) setTimeout(showNameNote, 300);
 }
 $('sheet-cancel').addEventListener('click', closeSheet);
 $('sheet').addEventListener('click', (e) => e.target === $('sheet') && closeSheet());

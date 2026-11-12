@@ -5,8 +5,10 @@
 // raison. Le clavier à l'écran montre le même bloc, en bande, sous ses touches (library.ts).
 // Sous « Téléphones gardés », ceux qui reviennent sans QR (remote-kept.ts) : en choisir un ouvre
 // « Oublier ce téléphone ».
+// Le nom de la borne sur le réseau ne se montre que s'il fait défaut (remote-name.ts) : sa raison, et
+// ce qu'il change pour le téléphone (Android : l'adresse IP).
 
-import { formatDate, formatSize, REMOTE_UPLOAD_MAX, t, type KeptPhone } from '@cyberpinball/core';
+import { formatDate, formatSize, REMOTE_UPLOAD_MAX, remoteNameSummary, t, type KeptPhone } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row } from './library';
 import type { PhoneRemote, RemoteBar } from './phone-remote';
 
@@ -120,6 +122,13 @@ export function createPhoneRemoteMenu(host: PhoneRemoteMenuHost) {
     if (bar?.phase === 'paired') {
       actions.push({ label: t('Déconnecter le téléphone'), detail: t('Il ne pilote plus la borne ; gardé, il pourra revenir sans QR code'), icon: 'close', key: 'remote:end', run: () => host.remote.end() });
     }
+    // Le nom de la borne qui fait défaut, ou un téléphone qui ne le trouve pas : la raison.
+    let nameSection: { title: string; rows: Row[] } | undefined;
+    const name = host.remote.nameFacts();
+    const said = name && remoteNameSummary(name);
+    if (name && said && said.state !== 'ok') {
+      nameSection = { title: t('Nom de la borne sur le réseau'), rows: [{ text: said.title, detail: said.detail, tone: 'warning' as const, badges: [t('À vérifier')], icon: 'network' as const }] };
+    }
     actions.push({ label: t('Retour'), icon: 'back', key: 'remote:back', run: back });
     // Téléphones gardés : chacun une ligne à choisir, qui ouvre « Oublier ce téléphone ».
     const kept = host.remote.keptPhones();
@@ -143,6 +152,7 @@ export function createPhoneRemoteMenu(host: PhoneRemoteMenuHost) {
       });
     }
     if (keptRows.length) sections.push({ title: t('Téléphones gardés'), rows: keptRows });
+    if (nameSection) sections.push(nameSection);
     sections.push({ title: t('Ce que fait le téléphone'), rows });
     return {
       heading: t('Télécommande du téléphone'),

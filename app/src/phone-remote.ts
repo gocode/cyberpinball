@@ -81,7 +81,6 @@ import {
   isLocalNetworkAddress,
   keptFingerprint,
   keptNameProof,
-  remoteLocalName,
   REMOTE_NAME_PATH,
   language,
   localeOf,
@@ -111,6 +110,8 @@ import {
   mediaPathFromUrl,
   type KeptPhone,
   type KeptPhones,
+  type RemoteNameFacts,
+  type RemotePhoneNameResult,
   type PhoneMessage,
   type RemoteField,
   type RemoteButton,
@@ -127,6 +128,7 @@ import {
 import { settleWithin, typeChars } from './page-input';
 import { pointerWindow } from './remote-pointer';
 import { qrRows } from './remote-qr';
+import type { MdnsResponder } from './mdns-responder';
 import { createRemoteImages, REMOTE_IMAGE_PATH, type RemoteImage } from './remote-images';
 import { remoteAvatar, type RemoteRanks } from './remote-ranks';
 import { journalIncident } from './uncaught';
@@ -358,8 +360,11 @@ export interface PhoneRemoteOptions {
   port?: number;
   /** Combien attendre que le port se libère avant d'en prendre un autre (essais) ; par défaut PORT_WAIT_MS. */
   portWaitMs?: number;
-  /** Nom de la machine (essais) ; par défaut os.hostname() : le téléphone gardé passe par « <nom>.local ». */
-  hostname?(): string;
+  /**
+   * Le répondeur mDNS de Cyber Pinball (mdns-responder.ts) : le nom de la borne sur le réseau local
+   * (« cyberpinball.local »), lancé sur la carte où la page est servie. Sans lui, pas de nom.
+   */
+  names?: Pick<MdnsResponder, 'start' | 'name' | 'facts' | 'phoneResult' | 'close'>;
 }
 
 /**
@@ -545,8 +550,10 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   /** L'adresse de la borne a changé depuis la dernière écoute (DHCP) : l'ancienne, que le QR mentionne. */
   let addressMoved: string | undefined;
   let listenTries = 0;
-  /** Nom de la borne sur le réseau local (« pinup.local »), s'il y en a un (remoteLocalName). */
-  const localName = () => remoteLocalName((opts.hostname ?? os.hostname)());
+  /** Nom de la borne sur le réseau local (« cyberpinball.local »), une fois annoncé (mdns-responder.ts). */
+  const localName = () => opts.names?.name();
+  /** Ce que chaque téléphone a déjà dit du nom pendant ce lancement : le journal ne le répète pas. */
+  const nameHeard = new Set<string>();
   /** Ce que fait chaque collection de l'écran envoyé ; le téléphone regarde-t-il la grille (images des frontons) ? */
   let collectionPicks: (undefined | (() => void))[] = [];
   let entriesFocus: (undefined | (() => void))[] = [];
@@ -662,7 +669,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   /**
    * Requête venue d'ailleurs que du réseau local, ou adressée à un autre nom que la borne (rebond
-   * DNS) : refusée. La borne se nomme par ses adresses, ou par son nom local (« pinup.local »).
+   * DNS) : refusée. La borne se nomme par ses adresses, ou par son nom local (« cyberpinball.local », mdns-responder.ts).
    */
   function allowed(req: http.IncomingMessage): boolean {
     if (!isLocalNetworkAddress(req.socket.remoteAddress)) return false;
@@ -674,23 +681,27 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   /**
    * Preuve du nom (GET /nom?f=…&n=…) : la page, ouverte par l'adresse, demande à la machine que
    * désigne le nom local si elle garde sa clé (f, keptFingerprint) ; la réponse (keptNameProof sur
-   * son défi n) le prouve sans rien dire de la clé. Lisible seulement de la page servie par une
-   * adresse de la borne (CORS) ; sinon rien.
+   * son défi n) le prouve sans rien dire de la clé. Lisible seulement d'une page servie par une
+   * adresse du réseau local sur le port de la borne (CORS) : la sienne, ou celle qu'elle avait avant
+   * que le routeur la change (l'onglet resté ouvert la retrouve ainsi par son nom) ; sinon rien.
    */
   function serveNameProof(req: http.IncomingMessage, res: http.ServerResponse): void {
     const q = new URLSearchParams((req.url ?? '').split('?')[1] ?? '');
     const f = q.get('f') ?? '';
     const nonce = fromBase64Url(q.get('n') ?? '', 12);
     const origin = String(req.headers.origin ?? '');
-    const o = /^http:\/\/([0-9.]+):(\d+)$/.exec(origin);
-    const fromPage = Boolean(o && address && Number(o[2]) === address.port && ownAddresses(interfaces()).has(o[1]!));
+    const o = /^http:\/\/(\d{1,3}(?:\.\d{1,3}){3}):(\d+)$/.exec(origin);
+    const fromPage = Boolean(o && address && Number(o[2]) === address.port && (ownAddresses(interfaces()).has(o[1]!) || (isLocalNetworkAddress(o[1]) && o[1] !== '127.0.0.1')));
     const phone = fromPage && nonce && /^[A-Za-z0-9_-]{22}$/.test(f) ? kept?.keys().find((k) => keptFingerprint(k.key) === f) : undefined;
+    // La page lit aussi le refus : une autre borne au même nom dit ainsi « pas cette clé » (le
+    // téléphone l'annonce), plutôt qu'un nom qui semblerait injoignable.
+    const cors = fromPage ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' } : {};
     if (!phone || !nonce) {
-      res.writeHead(404, { ...securityHeaders(String(req.headers.host)), 'Content-Type': 'text/plain; charset=utf-8' }).end();
+      res.writeHead(404, { ...securityHeaders(String(req.headers.host)), 'Content-Type': 'text/plain; charset=utf-8', ...cors }).end();
       return;
     }
     res
-      .writeHead(200, { ...securityHeaders(String(req.headers.host)), 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': origin, Vary: 'Origin' })
+      .writeHead(200, { ...securityHeaders(String(req.headers.host)), 'Content-Type': 'application/json; charset=utf-8', ...cors })
       .end(req.method === 'HEAD' ? undefined : JSON.stringify({ p: keptNameProof(phone.key, nonce) }));
   }
 
@@ -817,7 +828,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     ws.onText((frame) => {
       if (!pairing) return ws.close();
       if (!link) {
-        link = hello(ws, inbound, frame);
+        link = hello(ws, inbound, frame, String(req.headers.host ?? '').toLowerCase());
         return;
       }
       const raw = openRemote(link.key, link.inbound, frame);
@@ -835,7 +846,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   }
 
   /** Premier message d'une connexion : quelle clé l'ouvre, et la suite. */
-  function hello(ws: WebSocketLink, inbound: Buffer, frame: string): Link | undefined {
+  function hello(ws: WebSocketLink, inbound: Buffer, frame: string, via = ''): Link | undefined {
     const result = pairing!.hello((key) => openRemote(key, inbound, frame));
     const message = result?.message;
     const outbound = message ? fromBase64Url(message.c, REMOTE_CHALLENGE_BYTES) : undefined;
@@ -865,7 +876,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     }
     active = link;
     if (result.kind === 'kept') {
-      log(`Télécommande : téléphone gardé (${result.device}) reconnecté depuis ${ws.address}${result.replaced ? ', il prend la main' : ''}.`); // i18n-ignore : journal
+      const byName = /\.local:\d+$/.test(via) ? `, par le nom ${via.replace(/:\d+$/, '')}` : ''; // i18n-ignore : journal
+      log(`Télécommande : téléphone gardé (${result.device}) reconnecté depuis ${ws.address}${byName}${result.replaced ? ', il prend la main' : ''}.`); // i18n-ignore : journal
       kept?.seen(result.id);
       ready(link);
     } else if (result.kind === 'claimed') {
@@ -899,9 +911,11 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     // `kept` : la borne garde ce téléphone, il range sa clé pour revenir sans QR.
     // `name` : le nom local de la borne ; le téléphone gardé y passe s'il le joint (preuve /nom), pour
     // la retrouver même si le DHCP change son adresse.
+    // `nameIssue` : la borne n'a pas de nom sur le réseau ; la page le dit une fois, et reste sur l'adresse.
     const isKept = Boolean(pairing?.current()?.kept);
     const name = isKept ? localName() : undefined;
-    sendTo(link, { t: 'ready', kept: isKept, ...(name ? { name } : {}) });
+    const nameIssue = isKept && !name ? 'none' : undefined;
+    sendTo(link, { t: 'ready', kept: isKept, ...(name ? { name } : {}), ...(nameIssue ? { nameIssue } : {}) });
     lastActivity = Date.now();
     // Une liaison neuve : la vue Scores redemande ce qu'elle montre (« ranks »).
     ranksWatch = undefined;
@@ -1572,6 +1586,29 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     }
   }
 
+  /**
+   * La page dit ce qu'elle a obtenu du nom : passée par lui, nom injoignable depuis ce téléphone
+   * (pas de « .local » avant Android 12, Wi-Fi qui isole les appareils), ou autre borne au même nom.
+   * Le seul témoin du dernier maillon : gardé pour la Santé, dit une fois au journal.
+   */
+  function phoneNameResult(result: RemotePhoneNameResult): void {
+    const device = pairing?.current()?.device ?? t('Téléphone');
+    opts.names?.phoneResult(result, device);
+    const said = `${device}:${result}`;
+    if (nameHeard.has(said)) return;
+    nameHeard.add(said);
+    const name = localName() ?? '?';
+    log(
+      result === 'ok'
+        ? `Télécommande : le téléphone gardé (${device}) passe par le nom ${name}.` // i18n-ignore : journal
+        : result === 'other'
+          ? `Télécommande : pour le téléphone gardé (${device}), le nom ${name} mène à une autre machine, qui n'a pas sa clé ; il reste sur l'adresse IP.` // i18n-ignore : journal
+          : `Télécommande : le téléphone gardé (${device}) ne joint pas la borne par son nom ${name} (navigateur d'Android, sans mDNS, ou Wi-Fi qui isole les appareils) ; il reste sur l'adresse IP.`, // i18n-ignore : journal
+    );
+    tick();
+    menu?.changed();
+  }
+
   function handle(link: Link, message: PhoneMessage): void {
     if (message.t === 'bye') {
       log('Télécommande : le téléphone s’est déconnecté.'); // i18n-ignore : journal
@@ -1586,6 +1623,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       return;
     }
     if (pairing?.session() !== 'paired' || message.t === 'ping') return;
+    // Ce que la page a obtenu du nom : pas un geste (l'inactivité ne repart pas).
+    if (message.t === 'name') return phoneNameResult(message.r);
     lastActivity = Date.now();
     // L'envoi ne passe pas par la file des gestes : sa réponse ne doit pas attendre une injection.
     if (message.t === 'up') return void startUpload(link, message);
@@ -1920,11 +1959,12 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     server = s;
     address = { host, port };
     unavailable = undefined;
-    log(`Télécommande : page du téléphone servie sur ${host}:${port} (${mode === 'lan' ? `réseau local${localName() ? `, nom ${localName()}` : ''}` : 'essai, 127.0.0.1'}).`); // i18n-ignore : journal
+    log(`Télécommande : page du téléphone servie sur ${host}:${port} (${mode === 'lan' ? 'réseau local' : 'essai, 127.0.0.1'}).`); // i18n-ignore : journal
     // Adresse changée depuis la dernière écoute (DHCP, redémarrage) : un téléphone gardé par l'ancienne
     // adresse ne retrouve plus la page ; passé par le nom local, il revient seul.
     addressMoved = mode === 'lan' ? kept?.noteAddress(host) : undefined;
-    if (addressMoved) log(`Télécommande : adresse de la borne changée (${addressMoved} → ${host}) ; un téléphone gardé par l'ancienne adresse doit scanner le QR une fois, ${localName() ? `passé par le nom ${localName()} il revient seul` : 'la machine n’a pas de nom local utilisable'}. Une adresse réservée à la borne dans le routeur (DHCP) l'évite.`); // i18n-ignore : journal
+    if (addressMoved) log(`Télécommande : adresse de la borne changée (${addressMoved} → ${host}) ; un iPhone gardé passé par le nom de la borne revient seul ; un téléphone Android, ou ouvert par l'ancienne adresse, scanne le QR une fois.`); // i18n-ignore : journal
+    if (mode === 'lan') void opts.names?.start(host);
   }
 
   /**
@@ -2170,6 +2210,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     /** Cyber Pinball se ferme : le téléphone l'apprend, rien n'écoute plus. */
     close(): void {
       closed = true;
+      opts.names?.close();
       surfaces.clear();
       sleep('quit');
     },
@@ -2207,6 +2248,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       settle();
     },
     pending: () => pairing?.session() === 'pending',
+    /** Le nom de la borne sur le réseau (Santé, écran de la télécommande) ; undefined avant l'annonce. */
+    nameFacts: (): RemoteNameFacts | undefined => opts.names?.facts(),
     /** Téléphones gardés (le plus récemment vu d'abord), et celui qui pilote. */
     keptPhones(): (KeptPhone & { connected: boolean })[] {
       const now = active && pairing?.session() === 'paired' ? pairing.current()?.kept : undefined;
