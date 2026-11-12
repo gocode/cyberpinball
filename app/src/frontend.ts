@@ -6652,7 +6652,8 @@ function menuDmdColor(): string {
 
 /**
  * Teinte de la table que montrent les écrans (table-tint.ts) : ses médias, dans l'ordre fronton
- * (l'image allumée du .directb2s comprise), logo, plateau. Mesurée seulement si l'ambiance ou le
+ * (l'image allumée du .directb2s comprise), logo, plateau. Les points du DMD la prennent d'abord
+ * du média de l'écran du DMD (FullDMD ou capture du DMD). Mesurée seulement si l'ambiance ou le
  * DMD s'en servent ; la clé change avec la table et avec ses médias (adresse datée, mediaUrl).
  */
 function followTint(): void {
@@ -6661,8 +6662,9 @@ function followTint(): void {
   const table = used && medias ? screensSubject() : undefined;
   if (!table || !medias) return tints.follow(undefined);
   const urls = [medias.roleMedia(table, 'backglass').url, medias.wheel(table), medias.roleMedia(table, 'playfield').url];
-  const files = urls.map((u) => (u ? mediaPathFromUrl(u) : undefined)).filter((f): f is string => Boolean(f));
-  tints.follow({ key: JSON.stringify([table.file, ...urls]), files });
+  const dmdUrl = mediaSettings.dmdColor === DMD_TABLE_COLOR ? medias.roleMedia(table, 'dmd').url : undefined;
+  const paths = (list: readonly (string | undefined)[]) => list.map((u) => (u ? mediaPathFromUrl(u) : undefined)).filter((f): f is string => Boolean(f));
+  tints.follow({ key: JSON.stringify([table.file, ...urls, dmdUrl]), files: paths(urls), dmdFiles: paths([dmdUrl]) });
 }
 
 function broadcast(): void {

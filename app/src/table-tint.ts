@@ -1,6 +1,9 @@
 // Couleur de chaque table au menu (packages/core/src/tabletint.ts) : la teinte de la table montrée,
 // tirée de ses médias dans l'ordre fronton (l'image allumée du .directb2s comprise), logo, plateau ;
-// le premier qui a assez de couleur la donne. Calculée une fois par fichier, gardée dans
+// le premier qui a assez de couleur la donne. La couleur des points du DMD (« Couleur de la table »)
+// se mesure d'abord sur le média de l'écran du DMD (FullDMD, ou capture du DMD de la machine) : plus
+// proche du vrai DMD que le fronton (demande du 12/11/2026) ; sans teinte là, celle du fronton.
+// Calculée une fois par fichier, gardée dans
 // <données>\cache\teintes-tables.json, refaite quand le média change (chemin, taille, date).
 //
 // Rien n'est calculé pendant le défilement : la teinte montrée ne change que lorsque la table
@@ -30,12 +33,17 @@ export interface TableTintsOptions {
 export interface TintSubject {
   key: string;
   files: readonly string[];
+  /** Pour les points du DMD, lus avant `files` : le média de l'écran du DMD. */
+  dmdFiles?: readonly string[];
 }
+
+/** Teinte montrée : celle de l'ambiance (color absente : la sarcelle de la marque), et les points du DMD. */
+export type ShownTint = Partial<TableTint>;
 
 export class TableTints {
   private readonly cacheFile: string;
   private readonly memo = new Map<string, TintRecord>();
-  private shown?: TableTint;
+  private shown?: ShownTint;
   private pendingKey?: string;
   private timer?: NodeJS.Timeout;
   private run = 0;
@@ -45,7 +53,7 @@ export class TableTints {
   }
 
   /** Teinte à montrer (undefined : la sarcelle de la marque). */
-  current(): TableTint | undefined {
+  current(): ShownTint | undefined {
     return this.shown;
   }
 
@@ -66,7 +74,7 @@ export class TableTints {
     }
     this.timer = setTimeout(() => {
       this.timer = undefined;
-      void this.resolve(subject.files).then((tint) => {
+      void this.resolveSubject(subject).then((tint) => {
         if (run === this.run) this.settle(tint);
       });
     }, this.opts.settleMs ?? SETTLE_MS);
@@ -77,7 +85,15 @@ export class TableTints {
     this.run++;
   }
 
-  private settle(tint: TableTint | undefined): void {
+  /** Ambiance d'après `files` ; points du DMD d'après `dmdFiles`, sinon ceux de l'ambiance. */
+  private async resolveSubject(subject: TintSubject): Promise<ShownTint | undefined> {
+    const ambient = await this.resolve(subject.files);
+    const dmd = (subject.dmdFiles?.length ? await this.resolve(subject.dmdFiles) : undefined)?.dmd ?? ambient?.dmd;
+    if (!ambient && !dmd) return undefined;
+    return { ...ambient, ...(dmd && { dmd }) };
+  }
+
+  private settle(tint: ShownTint | undefined): void {
     const changed = this.shown?.color !== tint?.color || this.shown?.dmd !== tint?.dmd;
     this.shown = tint;
     if (changed) this.opts.onChange();

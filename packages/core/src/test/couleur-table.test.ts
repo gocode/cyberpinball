@@ -258,3 +258,57 @@ test('menu : rien n’est mesuré pendant le défilement, la teinte suit la tabl
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('menu : les points du DMD prennent d’abord la couleur du média de l’écran du DMD, l’ambiance celle du fronton (12/11/2026)', async () => {
+  interface Tints {
+    follow(subject: { key: string; files: readonly string[]; dmdFiles?: readonly string[] } | undefined): void;
+    current(): Partial<TableTint> | undefined;
+    dispose(): void;
+  }
+  type Converter = { mediaFrames(file: string): Promise<{ width: number; height: number; images: RgbaImage[] }> };
+  const { TableTints } = require(path.join(REPO_ROOT, 'app', 'dist', 'table-tint.js')) as {
+    TableTints: new (opts: { dataDir: string; settleMs?: number; onChange(): void; converter(): Converter }) => Tints;
+  };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'teintes-dmd-'));
+  try {
+    const at = (name: string) => {
+      const file = path.join(dir, name);
+      fs.writeFileSync(file, name);
+      return file;
+    };
+    const backglass = at('bleu-backglass.png');
+    const orange = at('orange-fulldmd.png');
+    const grey = at('gris-fulldmd.png');
+    // FullDMD : le cadre noir ne vote pas, les points orange du DMD donnent la teinte.
+    const images: Record<string, RgbaImage> = {
+      bleu: solid('#2a5bd7'),
+      orange: image([[[0, 0, 0, 255], 0.7], [[255, 120, 20, 255], 0.3]]),
+      gris: image([[[240, 240, 240, 255], 0.5], [[20, 20, 20, 255], 0.5]]),
+    };
+    const tints = new TableTints({
+      dataDir: dir,
+      settleMs: 1,
+      onChange() {},
+      converter: () => ({ mediaFrames: async (file: string) => ({ width: 40, height: 20, images: [images[path.basename(file).split('-')[0]!]!] }) }),
+    });
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    tints.follow({ key: 'orange', files: [backglass], dmdFiles: [orange] });
+    await wait(60);
+    const shown = tints.current()!;
+    assert.equal(shown.color, tintOf(images.bleu!).color, 'l’ambiance reste celle du fronton');
+    assert.equal(shown.dmd, tintOf(images.orange!).dmd, 'les points prennent l’orange du DMD');
+    assert.ok(hueDistance(lch(shown.dmd!)[2], lch('#ff7814')[2]) < 15);
+    // Média du DMD sans couleur : les points reprennent celle du fronton.
+    tints.follow({ key: 'gris', files: [backglass], dmdFiles: [grey] });
+    await wait(60);
+    assert.equal(tints.current()!.dmd, tintOf(images.bleu!).dmd);
+    // Fronton sans couleur mais DMD orange : les points orange, l’ambiance garde la sarcelle (pas de color).
+    tints.follow({ key: 'seul', files: [grey], dmdFiles: [orange] });
+    await wait(60);
+    assert.equal(tints.current()!.color, undefined);
+    assert.equal(tints.current()!.dmd, tintOf(images.orange!).dmd);
+    tints.dispose();
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
