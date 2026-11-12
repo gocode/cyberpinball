@@ -10,7 +10,7 @@ const { app, BrowserWindow } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const job = JSON.parse(fs.readFileSync(process.argv.at(-1), 'utf8'));
+const job = JSON.parse(fs.readFileSync(process.argv.at(-1), 'utf8').replace(/^﻿/, '')); // fichier écrit par PowerShell 5 : BOM
 
 app.on('window-all-closed', () => {});
 
