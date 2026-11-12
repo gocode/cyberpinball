@@ -79,6 +79,10 @@ import {
   renameWithRetryAsync,
   uploadAad,
   isLocalNetworkAddress,
+  keptFingerprint,
+  keptNameProof,
+  remoteLocalName,
+  REMOTE_NAME_PATH,
   language,
   localeOf,
   messagesOf,
@@ -354,6 +358,8 @@ export interface PhoneRemoteOptions {
   port?: number;
   /** Combien attendre que le port se libère avant d'en prendre un autre (essais) ; par défaut PORT_WAIT_MS. */
   portWaitMs?: number;
+  /** Nom de la machine (essais) ; par défaut os.hostname() : le téléphone gardé passe par « <nom>.local ». */
+  hostname?(): string;
 }
 
 /**
@@ -536,7 +542,11 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   let listenRetry: NodeJS.Timeout | undefined;
   /** L'écoute a dû prendre un autre port que le sien (dernier recours) : le QR le dit. */
   let portElsewhere = false;
+  /** L'adresse de la borne a changé depuis la dernière écoute (DHCP) : l'ancienne, que le QR mentionne. */
+  let addressMoved: string | undefined;
   let listenTries = 0;
+  /** Nom de la borne sur le réseau local (« pinup.local »), s'il y en a un (remoteLocalName). */
+  const localName = () => remoteLocalName((opts.hostname ?? os.hostname)());
   /** Ce que fait chaque collection de l'écran envoyé ; le téléphone regarde-t-il la grille (images des frontons) ? */
   let collectionPicks: (undefined | (() => void))[] = [];
   let entriesFocus: (undefined | (() => void))[] = [];
@@ -592,7 +602,11 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         qr: qr.rows,
         url,
         title: t('Télécommande'),
-        line: portElsewhere ? t('Port habituel pris par un autre programme : les téléphones gardés doivent scanner ce QR une fois') : t('Scannez avec votre téléphone, sur le même Wi-Fi que la borne'),
+        line: portElsewhere
+          ? t('Port habituel pris par un autre programme : les téléphones gardés doivent scanner ce QR une fois')
+          : addressMoved
+            ? t('Adresse de la borne changée : un téléphone gardé par l’ancienne adresse doit scanner ce QR une fois')
+            : t('Scannez avec votre téléphone, sur le même Wi-Fi que la borne'),
       };
     }
     const device = view.device === 'Téléphone' ? t('Téléphone') : view.device; // i18n-ignore : nom par défaut (remote.ts, deviceLabel)
@@ -622,8 +636,11 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   // --- Serveur -----------------------------------------------------------------
 
   function securityHeaders(host: string): Record<string, string> {
+    // La page ouverte par l'adresse demande la preuve du nom local (moveToName, telephone.js).
+    const name = localName();
+    const nameSrc = name && address ? ` http://${name}:${address.port}` : '';
     return {
-      'Content-Security-Policy': `default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self' ws://${host}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+      'Content-Security-Policy': `default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self' ws://${host}${nameSrc}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'no-referrer',
       'X-Frame-Options': 'DENY',
@@ -643,12 +660,38 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     return `window.cyberI18n = ${JSON.stringify({ language: lang, locale: localeOf(lang), messages })};\n`;
   }
 
-  /** Requête venue d'ailleurs que du réseau local, ou adressée à un autre nom que la borne (rebond DNS) : refusée. */
+  /**
+   * Requête venue d'ailleurs que du réseau local, ou adressée à un autre nom que la borne (rebond
+   * DNS) : refusée. La borne se nomme par ses adresses, ou par son nom local (« pinup.local »).
+   */
   function allowed(req: http.IncomingMessage): boolean {
     if (!isLocalNetworkAddress(req.socket.remoteAddress)) return false;
     const host = String(req.headers.host ?? '').toLowerCase();
-    const m = /^\[?([0-9a-f.:]+|localhost)\]?:(\d+)$/.exec(host);
-    return Boolean(m && address && Number(m[2]) === address.port && ownAddresses(interfaces()).has(m[1]!));
+    const m = /^\[?([0-9a-f.:]+|localhost|[a-z0-9-]{1,63}\.local)\]?:(\d+)$/.exec(host);
+    return Boolean(m && address && Number(m[2]) === address.port && (ownAddresses(interfaces()).has(m[1]!) || m[1] === localName()));
+  }
+
+  /**
+   * Preuve du nom (GET /nom?f=…&n=…) : la page, ouverte par l'adresse, demande à la machine que
+   * désigne le nom local si elle garde sa clé (f, keptFingerprint) ; la réponse (keptNameProof sur
+   * son défi n) le prouve sans rien dire de la clé. Lisible seulement de la page servie par une
+   * adresse de la borne (CORS) ; sinon rien.
+   */
+  function serveNameProof(req: http.IncomingMessage, res: http.ServerResponse): void {
+    const q = new URLSearchParams((req.url ?? '').split('?')[1] ?? '');
+    const f = q.get('f') ?? '';
+    const nonce = fromBase64Url(q.get('n') ?? '', 12);
+    const origin = String(req.headers.origin ?? '');
+    const o = /^http:\/\/([0-9.]+):(\d+)$/.exec(origin);
+    const fromPage = Boolean(o && address && Number(o[2]) === address.port && ownAddresses(interfaces()).has(o[1]!));
+    const phone = fromPage && nonce && /^[A-Za-z0-9_-]{22}$/.test(f) ? kept?.keys().find((k) => keptFingerprint(k.key) === f) : undefined;
+    if (!phone || !nonce) {
+      res.writeHead(404, { ...securityHeaders(String(req.headers.host)), 'Content-Type': 'text/plain; charset=utf-8' }).end();
+      return;
+    }
+    res
+      .writeHead(200, { ...securityHeaders(String(req.headers.host)), 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': origin, Vary: 'Origin' })
+      .end(req.method === 'HEAD' ? undefined : JSON.stringify({ p: keptNameProof(phone.key, nonce) }));
   }
 
   /**
@@ -686,6 +729,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8', Connection: 'close' }).end();
       return;
     }
+    if (url === REMOTE_NAME_PATH) return serveNameProof(req, res);
     const headers = securityHeaders(String(req.headers.host));
     if (url === '/catalogue.js') {
       res.writeHead(200, { ...headers, 'Content-Type': TYPES['.js']! }).end(req.method === 'HEAD' ? undefined : catalogue());
@@ -853,7 +897,11 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   function ready(link: Link): void {
     // `kept` : la borne garde ce téléphone, il range sa clé pour revenir sans QR.
-    sendTo(link, { t: 'ready', kept: Boolean(pairing?.current()?.kept) });
+    // `name` : le nom local de la borne ; le téléphone gardé y passe s'il le joint (preuve /nom), pour
+    // la retrouver même si le DHCP change son adresse.
+    const isKept = Boolean(pairing?.current()?.kept);
+    const name = isKept ? localName() : undefined;
+    sendTo(link, { t: 'ready', kept: isKept, ...(name ? { name } : {}) });
     lastActivity = Date.now();
     // Une liaison neuve : la vue Scores redemande ce qu'elle montre (« ranks »).
     ranksWatch = undefined;
@@ -1872,7 +1920,11 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     server = s;
     address = { host, port };
     unavailable = undefined;
-    log(`Télécommande : page du téléphone servie sur ${host}:${port} (${mode === 'lan' ? 'réseau local' : 'essai, 127.0.0.1'}).`); // i18n-ignore : journal
+    log(`Télécommande : page du téléphone servie sur ${host}:${port} (${mode === 'lan' ? `réseau local${localName() ? `, nom ${localName()}` : ''}` : 'essai, 127.0.0.1'}).`); // i18n-ignore : journal
+    // Adresse changée depuis la dernière écoute (DHCP, redémarrage) : un téléphone gardé par l'ancienne
+    // adresse ne retrouve plus la page ; passé par le nom local, il revient seul.
+    addressMoved = mode === 'lan' ? kept?.noteAddress(host) : undefined;
+    if (addressMoved) log(`Télécommande : adresse de la borne changée (${addressMoved} → ${host}) ; un téléphone gardé par l'ancienne adresse doit scanner le QR une fois, ${localName() ? `passé par le nom ${localName()} il revient seul` : 'la machine n’a pas de nom local utilisable'}. Une adresse réservée à la borne dans le routeur (DHCP) l'évite.`); // i18n-ignore : journal
   }
 
   /**

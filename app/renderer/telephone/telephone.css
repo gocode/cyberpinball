@@ -171,6 +171,7 @@ body[data-state='paired'] .dot {
 
 body[data-state='waiting'] .dot,
 body[data-state='lost'] .dot,
+body[data-state='unreachable'] .dot,
 body[data-state='connecting'] .dot {
   background: var(--warning);
   animation: pulse 1.4s ease-in-out infinite;
@@ -382,9 +383,11 @@ body[data-state='busy'] .message-mark {
 body[data-state='expired'] .message-title,
 body[data-state='used'] .message-title,
 body[data-state='lost'] .message-title,
+body[data-state='unreachable'] .message-title,
 body[data-state='expired'] .message-mark,
 body[data-state='used'] .message-mark,
-body[data-state='lost'] .message-mark {
+body[data-state='lost'] .message-mark,
+body[data-state='unreachable'] .message-mark {
   color: var(--warning);
 }
 

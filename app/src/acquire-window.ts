@@ -161,6 +161,8 @@ export interface AcquireRequest {
   expected: string;
   /** Message du bandeau à l'ouverture (repli d'un téléchargement direct, par exemple). */
   status?: string;
+  /** Le message informe (en vert) au lieu d'avertir (en orange). */
+  info?: boolean;
   /** Hôte, et s'il faut un compte : « vpuniverse.com, compte nécessaire » */
   host: string;
   /** Ce que la page téléchargera revient à ce destinataire (un média), pas à la liste d'attente. */
@@ -1035,7 +1037,7 @@ export function createAcquirer(events: AcquireEvents) {
       } else {
         open.status = request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.');
         // Le message d'une recherche libre est un mode d'emploi, pas un avertissement.
-        open.warn = request.status !== undefined && !request.search;
+        open.warn = request.status !== undefined && !request.search && !request.info;
         if (isGoogleSignIn(request.url)) googleRefused();
         else void contents.loadURL(request.url);
       }
@@ -1067,7 +1069,7 @@ export function createAcquirer(events: AcquireEvents) {
     win.contentView.addChildView(view);
     open = restore
       ? { win, view, request, status: RESUMED(request) }
-      : { win, view, request, status: request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.'), warn: request.status !== undefined && !request.search };
+      : { win, view, request, status: request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.'), warn: request.status !== undefined && !request.search && !request.info };
     // Reprise : le texte de la dernière page de résultats de l'historique gardé.
     if (restore) open.lastSearch = restore.entries.slice(0, restore.index + 1).reverse().map((e) => webSearchOf(e.url)).find(Boolean);
     const contents = view.webContents;

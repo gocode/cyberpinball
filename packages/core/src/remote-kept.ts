@@ -61,16 +61,20 @@ export function createKeptPhones(dataDir: string | undefined, opts: KeptPhonesOp
   const now = opts.now ?? Date.now;
   const file = dataDir ? path.join(dataDir, KEPT_PHONES_FILE) : undefined;
   let entries: Entry[] = [];
+  /** Adresse de la borne à sa dernière écoute (celle que connaissent les téléphones gardés par l'adresse). */
+  let lastAddress: string | undefined;
   if (file) {
     const read = readKeptJson(file);
     if (read.setAside) opts.log?.(`Télécommande : liste des téléphones gardés illisible, mise de côté (${path.basename(read.setAside)}).`); // i18n-ignore : journal
     entries = parseKeptPhones(read.value);
+    const a = (read.value as { address?: unknown } | undefined)?.address;
+    if (typeof a === 'string' && /^[0-9a-f.:]{2,45}$/i.test(a)) lastAddress = a;
   }
 
   function save(): void {
     if (!file) return;
     try {
-      writeFileAtomic(file, JSON.stringify({ version: 1, phones: entries }, null, 2) + '\n');
+      writeFileAtomic(file, JSON.stringify({ version: 1, phones: entries, ...(lastAddress ? { address: lastAddress } : {}) }, null, 2) + '\n');
     } catch (error) {
       opts.log?.(`Télécommande : liste des téléphones gardés non enregistrée (${(error as Error).message}).`); // i18n-ignore : journal
     }
@@ -114,6 +118,17 @@ export function createKeptPhones(dataDir: string | undefined, opts: KeptPhonesOp
       const stale = at - e.seen > 3_600_000;
       e.seen = at;
       if (stale) save();
+    },
+    /**
+     * La borne écoute à `host` sur le réseau local : l'adresse d'avant si elle a changé (DHCP) alors
+     * qu'elle garde des téléphones, sinon rien. Retenue pour l'écoute suivante.
+     */
+    noteAddress(host: string): string | undefined {
+      const before = lastAddress;
+      if (before === host) return undefined;
+      lastAddress = host;
+      save();
+      return before && entries.length ? before : undefined;
     },
     /** « Oublier » : faux s'il n'était pas gardé. */
     forget(id: string): boolean {

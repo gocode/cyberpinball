@@ -9,6 +9,11 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.11
+
+- Télécommande du téléphone : le téléphone gardé retrouve la borne même si le routeur lui donne une autre adresse au redémarrage. Il passe par le nom de la borne sur le réseau local ; refaites une fois son raccourci sur l'écran d'accueil quand la page le propose.
+- Télécommande du téléphone : sans la borne (autre Wi-Fi, borne éteinte), la page dit « Borne injoignable » et se reconnecte seule dès que la borne répond, sans actualiser ni rescanner le QR.
+
 ## 0.1.10
 
 - Roue : l'anneau vert, son étincelle et la lueur épousent la taille de chaque médaillon, et le halo reste derrière les médaillons voisins.

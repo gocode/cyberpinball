@@ -252,6 +252,29 @@ export function keptFingerprint(key: Uint8Array): string {
 }
 const FINGERPRINT = /^[A-Za-z0-9_-]{22}$/;
 
+/**
+ * Nom de la borne sur le réseau local (mDNS, « pinup.local ») tiré du nom de la machine, ou rien
+ * s'il n'en fait pas un (espace, point, accent…). Windows y répond de lui-même. Le téléphone gardé
+ * passe par ce nom plutôt que par l'adresse : le DHCP change l'adresse d'une borne redémarrée
+ * (incident du 12/11/2026), et le navigateur range la clé gardée par adresse et port.
+ */
+export function remoteLocalName(hostname: string): string | undefined {
+  const h = hostname.trim().toLowerCase();
+  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(h) && !/^\d+$/.test(h) ? `${h}.local` : undefined;
+}
+
+/** Ce que le téléphone demande avant de passer par le nom : la preuve que ce nom mène à sa borne. */
+export const REMOTE_NAME_PATH = '/nom';
+
+/**
+ * Preuve, pour un défi du téléphone (12 octets), que la machine jointe par le nom garde sa clé :
+ * l'étiquette ChaCha20-Poly1305 d'un texte fixe sous cette clé et ce défi. Même calcul dans
+ * telephone-core.js (nameProof) ; elle ne dit rien de la clé.
+ */
+export function keptNameProof(key: Uint8Array, nonce: Uint8Array): string {
+  return toBase64Url(Buffer.from(aeadSeal(key, nonce, Buffer.from('cyberpinball:nom', 'utf8'), new Uint8Array(0))));
+}
+
 export interface KeptPhoneKey {
   id: string;
   key: Buffer;

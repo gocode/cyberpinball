@@ -254,6 +254,10 @@ export const messages: Record<string, string> = {
   'Options de « {name} »': 'Options for "{name}"',
   'Options': 'Options',
   'Port habituel pris par un autre programme : les téléphones gardés doivent scanner ce QR une fois': 'Usual port taken by another program: kept phones must scan this QR code once',
+  'Borne injoignable': 'Cabinet unreachable',
+  'Vérifiez que le téléphone est sur le même Wi-Fi que la borne, et que Cyber Pinball est ouvert. La reconnexion est automatique.': 'Check that the phone is on the same Wi-Fi as the cabinet, and that Cyber Pinball is open. Reconnection is automatic.',
+  'Adresse de la borne changée : un téléphone gardé par l’ancienne adresse doit scanner ce QR une fois': 'Cabinet address changed: a phone kept by the old address must scan this QR code once',
+  'La télécommande passe maintenant par le nom de la borne : elle la retrouve même si son adresse change. Ajoutez-la de nouveau à l’écran d’accueil, puis supprimez l’ancien raccourci.': 'The remote now goes through the cabinet’s name: it finds it even if its address changes. Add it to the Home screen again, then delete the old shortcut.',
   'Quitter le plein écran': 'Exit full screen',
   'Plein écran': 'Full screen',
 };

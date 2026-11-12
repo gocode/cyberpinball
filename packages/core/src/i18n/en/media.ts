@@ -442,6 +442,8 @@ export const messages: Record<string, string> = {
   'archive illisible ({error})': 'unreadable archive ({error})',
   'aucun média dans ce qu’a envoyé le site': 'no media in what the site sent',
   'Média : {title}': 'Media: {title}',
+  'Cyber Pinball télécharge ce fichier pour le média : sa progression s’affiche dans le bandeau, inutile de cliquer dans la page.':
+    'Cyber Pinball is downloading this file for the media item: its progress shows in the banner, no need to click on the page.',
   'À faire vous-même : {reason}. Le fichier téléchargé revient aux propositions du média.': 'For you to do: {reason}. The downloaded file goes back to the media suggestions.',
   '{got} sur {total}': '{got} of {total}',
   '{got} sur environ {total}': '{got} of about {total}',

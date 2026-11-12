@@ -23,6 +23,12 @@
 // sans QR ni acceptation. Coupé (déconnecté à la borne, inactif, remplacé par un autre téléphone),
 // il propose « Reprendre » ; Cyber Pinball fermé, il se reconnecte seul à son retour.
 //
+// Nom de la borne (12/11/2026) : le QR donne son adresse IP, que le DHCP peut changer au
+// redémarrage — et le stockage du navigateur va avec l'adresse. Gardé, le téléphone reçoit le nom
+// local de la borne (« pinup.local ») ; s'il le joint et que la machine nommée prouve garder sa clé
+// (GET /nom), la page passe par ce nom, et le raccourci de l'écran d'accueil à refaire une fois
+// retrouve la borne quelle que soit son adresse. Sinon, la page reste à l'adresse.
+//
 // Démonstration hors écran : window.cyberRemoteDemo fixe un état sans borne.
 'use strict';
 
@@ -144,6 +150,8 @@ const MESSAGES = {
   connecting: { icon: 'network', title: () => t('Connexion à la borne…'), text: () => t('Le téléphone et la borne doivent être sur le même réseau local.') },
   waiting: { title: () => t('Comparez les codes'), text: () => t('Si ce code est aussi affiché sur la borne, appuyez sur Start pour accepter. Sinon, appuyez sur Exit pour refuser.') },
   lost: { icon: 'refresh', title: () => t('Reconnexion en cours…'), text: () => t('La liaison a été interrompue. Vérifiez le Wi-Fi du téléphone ; la reconnexion est automatique.') },
+  // Plusieurs essais sans réponse (autre Wi-Fi, borne éteinte) : la page réessaie toujours, seule.
+  unreachable: { icon: 'network', title: () => t('Borne injoignable'), text: () => t('Vérifiez que le téléphone est sur le même Wi-Fi que la borne, et que Cyber Pinball est ouvert. La reconnexion est automatique.') },
   refused: { icon: 'close', title: () => t('Connexion refusée'), text: () => t('La borne n’a pas accepté ce téléphone. Pour réessayer, scannez son nouveau QR code.'), again: true },
   expired: { icon: 'clock', title: () => t('QR code expiré'), text: () => t('Scannez le nouveau QR code affiché dans le bandeau de la borne.'), again: true },
   used: { icon: 'alert', title: () => t('QR code déjà utilisé'), text: () => t('Ce QR code ne peut plus servir. Scannez celui qui est maintenant affiché sur la borne.'), again: true },
@@ -199,9 +207,9 @@ function homeScreenHow() {
   if (/Android/.test(ua)) return t('Dans le menu du navigateur (⋮) : « Ajouter à l’écran d’accueil ».');
   return t('Dans le menu du navigateur : « Ajouter à l’écran d’accueil ».');
 }
-function offerHomeScreen() {
+function offerHomeScreen(moved = false) {
   openSheet(t('Gardez la télécommande sous la main'), [{ id: 'ok', label: t('Compris'), run: () => undefined }], {
-    text: `${t('Ce téléphone est gardé par la borne : il revient sans QR code. Ajoutez la télécommande à l’écran d’accueil pour l’ouvrir d’un geste.')}
+    text: `${moved ? t('La télécommande passe maintenant par le nom de la borne : elle la retrouve même si son adresse change. Ajoutez-la de nouveau à l’écran d’accueil, puis supprimez l’ancien raccourci.') : t('Ce téléphone est gardé par la borne : il revient sans QR code. Ajoutez la télécommande à l’écran d’accueil pour l’ouvrir d’un geste.')}
 
 ${homeScreenHow()}`,
     // « Compris » suffit : pas d'« Annuler » en double.
@@ -228,6 +236,7 @@ function setState(next, extra = {}) {
     waiting: t('En attente'),
     paired: t('Connecté'),
     lost: t('Reconnexion…'),
+    unreachable: t('Reconnexion…'),
   };
   $('link-text').textContent = links[next] ?? t('Déconnecté');
   if (next !== 'paired') {
@@ -700,6 +709,13 @@ let code = '';
 let kept = false;
 /** Astuce de l'écran d'accueil à montrer après le mode qui suit l'acceptation (setMode referme les feuilles). */
 let hintAfterMode = false;
+/**
+ * La page vient de passer par le nom de la borne : '1', téléphone déjà gardé (son raccourci mène à
+ * l'adresse, à refaire une fois) ; '2', juste accepté (l'astuce habituelle) ; '' sinon.
+ */
+let movedToName = '';
+/** Le nom de la borne déjà essayé depuis l'ouverture de la page. */
+let nameTried = false;
 
 function readFragment() {
   const params = new URLSearchParams(location.hash.slice(1));
@@ -710,7 +726,8 @@ function readFragment() {
   if (g && g.length === 32) {
     kept = true;
     store(KEPT_STORE, core.toB64(g));
-    if (!params.get('g')) history.replaceState(null, '', `#g=${core.toB64(g)}`);
+    movedToName = /^[12]$/.test(params.get('nom') ?? '') ? params.get('nom') : '';
+    if (!params.get('g') || movedToName) history.replaceState(null, '', `#g=${core.toB64(g)}`);
     return g;
   }
   const s = core.fromB64(params.get('s') ?? '');
@@ -728,11 +745,40 @@ function forgetKey() {
   history.replaceState(null, '', location.pathname);
 }
 
+/**
+ * Passe par le nom local de la borne (core.nameUrl) si la machine qu'il désigne prouve garder notre
+ * clé (GET /nom, défi tiré au hasard) : la clé ne part qu'avec la page, dans le fragment, jamais
+ * vers une machine qui ne l'a pas. Nom injoignable (téléphone qui ne résout pas « .local »,
+ * pare-feu) : la page reste à l'adresse, sans rien dire.
+ */
+async function moveToName(name, fresh) {
+  const base = core.nameUrl(location, name);
+  if (!base || !key) return;
+  const nonce = new Uint8Array(12);
+  crypto.getRandomValues(nonce);
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 4000);
+  try {
+    const r = await fetch(`${base}/nom?f=${core.keptFingerprint(key)}&n=${core.toB64(nonce)}`, { cache: 'no-store', signal: ctl.signal });
+    const proof = r.ok ? (await r.json())?.p : undefined;
+    if (proof !== core.nameProof(key, nonce) || !kept) return;
+  } catch {
+    return;
+  } finally {
+    clearTimeout(timer);
+  }
+  location.replace(`${base}/#g=${core.toB64(key)}&nom=${fresh ? 2 : 1}`);
+}
+
 function send(message) {
   if (!socket || socket.readyState !== 1 || !theirs || !key) return false;
   socket.send(core.seal(key, theirs, { ...message, s: ++sent }));
   return true;
 }
+
+/** Délai d'ouverture d'une liaison ; essais manqués avant « Borne injoignable ». */
+const CONNECT_MS = 8000;
+const UNREACHABLE_AFTER = 3;
 
 /** `force` : même depuis un état final (téléphone gardé qui attend le retour de Cyber Pinball). */
 function connect(force = false) {
@@ -745,6 +791,12 @@ function connect(force = false) {
   crypto.getRandomValues(mine);
   const ws = new WebSocket(`ws://${location.host}/liaison`);
   socket = ws;
+  // Une borne injoignable (autre Wi-Fi) peut laisser la connexion pendante une minute : abandonnée
+  // après CONNECT_MS, l'essai suivant part aussitôt.
+  const openTimer = setTimeout(() => {
+    if (ws === socket && ws.readyState === 0) ws.close();
+  }, CONNECT_MS);
+  ws.onopen = () => clearTimeout(openTimer);
   ws.onmessage = (e) => {
     if (ws !== socket || typeof e.data !== 'string') return;
     // En clair (un objet JSON) : le défi de la borne pour cette connexion, ou « clé inconnue » ;
@@ -770,7 +822,7 @@ function connect(force = false) {
       // Déjà gardé et venu par un nouveau QR : l'empreinte de son ancienne clé, pour que la borne
       // remplace son entrée au lieu d'en ajouter une (remote-kept.ts, keptFingerprint).
       const old = kept ? undefined : core.fromB64(stored(KEPT_STORE));
-      const prev = old && old.length === 32 ? core.toB64(core.aeadSeal(old, new Uint8Array(12), new TextEncoder().encode('cyberpinball:garde'), new Uint8Array(0))) : undefined;
+      const prev = old && old.length === 32 ? core.keptFingerprint(old) : undefined;
       send({ t: 'hello', c: core.toB64(mine), device: core.deviceName(navigator.userAgent), ...(prev ? { prev } : {}) });
       return;
     }
@@ -797,7 +849,8 @@ function connect(force = false) {
       return;
     }
     if (MESSAGES[state]?.again) return;
-    setState(state === 'connecting' && !retry ? 'connecting' : 'lost');
+    // Un échec de liaison n'efface jamais la clé : seule la borne qui ne la connaît plus (« unknown ») le fait.
+    setState(retry >= UNREACHABLE_AFTER ? 'unreachable' : state === 'connecting' && !retry ? 'connecting' : 'lost');
     retry++;
     retryTimer = setTimeout(connect, Math.min(5000, 600 * retry));
   };
@@ -826,8 +879,14 @@ function handle(m) {
       }
       setState('paired');
       if (navigator.vibrate) navigator.vibrate(30);
+      // Gardé et ouvert par l'adresse IP : la page passe par le nom de la borne s'il la mène à elle.
+      if (m.kept && !nameTried) {
+        nameTried = true;
+        void moveToName(m.name, fresh);
+      }
       // Une fois, juste après l'appairage : comment le garder sous la main (après le mode, qui suit).
-      if (fresh && !standalone() && !stored(HINT_STORE)) {
+      // Passée par le nom : une fois aussi sous ce nom, le raccourci d'avant menant à l'adresse.
+      if ((fresh || movedToName) && !stored(HINT_STORE) && (movedToName || !standalone())) {
         store(HINT_STORE, '1');
         hintAfterMode = true;
       }
@@ -843,7 +902,7 @@ function handle(m) {
       if (document.body.dataset.view === 'thread' && community.open && m.mode !== 'browser') send({ t: 'chat-open', key: community.open });
       if (hintAfterMode && state === 'paired') {
         hintAfterMode = false;
-        offerHomeScreen();
+        offerHomeScreen(movedToName === '1');
       }
       break;
     case 'screen':
@@ -1725,15 +1784,30 @@ function connectFresh() {
 }
 $('message-action').addEventListener('click', () => connectFresh());
 
+/**
+ * Le réseau revient, ou la page aussi : la liaison est retentée aussitôt, sans attendre l'essai prévu
+ * ni une connexion pendante vers une borne qui était injoignable. Rien si elle est ouverte, ni après
+ * un état final (sauf le téléphone gardé qui attend Cyber Pinball).
+ */
+function reconnectNow() {
+  if (socket && socket.readyState === 1) return;
+  const waitsForApp = kept && state === 'quit';
+  if (MESSAGES[state]?.again && !waitsForApp) return;
+  clearTimeout(retryTimer);
+  const pending = socket;
+  socket = undefined;
+  pending?.close();
+  retry = 0;
+  connect(waitsForApp);
+}
 // Retour sur la page (écran déverrouillé, application rouverte) : la liaison se refait aussitôt.
 document.addEventListener('visibilitychange', () => {
   // Téléphone verrouillé, application quittée : aucun bouton ne reste tenu à la borne.
   if (document.visibilityState === 'hidden') releaseButtons();
-  if (document.visibilityState === 'visible' && !socket && !MESSAGES[state]?.again) {
-    retry = 0;
-    connect();
-  }
+  if (document.visibilityState === 'visible') reconnectNow();
 });
+// Wi-Fi retrouvé (le bon réseau) : sans actualiser la page.
+window.addEventListener('online', reconnectNow);
 
 // --- Départ ---------------------------------------------------------------
 

@@ -358,6 +358,16 @@ export function createMediaSites(ctx: MediaSitesContext) {
       );
     const stop = new AbortController();
     stops.set(job.hit.site, stop);
+    // La page du fichier s'ouvre dans « Récupérer » pendant que Cyber Pinball le télécharge à
+    // côté (vue cachée, ci-dessous) : on voit d'où il vient, la progression est dans le bandeau.
+    ctx.acquirer.show({
+      url: job.hit.url,
+      game: job.hit.title,
+      expected: t('Média : {title}', { title: job.hit.title }),
+      host: t('{site} · votre propre compte', { site: source.label }),
+      status: t('Cyber Pinball télécharge ce fichier pour le média : sa progression s’affiche dans le bandeau, inutile de cliquer dans la page.'),
+      info: true,
+    });
     const incoming = path.join(folder, 'recu');
     fs.rmSync(folder, { recursive: true, force: true });
     let resolveDone!: (r: { file: string } | { error: string }) => void;

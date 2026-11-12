@@ -498,5 +498,25 @@
     return [system, browser].filter(Boolean).join(' · ');
   }
 
-  return { chachaBlock, poly1305, aeadSeal, aeadOpen, toB64, fromB64, seal, sealBytes, open, textDiff, deviceName };
+  /** Empreinte d'une clé gardée (keptFingerprint, remote.ts) : l'étiquette d'un texte fixe sous cette clé. */
+  function keptFingerprint(key) {
+    return toB64(aeadSeal(key, new Uint8Array(12), encoder.encode('cyberpinball:garde'), new Uint8Array(0)));
+  }
+
+  /** Preuve attendue de la borne jointe par son nom, pour ce défi (keptNameProof, remote.ts). */
+  function nameProof(key, nonce) {
+    return toB64(aeadSeal(key, nonce, encoder.encode('cyberpinball:nom'), new Uint8Array(0)));
+  }
+
+  /**
+   * Adresse par le nom local de la borne, si la page est ouverte par une adresse IP et que la borne
+   * en donne un (« pinup.local ») ; sinon rien. Même port.
+   */
+  function nameUrl(location, name) {
+    if (typeof name !== 'string' || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.local$/.test(name)) return null;
+    if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(location.hostname) || !location.port) return null;
+    return `http://${name}:${location.port}`;
+  }
+
+  return { chachaBlock, poly1305, aeadSeal, aeadOpen, toB64, fromB64, seal, sealBytes, open, textDiff, deviceName, keptFingerprint, nameProof, nameUrl };
 });
