@@ -539,15 +539,31 @@
     const r = Math.sqrt(Math.max(0, ox * ox + oy * oy - col(2) / base));
     return r > 0 ? { ox, oy, r } : undefined;
   }
-  const median = (list) => {
-    const sorted = [...list].sort((a, b) => a - b);
-    return sorted[Math.floor(sorted.length / 2)] ?? 0;
-  };
+  /**
+   * Seuil d'opacité du bord : le chrome d'un médaillon est opaque, une ombre portée ou une lueur
+   * autour de lui ne l'est qu'en partie. Avec un seuil à mi-opacité, l'ombre floue d'une wheel
+   * téléchargée passait pour le bord, et l'anneau grossissait du côté de l'ombre (12/11/2026).
+   */
+  const OPAQUE = 240;
+  /** Cercle qui passe par trois points ; undefined s'ils sont alignés. */
+  function circleThrough([ax, ay], [bx, by], [cx, cy]) {
+    const d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+    if (Math.abs(d) < 1e-6) return undefined;
+    const a2 = ax * ax + ay * ay;
+    const b2 = bx * bx + by * by;
+    const c2 = cx * cx + cy * cy;
+    const ox = (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d;
+    const oy = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d;
+    return { ox, oy, r: Math.hypot(ax - ox, ay - oy) };
+  }
   /**
    * Bord du médaillon : sur 180 rayons partis du centre, le dernier pixel opaque. Un logo qui déborde
-   * du disque (titre posé en travers du bas, 12/11/2026) donne des points hors du cercle, qui
-   * tiraient l'anneau de leur côté : seuls comptent les points proches du rayon médian, puis ceux qui
-   * restent près du cercle ajusté (trois passes, écart médian absolu).
+   * du disque (titre posé en travers du bas, bâton qui dépasse : Star Trek, Time Lord, 12/11/2026)
+   * donne des points hors du cercle. Même s'ils ne dépassent que de quelques pixels sur un large arc,
+   * ils tiraient l'anneau vers eux. Le cercle retenu est celui qui passe, à 1,5 pixel près, par le
+   * plus de points (cercles candidats par trois points répartis sur le tour), puis il est affiné par
+   * les moindres carrés sur ces seuls points. Si moins d'un tiers des points tombent sur un même
+   * cercle, l'image n'a pas de bord rond : { r: 1 }, la place entière.
    */
   function edgeCircle(d, w, h) {
     const cx = w / 2;
@@ -561,25 +577,37 @@
       for (let t = far; t > 0; t -= 0.5) {
         const x = Math.floor(cx + ux * t);
         const y = Math.floor(cy + uy * t);
-        if (x < 0 || y < 0 || x >= w || y >= h || d[(y * w + x) * 4 + 3] <= 128) continue;
+        if (x < 0 || y < 0 || x >= w || y >= h || d[(y * w + x) * 4 + 3] < OPAQUE) continue;
         pts.push([ux * t, uy * t]);
         break;
       }
     }
     if (pts.length < 12) return WHOLE;
-    const r0 = median(pts.map(([x, y]) => Math.hypot(x, y)));
-    let kept = pts.filter(([x, y]) => Math.abs(Math.hypot(x, y) - r0) < r0 * 0.08);
-    let c = fitCircle(kept.length >= 12 ? kept : pts);
-    for (let pass = 0; c && pass < 3; pass++) {
-      const gap = (p) => Math.abs(Math.hypot(p[0] - c.ox, p[1] - c.oy) - c.r);
-      const spread = Math.max(1, 3 * median(kept.map(gap)));
-      const next = pts.filter((p) => gap(p) <= spread);
-      if (next.length < 12) break;
-      kept = next;
+    const near = 1.5;
+    const on = (c, tol = near) => pts.filter((p) => Math.abs(Math.hypot(p[0] - c.ox, p[1] - c.oy) - c.r) <= tol);
+    const n = pts.length;
+    let best;
+    let bestCount = 0;
+    for (const [s1, s2] of [[n / 3, (2 * n) / 3], [n / 4, n / 2], [n / 6, n / 2], [n / 8, (3 * n) / 8]]) {
+      for (let i = 0; i < n; i++) {
+        const c = circleThrough(pts[i], pts[(i + Math.round(s1)) % n], pts[(i + Math.round(s2)) % n]);
+        if (!c || c.r > far) continue;
+        const count = on(c).length;
+        if (count > bestCount) {
+          best = c;
+          bestCount = count;
+        }
+      }
+    }
+    if (!best || bestCount < n / 3) return WHOLE;
+    // Affinage plus tolérant : un chrome pas tout à fait rond (Goonies) est moyenné de tous ses côtés.
+    let c = best;
+    for (let pass = 0; pass < 3; pass++) {
+      const kept = on(c, 2.5);
+      if (kept.length < 12) break;
       c = fitCircle(kept) ?? c;
     }
     const half = Math.max(w, h) / 2;
-    if (!c) return WHOLE;
     return { r: Math.min(1, c.r / half), dx: c.ox / half, dy: c.oy / half };
   }
   function reach(url) {

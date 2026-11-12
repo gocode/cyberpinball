@@ -14,6 +14,7 @@ son interface).
 - Télécommande du téléphone : le téléphone gardé retrouve la borne même si le routeur lui donne une autre adresse au redémarrage. Il passe par le nom de la borne sur le réseau local ; refaites une fois son raccourci sur l'écran d'accueil quand la page le propose.
 - Télécommande du téléphone : sans la borne (autre Wi-Fi, borne éteinte), la page dit « Borne injoignable » et se reconnecte seule dès que la borne répond, sans actualiser ni rescanner le QR.
 - Relance par Start : Cyber Pinball fermé, ou passé sur le bureau Windows, un appui long (2 s) sur le bouton Start de la borne le rouvre. Pour une borne dont Start est un bouton de joystick (Pinscape, encodeur en mode manette) ; réglable dans Menu système > Borne > « Relance par Start ».
+- Roue : l'anneau se cale sur le chrome du médaillon pour toute wheel ajoutée ou remplacée, sans se laisser tromper par une ombre portée, une lueur autour du médaillon ou un titre qui déborde.
 
 ## 0.1.10
 
