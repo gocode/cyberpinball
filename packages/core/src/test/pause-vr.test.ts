@@ -55,7 +55,7 @@ test('plugin : fronton cadré (proportions gardées) et vidéos de PuP que VPX n
   assert.match(cpp, /MSGPI_FLOAT_VAL_SETTING\(pupRatio, "PupRatio"[^;]*1\.7778f\);/);
   // Son de PuP : ScoreView et topper (et le fronton non demandé) dessinés à vide à chaque image, sauf si VPX les dessine.
   assert.match(cpp, /Pompe pompes\[\] = \{ \{ VPXWINDOW_Backglass \}, \{ VPXWINDOW_ScoreView \}, \{ VPXWINDOW_Topper \} \};/);
-  assert.match(cpp, /appliquer\(pause\.image\(t, jeu\)\);\s*pomper\(t\);/);
+  assert.match(cpp, /appliquer\(pause\.image\(t, jeu\)\);\s*avancerCalage\(\);\s*pomper\(t\);/);
   assert.match(cpp, /if \(t - demandee < 0\.3\)\s*continue;/);
 });
 

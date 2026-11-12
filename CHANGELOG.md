@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.11
 
+- Réalité virtuelle : recaler la borne d'un geste, à tout moment, au menu comme en pleine partie : les deux joysticks enfoncés ensemble 3 s (une jauge se remplit ; un appui court ne fait rien). En partie, la partie se met en pause, on pose les manettes sur les coins de la vraie barre avant, gâchette, et on reprend où on en était ; « Caler la borne » est aussi dans le menu de la pause. Quand le casque est remis après avoir été retiré et que le Quest est en limite fixe (il déplace alors la pièce à chaque fois), le calage est proposé d'office. « Lancer la bille » passe sur le bouton Y.
 - Amis et classements : « Vu il y a… » donne la dernière fois que chaque joueur était vraiment en ligne. Avant, tous les joueurs de l’annuaire semblaient vus au même moment (celui où une autre borne avait relayé la liste), et ceux qui ne revenaient plus n’en sortaient jamais ; les dates déjà faussées sont corrigées d’elles-mêmes.
 - Premier lancement d’une borne à Pinscape ou à encodeur en mode manette : Visual Pinball X s’installe dès l’ouverture de l’assistant, et le relevé des boutons attend la fin de l’installation. Les boutons et le lanceur de la borne se relèvent directement, sans clavier.
 - L’installeur installe le runtime Visual C++ de Microsoft s’il manque à Windows (Windows demande votre accord une fois), pendant que vous avez la souris en main : sur un Windows neuf, VPX démarre et les boutons d’un Pinscape sont lus dès le premier lancement.

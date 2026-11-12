@@ -83,6 +83,16 @@ import {
   vpxHeadsetInput,
   vpxPlaceProblem,
   vpxRecenteredHead,
+  calibrationCombo,
+  calibrationComboLabel,
+  CALIBRATION_HOLD_S,
+  type ControllerButton,
+  gripOffset,
+  type GripOffset,
+  inGameCalibration,
+  placeFromVpxCentering,
+  placeGap,
+  roomKeepingAdvice,
   vpxRoomChanges,
   vrGraphicsProfile,
   cachedVrBackglassView,
@@ -1722,6 +1732,7 @@ function headsetButton(name: string, down: boolean): void {
     if (down) wizardButton(name);
     return;
   }
+  calibrationComboButton(name, down);
   const held = headsetHolds.get(name);
   if (held) {
     clearTimeout(held.timer);
@@ -1749,6 +1760,47 @@ function headsetButton(name: string, down: boolean): void {
 /** Casque retiré, menu de Meta ouvert ou compagnon parti : plus aucun bouton des manettes n'est tenu. */
 function releaseHeadsetButtons(): void {
   for (const name of [...headsetHolds.keys()]) headsetButton(name, false);
+  comboDown.clear();
+  stopComboHold();
+}
+
+/** Boutons de la combinaison du calage enfoncés, et l'appui tenu en cours (jauge dans le casque). */
+const comboDown = new Set<string>();
+let comboHold: NodeJS.Timeout | undefined;
+/** Jauge de l’appui tenu, envoyée aux écrans rendus pour le casque (fronton : frontend.js, headsetHoldRing). */
+let headsetHoldView: { since: number; durationMs: number; label: string } | undefined;
+
+function stopComboHold(): void {
+  if (!comboHold) return;
+  clearTimeout(comboHold);
+  comboHold = undefined;
+  headsetHoldView = undefined;
+  broadcast();
+}
+
+/**
+ * Les deux joysticks enfoncés ensemble, tenus CALIBRATION_HOLD_S (manettes.ts, CALIBRATION_COMBO) : le calage
+ * s'ouvre, d'où qu'on soit au menu (demande du 12 novembre 2026), avec une jauge circulaire pendant l'appui ;
+ * lâché avant, rien. Le même geste en partie passe par le plugin (pause.h).
+ */
+function calibrationComboButton(name: string, down: boolean): void {
+  const combo = calibrationCombo(headset?.profile ?? 'touch');
+  if (!combo?.includes(name as ControllerButton)) return;
+  if (down) comboDown.add(name);
+  else comboDown.delete(name);
+  const both = combo.every((b) => comboDown.has(b));
+  if (!both) return stopComboHold();
+  if (comboHold || calibration || playing || launch || calibrateUnavailable()) return;
+  headsetHoldView = { since: Date.now(), durationMs: CALIBRATION_HOLD_S * 1000, label: t('Caler la borne') };
+  broadcast();
+  comboHold = setTimeout(() => {
+    comboHold = undefined;
+    headsetHoldView = undefined;
+    console.log('Casque : combinaison du calage tenue (les deux joysticks) ; calage de la borne ouvert.'); // i18n-ignore : journal
+    if (controllerWizard) closeControllerWizard(false);
+    openCalibration();
+    broadcast();
+  }, CALIBRATION_HOLD_S * 1000);
 }
 
 /** Fichier du réglage des manettes d'un casque, pour la configuration active (un réglage par casque et par configuration). */
@@ -1908,6 +1960,7 @@ function wizardButton(name: string): void {
   } else {
     const other = list.find((x) => x.id !== f.id && w.functions[x.id] === el);
     if (other) w.problem = t('{bouton} sert déjà à {fonction}', { bouton: elementLabel(el), fonction: other.label });
+    else if (calibrationCombo(w.profile)?.includes(el as ControllerButton)) w.problem = t('{bouton} sert à caler la borne (les deux joysticks enfoncés ensemble)', { bouton: elementLabel(el) });
     else {
       w.functions[f.id] = el;
       w.problem = undefined;
@@ -3098,7 +3151,7 @@ function prepareVision3d(vpxExe: string, inVr: boolean): Vision3dSourceKind | un
 // raison, tant que le menu n'est pas dans le casque. Dans le casque : ≡ de la manette gauche (menu du casque).
 library.provideSystemItem('vr-calibrate', {
   get detail() {
-    return calibrateMenuText({ vrReady: probeVr().ready, headset: headset?.state, place: headset?.place(), setting: headsetSetting() }).detail;
+    return calibrateMenuText({ vrReady: probeVr().ready, headset: headset?.state, place: headset?.place(), setting: headsetSetting(), combo: calibrationComboLabel(headset?.profile ?? 'touch') }).detail;
   },
   get tone() {
     return calibrateUnavailable() ? ('quiet' as const) : undefined;
@@ -3132,6 +3185,37 @@ function headsetSetting(): CalibrationSetting {
   return calibrationSetting(rotation);
 }
 
+/**
+ * Casque remis après avoir été retiré (une autre personne, ou le même joueur) : avec une limite de pièce, le Quest
+ * a gardé sa pièce, rien à faire ; en limite fixe ou sans limite, il l'a recentrée sur la tête au réveil (aucun
+ * événement : Link ne le dit pas, et ne donne aucune ancre aux applications PC). Écrit au journal, et le calage
+ * revient d'office, un geste pour le refaire, A pour le garder tel quel.
+ */
+/**
+ * Au premier port du casque (une fois pour toutes, noté dans <données>\vr\astuce-calage.json) : le geste du
+ * calage, brièvement, pour qu'on le connaisse avant d'en avoir besoin.
+ */
+function calibrationComboTip(): void {
+  const combo = calibrationComboLabel(headset?.profile ?? 'touch');
+  const file = path.join(loc.dataDir, 'vr', 'astuce-calage.json');
+  if (!combo || fs.existsSync(file)) return;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ montree: new Date().toISOString() }, null, 2) + '\n');
+  } catch {
+    // Dossier de la VR en lecture seule : l'astuce reviendra, sans gravité.
+  }
+  showBanner(t('Recaler la borne à tout moment, au menu comme en partie : {combo}.', { combo }));
+}
+
+function headsetPutBackOn(): void {
+  const place = headset?.place();
+  if (!place || headsetSetting() === 'bureau' || headset?.roomKeeping !== 'recentred') return;
+  console.log('Casque : remis après avoir été retiré, pièce du Quest sans limite (limite fixe) : il l’a recentrée sur la tête au réveil, écart non mesurable sans ancre (Link n’en donne pas) ; calage de la borne proposé d’office.'); // i18n-ignore : journal
+  calibrationOffered = false;
+  offerCalibration(true, 'casque remis, pièce recentrée par le Quest'); // i18n-ignore : journal
+}
+
 /** Hauteur des yeux dite par le compagnon (sol mal réglé), et limite du Quest changée depuis le calage. */
 let headsetEyes: number | undefined;
 let roomNotice = false;
@@ -3154,8 +3238,8 @@ function openHeadsetMenu(): void {
       icon: 'vr' as const,
       lead: t('Les mêmes boutons partout : A valide, B revient, les joysticks déplacent la sélection.'),
       sections: [
-        { title: t('Au menu'), rows: headsetControls(controllerSetting()).filter((c) => c.menu).map((c) => ({ text: c.label, detail: c.menu })) },
-        { title: t('En partie'), rows: headsetControls(controllerSetting()).map((c) => ({ text: c.label, detail: c.game })) },
+        { title: t('Au menu'), rows: [...headsetControls(controllerSetting()).filter((c) => c.menu).map((c) => ({ text: c.label, detail: c.menu })), ...comboRows()] },
+        { title: t('En partie'), rows: [...headsetControls(controllerSetting()).map((c) => ({ text: c.label, detail: c.game })), ...comboRows(true)] },
       ],
       actions: [
         { label: t('Caler la borne'), icon: 'layout' as const, detail: calibrateMenuText({ vrReady: probeVr().ready, headset: headset?.state, place: headset?.place(), setting: headsetSetting() }).detail.split(' · ')[0], run: () => {
@@ -3178,6 +3262,12 @@ function openHeadsetMenu(): void {
     library.openCustom(build, 0);
   });
   if (opened) console.log('Casque : menu du casque ouvert (≡).'); // i18n-ignore : journal
+}
+
+/** La combinaison du calage dans la légende des manettes (menu du casque), si ces manettes en ont une. */
+function comboRows(inGame = false): { text: string; detail: string }[] {
+  const combo = calibrationComboLabel(controllerSetting().profile);
+  return combo ? [{ text: t('Les deux joysticks enfoncés, 3 s'), detail: inGame ? t('Pause, puis caler la borne ; on reprend où on en était') : t('Caler la borne') }] : [];
 }
 
 /** Arrêt de la partie de VPX dans le casque en cours (le casque se perd pendant qu'elle se joue). */
@@ -3623,10 +3713,10 @@ function headInGame(head: HeadPose): void {
  * des manettes), et de nouveau si la limite du Quest change (`again`) : caler, ou passer en gardant le
  * calage précédent (demande du 10 novembre 2026).
  */
-function offerCalibration(again = false): void {
+function offerCalibration(again = false, reason = 'limite du Quest changée'): void { // i18n-ignore : journal
   if ((calibrationOffered && !again) || calibration || controllerWizard || playing || launch || calibrateUnavailable() || !headset?.worn) return;
   calibrationOffered = true;
-  const why = again ? 'limite du Quest changée' : isCalibrated(headset.place()) ? 'début de la session VR' : 'borne pas encore calée'; // i18n-ignore : journal
+  const why = again ? reason : isCalibrated(headset.place()) ? 'début de la session VR' : 'borne pas encore calée'; // i18n-ignore : journal
   console.log(`Casque : calage de la borne proposé d'office (${why}).`); // i18n-ignore : journal
   openCalibration(true);
 }
@@ -3640,7 +3730,7 @@ function calibrateUnavailable(): boolean {
  * revenir ; `intro` : l'écran d'accueil du calage proposé d'office (caler ou passer) ; `validated` :
  * les calages validés depuis l'ouverture (chacun appliqué aussitôt, le dernier gardé).
  */
-let calibration: { points: Partial<Record<CalibrationStep, Point3>>; place?: CabinetPlace; back: 'menu' | 'system'; placing?: boolean; intro?: boolean; validated: number } | undefined;
+let calibration: { points: Partial<Record<CalibrationStep, Point3>>; place?: CabinetPlace; back: 'menu' | 'system'; placing?: boolean; intro?: boolean; validated: number; grip?: GripOffset } | undefined;
 
 function openCalibration(intro = false): void {
   if (!headset || calibration || controllerWizard || playing || launch) return;
@@ -3666,6 +3756,7 @@ function showCalibration(problem?: string): void {
     vrRoomProblem ??
     (headset?.keyRenewed ? t('Vérifiez la place de la borne.') : undefined) ??
     (roomNotice ? t('La limite du Quest a changé : recalez.') : undefined) ??
+    (c.intro ? roomKeepingAdvice(headset?.roomKeeping, calibrationComboLabel(headset?.profile)) : undefined) ??
     (c.place ? vpxPlaceProblem(placeVpxSettings(c.place)) : undefined);
   headset?.setMarks(calibrationMarks(c));
   const prompt = { text, keys, ...(issue && { problem: issue }) };
@@ -3694,10 +3785,12 @@ function calibrationMarks(c: NonNullable<typeof calibration>): Point3[] {
  * points autant de fois qu'on veut ; la borne vient aussitôt dessus. Le côté de la borne vient de la
  * tête (orderCorners), jamais de l'ordre des points ni de la main.
  */
-function calibrationPoints(points: readonly Point3[], room: boolean, head: { x: number; z: number } | undefined, pressed: 0 | 1 = 0): void {
+function calibrationPoints(points: readonly Point3[], room: boolean, head: { x: number; z: number } | undefined, pressed: 0 | 1 = 0, grips?: readonly [Point3, Point3]): void {
   const c = calibration;
   if (!c || !points.length) return;
   c.intro = false;
+  // Les deux bouts et les deux prises au même instant : l'écart que le calage en partie (VPX, sur les prises) reprend.
+  if (points.length >= 2 && grips) c.grip = gripOffset([points[0]!, points[1]!], grips) ?? c.grip;
   if (!room) {
     c.points = {};
     c.place = undefined;
@@ -3774,7 +3867,9 @@ function applyCalibration(): void {
   if (!c?.place) return;
   const { left, right, middle } = c.points;
   // La limite du Quest est gardée avec le calage : si elle change, le calage est proposé de nouveau.
-  const place: CabinetPlace = { ...c.place, ...(headset?.room && { room: headset.room }), ...(headsetSetting() === 'bureau' && { free: true }) };
+  const kept = headset?.place()?.grip;
+  const grip = c.grip ?? kept;
+  const place: CabinetPlace = { ...c.place, ...(headset?.room && { room: headset.room }), ...(headsetSetting() === 'bureau' && { free: true }), ...(grip && { grip }) };
   headset?.showPlace(place, true);
   roomNotice = false;
   roomStale = false;
@@ -3786,6 +3881,7 @@ function applyCalibration(): void {
     console.warn(`Casque : calage pas écrit dans l’INI de la VR (${(error as Error).message}).`); // i18n-ignore : journal
   }
   const gap = !left || !right ? ', posée sur le regard du joueur' : middle ? `, milieu touché à ${calibrationGap(left, right, middle).toFixed(1)} cm du milieu calé` : ', milieu pas vérifié'; // i18n-ignore : journal
+  if (c.grip) console.log(`Casque : prises des manettes à ${Math.round(c.grip.up * 100)} cm au-dessus et ${Math.round(c.grip.back * 100)} cm en arrière de leurs bouts, écart ×${c.grip.widthRatio.toFixed(2)} (calage en partie par VPX).`); // i18n-ignore : journal
   console.log(`Casque : borne ${place.free ? 'posée au bureau' : 'calée'} (${menuConfiguration ?? 'configuration unique'}), barre avant de ${Math.round((place.lockbarWidth ?? 0) * 100)} cm à ${Math.round((place.lockbarHeight ?? 0) * 100)} cm du sol${gap} ; calage appliqué, l’écran du calage reste ouvert.`); // i18n-ignore : journal
   c.validated++;
   c.points = {};
@@ -3911,6 +4007,21 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
       if (table) details.push(`table : plateau de ${table.widthCm.toFixed(1)} cm, vitre du bas à ${table.glassBottomCm.toFixed(1)} cm ; plateau recalé sur celui du menu${menuWidth ? `, ${Math.round(menuWidth * 100)} cm de large` : ''}`); // i18n-ignore : journal
       writeIniSettings(vr.ini, settings);
       details.push(`place de la borne du casque${isCalibrated(place) ? ' calée' : ''} : ${settings.map((s) => `${s.key} ${s.value}`).join(', ')}`); // i18n-ignore : journal
+      // Caler la borne en partie (les deux joysticks, ou « Caler la borne » de la pause) : VPX aligné sur les prises
+      // des manettes tombe sur cette même place pour les mêmes bouts (calage.ts, inGameCalibration).
+      if (pausePlugin !== 'missing' && pausePlugin !== 'busy') {
+        const ig = inGameCalibration(place, table, menuWidth);
+        writeIniSettings(vr.ini, [
+          { section: 'PlayerVR', key: 'ControllerLockbarScale', value: String(ig.lockbarScale) },
+          { section: 'PlayerVR', key: 'ControllerCabYOffset', value: String(ig.cabYOffset) },
+          { section: 'Plugin.CyberPinball', key: 'Calibrate', value: '1' },
+          { section: 'Plugin.CyberPinball', key: 'CalibrateHeight', value: String(ig.heightSteps) },
+          { section: 'Plugin.CyberPinball', key: 'CalibrateLabel', value: t('Caler la borne') },
+          { section: 'Plugin.CyberPinball', key: 'CalibrateHelp', value: t('Manettes sur les coins de la barre · Gâchette : caler · A ou B : reprendre') },
+          { section: 'Plugin.CyberPinball', key: 'CalibratedLabel', value: t('Borne calée') },
+        ]);
+        details.push(`calage en partie : ${calibrationCombo(controllerSetting().profile) ? 'les deux joysticks tenus 3 s, ou ' : ''}« Caler la borne » de la pause ; ControllerLockbarScale ${ig.lockbarScale}, ControllerCabYOffset ${ig.cabYOffset}, hauteur ${ig.heightSteps} cm${ig.measured ? '' : ' (prises des manettes pas encore mesurées : recalez au menu)'}`); // i18n-ignore : journal
+      }
       const far = vpxPlaceProblem(settings);
       if (far) details.push(`attention : ${far}`); // i18n-ignore : journal
     }
@@ -3951,6 +4062,27 @@ function checkVrPlaceAfterGame(ini: string, tableFile: string): void {
   const place = readCabinetPlace(headsetPlaceFile());
   if (!place) return;
   const doc = IniDocument.parse(readTextIfExists(ini));
+  // Borne recalée pendant la partie (le plugin : « calage-partie … resultat=ok ») : VPX a réécrit la place de sa
+  // table en quittant ; la barre avant touchée devient celle de la borne du casque et des parties suivantes.
+  const block = lastVrMeasuresBlock(readTextIfExists(vrMeasuresFile()));
+  if (block && /^calage-partie .*resultat=ok/m.test(block.text)) {
+    const num = (key: string) => Number(doc.get('PlayerVR', key));
+    const saved = { orientation: num('Orientation'), tableX: num('TableX'), tableY: num('TableY') };
+    if ([saved.orientation, saved.tableX, saved.tableY].every(Number.isFinite)) {
+      const table = vpxTableGeometry(tableFile);
+      const menuWidth = menuPlayfield(headsetSources(), headsetTurn())?.width;
+      const next = placeFromVpxCentering(saved, place, inGameCalibration(place, table, menuWidth), table, menuWidth);
+      const gap = placeGap(place, next);
+      headset?.showPlace(next, true);
+      try {
+        writeVrCalibration(loc.dataDir, placeVpxSettings(next));
+      } catch (error) {
+        console.warn(`Casque : calage fait en partie pas écrit dans l’INI de la VR (${(error as Error).message}).`); // i18n-ignore : journal
+      }
+      console.log(`Casque : borne recalée pendant la partie (les deux joysticks ou la pause) ; barre avant déplacée de ${gap.cm.toFixed(0)} cm, tournée de ${gap.deg.toFixed(0)}° ; la borne du menu et les parties suivantes la suivent.`); // i18n-ignore : journal
+      return;
+    }
+  }
   const moved = placeVpxSettings(place, vpxTableGeometry(tableFile), menuPlayfield(headsetSources(), headsetTurn())?.width)
     .filter((s) => s.section === 'PlayerVR' && s.key !== 'TableZ')
     .map((s) => ({ key: s.key, want: Number(s.value), got: Number(doc.get(s.section, s.key)) }))
@@ -4423,6 +4555,7 @@ export function startFrontend(): void {
       // Session du casque : le réseau relevé au port ; casque retiré au menu, la session finit, l'avertissement
       // « Air Link sur un PC en Wi-Fi » pourra revenir à la suivante.
       if (headset?.worn && !headsetWornBefore) refreshVrNetwork();
+      if (headset?.worn && !headsetWornBefore) calibrationComboTip();
       if (!headset?.worn && headsetWornBefore && !playing && !launch) airLinkWarned = false;
       headsetWornBefore = Boolean(headset?.worn);
       // Compagnon parti pendant le calage : rien à garder.
@@ -4453,7 +4586,8 @@ export function startFrontend(): void {
     closeViews: () => closeHeadsetViews(),
     onButton: (button, down) => headsetButton(button, down),
     onProfile: () => offerControllerWizard(),
-    onPoints: (points, room, head, pressed) => calibrationPoints(points, room, head, pressed),
+    onPoints: (points, room, head, pressed, grips) => calibrationPoints(points, room, head, pressed, grips),
+    onPutBackOn: () => headsetPutBackOn(),
     onLost: (inGame) => headsetLost(inGame),
     onHead: (head) => headInGame(head),
     onCentre: (gaze) => calibrationCentre(gaze),
@@ -6736,7 +6870,10 @@ function broadcast(): void {
   for (const [role, win] of windows) {
     if (!win.isDestroyed()) win.webContents.send('state', inHeadset ? { ...viewFor(role), inHeadset: true } : viewFor(role));
   }
-  sendToHeadsetViews((role) => (headsetExitHint ? { ...viewFor(role, headsetMedias ?? medias), headsetHint: headsetExitHint, ...(headsetExitNote ? { headsetNote: headsetExitNote } : {}) } : viewFor(role, headsetMedias ?? medias)));
+  sendToHeadsetViews((role) => {
+    const view = headsetExitHint ? { ...viewFor(role, headsetMedias ?? medias), headsetHint: headsetExitHint, ...(headsetExitNote ? { headsetNote: headsetExitNote } : {}) } : viewFor(role, headsetMedias ?? medias);
+    return headsetHoldView ? { ...view, headsetHold: headsetHoldView } : view;
+  });
   // Télécommande du téléphone : le QR vit tant que l'écran qui le montre est affiché ; le téléphone suit l'écran.
   const surfaces = state.phase === 'library' && !desktop.active ? library.remoteSurfaces() : { menu: false, keyboard: false };
   // Pré-écoute (import du Juke-box) : jamais hors du menu.

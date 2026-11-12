@@ -3931,6 +3931,36 @@ html.jukebox-phase #root:has(> .banner) > .status-corner {
 .headset-prompt-problem { font-size: 6vh; color: var(--warning); max-width: 90vw; }
 .headset-prompt-keys { font-size: 7vh; color: var(--ink-muted); }
 
+/* Appui tenu dans le casque (les deux joysticks : caler la borne) : anneau qui se remplit, libellé au centre. */
+.headset-hold {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+.headset-hold > * { grid-area: 1 / 1; }
+@property --hold {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+.headset-hold-ring {
+  width: 70vh;
+  height: 70vh;
+  border-radius: 50%;
+  background: conic-gradient(var(--signal) calc(var(--hold) * 360deg), color-mix(in srgb, var(--ink-muted) 35%, transparent) 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4vh), #000 calc(100% - 4vh + 1px));
+  animation-name: headset-hold-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+.headset-hold-label { margin: 0; max-width: 50vh; font-size: 8vh; font-weight: 700; text-align: center; line-height: 1.1; }
+@keyframes headset-hold-fill { to { --hold: 1; } }
+
 /* Partie dans le casque, casque pas sur la tête (frontend.js, vrWearCard) : la consigne sur le playfield et le
    fronton de la borne, lisible de loin. Tailles en cqmin de #root, pivoté ou non. */
 .overlay.vr-wear {

@@ -10,8 +10,9 @@
 //
 // Chaque profil d'interaction OpenXR (Touch du Quest, Index, Vive, Windows Mixed Reality) a son réglage
 // par défaut (defaultControllerSetting) ; celui des Touch est la règle d'origine : gâchettes = flippers,
-// A = valider, B = retour, ≡ gauche = menu du casque, X = crédit, B tenu 1,5 s = quitter (Y libre), poignées = MagnaSave,
-// joystick gauche = déplacer, joystick droit = lanceur, son clic = lancer la bille. Le compagnon
+// A = valider, B = retour, ≡ gauche = menu du casque, X = crédit, B tenu 1,5 s = quitter, Y = lancer la bille,
+// poignées = MagnaSave, joystick gauche = déplacer, joystick droit = lanceur. Les clics des deux joysticks, enfoncés
+// ensemble 3 s, calent la borne, au menu comme en partie (CALIBRATION_COMBO) : ils ne font rien d'autre. Le compagnon
 // (packages/casque-vr) lit tous les éléments du catalogue (CONTROLLER_ELEMENTS) et envoie
 // « bouton <élément> 1|0 », ou « bouton <axe>-haut|bas|gauche|droite 1|0 » ; l'assistant des manettes
 // (app/src/frontend.ts) les prend un par un.
@@ -173,7 +174,8 @@ const DEFAULTS: Readonly<Record<HeadsetProfile, Partial<Record<HeadsetFunction, 
     credit: 'x',
     'magnasave-gauche': 'poignee-gauche',
     'magnasave-droit': 'poignee-droite',
-    lancer: 'clic-joystick-droit',
+    // Y, libre : le clic du joystick droit sert au calage (CALIBRATION_COMBO, 12 novembre 2026).
+    lancer: 'y',
     lanceur: 'joystick-droit',
     deplacer: 'joystick-gauche',
   },
@@ -210,11 +212,36 @@ const DEFAULTS: Readonly<Record<HeadsetProfile, Partial<Record<HeadsetFunction, 
     credit: 'clic-pave-gauche',
     'magnasave-gauche': 'poignee-gauche',
     'magnasave-droit': 'poignee-droite',
-    lancer: 'clic-joystick-droit',
+    // Pas de bouton libre pour lancer la bille : le clic du joystick droit sert au calage.
     lanceur: 'joystick-droit',
     deplacer: 'joystick-gauche',
   },
 };
+
+/**
+ * Caler la borne d'un geste, à tout moment (demande du 12 novembre 2026) : les deux boutons enfoncés ensemble,
+ * tenus CALIBRATION_HOLD_S, au menu comme en partie (la partie se met en pause, on recale, on reprend). Deux
+ * boutons qu'aucune fonction ne tient, ni au menu ni dans VPX, ni le bouton Meta : les clics des deux joysticks.
+ * Les profils sans deux boutons libres (Index : le clic gauche ouvre le menu du casque ; Vive : tout est pris)
+ * n'ont pas de combinaison : « Caler la borne » du menu du casque, ou du menu de la pause en partie.
+ */
+export const CALIBRATION_COMBO: Readonly<Partial<Record<HeadsetProfile, readonly [ControllerButton, ControllerButton]>>> = {
+  touch: ['clic-joystick-gauche', 'clic-joystick-droit'],
+  wmr: ['clic-joystick-gauche', 'clic-joystick-droit'],
+};
+
+/** Durée d'appui de la combinaison du calage (secondes) : 3 s, plus long que Quitter (demande du joueur, 12 novembre 2026) ; la même dans le plugin (pause.h, CALAGE_HOLD_S). */
+export const CALIBRATION_HOLD_S = 3;
+
+/** La combinaison du calage d'un profil, ou undefined. */
+export function calibrationCombo(profile: HeadsetProfile | undefined): readonly [ControllerButton, ControllerButton] | undefined {
+  return profile ? CALIBRATION_COMBO[profile] : undefined;
+}
+
+/** La combinaison telle que le joueur la lit (« les deux joysticks enfoncés ensemble, 3 s »), ou undefined. */
+export function calibrationComboLabel(profile: HeadsetProfile | undefined): string | undefined {
+  return calibrationCombo(profile) ? t('les deux joysticks enfoncés ensemble, 3 s') : undefined;
+}
 
 /** Le réglage par défaut d'un profil : celui des Touch est la règle d'origine (A valide, B revient…). */
 export function defaultControllerSetting(profile: HeadsetProfile): ControllerSetting {
@@ -241,6 +268,7 @@ export function controllerProblem(setting: ControllerSetting): string | undefine
     if (Boolean(def.axis) !== Boolean(f.axis)) return t('{fonction} : il faut {quoi}', { fonction: f.label, quoi: f.axis ? t('un joystick ou un pavé') : t('un bouton') });
     const other = used.get(el);
     if (other) return t('{bouton} sert déjà à {fonction}', { bouton: def.label, fonction: headsetFunctions().find((x) => x.id === other)!.label });
+    if (calibrationCombo(setting.profile)?.includes(el as ControllerButton)) return t('{bouton} sert à caler la borne (les deux joysticks enfoncés ensemble)', { bouton: def.label });
     used.set(el, f.id);
   }
   return undefined;
@@ -282,6 +310,16 @@ export function readControllerSetting(text: string | undefined, profile: Headset
       for (const f of headsetFunctions()) {
         const el = (raw.functions as Record<string, unknown>)[f.id];
         if (typeof el === 'string' && isControllerElement(el)) functions[f.id] = el;
+      }
+      // Réglage d'avant la combinaison du calage : la fonction posée sur un de ses boutons revient à son défaut
+      // si ce bouton-là est libre, sinon elle est retirée (lancer la bille ; jamais une fonction obligatoire).
+      const combo = calibrationCombo(profile);
+      for (const f of headsetFunctions()) {
+        const el = functions[f.id];
+        if (!el || !combo?.includes(el as ControllerButton)) continue;
+        const usual = DEFAULTS[profile][f.id];
+        delete functions[f.id];
+        if (usual && !Object.values(functions).includes(usual)) functions[f.id] = usual;
       }
       const setting = { profile, functions };
       if (!controllerProblem(setting)) return setting;
@@ -356,6 +394,13 @@ export const VPX_OPENXR = {
   rightStickY: 23,
 } as const;
 
+/**
+ * Touches du clavier que le plugin « CyberPinball » poste à VPX pour caler la borne en partie (pause.h,
+ * cyberpinball.cpp) : F13 met en marche puis arrête l'alignement de la table sur les manettes
+ * (VRControllerCalibration), F14 et F15 la montent et la descendent d'un centimètre (VRUp, VRDown). Codes SDL.
+ */
+export const VPX_CALIBRATION_KEYS = { VRControllerCalibration: 104, VRUp: 105, VRDown: 106 } as const;
+
 /** Une entrée « OpenXR;<rang>[;o|x;<seuil>] » comme VPX l'écrit (InputAction::GetMappingString). */
 function xr(element: number, threshold?: number): string {
   return threshold === undefined ? `OpenXR;${element}` : `OpenXR;${element};${threshold < 0 ? 'x' : 'o'};${threshold.toFixed(6)}`;
@@ -378,10 +423,13 @@ function vpxButton(element: ControllerElement, staged = false): string {
  * « augmente ou valide » et InGameUI « revient en arrière » (InputManager.cpp). Ce menu, dessiné
  * collé aux yeux en VR (vs_imgui.sc), ne s'ouvre que par le bouton du menu du casque : le retour met
  * la partie en pause et la reprend (Pause ; décision du 10 novembre 2026). Le clic du joystick gauche n'aligne jamais la table sur les manettes
- * (VRControllerCalibration, liaison par défaut de VPX) : elle ne bouge que sur demande.
+ * (VRControllerCalibration, liaison par défaut de VPX) : elle ne bouge que sur demande, par le plugin, au calage
+ * (touche F13, VPX_CALIBRATION_KEYS). Les boutons de la combinaison du calage sont liés à Custom1 et Custom2, sans
+ * autre rôle : le plugin les reconnaît (numéros 52 et 53 de VPX 10.8.1) et ne les laisse jamais à la table.
  */
 export function vpxMappingsFor(setting: ControllerSetting): Record<string, string[]> {
   const f = setting.functions;
+  const combo = calibrationCombo(setting.profile);
   const button = (fn: HeadsetFunction, staged = false) => (f[fn] ? [vpxButton(f[fn]!, staged)] : []);
   const axes = (['deplacer', 'lanceur'] as const).flatMap((fn) => (f[fn] ? [CONTROLLER_ELEMENTS[f[fn]!].vpx as readonly [number, number]] : []));
   return {
@@ -401,7 +449,11 @@ export function vpxMappingsFor(setting: ControllerSetting): Record<string, strin
     Credit1: button('credit'),
     ExitGame: button('quitter'),
     LaunchBall: button('lancer'),
-    VRControllerCalibration: [],
+    VRControllerCalibration: [`Key;${VPX_CALIBRATION_KEYS.VRControllerCalibration}`],
+    VRUp: [`Key;${VPX_CALIBRATION_KEYS.VRUp}`],
+    VRDown: [`Key;${VPX_CALIBRATION_KEYS.VRDown}`],
+    Custom1: combo ? [xr(CONTROLLER_ELEMENTS[combo[0]].vpx as number)] : [],
+    Custom2: combo ? [xr(CONTROLLER_ELEMENTS[combo[1]].vpx as number)] : [],
   };
 }
 
@@ -435,7 +487,8 @@ export function vpxHeadsetInput(text: string, setting: ControllerSetting = defau
     const raw = doc.get(INPUT, mappingKey(action))?.trim();
     const current = raw || (VPX_INPUT_DEFAULTS[action] !== undefined ? `Key;${VPX_INPUT_DEFAULTS[action]}` : '');
     const kept = parseMapping(current).filter((alt) => !alt.some(isXr));
-    const value = formatMapping([...kept, ...(mappings[action] ?? []).map((m) => [m])]);
+    const added = (mappings[action] ?? []).filter((m) => !kept.some((alt) => alt.length === 1 && alt[0] === m));
+    const value = formatMapping([...kept, ...added.map((m) => [m])]);
     // Valeur vide : VPX prendrait sa liaison par défaut, celle du clavier (aucune pour VRControllerCalibration).
     if (value !== (raw ?? '') && !(value === current && !raw)) settings.push({ section: INPUT, key: mappingKey(action), value });
   }

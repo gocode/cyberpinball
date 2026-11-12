@@ -24,6 +24,14 @@ namespace cyberpinball {
 
 /** Durée d'appui sur Pause pour quitter (secondes). */
 constexpr double QUIT_HOLD_S = 1.5;
+/**
+ * Durée d'appui des deux joysticks enfoncés ensemble pour caler la borne en partie (secondes) : les deux
+ * clics des joysticks ne servent à rien d'autre (manettes.ts, CALIBRATION_COMBO), et un geste en jouant ne
+ * la déclenche pas (demande du 12 novembre 2026 : 3 s, plus long que Quitter).
+ */
+constexpr double CALAGE_HOLD_S = 3.0;
+/** Images laissées à VPX entre son alignement sur les manettes et son arrêt (VRDevice::RenderFrame, à chaque image). */
+constexpr int CALAGE_IMAGES = 4;
 /** La jauge ne paraît qu'après ce délai : un appui court (pause) ne la fait pas clignoter. */
 constexpr double JAUGE_APRES_S = 0.2;
 /** VPX est en pause quand son temps de jeu n'avance plus depuis ce délai (il avance à chaque image). */
@@ -47,6 +55,8 @@ enum class Commande
    Plus,      // MagnaSave droit (poignée) : comme Droite au menu ; réglage : plus grand
    Retour,    // crédit (B des manettes du casque) : revient d'un cran du réglage des écrans
    Jeu,       // une action de la table (lancer, secousses, crédit…) : gardée pendant le menu
+   CalageG,   // clic du joystick gauche (porteur Custom1, sans autre fonction) : moitié de la combinaison du calage
+   CalageD,   // clic du joystick droit (porteur Custom2) : l'autre moitié
    Sortie,    // ExitGame (Échap) : jamais avalée
    Interface, // le menu de VPX : jamais avalé
    Inconnue,  // tout le reste : jamais avalée
@@ -66,6 +76,9 @@ enum : int
  * révision 5436) ; `api` reçoit l'action de l'API des plugins que VPX y lie (m_actionMap, pour vérifier la
  * table pendant la partie), ou -1 quand VPX ne la lie pas (Pause, les UI*).
  */
+/** Les gâchettes (flippers, et leur second temps : actions 0 à 3) : elles calent la borne à l'étape du calage. */
+inline bool estGachette(int id) { return id >= 0 && id <= 3; }
+
 inline Commande commandeVpx1081(int id, int& lieeA)
 {
    static const struct { Commande c; int api; } table[] = {
@@ -95,6 +108,16 @@ inline Commande commandeVpx1081(int id, int& lieeA)
       { Commande::Inconnue, -1 },                    // 23 PerfOverlay
       { Commande::Sortie, api::ExitGame },           // 24 ExitGame
       { Commande::Interface, api::OpenInGameUI },    // 25 InGameUI
+      // 26 VolumeDown … 51 ToggleStereo : jamais avalées.
+      { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, // 26-29
+      { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, // 30-33
+      { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, // 34-37
+      { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, // 38-41
+      { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, // 42-45
+      { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 }, // 46-49
+      { Commande::Inconnue, -1 }, { Commande::Inconnue, -1 },                                                         // 50-51
+      { Commande::CalageG, -1 },                     // 52 Custom1 (clic du joystick gauche, lié par Cyber Pinball)
+      { Commande::CalageD, -1 },                     // 53 Custom2 (clic du joystick droit)
    };
    if (id < 0 || id >= static_cast<int>(sizeof(table) / sizeof(table[0])))
    {
@@ -307,10 +330,12 @@ inline Reglage lireReglage(const std::string& texte)
 /** Les écrans que le joueur peut ajuster dans la pause. */
 enum class Ecran { Fronton = 0, Dmd = 1 };
 
-enum class Choix { Reprendre, Ajuster, Quitter };
+enum class Choix { Reprendre, Ajuster, Caler, Quitter };
+/** Les choix du menu de la pause, dans leur ordre à l'écran. */
+constexpr Choix CHOIX[4] = { Choix::Reprendre, Choix::Ajuster, Choix::Caler, Choix::Quitter };
 
-/** Où en est la pause : le menu, le choix de l'écran à ajuster, ou son réglage. */
-enum class Etape { Menu, ChoixEcran, Reglage };
+/** Où en est la pause : le menu, le choix de l'écran à ajuster, son réglage, ou le calage de la borne. */
+enum class Etape { Menu, ChoixEcran, Reglage, Calage };
 
 /** Ce que la pause demande au plugin. */
 struct Ordre
@@ -318,6 +343,8 @@ struct Ordre
    int reprendre = 0; // essai de reprise : 1 le premier moyen, 2 le second (0 rien)
    int quitter = 0;   // demande de sortie : 1 la première (ExitGame), 2 et plus de plus en plus ferme
    bool garder = false; // réglage d'un écran validé (A) : à enregistrer pour cette table
+   bool pause = false;  // mettre VPX en pause (combinaison du calage tenue pendant le jeu)
+   bool caler = false;  // aligner la table de VPX sur les manettes, maintenant (gâchette à l'étape du calage)
 };
 
 class Pause
@@ -342,6 +369,18 @@ public:
    }
    bool menuVisible() const { return menu && !quitte; }
    bool appuiEnCours() const { return appui; }
+   /** La combinaison du calage (deux joysticks enfoncés) : tenue, remplissage de sa jauge, visible. */
+   bool comboTenue() const { return comboG && comboD && !quitte; }
+   double jaugeCalage(double t) const
+   {
+      if (!comboTenue() || comboDeclenche)
+         return 0.0;
+      const double r = (t - debutCombo) / CALAGE_HOLD_S;
+      return r < 0.0 ? 0.0 : (r > 1.0 ? 1.0 : r);
+   }
+   bool jaugeCalageVisible(double t) const { return comboTenue() && !comboDeclenche && fiable && t - debutCombo >= JAUGE_APRES_S; }
+   /** Calages faits depuis l'ouverture de l'étape du calage (la table est déjà sur la barre). */
+   int calagesFaits() const { return calages; }
    bool quitteDemande() const { return quitte; }
    Choix choix() const { return selection; }
    /** La reprise demandée n'a pas pris : le menu rappelle le bouton Pause. */
@@ -356,7 +395,7 @@ public:
    }
    bool jaugeVisible(double t) const { return appui && !quitte && t - debut >= JAUGE_APRES_S; }
    /** Le fronton est à la pause : jauge ou menu, sinon il est rendu aux autres. */
-   bool affichee(double t) const { return jaugeVisible(t) || menuVisible(); }
+   bool affichee(double t) const { return jaugeVisible(t) || jaugeCalageVisible(t) || menuVisible(); }
 
    /**
     * L'invariant : jamais Pause, la sortie, le menu de VPX ni une action inconnue ; le reste seulement
@@ -368,15 +407,27 @@ public:
          return false;
       if (c == Commande::Pause || c == Commande::Sortie || c == Commande::Interface || c == Commande::Inconnue)
          return false;
+      // Les porteurs de la combinaison n'ont pas d'autre rôle : jamais rien pour la table.
+      if (c == Commande::CalageG || c == Commande::CalageD)
+         return true;
       return menuVisible();
    }
 
-   /** Une action de VPX (numéro déjà traduit). */
-   Ordre action(Commande c, bool presse, double t)
+   /** Une action de VPX (numéro déjà traduit) ; `gachette` : un flipper (estGachette). */
+   Ordre action(Commande c, bool presse, double t, bool gachette = false)
    {
       Ordre o;
       switch (c)
       {
+      case Commande::CalageG:
+      case Commande::CalageD:
+         (c == Commande::CalageG ? comboG : comboD) = presse;
+         if (comboG && comboD && presse)
+         {
+            debutCombo = t;
+            comboDeclenche = false;
+         }
+         return o;
       case Commande::Pause:
          interfaceVpx = false;
          if (presse && !appui)
@@ -399,6 +450,19 @@ public:
       }
       if (!menuVisible() || !presse || !fiable)
          return o;
+      if (etapeCourante == Etape::Calage)
+      {
+         // Gâchette : la table de VPX s'aligne sur les manettes posées sur la barre avant (autant de fois
+         // qu'on veut) ; A ou B : la partie reprend, le dernier calage reste.
+         if (gachette)
+         {
+            calages++;
+            o.caler = true;
+         }
+         else if (c == Commande::Valider || c == Commande::Retour)
+            o.reprendre = lancerReprise(t);
+         return o;
+      }
       if (etapeCourante == Etape::ChoixEcran)
       {
          switch (c)
@@ -442,14 +506,17 @@ public:
          }
          return o;
       }
+      int i = 0;
+      while (i < 3 && CHOIX[i] != selection)
+         i++;
       switch (c)
       {
       case Commande::Haut:
       case Commande::Gauche:
-      case Commande::Moins: selection = selection == Choix::Quitter ? Choix::Ajuster : Choix::Reprendre; break;
+      case Commande::Moins: selection = CHOIX[i > 0 ? i - 1 : 0]; break;
       case Commande::Bas:
       case Commande::Droite:
-      case Commande::Plus: selection = selection == Choix::Reprendre ? Choix::Ajuster : Choix::Quitter; break;
+      case Commande::Plus: selection = CHOIX[i < 3 ? i + 1 : 3]; break;
       case Commande::Valider:
          if (selection == Choix::Quitter)
             o.quitter = demanderSortie(t);
@@ -458,13 +525,10 @@ public:
             etapeCourante = Etape::ChoixEcran;
             ecranChoisi = Ecran::Fronton;
          }
+         else if (selection == Choix::Caler)
+            ouvrirCalage();
          else
-         {
-            debutReprise = t;
-            essaisReprise = 1;
-            echecReprise = false;
-            o.reprendre = 1;
-         }
+            o.reprendre = lancerReprise(t);
          break;
       default: break;
       }
@@ -502,11 +566,29 @@ public:
          selection = Choix::Reprendre;
          echecReprise = false;
          essaisReprise = 0;
+         // Pause demandée par la combinaison du calage : la partie s'arrête directement sur le calage.
+         if (calageAttendu)
+            ouvrirCalage();
+      }
+      // Combinaison du calage tenue assez longtemps : la pause (si la partie tourne), puis le calage.
+      if (comboTenue() && !comboDeclenche && fiable && t - debutCombo >= CALAGE_HOLD_S)
+      {
+         comboDeclenche = true;
+         if (menuVisible())
+            ouvrirCalage();
+         else if (!enPause)
+         {
+            calageAttendu = true;
+            o.pause = true;
+         }
       }
       if (!enPause)
       {
          menu = false;
          essaisReprise = 0;
+         // Une pause demandée qui ne vient pas en 2 s : oubliée (jamais de calage surgi plus tard).
+         if (calageAttendu && t - debutCombo > CALAGE_HOLD_S + 2.0)
+            calageAttendu = false;
       }
       // Appui tenu assez longtemps : la partie quitte.
       if (appui && !quitte && t - debut >= QUIT_HOLD_S)
@@ -535,6 +617,21 @@ public:
    void remiseAZero() { *this = Pause {}; }
 
 private:
+   void ouvrirCalage()
+   {
+      etapeCourante = Etape::Calage;
+      calageAttendu = false;
+      calages = 0;
+   }
+
+   int lancerReprise(double t)
+   {
+      debutReprise = t;
+      essaisReprise = 1;
+      echecReprise = false;
+      return 1;
+   }
+
    int demanderSortie(double t)
    {
       quitte = true;
@@ -564,6 +661,9 @@ private:
    Etape etapeCourante = Etape::Menu;
    Ecran ecranChoisi = Ecran::Fronton;
    bool dmdPresent = false;
+   bool comboG = false, comboD = false, comboDeclenche = false, calageAttendu = false;
+   double debutCombo = 0.0;
+   int calages = 0;
    Reglage reglages[2] {};
    Reglage brouillon {};
 };

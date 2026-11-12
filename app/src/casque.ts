@@ -11,7 +11,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { anchorHeight, buildDecor, cadenceWithoutScreens, COMPANION_KEY_FILE, CompanionCycle, companionKeyFolder, DECOR_TEXTURES, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, readCompanionKey, sceneProtocol, writeGlb, type CabinetPlace, type DecorTexture, type HeadsetProfile, type Point3, type VrGpu, type RoomBounds, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
+import { anchorHeight, buildDecor, cadenceWithoutScreens, COMPANION_KEY_FILE, CompanionCycle, companionKeyFolder, DECOR_TEXTURES, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, readCompanionKey, roomChangeGap, sceneProtocol, writeGlb, type CabinetPlace, type DecorTexture, type HeadsetProfile, type Point3, type VrGpu, type RoomBounds, type RoomKeeping, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
 import { openHandleTarget, type HandleTarget } from '@cyberpinball/win-displays';
 import type { OffscreenSharedTexture } from 'electron';
 import { OFFSCREEN } from './offscreen';
@@ -123,7 +123,9 @@ export interface HeadsetMenuOptions {
   onProfile?(profile: HeadsetProfile): void;
   /** Calage (calibrate) : le bout d'une manette touché, gâchette appuyée, dans la pièce (`room` faux : sans limite du Quest). */
   /** Calage : les points pris d'une gâchette (un, ou les deux manettes à la fois), et la tête à cet instant. */
-  onPoints?(points: Point3[], room: boolean, head: { x: number; z: number } | undefined, pressed: 0 | 1): void;
+  onPoints?(points: Point3[], room: boolean, head: { x: number; z: number } | undefined, pressed: 0 | 1, grips?: [Point3, Point3]): void;
+  /** Casque remis après un retrait qui a arrêté la session (accueil de Link) : la pièce a pu être recentrée. */
+  onPutBackOn?(): void;
   /**
    * Casque éteint, Link coupé ou session perdue (compagnon : « casque-perdu ») : `inGame` vrai quand le
    * compagnon veillait sur une partie de VPX dans le casque. L'affichage revient aux écrans du PC.
@@ -169,6 +171,10 @@ export class HeadsetMenu {
   private marks: Point3[] = [];
   /** Limite du Quest donnée par le compagnon à son lancement (pièce), gardée avec le calage. */
   room: RoomBounds | undefined;
+  /** Pièce gardée par le Quest quand le casque est remis (limite de pièce), ou recentrée sur la tête (limite fixe). */
+  roomKeeping: RoomKeeping | undefined;
+  /** Casque retiré (la session s'est arrêtée, accueil de Link) : à son retour, la pièce a pu bouger. */
+  private takenOff = false;
   private shown: HeadsetMenuState = 'waiting';
   /** Textures d'Electron confiées au compagnon : rendues (release) quand il les a copiées. */
   private target: HandleTarget | undefined;
@@ -480,13 +486,15 @@ export class HeadsetMenu {
           }
           continue;
         }
-        // Calage : « pointes x y z x y z [tete x z] [sans-piece] » (les deux manettes), ou « pointe main x y z … ».
-        const points = /^pointes? (gauche|droite) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)(?: (-?[\d.]+) (-?[\d.]+) (-?[\d.]+))?(?: tete (-?[\d.]+) (-?[\d.]+))?( sans-piece)?$/.exec(line);
+        // Calage : « pointes x y z x y z [tete x z] [sans-piece] [prises x y z x y z] » (les deux manettes), ou « pointe main x y z … ».
+        const points = /^pointes? (gauche|droite) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)(?: (-?[\d.]+) (-?[\d.]+) (-?[\d.]+))?(?: tete (-?[\d.]+) (-?[\d.]+))?( sans-piece)?(?: prises (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+))?$/.exec(line);
         if (points) {
           this.opts.log(`Casque : ${line}`); // i18n-ignore : journal
           const n = points.slice(2).map((v) => (v === undefined ? undefined : Number(v)));
           const list: Point3[] = [{ x: n[0]!, y: n[1]!, z: n[2]! }, ...(n[3] !== undefined ? [{ x: n[3], y: n[4]!, z: n[5]! }] : [])];
-          this.opts.onPoints?.(list, !points[10], n[6] !== undefined ? { x: n[6], z: n[7]! } : undefined, points[1] === 'droite' ? 1 : 0);
+          const g = points.slice(11, 17).map(Number);
+          const grips: [Point3, Point3] | undefined = points[11] !== undefined ? [{ x: g[0]!, y: g[1]!, z: g[2]! }, { x: g[3]!, y: g[4]!, z: g[5]! }] : undefined;
+          this.opts.onPoints?.(list, !points[10], n[6] !== undefined ? { x: n[6], z: n[7]! } : undefined, points[1] === 'droite' ? 1 : 0, grips);
           continue;
         }
         // Hauteur des yeux, limite de la pièce, pièce déplacée par le Quest : au journal, puis au menu.
@@ -501,8 +509,14 @@ export class HeadsetMenu {
           this.opts.onEyes?.(Number(eyes[1]));
           continue;
         }
+        if (line === 'piece aucune') { // i18n-ignore : protocole du compagnon
+          if (this.roomKeeping !== 'recentred') this.opts.log('Casque : pièce du Quest sans limite (limite fixe ou désactivée) : le Quest la recentre sur la tête chaque fois que le casque est remis, sans le dire aux applications ; le calage sera proposé à chaque retour du casque.'); // i18n-ignore : journal
+          this.roomKeeping = 'recentred';
+          continue;
+        }
         const room = /^piece ([\d.]+) ([\d.]+)$/.exec(line);
         if (room) {
+          this.roomKeeping = 'kept';
           this.room = { width: Number(room[1]), depth: Number(room[2]) };
           this.opts.log(`Casque : limite du Quest ${this.room.width.toFixed(2)} × ${this.room.depth.toFixed(2)} m.`); // i18n-ignore : journal
           this.opts.onRoom?.(this.room, false);
@@ -522,7 +536,8 @@ export class HeadsetMenu {
             const generation = readCompanionKey(fs.existsSync(keyFile) ? fs.readFileSync(keyFile, 'utf8') : undefined);
             this.writeKey(generation + 1, 'pièce recentrée par le runtime sous la session du compagnon'); // i18n-ignore : journal
           }
-          this.opts.log(`Casque : ${line} ; le runtime a recentré la pièce du compagnon seul : il repart ${now ? 'tout de suite' : 'à la fin de la partie'} sur une session neuve, sous une clé neuve, dans la pièce de VPX ; la borne reste où elle est.`); // i18n-ignore : journal
+          const gap = roomChangeGap(line);
+          this.opts.log(`Casque : ${line}${gap ? ` (origine de la pièce changée : écart ${gap.cm.toFixed(0)} cm, ${gap.deg.toFixed(0)}°)` : ''} ; le runtime a recentré la pièce du compagnon seul : correction, il repart ${now ? 'tout de suite' : 'à la fin de la partie'} sur une session neuve, sous une clé neuve, dans la pièce de VPX ; la borne reste où elle est.`); // i18n-ignore : journal
           this.roomRestart = true;
           if (now) this.restart();
           else this.restartAfterGame = true;
@@ -538,6 +553,8 @@ export class HeadsetMenu {
         if (line === 'session-arretee') {
           this.opts.log('Casque : session arrêtée par le runtime (accueil de Link) ; le compagnon repart aussitôt sur une session neuve.'); // i18n-ignore : journal
           this.restartNow = true;
+          // Casque retiré (le menu de Meta ouvert n'arrête pas la session) : à son retour, la pièce a pu bouger.
+          if (!this.worn) this.takenOff = true;
           continue;
         }
         if (!PROTOCOL.test(line)) continue;
@@ -552,6 +569,10 @@ export class HeadsetMenu {
           this.worn = line === 'porte 1';
           this.wornOnce ||= this.worn;
           this.opts.onStateChange?.();
+          if (this.worn && this.takenOff) {
+            this.takenOff = false;
+            this.opts.onPutBackOn?.();
+          }
         }
         // Relève faite : le compagnon veille sur la partie ; VPX parti, il reprend le casque avec le menu.
         if (line.startsWith('releve') && line.endsWith('veille')) {
@@ -732,7 +753,10 @@ export function readCabinetPlace(file: string): CabinetPlace | undefined {
     const lockbarWidth = num(p.lockbarWidth);
     const r = p.room as Record<string, unknown> | undefined;
     const room = r && num(r.width) !== undefined && num(r.depth) !== undefined ? { width: num(r.width)!, depth: num(r.depth)! } : undefined;
-    return { x, z, yaw, ...(lockbarHeight !== undefined && { lockbarHeight }), ...(lockbarWidth !== undefined && { lockbarWidth }), ...(room && { room }) };
+    // Écart prises-bouts des manettes (calage en partie par VPX), mesuré au calage du menu.
+    const g = p.grip as Record<string, unknown> | undefined;
+    const grip = g && num(g.up) !== undefined && num(g.back) !== undefined && num(g.widthRatio) !== undefined ? { up: num(g.up)!, back: num(g.back)!, widthRatio: num(g.widthRatio)! } : undefined;
+    return { x, z, yaw, ...(lockbarHeight !== undefined && { lockbarHeight }), ...(lockbarWidth !== undefined && { lockbarWidth }), ...(room && { room }), ...(grip && { grip }) };
   } catch {
     return undefined;
   }

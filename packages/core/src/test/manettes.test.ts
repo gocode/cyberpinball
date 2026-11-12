@@ -38,7 +38,7 @@ test('manettes : la règle des Touch, au menu et en partie (réglage par défaut
       ['credit', 'X', 'Collection suivante (roue)', 'Crédit'],
       ['magnasave-gauche', 'Poignée gauche', '—', 'MagnaSave gauche'],
       ['magnasave-droit', 'Poignée droite', '—', 'MagnaSave droit'],
-      ['lancer', 'Clic du joystick droit', '—', 'Lancer la bille'],
+      ['lancer', 'Y', '—', 'Lancer la bille'],
       ['lanceur', 'Joystick droit', 'Déplacer la sélection', 'Lanceur : tirer vers soi, lâcher'],
       ['deplacer', 'Joystick gauche', 'Déplacer la sélection', 'Déplacer la sélection du menu de VPX ; secouer la table'],
     ],
@@ -144,8 +144,13 @@ test('manettes : liaisons de VPX en partie, la même règle qu’au menu', () =>
     Credit1: ['OpenXR;8'],
     // Plus de sortie directe : Pause tenu 1,5 s quitte (plugin « CyberPinball »).
     ExitGame: [],
-    LaunchBall: ['OpenXR;13'],
-    VRControllerCalibration: [],
+    LaunchBall: ['OpenXR;9'],
+    // Caler la borne en partie : touches que le plugin poste à VPX, porteurs des deux clics des joysticks.
+    VRControllerCalibration: ['Key;104'],
+    VRUp: ['Key;105'],
+    VRDown: ['Key;106'],
+    Custom1: ['OpenXR;12'],
+    Custom2: ['OpenXR;13'],
   });
   // A valide partout (Start, et « augmenter / valider » du menu de VPX) ; B et ≡ ouvrent le menu de VPX
   // et y reviennent en arrière ; B n'est plus le crédit ; aucune liaison n'aligne la table sur les manettes.
@@ -153,7 +158,8 @@ test('manettes : liaisons de VPX en partie, la même règle qu’au menu', () =>
   assert.deepEqual(users('OpenXR;10'), ['Start', 'UIRight']);
   assert.deepEqual(users('OpenXR;11'), ['Pause']);
   assert.deepEqual(users('OpenXR;2'), ['InGameUI']);
-  assert.deepEqual(users('OpenXR;12'), []);
+  assert.deepEqual(users('OpenXR;12'), ['Custom1']);
+  assert.deepEqual(users('OpenXR;13'), ['Custom2']);
 });
 
 // La section [Input] que VPX a écrite dans l'INI de la VR du PC de développement (10 novembre 2026).
@@ -201,7 +207,9 @@ test('manettes : l’INI d’une partie dans le casque, à partir des liaisons p
   assert.equal(get('Mapping.Pause'), 'Key;19 | OpenXR;11');
   assert.equal(get('Mapping.UIRight'), 'Key;229 | OpenXR;20;o;0.600000 | OpenXR;22;o;0.600000 | OpenXR;10');
   assert.equal(get('Mapping.UIDown'), 'Key;228 | OpenXR;21;x;-0.600000 | OpenXR;23;x;-0.600000');
-  assert.equal(get('Mapping.VRControllerCalibration'), '');
+  // Plus jamais le clic du joystick gauche : F13, que seul le plugin poste (calage en partie).
+  assert.equal(get('Mapping.VRControllerCalibration'), 'Key;104');
+  assert.equal(get('Mapping.LaunchBall'), 'Key;40 | OpenXR;9');
   // Touches du clavier et recentrage (5 du pavé) gardés ; lanceur et secousses déjà aux joysticks : pas en double.
   assert.equal(get('Mapping.VRCenter'), 'Key;93');
   assert.equal(get('PlungerSensorCount'), '1');

@@ -77,6 +77,14 @@ MSGPI_STRING_VAL_SETTING(libelleEcranFronton, "BackglassLabel", "Backglass label
 MSGPI_STRING_VAL_SETTING(libelleEcranDmd, "DmdLabel", "DMD label", "Name of the DMD screen", true, "DMD", 64);
 MSGPI_STRING_VAL_SETTING(aideChoixEcran, "AdjustChooseHelp", "Choose screen help", "Keys reminder while choosing the screen", true, "Stick: choose - A: adjust - B: back", 128);
 MSGPI_STRING_VAL_SETTING(aideReglage, "AdjustHelp", "Adjust help", "Keys reminder while adjusting", true, "Sticks: position - Grips: size - A: keep - B: back", 128);
+// Caler la borne en partie (12 novembre 2026) : VPX aligne sa table sur les manettes posées sur la barre avant
+// (VRControllerCalibration, lié par Cyber Pinball à F13), puis la hauteur est reprise par pas d'un centimètre
+// (VRUp, VRDown liés à F14, F15) : celle du calage du menu, la pose des manettes de VPX n'étant pas leur bout.
+MSGPI_STRING_VAL_SETTING(libelleCaler, "CalibrateLabel", "Calibrate label", "Pause choice that aligns the table on the real lockbar", true, "Calibrate", 64);
+MSGPI_STRING_VAL_SETTING(aideCaler, "CalibrateHelp", "Calibrate help", "Keys reminder while calibrating", true, "Controllers on the lockbar corners - Trigger: calibrate - A or B: resume", 128);
+MSGPI_STRING_VAL_SETTING(libelleCale, "CalibratedLabel", "Calibrated label", "Shown once the table was aligned", true, "Table aligned", 64);
+MSGPI_INT_VAL_SETTING(hauteurCalage, "CalibrateHeight", "Calibrate height steps", "Centimetres to move the table up (negative: down) after aligning it on the controllers", true, -60, 60, 0);
+MSGPI_INT_VAL_SETTING(calageActif, "Calibrate", "Calibrate", "1 when Cyber Pinball bound the keys of the calibration (F13, F14, F15)", true, 0, 1, 0);
 
 double maintenant()
 {
@@ -91,6 +99,19 @@ bool relacherSortie = false;
 // la notification de VPX, moins lisible mais présente.
 double derniereDemande = -1.0;
 bool notifiee = false;
+
+/**
+ * Calage en cours (gâchette à l'étape du calage) : l'alignement de VPX sur les manettes mis en marche (F13),
+ * laissé CALAGE_IMAGES images, arrêté (F13), puis la hauteur reprise d'un pas par image (F14 monte, F15 descend).
+ */
+struct CalageEnCours
+{
+   int etape = 0; // 0 rien, 1 à mettre en marche, 2 en marche, 3 hauteur
+   int images = 0;
+   int pas = 0;
+   int fait = 0;
+};
+CalageEnCours calageVpx;
 
 // --- Son des vidéos de PuP dans le casque ----------------------------------------------------
 //
@@ -1023,16 +1044,28 @@ std::vector<HWND> fenetresVpx()
  * Pause de VPX ([Input] Mapping.Pause = Key;19, P) postée à sa fenêtre. Second moyen : la même touche par
  * SendInput, seulement si VPX a le premier plan (jamais dans une autre application).
  */
+/** Une touche (code virtuel, code de balayage) postée à la fenêtre de VPX, enfoncée puis relâchée. */
+bool posterTouche(UINT vk, UINT scan)
+{
+   const std::vector<HWND> w = fenetresVpx();
+   if (w.empty())
+      return false;
+   PostMessageW(w.front(), WM_KEYDOWN, vk, 1 | (scan << 16));
+   PostMessageW(w.front(), WM_KEYUP, vk, 1 | (scan << 16) | (1u << 30) | (1u << 31));
+   return true;
+}
+
+/** Touches du calage, liées par Cyber Pinball (manettes.ts, VPX_CALIBRATION_KEYS) : F13, F14, F15. */
+constexpr UINT TOUCHE_ALIGNER = VK_F13, BALAYAGE_ALIGNER = 0x64;
+constexpr UINT TOUCHE_MONTER = VK_F14, BALAYAGE_MONTER = 0x65;
+constexpr UINT TOUCHE_DESCENDRE = VK_F15, BALAYAGE_DESCENDRE = 0x66;
+
 void reprendreVpx(int essai)
 {
    constexpr UINT P = 0x19; // code de balayage de P
    if (essai == 1)
    {
-      const std::vector<HWND> w = fenetresVpx();
-      if (w.empty())
-         return;
-      PostMessageW(w.front(), WM_KEYDOWN, 'P', 1 | (P << 16));
-      PostMessageW(w.front(), WM_KEYUP, 'P', 1 | (P << 16) | (1u << 30) | (1u << 31));
+      posterTouche('P', P);
       return;
    }
    DWORD pid = 0;
@@ -1225,10 +1258,60 @@ void appliquer(const Ordre& o)
       std::snprintf(ligne, sizeof(ligne), "reglage fronton=%.3f,%.3f,%.3f dmd=%.3f,%.3f,%.3f", a.dx, a.dy, a.taille, b.dx, b.dy, b.taille);
       ecrire(ligne);
    }
+   // La combinaison du calage tenue en jouant : la pause de VPX (la touche Pause, comme la reprise).
+   if (o.pause)
+   {
+      reprendreVpx(1);
+      ecrire("calage-combinaison pause");
+   }
+   if (o.caler && calageVpx.etape == 0)
+   {
+      if (calageActif_Val)
+         calageVpx = CalageEnCours { 1, 0, hauteurCalage_Val, 0 };
+      else
+         ecrire("calage-partie resultat=touches_non_liees");
+   }
    if (o.reprendre)
       reprendreVpx(o.reprendre);
    if (o.quitter)
       quitterPartie(o.quitter);
+}
+
+/** Le calage en cours, une étape par image (VPX lit le clavier entre deux images). */
+void avancerCalage()
+{
+   CalageEnCours& c = calageVpx;
+   switch (c.etape)
+   {
+   case 1:
+      c.etape = posterTouche(TOUCHE_ALIGNER, BALAYAGE_ALIGNER) ? 2 : 0;
+      if (!c.etape)
+         ecrire("calage-partie resultat=aucune_fenetre");
+      c.images = 0;
+      return;
+   case 2:
+      if (++c.images < CALAGE_IMAGES)
+         return;
+      posterTouche(TOUCHE_ALIGNER, BALAYAGE_ALIGNER);
+      c.etape = 3;
+      return;
+   case 3:
+      if (c.fait != c.pas)
+      {
+         const bool monter = c.pas > 0;
+         posterTouche(monter ? TOUCHE_MONTER : TOUCHE_DESCENDRE, monter ? BALAYAGE_MONTER : BALAYAGE_DESCENDRE);
+         c.fait += monter ? 1 : -1;
+         return;
+      }
+      {
+         char ligne[96];
+         std::snprintf(ligne, sizeof(ligne), "calage-partie n=%d hauteur=%d resultat=ok", pause.calagesFaits(), c.pas);
+         ecrire(ligne);
+      }
+      c.etape = 0;
+      return;
+   default: return;
+   }
 }
 
 void MSGPIAPI onAction(const unsigned int, void*, void* data)
@@ -1253,7 +1336,7 @@ void MSGPIAPI onAction(const unsigned int, void*, void* data)
    }
    if (pause.avaler(c))
       ev->enableVPXProcessing = 0;
-   appliquer(pause.action(c, ev->isPressed != 0, maintenant()));
+   appliquer(pause.action(c, ev->isPressed != 0, maintenant(), estGachette(static_cast<int>(ev->action))));
 }
 
 void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
@@ -1269,6 +1352,7 @@ void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
    const double t = maintenant();
    const double jeu = vpxApi->GetGameTime();
    appliquer(pause.image(t, jeu));
+   avancerCalage();
    pomper(t);
    mesurer(t, jeu);
    capturesDuJour(t);
@@ -1277,7 +1361,9 @@ void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
    else if (!notifiee && t - derniereDemande > 0.3)
    {
       notifiee = true;
-      const std::string message = pause.menuVisible() ? std::string(libellePause_Val) + " : " + libelleReprendre_Val + " / " + libelleQuitter_Val : std::string(libelleQuitter_Val) + " ...";
+      const std::string message = pause.menuVisible() ? std::string(libellePause_Val) + " : " + libelleReprendre_Val + " / " + libelleQuitter_Val
+         : pause.jaugeCalageVisible(t)                ? std::string(libelleCaler_Val) + " ..."
+                                                      : std::string(libelleQuitter_Val) + " ...";
       vpxApi->PushNotification(message.c_str(), 2500);
    }
 }
@@ -1285,6 +1371,7 @@ void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
 void MSGPIAPI onGameStart(const unsigned int, void*, void*)
 {
    pause.remiseAZero();
+   calageVpx = CalageEnCours {};
    if (!versionConnue())
       pause.passif();
    relacherSortie = false;
@@ -1353,7 +1440,7 @@ struct Image
 };
 
 VPXTexture blanc = nullptr;
-Image titre, reprendre, quitter, marque, rappel, ajuster, etapeAjuster, aideAjuster;
+Image titre, reprendre, quitter, marque, rappel, ajuster, etapeAjuster, aideAjuster, caler, aideCalage, cale;
 Image aide[3];
 int lignesAide = 0;
 
@@ -1377,6 +1464,9 @@ void preparerTout()
    preparer(reprendre, libelleReprendre_Val, 8);
    preparer(quitter, libelleQuitter_Val, 8);
    preparer(ajuster, libelleAjuster_Val, 8);
+   preparer(caler, libelleCaler_Val, 8);
+   preparer(aideCalage, aideCaler_Val, 6);
+   preparer(cale, libelleCale_Val, 6);
    {
       const Etape e = pause.etape();
       const std::string nom = pause.ecran() == Ecran::Dmd ? libelleEcranDmd_Val : libelleEcranFronton_Val;
@@ -1449,6 +1539,7 @@ constexpr float ENCRE[3] = { 0.85f, 0.9f, 0.9f };
 constexpr float TERNE[3] = { 0.3f, 0.36f, 0.37f };
 
 int dessinerAjustement(VPXRenderContext2D* ctx, double t);
+int dessinerCalage(VPXRenderContext2D* ctx, double t);
 
 int MSGPIAPI dessinerPause(VPXRenderContext2D* ctx, void*)
 {
@@ -1458,19 +1549,22 @@ int MSGPIAPI dessinerPause(VPXRenderContext2D* ctx, void*)
    const double t = maintenant();
    derniereDemande = t;
    mesures.frontons++;
-   const bool tenu = pause.jaugeVisible(t);
+   const bool tenu = pause.jaugeVisible(t), combo = !tenu && pause.jaugeCalageVisible(t);
    if (!pause.affichee(t))
       return dessinerCadre(ctx, t);
-   if (!tenu && pause.etape() != Etape::Menu)
+   if (!tenu && !combo && pause.etape() == Etape::Calage)
+      return dessinerCalage(ctx, t);
+   if (!tenu && !combo && pause.etape() != Etape::Menu)
       return dessinerAjustement(ctx, t);
    preparerTout();
    poser(ctx, FOND);
-   if (tenu)
+   if (tenu || combo)
    {
-      // Jauge : un cercle de 48 traits qui se remplit en vert ; « Quitter » au milieu.
+      // Jauge : un cercle de 48 traits qui se remplit en vert ; « Quitter » (Pause tenu) ou « Caler la borne »
+      // (les deux joysticks enfoncés) au milieu.
       const float cx = L / 2.f, cy = H / 2.f, rayon = 260.f;
       constexpr int N = 48;
-      const int pleins = static_cast<int>(std::floor(pause.jauge(t) * N + 1e-6));
+      const int pleins = static_cast<int>(std::floor((tenu ? pause.jauge(t) : pause.jaugeCalage(t)) * N + 1e-6));
       for (int i = 0; i < N; i++)
       {
          const float a = -1.5707963f + 6.2831853f * static_cast<float>(i) / N;
@@ -1478,22 +1572,21 @@ int MSGPIAPI dessinerPause(VPXRenderContext2D* ctx, void*)
          const float* c = i < pleins ? SIGNAL : TERNE;
          rectangle(ctx, cx + rayon * std::cos(a) - w / 2.f, cy + rayon * std::sin(a) - h / 2.f, w, h, c[0], c[1], c[2], 1.f, a * 57.29578f + 90.f);
       }
-      texte(ctx, quitter, cx, cy, 110.f, ENCRE[0], ENCRE[1], ENCRE[2]);
+      texte(ctx, tenu ? quitter : caler, cx, cy, tenu ? 110.f : 80.f, ENCRE[0], ENCRE[1], ENCRE[2]);
       return 1;
    }
-   // Menu : « Pause », les trois choix (le choisi en vert, encadré), puis le rappel des touches en gros.
-   texte(ctx, titre, L / 2.f, 90.f, 96.f, ENCRE[0], ENCRE[1], ENCRE[2]);
+   // Menu : « Pause », les quatre choix (le choisi en vert, encadré), puis le rappel des touches en gros.
+   texte(ctx, titre, L / 2.f, 80.f, 90.f, ENCRE[0], ENCRE[1], ENCRE[2]);
    const Choix ch = pause.choix();
-   const float ys[3] = { 235.f, 350.f, 465.f };
-   const Image* items[3] = { &reprendre, &ajuster, &quitter };
-   const Choix ordre[3] = { Choix::Reprendre, Choix::Ajuster, Choix::Quitter };
-   for (int i = 0; i < 3; i++)
+   const float ys[4] = { 200.f, 290.f, 380.f, 470.f };
+   const Image* items[4] = { &reprendre, &ajuster, &caler, &quitter };
+   for (int i = 0; i < 4; i++)
    {
-      const bool choisi = ch == ordre[i];
+      const bool choisi = ch == CHOIX[i];
       if (choisi)
-         rectangle(ctx, 120.f, ys[i] - 52.f, L - 240.f, 104.f, SIGNAL[0], SIGNAL[1], SIGNAL[2], 0.18f);
+         rectangle(ctx, 120.f, ys[i] - 42.f, L - 240.f, 84.f, SIGNAL[0], SIGNAL[1], SIGNAL[2], 0.18f);
       const float* c = choisi ? SIGNAL : TERNE;
-      texte(ctx, *items[i], L / 2.f, ys[i], 80.f, c[0], c[1], c[2]);
+      texte(ctx, *items[i], L / 2.f, ys[i], 66.f, c[0], c[1], c[2]);
    }
    if (pause.repriseEchouee())
       texte(ctx, rappel, L / 2.f, 600.f, 64.f, SIGNAL[0], SIGNAL[1], SIGNAL[2]);
@@ -1533,6 +1626,27 @@ int dessinerAjustement(VPXRenderContext2D* ctx, double t)
    rectangle(ctx, 0.f, 0.f, L, 175.f, FOND[0], FOND[1], FOND[2], 0.8f);
    texte(ctx, etapeAjuster, L / 2.f, 55.f, 64.f, SIGNAL[0], SIGNAL[1], SIGNAL[2]);
    texte(ctx, aideAjuster, L / 2.f, 130.f, 44.f, ENCRE[0], ENCRE[1], ENCRE[2]);
+   return 1;
+}
+
+/**
+ * « Caler la borne » (pause, ou les deux joysticks tenus 3 s) : le fronton reste, et en haut la consigne :
+ * manettes sur les coins de la barre avant, gâchette pour caler (la table vient dessus, autant de fois qu'on
+ * veut), A ou B pour reprendre. Après un calage : « Borne calée » en vert.
+ */
+int dessinerCalage(VPXRenderContext2D* ctx, double t)
+{
+   preparerTout();
+   if (!dessinerCadre(ctx, t))
+      poser(ctx, FOND);
+   ctx->srcWidth = ctx->outWidth;
+   ctx->srcHeight = ctx->outHeight;
+   const Rect zone = zoneVisible(ctx);
+   const Rect rr = cadrer(L, H, zone.l, zone.h, { 0.f, 0.f, L, H });
+   cible = { zone.x + rr.x, zone.y + rr.y, rr.l, rr.h };
+   rectangle(ctx, 0.f, 0.f, L, 230.f, FOND[0], FOND[1], FOND[2], 0.85f);
+   texte(ctx, pause.calagesFaits() > 0 && calageVpx.etape == 0 ? cale : caler, L / 2.f, 60.f, 70.f, SIGNAL[0], SIGNAL[1], SIGNAL[2]);
+   texte(ctx, aideCalage, L / 2.f, 160.f, 44.f, ENCRE[0], ENCRE[1], ENCRE[2]);
    return 1;
 }
 
@@ -1605,7 +1719,9 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballPluginLoad(const uint32_t sessionId, cons
    msgApi->RegisterSetting(endpointId, &salleRatio);
    for (auto* reglage : { &pupDmdRatio })
       msgApi->RegisterSetting(endpointId, reglage);
-   for (auto* reglage : { &reglagesEcrans, &idTable, &libelleAjuster, &libelleEcranFronton, &libelleEcranDmd, &aideChoixEcran, &aideReglage })
+   for (auto* reglage : { &reglagesEcrans, &idTable, &libelleAjuster, &libelleEcranFronton, &libelleEcranDmd, &aideChoixEcran, &aideReglage, &libelleCaler, &aideCaler, &libelleCale })
+      msgApi->RegisterSetting(endpointId, reglage);
+   for (auto* reglage : { &hauteurCalage, &calageActif })
       msgApi->RegisterSetting(endpointId, reglage);
    msgApi->BroadcastMsg(endpointId, getVpxApiId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_MSG_GET_API), &vpxApi);
    msgApi->SubscribeMsg(endpointId, onGameStartId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_GAME_START), onGameStart, nullptr);
@@ -1632,7 +1748,7 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballPluginUnload()
    msgApi->UnsubscribeMsg(getAuxRendererId, onGetAuxRenderer, nullptr);
    msgApi->BroadcastMsg(endpointId, auxChangedId, nullptr);
    if (vpxApi)
-      for (VPXTexture* t : { &blanc, &titre.tex, &reprendre.tex, &quitter.tex, &marque.tex, &rappel.tex, &ajuster.tex, &etapeAjuster.tex, &aideAjuster.tex, &aide[0].tex, &aide[1].tex, &aide[2].tex, &imageDuFronton.tex, &imageDuDmd.tex, &scores.tex })
+      for (VPXTexture* t : { &blanc, &titre.tex, &reprendre.tex, &quitter.tex, &marque.tex, &rappel.tex, &ajuster.tex, &etapeAjuster.tex, &aideAjuster.tex, &caler.tex, &aideCalage.tex, &cale.tex,&aide[0].tex, &aide[1].tex, &aide[2].tex, &imageDuFronton.tex, &imageDuDmd.tex, &scores.tex })
          if (*t)
          {
             vpxApi->DeleteTexture(*t);

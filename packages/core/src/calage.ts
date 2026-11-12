@@ -35,6 +35,22 @@ export interface CabinetPlace {
   room?: RoomBounds;
   /** Posée librement au bureau (pas de vraie borne devant le joueur), pas calée sur une vraie barre avant. */
   free?: boolean;
+  /** Pose des manettes de VPX (prise en main) par rapport à leur bout, mesurée au calage (gripOffset). */
+  grip?: GripOffset;
+}
+
+/**
+ * VPX s'aligne sur la pose « grip » des manettes (le milieu de la prise en main, XRInputHandler.h), le calage
+ * de Cyber Pinball sur leur bout (pose de visée) : mesurés ensemble au calage du menu, les deux poses donnent
+ * l'écart, d'où le calage en partie (VPX aligné sur les manettes) tombe sur la même barre avant. Mètres.
+ */
+export interface GripOffset {
+  /** Le milieu des prises au-dessus du milieu des bouts. */
+  up: number;
+  /** Le milieu des prises en arrière (vers le joueur) du milieu des bouts. */
+  back: number;
+  /** Écart des prises sur écart des bouts. */
+  widthRatio: number;
 }
 
 /** Ce qui est devant le joueur : une vraie borne (barre avant à toucher), ou un bureau (placement libre). */
@@ -187,7 +203,7 @@ export function anchorHeight(place: CabinetPlace): number {
  * tant que le menu n'est pas dans le casque ; sinon où en est le calage, comment le faire, et la
  * limite du Quest (sa pièce change avec sa limite et son sol).
  */
-export function calibrateMenuText(opts: { vrReady: boolean; headset?: HeadsetMenuState; place?: CabinetPlace; setting?: CalibrationSetting }): { detail: string; unavailable: boolean } {
+export function calibrateMenuText(opts: { vrReady: boolean; headset?: HeadsetMenuState; place?: CabinetPlace; setting?: CalibrationSetting; combo?: string }): { detail: string; unavailable: boolean } {
   if (!opts.vrReady) return { detail: t('Réalité virtuelle indisponible : rien à caler'), unavailable: true };
   if (opts.headset !== 'shown') return { detail: t('Mettez le casque, le menu de Cyber Pinball dedans : le calage se fait aux manettes'), unavailable: true };
   const p = opts.place;
@@ -203,7 +219,8 @@ export function calibrateMenuText(opts: { vrReady: boolean; headset?: HeadsetMen
       opts.setting === 'bureau'
         ? t('Au bureau : la borne se pose devant vous (A), ou sur deux points du bord du bureau touchés du bout de la manette. Dans le casque : ≡ de la manette gauche')
         : t('Touchez la vraie barre avant du bout de la manette, gâchette appuyée : coin gauche, coin droit, puis le milieu. Dans le casque : ≡ de la manette gauche'),
-      t('Le Quest garde ce calage tant que sa limite et son sol ne changent pas : après « Ajuster le sol » ou une nouvelle limite, recalez'),
+      ...(opts.combo ? [t('À tout moment, au menu comme en partie : {combo}', { combo: opts.combo })] : []),
+      t('Le Quest garde ce calage avec une limite de pièce ; en limite fixe, il déplace la pièce chaque fois que le casque est remis, et le calage revient d’office'),
     ].join(' · '),
     unavailable: false,
   };
@@ -403,6 +420,172 @@ export function gameHeadSummary(heads: readonly { x: number; z: number; yaw: num
 export function roomMismatchProblem(summary: GameHeadSummary | undefined): string | undefined {
   if (!summary || summary.samples < 3 || summary.turned < summary.samples * 0.6) return undefined;
   return t('À la dernière partie, vous jouiez dos à la borne calée : la table de VPX n’était pas sur elle (pièce différente pour VPX, par exemple après « Réinitialiser la vue » de Link). Recalez, puis relancez la partie.');
+}
+
+// --- Calage en partie (12 novembre 2026) --------------------------------------------------------
+//
+// Retirer le casque et le remettre déplace la pièce du Quest dès qu'il n'a pas de limite de pièce (limite fixe
+// ou désactivée : il recentre la pièce sur la tête au réveil, sans rien dire aux applications) ; Link ne donne
+// aucune ancre aux applications PC (XR_FB_spatial_entity absent). Le calage se refait donc d'un geste, au menu
+// comme en partie : en partie, le plugin met VPX en pause et lui fait aligner sa table sur les manettes posées
+// sur la barre avant (VRControllerCalibration, VRDevice::RenderFrame), avec les réglages qui font tomber ce calage
+// de VPX (sur les prises) exactement sur celui de Cyber Pinball (sur les bouts) : ControllerLockbarScale,
+// ControllerCabYOffset, que VPX relit à chaque image, et la hauteur reprise par pas d'un centimètre (VRUp, VRDown).
+
+/** L'écart entre les prises et les bouts des manettes, posées sur les coins de la barre avant. */
+export function gripOffset(tips: readonly [Point3, Point3], grips: readonly [Point3, Point3]): GripOffset | undefined {
+  const axis = sub(tips[1], tips[0]);
+  const flat = Math.hypot(axis.x, axis.z);
+  const width = length(axis);
+  if (flat < 0.1 || width < 0.1) return undefined;
+  const forward = { x: axis.z / flat, z: -axis.x / flat };
+  const tip = { x: (tips[0].x + tips[1].x) / 2, y: (tips[0].y + tips[1].y) / 2, z: (tips[0].z + tips[1].z) / 2 };
+  const grip = { x: (grips[0].x + grips[1].x) / 2, y: (grips[0].y + grips[1].y) / 2, z: (grips[0].z + grips[1].z) / 2 };
+  const d = sub(grip, tip);
+  const offset = { up: d.y, back: -(d.x * forward.x + d.z * forward.z), widthRatio: length(sub(grips[1], grips[0])) / width };
+  // Une prise à plus de 25 cm du bout, ou un écart sans rapport : pas les deux poses d'une même manette.
+  if (Math.abs(offset.up) > 0.25 || Math.abs(offset.back) > 0.25 || offset.widthRatio < 0.6 || offset.widthRatio > 1.6) return undefined;
+  return offset;
+}
+
+/** Ce que VPX 10.8.1 fait de deux points des manettes quand il aligne sa table dessus (VRDevice::RenderFrame). */
+export interface VpxCentering {
+  orientation: number;
+  tableX: number;
+  tableY: number;
+  tableZ: number;
+  lockbarWidth: number;
+  lockbarHeight: number;
+}
+
+export function vpxControllerCentering(left: Point3, right: Point3, tableWidthCm: number, lockbarScale = 1, cabYOffset = 0): VpxCentering {
+  const axis = sub(right, left);
+  const angle = Math.atan2(-axis.z, axis.x);
+  const lockbarWidth = length(axis) * 100 * lockbarScale;
+  const scale = Math.min(2, Math.max(0.1, lockbarWidth / tableWidthCm));
+  const center = { x: -((left.x + right.x) / 2) * 100, y: -((left.y + right.y) / 2) * 100, z: -((left.z + right.z) / 2) * 100 };
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return {
+    orientation: (angle * 180) / Math.PI,
+    tableX: center.x * c - center.z * s,
+    tableY: center.x * s + center.z * c + cabYOffset + LOCKBAR_TO_PLAYFIELD_CM * scale,
+    tableZ: 0,
+    lockbarWidth,
+    lockbarHeight: -center.y,
+  };
+}
+
+/** Les prises des manettes attendues quand leurs bouts touchent ces deux coins (l'écart mesuré au calage du menu). */
+export function expectedGrips(left: Point3, right: Point3, grip: GripOffset): [Point3, Point3] {
+  const axis = sub(right, left);
+  const flat = Math.hypot(axis.x, axis.z) || 1;
+  const forward = { x: axis.z / flat, z: -axis.x / flat };
+  const center = { x: (left.x + right.x) / 2, y: (left.y + right.y) / 2, z: (left.z + right.z) / 2 };
+  const g = { x: center.x - forward.x * grip.back, y: center.y + grip.up, z: center.z - forward.z * grip.back };
+  const half = { x: (axis.x / 2) * grip.widthRatio, y: (axis.y / 2) * grip.widthRatio, z: (axis.z / 2) * grip.widthRatio };
+  return [sub(g, half), { x: g.x + half.x, y: g.y + half.y, z: g.z + half.z }];
+}
+
+/** Réglages du calage en partie : VPX ([PlayerVR]) et le plugin ([Plugin.CyberPinball] CalibrateHeight, en cm). */
+export interface InGameCalibration {
+  lockbarScale: number;
+  cabYOffset: number;
+  heightSteps: number;
+  /** L'écart prises-bouts vient d'un calage du menu (sinon : les prises prises pour les bouts). */
+  measured: boolean;
+}
+
+/**
+ * Les réglages qui font tomber l'alignement de VPX sur les prises des manettes sur la place que Cyber Pinball
+ * donne à la table (placeVpxSettings) pour les mêmes bouts : largeur (ControllerLockbarScale), recul
+ * (ControllerCabYOffset, en cm) et hauteur (pas d'un centimètre, VPX met TableZ à 0). Les écarts ne dépendent
+ * pas de la place de la barre : calculés sur la barre calée, ils valent pour la barre touchée en partie.
+ */
+export function inGameCalibration(place: CabinetPlace, table?: VpxTableGeometry, menuWidthM?: number): InGameCalibration {
+  const grip = place.grip ?? { up: 0, back: 0, widthRatio: 1 };
+  const { left, right } = placeLockbar(place);
+  const desired = Object.fromEntries(placeVpxSettings(place, table, menuWidthM).map((s) => [s.key, Number(s.value)]));
+  const tableWidthCm = table ? table.widthCm + 2.25 * 2.54 : STANDARD_TABLE_WIDTH_CM;
+  const [gl, gr] = expectedGrips(left, right, grip);
+  const gripWidthCm = length(sub(gr, gl)) * 100;
+  const lockbarScale = Math.min(2, Math.max(0.5, desired.LockbarWidth! / gripWidthCm));
+  const sim = vpxControllerCentering(gl, gr, tableWidthCm, lockbarScale, 0);
+  const round = (v: number, d = 1000) => Math.round(v * d) / d;
+  return {
+    lockbarScale: round(lockbarScale),
+    cabYOffset: round(Math.min(50, Math.max(-150, desired.TableY! - sim.tableY))),
+    heightSteps: Math.max(-60, Math.min(60, Math.round(desired.TableZ! + desired.LockbarHeight! - sim.lockbarHeight))),
+    measured: Boolean(place.grip),
+  };
+}
+
+/** VPX a aligné sa table sur les manettes pendant la partie (« calage-partie » du plugin) : de quoi retrouver la barre. */
+export interface VpxSavedPlace {
+  orientation: number;
+  tableX: number;
+  tableY: number;
+}
+
+/**
+ * La barre avant touchée en partie, d'après la place que VPX réécrit en quittant ([PlayerVR] Orientation,
+ * TableX, TableY : VRDevice::SaveVRSettings) et les réglages du calage en partie : l'inverse de
+ * vpxControllerCentering, les prises ramenées aux bouts. La hauteur et la largeur restent celles du calage
+ * (le sol du Quest ne bouge pas quand il recentre la pièce : 1,01 à 1,04 m sur trois calages le 12 novembre).
+ */
+export function placeFromVpxCentering(saved: VpxSavedPlace, place: CabinetPlace, calibration: InGameCalibration, table?: VpxTableGeometry, menuWidthM?: number): CabinetPlace {
+  const grip = place.grip ?? { up: 0, back: 0, widthRatio: 1 };
+  const desired = Object.fromEntries(placeVpxSettings(place, table, menuWidthM).map((s) => [s.key, Number(s.value)]));
+  const tableWidthCm = table ? table.widthCm + 2.25 * 2.54 : STANDARD_TABLE_WIDTH_CM;
+  const scale = Math.min(2, Math.max(0.1, desired.LockbarWidth! / tableWidthCm));
+  const a = (saved.orientation * Math.PI) / 180;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  const y = saved.tableY - calibration.cabYOffset - LOCKBAR_TO_PLAYFIELD_CM * scale;
+  const dx = saved.tableX * c + y * s;
+  const dz = -saved.tableX * s + y * c;
+  const axis = { x: c, z: -s };
+  const forward = { x: axis.z, z: -axis.x };
+  const tip = { x: -dx / 100 + forward.x * grip.back, z: -dz / 100 + forward.z * grip.back };
+  const half = (place.lockbarWidth ?? DEFAULT_LOCKBAR_WIDTH_M) / 2;
+  const h = place.lockbarHeight ?? LOCKBAR_HEIGHT_M;
+  const next = lockbarPlace({ x: tip.x - axis.x * half, y: h, z: tip.z - axis.z * half }, { x: tip.x + axis.x * half, y: h, z: tip.z + axis.z * half });
+  return { ...place, x: next.x, z: next.z, yaw: next.yaw };
+}
+
+/** L'écart entre deux places de la borne : au sol (cm) et en cap (degrés). */
+export function placeGap(a: CabinetPlace, b: CabinetPlace): { cm: number; deg: number } {
+  const la = placeLockbar(a);
+  const lb = placeLockbar(b);
+  const ma = { x: (la.left.x + la.right.x) / 2, z: (la.left.z + la.right.z) / 2 };
+  const mb = { x: (lb.left.x + lb.right.x) / 2, z: (lb.left.z + lb.right.z) / 2 };
+  const deg = Math.abs(((((b.yaw - a.yaw) * 180) / Math.PI + 540) % 360) - 180);
+  return { cm: Math.hypot(mb.x - ma.x, mb.z - ma.z) * 100, deg };
+}
+
+/**
+ * L'écart dit par le runtime quand la pièce du Quest bouge pendant une session (« piece-changee pose x y z
+ * lacet » : l'origine nouvelle vue dans l'ancienne, XrEventDataReferenceSpaceChangePending) : au sol et en cap.
+ */
+export function roomChangeGap(line: string): { cm: number; deg: number } | undefined {
+  const m = /^piece-changee pose (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)/.exec(line);
+  if (!m) return undefined;
+  const deg = Math.abs((((Number(m[4]) * 180) / Math.PI + 540) % 360) - 180);
+  return { cm: Math.hypot(Number(m[1]), Number(m[3])) * 100, deg };
+}
+
+/**
+ * Le Quest garde-t-il sa pièce quand le casque est retiré puis remis ? Avec une limite de pièce (des bords lus,
+ * « piece L P »), oui ; en limite fixe ou sans limite (« piece aucune »), il la recentre sur la tête au réveil.
+ */
+export type RoomKeeping = 'kept' | 'recentred';
+
+/** Ce que dit l'écran du calage d'une pièce recentrée à chaque retour du casque, ou undefined. */
+export function roomKeepingAdvice(keeping: RoomKeeping | undefined, combo: string | undefined): string | undefined {
+  if (keeping !== 'recentred') return undefined;
+  return combo
+    ? t('Le Quest est en limite fixe : il déplace la pièce chaque fois que le casque est remis. Recalez d’un geste ({combo}), ou créez une limite de pièce dans le Quest.', { combo })
+    : t('Le Quest est en limite fixe : il déplace la pièce chaque fois que le casque est remis. Recalez, ou créez une limite de pièce dans le Quest.');
 }
 
 /** Changements de pièce reçus par VPX pendant la partie (vpinball.log) : « Réinitialiser la vue » fait en jeu. */

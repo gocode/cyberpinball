@@ -54,7 +54,7 @@ test('calage : les gâchettes placent la borne (deux coins d’un coup), A valid
   assert.match(frontend, /const both = points\.length >= 2 && !calibrationProblem\(points\[0\]!, points\[1\]!\);/);
   assert.match(frontend, /const \[left, right\] = orderCorners\(pair\[0\], pair\[1\], head \?\? fallback\);/);
   const cpp = read('packages', 'casque-vr', 'src', 'casque.cpp');
-  assert.match(cpp, /say\(std::string\("pointes "\) \+ \(hand \? "droite " : "gauche "\) \+ p3\(at\[0\]\.pose\.position\) \+ " " \+ p3\(at\[1\]\.pose\.position\) \+ tail\);/);
+  assert.match(cpp, /say\(std::string\("pointes "\) \+ \(hand \? "droite " : "gauche "\) \+ p3\(at\[0\]\.pose\.position\) \+ " " \+ p3\(at\[1\]\.pose\.position\) \+ tail \+ grips\);/);
   assert.match(cpp, /" tete " \+ std::to_string\(head\.pose\.position\.x\) \+ " " \+ std::to_string\(head\.pose\.position\.z\)/);
 });
 

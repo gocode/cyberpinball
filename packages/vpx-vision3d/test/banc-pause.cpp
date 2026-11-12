@@ -11,7 +11,7 @@ static int echecs = 0;
 #define VERIFIE(c) do { if (!(c)) { std::printf("ECHEC ligne %d : %s\n", __LINE__, #c); echecs++; } } while (0)
 
 // Numéros internes des actions dans VPX 10.8.1 (InputManager::CreateInputActions).
-enum : int { FLIPPER_G = 0, FLIPPER_D = 1, MAGNA_G = 4, MAGNA_D = 5, UI_HAUT = 6, UI_BAS = 7, LANCER = 10, CREDIT = 15, START = 19, PAUSE = 22, SORTIE = 24, MENU_VPX = 25 };
+enum : int { FLIPPER_G = 0, FLIPPER_D = 1, MAGNA_G = 4, MAGNA_D = 5, UI_HAUT = 6, UI_BAS = 7, UI_GAUCHE = 8, LANCER = 10, CREDIT = 15, START = 19, PAUSE = 22, SORTIE = 24, MENU_VPX = 25, VR_CENTRER = 40, VR_MANETTES = 47, CUSTOM1 = 52, CUSTOM2 = 53 };
 
 static Commande cmd(int id)
 {
@@ -28,7 +28,7 @@ static Ordre images(Pause& p, double de, double a, bool joue, double& jeu)
       if (joue)
          jeu += 1.0 / 90.0;
       const Ordre o = p.image(t, jeu);
-      if (o.quitter || o.reprendre)
+      if (o.quitter || o.reprendre || o.pause || o.caler)
          dernier = o;
    }
    return dernier;
@@ -62,23 +62,27 @@ int main(int argc, char** argv)
    VERIFIE(p.vpxEnPause() && p.menuVisible() && p.choix() == Choix::Reprendre && !p.jaugeVisible(1.4));
 
    // INVARIANT : menu ouvert, Pause, la sortie, le menu de VPX et l'inconnu passent toujours ; le reste est gardé.
-   for (int id = -1; id < 40; id++)
+   for (int id = -1; id < 60; id++)
    {
       const Commande c = cmd(id);
       const bool jamais = c == Commande::Pause || c == Commande::Sortie || c == Commande::Interface || c == Commande::Inconnue;
       VERIFIE(p.avaler(c) == !jamais);
    }
 
-   // Trois choix : Reprendre, Ajuster les écrans, Quitter ; joystick, flippers et poignées pour aller de l'un à l'autre.
+   // Quatre choix : Reprendre, Ajuster les écrans, Caler la borne, Quitter ; joystick, flippers et poignées pour aller de l'un à l'autre.
    p.action(cmd(UI_BAS), true, 1.5);
    VERIFIE(p.choix() == Choix::Ajuster);
+   p.action(cmd(UI_BAS), true, 1.52);
+   VERIFIE(p.choix() == Choix::Caler);
    p.action(cmd(UI_BAS), true, 1.55);
    VERIFIE(p.choix() == Choix::Quitter);
    p.action(cmd(UI_BAS), true, 1.56);
    VERIFIE(p.choix() == Choix::Quitter);
    p.action(cmd(UI_HAUT), true, 1.6);
-   VERIFIE(p.choix() == Choix::Ajuster);
+   VERIFIE(p.choix() == Choix::Caler);
    p.action(cmd(FLIPPER_G), true, 1.7);
+   VERIFIE(p.choix() == Choix::Ajuster);
+   p.action(cmd(FLIPPER_G), true, 1.72);
    VERIFIE(p.choix() == Choix::Reprendre);
    p.action(cmd(FLIPPER_D), true, 1.75);
    p.action(cmd(MAGNA_G), true, 1.8);
@@ -99,6 +103,7 @@ int main(int argc, char** argv)
    images(p, 3.6, 4.0, false, jeu);
    VERIFIE(p.menuVisible());
    p.action(cmd(UI_BAS), true, 4.1);
+   p.action(cmd(UI_BAS), true, 4.12);
    p.action(cmd(UI_BAS), true, 4.15);
    o = p.action(cmd(START), true, 4.2);
    VERIFIE(o.quitter == 1 && p.quitteDemande() && !p.menuVisible());
@@ -291,6 +296,97 @@ int main(int argc, char** argv)
       // Hors du menu, le crédit (B) reste un crédit.
       Pause v;
       VERIFIE(!v.avaler(cmd(CREDIT)));
+   }
+   // Caler la borne en partie : les deux joysticks enfoncés ensemble (Custom1, Custom2), tenus CALAGE_HOLD_S (3 s).
+   {
+      constexpr double H = CALAGE_HOLD_S;
+      static_assert(H == 3.0, "3 s : demande du joueur, 12 novembre 2026");
+      // Les porteurs : les numéros 52 et 53 de VPX 10.8.1, toujours avalés (rien pour la table) ; VRCenter et
+      // l'alignement de VPX sur les manettes ne sont jamais pris pour les leurs.
+      VERIFIE(cmd(CUSTOM1) == Commande::CalageG && cmd(CUSTOM2) == Commande::CalageD);
+      VERIFIE(cmd(VR_CENTRER) == Commande::Inconnue && cmd(VR_MANETTES) == Commande::Inconnue && cmd(54) == Commande::Inconnue);
+      VERIFIE(estGachette(FLIPPER_G) && estGachette(3) && !estGachette(UI_GAUCHE) && !estGachette(-1));
+      Pause c;
+      double j = 0.0;
+      images(c, 0.0, 1.0, true, j);
+      VERIFIE(c.avaler(cmd(CUSTOM1)) && c.avaler(cmd(CUSTOM2)) && !c.avaler(cmd(LANCER)));
+      // Un seul joystick enfoncé, même longtemps : rien.
+      c.action(cmd(CUSTOM1), true, 1.0);
+      Ordre rc = images(c, 1.0, 3.0, true, j);
+      VERIFIE(!rc.pause && !c.jaugeCalageVisible(3.0) && !c.affichee(3.0));
+      // Les deux, appui court (lâché à 2 s, avant les 3 s) : la jauge paraît, se remplit, puis s'efface ; la partie continue.
+      c.action(cmd(CUSTOM2), true, 3.0);
+      VERIFIE(!c.jaugeCalageVisible(3.1) && c.jaugeCalageVisible(3.3) && c.affichee(3.3));
+      VERIFIE(c.jaugeCalage(3.0 + H / 2) > 0.49 && c.jaugeCalage(3.0 + H / 2) < 0.51);
+      rc = images(c, 3.0, 5.0, true, j);
+      VERIFIE(!rc.pause);
+      c.action(cmd(CUSTOM2), false, 5.0);
+      rc = images(c, 5.0, 7.0, true, j);
+      VERIFIE(!rc.pause && !c.vpxEnPause() && !c.menuVisible() && !c.affichee(7.0));
+      // Tenus 3 s en jouant : la pause demandée une fois, puis le calage dès que VPX s'arrête.
+      c.action(cmd(CUSTOM2), true, 8.0);
+      rc = images(c, 8.0, 8.0 + H - 0.1, true, j);
+      VERIFIE(!rc.pause);
+      rc = images(c, 8.0 + H - 0.1, 8.0 + H + 0.1, true, j);
+      VERIFIE(rc.pause && !rc.caler);
+      rc = images(c, 8.0 + H + 0.1, 12.0, false, j);
+      VERIFIE(!rc.pause && c.vpxEnPause() && c.menuVisible() && c.etape() == Etape::Calage);
+      c.action(cmd(CUSTOM1), false, 12.0);
+      c.action(cmd(CUSTOM2), false, 12.0);
+      // Étape du calage : le joystick ne cale pas, la gâchette si (autant de fois qu'on veut) ; flippers avalés.
+      VERIFIE(c.avaler(cmd(FLIPPER_G)) && c.avaler(cmd(START)) && !c.avaler(cmd(PAUSE)));
+      rc = c.action(cmd(UI_GAUCHE), true, 12.1);
+      VERIFIE(!rc.caler && c.calagesFaits() == 0);
+      rc = c.action(cmd(FLIPPER_G), true, 12.2, estGachette(FLIPPER_G));
+      VERIFIE(rc.caler && c.calagesFaits() == 1);
+      rc = c.action(cmd(FLIPPER_D), true, 12.5, estGachette(FLIPPER_D));
+      VERIFIE(rc.caler && c.calagesFaits() == 2 && c.etape() == Etape::Calage);
+      // A : la partie reprend (premier moyen), le calage reste.
+      rc = c.action(cmd(START), true, 12.7);
+      VERIFIE(rc.reprendre == 1 && !rc.caler);
+      images(c, 12.7, 13.5, true, j);
+      VERIFIE(!c.menuVisible() && !c.vpxEnPause());
+      // Depuis le menu de la pause : « Caler la borne » (troisième choix), sans combinaison.
+      images(c, 13.5, 14.0, false, j);
+      VERIFIE(c.menuVisible() && c.etape() == Etape::Menu);
+      c.action(cmd(UI_BAS), true, 14.1);
+      c.action(cmd(UI_BAS), true, 14.2);
+      VERIFIE(c.choix() == Choix::Caler);
+      c.action(cmd(START), true, 14.3);
+      VERIFIE(c.etape() == Etape::Calage && c.calagesFaits() == 0);
+      // La combinaison tenue pendant la pause : le calage directement, sans redemander la pause.
+      Pause d;
+      double k = 0.0;
+      images(d, 0.0, 1.0, true, k);
+      images(d, 1.0, 1.4, false, k);
+      d.action(cmd(CUSTOM1), true, 1.4);
+      d.action(cmd(CUSTOM2), true, 1.4);
+      rc = images(d, 1.4, 1.4 + H - 0.2, false, k);
+      VERIFIE(d.etape() == Etape::Menu);
+      rc = images(d, 1.4 + H - 0.2, 1.4 + H + 0.2, false, k);
+      VERIFIE(!rc.pause && d.etape() == Etape::Calage);
+      // Mode passif (actions inattendues) : la combinaison ne fait rien.
+      Pause e;
+      double m = 0.0;
+      e.passif();
+      images(e, 0.0, 1.0, true, m);
+      e.action(cmd(CUSTOM1), true, 1.0);
+      e.action(cmd(CUSTOM2), true, 1.0);
+      rc = images(e, 1.0, 1.0 + H + 1.0, true, m);
+      VERIFIE(!rc.pause && !e.avaler(cmd(CUSTOM1)) && !e.jaugeCalageVisible(2.0));
+      // Pause demandée qui ne vient jamais : oubliée, pas de calage surgi à la pause suivante.
+      Pause f;
+      double n = 0.0;
+      images(f, 0.0, 1.0, true, n);
+      f.action(cmd(CUSTOM1), true, 1.0);
+      f.action(cmd(CUSTOM2), true, 1.0);
+      rc = images(f, 1.0, 1.0 + H + 0.1, true, n);
+      VERIFIE(rc.pause);
+      f.action(cmd(CUSTOM1), false, 1.0 + H + 0.1);
+      f.action(cmd(CUSTOM2), false, 1.0 + H + 0.1);
+      images(f, 1.0 + H + 0.1, 1.0 + H + 3.0, true, n);
+      images(f, 1.0 + H + 3.0, 1.0 + H + 3.5, false, n);
+      VERIFIE(f.menuVisible() && f.etape() == Etape::Menu);
    }
    std::printf(echecs ? "banc de la pause : %d echec(s)\n" : "banc de la pause : tout va bien\n", echecs);
    return echecs ? 1 : 0;

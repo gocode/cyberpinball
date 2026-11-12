@@ -1135,6 +1135,13 @@ int main(int argc, char** argv)
    const char* aimBindings[2] = { "/user/hand/left/input/aim/pose", "/user/hand/right/input/aim/pose" };
    XrAction aimActions[2] = { XR_NULL_HANDLE, XR_NULL_HANDLE };
    XrSpace aimSpaces[2] = { XR_NULL_HANDLE, XR_NULL_HANDLE };
+   // Prise en main de chaque manette (pose « grip ») : celle sur laquelle VPX aligne sa table. Relevée au calage
+   // avec le bout, elle donne l'écart d'où le calage fait en partie par VPX tombe sur la même barre avant.
+   const char* gripNames[2] = { "prise-gauche", "prise-droite" };
+   const char* gripBindings[2] = { "/user/hand/left/input/grip/pose", "/user/hand/right/input/grip/pose" };
+   XrAction gripActions[2] = { XR_NULL_HANDLE, XR_NULL_HANDLE };
+   XrSpace gripSpaces[2] = { XR_NULL_HANDLE, XR_NULL_HANDLE };
+   int aimsBound = 0;
    XrActionSet actionSet = XR_NULL_HANDLE;
    bool controllers = false;
    {
@@ -1152,7 +1159,15 @@ int main(int argc, char** argv)
             strcpy_s(aci.localizedActionName, h ? "Visée droite" : "Visée gauche");
             XrPath path = XR_NULL_PATH;
             if (XR_SUCCEEDED(xrCreateAction_(actionSet, &aci, &aimActions[h])) && XR_SUCCEEDED(xrStringToPath_(instance, aimBindings[h], &path)))
+            {
                suggested.push_back({ aimActions[h], path });
+               aimsBound++;
+            }
+            strcpy_s(aci.actionName, gripNames[h]);
+            strcpy_s(aci.localizedActionName, h ? "Prise droite" : "Prise gauche");
+            path = XR_NULL_PATH;
+            if (XR_SUCCEEDED(xrCreateAction_(actionSet, &aci, &gripActions[h])) && XR_SUCCEEDED(xrStringToPath_(instance, gripBindings[h], &path)))
+               suggested.push_back({ gripActions[h], path });
          }
          for (Element& e : elements)
          {
@@ -1205,13 +1220,18 @@ int main(int argc, char** argv)
          XrSessionActionSetsAttachInfo attach { XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO };
          attach.countActionSets = 1;
          attach.actionSets = &actionSet;
-         controllers = suggested.size() == 2 && anyProfile && XR_SUCCEEDED(xrAttachSessionActionSets_(session, &attach));
+         controllers = aimsBound == 2 && anyProfile && XR_SUCCEEDED(xrAttachSessionActionSets_(session, &attach));
          for (int h = 0; controllers && h < 2; h++)
          {
             XrActionSpaceCreateInfo aimSpaceInfo { XR_TYPE_ACTION_SPACE_CREATE_INFO };
             aimSpaceInfo.action = aimActions[h];
             aimSpaceInfo.poseInActionSpace = { { 0, 0, 0, 1 }, { 0, 0, 0 } };
             xrCreateActionSpace_(session, &aimSpaceInfo, &aimSpaces[h]);
+            if (gripActions[h] != XR_NULL_HANDLE)
+            {
+               aimSpaceInfo.action = gripActions[h];
+               xrCreateActionSpace_(session, &aimSpaceInfo, &gripSpaces[h]);
+            }
          }
       }
       if (!controllers)
@@ -1438,6 +1458,10 @@ int main(int argc, char** argv)
       XrExtent2Df bounds {};
       if (XR_SUCCEEDED(xrGetReferenceSpaceBoundsRect_(session, XR_REFERENCE_SPACE_TYPE_STAGE, &bounds)) && bounds.width > 0 && bounds.height > 0)
          say("piece " + std::to_string(bounds.width) + " " + std::to_string(bounds.height));
+      else
+         // Limite fixe ou désactivée (12 novembre 2026, « Stationary boundary » au journal de Link) : le Quest
+         // recentre la pièce sur la tête chaque fois que le casque est remis, sans événement pour les applications.
+         say("piece aucune");
    }
 
    // Surfaces rendues hors écran par Cyber Pinball : les textures d'Electron ouvertes (par ressource),
@@ -1813,8 +1837,15 @@ int main(int argc, char** argv)
                      const bool headOk = XR_SUCCEEDED(xrLocateSpace_(view, base, fs.predictedDisplayTime, &head)) && (head.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT);
                      const auto p3 = [](const XrVector3f& v) { return std::to_string(v.x) + " " + std::to_string(v.y) + " " + std::to_string(v.z); };
                      const std::string tail = (headOk ? " tete " + std::to_string(head.pose.position.x) + " " + std::to_string(head.pose.position.z) : std::string()) + (stage ? "" : " sans-piece");
+                     // Les prises au même instant (« prises g d ») : seulement si les deux sont suivies.
+                     XrSpaceLocation gr[2] { { XR_TYPE_SPACE_LOCATION }, { XR_TYPE_SPACE_LOCATION } };
+                     bool gripOk = true;
+                     for (int h = 0; h < 2; h++)
+                        gripOk = gripOk && gripSpaces[h] != XR_NULL_HANDLE && XR_SUCCEEDED(xrLocateSpace_(gripSpaces[h], base, fs.predictedDisplayTime, &gr[h]))
+                           && (gr[h].locationFlags & XR_SPACE_LOCATION_POSITION_TRACKED_BIT);
+                     const std::string grips = gripOk ? " prises " + p3(gr[0].pose.position) + " " + p3(gr[1].pose.position) : std::string();
                      if (ok[0] && ok[1])
-                        say(std::string("pointes ") + (hand ? "droite " : "gauche ") + p3(at[0].pose.position) + " " + p3(at[1].pose.position) + tail);
+                        say(std::string("pointes ") + (hand ? "droite " : "gauche ") + p3(at[0].pose.position) + " " + p3(at[1].pose.position) + tail + grips);
                      else if (ok[hand])
                         say(std::string("pointe ") + (hand ? "droite " : "gauche ") + p3(at[hand].pose.position) + tail);
                   }

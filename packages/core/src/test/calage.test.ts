@@ -71,7 +71,7 @@ test('entrée « Caler la borne » : grisée avec sa raison hors du casque ; sin
   assert.match(calibrateMenuText({ vrReady: true, headset: 'waiting' }).detail, /Mettez le casque/);
   const fresh = calibrateMenuText({ vrReady: true, headset: 'shown' });
   assert.equal(fresh.unavailable, false);
-  assert.match(fresh.detail, /^Pas encore calée · .*coin gauche, coin droit, puis le milieu.*≡ de la manette gauche · .*limite et son sol/);
+  assert.match(fresh.detail, /^Pas encore calée · .*coin gauche, coin droit, puis le milieu.*≡ de la manette gauche · .*limite de pièce ; en limite fixe, il déplace la pièce chaque fois que le casque est remis/);
   assert.match(calibrateMenuText({ vrReady: true, headset: 'shown', place: { x: 0, z: 0, yaw: 0, lockbarWidth: 0.7, lockbarHeight: 0.86 } }).detail, /^Calée : barre avant de 70 cm, à 86 cm du sol/);
 });
 

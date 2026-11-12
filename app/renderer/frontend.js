@@ -1673,6 +1673,20 @@ function renderGame(s) {
 }
 
 /**
+ * Appui tenu dans le casque (les deux joysticks : caler la borne) : un anneau qui se remplit en vert, le libellé
+ * au milieu. L'animation part du temps déjà écoulé : un nouvel envoi de l'état ne la fait pas repartir de zéro.
+ */
+function headsetHoldRing(hold) {
+  const card = el('section', 'headset-hold');
+  // L'anneau est un dégradé conique masqué en couronne (frontend.css) : la part remplie suit --hold, de 0 à 1.
+  const ring = el('div', 'headset-hold-ring');
+  ring.style.animationDuration = `${hold.durationMs}ms`;
+  ring.style.animationDelay = `-${Math.max(0, Math.min(hold.durationMs, Date.now() - hold.since))}ms`;
+  card.append(ring, el('p', 'headset-hold-label', hold.label));
+  return card;
+}
+
+/**
  * Partie dans le casque, casque pas sur la tête : la consigne en grand, sur le playfield et le fronton de la
  * borne, du Start à la fin de la partie (VPX attend le casque pour démarrer la table).
  */
@@ -1932,6 +1946,13 @@ window.cyber.onState((s) => {
       background.show(undefined);
     }
     root.replaceChildren(vrWearCard(s.vrWear));
+    return;
+  }
+  // Les deux joysticks enfoncés ensemble (caler la borne) : une jauge circulaire au milieu du regard, qui se
+  // remplit en 3 s ; lâchés avant, elle s'efface (frontend.ts, calibrationComboButton).
+  if (role === 'backglass' && s.headsetHold) {
+    zoneLayer.classList.add('off');
+    root.replaceChildren(headsetHoldRing(s.headsetHold));
     return;
   }
   const prompt = s.phase === 'message' ? s.message?.prompt : undefined;

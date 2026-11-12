@@ -18,8 +18,9 @@ test('invariant : toute source passe par « remplir » et sa couverture est mesu
   // Rendus annexes (PuP, B2S, ScoreView) : le cadre intermédiaire ; images de secours : dessinerImage ; les deux remplissent.
   assert.match(cpp, /const Rect r = remplir\(cadre\.dedans\.srcWidth, cadre\.dedans\.srcHeight, cadre\.zone\.l, cadre\.zone\.h, \{ x, y, l, h \}, cadre\.reglage\);\s*cadre\.couvert = englober\(cadre\.couvert, r\);/);
   assert.match(cpp, /const Rect r = remplir\(img\.l, img\.h, cible\.l, cible\.h, \{ 0\.f, 0\.f, img\.l, img\.h \}, g\);/);
-  // Cadrage « contenu seulement » : le repère de la pause, et le DMD des scores (jamais rogné) ; toute autre source remplit.
-  assert.equal(cpp.match(/cadrer\(/g)?.length, 3);
+  // Cadrage « contenu seulement » : le repère de la pause (menu, ajustement des écrans, calage de la borne), et le
+  // DMD des scores (jamais rogné) ; toute autre source remplit.
+  assert.equal(cpp.match(/cadrer\(/g)?.length, 4);
   assert.match(cpp, /cadrer\(L, H, zone\.l, zone\.h/);
   // Les trois cadres mesurés : fronton, bande DMD, cadre DMD de la pièce VR.
   assert.match(cpp, /rendre\(ctx, chaineFronton, fronton, t, pause\.reglage\(Ecran::Fronton\), &rf\)/);
