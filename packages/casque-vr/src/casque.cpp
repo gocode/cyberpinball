@@ -1504,11 +1504,17 @@ int main(int argc, char** argv)
                say("releve VPX a pris le casque, veille");
                handover = false;
                standby = true;
+               // Le décor est celui du menu seulement : rien de lui ne reste pendant la partie (mémoire de la carte rendue).
+               std::string none;
+               if (decorReady && !decorRenderer.empty())
+                  decorRenderer.load("", none);
             }
             if (standby && state == XR_SESSION_STATE_FOCUSED)
             {
                standby = false;
                say("reprise");
+               // De retour au menu : le décor revient.
+               decorChanged = true;
             }
             if (state == XR_SESSION_STATE_READY)
             {

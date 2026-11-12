@@ -38,14 +38,21 @@ export interface VrSourceFacts {
 
 export interface VrSources {
   backglass?: BackglassSource;
+  /** Le DMD des scores, sinon ce qui remplit l'emplacement du DMD (full DMD de PuP, image). */
   dmd?: DmdSource;
+  /** Le full DMD, la grande zone de fond sous le fronton : écran 5 (ou 1) du PuP-Pack. */
+  fullDmd?: 'PuP-Pack';
 }
 
-/** Le DMD que pilote le script : PinMAME (ROM), FlexDMD, UltraDMD ; undefined sans aucun. */
+/**
+ * Le DMD des scores que pilote le script : PinMAME (ROM), FlexDMD, UltraDMD ; undefined sans aucun. Une ROM se
+ * reconnaît à VPinMAME.Controller ou LoadVPM, jamais à cGameName seul : les tables originales le gardent pour
+ * leur .directb2s (2001, 12 novembre 2026 : prise pour une ROM, ses scores d'UltraDMD comptés comme PinMAME).
+ */
 export function scriptDmd(script: string | undefined): 'PinMAME' | 'FlexDMD' | 'UltraDMD' | undefined {
   if (!script) return undefined;
   const code = script.replace(/'.*$/gm, '');
-  if (/VPinMAME\.Controller|\bLoadVPM\b|\bcGameName\s*=/i.test(code)) return 'PinMAME';
+  if (/VPinMAME\.Controller|\bLoadVPM\b/i.test(code)) return 'PinMAME';
   if (/FlexDMD/i.test(code)) return 'FlexDMD';
   if (/UltraDMD/i.test(code)) return 'UltraDMD';
   return undefined;
@@ -61,7 +68,7 @@ export function vrSources(f: VrSourceFacts): VrSources {
   }
   const backglass: BackglassSource | undefined = f.pupPack ? 'PuP-Pack' : f.directb2s ? 'directb2s' : f.backglassImage ? 'image' : undefined;
   const dmd: DmdSource | undefined = scriptDmd(f.script) ?? (f.pupPack ? 'PuP-Pack' : f.dmdImage ? 'image' : undefined);
-  return { ...(backglass ? { backglass } : {}), ...(dmd ? { dmd } : {}) };
+  return { ...(backglass ? { backglass } : {}), ...(dmd ? { dmd } : {}), ...(f.pupDmd ? { fullDmd: 'PuP-Pack' as const } : {}) };
 }
 
 /**

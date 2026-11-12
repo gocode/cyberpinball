@@ -26,6 +26,8 @@ test('sources du fronton et du DMD : la première de chaque chaîne, les quatre 
   assert.deepEqual(missingVrSources(vrSources(facts)), ['fronton', 'DMD']);
   assert.deepEqual(missingVrSources(vrSources({ ...facts, dmdImage: true })), ['fronton']);
   assert.equal(scriptDmd("' Controller : VPinMAME.Controller\nSub Init : End Sub"), undefined, 'un commentaire ne compte pas');
+  // 2001 (table originale) : cGameName pour son .directb2s, B2S.Server, scores d'UltraDMD : pas une ROM.
+  assert.equal(scriptDmd('Const cGameName = "HAL9000"\nSet Controller = CreateObject("B2S.Server")\nIf UltraMode = 1 And IsObject(UltraDMD) Then'), 'UltraDMD');
   assert.equal(isVrImage('a.png') && isVrImage('b.JPG') && !isVrImage('c.mp4'), true);
   assert.equal(VR_DMD_BAND, 0.25);
 });
@@ -44,13 +46,13 @@ test('mode bureau en VR : la visibilité réglée par le script selon ShowDT est
 
 test('plugin : bande DMD sous le fronton seulement quand une source y dessine, images de secours, jamais de cadre vide', () => {
   const cpp = read('packages', 'vpx-vision3d', 'src', 'cyberpinball.cpp');
-  assert.match(cpp, /if \(bande && \(dmdVu \|\| imageDmd\)\)/);
+  assert.match(cpp, /if \(bande && \(dmdVu \|\| imageDmd \|\| scores\.ok\)\)/);
   assert.match(cpp, /dmdVu = !rendre\(nullptr, chaineDmd,/);
   assert.match(cpp, /if \(f\.empty\(\) && charger\(imageDuFronton, imageFronton_Val\)\)/);
   assert.match(cpp, /Chaine chaineDmd \{ VPXWINDOW_ScoreView \};/);
   const frontend = read('app', 'src', 'frontend.ts');
   assert.match(frontend, /key: 'DmdBand', value: vr\.addBackglass \? String\(VR_DMD_BAND\) : '0'/);
-  assert.match(frontend, /key: 'DmdOrder', value: 'PUP,ScoreView,B2S'/);
+  assert.match(frontend, /key: 'DmdOrder', value: 'PUP,B2S'/);
   assert.match(frontend, /VR : pas de source \$\{missing\.join\(' ni de '\)\} pour cette table/);
 });
 
@@ -121,4 +123,27 @@ test('plugin : source d’affichage du cadre DMD de la pièce VR, PuP seul puis 
   assert.match(frontend, /key: 'RoomDmd', value: sources\.roomDmd/);
   assert.match(frontend, /table\(s\) au cadre DMD de pièce VR rempli par Cyber Pinball/);
   assert.equal(parseVrMeasures(['salle source=PUP', 'salle dmd=aucune', 'salle dmd=PUP', ''].join('\n'))?.roomDmd, 'PUP');
+});
+
+test('trois emplacements : fronton, full DMD, et les scores par-dessus, jamais cachés (2001, Terminator 2, Back to the Future)', () => {
+  const cpp = read('packages', 'vpx-vision3d', 'src', 'cyberpinball.cpp');
+  // Le full DMD (PuP, image DMD du .directb2s) est une chaîne ; le ScoreView de VPX n'y est plus : les scores sont dessinés par le plugin.
+  assert.match(cpp, /MSGPI_STRING_VAL_SETTING\(ordreDmd, "DmdOrder"[^\n]*"PUP,B2S", 256\);/);
+  // Les scores par-dessus le full DMD (sauf l'image DMD de B2S, qui les porte), ou seuls dans la bande.
+  assert.match(cpp, /if \(d != "B2S"\)\s*\{[\s\S]{0,400}dessinerScores\(ctx, dans,/);
+  // La source des scores : la plus grande source d'affichage d'un autre plugin (jamais celle du DMD de la pièce).
+  assert.match(cpp, /if \(d\.id\.endpointId == endpointId \|\| !d\.GetRenderFrame/);
+  // Le DMD des scores entier, jamais rogné.
+  assert.match(cpp, /Rect p = cadrer\(static_cast<float>\(scores\.l\), static_cast<float>\(scores\.h\), r\.l, r\.h,/);
+  // Pièce VR : le full DMD de PuP, puis les scores par-dessus.
+  assert.match(cpp, /const Rect fait = dessinerScores\(&c, dans,/);
+  // Ce que le plugin dessine est capturé (fronton et DMD de la pièce), pour vérifier les places sans casque.
+  assert.match(cpp, /capturerComposition\("debut"\);/);
+  assert.match(cpp, /"sources fronton=" \+[\s\S]{0,200}" scores="/);
+  // Jamais de DMD incrusté dans le fronton en VR : il a sa bande.
+  const frontend = read('app', 'src', 'frontend.ts');
+  assert.match(frontend, /key: 'BackglassDMDOverlay', value: '0'/);
+  assert.match(frontend, /key: 'ScoreViewDMDOverlay', value: '1'/);
+  // 2001 : full DMD de PuP et scores d'UltraDMD, les deux dits.
+  assert.deepEqual(vrSources({ ...facts, pupPack: true, pupDmd: true, script: 'IsObject(UltraDMD)' }), { backglass: 'PuP-Pack', dmd: 'UltraDMD', fullDmd: 'PuP-Pack' });
 });

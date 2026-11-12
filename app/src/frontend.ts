@@ -3460,7 +3460,7 @@ function noteVrMeasures(late = false): void {
       `Casque, mesures de VPX${when} (${m.samples} relevé(s) de 5 s) : VPX ${f(m.vpx.mean)} images/s (de ${f(m.vpx.min)} à ${f(m.vpx.max)}), plus grand écart entre deux images ${Math.round(m.worstGapMs)} ms ; fronton dessiné ${f(m.backglass)} fois/s ; vidéo de PuP la plus active ${f(m.video.mean)} nouvelles images/s (de ${f(m.video.min)} à ${f(m.video.max)}) ; temps de jeu ${f(m.gameTime, 2)} s par seconde.`, // i18n-ignore : journal
     );
   if (m.roomDmd) console.log(`Casque, cadre DMD de la pièce VR${when} : ${m.roomDmd === 'aucune' ? 'rien de dessiné (VR : pas de source DMD pour cette table)' : m.roomDmd === 'PUP' ? 'écran DMD de PuP' : 'image du DMD de Cyber Pinball'}.`); // i18n-ignore : journal
-  if (m.drawn) console.log(`Casque, sources dessinées${when} : fronton ${m.drawn.backglass === 'aucune' ? 'aucune (fond de Cyber Pinball)' : m.drawn.backglass}, DMD ${m.drawn.dmd === 'sans_bande' ? 'celui de la pièce VR de la table' : m.drawn.dmd}.`); // i18n-ignore : journal
+  if (m.drawn) console.log(`Casque, sources dessinées${when} : fronton ${m.drawn.backglass === 'aucune' ? 'aucune (fond de Cyber Pinball)' : m.drawn.backglass}, bande du DMD ${m.drawn.dmd === 'sans_bande' ? 'aucune (DMD de la pièce VR de la table)' : m.drawn.dmd}, scores ${m.drawn.scores === 'rom' ? 'dessinés (ROM, FlexDMD ou UltraDMD)' : (m.drawn.scores ?? 'aucun')}.`); // i18n-ignore : journal
   const shots = fs.existsSync(vrCapturesDir())
     ? fs
         .readdirSync(vrCapturesDir())
@@ -3863,7 +3863,12 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
       const sources = vrSourcesOf(tableFile, vr.addBackglass);
       writeIniSettings(vr.ini, [
         // Bande DMD sous le fronton que VPX pose (chaîne PuP, ScoreView, B2S), et images de secours.
-        { section: 'Plugin.CyberPinball', key: 'DmdOrder', value: 'PUP,ScoreView,B2S' },
+        // Bande sous le fronton : le full DMD (PuP, puis l'image DMD du .directb2s avec son DMD incrusté), les scores
+        // (ROM, FlexDMD, UltraDMD) dessinés par-dessus par le plugin ; jamais de DMD incrusté dans le fronton.
+        { section: 'Plugin.CyberPinball', key: 'DmdOrder', value: 'PUP,B2S' },
+        { section: 'Plugin.B2S', key: 'ScoreViewDMDOverlay', value: '1' },
+        { section: 'Plugin.B2S', key: 'ScoreViewDMDAutoPos', value: '1' },
+        { section: 'Plugin.B2S', key: 'BackglassDMDOverlay', value: '0' },
         { section: 'Plugin.CyberPinball', key: 'DmdBand', value: vr.addBackglass ? String(VR_DMD_BAND) : '0' },
         { section: 'Plugin.CyberPinball', key: 'BackglassImage', value: sources.backglassImage ?? '' },
         { section: 'Plugin.CyberPinball', key: 'DmdImage', value: sources.dmdImage ?? '' },
@@ -3885,7 +3890,7 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
       const missing = missingVrSources(sources.sources);
       const said = (v: string | undefined) => (v === 'room' ? 'celui de la pièce VR de la table' : (v ?? 'aucune')); // i18n-ignore : journal
       const frame = sources.dmdFrames.length ? ` (cadre DMD de la pièce VR : ${sources.dmdFrames.map((f) => f.name).join(', ')}${sources.roomDmd ? `, source publiée par le plugin : ${sources.roomDmd}` : ''})` : ''; // i18n-ignore : journal
-      details.push(`sources dans le casque : fronton ${said(sources.sources.backglass)}, DMD ${said(sources.sources.dmd)}${frame}${missing.length ? ` ; VR : pas de source ${missing.join(' ni de ')} pour cette table` : ''}`); // i18n-ignore : journal
+      details.push(`sources dans le casque : fronton ${said(sources.sources.backglass)}, DMD ${said(sources.sources.dmd)}${sources.sources.fullDmd ? `, full DMD ${sources.sources.fullDmd}` : ''}${frame}${missing.length ? ` ; VR : pas de source ${missing.join(' ni de ')} pour cette table` : ''}`); // i18n-ignore : journal
       details.push(`pause dans le casque : plugin ${pausePlugin === 'installed' ? 'installé' : 'à jour'}, appui court sur Pause ou tenu ${QUIT_HOLD_S} s pour quitter`); // i18n-ignore : journal
     }
     // Une seule pose : la table de VPX où est la borne du casque (calée ou non), à chaque partie.

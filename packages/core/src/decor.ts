@@ -1,8 +1,8 @@
 // Décor de réalité virtuelle : la caisse de flipper habillée et la capsule d'observation, autour des
 // écrans de la borne (décision du 12 novembre 2026 ; la maquette validée ce jour-là fait foi pour les
 // cotes et les couleurs). Construit à partir des panneaux de headsetPanels (casque.ts), dans l'espace de la borne
-// (mètres, x à droite, y en haut, -z devant le joueur), puis écrit en glTF (glb.ts) : le même fichier
-// sert au menu dans le casque (compagnon) et en partie (couche OpenXR dans VPX).
+// (mètres, x à droite, y en haut, -z devant le joueur), puis écrit en glTF (glb.ts) pour le compagnon.
+// Le décor est celui du menu seulement : en partie, rien de Cyber Pinball autour de la table de VPX.
 //
 // Rien ne se pose sur l'image d'un écran : les écrans restent des couches « quad » du compagnon.
 // L'éclairage est cuit dans les sommets (lumières de la maquette) ; à l'affichage, la couleur du

@@ -610,7 +610,7 @@ export class HeadsetMenu {
     }
     const place = this.readPlace();
     if (place) child.stdin.write(anchorLine(place));
-    // Le décor (caisse et capsule) autour des panneaux : le même fichier sert en partie (couche OpenXR de VPX).
+    // Le décor (caisse et capsule) autour des panneaux, au menu seulement (rien en partie).
     this.sendDecor(child, place);
     this.sendScene(child, this.opts.tint());
     child.stdin.write('fin\n');

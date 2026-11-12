@@ -520,7 +520,7 @@ export interface VrMeasures {
   gameTime: number;
   captures: { name: string; source: string; brightness: number; ok: boolean }[];
   /** Ce que le plugin a dessiné en dernier : la source du fronton et celle du DMD (« sources fronton=… dmd=… »). */
-  drawn?: { backglass: string; dmd: string };
+  drawn?: { backglass: string; dmd: string; scores?: string };
   /** Ce que le plugin a dessiné en dernier dans le cadre DMD de la pièce VR (« PUP », « image », « aucune »). */
   roomDmd?: string;
 }
@@ -577,7 +577,7 @@ export function parseVrMeasures(text: string): VrMeasures | undefined {
     video: stat('video'),
     gameTime: stat('jeu').mean,
     captures,
-    ...(last ? { drawn: { backglass: last.fronton ?? '?', dmd: last.dmd ?? '?' } } : {}),
+    ...(last ? { drawn: { backglass: last.fronton ?? '?', dmd: last.dmd ?? '?', ...(last.scores ? { scores: last.scores } : {}) } } : {}),
     ...(room?.dmd ? { roomDmd: room.dmd } : {}),
   };
 }
