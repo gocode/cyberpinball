@@ -1192,24 +1192,27 @@ html.menu-desktop .menu.menu-band .menu-nav {
 /*
  * Anneau et étincelle (maquette validée) : à l'arrêt, une étincelle blanche part du haut et fait le
  * tour du médaillon choisi ; derrière elle, l'anneau vert se trace sur son bord, puis l'étincelle
- * continue seule son tour (3,9 s). Le cercle est celui du bord mesuré du médaillon (--rim-r, centre
- * décalé de --rim-dx, --rim-dy : media.js, reach), posé dessus. Jamais pendant le glissement ni en
- * rafale ; chaque nouvelle table au centre le rejoue (frontend.js, wheelStage).
+ * continue seule de tourner, lentement (un tour en 7 s), tant que la table reste au centre. Le
+ * cercle est celui du bord mesuré du médaillon (--rim-r, centre décalé de --rim-dx, --rim-dy :
+ * media.js, reach). Tous deux passent derrière le médaillon choisi, devant ses voisins (z-index 19,
+ * entre le centre à 20 et les voisins à 18 : frontend.js, placeWheelItem) : collés à son bord, ils
+ * en dépassent juste. Jamais pendant le glissement ni en rafale ; chaque nouvelle table au centre
+ * les rejoue (frontend.js, wheelStage).
  */
 .wheel-orbit {
   display: none;
 }
 
 .menu-band .wheel-stage.landed .wheel-rim {
-  /* Le cercle occupe 92 % de sa boîte (r = 46 sur 50) : son trait tombe sur le bord, 1,5 unité en dedans. */
-  --rim-box: calc((var(--rim-r, 112.5) - 1.5) / 0.92);
+  /* Le cercle occupe 92 % de sa boîte (r = 46 sur 50) ; son trait (4,4 unités) est centré 1,2 unité hors du bord : il en dépasse de 3,4. */
+  --rim-box: calc((var(--rim-r, 112.5) + 1.2) / 0.92);
   display: block;
   position: absolute;
   left: calc((var(--ring-x) + var(--rim-dx, 0) - var(--rim-box)) * var(--w));
   top: calc((var(--ring-y) + var(--rim-dy, 0) - var(--rim-box)) * var(--w));
   width: calc(var(--rim-box) * 2 * var(--w));
   height: calc(var(--rim-box) * 2 * var(--w));
-  z-index: 21;
+  z-index: 19;
   pointer-events: none;
 }
 
@@ -1223,11 +1226,11 @@ html.menu-desktop .menu.menu-band .menu-nav {
   filter: drop-shadow(0 0 calc(3 * var(--w)) var(--signal)) drop-shadow(0 0 calc(10 * var(--w)) rgba(139, 226, 58, 0.6));
 }
 
-/* Trait de 3,6 unités, en unités du dessin (viewBox de 100 pour 2 × --rim-box) : le pointillé (pathLength) reste juste. */
+/* Trait de 4,4 unités, en unités du dessin (viewBox de 100 pour 2 × --rim-box) : le pointillé (pathLength) reste juste. */
 .wheel-rim circle {
   fill: none;
   stroke: #d8ffb0;
-  stroke-width: calc(180 / var(--rim-box));
+  stroke-width: calc(220 / var(--rim-box));
   stroke-dasharray: 1 1;
   stroke-dashoffset: 1;
   animation:
@@ -1253,18 +1256,18 @@ html.menu-desktop .menu.menu-band .menu-nav {
 
 /* L'étincelle, sur le même cercle. */
 .menu-band .wheel-stage.landed .wheel-orbit {
-  --orbit-r: calc(var(--rim-r, 112.5) - 1.5);
+  --orbit-r: calc(var(--rim-r, 112.5) + 1.2);
   display: block;
   position: absolute;
   left: calc((var(--ring-x) + var(--rim-dx, 0) - var(--orbit-r)) * var(--w));
   top: calc((var(--ring-y) + var(--rim-dy, 0) - var(--orbit-r)) * var(--w));
   width: calc(var(--orbit-r) * 2 * var(--w));
   height: calc(var(--orbit-r) * 2 * var(--w));
-  z-index: 22;
+  z-index: 19;
   pointer-events: none;
 }
 
-/* Elle mène le tracé de l'anneau (même durée, même courbe), puis continue seule son tour. */
+/* Elle mène le tracé de l'anneau (même durée, même courbe), puis continue seule de tourner, lentement. */
 .wheel-orbit .wheel-spark {
   position: absolute;
   inset: 0;
@@ -1273,7 +1276,7 @@ html.menu-desktop .menu.menu-band .menu-nav {
   animation:
     rim-spark-in 120ms linear forwards,
     rim-lead 1100ms cubic-bezier(0.37, 0, 0.3, 1) forwards,
-    rim-orbit 3900ms linear 1100ms infinite;
+    rim-orbit 7000ms linear 1100ms infinite;
 }
 
 .wheel-orbit .wheel-spark::before {
@@ -1281,9 +1284,9 @@ html.menu-desktop .menu.menu-band .menu-nav {
   position: absolute;
   left: 50%;
   top: 0;
-  width: calc(26 * var(--w));
-  height: calc(26 * var(--w));
-  margin: calc(-13 * var(--w)) 0 0 calc(-13 * var(--w));
+  width: calc(30 * var(--w));
+  height: calc(30 * var(--w));
+  margin: calc(-15 * var(--w)) 0 0 calc(-15 * var(--w));
   border-radius: 50%;
   background: radial-gradient(circle, #ffffff 0 16%, rgba(232, 255, 208, 0.85) 26%, rgba(139, 226, 58, 0.4) 46%, rgba(139, 226, 58, 0) 70%);
 }

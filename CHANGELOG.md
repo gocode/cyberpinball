@@ -15,6 +15,7 @@ son interface).
 - Roue : l'anneau, l'étincelle et le halo retrouvent le dessin et le mouvement de la maquette ; seul le halo passe derrière les médaillons voisins. L'éclat qui traverse le médaillon choisi est plus lent et plus discret.
 - Roue : à l'arrêt, une étincelle blanche fait le tour du médaillon choisi en traçant derrière elle un halo vert qui finit par l'entourer, puis elle continue son tour. L'éclat du médaillon s'affiche aussi sur la borne.
 - Roue : le halo vert autour du médaillon choisi revient, et l'anneau tracé par l'étincelle se pose exactement sur le bord chromé du médaillon. L'animation se rejoue à chaque nouvelle table au centre.
+- Roue : l'anneau vert et l'étincelle passent derrière le médaillon choisi, collés à son bord, sans passer derrière ses voisins ; l'étincelle continue ensuite de tourner lentement. L'animation ne s'interrompt plus en cours de route.
 
 ## 0.1.9
 

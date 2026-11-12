@@ -273,7 +273,10 @@ function wheelStage(s, style) {
   }
   const v = wheelView;
   v.style = style;
-  v.stage.className = `wheel-stage roue-${style}`;
+  // Le style de roue change seul : réécrire toute la classe effaçait .moving et .landed à chaque
+  // état reçu, et l'anneau, l'étincelle et l'éclat disparaissaient en cours de route (12/11/2026).
+  for (const c of [...v.stage.classList]) if (c.startsWith('roue-') && c !== `roue-${style}`) v.stage.classList.remove(c);
+  v.stage.classList.add(`roue-${style}`);
   // Autre collection (MagnaSave, déverrouillage du mode invité) : les tables qu'elles partagent
   // glisseraient de leur ancienne place à la nouvelle en se croisant. La roue se repose d'un coup :
   // celles qui restent sautent à leur place (logo déjà mesuré), celles qui partent s'en vont
