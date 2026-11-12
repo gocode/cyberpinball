@@ -14,6 +14,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Wheel: when it stops, a white spark circles the chosen medallion, drawing a green halo behind it until it surrounds the medallion, then keeps circling. The medallion sheen now also shows on the cabinet.
 - Wheel: the green halo around the chosen medallion is back, and the ring drawn by the spark sits exactly on the medallion's chrome edge. The animation replays for every new table in the centre.
 - Wheel: the green ring and the spark sit behind the chosen medallion, hugging its edge, without going behind its neighbours; the spark then keeps circling slowly. The animation no longer cuts out midway.
+- Wheel: the ring stays on the edge of medallions whose title spills over the disc, and the spark really keeps circling after its first lap.
 
 ## 0.1.9
 

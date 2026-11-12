@@ -53,3 +53,51 @@ test('roue : l’étincelle continue de tourner lentement après le tracé', () 
   assert.ok(orbit, 'tour sans fin de l’étincelle introuvable');
   assert.ok(Number(orbit[1]) >= 6000, `un tour en ${orbit[1]} ms : trop rapide`);
 });
+
+// Une animation qui suit une autre animation tenue (forwards, both) sur la même propriété doit
+// déclarer son départ : sans « from », elle part de la valeur tenue par la précédente. Le tour sans
+// fin de l'étincelle allait ainsi de 360° à 360° et restait immobile après la première révolution.
+test('feuilles : une animation enchaînée après une animation tenue déclare son départ', () => {
+  const frames = new Map<string, string>();
+  for (const m of css.matchAll(/@keyframes\s+([\w-]+)\s*\{([\s\S]*?)\n\}/g)) frames.set(m[1] ?? '', m[2] ?? '');
+  const props = (body: string) => new Set([...body.matchAll(/([a-z-]+)\s*:/g)].map((m) => m[1]));
+  for (const m of css.matchAll(/([^{}]+)\{[^{}]*?animation:\s*([^;]+);/g)) {
+    const list = (m[2] ?? '').split(/,(?![^(]*\))/).map((s) => s.trim().split(/\s+/));
+    list.forEach((parts, i) => {
+      const name = parts.find((p) => frames.has(p));
+      const body = name ? frames.get(name) ?? '' : '';
+      if (!name || i === 0 || /(^|\n)\s*(from|0%)[\s,{]/.test(body)) return;
+      for (const before of list.slice(0, i)) {
+        const held = before.some((p) => p === 'forwards' || p === 'both');
+        const prior = before.find((p) => frames.has(p));
+        if (!held || !prior) continue;
+        const shared = [...props(body)].filter((p) => props(frames.get(prior) ?? '').has(p));
+        assert.equal(shared.length, 0, `${(m[1] ?? '').trim()} : « ${name} » suit « ${prior} » tenue sur ${shared.join(', ')} sans départ (from)`);
+      }
+    });
+  }
+});
+
+// Mesure du bord d'un médaillon dont le titre déborde du disque (logo de table réel, 12/11/2026) :
+// l'anneau doit rester sur le cercle, pas être tiré vers le titre.
+test('roue : la mesure du bord ignore un titre qui déborde du médaillon', async () => {
+  const src = fs.readFileSync(path.join(RENDERER, 'media.js'), 'utf8');
+  const from = src.indexOf('  const WHOLE =');
+  const to = src.indexOf('  function reach(url)');
+  assert.ok(from > 0 && to > from, 'mesure du bord introuvable (media.js)');
+  const vm = await import('node:vm');
+  const edgeCircle = vm.runInNewContext(`${src.slice(from, to)}\nedgeCircle`) as (d: Uint8ClampedArray, w: number, h: number) => { r: number; dx: number; dy: number };
+  const size = 256;
+  const data = new Uint8ClampedArray(size * size * 4);
+  const R = 100;
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const inDisc = Math.hypot(x + 0.5 - 128, y + 0.5 - 128) <= R;
+    // Titre en travers du bas : plus large que le disque, il dépasse sous lui.
+    const inTitle = y >= 190 && y < 246 && x >= 6 && x < 250;
+    if (inDisc || inTitle) data[(y * size + x) * 4 + 3] = 255;
+  }
+  const c = edgeCircle(data, size, size);
+  const half = size / 2;
+  assert.ok(Math.abs(c.r * half - R) < 2, `rayon ${(c.r * half).toFixed(1)} au lieu de ${R}`);
+  assert.ok(Math.hypot(c.dx, c.dy) * half < 2, `centre décalé de ${(c.dx * half).toFixed(1)}, ${(c.dy * half).toFixed(1)}`);
+});

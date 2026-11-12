@@ -16,6 +16,7 @@ son interface).
 - Roue : à l'arrêt, une étincelle blanche fait le tour du médaillon choisi en traçant derrière elle un halo vert qui finit par l'entourer, puis elle continue son tour. L'éclat du médaillon s'affiche aussi sur la borne.
 - Roue : le halo vert autour du médaillon choisi revient, et l'anneau tracé par l'étincelle se pose exactement sur le bord chromé du médaillon. L'animation se rejoue à chaque nouvelle table au centre.
 - Roue : l'anneau vert et l'étincelle passent derrière le médaillon choisi, collés à son bord, sans passer derrière ses voisins ; l'étincelle continue ensuite de tourner lentement. L'animation ne s'interrompt plus en cours de route.
+- Roue : l'anneau reste sur le bord des médaillons dont le titre déborde du disque, et l'étincelle continue bien de tourner après son premier tour.
 
 ## 0.1.9
 

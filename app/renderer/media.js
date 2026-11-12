@@ -521,11 +521,39 @@
    */
   const medallionReach = new Map();
   const WHOLE = { r: 1, dx: 0, dy: 0 };
+  /** Cercle des moindres carrés (méthode de Kåsa : x² + y² + D x + E y + F = 0) ; undefined s'il est dégénéré. */
+  function fitCircle(pts) {
+    let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, sxz = 0, syz = 0, sz = 0;
+    for (const [x, y] of pts) {
+      const z = x * x + y * y;
+      sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y; sxz += x * z; syz += y * z; sz += z;
+    }
+    const m = [[sxx, sxy, sx], [sxy, syy, sy], [sx, sy, pts.length]];
+    const v = [-sxz, -syz, -sz];
+    const det = (q) => q[0][0] * (q[1][1] * q[2][2] - q[1][2] * q[2][1]) - q[0][1] * (q[1][0] * q[2][2] - q[1][2] * q[2][0]) + q[0][2] * (q[1][0] * q[2][1] - q[1][1] * q[2][0]);
+    const base = det(m);
+    if (!base) return undefined;
+    const col = (k) => det(m.map((row, r) => row.map((c, j) => (j === k ? v[r] : c))));
+    const ox = -col(0) / base / 2;
+    const oy = -col(1) / base / 2;
+    const r = Math.sqrt(Math.max(0, ox * ox + oy * oy - col(2) / base));
+    return r > 0 ? { ox, oy, r } : undefined;
+  }
+  const median = (list) => {
+    const sorted = [...list].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)] ?? 0;
+  };
+  /**
+   * Bord du médaillon : sur 180 rayons partis du centre, le dernier pixel opaque. Un logo qui déborde
+   * du disque (titre posé en travers du bas, 12/11/2026) donne des points hors du cercle, qui
+   * tiraient l'anneau de leur côté : seuls comptent les points proches du rayon médian, puis ceux qui
+   * restent près du cercle ajusté (trois passes, écart médian absolu).
+   */
   function edgeCircle(d, w, h) {
     const cx = w / 2;
     const cy = h / 2;
     const far = Math.hypot(cx, cy);
-    let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, sxz = 0, syz = 0, sz = 0, n = 0;
+    const pts = [];
     for (let i = 0; i < 180; i++) {
       const a = (i / 180) * Math.PI * 2;
       const ux = Math.cos(a);
@@ -534,30 +562,25 @@
         const x = Math.floor(cx + ux * t);
         const y = Math.floor(cy + uy * t);
         if (x < 0 || y < 0 || x >= w || y >= h || d[(y * w + x) * 4 + 3] <= 128) continue;
-        const px = cx + ux * t - cx;
-        const py = cy + uy * t - cy;
-        const z = px * px + py * py;
-        sx += px; sy += py; sxx += px * px; syy += py * py; sxy += px * py; sxz += px * z; syz += py * z; sz += z; n++;
+        pts.push([ux * t, uy * t]);
         break;
       }
     }
-    if (n < 12) return WHOLE;
-    // x² + y² + D x + E y + F = 0, au sens des moindres carrés (méthode de Kåsa).
-    const m = [[sxx, sxy, sx], [sxy, syy, sy], [sx, sy, n]];
-    const v = [-sxz, -syz, -sz];
-    const det = (q) => q[0][0] * (q[1][1] * q[2][2] - q[1][2] * q[2][1]) - q[0][1] * (q[1][0] * q[2][2] - q[1][2] * q[2][0]) + q[0][2] * (q[1][0] * q[2][1] - q[1][1] * q[2][0]);
-    const base = det(m);
-    if (!base) return WHOLE;
-    const col = (k) => det(m.map((row, r) => row.map((c, j) => (j === k ? v[r] : c))));
-    const D = col(0) / base;
-    const E = col(1) / base;
-    const F = col(2) / base;
-    const ox = -D / 2;
-    const oy = -E / 2;
-    const r = Math.sqrt(Math.max(0, ox * ox + oy * oy - F));
+    if (pts.length < 12) return WHOLE;
+    const r0 = median(pts.map(([x, y]) => Math.hypot(x, y)));
+    let kept = pts.filter(([x, y]) => Math.abs(Math.hypot(x, y) - r0) < r0 * 0.08);
+    let c = fitCircle(kept.length >= 12 ? kept : pts);
+    for (let pass = 0; c && pass < 3; pass++) {
+      const gap = (p) => Math.abs(Math.hypot(p[0] - c.ox, p[1] - c.oy) - c.r);
+      const spread = Math.max(1, 3 * median(kept.map(gap)));
+      const next = pts.filter((p) => gap(p) <= spread);
+      if (next.length < 12) break;
+      kept = next;
+      c = fitCircle(kept) ?? c;
+    }
     const half = Math.max(w, h) / 2;
-    if (!(r > 0)) return WHOLE;
-    return { r: Math.min(1, r / half), dx: ox / half, dy: oy / half };
+    if (!c) return WHOLE;
+    return { r: Math.min(1, c.r / half), dx: c.ox / half, dy: c.oy / half };
   }
   function reach(url) {
     if (!url) return Promise.resolve(WHOLE);
