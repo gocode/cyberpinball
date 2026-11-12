@@ -305,6 +305,21 @@ test('une démonstration qui note son échec (process.exitCode) le rend au scrip
   assert.deepEqual(lost, [], 'finir par app.exit(process.exitCode ?? 0)');
 });
 
+// Incident du 12/11/2026 : demo-sante.cjs -Accueil détruisait la fenêtre de son passage en
+// français ; app-lifetime.ts fermait alors toute l'application (dernière fenêtre avec un bouton
+// dans la barre des tâches), et la page du passage en anglais avortait (ERR_FAILED). Une
+// démonstration qui détruit ou ferme une fenêtre née de createWindow garde l'application par une
+// fenêtre gardienne (`keeper`, créée hors de createWindow), détruite juste avant app.exit.
+test('une démonstration qui ferme ses fenêtres garde l’application par une fenêtre gardienne', () => {
+  const unkept = SCRIPTS.filter((script) => {
+    const text = fs.readFileSync(path.join(DOCS, script), 'utf8').replace(/\/\/.*$/gm, '');
+    if (!/\bcreateWindow\(/.test(text)) return false;
+    const closes = text.split('\n').some((line) => !/\bkeeper\b/.test(line) && /\b\w+\.(destroy|close)\(\)/.test(line));
+    return closes && !/const keeper = new BrowserWindow\(/.test(text);
+  });
+  assert.deepEqual(unkept, [], 'ajouter `const keeper = new BrowserWindow({ show: false, … })` et keeper.destroy() avant app.exit');
+});
+
 // Incident du 29/10/2026 : demo-pup, demo-roms et demo-propositions pré-enregistraient le script de
 // leurs tables factices (data\cache\scripts.json) en version 3 de la lecture, l'application en était
 // à la 7 : une entrée plus ancienne est relue, le médecin relançait VPX (« spawn EFTYPE » sur la

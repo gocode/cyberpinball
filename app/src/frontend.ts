@@ -4593,7 +4593,15 @@ export function startFrontend(): void {
   }
   if (stress && install) void runStress(stress, process.env.CYBERPINBALL_TABLE);
   const autopilot = process.env.CYBERPINBALL_AUTOPILOT;
-  if (autopilot && !stress) void library.autopilot(autopilot.split(','), process.env.CYBERPINBALL_CAPTURE, (input) => (input.type === 'keyUp' ? handleKeyUp(input) : handleKey(input)), () => state.phase);
+  if (autopilot && !stress) {
+    // Une étape qui lève (capture, page détruite) arrête l'essai, dit pourquoi et ferme l'application :
+    // sans cela, l'application restait ouverte et la démonstration attendait sans fin.
+    const replay = library.autopilot(autopilot.split(','), process.env.CYBERPINBALL_CAPTURE, (input) => (input.type === 'keyUp' ? handleKeyUp(input) : handleKey(input)), () => state.phase);
+    replay.catch((error: Error) => {
+      console.log(`Autopilote : arrêt sur erreur (${error.stack ?? error.message}).`); // i18n-ignore : journal des essais
+      quit();
+    });
+  }
 }
 
 /** Les tables du disque, dans l'ordre choisi pour le menu. */

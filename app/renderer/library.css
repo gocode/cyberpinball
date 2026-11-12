@@ -206,6 +206,19 @@ body.mouse .lib-back:hover {
   max-width: calc(100% - 4.2cqmin);
 }
 
+/*
+ * Liste où une ligne a un drapeau (3,2 cqmin) et d'autres une icône (2,4 cqmin) : l'icône est
+ * centrée dans une case de la largeur du drapeau, tous les textes partent du même bord.
+ */
+.lib-rows.has-flags .lib-row-icon {
+  box-sizing: content-box;
+  padding-inline: 0.4cqmin;
+}
+
+.lib-rows.has-flags .lib-row-icon + .lib-row-text {
+  max-width: calc(100% - 4.2cqmin);
+}
+
 .lib-sub {
   margin-top: 1cqmin;
   font-size: 3.2cqmin;

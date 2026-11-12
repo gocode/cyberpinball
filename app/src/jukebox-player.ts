@@ -1220,8 +1220,23 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     /** Capture de la vue du lecteur YouTube (elle n'est pas dans celle de sa fenêtre). */
     onlineCapture: async (): Promise<Buffer | undefined> => {
       if (!online || online.view.webContents.isDestroyed()) return undefined;
-      const b = online.view.getBounds();
-      const image = await online.view.webContents.capturePage();
+      const view = online.view;
+      const b = view.getBounds();
+      // Clip masqué (vue réduite à rien, placeView) : rien à l'écran, rien à capturer ; le compositeur
+      // refusait l'image (« UnknownVizError ») et l'essai s'arrêtait (12/11/2026).
+      if (!b.width || !b.height) return undefined;
+      let image: Awaited<ReturnType<typeof view.webContents.capturePage>> | undefined;
+      for (let attempt = 1; !image; attempt++) {
+        try {
+          image = await view.webContents.capturePage();
+        } catch (error) {
+          if (attempt >= 3 || view.webContents.isDestroyed()) {
+            host.log(`Juke-box : vue en ligne pas capturée (${(error as Error).message}).`); // i18n-ignore : journal
+            return undefined;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
+        }
+      }
       const size = image.getSize();
       host.log(`Juke-box : vue en ligne ${b.width} × ${b.height} en ${b.x}, ${b.y} (image ${size.width} × ${size.height}).`); // i18n-ignore : journal
       return image.toPNG();

@@ -252,7 +252,8 @@ const SCROLLING: Record<string, string> = {
   'library.css | .lib-picker .kind-places': 'liste de contenu (emplacements du sélecteur de fichiers) : dans le cadre de la zone, avec les fichiers',
   'library.css | .lib-picker .kind-entries': 'liste de contenu (fichiers du sélecteur) : dans le cadre de la zone',
   'library.css | .lib-jukebox.jukebox-import .kind-jb-entries > .lib-rows': 'liste de contenu (morceaux d’un import YouTube, en borne) : dans le cadre de la zone, avec ses filets ; les choix de l’import restent visibles dessous',
-  'settings.css | .list ul': 'réglages de VPX (settings.ts) : une liste de réglages, pas de contenu ; Exit y remonte d’un niveau, Page préc./suiv. y sautent de dix',
+  'frontend.css | .overlay': 'écran plein (aide « Commandes », message) : rien à choisir ; plus haut que la fenêtre (bureau en 4:3, au plancher de 20 px), il part du haut, sous la marque, et défile à la molette au lieu de remonter sous les notifications',
+  'settings.css | .list ul':'réglages de VPX (settings.ts) : une liste de réglages, pas de contenu ; Exit y remonte d’un niveau, Page préc./suiv. y sautent de dix',
   'settings.css | .detail': 'réglages de VPX : le détail du réglage choisi, rien à choisir ; MagnaSave le fait défiler (data-reading, lecture.test.ts)',
   'settings.css | .choices': 'réglages de VPX : les valeurs d’un réglage, panneau qu’Exit referme',
 };

@@ -47,7 +47,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 - **Un nom à soi** : de 2 à 24 caractères, affiché seul, avec l'avatar. Deux joueurs du même nom se départagent par l'identifiant unique de leur fiche. Au premier démarrage, juste après l'assistant d'écrans, Cyber Pinball propose de choisir son pseudo et son avatar ; rien d'obligatoire, tout se change ensuite.
 - **« Mon avatar »** : une photo ou une image à vous, prise sur le PC ou dans le navigateur intégré, recadrée aux boutons de la borne (zoom, déplacer, recentrer) ou à la souris. Une photo y perd ses métadonnées, position GPS comprise. Sans avatar, vos initiales sur une teinte qui vous est propre. Seuls vos amis et les joueurs d'une demande en cours le reçoivent, et les joueurs qui voient vos scores dans les classements.
 
-<p align="center"><img src="images/fr/friends.webp?v=8a30474698" width="760" alt="Mes amis : Bruno en ligne, en partie sur Star Courier avec son nouveau record, et Émile hors ligne ; à côté, la fiche de Bruno avec ses derniers événements et « Voir sa bibliothèque »."></p>
+<p align="center"><img src="images/fr/friends.webp?v=8306cc0c9e" width="760" alt="Mes amis : Bruno en ligne, en partie sur Star Courier avec son nouveau record, et Émile hors ligne ; à côté, la fiche de Bruno avec ses derniers événements et « Voir sa bibliothèque »."></p>
 
 <p align="center">
   <img src="images/fr/features/friends-section.webp?v=e38b02af5d" width="300" alt="La rubrique Amis : Messages, Mes amis, Mon avatar, Mon profil public, Historique des parties, Trouver un joueur, Demandes d'amis, Mes badges, Partage et réseau, Scores des amis pendant la partie, Masquer les notifications pendant les parties.">
@@ -77,9 +77,9 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 - **Une table sans relevé** est annoncée « Départ manuel, pas de score en direct », avec la raison : son score compte s'il entre au tableau d'honneur de la table.
 - **Une borne restée sur une ancienne version** est signalée dans le salon, l'invitation et la bande, au lieu de sembler boguée.
 
-<p align="center"><img src="images/fr/live-scores.webp?v=1494989292" width="760" alt="Une partie entre amis sur Atlas Rising : en bas du fronton, la bande Partie entre amis montre les scores de Bruno et d'Alexis en direct, et le DMD les mêmes scores en points lumineux."></p>
+<p align="center"><img src="images/fr/live-scores.webp?v=cf6ce49d8c" width="760" alt="Une partie entre amis sur Atlas Rising : en bas du fronton, la bande Partie entre amis montre les scores de Bruno et d'Alexis en direct, et le DMD les mêmes scores en points lumineux."></p>
 
-<p align="center"><img src="images/fr/friends-notifications.webp?v=78efa94952" width="760" alt="Deux moments d'une partie : une ligne discrète en haut du plateau annonce que Bruno vient de se connecter, puis sa carte d'invitation avec le temps restant pour répondre."></p>
+<p align="center"><img src="images/fr/friends-notifications.webp?v=248819c9c6" width="760" alt="Deux moments d'une partie : une ligne discrète en haut du plateau annonce que Bruno vient de se connecter, puis sa carte d'invitation avec le temps restant pour répondre."></p>
 
 <p align="center"><img src="images/fr/features/live-scores-setting.webp?v=07be4522fc" width="360" alt="Scores des amis pendant la partie : Automatique choisi, Sur le fronton, Sur le topper, En bas du plateau, Sur le côté du plateau, et Scores sur le DMD."></p>
 
@@ -117,7 +117,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 - **Une place suffisante est vérifiée** avant de commencer (la taille plus 1 Gio).
 - **« Limiter le débit des téléchargements… »** : de 256 ko/s à 20 Mo/s, ou sans limite, pour laisser la connexion au reste de la maison.
 
-<p align="center"><img src="images/fr/friends-library.webp?v=2a1884157c" width="760" alt="La bibliothèque de Bruno : les tables présentes sur les deux bornes, et celle que cette borne n'a pas, Glass Lagoon, avec ses médias et « Récupérer toute la table »."></p>
+<p align="center"><img src="images/fr/friends-library.webp?v=2ad79696e5" width="760" alt="La bibliothèque de Bruno : les tables présentes sur les deux bornes, et celle que cette borne n'a pas, Glass Lagoon, avec ses médias et « Récupérer toute la table »."></p>
 
 ### Confidentialité, réseau et pare-feu
 
@@ -129,7 +129,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 
 ## Classements
 
-<p align="center"><img src="images/fr/leaderboard.webp?v=3f98341e48" width="360" alt="Le tableau des scores d'une table : le classement Mondial de l'année, chaque joueur avec le drapeau de son pays, son avatar et sa présence, et votre place sous le tableau."></p>
+<p align="center"><img src="images/fr/leaderboard.webp?v=ebcf7d0fee" width="360" alt="Le tableau des scores d'une table : le classement Mondial de l'année, chaque joueur avec le drapeau de son pays, son avatar et sa présence, et votre place sous le tableau."></p>
 
 - **« Tableau des scores »** sur la fiche de chaque table : quatre périodes, « Tout temps », « Cette année », « Cette semaine », « Aujourd’hui », changées aux flippers. Chaque partie jouée sur la borne y laisse ses scores, datés : lus dans la mémoire de la ROM après la partie (un par joueur, avec les initiales quand le score entre au tableau de la machine), ceux qui entrent au tableau d’honneur d’une table originale, le score d’une partie entre amis. « Tout temps » réunit aussi les records que la table gardait déjà, sans ses scores d’usine (les valeurs rondes qu’une ROM ou un script met au tableau à la première mise en route). Une table dont les scores ne se lisent pas le dit.
 - **Quatre portées** : « Cette borne », « Amis », « National » et « Mondial », changées aux MagnaSave. Sous chaque classement, votre place pour cette portée et cette période ; hors des premières lignes, votre ligne en fin de tableau.
@@ -278,7 +278,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **« Médias pendant la partie »** : figés (par défaut), animés ou éteints, sur les écrans que VPX n'occupe pas.
 - **Hors du menu des tables** (menu système, réglages, aide), les écrans passent à l'affichage de la marque, en silence ; la fiche d'une table garde ses médias.
 
-<p align="center"><img src="images/fr/launch.webp?v=e6b63f86e9" width="900" alt="Animation du lancement sur une borne à quatre écrans : après Start, le logo de Neon Abyss s'allume sur le plateau, traverse le DMD et se pose sur le fronton, puis les écrans s'effacent quand Visual Pinball X prend la main."></p>
+<p align="center"><img src="images/fr/launch.webp?v=d9a0c78278" width="900" alt="Animation du lancement sur une borne à quatre écrans : après Start, le logo de Neon Abyss s'allume sur le plateau, traverse le DMD et se pose sur le fronton, puis les écrans s'effacent quand Visual Pinball X prend la main."></p>
 
 ### DMD vivant et couleurs de la marque
 
@@ -350,7 +350,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 ## Juke-box
 
-<p align="center"><img src="images/fr/jukebox.webp?v=d51a2d9076" width="900" alt="Le Juke-box sur une borne à quatre écrans : sur le playfield, la playlist Néon nocturne, ses modes de lecture et le morceau en cours ; sur le fronton, l'illustration du morceau ; sur le DMD, le nom de l'artiste et un spectre en points lumineux."></p>
+<p align="center"><img src="images/fr/jukebox.webp?v=26444dfe04" width="900" alt="Le Juke-box sur une borne à quatre écrans : sur le playfield, la playlist Néon nocturne, ses modes de lecture et le morceau en cours ; sur le fronton, l'illustration du morceau ; sur le DMD, le nom de l'artiste et un spectre en points lumineux."></p>
 
 ### Le lecteur
 
@@ -468,7 +468,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **ROM absente** : « Récupérer la ROM … » ouvre sa page, ou « Jouer avec … », une révision voisine déjà sur la borne.
 - **Mémorisé** : une étape réglée reste cochée ; « Reprendre : Étape 3 sur 4 » en tête de la fiche.
 
-<p align="center"><img src="images/fr/missing-to-play.webp?v=265baffecb" width="760" alt="Ce qu'il manque pour jouer, pour Neon Abyss : l'étape 3 sur 4, la ROM à récupérer sur vpforums.org ou une révision voisine ; puis, la ROM installée, Tout est prêt pour jouer."></p>
+<p align="center"><img src="images/fr/missing-to-play.webp?v=f9fd568af5" width="760" alt="Ce qu'il manque pour jouer, pour Neon Abyss : l'étape 3 sur 4, la ROM à récupérer sur vpforums.org ou une révision voisine ; puis, la ROM installée, Tout est prêt pour jouer."></p>
 
 ## La fiche d'une table
 
@@ -628,7 +628,7 @@ Deux fonctions en bêta (badge « BÊTA » dans Menu système > Borne) : sans le
 
 ## Une borne qui s'entretient
 
-<p align="center"><img src="images/fr/health.webp?v=65df0dccb2" width="360" alt="Santé de la borne : 1 bloquant, 2 à vérifier, 3 OK. L'espace disque va bien, Midnight Circuit ne démarre pas faute de ROM, VPinMediaDB a des médias pour 2 tables, la borne du salon est reconnue avec ses 4 écrans, et une version plus récente de VPX est disponible."></p>
+<p align="center"><img src="images/fr/health.webp?v=c6ceeb14be" width="360" alt="Santé de la borne : 1 bloquant, 2 à vérifier, 3 OK. L'espace disque va bien, Midnight Circuit ne démarre pas faute de ROM, VPinMediaDB a des médias pour 2 tables, la borne du salon est reconnue avec ses 4 écrans, les tables sont dans votre sens, flippers en bas, et une version plus récente de VPX est disponible."></p>
 
 ### Santé de la borne
 

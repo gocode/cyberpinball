@@ -47,7 +47,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 - **A name of your own**: 2 to 24 characters, shown alone, with the avatar. Two players with the same name are told apart by the unique ID on their page. On first start, right after the screens wizard, Cyber Pinball offers to choose your nickname and avatar; nothing is required, and everything can be changed later.
 - **"My avatar"**: a photo or a picture of your own, taken from the PC or in the built-in browser, cropped with the cabinet buttons (zoom, move, recentre) or the mouse. A photo loses its metadata, GPS position included. Without an avatar, your initials on a hue of your own. Only your friends and the players of a pending request receive it, and the players who see your scores in the leaderboards.
 
-<p align="center"><img src="images/en/friends.webp?v=f215598b45" width="760" alt="My friends: Bruno online, playing Star Courier with his new high score, and Émile offline; next to it, Bruno's page with his latest events and See their library."></p>
+<p align="center"><img src="images/en/friends.webp?v=9353564220" width="760" alt="My friends: Bruno online, playing Star Courier with his new high score, and Émile offline; next to it, Bruno's page with his latest events and See their library."></p>
 
 <p align="center">
   <img src="images/en/features/friends-section.webp?v=e5c1ff7c24" width="300" alt="The Friends section: Messages, My friends, My avatar, My public profile, Game history, Find a player, Friend requests, My badges, Sharing and network, Friends' scores during the game, Hide notifications during games.">
@@ -77,9 +77,9 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 - **A table with no live reading** is labelled "Manual start, no live score", with the reason: its score counts if it makes the table's high-score board.
 - **A cabinet still on an old version** is flagged in the lobby, the invitation and the strip, instead of looking broken.
 
-<p align="center"><img src="images/en/live-scores.webp?v=216d920702" width="760" alt="A game with friends on Atlas Rising: at the bottom of the backglass, the Game with friends strip shows Bruno's and Alexis's scores live, and the DMD shows the same scores in glowing dots."></p>
+<p align="center"><img src="images/en/live-scores.webp?v=29773bd3be" width="760" alt="A game with friends on Atlas Rising: at the bottom of the backglass, the Game with friends strip shows Bruno's and Alexis's scores live, and the DMD shows the same scores in glowing dots."></p>
 
-<p align="center"><img src="images/en/friends-notifications.webp?v=dc42cfa51e" width="760" alt="Two moments of a game: a discreet line at the top of the playfield says Bruno just came online, then his invitation card with the time left to answer."></p>
+<p align="center"><img src="images/en/friends-notifications.webp?v=3ed1612d4f" width="760" alt="Two moments of a game: a discreet line at the top of the playfield says Bruno just came online, then his invitation card with the time left to answer."></p>
 
 <p align="center"><img src="images/en/features/live-scores-setting.webp?v=73afcfa0ab" width="360" alt="Friends' scores during the game: Automatic selected, On the backglass, On the topper, At the bottom of the playfield, On the side of the playfield, and Scores on the DMD."></p>
 
@@ -117,7 +117,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 - **Free space is checked** before starting (the size plus 1 GiB).
 - **"Limit download speed…"**: from 256 kB/s to 20 MB/s, or no limit, to leave the connection to the rest of the house.
 
-<p align="center"><img src="images/en/friends-library.webp?v=9d2ac18401" width="760" alt="Bruno's library: the tables on both cabinets, and the one this cabinet doesn't have, Glass Lagoon, with its media and Get the whole table."></p>
+<p align="center"><img src="images/en/friends-library.webp?v=937265c14c" width="760" alt="Bruno's library: the tables on both cabinets, and the one this cabinet doesn't have, Glass Lagoon, with its media and Get the whole table."></p>
 
 ### Privacy, network and firewall
 
@@ -129,7 +129,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 
 ## Leaderboards
 
-<p align="center"><img src="images/en/leaderboard.webp?v=1917ed2e02" width="360" alt="A table's scoreboard: this year's World ranking, each player with their country's flag, their avatar and their presence, and your own place under the board."></p>
+<p align="center"><img src="images/en/leaderboard.webp?v=e71ce7fd79" width="360" alt="A table's scoreboard: this year's World ranking, each player with their country's flag, their avatar and their presence, and your own place under the board."></p>
 
 - **"Scoreboard"** on every table's page: four periods, "All time", "This year", "This week", "Today", switched with the flippers. Every game played on the cabinet leaves its scores there, dated: read from the ROM's memory after the game (one per player, with initials when the score makes the machine's high score list), those that make an original table's high score list, the score of a game with friends. "All time" also brings in the high scores the table already kept, without its factory scores (the round values a ROM or script puts on the list when first started). A table whose scores cannot be read says so.
 - **Four scopes**: "This cabinet", "Friends", "National" and "World", switched with MagnaSave. Under each ranking, your place for that scope and period; outside the top lines, your own line at the end of the table.
@@ -278,7 +278,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **"Media during play"**: frozen (default), animated or off, on the screens VPX doesn't use.
 - **Outside the table menu** (system menu, settings, help), the screens switch to the brand display, in silence; a table's page keeps its media.
 
-<p align="center"><img src="images/en/launch.webp?v=e6b63f86e9" width="900" alt="Animation of the launch on a four-screen cabinet: after Start, the Neon Abyss logo lights up on the playfield, flies up through the DMD and lands on the backglass, then the screens fade out as Visual Pinball X takes over."></p>
+<p align="center"><img src="images/en/launch.webp?v=d9a0c78278" width="900" alt="Animation of the launch on a four-screen cabinet: after Start, the Neon Abyss logo lights up on the playfield, flies up through the DMD and lands on the backglass, then the screens fade out as Visual Pinball X takes over."></p>
 
 ### Live DMD and brand colours
 
@@ -350,7 +350,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 ## Jukebox
 
-<p align="center"><img src="images/en/jukebox.webp?v=a4fa3e5826" width="900" alt="The jukebox on a four-screen cabinet: on the playfield, the Néon nocturne playlist, its play modes and the track playing; on the backglass, the track's artwork; on the DMD, the artist's name and a spectrum in glowing dots."></p>
+<p align="center"><img src="images/en/jukebox.webp?v=588b41addb" width="900" alt="The jukebox on a four-screen cabinet: on the playfield, the Néon nocturne playlist, its play modes and the track playing; on the backglass, the track's artwork; on the DMD, the artist's name and a spectrum in glowing dots."></p>
 
 ### The player
 
@@ -468,7 +468,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **Missing ROM**: "Get the … ROM" opens its page, or "Play with …", a neighbouring revision already on the cabinet.
 - **Remembered**: a step that's done stays ticked; "Resume: Step 3 of 4" at the top of the table's page.
 
-<p align="center"><img src="images/en/missing-to-play.webp?v=8b4e90863c" width="760" alt="What's missing to play, for Neon Abyss: step 3 of 4, the ROM to fetch from vpforums.org or a neighbouring revision; then, once the ROM is installed, All set to play."></p>
+<p align="center"><img src="images/en/missing-to-play.webp?v=d751d66624" width="760" alt="What's missing to play, for Neon Abyss: step 3 of 4, the ROM to fetch from vpforums.org or a neighbouring revision; then, once the ROM is installed, All set to play."></p>
 
 ## A table's page
 
@@ -628,7 +628,7 @@ Two features in beta ("BETA" badge in System menu > Cabinet): without the hardwa
 
 ## A cabinet that looks after itself
 
-<p align="center"><img src="images/en/health.webp?v=5e114520e0" width="360" alt="Cabinet health: 1 blocking, 2 to check, 3 OK. Disk space is fine, Midnight Circuit won't start because its ROM is missing, VPinMediaDB has media for 2 tables, the living-room cabinet is recognised with all 4 screens, and a newer VPX is available."></p>
+<p align="center"><img src="images/en/health.webp?v=794ac8eb14" width="360" alt="Cabinet health: 1 blocking, 2 to check, 3 OK. Disk space is fine, Midnight Circuit won't start because its ROM is missing, VPinMediaDB has media for 2 tables, the living-room cabinet is recognised with all 4 screens, tables are the right way round with the flippers at the bottom, and a newer VPX is available."></p>
 
 ### Cabinet health
 

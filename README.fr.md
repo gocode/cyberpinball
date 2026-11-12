@@ -54,20 +54,20 @@ Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bor
 - **Trouver des partenaires de jeu.** Cherchez un joueur par son nom dans un annuaire que les bornes se transmettent entre elles, ou repérez les bornes voisines sur le réseau local, même sans Internet. Envoyez-lui une demande d'ami : il n'a plus qu'à l'accepter.
 - **Chez vous, c'est vous qui décidez.** Vos sauvegardes, vos fichiers de records et vos programmes ne quittent jamais votre borne. Le partage est activé par défaut et se coupe à un seul endroit, « Partage et réseau », qui montre aussi ce que les autres bornes peuvent voir. Le tout repose sur Hyperswarm, de [Holepunch](https://holepunch.to).
 
-<p align="center"><img src="docs/images/fr/friends-notifications.webp?v=78efa94952" width="760" alt="Deux moments d'une partie. Sur Star Courier, une ligne discrète en haut du plateau : Bruno vient de se connecter. Un peu plus tard, sur Neon Abyss, la carte de son invitation : Bruno vous invite à jouer, sur Neon Harbor, avec le temps restant pour répondre."></p>
+<p align="center"><img src="docs/images/fr/friends-notifications.webp?v=248819c9c6" width="760" alt="Deux moments d'une partie. Sur Star Courier, une ligne discrète en haut du plateau : Bruno vient de se connecter. Un peu plus tard, sur Neon Abyss, la carte de son invitation : Bruno vous invite à jouer, sur Neon Harbor, avec le temps restant pour répondre."></p>
 
-<p align="center"><img src="docs/images/fr/live-scores.webp?v=1494989292" width="760" alt="Une partie entre amis en cours sur Atlas Rising. En bas du fronton, la bande Partie entre amis donne les scores de Bruno et d'Alexis en direct, avec la bille de chacun ; dessous, le DMD reprend les mêmes scores en points lumineux."></p>
+<p align="center"><img src="docs/images/fr/live-scores.webp?v=cf6ce49d8c" width="760" alt="Une partie entre amis en cours sur Atlas Rising. En bas du fronton, la bande Partie entre amis donne les scores de Bruno et d'Alexis en direct, avec la bille de chacun ; dessous, le DMD reprend les mêmes scores en points lumineux."></p>
 
 <p align="center">
-  <img src="docs/images/fr/friends.webp?v=8a30474698" width="440" alt="Mes amis : Bruno est en ligne sur Star Courier et vient de battre son record, Émile est hors ligne. À côté, la page de Bruno, avec ses derniers événements et le bouton Voir sa bibliothèque.">
+  <img src="docs/images/fr/friends.webp?v=8306cc0c9e" width="440" alt="Mes amis : Bruno est en ligne sur Star Courier et vient de battre son record, Émile est hors ligne. À côté, la page de Bruno, avec ses derniers événements et le bouton Voir sa bibliothèque.">
   <img src="docs/images/fr/messages.webp?v=5ad77ce3bd" width="300" alt="La conversation avec Bruno sur la borne : la carte de son nouveau record sur Star Courier, ses messages, puis votre réponse, reçue et saluée d'un « Bravo » ; à côté, Écrire un message, Réponse rapide et Options de la conversation.">
 </p>
 
-<p align="center"><img src="docs/images/fr/friends-library.webp?v=2a1884157c" width="760" alt="La bibliothèque de Bruno : les tables que les deux bornes ont en commun, et Glass Lagoon, que cette borne n'a pas encore, avec ses médias et le bouton Récupérer toute la table."></p>
+<p align="center"><img src="docs/images/fr/friends-library.webp?v=2ad79696e5" width="760" alt="La bibliothèque de Bruno : les tables que les deux bornes ont en commun, et Glass Lagoon, que cette borne n'a pas encore, avec ses médias et le bouton Récupérer toute la table."></p>
 
 ## Des classements jusqu'au mondial
 
-<p align="center"><img src="docs/images/fr/leaderboard.webp?v=3f98341e48" width="360" alt="Le tableau des scores d'une table : le classement Mondial de l'année, chaque joueur avec le drapeau de son pays, son avatar et sa présence, et votre place sous le tableau."></p>
+<p align="center"><img src="docs/images/fr/leaderboard.webp?v=ebcf7d0fee" width="360" alt="Le tableau des scores d'une table : le classement Mondial de l'année, chaque joueur avec le drapeau de son pays, son avatar et sa présence, et votre place sous le tableau."></p>
 
 - **Un tableau des scores sur la fiche de chaque table.** Chaque partie jouée sur la borne y laisse ses scores, lus dans la table ou dans la mémoire de sa ROM, avec les records qu'elle gardait déjà. Tout temps, cette année, cette semaine ou aujourd'hui : les flippers changent de période.
 - **De votre borne au monde entier.** Les MagnaSave passent de « Cette borne » à « Amis », « National » et « Mondial ». Votre place est donnée sous chaque classement, même loin des premières lignes.
@@ -76,7 +76,7 @@ Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bor
 
 ## Un menu digne d'une vraie borne
 
-<p align="center"><img src="docs/images/fr/launch.webp?v=e6b63f86e9" width="900" alt="Le lancement animé d'une table sur une borne à quatre écrans : au Start, le logo de Neon Abyss s'allume sur le plateau, monte en traversant le DMD et vient se poser sur le fronton, puis les écrans s'effacent quand Visual Pinball X prend le relais."></p>
+<p align="center"><img src="docs/images/fr/launch.webp?v=d9a0c78278" width="900" alt="Le lancement animé d'une table sur une borne à quatre écrans : au Start, le logo de Neon Abyss s'allume sur le plateau, monte en traversant le DMD et vient se poser sur le fronton, puis les écrans s'effacent quand Visual Pinball X prend le relais."></p>
 
 - **Une roue de médaillons qui s'anime.** Posée sur la vidéo du plateau, avec une fenêtre pour chaque écran de la borne : le topper, le fronton et le DMD suivent le jeu sélectionné. La table choisie s'éclaire d'un halo à sa propre teinte, une étincelle fait le tour de son médaillon, et chaque appui envoie une onde de lumière le long de la roue.
 - **Une ouverture à la mise en route.** Des fils de lumière se tissent sur le plateau, une étincelle monte et s'embrase, et le nom de la borne apparaît pendant que le fronton et le DMD s'allument. Vous pouvez la remplacer par votre propre image ou vidéo.
@@ -93,7 +93,7 @@ Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bor
 
 ## Un Juke-box sur la borne
 
-<p align="center"><img src="docs/images/fr/jukebox.webp?v=d51a2d9076" width="900" alt="Le Juke-box sur une borne à quatre écrans : sur le playfield, la playlist Néon nocturne, ses modes de lecture et le morceau en cours ; sur le fronton, l'illustration du morceau ; sur le DMD, le nom de l'artiste et un spectre en points lumineux."></p>
+<p align="center"><img src="docs/images/fr/jukebox.webp?v=26444dfe04" width="900" alt="Le Juke-box sur une borne à quatre écrans : sur le playfield, la playlist Néon nocturne, ses modes de lecture et le morceau en cours ; sur le fronton, l'illustration du morceau ; sur le DMD, le nom de l'artiste et un spectre en points lumineux."></p>
 
 - **Un médaillon de plus sur la roue.** En tête de la roue des tables, il ouvre vos playlists. Le fronton passe le clip, le playfield montre la liste des morceaux, et le DMD dessine un spectre en points aux couleurs de la pochette. Les boutons font ce qu'ils font sur la roue : les flippers choisissent, Start joue ou met en pause, les MagnaSave changent de playlist.
 - **Vos playlists YouTube et vos propres fichiers.** Importez une playlist ou une vidéo YouTube par son lien, ou celles de votre compte (privées comprises), et ajoutez la musique de votre disque, un dossier entier d'un coup. Chaque morceau se pré-écoute avant l'import.
@@ -131,7 +131,7 @@ Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bor
 
 ## De la table repérée à la première partie
 
-<p align="center"><img src="docs/images/fr/missing-to-play.webp?v=265baffecb" width="760" alt="Ce qu'il manque pour jouer à Neon Abyss. À gauche, l'étape 3 sur 4 : il reste la ROM, et Cyber Pinball conseille de la récupérer sur vpforums.org, ou de jouer avec une révision proche déjà présente sur la borne. À droite, une fois la ROM installée : Tout est prêt pour jouer, avec Jouer comme première action."></p>
+<p align="center"><img src="docs/images/fr/missing-to-play.webp?v=f9fd568af5" width="760" alt="Ce qu'il manque pour jouer à Neon Abyss. À gauche, l'étape 3 sur 4 : il reste la ROM, et Cyber Pinball conseille de la récupérer sur vpforums.org, ou de jouer avec une révision proche déjà présente sur la borne. À droite, une fois la ROM installée : Tout est prêt pour jouer, avec Jouer comme première action."></p>
 
 - **« Ajouter une table » regroupe toutes les sources.** Un dossier d'import, une clé USB, le PC, votre dossier Téléchargements, votre téléphone ou le catalogue du [Virtual Pinball Spreadsheet](https://github.com/VirtualPinballSpreadsheet/vps-db) : pour chaque jeu, vous voyez ses versions et ce qui manque encore à votre borne pour y jouer. Les tables portent le nom que leur donne cette base.
 - **« Ce qu'il manque pour jouer ».** Un parcours pas à pas : d'une ROM ou d'un fronton manquant jusqu'à la bonne page de téléchargement, puis l'installation de ce que vous avez récupéré, et enfin « Jouer ». Seules la table et sa ROM sont indispensables ; le reste est proposé en bonus.
@@ -158,7 +158,7 @@ Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bor
 ## Une borne qui s'entretient toute seule
 
 <p align="center">
-  <img src="docs/images/fr/health.webp?v=65df0dccb2" width="360" alt="Santé de la borne : 1 point bloquant, 2 à vérifier, 3 OK. L'espace disque suffit ; Midnight Circuit ne démarre pas faute de ROM (ligne sélectionnée, avec Ouvrir le médecin de la table) ; VPinMediaDB a des médias pour 2 tables ; la borne du salon est reconnue avec ses 4 écrans ; une version plus récente de VPX peut être installée.">
+  <img src="docs/images/fr/health.webp?v=c6ceeb14be" width="360" alt="Santé de la borne : 1 point bloquant, 2 à vérifier, 3 OK. L'espace disque suffit ; Midnight Circuit ne démarre pas faute de ROM (ligne sélectionnée, avec Ouvrir le médecin de la table) ; VPinMediaDB a des médias pour 2 tables ; la borne du salon est reconnue avec ses 4 écrans ; les tables sont dans votre sens, flippers en bas ; une version plus récente de VPX peut être installée.">
   <img src="docs/images/fr/tech-sheet.webp?v=7cf1534a18" width="360" alt="La fiche technique de la borne : le PC, Windows, les écrans, les contrôleurs, les logiciels et Cyber Pinball, chaque bloc avec son état (OK ou À vérifier), puis Envoyer un rapport et Santé de la borne.">
 </p>
 

@@ -117,7 +117,10 @@ function renderLibrary(v) {
       if (section.title) box.append(libEl('h2', '', section.title));
       const list = libEl('ul', 'lib-rows');
       // Dès qu'une ligne a un drapeau, les autres gardent sa case, vide : les textes partent tous du même bord.
+      // Les icônes prennent alors la largeur du drapeau (library.css, .has-flags) : « Pays : France »
+      // sous « Partage activé » (Partage et réseau) partait 0,8 cqmin plus loin.
       const flagged = section.rows.some((r) => r.flag);
+      if (flagged) list.classList.add('has-flags');
       for (const row of section.rows) {
         // Fil de la messagerie : une bulle, une carte de la borne ou un séparateur de jour.
         if (row.bubble) {

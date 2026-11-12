@@ -9,7 +9,7 @@
 //   Émile  : ami hors ligne depuis trois heures (écrit dans social.json avant le démarrage).
 // CYBERPINBALL_RESEAU_DEMO=partie : de plus, Bruno invite la borne à une partie en direct sur la
 // table qu'ils ont tous deux, ici dans la même version (la partie se montre sans avertissement),
-// lance le départ dès qu'elle accepte, charge sa table (prête cinq secondes après la borne, qui l'attend au départ
+// lance le départ dès qu'elle accepte, charge sa table (prête huit secondes après la borne, qui l'attend au départ
 // commun), joue quatre secondes et bat son record ; l'historique des
 // parties a déjà deux soirées avec Émile (seedSimulatedFriends). =en-jeu : Bruno
 // attend que la borne soit en partie, puis l'invite (la notification pendant la partie,
@@ -80,7 +80,9 @@ export const DEMO_TABLES = {
  * (une borne lente à charger était prête en même temps que lui, et l'attente ne se voyait pas).
  */
 const BRUNO_LOADING_MS = 6000;
-const BRUNO_LATE_MS = 5000;
+// Huit secondes : la carte d'attente ne compte qu'une fois sa fenêtre chargée, ce qui a pris jusqu'à
+// quatre secondes sur un poste chargé (12/11/2026) ; avec cinq, l'attente ne se voyait presque plus.
+const BRUNO_LATE_MS = 8000;
 /** Table que la borne n'a pas, dans la démonstration de la coupure : assez lourde pour voir l'envoi avancer, s'arrêter, reprendre. */
 const CUT_TABLE_BYTES = 24 * 1024 * 1024;
 /** Débit de Bruno dans la démonstration de la coupure : un morceau de 64 Kio toutes les 25 ms (environ 2,5 Mo/s). */

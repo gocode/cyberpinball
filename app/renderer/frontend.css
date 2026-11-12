@@ -2337,7 +2337,13 @@ html.power-phase body,
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /*
+   * Un écran plein plus haut que la fenêtre (aide « Commandes » en 4:3, au plancher de 20 px) ne
+   * remonte jamais au-dessus de son rembourrage, sous la marque et les notifications du coin : il
+   * part du haut et défile. Centré tant qu'il tient.
+   */
+  justify-content: safe center;
+  overflow-y: auto;
   gap: 3cqmin;
   padding: var(--pad-top) var(--pad-side);
   background: var(--fond-ambiance);

@@ -15,7 +15,7 @@ test('les scripts injectés par le garde-fou de mise en page se compilent', () =
   const scripts = [...source.matchAll(/const (\w+) = (?:\/\*[^*]*\*\/ )?String\.raw`([\s\S]*?)`;/g)];
   assert.deepEqual(
     scripts.map((m) => m[1]),
-    ['SCRIPT', 'STABLE'],
+    ['SCRIPT', 'STABLE', 'SETTLED'],
   );
   for (const [, name, body] of scripts) {
     assert.doesNotThrow(() => new Function(`return ${body}`), `${name} ne se compile pas`);

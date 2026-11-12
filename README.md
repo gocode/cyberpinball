@@ -54,20 +54,20 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 - **Find players.** Search for a player by name in a directory the cabinets pass to each other, or find the cabinets around you on the local network, even without the Internet. Send a friend request; they accept on their side.
 - **Your cabinet, your rules.** Saves, high-score files and programs never leave your cabinet. Sharing is on by default and turned off in one place, "Sharing and network", which also shows what other cabinets can see. Built on [Holepunch](https://holepunch.to)'s Hyperswarm.
 
-<p align="center"><img src="docs/images/en/friends-notifications.webp?v=dc42cfa51e" width="760" alt="Two moments of a game. On Star Courier, one discreet line at the top of the playfield: Bruno just came online. A little later, on Neon Abyss, his invitation card: Bruno invites you to play, on Neon Harbor, with the time left to answer."></p>
+<p align="center"><img src="docs/images/en/friends-notifications.webp?v=3ed1612d4f" width="760" alt="Two moments of a game. On Star Courier, one discreet line at the top of the playfield: Bruno just came online. A little later, on Neon Abyss, his invitation card: Bruno invites you to play, on Neon Harbor, with the time left to answer."></p>
 
-<p align="center"><img src="docs/images/en/live-scores.webp?v=216d920702" width="760" alt="A game with friends in progress on Atlas Rising. At the bottom of the backglass, the Game with friends strip shows Bruno's and Alexis's scores live, with each player's ball; below it, the DMD shows the same scores in glowing dots."></p>
+<p align="center"><img src="docs/images/en/live-scores.webp?v=29773bd3be" width="760" alt="A game with friends in progress on Atlas Rising. At the bottom of the backglass, the Game with friends strip shows Bruno's and Alexis's scores live, with each player's ball; below it, the DMD shows the same scores in glowing dots."></p>
 
 <p align="center">
-  <img src="docs/images/en/friends.webp?v=f215598b45" width="440" alt="My friends: Bruno is online and playing Star Courier, with his new high score just now, and Émile is offline; next to it, Bruno's page with his latest events and See their library.">
+  <img src="docs/images/en/friends.webp?v=9353564220" width="440" alt="My friends: Bruno is online and playing Star Courier, with his new high score just now, and Émile is offline; next to it, Bruno's page with his latest events and See their library.">
   <img src="docs/images/en/messages.webp?v=eb9b0423c5" width="300" alt="The conversation with Bruno on the cabinet: the card of his new high score on Star Courier, his messages, then your reply, received and greeted with a “Bravo”; next to it, Write a message, Quick reply and Conversation options.">
 </p>
 
-<p align="center"><img src="docs/images/en/friends-library.webp?v=9d2ac18401" width="760" alt="Bruno's library: the tables on both cabinets and the one this cabinet does not have, Glass Lagoon, with its media and Get the whole table."></p>
+<p align="center"><img src="docs/images/en/friends-library.webp?v=937265c14c" width="760" alt="Bruno's library: the tables on both cabinets and the one this cabinet does not have, Glass Lagoon, with its media and Get the whole table."></p>
 
 ## Leaderboards, all the way to the world
 
-<p align="center"><img src="docs/images/en/leaderboard.webp?v=1917ed2e02" width="360" alt="A table's scoreboard: this year's World ranking, each player with their country's flag, their avatar and their presence, and your own place under the board."></p>
+<p align="center"><img src="docs/images/en/leaderboard.webp?v=e71ce7fd79" width="360" alt="A table's scoreboard: this year's World ranking, each player with their country's flag, their avatar and their presence, and your own place under the board."></p>
 
 - **A scoreboard on every table's page.** Every game played on the cabinet leaves its scores there, read from the table or from its ROM's memory, alongside the high scores it already kept. All time, this year, this week or today: the flippers change the period.
 - **From your cabinet to the whole world.** The MagnaSaves switch from "This cabinet" to "Friends", "National" and "World". Your place is shown under each ranking, even far from the top rows.
@@ -76,7 +76,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 
 ## A menu with real cabinet presence
 
-<p align="center"><img src="docs/images/en/launch.webp?v=e6b63f86e9" width="900" alt="Animation of the launch on a four-screen cabinet: after Start, the Neon Abyss logo lights up on the playfield, flies up through the DMD and lands on the backglass, then the screens fade out as Visual Pinball X takes over."></p>
+<p align="center"><img src="docs/images/en/launch.webp?v=d9a0c78278" width="900" alt="Animation of the launch on a four-screen cabinet: after Start, the Neon Abyss logo lights up on the playfield, flies up through the DMD and lands on the backglass, then the screens fade out as Visual Pinball X takes over."></p>
 
 - **A wheel of medallions that comes alive.** Over the table's own playfield video, with one window per cabinet screen: the topper, backglass and DMD follow the selected game. The chosen table lights up with a glow in its own colour, a spark runs around its medallion, and every press sends a wave of light along the wheel.
 - **An intro at power-up.** Threads of light weave across the playfield, a spark rises and ignites, and the cabinet's name appears as the backglass and DMD light up. You can replace it with your own picture or video.
@@ -93,7 +93,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 
 ## A jukebox on the cabinet
 
-<p align="center"><img src="docs/images/en/jukebox.webp?v=a4fa3e5826" width="900" alt="The jukebox on a four-screen cabinet: on the playfield, the Néon nocturne playlist, its play modes and the track playing; on the backglass, the track's artwork; on the DMD, the artist's name and a spectrum in glowing dots."></p>
+<p align="center"><img src="docs/images/en/jukebox.webp?v=588b41addb" width="900" alt="The jukebox on a four-screen cabinet: on the playfield, the Néon nocturne playlist, its play modes and the track playing; on the backglass, the track's artwork; on the DMD, the artist's name and a spectrum in glowing dots."></p>
 
 - **One more medallion on the wheel.** At the head of the table wheel, it opens your playlists. The backglass plays the music video, the playfield shows the track list, and the DMD draws a dot spectrum in the colours of the cover. The buttons do what they do on the wheel: flippers choose, Start plays or pauses, MagnaSaves change playlist.
 - **Your YouTube playlists and your own files.** Import a YouTube playlist or video from its link, or those of your account (private ones included), and add music from your disk, a whole folder at once. Every track can be previewed before importing.
@@ -131,7 +131,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 
 ## From "I want this table" to "Play"
 
-<p align="center"><img src="docs/images/en/missing-to-play.webp?v=8b4e90863c" width="760" alt="What's missing to play, for Neon Abyss: on the left, step 3 of 4, the ROM is still to do and the suggested action is to get it from vpforums.org, or to play with a neighbouring revision already on the cabinet; on the right, once the ROM is installed, All set to play, with Play as the first action."></p>
+<p align="center"><img src="docs/images/en/missing-to-play.webp?v=d751d66624" width="760" alt="What's missing to play, for Neon Abyss: on the left, step 3 of 4, the ROM is still to do and the suggested action is to get it from vpforums.org, or to play with a neighbouring revision already on the cabinet; on the right, once the ROM is installed, All set to play, with Play as the first action."></p>
 
 - **"Add a table" gathers every way in.** An import folder, a USB stick, the PC, your Downloads folder, your phone or the [Virtual Pinball Spreadsheet](https://github.com/VirtualPinballSpreadsheet/vps-db) catalogue: every game, its versions and what this cabinet still needs to play it. Each table is named from that database.
 - **"What's missing to play".** A step-by-step path, from a missing ROM or backglass to the right download page, then the install of what you fetched, ending on "Play". Only the table and its ROM are required; the rest is offered as extras.
@@ -158,7 +158,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 ## A cabinet that looks after itself
 
 <p align="center">
-  <img src="docs/images/en/health.webp?v=5e114520e0" width="360" alt="Cabinet health: 1 blocking, 2 to check, 3 OK. Disk space is fine, Midnight Circuit won't start because its ROM is missing (selected, with Open the table doctor), VPinMediaDB has media for 2 tables, the living-room cabinet is recognised with all 4 screens, and a newer VPX is available to install.">
+  <img src="docs/images/en/health.webp?v=794ac8eb14" width="360" alt="Cabinet health: 1 blocking, 2 to check, 3 OK. Disk space is fine, Midnight Circuit won't start because its ROM is missing (selected, with Open the table doctor), VPinMediaDB has media for 2 tables, the living-room cabinet is recognised with all 4 screens, tables are the right way round with the flippers at the bottom, and a newer VPX is available to install.">
   <img src="docs/images/en/tech-sheet.webp?v=be70aa361a" width="360" alt="The cabinet's tech sheet: the PC, Windows, the screens, the controllers, the software and Cyber Pinball, each block with its status (OK or To check), then Send a report and Cabinet health.">
 </p>
 

@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { app, BrowserWindow, screen, type BrowserWindowConstructorOptions, type Rectangle, type Display } from 'electron';
+import { app, BrowserWindow, screen, type BrowserWindowConstructorOptions, type Rectangle, type Display, type NativeImage, type WebContents } from 'electron';
 import { offscreenMode, parseSimulatedDisplays, readJsonFile, realScreensRefusal, type Rect } from '@cyberpinball/core';
 import { currentDesktop, HIDDEN_DESKTOP, startOnHiddenDesktop, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
@@ -275,6 +275,29 @@ function keepOffscreen(win: BrowserWindow): void {
     isMinimized: () => minimized.has(win),
     flashFrame: none,
   });
+  steadyCapture(win.webContents);
+}
+
+/**
+ * Hors écran, le compositeur refuse parfois une image (« UnknownVizError »), surtout quand
+ * d'autres rendus hors écran chargent le processeur graphique : la capture est retentée, jusqu'à
+ * quatre fois, avant de rendre l'erreur. Le 12/11/2026, ce refus passager arrêtait la démonstration
+ * du parcours à sa première capture, et bloquait celle du Juke-box (rejet jamais attendu).
+ */
+const CAPTURE_ATTEMPTS = 4;
+function steadyCapture(contents: WebContents): void {
+  const capture = contents.capturePage.bind(contents) as (...args: unknown[]) => Promise<NativeImage>;
+  const steady = async (...args: unknown[]): Promise<NativeImage> => {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await capture(...args);
+      } catch (error) {
+        if (attempt >= CAPTURE_ATTEMPTS || contents.isDestroyed()) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+      }
+    }
+  };
+  Object.assign(contents, { capturePage: steady });
 }
 
 /** Vrai si la fenêtre est affichée : vraiment, ou, hors écran, pour l'application. */

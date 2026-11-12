@@ -12,7 +12,7 @@ import type { RankingView } from './table-rankings';
 import type { TableBoard } from './table-scores';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, BrowserWindow, clipboard, dialog, net, screen as electronScreen, type Input, type Rectangle } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, net, screen as electronScreen, type Input, type Rectangle, type WebContents } from 'electron';
 import {
   isFavorite,
   CONFIG_KEY,
@@ -4973,6 +4973,23 @@ export function createLibrary(host: LibraryHost) {
       send('keyDown', code, k);
       send('keyUp', code, k);
     };
+    // Capture d'un écran : le compositeur hors écran refuse parfois une image (« UnknownVizError »,
+    // vue du lecteur YouTube remplacée pendant la capture). Le rejet n'était pas attendu : l'autopilote
+    // s'arrêtait net, l'application restait ouverte, la démonstration attendait sans fin (Juke-box,
+    // 12/11/2026). Trois essais, puis l'image manque et le journal le dit.
+    const snap = async (contents: WebContents, label: string): Promise<Buffer | undefined> => {
+      for (let attempt = 1; ; attempt++) {
+        try {
+          return (await contents.capturePage()).toPNG();
+        } catch (error) {
+          if (attempt >= 3) {
+            console.log(`Autopilote : capture impossible de « ${label} » (${(error as Error).message}).`); // i18n-ignore : journal des essais
+            return undefined;
+          }
+          await delay(500);
+        }
+      }
+    };
     for (const [i, step] of ['depart', ...steps].entries()) {
       if (i > 0) {
         if (step.startsWith('type:')) for (const ch of step.slice(5)) key(ch === ' ' ? 'Space' : `Key${ch.toUpperCase()}`, ch);
@@ -5045,14 +5062,20 @@ export function createLibrary(host: LibraryHost) {
         }
         sounds.push(`${name} : ${JSON.stringify({ ...sound, ecrans: screens })}`);
       }
-      fs.writeFileSync(path.join(captureDir, `${name}.png`), (await playfield.webContents.capturePage()).toPNG());
+      const shot = await snap(playfield.webContents, name);
+      if (shot) fs.writeFileSync(path.join(captureDir, `${name}.png`), shot);
       // Les autres écrans à part (ecrans\), pour ne pas changer ce que comptent les démonstrations.
       for (const [role, win] of host.windows()) {
         if (win === playfield || !isShown(win)) continue;
         fs.mkdirSync(path.join(captureDir, 'ecrans'), { recursive: true });
-        fs.writeFileSync(path.join(captureDir, 'ecrans', `${name}-${role}.png`), (await win.webContents.capturePage()).toPNG());
+        const png = await snap(win.webContents, `${name}-${role}`);
+        if (png) fs.writeFileSync(path.join(captureDir, 'ecrans', `${name}-${role}.png`), png);
       }
-      for (const extra of (await host.captureExtras?.()) ?? []) {
+      const extras = await host.captureExtras?.().catch((error: Error) => {
+        console.log(`Autopilote : capture impossible de « ${name} » (vues à part : ${error.message}).`); // i18n-ignore : journal des essais
+        return [];
+      });
+      for (const extra of extras ?? []) {
         fs.mkdirSync(path.join(captureDir, 'ecrans'), { recursive: true });
         fs.writeFileSync(path.join(captureDir, 'ecrans', `${name}-${extra.name}.png`), extra.png);
       }

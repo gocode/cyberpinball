@@ -245,8 +245,12 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
         // Une marge d'un cinquième de la ligne : la boîte du texte (jambages compris) dépasse un interligne serré.
         const s = getComputedStyle(e);
         const lineClamp = s.webkitLineClamp && s.webkitLineClamp !== 'none';
-        const tall = kept.bottom - kept.top;
-        if (!lineClamp && tall > T && (c.top - kept.top > Math.max(T, tall / 5) || kept.bottom - c.bottom > Math.max(T, tall / 5))) {
+        // Texte couché d'un quart de tour (bande de la partie dans un encart tourné) : sa hauteur
+        // de ligne est la largeur à l'écran, et son « … » coupe dans la hauteur de l'écran.
+        const lying = quarterTurned(e);
+        const [lo, hi] = lying ? ['left', 'right'] : ['top', 'bottom'];
+        const tall = kept[hi] - kept[lo];
+        if (!lineClamp && tall > T && (c[lo] - kept[lo] > Math.max(T, tall / 5) || kept[hi] - c[hi] > Math.max(T, tall / 5))) {
           problems.add('coupé en hauteur : ' + label(el) + ' par ' + label(e).slice(0, 60));
           break;
         }
@@ -651,6 +655,17 @@ const STABLE = String.raw`(() => {
 
 type Stable = { shape: string; zones: Record<string, number[]> };
 
+/**
+ * Attend la fin des animations qui en ont une (ouverture d'un écran, glissement d'une zone), deux
+ * secondes au plus ; les boucles (lueurs, spectre) ne comptent pas. Sur un poste chargé, l'écran du
+ * Juke-box était relevé en pleine ouverture, puis « déplacé » au relevé suivant (12/11/2026).
+ */
+const SETTLED = String.raw`(() => {
+  const ending = document.getAnimations().filter((a) => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime));
+  if (!ending.length) return true;
+  return Promise.race([Promise.all(ending.map((a) => a.finished.catch(() => undefined))), new Promise((r) => setTimeout(r, 2000))]).then(() => true);
+})()`;
+
 /** Défilements sans geste relevés par la page depuis la dernière inspection (scroll-keeper.js). */
 const DRIFTS = `(typeof CyberScroll === 'object' ? CyberScroll.takeDrifts() : [])`;
 
@@ -706,6 +721,7 @@ export class LayoutReport {
 
   async check(contents: WebContents, where: string): Promise<void> {
     const errors = this.watch(contents);
+    await contents.executeJavaScript(SETTLED).catch(() => undefined);
     let now: Stable | undefined;
     try {
       now = (await contents.executeJavaScript(STABLE)) as Stable;
