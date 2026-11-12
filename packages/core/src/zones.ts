@@ -259,16 +259,34 @@ export function moveZone(zone: ScreenZone, size: Size, dx: number, dy: number): 
  * format verrouillé, l'autre côté suit ; sans, seul cet axe change.
  */
 export function resizeZone(zone: ScreenZone, size: Size, axis: 'width' | 'height', delta: number): ScreenZone {
+  // En pixels entiers, les pixels gagnés ou perdus partagés entre les deux bords : un pas d'un pixel
+  // va d'un côté puis de l'autre, la zone reste où elle est (demande du 12/11/2026 ; avant, le centre
+  // recalculé sur des pixels arrondis glissait, et la hauteur ne grandissait que d'un côté).
   const r = toPx(zone, size);
-  const { cx, cy } = center(r);
-  let { w, h } = r;
-  if (axis === 'width') w = Math.max(1, w + delta);
-  else h = Math.max(1, h + delta);
+  const x = Math.round(r.x);
+  const y = Math.round(r.y);
+  const w0 = Math.round(r.w);
+  const h0 = Math.round(r.h);
+  let w = w0;
+  let h = h0;
+  if (axis === 'width') w = Math.max(1, w0 + delta);
+  else h = Math.max(1, h0 + delta);
   if (zone.aspect) {
-    if (axis === 'height') w = h * zone.aspect;
-    h = w / zone.aspect;
+    if (axis === 'height') w = Math.round(h * zone.aspect);
+    h = Math.round(w / zone.aspect);
   }
-  return fromPx({ x: cx - w / 2, y: cy - h / 2, w, h }, size, zone.aspect);
+  return fromPx({ x: x - startShare(w0, w), y: y - startShare(h0, h), w, h }, size, zone.aspect);
+}
+
+/**
+ * Pixels ajoutés (ou retirés, négatif) du côté du début (gauche, haut) quand un côté passe de `from` à
+ * `to` : la moitié, le pixel impair en alternance selon la parité de `from`, de sorte qu'un pas en
+ * arrière défait exactement le pas d'avant.
+ */
+function startShare(from: number, to: number): number {
+  const d = to - from;
+  if (d >= 0) return from % 2 === 0 ? Math.ceil(d / 2) : Math.floor(d / 2);
+  return -(from % 2 === 1 ? Math.ceil(-d / 2) : Math.floor(-d / 2));
 }
 
 /**

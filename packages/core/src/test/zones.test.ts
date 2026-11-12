@@ -284,6 +284,34 @@ test('redimensionner : format libre, un seul côté ; format verrouillé, les de
   assert.deepEqual(px(resizeZone(locked, FHD, 'width', 5000)), { x: 0, y: 0, width: 1920, height: 1080 });
 });
 
+test('redimensionner au pixel : un pixel d’un côté puis de l’autre, la zone ne glisse pas (12/11/2026)', () => {
+  const start = { x: 600 / 1920, y: 400 / 1080, width: 512 / 1920, height: 128 / 1080 };
+  for (const axis of ['width', 'height'] as const) {
+    const pos = axis === 'width' ? 'x' : 'y';
+    const len = axis;
+    let z: typeof start = start;
+    const center = (r: { x: number; y: number; width: number; height: number }) => r[pos] + r[len] / 2;
+    const c0 = center(px(start));
+    const seen: number[] = [];
+    // Dix pas d'un pixel : le bord du début et celui de la fin bougent chacun à leur tour, le centre reste à un demi-pixel.
+    for (let i = 0; i < 10; i++) {
+      const before = px(z);
+      z = resizeZone(z, FHD, axis, 1);
+      const after = px(z);
+      assert.equal(after[len], before[len] + 1);
+      seen.push(before[pos] - after[pos]);
+      assert.ok(Math.abs(center(after) - c0) <= 0.5, `${axis} : centre ${center(after)} pour ${c0}`);
+    }
+    assert.deepEqual(seen, [1, 0, 1, 0, 1, 0, 1, 0, 1, 0], `${axis} : alternance des bords`);
+    // Un pas plus grand se partage des deux côtés ; le chemin inverse revient exactement au départ.
+    z = resizeZone(z, FHD, axis, 6);
+    assert.ok(Math.abs(center(px(z)) - c0) <= 0.5);
+    z = resizeZone(z, FHD, axis, -6);
+    for (let i = 0; i < 10; i++) z = resizeZone(z, FHD, axis, -1);
+    assert.deepEqual(px(z), px(start), `${axis} : retour au départ`);
+  }
+});
+
 test('format conservé : 16:9 sur une bande, puis taille précise', () => {
   const band = { x: 0, y: 0.75, width: 1, height: 0.25 };
   const locked = setZoneAspect(band, FHD, 16 / 9);
