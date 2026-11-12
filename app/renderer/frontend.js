@@ -1340,7 +1340,8 @@ function syncLiveDmd(spec) {
     edit.append(el('div', 'live-dmd-edit-label'));
     edit.hidden = true;
     dmdZone.node.append(holder, edit);
-    liveDmd = { holder, box, edit, matrix: CyberFallback.dotMatrix(box, {}) };
+    // Les points remplissent la place réglée, quelles qu'en soient les proportions : pas de bandes noires.
+    liveDmd = { holder, box, edit, matrix: CyberFallback.dotMatrix(box, { fill: true }) };
   }
   liveDmd.framed = spec.framed;
   liveDmd.hidden = Boolean(spec.hidden);

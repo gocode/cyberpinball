@@ -5,11 +5,13 @@
 // comme les écrans. Chaque configuration de borne a son VPinballX.ini : celle qui
 // correspond aux écrans branchés est reconnue avant chaque synchronisation.
 
+import * as path from 'node:path';
 import {
   cabinetJoystickHids,
   configIniPath,
   findGlobalDmdFolders,
   loadCabinet,
+  prepareScoreViewLayouts,
   readJsonFile,
   selectConfiguration,
   writeVpxSync,
@@ -24,7 +26,7 @@ import {
 } from '@cyberpinball/core';
 import { probeAudioOutputs, probeUsbDevices } from '@cyberpinball/win-displays';
 import { readDof } from './dof-files';
-import { backupDir, locations } from './paths';
+import { backupDir, locations, vpxInstall } from './paths';
 
 export type VpxIniSync = VpxSyncWrite;
 
@@ -42,15 +44,32 @@ export function syncVpxIni(
 ): VpxIniSync {
   const loc = locations();
   const root = loc.root;
+  const scoreview = scoreViewLayouts(loc, dataDir);
+  const folders = { ...(root ? findGlobalDmdFolders(root) : {}), ...(scoreview && { scoreview }) };
   return writeVpxSync(
     dataDir,
     iniPath,
     cabinet,
     displays,
     profile,
-    { overwriteManual, audio, usb: usbDevices(), folders: root ? findGlobalDmdFolders(root) : undefined, dof: readDof(loc), hidNames: cabinetJoystickHids(cabinet), only },
+    { overwriteManual, audio, usb: usbDevices(), folders, dof: readDof(loc), hidNames: cabinetJoystickHids(cabinet), only },
     backupDir(dataDir),
   );
+}
+
+/**
+ * Mises en page de ScoreView qui remplissent la fenêtre du DMD (scoreviewlayouts.ts), tirées de
+ * celles de la version de VPX installée ; undefined sans VPX ou en cas d'échec (ScoreView garde les siennes).
+ */
+function scoreViewLayouts(loc: ReturnType<typeof locations>, dataDir: string): string | undefined {
+  const exe = vpxInstall(loc)?.exe;
+  if (!exe) return undefined;
+  try {
+    return prepareScoreViewLayouts(path.join(path.dirname(exe), 'plugins', 'scoreview', 'layouts'), dataDir);
+  } catch (error) {
+    console.log(`ScoreView : mises en page non préparées (${(error as Error).message}).`); // i18n-ignore : journal
+    return undefined;
+  }
 }
 
 /** VPinballX.ini de la configuration active : celui que lisent VPX, les réglages et l'assistant. */

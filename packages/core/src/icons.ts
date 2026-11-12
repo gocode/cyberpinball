@@ -132,6 +132,9 @@ export const ICON_NAMES = [
   'move-down',
   'zoom-in',
   'zoom-out',
+  // Largeur et hauteur du DMD, chacune seule (DMD sur la roue, Position du DMD)
+  'resize-width',
+  'resize-height',
   // Collections du menu des tables
   'history',
   'sparkle',

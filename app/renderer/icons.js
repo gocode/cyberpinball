@@ -140,6 +140,8 @@ const CYBER_ICONS = {
   'move-down': '<rect x="7" y="3" width="10" height="9" rx="1"/><path d="M12 15v6M9 18l3 3 3-3"/>', // Cadre et flèche en dessous.
   'zoom-in': '<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M10 7v6M7 10h6"/>', // Loupe et plus : rapprocher.
   'zoom-out': '<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M7 10h6"/>', // Loupe et moins : éloigner.
+  'resize-width': '<path d="M3 6v12M21 6v12M6 12h12M9 9l-3 3 3 3M15 9l3 3-3 3"/>', // Deux butées, flèche entre elles : la largeur.
+  'resize-height': '<path d="M6 3h12M6 21h12M12 6v12M9 9l3-3 3 3M9 15l3 3 3-3"/>', // La même, debout : la hauteur.
 
   // Collections du menu des tables (collections.ts)
   history: '<path d="M4.5 9A8 8 0 1 1 4 13M4 4v5h5M12 7v5l4 2"/>', // Retour circulaire et aiguilles : les dernières tables jouées.

@@ -141,6 +141,8 @@ export interface GlobalDmdFolders {
   serum?: string;
   /** Dossier qui contient <rom>\<rom>.pal : [Plugin.VNI] VniPath. */
   vni?: string;
+  /** Mises en page de ScoreView qui remplissent la fenêtre du DMD (scoreviewlayouts.ts) : [Plugin.ScoreView] LayoutFolder. */
+  scoreview?: string;
 }
 
 /**
@@ -167,6 +169,7 @@ export function vpxFolderDefaults(folders: GlobalDmdFolders): VpxSetting[] {
   if (folders.pinmame) defaults.push({ section: 'Plugin.PinMAME', key: 'PinMAMEPath', value: folders.pinmame });
   if (folders.serum) defaults.push({ section: 'Plugin.Serum', key: 'SerumPath', value: folders.serum });
   if (folders.vni) defaults.push({ section: 'Plugin.VNI', key: 'VniPath', value: folders.vni });
+  if (folders.scoreview) defaults.push({ section: 'Plugin.ScoreView', key: 'LayoutFolder', value: folders.scoreview });
   return defaults;
 }
 

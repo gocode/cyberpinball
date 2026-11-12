@@ -121,7 +121,7 @@ test('menu en partie : « Position du DMD » en tête, réglée aux flippers et 
   assert.equal(panel.sections[0]!.items[0]!.label, 'Écran', 'la place du DMD avant toute autre ligne');
   assert.deepEqual(
     panel.sections.flatMap((x) => x.items.map((i) => i.label)),
-    ['Écran', 'Position horizontale', 'Position verticale', 'Taille', 'Format', 'DMD', 'Enregistrer pour cette table', 'Revenir à la position générale', 'Tous les réglages de VPX', 'Reprendre la partie'],
+    ['Écran', 'Position horizontale', 'Position verticale', 'Largeur', 'Hauteur', 'Format', 'DMD', 'Enregistrer pour cette table', 'Revenir à la position générale', 'Tous les réglages de VPX', 'Reprendre la partie'],
   );
   // Sans place pour la table : la ligne est grisée avec sa raison, jamais cachée.
   assert.match(panel.sections[1]!.items[1]!.disabled!, /suit déjà la position générale/);
@@ -143,17 +143,51 @@ test('menu en partie : « Position du DMD » en tête, réglée aux flippers et 
   assert.equal(dmdMenuDirty(s), false);
 });
 
-test('menu en partie : taille au format 4:1, autre écran, masqué', () => {
+const panelChoice = (h: DmdMenuHost, s: ReturnType<typeof startDmdMenu>) => dmdMenuPanel(h, s, (c) => c.join(' ')).choices!.find((c) => c.selected)!.label;
+
+test('menu en partie : largeur et hauteur chacune seule, « Format » rend le 4:1, autre écran, masqué', () => {
   const h = host();
   const s = startDmdMenu({ screen: 0, zone: band, hidden: false });
-  // Taille : la hauteur suit la largeur.
+  // Largeur seule : la hauteur ne bouge pas, le format se libère (demande du 12/11/2026).
   s.item = 3;
   press(h, s, 'Digit1');
   press(h, s, 'ShiftRight', 2);
   press(h, s, 'Digit1');
-  const r = zoneRect(s.spot.zone, h.screens[0]!.bounds);
-  assert.equal(r.width, 520);
-  assert.equal(r.height, 130);
+  let r = zoneRect(s.spot.zone, h.screens[0]!.bounds);
+  assert.deepEqual([r.width, r.height], [514, 128]);
+  assert.equal(s.spot.zone.aspect, undefined);
+  // Hauteur seule : la largeur ne bouge pas.
+  s.item = 4;
+  press(h, s, 'Digit1');
+  press(h, s, 'ShiftLeft', 3);
+  press(h, s, 'Digit1');
+  r = zoneRect(s.spot.zone, h.screens[0]!.bounds);
+  assert.deepEqual([r.width, r.height], [514, 125]);
+  const panel = dmdMenuPanel(h, s, (codes) => codes.join(' ou '));
+  assert.match(panel.sections[0]!.items.find((i) => i.label === 'Format')!.value, /^Libre · 4,11:1$/);
+  // « Format » : 4:1 d'abord, il rend les proportions du DMD (largeur gardée).
+  s.item = 5;
+  press(h, s, 'Digit1');
+  assert.equal(s.mode, 'choice');
+  assert.equal(panelChoice(h, s), 'Libre');
+  press(h, s, 'ShiftLeft');
+  assert.equal(panelChoice(h, s), '4:1 (DMD)');
+  press(h, s, 'Digit1');
+  r = zoneRect(s.spot.zone, h.screens[0]!.bounds);
+  assert.equal(s.spot.zone.aspect, 4);
+  // Au pixel près : la hauteur est arrondie.
+  assert.ok(Math.abs(r.width / r.height - 4) < 0.02);
+  // Retour aux mesures du reste du test : 520 × 130.
+  s.item = 3;
+  press(h, s, 'Digit1');
+  press(h, s, 'ShiftRight', 6);
+  press(h, s, 'Digit1');
+  s.item = 4;
+  press(h, s, 'Digit1');
+  press(h, s, 'ShiftRight', 130 - zoneRect(s.spot.zone, h.screens[0]!.bounds).height);
+  press(h, s, 'Digit1');
+  r = zoneRect(s.spot.zone, h.screens[0]!.bounds);
+  assert.deepEqual([r.width, r.height], [520, 130]);
   // Clavier : flèches et + / − à toute ligne.
   press(h, s, 'ArrowDown');
   assert.equal(zoneRect(s.spot.zone, h.screens[0]!.bounds).y, r.y + 1);
@@ -167,7 +201,7 @@ test('menu en partie : taille au format 4:1, autre écran, masqué', () => {
   assert.equal(dmdSpotRect(h, s.spot).x < 0, true, 'S22E450 est à gauche du bureau');
   assert.ok(dmdMenuFrame(h, s, 1) && !dmdMenuFrame(h, s, 0), 'le cadre suit le DMD sur son écran');
   // Masqué : les lignes de place sont grisées avec leur raison, la ligne « DMD » le rend.
-  s.item = 5;
+  s.item = 6;
   press(h, s, 'Digit1');
   assert.equal(s.spot.hidden, true);
   s.item = 1;
@@ -193,17 +227,17 @@ test('menu en partie : quitter sans enregistrer demande, enregistrer reste dans 
   press(h, s, 'Escape');
   assert.deepEqual(press(h, s, 'Digit1'), { save: true, then: 'resume' });
   // Ligne « Enregistrer pour cette table » : le menu reste ouvert, plus rien à enregistrer ensuite.
-  s.item = 6;
+  s.item = 7;
   assert.deepEqual(press(h, s, 'Digit1'), { save: true, then: 'stay' });
   markDmdSaved(s, 'Enregistré');
   assert.equal(dmdMenuDirty(s), false);
   // « Tous les réglages de VPX » sans changement : directement.
-  s.item = 10;
+  s.item = 11;
   assert.deepEqual(press(h, s, 'Digit1'), { vpx: true, discard: false });
   // Aucune touche n'ouvre le menu de VPX : grisé avec sa raison.
   const blocked = host({ vpxMenuBlocked: 'Aucune touche' });
   const b = startDmdMenu({ screen: 0, zone: band, hidden: false });
-  b.item = 10;
+  b.item = 11;
   assert.equal(press(blocked, b, 'Digit1'), 'handled');
   assert.equal(b.notice, 'Aucune touche');
 });
@@ -246,28 +280,28 @@ test('menu en partie : « Recentrer la vue 3D » seulement avec la Vision 3D, gr
   const off = host();
   assert.ok(!titles(off).includes('Recentrer la vue 3D'));
   const s = startDmdMenu({ screen: 0, zone: band, hidden: false });
-  s.item = 7; // « Revenir à la position générale »
+  s.item = 8; // « Revenir à la position générale »
   press(off, s, 'ShiftRight');
-  assert.equal(s.item, 10, 'les lignes cachées sont sautées : « Tous les réglages de VPX »');
+  assert.equal(s.item, 11, 'les lignes cachées sont sautées : « Tous les réglages de VPX »');
   press(off, s, 'ShiftLeft');
-  assert.equal(s.item, 7);
-  assert.equal(dmdMenuAction(off, s, { op: 'item', index: 8 }), 'handled');
+  assert.equal(s.item, 8);
+  assert.equal(dmdMenuAction(off, s, { op: 'item', index: 9 }), 'handled');
   // Tête suivie : la ligne est là, dans « Partie », et demande le recentrage sans fermer le menu.
   const on = host({ vision3d: true, vision3dIntensity: '75 %' });
   const partie = dmdMenuPanel(on, s, (c) => c[0]!).sections.find((x) => x.title === 'Partie')!;
   assert.deepEqual(partie.items.map((i) => i.label), ['Recentrer la vue 3D', 'Intensité de la vue 3D', 'Tous les réglages de VPX', 'Reprendre la partie']);
   assert.equal(partie.items[1]!.value, '75 %');
   const i3 = startDmdMenu({ screen: 0, zone: band, hidden: false });
-  i3.item = 9;
+  i3.item = 10;
   assert.deepEqual(press(on, i3, 'Digit1'), { intensity3d: true });
-  s.item = 7;
+  s.item = 8;
   press(on, s, 'ShiftRight');
-  assert.equal(s.item, 8);
+  assert.equal(s.item, 9);
   assert.deepEqual(press(on, s, 'Digit1'), { recenter3d: true });
   // Capteur muet : grisée avec sa raison, rien ne se passe.
   const quiet = host({ vision3d: 'aucune tête' });
   const q = startDmdMenu({ screen: 0, zone: band, hidden: false });
-  q.item = 8;
+  q.item = 9;
   assert.equal(press(quiet, q, 'Digit1'), 'handled');
   assert.equal(q.notice, 'aucune tête');
   assert.equal(dmdMenuPanel(quiet, q, (c) => c[0]!).sections.find((x) => x.title === 'Partie')!.items[0]!.disabled, 'aucune tête');

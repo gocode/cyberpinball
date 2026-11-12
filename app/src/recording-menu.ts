@@ -271,7 +271,7 @@ export function createRecordingMenu(ctx: RecordingMenuContext) {
         // Une conséquence directe d'abord ; les noms exacts sont au plan.
         state: { label: t('Nouvelle prise'), tone: 'info' },
         where: now ? t('Remplace la vidéo actuelle ; l’ancienne restera récupérable dans la corbeille') : t('Ajoute une vidéo ; aujourd’hui : visuel par défaut'),
-        facts: `${f.width} × ${f.height} · ${clockLabel(keptSeconds(outcome.clock))} · ${formatSize(f.bytes)}`,
+        facts: `${f.width} × ${f.height}${f.fps ? ` · ${t('{fps} images/s', { fps: Math.round(f.fps) })}` : ''} · ${clockLabel(keptSeconds(outcome.clock))} · ${formatSize(f.bytes)}`,
         // L'aperçu (une image, la vidéo n'y joue pas) pris au milieu : la première image est noire (fondu d'entrée).
         thumb: { kind: 'video', url: `${mediaUrl(f.file)}#t=${Math.max(1, Math.round(keptSeconds(outcome.clock) / 2))}`, rotation: 0 },
       };

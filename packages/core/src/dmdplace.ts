@@ -27,7 +27,7 @@ import { t } from './i18n';
 import { IniDocument } from './ini';
 import type { ObservedDisplay, Rect, ScreenZone } from './model';
 import { vpxDisplayId, type VpxDisplayIdFormat } from './vpx';
-import { formatLabel, moveZone, moveZoneToScreen, planDrag, resizeZone, setZoneAspect, zoneRect, ZONE_FORMATS } from './zones';
+import { formatLabel, moveZone, moveZoneToScreen, planDrag, ratioLabel, resizeZone, setZoneAspect, zoneRect, ZONE_FORMATS } from './zones';
 
 // ---------------------------------------------------------------------------
 // Places enregistrées
@@ -211,13 +211,14 @@ export interface DmdMenuHost {
 }
 
 /** Lignes du menu, dans l'ordre. */
-export type DmdItemId = 'screen' | 'moveX' | 'moveY' | 'size' | 'format' | 'shown' | 'save' | 'general' | 'recenter3d' | 'intensity3d' | 'vpx' | 'resume';
+export type DmdItemId = 'screen' | 'moveX' | 'moveY' | 'width' | 'height' | 'format' | 'shown' | 'save' | 'general' | 'recenter3d' | 'intensity3d' | 'vpx' | 'resume';
 
 const ITEMS: readonly { id: DmdItemId; label: () => string }[] = [
   { id: 'screen', label: () => t('Écran') },
   { id: 'moveX', label: () => t('Position horizontale') },
   { id: 'moveY', label: () => t('Position verticale') },
-  { id: 'size', label: () => t('Taille') },
+  { id: 'width', label: () => t('Largeur') },
+  { id: 'height', label: () => t('Hauteur') },
   { id: 'format', label: () => t('Format') },
   { id: 'shown', label: () => t('DMD') },
   { id: 'save', label: () => t('Enregistrer pour cette table') },
@@ -232,10 +233,13 @@ const ITEMS: readonly { id: DmdItemId; label: () => string }[] = [
 const shown = (host: DmdMenuHost, id: DmdItemId) => (id !== 'recenter3d' && id !== 'intensity3d') || host.vision3d !== undefined;
 
 /** Lignes qui règlent la place du DMD (le reste : enregistrer, quitter). */
-const PLACE_ITEMS: readonly DmdItemId[] = ['screen', 'moveX', 'moveY', 'size', 'format', 'shown'];
+const PLACE_ITEMS: readonly DmdItemId[] = ['screen', 'moveX', 'moveY', 'width', 'height', 'format', 'shown'];
 
-/** Formats proposés pour le DMD : 4:1 (128 × 32) d'abord, puis libre et les autres. */
-const FORMATS = [ZONE_FORMATS.find((f) => f.aspect === 4)!, { label: '3:1', aspect: 3 }, { label: '2:1', aspect: 2 }, ...ZONE_FORMATS.filter((f) => f.aspect !== 4)];
+/**
+ * Formats proposés pour le DMD : 4:1 (128 × 32) d'abord, puis libre (largeur et hauteur réglées
+ * chacune seule : un flipper ramène au 4:1), et les autres.
+ */
+const FORMATS = [ZONE_FORMATS.find((f) => f.aspect === 4)!, ZONE_FORMATS.find((f) => !f.aspect)!, { label: '3:1', aspect: 3 }, { label: '2:1', aspect: 2 }, ...ZONE_FORMATS.filter((f) => f.aspect && f.aspect !== 4)];
 
 /** Pas d'un réglage aux boutons : le pixel ; un bouton maintenu accélère jusqu'à MAX_STEP. */
 const STEP = 1;
@@ -318,7 +322,7 @@ function itemBlocked(host: DmdMenuHost, s: DmdMenuState, id: DmdItemId): string 
   if (id === 'vpx') return host.vpxMenuBlocked;
   if (id === 'recenter3d' && typeof host.vision3d === 'string') return host.vision3d;
   if (id === 'screen' && host.screens.length < 2) return t('Un seul écran branché.');
-  if (['moveX', 'moveY', 'size', 'format'].includes(id) && s.spot.hidden) return t('DMD masqué : affichez-le d’abord (ligne « DMD »).');
+  if (['moveX', 'moveY', 'width', 'height', 'format'].includes(id) && s.spot.hidden) return t('DMD masqué : affichez-le d’abord (ligne « DMD »).');
   return undefined;
 }
 
@@ -356,10 +360,13 @@ function valueOf(host: DmdMenuHost, s: DmdMenuState, id: DmdItemId): string {
       return `${r.x} px`;
     case 'moveY':
       return `${r.y} px`;
-    case 'size':
-      return `${r.width} × ${r.height}`;
+    case 'width':
+      return `${r.width} px`;
+    case 'height':
+      return `${r.height} px`;
     case 'format':
-      return formatLabel(s.spot.zone.aspect);
+      // Largeur ou hauteur réglée seule : « Libre », avec les proportions du moment.
+      return s.spot.zone.aspect || !(r.width > 0 && r.height > 0) ? formatLabel(s.spot.zone.aspect) : `${formatLabel(undefined)} · ${ratioLabel(r.width / r.height)}`;
     case 'shown':
       return s.spot.hidden ? t('masqué') : t('affiché');
     case 'intensity3d':
@@ -369,10 +376,16 @@ function valueOf(host: DmdMenuHost, s: DmdMenuState, id: DmdItemId): string {
   }
 }
 
-/** Pas courant selon l'axe : position ou taille (la largeur ; la hauteur suit au format verrouillé). */
-function adjust(host: DmdMenuHost, s: DmdMenuState, axis: 'x' | 'y' | 'size', delta: number): void {
+/**
+ * Pas courant selon l'axe : position, largeur ou hauteur seule (le format se libère, « Format » y
+ * revient ; demande du 12/11/2026), ou les deux ensemble (+ et − du clavier : proportions gardées).
+ */
+function adjust(host: DmdMenuHost, s: DmdMenuState, axis: 'x' | 'y' | 'width' | 'height' | 'size', delta: number): void {
   const size = boundsOf(host, s);
-  if (axis === 'size') {
+  if (axis === 'width' || axis === 'height') {
+    const { aspect: _free, ...zone } = s.spot.zone;
+    s.spot = { ...s.spot, zone: resizeZone(zone, size, axis, delta) };
+  } else if (axis === 'size') {
     // Format libre : la taille garde les proportions du moment.
     const zone = s.spot.zone.aspect ? s.spot.zone : { ...s.spot.zone, aspect: (s.spot.zone.width * size.width) / (s.spot.zone.height * size.height) };
     const resized = resizeZone(zone, size, 'width', delta);
@@ -402,7 +415,8 @@ function open(host: DmdMenuHost, s: DmdMenuState): DmdMenuOutcome {
       return leave(s, 'resume');
     case 'moveX':
     case 'moveY':
-    case 'size':
+    case 'width':
+    case 'height':
       s.undo = { ...s.spot };
       s.mode = 'adjust';
       s.step = STEP;
@@ -411,7 +425,7 @@ function open(host: DmdMenuHost, s: DmdMenuState): DmdMenuOutcome {
       s.undo = { ...s.spot };
       s.mode = 'choice';
       const choices = choicesFor(host, s, id);
-      const current = id === 'screen' ? s.spot.screen : choices.findIndex((c) => c.label === valueOf(host, s, id));
+      const current = id === 'screen' ? s.spot.screen : choices.findIndex((c) => c.label === formatLabel(s.spot.zone.aspect));
       s.choice = Math.max(0, current);
       return 'handled';
     }
@@ -454,7 +468,7 @@ function cancel(s: DmdMenuState): void {
   close(s);
 }
 
-const ADJUST_AXIS: Partial<Record<DmdItemId, 'x' | 'y' | 'size'>> = { moveX: 'x', moveY: 'y', size: 'size' };
+const ADJUST_AXIS: Partial<Record<DmdItemId, 'x' | 'y' | 'width' | 'height'>> = { moveX: 'x', moveY: 'y', width: 'width', height: 'height' };
 
 /** Touche ou bouton (KeyboardEvent.code, ou jeton de joystick) pendant le menu. */
 export function dmdMenuKey(host: DmdMenuHost, s: DmdMenuState, input: { code: string; isAutoRepeat?: boolean }): DmdMenuOutcome {
@@ -471,19 +485,23 @@ export function dmdMenuKey(host: DmdMenuHost, s: DmdMenuState, input: { code: st
   const id = ITEMS[s.item]!.id;
   const arrow = ({ ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] } as Record<string, [number, number]>)[input.code];
   const sizeKey = ({ NumpadAdd: 1, Equal: 1, NumpadSubtract: -1, Minus: -1 } as Record<string, number>)[input.code];
-  // Flèches du clavier et + / − : la place du DMD, quelle que soit la ligne (DMD affiché).
+  // Flèches du clavier et + / − : la place du DMD, quelle que soit la ligne (DMD affiché) ; sur la
+  // largeur ou la hauteur ouverte, ← → la largeur, ↑ ↓ la hauteur.
   if ((arrow || sizeKey) && s.mode !== 'choice' && !s.spot.hidden) {
     s.step = nextStep(s.step, Boolean(input.isAutoRepeat));
-    if (arrow) adjust(host, s, arrow[0] ? 'x' : 'y', (arrow[0] || arrow[1]) * s.step);
+    const sizing = s.mode === 'adjust' && (id === 'width' || id === 'height');
+    if (arrow && sizing) adjust(host, s, arrow[0] ? 'width' : 'height', (arrow[0] || -arrow[1]) * s.step);
+    else if (arrow) adjust(host, s, arrow[0] ? 'x' : 'y', (arrow[0] || arrow[1]) * s.step);
     else adjust(host, s, 'size', sizeKey! * s.step * 4);
     return 'handled';
   }
   if (s.mode === 'adjust') {
     s.step = nextStep(s.step, Boolean(input.isAutoRepeat));
     const axis = ADJUST_AXIS[id]!;
-    if (is(k.previous) || is(k.next)) adjust(host, s, axis, (is(k.next) ? 1 : -1) * s.step * (axis === 'size' ? 4 : 1));
+    const moving = axis === 'x' || axis === 'y';
+    if (is(k.previous) || is(k.next)) adjust(host, s, axis, (is(k.next) ? 1 : -1) * s.step);
     // MagnaSave : la hauteur, dans les lignes de position (le DMD se promène dans les deux sens sans changer de ligne).
-    else if ((is(k.up) || is(k.down)) && axis !== 'size') adjust(host, s, 'y', (is(k.down) ? 1 : -1) * s.step);
+    else if ((is(k.up) || is(k.down)) && moving) adjust(host, s, 'y', (is(k.down) ? 1 : -1) * s.step);
     else if (is(k.confirm) || input.code === 'Enter') close(s);
     else if (is(k.exit) || input.code === 'Escape') cancel(s);
     else return 'unhandled';
@@ -628,7 +646,7 @@ export function dmdMenuPanel(host: DmdMenuHost, s: DmdMenuState, keyLabel: (code
   const hint = s.leaving
     ? t('{previous} / {next} : choisir · {confirm} : valider · {exit} : continuer le réglage', { previous: prev, next, confirm: ok, exit: no })
     : s.mode === 'adjust'
-      ? id === 'size'
+      ? id === 'width' || id === 'height'
         ? t('{previous} / {next} : réduire ou agrandir (maintenir pour aller vite) · {confirm} : valider · {exit} : annuler', { previous: prev, next, confirm: ok, exit: no })
         : up && down
           ? t('{previous} / {next} : gauche, droite · {up} / {down} : haut, bas (maintenir pour aller vite) · {confirm} : valider · {exit} : annuler', { previous: prev, next, up, down, confirm: ok, exit: no })

@@ -17,7 +17,7 @@ import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import { t } from './i18n';
 import type { ScreenZone } from './model';
-import { formatLabel, moveZone, resizeZone, setZoneAspect, zoneRect, ZONE_FORMATS } from './zones';
+import { formatLabel, moveZone, ratioLabel, resizeZone, setZoneAspect, zoneRect, ZONE_FORMATS } from './zones';
 
 // ---------------------------------------------------------------------------
 // Réglages enregistrés
@@ -121,17 +121,25 @@ export function menuDmdPlaceFor(spot: MenuDmdSpot, auto: ScreenZone, at: string)
 // ---------------------------------------------------------------------------
 // Écran de réglage (fiche > « DMD sur la roue »)
 
-export type MenuDmdItemId = 'shown' | 'moveX' | 'moveY' | 'size' | 'format' | 'save' | 'auto' | 'back';
+export type MenuDmdItemId = 'shown' | 'moveX' | 'moveY' | 'width' | 'height' | 'format' | 'save' | 'auto' | 'back';
 
-export const MENU_DMD_ITEMS: readonly MenuDmdItemId[] = ['shown', 'moveX', 'moveY', 'size', 'format', 'save', 'auto', 'back'];
+export const MENU_DMD_ITEMS: readonly MenuDmdItemId[] = ['shown', 'moveX', 'moveY', 'width', 'height', 'format', 'save', 'auto', 'back'];
 
-/** Formats des points : 4:1 (128 × 32) d'abord, puis 3:1, 2:1, libre et les autres. */
-const FORMATS = [ZONE_FORMATS.find((f) => f.aspect === 4)!, { label: '3:1', aspect: 3 }, { label: '2:1', aspect: 2 }, ...ZONE_FORMATS.filter((f) => f.aspect !== 4)];
+/** Lignes qui règlent la place des points (grisées quand le DMD est masqué). */
+const PLACE_LINES: readonly MenuDmdItemId[] = ['moveX', 'moveY', 'width', 'height', 'format'];
+
+/**
+ * Formats des points : 4:1 (128 × 32) d'abord, puis libre (largeur et hauteur réglées chacune
+ * seule : un flipper ramène au 4:1), 3:1, 2:1 et les autres.
+ */
+const FORMATS = [ZONE_FORMATS.find((f) => f.aspect === 4)!, ZONE_FORMATS.find((f) => !f.aspect)!, { label: '3:1', aspect: 3 }, { label: '2:1', aspect: 2 }, ...ZONE_FORMATS.filter((f) => f.aspect && f.aspect !== 4)];
 
 /**
  * Pas aux boutons : le pixel ; un bouton maintenu accélère d'un pixel par répétition, jusqu'à
  * MAX_STEP (un écran de DMD fait souvent moins de 1080 pixels de haut : pas de saut d'un bord à
- * l'autre en une seconde). La taille va deux fois plus vite (la largeur, la hauteur suit).
+ * l'autre en une seconde). La largeur et la hauteur se règlent chacune seule, au pixel (demande du
+ * 12/11/2026 : plus de « Taille » qui garde les proportions) ; + et − du clavier agrandissent
+ * encore les deux ensemble, deux fois plus vite.
  */
 const STEP = 1;
 const MAX_STEP = 24;
@@ -193,7 +201,7 @@ export function markMenuDmdAuto(host: MenuDmdEditorHost, s: MenuDmdEditor): void
 /** Pourquoi une ligne n'est pas disponible (grisée, la raison dite quand on la choisit). */
 export function menuDmdBlocked(host: MenuDmdEditorHost, s: MenuDmdEditor, id: MenuDmdItemId): string | undefined {
   if (id === 'auto' && !host.ownPlace && !menuDmdDirty(s)) return t('Cette table suit déjà la place automatique.');
-  if (['moveX', 'moveY', 'size', 'format'].includes(id) && s.spot.hidden) return t('DMD masqué : affichez-le d’abord (ligne « DMD sur la roue »).');
+  if (PLACE_LINES.includes(id) && s.spot.hidden) return t('DMD masqué : affichez-le d’abord (ligne « DMD sur la roue »).');
   return undefined;
 }
 
@@ -205,8 +213,10 @@ export function menuDmdLabel(id: MenuDmdItemId): string {
       return t('Position horizontale');
     case 'moveY':
       return t('Position verticale');
-    case 'size':
-      return t('Taille');
+    case 'width':
+      return t('Largeur');
+    case 'height':
+      return t('Hauteur');
     case 'format':
       return t('Format');
     case 'save':
@@ -228,22 +238,38 @@ export function menuDmdValue(host: MenuDmdEditorHost, s: MenuDmdEditor, id: Menu
       return `${r.x} px`;
     case 'moveY':
       return `${r.y} px`;
-    case 'size':
-      return `${r.width} × ${r.height}`;
+    case 'width':
+      return `${r.width} px`;
+    case 'height':
+      return `${r.height} px`;
     case 'format':
-      return formatLabel(s.spot.zone.aspect);
+      return menuDmdFormatValue(s.spot.zone, host.size);
     default:
       return '';
   }
+}
+
+/**
+ * Format montré : le format choisi (« 4:1 (DMD) »), ou « Libre · 4,5:1 » une fois la largeur ou la
+ * hauteur réglée seule, avec les proportions du moment.
+ */
+export function menuDmdFormatValue(zone: ScreenZone, size: { width: number; height: number }): string {
+  if (zone.aspect) return formatLabel(zone.aspect);
+  const r = zoneRect(zone, size);
+  return r.width > 0 && r.height > 0 ? `${formatLabel(undefined)} · ${ratioLabel(r.width / r.height)}` : formatLabel(undefined);
 }
 
 export function menuDmdFormats(): string[] {
   return FORMATS.map((f) => f.label);
 }
 
-function adjust(host: MenuDmdEditorHost, s: MenuDmdEditor, axis: 'x' | 'y' | 'size', delta: number): void {
+function adjust(host: MenuDmdEditorHost, s: MenuDmdEditor, axis: 'x' | 'y' | 'width' | 'height' | 'size', delta: number): void {
   const size = host.size;
-  if (axis === 'size') {
+  if (axis === 'width' || axis === 'height') {
+    // Un côté seul : le format se libère (« Format » y revient), le centre reste en place.
+    const { aspect: _free, ...zone } = s.spot.zone;
+    s.spot = { ...s.spot, zone: resizeZone(zone, size, axis, delta) };
+  } else if (axis === 'size') {
     // Format libre : la taille garde les proportions du moment.
     const zone = s.spot.zone.aspect ? s.spot.zone : { ...s.spot.zone, aspect: (s.spot.zone.width * size.width) / (s.spot.zone.height * size.height) };
     const resized = resizeZone(zone, size, 'width', delta);
@@ -340,13 +366,15 @@ export function menuDmdKey(host: MenuDmdEditorHost, s: MenuDmdEditor, keys: Menu
   const arrow = ({ ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] } as Record<string, [number, number]>)[input.code];
   const sizeKey = ({ NumpadAdd: 1, Equal: 1, NumpadSubtract: -1, Minus: -1 } as Record<string, number>)[input.code];
   if (s.mode === 'adjust') {
-    const axis = s.item === 'moveX' ? 'x' : s.item === 'moveY' ? 'y' : 'size';
+    const axis = s.item === 'moveX' ? 'x' : s.item === 'moveY' ? 'y' : s.item === 'width' ? 'width' : 'height';
+    const moving = axis === 'x' || axis === 'y';
     s.step = nextStep(s.step, Boolean(input.isAutoRepeat));
-    if (arrow && axis !== 'size') adjust(host, s, arrow[0] ? 'x' : 'y', (arrow[0] || arrow[1]) * s.step);
+    // Flèches : déplacer sur les lignes de position ; sur la largeur et la hauteur, ← → la largeur, ↑ ↓ la hauteur.
+    if (arrow) adjust(host, s, moving ? (arrow[0] ? 'x' : 'y') : arrow[0] ? 'width' : 'height', (arrow[0] || (moving ? arrow[1] : -arrow[1])) * s.step);
     else if (sizeKey) adjust(host, s, 'size', sizeKey * s.step * SIZE_FACTOR);
-    else if (is(keys.previous) || is(keys.next)) adjust(host, s, axis, (is(keys.next) ? 1 : -1) * s.step * (axis === 'size' ? SIZE_FACTOR : 1));
+    else if (is(keys.previous) || is(keys.next)) adjust(host, s, axis, (is(keys.next) ? 1 : -1) * s.step);
     // MagnaSave : la hauteur, dans les lignes de position (les points se promènent dans les deux sens sans changer de ligne).
-    else if ((is(keys.up) || is(keys.down)) && axis !== 'size') adjust(host, s, 'y', (is(keys.down) ? 1 : -1) * s.step);
+    else if ((is(keys.up) || is(keys.down)) && moving) adjust(host, s, 'y', (is(keys.down) ? 1 : -1) * s.step);
     else if (is(keys.confirm) || input.code === 'Enter') closeLine(s);
     else if (is(keys.exit) || input.code === 'Escape') cancelLine(s);
     // Une ligne ouverte garde les boutons : rien ne s'échappe vers l'écran.

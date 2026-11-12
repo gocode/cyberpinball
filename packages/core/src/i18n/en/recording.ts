@@ -78,6 +78,7 @@ export const messages: Record<string, string> = {
   'Aujourd’hui : visuel par défaut': 'Today: default visual',
   'Nouvelle : {name}': 'New: {name}',
   'Ce qui change sur la roue pour cette table. Rien n’est écrit avant « Confirmer ».': 'What changes on the wheel for this table. Nothing is written before “Confirm”.',
+  '{fps} images/s': '{fps} frames/s',
   // app/renderer/recording.html
   'Cyber Pinball — Enregistrement': 'Cyber Pinball — Recording',
 };

@@ -13,12 +13,16 @@ import {
   indicatorBounds,
   keptSeconds,
   listRecordings,
+  mergeFeatureSwitch,
   loadRecordingSettings,
   MIN_RECORDING_SECONDS,
   normalizeRecordingSettings,
   recordedMediaType,
   recordingBitrate,
   recordingBytes,
+  recordingCadenceLow,
+  RECORDING_CHROMIUM_FEATURES,
+  RECORDING_FPS,
   recordingMaxLong,
   RECORDING_QUALITIES,
   RECORDING_QUALITY_SIZES,
@@ -35,6 +39,7 @@ import {
   type RecordingEvent,
   type RecordingInput,
 } from '../gamerecording';
+import { readVideoCadence, videoCadenceOfBuffer } from '../videocadence';
 import { applyOps, trashDirFor } from '../fileops';
 import { localMediaChoices } from '../mediachoices';
 import { emptyMediaDraft, planMediaChanges } from '../mediaedit';
@@ -181,19 +186,106 @@ test('qualité : le plateau 4K filmé en 4K par défaut, jamais au-delà de l’
   assert.deepEqual([small.width, small.height], [1080, 1920]);
   // Fronton et DMD restent à 1280, quelle que soit la qualité du plateau.
   for (const q of RECORDING_QUALITIES) assert.equal(recordingMaxLong('backglass', q), 1280);
-  // Niveau H.264 : 4.0 jusqu'au 1080p (le seul d'avant), 5.0 en 1440p, 5.1 en 4K à 30 images/s.
-  assert.equal(h264CodecLevel(1080, 1920), '640028');
-  assert.equal(h264CodecLevel(608, 1080), '640028');
-  assert.equal(h264CodecLevel(1440, 2560), '640032');
-  assert.equal(h264CodecLevel(2160, 3840), '640033');
-  assert.equal(h264CodecLevel(2160, 3840, 60), '640034');
-  // Débit à la taille produite : 35 Mbit/s en 4K, environ 8,7 en 1080p (8 avant), un plancher pour un petit DMD.
-  assert.equal(recordingBitrate(2160, 3840), 34_800_000);
-  assert.equal(recordingBitrate(1080, 1920), 8_700_000);
+  // Niveau H.264 à 30 images/s : 4.0 jusqu'au 1080p, 5.0 en 1440p, 5.1 en 4K.
+  assert.equal(h264CodecLevel(1080, 1920, 30), '640028');
+  assert.equal(h264CodecLevel(608, 1080, 30), '640028');
+  assert.equal(h264CodecLevel(1440, 2560, 30), '640032');
+  assert.equal(h264CodecLevel(2160, 3840, 30), '640033');
+  // À 60 images/s (la cadence enregistrée) : 4.0 en 720p, 4.2 en 1080p, 5.1 en 1440p, 5.2 en 4K.
+  assert.equal(RECORDING_FPS, 60);
+  assert.equal(h264CodecLevel(720, 1280), '640028');
+  assert.equal(h264CodecLevel(1080, 1920), '64002a');
+  assert.equal(h264CodecLevel(1440, 2560), '640033');
+  assert.equal(h264CodecLevel(2160, 3840), '640034');
+  // Débit à la taille produite : 35 Mbit/s en 4K à 30 images/s ; une fois et demie à 60 (52 Mbit/s).
+  assert.equal(recordingBitrate(2160, 3840, 30), 34_800_000);
+  assert.equal(recordingBitrate(1080, 1920, 30), 8_700_000);
+  assert.equal(recordingBitrate(2160, 3840), 52_300_000);
+  assert.equal(recordingBitrate(1080, 1920), 13_100_000);
   assert.equal(recordingBitrate(1280, 320), 3_000_000);
-  // Poids annoncé : environ 131 Mo pour 30 s de 4K, quatre fois moins en 1080p.
-  assert.equal(Math.round(recordingBytes('4k', 30) / 1e6), 131);
+  // Poids annoncé : environ 197 Mo pour 30 s de 4K à 60 images/s, quatre fois moins en 1080p.
+  assert.equal(Math.round(recordingBytes('4k', 30) / 1e6), 197);
   assert.ok(recordingBytes('4k', 30) > 3.5 * recordingBytes('1080p', 30));
+});
+
+test('cadence : 60 images par seconde, capture sur la carte graphique demandée à Chromium sans écraser ses autres fonctions', () => {
+  // Mesuré sur le PinCab (12/11/2026) : 20 à 25 images/s écrites pour 30 demandées en capture ordinaire.
+  assert.deepEqual([...RECORDING_CHROMIUM_FEATURES], ['WebRtcAllowWgcUsingTexture', 'ZeroCopyDesktopCapture']);
+  assert.equal(mergeFeatureSwitch('', RECORDING_CHROMIUM_FEATURES), 'WebRtcAllowWgcUsingTexture,ZeroCopyDesktopCapture');
+  assert.equal(mergeFeatureSwitch('Foo, ZeroCopyDesktopCapture', RECORDING_CHROMIUM_FEATURES), 'Foo,ZeroCopyDesktopCapture,WebRtcAllowWgcUsingTexture');
+  // Demandé au chargement du module, avant que Chromium démarre.
+  const source = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'app', 'src', 'game-recording.ts'), 'utf8');
+  assert.ok(source.includes("app.commandLine.appendSwitch('enable-features', mergeFeatureSwitch(app.commandLine.getSwitchValue('enable-features'), RECORDING_CHROMIUM_FEATURES));"));
+  // Cadence basse signalée sous 80 % : les 25 images/s du PinCab l'auraient été, 56,6 non.
+  assert.equal(recordingCadenceLow(25), true);
+  assert.equal(recordingCadenceLow(47.9), true);
+  assert.equal(recordingCadenceLow(56.6), false);
+});
+
+/** Boîte ISO BMFF : taille, type, contenu. */
+function box(type: string, ...parts: Buffer[]): Buffer {
+  const body = Buffer.concat(parts);
+  const head = Buffer.alloc(8);
+  head.writeUInt32BE(8 + body.length, 0);
+  head.write(type, 4, 'latin1');
+  return Buffer.concat([head, body]);
+}
+const u32 = (...values: number[]): Buffer => {
+  const b = Buffer.alloc(4 * values.length);
+  values.forEach((v, i) => b.writeUInt32BE(v, i * 4));
+  return b;
+};
+/** Piste (`trak`) : identifiant, type (`vide` ou `soun`), base de temps, et `stts` éventuel. */
+function trak(id: number, handler: string, timescale: number, stts?: [number, number][]): Buffer {
+  const tkhd = box('tkhd', u32(0, 0, 0, id), Buffer.alloc(72));
+  const mdhd = box('mdhd', u32(0, 0, 0, timescale, 0), Buffer.alloc(4));
+  const hdlr = box('hdlr', u32(0, 0), Buffer.from(handler, 'latin1'), Buffer.alloc(12));
+  const stbl = stts ? box('stbl', box('stts', u32(0, stts.length, ...stts.flat()))) : box('stbl');
+  return box('trak', tkhd, box('mdia', mdhd, hdlr, box('minf', stbl)));
+}
+/** Fragment (`moof`) d'une piste : durée de chaque image dans `trun` (drapeau 0x100). */
+function moof(id: number, durations: number[]): Buffer {
+  const tfhd = box('tfhd', u32(0x020000, id));
+  const trun = box('trun', u32(0x000301, durations.length, 0), ...durations.map((d) => u32(d, 1000)));
+  return Buffer.concat([box('moof', box('mfhd', u32(0, 1)), box('traf', tfhd, trun)), box('mdat', Buffer.alloc(16))]);
+}
+
+test('cadence écrite : lue dans un MP4 fragmenté (MediaRecorder) comme dans un MP4 ordinaire, son ignoré', () => {
+  // Comme MediaRecorder : piste son puis vidéo, durées par défaut dans `trex`, images dans les `moof`.
+  const moov = box(
+    'moov',
+    trak(1, 'soun', 48_000),
+    trak(2, 'vide', 30_000),
+    box('mvex', box('trex', u32(0, 1, 1, 1024, 0, 0)), box('trex', u32(0, 2, 1, 500, 0, 0))),
+  );
+  // 60 images à 60 images/s (500 / 30 000 s), dont un trou de 100 ms, et un fragment de son au milieu.
+  const regular = Array.from({ length: 59 }, () => 500);
+  const file = Buffer.concat([box('ftyp', Buffer.from('isom')), moov, moof(2, regular.slice(0, 30)), moof(1, [1024, 1024]), moof(2, [3000, ...regular.slice(30)])]);
+  const c = videoCadenceOfBuffer(file)!;
+  assert.equal(c.frames, 60);
+  assert.ok(Math.abs(c.seconds - (59 * 500 + 3000) / 30_000) < 1e-9);
+  assert.equal(Math.round(c.maxGapMs), 100);
+  assert.ok(Math.abs(c.fps - 60 / c.seconds) < 1e-9);
+  // Durées par défaut du fragment (tfhd) puis de la piste (trex) quand trun ne les donne pas.
+  const plainTrun = box('trun', u32(0, 3));
+  const byDefault = Buffer.concat([moov, box('moof', box('traf', box('tfhd', u32(0x000008, 2, 1000)), plainTrun)), box('moof', box('traf', box('tfhd', u32(0, 2)), plainTrun))]);
+  const d = videoCadenceOfBuffer(byDefault)!;
+  assert.equal(d.frames, 6);
+  assert.ok(Math.abs(d.seconds - (3 * 1000 + 3 * 500) / 30_000) < 1e-9);
+  // MP4 ordinaire : la table `stts`, sur disque.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cadence-'));
+  const plain = path.join(dir, 'ordinaire.mp4');
+  fs.writeFileSync(plain, Buffer.concat([box('ftyp', Buffer.from('isom')), box('moov', trak(1, 'vide', 600, [[25, 20], [1, 60]]))]));
+  const p = readVideoCadence(plain)!;
+  assert.equal(p.frames, 26);
+  assert.ok(Math.abs(p.fps - 26 / ((25 * 20 + 60) / 600)) < 1e-9);
+  // La dernière image n'est pas un écart.
+  assert.equal(Math.round(p.maxGapMs), 33);
+  // Sans piste vidéo, ou illisible : rien.
+  fs.writeFileSync(plain, Buffer.concat([box('ftyp', Buffer.from('isom')), box('moov', trak(1, 'soun', 48_000, [[10, 1024]]))]));
+  assert.equal(readVideoCadence(plain), undefined);
+  assert.equal(readVideoCadence(path.join(dir, 'absent.mp4')), undefined);
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('plateau d’un poste de bureau (paysage, flippers en bas) : recadré au centre en 9:16', () => {

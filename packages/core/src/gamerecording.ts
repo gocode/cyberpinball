@@ -45,8 +45,38 @@ export const RECORDING_FADE_MS = 400;
  * ferme, le menu qui revient) ; à la fin de la durée, elles reçoivent le fondu de sortie.
  */
 export const RECORDING_TAIL_MS = 500;
-/** Cadence de l'enregistrement. */
-export const RECORDING_FPS = 30;
+/**
+ * Cadence de l'enregistrement : celle à laquelle VPX dessine la table (écrans à 60 Hz). À 30, la
+ * bille saute d'une image à l'autre (demande du 12/11/2026). La capture sur la carte graphique
+ * (RECORDING_CHROMIUM_FEATURES) la tient en 4K ; une machine qui ne suit pas donne moins d'images,
+ * et la cadence réellement écrite est mesurée dans chaque fichier (videocadence.ts).
+ */
+export const RECORDING_FPS = 60;
+/**
+ * Cadence en dessous de laquelle un enregistrement est signalé au journal : 80 % de RECORDING_FPS.
+ * Les vidéos d'une borne 4K tombaient à 20-25 images par seconde pour 30 demandées (12/11/2026).
+ */
+export const RECORDING_MIN_FPS_RATIO = 0.8;
+/**
+ * Capture d'écran de Chromium sur la carte graphique (Windows Graphics Capture, images gardées en
+ * texture). La capture ordinaire (DXGI) recopie chaque image par le processeur et s'interdit plus
+ * d'un demi-cœur : en 4K, une image coûte environ 20 ms, d'où 25 images par seconde au mieux, et
+ * moins en partie. Mesuré sur le PinCab (12/11/2026), plateau 4K demandé à 60 images par seconde :
+ * 39 images par seconde en capture ordinaire, 56,6 avec celle-ci, dessin 10 fois plus rapide.
+ */
+export const RECORDING_CHROMIUM_FEATURES = ['WebRtcAllowWgcUsingTexture', 'ZeroCopyDesktopCapture'] as const;
+
+/** Valeur de --enable-features complétée de `features`, sans doublon ni perte de ce qui y était. */
+export function mergeFeatureSwitch(current: string, features: readonly string[]): string {
+  const list = current.split(',').map((f) => f.trim()).filter(Boolean);
+  for (const f of features) if (!list.includes(f)) list.push(f);
+  return list.join(',');
+}
+
+/** Bilan de la cadence mesurée d'une vidéo : signalée basse sous RECORDING_MIN_FPS_RATIO. */
+export function recordingCadenceLow(fps: number, target = RECORDING_FPS): boolean {
+  return fps < target * RECORDING_MIN_FPS_RATIO;
+}
 
 /**
  * Définition de la vidéo du plateau (demande du 12/11/2026) : son grand côté au plus, jamais
@@ -65,14 +95,17 @@ export const RECORDING_QUALITY_SIZES: Record<RecordingQuality, { long: number; s
 export const RECORDING_QUALITY_LABELS: Record<RecordingQuality, string> = { '4k': '4K', '1440p': '1440p', '1080p': '1080p', '720p': '720p' };
 
 /**
- * Débit vidéo pour une image de `width` × `height` : 0,14 bit par point et par image, la densité
- * d'un 4K à 35 Mbit/s (ce que YouTube conseille pour du 4K à 30 images/s ; une table en jeu bouge
- * beaucoup, en détails fins). Un plancher garde un petit DMD net.
+ * Débit vidéo pour une image de `width` × `height` à `fps` images par seconde : à 30, 0,14 bit par
+ * point et par image, la densité d'un 4K à 35 Mbit/s (ce que YouTube conseille pour du 4K à 30
+ * images/s ; une table en jeu bouge beaucoup, en détails fins). Deux fois plus d'images ne
+ * demandent qu'une fois et demie le débit (YouTube : 35-45 Mbit/s en 4K30, 53-68 en 4K60), les
+ * images voisines se ressemblant davantage : (fps / 30)^0,585. Un plancher garde un petit DMD net.
  */
 export const RECORDING_BITS_PER_PIXEL = 0.14;
 export const RECORDING_MIN_BITRATE = 3_000_000;
-export function recordingBitrate(width: number, height: number): number {
-  return Math.max(RECORDING_MIN_BITRATE, Math.round((width * height * RECORDING_FPS * RECORDING_BITS_PER_PIXEL) / 100_000) * 100_000);
+export function recordingBitrate(width: number, height: number, fps = RECORDING_FPS): number {
+  const at30 = width * height * 30 * RECORDING_BITS_PER_PIXEL;
+  return Math.max(RECORDING_MIN_BITRATE, Math.round((at30 * Math.pow(fps / 30, 0.585)) / 100_000) * 100_000);
 }
 
 /** Poids d'une vidéo du plateau de cette définition (son compris, 160 kbit/s), pour `seconds` secondes. */

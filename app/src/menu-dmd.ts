@@ -82,7 +82,8 @@ const ICONS: Record<MenuDmdItemId, IconName> = {
   shown: 'eye',
   moveX: 'move-right',
   moveY: 'move-down',
-  size: 'zoom-in',
+  width: 'resize-width',
+  height: 'resize-height',
   format: 'layout',
   save: 'check',
   auto: 'auto',
@@ -217,7 +218,7 @@ export function createMenuDmd(host: MenuDmdHost): MenuDmd {
     const down = keyLabel(k.down);
     const hint =
       editor.mode === 'adjust'
-        ? editor.item === 'size'
+        ? editor.item === 'width' || editor.item === 'height'
           ? t('{previous} / {next} : réduire ou agrandir (maintenir pour aller vite) · {confirm} : valider · {exit} : annuler', { previous: prev, next, confirm: ok, exit: no })
           : up && down
             ? t('{previous} / {next} : gauche, droite · {up} / {down} : haut, bas (maintenir pour aller vite) · {confirm} : valider · {exit} : annuler', { previous: prev, next, up, down, confirm: ok, exit: no })

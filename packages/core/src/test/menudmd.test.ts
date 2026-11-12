@@ -125,7 +125,7 @@ test('écran de réglage : le relâchement du Start qui ouvre la ligne ne la val
   const h = host(true);
   const s = startMenuDmdEditor({ zone: { x: 0.25, y: 0.6, width: 0.5, height: 0.2, aspect: 4 }, hidden: false });
   const start = px(s.spot.zone);
-  for (const id of ['moveX', 'moveY', 'size', 'format'] as const) {
+  for (const id of ['moveX', 'moveY', 'width', 'height', 'format'] as const) {
     openMenuDmdItem(h, s, id);
     // Start relâché juste après l'ouverture : la ligne reste ouverte.
     assert.equal(menuDmdKey(h, s, KEYS, { code: 'Digit1', type: 'keyUp' }), 'handled');
@@ -165,23 +165,41 @@ test('menu : les touches propres à un écran ne reçoivent les relâchements qu
   }
 });
 
-test('écran de réglage : la taille garde le format 4:1, le format se choisit, Start valide', () => {
+test('écran de réglage : largeur et hauteur chacune seule, « Format » rend le 4:1, Start valide', () => {
   const h = host();
   const s = startMenuDmdEditor(menuDmdSpot(h.auto, undefined));
-  openMenuDmdItem(h, s, 'size');
+  const start = px(s.spot.zone);
+  // Largeur seule (demande du 12/11/2026) : la hauteur ne bouge pas, le format se libère.
+  openMenuDmdItem(h, s, 'width');
   menuDmdKey(h, s, KEYS, { code: 'ShiftLeft' });
-  const r = px(s.spot.zone);
-  assert.ok(Math.abs(r.width / r.height - 4) < 0.05, `${r.width} × ${r.height}`);
+  menuDmdKey(h, s, KEYS, { code: 'ShiftLeft' });
   menuDmdKey(h, s, KEYS, { code: 'Digit1' });
   assert.equal(s.mode, undefined);
+  assert.deepEqual([px(s.spot.zone).width, px(s.spot.zone).height], [start.width - 2, start.height]);
+  assert.equal(s.spot.zone.aspect, undefined);
+  // Hauteur seule : la largeur ne bouge pas ; ↑ ↓ du clavier aussi.
+  openMenuDmdItem(h, s, 'height');
+  menuDmdKey(h, s, KEYS, { code: 'ShiftRight' });
+  menuDmdKey(h, s, KEYS, { code: 'ArrowUp' });
+  menuDmdKey(h, s, KEYS, { code: 'Digit1' });
+  assert.deepEqual([px(s.spot.zone).width, px(s.spot.zone).height], [start.width - 2, start.height + 2]);
+  assert.equal(menuDmdValue(h, s, 'width'), `${start.width - 2} px`);
+  assert.equal(menuDmdValue(h, s, 'height'), `${start.height + 2} px`);
+  assert.match(menuDmdValue(h, s, 'format'), /^Libre · /);
   assert.ok(menuDmdDirty(s));
+  // « Format » s'ouvre sur « Libre » ; un flipper à gauche rend le 4:1, la largeur gardée.
   openMenuDmdItem(h, s, 'format');
   assert.equal(s.mode, 'choice');
-  assert.match(menuDmdFormats()[s.choice]!, /^4:1/);
-  menuDmdKey(h, s, KEYS, { code: 'ShiftRight' });
-  assert.equal(menuDmdValue(h, s, 'format'), '3:1');
+  assert.equal(menuDmdFormats()[s.choice], 'Libre');
+  menuDmdKey(h, s, KEYS, { code: 'ShiftLeft' });
+  menuDmdKey(h, s, KEYS, { code: 'Digit1' });
+  assert.match(menuDmdValue(h, s, 'format'), /^4:1/);
+  // Au pixel près : la hauteur est arrondie.
+  assert.ok(Math.abs(px(s.spot.zone).width / px(s.spot.zone).height - 4) < 0.02);
+  // Les autres formats, et Exit qui rend celui d'avant.
+  openMenuDmdItem(h, s, 'format');
   chooseMenuDmdFormat(h, s, 2);
-  assert.equal(menuDmdValue(h, s, 'format'), '2:1');
+  assert.equal(menuDmdValue(h, s, 'format'), '3:1');
   menuDmdKey(h, s, KEYS, { code: 'Escape' });
   assert.match(menuDmdValue(h, s, 'format'), /^4:1/);
 });
@@ -193,7 +211,7 @@ test('écran de réglage : masquer grise les lignes de place, avec la raison ; q
   assert.equal(openMenuDmdItem(h, s, 'shown'), 'handled');
   assert.equal(s.spot.hidden, true);
   assert.equal(menuDmdValue(h, s, 'shown'), 'masqué');
-  for (const id of ['moveX', 'moveY', 'size', 'format'] as const) assert.ok(menuDmdBlocked(h, s, id));
+  for (const id of ['moveX', 'moveY', 'width', 'height', 'format'] as const) assert.ok(menuDmdBlocked(h, s, id));
   assert.equal(openMenuDmdItem(h, s, 'moveX'), 'handled');
   assert.ok(s.notice);
   assert.equal(s.mode, undefined);

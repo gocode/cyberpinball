@@ -4,8 +4,9 @@
 // quand VPX s'est fermé (gameEnded). Les deux événements de l'enregistrement, « recording-start »
 // et « recording-end », partent de `events` ; `finished` donne les fichiers produits.
 //
-// La capture est celle de Chromium (desktopCapturer, getUserMedia : DXGI ou Windows Graphics
-// Capture selon Windows), dans une fenêtre jamais montrée (renderer/recorder.html) ; l'encodage est
+// La capture est celle de Chromium (desktopCapturer, getUserMedia), sur la carte graphique :
+// Windows Graphics Capture, images gardées en texture (RECORDING_CHROMIUM_FEATURES, demandé au
+// démarrage), dans une fenêtre jamais montrée (renderer/recorder.html) ; l'encodage est
 // celui de MediaRecorder (MP4, H.264 et AAC) : rien à télécharger, rien d'installé. Le témoin est
 // une petite fenêtre transparente, sans focus ni clic, posée au-dessus de VPX et exclue de la
 // capture (setContentProtection : WDA_EXCLUDEFROMCAPTURE depuis Windows 10 2004).
@@ -17,7 +18,7 @@
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { desktopCapturer, ipcMain, screen, type IpcMainEvent } from 'electron';
+import { app, desktopCapturer, ipcMain, screen, type IpcMainEvent } from 'electron';
 import {
   advanceRecording,
   ARMED_RECORDING,
@@ -25,7 +26,11 @@ import {
   edgeRotation,
   indicatorBounds,
   keptSeconds,
+  mergeFeatureSwitch,
   readMediaDimensions,
+  readVideoCadence,
+  recordingCadenceLow,
+  RECORDING_CHROMIUM_FEATURES,
   recordingDir,
   recordingEndText,
   recordingFileName,
@@ -55,6 +60,10 @@ import {
 } from '@cyberpinball/core';
 import { checkLayout } from './layout-check';
 import { createWindow, isShown, windowRect } from './offscreen';
+
+// Avant que Chromium démarre (ce module est chargé avant app.whenReady) : capture d'écran sur la
+// carte graphique, sans quoi un plateau 4K plafonne à 25 images par seconde.
+app.commandLine.appendSwitch('enable-features', mergeFeatureSwitch(app.commandLine.getSwitchValue('enable-features'), RECORDING_CHROMIUM_FEATURES));
 
 /** Un écran filmé : son rôle, le média qu'il remplira, son écran et sa zone (pixels physiques du bureau). */
 export interface RecordingScreen {
@@ -86,6 +95,8 @@ export interface RecordedFile {
   bytes: number;
   width: number;
   height: number;
+  /** Images par seconde réellement écrites (readVideoCadence) ; absent si illisible. */
+  fps?: number;
 }
 
 export interface RecordingOutcome {
@@ -324,7 +335,13 @@ export function armRecording(req: RecordingRequest): RecordingRun {
       renameWithRetry(part, file);
       const dims = readMediaDimensions(file);
       const target = plan.targets.find((t) => t.key === key)!;
-      files.push({ role: key, type: req.screens.find((s) => s.role === key)!.type, file, bytes, width: dims?.width ?? target.width, height: dims?.height ?? target.height });
+      const cadence = readVideoCadence(file);
+      files.push({ role: key, type: req.screens.find((s) => s.role === key)!.type, file, bytes, width: dims?.width ?? target.width, height: dims?.height ?? target.height, fps: cadence?.fps });
+      // Cadence réellement écrite : une capture qui ne suit pas se voit ici (RECORDING_MIN_FPS_RATIO).
+      if (cadence) {
+        const low = recordingCadenceLow(cadence.fps);
+        console.log(`Enregistrement (${req.table.id}) : ${key}, ${cadence.frames} images en ${cadence.seconds.toFixed(1)} s, ${cadence.fps.toFixed(1)} images/s pour ${RECORDING_FPS} demandées, écart max ${Math.round(cadence.maxGapMs)} ms${low ? ' : CADENCE BASSE, la capture ne suit pas (qualité à baisser ?)' : ''}.`);
+      }
     }
     try {
       if (fs.existsSync(dir) && fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);

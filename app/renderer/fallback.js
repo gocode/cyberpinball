@@ -308,11 +308,15 @@
    * Grille de cols × rows points, chaque point valant 0 à 15. Dessin : la grille est écrite dans
    * un petit canvas d'un pixel par point, agrandie sans lissage, puis couverte d'un masque noir
    * percé d'un trou rond par point, et d'un léger halo.
+   * fill : la grille remplit toute sa place, points étirés (DMD vivant du menu, à la place réglée
+   * sur la roue : pas de bandes noires quand cette place n'est pas en 4:1, demande du 12/11/2026) ;
+   * sinon les points restent ronds et la grille se centre.
    */
   class Matrix {
-    constructor(root, cols, rows, color) {
+    constructor(root, cols, rows, color, fill = false) {
       this.cols = cols;
       this.rows = rows;
+      this.fill = fill;
       this.buffer = new Uint8Array(cols * rows);
       this.canvas = el('canvas', 'cp-dmd-canvas');
       this.canvas.setAttribute('role', 'img');
@@ -339,8 +343,10 @@
       this.canvas.width = W;
       this.canvas.height = H;
       this.pitch = Math.min(W / this.cols, H / this.rows);
-      this.w = this.pitch * this.cols;
-      this.h = this.pitch * this.rows;
+      const px = this.fill ? W / this.cols : this.pitch;
+      const py = this.fill ? H / this.rows : this.pitch;
+      this.w = px * this.cols;
+      this.h = py * this.rows;
       this.x = (W - this.w) / 2;
       this.y = (H - this.h) / 2;
       this.mask.width = Math.ceil(this.w);
@@ -350,13 +356,14 @@
       m.fillRect(0, 0, this.mask.width, this.mask.height);
       m.globalCompositeOperation = 'destination-out';
       m.beginPath();
-      const r = this.pitch * 0.41;
+      const rx = px * 0.41;
+      const ry = py * 0.41;
       for (let y = 0; y < this.rows; y++) {
         for (let x = 0; x < this.cols; x++) {
-          const cx = (x + 0.5) * this.pitch;
-          const cy = (y + 0.5) * this.pitch;
-          m.moveTo(cx + r, cy);
-          m.arc(cx, cy, r, 0, Math.PI * 2);
+          const cx = (x + 0.5) * px;
+          const cy = (y + 0.5) * py;
+          m.moveTo(cx + rx, cy);
+          m.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
         }
       }
       m.fill();
@@ -428,8 +435,8 @@
    * Afficheur à la couleur donnée (options.color), sinon à la couleur réglée dans le menu, qu'il
    * suit ensuite (setDmdColor) jusqu'à sa destruction.
    */
-  function tintedMatrix(root, cols, rows, color, onDestroy) {
-    const matrix = new Matrix(root, cols, rows, color ?? dmdColor);
+  function tintedMatrix(root, cols, rows, color, onDestroy, fill = false) {
+    const matrix = new Matrix(root, cols, rows, color ?? dmdColor, fill);
     if (color === undefined) {
       tinted.add(matrix);
       onDestroy(() => tinted.delete(matrix));
@@ -928,7 +935,7 @@
    * Afficheur à points nu, pour des images calculées ailleurs (DMD du menu vivant : le
    * processus principal envoie chaque image, 128 × 32 nuances de 0 à 15). Il suit la taille
    * de son conteneur, garde sa dernière image, et la couleur réglée sauf options.color.
-   *   const m = CyberFallback.dotMatrix(conteneur, { color });
+   *   const m = CyberFallback.dotMatrix(conteneur, { color, fill });  // fill : remplir toute la place, points étirés
    *   m.show(points);   // Uint8Array de cols × rows nuances
    *   m.show(points, rgb); // et la couleur de chaque point (cols × rows × 3, au plein éclat)
    *   m.destroy();
@@ -938,7 +945,7 @@
     root.setAttribute('aria-hidden', 'true');
     container.append(root);
     let dispose = () => {};
-    const matrix = tintedMatrix(root, options.cols ?? 128, options.rows ?? 32, options.color, (fn) => (dispose = fn));
+    const matrix = tintedMatrix(root, options.cols ?? 128, options.rows ?? 32, options.color, (fn) => (dispose = fn), Boolean(options.fill));
     const observer = new ResizeObserver(() => matrix.resize());
     observer.observe(root);
     matrix.resize();
