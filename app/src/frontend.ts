@@ -358,6 +358,7 @@ import { createProfileWelcome } from './profile-welcome';
 import { createMenuSettings } from './menu-settings';
 import { createIntroMenu } from './intro-menu';
 import { createLanguageMenu } from './language-menu';
+import { createTermsMenu } from './terms-menu';
 import { createBackupsMenu } from './backups-menu';
 import { ejectDrive } from './drive-eject';
 import { freezeWrites } from './write-freeze';
@@ -759,8 +760,8 @@ const INTRO_READY_MAX_MS = 5000;
 let introFileCache: IntroFiles | undefined;
 /** Constats brefs arrivés pendant l'ouverture : montrés sur la roue, pas par-dessus les animations. */
 let pendingBanners: string[] = [];
-/** « Votre profil de joueur » à proposer à la fin de l'ouverture (premier démarrage arrivé sur la roue). */
-let pendingProfileWelcome = false;
+/** Écrans du premier démarrage à ouvrir à la fin de l'ouverture : conditions d'utilisation, profil de joueur. */
+let pendingStartupScreens: { terms: boolean; welcome: boolean } | undefined;
 
 function introFilesNow(): IntroFiles {
   return (introFileCache ??= loc.root ? introFiles(layoutOf(loc.root).media) : {});
@@ -799,9 +800,10 @@ function leaveIntro(): boolean {
   const banners = pendingBanners;
   pendingBanners = [];
   for (const text of banners) showBanner(text);
-  if (pendingProfileWelcome) {
-    pendingProfileWelcome = false;
-    openProfileWelcome();
+  if (pendingStartupScreens) {
+    const pending = pendingStartupScreens;
+    pendingStartupScreens = undefined;
+    openStartupScreens(pending);
   }
   return true;
 }
@@ -2101,6 +2103,9 @@ library.provideSystemItem(
 );
 // Langue de l'interface : le choix relance le menu, comme un changement de configuration.
 library.provideSystemItem('language', createLanguageMenu({ library, relaunch: () => relaunchMenu() }));
+// Conditions d'utilisation : à accepter au démarrage tant que la version en cours ne l'est pas, à relire ici.
+const termsMenu = createTermsMenu({ library, dataDir: loc.dataDir, quit: () => void quit() });
+library.provideSystemItem('terms', termsMenu.systemItem);
 // Mise à jour de Cyber Pinball : recherche discrète en arrière-plan (pastille rouge), installation à la demande.
 const updates = createUpdatesMenu({
   loc,
@@ -2614,16 +2619,20 @@ library.provideSystemItem('avatar', {
 const profileWelcome = createProfileWelcome({ library, net: socialNet, avatarMenu });
 
 /**
- * « Votre profil de joueur », puis la suite du premier démarrage telle qu'elle était : le message
- * qui attendait (installer VPX, ajouter une table) ou la roue.
+ * Écrans du démarrage, dans l'ordre : les conditions d'utilisation à accepter, puis « Votre profil
+ * de joueur » ; enfin la suite du démarrage telle qu'elle était : le message qui attendait
+ * (installer VPX, ajouter une table) ou la roue.
  */
-function openProfileWelcome(): void {
+function openStartupScreens(screens: { terms: boolean; welcome: boolean }): void {
   const landing = state;
-  profileWelcome.open(() => {
+  const resume = () => {
     library.leave();
     if (landing.phase === 'message' && landing.message) state = { ...state, phase: 'message', message: landing.message };
     broadcast();
-  });
+  };
+  const welcome = () => (screens.welcome ? profileWelcome.open(resume) : resume());
+  if (screens.terms) termsMenu.ask(welcome);
+  else if (screens.welcome) welcome();
 }
 
 const friendsMenu = createFriendsMenu({
@@ -4332,15 +4341,20 @@ export function startFrontend(): void {
   // fois, avant la suite. Jamais en mode invité ; pas pendant un essai sans opérateur, sauf demandé.
   const unattended = Boolean(process.env.CYBERPINBALL_AUTOPILOT || process.env.CYBERPINBALL_STRESS);
   const welcome = !choose && !guest.active && (!unattended || process.env.CYBERPINBALL_PROFIL === '1') && profileWelcomeDue(socialNet.state());
+  // Conditions d'utilisation pas encore acceptées dans leur version en cours (installation sans
+  // l'installeur, texte changé par une mise à jour) : avant tout le reste. Jamais en mode invité
+  // (la borne n'est pas à l'invité) ; pas pendant un essai sans opérateur, sauf demandé.
+  const terms = !choose && !guest.active && (!unattended || process.env.CYBERPINBALL_CONDITIONS === '1') && termsMenu.due();
+  const startupScreens = terms || welcome ? { terms, welcome } : undefined;
 
   // Ouverture : quand le démarrage arrive sur le menu des tables, avant la roue.
   if (!choose && introAtStartup({ settings: mediaSettings.intro, landing: state.phase, argv: process.argv, env: process.env })) {
     beginIntro('menu');
     // Une fenêtre qui ne dit jamais « prête » ne retient pas les autres.
     setTimeout(() => introRun.start() && introStarted(), INTRO_READY_MAX_MS);
-    // Le profil attend la fin de l'ouverture : rien ne se pose sur les animations.
-    pendingProfileWelcome = welcome;
-  } else if (welcome) openProfileWelcome();
+    // Conditions et profil attendent la fin de l'ouverture : rien ne se pose sur les animations.
+    pendingStartupScreens = startupScreens;
+  } else if (startupScreens) openStartupScreens(startupScreens);
 
   const stress = process.env.CYBERPINBALL_STRESS;
   // L'endurance lance de vraies parties : jamais hors écran.

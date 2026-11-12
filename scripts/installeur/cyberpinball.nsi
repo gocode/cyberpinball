@@ -12,6 +12,8 @@
 ;             et pour la version complète : COMPLET, VPX_ARCHIVE, VPX_ARCHIVE_NOM, VPX_NOTICE, VPX_VERSION,
 ;             VCREDIST, VCREDIST_NOM (installateur du runtime Visual C++ de Microsoft).
 ;   SITE : adresse du dépôt (« repository » du package.json racine).
+;   CONDITIONS : texte des conditions d'utilisation (UTF-16), CONDITIONS_VERSION : sa version
+;   (packages/core/src/terms.ts) ; les accepter écrit <racine>\data\conditions.json.
 ;   VPX_PAREFEU_REEL, VPX_PAREFEU_JONCTION : l'exécutable de VPX sous la racine, par le dossier de sa
 ;   version et par la jonction current (règle « Cyber Pinball VPX » du pare-feu).
 ;
@@ -71,6 +73,9 @@ Var AnciennesDonnees
 Var Maj
 ; /PAREFEU : la règle du pare-feu est demandée même en installation silencieuse (/S).
 Var ParefeuSilencieux
+; « 1 » : conditions d'utilisation acceptées sur leur page (jamais en mise à jour ni en silencieux :
+; l'application les présente alors elle-même).
+Var ConditionsAcceptees
 
 ; ---------------------------------------------------------------------------
 ; Interface
@@ -92,6 +97,14 @@ Var ParefeuSilencieux
   !define MUI_WELCOMEPAGE_TEXT "Cyber Pinball configure toute la borne de flipper virtuel à partir d'un seul modèle.$\r$\n$\r$\nTout s'installe dans un dossier racine que vous choisissez : l'application dans le sous-dossier app, et à côté les tables, médias, configuration, données et émulateurs.$\r$\n$\r$\n${TEXTE_VPX}$\r$\n$\r$\nLa désinstallation retire l'application seulement : vos tables, médias, configuration et données restent dans le dossier racine."
   !define MUI_PAGE_CUSTOMFUNCTION_PRE PasserEnMiseAJour
   !insertmacro MUI_PAGE_WELCOME
+
+  !define MUI_PAGE_HEADER_TEXT "Conditions d'utilisation"
+  !define MUI_PAGE_HEADER_SUBTEXT "À lire avant d'installer Cyber Pinball."
+  !define MUI_LICENSEPAGE_TEXT_TOP "Contenus de tiers, partage entre bornes, usage commercial, santé et garantie :"
+  !define MUI_LICENSEPAGE_TEXT_BOTTOM "Si vous acceptez ces conditions et vous engagez à les respecter, cliquez sur J'accepte. Sinon, l'installation s'arrête. Elles restent à lire dans Menu système > Cyber Pinball > Conditions d’utilisation."
+  !define MUI_PAGE_CUSTOMFUNCTION_PRE PasserEnMiseAJour
+  !define MUI_PAGE_CUSTOMFUNCTION_LEAVE PageConditionsQuitter
+  !insertmacro MUI_PAGE_LICENSE "${CONDITIONS}"
 
   !define MUI_PAGE_HEADER_TEXT "Dossier racine de la borne"
   !define MUI_PAGE_HEADER_SUBTEXT "Cyber Pinball, ses émulateurs, les tables et les médias vivront dans ce dossier."
@@ -479,6 +492,11 @@ Function RacineParDefaut
   ${EndIf}
 FunctionEnd
 
+; « J'accepte » : l'installation note l'accord, l'application ne le redemande pas.
+Function PageConditionsQuitter
+  StrCpy $ConditionsAcceptees "1"
+FunctionEnd
+
 Function PageRacineQuitter
   Call VerifierRacine
   ${If} $0 != ""
@@ -546,6 +564,18 @@ Section "Cyber Pinball" SEC_APP
   CreateDirectory "$Racine\downloads"
   CreateDirectory "$Racine\import"
   Call EcrirePointeur
+
+  ; Conditions d'utilisation acceptées sur leur page : notées comme l'application le fait
+  ; (packages/core/src/terms.ts), pour qu'elle ne les présente pas une seconde fois.
+  ${If} $ConditionsAcceptees == "1"
+    CreateDirectory "$Racine\data"
+    ClearErrors
+    FileOpen $1 "$Racine\data\conditions.json" w
+    ${IfNot} ${Errors}
+      FileWrite $1 '{$\r$\n  "version": "${CONDITIONS_VERSION}",$\r$\n  "via": "installeur"$\r$\n}$\r$\n'
+      FileClose $1
+    ${EndIf}
+  ${EndIf}
 
   ; Données d'avant le choix d'une racine (comme setupRoot) : modèle de borne,
   ; sauvegardes, VPinballX.ini du bac à sable. Copiées si absentes, jamais écrasées.

@@ -216,6 +216,10 @@ Chacune des étapes ci-dessous est une action de `lanceur.cmd` (rubrique « Fabr
 - Les polices (Audiowide, Bebas Neue, Orbitron, Saira) sont sous licence SIL Open Font License ; leurs licences se trouvent à côté d'elles, dans `app/renderer/polices`.
 - Cyber Pinball ne télécharge ni tables ni ROM à votre place. Les tables proviennent des sites de leurs auteurs, et les fabricants de flippers n'autorisent pas la diffusion de leurs ROM.
 
+## Conditions d'utilisation
+
+L'installeur, puis le menu tant qu'elles ne sont pas acceptées, présentent les conditions d'utilisation de Cyber Pinball ; elles restent à lire dans Menu système > Cyber Pinball > Conditions d’utilisation. En bref : Cyber Pinball ne fournit aucune table, ROM ni média de jeu commercial, et c'est à vous de vérifier que vous avez le droit de télécharger, d'installer, d'utiliser et de partager chaque contenu. Il est fourni sans garantie, et ses lumières clignotantes peuvent gêner les personnes sujettes à l'épilepsie photosensible. Ces conditions ne restreignent pas la licence ci-dessous.
+
 ## Licence
 
 Cyber Pinball est un logiciel libre, publié sous la licence publique générale GNU, version 3 ou (à votre choix) toute version ultérieure (GPL-3.0-or-later). Vous pouvez l'utiliser, l'étudier, le modifier et le redistribuer, gratuitement ou non, à condition que toute version redistribuée, modifiée ou non, reste sous cette licence et soit accompagnée de son code source. Il est fourni sans aucune garantie. Le texte complet se trouve dans le fichier [LICENSE](LICENSE).

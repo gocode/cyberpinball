@@ -52,6 +52,7 @@ export const SYSTEM_ITEM_IDS = [
   'guest-mode',
   'language',
   'updates',
+  'terms',
   'backups',
   'media-import',
   'rom-migration',
@@ -140,9 +141,9 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'cyberpinball',
     icon: 'pinball-app',
     label: 'Cyber Pinball', // i18n-ignore : le nom de l'application
-    get detail() { return t('Langue, mise à jour, activité récente, sauvegardes, migration, quitter ou redémarrer, veille et extinction'); },
+    get detail() { return t('Langue, mise à jour, activité récente, sauvegardes, migration, conditions d’utilisation, quitter ou redémarrer, veille et extinction'); },
     // Les sorties à la fin, de la plus légère à la plus lourde : quitter ou relancer Cyber Pinball, veille, redémarrage, arrêt.
-    entries: ['language', 'updates', 'activity', 'backups', 'migration', 'quit', 'relaunch', 'sleep', 'restart', 'shutdown'],
+    entries: ['language', 'updates', 'activity', 'backups', 'migration', 'terms', 'quit', 'relaunch', 'sleep', 'restart', 'shutdown'],
   },
   migration: {
     id: 'migration',
@@ -207,6 +208,7 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   // Nommée dans les deux langues, pour qu'on la retrouve quelle que soit la langue affichée.
   language: { icon: 'language', label: 'Langue / Language' }, // i18n-ignore
   updates: { icon: 'upgrade', get label() { return t('Mise à jour de Cyber Pinball'); } },
+  terms: { icon: 'rules', get label() { return t('Conditions d’utilisation'); } },
   backups: { icon: 'drive', get label() { return t('Sauvegardes'); } },
   'media-import': { icon: 'folder-download', get label() { return t('Reprendre les médias'); } },
   'rom-migration': { icon: 'link', get label() { return t('Regrouper les ROM'); } },

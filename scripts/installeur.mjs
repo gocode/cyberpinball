@@ -131,6 +131,19 @@ async function vcRedist() {
   return { file, name: path.basename(file), version: redist.version };
 }
 
+/**
+ * Page « Conditions d'utilisation » de l'installeur : le texte du cœur (packages/core/src/terms.ts),
+ * en français comme l'installeur, écrit en UTF-16 avec sa marque d'ordre pour NSIS.
+ */
+export function termsPage(dir = work) {
+  const core = require(path.join(repo, 'packages', 'core', 'dist', 'index.js'));
+  core.setLanguage('fr');
+  const file = path.join(dir, 'conditions.txt');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(file, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(core.termsPlainText(), 'utf16le')]));
+  return { CONDITIONS: file, CONDITIONS_VERSION: core.TERMS_VERSION };
+}
+
 export async function buildInstallers({ complete = true } = {}) {
   const exe = path.join(unpacked, 'CyberPinball.exe');
   if (!fs.existsSync(exe)) throw new Error(`${exe} manque : lancez d'abord la fabrication de l'exécutable.`);
@@ -146,6 +159,7 @@ export async function buildInstallers({ complete = true } = {}) {
   const common = { VERSION: version, VERSION_WIN: windowsVersion(version), ICONE: icon, BANDEAU: banner, SITE: site, VPX_PAREFEU_REEL: `${vpxDir}\\${vpx.version}\\${vpx.executable}`, VPX_PAREFEU_JONCTION: `${vpxDir}\\current\\${vpx.executable}` };
   fs.rmSync(work, { recursive: true, force: true });
   fs.mkdirSync(work, { recursive: true });
+  Object.assign(common, termsPage());
 
   step('Désinstalleur');
   // Écrit par un premier installeur, pour pouvoir le signer avant de l'embarquer.

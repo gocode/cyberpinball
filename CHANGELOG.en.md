@@ -13,6 +13,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Phone remote: without the cabinet (another Wi-Fi, cabinet off), the page says "Cabinet unreachable" and reconnects by itself as soon as the cabinet answers, without reloading or rescanning the QR code.
 - Relaunch with Start: with Cyber Pinball closed, or switched to the Windows desktop, a long press (2 s) on the cabinet's Start button reopens it. For cabinets whose Start is a joystick button (Pinscape, encoder in gamepad mode); set it in System menu > Borne (Cabinet) > “Relance par Start” (Relaunch with Start).
 - Wheel: the ring fits the medallion's chrome for any wheel image added or replaced, without being fooled by a drop shadow, a glow around the medallion or a title spilling over.
+- Terms of use: the cabinet shows them at startup until they are accepted, one page per part, with the buttons (third-party content and copyright, sharing between cabinets, commercial use, health, no warranty). You can read them again in System menu > Cyber Pinball > Terms of use; the next installer will ask you to accept them before installing.
 
 ## 0.1.10
 

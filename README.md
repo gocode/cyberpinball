@@ -216,6 +216,10 @@ Every step below is an action of `lanceur.cmd` (section "Fabrication et publicat
 - Fonts (Audiowide, Bebas Neue, Orbitron, Saira) are under the SIL Open Font License; their licence files sit next to them in `app/renderer/polices`.
 - Cyber Pinball does not download tables or ROMs for you. Tables come from their authors' sites, and pinball manufacturers do not allow their ROMs to be shared.
 
+## Terms of use
+
+The installer, then the menu for as long as they have not been accepted, show Cyber Pinball's terms of use; they can be read again in System menu > Cyber Pinball > Terms of use. In short: Cyber Pinball supplies no table, ROM or media from any commercial game, and it is up to you to make sure you have the right to download, install, use and share each piece of content. It comes with no warranty, and its flashing lights can affect people with photosensitive epilepsy. These terms do not restrict the licence below.
+
 ## Licence
 
 Cyber Pinball is free software, released under the GNU General Public License, version 3 or (at your option) any later version (GPL-3.0-or-later). You may use, study, modify and redistribute it, free of charge or not, provided that any redistributed version, modified or not, stays under this licence and comes with its source code. It comes with no warranty. The full text is in the [LICENSE](LICENSE) file.
