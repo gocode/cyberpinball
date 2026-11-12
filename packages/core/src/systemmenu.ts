@@ -48,6 +48,7 @@ export const SYSTEM_ITEM_IDS = [
   'explorer',
   'dedicated',
   'startup',
+  'start-relaunch',
   'guest-mode',
   'language',
   'updates',
@@ -133,7 +134,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     icon: 'cabinet',
     get label() { return t('Borne'); },
     get detail() { return t('Santé, fiche technique, boutons, écrans, son, réglages de VPX, réalité virtuelle, vision 3D, télécommande du téléphone, bureau Windows, mode invité'); },
-    entries: ['health', 'tech-sheet', 'cabinet', 'vpx-settings', 'vision3d', 'vr', 'vr-calibrate', 'vr-controllers', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'guest-mode'],
+    entries: ['health', 'tech-sheet', 'cabinet', 'vpx-settings', 'vision3d', 'vr', 'vr-calibrate', 'vr-controllers', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'start-relaunch', 'guest-mode'],
   },
   cyberpinball: {
     id: 'cyberpinball',
@@ -199,6 +200,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   explorer: { icon: 'folder', get label() { return t('Ouvrir l’Explorateur Windows'); } },
   dedicated: { icon: 'lock', get label() { return t('Borne dédiée'); } },
   startup: { icon: 'power', get label() { return t('Lancement au démarrage'); } },
+  // Appui long sur Start (bouton de joystick) : Cyber Pinball rouvert depuis Windows (app/src/start-relaunch.ts).
+  'start-relaunch': { icon: 'start', get label() { return t('Relance par Start'); } },
   'guest-mode': { icon: 'guest', get label() { return t('Mode invité'); } },
   collections: { icon: 'star', get label() { return t('Collections'); } },
   // Nommée dans les deux langues, pour qu'on la retrouve quelle que soit la langue affichée.

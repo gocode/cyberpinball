@@ -139,6 +139,7 @@ export * from './fulldmdtable';
 export * from './tabletint';
 export * from './dedicated';
 export * from './windowssettings';
+export * from './start-relaunch';
 export * from './uisounds';
 export * from './power';
 export * from './arcadehours';

@@ -45,6 +45,7 @@ import {
   type UpdatePlan,
 } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
+import { stopRelaunchWatcher } from './start-relaunch';
 
 export interface UpdatesHost {
   loc: Locations;
@@ -283,6 +284,9 @@ export function createUpdatesMenu(host: UpdatesHost) {
     recordPendingUpdate(host.loc.dataDir, { from: host.version, to: installs, started: new Date().toISOString(), installer });
     const args = updateInstallerArguments(root, { silent: host.silent });
     console.log(`Mise à jour : ${installer} ${args.join(' ')}`);
+    // Le veilleur de la relance par Start tient CyberPinball.exe ouvert : l'installeur ne pourrait pas le remplacer.
+    // Cyber Pinball relancé après la mise à jour le relance.
+    stopRelaunchWatcher(host.loc.dataDir);
     try {
       // Détaché : il survit à la fermeture de Cyber Pinball, qu'il attend avant de remplacer app\.
       const child = spawn(installer, args, {
@@ -344,6 +348,8 @@ export function createUpdatesMenu(host: UpdatesHost) {
       fs.writeFileSync(jobFile, `${JSON.stringify(job, null, 2)}\n`, 'utf8');
       recordPendingUpdate(host.loc.dataDir, { from: host.version, to: latest.version, started: new Date().toISOString(), installer: staged });
       console.log(`Mise à jour légère : ${helper} ${jobFile}`);
+      // Le veilleur de la relance par Start tient le dossier de l'application : arrêté, relancé par la nouvelle version.
+      stopRelaunchWatcher(host.loc.dataDir);
       const child = spawn(process.execPath, [helper, jobFile], {
         detached: true,
         stdio: 'ignore',

@@ -5,7 +5,7 @@
 import * as path from 'node:path';
 import { appendJournal, journalLine, type JournalLevel } from '@cyberpinball/core';
 
-export function journalConsole(dataDir: string): void {
+export function journalConsole(dataDir: string, who = 'Cyber Pinball'): void {
   const logsDir = path.join(dataDir, 'logs');
   const wrap = (name: 'log' | 'info' | 'warn' | 'error', level: JournalLevel) => {
     const original = console[name].bind(console);
@@ -22,5 +22,5 @@ export function journalConsole(dataDir: string): void {
   wrap('info', 'info');
   wrap('warn', 'avertissement');
   wrap('error', 'erreur');
-  console.log(`Cyber Pinball démarre (journal : ${path.join(logsDir, 'journal.txt')}).`); // i18n-ignore : journal
+  console.log(`${who} démarre (journal : ${path.join(logsDir, 'journal.txt')}).`); // i18n-ignore : journal
 }

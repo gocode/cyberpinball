@@ -11,6 +11,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 - Phone remote: the kept phone finds the cabinet even if the router gives it another address at a restart. It goes through the cabinet's name on the local network; redo its Home screen shortcut once when the page offers it.
 - Phone remote: without the cabinet (another Wi-Fi, cabinet off), the page says "Cabinet unreachable" and reconnects by itself as soon as the cabinet answers, without reloading or rescanning the QR code.
+- Relaunch with Start: with Cyber Pinball closed, or switched to the Windows desktop, a long press (2 s) on the cabinet's Start button reopens it. For cabinets whose Start is a joystick button (Pinscape, encoder in gamepad mode); set it in System menu > Borne (Cabinet) > “Relance par Start” (Relaunch with Start).
 
 ## 0.1.10
 

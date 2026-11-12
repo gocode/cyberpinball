@@ -29,6 +29,7 @@ import { holdSingleInstance } from './single-instance';
 import { startIdleCursor } from './idle-cursor';
 import { startSettingsAlone } from './settings';
 import { beatPulse, superviseCabinet } from './supervisor';
+import { noteAppRunning, runRelaunchWatcher } from './start-relaunch';
 import { noApplicationMenu } from './app-menu';
 import { journalConsole } from './journal';
 import { journalIncidents, journalNativeCrashes, journalProcessesGone, journalUncaught, reviveCrashedWindows } from './uncaught';
@@ -57,7 +58,9 @@ const wantsWizard = !wantsSettings && (process.argv.includes('--assistant') || w
 // Shell du compte (« Borne dédiée » sans Shell Launcher) : ce processus n'est que le surveillant
 // qui lance et relance Cyber Pinball. Sinon, un essai sans opérateur lancé sur le bureau de
 // l'utilisateur se refait sur le bureau caché.
-if (!superviseCabinet(loc.dataDir) && !relaunchOnHiddenDesktop()) {
+// Veilleur de la relance par Start (start-relaunch.ts) : aucune fenêtre, il lance Cyber Pinball
+// fermé sur un appui long du bouton Start.
+if (!superviseCabinet(loc.dataDir) && !runRelaunchWatcher() && !relaunchOnHiddenDesktop()) {
   // Lancé par le surveillant de la borne dédiée : le pouls qui lui dit que ce processus vit.
   beatPulse();
   // Fermer le menu ou l'assistant depuis Windows ferme toute l'application ; une relève n'en est pas une fermeture.
@@ -66,6 +69,8 @@ if (!superviseCabinet(loc.dataDir) && !relaunchOnHiddenDesktop()) {
   const single = holdSingleInstance({ relaying: isRelay(), ignore: () => isRelaunching() || isQuitting() });
   app.whenReady().then(async () => {
     if (!(await single)) return app.exit(0);
+    // Le veilleur de la relance par Start sait que Cyber Pinball est ouvert : il ne relance rien.
+    noteAppRunning(loc.dataDir);
     // Un autre menu de borne ouvert (PinUP Popper…) : aucun écran n'est pris avant qu'il soit
     // fermé, ou que l'utilisateur choisisse de continuer quand même.
     const gate = await otherFrontendsGate();

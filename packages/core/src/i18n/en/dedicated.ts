@@ -174,4 +174,12 @@ export const messages: Record<string, string> = {
   'Raccourci du dossier Démarrage retiré, vérifié': 'Startup folder shortcut removed, checked',
   'Effet à la prochaine ouverture de session': 'Takes effect at next sign-in',
   'Le script de secours n’a pas tout remis': 'The rescue script did not put everything back',
+  'Relance par Start': 'Relaunch with Start',
+  'Relance par Start : oui': 'Relaunch with Start: yes',
+  'Relance par Start : non': 'Relaunch with Start: no',
+  'Inutile en borne dédiée : Cyber Pinball y est relancé de lui-même': 'Not needed on a dedicated cabinet: Cyber Pinball relaunches by itself there',
+  'Start doit être un bouton de joystick (Pinscape, encodeur en mode manette) : relevez-le dans l’étape « Boutons »': 'Start must be a joystick button (Pinscape, encoder in gamepad mode): record it in the “Buttons” step',
+  'Appui long ({seconds} s) sur Start : rouvre Cyber Pinball fermé, ou le menu depuis le bureau Windows': 'Long press ({seconds} s) on Start: reopens Cyber Pinball when closed, or the menu from the Windows desktop',
+  'Désactivée : Start ne rouvre pas Cyber Pinball depuis Windows': 'Off: Start does not reopen Cyber Pinball from Windows',
+  'Libère tous les écrans du PC ; un appui long sur Start, {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu': 'Frees every PC screen; a long press on Start, {keys} or the Cyber Pinball taskbar button brings the menu back',
 };

@@ -8,6 +8,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, BrowserWindow, globalShortcut, ipcMain, session, shell, webContents, type Input, type Rectangle, type WebContents } from 'electron';
 import {
+  joystickStartCode,
+  relaunchEnabled,
+  saveRelaunchEnabled,
+  START_HOLD_MS,
   loadDedicatedRecord,
   loadPrereleaseSetting,
   createKeptPhones,
@@ -398,6 +402,7 @@ import { createDedicatedMenu } from './dedicated-menu';
 import { TableTints } from './table-tint';
 import { createDedicatedSystem } from './dedicated-system';
 import { handOverOnQuit, shellSession } from './dedicated-session';
+import { syncRelaunchWatcher, watchStartHold } from './start-relaunch';
 import { createPowerMenu } from './power';
 import { readWakeDevices } from './arcade-hours';
 import { createPhoneRemote, phoneRemoteMode, type MenuEntries, type MenuEntry, type RemoteJukebox } from './phone-remote';
@@ -2194,7 +2199,9 @@ if (shellSession()) {
   library.withdrawSystemItem('quit');
 } else library.provideSystemItem('desktop', {
   get detail() {
-    return t('Libère tous les écrans du PC ; {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu', { keys: shortcutLabel(SHORTCUTS.desktop) });
+    return startHoldCode()
+      ? t('Libère tous les écrans du PC ; un appui long sur Start, {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu', { keys: shortcutLabel(SHORTCUTS.desktop) })
+      : t('Libère tous les écrans du PC ; {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu', { keys: shortcutLabel(SHORTCUTS.desktop) });
   },
   // Touches lues dans la définition du raccourci (SHORTCUTS) : celles que reconnaissent handleKey et le raccourci global.
   get shortcut() {
@@ -2209,6 +2216,30 @@ library.provideSystemItem('relaunch', {
     return t('Ferme puis rouvre Cyber Pinball ; le PC reste allumé');
   },
   run: () => relaunchMenu(true),
+});
+// Relance par Start (start-relaunch.ts) : un appui long sur Start, bouton de joystick, rouvre
+// Cyber Pinball fermé (veilleur au démarrage de Windows) ou le menu depuis le bureau.
+library.provideSystemItem('start-relaunch', {
+  get label() {
+    if (shellSession()) return t('Relance par Start');
+    return relaunchEnabled(loc.dataDir) ? t('Relance par Start : oui') : t('Relance par Start : non');
+  },
+  get detail() {
+    if (shellSession()) return t('Inutile en borne dédiée : Cyber Pinball y est relancé de lui-même');
+    if (!joystickStartCode(buttons)) return t('Start doit être un bouton de joystick (Pinscape, encodeur en mode manette) : relevez-le dans l’étape « Boutons »');
+    return relaunchEnabled(loc.dataDir)
+      ? t('Appui long ({seconds} s) sur Start : rouvre Cyber Pinball fermé, ou le menu depuis le bureau Windows', { seconds: START_HOLD_MS / 1000 })
+      : t('Désactivée : Start ne rouvre pas Cyber Pinball depuis Windows');
+  },
+  get tone() {
+    return shellSession() || !joystickStartCode(buttons) ? ('quiet' as const) : undefined;
+  },
+  run: () => {
+    if (shellSession() || !joystickStartCode(buttons)) return;
+    saveRelaunchEnabled(loc.dataDir, !relaunchEnabled(loc.dataDir));
+    applyRelaunchWatcher();
+    broadcast();
+  },
 });
 // Collections de la roue : aussi au menu système, pour une borne dont les MagnaSave ne répondent pas.
 library.provideSystemItem(
@@ -3868,9 +3899,24 @@ const desktop = new DesktopMode<BrowserWindow, WebContents>({
 });
 /** Au bureau : range ce qui reviendrait sur un écran, et suit le retour d'une fenêtre rouverte. */
 let desktopWatch: NodeJS.Timeout | undefined;
+/** Au bureau : l'appui long sur Start qui ramène le menu (watchStartHold). */
+let desktopStartHold: (() => void) | undefined;
 /** Proposition de rendre à Windows l'orientation du bureau, en attente de réponse. */
 let legacyOrientation: LegacyOrientation | undefined;
 const DESKTOP_WATCH_MS = 500;
+/** Veilleur de la relance par Start mis en place ce délai après le démarrage du menu. */
+const RELAUNCH_SYNC_DELAY_MS = 15_000;
+
+/** Le bouton Start de la borne pour la relance par Start : un bouton de joystick, la relance voulue. */
+function startHoldCode(): string | undefined {
+  return relaunchEnabled(loc.dataDir) ? joystickStartCode(buttons) : undefined;
+}
+
+/** Veilleur de la relance par Start dans l'état voulu (raccourci du dossier Démarrage, processus). */
+function applyRelaunchWatcher(): void {
+  if (OFFSCREEN) return;
+  syncRelaunchWatcher({ dataDir: loc.dataDir, startupDir: dedicatedSystem.startupDir(), wanted: !shellSession() && Boolean(startHoldCode()) });
+}
 
 /**
  * Menu système > « Borne » > « Bureau Windows », ou son raccourci depuis le menu : tous les écrans du PC
@@ -3892,6 +3938,8 @@ function showDesktop(): boolean {
   if (!OFFSCREEN && !globalShortcut.register(accelerator(SHORTCUTS.desktop), () => restoreFromDesktop())) {
     console.warn(`Mode bureau : ${shortcutLabel(SHORTCUTS.desktop)} est déjà pris par un autre programme ; la barre des tâches ramène le menu.`);
   }
+  const startCode = startHoldCode();
+  if (startCode) desktopStartHold = watchStartHold(startCode, () => restoreFromDesktop());
   desktopWatch = setInterval(() => {
     if (desktop.reopened()) return restoreFromDesktop();
     for (const win of desktop.clear()) console.warn(`Mode bureau : « ${win.getTitle()} » était revenue sur son écran, de nouveau rangée.`);
@@ -3904,6 +3952,8 @@ function showDesktop(): boolean {
 function restoreFromDesktop(): void {
   if (!desktop.active) return;
   clearInterval(desktopWatch);
+  desktopStartHold?.();
+  desktopStartHold = undefined;
   if (!OFFSCREEN) globalShortcut.unregister(accelerator(SHORTCUTS.desktop));
   // L'orientation de jeu revient ; un quart de tour change la taille des écrans, le menu rouvre ses fenêtres.
   const moved = orientationFromDesktop();
@@ -4031,6 +4081,9 @@ export function startFrontend(): void {
   tilt = cabinet?.tilt;
   navigation = cabinet?.navigation;
   KEYS = menuKeysFor(cabinet);
+  // Le veilleur de la relance par Start suit le Start relevé ; relancé ici s'il ne tourne pas (après une mise à jour).
+  // Après l'ouverture : tasklist et le raccourci ne la retardent pas.
+  setTimeout(applyRelaunchWatcher, RELAUNCH_SYNC_DELAY_MS).unref();
   audioOutput = choose ? undefined : menuAudioOutput(cabinet)?.friendlyName;
   // Les boutons de volume règlent le son de toute la borne (Windows), sur les sorties de l'étape « Son ».
   cabinetVolume = startCabinetVolume({

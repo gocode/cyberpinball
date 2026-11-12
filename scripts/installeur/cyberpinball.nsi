@@ -200,6 +200,27 @@ Function ${un}ApplicationFermee
 FunctionEnd
 !macroend
 
+; Arrête le veilleur de la relance par Start (CyberPinball.exe --veilleur, sans fenêtre) : il
+; tient l'exécutable ouvert. Son pid est dans data\relance-start\veilleur.pid ; taskkill ne
+; vise ce pid que si c'est bien CyberPinball.exe. Cyber Pinball relancé le relance.
+!macro FONCTION_ARRET_VEILLEUR un
+Function ${un}ArreterVeilleur
+  ClearErrors
+  FileOpen $1 "$Racine\data\relance-start\veilleur.pid" r
+  ${If} ${Errors}
+    Return
+  ${EndIf}
+  FileRead $1 $2
+  FileClose $1
+  IntOp $2 $2 + 0
+  ${If} $2 > 0
+    nsExec::Exec '"$SYSDIR\taskkill.exe" /T /F /FI "PID eq $2" /FI "IMAGENAME eq ${EXE}"'
+    Pop $1
+    Sleep 500
+  ${EndIf}
+FunctionEnd
+!macroend
+
 ; ---------------------------------------------------------------------------
 !ifdef ECRIRE_DESINSTALLEUR
 ; Passe 1 : écrit le désinstalleur, puis quitte.
@@ -214,6 +235,7 @@ SectionEnd
 
 !insertmacro FONCTION_EMPLACEMENTS "un."
 !insertmacro FONCTION_APPLICATION_FERMEE "un."
+!insertmacro FONCTION_ARRET_VEILLEUR "un."
 
 ; Le désinstalleur reste dans <racine>\app : $INSTDIR est ce dossier.
 Function un.onInit
@@ -241,6 +263,7 @@ Function un.onInit
 FunctionEnd
 
 Section "Uninstall"
+  Call un.ArreterVeilleur
   StrCpy $0 "$INSTDIR\${EXE}"
   Call un.ApplicationFermee
 
@@ -248,6 +271,7 @@ Section "Uninstall"
   Delete "$MenuDir\${PRODUIT}.lnk"
   Delete "$BureauDir\${PRODUIT}.lnk"
   Delete "$DemarrageDir\${PRODUIT}.lnk"
+  Delete "$DemarrageDir\${PRODUIT} - relance par Start.lnk"
   Delete "$Racine\${PRODUIT}.lnk"
 
   ; L'entrée de Programmes et fonctionnalités, si elle désigne bien cette racine.
@@ -318,6 +342,7 @@ SectionEnd
 
 !insertmacro FONCTION_EMPLACEMENTS ""
 !insertmacro FONCTION_APPLICATION_FERMEE ""
+!insertmacro FONCTION_ARRET_VEILLEUR ""
 
 ; Lit la racine mémorisée dans root.json (UTF-8). Sortie : $0, vide si absente.
 Function LirePointeur
@@ -475,6 +500,7 @@ Section "Cyber Pinball" SEC_APP
   ${EndIf}
   StrCpy $INSTDIR $Racine
 
+  Call ArreterVeilleur
   StrCpy $0 "$Racine\app\${EXE}"
   Call ApplicationFermee
 

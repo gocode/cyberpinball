@@ -57,8 +57,9 @@ const NATIVE_NET = ['sodium-native', 'udx-native'];
 const common = { bundle: true, platform: 'node', format: 'cjs', target: 'node22', external: ['electron', 'koffi', '@ghostery/adblocker-electron-preload', ...NATIVE_NET], logLevel: 'warning' };
 await esbuild.build({ ...common, entryPoints: [path.join(repo, 'app', 'dist', 'main.js')], outfile: path.join(stage, 'dist', 'main.js') });
 // Un preload par type de fenêtre (preload.js, settings-preload.js…) : on les prend tous. Et la
-// mise en place de la mise à jour légère, lancée à part par l'exécutable en mode Node.
-for (const name of fs.readdirSync(path.join(repo, 'app', 'dist')).filter((f) => /preload\.js$/.test(f) || f === 'maj-legere.js')) {
+// mise en place de la mise à jour légère et le veilleur de la relance par Start, lancés à part par
+// l'exécutable en mode Node.
+for (const name of fs.readdirSync(path.join(repo, 'app', 'dist')).filter((f) => /preload\.js$/.test(f) || f === 'maj-legere.js' || f === 'veilleur.js')) {
   await esbuild.build({ ...common, entryPoints: [path.join(repo, 'app', 'dist', name)], outfile: path.join(stage, 'dist', name) });
 }
 // Script préchargé du bloqueur de publicités (app/src/ad-blocker.ts), injecté par la session
@@ -242,6 +243,14 @@ if (process.argv.includes('--deployer')) {
   if (!root) throw new Error("Aucune racine : lancez d'abord l'installation (setup) ou définissez CYBERPINBALL_ROOT.");
   const target = path.join(root, 'app');
 
+  // Le veilleur de la relance par Start (CyberPinball.exe --veilleur, sans fenêtre) tient
+  // l'exécutable : arrêté d'abord, Cyber Pinball le relance à son prochain démarrage.
+  const watcherPidFile = path.join(root, 'data', 'relance-start', 'veilleur.pid');
+  const watcherPid = fs.existsSync(watcherPidFile) ? Number.parseInt(fs.readFileSync(watcherPidFile, 'utf8'), 10) : NaN;
+  if (watcherPid > 0) {
+    spawnSync('taskkill', ['/T', '/F', '/FI', `PID eq ${watcherPid}`, '/FI', 'IMAGENAME eq CyberPinball.exe'], { stdio: 'ignore' });
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+  }
   const running = spawnSync('tasklist', ['/FI', 'IMAGENAME eq CyberPinball.exe', '/NH'], { encoding: 'utf8' }).stdout;
   if (running.includes('CyberPinball.exe')) throw new Error('Cyber Pinball est en cours d’exécution : fermez-le avant de déployer.');
 
