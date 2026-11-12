@@ -5581,6 +5581,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     // Partie enregistrée : son écran (aperçu, utiliser pour la roue, garder, jeter) avant la roue.
     if (recorded && !unseen) showRecording({ ...recorded, table: tables.find((t) => t.id === table.id) ?? recorded.table });
   } else {
+    // Toute partie échouée laisse sa trace au journal : le 12/11/2026, trois lancements d'Addams
+    // Family arrêtés sur sa fenêtre d'options n'y avaient rien laissé.
+    console.log(`Partie (${table.id}) : échec (${result.failure ?? 'inconnu'}) : ${result.message ?? ''}`); // i18n-ignore : journal
     const repaired = result.failure === 'dialog' && result.message ? repairScriptStop(table, result.message) : undefined;
     state = { ...state, phase: 'message', message: explain(result, table, repaired, Boolean(double)) };
   }

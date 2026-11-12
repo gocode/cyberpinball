@@ -7,6 +7,8 @@
 // crée pas son éditeur, donc ni audit de la table, ni éditeur de script, ni
 // fenêtre de progression. La reconnaissance des fenêtres de l'éditeur sert de
 // filet pour une autre version de VPX qui en ouvrirait une malgré tout.
+// Le script de la table peut ouvrir ses propres boîtes : une erreur (MsgBox) arrête
+// la partie, un formulaire d'options (core.vbs, VPinMAME.WSHDlg) est validé tel quel.
 
 import { t, tn } from './i18n';
 import { ROLES, type ObservedDisplay, type Rect, type RoleId } from './model';
@@ -24,11 +26,21 @@ export const VPX_GAME_TITLES = [
 /** Classe des boîtes de dialogue Windows (MessageBox, CDialog). */
 export const DIALOG_CLASS = '#32770';
 
+/** Contrôle d'une boîte de dialogue : sa classe Windows, son style (GWL_STYLE), son numéro (GetDlgCtrlID), son texte. */
+export interface ObservedControl {
+  className: string;
+  style: number;
+  id: number;
+  text: string;
+}
+
 export interface ObservedVpxWindow {
   title: string;
   className: string;
   /** Textes des contrôles (message d'une boîte de dialogue), lus seulement pour une boîte. */
   texts?: string[];
+  /** Contrôles d'une boîte, quand le lanceur les a lus : ils disent si c'est un formulaire d'options. */
+  controls?: ObservedControl[];
 }
 
 export type VpxWindowVerdict =
@@ -36,6 +48,11 @@ export type VpxWindowVerdict =
   | { kind: 'game' }
   /** Fenêtre de l'éditeur ou d'audit : masquée (hide) ou fermée (close), la partie continue. */
   | { kind: 'editor'; action: 'hide' | 'close'; notice: string }
+  /**
+   * Formulaire d'options ouvert par le script de la table (cases à cocher, boutons radio) : validé
+   * tel quel par son bouton `okId`, la partie continue avec les choix qu'il propose.
+   */
+  | { kind: 'options'; okId: number; notice: string }
   /** Boîte bloquante (question, erreur) : la partie est arrêtée avec ce message. */
   | { kind: 'dialog'; message: string }
   /** Autre fenêtre : laissée telle quelle, signalée. */
@@ -63,6 +80,30 @@ const EDITOR_DIALOGS: Record<string, string> = {
 
 /** Boutons d'une boîte de dialogue, à ne pas mêler au message. */
 const BUTTON_TEXT = /^&?(ok|oui|non|yes|no|annuler|cancel|réessayer|retry|ignorer|ignore|abandonner|abort|fermer|close)$/i;
+
+// Styles des boutons Windows (winuser.h, BS_TYPEMASK) : ceux d'un choix, et ceux d'un bouton à presser.
+const BS_TYPEMASK = 0x0f;
+const CHOICE_BUTTONS = new Set([0x02, 0x03, 0x04, 0x05, 0x06, 0x09]); // CHECKBOX, AUTOCHECKBOX, RADIOBUTTON, 3STATE, AUTO3STATE, AUTORADIOBUTTON
+const BS_PUSHBUTTON = 0x00;
+const BS_DEFPUSHBUTTON = 0x01;
+// Jamais « Oui » : répondre oui à une question, même accompagnée d'une case, serait décider à la place du joueur.
+const OK_TEXT = /^&?(ok|valider|appliquer|apply)$/i;
+
+const isButton = (c: ObservedControl) => c.className.trim().toLowerCase() === 'button';
+
+/**
+ * Bouton qui valide un formulaire d'options : une boîte de dialogue avec au moins une case à cocher
+ * ou un bouton radio (jamais une MessageBox, qui n'en a pas), et un bouton OK. C'est la boîte que
+ * core.vbs construit avec VPinMAME.WSHDlg (cvpmDips : addForm, addFrame, addChk, viewDips) quand
+ * une table propose ses options au démarrage : « &Ok » (bouton par défaut, n° 1000), cadres,
+ * boutons radio, cases, étiquettes (relevé sur le PinCab, VPinMAME enregistré, 12/11/2026).
+ * VPX attend sa fermeture : ni lui ni le script ne vont plus loin tant qu'elle est ouverte.
+ */
+function optionsOkButton(controls: readonly ObservedControl[]): ObservedControl | undefined {
+  if (!controls.some((c) => isButton(c) && CHOICE_BUTTONS.has(c.style & BS_TYPEMASK))) return undefined;
+  const pushes = controls.filter((c) => isButton(c) && [BS_PUSHBUTTON, BS_DEFPUSHBUTTON].includes(c.style & BS_TYPEMASK));
+  return pushes.find((c) => OK_TEXT.test(c.text.trim())) ?? (pushes.length === 1 ? pushes[0] : undefined);
+}
 
 function setting(key: string): string {
   const s = VPX_PLAY_SETTINGS.find((p) => p.key === key)!;
@@ -102,6 +143,20 @@ export function classifyVpxWindow(w: ObservedVpxWindow): VpxWindowVerdict {
       notice: errors
         ? tn(errors, 'Fenêtre « Table audit » de VPX fermée ({n} erreur signalée par VPX).', 'Fenêtre « Table audit » de VPX fermée ({n} erreurs signalées par VPX).')
         : t('Fenêtre « Table audit » de VPX fermée.'),
+    };
+  }
+
+  // Options de la table au démarrage (Addams Family VPW 2.4.41, « TABLE OPTIONS MENU ») : sur une
+  // borne sans souris, personne ne peut y répondre. Les arrêter comme une erreur reposait la même
+  // question à chaque lancement : la table ne se jouait jamais. Validées telles quelles, comme
+  // le ferait un clic sur OK, elles gardent les choix déjà enregistrés par la table.
+  const ok = optionsOkButton(w.controls ?? []);
+  if (ok) {
+    const name = title || t('sans titre');
+    return {
+      kind: 'options',
+      okId: ok.id,
+      notice: t('Fenêtre d’options de la table « {title} » validée telle quelle (bouton OK) : la partie continue avec ses choix enregistrés.', { title: name }),
     };
   }
 

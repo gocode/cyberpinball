@@ -317,6 +317,7 @@ export const messages: Record<string, string> = {
   'Fenêtre « Table audit » de VPX fermée ({n} erreur signalée par VPX).': 'VPX “Table audit” window closed ({n} error reported by VPX).',
   'Fenêtre « Table audit » de VPX fermée ({n} erreurs signalées par VPX).': 'VPX “Table audit” window closed ({n} errors reported by VPX).',
   'Fenêtre « Table audit » de VPX fermée.': 'VPX “Table audit” window closed.',
+  'Fenêtre d’options de la table « {title} » validée telle quelle (bouton OK) : la partie continue avec ses choix enregistrés.': 'Table options window “{title}” accepted as is (OK button): the game goes on with its saved choices.',
   'VPX demande s\'il peut créer l\'objet ActiveX « {object} » dont la table a besoin : son réglage [Player] SecurityLevel n\'est pas à 0. Remettez {setting} dans VPinballX.ini (au démarrage, Cyber Pinball propose de reprendre sa valeur).': 'VPX asks whether it may create the ActiveX object “{object}” the table needs: its [Player] SecurityLevel setting isn’t 0. Set {setting} again in VPinballX.ini (at startup, Cyber Pinball offers to restore it).',
   'VPX cherche un casque de réalité virtuelle : la VR est forcée ([PlayerVR] AskToTurnOn = 0). Remettez {setting} dans VPinballX.ini, et dans le .ini de la table s\'il la surcharge.': 'VPX is looking for a VR headset: VR is forced ([PlayerVR] AskToTurnOn = 0). Set {setting} again in VPinballX.ini, and in the table’s .ini if it overrides it.',
   // packages/core/src/sync.ts

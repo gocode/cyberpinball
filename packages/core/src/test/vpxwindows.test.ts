@@ -46,6 +46,48 @@ test('une autre boîte de dialogue garde son texte, sans les boutons', () => {
   });
 });
 
+// Boîte VPinMAME.WSHDlg que core.vbs ouvre pour les options d'une table (cvpmDips), relevée sur le
+// PinCab le 12/11/2026 : « &Ok » BS_DEFPUSHBUTTON n° 1000, cadre (7), boutons radio (9), case (3), étiquette.
+const WSHDLG_OPTIONS = {
+  title: 'TABLE OPTIONS MENU',
+  className: '#32770',
+  controls: [
+    { className: 'Button', id: 1000, style: 0x50030001, text: '&Ok' },
+    { className: 'Button', id: 1001, style: 0x50020007, text: 'Bear Toy' },
+    { className: 'Button', id: 1002, style: 0x50020009, text: 'Rug' },
+    { className: 'Button', id: 1003, style: 0x50000009, text: 'Head' },
+    { className: 'Button', id: 1004, style: 0x50030003, text: 'Enable Menu Next Start' },
+    { className: 'Static', id: 1005, style: 0x50020000, text: '* Restart To Apply Settings' },
+  ],
+};
+
+test("le formulaire d'options d'une table (core.vbs, WSHDlg) est validé par son OK, jamais pris pour une erreur", () => {
+  const verdict = classifyVpxWindow({ ...WSHDLG_OPTIONS, texts: WSHDLG_OPTIONS.controls.map((c) => c.text) });
+  assert.equal(verdict.kind, 'options');
+  assert.equal(verdict.kind === 'options' && verdict.okId, 1000);
+  assert.match(verdict.kind === 'options' ? verdict.notice : '', /« TABLE OPTIONS MENU » validée telle quelle/);
+  // Sans le texte « Ok » : le seul bouton à presser fait l'affaire.
+  const sansOk = WSHDLG_OPTIONS.controls.map((c) => (c.id === 1000 ? { ...c, text: 'Continuer' } : c));
+  assert.equal(classifyVpxWindow({ ...WSHDLG_OPTIONS, controls: sansOk }).kind, 'options');
+});
+
+test("une boîte sans case ni bouton radio reste une erreur, même lue avec ses contrôles", () => {
+  const verdict = classifyVpxWindow({
+    title: 'Visual Pinball Error',
+    className: '#32770',
+    texts: ['OK', "Can't start game"],
+    controls: [
+      { className: 'Button', id: 2, style: 0x50030001, text: 'OK' },
+      { className: 'Static', id: 65535, style: 0x50020080, text: "Can't start game" },
+    ],
+  });
+  assert.equal(verdict.kind, 'dialog');
+  // Des cases mais deux boutons sans OK : on ne devine pas lequel valide, la partie s'arrête.
+  const ambigu = WSHDLG_OPTIONS.controls.map((c) => (c.id === 1000 ? { ...c, text: 'Plus tard' } : c));
+  ambigu.push({ className: 'Button', id: 1006, style: 0x50010000, text: 'Quitter' });
+  assert.equal(classifyVpxWindow({ ...WSHDLG_OPTIONS, controls: ambigu }).kind, 'dialog');
+});
+
 test("l'audit de la table est fermé, la partie continue", () => {
   const audit =
     "This table contains error(s) that need to be fixed to ensure correct play.\r\n\r\nTable audit:\r\n. Error: sound 'DropTarget_Down' is used for playfield physical sound but has multiple channels (not mono).\r\n . Error: sound 'RampLoop1' is used for playfield physical sound but has multiple channels (not mono).\r\n";

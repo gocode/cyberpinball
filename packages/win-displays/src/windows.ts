@@ -31,6 +31,8 @@ const SWP_NOOWNERZORDER = 0x0200;
 const SWP_ASYNCWINDOWPOS = 0x4000;
 const KEYEVENTF_KEYUP = 0x0002;
 const GWL_EXSTYLE = -20;
+const GWL_STYLE = -16;
+const WM_COMMAND = 0x0111;
 const WS_EX_TOPMOST = 0x0008;
 
 interface Api {
@@ -42,6 +44,7 @@ interface Api {
   IsIconic: NativeFn;
   GetWindowTextW: NativeFn;
   GetClassNameW: NativeFn;
+  GetDlgCtrlID: NativeFn;
   GetWindowRect: NativeFn;
   GetForegroundWindow: NativeFn;
   SetForegroundWindow: NativeFn;
@@ -78,6 +81,7 @@ function loadApi(): Api {
     IsIconic: user32.func('bool __stdcall IsIconic(void *hwnd)'),
     GetWindowTextW: user32.func('int __stdcall GetWindowTextW(void *hwnd, void *buffer, int max)'),
     GetClassNameW: user32.func('int __stdcall GetClassNameW(void *hwnd, void *buffer, int max)'),
+    GetDlgCtrlID: user32.func('int __stdcall GetDlgCtrlID(void *hwnd)'),
     GetWindowRect: user32.func('bool __stdcall GetWindowRect(void *hwnd, void *rect)'),
     GetForegroundWindow: user32.func('void * __stdcall GetForegroundWindow()'),
     SetForegroundWindow: user32.func('bool __stdcall SetForegroundWindow(void *hwnd)'),
@@ -217,20 +221,54 @@ function controlText(w: Api, hwnd: unknown): string | undefined {
   return buffer.toString('utf16le', 0, Math.min(Number(result[0]), length) * 2);
 }
 
-/** Textes d'une fenêtre et de ses contrôles : le message d'une boîte de dialogue, par exemple. */
-export function windowTexts(target: WindowInfo): string[] {
+/** Contrôle d'une boîte de dialogue d'un autre processus. */
+export interface DialogControl {
+  hwnd: unknown;
+  className: string;
+  /** GWL_STYLE : pour un bouton, son type (case à cocher, bouton radio, bouton à presser…). */
+  style: number;
+  /** GetDlgCtrlID : le numéro que la boîte reçoit dans WM_COMMAND quand on le presse. */
+  id: number;
+  text: string;
+}
+
+/** Contrôles d'une fenêtre, dans l'ordre de Windows : texte (WM_GETTEXT), classe, style et numéro. */
+export function windowControls(target: WindowInfo): DialogControl[] {
   const w = loadApi();
-  const texts: string[] = [];
+  const controls: DialogControl[] = [];
   w.EnumChildWindows(
     target.hwnd,
     (hwnd: unknown) => {
-      const text = (controlText(w, hwnd) ?? describe(w, hwnd).title).trim();
-      if (text) texts.push(text);
+      const info = describe(w, hwnd);
+      controls.push({
+        hwnd,
+        className: info.className,
+        style: Number(w.GetWindowLongPtrW(hwnd, GWL_STYLE)) >>> 0,
+        id: Number(w.GetDlgCtrlID(hwnd)),
+        text: (controlText(w, hwnd) ?? info.title).trim(),
+      });
       return true;
     },
     0,
   );
-  return texts;
+  return controls;
+}
+
+/** Textes d'une fenêtre et de ses contrôles : le message d'une boîte de dialogue, par exemple. */
+export function windowTexts(target: WindowInfo): string[] {
+  return windowControls(target)
+    .map((c) => c.text)
+    .filter(Boolean);
+}
+
+/**
+ * Presse le bouton `control` d'une boîte de dialogue d'un autre processus, comme un clic : la boîte
+ * reçoit WM_COMMAND (BN_CLICKED, numéro du bouton, son HWND). Posté, pas envoyé : un VPX occupé
+ * ne bloque pas le menu. Vérifié sur la boîte VPinMAME.WSHDlg de core.vbs : elle se ferme en
+ * gardant l'état de ses cases.
+ */
+export function pressDialogButton(dialog: WindowInfo, control: Pick<DialogControl, 'hwnd' | 'id'>): boolean {
+  return Boolean(loadApi().PostMessageW(dialog.hwnd, WM_COMMAND, control.id & 0xffff, BigInt(koffi.address(control.hwnd))));
 }
 
 /**

@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.11
 
+- Tables qui proposent leurs options au premier lancement (The Addams Family VPW : « TABLE OPTIONS MENU ») : la fenêtre d'options est validée telle quelle et la partie se joue. Avant, « La partie n'a pas pu se dérouler » revenait à chaque lancement et la table ne se jouait jamais.
 - Roue : tous ses réglages sont réunis dans Menu système > Tables > Roue (présentation, ordre des tables, table au démarrage, Start sur la roue, couleur de chaque table, Juke-box dans la roue) ; « Médias, son et attente » garde le son, l'attente et le DMD.
 - Roue : les logos animés restent fixes hors du centre, comme prévu (dans la préversion précédente, la page refusait de lire leur fichier et tous restaient animés).
 - Roue : les logos animés ne s'animent plus tous à la fois. Seul celui de la table choisie bouge, ses voisins restent sur leur première image ; « Logos animés : tous » (Menu système > Tables > Roue) les anime tous comme avant.

@@ -4,8 +4,9 @@
 // l'éditeur ni l'audit de la table, et se termine proprement (code 0) quand on
 // ferme la fenêtre Player. Chaque autre fenêtre visible de VPX est classée par
 // classifyVpxWindow : fenêtre de l'éditeur masquée ou fermée (la partie continue,
-// avec un constat), boîte de dialogue bloquante (la partie s'arrête, son texte
-// devient le message), fenêtre inconnue signalée.
+// avec un constat), formulaire d'options de la table validé tel quel (la partie
+// continue), boîte de dialogue bloquante (la partie s'arrête, son texte devient le
+// message), fenêtre inconnue signalée.
 // En VR (packages/core/src/vr.ts), VPX n'ouvre pas « Visual Pinball Player » mais « Visual Pinball
 // VR Preview » (ce qu'un œil voit dans le casque) : elle tient lieu de fenêtre de jeu.
 
@@ -21,8 +22,10 @@ import {
   foregroundWindow,
   hideWindow,
   isHung,
+  pressDialogButton,
   visibleWindowsOf,
-  windowTexts,
+  windowControls,
+  type DialogControl,
   type WindowInfo,
 } from '@cyberpinball/win-displays';
 
@@ -35,6 +38,8 @@ const HUNG_GRACE_MS = 20_000;
 // Windows ne déclare une fenêtre figée (IsHungAppWindow) qu'après 5 s sans lire ses messages :
 // VPX part donc 8 s après s'être figé. Avec 8 s de plus (13 s), le joueur forçait au clavier.
 const HUNG_KILL_MS = 3_000;
+/** Formulaire d'options de la table encore ouvert ce temps après son OK : il ne se fermera pas, la partie est arrêtée. */
+const OPTIONS_CLOSE_MS = 3_000;
 
 export type LaunchFailure = 'spawn' | 'timeout' | 'dialog' | 'crash';
 
@@ -115,6 +120,8 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
   let hungKilled = false;
   /** Fenêtres déjà traitées (masquées, fermées ou signalées), par HWND. */
   const handled = new Set<bigint>();
+  /** Formulaires d'options de la table validés (OK pressé), par HWND, et quand. */
+  const optionsPressed = new Map<bigint, number>();
 
   const stop = () => {
     const target = player ?? visibleWindowsOf(child.pid ?? -1).find((w) => GAME_TITLES.includes(w.title));
@@ -129,17 +136,33 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
 
       for (const w of windows) {
         if (handled.has(w.handle) || failure) continue;
+        const controls: DialogControl[] | undefined = w.className.trim() === DIALOG_CLASS ? windowControls(w) : undefined;
         const verdict = classifyVpxWindow({
           title: w.title,
           className: w.className,
-          texts: w.className.trim() === DIALOG_CLASS ? windowTexts(w) : undefined,
+          texts: controls?.map((c) => c.text).filter(Boolean),
+          controls,
         });
         if (verdict.kind === 'game') continue;
-        if (verdict.kind === 'dialog') {
+        if (verdict.kind === 'options') {
+          // Options de la table au démarrage : validées telles quelles (OK), la partie continue.
+          // Sans réponse, VPX attendrait toujours ; arrêtée, la table reposerait la question à
+          // chaque lancement. Encore là OPTIONS_CLOSE_MS après le clic : arrêtée comme une erreur.
+          const pressed = optionsPressed.get(w.handle);
+          if (pressed === undefined) {
+            const ok = controls?.find((c) => c.id === verdict.okId);
+            if (ok && pressDialogButton(w, ok)) {
+              optionsPressed.set(w.handle, Date.now());
+              notices.push(verdict.notice);
+              continue;
+            }
+          } else if (Date.now() - pressed < OPTIONS_CLOSE_MS) continue;
+        }
+        if (verdict.kind === 'dialog' || verdict.kind === 'options') {
           // Une boîte de dialogue de VPX (question, erreur, ROM introuvable…) bloquerait
           // la borne : on rapporte son texte et on arrête la partie.
           failure = 'dialog';
-          message = verdict.message;
+          message = verdict.kind === 'dialog' ? verdict.message : [w.title.trim(), ...(controls ?? []).map((c) => c.text).filter(Boolean)].join(' : ');
           child.kill();
           return;
         }
