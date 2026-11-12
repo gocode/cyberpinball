@@ -11,7 +11,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { anchorHeight, COMPANION_KEY_FILE, companionKeyFolder, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, readCompanionKey, sceneProtocol, type CabinetPlace, type HeadsetProfile, type Point3, type VrGpu, type RoomBounds, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
+import { anchorHeight, buildDecor, COMPANION_KEY_FILE, companionKeyFolder, DECOR_TEXTURES, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, readCompanionKey, sceneProtocol, writeGlb, type CabinetPlace, type DecorTexture, type HeadsetProfile, type Point3, type VrGpu, type RoomBounds, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
 import { openHandleTarget, type HandleTarget } from '@cyberpinball/win-displays';
 import type { OffscreenSharedTexture } from 'electron';
 import { OFFSCREEN } from './offscreen';
@@ -25,7 +25,48 @@ export const HEADSET_TRIAL_DIR = process.env.CYBERPINBALL_CASQUE_ESSAI?.trim() |
 const RETRY_MS = 15_000;
 const STOP_TIMEOUT_MS = 4_000;
 /** Messages du compagnon gardés dans le journal (packages/casque-vr/src/casque.cpp). */
-const PROTOCOL = /^(pret|casque-absent|erreur|etat|centre|image|scene|releve|reprise|instantane|porte|casque-perdu|cadence|profondeur|fini)\b/;
+const PROTOCOL = /^(pret|casque-absent|erreur|etat|centre|image|scene|decor|releve|reprise|instantane|porte|casque-perdu|cadence|profondeur|fini)\b/;
+
+/**
+ * Textures du décor (caisse et capsule, packages/core/src/decor.ts) : <application>\natif\decor une fois
+ * l'application fabriquée, packages\casque-vr\decor en développement.
+ */
+export function decorTexturesDir(appDir: string): string | undefined {
+  const candidates = [
+    path.join(appDir, 'natif', 'decor'),
+    path.join(appDir, '..', 'packages', 'casque-vr', 'decor'),
+    path.join(appDir, '..', '..', 'packages', 'casque-vr', 'decor'),
+  ];
+  return candidates.find((d) => DECOR_TEXTURES.every((n) => fs.existsSync(path.join(d, n))));
+}
+
+/**
+ * Le décor des panneaux en .glb dans `dir` (decor.glb), refait seulement si les panneaux changent ;
+ * undefined sans textures ou si l'écriture échoue (le compagnon garde alors son sol simple).
+ */
+export function writeDecor(appDir: string, dir: string, panels: readonly HeadsetPanel[], log: (line: string) => void, lockbarWidth?: number): string | undefined {
+  const textures = decorTexturesDir(appDir);
+  if (!textures) {
+    log('Casque : textures du décor absentes, sol simple.'); // i18n-ignore : journal
+    return undefined;
+  }
+  try {
+    const file = path.join(dir, 'decor.glb');
+    const stamp = path.join(dir, 'decor.json');
+    const key = JSON.stringify({ panels: panels.map((p) => [p.role, p.position, p.orientation, p.width, p.height]), lockbarWidth, textures: DECOR_TEXTURES.map((n) => fs.statSync(path.join(textures, n)).size) });
+    if (fs.existsSync(file) && fs.existsSync(stamp) && fs.readFileSync(stamp, 'utf8') === key) return file;
+    const decor = buildDecor(panels, { lockbarWidth });
+    if (!decor) return undefined;
+    const bytes = new Map<DecorTexture, Uint8Array>(DECOR_TEXTURES.map((n) => [n, new Uint8Array(fs.readFileSync(path.join(textures, n)))]));
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(file, writeGlb(decor, bytes));
+    fs.writeFileSync(stamp, key);
+    return file;
+  } catch (error) {
+    log(`Casque : décor pas écrit (${(error as Error).message}), sol simple.`); // i18n-ignore : journal
+    return undefined;
+  }
+}
 
 /** Le compagnon, s'il est là : fabriqué avec l'application, ou construit en développement. */
 export function headsetExe(appDir: string): string | undefined {
@@ -119,6 +160,8 @@ export class HeadsetMenu {
   /** Panneaux et teinte de la scène envoyée au compagnon en cours. */
   private panels: HeadsetPanel[] = [];
   private sentTint: string | undefined;
+  /** Décor envoyé au compagnon (decor.glb), ou undefined : son sol simple. */
+  private decor: string | undefined;
   /** Relève en cours : le compagnon garde le casque jusqu'à ce que VPX le prenne, et part seul. */
   private handingOver = false;
   private snapshotTaken = false;
@@ -286,6 +329,8 @@ export class HeadsetMenu {
   /** Pose la borne à `place` dans le casque ; `keep` : la garde aussi (casque.json). Sans place : celle gardée. */
   showPlace(place: CabinetPlace | undefined, keep = false): void {
     if (place && keep) this.writePlace(place);
+    // Calée sur une vraie barre avant : la caisse du décor en prend la largeur (refait et renvoyé).
+    if (place && keep && this.child) this.sendDecor(this.child, place);
     const shown = place ?? this.readPlace();
     try {
       if (shown) this.child?.stdin.write(anchorLine(shown));
@@ -298,7 +343,9 @@ export class HeadsetMenu {
   private sendScene(child: ChildProcessWithoutNullStreams, tint: string | undefined): void {
     this.sentTint = tint;
     try {
-      for (const line of sceneProtocol(headsetScene(this.panels, tint, this.marks))) child.stdin.write(`${line}\n`);
+      for (const line of sceneProtocol(headsetScene(this.panels, tint, this.marks, { floor: !this.decor }))) child.stdin.write(`${line}\n`);
+      // Lueurs du décor à la teinte de la table ; sans teinte, la sarcelle.
+      if (this.decor) child.stdin.write(`teinte ${tint && /^#[0-9a-f]{6}$/i.test(tint) ? tint : ''}\n`);
     } catch {
       // Compagnon parti entre-temps : la scène suivra au prochain lancement.
     }
@@ -563,9 +610,25 @@ export class HeadsetMenu {
     }
     const place = this.readPlace();
     if (place) child.stdin.write(anchorLine(place));
+    // Le décor (caisse et capsule) autour des panneaux : le même fichier sert en partie (couche OpenXR de VPX).
+    this.sendDecor(child, place);
     this.sendScene(child, this.opts.tint());
     child.stdin.write('fin\n');
     this.opts.log(`Casque : compagnon lancé, ${panels.map((p) => `${p.role} ${p.width.toFixed(2)}×${p.height.toFixed(2)} m`).join(', ')}.`); // i18n-ignore : journal
+  }
+
+  /**
+   * Le décor (caisse et capsule) écrit d'après les panneaux et, borne calée sur une vraie barre avant,
+   * sa largeur ; envoyé au compagnon. Sans dossier de la VR, en essai ou sans textures : le sol simple.
+   */
+  private sendDecor(child: ChildProcessWithoutNullStreams, place: CabinetPlace | undefined): void {
+    const lockbarWidth = place && !place.free ? place.lockbarWidth : undefined;
+    this.decor = this.opts.keyDir && !HEADSET_TRIAL_DIR ? writeDecor(this.opts.appDir, this.opts.keyDir, this.panels, this.opts.log, lockbarWidth) : undefined;
+    try {
+      if (this.decor) child.stdin.write(`decor ${this.decor}\n`);
+    } catch {
+      // Compagnon parti : le décor suivra au prochain lancement.
+    }
   }
 
   private readPlace(): CabinetPlace | undefined {

@@ -123,3 +123,12 @@ test('compagnon : les écrans en couches « quad » hors calage, dans la couche 
   assert.match(scene, /D3D11_FILTER_ANISOTROPIC/);
   assert.match(scene, /DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL/);
 });
+
+test('scène : avec le décor (caisse et capsule), plus de sol simple ; les repères du calage restent', () => {
+  const marks = [{ x: -0.3, y: 0.85, z: -0.3 }, { x: 0.3, y: 0.85, z: -0.3 }];
+  const withFloor = headsetScene(panels, undefined, marks);
+  const withDecor = headsetScene(panels, undefined, marks, { floor: false });
+  assert.ok(withFloor.some((s) => s.kind === 'disque'));
+  assert.ok(!withDecor.some((s) => s.kind === 'disque'));
+  assert.equal(withDecor.filter((s) => s.kind === 'boite').length, 2);
+});

@@ -26,6 +26,9 @@
 //     scene, puis boite … | quad … | disque …, puis scene-fin
 //                        (la borne en volume autour des panneaux, packages/core/src/casque-scene.ts ;
 //                        un nouveau bloc remplace le précédent, par exemple quand la teinte change)
+//     decor <chemin.glb> (le décor : caisse habillée et capsule, packages/core/src/decor.ts, src/decor.cpp ;
+//                        sans chemin : plus de décor)
+//     teinte <#rrggbb>   (teinte de la table choisie, pour les lueurs du décor ; « teinte » seul : la sarcelle)
 //     ancre <x> <z> <lacet> (place de la borne dans la pièce, gardée par Cyber Pinball : sans elle, la
 //                        borne se pose devant le joueur au premier regard suivi)
 //     recentrer          (la borne revient devant le joueur)
@@ -37,7 +40,7 @@
 //   Sortie standard :
 //     pret <runtime> | casque-absent <raison> | erreur <texte> | etat <état OpenXR> | centre … | image <rôle>
 //     | libre <image> (image copiée : Electron peut reprendre sa texture) | porte 1|0 (casque porté ou non)
-//     | scene <n> formes | bouton <nom> 1|0 | releve … veille | reprise (VPX a rendu le casque)
+//     | scene <n> formes | decor <n> pieces | erreur decor … | bouton <nom> 1|0 | releve … veille | reprise (VPX a rendu le casque)
 //     | tete <x> <y> <z> <lacet> (en veille, toutes les 5 s)
 //     | piece-changee pose|sans-pose <x> <y> <z> <lacet> (pièce refaite sous la session : la nouvelle origine dans l'ancienne)
 //     | session-arretee (arrêt que personne n'a demandé : le runtime reprend la session)
@@ -61,6 +64,7 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 
+#include "decor.h"
 #include "scene.h"
 
 #include <algorithm>
@@ -213,6 +217,28 @@ std::vector<Panel> pending;
 /** Dernier bloc de scène complet reçu, à prendre par la boucle d'images. */
 std::vector<std::string> sceneLines;
 std::atomic<bool> sceneReady { false };
+/** Décor demandé (chemin du .glb, vide : aucun) et teinte de la table, pris par la boucle d'images. */
+std::string decorPath;
+std::atomic<bool> decorChanged { false };
+float tintRgb[3] { 0x36 / 255.f, 0xc9 / 255.f, 0xb4 / 255.f };
+std::atomic<bool> tintChanged { false };
+
+/** « #rrggbb » en trois composantes sRGB (0 à 1) ; faux si illisible. */
+bool parseHex(const std::string& s, float out[3])
+{
+   if (s.size() != 7 || s[0] != '#')
+      return false;
+   for (int i = 0; i < 3; i++)
+   {
+      char* end = nullptr;
+      const std::string part = s.substr(1 + 2 * i, 2);
+      const unsigned long v = std::strtoul(part.c_str(), &end, 16);
+      if (!end || *end)
+         return false;
+      out[i] = v / 255.f;
+   }
+   return true;
+}
 
 void readCommands()
 {
@@ -258,6 +284,26 @@ void readCommands()
          described = true;
       else if (word == "recentrer")
          wantRecenter = true;
+      else if (word == "decor")
+      {
+         std::string path;
+         std::getline(in >> std::ws, path);
+         std::lock_guard<std::mutex> lock(panelsMutex);
+         decorPath = path;
+         decorChanged = true;
+      }
+      else if (word == "teinte")
+      {
+         std::string hex;
+         in >> hex;
+         float rgb[3] = { 0x36 / 255.f, 0xc9 / 255.f, 0xb4 / 255.f };
+         if (hex.empty() || parseHex(hex, rgb))
+         {
+            std::lock_guard<std::mutex> lock(panelsMutex);
+            tintRgb[0] = rgb[0], tintRgb[1] = rgb[1], tintRgb[2] = rgb[2];
+            tintChanged = true;
+         }
+      }
       else if (word == "source")
       {
          std::string role;
@@ -377,13 +423,37 @@ int renderTest(const std::string& input, const std::string& output)
       float width, height;
    };
    std::vector<TestPanel> testPanels;
-   std::string line;
+   std::string line, decorFile;
+   float testTint[3] = { 0x36 / 255.f, 0xc9 / 255.f, 0xb4 / 255.f };
+   // Vue : yeux, tangage et lacet (radians) ; par défaut, le joueur debout un pas en arrière, regard 25° vers le bas.
+   float view[5] = { 0.f, 1.65f, 0.35f, -0.436f, 0.f };
+   double testTime = 0;
+   std::vector<std::pair<int, double>> forced; // passages forcés : nature, début (s)
    while (std::getline(file, line))
    {
       std::istringstream in(line);
       std::string word;
       in >> word;
-      if (word == "panneau")
+      if (word == "decor")
+         std::getline(in >> std::ws, decorFile);
+      else if (word == "teinte")
+      {
+         std::string hex;
+         in >> hex;
+         parseHex(hex, testTint);
+      }
+      else if (word == "vue")
+         in >> view[0] >> view[1] >> view[2] >> view[3] >> view[4];
+      else if (word == "temps")
+         in >> testTime;
+      else if (word == "passage")
+      {
+         int kind = 0;
+         double started = 0;
+         in >> kind >> started;
+         forced.push_back({ kind, started });
+      }
+      else if (word == "panneau")
       {
          std::string role;
          float x, y, w, h, px, py, pz, qx, qy, qz, qw, mw, mh;
@@ -406,6 +476,15 @@ int renderTest(const std::string& input, const std::string& output)
       return 4;
    }
    renderer.setScene(opaque, transparent);
+   decor::Renderer decorRenderer;
+   if (!decorFile.empty() && (!decorRenderer.init(device.Get(), error) || !decorRenderer.load(decorFile, error)))
+   {
+      say("erreur decor " + error);
+      return 4;
+   }
+   decorRenderer.setTint(testTint[0], testTint[1], testTint[2]);
+   for (const auto& [kind, started] : forced)
+      decorRenderer.forcePassage(kind, started);
    // Image témoin, en octets d'écran (BGRA, sRGB), avec ses mipmaps.
    constexpr UINT TW = 512, TH = 256;
    std::vector<unsigned char> pattern(TW * TH * 4);
@@ -459,15 +538,20 @@ int renderTest(const std::string& input, const std::string& output)
    context->OMSetRenderTargets(1, target.GetAddressOf(), depth.Get());
    const D3D11_VIEWPORT viewport { 0, 0, static_cast<float>(W), static_cast<float>(H), 0, 1 };
    context->RSSetViewports(1, &viewport);
-   // Joueur debout un pas en arrière (yeux à 1,65 m), regard 25° vers le bas ; champ de 100° en largeur.
-   const float pitch = -0.436f;
-   const float eyeQ[4] = { std::sin(pitch / 2), 0, 0, std::cos(pitch / 2) };
-   const float eyeT[3] = { 0.f, 1.65f, 0.35f };
+   // Champ de 100° en largeur ; lacet puis tangage.
+   const float pitch = view[3], yaw = view[4];
+   const XrQuaternionf qYaw { 0, std::sin(yaw / 2), 0, std::cos(yaw / 2) }, qPitch { std::sin(pitch / 2), 0, 0, std::cos(pitch / 2) };
+   const XrQuaternionf eye = mul(qYaw, qPitch);
+   const float eyeQ[4] = { eye.x, eye.y, eye.z, eye.w };
+   const float eyeT[3] = { view[0], view[1], view[2] };
+   const float origin[3] = { 0, 0, 0 };
    const float half = 0.8727f;
    const float vertical = std::atan(std::tan(half) * H / W);
    const scene::Mat4 world = scene::Mat4::identity();
-   const scene::Mat4 mvp = scene::Mat4::projection(-half, half, vertical, -vertical, NEAR_Z, FAR_Z) * scene::Mat4::poseInverse(eyeQ, eyeT) * world;
+   const scene::Mat4 proj = scene::Mat4::projection(-half, half, vertical, -vertical, NEAR_Z, FAR_Z);
+   const scene::Mat4 mvp = proj * scene::Mat4::poseInverse(eyeQ, eyeT) * world;
    renderer.draw(context.Get(), mvp, world, 1.f);
+   decorRenderer.draw(context.Get(), mvp, proj * scene::Mat4::poseInverse(eyeQ, origin), testTime, 1.f);
    // Les panneaux comme dans le casque : dans la même couche, avec la profondeur.
    const float fullImage[4] = { 0, 0, 1, 1 };
    for (const TestPanel& p : testPanels)
@@ -1226,6 +1310,10 @@ int main(int argc, char** argv)
    scene::Renderer pointers;
    /** Les écrans dessinés dans la couche de projection, avec la profondeur. */
    scene::ImageRenderer imageRenderer;
+   /** Décor (caisse et capsule), dans la couche de projection avec la profondeur, sous les écrans. */
+   decor::Renderer decorRenderer;
+   bool decorReady = false;
+   const ULONGLONG decorClock = GetTickCount64();
    std::vector<std::string> pointerLines;
    bool projection = false;
    {
@@ -1237,6 +1325,10 @@ int main(int argc, char** argv)
       projection = n == 2 && renderer.init(device.Get(), error) && pointers.init(device.Get(), error) && imageRenderer.init(device.Get(), error);
       if (!projection)
          say("erreur scène indisponible : " + (error.empty() ? std::string("vues du casque") : error));
+      std::string decorError;
+      decorReady = projection && decorRenderer.init(device.Get(), decorError);
+      if (projection && !decorReady)
+         say("erreur decor " + decorError);
       for (uint32_t e = 0; projection && e < 2; e++)
       {
          Eye& eye = eyes[e];
@@ -1606,6 +1698,23 @@ int main(int argc, char** argv)
          renderer.setScene(opaque, transparent);
          say("scene " + std::to_string(lines.size() - bad) + " formes" + (bad ? ", " + std::to_string(bad) + " illisibles" : ""));
       }
+      if (decorReady && decorChanged.exchange(false))
+      {
+         std::string path, error;
+         {
+            std::lock_guard<std::mutex> lock(panelsMutex);
+            path = decorPath;
+         }
+         if (decorRenderer.load(path, error))
+            say(path.empty() ? std::string("decor 0 pieces") : "decor charge " + path);
+         else
+            say("erreur decor " + error);
+      }
+      if (decorReady && tintChanged.exchange(false))
+      {
+         std::lock_guard<std::mutex> lock(panelsMutex);
+         decorRenderer.setTint(tintRgb[0], tintRgb[1], tintRgb[2]);
+      }
 
       XrFrameState fs { XR_TYPE_FRAME_STATE };
       if (const XrResult r = xrWaitFrame_(session, nullptr, &fs); XR_FAILED(r))
@@ -1944,6 +2053,14 @@ int main(int argc, char** argv)
                const scene::Mat4 mvp = scene::Mat4::projection(f.angleLeft, f.angleRight, f.angleUp, f.angleDown, NEAR_Z, FAR_Z) * scene::Mat4::poseInverse(vq, vt) * world;
                // Avec l'extension, le runtime fond toutes les couches ; sinon la scène fond seule.
                renderer.draw(context.Get(), mvp, world, colorScale ? 1.f : fade);
+               if (decorReady && !decorRenderer.empty())
+               {
+                  // Le ciel à l'infini : la même vue, sans translation (ni de la tête, ni de la borne).
+                  const float zero[3] = { 0, 0, 0 };
+                  const scene::Mat4 sky = scene::Mat4::projection(f.angleLeft, f.angleRight, f.angleUp, f.angleDown, NEAR_Z, FAR_Z) * scene::Mat4::poseInverse(vq, zero)
+                     * scene::Mat4::pose(aq, zero);
+                  decorRenderer.draw(context.Get(), mvp, sky, (GetTickCount64() - decorClock) / 1000.0, colorScale ? 1.f : fade);
+               }
                // Pendant le calage, les écrans dans la même couche et avec la profondeur : les repères et
                // le bout des manettes passent devant ou derrière comme dans la pièce. Sinon, en couches
                // « quad » (plus bas).

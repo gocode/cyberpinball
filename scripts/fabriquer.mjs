@@ -86,6 +86,11 @@ for (const name of fs.readdirSync(installerDir)) {
     fs.mkdirSync(path.join(stage, 'natif'), { recursive: true });
     fs.copyFileSync(exe, path.join(stage, 'natif', path.basename(exe)));
     console.log('Compagnon du casque : natif\\' + path.basename(exe));
+    // Textures du décor de la VR (caisse et capsule, packages/core/src/decor.ts) : natif\decor.
+    const decorSrc = path.join(repo, 'packages', 'casque-vr', 'decor');
+    fs.mkdirSync(path.join(stage, 'natif', 'decor'), { recursive: true });
+    for (const f of fs.readdirSync(decorSrc)) fs.copyFileSync(path.join(decorSrc, f), path.join(stage, 'natif', 'decor', f));
+    console.log('Décor du casque : natif\\decor');
   }
 }
 // Vision 3D (app/src/vision3d.ts) : le plugin VPX « Vision3D » (packages/vpx-vision3d, construit ici

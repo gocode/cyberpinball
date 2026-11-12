@@ -11,6 +11,8 @@ export * from './vision3d';
 export * from './casque';
 export * from './manettes';
 export * from './casque-scene';
+export * from './decor';
+export * from './glb';
 export * from './sync';
 export * from './gameorientation';
 export * from './store';

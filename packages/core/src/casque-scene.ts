@@ -114,16 +114,18 @@ function ring(
  * recomposées à chaque image du casque, et tout ombrage dessiné dans la couche de projection, à la
  * cadence du compagnon, se décalait d'eux quand la tête bougeait. `_tint` : gardé pour l'appel.
  */
-export function headsetScene(panels: readonly HeadsetPanel[], _tint?: string, marks: readonly Vec3[] = []): ScenePrimitive[] {
+export function headsetScene(panels: readonly HeadsetPanel[], _tint?: string, marks: readonly Vec3[] = [], opts: { floor?: boolean } = {}): ScenePrimitive[] {
   const scene: ScenePrimitive[] = [];
   const C = SCENE_COLORS;
 
-  // Sol à perte de vue, éclairci sous la borne.
+  // Sol à perte de vue, éclairci sous la borne : seulement sans le décor (decor.ts), qui a le sien.
   const pf = panels.find((p) => p.role === 'playfield');
   const head = panels.filter((p) => p.role !== 'playfield');
   const centerZ = pf && head.length ? (pf.position.z + head[0]!.position.z) / 2 : (pf ?? head[0])?.position.z ?? -0.6;
-  scene.push({ kind: 'disque', center: { x: 0, y: 0, z: centerZ }, radius: FLOOR_M, inner: rgba(C.void), outer: rgba(C.void) });
-  scene.push({ kind: 'disque', center: { x: 0, y: 0.001, z: centerZ }, radius: FLOOR_GLOW_M, inner: rgba(mix(C.void, C.surface, 0.15)), outer: rgba(C.void) });
+  if (opts.floor !== false) {
+    scene.push({ kind: 'disque', center: { x: 0, y: 0, z: centerZ }, radius: FLOOR_M, inner: rgba(C.void), outer: rgba(C.void) });
+    scene.push({ kind: 'disque', center: { x: 0, y: 0.001, z: centerZ }, radius: FLOOR_GLOW_M, inner: rgba(mix(C.void, C.surface, 0.15)), outer: rgba(C.void) });
+  }
 
   // Calage de la borne (calage.ts) : un plot vert sur chaque coin de la barre avant virtuelle, qui
   // doit tomber sur le vrai coin, touché du bout de la manette.
