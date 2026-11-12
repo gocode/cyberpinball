@@ -95,11 +95,16 @@ export function liveLinks(file: { urls?: VpsLink[] }): VpsLink[] {
 // ---------------------------------------------------------------------------
 // Catalogue
 
-/** Versions VPX d'un jeu, la plus récemment mise à jour d'abord. */
+/** Versions VPX déjà triées, par jeu (tant que sa liste de fichiers est la même) : le catalogue les relit à chaque filtre. */
+const versionsOf = new WeakMap<VpsGame, { from: VpsTableFile[] | undefined; list: VpsTableFile[] }>();
+
+/** Versions VPX d'un jeu, la plus récemment mise à jour d'abord (une copie : l'appelant peut la retrier). */
 export function vpxVersions(game: VpsGame): VpsTableFile[] {
-  return (game.tableFiles ?? [])
-    .filter((f) => f && (f.tableFormat ?? 'VPX').toUpperCase() === 'VPX')
-    .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  const known = versionsOf.get(game);
+  if (known && known.from === game.tableFiles) return [...known.list];
+  const list = (game.tableFiles ?? []).filter((f) => f && (f.tableFormat ?? 'VPX').toUpperCase() === 'VPX').sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  versionsOf.set(game, { from: game.tableFiles, list });
+  return [...list];
 }
 
 const hasFeature = (file: { features?: string[] }, feature: string) => (file.features ?? []).some((f) => f.toLowerCase() === feature.toLowerCase());
@@ -116,7 +121,9 @@ export function playableWithoutRom(game: VpsGame): boolean {
 
 export type CatalogKind = 'all' | 'ss' | 'em' | 'original' | 'norom';
 export type CatalogState = 'all' | 'missing' | 'installed';
-export type CatalogSort = 'name' | 'recent';
+/** « popular » : les jeux les plus suivis d'abord (popularity) ; « name » : par titre ; « recent » : nouveautés d'abord. */
+export type CatalogSort = 'popular' | 'name' | 'recent';
+export const CATALOG_SORTS: readonly CatalogSort[] = ['popular', 'recent', 'name'];
 /**
  * Fichiers que le jeu doit proposer (avec un lien vivant) : fronton, ROM, PuP-Pack…, une
  * version VR, ou des médias sur VPinMediaDB (index passé à catalog()).
@@ -140,6 +147,37 @@ export interface CatalogFilter {
   support?: CatalogSupport;
   site?: CatalogSite;
   sort?: CatalogSort;
+}
+
+/** Filtres et tri du catalogue que l'utilisateur garde d'une visite à l'autre (la recherche, non). */
+export type CatalogChoice = Required<Pick<CatalogFilter, 'kind' | 'support' | 'site' | 'state' | 'sort'>>;
+
+/** Choix d'origine : tous les jeux pas encore installés, les plus populaires d'abord. */
+export const CATALOG_DEFAULT: Readonly<CatalogChoice> = { kind: 'all', support: 'any', site: 'all', state: 'missing', sort: 'popular' };
+
+const catalogChoiceFile = (dataDir: string) => path.join(dataDir, 'catalogue-filtres.json');
+
+/**
+ * Derniers filtres et tri choisis (data\catalogue-filtres.json) ; une valeur inconnue (fichier
+ * abîmé, tri retiré d'une version à l'autre) reprend celle d'origine, le reste est gardé.
+ */
+export function loadCatalogChoice(dataDir: string): CatalogChoice {
+  let raw: Partial<Record<keyof CatalogChoice, unknown>> = {};
+  try {
+    raw = JSON.parse(fs.readFileSync(catalogChoiceFile(dataDir), 'utf8').replace(/^﻿/, '')) as typeof raw;
+  } catch {
+    // Jamais choisi : les valeurs d'origine.
+  }
+  const pick = <K extends keyof CatalogChoice>(key: K, values: readonly CatalogChoice[K][]): CatalogChoice[K] =>
+    values.includes(raw?.[key] as CatalogChoice[K]) ? (raw[key] as CatalogChoice[K]) : CATALOG_DEFAULT[key];
+  return { kind: pick('kind', CATALOG_KINDS), support: pick('support', CATALOG_SUPPORTS), site: pick('site', CATALOG_SITES), state: pick('state', CATALOG_STATES), sort: pick('sort', CATALOG_SORTS) };
+}
+
+export function saveCatalogChoice(dataDir: string, choice: CatalogChoice): void {
+  const file = catalogChoiceFile(dataDir);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const { kind, support, site, state, sort } = choice;
+  writeFileAtomic(file, JSON.stringify({ kind, support, site, state, sort }, null, 2) + '\n');
 }
 
 /** Ce que catalog() ne trouve pas dans la base VPS : jeux qui ont des médias sur VPinMediaDB (identifiants VPS). */
@@ -279,7 +317,8 @@ export function catalog(db: VpsDb, filter: CatalogFilter, installed: Set<string>
   const support = filter.support ?? 'any';
   const site = filter.site ?? 'all';
   const keep = (g: VpsGame) => {
-    if (!vpxVersions(g).length) return false;
+    const versions = vpxVersions(g);
+    if (!versions.length) return false;
     switch (filter.kind ?? 'all') {
       case 'ss':
         if (!/^SS$/i.test(g.type ?? '')) return false;
@@ -296,10 +335,10 @@ export function catalog(db: VpsDb, filter: CatalogFilter, installed: Set<string>
     }
     if (filter.state === 'installed' && !installed.has(g.id)) return false;
     if (filter.state === 'missing' && installed.has(g.id)) return false;
-    if (filter.vr && !vpxVersions(g).some((f) => hasFeature(f, 'VR'))) return false;
-    if (filter.pup && !(g.pupPackFiles?.length || vpxVersions(g).some((f) => hasFeature(f, 'incl. PuP')))) return false;
+    if (filter.vr && !versions.some((f) => hasFeature(f, 'VR'))) return false;
+    if (filter.pup && !(g.pupPackFiles?.length || versions.some((f) => hasFeature(f, 'incl. PuP')))) return false;
     if (support === 'media' && !extras.media?.has(g.id)) return false;
-    const files = supportFiles(g, support) ?? vpxVersions(g);
+    const files = support === 'any' ? versions : (supportFiles(g, support) ?? versions);
     const live = files.filter((f) => liveLinks(f).length);
     if (support !== 'any' && support !== 'media' && !live.length) return false;
     if (site !== 'all' && !live.some((f) => liveLinks(f).some((l) => linkOnSite(l.url, site)))) return false;
@@ -308,8 +347,50 @@ export function catalog(db: VpsDb, filter: CatalogFilter, installed: Set<string>
   const text = filter.text?.trim();
   if (text) return searchVps(db, text, 60).map((c) => c.game).filter(keep);
   const games = db.games.filter(keep);
-  if ((filter.sort ?? 'name') === 'recent') return games.sort((a, b) => lastUpdate(b) - lastUpdate(a));
-  return games.sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base', ignorePunctuation: true }) || (a.year ?? 0) - (b.year ?? 0));
+  const sort = filter.sort ?? 'name';
+  if (sort === 'recent') {
+    const last = new Map(games.map((g) => [g, lastUpdate(g)]));
+    return games.sort((a, b) => last.get(b)! - last.get(a)!);
+  }
+  if (sort === 'popular') return games.sort((a, b) => popularity(b) - popularity(a) || byTitle(a, b));
+  return games.sort(byTitle);
+}
+
+/**
+ * Ordre des titres, sans casse ni ponctuation. Un seul comparateur pour tout le module :
+ * localeCompare avec des options en recrée un à chaque comparaison, et trier les 2 600 jeux
+ * de la base prenait une demi-seconde (relevé du 12/11/2026), à chaque touche des filtres.
+ */
+const TITLES = new Intl.Collator('en', { sensitivity: 'base', ignorePunctuation: true });
+const byTitle = (a: VpsGame, b: VpsGame) => TITLES.compare(a.name, b.name) || (a.year ?? 0) - (b.year ?? 0);
+
+/** Fichiers d'un jeu que compte sa popularité : tout ce que la communauté a fait pour lui. */
+const POPULARITY_FILES = ['tableFiles', 'b2sFiles', 'romFiles', 'pupPackFiles', 'altSoundFiles', 'altColorFiles', 'soundFiles', 'topperFiles', 'povFiles', 'ruleFiles', 'tutorialFiles'] as const;
+const popularityOf = new WeakMap<VpsGame, number>();
+
+/**
+ * Popularité d'un jeu, faute de chiffres de téléchargement pour toute la base (VPS n'en a
+ * pas ; les forums ne les donnent que fiche par fiche) : le nombre d'auteurs différents qui
+ * ont fait quelque chose pour lui (versions, frontons, PuP-Packs, sons, couleurs…), puis le
+ * nombre de ces fichiers. Les jeux que tout le monde joue en tête (The Addams Family, Attack
+ * from Mars, Medieval Madness) ; une série de variantes d'un même auteur (NFL, une table par
+ * équipe) ne passe pas devant. Calculée une fois par jeu.
+ */
+export function popularity(game: VpsGame): number {
+  const known = popularityOf.get(game);
+  if (known !== undefined) return known;
+  const authors = new Set<string>();
+  let files = 0;
+  for (const key of POPULARITY_FILES) {
+    for (const f of (game[key] ?? []) as { authors?: string[] }[]) {
+      files++;
+      for (const a of f.authors ?? []) if (a.trim()) authors.add(a.trim().toLowerCase());
+    }
+  }
+  // Les auteurs d'abord ; le nombre de fichiers (plafonné) départage.
+  const score = authors.size * 100 + Math.min(files, 99);
+  popularityOf.set(game, score);
+  return score;
 }
 
 /** Dernière nouveauté d'un jeu : la plus récente de ses versions VPX. */

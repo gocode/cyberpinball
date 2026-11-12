@@ -63,6 +63,9 @@ import {
   webEngineLabel,
   webEngineUrl,
   webSearchOf,
+  SOURCE_SITES,
+  siteState,
+  sourceSearchUrl,
   WEB_ENGINES,
   youtubePlaylistSearchUrl,
   frontMove,
@@ -137,6 +140,8 @@ const WIDE_RATIO = 1500 / 1080;
 /** Recherche libre : la ligne du champ de recherche ; sur une page vidéo, la ligne qui la décrit (acquire.css). */
 const SEARCH_ROW = 76;
 const VIDEO_ROW = 62;
+/** Recherche libre d'une table : la ligne « Vos comptes » (acquire.css). */
+const ACCOUNTS_ROW = 62;
 /** Une page vidéo se lit après son chargement, puis de nouveau un peu plus tard (YouTube écrit son titre après coup). */
 const VIDEO_PROBE_DELAYS = [700, 3000];
 /** Une ligne de téléchargement en cours sous le bandeau (acquire.css, .download), et la marge qui les suit. */
@@ -172,6 +177,12 @@ export interface AcquireRequest {
    * « Retour à la recherche » au lieu de « Retour à la fiche » ; les pages vidéo y sont décrites.
    */
   search?: { query: string; engine: WebEngine; want?: GrabKind; playlists?: boolean };
+  /**
+   * Recherche libre d'une table : la ligne « Vos comptes » sous la recherche, un site par
+   * pastille avec son état (connecté ou non) ; connecté, la pastille cherche le texte sur ce
+   * site ; pas encore, elle ouvre sa page de connexion.
+   */
+  accounts?: boolean;
 }
 
 /**
@@ -274,6 +285,8 @@ export interface AcquireOpen {
   googleRefused?: boolean;
   /** Recherche libre : la dernière page de résultats vue, dont le champ garde le texte sur les pages suivantes. */
   lastSearch?: { query: string; engine: WebEngine };
+  /** « Vos comptes » : l'état de connexion de chaque site, relu à l'ouverture et à chaque page chargée. */
+  accounts?: { id: string; label: string; connected: boolean }[];
   /** Un téléphone attend d'être accepté : le bandeau a pris le clavier (Accepter, Refuser). */
   phonePending?: boolean;
 }
@@ -677,7 +690,7 @@ export function createAcquirer(events: AcquireEvents) {
   function barHeight(rows: number): number {
     const narrow = open?.scale?.narrow === true;
     const base = open?.screenNote ? (narrow ? BAR_NARROW_WITH_NOTE : BAR_WITH_NOTE) : narrow ? BAR_NARROW : BAR;
-    const reference = base + (open?.request.search ? SEARCH_ROW : 0) + (open?.request.search && open.video ? VIDEO_ROW : 0) + (jukeboxLine() ? VIDEO_ROW : 0) + (rows ? rows * DOWNLOAD_ROW + DOWNLOAD_PAD : 0);
+    const reference = base + (open?.request.search ? SEARCH_ROW : 0) + (open?.request.search && open.request.accounts ? ACCOUNTS_ROW : 0) + (open?.request.search && open.video ? VIDEO_ROW : 0) + (jukeboxLine() ? VIDEO_ROW : 0) + (rows ? rows * DOWNLOAD_ROW + DOWNLOAD_PAD : 0);
     return Math.ceil(reference * (open?.scale?.unit ?? 1));
   }
 
@@ -884,6 +897,17 @@ export function createAcquirer(events: AcquireEvents) {
     sendBar();
   }
 
+  /** Relit l'état de connexion de chaque site (« Vos comptes ») ; le bandeau se redessine s'il a changé. */
+  async function readAccounts(): Promise<void> {
+    if (!open?.request.accounts) return;
+    const target = open;
+    const states = await Promise.all(SOURCE_SITES.map(async (x) => ({ id: x.id, label: x.label, connected: siteState(x, await siteCookies(x.domain)).connected })));
+    if (open !== target) return;
+    const changed = JSON.stringify(states) !== JSON.stringify(target.accounts);
+    target.accounts = states;
+    if (changed) sendBar();
+  }
+
   function sendBar(): void {
     if (!open || open.win.isDestroyed()) return;
     const v = open.view.webContents;
@@ -895,6 +919,7 @@ export function createAcquirer(events: AcquireEvents) {
     open.win.webContents.send('acquire:state', {
       ...request,
       search: search ? { ...search, engines: WEB_ENGINES.map((id) => ({ id, label: webEngineLabel(id) })) } : undefined,
+      accounts: open.request.search && open.request.accounts ? (open.accounts ?? SOURCE_SITES.map((x) => ({ id: x.id, label: x.label, connected: false }))) : undefined,
       video: open.request.search && open.video ? videoLine(open.video) : undefined,
       jukebox: jukeboxLine(),
       status: open.status,
@@ -1009,6 +1034,15 @@ export function createAcquirer(events: AcquireEvents) {
       else if (action === 'end') events.remote?.end();
     });
     // Champ de recherche du bandeau : tant qu'on y tape, les touches ne sont pas des boutons de la borne.
+    // « Vos comptes » : la recherche du site sur le texte affiché si l'on y est connecté, sa page de connexion sinon.
+    ipcMain.on('acquire:site', (e, id: unknown, query: unknown) => {
+      if (!open?.request.accounts || e.sender !== open.win.webContents) return;
+      const site = SOURCE_SITES.find((x) => x.id === id);
+      if (!site) return;
+      const connected = open.accounts?.find((a) => a.id === site.id)?.connected === true;
+      const text = typeof query === 'string' && query.trim() ? query : (open.lastSearch ?? open.request.search)?.query ?? '';
+      void open.view.webContents.loadURL(connected && text.trim() ? sourceSearchUrl(site, text) : site.login);
+    });
     ipcMain.on('acquire:typing', (e, typing: unknown) => {
       if (open && e.sender === open.win.webContents) barTyping = typing === true;
     });
@@ -1042,6 +1076,7 @@ export function createAcquirer(events: AcquireEvents) {
         else void contents.loadURL(request.url);
       }
       sendBar();
+      void readAccounts();
       // Réduite (Windows+D, Windows+M) : focus() seul ne la rouvre pas.
       if (open.win.isMinimized()) open.win.restore();
       open.win.show();
@@ -1073,6 +1108,7 @@ export function createAcquirer(events: AcquireEvents) {
     // Reprise : le texte de la dernière page de résultats de l'historique gardé.
     if (restore) open.lastSearch = restore.entries.slice(0, restore.index + 1).reverse().map((e) => webSearchOf(e.url)).find(Boolean);
     const contents = view.webContents;
+    void readAccounts();
     claimFor(contents.id, request.claim);
     watchSizes(contents);
     guardContents(contents);
@@ -1142,6 +1178,8 @@ export function createAcquirer(events: AcquireEvents) {
       if (open) open.googleRefused = false;
     });
     for (const event of ['did-navigate', 'did-navigate-in-page', 'did-stop-loading'] as const) contents.on(event as 'did-stop-loading', () => sendBar());
+    // « Vos comptes » : une connexion (ou déconnexion) faite sur la page se voit à la page suivante.
+    contents.on('did-stop-loading', () => void readAccounts());
     // Recherche libre : chaque page chargée, ou changée sans rechargement (YouTube), est relue.
     contents.on('did-navigate', (_e, url) => {
       const found = webSearchOf(url);

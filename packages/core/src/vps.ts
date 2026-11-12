@@ -86,6 +86,10 @@ export interface VpsGame {
   /** Musique pour la table (souvent sur Dropbox). */
   soundFiles?: VpsTableFile[];
   topperFiles?: VpsTableFile[];
+  /** Logos de la roue : fiches de VPUniverse et de VPForums, parfois mega.nz (packs). */
+  wheelArtFiles?: VpsTableFile[];
+  /** Packs de médias de menu (presque toujours des fiches de VPForums). */
+  mediaPackFiles?: VpsTableFile[];
   povFiles?: VpsTableFile[];
   /** Cartes et feuilles de règles (presque toujours des pages de VPUniverse). */
   ruleFiles?: VpsTableFile[];

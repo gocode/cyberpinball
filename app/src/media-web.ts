@@ -47,6 +47,7 @@ import {
   type MediaOriginDraft,
   type MediaPageEntry,
   type MediaType,
+  type SiteSearchOptions,
   type TableEntry,
   type WebReceipt,
 } from '@cyberpinball/core';
@@ -127,29 +128,29 @@ export function createWebSearch(ctx: WebSearchContext) {
   // ---------- Ouverture ----------
 
   /** Texte cherché d'abord : le titre de la table (sans fabricant ni année), ou celui saisi dans les propositions. */
-  function queryFor(table: TableEntry, type: MediaType, title?: string): string {
-    return webSearchQuery(title ?? table.title, type);
+  function queryFor(table: TableEntry, type: MediaType, title?: string, refine?: SiteSearchOptions): string {
+    return webSearchQuery(title ?? table.title, type, refine);
   }
 
   /** Page de départ : la même d'une visite à l'autre, pour reprendre la page en cours. */
-  function startUrl(table: TableEntry, type: MediaType, title?: string): string {
-    return webEngineUrl(queryFor(table, type, title), 'web');
+  function startUrl(table: TableEntry, type: MediaType, title?: string, refine?: SiteSearchOptions): string {
+    return webEngineUrl(queryFor(table, type, title, refine), 'web');
   }
 
-  /** Ouvre (ou reprend) la recherche libre pour ce média ; renvoie la phrase à montrer. */
-  function open(table: TableEntry, type: MediaType, title?: string): string {
-    const query = queryFor(table, type, title);
+  /** Ouvre (ou reprend) la recherche libre pour ce média ; renvoie la phrase à montrer. `refine` : mots ajoutés, « Animés seulement ». */
+  function open(table: TableEntry, type: MediaType, title?: string, refine?: SiteSearchOptions): string {
+    const query = queryFor(table, type, title, refine);
     wanted = { table: table.file, type };
     ctx.sites.openWeb({ url: webEngineUrl(query, 'web'), table: table.file, title: table.title, type, label: typeLabel(type), query, engine: 'web' });
     return t('Navigateur intégré ouvert : cherchez, téléchargez, le fichier est vérifié puis proposé ici. Fermer (Échap) garde la page.');
   }
 
   /** Détail de l'action qui ouvre la recherche : téléchargement en cours, reprise, ou le texte cherché. */
-  function detail(table: TableEntry, type: MediaType, title?: string): string {
+  function detail(table: TableEntry, type: MediaType, title?: string, refine?: SiteSearchOptions): string {
     const loading = ctx.sites.webProgress();
     if (loading) return t('Téléchargement en cours : {got}', { got: formatTransfer(loading, true) });
-    if (ctx.sites.resumable(startUrl(table, type, title))) return t('Reprend la page où vous en étiez ; ce que vous téléchargez revient ici');
-    return t('Navigateur intégré, recherche libre : « {query} »', { query: queryFor(table, type, title) });
+    if (ctx.sites.resumable(startUrl(table, type, title, refine))) return t('Reprend la page où vous en étiez ; ce que vous téléchargez revient ici');
+    return t('Navigateur intégré, recherche libre : « {query} »', { query: queryFor(table, type, title, refine) });
   }
 
   // Ce qui arrive pendant la recherche : son écran s'ouvre si le gestionnaire est sur cette table.

@@ -11,6 +11,10 @@ son interface).
 
 ## 0.1.11
 
+- Ajouter une table : le catalogue répond aussitôt aux boutons. Les pages s'affichent sans attendre leurs vignettes, qui arrivent juste après (la page suivante est préparée d'avance), et l'écran des filtres ne fige plus la borne à chaque appui.
+- Ajouter une table : les filtres ne bougent plus sous le curseur en borne. Une ligne par filtre, toujours à la même place ; Start ouvre ses choix, chacun avec son nombre de jeux, au lieu de faire défiler les valeurs une à une.
+- Ajouter une table : le catalogue s'ouvre sur les jeux les plus populaires (ceux pour lesquels le plus d'auteurs ont fait des tables, frontons, PuP-Packs…). Les filtres et le tri que vous choisissez sont gardés, même après un redémarrage.
+- Chercher sur le web : la ligne « Vos comptes » sous la recherche donne accès directement à vpuniverse.com, vpforums.org, pinballnirvana.com et pinsound-community.org. Connecté, la pastille cherche le titre sur le site ; pas encore, elle ouvre sa page de connexion.
 - Télécommande du téléphone : le téléphone gardé retrouve la borne même si le routeur lui donne une autre adresse au redémarrage. Il passe par le nom de la borne sur le réseau local ; refaites une fois son raccourci sur l'écran d'accueil quand la page le propose.
 - Télécommande du téléphone : sans la borne (autre Wi-Fi, borne éteinte), la page dit « Borne injoignable » et se reconnecte seule dès que la borne répond, sans actualiser ni rescanner le QR.
 - Relance par Start : Cyber Pinball fermé, ou passé sur le bureau Windows, un appui long (2 s) sur le bouton Start de la borne le rouvre. Pour une borne dont Start est un bouton de joystick (Pinscape, encodeur en mode manette) ; réglable dans Menu système > Borne > « Relance par Start ».

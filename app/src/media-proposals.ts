@@ -28,6 +28,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  ANIMATABLE_MEDIA_TYPES,
+  hitAnimated,
+  mediaChoiceAnimated,
+  SITE_SEARCH_MORE_PAGES,
+  vpsSiteHits,
+  vpsWords,
   createTransferMeter,
   formatDate,
   formatSize,
@@ -47,6 +53,7 @@ import {
   type MediaPlacement,
   type MediaSiteId,
   type SiteHit,
+  type SiteSearchOptions,
   type SiteState,
   lowerFirst,
   MEDIA_CHOICE_SOURCE_LABELS,
@@ -118,8 +125,14 @@ export interface ProposalsContext {
   active(table: TableEntry): boolean;
   /** Où ce média s'affiche sur la borne, et s'il s'y voit (l'autre afficheur passe avant lui). */
   placement(type: MediaType): MediaPlacement;
-  /** Recherche libre du média (media-web.ts) ; `title` : le titre cherché ici, s'il y en a un. */
-  web?: { open(table: TableEntry, type: MediaType, title?: string): string; detail(table: TableEntry, type: MediaType, title?: string): string };
+  /**
+   * Recherche libre du média (media-web.ts) ; `title` : le titre cherché ici, s'il y en a un ;
+   * `refine` : les mots ajoutés et « Animés seulement ».
+   */
+  web?: {
+    open(table: TableEntry, type: MediaType, title?: string, refine?: SiteSearchOptions): string;
+    detail(table: TableEntry, type: MediaType, title?: string, refine?: SiteSearchOptions): string;
+  };
   /** Enregistrement du brouillon : nombre de changements, et le plan à valider. */
   save?: { changes(table: TableEntry): number; open(): void };
 }
@@ -194,6 +207,33 @@ interface State {
   sites: Partial<Record<MediaSiteId, SiteSearch>>;
   /** Message de l'écran des propositions (file, connexion), montré jusqu'au suivant. */
   notice?: { text: string; tone: Tone };
+  /**
+   * « Chercher plus » : jusqu'à SITE_SEARCH_MORE_PAGES pages par site, les fiches de tous
+   * les jeux trouvés (pas seulement des retenus), et les titres qui ont les mots cherchés
+   * sans désigner sûrement un jeu (« Titre approché »).
+   */
+  wide?: boolean;
+  /** Mots ajoutés au titre cherché (« neon », « tarcisio ») : les sites les cherchent, les autres propositions doivent les avoir. */
+  extra?: string;
+  /** Image du disque -> animée (APNG, GIF, WebP), lue une fois. */
+  animatedFiles: Map<string, boolean | undefined>;
+}
+
+/** Mots ajoutés, débarrassés des espaces en trop. */
+const cleanWords = (text: string | undefined) => (text ?? '').replace(/\s+/g, ' ').trim();
+
+/**
+ * Proposition qui a tous les mots ajoutés : son titre, son détail, le titre et l'auteur de
+ * sa fiche. Une fiche trouvée par la recherche de VPUniverse les a déjà, au moins dans sa
+ * description (recherche « et », `search_and_or=and`) ; celle de VPForums ne le garantit pas.
+ */
+function hasWords(choice: MediaChoice, extra: string): boolean {
+  const words = vpsWords(extra);
+  if (!words.length) return true;
+  const hit = choice.site?.hit;
+  if (hit && !hit.vps && hit.site === 'vpuniverse') return true;
+  const own = new Set(vpsWords([choice.label, choice.detail, hit?.title, hit?.author, choice.file ? path.basename(choice.file) : ''].filter(Boolean).join(' ')));
+  return words.every((w) => own.has(w));
 }
 
 /** Le média qui suit (ou précède) celui-ci parmi ceux que la borne montre, en boucle. */
@@ -216,6 +256,9 @@ export function createProposals(ctx: ProposalsContext) {
   let state: State | undefined;
   /** Tri choisi, gardé d'un média à l'autre pendant la visite. */
   let sort: ProposalSort = 'relevance';
+  /** « Animés seulement », gardé d'un média à l'autre comme le tri (sans effet sur les sons et le chargement). */
+  let animatedOnly = false;
+  const animatedFor = (type: MediaType) => animatedOnly && ANIMATABLE_MEDIA_TYPES.includes(type);
 
   // ---------- Recherche ----------
 
@@ -255,6 +298,10 @@ export function createProposals(ctx: ProposalsContext) {
       dead: previous?.dead ?? new Set(),
       query,
       sites: previous?.sites ?? {},
+      // Recherche élargie et mots ajoutés restent quand on change de titre.
+      wide: previous?.wide,
+      extra: previous?.extra,
+      animatedFiles: previous?.animatedFiles ?? new Map(),
     };
     ctx.progress(t('Recherche sur VPinMediaDB…'));
     const { db, problem } = await ctx.search.index();
@@ -281,20 +328,27 @@ export function createProposals(ctx: ProposalsContext) {
    * En ligne d'abord (VPinMediaDB), puis ce que la borne a, puis les sites (VPForums,
    * puis VPUniverse, lent), puis les vignettes VPS, en basse définition.
    */
-  function choicesFor(st: State, type: MediaType): MediaChoice[] {
+  function allChoicesFor(st: State, type: MediaType): MediaChoice[] {
     const games = includedGames(st);
     const mediadb = mediaDbChoices(
       games.flatMap((g) => (g.entry ? [{ entry: g.entry, game: g.lead.game }] : [])),
       st.quality.quality,
     );
     const vpsGames = games.map((g) => g.lead.game);
+    const matched = siteGames(st);
+    // Fiches rangées sous ces jeux par la base VPS, après celles de la recherche (qui ont une vignette).
+    const linked = vpsSiteHits(matched);
     const sites = ctx.sites
       ? siteMediaChoices(
           type,
-          MEDIA_SITES.map((s) => ({ site: s.id, hits: st.sites[s.id]?.hits ?? [] })),
-          vpsGames,
+          MEDIA_SITES.map((s) => {
+            const found = st.sites[s.id]?.hits ?? [];
+            return { site: s.id, hits: [...found, ...linked.filter((h) => h.site === s.id && !found.some((f) => f.id === h.id))] };
+          }),
+          matched,
           st.deep?.vps,
           (key) => ctx.sites!.receipt(key),
+          st.wide ? siteQueries(st) : undefined,
         )
       : [];
     // Téléchargés par l'utilisateur depuis la recherche web : en tête, il les a cherchés exprès.
@@ -302,11 +356,43 @@ export function createProposals(ctx: ProposalsContext) {
     return [...web, ...(mergeMediaChoices(mediadb, st.local)[type] ?? []), ...sites, ...(mergeMediaChoices(vpsImageChoices(vpsGames), vpsMusicChoices(vpsGames))[type] ?? [])];
   }
 
+  /** Image du disque animée (APNG, GIF, WebP animés), lue une fois par visite. */
+  function animatedFile(st: State, file: string): boolean | undefined {
+    if (!st.animatedFiles.has(file)) st.animatedFiles.set(file, readMediaDimensions(file)?.animated);
+    return st.animatedFiles.get(file);
+  }
+
+  /** Propositions montrées : toutes, moins ce que retirent « Animés seulement » et les mots ajoutés. */
+  function choicesFor(st: State, type: MediaType): MediaChoice[] {
+    let list = allChoicesFor(st, type);
+    if (animatedFor(type)) list = list.filter((c) => mediaChoiceAnimated(c, (file) => animatedFile(st, file)));
+    if (st.extra) list = list.filter((c) => hasWords(c, st.extra!));
+    return list;
+  }
+
+  /**
+   * Jeux dont les fiches des sites sont proposées : les jeux retenus ; après « Chercher
+   * plus », aussi ceux que la recherche approfondie a trouvés de façon sûre (autres
+   * éditions, versions originales du même titre), avec ou sans médias sur VPinMediaDB ; pas
+   * les noms seulement approchants (Dominatrix pour The Matrix).
+   */
+  function siteGames(st: State): VpsGame[] {
+    const games = includedGames(st).map((g) => g.lead.game);
+    if (!st.wide) return games;
+    for (const lead of st.deep?.leads ?? []) {
+      if ((lead.score >= 0.6 || lead.siblingOf) && !games.some((g) => g.id === lead.game.id)) games.push(lead.game);
+    }
+    return games;
+  }
+
   /** Textes à chercher sur les sites : le titre (sans sous-titre) de chaque jeu retenu, ou la saisie. */
   function siteQueries(st: State): string[] {
     const names = st.query ? [st.query] : includedGames(st).map((g) => g.lead.game.name);
     return [...new Set(names.map(siteQuery).filter(Boolean))].slice(0, 3);
   }
+
+  /** Ce que l'écran change à la recherche des sites et du web pour ce média. */
+  const refineFor = (st: State, type: MediaType): SiteSearchOptions => ({ animated: animatedFor(type), extra: st.extra });
 
   /**
    * Recherche sur chaque site, pour les jeux retenus et le média ouvert : trois pages au
@@ -326,9 +412,10 @@ export function createProposals(ctx: ProposalsContext) {
         found.login = true;
         continue;
       }
+      const refine = refineFor(st, type);
       for (const q of queries) {
-        ctx.progress(t('Recherche sur {site} : « {query} »…', { site: site.name, query: q }));
-        const r = await sites.search(site.id, q, type);
+        ctx.progress(t('Recherche sur {site} : « {query} »…', { site: site.name, query: [q, refine.extra].filter(Boolean).join(' ') }));
+        const r = await sites.search(site.id, q, type, { ...refine, pages: st.wide ? SITE_SEARCH_MORE_PAGES : undefined });
         if (r.kind === 'hits') found.hits.push(...r.hits.filter((h) => !found.hits.some((k) => k.id === h.id)));
         else if (r.kind === 'login') found.login = true;
         else
@@ -451,7 +538,9 @@ export function createProposals(ctx: ProposalsContext) {
       thumb = { kind: 'image', url: mediaUrl(file), rotation: 0 };
     }
     const facts = [
-      hit.category?.label,
+      hit.category?.label ?? (hit.vps ? t('lien de la base VPS') : undefined),
+      // Une vidéo s'anime d'office ; une image, seulement si la fiche le dit (wheel APNG).
+      choice.kind === 'image' && hitAnimated(hit) ? t('animée') : undefined,
       hit.author ? t('par {author}', { author: hit.author }) : undefined,
       hit.date ? formatDate(hit.date, { month: 'short', year: 'numeric' }) : undefined,
     ];
@@ -486,7 +575,10 @@ export function createProposals(ctx: ProposalsContext) {
     }
     if (pack) extra.push(t('Pack complet : les médias de tous les écrans ; reçus, les autres écrans les proposeront aussi.'));
     else if (choice.kind === 'video') extra.push(t('Aperçu : image fixe déposée par l’auteur ; la vidéo arrive au téléchargement.'));
-    return { action, title: choice.label, code: site.name, state, flag: otherGame(st, table, choice), popularity: popularity(hit), facts: facts.filter(Boolean).join(' · '), extra, thumb, progress };
+    if (hit.vps) extra.push(t('Fiche rangée sous ce jeu par la base VPS : son titre n’a pas été cherché, son aperçu arrive au téléchargement.'));
+    if (choice.site?.loose) extra.push(t('Recherche élargie : le titre a les mots cherchés, sans désigner sûrement l’un des jeux retenus.'));
+    const flag = otherGame(st, table, choice) ?? (choice.site?.loose ? { label: t('Titre approché'), tone: 'warning' as const } : undefined);
+    return { action, title: choice.label, code: site.name, state, flag, popularity: popularity(hit), facts: facts.filter(Boolean).join(' · '), extra, thumb, progress };
   }
 
   function cardFor(st: State, table: TableEntry, choice: MediaChoice, action: number): MediaCard {
@@ -601,6 +693,50 @@ export function createProposals(ctx: ProposalsContext) {
         },
       });
     }
+    // Élargir, filtrer : la recherche des sites est refaite, le curseur reste sur l'action.
+    actions.push(
+      st.wide
+        ? {
+            key: 'wide',
+            label: t('Recherche élargie'),
+            detail: t('Jusqu’à {n} pages par site, tous les jeux reconnus, titres approchés ; Start : revenir à la recherche simple', { n: SITE_SEARCH_MORE_PAGES }),
+            tone: 'ok',
+            run: () => {
+              st.wide = false;
+              reopen(table, type, ctx.cursor());
+            },
+          }
+        : {
+            key: 'wide',
+            label: t('Chercher plus'),
+            detail: t('Plus de pages sur les sites, les autres éditions du jeu, les titres approchés'),
+            run: () => {
+              st.wide = true;
+              reopen(table, type, ctx.cursor());
+            },
+          },
+    );
+    if (ANIMATABLE_MEDIA_TYPES.includes(type)) {
+      actions.push({
+        key: 'animated',
+        label: animatedOnly ? t('Animés seulement : oui') : t('Animés seulement : non'),
+        detail: animatedOnly
+          ? t('Vidéos et images animées (APNG, GIF) ; les sites cherchent dans leurs catégories animées. Start : tout montrer')
+          : t('Start : ne garder que les vidéos et les images animées (APNG, GIF)'),
+        tone: animatedOnly ? 'ok' : undefined,
+        run: () => {
+          animatedOnly = !animatedOnly;
+          reopen(table, type, ctx.cursor());
+        },
+      });
+    }
+    actions.push({
+      key: 'extra',
+      label: st.extra ? t('Mots ajoutés : « {words} »', { words: st.extra }) : t('Ajouter des mots à la recherche…'),
+      detail: st.extra ? t('Start pour les changer ; vide pour les retirer') : t('Un style, un auteur, une couleur : « neon », « tarcisio », « glass »…'),
+      tone: st.extra ? 'ok' : undefined,
+      run: () => askWords(table, type),
+    });
     const changes = ctx.save?.changes(table) ?? 0;
     if (changes) {
       actions.push({
@@ -637,7 +773,7 @@ export function createProposals(ctx: ProposalsContext) {
     if (ctx.web) {
       actions.push({
         label: t('Chercher sur le web…'),
-        detail: ctx.web.detail(table, type, st.query),
+        detail: ctx.web.detail(table, type, st.query, refineFor(st, type)),
         web: 'medias.proposals',
         tone: choices.length ? undefined : 'ok',
         run: () => openWeb(table, type),
@@ -658,12 +794,24 @@ export function createProposals(ctx: ProposalsContext) {
     const rows: Row[] = [];
     if (st.notice) rows.push({ text: st.notice.text, tone: st.notice.tone });
     if (!placement.shown && placement.note) rows.push({ text: t('Pas montré sur votre borne'), detail: placement.note, tone: 'warning' });
-    rows.push(...siteRows(st, type));
+    rows.push(...siteRows(st, type, choices));
     if (st.problem) rows.push({ text: t('VPinMediaDB indisponible'), detail: t('{problem}. Restent les médias déjà sur la borne, et les vignettes VPS déjà reçues.', { problem: st.problem }), tone: 'warning' });
+    // Ce que les filtres masquent : un écran vide ne doit pas passer pour une source vide.
+    const hidden = allChoicesFor(st, type).length - choices.length;
+    const filters = [animatedFor(type) ? t('animés seulement') : undefined, st.extra ? t('mots « {words} »', { words: st.extra }) : undefined].filter(Boolean);
+    if (filters.length) {
+      rows.push({
+        text: t('Filtre : {filters}', { filters: filters.join(t(', ')) }),
+        detail: hidden ? tn(hidden, '{n} proposition masquée ; « Animés seulement » et « Mots ajoutés » la rendent.', '{n} propositions masquées ; « Animés seulement » et « Mots ajoutés » les rendent.') : t('Aucune proposition masquée.'),
+        tone: 'info',
+      });
+    }
     if (!choices.length) {
       rows.push({
         text: t('Aucune proposition pour ce média'),
-        detail: st.games.length
+        detail: filters.length
+          ? t('Rien ne répond au filtre. « Chercher plus » élargit la recherche, « Chercher sur le web… » la reprend avec le filtre.')
+          : st.games.length
           ? t('Les jeux retenus n’ont pas de {label}, et la table n’en a pas dans son PuP-Pack ni son dossier du DMD. « Chercher sur le web… » pour le trouver vous-même, ou « Autres jeux… » pour en retenir d’autres.', { label: lowerFirst(info.label) })
           : t('Aucun jeu de la base VPS ne correspond : « Chercher un autre titre… », ou prenez un fichier dans le dossier d’import.'),
         tone: 'quiet',
@@ -762,11 +910,14 @@ export function createProposals(ctx: ProposalsContext) {
   // ---------- Sites communautaires ----------
 
   /** Une ligne par site : connexion, résultats, attente ; puis la file, s'il y a quelque chose dedans. */
-  function siteRows(st: State, type: MediaType): Row[] {
+  function siteRows(st: State, type: MediaType, choices: MediaChoice[]): Row[] {
     const rows: Row[] = [];
     for (const site of MEDIA_SITES) {
       const found = st.sites[site.id];
       if (!found) continue;
+      // Fiches rangées sous le jeu par la base VPS, que la recherche n'a pas rendues.
+      const linked = new Set(choices.filter((c) => c.site?.hit.site === site.id && c.site.hit.vps).map((c) => c.site!.hit.id)).size;
+      const linkedText = linked ? ` · ${tn(linked, '{n} fiche de plus, liée au jeu par la base VPS', '{n} fiches de plus, liées au jeu par la base VPS')}` : '';
       let detail: string;
       let tone: Tone = 'ok';
       if (found.login) {
@@ -784,7 +935,14 @@ export function createProposals(ctx: ProposalsContext) {
           tone = 'warning';
         }
       }
-      rows.push({ text: site.name, detail, tone });
+      rows.push({ text: site.name, detail: detail + linkedText, tone });
+    }
+    if (st.wide) {
+      rows.push({
+        text: t('Recherche élargie'),
+        detail: t('Jusqu’à {n} pages de résultats par titre, les fiches de toutes les éditions reconnues du jeu, et celles dont le titre a les mots cherchés sans désigner un jeu sûr (« Titre approché »).', { n: SITE_SEARCH_MORE_PAGES }),
+        tone: 'info',
+      });
     }
     const jobs = ctx.sites?.jobs() ?? [];
     if (jobs.some((j) => j.state !== 'received' && j.state !== 'failed')) {
@@ -809,7 +967,7 @@ export function createProposals(ctx: ProposalsContext) {
 
   /** « aucun pour ce média ; 1 pack complet, pour tous les écrans ; les autres : Afficheur large 2, Logo 16 ; 3 d’autres jeux ou sans média reconnu » */
   function hitSplit(st: State, hits: SiteHit[], type: MediaType): string {
-    const sum = siteHitSummary(hits, includedGames(st).map((g) => g.lead.game), st.deep?.vps);
+    const sum = siteHitSummary(hits, siteGames(st), st.deep?.vps, st.wide ? siteQueries(st) : undefined);
     const mine = sum.byType[type] ?? 0;
     const others = (Object.entries(sum.byType) as [MediaType, number][])
       .filter(([k]) => k !== type)
@@ -835,7 +993,7 @@ export function createProposals(ctx: ProposalsContext) {
   function openWeb(table: TableEntry, type: MediaType): void {
     const st = state!;
     lastPick.set(`${table.file}|${type}`, ++picks);
-    st.notice = { text: ctx.web!.open(table, type, st.query), tone: 'info' };
+    st.notice = { text: ctx.web!.open(table, type, st.query, refineFor(st, type)), tone: 'info' };
     ctx.show(() => build(type), ctx.cursor());
   }
 
@@ -911,7 +1069,7 @@ export function createProposals(ctx: ProposalsContext) {
       state.notice = { text: t('Reçu de {site} : « {title} », à choisir si vous le préférez.', { site: mediaSite(job.hit.site).name, title: job.hit.title }), tone: 'info' };
       return;
     }
-    const files = choicesFor(state, wanted.type).filter((c) => c.site?.received && jobKey(c.site.hit) === job.key);
+    const files = allChoicesFor(state, wanted.type).filter((c) => c.site?.received && jobKey(c.site.hit) === job.key);
     if (files.length !== 1) {
       state.notice = { text: files.length ? t('Reçu de {site} : {n} fichiers pour ce média, à choisir.', { site: mediaSite(job.hit.site).name, n: files.length }) : t('Reçu de {site}, mais rien pour ce média.', { site: mediaSite(job.hit.site).name }), tone: 'info' };
       return;
@@ -920,6 +1078,26 @@ export function createProposals(ctx: ProposalsContext) {
     const text = ctx.place(table, wanted.type, { from: c.file!, mode: 'copy', origin: { origin: mediaSite(job.hit.site).name, url: job.hit.url, vpsId: c.vpsId } });
     state.notice = { text: `${t('Reçu de {site}.', { site: mediaSite(job.hit.site).name })} ${text}`, tone: 'ok' };
   });
+
+  /**
+   * Mots ajoutés au titre : les sites les cherchent avec lui (« matrix neon »), et les autres
+   * propositions ne restent que si elles les ont. Vide : retirés.
+   */
+  function askWords(table: TableEntry, type: MediaType): void {
+    const st = state!;
+    const at = ctx.cursor();
+    ctx.prompt(
+      t('Ajouter des mots à la recherche'),
+      t('Mots'),
+      st.extra ?? '',
+      (text) => {
+        if (text === undefined) return ctx.show(() => build(type), at);
+        st.extra = cleanWords(text) || undefined;
+        reopen(table, type, at);
+      },
+      t('Ajoutés au titre du jeu sur VPForums et VPUniverse, et dans « Chercher sur le web… » : un style (« tarcisio », « diagonal », « glass orb »), un auteur, une couleur, « animated ». Les propositions qui ne les ont pas sont masquées. Laissez vide pour les retirer.'),
+    );
+  }
 
   // ---------- Jeux retenus ----------
 
@@ -1025,7 +1203,7 @@ export function createProposals(ctx: ProposalsContext) {
 
   /** Nombre de propositions connues pour ce type, si la recherche a déjà été faite pour cette table. */
   function count(table: TableEntry, type: MediaType): number | undefined {
-    return state && state.file === table.file ? choicesFor(state, type).length : undefined;
+    return state && state.file === table.file ? allChoicesFor(state, type).length : undefined;
   }
 
   return {

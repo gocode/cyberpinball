@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('cyberAcquire', {
   act: (action: 'back' | 'home' | 'browser' | 'close') => ipcRenderer.send('acquire:act', action),
   cancel: (id: number) => ipcRenderer.send('acquire:cancel', id),
   search: (query: string, engine: string) => ipcRenderer.send('acquire:search', query, engine),
+  // « Vos comptes » : un site, et le texte du champ de recherche.
+  site: (id: string, query: string) => ipcRenderer.send('acquire:site', id, query),
   video: () => ipcRenderer.send('acquire:video'),
   grab: (want: 'audio' | 'video') => ipcRenderer.send('acquire:grab', want),
   // « Ajouter au Juke-box » : la playlist ou la vidéo YouTube affichée (jukebox-menu.ts).

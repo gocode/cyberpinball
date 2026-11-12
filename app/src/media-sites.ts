@@ -38,6 +38,8 @@ import {
   receivedMedias,
   siteSearchByType,
   siteSearchUrl,
+  siteSearchTerms,
+  type SiteSearchOptions,
   siteState,
   siteHitKey,
   sourceSite,
@@ -180,12 +182,19 @@ export function createMediaSites(ctx: MediaSitesContext) {
 
   /**
    * Résultats d'un site pour un texte et un média : de la demi-heure passée, sinon lus
-   * maintenant, jusqu'à SITE_SEARCH_PAGES pages. VPUniverse cherche dans les seules
+   * maintenant, jusqu'à SITE_SEARCH_PAGES pages (`opts.pages` après « Chercher plus »), avec
+   * les mots ajoutés et « Animés seulement » (`siteSearchTerms`). VPUniverse cherche dans les seules
    * catégories du média ; VPForums, partout (une recherche sert à tous les médias).
    */
-  async function search(site: MediaSiteId, query: string, type?: MediaType): Promise<SiteSearchResult> {
+  async function search(site: MediaSiteId, query: string, type?: MediaType, opts: SiteSearchOptions & { pages?: number } = {}): Promise<SiteSearchResult> {
     const own = siteSearchByType(site) ? type : undefined;
-    return searchPages(site, query, `${site}:${own ?? '*'}:${query.toLowerCase()}`, (page) => siteSearchUrl(site, query, own, page));
+    // Mots ajoutés, et « animated » quand le site ne range pas à part les versions animées.
+    const text = siteSearchTerms(site, query, type, opts);
+    const animated = Boolean(opts.animated && own);
+    const pages = opts.pages ?? SITE_SEARCH_PAGES;
+    const urlOf = (page: number) => siteSearchUrl(site, text, own, page, animated);
+    // La clé est l'adresse elle-même : un autre texte, d'autres catégories, une autre recherche.
+    return searchPages(site, text, `${urlOf(1)}#${pages}`, urlOf, undefined, pages);
   }
 
   /**
@@ -205,13 +214,13 @@ export function createMediaSites(ctx: MediaSitesContext) {
    * recherche à la fois par site ; quand le site impose d'attendre (VPUniverse, pour un
    * visiteur : environ 90 s), on attend, `onWait` le dit à l'écran, puis on recommence une fois.
    */
-  function searchPages(site: MediaSiteId, query: string, key: string, urlOf: (page: number) => string, onWait?: (seconds: number) => void): Promise<SiteSearchResult> {
-    const run = (searching.get(site) ?? Promise.resolve()).then(() => searchPagesNow(site, query, key, urlOf, onWait));
+  function searchPages(site: MediaSiteId, query: string, key: string, urlOf: (page: number) => string, onWait?: (seconds: number) => void, pages = SITE_SEARCH_PAGES): Promise<SiteSearchResult> {
+    const run = (searching.get(site) ?? Promise.resolve()).then(() => searchPagesNow(site, query, key, urlOf, onWait, pages));
     searching.set(site, run.catch(() => undefined));
     return run;
   }
 
-  async function searchPagesNow(site: MediaSiteId, query: string, key: string, urlOf: (page: number) => string, onWait?: (seconds: number) => void): Promise<SiteSearchResult> {
+  async function searchPagesNow(site: MediaSiteId, query: string, key: string, urlOf: (page: number) => string, onWait: ((seconds: number) => void) | undefined, maxPages: number): Promise<SiteSearchResult> {
     const cached = searches.get(key);
     if (cached && Date.now() - cached.at < SEARCH_TTL_MS) return cached.result;
     const flood = await searchPage(site, query, undefined, 1, urlOf(1));
@@ -227,7 +236,7 @@ export function createMediaSites(ctx: MediaSitesContext) {
     let result = first;
     if (first.kind === 'hits') {
       const hits = [...first.hits];
-      for (let page = 2; page <= Math.min(first.pages ?? 1, SITE_SEARCH_PAGES); page++) {
+      for (let page = 2; page <= Math.min(first.pages ?? 1, maxPages); page++) {
         const next = await searchPage(site, query, undefined, page, urlOf(page));
         if (next.kind !== 'hits') break;
         hits.push(...next.hits.filter((h) => !hits.some((k) => k.id === h.id)));

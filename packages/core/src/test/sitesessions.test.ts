@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DOWNLOAD_PROBES, siteOfUrl, siteState, sourceSite, SOURCE_SITES } from '../sitesessions';
+import { DOWNLOAD_PROBES, siteOfUrl, sourceSearchUrl, siteState, sourceSite, SOURCE_SITES } from '../sitesessions';
 
 const NOW = new Date('2026-10-22T12:00:00Z');
 const inDays = (d: number) => NOW.getTime() / 1000 + d * 86400;
@@ -45,5 +45,18 @@ test('site d’un lien, et une sonde par moteur', () => {
     assert.doesNotThrow(() => new Function(`return ${DOWNLOAD_PROBES[site.engine]}`), site.label);
     // Jamais d'adresse fabriquée pour sauter un délai ou une confirmation.
     assert.ok(!/confirm=1|[?&]t=1/.test(DOWNLOAD_PROBES[site.engine]), site.label);
+  }
+});
+
+test('recherche libre : chaque site cherche le texte dans ses fichiers, encodé', () => {
+  const site = (id: string) => SOURCE_SITES.find((s) => s.id === id)!;
+  assert.equal(sourceSearchUrl(site('vpuniverse'), ' terminator 2 '), 'https://vpuniverse.com/search/?q=terminator%202&type=downloads_file');
+  // Les mots ajoutés pour le web (partWebQuery) sont retirés ; s'il ne reste rien, le texte tel quel.
+  assert.equal(sourceSearchUrl(site('vpuniverse'), 'Terminator 2 vpx vpinball'), 'https://vpuniverse.com/search/?q=Terminator%202&type=downloads_file');
+  assert.equal(sourceSearchUrl(site('vpuniverse'), 'vpinball'), 'https://vpuniverse.com/search/?q=vpinball&type=downloads_file');
+  assert.equal(sourceSearchUrl(site('pinballnirvana'), 'AC/DC & co'), 'https://pinballnirvana.com/forums/search/search?keywords=AC%2FDC%20%26%20co&t=resource');
+  for (const s of SOURCE_SITES) {
+    const url = new URL(sourceSearchUrl(s, 'x'));
+    assert.ok(url.hostname === s.domain || url.hostname.endsWith(`.${s.domain}`), `${s.id} : recherche sur son propre domaine`);
   }
 });

@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- Add a table: the catalog responds at once to the buttons. Pages show without waiting for their thumbnails, which arrive right after (the next page is prepared ahead), and the filters screen no longer freezes the cabinet on every press.
+- Add a table: the filters no longer move under the cursor on the cabinet. One line per filter, always in the same place; Start opens its choices, each with its number of games, instead of cycling through the values one by one.
+- Add a table: the catalog opens on the most popular games (those the most authors have made tables, backglasses, PuP-Packs… for). The filters and sort you choose are kept, even after a restart.
+- Search the web: the "Your accounts" line under the search gives direct access to vpuniverse.com, vpforums.org, pinballnirvana.com and pinsound-community.org. Signed in, the pill searches the title on the site; not yet, it opens its sign-in page.
 - Phone remote: the kept phone finds the cabinet even if the router gives it another address at a restart. It goes through the cabinet's name on the local network; redo its Home screen shortcut once when the page offers it.
 - Phone remote: without the cabinet (another Wi-Fi, cabinet off), the page says "Cabinet unreachable" and reconnects by itself as soon as the cabinet answers, without reloading or rescanning the QR code.
 - Relaunch with Start: with Cyber Pinball closed, or switched to the Windows desktop, a long press (2 s) on the cabinet's Start button reopens it. For cabinets whose Start is a joystick button (Pinscape, encoder in gamepad mode); set it in System menu > Borne (Cabinet) > “Relance par Start” (Relaunch with Start).

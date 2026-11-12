@@ -9,6 +9,10 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import {
   addToWaitList,
+  CATALOG_DEFAULT,
+  loadCatalogChoice,
+  popularity,
+  saveCatalogChoice,
   attachFile,
   cabinetScreens,
   catalog,
@@ -108,6 +112,29 @@ test('catalogue : jeux jouables en VPX, filtres par sorte et par état, tri par 
   assert.equal(catalog(db, { text: 'terminator' }, none)[0]!.id, 'BunvWvh9');
   assert.equal(playableWithoutRom(T2), false);
   assert.equal(playableWithoutRom(EM), true);
+});
+
+test('catalogue : tri par popularité (auteurs différents, puis fichiers), le titre départage', () => {
+  const none = new Set<string>();
+  // Terminator 2 : sept auteurs (versions, frontons, PuP-Pack, couleurs) ; Fireball et Mon Original : un seul.
+  assert.deepEqual(catalog(db, { sort: 'popular' }, none).map((g) => g.id), ['BunvWvh9', 'em1', 'orig']);
+  assert.ok(popularity(T2) > popularity(EM));
+  // Une série de variantes d'un seul auteur ne passe pas devant un jeu repris par beaucoup.
+  const series: VpsGame = { ...EM, id: 'nfl', name: 'NFL', tableFiles: Array.from({ length: 40 }, (_, i) => file(`n${i}`, { authors: ['Seul'] })) };
+  assert.equal(catalog(createVpsDb([series, T2]), { sort: 'popular' }, none)[0]!.id, 'BunvWvh9');
+  assert.equal(CATALOG_DEFAULT.sort, 'popular', 'par défaut : les plus populaires d’abord');
+});
+
+test('catalogue : derniers filtres et tri gardés d’une visite à l’autre, valeurs inconnues écartées', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-catalogue-'));
+  assert.deepEqual(loadCatalogChoice(dir), CATALOG_DEFAULT, 'jamais choisi : les valeurs d’origine');
+  saveCatalogChoice(dir, { kind: 'em', support: 'pup', site: 'vpuniverse', state: 'all', sort: 'name' });
+  assert.deepEqual(loadCatalogChoice(dir), { kind: 'em', support: 'pup', site: 'vpuniverse', state: 'all', sort: 'name' });
+  fs.writeFileSync(path.join(dir, 'catalogue-filtres.json'), JSON.stringify({ kind: 'ss', sort: 'downloads', site: 42 }));
+  assert.deepEqual(loadCatalogChoice(dir), { ...CATALOG_DEFAULT, kind: 'ss' });
+  fs.writeFileSync(path.join(dir, 'catalogue-filtres.json'), '{abîmé');
+  assert.deepEqual(loadCatalogChoice(dir), CATALOG_DEFAULT);
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('catalogue : filtres « Fichiers » (genre proposé avec un lien vivant) et « Site », combinés aux autres', () => {

@@ -385,7 +385,7 @@ export function createMedias(ctx: MediasContext) {
         b2s: (table) => b2sSources(session!, table),
         active: (table) => session?.file === table.file,
         placement: (type) => mediaPlacement(type, cabinet()),
-        web: web && { open: (table, type, title) => web.open(table, type, title), detail: (table, type, title) => web.detail(table, type, title) },
+        web: web && { open: (table, type, title, refine) => web.open(table, type, title, refine), detail: (table, type, title, refine) => web.detail(table, type, title, refine) },
         save: { changes: (table) => changes(session!, table), open: () => session && openPlan(session) },
         back: (type, message) => {
           if (!session) return;

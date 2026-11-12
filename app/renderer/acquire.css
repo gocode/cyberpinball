@@ -583,6 +583,86 @@ button.go:hover {
   filter: brightness(1.08);
 }
 
+/* « Vos comptes » (recherche libre d'une table) : ligne de 62 (ACCOUNTS_ROW dans acquire-window.ts),
+   une pastille par site ; connecté, son point en vert signal ; pas encore, en creux. */
+.accounts {
+  height: calc(62 * var(--u));
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: calc(14 * var(--u));
+  padding: 0 calc(32 * var(--u)) calc(12 * var(--u));
+  font-size: calc(20 * var(--u));
+}
+
+.accounts[hidden] {
+  display: none;
+}
+
+.accounts-title {
+  flex: none;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: calc(20 * var(--u));
+}
+
+.sites {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: calc(8 * var(--u));
+  overflow: hidden;
+}
+
+button.site {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  padding: calc(6 * var(--u)) calc(14 * var(--u));
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  color: var(--text);
+  font-size: calc(20 * var(--u));
+  white-space: nowrap;
+}
+
+button.site:hover {
+  border-color: var(--accent);
+}
+
+.site-dot {
+  flex: none;
+  width: calc(10 * var(--u));
+  height: calc(10 * var(--u));
+  border-radius: 50%;
+  border: 1px solid var(--muted);
+}
+
+button.site.on .site-dot {
+  border-color: var(--signal);
+  background: var(--signal);
+  box-shadow: 0 0 calc(6 * var(--u)) var(--signal-haze);
+}
+
+.site-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.site-state {
+  flex: none;
+  color: var(--muted);
+}
+
+button.site.on .site-state {
+  color: var(--accent);
+}
+
 .video {
   height: calc(52 * var(--u));
   display: flex;

@@ -91,6 +91,11 @@ import {
   vpsLabel,
   vpxVersions,
   waitListProblems,
+  CATALOG_DEFAULT,
+  CATALOG_SORTS,
+  loadCatalogChoice,
+  saveCatalogChoice,
+  type CatalogChoice,
   type CatalogFilter,
   type CatalogKind,
   type CatalogSite,
@@ -193,10 +198,12 @@ export interface CatalogContext {
 /** Jeux par page du catalogue : une page tient sur l'écran, cartes et vignettes comprises. */
 const PAGE = 12;
 
-const SORTS: CatalogSort[] = ['name', 'recent'];
-/** Filtres par défaut : tous les jeux pas encore installés, par titre. */
-const DEFAULT_FILTER = { kind: 'all', support: 'any', site: 'all', state: 'missing', sort: 'name' } as const;
+/** Filtres d'origine (CATALOG_DEFAULT) : tous les jeux pas encore installés, les plus populaires d'abord. */
+const DEFAULT_FILTER = CATALOG_DEFAULT;
 const SORT_LABELS: Record<CatalogSort, string> = {
+  get popular() {
+    return t('les plus populaires d’abord');
+  },
   get name() {
     return t('par titre');
   },
@@ -204,6 +211,22 @@ const SORT_LABELS: Record<CatalogSort, string> = {
     return t('nouveautés d’abord');
   },
 };
+/** Ce que veut dire chaque ordre, sur l'écran où on le choisit. */
+const SORT_DETAILS: Record<CatalogSort, string> = {
+  get popular() {
+    return t('Les jeux pour lesquels le plus d’auteurs ont fait des tables, frontons, PuP-Packs…');
+  },
+  get name() {
+    return t('De A à Z');
+  },
+  get recent() {
+    return t('La dernière version mise en ligne d’abord');
+  },
+};
+/** Jeux calculés gardés en mémoire (un filtre et ses voisins) : au-delà, les plus anciens sont oubliés. */
+const MEMO_SIZE = 48;
+/** Vignettes téléchargées ensemble (base VPS sur GitHub Pages). */
+const THUMBS_AT_ONCE = 6;
 
 const STATE_LABELS: Record<Need['state'], { label: string; tone: Tone }> = {
   have: {
@@ -284,6 +307,21 @@ const hostLine = (h: { label: string; account: boolean }) => (h.account ? t('{si
 export function createCatalog(ctx: CatalogContext) {
   const { host } = ctx;
   const filter: CatalogFilter & { page: number } = { ...DEFAULT_FILTER, page: 0 };
+  /** Les derniers filtres et tri choisis sont repris à la première ouverture (data\catalogue-filtres.json). */
+  let choiceLoaded = false;
+  function loadChoice(): void {
+    if (choiceLoaded) return;
+    choiceLoaded = true;
+    Object.assign(filter, loadCatalogChoice(dataDir()));
+  }
+  function saveChoice(): void {
+    const choice = Object.fromEntries(FILTERS.map((f) => [f.key, valueOf(f.key)])) as CatalogChoice;
+    try {
+      saveCatalogChoice(dataDir(), choice);
+    } catch {
+      // Disque en lecture seule : le choix vaut pour cette fois.
+    }
+  }
   /** Jeux qui ont des médias sur VPinMediaDB : chargé au premier filtre qui en a besoin ; null : index indisponible. */
   let mediaIds: ReadonlySet<string> | null | undefined;
   /** Adresse d'une vignette -> fichier reçu. */
@@ -623,10 +661,6 @@ export function createCatalog(ctx: CatalogContext) {
     return imageOf(game) ?? vpxVersions(game).map(imageOf).find(Boolean) ?? (game.b2sFiles ?? []).map(imageOf).find(Boolean);
   }
 
-  async function fetchThumbs(files: (MediaDbFile | undefined)[]): Promise<void> {
-    await ctx.search.stagePreviews(files.filter((f): f is MediaDbFile => Boolean(f)), thumbs, t('Vignettes'));
-  }
-
   function thumbOf(file: MediaDbFile | undefined, text: string): MediaThumb {
     const local = file && thumbs.get(file.url);
     if (!local || !fs.existsSync(local)) return { kind: 'fallback', rotation: 0, text };
@@ -643,7 +677,43 @@ export function createCatalog(ctx: CatalogContext) {
   // ---------- Catalogue ----------
 
   const extras = () => ({ media: mediaIds ?? undefined });
-  const games = (db: VpsDb, f: CatalogFilter = filter) => catalog(db, f, installed(), extras());
+  /**
+   * Jeux de chaque filtre déjà calculés : l'écran se redessine à chaque touche, et les choix
+   * d'un filtre comptent leurs jeux ; rien n'est recalculé tant que la base, les tables
+   * installées et l'index de VPinMediaDB n'ont pas changé.
+   */
+  const memo = new Map<string, VpsGame[]>();
+  let memoDb: VpsDb | undefined;
+  function games(db: VpsDb, f: CatalogFilter = filter): VpsGame[] {
+    if (db !== memoDb) {
+      memo.clear();
+      memoDb = db;
+    }
+    const here = installed();
+    const key = JSON.stringify([
+      f.text?.trim() ?? '',
+      f.kind ?? 'all',
+      f.support ?? 'any',
+      f.site ?? 'all',
+      f.state ?? 'all',
+      f.sort ?? 'name',
+      f.vr ?? false,
+      f.pup ?? false,
+      f.support === 'media' ? (mediaIds === undefined ? 'u' : mediaIds === null ? 'n' : mediaIds.size) : '',
+      (f.state ?? 'all') !== 'all' ? [...here].sort().join(',') : '',
+    ]);
+    const known = memo.get(key);
+    if (known) {
+      // Le plus récent en dernier : les plus anciens partent d'abord.
+      memo.delete(key);
+      memo.set(key, known);
+      return known;
+    }
+    const found = catalog(db, f, here, extras());
+    memo.set(key, found);
+    if (memo.size > MEMO_SIZE) memo.delete(memo.keys().next().value!);
+    return found;
+  }
 
   /** L'index de VPinMediaDB, pour le filtre de ses médias : chargé une fois, au premier besoin. */
   async function needMediaIds(): Promise<void> {
@@ -653,9 +723,34 @@ export function createCatalog(ctx: CatalogContext) {
     mediaIds = db ? new Set(db.entries.keys()) : null;
   }
 
+  /**
+   * Vignettes de la base VPS, téléchargées sans bloquer : l'écran s'affiche tout de suite (une
+   * carte sans vignette montre le titre), les touches répondent, et il se redessine quand elles
+   * arrivent. Avant le 12/11/2026, chaque page du catalogue attendait ses douze vignettes une à
+   * une, touches bloquées. `then` : la suite (la page suivante, préparée d'avance).
+   */
+  let thumbsRun = 0;
+  /** Une demande après l'autre : la page suivante préparée et la même page demandée ensuite ne téléchargent pas deux fois le même fichier. */
+  let thumbsQueue: Promise<void> = Promise.resolve();
+  function loadThumbs(files: (MediaDbFile | undefined)[], then?: () => (MediaDbFile | undefined)[]): void {
+    const run = ++thumbsRun;
+    const stage = (list: (MediaDbFile | undefined)[]) => {
+      const wanted = list.filter((f): f is MediaDbFile => Boolean(f) && !thumbs.has(f!.url));
+      return wanted.length ? ctx.search.stagePreviews(wanted, thumbs, t('Vignettes'), { quiet: true, atOnce: THUMBS_AT_ONCE }).then(() => true) : Promise.resolve(false);
+    };
+    thumbsQueue = thumbsQueue
+      .then(async () => {
+        if (await stage(files)) host.broadcast();
+        // Un autre écran a demandé les siennes entre-temps : on ne prépare plus rien pour celui-ci.
+        if (run === thumbsRun && then) await stage(then());
+      })
+      .catch(() => undefined);
+  }
+
   /** Catalogue ; `text` : une recherche toute faite (titre, initiales, nom de ROM), pour un autre écran qui y mène. */
   function openCatalog(at = 0, text?: string): void {
     refresh = undefined;
+    loadChoice();
     if (text !== undefined) {
       filter.text = text.trim() || undefined;
       filter.page = 0;
@@ -666,8 +761,10 @@ export function createCatalog(ctx: CatalogContext) {
       await needMediaIds();
       const found = games(db);
       filter.page = Math.min(filter.page, Math.max(0, Math.ceil(found.length / PAGE) - 1));
-      await fetchThumbs(found.slice(filter.page * PAGE, (filter.page + 1) * PAGE).map(gameImage));
+      const page = filter.page;
       ctx.show(() => buildCatalog(db, found), at);
+      // Les vignettes de la page, puis celles de la suivante : « Page suivante » s'affiche aussitôt garnie.
+      loadThumbs(found.slice(page * PAGE, (page + 1) * PAGE).map(gameImage), () => found.slice((page + 1) * PAGE, (page + 2) * PAGE).map(gameImage));
     });
   }
 
@@ -683,7 +780,7 @@ export function createCatalog(ctx: CatalogContext) {
   function buildCatalog(db: VpsDb, found: VpsGame[]): Built {
     const here = installed();
     const shown = found.slice(filter.page * PAGE, (filter.page + 1) * PAGE);
-    const actions: Action[] = shown.map((g) => ({ label: vpsLabel(g), run: () => openGame(g.id) }));
+    const actions: Action[] = shown.map((g) => ({ label: vpsLabel(g), key: `game:${g.id}`, run: () => openGame(g.id) }));
     const cards: MediaCard[] = shown.map((g, i) => {
       const versions = vpxVersions(g);
       const roms = [...new Set((g.romFiles ?? []).map((r) => r.version).filter(Boolean))];
@@ -702,16 +799,27 @@ export function createCatalog(ctx: CatalogContext) {
       };
     });
     const pages = Math.max(1, Math.ceil(found.length / PAGE));
-    if (filter.page + 1 < pages) {
+    // Les deux lignes de pages toujours là, à la même place (grisées quand il n'y a rien de ce côté) :
+    // en borne, les actions ne bougent pas d'une page à l'autre.
+    if (pages > 1) {
+      const last = filter.page + 1 >= pages;
       const range = { from: (filter.page + 1) * PAGE + 1, to: Math.min(found.length, (filter.page + 2) * PAGE), total: found.length };
-      actions.push({ label: t('Page suivante'), detail: t('{from} à {to} sur {total}', range), run: () => ((filter.page += 1), openCatalog(0)) });
+      const before = { from: (filter.page - 1) * PAGE + 1, to: filter.page * PAGE, total: found.length };
+      actions.push(
+        last
+          ? { label: t('Page suivante'), key: 'page:next', detail: t('Dernière page'), tone: 'quiet', run: () => undefined }
+          : { label: t('Page suivante'), key: 'page:next', detail: t('{from} à {to} sur {total}', range), run: () => ((filter.page += 1), openCatalog(ctx.cursor())) },
+        filter.page > 0
+          ? { label: t('Page précédente'), key: 'page:previous', detail: t('{from} à {to} sur {total}', before), run: () => ((filter.page -= 1), openCatalog(ctx.cursor())) }
+          : { label: t('Page précédente'), key: 'page:previous', detail: t('Première page'), tone: 'quiet', run: () => undefined },
+      );
     }
-    if (filter.page > 0) actions.push({ label: t('Page précédente'), run: () => ((filter.page -= 1), openCatalog(0)) });
     const active = activeFilters();
     const state = CATALOG_STATE_LABELS[filter.state ?? 'all'];
     actions.push(
       {
         label: filter.text ? t('Recherche : « {text} »', { text: filter.text }) : t('Chercher un titre…'),
+        key: 'search',
         icon: 'search',
         detail: filter.text ? t('Start pour changer ; vide pour tout revoir') : t('Titre, initiales (TMNT) ou nom de ROM (t2_l8)'),
         run: () =>
@@ -725,6 +833,7 @@ export function createCatalog(ctx: CatalogContext) {
       },
       {
         label: active.length ? t('Filtres : {list}', { list: active.join(' · ') }) : t('Filtres et tri'),
+        key: 'filters',
         icon: 'filter',
         detail: t('{state}, {sort} · Start pour les changer', { state, sort: filter.text ? t('ordre de la recherche') : SORT_LABELS[filter.sort ?? 'name'] }),
         run: () => openFilters(),
@@ -755,21 +864,22 @@ export function createCatalog(ctx: CatalogContext) {
 
   // ---------- Filtres du catalogue ----------
 
-  type FilterKey = 'kind' | 'support' | 'site' | 'state' | 'sort';
+  type FilterKey = keyof CatalogChoice;
   const FILTER_ICONS: Record<FilterKey, IconName> = { kind: 'tables', support: 'folder', site: 'monitor', state: 'cabinet', sort: 'sort' };
-  /** Chaque filtre : ses valeurs dans l'ordre de Start, leur libellé, et ce que dit la ligne. */
+  /** Chaque filtre : ses valeurs dans l'ordre de ses choix, leur libellé, et ce que dit sa ligne. Le tri d'abord. */
   const FILTERS: { key: FilterKey; name: () => string; values: readonly string[]; label: (v: string) => string; line: (v: string) => string }[] = [
+    { key: 'sort', name: () => t('Tri'), values: CATALOG_SORTS, label: (v) => SORT_LABELS[v as CatalogSort], line: (v) => t('Tri : {value}', { value: SORT_LABELS[v as CatalogSort] }) },
     { key: 'kind', name: () => t('Jeux'), values: CATALOG_KINDS, label: (v) => CATALOG_KIND_LABELS[v as CatalogKind], line: (v) => t('Jeux : {value}', { value: CATALOG_KIND_LABELS[v as CatalogKind] }) },
     { key: 'support', name: () => t('Fichiers'), values: CATALOG_SUPPORTS, label: (v) => CATALOG_SUPPORT_LABELS[v as CatalogSupport], line: (v) => t('Fichiers : {value}', { value: CATALOG_SUPPORT_LABELS[v as CatalogSupport] }) },
     { key: 'site', name: () => t('Site'), values: CATALOG_SITES, label: (v) => CATALOG_SITE_LABELS[v as CatalogSite], line: (v) => t('Site : {value}', { value: CATALOG_SITE_LABELS[v as CatalogSite] }) },
     { key: 'state', name: () => t('Sur la borne'), values: CATALOG_STATES, label: (v) => CATALOG_STATE_LABELS[v as CatalogState], line: (v) => t('Sur la borne : {value}', { value: CATALOG_STATE_LABELS[v as CatalogState] }) },
-    { key: 'sort', name: () => t('Tri'), values: SORTS, label: (v) => SORT_LABELS[v as CatalogSort], line: (v) => t('Tri : {value}', { value: SORT_LABELS[v as CatalogSort] }) },
   ];
   const valueOf = (key: FilterKey) => (filter[key] ?? DEFAULT_FILTER[key]) as string;
   const isDefault = () => FILTERS.every((f) => valueOf(f.key) === DEFAULT_FILTER[f.key]);
 
   function openFilters(at = 0): void {
     refresh = undefined;
+    loadChoice();
     void ctx.task(t('Filtres du catalogue…'), async () => {
       const db = await vpsDb();
       if (!db) return openCatalog();
@@ -779,66 +889,102 @@ export function createCatalog(ctx: CatalogContext) {
   }
 
   /**
-   * Filtres du catalogue : une ligne par filtre, Start passe à la valeur suivante ; à côté,
-   * les valeurs du filtre choisi et le nombre de jeux de chacune, les autres filtres gardés.
+   * Filtres du catalogue : une ligne par filtre, toujours les mêmes, à la même place (en borne,
+   * rien ne bouge quand on passe de l'une à l'autre) ; Start ouvre les choix du filtre, chacun
+   * avec son nombre de jeux. Avant le 12/11/2026, Start faisait défiler les valeurs une à une
+   * (sept appuis pour « avec un topper ») et la liste des choix, au-dessus des lignes, changeait
+   * de hauteur à chaque déplacement : les lignes sautaient sous le doigt.
    */
   function buildFilters(db: VpsDb): Built {
     const count = games(db).length;
-    const total = catalog(db, { state: 'all' }, installed()).length;
+    const total = games(db, { state: 'all' }).length;
     const see = () => ((filter.page = 0), openCatalog(0));
-    const shown = FILTERS.filter((f) => f.key !== 'sort' || !filter.text);
-    const actions: Action[] = shown.map((f, i) => {
+    const actions: Action[] = FILTERS.map((f, i) => {
       const current = valueOf(f.key);
-      const next = f.values[(f.values.indexOf(current) + 1) % f.values.length]!;
+      // Une recherche impose son ordre (le plus ressemblant d'abord) : le tri reste là, grisé.
+      if (f.key === 'sort' && filter.text) return { label: t('Tri : ordre de la recherche'), key: `filter:${f.key}`, detail: t('Le plus ressemblant d’abord, tant qu’un titre est cherché'), icon: FILTER_ICONS[f.key], tone: 'quiet', run: () => undefined };
       return {
         label: f.line(current),
-        detail: t('Start : {value}', { value: f.label(next) }),
+        key: `filter:${f.key}`,
+        detail: f.key === 'sort' ? t('Start : choisir l’ordre ({n} au choix)', { n: f.values.length }) : t('Start : choisir ({n} au choix, avec le nombre de jeux)', { n: f.values.length }),
         icon: FILTER_ICONS[f.key],
-        run: () => {
-          (filter as Record<FilterKey, string>)[f.key] = next;
-          filter.page = 0;
-          if (next === 'media' && mediaIds === undefined) return openFilters(i);
-          ctx.show(() => buildFilters(db), i);
-        },
+        run: () => openChoices(f.key, i),
       };
     });
-    if (!isDefault()) {
-      actions.push({
-        label: t('Effacer les filtres'),
-        detail: t('Tous les jeux, pas encore installés, par titre'),
-        icon: 'close',
-        run: () => {
-          Object.assign(filter, DEFAULT_FILTER, { page: 0 });
-          ctx.show(() => buildFilters(db), 0);
-        },
-      });
-    }
-    actions.push({ label: count ? tn(count, 'Voir le jeu', 'Voir les {n} jeux') : t('Aucun jeu : revenir au catalogue'), tone: count ? 'ok' : undefined, icon: 'check', run: see });
-    // Les valeurs du filtre sous le curseur, chacune avec son nombre de jeux.
-    const focus = shown[Math.min(ctx.cursor(), actions.length - 1)];
-    const sections: Section[] = [];
-    if (focus && focus.key !== 'sort') {
-      sections.push({
-        title: t('{filter} : les choix', { filter: focus.name() }),
-        rows: focus.values.map((v) => {
-          const n = v === 'media' && !mediaIds ? undefined : games(db, { ...filter, [focus.key]: v }).length;
-          return {
-            text: focus.label(v),
-            detail: n === undefined ? t('index de VPinMediaDB à télécharger (Start)') : tn(n, '{n} jeu', '{n} jeux'),
-            badges: v === valueOf(focus.key) ? [t('choisi')] : undefined,
-            tone: v === valueOf(focus.key) ? ('ok' as const) : n === 0 ? ('quiet' as const) : undefined,
-          };
-        }),
-      });
-    } else sections.push({ title: t('Filtres choisis'), rows: [{ text: activeFilters().join(' · ') || t('aucun'), detail: CATALOG_STATE_LABELS[filter.state ?? 'all'] }] });
+    actions.push(
+      isDefault()
+        ? { label: t('Effacer les filtres'), key: 'filters:clear', detail: t('Déjà les choix d’origine'), icon: 'close', tone: 'quiet', run: () => undefined }
+        : {
+            label: t('Effacer les filtres'),
+            key: 'filters:clear',
+            detail: t('Tous les jeux, pas encore installés, les plus populaires d’abord'),
+            icon: 'close',
+            run: () => {
+              Object.assign(filter, DEFAULT_FILTER, { page: 0 });
+              saveChoice();
+              ctx.show(() => buildFilters(db), ctx.cursor());
+            },
+          },
+      { label: count ? tn(count, 'Voir le jeu', 'Voir les {n} jeux') : t('Aucun jeu : revenir au catalogue'), key: 'filters:see', tone: count ? 'ok' : undefined, icon: 'check', run: see },
+    );
     return {
       heading: t('Filtres du catalogue'),
       subheading: t('{count} sur {total}', { count: tn(count, '{n} jeu', '{n} jeux'), total: formatNumber(total) }),
-      lead: t('Start change la valeur d’un filtre ; le nombre de jeux suit. « Fichiers » : ce que le jeu propose au téléchargement ; « Site » : où se télécharge la table (ou ces fichiers). Tous les jeux viennent de la base VPS.'),
-      sections,
+      lead: t('Start ouvre les choix d’un filtre, avec le nombre de jeux de chacun. Vos choix sont gardés pour la prochaine fois. « Fichiers » : ce que le jeu propose au téléchargement ; « Site » : où se télécharge la table (ou ces fichiers).'),
+      sections: [],
       actions,
       back: see,
     };
+  }
+
+  /**
+   * Choix d'un filtre : ses valeurs, chacune avec son nombre de jeux (les autres filtres gardés),
+   * la valeur en cours sous le curseur ; Start la retient et revient aux filtres. Les nombres sont
+   * comptés une fois, à l'ouverture.
+   */
+  function openChoices(key: FilterKey, back: number): void {
+    const f = FILTERS.find((x) => x.key === key)!;
+    void ctx.task(t('Filtres du catalogue…'), async () => {
+      const db = await vpsDb();
+      if (!db) return openCatalog();
+      const counts = new Map<string, number | undefined>();
+      if (key !== 'sort') for (const v of f.values) counts.set(v, v === 'media' && !mediaIds ? undefined : games(db, { ...filter, [key]: v }).length);
+      const current = valueOf(key);
+      const toFilters = () => ctx.show(() => buildFilters(db), back);
+      const choose = (v: string) => {
+        (filter as Record<FilterKey, string>)[key] = v;
+        filter.page = 0;
+        saveChoice();
+        // L'index de VPinMediaDB, au premier choix qui le demande.
+        if (v === 'media' && mediaIds === undefined) return openFilters(back);
+        toFilters();
+      };
+      ctx.show(
+        () => ({
+          heading: t('{filter} : les choix', { filter: f.name() }),
+          subheading: t('En cours : {value}', { value: f.label(current) }),
+          lead: key === 'sort' ? t('L’ordre des jeux dans le catalogue.') : t('Le nombre de jeux de chaque choix tient compte des autres filtres.'),
+          icon: FILTER_ICONS[key],
+          sections: [],
+          actions: [
+            ...f.values.map((v): Action => {
+              const n = counts.get(v);
+              const what = key === 'sort' ? SORT_DETAILS[v as CatalogSort] : n === undefined ? t('index de VPinMediaDB à télécharger') : tn(n, '{n} jeu', '{n} jeux');
+              return {
+                label: f.label(v),
+                key: `choice:${v}`,
+                detail: v === current ? t('choisi · {what}', { what }) : what,
+                tone: v === current ? 'ok' : n === 0 ? 'quiet' : undefined,
+                run: () => choose(v),
+              };
+            }),
+            { label: t('Retour aux filtres'), key: 'choices:back', icon: 'back', run: toFilters },
+          ],
+          back: toFilters,
+        }),
+        Math.max(0, f.values.indexOf(current)),
+      );
+    });
   }
 
   // ---------- Fiche d'un jeu : ses versions ----------
@@ -849,11 +995,11 @@ export function createCatalog(ctx: CatalogContext) {
       const db = await vpsDb();
       const game = db?.games.find((g) => g.id === gameId);
       if (!game) return openCatalog();
-      await fetchThumbs(vpxVersions(game).slice(0, 20).map(imageOf));
       // Ce que l'installation rapide récupère pour la version conseillée (une fois : les ROM sont lues sur le disque).
       const advice = recommendVersion(game);
       const fast = advice ? quickNeeds(needsOf(game, advice.file)) : undefined;
       ctx.show(() => buildGame(game, fast), at);
+      loadThumbs(vpxVersions(game).slice(0, 20).map(imageOf));
     });
   }
 
@@ -919,9 +1065,9 @@ export function createCatalog(ctx: CatalogContext) {
       const version = game && vpxVersions(game).find((v) => v.id === versionId);
       if (!game || !version) return openCatalog();
       await noteContents(waitList().items.filter((i) => i.gameId === game.id));
-      await fetchThumbs([imageOf(version), ...(game.b2sFiles ?? []).slice(0, 1).map(imageOf)]);
       refresh = () => ctx.show(() => buildNeeds(game, version), ctx.cursor());
       ctx.show(() => buildNeeds(game, version), at);
+      loadThumbs([imageOf(version), ...(game.b2sFiles ?? []).slice(0, 1).map(imageOf)]);
     });
   }
 
@@ -1089,8 +1235,8 @@ export function createCatalog(ctx: CatalogContext) {
     refresh = undefined;
     void ctx.task(t('Fichiers au choix…'), async () => {
       const files = choice.files.slice(0, 12);
-      await fetchThumbs(files.map(imageOf));
       ctx.show(() => fileGallery.build({ ...choice, files, sections: noticeSection(), after: [...(choice.web ? [choice.web] : []), { label: t('Retour'), run: choice.back }] }));
+      loadThumbs(files.map(imageOf));
     });
   }
 
@@ -1184,6 +1330,8 @@ export function createCatalog(ctx: CatalogContext) {
         ? t('Cherchez, ouvrez une page, téléchargez : le fichier est reconnu, puis rangé dans la partie de {game} que dit son contenu.', { game: target.gameLabel })
         : t('Cherchez, ouvrez une page, téléchargez : le fichier est reconnu, puis proposé à l’ajout.'),
       search: { query: req.query, engine: 'web' },
+      // Les sites des tables, sous la recherche : connecté, on y cherche directement ; sinon, on s'y connecte.
+      accounts: true,
       claim: {
         dir: acquisitionDir(),
         ...(target ? { title: target.kind ? t('{kind} : {game}', { kind: NEED_LABELS[target.kind], game: target.gameLabel }) : target.gameLabel } : {}),

@@ -28,14 +28,27 @@ export interface SourceSite {
   login: string;
   /** Moteur du forum : il dit quels cookies signalent un membre connecté. */
   engine: 'invision' | 'ipboard3' | 'xenforo';
+  /** Recherche du site, dans ses fichiers quand il le permet (« Vos comptes » de la recherche libre) ; `{q}` : le texte cherché. */
+  search: string;
 }
 
 export const SOURCE_SITES: readonly SourceSite[] = [
-  { id: 'vpuniverse', label: 'vpuniverse.com', domain: 'vpuniverse.com', home: 'https://vpuniverse.com/', login: 'https://vpuniverse.com/login/', engine: 'invision' },
-  { id: 'vpforums', label: 'vpforums.org', domain: 'vpforums.org', home: 'https://www.vpforums.org/', login: 'https://www.vpforums.org/index.php?app=core&module=global&section=login', engine: 'ipboard3' },
-  { id: 'pinballnirvana', label: 'pinballnirvana.com', domain: 'pinballnirvana.com', home: 'https://pinballnirvana.com/', login: 'https://pinballnirvana.com/forums/login/', engine: 'xenforo' },
-  { id: 'pinsound', label: 'pinsound-community.org', domain: 'pinsound-community.org', home: 'https://www.pinsound-community.org/', login: 'https://www.pinsound-community.org/index.php?/login/', engine: 'invision' },
+  { id: 'vpuniverse', label: 'vpuniverse.com', domain: 'vpuniverse.com', home: 'https://vpuniverse.com/', login: 'https://vpuniverse.com/login/', engine: 'invision', search: 'https://vpuniverse.com/search/?q={q}&type=downloads_file' },
+  { id: 'vpforums', label: 'vpforums.org', domain: 'vpforums.org', home: 'https://www.vpforums.org/', login: 'https://www.vpforums.org/index.php?app=core&module=global&section=login', engine: 'ipboard3', search: 'https://www.vpforums.org/index.php?app=core&module=search&do=search&fromMainBar=1&search_term={q}&search_app=downloads' },
+  { id: 'pinballnirvana', label: 'pinballnirvana.com', domain: 'pinballnirvana.com', home: 'https://pinballnirvana.com/', login: 'https://pinballnirvana.com/forums/login/', engine: 'xenforo', search: 'https://pinballnirvana.com/forums/search/search?keywords={q}&t=resource' },
+  { id: 'pinsound', label: 'pinsound-community.org', domain: 'pinsound-community.org', home: 'https://www.pinsound-community.org/', login: 'https://www.pinsound-community.org/index.php?/login/', engine: 'invision', search: 'https://www.pinsound-community.org/index.php?/search/&q={q}' },
 ];
+
+/**
+ * Où mène un site depuis la recherche libre : sa recherche sur le texte cherché quand on y est
+ * connecté (ses pages de fichiers demandent un compte), sa page de connexion sinon. Adresses
+ * relevées le 12/11/2026 (les quatre rendent leurs résultats sans compte).
+ */
+export function sourceSearchUrl(site: SourceSite, query: string): string {
+  // Les mots ajoutés pour un moteur du web (« vpinball », « vpx ») n'aident pas la recherche d'un site de tables.
+  const bare = query.replace(/\b(vpinball|vpx)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+  return site.search.replace('{q}', encodeURIComponent(bare || query.trim()));
+}
 
 export function sourceSite(id: LinkHostId): SourceSite | undefined {
   return SOURCE_SITES.find((s) => s.id === id);

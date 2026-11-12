@@ -504,4 +504,42 @@ export const messages: Record<string, string> = {
   'Le son de « {file} » n’a pas pu être extrait : {reason}.': 'The sound of “{file}” could not be extracted: {reason}.',
   // app/src/media-sounds.ts : sons d’un PuP-Pack désactivé
   'PuP-Pack {pack} (désactivé)': 'PuP-Pack {pack} (disabled)',
+  // app/src/media-proposals.ts : « Chercher plus », « Animés seulement », mots ajoutés, fiches de la base VPS
+  'lien de la base VPS': 'VPS database link',
+  'animée': 'animated',
+  'Fiche rangée sous ce jeu par la base VPS : son titre n’a pas été cherché, son aperçu arrive au téléchargement.':
+    'Listed under this game by the VPS database: its title was not searched, its preview arrives with the download.',
+  'Recherche élargie : le titre a les mots cherchés, sans désigner sûrement l’un des jeux retenus.':
+    'Wider search: the title has the searched words, without surely naming one of the selected games.',
+  'Titre approché': 'Close title',
+  'Recherche élargie': 'Wider search',
+  'Jusqu’à {n} pages par site, tous les jeux reconnus, titres approchés ; Start : revenir à la recherche simple':
+    'Up to {n} pages per site, every recognized game, close titles; Start: back to the simple search',
+  'Chercher plus': 'Search more',
+  'Plus de pages sur les sites, les autres éditions du jeu, les titres approchés': 'More pages on the sites, the game’s other editions, close titles',
+  'Animés seulement : oui': 'Animated only: yes',
+  'Animés seulement : non': 'Animated only: no',
+  'Vidéos et images animées (APNG, GIF) ; les sites cherchent dans leurs catégories animées. Start : tout montrer':
+    'Videos and animated images (APNG, GIF); the sites search their animated categories. Start: show everything',
+  'Start : ne garder que les vidéos et les images animées (APNG, GIF)': 'Start: keep only videos and animated images (APNG, GIF)',
+  'Mots ajoutés : « {words} »': 'Added words: “{words}”',
+  'Ajouter des mots à la recherche…': 'Add words to the search…',
+  'Start pour les changer ; vide pour les retirer': 'Start to change them; empty to remove them',
+  'Un style, un auteur, une couleur : « neon », « tarcisio », « glass »…': 'A style, an author, a color: “neon”, “tarcisio”, “glass”…',
+  'animés seulement': 'animated only',
+  'mots « {words} »': 'words “{words}”',
+  'Filtre : {filters}': 'Filter: {filters}',
+  '{n} proposition masquée ; « Animés seulement » et « Mots ajoutés » la rendent.': '{n} suggestion hidden; “Animated only” and “Added words” bring it back.',
+  '{n} propositions masquées ; « Animés seulement » et « Mots ajoutés » les rendent.': '{n} suggestions hidden; “Animated only” and “Added words” bring them back.',
+  'Aucune proposition masquée.': 'No suggestion hidden.',
+  'Rien ne répond au filtre. « Chercher plus » élargit la recherche, « Chercher sur le web… » la reprend avec le filtre.':
+    'Nothing matches the filter. “Search more” widens the search, “Search the web…” runs it again with the filter.',
+  '{n} fiche de plus, liée au jeu par la base VPS': '{n} more entry, linked to the game by the VPS database',
+  '{n} fiches de plus, liées au jeu par la base VPS': '{n} more entries, linked to the game by the VPS database',
+  'Jusqu’à {n} pages de résultats par titre, les fiches de toutes les éditions reconnues du jeu, et celles dont le titre a les mots cherchés sans désigner un jeu sûr (« Titre approché »).':
+    'Up to {n} result pages per title, entries for every recognized edition of the game, and those whose title has the searched words without surely naming a game (“Close title”).',
+  'Ajouter des mots à la recherche': 'Add words to the search',
+  'Mots': 'Words',
+  'Ajoutés au titre du jeu sur VPForums et VPUniverse, et dans « Chercher sur le web… » : un style (« tarcisio », « diagonal », « glass orb »), un auteur, une couleur, « animated ». Les propositions qui ne les ont pas sont masquées. Laissez vide pour les retirer.':
+    'Added to the game’s title on VPForums and VPUniverse, and in “Search the web…”: a style (“tarcisio”, “diagonal”, “glass orb”), an author, a color, “animated”. Suggestions without them are hidden. Leave empty to remove them.',
 };

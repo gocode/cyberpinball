@@ -80,6 +80,8 @@ export interface SiteCategory {
   kind?: MediaKind;
   /** Pack complet : une archive avec les médias de plusieurs écrans. */
   pack?: boolean;
+  /** Images animées (APNG) : avec les vidéos, ce que garde « Animés seulement ». */
+  animated?: boolean;
 }
 
 const VIDEO_TYPES: MediaType[] = ['Playfield', 'Backglass', 'DMD', 'FullDMD', 'Topper', 'Loading'];
@@ -90,7 +92,7 @@ export const SITE_CATEGORIES: Record<MediaSiteId, readonly SiteCategory[]> = {
   vpuniverse: [
     { id: '70', types: ['Wheel'], kind: 'image' }, // Wheel Images
     { id: '127', types: ['Wheel'], kind: 'image' }, // Tarcisio Style Wheels
-    { id: '149', types: ['Wheel'], kind: 'image' }, // Animated Wheel Images (APNG)
+    { id: '149', types: ['Wheel'], kind: 'image', animated: true }, // Animated Wheel Images (APNG)
     { id: '111', types: ['Loading'], kind: 'video' }, // Loading Animations
     { id: '160', types: ['Topper'], kind: 'video' }, // Topper Videos
     { id: '93', types: ['Topper'], kind: 'image' }, // Topper Images
@@ -142,16 +144,50 @@ export function siteSearchText(site: MediaSiteId, query: string): string {
 
 /** Pages de résultats lues au plus par recherche (25 fiches par page sur VPUniverse). */
 export const SITE_SEARCH_PAGES = 3;
+/** Pages lues après « Chercher plus » : jusqu'à 250 fiches par titre sur VPUniverse. */
+export const SITE_SEARCH_MORE_PAGES = 10;
+
+/** Catégorie de médias animés : vidéos, ou images animées (wheels APNG). */
+const isAnimatedCategory = (c: SiteCategory) => c.kind === 'video' || Boolean(c.animated);
 
 /**
  * Catégories où chercher un média : celles qui le rangent, et seulement elles. Toutes
  * catégories confondues, les logos d'un jeu connu remplissent la première page (16 sur
- * 25 pour Game of Thrones) et les toppers passent aux pages suivantes.
+ * 25 pour Game of Thrones) et les toppers passent aux pages suivantes. `animated` (« Animés
+ * seulement ») : ses seules catégories animées, s'il en a (« Animated Wheel Images » pour
+ * le logo) ; les wheels fixes d'un jeu connu passent sinon devant les animées.
  */
-export function siteSearchNodes(site: MediaSiteId, type?: MediaType): string[] {
+export function siteSearchNodes(site: MediaSiteId, type?: MediaType, animated = false): string[] {
   const all = SITE_CATEGORIES[site];
   const own = type ? all.filter((c) => c.types.includes(type) && !c.pack) : [];
-  return (own.length ? own : all).map((c) => c.id);
+  const moving = animated ? own.filter(isAnimatedCategory) : [];
+  return (moving.length ? moving : own.length ? own : all).map((c) => c.id);
+}
+
+/**
+ * Le site range-t-il à part les versions animées de ce média ? VPUniverse a une catégorie
+ * de wheels APNG ; VPForums mêle wheels fixes et animées dans « Wheel Logos ».
+ */
+export function siteHasAnimatedCategory(site: MediaSiteId, type: MediaType): boolean {
+  return SITE_CATEGORIES[site].some((c) => c.types.includes(type) && !c.pack && isAnimatedCategory(c));
+}
+
+/**
+ * Texte cherché sur un site : la recherche (`query`), plus `extra`, les mots ajoutés par
+ * l'utilisateur (« neon », « tarcisio »), plus « animated » pour « Animés seulement » quand
+ * le site ne range pas à part les versions animées de ce média (logos de VPForums).
+ */
+export function siteSearchTerms(site: MediaSiteId, query: string, type?: MediaType, opts: SiteSearchOptions = {}): string {
+  const animatedWord = opts.animated && type && !siteHasAnimatedCategory(site, type) ? 'animated' : '';
+  return [query, opts.extra ?? '', animatedWord].map((s) => s.trim()).filter(Boolean).join(' ');
+}
+
+/** Ce que l'écran des propositions change à la recherche d'un site. */
+export interface SiteSearchOptions {
+  /** « Animés seulement » : vidéos et images animées. */
+  animated?: boolean;
+  /** Mots ajoutés par l'utilisateur au titre cherché. */
+  extra?: string;
 }
 
 /**
@@ -160,10 +196,10 @@ export function siteSearchNodes(site: MediaSiteId, type?: MediaType): string[] {
  * catégorie et sa page de résultats ne dit pas son nombre de pages : `type` et `page`
  * n'y changent rien (sa recherche rend quelques fiches par titre).
  */
-export function siteSearchUrl(site: MediaSiteId, query: string, type?: MediaType, page = 1): string {
+export function siteSearchUrl(site: MediaSiteId, query: string, type?: MediaType, page = 1, animated = false): string {
   const q = encodeURIComponent(siteSearchText(site, query));
   if (site === 'vpuniverse') {
-    const nodes = siteSearchNodes(site, type).join(',');
+    const nodes = siteSearchNodes(site, type, animated).join(',');
     return `https://vpuniverse.com/search/?q=${q}&type=downloads_file&nodes=${nodes}&search_and_or=and&sortby=relevancy${page > 1 ? `&page=${page}` : ''}`;
   }
   return `https://www.vpforums.org/index.php?app=core&module=search&do=search&search_term=${q}&search_app=downloads`;
@@ -191,6 +227,11 @@ export interface SiteHit {
   date?: string;
   downloads?: number;
   version?: string;
+  /**
+   * Fiche rangée par la base VPS sous un jeu (`vpsSiteHits`) : son jeu, et les médias
+   * qu'elle porte ; ni rapprochement du titre, ni catégorie à lire.
+   */
+  vps?: { game: string; types: MediaType[]; kind?: MediaKind; pack: boolean };
 }
 
 /** Ce que le script de recherche a vu dans la page. */
@@ -336,6 +377,7 @@ export function hitTypes(hit: SiteHit): {
   kind?: MediaKind;
   pack: boolean;
 } {
+  if (hit.vps) return { types: hit.vps.types, kind: hit.vps.kind, pack: hit.vps.pack };
   const category = hit.category ? SITE_CATEGORIES[hit.site].find((c) => c.id === hit.category!.id) : undefined;
   const title = hit.title.toLowerCase();
   if (/media ?pack|complete media/.test(title) || category?.pack) return { types: PACK_TYPES, pack: true };
@@ -361,6 +403,36 @@ export function hitTypes(hit: SiteHit): {
   return category ? { types: category.types, kind: category.kind, pack: false } : { types: [], pack: false };
 }
 
+/** Mots d'un titre qui disent une version animée (« Animated Wheel », « APNG »). */
+const ANIMATED_WORDS = /\b(animated|animation|apng|gif|motion)\b/i;
+
+/** Fiche d'un média animé : rangée dans une catégorie animée (vidéos, wheels APNG), ou dite animée par son titre. */
+export function hitAnimated(hit: SiteHit): boolean {
+  const category = hit.category ? SITE_CATEGORIES[hit.site].find((c) => c.id === hit.category!.id) : undefined;
+  if (category && !category.pack && isAnimatedCategory(category)) return true;
+  return ANIMATED_WORDS.test(hit.title);
+}
+
+/**
+ * Proposition animée : une vidéo, une fiche de site animée (`hitAnimated`), une image
+ * animée sur le disque (APNG, GIF ou WebP animés, `animatedFile`), un fichier en ligne en
+ * APNG ou en GIF. Une image en ligne d'un autre format passe pour fixe : VPinMediaDB et
+ * la base VPS n'ont que des PNG et des WebP fixes.
+ */
+export function mediaChoiceAnimated(choice: MediaChoice, animatedFile: (file: string) => boolean | undefined): boolean {
+  if (choice.kind === 'video') return true;
+  if (choice.kind !== 'image') return false;
+  if (choice.site && !choice.site.received) return hitAnimated(choice.site.hit);
+  if (choice.file) return animatedFile(choice.file) === true;
+  return /\.(apng|gif)(?:[?#]|$)/i.test(choice.offer?.file.url ?? '');
+}
+
+/**
+ * Médias qui existent en version fixe et animée : « Animés seulement » a un sens pour eux.
+ * Le chargement n'est qu'en vidéo, les sons ne s'animent pas.
+ */
+export const ANIMATABLE_MEDIA_TYPES: readonly MediaType[] = ['Wheel', 'Playfield', 'Backglass', 'DMD', 'FullDMD', 'Topper'];
+
 /** Un résultat proposé pour un média d'un jeu. */
 export interface SiteOffer {
   hit: SiteHit;
@@ -371,6 +443,14 @@ export interface SiteOffer {
   game: VpsGame;
   /** Entre 0 et 1 : à quel point le titre désigne ce jeu. */
   score: number;
+  /** Retenu par la recherche élargie : le titre a les mots cherchés, sans désigner sûrement un jeu retenu. */
+  loose?: boolean;
+}
+
+/** Mots d'un texte cherché, sans les petits mots : ceux qu'un titre doit tous avoir pour la recherche élargie. */
+function queryWords(query: string): string[] {
+  const words = vpsWords(query).filter((w) => !QUERY_STOP.has(w));
+  return words.length ? words : vpsWords(query);
 }
 
 /**
@@ -392,16 +472,29 @@ function hitCandidates(vps: VpsDb, name: string): VpsCandidate[] {
  * résultat, débarrassé des mots du média, est rapproché de toute la base VPS : un
  * résultat « Terminator 3 » ne passe pas pour Terminator 2 parce qu'il en contient le
  * premier mot. Sans base VPS, il faut que le nom du jeu soit dans le titre.
+ *
+ * `loose` (recherche élargie, « Chercher plus ») : les textes cherchés. Un résultat que le
+ * rapprochement n'attribue à aucun jeu retenu est gardé si son titre a tous les mots de
+ * l'un d'eux (« Matrix Wheels Collection » pour « matrix »), au nom du premier jeu retenu,
+ * marqué `loose` et rangé après les autres. « Terminator 3 » ne passe toujours pas pour
+ * « terminator 2 » : il lui manque le « 2 ».
  */
-export function siteOffers(hits: SiteHit[], games: VpsGame[], vps?: VpsDb): Partial<Record<MediaType, SiteOffer[]>> {
+export function siteOffers(hits: SiteHit[], games: VpsGame[], vps?: VpsDb, loose?: readonly string[]): Partial<Record<MediaType, SiteOffer[]>> {
   const wanted = new Map(games.map((g) => [g.id, g]));
   const out: Partial<Record<MediaType, SiteOffer[]>> = {};
+  const looseWords = (loose ?? []).map(queryWords).filter((w) => w.length);
   for (const hit of hits) {
     const name = hitGameName(hit.title);
     if (!name) continue;
     let game: VpsGame | undefined;
     let score = 0;
-    if (vps) {
+    let wide = false;
+    if (hit.vps) {
+      // Rangée par la base VPS sous ce jeu : rien à rapprocher. Sans vignette, elle passe
+      // après les résultats de recherche qui en ont une (rapprochés à 0,6 au moins).
+      const own = wanted.get(hit.vps.game);
+      if (own) [game, score] = [own, 0.55];
+    } else if (vps) {
       const candidates = hitCandidates(vps, name);
       const best = candidates[0];
       const mine = candidates.find((c) => wanted.has(c.game.id));
@@ -416,13 +509,72 @@ export function siteOffers(hits: SiteHit[], games: VpsGame[], vps?: VpsDb): Part
       });
       if (g) [game, score] = [g, 0.7];
     }
+    if (!game && !hit.vps && games[0] && looseWords.length) {
+      const own = new Set(vpsWords(hit.title));
+      if (looseWords.some((words) => words.every((w) => own.has(w)))) [game, score, wide] = [games[0], 0.3, true];
+    }
     if (!game) continue;
     const { types, kind, pack } = hitTypes(hit);
-    for (const type of types) (out[type] ??= []).push({ hit, type, kind, pack, game, score });
+    for (const type of types) (out[type] ??= []).push({ hit, type, kind, pack, game, score, ...(wide && { loose: true }) });
   }
   // Le jeu le mieux désigné d'abord ; à égalité, un fichier propre au média avant un pack, puis le plus téléchargé.
   for (const list of Object.values(out)) {
     list!.sort((a, b) => b.score - a.score || Number(a.pack) - Number(b.pack) || (b.hit.downloads ?? 0) - (a.hit.downloads ?? 0));
+  }
+  return out;
+}
+
+/** Listes de la base VPS qui renvoient à des fiches de médias de menu, et ce qu'elles portent. */
+const VPS_MEDIA_LISTS: readonly { list: 'wheelArtFiles' | 'topperFiles' | 'mediaPackFiles'; type?: MediaType; word: string }[] = [
+  { list: 'wheelArtFiles', type: 'Wheel', word: 'Wheel' },
+  { list: 'topperFiles', type: 'Topper', word: 'Topper' },
+  { list: 'mediaPackFiles', word: 'Media Pack' },
+];
+
+/** Identifiant d'une fiche d'après son adresse, et son site ; rien pour un autre hôte (mega.nz, Google Drive). */
+function siteFileOf(url: string): { site: MediaSiteId; id: string; url: string } | undefined {
+  const vpu = /^https?:\/\/(?:www\.)?vpuniverse\.com\/files\/file\/(\d+)-/i.exec(url);
+  if (vpu) return { site: 'vpuniverse', id: vpu[1]!, url: url.split('?')[0]! };
+  const vpf = /^https?:\/\/(?:www\.)?vpforums\.org\/index\.php\?(?:.*&)?showfile=(\d+)/i.exec(url);
+  if (vpf) return { site: 'vpforums', id: vpf[1]!, url: `https://www.vpforums.org/index.php?app=downloads&showfile=${vpf[1]}` };
+  return undefined;
+}
+
+/**
+ * Fiches de VPUniverse et de VPForums que la base VPS range sous ces jeux (logos, toppers,
+ * packs de médias) : sûres, sans recherche ni requête, et parfois introuvables par le
+ * titre (« any », le « Wheel Mega Pack » de Blackval rangé sous The Matrix). La recherche
+ * de VPForums est réservée aux membres ; ses fiches liées par la base se voient sans
+ * compte. Titre : le jeu et le commentaire de la base (« The Matrix · Diagonal ») ; pas
+ * de vignette. Un lien signalé mort, ou vers un autre hôte (mega.nz), n'est pas repris.
+ */
+export function vpsSiteHits(games: VpsGame[]): SiteHit[] {
+  const out: SiteHit[] = [];
+  const seen = new Set<string>();
+  for (const game of games) {
+    for (const { list, type, word } of VPS_MEDIA_LISTS) {
+      for (const file of game[list] ?? []) {
+        for (const link of file.urls ?? []) {
+          const where = link.broken ? undefined : siteFileOf(link.url);
+          if (!where || seen.has(`${where.site}:${where.id}`)) continue;
+          seen.add(`${where.site}:${where.id}`);
+          const comment = file.comment?.trim();
+          const still = /\b(image|png|jpe?g|static)\b/i.test(comment ?? '');
+          // L'auteur distingue les fiches au même commentaire (« Animated (kilazz) », « Topper (Migs) »).
+          const author = file.authors?.[0];
+          out.push({
+            ...where,
+            title: `${game.name} · ${comment || word}${author ? ` (${author})` : ''}`,
+            author,
+            date: file.createdAt ? new Date(file.createdAt).toISOString() : undefined,
+            version: file.version,
+            vps: type
+              ? { game: game.id, types: [type], kind: type === 'Topper' && !still ? 'video' : 'image', pack: false }
+              : { game: game.id, types: [...PACK_TYPES], pack: true },
+          });
+        }
+      }
+    }
   }
   return out;
 }
@@ -505,11 +657,11 @@ export interface SiteHitSummary {
  * média ouvert. Sans ce détail, un écran sans proposition à côté de 25 résultats
  * passe pour une panne (afficheur 4:1 quand le site n'a que des FullDMD).
  */
-export function siteHitSummary(hits: SiteHit[], games: VpsGame[], vps?: VpsDb): SiteHitSummary {
+export function siteHitSummary(hits: SiteHit[], games: VpsGame[], vps?: VpsDb, loose?: readonly string[]): SiteHitSummary {
   const byType: Partial<Record<MediaType, number>> = {};
   const placed = new Set<string>();
   const packs = new Set<string>();
-  for (const [type, list] of Object.entries(siteOffers(hits, games, vps)) as [MediaType, SiteOffer[]][]) {
+  for (const [type, list] of Object.entries(siteOffers(hits, games, vps, loose)) as [MediaType, SiteOffer[]][]) {
     const ids = new Set(list.filter((o) => !o.pack).map((o) => o.hit.id));
     if (ids.size) byType[type] = ids.size;
     for (const o of list) (o.pack ? packs : placed).add(o.hit.id);
@@ -546,10 +698,14 @@ export function webSearchUrl(game: string, type: MediaType): string {
   return `https://duckduckgo.com/?q=${encodeURIComponent(webSearchQuery(game, type))}`;
 }
 
-/** Texte de cette recherche, repris dans le champ de recherche du bandeau de « Récupérer ». */
-export function webSearchQuery(game: string, type: MediaType): string {
+/**
+ * Texte de cette recherche, repris dans le champ de recherche du bandeau de « Récupérer ».
+ * `opts` : les mots ajoutés sur l'écran des propositions, et « animated » pour « Animés
+ * seulement » (« The Matrix neon animated wheel logo vpinball »).
+ */
+export function webSearchQuery(game: string, type: MediaType, opts: SiteSearchOptions = {}): string {
   const title = game.replace(/\s*\([^)]*\)\s*/g, ' ').split(/\s+-\s+|:\s*/)[0]!.replace(/\s+/g, ' ').trim();
-  return [title, WEB_SEARCH_WORDS[type] ?? type, 'vpinball'].filter(Boolean).join(' ');
+  return [title, opts.extra?.trim(), opts.animated ? 'animated' : '', WEB_SEARCH_WORDS[type] ?? type, 'vpinball'].filter(Boolean).join(' ');
 }
 
 /**
@@ -652,12 +808,14 @@ export function siteMediaChoices(
   games: VpsGame[],
   vps: VpsDb | undefined,
   receipt: (key: string) => SiteReceipt | undefined,
+  /** Recherche élargie : les textes cherchés (siteOffers). */
+  loose?: readonly string[],
 ): MediaChoice[] {
   const out: MediaChoice[] = [];
   for (const site of MEDIA_SITES) {
     const hits = results.filter((r) => r.site === site.id).flatMap((r) => r.hits);
     const seen = new Set<string>();
-    for (const offer of siteOffers(hits, games, vps)[type] ?? []) {
+    for (const offer of siteOffers(hits, games, vps, loose)[type] ?? []) {
       const key = siteHitKey(offer.hit);
       if (seen.has(key)) continue;
       seen.add(key);
@@ -692,7 +850,7 @@ export function siteMediaChoices(
         label: offer.hit.title,
         detail: offer.hit.category?.label ?? (offer.pack ? t('pack de médias') : site.name),
         vpsId: offer.game.id,
-        site: { hit: offer.hit, pack: offer.pack },
+        site: { hit: offer.hit, pack: offer.pack, ...(offer.loose && { loose: true }) },
       });
     }
   }

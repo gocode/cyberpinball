@@ -11,7 +11,7 @@ import * as vm from 'node:vm';
 import { test } from 'node:test';
 import { parseHTML } from 'linkedom';
 import type { MediaType } from '../medias';
-import { checkSiteSearch, hitGameName, hitTypes, MEDIA_SITES, receivedMedias, siteHitSummary, siteMediaChoices, siteOffers, siteQuery, siteSearchByType, siteSearchUrl, SITE_SEARCH_PAGES, SITE_SEARCH_PROBES, webHost, webMediaChoices, webSearchUrl, type SiteHit, type SiteReceipt, type WebReceipt } from '../mediasites';
+import { ANIMATABLE_MEDIA_TYPES, checkSiteSearch, hitAnimated, hitGameName, hitTypes, mediaChoiceAnimated, MEDIA_SITES, receivedMedias, siteHitSummary, siteMediaChoices, siteOffers, siteQuery, siteSearchByType, siteSearchTerms, siteSearchUrl, SITE_SEARCH_MORE_PAGES, SITE_SEARCH_PAGES, SITE_SEARCH_PROBES, vpsSiteHits, webHost, webMediaChoices, webSearchQuery, webSearchUrl, type SiteHit, type SiteReceipt, type WebReceipt } from '../mediasites';
 import { WAIT_PROBES } from '../sitesessions';
 import { createVpsDb, type VpsGame } from '../vps';
 
@@ -292,4 +292,103 @@ test('recherche par média : VPUniverse cherche dans les seules catégories du m
   assert.equal(siteSearchByType('vpuniverse'), true);
   assert.equal(siteSearchByType('vpforums'), false);
   assert.ok(SITE_SEARCH_PAGES >= 2);
+});
+
+// « Chercher plus », « Animés seulement », mots ajoutés (12/11/2026). Cas d'origine : les
+// wheels de The Matrix, choix jugé maigre, surtout en animé. VPUniverse en avait 23 ce
+// jour-là pour « matrix » dans ses trois catégories de wheels, dont 5 animées ; la base VPS
+// en rangeait une de plus sous le jeu, introuvable par le titre (« any », un Wheel Mega Pack).
+
+test('animés seulement : les catégories animées du média sur VPUniverse, le mot « animated » sur VPForums', () => {
+  const nodes = (type: MediaType, animated: boolean) => new URL(siteSearchUrl('vpuniverse', 'matrix', type, 1, animated)).searchParams.get('nodes')!.split(',');
+  assert.deepEqual(nodes('Wheel', true), ['149'], 'Animated Wheel Images (APNG)');
+  assert.deepEqual(nodes('Topper', true), ['160'], 'vidéos du topper, pas ses images');
+  assert.deepEqual(nodes('Playfield', true), ['140']);
+  // Média sans catégorie animée à lui : ses catégories, inchangées.
+  assert.deepEqual(nodes('GameHelp', true), nodes('GameHelp', false));
+  assert.deepEqual(nodes('Wheel', false), ['70', '127', '149']);
+  // VPUniverse range les wheels animées à part : le texte ne change pas ; VPForums les mêle aux autres.
+  assert.equal(siteSearchTerms('vpuniverse', 'matrix', 'Wheel', { animated: true }), 'matrix');
+  assert.equal(siteSearchTerms('vpforums', 'matrix', 'Wheel', { animated: true }), 'matrix animated');
+  assert.equal(siteSearchTerms('vpforums', 'matrix', 'Topper', { animated: true }), 'matrix', 'catégorie « Videos » de VPForums');
+  assert.equal(siteSearchTerms('vpuniverse', 'matrix', 'Wheel', { extra: '  neon ' }), 'matrix neon');
+  assert.ok(SITE_SEARCH_MORE_PAGES > SITE_SEARCH_PAGES);
+  assert.ok(!ANIMATABLE_MEDIA_TYPES.includes('Loading'), 'le chargement n’est qu’en vidéo');
+  assert.ok(!ANIMATABLE_MEDIA_TYPES.includes('Audio'));
+});
+
+test('fiche animée : sa catégorie (vidéos, wheels APNG), sinon son titre', () => {
+  assert.equal(hitAnimated(vpu('29579', 'Matrix (Original 2026) animated wheel', ['149', 'Animated Wheel Images (APNG)'])), true);
+  assert.equal(hitAnimated(vpu('22196', 'The Matrix - Animated Wheel', ['70', 'Wheel Images'])), true);
+  assert.equal(hitAnimated(vpu('13942', 'The Matrix (Animated Bullets) Wheel', ['127', 'Tarcisio Style Wheels'])), true);
+  assert.equal(hitAnimated(vpu('29591', 'The Matrix Wheel', ['70', 'Wheel Images'])), false);
+  assert.equal(hitAnimated(vpu('13666', 'The Matrix Topper Video', ['160', 'Topper Videos'])), true);
+  assert.equal(hitAnimated(vpu('1', 'The Matrix Topper', ['93', 'Topper Images'])), false);
+  const base = { id: 'x', type: 'Wheel' as MediaType, source: 'pup' as const, label: 'x', detail: '', file: 'x.png' };
+  assert.equal(mediaChoiceAnimated({ ...base, kind: 'image' }, () => true), true, 'APNG lu sur le disque');
+  assert.equal(mediaChoiceAnimated({ ...base, kind: 'image' }, () => false), false);
+  assert.equal(mediaChoiceAnimated({ ...base, kind: 'video' }, () => false), true);
+  assert.equal(mediaChoiceAnimated({ ...base, kind: 'audio' }, () => true), false);
+  const site = { hit: vpu('29579', 'Matrix animated wheel', ['149', 'Animated Wheel Images (APNG)']), pack: false };
+  assert.equal(mediaChoiceAnimated({ ...base, file: undefined, kind: 'image', source: 'vpuniverse', site }, () => false), true);
+  const online = (url: string) => ({ ...base, file: undefined, kind: 'image' as const, source: 'mediadb' as const, offer: { file: { url } } as never });
+  assert.equal(mediaChoiceAnimated(online('https://x/wheel.png'), () => undefined), false);
+  assert.equal(mediaChoiceAnimated(online('https://x/wheel.apng'), () => undefined), true);
+});
+
+test('recherche élargie : un titre qui a les mots cherchés passe, marqué ; Terminator 3 ne passe toujours pas pour terminator 2', () => {
+  const collection = vpu('500', 'Terminator 2 Wheels Collection by Someone', ['70', 'Wheel Images']);
+  const odd = vpu('501', 'T2 neon terminator 2 style', ['70', 'Wheel Images']);
+  const t3 = vpu('502', 'Terminator 3 Wheel', ['70', 'Wheel Images']);
+  // Sans élargir : ce que le rapprochement attribue seulement.
+  const strict = (siteOffers([collection, odd, t3], [T2], db).Wheel ?? []).map((o) => o.hit.id);
+  const wide = siteOffers([collection, odd, t3], [T2], db, ['terminator 2']).Wheel ?? [];
+  assert.ok(!strict.includes('502') && !wide.some((o) => o.hit.id === '502'), 'Terminator 3');
+  for (const id of ['500', '501']) assert.ok(wide.some((o) => o.hit.id === id), id);
+  // Les fiches approchées passent après les autres, marquées.
+  const loose = wide.filter((o) => o.loose).map((o) => o.hit.id);
+  assert.deepEqual(wide.slice(wide.length - loose.length).map((o) => o.hit.id), loose);
+  for (const o of wide) assert.equal(Boolean(o.loose), !strict.includes(o.hit.id));
+});
+
+test('fiches rangées par la base VPS : sans recherche, attribuées à leur jeu ; mega.nz et liens morts écartés', () => {
+  const matrix: VpsGame = {
+    id: 'WyxpJ3Wjt3',
+    name: 'The Matrix',
+    wheelArtFiles: [
+      { id: 'a', authors: ['Blackval'], comment: 'Wheel Mega Pack', urls: [{ url: 'https://vpuniverse.com/files/file/31875-any/' }] },
+      { id: 'b', authors: ['Select.nl'], comment: 'Animated Glass Orb', urls: [{ url: 'https://vpuniverse.com/files/file/31738-the-matrix-animated-glass-orb/' }] },
+      { id: 'c', urls: [{ url: 'https://mega.nz/folder/abc' }] },
+      { id: 'd', urls: [{ url: 'https://vpuniverse.com/files/file/1-dead/', broken: true }] },
+      { id: 'e', urls: [{ url: 'https://www.vpforums.org/index.php?app=downloads&showfile=4242' }] },
+    ],
+    topperFiles: [{ id: 'f', authors: ['BurtMacklin'], urls: [{ url: 'https://vpuniverse.com/files/file/13666-the-matrix-topper-video/' }] }],
+    mediaPackFiles: [{ id: 'g', urls: [{ url: 'https://www.vpforums.org/index.php?showtopic=1&showfile=777' }] }],
+  };
+  const vpsdb = createVpsDb([matrix, T2]);
+  const hits = vpsSiteHits([matrix]);
+  assert.deepEqual(
+    hits.map((h) => `${h.site}:${h.id}`),
+    ['vpuniverse:31875', 'vpuniverse:31738', 'vpforums:4242', 'vpuniverse:13666', 'vpforums:777'],
+  );
+  assert.equal(hits[0]!.title, 'The Matrix · Wheel Mega Pack (Blackval)');
+  assert.equal(hits[0]!.author, 'Blackval');
+  assert.equal(hits[3]!.title, 'The Matrix · Topper (BurtMacklin)', 'l’auteur distingue les fiches');
+  assert.equal(hits[2]!.url, 'https://www.vpforums.org/index.php?app=downloads&showfile=4242');
+  assert.equal(hitAnimated(hits[1]!), true, 'le commentaire le dit');
+  assert.deepEqual(hitTypes(hits[3]!), { types: ['Topper'], kind: 'video', pack: false });
+  assert.equal(hitTypes(hits[4]!).pack, true);
+  // Attribuées sans rapprochement du titre (« any »), pour leur jeu seulement.
+  const offers = siteOffers(hits, [matrix], vpsdb);
+  assert.deepEqual(offers.Wheel?.map((o) => o.hit.id).sort(), ['31738', '31875', '4242', '777'].sort());
+  assert.deepEqual(offers.Topper?.map((o) => o.hit.id), ['13666', '777']);
+  assert.deepEqual(siteOffers(hits, [T2], vpsdb), {});
+  // Après les résultats de recherche rapprochés (qui ont une vignette).
+  const found = vpu('29591', 'The Matrix Wheel', ['70', 'Wheel Images']);
+  assert.equal(siteOffers([found, ...hits], [matrix], vpsdb).Wheel?.[0]?.hit.id, '29591');
+});
+
+test('recherche sur le web : les mots ajoutés et « animated » suivent le titre', () => {
+  assert.equal(webSearchQuery('The Matrix (Original 2023)', 'Wheel'), 'The Matrix wheel logo vpinball');
+  assert.equal(webSearchQuery('The Matrix (Original 2023)', 'Wheel', { animated: true, extra: 'neon' }), 'The Matrix neon animated wheel logo vpinball');
 });

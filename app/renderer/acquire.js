@@ -104,6 +104,38 @@ function markEngine() {
   }
 }
 
+/**
+ * « Vos comptes » (recherche libre d'une table) : une pastille par site, avec son état. Connecté :
+ * elle cherche le texte du champ sur ce site ; pas encore : elle ouvre sa page de connexion.
+ */
+function showAccounts(accounts) {
+  const row = $('accounts');
+  row.hidden = !accounts;
+  document.documentElement.classList.toggle('with-accounts', Boolean(accounts));
+  if (!accounts) return;
+  $('sites').replaceChildren(
+    ...accounts.map((a) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `site${a.connected ? ' on' : ''}`;
+      b.dataset.site = a.id;
+      const dot = document.createElement('span');
+      dot.className = 'site-dot';
+      dot.setAttribute('aria-hidden', 'true');
+      const name = document.createElement('span');
+      name.className = 'site-name';
+      name.textContent = a.label;
+      const state = document.createElement('span');
+      state.className = 'site-state';
+      state.textContent = a.connected ? t('connecté') : t('se connecter');
+      b.append(dot, name, state);
+      b.title = a.connected ? t('Chercher le texte sur {site}, avec votre compte', { site: a.label }) : t('Ouvrir la page de connexion de {site}', { site: a.label });
+      b.addEventListener('click', () => window.cyberAcquire.site(a.id, $('query').value));
+      return b;
+    }),
+  );
+}
+
 $('search').addEventListener('submit', (e) => {
   e.preventDefault();
   if ($('query').value.trim()) window.cyberAcquire.search($('query').value, engine);
@@ -131,6 +163,7 @@ window.cyberAcquire.onState((s) => {
   // Écran étroit (portrait, 4:3) : les boutons sous le reste, comme le compte le processus principal.
   document.documentElement.classList.toggle('narrow', Boolean(s.narrow));
   showSearch(s.search);
+  showAccounts(s.accounts);
   $('home').textContent = s.search ? t('Retour à la recherche') : t('Retour à la fiche');
   $('home').title = s.search ? t('Retour à la recherche (première page de résultats)') : t('Retour à la fiche (page du fichier sur le site)');
   $('video').hidden = !s.video;

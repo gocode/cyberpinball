@@ -171,9 +171,11 @@ export interface MediaChoice {
   bytes?: number;
   /**
    * Site communautaire (mediasites.ts) : la fiche du site ; `received` quand le fichier
-   * est déjà arrivé (`file` le désigne alors), sinon il reste à télécharger.
+   * est déjà arrivé (`file` le désigne alors), sinon il reste à télécharger. `loose` :
+   * trouvée par la recherche élargie, son titre a les mots cherchés sans désigner sûrement
+   * un jeu retenu.
    */
-  site?: { hit: SiteHit; pack: boolean; received?: boolean };
+  site?: { hit: SiteHit; pack: boolean; received?: boolean; loose?: boolean };
 }
 
 export type MediaChoices = Partial<Record<MediaType, MediaChoice[]>>;

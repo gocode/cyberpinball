@@ -1420,12 +1420,18 @@ body.mouse .media-card[data-act]:hover {
   min-width: 0;
 }
 
-/* L'aperçu au format de son écran, plafonné : un plateau en hauteur ne fait pas déborder la tuile. */
+/*
+ * L'aperçu au format de son écran, plafonné : un plateau en hauteur ne fait pas déborder la
+ * tuile. En paysage, une tuile de logo (aperçu carré, titre sur deux lignes, état, détail)
+ * doit tenir entière dans la liste même sous une introduction de trois lignes, avec son état
+ * (« ≈ 45 s d'attente ») et son détail : à 20vmin, il lui manquait une quinzaine de pixels en
+ * 1920 × 1080 (contrôle de mise en page, 12/11/2026).
+ */
 .media-tile .media-thumb {
   width: 100%;
   height: auto;
   aspect-ratio: var(--thumb-aspect, 16 / 9);
-  max-height: 20vmin;
+  max-height: 17vmin;
 }
 
 @container (orientation: portrait) {

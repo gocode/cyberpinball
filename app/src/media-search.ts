@@ -230,20 +230,29 @@ export function createMediaSearch(ctx: MediaSearchContext) {
     return mediaDbQuality(loadMenuMediaSettings(host.dataDir).downloadQuality, loadCabinet(host.dataDir));
   }
 
-  /** Aperçus reçus et vérifiés dans downloads\vpinmediadb ; ceux qui manquent (réseau) sont absents. */
-  async function stagePreviews(files: MediaDbFile[], into: Map<string, string>, label = t('Aperçus')): Promise<void> {
+  /**
+   * Aperçus reçus et vérifiés dans downloads\vpinmediadb ; ceux qui manquent (réseau) sont absents.
+   * `quiet` : sans message d'attente (il occuperait l'écran et bloquerait les touches), pour des
+   * vignettes chargées pendant qu'on navigue ; `atOnce` : téléchargements menés ensemble.
+   */
+  async function stagePreviews(files: MediaDbFile[], into: Map<string, string>, label = t('Aperçus'), opts: { quiet?: boolean; atOnce?: number } = {}): Promise<void> {
     const wanted = [...new Map(files.map((f) => [f.url, f])).values()]
       // Un aperçu déjà reçu peut avoir été rangé dans medias\ entre-temps (même fichier que le téléchargement) : on le reprend.
       .filter((f) => !into.has(f.url) || !fs.existsSync(into.get(f.url)!));
     let n = 0;
-    for (const file of wanted) {
-      ctx.progress(t('{label} : {n} sur {total}…', { label, n: ++n, total: wanted.length }));
-      try {
-        into.set(file.url, (await stageMediaDbFile(staging(), file)).path);
-      } catch {
-        // Aperçu indisponible (réseau) : la carte le dit.
+    let next = 0;
+    const worker = async () => {
+      while (next < wanted.length) {
+        const file = wanted[next++]!;
+        if (!opts.quiet) ctx.progress(t('{label} : {n} sur {total}…', { label, n: ++n, total: wanted.length }));
+        try {
+          into.set(file.url, (await stageMediaDbFile(staging(), file)).path);
+        } catch {
+          // Aperçu indisponible (réseau) : la carte le dit.
+        }
       }
-    }
+    };
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(opts.atOnce ?? 1, wanted.length)) }, worker));
   }
 
   async function sizes(files: MediaDbFile[]): Promise<Map<string, number>> {
