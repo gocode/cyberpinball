@@ -395,26 +395,46 @@ function render(state) {
   panel.replaceChildren();
   panel.hidden = !report;
   if (!panel.hidden) {
-    // Colonne de gauche : rôles et points à vérifier ; à droite : le diff.
+    // Colonne de gauche : les rôles (ou les boutons) ; à droite : le diff. Les points à vérifier,
+    // puis le fichier écrit et sa sauvegarde, vont là où le panneau reste le moins haut : sous la
+    // gauche, sous la droite ou sur toute la largeur. Toujours à gauche, vingt et un boutons et
+    // leurs points à vérifier étaient coupés quand la droite restait presque vide (boutons de la
+    // porte, 12/11/2026).
     const columns = state.columns ?? {};
     const left = document.createElement('div');
     left.append(list(columns.left ?? t('Rôles'), state.summary));
-    if (state.findings.length) {
-      left.append(list(t('Points à vérifier'), state.findings, (f) => `finding-${f.severity}`));
-    }
-    panel.append(left, list(columns.right ?? (state.phase === 'summary' ? t('Modifications prévues') : t('Modifications écrites')), state.lines));
+    const right = document.createElement('div');
+    right.append(list(columns.right ?? (state.phase === 'summary' ? t('Modifications prévues') : t('Modifications écrites')), state.lines));
+    panel.append(left, right);
+    // Les colonnes s'étirent à la hauteur de la rangée : c'est le bas de leur contenu qui compte.
+    const bottom = (box) => box.lastElementChild?.getBoundingClientRect().bottom ?? 0;
+    const place = (nodes) => {
+      let best;
+      for (const box of [left, right, panel]) {
+        // Sur toute la largeur : sous les deux colonnes, d'un bord à l'autre.
+        for (const node of nodes) node.classList.toggle('wide', box === panel);
+        box.append(...nodes);
+        const height = Math.max(bottom(left), bottom(right), bottom(panel));
+        if (!best || height < best.height) best = { box, height };
+      }
+      for (const node of nodes) node.classList.toggle('wide', best.box === panel);
+      best.box.append(...nodes);
+    };
+    if (state.findings.length) place([list(t('Points à vérifier'), state.findings, (f) => `finding-${f.severity}`)]);
+    const paths = [];
     if (state.target) {
       const target = document.createElement('p');
       target.innerHTML = t('Fichier : <code></code>');
       target.querySelector('code').textContent = state.target;
-      panel.append(target);
+      paths.push(target);
     }
     if (state.backup) {
       const backup = document.createElement('p');
       backup.innerHTML = t('Ancienne version : <code></code>');
       backup.querySelector('code').textContent = state.backup;
-      panel.append(backup);
+      paths.push(backup);
     }
+    for (const path of paths) place([path]);
     fitPanel(panel);
   }
   placeZoneLabels();

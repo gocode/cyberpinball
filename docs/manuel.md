@@ -1020,6 +1020,7 @@ Les touches sont rangées dans `cabinet.json` (`buttons` pour le jeu, `navigatio
 | MagnaSave gauche / droit | `Mapping.LeftMagna`, `UIUp` (`Key;224`) / `RightMagna`, `UIDown` (`Key;228`) |
 | Extra Ball, Pause, balancier de tilt | `Mapping.ExtraBall` (`Key;5`), `Mapping.Pause` (`Key;19`), `Mapping.Tilt` (`Key;23`) |
 | Slam tilt (porte du monnayeur) | `Mapping.SlamTilt` (`Key;74`) |
+| Porte du monnayeur, porte : bouton − / + | `Mapping.CoinDoor` (`Key;77`), `Mapping.Service2` (`Key;37`) / `Mapping.Service3` (`Key;38`) ; voir [Volume du jeu](#volume-du-jeu) |
 | Tremblements | `Mapping.LeftNudge` (`Key;29`), `RightNudge` (`Key;56`), `CenterNudge` (`Key;44`) |
 | Volume − / + / Muet | aucune : `Mapping.VolumeDown` et `Mapping.VolumeUp` reçoivent `Key;0`, avec ou sans étape « Boutons » ; Cyber Pinball lit ces boutons lui-même (voir [Volume de la borne](#volume-de-la-borne)) |
 
@@ -1279,6 +1280,16 @@ Les boutons **Volume −**, **Volume +** et **Muet** (facultatifs, étape « Bou
 - **Volume de Windows** (`readEndpointVolumes`, `writeEndpointVolumes`, `packages/win-displays/src/system-volume.ts`) : Core Audio, `IMMDeviceEnumerator` puis `IAudioEndpointVolume` (`GetMasterVolumeLevelScalar`, `SetMasterVolumeLevelScalar`, `GetMute`, `SetMute`) appelés par leur table de méthodes avec koffi ; les sorties sont désignées par leur identifiant MMDevice, celui de l'étape « Son ».
 - **`[Input]`** : `Mapping.VolumeDown` et `Mapping.VolumeUp` n'ont plus de touche (`Key;0`), avec ou sans relevé, et un bouton de joystick qui y avait été écrit est retiré (`vpxVolumeSettings`) ; sinon `-` et `=` régleraient aussi VPX, qui afficherait un autre volume. Une manette ajoutée à la main dans F12 > « Input Settings » reste.
 - **Hors écran** (essais sans opérateur), le volume de Windows n'est jamais touché : un volume simulé, et les appuis arrivent par les fenêtres du menu (étapes `hold:` et `release:` de l'autopilote). Captures : `volume-borne-niveau.png`, `volume-borne-coupe.png`. Tests : [cabinetvolume.test.ts](../packages/core/src/test/cabinetvolume.test.ts).
+
+### Volume du jeu
+
+Une ROM trop faible face aux bruits mécaniques de la table (Medieval Madness sur un PinCab, 12/11/2026) ne se corrige ni par le volume de la borne, qui monte tout, ni par PinMAME : son réglage `volume` (`HKCU\Software\Freeware\Visual PinMame\<rom>`) est une atténuation, déjà à 0, son maximum. Le volume est celui de la machine elle-même : sur une WPC, une Stern ou une Data East, la ROM le garde dans sa NVRAM, et on le règle comme sur la vraie machine, porte du monnayeur ouverte, avec ses boutons − et +.
+
+- **Boutons** (facultatifs, étape « Boutons ») : « Porte du monnayeur » (Fin par défaut), « Porte : bouton − » (8) et « Porte : bouton + » (9). Un bouton libre de la borne, au joystick comme au clavier, peut tenir chacun d'eux ; un relevé fait avant eux les montre au récapitulatif, où l'on refait ce bouton seul.
+- **Chemin jusqu'à la ROM** : les actions `CoinDoor`, `Service2` et `Service3` de VPX arrivent au script de la table comme `keyCoinDoor`, `keyDown` et `keyUp` (`scripts/VPMKeys.vbs`), que `vpmKeyDown` (`WPC.vbs`…) donne aux interrupteurs de la porte. La porte bascule à chaque appui (`toggleKeyCoinDoor`).
+- **En partie** : porte, puis − ou + autant de fois qu'il faut (la ROM affiche le volume sur le DMD), puis porte pour la refermer. Le réglage reste pour cette table, dans sa NVRAM.
+- **Limites** : les machines plus anciennes (System 11, Gottlieb, premières électroniques) ont souvent un potentiomètre sur la carte son et pas de volume dans la ROM ; les boutons − et + n'y règlent rien. Les boutons Échap et Entrée du menu de service (7 et 0, `Service1` et `Service4`) gardent leurs touches de VPX, sans bouton à relever.
+- Tests : [buttons.test.ts](../packages/core/src/test/buttons.test.ts) (« porte du monnayeur et ses boutons − et + »).
 
 ## Plugins de VPX : backglass, PuP et DMD
 

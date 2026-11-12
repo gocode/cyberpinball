@@ -46,7 +46,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { IniDocument } from '../ini';
 import { loadCabinet, saveCabinet } from '../store';
-import type { Cabinet, CabinetButtons, NavigationButtons } from '../model';
+import type { ButtonId, Cabinet, CabinetButtons, NavigationButtons } from '../model';
 import { keepManualEdits, planVpxSync } from '../sync';
 import { isOwned, vpxOwnedKeys } from '../vpx-settings';
 import { devPcDisplays, emptyCabinet } from './fixtures';
@@ -529,6 +529,9 @@ test('relevé mixte : touches du clavier et boutons du joystick, librement d’u
     volumeDown: 'Minus',
     volumeUp: joy(14),
     volumeMute: joy(16),
+    coinDoor: joy(17),
+    serviceDown: joy(18),
+    serviceUp: 'Escape',
   };
   let keys: CabinetButtons = {};
   for (const b of BUTTONS) {
@@ -774,4 +777,37 @@ test('fenêtre au-dessus du menu (« Récupérer ») : aucune fenêtre de la bor
   const acquire = fs.readFileSync(path.join(dir, 'acquire-window.ts'), 'utf8');
   // Gardée devant dès sa création, avec ses sorties toujours possibles (Exit sans focus, page figée).
   assert.match(acquire, /keepInFront\(win\);[\s\S]{0,2500}win\.on\('closed'/);
+});
+
+test('porte du monnayeur et ses boutons − et + : relevés, écrits dans [Input], dits par l’aide-mémoire', () => {
+  // 12/11/2026, Medieval Madness trop faible sur le PinCab : le volume est celui de la ROM (NVRAM),
+  // réglé porte ouverte par ses boutons − et + (VPMKeys.vbs : keyCoinDoor, keyDown, keyUp). Des
+  // boutons libres de la borne doivent pouvoir les tenir, au joystick comme au clavier.
+  assert.deepEqual(
+    ['coinDoor', 'serviceDown', 'serviceUp'].map((id) => [buttonInfo(id as ButtonId).vpx, buttonInfo(id as ButtonId).required, DEFAULT_BUTTONS[id as ButtonId]]),
+    [[['CoinDoor'], false, 'End'], [['Service2'], false, 'Digit8'], [['Service3'], false, 'Digit9']],
+  );
+  // Les touches par défaut sont celles de VPX : rien de réécrit sans relevé.
+  assert.equal(VPX_INPUT_DEFAULTS.CoinDoor, sdlScancode('End'));
+  assert.equal(VPX_INPUT_DEFAULTS.Service2, sdlScancode('Digit8'));
+  assert.equal(VPX_INPUT_DEFAULTS.Service3, sdlScancode('Digit9'));
+
+  let keys: CabinetButtons = { ...DEFAULT_BUTTONS };
+  for (const [id, code] of [['coinDoor', joy(20)], ['serviceDown', joy(21)], ['serviceUp', 'KeyU']] as const) {
+    const record = recordButton(keys, id, code);
+    assert.equal(record.refused, undefined, `${id} : ${record.refused}`);
+    keys = record.keys;
+  }
+  assert.deepEqual(buttonProblems(keys), []);
+  const ini = planVpxSync(cabinetWith(keys), devPcDisplays(), VPX_FIRST_RUN).nextIni!;
+  assert.equal(input(ini, 'CoinDoor'), `${joy(20)} | Key;77`, 'joystick : la touche Fin de VPX reste');
+  assert.equal(input(ini, 'Service2'), `${joy(21)} | Key;37`);
+  assert.equal(input(ini, 'Service3'), 'Key;24', 'clavier : la touche relevée remplace 9');
+  assert.deepEqual(gameKeys(keys).find(([title]) => title === 'Volume du jeu : porte, −, +'), ['Volume du jeu : porte, −, +', 'Bouton 21 du joystick / Bouton 22 du joystick / U']);
+
+  // Relevé fait avant ces boutons (cabinet.json sans eux) : Fin, 8 et 9 restent ceux de VPX.
+  const before: CabinetButtons = { ...DEFAULT_BUTTONS, coinDoor: undefined, serviceDown: undefined, serviceUp: undefined };
+  const old = planVpxSync(cabinetWith(before), devPcDisplays(), VPX_FIRST_RUN).nextIni!;
+  for (const action of ['CoinDoor', 'Service2', 'Service3']) assert.equal(input(old, action) ?? `Key;${VPX_INPUT_DEFAULTS[action]}`, `Key;${VPX_INPUT_DEFAULTS[action]}`, action);
+  assert.equal(gameKeys(before).some(([title]) => title.startsWith('Volume du jeu')), false);
 });

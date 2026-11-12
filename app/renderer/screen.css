@@ -139,15 +139,15 @@ body {
 
 /*
  * Tous les boutons : relevés, en cours, à venir. Quatre colonnes sur un écran en largeur
- * (dix-sept boutons du jeu : cinq rangées, assez serrées pour laisser sa place à
- * l'avertissement du pied ; sur trois colonnes, la sixième rangée poussait les actions
- * dessous), deux sur un écran en hauteur.
+ * (vingt et un boutons du jeu : six rangées d'une ligne chacune, assez serrées pour laisser
+ * sa place à l'avertissement du pied ; un bouton passé dit « aucun », pas « pas de bouton »
+ * qui passait à la ligne et poussait les actions sur le pied), deux sur un écran en hauteur.
  */
 .buttons-list {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   text-align: left;
-  gap: 0.8vmin 1.2vmin;
+  gap: 0.6vmin 1.2vmin;
   width: min(94%, 160vmin);
   margin: 1vmin 0 0;
   padding: 0;
@@ -161,7 +161,7 @@ body {
   flex-wrap: wrap;
   justify-content: space-between;
   column-gap: 1vmin;
-  padding: 0.7vmin 1.4vmin;
+  padding: 0.5vmin 1.4vmin;
   border: 0.3vmin solid transparent;
   border-radius: 0.5vmin;
   background: var(--tile);
@@ -632,13 +632,18 @@ body.pointer [data-act] {
 }
 
 .panel p {
-  grid-column: 1 / -1;
   margin: 0.5vmin 0 0;
+}
+
+/* Bloc placé sous les deux colonnes (place, screen.js) : d'un bord à l'autre. */
+.panel > .wide {
+  grid-column: 1 / -1;
 }
 
 .panel code {
   font-family: 'Cascadia Mono', Consolas, monospace;
-  font-size: 0.9em;
+  /* Un peu plus petit que le texte, jamais sous le plancher de 20 px (1,852vmin à la référence 1080). */
+  font-size: max(0.9em, 1.852vmin);
   word-break: break-all;
 }
 

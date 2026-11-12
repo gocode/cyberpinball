@@ -1471,7 +1471,7 @@ function buttonsView(index: number, base: Record<string, unknown>) {
     const answered = capture.answered.has(b.id);
     return {
       label: b.label,
-      key: code ? keyLabel(code) : answered ? t('pas de bouton') : inForceSet[b.id] ? keyLabel(inForceSet[b.id]) : b.required ? '' : t('facultatif'),
+      key: code ? keyLabel(code) : answered ? t('aucun') : inForceSet[b.id] ? keyLabel(inForceSet[b.id]) : b.required ? '' : t('facultatif'),
       state: !summary && i === capture.index ? 'current' : answered ? 'done' : 'todo',
       selected: summary && capture.action === SUMMARY_ACTIONS.length + i,
       tried: summary && capture.tried.has(b.id),

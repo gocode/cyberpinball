@@ -71,6 +71,36 @@ export const BUTTONS: readonly ButtonInfo[] = [
     default: 'Home',
     vpx: ['SlamTilt'],
   },
+  // Porte du monnayeur et ses boutons − et + (scripts/VPMKeys.vbs : keyCoinDoor, keyDown, keyUp ;
+  // WPC.vbs les donne aux interrupteurs de la porte). Porte ouverte, − et + règlent le volume que
+  // la ROM garde dans sa NVRAM (WPC, Stern, Data East) : le seul moyen de monter une ROM trop
+  // faible sans monter aussi les bruits mécaniques de la table. La porte bascule à chaque appui
+  // (toggleKeyCoinDoor). VPX lit 7 et 0 (Service1, Service4 : Échap et Entrée du menu de service)
+  // sans bouton à relever ici.
+  {
+    id: 'coinDoor',
+    get label() { return t('Porte du monnayeur'); },
+    get how() { return t('Ouvre ou ferme la porte : porte ouverte, ses boutons − et + règlent le volume du jeu'); },
+    required: false,
+    default: 'End',
+    vpx: ['CoinDoor'],
+  },
+  {
+    id: 'serviceDown',
+    get label() { return t('Porte : bouton −'); },
+    get how() { return t('Porte ouverte, baisse le volume du jeu, gardé par la ROM ; dans le menu de service, recule'); },
+    required: false,
+    default: 'Digit8',
+    vpx: ['Service2'],
+  },
+  {
+    id: 'serviceUp',
+    get label() { return t('Porte : bouton +'); },
+    get how() { return t('Porte ouverte, monte le volume du jeu, gardé par la ROM ; dans le menu de service, avance'); },
+    required: false,
+    default: 'Digit9',
+    vpx: ['Service3'],
+  },
   { id: 'nudgeLeft', get label() { return t('Tremblement à gauche'); }, required: false, default: 'KeyZ', vpx: ['LeftNudge'] },
   { id: 'nudgeRight', get label() { return t('Tremblement à droite'); }, required: false, default: 'Slash', vpx: ['RightNudge'] },
   { id: 'nudgeCenter', get label() { return t('Tremblement vers l’avant'); }, required: false, default: 'Space', vpx: ['CenterNudge'] },
@@ -712,6 +742,7 @@ export function gameKeys(buttons: CabinetButtons | undefined, tilt?: CabinetTilt
   if (tiltWays.length) rows.push(['Tilt', tiltWays.join(' · ')]);
   optional(t('Tremblements'), ['nudgeLeft', 'nudgeRight', 'nudgeCenter']);
   optional('Volume', ['volumeDown', 'volumeUp', 'volumeMute']);
+  optional(t('Volume du jeu : porte, −, +'), ['coinDoor', 'serviceDown', 'serviceUp']);
   return rows;
 }
 
