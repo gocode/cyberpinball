@@ -3,6 +3,14 @@ export const messages: Record<string, string> = {
   // packages/core/src/vr.ts, systemmenu.ts : Menu système > Borne > Réalité virtuelle
   'Réalité virtuelle': 'Virtual reality',
   'Activer le casque, caler la borne, manettes du casque, recopie sur le playfield': 'Turn the headset on, align the cabinet, headset controllers, mirror on the playfield',
+  // app/src/frontend.ts : la pause dans le casque, « Ajuster les écrans » (plugin CyberPinball)
+  'Ajuster les écrans': 'Adjust screens',
+  'Joystick : choisir · A : régler · B : retour': 'Stick: choose · A: adjust · B: back',
+  'Joysticks : position · Poignées : taille · A : garder · B : retour': 'Sticks: position · Grips: size · A: keep · B: back',
+  // packages/core/src/health.ts : cadre mal rempli dans le casque (vr-ecrans.ts)
+  'VR : écran mal rempli pour {n} table': 'VR: screen poorly filled for {n} table',
+  'VR : écrans mal remplis pour {n} tables': 'VR: screens poorly filled for {n} tables',
+  '{list} ; en partie : Pause, « Ajuster les écrans »': '{list}; in a game: Pause, "Adjust screens"',
   // app/src/library.ts : badge d'une entrée de menu en plein essai
   BÊTA: 'BETA',
   // app/renderer/frontend.js : écran du PC au repos pendant que le menu est dans le casque

@@ -72,6 +72,7 @@ export const ICON_NAMES = [
   'health',
   // Médias, son et attente
   'layout-menu',
+  'wheel',
   'volume',
   'video',
   'rocket',

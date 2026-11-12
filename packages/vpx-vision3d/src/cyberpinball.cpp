@@ -25,7 +25,8 @@
 // Réglages ([Plugin.CyberPinball], écrits par Cyber Pinball dans la langue de l'application) :
 //   Pause, Resume, Quit, Help (rappel des touches, lignes séparées par « · »), ResumeHint : les libellés ;
 //   Order : les rendus du fronton à cadrer, dans l'ordre ; PupRatio : la forme du fronton de PuP ;
-//   Zone : la partie visible du fronton (fronton-vr.ts) ; LogFile, CaptureDir : mesures et captures.
+//   Zone : la partie visible du fronton (fronton-vr.ts) ; LogFile, CaptureDir : mesures et captures ;
+//   RoomDmd : la source publiée pour le cadre DMD de la pièce VR de la table (PUP, image, ou aucune).
 
 #define _CRT_SECURE_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
@@ -68,6 +69,14 @@ MSGPI_STRING_VAL_SETTING(imageDmd, "DmdImage", "DMD image", "Image drawn when no
 MSGPI_STRING_VAL_SETTING(zoneFronton, "Zone", "Visible backglass area", "Left,top,right,bottom fractions of the backglass that the VR room leaves visible", true, "0,0,1,1", 64);
 MSGPI_STRING_VAL_SETTING(fichierMesures, "LogFile", "Measures file", "Where the plugin writes its measures, empty for none", true, "", 1024);
 MSGPI_STRING_VAL_SETTING(dossierCaptures, "CaptureDir", "Captures folder", "Where the plugin saves captures of the VR preview, empty for none", true, "", 1024);
+MSGPI_FLOAT_VAL_SETTING(pupDmdRatio, "PupDmdRatio", "PuP DMD ratio", "Width over height of the PuP DMD screen, until learned from what PuP draws", true, 0.5f, 8.f, 0.01f, 1.7778f);
+MSGPI_STRING_VAL_SETTING(reglagesEcrans, "Screens", "Screens adjustment", "Player adjustment, saved for the table: fronton=dx,dy,size;dmd=dx,dy,size", true, "", 128);
+MSGPI_STRING_VAL_SETTING(idTable, "TableId", "Table id", "Table id written in the measures (no spaces)", true, "", 256);
+MSGPI_STRING_VAL_SETTING(libelleAjuster, "AdjustLabel", "Adjust label", "Pause choice that adjusts the screens", true, "Adjust screens", 64);
+MSGPI_STRING_VAL_SETTING(libelleEcranFronton, "BackglassLabel", "Backglass label", "Name of the backglass screen", true, "Backglass", 64);
+MSGPI_STRING_VAL_SETTING(libelleEcranDmd, "DmdLabel", "DMD label", "Name of the DMD screen", true, "DMD", 64);
+MSGPI_STRING_VAL_SETTING(aideChoixEcran, "AdjustChooseHelp", "Choose screen help", "Keys reminder while choosing the screen", true, "Stick: choose - A: adjust - B: back", 128);
+MSGPI_STRING_VAL_SETTING(aideReglage, "AdjustHelp", "Adjust help", "Keys reminder while adjusting", true, "Sticks: position - Grips: size - A: keep - B: back", 128);
 
 double maintenant()
 {
@@ -187,6 +196,17 @@ struct Mesures
 };
 Mesures mesures;
 
+/**
+ * Remplissage de chaque cadre à sa dernière image (part de sa zone visible couverte par la source, -1 : rien
+ * dessiné), écrit avec les mesures : Cyber Pinball dit au journal et dans la santé de la borne un cadre mal
+ * rempli (sous REMPLI_MIN), avant que le joueur le voie.
+ */
+struct Remplissage
+{
+   float fronton = -1.f, dmd = -1.f, salle = -1.f;
+};
+Remplissage remplissage;
+
 std::wstring large(const char* utf8)
 {
    const int n = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, nullptr, 0);
@@ -239,9 +259,10 @@ void mesurer(double t, double jeu)
    int video = 0;
    for (const auto& [cle, v] : mesures.videos)
       video = std::max(video, v.second);
-   char ligne[512];
-   std::snprintf(ligne, sizeof(ligne), "mesure t=%.0f vpx=%.1f ecart_ms=%.0f fronton=%.1f pup=%.1f video=%.1f jeu=%.2f pompees=%.1f zone=%s", t - mesures.debut, mesures.images / duree,
-      mesures.ecartMax * 1000.0, mesures.frontons / duree, mesures.pup / duree, video / duree, (jeu - mesures.jeu0) / duree, mesures.pompees / duree, zoneFronton_Val);
+   char ligne[640];
+   std::snprintf(ligne, sizeof(ligne), "mesure t=%.0f vpx=%.1f ecart_ms=%.0f fronton=%.1f pup=%.1f video=%.1f jeu=%.2f pompees=%.1f zone=%s remplir_fronton=%.2f remplir_dmd=%.2f remplir_salle=%.2f",
+      t - mesures.debut, mesures.images / duree, mesures.ecartMax * 1000.0, mesures.frontons / duree, mesures.pup / duree, video / duree, (jeu - mesures.jeu0) / duree, mesures.pompees / duree,
+      zoneFronton_Val, remplissage.fronton, remplissage.dmd, remplissage.salle);
    ecrire(ligne);
    mesures.fenetre = t;
    mesures.jeu0 = jeu;
@@ -268,8 +289,33 @@ struct Cadre
    VPXRenderContext2D dedans {};         // celui que voit le rendu appelé
    Rect zone {};                         // la partie visible du fronton, dans la surface du flasher
    bool pup = false;                     // le rendu appelé est PuP (mesure de ses vidéos)
+   Reglage reglage {};                   // réglage du joueur pour ce cadre (pause, « Ajuster les écrans »)
+   Rect couvert {};                      // ce que le rendu a couvert, dans la zone : la mesure du remplissage
 };
 Cadre cadre;
+
+/**
+ * Proportions apprises de PuP, par fenêtre (0 fronton, 1 DMD) : PuP pose son écran racine sur toute la surface
+ * qu'on lui donne, quelle que soit sa forme ; la plus grande image qu'il pose sur toute la surface (vidéo de
+ * fond, cadre du pack) dit la forme pour laquelle le pack est fait (The Matrix : trop petit dans le fronton,
+ * 12 novembre 2026, avec un 16:9 supposé). Apprise en partie, reprise par Cyber Pinball à la suivante.
+ */
+float appris[2] = { 0.f, 0.f };
+float apprisAire[2] = { 0.f, 0.f };
+
+void apprendre(VPXWindowId fenetre, float ratio, float aire)
+{
+   const int i = fenetre == VPXWINDOW_Backglass ? 0 : 1;
+   if (aire <= apprisAire[i] || ratio < 0.25f || ratio > 8.f)
+      return;
+   apprisAire[i] = aire;
+   if (appris[i] > 0.f && std::fabs(ratio - appris[i]) / appris[i] < 0.03f)
+      return;
+   appris[i] = ratio;
+   char ligne[96];
+   std::snprintf(ligne, sizeof(ligne), "ratio fenetre=%s valeur=%.3f", i == 0 ? "fronton" : "dmd", ratio);
+   ecrire(ligne);
+}
 
 /** Un nombre « 0.5333 » (point décimal, quelle que soit la langue du système). */
 float lireNombre(const char*& p)
@@ -310,7 +356,8 @@ Rect zoneVisible(const VPXRenderContext2D* ctx)
 /** Rectangle (x, y, l, h) de la surface du rendu appelé, dans celle du fronton : proportions gardées, centré. */
 void placer(float x, float y, float l, float h, float& X, float& Y, float& L2, float& H2)
 {
-   const Rect r = cadrer(cadre.dedans.srcWidth, cadre.dedans.srcHeight, cadre.zone.l, cadre.zone.h, { x, y, l, h });
+   const Rect r = remplir(cadre.dedans.srcWidth, cadre.dedans.srcHeight, cadre.zone.l, cadre.zone.h, { x, y, l, h }, cadre.reglage);
+   cadre.couvert = englober(cadre.couvert, r);
    X = cadre.zone.x + r.x;
    Y = cadre.zone.y + r.y;
    L2 = r.l;
@@ -321,6 +368,8 @@ void MSGPIAPI cadreImage(VPXRenderContext2D*, VPXTexture texture, float tintR, f
    float rotation, float srcX, float srcY, float srcW, float srcH)
 {
    float x, y, w, h;
+   if (cadre.pup && texW >= 64.f && texH >= 32.f && srcX <= 1.f && srcY <= 1.f && srcW >= cadre.dedans.srcWidth - 1.f && srcH >= cadre.dedans.srcHeight - 1.f)
+      apprendre(cadre.dedans.window, texW / texH, texW * texH);
    placer(srcX, srcY, srcW, srcH, x, y, w, h);
    if (cadre.pup)
       noterVideo(texture, x, y, w, h);
@@ -409,7 +458,7 @@ void chercher(Chaine& c, const char* ordre, double t)
  * Le premier rendu de la chaîne qui dessine, cadré dans `cible` (surface du flasher) ; `ctx` nul : essai sans
  * rien dessiner (fonctions de dessin vides), pour savoir si une source existe. Rend l'id du rendu, ou "".
  */
-std::string rendre(VPXRenderContext2D* ctx, Chaine& c, const Rect& cible, double t)
+std::string rendre(VPXRenderContext2D* ctx, Chaine& c, const Rect& cible, double t, Reglage g = {}, float* rempli = nullptr)
 {
    for (const Suivant& s : c.suivants)
    {
@@ -432,15 +481,20 @@ std::string rendre(VPXRenderContext2D* ctx, Chaine& c, const Rect& cible, double
       cadre.dedans.window = c.fenetre;
       cadre.zone = cible;
       cadre.pup = s.id == "PUP";
+      cadre.reglage = g;
+      cadre.couvert = {};
       cadre.dedans.outWidth = cible.l;
       cadre.dedans.outHeight = cible.h;
       cadre.dedans.DrawImage = cadreImage;
       cadre.dedans.DrawDisplay = cadreAfficheur;
       cadre.dedans.DrawSegDisplay = cadreSegments;
-      // PuP pose son écran racine sur toute sa surface (srcWidth = outWidth) : la forme de son fronton.
-      if (cadre.pup && c.fenetre == VPXWINDOW_Backglass)
+      // PuP pose son écran racine sur toute sa surface (srcWidth = outWidth) : la forme de son écran, apprise
+      // de ce qu'il dessine, sinon celle de la partie précédente (PupRatio, PupDmdRatio), sinon 16:9.
+      if (cadre.pup)
       {
-         const float ratio = pupRatio_Val > 0.1f ? pupRatio_Val : 16.f / 9.f;
+         const int i = c.fenetre == VPXWINDOW_Backglass ? 0 : 1;
+         const float defaut = i == 0 ? pupRatio_Val : pupDmdRatio_Val;
+         const float ratio = appris[i] > 0.1f ? appris[i] : (defaut > 0.1f ? defaut : 16.f / 9.f);
          if (cible.l / cible.h < ratio)
             cadre.dedans.outHeight = cible.l / ratio;
          else
@@ -463,6 +517,8 @@ std::string rendre(VPXRenderContext2D* ctx, Chaine& c, const Rect& cible, double
       {
          if (cadre.pup && ctx && c.fenetre == VPXWINDOW_Backglass)
             mesures.pup++;
+         if (rempli)
+            *rempli = couverture(cadre.couvert, cible.l, cible.h);
          return s.id;
       }
    }
@@ -510,18 +566,21 @@ bool charger(ImageFichier& img, const char* chemin)
    return img.tex && img.l > 0.f && img.h > 0.f;
 }
 
-/** Une image posée dans `cible`, proportions gardées, centrée. */
-void dessinerImage(VPXRenderContext2D* ctx, const ImageFichier& img, const Rect& cible)
+/** Une image posée dans `cible` comme toute source (remplir) ; rend la part de la cible couverte. */
+float dessinerImage(VPXRenderContext2D* ctx, const ImageFichier& img, const Rect& cible, Reglage g = {})
 {
-   const Rect r = cadrer(img.l, img.h, cible.l, cible.h, { 0.f, 0.f, img.l, img.h });
+   const Rect r = remplir(img.l, img.h, cible.l, cible.h, { 0.f, 0.f, img.l, img.h }, g);
    ctx->srcWidth = ctx->outWidth;
    ctx->srcHeight = ctx->outHeight;
    ctx->DrawImage(ctx, img.tex, 1.f, 1.f, 1.f, 1.f, 0.f, 0.f, img.l, img.h, 0.f, 0.f, 0.f, cible.x + r.x, cible.y + r.y, r.l, r.h);
+   return couverture(r, cible.l, cible.h);
 }
 
 /** Le DMD a-t-il une source qui dessine ? Essai à vide toutes les 0,5 s tant qu'aucune n'a été vue. */
 bool dmdVu = false;
 double dmdEssaiA = -10.0;
+// Les cadres à la dernière image, dans la surface du flasher : le contour de « Ajuster les écrans ».
+Rect rectFronton {}, rectDmd {};
 std::string dmdSource, frontonSource;
 
 void fondDans(VPXRenderContext2D* ctx, const Rect& r);
@@ -554,19 +613,20 @@ int dessinerCadre(VPXRenderContext2D* ctx, double t)
       dmd = { zone.x, zone.y + zone.h - hd, zone.l, hd };
       fronton.h -= hd;
    }
-   std::string f = rendre(ctx, chaineFronton, fronton, t);
+   float rf = -1.f, rd = -1.f;
+   std::string f = rendre(ctx, chaineFronton, fronton, t, pause.reglage(Ecran::Fronton), &rf);
    if (f.empty() && charger(imageDuFronton, imageFronton_Val))
    {
-      dessinerImage(ctx, imageDuFronton, fronton);
+      rf = dessinerImage(ctx, imageDuFronton, fronton, pause.reglage(Ecran::Fronton));
       f = "image";
    }
    std::string d;
    if (dmd.h > 0.f)
    {
-      d = rendre(ctx, chaineDmd, dmd, t);
+      d = rendre(ctx, chaineDmd, dmd, t, pause.reglage(Ecran::Dmd), &rd);
       if (d.empty() && imageDmd)
       {
-         dessinerImage(ctx, imageDuDmd, dmd);
+         rd = dessinerImage(ctx, imageDuDmd, dmd, pause.reglage(Ecran::Dmd));
          d = "image";
       }
       if (!d.empty() && f.empty())
@@ -575,6 +635,10 @@ int dessinerCadre(VPXRenderContext2D* ctx, double t)
          f = "fond";
       }
    }
+   remplissage.fronton = f.empty() || f == "fond" ? -1.f : rf;
+   remplissage.dmd = d.empty() ? -1.f : rd;
+   rectFronton = fronton;
+   rectDmd = dmd;
    if (f != frontonSource || d != dmdSource)
    {
       frontonSource = f;
@@ -582,6 +646,131 @@ int dessinerCadre(VPXRenderContext2D* ctx, double t)
       ecrire("sources fronton=" + (f.empty() ? std::string("aucune") : f) + " dmd=" + (d.empty() ? std::string(bande ? "aucune" : "sans_bande") : d));
    }
    return f.empty() && d.empty() ? 0 : 1;
+}
+
+// --- DMD de la pièce VR -----------------------------------------------------------------------
+//
+// Le cadre DMD qu'une pièce VR pose dans sa scène (flasher en mode DMD) ne montre, dans VPX 10.8.1, qu'une
+// source d'affichage de contrôleur (« ctrl://default/display » : la plus grande, ResURIResolver) : PinMAME,
+// FlexDMD, UltraDMD. Le plugin PuP n'en publie aucune, et son FullDMD ne va que dans la fenêtre ScoreView,
+// que VPX ne rend jamais en VR : le cadre restait gris (City Hunter, 12 novembre 2026 ; la pièce VR de la
+// table montre le FullDMD de PuP). Le plugin publie donc sa propre source, 512 × 288 (plus grande que tout
+// DMD de ROM : elle l'emporte) : [Plugin.CyberPinball] RoomDmd « PUP », l'écran DMD de PuP (racine 5, sinon
+// 1) dessiné en logiciel, sinon l'image du DMD de Cyber Pinball ; « image », l'image seule ; vide, aucune
+// source (le DMD de la ROM ou de FlexDMD remplit le cadre). Cyber Pinball ne l'écrit que pour une table à
+// pièce VR qui a un cadre DMD (vr-sources.ts, roomDmdSetting), jamais avec la bande DMD sous le fronton.
+
+MSGPI_FLOAT_VAL_SETTING(salleRatio, "RoomDmdRatio", "VR room DMD ratio", "Width over height of the DMD frame of the table's VR room (its flasher)", true, 0.5f, 8.f, 0.01f, 1.7778f);
+MSGPI_STRING_VAL_SETTING(salleDmd, "RoomDmd", "VR room DMD", "Display source published for the DMD frame of the table's VR room: PUP, image, or empty for none", true, "", 16);
+
+struct SalleDmd
+{
+   bool active = false;
+   std::vector<uint8_t> images[2];
+   int courante = 0;
+   unsigned int id = 0;
+   double renduA = -10.0;
+   std::string source = "?";
+   DWORD fil = 0; // fil de VPX qui prépare les images (onPrepareFrame) : le seul qui redessine
+   int l = SALLE_DMD_L, h = SALLE_DMD_H; // à la forme du cadre de la pièce (RoomDmdRatio)
+};
+SalleDmd salle;
+Chaine chaineSalle { VPXWINDOW_ScoreView };
+unsigned int getDisplaysId = 0, displaysChangedId = 0;
+
+void MSGPIAPI salleImage(VPXRenderContext2D* ctx, VPXTexture texture, float tintR, float tintG, float tintB, float alpha, float texX, float texY, float texW, float texH, float, float, float,
+   float srcX, float srcY, float srcW, float srcH)
+{
+   const VPXTextureInfo* info = texture && vpxApi ? vpxApi->GetTextureInfo(texture) : nullptr;
+   if (!info || !info->data)
+      return;
+   const float sx = ctx->srcWidth > 0.f ? ctx->outWidth / ctx->srcWidth : 1.f;
+   const float sy = ctx->srcHeight > 0.f ? ctx->outHeight / ctx->srcHeight : 1.f;
+   const TextureLue t { info->width, info->height, static_cast<FormatTexture>(info->format), info->data };
+   poserTexture(salle.images[salle.courante], salle.l, salle.h, t, tintR, tintG, tintB, alpha, texX, texY, texW, texH, srcX * sx, srcY * sy, srcW * sx, srcH * sy);
+}
+
+/** Une image neuve du DMD de la pièce : PuP, sinon l'image du DMD ; noire si rien ne dessine. */
+void redessinerSalle(double t)
+{
+   salle.courante ^= 1;
+   std::vector<uint8_t>& img = salle.images[salle.courante];
+   img.assign(static_cast<size_t>(salle.l) * salle.h * 3, 0);
+   VPXRenderContext2D c {};
+   c.window = VPXWINDOW_ScoreView;
+   c.is2D = 1;
+   c.outWidth = c.srcWidth = static_cast<float>(salle.l);
+   c.outHeight = c.srcHeight = static_cast<float>(salle.h);
+   c.DrawImage = salleImage;
+   c.DrawDisplay = rienAfficheur;
+   c.DrawSegDisplay = rienSegments;
+   const Rect tout { 0.f, 0.f, c.outWidth, c.outHeight };
+   std::string s;
+   if (std::strcmp(salleDmd_Val, "PUP") == 0)
+   {
+      // PuP seul : le rendu ScoreView (DMD de la ROM) lirait cette source même, en boucle.
+      chercher(chaineSalle, "PUP", t);
+      s = rendre(&c, chaineSalle, tout, t, pause.reglage(Ecran::Dmd), &remplissage.salle);
+   }
+   if (s.empty() && charger(imageDuDmd, imageDmd_Val))
+   {
+      remplissage.salle = dessinerImage(&c, imageDuDmd, tout, pause.reglage(Ecran::Dmd));
+      s = "image";
+   }
+   if (s.empty())
+      remplissage.salle = 0.f; // cadre noir : mal rempli, dit au journal
+   salle.id++;
+   if (s != salle.source)
+   {
+      salle.source = s;
+      ecrire("salle dmd=" + (s.empty() ? std::string("aucune") : s));
+   }
+}
+
+/** Image du DMD de la pièce demandée par VPX (flasher en mode DMD) : redessinée au plus 30 fois par seconde. */
+DisplayFrame MSGPIAPI imageSalle(const CtlResId)
+{
+   const double t = maintenant();
+   // Seulement depuis le fil de VPX, hors d'un autre rendu (le cadre du fronton est global) : sinon la dernière.
+   if (enPartie && GetCurrentThreadId() == salle.fil && !cadre.dehors && t - salle.renduA >= 1.0 / 30.0)
+   {
+      salle.renduA = t;
+      redessinerSalle(t);
+   }
+   if (salle.images[salle.courante].size() != static_cast<size_t>(salle.l) * salle.h * 3)
+      salle.images[salle.courante].assign(static_cast<size_t>(salle.l) * salle.h * 3, 0);
+   return { salle.id, salle.images[salle.courante].data() };
+}
+
+void MSGPIAPI onGetDisplays(const unsigned int, void*, void* data)
+{
+   auto* m = static_cast<GetDisplaySrcMsg*>(data);
+   if (!m || !salle.active)
+      return;
+   if (m->count < m->maxEntryCount && m->entries)
+   {
+      DisplaySrcId& e = m->entries[m->count];
+      e = DisplaySrcId {};
+      e.id.endpointId = endpointId;
+      e.id.resId = 0;
+      e.groupId = e.id;
+      e.width = static_cast<unsigned int>(salle.l);
+      e.height = static_cast<unsigned int>(salle.h);
+      e.hardware = CTLPI_DISPLAY_HARDWARE_LCD_DISPLAY;
+      e.frameFormat = CTLPI_DISPLAY_FORMAT_SRGB888;
+      e.GetRenderFrame = imageSalle;
+   }
+   m->count++;
+}
+
+/** Publie (ou retire) la source du DMD de la pièce, et le dit à VPX. */
+void publierSalle(bool active)
+{
+   if (salle.active == active)
+      return;
+   salle.active = active;
+   msgApi->BroadcastMsg(endpointId, displaysChangedId, nullptr);
+   ecrire(std::string("salle source=") + (active ? salleDmd_Val : "retiree"));
 }
 
 /** La table des actions (commandeVpx1081) vaut pour VPX 10.8.1 ; une autre version : plugin passif. */
@@ -814,6 +1003,13 @@ void capturesDuJour(double t)
 
 void appliquer(const Ordre& o)
 {
+   if (o.garder)
+   {
+      const Reglage a = pause.reglage(Ecran::Fronton), b = pause.reglage(Ecran::Dmd);
+      char ligne[160];
+      std::snprintf(ligne, sizeof(ligne), "reglage fronton=%.3f,%.3f,%.3f dmd=%.3f,%.3f,%.3f", a.dx, a.dy, a.taille, b.dx, b.dy, b.taille);
+      ecrire(ligne);
+   }
    if (o.reprendre)
       reprendreVpx(o.reprendre);
    if (o.quitter)
@@ -854,6 +1050,7 @@ void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
       relacherSortie = false;
       injecter(api::ExitGame, false);
    }
+   salle.fil = GetCurrentThreadId();
    const double t = maintenant();
    const double jeu = vpxApi->GetGameTime();
    appliquer(pause.image(t, jeu));
@@ -886,14 +1083,46 @@ void MSGPIAPI onGameStart(const unsigned int, void*, void*)
    dmdSource.clear();
    frontonSource.clear();
    mesures = Mesures {};
-   ecrire(std::string("debut zone=") + zoneFronton_Val + " ordre=" + ordreFronton_Val);
+   ecrire(std::string("debut zone=") + zoneFronton_Val + " ordre=" + ordreFronton_Val + " table=" + (idTable_Val[0] ? idTable_Val : "?"));
+   // Réglages des écrans enregistrés pour cette table (« fronton=dx,dy,taille;dmd=… »).
+   {
+      const std::string tout = reglagesEcrans_Val;
+      size_t debut = 0;
+      while (debut < tout.size())
+      {
+         const size_t fin = tout.find(';', debut);
+         const std::string part = tout.substr(debut, fin == std::string::npos ? std::string::npos : fin - debut);
+         if (part.rfind("fronton=", 0) == 0)
+            pause.poserReglage(Ecran::Fronton, lireReglage(part.substr(8)));
+         else if (part.rfind("dmd=", 0) == 0)
+            pause.poserReglage(Ecran::Dmd, lireReglage(part.substr(4)));
+         if (fin == std::string::npos)
+            break;
+         debut = fin + 1;
+      }
+   }
+   pause.dmdAjustable(bandeDmd_Val > 0.01f || salleDmd_Val[0] != 0);
+   appris[0] = appris[1] = 0.f;
+   apprisAire[0] = apprisAire[1] = 0.f;
+   remplissage = Remplissage {};
+   rectFronton = rectDmd = Rect {};
+   {
+      const float ratio = salleRatio_Val > 0.4f ? salleRatio_Val : 16.f / 9.f;
+      salle.l = SALLE_DMD_L;
+      salle.h = std::max(32, std::min(512, static_cast<int>(std::lround(SALLE_DMD_L / ratio))));
+   }
+   chaineSalle = Chaine { VPXWINDOW_ScoreView };
+   salle.source = "?";
+   salle.renduA = -10.0;
    enPartie = true;
+   publierSalle(salleDmd_Val[0] != 0);
 }
 
 void MSGPIAPI onGameEnd(const unsigned int, void*, void*)
 {
    enPartie = false;
    pause.remiseAZero();
+   publierSalle(false);
 }
 
 // --- Dessin sur le fronton ------------------------------------------------------------------
@@ -906,7 +1135,7 @@ struct Image
 };
 
 VPXTexture blanc = nullptr;
-Image titre, reprendre, quitter, marque, rappel;
+Image titre, reprendre, quitter, marque, rappel, ajuster, etapeAjuster, aideAjuster;
 Image aide[3];
 int lignesAide = 0;
 
@@ -929,6 +1158,13 @@ void preparerTout()
    preparer(titre, libellePause_Val, 8);
    preparer(reprendre, libelleReprendre_Val, 8);
    preparer(quitter, libelleQuitter_Val, 8);
+   preparer(ajuster, libelleAjuster_Val, 8);
+   {
+      const Etape e = pause.etape();
+      const std::string nom = pause.ecran() == Ecran::Dmd ? libelleEcranDmd_Val : libelleEcranFronton_Val;
+      preparer(etapeAjuster, (std::string(libelleAjuster_Val) + " : " + nom).c_str(), 6);
+      preparer(aideAjuster, e == Etape::Reglage ? aideReglage_Val : aideChoixEcran_Val, 6);
+   }
    preparer(marque, "Cyber Pinball", 6);
    preparer(rappel, libelleRappel_Val, 6);
    // Le rappel des touches, une ligne par morceau séparé par « · ».
@@ -994,6 +1230,8 @@ constexpr float SIGNAL[3] = { 0.55f, 0.89f, 0.23f };
 constexpr float ENCRE[3] = { 0.85f, 0.9f, 0.9f };
 constexpr float TERNE[3] = { 0.3f, 0.36f, 0.37f };
 
+int dessinerAjustement(VPXRenderContext2D* ctx, double t);
+
 int MSGPIAPI dessinerPause(VPXRenderContext2D* ctx, void*)
 {
    // Hors du casque (fenêtre 2D du fronton d'une borne) : jamais.
@@ -1005,6 +1243,8 @@ int MSGPIAPI dessinerPause(VPXRenderContext2D* ctx, void*)
    const bool tenu = pause.jaugeVisible(t);
    if (!pause.affichee(t))
       return dessinerCadre(ctx, t);
+   if (!tenu && pause.etape() != Etape::Menu)
+      return dessinerAjustement(ctx, t);
    preparerTout();
    poser(ctx, FOND);
    if (tenu)
@@ -1023,18 +1263,58 @@ int MSGPIAPI dessinerPause(VPXRenderContext2D* ctx, void*)
       texte(ctx, quitter, cx, cy, 110.f, ENCRE[0], ENCRE[1], ENCRE[2]);
       return 1;
    }
-   // Menu : « Pause », les deux choix (le choisi en vert, encadré), puis le rappel des touches en gros.
-   texte(ctx, titre, L / 2.f, 95.f, 100.f, ENCRE[0], ENCRE[1], ENCRE[2]);
-   const bool r = pause.choix() == Choix::Reprendre;
-   const float yChoisi = r ? 275.f : 415.f;
-   rectangle(ctx, 120.f, yChoisi - 62.f, L - 240.f, 124.f, SIGNAL[0], SIGNAL[1], SIGNAL[2], 0.18f);
-   texte(ctx, reprendre, L / 2.f, 275.f, 92.f, r ? SIGNAL[0] : TERNE[0], r ? SIGNAL[1] : TERNE[1], r ? SIGNAL[2] : TERNE[2]);
-   texte(ctx, quitter, L / 2.f, 415.f, 92.f, r ? TERNE[0] : SIGNAL[0], r ? TERNE[1] : SIGNAL[1], r ? TERNE[2] : SIGNAL[2]);
+   // Menu : « Pause », les trois choix (le choisi en vert, encadré), puis le rappel des touches en gros.
+   texte(ctx, titre, L / 2.f, 90.f, 96.f, ENCRE[0], ENCRE[1], ENCRE[2]);
+   const Choix ch = pause.choix();
+   const float ys[3] = { 235.f, 350.f, 465.f };
+   const Image* items[3] = { &reprendre, &ajuster, &quitter };
+   const Choix ordre[3] = { Choix::Reprendre, Choix::Ajuster, Choix::Quitter };
+   for (int i = 0; i < 3; i++)
+   {
+      const bool choisi = ch == ordre[i];
+      if (choisi)
+         rectangle(ctx, 120.f, ys[i] - 52.f, L - 240.f, 104.f, SIGNAL[0], SIGNAL[1], SIGNAL[2], 0.18f);
+      const float* c = choisi ? SIGNAL : TERNE;
+      texte(ctx, *items[i], L / 2.f, ys[i], 80.f, c[0], c[1], c[2]);
+   }
    if (pause.repriseEchouee())
       texte(ctx, rappel, L / 2.f, 600.f, 64.f, SIGNAL[0], SIGNAL[1], SIGNAL[2]);
    else
       for (int i = 0; i < lignesAide; i++)
-         texte(ctx, aide[i], L / 2.f, (lignesAide == 1 ? 600.f : 560.f + 90.f * static_cast<float>(i)), 64.f, ENCRE[0], ENCRE[1], ENCRE[2]);
+         texte(ctx, aide[i], L / 2.f, (lignesAide == 1 ? 620.f : 590.f + 75.f * static_cast<float>(i)), 56.f, ENCRE[0], ENCRE[1], ENCRE[2]);
+   return 1;
+}
+
+/** Le contour d'un rectangle de la surface du flasher, épaisseur `e`. */
+void contour(VPXRenderContext2D* ctx, const Rect& r, float e, const float* c)
+{
+   ctx->DrawImage(ctx, blanc, c[0], c[1], c[2], 1.f, 0.f, 0.f, 2.f, 2.f, 1.f, 1.f, 0.f, r.x, r.y, r.l, e);
+   ctx->DrawImage(ctx, blanc, c[0], c[1], c[2], 1.f, 0.f, 0.f, 2.f, 2.f, 1.f, 1.f, 0.f, r.x, r.y + r.h - e, r.l, e);
+   ctx->DrawImage(ctx, blanc, c[0], c[1], c[2], 1.f, 0.f, 0.f, 2.f, 2.f, 1.f, 1.f, 0.f, r.x, r.y, e, r.h);
+   ctx->DrawImage(ctx, blanc, c[0], c[1], c[2], 1.f, 0.f, 0.f, 2.f, 2.f, 1.f, 1.f, 0.f, r.x + r.l - e, r.y, e, r.h);
+}
+
+/**
+ * « Ajuster les écrans » (pause) : les vrais cadres, avec le réglage en cours en direct, le contour vert de
+ * l'écran choisi, et en haut l'étape et le rappel des touches (joysticks : position, poignées : taille, A
+ * garde, B revient). Le réglage est enregistré pour la table (ligne « reglage » des mesures).
+ */
+int dessinerAjustement(VPXRenderContext2D* ctx, double t)
+{
+   preparerTout();
+   if (!dessinerCadre(ctx, t))
+      poser(ctx, FOND);
+   ctx->srcWidth = ctx->outWidth;
+   ctx->srcHeight = ctx->outHeight;
+   const Rect zone = zoneVisible(ctx);
+   const Rect rr = cadrer(L, H, zone.l, zone.h, { 0.f, 0.f, L, H });
+   cible = { zone.x + rr.x, zone.y + rr.y, rr.l, rr.h };
+   const Rect c = pause.ecran() == Ecran::Dmd ? rectDmd : rectFronton;
+   if (c.l > 0.f && c.h > 0.f)
+      contour(ctx, c, std::max(2.f, zone.l * 0.006f), SIGNAL);
+   rectangle(ctx, 0.f, 0.f, L, 175.f, FOND[0], FOND[1], FOND[2], 0.8f);
+   texte(ctx, etapeAjuster, L / 2.f, 55.f, 64.f, SIGNAL[0], SIGNAL[1], SIGNAL[2]);
+   texte(ctx, aideAjuster, L / 2.f, 130.f, 44.f, ENCRE[0], ENCRE[1], ENCRE[2]);
    return 1;
 }
 
@@ -1103,12 +1383,20 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballPluginLoad(const uint32_t sessionId, cons
    msgApi->RegisterSetting(endpointId, &imageDmd);
    msgApi->RegisterSetting(endpointId, &fichierMesures);
    msgApi->RegisterSetting(endpointId, &dossierCaptures);
+   msgApi->RegisterSetting(endpointId, &salleDmd);
+   msgApi->RegisterSetting(endpointId, &salleRatio);
+   for (auto* reglage : { &pupDmdRatio })
+      msgApi->RegisterSetting(endpointId, reglage);
+   for (auto* reglage : { &reglagesEcrans, &idTable, &libelleAjuster, &libelleEcranFronton, &libelleEcranDmd, &aideChoixEcran, &aideReglage })
+      msgApi->RegisterSetting(endpointId, reglage);
    msgApi->BroadcastMsg(endpointId, getVpxApiId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_MSG_GET_API), &vpxApi);
    msgApi->SubscribeMsg(endpointId, onGameStartId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_GAME_START), onGameStart, nullptr);
    msgApi->SubscribeMsg(endpointId, onGameEndId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_GAME_END), onGameEnd, nullptr);
    msgApi->SubscribeMsg(endpointId, onPrepareFrameId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_PREPARE_FRAME), onPrepareFrame, nullptr);
    msgApi->SubscribeMsg(endpointId, onActionId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_ACTION_CHANGED), onAction, nullptr);
    msgApi->SubscribeMsg(endpointId, getAuxRendererId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_MSG_GET_AUX_RENDERER), onGetAuxRenderer, nullptr);
+   msgApi->SubscribeMsg(endpointId, getDisplaysId = msgApi->GetMsgID(CTLPI_NAMESPACE, CTLPI_DISPLAY_GET_SRC_MSG), onGetDisplays, nullptr);
+   displaysChangedId = msgApi->GetMsgID(CTLPI_NAMESPACE, CTLPI_DISPLAY_ON_SRC_CHG_MSG);
    // VPX relit la liste des rendus annexes.
    msgApi->BroadcastMsg(endpointId, auxChangedId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_AUX_RENDERER_CHG), nullptr);
 }
@@ -1116,6 +1404,8 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballPluginLoad(const uint32_t sessionId, cons
 MSGPI_EXPORT void MSGPIAPI CyberPinballPluginUnload()
 {
    enPartie = false;
+   publierSalle(false);
+   msgApi->UnsubscribeMsg(getDisplaysId, onGetDisplays, nullptr);
    msgApi->UnsubscribeMsg(onGameStartId, onGameStart, nullptr);
    msgApi->UnsubscribeMsg(onGameEndId, onGameEnd, nullptr);
    msgApi->UnsubscribeMsg(onPrepareFrameId, onPrepareFrame, nullptr);
@@ -1123,13 +1413,13 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballPluginUnload()
    msgApi->UnsubscribeMsg(getAuxRendererId, onGetAuxRenderer, nullptr);
    msgApi->BroadcastMsg(endpointId, auxChangedId, nullptr);
    if (vpxApi)
-      for (VPXTexture* t : { &blanc, &titre.tex, &reprendre.tex, &quitter.tex, &marque.tex, &rappel.tex, &aide[0].tex, &aide[1].tex, &aide[2].tex, &imageDuFronton.tex, &imageDuDmd.tex })
+      for (VPXTexture* t : { &blanc, &titre.tex, &reprendre.tex, &quitter.tex, &marque.tex, &rappel.tex, &ajuster.tex, &etapeAjuster.tex, &aideAjuster.tex, &aide[0].tex, &aide[1].tex, &aide[2].tex, &imageDuFronton.tex, &imageDuDmd.tex })
          if (*t)
          {
             vpxApi->DeleteTexture(*t);
             *t = nullptr;
          }
-   for (unsigned int id : { getVpxApiId, onGameStartId, onGameEndId, onPrepareFrameId, onActionId, getAuxRendererId, auxChangedId })
+   for (unsigned int id : { getVpxApiId, onGameStartId, onGameEndId, onPrepareFrameId, onActionId, getAuxRendererId, auxChangedId, getDisplaysId, displaysChangedId })
       msgApi->ReleaseMsgID(id);
    vpxApi = nullptr;
    msgApi = nullptr;

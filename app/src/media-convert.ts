@@ -5,6 +5,7 @@
 // - Son (opus, aac, webm…) ou son d'une vidéo (mp4, webm, mkv, mov) : décodé, découpé
 //   (début, fin, fondu de fin), écrit en WAV 16 bits à 44,1 kHz.
 // - Analyse d'un son : durée, voies, et les pics qui dessinent sa forme d'onde.
+// - Son encodé en Opus (WebCodecs), mis en Ogg ici : la musique tirée des ROM (rom-music.ts).
 // - Images d'un média (une image, ou quelques moments d'une vidéo), en pixels : le cadre du
 //   DMD d'un FullDMD y est cherché (fulldmdframe.ts).
 // - Avatar d'un joueur (avatar-menu.ts) : l'image de travail, réduite (une photo de 12 Mpx) et
@@ -21,7 +22,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Readable } from 'node:stream';
 import { session, WebContentsView } from 'electron';
-import { mediaKind, t, wavFile, type AudioTrim, type RgbaImage } from '@cyberpinball/core';
+import { mediaKind, oggOpusFile, t, wavFile, writeFileAtomic, type AudioTrim, type RgbaImage } from '@cyberpinball/core';
 
 const PARTITION = 'cyberpinball-conversion';
 const ORIGIN = 'https://conversion.cyberpinball.invalid';
@@ -41,6 +42,10 @@ export interface AudioProbe {
 
 // Script de la page de conversion. OfflineAudioContext décode sans carte son, et rééchantillonne
 // à 44,1 kHz ; decodeAudioData lit aussi le son d'une vidéo (première piste).
+// encodeOpus : le son encodé en Opus (WebCodecs) à 48 kHz (decodeAudioData rééchantillonne à la
+// fréquence du contexte) ; les paquets reviennent bout à bout, chacun précédé de sa longueur sur
+// 4 octets, avec le délai de l'encodeur (en-tête OpusHead qu'il rend, sinon 312, celui de libopus) ;
+// le conteneur Ogg est écrit par le processus principal (oggOpusFile).
 const PAGE = `<!doctype html><meta charset="utf-8"><title>conversion</title><script>
 let cache = { id: '', buffer: null };
 async function decode(id) {
@@ -85,6 +90,44 @@ window.extractAudio = async (id, out, start, end, fade) => {
   }
   await fetch('/out/' + out + '?rate=' + rate + '&channels=' + channels, { method: 'POST', body: pcm.buffer });
   return { frames };
+};
+window.encodeOpus = async (id, out, bitrate) => {
+  const data = await (await fetch('/in/' + id)).arrayBuffer();
+  const b = await new OfflineAudioContext(1, 1, 48000).decodeAudioData(data);
+  const channels = Math.min(2, b.numberOfChannels);
+  const packets = [];
+  let head = null;
+  let failure = null;
+  const encoder = new AudioEncoder({
+    output: (chunk, meta) => {
+      const bytes = new Uint8Array(chunk.byteLength);
+      chunk.copyTo(bytes);
+      packets.push(bytes);
+      const d = meta && meta.decoderConfig && meta.decoderConfig.description;
+      if (d && !head) head = new Uint8Array(d.buffer ? d.buffer.slice(d.byteOffset || 0, (d.byteOffset || 0) + d.byteLength) : d);
+    },
+    error: (e) => (failure = e),
+  });
+  encoder.configure({ codec: 'opus', sampleRate: 48000, numberOfChannels: channels, bitrate });
+  const step = 48000;
+  for (let off = 0; off < b.length; off += step) {
+    const n = Math.min(step, b.length - off);
+    const planar = new Float32Array(n * channels);
+    for (let c = 0; c < channels; c++) planar.set(b.getChannelData(c).subarray(off, off + n), c * n);
+    encoder.encode(new AudioData({ format: 'f32-planar', sampleRate: 48000, numberOfFrames: n, numberOfChannels: channels, timestamp: Math.round((off * 1e6) / 48000), data: planar }));
+  }
+  await encoder.flush();
+  encoder.close();
+  if (failure) throw failure;
+  let size = 0;
+  for (const p of packets) size += 4 + p.length;
+  const all = new Uint8Array(size);
+  const view = new DataView(all.buffer);
+  let at = 0;
+  for (const p of packets) { view.setUint32(at, p.length, true); all.set(p, at + 4); at += 4 + p.length; }
+  const preSkip = head && head.length >= 12 && String.fromCharCode(...head.slice(0, 8)) === 'OpusHead' ? head[10] | (head[11] << 8) : 312;
+  await fetch('/out/' + out + '?channels=' + channels + '&samples=' + b.length + '&preskip=' + preSkip, { method: 'POST', body: all.buffer });
+  return { packets: packets.length };
 };
 window.toPng = async (id, out) => {
   const blob = await (await fetch('/in/' + id)).blob();
@@ -262,6 +305,35 @@ export function createConverter() {
     fs.writeFileSync(out, wavFile(got.data, Number(got.query.get('rate')), Number(got.query.get('channels'))));
   }
 
+  /**
+   * Son (un WAV, ou tout son que Chromium lit) encodé en Opus et écrit en Ogg dans `out`
+   * (musique de la ROM, rom-music.ts) : le format des autres musiques du menu, dix fois moins
+   * lourd qu'un WAV.
+   */
+  async function audioToOggOpus(file: string, out: string, bitrate = 96_000): Promise<{ seconds: number; bytes: number }> {
+    const id = inputId(file);
+    const key = `o${next++}`;
+    try {
+      await run(`encodeOpus(${JSON.stringify(id)}, ${JSON.stringify(key)}, ${bitrate})`);
+    } catch (error) {
+      throw failure(error, 'audio');
+    }
+    const got = outputs.get(key);
+    outputs.delete(key);
+    if (!got) throw new Error(t('conversion sans résultat'));
+    const packets: Uint8Array[] = [];
+    for (let at = 0; at + 4 <= got.data.length; ) {
+      const length = got.data.readUInt32LE(at);
+      packets.push(got.data.subarray(at + 4, at + 4 + length));
+      at += 4 + length;
+    }
+    const samples = Number(got.query.get('samples'));
+    const ogg = oggOpusFile({ channels: Number(got.query.get('channels')), inputRate: 48_000, preSkip: Number(got.query.get('preskip')), packets, samples });
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    writeFileAtomic(out, ogg);
+    return { seconds: samples / 48_000, bytes: ogg.length };
+  }
+
   /** Image redessinée en PNG dans `out`. */
   async function imageToPng(file: string, out: string): Promise<{ width: number; height: number }> {
     const id = inputId(file);
@@ -339,7 +411,7 @@ export function createConverter() {
     return got.data;
   }
 
-  return { probeAudio, audioToWav, imageToPng, mediaFrames, fitJpeg, cropJpeg };
+  return { probeAudio, audioToWav, audioToOggOpus, imageToPng, mediaFrames, fitJpeg, cropJpeg };
 
 }
 

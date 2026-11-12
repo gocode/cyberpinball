@@ -15,6 +15,7 @@ import type { IconName } from './icons';
 export const SYSTEM_ITEM_IDS = [
   'all-tables',
   'collections',
+  'wheel',
   'add-table',
   'downloads',
   'roms',
@@ -113,8 +114,9 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'tables',
     icon: 'tables',
     get label() { return t('Tables'); },
-    get detail() { return t('Toutes les tables et leur fiche, collections de la roue, ajouter une table, téléchargements, bibliothèque de ROM'); },
-    entries: ['all-tables', 'collections', 'add-table', 'downloads', 'roms'],
+    get detail() { return t('Toutes les tables et leur fiche, collections, réglages de la roue, ajouter une table, téléchargements, bibliothèque de ROM'); },
+    // La roue à côté des collections qu'elle montre (12/11/2026 : « toutes les options de la roue dans un même menu »).
+    entries: ['all-tables', 'collections', 'wheel', 'add-table', 'downloads', 'roms'],
   },
   medias: {
     id: 'medias',
@@ -217,6 +219,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   'start-relaunch': { icon: 'start', get label() { return t('Relance par Start'); } },
   'guest-mode': { icon: 'guest', get label() { return t('Mode invité'); } },
   collections: { icon: 'star', get label() { return t('Collections'); } },
+  // Tous les réglages de la roue des tables (app/src/wheel-settings.ts) : présentation, ordre, Start, logos animés, couleur, Juke-box.
+  wheel: { icon: 'wheel', get label() { return t('Roue'); } },
   // Nommée dans les deux langues, pour qu'on la retrouve quelle que soit la langue affichée.
   language: { icon: 'language', label: 'Langue / Language' }, // i18n-ignore
   updates: { icon: 'upgrade', get label() { return t('Mise à jour de Cyber Pinball'); } },

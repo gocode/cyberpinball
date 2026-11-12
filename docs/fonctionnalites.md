@@ -319,14 +319,19 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
   <img src="images/fr/features/favorites.webp?v=13dc8bf325" width="300" alt="La fiche d'une table ajoutée aux favoris : l'étoile blanche après son titre, « Retirer des favoris ».">
 </p>
 
-### Ordre des tables et mode attente
+### Roue, ordre des tables et mode attente
 
+- **Menu système > Tables > Roue** réunit tous les réglages de la roue : présentation, ordre, table au démarrage, Start sur la roue, logos animés, couleur de chaque table, Juke-box.
+- **« Logos animés »** : seul le logo de la table choisie s'anime (par défaut), ses voisins restent sur leur première image ; ou tous s'animent.
 - **« Ordre des tables »** : par titre, dernières jouées, plus jouées, année, fabricant, ou mélangé à chaque démarrage.
 - **« Table au démarrage »** : la première, une table au hasard, ou la dernière jouée.
 - **« Start sur la roue »** : ouvrir la fiche (par défaut), ou jouer directement ; la fiche reste à Start maintenu (ou F6).
 - **Mode attente** après 5 minutes (de 1 à 30 minutes, ou jamais) : une table au hasard toutes les 20 s, avec ses médias, et le premier bouton ramène au menu tel qu'il était.
 
-<p align="center"><img src="images/fr/features/menu-settings.webp?v=6f2fec7495" width="360" alt="Médias, son et attente : roue du menu, ordre des tables, table au démarrage, musique des jeux et son volume, son des vidéos, lancement en cinéma, ouverture, sons de l'interface…"></p>
+<p align="center">
+  <img src="images/fr/features/wheel-settings.webp?v=1b731682e3" width="300" alt="Roue : présentation du menu, ordre des tables, table au démarrage, Start sur la roue, logos animés, couleur de chaque table, Juke-box dans la roue.">
+  <img src="images/fr/features/menu-settings.webp?v=f909af7172" width="300" alt="Médias, son et attente : visualiseur du Juke-box, musique des jeux et son volume, son des vidéos, lancement en cinéma, ouverture, sons de l'interface…">
+</p>
 
 ### Au bureau
 

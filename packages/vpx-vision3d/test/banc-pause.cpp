@@ -1,5 +1,6 @@
 // Banc de la pause dans le casque (src/pause.h), sans VPX : code de sortie 0 si tout va bien.
 #define _CRT_SECURE_NO_WARNINGS
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include "pause.h"
@@ -10,7 +11,7 @@ static int echecs = 0;
 #define VERIFIE(c) do { if (!(c)) { std::printf("ECHEC ligne %d : %s\n", __LINE__, #c); echecs++; } } while (0)
 
 // Numéros internes des actions dans VPX 10.8.1 (InputManager::CreateInputActions).
-enum : int { FLIPPER_G = 0, FLIPPER_D = 1, MAGNA_G = 4, UI_HAUT = 6, UI_BAS = 7, LANCER = 10, CREDIT = 15, START = 19, PAUSE = 22, SORTIE = 24, MENU_VPX = 25 };
+enum : int { FLIPPER_G = 0, FLIPPER_D = 1, MAGNA_G = 4, MAGNA_D = 5, UI_HAUT = 6, UI_BAS = 7, LANCER = 10, CREDIT = 15, START = 19, PAUSE = 22, SORTIE = 24, MENU_VPX = 25 };
 
 static Commande cmd(int id)
 {
@@ -38,7 +39,9 @@ int main(int argc, char** argv)
    // La table : le numéro interne, pas l'énumération de l'API (15 est le crédit, pas la Pause).
    int liee = 0;
    VERIFIE(commandeVpx1081(PAUSE, liee) == Commande::Pause && liee == -1);
-   VERIFIE(commandeVpx1081(CREDIT, liee) == Commande::Jeu && liee == api::AddCredit);
+   // Crédit : B des manettes du casque (XRInputHandler), « retour » du réglage des écrans ; MagnaSave : la taille.
+   VERIFIE(commandeVpx1081(CREDIT, liee) == Commande::Retour && liee == api::AddCredit);
+   VERIFIE(commandeVpx1081(MAGNA_G, liee) == Commande::Moins && liee == api::LeftMagnaSave && cmd(MAGNA_D) == Commande::Plus);
    VERIFIE(commandeVpx1081(SORTIE, liee) == Commande::Sortie && liee == api::ExitGame);
    VERIFIE(commandeVpx1081(START, liee) == Commande::Valider && liee == api::StartGame);
    VERIFIE(cmd(MENU_VPX) == Commande::Interface && cmd(UI_HAUT) == Commande::Haut && cmd(UI_BAS) == Commande::Bas);
@@ -66,13 +69,18 @@ int main(int argc, char** argv)
       VERIFIE(p.avaler(c) == !jamais);
    }
 
-   // Joystick vers le bas : « Quitter » ; vers le haut : « Reprendre » ; les flippers aussi.
+   // Trois choix : Reprendre, Ajuster les écrans, Quitter ; joystick, flippers et poignées pour aller de l'un à l'autre.
    p.action(cmd(UI_BAS), true, 1.5);
+   VERIFIE(p.choix() == Choix::Ajuster);
+   p.action(cmd(UI_BAS), true, 1.55);
+   VERIFIE(p.choix() == Choix::Quitter);
+   p.action(cmd(UI_BAS), true, 1.56);
    VERIFIE(p.choix() == Choix::Quitter);
    p.action(cmd(UI_HAUT), true, 1.6);
+   VERIFIE(p.choix() == Choix::Ajuster);
+   p.action(cmd(FLIPPER_G), true, 1.7);
    VERIFIE(p.choix() == Choix::Reprendre);
-   p.action(cmd(FLIPPER_D), true, 1.7);
-   VERIFIE(p.choix() == Choix::Quitter);
+   p.action(cmd(FLIPPER_D), true, 1.75);
    p.action(cmd(MAGNA_G), true, 1.8);
    VERIFIE(p.choix() == Choix::Reprendre);
 
@@ -91,6 +99,7 @@ int main(int argc, char** argv)
    images(p, 3.6, 4.0, false, jeu);
    VERIFIE(p.menuVisible());
    p.action(cmd(UI_BAS), true, 4.1);
+   p.action(cmd(UI_BAS), true, 4.15);
    o = p.action(cmd(START), true, 4.2);
    VERIFIE(o.quitter == 1 && p.quitteDemande() && !p.menuVisible());
    for (int id = -1; id < 40; id++)
@@ -184,6 +193,104 @@ int main(int argc, char** argv)
          std::fwrite(png.data(), 1, png.size(), f);
          std::fclose(f);
       }
+   }
+   // DMD de la pièce VR : une texture posée en logiciel dans l'image RGB publiée à VPX (jamais un cadre gris).
+   {
+      std::vector<uint8_t> dmd(static_cast<size_t>(8) * 4 * 3, 0);
+      // 2 × 1 RGBA : rouge opaque, vert à moitié transparent, étirée sur toute l'image 8 × 4.
+      const uint8_t px2[] = { 255, 0, 0, 255, 0, 255, 0, 128 };
+      TextureLue tex { 2, 1, FormatTexture::Rgba8, px2 };
+      poserTexture(dmd, 8, 4, tex, 1.f, 1.f, 1.f, 1.f, 0.f, 0.f, 2.f, 1.f, 0.f, 0.f, 8.f, 4.f);
+      VERIFIE(dmd[0] == 255 && dmd[1] == 0 && dmd[2] == 0);                           // gauche : rouge
+      VERIFIE(dmd[(3 * 8 + 7) * 3 + 1] >= 127 && dmd[(3 * 8 + 7) * 3 + 1] <= 129); // droite : vert à moitié sur du noir
+      // Teinte et alpha global, en RGB 8 bits, seulement dans le rectangle donné (et coupé aux bords).
+      const uint8_t blanc[] = { 200, 200, 200 };
+      TextureLue b { 1, 1, FormatTexture::Rgb8, blanc };
+      std::vector<uint8_t> z(static_cast<size_t>(8) * 4 * 3, 0);
+      poserTexture(z, 8, 4, b, 1.f, 0.5f, 0.f, 0.5f, 0.f, 0.f, 1.f, 1.f, 6.f, 2.f, 10.f, 10.f);
+      VERIFIE(z[(2 * 8 + 6) * 3] == 100 && z[(2 * 8 + 6) * 3 + 1] == 50 && z[(2 * 8 + 6) * 3 + 2] == 0);
+      VERIFIE(z[(1 * 8 + 6) * 3] == 0 && z[(2 * 8 + 5) * 3] == 0);
+      // 565 et luminance ; rien sans données ni surface.
+      const uint16_t bleu = 31;
+      TextureLue t565 { 1, 1, FormatTexture::Rgb565, &bleu };
+      poserTexture(z, 8, 4, t565, 1.f, 1.f, 1.f, 1.f, 0.f, 0.f, 1.f, 1.f, 0.f, 0.f, 1.f, 1.f);
+      VERIFIE(z[0] == 0 && z[2] == 255);
+      const float gris = 0.5f;
+      TextureLue lum { 1, 1, FormatTexture::Lum32F, &gris };
+      poserTexture(z, 8, 4, lum, 1.f, 1.f, 1.f, 1.f, 0.f, 0.f, 1.f, 1.f, 1.f, 0.f, 1.f, 1.f);
+      VERIFIE(z[3] == 128);
+      const std::vector<uint8_t> avant = z;
+      poserTexture(z, 8, 4, TextureLue {}, 1.f, 1.f, 1.f, 1.f, 0.f, 0.f, 1.f, 1.f, 0.f, 0.f, 8.f, 4.f);
+      poserTexture(z, 8, 4, b, 1.f, 1.f, 1.f, 1.f, 0.f, 0.f, 1.f, 1.f, 0.f, 0.f, 0.f, 4.f);
+      VERIFIE(z == avant);
+      static_assert(SALLE_DMD_L * 9 == SALLE_DMD_H * 16, "DMD de la pièce VR en 16:9, comme le FullDMD de PuP");
+   }
+   // Remplir un cadre (toute source, toute table) : proportions gardées, rogné au plus ROGNE_MAX, posé en bas.
+   {
+      // PuP 4:3 dans un fronton 16:10 : plein en largeur et en hauteur à 12 % près, rien de déformé.
+      const Rect a = remplir(1024.f, 768.f, 1600.f, 1000.f, { 0.f, 0.f, 1024.f, 768.f });
+      VERIFIE(std::fabs(a.l / a.h - 1024.f / 768.f) < 1e-3f);
+      VERIFIE(couverture(a, 1600.f, 1000.f) >= REMPLI_MIN);
+      // Même forme : exactement le cadre.
+      const Rect b = remplir(1600.f, 1000.f, 1600.f, 1000.f, { 0.f, 0.f, 1600.f, 1000.f });
+      VERIFIE(std::fabs(b.x) < 1e-3f && std::fabs(b.y) < 1e-3f && std::fabs(b.l - 1600.f) < 1e-2f && std::fabs(b.h - 1000.f) < 1e-2f);
+      // Forme très différente (DMD 4:1 dans un 16:9) : des bandes, jamais plus de 12 % rogné ; posé en bas, centré.
+      const Rect c = remplir(128.f, 32.f, 1600.f, 900.f, { 0.f, 0.f, 128.f, 32.f });
+      VERIFIE(c.l <= 1600.f / (1.f - ROGNE_MAX) + 0.5f && std::fabs(c.y + c.h - 900.f) < 0.5f);
+      VERIFIE(std::fabs(c.x + c.l / 2.f - 800.f) < 0.5f);
+      // Le réglage du joueur : décalage en part du cadre, taille autour de la place calculée.
+      const Rect d = remplir(1600.f, 1000.f, 1600.f, 1000.f, { 0.f, 0.f, 1600.f, 1000.f }, { 0.1f, -0.05f, 0.9f });
+      VERIFIE(std::fabs(d.l - 1440.f) < 0.5f && std::fabs(d.x - (80.f + 160.f)) < 0.5f && std::fabs(d.y - (100.f - 50.f)) < 0.5f);
+      // Mesure du remplissage : un cadre mal rempli se voit.
+      VERIFIE(couverture({ 0.f, 0.f, 800.f, 1000.f }, 1600.f, 1000.f) < REMPLI_MIN);
+      VERIFIE(std::fabs(couverture({ -100.f, 0.f, 1800.f, 1200.f }, 1600.f, 1000.f) - 1.f) < 1e-4f);
+      VERIFIE(couverture(englober({ 0.f, 0.f, 0.f, 0.f }, { 10.f, 10.f, 20.f, 20.f }), 100.f, 100.f) > 0.039f);
+      // Réglage lu de l'INI : point décimal, bornes ; sinon le neutre.
+      const Reglage g = lireReglage("0.05,-0.1,1.2");
+      VERIFIE(std::fabs(g.dx - 0.05f) < 1e-4f && std::fabs(g.dy + 0.1f) < 1e-4f && std::fabs(g.taille - 1.2f) < 1e-4f);
+      VERIFIE(lireReglage("0,0,9").taille == 1.f && lireReglage("abc").taille == 1.f && lireReglage("0,0").taille == 1.f);
+   }
+   // « Ajuster les écrans » : choix de l'écran, réglage en direct aux joysticks et poignées, A garde, B revient.
+   {
+      Pause q;
+      double j = 0.0;
+      images(q, 0.0, 1.0, true, j);
+      images(q, 1.0, 1.4, false, j); // pause : le menu paraît
+      q.dmdAjustable(true);
+      q.action(cmd(UI_BAS), true, 1.5);
+      q.action(cmd(START), true, 1.6);
+      VERIFIE(q.etape() == Etape::ChoixEcran && q.ecran() == Ecran::Fronton);
+      q.action(cmd(UI_BAS), true, 1.7);
+      VERIFIE(q.ecran() == Ecran::Dmd);
+      q.action(cmd(UI_HAUT), true, 1.75);
+      q.action(cmd(START), true, 1.8);
+      VERIFIE(q.etape() == Etape::Reglage);
+      q.action(cmd(MAGNA_D), true, 1.9);
+      q.action(cmd(UI_HAUT), true, 2.0);
+      q.action(cmd(FLIPPER_D), true, 2.1);
+      VERIFIE(std::fabs(q.reglage(Ecran::Fronton).taille - 1.02f) < 1e-4f && q.reglage(Ecran::Fronton).dy < 0.f && q.reglage(Ecran::Fronton).dx > 0.f);
+      // B : rien n'est gardé, retour au choix de l'écran.
+      VERIFIE(q.avaler(cmd(CREDIT)));
+      Ordre b = q.action(cmd(CREDIT), true, 2.2);
+      VERIFIE(!b.garder && q.etape() == Etape::ChoixEcran && q.reglage(Ecran::Fronton).taille == 1.f);
+      // A : gardé (à enregistrer pour la table).
+      q.action(cmd(START), true, 2.3);
+      q.action(cmd(MAGNA_G), true, 2.4);
+      b = q.action(cmd(START), true, 2.5);
+      VERIFIE(b.garder && std::fabs(q.reglage(Ecran::Fronton).taille - 0.98f) < 1e-4f && q.etape() == Etape::ChoixEcran);
+      q.action(cmd(CREDIT), true, 2.6);
+      VERIFIE(q.etape() == Etape::Menu && q.menuVisible());
+      // Sans DMD à ajuster : le fronton seul.
+      Pause u;
+      images(u, 0.0, 1.0, true, j);
+      images(u, 1.0, 1.4, false, j);
+      u.action(cmd(UI_BAS), true, 1.5);
+      u.action(cmd(START), true, 1.6);
+      u.action(cmd(UI_BAS), true, 1.7);
+      VERIFIE(u.ecran() == Ecran::Fronton);
+      // Hors du menu, le crédit (B) reste un crédit.
+      Pause v;
+      VERIFIE(!v.avaler(cmd(CREDIT)));
    }
    std::printf(echecs ? "banc de la pause : %d echec(s)\n" : "banc de la pause : tout va bien\n", echecs);
    return echecs ? 1 : 0;

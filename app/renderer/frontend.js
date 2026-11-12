@@ -227,6 +227,7 @@ function fillWheelItem(item, n) {
     // Logo qui n'est pas un médaillon carré (large, détouré) : posé sur un disque.
     node.classList.toggle('disc', item.ratio > 1.25 || item.ratio < 0.8);
     place();
+    attachStill(item);
   };
   // Place neuve : le logo y est posé tout de suite, mesuré une fois chargé.
   if (!tilt.firstChild) tilt.append(logo);
@@ -235,6 +236,32 @@ function fillWheelItem(item, n) {
     logo.addEventListener('load', shown, { once: true });
     logo.addEventListener('error', named, { once: true });
   }
+}
+
+/**
+ * Logos animés, réglage « Logos animés : seulement la table choisie » (Tables > Roue, 12/11/2026 : les
+ * voisins qui s'animent tous ensemble, « c'est très perturbant ») : la première image d'un logo
+ * animé (CyberMedia.stillLogo) est posée à côté du logo, en .wheel-still ; hors du centre, la feuille
+ * de style montre celle-ci et ne dessine plus le logo animé, qui reprend au centre. Un logo fixe
+ * n'en reçoit pas. Rien n'est calculé quand tous les logos s'animent.
+ */
+function attachStill(item) {
+  if (!wheelView?.stage.classList.contains('logos-fixes') || typeof CyberMedia.stillLogo !== 'function') return;
+  const { tilt } = item;
+  const logo = tilt.firstElementChild;
+  const url = logo?.classList.contains('wheel-img') && !logo.classList.contains('wheel-still') ? logo.dataset.logo : undefined;
+  if (!url || item.stillFor === url || tilt.querySelector(':scope > .wheel-still')?.dataset.of === url) return;
+  item.stillFor = url;
+  // Posée une fois décodée (stillLogo) : le logo animé ne laisse jamais une place vide. Un logo fixe
+  // (null) garde stillFor : il n'est plus redemandé tant que son adresse ne change pas.
+  CyberMedia.stillLogo(url, 'wheel-img wheel-still').then((still) => {
+    if (item.stillFor !== url || !still) return;
+    item.stillFor = undefined;
+    if (tilt.firstElementChild !== logo) return;
+    still.dataset.of = url;
+    tilt.querySelector(':scope > .wheel-still')?.remove();
+    tilt.append(still);
+  });
 }
 
 function placeWheelItem(item, style, hidden = item.leaving) {
@@ -277,6 +304,8 @@ function wheelStage(s, style) {
   // état reçu, et l'anneau, l'étincelle et l'éclat disparaissaient en cours de route (12/11/2026).
   for (const c of [...v.stage.classList]) if (c.startsWith('roue-') && c !== `roue-${style}`) v.stage.classList.remove(c);
   v.stage.classList.add(`roue-${style}`);
+  // Logos animés : la table choisie seule (par défaut), ou tous (« all »).
+  v.stage.classList.toggle('logos-fixes', s.wheelMotion !== 'all');
   // Autre collection (MagnaSave, déverrouillage du mode invité) : les tables qu'elles partagent
   // glisseraient de leur ancienne place à la nouvelle en se croisant. La roue se repose d'un coup :
   // celles qui restent sautent à leur place (logo déjà mesuré), celles qui partent s'en vont
@@ -335,6 +364,8 @@ function wheelStage(s, style) {
     // Table restée dans la roue dont le logo ou le titre a changé : contenu refait sur place.
     if (item.wheel !== n.wheel || item.title !== n.title) fillWheelItem(item, n);
     placeWheelItem(item, style);
+    // Réglage passé à « la table choisie » en route : les logos déjà posés reçoivent leur première image.
+    attachStill(item);
   }
   for (const [key, item] of v.items) {
     if (live.has(key) || item.leaving) continue;

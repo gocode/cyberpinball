@@ -79,8 +79,9 @@ test('sortie garantie : le plugin traduit le numéro interne des actions et n’
   assert.equal(cpp.match(/enableVPXProcessing\s*=\s*0/g)?.length, 1);
   assert.match(cpp, /if \(pause\.avaler\(c\)\)\s*ev->enableVPXProcessing = 0;/);
   assert.match(h, /if \(c == Commande::Pause \|\| c == Commande::Sortie \|\| c == Commande::Interface \|\| c == Commande::Inconnue\)\s*return false;/);
-  // Table de VPX 10.8.1 : Pause 22, ExitGame 24, InGameUI 25 (15 est le crédit).
-  assert.match(h, /\{ Commande::Jeu, api::AddCredit \},\s*\/\/ 15 Credit1/);
+  // Table de VPX 10.8.1 : Pause 22, ExitGame 24, InGameUI 25 (15 est le crédit, B des manettes : « retour » du
+  // réglage des écrans pendant la pause, jamais avalé hors du menu).
+  assert.match(h, /\{ Commande::Retour, api::AddCredit \},\s*\/\/ 15 Credit1/);
   assert.match(h, /\{ Commande::Pause, -1 \},\s*\/\/ 22 Pause/);
   assert.match(h, /\{ Commande::Sortie, api::ExitGame \},\s*\/\/ 24 ExitGame/);
   assert.match(h, /\{ Commande::Interface, api::OpenInGameUI \},\s*\/\/ 25 InGameUI/);

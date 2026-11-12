@@ -32,11 +32,14 @@ import { recordingLabel, type SavedRecording } from './gamerecording';
 import type { TableEntry } from './tables';
 import { vpsLabel, type VpsGame } from './vps';
 
-export type MediaChoiceSource = 'recording' | 'mediadb' | 'vps' | 'vps-music' | 'pup' | 'dmd-folder' | 'b2s' | 'vpx' | 'vpforums' | 'vpuniverse' | 'web';
+export type MediaChoiceSource = 'recording' | 'rom' | 'mediadb' | 'vps' | 'vps-music' | 'pup' | 'dmd-folder' | 'b2s' | 'vpx' | 'vpforums' | 'vpuniverse' | 'web';
 
 export const MEDIA_CHOICE_SOURCE_LABELS: Record<MediaChoiceSource, string> = {
   get recording() {
     return t('Enregistré en partie sur cette borne');
+  },
+  get rom() {
+    return t('Musique de la ROM');
   },
   mediadb: 'VPinMediaDB',
   get vps() {
@@ -271,6 +274,8 @@ export interface LocalChoiceOptions {
   vpxImages?: { type: MediaType; file: string; label: string }[];
   /** Parties enregistrées et gardées de côté (listRecordings) : en tête, ce sont celles de la borne. */
   recordings?: SavedRecording[];
+  /** Musique tirée de la ROM de la table (romaudio.ts), déjà enregistrée : « t2_l8, 30 s ». */
+  romMusic?: { file: string; bytes: number; label: string };
 }
 
 /** Un .directb2s de la table et ses images, déjà extraites dans le cache (b2sImages, b2sLitImages). */
@@ -432,6 +437,12 @@ export function localMediaChoices(table: TableEntry, opts: LocalChoiceOptions = 
   // Parties enregistrées sur cette borne (gamerecording.ts), les plus récentes d'abord.
   for (const rec of opts.recordings ?? []) {
     const choice = local(rec.type, rec.file, rec.bytes, 'recording', recordingLabel(rec.date));
+    if (choice) push(choice);
+  }
+
+  // Musique tirée de la ROM : faite elle aussi sur cette borne, pour ce jeu.
+  if (opts.romMusic) {
+    const choice = local('Audio', opts.romMusic.file, opts.romMusic.bytes, 'rom', opts.romMusic.label);
     if (choice) push(choice);
   }
 

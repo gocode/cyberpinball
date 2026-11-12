@@ -41,8 +41,11 @@ enum class Commande
    Valider,   // Start : confirme le choix
    Haut,      // joystick vers le haut : « Reprendre »
    Bas,       // joystick vers le bas : « Quitter »
-   Gauche,    // flipper, MagnaSave gauches : « Reprendre »
-   Droite,    // flipper, MagnaSave droits : « Quitter »
+   Gauche,    // flipper gauche, joystick à gauche : choix précédent ; réglage : à gauche
+   Droite,    // flipper droit, joystick à droite : choix suivant ; réglage : à droite
+   Moins,     // MagnaSave gauche (poignée) : comme Gauche au menu ; réglage : plus petit
+   Plus,      // MagnaSave droit (poignée) : comme Droite au menu ; réglage : plus grand
+   Retour,    // crédit (B des manettes du casque) : revient d'un cran du réglage des écrans
    Jeu,       // une action de la table (lancer, secousses, crédit…) : gardée pendant le menu
    Sortie,    // ExitGame (Échap) : jamais avalée
    Interface, // le menu de VPX : jamais avalé
@@ -70,8 +73,8 @@ inline Commande commandeVpx1081(int id, int& lieeA)
       { Commande::Droite, api::RightFlipper },       // 1 RightFlipper
       { Commande::Gauche, api::StagedLeftFlipper },  // 2 LeftStagedFlipper
       { Commande::Droite, api::StagedRightFlipper }, // 3 RightStagedFlipper
-      { Commande::Gauche, api::LeftMagnaSave },      // 4 LeftMagna
-      { Commande::Droite, api::RightMagnaSave },     // 5 RightMagna
+      { Commande::Moins, api::LeftMagnaSave },       // 4 LeftMagna
+      { Commande::Plus, api::RightMagnaSave },       // 5 RightMagna
       { Commande::Haut, -1 },                        // 6 UIUp (joystick vers le haut)
       { Commande::Bas, -1 },                         // 7 UIDown
       { Commande::Gauche, -1 },                      // 8 UILeft
@@ -81,7 +84,7 @@ inline Commande commandeVpx1081(int id, int& lieeA)
       { Commande::Jeu, api::RightNudge },            // 12 RightNudge
       { Commande::Jeu, api::CenterNudge },           // 13 CenterNudge
       { Commande::Jeu, api::Tilt },                  // 14 Tilt
-      { Commande::Jeu, api::AddCredit },             // 15 Credit1
+      { Commande::Retour, api::AddCredit },          // 15 Credit1 (B des manettes du casque, XRInputHandler)
       { Commande::Jeu, api::AddCredit2 },            // 16 Credit2
       { Commande::Jeu, -1 },                         // 17 Credit3
       { Commande::Jeu, -1 },                         // 18 Credit4
@@ -119,13 +122,202 @@ inline Rect cadrer(float sw, float sh, float W, float H, Rect r)
    return { ox + r.x * s, oy + r.y * s, r.l * s, r.h * s };
 }
 
-enum class Choix { Reprendre, Quitter };
+/**
+ * DMD de la pièce VR (règle du 12 novembre 2026 : le cadre DMD d'une pièce VR ne reste jamais gris). VPX
+ * 10.8.1 n'y montre qu'une source d'affichage de contrôleur (flasher en mode DMD, « ctrl://default/display »,
+ * la plus grande) ; le plugin PuP n'en publie aucune et son FullDMD n'est dessiné que dans la fenêtre
+ * ScoreView, jamais rendue en VR (City Hunter : un cadre gris). Le plugin publie donc la sienne : l'écran
+ * DMD de PuP (ou l'image du DMD) dessiné en logiciel dans une image RGB, ici.
+ */
+constexpr int SALLE_DMD_L = 512, SALLE_DMD_H = 288;
+
+/** Texture lue en mémoire (VPXTextureInfo) ; formats dans l'ordre de VPXTextureFormat. */
+enum class FormatTexture { Lum32F = 0, Rgb8 = 1, Rgba8 = 2, Rgb565 = 3 };
+struct TextureLue
+{
+   unsigned int l = 0, h = 0;
+   FormatTexture format = FormatTexture::Rgba8;
+   const void* data = nullptr;
+};
+
+/**
+ * La partie (texX, texY, texW, texH) d'une texture posée dans le rectangle (dx, dy, dw, dh) d'une image RGB
+ * L × H : échantillon au plus proche, teinte et alpha (celui de la texture compris), mélange sur le fond.
+ */
+inline void poserTexture(std::vector<uint8_t>& rgb, int L, int H, const TextureLue& t, float tr, float tg, float tb, float alpha, float texX, float texY, float texW, float texH, float dx,
+   float dy, float dw, float dh)
+{
+   if (!t.data || t.l == 0 || t.h == 0 || dw <= 0.f || dh <= 0.f || texW == 0.f || texH == 0.f || alpha <= 0.f || rgb.size() < static_cast<size_t>(L) * H * 3)
+      return;
+   auto borne = [](float v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : static_cast<int>(v); };
+   const int x0 = borne(dx, 0, L), x1 = borne(dx + dw + 0.999f, 0, L), y0 = borne(dy, 0, H), y1 = borne(dy + dh + 0.999f, 0, H);
+   const float teinte[3] = { tr, tg, tb };
+   for (int y = y0; y < y1; y++)
+   {
+      const float v = texY + (static_cast<float>(y) + 0.5f - dy) / dh * texH;
+      if (v < 0.f || v >= static_cast<float>(t.h))
+         continue;
+      const unsigned int ty = static_cast<unsigned int>(v);
+      for (int x = x0; x < x1; x++)
+      {
+         const float u = texX + (static_cast<float>(x) + 0.5f - dx) / dw * texW;
+         if (u < 0.f || u >= static_cast<float>(t.l))
+            continue;
+         const size_t i = static_cast<size_t>(ty) * t.l + static_cast<unsigned int>(u);
+         float c[3], a = 1.f;
+         switch (t.format)
+         {
+         case FormatTexture::Lum32F:
+            c[0] = c[1] = c[2] = static_cast<const float*>(t.data)[i] * 255.f;
+            break;
+         case FormatTexture::Rgb8:
+            for (int k = 0; k < 3; k++)
+               c[k] = static_cast<const uint8_t*>(t.data)[i * 3 + k];
+            break;
+         case FormatTexture::Rgba8:
+            for (int k = 0; k < 3; k++)
+               c[k] = static_cast<const uint8_t*>(t.data)[i * 4 + k];
+            a = static_cast<const uint8_t*>(t.data)[i * 4 + 3] / 255.f;
+            break;
+         case FormatTexture::Rgb565:
+         {
+            const uint16_t p = static_cast<const uint16_t*>(t.data)[i];
+            c[0] = ((p >> 11) & 31) * 255.f / 31.f;
+            c[1] = ((p >> 5) & 63) * 255.f / 63.f;
+            c[2] = (p & 31) * 255.f / 31.f;
+            break;
+         }
+         }
+         a *= alpha;
+         if (a <= 0.f)
+            continue;
+         if (a > 1.f)
+            a = 1.f;
+         uint8_t* d = &rgb[(static_cast<size_t>(y) * L + x) * 3];
+         for (int k = 0; k < 3; k++)
+         {
+            float s = c[k] * teinte[k];
+            s = s > 255.f ? 255.f : s < 0.f ? 0.f : s;
+            d[k] = static_cast<uint8_t>(d[k] + (s - d[k]) * a + 0.5f);
+         }
+      }
+   }
+}
+
+/**
+ * Remplir un cadre (règle du 12 novembre 2026 : chaque source, PuP, B2S, DMD, image, remplit la partie
+ * visible de son cadre, pour toute table, sans valeur propre à une table). Le rectangle (x, y, l, h) d'une
+ * surface sw × sh posé dans un cadre W × H : proportions gardées, le cadre rempli en rognant au plus
+ * ROGNE_MAX de la source sur un axe (au-delà, des bandes : jamais de forme trahie). Centré en largeur, posé
+ * en bas quand il reste de la hauteur (le fronton repose sur le DMD, comme sur une borne), centré quand il
+ * est rogné. `g` : le réglage du joueur (décalage en part du cadre, taille), appliqué par-dessus.
+ */
+constexpr float ROGNE_MAX = 0.12f;
+
+struct Reglage
+{
+   float dx = 0.f, dy = 0.f, taille = 1.f;
+};
+constexpr float REGLAGE_PAS = 0.01f, REGLAGE_PAS_TAILLE = 0.02f, REGLAGE_TAILLE_MIN = 0.5f, REGLAGE_TAILLE_MAX = 1.6f, REGLAGE_DECALAGE_MAX = 0.5f;
+
+inline Rect remplir(float sw, float sh, float W, float H, Rect r, Reglage g = {})
+{
+   if (sw <= 0.f || sh <= 0.f || W <= 0.f || H <= 0.f)
+      return r;
+   const float contenir = (W / sw < H / sh) ? W / sw : H / sh;
+   const float couvrir = (W / sw > H / sh) ? W / sw : H / sh;
+   const float limite = contenir / (1.f - ROGNE_MAX);
+   const float s = (couvrir < limite ? couvrir : limite) * g.taille;
+   const float w = sw * s, h = sh * s;
+   const float ox = (W - w) / 2.f + g.dx * W;
+   const float oy = (h <= H ? H - h : (H - h) / 2.f) + g.dy * H;
+   return { ox + r.x * s, oy + r.y * s, r.l * s, r.h * s };
+}
+
+/** Part du cadre W × H couverte par le rectangle r (0 à 1) : la mesure du remplissage. */
+inline float couverture(const Rect& r, float W, float H)
+{
+   if (W <= 0.f || H <= 0.f)
+      return 0.f;
+   const float x0 = r.x > 0.f ? r.x : 0.f, y0 = r.y > 0.f ? r.y : 0.f;
+   const float x1 = r.x + r.l < W ? r.x + r.l : W, y1 = r.y + r.h < H ? r.y + r.h : H;
+   return x1 > x0 && y1 > y0 ? (x1 - x0) * (y1 - y0) / (W * H) : 0.f;
+}
+
+/** Un cadre bien rempli : au moins cette part (sinon dit au journal et dans la santé de la borne). */
+constexpr float REMPLI_MIN = 0.85f;
+
+/** Le rectangle qui englobe deux autres (l = 0 : vide). */
+inline Rect englober(const Rect& a, const Rect& b)
+{
+   if (a.l <= 0.f || a.h <= 0.f)
+      return b;
+   if (b.l <= 0.f || b.h <= 0.f)
+      return a;
+   const float x0 = a.x < b.x ? a.x : b.x, y0 = a.y < b.y ? a.y : b.y;
+   const float x1 = a.x + a.l > b.x + b.l ? a.x + a.l : b.x + b.l, y1 = a.y + a.h > b.y + b.h ? a.y + a.h : b.y + b.h;
+   return { x0, y0, x1 - x0, y1 - y0 };
+}
+
+/** Réglage « dx,dy,taille » lu d'un texte (point décimal) ; le neutre s'il ne tient pas debout. */
+inline Reglage lireReglage(const std::string& texte)
+{
+   float v[3] = { 0.f, 0.f, 1.f };
+   size_t debut = 0;
+   for (int i = 0; i < 3; i++)
+   {
+      const size_t fin = texte.find(',', debut);
+      const std::string part = texte.substr(debut, fin == std::string::npos ? std::string::npos : fin - debut);
+      // Point décimal quelle que soit la langue du système (strtof suivrait la locale).
+      float x = 0.f, f = 0.f;
+      bool chiffre = false, negatif = false;
+      size_t k = 0;
+      if (k < part.size() && (part[k] == '-' || part[k] == '+'))
+         negatif = part[k++] == '-';
+      for (; k < part.size(); k++)
+      {
+         const char ch = part[k];
+         if (ch == '.' && f == 0.f)
+            f = 1.f;
+         else if (ch >= '0' && ch <= '9')
+         {
+            chiffre = true;
+            if (f > 0.f)
+               x += (ch - '0') * (f *= 0.1f);
+            else
+               x = x * 10.f + (ch - '0');
+         }
+         else
+            return {};
+      }
+      if (!chiffre)
+         return {};
+      if (negatif)
+         x = -x;
+      v[i] = x;
+      if (fin == std::string::npos && i < 2)
+         return {};
+      debut = fin == std::string::npos ? texte.size() : fin + 1;
+   }
+   if (v[0] < -REGLAGE_DECALAGE_MAX || v[0] > REGLAGE_DECALAGE_MAX || v[1] < -REGLAGE_DECALAGE_MAX || v[1] > REGLAGE_DECALAGE_MAX || v[2] < REGLAGE_TAILLE_MIN || v[2] > REGLAGE_TAILLE_MAX)
+      return {};
+   return { v[0], v[1], v[2] };
+}
+
+/** Les écrans que le joueur peut ajuster dans la pause. */
+enum class Ecran { Fronton = 0, Dmd = 1 };
+
+enum class Choix { Reprendre, Ajuster, Quitter };
+
+/** Où en est la pause : le menu, le choix de l'écran à ajuster, ou son réglage. */
+enum class Etape { Menu, ChoixEcran, Reglage };
 
 /** Ce que la pause demande au plugin. */
 struct Ordre
 {
    int reprendre = 0; // essai de reprise : 1 le premier moyen, 2 le second (0 rien)
    int quitter = 0;   // demande de sortie : 1 la première (ExitGame), 2 et plus de plus en plus ferme
+   bool garder = false; // réglage d'un écran validé (A) : à enregistrer pour cette table
 };
 
 class Pause
@@ -136,6 +328,18 @@ public:
    bool estFiable() const { return fiable; }
 
    bool vpxEnPause() const { return enPause; }
+   Etape etape() const { return menuVisible() ? etapeCourante : Etape::Menu; }
+   Ecran ecran() const { return ecranChoisi; }
+   /** Le DMD est-il là à ajuster (bande sous le fronton, cadre de la pièce) ? Sinon, le fronton seul. */
+   void dmdAjustable(bool oui) { dmdPresent = oui; }
+   bool dmdAjustable() const { return dmdPresent; }
+   /** Les réglages enregistrés de la table ([Plugin.CyberPinball] Adjust), en début de partie. */
+   void poserReglage(Ecran e, Reglage g) { reglages[static_cast<int>(e)] = g; }
+   /** Le réglage en vigueur : celui en cours de réglage (aperçu en direct), sinon l'enregistré. */
+   Reglage reglage(Ecran e) const
+   {
+      return etape() == Etape::Reglage && ecranChoisi == e ? brouillon : reglages[static_cast<int>(e)];
+   }
    bool menuVisible() const { return menu && !quitte; }
    bool appuiEnCours() const { return appui; }
    bool quitteDemande() const { return quitte; }
@@ -195,15 +399,65 @@ public:
       }
       if (!menuVisible() || !presse || !fiable)
          return o;
+      if (etapeCourante == Etape::ChoixEcran)
+      {
+         switch (c)
+         {
+         case Commande::Haut:
+         case Commande::Gauche:
+         case Commande::Moins: ecranChoisi = Ecran::Fronton; break;
+         case Commande::Bas:
+         case Commande::Droite:
+         case Commande::Plus:
+            if (dmdPresent)
+               ecranChoisi = Ecran::Dmd;
+            break;
+         case Commande::Valider:
+            brouillon = reglages[static_cast<int>(ecranChoisi)];
+            etapeCourante = Etape::Reglage;
+            break;
+         case Commande::Retour: etapeCourante = Etape::Menu; break;
+         default: break;
+         }
+         return o;
+      }
+      if (etapeCourante == Etape::Reglage)
+      {
+         auto borner = [](float v, float lo, float hi) { return v < lo ? lo : v > hi ? hi : v; };
+         switch (c)
+         {
+         case Commande::Haut: brouillon.dy = borner(brouillon.dy - REGLAGE_PAS, -REGLAGE_DECALAGE_MAX, REGLAGE_DECALAGE_MAX); break;
+         case Commande::Bas: brouillon.dy = borner(brouillon.dy + REGLAGE_PAS, -REGLAGE_DECALAGE_MAX, REGLAGE_DECALAGE_MAX); break;
+         case Commande::Gauche: brouillon.dx = borner(brouillon.dx - REGLAGE_PAS, -REGLAGE_DECALAGE_MAX, REGLAGE_DECALAGE_MAX); break;
+         case Commande::Droite: brouillon.dx = borner(brouillon.dx + REGLAGE_PAS, -REGLAGE_DECALAGE_MAX, REGLAGE_DECALAGE_MAX); break;
+         case Commande::Moins: brouillon.taille = borner(brouillon.taille - REGLAGE_PAS_TAILLE, REGLAGE_TAILLE_MIN, REGLAGE_TAILLE_MAX); break;
+         case Commande::Plus: brouillon.taille = borner(brouillon.taille + REGLAGE_PAS_TAILLE, REGLAGE_TAILLE_MIN, REGLAGE_TAILLE_MAX); break;
+         case Commande::Valider:
+            reglages[static_cast<int>(ecranChoisi)] = brouillon;
+            o.garder = true;
+            etapeCourante = Etape::ChoixEcran;
+            break;
+         case Commande::Retour: etapeCourante = Etape::ChoixEcran; break;
+         default: break;
+         }
+         return o;
+      }
       switch (c)
       {
       case Commande::Haut:
-      case Commande::Gauche: selection = Choix::Reprendre; break;
+      case Commande::Gauche:
+      case Commande::Moins: selection = selection == Choix::Quitter ? Choix::Ajuster : Choix::Reprendre; break;
       case Commande::Bas:
-      case Commande::Droite: selection = Choix::Quitter; break;
+      case Commande::Droite:
+      case Commande::Plus: selection = selection == Choix::Reprendre ? Choix::Ajuster : Choix::Quitter; break;
       case Commande::Valider:
          if (selection == Choix::Quitter)
             o.quitter = demanderSortie(t);
+         else if (selection == Choix::Ajuster)
+         {
+            etapeCourante = Etape::ChoixEcran;
+            ecranChoisi = Ecran::Fronton;
+         }
          else
          {
             debutReprise = t;
@@ -244,6 +498,7 @@ public:
       if (enPause && !avant && !interfaceVpx && !quitte)
       {
          menu = true;
+         etapeCourante = Etape::Menu;
          selection = Choix::Reprendre;
          echecReprise = false;
          essaisReprise = 0;
@@ -276,6 +531,7 @@ public:
       return o;
    }
 
+   /** Nouvelle partie : tout repart (les réglages des écrans sont reposés ensuite depuis l'INI). */
    void remiseAZero() { *this = Pause {}; }
 
 private:
@@ -305,6 +561,11 @@ private:
    int essaisReprise = 0;
    int essaisSortie = 0;
    Choix selection = Choix::Reprendre;
+   Etape etapeCourante = Etape::Menu;
+   Ecran ecranChoisi = Ecran::Fronton;
+   bool dmdPresent = false;
+   Reglage reglages[2] {};
+   Reglage brouillon {};
 };
 
 // PNG sans compression (blocs « stockés » de deflate) : les captures de diagnostic du plugin, sans bibliothèque.

@@ -32,7 +32,7 @@ export const messages: Record<string, string> = {
   'Configuration de la borne': 'Cabinet setup',
   // packages/core/src/systemmenu.ts : rubriques du menu système
   'Tables': 'Tables',
-  'Toutes les tables et leur fiche, collections de la roue, ajouter une table, téléchargements, bibliothèque de ROM': 'Every table and its page, wheel collections, add a table, downloads, ROM library',
+  'Toutes les tables et leur fiche, collections, réglages de la roue, ajouter une table, téléchargements, bibliothèque de ROM': 'Every table and its page, collections, wheel settings, add a table, downloads, ROM library',
   'Toutes les tables': 'All tables',
   'Migration': 'Migration',
   'Images et vidéos des tables, musique et mode attente du menu, Juke-box': 'Table images and videos, menu music and attract mode, Juke-box',
@@ -184,7 +184,19 @@ export const messages: Record<string, string> = {
   'Ordre des tables : {order}': 'Table order: {order}',
   '{detail} (Start : changer)': '{detail} (Start: change)',
   'Table au démarrage : {start}': 'Table at startup: {start}',
-  // Start sur la roue (tableorder.ts, WHEEL_STARTS ; app/src/menu-settings.ts, app/src/frontend.ts)
+  // Menu système > Tables > Roue (app/src/wheel-settings.ts ; mediaview.ts, WHEEL_MOTIONS)
+  Roue: 'Wheel',
+  'Comment la roue présente les tables. Chaque choix s’applique aussitôt ; les collections qu’elle montre se règlent dans « Collections ».':
+    'How the wheel presents the tables. Each choice applies at once; the collections it shows are set in “Collections”.',
+  '{layout} · ordre : {order} · logos animés : {motion}': '{layout} · order: {order} · animated logos: {motion}',
+  'seulement la table choisie': 'only the chosen table',
+  tous: 'all',
+  'Logos animés : {motion}': 'Animated logos: {motion}',
+  'Seul le logo de la table choisie s’anime ; les autres restent fixes, sur leur première image (Start : animer tous les logos)':
+    'Only the chosen table’s logo moves; the others stay still, on their first frame (Start: animate every logo)',
+  'Chaque logo animé de la roue joue son animation, même loin du centre (Start : seulement la table choisie)':
+    'Every animated logo on the wheel plays its animation, even far from the centre (Start: only the chosen table)',
+  // Start sur la roue (tableorder.ts, WHEEL_STARTS ; app/src/wheel-settings.ts, app/src/frontend.ts)
   'ouvrir la fiche': 'open the game page',
   'jouer directement': 'play right away',
   'Start sur la roue : {start}': 'Start on the wheel: {start}',

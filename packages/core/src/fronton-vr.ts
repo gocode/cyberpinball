@@ -20,6 +20,7 @@
 import * as fs from 'node:fs';
 import * as zlib from 'node:zlib';
 import { CompoundFile, readVpxScript } from './vpxinfo';
+import { frameRatio } from './vr-ecrans';
 
 /** Zone du fronton, en fractions de sa largeur et de sa hauteur, depuis le coin haut gauche. */
 export interface BackglassZone {
@@ -69,6 +70,58 @@ function records(buf: Buffer): Record_[] {
 
 const latin = (b: Buffer) => (b.length >= 4 ? b.toString('latin1', 4, Math.min(b.length, 4 + b.readUInt32LE(0))) : '');
 const wide = (b: Buffer) => (b.length >= 4 ? b.toString('utf16le', 4, Math.min(b.length, 4 + b.readUInt32LE(0))).replace(/\0+$/, '') : '');
+
+/** Type d'objet « flasher » dans un GameItem de VPX (ItemType : eItemFlasher). */
+const ITEM_FLASHER = 20;
+
+/**
+ * Un flasher en mode DMD, d'après ses enregistrements (flasher.cpp, LoadToken : IDMD booléen des anciennes
+ * tables, RDMD = 1 des nouvelles) : un cadre DMD dans la scène. Rend son nom, ou undefined.
+ */
+export function dmdFlasherName(recs: readonly { tag: string; body: Buffer }[]): string | undefined {
+  let name = '';
+  let dmd = false;
+  for (const r of recs) {
+    if (r.tag === 'NAME') name = wide(r.body);
+    else if (r.tag === 'IDMD' && r.body.length >= 4) dmd = r.body.readUInt32LE(0) !== 0;
+    else if (r.tag === 'RDMD' && r.body.length >= 4) dmd = r.body.readUInt32LE(0) === 1;
+  }
+  return dmd ? name || '?' : undefined;
+}
+
+/** Proportions d'un flasher (largeur / hauteur) d'après ses points (VCEN : x, y), undefined si inconnues. */
+export function flasherRatio(recs: readonly { tag: string; body: Buffer }[]): number | undefined {
+  const points = recs.filter((r) => r.tag === 'VCEN' && r.body.length >= 8).map((r) => ({ x: r.body.readFloatLE(0), y: r.body.readFloatLE(4) }));
+  return frameRatio(points);
+}
+
+/**
+ * Cadres DMD de la scène d'une table (flashers en mode DMD), leur nom et leur forme ; undefined si le fichier
+ * est illisible. Dans le casque, VPX n'y montre qu'une source d'affichage de contrôleur (vr-sources.ts).
+ */
+export function vpxDmdFrames(file: string): { name: string; ratio?: number }[] | undefined {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(file, 'r');
+    const cfb = new CompoundFile(fd);
+    const game = cfb.children(cfb.entries[0]!).find((e) => e.type === 1 && e.name === 'GameStg');
+    if (!game) return undefined;
+    const frames: { name: string; ratio?: number }[] = [];
+    for (const item of cfb.children(game)) {
+      if (item.type !== 2 || !/^GameItem\d+$/.test(item.name)) continue;
+      if (cfb.stream(item, 4).readUInt32LE(0) !== ITEM_FLASHER) continue;
+      const recs = records(cfb.stream(item, 1024 * 1024).subarray(4));
+      const name = dmdFlasherName(recs);
+      const ratio = name ? flasherRatio(recs) : undefined;
+      if (name) frames.push({ name, ...(ratio ? { ratio } : {}) });
+    }
+    return frames;
+  } catch {
+    return undefined;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
 
 /** Une image peut-elle être transparente ? PNG à canal alpha, WebP à drapeau alpha, image brute (BGRA) : oui. */
 export function imageMayBeTransparent(data: Buffer | undefined): boolean {
@@ -468,6 +521,8 @@ export interface VrMeasures {
   captures: { name: string; source: string; brightness: number; ok: boolean }[];
   /** Ce que le plugin a dessiné en dernier : la source du fronton et celle du DMD (« sources fronton=… dmd=… »). */
   drawn?: { backglass: string; dmd: string };
+  /** Ce que le plugin a dessiné en dernier dans le cadre DMD de la pièce VR (« PUP », « image », « aucune »). */
+  roomDmd?: string;
 }
 
 /**
@@ -503,7 +558,12 @@ export function parseVrMeasures(text: string): VrMeasures | undefined {
     .filter((l) => l.startsWith('sources '))
     .map(values)
     .pop();
-  if (!rows.length && !captures.length && !last) return undefined;
+  const room = text
+    .split(/\r?\n/)
+    .filter((l) => l.startsWith('salle dmd='))
+    .map(values)
+    .pop();
+  if (!rows.length && !captures.length && !last && !room) return undefined;
   const nums = (key: string) => rows.map((r) => Number(r[key])).filter((n) => Number.isFinite(n));
   const stat = (key: string) => {
     const v = nums(key);
@@ -518,5 +578,6 @@ export function parseVrMeasures(text: string): VrMeasures | undefined {
     gameTime: stat('jeu').mean,
     captures,
     ...(last ? { drawn: { backglass: last.fronton ?? '?', dmd: last.dmd ?? '?' } } : {}),
+    ...(room?.dmd ? { roomDmd: room.dmd } : {}),
   };
 }

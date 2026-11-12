@@ -47,9 +47,9 @@ test('fronton cadré : l’ordre des rendus suit les priorités de VPX, un rendu
 
 test('plugin : fronton cadré (proportions gardées) et vidéos de PuP que VPX ne dessine pas en VR dessinées à vide', () => {
   const cpp = read('packages', 'vpx-vision3d', 'src', 'cyberpinball.cpp');
-  // Hors de la pause, le rendu suivant passe par le cadre ; les coordonnées de sa surface y sont mises à l'échelle, centrées.
+  // Hors de la pause, le rendu suivant passe par le cadre ; sa surface y est posée pour remplir la zone (pause.h, remplir).
   assert.match(cpp, /if \(!pause\.affichee\(t\)\)\s*return dessinerCadre\(ctx, t\);/);
-  assert.match(cpp, /const Rect r = cadrer\(cadre\.dedans\.srcWidth, cadre\.dedans\.srcHeight, cadre\.zone\.l, cadre\.zone\.h/);
+  assert.match(cpp, /const Rect r = remplir\(cadre\.dedans\.srcWidth, cadre\.dedans\.srcHeight, cadre\.zone\.l, cadre\.zone\.h, \{ x, y, l, h \}, cadre\.reglage\);/);
   for (const fn of ['DrawImage = cadreImage', 'DrawDisplay = cadreAfficheur', 'DrawSegDisplay = cadreSegments']) assert.ok(cpp.includes(`cadre.dedans.${fn};`), fn);
   // PuP pose son écran sur toute sa surface : la forme de son fronton lui est donnée (16:9 par défaut).
   assert.match(cpp, /MSGPI_FLOAT_VAL_SETTING\(pupRatio, "PupRatio"[^;]*1\.7778f\);/);

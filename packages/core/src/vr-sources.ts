@@ -8,6 +8,12 @@
 // scène. Le plugin de Cyber Pinball dessine donc, sur le fronton que VPX pose, une bande DMD sous le fronton
 // (chaîne PuP, ScoreView, B2S), et des images de secours (fronton et DMD des médias de Cyber Pinball).
 // Ce module dit, sans VPX, quelle source chaque table aura, pour le journal et la santé de la borne.
+//
+// Cadre DMD d'une pièce VR (City Hunter, même jour : un DMD gris, alors que sa pièce montre le FullDMD de PuP) :
+// un flasher en mode DMD (fronton-vr.ts, vpxDmdFrames), où VPX 10.8.1 ne montre qu'une source d'affichage de
+// contrôleur (PinMAME, FlexDMD, UltraDMD). PuP n'en publie aucune : le plugin de Cyber Pinball publie la sienne
+// ([Plugin.CyberPinball] RoomDmd, roomDmdSetting), même chaîne que la bande : PuP, puis le DMD du script, puis
+// l'image.
 
 /** `room` : la pièce VR de la table, avec son propre fronton et son propre DMD. */
 export type BackglassSource = 'room' | 'PuP-Pack' | 'directb2s' | 'image';
@@ -20,6 +26,10 @@ export interface VrSourceFacts {
   pupPack: boolean;
   /** Fichier .directb2s à côté de la table. */
   directb2s: boolean;
+  /** La scène a un cadre DMD (flasher en mode DMD) : celui de la pièce VR. */
+  dmdFrame?: boolean;
+  /** Le PuP-Pack actif dessine dans la fenêtre du DMD (écran 5, sinon 1 : packDrawsDmd). */
+  pupDmd?: boolean;
   /** Image (pas vidéo) du fronton et du DMD trouvées par Cyber Pinball (médias de la table ou par défaut). */
   backglassImage: boolean;
   dmdImage: boolean;
@@ -43,10 +53,25 @@ export function scriptDmd(script: string | undefined): 'PinMAME' | 'FlexDMD' | '
 
 /** Les sources qu'aura la table dans le casque, la première de chaque chaîne. */
 export function vrSources(f: VrSourceFacts): VrSources {
-  if (f.ownRoom) return { backglass: 'room', dmd: 'room' };
+  if (f.ownRoom) {
+    // Pièce VR à cadre DMD : la chaîne de la bande, PuP, puis le DMD du script, puis l'image ; sans cadre, la pièce.
+    if (!f.dmdFrame) return { backglass: 'room', dmd: 'room' };
+    const dmd: DmdSource | undefined = f.pupDmd ? 'PuP-Pack' : (scriptDmd(f.script) ?? (f.dmdImage ? 'image' : undefined));
+    return { backglass: 'room', ...(dmd ? { dmd } : {}) };
+  }
   const backglass: BackglassSource | undefined = f.pupPack ? 'PuP-Pack' : f.directb2s ? 'directb2s' : f.backglassImage ? 'image' : undefined;
   const dmd: DmdSource | undefined = scriptDmd(f.script) ?? (f.pupPack ? 'PuP-Pack' : f.dmdImage ? 'image' : undefined);
   return { ...(backglass ? { backglass } : {}), ...(dmd ? { dmd } : {}) };
+}
+
+/**
+ * [Plugin.CyberPinball] RoomDmd : la source que le plugin publie pour le cadre DMD de la pièce VR (« PUP »,
+ * « image »), ou '' quand le DMD du script le remplit (ou sans pièce VR ni cadre DMD).
+ */
+export function roomDmdSetting(f: VrSourceFacts): 'PUP' | 'image' | '' {
+  if (!f.ownRoom || !f.dmdFrame) return '';
+  const dmd = vrSources(f).dmd;
+  return dmd === 'PuP-Pack' ? 'PUP' : dmd === 'image' ? 'image' : '';
 }
 
 /** Ce qui manque : le fronton, le DMD, ou rien. */

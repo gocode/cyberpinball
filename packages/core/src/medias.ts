@@ -580,7 +580,14 @@ export type B2sImageKind = 'backglass' | 'dmd';
 export type B2sImageProvider = (table: TableEntry, kind: B2sImageKind) => string | undefined;
 
 /** Étape de la recherche (§ 5.3) qui a fourni le média. */
-export type MediaSource = 'vpx-name' | 'folder-name' | 'vpinfe' | 'b2s' | 'default' | 'fallback';
+export type MediaSource = 'vpx-name' | 'folder-name' | 'vpinfe' | 'b2s' | 'rom' | 'default' | 'fallback';
+
+/**
+ * Musique tirée de la ROM de la table (romaudio.ts), déjà enregistrée dans
+ * <données>\cache\musiques-rom, ou undefined. Synchrone, comme B2sImageProvider :
+ * l'enregistrement se fait ailleurs, en tâche de fond.
+ */
+export type RomAudioProvider = (table: TableEntry) => string | undefined;
 
 export interface ResolvedMedia {
   /** Type demandé. */
@@ -610,6 +617,8 @@ export interface ResolvedMedia {
 export interface ResolveOptions {
   /** Image du .directb2s. Sans elle, l'étape 4 est sautée. */
   b2sImage?: B2sImageProvider;
+  /** Musique tirée de la ROM, pour la musique du jeu (Audio). Sans elle, cette étape est sautée. */
+  romAudio?: RomAudioProvider;
   /**
    * Bord des flippers dans l'image Windows du playfield (currentFlipperEdge, ou
    * cabinet.playfield.flipperEdge). Défaut : celui du modèle de borne, sinon en bas.
@@ -685,7 +694,8 @@ function dmdPartner(type: MediaType): MediaType | undefined {
  * Média à montrer pour une table, dans l'ordre du § 5.3 :
  * 1. medias\(Type) <nom du .vpx>.* ; 2. medias\(Type) <nom du dossier>.* ;
  * 3. noms de VPinFE dans medias\ ; 4. image du .directb2s (fronton ; DMDImage pour
- * l'afficheur) ; 5. <racine>\media\(Type).* ; 6. repli intégré.
+ * l'afficheur), musique tirée de la ROM (musique du jeu) ; 5. <racine>\media\(Type).* ;
+ * 6. repli intégré.
  * Pour DMD et FullDMD, l'autre type est essayé aux étapes 1 à 3 avant l'étape 4.
  */
 export function resolveMedia(table: TableEntry, root: string, type: MediaType, options: ResolveOptions = {}): ResolvedMedia {
@@ -706,6 +716,11 @@ export function resolveMedia(table: TableEntry, root: string, type: MediaType, o
   if (b2sKind && options.b2sImage) {
     const image = options.b2sImage(table, b2sKind);
     if (image && fs.existsSync(image)) return done('b2s', [image], info.type);
+  }
+  // Musique du jeu : celle tirée de sa ROM, avant la musique de la borne (propre à ce jeu).
+  if (info.type === 'Audio' && options.romAudio) {
+    const music = options.romAudio(table);
+    if (music && fs.existsSync(music)) return done('rom', [music], info.type);
   }
   const byDefault = findDefault(root, info, skipped);
   if (byDefault.length) return done('default', byDefault, info.type);

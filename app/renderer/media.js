@@ -641,5 +641,78 @@
     return known;
   }
 
-  window.CyberMedia = { layer, preload, logo, reach, beginRender, measuredRotation, fitTexts, setSink };
+  /**
+   * Première image d'un logo animé (APNG, GIF ou WebP animés), pour la roue qui ne laisse s'animer
+   * que la table choisie (réglage « Logos animés », 12/11/2026). Promesse d'une adresse blob: de
+   * cette image ; null pour un logo fixe, illisible, ou si le navigateur ne sait pas décoder
+   * image par image (ImageDecoder). Calculée une fois par logo ; le fichier n'est lu en entier
+   * que s'il est animé (l'en-tête suffit à le savoir).
+   */
+  const stills = new Map();
+  const IMAGE_TYPES = { png: 'image/png', apng: 'image/apng', gif: 'image/gif', webp: 'image/webp' };
+  async function decodeStill(url) {
+    if (typeof ImageDecoder !== 'function' || typeof fetch !== 'function') return null;
+    let decoder;
+    try {
+      const res = await fetch(url);
+      if (!res.ok || !res.body) return null;
+      const ext = /\.([a-z0-9]+)(?:[?#].*)?$/i.exec(decodeURIComponent(url))?.[1]?.toLowerCase();
+      const type = (res.headers.get('content-type') || '').split(';')[0].trim() || IMAGE_TYPES[ext] || '';
+      if (!/^image\/(png|apng|gif|webp)$/.test(type) || !(await ImageDecoder.isTypeSupported(type))) {
+        res.body.cancel().catch(() => {});
+        return null;
+      }
+      decoder = new ImageDecoder({ data: res.body, type });
+      await decoder.tracks.ready;
+      if (!decoder.tracks.selectedTrack?.animated) return null;
+      const { image } = await decoder.decode({ frameIndex: 0 });
+      const canvas = document.createElement('canvas');
+      canvas.width = image.displayWidth;
+      canvas.height = image.displayHeight;
+      canvas.getContext('2d').drawImage(image, 0, 0);
+      image.close();
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      return blob ? URL.createObjectURL(blob) : null;
+    } catch {
+      return null;
+    } finally {
+      decoder?.close();
+    }
+  }
+  function still(url) {
+    if (!url) return Promise.resolve(null);
+    let known = stills.get(url);
+    if (!known) {
+      known = decodeStill(url);
+      stills.set(url, known);
+      if (stills.size > 128) {
+        const [old, value] = stills.entries().next().value;
+        stills.delete(old);
+        value.then((blob) => blob && URL.revokeObjectURL(blob));
+      }
+    }
+    return known;
+  }
+  /**
+   * Image de la première image d'un logo animé, prête à poser (décodée) : une <img> neuve par
+   * demande ; null pour un logo fixe ou illisible. Voir still.
+   */
+  async function stillLogo(url, className) {
+    const blob = await still(url);
+    if (!blob) return null;
+    const img = new Image();
+    img.decoding = 'async';
+    img.draggable = false;
+    img.alt = '';
+    img.className = className ?? '';
+    img.src = blob;
+    try {
+      await img.decode?.();
+    } catch {
+      return null;
+    }
+    return img;
+  }
+
+  window.CyberMedia = { layer, preload, logo, reach, stillLogo, beginRender, measuredRotation, fitTexts, setSink };
 })();

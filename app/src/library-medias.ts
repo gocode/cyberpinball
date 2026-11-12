@@ -76,6 +76,7 @@ import { allowPreview } from './media-protocol';
 import type { Converter } from './media-convert';
 import { createProposals } from './media-proposals';
 import { createTableSounds } from './media-sounds';
+import { romMusicLabel } from './rom-music';
 import type { MediaSites } from './media-sites';
 import { createWebSearch } from './media-web';
 import type { MediaSearch } from './media-search';
@@ -245,9 +246,16 @@ export function createMedias(ctx: MediasContext) {
 
   const current = (s: Session, table: TableEntry, type: MediaType) => ownMediaPages(table, root(), type, { b2sImage: b2sImage(s) });
 
+  /** Musique tirée de la ROM (rom-music.ts), repli de la musique du jeu ; undefined sans le service (essais). */
+  const romAudio = () => {
+    const music = host.romMusic?.();
+    return music ? (table: TableEntry) => music.file(table) : undefined;
+  };
+
   function resolved(s: Session, table: TableEntry, type: MediaType): ResolvedMedia {
     return resolveMedia(table, root(), type, {
       b2sImage: b2sImage(s),
+      romAudio: romAudio(),
       cabinet: cabinet(),
       dimensions: dims(s),
       measure: true,
@@ -262,7 +270,7 @@ export function createMedias(ctx: MediasContext) {
     if (partner && draftPages(s.draft, partner, current(s, table, partner)).length) return t('{label} réduit à cet écran', { label: mediaTypeInfo(partner).label });
     // Même recherche, sans le dossier medias\ du jeu.
     const bare = { ...table, folder: path.join(table.folder, '.sans-medias') };
-    const r = resolveMedia(bare, root(), type, { b2sImage: b2sImage(s) });
+    const r = resolveMedia(bare, root(), type, { b2sImage: b2sImage(s), romAudio: romAudio() && (() => host.romMusic?.()?.file(table)) });
     const state = mediaStateLabel(r, root());
     if (r.source === 'fallback') return info.fallback === 'none' ? t('rien') : t('repli intégré : {what}', { what: lowerFirst(info.fallbackLabel) });
     // Le repli seul (sans « Repli : »), repris dans la phrase.
@@ -611,6 +619,45 @@ export function createMedias(ctx: MediasContext) {
     nav(s, () => buildType(s, type), at);
   }
 
+  /**
+   * « Musique de la ROM » (rom-music.ts), pour une table à ROM : la prendre comme musique du jeu
+   * si elle est déjà enregistrée, sinon faire tourner la ROM maintenant (environ une minute, sans
+   * son ni écran) ; l'écran se redessine quand elle est prête.
+   */
+  function romMusicAction(s: Session, table: TableEntry, type: MediaType, at: number): Action | undefined {
+    const music = host.romMusic?.();
+    const status = music?.status(table);
+    if (!music || !status || status.state === 'noRom') return undefined;
+    const label = t('Musique de la ROM');
+    const record = () => {
+      music.request(table);
+      s.next = { text: t('Enregistrement de la musique de {rom} lancé : elle sera proposée ici dans une minute environ.', { rom: status.rom }), tone: 'info' };
+      openType(s, type, at);
+    };
+    switch (status.state) {
+      case 'ok':
+        return {
+          label,
+          detail: t('{what} : Start pour la prendre', { what: romMusicLabel(status.rom, status.record) }),
+          tone: 'ok',
+          run: () => {
+            s.next = { text: place(s, table, type, { from: status.file!, mode: 'copy' }, { kind: 'set' }), tone: 'info' };
+            openType(s, type, at);
+          },
+        };
+      case 'recording':
+        return { label, detail: t('{rom} : enregistrement en cours, environ une minute, sans son ni écran', { rom: status.rom }), run: () => openType(s, type, at) };
+      case 'queued':
+        return { label, detail: t('{rom} : enregistrement demandé, il part dès que possible', { rom: status.rom }), run: () => openType(s, type, at) };
+      case 'silent':
+        return { label, detail: t('{rom} n’a rien joué au dernier essai ({detail}) ; Start pour réessayer', { rom: status.rom, detail: status.record.detail ?? '' }), run: record };
+      case 'failed':
+        return { label, detail: t('{rom} : échec au dernier essai ({detail}) ; Start pour réessayer', { rom: status.rom, detail: status.record.detail ?? '' }), tone: 'warning', run: record };
+      case 'none':
+        return { label, detail: t('Faire tourner {rom} sans son ni écran et garder sa musique (environ une minute)', { rom: status.rom }), run: record };
+    }
+  }
+
   function buildType(s: Session, type: MediaType): Built {
     const table = tableOf(s);
     if (!table) return lost();
@@ -679,6 +726,8 @@ export function createMedias(ctx: MediasContext) {
         const at = actions.length;
         actions.push({ label: t('Sons de la table'), detail: t('PuP-Pack, médias, vidéos avec du son : écouter, puis choisir'), tone: 'ok', run: () => sounds.open(table, type, at) });
       }
+      const romAction = type === 'Audio' ? romMusicAction(s, table, type, actions.length) : undefined;
+      if (romAction) actions.push(romAction);
       actions.push(
         { label: file ? t('Remplacer depuis le dossier d’import') : t('Prendre dans le dossier d’import'), detail: importDetail, run: () => openPick(s, type, { kind: 'set' }) },
         { label: file ? t('Remplacer : choisir un fichier…') : t('Choisir un fichier…'), detail: t('Téléchargements de Cyber Pinball, clé USB, ce PC ; ou glissez-le ici'), run: () => void pickOnPc(s, type, { kind: 'set' }) },

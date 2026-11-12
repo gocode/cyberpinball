@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { desktopVisibility } from '../fronton-vr';
-import { isVrImage, missingVrSources, scriptDmd, VR_DMD_BAND, vrSources } from '../vr-sources';
+import { desktopVisibility, dmdFlasherName, parseVrMeasures } from '../fronton-vr';
+import { isVrImage, missingVrSources, roomDmdSetting, scriptDmd, VR_DMD_BAND, vrSources } from '../vr-sources';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8').replace(/\r\n/g, '\n');
@@ -20,7 +20,7 @@ test('sources du fronton et du DMD : la première de chaque chaîne, les quatre 
   assert.deepEqual(vrSources({ ...facts, directb2s: true, script: 'Set Controller = CreateObject("VPinMAME.Controller")' }), { backglass: 'directb2s', dmd: 'PinMAME' });
   // The Matrix sans PuP-Pack : l'image du fronton de Cyber Pinball, et le DMD de FlexDMD.
   assert.deepEqual(vrSources({ ...facts, backglassImage: true, script: 'Set FlexDMD = CreateObject("FlexDMD.FlexDMD")' }), { backglass: 'image', dmd: 'FlexDMD' });
-  // City Hunter : sa pièce VR a son fronton et son DMD (alimenté par son script).
+  // Une pièce VR sans cadre DMD dans sa scène : son fronton et son DMD sont les siens.
   assert.deepEqual(vrSources({ ...facts, ownRoom: true, script: 'UltraDMD' }), { backglass: 'room', dmd: 'room' });
   // Rien du tout : dit, pour le journal et la santé de la borne.
   assert.deepEqual(missingVrSources(vrSources(facts)), ['fronton', 'DMD']);
@@ -67,4 +67,58 @@ test('recopie sur le playfield : une option du menu, éteinte par défaut, pass�
   assert.match(frontend, /library\.provideSystemItem\('vr-mirror', \{/);
   assert.match(frontend, /prepareVrGame\(\{[^}]*mirror: vrMirror \}\)/);
   assert.match(read('app', 'src', 'vr.ts'), /\.mirror === true;/);
+});
+
+test('cadre DMD d’une pièce VR : la chaîne de la bande, jamais gris (City Hunter, le FullDMD de PuP)', () => {
+  // City Hunter : flasher « DMDPUP » en mode DMD, PuP-Pack dont l'écran 1 est le FullDMD, pas de DMD de ROM.
+  const cityHunter = { ...facts, ownRoom: true, dmdFrame: true, pupPack: true, pupDmd: true, dmdImage: true, script: 'Set PuPlayer = CreateObject("PinUpPlayer.PinDisplay")' };
+  assert.deepEqual(vrSources(cityHunter), { backglass: 'room', dmd: 'PuP-Pack' });
+  assert.equal(roomDmdSetting(cityHunter), 'PUP');
+  // PuP d'abord, même devant la ROM (le plugin publie une source plus grande : elle l'emporte dans VPX).
+  assert.equal(roomDmdSetting({ ...cityHunter, script: 'LoadVPM "01560000", "DE.VBS", 3.36' }), 'PUP');
+  // Sans PuP pour le DMD : le DMD du script remplit le cadre lui-même, le plugin ne publie rien.
+  const rom = { ...cityHunter, pupDmd: false, script: 'Set FlexDMD = CreateObject("FlexDMD.FlexDMD")' };
+  assert.deepEqual(vrSources(rom), { backglass: 'room', dmd: 'FlexDMD' });
+  assert.equal(roomDmdSetting(rom), '');
+  // Ni PuP ni DMD de script : l'image du DMD de Cyber Pinball ; sans image, dit au journal et dans la santé.
+  const none = { ...cityHunter, pupDmd: false, pupPack: false, script: '' };
+  assert.equal(roomDmdSetting(none), 'image');
+  assert.deepEqual(missingVrSources(vrSources({ ...none, dmdImage: false })), ['DMD']);
+  assert.equal(roomDmdSetting({ ...none, dmdImage: false }), '');
+  // Fronton posé par VPX (pas de pièce VR) : la bande sous le fronton, jamais cette source.
+  assert.equal(roomDmdSetting({ ...cityHunter, ownRoom: false }), '');
+  assert.equal(roomDmdSetting({ ...cityHunter, dmdFrame: false }), '');
+});
+
+test('cadre DMD de la scène : flasher en mode DMD (IDMD des anciennes tables, RDMD = 1 des nouvelles)', () => {
+  const rec = (tag: string, n: number) => ({ tag, body: Buffer.from(new Uint32Array([n]).buffer) });
+  const name = (n: string) => {
+    const b = Buffer.alloc(4 + n.length * 2);
+    b.writeUInt32LE(n.length * 2, 0);
+    b.write(n, 4, 'utf16le');
+    return { tag: 'NAME', body: b };
+  };
+  assert.equal(dmdFlasherName([name('DMDPUP'), rec('IDMD', 1)]), 'DMDPUP');
+  assert.equal(dmdFlasherName([name('VR_DMD'), rec('RDMD', 1)]), 'VR_DMD');
+  assert.equal(dmdFlasherName([name('Flasher1'), rec('RDMD', 0)]), undefined);
+  assert.equal(dmdFlasherName([name('Flasher2'), rec('IDMD', 0)]), undefined);
+  assert.equal(dmdFlasherName([name('Flasher3')]), undefined);
+});
+
+test('plugin : source d’affichage du cadre DMD de la pièce VR, PuP seul puis l’image, au bilan', () => {
+  const cpp = read('packages', 'vpx-vision3d', 'src', 'cyberpinball.cpp');
+  assert.match(cpp, /MSGPI_STRING_VAL_SETTING\(salleDmd, "RoomDmd"/);
+  assert.match(cpp, /GetMsgID\(CTLPI_NAMESPACE, CTLPI_DISPLAY_GET_SRC_MSG\), onGetDisplays/);
+  assert.match(cpp, /e\.frameFormat = CTLPI_DISPLAY_FORMAT_SRGB888;/);
+  // PuP seul : le rendu ScoreView (DMD de ROM) lirait cette source même, en boucle.
+  assert.match(cpp, /chercher\(chaineSalle, "PUP", t\);/);
+  assert.match(cpp, /if \(s\.empty\(\) && charger\(imageDuDmd, imageDmd_Val\)\)/);
+  assert.match(cpp, /publierSalle\(salleDmd_Val\[0\] != 0\);/);
+  assert.match(cpp, /ecrire\("salle dmd=" \+/);
+  const pause = read('packages', 'vpx-vision3d', 'src', 'pause.h');
+  assert.match(pause, /constexpr int SALLE_DMD_L = 512, SALLE_DMD_H = 288;/);
+  const frontend = read('app', 'src', 'frontend.ts');
+  assert.match(frontend, /key: 'RoomDmd', value: sources\.roomDmd/);
+  assert.match(frontend, /table\(s\) au cadre DMD de pièce VR rempli par Cyber Pinball/);
+  assert.equal(parseVrMeasures(['salle source=PUP', 'salle dmd=aucune', 'salle dmd=PUP', ''].join('\n'))?.roomDmd, 'PUP');
 });

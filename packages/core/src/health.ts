@@ -182,6 +182,8 @@ export interface VrNetworkFacts {
   network?: PcNetwork;
   /** Tables sans source de fronton ou de DMD dans le casque (vr-sources.ts), « Titre (fronton, DMD) ». */
   noSource?: string[];
+  /** Tables dont un cadre était mal rempli à la dernière partie (vr-ecrans.ts), « Titre (fronton 62 %) ». */
+  poorFill?: string[];
 }
 
 // ---------- Seuils ----------
@@ -616,7 +618,19 @@ export function vrLines(facts: VrNetworkFacts): HealthLine[] {
         },
       ]
     : [];
-  return [...sources, ...vrLinkLines(facts)];
+  const fill: HealthLine[] = facts.poorFill?.length
+    ? [
+        {
+          check: 'vr',
+          state: 'check',
+          title: tn(facts.poorFill.length, 'VR : écran mal rempli pour {n} table', 'VR : écrans mal remplis pour {n} tables'),
+          detail: t('{list} ; en partie : Pause, « Ajuster les écrans »', { list: formatList(facts.poorFill.slice(0, 4)) }),
+          go: t('Ouvrir Réalité virtuelle'),
+          target: SYSTEM('vr'),
+        },
+      ]
+    : [];
+  return [...sources, ...fill, ...vrLinkLines(facts)];
 }
 
 function vrLinkLines(facts: VrNetworkFacts): HealthLine[] {

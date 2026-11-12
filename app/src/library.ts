@@ -244,6 +244,7 @@ import { createMediaImport } from './media-import';
 import { createInstallationImport } from './installation-import';
 import { userGesture } from './gesture-flash';
 import { createMedias, playsSoundPreview, type MediaView } from './library-medias';
+import type { RomMusic } from './rom-music';
 import { createTableFiles } from './table-files';
 import { createFilePicker, type PickRequest } from './file-picker';
 import { createDownloadsScreen } from './downloads-screen';
@@ -287,6 +288,8 @@ function keyLabel(key: string): string {
 }
 
 export interface LibraryHost {
+  /** Musique tirée des ROM (rom-music.ts) : repli de la musique du jeu, et source « Musique de la ROM ». */
+  romMusic?(): RomMusic | undefined;
   /** Le réseau du casque pour la santé de la borne (vr-reseau.ts) ; undefined sans casque relevé. */
   vrNetwork?(): VrNetworkFacts | undefined;
   /** Fiche technique : ce que l'application sait d'elle-même (mode, borne dédiée, réseau des amis…). */

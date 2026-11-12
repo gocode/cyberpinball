@@ -38,7 +38,8 @@ test('son dans le casque : le menu, le Juke-box et la partie dans le casque y pa
   assert.doesNotMatch(frontend, /output: \(\) => audioOutput,/);
   assert.doesNotMatch(frontend, /output: audioOutput \}/);
   // La partie dans le casque : l'INI de la VR seulement.
-  const prepare = frontend.slice(frontend.indexOf('function prepareVr('), frontend.indexOf('function prepareVr(') + 6000);
+  const debut = frontend.indexOf('function prepareVr(');
+  const prepare = frontend.slice(debut, frontend.indexOf('function ', debut + 20)); // toute la fonction, quelle que soit sa longueur
   assert.match(prepare, /const audio = findHeadsetAudio\(\);\s*if \(audio\) \{\s*writeIniSettings\(vr\.ini, vrAudioSettings\(audio\)\);/);
   assert.equal(frontend.match(/vrAudioSettings\(/g)?.length, 1);
 });

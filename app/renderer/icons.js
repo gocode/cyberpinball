@@ -64,6 +64,7 @@ const CYBER_ICONS = {
 
   // Médias, son et attente
   'layout-menu': '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 14h18M7 18h.01M12 18h.01M17 18h.01"/>', // Présentation du menu et roue de sélection.
+  wheel: '<circle cx="12" cy="10" r="5"/><circle cx="4.5" cy="13" r="2"/><circle cx="19.5" cy="13" r="2"/><path d="M3 20c6-3 12-3 18 0"/>', // Roue des tables : le médaillon choisi, ses deux voisins plus petits et l'arc qui les porte (Tables > Roue).
   volume: '<path d="M4 9v6h4l4 4V5L8 9zM17 4v16M15 8h4M15 16h4"/>', // Niveau de la musique, réglette distincte du son système.
   video: '<path d="M3 6h12v12H3zM15 10l6-4v12l-6-4"/>', // Son des vidéos du menu.
   rocket: '<path d="M9 16c0-7 5-11 12-13 0 7-4 12-11 13zM10 9H5l-3 6h7M15 14v5l-6 3v-6M5 19l-2 2M16 8h.01"/>', // Lancement de la partie.

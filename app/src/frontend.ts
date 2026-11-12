@@ -103,6 +103,17 @@ import {
   zoneSetting,
   vrNeedsVpxBackglass,
   vrSources,
+  roomDmdSetting,
+  vpxDmdFrames,
+  packDrawsDmd,
+  vrTableKey,
+  writeFileAtomic,
+  parseVrScreensBlock,
+  mergeVrScreens,
+  vrScreensSettings,
+  poorlyFilled,
+  poorFillSummary,
+  type VrScreensStore,
   missingVrSources,
   isVrImage,
   VR_DMD_BAND,
@@ -348,6 +359,7 @@ import { mediaFrame, prepareDressing } from './fulldmd';
 import { LiveDmd, type LiveDmdAnimationHandle } from './live-dmd';
 import { DmdWheels } from './dmd-wheel';
 import { createConverter } from './media-convert';
+import { RomMusic } from './rom-music';
 import { onKeyInput } from './key-input';
 import { onJoystickInput } from './joystick-input';
 import { locations, vpxInstall, vpxProfile } from './paths';
@@ -366,6 +378,7 @@ import { createJukeboxPlayer, type JukeboxMessage } from './jukebox-player';
 import { createAvatarMenu } from './avatar-menu';
 import { createProfileWelcome } from './profile-welcome';
 import { createMenuSettings } from './menu-settings';
+import { createWheelSettings } from './wheel-settings';
 import { createIntroMenu } from './intro-menu';
 import { createLanguageMenu } from './language-menu';
 import { createTermsMenu } from './terms-menu';
@@ -706,6 +719,11 @@ const REALIGN_TRIES = 3;
 // Médias des jeux : résolus au démarrage du menu, quand
 // le modèle de la borne et la rotation du playfield sont connus.
 let medias: MenuMedias | undefined;
+/**
+ * Musique tirée des ROM (rom-music.ts) : repli de la musique du jeu pour les tables à ROM qui n'en
+ * ont pas, enregistrée en tâche de fond ; s'arrête dès qu'une partie se prépare.
+ */
+let romMusic: RomMusic | undefined;
 /**
  * Médias du menu dessiné pour le casque (casque-vues.ts) : le playfield y est en portrait
  * (headsetTurn), son fond s'oriente donc d'après ce bord des flippers, pas celui de l'écran du PC.
@@ -1079,6 +1097,7 @@ const phoneRemote = createPhoneRemote({
   fromSources: !app.isPackaged,
 });
 const library = createLibrary({
+  romMusic: () => romMusic,
   vrNetwork: () => vrNetworkFacts(),
   root: loc.root,
   dataDir: loc.dataDir,
@@ -1267,7 +1286,7 @@ function jukeboxMenu(): { open(playlist?: string): void } | undefined {
 // Une playlist qui attendait un téléchargement : « Revenir au Juke-box » rouvre le lecteur sur elle.
 library.downloads.opener('jukebox', (back) => openJukebox('playlist' in back && typeof back.playlist === 'string' ? back.playlist : undefined));
 
-/** Le médaillon Juke-box est dans la roue (réglage « Juke-box dans la roue », Menu système > Médias). */
+/** Le médaillon Juke-box est dans la roue (réglage « Juke-box dans la roue », Menu système > Tables > Roue). */
 function jukeboxShown(): boolean {
   return mediaSettings.jukebox;
 }
@@ -2123,6 +2142,8 @@ library.provideSystemItem(
     },
   }),
 );
+// Roue des tables (Tables > Roue) : présentation, ordre, Start, logos animés, couleur, Juke-box ; dans medias.json aussi.
+library.provideSystemItem('wheel', createWheelSettings({ library, settings: () => mediaSettings, save: (next) => saveMediaSettings(next) }));
 // Langue de l'interface : le choix relance le menu, comme un changement de configuration.
 library.provideSystemItem('language', createLanguageMenu({ library, relaunch: () => relaunchMenu() }));
 // Conditions d'utilisation : à accepter au démarrage tant que la version en cours ne l'est pas, à relire ici.
@@ -3181,6 +3202,7 @@ function auditVrBackglass(): void {
   const hidden: string[] = [];
   const uncertain: string[] = [];
   const noSource: string[] = [];
+  const roomDmd: string[] = [];
   for (const table of tables) {
     try {
       const script = readTableScript(table.file);
@@ -3188,8 +3210,10 @@ function auditVrBackglass(): void {
       const displays = readVpxBackglassDisplays(table.file);
       // Le fronton de VPX leur sera ajouté : sa partie visible, calculée d'avance (3 s au plus par table).
       const needs = vrNeedsVpxBackglass({ room, backglassDisplays: displays, pupCapture: tableUsesPupCapture(script) });
-      const missing = missingVrSources(vrSourcesOf(table.file, needs).sources);
+      const sources = vrSourcesOf(table.file, needs);
+      const missing = missingVrSources(sources.sources);
       if (missing.length) noSource.push(`${table.title} (${missing.join(', ')})`);
+      if (sources.roomDmd) roomDmd.push(`${table.title} (${sources.roomDmd})`);
       if (needs) {
         const view = cachedVrBackglassView(table.file, vrZonesFile());
         if (view && view.hidden >= 0.02) hidden.push(`${table.title} (${Math.round(view.hidden * 100)} %)`);
@@ -3203,6 +3227,9 @@ function auditVrBackglass(): void {
   }
   console.log(`Réalité virtuelle : ${empty.length} table(s) au fronton vide dans le casque sans correctif (pièce VR, fronton capté par PuP, aucun flasher du fronton)${empty.length ? ` : ${empty.join(', ')} ; le fronton de VPX leur est ajouté à chaque partie` : ''}.`); // i18n-ignore : journal
   vrSourcesMissing = noSource;
+  vrPoorFill = poorFillSummary(readVrScreens());
+  // Cadre DMD de pièce VR sans DMD de script (PuP, image) : rempli par le plugin, sans quoi il resterait gris.
+  console.log(`Réalité virtuelle : ${roomDmd.length} table(s) au cadre DMD de pièce VR rempli par Cyber Pinball${roomDmd.length ? ` : ${roomDmd.join(' | ')}` : ''}.`); // i18n-ignore : journal
   console.log(`Réalité virtuelle : ${noSource.length} table(s) sans source de fronton ou de DMD dans le casque${noSource.length ? ` : ${noSource.join(' | ')}` : ''}.`); // i18n-ignore : journal
   console.log(`Réalité virtuelle : fronton de VPX en partie caché par la pièce de la table pour ${hidden.length} table(s)${hidden.length ? ` : ${hidden.join(', ')} ; le fronton et la pause y sont dessinés dans la partie visible` : ''}${uncertain.length ? ` ; selon le script, peut-être aussi caché pour ${uncertain.join(', ')} (capture à la prochaine partie)` : ''}.`); // i18n-ignore : journal
 }
@@ -3255,15 +3282,20 @@ function refreshVrNetwork(): void {
 
 /** Le réseau du casque, pour la santé de la borne. */
 function vrNetworkFacts(): VrNetworkFacts | undefined {
-  if (!linkMode && !pcNetwork && !vrSourcesMissing.length) return undefined;
-  return { ...(linkMode ? { transport: linkMode } : {}), ...(pcNetwork ? { network: pcNetwork } : {}), ...(vrSourcesMissing.length ? { noSource: vrSourcesMissing } : {}) };
+  if (!linkMode && !pcNetwork && !vrSourcesMissing.length && !vrPoorFill.length) return undefined;
+  return {
+    ...(linkMode ? { transport: linkMode } : {}),
+    ...(pcNetwork ? { network: pcNetwork } : {}),
+    ...(vrSourcesMissing.length ? { noSource: vrSourcesMissing } : {}),
+    ...(vrPoorFill.length ? { poorFill: vrPoorFill } : {}),
+  };
 }
 
 /**
  * Sources du fronton et du DMD d'une table dans le casque (vr-sources.ts), et les images de secours que le
  * plugin dessine quand rien d'autre ne le fait : celles des médias de la table, ou par défaut de Cyber Pinball.
  */
-function vrSourcesOf(tableFile: string, addBackglass: boolean): { sources: VrSources; backglassImage?: string; dmdImage?: string } {
+function vrSourcesOf(tableFile: string, addBackglass: boolean): { sources: VrSources; roomDmd: 'PUP' | 'image' | ''; dmdFrames: { name: string; ratio?: number }[]; backglassImage?: string; dmdImage?: string } {
   const table = tables.find((t) => samePath(t.file, tableFile));
   const image = (type: 'Backglass' | 'DMD') => {
     if (!table || !loc.root) return undefined;
@@ -3282,15 +3314,23 @@ function vrSourcesOf(tableFile: string, addBackglass: boolean): { sources: VrSou
   } catch {
     // Dossier illisible : pas de directb2s.
   }
-  const sources = vrSources({
+  const packs = activePacks(folder);
+  // Cadres DMD de la scène (pièce VR seulement : sinon la bande sous le fronton de VPX).
+  const dmdFrames = addBackglass ? [] : (vpxDmdFrames(tableFile) ?? []);
+  const facts = {
     ownRoom: !addBackglass,
-    pupPack: activePacks(folder).length > 0,
+    pupPack: packs.length > 0,
+    dmdFrame: dmdFrames.length > 0,
+    pupDmd: packs.some((pack) => {
+      const dir = pupVideosDir(folder);
+      return dir !== undefined && packDrawsDmd(path.join(dir, pack));
+    }),
     directb2s,
     backglassImage: Boolean(backglassImage),
     dmdImage: Boolean(dmdImage),
     script: readTableScript(tableFile),
-  });
-  return { sources, ...(backglassImage ? { backglassImage } : {}), ...(dmdImage ? { dmdImage } : {}) };
+  };
+  return { sources: vrSources(facts), roomDmd: roomDmdSetting(facts), dmdFrames, ...(backglassImage ? { backglassImage } : {}), ...(dmdImage ? { dmdImage } : {}) };
 }
 
 /** Tables sans source de fronton ou de DMD dans le casque (relevé au démarrage), pour la santé de la borne. */
@@ -3311,6 +3351,46 @@ function vrCapturesDir(): string {
  * Avant une partie dans le casque : la partie précédente reportée si elle ne l'a pas été (Cyber Pinball fermé
  * pendant la partie), le fichier de mesures réduit à ses 400 dernières lignes, les captures gardées à 8.
  */
+/** Fichier des écrans de chaque table dans le casque (vr-ecrans.ts). */
+function vrScreensFile(): string {
+  return path.join(loc.dataDir, 'vr', 'ecrans-vr.json');
+}
+
+function readVrScreens(): VrScreensStore {
+  try {
+    const data = JSON.parse(readTextIfExists(vrScreensFile()) || '{}') as unknown;
+    return data && typeof data === 'object' && !Array.isArray(data) ? (data as VrScreensStore) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Tables dont un cadre était mal rempli à la dernière partie, pour la santé de la borne. */
+let vrPoorFill: string[] = [];
+
+/**
+ * Ce qu'une partie dans le casque apprend des écrans de la table, gardé pour la suivante : proportions de PuP,
+ * réglage du joueur, remplissage de chaque cadre ; un cadre mal rempli est dit au journal et dans la santé.
+ */
+function noteVrScreens(text: string, when: string): void {
+  const { table: key, entry } = parseVrScreensBlock(text);
+  if (!key) return;
+  const title = tables.find((x) => vrTableKey(x.file) === key)?.title;
+  const store = mergeVrScreens(readVrScreens(), key, { ...entry, ...(title ? { title } : {}) });
+  try {
+    fs.mkdirSync(path.dirname(vrScreensFile()), { recursive: true });
+    writeFileAtomic(vrScreensFile(), JSON.stringify(store, null, 1));
+  } catch (error) {
+    console.warn(`Casque : écrans de la table pas enregistrés (${(error as Error).message}).`); // i18n-ignore : journal
+  }
+  vrPoorFill = poorFillSummary(store);
+  const name = title ?? decodeURIComponent(key);
+  if (entry.pupRatio || entry.pupDmdRatio) console.log(`Casque, écrans de ${name}${when} : proportions de PuP apprises${entry.pupRatio ? `, fronton ${entry.pupRatio}` : ''}${entry.pupDmdRatio ? `, DMD ${entry.pupDmdRatio}` : ''} ; reprises à la prochaine partie.`); // i18n-ignore : journal
+  if (entry.adjust) console.log(`Casque, écrans de ${name}${when} : réglage du joueur gardé (${Object.entries(entry.adjust).map(([k, v]) => `${k} ${v}`).join(', ')}).`); // i18n-ignore : journal
+  const poor = poorlyFilled(entry);
+  if (entry.fill) console.log(`Casque, remplissage des écrans de ${name}${when} : ${Object.entries(entry.fill).map(([k, v]) => `${k} ${Math.round((v ?? 0) * 100)} %`).join(', ')}${poor.length ? ` ; VR : écran mal rempli (${poor.map((p) => p.frame).join(', ')}), réglable en partie : Pause, « Ajuster les écrans »` : ''}.`); // i18n-ignore : journal
+}
+
 function prepareVrMeasures(): void {
   try {
     fs.mkdirSync(path.dirname(vrMeasuresFile()), { recursive: true });
@@ -3353,6 +3433,7 @@ function noteVrMeasures(late = false): void {
     // Marque impossible : le bilan pourrait revenir une fois de plus, sans gravité.
   }
   const when = late ? ' (partie précédente, pas reportée à sa fin)' : ''; // i18n-ignore : journal
+  noteVrScreens(block.text, when);
   const m = parseVrMeasures(block.text);
   if (!m) {
     console.log(`Casque, mesures de VPX${when} : aucune (partie de moins de 5 s).`); // i18n-ignore : journal
@@ -3372,6 +3453,7 @@ function noteVrMeasures(late = false): void {
     console.log(
       `Casque, mesures de VPX${when} (${m.samples} relevé(s) de 5 s) : VPX ${f(m.vpx.mean)} images/s (de ${f(m.vpx.min)} à ${f(m.vpx.max)}), plus grand écart entre deux images ${Math.round(m.worstGapMs)} ms ; fronton dessiné ${f(m.backglass)} fois/s ; vidéo de PuP la plus active ${f(m.video.mean)} nouvelles images/s (de ${f(m.video.min)} à ${f(m.video.max)}) ; temps de jeu ${f(m.gameTime, 2)} s par seconde.`, // i18n-ignore : journal
     );
+  if (m.roomDmd) console.log(`Casque, cadre DMD de la pièce VR${when} : ${m.roomDmd === 'aucune' ? 'rien de dessiné (VR : pas de source DMD pour cette table)' : m.roomDmd === 'PUP' ? 'écran DMD de PuP' : 'image du DMD de Cyber Pinball'}.`); // i18n-ignore : journal
   if (m.drawn) console.log(`Casque, sources dessinées${when} : fronton ${m.drawn.backglass === 'aucune' ? 'aucune (fond de Cyber Pinball)' : m.drawn.backglass}, DMD ${m.drawn.dmd === 'sans_bande' ? 'celui de la pièce VR de la table' : m.drawn.dmd}.`); // i18n-ignore : journal
   const shots = fs.existsSync(vrCapturesDir())
     ? fs
@@ -3779,6 +3861,16 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
         { section: 'Plugin.CyberPinball', key: 'DmdBand', value: vr.addBackglass ? String(VR_DMD_BAND) : '0' },
         { section: 'Plugin.CyberPinball', key: 'BackglassImage', value: sources.backglassImage ?? '' },
         { section: 'Plugin.CyberPinball', key: 'DmdImage', value: sources.dmdImage ?? '' },
+        // Cadre DMD de la pièce VR : la source que le plugin publie (PuP, image), ou aucune (DMD du script), à sa forme.
+        { section: 'Plugin.CyberPinball', key: 'RoomDmd', value: sources.roomDmd },
+        { section: 'Plugin.CyberPinball', key: 'RoomDmdRatio', value: String(sources.dmdFrames.find((f) => f.ratio)?.ratio ?? 1.7778) },
+        // Écrans de la table : proportions de PuP apprises, réglages du joueur (vr-ecrans.ts), et « Ajuster les écrans ».
+        ...vrScreensSettings(vrTableKey(tableFile), readVrScreens()[vrTableKey(tableFile)]),
+        { section: 'Plugin.CyberPinball', key: 'AdjustLabel', value: t('Ajuster les écrans') },
+        { section: 'Plugin.CyberPinball', key: 'BackglassLabel', value: t('Fronton') },
+        { section: 'Plugin.CyberPinball', key: 'DmdLabel', value: 'DMD' },
+        { section: 'Plugin.CyberPinball', key: 'AdjustChooseHelp', value: t('Joystick : choisir · A : régler · B : retour') },
+        { section: 'Plugin.CyberPinball', key: 'AdjustHelp', value: t('Joysticks : position · Poignées : taille · A : garder · B : retour') },
         { section: 'Plugin.CyberPinball', key: 'Zone', value: zoneSetting(zone) },
         { section: 'Plugin.CyberPinball', key: 'LogFile', value: vrMeasuresFile() },
         { section: 'Plugin.CyberPinball', key: 'CaptureDir', value: vrCapturesDir() },
@@ -3786,7 +3878,8 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
       if (view) details.push(describeBackglassView(view)); // i18n-ignore : journal
       const missing = missingVrSources(sources.sources);
       const said = (v: string | undefined) => (v === 'room' ? 'celui de la pièce VR de la table' : (v ?? 'aucune')); // i18n-ignore : journal
-      details.push(`sources dans le casque : fronton ${said(sources.sources.backglass)}, DMD ${said(sources.sources.dmd)}${missing.length ? ` ; VR : pas de source ${missing.join(' ni de ')} pour cette table` : ''}`); // i18n-ignore : journal
+      const frame = sources.dmdFrames.length ? ` (cadre DMD de la pièce VR : ${sources.dmdFrames.map((f) => f.name).join(', ')}${sources.roomDmd ? `, source publiée par le plugin : ${sources.roomDmd}` : ''})` : ''; // i18n-ignore : journal
+      details.push(`sources dans le casque : fronton ${said(sources.sources.backglass)}, DMD ${said(sources.sources.dmd)}${frame}${missing.length ? ` ; VR : pas de source ${missing.join(' ni de ')} pour cette table` : ''}`); // i18n-ignore : journal
       details.push(`pause dans le casque : plugin ${pausePlugin === 'installed' ? 'installé' : 'à jour'}, appui court sur Pause ou tenu ${QUIT_HOLD_S} s pour quitter`); // i18n-ignore : journal
     }
     // Une seule pose : la table de VPX où est la borne du casque (calée ou non), à chaque partie.
@@ -4211,7 +4304,25 @@ export function startFrontend(): void {
     captureDir: process.env.CYBERPINBALL_CAPTURE,
     log: (line) => console.log(line),
   });
-  medias = new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: choose ? undefined : cabinet, rotation, onChange: () => broadcast() });
+  romMusic ??= new RomMusic({
+    dataDir: loc.dataDir,
+    root: () => loc.root,
+    tables: () => tables,
+    busy: () => state.phase === 'loading' || state.phase === 'playing' || desktop.active,
+    converter: () => (converter ??= createConverter()),
+    onChange: (recorded) => {
+      // Une musique de plus : la musique des jeux est recherchée de nouveau, tout de suite.
+      if (recorded) {
+        medias?.invalidate();
+        headsetMedias?.invalidate();
+      }
+      broadcast();
+    },
+    // Hors écran (essais sans opérateur), rien d'office : seulement ce que l'écran demande.
+    automatic: !OFFSCREEN,
+    log: (line) => console.log(line),
+  });
+  medias = new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: choose ? undefined : cabinet, rotation, romAudio: (table) => romMusic?.file(table), onChange: () => broadcast() });
   // Couleur de chaque table (table-tint.ts) : mesurée par le convertisseur hors écran, une fois par média.
   // La teinte passe aussi au halo des cadres de la borne dans le casque (casque.ts).
   tints = new TableTints({
@@ -4305,7 +4416,7 @@ export function startFrontend(): void {
       broadcast();
     },
     openViews: () => {
-      headsetMedias ??= loc.root ? new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: loadCabinet(loc.dataDir), rotation: headsetTurn(), onChange: () => broadcast() }) : undefined;
+      headsetMedias ??= loc.root ? new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: loadCabinet(loc.dataDir), rotation: headsetTurn(), romAudio: (table) => romMusic?.file(table), onChange: () => broadcast() }) : undefined;
       openHeadsetViews(headsetPages, {
         appDir: path.join(__dirname, '..'),
         playfieldRotation: headsetTurn(),
@@ -4489,6 +4600,7 @@ function reloadTables(selectFile?: string): void {
   tables = scanOrdered();
   // Médias ajoutés, remplacés ou supprimés avec les tables : tout est recherché à nouveau.
   medias?.invalidate();
+  romMusic?.tablesChanged();
   headsetMedias?.invalidate();
   // Dossier des tables ou des médias créé depuis le démarrage (première table) : guetté aussi.
   mediaWatch?.rearm();
@@ -5057,6 +5169,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const inspectorReady = hooks.double && !displayMode && simulated === undefined ? inspectorFor(socialFirewall, (line) => console.log(line)) : Promise.resolve(undefined);
   guest.releaseAll();
   state = { ...state, phase: 'loading', help: false };
+  // La musique d'une ROM qui s'enregistre cède la place à la partie, tout de suite.
+  romMusic?.pause();
   startLaunch();
   launchCount++;
   const pressedAt = Date.now();
@@ -6118,6 +6232,8 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     // (pas sur le médaillon du Juke-box : elle couvrirait son affiche ; le repère change quand même).
     ...(role === 'playfield' && tables.length ? collections.view(mediaSettings.menuLayout === 'list' ? 'list' : playfieldLandscape() ? 'desk' : 'band', state.phase === 'menu' && !onJukebox()) : {}),
     menuLayout: mediaSettings.menuLayout,
+    // Logos animés de la roue : seul celui de la table choisie s'anime (« selected »), ou tous.
+    wheelMotion: mediaSettings.wheelMotion,
     // Couleur des points des afficheurs dessinés par Cyber Pinball (DMD du menu, replis dmd et fullDmd).
     dmdColor: menuDmdColor(),
     // Couleur de la table montrée (table-tint.ts) : l'ambiance du menu ; absente, la sarcelle de la marque.

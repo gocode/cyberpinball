@@ -90,6 +90,7 @@ import {
 } from '@cyberpinball/core';
 import type { Action, Built, LibraryHost, Row, Section, Tone } from './library';
 import type { MediaCard, MediaThumb } from './library-medias';
+import { romMusicLabel } from './rom-music';
 import { allowPreview } from './media-protocol';
 import type { DeepResult, MediaSearch } from './media-search';
 import { jobKey, type MediaSites, type SiteJob } from './media-sites';
@@ -274,6 +275,17 @@ export function createProposals(ctx: ProposalsContext) {
     return ids;
   }
 
+  /** Musique déjà tirée de la ROM de la table (rom-music.ts), proposée pour la musique du jeu. */
+  function romMusicChoice(table: TableEntry): { file: string; bytes: number; label: string } | undefined {
+    const status = ctx.host.romMusic?.()?.status(table);
+    if (status?.state !== 'ok' || !status.file) return undefined;
+    try {
+      return { file: status.file, bytes: fs.statSync(status.file).size, label: romMusicLabel(status.rom, status.record) };
+    } catch {
+      return undefined;
+    }
+  }
+
   /** Recherche pour cette table, faite une fois par visite du gestionnaire (ou refaite avec un titre saisi). */
   async function ensure(table: TableEntry, query?: string): Promise<State> {
     if (state && state.file === table.file && query === undefined) return state;
@@ -286,6 +298,7 @@ export function createProposals(ctx: ProposalsContext) {
       screenshot: ctx.search.screenshot(table),
       vpxImages: ctx.search.vpxImages(table),
       recordings: listRecordings(ctx.host.dataDir, table),
+      romMusic: romMusicChoice(table),
     });
     const next: State = {
       file: table.file,
@@ -613,6 +626,8 @@ export function createProposals(ctx: ProposalsContext) {
     else if (choice.offer?.quality === '4k') extra.push(t('Aperçu : la même image en 1k ; le fichier 4k arrive au téléchargement.'));
     if (choice.source === 'web') {
       extra.push(t('Téléchargé dans la fenêtre « Récupérer » ; gardé dans les téléchargements, copié dans medias\\ à l’enregistrement.'));
+    } else if (choice.source === 'rom') {
+      extra.push(t('Enregistrée sur cette borne en faisant tourner la ROM de la table dans PinMAME, de Start au premier silence ; gardée dans le cache, copiée dans medias\\ à l’enregistrement.'));
     } else if (choice.site?.received) {
       const hit = choice.site.hit;
       extra.push(hit.author ? t('De « {title} », par {author}.', { title: hit.title, author: hit.author }) : t('De « {title} ».', { title: hit.title }));

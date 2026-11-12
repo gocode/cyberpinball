@@ -1,5 +1,5 @@
 // Ordre des tables dans le menu (roues et liste) et table choisie au démarrage
-// (Menu système > Médias > « Médias, son et attente » > « Ordre des tables », « Table au démarrage »).
+// (Menu système > Tables > Roue > « Ordre des tables », « Table au démarrage »).
 //
 // Règles :
 // - par défaut, l'ordre des titres et la première table, comme avant ces réglages ;

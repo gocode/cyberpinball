@@ -10,6 +10,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import { b2sCacheDir, b2sImages } from './b2simage';
+import { romAudioDir } from './romaudio';
 import { DEFAULT_ARCADE_HOURS, normalizeArcadeHours, type ArcadeHoursSettings } from './arcadehours';
 import { DEFAULT_DMD_COLOR, normalizeDmdColor } from './dmdcolor';
 import { t } from './i18n';
@@ -32,6 +33,7 @@ import {
   type MediaSource,
   type MediaType,
   type ResolvedMedia,
+  type RomAudioProvider,
 } from './medias';
 import { ROLES, type Cabinet, type FlipperEdge, type RoleId, type Rotation } from './model';
 import { companion } from './tablefiles';
@@ -136,13 +138,15 @@ export function isServedMedia(file: string, allowedDirs: readonly string[]): boo
 
 /**
  * Dossiers que le protocole peut lire : medias\ de chaque table, <racine>\media\
- * (défauts de la borne) et le cache des images du .directb2s. Les replis intégrés sont
+ * (défauts de la borne), le cache des images du .directb2s et les musiques tirées des ROM
+ * (romaudio.ts : leur dossier seul, pas celui de travail de PinMAME). Les replis intégrés sont
  * dessinés par le rendu (fallback.js) : aucun fichier de l'application à servir.
  */
 export function allowedMediaDirs(opts: { root?: string; dataDir: string; tables: readonly TableEntry[] }): string[] {
   const dirs = opts.tables.map(tableMediaDir);
   if (opts.root) dirs.push(layoutOf(opts.root).media);
   dirs.push(b2sCacheDir(opts.dataDir));
+  dirs.push(romAudioDir(opts.dataDir));
   return [...new Map(dirs.map((d) => [path.resolve(d).toLowerCase(), d])).values()];
 }
 
@@ -248,6 +252,8 @@ export interface MenuMediaOptions {
   rotation: Rotation;
   /** Extraire l'image du .directb2s en tâche de fond (défaut : oui). */
   b2s?: boolean;
+  /** Musique tirée de la ROM (romaudio.ts) : repli de la musique du jeu. */
+  romAudio?: RomAudioProvider;
   /** Une image du .directb2s vient d'être extraite : l'état est à renvoyer aux fenêtres. */
   onChange?: () => void;
   /** Durée de vie des résultats : filet quand le guet des dossiers (mediawatch.ts) est impossible (défaut : 10 s). */
@@ -347,6 +353,7 @@ export class MenuMedias {
       flipperEdge: this.edge,
       dimensions: this.dimensions,
       b2sImage: this.opts.b2s === false ? undefined : (t: TableEntry, kind: B2sImageKind) => this.b2sImage(t, kind),
+      romAudio: this.opts.romAudio,
     };
     // Sans racine (bac à sable vide) : pas de défauts de la borne, les médias des tables restent lus.
     const root = this.opts.root ?? path.join(this.opts.dataDir, 'sans-racine');
@@ -489,6 +496,24 @@ function menuLayoutOf(value: unknown, fallback: MenuLayout): MenuLayout {
 }
 
 /**
+ * Logos animés de la roue (APNG, GIF ou WebP animés ; demande du 12/11/2026, « c'est très
+ * perturbant ») : seul celui de la table choisie s'anime (défaut), les autres gardent leur
+ * première image ; ou tous s'animent, comme avant.
+ */
+export type WheelMotion = 'selected' | 'all';
+
+export const WHEEL_MOTIONS: readonly WheelMotion[] = ['selected', 'all'];
+
+export const WHEEL_MOTION_LABELS: Record<WheelMotion, string> = {
+  get selected() {
+    return t('seulement la table choisie');
+  },
+  get all() {
+    return t('tous');
+  },
+};
+
+/**
  * DMD du menu : vivant (Cyber Pinball dessine l'afficheur à points : titre, records, PRESS
  * START, horloge, crédits, média DMD ; livedmd.ts), ou classique (le média DMD de la table,
  * sinon le DMD généré qui fait défiler le titre).
@@ -558,6 +583,8 @@ export interface MenuMediaSettings {
    * reste au vert signal.
    */
   tableColor: boolean;
+  /** Logos animés de la roue : seul celui de la table choisie s'anime (défaut), ou tous (WHEEL_MOTIONS). */
+  wheelMotion: WheelMotion;
   /**
    * Médaillon Juke-box en tête de chaque collection de la roue (jukebox-screens.ts) : montré par
    * défaut ; masqué, la bibliothèque musicale reste (gestion des playlists).
@@ -603,6 +630,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   dmd: 'live',
   dmdColor: DEFAULT_DMD_COLOR,
   tableColor: true,
+  wheelMotion: 'selected',
   jukebox: true,
   jukeboxVisualizer: DEFAULT_JUKEBOX_VISUALIZER,
   hours: DEFAULT_ARCADE_HOURS,
@@ -644,6 +672,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     dmd: MENU_DMD_MODES.includes(r.dmd as MenuDmdMode) ? (r.dmd as MenuDmdMode) : d.dmd,
     dmdColor: normalizeDmdColor(r.dmdColor),
     tableColor: typeof r.tableColor === 'boolean' ? r.tableColor : d.tableColor,
+    wheelMotion: WHEEL_MOTIONS.includes(r.wheelMotion as WheelMotion) ? (r.wheelMotion as WheelMotion) : d.wheelMotion,
     jukebox: typeof r.jukebox === 'boolean' ? r.jukebox : d.jukebox,
     jukeboxVisualizer: isVisualizerMode(r.jukeboxVisualizer) ? r.jukeboxVisualizer : d.jukeboxVisualizer,
     hours: normalizeArcadeHours(r.hours),

@@ -319,14 +319,19 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
   <img src="images/en/features/favorites.webp?v=8105d3ed83" width="300" alt="The page of a table added to favourites: the white star after its title, “Remove from favourites”.">
 </p>
 
-### Table order and attract mode
+### Wheel, table order and attract mode
 
+- **System menu > Tables > Wheel** gathers every wheel setting: layout, order, table at startup, Start on the wheel, animated logos, colour of each table, Juke-box.
+- **"Animated logos"**: only the chosen table's logo moves (default), its neighbours stay on their first frame; or all of them move.
 - **"Table order"**: by title, last played, most played, year, manufacturer, or shuffled at every start.
 - **"Table at startup"**: the first one, a random table, or the last one played.
 - **"Start on the wheel"**: open the game page (default), or play right away; the game page stays on a held Start (or F6).
 - **Attract mode** after 5 minutes (from 1 to 30 minutes, or never): a random table every 20 s, with its media, and the first button brings the menu back as it was.
 
-<p align="center"><img src="images/en/features/menu-settings.webp?v=be4f9206e1" width="360" alt="Media, sound and attract mode: menu wheel, table order, table at startup, game music and its volume, video sound, cinematic launch, intro, interface sounds…"></p>
+<p align="center">
+  <img src="images/en/features/wheel-settings.webp?v=07247843ea" width="300" alt="Wheel: menu layout, table order, table at startup, Start on the wheel, animated logos, colour of each table, Juke-box in the wheel.">
+  <img src="images/en/features/menu-settings.webp?v=54860c0860" width="300" alt="Media, sound and attract mode: Juke-box visualizer, game music and its volume, video sound, cinematic launch, intro, interface sounds…">
+</p>
 
 ### On a desk PC
 

@@ -776,6 +776,29 @@ body.mouse .collections-row:not(.disabled) {
   object-fit: contain;
 }
 
+/*
+ * Logos animés (réglage « Logos animés : seulement la table choisie », Tables > Roue, 12/11/2026) : hors du
+ * centre, la première image du logo (.wheel-still, frontend.js attachStill) est posée à sa place,
+ * le logo animé n'est plus dessiné, donc plus animé ; au centre, le logo animé reprend. Tant que
+ * la première image n'est pas prête, le logo animé reste : jamais de place vide. Le halo (copie du
+ * centre, sans .wheel-item) garde toujours le logo animé.
+ */
+.wheel-tilt > .wheel-img {
+  grid-area: 1 / 1;
+}
+
+.wheel-still {
+  display: none;
+}
+
+.wheel-stage.logos-fixes .wheel-item:not(.center) .wheel-tilt:has(> .wheel-still) > .wheel-img:not(.wheel-still) {
+  display: none;
+}
+
+.wheel-stage.logos-fixes .wheel-item:not(.center) .wheel-tilt > .wheel-still {
+  display: block;
+}
+
 /* Sans logo lisible : le titre, en texte. */
 .wheel-name {
   display: -webkit-box;

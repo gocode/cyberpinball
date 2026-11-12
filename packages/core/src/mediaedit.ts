@@ -472,6 +472,8 @@ export function mediaFallbackName(resolved: ResolvedMedia): string | undefined {
       return partner?.label;
     case 'b2s':
       return resolved.type === 'Backglass' ? t('image du .directb2s') : t('afficheur du .directb2s');
+    case 'rom':
+      return t('musique de la ROM');
     case 'default':
       return partner ? t('défaut de la borne ({label})', { label: partner.label }) : t('défaut de la borne');
     case 'fallback':
@@ -496,6 +498,8 @@ export function mediaStateLabel(resolved: ResolvedMedia, root?: string): { label
       };
     case 'b2s':
       return { label: t('Repli : {what}', { what: what! }), detail: t('Image tirée du fichier du backglass de la table'), present: false };
+    case 'rom':
+      return { label: t('Repli : {what}', { what: what! }), detail: t('Enregistrée en faisant tourner la ROM de la table ({name})', { name }), present: false };
     case 'default':
       return { label: t('Repli : {what}', { what: what! }), detail: root ? path.relative(root, resolved.file!) : name, present: false };
     case 'fallback':
