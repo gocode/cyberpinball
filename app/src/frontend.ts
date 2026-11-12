@@ -108,6 +108,8 @@ import {
   packDrawsDmd,
   vrTableKey,
   writeFileAtomic,
+  recordingIniText,
+  recordingIniCarryBack,
   parseVrScreensBlock,
   mergeVrScreens,
   vrScreensSettings,
@@ -5341,7 +5343,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     }
     if (vision3dSource && configuration) headTracker.start(vision3dSource, configuration.id, vision3d);
     // Les deux MagnaSave ouvrent désormais les réglages en partie (position du DMD, puis menu de VPX ; en VR, celui de VPX dans le casque).
-    if (configuration) inGameMenu.arm({ pid: game.pid, table, cabinet: configuration, displays: observedDisplays(), place: playfieldPlace(), configurationIni: vrGame?.ini ?? activeVpxIni(loc), dataDir: loc.dataDir, vr: playedVr, ...(vision3dSource && {
+    if (configuration) inGameMenu.arm({ pid: game.pid, table, cabinet: configuration, displays: observedDisplays(), place: playfieldPlace(), configurationIni: vrGame?.ini ?? recordIni?.ini ?? activeVpxIni(loc), dataDir: loc.dataDir, vr: playedVr, ...(vision3dSource && {
         vision3d: {
           state: () => headTracker.state,
           recenter: () => headTracker.recenter(),
@@ -5420,10 +5422,12 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   };
   // Hors écran, un chargement simulé qui tarde (CYBERPINBALL_PARTIE_SIMULEE_CHARGEMENT_MS) montre le cartouche.
   const simulatedLoadMs = Number(process.env.CYBERPINBALL_PARTIE_SIMULEE_CHARGEMENT_MS) || undefined;
+  // Jouer et enregistrer : le balancier simulé de VPX dessinerait son cercle dans la vidéo ; la partie reçoit un INI à part, balancier éteint (recordingini.ts).
+  const recordIni = recording && simulated === undefined && !vrGame && !double ? prepareRecordingIni(table) : undefined;
   const game =
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}) })
-      : launchVpx({ exe: install.exe, ini: vrGame?.ini ?? double?.ini ?? activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onVr, onPlaying, onForeground, onWindows });
+      : launchVpx({ exe: install.exe, ini: vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onVr, onPlaying, onForeground, onWindows });
   if (launch) {
     launch.stop = () => game.stop();
     launchStep('launched');
@@ -5529,6 +5533,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const recordsAfter = double ? double.records() : readTableRecords(played);
   double?.finish();
   recording?.gameEnded();
+  if (recordIni) finishRecordingIni(recordIni, table);
   if (simulated === undefined) globalShortcut.unregister(accelerator(SHORTCUTS.forceStop));
   if (vrEscape) globalShortcut.unregister(accelerator(SHORTCUTS.vrExit));
   cinema.stop();
@@ -5710,6 +5715,42 @@ function playedRotation(cabinet: Cabinet): Rotation {
   const value = edge ? edgeRotation(edge) : rotation;
   if (playing) played = { table: playing, rotation: value };
   return value;
+}
+
+/** INI de VPX pour une partie enregistrée : celui de la borne, balancier simulé éteint (recordingini.ts). */
+interface RecordingIni {
+  ini: string;
+  /** Texte reçu par VPX : ce qu'il y change en partie est reporté dans `base`. */
+  launched: string;
+  base: string;
+}
+
+function prepareRecordingIni(table: TableEntry): RecordingIni | undefined {
+  const base = activeVpxIni(loc);
+  try {
+    const text = recordingIniText(readTextIfExists(base));
+    if (text === undefined) return undefined;
+    const ini = path.join(loc.dataDir, 'enregistrement', 'VPinballX.ini');
+    fs.mkdirSync(path.dirname(ini), { recursive: true });
+    writeFileAtomic(ini, text);
+    console.log(`Enregistrement (${table.id}) : balancier simulé de VPX éteint pour cette partie (INI à part : ${ini}) ; son cercle n'entrera pas dans la vidéo.`); // i18n-ignore : journal
+    return { ini, launched: text, base };
+  } catch (error) {
+    console.log(`Enregistrement (${table.id}) : INI à part impossible (${(error as Error).message}) ; balancier simulé laissé, son cercle peut entrer dans la vidéo.`); // i18n-ignore : journal
+    return undefined;
+  }
+}
+
+/** Après la partie enregistrée : ce que VPX a changé dans son INI (réglages en partie) revient dans celui de la borne. */
+function finishRecordingIni(r: RecordingIni, table: TableEntry): void {
+  try {
+    const settings = recordingIniCarryBack(r.launched, readTextIfExists(r.ini));
+    if (!settings.length) return;
+    writeIniSettings(r.base, settings);
+    console.log(`Enregistrement (${table.id}) : ${settings.length} réglage(s) changé(s) dans VPX pendant la partie, repris dans l'INI de la borne (${settings.map((s) => `${s.section}.${s.key}`).join(', ')}).`); // i18n-ignore : journal
+  } catch (error) {
+    console.log(`Enregistrement (${table.id}) : réglages de la partie pas repris (${(error as Error).message}).`); // i18n-ignore : journal
+  }
 }
 
 /**

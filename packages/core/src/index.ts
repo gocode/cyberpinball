@@ -112,6 +112,7 @@ export * from './mediasearch';
 export * from './mediachoices';
 export * from './mp4audio';
 export * from './videocadence';
+export * from './recordingini';
 export * from './tablesounds';
 export * from './acquisition';
 export * from './gameparts';

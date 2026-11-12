@@ -43,6 +43,7 @@ import {
   type RecordingInput,
 } from '../gamerecording';
 import { readVideoCadence, videoCadenceOfBuffer } from '../videocadence';
+import { recordingIniCarryBack, recordingIniText } from '../recordingini';
 import { applyOps, trashDirFor } from '../fileops';
 import { localMediaChoices } from '../mediachoices';
 import { emptyMediaDraft, planMediaChanges } from '../mediaedit';
@@ -347,6 +348,31 @@ test('témoin et bande d’une partie entre amis : jamais ensemble, « Jouer et 
   const launches = [...source.matchAll(/play\([^)]*\{[^}]*\brecord:[^}]*\}\)/g)].map((m) => m[0]);
   assert.ok(launches.length > 0, 'un lancement « Jouer et enregistrer »');
   for (const launch of launches) assert.doesNotMatch(launch, /\bdouble\b/, launch);
+});
+
+test('balancier simulé de VPX éteint pour une partie enregistrée : son cercle n’entre pas dans la vidéo, rien d’autre ne change', () => {
+  // VPX dessine le balancier simulé dans l'image du plateau (PlumbOverlay.cpp) : cercle rouge en bas à gauche.
+  const base = '[Player]\r\nPlayfieldFullScreen = 1\r\nPlumbThresholdAngle = 1.5\r\n\r\n[Standalone]\r\nFoo = bar';
+  const text = recordingIniText(base)!;
+  assert.match(text, /SimulatedPlumb = 0/);
+  // Le reste tel quel, fins de ligne et dernière ligne sans saut comprises (VPX écrit ainsi).
+  assert.equal(text.replace(/\r\nSimulatedPlumb = 0/, ''), base);
+  assert.equal(recordingIniText(base.replace('[Player]', '[Player]\r\nSimulatedPlumb = 1'))?.includes('SimulatedPlumb = 0'), true);
+  // Balancier câblé (déjà éteint dans VPX) : rien à faire, l'INI de la borne sert tel quel.
+  assert.equal(recordingIniText('[Player]\r\nSimulatedPlumb = 0\r\n'), undefined);
+  // Après la partie : ce que VPX a changé revient dans l'INI de la borne, jamais le balancier éteint.
+  const after = text.replace('PlumbThresholdAngle = 1.5', 'PlumbThresholdAngle = 2').replace('Foo = bar', 'Foo = bar\r\nBaz = 1');
+  assert.deepEqual(recordingIniCarryBack(text, after), [
+    { section: 'Player', key: 'PlumbThresholdAngle', value: '2' },
+    { section: 'Standalone', key: 'Baz', value: '1' },
+  ]);
+  assert.deepEqual(recordingIniCarryBack(text, text), []);
+  // INI disparu (VPX planté avant d'écrire) : rien à reprendre.
+  assert.deepEqual(recordingIniCarryBack(text, ''), []);
+  // Le lancement d'une partie enregistrée passe bien cet INI à VPX (frontend.ts).
+  const front = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'app', 'src', 'frontend.ts'), 'utf8');
+  assert.ok(front.includes('ini: vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)'));
+  assert.ok(front.includes('if (recordIni) finishRecordingIni(recordIni, table);'));
 });
 
 test('médias produits : plateau, fronton, et le DMD de l’écran de la borne', () => {
