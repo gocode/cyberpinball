@@ -8,7 +8,7 @@
 // L'éclairage est cuit dans les sommets (lumières de la maquette) ; à l'affichage, la couleur du
 // sommet, multipliée par la texture, passe par la tonalité ACES quand la matière le demande.
 
-import { PLAYFIELD_SLOPE_DEG, rotateVector, type HeadsetPanel } from './casque';
+import { MENU_GLASS_DROP_M, PLAYFIELD_SLOPE_DEG, rotateVector, type HeadsetPanel } from './casque';
 import {
   add,
   alongAxis,
@@ -23,9 +23,14 @@ import {
   scale,
   v3,
   WORLD,
+  sub,
+  dot,
+  DECOR_LIGHT,
   type Frame,
   type V3,
 } from './decor-maillage';
+
+const mulV = (a: V3, b: V3): V3 => v3(a.x * b.x, a.y * b.y, a.z * b.z);
 
 /** Textures du décor (packages/casque-vr/decor/, scripts/decor-textures.cjs). */
 export const DECOR_TEXTURES = ['flanc.png', 'sol.png', 'nebuleuses.jpg', 'grille.png', 'lueur.png'] as const;
@@ -65,13 +70,19 @@ interface Surface {
   color: string;
   metalness: number;
   emissive?: { color: string; intensity: number };
+  /** Métal poli ou brossé : reflet de l'éclairage cuit, vu de la place du joueur. */
+  reflect?: number;
 }
 
 // Couleurs et matières de la maquette.
 const SATIN: Surface = { color: '#0a100f', metalness: 0.45 };
 const BLACK: Surface = { color: '#040707', metalness: 0.2 };
-const STEEL: Surface = { color: '#9bada7', metalness: 0.85 };
-const LEG: Surface = { color: '#161a1a', metalness: 0.55 };
+const STEEL: Surface = { color: '#9bada7', metalness: 0.85, reflect: 0.5 };
+/** Métal noir vert métallisé de la barre avant, des rails et des pieds (choix du 12/11/2026) : pas d'argent. */
+const BRUSHED: Surface = { color: '#16231f', metalness: 0.7, reflect: 0.8 };
+/** Place des yeux du joueur pour les reflets cuits (debout devant la barre). */
+const EYE = v3(0, 1.65, 0.35);
+const LEG: Surface = BRUSHED;
 const BOLT: Surface = { color: '#7d8a87', metalness: 0.9 };
 const RUBBER: Surface = { color: '#0a0c0c', metalness: 0 };
 const ART: Surface = { color: '#ffffff', metalness: 0.3 };
@@ -81,12 +92,23 @@ const FLOOR: Surface = { color: '#ffffff', metalness: 0.25 };
 
 /** Géométrie de la caisse et de la capsule (maquette validée). */
 export const DECOR = {
-  // Plateau presque à fleur : le dessus du cadre 6 mm au-dessus de l'image (retour du 12/11/2026).
-  rim: { side: 0.03, front: 0.07, back: 0.03, top: 0.006, bottom: -0.012, corner: 0.012 },
-  // Barre avant posée sur le cadre, son dessus à la hauteur de la vraie barre calée (0,046 m au-dessus
-  // du bord avant de l'image) ; son bord arrière s'arrête au bord de l'image du plateau (jamais dessus).
-  lockbar: { thickness: 0.04, depth: 0.1, radius: 0.008, center: 0.026, along: -0.05 },
-  body: { height: 0.33, drop: 2, panel: 0.018 },
+  // Dessus du cadre = la vitre, 3,5 mm sous le dessus de la barre avant (borne en 3D de VPX : vitre, barre
+  // et rails au même niveau à 1 ou 2 mm près), l'écran juste dessous. Les flancs montent jusqu'à `bottom`,
+  // sous la lèvre des rails.
+  rim: { side: 0.03, front: 0.07, back: 0.03, top: MENU_GLASS_DROP_M - 0.004 - 0.0035, bottom: MENU_GLASS_DROP_M - 0.004 - 0.0135, corner: 0.012 },
+  // Barre avant d'après des photos de vraies bornes (12/11/2026) : tôle creuse d'acier (`sheet`, sans
+  // caisson) qui coiffe le coin avant de la caisse et vient presque à fleur de la vitre. Dessus plat
+  // (`top` au-dessus du plan de l'image : la hauteur de la vraie barre calée), nez arrondi, lèvre
+  // sur la façade (`lip` sous la vitre), petit retour arrière sur la vitre, débord `overhang` qui est aussi
+  // le rayon du nez ; aux coins, le nez tourne autour de l'angle de la caisse (arrondi à l'horizontale
+  // et à la verticale), et elle s'enroule sur les flancs sur `wrap` depuis la façade. Son dessus va de
+  // l'arête au bord de l'image (jamais dessus) et, sur les flancs, au bord des rails.
+  lockbar: { top: MENU_GLASS_DROP_M - 0.004, overhang: 0.007, lip: 0.03, sheet: 0.002, wrap: 0.085 },
+  // Rails latéraux : acier le long du haut des flancs, de la barre à la tête, presque à fleur de la barre ;
+  // ils tiennent la vitre.
+  rail: { height: 0.0027, overhang: 0.004, round: 0.001, lip: 0.012, sheet: 0.002, inner: 0.028 },
+  // Hauteur des flancs : leur dessus suit les rails, leur bas reste où il était (0,46 m à l'avant).
+  body: { height: 0.376, drop: 2, panel: 0.018 },
   leg: { flange: 0.065, thickness: 0.004, above: 0.17, tip: 0.09, tipWidth: 0.005, floor: 0.03 },
   // Tête posée sur l'arrière de la caisse (enfoncée de `seat`), qui s'évase vers le haut : `flare` de plus
   // de chaque côté et `visor` de plus vers l'avant au sommet, comme une casquette (retour du 12/11/2026).
@@ -144,6 +166,7 @@ export function buildDecor(panels: readonly HeadsetPanel[], opts: { lockbarWidth
       const n = v3(mesh.normals[3 * i]!, mesh.normals[3 * i + 1]!, mesh.normals[3 * i + 2]!);
       const e = irradiance(p, n);
       let c = v3(base.x * e.x * diffuse, base.y * e.y * diffuse, base.z * e.z * diffuse);
+      if (surface.reflect) c = add(c, scale(mulV(base, reflection(p, n)), surface.reflect * surface.metalness));
       if (surface.emissive) c = add(c, scale(raw(surface.emissive.color), surface.emissive.intensity));
       colors.push(c.x, c.y, c.z, 1);
     }
@@ -162,7 +185,7 @@ export function buildDecor(panels: readonly HeadsetPanel[], opts: { lockbarWidth
   const R = DECOR.rim, B = DECOR.body;
   // Demi-largeur de la caisse : le plateau et son cadre, ou la vraie barre avant calée (bornée à 40-120 cm, calage.ts).
   const measured = opts.lockbarWidth !== undefined && Number.isFinite(opts.lockbarWidth) ? Math.min(1.2, Math.max(0.4, opts.lockbarWidth)) : 0;
-  const hw = Math.max(W / 2 + R.side, measured / 2);
+  const hw = Math.max(W / 2 + R.side, measured / 2 - DECOR.lockbar.overhang);
   // La tête repose sur l'arrière de la caisse : la caisse va jusqu'au dos de la tête, la bande arrière du
   // cadre la porte. Sans tête, le cadre s'arrête 3 cm après l'image.
   const H = DECOR.head;
@@ -223,30 +246,95 @@ export function buildDecor(panels: readonly HeadsetPanel[], opts: { lockbarWidth
     strip(inner, R.top, inner, 0, (i) => scale(outward(inner)(i), -1)); // bord intérieur, jusqu'à l'image
   });
 
-  // --- Barre avant : le cadre s'épaissit, profil arrondi côté mains.
-  part('barre', SATIN, lit, (m) => {
-    const L = DECOR.lockbar;
-    const profile = roundRectLoop(-L.depth / 2, -L.thickness / 2, L.depth / 2, L.thickness / 2, L.radius, 4, 6);
-    const base = m.vertexCount;
-    for (const x of [-hw, hw])
-      for (const [a, y] of profile) {
-        const p = at(pf, x, L.center + y, -(L.along + a));
-        m.vertex(p, dir(pf, 0, y, -a));
-      }
-    const n = profile.length;
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      m.tri(base + i, base + n + i, base + n + j);
-      m.tri(base + i, base + n + j, base + j);
+  // --- Barre avant et rails : acier brossé, comme sur les photos de vraies bornes.
+  // Profils dans (u, v) : u vers l'extérieur depuis l'arête de la caisse, v au-dessus du plan de l'image.
+  const arc = (cu: number, cv: number, r: number, a0: number, a1: number, steps: number) => {
+    const pts: { u: number; v: number; nu: number; nv: number }[] = [];
+    for (let k = 0; k <= steps; k++) {
+      const a = a0 + ((a1 - a0) * k) / steps;
+      pts.push({ u: cu + r * Math.cos(a), v: cv + r * Math.sin(a), nu: Math.cos(a), nv: Math.sin(a) });
     }
-    // Bouts de la barre.
-    for (const [x, s] of [[-hw, -1], [hw, 1]] as const) {
-      const c = m.vertex(at(pf, x, L.center, -L.along), dir(pf, s, 0, 0));
-      const first = m.vertexCount;
-      for (const [a, y] of profile) m.vertex(at(pf, x, L.center + y, -(L.along + a)), dir(pf, s, 0, 0));
-      for (let i = 0; i < n; i++) m.tri(c, first + i, first + ((i + 1) % n));
-    }
+    return pts;
+  };
+  const flat = (u0: number, v0: number, u1: number, v1: number, nu: number, nv: number) => [
+    { u: u0, v: v0, nu, nv },
+    { u: u1, v: v1, nu, nv },
+  ];
+  /** Arête de la caisse, pas à pas : point (x, a) au niveau du plan, normale vers l'extérieur (nx, na). */
+  type Edge = { x: number; a: number; nx: number; na: number };
+  const onEdge = (path: Edge[]) => ({
+    place: (i: number, u: number, v: number) => at(pf, path[i]!.x + u * path[i]!.nx, v, -(path[i]!.a + u * path[i]!.na)),
+    normal: (i: number, nu: number, nv: number) => dir(pf, nu * path[i]!.nx, nv, -(nu * path[i]!.na)),
+    // Bouts : normale dans le prolongement du chemin, vers l'extérieur.
+    tangent: (i: number) => {
+      const p = path[i]!, q = path[i === 0 ? 1 : i - 1]!;
+      return dir(pf, p.x - q.x, 0, -(p.a - q.a));
+    },
   });
+  const LB = DECOR.lockbar, RL = DECOR.rail;
+  // Bout arrière de la barre sur les flancs ; les rails partent de là jusqu'à la tête.
+  const wrapEnd = -R.front + LB.wrap;
+  {
+    const path: Edge[] = [];
+    // Coins : le nez tourne autour de l'angle de la caisse, arrondi à l'horizontale comme à la verticale
+    // (coin de boîte arrondi) ; la tôle enveloppe l'angle, qui ne ressort jamais.
+    const cornerSteps = 12;
+    const corner = (sx: -1 | 1) => {
+      const pts: Edge[] = [];
+      for (let k = 0; k <= cornerSteps; k++) {
+        const t = k / cornerSteps;
+        // Gauche : de -x vers l'avant ; droite : de l'avant vers +x.
+        const th = sx < 0 ? Math.PI + (t * Math.PI) / 2 : (3 * Math.PI) / 2 + (t * Math.PI) / 2;
+        pts.push({ x: sx * hw, a: -R.front, nx: Math.cos(th), na: Math.sin(th) });
+      }
+      return pts;
+    };
+    path.push({ x: -hw, a: wrapEnd, nx: -1, na: 0 }, ...corner(-1), ...corner(1), { x: hw, a: wrapEnd, nx: 1, na: 0 });
+    // Tôle creuse : nez (rayon = débord) et lèvre promenés le long de l'arête, puis leur envers.
+    const Ht = LB.top, ov = LB.overhang, rn = LB.overhang, lb = R.top - LB.lip, t = LB.sheet;
+    const profile = [
+      arc(0, Ht - rn, rn, Math.PI / 2, 0, 10),
+      flat(ov, Ht - rn, ov, lb, 1, 0),
+      flat(ov, lb, ov - t, lb, 0, -1),
+      flat(ov - t, lb, ov - t, Ht - rn, -1, 0),
+      arc(0, Ht - rn, rn - t, 0, Math.PI / 2, 10).map((q) => ({ ...q, nu: -q.nu, nv: -q.nv })),
+      flat(0, Ht - t, 0, Ht, -1, 0),
+    ];
+    const e = onEdge(path);
+    part('barre', BRUSHED, lit, (m) => {
+      m.sweep(path.length, profile, e.place, e.normal, { capNormal: (i) => e.tangent(i) });
+      // Repère du plan : x local = x, y local = -a (vers le joueur), z local = normale du plateau.
+      const plane: Frame = { o: pf.o, x: pf.x, y: pf.z, z: pf.y };
+      const flatOn = (poly: [number, number][], v0: number, v1: number) => m.slab(plane, poly.map(([x, a]) => [x, -a] as [number, number]), v0, v1);
+      // Le dessus, tôle plate de l'arête de la caisse jusqu'au bord de l'image (devant) et au bord des rails (côtés).
+      const xi = hw - RL.inner;
+      flatOn([[-hw, wrapEnd], [-hw, -R.front], [hw, -R.front], [hw, wrapEnd], [xi, wrapEnd], [xi, 0], [-xi, 0], [-xi, wrapEnd]], Ht - t, Ht);
+      // Retour arrière sur la vitre (la vitre glisse dessous), à 1,5 mm du bord de l'image et des rails.
+      const gap = 0.0015, lipLow = R.top - 0.002;
+      flatOn([[-xi, -gap], [xi, -gap], [xi, -gap - t], [-xi, -gap - t]], lipLow, Ht - t);
+      for (const s of [-1, 1] as const) flatOn([[s * xi, -gap], [s * (xi + t), -gap], [s * (xi + t), wrapEnd], [s * xi, wrapEnd]], lipLow, Ht - t);
+    });
+  }
+  for (const sx of [-1, 1] as const) {
+    // Les rails vont du bout de la barre jusque sous l'avant de la tête (ou jusqu'au bout du cadre).
+    const railEnd = headZ !== undefined ? alongTo(headZ + H.forward) + 0.005 : Lp + rimBack - 0.004;
+    const path: Edge[] = [
+      { x: sx * hw, a: wrapEnd, nx: sx, na: 0 },
+      { x: sx * hw, a: Math.min(railEnd, Lp + rimBack - 0.004), nx: sx, na: 0 },
+    ];
+    const top = R.top + RL.height, ov = RL.overhang, rr = RL.round, lb = R.top - RL.lip, tl = RL.sheet, inner = -RL.inner;
+    const profile = [
+      flat(inner, top, ov - rr, top, 0, 1),
+      arc(ov - rr, top - rr, rr, Math.PI / 2, 0, 4),
+      flat(ov, top - rr, ov, lb, 1, 0),
+      flat(ov, lb, ov - tl, lb, 0, -1),
+      flat(ov - tl, lb, ov - tl, R.top, -1, 0),
+      flat(ov - tl, R.top, inner, R.top, 0, -1),
+      flat(inner, R.top, inner, top, -1, 0),
+    ];
+    const e = onEdge(path);
+    part('rail', BRUSHED, lit, (m) => m.sweep(path.length, profile, e.place, e.normal, { capNormal: (i) => e.tangent(i) }));
+  }
 
   // --- Flancs habillés : prisme du profil, habillage sur la face extérieure (u de l'arrière à l'avant).
   for (const s of [-1, 1] as const) {
@@ -372,13 +460,22 @@ export function buildDecor(panels: readonly HeadsetPanel[], opts: { lockbarWidth
       m.lathe(f, [[0.004, 0], [0.024, 0], [0.025, 0.002], [0.02, 0.006], [0.006, 0.007]]);
       m.lathe(f, [[0.004, 0.006], [0.004, 0.05], [0, 0.05]], 16);
     });
-    part('tirette-poignee', { color: '#111515', metalness: 0.2 }, lit, (m) => {
-      const pts: [number, number][] = [];
-      for (let k = 0; k <= 16; k++) {
-        const t = (k / 16) * Math.PI;
-        pts.push([Math.sin(t) * 0.015, 0.045 + (1 - Math.cos(t)) * 0.016]);
+    // Poignée en champignon noir brillant : col court, chapeau large au bord arrondi, dessus bombé.
+    part('tirette-poignee', { color: '#0b0d0d', metalness: 0.2, reflect: 0.6 }, lit, (m) => {
+      const pts: [number, number][] = [[0, 0.046], [0.0055, 0.046], [0.0065, 0.051]];
+      for (let k = 0; k <= 8; k++) {
+        const t = (k / 8) * (Math.PI / 2);
+        pts.push([0.0065 + (0.0165 - 0.0065) * Math.sin(t), 0.051 + 0.006 * (1 - Math.cos(t))]);
       }
-      m.lathe(f, pts);
+      for (let k = 1; k <= 8; k++) {
+        const t = (k / 8) * (Math.PI / 2);
+        pts.push([0.0165 - 0.003 * (1 - Math.cos(t)), 0.057 + 0.003 * Math.sin(t)]);
+      }
+      for (let k = 1; k <= 8; k++) {
+        const t = k / 8;
+        pts.push([0.0135 * (1 - t), 0.06 + 0.004 * Math.sin((t * Math.PI) / 2)]);
+      }
+      m.lathe(f, pts, 40);
     });
   }
 
@@ -549,4 +646,18 @@ function roundRectLoop(x0: number, y0: number, x1: number, y1: number, r: number
     }
   }
   return pts;
+}
+
+/**
+ * Reflet cuit d'un métal, vu de la place du joueur : le ciel de la lumière d'ambiance dans la direction
+ * réfléchie, l'éclat de la lumière principale, et la lueur sarcelle de la capsule vers le haut.
+ */
+function reflection(p: V3, n: V3): V3 {
+  const view = normalize(sub(p, EYE));
+  const r = sub(view, scale(n, 2 * dot(view, n)));
+  const L = DECOR_LIGHT;
+  const k = 0.5 + 0.5 * r.y;
+  let c = scale(add(scale(L.hemi.ground, 1 - k), scale(L.hemi.sky, k)), 0.42);
+  for (const d of L.directional) c = add(c, scale(d.color, d.intensity * 1.6 * Math.pow(Math.max(0, dot(r, d.from)), 18)));
+  return add(c, scale(raw('#36c9b4'), 0.18 * Math.max(0, r.y)));
 }

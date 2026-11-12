@@ -261,7 +261,8 @@ export interface VpxTableGeometry {
  * la même taille et la même hauteur », 10 novembre 2026). VPX pose le plateau à « barre avant − vitre
  * du bas × échelle », 5 cm plus 5 cm à l'échelle devant elle, à l'échelle « LockbarWidth / (largeur
  * de la table + 2 1/4") » (VRDevice). Avec la table connue (`table`, readVpxGlass) : TableZ et TableY
- * mettent le bas de son plateau au droit de la barre avant, GLASS_DROP_M sous elle, comme le menu ; et
+ * mettent le bas de son plateau au droit de la barre avant, GLASS_DROP_M sous elle (le menu pose son
+ * écran plus haut, au ras de la vitre : MENU_GLASS_DROP_M, là où VPX a la vitre de sa table) ; et
  * avec la largeur du plateau du menu (`menuWidthM`, menuPlayfield), LockbarWidth donne à son plateau
  * cette largeur. Sans la table, la pose seule (jusqu'à 20 cm plus bas : vitre de 21,6 cm de la plupart
  * des tables).

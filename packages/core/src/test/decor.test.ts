@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { headsetPanels, LOCKBAR_HEIGHT_M, rotateVector, type HeadsetPanel, type HeadsetSource, type Quaternion } from '../casque';
 import { buildDecor, DECOR, DECOR_TEXTURES, type Decor, type DecorPart } from '../decor';
 import { coplanarConflicts } from '../decor-controle';
-import { Mesh } from '../decor-maillage';
+import { earcut, Mesh } from '../decor-maillage';
 import { readGlb, writeGlb } from '../glb';
 import { edgeRotation } from '../model';
 
@@ -106,13 +106,14 @@ for (const [name, panels] of configurations) {
     });
   }
 
-  test(`décor (${name}) : plateau presque à fleur, tête posée sur la caisse et évasée vers le haut comme une casquette`, () => {
+  test(`décor (${name}) : vitre au niveau des rails, écran juste dessous, tête posée sur la caisse et évasée vers le haut comme une casquette`, () => {
     const decor = buildDecor(panels)!;
     const pf = panels.find((p) => p.role === 'playfield')!;
-    // Le dessus du cadre à moins d'un centimètre au-dessus de l'image (devant elle, dans son repère).
+    // Le dessus du cadre (la vitre) à 2 cm au plus au-dessus de l'image, sous les rails.
     const cadre = decor.parts.find((p) => p.name === 'cadre')!;
     const rise = Math.max(...vertices(cadre).map((v) => inPanel(pf, v).z));
-    assert.ok(rise > 0.002 && rise < 0.01, `cadre à ${(rise * 1000).toFixed(1)} mm au-dessus de l'image`);
+    assert.ok(rise > 0.002 && rise <= DECOR.rim.top + 1e-9, `cadre à ${(rise * 1000).toFixed(1)} mm au-dessus de l'image`);
+    for (const rail of decor.parts.filter((p) => p.name === 'rail')) assert.ok(Math.max(...vertices(rail).map((v) => inPanel(pf, v).z)) > rise, 'rail sous la vitre');
     // La tête repose sur la caisse : son bas descend sous le dessus du cadre, la caisse va jusqu'à son dos.
     const tete = vertices(decor.parts.find((p) => p.name === 'tete')!);
     const cadreV = vertices(cadre);
@@ -135,6 +136,49 @@ for (const [name, panels] of configurations) {
   });
 }
 
+test('barre avant d’après de vraies bornes : tôle creuse qui coiffe le coin, presque à fleur de la vitre, lèvre sur la façade, coins enroulés, rails qui la prolongent', () => {
+  const panels = configurations[0]![1];
+  const decor = buildDecor(panels)!;
+  const pf = panels.find((p) => p.role === 'playfield')!;
+  const barre = vertices(decor.parts.find((p) => p.name === 'barre')!).map((v) => ({ ...v, l: inPanel(pf, v) }));
+  const facade = vertices(decor.parts.find((p) => p.name === 'facade')!);
+  const frontZ = Math.max(...facade.map((v) => v.z));
+  // Dessus à la hauteur de la vraie barre (calage) : 4,6 cm au-dessus du plan de l'image.
+  assert.ok(Math.abs(Math.max(...barre.map((v) => v.l.z)) - DECOR.lockbar.top) < 1e-6);
+  // La lèvre descend devant la façade, plus bas que la vitre, sans la traverser.
+  const lip = barre.filter((v) => v.z > frontZ);
+  assert.ok(lip.length > 0 && Math.min(...lip.map((v) => v.l.z)) < DECOR.rim.top - 0.02, 'lèvre trop courte');
+  // Coins enroulés : la barre revient sur les flancs, en débord.
+  const hw = Math.max(...vertices(decor.parts.find((p) => p.name === 'flanc-droit')!).map((v) => v.x));
+  const front = barre.filter((v) => Math.abs(v.x) < hw && v.l.z < DECOR.rim.top - 0.01); // la lèvre avant (le retour arrière reste sur la vitre)
+  assert.ok(Math.min(...front.map((v) => v.z)) > frontZ, 'la lèvre traverse la façade');
+  assert.ok(Math.abs(Math.max(...barre.map((v) => v.x)) - (hw + DECOR.lockbar.overhang)) < 1e-6);
+  // Vitre presque à fleur du dessus de la barre (moins d'un centimètre dessous).
+  assert.ok(DECOR.lockbar.top - DECOR.rim.top < 0.01);
+  // Rails des deux côtés, jusqu'à la tête.
+  const rails = decor.parts.filter((p) => p.name === 'rail');
+  assert.equal(rails.length, 2);
+  const tete = vertices(decor.parts.find((p) => p.name === 'tete')!);
+  for (const r of rails) {
+    const rv = vertices(r);
+    // Presque à fleur de la barre, juste dessous.
+    const railTop = Math.max(...rv.map((v) => inPanel(pf, v).z));
+    assert.ok(railTop < DECOR.lockbar.top && railTop > DECOR.lockbar.top - 0.006, `rail à ${(railTop * 1000).toFixed(1)} mm`);
+    assert.ok(Math.min(...rv.map((v) => v.z)) < Math.max(...tete.map((v) => v.z)), 'rail arrêté avant la tête');
+  }
+  // Métallisé : un reflet cuit, plus de lumière que le seul éclairage diffus de sa couleur.
+  const lum = (part: DecorPart) => part.colors.reduce((t, c, i) => (i % 4 === 3 ? t : t + c), 0) / (part.colors.length * 0.75);
+  assert.ok(lum(decor.parts.find((p) => p.name === 'barre')!) > 1.2 * lum(decor.parts.find((p) => p.name === 'cadre')!));
+});
+
+test('triangulation par oreilles : un polygone en U garde son aire', () => {
+  const u: [number, number][] = [[0, 0], [3, 0], [3, 2], [2, 2], [2, 1], [1, 1], [1, 2], [0, 2]];
+  const tris = earcut(u);
+  assert.equal(tris.length, u.length - 2);
+  const area = tris.reduce((t, [a, b, c]) => t + Math.abs((u[b]![0] - u[a]![0]) * (u[c]![1] - u[a]![1]) - (u[b]![1] - u[a]![1]) * (u[c]![0] - u[a]![0])) / 2, 0);
+  assert.ok(Math.abs(area - 5) < 1e-9, `aire ${area}`);
+});
+
 test('contrôle des surfaces coplanaires : deux faces du même côté au même endroit sont signalées, un contact dos à dos aussi mais à part', () => {
   const mk = (name: string, z: number, nz: number) => {
     const mesh = new Mesh();
@@ -154,8 +198,9 @@ test('décor : calé sur une vraie barre avant, la caisse en prend la largeur, s
   const xs = vertices(barre).map((v) => v.x);
   assert.ok(Math.abs(Math.max(...xs) - 0.35) < 1e-6 && Math.abs(Math.min(...xs) + 0.35) < 1e-6);
   for (const name of ['flanc-gauche', 'flanc-droit']) {
+    // La barre déborde de la caisse, comme une vraie : les flancs sont en retrait de son débord.
     const fx = vertices(decor.parts.find((p) => p.name === name)!).map((v) => Math.abs(v.x));
-    assert.ok(Math.abs(Math.max(...fx) - 0.35) < 1e-6, name);
+    assert.ok(Math.abs(Math.max(...fx) - (0.35 - DECOR.lockbar.overhang)) < 1e-6, name);
   }
   // Une barre plus étroite que le plateau et son cadre : la caisse garde la largeur du plateau.
   const narrow = buildDecor(panels, { lockbarWidth: 0.45 })!;

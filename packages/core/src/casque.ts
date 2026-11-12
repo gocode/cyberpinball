@@ -18,8 +18,14 @@ export const LOCKBAR_HEIGHT_M = 0.85;
 export const LOCKBAR_DISTANCE_M = 0.3;
 /** Pente du plateau (degrés) : celle d'une borne réglée, 6,5°. */
 export const PLAYFIELD_SLOPE_DEG = 6.5;
-/** Le plateau est sous la vitre, un peu plus bas que la barre avant. */
+/** En partie : le bas du plateau de VPX sous la barre avant (la vitre de sa table est au-dessus). */
 export const GLASS_DROP_M = 0.05;
+/**
+ * Au menu : l'écran du plateau juste sous la vitre, qui affleure la barre avant (retour du 12/11/2026,
+ * d'après une borne en 3D de VPX : vitre, barre et rails au même niveau à 1 ou 2 mm près). En partie,
+ * c'est la vitre de la table de VPX qui est à ce niveau, son plateau en 3D dessous (GLASS_DROP_M).
+ */
+export const MENU_GLASS_DROP_M = 0.012;
 /** Écart entre la tête de la borne et le bout du plateau, et entre deux panneaux de la tête. */
 const HEAD_GAP_M = 0.1;
 const PANEL_GAP_M = 0.02;
@@ -122,7 +128,7 @@ export const STANDARD_HEAD = { backglass: 1.05, dmd: 0.5, topper: 0.4 } as const
 export function headsetPanels(sources: readonly HeadsetSource[], playfieldRotation: Rotation, opts: { standardHead?: boolean } = {}): HeadsetPanel[] {
   const panels: HeadsetPanel[] = [];
   const slope = rad(PLAYFIELD_SLOPE_DEG);
-  const front = { y: LOCKBAR_HEIGHT_M - GLASS_DROP_M, z: -LOCKBAR_DISTANCE_M };
+  const front = { y: LOCKBAR_HEIGHT_M - MENU_GLASS_DROP_M, z: -LOCKBAR_DISTANCE_M };
   let far = { y: front.y, z: front.z - 1.0 };
   // Largeur du plateau vue du joueur, base des proportions de la tête.
   let playfieldWidth = DEFAULT_WIDTH_M.playfield * 0.56;

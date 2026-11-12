@@ -47,6 +47,56 @@ export function alongAxis(o: V3, axis: V3): Frame {
 }
 
 /** Un maillage : sommets (position, normale, uv), triangles. */
+/** Tronçon d'un profil : points (u, v) et leurs normales (nu, nv) dans le plan du profil. */
+export type ProfileSegment = { u: number; v: number; nu: number; nv: number }[];
+
+/** Aire signée d'un polygone (positive dans le sens trigonométrique). */
+export function signedArea(poly: readonly [number, number][]): number {
+  let a = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const [x0, y0] = poly[i]!, [x1, y1] = poly[(i + 1) % poly.length]!;
+    a += x0 * y1 - x1 * y0;
+  }
+  return a / 2;
+}
+
+/** Triangulation par oreilles d'un polygone simple (indices dans `poly`), quel que soit son sens. */
+export function earcut(poly: readonly [number, number][]): [number, number, number][] {
+  const sign = signedArea(poly) >= 0 ? 1 : -1;
+  const idx = poly.map((_, i) => i);
+  const out: [number, number, number][] = [];
+  const cross2 = (a: number, b: number, c: number) => {
+    const [ax, ay] = poly[a]!, [bx, by] = poly[b]!, [cx, cy] = poly[c]!;
+    return ((bx - ax) * (cy - ay) - (by - ay) * (cx - ax)) * sign;
+  };
+  const inside = (p: number, a: number, b: number, c: number) => cross2(a, b, p) >= -1e-15 && cross2(b, c, p) >= -1e-15 && cross2(c, a, p) >= -1e-15;
+  let guard = 0;
+  while (idx.length > 3 && guard++ < 10_000) {
+    let cut = false;
+    for (let k = 0; k < idx.length; k++) {
+      const a = idx[(k + idx.length - 1) % idx.length]!, b = idx[k]!, c = idx[(k + 1) % idx.length]!;
+      const area = cross2(a, b, c);
+      if (area <= 1e-15) {
+        // Point aligné avec ses voisins : retiré sans triangle.
+        if (Math.abs(area) <= 1e-15) {
+          idx.splice(k, 1);
+          cut = true;
+          break;
+        }
+        continue;
+      }
+      if (idx.some((p) => p !== a && p !== b && p !== c && inside(p, a, b, c))) continue;
+      out.push([a, b, c]);
+      idx.splice(k, 1);
+      cut = true;
+      break;
+    }
+    if (!cut) break;
+  }
+  if (idx.length === 3) out.push([idx[0]!, idx[1]!, idx[2]!]);
+  return out;
+}
+
 export class Mesh {
   readonly positions: number[] = [];
   readonly normals: number[] = [];
@@ -91,6 +141,64 @@ export class Mesh {
       [v3(0, 0, -1), [[1, -1, -1], [-1, -1, -1], [-1, 1, -1], [1, 1, -1]]],
     ];
     for (const [n, k] of faces) this.quad(P(...k[0]!), P(...k[1]!), P(...k[2]!), P(...k[3]!), dir(f, n.x, n.y, n.z));
+  }
+
+  /**
+   * Polygone plat quelconque (simple, convexe ou non) du plan local (x, y) à la cote z, normale `nz`
+   * (+1 ou -1 le long de z local) : triangulé par oreilles.
+   */
+  polygon(f: Frame, poly: [number, number][], z: number, nz: 1 | -1): void {
+    const base = this.vertexCount;
+    const n = dir(f, 0, 0, nz);
+    for (const [x, y] of poly) this.vertex(at(f, x, y, z), n);
+    for (const [a, b, c] of earcut(poly)) this.tri(base + a, base + b, base + c);
+  }
+
+  /**
+   * Pièce épaisse : polygone quelconque du plan local (x, y), épaissi de z0 à z1, faces de côté plates.
+   */
+  slab(f: Frame, poly: [number, number][], z0: number, z1: number): void {
+    const ccw = signedArea(poly) > 0 ? poly : [...poly].reverse();
+    this.polygon(f, ccw, z1, 1);
+    this.polygon(f, ccw, z0, -1);
+    const n = ccw.length;
+    for (let i = 0; i < n; i++) {
+      const [ax, ay] = ccw[i]!, [bx, by] = ccw[(i + 1) % n]!;
+      if (Math.hypot(bx - ax, by - ay) < 1e-9) continue;
+      this.quad(at(f, ax, ay, z0), at(f, bx, by, z0), at(f, bx, by, z1), at(f, ax, ay, z1), dir(f, by - ay, -(bx - ax), 0));
+    }
+  }
+
+  /**
+   * Profil promené le long d'un chemin : `place(i, u, v)` donne le point du profil (u, v) au pas i du
+   * chemin, `normal(i, nu, nv)` sa normale. Le profil est une suite de tronçons (arêtes vives entre
+   * eux, normales lissées dedans) ; `caps` ferme les deux bouts (normales `capNormal(0)` et `(last)`).
+   */
+  sweep(steps: number, profile: ProfileSegment[], place: (i: number, u: number, v: number) => V3, normal: (i: number, nu: number, nv: number) => V3, caps?: { capNormal: (i: number) => V3 }): void {
+    for (const seg of profile) {
+      const base = this.vertexCount, k = seg.length;
+      for (let i = 0; i < steps; i++) for (const pt of seg) this.vertex(place(i, pt.u, pt.v), normal(i, pt.nu, pt.nv));
+      for (let i = 0; i + 1 < steps; i++)
+        for (let j = 0; j + 1 < k; j++) {
+          const a = base + i * k + j, b = a + k;
+          this.tri(a, b, b + 1);
+          this.tri(a, b + 1, a + 1);
+        }
+    }
+    if (!caps) return;
+    // Contour du profil (points distincts, dans l'ordre), triangulé à chaque bout.
+    const outline: [number, number][] = [];
+    for (const seg of profile)
+      for (const pt of seg) {
+        const last = outline[outline.length - 1];
+        if (!last || Math.hypot(last[0] - pt.u, last[1] - pt.v) > 1e-9) outline.push([pt.u, pt.v]);
+      }
+    if (outline.length > 2 && Math.hypot(outline[0]![0] - outline[outline.length - 1]![0], outline[0]![1] - outline[outline.length - 1]![1]) < 1e-9) outline.pop();
+    for (const i of [0, steps - 1]) {
+      const base = this.vertexCount, n = caps.capNormal(i);
+      for (const [u, v] of outline) this.vertex(place(i, u, v), n);
+      for (const [a, b, c] of earcut(outline)) this.tri(base + a, base + b, base + c);
+    }
   }
 
   /**
