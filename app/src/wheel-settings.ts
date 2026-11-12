@@ -93,7 +93,7 @@ const capitalized = (text: string) => text.charAt(0).toLocaleUpperCase() + text.
  * Lignes de l'écran, dans l'ordre : un sous-écran revient sur sa ligne par son rang, tiré
  * d'ici (une ligne ajoutée ne décale pas les retours).
  */
-export const WHEEL_SETTINGS_ROWS = ['menuLayout', 'tableOrder', 'startTable', 'wheelStart', 'wheelMotion', 'tableColor', 'jukebox'] as const;
+export const WHEEL_SETTINGS_ROWS = ['menuLayout', 'tableOrder', 'startTable', 'wheelStart', 'wheelMotion', 'tableColor', 'jukebox', 'community'] as const;
 type Row = (typeof WHEEL_SETTINGS_ROWS)[number];
 const row = (key: Row) => WHEEL_SETTINGS_ROWS.indexOf(key);
 
@@ -156,6 +156,14 @@ export function createWheelSettings(host: WheelSettingsHost): ProvidedSystemItem
           : t('La roue ne montre que les tables ; vos playlists restent dans la gestion du Juke-box (Start : afficher le médaillon)'),
         icon: 'jukebox',
         run: () => set({ jukebox: !v.jukebox }),
+      },
+      community: {
+        label: v.community ? t('Communauté dans la roue : affichée') : t('Communauté dans la roue : masquée'),
+        detail: v.community
+          ? t('Le médaillon Communauté suit le Juke-box en tête de chaque collection : joueurs en ligne, messages, classements (Start : le masquer)')
+          : t('La communauté reste dans Menu système › Amis (Start : afficher le médaillon)'),
+        icon: 'friends',
+        run: () => set({ community: !v.community }),
       },
     };
     return WHEEL_SETTINGS_ROWS.map((key) => rows[key]);

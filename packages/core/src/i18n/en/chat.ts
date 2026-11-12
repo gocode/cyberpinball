@@ -140,7 +140,7 @@ export const messages: Record<string, string> = {
   'Vous aimez': 'You like this',
   'Activité récente · {n} derniers jours': 'Recent activity · last {n} days',
   'Ni record ni badge ces derniers jours': 'No high score or badge in recent days',
-  'Présence, table en cours, bibliothèque : réservées à ses amis': 'Presence, current table, library: for their friends only',
+  'Table en cours, parties jouées, bibliothèque : réservées à ses amis': 'Current table, games played, library: for their friends only',
   'En attente de sa réponse': 'Waiting for their answer',
   'Écrire un message': 'Write a message',
   'Indisponible : entre amis seulement, envoyez d’abord une demande d’ami': 'Unavailable: friends only, send a friend request first',

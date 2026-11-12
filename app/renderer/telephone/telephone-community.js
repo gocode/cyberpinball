@@ -3,7 +3,8 @@
 // choisit, met en forme et traduit tout ; la page ne fait que dessiner :
 // - Messages : les conversations dans l'ordre de la borne (la plus récente d'abord, puis les amis
 //   sans message), le dernier message, son moment, les non-lus ;
-// - Amis : les mêmes amis, en ligne d'abord, avec leur présence ;
+// - Joueurs : les mêmes amis, en ligne d'abord, avec leur présence, puis les autres joueurs en
+//   ligne (présence publique, jamais leur table), qu'on voit sans pouvoir leur écrire ;
 // - Scores : la vue des classements (telephone-ranks.js).
 // Un toucher ouvre le fil (« chat-open » : la clé publique de l'ami, rien d'autre) : la borne
 // l'envoie tant qu'il est ouvert et le marque lu. Les messages de l'ami à gauche, les miens à droite
@@ -25,7 +26,7 @@ const community = {
 
 for (const [id, label] of [
   ['seg-messages', () => t('Messages')],
-  ['seg-friends', () => t('Amis')],
+  ['seg-friends', () => t('Joueurs')],
   ['seg-ranks', () => t('Scores')],
 ]) {
   const b = document.getElementById(id);
@@ -104,7 +105,27 @@ function communityRow(row, detail) {
   return li;
 }
 
-/** Messages ou Amis : la liste, ou pourquoi elle est vide (chargement, messagerie fermée, aucun ami). */
+/** Un joueur en ligne qui n'est pas un ami : sa pastille, son nom, « En ligne · France » ; pas de fil à ouvrir. */
+function playerRow(row) {
+  const li = document.createElement('li');
+  const b = document.createElement('div');
+  b.className = 'entry conv player';
+  const text = document.createElement('span');
+  text.className = 'entry-text';
+  const label = document.createElement('span');
+  label.className = 'entry-label';
+  label.textContent = row.name;
+  const line = document.createElement('span');
+  line.className = 'entry-detail';
+  line.textContent = row.presence;
+  text.append(label, line);
+  b.append(communityFace(row), text);
+  b.setAttribute('aria-label', [row.name, row.presence].join(', '));
+  li.append(b);
+  return li;
+}
+
+/** Messages ou Joueurs : la liste, ou pourquoi elle est vide (chargement, messagerie fermée, aucun ami). */
 function renderCommunity() {
   const list = document.getElementById('conv-list');
   const c = community.data;
@@ -129,7 +150,15 @@ function renderCommunity() {
   const order = { online: 0, playing: 0, offline: 1, gone: 2 };
   const rows = friends ? c.rows.filter((r) => r.state !== 'gone').sort((a, b) => order[a.state] - order[b.state] || a.name.localeCompare(b.name)) : c.rows;
   list.replaceChildren(...rows.map((r) => communityRow(r, friends ? r.presence : r.last)));
-  if (!rows.length) showEmpty('conv', 'friend-add', t('Pas encore d’ami à qui écrire'), t('À la borne : Amis > Trouver un joueur.'));
+  // Joueurs : les autres joueurs en ligne, après mes amis ; on ne leur écrit pas (amis seulement).
+  const others = friends ? (c.players ?? []) : [];
+  if (others.length) {
+    const head = document.createElement('li');
+    head.className = 'conv-section';
+    head.textContent = t('Autres joueurs en ligne ({n})', { n: others.length });
+    list.append(head, ...others.map((r) => playerRow(r)));
+  }
+  if (!rows.length && !others.length) showEmpty('conv', 'friend-add', friends ? t('Personne en ligne pour l’instant') : t('Pas encore d’ami à qui écrire'), t('À la borne : Amis > Trouver un joueur.'));
   else showEmpty('conv');
 }
 

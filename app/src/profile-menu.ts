@@ -91,7 +91,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       });
       sections.push({ title: t('Activité récente · {n} derniers jours', { n: 30 }), rows: rows.length ? rows : [{ text: t('Ni record ni badge ces derniers jours'), tone: 'quiet' }] });
     }
-    if (!friend) sections.push({ rows: [{ text: t('Présence, table en cours, bibliothèque : réservées à ses amis'), tone: 'quiet', icon: 'lock' }] });
+    if (!friend) sections.push({ rows: [{ text: t('Table en cours, parties jouées, bibliothèque : réservées à ses amis'), tone: 'quiet', icon: 'lock' }] });
     // Actions : devenir ami, écrire (grisé pour un non-ami, avec sa raison), masquer, bloquer.
     const relation = net.state().outgoing.some((r) => r.key === key) ? 'outgoing' : net.state().incoming.some((r) => r.key === key) ? 'incoming' : friend ? 'friend' : 'none';
     if (relation === 'none') actions.push({ label: t('Envoyer une demande d’ami'), detail: t('Il la verra dans « Demandes d’amis » et pourra l’accepter'), icon: 'friend-add', tone: 'ok', run: () => { host.request(key, name); flash = { text: t('Demande envoyée à {name}', { name }), tone: 'ok' }; here(Number.MAX_SAFE_INTEGER); } });

@@ -1446,7 +1446,9 @@ html.menu-desktop .menu.menu-band .menu-nav {
  * chromé fait le diamètre du disque ci-dessous (225, l'image en a 3 % de marge) ; le halo vert le suit.
  */
 .menu-band .wheel-item.jukebox .wheel-img,
-.menu-band .wheel-halo.jukebox .wheel-img {
+.menu-band .wheel-halo.jukebox .wheel-img,
+.menu-band .wheel-item.community .wheel-img,
+.menu-band .wheel-halo.community .wheel-img {
   width: calc(232 * var(--w));
   height: calc(232 * var(--w));
 }
@@ -3899,7 +3901,8 @@ html.jukebox-phase.jukebox-desk #root > .banner {
 }
 
 /* Médaillon choisi : son nom en vert signal, en capitales, comme le titre de l'affiche. */
-.menu.jukebox-chosen .menu-title .title {
+.menu.jukebox-chosen .menu-title .title,
+.menu.community-chosen .menu-title .title {
   color: var(--signal);
   text-transform: uppercase;
   letter-spacing: 0.08em;

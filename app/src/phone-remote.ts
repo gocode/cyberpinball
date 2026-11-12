@@ -240,6 +240,11 @@ export interface RemoteCommunity {
   unread: number;
   rows: RemoteCommunityRow[];
   thread?: RemoteThread;
+  /**
+   * Les autres joueurs en ligne, qui ne sont pas mes amis (community-menu.ts, présence publique) :
+   * montrés dans « Joueurs » après mes amis, sans fil (on n'écrit qu'à ses amis).
+   */
+  players?: RemoteCommunityRow[];
 }
 
 /**

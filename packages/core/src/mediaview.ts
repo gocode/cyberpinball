@@ -593,6 +593,11 @@ export interface MenuMediaSettings {
    */
   jukebox: boolean;
   /**
+   * Médaillon Communauté en tête de chaque collection, après le Juke-box (community-menu.ts, décidé
+   * le 12/11/2026) : montré par défaut, masquable (Tables > Roue) ; jamais en mode invité.
+   */
+  community: boolean;
+  /**
    * Visualiseur du DMD pendant le Juke-box, quand aucun habillage n'est choisi
    * (jukebox-visualizer.ts) : les couleurs de la pochette (défaut), multicolore, ou classique (la
    * couleur du DMD).
@@ -635,6 +640,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   tableColor: true,
   wheelMotion: 'selected',
   jukebox: true,
+  community: true,
   jukeboxVisualizer: DEFAULT_JUKEBOX_VISUALIZER,
   hours: DEFAULT_ARCADE_HOURS,
   notices: 'all',
@@ -678,6 +684,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     tableColor: typeof r.tableColor === 'boolean' ? r.tableColor : d.tableColor,
     wheelMotion: WHEEL_MOTIONS.includes(r.wheelMotion as WheelMotion) ? (r.wheelMotion as WheelMotion) : d.wheelMotion,
     jukebox: typeof r.jukebox === 'boolean' ? r.jukebox : d.jukebox,
+    community: typeof r.community === 'boolean' ? r.community : d.community,
     jukeboxVisualizer: isVisualizerMode(r.jukeboxVisualizer) ? r.jukeboxVisualizer : d.jukeboxVisualizer,
     hours: normalizeArcadeHours(r.hours),
     notices: NOTICES_MODES.includes(r.notices as NoticesMode) ? (r.notices as NoticesMode) : d.notices,

@@ -98,6 +98,8 @@ function renderLibrary(v) {
     const content = libEl('div', 'lib-content');
     // Télécommande du téléphone : le QR code, le code à comparer ou le téléphone, en tête.
     if (v.remote) content.append(renderRemote(v.remote, false));
+    // Onglets (Joueurs en ligne : les filtres), en tête de la liste.
+    if (v.tabs?.length) content.append(renderTabs(v.tabs, v.cursor));
     // Médias : le message du moment, puis les cartes, puis les sections titrées.
     const sections = v.media ? [...v.sections.filter((x) => !x.title), { cards: true }, ...v.sections.filter((x) => x.title)] : v.sections;
     // Colonne latérale (Section.side : les choix d'un import) : à droite au bureau, dessous en borne.
@@ -119,7 +121,9 @@ function renderLibrary(v) {
       // Dès qu'une ligne a un drapeau, les autres gardent sa case, vide : les textes partent tous du même bord.
       // Les icônes prennent alors la largeur du drapeau (library.css, .has-flags) : « Pays : France »
       // sous « Partage activé » (Partage et réseau) partait 0,8 cqmin plus loin.
-      const flagged = section.rows.some((r) => r.flag);
+      // Joueurs en ligne (kind « players ») : la case du drapeau dans chaque groupe, même sans aucun pays connu,
+      // pour que les noms de tous les groupes partent du même bord.
+      const flagged = section.rows.some((r) => r.flag) || section.kind === 'players';
       if (flagged) list.classList.add('has-flags');
       for (const row of section.rows) {
         // Fil de la messagerie : une bulle, une carte de la borne ou un séparateur de jour.
@@ -139,7 +143,8 @@ function renderLibrary(v) {
         // Pastille d'un joueur (son avatar, sinon ses initiales) : à gauche de tout le bloc, à la place de l'icône.
         // Un pays : son drapeau à la place de l'icône.
         if (row.flag) line.append(flagNode(row.flag.code, row.flag.src, row.flag.name, 'lib-row-flag'));
-        else if (flagged && !row.icon && !row.avatar) line.append(libEl('span', 'flag lib-row-flag none'));
+        // Avec une pastille, le drapeau suit (Joueurs en ligne) ; sans drapeau, sa case reste, vide.
+        else if (flagged && (!row.icon || row.avatar)) line.append(libEl('span', 'flag lib-row-flag none'));
         else if (row.icon && !row.avatar) line.append(cyberIcon(row.icon, 'lib-row-icon'));
         line.append(libEl('span', 'lib-row-text', row.text));
         // Pas encore lue (Activité récente) : la pastille rouge des entrées du menu, et son mot dans les badges.
@@ -215,7 +220,7 @@ function renderLibrary(v) {
   // Les actions montrées en cartes (un média, une page, un fichier) ou en lignes à choisir
   // (un fichier de la table, un élément de la liste d'attente) ne sont pas répétées dans la liste.
   const carded = new Set(
-    [...(v.media?.cards ?? []), ...v.sections.flatMap((s) => s.rows.filter((r) => r.pick)), ...(v.health?.groups.flatMap((g) => g.lines) ?? []), ...(v.scoreboard?.tabs ?? []), ...(v.scoreboard?.scopes ?? [])].map((c) => c.action).filter((a) => a !== undefined),
+    [...(v.media?.cards ?? []), ...v.sections.flatMap((s) => s.rows.filter((r) => r.pick)), ...(v.health?.groups.flatMap((g) => g.lines) ?? []), ...(v.scoreboard?.tabs ?? []), ...(v.scoreboard?.scopes ?? []), ...(v.tabs ?? [])].map((c) => c.action).filter((a) => a !== undefined),
   );
   v.actions.forEach((a, i) => {
     if (carded.has(i)) return;
@@ -639,6 +644,29 @@ function scoreboardFace(l) {
     face.setAttribute('aria-label', l.status.label);
   }
   return face;
+}
+
+/**
+ * Onglets en tête d'une liste (Built.tabs) : libellé, puis le nombre ou la raison d'un onglet grisé.
+ * L'onglet ouvert est en bleu méta : le vert signal reste au seul choix du curseur.
+ */
+function renderTabs(tabs, cursor) {
+  const box = libEl('div', 'lib-tabs');
+  box.setAttribute('role', 'tablist');
+  for (const tab of tabs) {
+    // Le curseur sur un onglet (flippers dans les actions) : le cadre vert du choix.
+    const node = actOn(libEl('button', `lib-tab${tab.current ? ' current' : ''}${tab.disabled ? ' lib-tab-off' : ''}${tab.action === cursor ? ' selected' : ''}`), { type: 'activate', index: tab.action });
+    node.type = 'button';
+    node.setAttribute('role', 'tab');
+    node.setAttribute('aria-selected', String(tab.current));
+    if (tab.disabled) node.setAttribute('aria-disabled', 'true');
+    const label = libEl('span', 'lib-tab-label');
+    if (tab.flag) label.append(flagNode(tab.flag.code, tab.flag.src, tab.flag.name, 'lib-tab-flag'));
+    label.append(libEl('span', '', tab.label));
+    node.append(label, libEl('span', 'lib-tab-count', tab.count));
+    box.append(node);
+  }
+  return box;
 }
 
 /**

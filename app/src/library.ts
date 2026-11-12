@@ -623,6 +623,12 @@ export interface Built {
   health?: HealthView;
   /** Tableau des scores d'une table (scoreboard-menu.ts) : onglets des périodes et lignes, à la place des sections. */
   scoreboard?: ScoreboardView;
+  /**
+   * Onglets en tête de la liste (Joueurs en ligne : les filtres) : chacun ouvre son action, qui n'est
+   * pas répétée dans la colonne des actions. L'onglet ouvert en bleu (le vert reste au choix) ; un
+   * onglet qui ne peut rien montrer reste visible, grisé, sa raison à la place du nombre.
+   */
+  tabs?: { label: string; count: string; current: boolean; disabled?: boolean; action: number; flag?: FlagView }[];
   /** Bandeau d'aide propre à l'écran (sélecteur de fichiers : Exit remonte d'un dossier). */
   hint?: string;
   /** Intitulé des actions de l'écran, quand elles portent sur un élément choisi (« Néon nocturne · playlist mixte »). */
@@ -646,6 +652,8 @@ export interface Built {
    * sinon rien n'indique qu'on y coche (la ROM d'un ami, 01/11/2026).
    */
   listStart?: string;
+  /** Bandeau d'aide de la liste de contenu, entier, quand MagnaSave y fait autre chose que changer de zone (Joueurs en ligne : le filtre suivant). */
+  listHint?: string;
   /**
    * Commandes de plus dans la liste de contenu, dites par la barre des commandes (pré-écoute : MagnaSave
    * droit, flipper tenu). `first` : juste après les flippers, bien en vue ; un MagnaSave droit pris ainsi
@@ -4650,6 +4658,7 @@ export function createLibrary(host: LibraryHost) {
       journey: built.journey,
       health: built.health,
       scoreboard: built.scoreboard,
+      tabs: built.tabs,
       zone,
       // Zone de lecture : le rendu mesure le texte, le met dans un cadre s'il dépasse et le fait défiler.
       reading: read
@@ -4680,7 +4689,9 @@ export function createLibrary(host: LibraryHost) {
         : read?.active
           ? t('Flippers : faire défiler, tenus pour aller vite · Start ou Entrée : page suivante · Exit ou Échap : revenir aux actions · MagnaSave ou F6 : actions de l’écran')
         : zone?.active === 'list'
-          ? built.listStart
+          ? built.listHint
+            ? built.listHint
+            : built.listStart
             ? t('Flippers : parcourir, tenus pour aller vite · Start ou Entrée : {start} · Exit ou Échap : sortir de la liste · MagnaSave ou F6 : actions de l’écran', { start: built.listStart })
             : t('Flippers : parcourir, tenus pour aller vite · Start ou Entrée : valider · Exit ou Échap : sortir de la liste · MagnaSave ou F6 : actions de l’écran')
           : `${built.hint ?? t('Flippers ou Tab : choisir · Start ou Entrée : valider · Exit ou Échap : revenir · souris')}${zone ? ` · ${t('MagnaSave ou F6 : la liste')}` : readingOn ? ` · ${t('MagnaSave ou F6 : le texte')}` : ''}`,

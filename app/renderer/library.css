@@ -4420,3 +4420,90 @@ body.mouse button.lib-command:hover .lib-command-text {
     animation: none;
   }
 }
+
+/*
+ * Onglets en tête d'une liste (Built.tabs, Joueurs en ligne : les filtres). Même gabarit que les
+ * périodes du tableau des scores ; l'onglet ouvert en bleu méta (le vert signal reste au seul choix
+ * du curseur), un onglet indisponible en pointillé, sa raison à la place du nombre.
+ */
+.lib-tabs {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1cqmin;
+  margin-bottom: 1.6cqmin;
+}
+
+.lib-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3cqmin;
+  min-width: 0;
+  min-height: 6.4cqmin;
+  padding: 0.7cqmin 1.2cqmin;
+  border: 0.14cqmin solid var(--line-strong);
+  border-radius: 0.55cqmin;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+}
+
+.lib-tab-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8cqmin;
+  max-width: 100%;
+  font-size: 2.2cqmin;
+  font-weight: 600;
+  font-stretch: 106%;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+
+.lib-tab-flag {
+  flex: none;
+  width: 2.6cqmin;
+  height: 1.95cqmin;
+}
+
+.lib-tab-count {
+  max-width: 100%;
+  font-size: 1.9cqmin;
+  line-height: 1.2;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.lib-tab.current {
+  border-color: var(--meta);
+  background: color-mix(in srgb, var(--meta) 12%, var(--surface-raised));
+  box-shadow: inset 0 -0.42cqmin 0 var(--meta);
+}
+
+.lib-tab.current .lib-tab-label {
+  color: var(--meta);
+}
+
+.lib-tab.current .lib-tab-count {
+  color: var(--ink);
+}
+
+.lib-tab.lib-tab-off {
+  border-style: dashed;
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.lib-tab.selected {
+  border-color: var(--signal);
+  box-shadow: inset 0 0 0 0.14cqmin var(--signal), 0 0 2.2cqmin var(--signal-haze);
+}
+
+body.mouse .lib-tab:not(.current):hover {
+  border-color: var(--halo);
+}

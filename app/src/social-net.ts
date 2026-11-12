@@ -65,6 +65,15 @@ import {
   type ChatMessage,
   cardOf,
   cardsSample,
+  liveNow,
+  liveSample,
+  mergeBeacons,
+  signBeacon,
+  verifyBeacon,
+  LIVE_BATCH,
+  LIVE_BEACON_MS,
+  type LiveBeacon,
+  type LiveBoard,
   giveLike,
   likedByMe,
   likersOf,
@@ -264,6 +273,8 @@ type ScoresMessage = { t: 'scores'; scores: RankedScore[] };
 /** Profils publics et « J'aime » (publicprofile.ts) : entre toutes les bornes, comme les scores. */
 type CardsMessage = { t: 'cards'; cards: PublicCard[] };
 type LikesMessage = { t: 'likes'; likes: Like[]; ttl: number };
+/** Présence publique (livepresence.ts) : « en ligne » ou « en partie », entre toutes les bornes. */
+type LiveMessage_ = { t: 'live'; live: LiveBeacon[] };
 /** Un score à publier : le reste (clé, nom, pays, signature) vient de la borne. */
 /** Ce que la partie donne ; le nom, le pays et l'avatar sont ceux de la borne au moment de signer. */
 export type ScoreToPublish = Omit<RankedScore, 'key' | 'name' | 'country' | 'avatar' | 'sig'>;
@@ -273,7 +284,7 @@ export type FriendMessage = LibraryMessage | LiveMessage | ChatMessage;
 
 interface Link {
   stream: Duplex;
-  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage): void;
+  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage | LiveMessage_): void;
   /** Morceau de fichier (friendlibrary.ts, chunkFrame) ; false : le flux est plein, attendre « drain ». */
   sendChunk(frame: Buffer): boolean;
   via: 'internet' | 'lan';
@@ -384,6 +395,14 @@ export interface SocialNet {
   likers(event: string): Like[];
   /** Profil public (activé par défaut). */
   setPublicProfile(on: boolean): void;
+  /**
+   * Joueurs en ligne en ce moment, amis ou non (livepresence.ts) : leur dernier signal de moins de
+   * cinq minutes, ceux que j'ai bloqués laissés. Mes amis en ligne qui ne l'annoncent pas à tous n'y
+   * sont pas : la liste les ajoute d'après leur présence entre amis.
+   */
+  livePlayers(): LiveBeacon[];
+  /** « Apparaître en ligne pour tous » (activé par défaut) ; mes amis voient toujours ma présence. */
+  setPublicPresence(on: boolean): void;
   /** Masquer sur cette borne l'activité d'un joueur (ses évènements, ses « J'aime »). */
   hideActivity(key: string, hidden: boolean): void;
   activityHidden(key: string): boolean;
@@ -436,6 +455,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   let beacons: LanBeacons | undefined;
   let beaconTimer: NodeJS.Timeout | undefined;
   let refreshTimer: NodeJS.Timeout | undefined;
+  let liveTimer: NodeJS.Timeout | undefined;
   let graceTimer: NodeJS.Timeout | undefined;
   let searchTimer: NodeJS.Timeout | undefined;
   let redialTimer: NodeJS.Timeout | undefined;
@@ -770,6 +790,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         // Profils publics et « J'aime » : de toute borne reliée, chacun vérifié par sa signature.
         if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'cards') return receiveCards(key, (raw as { cards?: unknown }).cards);
         if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'likes') return receiveLikes(key, (raw as { likes?: unknown }).likes, (raw as { ttl?: unknown }).ttl);
+        // Présence publique : de toute borne reliée, chaque signal vérifié par sa signature.
+        if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'live') return receiveLive(key, (raw as { live?: unknown }).live);
         const parsed = parseSocialMessage(raw, now());
         if (parsed) return receive(key, parsed, link);
         // Bibliothèque partagée, partie en direct et messagerie : entre amis seulement.
@@ -821,6 +843,38 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     // Ma carte publique et une part de celles que je connais ; une borne d'avant les profils publics ignore ce message.
     const cards = cardsSample(profiles, ownCard());
     if (cards.length) link.send({ t: 'cards', cards });
+    // Qui est en ligne : mon signal et les plus récents connus ; une borne d'avant la présence publique ignore ce message.
+    const live = liveSample(liveBoard, ownBeacon(), now());
+    if (live.length) link.send({ t: 'live', live });
+    changed();
+  }
+
+  // ---------- Présence publique ----------
+
+  /** Signaux des joueurs en ligne (livepresence.ts), en mémoire seulement. */
+  const liveBoard: LiveBoard = new Map();
+
+  /** Mon signal, signé maintenant ; undefined si le partage ou la présence publique est coupé. */
+  function ownBeacon(): LiveBeacon | undefined {
+    if (!state.enabled || state.publicPresence === false) return undefined;
+    const country = myCountry();
+    return signBeacon(state, { status: presence.status === 'playing' ? 'playing' : 'online', ...(country ? { country } : {}) }, now());
+  }
+
+  /** Mon signal à toutes les bornes reliées (toutes les deux minutes, et quand j'entre en partie ou en sors). */
+  function announceLive(): void {
+    const own = ownBeacon();
+    if (own) for (const link of greetedLinks()) link.send({ t: 'live', live: [own] });
+  }
+
+  /** Signaux reçus : vérifiés, ceux d'un joueur bloqué laissés ; les nouveaux gardés et relayés. */
+  function receiveLive(from: string, raw: unknown): void {
+    if (!Array.isArray(raw) || state.blocked.includes(from)) return;
+    const beacons = raw.slice(0, LIVE_BATCH).map((b) => verifyBeacon(b, now())).filter((b): b is LiveBeacon => !!b && !state.blocked.includes(b.key));
+    if (!beacons.length) return;
+    const fresh = mergeBeacons(liveBoard, beacons, state.key.publicKey, now());
+    if (!fresh.length) return;
+    for (const link of greetedLinks(from)) link.send({ t: 'live', live: fresh });
     changed();
   }
 
@@ -1218,6 +1272,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         retries = 0;
         tidyAvatars();
         beginSearch();
+        liveTimer = setInterval(announceLive, LIVE_BEACON_MS);
+        liveTimer.unref?.();
         log(`Réseau des bornes : démarré (${opts.mode}, borne ${signProfile(state).name}, ${state.friends.length} ami(s) à chercher).`); // i18n-ignore : journal
       } catch (error) {
         const message = (error as Error).message;
@@ -1261,6 +1317,9 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     await stopLan();
     if (refreshTimer) clearInterval(refreshTimer);
     refreshTimer = undefined;
+    if (liveTimer) clearInterval(liveTimer);
+    liveTimer = undefined;
+    liveBoard.clear();
     for (const timer of [graceTimer, searchTimer, redialTimer]) if (timer) clearTimeout(timer);
     graceTimer = searchTimer = redialTimer = undefined;
     redialsSoon.clear();
@@ -1328,8 +1387,11 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       return true;
     },
     setPresence(next) {
+      const was = presence.status === 'playing';
       presence = next;
       broadcastFriends({ t: 'presence', presence });
+      // En partie ou de retour au menu : tout le monde le voit sans attendre le signal suivant.
+      if (was !== (next.status === 'playing')) announceLive();
     },
     publish(event) {
       const added = addEvent(state, event, now());
@@ -1362,6 +1424,12 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       const { publicProfile: _, ...rest } = state;
       commit(on ? rest : { ...rest, publicProfile: false });
       if (on) announceCard();
+    },
+    livePlayers: () => liveNow(liveBoard, now()).filter((b: LiveBeacon) => !state.blocked.includes(b.key)),
+    setPublicPresence(on) {
+      const { publicPresence: _, ...rest } = state;
+      commit(on ? rest : { ...rest, publicPresence: false });
+      if (on) announceLive();
     },
     hideActivity(key, hidden) {
       const next = setHidden(profiles, key, hidden);

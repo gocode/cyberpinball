@@ -191,6 +191,23 @@ function fillWheelItem(item, n) {
   item.wheel = n.wheel;
   item.title = n.title;
   const { node, tilt } = item;
+  // Médaillon Communauté : le gabarit chromé commun des médaillons (medaillons.cjs), toujours prêt.
+  if (n.community) {
+    const img = el('img', 'wheel-img');
+    img.src = 'medaillons/communaute-512.webp';
+    img.alt = t('Communauté');
+    img.draggable = false;
+    tilt.replaceChildren(img);
+    node.classList.remove('disc', 'jukebox');
+    node.classList.add('community');
+    item.ratio = 1;
+    if (wheelView) {
+      placeWheelItem(item, wheelView.style);
+      if (item.offset === 0) fitMedallion(wheelView);
+    }
+    return;
+  }
+  node.classList.remove('community');
   // Médaillon Juke-box (jukebox.js) : son logo rond, dessiné, toujours prêt.
   if (n.jukebox && window.CyberJukebox) {
     tilt.replaceChildren(CyberJukebox.logo('wheel-img', { wheel: true }));
@@ -606,6 +623,7 @@ function menuPanel(s) {
     v.meta.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'linear' });
   }
   v.node.classList.toggle('jukebox-chosen', Boolean(s.table.jukebox));
+  v.node.classList.toggle('community-chosen', Boolean(s.table.community));
   // Médaillon Juke-box choisi au bureau : son affiche dans le cadre du fronton du menu.
   const front = s.jukebox?.wheel && style && document.documentElement.classList.contains('menu-desktop') && window.CyberJukebox ? CyberJukebox.backglassPoster(s) : undefined;
   // La même affiche reste en place (ses animations continuent) ; une autre la remplace.

@@ -35,7 +35,7 @@ test('menu système : « Roue » est dans Tables, à côté des Collections', ()
   assert.equal(entries.indexOf('wheel'), entries.indexOf('collections') + 1);
 });
 
-const WHEEL_ROWS = ['menuLayout', 'tableOrder', 'startTable', 'wheelStart', 'wheelMotion', 'tableColor', 'jukebox'];
+const WHEEL_ROWS = ['menuLayout', 'tableOrder', 'startTable', 'wheelStart', 'wheelMotion', 'tableColor', 'jukebox', 'community'];
 
 test('écran Roue : tous les réglages de la roue, et eux seuls ; plus aucun dans « Médias, son et attente »', () => {
   const { WHEEL_SETTINGS_ROWS } = require(path.join(REPO_ROOT, 'app', 'dist', 'wheel-settings.js')) as { WHEEL_SETTINGS_ROWS: readonly string[] };

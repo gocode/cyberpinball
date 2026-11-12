@@ -62,6 +62,13 @@ export function checkVpxRuntimeNeeds(dir: string, required: string | undefined):
  * l'avertissement de la demande de Windows (frontend.ts, askVcRuntime ; vc-runtime.ts).
  */
 export async function installVpx(root: string, onProgress: (p: InstallProgress) => void, downloads?: DownloadManager): Promise<string> {
+  // Essai sans opérateur (CYBERPINBALL_AUTOPILOT) : jamais de vrai téléchargement de VPX, qu'un Start
+  // rejoué tombe sur « VPX n'est pas installé » ou non (incident de la démonstration de la communauté,
+  // 12/11/2026) ; un essai qui veut vraiment l'installer le dit (CYBERPINBALL_TELECHARGER_VPX=1).
+  if (process.env.CYBERPINBALL_AUTOPILOT && process.env.CYBERPINBALL_TELECHARGER_VPX !== '1') {
+    console.log('Installation de VPX : refusée pendant un essai sans opérateur (CYBERPINBALL_TELECHARGER_VPX=1 pour l’autoriser).'); // i18n-ignore : journal
+    throw new Error(t('Essai sans opérateur : pas de téléchargement de VPX'));
+  }
   const component = findComponent('vpx');
   const layout = layoutOf(root);
   const archive = path.join(layout.downloads, path.basename(new URL(component.url).pathname));

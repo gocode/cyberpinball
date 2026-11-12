@@ -36,6 +36,9 @@
 // CYBERPINBALL_RESEAU_DEMO=messagerie (Menu système > Amis > Messages) : la conversation avec Émile
 // (hors ligne) a déjà son historique et deux messages qui attendent sa connexion ; Bruno, devenu ami,
 // écrit deux messages, puis répond à ce que la borne lui écrit (une réaction, une phrase).
+// CYBERPINBALL_RESEAU_DEMO=communaute (médaillon Communauté, Joueurs en ligne) : en plus de Bruno
+// (ami, en partie) et de Dora (réseau local), quatre joueurs qui ne sont pas des amis, de plusieurs
+// pays, dont deux en partie ; leur présence publique les fait apparaître dans « Joueurs en ligne ».
 // Leurs dossiers sont dans <données>\reseau-simule\ (le bac à sable de l'essai).
 // Leurs tables sont inventées, comme celles des captures de la page du projet : les captures
 // de ces démonstrations vont sur la page publique du projet, aucun vrai jeu ne doit y paraître
@@ -50,7 +53,7 @@ import { createLiveGames, createTableVersions, type LiveGames } from './live-gam
 import { createSocialNet, type SocialNet } from './social-net';
 
 export function simulatedPlayersWanted(env: NodeJS.ProcessEnv): boolean {
-  return ['1', ...LIVE_DEMOS, 'coupure', 'retour', 'notifications', 'messagerie'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
+  return ['1', ...LIVE_DEMOS, 'coupure', 'retour', 'notifications', 'messagerie', 'communaute'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
 }
 
 /** Les démonstrations de la partie en direct : Bruno invite la borne (`en-jeu` : pendant qu'elle joue). */
@@ -286,7 +289,22 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
 
   /** Minuteurs posés avant ceux des scénarios (le « J'aime » de Dora) : arrêtés avec eux. */
   const timersLater: NodeJS.Timeout[] = [];
-  const dora = await bot(dataDir, 'Dora', true, bootstrap);
+  const dora = await bot(dataDir, 'Dora', true, bootstrap, mode === 'communaute' ? { country: 'FR' } : {});
+  // Communauté : des joueurs qui ne sont pas des amis, de plusieurs pays ; deux en partie (jamais la table chez les autres).
+  const strangers: SocialNet[] = [];
+  if (mode === 'communaute') {
+    const people: [string, string, boolean, [number, number, number]][] = [
+      ['Kiko', 'FR', false, [210, 120, 80]],
+      ['Ressort', 'FR', true, [120, 190, 90]],
+      ['Vortex', 'BE', true, [80, 120, 210]],
+      ['Tiltman', 'CA', false, [200, 90, 160]],
+    ];
+    for (const [name, country, playing, hue] of people) {
+      const net = await bot(dataDir, name, false, bootstrap, { country }, hue);
+      if (playing) net.setPresence({ status: 'playing', table: DEMO_TABLES.brunoPlays, since: new Date(Date.now() - 8 * 60_000).toISOString() });
+      strangers.push(net);
+    }
+  }
   // Profil public (messagerie) : Dora, qui n'est pas une amie, publie un record et un badge, puis aime le record de la borne.
   if (mode === 'messagerie') {
     dora.publish({ kind: 'record', table: DEMO_TABLES.emileRecord, score: 14_210_500, rank: 1, initials: 'DOR' });
@@ -573,6 +591,6 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     brunoChat?.stop();
     content.stop();
     games?.stop();
-    await Promise.all([bruno.stop(), chloe.stop(), dora.stop(), ...pair.map((n) => n.stop()), ...(emile ? [emile.stop()] : [])]);
+    await Promise.all([bruno.stop(), chloe.stop(), dora.stop(), ...strangers.map((n) => n.stop()), ...pair.map((n) => n.stop()), ...(emile ? [emile.stop()] : [])]);
   };
 }

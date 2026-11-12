@@ -1,0 +1,73 @@
+// Catalogue anglais : communauté (app/src/community-menu.ts : accueil du médaillon, « Joueurs en
+// ligne » ; présence publique dans friends-menu.ts ; médaillon de la roue dans frontend.ts et
+// wheel-settings.ts). Clé : le texte français tel qu'il est passé à t() ou tn().
+export const messages: Record<string, string> = {
+  // Accueil et médaillon
+  'Joueurs en ligne': 'Players online',
+  '{n} joueur en ligne': '{n} player online',
+  '{n} joueurs en ligne': '{n} players online',
+  '{n} en {country}': '{n} in {country}',
+  'Salon {country}': '{country} room',
+  'Salons par pays': 'Rooms by country',
+  'Les salons de discussion par pays arrivent dans une prochaine version': 'Chat rooms by country are coming in a later version',
+  'Classements': 'Leaderboards',
+  'Choisissez une table dans la roue : son tableau des scores, amis, pays et monde': 'Pick a table on the wheel: its leaderboard, friends, country and world',
+  '{title} : tableau des scores, amis, pays et monde': '{title}: leaderboard, friends, country and world',
+  'Ce que voient les autres joueurs : votre pseudo, votre pays, « En ligne » ou « En partie ». Table en cours, bibliothèque et messages : entre amis seulement.':
+    'What other players see: your name, your country, "Online" or "Playing". Current table, library and messages: friends only.',
+
+  // Joueurs en ligne : filtres et groupes
+  'Tous': 'All',
+  'À proximité': 'Nearby',
+  'Mêmes tables': 'Same tables',
+  'Réseau local coupé': 'Local network off',
+  'Pays non choisi': 'No country chosen',
+  'Filtre {name}': '{name} filter',
+  'Amis en ligne ({n})': 'Friends online ({n})',
+  'En {country} ({n})': 'In {country} ({n})',
+  'Ailleurs ({n})': 'Elsewhere ({n})',
+  'Sur votre réseau local ({n})': 'On your local network ({n})',
+  'Le plus de tables en commun ({n})': 'Most tables in common ({n})',
+  '{n} table : {list}': '{n} table: {list}',
+  '{n} tables : {list}': '{n} tables: {list}',
+  '{n} table en commun': '{n} table in common',
+  '{n} tables en commun': '{n} tables in common',
+  'Le réactiver : Partage et réseau': 'Turn it back on: Sharing and network',
+  'Réseau des bornes indisponible : nouvel essai tout seul': 'Cabinet network unavailable: it will retry by itself',
+  'Connexion au réseau des bornes…': 'Connecting to the cabinet network…',
+  '{filter} : {reason}': '{filter}: {reason}',
+  'Le choisir : Partage et réseau › Choisir mon pays': 'Choose it: Sharing and network › Choose my country',
+  'Personne pour ce filtre en ce moment': 'Nobody for this filter right now',
+  'MagnaSave : filtre suivant': 'MagnaSave: next filter',
+  'Personne en ligne pour l’instant': 'Nobody online yet',
+  'La liste se remplit à mesure que les bornes se signalent': 'The list fills up as cabinets announce themselves',
+  'Un joueur reste affiché jusqu’à 5 minutes après son départ. La table en cours n’est montrée qu’entre amis.': 'A player stays listed for up to 5 minutes after leaving. The current table is shown to friends only.',
+  'Flippers : choisir · Start : son profil · MagnaSave : filtre suivant · Exit : retour': 'Flippers: choose · Start: their profile · MagnaSave: next filter · Exit: back',
+  'Flippers : parcourir · Start : son profil · MagnaSave : filtre suivant · Exit : sortir de la liste': 'Flippers: browse · Start: their profile · MagnaSave: next filter · Exit: leave the list',
+
+  // Présence publique
+  'Apparaître en ligne pour tous : oui': 'Appear online to everyone: yes',
+  'Apparaître en ligne pour tous : non': 'Appear online to everyone: no',
+  '« En ligne » ou « En partie », jamais la table ; vos amis voient toujours votre présence': '"Online" or "Playing", never the table; your friends always see your status',
+  'Vous n’apparaissez plus dans cette liste ; vos amis voient toujours votre présence': 'You no longer appear in this list; your friends always see your status',
+  'Apparaître en ligne pour tous': 'Appear online to everyone',
+  '« En ligne » ou « En partie » dans « Joueurs en ligne », jamais la table': '"Online" or "Playing" in "Players online", never the table',
+  'Vous apparaissez en ligne pour tous': 'You appear online to everyone',
+  'Ne plus apparaître en ligne pour tous': 'Stop appearing online to everyone',
+  'Vos amis voient toujours votre présence ; les autres ne vous voient plus dans « Joueurs en ligne »': 'Your friends always see your status; others no longer see you in "Players online"',
+  'Vous n’apparaissez plus en ligne pour les autres joueurs': 'You no longer appear online to other players',
+
+  // Téléphone : la partie « Joueurs » de la Communauté
+  'Joueurs': 'Players',
+  'Autres joueurs en ligne ({n})': 'Other players online ({n})',
+
+  // Garde-fou des essais sans opérateur (install-vpx.ts)
+  'Essai sans opérateur : pas de téléchargement de VPX': 'Unattended test: no VPX download',
+
+  // Médaillon de la roue (Tables > Roue)
+  'Communauté dans la roue : affichée': 'Community on the wheel: shown',
+  'Communauté dans la roue : masquée': 'Community on the wheel: hidden',
+  'Le médaillon Communauté suit le Juke-box en tête de chaque collection : joueurs en ligne, messages, classements (Start : le masquer)':
+    'The Community medallion follows the Juke-box at the head of each collection: players online, messages, leaderboards (Start: hide it)',
+  'La communauté reste dans Menu système › Amis (Start : afficher le médaillon)': 'The community stays in System menu › Friends (Start: show the medallion)',
+};

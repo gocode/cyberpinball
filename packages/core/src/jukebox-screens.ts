@@ -38,6 +38,8 @@ import { DMD_HEIGHT, DMD_LEVEL, DMD_MARGIN, DMD_USABLE, DMD_WIDTH, blankDots, dr
 
 /** Clé du médaillon dans la roue (les tables y ont leur fichier). */
 export const JUKEBOX_WHEEL_KEY = 'juke-box:medaillon';
+/** Clé du médaillon Communauté dans la roue (community-menu.ts). */
+export const COMMUNITY_WHEEL_KEY = 'communaute:medaillon';
 
 /** Une place de la roue : l'entrée (son rang dans la roue) et son décalage depuis le centre. */
 export interface WheelPlace {
@@ -85,6 +87,42 @@ export function jukeboxWheel(w: JukeboxWheelInput): JukeboxWheel {
   const center = w.shown && w.selected ? 0 : Math.min(Math.max(0, w.at), Math.max(0, w.tables - 1)) + lead;
   const places = wheelPlaces(count, center).map(({ index, offset }): WheelEntry => (lead && index === 0 ? { offset, jukebox: true } : { offset, table: index - lead }));
   return { count, position: count ? center + 1 : 0, places };
+}
+
+/**
+ * Médaillons de Cyber Pinball en tête de la roue (Juke-box, puis Communauté : décidé le 12/11/2026,
+ * community-menu.ts), chacun sur le gabarit chromé commun. La roue d'une collection les compte avant
+ * ses tables ; le choix est sur un médaillon (`selected`) ou sur une table (`at`).
+ */
+export type Medallion = 'jukebox' | 'community';
+
+export interface MedallionWheelInput {
+  tables: number;
+  at: number;
+  /** Les médaillons montrés, dans l'ordre de la roue. */
+  leads: readonly Medallion[];
+  /** Le médaillon choisi ; absent : une table. */
+  selected?: Medallion;
+}
+
+export type MedallionEntry = { offset: number; medallion: Medallion } | { offset: number; table: number };
+
+export function medallionWheel(w: MedallionWheelInput): { count: number; position: number; places: MedallionEntry[] } {
+  const lead = w.leads.length;
+  const count = w.tables + lead;
+  const chosen = w.selected ? w.leads.indexOf(w.selected) : -1;
+  const center = chosen >= 0 ? chosen : Math.min(Math.max(0, w.at), Math.max(0, w.tables - 1)) + lead;
+  const places = wheelPlaces(count, center).map(({ index, offset }): MedallionEntry => (index < lead ? { offset, medallion: w.leads[index]! } : { offset, table: index - lead }));
+  return { count, position: count ? center + 1 : 0, places };
+}
+
+/** Flippers (ou clic sur une place) : l'entrée à `offset` du choix, médaillon ou table, en boucle. */
+export function medallionWheelMove(w: MedallionWheelInput, offset: number): { medallion: Medallion } | { table: number } | undefined {
+  const { count, position } = medallionWheel(w);
+  if (!count) return undefined;
+  const lead = w.leads.length;
+  const target = (((position - 1 + offset) % count) + count) % count;
+  return target < lead ? { medallion: w.leads[target]! } : { table: target - lead };
 }
 
 /** Flippers (ou clic sur une place) : l'entrée à `offset` du choix, en boucle sur la roue. */

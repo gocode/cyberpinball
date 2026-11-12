@@ -29,7 +29,11 @@ const SMALL = 512;
  * Intérieur de chaque médaillon : une image dessinée dans le trou de l'anneau. `disc` est le rayon
  * du disque de l'image, dans son propre repère (le disque du logo du Juke-box : 147 sur 300).
  */
-const MEDAILLONS = [{ name: 'juke-box', src: path.join(renderer, 'juke-box.svg'), size: 300, disc: 147 }];
+const MEDAILLONS = [
+  { name: 'juke-box', src: path.join(renderer, 'juke-box.svg'), size: 300, disc: 147 },
+  // Communauté (12/11/2026) : joueurs en ligne, messages, salons, classements (community-menu.ts).
+  { name: 'communaute', src: path.join(renderer, 'communaute.svg'), size: 300, disc: 147 },
+];
 
 const page = (ring, items) => `
 (async () => {

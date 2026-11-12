@@ -804,6 +804,20 @@ body:not([data-state='paired']) .thread {
   min-height: 68px;
 }
 
+/* Joueurs : les autres joueurs en ligne, après les amis ; un titre discret, des lignes qu'on ne touche pas. */
+.conv-section {
+  padding: 14px 4px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.conv.player {
+  cursor: default;
+}
+
 .conv.unread .entry-label,
 .conv.unread .entry-detail:not(.conv-note) {
   color: var(--ink);

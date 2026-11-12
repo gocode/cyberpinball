@@ -692,6 +692,12 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         ? { label: t('Activer mon profil public'), detail: t('Pays, badges, records et activité récente, visibles de tous'), icon: 'account', run: () => { net.setPublicProfile(true); flash = { text: t('Profil public activé'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
         : { label: t('Désactiver mon profil public'), detail: t('Les autres ne verront plus que votre pseudo dans l’annuaire'), icon: 'account', run: () => { net.setPublicProfile(false); flash = { text: t('Profil public désactivé'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
     );
+    // Présence publique (livepresence.ts) : « En ligne » ou « En partie » dans « Joueurs en ligne », jamais la table.
+    actions.push(
+      s.publicPresence === false
+        ? { label: t('Apparaître en ligne pour tous'), detail: t('« En ligne » ou « En partie » dans « Joueurs en ligne », jamais la table'), icon: 'pulse', run: () => { net.setPublicPresence(true); flash = { text: t('Vous apparaissez en ligne pour tous'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
+        : { label: t('Ne plus apparaître en ligne pour tous'), detail: t('Vos amis voient toujours votre présence ; les autres ne vous voient plus dans « Joueurs en ligne »'), icon: 'pulse', run: () => { net.setPublicPresence(false); flash = { text: t('Vous n’apparaissez plus en ligne pour les autres joueurs'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
+    );
     actions.push({ label: t('Choisir mon pays…'), detail: t('Pour le classement national'), icon: 'globe', run: () => openCountry() });
     actions.push({ label: t('Limiter le débit des téléchargements…'), detail: t('Actuellement : {rate}', { rate: rateLabel(s.downloadRate ?? 0) }), icon: 'gauge', run: () => openDownloadRate() });
     actions.push({ label: s.lan ? t('Désactiver le réseau local') : t('Activer le réseau local'), icon: 'monitor', run: async () => { await net.setLan(!s.lan); host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } });

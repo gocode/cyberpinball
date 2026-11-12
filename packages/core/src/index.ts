@@ -166,6 +166,7 @@ export * from './friendlibrary';
 export * from './livegame';
 export * from './chat';
 export * from './publicprofile';
+export * from './livepresence';
 export * from './livechoice';
 export * from './livestart';
 export * from './notices';
