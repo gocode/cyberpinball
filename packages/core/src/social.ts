@@ -110,7 +110,11 @@ export interface FriendRequest {
 
 export interface DirectoryEntry {
   profile: Profile;
-  /** Dernière fois que ce profil a été vu, directement ou relayé (ISO). */
+  /**
+   * Dernière fois que ce joueur a été vu en ligne (ISO) : par cette borne (bonjour, balise du
+   * réseau local), ou par une borne qui le relaie, à la date qu'elle en donne. Recevoir son profil
+   * relayé ne le rajeunit pas : sinon tous les joueurs relayés auraient l'heure du dernier relais.
+   */
   seen: string;
   /** Dernière balise reçue du réseau local (ISO) : « à proximité » tant qu'elle est récente. */
   lanSeen?: string;
@@ -170,6 +174,12 @@ export interface SocialState {
   /** Demandes refusées, pour répondre « non » sans les reposer à l'écran si le joueur la renvoie. */
   declined: { key: string; at: string }[];
   directory: DirectoryEntry[];
+  /**
+   * Dates « vu » de l'annuaire vérifiées : avant la 0.1.11-essai.28, chaque relais remettait tous
+   * les profils relayés à l'heure de réception ; absent, elles sont ramenées aux preuves sûres
+   * (repairDirectorySeen) à la relecture.
+   */
+  directorySeenChecked?: true;
   /** Évènements de ce joueur, du plus récent au plus ancien. */
   events: SocialEvent[];
   badges: EarnedBadge[];
@@ -262,7 +272,7 @@ function defaultName(key: string): string {
 
 export function newSocialState(now = new Date()): SocialState {
   const key = createPlayerKey();
-  return { version: 1, enabled: true, lan: true, shareLibrary: true, name: defaultName(key.publicKey), nameAt: now.toISOString(), key, friends: [], incoming: [], outgoing: [], blocked: [], declined: [], directory: [], events: [], badges: [], badgesChecked: false };
+  return { version: 1, enabled: true, lan: true, shareLibrary: true, name: defaultName(key.publicKey), nameAt: now.toISOString(), key, friends: [], incoming: [], outgoing: [], blocked: [], declined: [], directory: [], directorySeenChecked: true, events: [], badges: [], badgesChecked: false };
 }
 
 const array = <T>(v: unknown, keep: (x: unknown) => x is T): T[] => (Array.isArray(v) ? v.filter(keep) : []);
@@ -285,6 +295,9 @@ export function parseSocialState(raw: unknown): SocialState | undefined {
   } catch {
     return undefined;
   }
+  const directory = array(s.directory, (d): d is DirectoryEntry => !!d && typeof d === 'object' && !!verifyProfile((d as DirectoryEntry).profile, new Date(8.64e15)) && isIso((d as DirectoryEntry).seen));
+  const friends = array(s.friends, isFriend).map((f) => withNameAt({ ...f, events: array(f.events, (e): e is SocialEvent => !!parseEvent(e)) }));
+  const incoming = array(s.incoming, isRequest).map(withNameAt);
   return {
     version: 1,
     enabled: s.enabled !== false,
@@ -300,12 +313,13 @@ export function parseSocialState(raw: unknown): SocialState | undefined {
     name: normalizeName(s.name) ?? defaultName(key.publicKey),
     nameAt: isIso(s.nameAt) ? s.nameAt : new Date(0).toISOString(),
     key: { publicKey: key.publicKey, privateKey: key.privateKey },
-    friends: array(s.friends, isFriend).map((f) => withNameAt({ ...f, events: array(f.events, (e): e is SocialEvent => !!parseEvent(e)) })),
-    incoming: array(s.incoming, isRequest).map(withNameAt),
+    friends,
+    incoming,
     outgoing: array(s.outgoing, isRequest).map(withNameAt),
     blocked: array(s.blocked, (k): k is string => typeof k === 'string' && isPlayerPublicKey(k)),
     declined: array(s.declined, (d): d is { key: string; at: string } => !!d && typeof d === 'object' && isPlayerPublicKey((d as { key: string }).key) && isIso((d as { at: string }).at)),
-    directory: array(s.directory, (d): d is DirectoryEntry => !!d && typeof d === 'object' && !!verifyProfile((d as DirectoryEntry).profile, new Date(8.64e15)) && isIso((d as DirectoryEntry).seen)),
+    directory: s.directorySeenChecked === true ? directory : repairDirectorySeen(directory, { friends, incoming }),
+    directorySeenChecked: true,
     events: array(s.events, (e): e is SocialEvent => !!parseEvent(e)),
     badges: array(s.badges, (b): b is EarnedBadge => !!b && typeof b === 'object' && typeof (b as EarnedBadge).id === 'string' && isIso((b as EarnedBadge).at)),
     badgesChecked: s.badgesChecked === true,
@@ -367,8 +381,8 @@ export type SocialMessage =
    * Premier message d'une connexion : qui je suis, une part de mon annuaire, et l'empreinte de mon
    * avatar (absente : pas d'avatar ; une borne d'avant les avatars ne l'envoie pas).
    */
-  | { t: 'hello'; profile: Profile; dir: Profile[]; avatar?: string }
-  | { t: 'dir'; dir: Profile[] }
+  | { t: 'hello'; profile: Profile; dir: RelayedProfile[]; avatar?: string }
+  | { t: 'dir'; dir: RelayedProfile[] }
   | { t: 'request' }
   | { t: 'accept' }
   | { t: 'decline' }
@@ -433,11 +447,19 @@ function parsePresence(raw: unknown): Presence | undefined {
   return { status: r.status, since: r.since, ...(table ? { table } : {}) };
 }
 
+/** Profil relayé vérifié, avec la date « vu » que donne la borne qui relaie quand elle est lisible. */
+function relayedProfile(raw: unknown, now: Date): RelayedProfile | undefined {
+  const profile = verifyProfile(raw, now);
+  if (!profile) return undefined;
+  const seen = (raw as { seen?: unknown }).seen;
+  return isIso(seen) ? { ...profile, seen } : profile;
+}
+
 /** Message reçu d'un pair, vérifié champ par champ ; undefined : ignoré. Les profils faux sont retirés, pas le message. */
 export function parseSocialMessage(raw: unknown, now = new Date()): SocialMessage | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const m = raw as Record<string, unknown>;
-  const dir = () => (Array.isArray(m.dir) ? m.dir.slice(0, DIRECTORY_BATCH).map((p) => verifyProfile(p, now)).filter((p): p is Profile => !!p) : []);
+  const dir = () => (Array.isArray(m.dir) ? m.dir.slice(0, DIRECTORY_BATCH).map((p) => relayedProfile(p, now)).filter((p): p is RelayedProfile => !!p) : []);
   switch (m.t) {
     case 'hello': {
       const profile = verifyProfile(m.profile, now);
@@ -512,15 +534,38 @@ export function keepAvatars(state: SocialState): { state: SocialState; files: st
 // ---------------------------------------------------------------------------
 // Annuaire
 
-/** Ajoute ou rafraîchit des profils ; le plus récent l'emporte, sa propre clé n'y entre pas. */
-export function mergeDirectory(directory: readonly DirectoryEntry[], profiles: readonly Profile[], opts: { self: string; now: Date; lan?: boolean }): DirectoryEntry[] {
+/**
+ * Profil relayé d'une borne à l'autre (annuaire du bonjour, message « dir ») : `seen`, la dernière
+ * fois que la borne qui relaie a vu ce joueur en ligne. Non signé : il ne sert qu'à « Vu il y a… »
+ * et à l'ordre de l'annuaire, jamais avant la date du profil signé ni après maintenant.
+ * Une borne d'avant la 0.1.11-essai.28 ne l'envoie pas : la date du profil en tient lieu.
+ */
+export type RelayedProfile = Profile & { seen?: string };
+
+/** Le profil seul, sans la date « vu » du relais (gardé dans l'annuaire et pour chaque pair). */
+export function plainProfile(p: RelayedProfile): Profile {
+  return { key: p.key, name: p.name, at: p.at, sig: p.sig };
+}
+
+/**
+ * Ajoute ou rafraîchit des profils ; le plus récent l'emporte, sa propre clé n'y entre pas.
+ * Vu directement (bonjour du joueur, sa balise) : vu maintenant. Relayé : vu à la date que donne
+ * la borne qui relaie (sinon la date du profil), et jamais plus tard qu'une date déjà connue
+ * n'est remplacée par une plus ancienne.
+ */
+export function mergeDirectory(directory: readonly DirectoryEntry[], profiles: readonly RelayedProfile[], opts: { self: string; now: Date; lan?: boolean; relayed?: boolean }): DirectoryEntry[] {
   const byKey = new Map(directory.map((d) => [d.profile.key, d]));
-  const seen = opts.now.toISOString();
-  for (const profile of profiles) {
-    if (profile.key === opts.self) continue;
+  const nowMs = opts.now.getTime();
+  for (const relayed of profiles) {
+    if (relayed.key === opts.self) continue;
+    const profile = plainProfile(relayed);
     const old = byKey.get(profile.key);
     const newer = !old || Date.parse(profile.at) >= Date.parse(old.profile.at);
-    const lanSeen = opts.lan ? seen : old?.lanSeen;
+    const signedAt = Date.parse(profile.at);
+    const claimed = !opts.relayed ? nowMs : relayed.seen ? Date.parse(relayed.seen) : signedAt;
+    const when = Math.min(nowMs, Math.max(signedAt, claimed));
+    const seen = old && Date.parse(old.seen) >= when ? old.seen : new Date(when).toISOString();
+    const lanSeen = opts.lan && !opts.relayed ? opts.now.toISOString() : old?.lanSeen;
     byKey.set(profile.key, { profile: newer ? profile : old!.profile, seen, ...(lanSeen ? { lanSeen } : {}) });
   }
   const limit = opts.now.getTime() - DIRECTORY_TTL_DAYS * 24 * 3600_000;
@@ -535,10 +580,25 @@ export function mergeDirectory(directory: readonly DirectoryEntry[], profiles: r
  * et le nom des amis et des demandes suit le plus récent. Toute source de profils passe par
  * ici : un nom vu ailleurs que dans l'annuaire ne resterait pas à l'ancien.
  */
-export function learnProfiles(state: SocialState, profiles: readonly Profile[], opts: { now: Date; lan?: boolean }): SocialState {
-  let next: SocialState = { ...state, directory: mergeDirectory(state.directory, profiles, { self: state.key.publicKey, now: opts.now, ...(opts.lan ? { lan: true } : {}) }) };
-  for (const profile of profiles) next = renamePeer(next, profile);
+export function learnProfiles(state: SocialState, profiles: readonly RelayedProfile[], opts: { now: Date; lan?: boolean; relayed?: boolean }): SocialState {
+  let next: SocialState = { ...state, directory: mergeDirectory(state.directory, profiles, { self: state.key.publicKey, now: opts.now, ...(opts.lan ? { lan: true } : {}), ...(opts.relayed ? { relayed: true } : {}) }) };
+  for (const profile of profiles) next = renamePeer(next, plainProfile(profile));
   return next;
+}
+
+/**
+ * Dates « vu » d'un annuaire écrit avant la 0.1.11-essai.28, où chaque relais remettait tous les
+ * profils relayés à l'heure de réception : ramenées à la dernière preuve sûre que le joueur était
+ * en ligne (date de son profil signé, sa dernière balise locale, la dernière présence d'un ami, sa
+ * demande d'ami reçue), jamais plus tard que la date gardée.
+ */
+export function repairDirectorySeen(directory: readonly DirectoryEntry[], known: { friends: readonly Pick<Friend, 'key' | 'lastSeen'>[]; incoming: readonly Pick<FriendRequest, 'key' | 'at'>[] }): DirectoryEntry[] {
+  return directory.map((d) => {
+    const key = d.profile.key;
+    const proofs = [d.profile.at, d.lanSeen, known.friends.find((f) => f.key === key)?.lastSeen, known.incoming.find((r) => r.key === key)?.at].filter(isIso).map((iso) => Date.parse(iso));
+    const when = Math.min(Date.parse(d.seen), Math.max(...proofs));
+    return { ...d, seen: new Date(when).toISOString() };
+  });
 }
 
 /** Joueur tel qu'un écran ou un message le donne : sa clé, son nom, et la date du profil qui porte ce nom. */
@@ -552,9 +612,14 @@ export function peerProfile(state: SocialState, key: string): PeerName | undefin
   return kept ? { key, name: kept.name, ...(kept.nameAt ? { at: kept.nameAt } : {}) } : undefined;
 }
 
-/** Profils à envoyer à un pair : les plus récemment vus, le mien en tête. */
-export function directorySample(state: SocialState): Profile[] {
-  return [signProfile(state), ...state.directory.filter((d) => !state.blocked.includes(d.profile.key)).map((d) => d.profile)].slice(0, DIRECTORY_BATCH);
+/** Mon profil, relayé avec « vu maintenant » (bonjour, renommage). */
+export function ownRelayedProfile(state: Pick<SocialState, 'key' | 'name' | 'nameAt'>, now = new Date()): RelayedProfile {
+  return { ...signProfile(state), seen: now.toISOString() };
+}
+
+/** Profils à envoyer à un pair : les plus récemment vus, chacun avec sa date « vu », le mien en tête. */
+export function directorySample(state: SocialState, now = new Date()): RelayedProfile[] {
+  return [ownRelayedProfile(state, now), ...state.directory.filter((d) => !state.blocked.includes(d.profile.key)).map((d) => ({ ...d.profile, seen: d.seen }))].slice(0, DIRECTORY_BATCH);
 }
 
 /**

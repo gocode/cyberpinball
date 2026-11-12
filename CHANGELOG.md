@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.11
 
+- Amis et classements : « Vu il y a… » donne la dernière fois que chaque joueur était vraiment en ligne. Avant, tous les joueurs de l’annuaire semblaient vus au même moment (celui où une autre borne avait relayé la liste), et ceux qui ne revenaient plus n’en sortaient jamais ; les dates déjà faussées sont corrigées d’elles-mêmes.
 - Premier lancement d’une borne à Pinscape ou à encodeur en mode manette : Visual Pinball X s’installe dès l’ouverture de l’assistant, et le relevé des boutons attend la fin de l’installation. Les boutons et le lanceur de la borne se relèvent directement, sans clavier.
 - L’installeur installe le runtime Visual C++ de Microsoft s’il manque à Windows (Windows demande votre accord une fois), pendant que vous avez la souris en main : sur un Windows neuf, VPX démarre et les boutons d’un Pinscape sont lus dès le premier lancement.
 - VPX ou son runtime installés depuis le menu : un Pinscape vu pour la première fois est aussitôt lu, et le menu dit où relever ses boutons.

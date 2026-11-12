@@ -49,6 +49,8 @@ import {
   createPresenceBook,
   declineRequest,
   directorySample,
+  ownRelayedProfile,
+  plainProfile,
   DIRECTORY_TOPIC,
   FILE_CHUNK,
   friendSeen,
@@ -108,6 +110,7 @@ import {
   type PlayStats,
   type Presence,
   type Profile,
+  type RelayedProfile,
   type Reply,
   type SocialEvent,
   type SocialMessage,
@@ -811,7 +814,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     });
     channel.open();
     const avatar = ownAvatarHash();
-    link.send({ t: 'hello', profile: signProfile(state), dir: directorySample(state), ...(avatar ? { avatar } : {}) });
+    link.send({ t: 'hello', profile: signProfile(state), dir: directorySample(state, now()), ...(avatar ? { avatar } : {}) });
     // Une part des classements connus ; une borne d'avant les classements ignore ce message.
     const sample = rankingsSample(rankings, state.key.publicKey);
     if (sample.length) link.send({ t: 'scores', scores: sample });
@@ -944,8 +947,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         const first = !link.greeted;
         link.greeted = true;
         const lan = [...peer.links].some((l) => l.via === 'lan');
-        learn([message.profile], lan);
-        learn(message.dir, false); // relayés : vus par lui, pas forcément à proximité
+        learn([message.profile], { lan });
+        learn(message.dir, { relayed: true }); // relayés : vus par lui, à la date qu'il en donne
         // Une borne d'avant les avatars n'en annonce pas : comme aucun.
         peer.avatar = message.avatar ?? null;
         syncAvatar(key);
@@ -970,7 +973,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         return;
       }
       case 'dir':
-        learn(message.dir, false);
+        learn(message.dir, { relayed: true });
         return;
       case 'request':
       case 'accept':
@@ -1007,9 +1010,10 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
    * profil gardé pour chaque pair relié suivent le plus récent (un renommage envoyé par « dir »
    * vaut pour la demande qui le suit).
    */
-  function learn(profiles: readonly Profile[], lan: boolean): void {
-    commit(learnProfiles(state, profiles, { now: now(), lan }));
-    for (const profile of profiles) {
+  function learn(profiles: readonly RelayedProfile[], how: { lan?: boolean; relayed?: boolean }): void {
+    commit(learnProfiles(state, profiles, { now: now(), ...how }));
+    for (const relayed of profiles) {
+      const profile = plainProfile(relayed);
       const peer = peers.get(profile.key);
       if (peer && (!peer.profile || Date.parse(profile.at) >= Date.parse(peer.profile.at))) peer.profile = profile;
     }
@@ -1071,7 +1075,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     peers.set(profile.key, peer);
     const moved = peer.lan?.host !== host || peer.lan?.port !== beacon.port;
     peer.lan = { host, port: beacon.port };
-    learn([profile], true);
+    learn([profile], { lan: true });
     const relation = relationOf(state, profile.key);
     const follows = relation === 'friend' || relation === 'outgoing' || relation === 'incoming';
     if (moved && follows) log(`Réseau des bornes : balise locale de ${nameOf(profile.key)} (${host}:${beacon.port}).`); // i18n-ignore : journal
@@ -1319,7 +1323,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       const next = setName(state, name, now());
       if (!next) return false;
       commit(next);
-      const dir: SocialMessage = { t: 'dir', dir: [signProfile(state)] };
+      const dir: SocialMessage = { t: 'dir', dir: [ownRelayedProfile(state, now())] };
       for (const peer of peers.values()) for (const link of peer.links) link.send(dir);
       return true;
     },

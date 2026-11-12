@@ -13,6 +13,7 @@ import {
   acceptRequest,
   blockPlayer,
   declineRequest,
+  directorySample,
   eventText,
   learnProfiles,
   loadSocial,
@@ -25,6 +26,7 @@ import {
   peerProfile,
   playerSeed,
   receiveReply,
+  repairDirectorySeen,
   relationOf,
   requestFriend,
   playerId,
@@ -34,6 +36,7 @@ import {
   socialNetMode,
   syncReply,
   verifyProfile,
+  type DirectoryEntry,
   type SocialState,
 } from '../social';
 import type { TableEntry } from '../tables';
@@ -102,6 +105,76 @@ test('annuaire : le profil le plus récent l’emporte, recherche sans accents, 
   const near = { ...me, directory: mergeDirectory(dir, [signProfile(eloise)], { self: me.key.publicKey, now, lan: true }) };
   assert.deepEqual(nearbyPlayers(near, now).map((d) => d.profile.name), ['Éloïse']);
   assert.deepEqual(nearbyPlayers(near, new Date(now.getTime() + 120_000)), []);
+});
+
+test('annuaire : « vu » est la vraie dernière fois en ligne, jamais l’heure du dernier relais', () => {
+  const me = player('Moi');
+  const day = 24 * 3600_000;
+  const t0 = new Date('2026-11-12T08:00:00.000Z');
+  // Profils signés il y a quelques jours (date du nom).
+  const signed = (name: string, ago: number) => setName({ ...player(name), nameAt: new Date(t0.getTime() - ago).toISOString() }, name, new Date(t0.getTime() - ago))!;
+  const relay = signed('Relais', day);
+  const ana = signed('Ana', 5 * day), ben = signed('Ben', 9 * day), cleo = signed('Cleo', 2 * day);
+  // La borne relais a vu Ana il y a 2 h, Ben il y a 4 j ; Cleo, elle ne dit rien (borne d'avant la date relayée).
+  const anaSeen = new Date(t0.getTime() - 2 * 3600_000).toISOString();
+  const benSeen = new Date(t0.getTime() - 4 * day).toISOString();
+  const relayState = { ...relay, directory: [{ profile: signProfile(ana), seen: anaSeen }, { profile: signProfile(ben), seen: benSeen }] };
+  const sample = directorySample(relayState, t0);
+  assert.equal(sample[0]!.seen, t0.toISOString(), 'la borne qui relaie : vue maintenant');
+  // Le message passe par le réseau : la date relayée survit à la vérification.
+  const hello = parseSocialMessage(JSON.parse(JSON.stringify({ t: 'hello', profile: signProfile(relay), dir: [...sample, signProfile(cleo)] })), t0);
+  assert.ok(hello?.t === 'hello');
+  const later = new Date(t0.getTime() + 3 * 3600_000);
+  let s = learnProfiles(me, hello.dir, { now: later, relayed: true });
+  const seenOf = (st: SocialState, p: SocialState) => st.directory.find((d) => d.profile.key === p.key.publicKey)?.seen;
+  assert.equal(seenOf(s, relay), t0.toISOString(), 'le relais lui-même : vu quand il a envoyé');
+  assert.equal(seenOf(s, ana), anaSeen);
+  assert.equal(seenOf(s, ben), benSeen);
+  assert.equal(seenOf(s, cleo), cleo.nameAt, 'sans date relayée : celle du profil signé, jamais « maintenant »');
+  assert.ok(!s.directory.some((d) => 'seen' in d.profile), 'la date du relais ne se mêle pas au profil gardé');
+  // Un second relais, plus tard, sans nouvelle de Ben : sa date ne bouge pas (le bogue : toutes à l'heure du relais).
+  s = learnProfiles(s, [{ ...signProfile(ben), seen: benSeen }], { now: new Date(later.getTime() + 3600_000), relayed: true });
+  assert.equal(seenOf(s, ben), benSeen);
+  assert.equal(new Set(s.directory.map((d) => d.seen)).size, s.directory.length, 'chaque joueur garde sa propre date');
+  // Une date plus ancienne ne recule pas une date connue ; une date dans l'avenir s'arrête à maintenant.
+  s = learnProfiles(s, [{ ...signProfile(ana), seen: new Date(t0.getTime() - 3 * day).toISOString() }], { now: later, relayed: true });
+  assert.equal(seenOf(s, ana), anaSeen);
+  s = learnProfiles(s, [{ ...signProfile(ana), seen: new Date(later.getTime() + 30 * day).toISOString() }], { now: later, relayed: true });
+  assert.equal(seenOf(s, ana), later.toISOString());
+  // Vu directement (bonjour, balise) : maintenant.
+  s = learnProfiles(s, [signProfile(ben)], { now: later });
+  assert.equal(seenOf(s, ben), later.toISOString());
+  // Les joueurs relayés ne se rajeunissent plus : passé le délai de l'annuaire, ils en sortent.
+  s = learnProfiles(s, [{ ...signProfile(cleo) }], { now: new Date(t0.getTime() + 70 * day), relayed: true });
+  assert.equal(seenOf(s, cleo), undefined);
+});
+
+test('annuaire : les dates « vu » faussées par l’ancien relais sont réparées à la relecture', () => {
+  const me = player('Moi');
+  const t0 = new Date('2026-11-12T08:00:00.000Z');
+  const relayHour = new Date(t0.getTime() - 3 * 3600_000).toISOString();
+  const named = (name: string, at: string) => setName({ ...player(name), nameAt: at }, name, new Date(at))!;
+  const ana = named('Ana', '2026-11-01T10:00:00.000Z'), ben = named('Ben', '2026-11-02T10:00:00.000Z'), cleo = named('Cleo', '2026-11-03T10:00:00.000Z'), dan = named('Dan', '2026-11-04T10:00:00.000Z');
+  // Tous « vus » à la même heure, celle du dernier relais (le bogue).
+  const old = {
+    ...me,
+    directorySeenChecked: undefined,
+    directory: [ana, ben, cleo, dan].map((p): DirectoryEntry => ({ profile: signProfile(p), seen: relayHour })),
+    friends: [{ key: ben.key.publicKey, name: 'Ben', since: '2026-10-01T00:00:00.000Z', lastSeen: '2026-11-10T20:00:00.000Z', events: [] }],
+    incoming: [{ key: cleo.key.publicKey, name: 'Cleo', at: '2026-11-11T09:00:00.000Z' }],
+  };
+  old.directory[3] = { ...old.directory[3]!, lanSeen: '2026-11-12T07:30:00.000Z' };
+  const reread = parseSocialState(JSON.parse(JSON.stringify(old)))!;
+  const seenOf = (p: SocialState) => reread.directory.find((d) => d.profile.key === p.key.publicKey)?.seen;
+  assert.equal(seenOf(ana), ana.nameAt, 'sans autre preuve : la date du profil signé');
+  assert.equal(seenOf(ben), '2026-11-10T20:00:00.000Z', 'ami : sa dernière présence');
+  assert.equal(seenOf(cleo), '2026-11-11T09:00:00.000Z', 'demande reçue de lui');
+  assert.equal(seenOf(dan), relayHour, 'jamais plus tard que la date gardée (balise plus récente que le relais)');
+  assert.equal(reread.directorySeenChecked, true);
+  // Une fois réparé, rien n'y retouche.
+  const fresh = { ...reread, directory: [{ profile: signProfile(ana), seen: relayHour }] };
+  assert.equal(parseSocialState(JSON.parse(JSON.stringify(fresh)))!.directory[0]!.seen, relayHour);
+  assert.deepEqual(repairDirectorySeen([], { friends: [], incoming: [] }), []);
 });
 
 test('amitié : demande, acceptation, refus retenu, demandes croisées, blocage', () => {

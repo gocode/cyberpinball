@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- Friends and rankings: "Seen … ago" gives the last time each player was really online. Before, every player in the directory seemed seen at the same moment (when another cabinet had relayed the list), and those who no longer came back never left it; dates already distorted fix themselves.
 - First launch of a cabinet with a Pinscape or an encoder in gamepad mode: Visual Pinball X installs as soon as the wizard opens, and the button setup waits for the installation to finish. The cabinet buttons and plunger are set up directly, without a keyboard.
 - The installer installs Microsoft’s Visual C++ runtime if Windows lacks it (Windows asks for your consent once), while you have the mouse in hand: on a fresh Windows, VPX starts and a Pinscape’s buttons are read from the first launch.
 - VPX or its runtime installed from the menu: a Pinscape seen for the first time is read right away, and the menu says where to set up its buttons.
