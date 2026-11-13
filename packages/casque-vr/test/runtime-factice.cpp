@@ -34,6 +34,8 @@
 //   bouton <chemin> 1|0             un bouton (chemin OpenXR complet, /user/hand/…/click)
 //   valeur <chemin> V               un axe ou une gâchette (/user/hand/…/value, …/x, …/y)
 //   quitter                         le runtime met fin à la session (EXITING)
+//   tete-tourne V                   LibOVR : la tête tourne sur elle-même à V rad/s (lacet), vitesse donnée comme LibOVR
+//   tete-suivie 1|0                 LibOVR : la tête suivie en position (drapeaux 15) ou en orientation seule (3)
 //   contour-fige 1|0                LibOVR : le contour lu (ovr_GetBoundaryGeometry) figé dans l'espace de suivi du
 //                                   moment, comme un runtime qui recentre l'origine sans le retransformer ; le test
 //                                   de la limite (ovr_TestBoundary…) garde la vraie limite
@@ -149,6 +151,9 @@ struct World
    std::vector<XrVector3f> frozenOuter;
    XrPosef area = identity();
    bool ovrInputs = true; // faux : les entrées rendues à zéro (client sans le regard)
+   bool headTracked = true; // faux : la tête suivie en orientation seule (LibOVR, drapeaux 3)
+   float headSpin = 0.f; // tete-tourne : rad/s autour de la verticale, depuis headSpinAt (ms du scénario)
+   long long headSpinAt = 0;
 };
 
 std::mutex lock;
@@ -406,6 +411,16 @@ void advance(bool silent = false)
                world.outer.push_back({ std::stof(a.substr(0, c)), 0.f, std::stof(a.substr(c + 1)) });
          }
       }
+      else if (st.verb == "tete-tourne")
+      {
+         // La rotation déjà faite reste acquise : la tête ne revient pas d'un coup à son cap de départ.
+         if (world.headSpin != 0.f)
+            world.head.orientation = mul(yawQuat(world.headSpin * static_cast<float>(nowEpochMs() - world.headSpinAt) / 1000.f), world.head.orientation);
+         world.headSpin = num(st, 0);
+         world.headSpinAt = nowEpochMs();
+      }
+      else if (st.verb == "tete-suivie")
+         world.headTracked = num(st, 0) != 0.f;
       else if (st.verb == "contour-fige")
       {
          world.frozenOuter.clear();
@@ -1304,8 +1319,17 @@ extern "C" __declspec(dllexport) ovr::TrackingState ovr_GetTrackingState(void*, 
 {
    std::lock_guard<std::mutex> g(lock);
    ovr::TrackingState ts {};
-   ovr::putPose(ts.bytes, compose(inverse(world.origin), world.head));
-   const unsigned all = 15;
+   XrPosef head = world.head;
+   if (world.headSpin != 0.f)
+   {
+      // La tête tourne depuis headSpinAt : son lacet avance, sa vitesse angulaire est rendue (ovrPoseStatef).
+      const float a = world.headSpin * static_cast<float>(nowEpochMs() - world.headSpinAt) / 1000.f;
+      head.orientation = mul(yawQuat(a), world.head.orientation);
+      const XrVector3f w { 0.f, world.headSpin, 0.f };
+      std::memcpy(ts.bytes + 28, &w, 12);
+   }
+   ovr::putPose(ts.bytes, compose(inverse(world.origin), head));
+   const unsigned all = world.headTracked ? 15u : 3u;
    std::memcpy(ts.bytes + 88, &all, 4);
    for (int h = 0; h < 2; h++)
    {

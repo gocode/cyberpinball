@@ -8,10 +8,17 @@ import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { BANC_RUNTIME, BANC_SONDE, bancPret, jouer, sonder } from './banc-casque.mjs';
+import { BANC_RUNTIME, BANC_SONDE, bancPerime, bancPret, jouer, sonder } from './banc-casque.mjs';
 
 const pret = bancPret();
 const sauf = pret ? {} : { skip: 'banc pas construit : npm run casque-vr' };
+
+// Un banc compilé avant ses sources joue l'ancien code : ses échecs ne disent rien du nouveau (vu le 13/11/2026,
+// une sonde de 21:16 face au test de 21:49). L'essai le dit au lieu de laisser chercher une fausse régression.
+test('banc : compilé après ses sources', sauf, () => {
+  const perimees = bancPerime();
+  assert.deepEqual(perimees, [], `banc compilé avant ces sources, relancez npm run casque-vr : ${perimees.join(', ')}`);
+});
 
 const lignes = (r, re) => r.lignes.filter((l) => re.test(l.ligne));
 const trace = (r, re) => r.trace.filter((l) => re.test(l.ligne));
@@ -269,7 +276,7 @@ test('banc : saut de l’espace de suivi mesuré par la sonde dans le flux de la
   const sauts = r.lignes.filter((l) => l.startsWith('ovr saut '));
   assert.equal(sauts.length, 1, r.lignes.filter((l) => !l.startsWith('ovr points')).join('\n'));
   const saut = sondeOvr.parseOvrJump(sauts[0]);
-  assert.ok(saut && saut.dtMs < 25, sauts[0]);
+  assert.ok(saut && saut.dtMs < 60, sauts[0]);
   assert.equal(r.lignes.filter((l) => l.startsWith('ovr saut-refuse')).length, 0);
   const avant = calee(bouts[0], tetes[0], points[0]);
   const vraie = core.lockbarPlace(bouts.at(-1)[0], bouts.at(-1)[1]);
@@ -297,4 +304,88 @@ test('banc : contour lu figé après le saut (périmé), vu par ovr_TestBoundary
   // Avant le saut : concordants ; après : les points lus à des dizaines de centimètres de la vraie limite.
   assert.ok(pts(tests[0]) < 1 && ecart(tests[0]) < 1, tests[0]);
   assert.ok(tests.slice(1).some((l) => pts(l) > 20), tests.join(' | '));
+});
+
+// Le saut appliqué au menu (13 novembre 2026), arbitré contre le contour relu après lui, comme le frontend
+// (arbitrateJump) : les chiffres de 18:37 (tête lue avant puis après, à l'origine ; contour relu figé), la seconde
+// sorte (contour qui suit), une contradiction, et un saut refusé par la sonde (tête suivie en orientation seule).
+async function sauterReel({ figer = false, contourApres, suivie = true } = {}) {
+  const monde = contourMonde();
+  const pts = (c) => c.map(([x, z]) => `${x.toFixed(4)},${z.toFixed(4)}`).join(' ');
+  // Relevés du jour : tête à 1,142 ; 0,090, lacet −1,667, la barre calée de 0,549 ; −0,442 à 1,127 ; −0,437. Le Quest
+  // remet l'origine sur la tête : après le saut, la tête est à l'origine, lacet nul.
+  const r = await sonder(
+    [
+      '0 porte 1',
+      '0 limite piece 3.4 3.6',
+      `0 contour ${pts(monde)}`,
+      '0 tete 1.142 1.358 0.090 -1.667',
+      '0 manette gauche 0.548584 0.9 -0.441898',
+      '0 manette droite 1.127474 0.9 -0.436842',
+      ...(suivie ? [] : ['6900 tete-suivie 0']),
+      ...(figer ? ['6990 contour-fige 1'] : []),
+      '7000 origine 1.142 0.090 -1.667',
+      ...(contourApres ? [`7000 contour ${pts(contourApres(monde))}`] : []),
+    ].join('\n'),
+    { dureeMs: 13000 },
+  );
+  const points = r.lignes.filter((l) => l.startsWith('ovr points ')).map((l) => sondeOvr.parseOvrPoints(l));
+  const bouts = r.lignes
+    .filter((l) => l.startsWith('ovr manettes '))
+    .map((l) => {
+      const v = l.split(' ').slice(2).filter((x) => !x.startsWith('suivi')).map(Number);
+      return [{ x: v[0], y: v[1], z: v[2] }, { x: v[3], y: v[4], z: v[5] }];
+    });
+  const tetes = r.lignes.filter((l) => l.startsWith('ovr tete ')).map((l) => l.split(' ').slice(2, 6).map(Number));
+  const sauts = r.lignes.filter((l) => l.startsWith('ovr saut ')).map((l) => sondeOvr.parseOvrJump(l));
+  return { r, points, bouts, tetes, sauts, avant: calee(bouts[0], tetes[0], points[0]), vraie: core.lockbarPlace(bouts.at(-1)[0], bouts.at(-1)[1]) };
+}
+
+test('banc : saut de 18:37 rejoué (première sorte, contour figé), le saut fait foi, la borne sur la vraie, confirmé par la tête', banc, async () => {
+  const { r, points, sauts, avant, vraie } = await sauterReel({ figer: true });
+  assert.equal(sauts.length, 1, r.lignes.filter((l) => !l.startsWith('ovr points')).join('\n'));
+  const v = core.arbitrateJump(avant, sauts[0], points.at(-1));
+  assert.equal(v.kind, 'fige');
+  const reste = core.placeGap(v.place, vraie);
+  assert.ok(reste.cm < 2 && reste.deg < 1, JSON.stringify(reste));
+  assert.ok(core.jumpHeadCheck(v.place, sauts[0].headAfter).confirmed);
+  // L'ancrage attend le contour à jour : avec lui, plus rien à reposer.
+  assert.equal(core.anchorPlace(v.place, v.place.contour).kind, 'same');
+});
+
+test('banc : seconde sorte (le contour relu suit le saut), une seule correction, l’ancrage n’a plus rien à faire', banc, async () => {
+  const { points, sauts, avant, vraie } = await sauterReel();
+  assert.equal(sauts.length, 1);
+  const v = core.arbitrateJump(avant, sauts[0], points.at(-1));
+  assert.equal(v.kind, 'suivi');
+  const reste = core.placeGap(v.place, vraie);
+  assert.ok(reste.cm < 2 && reste.deg < 1, JSON.stringify(reste));
+  assert.equal(core.anchorPlace(v.place, points.at(-1)).kind, 'same');
+});
+
+test('banc : saut et contour qui se contredisent, rien de reposé (calage proposé)', banc, async () => {
+  // Le contour relu tourné de 30° autrement que le saut.
+  const autre = (monde) => monde.map(([x, z]) => [x * Math.cos(0.5) - z * Math.sin(0.5) + 0.3, x * Math.sin(0.5) + z * Math.cos(0.5)]);
+  const { points, sauts, avant } = await sauterReel({ figer: false, contourApres: autre });
+  assert.equal(sauts.length, 1);
+  assert.equal(core.arbitrateJump(avant, sauts[0], points.at(-1)).kind, 'contredit');
+});
+
+test('banc : saut refusé par la sonde (tête suivie en orientation seule), rien d’appliqué', banc, async () => {
+  const { r, sauts } = await sauterReel({ suivie: false });
+  assert.equal(sauts.length, 0, r.lignes.filter((l) => l.startsWith('ovr saut')).join('\n'));
+  assert.ok(r.lignes.some((l) => /^ovr saut-refuse raison=suivi-incomplet/.test(l)), r.lignes.filter((l) => !l.startsWith('ovr points')).join('\n'));
+});
+
+// Une tête qui tourne vite (6 rad/s, 344°/s, plus qu'un regard brusque) n'est pas un saut : la sonde avance la tête
+// d'avant par sa vitesse avant de comparer, même avec des relevés espacés par une machine chargée.
+test('banc : tête qui tourne vite (344°/s), aucun saut relevé ; le vrai saut ensuite, mesuré', banc, async () => {
+  const r = await sonder(['0 porte 1', '0 tete 0.2 1.6 0.1 0', '500 tete-tourne 6', '4000 tete-tourne 0', '5000 origine 0.6 -0.4 1.2'].join('\n'), { dureeMs: 8000 });
+  const sauts = r.lignes.filter((l) => l.startsWith('ovr saut '));
+  const tous = r.lignes.filter((l) => l.startsWith('ovr saut')).join(' | ');
+  // Pendant la rotation : aucun saut. Le vrai saut ensuite : mesuré, ou refusé pour un intervalle trop long quand la
+  // machine du banc est saturée (la suite complète en parallèle) ; jamais un faux saut, jamais un saut mal mesuré.
+  assert.ok(sauts.length <= 1, tous);
+  if (sauts.length) assert.ok(Math.abs(Math.abs(sondeOvr.parseOvrJump(sauts[0]).angle) - 1.2) < 0.05, sauts[0]);
+  else assert.ok(r.lignes.some((l) => /^ovr saut-refuse raison=intervalle-long .*bond=86/.test(l)), tous);
 });

@@ -38,15 +38,25 @@ export function parseOvrPoints(line: string): [number, number][] {
     .filter((p) => p.length === 2 && p.every(Number.isFinite));
 }
 
+/** Un saut de l'espace de suivi mesuré par la sonde : la transformation, l'intervalle des deux relevés, la tête après. */
+export interface OvrJump {
+  angle: number;
+  tx: number;
+  tz: number;
+  dy: number;
+  dtMs: number;
+  headAfter: { x: number; z: number };
+}
+
 /**
- * Un saut de l'espace de suivi mesuré dans le flux de la tête (« ovr saut angle=… deplacement=tx,tz sol=… … ») : la
- * transformation p' = R(angle) p + t, à appliquer à la place calée (movePlace). Relevé seulement pour l'instant.
+ * Un saut de l'espace de suivi mesuré dans le flux de la tête (« ovr saut angle=… deplacement=tx,tz sol=… … dt=…
+ * … a=x,y,z,lacet ») : la transformation p' = R(angle) p + t, à appliquer à la place calée (movePlace, arbitrateJump).
  */
-export function parseOvrJump(line: string): { angle: number; tx: number; tz: number; dy: number; dtMs: number } | undefined {
-  const m = /^ovr saut angle=(-?[\d.]+) deplacement=(-?[\d.]+),(-?[\d.]+) sol=(-?[\d.]+) .* dt=([\d.]+)/.exec(line);
+export function parseOvrJump(line: string): OvrJump | undefined {
+  const m = /^ovr saut angle=(-?[\d.]+) deplacement=(-?[\d.]+),(-?[\d.]+) sol=(-?[\d.]+) .* dt=([\d.]+) .* a=(-?[\d.]+),-?[\d.]+,(-?[\d.]+),/.exec(line);
   if (!m) return undefined;
-  const [angle, tx, tz, dy, dtMs] = m.slice(1).map(Number) as [number, number, number, number, number];
-  return [angle, tx, tz, dy, dtMs].every(Number.isFinite) ? { angle, tx, tz, dy, dtMs } : undefined;
+  const [angle, tx, tz, dy, dtMs, hx, hz] = m.slice(1).map(Number) as [number, number, number, number, number, number, number];
+  return [angle, tx, tz, dy, dtMs, hx, hz].every(Number.isFinite) ? { angle, tx, tz, dy, dtMs, headAfter: { x: hx, z: hz } } : undefined;
 }
 
 export class OvrProbe {
@@ -55,7 +65,7 @@ export class OvrProbe {
   private restarts = 0;
   private timer: NodeJS.Timeout | undefined;
 
-  constructor(private readonly opts: { appDir: string; log(line: string): void; onContour?(points: [number, number][]): void }) {}
+  constructor(private readonly opts: { appDir: string; log(line: string): void; onContour?(points: [number, number][]): void; onJump?(jump: OvrJump): void }) {}
 
   /** Lancée tant que `on` (réalité virtuelle activée) ; relancée si elle s'arrête, trois fois au plus. */
   set(on: boolean): void {
@@ -88,6 +98,9 @@ export class OvrProbe {
           continue;
         }
         if (line.startsWith('ovr ')) this.opts.log(`Casque, sonde LibOVR : ${line.slice(4)}`); // i18n-ignore : journal
+        // Un saut accepté par la sonde (garde-fous passés) : au menu, la borne reposée (frontend.ts, headsetJump).
+        const jump = line.startsWith('ovr saut ') ? parseOvrJump(line) : undefined;
+        if (jump) this.opts.onJump?.(jump);
       }
     });
     child.stderr.on('data', () => undefined);

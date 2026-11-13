@@ -95,6 +95,9 @@ struct TrackingState
 {
    unsigned char bytes[512];
    Pose head() const { return *reinterpret_cast<const Pose*>(bytes); }
+   // La vitesse de la tête (ovrPoseStatef : pose, vitesse angulaire, vitesse linéaire, dans l'espace de suivi).
+   Vec3 headAngularVelocity() const { return *reinterpret_cast<const Vec3*>(bytes + 28); }
+   Vec3 headLinearVelocity() const { return *reinterpret_cast<const Vec3*>(bytes + 40); }
    unsigned headFlags() const { return *reinterpret_cast<const unsigned*>(bytes + 88); }
    Pose hand(int h) const { return *reinterpret_cast<const Pose*>(bytes + 96 + 88 * h); }
    unsigned handFlags(int h) const { return *reinterpret_cast<const unsigned*>(bytes + 272 + 4 * h); }
@@ -295,13 +298,19 @@ struct HeadSample
 {
    double t = 0;
    Pose pose {};
+   Vec3 angular {}, linear {};
    unsigned flags = 0;
    bool valid = false;
 };
-constexpr double JUMP_MAX_DT_S = 0.025;
+/**
+ * Deux relevés au plus à cet intervalle (s) : la tête d'avant est d'abord avancée par sa vitesse (LibOVR la donne),
+ * le bond est l'écart à cette tête prévue ; ainsi une tête qui tourne vite n'est pas un saut, et des relevés espacés
+ * par une machine chargée (50 ms vus au banc) restent mesurables.
+ */
+constexpr double JUMP_MAX_DT_S = 0.06;
 constexpr float JUMP_MIN_M = 0.05f;
 constexpr float JUMP_MIN_YAW = 10.f * 3.14159265f / 180.f;
-constexpr float JUMP_MAX_TILT = 2.f * 3.14159265f / 180.f;
+constexpr float JUMP_MAX_TILT = 3.f * 3.14159265f / 180.f;
 
 std::string poseText(const Pose& p)
 {
@@ -309,13 +318,29 @@ std::string poseText(const Pose& p)
 }
 
 /** Un saut mesuré (« ovr saut … »), un bond refusé (« ovr saut-refuse … »), ou rien. */
-std::string headJump(const HeadSample& a, const HeadSample& b)
+/** La tête d'avant avancée de `dt` par sa vitesse : position, et lacet tourné de la vitesse autour de la verticale. */
+Pose predict(const HeadSample& a, double dt)
 {
+   Pose p = a.pose;
+   const float t = static_cast<float>(dt);
+   p.position = { p.position.x + a.linear.x * t, p.position.y + a.linear.y * t, p.position.z + a.linear.z * t };
+   const float h = 0.5f * a.angular.y * t;
+   const Quat turn { 0.f, std::sin(h), 0.f, std::cos(h) };
+   const Quat& q = a.pose.orientation;
+   p.orientation = { turn.w * q.x + turn.y * q.z, turn.w * q.y + turn.y * q.w, turn.w * q.z - turn.y * q.x, turn.w * q.w - turn.y * q.y };
+   return p;
+}
+
+std::string headJump(const HeadSample& first, const HeadSample& b)
+{
+   const double dt = b.t - first.t;
+   // La tête d'avant, là où sa vitesse l'aurait menée au second relevé.
+   HeadSample a = first;
+   a.pose = predict(first, dt);
    const float dyaw = wrap(yawOf(b.pose.orientation) - yawOf(a.pose.orientation));
    const float dpos = std::hypot(b.pose.position.x - a.pose.position.x, b.pose.position.z - a.pose.position.z);
    if (dpos <= JUMP_MIN_M && std::fabs(dyaw) <= JUMP_MIN_YAW)
       return "";
-   const double dt = b.t - a.t;
    const float dpitch = std::fabs(pitchOf(b.pose.orientation) - pitchOf(a.pose.orientation));
    const float droll = std::fabs(rollOf(b.pose.orientation) - rollOf(a.pose.orientation));
    char ms[32];
@@ -459,6 +484,9 @@ int main(int argc, char** argv)
    say("ovr charge " + dllPath);
    // Le flux de la tête relu toutes les quelques millisecondes (headJump) : minuterie à 1 ms pour la sonde seule.
    timeBeginPeriod(1);
+   // Et réveillée à l'heure même quand la machine est chargée (VPX en partie, 108 ms vus au banc sous charge) : elle ne
+   // fait presque rien à chaque tour, une priorité au-dessus de la normale ne retire rien aux autres.
+   SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS);
 
    // Client invisible ; la version 1.43 demandée d'abord, sinon sans version.
    InitParams params {};
@@ -577,6 +605,8 @@ int main(int argc, char** argv)
             HeadSample cur;
             cur.t = static_cast<double>(qpc.QuadPart) / static_cast<double>(freq.QuadPart);
             cur.pose = ts.head();
+            cur.angular = ts.headAngularVelocity();
+            cur.linear = ts.headLinearVelocity();
             cur.flags = ts.headFlags() & 15u;
             cur.valid = true;
             if (prevHead.valid)

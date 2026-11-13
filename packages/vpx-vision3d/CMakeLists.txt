@@ -29,6 +29,15 @@ set_target_properties(cyberpinball PROPERTIES OUTPUT_NAME "plugin-cyberpinball64
 # Version de VPX (GetFileVersionInfoW) : la table des actions ne vaut que pour 10.8.1.
 target_link_libraries(cyberpinball PRIVATE version)
 
+# Plugin VPX « CyberPinballDmd » : le DMD remplit sa fenêtre quand elle change de taille en partie (toutes les parties).
+add_library(cyberpinball-dmd SHARED src/dmd-suivi.cpp)
+target_include_directories(cyberpinball-dmd PRIVATE vendor/vpx src)
+set_target_properties(cyberpinball-dmd PROPERTIES OUTPUT_NAME "plugin-cyberpinballdmd64" PREFIX "")
+
+# Banc du suivi de la fenêtre du DMD (logique, sans VPX).
+add_executable(banc-suivi-dmd test/banc-suivi-dmd.cpp)
+target_include_directories(banc-suivi-dmd PRIVATE src)
+
 # Banc de la pause (logique, sans VPX ni casque).
 add_executable(banc-pause test/banc-pause.cpp)
 target_include_directories(banc-pause PRIVATE src)

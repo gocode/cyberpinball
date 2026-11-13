@@ -70,7 +70,7 @@ function args(argv) {
 }
 
 /** La copie de VPX du banc, faite une fois par version (robocopy /XJ : aucune jonction suivie ni recopiée). */
-function copieVpx(source) {
+export function copieVpx(source) {
   const nom = path.basename(path.resolve(source)).replace(/[^\w.-]/g, '_');
   const dest = path.join(os.tmpdir(), 'cyberpinball-banc-vpx', nom);
   if (!fs.existsSync(path.join(dest, VPX_EXE))) {

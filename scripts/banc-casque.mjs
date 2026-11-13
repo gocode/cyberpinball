@@ -14,6 +14,8 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const BANC_COMPAGNON = path.join(repo, 'build', 'casque-vr', 'Release', 'cyberpinball-casque.exe');
 export const BANC_RUNTIME = path.join(repo, 'build', 'casque-vr', 'Release', 'runtime-factice.dll');
 export const BANC_SONDE = path.join(repo, 'build', 'casque-vr', 'Release', 'cyberpinball-sonde-ovr.exe');
+/** Le témoin de la dernière construction réussie (HEADSET_BUILT de scripts/casque-vr.mjs). */
+const HEADSET_BUILT = path.join(repo, 'build', 'casque-vr', 'construit.txt');
 
 /**
  * La sonde LibOVR (packages/casque-vr/src/sonde-ovr.cpp) sur le runtime factice, qui exporte aussi les fonctions
@@ -45,6 +47,25 @@ export async function sonder(scenario, { dureeMs = 3000, dll = BANC_RUNTIME, ree
 /** Le banc est-il construit (compagnon et runtime factice) ? */
 export function bancPret() {
   return fs.existsSync(BANC_COMPAGNON) && fs.existsSync(BANC_RUNTIME);
+}
+
+/**
+ * Les sources du banc (packages/casque-vr : CMakeLists.txt, src, test) plus récentes que sa dernière construction
+ * réussie (témoin écrit par scripts/casque-vr.mjs ; à défaut, le plus récent des binaires) : le banc les jouerait
+ * sans elles, et ses essais échoueraient (ou passeraient) pour rien. Vide quand il est à jour ou pas construit.
+ */
+export function bancPerime() {
+  const bins = [BANC_COMPAGNON, BANC_RUNTIME, BANC_SONDE].filter((f) => fs.existsSync(f));
+  if (!bins.length) return [];
+  const built = fs.existsSync(HEADSET_BUILT) ? fs.statSync(HEADSET_BUILT).mtimeMs : Math.max(...bins.map((f) => fs.statSync(f).mtimeMs));
+  const base = path.join(repo, 'packages', 'casque-vr');
+  const files = [path.join(base, 'CMakeLists.txt')];
+  for (const dir of ['src', 'test']) {
+    for (const name of fs.readdirSync(path.join(base, dir), { recursive: true })) files.push(path.join(base, dir, String(name)));
+  }
+  return files
+    .filter((f) => fs.statSync(f).isFile() && fs.statSync(f).mtimeMs > built)
+    .map((f) => path.relative(repo, f).replace(/\\/g, '/'));
 }
 
 /**

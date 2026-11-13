@@ -840,16 +840,106 @@ function applyFit(f: ContourFit, p: { x: number; z: number }): { x: number; z: n
   return { x: co * p.x - si * p.z + f.tx, z: si * p.x + co * p.z + f.tz };
 }
 
+/** La transformation d'un saut de l'espace de suivi : p' = R(angle) p + t au sol, et le sol qui monte de `dy`. */
+export interface JumpTransform {
+  angle: number;
+  tx: number;
+  tz: number;
+  dy?: number;
+}
+
 /**
- * Une place déplacée par la transformation d'un saut de l'espace de suivi (p' = R(angle) p + t, au sol) : position,
- * cap, tête au calage. Le contour gardé, s'il y en a un, n'est pas touché (anchorPlace le remplace par le relu).
+ * Une place déplacée par la transformation d'un saut de l'espace de suivi : position, cap, tête au calage ; avec `dy`
+ * (le saut mesuré dans le flux de la tête), la hauteur de la barre aussi : la vraie barre n'a pas bougé, le sol de
+ * l'espace de suivi si (la hauteur, que le contour au sol ne donne pas). Le contour gardé n'est pas touché.
  */
-export function movePlace(place: CabinetPlace, f: { angle: number; tx: number; tz: number }): CabinetPlace {
-  const fit: ContourFit = { ...f, residualCm: 0 };
+export function movePlace(place: CabinetPlace, f: JumpTransform): CabinetPlace {
+  const fit: ContourFit = { angle: f.angle, tx: f.tx, tz: f.tz, residualCm: 0 };
   const at = applyFit(fit, place);
   const next: CabinetPlace = { ...place, x: at.x, z: at.z, yaw: place.yaw - f.angle };
   if (place.head) next.head = applyFit(fit, place.head);
+  if (f.dy && place.lockbarHeight !== undefined) next.lockbarHeight = place.lockbarHeight + f.dy;
   return next;
+}
+
+/** Deux sauts de suite : `second` appliqué après `first` (angles et sols ajoutés). */
+export function composeJumps(first: JumpTransform, second: JumpTransform): JumpTransform {
+  const c = Math.cos(second.angle), s = Math.sin(second.angle);
+  return { angle: first.angle + second.angle, tx: c * first.tx - s * first.tz + second.tx, tz: s * first.tx + c * first.tz + second.tz, dy: (first.dy ?? 0) + (second.dy ?? 0) };
+}
+
+/** Un contour déplacé par la transformation d'un saut. */
+export function moveContour(points: ContourPoints, f: JumpTransform): [number, number][] {
+  const fit: ContourFit = { angle: f.angle, tx: f.tx, tz: f.tz, residualCm: 0 };
+  return points.map(([x, z]) => {
+    const p = applyFit(fit, { x, z });
+    return [p.x, p.z];
+  });
+}
+
+/**
+ * Saut mesuré et contour d'accord, à ceci près (à la borne, centimètres et degrés) : le saut lu sur la tête a prédit
+ * la barre à 2,1 cm et 2,2° le 13 novembre 2026 ; un bond refusé sous 5 cm et 10° (sonde) reste bien au-delà.
+ */
+export const JUMP_MATCH_CM = 5;
+export const JUMP_MATCH_DEG = 3;
+
+export type JumpVerdict =
+  /** Le contour relu a suivi le saut (la limite est restée sur la vraie pièce) : une seule correction. */
+  | { kind: 'suivi'; place: CabinetPlace }
+  /**
+   * Le contour relu n'a pas bougé (le runtime recentre sans le retransformer : essai de 18:37) : le saut fait foi. La
+   * place garde le contour tel qu'un runtime à jour le rendrait (déplacé par le saut) ; tant que le contour relu reste
+   * `frozenRead`, l'ancrage attend (il déferait la correction).
+   */
+  | { kind: 'fige'; place: CabinetPlace; frozenRead: [number, number][] }
+  /** Pas de contour gardé, ou aucun relu : le saut seul. */
+  | { kind: 'sans-contour'; place: CabinetPlace }
+  /** Le contour relu a bougé autrement que le saut : rien n'est reposé, le calage est proposé. */
+  | { kind: 'contredit'; why: string };
+
+/** L'écart, à la borne, d'une transformation à l'identité (centimètres, degrés). */
+function fitGapAt(place: CabinetPlace, f: ContourFit): { cm: number; deg: number } {
+  return placeGap(place, movePlace(place, f));
+}
+
+/**
+ * L'arbitrage entre le saut mesuré dans le flux de la tête et l'ancrage sur le contour (demande du 13 novembre 2026) :
+ * `place` est la place d'avant le saut, avec le contour de son repère ; `current`, le contour relu après le saut.
+ * Le contour relu est comparé à deux prédictions : le contour d'avant déplacé par le saut (la limite a suivi : 'suivi'),
+ * et le contour d'avant tel quel (le contour lu n'a pas suivi : 'fige'). Ni l'un ni l'autre : 'contredit'.
+ */
+export function arbitrateJump(place: CabinetPlace, jump: JumpTransform, current?: ContourPoints): JumpVerdict {
+  const moved = movePlace(place, jump);
+  if (!place.contour?.length || !current?.length) return { kind: 'sans-contour', place: moved };
+  const predicted = moveContour(place.contour, jump);
+  const close = (f: ContourFit | undefined, at: CabinetPlace) => {
+    if (!f || f.residualCm > ANCHOR_MAX_RESIDUAL_CM) return undefined;
+    const g = fitGapAt(at, f);
+    return g.cm <= JUMP_MATCH_CM && g.deg <= JUMP_MATCH_DEG ? g : undefined;
+  };
+  if (close(fitContour(predicted, current), moved)) return { kind: 'suivi', place: { ...moved, contour: current.map((p) => [p[0], p[1]] as [number, number]) } };
+  if (close(fitContour(place.contour, current), place)) return { kind: 'fige', place: { ...moved, contour: predicted }, frozenRead: current.map((p) => [p[0], p[1]] as [number, number]) };
+  const f = fitContour(place.contour, current);
+  const said = f ? fitGapAt(place, f) : undefined;
+  const jumpGap = placeGap(place, moved);
+  return {
+    kind: 'contredit',
+    why: said
+      ? `contour relu déplacé de ${said.cm.toFixed(0)} cm et ${said.deg.toFixed(0)}° quand la tête dit ${jumpGap.cm.toFixed(0)} cm et ${jumpGap.deg.toFixed(0)}°` // i18n-ignore : journal
+      : `contour relu redessiné (${current.length} points au lieu de ${place.contour.length})`, // i18n-ignore : journal
+  };
+}
+
+/**
+ * Le saut confirmé par la tête : la tête gardée au calage, reposée par le saut, près de la tête juste après lui (à
+ * moins de ANCHOR_HEAD_MAX_CM). Le saut étant lu sur la tête, cela revient à dire que le joueur était près de sa place
+ * du calage au moment du saut : la borne là où il se tient. undefined : pas de tête gardée au calage.
+ */
+export function jumpHeadCheck(moved: CabinetPlace, headAfter: { x: number; z: number }): { cm: number; confirmed: boolean } | undefined {
+  if (!moved.head) return undefined;
+  const cm = Math.hypot(moved.head.x - headAfter.x, moved.head.z - headAfter.z) * 100;
+  return { cm, confirmed: cm < ANCHOR_HEAD_MAX_CM };
 }
 
 export type AnchorResult =

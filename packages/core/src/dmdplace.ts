@@ -115,7 +115,8 @@ const SECTION = 'ScoreView';
  * écrans dès que VPX la crée, avant son premier affichage (in-game-menu.ts, parkHiddenDmd). Avec
  * Output = 0, VPX n'ouvre aucune fenêtre : « DMD affiché » dans le menu en partie ne montrait rien
  * jusqu'au redémarrage de la table (13/11/2026). À sa vraie taille, et non réduite : le plugin
- * ScoreView choisit sa mise en page sur la taille de la fenêtre à son premier rendu.
+ * ScoreView choisit sa mise en page sur la taille de la fenêtre à son premier rendu, et ne la
+ * rechoisit qu'à un changement de taille signalé par le plugin « CyberPinballDmd » (dmd-suivi.cpp).
  */
 export function dmdPlaceSettings(place: DmdPlace, display: ObservedDisplay, format: VpxDisplayIdFormat): Record<string, string> {
   const rect = zoneRect(place.zone, display.bounds);

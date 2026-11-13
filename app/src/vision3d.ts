@@ -52,6 +52,7 @@ import { downloadComponent, findComponent } from '@cyberpinball/installer';
 import { deviceStatus, hklmValue, memoryIntegrityEnabled } from '@cyberpinball/win-displays';
 import { createWindow } from './offscreen';
 import { usbDevices } from './vpx-ini';
+import { installVpxPlugin, VISION3D_PLUGIN, vpxPluginFiles, type VpxPluginInstall } from './vpx-plugins';
 
 const folder = (dataDir: string) => path.join(dataDir, 'vision3d');
 const settingFile = (dataDir: string) => path.join(folder(dataDir), 'reglage.json');
@@ -113,48 +114,17 @@ export function probeVision3d(): Vision3dHardware {
 
 // --- Plugin VPX ---------------------------------------------------------------------------------
 
-const PLUGIN_DLL = 'plugin-vision3d64.dll';
-const PLUGIN_FOLDER = 'vision3d';
-
 /** plugin.cfg et la DLL : fabriqués avec l'application (natif\vision3d), ou construits en développement. */
 export function vision3dPluginFiles(appDir: string): { dll: string; cfg: string } | undefined {
-  const shipped = path.join(appDir, 'natif', PLUGIN_FOLDER);
-  if (fs.existsSync(path.join(shipped, PLUGIN_DLL))) return { dll: path.join(shipped, PLUGIN_DLL), cfg: path.join(shipped, 'plugin.cfg') };
-  for (const repo of [path.join(appDir, '..'), path.join(appDir, '..', '..')]) {
-    const dll = path.join(repo, 'build', 'vision3d', 'Release', PLUGIN_DLL);
-    const cfg = path.join(repo, 'packages', 'vpx-vision3d', 'plugin.cfg');
-    if (fs.existsSync(dll) && fs.existsSync(cfg)) return { dll, cfg };
-  }
-  return undefined;
+  return vpxPluginFiles(VISION3D_PLUGIN, appDir);
 }
-
-const sameFile = (a: string, b: string) => {
-  try {
-    return fs.readFileSync(a).equals(fs.readFileSync(b));
-  } catch {
-    return false;
-  }
-};
 
 /**
  * Met le plugin dans <VPX>\plugins\vision3d, s'il n'y est pas déjà à l'identique. VPX le trouve à
  * son lancement suivant. VPX ouvert garde la DLL : la copie attend alors la partie d'après.
  */
-export function installVision3dPlugin(vpxDir: string, appDir: string): 'installed' | 'up-to-date' | 'missing' | 'busy' {
-  const files = vision3dPluginFiles(appDir);
-  if (!files) return 'missing';
-  const target = path.join(vpxDir, 'plugins', PLUGIN_FOLDER);
-  const dll = path.join(target, PLUGIN_DLL);
-  const cfg = path.join(target, 'plugin.cfg');
-  if (sameFile(files.dll, dll) && sameFile(files.cfg, cfg)) return 'up-to-date';
-  try {
-    fs.mkdirSync(target, { recursive: true });
-    fs.copyFileSync(files.cfg, cfg);
-    fs.copyFileSync(files.dll, dll);
-    return 'installed';
-  } catch {
-    return 'busy';
-  }
+export function installVision3dPlugin(vpxDir: string, appDir: string): VpxPluginInstall {
+  return installVpxPlugin(VISION3D_PLUGIN, vpxDir, appDir);
 }
 
 // --- Suivi de la tête -------------------------------------------------------------------------

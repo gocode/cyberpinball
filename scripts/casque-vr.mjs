@@ -13,6 +13,7 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = path.join(repo, 'packages', 'casque-vr');
 const build = path.join(repo, 'build', 'casque-vr');
 export const HEADSET_EXE = path.join(build, 'Release', 'cyberpinball-casque.exe');
+export const HEADSET_BUILT = path.join(build, 'construit.txt');
 
 /** CMake : dans le PATH, sinon à sa place d'installation. */
 export function cmakePath() {
@@ -53,6 +54,9 @@ export function buildHeadset({ quiet = false } = {}) {
     if (quiet) console.log(compile.stdout, compile.stderr);
     return undefined;
   }
+  // Témoin de la dernière construction réussie : le banc (scripts/banc-casque.mjs) s'y compare pour savoir s'il
+  // joue bien les sources du moment (MSBuild ne relie pas un binaire dont les sources n'ont pas changé).
+  fs.writeFileSync(HEADSET_BUILT, `${new Date().toISOString()}\n`);
   return HEADSET_EXE;
 }
 

@@ -11,7 +11,10 @@
 // sur l'écran du plateau, tourné vers le joueur. Celle du plateau prend le premier plan : VPX le
 // perd et se met en pause (Player::OnFocusChanged), les boutons arrivent au menu. La fenêtre
 // « Visual Pinball Score View » de VPX suit chaque réglage (setWindowBounds) : le joueur voit le
-// vrai DMD bouger. À la sortie, VPX reprend le premier plan, et la partie.
+// vrai DMD bouger. Le plugin VPX « CyberPinballDmd » (dmd-suivi.cpp) donne la nouvelle taille à SDL
+// (qui ne suit pas seul une fenêtre sans bordure redimensionnée de l'extérieur) et fait rechoisir sa
+// mise en page à ScoreView : le DMD remplit sa nouvelle place tout de suite, sans bandes noires. À la
+// sortie, VPX reprend le premier plan, et la partie.
 //
 // La place enregistrée vaut pour la table dans cette configuration (positions-dmd.json) ; elle
 // est écrite dans le .ini de la table avant chaque partie (prepareDmdPlace), jamais pendant :
