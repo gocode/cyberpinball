@@ -266,6 +266,7 @@ import { createHealth, type HealthView } from './health';
 import { collectTechFacts, loadTechFacts, recentErrors, saveTechFacts, type DisplayLinkFacts } from './tech-facts';
 import { createTechSheet, type ReportFriend } from './tech-sheet';
 import { isShown, primaryRect, refuseOffscreen } from './offscreen';
+import { installationHints } from './installation-hints';
 
 const MANUFACTURERS = [
   'Williams', 'Bally', 'Gottlieb', 'Stern', 'Data East', 'Sega', 'Midway', 'Capcom', 'Atari', 'Zaccaria',
@@ -3645,8 +3646,9 @@ export function createLibrary(host: LibraryHost) {
       // ses couleurs, ses sons, son dossier DMD et ses médias sont rangés ailleurs ; ils la suivent.
       busy = t('Recherche de ses parties dans l’installation d’origine…');
       host.broadcast();
-      const companions = installationCompanions(s.prepared.sources, (vpx) => s.scripts.get(vpx.toLowerCase()), host.root ? [host.root] : []);
-      s.prepared.sources.push(...companions.sources);
+      const companions = installationCompanions(s.prepared.sources, (vpx) => s.scripts.get(vpx.toLowerCase()), host.root ? [host.root] : [], installationHints());
+      // Le dossier propre à une table remplace son .vpx ; ses parties rangées ailleurs s'ajoutent.
+      s.prepared.sources = companions.sources;
       s.companions = companions.reports;
       s.existing = knownTables();
       if (s.prepared.sources.some((src) => listVpx(src.path).length)) s.vps = await vpsForImport();

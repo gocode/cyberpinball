@@ -21,6 +21,7 @@ import {
 } from '@cyberpinball/core';
 import type { Action, Built, Row } from './library';
 import { onGesture } from './gesture-flash';
+import { installationHints } from './installation-hints';
 
 export interface InstallationImportHost {
   /** Racine de Cyber Pinball : jamais prise pour une autre installation. */
@@ -43,6 +44,8 @@ interface Listing {
   layout: InstallationLayout;
   tables: InstallationTable[];
   checked: Set<string>;
+  /** Toutes les tables du disque, et pas seulement celles que le menu d'origine joue (listes de lecture). */
+  all: boolean;
 }
 
 export function createInstallationImport(host: InstallationImportHost) {
@@ -54,7 +57,7 @@ export function createInstallationImport(host: InstallationImportHost) {
 
   /** Point d'entrée : l'installation trouvée sur ce PC s'ouvre directement ; sinon on la choisit. */
   function open(): void {
-    const found = knownTableInstallations(['C:', 'D:', 'E:', 'F:'], exclude());
+    const found = knownTableInstallations(['C:', 'D:', 'E:', 'F:'], exclude(), installationHints());
     if (found.length === 1) return openTables(found[0]!);
     host.openCustom(() => buildPlaces(found));
   }
@@ -83,17 +86,17 @@ export function createInstallationImport(host: InstallationImportHost) {
   async function choose(): Promise<void> {
     const dir = await host.pickFolder();
     if (!dir) return open();
-    const layout = findInstallation(dir, exclude());
+    const layout = findInstallation(dir, exclude(), installationHints());
     if (layout) return openTables(layout);
-    notice = t('« {dir} » : aucune installation reconnue (ni VPinMAME, ni PinUPSystem, ni PinballX autour d’un dossier de tables). Pour une table rangée dans son propre dossier, « Choisir un dossier… » de « Ajouter une table » suffit.', { dir });
-    host.openCustom(() => buildPlaces(knownTableInstallations(['C:', 'D:', 'E:', 'F:'], exclude())));
+    notice = t('« {dir} » : aucune installation reconnue (ni VPinMAME, ni VPX, ni PinUPSystem, ni PinballX, ni PinballY autour d’un dossier de tables). Pour une table rangée dans son propre dossier, « Choisir un dossier… » de « Ajouter une table » suffit.', { dir });
+    host.openCustom(() => buildPlaces(knownTableInstallations(['C:', 'D:', 'E:', 'F:'], exclude(), installationHints())));
   }
 
   function openTables(layout: InstallationLayout, at = 0): void {
     void host.task(t('Lecture de l’installation…'), () => {
       if (!listing || listing.layout.tables !== layout.tables) {
         const medias = indexInstallationMedias(layout);
-        listing = { layout, tables: listInstallationTables(layout, medias), checked: new Set() };
+        listing = { layout, tables: listInstallationTables(layout, medias), checked: new Set(), all: false };
       }
       host.openCustom(() => buildTables(listing!), at);
     });
@@ -105,7 +108,12 @@ export function createInstallationImport(host: InstallationImportHost) {
     const rows: Row[] = [];
     const redraw = () => host.openCustom(() => buildTables(l), host.cursor());
     let present = 0;
-    for (const table of l.tables) {
+    // Le menu d'origine dit quelles tables il joue (listes de lecture de Popper, tables activées de
+    // PinballX ou PinballY) : seules celles-là d'abord, les autres sur demande.
+    const knows = l.tables.some((tb) => tb.active !== undefined);
+    const played = l.tables.filter((tb) => tb.active);
+    const shown = knows && !l.all && played.length ? played : l.tables;
+    for (const table of shown) {
       const here = alreadyInstalled(table, installed);
       if (here) present++;
       const checked = l.checked.has(table.vpx);
@@ -123,7 +131,13 @@ export function createInstallationImport(host: InstallationImportHost) {
       const seen = [table.backglass ? t('fronton') : undefined, table.medias ? tn(table.medias, '{n} média', '{n} médias') : undefined].filter((x): x is string => Boolean(x));
       rows.push({
         text: name ? `${table.title} (${name})` : table.title,
-        detail: [path.relative(l.layout.tables, table.vpx), seen.length ? formatList(seen) : undefined].filter(Boolean).join(' · '),
+        detail: [
+          path.relative(l.layout.tables, table.vpx),
+          seen.length ? formatList(seen) : undefined,
+          table.playlists.length ? t('Listes : {lists}', { lists: formatList(table.playlists) }) : knows ? t('Dans aucune liste de lecture') : undefined,
+        ]
+          .filter(Boolean)
+          .join(' · '),
         // Cochée ou non, en toutes lettres : jamais l'icône seule ; « déjà dans la borne » à côté.
         badges: [checked ? t('Cochée') : t('Non cochée'), ...(here ? [t('Déjà dans la borne')] : [])],
         tone: checked ? 'ok' : here ? 'quiet' : undefined,
@@ -135,7 +149,7 @@ export function createInstallationImport(host: InstallationImportHost) {
     const chosen = l.tables.filter((tb) => l.checked.has(tb.vpx));
     actions.push({
       label: chosen.length ? tn(chosen.length, 'Reprendre la table cochée', 'Reprendre les {n} tables cochées') : t('Aucune table cochée'),
-      detail: chosen.length ? t('Avec son PuP-Pack, sa ROM, ses couleurs, ses sons et ses médias : le plan d’ajout montre tout avant d’installer') : t('Start sur une table la coche ou la décoche'),
+      detail: chosen.length ? t('Avec son dossier, son PuP-Pack, sa ROM, ses couleurs, ses sons, sa musique et ses médias : le plan d’ajout montre tout avant d’installer') : t('Start sur une table la coche ou la décoche'),
       icon: 'table-add',
       tone: chosen.length ? 'ok' : undefined,
       run: () => {
@@ -147,6 +161,25 @@ export function createInstallationImport(host: InstallationImportHost) {
       },
     });
     if (chosen.length) actions.push({ label: t('Tout décocher'), icon: 'broom', run: () => (l.checked.clear(), redraw()) });
+    // Une liste de lecture du menu d'origine se coche d'un coup.
+    const lists = new Map<string, InstallationTable[]>();
+    for (const tb of l.tables) for (const name of tb.playlists) lists.set(name, [...(lists.get(name) ?? []), tb]);
+    for (const [name, members] of [...lists].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], 'fr'))) {
+      const missing = members.filter((tb) => !l.checked.has(tb.vpx));
+      actions.push({
+        label: t('Cocher la liste « {name} »', { name }),
+        detail: missing.length ? tn(members.length, '{n} table', '{n} tables') : t('Déjà toutes cochées'),
+        icon: 'check',
+        run: () => (members.forEach((tb) => l.checked.add(tb.vpx)), redraw()),
+      });
+    }
+    if (knows && played.length && played.length < l.tables.length) {
+      actions.push(
+        l.all
+          ? { label: t('Seulement les tables de vos listes de lecture'), detail: tn(played.length, '{n} table', '{n} tables'), icon: 'filter', run: () => ((l.all = false), redraw()) }
+          : { label: t('Montrer toutes les tables du disque'), detail: t('{n} de plus, absentes des listes de lecture', { n: l.tables.length - played.length }), icon: 'filter', run: () => ((l.all = true), redraw()) },
+      );
+    }
     actions.push(
       { label: t('Une autre installation…'), detail: t('Choisir son dossier'), icon: 'folder', run: () => void choose() },
       host.web(redraw),
@@ -155,12 +188,16 @@ export function createInstallationImport(host: InstallationImportHost) {
     return {
       heading: t('Reprendre une table d’une autre installation'),
       icon: 'import',
-      subheading: [l.layout.root, tn(l.tables.length, '{n} table', '{n} tables'), present ? tn(present, '{n} déjà dans la borne', '{n} déjà dans la borne') : undefined, chosen.length ? tn(chosen.length, '{n} cochée', '{n} cochées') : undefined].filter(Boolean).join(' · '),
+      subheading: [
+        l.layout.root,
+        tn(l.tables.length, '{n} table', '{n} tables'),
+        knows ? tn(played.length, '{n} dans vos listes de lecture', '{n} dans vos listes de lecture') : undefined,
+        present ? tn(present, '{n} déjà dans la borne', '{n} déjà dans la borne') : undefined, chosen.length ? tn(chosen.length, '{n} cochée', '{n} cochées') : undefined].filter(Boolean).join(' · '),
       lead: lead(),
       sections: [
         ...noticeSection(),
         { title: t('Où sont ses parties'), rows: [{ text: placeDetail(l.layout), tone: 'quiet' }] },
-        { title: t('Ses tables'), rows: rows.length ? rows : [{ text: t('Aucune table dans {dir}', { dir: l.layout.tables }), tone: 'quiet' }] },
+        { title: shown === played && shown !== l.tables ? t('Ses tables jouées (listes de lecture)') : t('Ses tables'), rows: rows.length ? rows : [{ text: t('Aucune table dans {dir}', { dir: l.layout.tables }), tone: 'quiet' }] },
       ],
       actions,
       back: () => host.back(),
@@ -169,7 +206,7 @@ export function createInstallationImport(host: InstallationImportHost) {
   }
 
   const lead = () =>
-    t('Seules les tables cochées sont reprises, chacune avec ce que l’installation range ailleurs : son PuP-Pack (PUPVideos), sa ROM, ses couleurs et ses sons (VPinMAME), son dossier DMD, son fronton et ses médias. Tout est copié : l’installation d’origine ne change pas. Rien n’est installé avant que vous ayez validé le plan.');
+    t('Seules les tables cochées sont reprises, chacune avec tout son dossier quand elle en a un, et ce que l’installation range ailleurs : son PuP-Pack (PUPVideos), sa ROM, sa sauvegarde, ses couleurs et ses sons (VPinMAME), sa musique, son dossier DMD, son fronton et ses médias (Popper, PinballX, PinballY), sous tous les noms que l’installation leur donne. Tout est copié : l’installation d’origine ne change pas. Rien n’est installé avant que vous ayez validé le plan.');
 
   function noticeSection() {
     return notice ? [{ rows: [{ text: notice, tone: 'warning' as const }] }] : [];

@@ -205,6 +205,11 @@ export interface ScriptFacts {
    * (scriptcompat.ts) : corrigé dans le .vbs de Cyber Pinball (scriptCoreCompat).
    */
   coreCompat?: CompatFix[];
+  /**
+   * Morceaux que le script joue par PlayMusic, tels qu'il les nomme (« Akira\track.mp3 », ou le seul
+   * dossier « Akira\ » quand la suite est calculée) : VPX les cherche dans son dossier Music.
+   */
+  music?: string[];
 }
 
 export interface DoctorContext {
@@ -435,7 +440,24 @@ export function scriptFacts(vbs: string): ScriptFacts {
   }
   const compat = compatFixesFound(code);
   if (compat.length) facts.coreCompat = compat;
+  const music = playedMusic(code);
+  if (music.length) facts.music = music;
   return facts;
+}
+
+/**
+ * Morceaux joués par PlayMusic : la partie écrite en toutes lettres du nom (« "Akira\" & n & ".mp3" »
+ * donne « Akira\ »). Un nom sans dossier ni extension (variable seule) n'en dit rien.
+ */
+function playedMusic(code: string): string[] {
+  const out: string[] = [];
+  for (const m of code.matchAll(/\bPlayMusic\b\s*\(?\s*"([^"\r\n]+)"/gi)) {
+    const name = m[1]!.trim().replace(/\//g, '\\');
+    if (!name || /^[a-z]:|^\\\\/i.test(name)) continue;
+    if (!name.includes('\\') && !/\.(mp3|ogg|wav|flac)$/i.test(name)) continue;
+    if (!out.some((o) => o.toLowerCase() === name.toLowerCase())) out.push(name);
+  }
+  return out;
 }
 
 /**

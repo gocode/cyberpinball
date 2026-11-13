@@ -21,7 +21,7 @@ import {
 } from '../installation';
 import { buildZip } from '../romzip';
 import { classifyDir } from '../tablefiles';
-import { planImport } from '../tableimport';
+import { planImport, type ImportSource } from '../tableimport';
 
 const MATRIX = 'The Matrix (Original 2023)';
 const T2 = 'Terminator 2 (Williams 1991)';
@@ -89,11 +89,12 @@ test('installation : une table choisie seule emporte son PuP-Pack, son fronton, 
   const parts = reports[0]!.found.map((c) => `${c.part}:${path.basename(c.path)}`).sort();
   assert.deepEqual(parts, ['backglass:The Matrix (Original 2023).directb2s', 'dmdFolder:MatrixDMD', 'media:The Matrix (Original 2023).mp4', 'media:The Matrix (Original 2023).png', 'pup:TheMatrix']);
   assert.deepEqual(reports[0]!.missing, []);
-  assert.ok(sources.every((s) => s.mode === 'copy' && s.owner === i.matrix), 'copiés, rattachés à la table');
+  assert.equal(sources[0]!.path, i.matrix, 'la table d’abord, telle que choisie');
+  assert.ok(sources.slice(1).every((s) => s.mode === 'copy' && s.owner === i.matrix), 'copiés, rattachés à la table');
   assert.ok(!sources.some((s) => s.path.includes('AutrePack') || s.path.includes('Autre table')), 'rien d’une autre table');
 
   const tablesDir = path.join(i.own, 'tables');
-  const plan = planImport([{ path: i.matrix, mode: 'copy' }, ...sources], { tablesDir, scripts: facts as never });
+  const plan = planImport(sources, { tablesDir, scripts: facts as never });
   assert.equal(plan.tables.length, 1);
   const tp = plan.tables[0]!;
   const steps = tp.steps.map((s) => `${s.kind}:${path.relative(tp.folder, s.to)}`).sort();
@@ -119,7 +120,7 @@ test('installation : la ROM, ses couleurs et ses sons viennent de VPinMAME ; ce 
   assert.deepEqual(matrix.missing, ['dossier DMD « Absent »']);
 
   const library = path.join(i.own, 'pinmame', 'roms');
-  const plan = planImport([{ path: i.t2, mode: 'copy' }, { path: i.matrix, mode: 'copy' }, ...sources], { tablesDir: path.join(i.own, 'tables'), scripts: facts as never, romLibrary: library });
+  const plan = planImport(sources, { tablesDir: path.join(i.own, 'tables'), scripts: facts as never, romLibrary: library });
   const tp = plan.tables.find((t) => t.steps.some((s) => s.kind === 'table' && s.from === i.t2))!;
   const steps = tp.steps.map((s) => `${s.kind}:${path.relative(tp.folder, s.to)}`);
   assert.ok(steps.includes(`serum:${path.join('serum', 't2_l8')}`), steps.join('\n'));
@@ -132,13 +133,15 @@ test('installation : la ROM, ses couleurs et ses sons viennent de VPinMAME ; ce 
 test('installation : une archive déballée, le dossier d’import ou un fichier hors installation ne reçoivent rien de plus', () => {
   const i = installation();
   const facts = () => MATRIX_FACTS;
-  assert.deepEqual(installationCompanions([{ path: i.matrix, mode: 'move' }], facts, [i.own]).sources, []);
-  assert.deepEqual(installationCompanions([{ path: i.tables, mode: 'copy', unpacked: true }], facts, [i.own]).sources, []);
+  // Rien de plus : les sources rendues sont celles données.
+  const same = (sources: ImportSource[]) => assert.deepEqual(installationCompanions(sources, facts, [i.own]).sources, sources);
+  same([{ path: i.matrix, mode: 'move' }]);
+  same([{ path: i.tables, mode: 'copy', unpacked: true }]);
   const lone = write(path.join(i.root, 'Téléchargements', `${MATRIX}.vpx`));
-  assert.deepEqual(installationCompanions([{ path: lone, mode: 'copy' }], facts, [i.own]).sources, []);
+  same([{ path: lone, mode: 'copy' }]);
   // Téléchargé à côté de l'installation, hors de son dossier Tables : il n'y prend rien.
   const near = write(path.join(i.vp, 'Téléchargements', `${MATRIX}.vpx`));
-  assert.deepEqual(installationCompanions([{ path: near, mode: 'copy' }], facts, [i.own]).sources, []);
+  same([{ path: near, mode: 'copy' }]);
   // Un PuP-Pack apporté par l'import (celui du téléchargement) : jamais doublé par celui de l'installation.
   const ownPack = path.join(i.root, 'Téléchargements', 'MatrixPup');
   write(path.join(ownPack, 'screens.pup'));
@@ -147,7 +150,7 @@ test('installation : une archive déballée, le dossier d’import ou un fichier
   assert.ok(mine.sources.some((s) => s.path.endsWith('.directb2s')), 'le reste, si');
   // Déjà choisi avec la table : pas deux fois.
   const both = installationCompanions([{ path: i.matrix, mode: 'copy' }, { path: path.join(i.pup, 'TheMatrix'), mode: 'copy' }], facts, [i.own]);
-  assert.ok(!both.sources.some((s) => s.path.endsWith('TheMatrix')));
+  assert.equal(both.sources.filter((s) => s.path.endsWith('TheMatrix')).length, 1);
 });
 
 test('installation : liste de ses tables, une à une, et celles déjà dans la borne', () => {

@@ -37,7 +37,7 @@ import {
   type VariantChoice,
 } from './puppack';
 import { listRoms, romFile, romHash, romKey, sameRomFile, tableRomsDir } from './romlibrary';
-import { buildZip, listRelative, readZipEntries, recognizeRomName, romContent, zipContentHash, type RomHints, type RomZipMember } from './romzip';
+import { buildZip, isRomZip, listRelative, readZipEntries, recognizeRomName, romContent, zipContentHash, type RomHints, type RomZipMember } from './romzip';
 import { classifyDir, classifyFile, nameKey, type FileKind } from './tablefiles';
 import { parseTableName, readInfo, type TableInfoFile } from './tables';
 import { mergeFavorite } from './collections';
@@ -63,6 +63,8 @@ export interface ImportSource {
    * (son PuP-Pack dans PUPVideos, sa ROM dans VPinMAME…, installation.ts). Elle lui revient.
    */
   owner?: string;
+  /** Chemins à laisser de côté dans ce dossier : les autres versions d'une table, non cochées (installation.ts). */
+  exclude?: string[];
 }
 
 /** Table déjà installée, pour y ranger un complément (ROM, vidéos PuP…). */
@@ -538,7 +540,13 @@ function collect(src: ImportSource, pkg: number, items: Item[], ignored: string[
   const label = src.label ?? path.basename(src.path);
   const unpacked = Boolean(src.unpacked);
   const owner = src.owner ? { owner: src.owner } : {};
+  const excluded = (p: string) => src.exclude?.some((x) => samePath(x, p) || isInside(p, x)) ?? false;
   const push = (p: string, dir: boolean, kind: FileKind, parents: string[], source: string, media?: RecognizedMedia) => {
+    if (excluded(p)) return;
+    // Archive qui n'est pas une ROM de PinMAME : jamais rangée comme une ROM. Dans un dossier « roms »
+    // (image Spike 2 de VPinSPA, VPinMame\roms\spagb100.zip), elle garde sa place ; ailleurs, c'est
+    // l'archive d'où vient la table, ou un fronton de rechange déjà déballé à côté : laissée.
+    if (kind === 'rom' && !dir && !isRomZip(p)) kind = parents.some((d) => d.toLowerCase() === 'roms') ? 'other' : 'ignored';
     if (kind === 'ignored') ignored.push(source);
     else {
       const rom = kind === 'rom' && !dir ? describeRomZip(p, hints) : undefined;
@@ -582,6 +590,7 @@ function collect(src: ImportSource, pkg: number, items: Item[], ignored: string[
     for (const dirent of dirents) {
       const p = path.join(dir, dirent.name);
       const source = [label, ...parents, dirent.name].join(' › ');
+      if (excluded(p)) continue;
       if (dirent.isDirectory()) {
         const inner = folder
           ? mediaSubFolder(folder, dirent.name)
@@ -911,7 +920,9 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
         else add(item, item.isDir ? 'medias' : path.join('medias', name));
         break;
       case 'music':
-        add(item, item.isDir ? 'music' : path.join('music', name));
+        // Dossier « music » : il devient celui de la table ; un sous-dossier (VisualPinball\Music\Akira) y garde son nom,
+        // comme le script le demande (PlayMusic "Akira\track.mp3").
+        add(item, item.isDir ? (name.toLowerCase() === 'music' ? 'music' : path.join('music', name)) : path.join('music', ...musicParents(item.parents), name));
         break;
       case 'script':
         if (!item.isDir && vpxBases.includes(stem.toLowerCase())) {
@@ -1199,6 +1210,12 @@ function planPack(item: Item, game: Game, opts: PlanOptions, info: TableInfoFile
     noPupFiles: !analysis.pupFiles.length && !analysis.variants.length,
     renames: playlistRenames(root).map((r) => ({ from: r.from, to: r.to })),
   };
+}
+
+/** Dossiers d'un morceau sous « music » (« music\Akira ») : gardés, le script les nomme. */
+function musicParents(parents: string[]): string[] {
+  const at = parents.findIndex((p) => p.toLowerCase() === 'music');
+  return at >= 0 ? parents.slice(at + 1) : [];
 }
 
 function uniqueNames(names: string[]): string[] {

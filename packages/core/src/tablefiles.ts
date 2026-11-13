@@ -103,6 +103,8 @@ const DMD_ASSET_EXT = new Set(['.fnt', '.png', '.gif', '.apng', '.bmp', '.jpg'])
 export const ARCHIVE_EXT = new Set(['.zip', '.7z', '.rar']);
 const IGNORED_FILES = new Set(['crash.txt', 'crash.dmp', 'thumbs.db', 'desktop.ini', '.ds_store']);
 const IGNORED_DIRS = new Set(['cache', '__macosx', '.git']);
+/** Journaux et rapports que VPX, B2S, DOF ou PinMAME écrivent à côté d'une table : jamais repris avec elle. */
+const IGNORED_EXT = new Set(['.tmp', '.log', '.dmp']);
 
 /**
  * Une archive .zip est-elle une ROM (à ranger dans la bibliothèque) ou un paquet à
@@ -197,7 +199,7 @@ export function classifyFile(name: string, parents: string[] = []): FileKind {
   const ext = path.extname(lower);
   const parent = (parents.at(-1) ?? '').toLowerCase();
   const inside = (dir: string) => parents.some((p) => p.toLowerCase() === dir);
-  if (IGNORED_FILES.has(lower) || lower.endsWith('.tmp') || isJunkName(lower)) return 'ignored';
+  if (IGNORED_FILES.has(lower) || IGNORED_EXT.has(ext) || isJunkName(lower)) return 'ignored';
   if (ext === '.vpx') return 'table';
   if (ext === '.directb2s') return 'backglass';
   if (ext === '.zip') return 'rom';
@@ -233,7 +235,7 @@ export function classifyDir(name: string, dir: string, parents: string[] = [], d
     if (inside.some((e) => SERUM_EXT.has(e))) return 'serum';
     if (inside.some((e) => VNI_EXT.has(e))) return 'vni';
   }
-  if (lower === 'music') return 'music';
+  if (lower === 'music' || parent === 'music') return 'music';
   if (lower === 'medias') return 'media';
   if (lower === 'scripts') return 'script';
   if (lower === 'user') return 'user';

@@ -15,14 +15,15 @@ export const messages: Record<string, string> = {
   'La racine de l’installation, son dossier Tables ou PinUPSystem': 'The installation root, its Tables folder or PinUPSystem',
   'Reprendre une table d’une autre installation': 'Bring in a table from another installation',
   '« Choisir un dossier… » : la racine de l’installation, son dossier Tables ou PinUPSystem.': '“Choose a folder…”: the installation root, its Tables folder or PinUPSystem.',
-  '« {dir} » : aucune installation reconnue (ni VPinMAME, ni PinUPSystem, ni PinballX autour d’un dossier de tables). Pour une table rangée dans son propre dossier, « Choisir un dossier… » de « Ajouter une table » suffit.':
-    '“{dir}”: no installation recognised (no VPinMAME, PinUPSystem or PinballX around a tables folder). For a table kept in its own folder, “Choose a folder…” in “Add a table” is enough.',
+  '« {dir} » : aucune installation reconnue (ni VPinMAME, ni VPX, ni PinUPSystem, ni PinballX, ni PinballY autour d’un dossier de tables). Pour une table rangée dans son propre dossier, « Choisir un dossier… » de « Ajouter une table » suffit.':
+    '“{dir}”: no installation recognised (no VPinMAME, VPX, PinUPSystem, PinballX or PinballY around a tables folder). For a table kept in its own folder, “Choose a folder…” in “Add a table” is enough.',
   'Lecture de l’installation…': 'Reading the installation…',
   'Déjà dans la borne': 'Already on the cabinet',
   'Reprendre la table cochée': 'Bring in the ticked table',
   'Reprendre les {n} tables cochées': 'Bring in the {n} ticked tables',
   'Aucune table cochée': 'No table ticked',
-  'Avec son PuP-Pack, sa ROM, ses couleurs, ses sons et ses médias : le plan d’ajout montre tout avant d’installer': 'With its PuP-Pack, ROM, colours, sounds and media: the add plan shows everything before installing',
+  'Avec son dossier, son PuP-Pack, sa ROM, ses couleurs, ses sons, sa musique et ses médias : le plan d’ajout montre tout avant d’installer':
+    'With its folder, PuP-Pack, ROM, colours, sounds, music and media: the add plan shows everything before installing',
   'Start sur une table la coche ou la décoche': 'Start on a table ticks or unticks it',
   'Tout décocher': 'Untick all',
   'Une autre installation…': 'Another installation…',
@@ -34,13 +35,22 @@ export const messages: Record<string, string> = {
   'Ses tables': 'Its tables',
   'Aucune table dans {dir}': 'No table in {dir}',
   'cocher ou décocher la table': 'tick or untick the table',
-  'Seules les tables cochées sont reprises, chacune avec ce que l’installation range ailleurs : son PuP-Pack (PUPVideos), sa ROM, ses couleurs et ses sons (VPinMAME), son dossier DMD, son fronton et ses médias. Tout est copié : l’installation d’origine ne change pas. Rien n’est installé avant que vous ayez validé le plan.':
-    'Only the ticked tables are brought in, each with what the installation keeps elsewhere: its PuP-Pack (PUPVideos), its ROM, colours and sounds (VPinMAME), its DMD folder, its backglass and its media. Everything is copied: the original installation does not change. Nothing is installed before you have approved the plan.',
+  'Seules les tables cochées sont reprises, chacune avec tout son dossier quand elle en a un, et ce que l’installation range ailleurs : son PuP-Pack (PUPVideos), sa ROM, sa sauvegarde, ses couleurs et ses sons (VPinMAME), sa musique, son dossier DMD, son fronton et ses médias (Popper, PinballX, PinballY), sous tous les noms que l’installation leur donne. Tout est copié : l’installation d’origine ne change pas. Rien n’est installé avant que vous ayez validé le plan.':
+    'Only the ticked tables are brought in, each with its whole folder when it has one, and what the installation keeps elsewhere: its PuP-Pack (PUPVideos), its ROM, save, colours and sounds (VPinMAME), its music, its DMD folder, its backglass and its media (Popper, PinballX, PinballY), under every name the installation gives them. Everything is copied: the original installation does not change. Nothing is installed before you have approved the plan.',
   'VPinMAME : {dir}': 'VPinMAME: {dir}',
   'VPinMAME : absent': 'VPinMAME: missing',
   'PuP-Packs : {dir}': 'PuP-Packs: {dir}',
   'PuP-Packs : absents': 'PuP-Packs: missing',
   'Médias : {dirs}': 'Media: {dirs}',
+  'Listes : {lists}': 'Lists: {lists}',
+  'Dans aucune liste de lecture': 'In no playlist',
+  'Cocher la liste « {name} »': 'Tick the “{name}” list',
+  'Déjà toutes cochées': 'All already ticked',
+  'Seulement les tables de vos listes de lecture': 'Only the tables in your playlists',
+  'Montrer toutes les tables du disque': 'Show every table on the drive',
+  '{n} de plus, absentes des listes de lecture': '{n} more, not in any playlist',
+  '{n} dans vos listes de lecture': '{n} in your playlists',
+  'Ses tables jouées (listes de lecture)': 'Its played tables (playlists)',
   // app/src/library.ts
   'Dossier de l’autre installation': 'Folder of the other installation',
   'Reprise de tables d’une autre installation': 'Tables brought in from another installation',

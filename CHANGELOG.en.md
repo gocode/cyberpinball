@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.12
 
+- Add a table > "From another installation…": a table kept in its own folder (`Tables\<Name>\`), at any depth, now comes with that whole folder, its PuP-Pack, its ROM (even unzipped), its save, colours, sounds, music and all its media (loading video, topper…), found under every name PinUP Popper, PinballX or PinballY gives them. Logs, crash reports and original archives are no longer copied.
+- "From another installation…" first shows the tables you actually play: those in your PinUP Popper playlists (or enabled in PinballX and PinballY), with the names of their lists. "Tick the list" ticks them all at once; "Show every table on the drive" adds the copies and old versions.
 - Virtual reality: the headset readings finally start with Meta's current software (they looked for a file under another name). When the automatic alignment does not happen, the log says why: controllers not level, gap in centimetres, rest position not learned yet, or controllers no longer tracked by the headset.
 - Virtual reality: the controllers drawn, the command to use in green, also in the in-game pause ("Align the cabinet"), at each step of the controller wizard, and in the headset menu's legend.
 - Virtual reality: the cabinet alignment shows the controllers drawn, the command to use in green, and reminds at the bottom that you can align again any time by pressing both sticks down for 3 s. The gesture is explained the same way the first time the headset is worn and when the triggers are held instead.

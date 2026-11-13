@@ -11,6 +11,8 @@ son interface).
 
 ## 0.1.12
 
+- Ajouter une table > « Depuis une autre installation… » : une table rangée dans son propre dossier (`Tables\<Nom>\`), à n'importe quelle profondeur, arrive maintenant avec tout ce dossier, son PuP-Pack, sa ROM (même décompressée), sa sauvegarde, ses couleurs, ses sons, sa musique et tous ses médias (vidéo de chargement, topper…), retrouvés sous tous les noms que PinUP Popper, PinballX ou PinballY leur donnent. Les journaux, rapports de plantage et archives d'origine ne sont plus copiés.
+- « Depuis une autre installation… » montre d'abord les tables réellement jouées : celles de vos listes de lecture PinUP Popper (ou activées dans PinballX et PinballY), avec le nom de leurs listes. « Cocher la liste » les coche toutes d'un coup ; « Montrer toutes les tables du disque » ajoute les copies et anciennes versions.
 - Réalité virtuelle : le relevé du casque démarre enfin avec le logiciel actuel de Meta (il cherchait un fichier sous un autre nom). Quand le recalage automatique ne se fait pas, le journal dit pourquoi : manettes pas à niveau, écart en centimètres, position de repos pas encore apprise, ou manettes plus suivies par le casque.
 - Réalité virtuelle : les manettes dessinées, la commande à actionner en vert, aussi dans la pause en partie (« Caler la borne »), à chaque étape de l'assistant des manettes, et dans la légende du menu du casque.
 - Réalité virtuelle : le calage de la borne montre les manettes dessinées, la commande à actionner en vert, et rappelle en bas qu'on peut recaler à tout moment en enfonçant les deux sticks 3 s. Le geste est expliqué de la même façon au premier port du casque et quand on tient les gâchettes à sa place.

@@ -312,6 +312,12 @@ export function romContent(paths: string[]): RomContent | undefined {
   return { dir, chips };
 }
 
+/** Un .zip est une ROM s'il ne contient que des puces ; illisible, on le croit sur son extension. */
+export function isRomZip(file: string): boolean {
+  const entries = readZipEntries(file);
+  return !entries || Boolean(romContent(entries.map((e) => e.name)));
+}
+
 /** Fichiers d'un dossier, relatifs (séparateur /), sous-dossiers compris ; undefined au-delà de max. */
 export function listRelative(dir: string, max = 200): string[] | undefined {
   const out: string[] = [];
