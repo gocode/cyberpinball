@@ -34,6 +34,9 @@
 //   bouton <chemin> 1|0             un bouton (chemin OpenXR complet, /user/hand/…/click)
 //   valeur <chemin> V               un axe ou une gâchette (/user/hand/…/value, …/x, …/y)
 //   quitter                         le runtime met fin à la session (EXITING)
+//   contour-fige 1|0                LibOVR : le contour lu (ovr_GetBoundaryGeometry) figé dans l'espace de suivi du
+//                                   moment, comme un runtime qui recentre l'origine sans le retransformer ; le test
+//                                   de la limite (ovr_TestBoundary…) garde la vraie limite
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -142,6 +145,8 @@ struct World
    // LibOVR (sonde) : contour extérieur de la limite et pose de l'aire de jeu, fixés à la pièce réelle (le monde) ;
    // l'origine de suivi (STAGE, `origin`) peut bouger sans eux, comme Link à chaque connexion.
    std::vector<XrVector3f> outer;
+   // contour-fige : le contour rendu par ovr_GetBoundaryGeometry, figé dans l'espace de suivi (vide : le vrai).
+   std::vector<XrVector3f> frozenOuter;
    XrPosef area = identity();
    bool ovrInputs = true; // faux : les entrées rendues à zéro (client sans le regard)
 };
@@ -400,6 +405,13 @@ void advance(bool silent = false)
             if (c != std::string::npos)
                world.outer.push_back({ std::stof(a.substr(0, c)), 0.f, std::stof(a.substr(c + 1)) });
          }
+      }
+      else if (st.verb == "contour-fige")
+      {
+         world.frozenOuter.clear();
+         if (num(st, 0) != 0.f)
+            for (const XrVector3f& p : world.outer)
+               world.frozenOuter.push_back(compose(inverse(world.origin), XrPosef { { 0, 0, 0, 1 }, p }).position);
       }
       else if (st.verb == "aire")
          world.area = { yawQuat(num(st, 2)), { num(st, 0), 0.f, num(st, 1) } };
@@ -1333,7 +1345,9 @@ extern "C" __declspec(dllexport) int ovr_GetBoundaryGeometry(void*, unsigned typ
 {
    std::lock_guard<std::mutex> g(lock);
    std::vector<XrVector3f> list;
-   if (type == 0x1)
+   if (type == 0x1 && !world.frozenOuter.empty())
+      list = world.frozenOuter;
+   else if (type == 0x1)
       for (const XrVector3f& p : world.outer)
          list.push_back(ovr::inStage(p));
    else if (type == 0x100 && world.roomscale)
@@ -1359,6 +1373,48 @@ extern "C" __declspec(dllexport) int ovr_GetBoundaryDimensions(void*, unsigned t
       return 0;
    }
    return -1000;
+}
+namespace ovr {
+struct BoundaryTestResult
+{
+   char isTriggering;
+   char pad[3];
+   float closestDistance;
+   Vec3 closestPoint, closestPointNormal;
+};
+/** Le test de la limite par le runtime : toujours la vraie (le monde), vue dans l'espace de suivi. */
+int testPoint(const XrVector3f& stagePoint, BoundaryTestResult* r)
+{
+   std::memset(r, 0, sizeof(*r));
+   if (world.outer.size() < 3)
+      return 1001; // ovrSuccess_BoundaryInvalid
+   float best = 1e9f, bx = 0, bz = 0;
+   for (size_t i = 0; i < world.outer.size(); i++)
+   {
+      const XrVector3f a = inStage(world.outer[i]), b = inStage(world.outer[(i + 1) % world.outer.size()]);
+      const float dx = b.x - a.x, dz = b.z - a.z, len = dx * dx + dz * dz;
+      const float t = len > 0.f ? std::clamp(((stagePoint.x - a.x) * dx + (stagePoint.z - a.z) * dz) / len, 0.f, 1.f) : 0.f;
+      const float px = a.x + t * dx, pz = a.z + t * dz, d = std::hypot(stagePoint.x - px, stagePoint.z - pz);
+      if (d < best)
+         best = d, bx = px, bz = pz;
+   }
+   r->closestDistance = best;
+   r->closestPoint = { bx, 0.f, bz };
+   r->isTriggering = best < 0.3f ? 1 : 0;
+   return 0;
+}
+} // namespace ovr
+extern "C" __declspec(dllexport) int ovr_TestBoundary(void*, unsigned device, unsigned, ovr::BoundaryTestResult* r)
+{
+   std::lock_guard<std::mutex> g(lock);
+   if (device != 0x1)
+      return 1002; // ovrSuccess_DeviceUnavailable
+   return ovr::testPoint(compose(inverse(world.origin), world.head).position, r);
+}
+extern "C" __declspec(dllexport) int ovr_TestBoundaryPoint(void*, const ovr::Vec3* p, unsigned, ovr::BoundaryTestResult* r)
+{
+   std::lock_guard<std::mutex> g(lock);
+   return ovr::testPoint({ p->x, p->y, p->z }, r);
 }
 extern "C" __declspec(dllexport) int ovr_SetTrackingOriginType(void*, int) { return 0; }
 extern "C" __declspec(dllexport) double ovr_GetTimeInSeconds() { return static_cast<double>(GetTickCount64()) / 1000.0; }

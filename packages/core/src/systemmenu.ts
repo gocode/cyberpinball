@@ -45,7 +45,6 @@ export const SYSTEM_ITEM_IDS = [
   'vision3d',
   'vr',
   'vr-calibrate',
-  'vr-auto-calibrate',
   'vr-controllers',
   'vr-mirror',
   'controls',
@@ -160,7 +159,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     icon: 'vr',
     get label() { return t('Réalité virtuelle'); },
     get detail() { return t('Activer le casque, caler la borne, manettes du casque, recopie sur le playfield'); },
-    entries: ['vr', 'vr-calibrate', 'vr-auto-calibrate', 'vr-controllers', 'vr-mirror'],
+    entries: ['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror'],
     lead: 'vr',
   },
   cyberpinball: {
@@ -224,7 +223,6 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   vr: { icon: 'power', get label() { return t('Réalité virtuelle'); } },
   // Caler la borne du casque et les tables de VPX sur la vraie barre avant, aux manettes (calage.ts).
   'vr-calibrate': { icon: 'layout', get label() { return t('Caler la borne'); } },
-  'vr-auto-calibrate': { icon: 'refresh', get label() { return t('Recalage automatique'); } },
   'vr-controllers': { icon: 'button', get label() { return t('Manettes du casque'); } },
   'vr-mirror': { icon: 'screens', get label() { return t('Recopie sur le playfield'); } },
   // La perspective des tables suit la tête du joueur (vision3d.ts) : webcam ou Kinect.

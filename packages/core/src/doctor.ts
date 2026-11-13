@@ -77,6 +77,7 @@ import { aliasFor, historicAlias, neighbourRom, neighbourWarning, readTableAlias
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
 import { isChipName, listRelative, readZipEntries, romContent, type RomZipMember } from './romzip';
 import { companion, nameKey } from './tablefiles';
+import { b2sWithoutBackglass } from './b2simage';
 import { dofRomNumbers, tableDofIni, tableIniMasksGlobal, type DofSetup } from './dof';
 import { playBlockers, playSeverity } from './playable';
 import { parseTableName, readInfo, type TableEntry } from './tables';
@@ -108,6 +109,7 @@ export const FINDING_CODES = [
   'backglassMissing',
   'backglassMisnamed',
   'backglassStray',
+  'backglassEmpty',
   'romMissing',
   'romMisplaced',
   'romUnknown',
@@ -568,6 +570,8 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
 
   // 3. Backglass.
   const backglass = companion(folder, base, ownFolder, '.directb2s');
+  const emptyB2s = emptyBackglassFinding(backglass);
+  if (emptyB2s) findings.push(emptyB2s);
   const versionBases = files.filter((f) => f.toLowerCase().endsWith('.vpx')).map((f) => f.slice(0, -4).toLowerCase());
   const strays = files.filter(
     (f) =>
@@ -929,6 +933,26 @@ function pupDmdPlaceFinding(
   };
 }
 
+/**
+ * Fronton sans aucune image (b2sWithoutBackglass) : le plugin B2S de VPX planterait à la
+ * première image de la partie. Mis à la corbeille avant chaque partie et dès l'installation
+ * (PUP_PLAY_REPAIRS) : la table se joue alors sans fronton B2S, comme si elle n'en avait pas.
+ */
+function emptyBackglassFinding(file: string | undefined): Finding | undefined {
+  if (!file || !b2sWithoutBackglass(file)) return undefined;
+  const params = { file: path.basename(file) };
+  return {
+    code: 'backglassEmpty',
+    severity: 'warning',
+    title: t('Fronton sans image : VPX planterait au lancement'),
+    detail: t(
+      '« {file} » ne contient aucune image de fronton (un fichier de remplacement, souvent laissé par un autre menu de borne). Le plugin B2S de VPX s’arrête dessus dès la première image de la partie. Sans lui, la table se joue normalement ; le PuP-Pack et le DMD ne changent pas.',
+      params,
+    ),
+    fix: { label: t('Mettre « {file} » à la corbeille', params), ops: [{ op: 'trash', path: file }] },
+  };
+}
+
 /** Fichiers d'un pack renommés pour que le plugin PUP commence ses playlists comme PinUP Player (playlistRenames). */
 function playlistOrderFinding(pack: string, root: string, renames: PlaylistRename[]): Finding {
   const first = renames[0]!;
@@ -1113,7 +1137,7 @@ export function repairScriptAfterStop(entry: TableEntry, ctx: DoctorContext, ops
  * 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack), et une table que le core.vbs
  * arrête ne démarre pas (Back to the Future, 30 octobre 2026 : vpmInit appelé deux fois).
  */
-export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['scriptCoreCompat', 'pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['backglassEmpty', 'scriptCoreCompat','pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
 
 /**
  * Constats réparables de PUP_PLAY_REPAIRS pour cette table. Sans script connu (cache
@@ -1134,6 +1158,8 @@ export function pupPlayRepairs(entry: TableEntry, ctx: DoctorContext): Finding[]
   if (override?.state.kind === 'stale' && !pupOff) found.push(staleFinding(override));
   const compat = coreCompatFinding(entry, { ...ctx, script }, override);
   if (compat) found.push(compat);
+  const emptyB2s = emptyBackglassFinding(companion(entry.folder, base, true, '.directb2s'));
+  if (emptyB2s) found.push(emptyB2s);
   found.push(...checkPup(entry, { ...ctx, script, vpxLog: undefined }, override));
   return found.filter((f) => f.fix && PUP_PLAY_REPAIRS.includes(f.code));
 }

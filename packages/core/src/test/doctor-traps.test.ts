@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { diagnose, FINDING_CODES, pupMemory, pupOptionOps, scriptFacts, setPupMemory, tablePupPacks, type DoctorContext, type Finding } from '../doctor';
+import { diagnose, FINDING_CODES, pupMemory, pupOptionOps, repairPupForPlay, scriptFacts, setPupMemory, tablePupPacks, type DoctorContext, type Finding } from '../doctor';
 import type { PupCabinet } from '../puppack';
 import { applyOps, sameFile, type FileOp } from '../fileops';
 import { planJourney } from '../journey';
@@ -25,6 +25,8 @@ import { PUP_DISABLED_FOLDER } from '../pupdisabled';
 
 const SCRIPT = 'Const cGameName="afm_113b"\r\nLoadVPM "01560000", "WPC.VBS", 3.26\r\nController.GameName = cGameName\r\n';
 const TABLE = 'Attack from Mars (Bally 1995)';
+/** .directb2s sans image, tel que trouvé à côté d'Indiana Jones (VPW) sur une borne venue de PinUP Popper. */
+const EMPTY_B2S = '<?xml version="1.0" encoding="utf-8"?>\r\n<Backglass>\r\n  <Name>Generic</Name>\r\n  <ScreenID>1</ScreenID>\r\n  <Grouping/>\r\n</Backglass>\r\n';
 /** Même table, avec un PuP-Pack chargé par le script. */
 const PUP_SCRIPT = `${SCRIPT}Set PuPlayer = CreateObject("PinUpPlayer.PinDisplay")\r\nPuPlayer.B2SInit "", cGameName\r\n`;
 /** Même table, dont le script écrit le score sur l'écran 5 du pack (PuP-DMD). */
@@ -192,6 +194,8 @@ const TRAPS: Trap[] = [
     arm: (folder) => fs.renameSync(path.join(folder, `${TABLE}.directb2s`), path.join(folder, '1492939964_AttackFromMars(Bally1995)v2.directb2s')),
   },
   { code: 'backglassStray', arm: (folder) => write(path.join(folder, 'Ancien backglass.directb2s'), 'b2s') },
+  // Bouchon « Generic » d'une installation PinUP Popper (Indiana Jones, 13/11/2026) : le plugin B2S plante dessus.
+  { code: 'backglassEmpty', arm: (folder) => write(path.join(folder, `${TABLE}.directb2s`), EMPTY_B2S) },
   { code: 'romMissing', arm: (folder) => fs.rmSync(path.join(folder, 'pinmame'), { recursive: true }) },
   {
     code: 'romMisplaced',
@@ -1053,4 +1057,28 @@ test('fichier des erreurs de lecture : compteur, entrée périmée quand le fich
     [['(Wheel) T2.png', 'image']],
   );
   fs.rmSync(dir, { recursive: true });
+});
+
+test('fronton sans image : écarté avant la partie ; un vrai fronton et un fichier qui n’est pas du XML restent', () => {
+  const tablesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-b2s-vide-'));
+  const folder = healthyTable(tablesDir);
+  const b2s = path.join(folder, `${TABLE}.directb2s`);
+  const trashDir = `${tablesDir}-corbeille`;
+  const ctx = { tablesDir, script: scriptFacts(SCRIPT), cabinet: CABINET };
+  const codes = () => diagnose(scanTables(tablesDir)[0]!, ctx).map((f) => f.code);
+  // Fichier factice (« b2s ») et vrai fronton (image en base64, attributs avant Value) : rien à dire.
+  assert.ok(!codes().includes('backglassEmpty'));
+  write(b2s, '﻿<?xml version="1.0"?>\r\n<DirectB2SData Version="1.2">\r\n<Images>\r\n<BackglassOffImage Type="1" Value="iVBORw0KGgoAAAANSUhEUg" />\r\n</Images>\r\n</DirectB2SData>');
+  assert.ok(!codes().includes('backglassEmpty'));
+  assert.deepEqual(repairPupForPlay(scanTables(tablesDir)[0]!, ctx, { trashDir }).map((f) => f.code), []);
+  // Bouchon sans image, et image à la valeur vide : écarté d'office, à la corbeille, une seule fois.
+  for (const content of [EMPTY_B2S, '<DirectB2SData><Images><BackglassImage Value="" /></Images></DirectB2SData>']) {
+    write(b2s, content);
+    assert.ok(codes().includes('backglassEmpty'));
+    assert.deepEqual(repairPupForPlay(scanTables(tablesDir)[0]!, ctx, { trashDir }).map((f) => f.code), ['backglassEmpty']);
+    assert.ok(!fs.existsSync(b2s));
+    assert.deepEqual(repairPupForPlay(scanTables(tablesDir)[0]!, ctx, { trashDir }), []);
+  }
+  fs.rmSync(tablesDir, { recursive: true });
+  fs.rmSync(trashDir, { recursive: true, force: true });
 });

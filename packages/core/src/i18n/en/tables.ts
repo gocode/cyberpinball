@@ -9,6 +9,10 @@ export const messages: Record<string, string> = {
   '{file} remplace le script contenu dans la table. C\'est parfois voulu (correctif), souvent un reste d\'extraction qui rend la table injouable après une mise à jour.': '{file} overrides the script inside the table. Sometimes on purpose (a fix), often a leftover from extraction that breaks the table after an update.',
   'Mettre {file} à la corbeille': 'Move {file} to the trash',
   'Backglass mal nommé': 'Misnamed backglass',
+  'Fronton sans image : VPX planterait au lancement': 'Backglass without an image: VPX would crash at launch',
+  '« {file} » ne contient aucune image de fronton (un fichier de remplacement, souvent laissé par un autre menu de borne). Le plugin B2S de VPX s’arrête dessus dès la première image de la partie. Sans lui, la table se joue normalement ; le PuP-Pack et le DMD ne changent pas.':
+    '“{file}” contains no backglass image (a placeholder file, often left behind by another cabinet frontend). The VPX B2S plugin crashes on it at the very first frame of the game. Without it, the table plays normally; the PuP-Pack and the DMD are unchanged.',
+  'Mettre « {file} » à la corbeille': 'Move “{file}” to the trash',
   'VPX cherche « {base}.directb2s » ou « {wanted} » : « {best} » ne sera pas affiché.': 'VPX looks for “{base}.directb2s” or “{wanted}”: “{best}” won’t be shown.',
   'Renommer en « {name} »': 'Rename to “{name}”',
   'Pas de backglass': 'No backglass',

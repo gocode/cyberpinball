@@ -66,15 +66,9 @@ import {
   roomFromRecalibration,
   roomMeasureText,
   staleCalibration,
-  AUTO_RECAL_MIN_CM,
-  AUTO_RECAL_MIN_DEG,
-  AUTO_RECAL_STILL_S,
-  autoRecalibratedPlace,
-  restGate,
-  restGateReason,
-  restReference,
-  RestWatch,
-  type RestSample,
+  anchorPlace,
+  anchorHeadAtOrigin,
+  ANCHOR_HEAD_MAX_CM,
   calibrationGap,
   calibrationProblem,
   lockbarMarks,
@@ -467,7 +461,7 @@ import { inspectorFor, vpxFirewallTargets } from './vpx-inspector';
 import { scriptDmdWatch, simulatedDmdWatch, watchVpxDmd, type DmdWatch } from './dmd-watch';
 import { readLiveScoresSettings, writeLiveScoresSettings } from './live-scores-setting';
 import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
-import { centerWhenStarted, prepareVrGame, probeVr, readVrAutoRecal, readVrMirror, readVrMode, rememberVrSettings, writeIniSettings, writeVrAutoRecal, writeVrCalibration, writeVrMirror, writeVrMode, type VrGame } from './vr';
+import { centerWhenStarted, prepareVrGame, probeVr, readVrMirror, readVrMode, rememberVrSettings, writeIniSettings, writeVrCalibration, writeVrMirror, writeVrMode, type VrGame } from './vr';
 import { HEADSET_TRIAL_DIR, HeadsetMenu, readCabinetPlace, type HeadPose } from './casque';
 import { OvrProbe } from './sonde-ovr';
 import { prepareSchemaImage, schemaImageFile, type SchemaImage } from './schema-image';
@@ -3194,7 +3188,20 @@ library.provideSystemItem('quiet-in-game', {
 // est prêt. Sans runtime OpenXR, l'entrée reste visible, grisée avec sa raison ; Start n'y change rien.
 let vrMode = readVrMode(loc.dataDir);
 /** Sonde LibOVR (sonde-ovr.ts, 13 novembre 2026) : ce que Link donne à un client invisible, au journal. */
-const ovrProbe = new OvrProbe({ appDir: path.join(__dirname, '..'), log: (line) => console.log(line) });
+/** L'ancrage (anchorCheck) : le dernier contour lu par la sonde, le dernier repos, la limite redessinée déjà dite. */
+let latestContour: [number, number][] | undefined;
+let lastAnchorAt = 0;
+let anchorRedrawnSaid: string | undefined;
+/** Au-delà de ce déplacement (cm), le bandeau dit la borne remise en place. */
+const ANCHOR_BANNER_CM = 5;
+const ovrProbe = new OvrProbe({
+  appDir: path.join(__dirname, '..'),
+  log: (line) => console.log(line),
+  onContour: (points) => {
+    latestContour = points.length >= 3 ? points : undefined;
+    anchorCheck();
+  },
+});
 // Le menu dans le casque (casque.ts) : les écrans de la borne montrés dans le casque, hors partie.
 let headset: HeadsetMenu | undefined;
 /** Partie en cours : le casque est à VPX. */
@@ -3240,102 +3247,6 @@ library.provideSystemItem('vr-mirror', {
     library.openSystem();
   },
 });
-
-// « Recalage automatique » (Menu système > Borne > Réalité virtuelle) : les deux manettes posées sur les coins
-// de la barre avant, immobiles une seconde, suivies par le casque, recalent la borne (calage.ts, RestWatch).
-// Désactivé par défaut. Au menu seulement : en partie, VPX a le casque et le runtime ne donne pas les manettes.
-let vrAutoRecal = readVrAutoRecal(loc.dataDir);
-const restWatch = new RestWatch();
-library.provideSystemItem('vr-auto-calibrate', {
-  get detail() {
-    return vrAutoRecal
-      ? t('Oui · manettes posées aux coins inférieurs de la table, immobiles une seconde : la borne se recale. Au menu seulement : en partie, VPX a les manettes')
-      : t('Non · manettes posées aux coins inférieurs de la table : rien ne bouge. Recalez d’un geste ou par « Caler la borne »');
-  },
-  get tone() {
-    return vrMode === 'auto' ? undefined : ('quiet' as const);
-  },
-  run: () => {
-    vrAutoRecal = !vrAutoRecal;
-    writeVrAutoRecal(loc.dataDir, vrAutoRecal);
-    headset?.watchRest(vrAutoRecal);
-    console.log(`Réalité virtuelle : recalage automatique ${vrAutoRecal ? 'activé' : 'désactivé'}.`); // i18n-ignore : journal
-    library.openSystem();
-  },
-});
-
-/**
- * Un relevé des manettes au repos (compagnon : « repos … ») : posées, immobiles, sur la barre avant du calage
- * gardé, la borne se recale (une fois, réarmé quand elles s'en vont). Jamais pendant le calage, une partie, ou
- * au bureau. Chaque recalage au journal, avec l'écart corrigé.
- */
-/**
- * Apprentissage de la position de repos (restReference) : armé par un calage à la main, désarmé dès que la pièce a
- * pu bouger (session neuve du compagnon, casque remis), pour n'apprendre que dans la pièce du calage.
- */
-let restLearnArmed = false;
-
-/**
- * Ce que le journal dit quand le recalage automatique renonce (une fois par pose) : manettes posées immobiles mais
- * refusées (restGateReason), ou plus suivies du tout (le Quest bascule sur les mains, ou les perd de vue).
- */
-const stillWatch = new RestWatch();
-let restRefusalSaid = false;
-let restSeenAt = 0;
-let restLostSaid = false;
-
-function autoRecalDiagnose(sample: RestSample | undefined, previous: CabinetPlace | undefined): void {
-  if (!sample) {
-    stillWatch.push(undefined, () => true);
-    restRefusalSaid = false;
-    // Suivies il y a peu, puis plus du tout : posées hors de vue, ou le Quest est passé aux mains.
-    if (!restLostSaid && Date.now() - restSeenAt < 3000) {
-      restLostSaid = true;
-      console.log('Casque : recalage automatique impossible, manettes posées non suivies (le Quest ne les suit plus : passage aux mains, manettes hors de vue ou en veille).'); // i18n-ignore : journal
-    }
-    return;
-  }
-  restSeenAt = Date.now();
-  restLostSaid = false;
-  const still = stillWatch.push(sample, () => true);
-  if (!still || restRefusalSaid) return;
-  const reason = restGateReason(still, previous, restLearnArmed);
-  if (!reason) return;
-  restRefusalSaid = true;
-  console.log(`Casque : recalage automatique pas fait, manettes posées immobiles ${AUTO_RECAL_STILL_S} s : ${reason}.`); // i18n-ignore : journal
-}
-
-function autoRecalSample(sample: RestSample | undefined): void {
-  if (!vrAutoRecal || !headset || calibration || playing || launch || headsetSetting() === 'bureau') return;
-  const previous = headset.place();
-  autoRecalDiagnose(sample, previous);
-  const tips = restWatch.push(sample, (t) => restGate(t, previous, restLearnArmed));
-  if (!tips || !previous) return;
-  if (!previous.rest) {
-    // Première pose après le calage à la main : la position de repos apprise, rien de déplacé.
-    const rest = restReference(previous, tips);
-    restLearnArmed = false;
-    headset.showPlace({ ...previous, rest }, true);
-    console.log(`Casque : recalage automatique, position de repos des manettes apprise (à ${Math.round(Math.hypot(rest.x, rest.z) * 100)} cm de la place calée, ${Math.round(rest.dy * 100)} cm sous la barre, écartées de ${Math.round(rest.width * 100)} cm).`); // i18n-ignore : journal
-    return;
-  }
-  const place = autoRecalibratedPlace({ ...previous, rest: previous.rest }, tips);
-  const measure = roomFromRecalibration(previous, place);
-  lastAutoRecalAt = Date.now();
-  originNotice = false;
-  if (measure.cm < AUTO_RECAL_MIN_CM && measure.deg < AUTO_RECAL_MIN_DEG) {
-    console.log(`Casque : recalage automatique, manettes posées sur la barre avant : ${roomMeasureText(measure, 'rien à corriger')}.`); // i18n-ignore : journal
-    return;
-  }
-  headset.showPlace(place, true);
-  try {
-    writeVrCalibration(loc.dataDir, placeVpxSettings(place));
-  } catch (error) {
-    console.warn(`Casque : recalage automatique pas écrit dans l’INI de la VR (${(error as Error).message}).`); // i18n-ignore : journal
-  }
-  console.log(`Casque : recalage automatique, manettes posées sur la barre avant, immobiles ${AUTO_RECAL_STILL_S} s : écart corrigé de ${Math.round(measure.cm)} cm et ${Math.round(measure.deg)}°.`); // i18n-ignore : journal
-  showBanner(t('Borne recalée sur les manettes posées'));
-}
 
 // « Vision 3D » (Menu système > Borne, vision3d.ts) : la perspective des tables suit la tête du joueur,
 // par une webcam ou une Kinect pour Xbox 360. Sans capteur, l'entrée reste visible, grisée avec sa
@@ -3765,24 +3676,65 @@ function roomscaleTip(): void {
 
 /**
  * La pièce refaite par le Quest au port du casque (origine remise sur la tête) : la borne calée n'est plus sur la
- * vraie. Avec le recalage automatique et une position de repos apprise, les manettes posées sur la barre la remettent
- * d'elles-mêmes : on leur laisse ORIGIN_RESET_WAIT_MS ; sinon, ou passé ce délai, le calage est proposé, avec la
- * raison à l'écran.
+ * vraie. Avec un contour gardé au calage, l'ancrage sur la limite du Quest a ORIGIN_RESET_WAIT_MS pour la reposer ; il
+ * n'est cru que si la tête, remise à l'origine, est près de celle du calage (anchorHeadAtOrigin). Sinon, ou sans
+ * contour, le calage est proposé, avec la raison à l'écran.
  */
 let originResetTimer: NodeJS.Timeout | undefined;
-let lastAutoRecalAt = 0;
+
+/**
+ * Ancrage sur la limite du Quest (demande du 13 novembre 2026) : au menu, casque porté, le contour relu par la sonde
+ * LibOVR est recalé sur celui gardé au calage ; la borne est reposée d'autant, sans geste ni manettes. Limite fixe
+ * (le Quest la recentre sur la tête), bureau, calage, partie : rien. Limite redessinée (nombre de points, contours
+ * qui ne se recouvrent plus) : dit une fois, et le calage proposé une fois. Toujours actif, sans option.
+ */
+function anchorCheck(): void {
+  if (!headset || !latestContour || calibration || controllerWizard || playing || launch || !headset.worn) return;
+  if (headsetSetting() === 'bureau' || headset.roomKeeping === 'recentred') return;
+  const place = headset.place();
+  if (!place || !isCalibrated(place) || place.free) return;
+  const r = anchorPlace(place, latestContour);
+  if (!r || r.kind === 'same') return;
+  if (r.kind === 'redrawn') {
+    if (anchorRedrawnSaid === r.why) return;
+    anchorRedrawnSaid = r.why;
+    console.warn(`Casque : ancrage sur la limite du Quest impossible, ${r.why} ; le calage est proposé une fois (ou les deux joysticks, « Caler la borne »).`); // i18n-ignore : journal
+    roomNotice = true;
+    offerCalibration('limite-changee');
+    return;
+  }
+  lastAnchorAt = Date.now();
+  originNotice = false;
+  headset.showPlace(r.place, true);
+  try {
+    writeVrCalibration(loc.dataDir, placeVpxSettings(r.place));
+  } catch (error) {
+    console.warn(`Casque : ancrage sur la limite du Quest pas écrit dans l’INI de la VR (${(error as Error).message}).`); // i18n-ignore : journal
+  }
+  console.log(`Casque : ancrage sur la limite du Quest, la pièce a sauté : borne reposée de ${r.cm.toFixed(0)} cm et ${r.deg.toFixed(0)}° (contours recalés à ${r.residualCm.toFixed(1)} cm près).`); // i18n-ignore : journal
+  if (r.cm > ANCHOR_BANNER_CM) showBanner(t('Borne remise en place sur la limite du Quest'));
+}
 const ORIGIN_RESET_WAIT_MS = 5000;
 function headsetOriginReset(afterRemoval: boolean): void {
   const place = headset?.place();
   if (!place || !isCalibrated(place) || place.free || headsetSetting() === 'bureau') return;
   originNotice = true;
   if (originResetTimer) clearTimeout(originResetTimer);
-  if (vrAutoRecal && place.rest) {
+  if (place.contour?.length && latestContour) {
     const since = Date.now();
-    console.log(`Casque : recalage automatique attendu (manettes posées sur la barre) ; sinon le calage est proposé dans ${ORIGIN_RESET_WAIT_MS / 1000} s.`); // i18n-ignore : journal
+    console.log(`Casque : ancrage sur la limite du Quest attendu ; sinon le calage est proposé dans ${ORIGIN_RESET_WAIT_MS / 1000} s.`); // i18n-ignore : journal
     originResetTimer = setTimeout(() => {
       originResetTimer = undefined;
-      if (lastAutoRecalAt < since) offerCalibration('origine-remise');
+      // L'ancrage (ou rien à reposer) n'est cru que si la tête, remise à l'origine, est près de celle du calage.
+      anchorCheck();
+      const now = headset?.place();
+      const head = now ? anchorHeadAtOrigin(now) : undefined;
+      if (head?.confirmed) {
+        console.log(`Casque : borne ${lastAnchorAt >= since ? 'reposée' : 'laissée'} par l'ancrage sur la limite du Quest, confirmée par la tête (à ${Math.round(head.cm)} cm de celle du calage) ; pas de calage proposé.`); // i18n-ignore : journal
+        return;
+      }
+      if (head) console.log(`Casque : ancrage sur la limite du Quest pas confirmé, tête à ${Math.round(head.cm)} cm de celle du calage (plus de ${ANCHOR_HEAD_MAX_CM} cm : joueur ailleurs, ou le Quest a replacé sa limite avec la pièce) ; le calage est proposé.`); // i18n-ignore : journal
+      offerCalibration('origine-remise');
     }, ORIGIN_RESET_WAIT_MS);
     return;
   }
@@ -4561,8 +4513,6 @@ function applyCalibration(): void {
   const boundary = boundaryOf(headset?.roomKeeping);
   const head = left && right ? c.head : undefined;
   const place: CabinetPlace = { ...c.place, ...(headset?.room && { room: headset.room }), ...(headsetSetting() === 'bureau' && { free: true }), ...(grip && { grip }), ...(boundary && { boundary }), ...(head && { head }) };
-  // Recalage automatique : la prochaine pose des manettes sur la barre apprend leur position de repos.
-  if (left && right) restLearnArmed = true;
   // Recalage de la même vraie barre : l'écart à la précédente est celui de la pièce (mesuré, pas deviné).
   if (previous && isCalibrated(previous) && !previous.free && !place.free && left && right)
     console.log(`Casque : recalage, ${roomMeasureText(roomFromRecalibration(previous, place), 'barre avant recalée face à la précédente')}.`); // i18n-ignore : journal
@@ -5265,6 +5215,7 @@ export function startFrontend(): void {
     tint: () => tints?.current()?.color,
     snapshotDir: path.join(loc.dataDir, 'logs', 'casque'),
     placeFile: headsetPlaceFile(),
+    contour: () => latestContour,
     keyDir: path.join(loc.dataDir, 'vr'),
     onStateChange: () => {
       // Casque porté : les écrans rendus pour lui dessinent ; retiré, ils se reposent, et les écrans du PC
@@ -5308,7 +5259,6 @@ export function startFrontend(): void {
     onPoints: (points, room, head, pressed, grips) => calibrationPoints(points, room, head, pressed, grips),
     onOriginReset: (afterRemoval) => headsetOriginReset(afterRemoval),
     onPutBackOn: () => {
-      restLearnArmed = false;
       checkStaleCalibration();
       headsetPutBackOn();
     },
@@ -5320,11 +5270,7 @@ export function startFrontend(): void {
       headsetEyes = eyes;
       if (calibration) showCalibration();
     },
-    onRoom: () => {
-      restLearnArmed = false;
-      checkStaleCalibration();
-    },
-    onRest: (sample) => autoRecalSample(sample),
+    onRoom: () => checkStaleCalibration(),
     onRoomRestart: (eyes) => {
       roomStale = Boolean(eyeHeightProblem(eyes));
       console.log(`Casque : session neuve après le changement de pièce, yeux à ${eyes.toFixed(2)} m${roomStale ? ' : le sol de la pièce d’origine est faux, les applications qui démarrent la reçoivent ainsi' : ''}.`); // i18n-ignore : journal
@@ -5333,8 +5279,6 @@ export function startFrontend(): void {
     },
     log: (line) => console.log(line),
   });
-  headset.watchRest(vrAutoRecal);
-  if (vrAutoRecal) console.log(`Casque : recalage automatique actif, ${headset.place()?.rest ? 'position de repos des manettes apprise' : 'position de repos pas encore apprise (calez à la main, puis posez les manettes sur la barre)'}.`); // i18n-ignore : journal
   headset.watch();
   // Les images du schéma pour la pause en partie, préparées d'avance (prepareVr est synchrone).
   readyCalibrateImage(false);
@@ -6385,6 +6329,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   stopWaitExit?.();
   vrGameStop = undefined;
   if (playedVr && vrGame) checkVrPlaceAfterGame(vrGame.ini, played.file);
+  // La pièce a pu sauter pendant la partie : la borne du menu reposée sur la limite du Quest.
+  if (playedVr) setTimeout(anchorCheck, 0);
   if (playedVr && vrGame) checkVrRoomAfterGame(vpxLog, vrLogFrom);
   if (playedVr && vrGame && vrGameStart) noteLinkStats(vrGameStart, Date.now());
   headsetExitHint = undefined;

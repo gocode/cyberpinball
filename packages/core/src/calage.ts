@@ -44,8 +44,8 @@ export interface CabinetPlace {
    * référence physique que les têtes relevées en partie retrouvent si la pièce est gardée (roomFromHeads).
    */
   head?: { x: number; z: number };
-  /** Position de repos des manettes posées sur la barre, apprise après un calage à la main (recalage automatique). */
-  rest?: RestReference;
+  /** Le contour extérieur de la limite du Quest au calage, au sol (sonde LibOVR) : l'ancrage (anchorPlace). */
+  contour?: [number, number][];
 }
 
 /**
@@ -777,169 +777,114 @@ export function vpxRoomChanges(log: string): number {
   return (log.match(/OPENXR: Reference Space Change pending for Session/g) ?? []).length;
 }
 
-// --- Recalage automatique (option, 13 novembre 2026) ---------------------------------------------------------
+// --- Ancrage sur la limite du Quest (13 novembre 2026) -------------------------------------------------------
 //
-// Les deux manettes posées sur la barre avant, immobiles, suivies par le casque : la borne se recale d'elle-même.
-// Jamais en main : une manette tenue bouge de plusieurs millimètres et de plus d'un degré en une seconde ; posée,
-// elle ne bouge que du bruit du suivi. Posées, elles ne reposent pas comme tenues du bout sur les coins (essai du
-// 13 novembre 2026 : 10 cm d'écart, la borne déplacée à tort) : leur position de repos est apprise à la première
-// pose qui suit un calage à la main (RestReference, gardée avec la place), puis retrouvée. Pas de hauteur absolue :
-// le sol que Link donne peut changer d'une connexion à l'autre (33 cm le même jour) ; l'écart des deux manettes et
-// leur niveau suffisent, et la hauteur de la barre est corrigée avec le reste. Au menu seulement : en partie, VPX a
-// le casque, et le runtime ne donne les manettes qu'à l'application qui a le regard (session sans focus).
+// Le contour extérieur de la limite (sonde LibOVR, 406 points tracés à la main) est gardé avec la place calée. Quand
+// le Quest déplace son origine en gardant sa limite sur la vraie pièce, le contour relu a bougé de la même façon que
+// la vraie barre (essai du 13 novembre 2026 en partie : contour −48,4°, barre déplacée de 90,0 cm, mesurée à 89 cm et
+// 49° par le recalage) : la même transformation repose la borne. Quand le Quest refait sa pièce limite comprise (même
+// essai, au menu : contour quasi immobile, vraie barre tournée de −96,6°), le contour ne dit rien : le calage proposé
+// reste le filet (headsetOriginReset).
 
-/** Immobiles pendant au moins ce temps (secondes). */
-export const AUTO_RECAL_STILL_S = 1;
-/** Bout de chaque manette dans une boule de ce rayon pendant ce temps (millimètres). */
-export const AUTO_RECAL_STILL_MM = 4;
-/** Et tournée de moins que ceci (degrés). */
-export const AUTO_RECAL_STILL_DEG = 1.5;
-/** Écart des deux bouts : celui de la position de repos apprise, à ceci près ; et les deux à niveau (centimètres). */
-export const AUTO_RECAL_MATCH_CM = 2.5;
-/** Apprentissage (première pose après un calage à la main) : écart à la barre calée et hauteur, à ceci près (cm). */
-export const AUTO_RECAL_LEARN_CM = 8;
-export const AUTO_RECAL_LEARN_HEIGHT_CM = 10;
-/** Relevés plus espacés que ceci : la suite est rompue (secondes). */
-export const AUTO_RECAL_GAP_S = 0.3;
-/** En deçà de cet écart, la pièce est gardée : rien n'est réécrit (centimètres, degrés). */
-export const AUTO_RECAL_MIN_CM = 1;
-export const AUTO_RECAL_MIN_DEG = 1;
+/** Résidu du recalage des contours au-delà duquel la limite a été redessinée (centimètres). */
+export const ANCHOR_MAX_RESIDUAL_CM = 3;
+/** En deçà, rien à reposer (centimètres, degrés). */
+export const ANCHOR_MIN_CM = 1;
+export const ANCHOR_MIN_DEG = 0.5;
 
-export interface Quat {
-  x: number;
-  y: number;
-  z: number;
-  w: number;
-}
+export type ContourPoints = readonly (readonly [number, number])[];
 
-/** Un relevé du compagnon (« repos … ») : les bouts des manettes gauche et droite, leur orientation, l'instant (s). */
-export interface RestSample {
-  t: number;
-  tips: readonly [Point3, Point3];
-  rot: readonly [Quat, Quat];
+/** La transformation rigide au sol (rotation `angle` en radians, puis translation) qui envoie `from` sur `to`. */
+export interface ContourFit {
+  angle: number;
+  tx: number;
+  tz: number;
+  /** Écart quadratique moyen des points après la transformation (centimètres). */
+  residualCm: number;
 }
 
 /**
- * La position de repos des manettes posées sur la barre, dans le repère de la place calée : la « barre » que font
- * leurs deux bouts (milieu au sol, cap), sa hauteur sous celle de la vraie barre (`dy`), et l'écart des bouts.
+ * Le recalage de deux relevés du même contour (mêmes points, dans le même ordre : LibOVR rend le tracé tel quel), par
+ * moindres carrés ; undefined si le nombre de points diffère (la limite a été redessinée) ou s'il y en a moins de trois.
  */
-export interface RestReference {
-  x: number;
-  z: number;
-  yaw: number;
-  dy: number;
-  width: number;
-}
-
-/** L'angle entre deux orientations (degrés). */
-export function quatAngle(a: Quat, b: Quat): number {
-  const dot = Math.min(1, Math.abs(a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w));
-  return (2 * Math.acos(dot) * 180) / Math.PI;
-}
-
-/** Un vecteur au sol tourné de `a` autour de la verticale (même sens que le cap des places). */
-const rotateFlat = (v: { x: number; z: number }, a: number) => ({ x: v.x * Math.cos(a) + v.z * Math.sin(a), z: -v.x * Math.sin(a) + v.z * Math.cos(a) });
-
-/**
- * Les manettes posées peuvent-elles être sur la barre ? À niveau (2,5 cm), et : avec une position de repos apprise,
- * écartées comme elle (2,5 cm) ; sans elle et en apprentissage (`learning`, juste après un calage à la main), écartées
- * comme la barre calée (8 cm) et à sa hauteur (10 cm). La gauche est la manette gauche (ordre du compagnon).
- */
-export function restGate(tips: readonly [Point3, Point3], place: CabinetPlace | undefined, learning: boolean): boolean {
-  if (!place || !isCalibrated(place) || place.free) return false;
-  const spacing = Math.hypot(tips[1].x - tips[0].x, tips[1].z - tips[0].z);
-  if (Math.abs(tips[0].y - tips[1].y) * 100 > AUTO_RECAL_MATCH_CM) return false;
-  if (place.rest) return Math.abs(spacing - place.rest.width) * 100 <= AUTO_RECAL_MATCH_CM;
-  if (!learning) return false;
-  const height = (tips[0].y + tips[1].y) / 2;
-  return Math.abs(spacing - place.lockbarWidth!) * 100 <= AUTO_RECAL_LEARN_CM && Math.abs(height - place.lockbarHeight!) * 100 <= AUTO_RECAL_LEARN_HEIGHT_CM;
-}
-
-/**
- * Pourquoi des manettes posées et immobiles ne recalent pas (le journal le dit, pour qu'un essai se lise du premier
- * coup) ; undefined : elles passent (restGate). Mêmes seuils que restGate.
- */
-export function restGateReason(tips: readonly [Point3, Point3], place: CabinetPlace | undefined, learning: boolean): string | undefined {
-  if (restGate(tips, place, learning)) return undefined;
-  if (!place || !isCalibrated(place)) return 'pas de borne calée'; // i18n-ignore : journal
-  if (place.free) return 'borne posée au bureau, pas sur une vraie barre'; // i18n-ignore : journal
-  const cm = (m: number) => (Math.round(m * 1000) / 10).toFixed(1).replace('.', ',');
-  const level = Math.abs(tips[0].y - tips[1].y);
-  if (level * 100 > AUTO_RECAL_MATCH_CM) return `manettes pas à niveau : ${cm(level)} cm de différence de hauteur (tolérance ${AUTO_RECAL_MATCH_CM} cm)`; // i18n-ignore : journal
-  const spacing = Math.hypot(tips[1].x - tips[0].x, tips[1].z - tips[0].z);
-  if (place.rest) return `écart hors tolérance : ${cm(Math.abs(spacing - place.rest.width))} cm (manettes écartées de ${cm(spacing)} cm, ${cm(place.rest.width)} cm appris, tolérance ${AUTO_RECAL_MATCH_CM} cm)`; // i18n-ignore : journal
-  if (!learning) return 'position de repos pas encore apprise : calez à la main, puis posez les manettes sur la barre'; // i18n-ignore : journal
-  const height = (tips[0].y + tips[1].y) / 2;
-  return `apprentissage refusé : manettes écartées de ${cm(spacing)} cm pour une barre de ${cm(place.lockbarWidth!)} cm (tolérance ${AUTO_RECAL_LEARN_CM} cm), à ${cm(Math.abs(height - place.lockbarHeight!))} cm de sa hauteur (tolérance ${AUTO_RECAL_LEARN_HEIGHT_CM} cm)`; // i18n-ignore : journal
-}
-
-/** La position de repos apprise : les deux bouts posés, vus depuis la place calée à l'instant. */
-export function restReference(place: CabinetPlace, tips: readonly [Point3, Point3]): RestReference {
-  const r = lockbarPlace(tips[0], tips[1]);
-  const local = rotateFlat({ x: r.x - place.x, z: r.z - place.z }, -place.yaw);
-  return { x: local.x, z: local.z, yaw: r.yaw - place.yaw, dy: (place.lockbarHeight ?? r.lockbarHeight!) - r.lockbarHeight!, width: r.lockbarWidth! };
-}
-
-/**
- * Suit les relevés des manettes au repos et dit quand recaler : `push` rend les deux bouts (moyennés sur la
- * seconde immobile) une fois, puis plus rien tant que les manettes ne sont pas reparties (réarmé dès qu'un relevé
- * ne passe plus `gate`, ou qu'une manette n'est plus suivie : `push(undefined)`).
- */
-export class RestWatch {
-  private window: RestSample[] = [];
-  private armed = true;
-  /** Les bouts du dernier déclenchement : posées au même endroit, rien ; la pièce a sauté sous elles, de nouveau. */
-  private fired: [Point3, Point3] | undefined;
-
-  push(sample: RestSample | undefined, gate: (tips: readonly [Point3, Point3]) => boolean): [Point3, Point3] | undefined {
-    if (!sample || !gate(sample.tips)) {
-      this.window = [];
-      this.armed = true;
-      return undefined;
-    }
-    const last = this.window[this.window.length - 1];
-    if (last && sample.t - last.t > AUTO_RECAL_GAP_S) this.window = [];
-    this.window.push(sample);
-    // Garde la dernière seconde : du plus ancien relevé utile au dernier.
-    while (this.window.length > 1 && sample.t - this.window[1]!.t >= AUTO_RECAL_STILL_S) this.window.shift();
-    const first = this.window[0]!;
-    // Bougé (en main, ou en train d'être posé) : la seconde repart de ce relevé.
-    const moved = this.window.some((s) => [0, 1].some((h) => length(sub(s.tips[h]!, first.tips[h]!)) * 1000 > AUTO_RECAL_STILL_MM || quatAngle(s.rot[h]!, first.rot[h]!) > AUTO_RECAL_STILL_DEG));
-    if (moved) {
-      this.window = [sample];
-      return undefined;
-    }
-    if (sample.t - first.t < AUTO_RECAL_STILL_S) return undefined;
-    const mean = (h: 0 | 1): Point3 => {
-      const n = this.window.length;
-      return this.window.reduce((acc, s) => ({ x: acc.x + s.tips[h].x / n, y: acc.y + s.tips[h].y / n, z: acc.z + s.tips[h].z / n }), { x: 0, y: 0, z: 0 });
-    };
-    const tips: [Point3, Point3] = [mean(0), mean(1)];
-    // Déjà déclenché : de nouveau seulement si les manettes, toujours posées, ne sont plus au même endroit dans la
-    // pièce (essai du 13 novembre 2026 : le casque retiré puis remis, la pièce a sauté de 73 cm sous les manettes
-    // restées sur la barre ; rien ne réarmait, faute de relevé pendant le retrait).
-    if (!this.armed && !(this.fired && [0, 1].some((h) => length(sub(tips[h]!, this.fired![h]!)) * 100 > AUTO_RECAL_MIN_CM))) return undefined;
-    this.armed = false;
-    this.fired = tips;
-    return tips;
+export function fitContour(from: ContourPoints, to: ContourPoints): ContourFit | undefined {
+  const n = from.length;
+  if (n < 3 || to.length !== n) return undefined;
+  let ax = 0, az = 0, bx = 0, bz = 0;
+  for (let i = 0; i < n; i++) {
+    ax += from[i]![0] / n;
+    az += from[i]![1] / n;
+    bx += to[i]![0] / n;
+    bz += to[i]![1] / n;
   }
+  let c = 0, s = 0;
+  for (let i = 0; i < n; i++) {
+    const x1 = from[i]![0] - ax, z1 = from[i]![1] - az, x2 = to[i]![0] - bx, z2 = to[i]![1] - bz;
+    c += x1 * x2 + z1 * z2;
+    s += x1 * z2 - z1 * x2;
+  }
+  const angle = Math.atan2(s, c);
+  const co = Math.cos(angle), si = Math.sin(angle);
+  const tx = bx - (co * ax - si * az), tz = bz - (si * ax + co * az);
+  let sq = 0;
+  for (let i = 0; i < n; i++) {
+    const [x, z] = from[i]!;
+    sq += (co * x - si * z + tx - to[i]![0]) ** 2 + (si * x + co * z + tz - to[i]![1]) ** 2;
+  }
+  return { angle, tx, tz, residualCm: Math.sqrt(sq / n) * 100 };
+}
+
+/** Un point du sol par la transformation. */
+function applyFit(f: ContourFit, p: { x: number; z: number }): { x: number; z: number } {
+  const co = Math.cos(f.angle), si = Math.sin(f.angle);
+  return { x: co * p.x - si * p.z + f.tx, z: si * p.x + co * p.z + f.tz };
 }
 
 /**
- * La place recalée sur les deux bouts posés, d'après la position de repos apprise (`previous.rest`) : la place qui
- * remet cette position sur les bouts vus, cap, position et hauteur de la barre (le sol a pu changer) ; le reste du
- * calage gardé (dimensions, limite, prises) ; la tête au calage suit la barre, du même déplacement.
+ * Une place déplacée par la transformation d'un saut de l'espace de suivi (p' = R(angle) p + t, au sol) : position,
+ * cap, tête au calage. Le contour gardé, s'il y en a un, n'est pas touché (anchorPlace le remplace par le relu).
  */
-export function autoRecalibratedPlace(previous: CabinetPlace & { rest: RestReference }, tips: readonly [Point3, Point3]): CabinetPlace {
-  const r = lockbarPlace(tips[0], tips[1]);
-  const yaw = r.yaw - previous.rest.yaw;
-  const off = rotateFlat({ x: previous.rest.x, z: previous.rest.z }, yaw);
-  const next: CabinetPlace = { ...previous, x: r.x - off.x, z: r.z - off.z, yaw, lockbarHeight: r.lockbarHeight! + previous.rest.dy };
-  if (previous.head) {
-    // La tête dans le repère de l'ancienne place, reposée dans la nouvelle.
-    const local = rotateFlat({ x: previous.head.x - previous.x, z: previous.head.z - previous.z }, -previous.yaw);
-    const world = rotateFlat(local, yaw);
-    next.head = { x: next.x + world.x, z: next.z + world.z };
-  }
+export function movePlace(place: CabinetPlace, f: { angle: number; tx: number; tz: number }): CabinetPlace {
+  const fit: ContourFit = { ...f, residualCm: 0 };
+  const at = applyFit(fit, place);
+  const next: CabinetPlace = { ...place, x: at.x, z: at.z, yaw: place.yaw - f.angle };
+  if (place.head) next.head = applyFit(fit, place.head);
   return next;
+}
+
+export type AnchorResult =
+  | { kind: 'same' }
+  | { kind: 'redrawn'; why: string }
+  | { kind: 'moved'; place: CabinetPlace; cm: number; deg: number; residualCm: number };
+
+/**
+ * La place calée reposée d'après le contour relu (`current`) face à celui gardé au calage : 'moved' avec la place
+ * reposée (position, cap, tête au calage) et le
+ * contour courant gardé ; 'same' si rien n'a bougé ; 'redrawn' si la limite n'est plus la même (nombre de points,
+ * résidu). undefined : pas de contour gardé avec la place.
+ */
+export function anchorPlace(place: CabinetPlace, current: ContourPoints): AnchorResult | undefined {
+  if (!place.contour?.length) return undefined;
+  const f = fitContour(place.contour, current);
+  if (!f) return { kind: 'redrawn', why: `limite redessinée : ${current.length} points au lieu de ${place.contour.length}` }; // i18n-ignore : journal
+  if (f.residualCm > ANCHOR_MAX_RESIDUAL_CM) return { kind: 'redrawn', why: `limite redessinée : les contours ne se recouvrent pas (résidu ${f.residualCm.toFixed(1)} cm)` }; // i18n-ignore : journal
+  const next: CabinetPlace = { ...movePlace(place, f), contour: current.map((p) => [p[0], p[1]] as [number, number]) };
+  const { cm, deg } = placeGap(place, next);
+  if (cm < ANCHOR_MIN_CM && deg < ANCHOR_MIN_DEG) return { kind: 'same' };
+  return { kind: 'moved', place: next, cm, deg, residualCm: f.residualCm };
+}
+
+/**
+ * L'ancrage confirmé par la tête quand le Quest a remis l'origine sur elle au port du casque (originResetAtWear : la
+ * tête est alors à l'origine). Le joueur qui remet le casque à la borne a la tête près de celle du calage : la tête
+ * gardée (reposée par l'ancrage) à moins de ANCHOR_HEAD_MAX_CM de l'origine confirme la place. Plus loin, le joueur
+ * est ailleurs, ou le Quest a replacé sa limite avec la pièce (essai du 13 novembre 2026, 18:37 : contour déplacé
+ * de 12 cm et 5,5°, la vraie barre de 114 cm et 97°, tête reposée à 98 cm de l'origine) : le calage reste proposé.
+ * undefined : pas de tête gardée au calage.
+ */
+export const ANCHOR_HEAD_MAX_CM = 50;
+export function anchorHeadAtOrigin(place: CabinetPlace): { cm: number; confirmed: boolean } | undefined {
+  if (!place.head) return undefined;
+  const cm = Math.hypot(place.head.x, place.head.z) * 100;
+  return { cm, confirmed: cm < ANCHOR_HEAD_MAX_CM };
 }

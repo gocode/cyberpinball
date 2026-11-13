@@ -46,24 +46,16 @@ import {
   TRIGGERS_HINT_COMBO,
   TRIGGERS_HINT_S,
   ovrRuntimeDlls,
-  AUTO_RECAL_GAP_S,
-  AUTO_RECAL_MATCH_CM,
-  AUTO_RECAL_MIN_CM,
-  AUTO_RECAL_MIN_DEG,
-  AUTO_RECAL_STILL_DEG,
-  AUTO_RECAL_STILL_MM,
-  AUTO_RECAL_STILL_S,
-  autoRecalibratedPlace,
-  AUTO_RECAL_LEARN_CM,
-  AUTO_RECAL_LEARN_HEIGHT_CM,
-  restGate,
-  restGateReason,
+  anchorPlace,
+  movePlace,
+  anchorHeadAtOrigin,
+  ANCHOR_HEAD_MAX_CM,
+  ANCHOR_MAX_RESIDUAL_CM,
+  ANCHOR_MIN_CM,
+  ANCHOR_MIN_DEG,
   originResetAtWear,
   ORIGIN_RESET_CM,
   ORIGIN_RESET_DEG,
-  restReference,
-  RestWatch,
-  type RestSample,
   VPX_CALIBRATION_KEYS,
   vpxControllerCentering,
   vpxHeadsetInput,
@@ -161,10 +153,10 @@ test('détection : pièce recentrée par le Quest (limite fixe) dite au journal,
   assert.match(ts, /if \(!this\.worn\) this\.takenOff = this\.takenOffSeen = true;/);
   assert.match(ts, /this\.opts\.onPutBackOn\?\.\(\);/);
   const front = read('app', 'src', 'frontend.ts');
-  assert.match(front, /onPutBackOn: \(\) => \{\s*restLearnArmed = false;\s*checkStaleCalibration\(\);\s*headsetPutBackOn\(\);\s*\},/);
+  assert.match(front, /onPutBackOn: \(\) => \{\s*checkStaleCalibration\(\);\s*headsetPutBackOn\(\);\s*\},/);
   assert.match(front, /if \(!place \|\| headsetSetting\(\) === 'bureau' \|\| headset\?\.roomKeeping !== 'recentred'\) return;/);
   // L'écart prises-bouts survit à la relecture de casque.json.
-  assert.match(ts, /\.\.\.\(grip && \{ grip \}\), \.\.\.\(p\.free === true && \{ free: true \}\), \.\.\.\(boundary && \{ boundary \}\), \.\.\.\(head && \{ head \}\), \.\.\.\(rest && \{ rest \}\) \};/);
+  assert.match(ts, /\.\.\.\(grip && \{ grip \}\), \.\.\.\(p\.free === true && \{ free: true \}\), \.\.\.\(boundary && \{ boundary \}\), \.\.\.\(head && \{ head \}\), \.\.\.\(contour && \{ contour \}\) \};/);
   assert.match(front, /offerCalibration\('casque-remis'\);/);
   // Changement de pièce dit par le runtime pendant la session : l'écart au journal.
   const gap = roomChangeGap('piece-changee pose 0.300000 0.000000 -0.400000 0.523599')!;
@@ -288,7 +280,7 @@ test('calage périmé (13 novembre 2026) : limite changée de type ou de taille,
   // Proposé d'office, quel que soit le type de limite ; une seule fois par signature (calage-perime.json).
   assert.equal(shouldOfferCalibration('limite-changee', 'kept'), true);
   const front = read('app', 'src', 'frontend.ts');
-  assert.match(front, /onRoom: \(\) => \{\s*restLearnArmed = false;\s*checkStaleCalibration\(\);\s*\},/);
+  assert.match(front, /onRoom: \(\) => checkStaleCalibration\(\),/);
   assert.match(front, /if \(offered === stale\.signature\) return;/);
   assert.match(front, /if \(!offerCalibration\('limite-changee'\)\) return;\s*try \{\s*fs\.mkdirSync/);
   assert.match(front, /\.\.\.\(boundary && \{ boundary \}\), \.\.\.\(head && \{ head \}\) \};/);
@@ -367,79 +359,6 @@ test('aide : la combinaison dans le détail de « Caler la borne », dans les ma
     ['docs/manual.md', /both thumbsticks pressed together/],
   ] as const)
     assert.match(read(file), words, file);
-});
-
-test('recalage automatique (13 novembre 2026) : position de repos apprise après un calage à la main, sans hauteur absolue ; jamais en main', () => {
-  // Seuils figés.
-  assert.deepEqual(
-    [AUTO_RECAL_STILL_S, AUTO_RECAL_STILL_MM, AUTO_RECAL_STILL_DEG, AUTO_RECAL_MATCH_CM, AUTO_RECAL_LEARN_CM, AUTO_RECAL_LEARN_HEIGHT_CM, AUTO_RECAL_GAP_S, AUTO_RECAL_MIN_CM, AUTO_RECAL_MIN_DEG],
-    [1, 4, 1.5, 2.5, 8, 10, 0.3, 1, 1],
-  );
-  // Calée à la main : bouts tenus sur les coins, barre de 60 cm à 90 cm.
-  const calee: CabinetPlace = { ...lockbarPlace({ x: -0.3, y: 0.9, z: -0.4 }, { x: 0.3, y: 0.9, z: -0.4 }), head: { x: 0, z: 0.1 } };
-  // Posées, elles reposent 10 cm plus près du joueur, 3 cm plus haut, écartées de 56 cm (essai : 10 cm d'écart à tort).
-  const repos: [Point3, Point3] = [{ x: -0.28, y: 0.93, z: -0.3 }, { x: 0.28, y: 0.93, z: -0.3 }];
-  const flat = { x: 0, y: 0, z: 0, w: 1 };
-  const tilt = (deg: number) => ({ x: Math.sin((deg * Math.PI) / 360), y: 0, z: 0, w: Math.cos((deg * Math.PI) / 360) });
-  const sample = (t: number, tips: readonly [Point3, Point3], dx = 0, rot = flat): RestSample => ({ t, tips: [{ ...tips[0], x: tips[0].x + dx }, { ...tips[1], x: tips[1].x + dx }], rot: [rot, rot] });
-  const seconds = (from: number, to: number, f: (t: number, i: number) => RestSample | undefined) => {
-    const out: (RestSample | undefined)[] = [];
-    for (let i = 0, t = from; t <= to + 1e-9; i++, t = from + i * 0.1) out.push(f(t, i));
-    return out;
-  };
-  const run = (samples: (RestSample | undefined)[], place: CabinetPlace, learning = false) => {
-    const w = new RestWatch();
-    return samples.map((s) => w.push(s, (tips) => restGate(tips, place, learning))).filter(Boolean).length;
-  };
-  // Sans position apprise et hors apprentissage : jamais (plus de recalage supposé sur les bouts).
-  assert.equal(run(seconds(0, 3, (t) => sample(t, repos)), calee), 0);
-  // Apprentissage (juste après le calage à la main) : posées immobiles 1 s, une fois ; la position de repos apprise.
-  assert.equal(run(seconds(0, 3, (t, i) => sample(t, repos, (i % 2) * 0.001)), calee, true), 1);
-  const rest = restReference(calee, repos);
-  assert.ok(Math.abs(rest.width - 0.56) < 1e-9 && Math.abs(rest.dy + 0.03) < 1e-9 && Math.abs(Math.hypot(rest.x, rest.z) - 0.1) < 1e-6, JSON.stringify(rest));
-  const apprise: CabinetPlace = { ...calee, rest };
-  // La même pose, la pièce inchangée : la place retrouvée exactement (plus de 10 cm à tort).
-  const meme = autoRecalibratedPlace({ ...apprise, rest }, repos);
-  assert.ok(Math.abs(meme.x - calee.x) < 1e-9 && Math.abs(meme.z - calee.z) < 1e-9 && Math.abs(meme.yaw - calee.yaw) < 1e-9 && Math.abs(meme.lockbarHeight! - 0.9) < 1e-9);
-  assert.ok(roomFromRecalibration(calee, meme).cm < AUTO_RECAL_MIN_CM);
-  // La pièce de Link refaite : tournée de 29°, déplacée, et le sol monté de 33 cm. Les manettes posées au même
-  // endroit réel : la vraie barre retrouvée, hauteur comprise (pas de hauteur absolue dans le déclenchement).
-  const a = (29 * Math.PI) / 180;
-  const move = (p: Point3) => ({ x: p.x * Math.cos(a) + p.z * Math.sin(a) + 0.4, y: p.y - 0.33, z: -p.x * Math.sin(a) + p.z * Math.cos(a) - 0.2 });
-  const vues: [Point3, Point3] = [move(repos[0]), move(repos[1])];
-  assert.equal(run(seconds(0, 3, (t) => sample(t, vues)), apprise), 1);
-  const next = autoRecalibratedPlace({ ...apprise, rest }, vues);
-  const truth = lockbarPlace(move({ x: -0.3, y: 0.9, z: -0.4 }), move({ x: 0.3, y: 0.9, z: -0.4 }));
-  assert.ok(Math.abs(next.x - truth.x) < 1e-9 && Math.abs(next.z - truth.z) < 1e-9 && Math.abs(next.yaw - truth.yaw) < 1e-9 && Math.abs(next.lockbarHeight! - 0.57) < 1e-9, JSON.stringify(next));
-  assert.equal(next.lockbarWidth, calee.lockbarWidth);
-  const head = move({ x: 0, y: 0, z: 0.1 });
-  assert.ok(Math.abs(next.head!.x - head.x) < 1e-9 && Math.abs(next.head!.z - head.z) < 1e-9, JSON.stringify(next.head));
-  assert.equal(Math.round(roomFromRecalibration(calee, next).deg), 29);
-  // En main (5 mm de tremblement, ou 2° de rotation) : jamais. Pas à niveau (3 cm), ou écartées autrement (4 cm) : jamais.
-  assert.equal(run(seconds(0, 3, (t, i) => sample(t, vues, (i % 2) * 0.005)), apprise), 0);
-  assert.equal(run(seconds(0, 3, (t, i) => sample(t, vues, 0, tilt((i % 2) * 2))), apprise), 0);
-  assert.equal(run(seconds(0, 3, (t) => sample(t, [vues[0], { ...vues[1], y: vues[1].y + 0.03 }])), apprise), 0);
-  assert.equal(run(seconds(0, 3, (t) => sample(t, [vues[0], { ...vues[1], x: vues[1].x + 0.04 }])), apprise), 0);
-  // Une manette plus suivie : réarmé, reposées, un second recalage ; relevés trop espacés : rien.
-  assert.equal(run([...seconds(0, 2, (t) => sample(t, vues)), undefined, ...seconds(3, 5, (t) => sample(t, vues))], apprise), 2);
-  assert.equal(run([0, 0.5, 1, 1.5].map((t) => sample(t, vues)), apprise), 0);
-  // Une borne posée au bureau, ou pas calée : jamais.
-  assert.equal(restGate(vues, { ...apprise, free: true }, true), false);
-  assert.equal(restGate(vues, undefined, true), false);
-  // L'app : réglage éteint par défaut, apprentissage armé par un calage à la main, désarmé quand la pièce a pu bouger.
-  const front = read('app', 'src', 'frontend.ts');
-  assert.match(read('app', 'src', 'vr.ts'), /\.autoRecal === true;/);
-  assert.match(front, /library\.provideSystemItem\('vr-auto-calibrate', \{/);
-  assert.match(front, /onRest: \(sample\) => autoRecalSample\(sample\),/);
-  assert.match(front, /if \(!vrAutoRecal \|\| !headset \|\| calibration \|\| playing \|\| launch \|\| headsetSetting\(\) === 'bureau'\) return;/);
-  assert.match(front, /if \(left && right\) restLearnArmed = true;/);
-  assert.match(front, /onPutBackOn: \(\) => \{\s*restLearnArmed = false;/);
-  assert.match(front, /onRoom: \(\) => \{\s*restLearnArmed = false;/);
-  assert.match(front, /écart corrigé de \$\{Math\.round\(measure\.cm\)\} cm et \$\{Math\.round\(measure\.deg\)\}°/);
-  assert.match(front, /headset\.watchRest\(vrAutoRecal\);\s*if \(vrAutoRecal\) console\.log\([^\n]*\n\s*headset\.watch\(\);/);
-  assert.match(read('app', 'src', 'casque.ts'), /\.\.\.\(rest && \{ rest \}\) \};/);
-  const companion = read('packages', 'casque-vr', 'src', 'casque.cpp');
-  assert.match(companion, /if \(restWatch && controllers && !calibrating && state == XR_SESSION_STATE_FOCUSED/);
 });
 
 test('sonde LibOVR (13 novembre 2026) : la DLL du runtime de Meta, lancée avec la VR, au journal, sans rien changer', () => {
@@ -547,24 +466,7 @@ test('schéma des manettes, planches d’adaptation validées (13 novembre 2026)
   for (const e of SCHEMA_ELEMENTS) assert.ok(isControllerElement(e) && !CONTROLLER_ELEMENTS[e].axis, e);
 });
 
-test('recalage automatique : pourquoi il renonce, dit au journal sans ambiguïté (13 novembre 2026)', () => {
-  const calee: CabinetPlace = lockbarPlace({ x: -0.3, y: 0.9, z: -0.4 }, { x: 0.3, y: 0.9, z: -0.4 });
-  const repos: [Point3, Point3] = [{ x: -0.28, y: 0.93, z: -0.3 }, { x: 0.28, y: 0.93, z: -0.3 }];
-  const apprise: CabinetPlace = { ...calee, rest: restReference(calee, repos) };
-  assert.equal(restGateReason(repos, apprise, false), undefined);
-  assert.equal(restGateReason(repos, undefined, false), 'pas de borne calée');
-  assert.equal(restGateReason(repos, { ...apprise, free: true }, false), 'borne posée au bureau, pas sur une vraie barre');
-  assert.match(restGateReason([repos[0], { ...repos[1], y: 0.96 }], apprise, false)!, /^manettes pas à niveau : 3,0 cm de différence de hauteur \(tolérance 2\.5 cm\)$/);
-  assert.match(restGateReason([repos[0], { ...repos[1], x: 0.32 }], apprise, false)!, /^écart hors tolérance : 4,0 cm \(manettes écartées de 60,0 cm, 56,0 cm appris, tolérance 2\.5 cm\)$/);
-  assert.match(restGateReason(repos, calee, false)!, /^position de repos pas encore apprise : calez à la main/);
-  assert.match(restGateReason([{ x: -0.2, y: 0.93, z: -0.3 }, { x: 0.2, y: 0.93, z: -0.3 }], calee, true)!, /^apprentissage refusé : manettes écartées de 40,0 cm pour une barre de 60,0 cm/);
-  const front = read('app', 'src', 'frontend.ts');
-  assert.match(front, /recalage automatique impossible, manettes posées non suivies/);
-  assert.match(front, /recalage automatique pas fait, manettes posées immobiles \$\{AUTO_RECAL_STILL_S\} s : \$\{reason\}\./);
-  assert.match(front, /autoRecalDiagnose\(sample, previous\);/);
-});
-
-test('la pièce refaite au port du casque, détectée et suivie d’un recalage (13 novembre 2026, Air Link)', () => {
+test('la pièce refaite au port du casque, détectée, l’ancrage attendu ou le calage proposé (13 novembre 2026, Air Link)', () => {
   assert.deepEqual([ORIGIN_RESET_CM, ORIGIN_RESET_DEG], [3, 2]);
   // Le relevé de l'essai : tête à 0,6 cm et 1° de l'origine juste après le retour du casque.
   const reset = originResetAtWear('tete-au-port -0.005604 0.006338 -0.019155')!;
@@ -579,22 +481,136 @@ test('la pièce refaite au port du casque, détectée et suivie d’un recalage 
   assert.match(ts, /this\.opts\.onOriginReset\?\.\(this\.takenOffSeen\);/);
   const front = read('app', 'src', 'frontend.ts');
   assert.match(front, /onOriginReset: \(afterRemoval\) => headsetOriginReset\(afterRemoval\),/);
-  assert.match(front, /if \(lastAutoRecalAt < since\) offerCalibration\('origine-remise'\);/);
-  // Le recalage automatique repart quand la pièce saute sous les manettes restées posées (rien pendant le retrait).
-  const calee: CabinetPlace = lockbarPlace({ x: -0.3, y: 0.9, z: -0.4 }, { x: 0.3, y: 0.9, z: -0.4 });
-  const repos: [Point3, Point3] = [{ x: -0.28, y: 0.93, z: -0.3 }, { x: 0.28, y: 0.93, z: -0.3 }];
-  const apprise: CabinetPlace = { ...calee, rest: restReference(calee, repos) };
-  const flat = { x: 0, y: 0, z: 0, w: 1 };
-  const w = new RestWatch();
-  const gate = (tips: readonly [Point3, Point3]) => restGate(tips, apprise, false);
-  let fired = 0;
-  for (let i = 0; i <= 15; i++) if (w.push({ t: i * 0.1, tips: repos, rot: [flat, flat] }, gate)) fired++;
-  assert.equal(fired, 1);
-  // Retrait du casque : aucun relevé ; au retour, les mêmes manettes vues 73 cm plus loin : un second recalage.
-  const sautees: [Point3, Point3] = [{ ...repos[0], x: repos[0].x + 0.73 }, { ...repos[1], x: repos[1].x + 0.73 }];
-  for (let i = 0; i <= 15; i++) if (w.push({ t: 10 + i * 0.1, tips: sautees, rot: [flat, flat] }, gate)) fired++;
-  assert.equal(fired, 2);
-  // Toujours au même endroit ensuite : rien de plus.
-  for (let i = 0; i <= 15; i++) if (w.push({ t: 20 + i * 0.1, tips: sautees, rot: [flat, flat] }, gate)) fired++;
-  assert.equal(fired, 2);
+  // Avec un contour gardé : l'ancrage attendu, puis confirmé par la tête ; sinon le calage proposé.
+  assert.match(front, /if \(place\.contour\?\.length && latestContour\) \{/);
+  assert.match(front, /anchorCheck\(\);\s*const now = headset\?\.place\(\);\s*const head = now \? anchorHeadAtOrigin\(now\) : undefined;/);
+  assert.equal(/lastAutoRecalAt|vrAutoRecal|restLearnArmed/.test(front), false);
+});
+
+test('ancrage sur la limite du Quest (13 novembre 2026) : la borne reposée par le contour, sans geste', () => {
+  assert.deepEqual([ANCHOR_MAX_RESIDUAL_CM, ANCHOR_MIN_CM, ANCHOR_MIN_DEG], [3, 1, 0.5]);
+  // Un contour tracé à la main : 406 points irréguliers (aucune symétrie), comme celui de la borne.
+  const contour: [number, number][] = [];
+  for (let i = 0; i < 406; i++) {
+    const a = (i / 406) * 2 * Math.PI;
+    const r = 1.8 + 0.35 * Math.sin(3 * a) + 0.2 * Math.cos(5 * a + 1) + 0.1 * Math.sin(11 * a);
+    contour.push([0.3 + r * Math.cos(a), -0.2 + r * Math.sin(a)]);
+  }
+  const tips: [Point3, Point3] = [{ x: 0.55, y: 0.74, z: -0.44 }, { x: 1.13, y: 0.74, z: -0.44 }];
+  const calee: CabinetPlace = { ...lockbarPlace(tips[0], tips[1]), head: { x: 0.85, z: -0.1 }, contour };
+  // Le saut du jour : la pièce tournée de −97° autour d'un point lointain, la barre déplacée de 155 cm ; relevé au
+  // millimètre près (bruit de 3 mm sur chaque point).
+  const jump = (deg: number, cx: number, cz: number, dx: number, dz: number) => (p: { x: number; z: number }) => {
+    const a = (deg * Math.PI) / 180;
+    const x = p.x - cx, z = p.z - cz;
+    return { x: Math.cos(a) * x - Math.sin(a) * z + cx + dx, z: Math.sin(a) * x + Math.cos(a) * z + cz + dz };
+  };
+  const check = (move: (p: { x: number; z: number }) => { x: number; z: number }, wantCm: number, wantDeg: number) => {
+    const noise = (i: number) => 0.003 * Math.sin(i * 12.9898);
+    const seen = contour.map(([x, z], i) => {
+      const m = move({ x, z });
+      return [m.x + noise(i), m.z + noise(i + 7)] as [number, number];
+    });
+    const r = anchorPlace(calee, seen)!;
+    assert.equal(r.kind, 'moved');
+    if (r.kind !== 'moved') return;
+    const real = tips.map((t) => ({ ...t, ...move(t) })) as [Point3, Point3];
+    const truth = lockbarPlace(real[0], real[1]);
+    const gap = placeGap(truth, r.place);
+    assert.ok(gap.cm < 2 && gap.deg < 1, `à ${gap.cm.toFixed(2)} cm et ${gap.deg.toFixed(2)}° de la vraie place`);
+    assert.ok(Math.abs(r.cm - wantCm) < 3 && Math.abs(r.deg - wantDeg) < 1, `${r.cm} cm, ${r.deg}°`);
+    assert.ok(r.residualCm < 1);
+    assert.equal(r.place.lockbarHeight, calee.lockbarHeight);
+    assert.equal(r.place.contour!.length, 406);
+    const head = move(calee.head!);
+    assert.ok(Math.hypot(head.x - r.place.head!.x, head.z - r.place.head!.z) < 0.02);
+  };
+  // Chaque saut : la pièce tournée autour du milieu de la barre, puis déplacée de la longueur voulue.
+  const mid = { x: 0.84, z: -0.44 };
+  const around = (deg: number, cm: number, dir: number) => jump(deg, mid.x, mid.z, (cm / 100) * Math.cos(dir), (cm / 100) * Math.sin(dir));
+  // Au menu : 155 cm et 97°, le saut du jour, avec une limite restée sur la vraie pièce.
+  check(around(-97, 155, 2.4), 155, 97);
+  // En partie : contour −48,4°, barre déplacée de 90 cm (mesurée à 89 cm et 49° par le recalage en partie).
+  check(around(-48.4, 90, -0.7), 90, 48.4);
+  // Rien n'a bougé (le Quest a refait sa pièce limite comprise : le contour ne dit rien) : 'same', le filet décide.
+  assert.deepEqual(anchorPlace(calee, contour), { kind: 'same' });
+  // Limite redessinée : autre nombre de points, ou une autre forme (résidu).
+  assert.equal(anchorPlace(calee, contour.slice(0, 300))!.kind, 'redrawn');
+  assert.equal(anchorPlace(calee, contour.map(([x, z], i) => [x * (1 + 0.1 * Math.sin(i)), z] as [number, number]))!.kind, 'redrawn');
+  // Pas de contour gardé : pas d'ancrage.
+  assert.equal(anchorPlace({ ...calee, contour: undefined }, contour), undefined);
+});
+
+test('ancrage au menu : branché sur la sonde, gardé avec chaque place, confirmé par la tête au port (13 novembre 2026)', () => {
+  assert.equal(ANCHOR_HEAD_MAX_CM, 50);
+  // La tête reposée par l'ancrage, près de l'origine où le Quest l'a remise : confirmé ; loin (essai de 18:37 : la tête
+  // reportée à 98 cm, la vraie barre ayant sauté de 114 cm pendant que le contour bougeait de 12 cm) : pas confirmé.
+  const base = lockbarPlace({ x: -0.3, y: 0.9, z: -0.4 }, { x: 0.3, y: 0.9, z: -0.4 });
+  assert.deepEqual(anchorHeadAtOrigin({ ...base, head: { x: 0.12, z: 0.2 } })?.confirmed, true);
+  const loin = anchorHeadAtOrigin({ ...base, head: { x: 0.858, z: -0.475 } })!;
+  assert.equal(loin.confirmed, false);
+  assert.ok(Math.abs(loin.cm - 98) < 1, String(loin.cm));
+  assert.equal(anchorHeadAtOrigin(base), undefined);
+  const front = read('app', 'src', 'frontend.ts');
+  // Le contour de la sonde arrive au menu, et chaque place écrite garde le contour courant (même repère).
+  assert.match(front, /onContour: \(points\) => \{\s*latestContour = points\.length >= 3 \? points : undefined;\s*anchorCheck\(\);/);
+  assert.match(front, /contour: \(\) => latestContour,/);
+  // Ni au bureau, ni en limite fixe, ni pendant le calage ou une partie.
+  assert.match(front, /function anchorCheck\(\): void \{\s*if \(!headset \|\| !latestContour \|\| calibration \|\| controllerWizard \|\| playing \|\| launch \|\| !headset\.worn\) return;\s*if \(headsetSetting\(\) === 'bureau' \|\| headset\.roomKeeping === 'recentred'\) return;/);
+  assert.match(front, /if \(r\.kind === 'redrawn'\) \{\s*if \(anchorRedrawnSaid === r\.why\) return;/);
+  assert.match(front, /if \(r\.cm > ANCHOR_BANNER_CM\) showBanner\(t\('Borne remise en place sur la limite du Quest'\)\);/);
+  // Au port, origine remise : pas de calage proposé si l'ancrage est confirmé par la tête.
+  assert.match(front, /const head = now \? anchorHeadAtOrigin\(now\) : undefined;\s*if \(head\?\.confirmed\) \{/);
+  // Après une partie : la borne du menu reposée.
+  assert.match(front, /if \(playedVr\) setTimeout\(anchorCheck, 0\);/);
+  const casque = read('app', 'src', 'casque.ts');
+  assert.match(casque, /const \{ contour: _stale, rest: _gone, \.\.\.kept \}: CabinetPlace & \{ rest\?: unknown \} = recentred/);
+  assert.match(casque, /const contour = this\.opts\.contour\?\.\(\);/);
+  assert.match(casque, /\.\.\.\(contour && \{ contour \}\) \};/);
+});
+
+test('option « Recalage automatique » retirée (13 novembre 2026, l’ancrage la remplace) : ni réglage, ni relevés, ni repos appris', () => {
+  const menu = read('packages', 'core', 'src', 'systemmenu.ts');
+  assert.equal(menu.includes('vr-auto-calibrate'), false);
+  assert.match(menu, /entries: \['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror'\]/);
+  const front = read('app', 'src', 'frontend.ts');
+  assert.equal(/vr-auto-calibrate|autoRecalSample|watchRest|Borne recalée sur les manettes posées/.test(front), false);
+  const casque = read('app', 'src', 'casque.ts');
+  assert.equal(/watchRest|onRest|'repos /.test(casque), false);
+  // Un ancien « rest » dans casque.json est ignoré à la lecture, et oublié à la prochaine écriture.
+  assert.match(casque, /const \{ contour: _stale, rest: _gone, \.\.\.kept \}/);
+  assert.equal(/\.\.\.\(rest && \{ rest \}\)/.test(casque), false);
+  const companion = read('packages', 'casque-vr', 'src', 'casque.cpp');
+  assert.equal(/restWatch|"repos/.test(companion), false);
+  // Un réglage « autoRecal » déjà enregistré : ignoré, puis effacé à la prochaine écriture d'un réglage de la VR.
+  const vr = read('app', 'src', 'vr.ts');
+  assert.match(vr, /delete current\.autoRecal;/);
+  assert.equal(/readVrAutoRecal|writeVrAutoRecal/.test(vr), false);
+  const en = read('packages', 'core', 'src', 'i18n', 'en', 'settings.ts');
+  assert.equal(en.includes("'Recalage automatique'"), false);
+});
+
+test('saut mesuré dans le flux de la tête (13 novembre 2026, relevés du jour) : la barre prédite à 2 cm et 2°', () => {
+  // La tête lue par la sonde juste avant le saut (18:37:17.891) puis par OpenXR juste après (18:37:18.019).
+  const yaw = (y: number) => ({ x: -Math.sin(y), z: -Math.cos(y) });
+  const [x1, z1, y1] = [1.142, 0.09, -1.667];
+  const [x2, z2, y2] = [-0.005604, 0.006338, -0.019155];
+  const f1 = yaw(y1), f2 = yaw(y2);
+  const angle = Math.atan2(f1.x * f2.z - f1.z * f2.x, f1.x * f2.x + f1.z * f2.z);
+  const [c, s] = [Math.cos(angle), Math.sin(angle)];
+  const jump = { angle, tx: x2 - (c * x1 - s * z1), tz: z2 - (s * x1 + c * z1) };
+  // La barre calée à 18:36:56, puis recalée à 18:38:09 (155 cm et 97° plus loin dans l'espace de suivi).
+  const avant = lockbarPlace({ x: 0.548584, y: 0.9, z: -0.441898 }, { x: 1.127474, y: 0.9, z: -0.436842 });
+  const apres = lockbarPlace({ x: -0.460393, y: 0.9, z: 0.641169 }, { x: -0.520985, y: 0.9, z: 0.07632 });
+  const saut = placeGap(avant, apres);
+  assert.ok(Math.abs(saut.cm - 155) < 1 && Math.abs(saut.deg - 97) < 1, JSON.stringify(saut));
+  const reste = placeGap(movePlace(avant, jump), apres);
+  assert.ok(reste.cm < 2.5 && reste.deg < 2.5, JSON.stringify(reste));
+  // La sonde le relève sans rien changer : le frontend n'en fait encore rien.
+  const sonde = read('app', 'src', 'sonde-ovr.ts');
+  assert.match(sonde, /export function parseOvrJump\(line: string\)/);
+  assert.equal(/parseOvrJump|movePlace/.test(read('app', 'src', 'frontend.ts')), false);
+  const cpp = read('packages', 'casque-vr', 'src', 'sonde-ovr.cpp');
+  assert.match(cpp, /constexpr double JUMP_MAX_DT_S = 0\.025;/);
+  assert.match(cpp, /load\(dll, "ovr_TestBoundary", api\.testBoundary\);/);
 });

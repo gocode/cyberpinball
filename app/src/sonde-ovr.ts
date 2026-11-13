@@ -29,13 +29,33 @@ export function activeOvrDll(manifest = openXrActiveRuntime()): string | undefin
   return ovrRuntimeDlls(manifest, text).find((dll) => fs.existsSync(dll));
 }
 
+/** Les points d'une ligne « ovr points n=… x,z … » (contour extérieur de la limite, au sol, mètres). */
+export function parseOvrPoints(line: string): [number, number][] {
+  return line
+    .split(' ')
+    .slice(3)
+    .map((p) => p.split(',').map(Number) as [number, number])
+    .filter((p) => p.length === 2 && p.every(Number.isFinite));
+}
+
+/**
+ * Un saut de l'espace de suivi mesuré dans le flux de la tête (« ovr saut angle=… deplacement=tx,tz sol=… … ») : la
+ * transformation p' = R(angle) p + t, à appliquer à la place calée (movePlace). Relevé seulement pour l'instant.
+ */
+export function parseOvrJump(line: string): { angle: number; tx: number; tz: number; dy: number; dtMs: number } | undefined {
+  const m = /^ovr saut angle=(-?[\d.]+) deplacement=(-?[\d.]+),(-?[\d.]+) sol=(-?[\d.]+) .* dt=([\d.]+)/.exec(line);
+  if (!m) return undefined;
+  const [angle, tx, tz, dy, dtMs] = m.slice(1).map(Number) as [number, number, number, number, number];
+  return [angle, tx, tz, dy, dtMs].every(Number.isFinite) ? { angle, tx, tz, dy, dtMs } : undefined;
+}
+
 export class OvrProbe {
   private child: ChildProcessWithoutNullStreams | undefined;
   private wanted = false;
   private restarts = 0;
   private timer: NodeJS.Timeout | undefined;
 
-  constructor(private readonly opts: { appDir: string; log(line: string): void }) {}
+  constructor(private readonly opts: { appDir: string; log(line: string): void; onContour?(points: [number, number][]): void }) {}
 
   /** Lancée tant que `on` (réalité virtuelle activée) ; relancée si elle s'arrête, trois fois au plus. */
   set(on: boolean): void {
@@ -62,6 +82,11 @@ export class OvrProbe {
       while ((nl = buffer.indexOf('\n')) >= 0) {
         const line = buffer.slice(0, nl).trim();
         buffer = buffer.slice(nl + 1);
+        // Le contour complet : pour l'ancrage (frontend.ts), pas pour le journal (406 points à chaque changement).
+        if (line.startsWith('ovr points ')) {
+          this.opts.onContour?.(parseOvrPoints(line));
+          continue;
+        }
         if (line.startsWith('ovr ')) this.opts.log(`Casque, sonde LibOVR : ${line.slice(4)}`); // i18n-ignore : journal
       }
     });

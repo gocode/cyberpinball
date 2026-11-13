@@ -18,14 +18,30 @@
 //   ovr origine <code> sol|yeux                      espace de suivi demandé au niveau du sol
 //   ovr contour exterieur|aire n=<points> dims=<l>x<p> pts=<x>,<z> …   à chaque changement, casque porté
 //   ovr tete <x> <y> <z> <lacet> suivi=<bits>        toutes les 5 s, casque porté
+//   ovr empreinte n=<points> centre=<x>,<z> cap=<lacet>   le contour extérieur, relu à chaque relevé de tête
+//   ovr points n=<points> <x>,<z> …                  le contour extérieur complet, au millimètre, à chaque changement
+//                                                    (pour l'ancrage de Cyber Pinball, pas pour le journal)
 //   ovr manettes <xg> <yg> <zg> suivi=<bits> <xd> <yd> <zd> suivi=<bits>
 //   ovr entrees <code> type=<manettes>               à chaque changement du résultat de ovr_GetInputState
 //   ovr bouton <nom> 1|0                             chaque appui et relâchement, casque porté ou non
+//   ovr saut dt=<ms> angle=<rad> deplacement=<tx>,<tz> sol=<dy> rotation=<deg> de=<x>,<y>,<z>,<lacet> a=<x>,<y>,<z>,<lacet>
+//                                                    l'espace de suivi qui saute sous la tête (Link recentre) : deux
+//                                                    relevés suivis consécutifs, à quelques millisecondes, la tête
+//                                                    téléportée ; la transformation du saut (p' = R(angle) p + t)
+//   ovr saut-refuse raison=<…> …                     un bond de la tête qui ne passe pas les garde-fous (une fois par s)
+//   ovr test-limite code=<r> tete=<distance> calcule=<distance> ecart=<cm> points=<cm> n=<testés>
+//                                                    ovr_TestBoundary (distance de la tête à la limite, par le runtime)
+//                                                    face à la distance calculée sur le contour lu, et l'écart le
+//                                                    plus grand des points lus testés par ovr_TestBoundaryPoint : un
+//                                                    contour lu périmé, ou d'un autre espace, s'y voit
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#include <timeapi.h>
+#pragma comment(lib, "winmm.lib")
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -98,6 +114,16 @@ struct InputState
 constexpr unsigned CONTROLLER_TOUCH = 0x3;
 constexpr unsigned BOUNDARY_OUTER = 0x1;
 constexpr unsigned BOUNDARY_PLAY_AREA = 0x100;
+constexpr unsigned DEVICE_HMD = 0x1;
+// Résultat d'ovr_TestBoundary et d'ovr_TestBoundaryPoint : déclenché, distance, point le plus proche, sa normale.
+struct BoundaryTestResult
+{
+   char isTriggering;
+   char pad[3];
+   float closestDistance;
+   Vec3 closestPoint;
+   Vec3 closestPointNormal;
+};
 struct ErrorInfo
 {
    int result;
@@ -117,6 +143,8 @@ using FnGetBoundaryDimensions = int (*)(Session, unsigned, Vec3*);
 using FnSetTrackingOriginType = int (*)(Session, int);
 using FnGetTimeInSeconds = double (*)();
 using FnGetLastErrorInfo = void (*)(ErrorInfo*);
+using FnTestBoundary = int (*)(Session, unsigned, unsigned, BoundaryTestResult*);
+using FnTestBoundaryPoint = int (*)(Session, const Vec3*, unsigned, BoundaryTestResult*);
 
 struct Api
 {
@@ -132,6 +160,8 @@ struct Api
    FnSetTrackingOriginType setOrigin = nullptr;
    FnGetTimeInSeconds time = nullptr;
    FnGetLastErrorInfo lastError = nullptr;
+   FnTestBoundary testBoundary = nullptr;
+   FnTestBoundaryPoint testBoundaryPoint = nullptr;
 } api;
 
 std::atomic<bool> quit { false };
@@ -170,6 +200,144 @@ float yawOf(const Quat& q)
    return std::atan2(-fx, -fz);
 }
 
+std::vector<Vec3> outerPoints(Session s);
+
+/** Un vecteur tourné par une orientation. */
+Vec3 rotate(const Quat& q, const Vec3& v)
+{
+   const Vec3 u { q.x, q.y, q.z };
+   const Vec3 c1 { u.y * v.z - u.z * v.y, u.z * v.x - u.x * v.z, u.x * v.y - u.y * v.x };
+   const Vec3 c2 { u.y * c1.z - u.z * c1.y, u.z * c1.x - u.x * c1.z, u.x * c1.y - u.y * c1.x };
+   return { v.x + 2.f * (q.w * c1.x + c2.x), v.y + 2.f * (q.w * c1.y + c2.y), v.z + 2.f * (q.w * c1.z + c2.z) };
+}
+
+/** Le tangage (regard au-dessus de l'horizon) et le roulis (oreille droite au-dessus), radians. */
+float pitchOf(const Quat& q)
+{
+   return std::asin(std::clamp(rotate(q, { 0.f, 0.f, -1.f }).y, -1.f, 1.f));
+}
+float rollOf(const Quat& q)
+{
+   return std::asin(std::clamp(rotate(q, { 1.f, 0.f, 0.f }).y, -1.f, 1.f));
+}
+
+/** Un angle ramené dans ]-pi, pi]. */
+float wrap(float a)
+{
+   while (a > 3.14159265f)
+      a -= 6.2831853f;
+   while (a <= -3.14159265f)
+      a += 6.2831853f;
+   return a;
+}
+
+/** La distance d'un point du sol au contour fermé (segments), et le point le plus proche. */
+float contourDistance(const std::vector<Vec3>& pts, float x, float z, float& cx, float& cz)
+{
+   float best = 1e9f;
+   for (size_t i = 0; i < pts.size(); i++)
+   {
+      const Vec3& a = pts[i];
+      const Vec3& b = pts[(i + 1) % pts.size()];
+      const float dx = b.x - a.x, dz = b.z - a.z, len = dx * dx + dz * dz;
+      const float t = len > 0.f ? std::clamp(((x - a.x) * dx + (z - a.z) * dz) / len, 0.f, 1.f) : 0.f;
+      const float px = a.x + t * dx, pz = a.z + t * dz, d = std::hypot(x - px, z - pz);
+      if (d < best)
+         best = d, cx = px, cz = pz;
+   }
+   return best;
+}
+
+/**
+ * Le test de la limite par le runtime, face au contour lu (piste du 13 novembre 2026 : le contour lu pouvait être
+ * périmé, ou dans un autre espace, quand l'origine saute) : distance de la tête à la limite selon ovr_TestBoundary,
+ * celle calculée sur le contour lu, et l'écart le plus grand de huit points lus testés par ovr_TestBoundaryPoint
+ * (sur la limite du runtime, ils sont à zéro). Rien si le runtime n'a pas ces fonctions.
+ */
+std::string boundaryTest(Session s, const Pose& head)
+{
+   if (!api.testBoundary)
+      return "ovr test-limite absent";
+   BoundaryTestResult r {};
+   const int code = api.testBoundary(s, DEVICE_HMD, BOUNDARY_OUTER, &r);
+   std::string line = "ovr test-limite code=" + std::to_string(code);
+   if (code < 0)
+      return line + " " + lastError();
+   const std::vector<Vec3> pts = outerPoints(s);
+   float cx = 0, cz = 0;
+   const float mine = pts.empty() ? -1.f : contourDistance(pts, head.position.x, head.position.z, cx, cz);
+   line += " tete=" + fmt(r.closestDistance) + " proche=" + fmt(r.closestPoint.x) + "," + fmt(r.closestPoint.z) + " calcule=" + fmt(mine) + " proche-calcule=" + fmt(cx) + "," + fmt(cz)
+      + " ecart=" + fmt(100.f * std::fabs(std::fabs(r.closestDistance) - mine));
+   if (api.testBoundaryPoint && !pts.empty())
+   {
+      float worst = 0.f;
+      int tested = 0;
+      for (size_t i = 0; i < pts.size(); i += std::max<size_t>(1, pts.size() / 8))
+      {
+         BoundaryTestResult p {};
+         if (api.testBoundaryPoint(s, &pts[i], BOUNDARY_OUTER, &p) < 0)
+            continue;
+         worst = std::max(worst, std::fabs(p.closestDistance));
+         tested++;
+      }
+      line += " points=" + fmt(100.f * worst) + " n=" + std::to_string(tested);
+   }
+   return line;
+}
+
+/**
+ * Le saut de l'espace de suivi vu dans le flux de la tête (piste du 13 novembre 2026) : une tête ne se téléporte pas.
+ * Deux relevés suivis (15) consécutifs, à moins de JUMP_MAX_DT_S, et la tête bondit de plus de JUMP_MIN_M ou
+ * tourne de plus de JUMP_MIN_YAW : si le tangage et le roulis restent continus (un recentrage ne touche que le
+ * lacet, la position et le sol), le bond est la transformation du saut, dite telle quelle. Mesure seulement.
+ */
+struct HeadSample
+{
+   double t = 0;
+   Pose pose {};
+   unsigned flags = 0;
+   bool valid = false;
+};
+constexpr double JUMP_MAX_DT_S = 0.025;
+constexpr float JUMP_MIN_M = 0.05f;
+constexpr float JUMP_MIN_YAW = 10.f * 3.14159265f / 180.f;
+constexpr float JUMP_MAX_TILT = 2.f * 3.14159265f / 180.f;
+
+std::string poseText(const Pose& p)
+{
+   return fmt(p.position.x) + "," + fmt(p.position.y) + "," + fmt(p.position.z) + "," + fmt(yawOf(p.orientation));
+}
+
+/** Un saut mesuré (« ovr saut … »), un bond refusé (« ovr saut-refuse … »), ou rien. */
+std::string headJump(const HeadSample& a, const HeadSample& b)
+{
+   const float dyaw = wrap(yawOf(b.pose.orientation) - yawOf(a.pose.orientation));
+   const float dpos = std::hypot(b.pose.position.x - a.pose.position.x, b.pose.position.z - a.pose.position.z);
+   if (dpos <= JUMP_MIN_M && std::fabs(dyaw) <= JUMP_MIN_YAW)
+      return "";
+   const double dt = b.t - a.t;
+   const float dpitch = std::fabs(pitchOf(b.pose.orientation) - pitchOf(a.pose.orientation));
+   const float droll = std::fabs(rollOf(b.pose.orientation) - rollOf(a.pose.orientation));
+   char ms[32];
+   std::snprintf(ms, sizeof(ms), "%.1f", dt * 1000.0);
+   const std::string seen = " dt=" + std::string(ms) + " bond=" + fmt(100.f * dpos) + "cm," + fmt(dyaw * 57.29578f) + "deg de=" + poseText(a.pose) + " a=" + poseText(b.pose);
+   if (a.flags != 15 || b.flags != 15)
+      return "ovr saut-refuse raison=suivi-incomplet suivi=" + std::to_string(a.flags) + "/" + std::to_string(b.flags) + seen;
+   if (dt > JUMP_MAX_DT_S)
+      return "ovr saut-refuse raison=intervalle-long" + seen;
+   if (dpitch > JUMP_MAX_TILT || droll > JUMP_MAX_TILT)
+      return "ovr saut-refuse raison=tangage-ou-roulis tangage=" + fmt(dpitch * 57.29578f) + " roulis=" + fmt(droll * 57.29578f) + seen;
+   // La rotation qui mène le regard d'avant au regard d'après (au sol), puis la translation qui mène la tête.
+   const Vec3 fa = rotate(a.pose.orientation, { 0.f, 0.f, -1.f }), fb = rotate(b.pose.orientation, { 0.f, 0.f, -1.f });
+   const float angle = std::atan2(fa.x * fb.z - fa.z * fb.x, fa.x * fb.x + fa.z * fb.z);
+   const float c = std::cos(angle), s = std::sin(angle);
+   const float tx = b.pose.position.x - (c * a.pose.position.x - s * a.pose.position.z);
+   const float tz = b.pose.position.z - (s * a.pose.position.x + c * a.pose.position.z);
+   char line[256];
+   std::snprintf(line, sizeof(line), "ovr saut angle=%.5f deplacement=%.4f,%.4f sol=%.4f rotation=%.1f", angle, tx, tz, b.pose.position.y - a.pose.position.y, angle * 57.29578f);
+   return line + seen;
+}
+
 template <typename F>
 bool load(HMODULE dll, const char* name, F& out)
 {
@@ -195,6 +363,46 @@ std::string boundary(Session s, unsigned type)
    for (int i = 0; i < count; i += step)
       line += (i ? " " : "") + fmt(pts[static_cast<size_t>(i)].x) + "," + fmt(pts[static_cast<size_t>(i)].z);
    return line;
+}
+
+/** Le contour extérieur complet (vide si la limite n'en donne pas). */
+std::vector<Vec3> outerPoints(Session s)
+{
+   int count = 0;
+   if (api.boundaryGeometry(s, BOUNDARY_OUTER, nullptr, &count) < 0 || count <= 0)
+      return {};
+   std::vector<Vec3> pts(static_cast<size_t>(count));
+   if (api.boundaryGeometry(s, BOUNDARY_OUTER, pts.data(), &count) < 0)
+      return {};
+   pts.resize(static_cast<size_t>(std::max(0, count)));
+   return pts;
+}
+
+/** Le contour complet au millimètre, pour Cyber Pinball (« ovr points … »). */
+std::string pointsLine(const std::vector<Vec3>& pts)
+{
+   std::string line = "ovr points n=" + std::to_string(pts.size());
+   char b[48];
+   for (const Vec3& p : pts)
+   {
+      std::snprintf(b, sizeof(b), " %.4f,%.4f", p.x, p.z);
+      line += b;
+   }
+   return line;
+}
+
+/** L'empreinte du contour : son centre et le cap de son premier point vu du centre (relu, ou figé). */
+std::string footprint(const std::vector<Vec3>& pts)
+{
+   if (pts.empty())
+      return "ovr empreinte n=0";
+   double cx = 0, cz = 0;
+   for (const Vec3& p : pts)
+      cx += p.x, cz += p.z;
+   cx /= static_cast<double>(pts.size());
+   cz /= static_cast<double>(pts.size());
+   const double cap = std::atan2(pts[0].z - cz, pts[0].x - cx);
+   return "ovr empreinte n=" + std::to_string(pts.size()) + " centre=" + fmt(static_cast<float>(cx)) + "," + fmt(static_cast<float>(cz)) + " cap=" + fmt(static_cast<float>(cap));
 }
 
 struct ButtonName
@@ -241,12 +449,16 @@ int main(int argc, char** argv)
    load(dll, "ovr_GetBoundaryDimensions", api.boundaryDimensions);
    load(dll, "ovr_SetTrackingOriginType", api.setOrigin);
    load(dll, "ovr_GetLastErrorInfo", api.lastError);
+   load(dll, "ovr_TestBoundary", api.testBoundary);
+   load(dll, "ovr_TestBoundaryPoint", api.testBoundaryPoint);
    if (!ok)
    {
       say("ovr absent fonctions manquantes dans " + dllPath);
       return 4;
    }
    say("ovr charge " + dllPath);
+   // Le flux de la tête relu toutes les quelques millisecondes (headJump) : minuterie à 1 ms pour la sonde seule.
+   timeBeginPeriod(1);
 
    // Client invisible ; la version 1.43 demandée d'abord, sinon sans version.
    InitParams params {};
@@ -295,7 +507,10 @@ int main(int argc, char** argv)
       unsigned lastButtons = 0;
       bool triggers[2] {};
       std::string lastOuter, lastArea;
-      ULONGLONG poseAt = 0, boundaryAt = 0;
+      ULONGLONG poseAt = 0, boundaryAt = 0, refusedAt = 0;
+      HeadSample prevHead;
+      LARGE_INTEGER freq;
+      QueryPerformanceFrequency(&freq);
       while (!quit)
       {
          SessionStatus st {};
@@ -326,7 +541,10 @@ int main(int argc, char** argv)
             boundaryAt = now;
             const std::string outer = boundary(session, BOUNDARY_OUTER), area = boundary(session, BOUNDARY_PLAY_AREA);
             if (outer != lastOuter)
+            {
                say("ovr " + outer);
+               say(pointsLine(outerPoints(session)));
+            }
             if (area != lastArea)
                say("ovr " + area);
             lastOuter = outer;
@@ -339,6 +557,8 @@ int main(int argc, char** argv)
             const TrackingState ts = api.trackingState(session, api.time(), 0);
             const Pose h = ts.head();
             say("ovr tete " + fmt(h.position.x) + " " + fmt(h.position.y) + " " + fmt(h.position.z) + " " + fmt(yawOf(h.orientation)) + " suivi=" + std::to_string(ts.headFlags()));
+            say(footprint(outerPoints(session)));
+            say(boundaryTest(session, h));
             std::string m = "ovr manettes";
             for (int k = 0; k < 2; k++)
             {
@@ -347,6 +567,37 @@ int main(int argc, char** argv)
             }
             say(m);
          }
+         // La tête à chaque tour (environ 200 fois par seconde), casque présent : le saut de l'espace de suivi se voit
+         // entre deux relevés consécutifs (headJump). Rien au journal hors des sauts.
+         if (st.hmdPresent)
+         {
+            LARGE_INTEGER qpc;
+            QueryPerformanceCounter(&qpc);
+            const TrackingState ts = api.trackingState(session, api.time(), 0);
+            HeadSample cur;
+            cur.t = static_cast<double>(qpc.QuadPart) / static_cast<double>(freq.QuadPart);
+            cur.pose = ts.head();
+            cur.flags = ts.headFlags() & 15u;
+            cur.valid = true;
+            if (prevHead.valid)
+            {
+               const std::string jump = headJump(prevHead, cur);
+               if (jump.rfind("ovr saut ", 0) == 0)
+               {
+                  say(jump);
+                  say(boundaryTest(session, cur.pose));
+               }
+               else if (!jump.empty() && now - refusedAt >= 1000)
+               {
+                  refusedAt = now;
+                  say(jump);
+               }
+            }
+            prevHead = cur;
+         }
+         else
+            prevHead.valid = false;
+
          // Boutons bruts, à chaque changement.
          InputState in {};
          const int ir = api.inputState(session, CONTROLLER_TOUCH, &in);
@@ -367,7 +618,7 @@ int main(int argc, char** argv)
                triggers[k] = down;
             }
          }
-         Sleep(20);
+         Sleep(4);
       }
       api.destroy(session);
    }

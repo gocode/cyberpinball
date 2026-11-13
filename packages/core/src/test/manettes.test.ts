@@ -280,5 +280,5 @@ test('manettes : l’assistant, branché sur les manettes et rouvrable', () => {
   assert.match(frontend, /if \(other\) w\.problem = t\('\{bouton\} sert déjà à \{fonction\}'/);
   // Le réglage gardé sert au menu et à l'INI de VPX.
   assert.match(frontend, /const input = vpxHeadsetInput\(readTextIfExists\(vr\.ini\), controllerSetting\(\)\);/);
-  assert.match(read('packages', 'core', 'src', 'systemmenu.ts'), /'vision3d', 'realite-virtuelle', 'controls'[\s\S]*entries: \['vr', 'vr-calibrate', 'vr-auto-calibrate', 'vr-controllers', 'vr-mirror'\]/);
+  assert.match(read('packages', 'core', 'src', 'systemmenu.ts'), /'vision3d', 'realite-virtuelle', 'controls'[\s\S]*entries: \['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror'\]/);
 });

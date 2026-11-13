@@ -79,6 +79,30 @@ function hash(text: string, length: number): string {
 /** Extractions en cours, pour ne pas lire deux fois le même fichier en même temps. */
 const pending = new Map<string, Promise<B2sImages>>();
 
+/** Au-delà, un .directb2s contient forcément ses images en base64 : il n'est pas relu en entier. */
+const SMALL_B2S_BYTES = 4 * 1024 * 1024;
+
+/**
+ * .directb2s en XML qui ne contient aucune image de fronton (BackglassImage, On ou Off) : le
+ * plugin B2S de VPX 10.8.1 plante à la première image de la partie (0xC0000005, lecture à
+ * 0x330 dans plugin-b2s64.dll). Exemple : Indiana Jones (VPW), 13/11/2026, bouchon « Generic »
+ * de 130 octets venu d'une installation PinUP Popper (<Backglass><Name>Generic</Name>…).
+ * Prouvé au banc : même table, même PuP-Pack, plantage avec le bouchon, partie sans lui.
+ * Un fichier qui n'est pas du XML n'est pas jugé ici. Un gros fichier (images en base64) non plus.
+ */
+export function b2sWithoutBackglass(file: string): boolean {
+  let text: string;
+  try {
+    if (fs.statSync(file).size > SMALL_B2S_BYTES) return false;
+    text = fs.readFileSync(file, 'latin1');
+  } catch {
+    return false;
+  }
+  const body = text.replace(/^﻿|^ï»¿/, '').trimStart();
+  if (!body.startsWith('<')) return false;
+  return !/<Backglass(?:On|Off)?Image\b[^>]*\bValue\s*=\s*["\x27][^"\x27\s]/i.test(body);
+}
+
 /**
  * Images d'un .directb2s : le fronton (allumé de préférence) et le DMD s'il
  * existe, extraits une fois dans dossierCache puis relus depuis le cache tant
