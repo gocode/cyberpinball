@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- Jukebox: the first song played after startup came out of Windows' default output (often the playfield screen's speakers) instead of the backglass output; it now follows the cabinet's output, and the log records which output each song plays on.
 - Virtual reality: when the Quest uses a stationary boundary, the cabinet says once how to switch to a roomscale boundary, which keeps the cabinet in place better when the headset is put back on.
 - Virtual reality: on the "Put the headset on" screen, the cabinet's Exit now stops the game and goes back to the wheel (like Esc and Ctrl+Shift+K); the two instructions at the bottom are on two lines.
 - Jukebox: the glow of the progress bar's green thread is no longer cut off by a dark rectangle; it fades out smoothly.
