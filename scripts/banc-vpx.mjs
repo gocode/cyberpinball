@@ -60,7 +60,7 @@ function copieVpx(source) {
 }
 
 /** L'INI d'une partie dans le casque, comme Cyber Pinball l'écrit (vr.ts, manettes.ts, frontend.ts). */
-async function iniPartie(dir) {
+async function iniPartie(dir, imageCalage) {
   const core = await import(pathToFileURL(path.join(repo, 'packages', 'core', 'dist', 'index.js')).href);
   const log = path.join(dir, 'casque-vpx.txt');
   const settings = [
@@ -73,6 +73,10 @@ async function iniPartie(dir) {
     { section: 'Plugin.CyberPinball', key: 'Calibrate', value: '1' },
     { section: 'Plugin.CyberPinball', key: 'CalibrateHeight', value: '0' },
     { section: 'Plugin.CyberPinball', key: 'CalibrateLabel', value: 'Caler la borne' },
+    // Le schéma des manettes sous « Caler la borne » (image faite par Cyber Pinball), et la capture de l'étape.
+    { section: 'Plugin.CyberPinball', key: 'CalibrateImage', value: imageCalage ?? '' },
+    { section: 'Plugin.CyberPinball', key: 'CalibratedImage', value: imageCalage ? imageCalage.replace(/pause-image\.png$/, 'pause-image-calee.png') : '' },
+    { section: 'Plugin.CyberPinball', key: 'CaptureDir', value: dir },
     ...core.vpxHeadsetInput(''),
   ];
   const ini = path.join(dir, 'VPinballX.ini');
@@ -82,12 +86,12 @@ async function iniPartie(dir) {
   return { ini, log };
 }
 
-export async function jouerVpx({ vpx, table, scenario = SCENARIO_CALAGE, dureeMs = 40000 }) {
+export async function jouerVpx({ vpx, table, scenario = SCENARIO_CALAGE, dureeMs = 40000, imageCalage }) {
   if (!fs.existsSync(BANC_RUNTIME)) throw new Error('Runtime factice absent : npm run casque-vr.');
   if (!fs.existsSync(BANC_PLUGIN)) throw new Error('Plugin absent : node scripts/vision3d.mjs.');
   const copie = copieVpx(vpx);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-vpx-'));
-  const { ini, log } = await iniPartie(dir);
+  const { ini, log } = await iniPartie(dir, imageCalage);
   const manifeste = path.join(dir, 'runtime.json');
   fs.writeFileSync(manifeste, JSON.stringify({ file_format_version: '1.0.0', runtime: { name: 'Banc Cyber Pinball', library_path: BANC_RUNTIME } }, null, 2));
   const scenarioFile = path.join(dir, 'scenario.txt');
@@ -129,7 +133,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error('node scripts/banc-vpx.mjs --vpx <dossier de VPX> --table <fichier.vpx> [--scenario <fichier>] [--duree <ms>]');
     process.exit(2);
   }
-  const r = await jouerVpx({ vpx: a.vpx, table: a.table, scenario: a.scenario ? fs.readFileSync(a.scenario, 'utf8') : undefined, dureeMs: a.duree ? Number(a.duree) : undefined });
+  const r = await jouerVpx({ vpx: a.vpx, table: a.table, scenario: a.scenario ? fs.readFileSync(a.scenario, 'utf8') : undefined, dureeMs: a.duree ? Number(a.duree) : undefined, imageCalage: a['image-calage'] });
   console.log(`Dossier : ${r.dir}\nSortie de VPX : ${r.code}\nJournal de VPX : ${r.vpxLogFile ?? '(introuvable)'}`);
   console.log('--- plugin (casque-vpx.txt) ---\n' + r.plugin);
   console.log('--- runtime (trace) ---\n' + r.trace.split('\n').filter((l) => !/ image /.test(l)).slice(0, 200).join('\n'));

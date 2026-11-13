@@ -303,6 +303,8 @@ export const TRIGGERS_HINT_S = 2;
 export const GESTURE_CARD_MS = 6000;
 /** Les profils de manettes que le schéma (app/renderer/schema-manettes.js) sait dessiner. */
 export const CONTROLLER_SCHEMA_PROFILES: readonly HeadsetProfile[] = ['touch'];
+/** Les éléments que le schéma sait mettre en vert (des boutons : pas les directions des joysticks). */
+export const SCHEMA_ELEMENTS: readonly ControllerElement[] = ['a', 'b', 'x', 'y', 'menu-gauche', 'clic-joystick-gauche', 'clic-joystick-droit', 'gachette-gauche', 'gachette-droite', 'poignee-gauche', 'poignee-droite'];
 export const TRIGGERS_HINT_COMBO: readonly ControllerButton[] = ['gachette-gauche', 'gachette-droite'];
 
 /** La combinaison telle que le joueur la lit (« les deux joysticks enfoncés ensemble, 3 s »), ou undefined. */
@@ -426,6 +428,8 @@ export function menuActionOf(setting: ControllerSetting, event: string): Headset
 /** Un bouton des manettes : ce qu'il fait au menu de Cyber Pinball (et au calage), et en partie dans VPX. */
 export interface HeadsetControl {
   id: HeadsetFunction;
+  /** L'élément des manettes (pour le schéma : SCHEMA_ELEMENTS). */
+  element: ControllerElement;
   /** Le bouton, tel que le joueur le voit. */
   label: string;
   /** Au menu de Cyber Pinball dans le casque ; undefined : rien. */
@@ -438,7 +442,7 @@ export interface HeadsetControl {
 export function headsetControls(setting: ControllerSetting = defaultControllerSetting('touch')): HeadsetControl[] {
   return headsetFunctions().flatMap((f) => {
     const el = setting.functions[f.id];
-    return el ? [{ id: f.id, label: CONTROLLER_ELEMENTS[el].label, ...(f.menu && { menu: f.menu }), game: f.game }] : [];
+    return el ? [{ id: f.id, element: el, label: CONTROLLER_ELEMENTS[el].label, ...(f.menu && { menu: f.menu }), game: f.game }] : [];
   });
 }
 

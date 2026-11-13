@@ -81,6 +81,8 @@ MSGPI_STRING_VAL_SETTING(aideReglage, "AdjustHelp", "Adjust help", "Keys reminde
 // (VRControllerCalibration, lié par Cyber Pinball à F13), puis la hauteur est reprise par pas d'un centimètre
 // (VRUp, VRDown liés à F14, F15) : celle du calage du menu, la pose des manettes de VPX n'étant pas leur bout.
 MSGPI_STRING_VAL_SETTING(libelleCaler, "CalibrateLabel", "Calibrate label", "Pause choice that aligns the table on the real lockbar", true, "Calibrate", 64);
+MSGPI_STRING_VAL_SETTING(imageCaler, "CalibrateImage", "Calibrate image", "Controllers drawing shown while calibrating (prepared by Cyber Pinball)", true, "", 1024);
+MSGPI_STRING_VAL_SETTING(imageCalee, "CalibratedImage", "Calibrated image", "The same drawing once calibrated (prepared by Cyber Pinball)", true, "", 1024);
 MSGPI_STRING_VAL_SETTING(aideCaler, "CalibrateHelp", "Calibrate help", "Keys reminder while calibrating", true, "Controllers on the lockbar corners - Trigger: calibrate - A or B: resume", 128);
 MSGPI_STRING_VAL_SETTING(libelleCale, "CalibratedLabel", "Calibrated label", "Shown once the table was aligned", true, "Table aligned", 64);
 MSGPI_INT_VAL_SETTING(hauteurCalage, "CalibrateHeight", "Calibrate height steps", "Centimetres to move the table up (negative: down) after aligning it on the controllers", true, -60, 60, 0);
@@ -553,7 +555,7 @@ struct ImageFichier
    VPXTexture tex = nullptr;
    float l = 0.f, h = 0.f;
 };
-ImageFichier imageDuFronton, imageDuDmd;
+ImageFichier imageDuFronton, imageDuDmd, imageDuCalage, imageCalageFait;
 
 bool charger(ImageFichier& img, const char* chemin)
 {
@@ -1225,6 +1227,32 @@ void capturerComposition(const char* nom)
       ecrirePng(large(dossierCaptures_Val) + L"\\dmd-piece-" + horodatage + large(nom) + L".png", salle.l, salle.h, salle.images[salle.courante]);
 }
 
+int dessinerCalage(VPXRenderContext2D* ctx, double t);
+
+/**
+ * L'étape « Caler la borne » telle que le plugin la dessine sur le fronton, rendue en logiciel (800 × 600) dans
+ * CaptureDir : le schéma des manettes (CalibrateImage) se vérifie sans casque, au banc de VPX.
+ */
+void capturerCalage(const char* nom)
+{
+   if (!dossierCaptures_Val[0] || !vpxApi)
+      return;
+   SYSTEMTIME st {};
+   GetLocalTime(&st);
+   wchar_t horodatage[48];
+   swprintf(horodatage, 48, L"%04d%02d%02d-%02d%02d%02d-", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+   constexpr int CL = 800, CH = 600;
+   std::vector<uint8_t> rgb(static_cast<size_t>(CL) * CH * 3, 0);
+   toile = { &rgb, CL, CH };
+   VPXRenderContext2D c = contexteToile(VPXWINDOW_Backglass, CL, CH);
+   dessinerCalage(&c, maintenant());
+   toile = {};
+   const bool ok = ecrirePng(large(dossierCaptures_Val) + L"\\fronton-" + horodatage + large(nom) + L".png", CL, CH, rgb);
+   char ligne[160];
+   std::snprintf(ligne, sizeof(ligne), "composition nom=%s image=%s resultat=%s", nom, imageDuCalage.tex ? "schema" : "texte", ok ? "ok" : "echec");
+   ecrire(ligne);
+}
+
 /** Les deux captures d'une partie : 8 s après le début, et au premier menu de pause affiché 0,6 s. */
 void capturesDuJour(double t)
 {
@@ -1309,6 +1337,9 @@ void avancerCalage()
          ecrire(ligne);
       }
       c.etape = 0;
+      // La première fois : l'étape telle qu'elle se montre après un calage (« Borne calée »), en capture.
+      if (pause.calagesFaits() == 1)
+         capturerCalage("calee");
       return;
    default: return;
    }
@@ -1386,7 +1417,10 @@ void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
       tenueDite = tenue;
       const bool etape = pause.etape() == Etape::Calage;
       if (etape && !etapeDite)
+      {
          ecrire("calage-etape ouverte");
+         capturerCalage("calage");
+      }
       etapeDite = etape;
    }
    appliquer(pause.image(t, jeu));
@@ -1691,8 +1725,22 @@ int dessinerCalage(VPXRenderContext2D* ctx, double t)
    const Rect zone = zoneVisible(ctx);
    const Rect rr = cadrer(L, H, zone.l, zone.h, { 0.f, 0.f, L, H });
    cible = { zone.x + rr.x, zone.y + rr.y, rr.l, rr.h };
+   const bool fait = pause.calagesFaits() > 0 && calageVpx.etape == 0;
+   // Le schéma des manettes (maquette validée le 13 novembre 2026) : le voile sur tout le fronton, puis l'image que
+   // Cyber Pinball a préparée avec le vrai composant (le titre, les manettes, les gâchettes en vert, la ligne d'aide),
+   // centrée ; après un calage, la même avec « Borne calée » en vert. Sans image (autres manettes) : le texte en haut.
+   ImageFichier& img = fait && charger(imageCalageFait, imageCalee_Val) ? imageCalageFait : imageDuCalage;
+   if (&img == &imageCalageFait || charger(imageDuCalage, imageCaler_Val))
+   {
+      rectangle(ctx, 0.f, 0.f, L, H, FOND[0], FOND[1], FOND[2], 0.82f);
+      const float s = cible.l / L;
+      const float w = std::min(940.f, img.l * 640.f / img.h);
+      const float h = w * img.h / img.l;
+      ctx->DrawImage(ctx, img.tex, 1.f, 1.f, 1.f, 1.f, 0.f, 0.f, img.l, img.h, 0.f, 0.f, 0.f, cible.x + (L - w) / 2.f * s, cible.y + (H - h) / 2.f * s, w * s, h * s);
+      return 1;
+   }
    rectangle(ctx, 0.f, 0.f, L, 230.f, FOND[0], FOND[1], FOND[2], 0.85f);
-   texte(ctx, pause.calagesFaits() > 0 && calageVpx.etape == 0 ? cale : caler, L / 2.f, 60.f, 70.f, SIGNAL[0], SIGNAL[1], SIGNAL[2]);
+   texte(ctx, fait ? cale : caler, L / 2.f, 60.f, 70.f, SIGNAL[0], SIGNAL[1], SIGNAL[2]);
    texte(ctx, aideCalage, L / 2.f, 160.f, 44.f, ENCRE[0], ENCRE[1], ENCRE[2]);
    return 1;
 }
@@ -1766,7 +1814,7 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballPluginLoad(const uint32_t sessionId, cons
    msgApi->RegisterSetting(endpointId, &salleRatio);
    for (auto* reglage : { &pupDmdRatio })
       msgApi->RegisterSetting(endpointId, reglage);
-   for (auto* reglage : { &reglagesEcrans, &idTable, &libelleAjuster, &libelleEcranFronton, &libelleEcranDmd, &aideChoixEcran, &aideReglage, &libelleCaler, &aideCaler, &libelleCale })
+   for (auto* reglage : { &reglagesEcrans, &idTable, &libelleAjuster, &libelleEcranFronton, &libelleEcranDmd, &aideChoixEcran, &aideReglage, &libelleCaler, &aideCaler, &imageCaler, &imageCalee, &libelleCale })
       msgApi->RegisterSetting(endpointId, reglage);
    for (auto* reglage : { &hauteurCalage, &calageActif })
       msgApi->RegisterSetting(endpointId, reglage);
@@ -1795,7 +1843,7 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballPluginUnload()
    msgApi->UnsubscribeMsg(getAuxRendererId, onGetAuxRenderer, nullptr);
    msgApi->BroadcastMsg(endpointId, auxChangedId, nullptr);
    if (vpxApi)
-      for (VPXTexture* t : { &blanc, &titre.tex, &reprendre.tex, &quitter.tex, &marque.tex, &rappel.tex, &ajuster.tex, &etapeAjuster.tex, &aideAjuster.tex, &caler.tex, &aideCalage.tex, &cale.tex,&aide[0].tex, &aide[1].tex, &aide[2].tex, &imageDuFronton.tex, &imageDuDmd.tex, &scores.tex })
+      for (VPXTexture* t : { &blanc, &titre.tex, &reprendre.tex, &quitter.tex, &marque.tex, &rappel.tex, &ajuster.tex, &etapeAjuster.tex, &aideAjuster.tex, &caler.tex, &aideCalage.tex, &cale.tex,&aide[0].tex, &aide[1].tex, &aide[2].tex, &imageDuFronton.tex, &imageDuDmd.tex, &imageDuCalage.tex, &imageCalageFait.tex, &scores.tex })
          if (*t)
          {
             vpxApi->DeleteTexture(*t);

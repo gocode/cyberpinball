@@ -1,0 +1,14 @@
+/* Schéma des manettes du casque (schema-manettes.js) : trait blanc, la commande à actionner en vert signal. */
+.schema-manettes { display: flex; justify-content: center; flex: none; }
+.schema-manettes svg { display: block; height: 100%; width: auto; overflow: visible; }
+.schema-grand { height: 48vh; }
+.schema-moyen { height: 27.8vh; }
+.schema-petit { height: 17.6vh; }
+.schema-corps, .schema-piece { fill: var(--void); stroke: var(--ink); stroke-width: 4; stroke-linejoin: round; }
+.schema-anneau { fill: none; stroke: var(--ink); stroke-width: 10; }
+.schema-vert { fill: var(--signal); stroke: var(--signal); filter: drop-shadow(0 0 5px var(--signal)); }
+/* La taille des lettres est en unités du dessin (attribut font-size du schéma), pas en px de l'écran. */
+.schema-lettre { font-family: var(--font-ui); font-weight: 700; fill: var(--ink); text-anchor: middle; }
+.schema-sur-vert { fill: var(--void); }
+.schema-fleche { fill: none; stroke: var(--signal); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 5px var(--signal)); }
+.schema-onde { fill: none; stroke: var(--signal); stroke-width: 3; stroke-dasharray: 6 7; opacity: 0.8; }

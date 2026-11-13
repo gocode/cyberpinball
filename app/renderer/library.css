@@ -4665,3 +4665,10 @@ body.mouse .lib-chip.pick:not(.selected):hover {
   /* Trait vert doublé à l'intérieur : la tuile choisie se voit de loin, sans déborder de sa place. */
   box-shadow: inset 0 0 0 0.15cqmin var(--accent);
 }
+
+/* Légende du menu du casque (planche validée le 13/11/2026) : deux colonnes, un petit schéma des manettes par
+   commande à gauche (110 px à 1080 de haut), le bouton puis ce qu'il fait. */
+.lib-section.kind-controls .lib-rows { display: grid; grid-template-columns: 1fr 1fr; column-gap: 5.6cqmin; }
+.lib-row.with-controls { display: flex; align-items: center; gap: 2.2cqmin; }
+.lib-row.with-controls > .lib-row-main { flex: 1; min-width: 0; }
+.schema-ligne { height: 10.2cqmin; aspect-ratio: 520 / 300; }

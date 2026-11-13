@@ -126,7 +126,9 @@ const DEVELOPER_SHEETS = new Set(['fallback-demo.css']);
  * l'écran. Leur plancher se vérifie sur le rendu réel (garde-fou de mise en page des démonstrations,
  * interne/demos/demo-regles.ps1 et guides-tous.cjs).
  */
-const SCALED_SHEETS = new Set(['guide.css']);
+// L'image de la pause en partie (schema-image.css) : une image de taille fixe que le plugin met à l'échelle du
+// fronton dans VPX ; ses px sont ceux de la planche validée, vérifiés sur la capture du banc de VPX.
+const SCALED_SHEETS = new Set(['guide.css', 'schema-image.css']);
 
 // Un corps en px fixes ne suit pas l'écran : 16 px restent 16 px en 4K (8 px de référence). Le
 // bandeau de « Récupérer » (acquire.css), plus ancien que le design system, gardait ainsi des

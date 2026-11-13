@@ -247,7 +247,7 @@ test('manettes : branchements du compagnon et du menu', () => {
   assert.match(frontend, /if \(b !== 'previous' && b !== 'next'\) return void headsetHolds\.set\(name, \{ b \}\);/);
   // La légende du menu du casque vient du réglage des manettes branchées.
   assert.match(frontend, /headsetControls\(controllerSetting\(\)\)\.filter\(\(c\) => c\.menu\)/);
-  assert.match(frontend, /headsetControls\(controllerSetting\(\)\)\.map\(\(c\) => \(\{ text: c\.label, detail: c\.game \}\)\)/);
+  assert.match(frontend, /headsetControls\(controllerSetting\(\)\)\.map\(\(c\) => \(\{ text: c\.label, detail: c\.game, \.\.\.legendControls\(\[c\.element\]\) \}\)\)/);
 });
 
 test('manettes : l’INI de VPX suit le réglage des manettes (boutons, lanceur et secousses)', () => {

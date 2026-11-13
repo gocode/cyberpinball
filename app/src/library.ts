@@ -537,6 +537,8 @@ export interface Row {
   progress?: { value?: number; tone?: Tone; busy?: boolean };
   /** Schéma de l'écran du DMD à droite de la ligne (« Écran du DMD ») : FullDMD ou DMD seul en bande. */
   figure?: 'fulldmd' | 'dmd';
+  /** Schéma des manettes du casque à gauche (légende du menu du casque) : ces commandes en vert ; vide, une case vide. */
+  controls?: string[];
   /** Pastille d'un joueur devant le texte (avatar.ts) : son image, sinon ses initiales ; à la place de l'icône. */
   avatar?: AvatarView;
   /** Pastilles des joueurs d'une partie, en ligne après le texte (historique des parties). */

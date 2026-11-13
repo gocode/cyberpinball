@@ -100,6 +100,7 @@ import {
   calibrationCombo,
   CalibrationComboHold,
   TRIGGERS_HINT_COMBO,
+  SCHEMA_ELEMENTS,
   CONTROLLER_SCHEMA_PROFILES,
   GESTURE_CARD_MS,
   TRIGGERS_HINT_S,
@@ -462,6 +463,7 @@ import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
 import { centerWhenStarted, prepareVrGame, probeVr, readVrAutoRecal, readVrMirror, readVrMode, rememberVrSettings, writeIniSettings, writeVrAutoRecal, writeVrCalibration, writeVrMirror, writeVrMode, type VrGame } from './vr';
 import { HEADSET_TRIAL_DIR, HeadsetMenu, readCabinetPlace, type HeadPose } from './casque';
 import { OvrProbe } from './sonde-ovr';
+import { prepareSchemaImage, schemaImageFile, type SchemaImage } from './schema-image';
 import { installPausePlugin, pauseSettingsFor, QUIT_HOLD_S } from './pause-vr';
 import { askElevation } from './uac-confirm';
 import { downloadKinectDriver, HeadTracker, installKinectDriver, installVision3dPlugin, probeVision3d, readVision3d, vision3dPluginFiles, writeVision3d } from './vision3d';
@@ -718,6 +720,11 @@ interface Message {
     /** En bas : le geste qui sert à tout moment (le calage : recaler d'un geste), avec son petit schéma. */
     band?: { schema?: string[]; text: string; detail: string };
   };
+  /**
+   * Une étape de l'assistant des manettes (planche validée le 13 novembre 2026) : l'étape, la fonction en grand,
+   * le schéma avec le bouton proposé en vert, la ligne « Proposé : A · appuyez sur le bouton voulu », le retour.
+   */
+  wizard?: { header: string; step: string; schema?: string[]; proposedLabel?: string; proposed?: string; hint: string; back?: string; problem?: string };
 }
 
 /**
@@ -2116,6 +2123,7 @@ function elementLabel(el: string | undefined): string {
 function showControllerWizard(): void {
   const w = controllerWizard;
   if (!w) return;
+  let wizardView: Message['wizard'];
   const list = headsetFunctions();
   const table = list.map((f) => t('{fonction} : {bouton}', { fonction: f.label, bouton: elementLabel(w.functions[f.id]) }));
   let lines: string[];
@@ -2135,6 +2143,21 @@ function showControllerWizard(): void {
   else if (w.phase === 'step') {
     const f = list[w.index]!;
     const back = w.functions.retour;
+    // Le schéma (manettes dessinées) : le bouton proposé, celui du réglage par défaut, en vert ; une fonction de
+    // joystick (pousser, tirer) n'a pas de bouton à dessiner : le texte seul.
+    const proposed = defaultControllerSetting(w.profile).functions[f.id];
+    const drawn = schemaProfile(w.profile) && !f.axis && proposed !== undefined && SCHEMA_ELEMENTS.includes(proposed);
+    if (drawn)
+      wizardView = {
+        header: t('Manettes du casque · étape {n} sur {total}', { n: w.index + 1, total: list.length }),
+        step: f.label,
+        schema: [proposed],
+        proposedLabel: t('Proposé :'),
+        proposed: elementLabel(proposed),
+        hint: t('appuyez sur le bouton voulu'),
+        ...(back && f.id !== 'retour' && { back: f.optional ? t('{retour} : passer (facultatif)', { retour: elementLabel(back) }) : t('{retour} : étape précédente', { retour: elementLabel(back) }) }),
+        ...(w.problem && { problem: w.problem }),
+      };
     lines = [
       t('Étape {n} sur {total} : {fonction}', { n: w.index + 1, total: list.length, fonction: f.label }),
       f.id === 'lanceur' ? t('Tirez vers vous le joystick ou le pavé voulu.') : f.axis ? t('Poussez le joystick ou le pavé voulu.') : t('Appuyez sur le bouton voulu.'),
@@ -2147,7 +2170,7 @@ function showControllerWizard(): void {
       ...(w.problem ? [w.problem] : []),
       t('{valider} : garder · {retour} : recommencer', { valider: elementLabel(w.functions.valider), retour: elementLabel(w.functions.retour) }),
     ];
-  state = { ...state, phase: 'message', help: false, message: { title: t('Manettes du casque'), lines } };
+  state = { ...state, phase: 'message', help: false, message: { title: t('Manettes du casque'), lines, ...(wizardView && { wizard: wizardView }) } };
   broadcast();
 }
 
@@ -3621,6 +3644,38 @@ function calibrationComboTip(): void {
   if (!showGestureCard()) showBanner(t('Recaler la borne à tout moment, au menu comme en partie : {combo}.', { combo }));
 }
 
+/**
+ * L'image de la pause en partie (schema-image.ts) : le titre (« Caler la borne », ou « Borne calée » en vert après
+ * un calage), les gâchettes en vert, la ligne d'aide avec « Gâchette » en vert.
+ */
+function calibrateImageSpec(done: boolean): SchemaImage | undefined {
+  if (!schemaProfile(controllerSetting().profile)) return undefined;
+  return {
+    title: done ? t('Borne calée') : t('Caler la borne'),
+    ...(done && { titleGreen: true }),
+    vert: ['gachette-gauche', 'gachette-droite'],
+    text: t('Manettes sur les coins de la barre · Gâchette : caler · A ou B : reprendre'),
+    lead: t('Gâchette'),
+  };
+}
+
+/**
+ * Le chemin de l'image de la pause si elle est prête pour ces manettes et cette langue ; sinon undefined, et elle
+ * est faite en arrière-plan pour la partie suivante (une fois par contenu, gardée dans <données>\vr\schemas).
+ */
+const calibrateImagePending = new Set<string>();
+function readyCalibrateImage(done: boolean): string | undefined {
+  const spec = calibrateImageSpec(done);
+  if (!spec) return undefined;
+  const file = schemaImageFile(loc.dataDir, spec);
+  if (fs.existsSync(file)) return file;
+  if (!calibrateImagePending.has(file)) {
+    calibrateImagePending.add(file);
+    void prepareSchemaImage(loc.dataDir, path.join(__dirname, '..', 'renderer'), spec, (line) => console.log(line)).finally(() => calibrateImagePending.delete(file));
+  }
+  return undefined;
+}
+
 /** Les profils de manettes dessinés (schema-manettes.js) : un autre garde le texte seul, jamais un dessin faux. */
 function schemaProfile(profile: HeadsetProfile | undefined): boolean {
   return Boolean(profile && CONTROLLER_SCHEMA_PROFILES.includes(profile));
@@ -3729,8 +3784,8 @@ function openHeadsetMenu(): void {
       icon: 'vr' as const,
       lead: t('Les mêmes boutons partout : A valide, B revient, les joysticks déplacent la sélection.'),
       sections: [
-        { title: t('Au menu'), rows: [...headsetControls(controllerSetting()).filter((c) => c.menu).map((c) => ({ text: c.label, detail: c.menu })), ...comboRows()] },
-        { title: t('En partie'), rows: [...headsetControls(controllerSetting()).map((c) => ({ text: c.label, detail: c.game })), ...comboRows(true)] },
+        { title: t('Au menu'), kind: legendKind(), rows: [...headsetControls(controllerSetting()).filter((c) => c.menu).map((c) => ({ text: c.label, detail: c.menu, ...legendControls([c.element]) })), ...comboRows()] },
+        { title: t('En partie'), kind: legendKind(), rows: [...headsetControls(controllerSetting()).map((c) => ({ text: c.label, detail: c.game, ...legendControls([c.element]) })), ...comboRows(true)] },
       ],
       actions: [
         { label: t('Caler la borne'), icon: 'layout' as const, detail: calibrateMenuText({ vrReady: probeVr().ready, headset: headset?.state, place: headset?.place(), setting: headsetSetting() }).detail.split(' · ')[0], run: () => {
@@ -3756,9 +3811,20 @@ function openHeadsetMenu(): void {
 }
 
 /** La combinaison du calage dans la légende des manettes (menu du casque), si ces manettes en ont une. */
-function comboRows(inGame = false): { text: string; detail: string }[] {
-  const combo = calibrationComboLabel(controllerSetting().profile);
-  return combo ? [{ text: t('Les deux sticks enfoncés jusqu’au clic, 3 s'), detail: inGame ? t('Pause, puis caler la borne ; on reprend où on en était') : t('Caler la borne') }] : [];
+function comboRows(inGame = false): { text: string; detail: string; controls?: string[] }[] {
+  const combo = calibrationCombo(controllerSetting().profile);
+  return combo ? [{ text: t('Les deux sticks enfoncés jusqu’au clic, 3 s'), detail: inGame ? t('Pause, puis caler la borne ; on reprend où on en était') : t('Caler la borne'), ...legendControls([...combo]) }] : [];
+}
+
+/** La légende en deux colonnes, un petit schéma par commande (planche validée) ; sans dessin, la liste d'avant. */
+function legendKind(): string | undefined {
+  return schemaProfile(controllerSetting().profile) ? 'controls' : undefined;
+}
+
+/** Les commandes d'une ligne de la légende, si le schéma sait les dessiner ; sinon une case vide (alignement). */
+function legendControls(elements: readonly string[]): { controls?: string[] } {
+  if (!schemaProfile(controllerSetting().profile)) return {};
+  return { controls: elements.filter((e) => SCHEMA_ELEMENTS.includes(e as ControllerElement)) };
 }
 
 /** Arrêt de la partie de VPX dans le casque en cours (le casque se perd pendant qu'elle se joue). */
@@ -4569,6 +4635,9 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
           { section: 'Plugin.CyberPinball', key: 'CalibrateHeight', value: String(ig.heightSteps) },
           { section: 'Plugin.CyberPinball', key: 'CalibrateLabel', value: t('Caler la borne') },
           { section: 'Plugin.CyberPinball', key: 'CalibrateHelp', value: t('Manettes sur les coins de la barre · Gâchette : caler · A ou B : reprendre') },
+          // Le schéma des manettes sous « Caler la borne » (image prête, manettes dessinées) ; sinon le texte seul.
+          { section: 'Plugin.CyberPinball', key: 'CalibrateImage', value: readyCalibrateImage(false) ?? '' },
+          { section: 'Plugin.CyberPinball', key: 'CalibratedImage', value: readyCalibrateImage(true) ?? '' },
           { section: 'Plugin.CyberPinball', key: 'CalibratedLabel', value: t('Borne calée') },
         ]);
         details.push(`calage en partie : ${calibrationCombo(controllerSetting().profile) ? 'les deux joysticks tenus 3 s, ou ' : ''}« Caler la borne » de la pause ; ControllerLockbarScale ${ig.lockbarScale}, ControllerCabYOffset ${ig.cabYOffset}, hauteur ${ig.heightSteps} cm${ig.measured ? '' : ' (prises des manettes pas encore mesurées : recalez au menu)'}`); // i18n-ignore : journal
@@ -5183,6 +5252,9 @@ export function startFrontend(): void {
   });
   headset.watchRest(vrAutoRecal);
   headset.watch();
+  // Les images du schéma pour la pause en partie, préparées d'avance (prepareVr est synchrone).
+  readyCalibrateImage(false);
+  readyCalibrateImage(true);
   // Sonde LibOVR (sonde-ovr.ts) : mesure seulement, tant que la réalité virtuelle est activée.
   ovrProbe.set(vrMode === 'auto');
   // Horaire de la borne : nuit et arrêt programmé, d'après les réglages de medias.json.

@@ -40,6 +40,8 @@ import {
   staleCalibration,
   CONTROLLER_SCHEMA_PROFILES,
   GESTURE_CARD_MS,
+  SCHEMA_ELEMENTS,
+  CONTROLLER_ELEMENTS,
   isControllerElement,
   TRIGGERS_HINT_COMBO,
   TRIGGERS_HINT_S,
@@ -487,8 +489,9 @@ test('schéma des manettes (maquette validée le 13 novembre 2026) : un composan
   // Pas de style en ligne (CSP de la page : style-src 'self') ; les lettres du dessin hors du garde-fou des 20 px.
   assert.doesNotMatch(js, /style=|<style/);
   assert.match(js, /box\.dataset\.belowFloor = '';/);
-  const css = read('app', 'renderer', 'frontend.css');
-  assert.match(css, /\.schema-vert \{ fill: var\(--signal\); stroke: var\(--signal\);/);
+  // Les styles du schéma dans leur feuille, partagée par la page du casque et la page de l'image de la pause.
+  assert.match(read('app', 'renderer', 'schema-manettes.css'), /\.schema-vert \{ fill: var\(--signal\); stroke: var\(--signal\);/);
+  assert.match(html, /<link rel="stylesheet" href="schema-manettes\.css" \/>/);
   // Le calage : gâchettes pour placer, A une fois placée ; en bas, le geste des sticks ; le conseil ne le répète pas.
   const front = read('app', 'src', 'frontend.ts');
   assert.match(front, /const schema = drawn && !desk && !c\.placing \? \(c\.place \? \['a'\] : \['gachette-gauche', 'gachette-droite'\]\) : undefined;/);
@@ -501,4 +504,37 @@ test('schéma des manettes (maquette validée le 13 novembre 2026) : un composan
   assert.match(front, /headsetCard: headsetCardView/);
   // Le texte du geste dit où et avec quel doigt.
   assert.match(calibrationComboLabel('touch')!, /sous les pouces/);
+});
+
+test('schéma des manettes, planches d’adaptation validées (13 novembre 2026) : pause en partie, assistant, légende', () => {
+  // Pause en partie : Cyber Pinball fait l'image avec le vrai composant (titre, schéma, ligne d'aide), le plugin la pose.
+  const page = read('app', 'renderer', 'schema-image.html');
+  assert.ok(page.indexOf('schema-manettes.js') > 0 && page.indexOf('schema-manettes.js') < page.indexOf('schema-image.js'));
+  assert.match(page, /style-src 'self'/);
+  assert.doesNotMatch(read('app', 'renderer', 'schema-image.js'), /style=|\.style\./);
+  const image = read('app', 'src', 'schema-image.ts');
+  assert.match(image, /createHash\('sha1'\)\.update\(JSON\.stringify\(\{ v: SCHEMA_IMAGE_VERSION, \.\.\.image \}\)\)/);
+  assert.match(image, /transparent: true, backgroundColor: '#00000000', webPreferences: \{ offscreen: true/);
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /key: 'CalibrateImage', value: readyCalibrateImage\(false\) \?\? '' \}/);
+  assert.match(front, /key: 'CalibratedImage', value: readyCalibrateImage\(true\) \?\? '' \}/);
+  assert.match(front, /title: done \? t\('Borne calée'\) : t\('Caler la borne'\),/);
+  const plugin = read('packages', 'vpx-vision3d', 'src', 'cyberpinball.cpp');
+  assert.match(plugin, /MSGPI_STRING_VAL_SETTING\(imageCaler, "CalibrateImage"/);
+  assert.match(plugin, /MSGPI_STRING_VAL_SETTING\(imageCalee, "CalibratedImage"/);
+  assert.match(plugin, /&aideCaler, &imageCaler, &imageCalee, &libelleCale \}/);
+  // Sans image (autres manettes), la consigne en texte d'avant ; l'étape se capture au banc de VPX.
+  assert.match(plugin, /texte\(ctx, aideCalage, L \/ 2\.f, 160\.f, 44\.f/);
+  assert.match(plugin, /capturerCalage\("calage"\);/);
+  assert.match(plugin, /capturerCalage\("calee"\);/);
+  // Assistant des manettes : le bouton proposé (réglage par défaut) en vert, une fonction de joystick sans dessin.
+  assert.match(front, /const drawn = schemaProfile\(w\.profile\) && !f\.axis && proposed !== undefined && SCHEMA_ELEMENTS\.includes\(proposed\);/);
+  assert.match(read('app', 'renderer', 'frontend.js'), /\} else if \(s\.phase === 'message' && s\.message\?\.wizard\) \{/);
+  assert.match(read('app', 'renderer', 'frontend.css'), /\.wizard-card > \.wizard-head \{/);
+  // Légende du menu du casque : deux colonnes, un petit schéma par commande, une case vide sinon.
+  assert.match(front, /kind: legendKind\(\), rows:/);
+  assert.match(read('app', 'renderer', 'library.js'), /li\.append\(\(row\.controls\.length && schemaManettes\(row\.controls, 'schema-ligne'\)\) \|\| libEl\('div', 'schema-manettes schema-ligne'\), main\);/);
+  assert.match(read('app', 'renderer', 'library.css'), /\.lib-section\.kind-controls \.lib-rows \{ display: grid; grid-template-columns: 1fr 1fr;/);
+  // Ce que le schéma sait dessiner : des boutons des manettes, jamais une direction de joystick.
+  for (const e of SCHEMA_ELEMENTS) assert.ok(isControllerElement(e) && !CONTROLLER_ELEMENTS[e].axis, e);
 });

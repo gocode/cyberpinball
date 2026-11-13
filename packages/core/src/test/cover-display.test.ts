@@ -40,6 +40,8 @@ test('chaque module qui crée une fenêtre la fait couvrir son écran par coverD
     'remote-pointer.ts': [/parent,/, /transparent: true,/, /overlayContent\(win, parent\)/],
     // Le menu dessiné pour le casque : rendu hors écran par nature (texture partagée), jamais montré.
     'casque-vues.ts': [/show: false,/, /offscreen: \{ useSharedTexture: true \}/],
+    // L'image du schéma des manettes pour la pause en partie : page jamais montrée, rendue hors écran puis capturée.
+    'schema-image.ts': [/show: false,/, /webPreferences: \{ offscreen: true/],
     // La webcam de la Vision 3D : page jamais montrée, dans sa propre partition sans réseau.
     'vision3d.ts': [/show: false,\s+width: 320,/, /partition: WEBCAM_PARTITION,/],
   };

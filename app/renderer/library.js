@@ -186,11 +186,16 @@ function renderLibrary(v) {
         // Libellé à gauche (Fiche technique : « Processeur », « Mémoire ») : sa propre colonne, commune à la section.
         const parts = Boolean(row.check || row.thumb || row.aside || row.label);
         // Schéma à droite (« Écran du DMD ») ou pastille à gauche : le texte passe dans une colonne à part.
-        const main = row.figure || row.avatar || parts ? libEl('div', 'lib-row-main') : li;
+        const main = row.figure || row.avatar || parts || row.controls ? libEl('div', 'lib-row-main') : li;
         main.append(line);
         if (row.detail) main.append(libEl('div', 'lib-row-detail', row.detail));
         if (row.sub) main.append(libEl('div', 'lib-row-sub', row.sub));
         if (row.figure) li.append(main, dmdFigure(row.figure));
+        // Légende du menu du casque : le schéma des manettes à gauche, la commande en vert ; sans dessin, une case vide.
+        if (row.controls) {
+          li.classList.add('with-controls');
+          li.append((row.controls.length && schemaManettes(row.controls, 'schema-ligne')) || libEl('div', 'schema-manettes schema-ligne'), main);
+        }
         if (row.avatar) {
           li.classList.add('with-avatar');
           li.append(avatarNode(row.avatar, 'lib-row-avatar'), main);

@@ -3795,8 +3795,31 @@ html.jukebox-phase #root:has(> .banner) > .status-corner {
 .headset-prompt.with-schema .headset-prompt-keys, .headset-gesture .headset-prompt-keys { font-size: 5.75vh; }
 .headset-prompt.with-schema .headset-prompt-problem { font-size: 4.6vh; }
 .headset-prompt.with-band { padding-bottom: 27.8vh; }
+
+/* Une étape de l'assistant des manettes (planche validée le 13/11/2026, rapportée à 1080 de haut : 1cqmin = 10,8 px). */
+.wizard-card {
+  width: 122cqmin;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.8cqmin;
+  padding: 4.6cqmin 5.6cqmin;
+  border: 2px solid var(--line-strong);
+  border-radius: 1.7cqmin;
+  background: var(--surface);
+  text-align: center;
+}
+.wizard-card p { margin: 0; }
+.wizard-card > .wizard-head { margin: 0; font-size: 4.26cqmin; line-height: 1.2; white-space: nowrap; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-muted); }
+.wizard-step { font-size: 7.8cqmin; font-weight: 700; color: var(--ink); }
+.wizard-proposed { font-size: 4.44cqmin; color: var(--ink-muted); }
+.wizard-proposed b { color: var(--signal); }
+.wizard-back { font-size: 3.7cqmin; color: var(--ink-faint); }
+.wizard-problem { font-size: 3.7cqmin; color: var(--warning); }
+.schema-assistant { height: 33.3cqmin; }
 /* Un problème long sous la consigne : le schéma cède la place (jamais la consigne coupée) ; sinon, la taille validée. */
-.headset-prompt.with-schema > .schema-moyen { flex: 0 1 27.8vh; height: auto; min-height: 12vh; }
+.headset-prompt.with-schema > .headset-prompt-schema { flex: 0 1 27.8vh; height: auto; min-height: 12vh; }
 .headset-prompt-band {
   position: absolute;
   left: 0;
@@ -3812,21 +3835,6 @@ html.jukebox-phase #root:has(> .banner) > .status-corner {
 }
 .headset-prompt-band p { font-size: 4.6vh; text-align: left; line-height: 1.15; }
 .headset-prompt-band span { display: block; color: var(--ink-muted); font-size: 3.5vh; }
-
-/* Schéma des manettes du casque (schema-manettes.js) : trait blanc, la commande à actionner en vert signal. */
-.schema-manettes { display: flex; justify-content: center; flex: none; }
-.schema-manettes svg { display: block; height: 100%; width: auto; overflow: visible; }
-.schema-grand { height: 48vh; }
-.schema-moyen { height: 27.8vh; }
-.schema-petit { height: 17.6vh; }
-.schema-corps, .schema-piece { fill: var(--void); stroke: var(--ink); stroke-width: 4; stroke-linejoin: round; }
-.schema-anneau { fill: none; stroke: var(--ink); stroke-width: 10; }
-.schema-vert { fill: var(--signal); stroke: var(--signal); filter: drop-shadow(0 0 5px var(--signal)); }
-/* La taille des lettres est en unités du dessin (attribut font-size du schéma), pas en px de l'écran. */
-.schema-lettre { font-family: var(--font-ui); font-weight: 700; fill: var(--ink); text-anchor: middle; }
-.schema-sur-vert { fill: var(--void); }
-.schema-fleche { fill: none; stroke: var(--signal); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 5px var(--signal)); }
-.schema-onde { fill: none; stroke: var(--signal); stroke-width: 3; stroke-dasharray: 6 7; opacity: 0.8; }
 
 /* Appui tenu dans le casque (les deux joysticks : caler la borne) : anneau qui se remplit, libellé au centre. */
 .headset-hold {

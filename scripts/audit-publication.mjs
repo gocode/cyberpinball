@@ -218,7 +218,10 @@ export function auditRepository({ commits } = {}) {
   // Seuls les fichiers publiés comptent : les documents internes ne partent pas.
   for (const f of tracked.filter((x) => SECRET_FILES.test(x))) problems.push(`${f} : fichier de secret suivi par git (à retirer : git rm --cached)`);
   for (const f of unplacedFiles(tracked)) problems.push(`${f} : hors des emplacements publics (PUBLIC) et des dossiers internes : à ranger dans interne/, ou à déclarer public dans scripts/audit-publication.mjs`);
-  const files = tracked.filter((f) => !isPrivate(f));
+  // Les fichiers neufs pas encore ajoutés (ni ignorés) partiront au prochain commit : leur contenu est contrôlé dès
+  // maintenant (13/11/2026 : un renvoi vers interne/ dans un fichier neuf du rendu n'a été vu qu'à la publication).
+  const untracked = execFileSync('git', ['ls-files', '-z', '--others', '--exclude-standard'], { cwd: repo, encoding: 'utf8' }).split('\0').filter(Boolean);
+  const files = [...tracked, ...untracked.filter((f) => !tracked.includes(f))].filter((f) => !isPrivate(f));
   const places = internalPlaces(tracked);
   for (const file of files.filter((f) => internalFile(f, patterns))) problems.push(`${file} : chemin d'un travail interne (motif de interne/motifs-internes.txt), à ranger dans video/`);
   for (const file of files) {

@@ -1288,6 +1288,9 @@ function drawPlayfield(s) {
   } else if (s.phase === 'confirmQuit') {
     cover = el('section', 'overlay');
     cover.append(el('h1', '', t('Quitter Cyber Pinball ?')), el('div', 'lead', t('Start : quitter · Exit : rester')));
+  } else if (s.phase === 'message' && s.message?.wizard) {
+    cover = el('section', 'overlay');
+    cover.append(wizardCard(s.message.wizard));
   } else if (s.phase === 'message' && s.message) {
     cover = el('section', s.message.action === 'power' ? 'overlay power' : 'overlay');
     cover.append(el('h1', '', s.message.title));
@@ -1774,6 +1777,24 @@ function headsetHoldRing(hold) {
   return card;
 }
 
+/**
+ * Une étape de l'assistant des manettes (planche validée le 13 novembre 2026) : l'étape, la fonction en grand, le
+ * schéma avec le bouton proposé en vert, « Proposé : A · appuyez sur le bouton voulu », puis le retour.
+ */
+function wizardCard(w) {
+  const card = el('div', 'wizard-card');
+  card.append(el('h1', 'wizard-head', w.header), el('p', 'wizard-step', w.step));
+  const schema = w.schema ? schemaManettes(w.schema, 'schema-assistant') : undefined;
+  if (schema) card.append(schema);
+  if (w.problem) card.append(el('p', 'wizard-problem', w.problem));
+  const line = el('p', 'wizard-proposed');
+  if (w.proposed) line.append(document.createTextNode(typo(`${w.proposedLabel} `)), el('b', '', w.proposed), document.createTextNode(typo(` · ${w.hint}`)));
+  else line.textContent = typo(w.hint);
+  card.append(line);
+  if (w.back) card.append(el('p', 'wizard-back', w.back));
+  return card;
+}
+
 /** La ligne des boutons d'une consigne, sa commande principale (`lead`, en tête) en vert, comme sur le schéma. */
 function promptKeys(keys, lead) {
   const line = el('p', 'headset-prompt-keys');
@@ -2079,6 +2100,7 @@ window.cyber.onState((s) => {
     const schema = prompt?.schema ? schemaManettes(prompt.schema, 'schema-moyen') : undefined;
     if (schema) {
       card.classList.add('with-schema');
+      schema.classList.add('headset-prompt-schema');
       card.append(schema);
     }
     if (prompt?.problem) card.append(el('p', 'headset-prompt-problem', prompt.problem));

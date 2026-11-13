@@ -4,6 +4,7 @@
 // arrête : tout fichier hors des emplacements publics déclarés est désormais refusé.
 
 import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
 import { test } from 'node:test';
 import { internalPlaces, internalReferences, isPrivate, isPublic, unplacedFiles, workTraces } from './audit-publication.mjs';
 
@@ -41,4 +42,12 @@ test('aucune trace des revues de conception dans un fichier publié', () => {
   assert.equal(workTraces('docs/manual.md', 'Phone page (mock-up reviewed by Codex on 06/11/2026).').length, 1);
   assert.deepEqual(workTraces('app/src/a.ts', '// Douze pixels entre deux pastilles. Le codec vidéo, les codecs.'), []);
   assert.deepEqual(workTraces('scripts/audit-publication.mjs', 'const WORK_TRACE = /Codex/;'), []);
+});
+
+// Un fichier neuf, pas encore ajouté à git, part au prochain commit : l'audit le lit déjà (13/11/2026 : un renvoi
+// vers interne/ dans un fichier neuf du rendu n'avait été vu qu'à la publication). Les fichiers ignorés, non.
+test('les fichiers neufs non ignorés sont contrôlés avant leur premier commit', () => {
+  const source = fs.readFileSync(new URL('./audit-publication.mjs', import.meta.url), 'utf8');
+  assert.match(source, /\['ls-files', '-z', '--others', '--exclude-standard'\]/);
+  assert.match(source, /const files = \[\.\.\.tracked, \.\.\.untracked\.filter\(\(f\) => !tracked\.includes\(f\)\)\]\.filter\(\(f\) => !isPrivate\(f\)\);/);
 });
