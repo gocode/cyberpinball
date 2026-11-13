@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.11
 
+- Réalité virtuelle : sur l'écran « Mettez le casque », Exit de la borne arrête bien la partie et ramène à la roue (comme Échap et Ctrl+Maj+K) ; les deux consignes du bas sont sur deux lignes.
 - Médaillons vivants : dans la roue, le médaillon du Juke-box s'anime (trois fils lumineux ondulent autour de la note) et celui de la Communauté aussi (des bulles de discussion avec des emojis montent derrière le joueur). Seul le médaillon au centre bouge, ses voisins restent immobiles.
 - Juke-box : le médaillon animé en tête de l'écran, ses fils qui traversent l'affiche du fronton, et une barre de progression en fil vert, avec une étincelle en tête de lecture.
 - Modération des salons : sur une ligne, « Signaler ce message » avec sa raison ; le signalement part chiffré aux seuls modérateurs, et le joueur signalé ne sait pas qui. Les modérateurs (une charte signée par le projet, livrée avec Cyber Pinball) ont Menu système > Amis > Modération : la file des signalements, le contexte, et les décisions (masquer le message, sourdine 1 h, 24 h ou 7 jours, exclure, lever, classer sans suite), appliquées par toutes les bornes ; ils posent aussi le sujet de chaque salon. Un joueur sanctionné lit toujours, et voit pourquoi il ne peut plus écrire et jusqu'à quand.

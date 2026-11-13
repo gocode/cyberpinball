@@ -193,8 +193,10 @@ test('chargement : le garde-fou de mise en page contrôle les deux compositions 
 const WEAR = {
   status: 'Partie dans le casque',
   text: 'Mettez le casque : la table démarre quand il est sur la tête',
-  keys: 'Ctrl+Maj+K ou Exit : arrêter · Pour jouer sur les écrans : Menu système > Borne > Réalité virtuelle',
+  keys: ['Exit : arrêter (au clavier : Ctrl+Maj+K ou Échap)', 'Pour jouer sur les écrans : Menu système > Borne > Réalité virtuelle'],
 };
+/** Ce qu'affiche l'écran : les espaces avant « : » sont insécables (typo, frontend.js). */
+const shown = (text: string) => text.replace(/ ([:;!?»])/g, '\u00a0$1');
 
 test('partie dans le casque, casque pas sur la tête : la consigne en grand sur le playfield, au chargement comme en partie', () => {
   for (const shape of ['cab', 'desktop'] as const) {
@@ -202,11 +204,13 @@ test('partie dans le casque, casque pas sur la tête : la consigne en grand sur 
     send({ ...loadingState({ video: true }), vrWear: WEAR });
     const card = root.querySelector('.vr-wear');
     assert.ok(card, `${shape} : consigne au chargement`);
-    assert.equal(card!.querySelector('.vr-wear-text')!.textContent, WEAR.text);
+    assert.equal(card!.querySelector('.vr-wear-text')!.textContent, shown(WEAR.text));
     assert.equal(root.querySelector('.loading-card'), null, `${shape} : rien d'autre que la consigne`);
     // La fenêtre de VPX (l'aperçu de la VR) paraît : phase de jeu, la consigne reste.
     send({ ...loadingState({ video: true }), phase: 'playing', game: { role: 'playfield', table: { title: 'Neon Galaxy' }, mode: 'still', medias: {}, play: {} }, vrWear: WEAR });
-    assert.equal(root.querySelector('.vr-wear-keys')!.textContent, WEAR.keys, `${shape} : consigne en partie`);
+    // Une consigne par ligne (essai.30), jamais coupée juste avant « : ».
+    assert.deepEqual([...root.querySelectorAll('.vr-wear-keys')].map((p) => p.textContent), WEAR.keys.map(shown), `${shape} : consigne en partie`);
+    assert.ok([...root.querySelectorAll('.vr-wear-keys')].every((p) => !/ :/.test(p.textContent ?? '')), `${shape} : aucune espace sécable avant « : »`);
     // Casque mis, partie finie, ou partie sur les écrans : plus de consigne.
     send({ ...loadingState({ video: true }), phase: 'playing', game: { role: 'playfield', table: { title: 'Neon Galaxy' }, mode: 'still', medias: {}, play: {} } });
     assert.equal(root.querySelector('.vr-wear'), null, `${shape} : consigne retirée`);
@@ -220,4 +224,18 @@ test('la consigne du casque a son style, lisible de loin, et le processus princi
   assert.match(main, /vrGame && !headset\?\.worn/);
   assert.match(main, /vrWear: vrWearHint && \(role === 'playfield' \|\| role === 'backglass'\)/);
   assert.match(main, /if \(!playedVr\) vrWearHint = undefined;/);
+});
+
+test('attente du casque : Exit de la borne (touche ou bouton du joystick), Échap et le raccourci arrêtent la partie et ramènent à la roue', () => {
+  const main = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
+  // Exit lu quelle que soit la fenêtre au premier plan, tant que la consigne est là et le casque pas sur la tête.
+  assert.match(main, /const stopWaitExit = vrGame !== undefined \? watchExitWhileWaiting\(\(\) => Boolean\(vrWearHint\) && !headset\?\.worn, \(\) => \{[\s\S]{0,200}game\.stop\(\);/);
+  assert.match(main, /inGameMenu\.disarm\(\);\s*stopWaitExit\?\.\(\);/);
+  // Les touches d'Exit de la borne : clavier par Windows, joystick par SDL ; un bouton déjà tenu au départ ne compte pas.
+  assert.match(main, /function watchExitWhileWaiting\(active: \(\) => boolean, onExit: \(\) => void\): \(\) => void \{\s*const codes = \(\) => KEYS\.exit;\s*let wasDown = true;/);
+  assert.match(main, /keysDown\(vks\)/);
+  assert.match(main, /joystickButtonsHeld\(\)/);
+  // Échap et le raccourci affiché : raccourcis globaux pour toute partie dans le casque.
+  assert.match(main, /globalShortcut\.register\(accelerator\(SHORTCUTS\.vrExit\)/);
+  assert.match(main, /globalShortcut\.register\(accelerator\(SHORTCUTS\.forceStop\)/);
 });

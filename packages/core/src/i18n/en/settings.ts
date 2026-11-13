@@ -52,7 +52,8 @@ export const messages: Record<string, string> = {
   'Casque non détecté : partie en mode normal': 'Headset not detected: game in normal mode',
   'Partie dans le casque': 'Game in the headset',
   'Mettez le casque : la table démarre quand il est sur la tête': 'Put the headset on: the table starts once it’s on your head',
-  '{keys} ou Exit : arrêter · Pour jouer sur les écrans : Menu système > Borne > Réalité virtuelle': '{keys} or Exit: stop · To play on the screens: System menu > Cabinet > Virtual reality',
+  'Exit : arrêter (au clavier : {keys} ou Échap)': 'Exit: stop (on the keyboard: {keys} or Esc)',
+  'Pour jouer sur les écrans : Menu système > Borne > Réalité virtuelle': 'To play on the screens: System menu > Cabinet > Virtual reality',
   // app/src/frontend.ts : menu du casque (≡ de la manette gauche)
   'Menu du casque': 'Headset menu',
   'Les mêmes boutons partout : A valide, B revient, les joysticks déplacent la sélection.': 'The same buttons everywhere: A confirms, B goes back, the thumbsticks move the selection.',

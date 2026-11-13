@@ -83,6 +83,7 @@ import {
   vpxHeadsetInput,
   vpxPlaceProblem,
   vpxRecenteredHead,
+  windowsVk,
   calibrationCombo,
   calibrationComboLabel,
   CALIBRATION_HOLD_S,
@@ -360,7 +361,7 @@ import {
   mentions,
   maskWords,
 } from '@cyberpinball/core';
-import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, setCursorPosition, visibleWindowsOf } from '@cyberpinball/win-displays';
+import { bringToFront, foregroundWindow, keysDown, listWindows, moveWindow, probeDisplayLinks, setCursorPosition, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
 import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, whenReadyToShow, windowRect } from './offscreen';
@@ -380,7 +381,7 @@ import { DmdWheels } from './dmd-wheel';
 import { createConverter } from './media-convert';
 import { RomMusic } from './rom-music';
 import { onKeyInput } from './key-input';
-import { onJoystickInput, retryJoysticks } from './joystick-input';
+import { joystickButtonsHeld, onJoystickInput, retryJoysticks, watchJoystickButtons } from './joystick-input';
 import { locations, vpxInstall, vpxProfile } from './paths';
 import { loadPlugins } from './plugins';
 import { activeVpxIni, audioOutputs, syncConfiguration } from './vpx-ini';
@@ -3377,6 +3378,40 @@ function headsetPutBackOn(): void {
   offerCalibration(true, 'casque remis, pièce recentrée par le Quest'); // i18n-ignore : journal
 }
 
+/**
+ * Exit de la borne pendant une attente où aucune fenêtre de Cyber Pinball n'a le clavier (VPX attend le casque) :
+ * les touches d'Exit de cette borne lues par Windows (GetAsyncKeyState), ses boutons de joystick par SDL, toutes
+ * les 50 ms tant que `active()` ; un appui (pas un bouton déjà tenu au départ) appelle `onExit` une fois.
+ */
+function watchExitWhileWaiting(active: () => boolean, onExit: () => void): () => void {
+  const codes = () => KEYS.exit;
+  let wasDown = true;
+  let done = false;
+  const stopJoystick = watchJoystickButtons(() => undefined);
+  const timer = setInterval(() => {
+    if (done || !active()) return void (wasDown = true);
+    const list = codes();
+    const joystick = new Set(joystickButtonsHeld());
+    const vks = list.filter((c) => !c.startsWith('SDLJoy_')).map(windowsVk).filter((v): v is number => v !== undefined);
+    let keyboard: number[] = [];
+    try {
+      keyboard = vks.length ? keysDown(vks) : [];
+    } catch {
+      keyboard = [];
+    }
+    const down = list.some((c) => (c.startsWith('SDLJoy_') ? joystick.has(c) : keyboard.includes(windowsVk(c) ?? -1)));
+    if (down && !wasDown) {
+      done = true;
+      onExit();
+    }
+    wasDown = down;
+  }, 50);
+  return () => {
+    clearInterval(timer);
+    stopJoystick();
+  };
+}
+
 /** Hauteur des yeux dite par le compagnon (sol mal réglé), et limite du Quest changée depuis le calage. */
 let headsetEyes: number | undefined;
 let roomNotice = false;
@@ -3814,7 +3849,7 @@ let headsetWornBefore = false;
  * le fronton de la borne, de l'appui sur Start à la fin de la partie. VPX attend le casque pour démarrer la
  * table (essai du 12/11/2026, The Addams Family : 3 min sans rien sur la borne, VPX croyait bloqué).
  */
-let vrWearHint: { status: string; text: string; keys: string } | undefined;
+let vrWearHint: { status: string; text: string; keys: string[] } | undefined;
 
 /** Le bouton Pause des manettes, et comment quitter, en clair : « B : pause · tenu : quitter ». */
 function exitHintText(): string | undefined {
@@ -5683,7 +5718,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
       ? {
           status: t('Partie dans le casque'),
           text: t('Mettez le casque : la table démarre quand il est sur la tête'),
-          keys: t('{keys} ou Exit : arrêter · Pour jouer sur les écrans : Menu système > Borne > Réalité virtuelle', { keys: shortcutLabel(SHORTCUTS.forceStop) }),
+          // Une consigne par ligne (essai.30 : les deux sur une ligne, coupée avant « : », illisible).
+          keys: [t('Exit : arrêter (au clavier : {keys} ou Échap)', { keys: shortcutLabel(SHORTCUTS.forceStop) }), t('Pour jouer sur les écrans : Menu système > Borne > Réalité virtuelle')],
         }
       : undefined;
   if (vrWearHint) console.log(`Réalité virtuelle (${played.id}) : casque pas sur la tête au lancement ; la borne dit de le mettre.`); // i18n-ignore : journal
@@ -5746,6 +5782,13 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (hooks.gate) gameNotices.prepareWait(liveGames.waitView({ manual: liveManual }));
   // Une partie simulée ne prend aucun raccourci global au poste.
   if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
+  // VPX attend le casque (consigne « Mettez le casque ») : il a le premier plan mais ne lit encore aucun bouton ;
+  // Exit de la borne (touche ou bouton du joystick), lu ici quelle que soit la fenêtre au premier plan, arrête
+  // la partie et ramène à la roue (essai.30 : le joueur restait bloqué sur cet écran).
+  const stopWaitExit = vrGame !== undefined ? watchExitWhileWaiting(() => Boolean(vrWearHint) && !headset?.worn, () => {
+    console.log(`Réalité virtuelle (${played.id}) : Exit pendant l'attente du casque ; la partie s'arrête, retour à la roue.`); // i18n-ignore : journal
+    game.stop();
+  }) : undefined;
   // Partie dans le casque : Échap quitte toujours, que VPX ait le clavier ou non, quoi que fasse un plugin ou le
   // réglage des manettes (essai du 10 novembre 2026 : partie bloquée, sortie avalée). Cyber Pinball ferme VPX.
   const vrEscape = vrGame !== undefined && simulated === undefined && globalShortcut.register(accelerator(SHORTCUTS.vrExit), () => {
@@ -5802,6 +5845,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (watchLive) clearInterval(watchLive);
   gameNotices.close();
   inGameMenu.disarm();
+  stopWaitExit?.();
   const load = gameLoad?.stop(playedVr ? 'casque' : 'ecrans');
   if (load) console.log(load);
   vrGameStop = undefined;

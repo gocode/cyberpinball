@@ -24,8 +24,16 @@ document.documentElement.classList.toggle('annex', role !== 'playfield');
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
+  if (text !== undefined) node.textContent = typo(text);
   return node;
+}
+
+/**
+ * Typographie française à l'écran : l'espace avant « : ; ! ? » et dans les guillemets devient insécable, pour
+ * qu'une ligne ne se coupe jamais juste avant « : » (essai.30 : « …les écrans / : Menu système »).
+ */
+function typo(text) {
+  return typeof text === 'string' ? text.replace(/ ([:;!?»])/g, ' $1').replace(/« /g, '« ') : text;
 }
 
 /** Marque « CYBER PINBALL », PINBALL en vert signal (theme.css, .brand .pin). */
@@ -1718,7 +1726,9 @@ function headsetHoldRing(hold) {
  */
 function vrWearCard(wear) {
   const card = el('section', 'overlay vr-wear');
-  card.append(el('p', 'vr-wear-status', wear.status), el('p', 'vr-wear-text', wear.text), el('p', 'vr-wear-keys', wear.keys));
+  // Une consigne par ligne (Exit, puis jouer sur les écrans) : jamais deux consignes coupées l'une dans l'autre.
+  const keys = Array.isArray(wear.keys) ? wear.keys : [wear.keys];
+  card.append(el('p', 'vr-wear-status', wear.status), el('p', 'vr-wear-text', wear.text), ...keys.map((line) => el('p', 'vr-wear-keys', line)));
   return card;
 }
 
