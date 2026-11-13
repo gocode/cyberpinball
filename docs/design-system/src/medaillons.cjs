@@ -1,7 +1,8 @@
 // Médaillons de la roue, sur le gabarit commun (11/11/2026) : l'anneau chromé de 1 000 × 1 000
 // (medaillons/contour.png, tiré du fichier Photoshop du mainteneur, sans effet de verre), son
 // centre rempli par l'intérieur propre à chaque médaillon. Tout médaillon ajouté au menu passe par
-// ce gabarit (MEDAILLONS ci-dessous) ; le Juke-box est le premier.
+// ce gabarit (MEDAILLONS ci-dessous) ; le Juke-box est le premier. Depuis le 13/11/2026, l'intérieur
+// est vivant dans la roue (medaillons-vivants.js) ; ces images en sont la première image.
 //
 // Deux tailles par médaillon, dans app/renderer/medaillons :
 //   <nom>.png       pleine définition (920 × 920, centré sur le trou, pixels d'origine) : en grand,
@@ -21,19 +22,17 @@ const { app, BrowserWindow } = require('electron');
 
 const here = __dirname;
 const out = path.resolve(here, '..', '..', '..', 'app', 'renderer', 'medaillons');
-const renderer = path.resolve(here, '..', '..', '..', 'app', 'renderer');
 /** Côté du carré gardé autour du trou (l'anneau en déborde jusqu'à 455 px du centre), et de la version allégée. */
 const CROP = 920;
 const SMALL = 512;
 /**
- * Intérieur de chaque médaillon : une image dessinée dans le trou de l'anneau. `disc` est le rayon
- * du disque de l'image, dans son propre repère (le disque du logo du Juke-box : 147 sur 300).
+ * Intérieur de chaque médaillon (13/11/2026) : la première image de son intérieur vivant
+ * (app/renderer/medaillons-vivants.js, CyberMedaillons.paint), peinte dans le trou de l'anneau.
+ * L'image fixe et le médaillon animé de la roue sont ainsi le même dessin.
+ *   juke-box   : « Onde », trois fils Soie autour du rond à la note ;
+ *   communaute : « Montée », le bonhomme vert dans le rond, des bulles d'emojis qui montent.
  */
-const MEDAILLONS = [
-  { name: 'juke-box', src: path.join(renderer, 'juke-box.svg'), size: 300, disc: 147 },
-  // Communauté (12/11/2026) : joueurs en ligne, messages, salons, classements (community-menu.ts).
-  { name: 'communaute', src: path.join(renderer, 'communaute.svg'), size: 300, disc: 147 },
-];
+const MEDAILLONS = [{ name: 'juke-box' }, { name: 'communaute' }];
 
 const page = (ring, items) => `
 (async () => {
@@ -83,12 +82,16 @@ const page = (ring, items) => `
   };
   const bare = canvas(W, H); bare.getContext('2d').drawImage(ring, 0, 0);
   emit('contour', bare);
+  // Les emojis de « Montée » viennent de la police de couleur du système : attendre qu'elle soit prête.
+  await document.fonts?.ready;
   for (const m of ${JSON.stringify(items)}) {
-    const art = await load(m.src);
     const full = canvas(W, H); const g = full.getContext('2d');
-    const R = rMax + 6, k = R / m.disc;
+    // Le disque de l'intérieur (rayon 147 sur 300) remplit le carré : il va jusqu'au plus grand rayon du trou, plus 6 px.
+    const R = rMax + 6, side = Math.round(2 * R);
+    const inner = canvas(side, side);
+    CyberMedaillons.paint(m.name, inner.getContext('2d'), side);
     g.save(); g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.clip();
-    g.drawImage(art, cx - (m.size / 2) * k, cy - (m.size / 2) * k, m.size * k, m.size * k);
+    g.drawImage(inner, cx - side / 2, cy - side / 2);
     g.restore();
     g.drawImage(ring, 0, 0);
     emit(m.name, full);
@@ -101,13 +104,13 @@ app.whenReady().then(async () => {
   const win = new BrowserWindow({ show: false, width: 200, height: 200, webPreferences: { offscreen: true } });
   await win.loadURL('data:text/html,<!doctype html><meta charset="utf-8">');
   const url = (f) => 'file:///' + f.replace(/\\/g, '/');
-  // Une page data: ne lit pas les fichiers : une page locale vide, à côté des sources.
+  // Une page data: ne lit pas les fichiers : une page locale vide, à côté des sources, avec le dessin des intérieurs.
   const blank = path.join(out, '.page.html');
   fs.mkdirSync(out, { recursive: true });
-  fs.writeFileSync(blank, '<!doctype html><meta charset="utf-8">');
+  fs.writeFileSync(blank, '<!doctype html><meta charset="utf-8"><script src="../medaillons-vivants.js"></script>');
   await win.loadFile(blank);
   fs.rmSync(blank);
-  const result = await win.webContents.executeJavaScript(page(url(path.join(here, 'medaillons', 'contour.png')), MEDAILLONS.map((m) => ({ ...m, src: url(m.src) }))));
+  const result = await win.webContents.executeJavaScript(page(url(path.join(here, 'medaillons', 'contour.png')), MEDAILLONS));
   for (const [name, data] of Object.entries(result.files)) {
     const bytes = Buffer.from(data.slice(data.indexOf(',') + 1), 'base64');
     fs.writeFileSync(path.join(out, name), bytes);

@@ -1749,6 +1749,22 @@ Au Start sur « Jouer », le lancement se joue comme une ouverture de film, sur 
 - **Jamais d'écran clair** : aucune fenêtre n'est ouverte pour le cinéma ; tout se joue dans les fenêtres du menu, sur leurs fonds sombres, et le fondu ne touche que la couche du cinéma.
 - **Dessin** : allumage sans rebond, une seule petite décélération à la pose, ondes brèves et fines, voile du fronton à 64 %, halo de tenue calme ; le DMD dans sa matrice orange (disque de 9 points, cœur 14, traînée de 10 points, éclat local à 15 seulement).
 
+### Médaillons vivants : Juke-box et Communauté
+
+Les médaillons du Juke-box et de la Communauté sont animés (choix du mainteneur, 13/11/2026). Leur intérieur est dessiné en direct dans un canevas, sous l'anneau chromé commun ([app/renderer/medaillons-vivants.js](../app/renderer/medaillons-vivants.js), `CyberMedaillons`) :
+
+- **Juke-box, « Onde »** : trois fils Soie (vert signal, sarcelle, violet) ondulent en fuseau autour du rond à la note ; une étincelle court le long du fil vert.
+- **Communauté, « Montée »** : le même rond, avec le joueur vert ; derrière lui montent des bulles de discussion violettes, bleues ou vertes, qui portent un emoji (amitié, compétition, scores) ou trois points. Les emojis viennent de la police de couleur de Windows (Segoe UI Emoji) ; aucun drapeau, que Windows affiche en deux lettres.
+- **Volume** : un reflet doux en haut à gauche et une ombre légère en bas à droite, par-dessus l'intérieur.
+
+**Dans la roue**, chaque médaillon est un canevas posé dans le trou de l'anneau (80,65 % de l'image du contour), sous l'anneau en image (`img.wheel-img`, `medaillons/contour-512.webp`) : le halo vert et le cercle lumineux de la roue se calent sur l'anneau, comme pour un logo. Seul le médaillon du centre s'anime, et repart de sa première image en y arrivant ; ses voisins restent sur leur première image (au réglage « Logos animés : tous » (all animated), tous s'animent). L'image reste figée quand Windows demande moins d'animations, et rien n'est dessiné tant que la fenêtre est cachée (une seule boucle `requestAnimationFrame` pour tous les canevas).
+
+**Juke-box** : sur le plateau en borne, le médaillon vivant est en tête de la playlist, ses fils derrière le titre. Sur l'affiche (fronton, plateau derrière la roue), les fils traversent toute l'affiche en passant derrière le médaillon ; le vinyle, l'orbite et le filet de l'ancien décor sont retirés. Pour un morceau sans clip, au fronton, les fils battent derrière la pochette et le titre. La barre de progression du morceau devient un fil vert, ondulé sur la part jouée, l'étincelle en tête de lecture. Un clip garde tout le fronton. Aucune pulsation sur le tempo : en lecture, les fils ondulent à amplitude constante ; en pause, ils se posent presque à plat.
+
+**Images fixes** : `medaillons/juke-box.png`, `communaute.png` et leurs versions WebP de 512 px sont la première image de ces intérieurs, tirée du même code par le générateur (`npx electron docs/design-system/src/medaillons.cjs`, `CyberMedaillons.paint`). Elles servent là où le médaillon reste fixe (cinématique d'entrée du Juke-box), et de repli sans canevas.
+
+**Essais** : [medaillons-vivants-chromium.test.ts](../packages/core/src/test/medaillons-vivants-chromium.test.ts) ouvre la vraie page du menu dans un Chromium hors écran, avec les deux médaillons dans la roue. Il vérifie que l'anneau couvre le canevas centré dans son trou, que le médaillon du centre s'anime et que son voisin reste immobile, sans erreur ni refus de la politique de sécurité.
+
 ### Roue : ses réglages
 
 Tous les réglages de la roue des tables sont sur un même écran, **Menu système > Tables > Roue**, à côté des Collections (demande du 12/11/2026). Ils étaient mêlés au son et au mode attente dans Menu système > Médias > « Médias, son et attente », qui garde le son, l'attente, le DMD et les médias. Code : [app/src/wheel-settings.ts](../app/src/wheel-settings.ts) ; tout est gardé dans `<données>\medias.json`, et s'applique aussitôt.

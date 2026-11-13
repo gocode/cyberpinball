@@ -42,12 +42,12 @@
   // ---------- Logo du médaillon ----------
 
   /**
-   * Médaillon du Juke-box : le gabarit commun des médaillons de la roue (l'anneau chromé,
-   * docs/design-system/src/medaillons.cjs), son centre rempli par le logo « Sillon » du 10/11/2026
-   * (juke-box.svg : vinyle à sillons, deux croches vert signal dans un label sarcelle, six pistes de
-   * son violettes) ; une illustration, pas un pictogramme du registre (celui-là est « jukebox »,
-   * icons.js). Dans la roue, la version allégée (512 px, WebP) ; en grand (affiche du fronton,
-   * animations), la pleine définition (920 px).
+   * Médaillon du Juke-box, en image fixe : le gabarit commun des médaillons de la roue (l'anneau
+   * chromé, docs/design-system/src/medaillons.cjs), son centre rempli par la première image d'« Onde »
+   * (13/11/2026, medaillons-vivants.js : trois fils Soie autour du rond à la note) ; une illustration,
+   * pas un pictogramme du registre (celui-là est « jukebox », icons.js). La roue et l'affiche montrent
+   * le médaillon vivant (CyberMedaillons) ; cette image sert ailleurs (cinématique d'entrée, repli sans
+   * canevas). Version allégée (512 px, WebP) ou pleine définition (920 px).
    */
   function logo(className = 'jb-logo', { wheel = false } = {}) {
     const img = el('img', className);
@@ -108,14 +108,27 @@
   }
 
   /**
-   * Disque de l'affiche : le logo, un halo qui respire, une orbite et un grand vinyle qui tournent
-   * lentement derrière lui (transformations et opacité seulement : léger pour la carte graphique).
+   * Disque de l'affiche : le médaillon vivant « Onde » (medaillons-vivants.js) dans un halo qui
+   * respire ; ses fils traversent toute l'affiche (poster). Le vinyle, l'orbite et le filet d'avant
+   * le 13/11/2026 sont retirés : les fils d'Onde font ce décor. Sans canevas, le logo fixe et l'ancien décor.
    */
   function emblem() {
     const box = el('div', 'jb-emblem');
     box.setAttribute('aria-hidden', 'true');
-    box.append(el('div', 'jb-emblem-vinyl'), el('div', 'jb-emblem-halo'), el('div', 'jb-emblem-rail'), el('div', 'jb-emblem-orbit'), logo('jb-logo'), el('div', 'jb-emblem-wave'));
+    if (window.CyberMedaillons) box.append(el('div', 'jb-emblem-halo'), CyberMedaillons.medallion('juke-box', 'jb-logo'), el('div', 'jb-emblem-wave'));
+    else box.append(el('div', 'jb-emblem-vinyl'), el('div', 'jb-emblem-halo'), el('div', 'jb-emblem-rail'), el('div', 'jb-emblem-orbit'), logo('jb-logo'), el('div', 'jb-emblem-wave'));
     return box;
+  }
+
+  /**
+   * Les fils d'Onde sur toute une zone, à la hauteur du médaillon (ou de la pochette) : un canevas
+   * posé en premier, sous les textes. `playing` : déployés en lecture, presque à plat sinon.
+   */
+  function fils(anchor, className, opts) {
+    const canvas = el('canvas', className);
+    canvas.setAttribute('aria-hidden', 'true');
+    window.CyberMedaillons?.waves(canvas, anchor, opts);
+    return canvas;
   }
 
   /**
@@ -163,7 +176,11 @@
   function poster(p, className = '', hint = false) {
     const key = JSON.stringify([className, hint, p]);
     const known = posters.get(key);
-    if (known) return known;
+    if (known) {
+      // Affiche remise à l'écran : son médaillon et ses fils reprennent.
+      window.CyberMedaillons?.revive(known);
+      return known;
+    }
     const box = el('section', `jb-poster ${className}`.trim());
     box.classList.toggle('jb-poster-empty', Boolean(p.empty));
     const stage = el('div', 'jb-poster-stage');
@@ -179,7 +196,10 @@
       detail.title = p.detail;
       copy.append(detail);
     }
-    stage.append(head, copy, emblem());
+    const disc = emblem();
+    stage.append(head, copy, disc);
+    // Les fils d'Onde de bord à bord, passant derrière le médaillon (affiche du 13/11/2026).
+    if (window.CyberMedaillons) box.append(fils(disc, 'jb-poster-fils', { alpha: 0.75, amp: 0.4, reference: 1400 }));
     if (hint) {
       const foot = el('footer', 'jb-poster-foot');
       const go = el('span', 'jb-poster-go');
@@ -446,6 +466,15 @@
     const d = t0?.duration ?? now.duration;
     fill.style.width = `${t0 && d > 0 ? Math.min(100, (t0.position / d) * 100) : 0}%`;
     bar.append(fill);
+    // La barre en fil vert d'Onde (13/11/2026) : ondulée sur la part jouée, l'étincelle en tête de
+    // lecture ; à plat en pause. La largeur de la part jouée (le span) reste la mesure.
+    if (window.CyberMedaillons) {
+      bar.classList.add('jb-fil');
+      const trace = el('canvas', 'jb-fil-trace');
+      trace.setAttribute('aria-hidden', 'true');
+      bar.append(trace);
+      CyberMedaillons.track(trace, bar, () => !now.paused);
+    }
     return bar;
   }
 
@@ -465,11 +494,21 @@
       const now = el('div', 'jb-zone jb-now');
       const help = el('div', 'jb-zone jb-help');
       for (const [zone, name] of [[head, 'en-tete'], [playlist, 'playlist'], [list, 'liste'], [now, 'lecture'], [help, 'commandes']]) zone.dataset.stable = `juke-box-${name}`;
-      node.append(ambiance(), head, playlist, list, now, help);
+      // En tête de la playlist : le médaillon vivant « Onde », ses fils derrière le titre (13/11/2026).
+      const onde = el('div', 'jb-onde');
+      onde.setAttribute('aria-hidden', 'true');
+      if (window.CyberMedaillons) {
+        const med = CyberMedaillons.medallion('juke-box', 'jb-onde-med');
+        onde.append(fils(med, 'jb-onde-fils', { alpha: 0.75, amp: 0.5, reference: 1080, playing: () => node.classList.contains('jb-playing') }), med);
+        node.classList.add('jb-avec-onde');
+      }
+      node.append(ambiance(), onde, head, playlist, list, now, help);
       cab = { node, playlist, list, now, help };
     }
     // L'ambiance ne s'anime que pendant la musique (pas en pause).
     cab.node.classList.toggle('jb-playing', Boolean(view.now && !view.now.paused));
+    // Écran gardé d'une visite à l'autre : le médaillon et ses fils reprennent.
+    window.CyberMedaillons?.revive(cab.node);
     fillPlaylist(cab.playlist, view);
     fillList(cab.list, view, false);
     fillNow(cab.now, view, s, false);
@@ -1085,7 +1124,10 @@
     text.append(el('p', 'jb-label', c.now.label), el('h1', 'jb-audio-title jb-ellipsis', c.now.title));
     if (c.now.artist) text.append(el('h2', 'jb-ellipsis', c.now.artist));
     if (c.now.album) text.append(el('p', 'jb-muted jb-ellipsis', t('Album {album}', { album: c.now.album })));
-    audio.append(art(c.now.image, c.now.key, 'jb-art jb-audio-art'), text);
+    const cover = art(c.now.image, c.now.key, 'jb-art jb-audio-art');
+    audio.append(cover, text);
+    // Morceau sans clip : les fils d'Onde battent derrière la pochette et le titre (13/11/2026).
+    if (window.CyberMedaillons) box.append(fils(cover, 'jb-poster-fils', { alpha: 0.55, amp: 0.5, reference: 1400, playing: () => !c.now.paused }));
     box.append(audio);
     return box;
   }

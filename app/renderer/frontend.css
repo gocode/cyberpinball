@@ -1453,6 +1453,25 @@ html.menu-desktop .menu.menu-band .menu-nav {
   height: calc(232 * var(--w));
 }
 
+/*
+ * Médaillon vivant (medaillons-vivants.js) : son intérieur dans un canevas posé dans le trou de
+ * l'anneau (80,65 % de l'image du contour), sous l'anneau ; la copie du halo n'en garde que l'anneau.
+ */
+.wheel-tilt > .wheel-vivant {
+  grid-area: 1 / 1;
+  width: 80.65%;
+  height: 80.65%;
+  border-radius: 50%;
+}
+
+.menu-band .wheel-item.jukebox .wheel-vivant,
+.menu-band .wheel-halo.jukebox .wheel-vivant,
+.menu-band .wheel-item.community .wheel-vivant,
+.menu-band .wheel-halo.community .wheel-vivant {
+  width: calc(232 * 0.8065 * var(--w));
+  height: calc(232 * 0.8065 * var(--w));
+}
+
 .menu-band .wheel-item.disc .wheel-tilt::before,
 .menu-band .wheel-halo.disc .wheel-tilt::before {
   content: '';

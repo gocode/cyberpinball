@@ -1749,6 +1749,22 @@ On Start on "Jouer" (Play), the launch plays like the opening of a film, on ever
 - **Never a light screen**: no window is opened for the cinematic launch; everything happens in the menu windows, on their dark backgrounds, and the fade only touches the cinematic layer.
 - **Design**: ignition with no bounce, a single small deceleration on landing, short thin ripples, backglass dimmed to 64 %, a calm halo while waiting; the DMD in its orange matrix (9-dot disc, core 14, 10-dot trail, a local flash at 15 only).
 
+### Living medallions: Jukebox and Community
+
+The Jukebox and Community medallions are animated (maintainer's choice, 11/13/2026). Their inside is drawn live in a canvas, under the shared chrome ring ([app/renderer/medaillons-vivants.js](../app/renderer/medaillons-vivants.js), `CyberMedaillons`):
+
+- **Jukebox, "Onde" (Wave)**: three Silk threads (signal green, teal, violet) weave in a spindle around the round badge with the note; a spark runs along the green thread.
+- **Community, "Montée" (Rise)**: the same round badge, with the green player; behind it, violet, blue or green chat bubbles rise, each carrying an emoji (friendship, competition, scores) or three dots. The emojis come from Windows' color font (Segoe UI Emoji); no flags, which Windows shows as two letters.
+- **Volume**: a soft highlight at the top left and a light shadow at the bottom right, over the inside.
+
+**In the wheel**, each medallion is a canvas placed in the ring's hole (80.65 % of the ring image), under the ring as an image (`img.wheel-img`, `medaillons/contour-512.webp`): the wheel's green halo and light circle fit the ring, as they do for a logo. Only the center medallion is animated, and it restarts from its first frame when it arrives there; its neighbors stay on their first frame (with the "Logos animés : tous" (all animated) setting, all of them animate). The picture stays still when Windows asks for reduced motion, and nothing is drawn while the window is hidden (a single `requestAnimationFrame` loop for every canvas).
+
+**Jukebox**: on the cabinet's playfield, the living medallion heads the playlist, its threads behind the title. On the poster (backglass, playfield behind the wheel), the threads cross the whole poster, passing behind the medallion; the vinyl, orbit and light line of the former decor are removed. For a track without a clip, on the backglass, the threads move behind the cover and the title. The track's progress bar becomes a green thread, wavy over the played part, with the spark as the playhead. A clip keeps the whole backglass. No pulse on the beat: while playing, the threads wave at a constant amplitude; when paused, they settle almost flat.
+
+**Still images**: `medaillons/juke-box.png`, `communaute.png` and their 512 px WebP versions are the first frame of these insides, drawn from the same code by the generator (`npx electron docs/design-system/src/medaillons.cjs`, `CyberMedaillons.paint`). They are used where the medallion stays still (the Jukebox's entrance cinematic), and as a fallback without a canvas.
+
+**Tests**: [medaillons-vivants-chromium.test.ts](../packages/core/src/test/medaillons-vivants-chromium.test.ts) opens the real menu page in an off-screen Chromium, with both medallions in the wheel. It checks that the ring covers the canvas centered in its hole, that the center medallion animates and its neighbor stays still, with no error and no refusal from the security policy.
+
 ### Wheel: its settings
 
 Every setting of the tables wheel is on one screen, **Menu système > Tables > Roue** (System menu > Tables > Wheel), next to Collections (request of 12/11/2026). They were mixed with sound and attract mode in System menu > Médias (Media) > "Médias, son et attente" (Media, sound and attract mode), which keeps sound, attract mode, the DMD and media. Code: [app/src/wheel-settings.ts](../app/src/wheel-settings.ts); everything is kept in `<data>\medias.json` and applies at once.

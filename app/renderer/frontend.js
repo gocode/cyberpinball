@@ -191,13 +191,17 @@ function fillWheelItem(item, n) {
   item.wheel = n.wheel;
   item.title = n.title;
   const { node, tilt } = item;
-  // Médaillon Communauté : le gabarit chromé commun des médaillons (medaillons.cjs), toujours prêt.
+  // Médaillon Communauté : son intérieur vivant (« Montée », medaillons-vivants.js) sous l'anneau
+  // chromé commun ; l'image fixe du générateur (medaillons.cjs) faute de canevas.
   if (n.community) {
-    const img = el('img', 'wheel-img');
-    img.src = 'medaillons/communaute-512.webp';
-    img.alt = t('Communauté');
-    img.draggable = false;
-    tilt.replaceChildren(img);
+    if (window.CyberMedaillons) tilt.replaceChildren(...CyberMedaillons.wheelNodes('communaute', t('Communauté')));
+    else {
+      const img = el('img', 'wheel-img');
+      img.src = 'medaillons/communaute-512.webp';
+      img.alt = t('Communauté');
+      img.draggable = false;
+      tilt.replaceChildren(img);
+    }
     node.classList.remove('disc', 'jukebox');
     node.classList.add('community');
     item.ratio = 1;
@@ -208,9 +212,11 @@ function fillWheelItem(item, n) {
     return;
   }
   node.classList.remove('community');
-  // Médaillon Juke-box (jukebox.js) : son logo rond, dessiné, toujours prêt.
+  // Médaillon Juke-box : son intérieur vivant (« Onde », medaillons-vivants.js) sous l'anneau chromé
+  // commun ; le logo fixe de jukebox.js faute de canevas.
   if (n.jukebox && window.CyberJukebox) {
-    tilt.replaceChildren(CyberJukebox.logo('wheel-img', { wheel: true }));
+    if (window.CyberMedaillons) tilt.replaceChildren(...CyberMedaillons.wheelNodes('juke-box', t('Juke-box')));
+    else tilt.replaceChildren(CyberJukebox.logo('wheel-img', { wheel: true }));
     node.classList.remove('disc');
     node.classList.add('jukebox');
     item.ratio = 1;
@@ -323,6 +329,8 @@ function wheelStage(s, style) {
   v.stage.classList.add(`roue-${style}`);
   // Logos animés : la table choisie seule (par défaut), ou tous (« all »).
   v.stage.classList.toggle('logos-fixes', s.wheelMotion !== 'all');
+  // Roue remise à l'écran (retour du Juke-box, d'une partie) : les médaillons vivants reprennent.
+  window.CyberMedaillons?.revive(v.stage);
   // Autre collection (MagnaSave, déverrouillage du mode invité) : les tables qu'elles partagent
   // glisseraient de leur ancienne place à la nouvelle en se croisant. La roue se repose d'un coup :
   // celles qui restent sautent à leur place (logo déjà mesuré), celles qui partent s'en vont

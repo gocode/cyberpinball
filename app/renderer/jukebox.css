@@ -186,6 +186,62 @@
   border-radius: inherit;
 }
 
+/*
+ * Barre en fil vert d'Onde (13/11/2026, medaillons-vivants.js) : la barre garde sa place et sa part
+ * jouée (le span, invisible, reste la mesure) ; un canevas plus haut qu'elle dessine le fil ondulé,
+ * l'étincelle en tête, sans rien déplacer autour.
+ */
+.jb-progress.jb-fil {
+  position: relative;
+  overflow: visible;
+  background: transparent;
+}
+
+.jb-progress.jb-fil > span {
+  visibility: hidden;
+}
+
+.jb-fil-trace {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 100%;
+  height: calc(24 * var(--jp, var(--cp)));
+  translate: 0 -50%;
+  pointer-events: none;
+}
+
+/* Médaillon vivant hors de la roue : le canevas dans le trou de l'anneau (80,65 %), l'anneau par-dessus. */
+.medaillon-vivant {
+  position: relative;
+  display: block;
+}
+
+.medaillon-vivant > .medaillon-vivant-fond {
+  position: absolute;
+  left: 9.675%;
+  top: 9.675%;
+  width: 80.65%;
+  height: 80.65%;
+  border-radius: 50%;
+}
+
+.medaillon-vivant > .medaillon-vivant-anneau {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Fils d'Onde de l'affiche, de bord à bord, sous les textes et le disque. */
+.jb-poster-fils {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 /* ---------- Commandes : pastilles vertes, comme le bandeau du menu ---------- */
 
 .jb-help {
@@ -264,6 +320,43 @@
   top: calc(150 * var(--jp));
   width: calc(984 * var(--jp));
   height: calc(190 * var(--jp));
+}
+
+/*
+ * Médaillon vivant « Onde » en tête de la playlist (13/11/2026) : à gauche du titre, ses trois fils
+ * sur toute la largeur de l'écran, derrière le titre ; le fil d'Ariane, dessous, ne bouge pas.
+ */
+.jb-cab .jb-onde {
+  position: absolute;
+  left: 0;
+  top: calc(146 * var(--jp));
+  width: calc(1080 * var(--jp));
+  height: calc(126 * var(--jp));
+  pointer-events: none;
+}
+
+.jb-onde-fils {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.jb-cab .jb-onde-med {
+  position: absolute;
+  left: calc(48 * var(--jp));
+  top: calc(6 * var(--jp));
+  width: calc(114 * var(--jp));
+  height: calc(114 * var(--jp));
+}
+
+.jb-cab.jb-avec-onde .jb-playlist > .jb-between {
+  padding-left: calc(138 * var(--jp));
+}
+
+.jb-cab.jb-avec-onde .jb-playlist-name,
+.jb-cab.jb-avec-onde .jb-playlist .jb-label {
+  text-shadow: 0 0 calc(12 * var(--jp)) var(--void), 0 0 calc(4 * var(--jp)) var(--void);
 }
 
 .jb-playlist-names {
