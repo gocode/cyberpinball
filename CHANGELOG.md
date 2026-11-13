@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.11
 
+- Réalité virtuelle : nouvelle option « Recalage automatique » (Menu système > Borne > Réalité virtuelle, désactivée par défaut) : les deux manettes posées aux coins inférieurs de la table, immobiles une seconde, et la borne se recale d'elle-même, au menu. Jamais avec les manettes en main.
 - Réalité virtuelle : quand la limite du Quest change (limite fixe ou de pièce, ou une autre taille), le calage de la borne est proposé une seule fois au menu. Le journal dit après chaque partie et chaque recalage si la pièce est restée en place ou de combien elle s'est déplacée.
 - Réalité virtuelle : à l'étape « Caler la borne » en partie, une gâchette enfoncée à fond ne cale plus deux fois de suite ; le journal dit, en fin de partie, quelles commandes des manettes sont arrivées.
 - Réalité virtuelle : les deux joysticks tenus 3 s ouvrent le calage de la borne aussi depuis l’écran « Manettes du casque », qui se ferme sans rien changer ; chaque étape du geste est écrite au journal.

@@ -190,6 +190,8 @@ std::atomic<bool> anchorGiven { false };
 float anchorX = 0, anchorY = 0, anchorZ = 0, anchorYaw = 0;
 /** Calage de la borne en cours (Cyber Pinball : « calage 1|0 ») : points touchés et repères des manettes. */
 std::atomic<bool> calibrating { false };
+// Recalage automatique (Cyber Pinball, « repos 1 ») : les bouts des manettes suivies, 10 fois par seconde.
+std::atomic<bool> restWatch { false };
 std::atomic<bool> wantQuit { false };
 /** Relève demandée par Cyber Pinball (une partie de VPX démarre), et quand. */
 std::atomic<bool> handover { false };
@@ -345,6 +347,12 @@ void readCommands()
          int on = 0;
          in >> on;
          calibrating = on != 0;
+      }
+      else if (word == "repos")
+      {
+         int on = 0;
+         in >> on;
+         restWatch = on != 0;
       }
       else if (word == "releve")
       {
@@ -1898,6 +1906,41 @@ int main(int argc, char** argv)
       }
       else
          releaseControls();
+
+      // Recalage automatique : les deux bouts et leur orientation, 10 fois par seconde, seulement s'ils sont
+      // vraiment suivis (une manette endormie ou hors de vue n'a plus les bits « suivie ») ; Cyber Pinball juge
+      // si elles sont posées, immobiles, sur la barre avant (calage.ts, RestWatch). Au menu seulement : sans le
+      // regard (partie de VPX), le runtime ne donne pas les manettes.
+      static ULONGLONG restSaidAt = 0;
+      static bool restLost = false;
+      if (restWatch && controllers && !calibrating && state == XR_SESSION_STATE_FOCUSED && GetTickCount64() - restSaidAt >= 100)
+      {
+         restSaidAt = GetTickCount64();
+         constexpr XrSpaceLocationFlags tracked = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_POSITION_TRACKED_BIT
+            | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT;
+         XrSpaceLocation at[2] { { XR_TYPE_SPACE_LOCATION }, { XR_TYPE_SPACE_LOCATION } };
+         bool ok = true;
+         for (int h = 0; h < 2; h++)
+            ok = ok && aimSpaces[h] != XR_NULL_HANDLE && XR_SUCCEEDED(xrLocateSpace_(aimSpaces[h], base, fs.predictedDisplayTime, &at[h]))
+               && (at[h].locationFlags & tracked) == tracked;
+         if (ok)
+         {
+            std::string line = "repos";
+            for (int h = 0; h < 2; h++)
+            {
+               const XrPosef& q = at[h].pose;
+               for (float v : { q.position.x, q.position.y, q.position.z, q.orientation.x, q.orientation.y, q.orientation.z, q.orientation.w })
+                  line += " " + std::to_string(v);
+            }
+            say(line);
+            restLost = false;
+         }
+         else if (!restLost)
+         {
+            say("repos aucune");
+            restLost = true;
+         }
+      }
 
       // Repères des manettes pendant le calage : un petit cube vert au bout de chacune.
       pointerLines.clear();

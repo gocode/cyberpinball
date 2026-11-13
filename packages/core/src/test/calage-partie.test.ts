@@ -38,6 +38,17 @@ import {
   ROOM_KEPT_RECALIBRATION_DEG,
   shouldOfferCalibration,
   staleCalibration,
+  AUTO_RECAL_GAP_S,
+  AUTO_RECAL_MATCH_CM,
+  AUTO_RECAL_MIN_CM,
+  AUTO_RECAL_MIN_DEG,
+  AUTO_RECAL_STILL_DEG,
+  AUTO_RECAL_STILL_MM,
+  AUTO_RECAL_STILL_S,
+  autoRecalibratedPlace,
+  onCalibratedLockbar,
+  RestWatch,
+  type RestSample,
   VPX_CALIBRATION_KEYS,
   vpxControllerCentering,
   vpxHeadsetInput,
@@ -341,4 +352,58 @@ test('aide : la combinaison dans le détail de « Caler la borne », dans les ma
     ['docs/manual.md', /both thumbsticks pressed together/],
   ] as const)
     assert.match(read(file), words, file);
+});
+
+test('recalage automatique (13 novembre 2026) : manettes posées, immobiles 1 s, sur la barre du calage ; jamais en main', () => {
+  // Seuils figés.
+  assert.deepEqual([AUTO_RECAL_STILL_S, AUTO_RECAL_STILL_MM, AUTO_RECAL_STILL_DEG, AUTO_RECAL_MATCH_CM, AUTO_RECAL_GAP_S, AUTO_RECAL_MIN_CM, AUTO_RECAL_MIN_DEG], [1, 4, 1.5, 2.5, 0.3, 1, 1]);
+  const place: CabinetPlace = { ...lockbarPlace({ x: -0.3, y: 0.9, z: -0.4 }, { x: 0.3, y: 0.9, z: -0.4 }), head: { x: 0, z: 0.1 } };
+  const flat = { x: 0, y: 0, z: 0, w: 1 };
+  const tilt = (deg: number) => ({ x: Math.sin((deg * Math.PI) / 360), y: 0, z: 0, w: Math.cos((deg * Math.PI) / 360) });
+  const posees = (t: number, dx = 0, rot = flat): RestSample => ({ t, tips: [{ x: -0.3 + dx, y: 0.9, z: -0.4 }, { x: 0.3 + dx, y: 0.9, z: -0.4 }], rot: [rot, rot] });
+  const run = (samples: (RestSample | undefined)[]) => {
+    const w = new RestWatch();
+    return samples.map((s) => w.push(s, place)).filter(Boolean).length;
+  };
+  const seconds = (from: number, to: number, f: (t: number, i: number) => RestSample | undefined) => {
+    const out: (RestSample | undefined)[] = [];
+    for (let i = 0, t = from; t <= to + 1e-9; i++, t = from + i * 0.1) out.push(f(t, i));
+    return out;
+  };
+  // Posées, immobiles (bruit du suivi : 1 mm) : un recalage après 1 s, un seul tant qu'elles restent.
+  assert.equal(run(seconds(0, 5, (t, i) => posees(t, (i % 2) * 0.001))), 1);
+  // En main : 5 mm de tremblement, ou 2° de rotation : jamais.
+  assert.equal(run(seconds(0, 5, (t, i) => posees(t, (i % 2) * 0.005))), 0);
+  assert.equal(run(seconds(0, 5, (t, i) => posees(t, 0, tilt((i % 2) * 2)))), 0);
+  // Ailleurs que sur la barre : écart des bouts 4 cm de trop, ou 3 cm plus haut.
+  assert.equal(run(seconds(0, 5, (t) => ({ ...posees(t), tips: [{ x: -0.32, y: 0.9, z: -0.4 }, { x: 0.32, y: 0.9, z: -0.4 }] }))), 0);
+  assert.equal(run(seconds(0, 5, (t) => ({ ...posees(t), tips: [{ x: -0.3, y: 0.93, z: -0.4 }, { x: 0.3, y: 0.93, z: -0.4 }] }))), 0);
+  // Une manette plus suivie (endormie) : réarmé ; reposées : un second recalage.
+  assert.equal(run([...seconds(0, 2, (t) => posees(t)), undefined, ...seconds(3, 5, (t) => posees(t))]), 2);
+  // Relevés trop espacés (suite rompue) : pas de seconde immobile.
+  assert.equal(run([0, 0.5, 1, 1.5].map((t) => posees(t))), 0);
+  // Pas de calage gardé, ou une borne posée au bureau : jamais.
+  assert.equal(new RestWatch().push(posees(0), undefined), undefined);
+  assert.equal(onCalibratedLockbar(posees(0).tips, { ...place, free: true }), false);
+  // La place recalée : la pièce recentrée par le Quest (29°), la même vraie barre retrouvée, dimensions gardées.
+  const a = (29 * Math.PI) / 180;
+  const rot = (p: { x: number; y: number; z: number }) => ({ x: p.x * Math.cos(a) + p.z * Math.sin(a), y: p.y, z: -p.x * Math.sin(a) + p.z * Math.cos(a) });
+  const tips: [Point3, Point3] = [rot({ x: 0.3, y: 0.9, z: -0.4 }), rot({ x: -0.3, y: 0.9, z: -0.4 })];
+  const next = autoRecalibratedPlace(place, tips);
+  const truth = lockbarPlace(rot({ x: -0.3, y: 0.9, z: -0.4 }), rot({ x: 0.3, y: 0.9, z: -0.4 }));
+  assert.ok(Math.abs(next.x - truth.x) < 1e-9 && Math.abs(next.z - truth.z) < 1e-9 && Math.abs(next.yaw - truth.yaw) < 1e-9);
+  assert.equal(next.lockbarWidth, place.lockbarWidth);
+  const head = rot({ x: 0, y: 0, z: 0.1 });
+  assert.ok(Math.abs(next.head!.x - head.x) < 1e-9 && Math.abs(next.head!.z - head.z) < 1e-9, JSON.stringify(next.head));
+  assert.ok(Math.round(roomFromRecalibration(place, next).deg) === 29);
+  // L'app : réglage éteint par défaut, relevés suivis au menu seulement, chaque recalage au journal avec l'écart.
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(read('app', 'src', 'vr.ts'), /\.autoRecal === true;/);
+  assert.match(front, /library\.provideSystemItem\('vr-auto-calibrate', \{/);
+  assert.match(front, /onRest: \(sample\) => autoRecalSample\(sample\),/);
+  assert.match(front, /if \(!vrAutoRecal \|\| !headset \|\| calibration \|\| playing \|\| launch \|\| headsetSetting\(\) === 'bureau'\) return;/);
+  assert.match(front, /écart corrigé de \$\{Math\.round\(measure\.cm\)\} cm et \$\{Math\.round\(measure\.deg\)\}°/);
+  assert.match(front, /headset\.watchRest\(vrAutoRecal\);\s*headset\.watch\(\);/);
+  const companion = read('packages', 'casque-vr', 'src', 'casque.cpp');
+  assert.match(companion, /if \(restWatch && controllers && !calibrating && state == XR_SESSION_STATE_FOCUSED/);
 });

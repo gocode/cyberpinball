@@ -65,6 +65,12 @@ import {
   roomFromRecalibration,
   roomMeasureText,
   staleCalibration,
+  AUTO_RECAL_MIN_CM,
+  AUTO_RECAL_MIN_DEG,
+  AUTO_RECAL_STILL_S,
+  autoRecalibratedPlace,
+  RestWatch,
+  type RestSample,
   calibrationGap,
   calibrationProblem,
   lockbarMarks,
@@ -445,7 +451,7 @@ import { inspectorFor, vpxFirewallTargets } from './vpx-inspector';
 import { scriptDmdWatch, simulatedDmdWatch, watchVpxDmd, type DmdWatch } from './dmd-watch';
 import { readLiveScoresSettings, writeLiveScoresSettings } from './live-scores-setting';
 import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
-import { centerWhenStarted, prepareVrGame, probeVr, readVrMirror, readVrMode, rememberVrSettings, writeIniSettings, writeVrCalibration, writeVrMirror, writeVrMode, type VrGame } from './vr';
+import { centerWhenStarted, prepareVrGame, probeVr, readVrAutoRecal, readVrMirror, readVrMode, rememberVrSettings, writeIniSettings, writeVrAutoRecal, writeVrCalibration, writeVrMirror, writeVrMode, type VrGame } from './vr';
 import { HEADSET_TRIAL_DIR, HeadsetMenu, readCabinetPlace, type HeadPose } from './casque';
 import { installPausePlugin, pauseSettingsFor, QUIT_HOLD_S } from './pause-vr';
 import { askElevation } from './uac-confirm';
@@ -3098,6 +3104,55 @@ library.provideSystemItem('vr-mirror', {
   },
 });
 
+// « Recalage automatique » (Menu système > Borne > Réalité virtuelle) : les deux manettes posées sur les coins
+// de la barre avant, immobiles une seconde, suivies par le casque, recalent la borne (calage.ts, RestWatch).
+// Désactivé par défaut. Au menu seulement : en partie, VPX a le casque et le runtime ne donne pas les manettes.
+let vrAutoRecal = readVrAutoRecal(loc.dataDir);
+const restWatch = new RestWatch();
+library.provideSystemItem('vr-auto-calibrate', {
+  get detail() {
+    return vrAutoRecal
+      ? t('Oui · manettes posées aux coins inférieurs de la table, immobiles une seconde : la borne se recale. Au menu seulement : en partie, VPX a les manettes')
+      : t('Non · manettes posées aux coins inférieurs de la table : rien ne bouge. Recalez d’un geste ou par « Caler la borne »');
+  },
+  get tone() {
+    return vrMode === 'auto' ? undefined : ('quiet' as const);
+  },
+  run: () => {
+    vrAutoRecal = !vrAutoRecal;
+    writeVrAutoRecal(loc.dataDir, vrAutoRecal);
+    headset?.watchRest(vrAutoRecal);
+    console.log(`Réalité virtuelle : recalage automatique ${vrAutoRecal ? 'activé' : 'désactivé'}.`); // i18n-ignore : journal
+    library.openSystem();
+  },
+});
+
+/**
+ * Un relevé des manettes au repos (compagnon : « repos … ») : posées, immobiles, sur la barre avant du calage
+ * gardé, la borne se recale (une fois, réarmé quand elles s'en vont). Jamais pendant le calage, une partie, ou
+ * au bureau. Chaque recalage au journal, avec l'écart corrigé.
+ */
+function autoRecalSample(sample: RestSample | undefined): void {
+  if (!vrAutoRecal || !headset || calibration || playing || launch || headsetSetting() === 'bureau') return;
+  const previous = headset.place();
+  const tips = restWatch.push(sample, previous);
+  if (!tips || !previous) return;
+  const place = autoRecalibratedPlace(previous, tips);
+  const measure = roomFromRecalibration(previous, place);
+  if (measure.cm < AUTO_RECAL_MIN_CM && measure.deg < AUTO_RECAL_MIN_DEG) {
+    console.log(`Casque : recalage automatique, manettes posées sur la barre avant : ${roomMeasureText(measure, 'rien à corriger')}.`); // i18n-ignore : journal
+    return;
+  }
+  headset.showPlace(place, true);
+  try {
+    writeVrCalibration(loc.dataDir, placeVpxSettings(place));
+  } catch (error) {
+    console.warn(`Casque : recalage automatique pas écrit dans l’INI de la VR (${(error as Error).message}).`); // i18n-ignore : journal
+  }
+  console.log(`Casque : recalage automatique, manettes posées sur la barre avant, immobiles ${AUTO_RECAL_STILL_S} s : écart corrigé de ${Math.round(measure.cm)} cm et ${Math.round(measure.deg)}°.`); // i18n-ignore : journal
+  showBanner(t('Borne recalée sur les manettes posées'));
+}
+
 // « Vision 3D » (Menu système > Borne, vision3d.ts) : la perspective des tables suit la tête du joueur,
 // par une webcam ou une Kinect pour Xbox 360. Sans capteur, l'entrée reste visible, grisée avec sa
 // raison ; une Kinect sans pilote propose de l'installer (chez Microsoft, avec l'accord de Windows).
@@ -4941,6 +4996,7 @@ export function startFrontend(): void {
       if (calibration) showCalibration();
     },
     onRoom: () => checkStaleCalibration(),
+    onRest: (sample) => autoRecalSample(sample),
     onRoomRestart: (eyes) => {
       roomStale = Boolean(eyeHeightProblem(eyes));
       console.log(`Casque : session neuve après le changement de pièce, yeux à ${eyes.toFixed(2)} m${roomStale ? ' : le sol de la pièce d’origine est faux, les applications qui démarrent la reçoivent ainsi' : ''}.`); // i18n-ignore : journal
@@ -4949,6 +5005,7 @@ export function startFrontend(): void {
     },
     log: (line) => console.log(line),
   });
+  headset.watchRest(vrAutoRecal);
   headset.watch();
   // Horaire de la borne : nuit et arrêt programmé, d'après les réglages de medias.json.
   hours.start();

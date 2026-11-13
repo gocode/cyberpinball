@@ -756,3 +756,109 @@ export function roomKeepingAdvice(keeping: RoomKeeping | undefined, combo: strin
 export function vpxRoomChanges(log: string): number {
   return (log.match(/OPENXR: Reference Space Change pending for Session/g) ?? []).length;
 }
+
+// --- Recalage automatique (option, 13 novembre 2026) ---------------------------------------------------------
+//
+// Les deux manettes posées sur les coins de la barre avant, immobiles, suivies par le casque : la borne se recale
+// d'elle-même. Jamais en main : une manette tenue bouge de plusieurs millimètres et de plus d'un degré en une
+// seconde ; posée, elle ne bouge que du bruit du suivi. Et jamais ailleurs que sur la barre : leur écart et leur
+// hauteur doivent être ceux du calage gardé, à 2,5 cm près. Au menu seulement : en partie, VPX a le casque, et le
+// runtime ne donne les manettes qu'à l'application qui a le regard (OpenXR, session sans focus : actions inactives).
+
+/** Immobiles pendant au moins ce temps (secondes). */
+export const AUTO_RECAL_STILL_S = 1;
+/** Bout de chaque manette dans une boule de ce rayon pendant ce temps (millimètres). */
+export const AUTO_RECAL_STILL_MM = 4;
+/** Et tournée de moins que ceci (degrés). */
+export const AUTO_RECAL_STILL_DEG = 1.5;
+/** Écart des deux bouts et hauteur de chacun : ceux du calage gardé, à ceci près (centimètres). */
+export const AUTO_RECAL_MATCH_CM = 2.5;
+/** Relevés plus espacés que ceci : la suite est rompue (secondes). */
+export const AUTO_RECAL_GAP_S = 0.3;
+/** En deçà de cet écart, la pièce est gardée : rien n'est réécrit (centimètres, degrés). */
+export const AUTO_RECAL_MIN_CM = 1;
+export const AUTO_RECAL_MIN_DEG = 1;
+
+export interface Quat {
+  x: number;
+  y: number;
+  z: number;
+  w: number;
+}
+
+/** Un relevé du compagnon (« repos … ») : les deux bouts suivis, leur orientation, l'instant (secondes). */
+export interface RestSample {
+  t: number;
+  tips: readonly [Point3, Point3];
+  rot: readonly [Quat, Quat];
+}
+
+/** L'angle entre deux orientations (degrés). */
+export function quatAngle(a: Quat, b: Quat): number {
+  const dot = Math.min(1, Math.abs(a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w));
+  return (2 * Math.acos(dot) * 180) / Math.PI;
+}
+
+/** Les deux bouts sont-ils sur la barre avant du calage gardé (écart et hauteur à AUTO_RECAL_MATCH_CM près) ? */
+export function onCalibratedLockbar(tips: readonly [Point3, Point3], place: CabinetPlace | undefined): boolean {
+  if (!place || !isCalibrated(place) || place.free) return false;
+  const tol = AUTO_RECAL_MATCH_CM / 100;
+  const spacing = Math.hypot(tips[1].x - tips[0].x, tips[1].z - tips[0].z);
+  return Math.abs(spacing - place.lockbarWidth!) <= tol && tips.every((p) => Math.abs(p.y - place.lockbarHeight!) <= tol);
+}
+
+/**
+ * Suit les relevés des manettes au repos et dit quand recaler : `push` rend les deux bouts (moyennés sur la
+ * seconde immobile) une fois, puis plus rien tant que les manettes n'ont pas quitté la barre (réarmé dès qu'un
+ * relevé n'y est plus, ou qu'une manette n'est plus suivie : `push(undefined)`).
+ */
+export class RestWatch {
+  private window: RestSample[] = [];
+  private armed = true;
+
+  push(sample: RestSample | undefined, place: CabinetPlace | undefined): [Point3, Point3] | undefined {
+    if (!sample || !onCalibratedLockbar(sample.tips, place)) {
+      this.window = [];
+      this.armed = true;
+      return undefined;
+    }
+    const last = this.window[this.window.length - 1];
+    if (last && sample.t - last.t > AUTO_RECAL_GAP_S) this.window = [];
+    this.window.push(sample);
+    // Garde la dernière seconde : du plus ancien relevé utile au dernier.
+    while (this.window.length > 1 && sample.t - this.window[1]!.t >= AUTO_RECAL_STILL_S) this.window.shift();
+    const first = this.window[0]!;
+    // Bougé (en main, ou en train d'être posé) : la seconde repart de ce relevé.
+    const moved = this.window.some((s) => [0, 1].some((h) => length(sub(s.tips[h]!, first.tips[h]!)) * 1000 > AUTO_RECAL_STILL_MM || quatAngle(s.rot[h]!, first.rot[h]!) > AUTO_RECAL_STILL_DEG));
+    if (moved) {
+      this.window = [sample];
+      return undefined;
+    }
+    if (!this.armed || sample.t - first.t < AUTO_RECAL_STILL_S) return undefined;
+    this.armed = false;
+    const mean = (h: 0 | 1): Point3 => {
+      const n = this.window.length;
+      return this.window.reduce((acc, s) => ({ x: acc.x + s.tips[h].x / n, y: acc.y + s.tips[h].y / n, z: acc.z + s.tips[h].z / n }), { x: 0, y: 0, z: 0 });
+    };
+    return [mean(0), mean(1)];
+  }
+}
+
+/**
+ * La place recalée sur les deux bouts posés (`tips`, dans n'importe quel ordre) : la position et le cap de la
+ * barre, les dimensions du calage gardé (la vraie borne n'a pas changé), et ce que le calage gardait (limite,
+ * prises des manettes) ; la tête au calage suit la barre, du même déplacement.
+ */
+export function autoRecalibratedPlace(previous: CabinetPlace, tips: readonly [Point3, Point3]): CabinetPlace {
+  const [left, right] = orderCorners(tips[0], tips[1], { x: previous.x, z: previous.z });
+  const moved = lockbarPlace(left, right);
+  const next: CabinetPlace = { ...previous, x: moved.x, z: moved.z, yaw: moved.yaw };
+  if (previous.head) {
+    // La tête dans le repère de l'ancienne place, reposée dans la nouvelle.
+    const dx = previous.head.x - previous.x;
+    const dz = previous.head.z - previous.z;
+    const a = moved.yaw - previous.yaw;
+    next.head = { x: next.x + dx * Math.cos(a) + dz * Math.sin(a), z: next.z - dx * Math.sin(a) + dz * Math.cos(a) };
+  }
+  return next;
+}

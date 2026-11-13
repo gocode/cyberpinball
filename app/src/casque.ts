@@ -11,7 +11,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { anchorHeight, buildDecor, cadenceWithoutScreens, COMPANION_KEY_FILE, CompanionCycle, companionKeyFolder, DECOR_TEXTURES, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, headAtWear, readCompanionKey, roomChangeGap, sceneProtocol, writeGlb, type CabinetPlace, type DecorTexture, type HeadsetProfile, type Point3, type VrGpu, type RoomBounds, type RoomKeeping, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
+import { anchorHeight, buildDecor, cadenceWithoutScreens, COMPANION_KEY_FILE, CompanionCycle, companionKeyFolder, DECOR_TEXTURES, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, headAtWear, readCompanionKey, roomChangeGap, sceneProtocol, writeGlb, type CabinetPlace, type DecorTexture, type HeadsetProfile, type Point3, type RestSample, type VrGpu, type RoomBounds, type RoomKeeping, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
 import { openHandleTarget, type HandleTarget } from '@cyberpinball/win-displays';
 import type { OffscreenSharedTexture } from 'electron';
 import { OFFSCREEN } from './offscreen';
@@ -146,6 +146,8 @@ export interface HeadsetMenuOptions {
   onEyes?(eyes: number): void;
   /** Limite du Quest au lancement du compagnon ; `changed` : le Quest a déplacé la pièce pendant la session. */
   onRoom?(room: RoomBounds | undefined, changed: boolean): void;
+  /** Recalage automatique (watchRest) : les bouts des deux manettes suivies, ou undefined si l'une ne l'est plus. */
+  onRest?(sample: RestSample | undefined): void;
   log(line: string): void;
 }
 
@@ -336,6 +338,17 @@ export class HeadsetMenu {
     }
   }
 
+  /** Recalage automatique : le compagnon relève les bouts des manettes (« repos … »), redit à chaque lancement. */
+  private restWatched = false;
+  watchRest(on: boolean): void {
+    this.restWatched = on;
+    try {
+      this.child?.stdin.write(`repos ${on ? 1 : 0}\n`);
+    } catch {
+      // Compagnon parti : redit au prochain lancement.
+    }
+  }
+
   /** Repères du calage (coins de la barre avant, espace de la borne) : la scène est renvoyée avec eux. */
   setMarks(marks: Point3[]): void {
     this.marks = marks;
@@ -456,6 +469,14 @@ export class HeadsetMenu {
         const button = /^bouton (\S+) ([01])$/.exec(line);
         if (button) {
           if (parseControllerEvent(button[1]!)) this.opts.onButton?.(button[1]!, button[2] === '1');
+          continue;
+        }
+        // Recalage automatique : les bouts des manettes, 10 fois par seconde (pas au journal).
+        if (line.startsWith('repos ')) {
+          const n = line.slice(6).split(' ').map(Number);
+          const at = (i: number) => ({ x: n[i]!, y: n[i + 1]!, z: n[i + 2]! });
+          const q = (i: number) => ({ x: n[i]!, y: n[i + 1]!, z: n[i + 2]!, w: n[i + 3]! });
+          this.opts.onRest?.(n.length === 14 && n.every(Number.isFinite) ? { t: Date.now() / 1000, tips: [at(0), at(7)], rot: [q(3), q(10)] } : undefined);
           continue;
         }
         // Veille : la tête du joueur dans la pièce (au journal par Cyber Pinball, pas ici : toutes les 5 s).
@@ -693,6 +714,7 @@ export class HeadsetMenu {
     this.sendDecor(child, place);
     this.sendScene(child, this.opts.tint());
     child.stdin.write('fin\n');
+    if (this.restWatched) child.stdin.write('repos 1\n');
     this.opts.log(`Casque : compagnon lancé, ${panels.map((p) => `${p.role} ${p.width.toFixed(2)}×${p.height.toFixed(2)} m`).join(', ')}.`); // i18n-ignore : journal
   }
 

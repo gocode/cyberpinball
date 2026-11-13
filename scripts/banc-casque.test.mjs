@@ -64,3 +64,17 @@ test('banc : calage, les deux bouts et les deux prises des manettes à la gâche
   assert.equal(p.length, 1);
   assert.match(p[0].ligne, /^pointes droite -0\.30\d* 1\.02\d* -0\.35\d* 0\.30\d* 1\.02\d* -0\.35\d* tete [-\d.]+ [-\d.]+ prises -0\.30\d* 1\.05\d* -0\.27\d* 0\.30\d* 1\.05\d* -0\.27\d*$/);
 });
+
+test('banc : recalage automatique, les bouts des manettes suivies relevés au menu (« repos »), rien sans la commande', sauf, async () => {
+  const scenario = ['0 porte 1', '0 manette gauche -0.3 0.9 -0.4', '0 manette droite 0.3 0.9 -0.4', '2500 suivie gauche 0'].join('\n');
+  const r = await jouer(scenario, { dureeMs: 3500, commandes: [[800, 'repos 1']] });
+  const vus = lignes(r, /^repos -?\d/);
+  // 10 fois par seconde entre 0,8 s et 2,5 s, à la charge de la machine près.
+  assert.ok(vus.length >= 8 && vus.length <= 20, String(vus.length));
+  assert.match(vus[0].ligne, /^repos -0\.30\d* 0\.90\d* -0\.40\d* (-?[\d.]+ ){3}[\d.]+ 0\.30\d* 0\.90\d* -0\.40\d* (-?[\d.]+ ){3}[\d.]+$/);
+  // Une manette plus suivie (endormie, hors de vue) : dit une fois, plus de relevé.
+  assert.equal(lignes(r, /^repos aucune$/).length, 1);
+  assert.ok(vus.every((l) => l.ms < 2700), 'relevé après la perte du suivi');
+  const sans = await jouer(scenario, { dureeMs: 2000 });
+  assert.equal(lignes(sans, /^repos /).length, 0);
+});

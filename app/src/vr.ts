@@ -65,8 +65,24 @@ export function writeVrMirror(dataDir: string, mirror: boolean): void {
   writeVrSetting(dataDir, { mirror });
 }
 
-/** Un réglage de la VR écrit sans perdre les autres (mode, recopie). */
-function writeVrSetting(dataDir: string, patch: { mode?: VrMode; mirror?: boolean }): void {
+/**
+ * « Recalage automatique » (Réalité virtuelle) : les manettes posées sur les coins de la barre avant, immobiles,
+ * recalent la borne (calage.ts, RestWatch). Désactivé par défaut (demande du 13 novembre 2026).
+ */
+export function readVrAutoRecal(dataDir: string): boolean {
+  try {
+    return (JSON.parse(fs.readFileSync(settingFile(dataDir), 'utf8')) as { autoRecal?: unknown }).autoRecal === true;
+  } catch {
+    return false;
+  }
+}
+
+export function writeVrAutoRecal(dataDir: string, autoRecal: boolean): void {
+  writeVrSetting(dataDir, { autoRecal });
+}
+
+/** Un réglage de la VR écrit sans perdre les autres (mode, recopie, recalage automatique). */
+function writeVrSetting(dataDir: string, patch: { mode?: VrMode; mirror?: boolean; autoRecal?: boolean }): void {
   let current: Record<string, unknown> = {};
   try {
     current = JSON.parse(fs.readFileSync(settingFile(dataDir), 'utf8')) as Record<string, unknown>;

@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- Virtual reality: new "Automatic alignment" option (System menu > Cabinet > Virtual reality, off by default): both controllers laid on the lower corners of the table, still for one second, and the cabinet aligns again by itself, in the menu. Never with the controllers in the hand.
 - Virtual reality: when the Quest's boundary changes (stationary or roomscale, or another size), the cabinet alignment is offered only once in the menu. After each game and each new alignment, the log says whether the room stayed in place or by how much it moved.
 - Virtual reality: at the "Align the cabinet" step in a game, a trigger pressed fully no longer aligns twice in a row; at the end of the game, the log says which controller commands arrived.
 - Virtual reality: both thumbsticks held 3 s open the cabinet alignment also from the "Headset controllers" screen, which closes without changing anything; each step of the gesture is written to the log.
