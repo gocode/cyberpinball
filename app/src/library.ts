@@ -770,7 +770,8 @@ type Screen =
   /** Prospectus ou règles de la table, page par page (flippers : page précédente ou suivante). */
   | { kind: 'pages'; file: string; type: SheetPageType; index: number }
   /** Tableau des scores de la table : une portée (MagnaSave) et une période (flippers) à la fois. */
-  | { kind: 'scores'; file: string; period: ScorePeriod; scope: RankingScope }
+  // `back` : ouvert depuis un autre écran (Classements de la Communauté), son « Retour » y ramène ; sans lui, la fiche.
+  | { kind: 'scores'; file: string; period: ScorePeriod; scope: RankingScope; back?: () => void }
   | { kind: 'edit'; file: string; fields: { Title: string; Manufacturer: string; Year?: number }; editor?: Editor }
   /** `added` : ce que l'ajout a fait en plus de ranger les fichiers (médias de VPinMediaDB), montré à la vérification. */
   /** `back` : l'écran qui l'a ouvert (Santé de la borne), à la place de la fiche. */
@@ -2640,10 +2641,10 @@ export function createLibrary(host: LibraryHost) {
    */
   function buildScores(s: ScoresScreen): Built {
     const table = find(s.file);
-    const back = () => (table ? openSheet(table) : leave());
+    const back = s.back ?? (() => (table ? openSheet(table) : leave()));
     if (!table || !host.scores) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), door: 'sheet.back', run: leave }], back };
     // Un onglet cliqué : le curseur revient sur « Retour à la fiche », le seul choix en vert.
-    const show = (change: Partial<Pick<ScoresScreen, 'period' | 'scope'>>) => go({ kind: 'scores', file: s.file, period: s.period, scope: s.scope, ...change }, SCORES_BACK);
+    const show = (change: Partial<Pick<ScoresScreen, 'period' | 'scope'>>) => go({ kind: 'scores', file: s.file, period: s.period, scope: s.scope, ...(s.back ? { back: s.back } : {}), ...change }, SCORES_BACK);
     const scope = s.scope;
     const network = scope !== 'cabinet';
     const view = (period: ScorePeriod): RankingView =>
@@ -2660,14 +2661,14 @@ export function createLibrary(host: LibraryHost) {
       actions: [
         ...SCORE_PERIODS.map((period) => ({ label: t('Onglet {period}', { period: periodLabel(period) }), key: `period-${period}`, door: 'sheet.scores' as const, run: () => show({ period }) })),
         ...RANKING_SCOPES.map((sc) => ({ label: t('Onglet {period}', { period: scopeLabel(sc) }), key: `scope-${sc}`, door: 'sheet.scores' as const, run: () => show({ scope: sc }) })),
-        { label: t('Retour à la fiche'), icon: 'back' as const, key: 'back', door: 'sheet.back' as const, run: back },
+        { label: s.back ? t('Retour aux classements') : t('Retour à la fiche'), icon: 'back' as const, key: 'back', door: 'sheet.back' as const, run: back },
         // Masquer un score aberrant : sur cette borne seulement ; fermé à l'invité (porte de « Gérer la table »).
         ...(lines.length && host.hideScore
           ? [{ label: t('Masquer un score…'), detail: t('Un score douteux, ou tous ceux d’un joueur, sur cette borne'), icon: 'eye' as const, key: 'hide', door: 'sheet.manage' as const, run: () => openHideScore(table, s, lines) }]
           : []),
       ],
       back,
-      hint: t('Flippers : période précédente ou suivante · MagnaSave : portée · Start ou Exit : retour à la fiche · souris'),
+      hint: s.back ? t('Flippers : période précédente ou suivante · MagnaSave : portée · Start ou Exit : retour aux classements · souris') : t('Flippers : période précédente ou suivante · MagnaSave : portée · Start ou Exit : retour à la fiche · souris'),
       keys: (input) => {
         const KEYS = host.keys();
         // Start revient à la fiche, même après un clic sur un onglet (qui y a posé le curseur).
@@ -2694,7 +2695,7 @@ export function createLibrary(host: LibraryHost) {
 
   /** « Masquer un score… » : les lignes du classement ; une ligne choisie, masquer ce score ou tous ceux du joueur. */
   function openHideScore(table: TableEntry, s: ScoresScreen, lines: RankingLine[]): void {
-    const backToScores = () => go({ kind: 'scores', file: table.file, period: s.period, scope: s.scope }, SCORES_BACK);
+    const backToScores = () => go({ kind: 'scores', file: table.file, period: s.period, scope: s.scope, ...(s.back ? { back: s.back } : {}) }, SCORES_BACK);
     openCustom(
       () => ({
         heading: t('Masquer un score'),
@@ -5216,6 +5217,8 @@ export function createLibrary(host: LibraryHost) {
     /** Sélecteur de fichiers de Cyber Pinball ; undefined à l'abandon, l'écran d'où l'on vient revient tel quel. */
     pick: pickPaths,
     openNotice,
+    /** Tableau des scores d'une table ouvert depuis un autre écran (Classements) : portée, période, et son « Retour » vers `back`. */
+    openScores: (table: TableEntry, scope: RankingScope, period: ScorePeriod, back: () => void) => go({ kind: 'scores', file: table.file, period, scope, back }, SCORES_BACK),
     /** Fiche ouverte depuis la roue : son « Retour » y ramène. */
     openSheet: (table: TableEntry, flash?: string) => {
       sheetReturn = undefined;

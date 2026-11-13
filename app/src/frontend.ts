@@ -422,6 +422,7 @@ import { createChatMenu } from './chat-menu';
 import { createProfileMenu } from './profile-menu';
 import { createCommunityMenu } from './community-menu';
 import { createRoomsMenu } from './rooms-menu';
+import { createRankingsMenu } from './rankings-menu';
 import { createFirewallRule } from './firewall-rule';
 import { guardFirewall } from './firewall-guard';
 import { createMdnsResponder } from './mdns-responder';
@@ -2978,6 +2979,15 @@ socialNet.onRoomLines((lines) => {
   const hits = lines.filter((l) => !s.ignored.includes(l.key) && mentions(l.text, name) && roomsMenu.shown() !== l.room);
   if (hits.length) menuNotices.push(hits.map((l) => ({ kind: 'room-mention' as const, key: l.id, at: Date.now(), who: l.name, player: l.key, subject: roomsMenu.roomName(l.room), extra: s.filter ? maskWords(l.text) : l.text })));
 });
+// Classements de toutes mes tables (rankings-menu.ts) : la porte « Classements » de l'accueil Communauté.
+const rankingsMenu = createRankingsMenu({
+  library,
+  tables: () => tables,
+  local: (table, period) => tableScores.board(table, period),
+  network: (table, scope, period) => tableRankings.view(table, scope, period),
+  zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
+  openSharing: (back) => library.runSystemItem('sharing', back),
+});
 // Communauté (community-menu.ts) : l'accueil du médaillon de la roue, et « Joueurs en ligne », amis ou non.
 const communityMenu = createCommunityMenu({
   rooms: { door: () => roomsMenu.door(), glance: () => roomsMenu.glance(), open: (back) => roomsMenu.openDefault(back) },
@@ -2998,10 +3008,7 @@ const communityMenu = createCommunityMenu({
     quiet: () => chatMenu.item.tone === 'quiet',
     open: (back) => library.runSystemItem('messages', back),
   },
-  rankings: () => {
-    const table = tables[state.index];
-    return table ? { detail: t('{title} : tableau des scores, amis, pays et monde', { title: table.title }), open: () => library.openSheet(table) } : undefined;
-  },
+  rankings: { detail: () => rankingsMenu.detail(), open: (back) => rankingsMenu.open(back) },
   openSharing: (back) => library.runSystemItem('sharing', back),
 });
 library.provideSystemItem('online-players', communityMenu.item);

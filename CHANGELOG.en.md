@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- Tables wheel: scrolling fast no longer doubles the medallions (the chosen table's green halo now always glides with it), and each press asks the display for three times less work: the wheel keeps up better with bursts.
+- Community: the "Leaderboards" door on the home screen opens the leaderboards of all your tables (each table's leader, their score, your place), in This cabinet, Friends, National and Worldwide tabs, over the period of your choice; it no longer opens a single table's board, the one left chosen on the wheel. An empty room simply says "Nothing new for now".
 - Williams and Bally tables from the 1990s (Medieval Madness, Terminator 2, The Addams Family…): they no longer run their several-second “TESTING…” check before every game. The « Démarrage rapide des ROM » (Fast ROM startup) setting (« Réglages de VPX » (VPX settings), « Essentiels » (Essentials) tab) is on by default, unless you had already set it; rules and scores unchanged.
 - Virtual reality: in System menu > Cabinet, the virtual reality row shows again whether it is on, with its Beta badge. The alignment no longer opens by itself the first time the headset is worn: only when the headset is put back on with a stationary boundary.
 - Opening on a cabinet with a vertical playfield: leaving the animation, the playfield no longer flips to landscape for a moment (nor at the end of a game), and the opening breath's chord lands right on the playfield's burst instead of coming before it.

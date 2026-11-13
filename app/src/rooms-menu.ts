@@ -266,7 +266,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         pick: true,
       } satisfies Row;
     });
-    if (!rows.length) rows.push({ text: t('Rien d’écrit ici ces sept derniers jours'), detail: t('Soyez le premier : « Écrire dans le salon »'), icon: 'message', tone: 'quiet' });
+    if (!rows.length) rows.push({ text: t('Rien de neuf pour l’instant'), detail: t('Soyez le premier : « Écrire dans le salon »'), icon: 'message', tone: 'quiet' });
     sections.push({ kind: 'room', rows });
     // Les présents, dans la colonne latérale (à droite au bureau, dessous en borne).
     const present = net.roomPresent(room).filter((h) => !ignored(h.key));
@@ -640,7 +640,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       const present = net.roomPresent(room).length;
       return {
         label: roomName(room),
-        detail: problem ?? [mentionsN ? tn(mentionsN, '{n} mention', '{n} mentions') : undefined, tn(present, '{n} présent', '{n} présents'), last ? `<${last.name}> ${shownText(last.text)}` : t('rien d’écrit ces 7 derniers jours')].filter(Boolean).join(' · '),
+        detail: problem ?? [mentionsN ? tn(mentionsN, '{n} mention', '{n} mentions') : undefined, tn(present, '{n} présent', '{n} présents'), last ? `<${last.name}> ${shownText(last.text)}` : t('rien de neuf pour l’instant')].filter(Boolean).join(' · '),
         attention: mentionsN > 0,
         quiet: Boolean(problem),
       };

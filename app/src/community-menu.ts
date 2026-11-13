@@ -50,8 +50,8 @@ export interface CommunityMenuHost {
   messages: { detail(): string; attention(): boolean; quiet(): boolean; open(back: () => void): void };
   /** Le salon de mon pays (rooms-menu.ts) : ce que dit sa porte, et l'ouvrir. */
   rooms?: { door(): { label: string; detail: string; attention: boolean; quiet: boolean }; glance?(): RoomGlance; open(back: () => void): void };
-  /** Le tableau des scores de la table choisie dans la roue ; undefined : aucune table. */
-  rankings?(): { detail: string; open(back: () => void): void } | undefined;
+  /** Les classements de toutes mes tables (rankings-menu.ts) : ce que dit la porte, et les ouvrir. */
+  rankings: { detail(): string; open(back: () => void): void };
   /** Partage et réseau (activer le partage, le réseau local, la présence publique). */
   openSharing(back: () => void): void;
   now?(): Date;
@@ -297,7 +297,6 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     const back = homeBack ?? (() => lib.openSystem());
     const here = () => lib.openCustom(buildHome);
     const c = myCountry();
-    const rankings = host.rankings?.();
     const actions: Action[] = [
       {
         label: t('Joueurs en ligne'),
@@ -333,10 +332,9 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
       })(),
       {
         label: t('Classements'),
-        detail: rankings?.detail ?? t('Choisissez une table dans la roue : son tableau des scores, amis, pays et monde'),
+        detail: host.rankings.detail(),
         icon: 'trophy',
-        ...(rankings ? {} : { tone: 'quiet' as const }),
-        run: () => (rankings ? rankings.open(here) : here()),
+        run: () => host.rankings.open(here),
       },
       { label: t('Retour'), icon: 'back', run: back },
     ];
@@ -369,7 +367,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
         ? host.messages.detail()
         : t('Joueurs en ligne, messages, salon, classements');
     const eyebrow = room ? (room.problem ? room.name : `${room.name} · ${tn(room.present, '{n} présent', '{n} présents')}`) : t('Joueurs en ligne');
-    const heading = room?.problem ?? (room?.last ? `<${room.last.name}> ${room.last.text}` : room ? t('Rien d’écrit ici ces sept derniers jours') : t('Start pour ouvrir la Communauté'));
+    const heading = room?.problem ?? (room?.last ? `<${room.last.name}> ${room.last.text}` : room ? t('Rien de neuf pour l’instant') : t('Start pour ouvrir la Communauté'));
     return { ...frame, stats: countsLine(list), empty: false, eyebrow, heading, detail };
   }
 

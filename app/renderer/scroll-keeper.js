@@ -148,6 +148,8 @@ const CyberScroll = (() => {
   function keeper(reveal) {
     let last;
     let captured = [];
+    /** capture() a précédé ce rendu : on sait ce qui était défilé avant lui. */
+    let fresh = false;
     let anchors = [];
     /** Choix amené dans la vue sans geste de l'utilisateur depuis : il y reste entier (images chargées ensuite). */
     let revealed;
@@ -177,6 +179,7 @@ const CyberScroll = (() => {
     return {
       capture(root) {
         captured = scrolled(root).map(([node, at]) => [keyOf(node, root), at, byUser(node)]);
+        fresh = true;
         // Élément choisi dans la vue de sa liste : il y restera à la même place.
         anchors = [];
         chosenIn(root).forEach(([node], rank) => {
@@ -225,7 +228,12 @@ const CyberScroll = (() => {
           }
         }
         for (const node of moved) expected.set(node, positionOf(node));
-        for (const [node, at] of scrolled(root)) expected.set(node, at);
+        // Rien n'était défilé avant le rendu et rien ne l'a été ici : le rendu n'a pu défiler aucun
+        // élément (un élément neuf part du haut, l'ancrage du défilement ne déplace qu'une liste déjà
+        // défilée). Relire la position de chaque élément de la page forçait alors sa mise en page à
+        // chaque appui, roue des tables comprise (13/11/2026, fluidité de la roue).
+        if (!fresh || captured.length || moved.size) for (const [node, at] of scrolled(root)) expected.set(node, at);
+        fresh = false;
         captured = [];
         anchors = [];
         last = { screen, selection };

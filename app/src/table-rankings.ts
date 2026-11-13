@@ -60,6 +60,8 @@ export interface RankingView {
   me?: RankingPosition;
   /** Pourquoi ce classement ne se montre pas ; les lignes sont alors vides. */
   unavailable?: string;
+  /** L'empreinte de la table se calcule encore : le classement viendra. */
+  pending?: true;
   /** Ce qui se compare (la version, les billes), et l'état du réseau. */
   note?: string;
 }
@@ -73,12 +75,17 @@ export interface TableRankings {
 export function createTableRankings(opts: TableRankingsOptions): TableRankings {
   /** Version de chaque table, par fichier : calculée une fois par lancement (le .vpx peut changer, la borne redémarre). */
   const versions = new Map<string, Version>();
+  /**
+   * Une empreinte à la fois : le tableau global des Classements demande celles de toutes les tables,
+   * et chacune lit son .vpx en entier (gardée ensuite, live-game.ts).
+   */
+  let queue: Promise<void> = Promise.resolve();
 
   function versionOf(table: TableEntry): Version {
     const known = versions.get(table.file);
     if (known) return known;
     versions.set(table.file, { state: 'pending' });
-    void (async () => {
+    queue = queue.then(async () => {
       try {
         const board = boardKey(await opts.versionOf(table));
         const balls = board ? await opts.ballsOf(table) : undefined;
@@ -87,7 +94,7 @@ export function createTableRankings(opts: TableRankingsOptions): TableRankings {
         versions.set(table.file, { state: 'none' });
       }
       opts.changed?.();
-    })();
+    });
     return versions.get(table.file)!;
   }
 
@@ -114,7 +121,7 @@ export function createTableRankings(opts: TableRankingsOptions): TableRankings {
       const state = opts.net.state();
       if (!state.enabled) return { lines: [], players: 0, unavailable: t('Partage désactivé : Amis > Partage et réseau') };
       const version = versionOf(table);
-      if (version.state === 'pending') return { lines: [], players: 0, unavailable: t('Empreinte de la table en calcul…') };
+      if (version.state === 'pending') return { lines: [], players: 0, unavailable: t('Empreinte de la table en calcul…'), pending: true };
       if (version.state === 'none') return { lines: [], players: 0, unavailable: t('Version de la table illisible : pas de classement') };
       const country = opts.net.country();
       if (scope === 'country' && !country) return { lines: [], players: 0, unavailable: t('Pays non choisi : Amis > Partage et réseau') };

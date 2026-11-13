@@ -780,7 +780,7 @@ body.mouse .collections-row:not(.disabled) {
  * Logos animés (réglage « Logos animés : seulement la table choisie », Tables > Roue, 12/11/2026) : hors du
  * centre, la première image du logo (.wheel-still, frontend.js attachStill) est posée à sa place,
  * le logo animé n'est plus dessiné, donc plus animé ; au centre, le logo animé reprend. Tant que
- * la première image n'est pas prête, le logo animé reste : jamais de place vide. Le halo (copie du
+ * la première image n'est pas prête, le logo animé reste : jamais de place vide. Le halo (jumeau du
  * centre, sans .wheel-item) garde toujours le logo animé.
  */
 .wheel-tilt > .wheel-img {
@@ -1140,8 +1140,8 @@ html.menu-desktop .menu.menu-band .menu-nav {
  * Halo vert de la table choisie (11/11/2026) : une lueur collée au médaillon, qui vient de derrière
  * lui, jamais un cercle posé autour. Elle épouse la forme de ce qu'on voit (drop-shadow suit la
  * transparence du logo ; pour un médaillon sans logo, son disque), quelle que soit sa taille. Elle
- * est portée par une copie du médaillon qui le suit, posée derrière toute la roue (.wheel-halo,
- * frontend.js, haloFollow) : elle ne passe jamais sur un médaillon voisin. Mouvement « Soie »
+ * est portée par le jumeau du médaillon, posé derrière toute la roue (.wheel-halo, frontend.js,
+ * wheelHalo et haloSync), qui glisse toujours avec lui : elle ne passe jamais sur un médaillon voisin. Mouvement « Soie »
  * (wheelMoved) : pendant le glissement, la lueur baisse ; à l'arrêt (.landed, jamais pendant une
  * rafale), elle souffle une fois puis se pose, un fil s'enroule au bord du médaillon (.wheel-rim) et
  * une lueur douce le traverse (.wheel-glint), tous deux à la taille du médaillon (--rim-r).
@@ -1180,7 +1180,8 @@ html.menu-desktop .menu.menu-band .menu-nav {
   filter: var(--halo-bas);
 }
 
-.menu-band .wheel-stage.landed .wheel-halo .wheel-tilt {
+/* Seul le jumeau du centre a un contenu : les autres, vides, ne soufflent pas pour rien. */
+.menu-band .wheel-stage.landed .wheel-halo .wheel-tilt:not(:empty) {
   animation: halo-souffle 900ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
@@ -1421,6 +1422,7 @@ html.menu-desktop .menu.menu-band .menu-nav {
   position: absolute;
   left: 0;
   top: 0;
+  /* 150 unités de côté : PULSE_SIZE, frontend.js (l'onde est placée en pour-cent de sa taille). */
   width: calc(150 * var(--w));
   height: calc(150 * var(--w));
   z-index: 2;
@@ -1704,6 +1706,17 @@ html.menu-desktop .menu-band .menu-frame.fronton {
   top: calc(76 * var(--u));
   width: calc(var(--bg-w) + 32 * var(--u));
   height: calc(var(--bg-w) * 9 / 16 + 32 * var(--u));
+}
+
+/*
+ * Logo qui entre dans la roue (saut de plusieurs tables, autre collection) : il paraît à sa place en
+ * fondu, depuis l'opacité nulle de son premier style (wheelStage) ; sans calcul de mise en page forcé.
+ */
+@starting-style {
+  .wheel-item.entering,
+  .wheel-halo.entering {
+    opacity: 0;
+  }
 }
 
 /* Passage d'un bord à l'autre (peu de tables) : repositionné d'un coup, hors champ (wheelStage). */

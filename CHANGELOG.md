@@ -11,6 +11,8 @@ son interface).
 
 ## 0.1.11
 
+- Roue des tables : en faisant défiler vite, les médaillons ne se dédoublent plus (le halo vert de la table choisie glisse maintenant toujours avec elle), et chaque appui demande trois fois moins de travail à l'affichage : la roue suit mieux les rafales.
+- Communauté : la porte « Classements » de l'accueil ouvre les classements de toutes vos tables (le premier de chacune, son score, votre place), en onglets Cette borne, Amis, National et Mondial, sur la période de votre choix ; elle n'ouvre plus le tableau d'une seule table, celle restée choisie dans la roue. Un salon vide dit simplement « Rien de neuf pour l'instant ».
 - Tables Williams et Bally des années 1990 (Medieval Madness, Terminator 2, La Famille Addams…) : elles ne refont plus leur test « TESTING… » de plusieurs secondes avant chaque partie. Le réglage « Démarrage rapide des ROM » (Réglages de VPX, onglet « Essentiels ») est activé d’office, sauf si vous l’aviez déjà choisi ; règles et scores inchangés.
 - Réalité virtuelle : dans Menu système > Borne, la ligne de la réalité virtuelle montre de nouveau si elle est activée, avec son badge Bêta. Le calage ne s'ouvre plus de lui-même au premier port du casque : seulement quand le casque est remis en limite fixe.
 - Ouverture sur une borne au playfield vertical : en sortant de l'animation, le plateau ne passe plus un instant en paysage (ni à la fin d'une partie), et l'accord du souffle de l'ouverture tombe pile sur l'explosion du plateau au lieu d'arriver avant.

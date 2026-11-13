@@ -12,7 +12,7 @@ export const messages: Record<string, string> = {
   '→ {name} arrive': '→ {name} joins',
   '← {name} part': '← {name} leaves',
   'Ligne de {name} à {time}': 'Line from {name} at {time}',
-  'Rien d’écrit ici ces sept derniers jours': 'Nothing written here in the last seven days',
+  'Rien de neuf pour l’instant': 'Nothing new for now',
   'Soyez le premier : « Écrire dans le salon »': 'Be the first: "Write in the room"',
   'Aller au salon Monde': 'Go to the World room',
   'Tous les pays, en anglais de préférence': 'All countries, preferably in English',
@@ -120,7 +120,7 @@ export const messages: Record<string, string> = {
   'Acceptez d’abord les règles des salons, à la borne : Écrire dans le salon': 'Accept the room rules first, at the cabinet: Write in the room',
 
   // Porte de l'accueil, notification des mentions
-  'rien d’écrit ces 7 derniers jours': 'nothing written in the last 7 days',
+  'rien de neuf pour l’instant': 'nothing new for now',
   '{n} mention': '{n} mention',
   '{n} mentions': '{n} mentions',
   '{name} vous cite · {room}': '{name} mentions you · {room}',
