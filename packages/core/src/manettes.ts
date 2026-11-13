@@ -299,11 +299,15 @@ export class CalibrationComboHold {
  * avec elles (essai du 13 novembre 2026 : le joueur tenait les gâchettes, pas les sticks) ; une aide le dit.
  */
 export const TRIGGERS_HINT_S = 2;
+/** La carte d'un geste dans le casque reste ce temps (millisecondes). */
+export const GESTURE_CARD_MS = 6000;
+/** Les profils de manettes que le schéma (app/renderer/schema-manettes.js) sait dessiner. */
+export const CONTROLLER_SCHEMA_PROFILES: readonly HeadsetProfile[] = ['touch'];
 export const TRIGGERS_HINT_COMBO: readonly ControllerButton[] = ['gachette-gauche', 'gachette-droite'];
 
 /** La combinaison telle que le joueur la lit (« les deux joysticks enfoncés ensemble, 3 s »), ou undefined. */
 export function calibrationComboLabel(profile: HeadsetProfile | undefined): string | undefined {
-  return calibrationCombo(profile) ? t('les deux joysticks enfoncés ensemble, 3 s') : undefined;
+  return calibrationCombo(profile) ? t('enfoncez les deux sticks (sous les pouces) jusqu’au clic, 3 s') : undefined;
 }
 
 /** Le réglage par défaut d'un profil : celui des Touch est la règle d'origine (A valide, B revient…). */
@@ -331,7 +335,7 @@ export function controllerProblem(setting: ControllerSetting): string | undefine
     if (Boolean(def.axis) !== Boolean(f.axis)) return t('{fonction} : il faut {quoi}', { fonction: f.label, quoi: f.axis ? t('un joystick ou un pavé') : t('un bouton') });
     const other = used.get(el);
     if (other) return t('{bouton} sert déjà à {fonction}', { bouton: def.label, fonction: headsetFunctions().find((x) => x.id === other)!.label });
-    if (calibrationCombo(setting.profile)?.includes(el as ControllerButton)) return t('{bouton} sert à caler la borne (les deux joysticks enfoncés ensemble)', { bouton: def.label });
+    if (calibrationCombo(setting.profile)?.includes(el as ControllerButton)) return t('{bouton} sert à caler la borne (les deux sticks enfoncés ensemble)', { bouton: def.label });
     used.set(el, f.id);
   }
   return undefined;

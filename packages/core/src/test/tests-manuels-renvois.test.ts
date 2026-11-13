@@ -71,3 +71,15 @@ test('manuel : une plage « tests manuels N à M » tient dans une seule section
   }
   assert.deepEqual(found, []);
 });
+
+// Deux sessions qui prennent le même numéro libre en même temps (13/11/2026 : 1125 et 1126 deux fois après une
+// fusion) : un numéro n'existe qu'une fois par langue, et les deux langues ont les mêmes numéros.
+test('tests manuels : chaque numéro une seule fois, les mêmes en français et en anglais', { skip: withoutInternal(MANUAL_TESTS) }, () => {
+  const numbers = (file: string) => [...fs.readFileSync(path.join(MANUAL_TESTS, file), 'utf8').matchAll(/^\| (\d+) \|/gm)].map((m) => Number(m[1]));
+  const fr = numbers('tests-manuels.md');
+  const en = numbers('manual-tests.md');
+  const twice = (list: number[]) => [...new Set(list.filter((n, i) => list.indexOf(n) !== i))];
+  assert.deepEqual(twice(fr), [], 'tests-manuels.md : numéros en double');
+  assert.deepEqual(twice(en), [], 'manual-tests.md : numéros en double');
+  assert.deepEqual([...new Set(fr)].sort((a, b) => a - b), [...new Set(en)].sort((a, b) => a - b), 'les deux langues n’ont pas les mêmes numéros');
+});

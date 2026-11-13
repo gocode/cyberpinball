@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.12
 
+- Virtual reality: the cabinet alignment shows the controllers drawn, the command to use in green, and reminds at the bottom that you can align again any time by pressing both sticks down for 3 s. The gesture is explained the same way the first time the headset is worn and when the triggers are held instead.
 - Table wheel: the MagnaSave buttons change collection without showing the list of collections over the tables any more; only the marker under the title changes. The full list opens from the Collections medallion.
 - Buttons: a cabinet button can now lead straight to the Windows desktop (System menu > Cabinet > Cabinet setup > Interface buttons > “Windows desktop”, optional). One press, from any menu screen, frees every PC screen; if it is a joystick button (Pinscape, encoder in gamepad mode), pressing it again on the desktop brings the menu back.
 - Table wheel: new Collections medallion, after the Jukebox and Community, with its animated star. Start opens the list of your collections (All, Favourites, Recent, manufacturers, decades, your own); Start on one shows it on the wheel, Exit goes back to the medallion. When selected, it shows its poster on the playfield and backglass. It can be hidden in System menu > Tables > Wheel.

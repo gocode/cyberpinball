@@ -100,6 +100,8 @@ import {
   calibrationCombo,
   CalibrationComboHold,
   TRIGGERS_HINT_COMBO,
+  CONTROLLER_SCHEMA_PROFILES,
+  GESTURE_CARD_MS,
   TRIGGERS_HINT_S,
   calibrationComboLabel,
   CALIBRATION_HOLD_S,
@@ -704,7 +706,18 @@ interface Message {
    * Dans le casque : la consigne du moment, en très gros au milieu du regard (fronton), avec les boutons
    * en rappel ; un problème ou l'état seulement s'il y en a (calage de la borne).
    */
-  prompt?: { text: string; keys: string; problem?: string; status?: string };
+  prompt?: {
+    text: string;
+    keys: string;
+    problem?: string;
+    status?: string;
+    /** Le schéma des manettes (schema-manettes.js), ces commandes en vert ; profil Touch seulement. */
+    schema?: string[];
+    /** Le début de `keys` à mettre en vert, la commande que montre le schéma. */
+    keysLead?: string;
+    /** En bas : le geste qui sert à tout moment (le calage : recaler d'un geste), avec son petit schéma. */
+    band?: { schema?: string[]; text: string; detail: string };
+  };
 }
 
 /**
@@ -1980,7 +1993,7 @@ function triggersHintButton(name: string, down: boolean): void {
     triggersTimer = undefined;
     if (!triggersHold.due(Date.now()) || calibration || controllerWizard || playing || launch) return;
     console.log(`Casque : les deux gâchettes tenues ${TRIGGERS_HINT_S} s au menu ; aide « les sticks, pas les gâchettes » montrée.`); // i18n-ignore : journal
-    showBanner(t('Pour recaler la borne : enfoncez les deux sticks, pas les gâchettes'));
+    if (!showGestureCard()) showBanner(t('Pour recaler la borne : enfoncez les deux sticks, pas les gâchettes'));
   }, TRIGGERS_HINT_S * 1000 + 20);
 }
 
@@ -2190,7 +2203,7 @@ function wizardButton(name: string): void {
   } else {
     const other = list.find((x) => x.id !== f.id && w.functions[x.id] === el);
     if (other) w.problem = t('{bouton} sert déjà à {fonction}', { bouton: elementLabel(el), fonction: other.label });
-    else if (calibrationCombo(w.profile)?.includes(el as ControllerButton)) w.problem = t('{bouton} sert à caler la borne (les deux joysticks enfoncés ensemble)', { bouton: elementLabel(el) });
+    else if (calibrationCombo(w.profile)?.includes(el as ControllerButton)) w.problem = t('{bouton} sert à caler la borne (les deux sticks enfoncés ensemble)', { bouton: elementLabel(el) });
     else {
       w.functions[f.id] = el;
       w.problem = undefined;
@@ -3605,7 +3618,36 @@ function calibrationComboTip(): void {
   } catch {
     // Dossier de la VR en lecture seule : l'astuce reviendra, sans gravité.
   }
-  showBanner(t('Recaler la borne à tout moment, au menu comme en partie : {combo}.', { combo }));
+  if (!showGestureCard()) showBanner(t('Recaler la borne à tout moment, au menu comme en partie : {combo}.', { combo }));
+}
+
+/** Les profils de manettes dessinés (schema-manettes.js) : un autre garde le texte seul, jamais un dessin faux. */
+function schemaProfile(profile: HeadsetProfile | undefined): boolean {
+  return Boolean(profile && CONTROLLER_SCHEMA_PROFILES.includes(profile));
+}
+
+/** La carte d'un geste montrée dans le casque (fronton), quelques secondes. */
+let headsetCardView: { schema?: string[]; text: string; detail: string } | undefined;
+let headsetCardTimer: NodeJS.Timeout | undefined;
+
+/**
+ * La carte du geste du calage (maquette validée le 13 novembre 2026) : les deux sticks en vert, « Enfoncez les
+ * deux sticks, 3 s », où et avec quel doigt. Seulement pour des manettes dessinées ; sinon false (le bandeau dit
+ * le geste en texte).
+ */
+function showGestureCard(ms = GESTURE_CARD_MS): boolean {
+  const profile = headset?.profile;
+  const combo = calibrationCombo(profile ?? 'touch');
+  if (!combo || !schemaProfile(profile)) return false;
+  headsetCardView = { schema: [...combo], text: t('Enfoncez les deux sticks, 3 s'), detail: t('Sous les pouces, jusqu’au clic · pas les gâchettes') };
+  if (headsetCardTimer) clearTimeout(headsetCardTimer);
+  headsetCardTimer = setTimeout(() => {
+    headsetCardView = undefined;
+    headsetCardTimer = undefined;
+    broadcast();
+  }, ms);
+  broadcast();
+  return true;
 }
 
 /**
@@ -3716,7 +3758,7 @@ function openHeadsetMenu(): void {
 /** La combinaison du calage dans la légende des manettes (menu du casque), si ces manettes en ont une. */
 function comboRows(inGame = false): { text: string; detail: string }[] {
   const combo = calibrationComboLabel(controllerSetting().profile);
-  return combo ? [{ text: t('Les deux joysticks enfoncés, 3 s'), detail: inGame ? t('Pause, puis caler la borne ; on reprend où on en était') : t('Caler la borne') }] : [];
+  return combo ? [{ text: t('Les deux sticks enfoncés jusqu’au clic, 3 s'), detail: inGame ? t('Pause, puis caler la borne ; on reprend où on en était') : t('Caler la borne') }] : [];
 }
 
 /** Arrêt de la partie de VPX dans le casque en cours (le casque se perd pendant qu'elle se joue). */
@@ -4243,10 +4285,22 @@ function showCalibration(problem?: string): void {
     vrRoomProblem ??
     (headset?.keyRenewed ? t('Vérifiez la place de la borne.') : undefined) ??
     (roomNotice ? t('La limite du Quest a changé : recalez.') : undefined) ??
-    (c.intro ? roomKeepingAdvice(headset?.roomKeeping, calibrationComboLabel(headset?.profile)) : undefined) ??
+    // Le geste est dit par la bande du bas quand les manettes l'ont : le conseil ne le répète pas.
+    (c.intro ? roomKeepingAdvice(headset?.roomKeeping, calibrationCombo(headset?.profile ?? 'touch') ? undefined : calibrationComboLabel(headset?.profile)) : undefined) ??
     (c.place ? vpxPlaceProblem(placeVpxSettings(c.place)) : undefined);
   headset?.setMarks(calibrationMarks(c));
-  const prompt = { text, keys, ...(issue && { problem: issue }) };
+  // Le schéma des manettes (Touch) : les gâchettes pour placer ; la borne placée, A pour valider. En bas, le geste.
+  const drawn = schemaProfile(headset?.profile);
+  const combo = calibrationCombo(headset?.profile ?? 'touch');
+  const schema = drawn && !desk && !c.placing ? (c.place ? ['a'] : ['gachette-gauche', 'gachette-droite']) : undefined;
+  const lead = c.place ? 'A' : t('Gâchette');
+  const prompt = {
+    text,
+    keys: c.place && keys ? t('A : valider · Gâchette : replacer') : keys,
+    ...(schema && { schema, keysLead: lead }),
+    ...(issue && { problem: issue }),
+    ...(combo && !desk && { band: { ...(drawn && { schema: [...combo] }), text: t('À tout moment, enfoncez les deux sticks 3 s'), detail: t('pour recaler la borne, au menu comme en partie') } }),
+  };
   state = { ...state, phase: 'message', help: false, message: { title: t('Caler la borne'), lines: [text, ...(issue ? [issue] : []), ...(keys ? [keys] : [])], prompt } };
   broadcast();
 }
@@ -7423,7 +7477,7 @@ function broadcast(): void {
   }
   sendToHeadsetViews((role) => {
     const view = headsetExitHint ? { ...viewFor(role, headsetMedias ?? medias), headsetHint: headsetExitHint, ...(headsetExitNote ? { headsetNote: headsetExitNote } : {}) } : viewFor(role, headsetMedias ?? medias);
-    return headsetHoldView ? { ...view, headsetHold: headsetHoldView } : view;
+    return { ...view, ...(headsetHoldView && { headsetHold: headsetHoldView }), ...(headsetCardView && { headsetCard: headsetCardView }) };
   });
   // Télécommande du téléphone : le QR vit tant que l'écran qui le montre est affiché ; le téléphone suit l'écran.
   const surfaces = state.phase === 'library' && !desktop.active ? library.remoteSurfaces() : { menu: false, keyboard: false };

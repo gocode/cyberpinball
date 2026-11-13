@@ -84,7 +84,9 @@ test('chaque page qui dessine une icône charge le registre avant ses scripts', 
 });
 
 test('les écrans ne copient pas de dessin : ils demandent une icône au registre', () => {
-  for (const file of fs.readdirSync(RENDERER).filter((f) => f.endsWith('.js') && f !== 'icons.js')) {
+  // schema-manettes.js est le registre du schéma des manettes du casque : un seul dessin, paramétré (la commande à
+  // mettre en vert), réutilisé partout ; pas une icône fixe du registre.
+  for (const file of fs.readdirSync(RENDERER).filter((f) => f.endsWith('.js') && f !== 'icons.js' && f !== 'schema-manettes.js')) {
     const text = fs.readFileSync(path.join(RENDERER, file), 'utf8');
     assert.ok(!/<path d=|createElementNS\([^)]*svg/.test(text), `${file} dessine un SVG lui-même : l'ajouter au registre (icons.js)`);
   }

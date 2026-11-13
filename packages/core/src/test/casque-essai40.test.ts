@@ -62,7 +62,7 @@ test('calage : une consigne courte, en très gros au milieu du regard ; le déta
   const frontend = read('app', 'src', 'frontend.ts');
   const show = frontend.slice(frontend.indexOf('function showCalibration('), frontend.indexOf('function calibrationMarks('));
   assert.doesNotMatch(show, /eyeHeightProblem|roomStale/);
-  assert.match(show, /const prompt = \{ text, keys, \.\.\.\(issue && \{ problem: issue \}\) \};/);
+  assert.match(show, /const prompt = \{\s*text,\s*keys:[\s\S]{0,300}\.\.\.\(issue && \{ problem: issue \}\),/);
   assert.match(read('app', 'renderer', 'frontend.js'), /if \(role === 'backglass' && \(prompt \|\| hint\)\) \{/);
   assert.match(read('app', 'renderer', 'frontend.css'), /\.headset-prompt-text \{ font-size: 13vh;/);
 });

@@ -38,6 +38,9 @@ import {
   ROOM_KEPT_RECALIBRATION_DEG,
   shouldOfferCalibration,
   staleCalibration,
+  CONTROLLER_SCHEMA_PROFILES,
+  GESTURE_CARD_MS,
+  isControllerElement,
   TRIGGERS_HINT_COMBO,
   TRIGGERS_HINT_S,
   ovrRuntimeDll,
@@ -468,4 +471,34 @@ test('aide des gâchettes (13 novembre 2026 : le geste du calage confondu avec l
   assert.match(front, /showBanner\(t\('Pour recaler la borne : enfoncez les deux sticks, pas les gâchettes'\)\);/);
   // Toute autre touche annule l'aide.
   assert.match(front, /if \(!TRIGGERS_HINT_COMBO\.includes\(name as ControllerButton\)\) \{\s*if \(down\) \{\s*triggersHold\.reset\(\);/);
+});
+
+test('schéma des manettes (maquette validée le 13 novembre 2026) : un composant, la commande en vert, Touch seulement', () => {
+  const html = read('app', 'renderer', 'frontend.html');
+  assert.ok(html.indexOf('schema-manettes.js') > 0 && html.indexOf('schema-manettes.js') < html.indexOf('frontend.js'));
+  const js = read('app', 'renderer', 'schema-manettes.js');
+  // Les profils dessinés, les mêmes des deux côtés ; un autre profil garde le texte seul.
+  assert.deepEqual([...CONTROLLER_SCHEMA_PROFILES], ['touch']);
+  assert.match(js, /const SCHEMA_PROFILES = \['touch'\];/);
+  // Les commandes du dessin portent les noms des éléments des manettes (manettes.ts).
+  for (const name of ['clic-joystick-gauche', 'clic-joystick-droit', 'menu-gauche']) assert.ok(isControllerElement(name) && js.includes(name), name);
+  assert.match(js, /`gachette-\$\{cote\}`/);
+  assert.match(js, /`poignee-\$\{cote\}`/);
+  // Pas de style en ligne (CSP de la page : style-src 'self') ; les lettres du dessin hors du garde-fou des 20 px.
+  assert.doesNotMatch(js, /style=|<style/);
+  assert.match(js, /box\.dataset\.belowFloor = '';/);
+  const css = read('app', 'renderer', 'frontend.css');
+  assert.match(css, /\.schema-vert \{ fill: var\(--signal\); stroke: var\(--signal\);/);
+  // Le calage : gâchettes pour placer, A une fois placée ; en bas, le geste des sticks ; le conseil ne le répète pas.
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /const schema = drawn && !desk && !c\.placing \? \(c\.place \? \['a'\] : \['gachette-gauche', 'gachette-droite'\]\) : undefined;/);
+  assert.match(front, /band: \{ \.\.\.\(drawn && \{ schema: \[\.\.\.combo\] \}\), text: t\('À tout moment, enfoncez les deux sticks 3 s'\)/);
+  assert.match(front, /calibrationCombo\(headset\?\.profile \?\? 'touch'\) \? undefined : calibrationComboLabel\(headset\?\.profile\)/);
+  // La carte du geste : rappel au premier port et aide des gâchettes ; sans dessin, le bandeau en texte.
+  assert.equal(GESTURE_CARD_MS, 6000);
+  assert.match(front, /if \(!showGestureCard\(\)\) showBanner\(t\('Recaler la borne à tout moment/);
+  assert.match(front, /if \(!showGestureCard\(\)\) showBanner\(t\('Pour recaler la borne : enfoncez les deux sticks, pas les gâchettes'\)\);/);
+  assert.match(front, /headsetCard: headsetCardView/);
+  // Le texte du geste dit où et avec quel doigt.
+  assert.match(calibrationComboLabel('touch')!, /sous les pouces/);
 });

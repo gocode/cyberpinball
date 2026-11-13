@@ -1774,6 +1774,23 @@ function headsetHoldRing(hold) {
   return card;
 }
 
+/** La ligne des boutons d'une consigne, sa commande principale (`lead`, en tête) en vert, comme sur le schéma. */
+function promptKeys(keys, lead) {
+  const line = el('p', 'headset-prompt-keys');
+  if (lead && keys.startsWith(lead)) line.append(el('b', '', lead), document.createTextNode(typo(keys.slice(lead.length))));
+  else line.textContent = typo(keys);
+  return line;
+}
+
+/** La carte d'un geste des manettes : le schéma en grand, le geste, puis une ligne courte (où, quel doigt). */
+function headsetGestureCard(card) {
+  const section = el('section', 'headset-prompt headset-gesture');
+  const schema = card.schema ? schemaManettes(card.schema, 'schema-grand') : undefined;
+  if (schema) section.append(schema);
+  section.append(el('p', 'headset-prompt-text', card.text), el('p', 'headset-prompt-keys', card.detail));
+  return section;
+}
+
 /**
  * Partie dans le casque, casque pas sur la tête : la consigne en grand, sur le playfield et le fronton de la
  * borne, du Start à la fin de la partie (VPX attend le casque pour démarrer la table).
@@ -2047,15 +2064,38 @@ window.cyber.onState((s) => {
   }
   const prompt = s.phase === 'message' ? s.message?.prompt : undefined;
   const hint = s.phase === 'loading' ? s.headsetHint : undefined;
+  // La carte d'un geste des manettes (rappel, aide des gâchettes) : au milieu du regard, sauf pendant une consigne.
+  if (role === 'backglass' && s.headsetCard && !prompt && !hint) {
+    zoneLayer.classList.add('off');
+    root.replaceChildren(headsetGestureCard(s.headsetCard));
+    return;
+  }
   if (role === 'backglass' && (prompt || hint)) {
     zoneLayer.classList.add('off');
     const card = el('section', 'headset-prompt');
     if (prompt?.status) card.append(el('p', 'headset-prompt-status', prompt.status));
     card.append(el('p', 'headset-prompt-text', prompt ? prompt.text : hint));
+    // Le schéma des manettes, la commande à actionner en vert (schema-manettes.js) : le dessin d'abord.
+    const schema = prompt?.schema ? schemaManettes(prompt.schema, 'schema-moyen') : undefined;
+    if (schema) {
+      card.classList.add('with-schema');
+      card.append(schema);
+    }
     if (prompt?.problem) card.append(el('p', 'headset-prompt-problem', prompt.problem));
     // Chargement d'une partie : l'avertissement du réseau du casque, sous la consigne (Air Link sur un PC en Wi-Fi).
     if (!prompt && s.headsetNote) card.append(el('p', 'headset-prompt-problem', s.headsetNote));
-    if (prompt?.keys) card.append(el('p', 'headset-prompt-keys', prompt.keys));
+    if (prompt?.keys) card.append(promptKeys(prompt.keys, prompt.keysLead));
+    // En bas, le geste qui sert à tout moment (le premier calage : recaler d'un geste ensuite).
+    if (prompt?.band) {
+      card.classList.add('with-band');
+      const band = el('div', 'headset-prompt-band');
+      const small = prompt.band.schema ? schemaManettes(prompt.band.schema, 'schema-petit') : undefined;
+      if (small) band.append(small);
+      const text = el('p', '', prompt.band.text);
+      text.append(el('span', '', prompt.band.detail));
+      band.append(text);
+      card.append(band);
+    }
     root.replaceChildren(card);
     return;
   }
