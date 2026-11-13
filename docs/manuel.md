@@ -1353,6 +1353,7 @@ Clés écrites (`vpxSettingsFor` et `vpxPluginDefaults` dans `packages/core/src/
 | `[Plugin.B2S] ScoreViewDMDOverlay`, `ScoreViewDMDAutoPos` | 1 et 1 si le rôle DMD existe et n'est pas un DMD seul. Le FullDMD d'un .directb2s passe devant ScoreView : sans incrustation, on ne verrait que son cadre. La position du DMD est cherchée dans l'image | non, proposées si la clé est vide |
 | `[Plugin.DMDUtil] Enable`, et `ZeDMD`, `PIN2DMD` ou `Pixelcade` | 1 pour le DMD réel reconnu ; rien sans DMD réel | oui |
 | `[Plugin.PinMAME] PinMAMEPath` | `<racine>\pinmame`, s'il contient `roms` | non, proposée si la clé est vide |
+| `[Plugin.PinMAME] Cheat` | 1 si le plugin PinMAME est activé. Sans lui, une ROM WPC (Williams et Bally, 1990-1999) refait son test de mémoire, « TESTING… », avant chaque partie ; activé, PinMAME saute ce contrôle (`wpc.c`, `MACHINE_INIT`). Règles et scores inchangés. Réglage « Démarrage rapide des ROM » de l'onglet « Essentiels » | non, proposée si la clé est vide |
 | `[Plugin.Serum] SerumPath`, `[Plugin.VNI] VniPath` | `<racine>\pinmame\altcolor`, s'il contient un `<rom>\<rom>.cRZ` ou `.cROMc` (Serum), `.pal` ou `.vni` (VNI) | non, proposées si la clé est vide |
 
 Chaque table cherche d'abord ses ROM et ses couleurs dans son propre dossier (`pinmame\roms`, `serum`, `vni`, `pinmame\altcolor`) ; les dossiers communs ne servent qu'ensuite. La synchronisation signale « B2S et B2SLegacy activés ensemble » quand les deux le sont (B2SLegacy rallumé à la main, puis gardé).

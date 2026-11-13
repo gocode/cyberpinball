@@ -660,6 +660,19 @@ export const VPX_ESSENTIALS: EssentialGroup[] = [
     },
     settings: [
       {
+        section: 'Plugin.PinMAME',
+        key: 'Cheat',
+        get label() {
+          return t('Démarrage rapide des ROM');
+        },
+        get help() {
+          return t('Saute le test de la mémoire (« TESTING… ») que les ROM Williams et Bally WPC refont à chaque partie. Ne change ni les règles ni les scores. Cyber Pinball l’active tant que vous n’avez rien choisi.');
+        },
+        get values() {
+          return [t('Non'), t('Oui')];
+        },
+      },
+      {
         section: 'TableOverride',
         key: 'Difficulty',
         get label() {

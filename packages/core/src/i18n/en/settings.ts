@@ -399,6 +399,9 @@ export const messages: Record<string, string> = {
   'Difficulté générale : pente, taille des flippers, dispersion de la bille. Se règle table par table.': 'Overall difficulty: slope, flipper size, ball scatter. Set per table.',
   'Luminosité de la scène': 'Camera exposure',
   'Éclaircit ou assombrit toute la table. Se règle table par table.': 'Brightens or darkens the whole table. Set per table.',
+  'Démarrage rapide des ROM': 'Fast ROM startup',
+  'Saute le test de la mémoire (« TESTING… ») que les ROM Williams et Bally WPC refont à chaque partie. Ne change ni les règles ni les scores. Cyber Pinball l’active tant que vous n’avez rien choisi.':
+    'Skips the memory test (“TESTING…”) that Williams and Bally WPC ROMs run before every game. Rules and scores are unchanged. Cyber Pinball turns it on as long as you have not chosen otherwise.',
   'Imposer le niveau de lumière': 'Override table light level',
   'Remplace l’ambiance jour / nuit prévue par la table par celle choisie ci-dessous.': 'Replaces the table’s own day/night lighting with the one chosen below.',
   'Jour / nuit': 'Day/night',

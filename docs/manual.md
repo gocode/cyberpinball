@@ -1353,6 +1353,7 @@ Keys written (`vpxSettingsFor` and `vpxPluginDefaults` in `packages/core/src/vpx
 | `[Plugin.B2S] ScoreViewDMDOverlay`, `ScoreViewDMDAutoPos` | 1 and 1 if the DMD role exists and is not a DMD only. The FullDMD of a .directb2s goes in front of ScoreView: without the overlay, only its frame would be visible. The DMD's position is searched for in the image | no, offered if the key is empty |
 | `[Plugin.DMDUtil] Enable`, and `ZeDMD`, `PIN2DMD` or `Pixelcade` | 1 for the recognized real DMD; nothing without a real DMD | yes |
 | `[Plugin.PinMAME] PinMAMEPath` | `<racine>\pinmame`, if it contains `roms` | no, offered if the key is empty |
+| `[Plugin.PinMAME] Cheat` | 1 if the PinMAME plugin is enabled. Without it, a WPC ROM (Williams and Bally, 1990-1999) runs its memory test, “TESTING…”, before every game; when on, PinMAME skips that check (`wpc.c`, `MACHINE_INIT`). Rules and scores unchanged. Setting « Démarrage rapide des ROM » (Fast ROM startup) in the « Essentiels » (Essentials) tab | no, offered if the key is empty |
 | `[Plugin.Serum] SerumPath`, `[Plugin.VNI] VniPath` | `<racine>\pinmame\altcolor`, if it contains a `<rom>\<rom>.cRZ` or `.cROMc` (Serum), `.pal` or `.vni` (VNI) | no, offered if the key is empty |
 
 Each table first looks for its ROMs and colorizations in its own folder (`pinmame\roms`, `serum`, `vni`, `pinmame\altcolor`); the shared folders only come after. The synchronization reports "B2S et B2SLegacy activés ensemble" (B2S and B2SLegacy enabled together) when both are enabled (B2SLegacy turned back on by hand, then kept).

@@ -121,6 +121,7 @@ test('schéma 10.8.1-5436 : réglages des plugins et priorités des fenêtres', 
     ['Plugin.Serum', 'SerumPath'],
     ['Plugin.VNI', 'VniPath'],
     ['Plugin.PinMAME', 'PinMAMEPath'],
+    ['Plugin.PinMAME', 'Cheat'],
     ['Plugin.PUP', 'PUPFolder'],
     ['Plugin.DOF', 'Enable'],
     ['Backglass', 'Priority.PUP'],
@@ -314,6 +315,21 @@ test('dossiers globaux de ROM et de colorisation : proposés seulement s’ils e
   assert.equal(get(plan.nextIni, 'Plugin.VNI', 'VniPath'), undefined);
 });
 
+test('démarrage rapide des ROM : Cheat proposé quand la clé est vide, jamais imposé', () => {
+  // Sans Cheat, une ROM WPC refait son test de mémoire (« TESTING… ») à chaque partie.
+  assert.equal(get(planVpxSync(cabinet(), devPcDisplays(), '', PROFILE).nextIni, 'Plugin.PinMAME', 'Cheat'), '1');
+  // Clé présente mais vide, comme l'écrivait l'assistant jusqu'ici : proposée aussi.
+  assert.equal(get(planVpxSync(cabinet(), devPcDisplays(), '[Plugin.PinMAME]\nEnable = 1\nCheat = \n', PROFILE).nextIni, 'Plugin.PinMAME', 'Cheat'), '1');
+  // Un choix de l'utilisateur reste le sien.
+  const chosen = '[Plugin.PinMAME]\nCheat = 0\n';
+  const off = planVpxSync(cabinet(), devPcDisplays(), chosen, PROFILE);
+  assert.equal(get(off.nextIni ?? chosen, 'Plugin.PinMAME', 'Cheat'), '0');
+  assert.ok(!off.manualEdits.some((e) => e.key === 'Cheat'));
+  // Greffon PinMAME éteint : rien à proposer.
+  const noPinmame = { ...PROFILE, enabledPlugins: PROFILE.enabledPlugins.filter((p) => p !== 'PinMAME') };
+  assert.equal(get(planVpxSync(cabinet(), devPcDisplays(), '', noPinmame).nextIni, 'Plugin.PinMAME', 'Cheat'), undefined);
+});
+
 test('chaque clé écrite pour VPX 10.8.1-5436 existe dans son schéma', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-dmd-'));
   fs.mkdirSync(path.join(root, 'pinmame', 'roms'), { recursive: true });
@@ -329,6 +345,6 @@ test('chaque clé écrite pour VPX 10.8.1-5436 existe dans son schéma', () => {
   for (const e of written) assert.ok(known.has(`${e.section}/${e.key}`.toLowerCase()) || (action(e) ?? '') in VPX_INPUT_DEFAULTS, `[${e.section}] ${e.key}`);
   // Et l'écran des réglages les montre toutes comme gérées, sauf les valeurs proposées.
   const owned = vpxOwnedKeys(PROFILE, [], false, { roles: ['playfield', 'backglass', 'dmd', 'topper'], dmdKeys: ['Enable', 'ZeDMD', 'PIN2DMD', 'Pixelcade'], inputKeys: Object.keys(plan.memory).filter((id) => id.startsWith('Input.')).map((id) => id.slice('Input.'.length)) });
-  const proposed = ['CabinetAutofitMode', 'ScoreViewDMDOverlay', 'ScoreViewDMDAutoPos', 'PinMAMEPath', 'VniPath'];
+  const proposed = ['CabinetAutofitMode', 'ScoreViewDMDOverlay', 'ScoreViewDMDAutoPos', 'PinMAMEPath', 'VniPath', 'Cheat'];
   for (const e of written) if (!proposed.includes(e.key)) assert.ok(isOwned(owned, e.section, e.key), `[${e.section}] ${e.key}`);
 });

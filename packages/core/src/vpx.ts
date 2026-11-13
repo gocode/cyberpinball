@@ -187,6 +187,9 @@ export const VPX_PLAY_SETTINGS: readonly VpxSetting[] = [
   { section: 'PlayerVR', key: 'AskToTurnOn', value: '2' },
 ];
 
+/** Démarrage rapide des ROM WPC : le test de mémoire sauté (vpxPluginDefaults). */
+export const PINMAME_FAST_BOOT: VpxSetting = { section: 'Plugin.PinMAME', key: 'Cheat', value: '1' };
+
 /** Plugins que Cyber Pinball éteint parce qu'un plugin activé fait le même travail (VPX_PLUGIN_CONFLICTS). */
 export function disabledPlugins(profile: VpxProfile): string[] {
   const off = profile.enabledPlugins.flatMap((p) => VPX_PLUGIN_CONFLICTS[p] ?? []);
@@ -207,9 +210,17 @@ export function rendererPriorities(section: string, profile: VpxProfile, dmdKind
  * apparaît pas : on ne verrait que le cadre. ScoreViewDMDAutoPos cherche dans
  * l'image le plus grand rectangle sombre aux proportions du DMD (B2SDMDOverlay.cpp).
  * Rien pour un écran DMD seul : B2S n'y dessine pas (DMD_ONLY_PRIORITIES).
+ *
+ * [Plugin.PinMAME] Cheat (PINMAME_FAST_BOOT) : sans lui, une ROM WPC (Williams et Bally,
+ * 1990-1999) refait à chaque partie le test de sa mémoire, plusieurs secondes de « TESTING… »
+ * avant de jouer. Activé, PinMAME saute ce contrôle (wpc.c, MACHINE_INIT : « speed up startup
+ * by disable checksum »). Le greffon le met à non par défaut, alors que VPinMAME l'avait
+ * d'office sur la plupart des bornes : une table qui démarrait vite se mettait à tester.
+ * Ni les règles ni les scores n'en dépendent.
  */
 export function vpxPluginDefaults(assignments: Partial<Record<RoleId, ObservedDisplay>>, profile: VpxProfile, dmdKind?: DmdKind): VpxSetting[] {
   const defaults: VpxSetting[] = [];
+  if (profile.enabledPlugins.includes('PinMAME')) defaults.push(PINMAME_FAST_BOOT);
   if (assignments.dmd && dmdKind !== 'dmd' && profile.enabledPlugins.includes('B2S')) {
     defaults.push({ section: 'Plugin.B2S', key: 'ScoreViewDMDOverlay', value: '1' });
     defaults.push({ section: 'Plugin.B2S', key: 'ScoreViewDMDAutoPos', value: '1' });
