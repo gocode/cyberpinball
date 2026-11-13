@@ -4605,3 +4605,45 @@ body.mouse .room-line.pick:not(.selected):hover {
 .lib-section.kind-room-topic .lib-row {
   font-weight: 600;
 }
+
+/*
+ * Badges (Section.kind « chips ») : les phrases préparées d'un salon, des pastilles arrondies les unes
+ * à côté des autres, à la ligne au bout de la place. On voit qu'il s'agit de phrases toutes faites, pas
+ * d'options du menu ; la phrase choisie prend le vert du choix.
+ */
+.lib-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1cqmin 1.1cqmin;
+  margin: 0;
+  padding: 0.4cqmin 0;
+  list-style: none;
+}
+
+.lib-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 5.2cqmin;
+  padding: 0.6cqmin 2cqmin;
+  border: 0.14cqmin solid var(--line-strong);
+  border-radius: 99cqmin;
+  background: var(--surface-raised);
+  font-size: 2.1cqmin;
+  line-height: 1.3;
+  color: var(--ink);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lib-chip.selected {
+  border-color: var(--signal);
+  background: var(--signal);
+  color: var(--on-signal);
+  box-shadow: 0 0 2cqmin var(--signal-haze);
+}
+
+body.mouse .lib-chip.pick:not(.selected):hover {
+  border-color: var(--halo);
+}

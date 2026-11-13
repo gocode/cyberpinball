@@ -41,9 +41,7 @@ export const messages: Record<string, string> = {
   'Il vous a cité à {time}': 'They mentioned you at {time}',
   'Clavier à l’écran…': 'On-screen keyboard…',
   '« /me … » pour une action': '"/me …" for an action',
-  'Sur le téléphone': 'On the phone',
   'Communauté › Salon : le champ est prêt sur le téléphone': 'Community › Room: the field is ready on the phone',
-  'Reliez un téléphone : Menu système › Télécommande du téléphone': 'Link a phone: System menu › Phone remote',
   'Retour au salon': 'Back to the room',
   '300 caractères, une ligne · @pseudo prévient le joueur · aucun lien': '300 characters, one line · @name notifies the player · no links',
   'Une ligne, 300 caractères au plus. « /me » pour une action, « /ignorer pseudo » pour ignorer un joueur.': 'One line, 300 characters at most. "/me" for an action, "/ignorer name" to ignore a player.',
@@ -114,6 +112,9 @@ export const messages: Record<string, string> = {
   'Joueurs ignorés': 'Ignored players',
 
   // Téléphone
+  'Écrivez avec votre téléphone': 'Write with your phone',
+  'Phrases préparées': 'Ready-made phrases',
+  'Flippers : choisir une phrase · Start : l’envoyer · Exit : sortir des phrases': 'Flippers: choose a phrase · Start: send it · Exit: leave the phrases',
   'Salon': 'Room',
   'Salon indisponible': 'Room unavailable',
   'Acceptez d’abord les règles des salons, à la borne : Écrire dans le salon': 'Accept the room rules first, at the cabinet: Write in the room',

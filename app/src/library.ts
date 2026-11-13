@@ -657,6 +657,12 @@ export interface Built {
   /** Phrases propres à cet écran pour le bloc du téléphone (remoteBlock). */
   remoteWording?: RemoteWording;
   /**
+   * L'écran montre le bloc de la télécommande du téléphone (son QR code à viser, puis le téléphone
+   * relié) sans en être l'écran : la télécommande s'éveille tant qu'il est affiché, et le moteur
+   * remplit `remote` lui-même (« Écrire dans le salon »).
+   */
+  phone?: true;
+  /**
    * Ce que Start fait sur un élément de la liste de contenu (« cocher ou décocher »), dit par le
    * bandeau d'aide tant qu'on y est ; sans lui, « valider ». Une liste de cases à cocher le dit :
    * sinon rien n'indique qu'on y coche (la ROM d'un ami, 01/11/2026).
@@ -4653,7 +4659,7 @@ export function createLibrary(host: LibraryHost) {
       lead: built.lead,
       sections: built.sections,
       crop: built.crop ? { src: built.crop.src, width: built.crop.width, height: built.crop.height, box: built.crop.box, caption: built.crop.caption } : undefined,
-      remote: built.remote ? remoteBlock(built.remote, 'screen', built.remoteWording) : undefined,
+      remote: built.remote ? remoteBlock(built.remote, 'screen', built.remoteWording) : built.phone && host.phoneRemote?.bar() ? remoteBlock(host.phoneRemote.bar()!, 'screen', built.remoteWording) : undefined,
 
       back: backLabel(built),
       // Dans la liste d'un écran à deux zones, Exit n'y ramène pas : il passe aux actions, le bouton le dit (et fait de même au clic).
@@ -4954,7 +4960,9 @@ export function createLibrary(host: LibraryHost) {
   /** Où le menu montre le QR code maintenant : l'écran de la télécommande, le clavier à l'écran. */
   function remoteSurfaces(): { menu: boolean; keyboard: boolean } {
     const editor = (screen?.kind === 'edit' || screen?.kind === 'prompt') && screen.editor && screen.editor.kind !== 'choice';
-    return { menu: Boolean(remoteMenu?.shown()), keyboard: Boolean(editor) };
+    // Un écran décrit qui montre le bloc du téléphone (Built.phone) le réveille comme l'écran de la télécommande.
+    const phone = screen?.kind === 'custom' && Boolean(screen.build().phone);
+    return { menu: Boolean(remoteMenu?.shown()) || phone, keyboard: Boolean(editor) };
   }
 
   // ---------- Mode sans opérateur ----------

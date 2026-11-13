@@ -43,6 +43,8 @@ export interface CommunityMenuHost {
   tables(): readonly TableEntry[];
   openProfile(key: string, back: () => void): void;
   openFriend(key: string, back: () => void): void;
+  /** Mes amis (friends-menu.ts) : leur état en une ligne (en ligne, demandes reçues) et la liste, « Retour » vers `back`. */
+  friends?: { detail(): string; attention(): boolean; open(back: () => void): void };
   /** La messagerie (chat-menu.ts) : son état en une ligne et sa liste, « Retour » vers `back`. */
   messages: { detail(): string; attention(): boolean; quiet(): boolean; open(back: () => void): void };
   /** Le salon de mon pays (rooms-menu.ts) : ce que dit sa porte, et l'ouvrir. */
@@ -283,6 +285,18 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
         ...(s.enabled ? {} : { tone: 'quiet' as const }),
         run: () => openPlayers(here),
       },
+      ...(host.friends
+        ? [
+            {
+              label: t('Mes amis'),
+              detail: host.friends.detail(),
+              icon: 'friend-list' as const,
+              ...(host.friends.attention() ? { attention: true } : {}),
+              ...(s.enabled ? {} : { tone: 'quiet' as const }),
+              run: () => host.friends!.open(here),
+            },
+          ]
+        : []),
       {
         label: t('Messages'),
         detail: host.messages.detail(),

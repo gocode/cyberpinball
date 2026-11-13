@@ -324,20 +324,25 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       const table = host.currentTable();
       const phrases = [t('Qui veut faire une partie ?'), ...(table ? [t('Quelqu’un sur {table} ?', { table: table.title })] : []), t('Bien joué !'), t('J’arrive dans 5 minutes'), t('Merci !'), t('Bonne soirée !')];
       const mention = [...roomLines(net.rooms(), room)].reverse().find((l) => l.key !== me().key.publicKey && visible(l) && mentions(l.text, me().name));
-      const actions: Action[] = [
-        ...(mention ? [{ label: t('Répondre à @{name}', { name: mention.name }), detail: t('Il vous a cité à {time}', { time: time(mention.at) }), icon: 'message' as const, run: () => askText(room, `@${mention.name} `, send) }] : []),
-        ...phrases.map((p, i) => ({ label: p, key: `phrase:${i}`, run: () => send(p) })),
-        { label: t('Clavier à l’écran…'), detail: t('« /me … » pour une action'), icon: 'keyboard', run: () => askText(room, '', send) },
-        {
-          label: t('Sur le téléphone'),
-          detail: host.phoneLinked() ? t('Communauté › Salon : le champ est prêt sur le téléphone') : t('Reliez un téléphone : Menu système › Télécommande du téléphone'),
-          icon: 'phone',
-          ...(host.phoneLinked() ? {} : { tone: 'quiet' as const }),
-          run: () => lib.openCustom(build),
-        },
-        { label: t('Retour au salon'), icon: 'back', run: backToRoom },
-      ];
-      return { heading: t('Écrire dans le salon'), icon: 'message', subheading: roomName(room), lead: t('300 caractères, une ligne · @pseudo prévient le joueur · aucun lien'), sections: [], actions, back: backToRoom };
+      const actions: Action[] = [];
+      // Les phrases préparées : des badges les uns à côté des autres (Section.kind « chips »), à choisir d'un appui.
+      const chips: Row[] = phrases.map((p, i) => ({ text: p, action: actions.push({ label: p, key: `phrase:${i}`, run: () => send(p) }) - 1, pick: true }));
+      if (mention) actions.push({ label: t('Répondre à @{name}', { name: mention.name }), detail: t('Il vous a cité à {time}', { time: time(mention.at) }), icon: 'message', run: () => askText(room, `@${mention.name} `, send) });
+      actions.push({ label: t('Clavier à l’écran…'), detail: t('« /me … » pour une action'), icon: 'keyboard', run: () => askText(room, '', send) });
+      actions.push({ label: t('Retour au salon'), icon: 'back', run: backToRoom });
+      return {
+        heading: t('Écrire dans le salon'),
+        icon: 'message',
+        subheading: roomName(room),
+        lead: t('300 caractères, une ligne · @pseudo prévient le joueur · aucun lien'),
+        // Le téléphone, clavier le plus rapide : son QR code à viser, ou le téléphone déjà relié.
+        phone: true,
+        remoteWording: { offer: t('Écrivez avec votre téléphone'), paired: [t('Communauté › Salon : le champ est prêt sur le téléphone')] },
+        sections: [{ title: t('Phrases préparées'), kind: 'chips', rows: chips }],
+        actions,
+        back: backToRoom,
+        listHint: t('Flippers : choisir une phrase · Start : l’envoyer · Exit : sortir des phrases'),
+      };
     };
     lib.openCustom(build);
   }

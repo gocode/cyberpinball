@@ -114,6 +114,25 @@ function renderLibrary(v) {
         content.append(renderMediaCards(v.media, v.cursor));
         continue;
       }
+      // Badges (Section.kind « chips » : les phrases préparées d'un salon) : les uns à côté des autres,
+      // à la ligne au bout ; chacun se choisit et s'envoie comme une ligne de la liste.
+      if (section.kind === 'chips') {
+        const box = libEl('section', 'lib-section kind-chips');
+        if (section.title) box.append(libEl('h2', '', section.title));
+        const chips = libEl('ul', 'lib-chips');
+        for (const row of section.rows) {
+          const li = libEl('li', 'lib-chip', row.text);
+          if (row.action !== undefined) {
+            li.classList.add('pick');
+            if (row.action === v.cursor) li.classList.add('selected');
+            actOn(li, { type: 'activate', index: row.action });
+          }
+          chips.append(li);
+        }
+        box.append(chips);
+        (section.side ? side : main).append(box);
+        continue;
+      }
       // Liste d'options (Section.options) : pas une liste de contenu, le garde-fou ne lui demande pas de cadre.
       const box = libEl('section', `lib-section${section.kind ? ` kind-${section.kind}` : ''}${section.options ? ' options' : ''}`);
       if (section.title) box.append(libEl('h2', '', section.title));

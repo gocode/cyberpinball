@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.11
 
+- Communauté : l'accueil a aussi une porte « Mes amis » ; « Écrire dans le salon » montre le QR code du téléphone, et les phrases préparées sont des badges les uns à côté des autres, qu'on choisit d'un appui.
 - Juke-box : le premier morceau joué après le démarrage sortait par la sortie par défaut de Windows (souvent les haut-parleurs de l'écran du playfield) au lieu de celle du fronton ; il suit maintenant la sortie de la borne, et le journal note sur quelle sortie joue chaque morceau.
 - Réalité virtuelle : quand le Quest est en limite fixe, la borne dit une fois comment passer en limite de pièce, qui garde mieux la borne en place quand le casque est remis.
 - Réalité virtuelle : sur l'écran « Mettez le casque », Exit de la borne arrête bien la partie et ramène à la roue (comme Échap et Ctrl+Maj+K) ; les deux consignes du bas sont sur deux lignes.

@@ -2934,6 +2934,11 @@ socialNet.onRoomLines((lines) => {
 // Communauté (community-menu.ts) : l'accueil du médaillon de la roue, et « Joueurs en ligne », amis ou non.
 const communityMenu = createCommunityMenu({
   rooms: { door: () => roomsMenu.door(), open: (back) => roomsMenu.openDefault(back) },
+  friends: {
+    detail: () => friendsMenu.items.friends.detail ?? '',
+    attention: () => Boolean(friendsMenu.items['friend-requests'].attention || friendsMenu.items.friends.attention),
+    open: (back) => library.runSystemItem('friends', back),
+  },
   library,
   net: socialNet,
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
