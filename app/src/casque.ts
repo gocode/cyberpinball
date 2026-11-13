@@ -468,6 +468,8 @@ export class HeadsetMenu {
         // « bouton <nom> 1|0 » : un bouton des manettes, remis au menu comme un bouton de la borne (pas au journal).
         const button = /^bouton (\S+) ([01])$/.exec(line);
         if (button) {
+          // Chaque bouton (pas les directions des joysticks) au journal, brut : ce que Link remet au compagnon.
+          if (!parseControllerEvent(button[1]!)?.direction) this.opts.log(`Casque, bouton brut : ${button[1]} ${button[2]}`); // i18n-ignore : journal
           if (parseControllerEvent(button[1]!)) this.opts.onButton?.(button[1]!, button[2] === '1');
           continue;
         }
@@ -480,8 +482,14 @@ export class HeadsetMenu {
           continue;
         }
         // Veille : la tête du joueur dans la pièce (au journal par Cyber Pinball, pas ici : toutes les 5 s).
+        // Au menu, la tête dans la pièce (STAGE) toutes les 5 s, au journal : à comparer à la sonde LibOVR.
+        if (line.startsWith('tete-menu ')) {
+          this.opts.log(`Casque, tête (OpenXR, pièce) : ${line.slice(10)}`); // i18n-ignore : journal
+          continue;
+        }
         const head = /^tete (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)$/.exec(line);
         if (head) {
+          this.opts.log(`Casque, tête en partie (OpenXR, pièce) : ${line.slice(5)}`); // i18n-ignore : journal
           this.lastHead = { x: Number(head[1]), y: Number(head[2]), z: Number(head[3]), yaw: Number(head[4]) };
           this.opts.onHead?.(this.lastHead);
           continue;

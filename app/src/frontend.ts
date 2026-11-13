@@ -453,6 +453,7 @@ import { readLiveScoresSettings, writeLiveScoresSettings } from './live-scores-s
 import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
 import { centerWhenStarted, prepareVrGame, probeVr, readVrAutoRecal, readVrMirror, readVrMode, rememberVrSettings, writeIniSettings, writeVrAutoRecal, writeVrCalibration, writeVrMirror, writeVrMode, type VrGame } from './vr';
 import { HEADSET_TRIAL_DIR, HeadsetMenu, readCabinetPlace, type HeadPose } from './casque';
+import { OvrProbe } from './sonde-ovr';
 import { installPausePlugin, pauseSettingsFor, QUIT_HOLD_S } from './pause-vr';
 import { askElevation } from './uac-confirm';
 import { downloadKinectDriver, HeadTracker, installKinectDriver, installVision3dPlugin, probeVision3d, readVision3d, vision3dPluginFiles, writeVision3d } from './vision3d';
@@ -3059,6 +3060,8 @@ library.provideSystemItem('quiet-in-game', {
 // « Réalité virtuelle » (Menu système > Borne, vr.ts) : désactivée, ou les tables dans le casque quand il
 // est prêt. Sans runtime OpenXR, l'entrée reste visible, grisée avec sa raison ; Start n'y change rien.
 let vrMode = readVrMode(loc.dataDir);
+/** Sonde LibOVR (sonde-ovr.ts, 13 novembre 2026) : ce que Link donne à un client invisible, au journal. */
+const ovrProbe = new OvrProbe({ appDir: path.join(__dirname, '..'), log: (line) => console.log(line) });
 // Le menu dans le casque (casque.ts) : les écrans de la borne montrés dans le casque, hors partie.
 let headset: HeadsetMenu | undefined;
 /** Partie en cours : le casque est à VPX. */
@@ -3080,6 +3083,7 @@ library.provideSystemItem('vr', {
     if (!readiness.ready) return void library.openSystem();
     vrMode = vrMode === 'auto' ? 'off' : 'auto';
     writeVrMode(loc.dataDir, vrMode);
+    ovrProbe.set(vrMode === 'auto');
     console.log(`Réalité virtuelle : ${vrMode === 'auto' ? `activée (${readiness.runtime})` : 'désactivée'}.`); // i18n-ignore : journal
     library.openSystem();
   },
@@ -4902,6 +4906,7 @@ export function startFrontend(): void {
   app.on('before-quit', () => {
     closing = true;
     headset?.dispose();
+    ovrProbe.set(false);
     // Le téléphone apprend que Cyber Pinball se ferme ; plus rien n'écoute.
     phoneRemote.close();
     cabinetVolume?.stop();
@@ -5007,6 +5012,8 @@ export function startFrontend(): void {
   });
   headset.watchRest(vrAutoRecal);
   headset.watch();
+  // Sonde LibOVR (sonde-ovr.ts) : mesure seulement, tant que la réalité virtuelle est activée.
+  ovrProbe.set(vrMode === 'auto');
   // Horaire de la borne : nuit et arrêt programmé, d'après les réglages de medias.json.
   hours.start();
   // Diagnostic : les tables dont le fronton serait vide dans le casque (capture de PuP, sans flasher du fronton),

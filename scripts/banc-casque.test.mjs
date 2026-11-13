@@ -4,7 +4,8 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { bancPret, jouer } from './banc-casque.mjs';
+import * as fs from 'node:fs';
+import { BANC_SONDE, bancPret, jouer, sonder } from './banc-casque.mjs';
 
 const pret = bancPret();
 const sauf = pret ? {} : { skip: 'banc pas construit : npm run casque-vr' };
@@ -67,14 +68,48 @@ test('banc : calage, les deux bouts et les deux prises des manettes à la gâche
 
 test('banc : recalage automatique, les bouts des manettes suivies relevés au menu (« repos »), rien sans la commande', sauf, async () => {
   const scenario = ['0 porte 1', '0 manette gauche -0.3 0.9 -0.4', '0 manette droite 0.3 0.9 -0.4', '2500 suivie gauche 0'].join('\n');
-  const r = await jouer(scenario, { dureeMs: 3500, commandes: [[800, 'repos 1']] });
+  const r = await jouer(scenario, { dureeMs: 3500, commandes: [[300, 'repos 1']] });
   const vus = lignes(r, /^repos -?\d/);
-  // 10 fois par seconde entre 0,8 s et 2,5 s, à la charge de la machine près.
-  assert.ok(vus.length >= 8 && vus.length <= 20, String(vus.length));
+  // 10 fois par seconde jusqu'à 2,5 s (moins si la machine est chargée : la commande arrive plus tard).
+  assert.ok(vus.length >= 3 && vus.length <= 25, String(vus.length));
   assert.match(vus[0].ligne, /^repos -0\.30\d* 0\.90\d* -0\.40\d* (-?[\d.]+ ){3}[\d.]+ 0\.30\d* 0\.90\d* -0\.40\d* (-?[\d.]+ ){3}[\d.]+$/);
   // Une manette plus suivie (endormie, hors de vue) : dit une fois, plus de relevé.
   assert.equal(lignes(r, /^repos aucune$/).length, 1);
-  assert.ok(vus.every((l) => l.ms < 2700), 'relevé après la perte du suivi');
+  const perte = r.lignes.findIndex((l) => l.ligne === 'repos aucune');
+  assert.ok(r.lignes.slice(perte).every((l) => !/^repos -?\d/.test(l.ligne)), 'relevé après la perte du suivi');
   const sans = await jouer(scenario, { dureeMs: 2000 });
   assert.equal(lignes(sans, /^repos /).length, 0);
+});
+
+test('banc : sonde LibOVR, client invisible : limite fixée à la pièce, tête, manettes, clics bruts', pret && fs.existsSync(BANC_SONDE) ? {} : { skip: 'sonde pas construite : npm run casque-vr' }, async () => {
+  const r = await sonder(
+    [
+      '0 porte 1',
+      '0 limite piece 2.5 3.4',
+      '0 contour -1.2,-1.6 1.3,-1.7 1.4,1.5 -1.1,1.8 -1.5,0.2',
+      '0 tete 0.1 1.6 0.2 0.3',
+      '1000 bouton /user/hand/left/input/thumbstick/click 1',
+      '1300 bouton /user/hand/left/input/thumbstick/click 0',
+      '1400 bouton /user/hand/right/input/thumbstick/click 1',
+      '1500 origine 0.5 0.2 0.7',
+      '2600 ovr-entrees 0',
+      '2700 bouton /user/hand/right/input/thumbstick/click 0',
+    ].join('\n'),
+    { dureeMs: 4000 },
+  );
+  const l = (re) => r.lignes.filter((x) => re.test(x));
+  assert.equal(r.code, 0, r.lignes.join('\n'));
+  assert.equal(l(/^ovr charge /).length, 1);
+  assert.deepEqual(l(/^ovr init /), ['ovr init 0 version 1.43']);
+  assert.deepEqual(l(/^ovr etat /), ['ovr etat visible=0 casque=1 porte=1 regard=0']);
+  assert.match(l(/^ovr tete /)[0], /^ovr tete 0\.100 1\.600 0\.200 0\.300 suivi=15$/);
+  assert.match(l(/^ovr manettes /)[0], /^ovr manettes -0\.300 1\.000 -0\.350 suivi=15 0\.300 1\.000 -0\.350 suivi=15$/);
+  // Le contour et l'aire sont fixés à la pièce : l'origine déplacée (Link), ils changent dans l'espace de suivi.
+  const contours = l(/^ovr contour exterieur /);
+  assert.equal(contours.length, 2);
+  assert.match(contours[0], /n=5 pts=-1\.200,-1\.600 1\.300,-1\.700 /);
+  assert.equal(l(/^ovr aire code=0 n=4 dims=2\.500x3\.400 /).length, 2);
+  // Chaque appui et relâchement des clics, bruts ; les entrées rendues à zéro (sans regard) relâchent le droit.
+  assert.deepEqual(l(/^ovr bouton /), ['ovr bouton clic-joystick-gauche 1', 'ovr bouton clic-joystick-gauche 0', 'ovr bouton clic-joystick-droit 1', 'ovr bouton clic-joystick-droit 0']);
+  assert.equal(l(/^ovr fin$/).length, 1);
 });

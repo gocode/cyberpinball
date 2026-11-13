@@ -7,6 +7,10 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.1.12
+
+- Virtual reality: the log records what the headset passes on (room boundary, head and controller positions, each button), in the menu as in a game, to prepare an alignment that holds from one Link connection to the next. Nothing changes in use.
+
 ## 0.1.11
 
 - Virtual reality: new "Automatic alignment" option (System menu > Cabinet > Virtual reality, off by default): both controllers laid on the lower corners of the table, still for one second, and the cabinet aligns again by itself, in the menu. Never with the controllers in the hand.

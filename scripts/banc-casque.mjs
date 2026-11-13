@@ -13,6 +13,33 @@ import { fileURLToPath } from 'node:url';
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const BANC_COMPAGNON = path.join(repo, 'build', 'casque-vr', 'Release', 'cyberpinball-casque.exe');
 export const BANC_RUNTIME = path.join(repo, 'build', 'casque-vr', 'Release', 'runtime-factice.dll');
+export const BANC_SONDE = path.join(repo, 'build', 'casque-vr', 'Release', 'cyberpinball-sonde-ovr.exe');
+
+/**
+ * La sonde LibOVR (packages/casque-vr/src/sonde-ovr.cpp) sur le runtime factice, qui exporte aussi les fonctions
+ * de LibOVR : rend ses lignes au bout de `dureeMs` (la sonde reçoit « fin » et s'arrête).
+ */
+export async function sonder(scenario, { dureeMs = 3000 } = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-sonde-'));
+  const scenarioFile = path.join(dir, 'scenario.txt');
+  fs.writeFileSync(scenarioFile, scenario.trim() + '\n');
+  const env = { ...process.env, CYBERPINBALL_XR_SCENARIO: scenarioFile, CYBERPINBALL_XR_TRACE: path.join(dir, 'trace.txt'), CYBERPINBALL_XR_DEBUT_FICHIER: path.join(dir, 'debut.txt') };
+  const child = spawn(BANC_SONDE, ['--ovr', BANC_RUNTIME], { env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  let out = '';
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', (c) => (out += c));
+  child.stderr.on('data', () => undefined);
+  const code = await new Promise((resolve) => {
+    const timer = setTimeout(() => child.stdin.end('fin\n'), dureeMs);
+    const kill = setTimeout(() => child.kill(), dureeMs + 5000);
+    child.on('exit', (c) => {
+      clearTimeout(timer);
+      clearTimeout(kill);
+      resolve(c);
+    });
+  });
+  return { code, lignes: out.split(/\r?\n/).filter(Boolean) };
+}
 
 /** Le banc est-il construit (compagnon et runtime factice) ? */
 export function bancPret() {

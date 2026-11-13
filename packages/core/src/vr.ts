@@ -173,6 +173,22 @@ export function openXrRuntimeName(manifest: string, text?: string): string {
 }
 
 /**
+ * La DLL de LibOVR du runtime de Meta (sonde, app/src/sonde-ovr.ts) : le runtime OpenXR de Meta est lui-même
+ * LibOVRRT64_1.dll (son manifeste la nomme), et l'API LibOVR est dans la même DLL. undefined : autre runtime
+ * (SteamVR, Virtual Desktop…), ou manifeste illisible. Le chemin relatif du manifeste part de son dossier.
+ */
+export function ovrRuntimeDll(manifest: string, text: string): string | undefined {
+  let library: unknown;
+  try {
+    library = (JSON.parse(text) as { runtime?: { library_path?: unknown } }).runtime?.library_path;
+  } catch {
+    return undefined;
+  }
+  if (typeof library !== 'string' || !/^libovrrt64_1\.dll$/i.test(path.win32.basename(library))) return undefined;
+  return path.win32.resolve(path.win32.dirname(manifest), library);
+}
+
+/**
  * Le casque peut-il servir ? Seulement ce qui se lit sans le réveiller : un runtime OpenXR déclaré
  * et son manifeste présent. Que le casque soit branché, VPX le saura au lancement (Autodetect).
  */

@@ -87,6 +87,9 @@ for (const name of fs.readdirSync(installerDir)) {
     fs.mkdirSync(path.join(stage, 'natif'), { recursive: true });
     fs.copyFileSync(exe, path.join(stage, 'natif', path.basename(exe)));
     console.log('Compagnon du casque : natif\\' + path.basename(exe));
+    // Sonde LibOVR (app/src/sonde-ovr.ts), construite avec le compagnon.
+    const sonde = path.join(path.dirname(exe), 'cyberpinball-sonde-ovr.exe');
+    if (fs.existsSync(sonde)) fs.copyFileSync(sonde, path.join(stage, 'natif', path.basename(sonde)));
     // Textures du décor de la VR (caisse et capsule, packages/core/src/decor.ts) : natif\decor.
     const decorSrc = path.join(repo, 'packages', 'casque-vr', 'decor');
     fs.mkdirSync(path.join(stage, 'natif', 'decor'), { recursive: true });

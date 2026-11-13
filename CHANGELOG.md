@@ -9,6 +9,10 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.12
+
+- Réalité virtuelle : le journal relève ce que le casque transmet (limite de la pièce, position de la tête et des manettes, chaque bouton), au menu comme en partie, pour préparer un calage qui tienne d'une connexion de Link à l'autre. Rien ne change à l'usage.
+
 ## 0.1.11
 
 - Réalité virtuelle : nouvelle option « Recalage automatique » (Menu système > Borne > Réalité virtuelle, désactivée par défaut) : les deux manettes posées aux coins inférieurs de la table, immobiles une seconde, et la borne se recale d'elle-même, au menu. Jamais avec les manettes en main.

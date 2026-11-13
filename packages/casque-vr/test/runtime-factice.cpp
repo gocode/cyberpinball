@@ -139,6 +139,11 @@ struct World
    XrVector3f tip[2] { { -0.3f, 1.0f, -0.35f }, { 0.3f, 1.0f, -0.35f } };
    bool tracked[2] { true, true };
    std::map<std::string, float> inputs; // chemins → valeur (bouton : 0 ou 1)
+   // LibOVR (sonde) : contour extérieur de la limite et pose de l'aire de jeu, fixés à la pièce réelle (le monde) ;
+   // l'origine de suivi (STAGE, `origin`) peut bouger sans eux, comme Link à chaque connexion.
+   std::vector<XrVector3f> outer;
+   XrPosef area = identity();
+   bool ovrInputs = true; // faux : les entrées rendues à zéro (client sans le regard)
 };
 
 std::mutex lock;
@@ -385,6 +390,21 @@ void advance(bool silent = false)
          world.roomscale = !st.args.empty() && st.args[0] == "piece";
          world.roomW = num(st, 1), world.roomD = num(st, 2);
       }
+      else if (st.verb == "contour")
+      {
+         // « contour x,z x,z … » : le contour extérieur de la limite, dans le monde.
+         world.outer.clear();
+         for (const std::string& a : st.args)
+         {
+            const size_t c = a.find(',');
+            if (c != std::string::npos)
+               world.outer.push_back({ std::stof(a.substr(0, c)), 0.f, std::stof(a.substr(c + 1)) });
+         }
+      }
+      else if (st.verb == "aire")
+         world.area = { yawQuat(num(st, 2)), { num(st, 0), 0.f, num(st, 1) } };
+      else if (st.verb == "ovr-entrees")
+         world.ovrInputs = num(st, 0) != 0.f;
       else if (st.verb == "origine")
       {
          const XrPosef before = world.origin;
@@ -1185,4 +1205,165 @@ extern "C" __declspec(dllexport) XrResult XRAPI_CALL xrNegotiateLoaderRuntimeInt
    req->runtimeApiVersion = XR_API_VERSION_1_0;
    req->getInstanceProcAddr = getInstanceProcAddr;
    return XR_SUCCESS;
+}
+
+// --- LibOVR (sonde, packages/casque-vr/src/sonde-ovr.cpp) ---------------------------------------------------
+// Le même monde que le scénario, vu par un client LibOVR invisible : l'espace de suivi est celui de STAGE
+// (l'origine qui bouge), le contour et l'aire de jeu restent fixés à la pièce. Décrit à la main, comme la sonde.
+namespace ovr {
+struct Vec3
+{
+   float x, y, z;
+};
+struct InitParams
+{
+   uint32_t flags, minor;
+   void* log;
+   uintptr_t user;
+   uint32_t timeout, pad;
+};
+struct SessionStatus
+{
+   char isVisible, hmdPresent, hmdMounted, displayLost, shouldQuit, shouldRecenter, hasInputFocus, overlayPresent, depthRequested;
+   char rest[55];
+};
+struct TrackingState
+{
+   unsigned char bytes[512];
+};
+struct InputState
+{
+   double time;
+   unsigned buttons, touches;
+   float indexTrigger[2], handTrigger[2], thumbstick[2][2];
+   unsigned controllerType;
+   unsigned char rest[256];
+};
+struct ErrorInfo
+{
+   int result;
+   char text[512];
+};
+/** Un point du monde dans l'espace de suivi (STAGE). */
+XrVector3f inStage(const XrVector3f& p)
+{
+   return compose(inverse(world.origin), XrPosef { { 0, 0, 0, 1 }, p }).position;
+}
+void putPose(unsigned char* at, const XrPosef& p)
+{
+   std::memcpy(at, &p.orientation, 16);
+   std::memcpy(at + 16, &p.position, 12);
+}
+} // namespace ovr
+
+extern "C" __declspec(dllexport) int ovr_Initialize(const ovr::InitParams* p)
+{
+   std::lock_guard<std::mutex> g(lock);
+   init();
+   advance(true);
+   trace("ovr init drapeaux=" + std::to_string(p ? p->flags : 0) + " version=" + std::to_string(p ? p->minor : 0));
+   return 0;
+}
+extern "C" __declspec(dllexport) void ovr_Shutdown() { trace("ovr fin"); }
+extern "C" __declspec(dllexport) int ovr_Create(void** session, void* luid)
+{
+   std::lock_guard<std::mutex> g(lock);
+   startClock();
+   advance();
+   if (world.absent)
+      return -6000; // casque absent
+   std::memset(luid, 0, 8);
+   *session = reinterpret_cast<void*>(1);
+   trace("ovr session creee");
+   return 0;
+}
+extern "C" __declspec(dllexport) void ovr_Destroy(void*) { trace("ovr session detruite"); }
+extern "C" __declspec(dllexport) int ovr_GetSessionStatus(void*, ovr::SessionStatus* st)
+{
+   std::lock_guard<std::mutex> g(lock);
+   advance();
+   std::memset(st, 0, sizeof(*st));
+   st->hmdPresent = world.absent ? 0 : 1;
+   st->hmdMounted = world.worn && !world.absent ? 1 : 0;
+   st->shouldQuit = world.quit ? 1 : 0;
+   return 0;
+}
+extern "C" __declspec(dllexport) ovr::TrackingState ovr_GetTrackingState(void*, double, char)
+{
+   std::lock_guard<std::mutex> g(lock);
+   ovr::TrackingState ts {};
+   ovr::putPose(ts.bytes, compose(inverse(world.origin), world.head));
+   const unsigned all = 15;
+   std::memcpy(ts.bytes + 88, &all, 4);
+   for (int h = 0; h < 2; h++)
+   {
+      ovr::putPose(ts.bytes + 96 + 88 * h, XrPosef { { 0, 0, 0, 1 }, ovr::inStage(world.tip[h]) });
+      const unsigned f = world.tracked[h] ? 15u : 0u;
+      std::memcpy(ts.bytes + 272 + 4 * h, &f, 4);
+   }
+   return ts;
+}
+extern "C" __declspec(dllexport) int ovr_GetInputState(void*, unsigned type, ovr::InputState* in)
+{
+   std::lock_guard<std::mutex> g(lock);
+   advance();
+   std::memset(in, 0, sizeof(*in));
+   in->controllerType = type;
+   if (!world.ovrInputs)
+      return 0;
+   const auto v = [](const char* path) {
+      const auto it = world.inputs.find(path);
+      return it == world.inputs.end() ? 0.f : it->second;
+   };
+   const struct
+   {
+      const char* path;
+      unsigned bit;
+   } bits[] = { { "/user/hand/right/input/a/click", 0x1 }, { "/user/hand/right/input/b/click", 0x2 }, { "/user/hand/right/input/thumbstick/click", 0x4 },
+      { "/user/hand/left/input/x/click", 0x100 }, { "/user/hand/left/input/y/click", 0x200 }, { "/user/hand/left/input/thumbstick/click", 0x400 },
+      { "/user/hand/left/input/menu/click", 0x100000 } };
+   for (const auto& b : bits)
+      if (v(b.path) > 0.5f)
+         in->buttons |= b.bit;
+   in->indexTrigger[0] = v("/user/hand/left/input/trigger/value");
+   in->indexTrigger[1] = v("/user/hand/right/input/trigger/value");
+   return 0;
+}
+extern "C" __declspec(dllexport) int ovr_GetBoundaryGeometry(void*, unsigned type, ovr::Vec3* pts, int* count)
+{
+   std::lock_guard<std::mutex> g(lock);
+   std::vector<XrVector3f> list;
+   if (type == 0x1)
+      for (const XrVector3f& p : world.outer)
+         list.push_back(ovr::inStage(p));
+   else if (type == 0x100 && world.roomscale)
+   {
+      // Les quatre coins de l'aire de jeu, dans l'ordre du tour.
+      const float c[4][2] = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } };
+      for (const auto& k : c)
+         list.push_back(ovr::inStage(compose(world.area, XrPosef { { 0, 0, 0, 1 }, { k[0] * world.roomW / 2, 0.f, k[1] * world.roomD / 2 } }).position));
+   }
+   if (count)
+      *count = static_cast<int>(list.size());
+   if (pts)
+      for (size_t i = 0; i < list.size(); i++)
+         pts[i] = { list[i].x, list[i].y, list[i].z };
+   return list.empty() ? -1000 : 0;
+}
+extern "C" __declspec(dllexport) int ovr_GetBoundaryDimensions(void*, unsigned type, ovr::Vec3* d)
+{
+   std::lock_guard<std::mutex> g(lock);
+   if (type == 0x100 && world.roomscale)
+   {
+      *d = { world.roomW, 2.5f, world.roomD };
+      return 0;
+   }
+   return -1000;
+}
+extern "C" __declspec(dllexport) int ovr_SetTrackingOriginType(void*, int) { return 0; }
+extern "C" __declspec(dllexport) double ovr_GetTimeInSeconds() { return static_cast<double>(GetTickCount64()) / 1000.0; }
+extern "C" __declspec(dllexport) void ovr_GetLastErrorInfo(ovr::ErrorInfo* e)
+{
+   e->result = -1000;
+   strcpy_s(e->text, "banc");
 }

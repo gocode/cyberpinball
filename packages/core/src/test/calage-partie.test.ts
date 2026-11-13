@@ -38,6 +38,7 @@ import {
   ROOM_KEPT_RECALIBRATION_DEG,
   shouldOfferCalibration,
   staleCalibration,
+  ovrRuntimeDll,
   AUTO_RECAL_GAP_S,
   AUTO_RECAL_MATCH_CM,
   AUTO_RECAL_MIN_CM,
@@ -406,4 +407,25 @@ test('recalage automatique (13 novembre 2026) : manettes posées, immobiles 1 s,
   assert.match(front, /headset\.watchRest\(vrAutoRecal\);\s*headset\.watch\(\);/);
   const companion = read('packages', 'casque-vr', 'src', 'casque.cpp');
   assert.match(companion, /if \(restWatch && controllers && !calibrating && state == XR_SESSION_STATE_FOCUSED/);
+});
+
+test('sonde LibOVR (13 novembre 2026) : la DLL du runtime de Meta, lancée avec la VR, au journal, sans rien changer', () => {
+  assert.equal(ovrRuntimeDll('C:\\Program Files\\Meta Horizon\\Support\\oculus-runtime\\oculus_openxr_64.json', JSON.stringify({ runtime: { library_path: '.\\LibOVRRT64_1.dll' } })), 'C:\\Program Files\\Meta Horizon\\Support\\oculus-runtime\\LibOVRRT64_1.dll');
+  assert.equal(ovrRuntimeDll('C:\\x\\a.json', JSON.stringify({ runtime: { library_path: 'D:\\Meta\\libovrrt64_1.dll' } })), 'D:\\Meta\\libovrrt64_1.dll');
+  assert.equal(ovrRuntimeDll('C:\\Steam\\steamxr_win64.json', JSON.stringify({ runtime: { library_path: '..\\bin\\vrclient_x64.dll' } })), undefined);
+  assert.equal(ovrRuntimeDll('C:\\x\\a.json', 'pas du json'), undefined);
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /ovrProbe\.set\(vrMode === 'auto'\);/);
+  assert.match(front, /headset\?\.dispose\(\);\s*ovrProbe\.set\(false\);/);
+  const sonde = read('app', 'src', 'sonde-ovr.ts');
+  assert.match(sonde, /spawn\(exe, \['--ovr', dll\]/);
+  assert.match(sonde, /this\.opts\.log\(`Casque, sonde LibOVR : \$\{line\.slice\(4\)\}`\)/);
+  // Rien de Meta n'est livré : la sonde charge la DLL installée, sans en-tête du SDK.
+  const cpp = read('packages', 'casque-vr', 'src', 'sonde-ovr.cpp');
+  assert.doesNotMatch(cpp, /#include\s*[<"]OVR/);
+  assert.match(cpp, /INIT_INVISIBLE = 0x10/);
+  // Boutons bruts du compagnon au journal (pas les directions des joysticks), tête au menu toutes les 5 s.
+  assert.match(read('app', 'src', 'casque.ts'), /if \(!parseControllerEvent\(button\[1\]!\)\?\.direction\) this\.opts\.log\(`Casque, bouton brut : /);
+  assert.match(read('packages', 'casque-vr', 'src', 'casque.cpp'), /say\("tete-menu " \+/);
+  assert.match(read('scripts', 'fabriquer.mjs'), /'cyberpinball-sonde-ovr\.exe'/);
 });

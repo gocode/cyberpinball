@@ -2007,6 +2007,22 @@ int main(int argc, char** argv)
          }
       }
 
+      // Au menu, casque porté : la tête dans la pièce toutes les 5 s (« tete-menu x y z lacet »), au journal, pour la
+      // comparer à celle que lit la sonde LibOVR (sonde-ovr.cpp) au même moment.
+      static ULONGLONG menuHeadAt = 0;
+      if (!standby && worn && stage && state == XR_SESSION_STATE_FOCUSED && GetTickCount64() - menuHeadAt >= 5000)
+      {
+         XrSpaceLocation loc { XR_TYPE_SPACE_LOCATION };
+         constexpr XrSpaceLocationFlags valid = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+         if (XR_SUCCEEDED(xrLocateSpace_(view, base, fs.predictedDisplayTime, &loc)) && (loc.locationFlags & valid) == valid)
+         {
+            menuHeadAt = GetTickCount64();
+            const XrVector3f fwd = rotate(loc.pose.orientation, { 0, 0, -1 });
+            say("tete-menu " + std::to_string(loc.pose.position.x) + " " + std::to_string(loc.pose.position.y) + " " + std::to_string(loc.pose.position.z) + " "
+               + std::to_string(std::atan2(-fwd.x, -fwd.z)));
+         }
+      }
+
       // Veille pendant une partie de VPX : la tête du joueur dans la pièce, toutes les 5 s (« tete x y z lacet ») ;
       // Cyber Pinball la compare à la barre avant calée, et à ce que VPX en voit s'il recentre la table.
       if (standby && stage && GetTickCount64() - headSaidAt >= 5000)
