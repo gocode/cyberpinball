@@ -27,6 +27,17 @@ import {
   readControllerSetting,
   roomChangeGap,
   roomKeepingAdvice,
+  boundaryOf,
+  roomFromHeads,
+  roomFromRecalibration,
+  roomMeasureText,
+  ROOM_HEAD_MIN_SAMPLES,
+  ROOM_KEPT_HEAD_CM,
+  ROOM_KEPT_HEAD_DEG,
+  ROOM_KEPT_RECALIBRATION_CM,
+  ROOM_KEPT_RECALIBRATION_DEG,
+  shouldOfferCalibration,
+  staleCalibration,
   VPX_CALIBRATION_KEYS,
   vpxControllerCentering,
   vpxHeadsetInput,
@@ -124,22 +135,23 @@ test('détection : pièce recentrée par le Quest (limite fixe) dite au journal,
   assert.match(ts, /if \(!this\.worn\) this\.takenOff = this\.takenOffSeen = true;/);
   assert.match(ts, /this\.opts\.onPutBackOn\?\.\(\);/);
   const front = read('app', 'src', 'frontend.ts');
-  assert.match(front, /onPutBackOn: \(\) => headsetPutBackOn\(\),/);
+  assert.match(front, /onPutBackOn: \(\) => \{\s*checkStaleCalibration\(\);\s*headsetPutBackOn\(\);\s*\},/);
   assert.match(front, /if \(!place \|\| headsetSetting\(\) === 'bureau' \|\| headset\?\.roomKeeping !== 'recentred'\) return;/);
   // L'écart prises-bouts survit à la relecture de casque.json.
-  assert.match(ts, /\.\.\.\(grip && \{ grip \}\) \};/);
+  assert.match(ts, /\.\.\.\(grip && \{ grip \}\), \.\.\.\(p\.free === true && \{ free: true \}\), \.\.\.\(boundary && \{ boundary \}\), \.\.\.\(head && \{ head \}\) \};/);
   assert.match(front, /offerCalibration\('casque-remis'\);/);
   // Changement de pièce dit par le runtime pendant la session : l'écart au journal.
   const gap = roomChangeGap('piece-changee pose 0.300000 0.000000 -0.400000 0.523599')!;
   assert.ok(Math.abs(gap.cm - 50) < 0.01 && Math.abs(gap.deg - 30) < 0.01);
   assert.equal(roomChangeGap('piece-changee sans-pose'), undefined);
   assert.match(ts, /origine de la pièce changée : écart \$\{gap\.cm\.toFixed\(0\)\} cm/);
-  // La tête au port, vue de l'origine : départage la cause (13 novembre 2026). Collée à l'origine : remise sur la tête.
+  // La tête au port, mesurée sur la tête au calage (repère physique), plus de seuil sur l'origine (13 novembre 2026).
   assert.match(casque, /say\("tete-au-port " \+ std::to_string\(loc\.pose\.position\.x\)/);
   const near = headAtWear('tete-au-port 0.100000 -0.150000 0.087266')!;
-  assert.ok(Math.abs(near.cm - Math.hypot(10, 15)) < 0.01 && Math.abs(near.deg - 5) < 0.01 && near.onHead);
-  assert.equal(headAtWear('tete-au-port 0.600000 0.300000 1.2')!.onHead, false);
-  assert.match(ts, /const atWear = headAtWear\(line\);/);
+  assert.ok(Math.abs(near.cm - Math.hypot(10, 15)) < 0.01 && Math.abs(near.deg - 5) < 0.01 && !near.fromPlace);
+  const atPlace = headAtWear('tete-au-port 0.600000 0.300000 0.087266', { x: 0, z: 0, yaw: 0, head: { x: 0.5, z: 0.3 } })!;
+  assert.ok(Math.abs(atPlace.cm - 10) < 0.01 && Math.abs(atPlace.deg - 5) < 0.01 && atPlace.fromPlace);
+  assert.match(ts, /const atWear = headAtWear\(line, this\.readPlace\(\)\);/);
   assert.match(ts, /const after = this\.takenOffSeen \? 'après un retrait du casque' : 'au premier port de la session';/);
   // Limite fixe vue la première fois : le passage en limite de pièce conseillé une fois (astuce-limite.json).
   assert.match(front, /onStationary: \(\) => roomscaleTip\(\),/);
@@ -227,6 +239,63 @@ test('détection de la panne du geste en partie (13 novembre 2026, « rien du to
   assert.match(pluginSrc, /"action-vue id=%u pressee=%d"/);
   assert.match(pluginSrc, /actionsVues\[0\] = actionsVues\[1\] = 0;/);
   assert.match(read('packages', 'vpx-vision3d', 'src', 'pause.h'), /inline bool estGachette\(int id\) \{ return id == 0 \|\| id == 1; \}/);
+});
+
+test('calage périmé (13 novembre 2026) : limite changée de type ou de taille, dit une fois, proposé une fois au menu', () => {
+  const calee: CabinetPlace = { x: 0, z: 0, yaw: 0, lockbarWidth: 0.6, lockbarHeight: 0.9 };
+  const piece = { width: 2.5, depth: 3.4 };
+  // Même type, même taille : rien. Type inconnu (calage d'avant, sans limite de pièce gardée) : rien.
+  assert.equal(staleCalibration({ ...calee, boundary: 'fixe' }, 'recentred', undefined), undefined);
+  assert.equal(staleCalibration({ ...calee, boundary: 'piece', room: piece }, 'kept', { width: 2.52, depth: 3.38 }), undefined);
+  assert.equal(staleCalibration(calee, 'kept', piece), undefined);
+  assert.equal(staleCalibration({ ...calee, boundary: 'fixe', free: true }, 'kept', piece), undefined);
+  assert.equal(staleCalibration({ x: 0, z: 0, yaw: 0, boundary: 'fixe' }, 'kept', piece), undefined);
+  // Fixe ↔ pièce, dans les deux sens ; pièce d'une autre taille.
+  const versPiece = staleCalibration({ ...calee, boundary: 'fixe' }, 'kept', piece)!;
+  assert.match(versPiece.log, /^calage fait en limite fixe, Quest maintenant en limite de pièce \(2\.50 × 3\.40 m\)$/);
+  const versFixe = staleCalibration({ ...calee, room: piece }, 'recentred', undefined)!;
+  assert.equal(versFixe.signature, 'piece>fixe');
+  const taille = staleCalibration({ ...calee, boundary: 'piece', room: piece }, 'kept', { width: 3, depth: 3.4 })!;
+  assert.equal(taille.signature, 'piece 2.50 × 3.40 m>3.00 × 3.40 m');
+  assert.equal(boundaryOf('recentred'), 'fixe');
+  assert.equal(boundaryOf('kept'), 'piece');
+  // Proposé d'office, quel que soit le type de limite ; une seule fois par signature (calage-perime.json).
+  assert.equal(shouldOfferCalibration('limite-changee', 'kept'), true);
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /onRoom: \(\) => checkStaleCalibration\(\),/);
+  assert.match(front, /if \(offered === stale\.signature\) return;/);
+  assert.match(front, /if \(!offerCalibration\('limite-changee'\)\) return;\s*try \{\s*fs\.mkdirSync/);
+  assert.match(front, /\.\.\.\(boundary && \{ boundary \}\), \.\.\.\(head && \{ head \}\) \};/);
+  // Limite fixe dite au compagnon : onRoom aussi (un calage fait en limite de pièce devient périmé).
+  assert.match(read('app', 'src', 'casque.ts'), /this\.roomKeeping = 'recentred';\s*this\.room = undefined;\s*this\.opts\.onRoom\?\.\(undefined, false\);/);
+});
+
+test('pièce gardée ou déplacée, mesurée sur des repères physiques (13 novembre 2026)', () => {
+  // Seuils figés : la tête en partie à 30 cm et 20° de la tête au calage ; un recalage à 5 cm et 3° du précédent.
+  assert.deepEqual([ROOM_KEPT_HEAD_CM, ROOM_KEPT_HEAD_DEG, ROOM_KEPT_RECALIBRATION_CM, ROOM_KEPT_RECALIBRATION_DEG, ROOM_HEAD_MIN_SAMPLES], [30, 20, 5, 3, 3]);
+  const place: CabinetPlace = { x: 0, z: 0, yaw: 0, lockbarWidth: 0.6, lockbarHeight: 0.9, head: { x: 0, z: 0.1 } };
+  const deg = (d: number) => (d * Math.PI) / 180;
+  // Le joueur à sa place, un regard de côté : pièce gardée (médianes).
+  const joue = [{ x: 0.05, z: 0.12, yaw: deg(3) }, { x: -0.04, z: 0.08, yaw: deg(-2) }, { x: 0.02, z: 0.15, yaw: deg(70) }, { x: 0.01, z: 0.1, yaw: deg(1) }];
+  const gardee = roomFromHeads(place, joue)!;
+  assert.ok(gardee.kept && gardee.cm < 5 && gardee.deg < 3, JSON.stringify(gardee));
+  assert.match(roomMeasureText(gardee, 'tête'), /^pièce gardée \(tête : écart \d+ cm et \d+°\)$/);
+  // Le Quest a recentré la pièce : le joueur au même endroit réel, vu 40 cm et 29° plus loin.
+  const recentree = roomFromHeads(place, joue.map((h) => ({ x: h.x + 0.4, z: h.z, yaw: h.yaw + deg(29) })))!;
+  // Médianes : x 0,015 + 0,4 et z 0,11 face à (0 ; 0,1), soit 42 cm ; caps 27, 30, 32 et 99°, soit 31°.
+  assert.ok(!recentree.kept && Math.round(recentree.cm) === 42 && Math.round(recentree.deg) === 31, JSON.stringify(recentree));
+  assert.equal(roomMeasureText(recentree, 'tête'), 'pièce déplacée de 42 cm et 31° (tête)');
+  // Trop peu de relevés, ou pas de tête gardée au calage : pas de verdict.
+  assert.equal(roomFromHeads(place, joue.slice(0, 2)), undefined);
+  assert.equal(roomFromHeads({ ...place, head: undefined }, joue), undefined);
+  // Recalage de la même barre : l'écart des deux barres.
+  assert.ok(roomFromRecalibration(place, { ...place, x: 0.02 }).kept);
+  const deplacee = roomFromRecalibration(place, { ...place, yaw: deg(-53) });
+  assert.ok(!deplacee.kept && Math.round(deplacee.deg) === 53);
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /console\.log\(`Casque : recalage, \$\{roomMeasureText\(roomFromRecalibration\(previous, place\), 'barre avant recalée face à la précédente'\)\}\.`\);/);
+  assert.match(front, /const measure = roomFromHeads\(place, gameHeads\);/);
+  assert.match(front, /c\.head = head;/);
 });
 
 test('geste au menu (13 novembre 2026, PinCab : rien) : détecté avant l’assistant des manettes, sans réglage, chaque étape au journal', () => {

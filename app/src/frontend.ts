@@ -60,7 +60,11 @@ import {
   eyeHeightProblem,
   isCalibrated,
   placeVpxSettings,
-  roomMoved,
+  boundaryOf,
+  roomFromHeads,
+  roomFromRecalibration,
+  roomMeasureText,
+  staleCalibration,
   calibrationGap,
   calibrationProblem,
   lockbarMarks,
@@ -3996,14 +4000,49 @@ function headInGame(head: HeadPose): void {
  * (shouldOfferCalibration, décision du 13 novembre 2026) ; caler, ou passer en gardant le calage précédent.
  * Les autres moments (premier port, limite changée) sont seulement écrits au journal.
  */
-function offerCalibration(reason: CalibrationOfferReason): void {
-  if (calibration || controllerWizard || playing || launch || calibrateUnavailable() || !headset?.worn) return;
+function offerCalibration(reason: CalibrationOfferReason): boolean {
+  if (calibration || controllerWizard || playing || launch || calibrateUnavailable() || !headset?.worn) return false;
   if (!shouldOfferCalibration(reason, headset.roomKeeping)) {
     if (reason !== 'premier-port') console.log(`Casque : calage pas proposé d'office (${reason}, pièce ${headset.roomKeeping === 'kept' ? 'gardée par le Quest' : 'inconnue'}) ; les deux joysticks ou « Caler la borne » pour recaler.`); // i18n-ignore : journal
-    return;
+    return false;
   }
-  console.log(`Casque : calage de la borne proposé d'office (casque remis, pièce recentrée par le Quest).`); // i18n-ignore : journal
+  console.log(`Casque : calage de la borne proposé d'office (${reason === 'limite-changee' ? 'calage périmé : la limite du Quest a changé' : 'casque remis, pièce recentrée par le Quest'}).`); // i18n-ignore : journal
   openCalibration(true);
+  return true;
+}
+
+/** Signature du calage périmé déjà dit au journal pendant cette session de Cyber Pinball (staleCalibration). */
+let staleSaid: string | undefined;
+
+/**
+ * Calage périmé (staleCalibration : la limite du Quest a changé de type ou de taille depuis le calage) : dit une
+ * fois au journal, et le calage proposé une seule fois au menu, retenu dans `<données>\vr\calage-perime.json`
+ * (demande du 13 novembre 2026). Pas encore proposable (casque pas sur la tête, partie) : redit au prochain port.
+ */
+function checkStaleCalibration(): void {
+  if (!headset || headsetSetting() === 'bureau') return;
+  const stale = staleCalibration(headset.place(), headset.roomKeeping, headset.room);
+  if (!stale) return;
+  const file = path.join(loc.dataDir, 'vr', 'calage-perime.json');
+  let offered: string | undefined;
+  try {
+    offered = (JSON.parse(fs.readFileSync(file, 'utf8')) as { signature?: string }).signature;
+  } catch {
+    // Jamais proposé.
+  }
+  if (offered === stale.signature) return;
+  if (staleSaid !== stale.signature) {
+    staleSaid = stale.signature;
+    console.warn(`Casque : calage périmé, ${stale.log} ; le calage est proposé une fois au menu (ou les deux joysticks, « Caler la borne »).`); // i18n-ignore : journal
+  }
+  roomNotice = true;
+  if (!offerCalibration('limite-changee')) return;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ signature: stale.signature, proposee: new Date().toISOString() }, null, 2) + '\n');
+  } catch {
+    // Dossier de la VR en lecture seule : la proposition reviendra, sans gravité.
+  }
 }
 
 function calibrateUnavailable(): boolean {
@@ -4015,7 +4054,7 @@ function calibrateUnavailable(): boolean {
  * revenir ; `intro` : l'écran d'accueil du calage proposé d'office (caler ou passer) ; `validated` :
  * les calages validés depuis l'ouverture (chacun appliqué aussitôt, le dernier gardé).
  */
-let calibration: { points: Partial<Record<CalibrationStep, Point3>>; place?: CabinetPlace; back: 'menu' | 'system'; placing?: boolean; intro?: boolean; validated: number; grip?: GripOffset } | undefined;
+let calibration: { points: Partial<Record<CalibrationStep, Point3>>; place?: CabinetPlace; back: 'menu' | 'system'; placing?: boolean; intro?: boolean; validated: number; grip?: GripOffset; head?: { x: number; z: number } } | undefined;
 
 function openCalibration(intro = false): void {
   if (!headset || calibration || controllerWizard || playing || launch) return;
@@ -4101,6 +4140,8 @@ function calibrationPoints(points: readonly Point3[], room: boolean, head: { x: 
   const fallback = headset?.lastHead ?? { x: (pair[0].x + pair[1].x) / 2, z: (pair[0].z + pair[1].z) / 2 + 1 };
   const [left, right] = orderCorners(pair[0], pair[1], head ?? fallback);
   c.points = { left, right };
+  // La tête à cet instant, mains sur les coins : la référence physique de la pièce gardée (roomFromHeads).
+  c.head = head;
   // La borne du casque vient aussitôt sur la barre avant, ses coins marqués : de quoi juger avant de valider.
   c.place = lockbarPlace(left, right);
   headset?.showPlace(c.place);
@@ -4152,9 +4193,15 @@ function applyCalibration(): void {
   if (!c?.place) return;
   const { left, right, middle } = c.points;
   // La limite du Quest est gardée avec le calage : si elle change, le calage est proposé de nouveau.
-  const kept = headset?.place()?.grip;
-  const grip = c.grip ?? kept;
-  const place: CabinetPlace = { ...c.place, ...(headset?.room && { room: headset.room }), ...(headsetSetting() === 'bureau' && { free: true }), ...(grip && { grip }) };
+  const previous = headset?.place();
+  const grip = c.grip ?? previous?.grip;
+  // Avec le calage : la limite du Quest (taille et type, staleCalibration) et la tête du joueur (roomFromHeads).
+  const boundary = boundaryOf(headset?.roomKeeping);
+  const head = left && right ? c.head : undefined;
+  const place: CabinetPlace = { ...c.place, ...(headset?.room && { room: headset.room }), ...(headsetSetting() === 'bureau' && { free: true }), ...(grip && { grip }), ...(boundary && { boundary }), ...(head && { head }) };
+  // Recalage de la même vraie barre : l'écart à la précédente est celui de la pièce (mesuré, pas deviné).
+  if (previous && isCalibrated(previous) && !previous.free && !place.free && left && right)
+    console.log(`Casque : recalage, ${roomMeasureText(roomFromRecalibration(previous, place), 'barre avant recalée face à la précédente')}.`); // i18n-ignore : journal
   headset?.showPlace(place, true);
   roomNotice = false;
   roomStale = false;
@@ -4392,6 +4439,8 @@ function checkVrPlaceAfterGame(ini: string, tableFile: string): void {
 function checkVrRoomAfterGame(vpxLog: string, from: number): void {
   const place = readCabinetPlace(headsetPlaceFile());
   const summary = place && gameHeads.length ? gameHeadSummary(gameHeads, place) : undefined;
+  const measure = roomFromHeads(place, gameHeads);
+  if (measure) console.log(`Casque : ${roomMeasureText(measure, `tête pendant la partie face à la tête au calage, ${measure.samples} relevé(s)`)}.`); // i18n-ignore : journal
   if (summary)
     console.log(`Réalité virtuelle : tête pendant la partie, ${summary.samples} relevé(s) : regard à ${Math.round(summary.meanAngle)}° de l’axe de la borne en moyenne, ${summary.turned} relevé(s) dos à elle, à ${summary.meanDistance.toFixed(2)} m de la barre avant en moyenne.`); // i18n-ignore : journal
   let changes = 0;
@@ -4879,7 +4928,10 @@ export function startFrontend(): void {
     onButton: (button, down) => headsetButton(button, down),
     onProfile: () => offerControllerWizard(),
     onPoints: (points, room, head, pressed, grips) => calibrationPoints(points, room, head, pressed, grips),
-    onPutBackOn: () => headsetPutBackOn(),
+    onPutBackOn: () => {
+      checkStaleCalibration();
+      headsetPutBackOn();
+    },
     onStationary: () => roomscaleTip(),
     onLost: (inGame) => headsetLost(inGame),
     onHead: (head) => headInGame(head),
@@ -4888,13 +4940,7 @@ export function startFrontend(): void {
       headsetEyes = eyes;
       if (calibration) showCalibration();
     },
-    onRoom: (room, changed) => {
-      const place = headset?.place();
-      if (!changed && !(isCalibrated(place) && roomMoved(place?.room, room))) return;
-      console.warn('Casque : la limite du Quest a changé depuis le calage ; à recaler (les deux joysticks ou « Caler la borne »).'); // i18n-ignore : journal
-      roomNotice = true;
-      offerCalibration('limite-changee');
-    },
+    onRoom: () => checkStaleCalibration(),
     onRoomRestart: (eyes) => {
       roomStale = Boolean(eyeHeightProblem(eyes));
       console.log(`Casque : session neuve après le changement de pièce, yeux à ${eyes.toFixed(2)} m${roomStale ? ' : le sol de la pièce d’origine est faux, les applications qui démarrent la reçoivent ainsi' : ''}.`); // i18n-ignore : journal

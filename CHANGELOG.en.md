@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- Virtual reality: when the Quest's boundary changes (stationary or roomscale, or another size), the cabinet alignment is offered only once in the menu. After each game and each new alignment, the log says whether the room stayed in place or by how much it moved.
 - Virtual reality: at the "Align the cabinet" step in a game, a trigger pressed fully no longer aligns twice in a row; at the end of the game, the log says which controller commands arrived.
 - Virtual reality: both thumbsticks held 3 s open the cabinet alignment also from the "Headset controllers" screen, which closes without changing anything; each step of the gesture is written to the log.
 - Menus: the flippers always follow the screen's order, top to bottom: the tabs, then the list, then the actions, never jumping back up to the tabs from the bottom of the list (Leaderboards, Players online). A setting you cycle through (the Leaderboards period, a filter, an option) keeps the selection on it at each press, and coming back from a screen (a table's leaderboard, a profile) puts the selection back on the item you left from.

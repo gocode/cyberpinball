@@ -178,7 +178,9 @@ test('calage proposé d’office seulement casque remis en limite fixe ; gâchet
   // gâchettes placent et replacent la borne ; un seul bouton (A) valide et sort ; B sort sans rien changer.
   const repo = path.join(__dirname, '..', '..', '..', '..');
   const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
-  for (const reason of ['premier-port', 'limite-changee', 'piece-perimee'] as const)
+  // Calage périmé (limite changée, staleCalibration) : proposé une fois, quel que soit le type de limite.
+  for (const keeping of ['kept', 'recentred', undefined] as const) assert.equal(shouldOfferCalibration('limite-changee', keeping), true);
+  for (const reason of ['premier-port', 'piece-perimee'] as const)
     for (const keeping of ['kept', 'recentred', undefined] as const) assert.equal(shouldOfferCalibration(reason, keeping), false, `${reason} ${keeping}`);
   assert.equal(shouldOfferCalibration('casque-remis', 'kept'), false);
   assert.equal(shouldOfferCalibration('casque-remis', undefined), false);
@@ -188,7 +190,7 @@ test('calage proposé d’office seulement casque remis en limite fixe ; gâchet
   assert.match(frontend, /openCalibration\(true\);/);
   // A valide et sort : appliqué (place et INI de VPX), puis l'écran se ferme.
   assert.match(frontend, /else if \(KEYS\.confirm\.includes\(input\.code\) && calibration\?\.place\) \{\s*applyCalibration\(\);\s*closeCalibration\(\);\s*\}/);
-  assert.match(frontend, /function applyCalibration\(\): void \{[\s\S]{0,600}headset\?\.showPlace\(place, true\);[\s\S]{0,400}writeVrCalibration\([\s\S]{0,1200}c\.validated\+\+;\s*c\.points = \{\};\s*c\.place = undefined;\s*showCalibration\(\);/);
+  assert.match(frontend, /function applyCalibration\(\): void \{[\s\S]{0,1600}headset\?\.showPlace\(place, true\);[\s\S]{0,400}writeVrCalibration\([\s\S]{0,1200}c\.validated\+\+;\s*c\.points = \{\};\s*c\.place = undefined;\s*showCalibration\(\);/);
   // B sort sans rien changer : la place gardée revient.
   assert.match(frontend, /if \(KEYS\.exit\.includes\(input\.code\)\) closeCalibration\(\);/);
   assert.match(frontend, /function closeCalibration\(\): void \{[\s\S]{0,200}headset\?\.showPlace\(undefined\);/);

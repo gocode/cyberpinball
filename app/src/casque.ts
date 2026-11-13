@@ -513,11 +513,12 @@ export class HeadsetMenu {
           this.opts.onEyes?.(Number(eyes[1]));
           continue;
         }
-        // La tête au port, vue de l'origine de la pièce : origine remise sur la tête, ou pièce gardée.
-        const atWear = headAtWear(line);
+        // La tête au port, mesurée sur la tête au calage (repère physique) ; le verdict vient des têtes de la partie.
+        const atWear = headAtWear(line, this.readPlace());
         if (atWear) {
           const after = this.takenOffSeen ? 'après un retrait du casque' : 'au premier port de la session'; // i18n-ignore : journal
-          this.opts.log(`Casque : tête au port ${after}, à ${atWear.cm.toFixed(0)} cm de l'origine de la pièce et tournée de ${atWear.deg.toFixed(0)}° ${atWear.onHead ? ': origine remise sur la tête' : ': origine gardée'}.`); // i18n-ignore : journal
+          const from = atWear.fromPlace ? 'de sa place au calage (un relevé, pris au port)' : 'de l’origine de la pièce (pas de tête gardée au calage : recalez pour mesurer)'; // i18n-ignore : journal
+          this.opts.log(`Casque : tête au port ${after}, à ${atWear.cm.toFixed(0)} cm et ${atWear.deg.toFixed(0)}° ${from}.`); // i18n-ignore : journal
           this.takenOffSeen = false;
           continue;
         }
@@ -525,6 +526,8 @@ export class HeadsetMenu {
           if (this.roomKeeping !== 'recentred') this.opts.onStationary?.();
           if (this.roomKeeping !== 'recentred') this.opts.log('Casque : pièce du Quest sans limite (limite fixe ou désactivée) : le Quest la recentre sur la tête chaque fois que le casque est remis, sans le dire aux applications ; le calage sera proposé à chaque retour du casque.'); // i18n-ignore : journal
           this.roomKeeping = 'recentred';
+          this.room = undefined;
+          this.opts.onRoom?.(undefined, false);
           continue;
         }
         const room = /^piece ([\d.]+) ([\d.]+)$/.exec(line);
@@ -780,7 +783,11 @@ export function readCabinetPlace(file: string): CabinetPlace | undefined {
     // Écart prises-bouts des manettes (calage en partie par VPX), mesuré au calage du menu.
     const g = p.grip as Record<string, unknown> | undefined;
     const grip = g && num(g.up) !== undefined && num(g.back) !== undefined && num(g.widthRatio) !== undefined ? { up: num(g.up)!, back: num(g.back)!, widthRatio: num(g.widthRatio)! } : undefined;
-    return { x, z, yaw, ...(lockbarHeight !== undefined && { lockbarHeight }), ...(lockbarWidth !== undefined && { lockbarWidth }), ...(room && { room }), ...(grip && { grip }) };
+    // Type de limite au calage (staleCalibration) et tête du joueur au calage (roomFromHeads).
+    const boundary = p.boundary === 'fixe' || p.boundary === 'piece' ? p.boundary : undefined;
+    const h = p.head as Record<string, unknown> | undefined;
+    const head = h && num(h.x) !== undefined && num(h.z) !== undefined ? { x: num(h.x)!, z: num(h.z)! } : undefined;
+    return { x, z, yaw, ...(lockbarHeight !== undefined && { lockbarHeight }), ...(lockbarWidth !== undefined && { lockbarWidth }), ...(room && { room }), ...(grip && { grip }), ...(p.free === true && { free: true }), ...(boundary && { boundary }), ...(head && { head }) };
   } catch {
     return undefined;
   }

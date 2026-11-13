@@ -37,6 +37,13 @@ export interface CabinetPlace {
   free?: boolean;
   /** Pose des manettes de VPX (prise en main) par rapport à leur bout, mesurée au calage (gripOffset). */
   grip?: GripOffset;
+  /** Type de limite du Quest au moment du calage (staleCalibration). */
+  boundary?: BoundaryKind;
+  /**
+   * La tête du joueur au calage, mains sur les coins de la barre avant (au sol de la pièce, mètres) : la
+   * référence physique que les têtes relevées en partie retrouvent si la pièce est gardée (roomFromHeads).
+   */
+  head?: { x: number; z: number };
 }
 
 /**
@@ -346,6 +353,91 @@ export function roomMoved(saved: RoomBounds | undefined, now: RoomBounds | undef
   return Math.abs(saved.width - now.width) > 0.05 || Math.abs(saved.depth - now.depth) > 0.05;
 }
 
+/** Type de limite du Quest : fixe (la pièce recentrée sur la tête à chaque retour du casque) ou de pièce (gardée). */
+export type BoundaryKind = 'fixe' | 'piece';
+
+/** Le type de limite d'après ce que le compagnon en dit (« piece aucune » ou « piece L P »). */
+export function boundaryOf(keeping: RoomKeeping | undefined): BoundaryKind | undefined {
+  return keeping === 'recentred' ? 'fixe' : keeping === 'kept' ? 'piece' : undefined;
+}
+
+/** Un calage qui ne correspond plus à la limite du Quest : `signature` pour ne le dire qu'une fois, `log` pour le journal. */
+export interface StaleCalibration {
+  signature: string;
+  log: string;
+}
+
+/**
+ * Le calage gardé correspond-il encore à la limite du Quest (demande du 13 novembre 2026 : « dis-le une fois,
+ * propose le calage une fois au menu ») ? Non quand le type a changé (limite fixe ↔ limite de pièce) ou que la
+ * limite de pièce n'a plus la même taille (roomMoved, plus de 5 cm sur un côté). Un calage d'avant ce relevé
+ * sans limite de pièce gardée a un type inconnu : rien à dire. Une borne posée au bureau non plus.
+ */
+export function staleCalibration(place: CabinetPlace | undefined, keeping: RoomKeeping | undefined, room: RoomBounds | undefined): StaleCalibration | undefined {
+  if (!place || !isCalibrated(place) || place.free) return undefined;
+  const now = boundaryOf(keeping);
+  const then = place.boundary ?? (place.room ? 'piece' : undefined);
+  if (!now || !then) return undefined;
+  const size = (r: RoomBounds | undefined) => (r ? `${r.width.toFixed(2)} × ${r.depth.toFixed(2)} m` : 'taille inconnue'); // i18n-ignore : journal
+  const name = (k: BoundaryKind) => (k === 'fixe' ? 'limite fixe' : 'limite de pièce'); // i18n-ignore : journal
+  if (now !== then)
+    return { signature: `${then}>${now}${now === 'piece' ? ` ${size(room)}` : ''}`, log: `calage fait en ${name(then)}, Quest maintenant en ${name(now)}${now === 'piece' ? ` (${size(room)})` : ''}` }; // i18n-ignore : journal
+  if (now === 'piece' && roomMoved(place.room, room)) return { signature: `piece ${size(place.room)}>${size(room)}`, log: `limite de pièce de ${size(place.room)} au calage, ${size(room)} maintenant` }; // i18n-ignore : journal
+  return undefined;
+}
+
+/**
+ * Pièce gardée ou déplacée, mesurée sur des repères physiques (demande du 13 novembre 2026 : mesurer plutôt que
+ * deviner). Deux mesures : la tête pendant la partie face à la tête au calage (le joueur joue où il a calé, mains
+ * sur la barre avant), et la barre avant d'un recalage face à la précédente. Seuils figés par calage-partie.test.ts.
+ */
+export const ROOM_KEPT_HEAD_CM = 30;
+export const ROOM_KEPT_HEAD_DEG = 20;
+export const ROOM_KEPT_RECALIBRATION_CM = 5;
+export const ROOM_KEPT_RECALIBRATION_DEG = 3;
+/** Relevés de la tête (toutes les 5 s en partie) qu'il faut au moins pour juger. */
+export const ROOM_HEAD_MIN_SAMPLES = 3;
+
+export interface RoomMeasure {
+  cm: number;
+  deg: number;
+  kept: boolean;
+  /** Relevés de la tête pris en compte (1 pour un recalage). */
+  samples: number;
+}
+
+const median = (values: readonly number[]) => {
+  const s = [...values].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
+};
+/** L'angle signé de b par rapport à a, en degrés, entre -180 et 180. */
+const turn = (a: number, b: number) => ((((((b - a) * 180) / Math.PI + 540) % 360) + 360) % 360) - 180;
+
+/**
+ * La tête pendant la partie (relevés du compagnon en veille, « tete x y z lacet ») face à la tête au calage : la
+ * médiane des positions et des caps, pour qu'un regard de côté ne compte pas. undefined : pas de tête gardée au
+ * calage (calage d'avant ce relevé) ou trop peu de relevés.
+ */
+export function roomFromHeads(place: CabinetPlace | undefined, heads: readonly { x: number; z: number; yaw: number }[]): RoomMeasure | undefined {
+  if (!place?.head || heads.length < ROOM_HEAD_MIN_SAMPLES) return undefined;
+  const cm = Math.hypot(median(heads.map((h) => h.x)) - place.head.x, median(heads.map((h) => h.z)) - place.head.z) * 100;
+  const deg = Math.abs(median(heads.map((h) => turn(place.yaw, h.yaw))));
+  return { cm, deg, kept: cm <= ROOM_KEPT_HEAD_CM && deg <= ROOM_KEPT_HEAD_DEG, samples: heads.length };
+}
+
+/** La barre avant d'un recalage face à la précédente (placeGap) : la même vraie barre, donc l'écart de la pièce. */
+export function roomFromRecalibration(previous: CabinetPlace, next: CabinetPlace): RoomMeasure {
+  const { cm, deg } = placeGap(previous, next);
+  return { cm, deg, kept: cm <= ROOM_KEPT_RECALIBRATION_CM && deg <= ROOM_KEPT_RECALIBRATION_DEG, samples: 1 };
+}
+
+/** Ce que dit le journal : « pièce gardée » ou « pièce déplacée de X cm », avec l'écart et ce qui l'a mesuré. */
+export function roomMeasureText(m: RoomMeasure, by: string): string {
+  const gap = `${Math.round(m.cm)} cm et ${Math.round(m.deg)}°`; // i18n-ignore : journal
+  return m.kept ? `pièce gardée (${by} : écart ${gap})` : `pièce déplacée de ${Math.round(m.cm)} cm et ${Math.round(m.deg)}° (${by})`; // i18n-ignore : journal
+}
+
 /** Hauteur des yeux plausible pour un joueur debout ou assis (mètres) ; au-delà, le sol du Quest est mal réglé. */
 export const EYES_MIN_M = 1.0;
 export const EYES_MAX_M = 2.1;
@@ -582,16 +674,17 @@ export function roomChangeGap(line: string): { cm: number; deg: number } | undef
 export type RoomKeeping = 'kept' | 'recentred';
 
 /**
- * La tête au port du casque, vue de l'origine de la pièce (« tete-au-port x z lacet ») : à moins de 40 cm et 20°
- * d'elle, l'origine vient d'être remise sur la tête (limite fixe). Sert à départager la cause (le Quest à la
- * remise du casque, ou la session neuve du compagnon) en comparant au port en pleine partie (VPX garde sa session).
+ * La tête au port du casque (« tete-au-port x z lacet »), mesurée sur un repère physique : la tête au calage
+ * (`place.head`, mains sur la barre avant), plus de seuil deviné sur l'origine de la pièce (13 novembre 2026).
+ * Un seul relevé, pris où le joueur met le casque : une indication au journal ; le verdict vient des têtes de la
+ * partie (roomFromHeads). Sans tête gardée au calage, l'écart à l'origine de la pièce (`fromPlace` faux).
  */
-export function headAtWear(line: string): { cm: number; deg: number; onHead: boolean } | undefined {
+export function headAtWear(line: string, place?: CabinetPlace): { cm: number; deg: number; fromPlace: boolean } | undefined {
   const m = /^tete-au-port (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)$/.exec(line);
   if (!m) return undefined;
-  const cm = Math.hypot(Number(m[1]), Number(m[2])) * 100;
-  const deg = Math.abs((((Number(m[3]) * 180) / Math.PI + 540) % 360) - 180);
-  return { cm, deg, onHead: cm < 40 && deg < 20 };
+  const [x, z, yaw] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (place?.head) return { cm: Math.hypot(x - place.head.x, z - place.head.z) * 100, deg: Math.abs(turn(place.yaw, yaw)), fromPlace: true };
+  return { cm: Math.hypot(x, z) * 100, deg: Math.abs(turn(0, yaw)), fromPlace: false };
 }
 
 /**
@@ -646,6 +739,8 @@ export type CalibrationOfferReason = 'premier-port' | 'casque-remis' | 'limite-c
  * du casque, jamais en limite de pièce. Le reste du temps : les deux joysticks, ou « Caler la borne ».
  */
 export function shouldOfferCalibration(reason: CalibrationOfferReason, keeping: RoomKeeping | undefined): boolean {
+  // Calage périmé (limite changée de type ou de taille, staleCalibration) : proposé une fois, l'appelant le garde.
+  if (reason === 'limite-changee') return true;
   return reason === 'casque-remis' && keeping === 'recentred';
 }
 
