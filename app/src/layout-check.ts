@@ -43,6 +43,8 @@
 // Une liste ne défile jamais sans geste de l'utilisateur (app/renderer/scroll-keeper.js) : un
 // rendu qui la ramène ailleurs, un tic de progression par exemple, est signalé.
 // Un tableau en colonnes (data-aligned) : cases, lignes de base et images alignées au pixel.
+// L'ordre des flippers (data-nav-order, visualOrder) est celui des éléments à choisir dans la page,
+// de haut en bas : un onglet du haut atteint après la dernière ligne est signalé.
 // Les problèmes vont dans la console et dans <captures>\mise-en-page.txt.
 
 import * as fs from 'node:fs';
@@ -647,6 +649,30 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
         if (gap > 0.5) problems.add('colonne ' + (i + 1) + ' décalée d’une ligne à l’autre (' + gap.toFixed(1) + ' px, bord ' + (k ? 'droit' : 'gauche') + ') : ' + label(table));
       }
     });
+  }
+  // Ordre de navigation (13/11/2026, onglets des Classements) : les flippers suivent l'ordre de
+  // l'affichage, de haut en bas, jamais le rang des actions. L'ordre des flippers (data-nav-order,
+  // visualOrder) doit être celui des éléments à choisir dans la page : un écart, et le choix remonte
+  // ou redescend par-dessus d'autres éléments. Une colonne latérale (Section.side) se lit à part.
+  for (const screen of document.querySelectorAll('.lib[data-nav-order]')) {
+    if (!shown(screen) || screen.querySelector('.lib-content-side')) continue;
+    const nav = screen.dataset.navOrder.split(',').filter(Boolean).map(Number);
+    const seen = new Map();
+    for (const el of screen.querySelectorAll('[data-act]')) {
+      if (el.classList.contains('fixable') || !shown(el)) continue;
+      let act;
+      try {
+        act = JSON.parse(el.dataset.act);
+      } catch {
+        continue;
+      }
+      if (act.type !== 'activate' || seen.has(act.index)) continue;
+      seen.set(act.index, el);
+    }
+    const page = [...seen.keys()];
+    const flippers = nav.filter((i) => seen.has(i));
+    const at = page.findIndex((i, k) => flippers[k] !== i);
+    if (at >= 0 && flippers[at] !== undefined) problems.add('ordre de navigation différent de l’affichage : ' + (at ? 'après ' + label(seen.get(page[at - 1])).slice(0, 50) + ', ' : '') + 'le flipper va à ' + label(seen.get(flippers[at])).slice(0, 50) + ' au lieu de ' + label(seen.get(page[at])).slice(0, 50));
   }
   return [...problems];
 })()`;

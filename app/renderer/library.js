@@ -29,6 +29,8 @@ function renderLibrary(v) {
   // Page d'un guide du jeu : elle prend la place de l'en-tête (guide.css).
   const guide = v.pages?.help?.kind === 'guide';
   const o = libEl('section', `lib lib-${v.screen}${v.variant ? ` lib-${v.variant}` : ''}${guide ? ' lib-guide' : ''}`);
+  // L'ordre des flippers : le garde-fou de mise en page (layout-check.ts) le compare à l'ordre de l'affichage.
+  if (v.order) o.dataset.navOrder = v.order.join(',');
   const head = libEl('header', 'lib-head');
   // Interface propre (gestion du Juke-box) : son nom en haut à droite, sur la ligne de la marque ; ni
   // « Retour » en tête ni bandeau de liste : ses commandes, au pied, disent et font le retour.

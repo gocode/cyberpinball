@@ -31,6 +31,8 @@ export interface ZoneSource {
   health?: { groups: readonly { lines: readonly { action?: number }[] }[] };
   /** Tableau des scores (son rendu à part) : portées, puis onglets, au-dessus des actions. */
   scoreboard?: { scopes?: readonly { action?: number }[]; tabs?: readonly { action?: number }[] };
+  /** Onglets en tête de la liste (Built.tabs : filtres de « Joueurs en ligne », portées des Classements). */
+  tabs?: readonly { action?: number }[];
 }
 
 /**
@@ -86,6 +88,10 @@ export function visualOrder(source: ZoneSource, count: number, landscape = false
   if (source.health) for (const g of source.health.groups) for (const l of g.lines) add(l.action);
   else if (source.scoreboard) for (const c of [...(source.scoreboard.scopes ?? []), ...(source.scoreboard.tabs ?? [])]) add(c.action);
   else {
+    // Les onglets d'abord : ils sont rendus en tête de la liste, au-dessus des lignes. Oubliés ici
+    // (13/11/2026), ils passaient après la dernière ligne : du bas de la liste, le flipper remontait
+    // aux onglets, puis redescendait aux actions.
+    for (const tab of source.tabs ?? []) add(tab.action);
     const main = source.sections.filter((s) => !s.side);
     const sections = landscape ? [...side, ...main] : [...main, ...side];
     if (source.media) {

@@ -183,6 +183,7 @@ import {
   type GuestDoor,
   type GuestMode,
   actionIds,
+  indexOfId,
   anchorOf,
   followCursor,
   resolveActivation,
@@ -866,6 +867,12 @@ export function createLibrary(host: LibraryHost) {
   /** Ce que la dernière vue montrait sous le curseur : il le suit si la liste change (focus.ts). */
   let anchor: FocusAnchor | undefined;
   /**
+   * Dernier élément choisi de chaque écran fourni (par sa fonction `build`), le temps que le menu
+   * reste ouvert : revenir d'un sous-écran (le tableau d'une table, un profil, les Classements) ramène
+   * le curseur sur l'élément d'où l'on était parti, pas en haut de l'écran (13/11/2026).
+   */
+  let lastFocus = new WeakMap<() => Built, string>();
+  /**
    * Zones de l'écran (listzones.ts) : d'où l'on est entré dans la liste de contenu, où on l'a
    * quittée ; oublié à l'ouverture d'un autre écran. `letter` : initiale du dernier saut par lettre
    * (flipper tenu), montrée tant que le flipper reste tenu.
@@ -1066,6 +1073,7 @@ export function createLibrary(host: LibraryHost) {
   function go(next: Screen, at = 0): void {
     // Mode invité : un écran fermé ne s'ouvre pas, le cadenas le dit.
     if (!host.guest.knock(GUEST_SCREENS[next.kind])) return;
+    if (screen?.kind === 'custom' && anchor?.screen === screen && anchor.id !== undefined) lastFocus.set((screen as Extract<Screen, { kind: 'custom' }>).build, anchor.id);
     screen = next;
     cursor = at;
     host.enter();
@@ -1076,6 +1084,7 @@ export function createLibrary(host: LibraryHost) {
     // Le menu se ferme : un message laissé ne revient pas à sa prochaine ouverture (gesture-flash.ts).
     userGesture();
     screen = undefined;
+    lastFocus = new WeakMap();
     section = undefined;
     systemGroup = undefined;
     systemChosen = undefined;
@@ -1177,8 +1186,21 @@ export function createLibrary(host: LibraryHost) {
    * Écran fourni par l'appelant (configurations de la borne) ; ses actions ouvrent les écrans
    * suivants. `table` : la table dont il parle (ses médias, ses fichiers…), sinon aucune.
    */
-  function openCustom(build: () => Built, at = 0, table?: string): void {
-    go({ kind: 'custom', build, table }, at);
+  function openCustom(build: () => Built, at?: number, table?: string): void {
+    // Le même écran redessiné après un de ses gestes (un réglage qu'on fait défiler, un onglet, un
+    // filtre) : il reste le même écran, et le curseur reste sur l'élément qu'il montrait (focus.ts),
+    // jusqu'à ce qu'on en sorte. Un nouvel écran obligeait à revenir sur « Période » après chaque
+    // appui (13/11/2026). Un rang donné (`at`) est obéi.
+    const same = screen?.kind === 'custom' && (screen as Extract<Screen, { kind: 'custom' }>).build === build && (screen as Extract<Screen, { kind: 'custom' }>).table === table;
+    if (same && at === undefined) {
+      host.enter();
+      host.broadcast();
+      return;
+    }
+    // Retour sur un écran déjà visité : le curseur sur l'élément qu'on y avait choisi, s'il est encore là.
+    const known = at === undefined ? lastFocus.get(build) : undefined;
+    const back = known !== undefined ? indexOfId(actionIds(shownActions(build())), known) : -1;
+    go({ kind: 'custom', build, table }, at ?? Math.max(0, back));
   }
 
   /** Saisie d'un nom avec le clavier à l'écran (ou un vrai clavier). */
@@ -2385,6 +2407,11 @@ export function createLibrary(host: LibraryHost) {
     return host.guest.active ? { ...built, actions: built.actions.filter((a) => host.guest.allows(a.door)) } : built;
   }
 
+  /** Les actions montrées : en mode invité, sans celles dont la porte est fermée. */
+  function shownActions(built: Built): Action[] {
+    return host.guest.active ? built.actions.filter((a) => host.guest.allows(a.door)) : built.actions;
+  }
+
   function buildScreen(): Built {
     switch (screen!.kind) {
       case 'system':
@@ -2657,10 +2684,11 @@ export function createLibrary(host: LibraryHost) {
       subheading: table.title,
       sections: [],
       scoreboard,
-      // Les onglets d'abord (rendus dans le tableau), puis le retour, seul dans la colonne des actions.
+      // Les onglets d'abord (rendus dans le tableau), dans l'ordre de lecture : les portées au-dessus,
+      // puis les périodes ; puis le retour, seul dans la colonne des actions.
       actions: [
-        ...SCORE_PERIODS.map((period) => ({ label: t('Onglet {period}', { period: periodLabel(period) }), key: `period-${period}`, door: 'sheet.scores' as const, run: () => show({ period }) })),
         ...RANKING_SCOPES.map((sc) => ({ label: t('Onglet {period}', { period: scopeLabel(sc) }), key: `scope-${sc}`, door: 'sheet.scores' as const, run: () => show({ scope: sc }) })),
+        ...SCORE_PERIODS.map((period) => ({ label: t('Onglet {period}', { period: periodLabel(period) }), key: `period-${period}`, door: 'sheet.scores' as const, run: () => show({ period }) })),
         { label: s.back ? t('Retour aux classements') : t('Retour à la fiche'), icon: 'back' as const, key: 'back', door: 'sheet.back' as const, run: back },
         // Masquer un score aberrant : sur cette borne seulement ; fermé à l'invité (porte de « Gérer la table »).
         ...(lines.length && host.hideScore
@@ -4681,6 +4709,8 @@ export function createLibrary(host: LibraryHost) {
       health: built.health,
       scoreboard: built.scoreboard,
       tabs: built.tabs,
+      // L'ordre des flippers (visualOrder) : le garde-fou de mise en page le compare à celui de l'affichage.
+      order: visualOrder(built, built.actions.length, host.landscape?.() ?? false),
       zone,
       // Zone de lecture : le rendu mesure le texte, le met dans un cadre s'il dépasse et le fait défiler.
       reading: read

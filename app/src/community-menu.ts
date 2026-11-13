@@ -208,6 +208,13 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     }
     const tables = commonTables(host.tables().map(presenceTable), net.rankings().scores);
     const groups = onlineGroups(list, myCountry(), filter);
+    // Les onglets des filtres, rendus en tête de la liste : leurs actions d'abord, dans l'ordre de
+    // lecture (de haut en bas), puis les joueurs, puis la colonne des actions.
+    const tabs = ONLINE_FILTERS.map((f) => {
+      const problem = filterProblem(f);
+      const action = actions.push({ label: t('Filtre {name}', { name: filterLabel(f) }), key: `filter-${f}`, run: () => ((filter = f), here()) }) - 1;
+      return { label: filterLabel(f), count: problem ?? String(counts[f]), current: f === filter, disabled: Boolean(problem), action, ...(f === 'country' && myCountry() ? { flag: flagView(myCountry()!, locale()) } : {}) };
+    });
     for (const g of groups) {
       sections.push({
         title: groupTitle(g),
@@ -243,13 +250,6 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
       });
       if (problem) actions.push({ label: t('Partage et réseau'), icon: 'network', run: () => host.openSharing(here) });
     }
-    // Les onglets (rendus en tête de la liste, pas répétés dans les actions) : leurs actions après
-    // celles des joueurs, pour que le curseur arrive sur le premier joueur.
-    const tabs = ONLINE_FILTERS.map((f) => {
-      const problem = filterProblem(f);
-      const action = actions.push({ label: t('Filtre {name}', { name: filterLabel(f) }), key: `filter-${f}`, run: () => ((filter = f), here()) }) - 1;
-      return { label: filterLabel(f), count: problem ?? String(counts[f]), current: f === filter, disabled: Boolean(problem), action, ...(f === 'country' && myCountry() ? { flag: flagView(myCountry()!, locale()) } : {}) };
-    });
     if (s.enabled) {
       const shown = s.publicPresence !== false;
       actions.push({
@@ -286,7 +286,8 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
   function openPlayers(back?: () => void): void {
     playersBack = back;
     filter = 'all';
-    lib.openCustom(buildPlayers);
+    // Le curseur sur le premier joueur (juste après les onglets des filtres).
+    lib.openCustom(buildPlayers, ONLINE_FILTERS.length);
   }
 
   // ---------- Accueil Communauté ----------

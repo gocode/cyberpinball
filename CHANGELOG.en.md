@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- Menus: the flippers always follow the screen's order, top to bottom: the tabs, then the list, then the actions, never jumping back up to the tabs from the bottom of the list (Leaderboards, Players online). A setting you cycle through (the Leaderboards period, a filter, an option) keeps the selection on it at each press, and coming back from a screen (a table's leaderboard, a profile) puts the selection back on the item you left from.
 - Virtual reality: taking the headset off in the menu no longer restarts the headset menu; it resumes where it was when the headset comes back, without going through the Meta Horizon Link home.
 - Tables wheel: scrolling fast no longer doubles the medallions (the chosen table's green halo now always glides with it), and each press asks the display for three times less work: the wheel keeps up better with bursts.
 - Community: the "Leaderboards" door on the home screen opens the leaderboards of all your tables (each table's leader, their score, your place), in This cabinet, Friends, National and Worldwide tabs, over the period of your choice; it no longer opens a single table's board, the one left chosen on the wheel. An empty room simply says "Nothing new for now".

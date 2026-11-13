@@ -116,7 +116,8 @@ function limits(board: TableBoard): string | undefined {
 /** Le tableau d'une période, avec ses onglets ; `boards` donne celui de chaque période. */
 export function scoreboardView(boards: (period: ScorePeriod) => TableBoard, period: ScorePeriod, now = new Date()): ScoreboardView {
   const board = boards(period);
-  const tabs = SCORE_PERIODS.map((p, action) => {
+  const tabs = SCORE_PERIODS.map((p, i) => {
+    const action = RANKING_SCOPES.length + i;
     const b = p === period ? board : boards(p);
     const count = p === 'all' && !b.games && b.lines.length ? t('records de la table') : tn(b.games, '{n} partie', '{n} parties');
     return { period: p, label: periodLabel(p), count, current: p === period, action };
@@ -144,9 +145,12 @@ export function scopeLabel(scope: RankingScope): string {
   }
 }
 
-/** Les quatre portées en onglets ; leurs actions suivent celles des périodes. */
+/**
+ * Les quatre portées en onglets, au-dessus des périodes : leurs actions viennent d'abord, celles
+ * des périodes ensuite. L'ordre des choix suit l'ordre de lecture, de haut en bas (13/11/2026).
+ */
 export function scopeTabs(scope: RankingScope): NonNullable<ScoreboardView['scopes']> {
-  return RANKING_SCOPES.map((s, i) => ({ scope: s, label: scopeLabel(s), current: s === scope, action: SCORE_PERIODS.length + i }));
+  return RANKING_SCOPES.map((s, i) => ({ scope: s, label: scopeLabel(s), current: s === scope, action: i }));
 }
 
 /** Le pays d'une ligne : code, nom et drapeau. */
@@ -173,7 +177,8 @@ function rankingLineView(line: RankingViewLine, now: Date, apart: boolean): Scor
 /** Un classement en réseau (amis, pays, monde), avec ses périodes ; `views` donne celui de chaque période. */
 export function rankingScoreboardView(views: (period: ScorePeriod) => RankingView, scope: Exclude<RankingScope, 'cabinet'>, period: ScorePeriod, now = new Date()): ScoreboardView {
   const view = views(period);
-  const tabs = SCORE_PERIODS.map((p, action) => {
+  const tabs = SCORE_PERIODS.map((p, i) => {
+    const action = RANKING_SCOPES.length + i;
     const v = p === period ? view : views(p);
     return { period: p, label: periodLabel(p), count: v.unavailable ? '—' : tn(v.players, '{n} joueur', '{n} joueurs'), current: p === period, action };
   });

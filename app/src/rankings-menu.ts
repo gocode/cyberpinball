@@ -136,6 +136,13 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
     const board = boardOf(scope, period);
     const actions: Action[] = [];
     const sections: Section[] = [];
+    // Les onglets des portées, rendus en tête de la liste : leurs actions d'abord, dans l'ordre de
+    // lecture (de haut en bas), puis les tables, puis la colonne des actions.
+    const tabs = RANKING_SCOPES.map((sc) => {
+      const b = boardOf(sc, period);
+      const action = actions.push({ label: t('Onglet {period}', { period: scopeLabel(sc) }), key: `scope-${sc}`, run: () => ((scope = sc), here()) }) - 1;
+      return { label: scopeLabel(sc), count: b.unavailable ?? tn(b.ranked.length, '{n} table', '{n} tables'), current: sc === scope, disabled: Boolean(b.unavailable), action };
+    });
     const rows: Row[] = board.ranked.map((r) => {
       const action = actions.push({ label: r.table.title, key: `table:${r.table.file}`, icon: 'trophy', run: () => host.library.openScores(r.table, scope, period, here) }) - 1;
       const flag = r.leader.country ? flagView(r.leader.country, locale()) : undefined;
@@ -157,12 +164,6 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
     if (rows.length && board.without) notes.push({ text: tn(board.without, '{n} autre table sans score', '{n} autres tables sans score'), icon: 'info', tone: 'quiet' });
     if (notes.length) sections.push({ rows: notes });
     if (board.unavailable && scope !== 'cabinet') actions.push({ label: t('Partage et réseau'), icon: 'network', run: () => host.openSharing(here) });
-    // Les onglets des portées, rendus en tête de la liste : leurs actions après les tables, pour que le curseur arrive sur la première.
-    const tabs = RANKING_SCOPES.map((sc) => {
-      const b = boardOf(sc, period);
-      const action = actions.push({ label: t('Onglet {period}', { period: scopeLabel(sc) }), key: `scope-${sc}`, run: () => ((scope = sc), here()) }) - 1;
-      return { label: scopeLabel(sc), count: b.unavailable ?? tn(b.ranked.length, '{n} table', '{n} tables'), current: sc === scope, disabled: Boolean(b.unavailable), action };
-    });
     actions.push({
       label: t('Période : {period}', { period: periodLabel(period) }),
       detail: t('Start : {next}', { next: periodLabel(SCORE_PERIODS[(SCORE_PERIODS.indexOf(period) + 1) % SCORE_PERIODS.length]!) }),
@@ -201,7 +202,8 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
       cache.clear();
       // Le classement mondial d'abord ; sans réseau (partage désactivé), celui de cette borne.
       scope = boardOf('world', period).unavailable ? 'cabinet' : 'world';
-      host.library.openCustom(build);
+      // Le curseur sur la première table (juste après les onglets), ou sur « Période » sans table.
+      host.library.openCustom(build, RANKING_SCOPES.length);
     },
     detail: () => t('Toutes vos tables : cette borne, amis, national et mondial'),
   };

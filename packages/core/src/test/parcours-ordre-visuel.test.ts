@@ -104,11 +104,15 @@ function randomScreen(r: () => number): { source: ZoneSource; count: number } {
   }
   // Cartes de médias : jamais avec une colonne latérale (les choix d'un import), aucun écran ne les mêle.
   const media = r() < 0.3 && !sections.some((x) => x.side) ? { cards: take(Math.floor(r() * 5)).map((action) => ({ action })) } : undefined;
-  return { source: { sections, ...(media ? { media } : {}) }, count };
+  // Onglets en tête de la liste (Built.tabs), leurs actions n'importe où dans les rangs.
+  const tabs = r() < 0.4 ? take(1 + Math.floor(r() * 4)).map((action) => ({ action })) : undefined;
+  return { source: { sections, ...(media ? { media } : {}), ...(tabs ? { tabs } : {}) }, count };
 }
 
 /** Bloc d'affichage d'une action, de haut en bas : contenu (et sa colonne latérale), puis les actions de l'écran. */
 function block(source: ZoneSource, action: number, landscape: boolean): number {
+  // Les onglets, rendus en tête de la liste, au-dessus du contenu et de sa colonne latérale.
+  if (source.tabs?.some((t) => t.action === action)) return -1;
   const side = source.sections.some((s) => s.side);
   const inSide = source.sections.some((s) => s.side && s.rows.some((r) => r.pick && r.action === action));
   const inMain = source.sections.some((s) => !s.side && s.rows.some((r) => r.pick && r.action === action)) || Boolean(source.media?.cards.some((c) => c.action === action));
@@ -131,6 +135,9 @@ test('tout écran : le parcours aux flippers passe une fois par chaque action, d
       // Jamais un bloc d'avant après un bloc d'après (contenu, colonne latérale, actions de l'écran).
       const blocks = order.map((a) => block(source, a, landscape));
       for (let i = 1; i < blocks.length; i++) assert.ok(blocks[i]! >= blocks[i - 1]!, `retour en arrière à ${order[i]} (${JSON.stringify(source)})`);
+      // Les onglets dans leur ordre.
+      const tabs = (source.tabs ?? []).map((t) => order.indexOf(t.action!));
+      for (let i = 1; i < tabs.length; i++) assert.ok(tabs[i]! > tabs[i - 1]!);
       // Dans une section, ses lignes dans leur ordre.
       for (const s of source.sections) {
         const picks = s.rows.filter((x) => x.pick).map((x) => order.indexOf(x.action!));
@@ -143,7 +150,8 @@ test('tout écran : le parcours aux flippers passe une fois par chaque action, d
 test('le rendu place le contenu comme le parcours le suppose', () => {
   const js = read('renderer', 'library.js');
   const css = read('renderer', 'library.css');
-  // Colonne latérale après le reste du contenu, actions de l'écran après le contenu.
+  // Onglets en tête du contenu, colonne latérale après le reste du contenu, actions de l'écran après le contenu.
+  assert.ok(js.indexOf('content.append(renderTabs(v.tabs, v.cursor))') >= 0 && js.indexOf('content.append(renderTabs(v.tabs, v.cursor))') < js.indexOf('content.append(main, side)'));
   assert.match(js, /content\.append\(main, side\)/);
   assert.match(js, /\(section\.side \? side : main\)\.append\(box\)/);
   assert.match(js, /body\.append\(actions\)/);
@@ -204,4 +212,24 @@ test('toute pastille de hauteur fixe du rendu tient sur une ligne', () => {
     }
   }
   assert.ok(seen >= 5, 'les pastilles du bandeau et des repères sont bien relevées');
+});
+
+test('Classements, Joueurs en ligne : des dernières lignes, le flipper passe aux actions, jamais aux onglets du haut', () => {
+  // Retour du 13/11/2026 : du bas de la liste des tables, le choix remontait aux onglets des portées,
+  // puis redescendait à « Période » et « Retour ». Onglets 0 à 3, tables 4 à 6, puis les actions.
+  const source: ZoneSource = { tabs: [0, 1, 2, 3].map((action) => ({ action })), sections: [{ title: '3 tables classées', rows: [4, 5, 6].map((action) => ({ action, pick: true })) }] };
+  const order = visualOrder(source, 9, false);
+  assert.deepEqual(order, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.equal(zoneStep(undefined, 9, 6, 1, order), 7, 'de la dernière table : « Période »');
+  assert.equal(zoneStep(undefined, 9, 4, -1, order), 3, 'de la première table, en remontant : le dernier onglet');
+  // Le même écran avec les onglets rangés après les lignes : l'ordre suit l'affichage, pas le rang.
+  const late: ZoneSource = { tabs: [3, 4, 5, 6].map((action) => ({ action })), sections: [{ rows: [0, 1, 2].map((action) => ({ action, pick: true })) }] };
+  assert.deepEqual(visualOrder(late, 9, false), [3, 4, 5, 6, 0, 1, 2, 7, 8]);
+});
+
+test('le garde-fou de mise en page compare l’ordre des flippers à celui de l’affichage', () => {
+  const check = read('src', 'layout-check.ts');
+  assert.match(check, /ordre de navigation différent de l’affichage/);
+  assert.match(read('renderer', 'library.js'), /o\.dataset\.navOrder = v\.order\.join\(','\)/);
+  assert.match(read('src', 'library.ts'), /order: visualOrder\(built, built\.actions\.length, host\.landscape\?\.\(\) \?\? false\)/);
 });

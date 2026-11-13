@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.11
 
+- Menus : les flippers suivent toujours l'ordre de l'écran, de haut en bas : les onglets, puis la liste, puis les actions, sans remonter aux onglets depuis le bas de la liste (Classements, Joueurs en ligne). Un réglage qu'on fait défiler (la période des Classements, un filtre, une option) garde le choix sur lui à chaque appui, et revenir d'un écran (le tableau d'une table, un profil) ramène le choix sur l'élément d'où l'on était parti.
 - Réalité virtuelle : retirer le casque au menu ne relance plus le menu du casque ; il reprend là où il était quand le casque revient, sans repasser par l'accueil de Meta Horizon Link.
 - Roue des tables : en faisant défiler vite, les médaillons ne se dédoublent plus (le halo vert de la table choisie glisse maintenant toujours avec elle), et chaque appui demande trois fois moins de travail à l'affichage : la roue suit mieux les rafales.
 - Communauté : la porte « Classements » de l'accueil ouvre les classements de toutes vos tables (le premier de chacune, son score, votre place), en onglets Cette borne, Amis, National et Mondial, sur la période de votre choix ; elle n'ouvre plus le tableau d'une seule table, celle restée choisie dans la roue. Un salon vide dit simplement « Rien de neuf pour l'instant ».
