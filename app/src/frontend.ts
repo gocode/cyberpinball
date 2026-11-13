@@ -85,6 +85,7 @@ import {
   vpxRecenteredHead,
   windowsVk,
   calibrationCombo,
+  CalibrationComboHold,
   calibrationComboLabel,
   CALIBRATION_HOLD_S,
   type ControllerButton,
@@ -1848,11 +1849,12 @@ const HEADSET_REPEAT_MS = 70;
  * borne : ni le téléphone ni sa combinaison n'y entrent. L'assistant des manettes les prend avant tout.
  */
 function headsetButton(name: string, down: boolean): void {
+  // La combinaison du calage d'abord, quel que soit l'écran (assistant des manettes compris) ni le réglage.
+  calibrationComboButton(name, down);
   if (controllerWizard) {
     if (down) wizardButton(name);
     return;
   }
-  calibrationComboButton(name, down);
   const held = headsetHolds.get(name);
   if (held) {
     clearTimeout(held.timer);
@@ -1880,47 +1882,57 @@ function headsetButton(name: string, down: boolean): void {
 /** Casque retiré, menu de Meta ouvert ou compagnon parti : plus aucun bouton des manettes n'est tenu. */
 function releaseHeadsetButtons(): void {
   for (const name of [...headsetHolds.keys()]) headsetButton(name, false);
-  comboDown.clear();
+  comboHold?.reset();
   stopComboHold();
 }
 
-/** Boutons de la combinaison du calage enfoncés, et l'appui tenu en cours (jauge dans le casque). */
-const comboDown = new Set<string>();
-let comboHold: NodeJS.Timeout | undefined;
+/** La combinaison du calage au menu (manettes.ts, CalibrationComboHold), pour le profil des manettes branchées. */
+let comboHold: CalibrationComboHold | undefined;
+let comboHoldProfile: HeadsetProfile | undefined;
+let comboTimer: NodeJS.Timeout | undefined;
 /** Jauge de l’appui tenu, envoyée aux écrans rendus pour le casque (fronton : frontend.js, headsetHoldRing). */
 let headsetHoldView: { since: number; durationMs: number; label: string } | undefined;
 
 function stopComboHold(): void {
-  if (!comboHold) return;
-  clearTimeout(comboHold);
-  comboHold = undefined;
+  if (comboTimer) clearTimeout(comboTimer);
+  comboTimer = undefined;
+  if (!headsetHoldView) return;
   headsetHoldView = undefined;
   broadcast();
 }
 
 /**
  * Les deux joysticks enfoncés ensemble, tenus CALIBRATION_HOLD_S (manettes.ts, CALIBRATION_COMBO) : le calage
- * s'ouvre, d'où qu'on soit au menu (demande du 12 novembre 2026), avec une jauge circulaire pendant l'appui ;
- * lâché avant, rien. Le même geste en partie passe par le plugin (pause.h).
+ * s'ouvre, d'où qu'on soit au menu (demande du 12 novembre 2026), assistant des manettes compris, avec une jauge
+ * circulaire dès que les deux sont tenus ; lâchés avant, rien. Chaque étape au journal. Le même geste en partie
+ * passe par le plugin (pause.h).
  */
 function calibrationComboButton(name: string, down: boolean): void {
-  const combo = calibrationCombo(headset?.profile ?? 'touch');
-  if (!combo?.includes(name as ControllerButton)) return;
-  if (down) comboDown.add(name);
-  else comboDown.delete(name);
-  const both = combo.every((b) => comboDown.has(b));
-  if (!both) return stopComboHold();
-  if (comboHold || calibration || playing || launch || calibrateUnavailable()) return;
+  const profile = headset?.profile ?? 'touch';
+  const combo = calibrationCombo(profile);
+  if (!combo) return;
+  if (!comboHold || comboHoldProfile !== profile) {
+    comboHold = new CalibrationComboHold(combo);
+    comboHoldProfile = profile;
+  }
+  const event = comboHold.press(name, down, Date.now());
+  if (!event) return;
+  console.log(`Casque : combinaison du calage, ${name} ${down ? 'enfoncé' : 'relâché'}${event === 'debut' ? ', les deux tenus' : event === 'lachee' ? ', lâchée avant 3 s' : ''}${controllerWizard ? ' (assistant des manettes ouvert)' : ''}.`); // i18n-ignore : journal
+  if (event === 'lachee') return stopComboHold();
+  if (event !== 'debut') return;
+  const why = calibration ? 'calage déjà ouvert' : playing || launch ? 'partie en cours' : calibrateUnavailable() ? 'menu pas dans le casque' : undefined; // i18n-ignore : journal
+  if (why) return void console.log(`Casque : combinaison du calage tenue, rien à ouvrir (${why}).`); // i18n-ignore : journal
   headsetHoldView = { since: Date.now(), durationMs: CALIBRATION_HOLD_S * 1000, label: t('Caler la borne') };
   broadcast();
-  comboHold = setTimeout(() => {
-    comboHold = undefined;
+  comboTimer = setTimeout(() => {
+    comboTimer = undefined;
+    if (!comboHold?.due(Date.now())) return stopComboHold();
     headsetHoldView = undefined;
-    console.log('Casque : combinaison du calage tenue (les deux joysticks) ; calage de la borne ouvert.'); // i18n-ignore : journal
+    console.log(`Casque : combinaison du calage tenue ${CALIBRATION_HOLD_S} s ; calage de la borne ouvert${controllerWizard ? ' (assistant des manettes fermé)' : ''}.`); // i18n-ignore : journal
     if (controllerWizard) closeControllerWizard(false);
     openCalibration();
     broadcast();
-  }, CALIBRATION_HOLD_S * 1000);
+  }, CALIBRATION_HOLD_S * 1000 + 20);
 }
 
 /** Fichier du réglage des manettes d'un casque, pour la configuration active (un réglage par casque et par configuration). */

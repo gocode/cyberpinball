@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import {
   CALIBRATION_HOLD_S,
   calibrationCombo,
+  CalibrationComboHold,
   calibrationComboLabel,
   controllerProblem,
   defaultControllerSetting,
@@ -198,7 +199,7 @@ test('invariant : la même combinaison, la même durée et les mêmes touches da
   assert.match(front, /key: 'ControllerCabYOffset', value: String\(ig\.cabYOffset\)/);
   assert.match(front, /key: 'CalibrateHeight', value: String\(ig\.heightSteps\)/);
   // Au menu : la combinaison tenue CALIBRATION_HOLD_S ouvre le calage, avec la jauge dans le casque.
-  assert.match(front, /comboHold = setTimeout\(\(\) => \{/);
+  assert.match(front, /comboTimer = setTimeout\(\(\) => \{/);
   assert.match(read('app', 'renderer', 'frontend.js'), /if \(role === 'backglass' && s\.headsetHold\) \{/);
 });
 
@@ -216,6 +217,50 @@ test('détection de la panne du geste en partie (13 novembre 2026, « rien du to
   assert.match(inGameCalibrationReport(full)!, /2 clic\(s\)[\s\S]*1 calage\(s\) fait\(s\) ; calage fait$/);
   assert.match(inGameCalibrationReport(full.replace('calage-partie n=1 hauteur=13 resultat=ok', ''))!, /touche F13 pas postée/);
   assert.match(read('app', 'src', 'frontend.ts'), /const calibrationReport = inGameCalibrationReport\(block\.text\);/);
+  // Les actions vues par le plugin (première de chacune, « action-vue ») : dit sur la borne si les manettes l'atteignent.
+  assert.match(inGameCalibrationReport('calage actif=1 hauteur=13\naction-vue id=1 pressee=1\naction-vue id=0 pressee=1\naction-vue id=22 pressee=1')!, /actions de VPX reçues : 0, 1, 22 ; aucun clic des joysticks : geste pas fait, ou VPX ne transmet pas les clics alors que les gâchettes arrivent/);
+  assert.match(inGameCalibrationReport('calage actif=1 hauteur=13\naction-vue id=24 pressee=1')!, /ni aucune gâchette : les manettes du casque n’atteignent pas le plugin/);
+  assert.match(inGameCalibrationReport(full + '\naction-vue id=52 pressee=1\naction-vue id=53 pressee=1')!, /actions de VPX reçues : 52, 53 ; calage fait$/);
+  // Le plugin écrit la première action de chaque sorte, remise à zéro à chaque partie ; une gâchette n'est pas
+  // comptée deux fois (le second temps du flipper n'est pas une gâchette : banc de VPX, une gâchette = deux calages).
+  const pluginSrc = read('packages', 'vpx-vision3d', 'src', 'cyberpinball.cpp');
+  assert.match(pluginSrc, /"action-vue id=%u pressee=%d"/);
+  assert.match(pluginSrc, /actionsVues\[0\] = actionsVues\[1\] = 0;/);
+  assert.match(read('packages', 'vpx-vision3d', 'src', 'pause.h'), /inline bool estGachette\(int id\) \{ return id == 0 \|\| id == 1; \}/);
+});
+
+test('geste au menu (13 novembre 2026, PinCab : rien) : détecté avant l’assistant des manettes, sans réglage, chaque étape au journal', () => {
+  const combo = calibrationCombo('touch')!;
+  const hold = new CalibrationComboHold(combo, 3000);
+  // Un seul joystick, même longtemps : rien.
+  assert.equal(hold.press('clic-joystick-gauche', true, 0), 'clic');
+  assert.equal(hold.due(10_000), false);
+  // Les deux : la jauge part tout de suite (début), le calage à 3 s, une seule fois.
+  assert.equal(hold.press('clic-joystick-droit', true, 10_000), 'debut');
+  assert.equal(hold.heldSince(), 10_000);
+  assert.equal(hold.due(12_999), false);
+  assert.equal(hold.due(13_000), true);
+  assert.equal(hold.due(14_000), false);
+  assert.equal(hold.press('clic-joystick-droit', false, 14_000), 'clic');
+  // Appui court : lâché à 2 s, rien ne s'ouvre, la jauge s'efface.
+  assert.equal(hold.press('clic-joystick-droit', true, 20_000), 'debut');
+  assert.equal(hold.press('clic-joystick-gauche', false, 22_000), 'lachee');
+  assert.equal(hold.due(30_000), false);
+  // Les autres boutons ne la concernent pas ; tout relâché (casque retiré) : rien ne reste tenu.
+  assert.equal(hold.press('a', true, 0), undefined);
+  hold.reset();
+  assert.equal(hold.heldSince(), undefined);
+  const front = read('app', 'src', 'frontend.ts');
+  // Avant l'assistant des manettes (ouvert d'office sans réglage gardé), qui prenait tous les boutons.
+  assert.match(front, /function headsetButton\(name: string, down: boolean\): void \{\s*\/\/[^\n]*\n\s*calibrationComboButton\(name, down\);\s*if \(controllerWizard\) \{/);
+  // Seulement le profil des manettes, jamais leur réglage.
+  assert.match(front, /function calibrationComboButton\(name: string, down: boolean\): void \{\s*const profile = headset\?\.profile \?\? 'touch';\s*const combo = calibrationCombo\(profile\);/);
+  const start = front.indexOf('function calibrationComboButton');
+  assert.doesNotMatch(front.slice(start, front.indexOf('\n}\n', start)), /controllerSetting\(\)/);
+  // Chaque étape au journal, la jauge dès que les deux sont tenus, l'assistant fermé quand le calage s'ouvre.
+  assert.match(front, /Casque : combinaison du calage, \$\{name\} \$\{down \? 'enfoncé' : 'relâché'\}/);
+  assert.match(front, /if \(event !== 'debut'\) return;[\s\S]{0,600}headsetHoldView = \{ since: Date\.now\(\), durationMs: CALIBRATION_HOLD_S \* 1000/);
+  assert.match(front, /if \(controllerWizard\) closeControllerWizard\(false\);\s*openCalibration\(\);/);
 });
 
 test('aide : la combinaison dans le détail de « Caler la borne », dans les manuels et au premier port du casque', () => {

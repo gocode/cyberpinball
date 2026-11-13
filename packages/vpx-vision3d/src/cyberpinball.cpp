@@ -1314,11 +1314,24 @@ void avancerCalage()
    }
 }
 
+/**
+ * Les actions de VPX déjà vues pendant la partie : la première de chacune est écrite au journal (« action-vue »),
+ * pour savoir sur la borne si les manettes du casque atteignent le plugin (gâchettes : 0 à 3, clics : 52 et 53).
+ */
+unsigned long long actionsVues[2] = { 0, 0 };
+
 void MSGPIAPI onAction(const unsigned int, void*, void* data)
 {
    auto* ev = static_cast<VPXActionEvent*>(data);
    if (!enPartie || !ev)
       return;
+   if (const unsigned int id = ev->action; id < 128 && !(actionsVues[id / 64] & (1ull << (id % 64))))
+   {
+      actionsVues[id / 64] |= 1ull << (id % 64);
+      char ligne[64];
+      std::snprintf(ligne, sizeof(ligne), "action-vue id=%u pressee=%d", id, ev->isPressed ? 1 : 0);
+      ecrire(ligne);
+   }
    // OnActionChanged donne le numéro interne de l'action (InputManager), pas une VPXAction.
    int liee = -1;
    const Commande c = commandeVpx1081(static_cast<int>(ev->action), liee);
@@ -1397,6 +1410,7 @@ void MSGPIAPI onGameStart(const unsigned int, void*, void*)
 {
    pause.remiseAZero();
    calageVpx = CalageEnCours {};
+   actionsVues[0] = actionsVues[1] = 0;
    if (!versionConnue())
    {
       pause.passif();

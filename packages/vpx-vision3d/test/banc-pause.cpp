@@ -305,7 +305,7 @@ int main(int argc, char** argv)
       // l'alignement de VPX sur les manettes ne sont jamais pris pour les leurs.
       VERIFIE(cmd(CUSTOM1) == Commande::CalageG && cmd(CUSTOM2) == Commande::CalageD);
       VERIFIE(cmd(VR_CENTRER) == Commande::Inconnue && cmd(VR_MANETTES) == Commande::Inconnue && cmd(54) == Commande::Inconnue);
-      VERIFIE(estGachette(FLIPPER_G) && estGachette(3) && !estGachette(UI_GAUCHE) && !estGachette(-1));
+      VERIFIE(estGachette(FLIPPER_G) && estGachette(1) && !estGachette(2) && !estGachette(3) && !estGachette(UI_GAUCHE) && !estGachette(-1));
       Pause c;
       double j = 0.0;
       images(c, 0.0, 1.0, true, j);
@@ -339,6 +339,9 @@ int main(int argc, char** argv)
       VERIFIE(!rc.caler && c.calagesFaits() == 0);
       rc = c.action(cmd(FLIPPER_G), true, 12.2, estGachette(FLIPPER_G));
       VERIFIE(rc.caler && c.calagesFaits() == 1);
+      // La même gâchette enfoncée à fond : le second temps du flipper (action 2) ne cale pas une seconde fois.
+      rc = c.action(cmd(2), true, 12.25, estGachette(2));
+      VERIFIE(!rc.caler && c.calagesFaits() == 1);
       rc = c.action(cmd(FLIPPER_D), true, 12.5, estGachette(FLIPPER_D));
       VERIFIE(rc.caler && c.calagesFaits() == 2 && c.etape() == Etape::Calage);
       // A : la partie reprend (premier moyen), le calage reste.

@@ -609,14 +609,22 @@ export function inGameCalibrationReport(block: string): string | undefined {
   const opened = count(/^calage-etape ouverte/gm);
   const triggers = count(/^calage-gachette/gm);
   const done = count(/^calage-partie .*resultat=ok/gm);
-  const facts = `${clicks} clic(s) des joysticks reçu(s) par le plugin, combinaison tenue ${held} fois, calage ouvert ${opened} fois, ${triggers} gâchette(s), ${done} calage(s) fait(s)`; // i18n-ignore : journal
+  // Les actions de VPX arrivées au plugin (« action-vue id=… », la première de chacune dans la partie).
+  const seen = [...block.matchAll(/^action-vue id=(\d+)/gm)].map((m) => Number(m[1]));
+  const seenText = seen.length ? ` ; actions de VPX reçues : ${[...new Set(seen)].sort((a, b) => a - b).join(', ')}` : ''; // i18n-ignore : journal
+  const facts = `${clicks} clic(s) des joysticks reçu(s) par le plugin, combinaison tenue ${held} fois, calage ouvert ${opened} fois, ${triggers} gâchette(s), ${done} calage(s) fait(s)${seenText}`; // i18n-ignore : journal
+  const flippers = seen.some((id) => id <= 3);
   const why =
     armed[1] !== '1'
       ? 'touches du calage pas liées dans l’INI de la partie (plugin sans réglage Calibrate)' // i18n-ignore : journal
       : passive
         ? `plugin passif (${passive[1]}) : il n’écoute plus aucune action de VPX` // i18n-ignore : journal
         : clicks === 0
-          ? 'aucun clic des joysticks n’est arrivé au plugin : VPX ne les a pas transmis (liaisons Custom1, Custom2)' // i18n-ignore : journal
+          ? seen.length === 0
+            ? 'aucune action de VPX n’est arrivée au plugin' // i18n-ignore : journal
+            : flippers
+              ? 'aucun clic des joysticks : geste pas fait, ou VPX ne transmet pas les clics alors que les gâchettes arrivent (liaisons Custom1, Custom2)' // i18n-ignore : journal
+              : 'aucun clic des joysticks, ni aucune gâchette : les manettes du casque n’atteignent pas le plugin' // i18n-ignore : journal
           : held === 0
             ? 'les deux clics n’ont jamais été tenus ensemble' // i18n-ignore : journal
             : opened === 0
@@ -626,7 +634,7 @@ export function inGameCalibrationReport(block: string): string | undefined {
                 : done === 0
                   ? 'gâchette sans calage fini (touche F13 pas postée à VPX)' // i18n-ignore : journal
                   : 'calage fait'; // i18n-ignore : journal
-  return clicks || passive || armed[1] !== '1' ? `${facts} ; ${why}` : undefined;
+  return clicks || passive || armed[1] !== '1' || seen.length ? `${facts} ; ${why}` : undefined;
 }
 
 /** Les moments où le calage pourrait s'ouvrir de lui-même dans le casque. */

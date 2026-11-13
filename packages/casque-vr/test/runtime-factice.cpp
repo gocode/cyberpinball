@@ -938,10 +938,34 @@ XrResult XRAPI_CALL createAction(XrActionSet set, const XrActionCreateInfo* ci, 
    return XR_SUCCESS;
 }
 
+/**
+ * Les chemins du profil Touch (spécification OpenXR 1.0, « Oculus Touch Controller Profile ») : comme Link,
+ * le banc refuse une liaison hors du profil (XR_ERROR_PATH_UNSUPPORTED). VPX propose ses 30 chemins un par un
+ * (XRInputHandler::SuggestBindings) et n'en garde que ceux acceptés : 17 sur Link, 17 ici.
+ */
+bool touchPath(const std::string& p)
+{
+   static const std::set<std::string> common = { "squeeze", "squeeze/value", "trigger", "trigger/value", "trigger/touch", "thumbstick", "thumbstick/x",
+      "thumbstick/y", "thumbstick/click", "thumbstick/touch", "thumbrest/touch", "grip/pose", "aim/pose" };
+   static const std::set<std::string> left = { "x/click", "x/touch", "y/click", "y/touch", "menu/click" };
+   static const std::set<std::string> right = { "a/click", "a/touch", "b/click", "b/touch", "system/click" };
+   for (const auto& [hand, own] : { std::pair { std::string("/user/hand/left/input/"), &left }, std::pair { std::string("/user/hand/right/input/"), &right } })
+      if (p.rfind(hand, 0) == 0)
+      {
+         const std::string rest = p.substr(hand.size());
+         return common.count(rest) || own->count(rest);
+      }
+   return p == "/user/hand/left/output/haptic" || p == "/user/hand/right/output/haptic";
+}
+
 XrResult XRAPI_CALL suggestBindings(XrInstance i, const XrInteractionProfileSuggestedBinding* sb)
 {
    std::lock_guard<std::mutex> g(lock);
    auto* inst = reinterpret_cast<Instance*>(i);
+   if (inst->paths[sb->interactionProfile] == "/interaction_profiles/oculus/touch_controller")
+      for (uint32_t k = 0; k < sb->countSuggestedBindings; k++)
+         if (!touchPath(inst->paths[sb->suggestedBindings[k].binding]))
+            return XR_ERROR_PATH_UNSUPPORTED;
    auto& map = inst->bindings[sb->interactionProfile];
    map.clear();
    for (uint32_t k = 0; k < sb->countSuggestedBindings; k++)
@@ -1035,6 +1059,46 @@ XrResult XRAPI_CALL getBoundsRect(XrSession, XrReferenceSpaceType type, XrExtent
    return XR_SPACE_BOUNDS_UNAVAILABLE;
 }
 
+// --- Ce que VPX demande en plus du compagnon (VRDevice::SetupHMD, XRInputHandler) ------------------
+XrResult XRAPI_CALL getSystemProperties(XrInstance, XrSystemId id, XrSystemProperties* p)
+{
+   p->systemId = id;
+   p->vendorId = 0x2833;
+   strcpy_s(p->systemName, "Banc Cyber Pinball");
+   p->graphicsProperties.maxSwapchainImageWidth = 4096;
+   p->graphicsProperties.maxSwapchainImageHeight = 4096;
+   p->graphicsProperties.maxLayerCount = 16;
+   p->trackingProperties.orientationTracking = XR_TRUE;
+   p->trackingProperties.positionTracking = XR_TRUE;
+   return XR_SUCCESS;
+}
+
+XrResult XRAPI_CALL enumerateViewConfigurations(XrInstance, XrSystemId, uint32_t cap, uint32_t* count, XrViewConfigurationType* types)
+{
+   *count = 1;
+   if (cap)
+      types[0] = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+   return XR_SUCCESS;
+}
+
+XrResult XRAPI_CALL enumerateEnvironmentBlendModes(XrInstance, XrSystemId, XrViewConfigurationType, uint32_t cap, uint32_t* count, XrEnvironmentBlendMode* modes)
+{
+   *count = 1;
+   if (cap)
+      modes[0] = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+   return XR_SUCCESS;
+}
+
+XrResult XRAPI_CALL destroyAction(XrAction a)
+{
+   std::lock_guard<std::mutex> g(lock);
+   // L'action reste en mémoire : une liaison proposée ou une session peut encore la nommer.
+   reinterpret_cast<Action*>(a)->set = nullptr;
+   return XR_SUCCESS;
+}
+
+XrResult XRAPI_CALL destroyActionSet(XrActionSet) { return XR_SUCCESS; }
+
 XrResult XRAPI_CALL getInstanceProcAddr(XrInstance, const char* name, PFN_xrVoidFunction* fn);
 
 const std::map<std::string, PFN_xrVoidFunction>& table()
@@ -1084,6 +1148,11 @@ const std::map<std::string, PFN_xrVoidFunction>& table()
       F("xrGetActionStateFloat", getActionStateFloat),
       F("xrGetCurrentInteractionProfile", getCurrentInteractionProfile),
       F("xrGetReferenceSpaceBoundsRect", getBoundsRect),
+      F("xrGetSystemProperties", getSystemProperties),
+      F("xrEnumerateViewConfigurations", enumerateViewConfigurations),
+      F("xrEnumerateEnvironmentBlendModes", enumerateEnvironmentBlendModes),
+      F("xrDestroyAction", destroyAction),
+      F("xrDestroyActionSet", destroyActionSet),
 #undef F
    };
    return t;

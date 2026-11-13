@@ -11,6 +11,8 @@ son interface).
 
 ## 0.1.11
 
+- Réalité virtuelle : à l'étape « Caler la borne » en partie, une gâchette enfoncée à fond ne cale plus deux fois de suite ; le journal dit, en fin de partie, quelles commandes des manettes sont arrivées.
+- Réalité virtuelle : les deux joysticks tenus 3 s ouvrent le calage de la borne aussi depuis l’écran « Manettes du casque », qui se ferme sans rien changer ; chaque étape du geste est écrite au journal.
 - Menus : les flippers suivent toujours l'ordre de l'écran, de haut en bas : les onglets, puis la liste, puis les actions, sans remonter aux onglets depuis le bas de la liste (Classements, Joueurs en ligne). Un réglage qu'on fait défiler (la période des Classements, un filtre, une option) garde le choix sur lui à chaque appui, et revenir d'un écran (le tableau d'une table, un profil) ramène le choix sur l'élément d'où l'on était parti.
 - Réalité virtuelle : retirer le casque au menu ne relance plus le menu du casque ; il reprend là où il était quand le casque revient, sans repasser par l'accueil de Meta Horizon Link.
 - Roue des tables : en faisant défiler vite, les médaillons ne se dédoublent plus (le halo vert de la table choisie glisse maintenant toujours avec elle), et chaque appui demande trois fois moins de travail à l'affichage : la roue suit mieux les rafales.

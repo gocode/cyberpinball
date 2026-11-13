@@ -76,8 +76,12 @@ enum : int
  * révision 5436) ; `api` reçoit l'action de l'API des plugins que VPX y lie (m_actionMap, pour vérifier la
  * table pendant la partie), ou -1 quand VPX ne la lie pas (Pause, les UI*).
  */
-/** Les gâchettes (flippers, et leur second temps : actions 0 à 3) : elles calent la borne à l'étape du calage. */
-inline bool estGachette(int id) { return id >= 0 && id <= 3; }
+/**
+ * Les gâchettes (flippers, actions 0 et 1) : elles calent la borne à l'étape du calage. Le second temps des
+ * flippers (actions 2 et 3) n'en est pas une : une gâchette des manettes enfoncée à fond donne les deux (0,3 puis
+ * 0,6 : manettes.ts, vpxMappingsFor), et comptait deux calages pour un appui (banc de VPX, 13 novembre 2026).
+ */
+inline bool estGachette(int id) { return id == 0 || id == 1; }
 
 inline Commande commandeVpx1081(int id, int& lieeA)
 {

@@ -238,6 +238,62 @@ export function calibrationCombo(profile: HeadsetProfile | undefined): readonly 
   return profile ? CALIBRATION_COMBO[profile] : undefined;
 }
 
+/** Ce que fait un appui ou un relâché dans la combinaison du calage. */
+export type ComboEvent = 'clic' | 'debut' | 'lachee' | undefined;
+
+/**
+ * La combinaison du calage au menu, sans horloge à elle (13 novembre 2026 : au PinCab, l'assistant des manettes
+ * ouvert d'office recevait les boutons avant elle, et le geste ne faisait rien). Elle ne dépend d'aucun réglage
+ * des manettes, seulement du profil. `press` dit chaque changement ; `due` dit, une fois, que les deux boutons
+ * sont tenus ensemble depuis CALIBRATION_HOLD_S.
+ */
+export class CalibrationComboHold {
+  private readonly down = new Set<string>();
+  private since: number | undefined;
+  private fired = false;
+
+  constructor(private readonly combo: readonly string[], private readonly holdMs = CALIBRATION_HOLD_S * 1000) {}
+
+  /** Un bouton des manettes : `clic` (un des deux), `debut` (les deux tenus), `lachee` (lâchée avant l'heure). */
+  press(name: string, isDown: boolean, now: number): ComboEvent {
+    if (!this.combo.includes(name)) return undefined;
+    const wasHeld = this.since !== undefined;
+    if (isDown) this.down.add(name);
+    else this.down.delete(name);
+    const held = this.combo.every((b) => this.down.has(b));
+    if (held && !wasHeld) {
+      this.since = now;
+      this.fired = false;
+      return 'debut';
+    }
+    if (!held && wasHeld) {
+      const early = !this.fired;
+      this.since = undefined;
+      return early ? 'lachee' : 'clic';
+    }
+    return 'clic';
+  }
+
+  /** Les deux tenus assez longtemps : vrai une seule fois par appui. */
+  due(now: number): boolean {
+    if (this.since === undefined || this.fired || now - this.since < this.holdMs) return false;
+    this.fired = true;
+    return true;
+  }
+
+  /** Tenue en cours, depuis cet instant (pour la jauge). */
+  heldSince(): number | undefined {
+    return this.fired ? undefined : this.since;
+  }
+
+  /** Tout relâché (casque retiré, compagnon parti). */
+  reset(): void {
+    this.down.clear();
+    this.since = undefined;
+    this.fired = false;
+  }
+}
+
 /** La combinaison telle que le joueur la lit (« les deux joysticks enfoncés ensemble, 3 s »), ou undefined. */
 export function calibrationComboLabel(profile: HeadsetProfile | undefined): string | undefined {
   return calibrationCombo(profile) ? t('les deux joysticks enfoncés ensemble, 3 s') : undefined;
