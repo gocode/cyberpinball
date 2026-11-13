@@ -35,6 +35,8 @@ const REVIEWED = new Set([
   'hours',
   'inGameMenu',
   'jukeboxPlayer',
+  // Réglages du Juke-box : ouverts depuis sa gestion, par l'utilisateur.
+  'jukeboxSettings',
   'liveDmd',
   'liveGames',
   'menuConfiguration',

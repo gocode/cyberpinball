@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.11
 
+- Réglages du Juke-box : une rubrique à part (Menu système > Médias > Réglages du Juke-box, et en tête de la gestion du Juke-box) réunit ses réglages. Le Juke-box peut jouer sur plusieurs sorties à la fois (le fronton, l'écran du playfield, un caisson…), chacune avec son volume, un profil (complet, basses seules, médiums et aigus, ou vos basses, médiums et aigus de −12 à +12 dB) et un retard ; « Écouter cette sortie » joue cinq secondes sur elle seule. Tout s'entend aussitôt, même sur le morceau en cours. Le visualiseur du DMD et le médaillon dans la roue s'y règlent aussi.
 - Communauté : l'accueil a aussi une porte « Mes amis » ; « Écrire dans le salon » montre le QR code du téléphone, et les phrases préparées sont des badges les uns à côté des autres, qu'on choisit d'un appui.
 - Juke-box : le premier morceau joué après le démarrage sortait par la sortie par défaut de Windows (souvent les haut-parleurs de l'écran du playfield) au lieu de celle du fronton ; il suit maintenant la sortie de la borne, et le journal note sur quelle sortie joue chaque morceau.
 - Réalité virtuelle : quand le Quest est en limite fixe, la borne dit une fois comment passer en limite de pièce, qui garde mieux la borne en place quand le casque est remis.

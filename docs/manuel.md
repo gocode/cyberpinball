@@ -1777,6 +1777,24 @@ Tous les réglages de la roue des tables sont sur un même écran, **Menu systè
 
 Les collections que la roue montre se choisissent dans **Menu système > Tables > Collections**. Tests : [roue-reglages.test.ts](../packages/core/src/test/roue-reglages.test.ts).
 
+### Réglages du Juke-box
+
+Tous les réglages du Juke-box sont sur un même écran, **Menu système > Médias > Réglages du Juke-box**, juste après la gestion du Juke-box, et aussi en ligne « Réglages du Juke-box » en tête de cette gestion, où Exit ramène (demande du 13/11/2026 : la configuration du Juke-box, pas la gestion de son contenu). Code : [app/src/jukebox-settings.ts](../app/src/jukebox-settings.ts), [packages/core/src/jukebox-audio.ts](../packages/core/src/jukebox-audio.ts) ; tout est gardé dans `<données>\medias.json` (`jukeboxAudio`, `jukeboxVisualizer`, `jukebox`) et s'applique aussitôt, même au morceau en cours.
+
+- **« Sorties du son »** (Start : la liste) : les sorties de Windows (sans les virtuelles, comme le casque, comme à l'étape « Son »), celle de la borne en tête. Sans réglage, le Juke-box joue sur la sortie du menu (celle du fronton, voir l'étape « Son »), son intact : c'est le réglage d'usine, par le même chemin qu'avant (`setSinkId` seul). Start sur une sortie ouvre son écran :
+  - **« Juke-box sur cette sortie »** : oui ou non. Ajouter une sortie garde celle qui jouait (on ajoute du son, on ne le déplace pas) ; la dernière sortie active ne se coupe pas (grisée, avec sa raison).
+  - **« Volume »** : de 0 à 100 %, par rapport aux autres sorties ; le volume général reste celui de la borne (boutons de volume).
+  - **« Profil »** : **complet** (son intact), **basses seules** (sous 120 Hz, deux étages passe-bas : pour un caisson), **médiums et aigus** (au-dessus de 120 Hz : de petits haut-parleurs à côté d'un caisson), **personnalisé** : **« Basses »** (plateau grave à 200 Hz), **« Médiums »** (cloche à 1 kHz), **« Aigus »** (plateau aigu à 4 kHz), de −12 à +12 dB par pas de 3 dB ; hors profil personnalisé, ces trois lignes sont grisées.
+  - **« Retard »** : de 0 à 200 ms, pour caler une sortie qui sonne avant les autres.
+  - **« Écouter cette sortie »** : cinq secondes sur elle seule, avec ses réglages : deux pulsations de basse, un accord, des cymbales, puis tout ensemble, synthétisés sur place (aucun fichier).
+  - **« Revenir au réglage d'usine »**, dans la liste, vide `jukeboxAudio`.
+- **« Visualiseur du Juke-box »** (Start : mode suivant) : Pochette, Multicolore, Classique (venu de « Médias, son et attente »).
+- **« Juke-box dans la roue »** : le même réglage que dans Tables > Roue.
+
+**Comment le son se partage.** Electron n'envoie un élément que sur une sortie. Dès que le plan est autre chose que la sortie du menu, son intact, le morceau passe par un graphe Web Audio ([app/renderer/audio-routes.js](../app/renderer/audio-routes.js), `CyberAudioRoutes`) : `createMediaElementSource`, puis une branche par sortie (filtres, retard, gain), chacune finie dans un `MediaStreamDestination` joué par un `<audio>` hors du document posé sur sa sortie (`setSinkId`, retrouvée par son nom Windows comme partout). Un nouveau plan ne refait que les branches : le morceau ne repart pas. Le spectre du DMD lit alors l'analyseur du graphe. Le processus principal envoie le plan avec chaque état du clip (`jukeboxRoutes`) ; pour le lecteur YouTube, le même moteur est rejoué dans sa page et posé sur sa vidéo à chaque relevé (`onlineRoutesScript`), refait si YouTube change d'élément. Casque en usage, tout suit le casque comme avant ; les sorties de la borne attendent. Le journal note la sortie réelle de chaque morceau (« Juke-box : t4 joue sur … »), une sortie introuvable (« (introuvable) »), et le routage du lecteur YouTube.
+
+Tests : [jukebox-audio.test.ts](../packages/core/src/test/jukebox-audio.test.ts) (réglage d'usine, ajout, dernière sortie, filtres, fichier abîmé), [jukebox-reglages.test.ts](../packages/core/src/test/jukebox-reglages.test.ts) (écrans, boutons, retour sur la ligne), et [jukebox-sorties-chromium.test.ts](../packages/core/src/test/jukebox-sorties-chromium.test.ts), dans un vrai Chromium hors écran et muet : un la à 440 Hz traverse le graphe, deux branches avec leurs filtres, un nouveau plan sans couper le morceau, l'extrait d'essai.
+
 ### Ordre des tables et table au démarrage
 
 Trois réglages de **Menu système > Tables > Roue**, gardés dans `<données>\medias.json` (champs `tableOrder` et `startTable`) ; code : [packages/core/src/tableorder.ts](../packages/core/src/tableorder.ts), appliqué par `app/src/frontend.ts` à chaque lecture des tables.

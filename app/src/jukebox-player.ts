@@ -70,6 +70,7 @@ import {
   type JukeboxPlaylistInput,
   type JukeboxPosterView,
   type JukeboxVisualizerMode,
+  type JukeboxAudioRoute,
   type Rgb,
   type PlayerEffect,
   type PlayerInput,
@@ -96,6 +97,11 @@ export interface JukeboxPlayerHost {
   desk(): boolean;
   /** Sortie audio du fronton (nom Windows). */
   output(): string | undefined;
+  /**
+   * Sorties du son du Juke-box (Réglages du Juke-box, jukeboxRoutes) : une route par sortie active ;
+   * absent, la sortie du fronton, son intact.
+   */
+  routes?(): JukeboxAudioRoute[];
   /** Rend un fichier lisible par le protocole des médias (media-protocol.ts). */
   allow(file: string): void;
   /** Exit : retour à la roue (la musique est déjà arrêtée). */
@@ -131,6 +137,8 @@ export interface JukeboxOrder {
   image?: string;
   paused: boolean;
   output?: string;
+  /** Sorties du son, relues à chaque état : un réglage changé s'entend sans relancer le morceau. */
+  routes?: JukeboxAudioRoute[];
   volume: number;
 }
 
@@ -238,7 +246,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
   let entranceSeq = 0;
   /** Le cadre du clip dans sa fenêtre (pixels de la page), dit par la fenêtre du clip. */
   let clipRect: Rectangle | undefined;
-  let online: { id: number; view: WebContentsView; win: BrowserWindow; timer: NodeJS.Timeout; started: number; ended?: boolean; lastTime?: number } | undefined;
+  let online: { id: number; view: WebContentsView; win: BrowserWindow; timer: NodeJS.Timeout; started: number; ended?: boolean; lastTime?: number; routed?: boolean } | undefined;
   let dmd: { kind: 'wheel' | 'player'; stop(): void } | undefined;
   let wheelStats = { tracks: 0, playlists: 0 };
 
@@ -866,6 +874,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
   async function probeOnline(): Promise<void> {
     const o = online;
     if (!o || !order || order.id !== o.id) return;
+    void routeOnline();
     const r = (await onlineScript(PROBE_SCRIPT)) as
       | { state?: number; time?: number; duration?: number; paused?: boolean; ended?: boolean; ad?: boolean; code?: number; error?: string; levels?: number[] }
       | undefined;
@@ -895,6 +904,28 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     if ((r.state === 0 || r.ended) && !o.ended && Date.now() - o.started > 2000) {
       o.ended = true;
       ended();
+    }
+  }
+
+  /**
+   * Sorties du son dans la page du lecteur YouTube : le graphe de audio-routes.js posé sur sa vidéo,
+   * refait si YouTube change d'élément ou si les réglages changent. Son intact sur la sortie du
+   * fronton (cas d'usine) : rien, audioSinkScript suffit.
+   */
+  let onlineRoutesKey: string | undefined;
+  async function routeOnline(): Promise<void> {
+    const o = online;
+    if (!o || !host.routes) return;
+    const routes = host.routes();
+    const menuOnly = routes.length === 1 && routes[0]!.gain === 1 && !routes[0]!.filters.length && !routes[0]!.delay && routes[0]!.output === (host.output() ?? '');
+    const key = `${o.id}:${JSON.stringify(routes)}`;
+    if (menuOnly && !o.routed) return;
+    const result = (await onlineScript(onlineRoutesScript(routes))) as string | undefined;
+    if (online !== o) return;
+    if (result === 'attached' || result === 'updated') o.routed = true;
+    if (result && result !== 'same' && result !== 'no-video' && key !== onlineRoutesKey) {
+      onlineRoutesKey = key;
+      host.log(`Juke-box : son du lecteur YouTube sur ${routes.map((r) => r.output || 'la sortie par défaut').join(', ')} (${result}).`); // i18n-ignore : journal
     }
   }
 
@@ -1164,7 +1195,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       const now = pv.now;
       out.clip = {
         place: background ? 'hidden' : roles.includes('backglass') && !host.desk() ? 'zone' : host.desk() ? 'desk' : 'thumb',
-        ...(order ? { order: { id: order.id, kind: order.kind, ...(order.audio ? { audio: order.audio } : {}), ...(order.video ? { video: order.video } : {}), ...(order.image ? { image: order.image } : {}), paused: order.paused, ...(order.output ? { output: order.output } : {}), volume: order.volume } } : {}),
+        ...(order ? { order: { id: order.id, kind: order.kind, ...(order.audio ? { audio: order.audio } : {}), ...(order.video ? { video: order.video } : {}), ...(order.image ? { image: order.image } : {}), paused: order.paused, ...(order.output ? { output: order.output } : {}), ...(host.routes ? { routes: host.routes() } : {}), volume: order.volume } } : {}),
         ...(now ? { now } : {}),
         ...(card && now && order?.kind !== 'online' ? { card: { id: card.id, eyebrow: cardEyebrow(now), until: card.until } } : {}),
         ...(seekOrder && order?.kind !== 'online' ? { seek: seekOrder } : {}),
@@ -1273,6 +1304,47 @@ html, body { background: #030807 !important; }
  * Relevé du lecteur : état (0 : fini), temps, durée, publicité (classe ad-showing), erreur (code
  * de l'API du lecteur, sinon le message affiché). L'écouteur onError du lecteur est posé au premier passage.
  */
+/** Le moteur des sorties du son (app/renderer/audio-routes.js), lu une fois, pour la page YouTube. */
+let routesSource: string | undefined;
+function audioRoutesSource(): string {
+  if (routesSource !== undefined) return routesSource;
+  try {
+    routesSource = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'audio-routes.js'), 'utf8');
+  } catch {
+    routesSource = '';
+  }
+  return routesSource;
+}
+
+/**
+ * Pose le graphe des sorties sur la vidéo de la page YouTube : « attached » la première fois (ou
+ * pour une nouvelle vidéo), « updated » quand le plan change, « same » sinon, « no-video » tant que
+ * la page n'a pas de vidéo, « failed » si Web Audio la refuse (le son reste sur la sortie du fronton).
+ */
+export function onlineRoutesScript(routes: readonly JukeboxAudioRoute[]): string {
+  return `(() => {
+${audioRoutesSource()}
+  const routes = ${JSON.stringify(routes)};
+  const v = document.querySelector('video');
+  if (!v || !window.CyberAudioRoutes) return 'no-video';
+  const key = JSON.stringify(routes);
+  const s = window.__cyberpinballRoutes;
+  if (s && s.media === v) {
+    if (s.key === key) return 'same';
+    s.key = key;
+    s.handle.update(routes);
+    return 'updated';
+  }
+  try {
+    const handle = window.CyberAudioRoutes.attach(v, routes);
+    window.__cyberpinballRoutes = { media: v, key, handle };
+    return 'attached';
+  } catch (e) {
+    return 'failed';
+  }
+})()`;
+}
+
 const PROBE_SCRIPT = `(() => {
   const p = document.getElementById('movie_player');
   const v = document.querySelector('video');

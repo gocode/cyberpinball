@@ -101,6 +101,8 @@ export interface JukeboxMenuHost {
   openSystem(): void;
   /** Le lecteur du Juke-box, sur cette playlist (la gestion ouverte du lecteur y revient). */
   openPlayer(playlist?: string): void;
+  /** Réglages du Juke-box (sorties du son, visualiseur) ; `back` revient à la gestion. Absent : pas proposé. */
+  openSettings?(back: () => void): void;
   /** Retour à la roue des tables. */
   leave(): void;
   /** Saisie d'un texte : clavier à l'écran, vrai clavier (Ctrl+V), ou téléphone ; `options` : préfixe fixe du champ. */
@@ -337,7 +339,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
   function show(build: () => Built): void {
     const playlists = store().playlists;
     const index = Math.max(0, playlists.findIndex((p) => p.id === chosen));
-    display(build, playlists.length ? (host.account ? 3 : 2) + index : 0);
+    display(build, playlists.length ? 2 + (host.account ? 1 : 0) + (host.openSettings ? 1 : 0) + index : 0);
   }
 
   function manageScreen(): Built {
@@ -361,6 +363,10 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     if (host.account) {
       const accountAt = add({ label: t('Compte YouTube'), key: 'account', icon: 'account', run: () => openAccount(() => open()) });
       global.push({ text: t('Compte YouTube'), detail: accountText(), icon: 'account', action: accountAt, pick: true });
+    }
+    if (host.openSettings) {
+      const settingsAt = add({ label: t('Réglages du Juke-box'), key: 'settings', icon: 'sliders', run: () => host.openSettings!(() => open()) });
+      global.push({ text: t('Réglages du Juke-box'), detail: t('Sorties du son, visualiseur du DMD'), icon: 'sliders', action: settingsAt, pick: true });
     }
     sections.push({ kind: 'jb-global', options: true, rows: global });
 

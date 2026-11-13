@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- Juke-box settings: a section of its own (System menu > Media > Juke-box settings, and at the top of the Juke-box management) gathers its settings. The Juke-box can play on several outputs at once (the backglass, the playfield screen, a subwoofer…), each with its own volume, a profile (full, bass only, mids and highs, or your own bass, mids and treble from −12 to +12 dB) and a delay; “Listen to this output” plays five seconds on it alone. Everything is heard at once, even on the current song. The DMD visualiser and the medallion in the wheel are set there too.
 - Community: the home screen also has a "My friends" door; "Write in the room" shows the phone's QR code, and the ready-made phrases are badges side by side, chosen with one press.
 - Jukebox: the first song played after startup came out of Windows' default output (often the playfield screen's speakers) instead of the backglass output; it now follows the cabinet's output, and the log records which output each song plays on.
 - Virtual reality: when the Quest uses a stationary boundary, the cabinet says once how to switch to a roomscale boundary, which keeps the cabinet in place better when the headset is put back on.

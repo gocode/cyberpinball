@@ -360,6 +360,8 @@ import {
   locale,
   mentions,
   maskWords,
+  jukeboxRoutes,
+  type JukeboxAudioRoute,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, keysDown, listWindows, moveWindow, probeDisplayLinks, setCursorPosition, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays, simulatedDisplays } from './displays';
@@ -399,6 +401,7 @@ import { createAvatarMenu } from './avatar-menu';
 import { createProfileWelcome } from './profile-welcome';
 import { createMenuSettings } from './menu-settings';
 import { createWheelSettings } from './wheel-settings';
+import { createJukeboxSettings } from './jukebox-settings';
 import { createIntroMenu } from './intro-menu';
 import { createLanguageMenu } from './language-menu';
 import { createTermsMenu } from './terms-menu';
@@ -799,6 +802,13 @@ function findHeadsetAudio(): string | undefined {
 function menuOutput(): string | undefined {
   return headset?.inUse ? (findHeadsetAudio() ?? audioOutput) : audioOutput;
 }
+/**
+ * Sorties du son du Juke-box (Réglages du Juke-box). Casque en usage : tout le son va dans le casque
+ * (menuOutput), les sorties de la borne attendent.
+ */
+function jukeboxAudioRoutes(): JukeboxAudioRoute[] {
+  return jukeboxRoutes(headset?.inUse ? { outputs: [] } : mediaSettings.jukeboxAudio, menuOutput());
+}
 /** Numéro du lancement en cours : le son de lancement est joué une fois par lancement. */
 let launchCount = 0;
 /**
@@ -1196,6 +1206,8 @@ const library = createLibrary({
   landscape: () => playfieldLandscape(),
   // Exit de la gestion du Juke-box : le lecteur, sur la playlist choisie.
   jukeboxPlayer: (playlist) => openJukebox(playlist),
+  // « Réglages du Juke-box » depuis sa gestion : Exit y ramène.
+  jukeboxSettings: (back) => jukeboxSettings.open(back),
   browserScreen: () => browserScreenRect(),
   takeForeground: () => void takeForeground(),
   // MagnaSave droit : écouter un morceau à l'import ; seulement si le gauche est là pour changer de zone.
@@ -1278,6 +1290,7 @@ const jukeboxPlayer = createJukeboxPlayer({
   windowRoles: () => windowRoles,
   desk: () => playfieldLandscape(),
   output: () => menuOutput(),
+  routes: () => jukeboxAudioRoutes(),
   allow: (file) => allowJukebox(file),
   leave: () => {
     state = { ...state, phase: tables.length ? 'menu' : 'message', jukebox: true, community: false, ...(tables.length ? {} : { message: noTables() }) };
@@ -2304,6 +2317,34 @@ library.provideSystemItem(
 );
 // Roue des tables (Tables > Roue) : présentation, ordre, Start, logos animés, couleur, Juke-box ; dans medias.json aussi.
 library.provideSystemItem('wheel', createWheelSettings({ library, settings: () => mediaSettings, save: (next) => saveMediaSettings(next) }));
+// Réglages du Juke-box (Médias > Réglages du Juke-box, et depuis sa gestion) : sorties du son, visualiseur, médaillon.
+const jukeboxSettings = createJukeboxSettings({
+  library,
+  settings: () => mediaSettings,
+  save: (next) => saveMediaSettings(next),
+  outputs: () => audioOutputs(),
+  menuOutput: () => menuOutput(),
+  place: (name) => jukeboxOutputPlace(name),
+  test: (route) => {
+    const win = windows.get('playfield');
+    if (win && !win.isDestroyed()) win.webContents.send('jukebox-audio-test', route);
+    console.log(`Juke-box : extrait d'essai sur « ${route.output || 'sortie par défaut'} ».`); // i18n-ignore : journal
+  },
+});
+library.provideSystemItem('jukebox-settings', jukeboxSettings.item);
+
+/** Ce que la borne fait d'une sortie audio (étape « Son ») : fronton, playfield, sortie par défaut de Windows. */
+function jukeboxOutputPlace(name: string): string | undefined {
+  const audio = loadCabinet(loc.dataDir)?.audio;
+  const places: string[] = [];
+  for (const [role, label] of [['backglass', t('fronton')], ['playfield', t('playfield')]] as const) {
+    const id = audio?.roles[role];
+    const out = id ? audio!.outputs.find((o) => o.endpointId.toLowerCase() === id.toLowerCase()) : undefined;
+    if (out && (out.lastSeen?.friendlyName ?? out.label) === name) places.push(label);
+  }
+  if (audioOutputs()?.find((o) => o.friendlyName === name)?.isDefault) places.push(t('sortie par défaut de Windows'));
+  return places.length ? places.join(', ') : undefined;
+}
 // Langue de l'interface : le choix relance le menu, comme un changement de configuration.
 library.provideSystemItem('language', createLanguageMenu({ library, relaunch: () => relaunchMenu() }));
 // Conditions d'utilisation : à accepter au démarrage tant que la version en cours ne l'est pas, à relire ici.

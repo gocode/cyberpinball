@@ -798,13 +798,48 @@
     window.CyberMenuAudio?.route?.(media);
   }
 
+  /**
+   * Une seule sortie, son intact (le cas d'usine) : l'élément y joue directement. Sinon (plusieurs
+   * sorties, volume, profil, retard : Réglages du Juke-box), le graphe de audio-routes.js.
+   */
+  const plainRoutes = (routes) => !routes || (routes.length === 1 && routes[0].gain === 1 && !routes[0].filters.length && !routes[0].delay);
+
+  /** Pose le son du morceau sur ses sorties ; rejoué quand les réglages changent pendant la lecture. */
+  function routeMedia(m, media, order) {
+    const routes = order.routes;
+    m.routesKey = JSON.stringify(routes ?? null);
+    if (m.graph) return m.graph.update(routes);
+    // Son intact sur la sortie du menu : l'élément y va directement.
+    const menuOnly = plainRoutes(routes) && (routes?.[0]?.output || '') === (order.output || '');
+    if (menuOnly || !window.CyberAudioRoutes) return route(media, order.output);
+    try {
+      m.graph = window.CyberAudioRoutes.attach(media, routes);
+    } catch {
+      // Graphe impossible (son illisible pour Web Audio) : la sortie du menu, comme avant.
+      route(media, order.output);
+    }
+  }
+
+  /** Les réglages des sorties ont changé pendant le morceau : le son suit sans repartir. */
+  function rerouteMedia(order) {
+    const m = clip?.media;
+    if (!m || m.id !== order.id) return;
+    if (m.routesKey === JSON.stringify(order.routes ?? null)) return;
+    const lead = m.audio ?? m.video;
+    if (lead) routeMedia(m, lead, order);
+  }
+
   const send = (msg) => window.cyber?.jukebox?.(msg);
+
+  // Réglages du Juke-box, « Écouter cette sortie » : l'extrait d'essai sur elle seule (audio-routes.js).
+  window.cyber?.onJukeboxAudioTest?.((route) => window.CyberAudioRoutes?.test(route));
 
   function stopMedia() {
     const m = clip?.media;
     if (!m) return;
     clearInterval(m.levelsTimer);
     m.context?.close().catch(() => {});
+    m.graph?.close();
     for (const media of [m.audio, m.video]) {
       if (!media) continue;
       media.pause();
@@ -818,9 +853,11 @@
   /** Niveaux du son, pris avant la sortie (captureStream), pour le spectre du DMD et le visualiseur. */
   function listen(m, source) {
     try {
-      if (typeof source.captureStream !== 'function') return;
       const start = () => {
-        if (m.context || clip?.media !== m) return;
+        if (m.context || m.levelsTimer || clip?.media !== m) return;
+        // Son passé dans le graphe des sorties : sa mesure est déjà là.
+        if (m.graph) return measure(m, m.graph.analyser, m.graph.analyser.context.sampleRate);
+        if (typeof source.captureStream !== 'function') return;
         let stream;
         try {
           stream = source.captureStream();
@@ -831,32 +868,37 @@
         if (!stream.getAudioTracks().length) return;
         const context = new AudioContext();
         const analyser = context.createAnalyser();
-        analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.7;
         context.createMediaStreamSource(stream).connect(analyser);
-        const bins = new Uint8Array(analyser.frequencyBinCount);
         m.context = context;
-        m.levelsTimer = setInterval(() => {
-          analyser.getByteFrequencyData(bins);
-          // 24 bandes sur une échelle logarithmique, de 60 Hz à 12 kHz environ.
-          const levels = [];
-          const nyquist = context.sampleRate / 2;
-          for (let b = 0; b < 24; b++) {
-            const lo = Math.floor((60 * Math.pow(200, b / 24) / nyquist) * bins.length);
-            const hi = Math.max(lo + 1, Math.floor((60 * Math.pow(200, (b + 1) / 24) / nyquist) * bins.length));
-            let peak = 0;
-            for (let i = lo; i < Math.min(hi, bins.length); i++) peak = Math.max(peak, bins[i]);
-            levels.push(Math.round((peak / 255) * 1000) / 1000);
-          }
-          m.levels = levels;
-          send({ type: 'levels', id: m.id, levels });
-          paintVisualizer(levels);
-        }, 66);
+        measure(m, analyser, context.sampleRate);
       };
       source.addEventListener('playing', start, { once: true });
     } catch {
       // Sans mesure du son : le DMD garde son mouvement doux.
     }
+  }
+
+  /** Relevé des niveaux (24 bandes) toutes les 66 ms, pour le DMD et le visualiseur. */
+  function measure(m, analyser, sampleRate) {
+    analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.7;
+    const bins = new Uint8Array(analyser.frequencyBinCount);
+    m.levelsTimer = setInterval(() => {
+      analyser.getByteFrequencyData(bins);
+      // 24 bandes sur une échelle logarithmique, de 60 Hz à 12 kHz environ.
+      const levels = [];
+      const nyquist = sampleRate / 2;
+      for (let b = 0; b < 24; b++) {
+        const lo = Math.floor((60 * Math.pow(200, b / 24) / nyquist) * bins.length);
+        const hi = Math.max(lo + 1, Math.floor((60 * Math.pow(200, (b + 1) / 24) / nyquist) * bins.length));
+        let peak = 0;
+        for (let i = lo; i < Math.min(hi, bins.length); i++) peak = Math.max(peak, bins[i]);
+        levels.push(Math.round((peak / 255) * 1000) / 1000);
+      }
+      m.levels = levels;
+      send({ type: 'levels', id: m.id, levels });
+      paintVisualizer(levels);
+    }, 66);
   }
 
   function startMedia(order) {
@@ -877,7 +919,11 @@
         'playing',
         () => {
           const s = window.CyberMenuAudio?.status?.();
-          send({ type: 'sink', id: order.id, routed: Boolean(media.sinkId), label: s?.sortie, problem: s?.probleme });
+          const m = clip?.media;
+          if (m?.graph) {
+            const g = window.CyberAudioRoutes?.status?.().branches ?? [];
+            send({ type: 'sink', id: order.id, routed: true, label: g.map((b) => `${b.sortie || 'défaut'}${b.trouvee === false ? ' (introuvable)' : ''}`).join(', ') }); // i18n-ignore : journal
+          } else send({ type: 'sink', id: order.id, routed: Boolean(media.sinkId), label: s?.sortie, problem: s?.probleme });
         },
         { once: true },
       );
@@ -890,7 +936,7 @@
       audio.preload = 'auto';
       audio.volume = order.volume;
       audio.src = order.audio;
-      route(audio, order.output);
+      routeMedia(m, audio, order);
       report(audio);
       m.audio = audio;
       if (order.video) {
@@ -925,7 +971,7 @@
       video.volume = order.volume;
       video.src = order.video;
       clip.stage.replaceChildren(video);
-      route(video, order.output);
+      routeMedia(m, video, order);
       report(video);
       m.video = video;
       listen(m, video);
@@ -936,7 +982,7 @@
       audio.preload = 'auto';
       audio.volume = order.volume;
       audio.src = order.audio;
-      route(audio, order.output);
+      routeMedia(m, audio, order);
       report(audio);
       m.audio = audio;
       listen(m, audio);
@@ -1017,7 +1063,10 @@
         clip.stage.replaceChildren(el('div', 'jb-online-ground'));
         requestAnimationFrame(reportClip);
       } else startMedia(order);
-    } else clip.order = order;
+    } else {
+      clip.order = order;
+      rerouteMedia(order);
+    }
     // Son seul (ou vidéo absente) : la pochette, sinon le visualiseur.
     if (order.kind !== 'online' && !clip.media?.video) paintStill(order, now);
     setPaused(order.paused);

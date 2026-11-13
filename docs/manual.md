@@ -1777,6 +1777,24 @@ Every setting of the tables wheel is on one screen, **Menu système > Tables > R
 
 The collections the wheel shows are chosen in **Menu système > Tables > Collections** (System menu > Tables > Collections). Tests: [roue-reglages.test.ts](../packages/core/src/test/roue-reglages.test.ts).
 
+### Juke-box settings
+
+Every setting of the Juke-box is on one screen, **Menu système > Médias > Réglages du Juke-box** (System menu > Media > Juke-box settings), right after the Juke-box management, and also as the "Réglages du Juke-box" line at the top of that management, where Exit leads back (request of 13/11/2026: configuring the Juke-box, not managing its content). Code: [app/src/jukebox-settings.ts](../app/src/jukebox-settings.ts), [packages/core/src/jukebox-audio.ts](../packages/core/src/jukebox-audio.ts); everything is kept in `<data>\medias.json` (`jukeboxAudio`, `jukeboxVisualizer`, `jukebox`) and applies at once, even to the song playing.
+
+- **"Sorties du son"** (Sound outputs; Start: the list): the Windows outputs (virtual ones such as the headset's left out, like in the "Son" step), the cabinet's first. With no setting, the Juke-box plays on the menu output (the backglass one, see the "Son" step), sound untouched: that is the factory setting, on the same path as before (`setSinkId` alone). Start on an output opens its screen:
+  - **"Juke-box sur cette sortie"** (Juke-box on this output): yes or no. Adding an output keeps the one that was playing (sound is added, never moved); the last active output cannot be cut (greyed, with its reason).
+  - **"Volume"**: 0 to 100 %, relative to the other outputs; the overall volume stays the cabinet's (Volume buttons).
+  - **"Profil"** (Profile): **complet** (full, untouched), **basses seules** (bass only, below 120 Hz, two low-pass stages: for a subwoofer), **médiums et aigus** (mids and highs, above 120 Hz: small speakers next to a subwoofer), **personnalisé** (custom): **"Basses"** (low shelf 200 Hz), **"Médiums"** (peak 1 kHz), **"Aigus"** (high shelf 4 kHz), from −12 to +12 dB in 3 dB steps; outside the custom profile these three lines are greyed.
+  - **"Retard"** (Delay): 0 to 200 ms, to line up an output that sounds earlier than the others.
+  - **"Écouter cette sortie"** (Listen to this output): five seconds on this output alone, with its settings: two bass pulses, a chord, cymbals, then all together, synthesised on the spot (no file).
+  - **"Revenir au réglage d'usine"** (Back to the factory setting) in the list empties `jukeboxAudio`.
+- **"Visualiseur du Juke-box"** (Juke-box visualiser; Start: next mode): Pochette, Multicolore, Classique (moved from "Médias, son et attente").
+- **"Juke-box dans la roue"** (Juke-box in the wheel): the same setting as in Tables > Roue.
+
+**How the sound is split.** Electron sends an element to one output only. As soon as the plan is more than the menu output with untouched sound, the song goes through a Web Audio graph ([app/renderer/audio-routes.js](../app/renderer/audio-routes.js), `CyberAudioRoutes`): `createMediaElementSource`, then one branch per output (filters, delay, gain), each ending in a `MediaStreamDestination` played by an off-document `<audio>` placed on its output (`setSinkId`, found by its Windows name like everywhere else). A new plan only rebuilds the branches: the song does not restart. The DMD spectrum then reads the graph's analyser. The main process sends the plan with each state of the clip (`jukeboxRoutes`); for the YouTube player, the same engine is replayed in its page and laid on its video at each probe (`onlineRoutesScript`), redone if YouTube changes the element. With the headset in use, everything follows the headset as before; the cabinet outputs wait. The log notes the real output of each song ("Juke-box : t4 joue sur …"), an output that cannot be found ("(introuvable)"), and the YouTube player's routing.
+
+Tests: [jukebox-audio.test.ts](../packages/core/src/test/jukebox-audio.test.ts) (factory setting, adding, last output, filters, damaged file), [jukebox-reglages.test.ts](../packages/core/src/test/jukebox-reglages.test.ts) (screens, buttons, return to the line), and [jukebox-sorties-chromium.test.ts](../packages/core/src/test/jukebox-sorties-chromium.test.ts), in a real off-screen and muted Chromium: a 440 Hz tone goes through the graph, two branches with their filters, a new plan without stopping the song, the test excerpt.
+
 ### Table order and startup table
 
 Three settings of **Menu système > Tables > Roue** (System menu > Tables > Wheel), kept in `<data>\medias.json` (fields `tableOrder` and `startTable`); code: [packages/core/src/tableorder.ts](../packages/core/src/tableorder.ts), applied by `app/src/frontend.ts` each time the tables are read.

@@ -22,6 +22,7 @@ export const SYSTEM_ITEM_IDS = [
   'missing-media',
   'menu-media',
   'jukebox',
+  'jukebox-settings',
   'online-players',
   'community-settings',
   'moderation',
@@ -126,8 +127,9 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'medias',
     icon: 'image',
     get label() { return t('Médias'); },
-    get detail() { return t('Images et vidéos des tables, musique et mode attente du menu, Juke-box'); },
-    entries: ['missing-media', 'menu-media', 'jukebox'],
+    get detail() { return t('Images et vidéos des tables, musique et mode attente du menu, Juke-box et ses réglages'); },
+    // Les réglages du Juke-box à côté de sa gestion (13/11/2026 : sorties du son, visualiseur, médaillon).
+    entries: ['missing-media', 'menu-media', 'jukebox', 'jukebox-settings'],
   },
   // Réseau des bornes (social.ts) : les amis, l'annuaire des joueurs, les badges, le partage.
   amis: {
@@ -179,6 +181,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   'menu-media': { icon: 'music', get label() { return t('Médias, son et attente'); } },
   // Playlists du Juke-box : import de YouTube, fichiers locaux, qualité, place (app/src/jukebox-menu.ts).
   jukebox: { icon: 'jukebox', label: 'Juke-box' }, // i18n-ignore : le nom du Juke-box, le même en anglais
+  // Réglages du Juke-box (app/src/jukebox-settings.ts) : sorties du son, visualiseur du DMD, médaillon dans la roue.
+  'jukebox-settings': { icon: 'sliders', get label() { return t('Réglages du Juke-box'); } },
   // La messagerie entre amis (chat-menu.ts) : en tête de la rubrique, la pastille rouge quand un message attend.
   // Joueurs en ligne, amis ou non (community-menu.ts) : en tête de la rubrique Amis.
   'online-players': { icon: 'globe', get label() { return t('Joueurs en ligne'); } },

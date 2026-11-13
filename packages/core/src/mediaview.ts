@@ -16,6 +16,7 @@ import { DEFAULT_DMD_COLOR, normalizeDmdColor } from './dmdcolor';
 import { t } from './i18n';
 import { DEFAULT_INTRO_SETTINGS, normalizeIntroSettings, type IntroSettings } from './intro';
 import { DEFAULT_JUKEBOX_VISUALIZER, isVisualizerMode, type JukeboxVisualizerMode } from './jukebox-visualizer';
+import { DEFAULT_JUKEBOX_AUDIO, normalizeJukeboxAudio, type JukeboxAudioSettings } from './jukebox-audio';
 import { layoutOf } from './locations';
 import { MEDIADB_QUALITY_SETTINGS, type MediaDbQualitySetting } from './mediadb';
 import { NOTICES_MODES, type NoticesMode } from './notices';
@@ -603,6 +604,11 @@ export interface MenuMediaSettings {
    * couleur du DMD).
    */
   jukeboxVisualizer: JukeboxVisualizerMode;
+  /**
+   * Sorties du son du Juke-box (jukebox-audio.ts) : une ou plusieurs, chacune avec son volume, son
+   * profil et son retard ; aucune choisie par défaut, le Juke-box suit la sortie du menu.
+   */
+  jukeboxAudio: JukeboxAudioSettings;
   /** Horaire de la borne (arcadehours.ts) : nuit voilée, arrêt à heure fixe ; non suivi par défaut. */
   hours: ArcadeHoursSettings;
   /**
@@ -642,6 +648,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   jukebox: true,
   community: true,
   jukeboxVisualizer: DEFAULT_JUKEBOX_VISUALIZER,
+  jukeboxAudio: DEFAULT_JUKEBOX_AUDIO,
   hours: DEFAULT_ARCADE_HOURS,
   notices: 'all',
   intro: DEFAULT_INTRO_SETTINGS,
@@ -686,6 +693,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     jukebox: typeof r.jukebox === 'boolean' ? r.jukebox : d.jukebox,
     community: typeof r.community === 'boolean' ? r.community : d.community,
     jukeboxVisualizer: isVisualizerMode(r.jukeboxVisualizer) ? r.jukeboxVisualizer : d.jukeboxVisualizer,
+    jukeboxAudio: normalizeJukeboxAudio(r.jukeboxAudio),
     hours: normalizeArcadeHours(r.hours),
     notices: NOTICES_MODES.includes(r.notices as NoticesMode) ? (r.notices as NoticesMode) : d.notices,
     intro: normalizeIntroSettings(r.intro),

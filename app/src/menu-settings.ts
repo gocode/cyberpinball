@@ -25,8 +25,6 @@ import {
   RECORDING_QUALITY_LABELS,
   RECORDING_QUALITY_SIZES,
   VOLUME_CHOICES,
-  JUKEBOX_VISUALIZER_MODES,
-  visualizerModeLabel,
   arcadeHoursSummary,
   attractDelayLabel,
   dmdColorLabel,
@@ -92,7 +90,6 @@ type ChoiceKey = 'attractDelay' | 'attractInterval';
  * d'ici (une ligne ajoutée ne décale plus les retours).
  */
 export const MENU_SETTINGS_ROWS = [
-  'jukeboxVisualizer',
   'music',
   'musicVolume',
   'videoVolume',
@@ -136,17 +133,6 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
   function actions(): Action[] {
     const v = s();
     const rows: Record<Row, Action> = {
-      jukeboxVisualizer: {
-        label: t('Visualiseur du Juke-box : {mode}', { mode: visualizerModeLabel(v.jukeboxVisualizer) }),
-        detail:
-          v.jukeboxVisualizer === 'pochette'
-            ? t('Le DMD prend les couleurs de la pochette du morceau, en dégradé ; multicolore sans pochette (Start : changer)')
-            : v.jukeboxVisualizer === 'multicolore'
-              ? t('Le DMD change doucement de couleur, d’une colonne à l’autre et dans le temps (Start : changer)')
-              : t('Le DMD garde sa couleur réglée, sans dégradé (Start : changer)'),
-        icon: 'spectrum',
-        run: () => set({ jukeboxVisualizer: JUKEBOX_VISUALIZER_MODES[(JUKEBOX_VISUALIZER_MODES.indexOf(v.jukeboxVisualizer) + 1) % JUKEBOX_VISUALIZER_MODES.length]! }),
-      },
       music: {
         label: v.music ? t('Musique des jeux : jouée') : t('Musique des jeux : coupée'),
         detail: v.music ? t('Musique du jeu choisi pendant la navigation (Start : couper)') : t('Borne silencieuse dans le menu (Start : jouer la musique de chaque jeu)'),

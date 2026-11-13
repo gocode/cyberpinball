@@ -418,6 +418,8 @@ export interface LibraryHost {
   downloadsChanged?(): void;
   /** Juke-box : le lecteur, ouvert sur cette playlist (« Exit » de la gestion du Juke-box y revient). */
   jukeboxPlayer?(playlist?: string): void;
+  /** Juke-box : ses réglages (sorties du son…), ouverts depuis sa gestion ; `back` y ramène. */
+  jukeboxSettings?(back: () => void): void;
   /** Juke-box : playlists ou bibliothèque changées (jukebox-library.ts). */
   jukeboxChanged?(): void;
   /** Essais sans opérateur : ce qu'une capture de fenêtre ne voit pas (la vue du lecteur YouTube posée sur le fronton). */
@@ -1560,6 +1562,7 @@ export function createLibrary(host: LibraryHost) {
     showing: (build) => screen?.kind === 'custom' && screen.build === build,
     openSystem: () => openSystem(),
     openPlayer: (playlist) => (host.jukeboxPlayer ? host.jukeboxPlayer(playlist) : leave()),
+    ...(host.jukeboxSettings ? { openSettings: (back: () => void) => host.jukeboxSettings!(back) } : {}),
     leave: () => leave(),
     prompt: (heading, label, value, done, lead, options) => openPrompt(heading, label, value, done, lead, options),
     pick: (request) => pickPaths(request),
