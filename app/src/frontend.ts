@@ -71,6 +71,7 @@ import {
   AUTO_RECAL_STILL_S,
   autoRecalibratedPlace,
   restGate,
+  restGateReason,
   restReference,
   RestWatch,
   type RestSample,
@@ -3268,9 +3269,40 @@ library.provideSystemItem('vr-auto-calibrate', {
  */
 let restLearnArmed = false;
 
+/**
+ * Ce que le journal dit quand le recalage automatique renonce (une fois par pose) : manettes posées immobiles mais
+ * refusées (restGateReason), ou plus suivies du tout (le Quest bascule sur les mains, ou les perd de vue).
+ */
+const stillWatch = new RestWatch();
+let restRefusalSaid = false;
+let restSeenAt = 0;
+let restLostSaid = false;
+
+function autoRecalDiagnose(sample: RestSample | undefined, previous: CabinetPlace | undefined): void {
+  if (!sample) {
+    stillWatch.push(undefined, () => true);
+    restRefusalSaid = false;
+    // Suivies il y a peu, puis plus du tout : posées hors de vue, ou le Quest est passé aux mains.
+    if (!restLostSaid && Date.now() - restSeenAt < 3000) {
+      restLostSaid = true;
+      console.log('Casque : recalage automatique impossible, manettes posées non suivies (le Quest ne les suit plus : passage aux mains, manettes hors de vue ou en veille).'); // i18n-ignore : journal
+    }
+    return;
+  }
+  restSeenAt = Date.now();
+  restLostSaid = false;
+  const still = stillWatch.push(sample, () => true);
+  if (!still || restRefusalSaid) return;
+  const reason = restGateReason(still, previous, restLearnArmed);
+  if (!reason) return;
+  restRefusalSaid = true;
+  console.log(`Casque : recalage automatique pas fait, manettes posées immobiles ${AUTO_RECAL_STILL_S} s : ${reason}.`); // i18n-ignore : journal
+}
+
 function autoRecalSample(sample: RestSample | undefined): void {
   if (!vrAutoRecal || !headset || calibration || playing || launch || headsetSetting() === 'bureau') return;
   const previous = headset.place();
+  autoRecalDiagnose(sample, previous);
   const tips = restWatch.push(sample, (t) => restGate(t, previous, restLearnArmed));
   if (!tips || !previous) return;
   if (!previous.rest) {
@@ -5251,6 +5283,7 @@ export function startFrontend(): void {
     log: (line) => console.log(line),
   });
   headset.watchRest(vrAutoRecal);
+  if (vrAutoRecal) console.log(`Casque : recalage automatique actif, ${headset.place()?.rest ? 'position de repos des manettes apprise' : 'position de repos pas encore apprise (calez à la main, puis posez les manettes sur la barre)'}.`); // i18n-ignore : journal
   headset.watch();
   // Les images du schéma pour la pause en partie, préparées d'avance (prepareVr est synchrone).
   readyCalibrateImage(false);

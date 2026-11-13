@@ -5,7 +5,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as fs from 'node:fs';
-import { BANC_SONDE, bancPret, jouer, sonder } from './banc-casque.mjs';
+import { createRequire } from 'node:module';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { BANC_RUNTIME, BANC_SONDE, bancPret, jouer, sonder } from './banc-casque.mjs';
 
 const pret = bancPret();
 const sauf = pret ? {} : { skip: 'banc pas construit : npm run casque-vr' };
@@ -112,4 +115,37 @@ test('banc : sonde LibOVR, client invisible : limite fixée à la pièce, tête,
   // Chaque appui et relâchement des clics, bruts ; les entrées rendues à zéro (sans regard) relâchent le droit.
   assert.deepEqual(l(/^ovr bouton /), ['ovr bouton clic-joystick-gauche 1', 'ovr bouton clic-joystick-gauche 0', 'ovr bouton clic-joystick-droit 1', 'ovr bouton clic-joystick-droit 0']);
   assert.equal(l(/^ovr fin$/).length, 1);
+});
+
+// La sonde trouvée comme l'application la trouve (app/src/sonde-ovr.ts, activeOvrDll), depuis un manifeste copié
+// sur celui de Meta Horizon Link (13 novembre 2026 : il nomme LibOVRRTImpl64_1.dll ; la sonde cherchait le nom du
+// manifeste, « pas lancée » sur la borne). La DLL d'entrée LibOVRRT64_1.dll d'abord, l'autre à défaut.
+const sondeOvr = createRequire(import.meta.url)('../app/dist/sonde-ovr.js');
+const vraiManifeste = JSON.stringify({ file_format_version: '1.0.0', runtime: { name: 'Oculus OpenXR', library_path: '.\\LibOVRRTImpl64_1.dll' } }, null, 4);
+
+test('banc : la DLL de LibOVR trouvée depuis le manifeste réel de Meta (LibOVRRTImpl64_1.dll nommée)', pret && fs.existsSync(BANC_SONDE) ? {} : { skip: 'sonde pas construite : npm run casque-vr' }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-manifeste-meta-'));
+  const manifeste = path.join(dir, 'oculus_openxr_64.json');
+  fs.writeFileSync(manifeste, vraiManifeste);
+  assert.equal(sondeOvr.activeOvrDll(manifeste), undefined);
+  fs.copyFileSync(BANC_RUNTIME, path.join(dir, 'LibOVRRTImpl64_1.dll'));
+  assert.equal(sondeOvr.activeOvrDll(manifeste), path.join(dir, 'LibOVRRTImpl64_1.dll'));
+  fs.copyFileSync(BANC_RUNTIME, path.join(dir, 'LibOVRRT64_1.dll'));
+  const dll = sondeOvr.activeOvrDll(manifeste);
+  assert.equal(dll, path.join(dir, 'LibOVRRT64_1.dll'));
+  const r = await sonder('0 porte 1', { dureeMs: 1500, dll });
+  assert.ok(r.lignes.includes(`ovr charge ${dll}`), r.lignes.join('\n'));
+  assert.ok(r.lignes.includes('ovr init 0 version 1.43'), r.lignes.join('\n'));
+});
+
+// Le vrai runtime de Meta, s'il est installé sur ce poste : la sonde chargée et initialisée en client invisible.
+// Sans casque branché, ovr_Create répond « No HMD attached » (-1007) : attendu, et dit au journal.
+const META = 'C:\\Program Files\\Meta Horizon\\Support\\oculus-runtime\\oculus_openxr_64.json';
+test('sonde sur le vrai runtime de Meta (poste où il est installé) : chargée, initialisée, session dite', fs.existsSync(META) && fs.existsSync(BANC_SONDE) ? {} : { skip: 'runtime de Meta absent de ce poste' }, async () => {
+  const dll = sondeOvr.activeOvrDll(META);
+  assert.ok(dll && /LibOVRRT64_1\.dll$/i.test(dll), String(dll));
+  const r = await sonder('', { dureeMs: 4000, dll, reel: true });
+  assert.ok(r.lignes.includes(`ovr charge ${dll}`), r.lignes.join('\n'));
+  assert.ok(r.lignes.some((l) => /^ovr init 0 /.test(l)), r.lignes.join('\n'));
+  assert.ok(r.lignes.some((l) => /^ovr session (0|-1007)\b/.test(l)), r.lignes.join('\n'));
 });

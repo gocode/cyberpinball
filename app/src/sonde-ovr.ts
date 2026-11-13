@@ -7,7 +7,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ovrRuntimeDll } from '@cyberpinball/core';
+import { ovrRuntimeDlls } from '@cyberpinball/core';
 import { openXrActiveRuntime } from '@cyberpinball/win-displays';
 
 const EXE = 'cyberpinball-sonde-ovr.exe';
@@ -17,9 +17,8 @@ export function ovrProbeExe(appDir: string): string | undefined {
   return [path.join(appDir, 'natif', EXE), path.join(appDir, '..', 'build', 'casque-vr', 'Release', EXE), path.join(appDir, '..', '..', 'build', 'casque-vr', 'Release', EXE)].find((f) => fs.existsSync(f));
 }
 
-/** La DLL de LibOVR du runtime OpenXR actif, si c'est celui de Meta et qu'elle est là. */
-export function activeOvrDll(): string | undefined {
-  const manifest = openXrActiveRuntime();
+/** La DLL de LibOVR du runtime OpenXR actif, si c'est celui de Meta : la première des candidates présente. */
+export function activeOvrDll(manifest = openXrActiveRuntime()): string | undefined {
   if (!manifest) return undefined;
   let text: string;
   try {
@@ -27,8 +26,7 @@ export function activeOvrDll(): string | undefined {
   } catch {
     return undefined;
   }
-  const dll = ovrRuntimeDll(manifest, text);
-  return dll && fs.existsSync(dll) ? dll : undefined;
+  return ovrRuntimeDlls(manifest, text).find((dll) => fs.existsSync(dll));
 }
 
 export class OvrProbe {

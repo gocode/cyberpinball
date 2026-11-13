@@ -837,6 +837,24 @@ export function restGate(tips: readonly [Point3, Point3], place: CabinetPlace | 
   return Math.abs(spacing - place.lockbarWidth!) * 100 <= AUTO_RECAL_LEARN_CM && Math.abs(height - place.lockbarHeight!) * 100 <= AUTO_RECAL_LEARN_HEIGHT_CM;
 }
 
+/**
+ * Pourquoi des manettes posées et immobiles ne recalent pas (le journal le dit, pour qu'un essai se lise du premier
+ * coup) ; undefined : elles passent (restGate). Mêmes seuils que restGate.
+ */
+export function restGateReason(tips: readonly [Point3, Point3], place: CabinetPlace | undefined, learning: boolean): string | undefined {
+  if (restGate(tips, place, learning)) return undefined;
+  if (!place || !isCalibrated(place)) return 'pas de borne calée'; // i18n-ignore : journal
+  if (place.free) return 'borne posée au bureau, pas sur une vraie barre'; // i18n-ignore : journal
+  const cm = (m: number) => (Math.round(m * 1000) / 10).toFixed(1).replace('.', ',');
+  const level = Math.abs(tips[0].y - tips[1].y);
+  if (level * 100 > AUTO_RECAL_MATCH_CM) return `manettes pas à niveau : ${cm(level)} cm de différence de hauteur (tolérance ${AUTO_RECAL_MATCH_CM} cm)`; // i18n-ignore : journal
+  const spacing = Math.hypot(tips[1].x - tips[0].x, tips[1].z - tips[0].z);
+  if (place.rest) return `écart hors tolérance : ${cm(Math.abs(spacing - place.rest.width))} cm (manettes écartées de ${cm(spacing)} cm, ${cm(place.rest.width)} cm appris, tolérance ${AUTO_RECAL_MATCH_CM} cm)`; // i18n-ignore : journal
+  if (!learning) return 'position de repos pas encore apprise : calez à la main, puis posez les manettes sur la barre'; // i18n-ignore : journal
+  const height = (tips[0].y + tips[1].y) / 2;
+  return `apprentissage refusé : manettes écartées de ${cm(spacing)} cm pour une barre de ${cm(place.lockbarWidth!)} cm (tolérance ${AUTO_RECAL_LEARN_CM} cm), à ${cm(Math.abs(height - place.lockbarHeight!))} cm de sa hauteur (tolérance ${AUTO_RECAL_LEARN_HEIGHT_CM} cm)`; // i18n-ignore : journal
+}
+
 /** La position de repos apprise : les deux bouts posés, vus depuis la place calée à l'instant. */
 export function restReference(place: CabinetPlace, tips: readonly [Point3, Point3]): RestReference {
   const r = lockbarPlace(tips[0], tips[1]);

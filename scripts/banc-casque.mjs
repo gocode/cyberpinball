@@ -19,12 +19,13 @@ export const BANC_SONDE = path.join(repo, 'build', 'casque-vr', 'Release', 'cybe
  * La sonde LibOVR (packages/casque-vr/src/sonde-ovr.cpp) sur le runtime factice, qui exporte aussi les fonctions
  * de LibOVR : rend ses lignes au bout de `dureeMs` (la sonde reçoit « fin » et s'arrête).
  */
-export async function sonder(scenario, { dureeMs = 3000 } = {}) {
+export async function sonder(scenario, { dureeMs = 3000, dll = BANC_RUNTIME, reel = false } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-sonde-'));
   const scenarioFile = path.join(dir, 'scenario.txt');
   fs.writeFileSync(scenarioFile, scenario.trim() + '\n');
   const env = { ...process.env, CYBERPINBALL_XR_SCENARIO: scenarioFile, CYBERPINBALL_XR_TRACE: path.join(dir, 'trace.txt'), CYBERPINBALL_XR_DEBUT_FICHIER: path.join(dir, 'debut.txt') };
-  const child = spawn(BANC_SONDE, ['--ovr', BANC_RUNTIME], { env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  // Le vrai runtime (`reel`) ne lit pas de scénario : l'environnement du banc ne lui est pas donné.
+  const child = spawn(BANC_SONDE, ['--ovr', dll], { env: reel ? process.env : env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   let out = '';
   child.stdout.setEncoding('utf8');
   child.stdout.on('data', (c) => (out += c));

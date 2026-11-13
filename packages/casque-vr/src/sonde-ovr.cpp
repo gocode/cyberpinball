@@ -268,12 +268,16 @@ int main(int argc, char** argv)
          Sleep(100);
    }
 
+   // Casque absent : nouvel essai toutes les 10 s, dit au journal seulement quand le résultat change.
+   int lastCreate = 1;
    while (!quit)
    {
       Session session = nullptr;
       Luid luid {};
       r = api.create(&session, &luid);
-      say("ovr session " + std::to_string(r) + (r < 0 ? " " + lastError() : std::string()));
+      if (r != lastCreate)
+         say("ovr session " + std::to_string(r) + (r < 0 ? " " + lastError() : std::string()));
+      lastCreate = r;
       if (r < 0)
       {
          for (int i = 0; i < 100 && !quit; i++)

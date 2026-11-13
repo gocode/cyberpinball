@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.12
 
+- Réalité virtuelle : le relevé du casque démarre enfin avec le logiciel actuel de Meta (il cherchait un fichier sous un autre nom). Quand le recalage automatique ne se fait pas, le journal dit pourquoi : manettes pas à niveau, écart en centimètres, position de repos pas encore apprise, ou manettes plus suivies par le casque.
 - Réalité virtuelle : les manettes dessinées, la commande à actionner en vert, aussi dans la pause en partie (« Caler la borne »), à chaque étape de l'assistant des manettes, et dans la légende du menu du casque.
 - Réalité virtuelle : le calage de la borne montre les manettes dessinées, la commande à actionner en vert, et rappelle en bas qu'on peut recaler à tout moment en enfonçant les deux sticks 3 s. Le geste est expliqué de la même façon au premier port du casque et quand on tient les gâchettes à sa place.
 - Roue des tables : les MagnaSave changent de collection sans plus afficher la liste des collections par-dessus les tables ; seul le repère sous le titre change. La liste complète s'ouvre par le médaillon Collections.

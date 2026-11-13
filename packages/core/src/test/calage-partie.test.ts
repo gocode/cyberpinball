@@ -45,7 +45,7 @@ import {
   isControllerElement,
   TRIGGERS_HINT_COMBO,
   TRIGGERS_HINT_S,
-  ovrRuntimeDll,
+  ovrRuntimeDlls,
   AUTO_RECAL_GAP_S,
   AUTO_RECAL_MATCH_CM,
   AUTO_RECAL_MIN_CM,
@@ -57,6 +57,7 @@ import {
   AUTO_RECAL_LEARN_CM,
   AUTO_RECAL_LEARN_HEIGHT_CM,
   restGate,
+  restGateReason,
   restReference,
   RestWatch,
   type RestSample,
@@ -432,17 +433,21 @@ test('recalage automatique (13 novembre 2026) : position de repos apprise après
   assert.match(front, /onPutBackOn: \(\) => \{\s*restLearnArmed = false;/);
   assert.match(front, /onRoom: \(\) => \{\s*restLearnArmed = false;/);
   assert.match(front, /écart corrigé de \$\{Math\.round\(measure\.cm\)\} cm et \$\{Math\.round\(measure\.deg\)\}°/);
-  assert.match(front, /headset\.watchRest\(vrAutoRecal\);\s*headset\.watch\(\);/);
+  assert.match(front, /headset\.watchRest\(vrAutoRecal\);\s*if \(vrAutoRecal\) console\.log\([^\n]*\n\s*headset\.watch\(\);/);
   assert.match(read('app', 'src', 'casque.ts'), /\.\.\.\(rest && \{ rest \}\) \};/);
   const companion = read('packages', 'casque-vr', 'src', 'casque.cpp');
   assert.match(companion, /if \(restWatch && controllers && !calibrating && state == XR_SESSION_STATE_FOCUSED/);
 });
 
 test('sonde LibOVR (13 novembre 2026) : la DLL du runtime de Meta, lancée avec la VR, au journal, sans rien changer', () => {
-  assert.equal(ovrRuntimeDll('C:\\Program Files\\Meta Horizon\\Support\\oculus-runtime\\oculus_openxr_64.json', JSON.stringify({ runtime: { library_path: '.\\LibOVRRT64_1.dll' } })), 'C:\\Program Files\\Meta Horizon\\Support\\oculus-runtime\\LibOVRRT64_1.dll');
-  assert.equal(ovrRuntimeDll('C:\\x\\a.json', JSON.stringify({ runtime: { library_path: 'D:\\Meta\\libovrrt64_1.dll' } })), 'D:\\Meta\\libovrrt64_1.dll');
-  assert.equal(ovrRuntimeDll('C:\\Steam\\steamxr_win64.json', JSON.stringify({ runtime: { library_path: '..\\bin\\vrclient_x64.dll' } })), undefined);
-  assert.equal(ovrRuntimeDll('C:\\x\\a.json', 'pas du json'), undefined);
+  // Le manifeste réel de Meta Horizon Link (13 novembre 2026, borne et poste de développement) : il nomme
+  // LibOVRRTImpl64_1.dll ; la sonde essaie d'abord LibOVRRT64_1.dll, l'entrée LibOVR, dans le même dossier.
+  const dir = 'C:\\Program Files\\Meta Horizon\\Support\\oculus-runtime';
+  const real = JSON.stringify({ file_format_version: '1.0.0', runtime: { name: 'Oculus OpenXR', library_path: '.\\LibOVRRTImpl64_1.dll' } });
+  assert.deepEqual(ovrRuntimeDlls(`${dir}\\oculus_openxr_64.json`, real), [`${dir}\\LibOVRRT64_1.dll`, `${dir}\\LibOVRRTImpl64_1.dll`]);
+  assert.deepEqual(ovrRuntimeDlls(`${dir}\\oculus_openxr_64.json`, JSON.stringify({ runtime: { library_path: '.\\LibOVRRT64_1.dll' } })), [`${dir}\\LibOVRRT64_1.dll`, `${dir}\\LibOVRRTImpl64_1.dll`]);
+  assert.deepEqual(ovrRuntimeDlls('C:\\Steam\\steamxr_win64.json', JSON.stringify({ runtime: { library_path: '..\\bin\\vrclient_x64.dll' } })), []);
+  assert.deepEqual(ovrRuntimeDlls('C:\\x\\a.json', 'pas du json'), []);
   const front = read('app', 'src', 'frontend.ts');
   assert.match(front, /ovrProbe\.set\(vrMode === 'auto'\);/);
   assert.match(front, /headset\?\.dispose\(\);\s*ovrProbe\.set\(false\);/);
@@ -537,4 +542,21 @@ test('schéma des manettes, planches d’adaptation validées (13 novembre 2026)
   assert.match(read('app', 'renderer', 'library.css'), /\.lib-section\.kind-controls \.lib-rows \{ display: grid; grid-template-columns: 1fr 1fr;/);
   // Ce que le schéma sait dessiner : des boutons des manettes, jamais une direction de joystick.
   for (const e of SCHEMA_ELEMENTS) assert.ok(isControllerElement(e) && !CONTROLLER_ELEMENTS[e].axis, e);
+});
+
+test('recalage automatique : pourquoi il renonce, dit au journal sans ambiguïté (13 novembre 2026)', () => {
+  const calee: CabinetPlace = lockbarPlace({ x: -0.3, y: 0.9, z: -0.4 }, { x: 0.3, y: 0.9, z: -0.4 });
+  const repos: [Point3, Point3] = [{ x: -0.28, y: 0.93, z: -0.3 }, { x: 0.28, y: 0.93, z: -0.3 }];
+  const apprise: CabinetPlace = { ...calee, rest: restReference(calee, repos) };
+  assert.equal(restGateReason(repos, apprise, false), undefined);
+  assert.equal(restGateReason(repos, undefined, false), 'pas de borne calée');
+  assert.equal(restGateReason(repos, { ...apprise, free: true }, false), 'borne posée au bureau, pas sur une vraie barre');
+  assert.match(restGateReason([repos[0], { ...repos[1], y: 0.96 }], apprise, false)!, /^manettes pas à niveau : 3,0 cm de différence de hauteur \(tolérance 2\.5 cm\)$/);
+  assert.match(restGateReason([repos[0], { ...repos[1], x: 0.32 }], apprise, false)!, /^écart hors tolérance : 4,0 cm \(manettes écartées de 60,0 cm, 56,0 cm appris, tolérance 2\.5 cm\)$/);
+  assert.match(restGateReason(repos, calee, false)!, /^position de repos pas encore apprise : calez à la main/);
+  assert.match(restGateReason([{ x: -0.2, y: 0.93, z: -0.3 }, { x: 0.2, y: 0.93, z: -0.3 }], calee, true)!, /^apprentissage refusé : manettes écartées de 40,0 cm pour une barre de 60,0 cm/);
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /recalage automatique impossible, manettes posées non suivies/);
+  assert.match(front, /recalage automatique pas fait, manettes posées immobiles \$\{AUTO_RECAL_STILL_S\} s : \$\{reason\}\./);
+  assert.match(front, /autoRecalDiagnose\(sample, previous\);/);
 });

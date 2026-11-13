@@ -173,19 +173,22 @@ export function openXrRuntimeName(manifest: string, text?: string): string {
 }
 
 /**
- * La DLL de LibOVR du runtime de Meta (sonde, app/src/sonde-ovr.ts) : le runtime OpenXR de Meta est lui-même
- * LibOVRRT64_1.dll (son manifeste la nomme), et l'API LibOVR est dans la même DLL. undefined : autre runtime
- * (SteamVR, Virtual Desktop…), ou manifeste illisible. Le chemin relatif du manifeste part de son dossier.
+ * Les DLL de LibOVR du runtime de Meta, dans l'ordre où les essayer (sonde, app/src/sonde-ovr.ts). Le manifeste
+ * OpenXR de Meta nomme LibOVRRTImpl64_1.dll (Meta Horizon Link, novembre 2026 ; avant, LibOVRRT64_1.dll) ; dans
+ * le même dossier, LibOVRRT64_1.dll est l'entrée des applications LibOVR et relaie vers elle. Les deux exportent
+ * les ovr_* (lu dans leurs tables d'export, et la sonde initialisée sur l'une et l'autre, 13 novembre 2026). [] :
+ * autre runtime (SteamVR, Virtual Desktop…), ou manifeste illisible. Le chemin relatif part du dossier du manifeste.
  */
-export function ovrRuntimeDll(manifest: string, text: string): string | undefined {
+export function ovrRuntimeDlls(manifest: string, text: string): string[] {
   let library: unknown;
   try {
     library = (JSON.parse(text) as { runtime?: { library_path?: unknown } }).runtime?.library_path;
   } catch {
-    return undefined;
+    return [];
   }
-  if (typeof library !== 'string' || !/^libovrrt64_1\.dll$/i.test(path.win32.basename(library))) return undefined;
-  return path.win32.resolve(path.win32.dirname(manifest), library);
+  if (typeof library !== 'string' || !/^libovrrt(impl)?64_1\.dll$/i.test(path.win32.basename(library))) return [];
+  const dir = path.win32.dirname(path.win32.resolve(path.win32.dirname(manifest), library));
+  return [path.win32.join(dir, 'LibOVRRT64_1.dll'), path.win32.join(dir, 'LibOVRRTImpl64_1.dll')];
 }
 
 /**

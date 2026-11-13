@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.12
 
+- Virtual reality: the headset readings finally start with Meta's current software (they looked for a file under another name). When the automatic alignment does not happen, the log says why: controllers not level, gap in centimetres, rest position not learned yet, or controllers no longer tracked by the headset.
 - Virtual reality: the controllers drawn, the command to use in green, also in the in-game pause ("Align the cabinet"), at each step of the controller wizard, and in the headset menu's legend.
 - Virtual reality: the cabinet alignment shows the controllers drawn, the command to use in green, and reminds at the bottom that you can align again any time by pressing both sticks down for 3 s. The gesture is explained the same way the first time the headset is worn and when the triggers are held instead.
 - Table wheel: the MagnaSave buttons change collection without showing the list of collections over the tables any more; only the marker under the title changes. The full list opens from the Collections medallion.
