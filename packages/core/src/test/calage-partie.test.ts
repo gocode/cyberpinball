@@ -139,7 +139,7 @@ test('détection : pièce recentrée par le Quest (limite fixe) dite au journal,
   assert.ok(Math.abs(near.cm - Math.hypot(10, 15)) < 0.01 && Math.abs(near.deg - 5) < 0.01 && near.onHead);
   assert.equal(headAtWear('tete-au-port 0.600000 0.300000 1.2')!.onHead, false);
   assert.match(ts, /const atWear = headAtWear\(line\);/);
-  assert.match(ts, /après un retrait du casque \(session neuve du compagnon\)/);
+  assert.match(ts, /const after = this\.takenOffSeen \? 'après un retrait du casque' : 'au premier port de la session';/);
   // Limite fixe vue la première fois : le passage en limite de pièce conseillé une fois (astuce-limite.json).
   assert.match(front, /onStationary: \(\) => roomscaleTip\(\),/);
   assert.match(front, /const file = path\.join\(loc\.dataDir, 'vr', 'astuce-limite\.json'\);/);

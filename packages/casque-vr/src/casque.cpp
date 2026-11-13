@@ -1480,6 +1480,15 @@ int main(int argc, char** argv)
 
    XrPosef anchor { { 0, 0, 0, 1 }, { 0, 0, -0.f } };
    bool running = false, exitRequested = false, done = false;
+   // Session suspendue (casque retiré au menu) depuis cet instant, ou 0 ; reprise au READY suivant.
+   ULONGLONG suspendedAt = 0;
+   // 30 s : au pire, comme avant (session neuve) ; le banc d'essai l'abrège (CYBERPINBALL_SUSPENSION_MAX_MS).
+   ULONGLONG SUSPEND_MAX_MS = 30'000;
+   {
+      char v[32] {};
+      if (GetEnvironmentVariableA("CYBERPINBALL_SUSPENSION_MAX_MS", v, sizeof v) > 0)
+         SUSPEND_MAX_MS = std::strtoull(v, nullptr, 10);
+   }
    // Veille pendant une partie de VPX dans le casque (après la relève), et perte du casque dite une fois.
    bool standby = false, lostSaid = false;
    // Écrans à soumettre au casque : porté depuis (ou repris depuis), et l'absence dite une fois par période.
@@ -1571,18 +1580,25 @@ int main(int argc, char** argv)
                XrSessionBeginInfo bi { XR_TYPE_SESSION_BEGIN_INFO };
                bi.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
                running = XR_SUCCEEDED(xrBeginSession_(session, &bi));
+               if (suspendedAt)
+                  say(std::string("session-reprise ") + (running ? "ok" : "refusee") + " apres " + std::to_string((GetTickCount64() - suspendedAt) / 1000) + " s");
+               suspendedAt = 0;
             }
             else if (state == XR_SESSION_STATE_STOPPING)
             {
                xrEndSession_(session);
                running = false;
-               // Arrêt que personne n'a demandé : le runtime de Meta reprend la session (accueil de Link,
-               // application choisie de nouveau). Ce n'est pas un casque perdu (essai du 10 novembre 2026 :
-               // VISIBLE, SYNCHRONIZED puis STOPPING à chaque passage par l'accueil) : Cyber Pinball relance
-               // aussitôt une session neuve, qui prend le casque d'elle-même.
-               if (!exitRequested && !handover && !standby)
-                  say("session-arretee");
-               done = true;
+               // Casque retiré au menu (Link passe par STOPPING) : la même session reste en vie et reprend
+               // au READY suivant, comme VPX fait de la sienne (13 novembre 2026 : relancer une session neuve
+               // à chaque retrait laissait l'accueil de Link à l'écran jusqu'à 29 s, et le Quest recentrait la
+               // pièce). Une sortie demandée, la relève et la veille d'une partie finissent comme avant.
+               if (exitRequested || handover || standby)
+                  done = true;
+               else
+               {
+                  suspendedAt = GetTickCount64();
+                  say("session-suspendue");
+               }
             }
             else if (state == XR_SESSION_STATE_LOSS_PENDING)
                lost("session perdue");
@@ -1736,6 +1752,14 @@ int main(int argc, char** argv)
 
       if (!running)
       {
+         // Session suspendue que le runtime ne redonne pas (Link qui attend qu'on rechoisisse l'application) :
+         // au bout de SUSPEND_MAX_MS, une session neuve, comme avant (Cyber Pinball relance le compagnon).
+         if (suspendedAt && GetTickCount64() - suspendedAt > SUSPEND_MAX_MS && !exitRequested)
+         {
+            say("session-arretee pas reprise en " + std::to_string(SUSPEND_MAX_MS / 1000) + " s");
+            done = true;
+            break;
+         }
          Sleep(50);
          continue;
       }

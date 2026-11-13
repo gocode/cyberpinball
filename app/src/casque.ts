@@ -516,7 +516,7 @@ export class HeadsetMenu {
         // La tête au port, vue de l'origine de la pièce : origine remise sur la tête, ou pièce gardée.
         const atWear = headAtWear(line);
         if (atWear) {
-          const after = this.takenOffSeen ? 'après un retrait du casque (session neuve du compagnon)' : 'au premier port de la session'; // i18n-ignore : journal
+          const after = this.takenOffSeen ? 'après un retrait du casque' : 'au premier port de la session'; // i18n-ignore : journal
           this.opts.log(`Casque : tête au port ${after}, à ${atWear.cm.toFixed(0)} cm de l'origine de la pièce et tournée de ${atWear.deg.toFixed(0)}° ${atWear.onHead ? ': origine remise sur la tête' : ': origine gardée'}.`); // i18n-ignore : journal
           this.takenOffSeen = false;
           continue;
@@ -562,9 +562,20 @@ export class HeadsetMenu {
           this.opts.log(`Casque : ${line} ; seule la session en veille du compagnon est tombée : la partie continue, le compagnon repart à la fin.`); // i18n-ignore : journal
           continue;
         }
-        // Le runtime a arrêté la session sans que personne le demande (accueil de Link) : session neuve aussitôt.
-        if (line === 'session-arretee') {
-          this.opts.log('Casque : session arrêtée par le runtime (accueil de Link) ; le compagnon repart aussitôt sur une session neuve.'); // i18n-ignore : journal
+        // Casque retiré au menu : le compagnon garde sa session, qui reprend quand le casque revient (13 novembre
+        // 2026 ; avant, une session neuve à chaque retrait, et l'accueil de Link restait à l'écran).
+        if (line === 'session-suspendue') {
+          this.opts.log('Casque : retiré au menu ; la même session attend son retour (pas de compagnon relancé).'); // i18n-ignore : journal
+          if (!this.worn) this.takenOff = this.takenOffSeen = true;
+          continue;
+        }
+        if (line.startsWith('session-reprise')) {
+          this.opts.log(`Casque : ${line}.`); // i18n-ignore : journal
+          continue;
+        }
+        // Session que le runtime n'a pas redonnée (ou ancien compagnon) : session neuve aussitôt.
+        if (line.startsWith('session-arretee')) {
+          this.opts.log(`Casque : ${line} ; le compagnon repart sur une session neuve.`); // i18n-ignore : journal
           this.restartNow = true;
           // Casque retiré (le menu de Meta ouvert n'arrête pas la session) : à son retour, la pièce a pu bouger.
           if (!this.worn) this.takenOff = this.takenOffSeen = true;

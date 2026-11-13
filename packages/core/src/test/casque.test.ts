@@ -191,11 +191,15 @@ test('pièce du Quest changée ou vue réinitialisée : la borne reste où elle 
 test('fin de partie et accueil de Link : le menu revient sans repasser par Link', () => {
   // La session en veille ne reprend le casque que rechoisie dans l'accueil de Link (5 à 11 s), une
   // session neuve le prend d'elle-même (1 s) ; l'arrêt de la session par le runtime n'est pas un casque perdu.
+  // Au menu (13 novembre 2026, banc d'essai scripts/banc-casque.test.mjs) : casque retiré, la même session
+  // est suspendue puis reprise ; une session neuve seulement si le runtime ne la redonne pas.
   const repo = path.join(__dirname, '..', '..', '..', '..');
   const cpp = source(repo, 'packages', 'casque-vr', 'src', 'casque.cpp');
-  assert.match(cpp, /if \(!exitRequested && !handover && !standby\)\s*say\("session-arretee"\);\s*done = true;/);
+  assert.match(cpp, /if \(exitRequested \|\| handover \|\| standby\)\s*done = true;\s*else\s*\{\s*suspendedAt = GetTickCount64\(\);\s*say\("session-suspendue"\);/);
+  assert.match(cpp, /say\("session-arretee pas reprise en " \+ std::to_string\(SUSPEND_MAX_MS \/ 1000\) \+ " s"\);/);
   const menu = fs.readFileSync(path.join(repo, 'app', 'src', 'casque.ts'), 'utf8');
-  assert.match(menu, /if \(line === 'session-arretee'\) \{[\s\S]{0,300}this\.restartNow = true;/);
+  assert.match(menu, /if \(line === 'session-suspendue'\) \{[\s\S]{0,300}continue;/);
+  assert.match(menu, /if \(line\.startsWith\('session-arretee'\)\) \{[\s\S]{0,300}this\.restartNow = true;/);
   assert.match(menu, /if \(this\.restartNow\) \{\s*this\.restartNow = false;\s*this\.retryAt = 0;\s*setImmediate\(\(\) => this\.check\(\)\);/);
   const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
   assert.match(frontend, /headsetPaused = false;[\s\S]{0,500}if \(playedVr && headset\?\.standby\) \{[\s\S]{0,200}headset\.restart\(\);/);

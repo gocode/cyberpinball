@@ -15,3 +15,10 @@ target_include_directories(cyberpinball-casque PRIVATE third_party)
 target_compile_definitions(cyberpinball-casque PRIVATE UNICODE _UNICODE)
 target_compile_options(cyberpinball-casque PRIVATE /W4 /utf-8 /permissive-)
 target_link_libraries(cyberpinball-casque PRIVATE d3d11 dxgi d3dcompiler windowscodecs ole32)
+
+# Banc d'essai : un runtime OpenXR factice, sans casque ni fenêtre, qui joue un scénario (casque retiré et
+# remis, boutons, poses, limite de la pièce) et trace ce que fait le compagnon (scripts/banc-casque.test.mjs).
+add_library(runtime-factice SHARED test/runtime-factice.cpp)
+target_include_directories(runtime-factice PRIVATE third_party)
+target_compile_options(runtime-factice PRIVATE /W4 /utf-8 /permissive-)
+target_link_libraries(runtime-factice PRIVATE d3d11 dxgi)
