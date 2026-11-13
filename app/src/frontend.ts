@@ -357,6 +357,8 @@ import {
   type RemoteJukeboxOp,
   countryName,
   locale,
+  mentions,
+  maskWords,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, setCursorPosition, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays, simulatedDisplays } from './displays';
@@ -411,6 +413,7 @@ import { createChatService } from './chat-service';
 import { createChatMenu } from './chat-menu';
 import { createProfileMenu } from './profile-menu';
 import { createCommunityMenu } from './community-menu';
+import { createRoomsMenu } from './rooms-menu';
 import { createFirewallRule } from './firewall-rule';
 import { guardFirewall } from './firewall-guard';
 import { createMdnsResponder } from './mdns-responder';
@@ -1457,7 +1460,8 @@ phoneRemote.setMenu({
   jukebox: () => remoteJukebox(),
   jukeboxAct: (op, key, fraction) => remoteJukeboxAct(op, key, fraction),
   // Communauté au téléphone (messages, amis) : au menu, et pendant une partie si le réglage le permet ; jamais en mode invité.
-  community: (open) => (guest.active ? { closed: t('Fermée en mode invité.'), unread: 0, rows: [] } : { ...chatMenu.remoteCommunity(open), players: remoteOnlinePlayers() }),
+  community: (open) => (guest.active ? { closed: t('Fermée en mode invité.'), unread: 0, rows: [] } : { ...chatMenu.remoteCommunity(open), players: remoteOnlinePlayers(), ...remoteRoom() }),
+  roomSend: (text) => remoteRoomSend(text),
   chatSend: (key, text) => {
     if (phoneMayWrite()) chatService.send(key, text);
   },
@@ -1716,6 +1720,18 @@ function remoteOnlinePlayers() {
       state: p.status === 'playing' ? ('playing' as const) : ('online' as const),
       last: '',
     }));
+}
+
+/** Le salon par pays pour le téléphone (rooms-menu.ts) : celui ouvert à la borne, sinon le salon par défaut. */
+function remoteRoom() {
+  return socialNet.state().enabled ? { room: roomsMenu.remote() } : {};
+}
+
+/** Une ligne écrite au téléphone dans ce salon ; jamais en mode invité. */
+function remoteRoomSend(text: string): void {
+  if (guest.active || !socialNet.state().enabled) return;
+  const r = roomsMenu.remote();
+  if (!r.blocked) roomsMenu.write(r.room, text);
 }
 
 /** Le médaillon Communauté touché au téléphone : choisi, ou, déjà choisi, ouvert. */
@@ -2874,8 +2890,29 @@ const profileMenu = createProfileMenu({
   openThread: (key, back) => chatMenu.openThread(key, back),
 });
 library.provideSystemItem('public-profile', profileMenu.item);
+// Salons par pays (rooms-menu.ts) : le journal, écrire, les options d'une ligne, les règles, les réglages de la communauté.
+const roomsMenu = createRoomsMenu({
+  library,
+  net: socialNet,
+  openProfile: (key, back) => profileMenu.openProfile(key, back),
+  openFriend: (key, back) => friendsMenu.openFriend(key, back),
+  currentTable: () => tables[state.index],
+  phoneLinked: () => phoneRemote?.connected() === 'menu',
+});
+library.provideSystemItem('community-settings', roomsMenu.settingsItem);
+// Mon pseudo cité dans un salon qui n'est pas à l'écran : la notification (au menu ; en partie, si le réglage le permet).
+socialNet.onRoomLines((lines) => {
+  const s = socialNet.rooms();
+  const name = socialNet.state().name;
+  if (guest.active) return;
+  const playingNow = state.phase === 'playing' || state.phase === 'loading';
+  if (playingNow && !s.mentionsInGame) return;
+  const hits = lines.filter((l) => !s.ignored.includes(l.key) && mentions(l.text, name) && roomsMenu.shown() !== l.room);
+  if (hits.length) menuNotices.push(hits.map((l) => ({ kind: 'room-mention' as const, key: l.id, at: Date.now(), who: l.name, player: l.key, subject: roomsMenu.roomName(l.room), extra: s.filter ? maskWords(l.text) : l.text })));
+});
 // Communauté (community-menu.ts) : l'accueil du médaillon de la roue, et « Joueurs en ligne », amis ou non.
 const communityMenu = createCommunityMenu({
+  rooms: { door: () => roomsMenu.door(), open: (back) => roomsMenu.openDefault(back) },
   library,
   net: socialNet,
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
@@ -4499,6 +4536,9 @@ export function startFrontend(): void {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) profileMenu.openMine(state.phase === 'menu' ? () => library.leave() : undefined);
     }
     // Message d'un ami : son fil (celui du dernier message non lu), sinon la liste des conversations.
+    else if (action.type === 'rooms') {
+      if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) roomsMenu.openMention(state.phase === 'menu' ? () => library.leave() : () => library.openSystem());
+    }
     else if (action.type === 'messages') {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) chatMenu.openUnread(state.phase === 'menu' ? () => library.leave() : undefined);
     }

@@ -304,6 +304,20 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       if (playing) net.setPresence({ status: 'playing', table: DEMO_TABLES.brunoPlays, since: new Date(Date.now() - 8 * 60_000).toISOString() });
       strangers.push(net);
     }
+    // Salon France : ils y entrent (règles acceptées), écrivent quelques lignes, Bruno cite la borne.
+    const room = 'pays-FR';
+    const say = (net: SocialNet, text: string, ms: number, action = false) => timersLater.push(setTimeout(() => void net.roomSend(room, text, action), ms));
+    for (const net of [...strangers, bruno, dora]) {
+      net.setRooms({ rulesAt: new Date().toISOString() });
+      net.roomOpen(room);
+    }
+    const [kiko, ressort, vortex] = strangers;
+    say(kiko!, 'bonsoir ! quelqu’un sur Star Courier ce soir ?', 1500); // i18n-ignore : ligne d'un joueur fictif
+    say(ressort!, 'la nouvelle version de Thunder Reef est sortie, le multibille est enfin jouable', 3000); // i18n-ignore : ligne d'un joueur fictif
+    say(dora, 'oui, la rampe de gauche est réglée au millimètre', 4500); // i18n-ignore : ligne d'un joueur fictif
+    say(vortex!, 'salut de Bruxelles, je passe par le salon France', 6000); // i18n-ignore : ligne d'un joueur fictif
+    say(kiko!, 'lance une partie de Star Courier, qui me suit ?', 7500, true); // i18n-ignore : ligne d'un joueur fictif
+    say(bruno, `@${me.name} tu viens ? je finis ma bille et je lance une partie en direct`, 9000); // i18n-ignore : ligne d'un joueur fictif
   }
   // Profil public (messagerie) : Dora, qui n'est pas une amie, publie un record et un badge, puis aime le record de la borne.
   if (mode === 'messagerie') {

@@ -217,6 +217,16 @@ export interface RemoteCommunityRow {
   note?: string;
 }
 
+/** Le salon montré au téléphone : à l'ancienne, une ligne par message ; pourquoi on ne peut pas écrire. */
+export interface RemoteRoom {
+  name: string;
+  present: number;
+  lines: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' }[];
+  phrases: string[];
+  /** On ne peut pas écrire (règles à accepter à la borne, salons désactivés…) : pourquoi. */
+  blocked?: string;
+}
+
 /** Le fil d'un ami ouvert au téléphone : jours, évènements de l'ami et messages, comme à la borne. */
 export interface RemoteThread {
   key: string;
@@ -240,6 +250,8 @@ export interface RemoteCommunity {
   unread: number;
   rows: RemoteCommunityRow[];
   thread?: RemoteThread;
+  /** Le salon par pays montré au téléphone (rooms-menu.ts) : ses dernières lignes, ses présents, les phrases. */
+  room?: RemoteRoom;
   /**
    * Les autres joueurs en ligne, qui ne sont pas mes amis (community-menu.ts, présence publique) :
    * montrés dans « Joueurs » après mes amis, sans fil (on n'écrit qu'à ses amis).
@@ -296,6 +308,8 @@ export interface MenuTarget {
   chat?(): RemoteChat | undefined;
   /** Écrire à un ami, ou réagir à un de ses messages, depuis le téléphone ; la messagerie vérifie tout. */
   chatSend?(key: string, text: string): void;
+  /** Une ligne écrite au téléphone dans le salon qu'il montre. */
+  roomSend?(text: string): void;
   chatReact?(key: string, target: string, kind: string): void;
   /** Communauté : les conversations et le fil ouvert au téléphone (`open`) ; sans elle, l'onglet le dit. */
   community?(open?: string): RemoteCommunity;
@@ -1060,7 +1074,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       return;
     }
     const face = (a: AvatarView): AvatarView => remoteAvatar(images, a);
-    const shown: RemoteCommunity = { ...c, rows: c.rows.map((r) => ({ ...r, avatar: face(r.avatar) })), ...(c.thread ? { thread: { ...c.thread, avatar: face(c.thread.avatar) } } : {}) };
+    const shown: RemoteCommunity = { ...c, rows: c.rows.map((r) => ({ ...r, avatar: face(r.avatar) })), ...(c.players ? { players: c.players.map((r) => ({ ...r, avatar: face(r.avatar) })) } : {}), ...(c.thread ? { thread: { ...c.thread, avatar: face(c.thread.avatar) } } : {}) };
     const text = JSON.stringify(shown);
     if (!force && text === communitySent) return;
     communitySent = text;
@@ -1577,6 +1591,10 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         return;
       case 'chat-react':
         menu.chatReact?.(message.key, message.target, message.kind);
+        pushCommunity(true);
+        return;
+      case 'room-send':
+        menu.roomSend?.(message.text);
         pushCommunity(true);
         return;
       case 'set':

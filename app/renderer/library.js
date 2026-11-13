@@ -126,6 +126,11 @@ function renderLibrary(v) {
       const flagged = section.rows.some((r) => r.flag) || section.kind === 'players';
       if (flagged) list.classList.add('has-flags');
       for (const row of section.rows) {
+        // Salon : une ligne du journal, à l'ancienne.
+        if (row.log) {
+          list.append(roomLogLine(row, v.cursor));
+          continue;
+        }
         // Fil de la messagerie : une bulle, une carte de la borne ou un séparateur de jour.
         if (row.bubble) {
           list.append(chatBubble(row, v.cursor));
@@ -644,6 +649,32 @@ function scoreboardFace(l) {
     face.setAttribute('aria-label', l.status.label);
   }
   return face;
+}
+
+/**
+ * Une ligne d'un salon (Row.log) : l'heure, le drapeau, « <pseudo> » à la teinte de sa clé, le texte
+ * qui revient à la ligne sous lui ; une action (/me) en italique, une ligne qui me cite surlignée en
+ * bleu, une ligne de service (arrivée, départ) plus discrète. Choisie, le cadre vert du choix.
+ */
+function roomLogLine(row, cursor) {
+  const l = row.log;
+  const li = libEl('li', `room-line kind-${l.kind}`);
+  if (row.action !== undefined) {
+    li.classList.add('pick');
+    if (row.action === cursor) li.classList.add('selected');
+    actOn(li, { type: 'activate', index: row.action });
+  }
+  li.append(libEl('time', 'room-time', l.time));
+  const body = libEl('span', 'room-text');
+  if (l.flag) body.append(flagNode(l.flag.code, l.flag.src, l.flag.name, 'room-flag'));
+  if (l.nick) {
+    const nick = libEl('span', 'room-nick', l.nick);
+    if (typeof l.hue === 'number') nick.style.setProperty('--h', String(l.hue));
+    body.append(nick);
+  }
+  body.append(libEl('span', l.kind === 'me' ? 'room-say room-act' : 'room-say', l.text));
+  li.append(body);
+  return li;
 }
 
 /**

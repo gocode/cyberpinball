@@ -27,6 +27,7 @@ const community = {
 for (const [id, label] of [
   ['seg-messages', () => t('Messages')],
   ['seg-friends', () => t('Joueurs')],
+  ['seg-room', () => t('Salon')],
   ['seg-ranks', () => t('Scores')],
 ]) {
   const b = document.getElementById(id);
@@ -124,6 +125,77 @@ function playerRow(row) {
   li.append(b);
   return li;
 }
+
+/**
+ * Le salon par pays (la borne choisit : celui ouvert à la borne, sinon celui par défaut) : ses dernières
+ * lignes à l'ancienne (l'heure, <pseudo> à la teinte de sa clé, le texte), des phrases d'un appui et un
+ * champ. Écrire passe par la borne (« room-send »), qui vérifie les règles, les limites et le texte.
+ */
+function renderRoom() {
+  const r = community.data?.room;
+  const list = document.getElementById('room-lines');
+  const status = document.getElementById('room-status');
+  const chips = document.getElementById('room-chips');
+  const field = document.getElementById('room-field');
+  document.getElementById('room-send').textContent = t('Envoyer');
+  document.getElementById('room-head').textContent = r ? r.name : t('Salon indisponible');
+  if (!r) {
+    list.replaceChildren();
+    status.hidden = false;
+    status.textContent = community.data?.closed ?? t('Partage désactivé : Partage et réseau');
+    chips.replaceChildren();
+    field.disabled = true;
+    return;
+  }
+  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+  list.replaceChildren(
+    ...r.lines.map((l) => {
+      const li = document.createElement('li');
+      li.className = `room-line kind-${l.kind}`;
+      const time = document.createElement('time');
+      time.textContent = l.time;
+      const text = document.createElement('span');
+      text.className = 'room-text';
+      if (l.nick) {
+        const nick = document.createElement('span');
+        nick.className = 'room-nick';
+        nick.textContent = l.nick;
+        if (typeof l.hue === 'number') nick.style.setProperty('--h', String(l.hue));
+        text.append(nick);
+      }
+      const say = document.createElement('span');
+      say.className = l.kind === 'me' ? 'room-act' : '';
+      say.textContent = l.text;
+      text.append(say);
+      li.append(time, text);
+      return li;
+    }),
+  );
+  if (atBottom || community.roomShown !== r.name) list.scrollTop = list.scrollHeight;
+  community.roomShown = r.name;
+  status.hidden = !r.blocked;
+  status.textContent = r.blocked ?? '';
+  field.disabled = Boolean(r.blocked);
+  const chip = (label, run) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip';
+    b.textContent = label;
+    b.disabled = Boolean(r.blocked);
+    b.addEventListener('click', run);
+    return b;
+  };
+  chips.replaceChildren(...r.phrases.map((p) => chip(p, () => send({ t: 'room-send', text: p }))));
+}
+
+document.getElementById('room-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const field = document.getElementById('room-field');
+  const text = field.value.trim();
+  if (!text || !community.data?.room || community.data.room.blocked) return;
+  send({ t: 'room-send', text });
+  field.value = '';
+});
 
 /** Messages ou Joueurs : la liste, ou pourquoi elle est vide (chargement, messagerie fermée, aucun ami). */
 function renderCommunity() {
@@ -248,9 +320,13 @@ function communityMessage(m) {
     unread: Number.isInteger(m.unread) ? m.unread : 0,
     rows: Array.isArray(m.rows) ? m.rows : [],
     thread: m.thread && typeof m.thread === 'object' && typeof m.thread.key === 'string' && Array.isArray(m.thread.items) ? m.thread : undefined,
+    // Les autres joueurs en ligne (Joueurs) et le salon par pays (Salon) : gardés, sinon ces vues restent vides.
+    players: Array.isArray(m.players) ? m.players : [],
+    room: m.room && typeof m.room === 'object' && typeof m.room.name === 'string' && Array.isArray(m.room.lines) ? m.room : undefined,
   };
   renderCommunity();
   if (document.body.dataset.view === 'thread') renderThread();
+  if (document.body.dataset.view === 'room') renderRoom();
   renderTop();
 }
 
@@ -277,7 +353,8 @@ function communityTop(shown) {
     const row = th ?? community.data?.rows.find((r) => r.key === community.open);
     return { title: row?.name ?? '', detail: row?.presence ?? '', face: row ? communityFace(row, 'top-face') : undefined };
   }
-  if (!['messages', 'friends', 'ranks'].includes(shown)) return undefined;
+  if (shown === 'room' && community.data?.room) return { title: community.data.room.name, detail: tn(community.data.room.present, '{n} présent', '{n} présents') };
+  if (!['messages', 'friends', 'room', 'ranks'].includes(shown)) return undefined;
   const unread = community.data?.unread ?? 0;
   return { title: t('Communauté'), detail: unread ? tn(unread, '{n} message non lu', '{n} messages non lus') : '' };
 }

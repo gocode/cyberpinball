@@ -88,6 +88,7 @@
       <div class="seg" id="community-seg" role="tablist">
         <button type="button" class="seg-tab" id="seg-messages" role="tab" data-view="messages"></button>
         <button type="button" class="seg-tab" id="seg-friends" role="tab" data-view="friends"></button>
+        <button type="button" class="seg-tab" id="seg-room" role="tab" data-view="room"></button>
         <button type="button" class="seg-tab" id="seg-ranks" role="tab" data-view="ranks"></button>
       </div>
       <section class="community" id="community" role="tabpanel">
@@ -99,6 +100,17 @@
         </div>
       </section>
       <!-- Le fil d'un ami, plein écran : jours, évènements, bulles des deux côtés ; réponses d'un appui et champ en bas. -->
+      <!-- Salon par pays (telephone-community.js) : le journal à l'ancienne, des phrases, un champ. -->
+      <section class="room" id="room" aria-live="polite">
+        <p class="room-head" id="room-head"></p>
+        <ol class="room-lines" id="room-lines"></ol>
+        <p class="thread-status" id="room-status" hidden></p>
+        <div class="thread-chips" id="room-chips"></div>
+        <form class="thread-form" id="room-form" autocomplete="off">
+          <input type="text" id="room-field" maxlength="300" autocomplete="off" enterkeyhint="send" />
+          <button type="submit" class="thread-send" id="room-send"></button>
+        </form>
+      </section>
       <section class="thread" id="thread" aria-live="polite">
         <ol class="thread-lines" id="thread-lines"></ol>
         <p class="thread-status" id="thread-status"></p>

@@ -45,6 +45,8 @@ export interface CommunityMenuHost {
   openFriend(key: string, back: () => void): void;
   /** La messagerie (chat-menu.ts) : son état en une ligne et sa liste, « Retour » vers `back`. */
   messages: { detail(): string; attention(): boolean; quiet(): boolean; open(back: () => void): void };
+  /** Le salon de mon pays (rooms-menu.ts) : ce que dit sa porte, et l'ouvrir. */
+  rooms?: { door(): { label: string; detail: string; attention: boolean; quiet: boolean }; open(back: () => void): void };
   /** Le tableau des scores de la table choisie dans la roue ; undefined : aucune table. */
   rankings?(): { detail: string; open(back: () => void): void } | undefined;
   /** Partage et réseau (activer le partage, le réseau local, la présence publique). */
@@ -106,7 +108,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
   function summary(): ReturnType<CommunityMenu['summary']> {
     const list = players();
     const c = myCountry();
-    return { online: list.length, country: c ? list.filter((p) => p.country === c).length : 0, friends: list.filter((p) => p.friend).length, attention: host.messages.attention() };
+    return { online: list.length, country: c ? list.filter((p) => p.country === c).length : 0, friends: list.filter((p) => p.friend).length, attention: host.messages.attention() || Boolean(host.rooms?.door().attention) };
   }
 
   /** « 47 en ligne · 12 en France · 3 amis » */
@@ -289,13 +291,11 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
         ...(host.messages.quiet() ? { tone: 'quiet' as const } : {}),
         run: () => host.messages.open(here),
       },
-      {
-        label: c ? t('Salon {country}', { country: countryLabel(c)! }) : t('Salons par pays'),
-        detail: t('Les salons de discussion par pays arrivent dans une prochaine version'),
-        icon: 'globe',
-        tone: 'quiet',
-        run: here,
-      },
+      (() => {
+        const door = host.rooms?.door();
+        if (!door) return { label: c ? t('Salon {country}', { country: countryLabel(c)! }) : t('Salons par pays'), detail: t('Les salons de discussion par pays arrivent dans une prochaine version'), icon: 'globe' as const, tone: 'quiet' as const, run: here };
+        return { label: door.label, detail: door.detail, icon: 'globe' as const, ...(door.attention ? { attention: true } : {}), ...(door.quiet ? { tone: 'quiet' as const } : {}), run: () => host.rooms!.open(here) };
+      })(),
       {
         label: t('Classements'),
         detail: rankings?.detail ?? t('Choisissez une table dans la roue : son tableau des scores, amis, pays et monde'),

@@ -452,6 +452,8 @@ export type PhoneMessage =
    */
   | { t: 'chat-send'; s: number; key: string; text: string }
   | { t: 'chat-react'; s: number; key: string; target: string; kind: string }
+  /** Salon par pays (rooms-menu.ts) : écrire une ligne dans le salon montré au téléphone ; la borne vérifie tout. */
+  | { t: 'room-send'; s: number; text: string }
   /**
    * Communauté (messages, amis) : le fil ouvert au téléphone, la clé publique d'un ami, ou aucun
    * (`key` absent : la liste). La borne envoie ce fil tant qu'il est ouvert, et le marque lu.
@@ -538,6 +540,8 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       return { t: 'ranks-off', s };
     case 'chat-send':
       return typeof m.key === 'string' && /^[0-9a-f]{64}$/.test(m.key) && typeof m.text === 'string' && m.text.length <= 4000 ? { t: 'chat-send', s, key: m.key, text: m.text } : undefined;
+    case 'room-send':
+      return typeof m.text === 'string' && m.text.length <= 1000 ? { t: 'room-send', s, text: m.text } : undefined;
     case 'chat-react':
       return typeof m.key === 'string' && /^[0-9a-f]{64}$/.test(m.key) && typeof m.target === 'string' && /^[0-9a-f]{16}$/.test(m.target) && typeof m.kind === 'string' && /^[a-z]{1,20}$/.test(m.kind) ? { t: 'chat-react', s, key: m.key, target: m.target, kind: m.kind } : undefined;
     case 'jb': {

@@ -492,6 +492,8 @@ export type UiAction =
   | { type: 'messages' }
   /** Notification d'un « J'aime » : Mon profil public (profile-menu.ts). */
   | { type: 'my-profile' }
+  /** Notification d'une mention dans un salon : ce salon (rooms-menu.ts). */
+  | { type: 'rooms' }
   /** Résumé « 4 nouveautés » : Activité récente, qui dit chacune en entier. */
   | { type: 'activity' }
   /** Repère de la liste de contenu (« Sortir de la liste », « Revenir à la liste ») : comme MagnaSave. */
@@ -553,6 +555,12 @@ export interface Row {
    * séparateur de jour. Les badges sont les réactions posées sur le message, sous la bulle.
    */
   bubble?: 'in' | 'out' | 'pending' | 'expired' | 'card' | 'day';
+  /**
+   * Ligne d'un salon (rooms-menu.ts), à l'ancienne : l'heure, le drapeau, « <pseudo> » à la teinte de
+   * sa clé, le texte. `kind` : une ligne, une action (/me), une ligne qui me cite, la mienne, ou une
+   * ligne de service (arrivée, départ) plus discrète.
+   */
+  log?: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys'; flag?: FlagView };
 }
 export interface Section {
   title?: string;

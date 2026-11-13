@@ -710,7 +710,7 @@ body[data-view='thread'] .views {
 
 .seg {
   display: none;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
   flex-shrink: 0;
   gap: 4px;
   padding: 4px;
@@ -721,6 +721,7 @@ body[data-view='thread'] .views {
 
 body:not([data-mode='browser'])[data-view='messages'] .seg,
 body:not([data-mode='browser'])[data-view='friends'] .seg,
+body:not([data-mode='browser'])[data-view='room'] .seg,
 body:not([data-mode='browser'])[data-view='ranks'] .seg {
   display: grid;
 }
@@ -3346,4 +3347,98 @@ body[data-layout='editing'] .jb-mini {
   background: none;
   color: var(--ink-muted);
   font-size: 22px;
+}
+
+/* Salon par pays : le journal à l'ancienne (une ligne par message), les phrases et le champ du fil. */
+.room {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+body:not([data-mode='browser'])[data-view='room'] .room {
+  display: flex;
+}
+
+body:not([data-state='paired']) .room {
+  visibility: hidden;
+}
+
+.room-head {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.room-lines {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: var(--surface-sunken);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.room-line {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  column-gap: 6px;
+  padding: 3px 4px;
+  font-size: 15px;
+  line-height: 21px;
+}
+
+.room-line time {
+  font-size: 12px;
+  line-height: 21px;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.room-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.room-nick {
+  font-weight: 600;
+  color: hsl(var(--h, 170) 75% 70%);
+}
+
+.room-nick::before {
+  content: '<';
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
+.room-nick::after {
+  content: '> ';
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
+.room-act {
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+.room-line.kind-own .room-nick {
+  color: var(--signal);
+}
+
+.room-line.kind-mention {
+  border-radius: 6px;
+  background: rgba(95, 180, 207, 0.12);
+  box-shadow: inset 3px 0 0 var(--meta);
 }

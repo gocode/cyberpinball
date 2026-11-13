@@ -89,7 +89,7 @@ const VIEWS = {
   buttons: { icon: 'gamepad', label: () => t('Boutons') },
 };
 /** Vues de la Communauté (un même onglet) : les messages, les amis, les scores ; et le fil d'un ami, plein écran. */
-const COMMUNITY_VIEWS = ['messages', 'friends', 'ranks'];
+const COMMUNITY_VIEWS = ['messages', 'friends', 'room', 'ranks'];
 const tabOf = (v) => (COMMUNITY_VIEWS.includes(v) || v === 'thread' ? 'community' : v === 'player' ? 'jukebox' : v);
 for (const [name, def] of Object.entries(VIEWS)) {
   const tab = $(`tab-${name}`);
@@ -314,6 +314,7 @@ function setView(next) {
   if (next === 'ranks' && before !== 'ranks') ranksEnter();
   if (next !== 'ranks' && before === 'ranks') ranksLeave();
   if (next === 'messages' || next === 'friends') renderCommunity();
+  if (next === 'room') renderRoom();
   if (next === 'jukebox' || next === 'player') renderJukebox();
 }
 

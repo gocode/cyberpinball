@@ -65,6 +65,25 @@ import {
   type ChatMessage,
   cardOf,
   cardsSample,
+  loadRooms,
+  mergeRoomLines,
+  roomBacklog,
+  roomLines,
+  saveRooms,
+  signRoomHere,
+  signRoomLine,
+  verifyRoomHere,
+  verifyRoomLine,
+  cannotWrite,
+  isRoomId,
+  roomsFile,
+  ROOM_BATCH,
+  ROOM_HERE_FRESH_MS,
+  ROOM_HERE_MS,
+  type RoomHere,
+  type RoomId,
+  type RoomLine,
+  type RoomsState,
   liveNow,
   liveSample,
   mergeBeacons,
@@ -275,6 +294,8 @@ type CardsMessage = { t: 'cards'; cards: PublicCard[] };
 type LikesMessage = { t: 'likes'; likes: Like[]; ttl: number };
 /** Présence publique (livepresence.ts) : « en ligne » ou « en partie », entre toutes les bornes. */
 type LiveMessage_ = { t: 'live'; live: LiveBeacon[] };
+/** Salons par pays (rooms.ts) : lignes, demande d'historique, présents ; entre toutes les bornes. */
+type RoomMessage = { t: 'room'; lines: RoomLine[] } | { t: 'room-ask'; room: RoomId; since?: string } | { t: 'room-here'; here: RoomHere[] };
 /** Un score à publier : le reste (clé, nom, pays, signature) vient de la borne. */
 /** Ce que la partie donne ; le nom, le pays et l'avatar sont ceux de la borne au moment de signer. */
 export type ScoreToPublish = Omit<RankedScore, 'key' | 'name' | 'country' | 'avatar' | 'sig'>;
@@ -284,7 +305,7 @@ export type FriendMessage = LibraryMessage | LiveMessage | ChatMessage;
 
 interface Link {
   stream: Duplex;
-  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage | LiveMessage_): void;
+  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage | LiveMessage_ | RoomMessage): void;
   /** Morceau de fichier (friendlibrary.ts, chunkFrame) ; false : le flux est plein, attendre « drain ». */
   sendChunk(frame: Buffer): boolean;
   via: 'internet' | 'lan';
@@ -403,6 +424,26 @@ export interface SocialNet {
   livePlayers(): LiveBeacon[];
   /** « Apparaître en ligne pour tous » (activé par défaut) ; mes amis voient toujours ma présence. */
   setPublicPresence(on: boolean): void;
+  /** Salons par pays (rooms.ts) : lignes gardées sur la borne, règles acceptées, joueurs ignorés, réglages. */
+  rooms(): RoomsState;
+  /**
+   * Écrire dans un salon : la ligne signée, gardée et envoyée à toutes les bornes reliées ; sinon
+   * pourquoi pas (salons désactivés, règles pas acceptées, trop tôt, trop de lignes, texte refusé).
+   */
+  roomSend(room: RoomId, text: string, action?: boolean): { line: RoomLine } | { reason: 'disabled' | 'rules' | 'gap' | 'burst' | 'text' | 'offline' };
+  /**
+   * Le salon à l'écran (undefined : aucun) : j'y suis présent (signal toutes les deux minutes), et son
+   * historique des 24 dernières heures est demandé aux bornes reliées.
+   */
+  roomOpen(room: RoomId | undefined): void;
+  /** Les présents d'un salon en ce moment (soi compris, s'il y est), le plus récent d'abord. */
+  roomPresent(room: RoomId): RoomHere[];
+  /** Arrivées et départs vus d'un salon (en mémoire), pour le journal. */
+  roomMoves(room: RoomId): { at: string; key: string; name: string; join: boolean }[];
+  /** Réglages et état des salons sur cette borne : règles acceptées, joueurs ignorés, filtre… */
+  setRooms(change: Partial<Pick<RoomsState, 'enabled' | 'filter' | 'mentionsInGame' | 'rulesAt' | 'defaultRoom' | 'ignored' | 'read'>>): void;
+  /** De nouvelles lignes dans les salons (pas les miennes) : les mentions de mon pseudo. */
+  onRoomLines(listener: (lines: RoomLine[]) => void): () => void;
   /** Masquer sur cette borne l'activité d'un joueur (ses évènements, ses « J'aime »). */
   hideActivity(key: string, hidden: boolean): void;
   activityHidden(key: string): boolean;
@@ -792,6 +833,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'likes') return receiveLikes(key, (raw as { likes?: unknown }).likes, (raw as { ttl?: unknown }).ttl);
         // Présence publique : de toute borne reliée, chaque signal vérifié par sa signature.
         if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'live') return receiveLive(key, (raw as { live?: unknown }).live);
+        // Salons par pays : de toute borne reliée, chaque ligne et chaque présent vérifiés par leur signature.
+        if (raw && typeof raw === 'object' && typeof (raw as { t?: unknown }).t === 'string' && ((raw as { t: string }).t === 'room' || (raw as { t: string }).t.startsWith('room-'))) return receiveRoom(key, raw as Record<string, unknown>, link);
         const parsed = parseSocialMessage(raw, now());
         if (parsed) return receive(key, parsed, link);
         // Bibliothèque partagée, partie en direct et messagerie : entre amis seulement.
@@ -865,6 +908,99 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   function announceLive(): void {
     const own = ownBeacon();
     if (own) for (const link of greetedLinks()) link.send({ t: 'live', live: [own] });
+  }
+
+  // ---------- Salons par pays ----------
+
+  let rooms = loadRooms(opts.dataDir, now());
+  let roomsTimer: NodeJS.Timeout | undefined;
+  function saveRoomsSoon(): void {
+    if (roomsTimer) return;
+    roomsTimer = setTimeout(() => {
+      roomsTimer = undefined;
+      saveOrWarn(roomsFile(opts.dataDir), () => saveRooms(opts.dataDir, rooms));
+    }, 2000);
+    roomsTimer.unref?.();
+  }
+  /** Le salon à l'écran ; ses présents, en mémoire ; les arrivées et départs vus. */
+  let roomShown: RoomId | undefined;
+  const hereBoard = new Map<string, RoomHere>();
+  const moves = new Map<RoomId, { at: string; key: string; name: string; join: boolean }[]>();
+  const roomListeners = new Set<(lines: RoomLine[]) => void>();
+  let hereTimer: NodeJS.Timeout | undefined;
+
+  function noteMove(room: RoomId, key: string, name: string, join: boolean): void {
+    const list = moves.get(room) ?? [];
+    list.push({ at: now().toISOString(), key, name, join });
+    moves.set(room, list.slice(-50));
+  }
+
+  /** Mon signal de présence dans le salon à l'écran, à toutes les bornes reliées. */
+  function announceHere(): void {
+    if (!roomShown || !state.enabled) return;
+    const here = signRoomHere(state, roomShown, myCountry(), now());
+    for (const link of greetedLinks()) link.send({ t: 'room-here', here: [here] });
+  }
+
+  /** L'historique du salon à l'écran, demandé à ces liaisons (depuis ma dernière ligne). */
+  function askBacklog(links: readonly Link[]): void {
+    if (!roomShown) return;
+    const since = roomLines(rooms, roomShown).at(-1)?.at;
+    for (const link of links) link.send({ t: 'room-ask', room: roomShown, ...(since ? { since } : {}) });
+  }
+
+  /** Les présents qui ont vieilli : leur départ se note. */
+  function expireHere(): void {
+    const limit = ms() - ROOM_HERE_FRESH_MS;
+    for (const [key, h] of hereBoard) {
+      if (Date.parse(h.at) >= limit) continue;
+      hereBoard.delete(key);
+      noteMove(h.room, key, h.name, false);
+    }
+  }
+
+  function receiveRoom(from: string, m: Record<string, unknown>, link: Link): void {
+    if (state.blocked.includes(from)) return;
+    if (m.t === 'room') {
+      if (!Array.isArray(m.lines)) return;
+      const lines = m.lines.slice(0, ROOM_BATCH).map((l) => verifyRoomLine(l, now())).filter((l): l is RoomLine => !!l && !state.blocked.includes(l.key) && l.key !== state.key.publicKey);
+      if (!lines.length) return;
+      const merged = mergeRoomLines(rooms, lines, now());
+      if (!merged.fresh.length) return;
+      rooms = merged.state;
+      saveRoomsSoon();
+      for (const l of greetedLinks(from)) l.send({ t: 'room', lines: merged.fresh });
+      for (const listener of roomListeners) listener(merged.fresh);
+      changed();
+      return;
+    }
+    if (m.t === 'room-ask') {
+      if (!isRoomId(m.room)) return;
+      const since = typeof m.since === 'string' && !Number.isNaN(Date.parse(m.since)) ? m.since : undefined;
+      const lines = roomBacklog(rooms, m.room, since, now());
+      if (lines.length) link.send({ t: 'room', lines });
+      return;
+    }
+    if (m.t === 'room-here') {
+      if (!Array.isArray(m.here)) return;
+      expireHere();
+      const fresh: RoomHere[] = [];
+      for (const raw of m.here.slice(0, ROOM_BATCH)) {
+        const h = verifyRoomHere(raw, now());
+        if (!h || h.key === state.key.publicKey || state.blocked.includes(h.key)) continue;
+        const had = hereBoard.get(h.key);
+        if (had && Date.parse(had.at) >= Date.parse(h.at)) continue;
+        hereBoard.set(h.key, h);
+        fresh.push(h);
+        if (!had || had.room !== h.room) {
+          if (had) noteMove(had.room, h.key, had.name, false);
+          noteMove(h.room, h.key, h.name, true);
+        }
+      }
+      if (!fresh.length) return;
+      for (const l of greetedLinks(from)) l.send({ t: 'room-here', here: fresh });
+      changed();
+    }
   }
 
   /** Signaux reçus : vérifiés, ceux d'un joueur bloqué laissés ; les nouveaux gardés et relayés. */
@@ -1022,6 +1158,15 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
           if (relationOf(state, key) === 'friend') greetFriend(key);
           // Mes « J'aime » pour ce joueur qui attendaient sa borne.
           deliverLikes(key);
+          // Ma présence publique telle qu'elle est maintenant : elle a pu changer (en partie, au menu)
+          // entre l'ouverture de cette liaison et son bonjour.
+          const own = ownBeacon();
+          if (own) link.send({ t: 'live', live: [own] });
+          // Salon à l'écran : son historique demandé à cette borne, et ma présence annoncée.
+          if (roomShown) {
+            askBacklog([link]);
+            if (state.enabled) link.send({ t: 'room-here', here: [signRoomHere(state, roomShown, myCountry(), now())] });
+          }
           changed();
         }
         return;
@@ -1303,6 +1448,12 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     retries = 0;
     lanRetries = 0;
     await teardown();
+    // Une ligne écrite juste avant l'arrêt n'attend pas l'écriture différée.
+    if (roomsTimer) {
+      clearTimeout(roomsTimer);
+      roomsTimer = undefined;
+      saveOrWarn(roomsFile(opts.dataDir), () => saveRooms(opts.dataDir, rooms));
+    }
     // Un « J'aime » donné ou reçu juste avant l'arrêt n'attend pas l'écriture différée.
     if (profilesTimer) {
       clearTimeout(profilesTimer);
@@ -1320,6 +1471,9 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     if (liveTimer) clearInterval(liveTimer);
     liveTimer = undefined;
     liveBoard.clear();
+    if (hereTimer) clearInterval(hereTimer);
+    hereTimer = undefined;
+    hereBoard.clear();
     for (const timer of [graceTimer, searchTimer, redialTimer]) if (timer) clearTimeout(timer);
     graceTimer = searchTimer = redialTimer = undefined;
     redialsSoon.clear();
@@ -1424,6 +1578,50 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       const { publicProfile: _, ...rest } = state;
       commit(on ? rest : { ...rest, publicProfile: false });
       if (on) announceCard();
+    },
+    rooms: () => rooms,
+    roomSend(room, text, action) {
+      if (!state.enabled) return { reason: 'disabled' };
+      const why = cannotWrite(rooms, state.key.publicKey, room, now());
+      if (why) return { reason: why };
+      const line = signRoomLine(state, { room, text, ...(action ? { me: true } : {}), ...(myCountry() ? { country: myCountry() } : {}) }, now());
+      if (!line) return { reason: 'text' };
+      rooms = mergeRoomLines(rooms, [line], now()).state;
+      rooms = { ...rooms, read: { ...rooms.read, [room]: line.at } };
+      saveRoomsSoon();
+      for (const link of greetedLinks()) link.send({ t: 'room', lines: [line] });
+      changed();
+      return { line };
+    },
+    roomOpen(room) {
+      if (room === roomShown) return;
+      roomShown = room;
+      if (hereTimer) clearInterval(hereTimer);
+      hereTimer = undefined;
+      if (!room) return;
+      announceHere();
+      askBacklog(greetedLinks());
+      hereTimer = setInterval(() => {
+        expireHere();
+        announceHere();
+      }, ROOM_HERE_MS);
+      hereTimer.unref?.();
+    },
+    roomPresent(room) {
+      expireHere();
+      const others = [...hereBoard.values()].filter((h) => h.room === room && !state.blocked.includes(h.key));
+      const me = roomShown === room && state.enabled ? [signRoomHere(state, room, myCountry(), now())] : [];
+      return [...me, ...others.sort((a, b) => Date.parse(b.at) - Date.parse(a.at))];
+    },
+    roomMoves: (room) => moves.get(room) ?? [],
+    setRooms(change) {
+      rooms = { ...rooms, ...change };
+      saveRoomsSoon();
+      changed();
+    },
+    onRoomLines(listener) {
+      roomListeners.add(listener);
+      return () => roomListeners.delete(listener);
     },
     livePlayers: () => liveNow(liveBoard, now()).filter((b: LiveBeacon) => !state.blocked.includes(b.key)),
     setPublicPresence(on) {
