@@ -4594,3 +4594,14 @@ body.mouse .lib-tab:not(.current):hover {
 body.mouse .room-line.pick:not(.selected):hover {
   border-color: var(--halo);
 }
+
+/* Ligne masquée par la modération : le pseudo reste, le texte dit la décision, en italique et éteint. */
+.room-line.kind-masked .room-say {
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+/* Sujet du salon, posé par la modération : une ligne au-dessus du journal. */
+.lib-section.kind-room-topic .lib-row {
+  font-weight: 600;
+}

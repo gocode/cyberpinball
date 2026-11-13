@@ -43,13 +43,14 @@ export type NoticeKind =
   | 'friend-message'
   | 'player-like'
   | 'room-mention'
+  | 'room-report'
   | 'friend-request' | 'friend-accepted' | 'download-failed' | 'download-done' | 'friend-online' | 'friend-playing' | 'friend-record' | 'friend-badge';
 
 /** Bleu méta : une information ; vert : une réussite ; ambre : à voir ; rouge : bloqué. */
 export type NoticeTone = 'ok' | 'info' | 'warning' | 'error';
 
 /** Ce qu'un clic sur la notification ouvre (action du menu des tables). */
-export type NoticeAct = { type: 'friends' } | { type: 'friend-requests' } | { type: 'downloads' } | { type: 'live-game' } | { type: 'activity' } | { type: 'messages' } | { type: 'my-profile' } | { type: 'rooms' };
+export type NoticeAct = { type: 'friends' } | { type: 'friend-requests' } | { type: 'downloads' } | { type: 'live-game' } | { type: 'activity' } | { type: 'messages' } | { type: 'my-profile' } | { type: 'rooms' } | { type: 'moderation' };
 
 export interface NoticeEvent {
   kind: NoticeKind;
@@ -124,6 +125,8 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   // Un « J'aime » sur mon activité publique (publicprofile.ts) : au menu, regroupés, jamais un par un.
   // Mon pseudo cité dans un salon (rooms.ts) : partout, par-dessus VPX compris si le réglage le permet.
   'room-mention': { priority: 9, ttlMs: 30 * MIN, quietMs: MIN, icon: 'globe', tone: 'info', act: { type: 'rooms' }, away: true, sound: 'news' },
+  // Un signalement reçu par un modérateur : au menu, regroupés.
+  'room-report': { priority: 8, ttlMs: 60 * MIN, quietMs: MIN, icon: 'alert', tone: 'warning', act: { type: 'moderation' }, sound: 'news' },
   'player-like': { priority: 18, ttlMs: 60 * MIN, quietMs: MIN, icon: 'star', tone: 'ok', act: { type: 'my-profile' } },
   'friend-request': { priority: 10, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friend-request', tone: 'warning', act: { type: 'friend-requests' } },
   'friend-accepted': { priority: 11, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friends', tone: 'ok', act: { type: 'friends' } },
@@ -345,6 +348,11 @@ export function noticeText(kind: NoticeKind, events: readonly NoticeEvent[], opt
       if (one) return fit({ title: t('{name} vous cite · {room}', { name: who(one), room: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
       return fit({ title: tn(n, '{n} mention dans les salons', '{n} mentions dans les salons'), detail: last.extra ? `${who(last)} : ${last.extra}` : names() });
     }
+    case 'room-report': {
+      const last = events[events.length - 1]!;
+      if (one) return fit({ title: t('Signalement · {room}', { room: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
+      return fit({ title: tn(n, '{n} signalement à traiter', '{n} signalements à traiter'), ...(last.extra ? { detail: last.extra } : {}) });
+    }
     case 'player-like': {
       // `subject` : ce qui est aimé (« Comet Chaser · 14 210 500 », un badge).
       const last = events[events.length - 1]!;
@@ -395,6 +403,8 @@ function digestPart(kind: NoticeKind, n: number): string {
       return tn(n, '{n} « J’aime »', '{n} « J’aime »');
     case 'room-mention':
       return tn(n, '{n} mention', '{n} mentions');
+    case 'room-report':
+      return tn(n, '{n} signalement', '{n} signalements');
     case 'friend-online':
       return tn(n, '{n} ami connecté', '{n} amis connectés');
     case 'friend-request':

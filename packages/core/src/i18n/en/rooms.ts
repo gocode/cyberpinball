@@ -56,7 +56,6 @@ export const messages: Record<string, string> = {
   'Ignorer {name} dans les salons': 'Ignore {name} in the rooms',
   'Ses lignes disparaissent de vos salons · il n’est pas prévenu': 'Their lines disappear from your rooms · they are not told',
   'Signaler ce message': 'Report this message',
-  'Avec la modération des salons, dans une prochaine version': 'With room moderation, in a later version',
   'Pas votre ami': 'Not your friend',
   'Votre ligne': 'Your line',
   'Plus de demande d’ami, plus de connexion avec sa borne, ses lignes disparaissent de vos salons. Débloquer : Partage et réseau.': 'No more friend requests, no more connection with their cabinet, their lines disappear from your rooms. Unblock: Sharing and network.',

@@ -39,21 +39,43 @@
 // CYBERPINBALL_RESEAU_DEMO=communaute (médaillon Communauté, Joueurs en ligne) : en plus de Bruno
 // (ami, en partie) et de Dora (réseau local), quatre joueurs qui ne sont pas des amis, de plusieurs
 // pays, dont deux en partie ; leur présence publique les fait apparaître dans « Joueurs en ligne ».
+// CYBERPINBALL_RESEAU_DEMO=moderation : la même chose, et la borne est modératrice d'une charte
+// d'essai (signée par une clé de projet créée pour l'essai, jamais la vraie) ; Kiko écrit une ligne
+// injurieuse, Dora et Ressort la signalent.
 // Leurs dossiers sont dans <données>\reseau-simule\ (le bac à sable de l'essai).
 // Leurs tables sont inventées, comme celles des captures de la page du projet : les captures
 // de ces démonstrations vont sur la page publique du projet, aucun vrai jeu ne doit y paraître
 // (packages\core\src\test\demo-tables-inventees.test.ts).
 
+import { generateKeyPairSync } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { acknowledge, addEvent, addToHistory, newChatState, readAvatarImage, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, PUP_FOLDER, readHostSettings, receiveLines, saveChat, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, toWire, verifyWire, writeLine, type LiveGame, type SocialState, type TableEntry } from '@cyberpinball/core';
+import { acknowledge, addEvent, addToHistory, newChatState, readAvatarImage, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, PUP_FOLDER, readHostSettings, receiveLines, saveChat, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, toWire, verifyWire, writeLine, type LiveGame, type SocialState, type TableEntry, signCharter, type Charter } from '@cyberpinball/core';
 import { createChatService, type ChatService } from './chat-service';
 import { createFriendContent, type FriendContent } from './friend-content';
 import { createLiveGames, createTableVersions, type LiveGames } from './live-game';
 import { createSocialNet, type SocialNet } from './social-net';
 
 export function simulatedPlayersWanted(env: NodeJS.ProcessEnv): boolean {
-  return ['1', ...LIVE_DEMOS, 'coupure', 'retour', 'notifications', 'messagerie', 'communaute'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
+  return ['1', ...LIVE_DEMOS, 'coupure', 'retour', 'notifications', 'messagerie', 'communaute', 'moderation'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
+}
+
+/** Charte d'essai de la démonstration de la modération : toutes les bornes du réseau simulé la reçoivent. */
+let demoCharterValue: Charter | undefined;
+
+/**
+ * Démonstration de la modération (réseau simulé seulement) : une clé de projet créée pour l'essai
+ * signe une charte où la borne est modératrice. La vraie clé du projet n'y est jamais : la charte ne
+ * vaut que dans ce réseau d'essai, dont les bornes la reçoivent en option (SocialNetOptions.charter).
+ */
+export function demoCharter(dataDir: string, env: NodeJS.ProcessEnv = process.env): Charter | undefined {
+  if (env.CYBERPINBALL_RESEAU_DEMO !== 'moderation') return undefined;
+  if (demoCharterValue) return demoCharterValue;
+  const me = loadSocial(dataDir);
+  saveSocial(dataDir, me);
+  const project = generateKeyPairSync('ed25519');
+  demoCharterValue = signCharter({ version: 1, moderators: [me.key.publicKey], at: new Date().toISOString() }, project.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString());
+  return demoCharterValue;
 }
 
 /** Les démonstrations de la partie en direct : Bruno invite la borne (`en-jeu` : pendant qu'elle joue). */
@@ -200,7 +222,7 @@ async function bot(dataDir: string, name: string, lan: boolean, bootstrap: { hos
   // Une borne fictive déjà venue (démarrage suivant de la démonstration) garde sa clé et ses amis.
   if (fs.existsSync(socialFile(dir))) saveSocial(dir, { ...loadSocial(dir), lan, ...extra });
   else saveSocial(dir, { ...setName(newSocialState(), name)!, lan, ...extra });
-  const net = createSocialNet({ dataDir: dir, mode: 'simulated', host: '127.0.0.1', bootstrap });
+  const net = createSocialNet({ dataDir: dir, mode: 'simulated', host: '127.0.0.1', bootstrap, ...(demoCharterValue ? { charter: demoCharterValue } : {}) });
   // Son avatar (avatar.ts) : une silhouette dessinée, jamais une vraie photo (les captures sont publiques).
   if (avatar) net.setAvatar(readAvatarImage(avatarPicture(avatar)));
   await net.start();
@@ -289,10 +311,11 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
 
   /** Minuteurs posés avant ceux des scénarios (le « J'aime » de Dora) : arrêtés avec eux. */
   const timersLater: NodeJS.Timeout[] = [];
-  const dora = await bot(dataDir, 'Dora', true, bootstrap, mode === 'communaute' ? { country: 'FR' } : {});
+  const community = mode === 'communaute' || mode === 'moderation';
+  const dora = await bot(dataDir, 'Dora', true, bootstrap, community ? { country: 'FR' } : {});
   // Communauté : des joueurs qui ne sont pas des amis, de plusieurs pays ; deux en partie (jamais la table chez les autres).
   const strangers: SocialNet[] = [];
-  if (mode === 'communaute') {
+  if (community) {
     const people: [string, string, boolean, [number, number, number]][] = [
       ['Kiko', 'FR', false, [210, 120, 80]],
       ['Ressort', 'FR', true, [120, 190, 90]],
@@ -318,6 +341,17 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     say(vortex!, 'salut de Bruxelles, je passe par le salon France', 6000); // i18n-ignore : ligne d'un joueur fictif
     say(kiko!, 'lance une partie de Star Courier, qui me suit ?', 7500, true); // i18n-ignore : ligne d'un joueur fictif
     say(bruno, `@${me.name} tu viens ? je finis ma bille et je lance une partie en direct`, 9000); // i18n-ignore : ligne d'un joueur fictif
+    // Modération : une ligne injurieuse de Kiko, signalée par Dora et Ressort.
+    if (mode === 'moderation') {
+      say(kiko!, 'Ressort t’es vraiment un gros nul, retourne jouer à la console', 11_000); // i18n-ignore : ligne d'un joueur fictif
+      timersLater.push(setTimeout(() => {
+        const bad = kiko!.rooms().lines.find((l) => l.key === kiko!.state().key.publicKey && /gros nul/.test(l.text));
+        if (!bad) return;
+        dora.report(bad, 'insults');
+        ressort!.report(bad, 'insults');
+        log('Réseau simulé : Dora et Ressort signalent la ligne de Kiko.'); // i18n-ignore : journal
+      }, 13_000));
+    }
   }
   // Profil public (messagerie) : Dora, qui n'est pas une amie, publie un record et un badge, puis aime le record de la borne.
   if (mode === 'messagerie') {

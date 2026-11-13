@@ -24,6 +24,7 @@ export const SYSTEM_ITEM_IDS = [
   'jukebox',
   'online-players',
   'community-settings',
+  'moderation',
   'messages',
   'public-profile',
   'friends',
@@ -134,7 +135,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     icon: 'friends',
     get label() { return t('Amis'); },
     get detail() { return t('Messages, mes amis, mon avatar, mon profil public, historique des parties, trouver un joueur, demandes, badges, partage'); },
-    entries: ['online-players', 'messages', 'friends', 'avatar', 'public-profile', 'game-history', 'find-player', 'friend-requests', 'badges', 'community-settings', 'sharing', 'live-scores', 'quiet-in-game'],
+    entries: ['online-players', 'messages', 'friends', 'avatar', 'public-profile', 'game-history', 'find-player', 'friend-requests', 'badges', 'community-settings', 'moderation', 'sharing', 'live-scores', 'quiet-in-game'],
   },
   borne: {
     id: 'borne',
@@ -183,6 +184,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   'online-players': { icon: 'globe', get label() { return t('Joueurs en ligne'); } },
   // Réglages de la communauté (rooms-menu.ts) : présence publique, salons, filtre de mots, joueurs ignorés, règles.
   'community-settings': { icon: 'sliders', get label() { return t('Réglages de la communauté'); } },
+  // La file des signalements des salons (rooms-menu.ts) : fournie aux seuls modérateurs de la charte.
+  moderation: { icon: 'alert', get label() { return t('Modération'); } },
   messages: { icon: 'message', get label() { return t('Messages'); } },
   friends: { icon: 'friend-list', get label() { return t('Mes amis'); } },
   avatar: { icon: 'avatar', get label() { return t('Mon avatar'); } },

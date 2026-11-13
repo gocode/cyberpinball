@@ -168,6 +168,7 @@ export * from './chat';
 export * from './publicprofile';
 export * from './livepresence';
 export * from './rooms';
+export * from './moderation';
 export * from './livechoice';
 export * from './livestart';
 export * from './notices';

@@ -443,7 +443,7 @@ import { createLiveGames, type LiveProgress, type LiveStartGate } from './live-g
 import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
 import { createActivityMenu } from './activity-menu';
-import { seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
+import { demoCharter, seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
 import { createDedicatedMenu } from './dedicated-menu';
 import { TableTints } from './table-tint';
 import { createDedicatedSystem } from './dedicated-system';
@@ -2479,11 +2479,16 @@ function socialChanged(): void {
     if (closing) return;
     // Un ami revenu en ligne : la messagerie lui envoie ce qui l'attendait (chat-service.ts).
     chatService.observe();
+    // Une charte reçue a pu faire de cette borne un modérateur (ou le contraire).
+    syncModerationItem();
     menuNotices.observe();
     broadcast();
   }, 250);
 }
+// Démonstration de la modération (réseau simulé seulement) : la charte d'essai où cette borne est modératrice.
+const socialCharter = socialDemo ? demoCharter(loc.dataDir) : undefined;
 const socialNet = createSocialNet({
+  ...(socialCharter ? { charter: socialCharter } : {}),
   dataDir: loc.dataDir,
   mode: socialMode,
   log: (line) => console.log(line),
@@ -2900,6 +2905,21 @@ const roomsMenu = createRoomsMenu({
   phoneLinked: () => phoneRemote?.connected() === 'menu',
 });
 library.provideSystemItem('community-settings', roomsMenu.settingsItem);
+// Modération : l'entrée n'existe que pour un modérateur de la charte (elle peut changer : relue à chaque changement du réseau).
+let moderationShown = false;
+function syncModerationItem(): void {
+  const on = socialNet.amModerator();
+  if (on === moderationShown) return;
+  moderationShown = on;
+  if (on) library.provideSystemItem('moderation', roomsMenu.moderationItem);
+  else library.withdrawSystemItem('moderation');
+}
+syncModerationItem();
+// Un signalement reçu (modérateur) : la notification, au menu.
+socialNet.onReports((reports) => {
+  syncModerationItem();
+  menuNotices.push(reports.map((r) => ({ kind: 'room-report' as const, key: r.id, at: Date.now(), who: r.name, player: r.line.key, subject: roomsMenu.roomName(r.line.room), extra: `${r.line.name} : ${r.line.text}` })));
+});
 // Mon pseudo cité dans un salon qui n'est pas à l'écran : la notification (au menu ; en partie, si le réglage le permet).
 socialNet.onRoomLines((lines) => {
   const s = socialNet.rooms();
@@ -4536,6 +4556,9 @@ export function startFrontend(): void {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) profileMenu.openMine(state.phase === 'menu' ? () => library.leave() : undefined);
     }
     // Message d'un ami : son fil (celui du dernier message non lu), sinon la liste des conversations.
+    else if (action.type === 'moderation') {
+      if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) roomsMenu.openModeration(state.phase === 'menu' ? () => library.leave() : () => library.openSystem());
+    }
     else if (action.type === 'rooms') {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) roomsMenu.openMention(state.phase === 'menu' ? () => library.leave() : () => library.openSystem());
     }

@@ -75,6 +75,27 @@ import {
   verifyRoomHere,
   verifyRoomLine,
   cannotWrite,
+  actsSample,
+  handleReports,
+  isModerator,
+  lineRefused,
+  loadModeration,
+  mergeCharter,
+  mergeModActs,
+  mergeReports,
+  moderationFile,
+  sanctionOf,
+  saveModeration,
+  signModAct,
+  signReport,
+  verifyCharter,
+  verifyModAct,
+  verifyReport,
+  type Charter,
+  type ModAct,
+  type ModerationState,
+  type ModReason,
+  type ModReport,
   isRoomId,
   roomsFile,
   ROOM_BATCH,
@@ -285,6 +306,8 @@ export interface SocialNetOptions {
   systemLocale?: () => string | undefined;
   /** De nouveaux « J'aime » sur mes évènements publics (publicprofile.ts) : la notification. */
   onLike?: (likes: Like[]) => void;
+  /** Essais : la charte des modérateurs à utiliser (signée par une clé de projet d'essai), à la place de la livrée. */
+  charter?: Charter;
 }
 
 /** Scores des classements national et mondial (rankings.ts) : entre toutes les bornes, pas seulement entre amis. */
@@ -296,6 +319,8 @@ type LikesMessage = { t: 'likes'; likes: Like[]; ttl: number };
 type LiveMessage_ = { t: 'live'; live: LiveBeacon[] };
 /** Salons par pays (rooms.ts) : lignes, demande d'historique, présents ; entre toutes les bornes. */
 type RoomMessage = { t: 'room'; lines: RoomLine[] } | { t: 'room-ask'; room: RoomId; since?: string } | { t: 'room-here'; here: RoomHere[] };
+/** Modération (moderation.ts) : charte et décisions entre toutes les bornes ; signalements chiffrés pour les modérateurs. */
+type ModMessage = { t: 'mod'; charter?: unknown; acts?: ModAct[] } | { t: 'report'; boxes: { to: string; box: string }[]; ttl: number };
 /** Un score à publier : le reste (clé, nom, pays, signature) vient de la borne. */
 /** Ce que la partie donne ; le nom, le pays et l'avatar sont ceux de la borne au moment de signer. */
 export type ScoreToPublish = Omit<RankedScore, 'key' | 'name' | 'country' | 'avatar' | 'sig'>;
@@ -305,7 +330,7 @@ export type FriendMessage = LibraryMessage | LiveMessage | ChatMessage;
 
 interface Link {
   stream: Duplex;
-  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage | LiveMessage_ | RoomMessage): void;
+  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage | LiveMessage_ | RoomMessage | ModMessage): void;
   /** Morceau de fichier (friendlibrary.ts, chunkFrame) ; false : le flux est plein, attendre « drain ». */
   sendChunk(frame: Buffer): boolean;
   via: 'internet' | 'lan';
@@ -430,7 +455,7 @@ export interface SocialNet {
    * Écrire dans un salon : la ligne signée, gardée et envoyée à toutes les bornes reliées ; sinon
    * pourquoi pas (salons désactivés, règles pas acceptées, trop tôt, trop de lignes, texte refusé).
    */
-  roomSend(room: RoomId, text: string, action?: boolean): { line: RoomLine } | { reason: 'disabled' | 'rules' | 'gap' | 'burst' | 'text' | 'offline' };
+  roomSend(room: RoomId, text: string, action?: boolean): { line: RoomLine } | { reason: 'disabled' | 'rules' | 'gap' | 'burst' | 'text' | 'offline' | 'muted' };
   /**
    * Le salon à l'écran (undefined : aucun) : j'y suis présent (signal toutes les deux minutes), et son
    * historique des 24 dernières heures est demandé aux bornes reliées.
@@ -444,6 +469,18 @@ export interface SocialNet {
   setRooms(change: Partial<Pick<RoomsState, 'enabled' | 'filter' | 'mentionsInGame' | 'rulesAt' | 'defaultRoom' | 'ignored' | 'read'>>): void;
   /** De nouvelles lignes dans les salons (pas les miennes) : les mentions de mon pseudo. */
   onRoomLines(listener: (lines: RoomLine[]) => void): () => void;
+  /** Modération des salons (moderation.ts) : la charte connue, les décisions, les signalements reçus (modérateur). */
+  moderation(): ModerationState;
+  /** Je suis modérateur (ma clé est dans la charte). */
+  amModerator(): boolean;
+  /** Une décision de modérateur : signée, appliquée ici, envoyée à toutes les bornes ; rend false si je ne suis pas modérateur. */
+  moderate(act: Omit<ModAct, 'id' | 'by' | 'at' | 'sig'>): boolean;
+  /** Signaler une ligne : le signalement part, chiffré, vers chaque modérateur (directement, ou relayé). */
+  report(line: RoomLine, reason: ModReason): void;
+  /** Les signalements de cette ligne sont traités (modérateur). */
+  handleReports(lineId: string): void;
+  /** De nouveaux signalements reçus (modérateur) : la notification. */
+  onReports(listener: (reports: ModReport[]) => void): () => void;
   /** Masquer sur cette borne l'activité d'un joueur (ses évènements, ses « J'aime »). */
   hideActivity(key: string, hidden: boolean): void;
   activityHidden(key: string): boolean;
@@ -835,6 +872,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'live') return receiveLive(key, (raw as { live?: unknown }).live);
         // Salons par pays : de toute borne reliée, chaque ligne et chaque présent vérifiés par leur signature.
         if (raw && typeof raw === 'object' && typeof (raw as { t?: unknown }).t === 'string' && ((raw as { t: string }).t === 'room' || (raw as { t: string }).t.startsWith('room-'))) return receiveRoom(key, raw as Record<string, unknown>, link);
+        // Modération : charte et décisions vérifiées par leurs signatures ; signalements chiffrés.
+        if (raw && typeof raw === 'object' && ((raw as { t?: unknown }).t === 'mod' || (raw as { t?: unknown }).t === 'report')) return receiveModeration(key, raw as Record<string, unknown>);
         const parsed = parseSocialMessage(raw, now());
         if (parsed) return receive(key, parsed, link);
         // Bibliothèque partagée, partie en direct et messagerie : entre amis seulement.
@@ -886,6 +925,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     // Ma carte publique et une part de celles que je connais ; une borne d'avant les profils publics ignore ce message.
     const cards = cardsSample(profiles, ownCard());
     if (cards.length) link.send({ t: 'cards', cards });
+    // La charte des modérateurs et les décisions en vigueur ; une borne d'avant la modération ignore ce message.
+    link.send(moderationSample());
     // Qui est en ligne : mon signal et les plus récents connus ; une borne d'avant la présence publique ignore ce message.
     const live = liveSample(liveBoard, ownBeacon(), now());
     if (live.length) link.send({ t: 'live', live });
@@ -959,11 +1000,155 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     }
   }
 
+  // ---------- Modération des salons ----------
+
+  let moderation = loadModeration(opts.dataDir, now());
+  if (opts.charter) moderation = { ...moderation, charter: opts.charter };
+  let moderationTimer: NodeJS.Timeout | undefined;
+  function saveModerationSoon(): void {
+    if (moderationTimer) return;
+    moderationTimer = setTimeout(() => {
+      moderationTimer = undefined;
+      saveOrWarn(moderationFile(opts.dataDir), () => saveModeration(opts.dataDir, moderation));
+    }, 2000);
+    moderationTimer.unref?.();
+  }
+  const reportListeners = new Set<(reports: ModReport[]) => void>();
+  /** Boîtes de signalement déjà relayées : un relais ne repasse pas deux fois. */
+  const boxesRelayed = new Set<string>();
+
+  // Chiffrement des signalements : la clé Ed25519 du joueur, convertie en clé X25519 (libsodium).
+  const sodium = (() => {
+    try {
+      return require('sodium-universal') as {
+        crypto_box_SEALBYTES: number;
+        crypto_box_seal(c: Buffer, m: Buffer, pk: Buffer): void;
+        crypto_box_seal_open(m: Buffer, c: Buffer, pk: Buffer, sk: Buffer): boolean;
+        crypto_sign_ed25519_pk_to_curve25519(curve: Buffer, ed: Buffer): void;
+        crypto_sign_ed25519_sk_to_curve25519(curve: Buffer, ed: Buffer): void;
+        crypto_sign_seed_keypair(pk: Buffer, sk: Buffer, seed: Buffer): void;
+      };
+    } catch {
+      return undefined;
+    }
+  })();
+  function sealFor(key: string, text: string): string | undefined {
+    if (!sodium) return undefined;
+    try {
+      const pk = Buffer.alloc(32);
+      sodium.crypto_sign_ed25519_pk_to_curve25519(pk, Buffer.from(key, 'hex'));
+      const m = Buffer.from(text, 'utf8');
+      const c = Buffer.alloc(m.length + sodium.crypto_box_SEALBYTES);
+      sodium.crypto_box_seal(c, m, pk);
+      return c.toString('base64');
+    } catch {
+      return undefined;
+    }
+  }
+  function openBox(box: string): string | undefined {
+    if (!sodium) return undefined;
+    try {
+      const edPk = Buffer.alloc(32);
+      const edSk = Buffer.alloc(64);
+      sodium.crypto_sign_seed_keypair(edPk, edSk, playerSeed(state.key));
+      const pk = Buffer.alloc(32);
+      const sk = Buffer.alloc(32);
+      sodium.crypto_sign_ed25519_pk_to_curve25519(pk, edPk);
+      sodium.crypto_sign_ed25519_sk_to_curve25519(sk, edSk);
+      const c = Buffer.from(box, 'base64');
+      if (c.length < sodium.crypto_box_SEALBYTES) return undefined;
+      const m = Buffer.alloc(c.length - sodium.crypto_box_SEALBYTES);
+      return sodium.crypto_box_seal_open(m, c, pk, sk) ? m.toString('utf8') : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Ce que je donne au bonjour : la charte, et les décisions en vigueur (avec les levées). */
+  function moderationSample(): ModMessage {
+    return { t: 'mod', charter: moderation.charter, acts: actsSample(moderation, now()) };
+  }
+
+  /** Signalements pour d'autres que moi : à leur borne si elle est reliée, sinon un relais de plus tant qu'il en reste. */
+  function forwardBoxes(boxes: { to: string; box: string }[], ttl: number, from?: string): void {
+    for (const b of boxes) {
+      const direct = bestLink(b.to);
+      if (direct?.greeted) direct.send({ t: 'report', boxes: [b], ttl: 0 });
+      else if (ttl > 0) for (const link of greetedLinks(from)) link.send({ t: 'report', boxes: [b], ttl: ttl - 1 });
+    }
+  }
+
+  function receiveModeration(from: string, m: Record<string, unknown>): void {
+    if (state.blocked.includes(from)) return;
+    if (m.t === 'mod') {
+      let changedAny = false;
+      if (m.charter !== undefined) {
+        const c = verifyCharter(m.charter);
+        const next = c && mergeCharter(moderation, c);
+        if (next) {
+          moderation = next;
+          changedAny = true;
+          for (const link of greetedLinks(from)) link.send({ t: 'mod', charter: c });
+        }
+      }
+      if (Array.isArray(m.acts)) {
+        const acts = m.acts.slice(0, 200).map((a) => verifyModAct(a, moderation.charter, now())).filter((a): a is ModAct => !!a);
+        const merged = mergeModActs(moderation, acts, now());
+        if (merged.fresh.length) {
+          moderation = merged.state;
+          changedAny = true;
+          for (const link of greetedLinks(from)) link.send({ t: 'mod', acts: merged.fresh });
+        }
+      }
+      if (changedAny) {
+        saveModerationSoon();
+        changed();
+      }
+      return;
+    }
+    if (m.t === 'report' && Array.isArray(m.boxes)) {
+      const ttl = typeof m.ttl === 'number' && Number.isInteger(m.ttl) ? Math.max(0, Math.min(m.ttl, 2)) : 0;
+      const boxes = m.boxes.slice(0, 20).filter((b): b is { to: string; box: string } => !!b && typeof (b as { to?: unknown }).to === 'string' && /^[0-9a-f]{64}$/.test((b as { to: string }).to) && typeof (b as { box?: unknown }).box === 'string' && (b as { box: string }).box.length <= 8000);
+      const mine: ModReport[] = [];
+      const others: { to: string; box: string }[] = [];
+      for (const b of boxes) {
+        if (b.to === state.key.publicKey) {
+          if (!isModerator(moderation.charter, state.key.publicKey)) continue;
+          const text = openBox(b.box);
+          let parsed: unknown;
+          try {
+            parsed = text ? JSON.parse(text) : undefined;
+          } catch {
+            parsed = undefined;
+          }
+          const r = verifyReport(parsed, now());
+          if (r) mine.push(r);
+          continue;
+        }
+        if (boxesRelayed.has(b.box)) continue;
+        boxesRelayed.add(b.box);
+        if (boxesRelayed.size > 2000) boxesRelayed.clear();
+        others.push(b);
+      }
+      if (others.length) forwardBoxes(others, ttl, from);
+      if (mine.length) {
+        const merged = mergeReports(moderation, mine, now());
+        if (merged.fresh.length) {
+          moderation = merged.state;
+          saveModerationSoon();
+          for (const listener of reportListeners) listener(merged.fresh);
+          changed();
+        }
+      }
+    }
+  }
+
   function receiveRoom(from: string, m: Record<string, unknown>, link: Link): void {
     if (state.blocked.includes(from)) return;
     if (m.t === 'room') {
       if (!Array.isArray(m.lines)) return;
-      const lines = m.lines.slice(0, ROOM_BATCH).map((l) => verifyRoomLine(l, now())).filter((l): l is RoomLine => !!l && !state.blocked.includes(l.key) && l.key !== state.key.publicKey);
+      // Une ligne d'un joueur exclu, ou en sourdine à son heure, n'est ni gardée ni relayée.
+      const lines = m.lines.slice(0, ROOM_BATCH).map((l) => verifyRoomLine(l, now())).filter((l): l is RoomLine => !!l && !state.blocked.includes(l.key) && l.key !== state.key.publicKey && !lineRefused(moderation.acts, l));
       if (!lines.length) return;
       const merged = mergeRoomLines(rooms, lines, now());
       if (!merged.fresh.length) return;
@@ -1448,6 +1633,11 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     retries = 0;
     lanRetries = 0;
     await teardown();
+    if (moderationTimer) {
+      clearTimeout(moderationTimer);
+      moderationTimer = undefined;
+      saveOrWarn(moderationFile(opts.dataDir), () => saveModeration(opts.dataDir, moderation));
+    }
     // Une ligne écrite juste avant l'arrêt n'attend pas l'écriture différée.
     if (roomsTimer) {
       clearTimeout(roomsTimer);
@@ -1579,11 +1769,48 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       commit(on ? rest : { ...rest, publicProfile: false });
       if (on) announceCard();
     },
+    moderation: () => moderation,
+    amModerator: () => isModerator(moderation.charter, state.key.publicKey),
+    moderate(act) {
+      if (!isModerator(moderation.charter, state.key.publicKey)) return false;
+      const signed = signModAct(state.key, act, now());
+      moderation = mergeModActs(moderation, [signed], now()).state;
+      saveModerationSoon();
+      for (const link of greetedLinks()) link.send({ t: 'mod', acts: [signed] });
+      changed();
+      return true;
+    },
+    report(line, reason) {
+      const report = signReport(state, line, reason, now());
+      const text = JSON.stringify(report);
+      const boxes = moderation.charter.moderators.filter((k) => k !== state.key.publicKey).flatMap((to) => {
+        const box = sealFor(to, text);
+        return box ? [{ to, box }] : [];
+      });
+      // Je suis moi-même modérateur : le signalement entre directement dans ma file.
+      if (isModerator(moderation.charter, state.key.publicKey)) {
+        moderation = mergeReports(moderation, [report], now()).state;
+        saveModerationSoon();
+      }
+      for (const b of boxes) boxesRelayed.add(b.box);
+      forwardBoxes(boxes, 2);
+      changed();
+    },
+    handleReports(lineId) {
+      moderation = handleReports(moderation, lineId, now());
+      saveModerationSoon();
+      changed();
+    },
+    onReports(listener) {
+      reportListeners.add(listener);
+      return () => reportListeners.delete(listener);
+    },
     rooms: () => rooms,
     roomSend(room, text, action) {
       if (!state.enabled) return { reason: 'disabled' };
       const why = cannotWrite(rooms, state.key.publicKey, room, now());
       if (why) return { reason: why };
+      if (sanctionOf(moderation.acts, state.key.publicKey, now())) return { reason: 'muted' };
       const line = signRoomLine(state, { room, text, ...(action ? { me: true } : {}), ...(myCountry() ? { country: myCountry() } : {}) }, now());
       if (!line) return { reason: 'text' };
       rooms = mergeRoomLines(rooms, [line], now()).state;

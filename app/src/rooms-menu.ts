@@ -26,6 +26,14 @@ import {
   t,
   tn,
   WORLD_ROOM,
+  lineHidden,
+  MOD_REASONS,
+  MUTE_HOURS,
+  pendingReports,
+  roomTopic,
+  sanctionOf,
+  TOPIC_MAX,
+  type ModReason,
   type RoomId,
   type RoomLine,
   type TableEntry,
@@ -70,6 +78,10 @@ export interface RoomsMenu {
   shown(): RoomId | undefined;
   /** Écrire depuis le téléphone (ou un autre clavier) dans un salon : la raison d'un refus, en clair. */
   write(room: RoomId, text: string): string | undefined;
+  /** Menu système > Amis > Modération (modérateurs seulement) : la file des signalements. */
+  moderationItem: ProvidedSystemItem;
+  /** Clic sur la notification d'un signalement : la file, son « Retour » vers `back`. */
+  openModeration(back: () => void): void;
   /** Le salon pour le téléphone : celui à l'écran, sinon celui par défaut ; ses 60 dernières lignes. */
   remote(): { room: RoomId; name: string; present: number; lines: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' }[]; phrases: string[]; blocked?: string };
 }
@@ -124,7 +136,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
     if (!s.enabled) return t('Salons désactivés : Réglages de la communauté');
     if (!net.status().running) return t('Pas relié au réseau des bornes pour l’instant');
     void room;
-    return undefined;
+    return mySanction();
   }
 
   function sendReason(reason: string): string {
@@ -137,9 +149,35 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         return t('Vingt lignes en dix minutes au plus : patientez un peu');
       case 'disabled':
         return t('Salons désactivés : Réglages de la communauté');
+      case 'muted':
+        return mySanction() ?? t('Décision de la modération : vous ne pouvez pas écrire pour l’instant');
       default:
         return t('Ligne vide ou trop longue : 300 caractères au plus');
     }
+  }
+
+  function reasonLabel(r: ModReason): string {
+    switch (r) {
+      case 'insults':
+        return t('Insultes ou harcèlement');
+      case 'spam':
+        return t('Spam ou publicité');
+      case 'shocking':
+        return t('Contenu choquant');
+      case 'personal':
+        return t('Informations personnelles');
+      default:
+        return t('Autre');
+    }
+  }
+
+  /** Ma sanction en cours, en clair (« En sourdine jusqu'à 22:40 · raison : insultes ») ; undefined : aucune. */
+  function mySanction(): string | undefined {
+    const a = sanctionOf(net.moderation().acts, me().key.publicKey, now());
+    if (!a) return undefined;
+    const why = a.reason ? t('raison : {reason}', { reason: reasonLabel(a.reason).toLowerCase() }) : undefined;
+    const head = a.kind === 'ban' ? t('Exclu des salons par la modération') : t('En sourdine jusqu’à {time}', { time: time(a.until!) });
+    return [head, a.kind === 'mute' ? t('décision de la modération') : undefined, why].filter(Boolean).join(' · ');
   }
 
   /** Écrire : « /me … » est une action ; « /ignorer pseudo » ignore ce joueur. Rend la raison d'un refus. */
@@ -196,6 +234,10 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       sections.push({ rows: [{ text: notice.text, tone: notice.tone }] });
       notice = undefined;
     }
+    // Le sujet du salon, posé par la modération.
+    const acts = net.moderation().acts;
+    const topic = roomTopic(acts, room, now());
+    if (topic) sections.push({ kind: 'room-topic', rows: [{ text: t('Sujet : {text}', { text: topic.text! }), icon: 'pin', tone: 'info' }] });
     const rows: Row[] = items.map((it) => {
       if ('move' in it && it.move) {
         const m = it.move;
@@ -203,9 +245,10 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       }
       const l = (it as { line: RoomLine }).line;
       const own = l.key === self;
-      const text = shownText(l.text);
+      const hidden = lineHidden(acts, l.id, now());
+      const text = hidden ? t('message masqué par la modération') : shownText(l.text);
       const index = actions.push({ label: t('Ligne de {name} à {time}', { name: l.name, time: time(l.at) }), key: `line:${l.id}`, run: () => openLine(l) }) - 1;
-      const kind = own ? 'own' : l.me ? 'me' : mentions(l.text, me().name) ? 'mention' : 'line';
+      const kind = hidden ? 'masked' : own ? 'own' : l.me ? 'me' : mentions(l.text, me().name) ? 'mention' : 'line';
       return {
         text: `${l.name} : ${text}`,
         log: { time: time(l.at), nick: l.name, hue: hueOf(l.key, l.name), text, kind, ...(l.country ? { flag: flagView(l.country, locale()) } : {}) },
@@ -240,6 +283,12 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       ...(problem ? { tone: 'quiet' as const } : {}),
       run: () => (problem ? lib.openCustom(buildRoom) : s.rulesAt ? openWrite(room) : openRules(() => openWrite(room))),
     });
+    // Modérateur : le sujet du salon et la file des signalements.
+    if (net.amModerator()) {
+      const pending = pendingReports(net.moderation()).length;
+      actions.push({ label: t('Sujet du salon…'), detail: topic ? topic.text! : t('Aucun sujet · modération'), icon: 'pin', run: () => askTopic(room) });
+      actions.push({ label: t('Signalements ({n})', { n: pending }), detail: t('Modération : les lignes signalées, à traiter'), icon: 'alert', ...(pending ? { attention: true } : {}), run: () => openModeration(() => openRoom(room, back)) });
+    }
     actions.push({ label: t('Autres salons…'), detail: t('Monde, et les salons des autres pays'), icon: 'list', run: () => openList(() => openRoom(room, back)) });
     actions.push({ label: t('Règles des salons'), icon: 'rules', run: () => openRules(() => openRoom(room, back)) });
     actions.push({ label: t('Retour'), icon: 'back', run: () => leave(back) });
@@ -315,7 +364,8 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         actions.push(isIgnored
           ? { label: t('Ne plus ignorer {name}', { name: l.name }), icon: 'eye', run: () => { setIgnored(l.key, false); backToRoom(); } }
           : { label: t('Ignorer {name} dans les salons', { name: l.name }), detail: t('Ses lignes disparaissent de vos salons · il n’est pas prévenu'), icon: 'eye', run: () => { setIgnored(l.key, true); notice = { text: t('{name} est ignoré dans les salons', { name: l.name }), tone: 'ok' }; backToRoom(); } });
-        actions.push({ label: t('Signaler ce message'), detail: t('Avec la modération des salons, dans une prochaine version'), icon: 'alert', tone: 'quiet', run: here });
+        actions.push({ label: t('Signaler ce message'), detail: t('Envoyé chiffré aux modérateurs, avec la raison ; {name} ne saura pas qui', { name: l.name }), icon: 'alert', run: () => askReason(t('Signaler ce message'), (reason) => { net.report(l, reason); notice = { text: t('Signalement envoyé aux modérateurs'), tone: 'ok' }; backToRoom(); }, here) });
+        if (net.amModerator()) for (const a of decisions(l, backToRoom)) actions.push(a);
         actions.push({ label: t('Bloquer {name}', { name: l.name }), detail: t('Plus de demande, plus de connexion avec sa borne'), icon: 'lock', tone: 'warning', run: () => confirmBlock(l, here, backToRoom) });
       }
       actions.push({ label: t('Retour au salon'), icon: 'back', run: backToRoom });
@@ -346,6 +396,121 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       }),
       1,
     );
+  }
+
+  // ---------- Modération ----------
+
+  /** Choisir une raison (signaler, décider), puis `done`. */
+  function askReason(heading: string, done: (reason: ModReason) => void, cancel: () => void): void {
+    lib.openCustom(() => ({
+      heading,
+      icon: 'alert',
+      lead: t('Pourquoi ? La raison est jointe, et dite au joueur s’il est sanctionné.'),
+      sections: [],
+      actions: [...MOD_REASONS.map((r) => ({ label: reasonLabel(r), key: `reason:${r}`, run: () => done(r) })), { label: t('Annuler'), icon: 'back' as const, run: cancel }],
+      back: cancel,
+    }));
+  }
+
+  /** Les décisions d'un modérateur sur une ligne : masquer, sourdine, exclure, lever ce qui est en cours. */
+  function decisions(l: RoomLine, after: () => void): Action[] {
+    const acts = net.moderation().acts;
+    const decide = (act: Parameters<typeof net.moderate>[0], text: string) => {
+      net.moderate(act);
+      net.handleReports(l.id);
+      notice = { text, tone: 'ok' };
+      after();
+    };
+    const out: Action[] = [];
+    const hide = acts.find((a) => a.kind === 'hide' && a.target === l.id && lineHidden([a], l.id, now()));
+    out.push(
+      hide
+        ? { label: t('Ne plus masquer ce message'), detail: t('Modération · pour tous les joueurs'), icon: 'eye', run: () => decide({ kind: 'lift', target: hide.id }, t('Message de nouveau visible')) }
+        : { label: t('Masquer ce message'), detail: t('Modération · pour tous les joueurs'), icon: 'eye', run: () => askReason(t('Masquer ce message'), (reason) => decide({ kind: 'hide', target: l.id, reason }, t('Message masqué pour tous')), () => openLine(l)) },
+    );
+    const current = sanctionOf(acts, l.key, now());
+    if (current) {
+      out.push({ label: t('Lever la sanction de {name}', { name: l.name }), detail: current.kind === 'ban' ? t('Exclu des salons') : t('En sourdine jusqu’à {time}', { time: time(current.until!) }), icon: 'unlock', run: () => decide({ kind: 'lift', target: current.id }, t('Sanction levée')) });
+    } else {
+      for (const hours of MUTE_HOURS) {
+        const label = hours === 1 ? t('Sourdine 1 h') : hours === 24 ? t('Sourdine 24 h') : t('Sourdine 7 jours');
+        out.push({ label, detail: t('Lecture seule dans tous les salons, et le message masqué'), icon: hours === 1 ? 'volume-low' : hours === 24 ? 'volume-mute' : 'calendar', key: `mute:${hours}`, run: () => askReason(label, (reason) => { net.moderate({ kind: 'hide', target: l.id, reason }); decide({ kind: 'mute', target: l.key, name: l.name, until: new Date(now().getTime() + hours * 3600_000).toISOString(), reason }, t('{name} en sourdine', { name: l.name })); }, () => openLine(l)) });
+      }
+      out.push({ label: t('Exclure des salons'), detail: t('Sans limite de durée, et le message masqué'), icon: 'close', tone: 'warning', run: () => askReason(t('Exclure des salons'), (reason) => { net.moderate({ kind: 'hide', target: l.id, reason }); decide({ kind: 'ban', target: l.key, name: l.name, reason }, t('{name} exclu des salons', { name: l.name })); }, () => openLine(l)) });
+    }
+    return out;
+  }
+
+  function askTopic(room: RoomId): void {
+    const back = () => openRoom(room, current?.back ?? (() => lib.openSystem()));
+    lib.openPrompt(t('Sujet du salon'), roomName(room), roomTopic(net.moderation().acts, room, now())?.text ?? '', (text) => {
+      const clean = text === undefined ? undefined : (cleanRoomText(text) ?? '');
+      if (clean !== undefined) {
+        net.moderate({ kind: 'topic', room, text: [...clean].slice(0, TOPIC_MAX).join('') });
+        notice = { text: clean ? t('Sujet posé') : t('Sujet retiré'), tone: 'ok' };
+      }
+      back();
+    }, t('Une ligne, 120 caractères au plus ; vide : plus de sujet.'));
+  }
+
+  /** La file des signalements : une ligne par message signalé, les plus signalés d'abord. */
+  function openModeration(back: () => void): void {
+    const here = () => openModeration(back);
+    lib.openCustom(() => {
+      const queue = pendingReports(net.moderation());
+      const actions: Action[] = [];
+      const rows: Row[] = queue.map((q) => {
+        const index = actions.push({ label: t('Signalement de la ligne de {name}', { name: q.line.name }), key: `report:${q.line.id}`, run: () => openReport(q.line.id, here) }) - 1;
+        const reasons = [...new Set(q.reports.map((r) => reasonLabel(r.reason)))].join(', ');
+        return {
+          text: `${q.line.name} : ${shownText(q.line.text)}`,
+          detail: [roomName(q.line.room), time(q.line.at), tn(q.reports.length, '{n} signalement', '{n} signalements'), reasons].join(' · '),
+          icon: 'alert',
+          tone: 'warning',
+          action: index,
+          pick: true,
+        } satisfies Row;
+      });
+      actions.push({ label: t('Retour'), icon: 'back', run: back });
+      return {
+        heading: t('Signalements'),
+        icon: 'alert',
+        subheading: tn(queue.length, '{n} message à traiter', '{n} messages à traiter'),
+        lead: t('Vos décisions sont signées de votre clé de modérateur et appliquées par toutes les bornes. Le joueur signalé ne sait pas qui l’a signalé.'),
+        sections: [{ rows: rows.length ? rows : [{ text: t('Rien à traiter'), icon: 'check', tone: 'ok' }] }],
+        actions,
+        back,
+      };
+    });
+  }
+
+  /** Un message signalé : le contexte (les lignes autour), qui l'a signalé et pourquoi, les décisions. */
+  function openReport(lineId: string, back: () => void): void {
+    lib.openCustom(() => {
+      const q = pendingReports(net.moderation()).find((x) => x.line.id === lineId);
+      if (!q) return { heading: t('Signalements'), icon: 'alert', sections: [{ rows: [{ text: t('Déjà traité'), icon: 'check', tone: 'ok' }] }], actions: [{ label: t('Retour'), icon: 'back', run: back }], back };
+      const l = q.line;
+      const all = roomLines(net.rooms(), l.room);
+      const at = all.findIndex((x) => x.id === l.id);
+      const context = at >= 0 ? all.slice(Math.max(0, at - 3), at + 3) : [l];
+      const rows: Row[] = context.map((x) => ({ text: `${x.name} : ${x.text}`, log: { time: time(x.at), nick: x.name, hue: hueOf(x.key, x.name), text: x.text, kind: x.id === l.id ? 'mention' : 'line', ...(x.country ? { flag: flagView(x.country, locale()) } : {}) } }));
+      const actions: Action[] = [
+        ...decisions(l, back),
+        { label: t('Classer sans suite'), detail: t('Rien n’est appliqué ; le signalement sort de la file'), icon: 'check', run: () => { net.handleReports(l.id); back(); } },
+        { label: t('Retour'), icon: 'back', run: back },
+      ];
+      return {
+        heading: t('Ligne de {name}', { name: l.name, time: time(l.at) }),
+        avatar: avatarView(l.key, l.name, net.avatarFile(l.key)),
+        subheading: [roomName(l.room), time(l.at)].join(' · '),
+        sections: [
+          { kind: 'room', rows },
+          { title: t('Signalé par ({n})', { n: q.reports.length }), rows: q.reports.map((r) => ({ text: r.name, detail: [reasonLabel(r.reason), time(r.at)].join(' · '), icon: 'alert' as const })) },
+        ],
+        actions,
+        back,
+      };
+    });
   }
 
   // ---------- Règles ----------
@@ -475,6 +640,17 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
     defaultRoom,
     unreadMentions,
     shown: () => (current && lib.isShowing(buildRoom) ? current.room : undefined),
+    moderationItem: {
+      get detail() {
+        const n = pendingReports(net.moderation()).length;
+        return n ? tn(n, '{n} message signalé à traiter', '{n} messages signalés à traiter') : t('Rien à traiter');
+      },
+      get attention() {
+        return pendingReports(net.moderation()).length > 0;
+      },
+      run: () => openModeration(() => lib.openSystem()),
+    },
+    openModeration,
     remote() {
       const room = current && lib.isShowing(buildRoom) ? current.room : defaultRoom();
       const self = me().key.publicKey;
