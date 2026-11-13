@@ -24,12 +24,6 @@ export const messages: Record<string, string> = {
   Collections: 'Collections',
   'affichée sur la roue': 'shown on the wheel',
   'Affichée : {collection}': 'Shown: {collection}',
-  '{n} autre au-dessus': '{n} more above',
-  '{n} autres au-dessus': '{n} more above',
-  '{n} autre en dessous': '{n} more below',
-  '{n} autres en dessous': '{n} more below',
-  'MagnaSave : changer de collection': 'MagnaSave: change collection',
-  'Flippers : tables · Start : fiche': 'Flippers: tables · Start: game page',
   // app/src/frontend.ts
   'Changer de collection (Toutes, Favoris, Récentes, un fabricant, une décennie…)': 'Change collection (All, Favourites, Recent, a manufacturer, a decade…)',
   'MagnaSave gauche ou droit, ou clic sur le repère au-dessus de la roue': 'Left or right MagnaSave, or click the marker above the wheel',

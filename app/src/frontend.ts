@@ -1476,7 +1476,6 @@ function openJukebox(playlist?: string): void {
     }
   }
   cancelWheelPress();
-  collections.hidePanel();
   const fresh = !jukeboxPlayer.active();
   state = { ...state, phase: 'jukebox', help: false, message: undefined, medallion: 'jukebox' };
   jukeboxPlayer.open(playlist);
@@ -1767,7 +1766,6 @@ function remotePickTable(file: string): void {
   const shelf = collections.shelf();
   const at = shelf.tables.findIndex((x) => x.file === file);
   if (at < 0) return;
-  collections.hidePanel();
   const picked = collections.move(at - shelf.index);
   state = { ...state, index: picked ? Math.max(0, tables.indexOf(picked)) : index, medallion: undefined };
   playUiSound('solenoid');
@@ -1779,7 +1777,6 @@ function remotePickJukebox(): void {
   if (!remoteWakes() || state.phase !== 'menu' || !jukeboxShown()) return;
   if (onJukebox()) return void openJukebox();
   if (!guest.knock('menu.choose')) return;
-  collections.hidePanel();
   state = { ...state, medallion: 'jukebox' };
   playUiSound('solenoid');
   broadcast();
@@ -1818,7 +1815,6 @@ function remotePickCommunity(): void {
   if (!remoteWakes() || state.phase !== 'menu' || !communityShown()) return;
   if (onCommunity()) return void openCommunity();
   if (!guest.knock('menu.choose')) return;
-  collections.hidePanel();
   state = { ...state, medallion: 'community' };
   playUiSound('solenoid');
   broadcast();
@@ -1829,7 +1825,6 @@ function remotePickCollections(): void {
   if (!remoteWakes() || state.phase !== 'menu' || !collectionsShown()) return;
   if (onCollections()) return void openCollectionsMedallion();
   if (!guest.knock('menu.choose')) return;
-  collections.hidePanel();
   state = { ...state, medallion: 'collections' };
   playUiSound('solenoid');
   broadcast();
@@ -7008,9 +7003,8 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     table: !shown && onJukebox() ? jukeboxCard() : !shown && onCommunity() ? communityCard() : !shown && onCollections() ? collectionsCard() : table ? describe(table, !shown) : undefined,
     neighbors,
     // Repère de la collection active, partout où le menu des tables est dessiné (sous une fiche aussi :
-    // sa zone ne bouge jamais), et la liste des collections quelques secondes après un MagnaSave, au menu seulement
-    // (pas sur le médaillon du Juke-box : elle couvrirait son affiche ; le repère change quand même).
-    ...(role === 'playfield' && tables.length ? collections.view(mediaSettings.menuLayout === 'list' ? 'list' : playfieldLandscape() ? 'desk' : 'band', state.phase === 'menu' && !onMedallion()) : {}),
+    // sa zone ne bouge jamais). La liste des collections ne paraît plus par-dessus la roue : le médaillon Collections l'ouvre.
+    ...(role === 'playfield' && tables.length ? collections.view() : {}),
     menuLayout: mediaSettings.menuLayout,
     // Logos animés de la roue : seul celui de la table choisie s'anime (« selected »), ou tous.
     wheelMotion: mediaSettings.wheelMotion,
@@ -7152,8 +7146,6 @@ function cinemaFor(role: RoleId): CinemaView | undefined {
 
 /** Table voisine dans le menu des tables (boutons, roue cliquée) : le solénoïde claque à chaque table. */
 function moveSelection(offset: number): void {
-  // Un flipper ferme la liste des collections, et change de table quand même.
-  collections.hidePanel();
   const leads = wheelLeads();
   if (leads.length) {
     // Les médaillons (Juke-box, Communauté, Collections) en tête de la collection : ils se choisissent comme une table.

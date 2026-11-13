@@ -7,7 +7,6 @@
 
 import {
   buildCollections,
-  collectionsPanel,
   findCollection,
   loadCollections,
   saveCollections,
@@ -15,7 +14,6 @@ import {
   ShelfMemory,
   stepCollection,
   type Collection,
-  type CollectionsPanel,
   type CollectionsSettings,
   type MyCollection,
   addMyCollection,
@@ -24,7 +22,6 @@ import {
   setTableInMyCollection,
   t,
   tn,
-  PANEL_BUDGET,
   type FriendsShelf,
   type ShelfView,
   type TableEntry,
@@ -294,9 +291,6 @@ export function tableCollectionsAction(host: {
   };
 }
 
-/** Durée de la liste des collections après le dernier MagnaSave, puis son fondu. */
-export const COLLECTIONS_PANEL_MS = 4000;
-const PANEL_FADE_MS = 160;
 /** Les amis en ligne et leurs tables ne se recalculent pas à chaque rendu. */
 const FRIENDS_CACHE_MS = 2000;
 
@@ -350,11 +344,11 @@ export interface CollectionsMenu {
   /** Boutons choisis pour changer de collection ; undefined : les MagnaSave. */
   keys(): { previous?: string; next?: string } | undefined;
   setKeys(keys: { previous: string; next: string } | undefined): void;
-  /** Ce que le playfield dessine : le repère, et la liste quand elle est montrée. */
-  view(layout: keyof typeof PANEL_BUDGET, panel?: boolean): { shelf: ShelfView; collections?: CollectionsPanel & { leaving?: boolean } };
-  /** Un flipper : la liste des collections se ferme aussitôt. */
-  hidePanel(): void;
-  dispose(): void;
+  /**
+   * Ce que le playfield dessine : le repère de la collection affichée. La liste des collections ne
+   * paraît plus par-dessus la roue après un MagnaSave (13/11/2026) : le médaillon Collections l'ouvre.
+   */
+  view(): { shelf: ShelfView };
 }
 
 export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
@@ -377,9 +371,6 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
   const memory = new ShelfMemory();
   let cache: { tables: readonly TableEntry[]; list: Collection<TableEntry>[] } | undefined;
   let friendsCache: { at: number; tables: readonly TableEntry[]; value: FriendsShelf } | undefined;
-  let panelUntil = 0;
-  let panelTimer: NodeJS.Timeout | undefined;
-  let fadeTimer: NodeJS.Timeout | undefined;
 
   function friends(tables: readonly TableEntry[]): FriendsShelf | undefined {
     if (!host.friends) return undefined;
@@ -427,19 +418,8 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
     if (selected && at >= 0) memory.remember(c.id, selected.file, at);
   }
 
-  function showPanel(): void {
-    panelUntil = now() + COLLECTIONS_PANEL_MS;
-    clearTimeout(panelTimer);
-    clearTimeout(fadeTimer);
-    panelTimer = setTimeout(() => host.redraw(), COLLECTIONS_PANEL_MS);
-    fadeTimer = setTimeout(() => host.redraw(), COLLECTIONS_PANEL_MS + PANEL_FADE_MS);
-  }
-
   function open(next: Collection<TableEntry>): boolean {
-    if (next.id === current().id) {
-      showPanel();
-      return false;
-    }
+    if (next.id === current().id) return false;
     remember();
     active = next.id;
     settings = { ...settings, active: next.id };
@@ -451,7 +431,6 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
     const index = memory.indexIn(next.id, next.tables, host.startIndex(next.tables));
     if (next.tables[index]) host.select(next.tables[index]!);
     console.log(`Collections : ${next.id} (${next.tables.length}).`);
-    showPanel();
     return true;
   }
 
@@ -501,22 +480,8 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
       cache = undefined;
       friendsCache = undefined;
     },
-    view(layout, panel = true) {
-      const c = current();
-      const locked = Boolean(host.guestCollection());
-      const left = panelUntil - now();
-      const collections = panel && left > -PANEL_FADE_MS && !locked ? { ...collectionsPanel(list(), c.id, PANEL_BUDGET[layout]), ...(left <= 0 ? { leaving: true } : {}) } : undefined;
-      return { shelf: shelfView(c, locked), ...(collections ? { collections } : {}) };
-    },
-    hidePanel() {
-      if (panelUntil <= now() - PANEL_FADE_MS) return;
-      panelUntil = 0;
-      clearTimeout(panelTimer);
-      clearTimeout(fadeTimer);
-    },
-    dispose() {
-      clearTimeout(panelTimer);
-      clearTimeout(fadeTimer);
+    view() {
+      return { shelf: shelfView(current(), Boolean(host.guestCollection())) };
     },
   };
 }

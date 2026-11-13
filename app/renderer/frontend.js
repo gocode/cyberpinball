@@ -742,7 +742,6 @@ function menuPanel(s) {
   v.star.toggleAttribute('data-on', Boolean(s.table.favorite));
   fillShelf(v.shelf, s.shelf, s);
   v.node.classList.toggle('has-shelf', Boolean(s.shelf));
-  placeCollections(v.node, s.collections);
   v.meta.textContent = s.table.subtitle ?? '';
   // Dans une boîte flexible, l'espace en tête d'un texte nu disparaîtrait : un seul élément de texte.
   const count = el('span');
@@ -765,50 +764,6 @@ function fillShelf(box, shelf, s) {
   const position = el('span', 'menu-shelf-position');
   position.append(el('b', '', String(s.position)), ` / ${s.count}`);
   box.replaceChildren(cyberIcon(shelf.locked ? 'lock' : shelf.icon, 'menu-shelf-icon'), el('span', 'menu-shelf-label', shelf.label), el('span', 'menu-shelf-rule'), position);
-}
-
-/**
- * Liste des collections, montrée quelques secondes à chaque MagnaSave (la collection change
- * aussitôt, la liste dit où l'on est) : posée au-dessus du repère, la collection active
- * cerclée de vert ; une collection vide grisée, sa raison dessous, jamais cachée. Fabricants
- * et décennies sous leur intertitre. Une liste longue ne vient que par ses lignes autour de
- * l'active (le processus principal les choisit) : rien n'y défile.
- */
-let collectionsBox;
-
-function placeCollections(menu, c) {
-  if (!c) {
-    collectionsBox?.remove();
-    collectionsBox = undefined;
-    return;
-  }
-  collectionsBox ??= el('div', 'collections-panel');
-  collectionsBox.classList.toggle('leaving', Boolean(c.leaving));
-  const list = el('div', 'collections-list');
-  // Les deux places des « autres au-dessus / en dessous » sont toujours là : les lignes ne sautent pas.
-  const more = (text, arrow) => el('div', 'collections-more', text ? `${arrow} ${text}` : '');
-  list.append(more(c.more?.before, '▲'));
-  for (const section of c.sections) {
-    if (section.title) list.append(el('div', 'collections-heading', section.title));
-    for (const r of section.rows) {
-      const row = el('div', `collections-row${r.focus ? ' focus' : ''}${r.disabled ? ' disabled' : ''}`);
-      row.dataset.act = JSON.stringify({ type: 'collections', id: r.id });
-      const text = el('span', 'collections-text');
-      text.append(el('span', 'collections-label', r.label));
-      if (r.disabled && r.reason) text.append(el('span', 'collections-reason', r.reason));
-      row.append(cyberIcon(r.icon ?? 'list', 'collections-icon'), text, el('span', 'collections-count', r.countLabel ?? '0'));
-      list.append(row);
-    }
-  }
-  list.append(more(c.more?.after, '▼'));
-  const head = el('div', 'collections-head', c.title);
-  collectionsBox.replaceChildren(head, list);
-  if (c.hint) {
-    const hint = el('div', 'collections-hint');
-    for (const part of c.hint) hint.append(el('span', '', part));
-    collectionsBox.append(hint);
-  }
-  if (collectionsBox.parentNode !== menu) menu.append(collectionsBox);
 }
 
 /**

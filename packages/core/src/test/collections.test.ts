@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { PANEL_LINE, ShelfMemory, addMyCollection, removeMyCollection, renameMyCollection, setTableInMyCollection, type CollectionsSettings, buildCollections, collectionsPanel, shelfView, findCollection, isFavorite, loadCollections, mergeFavorite, saveCollections, setFavorite, stepCollection } from '../collections';
+import { ShelfMemory, addMyCollection, removeMyCollection, renameMyCollection, setTableInMyCollection, type CollectionsSettings, buildCollections, shelfView, findCollection, isFavorite, loadCollections, mergeFavorite, saveCollections, setFavorite, stepCollection } from '../collections';
 import { setLanguage } from '../i18n';
 import type { TableEntry } from '../tables';
 
@@ -122,34 +122,6 @@ test('collections : la collection active se garde, une valeur illisible donne To
   fs.writeFileSync(path.join(dir, 'collections.json'), '{"active":"nimporte"}');
   assert.deepEqual(loadCollections(dir), { active: 'all', mine: [] });
   fs.rmSync(dir, { recursive: true, force: true });
-});
-
-test('collections : la liste se découpe autour de l’active, sans défiler, intertitres gardés', () => {
-  const many = Array.from({ length: 12 }, (_, i) => table(`Table ${i}`, { manufacturer: `Fabricant ${String.fromCharCode(65 + i)}`, year: 1960 + i * 5 }));
-  const list = buildCollections(many);
-  const rows = (p: ReturnType<typeof collectionsPanel>) => p.sections.flatMap((s) => s.rows);
-  // Hauteur occupée, d'après les hauteurs de ligne de la liste.
-  const height = (p: ReturnType<typeof collectionsPanel>) => p.sections.reduce((n, s) => n + (s.title ? PANEL_LINE.heading : 0) + s.rows.reduce((m, r) => m + (r.reason ? PANEL_LINE.reason : PANEL_LINE.row), 0), 0);
-  const top = collectionsPanel(list, 'all', 600);
-  assert.equal(rows(top)[0]!.id, 'all');
-  assert.equal(top.hidden.before, 0);
-  assert.ok(top.hidden.after > 0);
-  assert.ok(top.more.after);
-  // Au milieu des fabricants : l'intertitre en tête, l'active cerclée, rien de plus que la fenêtre (+ l'intertitre repris).
-  const mid = collectionsPanel(list, 'maker:fabricant f', 600);
-  assert.equal(mid.sections[0]!.title, 'Fabricants');
-  assert.ok(rows(mid).some((r) => r.focus && r.id === 'maker:fabricant f'));
-  assert.ok(height(mid) <= 600);
-  assert.ok(height(top) <= 600);
-  assert.ok(mid.hidden.before > 0 && mid.hidden.after > 0);
-  // Vides : grisées, avec leur raison.
-  const friends = rows(top).find((r) => r.id === 'friends')!;
-  assert.equal(friends.disabled, true);
-  assert.ok(friends.reason);
-  // Au bout : la dernière décennie, rien après.
-  const end = collectionsPanel(list, list[list.length - 1]!.id, 600);
-  assert.equal(end.hidden.after, 0);
-  assert.equal(rows(end).at(-1)!.focus, true);
 });
 
 test('collections : le nom d’une collection fixe tient dans le repère, en français et en anglais', () => {

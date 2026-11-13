@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.12
 
+- Roue des tables : les MagnaSave changent de collection sans plus afficher la liste des collections par-dessus les tables ; seul le repère sous le titre change. La liste complète s'ouvre par le médaillon Collections.
 - Boutons : un bouton de la borne peut mener directement au bureau Windows (Menu système > Borne > Configuration de la borne > Boutons de l'interface > « Bureau Windows », facultatif). Un appui, de n'importe quel écran du menu, libère tous les écrans du PC ; s'il s'agit d'un bouton de joystick (Pinscape, encodeur en mode manette), un nouvel appui au bureau ramène le menu.
 - Roue des tables : nouveau médaillon Collections, après le Juke-box et la Communauté, avec son étoile animée. Start ouvre la liste de vos collections (Toutes, Favoris, Récentes, fabricants, décennies, les vôtres) ; Start sur l'une l'affiche sur la roue, Exit revient au médaillon. Choisi, il montre son affiche au plateau et au fronton. Il se masque dans Menu système > Tables > Roue.
 - Réalité virtuelle : le journal relève ce que le casque transmet (limite de la pièce, position de la tête et des manettes, chaque bouton), au menu comme en partie, pour préparer un calage qui tienne d'une connexion de Link à l'autre. Rien ne change à l'usage.
