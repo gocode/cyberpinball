@@ -185,7 +185,9 @@ export type JukeboxMessage =
   | { type: 'levels'; id: number; levels: number[] }
   | { type: 'clip'; rect?: { x: number; y: number; width: number; height: number } }
   /** Contrôle de débordement de la page (une fois par ouverture) : ce qui dépasse de la fenêtre. */
-  | { type: 'overflow'; text: string };
+  | { type: 'overflow'; text: string }
+  /** Sortie sur laquelle le morceau joue vraiment (une fois par morceau) : le journal la note. */
+  | { type: 'sink'; id: number; label?: string; problem?: string; routed: boolean };
 
 const isAbsolute = (p: string | undefined): p is string => Boolean(p && path.isAbsolute(p));
 
@@ -698,6 +700,13 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       return;
     }
     if (!order || msg.id !== order.id) return;
+    if (msg.type === 'sink') {
+      const wanted = host.output();
+      const where = msg.routed ? `« ${String(msg.label ?? '').slice(0, 120)} »` : 'la sortie par défaut de Windows'; // i18n-ignore : journal
+      const warn = wanted && !msg.routed ? ` [avertissement] sortie voulue « ${wanted} »${msg.problem ? ` (${String(msg.problem).slice(0, 160)})` : ''}` : ''; // i18n-ignore : journal
+      host.log(`Juke-box : ${order.key} joue sur ${where}.${warn}`); // i18n-ignore : journal
+      return;
+    }
     if (msg.type === 'time') {
       failures = 0;
       time = { key: order.key, position: msg.position, ...(msg.duration ? { duration: msg.duration } : time?.duration !== undefined ? { duration: time.duration } : {}), paused: msg.paused ?? order.paused };

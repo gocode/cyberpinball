@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- Virtual reality: when the Quest uses a stationary boundary, the cabinet says once how to switch to a roomscale boundary, which keeps the cabinet in place better when the headset is put back on.
 - Virtual reality: on the "Put the headset on" screen, the cabinet's Exit now stops the game and goes back to the wheel (like Esc and Ctrl+Shift+K); the two instructions at the bottom are on two lines.
 - Jukebox: the glow of the progress bar's green thread is no longer cut off by a dark rectangle; it fades out smoothly.
 - Living medallions: in the wheel, the Jukebox medallion is animated (three glowing threads wave around the note), and so is the Community one (chat bubbles with emojis rise behind the player). Only the medallion in the center moves; its neighbors stay still.

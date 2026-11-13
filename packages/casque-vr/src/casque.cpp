@@ -1933,6 +1933,10 @@ int main(int argc, char** argv)
          {
             eyesSaid = true;
             say("yeux " + std::to_string(loc.pose.position.y));
+            // La tête au port, dans la pièce (13 novembre 2026) : collée à l'origine et tournée comme elle, c'est que
+            // l'origine vient d'être remise sur la tête (limite fixe), à la remise du casque ou à la session neuve.
+            const XrVector3f fwd = rotate(loc.pose.orientation, { 0, 0, -1 });
+            say("tete-au-port " + std::to_string(loc.pose.position.x) + " " + std::to_string(loc.pose.position.z) + " " + std::to_string(std::atan2(-fwd.x, -fwd.z)));
          }
       }
 

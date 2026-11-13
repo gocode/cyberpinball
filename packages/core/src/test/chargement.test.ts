@@ -230,7 +230,7 @@ test('attente du casque : Exit de la borne (touche ou bouton du joystick), Écha
   const main = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
   // Exit lu quelle que soit la fenêtre au premier plan, tant que la consigne est là et le casque pas sur la tête.
   assert.match(main, /const stopWaitExit = vrGame !== undefined \? watchExitWhileWaiting\(\(\) => Boolean\(vrWearHint\) && !headset\?\.worn, \(\) => \{[\s\S]{0,200}game\.stop\(\);/);
-  assert.match(main, /inGameMenu\.disarm\(\);\s*stopWaitExit\?\.\(\);/);
+  assert.match(main, /if \(load\) console\.log\(load\);\s*stopWaitExit\?\.\(\);/);
   // Les touches d'Exit de la borne : clavier par Windows, joystick par SDL ; un bouton déjà tenu au départ ne compte pas.
   assert.match(main, /function watchExitWhileWaiting\(active: \(\) => boolean, onExit: \(\) => void\): \(\) => void \{\s*const codes = \(\) => KEYS\.exit;\s*let wasDown = true;/);
   assert.match(main, /keysDown\(vks\)/);

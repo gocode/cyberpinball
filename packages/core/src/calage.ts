@@ -581,6 +581,19 @@ export function roomChangeGap(line: string): { cm: number; deg: number } | undef
  */
 export type RoomKeeping = 'kept' | 'recentred';
 
+/**
+ * La tête au port du casque, vue de l'origine de la pièce (« tete-au-port x z lacet ») : à moins de 40 cm et 20°
+ * d'elle, l'origine vient d'être remise sur la tête (limite fixe). Sert à départager la cause (le Quest à la
+ * remise du casque, ou la session neuve du compagnon) en comparant au port en pleine partie (VPX garde sa session).
+ */
+export function headAtWear(line: string): { cm: number; deg: number; onHead: boolean } | undefined {
+  const m = /^tete-au-port (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)$/.exec(line);
+  if (!m) return undefined;
+  const cm = Math.hypot(Number(m[1]), Number(m[2])) * 100;
+  const deg = Math.abs((((Number(m[3]) * 180) / Math.PI + 540) % 360) - 180);
+  return { cm, deg, onHead: cm < 40 && deg < 20 };
+}
+
 /** Ce que dit l'écran du calage d'une pièce recentrée à chaque retour du casque, ou undefined. */
 export function roomKeepingAdvice(keeping: RoomKeeping | undefined, combo: string | undefined): string | undefined {
   if (keeping !== 'recentred') return undefined;

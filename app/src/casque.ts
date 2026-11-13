@@ -11,7 +11,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { anchorHeight, buildDecor, cadenceWithoutScreens, COMPANION_KEY_FILE, CompanionCycle, companionKeyFolder, DECOR_TEXTURES, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, readCompanionKey, roomChangeGap, sceneProtocol, writeGlb, type CabinetPlace, type DecorTexture, type HeadsetProfile, type Point3, type VrGpu, type RoomBounds, type RoomKeeping, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
+import { anchorHeight, buildDecor, cadenceWithoutScreens, COMPANION_KEY_FILE, CompanionCycle, companionKeyFolder, DECOR_TEXTURES, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, headAtWear, readCompanionKey, roomChangeGap, sceneProtocol, writeGlb, type CabinetPlace, type DecorTexture, type HeadsetProfile, type Point3, type VrGpu, type RoomBounds, type RoomKeeping, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
 import { openHandleTarget, type HandleTarget } from '@cyberpinball/win-displays';
 import type { OffscreenSharedTexture } from 'electron';
 import { OFFSCREEN } from './offscreen';
@@ -126,6 +126,8 @@ export interface HeadsetMenuOptions {
   onPoints?(points: Point3[], room: boolean, head: { x: number; z: number } | undefined, pressed: 0 | 1, grips?: [Point3, Point3]): void;
   /** Casque remis après un retrait qui a arrêté la session (accueil de Link) : la pièce a pu être recentrée. */
   onPutBackOn?(): void;
+  /** Le Quest est en limite fixe (première fois dite par ce compagnon). */
+  onStationary?(): void;
   /**
    * Casque éteint, Link coupé ou session perdue (compagnon : « casque-perdu ») : `inGame` vrai quand le
    * compagnon veillait sur une partie de VPX dans le casque. L'affichage revient aux écrans du PC.
@@ -175,6 +177,8 @@ export class HeadsetMenu {
   roomKeeping: RoomKeeping | undefined;
   /** Casque retiré (la session s'est arrêtée, accueil de Link) : à son retour, la pièce a pu bouger. */
   private takenOff = false;
+  /** Le même retrait, pour dire au journal d'où vient le port suivant (« tete-au-port »). */
+  private takenOffSeen = false;
   private shown: HeadsetMenuState = 'waiting';
   /** Textures d'Electron confiées au compagnon : rendues (release) quand il les a copiées. */
   private target: HandleTarget | undefined;
@@ -509,7 +513,16 @@ export class HeadsetMenu {
           this.opts.onEyes?.(Number(eyes[1]));
           continue;
         }
+        // La tête au port, vue de l'origine de la pièce : origine remise sur la tête, ou pièce gardée.
+        const atWear = headAtWear(line);
+        if (atWear) {
+          const after = this.takenOffSeen ? 'après un retrait du casque (session neuve du compagnon)' : 'au premier port de la session'; // i18n-ignore : journal
+          this.opts.log(`Casque : tête au port ${after}, à ${atWear.cm.toFixed(0)} cm de l'origine de la pièce et tournée de ${atWear.deg.toFixed(0)}° ${atWear.onHead ? ': origine remise sur la tête' : ': origine gardée'}.`); // i18n-ignore : journal
+          this.takenOffSeen = false;
+          continue;
+        }
         if (line === 'piece aucune') { // i18n-ignore : protocole du compagnon
+          if (this.roomKeeping !== 'recentred') this.opts.onStationary?.();
           if (this.roomKeeping !== 'recentred') this.opts.log('Casque : pièce du Quest sans limite (limite fixe ou désactivée) : le Quest la recentre sur la tête chaque fois que le casque est remis, sans le dire aux applications ; le calage sera proposé à chaque retour du casque.'); // i18n-ignore : journal
           this.roomKeeping = 'recentred';
           continue;
@@ -554,7 +567,7 @@ export class HeadsetMenu {
           this.opts.log('Casque : session arrêtée par le runtime (accueil de Link) ; le compagnon repart aussitôt sur une session neuve.'); // i18n-ignore : journal
           this.restartNow = true;
           // Casque retiré (le menu de Meta ouvert n'arrête pas la session) : à son retour, la pièce a pu bouger.
-          if (!this.worn) this.takenOff = true;
+          if (!this.worn) this.takenOff = this.takenOffSeen = true;
           continue;
         }
         if (!PROTOCOL.test(line)) continue;

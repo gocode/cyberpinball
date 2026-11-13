@@ -3370,6 +3370,24 @@ function calibrationComboTip(): void {
   showBanner(t('Recaler la borne à tout moment, au menu comme en partie : {combo}.', { combo }));
 }
 
+/**
+ * Limite fixe vue pour la première fois sur cette borne (une fois pour toutes, <données>\vr\astuce-limite.json) :
+ * comment passer en limite de pièce, la seule façon côté Quest de garder la pièce quand le casque est remis
+ * (le recalage d'un geste reste là sinon). Une action dans le casque, environ 3 minutes.
+ */
+function roomscaleTip(): void {
+  const file = path.join(loc.dataDir, 'vr', 'astuce-limite.json');
+  if (fs.existsSync(file) || headsetSetting() === 'bureau') return;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ montree: new Date().toISOString() }, null, 2) + '\n');
+  } catch {
+    // Dossier de la VR en lecture seule : l'astuce reviendra, sans gravité.
+  }
+  console.log('Casque : limite fixe vue pour la première fois ; le passage en limite de pièce est conseillé une fois.'); // i18n-ignore : journal
+  showBanner(t('Le Quest est en limite fixe : la borne se décale chaque fois que le casque est remis. Pour qu’elle reste en place : dans le Quest, réglages de la limite, choisissez « Pièce » et tracez le contour (environ 3 minutes).'));
+}
+
 function headsetPutBackOn(): void {
   const place = headset?.place();
   if (!place || headsetSetting() === 'bureau' || headset?.roomKeeping !== 'recentred') return;
@@ -4791,6 +4809,7 @@ export function startFrontend(): void {
     onProfile: () => offerControllerWizard(),
     onPoints: (points, room, head, pressed, grips) => calibrationPoints(points, room, head, pressed, grips),
     onPutBackOn: () => headsetPutBackOn(),
+    onStationary: () => roomscaleTip(),
     onLost: (inGame) => headsetLost(inGame),
     onHead: (head) => headInGame(head),
     onCentre: (gaze) => calibrationCentre(gaze),
@@ -5845,9 +5864,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (watchLive) clearInterval(watchLive);
   gameNotices.close();
   inGameMenu.disarm();
-  stopWaitExit?.();
   const load = gameLoad?.stop(playedVr ? 'casque' : 'ecrans');
   if (load) console.log(load);
+  stopWaitExit?.();
   vrGameStop = undefined;
   if (playedVr && vrGame) checkVrPlaceAfterGame(vrGame.ini, played.file);
   if (playedVr && vrGame) checkVrRoomAfterGame(vpxLog, vrLogFrom);

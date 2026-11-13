@@ -163,6 +163,46 @@ test('bibliothèque : sans sortie affectée par l’assistant, la sortie par dé
   assert.equal(audio.sinkId, '');
 });
 
+// 13/11/2026, PinCab : le premier morceau du Juke-box sortait par les haut-parleurs du playfield
+// (sortie par défaut de Windows). La fenêtre du fronton apprend sa sortie au premier morceau ;
+// l'élément new Audio(), hors du document, était routé avant que la sortie soit trouvée, puis
+// oublié : ni querySelectorAll ni l'écouteur de play ne le voient.
+test('menu-audio : un élément hors du document routé avant que la sortie soit trouvée la rejoint', async () => {
+  const page = soundPage();
+  const audio = page.window.CyberMenuAudio as { update(s: unknown): void; route(el: unknown): void; status(): { sortie: string } };
+  const song = page.document.createElement('audio') as unknown as { sinkId: string; setAttribute(n: string, v: string): void; removeAttribute(n: string): void; isConnected?: boolean };
+  song.setAttribute('src', 'cyber-media://fichier/morceau.m4a');
+  // Comme jukebox.js : la sortie demandée, puis l'élément routé aussitôt (la recherche est asynchrone).
+  audio.update({ video: 0, output: FRONTON });
+  audio.route(song);
+  assert.equal(song.sinkId, '', 'sortie pas encore trouvée');
+  await settle();
+  assert.equal(audio.status().sortie, FRONTON);
+  assert.equal(song.sinkId, 'fronton-id', 'le morceau rejoint la sortie du fronton une fois trouvée');
+  // Une autre sortie ensuite (casque, assistant refait) : l'élément suit encore.
+  const casque = page.document.createElement('audio') as unknown as { sinkId: string; setAttribute(n: string, v: string): void };
+  casque.setAttribute('src', 'cyber-media://fichier/suivant.m4a');
+  audio.update({ video: 0, output: 'Haut-parleurs (HDMI)' });
+  audio.route(casque);
+  await settle();
+  assert.equal(song.sinkId, 'hdmi-id');
+  assert.equal(casque.sinkId, 'hdmi-id');
+  // Un élément vidé (morceau arrêté) est oublié : plus rerouté.
+  song.removeAttribute('src');
+  audio.route(casque);
+  audio.update({ video: 0, output: FRONTON });
+  await settle();
+  assert.equal(song.sinkId, 'hdmi-id', 'élément vidé laissé tel quel');
+  assert.equal(casque.sinkId, 'fronton-id');
+});
+
+test('invariant : jukebox.js note au journal la sortie de chaque morceau', () => {
+  const js = fs.readFileSync(path.join(APP, 'renderer', 'jukebox.js'), 'utf8');
+  assert.match(js, /type: 'sink'/);
+  const player = fs.readFileSync(path.join(APP, 'src', 'jukebox-player.ts'), 'utf8');
+  assert.match(player, /msg\.type === 'sink'[\s\S]{0,600}sortie par défaut de Windows/);
+});
+
 // ---------------------------------------------------------------------------
 // Pages web de « Récupérer » : audioSinkScript
 

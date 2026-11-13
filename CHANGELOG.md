@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.11
 
+- Réalité virtuelle : quand le Quest est en limite fixe, la borne dit une fois comment passer en limite de pièce, qui garde mieux la borne en place quand le casque est remis.
 - Réalité virtuelle : sur l'écran « Mettez le casque », Exit de la borne arrête bien la partie et ramène à la roue (comme Échap et Ctrl+Maj+K) ; les deux consignes du bas sont sur deux lignes.
 - Juke-box : la lueur du fil vert de la barre de progression n'est plus coupée net par un rectangle sombre ; elle s'éteint en douceur.
 - Médaillons vivants : dans la roue, le médaillon du Juke-box s'anime (trois fils lumineux ondulent autour de la note) et celui de la Communauté aussi (des bulles de discussion avec des emojis montent derrière le joueur). Seul le médaillon au centre bouge, ses voisins restent immobiles.

@@ -872,6 +872,15 @@
         send({ type: 'time', id: order.id, position: media.currentTime, duration: Number.isFinite(media.duration) ? media.duration : undefined, paused: media.paused });
       });
       media.addEventListener('ended', () => send({ type: 'ended', id: order.id }));
+      // La sortie réellement prise, notée au journal une fois par morceau (diagnostic sur la borne).
+      media.addEventListener(
+        'playing',
+        () => {
+          const s = window.CyberMenuAudio?.status?.();
+          send({ type: 'sink', id: order.id, routed: Boolean(media.sinkId), label: s?.sortie, problem: s?.probleme });
+        },
+        { once: true },
+      );
       media.addEventListener('error', () => send({ type: 'error', id: order.id, message: media.error?.message || String(media.error?.code ?? '') }));
     };
     if (order.kind === 'local') {

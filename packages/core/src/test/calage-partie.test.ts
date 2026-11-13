@@ -15,6 +15,7 @@ import {
   defaultControllerSetting,
   expectedGrips,
   gripOffset,
+  headAtWear,
   headsetFunctions,
   inGameCalibration,
   lockbarPlace,
@@ -118,7 +119,7 @@ test('détection : pièce recentrée par le Quest (limite fixe) dite au journal,
   assert.match(casque, /"\/user\/hand\/left\/input\/grip\/pose"/);
   const ts = read('app', 'src', 'casque.ts');
   assert.match(ts, /if \(line === 'piece aucune'\) \{/);
-  assert.match(ts, /if \(!this\.worn\) this\.takenOff = true;/);
+  assert.match(ts, /if \(!this\.worn\) this\.takenOff = this\.takenOffSeen = true;/);
   assert.match(ts, /this\.opts\.onPutBackOn\?\.\(\);/);
   const front = read('app', 'src', 'frontend.ts');
   assert.match(front, /onPutBackOn: \(\) => headsetPutBackOn\(\),/);
@@ -131,6 +132,16 @@ test('détection : pièce recentrée par le Quest (limite fixe) dite au journal,
   assert.ok(Math.abs(gap.cm - 50) < 0.01 && Math.abs(gap.deg - 30) < 0.01);
   assert.equal(roomChangeGap('piece-changee sans-pose'), undefined);
   assert.match(ts, /origine de la pièce changée : écart \$\{gap\.cm\.toFixed\(0\)\} cm/);
+  // La tête au port, vue de l'origine : départage la cause (13 novembre 2026). Collée à l'origine : remise sur la tête.
+  assert.match(casque, /say\("tete-au-port " \+ std::to_string\(loc\.pose\.position\.x\)/);
+  const near = headAtWear('tete-au-port 0.100000 -0.150000 0.087266')!;
+  assert.ok(Math.abs(near.cm - Math.hypot(10, 15)) < 0.01 && Math.abs(near.deg - 5) < 0.01 && near.onHead);
+  assert.equal(headAtWear('tete-au-port 0.600000 0.300000 1.2')!.onHead, false);
+  assert.match(ts, /const atWear = headAtWear\(line\);/);
+  assert.match(ts, /après un retrait du casque \(session neuve du compagnon\)/);
+  // Limite fixe vue la première fois : le passage en limite de pièce conseillé une fois (astuce-limite.json).
+  assert.match(front, /onStationary: \(\) => roomscaleTip\(\),/);
+  assert.match(front, /const file = path\.join\(loc\.dataDir, 'vr', 'astuce-limite\.json'\);/);
   // Conseil à l'écran du calage proposé : limite de pièce, ou le geste.
   assert.match(roomKeepingAdvice('recentred', 'les deux joysticks enfoncés ensemble, 3 s') ?? '', /limite fixe.*les deux joysticks/);
   assert.equal(roomKeepingAdvice('kept', 'x'), undefined);

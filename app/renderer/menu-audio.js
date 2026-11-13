@@ -152,6 +152,10 @@
     sinkLabel = id ? name : 'sortie par défaut'; // i18n-ignore : état lu par les essais (status), jamais affiché
     for (const track of [music, launch, ...fading]) route(track?.el);
     for (const el of document.querySelectorAll('audio, video')) route(el);
+    // Les éléments hors du document (new Audio() : musique du Juke-box…) passés par route avant que
+    // la sortie soit trouvée : ni querySelectorAll ni l'écouteur de play ne les voient (13/11/2026,
+    // premier morceau du Juke-box sur les haut-parleurs du playfield, sortie par défaut de Windows).
+    for (const el of [...routed]) route(el);
     window.CyberMedia?.setSink?.(sinkId);
     window.CyberUiSounds?.setSink?.(sinkId);
   }
@@ -162,8 +166,21 @@
    * forcément branchée à la borne.
    */
   function route(el) {
-    if (typeof el?.setSinkId !== 'function' || el.sinkId === sinkId) return;
+    if (typeof el?.setSinkId !== 'function') return;
+    remember(el);
+    if (el.sinkId === sinkId) return;
     el.setSinkId(sinkId).catch(() => {});
+  }
+
+  /**
+   * Éléments déjà routés : rerouté quand la sortie change ou est enfin trouvée, même hors du
+   * document. Un élément vidé (src retiré : morceau ou musique arrêtés) est oublié.
+   */
+  const routed = new Set();
+  const hasSource = (el) => Boolean(el.currentSrc || el.src || el.getAttribute?.('src') || el.srcObject);
+  function remember(el) {
+    for (const old of routed) if (!hasSource(old)) routed.delete(old);
+    routed.add(el);
   }
 
   // Filet : un élément du document qui se met à jouer sans être passé par route.

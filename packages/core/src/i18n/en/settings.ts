@@ -124,6 +124,7 @@ export const messages: Record<string, string> = {
   'Le Quest est en limite fixe : il déplace la pièce chaque fois que le casque est remis. Recalez, ou créez une limite de pièce dans le Quest.': 'The Quest uses a stationary boundary: it moves the room every time the headset is put back on. Align again, or create a roomscale boundary in the Quest.',
   'Manettes sur les coins de la barre · Gâchette : caler · A ou B : reprendre': 'Controllers on the lockbar corners · Trigger: align · A or B: resume',
   'Borne calée': 'Cabinet aligned',
+  'Le Quest est en limite fixe : la borne se décale chaque fois que le casque est remis. Pour qu’elle reste en place : dans le Quest, réglages de la limite, choisissez « Pièce » et tracez le contour (environ 3 minutes).': 'The Quest uses a stationary boundary: the cabinet shifts every time the headset is put back on. To keep it in place: in the Quest, boundary settings, choose “Roomscale” and trace the outline (about 3 minutes).',
   'Recaler la borne à tout moment, au menu comme en partie : {combo}.': 'Align the cabinet again any time, in the menu or in a game: {combo}.',
   'Les deux joysticks enfoncés, 3 s': 'Both thumbsticks pressed, 3 s',
   'Pause, puis caler la borne ; on reprend où on en était': 'Pause, then align the cabinet; the game resumes where it was',
