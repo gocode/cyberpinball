@@ -37,6 +37,7 @@ import {
   formatManualEdit,
   gameKeys,
   displayKeys,
+  joystickButton,
   keyLabel,
   interfaceKeys,
   collectionKeys as cabinetCollectionKeys,
@@ -474,7 +475,7 @@ import { createDedicatedMenu } from './dedicated-menu';
 import { TableTints } from './table-tint';
 import { createDedicatedSystem } from './dedicated-system';
 import { handOverOnQuit, shellSession } from './dedicated-session';
-import { syncRelaunchWatcher, watchStartHold } from './start-relaunch';
+import { syncRelaunchWatcher, watchDesktopButton, watchStartHold } from './start-relaunch';
 import { createPowerMenu } from './power';
 import { readWakeDevices } from './arcade-hours';
 import { createPhoneRemote, phoneRemoteMode, type MenuEntries, type MenuEntry, type RemoteJukebox } from './phone-remote';
@@ -523,7 +524,7 @@ function menuKeys(): [string, string][] {
     ...(KEYS.help.length ? [['menu.commands', t('Afficher les commandes'), or(KEYS.help)] as [GuestDoor, string, string]] : []),
     ['menu.vpx-settings', t('Réglages de VPX'), KEYS.settings.length ? t('{keys}, ou Exit puis « Réglages de VPX »', { keys: or(KEYS.settings) }) : t('Exit puis « Réglages de VPX »')],
     ['menu.system', t('Menu et configuration (tables, réglages, boutons, écrans, Bureau Windows, quitter)'), t('Exit ({keys}), Tab, ou clic sur ⚙ en haut à droite', { keys: or(KEYS.exit) })],
-    ['shortcut.desktop', t('Bureau Windows (tous les écrans du PC), puis retour au menu'), shortcutLabel(SHORTCUTS.desktop)],
+    ['shortcut.desktop', t('Bureau Windows (tous les écrans du PC), puis retour au menu'), formatList([...KEYS.desktop.map(keyLabel), shortcutLabel(SHORTCUTS.desktop)], 'or')],
     ['game.force-stop', t('Arrêter une partie bloquée'), shortcutLabel(SHORTCUTS.forceStop)],
   ];
   return rows.filter(([door]) => guest.allows(door)).map(([, what, how]) => [what, how]);
@@ -2571,9 +2572,13 @@ if (shellSession()) {
   library.withdrawSystemItem('quit');
 } else library.provideSystemItem('desktop', {
   get detail() {
-    return startHoldCode()
-      ? t('Libère tous les écrans du PC ; un appui long sur Start, {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu', { keys: shortcutLabel(SHORTCUTS.desktop) })
-      : t('Libère tous les écrans du PC ; {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu', { keys: shortcutLabel(SHORTCUTS.desktop) });
+    // Le bouton « Bureau Windows » de la borne, s'il a été relevé : il ouvre le bureau, et le referme s'il est de joystick (watchDesktopButton).
+    const own = KEYS.desktop[0];
+    const button = own ? t('Bouton de la borne : {button}', { button: keyLabel(own) }) + ' · ' : '';
+    const keys = own && joystickButton(own) ? formatList([t('{button} de nouveau', { button: keyLabel(own) }), shortcutLabel(SHORTCUTS.desktop)], 'or') : shortcutLabel(SHORTCUTS.desktop);
+    return button + (startHoldCode()
+      ? t('Libère tous les écrans du PC ; un appui long sur Start, {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu', { keys })
+      : t('Libère tous les écrans du PC ; {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu', { keys }));
   },
   // Touches lues dans la définition du raccourci (SHORTCUTS) : celles que reconnaissent handleKey et le raccourci global.
   get shortcut() {
@@ -4761,6 +4766,8 @@ const desktop = new DesktopMode<BrowserWindow, WebContents>({
 let desktopWatch: NodeJS.Timeout | undefined;
 /** Au bureau : l'appui long sur Start qui ramène le menu (watchStartHold). */
 let desktopStartHold: (() => void) | undefined;
+/** Au bureau : le bouton « Bureau Windows » de la borne, de joystick, qui ramène le menu (watchDesktopButton). */
+let desktopButton: (() => void) | undefined;
 /** Proposition de rendre à Windows l'orientation du bureau, en attente de réponse. */
 let legacyOrientation: LegacyOrientation | undefined;
 const DESKTOP_WATCH_MS = 500;
@@ -4800,6 +4807,8 @@ function showDesktop(): boolean {
   }
   const startCode = startHoldCode();
   if (startCode) desktopStartHold = watchStartHold(startCode, () => restoreFromDesktop());
+  const buttonCode = KEYS.desktop.find((code) => joystickButton(code));
+  if (buttonCode) desktopButton = watchDesktopButton(buttonCode, () => restoreFromDesktop());
   desktopWatch = setInterval(() => {
     if (desktop.reopened()) return restoreFromDesktop();
     for (const win of desktop.clear()) console.warn(`Mode bureau : « ${win.getTitle()} » était revenue sur son écran, de nouveau rangée.`);
@@ -4814,6 +4823,8 @@ function restoreFromDesktop(): void {
   clearInterval(desktopWatch);
   desktopStartHold?.();
   desktopStartHold = undefined;
+  desktopButton?.();
+  desktopButton = undefined;
   if (!OFFSCREEN) globalShortcut.unregister(accelerator(SHORTCUTS.desktop));
   // L'orientation de jeu revient ; un quart de tour change la taille des écrans, le menu rouvre ses fenêtres.
   const moved = orientationFromDesktop();
@@ -5528,6 +5539,8 @@ function handleKey(input: Input, fromPhone = false): boolean {
   }
   // Raccourci du mode bureau, de n'importe quel écran du menu (sauf pendant une partie) ; une fenêtre rouverte au bureau le reçoit aussi : retour.
   if (matchesShortcut(input, SHORTCUTS.desktop)) return desktop.active ? (restoreFromDesktop(), true) : guest.knock('shortcut.desktop') ? showDesktop() : true;
+  // Bouton « Bureau Windows » de la borne (Boutons de l'interface, facultatif) : de même, d'un appui, de n'importe quel écran du menu.
+  if (is(KEYS.desktop)) return input.isAutoRepeat ? true : desktop.active ? (restoreFromDesktop(), true) : guest.knock('shortcut.desktop') ? showDesktop() : true;
   // N'importe quel bouton en mode attente y met fin, sans autre effet ; sinon il remet le compte à zéro.
   // Le préavis d'arrêt de l'horaire aussi : la borne reste allumée tant qu'on joue.
   const noticed = hours.activity();

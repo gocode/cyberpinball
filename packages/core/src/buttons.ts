@@ -552,6 +552,8 @@ export const NAVIGATION: readonly NavigationInfo[] = [
   { id: 'back', get label() { return t('Retour et menu'); }, required: true, game: 'exit', fallback: ['Escape'] },
   { id: 'help', get label() { return t('Aide-mémoire'); }, required: false, fallback: [] },
   { id: 'settings', get label() { return t('Réglages de VPX'); }, required: false, fallback: [] },
+  // Bureau Windows d'un appui, de n'importe quel écran du menu ; au bureau, le même bouton (de joystick) ramène le menu.
+  { id: 'desktop', get label() { return t('Bureau Windows'); }, required: false, fallback: [] },
   // Configuration de la borne (assistant, étapes seules) : en sortir sans rien écrire, d'un appui (wizardsteps.ts, quitButtonActs).
   { id: 'quit', get label() { return t('Quitter sans enregistrer'); }, required: false, fallback: [] },
 ];
@@ -635,10 +637,14 @@ export function navigationKeys(source: ButtonsSource, vertical = true): Navigati
   return result;
 }
 
-/** Touches de toute l'interface : navigation, puis aide-mémoire (H, F1) et réglages de VPX (R). */
+/**
+ * Touches de toute l'interface : navigation, puis aide-mémoire (H, F1), réglages de VPX (R) et
+ * Bureau Windows (son seul bouton : Ctrl+Maj+D, raccourci du clavier, se lit à part, SHORTCUTS).
+ */
 export interface InterfaceKeys extends NavigationKeys {
   help: string[];
   settings: string[];
+  desktop: string[];
 }
 
 /**
@@ -648,7 +654,7 @@ export interface InterfaceKeys extends NavigationKeys {
 export function interfaceKeys(source: ButtonsSource, vertical = true): InterfaceKeys {
   const nav = navigationButtons(source);
   const own = (id: NavigationId, keyboard: string[]) => [...new Set([...(nav[id] ? [nav[id]!] : []), ...withoutButtonKeys(keyboard, source)])];
-  return { ...navigationKeys(source, vertical), help: own('help', ['KeyH', 'F1']), settings: own('settings', ['KeyR']) };
+  return { ...navigationKeys(source, vertical), help: own('help', ['KeyH', 'F1']), settings: own('settings', ['KeyR']), desktop: own('desktop', []) };
 }
 
 /**
@@ -659,7 +665,7 @@ export function interfaceKeys(source: ButtonsSource, vertical = true): Interface
  */
 export function collectionKeys(source: ButtonsSource, keys: InterfaceKeys = interfaceKeys(source)): { previous: string[]; next: string[] } {
   const game = buttonKeys(source?.buttons);
-  const ui = [...keys.previous, ...keys.next, ...keys.confirm, ...keys.exit, ...keys.help, ...keys.settings];
+  const ui = [...keys.previous, ...keys.next, ...keys.confirm, ...keys.exit, ...keys.help, ...keys.settings, ...keys.desktop];
   const taken = new Set([...ui, ...Object.values(game).filter(Boolean)]);
   const own = (recorded: string | undefined, fallback: string) => (recorded && !ui.includes(recorded) ? [recorded] : !recorded && !taken.has(fallback) ? [fallback] : []);
   return { previous: own(game.leftMagna, 'ControlLeft'), next: own(game.rightMagna, 'ControlRight') };
@@ -696,7 +702,7 @@ export const ZONE_KEY = 'F6';
  */
 export function zoneSwitchKeys(source: ButtonsSource): string[] {
   const ui = interfaceKeys(source);
-  const taken = new Set([...ui.previous, ...ui.next, ...ui.confirm, ...ui.exit, ...ui.help, ...ui.settings]);
+  const taken = new Set([...ui.previous, ...ui.next, ...ui.confirm, ...ui.exit, ...ui.help, ...ui.settings, ...ui.desktop]);
   // Les MagnaSave tels que la roue les lit (collectionKeys) : relevés, sinon Ctrl gauche et Ctrl droit.
   // Novembre 2026 : sur une borne aux MagnaSave non relevés (Ctrl envoyés par la carte), la roue les
   // lisait, mais pas les écrans de gestion ni la pré-écoute du Juke-box.

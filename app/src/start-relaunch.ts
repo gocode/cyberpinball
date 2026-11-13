@@ -109,6 +109,30 @@ export function syncRelaunchWatcher(opts: { dataDir: string; startupDir: string;
 }
 
 /**
+ * Au bureau : un appui sur le bouton « Bureau Windows » de la borne (Boutons de l'interface),
+ * bouton de joystick, ramène le menu, sauf pendant une partie de VPX lancée depuis le bureau.
+ * Le bouton qui vient d'ouvrir le bureau, encore tenu, doit d'abord être relâché. Une touche du
+ * clavier n'y est pas lue (un raccourci global sans Ctrl prendrait la touche à tout Windows) :
+ * Ctrl+Maj+D, la barre des tâches ou Start maintenu ramènent alors le menu. Rend de quoi arrêter.
+ */
+export function watchDesktopButton(code: string, onPress: () => void): () => void {
+  const press = new HoldDetector(0);
+  press.waitRelease();
+  const check = (): void => {
+    if (!press.update(joystickButtonsHeld().includes(code), Date.now())) return;
+    if (vpxPlaying()) return void console.log('Bureau Windows : bouton appuyé pendant une partie de VPX, ignoré.'); // i18n-ignore : journal
+    console.log('Bureau Windows : bouton appuyé au bureau, retour au menu.'); // i18n-ignore : journal
+    onPress();
+  };
+  const stopWatch = watchJoystickButtons(() => check());
+  const timer = setInterval(check, HOLD_POLL_MS);
+  return () => {
+    clearInterval(timer);
+    stopWatch();
+  };
+}
+
+/**
  * Au bureau (« Bureau Windows ») : un appui long sur `code` appelle `onHold`, sauf pendant une
  * partie de VPX lancée depuis le bureau. Un Start déjà tenu en entrant (celui qui a choisi
  * « Bureau Windows ») doit d'abord être relâché. Rend de quoi arrêter.

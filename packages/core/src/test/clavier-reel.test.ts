@@ -175,19 +175,20 @@ test('assistant complet au clavier : boutons du jeu puis de l’interface relev�
         ...keyboard(...Object.values(GAME_BY_KEYBOARD)),
         ...keyboard('KeyA', 'KeyS', 'KeyQ', 'Digit2'),
         // Boutons de l'interface, proposés sur ceux du jeu : « Tout relever », puis au clavier ;
-        // Retour (U) passe les boutons des réglages et de la sortie sans enregistrer.
+        // Retour (U) passe les boutons des réglages, du bureau Windows et de la sortie sans enregistrer.
         'click:#actions button:nth-child(4)',
-        ...keyboard(...Object.values(navigation), 'KeyU', 'KeyU'),
+        ...keyboard(...Object.values(navigation), 'KeyU', 'KeyU', 'KeyU'),
         ...keyboard('KeyJ', 'KeyL', 'KeyU', 'KeyK'),
         'CtrlQ',
       ],
       [],
     );
-    assert.deepEqual(INTERFACE_KEYS.items.map((b) => b.id), [...Object.keys(navigation), 'settings', 'quit']);
+    assert.deepEqual(INTERFACE_KEYS.items.map((b) => b.id), [...Object.keys(navigation), 'settings', 'desktop', 'quit']);
     for (const line of [
       ...Object.entries(GAME_BY_KEYBOARD).map(([id, code]) => recorded('game', id, code)),
       ...Object.entries(navigation).map(([id, code]) => recorded('interface', id, code)),
       recorded('interface', 'settings', 'KeyU', 'passé'),
+      recorded('interface', 'desktop', 'KeyU', 'passé'),
       recorded('interface', 'quit', 'KeyU', 'passé'),
     ])
       assert.ok(output.includes(line), `${line}\n---\n${output}`);

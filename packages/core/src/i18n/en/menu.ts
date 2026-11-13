@@ -87,6 +87,8 @@ export const messages: Record<string, string> = {
   'Commandes de la borne': 'Cabinet controls',
   'Les boutons du menu et de la partie': 'The buttons of the menu and of the game',
   'Libère tous les écrans du PC ; {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu': 'Frees every PC screen; {keys} or the Cyber Pinball taskbar button brings the menu back',
+  'Bouton de la borne : {button}': 'Cabinet button: {button}',
+  '{button} de nouveau': '{button} again',
   'Touches par défaut des encodeurs remises': 'Encoder default keys restored',
   'Configuration « {name} » reconnue (avant : « {previous} »).': 'Configuration “{name}” detected (was “{previous}”).',
   'Boutons de la borne à refaire': 'Cabinet buttons need redoing',

@@ -27,6 +27,8 @@ import {
   refusedNavigationKey,
   defaultNavigation,
   interfaceKeys,
+  collectionKeys,
+  zoneSwitchKeys,
   INTERFACE_KEYS,
   GAME_KEYS,
   keysToTry,
@@ -726,14 +728,14 @@ test('interface : les touches de secours du clavier gardent toujours leur rôle'
 });
 
 test('interface : relevé au clavier et au joystick mélangés, Retour passe les facultatifs', () => {
-  const pressed = ['KeyJ', joy(1), 'Enter', 'KeyU', 'KeyU', joy(5), joy(8)];
+  const pressed = ['KeyJ', joy(1), 'Enter', 'KeyU', 'KeyU', joy(5), joy(7), joy(8)];
   let keys: SetKeys = {};
   for (const [i, n] of NAVIGATION.entries()) {
     const record = recordKey(INTERFACE_KEYS, keys, n.id, pressed[i]!);
     assert.equal(record.refused, undefined, n.id);
     keys = record.keys;
   }
-  assert.deepEqual(keys, { previous: 'KeyJ', next: joy(1), confirm: 'Enter', back: 'KeyU', settings: joy(5), quit: joy(8) });
+  assert.deepEqual(keys, { previous: 'KeyJ', next: joy(1), confirm: 'Enter', back: 'KeyU', settings: joy(5), desktop: joy(7), quit: joy(8) });
   // Une touche d'un autre bouton de l'interface passe au nouveau : Précédent, obligatoire, est à relever de nouveau.
   assert.deepEqual(recordKey(INTERFACE_KEYS, keys, 'help', 'KeyJ').taken, { id: 'previous', label: 'Précédent', required: true });
   // Le même bouton physique peut servir au jeu et à l'interface : chaque jeu ne refuse que ses propres doublons.
@@ -762,6 +764,27 @@ test('interface : enregistrée dans cabinet.json, absente de [Input], remise ave
   const reset = withDefaultButtons({ ...cabinetWith(buttons), navigation });
   assert.deepEqual(reset.buttons, DEFAULT_BUTTONS);
   assert.deepEqual(reset.navigation, { previous: 'ShiftLeft', next: 'ShiftRight', confirm: 'Digit1', back: 'Escape' });
+});
+
+test('bouton « Bureau Windows » de l’interface : facultatif, sans touche de secours, ouvre et referme le bureau', () => {
+  const desktop = NAVIGATION.find((n) => n.id === 'desktop')!;
+  assert.equal(desktop.required, false);
+  assert.deepEqual(desktop.fallback, [], 'Ctrl+Maj+D, raccourci du clavier, se lit à part');
+  // Sans bouton relevé, aucune touche (pas de lettre du clavier qui ouvrirait le bureau) ; relevé, son bouton seul.
+  assert.deepEqual(interfaceKeys(undefined).desktop, []);
+  const source = { buttons: { ...DEFAULT_BUTTONS }, navigation: { ...navigationButtons({ buttons: { ...DEFAULT_BUTTONS } }), desktop: joy(9) } };
+  assert.deepEqual(interfaceKeys(source).desktop, [joy(9)]);
+  // Ni MagnaSave ni bascule des zones sur le bouton du bureau.
+  const magna = { ...source, buttons: { ...DEFAULT_BUTTONS, leftMagna: joy(9) } };
+  assert.deepEqual(collectionKeys(magna).previous, []);
+  assert.ok(!zoneSwitchKeys(magna).includes(joy(9)));
+  // Le menu l'ouvre de n'importe quel écran, et au bureau le même bouton de joystick ramène le menu.
+  const frontend = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'app', 'src', 'frontend.ts'), 'utf8');
+  assert.match(frontend, /function handleKey[\s\S]*?if \(is\(KEYS\.desktop\)\) return[^\n]*restoreFromDesktop\(\)[^\n]*showDesktop\(\)/);
+  assert.match(frontend, /function showDesktop[\s\S]*?desktopButton = watchDesktopButton\(/);
+  assert.match(frontend, /function restoreFromDesktop[\s\S]*?desktopButton\?\.\(\);/);
+  // Le geste est écrit là où il agit : aide-mémoire et entrée « Bureau Windows ».
+  assert.match(frontend, /\['shortcut\.desktop'[^\n]*KEYS\.desktop/);
 });
 
 test('l’interface lit ses propres boutons partout, jamais ceux du jeu seuls', () => {
