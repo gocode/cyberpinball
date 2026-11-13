@@ -22,6 +22,21 @@ import {
 const REPO = path.join(__dirname, '..', '..', '..', '..');
 const APP = path.join(REPO, 'app', 'src');
 
+test('menu système : une rubrique qui s’allume montre son état et son badge sur sa propre ligne (Réalité virtuelle)', () => {
+  // 13/11/2026 : regroupés sous « Réalité virtuelle », les réglages du casque cachaient l'état de la VR et son
+  // badge Bêta tant qu'on n'entrait pas dans la rubrique. L'entrée de tête les remonte sur la ligne de la rubrique.
+  assert.equal(SYSTEM_GROUPS['realite-virtuelle'].lead, 'vr');
+  for (const id of SYSTEM_GROUP_IDS) {
+    const lead = SYSTEM_GROUPS[id].lead;
+    if (lead) assert.ok(SYSTEM_GROUPS[id].entries.includes(lead), `${id} : son entrée de tête est dedans`);
+  }
+  const library = fs.readFileSync(path.join(APP, 'library.ts'), 'utf8');
+  assert.match(library, /const lead = isSystemGroup\(id\) && SYSTEM_GROUPS\[id\]\.lead \? systemItems\.get\(SYSTEM_GROUPS\[id\]\.lead!\) : undefined;\s*const item = isSystemGroup\(id\) \? lead : systemItems\.get\(id\);/);
+  assert.match(library, /\.\.\.\(item\?\.badge && \{ badge: item\.badge \}\),/);
+  // L'entrée d'activation garde son badge et son état (frontend.ts).
+  assert.match(fs.readFileSync(path.join(APP, 'frontend.ts'), 'utf8'), /library\.provideSystemItem\('vr', \{\s*\/\/[^\n]*\n\s*badge: 'beta',\s*get label\(\) \{\s*return vrMenuText\(vrMode, probeVr\(\)\)\.label;/);
+});
+
 test('menu système : chaque entrée est rangée une fois, sous une seule rubrique', () => {
   const seen = new Map<SystemEntryId, SystemGroupId>();
   for (const group of SYSTEM_GROUP_IDS) {

@@ -2358,7 +2358,9 @@ export function createLibrary(host: LibraryHost) {
   function buildSystem(group: SystemGroupId | undefined): Built {
     const actions: Action[] = systemEntries(group).map((id) => {
       const entry = systemEntry(id);
-      const item = isSystemGroup(id) ? undefined : systemItems.get(id);
+      // Une rubrique qui a une entrée de tête (l'activation) montre son état et son badge sur sa propre ligne.
+      const lead = isSystemGroup(id) && SYSTEM_GROUPS[id].lead ? systemItems.get(SYSTEM_GROUPS[id].lead!) : undefined;
+      const item = isSystemGroup(id) ? lead : systemItems.get(id);
       return {
         label: item?.label ?? entry.label,
         detail: isSystemGroup(id) ? SYSTEM_GROUPS[id].detail : item?.detail,
@@ -2366,7 +2368,7 @@ export function createLibrary(host: LibraryHost) {
         attention: systemAttention(id),
         ...(item?.tone && { tone: item.tone }),
         ...(item?.badge && { badge: item.badge }),
-        shortcut: item?.shortcut,
+        shortcut: isSystemGroup(id) ? undefined : item?.shortcut,
         run: () => runSystemEntry(id),
       };
     });

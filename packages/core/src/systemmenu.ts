@@ -89,6 +89,12 @@ export interface SystemGroup extends SystemEntry {
   /** Ce qu'on y trouve, sous le nom de la rubrique. */
   readonly detail: string;
   readonly entries: readonly SystemEntryId[];
+  /**
+   * L'entrée de tête de la rubrique, celle qui l'allume ou l'éteint : la ligne de la rubrique en prend le
+   * libellé (avec l'état), le ton et le badge, pour qu'on les voie avant d'entrer (13/11/2026 : « Réalité
+   * virtuelle » ne disait plus si la VR était activée, ni son badge Bêta, une fois ses réglages regroupés).
+   */
+  readonly lead?: SystemItemId;
 }
 
 /** Rubriques du menu système, dans l'ordre. */
@@ -154,6 +160,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     get label() { return t('Réalité virtuelle'); },
     get detail() { return t('Activer le casque, caler la borne, manettes du casque, recopie sur le playfield'); },
     entries: ['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror'],
+    lead: 'vr',
   },
   cyberpinball: {
     id: 'cyberpinball',

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { anchorHeight, cabinetPlaceFileName, calibrateMenuText, calibrationSetting, DESK_LOCKBAR_HEIGHT_M, freePlace, calibrationGap, calibrationProblem, eyeHeightProblem, isCalibrated, lockbarMarks, lockbarPlace, lockbarVpxSettings, placeLockbar, placeVpxSettings, roomMoved, STANDARD_TABLE_WIDTH_CM } from '../calage';
+import { anchorHeight, cabinetPlaceFileName, calibrateMenuText, calibrationSetting, DESK_LOCKBAR_HEIGHT_M, freePlace, calibrationGap, calibrationProblem, eyeHeightProblem, isCalibrated, lockbarMarks, lockbarPlace, lockbarVpxSettings, placeLockbar, placeVpxSettings, roomMoved, shouldOfferCalibration, STANDARD_TABLE_WIDTH_CM } from '../calage';
 import { LOCKBAR_DISTANCE_M, LOCKBAR_HEIGHT_M } from '../casque';
 import { vrCarriedSettings } from '../vr';
 
@@ -140,7 +140,8 @@ test('borne fixe : aucun recentrage automatique, la place imposée à VPX, le ca
   const frontend = read('app', 'src', 'frontend.ts');
   assert.match(frontend, /const table = vpxTableGeometry\(tableFile\);\s*const menuWidth = menuPlayfield\(headsetSources\(\), headsetTurn\(\)\)\?\.width;\s*const settings = placeVpxSettings\(place, table, menuWidth\);[\s\S]{0,400}writeIniSettings\(vr\.ini, settings\);/);
   assert.match(frontend, /const vrCenter = vrGame && !readCabinetPlace\(headsetPlaceFile\(\)\) && !vrHasSavedPlace\(vrText\)/);
-  assert.match(frontend, /if \(headset\?\.worn\) offerControllerWizard\(\);\s*if \(headset\?\.worn\) offerCalibration\(\);/);
+  // Au port du casque : l'assistant des manettes d'abord ; le calage, seulement s'il est remis en limite fixe.
+  assert.match(frontend, /if \(headset\?\.worn\) offerControllerWizard\(\);\s*if \(headset\?\.worn\) offerCalibration\('premier-port'\);/);
   const cpp = read('packages', 'casque-vr', 'src', 'casque.cpp');
   // Dans la pièce, un changement d'espace du Quest ne déplace pas la borne : il est seulement dit.
   assert.match(cpp, /if \(!stage\)\s*wantRecenter = true;\s*else if \(change->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_STAGE\)\s*\{[\s\S]{0,200}say\(std::string\("piece-changee "\)/);
@@ -171,19 +172,20 @@ test('un calage par configuration ; au bureau, la borne posée librement, puis f
   assert.match(frontend, /c\.place = freePlace\(gaze, gaze\.eyes\);\s*c\.placing = false;\s*applyCalibration\(\);\s*closeCalibration\(\);/);
 });
 
-test('calage proposé à chaque session VR ; gâchettes autant qu’on veut, A valide et sort, B sort sans rien changer', () => {
-  // Demandes du 10 novembre 2026 : à chaque démarrage d'une session VR, l'écran du calage s'ouvre
-  // d'office ; les gâchettes placent et replacent la borne, qui vient aussitôt ; un seul bouton (A)
-  // valide et sort ; B sort sans rien changer. L'assistant des manettes reste avant.
+test('calage proposé d’office seulement casque remis en limite fixe ; gâchettes autant qu’on veut, A valide et sort, B sort sans rien changer', () => {
+  // Décision du 13 novembre 2026 : l'écran du calage ne s'ouvre de lui-même que quand le casque a été retiré
+  // puis remis et que le Quest est en limite fixe ; jamais au premier port, jamais en limite de pièce. Les
+  // gâchettes placent et replacent la borne ; un seul bouton (A) valide et sort ; B sort sans rien changer.
   const repo = path.join(__dirname, '..', '..', '..', '..');
   const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
-  // Plus de condition « pas encore calée » : proposé à chaque session, une fois, après l'assistant.
-  assert.doesNotMatch(frontend, /!isCalibrated\(headset\.place\(\)\)\) offerCalibration/);
-  assert.match(frontend, /if \(headset\?\.worn\) offerCalibration\(\);\s*\}/);
-  assert.match(frontend, /if \(\(calibrationOffered && !again\) \|\| calibration \|\| controllerWizard/);
+  for (const reason of ['premier-port', 'limite-changee', 'piece-perimee'] as const)
+    for (const keeping of ['kept', 'recentred', undefined] as const) assert.equal(shouldOfferCalibration(reason, keeping), false, `${reason} ${keeping}`);
+  assert.equal(shouldOfferCalibration('casque-remis', 'kept'), false);
+  assert.equal(shouldOfferCalibration('casque-remis', undefined), false);
+  assert.equal(shouldOfferCalibration('casque-remis', 'recentred'), true);
+  assert.match(frontend, /if \(!shouldOfferCalibration\(reason, headset\.roomKeeping\)\) \{/);
+  assert.match(frontend, /offerCalibration\('casque-remis'\);/);
   assert.match(frontend, /openCalibration\(true\);/);
-  // Casque perdu : la session suivante repropose le calage.
-  assert.match(frontend, /if \(calibration\) closeCalibration\(\);\s*\/\/[^\n]*\s*calibrationOffered = false;/);
   // A valide et sort : appliqué (place et INI de VPX), puis l'écran se ferme.
   assert.match(frontend, /else if \(KEYS\.confirm\.includes\(input\.code\) && calibration\?\.place\) \{\s*applyCalibration\(\);\s*closeCalibration\(\);\s*\}/);
   assert.match(frontend, /function applyCalibration\(\): void \{[\s\S]{0,600}headset\?\.showPlace\(place, true\);[\s\S]{0,400}writeVrCalibration\([\s\S]{0,1200}c\.validated\+\+;\s*c\.points = \{\};\s*c\.place = undefined;\s*showCalibration\(\);/);

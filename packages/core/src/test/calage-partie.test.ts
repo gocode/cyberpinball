@@ -16,6 +16,7 @@ import {
   expectedGrips,
   gripOffset,
   headAtWear,
+  inGameCalibrationReport,
   headsetFunctions,
   inGameCalibration,
   lockbarPlace,
@@ -126,7 +127,7 @@ test('détection : pièce recentrée par le Quest (limite fixe) dite au journal,
   assert.match(front, /if \(!place \|\| headsetSetting\(\) === 'bureau' \|\| headset\?\.roomKeeping !== 'recentred'\) return;/);
   // L'écart prises-bouts survit à la relecture de casque.json.
   assert.match(ts, /\.\.\.\(grip && \{ grip \}\) \};/);
-  assert.match(front, /offerCalibration\(true, 'casque remis, pièce recentrée par le Quest'\);/);
+  assert.match(front, /offerCalibration\('casque-remis'\);/);
   // Changement de pièce dit par le runtime pendant la session : l'écart au journal.
   const gap = roomChangeGap('piece-changee pose 0.300000 0.000000 -0.400000 0.523599')!;
   assert.ok(Math.abs(gap.cm - 50) < 0.01 && Math.abs(gap.deg - 30) < 0.01);
@@ -199,6 +200,22 @@ test('invariant : la même combinaison, la même durée et les mêmes touches da
   // Au menu : la combinaison tenue CALIBRATION_HOLD_S ouvre le calage, avec la jauge dans le casque.
   assert.match(front, /comboHold = setTimeout\(\(\) => \{/);
   assert.match(read('app', 'renderer', 'frontend.js'), /if \(role === 'backglass' && s\.headsetHold\) \{/);
+});
+
+test('détection de la panne du geste en partie (13 novembre 2026, « rien du tout ») : chaque étape au journal du plugin, bilan à la fin de la partie', () => {
+  const plugin = read('packages', 'vpx-vision3d', 'src', 'cyberpinball.cpp');
+  for (const line of ['calage actif=%d hauteur=%d', 'calage-clic %s=%d fiable=%d', 'calage-combinaison tenue', 'calage-etape ouverte', 'calage-gachette', 'calage-touche F13 marche', 'calage-touche F13 arret', 'passif raison=version', 'passif raison=actions'])
+    assert.ok(plugin.includes(line), line);
+  // Plugin d'avant : rien à dire. Aucun clic arrivé : VPX ne les transmet pas.
+  assert.equal(inGameCalibrationReport('debut table=x\nmesure t=5'), undefined);
+  assert.equal(inGameCalibrationReport('calage actif=1 hauteur=13\nmesure t=5'), undefined);
+  assert.match(inGameCalibrationReport('calage actif=1 hauteur=13\npassif raison=actions action=3 liee=3')!, /plugin passif \(actions\)/);
+  assert.match(inGameCalibrationReport('calage actif=0 hauteur=0')!, /touches du calage pas liées/);
+  assert.match(inGameCalibrationReport('calage actif=1 hauteur=13\ncalage-clic gauche=1 fiable=1\ncalage-clic gauche=0 fiable=1')!, /1 clic\(s\)[\s\S]*jamais été tenus ensemble/);
+  const full = ['calage actif=1 hauteur=13', 'calage-clic gauche=1 fiable=1', 'calage-clic droit=1 fiable=1', 'calage-combinaison tenue', 'calage-combinaison pause demandee', 'calage-etape ouverte', 'calage-gachette', 'calage-touche F13 marche', 'calage-touche F13 arret', 'calage-partie n=1 hauteur=13 resultat=ok'].join('\n');
+  assert.match(inGameCalibrationReport(full)!, /2 clic\(s\)[\s\S]*1 calage\(s\) fait\(s\) ; calage fait$/);
+  assert.match(inGameCalibrationReport(full.replace('calage-partie n=1 hauteur=13 resultat=ok', ''))!, /touche F13 pas postée/);
+  assert.match(read('app', 'src', 'frontend.ts'), /const calibrationReport = inGameCalibrationReport\(block\.text\);/);
 });
 
 test('aide : la combinaison dans le détail de « Caler la borne », dans les manuels et au premier port du casque', () => {

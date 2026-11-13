@@ -1262,7 +1262,7 @@ void appliquer(const Ordre& o)
    if (o.pause)
    {
       reprendreVpx(1);
-      ecrire("calage-combinaison pause");
+      ecrire("calage-combinaison pause demandee");
    }
    if (o.caler && calageVpx.etape == 0)
    {
@@ -1285,14 +1285,14 @@ void avancerCalage()
    {
    case 1:
       c.etape = posterTouche(TOUCHE_ALIGNER, BALAYAGE_ALIGNER) ? 2 : 0;
-      if (!c.etape)
-         ecrire("calage-partie resultat=aucune_fenetre");
+      ecrire(c.etape ? "calage-touche F13 marche" : "calage-partie resultat=aucune_fenetre");
       c.images = 0;
       return;
    case 2:
       if (++c.images < CALAGE_IMAGES)
          return;
       posterTouche(TOUCHE_ALIGNER, BALAYAGE_ALIGNER);
+      ecrire("calage-touche F13 arret");
       c.etape = 3;
       return;
    case 3:
@@ -1332,11 +1332,24 @@ void MSGPIAPI onAction(const unsigned int, void*, void* data)
       {
          pause.passif();
          vpxApi->PushNotification("Cyber Pinball : pause du casque coupee (actions de VPX inattendues)", 4000);
+         char ligne[96];
+         std::snprintf(ligne, sizeof(ligne), "passif raison=actions action=%d liee=%d", static_cast<int>(ev->action), liee);
+         ecrire(ligne);
       }
+   }
+   // Chaque appui des porteurs de la combinaison du calage (les clics des joysticks), pour suivre le geste au journal.
+   if (c == Commande::CalageG || c == Commande::CalageD)
+   {
+      char ligne[96];
+      std::snprintf(ligne, sizeof(ligne), "calage-clic %s=%d fiable=%d", c == Commande::CalageG ? "gauche" : "droit", ev->isPressed ? 1 : 0, pause.estFiable() ? 1 : 0);
+      ecrire(ligne);
    }
    if (pause.avaler(c))
       ev->enableVPXProcessing = 0;
-   appliquer(pause.action(c, ev->isPressed != 0, maintenant(), estGachette(static_cast<int>(ev->action))));
+   const Ordre o = pause.action(c, ev->isPressed != 0, maintenant(), estGachette(static_cast<int>(ev->action)));
+   if (o.caler)
+      ecrire(calageActif_Val ? "calage-gachette" : "calage-gachette touches_non_liees");
+   appliquer(o);
 }
 
 void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
@@ -1351,6 +1364,18 @@ void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
    salle.fil = GetCurrentThreadId();
    const double t = maintenant();
    const double jeu = vpxApi->GetGameTime();
+   {
+      // Les étapes du geste au journal : combinaison tenue, étape du calage ouverte.
+      static bool tenueDite = false, etapeDite = false;
+      const bool tenue = pause.comboTenue();
+      if (tenue && !tenueDite)
+         ecrire("calage-combinaison tenue");
+      tenueDite = tenue;
+      const bool etape = pause.etape() == Etape::Calage;
+      if (etape && !etapeDite)
+         ecrire("calage-etape ouverte");
+      etapeDite = etape;
+   }
    appliquer(pause.image(t, jeu));
    avancerCalage();
    pomper(t);
@@ -1373,7 +1398,15 @@ void MSGPIAPI onGameStart(const unsigned int, void*, void*)
    pause.remiseAZero();
    calageVpx = CalageEnCours {};
    if (!versionConnue())
+   {
       pause.passif();
+      ecrire("passif raison=version");
+   }
+   {
+      char ligne[64];
+      std::snprintf(ligne, sizeof(ligne), "calage actif=%d hauteur=%d", static_cast<int>(calageActif_Val), static_cast<int>(hauteurCalage_Val));
+      ecrire(ligne);
+   }
    relacherSortie = false;
    notifiee = false;
    for (Pompe& p : pompes)

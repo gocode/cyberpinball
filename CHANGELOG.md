@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.11
 
+- Réalité virtuelle : dans Menu système > Borne, la ligne de la réalité virtuelle montre de nouveau si elle est activée, avec son badge Bêta. Le calage ne s'ouvre plus de lui-même au premier port du casque : seulement quand le casque est remis en limite fixe.
 - Ouverture sur une borne au playfield vertical : en sortant de l'animation, le plateau ne passe plus un instant en paysage (ni à la fin d'une partie), et l'accord du souffle de l'ouverture tombe pile sur l'explosion du plateau au lieu d'arriver avant.
 - Configuration de la borne : chaque écran dit maintenant, sous « Quitter sans enregistrer », le geste qui en sort à cette étape (Exit maintenu 2 s, ou toute touche maintenue 3 s pendant le relevé des boutons). Un bouton de la borne peut aussi lui être affecté (Boutons de l'interface > « Quitter sans enregistrer ») : un appui pose la question, un second sort sans rien changer, à toute étape, assistant complet ou étape seule.
 - Boutons : un bouton de la borne déjà pris par un autre rôle n'est plus refusé ; il passe au nouveau rôle, l'ancien est vidé et l'écran le dit (redemandé s'il est obligatoire). Une borne dont tous les boutons sont pris peut ainsi en échanger.

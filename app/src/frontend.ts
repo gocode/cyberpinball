@@ -94,6 +94,9 @@ import {
   placeFromVpxCentering,
   placeGap,
   roomKeepingAdvice,
+  shouldOfferCalibration,
+  inGameCalibrationReport,
+  type CalibrationOfferReason,
   vpxRoomChanges,
   vrGraphicsProfile,
   cachedVrBackglassView,
@@ -2106,7 +2109,7 @@ function closeControllerWizard(keep: boolean): void {
     state = { ...state, phase: 'menu', message: undefined };
     broadcast();
   } else library.openSystem();
-  if (headset?.worn) offerCalibration();
+  if (headset?.worn) offerCalibration('premier-port');
 }
 
 /** Bandeau du menu pendant un envoi du téléphone. */
@@ -3441,8 +3444,7 @@ function headsetPutBackOn(): void {
   const place = headset?.place();
   if (!place || headsetSetting() === 'bureau' || headset?.roomKeeping !== 'recentred') return;
   console.log('Casque : remis après avoir été retiré, pièce du Quest sans limite (limite fixe) : il l’a recentrée sur la tête au réveil, écart non mesurable sans ancre (Link n’en donne pas) ; calage de la borne proposé d’office.'); // i18n-ignore : journal
-  calibrationOffered = false;
-  offerCalibration(true, 'casque remis, pièce recentrée par le Quest'); // i18n-ignore : journal
+  offerCalibration('casque-remis');
 }
 
 /**
@@ -3484,8 +3486,6 @@ let headsetEyes: number | undefined;
 let roomNotice = false;
 /** Session neuve d'après un changement de pièce, yeux hors de la plage : les applications qui démarrent ont l'ancienne pièce. */
 let roomStale = false;
-/** Calage déjà proposé d'office pendant cette session (Exit le referme ; il revient à la suivante). */
-let calibrationOffered = false;
 
 /**
  * Menu du casque (≡ de la manette gauche, au menu de Cyber Pinball) : caler la borne, la recentrer,
@@ -3547,8 +3547,6 @@ function headsetLost(inGame: boolean): void {
     vrGameStop();
   } else console.warn('Casque : éteint ou Link coupé ; retour aux écrans du PC.'); // i18n-ignore : journal
   if (calibration) closeCalibration();
-  // Nouvelle session VR au prochain port : le calage y sera proposé de nouveau.
-  calibrationOffered = false;
 }
 
 /** Tête du joueur déjà notée pour la partie dans le casque en cours. */
@@ -3796,6 +3794,9 @@ function noteVrMeasures(late = false): void {
   }
   const when = late ? ' (partie précédente, pas reportée à sa fin)' : ''; // i18n-ignore : journal
   noteVrScreens(block.text, when);
+  // Le geste du calage en partie (deux joysticks tenus 3 s) : où il s'est arrêté, s'il a été tenté.
+  const calibrationReport = inGameCalibrationReport(block.text);
+  if (calibrationReport) console.log(`Casque, calage en partie${when} : ${calibrationReport}.`); // i18n-ignore : journal
   const m = parseVrMeasures(block.text);
   if (!m) {
     console.log(`Casque, mesures de VPX${when} : aucune (partie de moins de 5 s).`); // i18n-ignore : journal
@@ -3972,15 +3973,17 @@ function headInGame(head: HeadPose): void {
 }
 
 /**
- * Calage proposé d'office dans le casque, une fois par session VR (au premier port, après l'assistant
- * des manettes), et de nouveau si la limite du Quest change (`again`) : caler, ou passer en gardant le
- * calage précédent (demande du 10 novembre 2026).
+ * Calage proposé d'office dans le casque : seulement quand le casque a été retiré puis remis en limite fixe
+ * (shouldOfferCalibration, décision du 13 novembre 2026) ; caler, ou passer en gardant le calage précédent.
+ * Les autres moments (premier port, limite changée) sont seulement écrits au journal.
  */
-function offerCalibration(again = false, reason = 'limite du Quest changée'): void { // i18n-ignore : journal
-  if ((calibrationOffered && !again) || calibration || controllerWizard || playing || launch || calibrateUnavailable() || !headset?.worn) return;
-  calibrationOffered = true;
-  const why = again ? reason : isCalibrated(headset.place()) ? 'début de la session VR' : 'borne pas encore calée'; // i18n-ignore : journal
-  console.log(`Casque : calage de la borne proposé d'office (${why}).`); // i18n-ignore : journal
+function offerCalibration(reason: CalibrationOfferReason): void {
+  if (calibration || controllerWizard || playing || launch || calibrateUnavailable() || !headset?.worn) return;
+  if (!shouldOfferCalibration(reason, headset.roomKeeping)) {
+    if (reason !== 'premier-port') console.log(`Casque : calage pas proposé d'office (${reason}, pièce ${headset.roomKeeping === 'kept' ? 'gardée par le Quest' : 'inconnue'}) ; les deux joysticks ou « Caler la borne » pour recaler.`); // i18n-ignore : journal
+    return;
+  }
+  console.log(`Casque : calage de la borne proposé d'office (casque remis, pièce recentrée par le Quest).`); // i18n-ignore : journal
   openCalibration(true);
 }
 
@@ -4833,7 +4836,7 @@ export function startFrontend(): void {
       // Manettes sans réglage pour cette configuration, puis borne pas encore calée : l'assistant et le
       // calage s'ouvrent d'office dans le casque, avant la navigation.
       if (headset?.worn) offerControllerWizard();
-      if (headset?.worn) offerCalibration();
+      if (headset?.worn) offerCalibration('premier-port');
       // Compagnon parti pendant l'assistant : rien à garder.
       if (controllerWizard && !headset?.running) closeControllerWizard(false);
       broadcast();
@@ -4869,15 +4872,15 @@ export function startFrontend(): void {
     onRoom: (room, changed) => {
       const place = headset?.place();
       if (!changed && !(isCalibrated(place) && roomMoved(place?.room, room))) return;
-      console.warn('Casque : la limite du Quest a changé depuis le calage ; calage de la borne proposé.'); // i18n-ignore : journal
+      console.warn('Casque : la limite du Quest a changé depuis le calage ; à recaler (les deux joysticks ou « Caler la borne »).'); // i18n-ignore : journal
       roomNotice = true;
-      offerCalibration(true);
+      offerCalibration('limite-changee');
     },
     onRoomRestart: (eyes) => {
       roomStale = Boolean(eyeHeightProblem(eyes));
       console.log(`Casque : session neuve après le changement de pièce, yeux à ${eyes.toFixed(2)} m${roomStale ? ' : le sol de la pièce d’origine est faux, les applications qui démarrent la reçoivent ainsi' : ''}.`); // i18n-ignore : journal
       if (calibration) showCalibration();
-      else if (roomStale) offerCalibration(true);
+      else if (roomStale) offerCalibration('piece-perimee');
     },
     log: (line) => console.log(line),
   });

@@ -594,6 +594,53 @@ export function headAtWear(line: string): { cm: number; deg: number; onHead: boo
   return { cm, deg, onHead: cm < 40 && deg < 20 };
 }
 
+/**
+ * Bilan du geste du calage pendant une partie, d'après les lignes du plugin (casque-vpx.txt, 13 novembre 2026 :
+ * « deux joysticks tenus 3 s, rien du tout ») : où il s'est arrêté, pour que la panne se voie au journal.
+ * undefined : plugin d'avant le calage en partie (aucune ligne « calage actif=… »).
+ */
+export function inGameCalibrationReport(block: string): string | undefined {
+  const armed = /^calage actif=(\d)/m.exec(block);
+  if (!armed) return undefined;
+  const count = (re: RegExp) => (block.match(re) ?? []).length;
+  const passive = /^passif raison=(\S+)/m.exec(block);
+  const clicks = count(/^calage-clic \S+=1/gm);
+  const held = count(/^calage-combinaison tenue/gm);
+  const opened = count(/^calage-etape ouverte/gm);
+  const triggers = count(/^calage-gachette/gm);
+  const done = count(/^calage-partie .*resultat=ok/gm);
+  const facts = `${clicks} clic(s) des joysticks reçu(s) par le plugin, combinaison tenue ${held} fois, calage ouvert ${opened} fois, ${triggers} gâchette(s), ${done} calage(s) fait(s)`; // i18n-ignore : journal
+  const why =
+    armed[1] !== '1'
+      ? 'touches du calage pas liées dans l’INI de la partie (plugin sans réglage Calibrate)' // i18n-ignore : journal
+      : passive
+        ? `plugin passif (${passive[1]}) : il n’écoute plus aucune action de VPX` // i18n-ignore : journal
+        : clicks === 0
+          ? 'aucun clic des joysticks n’est arrivé au plugin : VPX ne les a pas transmis (liaisons Custom1, Custom2)' // i18n-ignore : journal
+          : held === 0
+            ? 'les deux clics n’ont jamais été tenus ensemble' // i18n-ignore : journal
+            : opened === 0
+              ? 'combinaison tenue, mais l’étape du calage ne s’est pas ouverte (pause de VPX pas venue)' // i18n-ignore : journal
+              : triggers === 0
+                ? 'calage ouvert, aucune gâchette' // i18n-ignore : journal
+                : done === 0
+                  ? 'gâchette sans calage fini (touche F13 pas postée à VPX)' // i18n-ignore : journal
+                  : 'calage fait'; // i18n-ignore : journal
+  return clicks || passive || armed[1] !== '1' ? `${facts} ; ${why}` : undefined;
+}
+
+/** Les moments où le calage pourrait s'ouvrir de lui-même dans le casque. */
+export type CalibrationOfferReason = 'premier-port' | 'casque-remis' | 'limite-changee' | 'piece-perimee';
+
+/**
+ * Le calage s'ouvre-t-il de lui-même (décision du joueur, 13 novembre 2026) ? Seulement quand le casque a été
+ * retiré puis remis et que le Quest est en limite fixe (il vient de déplacer la pièce) ; jamais au premier port
+ * du casque, jamais en limite de pièce. Le reste du temps : les deux joysticks, ou « Caler la borne ».
+ */
+export function shouldOfferCalibration(reason: CalibrationOfferReason, keeping: RoomKeeping | undefined): boolean {
+  return reason === 'casque-remis' && keeping === 'recentred';
+}
+
 /** Ce que dit l'écran du calage d'une pièce recentrée à chaque retour du casque, ou undefined. */
 export function roomKeepingAdvice(keeping: RoomKeeping | undefined, combo: string | undefined): string | undefined {
   if (keeping !== 'recentred') return undefined;

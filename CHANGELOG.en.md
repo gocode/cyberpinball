@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- Virtual reality: in System menu > Cabinet, the virtual reality row shows again whether it is on, with its Beta badge. The alignment no longer opens by itself the first time the headset is worn: only when the headset is put back on with a stationary boundary.
 - Opening on a cabinet with a vertical playfield: leaving the animation, the playfield no longer flips to landscape for a moment (nor at the end of a game), and the opening breath's chord lands right on the playfield's burst instead of coming before it.
 - Cabinet setup: every screen now states, under "Quit without saving", the gesture that leaves at this step (Exit held 2 s, or any key held 3 s while buttons are being recorded). A cabinet button can also be assigned to it (Interface buttons > "Quit without saving"): one press asks the question, a second leaves without changing anything, at any step, full wizard or single step.
 - Buttons: a cabinet button already used by another role is no longer refused; it moves to the new role, the old one is emptied and the screen says so (asked again if it is required). A cabinet whose buttons are all taken can now swap them.

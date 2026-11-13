@@ -88,7 +88,7 @@ test('sortie garantie : le plugin traduit le numéro interne des actions et n’
   // Quitter : ExitGame, puis la fermeture de la fenêtre de VPX si la partie tourne encore.
   assert.match(cpp, /PostMessageW\(w, WM_CLOSE, 0, 0\)/);
   // Autre version de VPX : la table ne vaut plus, le plugin est passif.
-  assert.match(cpp, /if \(!versionConnue\(\)\)\s*pause\.passif\(\);/);
+  assert.match(cpp, /if \(!versionConnue\(\)\)\s*\{?\s*pause\.passif\(\);/);
 });
 
 test('réglage des manettes à l’envers (A et B croisés) : dit, réglage par défaut proposé, sauf s’il a été gardé sciemment', () => {
