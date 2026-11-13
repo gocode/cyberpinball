@@ -46,6 +46,7 @@ export const messages: Record<string, string> = {
   'Touchez l’autre coin': 'Touch the other corner',
   'Gâchette : placer · A : valider': 'Trigger: place · A: confirm',
   'Gâchette': 'Trigger',
+  'Le Quest a déplacé la pièce en remettant le casque : recalez.': 'The Quest moved the room when the headset was put back on: align again.',
   'Manettes du casque · étape {n} sur {total}': 'Headset controllers · step {n} of {total}',
   'Proposé :': 'Suggested:',
   'appuyez sur le bouton voulu': 'press the button you want',

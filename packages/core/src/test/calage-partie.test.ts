@@ -58,6 +58,9 @@ import {
   AUTO_RECAL_LEARN_HEIGHT_CM,
   restGate,
   restGateReason,
+  originResetAtWear,
+  ORIGIN_RESET_CM,
+  ORIGIN_RESET_DEG,
   restReference,
   RestWatch,
   type RestSample,
@@ -559,4 +562,39 @@ test('recalage automatique : pourquoi il renonce, dit au journal sans ambiguït�
   assert.match(front, /recalage automatique impossible, manettes posées non suivies/);
   assert.match(front, /recalage automatique pas fait, manettes posées immobiles \$\{AUTO_RECAL_STILL_S\} s : \$\{reason\}\./);
   assert.match(front, /autoRecalDiagnose\(sample, previous\);/);
+});
+
+test('la pièce refaite au port du casque, détectée et suivie d’un recalage (13 novembre 2026, Air Link)', () => {
+  assert.deepEqual([ORIGIN_RESET_CM, ORIGIN_RESET_DEG], [3, 2]);
+  // Le relevé de l'essai : tête à 0,6 cm et 1° de l'origine juste après le retour du casque.
+  const reset = originResetAtWear('tete-au-port -0.005604 0.006338 -0.019155')!;
+  assert.ok(reset.cm < 1 && reset.deg < 1.2, JSON.stringify(reset));
+  // Une tête ailleurs (pièce gardée, câble : 2 à 4 cm et 2 à 9° de sa place) : rien.
+  assert.equal(originResetAtWear('tete-au-port -0.545156 0.684925 1.278773'), undefined);
+  assert.equal(originResetAtWear('tete-au-port 0.04 0.00 0.0'), undefined);
+  assert.equal(originResetAtWear('tete-au-port 0.00 0.01 0.05'), undefined);
+  assert.equal(shouldOfferCalibration('origine-remise', 'kept'), true);
+  const ts = read('app', 'src', 'casque.ts');
+  assert.match(ts, /const reset = originResetAtWear\(line\);\s*if \(reset\) \{/);
+  assert.match(ts, /this\.opts\.onOriginReset\?\.\(this\.takenOffSeen\);/);
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /onOriginReset: \(afterRemoval\) => headsetOriginReset\(afterRemoval\),/);
+  assert.match(front, /if \(lastAutoRecalAt < since\) offerCalibration\('origine-remise'\);/);
+  // Le recalage automatique repart quand la pièce saute sous les manettes restées posées (rien pendant le retrait).
+  const calee: CabinetPlace = lockbarPlace({ x: -0.3, y: 0.9, z: -0.4 }, { x: 0.3, y: 0.9, z: -0.4 });
+  const repos: [Point3, Point3] = [{ x: -0.28, y: 0.93, z: -0.3 }, { x: 0.28, y: 0.93, z: -0.3 }];
+  const apprise: CabinetPlace = { ...calee, rest: restReference(calee, repos) };
+  const flat = { x: 0, y: 0, z: 0, w: 1 };
+  const w = new RestWatch();
+  const gate = (tips: readonly [Point3, Point3]) => restGate(tips, apprise, false);
+  let fired = 0;
+  for (let i = 0; i <= 15; i++) if (w.push({ t: i * 0.1, tips: repos, rot: [flat, flat] }, gate)) fired++;
+  assert.equal(fired, 1);
+  // Retrait du casque : aucun relevé ; au retour, les mêmes manettes vues 73 cm plus loin : un second recalage.
+  const sautees: [Point3, Point3] = [{ ...repos[0], x: repos[0].x + 0.73 }, { ...repos[1], x: repos[1].x + 0.73 }];
+  for (let i = 0; i <= 15; i++) if (w.push({ t: 10 + i * 0.1, tips: sautees, rot: [flat, flat] }, gate)) fired++;
+  assert.equal(fired, 2);
+  // Toujours au même endroit ensuite : rien de plus.
+  for (let i = 0; i <= 15; i++) if (w.push({ t: 20 + i * 0.1, tips: sautees, rot: [flat, flat] }, gate)) fired++;
+  assert.equal(fired, 2);
 });

@@ -690,6 +690,22 @@ export function headAtWear(line: string, place?: CabinetPlace): { cm: number; de
 }
 
 /**
+ * L'origine de la pièce remise sur la tête au port du casque : la tête à moins de ORIGIN_RESET_CM et
+ * ORIGIN_RESET_DEG de l'origine. Une tête posée là par hasard, à un centimètre et un degré près, ne se voit pas ; le
+ * Quest, lui, refait ainsi sa pièce (essai du 13 novembre 2026 en Air Link, limite de pièce : tête à 0,6 cm et 1° de
+ * l'origine, sol déplacé de 41 cm). La borne calée n'est alors plus sur la vraie, quelle que soit la limite.
+ */
+export const ORIGIN_RESET_CM = 3;
+export const ORIGIN_RESET_DEG = 2;
+export function originResetAtWear(line: string): { cm: number; deg: number } | undefined {
+  const m = /^tete-au-port (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)$/.exec(line);
+  if (!m) return undefined;
+  const cm = Math.hypot(Number(m[1]), Number(m[2])) * 100;
+  const deg = Math.abs(turn(0, Number(m[3])));
+  return cm < ORIGIN_RESET_CM && deg < ORIGIN_RESET_DEG ? { cm, deg } : undefined;
+}
+
+/**
  * Bilan du geste du calage pendant une partie, d'après les lignes du plugin (casque-vpx.txt, 13 novembre 2026 :
  * « deux joysticks tenus 3 s, rien du tout ») : où il s'est arrêté, pour que la panne se voie au journal.
  * undefined : plugin d'avant le calage en partie (aucune ligne « calage actif=… »).
@@ -733,7 +749,7 @@ export function inGameCalibrationReport(block: string): string | undefined {
 }
 
 /** Les moments où le calage pourrait s'ouvrir de lui-même dans le casque. */
-export type CalibrationOfferReason = 'premier-port' | 'casque-remis' | 'limite-changee' | 'piece-perimee';
+export type CalibrationOfferReason = 'premier-port' | 'casque-remis' | 'limite-changee' | 'piece-perimee' | 'origine-remise';
 
 /**
  * Le calage s'ouvre-t-il de lui-même (décision du joueur, 13 novembre 2026) ? Seulement quand le casque a été
@@ -743,6 +759,8 @@ export type CalibrationOfferReason = 'premier-port' | 'casque-remis' | 'limite-c
 export function shouldOfferCalibration(reason: CalibrationOfferReason, keeping: RoomKeeping | undefined): boolean {
   // Calage périmé (limite changée de type ou de taille, staleCalibration) : proposé une fois, l'appelant le garde.
   if (reason === 'limite-changee') return true;
+  // L'origine remise sur la tête au port (originResetAtWear) : la borne n'est plus sur la vraie, quelle que soit la limite.
+  if (reason === 'origine-remise') return true;
   return reason === 'casque-remis' && keeping === 'recentred';
 }
 
@@ -870,6 +888,8 @@ export function restReference(place: CabinetPlace, tips: readonly [Point3, Point
 export class RestWatch {
   private window: RestSample[] = [];
   private armed = true;
+  /** Les bouts du dernier déclenchement : posées au même endroit, rien ; la pièce a sauté sous elles, de nouveau. */
+  private fired: [Point3, Point3] | undefined;
 
   push(sample: RestSample | undefined, gate: (tips: readonly [Point3, Point3]) => boolean): [Point3, Point3] | undefined {
     if (!sample || !gate(sample.tips)) {
@@ -889,13 +909,19 @@ export class RestWatch {
       this.window = [sample];
       return undefined;
     }
-    if (!this.armed || sample.t - first.t < AUTO_RECAL_STILL_S) return undefined;
-    this.armed = false;
+    if (sample.t - first.t < AUTO_RECAL_STILL_S) return undefined;
     const mean = (h: 0 | 1): Point3 => {
       const n = this.window.length;
       return this.window.reduce((acc, s) => ({ x: acc.x + s.tips[h].x / n, y: acc.y + s.tips[h].y / n, z: acc.z + s.tips[h].z / n }), { x: 0, y: 0, z: 0 });
     };
-    return [mean(0), mean(1)];
+    const tips: [Point3, Point3] = [mean(0), mean(1)];
+    // Déjà déclenché : de nouveau seulement si les manettes, toujours posées, ne sont plus au même endroit dans la
+    // pièce (essai du 13 novembre 2026 : le casque retiré puis remis, la pièce a sauté de 73 cm sous les manettes
+    // restées sur la barre ; rien ne réarmait, faute de relevé pendant le retrait).
+    if (!this.armed && !(this.fired && [0, 1].some((h) => length(sub(tips[h]!, this.fired![h]!)) * 100 > AUTO_RECAL_MIN_CM))) return undefined;
+    this.armed = false;
+    this.fired = tips;
+    return tips;
   }
 }
 

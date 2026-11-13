@@ -11,7 +11,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { anchorHeight, buildDecor, cadenceWithoutScreens, COMPANION_KEY_FILE, CompanionCycle, companionKeyFolder, DECOR_TEXTURES, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, headAtWear, readCompanionKey, roomChangeGap, sceneProtocol, writeGlb, type CabinetPlace, type DecorTexture, type HeadsetProfile, type Point3, type RestSample, type VrGpu, type RoomBounds, type RoomKeeping, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
+import { anchorHeight, buildDecor, cadenceWithoutScreens, COMPANION_KEY_FILE, CompanionCycle, companionKeyFolder, DECOR_TEXTURES, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, headAtWear, originResetAtWear, readCompanionKey, roomChangeGap, sceneProtocol, writeGlb, type CabinetPlace, type DecorTexture, type HeadsetProfile, type Point3, type RestSample, type VrGpu, type RoomBounds, type RoomKeeping, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
 import { openHandleTarget, type HandleTarget } from '@cyberpinball/win-displays';
 import type { OffscreenSharedTexture } from 'electron';
 import { OFFSCREEN } from './offscreen';
@@ -126,6 +126,8 @@ export interface HeadsetMenuOptions {
   onPoints?(points: Point3[], room: boolean, head: { x: number; z: number } | undefined, pressed: 0 | 1, grips?: [Point3, Point3]): void;
   /** Casque remis après un retrait qui a arrêté la session (accueil de Link) : la pièce a pu être recentrée. */
   onPutBackOn?(): void;
+  /** L'origine de la pièce remise sur la tête au port (originResetAtWear) : `afterRemoval` vrai après un retrait. */
+  onOriginReset?(afterRemoval: boolean): void;
   /** Le Quest est en limite fixe (première fois dite par ce compagnon). */
   onStationary?(): void;
   /**
@@ -545,6 +547,12 @@ export class HeadsetMenu {
         // La tête au port, mesurée sur la tête au calage (repère physique) ; le verdict vient des têtes de la partie.
         const atWear = headAtWear(line, this.readPlace());
         if (atWear) {
+          // La pièce refaite par le Quest : la tête retombe sur l'origine même (au centimètre et au degré près).
+          const reset = originResetAtWear(line);
+          if (reset) {
+            this.opts.log(`Casque : origine de la pièce remise sur la tête au port ${this.takenOffSeen ? 'après un retrait du casque' : 'au premier port de la session'} (tête à ${reset.cm.toFixed(1)} cm et ${reset.deg.toFixed(1)}° de l'origine) : le Quest a refait sa pièce, la borne calée n'est plus sur la vraie.`); // i18n-ignore : journal
+            this.opts.onOriginReset?.(this.takenOffSeen);
+          }
           const after = this.takenOffSeen ? 'après un retrait du casque' : 'au premier port de la session'; // i18n-ignore : journal
           const from = atWear.fromPlace ? 'de sa place au calage (un relevé, pris au port)' : 'de l’origine de la pièce (pas de tête gardée au calage : recalez pour mesurer)'; // i18n-ignore : journal
           this.opts.log(`Casque : tête au port ${after}, à ${atWear.cm.toFixed(0)} cm et ${atWear.deg.toFixed(0)}° ${from}.`); // i18n-ignore : journal

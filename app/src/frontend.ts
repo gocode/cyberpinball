@@ -3315,6 +3315,8 @@ function autoRecalSample(sample: RestSample | undefined): void {
   }
   const place = autoRecalibratedPlace({ ...previous, rest: previous.rest }, tips);
   const measure = roomFromRecalibration(previous, place);
+  lastAutoRecalAt = Date.now();
+  originNotice = false;
   if (measure.cm < AUTO_RECAL_MIN_CM && measure.deg < AUTO_RECAL_MIN_DEG) {
     console.log(`Casque : recalage automatique, manettes posées sur la barre avant : ${roomMeasureText(measure, 'rien à corriger')}.`); // i18n-ignore : journal
     return;
@@ -3755,6 +3757,33 @@ function roomscaleTip(): void {
   showBanner(t('Le Quest est en limite fixe : la borne se décale chaque fois que le casque est remis. Pour qu’elle reste en place : dans le Quest, réglages de la limite, choisissez « Pièce » et tracez le contour (environ 3 minutes).'));
 }
 
+/**
+ * La pièce refaite par le Quest au port du casque (origine remise sur la tête) : la borne calée n'est plus sur la
+ * vraie. Avec le recalage automatique et une position de repos apprise, les manettes posées sur la barre la remettent
+ * d'elles-mêmes : on leur laisse ORIGIN_RESET_WAIT_MS ; sinon, ou passé ce délai, le calage est proposé, avec la
+ * raison à l'écran.
+ */
+let originResetTimer: NodeJS.Timeout | undefined;
+let lastAutoRecalAt = 0;
+const ORIGIN_RESET_WAIT_MS = 5000;
+function headsetOriginReset(afterRemoval: boolean): void {
+  const place = headset?.place();
+  if (!place || !isCalibrated(place) || place.free || headsetSetting() === 'bureau') return;
+  originNotice = true;
+  if (originResetTimer) clearTimeout(originResetTimer);
+  if (vrAutoRecal && place.rest) {
+    const since = Date.now();
+    console.log(`Casque : recalage automatique attendu (manettes posées sur la barre) ; sinon le calage est proposé dans ${ORIGIN_RESET_WAIT_MS / 1000} s.`); // i18n-ignore : journal
+    originResetTimer = setTimeout(() => {
+      originResetTimer = undefined;
+      if (lastAutoRecalAt < since) offerCalibration('origine-remise');
+    }, ORIGIN_RESET_WAIT_MS);
+    return;
+  }
+  console.log(`Casque : calage de la borne proposé, ${afterRemoval ? 'casque remis' : 'premier port'} avec la pièce refaite.`); // i18n-ignore : journal
+  offerCalibration('origine-remise');
+}
+
 function headsetPutBackOn(): void {
   const place = headset?.place();
   if (!place || headsetSetting() === 'bureau' || headset?.roomKeeping !== 'recentred') return;
@@ -3799,6 +3828,8 @@ function watchExitWhileWaiting(active: () => boolean, onExit: () => void): () =>
 /** Hauteur des yeux dite par le compagnon (sol mal réglé), et limite du Quest changée depuis le calage. */
 let headsetEyes: number | undefined;
 let roomNotice = false;
+/** La pièce refaite par le Quest au port du casque (headsetOriginReset) : dit à l'écran du calage proposé. */
+let originNotice = false;
 /** Session neuve d'après un changement de pièce, yeux hors de la plage : les applications qui démarrent ont l'ancienne pièce. */
 let roomStale = false;
 
@@ -4309,7 +4340,7 @@ function offerCalibration(reason: CalibrationOfferReason): boolean {
     if (reason !== 'premier-port') console.log(`Casque : calage pas proposé d'office (${reason}, pièce ${headset.roomKeeping === 'kept' ? 'gardée par le Quest' : 'inconnue'}) ; les deux joysticks ou « Caler la borne » pour recaler.`); // i18n-ignore : journal
     return false;
   }
-  console.log(`Casque : calage de la borne proposé d'office (${reason === 'limite-changee' ? 'calage périmé : la limite du Quest a changé' : 'casque remis, pièce recentrée par le Quest'}).`); // i18n-ignore : journal
+  console.log(`Casque : calage de la borne proposé d'office (${reason === 'limite-changee' ? 'calage périmé : la limite du Quest a changé' : reason === 'origine-remise' ? 'pièce refaite par le Quest au port du casque' : 'casque remis, pièce recentrée par le Quest'}).`); // i18n-ignore : journal
   openCalibration(true);
   return true;
 }
@@ -4383,6 +4414,7 @@ function showCalibration(problem?: string): void {
     vrRoomProblem ??
     (headset?.keyRenewed ? t('Vérifiez la place de la borne.') : undefined) ??
     (roomNotice ? t('La limite du Quest a changé : recalez.') : undefined) ??
+    (originNotice ? t('Le Quest a déplacé la pièce en remettant le casque : recalez.') : undefined) ??
     // Le geste est dit par la bande du bas quand les manettes l'ont : le conseil ne le répète pas.
     (c.intro ? roomKeepingAdvice(headset?.roomKeeping, calibrationCombo(headset?.profile ?? 'touch') ? undefined : calibrationComboLabel(headset?.profile)) : undefined) ??
     (c.place ? vpxPlaceProblem(placeVpxSettings(c.place)) : undefined);
@@ -4521,6 +4553,7 @@ function applyCalibration(): void {
     console.log(`Casque : recalage, ${roomMeasureText(roomFromRecalibration(previous, place), 'barre avant recalée face à la précédente')}.`); // i18n-ignore : journal
   headset?.showPlace(place, true);
   roomNotice = false;
+  originNotice = false;
   roomStale = false;
   vrRoomProblem = undefined;
   if (headset) headset.keyRenewed = false;
@@ -5256,6 +5289,7 @@ export function startFrontend(): void {
     onButton: (button, down) => headsetButton(button, down),
     onProfile: () => offerControllerWizard(),
     onPoints: (points, room, head, pressed, grips) => calibrationPoints(points, room, head, pressed, grips),
+    onOriginReset: (afterRemoval) => headsetOriginReset(afterRemoval),
     onPutBackOn: () => {
       restLearnArmed = false;
       checkStaleCalibration();
