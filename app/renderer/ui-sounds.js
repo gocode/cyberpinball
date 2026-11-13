@@ -11,7 +11,7 @@
 // prend la main) : il part au tout début de la partie et y finit de sonner. Et le son d'un
 // appel (cue.call : le carillon d'une invitation d'un ami) : il sonne aussi pendant la partie.
 //
-//   CyberUiSounds.play(id, volume, handover, call)  // volume de 0 à 1 ; rend true si le son part
+//   CyberUiSounds.play(id, volume, handover, call, hitAt)  // volume de 0 à 1 ; hitAt : accent daté (HIT) ; rend true si le son part
 //   CyberUiSounds.setPhase(phase)   // phase de l'état (frontend.js)
 //   CyberUiSounds.setSink(sinkId)   // sortie Chromium du son du menu ; '' : par défaut
 //   CyberUiSounds.status()          // ce qui a joué, pour les essais sans opérateur
@@ -27,6 +27,15 @@
   const MIN_GAP_MS = 45;
   /** Contexte audio fermé après ce temps sans son : aucun flux ouvert sur la sortie pendant le reste du menu. */
   const IDLE_CLOSE_MS = 4000;
+  /**
+   * Accent d'un son calé sur une animation, en secondes depuis son début : le souffle de
+   * l'ouverture ouvre son accord à 1,25 s. Un message daté (cue.hitAt) fait partir le son
+   * HIT[id] secondes avant cet instant, moins le retard de la sortie : l'accord tombe sur
+   * l'ignition du plateau, pas 1,25 s après l'arrivée du message.
+   */
+  const HIT = { intro: 1.25 };
+  /** Accent déjà passé de plus que cela : le son ne part plus (il tomberait à contretemps). */
+  const HIT_LATE_S = 0.25;
 
   let ctx;
   let noise;
@@ -199,7 +208,7 @@
       f.type = 'bandpass';
       f.Q.value = 6;
       f.frequency.setValueAtTime(400, t);
-      f.frequency.exponentialRampToValueAtTime(5200, t + 1.25);
+      f.frequency.exponentialRampToValueAtTime(5200, t + HIT.intro);
       const g = ac.createGain();
       g.gain.setValueAtTime(0.0001, t);
       g.gain.linearRampToValueAtTime(0.16, t + 1.1);
@@ -207,7 +216,8 @@
       src.connect(f).connect(g).connect(out);
       src.start(t);
       src.stop(t + 1.55);
-      const at = t + 1.25;
+      // L'accord : l'accent du son (HIT.intro), posé sur l'ignition quand le message le date (cue.hitAt).
+      const at = t + HIT.intro;
       for (const [freq, peak] of [
         [440, 0.1],
         [659.3, 0.08],
@@ -256,25 +266,47 @@
     }
   }
 
-  function play(id, volume, relay = false, ring = false) {
+  /**
+   * `hitAt` (cue.hitAt) : son calé sur une animation, l'instant (Date.now()) où son accent
+   * (HIT[id]) doit s'entendre. Le départ se compte sur l'horloge du contexte audio une fois qu'il
+   * tourne (un contexte suspendu n'avance pas : compté avant, le son glisserait d'autant), moins
+   * le retard de la sortie (outputLatency). Sans hitAt, le son part tout de suite.
+   */
+  function play(id, volume, relay = false, ring = false, hitAt = undefined) {
     const recipe = RECIPES[id];
     const handover = relay && HANDOVER.has(id);
     const call = ring && CALL.has(id);
     if ((silent && !handover && !call) || !recipe || !(volume > 0)) return false;
     const now = Date.now();
     if (now - (lastAt[id] ?? -Infinity) < MIN_GAP_MS) return false;
+    const timed = typeof hitAt === 'number' && Number.isFinite(hitAt) && typeof HIT[id] === 'number';
+    // Accent déjà passé : le son tomberait à contretemps de l'animation.
+    if (timed && (now - hitAt) / 1000 > HIT_LATE_S) return false;
     lastAt[id] = now;
     const ac = context();
     const out = ac.createGain();
     out.gain.value = Math.min(1, volume);
     out.connect(ac.destination);
-    const length = recipe(ac, out, ac.currentTime + 0.01);
     // Un son permis pendant la partie (relais, appel) n'est pas coupé par son début.
     const entry = { out, handover: handover || call };
-    entry.timer = setTimeout(() => forget(entry), (length + 0.2) * 1000);
     live.add(entry);
     history.push({ son: id, volume: Math.round(volume * 1000) / 1000 });
     if (history.length > 20) history.shift();
+    const start = () => {
+      // Oublié entre-temps (la partie a commencé) : rien ne part.
+      if (!live.has(entry) || ctx !== ac) return;
+      let delay = 0.01;
+      if (timed) {
+        const lag = Number(ac.outputLatency) || Number(ac.baseLatency) || 0;
+        const lead = (hitAt - Date.now()) / 1000 - HIT[id] - lag;
+        if (-lead > HIT_LATE_S) return forget(entry);
+        delay = Math.max(0.01, lead);
+      }
+      const length = recipe(ac, out, ac.currentTime + delay);
+      entry.timer = setTimeout(() => forget(entry), (delay + length + 0.2) * 1000);
+    };
+    if (timed && ac.state !== 'running') ac.resume().then(start, start);
+    else start();
     return true;
   }
 
@@ -300,5 +332,5 @@
     status: () => ({ joues: history.slice(), muet: silent, enCours: live.size }),
   };
 
-  window.cyber?.onUiSound?.((cue) => play(cue?.id, cue?.volume, cue?.handover === true, cue?.call === true));
+  window.cyber?.onUiSound?.((cue) => play(cue?.id, cue?.volume, cue?.handover === true, cue?.call === true, cue?.hitAt));
 })();

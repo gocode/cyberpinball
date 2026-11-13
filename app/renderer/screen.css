@@ -468,6 +468,16 @@ body.pointer [data-act] {
   border-radius: 0.5vmin;
 }
 
+.quit-how {
+  display: block;
+  margin-top: 0.3vmin;
+  /* 20 px au moins à la référence 1080 : le plus petit texte lisible de la borne. */
+  font-size: 1.9vmin;
+  font-stretch: 100%;
+  letter-spacing: 0.02em;
+  color: var(--quiet);
+}
+
 .quit.holding {
   border-color: var(--warning);
   color: var(--warning);

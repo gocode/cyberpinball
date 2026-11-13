@@ -308,6 +308,7 @@ import {
   loadRecordingSettings,
   saveRecordingSettings,
   type RecordingSettings,
+  INTRO_TIMELINE,
   IntroRun,
   type IntroView,
   INTRO_SKIP_FLAG,
@@ -859,7 +860,9 @@ function introWindowReady(id: number): void {
 function introStarted(): void {
   broadcast();
   // Une musique d'ouverture choisie par le joueur a la parole : le souffle se tait.
-  if (introSource(mediaSettings.intro, introFilesNow(), 'music').source !== 'file') playUiSound('intro');
+  // Son accord tombe sur l'ignition du plateau, à l'horloge des animations (startedAt), pas à l'arrivée du message.
+  const startedAt = introRun.current?.startedAt;
+  if (introSource(mediaSettings.intro, introFilesNow(), 'music').source !== 'file') playUiSound('intro', startedAt === undefined ? undefined : startedAt + INTRO_TIMELINE.ignition);
 }
 
 /** Premier bouton pendant l'ouverture : la roue (ou les réglages), et rien d'autre. */
@@ -2244,7 +2247,7 @@ function openCabinetSetup(): void {
   library.openCustom(() => ({
     heading: SYSTEM_ITEMS.cabinet.label,
     icon: SYSTEM_ITEMS.cabinet.icon,
-    lead: t('Chaque étape se refait seule, puis revient au menu des tables. « Quitter sans enregistrer » (ou Exit maintenu 2 s) en sort sans rien changer.'),
+    lead: t('Chaque étape se refait seule, puis revient au menu des tables. Exit maintenu 2 s (ou le bouton « Quitter sans enregistrer » des boutons de l’interface) en sort sans rien changer, à toute étape.'),
     sections: [],
     actions: [...cabinetSetupItems().map((i) => ({ label: i.label, detail: i.detail, icon: i.icon, attention: i.attention, run: i.run })), { label: t('Retour'), icon: 'back', run: () => library.openSystem() }],
     back: () => library.openSystem(),
@@ -6915,9 +6918,10 @@ function moveSelection(offset: number): void {
 /**
  * Son de l'interface (uisounds.ts), joué par la fenêtre du playfield (renderer/ui-sounds.js)
  * sur la sortie du son du menu : seulement s'il est activé, et jamais pendant une partie.
+ * `hitAt` : son calé sur une animation, l'instant (Date.now()) où son accent doit s'entendre.
  */
-function playUiSound(id: UiSoundId): void {
-  const cue = uiSoundCue(id, mediaSettings, moment());
+function playUiSound(id: UiSoundId, hitAt?: number): void {
+  const cue = uiSoundCue(id, mediaSettings, moment(), hitAt);
   const win = windows.get('playfield');
   if (cue && win && !win.isDestroyed()) win.webContents.send('ui-sound', cue);
 }

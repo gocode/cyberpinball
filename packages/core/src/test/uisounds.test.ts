@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import * as vm from 'node:vm';
 import { REPO_ROOT } from './i18n-scan';
+import { INTRO_TIMELINE } from '../intro';
 import { NOTICE_RULES } from '../notices';
 import { UI_SOUND_IDS, UI_SOUNDS, uiSoundCue } from '../uisounds';
 import { DEFAULT_MENU_MEDIA_SETTINGS, normalizeMenuMediaSettings, type MenuMediaSettings } from '../mediaview';
@@ -110,16 +111,19 @@ interface FakeLog {
   /** Fin programmée de chaque source, relative au début du son. */
   stops: number[];
   starts: number;
+  /** Départ programmé de chaque source, relatif à l'horloge du contexte au moment de l'appel. */
+  startAt: number[];
   sinks: string[];
 }
 
-function fakeAudio(log: FakeLog) {
+function fakeAudio(log: FakeLog, audio: { outputLatency?: number; state?: string } = {}) {
   const param = () => ({ value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} });
   const node = <T extends object>(extra: T) => ({ connect: (n: unknown) => n, disconnect: () => void log.disconnected++, ...extra });
   return class FakeAudioContext {
     sampleRate = 48000;
     currentTime = 10;
-    state = 'running';
+    state = audio.state ?? 'running';
+    outputLatency = audio.outputLatency ?? 0;
     destination = node({});
     constructor() {
       log.contexts++;
@@ -129,11 +133,11 @@ function fakeAudio(log: FakeLog) {
     }
     createOscillator() {
       const ctx = this;
-      return node({ type: 'sine', frequency: param(), start: () => void log.starts++, stop: (t: number) => void log.stops.push(t - ctx.currentTime) });
+      return node({ type: 'sine', frequency: param(), start: (t: number) => void (log.starts++, log.startAt.push(t - ctx.currentTime)), stop: (t: number) => void log.stops.push(t - ctx.currentTime) });
     }
     createBufferSource() {
       const ctx = this;
-      return node({ buffer: undefined, start: () => void log.starts++, stop: (t: number) => void log.stops.push(t - ctx.currentTime) });
+      return node({ buffer: undefined, start: (t: number) => void (log.starts++, log.startAt.push(t - ctx.currentTime)), stop: (t: number) => void log.stops.push(t - ctx.currentTime) });
     }
     createBiquadFilter() {
       return node({ type: 'lowpass', frequency: param(), Q: param() });
@@ -143,7 +147,8 @@ function fakeAudio(log: FakeLog) {
       return { getChannelData: () => data };
     }
     resume() {
-      return Promise.resolve();
+      // Une sortie qui se réveille : le contexte tourne une fois la promesse tenue, pas avant.
+      return Promise.resolve().then(() => void (this.state = 'running'));
     }
     close() {
       log.closed++;
@@ -156,8 +161,8 @@ function fakeAudio(log: FakeLog) {
   };
 }
 
-function uiSoundsWindow() {
-  const log: FakeLog = { contexts: 0, closed: 0, disconnected: 0, stops: [], starts: 0, sinks: [] };
+function uiSoundsWindow(audio: { outputLatency?: number; state?: string } = {}) {
+  const log: FakeLog = { contexts: 0, closed: 0, disconnected: 0, stops: [], starts: 0, startAt: [], sinks: [] };
   let onCue: ((cue: unknown) => void) | undefined;
   const timers: (() => void)[] = [];
   // Horloge figée, avancée par l'essai : l'écart entre deux sons ne dépend pas de la charge du poste.
@@ -165,7 +170,7 @@ function uiSoundsWindow() {
   const window: Record<string, unknown> = { cyber: { onUiSound: (cb: (cue: unknown) => void) => (onCue = cb) } };
   const ctx = vm.createContext({
     window,
-    AudioContext: fakeAudio(log),
+    AudioContext: fakeAudio(log, audio),
     Date: { now: () => clock.now },
     Math,
     setTimeout: (fn: () => void) => timers.push(fn),
@@ -173,7 +178,7 @@ function uiSoundsWindow() {
   });
   vm.runInContext(read('app', 'renderer', 'ui-sounds.js'), ctx, { filename: 'ui-sounds.js' });
   const api = window.CyberUiSounds as {
-    play(id: string, volume: number): boolean;
+    play(id: string, volume: number, handover?: boolean, call?: boolean, hitAt?: number): boolean;
     setPhase(phase: string): void;
     setSink(id: string): void;
     recipes(): string[];
@@ -237,6 +242,53 @@ test('fenêtre : chaque recette tient dans sa durée et sort sur la sortie du me
   }
 });
 
+// Essai du 13/11/2026 sur le PinCab : l'accord du souffle sonnait avant l'ignition du plateau.
+// Joué à l'arrivée du message, son accent (1,25 s) tombait 1,15 s avant l'éclair (2,4 s).
+test('fenêtre : le souffle de l’ouverture, daté, ouvre son accord sur l’ignition du plateau', async () => {
+  assert.equal(INTRO_TIMELINE.ignition, 2400);
+  assert.equal(INTRO_TIMELINE.backglassPower, INTRO_TIMELINE.ignition, 'le fronton s’allume avec l’ignition');
+  // Accent de la recette (HIT.intro) : le dernier départ de source, celui de l'accord.
+  const accent = (log: FakeLog) => Math.max(...log.startAt);
+  const near = (a: number, b: number, what: string) => assert.ok(Math.abs(a - b) < 1e-6, `${what} : ${a} au lieu de ${b}`);
+
+  // Départ des animations à l'instant du message : l'accord 2,4 s plus tard.
+  const w = uiSoundsWindow();
+  w.cue(uiSoundCue('intro', S, 'browse', w.clock.now + INTRO_TIMELINE.ignition));
+  near(accent(w.log), 2.4, 'accord sur l’ignition');
+  near(Math.min(...w.log.startAt), 2.4 - 1.25, 'le souffle part avant, avec l’étincelle');
+  w.flush();
+  assert.equal(w.api.status().enCours, 0, 'libéré à la fin');
+
+  // Message reçu 300 ms après le départ : l'accord reste sur l'ignition.
+  const late = uiSoundsWindow();
+  late.api.play('intro', 1, false, false, late.clock.now + INTRO_TIMELINE.ignition - 300);
+  near(accent(late.log), 2.1, 'message en retard, accord à l’heure');
+
+  // Le retard de la sortie (outputLatency) est retranché : on entend l'accord à l'ignition.
+  const lag = uiSoundsWindow({ outputLatency: 0.08 });
+  lag.api.play('intro', 1, false, false, lag.clock.now + INTRO_TIMELINE.ignition);
+  near(accent(lag.log), 2.4 - 0.08, 'retard de la sortie compensé');
+
+  // Contexte suspendu (sortie qui se réveille) : son horloge n'avance pas, le départ se compte une fois qu'il tourne.
+  const sleepy = uiSoundsWindow({ state: 'suspended' });
+  sleepy.api.play('intro', 1, false, false, sleepy.clock.now + INTRO_TIMELINE.ignition);
+  assert.equal(sleepy.log.starts, 0, 'rien de programmé sur une horloge arrêtée');
+  sleepy.clock.now += 500;
+  await new Promise((r) => setImmediate(r));
+  near(accent(sleepy.log), 1.9, 'compté au réveil de la sortie');
+
+  // Accent déjà passé : pas de son à contretemps.
+  const past = uiSoundsWindow();
+  assert.equal(past.api.play('intro', 1, false, false, past.clock.now - 1000), false);
+  assert.equal(past.log.contexts, 0);
+
+  // Sans date (tout autre son), le son part tout de suite, comme avant.
+  const now = uiSoundsWindow();
+  now.api.play('intro', 1);
+  near(Math.min(...now.log.startAt), 0.01, 'non daté : tout de suite');
+  assert.deepEqual(uiSoundCue('coin', S, 'browse'), { id: 'coin', volume: playVolume(50) }, 'pas de date sans hitAt');
+});
+
 // ---------------------------------------------------------------------------
 // Branchements
 
@@ -244,11 +296,13 @@ test('branchements : le processus principal ne joue un son que par uiSoundCue, a
   const main = read('app', 'src', 'frontend.ts');
   assert.equal(main.match(/'ui-sound'/g)?.length, 1, 'un seul envoi du canal ui-sound');
   const fn = main.slice(main.indexOf('function playUiSound('), main.indexOf('function moment('));
-  assert.match(fn, /uiSoundCue\(id, mediaSettings, moment\(\)\)/);
+  assert.match(fn, /uiSoundCue\(id, mediaSettings, moment\(\), hitAt\)/);
   assert.match(fn, /windows\.get\('playfield'\)/);
   // Chaque son du registre a son déclencheur : un appel explicite, ou, pour le son d'une
   // notification, la règle qui le porte (NoticeRule.sound), jouée par menu-notices.ts.
-  for (const id of UI_SOUND_IDS.filter((id) => !UI_SOUNDS[id].notice)) assert.match(main, new RegExp(`playUiSound\\('${id}'\\)`), id);
+  for (const id of UI_SOUND_IDS.filter((id) => !UI_SOUNDS[id].notice)) assert.match(main, new RegExp(`playUiSound\\('${id}'[,)]`), id);
+  // Le souffle de l'ouverture est daté : son accord sur l'ignition, à l'horloge des animations.
+  assert.match(main, /playUiSound\('intro', startedAt === undefined \? undefined : startedAt \+ INTRO_TIMELINE\.ignition\)/);
   assert.match(main, /sound: \(id\) => playUiSound\(id\)/, 'les sons des notifications, joués à leur entrée');
   // Fenêtre : la page charge le moteur, l'état lui donne la phase, la sortie du menu lui est passée.
   assert.match(read('app', 'renderer', 'frontend.html'), /<script src="ui-sounds\.js"><\/script>/);

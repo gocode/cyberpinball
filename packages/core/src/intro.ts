@@ -252,6 +252,11 @@ export const INTRO_TIMELINE = {
   dmdBrandLength: 900,
   /** FullDMD : PRESS START sous la marque. */
   dmdPress: 3500,
+  /**
+   * L'ignition du plateau (l'éclair de l'ouverture Soie, intro.js) : le souffle de l'ouverture
+   * (ui-sounds.js) y ouvre son accord, calé sur cet instant et non sur l'arrivée du son.
+   */
+  ignition: 2400,
   /** Fronton : ses lampes s'allument en vacillant à l'ignition, puis la marque, avec celle du plateau. */
   backglassPower: 2400,
   backglassBrand: 2500,

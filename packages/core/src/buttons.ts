@@ -150,6 +150,12 @@ export interface ButtonRecord<K = SetKeys> {
   skipped?: boolean;
   /** Touche refusée et pourquoi ; le relevé est inchangé. */
   refused?: string;
+  /**
+   * Bouton du même jeu qui avait déjà cette touche : il la perd, vidé, et le relevé le dit (jamais
+   * de refus : une borne dont tous les boutons sont pris doit pouvoir en échanger). Un bouton
+   * obligatoire ainsi vidé est redemandé avant l'enregistrement.
+   */
+  taken?: { id: string; label: string; required: boolean };
 }
 
 /** Le bouton de jeu `id` vient d'envoyer `code` (recordKey sur les boutons du jeu). */
@@ -204,9 +210,10 @@ export const GAME_KEYS: KeySet = {
 
 /**
  * Le bouton `id` vient d'envoyer `code`, touche du clavier ou bouton du joystick : les deux
- * se relèvent de la même façon, et se mélangent librement d'un bouton à l'autre. Refusé si
- * un autre bouton du même jeu l'a déjà, ou si `set.refused` le refuse ; le bouton qui passe
- * (`set.skip`), une fois relevé, passe un bouton facultatif.
+ * se relèvent de la même façon, et se mélangent librement d'un bouton à l'autre. Refusé
+ * seulement si `set.refused` le refuse ; un autre bouton du même jeu qui l'avait déjà la perd
+ * (`taken`, demande du 13 novembre 2026 : refuser bloquait une borne dont tous les boutons sont
+ * pris). Le bouton qui passe (`set.skip`), une fois relevé, passe un bouton facultatif.
  */
 export function recordKey(set: KeySet, keys: SetKeys, id: string, code: string): ButtonRecord {
   const item = set.items.find((b) => b.id === id)!;
@@ -216,12 +223,20 @@ export function recordKey(set: KeySet, keys: SetKeys, id: string, code: string):
     delete next[id];
     return { keys: next, skipped: true };
   }
-  const holder = set.items.find((b) => b.id !== id && keys[b.id] === code);
-  const refused = holder
-    ? t('{key} est déjà la touche du bouton {button} : appuyez sur un autre bouton, ou cliquez sur {button} pour le refaire.', { key: keyLabel(code), button: holder.label })
-    : set.refused(id, code);
+  const refused = set.refused(id, code);
   if (refused) return { keys, refused };
-  return { keys: { ...keys, [id]: code } };
+  const next: SetKeys = { ...keys, [id]: code };
+  const holder = set.items.find((b) => b.id !== id && keys[b.id] === code);
+  if (!holder) return { keys: next };
+  delete next[holder.id];
+  return { keys: next, taken: { id: holder.id, label: holder.label, required: holder.required } };
+}
+
+/** Ce que le relevé dit d'un bouton vidé parce qu'un autre a pris sa touche (recordKey, `taken`). */
+export function takenNotice(taken: { label: string; required: boolean }, code: string): string {
+  return taken.required
+    ? t('{key} était le bouton {button} : il passe au nouveau, et {button} est à relever de nouveau.', { key: keyLabel(code), button: taken.label })
+    : t('{key} était le bouton {button} : il passe au nouveau, et {button} restera sans bouton à l’enregistrement.', { key: keyLabel(code), button: taken.label });
 }
 
 /** Ce qui rend un relevé de ce jeu inutilisable (buttonProblems, navigationProblems). Vide : valable. */
@@ -537,6 +552,8 @@ export const NAVIGATION: readonly NavigationInfo[] = [
   { id: 'back', get label() { return t('Retour et menu'); }, required: true, game: 'exit', fallback: ['Escape'] },
   { id: 'help', get label() { return t('Aide-mémoire'); }, required: false, fallback: [] },
   { id: 'settings', get label() { return t('Réglages de VPX'); }, required: false, fallback: [] },
+  // Configuration de la borne (assistant, étapes seules) : en sortir sans rien écrire, d'un appui (wizardsteps.ts, quitButtonActs).
+  { id: 'quit', get label() { return t('Quitter sans enregistrer'); }, required: false, fallback: [] },
 ];
 
 /**

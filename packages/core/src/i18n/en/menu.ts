@@ -81,8 +81,8 @@ export const messages: Record<string, string> = {
   'Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son': 'Every step in a row: buttons, screens, playfield, layout, sound',
   'Touches par défaut des encodeurs': 'Encoder default keys',
   'Si les boutons ne répondent plus comme prévu (aussi à la souris)': 'If the buttons no longer respond as expected (mouse works too)',
-  'Chaque étape se refait seule, puis revient au menu des tables. « Quitter sans enregistrer » (ou Exit maintenu 2 s) en sort sans rien changer.':
-    'Each step can be redone on its own, then returns to the table menu. “Quit without saving” (or holding Exit for 2 s) leaves without changing anything.',
+  'Chaque étape se refait seule, puis revient au menu des tables. Exit maintenu 2 s (ou le bouton « Quitter sans enregistrer » des boutons de l’interface) en sort sans rien changer, à toute étape.':
+    'Each step can be redone on its own, then returns to the table menu. Holding Exit for 2 s (or the “Quit without saving” interface button) leaves without changing anything, at any step.',
   'Bureau Windows': 'Windows desktop',
   'Commandes de la borne': 'Cabinet controls',
   'Les boutons du menu et de la partie': 'The buttons of the menu and of the game',

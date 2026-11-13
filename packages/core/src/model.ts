@@ -250,7 +250,7 @@ export type ButtonId =
 export type CabinetButtons = Partial<Record<ButtonId, string>>;
 
 /** Boutons de l'interface (liste et ordre dans buttons.ts, NAVIGATION). */
-export type NavigationId = 'previous' | 'next' | 'confirm' | 'back' | 'help' | 'settings';
+export type NavigationId = 'previous' | 'next' | 'confirm' | 'back' | 'help' | 'settings' | 'quit';
 
 /** Bouton de l'interface -> touche ou bouton de joystick, comme CabinetButtons. */
 export type NavigationButtons = Partial<Record<NavigationId, string>>;

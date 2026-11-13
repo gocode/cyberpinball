@@ -12,8 +12,6 @@ export const messages: Record<string, string> = {
     'Start ({confirm}): yes · Exit ({exit}): no · same gesture again: yes · no answer in {n} s: carry on',
   'touches par défaut des encodeurs': 'encoder default keys',
   '{button} : pas de bouton': '{button}: no button',
-  '{key} est déjà la touche du bouton {button} : appuyez sur un autre bouton, ou cliquez sur {button} pour le refaire.':
-    '{key} is already the {button} key: press another button, or click {button} to redo it.',
   '{button} : {key}': '{button}: {key}',
   'Impossible de valider : {problems}.': 'Can’t confirm: {problems}.',
   'Essayez d’abord sur la borne : {buttons}.': 'Try these on the cabinet first: {buttons}.',
@@ -618,4 +616,12 @@ export const messages: Record<string, string> = {
   'Secousses : accéléromètre lu à la force {gain} ; un Pinscape réglé en « 1G » n’y donne presque aucune secousse (VPX ignore tout ce qui reste sous {floor} % de l’échelle). Réglez la force des secousses à l’essai ({where}).':
     'Nudging: accelerometer read at strength {gain}; a Pinscape set to “1G” gives almost no nudge there (VPX ignores anything under {floor}% of the scale). Set the nudge strength by testing ({where}).',
   'Balancier de la borne ou simulé par VPX, force des secousses de l’accéléromètre : réglage à l’essai': 'Cabinet tilt bob or simulated by VPX, accelerometer nudge strength: set by testing',
+  'Toute touche maintenue {n} s': 'Any key held {n} s',
+  'Exit ({key}) maintenu {n} s': 'Exit ({key}) held {n} s',
+  'Échap maintenue {n} s': 'Esc held {n} s',
+  'ou {key}': 'or {key}',
+  '{key} était le bouton {button} : il passe au nouveau, et {button} est à relever de nouveau.': '{key} was the {button} button: it moves to the new one, and {button} must be recorded again.',
+  '{key} était le bouton {button} : il passe au nouveau, et {button} restera sans bouton à l’enregistrement.': '{key} was the {button} button: it moves to the new one, and {button} will have no button once saved.',
+  'à relever': 'to record',
+  '{key} est maintenant le bouton {button}': '{key} is now the {button} button',
 };

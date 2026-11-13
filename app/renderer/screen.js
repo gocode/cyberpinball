@@ -324,6 +324,13 @@ function renderQuit(state) {
   const button = $('quit');
   button.hidden = !q?.button;
   button.textContent = q?.button ?? '';
+  // Le geste qui marche à cette étape, toujours dit : sans lui, personne ne sait qu'Exit maintenu sort.
+  if (q?.how && !q.holding) {
+    const how = document.createElement('small');
+    how.className = 'quit-how';
+    how.textContent = q.how;
+    button.append(how);
+  }
   button.classList.toggle('holding', Boolean(q?.holding));
   const box = $('quit-dialog');
   const shown = q?.dialog ?? (q?.leaving && { title: t('Sortie sans enregistrer'), destination: q.leaving });

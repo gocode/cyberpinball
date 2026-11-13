@@ -258,11 +258,21 @@
       return `repli:${opts.game ? 'partie' : view.fallback}:${view.type}:${card.title}:${card.manufacturer}:${card.year}${still}`;
     }
 
+    /**
+     * Repli dessiné pour le joueur (l'ouverture, le repli « en partie ») : tourné comme la racine
+     * sur un playfield pivoté (frontend.css, .media-fallback.facing-player). La marque est portée
+     * par le repli lui-même, pas par la phase de la page : pendant le fondu qui suit la fin de la
+     * phase, il reste tourné jusqu'à son retrait, au lieu de se coucher en paysage un instant.
+     */
+    function fallbackBox(className, facing) {
+      return el('div', `media-fallback${className ? ` ${className}` : ''}${facing ? ' facing-player' : ''}`);
+    }
+
     function fallbackContent(view, opts, slot) {
       const card = view.card ?? {};
       const intro = INTRO_KINDS[view.fallback];
       if (intro && typeof window.CyberIntro?.[intro] === 'function') {
-        const box = el('div', 'media-fallback intro-fallback');
+        const box = fallbackBox('intro-fallback', true);
         slot.handle = window.CyberIntro[intro](box, card, { intro: view.intro });
         // Couche déjà coupée (voile de nuit, fenêtre cachée) : la scène ne tourne pas avant d'être vue.
         slot.handle?.setActive?.(active && !document.hidden);
@@ -275,11 +285,11 @@
       let kind = opts.game ? 'inGame' : FALLBACK_KINDS[view.fallback];
       if (kind === 'dmd' && view.type === 'FullDMD') kind = 'fullDmd';
       if (kit && kind && typeof kit[kind] === 'function') {
-        const box = el('div', 'media-fallback');
+        const box = fallbackBox('', Boolean(opts.game));
         slot.handle = kit[kind](box, card, { animate: !opts.still });
         return box;
       }
-      const box = el('div', 'media-fallback minimal');
+      const box = fallbackBox('minimal', Boolean(opts.game));
       const content = opts.game ? options.inGame?.(view) : options.minimal?.(view);
       if (content) box.append(content);
       return box;

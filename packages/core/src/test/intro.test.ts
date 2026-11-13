@@ -253,6 +253,48 @@ test('rendu : du noir avant le départ, puis chaque couche monte la scène de so
   assert.deepEqual(p.mounted, ['playfield:1']);
 });
 
+// Essai du 13/11/2026 sur le PinCab : au premier bouton, l'animation du plateau passait un instant
+// en paysage. La rotation suivait html.intro-phase, retiré dès l'état de la roue, alors que
+// l'animation reste à l'écran le temps du fondu (media.js, FADE_MS). Même chose en fin de partie
+// pour le repli « en partie » (html.in-game).
+test('rendu : sur un playfield pivoté, l’ouverture reste tournée pendant le fondu vers la roue', () => {
+  const p = menuRenderer({
+    CyberIntro: { playfield: () => ({ destroy() {} }), scenes: () => [], repaint() {} },
+    location: { search: '?role=playfield&rotation=90' },
+  });
+  const pf = view('playfield', 'playfield');
+  p.send(introState('playfield', { id: 1, startedAt: Date.now(), screens: { playfield: pf }, hint: 'Appuyez' }));
+  const scene = p.document.querySelector('#media-bg .intro-fallback');
+  assert.ok(scene, 'l’animation du plateau est montée');
+  assert.ok(scene!.classList.contains('facing-player'), 'tournée pour le joueur');
+  // Premier bouton : l'état de la roue. L'animation part en fondu, toujours tournée.
+  p.send({ ...introState('playfield', undefined as never), phase: 'menu', intro: undefined });
+  assert.ok(!p.document.documentElement.classList.contains('intro-phase'), 'la phase est finie');
+  assert.ok(scene!.isConnected, 'encore à l’écran pendant le fondu');
+  assert.ok(scene!.classList.contains('facing-player'), 'toujours tournée : aucun instant en paysage');
+  // Le fond du menu, sans texte, reste dans le repère de l'écran.
+  for (const box of p.document.querySelectorAll('#media-bg .media-fallback')) {
+    if (box !== scene) assert.ok(!box.classList.contains('facing-player'), 'le fond du menu n’est pas tourné');
+  }
+});
+
+test('feuille de style : la rotation d’un repli du plateau suit le repli, jamais la phase de la page', () => {
+  const css = read('app', 'renderer', 'frontend.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  // Une règle qui tourne un repli d'après la phase (html.in-game, html.intro-phase…) le coucherait
+  // en paysage le temps de son fondu, ou tournerait à tort le fond qui part au début de la phase.
+  const selectors = [...css.matchAll(/([^{}]+)\{[^{}]*rotate\(var\(--turned\)\)[^{}]*\}/g)].flatMap((m) => (m[1] ?? '').split(',').map((s) => s.trim()));
+  const fallbacks = selectors.filter((s) => s.includes('.media-fallback'));
+  assert.equal(fallbacks.length, 3, 'une règle à 90, 180 et 270°');
+  for (const s of fallbacks) {
+    assert.match(s, /^html\[data-rotation='(90|180|270)'\] #media-bg \.media-fallback\.facing-player$/, s);
+  }
+  assert.doesNotMatch(css, /html\.[\w-]+\[data-rotation[^{]*\.media-fallback/, 'aucune rotation de repli liée à une phase');
+  // Les replis tournés pour le joueur : l'ouverture et le repli « en partie », marqués par media.js.
+  const media = read('app', 'renderer', 'media.js');
+  assert.match(media, /fallbackBox\('intro-fallback', true\)/);
+  assert.equal((media.match(/fallbackBox\('(?:minimal)?', Boolean\(opts\.game\)\)/g) ?? []).length, 2);
+});
+
 test('rendu : un écran annexe joue l’ouverture de chacune de ses zones (fronton, DMD)', () => {
   const p = page('backglass', [
     { role: 'backglass', zone: { x: 0, y: 0, width: 1, height: 0.75 } },

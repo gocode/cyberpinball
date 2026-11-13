@@ -223,6 +223,23 @@ export function quitHoldMs(phase: WizardPhase, code: string, exitKeys: readonly 
   return undefined;
 }
 
+/**
+ * Bouton « Quitter sans enregistrer » de la borne (facultatif, étape « Boutons de l'interface ») :
+ * comme Ctrl+Q, un appui ouvre la question et un second y répond oui, à toute étape de la
+ * configuration, assistant complet ou étape seule. Sauf là où ce même bouton physique a déjà un
+ * rôle : pendant le relevé d'un bouton, il se relève comme n'importe quel autre (maintenu 3 s, il
+ * ouvre la question, comme toute touche) ; et quand l'étape le lit pour autre chose (`stepKeys` :
+ * boutons essayés au récapitulatif des boutons, balancier du tilt).
+ */
+export function quitButtonActs(phase: WizardPhase, code: string, quitKeys: readonly string[], stepKeys: readonly string[] = []): boolean {
+  if (phase === 'done' || !quitKeys.includes(code)) return false;
+  if (CAPTURE_PHASES.includes(phase) && !SUMMARY_PHASES.includes(phase)) return false;
+  return !stepKeys.includes(code);
+}
+
+/** Récapitulatifs des deux jeux de boutons : l'étape « Boutons » n'y relève plus rien, elle essaie. */
+const SUMMARY_PHASES: readonly WizardPhase[] = ['buttonsSummary', 'navigationSummary'];
+
 /** Ctrl+Q : la question, sur toutes les étapes ; Ctrl+Q de nouveau : oui. */
 export function isQuitShortcut(input: { code: string; control?: boolean }): boolean {
   return Boolean(input.control) && input.code === 'KeyQ';

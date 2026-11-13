@@ -142,6 +142,13 @@ export interface UiSoundCue {
   handover?: true;
   /** Son d'un appel, ou d'une notification qui se montre pendant la partie : la fenêtre le laisse y sonner. */
   call?: true;
+  /**
+   * Son calé sur une animation : l'instant (Date.now(), même horloge que les fenêtres) où son
+   * accent doit s'entendre. La fenêtre en déduit le départ du son (ui-sounds.js, HIT), au lieu
+   * de le jouer à l'arrivée du message : le souffle de l'ouverture ouvre son accord à l'ignition
+   * du plateau (INTRO_TIMELINE.ignition), quels que soient le délai du message et celui de la sortie.
+   */
+  hitAt?: number;
 }
 
 /**
@@ -150,13 +157,14 @@ export interface UiSoundCue {
  * bobine, à l'instant où VPX prend la main) et le son d'un appel (une invitation d'un ami, qui
  * attend une réponse) ; jamais en mode attente, jamais quand les sons de l'interface sont coupés
  * ou à 0 %. Le chargement est permis : la pièce tombe au Start, avant que VPX ne prenne les écrans.
+ * `hitAt` : son calé sur une animation (UiSoundCue.hitAt).
  */
-export function uiSoundCue(id: UiSoundId, settings: Pick<MenuMediaSettings, 'uiSounds' | 'uiSoundsVolume'>, moment: MenuMoment): UiSoundCue | undefined {
+export function uiSoundCue(id: UiSoundId, settings: Pick<MenuMediaSettings, 'uiSounds' | 'uiSoundsVolume'>, moment: MenuMoment, hitAt?: number): UiSoundCue | undefined {
   const handover = UI_SOUNDS[id].handover === true;
   // Un appel, ou le son d'une notification qui se montre aussi pendant la partie : la fenêtre les laisse sonner.
   const call = UI_SOUNDS[id].call === true || UI_SOUNDS[id].notice === true;
   if (!settings.uiSounds || (moment === 'game' && !handover && !call) || moment === 'attract') return undefined;
   const volume = playVolume(settings.uiSoundsVolume);
   if (!(volume > 0)) return undefined;
-  return { id, volume, ...(handover ? { handover } : {}), ...(call ? { call } : {}) };
+  return { id, volume, ...(handover ? { handover } : {}), ...(call ? { call } : {}), ...(typeof hitAt === 'number' ? { hitAt } : {}) };
 }

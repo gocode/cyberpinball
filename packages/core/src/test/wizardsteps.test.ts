@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { DEFAULT_BUTTONS, isInputKey } from '../buttons';
+import { DEFAULT_BUTTONS, isInputKey, NAVIGATION } from '../buttons';
 import { toPhysicalScreen } from '../fingerprint';
 import { IniDocument } from '../ini';
 import type { Cabinet } from '../model';
@@ -19,6 +19,7 @@ import {
   isAudioKey,
   isLayoutKey,
   isQuitShortcut,
+  quitButtonActs,
   quitDestination,
   quitHoldMs,
   stepCabinet,
@@ -79,6 +80,39 @@ test('toute étape a une sortie sans enregistrer : Échap maintenue 2 s, Ctrl+Q,
   assert.ok(QUIT_HOLD_MS.capture > QUIT_HOLD_MS.exit && QUIT_HOLD_MS.exit >= 2000, 'un appui ordinaire ne dure jamais aussi longtemps');
   assert.equal(quitHoldMs('done', 'Escape', ['Escape']), undefined, 'enregistré : plus rien à quitter');
   assert.equal(isQuitShortcut({ code: 'KeyQ' }), false);
+});
+
+test('bouton « Quitter sans enregistrer » de la borne : un appui, à toute étape, sauf là où il a déjà un rôle', () => {
+  const own = 'SDLJoy_x_1;9';
+  for (const phase of WIZARD_PHASES) {
+    const acts = quitButtonActs(phase, own, [own]);
+    // Pendant le relevé d'un bouton, il se relève comme un autre (maintenu 3 s, il ouvre la question comme toute touche).
+    const expected = phase !== 'done' && phase !== 'buttons' && phase !== 'navigation';
+    assert.equal(acts, expected, phase);
+    if (phase !== 'done') assert.equal(quitButtonActs(phase, 'KeyA', [own]), false, `${phase} : une autre touche`);
+  }
+  // Même bouton physique qu'un bouton que l'étape essaie (récapitulatif) ou lit (balancier du tilt) : il garde ce rôle-là.
+  assert.equal(quitButtonActs('buttonsSummary', own, [own], [own]), false);
+  assert.equal(quitButtonActs('tilt', own, [own], [own]), false);
+  // Non affecté : rien.
+  assert.equal(quitButtonActs('assign', own, []), false);
+  // Facultatif, dans les boutons de l'interface, après Aide-mémoire et Réglages de VPX.
+  const quit = NAVIGATION.find((n) => n.id === 'quit');
+  assert.ok(quit && !quit.required && quit.fallback.length === 0);
+});
+
+test('wizard.ts : le geste de sortie est dit sur chaque écran, et le bouton de la borne passe avant toute étape', () => {
+  const wizard = topLevelFunctions(read('app', 'src', 'wizard.ts'));
+  const handleKey = wizard.get('handleKey')!;
+  const at = handleKey.indexOf('quitButtonActs(wizard.phase, input.code, KEYS.quit, stepKeys())');
+  assert.ok(at > 0 && at < handleKey.indexOf('wizard.phase ==='), 'handleKey : le bouton avant la première étape');
+  assert.match(wizard.get('quitView')!, /how: quitGestures\(\)/);
+  // Le geste qui marche : toute touche 3 s pendant le relevé, sinon Exit maintenu 2 s ; et le bouton dédié s'il agit ici.
+  const gestures = wizard.get('quitGestures')!;
+  assert.match(gestures, /QUIT_HOLD_MS\.capture/);
+  assert.match(gestures, /QUIT_HOLD_MS\.exit/);
+  assert.match(gestures, /quitButtonActs\(wizard\.phase, own/);
+  assert.match(read('app', 'renderer', 'screen.js'), /how\.className = 'quit-how'/);
 });
 
 test('quitter sans enregistrer : retour au menu, ou fermeture annoncée au premier démarrage', () => {
@@ -186,7 +220,7 @@ test('ce qui serait perdu en quittant : annoncé en clair, rien quand rien n’a
 test('wizard.ts : la question « Quitter sans enregistrer ? » passe avant toute étape', () => {
   const wizard = topLevelFunctions(read('app', 'src', 'wizard.ts'));
   const handleKey = wizard.get('handleKey')!;
-  const firstPhase = handleKey.indexOf('wizard.phase');
+  const firstPhase = handleKey.indexOf('wizard.phase ===');
   for (const call of ['isQuitShortcut(input)', 'watchHold(input.code)', 'handleQuitKey(input)']) {
     const at = handleKey.indexOf(call);
     assert.ok(at > 0 && at < firstPhase, `handleKey : ${call} avant la première étape`);

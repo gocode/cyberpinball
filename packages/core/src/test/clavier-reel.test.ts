@@ -110,7 +110,7 @@ const GAME_BY_KEYBOARD: Record<string, string> = {
   volumeMute: 'KeyM',
 };
 
-test('boutons du jeu au clavier : chaque action relevée et enregistrée, un bouton refait seul, touche prise refusée, Retour arrière et Échap', { skip, timeout: 200_000 }, () => {
+test('boutons du jeu au clavier : chaque action relevée et enregistrée, un bouton refait seul, touche prise reprise, Retour arrière et Échap', { skip, timeout: 200_000 }, () => {
   assert.deepEqual(Object.keys(GAME_BY_KEYBOARD), BUTTONS.map((b) => b.id), 'un relevé pour chaque bouton du jeu');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-clavier-'));
   try {
@@ -131,9 +131,12 @@ test('boutons du jeu au clavier : chaque action relevée et enregistrée, un bou
         ...keyboard('Escape'),
         // « Tout relever » (quatrième action) : chaque bouton au clavier.
         ...keyboard(...repeat('ArrowRight', 3), 'Enter'),
-        ...keyboard('KeyA', 'KeyS', 'KeyA'), // A, déjà au flipper gauche, refusée pour Start
-        ...keyboard('Digit2', 'KeyE', 'Backspace'), // Exit relevé sur E par erreur, refait
+        // A, déjà au flipper gauche, reprise par Start : le flipper gauche est vidé, redemandé à la fin.
+        // Retour arrière revient à Start, relevé sur 2.
+        ...keyboard('KeyA', 'KeyS', 'KeyA', 'Backspace', 'Digit2'),
+        ...keyboard('KeyE', 'Backspace'), // Exit relevé sur E par erreur, refait
         ...keyboard(...Object.values(GAME_BY_KEYBOARD).slice(3)),
+        ...keyboard('KeyA'), // le flipper gauche, redemandé après le dernier bouton
         // Essai des boutons principaux, puis Start enregistre.
         ...keyboard('KeyA', 'KeyS', 'KeyQ', 'Digit2'),
       ],
@@ -142,7 +145,8 @@ test('boutons du jeu au clavier : chaque action relevée et enregistrée, un bou
     for (const line of [
       recorded('game', 'credit', 'Digit5'),
       'Assistant : « Quitter sans enregistrer ? » (buttonsSummary)',
-      recorded('game', 'start', 'KeyA', 'refusé (A est déjà la touche du bouton Flipper gauche'),
+      recorded('game', 'start', 'KeyA', 'gardé, leftFlipper vidé'),
+      recorded('game', 'start', 'Digit2'),
       recorded('game', 'exit', 'KeyE'),
       ...Object.entries(GAME_BY_KEYBOARD).map(([id, code]) => recorded('game', id, code)),
     ])
@@ -171,19 +175,20 @@ test('assistant complet au clavier : boutons du jeu puis de l’interface relev�
         ...keyboard(...Object.values(GAME_BY_KEYBOARD)),
         ...keyboard('KeyA', 'KeyS', 'KeyQ', 'Digit2'),
         // Boutons de l'interface, proposés sur ceux du jeu : « Tout relever », puis au clavier ;
-        // Retour (U) passe le bouton des réglages.
+        // Retour (U) passe les boutons des réglages et de la sortie sans enregistrer.
         'click:#actions button:nth-child(4)',
-        ...keyboard(...Object.values(navigation), 'KeyU'),
+        ...keyboard(...Object.values(navigation), 'KeyU', 'KeyU'),
         ...keyboard('KeyJ', 'KeyL', 'KeyU', 'KeyK'),
         'CtrlQ',
       ],
       [],
     );
-    assert.deepEqual(INTERFACE_KEYS.items.map((b) => b.id), [...Object.keys(navigation), 'settings']);
+    assert.deepEqual(INTERFACE_KEYS.items.map((b) => b.id), [...Object.keys(navigation), 'settings', 'quit']);
     for (const line of [
       ...Object.entries(GAME_BY_KEYBOARD).map(([id, code]) => recorded('game', id, code)),
       ...Object.entries(navigation).map(([id, code]) => recorded('interface', id, code)),
       recorded('interface', 'settings', 'KeyU', 'passé'),
+      recorded('interface', 'quit', 'KeyU', 'passé'),
     ])
       assert.ok(output.includes(line), `${line}\n---\n${output}`);
     // Les deux relevés validés au clavier : la question de Ctrl+Q arrive après les boutons.

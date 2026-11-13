@@ -3714,13 +3714,18 @@ html.menu-desktop:not(html.in-game):not(html.attract-mode):not(html.intro-phase)
 }
 
 /*
- * Repli « en partie » du fond du playfield (titre, fabricant, année) : tourné pour le
- * joueur comme la racine, sinon ses textes restent couchés sur une borne au playfield
- * pivoté. Le fond animé du menu, sans texte, reste dans le repère de l'écran.
+ * Replis dessinés pour le joueur (media.js, fallbackBox) : le repli « en partie » du fond du
+ * playfield (titre, fabricant, année) et l'animation de Cyber Pinball de l'ouverture (intro.js),
+ * tournés comme la racine, sinon couchés sur une borne au playfield pivoté ; un fichier
+ * d'ouverture de l'utilisateur l'est par media.js (bord des flippers). Le fond animé du menu,
+ * sans texte, reste dans le repère de l'écran. La rotation suit le repli (.facing-player), jamais
+ * la phase de la page (html.in-game, html.intro-phase) : un repli qui part en fondu après la fin
+ * de sa phase resterait sinon un instant en paysage (sortie de l'ouverture, fin de partie), et le
+ * fond du menu, qui part en fondu au début d'une phase, serait tourné à tort.
  */
-html.in-game[data-rotation='90'] #media-bg .media-fallback,
-html.in-game[data-rotation='180'] #media-bg .media-fallback,
-html.in-game[data-rotation='270'] #media-bg .media-fallback {
+html[data-rotation='90'] #media-bg .media-fallback.facing-player,
+html[data-rotation='180'] #media-bg .media-fallback.facing-player,
+html[data-rotation='270'] #media-bg .media-fallback.facing-player {
   inset: auto;
   top: 50%;
   left: 50%;
@@ -3729,22 +3734,7 @@ html.in-game[data-rotation='270'] #media-bg .media-fallback {
   transform: translate(-50%, -50%) rotate(var(--turned));
 }
 
-/*
- * Ouverture au démarrage (intro.js) : l'animation de Cyber Pinball du plateau est tournée pour
- * le joueur, comme la racine ; un fichier de l'utilisateur l'est par media.js (bord des
- * flippers). Rien n'assombrit l'écran : la scène est le seul contenu.
- */
-html.intro-phase[data-rotation='90'] #media-bg .media-fallback,
-html.intro-phase[data-rotation='180'] #media-bg .media-fallback,
-html.intro-phase[data-rotation='270'] #media-bg .media-fallback {
-  inset: auto;
-  top: 50%;
-  left: 50%;
-  width: var(--turned-width);
-  height: var(--turned-height);
-  transform: translate(-50%, -50%) rotate(var(--turned));
-}
-
+/* Ouverture (intro.js) : rien n'assombrit l'écran, la scène est le seul contenu. */
 html.intro-phase #media-bg::after {
   display: none;
 }

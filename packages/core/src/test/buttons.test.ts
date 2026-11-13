@@ -22,6 +22,7 @@ import {
   navigationKeys,
   recordButton,
   recordKey,
+  takenNotice,
   refusedKey,
   refusedNavigationKey,
   defaultNavigation,
@@ -336,8 +337,12 @@ test('bouton Pause : facultatif, sur P comme dans VPX, et un relevé fait sans l
   const taken = planVpxSync(cabinetWith({ ...before, plunger: 'KeyP' }), devPcDisplays(), VPX_FIRST_RUN);
   assert.equal(input(taken.nextIni!, 'Pause'), 'Key;0');
   assert.deepEqual(taken.silenced.map((s) => [s.action, s.button]), [['Pause', 'plunger']]);
-  // Relevé avec Pause : P n'est plus libre pour un autre bouton.
-  assert.match(recordButton({ ...DEFAULT_BUTTONS }, 'plunger', 'KeyP').refused!, /P est déjà la touche du bouton Pause/);
+  // Relevé avec Pause : P donné à un autre bouton quitte Pause, qui reste sans bouton (facultatif).
+  const moved = recordButton({ ...DEFAULT_BUTTONS }, 'plunger', 'KeyP');
+  assert.equal(moved.refused, undefined);
+  assert.equal(moved.keys.plunger, 'KeyP');
+  assert.equal(moved.keys.pause, undefined);
+  assert.deepEqual(moved.taken, { id: 'pause', label: 'Pause', required: false });
 });
 
 test('boutons de manette affectés dans VPX : gardés à côté de la touche', () => {
@@ -544,9 +549,11 @@ test('relevé mixte : touches du clavier et boutons du joystick, librement d’u
   assert.deepEqual(buttonKeys(keys), keys, 'un relevé mixte pilote l’interface tel quel');
   assert.deepEqual(navigationKeys({ buttons: keys }).next, ['ShiftRight', 'ArrowRight', 'ArrowDown']);
   assert.deepEqual(navigationKeys({ buttons: keys }).confirm, [joy(2), 'Enter', 'NumpadEnter']);
-  // Une touche déjà prise est refusée, qu'elle vienne du clavier ou du joystick.
-  assert.match(recordButton(keys, 'credit', 'ShiftRight').refused!, /Maj droite est déjà la touche du bouton Flipper droit/);
-  assert.match(recordButton(keys, 'credit', joy(0)).refused!, /Bouton 1 du joystick est déjà la touche du bouton Flipper gauche/);
+  // Une touche déjà prise passe au nouveau bouton, qu'elle vienne du clavier ou du joystick ; l'ancien est vidé.
+  assert.deepEqual(recordButton(keys, 'credit', 'ShiftRight').taken?.id, 'rightFlipper');
+  assert.equal(recordButton(keys, 'credit', 'ShiftRight').keys.rightFlipper, undefined);
+  assert.deepEqual(recordButton(keys, 'credit', joy(0)).taken?.id, 'leftFlipper');
+  assert.equal(recordButton(keys, 'credit', joy(0)).keys.credit, joy(0));
 
   // Enregistré dans cabinet.json, relu tel quel.
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-mixte-'));
@@ -597,6 +604,9 @@ test('clavier et joystick : le clavier suit les boutons du joystick, et l’assi
   assert.match(wizard, /win\.on\('blur', [^\n]*isFocused\(\)[^\n]*releaseKeys\(\)/);
   // Le relevé passe par recordKey, sans distinguer clavier et joystick.
   assert.match(wizard, /function handleButtonKey[\s\S]*?recordKey\(/);
+  // Un bouton obligatoire qui perd sa touche au profit d'un autre est redemandé, et le relevé le dit.
+  assert.match(wizard, /function handleButtonKey[\s\S]*?if \(record\.taken\.required\) capture\.answered\.delete\(record\.taken\.id\)/);
+  assert.match(wizard, /function handleButtonKey[\s\S]*?capture\.taken = record\.taken && takenNotice\(record\.taken, code\)/);
 });
 
 test('chaque bouton, du jeu et de l’interface, se relève sur une touche du clavier comme sur un bouton du joystick', () => {
@@ -612,17 +622,35 @@ test('chaque bouton, du jeu et de l’interface, se relève sur une touche du cl
       const byJoystick = recordKey(set, {}, item.id, joy(i));
       assert.equal(byJoystick.refused, undefined, `${set.kind} ${item.id} : ${byJoystick.refused}`);
       assert.equal(byJoystick.keys[item.id], joy(i));
-      // Déjà prise par un autre bouton du même jeu : refusée, sans rien changer.
+      // Déjà prise par un autre bouton du même jeu : jamais refusée (13/11/2026 : une borne dont tous
+      // les boutons sont pris ne pouvait plus en échanger) ; elle passe au nouveau, l'ancien est vidé et nommé.
       const other = set.items.find((b) => b.id !== item.id)!;
       const taken = recordKey(set, { [other.id]: key }, item.id, key);
-      assert.match(taken.refused!, new RegExp(`déjà la touche du bouton ${other.label}`));
-      assert.deepEqual(taken.keys, { [other.id]: key });
+      assert.equal(taken.refused, undefined, `${set.kind} ${item.id}`);
+      assert.deepEqual(taken.keys, { [item.id]: key });
+      assert.deepEqual(taken.taken, { id: other.id, label: other.label, required: other.required });
+      assert.match(takenNotice(taken.taken!, key), new RegExp(`était le bouton ${other.label}`));
     }
   }
-  // Le bouton qui passe (Exit, Retour), une fois relevé, passe un bouton facultatif ; un obligatoire le garde.
+  // Tous les boutons pris : chacun peut encore changer de touche, en la prenant à un autre.
+  for (const set of [GAME_KEYS, INTERFACE_KEYS]) {
+    const full = Object.fromEntries(set.items.map((b, i) => [b.id, joy(i)]));
+    for (const [i, item] of set.items.entries()) {
+      const from = set.items[(i + 1) % set.items.length]!;
+      const swap = recordKey(set, full, item.id, full[from.id]!);
+      if (swap.skipped) continue; // le bouton qui passe, sur un facultatif
+      assert.equal(swap.refused, undefined, `${set.kind} ${item.id} sur la touche de ${from.id}`);
+      assert.equal(swap.keys[item.id], full[from.id]);
+      assert.equal(swap.keys[from.id], undefined);
+    }
+  }
+  // Un bouton obligatoire vidé est annoncé « à relever de nouveau » ; un facultatif, « sans bouton ».
+  assert.match(takenNotice({ label: 'Start', required: true }, 'Digit1'), /Start est à relever de nouveau/);
+  assert.match(takenNotice({ label: 'Pause', required: false }, 'KeyP'), /Pause restera sans bouton à l’enregistrement/);
+  // Le bouton qui passe (Exit, Retour), une fois relevé, passe un bouton facultatif ; un obligatoire le prend.
   const exit = 'Escape';
   assert.equal(recordKey(GAME_KEYS, { exit }, 'extraBall', exit).skipped, true);
-  assert.match(recordKey(GAME_KEYS, { exit }, 'credit', exit).refused!, /déjà la touche du bouton Exit/);
+  assert.equal(recordKey(GAME_KEYS, { exit }, 'credit', exit).taken?.id, 'exit');
 });
 
 test('touches du clavier : le relâchement d’un appui traité arrive toujours (key-input.ts)', () => {
@@ -698,15 +726,16 @@ test('interface : les touches de secours du clavier gardent toujours leur rôle'
 });
 
 test('interface : relevé au clavier et au joystick mélangés, Retour passe les facultatifs', () => {
-  const pressed = ['KeyJ', joy(1), 'Enter', 'KeyU', 'KeyU', joy(5)];
+  const pressed = ['KeyJ', joy(1), 'Enter', 'KeyU', 'KeyU', joy(5), joy(8)];
   let keys: SetKeys = {};
   for (const [i, n] of NAVIGATION.entries()) {
     const record = recordKey(INTERFACE_KEYS, keys, n.id, pressed[i]!);
     assert.equal(record.refused, undefined, n.id);
     keys = record.keys;
   }
-  assert.deepEqual(keys, { previous: 'KeyJ', next: joy(1), confirm: 'Enter', back: 'KeyU', settings: joy(5) });
-  assert.match(recordKey(INTERFACE_KEYS, keys, 'help', 'KeyJ').refused!, /J est déjà la touche du bouton Précédent/);
+  assert.deepEqual(keys, { previous: 'KeyJ', next: joy(1), confirm: 'Enter', back: 'KeyU', settings: joy(5), quit: joy(8) });
+  // Une touche d'un autre bouton de l'interface passe au nouveau : Précédent, obligatoire, est à relever de nouveau.
+  assert.deepEqual(recordKey(INTERFACE_KEYS, keys, 'help', 'KeyJ').taken, { id: 'previous', label: 'Précédent', required: true });
   // Le même bouton physique peut servir au jeu et à l'interface : chaque jeu ne refuse que ses propres doublons.
   assert.equal(recordKey(INTERFACE_KEYS, keys, 'help', 'ShiftLeft').refused, undefined);
   assert.deepEqual(keysToTry(INTERFACE_KEYS, keys, navigationButtons(undefined)), ['previous', 'next', 'confirm', 'back']);

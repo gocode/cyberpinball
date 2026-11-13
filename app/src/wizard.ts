@@ -6,8 +6,10 @@
 // démarrage, ou avec --assistant ; --assistant --boutons, --ecrans, --playfield,
 // --disposition ou --son ne refait que cette étape (WIZARD_STEPS, core).
 // À toute étape, « Quitter sans enregistrer » (souris, Ctrl+Q, Échap ou Exit
-// maintenu 2 s, n'importe quelle touche maintenue 3 s pendant le relevé des
-// boutons) rend la main au menu sans rien écrire.
+// maintenu 2 s, le bouton « Quitter sans enregistrer » de l'interface s'il est
+// affecté, n'importe quelle touche maintenue 3 s pendant le relevé des boutons)
+// rend la main au menu sans rien écrire. Le bouton en haut à droite de chaque
+// écran dit le geste qui marche à ce moment-là.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -25,6 +27,7 @@ import {
   MAIN_GAME_BUTTONS,
   navigationButtons,
   recordKey,
+  takenNotice,
   withoutButtonKeys,
   IniDocument,
   keyLabel,
@@ -43,8 +46,10 @@ import {
   WIZARD_FLAGS,
   cabinetChanges,
   isQuitShortcut,
+  quitButtonActs,
   quitDestination,
   quitHoldMs,
+  QUIT_HOLD_MS,
   stepCabinet,
   wizardStepOf,
   type CabinetField,
@@ -163,7 +168,8 @@ const COLORS = ['#ff3d7f', '#22d3ee', '#facc15', '#a3e635', '#c084fc', '#fb923c'
  * Entrée, Échap et Retour arrière d'un clavier.
  */
 function wizardKeys(source: ButtonsSource) {
-  return { ...navigationKeys(source, false), back: withoutButtonKeys(['Backspace'], source) };
+  const quit = navigationButtons(source).quit;
+  return { ...navigationKeys(source, false), back: withoutButtonKeys(['Backspace'], source), quit: quit ? [quit] : [] };
 }
 let KEYS = wizardKeys(undefined);
 
@@ -264,6 +270,8 @@ interface ButtonCapture {
   last?: string;
   /** Touche refusée et pourquoi. */
   refused?: string;
+  /** Bouton qui vient de perdre sa touche au profit d'un autre (takenNotice, core) : dit jusqu'au relevé suivant. */
+  taken?: string;
   /** Dernière touche relevée et quand : un contact qui rebondit (balancier, interrupteur) ne compte qu'une fois (BOUNCE_MS). */
   bounce?: { code: string; at: number };
   /** Touches qui n'ont pas à être essayées (keysToTry) : celles en vigueur à l'arrivée, ou celles par défaut choisies. */
@@ -613,7 +621,8 @@ function handleKey(input: Input): boolean {
   if (input.type === 'keyUp') return handleKeyUp(input);
   const is = (group: string[]) => group.includes(input.code);
   // Quitter sans enregistrer : avant toute étape, pour qu'aucune ne puisse retenir le joueur.
-  if (isQuitShortcut(input)) {
+  // Ctrl+Q, ou le bouton « Quitter sans enregistrer » de la borne (sauf là où ce bouton a déjà un rôle).
+  if (isQuitShortcut(input) || quitButtonActs(wizard.phase, input.code, KEYS.quit, stepKeys())) {
     if (!input.isAutoRepeat && !wizard.leaving) {
       if (wizard.quit) leaveWithoutSaving();
       else askQuit();
@@ -758,6 +767,17 @@ function handleKeyUp(input: Input): boolean {
 // La question annonce ce qui serait perdu. Start : oui · Exit : non · le même geste
 // encore : oui ; sans réponse, l'assistant reprend. Rien n'est écrit : ni le modèle,
 // ni VPinballX.ini ; une orientation d'écran non confirmée est remise.
+
+/**
+ * Touches que l'étape en cours lit pour autre chose que se déplacer : les boutons essayés au
+ * récapitulatif des boutons, le balancier du tilt. Le bouton « Quitter sans enregistrer » ne les
+ * prend pas quand il est le même bouton physique (quitButtonActs, core).
+ */
+function stepKeys(): string[] {
+  if (isSummaryPhase(wizard.phase) && wizard.capture) return Object.values(wizard.capture.keys).filter((k): k is string => Boolean(k));
+  if (wizard.phase === 'tilt' && wizard.tiltStep?.bob) return [wizard.tiltStep.bob];
+  return [];
+}
 
 /** Touches Exit connues : celles de l'assistant, et Exit (ou Retour) déjà relevé pendant le relevé. */
 function exitKeys(): string[] {
@@ -908,6 +928,25 @@ function pendingChanges(): string[] {
   return lines;
 }
 
+/**
+ * Gestes qui ouvrent « Quitter sans enregistrer ? » à cette étape, dits sous le bouton de chaque
+ * écran : sans eux, personne ne sait qu'Exit maintenu sort (demande du 13 novembre 2026).
+ */
+function quitGestures(): string[] {
+  const capturing = CAPTURE_PHASES.includes(wizard.phase) && !isSummaryPhase(wizard.phase);
+  const exit = exitKeys()[0];
+  const gestures = [
+    capturing
+      ? t('Toute touche maintenue {n} s', { n: QUIT_HOLD_MS.capture / 1000 })
+      : exit
+        ? t('Exit ({key}) maintenu {n} s', { key: keyLabel(exit), n: QUIT_HOLD_MS.exit / 1000 })
+        : t('Échap maintenue {n} s', { n: QUIT_HOLD_MS.exit / 1000 }),
+  ];
+  const own = KEYS.quit[0];
+  if (own && quitButtonActs(wizard.phase, own, KEYS.quit, stepKeys())) gestures.push(t('ou {key}', { key: keyLabel(own) }));
+  return gestures;
+}
+
 /** Bouton, question et sortie : sur chaque écran, à chaque étape. */
 function quitView() {
   // Retour au menu qui attend la fin de l'installation de VPX : sa progression sous la destination.
@@ -918,6 +957,7 @@ function quitView() {
   const quit = wizard.quit;
   const label = (codes: string[]) => formatList([...new Set(codes)].slice(0, 2).map(keyLabel), 'or');
   return {
+    how: quitGestures().join(' · '),
     button:
       holding === undefined
         ? t('Quitter sans enregistrer')
@@ -1039,6 +1079,7 @@ function touched(capture: ButtonCapture): void {
   capture.deadline = undefined;
   stopButtonsCountdown();
   capture.refused = undefined;
+  capture.taken = undefined;
   capture.notice = undefined;
 }
 
@@ -1058,14 +1099,20 @@ function handleButtonKey(input: Input): void {
   const button = capture.set.items[capture.index]!;
   const record = recordKey(capture.set, capture.keys, button.id, code);
   capture.refused = record.refused;
+  if (!record.refused) capture.taken = record.taken && takenNotice(record.taken, code);
   // Sans opérateur, la trace de chaque relevé (essais de bout en bout, clavier-reel.test.ts).
-  if (process.env.CYBERPINBALL_AUTOPILOT) console.log(`Assistant : relevé ${capture.set.kind}, ${button.id} sur ${code} : ${record.refused ? `refusé (${record.refused})` : record.skipped ? 'passé' : 'gardé'}`); // i18n-ignore : console de l'autopilote
+  if (process.env.CYBERPINBALL_AUTOPILOT) console.log(`Assistant : relevé ${capture.set.kind}, ${button.id} sur ${code} : ${record.refused ? `refusé (${record.refused})` : record.skipped ? 'passé' : record.taken ? `gardé, ${record.taken.id} vidé` : 'gardé'}`); // i18n-ignore : console de l'autopilote
   if (record.refused) return;
   // Une autre touche : l'essai de ce bouton est à refaire.
   if (capture.keys[button.id] !== record.keys[button.id]) capture.tried.delete(button.id);
   capture.keys = record.keys;
   capture.last = record.skipped ? t('{button} : pas de bouton', { button: button.label }) : t('{button} : {key}', { button: button.label, key: keyLabel(code) });
   capture.answered.add(button.id);
+  // Le bouton qui a perdu sa touche : à essayer de nouveau, et redemandé s'il est obligatoire (nextButton).
+  if (record.taken) {
+    capture.tried.delete(record.taken.id);
+    if (record.taken.required) capture.answered.delete(record.taken.id);
+  }
   // Pas après Exit qui passe un bouton : on le presse plusieurs fois de suite, vite.
   capture.bounce = record.skipped ? undefined : { code, at: Date.now() };
   nextButton(capture);
@@ -1466,12 +1513,26 @@ function buttonsView(index: number, base: Record<string, unknown>) {
   const rotation = index === previousPlayfieldIndex() ? edgeRotation(previousEdge() ?? 'bottom') : 0;
   // Pas encore relevé : la touche en vigueur, en retrait.
   const inForceSet = inForceKeys(set);
+  // Touche en vigueur d'un bouton, si un autre bouton du relevé ne l'a pas reprise (recordKey, `taken`).
+  const holderOf = (id: string) => set.items.find((o) => o.id !== id && inForceSet[id] && capture.keys[o.id] === inForceSet[id]);
   const list = set.items.map((b, i) => {
     const code = capture.keys[b.id];
     const answered = capture.answered.has(b.id);
     return {
       label: b.label,
-      key: code ? keyLabel(code) : answered ? t('aucun') : inForceSet[b.id] ? keyLabel(inForceSet[b.id]) : b.required ? '' : t('facultatif'),
+      key: code
+        ? keyLabel(code)
+        : answered
+          ? t('aucun')
+          : holderOf(b.id)
+            ? b.required
+              ? t('à relever')
+              : t('facultatif')
+            : inForceSet[b.id]
+              ? keyLabel(inForceSet[b.id])
+              : b.required
+                ? ''
+                : t('facultatif'),
       state: !summary && i === capture.index ? 'current' : answered ? 'done' : 'todo',
       selected: summary && capture.action === SUMMARY_ACTIONS.length + i,
       tried: summary && capture.tried.has(b.id),
@@ -1500,7 +1561,7 @@ function buttonsView(index: number, base: Record<string, unknown>) {
         : silenced.length
           ? t('Perdent leur touche dans VPX : {actions}', { actions: silenced.join(', ') })
           : t('Les autres touches de VPX ne changent pas.'),
-      notice: capture.notice ?? (keyProblems(set, keys).join(' ; ') || (seconds === undefined ? undefined : t('Sans réponse dans {n} s : touches actuelles gardées.', { n: seconds }))),
+      notice: capture.notice ?? capture.taken ?? (keyProblems(set, keys).join(' ; ') || (seconds === undefined ? undefined : t('Sans réponse dans {n} s : touches actuelles gardées.', { n: seconds }))),
       step: toTry.length
         ? t('Essai des touches relevées : {buttons}', { buttons: tried })
         : t('{last} · choisissez un bouton pour lui donner une autre touche.', {
@@ -1538,11 +1599,16 @@ function buttonsView(index: number, base: Record<string, unknown>) {
       : t('Bouton facultatif {n} sur {total}', { n: capture.index + 1 - required, total: set.items.length - required }),
     details: [
       ...('how' in button && button.how ? [button.how] : []),
-      recorded ? t('Touche actuelle : {key}', { key: current ? keyLabel(current) : t('aucune') }) : t('Touche par défaut : {key}', { key: current ? keyLabel(current) : t('aucune') }),
+      holderOf(button.id)
+        ? t('{key} est maintenant le bouton {button}', { key: keyLabel(current), button: holderOf(button.id)!.label })
+        : recorded
+          ? t('Touche actuelle : {key}', { key: current ? keyLabel(current) : t('aucune') })
+          : t('Touche par défaut : {key}', { key: current ? keyLabel(current) : t('aucune') }),
       joystickLine(),
     ].join(' · '),
     notice:
       capture.refused ??
+      capture.taken ??
       (seconds === undefined
         ? undefined
         : wizard.buttons
