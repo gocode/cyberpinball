@@ -7,6 +7,12 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.1.13
+
+- Virtual reality with Air Link: the cabinet no longer follows the head when the headset is put back on. Cyber Pinball recognises the Quest remaking the room, measured on the head at that very moment, and puts the cabinet back in place at once, at the menu as in a game, height included; the Quest boundary, read again through a new session when needed (a short black), confirms it. Moving the headset around in the hand no longer moves anything.
+- Rooms: the ready-made phrases can now be set (Community settings > Ready-made phrases, or "Manage phrases…" from "Write in the room"): add with the on-screen keyboard or the phone, edit, move up, move down, delete, restore the original ones. `{table}` in them becomes the table chosen on the wheel. The phone offers the same ones, "Thanks!" included.
+- 3D vision with the Kinect: the perspective follows your head from the start of the game. The Kinect now turns on as soon as you press Start, while the table loads and you are still moving (it only picks up a player who moves), and stays on for two minutes after the game, for the next one. The 3D vision screen says how long it took to track your head in the last game.
+
 ## 0.1.12
 
 - Players online: the list shows every player your cabinet has come across, even offline. Those online come first ("Online in France", "Online elsewhere"), their badge ringed in green, with what they are doing below ("Playing", "Online"); the others follow under "Offline", your friends first, with when they were last seen.

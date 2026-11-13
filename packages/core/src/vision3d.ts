@@ -251,13 +251,20 @@ export function vision3dPluginLog(log: string): Vision3dPluginLog {
 }
 
 /** Bilan d'une partie avec Vision 3D : ce qui a marché, ou où ça a coincé, en clair. */
-export function vision3dGameReport(plugin: Vision3dPluginLog, sent: number, failure?: string): { ok: boolean; text: string } {
+/**
+ * Bilan de la dernière partie. `trackedAfterMs` : délai entre la table à l'écran et la première tête
+ * suivie (0 : déjà suivie, le capteur allumé au Start l'avait repérée pendant le chargement).
+ */
+export function vision3dGameReport(plugin: Vision3dPluginLog, sent: number, failure?: string, trackedAfterMs?: number): { ok: boolean; text: string } {
   if (failure) return { ok: false, text: t('Dernière partie : le capteur ne répondait pas ({reason})', { reason: failure }) };
   if (plugin === 'disabled') return { ok: false, text: t('Dernière partie : VPX avait le module Vision 3D éteint ([Plugin.Vision3D] Enable)') };
   if (plugin === 'failed') return { ok: false, text: t('Dernière partie : VPX n’a pas pu charger le module Vision 3D (voir vpinball.log)') };
   if (plugin === 'absent') return { ok: false, text: t('Dernière partie : VPX n’a pas trouvé le module Vision 3D dans son dossier plugins') };
   if (!sent) return { ok: false, text: t('Dernière partie : module chargé par VPX, mais aucune tête vue par le capteur') };
-  return { ok: true, text: t('Dernière partie : module chargé par VPX, {n} positions de la tête envoyées', { n: sent }) };
+  if (trackedAfterMs === undefined) return { ok: true, text: t('Dernière partie : module chargé par VPX, {n} positions de la tête envoyées', { n: sent }) };
+  // Moins d'une demi-seconde : la tête était suivie dès l'arrivée de la table.
+  if (trackedAfterMs < 500) return { ok: true, text: t('Dernière partie : tête suivie dès le début, {n} positions envoyées', { n: sent }) };
+  return { ok: true, text: t('Dernière partie : tête suivie {s} s après le début, {n} positions envoyées', { s: Math.round(trackedAfterMs / 1000), n: sent }) };
 }
 
 /** Taille annoncée du pilote de Microsoft (manifeste des composants), pour le dire avant de télécharger. */

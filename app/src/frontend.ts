@@ -67,14 +67,10 @@ import {
   roomMeasureText,
   staleCalibration,
   anchorPlace,
-  arbitrateJump,
-  composeJumps,
-  fitContour,
-  jumpHeadCheck,
-  ANCHOR_MAX_RESIDUAL_CM,
-  type JumpTransform,
-  anchorHeadAtOrigin,
-  ANCHOR_HEAD_MAX_CM,
+  RoomFrame,
+  inverseJump,
+  movePlace,
+  type AnchorResult,
   calibrationGap,
   calibrationProblem,
   lockbarMarks,
@@ -3195,29 +3191,33 @@ library.provideSystemItem('quiet-in-game', {
 // est prêt. Sans runtime OpenXR, l'entrée reste visible, grisée avec sa raison ; Start n'y change rien.
 let vrMode = readVrMode(loc.dataDir);
 /** Sonde LibOVR (sonde-ovr.ts, 13 novembre 2026) : ce que Link donne à un client invisible, au journal. */
-/** L'ancrage (anchorCheck) : le dernier contour lu par la sonde, le dernier repos, la limite redessinée déjà dite. */
-let latestContour: [number, number][] | undefined;
+/**
+ * Le repère de la pièce (RoomFrame, essai réel du 13 novembre 2026) : le contour lu par la sonde, et les sauts mesurés
+ * depuis son dernier rafraîchissement qui le reportent dans le repère courant (contour effectif). La place calée garde
+ * toujours le contour effectif (casque.ts, writePlace) : elle et lui restent du même repère, même écrite après un saut
+ * (recalage en partie compris).
+ */
+const roomFrame = new RoomFrame();
 let lastAnchorAt = 0;
 let anchorRedrawnSaid: string | undefined;
+/** Le dernier saut appliqué : l'instant, et de combien la borne a été reposée (à dire au port). */
+let lastJump: { at: number; jump: OvrJump; gap: { cm: number; deg: number } } | undefined;
 /**
- * Le saut mesuré (headsetJump) : en attente le temps que la sonde relise le contour (JUMP_SETTLE_MS) ; le contour relu
- * figé (arbitrateJump 'fige') tant qu'il ne change pas ; le dernier saut appliqué.
+ * Le port en cours (headsetOriginReset) : ce qui a reposé la borne (saut mesuré, contour rafraîchi), la session neuve
+ * du compagnon demandée pour relire le contour, et ses minuteries.
  */
-let pendingJump: { jump: JumpTransform; headAfter: { x: number; z: number }; dtMs: number; place: CabinetPlace; timer: NodeJS.Timeout } | undefined;
-let frozenContour: [number, number][] | undefined;
-let lastJumpAt = 0;
-/** Le contour est relu toutes les 2 s par la sonde : l'arbitrage attend un relevé de plus. */
-const JUMP_SETTLE_MS = 3000;
+let portWatch: { since: number; jump?: { cm: number; deg: number }; refreshed?: boolean; contour?: AnchorResult; restartAt?: number; timers: NodeJS.Timeout[] } | undefined;
+/** Essai a) : l'origine défaite par la sonde, en attente d'une tête d'OpenXR pour savoir si elle l'est pour tous. */
+let undoWatch: { jump: OvrJump; head: { x: number; z: number; yaw: number }; timer: NodeJS.Timeout } | undefined;
 /** Au-delà de ce déplacement (cm), le bandeau dit la borne remise en place. */
 const ANCHOR_BANNER_CM = 5;
 const ovrProbe = new OvrProbe({
   appDir: path.join(__dirname, '..'),
   log: (line) => console.log(line),
-  onContour: (points) => {
-    latestContour = points.length >= 3 ? points : undefined;
-    anchorCheck();
-  },
+  undoOrigin: true,
+  onContour: (points) => headsetContour(points),
   onJump: (jump) => headsetJump(jump),
+  onUndo: (undo) => headsetUndo(undo),
 });
 // Le menu dans le casque (casque.ts) : les écrans de la borne montrés dans le casque, hors partie.
 let headset: HeadsetMenu | undefined;
@@ -3364,6 +3364,8 @@ function openVision3dScreen(at = 0): void {
         run: () => {
           vision3d = { ...readVision3d(loc.dataDir), mode: vision3d.mode === 'on' ? 'off' : 'on' };
           writeVision3d(loc.dataDir, vision3d);
+          // Désactivée : le capteur gardé allumé depuis la dernière partie s'éteint aussitôt.
+          if (vision3d.mode === 'off' && !vision3dTest) headTracker.stop();
           console.log(`Vision 3D : ${vision3d.mode === 'on' ? `activée (${readiness.label})` : 'désactivée'}.`); // i18n-ignore : journal
           openVision3dScreen(library.cursor());
         },
@@ -3436,8 +3438,8 @@ function noteVision3dGame(logFile: string, from: number): void {
   } catch {
     text = '';
   }
-  const { sent, failure } = headTracker.summary();
-  vision3dLastGame = vision3dGameReport(vision3dPluginLog(text), sent, failure);
+  const { sent, failure, trackedAfterMs } = headTracker.summary();
+  vision3dLastGame = vision3dGameReport(vision3dPluginLog(text), sent, failure, trackedAfterMs);
   console.log(`Vision 3D : ${vision3dLastGame.text}`); // i18n-ignore : journal (texte déjà traduit)
 }
 
@@ -3548,6 +3550,18 @@ function prepareVision3d(vpxExe: string, inVr: boolean): Vision3dSourceKind | un
     return undefined;
   }
   return readiness.source;
+}
+
+/**
+ * Au Start : le capteur de la Vision 3D allumé pendant le chargement de la table, rien n'est encore
+ * envoyé à VPX (prepareVision3d décide ensuite pour la partie). Lecture du matériel en cache.
+ */
+function warmVision3d(): void {
+  // Partie qui partira dans le casque (VR activée, casque vu) : pas de Vision 3D, rien à allumer.
+  if (vision3d.mode !== 'on' || (vrMode === 'auto' && headsetDetected())) return;
+  stopVision3dTest();
+  const readiness = vision3dReadiness(vision3dHardware(), vision3d.source);
+  if (readiness.ready) headTracker.warm(readiness.source, vision3d);
 }
 
 // « Caler la borne » (Menu système > Borne > Réalité virtuelle, après l'activation) : la borne du casque et les
@@ -3691,13 +3705,6 @@ function roomscaleTip(): void {
   showBanner(t('Le Quest est en limite fixe : la borne se décale chaque fois que le casque est remis. Pour qu’elle reste en place : dans le Quest, réglages de la limite, choisissez « Pièce » et tracez le contour (environ 3 minutes).'));
 }
 
-/**
- * La pièce refaite par le Quest au port du casque (origine remise sur la tête) : la borne calée n'est plus sur la
- * vraie. Avec un contour gardé au calage, l'ancrage sur la limite du Quest a ORIGIN_RESET_WAIT_MS pour la reposer ; il
- * n'est cru que si la tête, remise à l'origine, est près de celle du calage (anchorHeadAtOrigin). Sinon, ou sans
- * contour, le calage est proposé, avec la raison à l'écran.
- */
-let originResetTimer: NodeJS.Timeout | undefined;
 
 /**
  * Ancrage sur la limite du Quest (demande du 13 novembre 2026) : au menu, casque porté, le contour relu par la sonde
@@ -3705,29 +3712,22 @@ let originResetTimer: NodeJS.Timeout | undefined;
  * (le Quest la recentre sur la tête), bureau, calage, partie : rien. Limite redessinée (nombre de points, contours
  * qui ne se recouvrent plus) : dit une fois, et le calage proposé une fois. Toujours actif, sans option.
  */
-function anchorCheck(): void {
-  if (!headset || !latestContour || calibration || controllerWizard || playing || launch || !headset.worn) return;
-  // Un saut en attente d'arbitrage : il décide seul (une seule correction, jamais deux).
-  if (pendingJump) return;
-  // Contour relu figé après un saut (le runtime ne l'a pas retransformé) : l'ancrage déferait la correction.
-  if (frozenContour) {
-    const f = fitContour(frozenContour, latestContour);
-    if (f && f.residualCm <= ANCHOR_MAX_RESIDUAL_CM && Math.abs(f.angle) < 0.01 && Math.hypot(f.tx, f.tz) < 0.01) return;
-    console.log('Casque : contour de la limite relu de nouveau à jour après le saut ; ancrage repris.'); // i18n-ignore : journal
-    frozenContour = undefined;
-  }
-  if (headsetSetting() === 'bureau' || headset.roomKeeping === 'recentred') return;
+function anchorCheck(): AnchorResult | undefined {
+  const current = roomFrame.effective();
+  if (!headset || !current || calibration || controllerWizard || playing || launch || !headset.worn) return undefined;
+  if (undoWatch) return undefined;
+  if (headsetSetting() === 'bureau' || headset.roomKeeping === 'recentred') return undefined;
   const place = headset.place();
-  if (!place || !isCalibrated(place) || place.free) return;
-  const r = anchorPlace(place, latestContour);
-  if (!r || r.kind === 'same') return;
+  if (!place || !isCalibrated(place) || place.free) return undefined;
+  const r = anchorPlace(place, current);
+  if (!r || r.kind === 'same') return r;
   if (r.kind === 'redrawn') {
-    if (anchorRedrawnSaid === r.why) return;
+    if (anchorRedrawnSaid === r.why) return r;
     anchorRedrawnSaid = r.why;
     console.warn(`Casque : ancrage sur la limite du Quest impossible, ${r.why} ; le calage est proposé une fois (ou les deux joysticks, « Caler la borne »).`); // i18n-ignore : journal
     roomNotice = true;
     offerCalibration('limite-changee');
-    return;
+    return r;
   }
   lastAnchorAt = Date.now();
   originNotice = false;
@@ -3739,108 +3739,184 @@ function anchorCheck(): void {
   }
   console.log(`Casque : ancrage sur la limite du Quest, la pièce a sauté : borne reposée de ${r.cm.toFixed(0)} cm et ${r.deg.toFixed(0)}° (contours recalés à ${r.residualCm.toFixed(1)} cm près).`); // i18n-ignore : journal
   if (r.cm > ANCHOR_BANNER_CM) showBanner(t('Borne remise en place sur la limite du Quest'));
+  return r;
 }
-/**
- * Un saut de l'espace de suivi mesuré par la sonde dans le flux de la tête (demande du 13 novembre 2026) : au menu,
- * casque présent, hors calage et partie. Gardé JUMP_SETTLE_MS (deux sauts de suite se composent), le temps que le
- * contour soit relu, puis arbitré contre lui (arbitrateJump) : 'suivi' ou 'fige', la borne reposée par le saut ;
- * 'sans-contour', aussi ; 'contredit', rien de reposé et le calage proposé. Reposée, la tête gardée au calage doit
- * tomber près de la tête d'après le saut (jumpHeadCheck), sinon le calage est proposé avec la raison.
- */
-function headsetJump(jump: OvrJump): void {
-  if (!headset || calibration || controllerWizard || playing || launch || headsetSetting() === 'bureau') {
-    console.log(`Casque : saut de l’espace de suivi relevé (${(jump.angle * 180 / Math.PI).toFixed(1)}°, ${(Math.hypot(jump.tx, jump.tz) * 100).toFixed(0)} cm), pas appliqué : ${playing || launch ? 'partie en cours' : calibration ? 'calage en cours' : 'pas au menu du casque'}.`); // i18n-ignore : journal
-    return;
-  }
-  const place = pendingJump?.place ?? headset.place();
-  if (!place || !isCalibrated(place) || place.free) return;
-  const before = pendingJump?.jump;
-  if (pendingJump) clearTimeout(pendingJump.timer);
-  // Deux sauts dans l'attente : le second après le premier.
-  const composed: JumpTransform = before ? composeJumps(before, jump) : { angle: jump.angle, tx: jump.tx, tz: jump.tz, dy: jump.dy };
-  pendingJump = { jump: composed, headAfter: jump.headAfter, dtMs: jump.dtMs, place, timer: setTimeout(settleJump, JUMP_SETTLE_MS) };
+/** Un saut au journal : rotation, déplacement, sol, intervalle des deux relevés. */
+function jumpText(jump: OvrJump): string {
+  return `${((jump.angle * 180) / Math.PI).toFixed(1)}°, ${(Math.hypot(jump.tx, jump.tz) * 100).toFixed(0)} cm, sol ${(jump.dy * 100).toFixed(1)} cm, relevés à ${jump.dtMs.toFixed(1)} ms`; // i18n-ignore : journal
 }
 
-function settleJump(): void {
-  const p = pendingJump;
-  pendingJump = undefined;
-  if (!p || !headset) return;
-  if (calibration || playing || launch) {
-    console.log('Casque : saut de l’espace de suivi pas appliqué, calage ou partie commencés pendant l’attente.'); // i18n-ignore : journal
+/** Une place au journal : milieu de la barre, cap, hauteur. */
+function placeText(q: CabinetPlace): string {
+  return `${q.x.toFixed(3)},${q.z.toFixed(3)} cap ${((q.yaw * 180) / Math.PI).toFixed(1)}° barre ${(q.lockbarHeight ?? 0).toFixed(3)} m`; // i18n-ignore : journal
+}
+
+/**
+ * Un saut mesuré par la sonde (remise d'origine du Quest, sa signature : la tête arrive à l'origine même), au menu
+ * comme en partie, calage compris : J le garde (le contour effectif suit), et la borne est reposée tout de suite
+ * (movePlace), l'INI de la VR aussi, pour le menu et pour la partie suivante. Une seule correction : la place écrite
+ * garde le contour effectif, que l'ancrage retrouve ensuite tel quel.
+ */
+function headsetJump(jump: OvrJump): void {
+  roomFrame.onJump(jump);
+  const place = headset?.place();
+  if (!headset || !place || !isCalibrated(place) || place.free || headsetSetting() === 'bureau') {
+    console.log(`Casque : saut de l’espace de suivi mesuré par la sonde (${jumpText(jump)}), pas de borne calée à reposer.`); // i18n-ignore : journal
     return;
   }
-  const v = arbitrateJump(p.place, p.jump, latestContour);
-  const said = `${(p.jump.angle * 180 / Math.PI).toFixed(1)}°, ${(Math.hypot(p.jump.tx, p.jump.tz) * 100).toFixed(0)} cm, sol ${((p.jump.dy ?? 0) * 100).toFixed(1)} cm, relevés à ${p.dtMs.toFixed(0)} ms`; // i18n-ignore : journal
-  if (v.kind === 'contredit') {
-    console.warn(`Casque : saut de l’espace de suivi (${said}) pas appliqué : ${v.why} ; calage proposé.`); // i18n-ignore : journal
-    jumpNotice = true;
-    offerCalibration('origine-remise');
-    return;
-  }
-  const gap = placeGap(p.place, v.place);
-  headset.showPlace(v.place, true);
+  const next = movePlace(place, jump);
+  const gap = placeGap(place, next);
+  headset.showPlace(next, true);
   try {
-    writeVrCalibration(loc.dataDir, placeVpxSettings(v.place));
+    writeVrCalibration(loc.dataDir, placeVpxSettings(next));
   } catch (error) {
     console.warn(`Casque : saut appliqué, pas écrit dans l’INI de la VR (${(error as Error).message}).`); // i18n-ignore : journal
   }
-  frozenContour = v.kind === 'fige' ? v.frozenRead : undefined;
-  lastJumpAt = Date.now();
-  const where = (q: CabinetPlace) => `${q.x.toFixed(3)},${q.z.toFixed(3)} cap ${(q.yaw * 180 / Math.PI).toFixed(1)}° barre ${(q.lockbarHeight ?? 0).toFixed(3)} m`;
-  const kind = v.kind === 'suivi' ? 'le contour a suivi' : v.kind === 'fige' ? 'contour relu figé, le saut fait foi' : 'sans contour'; // i18n-ignore : journal
-  console.log(`Casque : saut de l’espace de suivi mesuré par la sonde (${said}), ${kind} : borne reposée de ${gap.cm.toFixed(0)} cm et ${gap.deg.toFixed(0)}°, de ${where(p.place)} à ${where(v.place)}.`); // i18n-ignore : journal
-  const head = jumpHeadCheck(v.place, p.headAfter);
-  if (head?.confirmed) {
-    originNotice = false;
-    showBanner(t('Borne remise en place'));
-    console.log(`Casque : saut confirmé par la tête (tête du calage reposée à ${Math.round(head.cm)} cm de la tête après le saut).`); // i18n-ignore : journal
-    return;
-  }
-  console.log(`Casque : saut pas confirmé par la tête (${head ? `tête du calage reposée à ${Math.round(head.cm)} cm de la tête après le saut, plus de ${ANCHOR_HEAD_MAX_CM} cm` : 'pas de tête gardée au calage'}) ; calage proposé.`); // i18n-ignore : journal
-  jumpUnconfirmedNotice = true;
-  offerCalibration('origine-remise');
+  lastJump = { at: Date.now(), jump, gap };
+  if (portWatch) portWatch.jump = gap;
+  originNotice = false;
+  console.log(`Casque : saut de l’espace de suivi mesuré par la sonde (${jumpText(jump)})${playing || launch ? ', en partie' : ''} : borne reposée de ${gap.cm.toFixed(0)} cm et ${gap.deg.toFixed(0)}°, de ${placeText(place)} à ${placeText(next)}.`); // i18n-ignore : journal
+  if (!playing && !launch && headset.worn) showBanner(t('Borne remise en place'));
 }
 
-const ORIGIN_RESET_WAIT_MS = 5000;
+/**
+ * Essai a) : la sonde a redonné l'ancien repère (ovr_SpecifyTrackingOrigin) et la tête y est revenue pour elle. Vaut-il
+ * pour OpenXR aussi ? La prochaine tête du compagnon (menu ou partie, 5 s au plus) le dit : tout près de la tête que
+ * la sonde a relue dans l'ancien repère, l'origine est commune et défaite pour tous (le saut appliqué est annulé) ;
+ * tout près de cette tête reportée par le saut, elle ne valait que pour la sonde, à qui le repère du runtime est rendu.
+ */
+function headsetUndo(undo: { code: number; back: boolean; head: { x: number; z: number; yaw: number } }): void {
+  const jump = lastJump && Date.now() - lastJump.at < 2000 ? lastJump.jump : undefined;
+  if (!undo.back || !jump) {
+    console.log(`Casque : origine pas défaite par la sonde (code ${undo.code}${undo.back ? ', pas de saut récent' : ', la tête n’est pas revenue'}) ; le saut appliqué reste.`); // i18n-ignore : journal
+    if (undo.back) ovrProbe.send('origine-retour');
+    return;
+  }
+  if (undoWatch) clearTimeout(undoWatch.timer);
+  undoWatch = {
+    jump,
+    head: undo.head,
+    timer: setTimeout(() => {
+      undoWatch = undefined;
+      ovrProbe.send('origine-retour');
+      console.log('Casque : origine défaite par la sonde, aucune tête d’OpenXR pour trancher en 6 s ; repère du runtime rendu à la sonde, le saut appliqué reste.'); // i18n-ignore : journal
+    }, 6000),
+  };
+  console.log('Casque : origine défaite par la sonde (la tête y est revenue pour elle) ; la prochaine tête d’OpenXR dira si elle l’est pour tous.'); // i18n-ignore : journal
+}
+
+/** Une tête d'OpenXR (compagnon, menu ou partie) : tranche l'essai a) en cours. */
+function openXrHead(head: { x: number; z: number; yaw: number }): void {
+  const w = undoWatch;
+  if (!w) return;
+  clearTimeout(w.timer);
+  undoWatch = undefined;
+  // Les deux hypothèses : l'ancien repère (origine défaite pour tous), ou le repère d'après le saut (pour la sonde seule).
+  const c = Math.cos(w.jump.angle), s = Math.sin(w.jump.angle);
+  const moved = { x: c * w.head.x - s * w.head.z + w.jump.tx, z: s * w.head.x + c * w.head.z + w.jump.tz };
+  const dOld = Math.hypot(head.x - w.head.x, head.z - w.head.z);
+  const dNew = Math.hypot(head.x - moved.x, head.z - moved.z);
+  if (dOld < dNew) {
+    // Pour tous : le Quest a repris l'ancien repère, la borne et J reviennent sur leurs pas.
+    const back = inverseJump(w.jump);
+    roomFrame.onJump(back);
+    const place = headset?.place();
+    if (headset && place && isCalibrated(place) && !place.free) {
+      const next = movePlace(place, back);
+      headset.showPlace(next, true);
+      try {
+        writeVrCalibration(loc.dataDir, placeVpxSettings(next));
+      } catch {
+        // Gardée au prochain calage.
+      }
+    }
+    console.log(`Casque : origine défaite pour toutes les applications (tête d’OpenXR à ${(dOld * 100).toFixed(0)} cm de l’ancien repère, ${(dNew * 100).toFixed(0)} cm du nouveau) : le saut est annulé, la borne reprend sa place d’avant, VPX aussi.`); // i18n-ignore : journal
+    return;
+  }
+  ovrProbe.send('origine-retour');
+  console.log(`Casque : origine défaite pour la sonde seule (tête d’OpenXR à ${(dNew * 100).toFixed(0)} cm du repère d’après le saut, ${(dOld * 100).toFixed(0)} cm de l’ancien) : repère du runtime rendu à la sonde, le saut appliqué reste.`); // i18n-ignore : journal
+}
+
+/**
+ * Un contour lu par la sonde : rafraîchi (son contenu a changé), J repart de l'identité et l'ancrage rattrape la dérive
+ * accumulée ou confirme ; au port, son résultat est gardé pour le dire.
+ */
+function headsetContour(points: [number, number][]): void {
+  if (points.length < 3) return;
+  if (undoWatch) {
+    console.log('Casque : contour lu pendant l’essai de l’origine défaite, laissé de côté.'); // i18n-ignore : journal
+    return;
+  }
+  const before = roomFrame.pending();
+  const kind = roomFrame.onRead(points);
+  if (kind === 'rafraichi') {
+    const restart = portWatch?.restartAt ? `, ${Date.now() - portWatch.restartAt} ms après la session neuve du compagnon` : ''; // i18n-ignore : journal
+    console.log(`Casque : contour de la limite rafraîchi par le runtime (${points.length} points${restart})${before.count ? ` ; ${before.count} saut(s) mesuré(s) depuis le précédent, repris par lui` : ''}.`); // i18n-ignore : journal
+  }
+  if (kind === 'rafraichi' && portWatch) portWatch.refreshed = true;
+  // Le casque pas encore redit porté (session neuve du compagnon) : l'ancrage sera refait à son port et au bilan.
+  const r = anchorCheck();
+  if (kind === 'rafraichi' && portWatch && r) portWatch.contour = r;
+}
+
+/**
+ * La pièce refaite par le Quest au port du casque (origine remise sur la tête). Ordre voulu (demande du 13 novembre
+ * 2026) : le saut mesuré par la sonde repose la borne tout de suite (headsetJump) ; puis un contour rafraîchi confirme ou
+ * rattrape la dérive. Pas de contour rafraîchi dans PORT_REFRESH_MS : session neuve du compagnon (le contour a suivi
+ * 0,5 s après une session neuve le 13 novembre). Au bout de PORT_SETTLE_MS : le journal dit lequel a reposé la borne
+ * (et l'écart entre les deux) ; ni l'un ni l'autre, le calage est proposé. Pas de « confirmation » par une distance.
+ */
+const PORT_REFRESH_MS = 2500;
+const PORT_SETTLE_MS = 8000;
 function headsetOriginReset(afterRemoval: boolean): void {
   const place = headset?.place();
   if (!place || !isCalibrated(place) || place.free || headsetSetting() === 'bureau') return;
   originNotice = true;
-  if (originResetTimer) clearTimeout(originResetTimer);
-  if (place.contour?.length && latestContour) {
-    const since = Date.now();
-    console.log(`Casque : ancrage sur la limite du Quest attendu ; sinon le calage est proposé dans ${ORIGIN_RESET_WAIT_MS / 1000} s.`); // i18n-ignore : journal
-    originResetTimer = setTimeout(() => {
-      originResetTimer = undefined;
-      // Le saut mesuré par la sonde a déjà tranché (appliqué, confirmé ou calage proposé).
-      if (pendingJump || lastJumpAt >= since - JUMP_SETTLE_MS) return;
-      // L'ancrage (ou rien à reposer) n'est cru que si la tête, remise à l'origine, est près de celle du calage.
-      anchorCheck();
-      const now = headset?.place();
-      const head = now ? anchorHeadAtOrigin(now) : undefined;
-      if (head?.confirmed) {
-        console.log(`Casque : borne ${lastAnchorAt >= since ? 'reposée' : 'laissée'} par l'ancrage sur la limite du Quest, confirmée par la tête (à ${Math.round(head.cm)} cm de celle du calage) ; pas de calage proposé.`); // i18n-ignore : journal
-        return;
-      }
-      if (head) console.log(`Casque : ancrage sur la limite du Quest pas confirmé, tête à ${Math.round(head.cm)} cm de celle du calage (plus de ${ANCHOR_HEAD_MAX_CM} cm : joueur ailleurs, ou le Quest a replacé sa limite avec la pièce) ; le calage est proposé.`); // i18n-ignore : journal
-      offerCalibration('origine-remise');
-    }, ORIGIN_RESET_WAIT_MS);
+  for (const timer of portWatch?.timers ?? []) clearTimeout(timer);
+  // Le saut est vu par la sonde quelques millisecondes avant le port d'OpenXR.
+  const since = Date.now() - 1500;
+  const watch: NonNullable<typeof portWatch> = { since, timers: [], ...(lastJump && lastJump.at >= since && { jump: lastJump.gap }) };
+  portWatch = watch;
+  console.log(`Casque, au port : origine remise sur la tête (${afterRemoval ? 'casque remis' : 'premier port'}) ; ${watch.jump ? `saut déjà mesuré, borne reposée de ${watch.jump.cm.toFixed(0)} cm et ${watch.jump.deg.toFixed(0)}°` : 'pas de saut mesuré'} ; contour à rafraîchir.`); // i18n-ignore : journal
+  watch.timers.push(
+    setTimeout(() => {
+      if (portWatch !== watch || watch.refreshed || playing || launch || calibration || !headset) return;
+      watch.restartAt = Date.now();
+      console.log('Casque, au port : contour pas rafraîchi ; session neuve du compagnon pour le relire (noir le temps de la relance).'); // i18n-ignore : journal
+      headset.restart();
+    }, PORT_REFRESH_MS),
+    setTimeout(() => settlePort(watch, afterRemoval), PORT_SETTLE_MS),
+  );
+}
+
+function settlePort(watch: NonNullable<typeof portWatch>, afterRemoval: boolean): void {
+  if (portWatch !== watch) return;
+  if (watch.refreshed && !watch.contour) watch.contour = anchorCheck();
+  portWatch = undefined;
+  const c = watch.contour;
+  const byContour = c && c.kind === 'moved' ? `contour rafraîchi : borne reposée de ${c.cm.toFixed(0)} cm et ${c.deg.toFixed(0)}°` : c && c.kind === 'same' ? 'contour rafraîchi : rien à reposer' : undefined; // i18n-ignore : journal
+  if (watch.jump && byContour) {
+    // L'écart entre les deux : notre mesure de précision sur le vrai Link.
+    const gap = c && c.kind === 'moved' ? `${c.cm.toFixed(1)} cm et ${c.deg.toFixed(1)}°` : 'moins de 1 cm et 0,5°'; // i18n-ignore : journal
+    console.log(`Casque, au port : borne reposée par le saut mesuré (${watch.jump.cm.toFixed(0)} cm, ${watch.jump.deg.toFixed(0)}°), puis ${byContour} ; écart entre le saut et le contour : ${gap}.`); // i18n-ignore : journal
     return;
   }
-  // Sans contour : le saut mesuré par la sonde (s'il arrive) a le même délai.
-  const since = Date.now();
-  originResetTimer = setTimeout(() => {
-    originResetTimer = undefined;
-    if (pendingJump || lastJumpAt >= since - JUMP_SETTLE_MS) return;
-    console.log(`Casque : calage de la borne proposé, ${afterRemoval ? 'casque remis' : 'premier port'} avec la pièce refaite.`); // i18n-ignore : journal
-    offerCalibration('origine-remise');
-  }, ORIGIN_RESET_WAIT_MS);
+  if (watch.jump) {
+    console.log(`Casque, au port : borne reposée par le saut mesuré (${watch.jump.cm.toFixed(0)} cm, ${watch.jump.deg.toFixed(0)}°) ; contour pas rafraîchi.`); // i18n-ignore : journal
+    return;
+  }
+  if (byContour) {
+    console.log(`Casque, au port : pas de saut mesuré ; ${byContour}.`); // i18n-ignore : journal
+    return;
+  }
+  console.log(`Casque, au port : ni saut mesuré ni contour rafraîchi (${c?.kind === 'redrawn' ? c.why : 'pas de contour gardé avec la place, ou contour pas relu'}) ; calage proposé, ${afterRemoval ? 'casque remis' : 'premier port'}.`); // i18n-ignore : journal
+  offerCalibration('origine-remise');
 }
 
 function headsetPutBackOn(): void {
   const place = headset?.place();
   if (!place || headsetSetting() === 'bureau' || headset?.roomKeeping !== 'recentred') return;
-  if (pendingJump || Date.now() - lastJumpAt < 2 * JUMP_SETTLE_MS) {
+  if (lastJump && Date.now() - lastJump.at < 3000) {
     console.log('Casque : remis en limite fixe, le saut mesuré par la sonde décide (pas de calage proposé d’office).'); // i18n-ignore : journal
     return;
   }
@@ -3887,9 +3963,6 @@ let headsetEyes: number | undefined;
 let roomNotice = false;
 /** La pièce refaite par le Quest au port du casque (headsetOriginReset) : dit à l'écran du calage proposé. */
 let originNotice = false;
-/** Le saut mesuré contredit par le contour, ou pas confirmé par la tête (settleJump) : dit à l'écran du calage proposé. */
-let jumpNotice = false;
-let jumpUnconfirmedNotice = false;
 /** Session neuve d'après un changement de pièce, yeux hors de la plage : les applications qui démarrent ont l'ancienne pièce. */
 let roomStale = false;
 
@@ -4483,8 +4556,6 @@ function showCalibration(problem?: string): void {
     vrRoomProblem ??
     (headset?.keyRenewed ? t('Vérifiez la place de la borne.') : undefined) ??
     (roomNotice ? t('La limite du Quest a changé : recalez.') : undefined) ??
-    (jumpNotice ? t('Le casque et la limite du Quest ne s’accordent plus : recalez.') : undefined) ??
-    (jumpUnconfirmedNotice ? t('La borne a été replacée, sans pouvoir le vérifier : recalez si elle n’est pas sur la vraie.') : undefined) ??
     (originNotice ? t('Le Quest a déplacé la pièce en remettant le casque : recalez.') : undefined) ??
     // Le geste est dit par la bande du bas quand les manettes l'ont : le conseil ne le répète pas.
     (c.intro ? roomKeepingAdvice(headset?.roomKeeping, calibrationCombo(headset?.profile ?? 'touch') ? undefined : calibrationComboLabel(headset?.profile)) : undefined) ??
@@ -4623,8 +4694,6 @@ function applyCalibration(): void {
   headset?.showPlace(place, true);
   roomNotice = false;
   originNotice = false;
-  jumpNotice = false;
-  jumpUnconfirmedNotice = false;
   roomStale = false;
   vrRoomProblem = undefined;
   if (headset) headset.keyRenewed = false;
@@ -5321,7 +5390,7 @@ export function startFrontend(): void {
     tint: () => tints?.current()?.color,
     snapshotDir: path.join(loc.dataDir, 'logs', 'casque'),
     placeFile: headsetPlaceFile(),
-    contour: () => latestContour,
+    contour: () => roomFrame.effective(),
     keyDir: path.join(loc.dataDir, 'vr'),
     onStateChange: () => {
       // Casque porté : les écrans rendus pour lui dessinent ; retiré, ils se reposent, et les écrans du PC
@@ -5332,6 +5401,11 @@ export function startFrontend(): void {
       // « Air Link sur un PC en Wi-Fi » pourra revenir à la suivante.
       if (headset?.worn && !headsetWornBefore) refreshVrNetwork();
       if (headset?.worn && !headsetWornBefore) calibrationComboTip();
+      // Casque remis : l'ancrage sur le contour effectif (un contour rafraîchi pendant qu'il ne l'était pas).
+      if (headset?.worn && !headsetWornBefore) {
+        const r = anchorCheck();
+        if (portWatch?.refreshed && r) portWatch.contour = r;
+      }
       if (!headset?.worn && headsetWornBefore && !playing && !launch) airLinkWarned = false;
       headsetWornBefore = Boolean(headset?.worn);
       // Compagnon parti pendant le calage : rien à garder.
@@ -5370,7 +5444,11 @@ export function startFrontend(): void {
     },
     onStationary: () => roomscaleTip(),
     onLost: (inGame) => headsetLost(inGame),
-    onHead: (head) => headInGame(head),
+    onHead: (head) => {
+      openXrHead(head);
+      headInGame(head);
+    },
+    onMenuHead: (head) => openXrHead(head),
     onCentre: (gaze) => calibrationCentre(gaze),
     onEyes: (eyes) => {
       headsetEyes = eyes;
@@ -6126,6 +6204,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   startLaunch();
   launchCount++;
   const pressedAt = Date.now();
+  // Vision 3D : le capteur s'allume dès le Start, pas quand la table paraît. Le joueur bouge encore
+  // (il vient d'appuyer) : la Kinect, en mode assis, ne repère quelqu'un qu'en mouvement ; allumée
+  // une fois le joueur immobile devant le plateau, elle tardait parfois de longues secondes.
+  if (simulated === undefined && mode !== 'display') warmVision3d();
   // Lancement en cinéma, pour une vraie partie : la chorégraphie part au Start, dans les fenêtres
   // du menu ; elle ne retarde rien de ce qui suit (cinema.test.ts).
   if (mediaSettings.cinema && !displayMode) cinema.start(launchCount, { title: table.title, manufacturer: table.manufacturer, year: table.year, logo: medias?.wheel(table) });
@@ -6320,8 +6402,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     const dmdPlugin = installVpxPlugin(DMD_PLUGIN, path.dirname(install.exe), path.join(__dirname, '..'));
     if (dmdPlugin !== 'up-to-date') console.log(`Plugin du DMD : ${dmdPlugin === 'installed' ? 'copié dans VPX' : dmdPlugin === 'busy' ? 'VPX ouvert, copie à la partie suivante' : 'absent de cette version'}.`); // i18n-ignore : journal
   }
-  // Vision 3D (vision3d.ts) : le capteur s'allume quand la table est à l'écran, s'éteint à la fin.
+  // Vision 3D (vision3d.ts) : le capteur, allumé dès le Start, suit la tête pour VPX quand la table est à l'écran.
   const vision3dSource = simulated === undefined && !displayMode ? prepareVision3d(install.exe, Boolean(vrGame)) : undefined;
+  // Allumé au Start, mais pas de Vision 3D pour cette partie (dans le casque) : éteint tout de suite.
+  if (!vision3dSource && headTracker.running && !vision3dTest) headTracker.stop();
   // Bilan de la Vision 3D : ce que VPX écrira de son module dans vpinball.log, à partir d'ici.
   const vision3dLog = path.join(vpxPrefDir(install.version), 'vpinball.log');
   const vision3dLogFrom = vision3dSource && fs.existsSync(vision3dLog) ? fs.statSync(vision3dLog).size : 0;
@@ -6450,7 +6534,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   vrWearHint = undefined;
   if (vision3dSource) noteVision3dGame(vision3dLog, vision3dLogFrom);
   if (playedVr && vrGame) noteVrMeasures();
-  headTracker.stop();
+  // Gardé allumé deux minutes : la partie suivante a le joueur déjà repéré (partie dans le casque : éteint).
+  if (vision3dSource && !playedVr) headTracker.release();
+  else headTracker.stop();
   stopCentering?.();
   headsetPaused = false;
   // VPX parti, le compagnon qui veillait repart sur une session neuve : elle prend le casque d'elle-même,

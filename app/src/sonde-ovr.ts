@@ -59,13 +59,39 @@ export function parseOvrJump(line: string): OvrJump | undefined {
   return [angle, tx, tz, dy, dtMs, hx, hz].every(Number.isFinite) ? { angle, tx, tz, dy, dtMs, headAfter: { x: hx, z: hz } } : undefined;
 }
 
+/** Essai a) : « ovr origine-defaite code=… revenue=1|0 tete=x,y,z,lacet attendue=… » (la tête relue après). */
+export function parseOvrUndo(line: string): { code: number; back: boolean; head: { x: number; z: number; yaw: number } } | undefined {
+  const m = /^ovr origine-defaite code=(-?\d+) revenue=([01]) tete=(-?[\d.]+),-?[\d.]+,(-?[\d.]+),(-?[\d.]+)/.exec(line);
+  if (!m) return undefined;
+  return { code: Number(m[1]), back: m[2] === '1', head: { x: Number(m[3]), z: Number(m[4]), yaw: Number(m[5]) } };
+}
+
 export class OvrProbe {
   private child: ChildProcessWithoutNullStreams | undefined;
   private wanted = false;
   private restarts = 0;
   private timer: NodeJS.Timeout | undefined;
 
-  constructor(private readonly opts: { appDir: string; log(line: string): void; onContour?(points: [number, number][]): void; onJump?(jump: OvrJump): void }) {}
+  constructor(
+    private readonly opts: {
+      appDir: string;
+      log(line: string): void;
+      onContour?(points: [number, number][]): void;
+      onJump?(jump: OvrJump): void;
+      /** Essai a) (--defaire-origine) : la sonde redonne l'ancien repère après un saut et dit si la tête y revient. */
+      undoOrigin?: boolean;
+      onUndo?(undo: { code: number; back: boolean; head: { x: number; z: number; yaw: number } }): void;
+    },
+  ) {}
+
+  /** Une commande à la sonde (« origine-retour » : le repère du runtime lui est rendu). */
+  send(command: string): void {
+    try {
+      this.child?.stdin.write(`${command}\n`);
+    } catch {
+      // Sonde partie : rien à rendre.
+    }
+  }
 
   /** Lancée tant que `on` (réalité virtuelle activée) ; relancée si elle s'arrête, trois fois au plus. */
   set(on: boolean): void {
@@ -82,7 +108,7 @@ export class OvrProbe {
       this.opts.log(`Casque, sonde LibOVR : pas lancée (${!exe ? 'sonde absente de l’application' : 'runtime OpenXR actif sans LibOVR de Meta'}).`); // i18n-ignore : journal
       return;
     }
-    const child = spawn(exe, ['--ovr', dll], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(exe, ['--ovr', dll, ...(this.opts.undoOrigin ? ['--defaire-origine'] : [])], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     this.child = child;
     let buffer = '';
     child.stdout.setEncoding('utf8');
@@ -101,6 +127,8 @@ export class OvrProbe {
         // Un saut accepté par la sonde (garde-fous passés) : au menu, la borne reposée (frontend.ts, headsetJump).
         const jump = line.startsWith('ovr saut ') ? parseOvrJump(line) : undefined;
         if (jump) this.opts.onJump?.(jump);
+        const undo = line.startsWith('ovr origine-defaite ') ? parseOvrUndo(line) : undefined;
+        if (undo) this.opts.onUndo?.(undo);
       }
     });
     child.stderr.on('data', () => undefined);

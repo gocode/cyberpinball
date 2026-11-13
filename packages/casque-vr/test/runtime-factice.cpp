@@ -34,6 +34,9 @@
 //   bouton <chemin> 1|0             un bouton (chemin OpenXR complet, /user/hand/…/click)
 //   valeur <chemin> V               un axe ou une gâchette (/user/hand/…/value, …/x, …/y)
 //   quitter                         le runtime met fin à la session (EXITING)
+//   tete-penche T                   la tête basculée de T rad en tangage (casque tenu en main vers ±90° : T = 1.5)
+//   origine-commune 1|0             LibOVR : ovr_SpecifyTrackingOrigin vaut pour tous (OpenXR compris), ou pour la
+//                                   sonde seule (défaut)
 //   tete-tourne V                   LibOVR : la tête tourne sur elle-même à V rad/s (lacet), vitesse donnée comme LibOVR
 //   tete-suivie 1|0                 LibOVR : la tête suivie en position (drapeaux 15) ou en orientation seule (3)
 //   contour-fige 1|0                LibOVR : le contour lu (ovr_GetBoundaryGeometry) figé dans l'espace de suivi du
@@ -152,6 +155,9 @@ struct World
    XrPosef area = identity();
    bool ovrInputs = true; // faux : les entrées rendues à zéro (client sans le regard)
    bool headTracked = true; // faux : la tête suivie en orientation seule (LibOVR, drapeaux 3)
+   float headPitch = 0.f; // tete-penche : tangage de la tête (rad)
+   bool sharedOrigin = false; // origine-commune : ovr_SpecifyTrackingOrigin change aussi l'origine d'OpenXR
+   XrPosef ovrOffset = identity(); // ovr_SpecifyTrackingOrigin pour la sonde seule
    float headSpin = 0.f; // tete-tourne : rad/s autour de la verticale, depuis headSpinAt (ms du scénario)
    long long headSpinAt = 0;
 };
@@ -411,6 +417,10 @@ void advance(bool silent = false)
                world.outer.push_back({ std::stof(a.substr(0, c)), 0.f, std::stof(a.substr(c + 1)) });
          }
       }
+      else if (st.verb == "tete-penche")
+         world.headPitch = num(st, 0);
+      else if (st.verb == "origine-commune")
+         world.sharedOrigin = num(st, 0) != 0.f;
       else if (st.verb == "tete-tourne")
       {
          // La rotation déjà faite reste acquise : la tête ne revient pas d'un coup à son cap de départ.
@@ -1274,7 +1284,7 @@ struct ErrorInfo
 /** Un point du monde dans l'espace de suivi (STAGE). */
 XrVector3f inStage(const XrVector3f& p)
 {
-   return compose(inverse(world.origin), XrPosef { { 0, 0, 0, 1 }, p }).position;
+   return compose(inverse(compose(world.origin, world.ovrOffset)), XrPosef { { 0, 0, 0, 1 }, p }).position;
 }
 void putPose(unsigned char* at, const XrPosef& p)
 {
@@ -1328,7 +1338,13 @@ extern "C" __declspec(dllexport) ovr::TrackingState ovr_GetTrackingState(void*, 
       const XrVector3f w { 0.f, world.headSpin, 0.f };
       std::memcpy(ts.bytes + 28, &w, 12);
    }
-   ovr::putPose(ts.bytes, compose(inverse(world.origin), head));
+   if (world.headPitch != 0.f)
+   {
+      // Basculée autour de l'axe des oreilles (x local) : le regard monte ou descend.
+      const float h = 0.5f * world.headPitch;
+      head.orientation = mul(head.orientation, XrQuaternionf { std::sin(h), 0.f, 0.f, std::cos(h) });
+   }
+   ovr::putPose(ts.bytes, compose(inverse(compose(world.origin, world.ovrOffset)), head));
    const unsigned all = world.headTracked ? 15u : 3u;
    std::memcpy(ts.bytes + 88, &all, 4);
    for (int h = 0; h < 2; h++)
@@ -1433,7 +1449,7 @@ extern "C" __declspec(dllexport) int ovr_TestBoundary(void*, unsigned device, un
    std::lock_guard<std::mutex> g(lock);
    if (device != 0x1)
       return 1002; // ovrSuccess_DeviceUnavailable
-   return ovr::testPoint(compose(inverse(world.origin), world.head).position, r);
+   return ovr::testPoint(compose(inverse(compose(world.origin, world.ovrOffset)), world.head).position, r);
 }
 extern "C" __declspec(dllexport) int ovr_TestBoundaryPoint(void*, const ovr::Vec3* p, unsigned, ovr::BoundaryTestResult* r)
 {
@@ -1441,6 +1457,24 @@ extern "C" __declspec(dllexport) int ovr_TestBoundaryPoint(void*, const ovr::Vec
    return ovr::testPoint({ p->x, p->y, p->z }, r);
 }
 extern "C" __declspec(dllexport) int ovr_SetTrackingOriginType(void*, int) { return 0; }
+// L'origine donnée par la sonde (une pose de l'espace de suivi courant devient l'origine) : pour elle seule, ou pour
+// tous selon « origine-commune ».
+struct OvrPose
+{
+   XrQuaternionf orientation;
+   XrVector3f position;
+};
+extern "C" __declspec(dllexport) int ovr_SpecifyTrackingOrigin(void*, OvrPose p)
+{
+   std::lock_guard<std::mutex> g(lock);
+   const XrPosef pose { p.orientation, p.position };
+   if (world.sharedOrigin)
+      world.origin = compose(compose(world.origin, world.ovrOffset), pose), world.ovrOffset = identity();
+   else
+      world.ovrOffset = compose(world.ovrOffset, pose);
+   trace(std::string("ovr origine donnee ") + (world.sharedOrigin ? "pour tous" : "pour la sonde"));
+   return 0;
+}
 extern "C" __declspec(dllexport) double ovr_GetTimeInSeconds() { return static_cast<double>(GetTickCount64()) / 1000.0; }
 extern "C" __declspec(dllexport) void ovr_GetLastErrorInfo(ovr::ErrorInfo* e)
 {

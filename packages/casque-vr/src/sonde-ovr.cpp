@@ -14,7 +14,7 @@
 //   ovr charge <dll> | ovr absent <raison>          la DLL et ses fonctions
 //   ovr init <code> [<message>]                      ovr_Initialize (client invisible)
 //   ovr session <code> [<message>]                   ovr_Create (casque branché ou non)
-//   ovr etat visible=… casque=… porte=… regard=…     à chaque changement (ovr_GetSessionStatus)
+//   ovr etat visible=… casque=… porte=… regard=… recentrer=…   à chaque changement (ovr_GetSessionStatus)
 //   ovr origine <code> sol|yeux                      espace de suivi demandé au niveau du sol
 //   ovr contour exterieur|aire n=<points> dims=<l>x<p> pts=<x>,<z> …   à chaque changement, casque porté
 //   ovr tete <x> <y> <z> <lacet> suivi=<bits>        toutes les 5 s, casque porté
@@ -29,6 +29,13 @@
 //                                                    relevés suivis consécutifs, à quelques millisecondes, la tête
 //                                                    téléportée ; la transformation du saut (p' = R(angle) p + t)
 //   ovr saut-refuse raison=<…> …                     un bond de la tête qui ne passe pas les garde-fous (une fois par s)
+//                                                    seule la signature de la remise d'origine du Quest est un saut :
+//                                                    arrivée à l'origine même, cap nul (9 fois sur 9 le 13 novembre 2026)
+//   ovr origine-defaite code=<r> revenue=1|0 tete=… attendue=…   --defaire-origine : après un saut, l'ancien repère
+//                                                    redonné par ovr_SpecifyTrackingOrigin, puis la tête relue
+//   ovr origine-retablie code=<r>                    « origine-retour » reçu : le repère du runtime rendu à la sonde
+//   ovr session-neuve demandee | ovr contour-apres-session-neuve change=1|0 delai=<ms>
+//                                                    après un saut : la session LibOVR refaite, le contour relu
 //   ovr test-limite code=<r> tete=<distance> calcule=<distance> ecart=<cm> points=<cm> n=<testés>
 //                                                    ovr_TestBoundary (distance de la tête à la limite, par le runtime)
 //                                                    face à la distance calculée sur le contour lu, et l'écart le
@@ -148,6 +155,7 @@ using FnGetTimeInSeconds = double (*)();
 using FnGetLastErrorInfo = void (*)(ErrorInfo*);
 using FnTestBoundary = int (*)(Session, unsigned, unsigned, BoundaryTestResult*);
 using FnTestBoundaryPoint = int (*)(Session, const Vec3*, unsigned, BoundaryTestResult*);
+using FnSpecifyTrackingOrigin = int (*)(Session, Pose);
 
 struct Api
 {
@@ -165,9 +173,12 @@ struct Api
    FnGetLastErrorInfo lastError = nullptr;
    FnTestBoundary testBoundary = nullptr;
    FnTestBoundaryPoint testBoundaryPoint = nullptr;
+   FnSpecifyTrackingOrigin specifyOrigin = nullptr;
 } api;
 
 std::atomic<bool> quit { false };
+/** « origine-retour » reçu de Cyber Pinball : l'ancien repère redonné à la sonde seule, le rendre au runtime. */
+std::atomic<bool> wantRevert { false };
 
 void say(const std::string& line)
 {
@@ -311,13 +322,19 @@ constexpr double JUMP_MAX_DT_S = 0.06;
 constexpr float JUMP_MIN_M = 0.05f;
 constexpr float JUMP_MIN_YAW = 10.f * 3.14159265f / 180.f;
 constexpr float JUMP_MAX_TILT = 3.f * 3.14159265f / 180.f;
+// La remise d'origine du Quest : la tête arrive à l'origine même, cap nul (relevés réels du 13 novembre 2026, 9 sur 9 :
+// « a=0.000,1.679,0.000,-0.000 »). Tout autre bond est refusé : les rafales du casque tenu en main, basculé vers ±90° de
+// tangage, font tourner le cap tiré du quaternion de 10 à 160° en quelques millisecondes sans que la tête bouge.
+constexpr float JUMP_ORIGIN_M = 0.02f;
+constexpr float JUMP_ORIGIN_YAW = 2.f * 3.14159265f / 180.f;
+// Au-delà de ce tangage, le cap du regard projeté au sol n'a plus de sens.
+constexpr float JUMP_MAX_PITCH = 60.f * 3.14159265f / 180.f;
 
 std::string poseText(const Pose& p)
 {
    return fmt(p.position.x) + "," + fmt(p.position.y) + "," + fmt(p.position.z) + "," + fmt(yawOf(p.orientation));
 }
 
-/** Un saut mesuré (« ovr saut … »), un bond refusé (« ovr saut-refuse … »), ou rien. */
 /** La tête d'avant avancée de `dt` par sa vitesse : position, et lacet tourné de la vitesse autour de la verticale. */
 Pose predict(const HeadSample& a, double dt)
 {
@@ -331,7 +348,18 @@ Pose predict(const HeadSample& a, double dt)
    return p;
 }
 
-std::string headJump(const HeadSample& first, const HeadSample& b)
+/** Un saut mesuré : la ligne, sa transformation (p' = R(angle) p + t) et la tête d'avant prévue à l'instant d'après. */
+struct Jump
+{
+   bool accepted = false;
+   std::string line;
+   float angle = 0, tx = 0, tz = 0;
+   Pose before {};
+};
+
+/** Un saut mesuré (« ovr saut … »), un bond refusé (« ovr saut-refuse … »), ou rien. */
+Jump headJump(const HeadSample& first, const HeadSample& b);
+std::string headJumpLine(const HeadSample& first, const HeadSample& b, Jump& out)
 {
    const double dt = b.t - first.t;
    // La tête d'avant, là où sa vitesse l'aurait menée au second relevé.
@@ -350,6 +378,11 @@ std::string headJump(const HeadSample& first, const HeadSample& b)
       return "ovr saut-refuse raison=suivi-incomplet suivi=" + std::to_string(a.flags) + "/" + std::to_string(b.flags) + seen;
    if (dt > JUMP_MAX_DT_S)
       return "ovr saut-refuse raison=intervalle-long" + seen;
+   const float pa = pitchOf(a.pose.orientation), pb = pitchOf(b.pose.orientation);
+   if (std::fabs(pa) > JUMP_MAX_PITCH || std::fabs(pb) > JUMP_MAX_PITCH)
+      return "ovr saut-refuse raison=tete-inclinee tangage=" + fmt(pa * 57.29578f) + "/" + fmt(pb * 57.29578f) + seen;
+   if (std::hypot(b.pose.position.x, b.pose.position.z) > JUMP_ORIGIN_M || std::fabs(yawOf(b.pose.orientation)) > JUMP_ORIGIN_YAW)
+      return "ovr saut-refuse raison=arrivee-hors-origine" + seen;
    if (dpitch > JUMP_MAX_TILT || droll > JUMP_MAX_TILT)
       return "ovr saut-refuse raison=tangage-ou-roulis tangage=" + fmt(dpitch * 57.29578f) + " roulis=" + fmt(droll * 57.29578f) + seen;
    // La rotation qui mène le regard d'avant au regard d'après (au sol), puis la translation qui mène la tête.
@@ -360,7 +393,32 @@ std::string headJump(const HeadSample& first, const HeadSample& b)
    const float tz = b.pose.position.z - (s * a.pose.position.x + c * a.pose.position.z);
    char line[256];
    std::snprintf(line, sizeof(line), "ovr saut angle=%.5f deplacement=%.4f,%.4f sol=%.4f rotation=%.1f", angle, tx, tz, b.pose.position.y - a.pose.position.y, angle * 57.29578f);
+   out.accepted = true;
+   out.angle = angle, out.tx = tx, out.tz = tz, out.before = a.pose;
    return line + seen;
+}
+
+Jump headJump(const HeadSample& first, const HeadSample& b)
+{
+   Jump j;
+   j.line = headJumpLine(first, b, j);
+   return j;
+}
+
+/** La pose qui, donnée à ovr_SpecifyTrackingOrigin, redonne le repère d'avant un saut : l'ancienne origine, vue d'après. */
+Pose undoPose(const Jump& j)
+{
+   // Le cap du saut est R(angle) au sol (x' = c x - s z) : un quart de tour autour de la verticale de -angle.
+   const float h = -0.5f * j.angle;
+   return { { 0.f, std::sin(h), 0.f, std::cos(h) }, { j.tx, 0.f, j.tz } };
+}
+
+/** L'inverse d'une pose (pour rendre son repère au runtime). */
+Pose inversePose(const Pose& p)
+{
+   const Quat c { -p.orientation.x, -p.orientation.y, -p.orientation.z, p.orientation.w };
+   const Vec3 t = rotate(c, p.position);
+   return { c, { -t.x, -t.y, -t.z } };
 }
 
 template <typename F>
@@ -444,9 +502,15 @@ constexpr ButtonName BUTTONS[] = { { 0x1, "a" }, { 0x2, "b" }, { 0x4, "clic-joys
 int main(int argc, char** argv)
 {
    std::string dllPath;
-   for (int i = 1; i + 1 < argc; i++)
-      if (std::string(argv[i]) == "--ovr")
+   bool undoOrigin = false;
+   for (int i = 1; i < argc; i++)
+   {
+      if (std::string(argv[i]) == "--ovr" && i + 1 < argc)
          dllPath = argv[i + 1];
+      // Essai a) (13 novembre 2026) : défaire la remise d'origine après un saut (ovr_SpecifyTrackingOrigin).
+      if (std::string(argv[i]) == "--defaire-origine")
+         undoOrigin = true;
+   }
    if (dllPath.empty())
    {
       say("ovr absent pas de dll indiquee (--ovr)");
@@ -456,8 +520,14 @@ int main(int argc, char** argv)
    std::thread([] {
       std::string l;
       while (std::getline(std::cin, l))
+      {
+         if (!l.empty() && l.back() == '\r')
+            l.pop_back();
          if (l == "fin")
             break;
+         if (l == "origine-retour")
+            wantRevert = true;
+      }
       quit = true;
    }).detach();
 
@@ -476,6 +546,7 @@ int main(int argc, char** argv)
    load(dll, "ovr_GetLastErrorInfo", api.lastError);
    load(dll, "ovr_TestBoundary", api.testBoundary);
    load(dll, "ovr_TestBoundaryPoint", api.testBoundaryPoint);
+   load(dll, "ovr_SpecifyTrackingOrigin", api.specifyOrigin);
    if (!ok)
    {
       say("ovr absent fonctions manquantes dans " + dllPath);
@@ -510,6 +581,13 @@ int main(int argc, char** argv)
 
    // Casque absent : nouvel essai toutes les 10 s, dit au journal seulement quand le résultat change.
    int lastCreate = 1;
+   struct
+   {
+      bool pending = false;
+      std::string before;
+      ULONGLONG at = 0;
+   } recreated;
+   std::string lastPoints;
    while (!quit)
    {
       Session session = nullptr;
@@ -535,7 +613,10 @@ int main(int argc, char** argv)
       unsigned lastButtons = 0;
       bool triggers[2] {};
       std::string lastOuter, lastArea;
-      ULONGLONG poseAt = 0, boundaryAt = 0, refusedAt = 0;
+      ULONGLONG poseAt = 0, boundaryAt = 0, refusedAt = 0, recreateAt = 0;
+      // Essai a) : l'ancien repère redonné à la sonde, en attente de savoir s'il l'est aussi pour les autres.
+      bool undone = false;
+      Pose undoneWith {};
       HeadSample prevHead;
       LARGE_INTEGER freq;
       QueryPerformanceFrequency(&freq);
@@ -543,10 +624,12 @@ int main(int argc, char** argv)
       {
          SessionStatus st {};
          api.sessionStatus(session, &st);
-         if (first || st.isVisible != last.isVisible || st.hmdPresent != last.hmdPresent || st.hmdMounted != last.hmdMounted || st.hasInputFocus != last.hasInputFocus)
+         if (first || st.isVisible != last.isVisible || st.hmdPresent != last.hmdPresent || st.hmdMounted != last.hmdMounted || st.hasInputFocus != last.hasInputFocus
+            || st.shouldRecenter != last.shouldRecenter)
          {
+            // Essai b) : la remise d'origine est-elle une demande à l'application (ShouldRecenter) ?
             say(std::string("ovr etat visible=") + (st.isVisible ? "1" : "0") + " casque=" + (st.hmdPresent ? "1" : "0") + " porte=" + (st.hmdMounted ? "1" : "0")
-               + " regard=" + (st.hasInputFocus ? "1" : "0"));
+               + " regard=" + (st.hasInputFocus ? "1" : "0") + " recentrer=" + (st.shouldRecenter ? "1" : "0"));
             if (st.hmdMounted && !last.hmdMounted)
             {
                poseAt = 0;
@@ -571,7 +654,15 @@ int main(int argc, char** argv)
             if (outer != lastOuter)
             {
                say("ovr " + outer);
-               say(pointsLine(outerPoints(session)));
+               const std::string pts = pointsLine(outerPoints(session));
+               say(pts);
+               // Essai c) : la session refaite après un saut, le contour relu a-t-il changé ?
+               if (recreated.pending)
+               {
+                  recreated.pending = false;
+                  say("ovr contour-apres-session-neuve change=" + std::string(pts != recreated.before ? "1" : "0") + " delai=" + std::to_string(GetTickCount64() - recreated.at));
+               }
+               lastPoints = pts;
             }
             if (area != lastArea)
                say("ovr " + area);
@@ -611,22 +702,57 @@ int main(int argc, char** argv)
             cur.valid = true;
             if (prevHead.valid)
             {
-               const std::string jump = headJump(prevHead, cur);
-               if (jump.rfind("ovr saut ", 0) == 0)
+               const Jump jump = headJump(prevHead, cur);
+               if (jump.accepted)
                {
-                  say(jump);
+                  say(jump.line);
                   say(boundaryTest(session, cur.pose));
+                  // Essai a) : redonner l'ancien repère, puis relire la tête ; Cyber Pinball dit s'il vaut pour tous.
+                  if (undoOrigin && api.specifyOrigin && !undone)
+                  {
+                     const Pose p = undoPose(jump);
+                     const int code = api.specifyOrigin(session, p);
+                     Sleep(20);
+                     const Pose h = api.trackingState(session, api.time(), 0).head();
+                     const bool back = std::hypot(h.position.x - jump.before.position.x, h.position.z - jump.before.position.z) < 0.03f
+                        && std::fabs(wrap(yawOf(h.orientation) - yawOf(jump.before.orientation))) < 3.f * 3.14159265f / 180.f;
+                     say("ovr origine-defaite code=" + std::to_string(code) + " revenue=" + (back ? "1" : "0") + " tete=" + poseText(h) + " attendue=" + poseText(jump.before));
+                     if (code >= 0 && back)
+                        undone = true, undoneWith = p;
+                     else if (code >= 0)
+                        api.specifyOrigin(session, inversePose(p)); // pas revenue : rien de changé pour la suite
+                     cur.valid = false; // le repère a changé sous la sonde : pas de bond à lire au relevé suivant
+                  }
+                  // Essai c) : la session LibOVR refaite dans 1,5 s, pour voir si le contour suit (sans essai a) en cours).
+                  if (!undone)
+                     recreateAt = now + 1500;
                }
-               else if (!jump.empty() && now - refusedAt >= 1000)
+               else if (!jump.line.empty() && now - refusedAt >= 1000)
                {
                   refusedAt = now;
-                  say(jump);
+                  say(jump.line);
                }
             }
             prevHead = cur;
          }
          else
             prevHead.valid = false;
+         // « origine-retour » : l'ancien repère ne valait que pour la sonde ; le repère du runtime lui est rendu.
+         if (wantRevert.exchange(false) && undone)
+         {
+            undone = false;
+            const int code = api.specifyOrigin(session, inversePose(undoneWith));
+            say("ovr origine-retablie code=" + std::to_string(code));
+            prevHead.valid = false;
+            recreateAt = now + 500;
+         }
+         if (recreateAt && now >= recreateAt && !undone)
+         {
+            recreateAt = 0;
+            say("ovr session-neuve demandee");
+            recreated = { true, lastPoints, GetTickCount64() };
+            break;
+         }
 
          // Boutons bruts, à chaque changement.
          InputState in {};

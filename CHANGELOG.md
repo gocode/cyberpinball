@@ -9,6 +9,12 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.13
+
+- Réalité virtuelle en Air Link : la borne ne suit plus la tête quand on remet le casque. Cyber Pinball reconnaît la remise de la pièce par le Quest, mesurée sur la tête au moment même, et remet la borne en place aussitôt, au menu comme en partie, hauteur comprise ; la limite du Quest, relue au besoin par une session neuve (un court noir), le confirme. Les gestes du casque tenu en main ne déplacent plus rien.
+- Salons : les phrases préparées se règlent (Réglages de la communauté > Phrases préparées, ou « Gérer les phrases… » depuis « Écrire dans le salon ») : ajouter au clavier à l'écran ou au téléphone, modifier, monter, descendre, supprimer, rétablir celles d'origine. `{table}` y devient la table choisie dans la roue. Le téléphone propose les mêmes, « Merci ! » compris.
+- Vision 3D avec la Kinect : la perspective suit la tête dès le début de la partie. La Kinect s'allume maintenant dès le Start, pendant le chargement de la table, quand vous bougez encore (elle ne repère un joueur qu'en mouvement), et reste allumée deux minutes après la partie pour la suivante. L'écran Vision 3D dit au bout de combien de temps la tête a été suivie à la dernière partie.
+
 ## 0.1.12
 
 - Joueurs en ligne : la liste montre tous les joueurs que votre borne a croisés, même hors ligne. Ceux en ligne viennent d'abord (« En ligne en France », « En ligne ailleurs »), leur pastille cerclée de vert, avec dessous ce qu'ils font (« En partie », « En ligne ») ; les autres suivent dans « Hors ligne », vos amis d'abord, avec la dernière fois qu'on les a vus.

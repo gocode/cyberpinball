@@ -147,6 +147,8 @@ export interface HeadsetMenuOptions {
   onRoomRestart?(eyes: number): void;
   /** Veille pendant une partie : la tête du joueur dans la pièce (compagnon : « tete x y z lacet », toutes les 5 s). */
   onHead?(head: HeadPose): void;
+  /** La tête au menu, dans la pièce d'OpenXR (« tete-menu », toutes les 5 s) : à comparer à celle de la sonde. */
+  onMenuHead?(head: HeadPose): void;
   /** Recentrage fait (sur demande) : la place donnée par le regard du joueur. */
   onCentre?(place: { x: number; z: number; yaw: number; eyes?: number }): void;
   /** Hauteur des yeux au-dessus du sol de la pièce (mètres), à chaque port du casque. */
@@ -471,6 +473,8 @@ export class HeadsetMenu {
         // Au menu, la tête dans la pièce (STAGE) toutes les 5 s, au journal : à comparer à la sonde LibOVR.
         if (line.startsWith('tete-menu ')) {
           this.opts.log(`Casque, tête (OpenXR, pièce) : ${line.slice(10)}`); // i18n-ignore : journal
+          const [x, y, z, yaw] = line.slice(10).split(' ').map(Number);
+          if ([x, y, z, yaw].every(Number.isFinite)) this.opts.onMenuHead?.({ x: x!, y: y!, z: z!, yaw: yaw! });
           continue;
         }
         const head = /^tete (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)$/.exec(line);

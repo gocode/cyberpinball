@@ -152,7 +152,51 @@ export interface RoomsState {
   ignored: string[];
   /** Dernière ligne lue de chaque salon (ISO), pour les mentions non lues. */
   read: Record<RoomId, string>;
+  /** Phrases préparées d'« Écrire dans le salon », dans l'ordre ; absent : celles d'origine (DEFAULT_PHRASES). */
+  phrases?: string[];
   lines: RoomLine[];
+}
+
+// ---------------------------------------------------------------------------
+// Phrases préparées (13/11/2026) : un réglage de la borne, proposé en badges dans « Écrire dans le
+// salon » et au téléphone. Chacune suit les règles d'une ligne (cleanRoomText : une ligne, 300
+// caractères au plus) ; {table} y devient la table choisie dans la roue, et une phrase qui le porte
+// n'est proposée que si une table est choisie. Celles d'origine sont gardées sous leur texte
+// français, clé du catalogue : elles suivent la langue de la borne tant qu'on ne les modifie pas.
+
+/** Nombre de phrases au plus. */
+export const PHRASES_MAX = 20;
+/** Marque de la table choisie dans la roue, dans le texte d'une phrase. */
+export const PHRASE_TABLE = '{table}';
+/** Les phrases d'origine, dans leur ordre (clés du catalogue, traduites à l'affichage par rooms-menu.ts). */
+export const DEFAULT_PHRASES: readonly string[] = ['Qui veut faire une partie ?', 'Quelqu’un sur {table} ?', 'Bien joué !', 'J’arrive dans 5 minutes', 'Merci !', 'Bonne soirée !']; // i18n-ignore : clés du catalogue
+
+/** Les phrases de la borne : les siennes, sinon celles d'origine. */
+export function roomPhrases(s: Pick<RoomsState, 'phrases'>): string[] {
+  return [...(s.phrases ?? DEFAULT_PHRASES)];
+}
+
+/** Une liste de phrases relue ou changée : chacune nettoyée comme une ligne, sans doublon, 20 au plus ; undefined : pas une liste. */
+export function cleanPhrases(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: string[] = [];
+  for (const p of raw) {
+    const text = cleanRoomText(p);
+    if (text && !out.includes(text) && out.length < PHRASES_MAX) out.push(text);
+  }
+  return out;
+}
+
+/** Le réglage à garder pour `list` : undefined quand ce sont exactement celles d'origine (elles suivent alors la langue). */
+export function phrasesSetting(list: readonly string[]): string[] | undefined {
+  const clean = cleanPhrases(list) ?? [];
+  return clean.length === DEFAULT_PHRASES.length && clean.every((p, i) => p === DEFAULT_PHRASES[i]) ? undefined : clean;
+}
+
+/** Le texte d'une phrase pour la table choisie : {table} remplacé ; undefined si la phrase en parle et qu'aucune table n'est choisie. */
+export function phraseForTable(text: string, table: string | undefined): string | undefined {
+  if (!text.includes(PHRASE_TABLE)) return text;
+  return table ? text.split(PHRASE_TABLE).join(table) : undefined;
 }
 
 export function newRoomsState(): RoomsState {
@@ -171,6 +215,7 @@ export function loadRooms(dataDir: string, now = new Date()): RoomsState {
   const s = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const read: Record<RoomId, string> = {};
   if (s.read && typeof s.read === 'object') for (const [room, at] of Object.entries(s.read as Record<string, unknown>)) if (isRoomId(room) && isIso(at)) read[room] = at;
+  const phrases = cleanPhrases(s.phrases);
   // Relues sans revérifier leur signature (déjà vérifiée à l'arrivée), mais leur forme oui.
   const lines = (Array.isArray(s.lines) ? s.lines : []).filter((l): l is RoomLine => {
     const r = l as Record<string, unknown>;
@@ -186,6 +231,8 @@ export function loadRooms(dataDir: string, now = new Date()): RoomsState {
       ...(isRoomId(s.defaultRoom) ? { defaultRoom: s.defaultRoom } : {}),
       ignored: Array.isArray(s.ignored) ? s.ignored.filter(isPlayerPublicKey).slice(0, 1000) : [],
       read,
+      // Fichier abîmé ou écrit à la main : chaque phrase relue comme une ligne, la liste bornée.
+      ...(phrases ? { phrases } : {}),
       lines,
     },
     now,

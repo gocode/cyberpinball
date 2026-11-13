@@ -466,7 +466,7 @@ export interface SocialNet {
   /** Arrivées et départs vus d'un salon (en mémoire), pour le journal. */
   roomMoves(room: RoomId): { at: string; key: string; name: string; join: boolean }[];
   /** Réglages et état des salons sur cette borne : règles acceptées, joueurs ignorés, filtre… */
-  setRooms(change: Partial<Pick<RoomsState, 'enabled' | 'filter' | 'mentionsInGame' | 'rulesAt' | 'defaultRoom' | 'ignored' | 'read'>>): void;
+  setRooms(change: Partial<Pick<RoomsState, 'enabled' | 'filter' | 'mentionsInGame' | 'rulesAt' | 'defaultRoom' | 'ignored' | 'read' | 'phrases'>>): void;
   /** De nouvelles lignes dans les salons (pas les miennes) : les mentions de mon pseudo. */
   onRoomLines(listener: (lines: RoomLine[]) => void): () => void;
   /** Modération des salons (moderation.ts) : la charte connue, les décisions, les signalements reçus (modérateur). */

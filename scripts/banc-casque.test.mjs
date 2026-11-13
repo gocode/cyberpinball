@@ -96,7 +96,7 @@ test('banc : sonde LibOVR, client invisible : limite fixée à la pièce, tête,
   assert.equal(r.code, 0, r.lignes.join('\n'));
   assert.equal(l(/^ovr charge /).length, 1);
   assert.deepEqual(l(/^ovr init /), ['ovr init 0 version 1.43']);
-  assert.deepEqual(l(/^ovr etat /), ['ovr etat visible=0 casque=1 porte=1 regard=0']);
+  assert.deepEqual(l(/^ovr etat /), ['ovr etat visible=0 casque=1 porte=1 regard=0 recentrer=0']);
   assert.match(l(/^ovr tete /)[0], /^ovr tete 0\.100 1\.600 0\.200 0\.300 suivi=15$/);
   assert.match(l(/^ovr manettes /)[0], /^ovr manettes -0\.300 1\.000 -0\.350 suivi=15 0\.300 1\.000 -0\.350 suivi=15$/);
   // Le contour et l'aire sont fixés à la pièce : l'origine déplacée (Link), ils changent dans l'espace de suivi.
@@ -142,12 +142,11 @@ test('sonde sur le vrai runtime de Meta (poste où il est installé) : chargée,
   assert.ok(r.lignes.some((l) => /^ovr session (0|-1007)\b/.test(l)), r.lignes.join('\n'));
 });
 
-// La borne reposée sur la limite du Quest (ancrage), sur la vraie sonde et le runtime factice : un contour de 406
-// points fixé à la pièce, l'origine de suivi qui saute (Link), les manettes posées sur la vraie barre comme témoin.
-// La place calée avant le saut, reposée par anchorPlace avec le contour relu par la sonde, doit retomber sur la
-// barre que les manettes donnent après le saut. Trois cas de l'essai du 13 novembre 2026 : saut de 155 cm et 97°,
-// origine remise sur la tête au port (ancrage confirmé par la tête), pièce refaite avec sa limite (rien à reposer,
-// tête loin : le calage reste proposé).
+// La borne reposée sur la limite du Quest et par les sauts mesurés, sur la vraie sonde et le runtime factice (essai réel
+// du 13 novembre 2026 en Air Link) : un contour de 406 points fixé à la pièce, l'origine de suivi que le Quest remet sur
+// la tête à chaque remise du casque, les manettes posées sur la vraie barre comme témoin indépendant. Le repère de la
+// pièce (RoomFrame) : J, les sauts mesurés depuis le dernier contour rafraîchi, reporte le contour lu dans le repère
+// courant ; la place garde ce contour effectif.
 const core = createRequire(import.meta.url)('../packages/core/dist/index.js');
 
 /** Un contour de pièce irrégulier de 406 points, dans le monde (mètres). */
@@ -173,35 +172,19 @@ function origineVers(m, d, a) {
 const GAUCHE = [0.6, 0.95, -0.45];
 const DROITE = [1.15, 0.95, -0.45];
 const TETE = [0.87, 1.6, -0.12];
-
-/** Joue le scénario, rend les contours relus (« ovr points »), les bouts des manettes et la tête, avant et après le saut. */
-async function sauter(origine, { contourApres, figer, dureeMs = 13000 } = {}) {
-  const monde = contourMonde();
-  const pts = (c) => c.map(([x, z]) => `${x.toFixed(4)},${z.toFixed(4)}`).join(' ');
-  const r = await sonder(
-    [
-      '0 porte 1',
-      '0 limite piece 3.4 3.6',
-      `0 contour ${pts(monde)}`,
-      `0 tete ${TETE.join(' ')} 0`,
-      `0 manette gauche ${GAUCHE.join(' ')}`,
-      `0 manette droite ${DROITE.join(' ')}`,
-      `7000 origine ${origine.join(' ')}`,
-      ...(contourApres ? [`7000 contour ${pts(contourApres(monde))}`] : []),
-      ...(figer ? ['6990 contour-fige 1'] : []),
-    ].join('\n'),
-    { dureeMs },
-  );
-  const points = r.lignes.filter((l) => l.startsWith('ovr points ')).map((l) => sondeOvr.parseOvrPoints(l));
-  const bouts = r.lignes
+const pts = (c) => c.map(([x, z]) => `${x.toFixed(4)},${z.toFixed(4)}`).join(' ');
+const lire = (r) => ({
+  points: r.lignes.filter((l) => l.startsWith('ovr points ')).map((l) => sondeOvr.parseOvrPoints(l)),
+  bouts: r.lignes
     .filter((l) => l.startsWith('ovr manettes '))
     .map((l) => {
       const v = l.split(' ').slice(2).filter((x) => !x.startsWith('suivi')).map(Number);
       return [{ x: v[0], y: v[1], z: v[2] }, { x: v[3], y: v[4], z: v[5] }];
-    });
-  const tetes = r.lignes.filter((l) => l.startsWith('ovr tete ')).map((l) => l.split(' ').slice(2, 6).map(Number));
-  return { r, points, bouts, tetes };
-}
+    }),
+  tetes: r.lignes.filter((l) => l.startsWith('ovr tete ')).map((l) => l.split(' ').slice(2, 6).map(Number)),
+  sauts: r.lignes.filter((l) => l.startsWith('ovr saut ')).map((l) => sondeOvr.parseOvrJump(l)),
+});
+const sansPoints = (r) => r.lignes.filter((l) => !l.startsWith('ovr points')).join('\n');
 
 /** La place calée sur les manettes posées (comme le calage à la main), avec la tête et le contour du même repère. */
 function calee(bouts, tete, contour) {
@@ -210,110 +193,89 @@ function calee(bouts, tete, contour) {
 
 const banc = pret && fs.existsSync(BANC_SONDE) ? {} : { skip: 'sonde pas construite : npm run casque-vr' };
 
-test('banc : ancrage sur la limite du Quest, saut de 155 cm et 97° (Link), la borne reposée à moins de 2 cm et 1°', banc, async () => {
+test('banc : ancrage sur la limite du Quest, saut de 155 cm et 97° (contour qui suit la pièce), la borne reposée à moins de 2 cm et 1°', banc, async () => {
   const a = (97 * Math.PI) / 180;
   const milieu = [(GAUCHE[0] + DROITE[0]) / 2, (GAUCHE[2] + DROITE[2]) / 2];
   const origine = origineVers(milieu, [1.55, 0], a);
-  const { r, points, bouts, tetes } = await sauter([origine[0], origine[1], a]);
-  assert.equal(points.length, 2, r.lignes.filter((l) => !l.startsWith('ovr points')).join('\n'));
-  assert.equal(points[0].length, 406);
+  const r = await sonder(
+    ['0 porte 1', '0 limite piece 3.4 3.6', `0 contour ${pts(contourMonde())}`, `0 tete ${TETE.join(' ')} 0`, `0 manette gauche ${GAUCHE.join(' ')}`, `0 manette droite ${DROITE.join(' ')}`, `7000 origine ${origine[0]} ${origine[1]} ${a}`].join('\n'),
+    { dureeMs: 13000 },
+  );
+  const { points, bouts, tetes, sauts } = lire(r);
+  assert.equal(points.length, 2, sansPoints(r));
+  // La tête n'arrive pas à l'origine : ce n'est pas la signature de la remise d'origine, la sonde refuse le bond.
+  assert.equal(sauts.length, 0);
+  assert.ok(r.lignes.some((l) => /^ovr saut-refuse raison=arrivee-hors-origine/.test(l)), sansPoints(r));
   const avant = calee(bouts[0], tetes[0], points[0]);
   const vraie = core.lockbarPlace(bouts.at(-1)[0], bouts.at(-1)[1]);
-  const saut = core.placeGap(avant, vraie);
-  assert.ok(Math.abs(saut.cm - 155) < 2 && Math.abs(saut.deg - 97) < 1, JSON.stringify(saut));
   const ancre = core.anchorPlace(avant, points[1]);
   assert.equal(ancre.kind, 'moved');
   const reste = core.placeGap(ancre.place, vraie);
   assert.ok(reste.cm < 2 && reste.deg < 1, `reste ${JSON.stringify(reste)}`);
-  assert.ok(ancre.residualCm < 1, String(ancre.residualCm));
-  // Reposée : plus rien à faire au relevé suivant (le même contour).
   assert.equal(core.anchorPlace(ancre.place, points[1]).kind, 'same');
 });
 
-test('banc : origine remise sur la tête au port, la borne reposée et l’ancrage confirmé par la tête', banc, async () => {
-  const a = 0.6;
-  const { points, bouts, tetes } = await sauter([TETE[0], TETE[2], a]);
-  const avant = calee(bouts[0], tetes[0], points[0]);
-  // La tête retombe sur l'origine (originResetAtWear) ; la barre a sauté.
-  assert.ok(Math.hypot(tetes.at(-1)[0], tetes.at(-1)[2]) < 0.01, JSON.stringify(tetes.at(-1)));
-  const vraie = core.lockbarPlace(bouts.at(-1)[0], bouts.at(-1)[1]);
-  const ancre = core.anchorPlace(avant, points.at(-1));
-  assert.equal(ancre.kind, 'moved');
-  const reste = core.placeGap(ancre.place, vraie);
-  assert.ok(reste.cm < 2 && reste.deg < 1, `reste ${JSON.stringify(reste)}`);
-  const tete = core.anchorHeadAtOrigin(ancre.place);
-  assert.ok(tete.confirmed && tete.cm < 2, JSON.stringify(tete));
-});
-
-test('banc : pièce refaite avec sa limite au port (contour inchangé dans le suivi), rien à reposer, tête loin : calage proposé', banc, async () => {
-  const a = 0.6;
-  const origine = [TETE[0], TETE[2], a];
-  // Le Quest replace sa limite avec l'origine : le contour suit, il est inchangé dans l'espace de suivi.
-  const avec = (monde) => monde.map(([x, z]) => {
-    const [rx, rz] = tourner(a, [x, z]);
-    return [rx + origine[0], rz + origine[1]];
-  });
-  const { points, bouts, tetes } = await sauter(origine, { contourApres: avec });
-  const avant = calee(bouts[0], tetes[0], points[0]);
-  const ancre = core.anchorPlace(avant, points.at(-1));
-  assert.equal(ancre.kind, 'same');
-  // La vraie barre a pourtant sauté : seule la tête (à l'origine, loin de celle du calage) le dit.
-  const vraie = core.lockbarPlace(bouts.at(-1)[0], bouts.at(-1)[1]);
-  assert.ok(core.placeGap(avant, vraie).cm > 30);
-  const tete = core.anchorHeadAtOrigin(avant);
-  assert.equal(tete.confirmed, false, JSON.stringify(tete));
-});
-
-// Piste 1 (13 novembre 2026) : le saut mesuré dans le flux de la tête, relevée toutes les quelques millisecondes ;
-// une tête ne se téléporte pas, le bond entre deux relevés consécutifs est la transformation du saut. Validé sur les
-// relevés du jour : la tête lue par la sonde à 18:37:17.891 puis par OpenXR à 18:37:18.019 prédit la barre après le
-// saut de 155 cm et 97° à 2,1 cm et 2,2° près (le contour, lui, ne bougeait que de 12 cm).
-test('banc : saut de l’espace de suivi mesuré par la sonde dans le flux de la tête, la borne reposée à moins de 2 cm et 1°', banc, async () => {
-  const a = (97 * Math.PI) / 180;
-  const milieu = [(GAUCHE[0] + DROITE[0]) / 2, (GAUCHE[2] + DROITE[2]) / 2];
-  const origine = origineVers(milieu, [1.55, 0], a);
-  const { r, bouts, tetes, points } = await sauter([origine[0], origine[1], a]);
-  const sauts = r.lignes.filter((l) => l.startsWith('ovr saut '));
-  assert.equal(sauts.length, 1, r.lignes.filter((l) => !l.startsWith('ovr points')).join('\n'));
-  const saut = sondeOvr.parseOvrJump(sauts[0]);
-  assert.ok(saut && saut.dtMs < 60, sauts[0]);
-  assert.equal(r.lignes.filter((l) => l.startsWith('ovr saut-refuse')).length, 0);
-  const avant = calee(bouts[0], tetes[0], points[0]);
-  const vraie = core.lockbarPlace(bouts.at(-1)[0], bouts.at(-1)[1]);
-  const reposee = core.movePlace(avant, saut);
-  const reste = core.placeGap(reposee, vraie);
-  assert.ok(reste.cm < 2 && reste.deg < 1, `reste ${JSON.stringify(reste)} (${sauts[0]})`);
-  // Le test de la limite par le runtime suit le saut ; le contour relu concorde avec lui (pas périmé).
-  const tests = r.lignes.filter((l) => l.startsWith('ovr test-limite code=0'));
-  assert.ok(tests.length >= 2, r.lignes.join('\n'));
-  for (const l of tests) {
-    assert.ok(Number(/ ecart=([\d.]+)/.exec(l)[1]) < 1, l);
-    assert.ok(Number(/ points=([\d.]+)/.exec(l)[1]) < 1, l);
-  }
-});
-
-// Piste 2 : le runtime recentre l'origine sans retransformer le contour qu'il rend. ovr_TestBoundary, lui, garde la
-// vraie limite : sa distance diverge de celle calculée sur le contour lu, et les points lus ne sont plus sur la limite.
 test('banc : contour lu figé après le saut (périmé), vu par ovr_TestBoundary face au contour lu', banc, async () => {
-  const a = 0.9;
-  const { r } = await sauter([0.4, -0.3, a], { figer: true, dureeMs: 17000 });
+  const r = await sonder(
+    ['0 porte 1', '0 limite piece 3.4 3.6', `0 contour ${pts(contourMonde())}`, `0 tete ${TETE.join(' ')} 0`, '6990 contour-fige 1', '7000 origine 0.4 -0.3 0.9'].join('\n'),
+    { dureeMs: 17000 },
+  );
   const tests = r.lignes.filter((l) => l.startsWith('ovr test-limite code=0'));
   const ecart = (l) => Number(/ ecart=([\d.]+)/.exec(l)[1]);
-  const pts = (l) => Number(/ points=([\d.]+)/.exec(l)[1]);
-  assert.ok(tests.length >= 2, r.lignes.join('\n'));
-  // Avant le saut : concordants ; après : les points lus à des dizaines de centimètres de la vraie limite.
-  assert.ok(pts(tests[0]) < 1 && ecart(tests[0]) < 1, tests[0]);
-  assert.ok(tests.slice(1).some((l) => pts(l) > 20), tests.join(' | '));
+  const points = (l) => Number(/ points=([\d.]+)/.exec(l)[1]);
+  assert.ok(tests.length >= 2, sansPoints(r));
+  assert.ok(points(tests[0]) < 1 && ecart(tests[0]) < 1, tests[0]);
+  assert.ok(tests.slice(1).some((l) => points(l) > 20), tests.join(' | '));
 });
 
-// Le saut appliqué au menu (13 novembre 2026), arbitré contre le contour relu après lui, comme le frontend
-// (arbitrateJump) : les chiffres de 18:37 (tête lue avant puis après, à l'origine ; contour relu figé), la seconde
-// sorte (contour qui suit), une contradiction, et un saut refusé par la sonde (tête suivie en orientation seule).
-async function sauterReel({ figer = false, contourApres, suivie = true } = {}) {
+// Les neuf remises d'origine du 13 novembre 2026 (20:08-20:12, Air Link) : la tête d'avant (« de= » du journal), puis
+// l'origine remise sur elle ; la sonde doit les prendre toutes, avec la rotation relevée.
+const REMISES = [
+  [0.429, 1.655, -0.165, -0.447],
+  [-0.3, 1.609, 0.69, 0.344],
+  [-0.201, 1.679, -1.556, 2.598],
+  [-1.052, 1.653, -1.538, -1.461],
+  [0.413, 1.658, -0.059, -0.676],
+  [-0.391, 1.649, 0.485, 1.078],
+  [0.704, 1.64, 0.064, -0.884],
+  [0.121, 1.666, 0.213, -1.184],
+  [-0.111, 1.667, 0.012, 0.634],
+];
+
+test('banc : les neuf remises d’origine réelles du 13 novembre 2026, toutes mesurées, la tête arrivée à l’origine', banc, async () => {
+  const etapes = ['0 porte 1'];
+  let o = [0, 0, 0]; // l'origine courante dans le monde (x, z, lacet)
+  REMISES.forEach(([x, y, z, yaw], i) => {
+    // La tête, vue dans l'espace courant comme dans le journal, puis l'origine remise sur elle.
+    const [wx, wz] = tourner(o[2], [x, z]);
+    const tete = [o[0] + wx, o[1] + wz, o[2] + yaw];
+    const t = 500 + i * 1000;
+    etapes.push(`${t} tete ${tete[0]} ${y} ${tete[1]} ${tete[2]}`, `${t + 600} origine ${tete[0]} ${tete[1]} ${tete[2]}`);
+    o = tete;
+  });
+  const r = await sonder(etapes.join('\n'), { dureeMs: 11000 });
+  const { sauts } = lire(r);
+  assert.equal(sauts.length, REMISES.length, r.lignes.filter((l) => l.startsWith('ovr saut')).join('\n'));
+  sauts.forEach((s, i) => {
+    assert.ok(Math.abs(Math.abs(s.angle) - Math.abs(REMISES[i][3])) < 0.01, `${i} : ${s.angle}`);
+    assert.ok(Math.hypot(s.headAfter.x, s.headAfter.z) < 0.02, JSON.stringify(s.headAfter));
+  });
+});
+
+test('banc : rafales du casque tenu en main (tête basculée vers 90°, cap qui tourne sans bouger) refusées, même à l’origine', banc, async () => {
+  const etapes = ['0 porte 1', '0 tete 0.4 1.6 0.3 0', '500 tete-penche 1.45'];
+  // Ailleurs, puis à l'origine même : le cap saute de 15 à 30° toutes les 5 ms, la position ne bouge pas.
+  for (let i = 0; i < 8; i++) etapes.push(`${1000 + i * 5} tete 0.4 1.6 0.3 ${(i * 0.4) % 6.28}`);
+  for (let i = 0; i < 8; i++) etapes.push(`${2500 + i * 5} tete 0 1.6 0 ${i === 7 ? 0 : (i * 0.5) % 6.28}`);
+  const r = await sonder(etapes.join('\n'), { dureeMs: 4000 });
+  const { sauts } = lire(r);
+  assert.equal(sauts.length, 0, r.lignes.filter((l) => l.startsWith('ovr saut')).join('\n'));
+  assert.ok(r.lignes.some((l) => /^ovr saut-refuse raison=tete-inclinee/.test(l)), r.lignes.filter((l) => l.startsWith('ovr saut')).join('\n'));
+});
+
+/** Le saut de 18:37 rejoué : tête et barre du jour, l'origine remise sur la tête ; contour figé ou non, saut refusé. */
+async function sauterReel({ figer = false, suivie = true, rafraichir = false } = {}) {
   const monde = contourMonde();
-  const pts = (c) => c.map(([x, z]) => `${x.toFixed(4)},${z.toFixed(4)}`).join(' ');
-  // Relevés du jour : tête à 1,142 ; 0,090, lacet −1,667, la barre calée de 0,549 ; −0,442 à 1,127 ; −0,437. Le Quest
-  // remet l'origine sur la tête : après le saut, la tête est à l'origine, lacet nul.
   const r = await sonder(
     [
       '0 porte 1',
@@ -325,67 +287,95 @@ async function sauterReel({ figer = false, contourApres, suivie = true } = {}) {
       ...(suivie ? [] : ['6900 tete-suivie 0']),
       ...(figer ? ['6990 contour-fige 1'] : []),
       '7000 origine 1.142 0.090 -1.667',
-      ...(contourApres ? [`7000 contour ${pts(contourApres(monde))}`] : []),
+      // Le contour rafraîchi par le runtime (à la session neuve d'une application, fait 4 du 13 novembre).
+      ...(rafraichir ? ['10500 contour-fige 0'] : []),
     ].join('\n'),
     { dureeMs: 13000 },
   );
-  const points = r.lignes.filter((l) => l.startsWith('ovr points ')).map((l) => sondeOvr.parseOvrPoints(l));
-  const bouts = r.lignes
-    .filter((l) => l.startsWith('ovr manettes '))
-    .map((l) => {
-      const v = l.split(' ').slice(2).filter((x) => !x.startsWith('suivi')).map(Number);
-      return [{ x: v[0], y: v[1], z: v[2] }, { x: v[3], y: v[4], z: v[5] }];
-    });
-  const tetes = r.lignes.filter((l) => l.startsWith('ovr tete ')).map((l) => l.split(' ').slice(2, 6).map(Number));
-  const sauts = r.lignes.filter((l) => l.startsWith('ovr saut ')).map((l) => sondeOvr.parseOvrJump(l));
-  return { r, points, bouts, tetes, sauts, avant: calee(bouts[0], tetes[0], points[0]), vraie: core.lockbarPlace(bouts.at(-1)[0], bouts.at(-1)[1]) };
+  const l = lire(r);
+  return { r, ...l, avant: calee(l.bouts[0], l.tetes[0], l.points[0]), vraie: core.lockbarPlace(l.bouts.at(-1)[0], l.bouts.at(-1)[1]) };
 }
 
-test('banc : saut de 18:37 rejoué (première sorte, contour figé), le saut fait foi, la borne sur la vraie, confirmé par la tête', banc, async () => {
-  const { r, points, sauts, avant, vraie } = await sauterReel({ figer: true });
-  assert.equal(sauts.length, 1, r.lignes.filter((l) => !l.startsWith('ovr points')).join('\n'));
-  const v = core.arbitrateJump(avant, sauts[0], points.at(-1));
-  assert.equal(v.kind, 'fige');
-  const reste = core.placeGap(v.place, vraie);
+/** Ce que fait l'application : J au saut, la borne reposée par lui, la place gardée avec le contour effectif. */
+function rejouer({ points, sauts, avant }) {
+  const frame = new core.RoomFrame();
+  frame.onRead(points[0]);
+  let place = avant;
+  for (const s of sauts) {
+    frame.onJump(s);
+    place = { ...core.movePlace(place, s), contour: frame.effective() };
+  }
+  const kinds = points.slice(1).map((p) => frame.onRead(p));
+  return { frame, place, kinds };
+}
+
+test('banc : saut de 18:37 rejoué (contour figé), la borne reposée par le saut, l’ancrage ne la défait pas', banc, async () => {
+  const run = await sauterReel({ figer: true });
+  assert.equal(run.sauts.length, 1, sansPoints(run.r));
+  const { frame, place, kinds } = rejouer(run);
+  assert.ok(kinds.every((k) => k === 'inchange'), kinds.join(','));
+  const reste = core.placeGap(place, run.vraie);
   assert.ok(reste.cm < 2 && reste.deg < 1, JSON.stringify(reste));
-  assert.ok(core.jumpHeadCheck(v.place, sauts[0].headAfter).confirmed);
-  // L'ancrage attend le contour à jour : avec lui, plus rien à reposer.
-  assert.equal(core.anchorPlace(v.place, v.place.contour).kind, 'same');
+  assert.deepEqual(core.anchorPlace(place, frame.effective()), { kind: 'same' });
 });
 
-test('banc : seconde sorte (le contour relu suit le saut), une seule correction, l’ancrage n’a plus rien à faire', banc, async () => {
-  const { points, sauts, avant, vraie } = await sauterReel();
-  assert.equal(sauts.length, 1);
-  const v = core.arbitrateJump(avant, sauts[0], points.at(-1));
-  assert.equal(v.kind, 'suivi');
-  const reste = core.placeGap(v.place, vraie);
+test('banc : contour qui suit la remise d’origine, une seule correction (le saut, puis le contour qui confirme)', banc, async () => {
+  const run = await sauterReel();
+  assert.equal(run.sauts.length, 1);
+  const { frame, place, kinds } = rejouer(run);
+  assert.ok(kinds.includes('rafraichi'), kinds.join(','));
+  const reste = core.placeGap(place, run.vraie);
   assert.ok(reste.cm < 2 && reste.deg < 1, JSON.stringify(reste));
-  assert.equal(core.anchorPlace(v.place, points.at(-1)).kind, 'same');
+  assert.deepEqual(core.anchorPlace(place, frame.effective()), { kind: 'same' });
 });
 
-test('banc : saut et contour qui se contredisent, rien de reposé (calage proposé)', banc, async () => {
-  // Le contour relu tourné de 30° autrement que le saut.
-  const autre = (monde) => monde.map(([x, z]) => [x * Math.cos(0.5) - z * Math.sin(0.5) + 0.3, x * Math.sin(0.5) + z * Math.cos(0.5)]);
-  const { points, sauts, avant } = await sauterReel({ figer: false, contourApres: autre });
-  assert.equal(sauts.length, 1);
-  assert.equal(core.arbitrateJump(avant, sauts[0], points.at(-1)).kind, 'contredit');
+test('banc : saut refusé (tête suivie en orientation seule), le contour rafraîchi ensuite repose seul la borne', banc, async () => {
+  const run = await sauterReel({ suivie: false, figer: true, rafraichir: true });
+  assert.equal(run.sauts.length, 0, run.r.lignes.filter((l) => l.startsWith('ovr saut')).join('\n'));
+  assert.ok(run.r.lignes.some((l) => /^ovr saut-refuse raison=suivi-incomplet/.test(l)));
+  const { frame, place, kinds } = rejouer(run);
+  assert.ok(kinds.includes('rafraichi'), kinds.join(','));
+  const ancre = core.anchorPlace(place, frame.effective());
+  assert.equal(ancre.kind, 'moved');
+  const reste = core.placeGap(ancre.place, run.vraie);
+  assert.ok(reste.cm < 2 && reste.deg < 1, JSON.stringify(reste));
 });
 
-test('banc : saut refusé par la sonde (tête suivie en orientation seule), rien d’appliqué', banc, async () => {
-  const { r, sauts } = await sauterReel({ suivie: false });
-  assert.equal(sauts.length, 0, r.lignes.filter((l) => l.startsWith('ovr saut')).join('\n'));
-  assert.ok(r.lignes.some((l) => /^ovr saut-refuse raison=suivi-incomplet/.test(l)), r.lignes.filter((l) => !l.startsWith('ovr points')).join('\n'));
-});
-
-// Une tête qui tourne vite (6 rad/s, 344°/s, plus qu'un regard brusque) n'est pas un saut : la sonde avance la tête
-// d'avant par sa vitesse avant de comparer, même avec des relevés espacés par une machine chargée.
-test('banc : tête qui tourne vite (344°/s), aucun saut relevé ; le vrai saut ensuite, mesuré', banc, async () => {
-  const r = await sonder(['0 porte 1', '0 tete 0.2 1.6 0.1 0', '500 tete-tourne 6', '4000 tete-tourne 0', '5000 origine 0.6 -0.4 1.2'].join('\n'), { dureeMs: 8000 });
+// Une tête qui tourne vite (6 rad/s, 344°/s) n'est pas un saut : la sonde avance la tête d'avant par sa vitesse.
+test('banc : tête qui tourne vite (344°/s), aucun saut ; la remise d’origine ensuite, mesurée', banc, async () => {
+  const r = await sonder(['0 porte 1', '0 tete 0.2 1.6 0.1 0', '500 tete-tourne 6', '4000 tete-tourne 0', '4100 tete 0.2 1.6 0.1 0', '5000 origine 0.2 0.1 0'].join('\n'), { dureeMs: 8000 });
   const sauts = r.lignes.filter((l) => l.startsWith('ovr saut '));
   const tous = r.lignes.filter((l) => l.startsWith('ovr saut')).join(' | ');
-  // Pendant la rotation : aucun saut. Le vrai saut ensuite : mesuré, ou refusé pour un intervalle trop long quand la
+  // Pendant la rotation : aucun saut. La remise ensuite : mesurée, ou refusée pour un intervalle trop long quand la
   // machine du banc est saturée (la suite complète en parallèle) ; jamais un faux saut, jamais un saut mal mesuré.
   assert.ok(sauts.length <= 1, tous);
-  if (sauts.length) assert.ok(Math.abs(Math.abs(sondeOvr.parseOvrJump(sauts[0]).angle) - 1.2) < 0.05, sauts[0]);
-  else assert.ok(r.lignes.some((l) => /^ovr saut-refuse raison=intervalle-long .*bond=86/.test(l)), tous);
+  if (sauts.length) assert.ok(Math.abs(sondeOvr.parseOvrJump(sauts[0]).tx + 0.2) < 0.02, sauts[0]);
+  else assert.ok(r.lignes.some((l) => /^ovr saut-refuse raison=intervalle-long .*bond=22/.test(l)), tous);
+});
+
+// Essai a) : l'ancien repère redonné par la sonde (ovr_SpecifyTrackingOrigin). Pour elle seule (défaut du runtime
+// factice) : la tête y revient pour elle ; « origine-retour » lui rend le repère du runtime, sans faux saut ensuite.
+test('banc : essai a), origine défaite pour la sonde seule, puis rendue au runtime ; aucun faux saut', banc, async () => {
+  const r = await sonder(['0 porte 1', '0 tete 0.6 1.6 -0.3 0.8', '1000 origine 0.6 -0.3 0.8'].join('\n'), {
+    dureeMs: 6000,
+    args: ['--defaire-origine'],
+    commandes: [[3500, 'origine-retour']],
+  });
+  const defaite = r.lignes.find((l) => l.startsWith('ovr origine-defaite '));
+  assert.match(defaite ?? '', /code=0 revenue=1 /, r.lignes.join('\n'));
+  assert.ok(r.lignes.includes('ovr origine-retablie code=0'), r.lignes.join('\n'));
+  assert.equal(r.lignes.filter((l) => l.startsWith('ovr saut ')).length, 1, r.lignes.filter((l) => l.startsWith('ovr saut')).join('\n'));
+  // Rendue : la tête est de nouveau dans le repère d'après la remise (à l'origine).
+  const tete = r.lignes.filter((l) => l.startsWith('ovr tete ')).at(-1).split(' ').slice(2, 5).map(Number);
+  assert.ok(Math.hypot(tete[0], tete[2]) < 0.02, JSON.stringify(tete));
+  // Sans l'argument : rien n'est tenté.
+  const sans = await sonder(['0 porte 1', '0 tete 0.6 1.6 -0.3 0.8', '1000 origine 0.6 -0.3 0.8'].join('\n'), { dureeMs: 3000 });
+  assert.equal(sans.lignes.some((l) => l.startsWith('ovr origine-defaite')), false);
+});
+
+// Essai c) : après un saut, la session LibOVR de la sonde refaite, le contour relu ; s'il est figé, il ne change pas.
+test('banc : essai c), session LibOVR refaite après le saut, contour relu (inchangé s’il est figé)', banc, async () => {
+  const r = await sonder(['0 porte 1', '0 limite piece 3.4 3.6', `0 contour ${pts(contourMonde())}`, '0 tete 0.6 1.6 -0.3 0.8', '990 contour-fige 1', '1000 origine 0.6 -0.3 0.8'].join('\n'), { dureeMs: 6000 });
+  assert.ok(r.lignes.includes('ovr session-neuve demandee'), sansPoints(r));
+  assert.match(r.lignes.find((l) => l.startsWith('ovr contour-apres-session-neuve')) ?? '', /change=0 /, sansPoints(r));
 });

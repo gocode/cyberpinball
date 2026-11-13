@@ -138,3 +138,105 @@ app.whenReady().then(async () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Mise en route (journal du PinCab, 13/11/2026 : 13 à 39 s de partie sans suivi) : la Kinect, en mode
+// assis, ne repère le joueur qu'en mouvement. Allumée au Start, pendant le chargement, sans bloquer
+// l'application (NuiInitialize lent, sur un fil de koffi) ; la tête est déjà suivie quand la partie
+// commence ; gardée allumée après la partie, la suivante la reprend sans rallumer ; puis éteinte seule.
+test('Kinect : allumée dès le Start sans bloquer, tête déjà suivie au début de la partie, gardée pour la suivante puis éteinte', { skip, timeout: 120_000 }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-kinect-'));
+  try {
+    const main = path.join(dir, 'main.js');
+    const report = path.join(dir, 'rapport.json');
+    const vision3d = path.join(REPO, 'app', 'dist', 'vision3d.js');
+    const core = path.join(REPO, 'packages', 'core', 'dist', 'vision3d.js');
+    fs.writeFileSync(
+      main,
+      `const { app } = require('electron');
+const fs = require('node:fs');
+const dgram = require('node:dgram');
+const koffi = require(${JSON.stringify(require.resolve('koffi', { paths: [REPO] }))});
+app.on('window-all-closed', () => undefined);
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+app.whenReady().then(async () => {
+  const seen = { packets: [], log: [] };
+  const sock = dgram.createSocket('udp4');
+  sock.on('message', () => seen.packets.push(Date.now()));
+  await new Promise((r) => sock.bind(47424, '127.0.0.1', r));
+  try {
+    const { HeadTracker } = require(${JSON.stringify(vision3d)});
+    const { parseVision3dSetting } = require(${JSON.stringify(core)});
+    const initialisations = koffi.load(${JSON.stringify(FAKE_DLL)}).func('int32_t __stdcall FacticeInitialisations()');
+    const tracker = new HeadTracker({ dataDir: ${JSON.stringify(dir)}, appDir: ${JSON.stringify(path.join(REPO, 'app'))}, log: (l) => seen.log.push(l) });
+    const setting = parseVision3dSetting({ intensity: 1 });
+    // Le fil principal ne gèle pas pendant l'allumage (l'écran de chargement tourne).
+    let last = Date.now();
+    seen.maxGap = 0;
+    const beat = setInterval(() => { const now = Date.now(); seen.maxGap = Math.max(seen.maxGap, now - last); last = now; }, 10);
+    const t0 = Date.now();
+    tracker.warm('kinect1', setting);
+    seen.warmMs = Date.now() - t0;
+    await wait(2600); // allumage 800 ms + repérage 100 images (≈ 1 s)
+    clearInterval(beat);
+    seen.stateAtStart = tracker.state;
+    const startedAt = Date.now();
+    tracker.start('kinect1', 'essai', setting);
+    await wait(1500);
+    seen.firstPacketMs = seen.packets.length ? seen.packets[0] - startedAt : undefined;
+    seen.first = tracker.summary();
+    // Fin de partie : gardé allumé ; la partie suivante le reprend sans rallumer.
+    tracker.release(400);
+    await wait(150);
+    seen.runningAfterRelease = tracker.running;
+    tracker.warm('kinect1', setting);
+    tracker.start('kinect1', 'essai', setting);
+    seen.second = tracker.summary();
+    seen.initialisations = initialisations();
+    tracker.release(300);
+    await wait(900);
+    seen.runningAfterIdle = tracker.running;
+  } catch (e) {
+    seen.error = String(e && e.stack || e);
+  }
+  sock.close();
+  fs.writeFileSync(${JSON.stringify(report)}, JSON.stringify(seen));
+  app.exit(0);
+});
+`,
+    );
+    const run = runElectron(electron!, [`--user-data-dir=${path.join(dir, 'profil')}`, main], {
+      dir,
+      timeout: 60_000,
+      env: { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_VISION3D_PORT: '47424', CYBERPINBALL_KINECT_DLL: FAKE_DLL, KINECT_FACTICE_INIT_MS: '800', KINECT_FACTICE_REPERAGE: '100' },
+    });
+    assert.ok(fs.existsSync(report), `pas de rapport : ${run.stdout}\n${run.stderr}`);
+    const seen = JSON.parse(fs.readFileSync(report, 'utf8')) as {
+      log: string[];
+      error?: string;
+      warmMs: number;
+      maxGap: number;
+      stateAtStart: string;
+      firstPacketMs?: number;
+      first: { trackedAfterMs?: number };
+      second: { trackedAfterMs?: number };
+      runningAfterRelease: boolean;
+      initialisations: number;
+      runningAfterIdle: boolean;
+    };
+    const trace = `\n${seen.log.join('\n')}\n${seen.error ?? ''}`;
+    assert.equal(seen.error, undefined, trace);
+    assert.ok(seen.warmMs < 100, `warm() a bloqué ${seen.warmMs} ms${trace}`);
+    assert.ok(seen.maxGap < 300, `fil principal gelé ${seen.maxGap} ms pendant l'allumage${trace}`);
+    assert.equal(seen.stateAtStart, 'tracking', `tête pas encore suivie au début de la partie${trace}`);
+    assert.equal(seen.first.trackedAfterMs, 0, trace);
+    // Position de jeu mesurée en 24 images (≈ 0,25 s), puis les déplacements partent.
+    assert.ok(seen.firstPacketMs !== undefined && seen.firstPacketMs < 800, `premier paquet ${seen.firstPacketMs} ms après le début${trace}`);
+    assert.equal(seen.runningAfterRelease, true, trace);
+    assert.equal(seen.second.trackedAfterMs, 0, trace);
+    assert.equal(seen.initialisations, 1, `NuiInitialize appelé ${seen.initialisations} fois${trace}`);
+    assert.equal(seen.runningAfterIdle, false, `capteur pas éteint après le délai${trace}`);
+    assert.ok(seen.log.some((l) => /tête repérée .* après l’allumage/.test(l)), trace);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -214,6 +214,9 @@ test('bilan d’une partie : le journal de VPX dit si le module est chargé, ét
   assert.match(vision3dGameReport('disabled', 300).text, /éteint/);
   assert.match(vision3dGameReport('absent', 300).text, /pas trouvé/);
   assert.match(vision3dGameReport('loaded', 0, 'la Kinect ne répond plus').text, /ne répondait pas/);
+  // Délai avant la première tête suivie : dit, pour juger la mise en route (capteur allumé dès le Start).
+  assert.match(vision3dGameReport('loaded', 812, undefined, 0).text, /dès le début/);
+  assert.match(vision3dGameReport('loaded', 812, undefined, 12_400).text, /suivie 12 s après le début/);
 });
 
 test('Kinect pour Xbox 360 : sans le SDK de Microsoft, le pilote la refuse ; l’installation (SDK compris) est proposée', () => {

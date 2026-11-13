@@ -1,8 +1,8 @@
 // Salons par pays (rooms.ts, décidés le 12/11/2026) à l'écran : le journal d'un salon à l'ancienne
 // (une ligne par message, l'heure, le drapeau, <pseudo> à la teinte de sa clé), les présents, écrire
-// (phrases rapides, clavier à l'écran, téléphone), les options d'une ligne (répondre, profil, demande
+// (phrases préparées, clavier à l'écran, téléphone), les options d'une ligne (répondre, profil, demande
 // d'ami, ignorer, bloquer), les règles acceptées une fois, la liste des salons et les réglages de la
-// communauté (Menu système > Amis > Réglages de la communauté).
+// communauté (Menu système > Amis > Réglages de la communauté), dont les phrases préparées.
 //
 // Le salon à l'écran est annoncé au réseau (net.roomOpen) : j'y suis présent, son historique est
 // demandé ; dès que son écran n'est plus affiché, je n'y suis plus.
@@ -15,15 +15,21 @@ import {
   cleanRoomText,
   countryCodes,
   countryName,
+  DEFAULT_PHRASES,
   flagView,
   playerFlag,
   locale,
   maskWords,
   mentions,
+  phraseForTable,
+  phrasesSetting,
+  PHRASE_TABLE,
+  PHRASES_MAX,
   relationOf,
   roomCountry,
   roomLines,
   roomOfCountry,
+  roomPhrases,
   t,
   tn,
   WORLD_ROOM,
@@ -324,7 +330,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
 
   // ---------- Écrire ----------
 
-  function openWrite(room: RoomId): void {
+  function openWrite(room: RoomId, at?: number): void {
     const backToRoom = () => openRoom(room, current?.back ?? (() => lib.openSystem()));
     const send = (text: string) => {
       if (!net.rooms().rulesAt) return openRules(() => openWrite(room));
@@ -333,12 +339,14 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       backToRoom();
     };
     const build = (): Built => {
-      const table = host.currentTable();
-      const phrases = [t('Qui veut faire une partie ?'), ...(table ? [t('Quelqu’un sur {table} ?', { table: table.title })] : []), t('Bien joué !'), t('J’arrive dans 5 minutes'), t('Merci !'), t('Bonne soirée !')];
+      const phrases = readyPhrases();
       const mention = [...roomLines(net.rooms(), room)].reverse().find((l) => l.key !== me().key.publicKey && visible(l) && mentions(l.text, me().name));
       const actions: Action[] = [];
       // Les phrases préparées : des badges les uns à côté des autres (Section.kind « chips »), à choisir d'un appui.
       const chips: Row[] = phrases.map((p, i) => ({ text: p, action: actions.push({ label: p, key: `phrase:${i}`, run: () => send(p) }) - 1, pick: true }));
+      if (!chips.length) chips.push({ text: t('Aucune phrase préparée'), tone: 'quiet' });
+      // Juste après les phrases : les gérer (Réglages de la communauté > Phrases préparées), retour sur ce bouton.
+      actions.push({ label: t('Gérer les phrases…'), detail: t('Ajouter, modifier, ranger, supprimer'), icon: 'edit', key: 'phrases', run: () => openPhrases(() => openWrite(room, readyPhrases().length)) });
       if (mention) actions.push({ label: t('Répondre à @{name}', { name: mention.name }), detail: t('Il vous a cité à {time}', { time: time(mention.at) }), icon: 'message', run: () => askText(room, `@${mention.name} `, send) });
       actions.push({ label: t('Clavier à l’écran…'), detail: t('« /me … » pour une action'), icon: 'keyboard', run: () => askText(room, '', send) });
       actions.push({ label: t('Retour au salon'), icon: 'back', run: backToRoom });
@@ -364,7 +372,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         listHint: t('Flippers : choisir une phrase · Start : l’envoyer · Exit : sortir des phrases'),
       };
     };
-    lib.openCustom(build);
+    lib.openCustom(build, at);
   }
 
   function askText(room: RoomId, value: string, done: (text: string) => void): void {
@@ -600,6 +608,210 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
     }));
   }
 
+  // ---------- Phrases préparées ----------
+
+  /** Le texte d'une phrase gardée : celles d'origine dans la langue de la borne, {table} laissé tel quel. */
+  function phraseText(p: string): string {
+    // Dans l'ordre de DEFAULT_PHRASES (test phrases-salons) : des appels littéraux, relevés par le catalogue.
+    const defaults = [t('Qui veut faire une partie ?'), t('Quelqu’un sur {table} ?', { table: PHRASE_TABLE }), t('Bien joué !'), t('J’arrive dans 5 minutes'), t('Merci !'), t('Bonne soirée !')];
+    const i = DEFAULT_PHRASES.indexOf(p);
+    return i >= 0 ? defaults[i]! : p;
+  }
+
+  /** Les phrases à proposer (Écrire dans le salon, téléphone) : {table} remplacé ; sans table choisie, celles qui en parlent sont écartées. */
+  function readyPhrases(): string[] {
+    const table = host.currentTable()?.title;
+    return roomPhrases(net.rooms())
+      .map((p) => phraseForTable(phraseText(p), table))
+      .filter((p): p is string => p !== undefined);
+  }
+
+  type PhraseNotice = { text: string; tone: 'ok' | 'warning' };
+  const noticeRows = (n: PhraseNotice | undefined): Section[] => (n ? [{ rows: [{ text: n.text, tone: n.tone }] }] : []);
+  const savePhrases = (list: string[]) => net.setRooms({ phrases: phrasesSetting(list) });
+  /** Une phrase déjà dans la liste (gardée, ou telle qu'affichée dans la langue de la borne), hors `except`. */
+  const phraseTaken = (text: string, except?: string) => roomPhrases(net.rooms()).some((p) => p !== except && (p === text || phraseText(p) === text));
+
+  /** Saisir une phrase (clavier à l'écran ou téléphone), nettoyée comme une ligne du salon ; `cancel` reçoit la raison d'un refus. */
+  function askPhrase(heading: string, value: string, except: string | undefined, done: (text: string) => void, cancel: (refused?: PhraseNotice) => void): void {
+    lib.openPrompt(
+      heading,
+      t('Phrase préparée'),
+      value,
+      (raw) => {
+        if (raw === undefined) return cancel();
+        const text = cleanRoomText(raw);
+        if (!text) return cancel({ text: t('Phrase vide ou trop longue : 300 caractères au plus'), tone: 'warning' });
+        if (phraseTaken(text, except)) return cancel({ text: t('Cette phrase est déjà dans la liste'), tone: 'warning' });
+        done(text);
+      },
+      t('Une ligne, 300 caractères au plus, comme dans le salon. {table} : la table choisie dans la roue.', { table: PHRASE_TABLE }),
+    );
+  }
+
+  /** Une phrase dans les listes : son texte et, quand elle porte {table}, ce qu'elle devient avec la table choisie. */
+  function phraseRow(p: string): Pick<Row, 'text' | 'detail'> {
+    const text = phraseText(p);
+    if (!text.includes(PHRASE_TABLE)) return { text };
+    const table = host.currentTable()?.title;
+    return { text, detail: table ? t('Avec la table choisie : {text}', { text: phraseForTable(text, table)! }) : t('Proposée quand une table est choisie dans la roue') };
+  }
+
+  /**
+   * Réglages de la communauté > Phrases préparées : la liste dans l'ordre des badges, puis ajouter,
+   * rétablir celles d'origine, retour. `at` : le rang de l'élément où poser le curseur ; `notice` :
+   * l'avis du geste qui vient d'être fait, en tête.
+   */
+  function openPhrases(back: () => void, at?: number, notice?: PhraseNotice): void {
+    const here = (n: number, next?: PhraseNotice) => openPhrases(back, n, next);
+    const build = (): Built => {
+      const list = roomPhrases(net.rooms());
+      const actions: Action[] = [];
+      const rows: Row[] = list.map((p) => ({ ...phraseRow(p), action: actions.push({ label: phraseText(p), key: `phrase:${p}`, run: () => openPhrase(p, here) }) - 1, pick: true }));
+      // Les actions après la liste, dans l'ordre de l'affichage ; après chacune, le curseur y revient.
+      const addAt = list.length;
+      const full = list.length >= PHRASES_MAX;
+      actions.push({
+        label: t('Ajouter une phrase…'),
+        detail: full ? t('{n} phrases au plus : supprimez-en une d’abord', { n: PHRASES_MAX }) : t('Clavier à l’écran ou téléphone · 300 caractères'),
+        icon: 'plus',
+        ...(full ? { tone: 'quiet' as const } : {}),
+        run: () =>
+          full
+            ? here(addAt)
+            : askPhrase(t('Ajouter une phrase'), '', undefined, (text) => {
+                savePhrases([...roomPhrases(net.rooms()), text]);
+                here(addAt + 1, { text: t('Phrase ajoutée à la fin de la liste'), tone: 'ok' });
+              }, (refused) => here(addAt, refused)),
+      });
+      const original = phrasesSetting(list) === undefined;
+      actions.push({
+        label: t('Rétablir celles d’origine…'),
+        detail: original ? t('Ce sont déjà celles d’origine') : t('Les six phrases du départ, à la place des vôtres'),
+        icon: 'restore',
+        ...(original ? { tone: 'quiet' as const } : {}),
+        run: () => (original ? here(addAt + 1) : confirmRestore((done) => here(done ? DEFAULT_PHRASES.length + 1 : addAt + 1, done))),
+      });
+      actions.push({ label: t('Retour'), icon: 'back', run: back });
+      return {
+        heading: t('Phrases préparées'),
+        icon: 'message',
+        subheading: t('Réglages de la communauté'),
+        lead: t('Proposées en badges dans « Écrire dans le salon » et au téléphone, d’un appui. {table} : la table choisie dans la roue.', { table: PHRASE_TABLE }),
+        sections: [...noticeRows(notice), { title: tn(list.length, '{n} phrase', '{n} phrases'), rows: rows.length ? rows : [{ text: t('Aucune phrase : « Ajouter une phrase… » en crée une'), icon: 'message', tone: 'quiet' }] }],
+        actions,
+        back,
+        listHint: t('Flippers : parcourir · Start : modifier, ranger ou supprimer la phrase · Exit : sortir de la liste'),
+      };
+    };
+    lib.openCustom(build, at);
+  }
+
+  /** « Rétablir celles d'origine ? » : `after` reçoit l'avis quand c'est fait, rien quand c'est annulé. */
+  function confirmRestore(after: (done?: PhraseNotice) => void): void {
+    lib.openCustom(
+      () => ({
+        heading: t('Rétablir les phrases d’origine ?'),
+        icon: 'restore',
+        lead: t('Vos phrases sont remplacées par les six du départ, dans la langue de la borne.'),
+        sections: [],
+        actions: [
+          { label: t('Rétablir'), icon: 'restore', tone: 'warning', run: () => { net.setRooms({ phrases: undefined }); after({ text: t('Phrases d’origine rétablies'), tone: 'ok' }); } },
+          { label: t('Annuler'), icon: 'back', run: () => after() },
+        ],
+        back: () => after(),
+      }),
+      1,
+    );
+  }
+
+  /**
+   * Une phrase : modifier, monter, descendre, supprimer. Monter et Descendre redessinent le même écran :
+   * le curseur reste sur le bouton. `toList(n, avis)` : retour à la liste, le curseur sur le rang `n`.
+   */
+  function openPhrase(phrase: string, toList: (n: number, notice?: PhraseNotice) => void): void {
+    let p = phrase;
+    let notice: PhraseNotice | undefined;
+    const rank = () => roomPhrases(net.rooms()).indexOf(p);
+    const backToList = () => toList(Math.max(0, rank()));
+    const move = (by: -1 | 1) => {
+      const list = roomPhrases(net.rooms());
+      const i = list.indexOf(p);
+      const j = i + by;
+      if (i >= 0 && j >= 0 && j < list.length) {
+        [list[i], list[j]] = [list[j]!, list[i]!];
+        savePhrases(list);
+      }
+      notice = undefined;
+      lib.openCustom(build);
+    };
+    const build = (): Built => {
+      const list = roomPhrases(net.rooms());
+      const i = list.indexOf(p);
+      const first = i <= 0;
+      const last = i === list.length - 1;
+      return {
+        heading: t('Phrase préparée'),
+        icon: 'message',
+        subheading: t('{i} sur {n}', { i: i + 1, n: list.length }),
+        sections: [...noticeRows(notice), { rows: [{ ...phraseRow(p), icon: 'message' }] }],
+        actions: [
+          {
+            label: t('Modifier…'),
+            detail: t('Clavier à l’écran ou téléphone'),
+            icon: 'edit',
+            run: () =>
+              askPhrase(t('Modifier la phrase'), phraseText(p), p, (text) => {
+                // Inchangée (celle d'origine telle qu'affichée) : gardée sous sa clé, elle suit toujours la langue.
+                if (text !== phraseText(p)) {
+                  const next = roomPhrases(net.rooms());
+                  next[next.indexOf(p)] = text;
+                  savePhrases(next);
+                  p = text;
+                }
+                notice = undefined;
+                lib.openCustom(build, 0);
+              }, (refused) => {
+                notice = refused;
+                lib.openCustom(build, 0);
+              }),
+          },
+          { label: t('Monter'), detail: first ? t('Déjà la première') : t('Une place plus tôt dans les badges'), icon: 'move-up', ...(first ? { tone: 'quiet' as const } : {}), run: () => move(-1) },
+          { label: t('Descendre'), detail: last ? t('Déjà la dernière') : t('Une place plus loin dans les badges'), icon: 'move-down', ...(last ? { tone: 'quiet' as const } : {}), run: () => move(1) },
+          { label: t('Supprimer…'), detail: t('Après confirmation'), icon: 'trash', tone: 'warning', run: () => confirmDelete() },
+          { label: t('Retour'), icon: 'back', run: backToList },
+        ],
+        back: backToList,
+      };
+    };
+    const confirmDelete = () =>
+      lib.openCustom(
+        () => ({
+          heading: t('Supprimer cette phrase ?'),
+          icon: 'trash',
+          lead: t('« {text} » ne sera plus proposée. « Rétablir celles d’origine » remet les six du départ.', { text: phraseText(p) }),
+          sections: [],
+          actions: [
+            {
+              label: t('Supprimer'),
+              icon: 'trash',
+              tone: 'warning',
+              run: () => {
+                const i = rank();
+                savePhrases(roomPhrases(net.rooms()).filter((x) => x !== p));
+                // Le curseur sur la phrase qui prend sa place (ou « Ajouter une phrase… » après la dernière).
+                toList(Math.max(0, i), { text: t('Phrase supprimée'), tone: 'ok' });
+              },
+            },
+            { label: t('Annuler'), icon: 'back', run: () => lib.openCustom(build, 3) },
+          ],
+          back: () => lib.openCustom(build, 3),
+        }),
+        1,
+      );
+    lib.openCustom(build);
+  }
+
   // ---------- Réglages de la communauté ----------
 
   function openSettings(back: () => void, at?: number): void {
@@ -613,8 +825,9 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         { label: t('Salon par défaut : {room}', { room: roomName(defaultRoom()) }), detail: t('Celui où l’on entre depuis la Communauté'), icon: 'pin', run: () => { net.setRooms({ defaultRoom: defaultRoom() === WORLD_ROOM && myCountry() ? roomOfCountry(myCountry()!) : WORLD_ROOM }); here(2); } },
         { label: s.filter ? t('Filtre de mots : activé') : t('Filtre de mots : désactivé'), detail: t('Masque les mots grossiers par des étoiles'), icon: 'filter', run: () => { net.setRooms({ filter: !s.filter }); here(3); } },
         { label: s.mentionsInGame ? t('Mentions pendant les parties : carte et son') : t('Mentions pendant les parties : rien'), detail: t('Quand on vous cite dans un salon, en haut du plateau'), icon: 'bell', run: () => { net.setRooms({ mentionsInGame: !s.mentionsInGame }); here(4); } },
-        { label: tn(s.ignored.length, '{n} joueur ignoré', '{n} joueurs ignorés'), detail: s.ignored.length ? t('Start : ne plus les ignorer') : t('Leurs lignes disparaissent de vos salons'), icon: 'eye', ...(s.ignored.length ? {} : { tone: 'quiet' as const }), run: () => (s.ignored.length ? openIgnored(() => here(5)) : here(5)) },
-        { label: t('Règles des salons'), detail: s.rulesAt ? t('Acceptées le {date}', { date: new Date(s.rulesAt).toLocaleDateString(locale()) }) : t('Pas encore acceptées'), icon: 'rules', run: () => openRules(() => here(6)) },
+        { label: t('Phrases préparées'), detail: tn(roomPhrases(s).length, '{n} phrase, en badges dans « Écrire dans le salon » et au téléphone', '{n} phrases, en badges dans « Écrire dans le salon » et au téléphone'), icon: 'message', run: () => openPhrases(() => here(5)) },
+        { label: tn(s.ignored.length, '{n} joueur ignoré', '{n} joueurs ignorés'), detail: s.ignored.length ? t('Start : ne plus les ignorer') : t('Leurs lignes disparaissent de vos salons'), icon: 'eye', ...(s.ignored.length ? {} : { tone: 'quiet' as const }), run: () => (s.ignored.length ? openIgnored(() => here(6)) : here(6)) },
+        { label: t('Règles des salons'), detail: s.rulesAt ? t('Acceptées le {date}', { date: new Date(s.rulesAt).toLocaleDateString(locale()) }) : t('Pas encore acceptées'), icon: 'rules', run: () => openRules(() => here(7)) },
         { label: t('Retour'), icon: 'back', run: back },
       ];
       return { heading: t('Réglages de la communauté'), icon: 'sliders', subheading: t('Menu système · Amis'), lead: t('En mode invité, la communauté est fermée : le menu système l’est aussi.'), sections: [], actions, back };
@@ -664,7 +877,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
     },
     settingsItem: {
       get detail() {
-        return t('Présence, salons, filtre de mots, joueurs ignorés, règles');
+        return t('Présence, salons, filtre de mots, phrases préparées, joueurs ignorés, règles');
       },
       run: () => openSettings(() => lib.openSystem()),
     },
@@ -691,13 +904,13 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         .slice(-60)
         .map((l) => ({ time: time(l.at), nick: l.name, hue: hueOf(l.key, l.name), text: shownText(l.text), kind: (l.key === self ? 'own' : l.me ? 'me' : mentions(l.text, me().name) ? 'mention' : 'line') as 'own' | 'me' | 'mention' | 'line' }));
       const problem = writeProblem(room) ?? (net.rooms().rulesAt ? undefined : t('Acceptez d’abord les règles des salons, à la borne : Écrire dans le salon'));
-      const table = host.currentTable();
       return {
         room,
         name: roomName(room),
         present: net.roomPresent(room).length,
         lines,
-        phrases: [t('Qui veut faire une partie ?'), ...(table ? [t('Quelqu’un sur {table} ?', { table: table.title })] : []), t('Bien joué !'), t('J’arrive dans 5 minutes'), t('Bonne soirée !')],
+        // Les mêmes phrases qu'à la borne (Réglages de la communauté > Phrases préparées).
+        phrases: readyPhrases(),
         ...(problem ? { blocked: problem } : {}),
       };
     },

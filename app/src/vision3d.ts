@@ -8,8 +8,9 @@
 // - Pendant une partie, HeadTracker lit le capteur (webcam : fenêtre cachée et MediaPipe ; Kinect
 //   pour Xbox 360 : Kinect10.dll de Microsoft par koffi), lisse la position de la tête, la compare à
 //   la position de jeu et envoie le déplacement au plugin par UDP local (127.0.0.1, format opentrack).
-//   La caméra s'allume au début de la partie et s'éteint à la fin ; aucune image ne quitte le PC
-//   (la fenêtre de la webcam n'a accès à aucun réseau).
+//   Le capteur s'allume dès le Start (pendant le chargement de la table : la Kinect a le temps de
+//   repérer le joueur) et reste allumé deux minutes après la partie, pour la suivante ; aucune image
+//   ne quitte le PC (la fenêtre de la webcam n'a accès à aucun réseau).
 // - Pilote de la Kinect : téléchargé chez Microsoft à la demande (components.json,
 //   « kinect-sdk-1.8 » : le SDK, sans lequel le pilote refuse une Kinect pour Xbox 360), empreinte et signature vérifiées, installé en silence avec l'accord de
 //   Windows (élévation).
@@ -133,6 +134,13 @@ export function installVision3dPlugin(vpxDir: string, appDir: string): VpxPlugin
 const NEUTRAL_SAMPLES = 24;
 /** Calibrage : deux fois plus de mesures, le joueur averti et immobile (environ deux secondes). */
 export const CALIBRATION_SAMPLES = 50;
+/**
+ * Capteur gardé allumé après une partie : rejouer tout de suite ne remet pas le capteur en route.
+ * La Kinect, en mode assis, ne repère le joueur qu'après un mouvement : rallumée au début de chaque
+ * partie, alors que le joueur est immobile devant le plateau, elle pouvait attendre de longues
+ * secondes (journal du PinCab, 13/11/2026 : 13 à 39 s de partie sans suivi).
+ */
+export const VISION3D_KEEP_WARM_MS = 2 * 60_000;
 
 export type TrackerState = 'off' | 'starting' | 'searching' | 'tracking' | 'failed';
 
@@ -146,8 +154,21 @@ export interface HeadTrackerOptions {
   log: (line: string) => void;
 }
 
+const sensorName = (kind: Vision3dSourceKind) => (kind === 'kinect1' ? 'Kinect' : 'webcam');
+
+/**
+ * Le capteur et la partie sont deux choses : le capteur s'allume dès le Start (warm, pendant le
+ * chargement de la table, quand le joueur bouge encore et que la Kinect le repère), la partie
+ * commence quand la table est à l'écran (start : position de jeu, envoi à VPX). À la fin, release
+ * garde le capteur allumé VISION3D_KEEP_WARM_MS pour la partie suivante, puis l'éteint.
+ */
 export class HeadTracker {
   private source?: Source;
+  /** Capteur allumé : lequel, et son réglage (un autre champ de webcam : capteur rallumé). */
+  private sourceKey?: string;
+  private sourceSince = 0;
+  private sourceSeen = false;
+  private idleTimer?: NodeJS.Timeout;
   private socket?: dgram.Socket;
   private filter = new HeadFilter();
   private smoothing: Vision3dSmoothing = 'normal';
@@ -161,6 +182,8 @@ export class HeadTracker {
   private samples: Vec3[] = [];
   private lastSeen = 0;
   private failure?: string;
+  /** Partie en cours : depuis quand, et quand la tête y a été suivie pour la première fois. */
+  private game?: { since: number; trackedAfterMs?: number };
   /** Essai hors partie en cours : où rendre les positions (test). */
   private testing?: (p: Vec3) => void;
   /** Déplacements envoyés (essais et journal). */
@@ -169,7 +192,8 @@ export class HeadTracker {
   constructor(private readonly opts: HeadTrackerOptions) {}
 
   get state(): TrackerState {
-    if (!this.source) return this.failure ? 'failed' : 'off';
+    if (this.failure) return 'failed';
+    if (!this.source) return 'off';
     if (!this.lastSeen) return 'starting';
     return Date.now() - this.lastSeen < 1000 ? 'tracking' : 'searching';
   }
@@ -178,7 +202,11 @@ export class HeadTracker {
     return this.failure;
   }
 
-  /** Allume le capteur pour une partie. Sans erreur : la partie se joue sans Vision 3D si le capteur fait défaut. */
+  /** Le capteur est-il allumé (partie, chargement, ou gardé pour la partie suivante) ? */
+  get running(): boolean {
+    return Boolean(this.source);
+  }
+
   /** Intensité et réactivité, changées à tout moment (écran Vision 3D, réglages en partie) : effet immédiat. */
   configure(setting: Pick<Vision3dSetting, 'intensity' | 'smoothing'>): void {
     this.intensity = setting.intensity;
@@ -188,32 +216,38 @@ export class HeadTracker {
     }
   }
 
-  start(kind: Vision3dSourceKind, configurationId: string, setting: Vision3dSetting): void {
-    this.stop();
+  /**
+   * Allume le capteur sans rien envoyer à VPX : au Start, pendant le chargement de la table. Déjà
+   * allumé avec le même capteur (partie d'avant) : gardé tel quel, le joueur déjà repéré.
+   */
+  warm(kind: Vision3dSourceKind, setting: Vision3dSetting): void {
+    this.endGame();
     this.configure(setting);
-    this.failure = undefined;
+    if (this.ensureSource(kind, setting, 'dès le Start, pendant le chargement de la table')) this.opts.log(`Vision 3D : ${sensorName(kind)} déjà allumée, ${this.state === 'tracking' ? 'tête suivie' : 'tête pas encore repérée'}.`); // i18n-ignore : journal
+    // Lancement abandonné avant VPX (configuration à choisir, Exit pendant la préparation) : le capteur s'éteint seul.
+    this.armIdle(VISION3D_KEEP_WARM_MS);
+  }
+
+  /**
+   * Début de la partie (la table à l'écran) : la position de jeu (enregistrée, ou mesurée à la
+   * première seconde), puis le déplacement de la tête envoyé au plugin. Le capteur allumé au Start
+   * sert tel quel. Sans erreur : la partie se joue sans Vision 3D si le capteur fait défaut.
+   */
+  start(kind: Vision3dSourceKind, configurationId: string, setting: Vision3dSetting): void {
+    this.endGame();
+    this.configure(setting);
     this.kind = kind;
     this.configurationId = configurationId;
     const saved = setting.neutral[configurationId];
     this.neutral = saved && saved.source === kind ? { x: saved.x, y: saved.y, z: saved.z } : undefined;
     this.samples = [];
-    this.filter.reset();
-    this.lastSeen = 0;
-    this.sent = 0;
+    const reused = this.ensureSource(kind, setting, 'au début de la partie'); // i18n-ignore : journal
+    if (!this.source) return;
     this.socket = dgram.createSocket('udp4');
     this.socket.on('error', () => undefined);
-    const onHead = (p: Vec3) => this.push(p);
-    const onFailure = (reason: string) => {
-      this.failure = reason;
-      this.opts.log(`Vision 3D : ${reason}`); // i18n-ignore : journal
-    };
-    try {
-      this.source = kind === 'kinect1' ? startKinect1(onHead, onFailure, this.opts.log) : startWebcam(setting.webcamFovDeg, onHead, onFailure, this.opts.log);
-      this.opts.log(`Vision 3D : ${kind === 'kinect1' ? 'Kinect' : 'webcam'} allumée${this.neutral ? '' : ', position de jeu mesurée à la première seconde'}.`); // i18n-ignore : journal
-    } catch (error) {
-      onFailure((error as Error).message);
-      this.stop();
-    }
+    const tracked = this.state === 'tracking';
+    this.game = { since: Date.now(), ...(tracked && { trackedAfterMs: 0 }) };
+    this.opts.log(`Vision 3D : début de partie, ${sensorName(kind)} ${reused ? 'allumée avant' : 'allumée à l’instant'}, ${tracked ? 'tête déjà suivie' : 'tête pas encore repérée'}${this.neutral ? '' : ', position de jeu mesurée à la première seconde'}.`); // i18n-ignore : journal
   }
 
   /**
@@ -221,25 +255,13 @@ export class HeadTracker {
    * `onHead` ; rien n'est envoyé à VPX ni enregistré. stop() l'éteint.
    */
   test(kind: Vision3dSourceKind, setting: Vision3dSetting, onHead: (p: Vec3) => void, configurationId?: string): void {
-    this.stop();
+    this.endGame();
     this.configure(setting);
     this.kind = kind;
     this.configurationId = configurationId;
-    this.failure = undefined;
-    this.filter.reset();
-    this.lastSeen = 0;
     this.testing = onHead;
-    const onFailure = (reason: string) => {
-      this.failure = reason;
-      this.opts.log(`Vision 3D (essai) : ${reason}`); // i18n-ignore : journal
-    };
-    try {
-      this.source = kind === 'kinect1' ? startKinect1((p) => this.push(p), onFailure, this.opts.log) : startWebcam(setting.webcamFovDeg, (p) => this.push(p), onFailure, this.opts.log);
-      this.opts.log(`Vision 3D : essai du capteur (${kind === 'kinect1' ? 'Kinect' : 'webcam'}).`); // i18n-ignore : journal
-    } catch (error) {
-      onFailure((error as Error).message);
-      this.stop();
-    }
+    this.ensureSource(kind, setting, 'pour l’essai'); // i18n-ignore : journal
+    this.opts.log(`Vision 3D : essai du capteur (${sensorName(kind)}).`); // i18n-ignore : journal
   }
 
   /**
@@ -262,26 +284,101 @@ export class HeadTracker {
     this.samples = [];
   }
 
-  /** Bilan de la partie qui s'achève : positions envoyées et panne du capteur, lus avant stop(). */
-  summary(): { sent: number; failure?: string } {
-    return { sent: this.sent, ...(this.failure && { failure: this.failure }) };
+  /** Bilan de la partie qui s'achève : positions envoyées, délai avant la première tête suivie, panne du capteur ; lus avant release(). */
+  summary(): { sent: number; trackedAfterMs?: number; failure?: string } {
+    return { sent: this.sent, ...(this.game?.trackedAfterMs !== undefined && { trackedAfterMs: this.game.trackedAfterMs }), ...(this.failure && { failure: this.failure }) };
   }
 
-  stop(): void {
+  /**
+   * Fin de partie : plus rien n'est envoyé à VPX, mais le capteur reste allumé `keepMs` pour la
+   * partie suivante (le joueur reste repéré), puis s'éteint de lui-même.
+   */
+  release(keepMs = VISION3D_KEEP_WARM_MS): void {
+    this.endGame();
     this.testing = undefined;
     this.calibrating?.done(undefined);
     this.calibrating = undefined;
+    if (!this.source) return;
+    if (keepMs <= 0 || this.failure) return this.stop();
+    this.armIdle(keepMs);
+  }
+
+  /** Extinction automatique dans `keepMs`, sauf partie ou essai d'ici là (ensureSource l'annule). */
+  private armIdle(keepMs: number): void {
+    if (!this.source) return;
+    clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => {
+      this.opts.log(`Vision 3D : capteur éteint (aucune partie lancée en ${Math.round(keepMs / 1000)} s).`); // i18n-ignore : journal
+      this.stop();
+    }, keepMs);
+    this.idleTimer.unref?.();
+  }
+
+  /** Éteint le capteur tout de suite (essai fini, Vision 3D désactivée, partie dans le casque). */
+  stop(): void {
+    this.endGame();
+    this.testing = undefined;
+    this.calibrating?.done(undefined);
+    this.calibrating = undefined;
+    if (this.source) this.opts.log('Vision 3D : capteur éteint.'); // i18n-ignore : journal
+    this.stopSource();
+  }
+
+  /** Allume le capteur s'il ne l'est pas déjà (même capteur, même réglage) ; true : il l'était. */
+  private ensureSource(kind: Vision3dSourceKind, setting: Vision3dSetting, when: string): boolean {
+    clearTimeout(this.idleTimer);
+    this.idleTimer = undefined;
+    const key = kind === 'webcam' ? `webcam:${setting.webcamFovDeg}` : kind;
+    if (this.source && this.sourceKey === key && !this.failure) return true;
+    this.stopSource();
+    this.failure = undefined;
+    this.filter.reset();
+    this.lastSeen = 0;
+    this.sourceSeen = false;
+    this.sourceSince = Date.now();
+    const onHead = (p: Vec3) => this.push(p);
+    const onFailure = (reason: string) => {
+      this.failure = reason;
+      this.opts.log(`Vision 3D${this.testing ? ' (essai)' : ''} : ${reason}`); // i18n-ignore : journal
+    };
+    try {
+      this.source = kind === 'kinect1' ? startKinect1(onHead, onFailure, this.opts.log) : startWebcam(setting.webcamFovDeg, onHead, onFailure, this.opts.log);
+      this.sourceKey = key;
+      this.opts.log(`Vision 3D : ${sensorName(kind)} allumée ${when}.`); // i18n-ignore : journal
+    } catch (error) {
+      onFailure((error as Error).message);
+      this.stopSource();
+    }
+    return false;
+  }
+
+  private stopSource(): void {
+    clearTimeout(this.idleTimer);
+    this.idleTimer = undefined;
     this.source?.stop();
     this.source = undefined;
+    this.sourceKey = undefined;
+  }
+
+  private endGame(): void {
     this.socket?.close();
     this.socket = undefined;
-    if (this.sent) this.opts.log(`Vision 3D : capteur éteint (${this.sent} positions envoyées).`); // i18n-ignore : journal
+    if (this.game && this.sent) this.opts.log(`Vision 3D : fin de partie (${this.sent} positions envoyées).`); // i18n-ignore : journal
+    this.game = undefined;
     this.sent = 0;
   }
 
   private push(raw: Vec3): void {
     const now = Date.now();
     this.lastSeen = now;
+    if (!this.sourceSeen) {
+      this.sourceSeen = true;
+      this.opts.log(`Vision 3D : tête repérée ${((now - this.sourceSince) / 1000).toFixed(1)} s après l’allumage du capteur.`); // i18n-ignore : journal
+    }
+    if (this.game && this.game.trackedAfterMs === undefined) {
+      this.game.trackedAfterMs = now - this.game.since;
+      this.opts.log(`Vision 3D : tête suivie ${(this.game.trackedAfterMs / 1000).toFixed(1)} s après le début de la partie.`); // i18n-ignore : journal
+    }
     const p = this.filter.filter(raw, now / 1000);
     if (this.calibrating) {
       const c = this.calibrating;
@@ -294,6 +391,8 @@ export class HeadTracker {
       }
     }
     if (this.testing) return this.testing(p);
+    // Capteur allumé hors partie (chargement de la table, entre deux parties) : le lissage suit, rien ne part.
+    if (!this.game) return;
     if (!this.neutral) {
       this.samples.push(p);
       if (this.samples.length < NEUTRAL_SAMPLES) return;
@@ -468,56 +567,87 @@ function loadNui(): NuiApi {
   return nui;
 }
 
+/**
+ * Appels lents au pilote (NuiInitialize : une demi-seconde à une seconde au PinCab, 13/11/2026) : sur
+ * un fil de koffi, jamais sur le fil principal (l'écran de chargement gèlerait au Start). Les uns
+ * après les autres : un arrêt et un rallumage ne se croisent jamais dans le pilote.
+ */
+let nuiQueue: Promise<unknown> = Promise.resolve();
+function nuiAsync(fn: NativeFn, ...args: unknown[]): Promise<number> {
+  const call = nuiQueue.then(
+    () =>
+      new Promise<number>((resolve, reject) => {
+        (fn as unknown as { async: (...a: unknown[]) => void }).async(...args, (error: unknown, result: number) => (error ? reject(error) : resolve(result)));
+      }),
+  );
+  nuiQueue = call.catch(() => undefined);
+  return call;
+}
+
 function startKinect1(onHead: (p: Vec3) => void, onFailure: (reason: string) => void, log: (line: string) => void): Source {
   const api = loadNui();
-  const hr = api.initialize(NUI_INITIALIZE_FLAG_USES_SKELETON) as number;
-  if (hr < 0) throw new Error(nuiErrorReason(hr)); // raison en clair, d'après NuiApi.h du SDK 1.8
-  const tr = api.trackingEnable(null, NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT) as number;
-  if (tr < 0) {
-    api.shutdown();
-    throw new Error(nuiErrorReason(tr));
-  }
   const frame = Buffer.alloc(NUI_SKELETON_FRAME_SIZE);
-  let aimed = false;
-  /** Le moteur tourne : la tête « bouge » sans que le joueur bouge ; ces images sont ignorées. */
-  let settleUntil = 0;
-  let errors = 0;
-  const timer = setInterval(() => {
-    const rc = api.nextFrame(0, frame) as number;
-    if (rc < 0) {
-      // E_NUI_FRAME_NO_DATA : pas de nouvelle image ; une erreur qui dure : capteur débranché.
-      if ((rc >>> 0) !== 0x83010001 && ++errors > 300) {
-        clearInterval(timer);
-        onFailure('la Kinect ne répond plus'); // i18n-ignore : journal
+  let stopped = false;
+  let timer: NodeJS.Timeout | undefined;
+  const startedAt = Date.now();
+  void (async () => {
+    try {
+      const hr = await nuiAsync(api.initialize, NUI_INITIALIZE_FLAG_USES_SKELETON);
+      if (hr < 0) throw new Error(nuiErrorReason(hr)); // raison en clair, d'après NuiApi.h du SDK 1.8
+      if (stopped) return;
+      // Mode assis : la caisse cache les jambes du joueur ; il ne repère le joueur qu'après un mouvement.
+      const tr = await nuiAsync(api.trackingEnable, null, NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT);
+      if (tr < 0) {
+        nuiAsync(api.shutdown).catch(() => undefined);
+        throw new Error(nuiErrorReason(tr));
       }
+    } catch (error) {
+      if (!stopped) onFailure((error as Error).message);
       return;
     }
-    errors = 0;
-    const seen = readSkeletonFrame(frame);
-    if (!seen || Date.now() < settleUntil) return;
-    if (!aimed) {
-      // Une fois par partie : le moteur s'use et bloque la lecture une seconde.
-      aimed = true;
-      const elevation = [0];
-      if ((api.getElevation(elevation) as number) >= 0) {
-        const target = kinectAim(seen.head, elevation[0]!);
-        if (target !== undefined && (api.setElevation(target) as number) >= 0) {
-          log(`Vision 3D (Kinect) : inclinaison ${elevation[0]}° -> ${target}° pour viser la tête.`); // i18n-ignore : journal
-          settleUntil = Date.now() + 1500;
-          return;
+    // Arrêté pendant l'allumage : stop() a déjà mis l'arrêt du pilote dans la file.
+    if (stopped) return;
+    log(`Vision 3D (Kinect) : prête en ${Date.now() - startedAt} ms.`); // i18n-ignore : journal
+    let aimed = false;
+    /** Le moteur tourne : la tête « bouge » sans que le joueur bouge ; ces images sont ignorées. */
+    let settleUntil = 0;
+    let errors = 0;
+    timer = setInterval(() => {
+      const rc = api.nextFrame(0, frame) as number;
+      if (rc < 0) {
+        // E_NUI_FRAME_NO_DATA : pas de nouvelle image ; une erreur qui dure : capteur débranché.
+        if ((rc >>> 0) !== 0x83010001 && ++errors > 300) {
+          clearInterval(timer);
+          onFailure('la Kinect ne répond plus'); // i18n-ignore : journal
+        }
+        return;
+      }
+      errors = 0;
+      const seen = readSkeletonFrame(frame);
+      if (!seen || Date.now() < settleUntil) return;
+      if (!aimed) {
+        // Une fois par allumage : le moteur s'use et bloque la lecture une seconde.
+        aimed = true;
+        const elevation = [0];
+        if ((api.getElevation(elevation) as number) >= 0) {
+          const target = kinectAim(seen.head, elevation[0]!);
+          if (target !== undefined && (api.setElevation(target) as number) >= 0) {
+            log(`Vision 3D (Kinect) : inclinaison ${elevation[0]}° -> ${target}° pour viser la tête.`); // i18n-ignore : journal
+            settleUntil = Date.now() + 1500;
+            return;
+          }
         }
       }
-    }
-    onHead(kinectHead(seen.head, seen.floor));
-  }, 10);
+      onHead(kinectHead(seen.head, seen.floor));
+    }, 10);
+  })();
   return {
     stop() {
+      stopped = true;
       clearInterval(timer);
-      try {
-        api.shutdown();
-      } catch {
-        // Capteur débranché pendant la partie.
-      }
+      // Dans la file, après l'allumage en cours s'il y en a un, avant tout rallumage : jamais croisés.
+      // Capteur débranché pendant la partie : l'erreur du pilote est sans suite.
+      nuiAsync(api.shutdown).catch(() => undefined);
     },
   };
 }

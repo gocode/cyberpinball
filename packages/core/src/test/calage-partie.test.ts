@@ -49,13 +49,11 @@ import {
   anchorPlace,
   movePlace,
   moveContour,
-  arbitrateJump,
   composeJumps,
-  jumpHeadCheck,
-  JUMP_MATCH_CM,
-  JUMP_MATCH_DEG,
-  anchorHeadAtOrigin,
-  ANCHOR_HEAD_MAX_CM,
+  RoomFrame,
+  type JumpTransform,
+  inverseJump,
+  sameContour,
   ANCHOR_MAX_RESIDUAL_CM,
   ANCHOR_MIN_CM,
   ANCHOR_MIN_DEG,
@@ -380,7 +378,7 @@ test('sonde LibOVR (13 novembre 2026) : la DLL du runtime de Meta, lancée avec 
   assert.match(front, /ovrProbe\.set\(vrMode === 'auto'\);/);
   assert.match(front, /headset\?\.dispose\(\);\s*ovrProbe\.set\(false\);/);
   const sonde = read('app', 'src', 'sonde-ovr.ts');
-  assert.match(sonde, /spawn\(exe, \['--ovr', dll\]/);
+  assert.match(sonde, /spawn\(exe, \['--ovr', dll, \.\.\.\(this\.opts\.undoOrigin \? \['--defaire-origine'\] : \[\]\)\]/);
   assert.match(sonde, /this\.opts\.log\(`Casque, sonde LibOVR : \$\{line\.slice\(4\)\}`\)/);
   // Rien de Meta n'est livré : la sonde charge la DLL installée, sans en-tête du SDK.
   const cpp = read('packages', 'casque-vr', 'src', 'sonde-ovr.cpp');
@@ -488,8 +486,8 @@ test('la pièce refaite au port du casque, détectée, l’ancrage attendu ou le
   const front = read('app', 'src', 'frontend.ts');
   assert.match(front, /onOriginReset: \(afterRemoval\) => headsetOriginReset\(afterRemoval\),/);
   // Avec un contour gardé : l'ancrage attendu, puis confirmé par la tête ; sinon le calage proposé.
-  assert.match(front, /if \(place\.contour\?\.length && latestContour\) \{/);
-  assert.match(front, /anchorCheck\(\);\s*const now = headset\?\.place\(\);\s*const head = now \? anchorHeadAtOrigin\(now\) : undefined;/);
+  assert.match(front, /setTimeout\(\(\) => settlePort\(watch, afterRemoval\), PORT_SETTLE_MS\)/);
+  assert.equal(/anchorHeadAtOrigin|jumpHeadCheck|confirmée par la tête/.test(front), false);
   assert.equal(/lastAutoRecalAt|vrAutoRecal|restLearnArmed/.test(front), false);
 });
 
@@ -547,34 +545,6 @@ test('ancrage sur la limite du Quest (13 novembre 2026) : la borne reposée par 
   assert.equal(anchorPlace({ ...calee, contour: undefined }, contour), undefined);
 });
 
-test('ancrage au menu : branché sur la sonde, gardé avec chaque place, confirmé par la tête au port (13 novembre 2026)', () => {
-  assert.equal(ANCHOR_HEAD_MAX_CM, 50);
-  // La tête reposée par l'ancrage, près de l'origine où le Quest l'a remise : confirmé ; loin (essai de 18:37 : la tête
-  // reportée à 98 cm, la vraie barre ayant sauté de 114 cm pendant que le contour bougeait de 12 cm) : pas confirmé.
-  const base = lockbarPlace({ x: -0.3, y: 0.9, z: -0.4 }, { x: 0.3, y: 0.9, z: -0.4 });
-  assert.deepEqual(anchorHeadAtOrigin({ ...base, head: { x: 0.12, z: 0.2 } })?.confirmed, true);
-  const loin = anchorHeadAtOrigin({ ...base, head: { x: 0.858, z: -0.475 } })!;
-  assert.equal(loin.confirmed, false);
-  assert.ok(Math.abs(loin.cm - 98) < 1, String(loin.cm));
-  assert.equal(anchorHeadAtOrigin(base), undefined);
-  const front = read('app', 'src', 'frontend.ts');
-  // Le contour de la sonde arrive au menu, et chaque place écrite garde le contour courant (même repère).
-  assert.match(front, /onContour: \(points\) => \{\s*latestContour = points\.length >= 3 \? points : undefined;\s*anchorCheck\(\);/);
-  assert.match(front, /contour: \(\) => latestContour,/);
-  // Ni au bureau, ni en limite fixe, ni pendant le calage ou une partie.
-  assert.match(front, /function anchorCheck\(\): void \{\s*if \(!headset \|\| !latestContour \|\| calibration \|\| controllerWizard \|\| playing \|\| launch \|\| !headset\.worn\) return;[\s\S]*?if \(headsetSetting\(\) === 'bureau' \|\| headset\.roomKeeping === 'recentred'\) return;/);
-  assert.match(front, /if \(r\.kind === 'redrawn'\) \{\s*if \(anchorRedrawnSaid === r\.why\) return;/);
-  assert.match(front, /if \(r\.cm > ANCHOR_BANNER_CM\) showBanner\(t\('Borne remise en place sur la limite du Quest'\)\);/);
-  // Au port, origine remise : pas de calage proposé si l'ancrage est confirmé par la tête.
-  assert.match(front, /const head = now \? anchorHeadAtOrigin\(now\) : undefined;\s*if \(head\?\.confirmed\) \{/);
-  // Après une partie : la borne du menu reposée.
-  assert.match(front, /if \(playedVr\) setTimeout\(anchorCheck, 0\);/);
-  const casque = read('app', 'src', 'casque.ts');
-  assert.match(casque, /const \{ contour: _stale, rest: _gone, \.\.\.kept \}: CabinetPlace & \{ rest\?: unknown \} = recentred/);
-  assert.match(casque, /const contour = this\.opts\.contour\?\.\(\);/);
-  assert.match(casque, /\.\.\.\(contour && \{ contour \}\) \};/);
-});
-
 test('option « Recalage automatique » retirée (13 novembre 2026, l’ancrage la remplace) : ni réglage, ni relevés, ni repos appris', () => {
   const menu = read('packages', 'core', 'src', 'systemmenu.ts');
   assert.equal(menu.includes('vr-auto-calibrate'), false);
@@ -619,74 +589,80 @@ test('saut mesuré dans le flux de la tête (13 novembre 2026, relevés du jour)
   assert.match(cpp, /load\(dll, "ovr_TestBoundary", api\.testBoundary\);/);
 });
 
-test('saut mesuré appliqué au menu, arbitré contre le contour (13 novembre 2026) : une seule correction, jamais deux', () => {
-  assert.deepEqual([JUMP_MATCH_CM, JUMP_MATCH_DEG], [5, 3]);
+
+test('repère de la pièce (essai réel du 13 novembre 2026, Air Link) : le contour effectif, une seule correction par saut', () => {
   const contour: [number, number][] = [];
   for (let i = 0; i < 406; i++) {
     const a = (i / 406) * 2 * Math.PI;
     const r = 1.8 + 0.35 * Math.sin(3 * a) + 0.2 * Math.cos(5 * a + 1) + 0.1 * Math.sin(11 * a);
-    contour.push([0.3 + r * Math.cos(a), -0.2 + r * Math.sin(a)]);
+    contour.push([-0.474 + r * Math.cos(a), 0.424 + r * Math.sin(a)]);
   }
-  // Première sorte, chiffres réels de 18:37 : la tête lue avant le saut par la sonde, après par OpenXR ; le contour relu
-  // trois secondes plus tard n'a pas bougé (il ne bougera que de 12 cm une minute après).
-  const yaw = (y: number) => ({ x: -Math.sin(y), z: -Math.cos(y) });
-  const [x1, z1, y1] = [1.142, 0.09, -1.667];
-  const [x2, z2, y2] = [-0.005604, 0.006338, -0.019155];
-  const f1 = yaw(y1), f2 = yaw(y2);
-  const angle = Math.atan2(f1.x * f2.z - f1.z * f2.x, f1.x * f2.x + f1.z * f2.z);
-  const [c, s] = [Math.cos(angle), Math.sin(angle)];
-  const jump = { angle, tx: x2 - (c * x1 - s * z1), tz: z2 - (s * x1 + c * z1), dy: 0 };
-  const avant: CabinetPlace = { ...lockbarPlace({ x: 0.548584, y: 0.9, z: -0.441898 }, { x: 1.127474, y: 0.9, z: -0.436842 }), head: { x: 0.869496, z: -0.276959 }, contour };
-  const apres = lockbarPlace({ x: -0.460393, y: 0.9, z: 0.641169 }, { x: -0.520985, y: 0.9, z: 0.07632 });
-  const fige = arbitrateJump(avant, jump, contour);
-  assert.equal(fige.kind, 'fige');
-  if (fige.kind !== 'fige') return;
-  const reste = placeGap(fige.place, apres);
-  assert.ok(reste.cm < 2.5 && reste.deg < 2.5, JSON.stringify(reste));
-  // Le contour gardé est celui qu'un runtime à jour rendrait : l'ancrage le retrouvera quand le contour relu suivra.
-  assert.equal(anchorPlace(fige.place, moveContour(contour, jump))!.kind, 'same');
-  // Tant que le contour relu reste figé, l'ancrage déferait la correction : c'est pourquoi il attend (frontend).
-  assert.equal(anchorPlace(fige.place, fige.frozenRead)!.kind, 'moved');
-  // La tête du calage, reposée par le saut, tombe près de la tête d'après le saut (à l'origine) : confirmé.
-  const tete = jumpHeadCheck(fige.place, { x: x2, z: z2 })!;
-  assert.ok(tete.confirmed && tete.cm < 50, JSON.stringify(tete));
-  // Seconde sorte, chiffres de 18:38-18:43 : la limite est restée sur la pièce, le contour relu a suivi le saut
-  // (−48,4°, la barre à 90 cm) ; une seule correction, et l'ancrage n'a ensuite plus rien à faire.
-  const mid = { x: 0.84, z: -0.44 };
-  const a2 = (-48.4 * Math.PI) / 180;
-  const [c2, s2] = [Math.cos(a2), Math.sin(a2)];
-  const d = { x: 0.9 * Math.cos(-0.7), z: 0.9 * Math.sin(-0.7) };
-  const jump2 = { angle: a2, tx: mid.x - (c2 * mid.x - s2 * mid.z) + d.x, tz: mid.z - (s2 * mid.x + c2 * mid.z) + d.z };
-  const suivi = arbitrateJump(avant, jump2, moveContour(contour, jump2));
-  assert.equal(suivi.kind, 'suivi');
-  if (suivi.kind !== 'suivi') return;
-  assert.ok(Math.abs(placeGap(avant, suivi.place).cm - 90) < 3);
-  assert.deepEqual(anchorPlace(suivi.place, moveContour(contour, jump2)), { kind: 'same' });
-  // Le même saut lu à 2 cm et 2° près à la borne (l'écart du relevé de 18:37) : toujours 'suivi', une seule correction.
-  const m = movePlace(avant, jump2);
-  const e = (2 * Math.PI) / 180;
-  const bruit = composeJumps(jump2, { angle: e, tx: m.x - (Math.cos(e) * m.x - Math.sin(e) * m.z) + 0.02, tz: m.z - (Math.sin(e) * m.x + Math.cos(e) * m.z) });
-  assert.equal(arbitrateJump(avant, bruit, moveContour(contour, jump2)).kind, 'suivi');
-  // Contradiction : le contour relu a tourné de 30° quand la tête dit 97° : rien n'est reposé.
-  const autre = { angle: Math.PI / 6, tx: 0.2, tz: -0.1 };
-  const contredit = arbitrateJump(avant, jump, moveContour(contour, autre));
-  assert.equal(contredit.kind, 'contredit');
-  // Sans contour gardé : le saut seul.
-  assert.equal(arbitrateJump({ ...avant, contour: undefined }, jump, contour).kind, 'sans-contour');
-  // Le sol : la barre suit (la vraie n'a pas bougé, le sol de l'espace de suivi si).
-  assert.ok(Math.abs(movePlace(avant, { ...jump, dy: -0.41 }).lockbarHeight! - (avant.lockbarHeight! - 0.41)) < 1e-9);
-  // Deux sauts de suite : composés, comme appliqués l'un après l'autre.
-  const deux = composeJumps(jump2, jump);
-  const g = placeGap(movePlace(movePlace(avant, jump2), jump), movePlace(avant, deux));
-  assert.ok(g.cm < 0.01 && g.deg < 0.01, JSON.stringify(g));
-  // Le frontend : un saut accepté par la sonde arbitré après le relevé du contour, l'ancrage tenu à l'écart.
+  // Les sauts réels de 20:10 à 20:12 (rotation et bond de la tête) : chacun arrive à l'origine même.
+  const reels: [number, number][] = [[19.5, 75.088], [148.8, 156.964], [-83.6, 186.319], [-38.7, 41.739], [61.8, 62.245], [-50.7, 70.759], [-67.9, 24.441], [36.3, 11.16]];
+  // La place calée et son contour (même repère), puis la vraie barre, qui ne bouge jamais dans la pièce.
+  const calee: CabinetPlace = { ...lockbarPlace({ x: -0.3, y: 0.9, z: -0.4 }, { x: 0.3, y: 0.9, z: -0.4 }), contour };
+  const frame = new RoomFrame();
+  assert.equal(frame.onRead(contour), 'premier');
+  let place = calee;
+  let vraie = calee;
+  for (const [deg, cm] of reels) {
+    const angle = (deg * Math.PI) / 180;
+    const jump = { angle, tx: (cm / 100) * Math.cos(angle * 3), tz: (cm / 100) * Math.sin(angle * 3), dy: 0 };
+    // Le Quest remet l'origine : la vraie barre change de coordonnées ; le contour lu, lui, reste (fait 3).
+    vraie = movePlace(vraie, jump);
+    assert.equal(frame.onRead(contour), 'inchange');
+    // Le saut mesuré : J le garde, la borne est reposée par lui ; la place garde le contour effectif.
+    frame.onJump(jump);
+    place = { ...movePlace(place, jump), contour: frame.effective() };
+    const g = placeGap(place, vraie);
+    assert.ok(g.cm < 0.01 && g.deg < 0.01, JSON.stringify(g));
+    // L'ancrage sur le contour effectif n'a rien à faire : jamais deux corrections.
+    assert.deepEqual(anchorPlace(place, frame.effective()!), { kind: 'same' });
+  }
+  // Le contour rafraîchi (fait 4 : à la session neuve du compagnon) suit la vraie pièce : J repart, l'ancrage confirme.
+  const vrai = moveContour(contour, (() => {
+    let j: JumpTransform = { angle: 0, tx: 0, tz: 0, dy: 0 };
+    for (const [deg, cm] of reels) {
+      const angle = (deg * Math.PI) / 180;
+      j = composeJumps(j, { angle, tx: (cm / 100) * Math.cos(angle * 3), tz: (cm / 100) * Math.sin(angle * 3), dy: 0 });
+    }
+    return j;
+  })());
+  assert.equal(frame.onRead(vrai), 'rafraichi');
+  assert.equal(frame.pending().count, 0);
+  assert.deepEqual(anchorPlace(place, frame.effective()!), { kind: 'same' });
+  // Défaut d'essai.13 (20:10:13) : une place écrite dans le nouveau repère avec le contour périmé, reposée à tort
+  // au rafraîchissement suivant. Avec le contour effectif, elle garde un contour de son repère : rien à tort.
+  const f2 = new RoomFrame();
+  f2.onRead(contour);
+  const enPartie = { angle: (-25.4 * Math.PI) / 180, tx: 0.3, tz: -0.34, dy: 0 };
+  f2.onJump(enPartie);
+  const recaleeEnPartie: CabinetPlace = { ...movePlace(calee, enPartie), contour: f2.effective() };
+  f2.onRead(moveContour(contour, enPartie));
+  assert.deepEqual(anchorPlace(recaleeEnPartie, f2.effective()!), { kind: 'same' });
+  // Sans J (essai.13), la même place gardait le contour périmé : le rafraîchissement la reposait encore.
+  assert.equal(anchorPlace({ ...recaleeEnPartie, contour }, moveContour(contour, enPartie))!.kind, 'moved');
+  // Le saut inverse, et deux contours identiques à 2 mm près.
+  const back = composeJumps(enPartie, inverseJump(enPartie));
+  assert.ok(Math.abs(back.angle) < 1e-12 && Math.hypot(back.tx, back.tz) < 1e-12);
+  assert.equal(sameContour(contour, contour.map(([x, z]) => [x + 0.001, z] as [number, number])), true);
+  assert.equal(sameContour(contour, contour.map(([x, z]) => [x + 0.01, z] as [number, number])), false);
+  // Le frontend : le contour effectif gardé avec chaque place, le saut appliqué tout de suite, le port dit lequel.
   const front = read('app', 'src', 'frontend.ts');
-  assert.match(front, /onJump: \(jump\) => headsetJump\(jump\),/);
-  assert.match(front, /const v = arbitrateJump\(p\.place, p\.jump, latestContour\);/);
-  assert.match(front, /if \(pendingJump\) return;\s*\/\/ Contour relu figé/);
-  assert.match(front, /frozenContour = v\.kind === 'fige' \? v\.frozenRead : undefined;/);
-  assert.match(front, /const head = jumpHeadCheck\(v\.place, p\.headAfter\);/);
-  assert.match(front, /if \(pendingJump \|\| lastJumpAt >= since - JUMP_SETTLE_MS\) return;/);
-  const sonde = read('app', 'src', 'sonde-ovr.ts');
-  assert.match(sonde, /if \(jump\) this\.opts\.onJump\?\.\(jump\);/);
+  assert.match(front, /contour: \(\) => roomFrame\.effective\(\),/);
+  assert.match(front, /function headsetJump\(jump: OvrJump\): void \{\s*roomFrame\.onJump\(jump\);/);
+  assert.match(front, /const next = movePlace\(place, jump\);/);
+  assert.match(front, /const kind = roomFrame\.onRead\(points\);/);
+  assert.match(front, /écart entre le saut et le contour/);
+  assert.match(front, /ni saut mesuré ni contour rafraîchi/);
+  assert.match(front, /headset\.restart\(\);/);
+  assert.match(front, /undoOrigin: true,/);
+  // La sonde : la signature de la remise d'origine seule, et les essais a), b), c).
+  const cpp = read('packages', 'casque-vr', 'src', 'sonde-ovr.cpp');
+  assert.match(cpp, /raison=arrivee-hors-origine/);
+  assert.match(cpp, /raison=tete-inclinee/);
+  assert.match(cpp, /constexpr float JUMP_ORIGIN_M = 0\.02f;/);
+  assert.match(cpp, /api\.specifyOrigin\(session, p\)/);
+  assert.match(cpp, /recentrer=/);
+  assert.match(cpp, /ovr contour-apres-session-neuve change=/);
 });

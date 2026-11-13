@@ -877,71 +877,6 @@ export function moveContour(points: ContourPoints, f: JumpTransform): [number, n
   });
 }
 
-/**
- * Saut mesuré et contour d'accord, à ceci près (à la borne, centimètres et degrés) : le saut lu sur la tête a prédit
- * la barre à 2,1 cm et 2,2° le 13 novembre 2026 ; un bond refusé sous 5 cm et 10° (sonde) reste bien au-delà.
- */
-export const JUMP_MATCH_CM = 5;
-export const JUMP_MATCH_DEG = 3;
-
-export type JumpVerdict =
-  /** Le contour relu a suivi le saut (la limite est restée sur la vraie pièce) : une seule correction. */
-  | { kind: 'suivi'; place: CabinetPlace }
-  /**
-   * Le contour relu n'a pas bougé (le runtime recentre sans le retransformer : essai de 18:37) : le saut fait foi. La
-   * place garde le contour tel qu'un runtime à jour le rendrait (déplacé par le saut) ; tant que le contour relu reste
-   * `frozenRead`, l'ancrage attend (il déferait la correction).
-   */
-  | { kind: 'fige'; place: CabinetPlace; frozenRead: [number, number][] }
-  /** Pas de contour gardé, ou aucun relu : le saut seul. */
-  | { kind: 'sans-contour'; place: CabinetPlace }
-  /** Le contour relu a bougé autrement que le saut : rien n'est reposé, le calage est proposé. */
-  | { kind: 'contredit'; why: string };
-
-/** L'écart, à la borne, d'une transformation à l'identité (centimètres, degrés). */
-function fitGapAt(place: CabinetPlace, f: ContourFit): { cm: number; deg: number } {
-  return placeGap(place, movePlace(place, f));
-}
-
-/**
- * L'arbitrage entre le saut mesuré dans le flux de la tête et l'ancrage sur le contour (demande du 13 novembre 2026) :
- * `place` est la place d'avant le saut, avec le contour de son repère ; `current`, le contour relu après le saut.
- * Le contour relu est comparé à deux prédictions : le contour d'avant déplacé par le saut (la limite a suivi : 'suivi'),
- * et le contour d'avant tel quel (le contour lu n'a pas suivi : 'fige'). Ni l'un ni l'autre : 'contredit'.
- */
-export function arbitrateJump(place: CabinetPlace, jump: JumpTransform, current?: ContourPoints): JumpVerdict {
-  const moved = movePlace(place, jump);
-  if (!place.contour?.length || !current?.length) return { kind: 'sans-contour', place: moved };
-  const predicted = moveContour(place.contour, jump);
-  const close = (f: ContourFit | undefined, at: CabinetPlace) => {
-    if (!f || f.residualCm > ANCHOR_MAX_RESIDUAL_CM) return undefined;
-    const g = fitGapAt(at, f);
-    return g.cm <= JUMP_MATCH_CM && g.deg <= JUMP_MATCH_DEG ? g : undefined;
-  };
-  if (close(fitContour(predicted, current), moved)) return { kind: 'suivi', place: { ...moved, contour: current.map((p) => [p[0], p[1]] as [number, number]) } };
-  if (close(fitContour(place.contour, current), place)) return { kind: 'fige', place: { ...moved, contour: predicted }, frozenRead: current.map((p) => [p[0], p[1]] as [number, number]) };
-  const f = fitContour(place.contour, current);
-  const said = f ? fitGapAt(place, f) : undefined;
-  const jumpGap = placeGap(place, moved);
-  return {
-    kind: 'contredit',
-    why: said
-      ? `contour relu déplacé de ${said.cm.toFixed(0)} cm et ${said.deg.toFixed(0)}° quand la tête dit ${jumpGap.cm.toFixed(0)} cm et ${jumpGap.deg.toFixed(0)}°` // i18n-ignore : journal
-      : `contour relu redessiné (${current.length} points au lieu de ${place.contour.length})`, // i18n-ignore : journal
-  };
-}
-
-/**
- * Le saut confirmé par la tête : la tête gardée au calage, reposée par le saut, près de la tête juste après lui (à
- * moins de ANCHOR_HEAD_MAX_CM). Le saut étant lu sur la tête, cela revient à dire que le joueur était près de sa place
- * du calage au moment du saut : la borne là où il se tient. undefined : pas de tête gardée au calage.
- */
-export function jumpHeadCheck(moved: CabinetPlace, headAfter: { x: number; z: number }): { cm: number; confirmed: boolean } | undefined {
-  if (!moved.head) return undefined;
-  const cm = Math.hypot(moved.head.x - headAfter.x, moved.head.z - headAfter.z) * 100;
-  return { cm, confirmed: cm < ANCHOR_HEAD_MAX_CM };
-}
-
 export type AnchorResult =
   | { kind: 'same' }
   | { kind: 'redrawn'; why: string }
@@ -964,17 +899,58 @@ export function anchorPlace(place: CabinetPlace, current: ContourPoints): Anchor
   return { kind: 'moved', place: next, cm, deg, residualCm: f.residualCm };
 }
 
+/** Deux contours lus identiques (même nombre de points, chacun à moins de 2 mm) : rien n'a été rafraîchi. */
+export function sameContour(a: ContourPoints, b: ContourPoints): boolean {
+  return a.length === b.length && a.every((p, i) => Math.hypot(p[0] - b[i]![0], p[1] - b[i]![1]) < 0.002);
+}
+
 /**
- * L'ancrage confirmé par la tête quand le Quest a remis l'origine sur elle au port du casque (originResetAtWear : la
- * tête est alors à l'origine). Le joueur qui remet le casque à la borne a la tête près de celle du calage : la tête
- * gardée (reposée par l'ancrage) à moins de ANCHOR_HEAD_MAX_CM de l'origine confirme la place. Plus loin, le joueur
- * est ailleurs, ou le Quest a replacé sa limite avec la pièce (essai du 13 novembre 2026, 18:37 : contour déplacé
- * de 12 cm et 5,5°, la vraie barre de 114 cm et 97°, tête reposée à 98 cm de l'origine) : le calage reste proposé.
- * undefined : pas de tête gardée au calage.
+ * Le repère de la pièce vu par la sonde (essai réel du 13 novembre 2026 en Air Link) : à chaque remise du casque, le
+ * Quest remet l'origine sur la tête, et le contour que le PC rend ne suit pas (il n'est rafraîchi qu'à la création
+ * d'une session d'application). J, la composée des sauts mesurés depuis le dernier contour rafraîchi, reporte ce
+ * contour dans le repère courant : le contour effectif. La place calée garde toujours le contour effectif, si bien
+ * qu'elle et lui restent du même repère ; un saut mesuré la repose (movePlace), et au rafraîchissement l'ancrage
+ * (anchorPlace) rattrape la dérive accumulée ou confirme. J revient à l'identité quand le contour lu change.
  */
-export const ANCHOR_HEAD_MAX_CM = 50;
-export function anchorHeadAtOrigin(place: CabinetPlace): { cm: number; confirmed: boolean } | undefined {
-  if (!place.head) return undefined;
-  const cm = Math.hypot(place.head.x, place.head.z) * 100;
-  return { cm, confirmed: cm < ANCHOR_HEAD_MAX_CM };
+export class RoomFrame {
+  private read: [number, number][] | undefined;
+  private jump: JumpTransform = { angle: 0, tx: 0, tz: 0, dy: 0 };
+  private jumps = 0;
+
+  /** Un contour lu : 'premier', 'rafraichi' (son contenu a changé : J repart de l'identité) ou 'inchange'. */
+  onRead(points: ContourPoints): 'premier' | 'rafraichi' | 'inchange' {
+    const copy = points.map((p) => [p[0], p[1]] as [number, number]);
+    if (!this.read) {
+      this.read = copy;
+      return 'premier';
+    }
+    if (sameContour(this.read, copy)) return 'inchange';
+    this.read = copy;
+    this.jump = { angle: 0, tx: 0, tz: 0, dy: 0 };
+    this.jumps = 0;
+    return 'rafraichi';
+  }
+
+  /** Un saut mesuré (après ceux déjà gardés). */
+  onJump(jump: JumpTransform): void {
+    this.jump = composeJumps(this.jump, jump);
+    this.jumps++;
+  }
+
+  /** Le contour lu, reporté par les sauts mesurés depuis son rafraîchissement ; undefined tant que rien n'est lu. */
+  effective(): [number, number][] | undefined {
+    if (!this.read) return undefined;
+    return this.jumps ? moveContour(this.read, this.jump) : this.read.map((p) => [p[0], p[1]] as [number, number]);
+  }
+
+  /** Les sauts gardés depuis le dernier rafraîchissement, et leur composée. */
+  pending(): { count: number; jump: JumpTransform } {
+    return { count: this.jumps, jump: { ...this.jump } };
+  }
+}
+
+/** Le saut inverse (défaire un saut appliqué). */
+export function inverseJump(j: JumpTransform): JumpTransform {
+  const c = Math.cos(-j.angle), s = Math.sin(-j.angle);
+  return { angle: -j.angle, tx: -(c * j.tx - s * j.tz), tz: -(s * j.tx + c * j.tz), dy: -(j.dy ?? 0) };
 }
