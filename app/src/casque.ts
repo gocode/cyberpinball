@@ -357,8 +357,13 @@ export class HeadsetMenu {
   }
 
   /** Pose la borne à `place` dans le casque ; `keep` : la garde aussi (casque.json). Sans place : celle gardée. */
-  showPlace(place: CabinetPlace | undefined, keep = false): void {
-    if (place && keep) this.writePlace(place);
+  /**
+   * `calibrated` : la place vient d'un calage sur la vraie barre (au menu ou en partie) ; elle prend alors le contour
+   * courant. Sinon, le contour n'est gardé que si la place en avait déjà un (une borne calée avant l'ancrage n'en a
+   * pas : on ne sait pas si elle est encore du même repère, le calage est proposé une fois, frontend.ts).
+   */
+  showPlace(place: CabinetPlace | undefined, keep = false, calibrated = false): void {
+    if (place && keep) this.writePlace(place, false, calibrated);
     // Calée sur une vraie barre avant : la caisse du décor en prend la largeur (refait et renvoyé).
     if (place && keep && this.child) this.sendDecor(this.child, place);
     const shown = place ?? this.readPlace();
@@ -744,11 +749,13 @@ export class HeadsetMenu {
    * barre avant calée (hauteur, largeur), la limite du Quest et le placement libre restent ; la borne
    * n'est plus sur la vraie, mais garde sa taille et sa hauteur.
    */
-  private writePlace(place: CabinetPlace, recentred = false): void {
+  private writePlace(place: CabinetPlace, recentred = false, calibrated = false): void {
     if (!this.opts.placeFile || ![place.x, place.z, place.yaw].every(Number.isFinite)) return;
+    const had = Boolean(this.readPlace()?.contour?.length);
     const { contour: _stale, rest: _gone, ...kept }: CabinetPlace & { rest?: unknown } = recentred ? { ...this.readPlace(), x: place.x, z: place.z, yaw: place.yaw } : place;
-    // Le contour du repère de cette place : le courant, sinon aucun (un contour d'un autre repère la déplacerait à tort).
-    const contour = this.opts.contour?.();
+    // Le contour du repère de cette place : le courant, sinon aucun (un contour d'un autre repère la déplacerait à tort) ;
+    // jamais attaché en silence à une place qui n'en avait pas, sauf au calage.
+    const contour = calibrated || had ? this.opts.contour?.() : undefined;
     try {
       fs.mkdirSync(path.dirname(this.opts.placeFile), { recursive: true });
       // Le contour (des centaines de points) sur une seule ligne.

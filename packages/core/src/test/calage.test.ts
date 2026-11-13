@@ -190,7 +190,7 @@ test('calage proposé d’office seulement casque remis en limite fixe ; gâchet
   assert.match(frontend, /openCalibration\(true\);/);
   // A valide et sort : appliqué (place et INI de VPX), puis l'écran se ferme.
   assert.match(frontend, /else if \(KEYS\.confirm\.includes\(input\.code\) && calibration\?\.place\) \{\s*applyCalibration\(\);\s*closeCalibration\(\);\s*\}/);
-  assert.match(frontend, /function applyCalibration\(\): void \{[\s\S]{0,1600}headset\?\.showPlace\(place, true\);[\s\S]{0,400}writeVrCalibration\([\s\S]{0,1200}c\.validated\+\+;\s*c\.points = \{\};\s*c\.place = undefined;\s*showCalibration\(\);/);
+  assert.match(frontend, /function applyCalibration\(\): void \{[\s\S]{0,1600}headset\?\.showPlace\(place, true, true\);[\s\S]{0,400}writeVrCalibration\([\s\S]{0,1200}c\.validated\+\+;\s*c\.points = \{\};\s*c\.place = undefined;\s*showCalibration\(\);/);
   // B sort sans rien changer : la place gardée revient.
   assert.match(frontend, /if \(KEYS\.exit\.includes\(input\.code\)\) closeCalibration\(\);/);
   assert.match(frontend, /function closeCalibration\(\): void \{[\s\S]{0,200}headset\?\.showPlace\(undefined\);/);

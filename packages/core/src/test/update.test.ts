@@ -274,13 +274,20 @@ test('socle installé : lu dans le package.json de l’application, absent sinon
 });
 
 /** Paquet léger fabriqué comme par scripts/fabriquer.mjs (tar.exe de Windows). */
-function makeAppPackage(dir: string, version: string, socle: string): Buffer {
-  const src = path.join(dir, `src-${version}`);
-  fs.mkdirSync(path.join(src, 'dist'), { recursive: true });
+/** `withCode: false` : le bon numéro sans le code ni l'interface, comme la 0.1.13-essai.1 publiée incomplète. */
+function makeAppPackage(dir: string, version: string, socle: string, withCode = true): Buffer {
+  const src = path.join(dir, `src-${version}${withCode ? '' : '-sans-code'}`);
+  fs.mkdirSync(path.join(src, 'natif'), { recursive: true });
+  fs.writeFileSync(path.join(src, 'natif', 'plugin.cfg'), '');
   fs.writeFileSync(path.join(src, 'package.json'), JSON.stringify({ version, cyberpinball: { socle } }));
-  fs.writeFileSync(path.join(src, 'dist', 'main.js'), `// ${version}`);
-  const zip = path.join(dir, `app-${version}.zip`);
-  const run = spawnSync(windowsTar(), ['-a', '-c', '-f', zip, '-C', src, 'package.json', 'dist']);
+  if (withCode) {
+    fs.mkdirSync(path.join(src, 'dist'), { recursive: true });
+    fs.mkdirSync(path.join(src, 'renderer'), { recursive: true });
+    fs.writeFileSync(path.join(src, 'dist', 'main.js'), `// ${version}`);
+    fs.writeFileSync(path.join(src, 'renderer', 'frontend.html'), '<!doctype html>');
+  }
+  const zip = path.join(dir, `app-${version}${withCode ? '' : '-sans-code'}.zip`);
+  const run = spawnSync(windowsTar(), ['-a', '-c', '-f', zip, '-C', src, ...fs.readdirSync(src)]);
   assert.equal(run.status, 0, String(run.stderr));
   return fs.readFileSync(zip);
 }
@@ -310,6 +317,13 @@ test('paquet léger : téléchargé à côté de l’installeur, déplié, refus
     assert.throws(() => unpackAppPackage(wrongFile, staged, wrong), /inutilisable/);
     assert.ok(!fs.existsSync(staged));
     assert.throws(() => unpackAppPackage(file, staged, { ...m, app: { ...m.app!, socle: 'electron-40.0.0-def' } }), /inutilisable/);
+
+    // Le bon numéro, mais sans le code de l'application : refusé, et la raison dite telle quelle.
+    const empty = makeAppPackage(dir, '0.2.3', 'electron-44.5.1-abc', false);
+    const emptyFile = path.join(dir, 'sans-code.zip');
+    fs.writeFileSync(emptyFile, empty);
+    assert.throws(() => unpackAppPackage(emptyFile, staged, m), /code de l’application manque/);
+    assert.ok(!fs.existsSync(staged));
   } finally {
     await site.close();
     fs.rmSync(dir, { recursive: true, force: true });

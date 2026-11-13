@@ -749,7 +749,7 @@ export function inGameCalibrationReport(block: string): string | undefined {
 }
 
 /** Les moments où le calage pourrait s'ouvrir de lui-même dans le casque. */
-export type CalibrationOfferReason = 'premier-port' | 'casque-remis' | 'limite-changee' | 'piece-perimee' | 'origine-remise';
+export type CalibrationOfferReason = 'premier-port' | 'casque-remis' | 'limite-changee' | 'piece-perimee' | 'origine-remise' | 'sans-contour';
 
 /**
  * Le calage s'ouvre-t-il de lui-même (décision du joueur, 13 novembre 2026) ? Seulement quand le casque a été
@@ -761,6 +761,8 @@ export function shouldOfferCalibration(reason: CalibrationOfferReason, keeping: 
   if (reason === 'limite-changee') return true;
   // L'origine remise sur la tête au port (originResetAtWear) : la borne n'est plus sur la vraie, quelle que soit la limite.
   if (reason === 'origine-remise') return true;
+  // Une borne calée sans contour gardé : un calage, une fois, et elle se replacera ensuite seule.
+  if (reason === 'sans-contour') return true;
   return reason === 'casque-remis' && keeping === 'recentred';
 }
 

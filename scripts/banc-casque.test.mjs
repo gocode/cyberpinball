@@ -379,3 +379,22 @@ test('banc : essai c), session LibOVR refaite après le saut, contour relu (inch
   assert.ok(r.lignes.includes('ovr session-neuve demandee'), sansPoints(r));
   assert.match(r.lignes.find((l) => l.startsWith('ovr contour-apres-session-neuve')) ?? '', /change=0 /, sansPoints(r));
 });
+
+// Une borne calée avant l'ancrage n'a pas de contour gardé : l'ancrage ne peut rien (anchorPlace undefined, d'où le
+// calage proposé une fois au menu) ; après le calage, la place garde le contour effectif et l'ancrage agit.
+test('banc : place sans contour, contour lu, rien à ancrer ; après le calage, la remise d’origine est rattrapée', banc, async () => {
+  const run = await sauterReel({ figer: true, suivie: false, rafraichir: true });
+  const { points, bouts, tetes } = run;
+  const sans = { ...calee(bouts[0], tetes[0], undefined) };
+  delete sans.contour;
+  assert.equal(core.anchorPlace(sans, points[0]), undefined);
+  // Le calage refait avec le contour du moment : la remise d'origine (non mesurée ici), rattrapée au rafraîchissement.
+  const frame = new core.RoomFrame();
+  frame.onRead(points[0]);
+  const recalee = { ...sans, contour: frame.effective() };
+  assert.equal(frame.onRead(points.at(-1)), 'rafraichi');
+  const ancre = core.anchorPlace(recalee, frame.effective());
+  assert.equal(ancre.kind, 'moved');
+  const reste = core.placeGap(ancre.place, run.vraie);
+  assert.ok(reste.cm < 2 && reste.deg < 1, JSON.stringify(reste));
+});

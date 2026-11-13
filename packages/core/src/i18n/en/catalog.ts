@@ -405,6 +405,7 @@ export const messages: Record<string, string> = {
   'version de l’installeur illisible': 'unreadable installer version',
   'paquet de l’application illisible': 'unreadable application package',
   'il contient la version {version}, pas {expected}': 'it holds version {version}, not {expected}',
+  'le code de l’application manque dans le paquet': 'the application code is missing from the package',
   'Paquet de l’application inutilisable ({problem}) : rien n’a été remplacé.': 'Unusable application package ({problem}): nothing was replaced.',
   'Paquet de l’application introuvable : {dir}': 'Application package not found: {dir}',
   '{dir} reste utilisé : rien n’a été remplacé ({message}).': '{dir} is still in use: nothing was replaced ({message}).',

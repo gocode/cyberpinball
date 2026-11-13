@@ -498,8 +498,11 @@ export function unpackAppPackage(zip: string, target: string, manifest: UpdateMa
     } catch {
       // Pas de package.json : signalé ci-dessous.
     }
-    if (pkg.version !== manifest.version || pkg.cyberpinball?.socle !== manifest.app?.socle || !fs.existsSync(path.join(target, 'dist', 'main.js'))) {
+    if (pkg.version !== manifest.version || pkg.cyberpinball?.socle !== manifest.app?.socle) {
       problem = t('il contient la version {version}, pas {expected}', { version: String(pkg.version), expected: manifest.version });
+    } else if (!fs.existsSync(path.join(target, 'dist', 'main.js')) || !fs.existsSync(path.join(target, 'renderer', 'frontend.html'))) {
+      // Le bon numéro, mais pas le code (0.1.13-essai.1, publiée incomplète) : le dire tel quel.
+      problem = t('le code de l’application manque dans le paquet');
     }
   }
   if (problem) {

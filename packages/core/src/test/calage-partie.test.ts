@@ -666,3 +666,17 @@ test('repère de la pièce (essai réel du 13 novembre 2026, Air Link) : le cont
   assert.match(cpp, /recentrer=/);
   assert.match(cpp, /ovr contour-apres-session-neuve change=/);
 });
+
+test('borne calée sans contour (avant l’ancrage, 13 novembre 2026) : dit et calage proposé une fois, contour jamais attaché en silence', () => {
+  assert.equal(shouldOfferCalibration('sans-contour', 'kept'), true);
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /if \(!r\) \{\s*noContourCheck\(place\);/);
+  assert.match(front, /if \(!offerCalibration\('sans-contour'\)\) return;\s*noContourSaid = signature;/);
+  assert.match(front, /'calage-sans-contour\.json'/);
+  assert.match(front, /t\('Calez la borne une fois : elle se replacera ensuite seule\.'\)/);
+  // Seuls les calages sur la vraie barre (menu, partie) donnent le contour courant à une place qui n'en avait pas.
+  assert.match(front, /headset\?\.showPlace\(place, true, true\);/);
+  assert.match(front, /headset\?\.showPlace\(next, true, true\);/);
+  const casque = read('app', 'src', 'casque.ts');
+  assert.match(casque, /const contour = calibrated \|\| had \? this\.opts\.contour\?\.\(\) : undefined;/);
+});

@@ -26,6 +26,7 @@ import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { lockBuild, stageProblems } from './paquet-application.mjs';
 import { sign, signatureConfigured } from './signature.mjs';
 
 const require = createRequire(import.meta.url);
@@ -40,6 +41,15 @@ const version = process.env.CYBERPINBALL_VERSION_ESSAI || rootPkg.version;
 
 function step(text) {
   console.log(`\n> ${text}`);
+}
+
+// Une seule fabrication à la fois dans ce dossier : la suivante viderait build\ pendant que celle-ci
+// le remplit (préversion 0.1.13-essai.1 partie sans son code, scripts/paquet-application.mjs).
+try {
+  lockBuild(release);
+} catch (error) {
+  console.error(`Fabrication refusée : ${error.message}`);
+  process.exit(1);
 }
 
 step('Compilation TypeScript');
@@ -218,6 +228,8 @@ fs.writeFileSync(
 function packageApplication() {
   const { UPDATE_APP_NAME, windowsTar } = require(path.join(repo, 'packages', 'core', 'dist', 'update.js'));
   const zip = path.join(release, UPDATE_APP_NAME);
+  const missing = stageProblems(stage);
+  if (missing.length) throw new Error(`build\\app incomplet, paquet pas fait : il manque ${missing.join(', ')}.`);
   fs.mkdirSync(release, { recursive: true });
   fs.rmSync(zip, { force: true });
   const run = spawnSync(windowsTar(), ['-a', '-c', '-f', zip, '-C', stage, ...fs.readdirSync(stage)], { encoding: 'utf8' });

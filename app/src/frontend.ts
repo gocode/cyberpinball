@@ -3720,7 +3720,11 @@ function anchorCheck(): AnchorResult | undefined {
   const place = headset.place();
   if (!place || !isCalibrated(place) || place.free) return undefined;
   const r = anchorPlace(place, current);
-  if (!r || r.kind === 'same') return r;
+  if (!r) {
+    noContourCheck(place);
+    return r;
+  }
+  if (r.kind === 'same') return r;
   if (r.kind === 'redrawn') {
     if (anchorRedrawnSaid === r.why) return r;
     anchorRedrawnSaid = r.why;
@@ -3741,6 +3745,34 @@ function anchorCheck(): AnchorResult | undefined {
   if (r.cm > ANCHOR_BANNER_CM) showBanner(t('Borne remise en place sur la limite du Quest'));
   return r;
 }
+/**
+ * Une borne calée avant l'ancrage n'a pas de contour gardé : l'ancrage ne peut rien pour elle, et rien ne le disait
+ * (13 novembre 2026). Quand la sonde lit un contour, casque porté au menu : dit une fois au journal et à l'écran, et le
+ * calage proposé une fois pour cette place (retenu dans `<données>\vr\calage-sans-contour.json`). Le contour courant
+ * n'est pas attaché en silence : on ne sait pas si la place est encore du même repère.
+ */
+let noContourSaid: string | undefined;
+function noContourCheck(place: CabinetPlace): void {
+  const signature = `${place.x.toFixed(3)},${place.z.toFixed(3)},${place.yaw.toFixed(3)}`;
+  if (noContourSaid === signature) return;
+  const file = path.join(loc.dataDir, 'vr', 'calage-sans-contour.json');
+  try {
+    if ((JSON.parse(fs.readFileSync(file, 'utf8')) as { signature?: string }).signature === signature) return;
+  } catch {
+    // Jamais proposé.
+  }
+  console.log('Casque : borne calée sans contour de la limite gardé (calée avant l’ancrage) : elle ne peut pas se replacer seule ; le calage est proposé une fois.'); // i18n-ignore : journal
+  noContourNotice = true;
+  if (!offerCalibration('sans-contour')) return;
+  noContourSaid = signature;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ signature, proposee: new Date().toISOString() }, null, 2) + '\n');
+  } catch {
+    // Dossier de la VR en lecture seule : la proposition reviendra, sans gravité.
+  }
+}
+
 /** Un saut au journal : rotation, déplacement, sol, intervalle des deux relevés. */
 function jumpText(jump: OvrJump): string {
   return `${((jump.angle * 180) / Math.PI).toFixed(1)}°, ${(Math.hypot(jump.tx, jump.tz) * 100).toFixed(0)} cm, sol ${(jump.dy * 100).toFixed(1)} cm, relevés à ${jump.dtMs.toFixed(1)} ms`; // i18n-ignore : journal
@@ -3963,6 +3995,8 @@ let headsetEyes: number | undefined;
 let roomNotice = false;
 /** La pièce refaite par le Quest au port du casque (headsetOriginReset) : dit à l'écran du calage proposé. */
 let originNotice = false;
+/** La borne calée sans contour gardé (noContourCheck) : dit à l'écran du calage proposé. */
+let noContourNotice = false;
 /** Session neuve d'après un changement de pièce, yeux hors de la plage : les applications qui démarrent ont l'ancienne pièce. */
 let roomStale = false;
 
@@ -4482,7 +4516,7 @@ function offerCalibration(reason: CalibrationOfferReason): boolean {
     if (reason !== 'premier-port') console.log(`Casque : calage pas proposé d'office (${reason}, pièce ${headset.roomKeeping === 'kept' ? 'gardée par le Quest' : 'inconnue'}) ; les deux joysticks ou « Caler la borne » pour recaler.`); // i18n-ignore : journal
     return false;
   }
-  console.log(`Casque : calage de la borne proposé d'office (${reason === 'limite-changee' ? 'calage périmé : la limite du Quest a changé' : reason === 'origine-remise' ? 'pièce refaite par le Quest au port du casque' : 'casque remis, pièce recentrée par le Quest'}).`); // i18n-ignore : journal
+  console.log(`Casque : calage de la borne proposé d'office (${reason === 'limite-changee' ? 'calage périmé : la limite du Quest a changé' : reason === 'origine-remise' ? 'pièce refaite par le Quest au port du casque' : reason === 'sans-contour' ? 'borne calée sans contour de la limite, une fois' : 'casque remis, pièce recentrée par le Quest'}).`); // i18n-ignore : journal
   openCalibration(true);
   return true;
 }
@@ -4556,6 +4590,7 @@ function showCalibration(problem?: string): void {
     vrRoomProblem ??
     (headset?.keyRenewed ? t('Vérifiez la place de la borne.') : undefined) ??
     (roomNotice ? t('La limite du Quest a changé : recalez.') : undefined) ??
+    (noContourNotice ? t('Calez la borne une fois : elle se replacera ensuite seule.') : undefined) ??
     (originNotice ? t('Le Quest a déplacé la pièce en remettant le casque : recalez.') : undefined) ??
     // Le geste est dit par la bande du bas quand les manettes l'ont : le conseil ne le répète pas.
     (c.intro ? roomKeepingAdvice(headset?.roomKeeping, calibrationCombo(headset?.profile ?? 'touch') ? undefined : calibrationComboLabel(headset?.profile)) : undefined) ??
@@ -4691,9 +4726,10 @@ function applyCalibration(): void {
   // Recalage de la même vraie barre : l'écart à la précédente est celui de la pièce (mesuré, pas deviné).
   if (previous && isCalibrated(previous) && !previous.free && !place.free && left && right)
     console.log(`Casque : recalage, ${roomMeasureText(roomFromRecalibration(previous, place), 'barre avant recalée face à la précédente')}.`); // i18n-ignore : journal
-  headset?.showPlace(place, true);
+  headset?.showPlace(place, true, true);
   roomNotice = false;
   originNotice = false;
+  noContourNotice = false;
   roomStale = false;
   vrRoomProblem = undefined;
   if (headset) headset.keyRenewed = false;
@@ -4900,7 +4936,7 @@ function checkVrPlaceAfterGame(ini: string, tableFile: string): void {
       const menuWidth = menuPlayfield(headsetSources(), headsetTurn())?.width;
       const next = placeFromVpxCentering(saved, place, inGameCalibration(place, table, menuWidth), table, menuWidth);
       const gap = placeGap(place, next);
-      headset?.showPlace(next, true);
+      headset?.showPlace(next, true, true);
       try {
         writeVrCalibration(loc.dataDir, placeVpxSettings(next));
       } catch (error) {

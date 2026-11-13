@@ -37,6 +37,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { auditRepository } from './audit-publication.mjs';
 import { loadPrivateKey } from './cle-publication.mjs';
+import { lockBuild, zipProblems } from './paquet-application.mjs';
 import { describeRepository } from './decrire-github.mjs';
 import { githubToken, missingTokenMessage } from './jeton-github.mjs';
 import { snapshotAndPush } from './envoyer-github.mjs';
@@ -113,10 +114,17 @@ if (!local) {
   if (existing.status === 200) fail(`la release v${version} existe déjà : changez la version de package.json.`);
 }
 
+// Le verrou de fabrication tenu jusqu'à la fin : aucune autre fabrication ne refait release\ entre la
+// fabrication et l'envoi (scripts/paquet-application.mjs).
+try {
+  lockBuild(release);
+} catch (error) {
+  fail(error.message);
+}
 if (!argv.includes('--sans-fabrication')) {
   step(rapid ? 'Fabrication de l’application seule (sans electron-builder ni installeurs)' : 'Fabrication des installeurs');
   const args = [path.join(repo, 'scripts', 'fabriquer.mjs'), ...(rapid ? ['--application'] : ['--installeur', ...(argv.includes('--leger') ? ['--leger'] : [])])];
-  const run = spawnSync(process.execPath, args, { cwd: repo, stdio: 'inherit' });
+  const run = spawnSync(process.execPath, args, { cwd: repo, stdio: 'inherit', env: { ...process.env, CYBERPINBALL_FABRICATION_PARENT: String(process.pid) } });
   if (run.status !== 0) fail('la fabrication a échoué.');
 }
 // L'application telle que fabriquée (build\app), dont le paquet léger est l'image exacte.
@@ -130,6 +138,9 @@ const complete = path.join(release, 'CyberPinball-Setup-complet.exe');
 const appPackage = path.join(release, update.UPDATE_APP_NAME);
 if (!rapid && !fs.existsSync(installer)) fail(`${installer} manque.`);
 if (!fs.existsSync(appPackage)) fail(`${appPackage} manque.`);
+// Le paquet relu tel qu'il partira : sans son code, les bornes le refuseraient (0.1.13-essai.1).
+const packageMissing = zipProblems(appPackage);
+if (packageMissing.length) fail(`${update.UPDATE_APP_NAME} incomplet, rien n'est publié : il manque ${packageMissing.join(', ')}. Relancez sans --sans-fabrication.`);
 
 // Publication rapide : les installeurs sont ceux du dernier flux publié (préversions comprises
 // pour une préversion), à condition que les bornes puissent prendre le paquet léger.
