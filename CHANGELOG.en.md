@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.11
 
+- Juke-box on several outputs: the sound no longer slows down and speeds up. Each output now has its own playback of the song, clocked by its sound card, and they all stay aligned. In the Juke-box management, the chosen tile at the top (Import from YouTube, New playlist, YouTube account, Juke-box settings) finally shows: green frame and tinted background.
 - Community: when the medallion is chosen on the wheel, its poster shows behind the wheel and on the backglass, like the Jukebox one: the number of players online, those from your country and your friends, your country's room with its last line, and the friends online.
 - Juke-box settings: a section of its own (System menu > Media > Juke-box settings, and at the top of the Juke-box management) gathers its settings. The Juke-box can play on several outputs at once (the backglass, the playfield screen, a subwoofer…), each with its own volume, a profile (full, bass only, mids and highs, or your own bass, mids and treble from −12 to +12 dB) and a delay; “Listen to this output” plays five seconds on it alone. Everything is heard at once, even on the current song. The DMD visualiser and the medallion in the wheel are set there too.
 - Community: the home screen also has a "My friends" door; "Write in the room" shows the phone's QR code, and the ready-made phrases are badges side by side, chosen with one press.

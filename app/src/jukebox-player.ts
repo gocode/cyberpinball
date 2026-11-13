@@ -1321,6 +1321,7 @@ function audioRoutesSource(): string {
  * pour une nouvelle vidéo), « updated » quand le plan change, « same » sinon, « no-video » tant que
  * la page n'a pas de vidéo, « failed » si Web Audio la refuse (le son reste sur la sortie du fronton).
  */
+// Une seule vidéo dans la page YouTube : les autres sorties reçoivent son flux (mode flux), chacune sur sa carte.
 export function onlineRoutesScript(routes: readonly JukeboxAudioRoute[]): string {
   return `(() => {
 ${audioRoutesSource()}
@@ -1336,7 +1337,7 @@ ${audioRoutesSource()}
     return 'updated';
   }
   try {
-    const handle = window.CyberAudioRoutes.attach(v, routes);
+    const handle = window.CyberAudioRoutes.attach(v, routes, { flux: true });
     window.__cyberpinballRoutes = { media: v, key, handle };
     return 'attached';
   } catch (e) {

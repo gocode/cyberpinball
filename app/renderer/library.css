@@ -4647,3 +4647,21 @@ body.mouse .room-line.pick:not(.selected):hover {
 body.mouse .lib-chip.pick:not(.selected):hover {
   border-color: var(--halo);
 }
+
+/*
+ * Choix courant des lignes en tuiles (13/11/2026) : une section qui pose son propre fond ou sa
+ * bordure sur ses lignes rendait aussi ceux de la ligne choisie (tuiles du haut de la gestion du
+ * Juke-box : seul l'éclat passait). Ici, plus précis et plus bas, le trait et l'aplat verts reviennent.
+ * Garde-fous : selection-visible.test.ts (feuille de style) et « choix courant invisible » (layout-check.ts).
+ */
+.lib-jukebox .kind-jb-global .lib-row.selected,
+.lib-jukebox .kind-jb-segments .lib-row.selected,
+.lib-jukebox .kind-jb-fields .lib-row.selected,
+.lib-picker .kind-places .lib-row.selected,
+.kind-reactions .lib-row.selected,
+.kind-phrases .lib-row.selected {
+  border-color: var(--accent);
+  background: var(--signal-wash);
+  /* Trait vert doublé à l'intérieur : la tuile choisie se voit de loin, sans déborder de sa place. */
+  box-shadow: inset 0 0 0 0.15cqmin var(--accent);
+}

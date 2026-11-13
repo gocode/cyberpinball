@@ -558,6 +558,19 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
       else seenIcons.set(name, entry);
     }
   }
+  // Choix courant invisible (13/11/2026, tuiles du haut de la gestion du Juke-box : une règle plus
+  // précise rendait leur fond et leur bordure, et seul l'éclat passait) : la ligne choisie doit se
+  // distinguer de ses voisines de même forme, par son fond, sa bordure, sa couleur ou son contour.
+  const look = (el) => {
+    const s = getComputedStyle(el);
+    return [s.backgroundColor, s.backgroundImage, s.borderTopColor, s.borderLeftColor, s.borderLeftWidth, s.color, s.outlineStyle, s.outlineColor, s.boxShadow].join('|');
+  };
+  for (const sel of document.querySelectorAll('.lib-row.selected, .lib-action.selected')) {
+    if (!shown(sel) || !sel.parentElement) continue;
+    const kind = sel.classList.contains('lib-row') ? 'lib-row' : 'lib-action';
+    const peer = [...sel.parentElement.children].find((el) => el !== sel && el.classList.contains(kind) && !el.classList.contains('selected') && !el.classList.contains('current') && shown(el));
+    if (peer && look(peer) === look(sel)) problems.add('choix courant invisible : il a le même fond, la même bordure et la même couleur que ses voisines : ' + label(sel));
+  }
   // Mesures dans le repère d'une liste : dans une vue pivotée d'un quart de tour, sa gauche est en
   // haut (ou en bas) de l'écran.
   const localRect = (r, q) =>
