@@ -2256,6 +2256,7 @@ Around the screens, the decor decided on 12 November 2026: a pinball cabinet dre
 
 - **The cabinet**: a continuous glass frame that forms the lockbar, side panels reading "C Y B E R  P I N B A L L", arcade buttons with their glow, plunger, coin door, angle-iron legs, and a head with a speaker on each side of the DMD.
 - **The sky**: nebulae, twinkling stars, and a distant passing object every 25 to 45 s, high up or to the sides, never in front of the playfield or the backglass.
+- **Seamless sky**: the seam of the nebula texture (u = 0, right in front of the player, from the zenith to the horizon) is blurred in one piece by `scripts/decor-textures.cjs`, which rejects any column differing from its neighbours by more than 8%. The `casque-rendu.test.ts` test renders the sky alone (`ciel-seul`) from 12 angles, over 360° and up to the zenith, and rejects any abnormal column.
 - **Construction**: Cyber Pinball builds the decor from the panels (`packages/core/src/decor.ts`, `buildDecor`), with the mockup's lighting baked into the vertices.
 - **File**: it writes it as glTF (`glb.ts`) to `<data>\vr\decor.glb`, rebuilt only when the panels change. Its textures are in `packages/casque-vr/decor` (drawn by `scripts/decor-textures.cjs`) and shipped in `natif\decor`.
 - **Display**: the companion loads it (`decor <path>`, `packages/casque-vr/src/decor.cpp`) and draws it in the projection layer, with depth. The sky is at infinity, its stars computed per pixel. The glows take the table's tint (`teinte <#rrggbb>`).

@@ -61,6 +61,8 @@ class Renderer
    void setTint(float r, float g, float b);
    /** Rendu d'essai : un passage de nature `kind` (1 convoi, 2 satellite, 3 comète, 4 traînée laser) commencé à `t0`. */
    void forcePassage(int kind, double t0) { m_sky.force(kind, t0); }
+   /** Rendu d'essai : le ciel seul (sans la caisse ni la capsule), pour contrôler son raccord. */
+   void setSkyOnly(bool on) { m_skyOnly = on; }
    /**
     * Dessine le décor pour un œil : `mvp` de la borne au clip, `sky` la même sans translation (le ciel
     * à l'infini), `t` le temps (secondes), `fade` de 1 (plein) à 0 (noir).
@@ -68,6 +70,7 @@ class Renderer
    void draw(ID3D11DeviceContext* context, const scene::Mat4& mvp, const scene::Mat4& sky, double t, float fade);
 
  private:
+   bool m_skyOnly = false;
    struct Part
    {
       Microsoft::WRL::ComPtr<ID3D11Buffer> vertices, indices;

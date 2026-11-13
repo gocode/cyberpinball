@@ -782,7 +782,7 @@ void Renderer::draw(ID3D11DeviceContext* context, const scene::Mat4& mvp, const 
       {
          const Material& mat = m_materials[part.material];
          const int wanted = part.sky ? 0 : mat.blend == 0 ? 1 : 2;
-         if (wanted != pass)
+         if (wanted != pass || (m_skyOnly && !part.sky))
             continue;
          k.flags[0] = mat.texture >= 0 ? 1.f : 0.f;
          k.flags[1] = mat.toneMapped ? 1.f : 0.f;

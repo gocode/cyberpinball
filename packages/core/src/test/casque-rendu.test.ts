@@ -62,3 +62,53 @@ test('compagnon, rendu hors écran : cinq allers-retours veille/reprise, le déc
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+/** Plus forte chute (ou bosse) de luminosité d'une colonne par rapport à ses voisines : médiane verticale, étoiles écartées. */
+function columnSeam(file: string): { drop: number; x: number } {
+  const b = fs.readFileSync(file);
+  const off = b.readUInt32LE(10), w = b.readInt32LE(18), h = Math.abs(b.readInt32LE(22)), bytes = b.readUInt16LE(28) / 8;
+  const stride = Math.ceil((w * bytes) / 4) * 4;
+  const med: number[] = [];
+  for (let x = 0; x < w; x++) {
+    const v: number[] = [];
+    for (let y = 0; y < h; y += 2) {
+      const i = off + y * stride + x * bytes;
+      v.push(0.0722 * b[i]! + 0.7152 * b[i + 1]! + 0.2126 * b[i + 2]!);
+    }
+    v.sort((p, q) => p - q);
+    med.push(v[v.length >> 1]!);
+  }
+  let worst = { drop: 0, x: -1 };
+  for (let x = 12; x < w - 12; x++) {
+    const around = (med[x - 12]! + med[x - 10]! + med[x + 10]! + med[x + 12]!) / 4;
+    const drop = around > 2 ? Math.abs(around - med[x]!) / around : 0;
+    if (drop > worst.drop) worst = { drop, x };
+  }
+  return worst;
+}
+
+// Retour du 13/11/2026 : une bande foncée du zénith à l'horizon, pile devant le joueur (raccord u = 0 de
+// la texture des nébuleuses). Le ciel seul, vu de l'intérieur, sur 360° et jusqu'au zénith : aucune colonne
+// nettement différente de ses voisines (la variation naturelle des nébuleuses reste sous 5 %).
+test('compagnon, rendu hors écran : le ciel n’a aucune couture, sur 360° et jusqu’au zénith', { skip: !fs.existsSync(exe) && 'compagnon pas construit (npm run casque-vr)' }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'casque-ciel-'));
+  try {
+    const panels = headsetPanels(borne, edgeRotation('left'), { standardHead: true });
+    const textures = new Map(DECOR_TEXTURES.map((t) => [t, fs.readFileSync(path.join(repo, 'packages', 'casque-vr', 'decor', t))]));
+    const glb = path.join(dir, 'decor.glb');
+    fs.writeFileSync(glb, writeGlb(buildDecor(panels)!, textures));
+    const seams: string[] = [];
+    for (const yaw of [0, 90, 180, -90])
+      for (const pitch of [0, 45, 80]) {
+        const scene = path.join(dir, `ciel-${yaw}-${pitch}.txt`), bmp = path.join(dir, `ciel-${yaw}-${pitch}.bmp`);
+        fs.writeFileSync(scene, [`decor ${glb}`, 'ciel-seul', `vue 0 1.65 0 ${(pitch * Math.PI) / 180} ${(yaw * Math.PI) / 180}`, 'temps 3'].join('\n') + '\n');
+        const said = execFileSync(exe, ['--rendu-essai', scene, bmp], { encoding: 'utf8', windowsHide: true });
+        assert.doesNotMatch(said, /erreur/, said);
+        const s = columnSeam(bmp);
+        if (s.drop > 0.08) seams.push(`lacet ${yaw}°, tangage ${pitch}° : colonne ${s.x} à ${(s.drop * 100).toFixed(1)} %`);
+      }
+    assert.deepEqual(seams, []);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

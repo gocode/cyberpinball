@@ -437,6 +437,7 @@ int renderTest(const std::string& input, const std::string& output)
    float view[5] = { 0.f, 1.65f, 0.35f, -0.436f, 0.f };
    double testTime = 0;
    int cycles = 0; // allers-retours veille/reprise avant le rendu (décor libéré puis rechargé, comme au casque)
+   bool skyOnly = false; // « ciel-seul » : le ciel du décor sans rien devant, pour contrôler son raccord
    std::vector<std::pair<int, double>> forced; // passages forcés : nature, début (s)
    while (std::getline(file, line))
    {
@@ -457,6 +458,8 @@ int renderTest(const std::string& input, const std::string& output)
          in >> testTime;
       else if (word == "cycles")
          in >> cycles;
+      else if (word == "ciel-seul")
+         skyOnly = true;
       else if (word == "passage")
       {
          int kind = 0;
@@ -510,6 +513,7 @@ int renderTest(const std::string& input, const std::string& output)
       }
    }
    decorRenderer.setTint(testTint[0], testTint[1], testTint[2]);
+   decorRenderer.setSkyOnly(skyOnly);
    for (const auto& [kind, started] : forced)
       decorRenderer.forcePassage(kind, started);
    // Image témoin, en octets d'écran (BGRA, sRGB), avec ses mipmaps.

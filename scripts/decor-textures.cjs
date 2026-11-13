@@ -79,11 +79,45 @@ function nebuleuses() {
     const o = (j * sw + i) * 4; img.data[o] = col[0]; img.data[o + 1] = col[1]; img.data[o + 2] = col[2]; img.data[o + 3] = 255;
   }
   sg.putImageData(img, 0, 0);
+  // Raccord sans couture à u = 0 (pile devant le joueur) : les trois copies sont posées au pixel près sur
+  // un canevas large, agrandies et floutées EN UNE FOIS, puis le tiers du milieu est gardé. Flouter chaque
+  // copie à part (le filtre d'un drawImage ne voit que lui) assombrissait ses bords : une bande foncée du
+  // zénith à l'horizon devant le joueur (retour du 13/11/2026).
+  const wide = canvas(sw * 3, sh), wg = wide.getContext('2d');
+  for (const dx of [0, sw, 2 * sw]) wg.drawImage(small, dx, 0);
+  const big = canvas(W * 3, H), bg = big.getContext('2d');
+  bg.imageSmoothingQuality = 'high'; bg.filter = 'blur(3px)';
+  bg.drawImage(wide, 0, 0, W * 3, H);
   const c = canvas(W, H), g = c.getContext('2d');
-  g.imageSmoothingQuality = 'high'; g.filter = 'blur(3px)';
-  // Raccord sans couture à u = 0 : l'image est dessinée trois fois côte à côte avant le flou.
-  for (const dx of [-W, 0, W]) g.drawImage(small, dx, 0, W, H);
+  g.drawImage(big, W, 0, W, H, 0, 0, W, H);
+  window.cielControle = checkSeamless(c);
   return c;
+}
+
+/**
+ * Contrôle du ciel : aucune colonne nettement plus sombre (ou plus claire) que ses voisines, raccord
+ * u = 0 / u = 1 compris (voisines prises en boucle). Médiane verticale de chaque colonne, telle que le
+ * JPEG la gardera : la couleur multipliée par son opacité (un bord transparent devient noir).
+ */
+function checkSeamless(c) {
+  const { width: W, height: H } = c, data = c.getContext('2d').getImageData(0, 0, W, H).data;
+  const med = [];
+  for (let x = 0; x < W; x++) {
+    const v = [];
+    for (let y = 0; y < H; y += 4) { const o = (y * W + x) * 4; v.push(((0.2126 * data[o] + 0.7152 * data[o + 1] + 0.0722 * data[o + 2]) * data[o + 3]) / 255); }
+    v.sort((a, b) => a - b);
+    med.push(v[v.length >> 1]);
+  }
+  // Une couture est une marche ou un creux étroit : écart à la moyenne des voisines à ±6 et ±8 colonnes
+  // (une pente douce s'y annule). Au-delà de 8 % et de 1,5 niveau, l'image est refusée.
+  let worst = { rel: 0, abs: 0, x: -1 };
+  for (let x = 0; x < W; x++) {
+    const at = (k) => med[(x + k + W) % W];
+    const around = (at(-8) + at(-6) + at(6) + at(8)) / 4, abs = Math.abs(around - med[x]), rel = around > 0 ? abs / around : 0;
+    if (rel > worst.rel && abs > 1.5) worst = { rel, abs, x };
+  }
+  if (worst.rel > 0.08) throw new Error('nebuleuses.jpg : colonne ' + worst.x + ' différente de ses voisines de ' + Math.round(100 * worst.rel) + ' % (couture du ciel)');
+  return worst;
 }
 
 function grille() {
@@ -119,6 +153,8 @@ app.whenReady().then(async () => {
   const html = `<!doctype html><meta charset="utf-8"><style>@font-face{font-family:Saira;src:url(data:font/ttf;base64,${font});}</style><body></body>`;
   await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
   const images = await win.webContents.executeJavaScript(PAGE);
+  const ciel = await win.webContents.executeJavaScript('window.cielControle');
+  console.log(`nebuleuses.jpg : raccord contrôlé, plus fort écart d'une colonne à ses voisines ${(100 * ciel.rel).toFixed(1)} % (colonne ${ciel.x})`);
   fs.mkdirSync(OUT, { recursive: true });
   for (const [name, url] of Object.entries(images)) {
     const bytes = Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
