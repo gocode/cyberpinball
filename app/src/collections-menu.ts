@@ -30,6 +30,37 @@ import {
   type TableEntry,
 } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
+import type { CommunityPosterView } from './community-menu';
+
+/** Collections nommées au plus sur l'affiche du médaillon ; au-delà, « +3 ». */
+const POSTER_OTHERS = 4;
+
+/**
+ * L'affiche du médaillon Collections (13/11/2026), sur le modèle de celle de la Communauté
+ * (app/renderer/community.js) : la marque, le grand titre, le nombre de collections et de tables, la
+ * collection montrée par la roue, quelques autres ; « Start · Choisir une collection » au fronton.
+ */
+export function collectionsPoster(collections: Pick<CollectionsMenu, 'list' | 'current'>): CommunityPosterView {
+  const list = collections.list().filter((c) => c.tables.length);
+  const current = collections.current();
+  const all = list.find((c) => c.id === 'all') ?? current;
+  const others = list.filter((c) => c.id !== current.id);
+  const named = others.slice(0, POSTER_OTHERS).map((c) => c.label);
+  const more = others.length - named.length;
+  return {
+    edition: t('Toutes vos tables, rangées'),
+    label: t('Votre borne. Vos tables.'),
+    title: t('COLLECTIONS'),
+    stats: [tn(list.length, '{n} collection', '{n} collections'), tn(all.tables.length, '{n} table', '{n} tables')].join(' · '),
+    empty: false,
+    eyebrow: t('Affichée sur la roue'),
+    heading: `${current.label} · ${tn(current.tables.length, '{n} table', '{n} tables')}`,
+    ...(named.length ? { detail: t('Aussi : {names}', { names: [...named, ...(more ? [`+${more}`] : [])].join(', ') }) } : {}),
+    tagline: t('Favoris, fabricants, décennies, les vôtres.'),
+    start: t('Start'),
+    open: t('Choisir une collection'),
+  };
+}
 
 /**
  * Menu système > Collections (à la racine, et dans Tables) : la même liste que les MagnaSave, à
@@ -45,16 +76,27 @@ export function createCollectionsItem(host: {
   keysLabel(): string | undefined;
   /** Choisir les boutons des collections : l'écran qui attend les deux appuis ; `back` y ramène. */
   captureKeys(back: () => void): void;
-}): ProvidedSystemItem {
+}): ProvidedSystemItem & { openFromWheel(back: () => void, shown: () => void): void } {
   const lib = host.library;
+  /**
+   * Ouverte par le médaillon Collections de la roue : Exit (Retour) ramène au médaillon, une
+   * collection choisie s'affiche sur la roue, sur sa table (`shown`) ; sans lui, le menu système.
+   */
+  let wheel: { back: () => void; shown: () => void } | undefined;
   const groupTitle = (g: string) => (g === 'mine' ? t('Mes collections') : g === 'maker' ? t('Fabricants') : g === 'decade' ? t('Décennies') : undefined);
 
   function open(): void {
+    wheel = undefined;
+    show();
+  }
+
+  function show(): void {
     lib.openCustom(build, Math.max(0, host.collections.list().findIndex((c) => c.id === host.collections.current().id)));
   }
 
   function build(): Built {
-    const back = () => lib.openSystem();
+    const from = wheel;
+    const back = from ? from.back : () => lib.openSystem();
     const current = host.collections.current().id;
     // Une ligne par collection, sous son intertitre, reliée à son action : la liste se parcourt aux
     // flippers, Start l'affiche sur la roue (comme « Jouer avec un ami »).
@@ -75,7 +117,8 @@ export function createCollectionsItem(host: {
           run: () => {
             if (!count) return;
             host.collections.choose(c.id);
-            lib.leave();
+            if (from) from.shown();
+            else lib.leave();
           },
         }) - 1;
       const detail = count ? [tn(count, '{n} table', '{n} tables'), c.id === current ? t('affichée sur la roue') : undefined, c.detail].filter(Boolean).join(' · ') : (c.reason ?? '');
@@ -105,7 +148,7 @@ export function createCollectionsItem(host: {
     return {
       heading: t('Collections'),
       icon: 'star',
-      lead: t('La roue ne montre que les tables de la collection choisie. Start l’affiche ; sur la roue, les boutons des collections passent de l’une à l’autre.'),
+      lead: from ? t('Start affiche la collection sur la roue ; Exit revient au médaillon.') : t('La roue ne montre que les tables de la collection choisie. Start l’affiche ; sur la roue, les boutons des collections passent de l’une à l’autre.'),
       sections,
       actions,
       back,
@@ -185,6 +228,10 @@ export function createCollectionsItem(host: {
       return t('Affichée : {collection}', { collection: host.collections.current().label });
     },
     run: open,
+    openFromWheel(back, shown) {
+      wheel = { back, shown };
+      show();
+    },
   };
 }
 

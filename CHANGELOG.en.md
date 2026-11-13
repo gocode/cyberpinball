@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.12
 
+- Table wheel: new Collections medallion, after the Jukebox and Community, with its animated star. Start opens the list of your collections (All, Favourites, Recent, manufacturers, decades, your own); Start on one shows it on the wheel, Exit goes back to the medallion. When selected, it shows its poster on the playfield and backglass. It can be hidden in System menu > Tables > Wheel.
 - Virtual reality: the log records what the headset passes on (room boundary, head and controller positions, each button), in the menu as in a game, to prepare an alignment that holds from one Link connection to the next. Nothing changes in use.
 
 ## 0.1.11

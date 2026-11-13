@@ -1,6 +1,6 @@
 // Médaillons vivants de la roue (13/11/2026), dans un vrai Chromium hors écran : la vraie page du menu
-// (frontend.html, sa politique de sécurité, ses scripts et ses feuilles), une roue avec le Juke-box et
-// la Communauté. Ce que Chromium dessine vraiment : chaque médaillon a son intérieur dans un canevas,
+// (frontend.html, sa politique de sécurité, ses scripts et ses feuilles), une roue avec le Juke-box,
+// la Communauté et les Collections. Ce que Chromium dessine vraiment : chaque médaillon a son intérieur dans un canevas,
 // posé dans le trou de l'anneau chromé (img.wheel-img, sur lequel se calent le halo et le cercle de la
 // roue) ; seul le médaillon du centre s'anime, ses voisins restent sur leur première image.
 
@@ -51,7 +51,7 @@ app.whenReady().then(async () => {
     for (let i = 0; i < data.length; i += 4 * 97) { print = (print * 31 + data[i] + 7 * data[i + 1] + 13 * data[i + 2]) % 1000000007; if (data[i + 3] > 0) lit++; }
     const a = cv.getBoundingClientRect(), b = ring.getBoundingClientRect();
     return {
-      kind: n.classList.contains('jukebox') ? 'juke-box' : n.classList.contains('community') ? 'communaute' : '?',
+      kind: n.classList.contains('jukebox') ? 'juke-box' : ring.alt === 'Collections' ? 'collections' : n.classList.contains('community') ? 'communaute' : '?',
       center: n.classList.contains('center'),
       ring: decodeURIComponent(ring.getAttribute('src')).replace(/^.*\\//, ''),
       print, lit,
@@ -89,21 +89,27 @@ interface Look {
   ringOnTop: boolean;
 }
 
-/** Une roue : le Juke-box à gauche, la Communauté au centre, une table à droite ; puis l'inverse. */
-function wheelState(center: 'juke-box' | 'communaute') {
+type Kind = 'juke-box' | 'communaute' | 'collections';
+
+/** Une roue : les trois médaillons, celui demandé au centre, puis une table. */
+function wheelState(center: Kind) {
   const state = menuState({ 'A.vpx': undefined, 'B.vpx': undefined, 'C.vpx': undefined });
-  const jukebox = { key: '__jukebox', title: 'Juke-box', jukebox: true };
-  const community = { key: '__communaute', title: 'Communauté', community: true };
-  const [left, middle] = center === 'communaute' ? [jukebox, community] : [community, jukebox];
+  const all: Record<Kind, object> = {
+    'juke-box': { key: '__jukebox', title: 'Juke-box', jukebox: true },
+    communaute: { key: '__communaute', title: 'Communauté', community: true },
+    collections: { key: '__collections', title: 'Collections', collectionsMedallion: true },
+  };
+  const others = (Object.keys(all) as Kind[]).filter((k) => k !== center);
   state.neighbors = [
-    { offset: -1, ...left },
-    { offset: 0, ...middle },
-    { offset: 1, key: 'C.vpx', title: 'C.vpx', wheel: undefined },
+    { offset: -1, ...all[others[0]!] },
+    { offset: 0, ...all[center] },
+    { offset: 1, ...all[others[1]!] },
+    { offset: 2, key: 'C.vpx', title: 'C.vpx', wheel: undefined },
   ] as unknown as typeof state.neighbors;
   return state;
 }
 
-for (const center of ['communaute', 'juke-box'] as const) {
+for (const center of ['communaute', 'juke-box', 'collections'] as const) {
   test(`roue, vrai Chromium : médaillons vivants, ${center} au centre s'anime, son voisin reste sur sa première image`, { skip: electron ? false : 'Electron sous Windows requis', timeout: 120_000 }, () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-medaillons-'));
     try {
@@ -117,7 +123,8 @@ for (const center of ['communaute', 'juke-box'] as const) {
       assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
       const out = JSON.parse(fs.readFileSync(path.join(dir, 'out.json'), 'utf8')) as { first: Look[]; second: Look[]; console: string[] };
       assert.deepEqual(out.console.filter((m) => /Content Security Policy|Uncaught|TypeError|ReferenceError/.test(m)), [], 'aucune erreur ni refus de la page');
-      assert.equal(out.first.length, 2, `deux médaillons vivants dans la roue : ${JSON.stringify(out.first)}`);
+      assert.equal(out.first.length, 3, `trois médaillons vivants dans la roue : ${JSON.stringify(out.first)}`);
+      assert.deepEqual(out.first.map((m) => m.kind).sort(), ['collections', 'communaute', 'juke-box'], 'chacun son intérieur');
       for (const m of out.first) {
         assert.equal(m.ring, 'contour-512.webp', `${m.kind} : l'anneau chromé commun en image (halo et cercle s'y calent)`);
         assert.ok(m.ringOnTop, `${m.kind} : l'anneau couvre le canevas`);
@@ -128,7 +135,7 @@ for (const center of ['communaute', 'juke-box'] as const) {
       const at = (list: Look[], c: boolean) => list.find((m) => m.center === c)!;
       assert.equal(at(out.first, true).kind, center);
       assert.notEqual(at(out.first, true).print, at(out.second, true).print, 'le médaillon du centre s’anime');
-      assert.equal(at(out.first, false).print, at(out.second, false).print, 'le voisin reste sur sa première image');
+      for (const m of out.first.filter((x) => !x.center)) assert.equal(m.print, out.second.find((x) => x.kind === m.kind)!.print, `${m.kind}, voisin : reste sur sa première image`);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

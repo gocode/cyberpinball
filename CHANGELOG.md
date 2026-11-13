@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.12
 
+- Roue des tables : nouveau médaillon Collections, après le Juke-box et la Communauté, avec son étoile animée. Start ouvre la liste de vos collections (Toutes, Favoris, Récentes, fabricants, décennies, les vôtres) ; Start sur l'une l'affiche sur la roue, Exit revient au médaillon. Choisi, il montre son affiche au plateau et au fronton. Il se masque dans Menu système > Tables > Roue.
 - Réalité virtuelle : le journal relève ce que le casque transmet (limite de la pièce, position de la tête et des manettes, chaque bouton), au menu comme en partie, pour préparer un calage qui tienne d'une connexion de Link à l'autre. Rien ne change à l'usage.
 
 ## 0.1.11

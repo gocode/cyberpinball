@@ -241,14 +241,17 @@ function fillWheelItem(item, n) {
   item.wheel = n.wheel;
   item.title = n.title;
   const { node, tilt } = item;
-  // Médaillon Communauté : son intérieur vivant (« Montée », medaillons-vivants.js) sous l'anneau
-  // chromé commun ; l'image fixe du générateur (medaillons.cjs) faute de canevas.
-  if (n.community) {
-    if (window.CyberMedaillons) tilt.replaceChildren(...CyberMedaillons.wheelNodes('communaute', t('Communauté')));
+  // Médaillons Communauté et Collections : leur intérieur vivant (« Montée », « Carrousel »,
+  // medaillons-vivants.js) sous l'anneau chromé commun ; l'image fixe du générateur (medaillons.cjs)
+  // faute de canevas. Les deux ont la classe community (taille et place du médaillon dessiné).
+  if (n.community || n.collectionsMedallion) {
+    const kind = n.community ? 'communaute' : 'collections';
+    const alt = n.community ? t('Communauté') : t('Collections');
+    if (window.CyberMedaillons) tilt.replaceChildren(...CyberMedaillons.wheelNodes(kind, alt));
     else {
       const img = el('img', 'wheel-img');
-      img.src = 'medaillons/communaute-512.webp';
-      img.alt = t('Communauté');
+      img.src = `medaillons/${kind}-512.webp`;
+      img.alt = alt;
       img.draggable = false;
       tilt.replaceChildren(img);
     }
@@ -719,15 +722,17 @@ function menuPanel(s) {
     v.meta.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'linear' });
   }
   v.node.classList.toggle('jukebox-chosen', Boolean(s.table.jukebox));
-  v.node.classList.toggle('community-chosen', Boolean(s.table.community));
-  // Médaillon Juke-box ou Communauté choisi au bureau : son affiche dans le cadre du fronton du menu.
+  v.node.classList.toggle('community-chosen', Boolean(s.table.community || s.table.collectionsMedallion));
+  // Médaillon Juke-box, Communauté ou Collections choisi au bureau : son affiche dans le cadre du fronton du menu.
   const deskFront = style && document.documentElement.classList.contains('menu-desktop');
   const front =
     deskFront && s.jukebox?.wheel && window.CyberJukebox
       ? CyberJukebox.backglassPoster(s)
       : deskFront && s.community?.poster && window.CyberCommunity
         ? CyberCommunity.backglassPoster(s)
-        : undefined;
+        : deskFront && s.collectionsMedallion?.poster && window.CyberCollections
+          ? CyberCollections.backglassPoster(s)
+          : undefined;
   // La même affiche reste en place (ses animations continuent) ; une autre la remplace.
   const shown = v.backglass.querySelector(':scope > .jb-wheel-fronton'); // i18n-ignore : sélecteur CSS
   if (shown !== front) {
@@ -1281,6 +1286,8 @@ function drawPlayfield(s) {
   if (s.phase === 'menu' && s.jukebox?.wheel && window.CyberJukebox) nodes.push(CyberJukebox.wheelPoster(s, document.documentElement.classList.contains('menu-desktop')));
   // Médaillon Communauté choisi : la sienne, de même (community.js).
   else if (s.phase === 'menu' && s.community?.poster && window.CyberCommunity) nodes.push(CyberCommunity.wheelPoster(s, document.documentElement.classList.contains('menu-desktop')));
+  // Médaillon Collections choisi : la sienne, même mise en page (community.js).
+  else if (s.phase === 'menu' && s.collectionsMedallion?.poster && window.CyberCollections) nodes.push(CyberCollections.wheelPoster(s, document.documentElement.classList.contains('menu-desktop')));
   // Extinction, veille ou redémarrage en cours : plus rien à choisir, ni roue dentée ni cadenas.
   // Mode invité : le cadenas prend la place de la roue dentée, le menu système est fermé.
   // Interface propre (gestion du Juke-box) : son nom à la place de la roue dentée, ni rubriques ni cadre du menu système.
@@ -1752,7 +1759,8 @@ function renderZones(s) {
     // son affiche. Les deux sont appelés à chaque fois : chacun retire la sienne quand elle n'a plus lieu d'être.
     const jukeboxZone = Boolean(window.CyberJukebox?.zone(z.node, z.role, s));
     const communityZone = Boolean(window.CyberCommunity?.zone(z.node, z.role, s));
-    if (jukeboxZone || communityZone) {
+    const collectionsZone = Boolean(window.CyberCollections?.zone(z.node, z.role, s));
+    if (jukeboxZone || communityZone || collectionsZone) {
       z.layer.show(undefined);
       z.layer.setActive(false);
       continue;
@@ -1876,7 +1884,7 @@ function renderIntro(s) {
 
 /** Le fond du playfield ne joue que s'il se voit : les superpositions et la fiche sont opaques. */
 function backgroundVisible(s) {
-  return s.phase === 'menu' && !s.help && !s.jukebox?.wheel && !s.community?.poster;
+  return s.phase === 'menu' && !s.help && !s.jukebox?.wheel && !s.community?.poster && !s.collectionsMedallion?.poster;
 }
 
 // ---------- Horaire de la borne (arcadehours.ts, frontend.css) ----------

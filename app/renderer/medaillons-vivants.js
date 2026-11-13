@@ -1,5 +1,5 @@
 // Médaillons vivants des rubriques (13/11/2026) : l'intérieur des médaillons Juke-box (« Onde ») et
-// Communauté (« Montée ») dessiné en direct dans un canevas, sous l'anneau chromé commun
+// Communauté (« Montée »), puis Collections (« Éclat », 13/11/2026) dessiné en direct dans un canevas, sous l'anneau chromé commun
 // (medaillons/contour.png, contour-512.webp). Dessin validé par le mainteneur sur la planche du
 // 13/11/2026 : trois fils Soie en fuseau autour du rond à la note ; le même rond avec le bonhomme vert,
 // et des bulles de discussion qui montent, portant des emojis ou trois points. Un reflet en haut à
@@ -298,10 +298,88 @@
     volume(c);
   }
 
+  // ---------- Collections : « Éclat » ----------
+
+  /*
+   * Choisi par le mainteneur le 13/11/2026 (planche des médaillons vivants, premier tour Collections).
+   * Le même rond que les deux autres, avec l'étoile vert signal des favoris à la place de la note ou du
+   * bonhomme. Derrière, de petites étoiles violettes, bleues et vertes partent du rond l'une après
+   * l'autre et filent vers le bord en tournant, comme un favori qu'on ajoute ; elles grandissent puis
+   * s'effacent avant l'anneau. Formes pleines, aucun fil, aucune pulsation.
+   */
+  const STAR_COLORS = [VIOLET, META, SIGNAL];
+
+  /** Étoile à cinq branches centrée en (x, y), rayon extérieur R ; `inner` : part du rayon intérieur. */
+  function starPath(c, x, y, R, rot = 0, inner = 0.47) {
+    c.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + rot + (i * Math.PI) / 5;
+      const r = i % 2 ? R * inner : R;
+      if (i) c.lineTo(x + r * Math.cos(a), y + r * Math.sin(a));
+      else c.moveTo(x + r * Math.cos(a), y + r * Math.sin(a));
+    }
+    c.closePath();
+  }
+
+  /** Petite étoile de couleur : dégradé doux, pointes adoucies, liseré sombre pour se détacher. */
+  function smallStar(c, x, y, R, rot, col, a) {
+    if (a <= 0.01 || R <= 0.3) return;
+    c.save();
+    c.globalAlpha = a;
+    c.lineJoin = 'round';
+    starPath(c, x, y, R, rot);
+    c.lineWidth = Math.max(2, R * 0.32);
+    c.strokeStyle = '#0a1a19';
+    c.stroke();
+    const g = c.createLinearGradient(x, y - R, x, y + R);
+    g.addColorStop(0, rgba(mix(col, [255, 255, 255], 0.25), 1));
+    g.addColorStop(1, rgba(mix(col, [0, 0, 0], 0.15), 1));
+    c.fillStyle = g;
+    c.strokeStyle = g;
+    c.lineWidth = R * 0.16;
+    c.fill();
+    c.stroke();
+    c.restore();
+  }
+
+  /** L'étoile verte du rond, de la taille de la note d'Onde. */
+  function favoriteStar(c, k) {
+    c.save();
+    c.lineJoin = 'round';
+    c.fillStyle = '#8be23a';
+    c.strokeStyle = '#8be23a';
+    c.lineWidth = 5;
+    c.shadowColor = 'rgba(139,226,58,.55)';
+    c.shadowBlur = 12 * k;
+    starPath(c, 150, 153, 40, 0, 0.46);
+    c.fill();
+    c.stroke();
+    c.restore();
+  }
+
+  function eclat(c, t, k) {
+    disc(c);
+    // Dix étoiles, départs réguliers (une toutes les 0,34 s), directions à l'angle d'or : jamais deux de suite au même endroit.
+    for (let i = 0; i < 10; i++) {
+      const P = 3.4;
+      const u = frac(t / P + i / 10);
+      const cycle = Math.floor(t / P + i / 10);
+      const a = (i * 137.5 + cycle * 61) * D;
+      const r = 64 + 72 * ease(u);
+      const size = 8 + 10 * Math.sin(Math.PI * clamp(u * 1.2));
+      const alpha = Math.min(1, 6 * u) * (1 - clamp((u - 0.75) / 0.25));
+      smallStar(c, 150 + r * Math.cos(a), 150 + r * Math.sin(a), size, u * 3 + i, STAR_COLORS[i % 3], alpha);
+    }
+    label(c, k, 0.45);
+    favoriteStar(c, k);
+    volume(c);
+  }
+
   /** Les intérieurs, et l'instant de leur première image (la plus parlante, montrée à l'arrêt). */
   const KINDS = {
     'juke-box': { draw: onde, t0: 1.1 },
     communaute: { draw: montee, t0: 4 },
+    collections: { draw: eclat, t0: 1.6 },
   };
 
   /** Un intérieur dans un carré de px × px (le disque de rayon 147 le remplit). */

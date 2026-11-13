@@ -599,6 +599,12 @@ export interface MenuMediaSettings {
    */
   community: boolean;
   /**
+   * Médaillon Collections en tête de chaque collection, après la Communauté (collections-menu.ts,
+   * demandé le 13/11/2026) : Start ouvre la liste des collections, une collection choisie s'affiche
+   * sur la roue. Montré par défaut, masquable (Tables > Roue).
+   */
+  collectionsMedallion: boolean;
+  /**
    * Visualiseur du DMD pendant le Juke-box, quand aucun habillage n'est choisi
    * (jukebox-visualizer.ts) : les couleurs de la pochette (défaut), multicolore, ou classique (la
    * couleur du DMD).
@@ -647,6 +653,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   wheelMotion: 'selected',
   jukebox: true,
   community: true,
+  collectionsMedallion: true,
   jukeboxVisualizer: DEFAULT_JUKEBOX_VISUALIZER,
   jukeboxAudio: DEFAULT_JUKEBOX_AUDIO,
   hours: DEFAULT_ARCADE_HOURS,
@@ -692,6 +699,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     wheelMotion: WHEEL_MOTIONS.includes(r.wheelMotion as WheelMotion) ? (r.wheelMotion as WheelMotion) : d.wheelMotion,
     jukebox: typeof r.jukebox === 'boolean' ? r.jukebox : d.jukebox,
     community: typeof r.community === 'boolean' ? r.community : d.community,
+    collectionsMedallion: typeof r.collectionsMedallion === 'boolean' ? r.collectionsMedallion : d.collectionsMedallion,
     jukeboxVisualizer: isVisualizerMode(r.jukeboxVisualizer) ? r.jukeboxVisualizer : d.jukeboxVisualizer,
     jukeboxAudio: normalizeJukeboxAudio(r.jukeboxAudio),
     hours: normalizeArcadeHours(r.hours),

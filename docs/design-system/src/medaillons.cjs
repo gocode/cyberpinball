@@ -30,9 +30,10 @@ const SMALL = 512;
  * (app/renderer/medaillons-vivants.js, CyberMedaillons.paint), peinte dans le trou de l'anneau.
  * L'image fixe et le médaillon animé de la roue sont ainsi le même dessin.
  *   juke-box   : « Onde », trois fils Soie autour du rond à la note ;
- *   communaute : « Montée », le bonhomme vert dans le rond, des bulles d'emojis qui montent.
+ *   communaute : « Montée », le bonhomme vert dans le rond, des bulles d'emojis qui montent ;
+ *   collections : « Éclat », l’étoile verte des favoris dans le rond, des petites étoiles qui en partent.
  */
-const MEDAILLONS = [{ name: 'juke-box' }, { name: 'communaute' }];
+const MEDAILLONS = [{ name: 'juke-box' }, { name: 'communaute' }, { name: 'collections' }];
 
 const page = (ring, items) => `
 (async () => {
