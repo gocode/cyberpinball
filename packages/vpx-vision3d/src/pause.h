@@ -81,6 +81,8 @@ enum : int
  * flippers (actions 2 et 3) n'en est pas une : une gâchette des manettes enfoncée à fond donne les deux (0,3 puis
  * 0,6 : manettes.ts, vpxMappingsFor), et comptait deux calages pour un appui (banc de VPX, 13 novembre 2026).
  */
+/** Deux gâchettes à moins de cet écart (secondes) : une seule pression des deux mains, un seul calage. */
+constexpr double CALAGE_REGROUPE_S = 0.5;
 inline bool estGachette(int id) { return id == 0 || id == 1; }
 
 inline Commande commandeVpx1081(int id, int& lieeA)
@@ -458,8 +460,13 @@ public:
       {
          // Gâchette : la table de VPX s'aligne sur les manettes posées sur la barre avant (autant de fois
          // qu'on veut) ; A ou B : la partie reprend, le dernier calage reste.
+         // Les deux gâchettes pressées ensemble (une main sur chaque coin, essai du 13 novembre 2026 : n=2, 4, 6, 8)
+         // ne font qu'un calage : une gâchette à moins de CALAGE_REGROUPE_S de la précédente est la même pression.
          if (gachette)
          {
+            if (dernierCalage >= 0.0 && t - dernierCalage < CALAGE_REGROUPE_S)
+               return o;
+            dernierCalage = t;
             calages++;
             o.caler = true;
          }
@@ -668,6 +675,7 @@ private:
    bool comboG = false, comboD = false, comboDeclenche = false, calageAttendu = false;
    double debutCombo = 0.0;
    int calages = 0;
+   double dernierCalage = -1.0;
    Reglage reglages[2] {};
    Reglage brouillon {};
 };

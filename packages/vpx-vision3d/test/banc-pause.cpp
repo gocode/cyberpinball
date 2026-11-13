@@ -342,12 +342,16 @@ int main(int argc, char** argv)
       // La même gâchette enfoncée à fond : le second temps du flipper (action 2) ne cale pas une seconde fois.
       rc = c.action(cmd(2), true, 12.25, estGachette(2));
       VERIFIE(!rc.caler && c.calagesFaits() == 1);
-      rc = c.action(cmd(FLIPPER_D), true, 12.5, estGachette(FLIPPER_D));
+      // Les deux gâchettes pressées ensemble (une main sur chaque coin) : un seul calage.
+      rc = c.action(cmd(FLIPPER_D), true, 12.25, estGachette(FLIPPER_D));
+      VERIFIE(!rc.caler && c.calagesFaits() == 1);
+      // Une nouvelle pression, plus tard : un second calage.
+      rc = c.action(cmd(FLIPPER_D), true, 12.75, estGachette(FLIPPER_D));
       VERIFIE(rc.caler && c.calagesFaits() == 2 && c.etape() == Etape::Calage);
       // A : la partie reprend (premier moyen), le calage reste.
-      rc = c.action(cmd(START), true, 12.7);
+      rc = c.action(cmd(START), true, 12.9);
       VERIFIE(rc.reprendre == 1 && !rc.caler);
-      images(c, 12.7, 13.5, true, j);
+      images(c, 12.9, 13.5, true, j);
       VERIFIE(!c.menuVisible() && !c.vpxEnPause());
       // Depuis le menu de la pause : « Caler la borne » (troisième choix), sans combinaison.
       images(c, 13.5, 14.0, false, j);

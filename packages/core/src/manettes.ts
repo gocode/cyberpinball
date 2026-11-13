@@ -294,6 +294,13 @@ export class CalibrationComboHold {
   }
 }
 
+/**
+ * Les deux gâchettes tenues ensemble au menu, seules, pendant ce temps (secondes) : le geste du calage confondu
+ * avec elles (essai du 13 novembre 2026 : le joueur tenait les gâchettes, pas les sticks) ; une aide le dit.
+ */
+export const TRIGGERS_HINT_S = 2;
+export const TRIGGERS_HINT_COMBO: readonly ControllerButton[] = ['gachette-gauche', 'gachette-droite'];
+
 /** La combinaison telle que le joueur la lit (« les deux joysticks enfoncés ensemble, 3 s »), ou undefined. */
 export function calibrationComboLabel(profile: HeadsetProfile | undefined): string | undefined {
   return calibrationCombo(profile) ? t('les deux joysticks enfoncés ensemble, 3 s') : undefined;

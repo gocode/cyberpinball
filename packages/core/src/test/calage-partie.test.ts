@@ -38,6 +38,8 @@ import {
   ROOM_KEPT_RECALIBRATION_DEG,
   shouldOfferCalibration,
   staleCalibration,
+  TRIGGERS_HINT_COMBO,
+  TRIGGERS_HINT_S,
   ovrRuntimeDll,
   AUTO_RECAL_GAP_S,
   AUTO_RECAL_MATCH_CM,
@@ -47,7 +49,10 @@ import {
   AUTO_RECAL_STILL_MM,
   AUTO_RECAL_STILL_S,
   autoRecalibratedPlace,
-  onCalibratedLockbar,
+  AUTO_RECAL_LEARN_CM,
+  AUTO_RECAL_LEARN_HEIGHT_CM,
+  restGate,
+  restReference,
   RestWatch,
   type RestSample,
   VPX_CALIBRATION_KEYS,
@@ -147,10 +152,10 @@ test('détection : pièce recentrée par le Quest (limite fixe) dite au journal,
   assert.match(ts, /if \(!this\.worn\) this\.takenOff = this\.takenOffSeen = true;/);
   assert.match(ts, /this\.opts\.onPutBackOn\?\.\(\);/);
   const front = read('app', 'src', 'frontend.ts');
-  assert.match(front, /onPutBackOn: \(\) => \{\s*checkStaleCalibration\(\);\s*headsetPutBackOn\(\);\s*\},/);
+  assert.match(front, /onPutBackOn: \(\) => \{\s*restLearnArmed = false;\s*checkStaleCalibration\(\);\s*headsetPutBackOn\(\);\s*\},/);
   assert.match(front, /if \(!place \|\| headsetSetting\(\) === 'bureau' \|\| headset\?\.roomKeeping !== 'recentred'\) return;/);
   // L'écart prises-bouts survit à la relecture de casque.json.
-  assert.match(ts, /\.\.\.\(grip && \{ grip \}\), \.\.\.\(p\.free === true && \{ free: true \}\), \.\.\.\(boundary && \{ boundary \}\), \.\.\.\(head && \{ head \}\) \};/);
+  assert.match(ts, /\.\.\.\(grip && \{ grip \}\), \.\.\.\(p\.free === true && \{ free: true \}\), \.\.\.\(boundary && \{ boundary \}\), \.\.\.\(head && \{ head \}\), \.\.\.\(rest && \{ rest \}\) \};/);
   assert.match(front, /offerCalibration\('casque-remis'\);/);
   // Changement de pièce dit par le runtime pendant la session : l'écart au journal.
   const gap = roomChangeGap('piece-changee pose 0.300000 0.000000 -0.400000 0.523599')!;
@@ -274,7 +279,7 @@ test('calage périmé (13 novembre 2026) : limite changée de type ou de taille,
   // Proposé d'office, quel que soit le type de limite ; une seule fois par signature (calage-perime.json).
   assert.equal(shouldOfferCalibration('limite-changee', 'kept'), true);
   const front = read('app', 'src', 'frontend.ts');
-  assert.match(front, /onRoom: \(\) => checkStaleCalibration\(\),/);
+  assert.match(front, /onRoom: \(\) => \{\s*restLearnArmed = false;\s*checkStaleCalibration\(\);\s*\},/);
   assert.match(front, /if \(offered === stale\.signature\) return;/);
   assert.match(front, /if \(!offerCalibration\('limite-changee'\)\) return;\s*try \{\s*fs\.mkdirSync/);
   assert.match(front, /\.\.\.\(boundary && \{ boundary \}\), \.\.\.\(head && \{ head \}\) \};/);
@@ -333,7 +338,7 @@ test('geste au menu (13 novembre 2026, PinCab : rien) : détecté avant l’assi
   assert.equal(hold.heldSince(), undefined);
   const front = read('app', 'src', 'frontend.ts');
   // Avant l'assistant des manettes (ouvert d'office sans réglage gardé), qui prenait tous les boutons.
-  assert.match(front, /function headsetButton\(name: string, down: boolean\): void \{\s*\/\/[^\n]*\n\s*calibrationComboButton\(name, down\);\s*if \(controllerWizard\) \{/);
+  assert.match(front, /function headsetButton\(name: string, down: boolean\): void \{\s*\/\/[^\n]*\n\s*calibrationComboButton\(name, down\);\s*triggersHintButton\(name, down\);\s*if \(controllerWizard\) \{/);
   // Seulement le profil des manettes, jamais leur réglage.
   assert.match(front, /function calibrationComboButton\(name: string, down: boolean\): void \{\s*const profile = headset\?\.profile \?\? 'touch';\s*const combo = calibrationCombo\(profile\);/);
   const start = front.indexOf('function calibrationComboButton');
@@ -355,56 +360,75 @@ test('aide : la combinaison dans le détail de « Caler la borne », dans les ma
     assert.match(read(file), words, file);
 });
 
-test('recalage automatique (13 novembre 2026) : manettes posées, immobiles 1 s, sur la barre du calage ; jamais en main', () => {
+test('recalage automatique (13 novembre 2026) : position de repos apprise après un calage à la main, sans hauteur absolue ; jamais en main', () => {
   // Seuils figés.
-  assert.deepEqual([AUTO_RECAL_STILL_S, AUTO_RECAL_STILL_MM, AUTO_RECAL_STILL_DEG, AUTO_RECAL_MATCH_CM, AUTO_RECAL_GAP_S, AUTO_RECAL_MIN_CM, AUTO_RECAL_MIN_DEG], [1, 4, 1.5, 2.5, 0.3, 1, 1]);
-  const place: CabinetPlace = { ...lockbarPlace({ x: -0.3, y: 0.9, z: -0.4 }, { x: 0.3, y: 0.9, z: -0.4 }), head: { x: 0, z: 0.1 } };
+  assert.deepEqual(
+    [AUTO_RECAL_STILL_S, AUTO_RECAL_STILL_MM, AUTO_RECAL_STILL_DEG, AUTO_RECAL_MATCH_CM, AUTO_RECAL_LEARN_CM, AUTO_RECAL_LEARN_HEIGHT_CM, AUTO_RECAL_GAP_S, AUTO_RECAL_MIN_CM, AUTO_RECAL_MIN_DEG],
+    [1, 4, 1.5, 2.5, 8, 10, 0.3, 1, 1],
+  );
+  // Calée à la main : bouts tenus sur les coins, barre de 60 cm à 90 cm.
+  const calee: CabinetPlace = { ...lockbarPlace({ x: -0.3, y: 0.9, z: -0.4 }, { x: 0.3, y: 0.9, z: -0.4 }), head: { x: 0, z: 0.1 } };
+  // Posées, elles reposent 10 cm plus près du joueur, 3 cm plus haut, écartées de 56 cm (essai : 10 cm d'écart à tort).
+  const repos: [Point3, Point3] = [{ x: -0.28, y: 0.93, z: -0.3 }, { x: 0.28, y: 0.93, z: -0.3 }];
   const flat = { x: 0, y: 0, z: 0, w: 1 };
   const tilt = (deg: number) => ({ x: Math.sin((deg * Math.PI) / 360), y: 0, z: 0, w: Math.cos((deg * Math.PI) / 360) });
-  const posees = (t: number, dx = 0, rot = flat): RestSample => ({ t, tips: [{ x: -0.3 + dx, y: 0.9, z: -0.4 }, { x: 0.3 + dx, y: 0.9, z: -0.4 }], rot: [rot, rot] });
-  const run = (samples: (RestSample | undefined)[]) => {
-    const w = new RestWatch();
-    return samples.map((s) => w.push(s, place)).filter(Boolean).length;
-  };
+  const sample = (t: number, tips: readonly [Point3, Point3], dx = 0, rot = flat): RestSample => ({ t, tips: [{ ...tips[0], x: tips[0].x + dx }, { ...tips[1], x: tips[1].x + dx }], rot: [rot, rot] });
   const seconds = (from: number, to: number, f: (t: number, i: number) => RestSample | undefined) => {
     const out: (RestSample | undefined)[] = [];
     for (let i = 0, t = from; t <= to + 1e-9; i++, t = from + i * 0.1) out.push(f(t, i));
     return out;
   };
-  // Posées, immobiles (bruit du suivi : 1 mm) : un recalage après 1 s, un seul tant qu'elles restent.
-  assert.equal(run(seconds(0, 5, (t, i) => posees(t, (i % 2) * 0.001))), 1);
-  // En main : 5 mm de tremblement, ou 2° de rotation : jamais.
-  assert.equal(run(seconds(0, 5, (t, i) => posees(t, (i % 2) * 0.005))), 0);
-  assert.equal(run(seconds(0, 5, (t, i) => posees(t, 0, tilt((i % 2) * 2)))), 0);
-  // Ailleurs que sur la barre : écart des bouts 4 cm de trop, ou 3 cm plus haut.
-  assert.equal(run(seconds(0, 5, (t) => ({ ...posees(t), tips: [{ x: -0.32, y: 0.9, z: -0.4 }, { x: 0.32, y: 0.9, z: -0.4 }] }))), 0);
-  assert.equal(run(seconds(0, 5, (t) => ({ ...posees(t), tips: [{ x: -0.3, y: 0.93, z: -0.4 }, { x: 0.3, y: 0.93, z: -0.4 }] }))), 0);
-  // Une manette plus suivie (endormie) : réarmé ; reposées : un second recalage.
-  assert.equal(run([...seconds(0, 2, (t) => posees(t)), undefined, ...seconds(3, 5, (t) => posees(t))]), 2);
-  // Relevés trop espacés (suite rompue) : pas de seconde immobile.
-  assert.equal(run([0, 0.5, 1, 1.5].map((t) => posees(t))), 0);
-  // Pas de calage gardé, ou une borne posée au bureau : jamais.
-  assert.equal(new RestWatch().push(posees(0), undefined), undefined);
-  assert.equal(onCalibratedLockbar(posees(0).tips, { ...place, free: true }), false);
-  // La place recalée : la pièce recentrée par le Quest (29°), la même vraie barre retrouvée, dimensions gardées.
+  const run = (samples: (RestSample | undefined)[], place: CabinetPlace, learning = false) => {
+    const w = new RestWatch();
+    return samples.map((s) => w.push(s, (tips) => restGate(tips, place, learning))).filter(Boolean).length;
+  };
+  // Sans position apprise et hors apprentissage : jamais (plus de recalage supposé sur les bouts).
+  assert.equal(run(seconds(0, 3, (t) => sample(t, repos)), calee), 0);
+  // Apprentissage (juste après le calage à la main) : posées immobiles 1 s, une fois ; la position de repos apprise.
+  assert.equal(run(seconds(0, 3, (t, i) => sample(t, repos, (i % 2) * 0.001)), calee, true), 1);
+  const rest = restReference(calee, repos);
+  assert.ok(Math.abs(rest.width - 0.56) < 1e-9 && Math.abs(rest.dy + 0.03) < 1e-9 && Math.abs(Math.hypot(rest.x, rest.z) - 0.1) < 1e-6, JSON.stringify(rest));
+  const apprise: CabinetPlace = { ...calee, rest };
+  // La même pose, la pièce inchangée : la place retrouvée exactement (plus de 10 cm à tort).
+  const meme = autoRecalibratedPlace({ ...apprise, rest }, repos);
+  assert.ok(Math.abs(meme.x - calee.x) < 1e-9 && Math.abs(meme.z - calee.z) < 1e-9 && Math.abs(meme.yaw - calee.yaw) < 1e-9 && Math.abs(meme.lockbarHeight! - 0.9) < 1e-9);
+  assert.ok(roomFromRecalibration(calee, meme).cm < AUTO_RECAL_MIN_CM);
+  // La pièce de Link refaite : tournée de 29°, déplacée, et le sol monté de 33 cm. Les manettes posées au même
+  // endroit réel : la vraie barre retrouvée, hauteur comprise (pas de hauteur absolue dans le déclenchement).
   const a = (29 * Math.PI) / 180;
-  const rot = (p: { x: number; y: number; z: number }) => ({ x: p.x * Math.cos(a) + p.z * Math.sin(a), y: p.y, z: -p.x * Math.sin(a) + p.z * Math.cos(a) });
-  const tips: [Point3, Point3] = [rot({ x: 0.3, y: 0.9, z: -0.4 }), rot({ x: -0.3, y: 0.9, z: -0.4 })];
-  const next = autoRecalibratedPlace(place, tips);
-  const truth = lockbarPlace(rot({ x: -0.3, y: 0.9, z: -0.4 }), rot({ x: 0.3, y: 0.9, z: -0.4 }));
-  assert.ok(Math.abs(next.x - truth.x) < 1e-9 && Math.abs(next.z - truth.z) < 1e-9 && Math.abs(next.yaw - truth.yaw) < 1e-9);
-  assert.equal(next.lockbarWidth, place.lockbarWidth);
-  const head = rot({ x: 0, y: 0, z: 0.1 });
+  const move = (p: Point3) => ({ x: p.x * Math.cos(a) + p.z * Math.sin(a) + 0.4, y: p.y - 0.33, z: -p.x * Math.sin(a) + p.z * Math.cos(a) - 0.2 });
+  const vues: [Point3, Point3] = [move(repos[0]), move(repos[1])];
+  assert.equal(run(seconds(0, 3, (t) => sample(t, vues)), apprise), 1);
+  const next = autoRecalibratedPlace({ ...apprise, rest }, vues);
+  const truth = lockbarPlace(move({ x: -0.3, y: 0.9, z: -0.4 }), move({ x: 0.3, y: 0.9, z: -0.4 }));
+  assert.ok(Math.abs(next.x - truth.x) < 1e-9 && Math.abs(next.z - truth.z) < 1e-9 && Math.abs(next.yaw - truth.yaw) < 1e-9 && Math.abs(next.lockbarHeight! - 0.57) < 1e-9, JSON.stringify(next));
+  assert.equal(next.lockbarWidth, calee.lockbarWidth);
+  const head = move({ x: 0, y: 0, z: 0.1 });
   assert.ok(Math.abs(next.head!.x - head.x) < 1e-9 && Math.abs(next.head!.z - head.z) < 1e-9, JSON.stringify(next.head));
-  assert.ok(Math.round(roomFromRecalibration(place, next).deg) === 29);
-  // L'app : réglage éteint par défaut, relevés suivis au menu seulement, chaque recalage au journal avec l'écart.
+  assert.equal(Math.round(roomFromRecalibration(calee, next).deg), 29);
+  // En main (5 mm de tremblement, ou 2° de rotation) : jamais. Pas à niveau (3 cm), ou écartées autrement (4 cm) : jamais.
+  assert.equal(run(seconds(0, 3, (t, i) => sample(t, vues, (i % 2) * 0.005)), apprise), 0);
+  assert.equal(run(seconds(0, 3, (t, i) => sample(t, vues, 0, tilt((i % 2) * 2))), apprise), 0);
+  assert.equal(run(seconds(0, 3, (t) => sample(t, [vues[0], { ...vues[1], y: vues[1].y + 0.03 }])), apprise), 0);
+  assert.equal(run(seconds(0, 3, (t) => sample(t, [vues[0], { ...vues[1], x: vues[1].x + 0.04 }])), apprise), 0);
+  // Une manette plus suivie : réarmé, reposées, un second recalage ; relevés trop espacés : rien.
+  assert.equal(run([...seconds(0, 2, (t) => sample(t, vues)), undefined, ...seconds(3, 5, (t) => sample(t, vues))], apprise), 2);
+  assert.equal(run([0, 0.5, 1, 1.5].map((t) => sample(t, vues)), apprise), 0);
+  // Une borne posée au bureau, ou pas calée : jamais.
+  assert.equal(restGate(vues, { ...apprise, free: true }, true), false);
+  assert.equal(restGate(vues, undefined, true), false);
+  // L'app : réglage éteint par défaut, apprentissage armé par un calage à la main, désarmé quand la pièce a pu bouger.
   const front = read('app', 'src', 'frontend.ts');
   assert.match(read('app', 'src', 'vr.ts'), /\.autoRecal === true;/);
   assert.match(front, /library\.provideSystemItem\('vr-auto-calibrate', \{/);
   assert.match(front, /onRest: \(sample\) => autoRecalSample\(sample\),/);
   assert.match(front, /if \(!vrAutoRecal \|\| !headset \|\| calibration \|\| playing \|\| launch \|\| headsetSetting\(\) === 'bureau'\) return;/);
+  assert.match(front, /if \(left && right\) restLearnArmed = true;/);
+  assert.match(front, /onPutBackOn: \(\) => \{\s*restLearnArmed = false;/);
+  assert.match(front, /onRoom: \(\) => \{\s*restLearnArmed = false;/);
   assert.match(front, /écart corrigé de \$\{Math\.round\(measure\.cm\)\} cm et \$\{Math\.round\(measure\.deg\)\}°/);
   assert.match(front, /headset\.watchRest\(vrAutoRecal\);\s*headset\.watch\(\);/);
+  assert.match(read('app', 'src', 'casque.ts'), /\.\.\.\(rest && \{ rest \}\) \};/);
   const companion = read('packages', 'casque-vr', 'src', 'casque.cpp');
   assert.match(companion, /if \(restWatch && controllers && !calibrating && state == XR_SESSION_STATE_FOCUSED/);
 });
@@ -428,4 +452,20 @@ test('sonde LibOVR (13 novembre 2026) : la DLL du runtime de Meta, lancée avec 
   assert.match(read('app', 'src', 'casque.ts'), /if \(!parseControllerEvent\(button\[1\]!\)\?\.direction\) this\.opts\.log\(`Casque, bouton brut : /);
   assert.match(read('packages', 'casque-vr', 'src', 'casque.cpp'), /say\("tete-menu " \+/);
   assert.match(read('scripts', 'fabriquer.mjs'), /'cyberpinball-sonde-ovr\.exe'/);
+});
+
+test('aide des gâchettes (13 novembre 2026 : le geste du calage confondu avec les gâchettes) : au menu, une fois, jamais en partie ni au calage', () => {
+  assert.equal(TRIGGERS_HINT_S, 2);
+  assert.deepEqual(TRIGGERS_HINT_COMBO, ['gachette-gauche', 'gachette-droite']);
+  const hold = new CalibrationComboHold(TRIGGERS_HINT_COMBO, TRIGGERS_HINT_S * 1000);
+  assert.equal(hold.press('gachette-gauche', true, 0), 'clic');
+  assert.equal(hold.press('gachette-droite', true, 100), 'debut');
+  assert.equal(hold.due(2_099), false);
+  assert.equal(hold.due(2_100), true);
+  assert.equal(hold.due(3_000), false);
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /if \(event !== 'debut' \|\| calibration \|\| controllerWizard \|\| playing \|\| launch \|\| !calibrationCombo\(headset\?\.profile \?\? 'touch'\)\) return;/);
+  assert.match(front, /showBanner\(t\('Pour recaler la borne : enfoncez les deux sticks, pas les gâchettes'\)\);/);
+  // Toute autre touche annule l'aide.
+  assert.match(front, /if \(!TRIGGERS_HINT_COMBO\.includes\(name as ControllerButton\)\) \{\s*if \(down\) \{\s*triggersHold\.reset\(\);/);
 });

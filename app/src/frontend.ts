@@ -69,6 +69,8 @@ import {
   AUTO_RECAL_MIN_DEG,
   AUTO_RECAL_STILL_S,
   autoRecalibratedPlace,
+  restGate,
+  restReference,
   RestWatch,
   type RestSample,
   calibrationGap,
@@ -96,6 +98,8 @@ import {
   windowsVk,
   calibrationCombo,
   CalibrationComboHold,
+  TRIGGERS_HINT_COMBO,
+  TRIGGERS_HINT_S,
   calibrationComboLabel,
   CALIBRATION_HOLD_S,
   type ControllerButton,
@@ -1914,6 +1918,7 @@ const HEADSET_REPEAT_MS = 70;
 function headsetButton(name: string, down: boolean): void {
   // La combinaison du calage d'abord, quel que soit l'écran (assistant des manettes compris) ni le réglage.
   calibrationComboButton(name, down);
+  triggersHintButton(name, down);
   if (controllerWizard) {
     if (down) wizardButton(name);
     return;
@@ -1946,7 +1951,41 @@ function headsetButton(name: string, down: boolean): void {
 function releaseHeadsetButtons(): void {
   for (const name of [...headsetHolds.keys()]) headsetButton(name, false);
   comboHold?.reset();
+  triggersHold.reset();
   stopComboHold();
+}
+
+/**
+ * Les deux gâchettes tenues seules TRIGGERS_HINT_S au menu : le geste du calage confondu (les sticks, pas les
+ * gâchettes) ; une aide brève le dit, une fois par appui. Jamais pendant le calage (les gâchettes y placent la
+ * borne), l'assistant des manettes, ni en partie (les gâchettes sont les flippers) ; seulement si les manettes ont
+ * la combinaison des sticks. Toute autre touche annule.
+ */
+const triggersHold = new CalibrationComboHold(TRIGGERS_HINT_COMBO, TRIGGERS_HINT_S * 1000);
+let triggersTimer: NodeJS.Timeout | undefined;
+
+function triggersHintButton(name: string, down: boolean): void {
+  const cancel = () => {
+    if (triggersTimer) clearTimeout(triggersTimer);
+    triggersTimer = undefined;
+  };
+  if (!TRIGGERS_HINT_COMBO.includes(name as ControllerButton)) {
+    if (down) {
+      triggersHold.reset();
+      cancel();
+    }
+    return;
+  }
+  const event = triggersHold.press(name, down, Date.now());
+  if (event === 'lachee') return cancel();
+  if (event !== 'debut' || calibration || controllerWizard || playing || launch || !calibrationCombo(headset?.profile ?? 'touch')) return;
+  cancel();
+  triggersTimer = setTimeout(() => {
+    triggersTimer = undefined;
+    if (!triggersHold.due(Date.now()) || calibration || controllerWizard || playing || launch) return;
+    console.log(`Casque : les deux gâchettes tenues ${TRIGGERS_HINT_S} s au menu ; aide « les sticks, pas les gâchettes » montrée.`); // i18n-ignore : journal
+    showBanner(t('Pour recaler la borne : enfoncez les deux sticks, pas les gâchettes'));
+  }, TRIGGERS_HINT_S * 1000 + 20);
 }
 
 /** La combinaison du calage au menu (manettes.ts, CalibrationComboHold), pour le profil des manettes branchées. */
@@ -3187,12 +3226,26 @@ library.provideSystemItem('vr-auto-calibrate', {
  * gardé, la borne se recale (une fois, réarmé quand elles s'en vont). Jamais pendant le calage, une partie, ou
  * au bureau. Chaque recalage au journal, avec l'écart corrigé.
  */
+/**
+ * Apprentissage de la position de repos (restReference) : armé par un calage à la main, désarmé dès que la pièce a
+ * pu bouger (session neuve du compagnon, casque remis), pour n'apprendre que dans la pièce du calage.
+ */
+let restLearnArmed = false;
+
 function autoRecalSample(sample: RestSample | undefined): void {
   if (!vrAutoRecal || !headset || calibration || playing || launch || headsetSetting() === 'bureau') return;
   const previous = headset.place();
-  const tips = restWatch.push(sample, previous);
+  const tips = restWatch.push(sample, (t) => restGate(t, previous, restLearnArmed));
   if (!tips || !previous) return;
-  const place = autoRecalibratedPlace(previous, tips);
+  if (!previous.rest) {
+    // Première pose après le calage à la main : la position de repos apprise, rien de déplacé.
+    const rest = restReference(previous, tips);
+    restLearnArmed = false;
+    headset.showPlace({ ...previous, rest }, true);
+    console.log(`Casque : recalage automatique, position de repos des manettes apprise (à ${Math.round(Math.hypot(rest.x, rest.z) * 100)} cm de la place calée, ${Math.round(rest.dy * 100)} cm sous la barre, écartées de ${Math.round(rest.width * 100)} cm).`); // i18n-ignore : journal
+    return;
+  }
+  const place = autoRecalibratedPlace({ ...previous, rest: previous.rest }, tips);
   const measure = roomFromRecalibration(previous, place);
   if (measure.cm < AUTO_RECAL_MIN_CM && measure.deg < AUTO_RECAL_MIN_DEG) {
     console.log(`Casque : recalage automatique, manettes posées sur la barre avant : ${roomMeasureText(measure, 'rien à corriger')}.`); // i18n-ignore : journal
@@ -4309,6 +4362,8 @@ function applyCalibration(): void {
   const boundary = boundaryOf(headset?.roomKeeping);
   const head = left && right ? c.head : undefined;
   const place: CabinetPlace = { ...c.place, ...(headset?.room && { room: headset.room }), ...(headsetSetting() === 'bureau' && { free: true }), ...(grip && { grip }), ...(boundary && { boundary }), ...(head && { head }) };
+  // Recalage automatique : la prochaine pose des manettes sur la barre apprend leur position de repos.
+  if (left && right) restLearnArmed = true;
   // Recalage de la même vraie barre : l'écart à la précédente est celui de la pièce (mesuré, pas deviné).
   if (previous && isCalibrated(previous) && !previous.free && !place.free && left && right)
     console.log(`Casque : recalage, ${roomMeasureText(roomFromRecalibration(previous, place), 'barre avant recalée face à la précédente')}.`); // i18n-ignore : journal
@@ -5041,6 +5096,7 @@ export function startFrontend(): void {
     onProfile: () => offerControllerWizard(),
     onPoints: (points, room, head, pressed, grips) => calibrationPoints(points, room, head, pressed, grips),
     onPutBackOn: () => {
+      restLearnArmed = false;
       checkStaleCalibration();
       headsetPutBackOn();
     },
@@ -5052,7 +5108,10 @@ export function startFrontend(): void {
       headsetEyes = eyes;
       if (calibration) showCalibration();
     },
-    onRoom: () => checkStaleCalibration(),
+    onRoom: () => {
+      restLearnArmed = false;
+      checkStaleCalibration();
+    },
     onRest: (sample) => autoRecalSample(sample),
     onRoomRestart: (eyes) => {
       roomStale = Boolean(eyeHeightProblem(eyes));

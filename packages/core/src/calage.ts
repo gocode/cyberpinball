@@ -44,6 +44,8 @@ export interface CabinetPlace {
    * référence physique que les têtes relevées en partie retrouvent si la pièce est gardée (roomFromHeads).
    */
   head?: { x: number; z: number };
+  /** Position de repos des manettes posées sur la barre, apprise après un calage à la main (recalage automatique). */
+  rest?: RestReference;
 }
 
 /**
@@ -759,11 +761,14 @@ export function vpxRoomChanges(log: string): number {
 
 // --- Recalage automatique (option, 13 novembre 2026) ---------------------------------------------------------
 //
-// Les deux manettes posées sur les coins de la barre avant, immobiles, suivies par le casque : la borne se recale
-// d'elle-même. Jamais en main : une manette tenue bouge de plusieurs millimètres et de plus d'un degré en une
-// seconde ; posée, elle ne bouge que du bruit du suivi. Et jamais ailleurs que sur la barre : leur écart et leur
-// hauteur doivent être ceux du calage gardé, à 2,5 cm près. Au menu seulement : en partie, VPX a le casque, et le
-// runtime ne donne les manettes qu'à l'application qui a le regard (OpenXR, session sans focus : actions inactives).
+// Les deux manettes posées sur la barre avant, immobiles, suivies par le casque : la borne se recale d'elle-même.
+// Jamais en main : une manette tenue bouge de plusieurs millimètres et de plus d'un degré en une seconde ; posée,
+// elle ne bouge que du bruit du suivi. Posées, elles ne reposent pas comme tenues du bout sur les coins (essai du
+// 13 novembre 2026 : 10 cm d'écart, la borne déplacée à tort) : leur position de repos est apprise à la première
+// pose qui suit un calage à la main (RestReference, gardée avec la place), puis retrouvée. Pas de hauteur absolue :
+// le sol que Link donne peut changer d'une connexion à l'autre (33 cm le même jour) ; l'écart des deux manettes et
+// leur niveau suffisent, et la hauteur de la barre est corrigée avec le reste. Au menu seulement : en partie, VPX a
+// le casque, et le runtime ne donne les manettes qu'à l'application qui a le regard (session sans focus).
 
 /** Immobiles pendant au moins ce temps (secondes). */
 export const AUTO_RECAL_STILL_S = 1;
@@ -771,8 +776,11 @@ export const AUTO_RECAL_STILL_S = 1;
 export const AUTO_RECAL_STILL_MM = 4;
 /** Et tournée de moins que ceci (degrés). */
 export const AUTO_RECAL_STILL_DEG = 1.5;
-/** Écart des deux bouts et hauteur de chacun : ceux du calage gardé, à ceci près (centimètres). */
+/** Écart des deux bouts : celui de la position de repos apprise, à ceci près ; et les deux à niveau (centimètres). */
 export const AUTO_RECAL_MATCH_CM = 2.5;
+/** Apprentissage (première pose après un calage à la main) : écart à la barre calée et hauteur, à ceci près (cm). */
+export const AUTO_RECAL_LEARN_CM = 8;
+export const AUTO_RECAL_LEARN_HEIGHT_CM = 10;
 /** Relevés plus espacés que ceci : la suite est rompue (secondes). */
 export const AUTO_RECAL_GAP_S = 0.3;
 /** En deçà de cet écart, la pièce est gardée : rien n'est réécrit (centimètres, degrés). */
@@ -786,11 +794,23 @@ export interface Quat {
   w: number;
 }
 
-/** Un relevé du compagnon (« repos … ») : les deux bouts suivis, leur orientation, l'instant (secondes). */
+/** Un relevé du compagnon (« repos … ») : les bouts des manettes gauche et droite, leur orientation, l'instant (s). */
 export interface RestSample {
   t: number;
   tips: readonly [Point3, Point3];
   rot: readonly [Quat, Quat];
+}
+
+/**
+ * La position de repos des manettes posées sur la barre, dans le repère de la place calée : la « barre » que font
+ * leurs deux bouts (milieu au sol, cap), sa hauteur sous celle de la vraie barre (`dy`), et l'écart des bouts.
+ */
+export interface RestReference {
+  x: number;
+  z: number;
+  yaw: number;
+  dy: number;
+  width: number;
 }
 
 /** L'angle entre deux orientations (degrés). */
@@ -799,25 +819,42 @@ export function quatAngle(a: Quat, b: Quat): number {
   return (2 * Math.acos(dot) * 180) / Math.PI;
 }
 
-/** Les deux bouts sont-ils sur la barre avant du calage gardé (écart et hauteur à AUTO_RECAL_MATCH_CM près) ? */
-export function onCalibratedLockbar(tips: readonly [Point3, Point3], place: CabinetPlace | undefined): boolean {
+/** Un vecteur au sol tourné de `a` autour de la verticale (même sens que le cap des places). */
+const rotateFlat = (v: { x: number; z: number }, a: number) => ({ x: v.x * Math.cos(a) + v.z * Math.sin(a), z: -v.x * Math.sin(a) + v.z * Math.cos(a) });
+
+/**
+ * Les manettes posées peuvent-elles être sur la barre ? À niveau (2,5 cm), et : avec une position de repos apprise,
+ * écartées comme elle (2,5 cm) ; sans elle et en apprentissage (`learning`, juste après un calage à la main), écartées
+ * comme la barre calée (8 cm) et à sa hauteur (10 cm). La gauche est la manette gauche (ordre du compagnon).
+ */
+export function restGate(tips: readonly [Point3, Point3], place: CabinetPlace | undefined, learning: boolean): boolean {
   if (!place || !isCalibrated(place) || place.free) return false;
-  const tol = AUTO_RECAL_MATCH_CM / 100;
   const spacing = Math.hypot(tips[1].x - tips[0].x, tips[1].z - tips[0].z);
-  return Math.abs(spacing - place.lockbarWidth!) <= tol && tips.every((p) => Math.abs(p.y - place.lockbarHeight!) <= tol);
+  if (Math.abs(tips[0].y - tips[1].y) * 100 > AUTO_RECAL_MATCH_CM) return false;
+  if (place.rest) return Math.abs(spacing - place.rest.width) * 100 <= AUTO_RECAL_MATCH_CM;
+  if (!learning) return false;
+  const height = (tips[0].y + tips[1].y) / 2;
+  return Math.abs(spacing - place.lockbarWidth!) * 100 <= AUTO_RECAL_LEARN_CM && Math.abs(height - place.lockbarHeight!) * 100 <= AUTO_RECAL_LEARN_HEIGHT_CM;
+}
+
+/** La position de repos apprise : les deux bouts posés, vus depuis la place calée à l'instant. */
+export function restReference(place: CabinetPlace, tips: readonly [Point3, Point3]): RestReference {
+  const r = lockbarPlace(tips[0], tips[1]);
+  const local = rotateFlat({ x: r.x - place.x, z: r.z - place.z }, -place.yaw);
+  return { x: local.x, z: local.z, yaw: r.yaw - place.yaw, dy: (place.lockbarHeight ?? r.lockbarHeight!) - r.lockbarHeight!, width: r.lockbarWidth! };
 }
 
 /**
  * Suit les relevés des manettes au repos et dit quand recaler : `push` rend les deux bouts (moyennés sur la
- * seconde immobile) une fois, puis plus rien tant que les manettes n'ont pas quitté la barre (réarmé dès qu'un
- * relevé n'y est plus, ou qu'une manette n'est plus suivie : `push(undefined)`).
+ * seconde immobile) une fois, puis plus rien tant que les manettes ne sont pas reparties (réarmé dès qu'un relevé
+ * ne passe plus `gate`, ou qu'une manette n'est plus suivie : `push(undefined)`).
  */
 export class RestWatch {
   private window: RestSample[] = [];
   private armed = true;
 
-  push(sample: RestSample | undefined, place: CabinetPlace | undefined): [Point3, Point3] | undefined {
-    if (!sample || !onCalibratedLockbar(sample.tips, place)) {
+  push(sample: RestSample | undefined, gate: (tips: readonly [Point3, Point3]) => boolean): [Point3, Point3] | undefined {
+    if (!sample || !gate(sample.tips)) {
       this.window = [];
       this.armed = true;
       return undefined;
@@ -845,20 +882,20 @@ export class RestWatch {
 }
 
 /**
- * La place recalée sur les deux bouts posés (`tips`, dans n'importe quel ordre) : la position et le cap de la
- * barre, les dimensions du calage gardé (la vraie borne n'a pas changé), et ce que le calage gardait (limite,
- * prises des manettes) ; la tête au calage suit la barre, du même déplacement.
+ * La place recalée sur les deux bouts posés, d'après la position de repos apprise (`previous.rest`) : la place qui
+ * remet cette position sur les bouts vus, cap, position et hauteur de la barre (le sol a pu changer) ; le reste du
+ * calage gardé (dimensions, limite, prises) ; la tête au calage suit la barre, du même déplacement.
  */
-export function autoRecalibratedPlace(previous: CabinetPlace, tips: readonly [Point3, Point3]): CabinetPlace {
-  const [left, right] = orderCorners(tips[0], tips[1], { x: previous.x, z: previous.z });
-  const moved = lockbarPlace(left, right);
-  const next: CabinetPlace = { ...previous, x: moved.x, z: moved.z, yaw: moved.yaw };
+export function autoRecalibratedPlace(previous: CabinetPlace & { rest: RestReference }, tips: readonly [Point3, Point3]): CabinetPlace {
+  const r = lockbarPlace(tips[0], tips[1]);
+  const yaw = r.yaw - previous.rest.yaw;
+  const off = rotateFlat({ x: previous.rest.x, z: previous.rest.z }, yaw);
+  const next: CabinetPlace = { ...previous, x: r.x - off.x, z: r.z - off.z, yaw, lockbarHeight: r.lockbarHeight! + previous.rest.dy };
   if (previous.head) {
     // La tête dans le repère de l'ancienne place, reposée dans la nouvelle.
-    const dx = previous.head.x - previous.x;
-    const dz = previous.head.z - previous.z;
-    const a = moved.yaw - previous.yaw;
-    next.head = { x: next.x + dx * Math.cos(a) + dz * Math.sin(a), z: next.z - dx * Math.sin(a) + dz * Math.cos(a) };
+    const local = rotateFlat({ x: previous.head.x - previous.x, z: previous.head.z - previous.z }, -previous.yaw);
+    const world = rotateFlat(local, yaw);
+    next.head = { x: next.x + world.x, z: next.z + world.z };
   }
   return next;
 }

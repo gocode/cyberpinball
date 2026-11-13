@@ -51,6 +51,7 @@ export const messages: Record<string, string> = {
   'Oui · manettes posées aux coins inférieurs de la table, immobiles une seconde : la borne se recale. Au menu seulement : en partie, VPX a les manettes': 'Yes · controllers laid on the lower corners of the table, still for one second: the cabinet aligns again. In the menu only: in a game, VPX has the controllers',
   'Non · manettes posées aux coins inférieurs de la table : rien ne bouge. Recalez d’un geste ou par « Caler la borne »': 'No · controllers laid on the lower corners of the table: nothing moves. Align again with the gesture or with "Align the cabinet"',
   'Borne recalée sur les manettes posées': 'Cabinet aligned on the controllers laid down',
+  'Pour recaler la borne : enfoncez les deux sticks, pas les gâchettes': 'To align the cabinet: press both sticks down, not the triggers',
   'Oui · la vue d’un œil du casque, en paysage, sur l’écran du plateau': 'Yes · one eye of the headset, in landscape, on the playfield screen',
   'Non · l’écran du plateau garde Cyber Pinball, la carte graphique ne copie rien': 'No · the playfield screen keeps Cyber Pinball, the graphics card copies nothing',
   'Casque non détecté : partie en mode normal': 'Headset not detected: game in normal mode',

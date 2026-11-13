@@ -817,7 +817,10 @@ export function readCabinetPlace(file: string): CabinetPlace | undefined {
     const boundary = p.boundary === 'fixe' || p.boundary === 'piece' ? p.boundary : undefined;
     const h = p.head as Record<string, unknown> | undefined;
     const head = h && num(h.x) !== undefined && num(h.z) !== undefined ? { x: num(h.x)!, z: num(h.z)! } : undefined;
-    return { x, z, yaw, ...(lockbarHeight !== undefined && { lockbarHeight }), ...(lockbarWidth !== undefined && { lockbarWidth }), ...(room && { room }), ...(grip && { grip }), ...(p.free === true && { free: true }), ...(boundary && { boundary }), ...(head && { head }) };
+    // Position de repos des manettes posées (recalage automatique), apprise après un calage à la main.
+    const q = p.rest as Record<string, unknown> | undefined;
+    const rest = q && ['x', 'z', 'yaw', 'dy', 'width'].every((k) => num(q[k]) !== undefined) ? { x: num(q.x)!, z: num(q.z)!, yaw: num(q.yaw)!, dy: num(q.dy)!, width: num(q.width)! } : undefined;
+    return { x, z, yaw, ...(lockbarHeight !== undefined && { lockbarHeight }), ...(lockbarWidth !== undefined && { lockbarWidth }), ...(room && { room }), ...(grip && { grip }), ...(p.free === true && { free: true }), ...(boundary && { boundary }), ...(head && { head }), ...(rest && { rest }) };
   } catch {
     return undefined;
   }
