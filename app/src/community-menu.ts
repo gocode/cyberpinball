@@ -29,6 +29,7 @@ import {
   type TableEntry,
 } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
+import type { RoomGlance } from './rooms-menu';
 import type { SocialNet } from './social-net';
 
 export interface CommunityMenuHost {
@@ -48,7 +49,7 @@ export interface CommunityMenuHost {
   /** La messagerie (chat-menu.ts) : son état en une ligne et sa liste, « Retour » vers `back`. */
   messages: { detail(): string; attention(): boolean; quiet(): boolean; open(back: () => void): void };
   /** Le salon de mon pays (rooms-menu.ts) : ce que dit sa porte, et l'ouvrir. */
-  rooms?: { door(): { label: string; detail: string; attention: boolean; quiet: boolean }; open(back: () => void): void };
+  rooms?: { door(): { label: string; detail: string; attention: boolean; quiet: boolean }; glance?(): RoomGlance; open(back: () => void): void };
   /** Le tableau des scores de la table choisie dans la roue ; undefined : aucune table. */
   rankings?(): { detail: string; open(back: () => void): void } | undefined;
   /** Partage et réseau (activer le partage, le réseau local, la présence publique). */
@@ -67,6 +68,26 @@ export interface CommunityMenu {
   summary(): { online: number; country: number; friends: number; attention: boolean };
   /** Les joueurs en ligne, amis compris, dans l'ordre de la liste (téléphone). */
   players(): OnlinePlayer[];
+  /** L'affiche du médaillon choisi dans la roue (plateau, fronton), comme celle du Juke-box. */
+  poster(): CommunityPosterView;
+}
+
+/**
+ * L'affiche du médaillon Communauté (app/renderer/community.js), textes déjà traduits : la marque,
+ * le grand titre, les chiffres, le salon de mon pays et sa dernière ligne, les amis en ligne.
+ */
+export interface CommunityPosterView {
+  edition: string;
+  label: string;
+  title: string;
+  stats: string;
+  empty: boolean;
+  eyebrow: string;
+  heading: string;
+  detail?: string;
+  tagline: string;
+  start: string;
+  open: string;
 }
 
 export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
@@ -330,6 +351,28 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     };
   }
 
+  /** Amis en ligne nommés au plus sur l'affiche ; au-delà, « +2 ». */
+  const POSTER_FRIENDS = 3;
+
+  function poster(): CommunityPosterView {
+    const frame = { edition: t('Le flipper se joue à plusieurs'), label: t('Votre borne. Vos joueurs.'), title: t('COMMUNAUTÉ'), tagline: t('Joueurs, salons, classements.'), start: t('Start'), open: t('Ouvrir la Communauté') };
+    if (!net.state().enabled)
+      return { ...frame, stats: t('Le réseau des bornes vous attend.'), empty: true, eyebrow: t('Pour commencer'), heading: t('Activez le partage'), detail: t('Menu système › Amis › Partage et réseau') };
+    const list = players();
+    const room = host.rooms?.glance?.();
+    const friends = list.filter((p) => p.friend);
+    const named = friends.slice(0, POSTER_FRIENDS).map((p) => p.name);
+    const more = friends.length - named.length;
+    const detail = friends.length
+      ? t('Amis en ligne : {names}', { names: [...named, ...(more ? [`+${more}`] : [])].join(', ') })
+      : host.messages.attention()
+        ? host.messages.detail()
+        : t('Joueurs en ligne, messages, salon, classements');
+    const eyebrow = room ? (room.problem ? room.name : `${room.name} · ${tn(room.present, '{n} présent', '{n} présents')}`) : t('Joueurs en ligne');
+    const heading = room?.problem ?? (room?.last ? `<${room.last.name}> ${room.last.text}` : room ? t('Rien d’écrit ici ces sept derniers jours') : t('Start pour ouvrir la Communauté'));
+    return { ...frame, stats: countsLine(list), empty: false, eyebrow, heading, detail };
+  }
+
   function openHome(back: () => void): void {
     homeBack = back;
     lib.openCustom(buildHome);
@@ -350,6 +393,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
       run: () => openPlayers(),
     },
     summary,
+    poster,
     players: () => onlineGroups(players(), myCountry(), 'all').flatMap((g) => g.players),
   };
 }

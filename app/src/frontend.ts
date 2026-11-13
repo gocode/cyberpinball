@@ -2974,7 +2974,7 @@ socialNet.onRoomLines((lines) => {
 });
 // Communauté (community-menu.ts) : l'accueil du médaillon de la roue, et « Joueurs en ligne », amis ou non.
 const communityMenu = createCommunityMenu({
-  rooms: { door: () => roomsMenu.door(), open: (back) => roomsMenu.openDefault(back) },
+  rooms: { door: () => roomsMenu.door(), glance: () => roomsMenu.glance(), open: (back) => roomsMenu.openDefault(back) },
   friends: {
     detail: () => friendsMenu.items.friends.detail ?? '',
     attention: () => Boolean(friendsMenu.items['friend-requests'].attention || friendsMenu.items.friends.attention),
@@ -6815,6 +6815,8 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     dmdMessage: dmdMessage && dmdMessage.until > Date.now() && state.phase !== 'playing' && state.phase !== 'loading' ? dmdMessage.text : undefined,
     // Juke-box : l'affiche du médaillon choisi, ou le lecteur (liste, clip, cartel).
     jukebox: jukeboxPlayer.view(role, (state.phase === 'menu' && !state.help && onJukebox()) || jukeboxManaging()),
+    // Communauté : l'affiche du médaillon choisi (plateau, fronton), comme celle du Juke-box.
+    community: state.phase === 'menu' && !state.help && onCommunity() ? { poster: communityMenu.poster() } : undefined,
     gameKeys: gameKeys(buttons, tilt),
     // Aide-mémoire du chargement : au bureau toujours ; en borne, celui du réglage de l'affichage seulement (display).
     loadingKeys: displayMode ? { title: t('Réglage de l’affichage'), rows: displayKeys(buttons), display: true } : { title: t('Commandes de la partie'), rows: gameKeys(buttons, tilt), display: false },

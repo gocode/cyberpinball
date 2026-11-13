@@ -640,8 +640,14 @@ function menuPanel(s) {
   }
   v.node.classList.toggle('jukebox-chosen', Boolean(s.table.jukebox));
   v.node.classList.toggle('community-chosen', Boolean(s.table.community));
-  // Médaillon Juke-box choisi au bureau : son affiche dans le cadre du fronton du menu.
-  const front = s.jukebox?.wheel && style && document.documentElement.classList.contains('menu-desktop') && window.CyberJukebox ? CyberJukebox.backglassPoster(s) : undefined;
+  // Médaillon Juke-box ou Communauté choisi au bureau : son affiche dans le cadre du fronton du menu.
+  const deskFront = style && document.documentElement.classList.contains('menu-desktop');
+  const front =
+    deskFront && s.jukebox?.wheel && window.CyberJukebox
+      ? CyberJukebox.backglassPoster(s)
+      : deskFront && s.community?.poster && window.CyberCommunity
+        ? CyberCommunity.backglassPoster(s)
+        : undefined;
   // La même affiche reste en place (ses animations continuent) ; une autre la remplace.
   const shown = v.backglass.querySelector(':scope > .jb-wheel-fronton'); // i18n-ignore : sélecteur CSS
   if (shown !== front) {
@@ -1193,6 +1199,8 @@ function drawPlayfield(s) {
   const nodes = [];
   // Médaillon Juke-box choisi dans la roue : son affiche derrière le menu (tout le plateau en borne, le cadre 9:16 au bureau).
   if (s.phase === 'menu' && s.jukebox?.wheel && window.CyberJukebox) nodes.push(CyberJukebox.wheelPoster(s, document.documentElement.classList.contains('menu-desktop')));
+  // Médaillon Communauté choisi : la sienne, de même (community.js).
+  else if (s.phase === 'menu' && s.community?.poster && window.CyberCommunity) nodes.push(CyberCommunity.wheelPoster(s, document.documentElement.classList.contains('menu-desktop')));
   // Extinction, veille ou redémarrage en cours : plus rien à choisir, ni roue dentée ni cadenas.
   // Mode invité : le cadenas prend la place de la roue dentée, le menu système est fermé.
   // Interface propre (gestion du Juke-box) : son nom à la place de la roue dentée, ni rubriques ni cadre du menu système.
@@ -1660,8 +1668,11 @@ function renderZones(s) {
       z.layer.setActive(false);
       continue;
     }
-    // Juke-box : le clip, l'affiche ou le morceau en cours à la place du média du fronton.
-    if (window.CyberJukebox?.zone(z.node, z.role, s)) {
+    // Juke-box : le clip, l'affiche ou le morceau en cours à la place du média du fronton ; Communauté :
+    // son affiche. Les deux sont appelés à chaque fois : chacun retire la sienne quand elle n'a plus lieu d'être.
+    const jukeboxZone = Boolean(window.CyberJukebox?.zone(z.node, z.role, s));
+    const communityZone = Boolean(window.CyberCommunity?.zone(z.node, z.role, s));
+    if (jukeboxZone || communityZone) {
       z.layer.show(undefined);
       z.layer.setActive(false);
       continue;
@@ -1785,7 +1796,7 @@ function renderIntro(s) {
 
 /** Le fond du playfield ne joue que s'il se voit : les superpositions et la fiche sont opaques. */
 function backgroundVisible(s) {
-  return s.phase === 'menu' && !s.help && !s.jukebox?.wheel;
+  return s.phase === 'menu' && !s.help && !s.jukebox?.wheel && !s.community?.poster;
 }
 
 // ---------- Horaire de la borne (arcadehours.ts, frontend.css) ----------

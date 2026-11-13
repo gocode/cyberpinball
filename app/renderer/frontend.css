@@ -3894,7 +3894,8 @@ html.jukebox-desk #root {
 }
 
 /* Médaillon choisi en borne : l'affiche est sombre, le voile de lecture du menu n'a rien à assombrir. */
-.menu.jukebox-chosen .menu-scrim {
+.menu.jukebox-chosen .menu-scrim,
+.menu.community-chosen .menu-scrim {
   display: none;
 }
 

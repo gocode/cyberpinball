@@ -70,4 +70,16 @@ export const messages: Record<string, string> = {
   'Le médaillon Communauté suit le Juke-box en tête de chaque collection : joueurs en ligne, messages, classements (Start : le masquer)':
     'The Community medallion follows the Juke-box at the head of each collection: players online, messages, leaderboards (Start: hide it)',
   'La communauté reste dans Menu système › Amis (Start : afficher le médaillon)': 'The community stays in System menu › Friends (Start: show the medallion)',
+  // L'affiche du médaillon (plateau, fronton), comme celle du Juke-box
+  'Le flipper se joue à plusieurs': 'Pinball is better together',
+  'Votre borne. Vos joueurs.': 'Your cabinet. Your players.',
+  'COMMUNAUTÉ': 'COMMUNITY',
+  'Joueurs, salons, classements.': 'Players, rooms, leaderboards.',
+  'Ouvrir la Communauté': 'Open Community',
+  'Le réseau des bornes vous attend.': 'The cabinet network is waiting for you.',
+  'Activez le partage': 'Turn on sharing',
+  'Menu système › Amis › Partage et réseau': 'System menu › Friends › Sharing and network',
+  'Amis en ligne : {names}': 'Friends online: {names}',
+  'Joueurs en ligne, messages, salon, classements': 'Players online, messages, room, leaderboards',
+  'Start pour ouvrir la Communauté': 'Start to open Community',
 };

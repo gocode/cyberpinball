@@ -1125,6 +1125,16 @@
  * pixels de cette référence, multipliés par --pp : aucun texte sous 20 px à l'échelle 1.
  * Le décor ne bouge que par transformations et opacité (vinyle 100 s, orbite 40 s, halo qui respire).
  */
+/*
+ * Plancher des textes de l'affiche (Juke-box, Communauté) : 20 px rapportés à un petit côté de fenêtre
+ * de 1 080 px, comme le garde-fou de la mise en page (layout-check.ts). Sans effet tant que l'affiche a
+ * ses proportions 16:9 ; il retient les petits textes sur un fronton en bandeau (1920 × 720, DMD dessous).
+ * Sur :root : les mêmes règles servent aussi hors de l'affiche.
+ */
+:root {
+  --jb-floor: calc(20 * 100vmin / 1080);
+}
+
 .jb-poster {
   --pw: 1920;
   --ph: 1080;
@@ -1160,7 +1170,7 @@
   column-gap: calc(96 * var(--pp));
   padding: calc(48 * var(--pp)) calc(120 * var(--pp)) calc(58 * var(--pp)) calc(104 * var(--pp));
   box-sizing: border-box;
-  font-size: calc(24 * var(--pp));
+  font-size: max(calc(24 * var(--pp)), var(--jb-floor));
 }
 
 .jb-poster-head {
@@ -1174,12 +1184,12 @@
 }
 
 .jb-poster-head .jb-brand {
-  font-size: calc(25 * var(--pp));
+  font-size: max(calc(25 * var(--pp)), var(--jb-floor));
   letter-spacing: 0.34em;
 }
 
 .jb-poster-edition {
-  font-size: calc(var(--small) * var(--pp));
+  font-size: max(calc(var(--small) * var(--pp)), var(--jb-floor));
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-muted);
@@ -1195,12 +1205,12 @@
 }
 
 .jb-poster-stage .jb-label {
-  font-size: calc(24 * var(--pp));
+  font-size: max(calc(24 * var(--pp)), var(--jb-floor));
   letter-spacing: 0.22em;
 }
 
 .jb-poster-title {
-  font-size: calc(var(--title) * var(--pp));
+  font-size: max(calc(var(--title) * var(--pp)), var(--jb-floor));
   font-weight: 780;
   font-stretch: 90%;
   letter-spacing: -0.045em;
@@ -1210,7 +1220,7 @@
 }
 
 .jb-poster-stats {
-  font-size: calc(var(--stats) * var(--pp));
+  font-size: max(calc(var(--stats) * var(--pp)), var(--jb-floor));
   color: var(--ink-muted);
   letter-spacing: 0.025em;
 }
@@ -1233,13 +1243,13 @@
 }
 
 .jb-poster-stage .jb-eyebrow {
-  font-size: calc(var(--small) * var(--pp));
+  font-size: max(calc(var(--small) * var(--pp)), var(--jb-floor));
   letter-spacing: 0.19em;
 }
 
 /* Titre de la dernière écoute : deux lignes au plus, puis une ellipse (le texte entier en info-bulle). */
 .jb-poster-heading {
-  font-size: calc(var(--heading) * var(--pp));
+  font-size: max(calc(var(--heading) * var(--pp)), var(--jb-floor));
   font-weight: 600;
   line-height: 1.2;
   margin: calc(12 * var(--pp)) 0 !important;
@@ -1251,7 +1261,7 @@
 }
 
 .jb-poster-detail {
-  font-size: calc(var(--detail) * var(--pp));
+  font-size: max(calc(var(--detail) * var(--pp)), var(--jb-floor));
   max-width: 100%;
 }
 
@@ -1322,7 +1332,7 @@
   border-top: 1px solid var(--line-strong);
   padding-top: calc(24 * var(--pp));
   margin-right: calc(-16 * var(--pp));
-  font-size: calc(var(--small) * var(--pp));
+  font-size: max(calc(var(--small) * var(--pp)), var(--jb-floor));
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-muted);
@@ -1488,7 +1498,7 @@
 
 .jb-wheel-poster.desk .jb-poster .jb-label,
 .jb-wheel-poster.desk .jb-label {
-  font-size: calc(20 * var(--pp));
+  font-size: max(calc(20 * var(--pp)), var(--jb-floor));
 }
 
 .jb-wheel-poster.desk .jb-poster-rule {
@@ -1541,7 +1551,7 @@
 
 .jb-clip-poster.place-desk .jb-label,
 .jb-wheel-fronton .jb-label {
-  font-size: calc(20 * var(--pp));
+  font-size: max(calc(20 * var(--pp)), var(--jb-floor));
 }
 
 /*

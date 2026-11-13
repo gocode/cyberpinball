@@ -66,6 +66,8 @@ export interface RoomsMenu {
   openMention(back: () => void): void;
   /** Le salon par défaut et ce que dit sa porte dans l'accueil Communauté. */
   door(): { label: string; detail: string; attention: boolean; quiet: boolean };
+  /** Le salon par défaut d'un coup d'œil (affiche du médaillon Communauté) : son nom, ses présents, sa dernière ligne. */
+  glance(): RoomGlance;
   /** Menu système > Amis > Réglages de la communauté. */
   settingsItem: ProvidedSystemItem;
   /** Nom d'un salon (« Salon France », « Salon Monde »). */
@@ -84,6 +86,14 @@ export interface RoomsMenu {
   openModeration(back: () => void): void;
   /** Le salon pour le téléphone : celui à l'écran, sinon celui par défaut ; ses 60 dernières lignes. */
   remote(): { room: RoomId; name: string; present: number; lines: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' }[]; phrases: string[]; blocked?: string };
+}
+
+/** Le salon par défaut d'un coup d'œil : la dernière ligne visible (filtre de mots appliqué), ou la raison d'un salon fermé. */
+export interface RoomGlance {
+  name: string;
+  present: number;
+  last?: { name: string; text: string };
+  problem?: string;
 }
 
 /** Lignes du journal montrées au plus (les plus récentes). */
@@ -634,6 +644,13 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         attention: mentionsN > 0,
         quiet: Boolean(problem),
       };
+    },
+    glance() {
+      const room = defaultRoom();
+      const s = net.rooms();
+      const problem = !me().enabled ? t('Indisponible : partage désactivé (Partage et réseau)') : !s.enabled ? t('Salons désactivés : Réglages de la communauté') : undefined;
+      const last = roomLines(s, room).filter(visible).at(-1);
+      return { name: roomName(room), present: net.roomPresent(room).length, ...(last ? { last: { name: last.name, text: shownText(last.text) } } : {}), ...(problem ? { problem } : {}) };
     },
     settingsItem: {
       get detail() {
