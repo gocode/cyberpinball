@@ -91,4 +91,6 @@ export const messages: Record<string, string> = {
   'Mon pays': 'My country',
   'Il accompagne vos scores : il vous place au classement national, et se voit à côté de votre nom.': 'It goes with your scores: it places you in the national ranking, and shows next to your name.',
   'Le pays réglé dans Windows, s’il se lit': 'The country set in Windows, if it can be read',
+  // packages/core/src/rankings.ts (playerFlag)
+  'Pays non indiqué': 'Country not given',
 };

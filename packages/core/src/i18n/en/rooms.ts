@@ -114,6 +114,7 @@ export const messages: Record<string, string> = {
   // Téléphone
   'Écrivez avec votre téléphone': 'Write with your phone',
   'Phrases préparées': 'Ready-made phrases',
+  'Derniers messages': 'Latest messages',
   'Flippers : choisir une phrase · Start : l’envoyer · Exit : sortir des phrases': 'Flippers: choose a phrase · Start: send it · Exit: leave the phrases',
   'Salon': 'Room',
   'Salon indisponible': 'Room unavailable',

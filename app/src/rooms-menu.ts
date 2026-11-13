@@ -16,6 +16,7 @@ import {
   countryCodes,
   countryName,
   flagView,
+  playerFlag,
   locale,
   maskWords,
   mentions,
@@ -98,6 +99,8 @@ export interface RoomGlance {
 
 /** Lignes du journal montrées au plus (les plus récentes). */
 const LOG_SHOWN = 120;
+/** Les derniers messages, au-dessus des phrases d'« Écrire dans le salon ». */
+const WRITE_RECENT = 5;
 
 export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
   const net = host.net;
@@ -254,17 +257,8 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         return { text: m.join ? t('→ {name} arrive', { name: m.name }) : t('← {name} part', { name: m.name }), log: { time: time(m.at), text: m.join ? t('→ {name} arrive', { name: m.name }) : t('← {name} part', { name: m.name }), kind: 'sys' } } satisfies Row;
       }
       const l = (it as { line: RoomLine }).line;
-      const own = l.key === self;
-      const hidden = lineHidden(acts, l.id, now());
-      const text = hidden ? t('message masqué par la modération') : shownText(l.text);
       const index = actions.push({ label: t('Ligne de {name} à {time}', { name: l.name, time: time(l.at) }), key: `line:${l.id}`, run: () => openLine(l) }) - 1;
-      const kind = hidden ? 'masked' : own ? 'own' : l.me ? 'me' : mentions(l.text, me().name) ? 'mention' : 'line';
-      return {
-        text: `${l.name} : ${text}`,
-        log: { time: time(l.at), nick: l.name, hue: hueOf(l.key, l.name), text, kind, ...(l.country ? { flag: flagView(l.country, locale()) } : {}) },
-        action: index,
-        pick: true,
-      } satisfies Row;
+      return { ...logRow(l, acts), action: index, pick: true } satisfies Row;
     });
     if (!rows.length) rows.push({ text: t('Rien de neuf pour l’instant'), detail: t('Soyez le premier : « Écrire dans le salon »'), icon: 'message', tone: 'quiet' });
     sections.push({ kind: 'room', rows });
@@ -278,7 +272,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         ? present.map((h) => ({
             text: h.name,
             avatar: avatarView(h.key, h.name, net.avatarFile(h.key)),
-            ...(h.country ? { flag: flagView(h.country, locale()) } : {}),
+            flag: playerFlag(h.country, locale()),
             badges: h.key === self ? [t('Vous')] : relationOf(me(), h.key) === 'friend' ? [t('Ami')] : [],
           }))
         : [{ text: t('Personne pour l’instant'), tone: 'quiet' }],
@@ -314,6 +308,14 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
     };
   }
 
+  /** Une ligne du salon, à l'ancienne : heure, drapeau, pseudo coloré, texte (masqué par la modération au besoin). */
+  function logRow(l: RoomLine, acts: ReturnType<typeof net.moderation>['acts']): Row {
+    const hidden = lineHidden(acts, l.id, now());
+    const text = hidden ? t('message masqué par la modération') : shownText(l.text);
+    const kind = hidden ? 'masked' : l.key === me().key.publicKey ? 'own' : l.me ? 'me' : mentions(l.text, me().name) ? 'mention' : 'line';
+    return { text: `${l.name} : ${text}`, log: { time: time(l.at), nick: l.name, hue: hueOf(l.key, l.name), text, kind, flag: playerFlag(l.country, locale()) } };
+  }
+
   function leave(back: () => void): void {
     current = undefined;
     net.roomOpen(undefined);
@@ -340,15 +342,23 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       if (mention) actions.push({ label: t('Répondre à @{name}', { name: mention.name }), detail: t('Il vous a cité à {time}', { time: time(mention.at) }), icon: 'message', run: () => askText(room, `@${mention.name} `, send) });
       actions.push({ label: t('Clavier à l’écran…'), detail: t('« /me … » pour une action'), icon: 'keyboard', run: () => askText(room, '', send) });
       actions.push({ label: t('Retour au salon'), icon: 'back', run: backToRoom });
+      // Les derniers messages au-dessus : on répond en sachant ce qui vient d'être dit (13/11/2026).
+      const acts = net.moderation().acts;
+      const recent = roomLines(net.rooms(), room).filter(visible).slice(-WRITE_RECENT).map((l) => logRow(l, acts));
       return {
         heading: t('Écrire dans le salon'),
         icon: 'message',
         subheading: roomName(room),
         lead: t('300 caractères, une ligne · @pseudo prévient le joueur · aucun lien'),
-        // Le téléphone, clavier le plus rapide : son QR code à viser, ou le téléphone déjà relié.
+        // Le téléphone, clavier le plus rapide : son QR code à viser, ou le téléphone déjà relié, en
+        // bande sous les phrases, à la taille de celle du clavier à l'écran.
         phone: true,
+        phoneBand: true,
         remoteWording: { offer: t('Écrivez avec votre téléphone'), paired: [t('Communauté › Salon : le champ est prêt sur le téléphone')] },
-        sections: [{ title: t('Phrases préparées'), kind: 'chips', rows: chips }],
+        sections: [
+          { title: t('Derniers messages'), kind: 'room', rows: recent.length ? recent : [{ text: t('Rien de neuf pour l’instant'), icon: 'message', tone: 'quiet' }] },
+          { title: t('Phrases préparées'), kind: 'chips', rows: chips },
+        ],
         actions,
         back: backToRoom,
         listHint: t('Flippers : choisir une phrase · Start : l’envoyer · Exit : sortir des phrases'),
@@ -388,7 +398,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         heading: l.name,
         avatar: avatarView(l.key, l.name, net.avatarFile(l.key)),
         subheading: self ? t('Votre ligne') : rel === 'friend' ? t('Votre ami') : t('Pas votre ami'),
-        sections: [{ kind: 'room', rows: [{ text: `${l.name} : ${shownText(l.text)}`, log: { time: time(l.at), nick: l.name, hue: hueOf(l.key, l.name), text: shownText(l.text), kind: l.me ? 'me' : 'line', ...(l.country ? { flag: flagView(l.country, locale()) } : {}) } }] }],
+        sections: [{ kind: 'room', rows: [{ text: `${l.name} : ${shownText(l.text)}`, log: { time: time(l.at), nick: l.name, hue: hueOf(l.key, l.name), text: shownText(l.text), kind: l.me ? 'me' : 'line', flag: playerFlag(l.country, locale()) } }] }],
         actions,
         back: backToRoom,
       };
@@ -508,7 +518,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       const all = roomLines(net.rooms(), l.room);
       const at = all.findIndex((x) => x.id === l.id);
       const context = at >= 0 ? all.slice(Math.max(0, at - 3), at + 3) : [l];
-      const rows: Row[] = context.map((x) => ({ text: `${x.name} : ${x.text}`, log: { time: time(x.at), nick: x.name, hue: hueOf(x.key, x.name), text: x.text, kind: x.id === l.id ? 'mention' : 'line', ...(x.country ? { flag: flagView(x.country, locale()) } : {}) } }));
+      const rows: Row[] = context.map((x) => ({ text: `${x.name} : ${x.text}`, log: { time: time(x.at), nick: x.name, hue: hueOf(x.key, x.name), text: x.text, kind: x.id === l.id ? 'mention' : 'line', flag: playerFlag(x.country, locale()) } }));
       const actions: Action[] = [
         ...decisions(l, back),
         { label: t('Classer sans suite'), detail: t('Rien n’est appliqué ; le signalement sort de la file'), icon: 'check', run: () => { net.handleReports(l.id); back(); } },

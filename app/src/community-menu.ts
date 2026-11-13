@@ -15,9 +15,11 @@ import {
   commonTables,
   countryName,
   flagView,
+  playerFlag,
   locale,
   nearbyPlayers,
   ONLINE_FILTERS,
+  socialAgo,
   onlineCounts,
   onlineGroups,
   presenceTable,
@@ -124,6 +126,45 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     return out;
   }
 
+  /**
+   * Tous les joueurs connus de la borne (13/11/2026 : il y a encore peu de monde en ligne) : ceux en
+   * ligne (players), puis mes amis hors ligne, l'annuaire du réseau et les joueurs des classements,
+   * chacun avec la dernière fois qu'il a été vu. Jamais moi ni un joueur bloqué.
+   */
+  function everyone(): OnlinePlayer[] {
+    const s = net.state();
+    if (!s.enabled) return [];
+    const online = players();
+    const me = s.key.publicKey;
+    const out = new Map<string, OnlinePlayer>(online.map((p) => [p.key, p]));
+    const near = new Set(nearbyPlayers(s, now()).map((d) => d.profile.key));
+    const common = commonTables(host.tables().map(presenceTable), net.rankings().scores);
+    // Le pays et la dernière date connus par les classements (le score le plus récent de chacun).
+    const ranked = new Map<string, { name: string; country?: string; at: string }>();
+    for (const sc of net.rankings().scores) {
+      const had = ranked.get(sc.key);
+      if (!had || Date.parse(sc.at) > Date.parse(had.at)) ranked.set(sc.key, { name: sc.name, ...(sc.country ? { country: sc.country } : {}), at: sc.at });
+    }
+    const later = (a: string | undefined, b: string | undefined) => (!a ? b : !b ? a : Date.parse(a) >= Date.parse(b) ? a : b);
+    const add = (key: string, name: string, seen: string | undefined, friend: boolean) => {
+      if (key === me || s.blocked.includes(key)) return;
+      const had = out.get(key);
+      if (had) {
+        if (had.status === 'offline') {
+          const at = later(had.seen, seen);
+          if (at) had.seen = at;
+        }
+        return;
+      }
+      const country = net.publicCard(key)?.country ?? ranked.get(key)?.country;
+      out.set(key, { key, name, ...(country ? { country } : {}), status: 'offline', ...(seen ? { seen } : {}), friend, nearby: near.has(key), commonTables: common.get(key)?.length ?? 0 });
+    };
+    for (const f of s.friends) add(f.key, f.name, f.lastSeen, true);
+    for (const d of s.directory) add(d.profile.key, d.profile.name, d.seen, false);
+    for (const [key, r] of ranked) add(key, r.name, r.at, false);
+    return [...out.values()];
+  }
+
   const myCountry = () => net.country();
   const avatar = (key: string, name: string) => avatarView(key, name, net.avatarFile(key));
   const countryLabel = (code: string | undefined) => (code ? countryName(code, locale()) : undefined);
@@ -172,13 +213,15 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
       case 'friends':
         return t('Amis en ligne ({n})', { n });
       case 'country':
-        return t('En {country} ({n})', { country: countryLabel(myCountry()) ?? '?', n });
+        return t('En ligne en {country} ({n})', { country: countryLabel(myCountry()) ?? '?', n });
       case 'elsewhere':
-        return t('Ailleurs ({n})', { n });
+        return t('En ligne ailleurs ({n})', { n });
       case 'nearby':
         return t('Sur votre réseau local ({n})', { n });
       case 'tables':
         return t('Le plus de tables en commun ({n})', { n });
+      case 'offline':
+        return t('Hors ligne ({n})', { n });
     }
   }
 
@@ -194,7 +237,9 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
   function buildPlayers(): Built {
     const s = net.state();
     const status = net.status();
-    const list = players();
+    // Tous les joueurs connus, ceux en ligne d'abord ; les chiffres d'en-tête ne comptent que ceux en ligne.
+    const list = everyone();
+    const online = list.filter((p) => p.status !== 'offline');
     const actions: Action[] = [];
     const sections: Section[] = [];
     const back = playersBack ?? (() => lib.openSystem());
@@ -202,7 +247,6 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     const counts = onlineCounts(list, myCountry());
     if (!s.enabled) {
       sections.push({ rows: [{ text: t('Partage désactivé : personne ne vous voit, vous ne voyez personne'), detail: t('Le réactiver : Partage et réseau'), icon: 'network', tone: 'quiet' }] });
-      actions.push({ label: t('Partage et réseau'), icon: 'network', run: () => host.openSharing(here) });
     } else if (!status.running) {
       sections.push({ rows: [{ text: status.error ? t('Réseau des bornes indisponible : nouvel essai tout seul') : t('Connexion au réseau des bornes…'), icon: 'network', tone: 'quiet' }] });
     }
@@ -221,16 +265,22 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
         kind: 'players',
         rows: g.players.map((p) => {
           const index = actions.push({ label: p.name, key: `player:${p.key}`, icon: p.friend ? 'friend-list' : 'account', run: () => (p.friend ? host.openFriend(p.key, here) : host.openProfile(p.key, here)) }) - 1;
-          const state = p.status === 'playing' ? t('En partie') : t('En ligne');
-          const extra = closeness(p, tables);
-          const flag = p.country ? flagView(p.country, locale()) : undefined;
+          // Son drapeau devant le nom ; sans pays, le drapeau Cyber Pinball (13/11/2026).
+          const flag = playerFlag(p.country, locale());
+          // Le nom seul sur sa ligne (13/11/2026 : pas de badges les uns derrière les autres). En ligne :
+          // l'anneau vert autour de la pastille (ton « ok », comme dans « Mes amis »). Dessous, ce qu'il
+          // fait : en partie (sur quelle table, entre amis), en ligne, ou depuis quand on ne l'a pas vu ;
+          // « Ami » seulement hors de la section des amis, et la demande envoyée.
+          const table = p.friend && p.status === 'playing' ? net.presenceOf(p.key)?.table?.title : undefined;
+          const doing =
+            p.status === 'playing' ? (table ? t('En partie sur {table}', { table }) : t('En partie')) : p.status === 'online' ? t('En ligne') : p.seen ? t('Vu {ago}', { ago: socialAgo(p.seen, now()) }) : t('Hors ligne');
+          const tie = p.friend ? (g.id === 'friends' ? undefined : t('Ami')) : s.outgoing.some((r) => r.key === p.key) ? t('Demande envoyée') : undefined;
           return {
             text: p.name,
             avatar: avatar(p.key, p.name),
-            ...(flag ? { flag } : {}),
-            detail: extra ? `${state} · ${extra}` : state,
-            badges: p.friend ? [t('Ami')] : s.outgoing.some((r) => r.key === p.key) ? [t('Demande envoyée')] : [],
-            tone: p.friend ? ('ok' as const) : undefined,
+            flag,
+            detail: [doing, tie, closeness(p, tables)].filter(Boolean).join(' · '),
+            ...(p.status === 'offline' ? {} : { tone: 'ok' as const }),
             action: index,
             pick: true,
           } satisfies Row;
@@ -245,16 +295,18 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
             ? { text: t('{filter} : {reason}', { filter: filterLabel(filter), reason: problem }), detail: filter === 'nearby' ? t('Le réactiver : Partage et réseau') : t('Le choisir : Partage et réseau › Choisir mon pays'), icon: 'info', tone: 'quiet' }
             : list.length
               ? { text: t('Personne pour ce filtre en ce moment'), detail: t('MagnaSave : filtre suivant'), icon: 'info', tone: 'quiet' }
-              : { text: t('Personne en ligne pour l’instant'), detail: t('La liste se remplit à mesure que les bornes se signalent'), icon: 'info', tone: 'quiet' },
+              : { text: t('Aucun joueur connu pour l’instant'), detail: t('La liste se remplit à mesure que les bornes se signalent'), icon: 'info', tone: 'quiet' },
         ],
       });
       if (problem) actions.push({ label: t('Partage et réseau'), icon: 'network', run: () => host.openSharing(here) });
     }
+    // Partage désactivé : de quoi le réactiver, dans la colonne des actions (après la liste, dans l'ordre de lecture).
+    if (!s.enabled) actions.push({ label: t('Partage et réseau'), icon: 'network', run: () => host.openSharing(here) });
     if (s.enabled) {
       const shown = s.publicPresence !== false;
       actions.push({
         label: shown ? t('Apparaître en ligne pour tous : oui') : t('Apparaître en ligne pour tous : non'),
-        detail: shown ? t('« En ligne » ou « En partie », jamais la table ; vos amis voient toujours votre présence') : t('Vous n’apparaissez plus dans cette liste ; vos amis voient toujours votre présence'),
+        detail: shown ? t('« En ligne » ou « En partie », jamais la table ; vos amis voient toujours votre présence') : t('Les autres vous voient hors ligne ; vos amis voient toujours votre présence'),
         icon: 'pulse',
         run: () => (net.setPublicPresence(!shown), here()),
       });
@@ -263,8 +315,8 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     return {
       heading: t('Joueurs en ligne'),
       icon: 'friends',
-      subheading: countsLine(list),
-      lead: t('Un joueur reste affiché jusqu’à 5 minutes après son départ. La table en cours n’est montrée qu’entre amis.'),
+      subheading: countsLine(online),
+      lead: t('Tous les joueurs croisés par votre borne, ceux en ligne d’abord. La table en cours n’est montrée qu’entre amis.'),
       tabs,
       sections,
       actions,

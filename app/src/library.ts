@@ -135,6 +135,7 @@ import {
   type MediaDb,
   formatDate,
   flagView,
+  playerFlag,
   formatDateTime,
   formatList,
   formatNumber,
@@ -668,6 +669,12 @@ export interface Built {
    * remplit `remote` lui-même (« Écrire dans le salon »).
    */
   phone?: true;
+  /**
+   * Le bloc du téléphone en bande, à la taille de celle du clavier à l'écran, après les sections
+   * plutôt qu'en tête (« Écrire dans le salon », 13/11/2026 : le QR ne prend pas la place des
+   * derniers messages).
+   */
+  phoneBand?: true;
   /**
    * Ce que Start fait sur un élément de la liste de contenu (« cocher ou décocher »), dit par le
    * bandeau d'aide tant qu'on y est ; sans lui, « valider ». Une liste de cases à cocher le dit :
@@ -2737,8 +2744,8 @@ export function createLibrary(host: LibraryHost) {
           {
             title: t('Choisir le score'),
             rows: lines.map((l, i) => {
-              const flag = l.country ? flagView(l.country, language() === 'en' ? 'en-GB' : 'fr-FR') : undefined;
-              return { text: t('{rank}. {name} {score}', { rank: l.rank, name: l.name, score: formatNumber(l.score) }), detail: [flag?.name, formatDateTime(l.at)].filter(Boolean).join(' · '), ...(flag ? { flag } : {}), action: i, pick: true };
+              const flag = playerFlag(l.country, language() === 'en' ? 'en-GB' : 'fr-FR');
+              return { text: t('{rank}. {name} {score}', { rank: l.rank, name: l.name, score: formatNumber(l.score) }), detail: [l.country ? flag.name : undefined, formatDateTime(l.at)].filter(Boolean).join(' · '), flag, action: i, pick: true };
             }),
           },
         ],
@@ -2940,7 +2947,21 @@ export function createLibrary(host: LibraryHost) {
       ];
     }
     const packs = pupPacksOf(table, s);
-    if (!packs.length) return [];
+    if (!packs.length) {
+      // Pack sans options : la fiche le montre quand même (on le cherchait là, Indiana Jones,
+      // 13/11/2026) ; Start ouvre sa partie, où il se désactive.
+      const active = samePath(table.folder, tablesDir()) ? [] : pupSwitchView(table).sw.active;
+      if (!active.length) return [];
+      return [
+        {
+          label: 'PuP-Pack', // i18n-ignore : nom propre
+          icon: 'pup',
+          detail: t('actif : {packs} · sans options à choisir', { packs: active.join(', ') }),
+          door: 'sheet.pup',
+          run: () => gameParts.openPart(table, 'pup'),
+        },
+      ];
+    }
     const unsuited = packs.some((p) => p.recommended && p.applied !== p.recommended && p.memory?.chosen !== 'user');
     const applied = packs.map((p) => p.applied?.label ?? t('aucune option appliquée')).join(' · ');
     return [
@@ -4697,7 +4718,8 @@ export function createLibrary(host: LibraryHost) {
       lead: built.lead,
       sections: built.sections,
       crop: built.crop ? { src: built.crop.src, width: built.crop.width, height: built.crop.height, box: built.crop.box, caption: built.crop.caption } : undefined,
-      remote: built.remote ? remoteBlock(built.remote, 'screen', built.remoteWording) : built.phone && host.phoneRemote?.bar() ? remoteBlock(host.phoneRemote.bar()!, 'screen', built.remoteWording) : undefined,
+      remote: built.remote ? remoteBlock(built.remote, 'screen', built.remoteWording) : built.phone && host.phoneRemote?.bar() ? remoteBlock(host.phoneRemote.bar()!, built.phoneBand ? 'keyboard' : 'screen', built.remoteWording) : undefined,
+      remoteBand: built.phoneBand,
 
       back: backLabel(built),
       // Dans la liste d'un écran à deux zones, Exit n'y ramène pas : il passe aux actions, le bouton le dit (et fait de même au clic).

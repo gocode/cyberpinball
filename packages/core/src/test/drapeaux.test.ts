@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { countryCodes, countryName, countryOfLocale, COUNTRY_CODES, flagSrc, flagView, knownCountry } from '../rankings';
+import { countryCodes, countryName, countryOfLocale, COUNTRY_CODES, flagSrc, flagView, knownCountry, NO_COUNTRY_FLAG, playerFlag } from '../rankings';
 
 const REPO = path.join(__dirname, '..', '..', '..', '..');
 const FLAGS = path.join(REPO, 'app', 'renderer', 'drapeaux');
@@ -16,7 +16,8 @@ test('drapeaux : un fichier par pays, aucun de trop, la licence à côté', () =
   const files = fs.readdirSync(FLAGS);
   assert.ok(files.includes('LICENSE'), 'la licence MIT de flag-icons accompagne les drapeaux');
   const svgs = files.filter((f) => f.endsWith('.svg'));
-  const expected = COUNTRY_CODES.map((c) => `${c.toLowerCase()}.svg`);
+  // Plus celui de Cyber Pinball : le drapeau d'un joueur sans pays (NO_COUNTRY_FLAG).
+  const expected = [...COUNTRY_CODES.map((c) => `${c.toLowerCase()}.svg`), path.basename(NO_COUNTRY_FLAG)];
   assert.deepEqual(
     expected.filter((f) => !svgs.includes(f)),
     [],
@@ -35,7 +36,7 @@ test('drapeaux : un fichier par pays, aucun de trop, la licence à côté', () =
 });
 
 test('drapeaux : du SVG seul, sans script ni ressource extérieure, en 4:3', () => {
-  for (const code of COUNTRY_CODES) {
+  for (const code of [...COUNTRY_CODES, 'cyberpinball']) {
     const svg = fs.readFileSync(path.join(FLAGS, `${code.toLowerCase()}.svg`), 'utf8');
     assert.match(svg, /^<svg[^>]*viewBox="0 0 640 480"/, `${code} : pas un SVG 4:3`);
     assert.doesNotMatch(svg, /<script|\son[a-z]+=|<foreignObject|href="(?!#)|url\((?!#)/i, `${code} : contenu actif ou ressource extérieure`);
@@ -63,4 +64,12 @@ test('pays : drapeau, nom, et région de Windows', () => {
   assert.equal(countryOfLocale('en_GB.UTF-8'), 'GB');
   assert.equal(countryOfLocale('ru-SU'), undefined, 'une région disparue ne devient pas un pays');
   assert.equal(countryOfLocale('fr'), undefined);
+});
+
+test('joueur sans pays : le drapeau Cyber Pinball, à la place du sien', () => {
+  assert.deepEqual(playerFlag('BE', 'fr-FR'), flagView('BE', 'fr-FR'));
+  const none = playerFlag(undefined, 'fr-FR');
+  assert.equal(none.src, NO_COUNTRY_FLAG);
+  assert.equal(none.code, '');
+  assert.ok(fs.existsSync(path.join(FLAGS, path.basename(NO_COUNTRY_FLAG))));
 });

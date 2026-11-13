@@ -177,6 +177,7 @@ export const messages: Record<string, string> = {
   'PuP-Pack désactivé ({packs}) : la table se joue sans lui. « Réactiver le PuP-Pack » le remet tel quel.': 'PuP-Pack disabled ({packs}): the table plays without it. “Re-enable the PuP-Pack” puts it back as it was.',
   'Laissés en place : {reasons}.': 'Left in place: {reasons}.',
   'désactivé : la table se joue sans ses vidéos · Start pour le réactiver': 'disabled: the table plays without its videos · Start to re-enable it',
+  'actif : {packs} · sans options à choisir': 'active: {packs} · no options to choose',
   'Dans « Parties du jeu » : la table se joue sans ses vidéos, réactivable à tout moment': 'In “Game parts”: the table plays without its videos, can be re-enabled at any time',
   'PuP-Pack désactivé dans cette table': 'PuP-Pack disabled in this table',
   'Il se range avec l’ancien, dans « {folder} » : la table se joue toujours sans lui. « Parties du jeu » > PuP-Pack pour le réactiver.': 'It is stored with the old one, in “{folder}”: the table still plays without it. “Game parts” > PuP-Pack to re-enable it.',

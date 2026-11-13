@@ -421,8 +421,8 @@ const TYPES: Record<string, string> = {
   '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
 };
-/** Drapeau d'un pays (app/renderer/drapeaux, flagSrc) : deux lettres, rien d'autre. */
-const FLAG_PATH = /^\/drapeaux\/([a-z]{2})\.svg$/;
+/** Drapeau d'un pays (app/renderer/drapeaux, flagSrc) : deux lettres, ou celui de Cyber Pinball (NO_COUNTRY_FLAG) ; rien d'autre. */
+const FLAG_PATH = /^\/drapeaux\/([a-z]{2}|cyberpinball)\.svg$/;
 /** Une image sous son jeton (remote-images.ts) : pastille d'un joueur, pochette, miniature d'une table. */
 const IMAGE_PATH = new RegExp(`^${REMOTE_IMAGE_PATH}([A-Za-z0-9_-]{22})$`);
 /** Port de la télécommande encore pris (relève, mise à jour) : attendu jusqu'à 45 s, essayé chaque seconde. */
@@ -765,7 +765,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       res.writeHead(200, { ...headers, 'Content-Type': TYPES['.js']! }).end(req.method === 'HEAD' ? undefined : catalogue());
       return;
     }
-    // Un drapeau (deux lettres), ou une image sous son jeton (pastille, pochette, miniature) ; rien d'autre du disque.
+    // Un drapeau (deux lettres, ou Cyber Pinball), ou une image sous son jeton (pastille, pochette, miniature) ; rien d'autre du disque.
     const flag = FLAG_PATH.exec(url);
     const token = IMAGE_PATH.exec(url)?.[1];
     const image: RemoteImage | undefined = flag ? { file: path.join(rendererDir, 'drapeaux', `${flag[1]}.svg`) } : token ? images.get(token) : undefined;

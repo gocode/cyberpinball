@@ -23,6 +23,7 @@ import { isBallCount } from './ballcount';
 import { inPeriod, SCORE_PERIODS, type PlayedSource, type ScorePeriod } from './scoreboard';
 import { isPlayerPublicKey, signText, verifyText, type PlayerKey } from './sharing';
 import { normalizeName, type PresenceTable } from './social';
+import { t } from './i18n';
 import { readKeptJson } from './store';
 
 export const RANKINGS_FILE = 'classements.json';
@@ -356,6 +357,18 @@ export interface FlagView {
 export function flagView(code: string, locale: string): FlagView {
   const src = flagSrc(code);
   return { code, name: countryName(code, locale), ...(src ? { src } : {}) };
+}
+
+/**
+ * Drapeau Cyber Pinball (app/renderer/drapeaux/cyberpinball.svg, la bille comète de l'icône) : celui
+ * d'un joueur qui n'a pas dit son pays, à la même place qu'un drapeau (13/11/2026). Ainsi chaque
+ * joueur a le sien, et les prénoms partent tous du même bord.
+ */
+export const NO_COUNTRY_FLAG = 'drapeaux/cyberpinball.svg';
+
+/** Le drapeau d'un joueur : celui de son pays, sinon le drapeau Cyber Pinball. */
+export function playerFlag(code: string | undefined, locale: string): FlagView {
+  return code ? flagView(code, locale) : { code: '', name: t('Pays non indiqué'), src: NO_COUNTRY_FLAG };
 }
 
 /** Les pays proposés au choix, par ordre alphabétique de leur nom dans la langue de l'interface. */

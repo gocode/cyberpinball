@@ -98,8 +98,9 @@ function renderLibrary(v) {
   else if (v.scoreboard) body.append(renderScoreboard(v.scoreboard));
   else if (v.media || v.sections.length) {
     const content = libEl('div', 'lib-content');
-    // Télécommande du téléphone : le QR code, le code à comparer ou le téléphone, en tête.
-    if (v.remote) content.append(renderRemote(v.remote, false));
+    // Télécommande du téléphone : le QR code, le code à comparer ou le téléphone, en tête ; en bande
+    // après les sections quand l'écran le demande (remoteBand, « Écrire dans le salon »).
+    if (v.remote && !v.remoteBand) content.append(renderRemote(v.remote, false));
     // Onglets (Joueurs en ligne : les filtres), en tête de la liste.
     if (v.tabs?.length) content.append(renderTabs(v.tabs, v.cursor));
     // Médias : le message du moment, puis les cartes, puis les sections titrées.
@@ -167,10 +168,10 @@ function renderLibrary(v) {
         }
         const line = libEl('div', 'lib-row-line');
         // Pastille d'un joueur (son avatar, sinon ses initiales) : à gauche de tout le bloc, à la place de l'icône.
-        // Un pays : son drapeau à la place de l'icône.
+        // Un pays : son drapeau devant le nom, à la place de l'icône ; un joueur sans pays a le drapeau
+        // Cyber Pinball (playerFlag, 13/11/2026). Une ligne sans drapeau garde sa case, vide.
         if (row.flag) line.append(flagNode(row.flag.code, row.flag.src, row.flag.name, 'lib-row-flag'));
-        // Avec une pastille, le drapeau suit (Joueurs en ligne) ; sans drapeau, sa case reste, vide.
-        else if (flagged && (!row.icon || row.avatar)) line.append(libEl('span', 'flag lib-row-flag none'));
+        else if (flagged && !row.icon && !row.avatar) line.append(libEl('span', 'flag lib-row-flag none'));
         else if (row.icon && !row.avatar) line.append(cyberIcon(row.icon, 'lib-row-icon'));
         line.append(libEl('span', 'lib-row-text', row.text));
         // Pas encore lue (Activité récente) : la pastille rouge des entrées du menu, et son mot dans les badges.
@@ -224,6 +225,7 @@ function renderLibrary(v) {
       box.append(list);
       (section.side ? side : main).append(box);
     }
+    if (v.remote && v.remoteBand) main.append(renderRemote(v.remote, true));
     // Galerie : le détail de la tuile choisie sous la liste qui défile, jamais par-dessus. Sur les
     // actions de l'écran, celui de la tuile où l'on reviendra : la galerie ne change pas de taille.
     const detail = v.media?.gallery ? galleryDetail(v.media, v.zone?.listCursor ?? v.cursor) : undefined;
@@ -760,7 +762,7 @@ function renderScoreboard(b) {
     // Une seule grille pour tout le tableau (chaque ligne en sous-grille) : rang, drapeau, pastille,
     // nom, score et date tombent dans les mêmes colonnes d'une ligne à l'autre, au pixel près. Dès
     // qu'une ligne a un drapeau ou une pastille, leur colonne existe pour toutes, vide au besoin.
-    const flags = b.lines.some((l) => l.country);
+    const flags = b.lines.some((l) => l.flag || l.country);
     const avatars = b.lines.some((l) => l.avatar);
     const list = libEl('ol', `scoreboard-lines${flags ? ' with-flags' : ''}${avatars ? ' with-avatars' : ''}`);
     // Garde-fou de mise en page (layout-check.ts) : colonnes, lignes de base et images alignées.
@@ -768,7 +770,7 @@ function renderScoreboard(b) {
     for (const l of b.lines) {
       const li = libEl('li', `scoreboard-line${l.first ? ' first' : ''}${l.mine ? ' mine' : ''}${l.apart ? ' apart' : ''}`);
       li.append(libEl('span', 'scoreboard-rank', l.rank));
-      if (flags) li.append(l.country ? flagNode(l.country, l.flag, l.countryName, 'scoreboard-flag') : libEl('span', 'scoreboard-flag none'));
+      if (flags) li.append(l.flag || l.country ? flagNode(l.country ?? '', l.flag, l.countryName, 'scoreboard-flag') : libEl('span', 'scoreboard-flag none'));
       // Classements en réseau : la pastille du joueur, cerclée de vert quand sa borne est en ligne.
       if (avatars) li.append(l.avatar ? scoreboardFace(l) : libEl('span', 'scoreboard-face none'));
       const name = libEl('span', `scoreboard-name${l.anonymous ? ' anonymous' : ''}`);

@@ -11,6 +11,10 @@ son interface).
 
 ## 0.1.12
 
+- Joueurs en ligne : la liste montre tous les joueurs que votre borne a croisés, même hors ligne. Ceux en ligne viennent d'abord (« En ligne en France », « En ligne ailleurs »), leur pastille cerclée de vert, avec dessous ce qu'ils font (« En partie », « En ligne ») ; les autres suivent dans « Hors ligne », vos amis d'abord, avec la dernière fois qu'on les a vus.
+- Le drapeau de chaque joueur est devant son nom ; un joueur qui n'a pas dit son pays a le drapeau Cyber Pinball, une bille comète (joueurs, classements, salons).
+- Écrire dans le salon : les derniers messages restent au-dessus des phrases préparées, pour répondre en sachant ce qui vient d'être dit ; le QR code du téléphone reprend sa taille normale, sous les phrases.
+- Fiche de la table : la ligne « PuP-Pack » apparaît dès que la table a un pack, même sans options à choisir ; Start ouvre sa partie, où il se désactive.
 - Tables qui plantaient VPX au lancement (« 0xC0000005, accès mémoire interdit ») à cause d’un fronton vide : un fichier .directb2s sans aucune image, souvent laissé par un autre menu de borne (vu sur Indiana Jones venue d’une installation PinUP Popper). Le plugin du fronton de VPX s’arrête dessus dès la première image. Cyber Pinball met maintenant ce fichier à la corbeille de lui-même, à l’installation et avant chaque partie : la table se joue, avec son PuP-Pack. Le médecin de la table le signale aussi (« Fronton sans image »).
 - Réalité virtuelle (Quest en limite de pièce) : la borne reste sur la vraie quand Link déplace la pièce. Cyber Pinball relit la limite du Quest et remet la borne en place tout seul, sans geste ni manettes ; si la limite a été redessinée, le calage est proposé une fois. L'option « Recalage automatique » (manettes posées sur la barre) disparaît : la borne se replace désormais seule sur le contour de la pièce.
 - Réalité virtuelle : quand le Quest déplace la pièce en remettant le casque (fréquent en Air Link), Cyber Pinball s'en aperçoit : la borne se replace sur la limite du Quest quand la position de la tête le confirme, sinon le calage s'ouvre en le disant.

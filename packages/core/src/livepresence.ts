@@ -111,11 +111,16 @@ export function liveSample(board: LiveBoard, own: LiveBeacon | undefined, now = 
 export const ONLINE_FILTERS = ['all', 'country', 'nearby', 'tables'] as const;
 export type OnlineFilter = (typeof ONLINE_FILTERS)[number];
 
+/** Présence d'un joueur de la liste : en ligne, en partie, ou hors ligne (vu plus tôt). */
+export type PlayerPresence = BeaconStatus | 'offline';
+
 export interface OnlinePlayer {
   key: string;
   name: string;
   country?: string;
-  status: BeaconStatus;
+  status: PlayerPresence;
+  /** Hors ligne : la dernière fois qu'il a été vu (ISO), s'il est connu. */
+  seen?: string;
   friend: boolean;
   /** Sur le même réseau local que cette borne. */
   nearby?: boolean;
@@ -123,13 +128,18 @@ export interface OnlinePlayer {
   commonTables?: number;
 }
 
-export type OnlineGroupId = 'friends' | 'country' | 'elsewhere' | 'nearby' | 'tables';
+export type OnlineGroupId = 'friends' | 'country' | 'elsewhere' | 'nearby' | 'tables' | 'offline';
 export interface OnlineGroup {
   id: OnlineGroupId;
   players: OnlinePlayer[];
 }
 
-const byPresenceThenName = (a: OnlinePlayer, b: OnlinePlayer) => (a.status === b.status ? 0 : a.status === 'playing' ? -1 : 1) || a.name.localeCompare(b.name);
+const PRESENCE_RANK: Record<PlayerPresence, number> = { playing: 0, online: 1, offline: 2 };
+const seenAt = (p: OnlinePlayer) => (p.seen ? Date.parse(p.seen) || 0 : 0);
+/** En partie, puis en ligne, puis hors ligne (le plus récemment vu d'abord) ; puis par nom. */
+const byPresenceThenName = (a: OnlinePlayer, b: OnlinePlayer) =>
+  PRESENCE_RANK[a.status] - PRESENCE_RANK[b.status] || (a.status === 'offline' ? seenAt(b) - seenAt(a) : 0) || a.name.localeCompare(b.name);
+const isOnline = (p: OnlinePlayer) => p.status !== 'offline';
 
 /** Combien de joueurs chaque filtre montrerait (le nombre sous chaque onglet). */
 export function onlineCounts(players: readonly OnlinePlayer[], country: string | undefined): Record<OnlineFilter, number> {
@@ -142,29 +152,34 @@ export function onlineCounts(players: readonly OnlinePlayer[], country: string |
 }
 
 /**
- * Les groupes de la liste pour un filtre. Tous : amis en ligne, puis mon pays, puis ailleurs ; dans
- * chaque groupe, en partie d'abord, puis par nom. Mon pays : les joueurs de mon pays, amis en tête.
- * À proximité : le réseau local. Mêmes tables : le plus de tables en commun d'abord. Un groupe vide
- * n'est pas rendu.
+ * Les groupes de la liste pour un filtre. La liste montre tous les joueurs connus (13/11/2026 : il y
+ * a encore peu de monde), ceux en ligne d'abord. Tous : amis en ligne, puis mon pays, puis ailleurs,
+ * puis tous ceux hors ligne (amis d'abord, le plus récemment vu ensuite) ; dans chaque groupe en
+ * ligne, en partie d'abord, puis par nom. Mon pays : de même, pour les joueurs de mon pays.
+ * À proximité : le réseau local. Mêmes tables : en ligne d'abord, puis le plus de tables en commun.
+ * Un groupe vide n'est pas rendu.
  */
 export function onlineGroups(players: readonly OnlinePlayer[], country: string | undefined, filter: OnlineFilter): OnlineGroup[] {
   const groups: OnlineGroup[] = [];
   const push = (id: OnlineGroupId, list: OnlinePlayer[]) => {
     if (list.length) groups.push({ id, players: list });
   };
+  const online = (a: OnlinePlayer, b: OnlinePlayer) => Number(isOnline(b)) - Number(isOnline(a));
   if (filter === 'tables') {
-    push('tables', players.filter((p) => (p.commonTables ?? 0) > 0).sort((a, b) => (b.commonTables ?? 0) - (a.commonTables ?? 0) || byPresenceThenName(a, b)));
+    push('tables', players.filter((p) => (p.commonTables ?? 0) > 0).sort((a, b) => online(a, b) || (b.commonTables ?? 0) - (a.commonTables ?? 0) || byPresenceThenName(a, b)));
     return groups;
   }
   if (filter === 'nearby') {
-    push('nearby', players.filter((p) => p.nearby).sort((a, b) => Number(b.friend) - Number(a.friend) || byPresenceThenName(a, b)));
+    push('nearby', players.filter((p) => p.nearby).sort((a, b) => online(a, b) || Number(b.friend) - Number(a.friend) || byPresenceThenName(a, b)));
     return groups;
   }
   const pool = filter === 'country' ? players.filter((p) => country && p.country === country) : players;
-  push('friends', pool.filter((p) => p.friend).sort(byPresenceThenName));
-  const others = pool.filter((p) => !p.friend);
+  const live = pool.filter(isOnline);
+  push('friends', live.filter((p) => p.friend).sort(byPresenceThenName));
+  const others = live.filter((p) => !p.friend);
   push('country', others.filter((p) => country && p.country === country).sort(byPresenceThenName));
   if (filter === 'all') push('elsewhere', others.filter((p) => !country || p.country !== country).sort(byPresenceThenName));
+  push('offline', pool.filter((p) => !isOnline(p)).sort((a, b) => Number(b.friend) - Number(a.friend) || byPresenceThenName(a, b)));
   return groups;
 }
 

@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.12
 
+- Players online: the list shows every player your cabinet has come across, even offline. Those online come first ("Online in France", "Online elsewhere"), their badge ringed in green, with what they are doing below ("Playing", "Online"); the others follow under "Offline", your friends first, with when they were last seen.
+- Each player's flag is before their name; a player who has not given their country has the Cyber Pinball flag, a comet ball (players, leaderboards, chat rooms).
+- Writing in a chat room: the latest messages stay above the ready-made phrases, so you reply knowing what was just said; the phone's QR code is back to its normal size, below the phrases.
+- Table details: the “PuP-Pack” line shows as soon as the table has a pack, even with no options to choose; Start opens its part, where it can be disabled.
 - Tables that crashed VPX at launch (“0xC0000005, memory access violation”) because of an empty backglass: a .directb2s file with no image at all, often left behind by another cabinet frontend (seen on Indiana Jones coming from a PinUP Popper installation). VPX’s backglass plugin crashes on it at the very first frame. Cyber Pinball now moves that file to the trash by itself, on installation and before each game: the table plays, with its PuP-Pack. The table doctor also reports it (“Backglass without an image”).
 - Virtual reality (Quest with a roomscale boundary): the cabinet stays on the real one when Link moves the room. Cyber Pinball re-reads the Quest boundary and puts the cabinet back in place by itself, with no gesture and no controllers; if the boundary was redrawn, the alignment is offered once. The "Automatic alignment" option (controllers laid on the lockbar) is gone: the cabinet now puts itself back on the room's outline.
 - Virtual reality: when the Quest moves the room as the headset is put back on (frequent with Air Link), Cyber Pinball notices: the cabinet puts itself back on the Quest boundary when the head position confirms it, otherwise the alignment opens and says so.

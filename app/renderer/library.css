@@ -4666,6 +4666,14 @@ body.mouse .lib-chip.pick:not(.selected):hover {
   box-shadow: inset 0 0 0 0.15cqmin var(--accent);
 }
 
+/*
+ * Joueurs en ligne (Section.kind « players », 13/11/2026) : être en ligne se dit par l'anneau vert
+ * de la pastille seulement ; la barre verte à gauche reste celle du choix courant.
+ */
+.kind-players .lib-row.tone-ok:not(.selected) {
+  border-left-color: transparent;
+}
+
 /* Légende du menu du casque (planche validée le 13/11/2026) : deux colonnes, un petit schéma des manettes par
    commande à gauche (110 px à 1080 de haut), le bouton puis ce qu'il fait. */
 .lib-section.kind-controls .lib-rows { display: grid; grid-template-columns: 1fr 1fr; column-gap: 5.6cqmin; }

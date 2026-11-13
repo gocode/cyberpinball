@@ -5,7 +5,7 @@
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec un tableau d'essai.
 
-import { countryName, flagSrc, formatNumber, language, RANKING_SCOPES, SCORE_PERIODS, t, tn, type AvatarView, type BoardLine, type RankingScope, type ScorePeriod } from '@cyberpinball/core';
+import { countryName, flagSrc, NO_COUNTRY_FLAG, formatNumber, language, RANKING_SCOPES, SCORE_PERIODS, t, tn, type AvatarView, type BoardLine, type RankingScope, type ScorePeriod } from '@cyberpinball/core';
 import type { PlayerStatus, RankingView, RankingViewLine } from './table-rankings';
 import type { TableBoard } from './table-scores';
 
@@ -167,7 +167,8 @@ function rankingLineView(line: RankingViewLine, now: Date, apart: boolean): Scor
     score: formatNumber(line.score),
     when: whenLabel({ at: line.at }, now),
     ...(line.rank === 1 ? { first: true } : {}),
-    ...(line.country ? countryOf(line.country) : {}),
+    // Classement en réseau : chaque joueur a un drapeau, celui de Cyber Pinball s'il n'a pas dit son pays.
+    ...(line.country ? countryOf(line.country) : { countryName: t('Pays non indiqué'), flag: NO_COUNTRY_FLAG }),
     ...(line.mine ? { mine: true } : {}),
     avatar: line.face,
     ...(line.status ? { status: line.status } : {}),

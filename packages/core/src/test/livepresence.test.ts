@@ -89,6 +89,26 @@ test('Joueurs en ligne : amis, mon pays, ailleurs ; en partie d’abord ; filtre
   assert.deepEqual(onlineGroups([], 'FR', 'all'), [], 'aucun groupe vide');
 });
 
+test('Joueurs en ligne : tous les joueurs connus, ceux en ligne d’abord, puis hors ligne (amis, puis le plus récemment vu)', () => {
+  // 13/11/2026 : il y a encore peu de monde en ligne ; la liste montre aussi ceux qui ne le sont pas.
+  const p = (name: string, o: Partial<OnlinePlayer> = {}): OnlinePlayer => ({ key: name, name, status: 'online', friend: false, ...o });
+  const players = [
+    p('Ancien', { country: 'FR', status: 'offline', seen: '2026-11-01T20:00:00Z', commonTables: 4 }),
+    p('Recent', { country: 'BE', status: 'offline', seen: '2026-11-12T20:00:00Z' }),
+    p('Copain', { country: 'FR', status: 'offline', friend: true, seen: '2026-10-01T20:00:00Z' }),
+    p('Kiko', { country: 'FR', commonTables: 1 }),
+    p('Vortex', { country: 'BE', status: 'playing' }),
+    p('Nova', { country: 'FR', friend: true }),
+  ];
+  const names = (filter: Parameters<typeof onlineGroups>[2]) => onlineGroups(players, 'FR', filter).map((g) => `${g.id}: ${g.players.map((x) => x.name).join(', ')}`);
+  // En ligne d'abord (amis, mon pays, ailleurs), puis hors ligne : mon ami, puis le plus récemment vu.
+  assert.deepEqual(names('all'), ['friends: Nova', 'country: Kiko', 'elsewhere: Vortex', 'offline: Copain, Recent, Ancien']);
+  assert.deepEqual(names('country'), ['friends: Nova', 'country: Kiko', 'offline: Copain, Ancien']);
+  // Mêmes tables : en ligne d'abord, même avec moins de tables en commun.
+  assert.deepEqual(names('tables'), ['tables: Kiko, Ancien']);
+  assert.deepEqual(onlineCounts(players, 'FR'), { all: 6, country: 4, nearby: 0, tables: 2 });
+});
+
 interface Net {
   state(): SocialState;
   start(): Promise<void>;

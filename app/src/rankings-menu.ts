@@ -10,7 +10,7 @@
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec des tables d'essai.
 
-import { flagView, formatNumber, locale, RANKING_SCOPES, SCORE_PERIODS, t, tn, type RankingScope, type ScorePeriod, type TableEntry } from '@cyberpinball/core';
+import { formatNumber, playerFlag, locale, RANKING_SCOPES, SCORE_PERIODS, t, tn, type RankingScope, type ScorePeriod, type TableEntry } from '@cyberpinball/core';
 import type { Action, Built, Row, Section } from './library';
 import { periodLabel, scopeLabel } from './scoreboard-menu';
 import type { RankingView } from './table-rankings';
@@ -145,11 +145,11 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
     });
     const rows: Row[] = board.ranked.map((r) => {
       const action = actions.push({ label: r.table.title, key: `table:${r.table.file}`, icon: 'trophy', run: () => host.library.openScores(r.table, scope, period, here) }) - 1;
-      const flag = r.leader.country ? flagView(r.leader.country, locale()) : undefined;
+      const flag = playerFlag(r.leader.country, locale());
       return {
         text: r.table.title,
         detail: [t('1. {name} · {score}', { name: r.leader.name, score: formatNumber(r.leader.score) }), r.count, r.mine].filter(Boolean).join(' · '),
-        ...(flag ? { flag } : {}),
+        flag,
         ...(r.first ? { badges: [t('Premier')], tone: 'ok' as const } : {}),
         action,
         pick: true,

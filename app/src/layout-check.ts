@@ -592,6 +592,17 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
     const last = starts.reduce((a, b) => (b[0] > a[0] ? b : a), starts[0]);
     if (starts.length > 1 && last[0] - first[0] > 0.5) problems.add('textes d’une liste qui ne partent pas du même bord (' + (last[0] - first[0]).toFixed(1) + ' px) : ' + label(first[1]) + ' et ' + label(last[1]));
   }
+  // Ligne avec pastille (Joueurs en ligne) : la ligne du nom (le drapeau, ou le nom seul) part du même
+  // bord que la ligne du dessous (13/11/2026 : prénoms décalés quand un joueur n'avait pas de drapeau).
+  for (const row of document.querySelectorAll('.lib-row.with-avatar')) {
+    if (!shown(row)) continue;
+    const q = (((Math.round(turn(row) / (Math.PI / 2)) % 4) + 4) % 4);
+    const first = [...row.querySelectorAll('.lib-row-line > *')].find(shown);
+    const under = row.querySelector('.lib-row-detail');
+    if (!first || !under || !shown(under)) continue;
+    const gap = Math.abs(localRect(first.getBoundingClientRect(), q).left - localRect(under.getBoundingClientRect(), q).left);
+    if (gap > 0.5) problems.add('nom décalé de sa ligne de détail (' + gap.toFixed(1) + ' px) : ' + label(row).slice(0, 60));
+  }
   // Tableaux en colonnes (data-aligned, le tableau des scores) : chaque case commence et finit au
   // même endroit sur toutes les lignes ; le texte d'une ligne partage une même ligne de base (une
   // sonde de taille nulle devant le premier texte de chaque élément) ; drapeau et pastille sont
