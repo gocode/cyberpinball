@@ -63,6 +63,29 @@ export function coverDisplay(win: BrowserWindow, bounds: Rectangle): void {
 }
 
 /**
+ * Calque transparent posé sur tout un écran sans plein écran (réglages en partie, in-game-menu.ts :
+ * par-dessus VPX, qu'on voit au travers). Une fenêtre sans cadre posée aux limites de l'écran peut
+ * en être amputée de la barre des tâches (coverProblem) : le 13/11/2026, sur l'écran du DMD de la
+ * borne de référence, le cadre du DMD n'atteignait plus le bas de l'écran. Une fois le calque
+ * montré, il est reposé à sa place s'il ne la couvre pas exactement. Rend l'écart, pour le journal,
+ * ou undefined.
+ */
+export function keepOverlayOnScreen(win: BrowserWindow, bounds: Rectangle): string | undefined {
+  if (win.isDestroyed() || OFFSCREEN) return undefined;
+  const before = win.getContentBounds();
+  if (sameBox(before, bounds)) return undefined;
+  win.setBounds(bounds);
+  const after = win.getContentBounds();
+  const where = (r: Rectangle) => `${r.width} × ${r.height} en ${r.x}, ${r.y}`;
+  return `${where(before)} au lieu de ${where(bounds)} ; reposée, ${sameBox(after, bounds) ? 'elle couvre l’écran' : `toujours ${where(after)}`}`; // i18n-ignore : journal
+}
+
+/** Deux rectangles égaux, au pixel près (arrondis d'Electron). */
+function sameBox(a: Rectangle, b: Rectangle): boolean {
+  return Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1 && Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
+}
+
+/**
  * Réduit une fenêtre couverte par coverDisplay (mode bureau, desktop-mode.ts) : elle
  * quitte d'abord le plein écran, pour ne pas revenir en bleu pâle ; rouverte, elle le reprend.
  */

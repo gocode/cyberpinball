@@ -31,6 +31,13 @@ body {
   touch-action: none;
 }
 
+/* Aucune fenêtre du DMD de VPX dans cette partie : la place que le DMD prendra, en points de DMD. */
+.dmd-frame.preview {
+  background:
+    radial-gradient(circle, var(--signal-haze) 0 34%, transparent 38%) 0 0 / 12px 12px,
+    var(--scrim);
+}
+
 .dmd-frame.away {
   opacity: 0;
 }

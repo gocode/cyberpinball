@@ -26,7 +26,8 @@
 //   Pause, Resume, Quit, Help (rappel des touches, lignes séparées par « · »), ResumeHint : les libellés ;
 //   Order : les rendus du fronton à cadrer, dans l'ordre ; PupRatio : la forme du fronton de PuP ;
 //   Zone : la partie visible du fronton (fronton-vr.ts) ; LogFile, CaptureDir : mesures et captures ;
-//   RoomDmd : la source publiée pour le cadre DMD de la pièce VR de la table (PUP, image, ou aucune).
+//   RoomDmd : la source publiée pour le cadre DMD de la pièce VR de la table (PUP, image, ou aucune) ;
+//   TimerGuard : la garde de la minuterie de Windows (minuterie.h), 1 par défaut.
 
 #define _CRT_SECURE_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
@@ -45,6 +46,7 @@
 #include "MsgPlugin.h"
 #include "VPXPlugin.h"
 #include "pause.h"
+#include "minuterie.h"
 
 using namespace cyberpinball;
 
@@ -87,6 +89,13 @@ MSGPI_STRING_VAL_SETTING(aideCaler, "CalibrateHelp", "Calibrate help", "Keys rem
 MSGPI_STRING_VAL_SETTING(libelleCale, "CalibratedLabel", "Calibrated label", "Shown once the table was aligned", true, "Table aligned", 64);
 MSGPI_INT_VAL_SETTING(hauteurCalage, "CalibrateHeight", "Calibrate height steps", "Centimetres to move the table up (negative: down) after aligning it on the controllers", true, -60, 60, 0);
 MSGPI_INT_VAL_SETTING(calageActif, "Calibrate", "Calibrate", "1 when Cyber Pinball bound the keys of the calibration (F13, F14, F15)", true, 0, 1, 0);
+// Minuterie de Windows (minuterie.h) : 1, ses demandes comptent toujours (défaut) ; 0, Windows décide ; 2, ignorées
+// d'office, ce que Windows fait à un processus sans fenêtre visible (essais, sur un Windows à minuterie par processus).
+MSGPI_INT_VAL_SETTING(gardeMinuterie, "TimerGuard", "Timer guard", "1: Windows always honors the timer resolution VPX asks for, even with no visible window; 0: Windows decides; 2: always ignored (test bench)", true, 0, 2, 1);
+// Essai de cadence, une partie d'une minute qui fait la preuve sur une borne : sans garde, puis à 20 s la capture
+// d'avant le 13 novembre 2026 (PrintWindow sur la plus grande fenêtre de VPX, cachée en VR), puis à 40 s la garde.
+// Les mesures disent la cadence et la minuterie de chaque phase ; Cyber Pinball en tire la conclusion au journal.
+MSGPI_INT_VAL_SETTING(essaiCadence, "CadenceTest", "Cadence test", "1: one-minute test of the frame rate cap (no timer guard, old hidden-window capture at 20 s, timer guard at 40 s)", true, 0, 1, 0);
 
 double maintenant()
 {
@@ -204,7 +213,8 @@ int MSGPIAPI veiller(VPXRenderContext2D* ctx, void*)
 // le plugin écrit ce qu'il mesure dans [Plugin.CyberPinball] LogFile (Cyber Pinball le reporte au journal) :
 // images de VPX par seconde et plus grand écart entre deux, fois où VPX dessine le fronton, fois où PuP
 // dessine, nouvelles images de la vidéo de PuP la plus active (texture changée à la même place : PuP en
-// crée une neuve à chaque image, PUPMediaPlayer::Render), vitesse du temps de jeu, fenêtres pompées. Et il
+// crée une neuve à chaque image, PUPMediaPlayer::Render), vitesse du temps de jeu, fenêtres pompées, durée
+// réelle de Sleep(1) (minuterie.h : 1 à 2 ms, 15,6 ms quand Windows ignore la minuterie demandée par VPX). Et il
 // capture deux fois par partie la fenêtre d'aperçu VR de VPX (8 s après le début, puis au premier menu de
 // pause), sans rien montrer à l'écran (PrintWindow ; si l'image est noire, la zone de l'écran sous la
 // fenêtre), en PNG dans [Plugin.CyberPinball] CaptureDir. Lignes en ASCII « clé=valeur ».
@@ -216,8 +226,11 @@ struct Mesures
    std::map<uint64_t, std::pair<VPXTexture, int>> videos; // place dessinée -> dernière texture, changements
    bool captureDebut = false, capturePause = false;
    double menuDepuis = -1.0;
+   bool minuterieDegradee = false; // dernière mesure de Sleep(1) au-dessus de MINUTERIE_DEGRADEE_MS (dit une fois)
+   int essai = 0;                  // essai de cadence : 0 pas commencé, 1 sans garde, 2 capture faite, 3 garde posée, 4 fini
 };
 Mesures mesures;
+SondeMinuterie sondeMinuterie;
 
 /**
  * Remplissage de chaque cadre à sa dernière image (part de sa zone visible couverte par la source, -1 : rien
@@ -263,6 +276,38 @@ void noterVideo(VPXTexture tex, float x, float y, float w, float h)
    }
 }
 
+/** La garde de la minuterie de Windows, selon [Plugin.CyberPinball] TimerGuard ; dit au journal. */
+void garderMinuterie(const char* quand)
+{
+   // L'essai de cadence commence sans garde : Windows décide, comme avant le 13 novembre 2026.
+   const int mode = essaiCadence_Val ? 0 : static_cast<int>(gardeMinuterie_Val);
+   const Minuterie m = mode == 1 ? Minuterie::Gardee : mode == 2 ? Minuterie::Ignoree : Minuterie::Systeme;
+   const bool ok = reglerMinuterie(m);
+   char ligne[96];
+   std::snprintf(ligne, sizeof(ligne), "minuterie garde=%d quand=%s resultat=%s", mode, quand, ok ? "ok" : "refuse");
+   ecrire(ligne);
+}
+
+/**
+ * À chaque image : la minuterie vient de se dégrader (Sleep(1) ne dure plus une à deux millisecondes), ou de se
+ * rétablir ; l'instant est écrit, et la garde reposée si elle est demandée (rien d'autre : la sonde mesure sur son fil).
+ */
+void suivreMinuterie(double t)
+{
+   const double ms = sondeMinuterie.derniere();
+   if (ms < 0.0)
+      return;
+   const bool degradee = ms > MINUTERIE_DEGRADEE_MS;
+   if (degradee == mesures.minuterieDegradee)
+      return;
+   mesures.minuterieDegradee = degradee;
+   char ligne[96];
+   std::snprintf(ligne, sizeof(ligne), "minuterie etat=%s t=%.1f ms=%.1f", degradee ? "degradee" : "retablie", mesures.debut < 0.0 ? 0.0 : t - mesures.debut, ms);
+   ecrire(ligne);
+   if (degradee && gardeMinuterie_Val == 1 && !essaiCadence_Val)
+      garderMinuterie("degradee");
+}
+
 /** À chaque image : compte, et toutes les 5 s, la ligne de mesures. */
 void mesurer(double t, double jeu)
 {
@@ -283,9 +328,9 @@ void mesurer(double t, double jeu)
    for (const auto& [cle, v] : mesures.videos)
       video = std::max(video, v.second);
    char ligne[640];
-   std::snprintf(ligne, sizeof(ligne), "mesure t=%.0f vpx=%.1f ecart_ms=%.0f fronton=%.1f pup=%.1f video=%.1f jeu=%.2f pompees=%.1f zone=%s remplir_fronton=%.2f remplir_dmd=%.2f remplir_salle=%.2f",
+   std::snprintf(ligne, sizeof(ligne), "mesure t=%.0f vpx=%.1f ecart_ms=%.0f fronton=%.1f pup=%.1f video=%.1f jeu=%.2f pompees=%.1f zone=%s remplir_fronton=%.2f remplir_dmd=%.2f remplir_salle=%.2f minuterie_ms=%.1f",
       t - mesures.debut, mesures.images / duree, mesures.ecartMax * 1000.0, mesures.frontons / duree, mesures.pup / duree, video / duree, (jeu - mesures.jeu0) / duree, mesures.pompees / duree,
-      zoneFronton_Val, remplissage.fronton, remplissage.dmd, remplissage.salle);
+      zoneFronton_Val, remplissage.fronton, remplissage.dmd, remplissage.salle, sondeMinuterie.relever());
    ecrire(ligne);
    mesures.fenetre = t;
    mesures.jeu0 = jeu;
@@ -1010,13 +1055,19 @@ void injecter(int action, bool presse)
    vpxApi->SetInputState(&etat);
 }
 
-/** Les fenêtres de VPX (SDL) de ce processus, la plus grande d'abord (le playfield, ou son aperçu en VR). */
-std::vector<HWND> fenetresVpx()
+/**
+ * Les fenêtres de VPX (SDL) de ce processus, la plus grande d'abord. `visibles` : seulement celles qui sont
+ * montrées. En VR, VPX crée ses fenêtres annexes (fronton, DMD) cachées et ne les montre jamais : la plus grande
+ * fenêtre du processus est alors l'une d'elles dès que l'aperçu est réduit, pas l'aperçu.
+ */
+std::vector<HWND> fenetresVpx(bool visibles = false)
 {
    struct Trouvees
    {
       std::vector<std::pair<long long, HWND>> l;
+      bool visibles = false;
    } t;
+   t.visibles = visibles;
    EnumWindows(
       [](HWND w, LPARAM p) -> BOOL
       {
@@ -1024,7 +1075,7 @@ std::vector<HWND> fenetresVpx()
          GetWindowThreadProcessId(w, &pid);
          wchar_t classe[64] {};
          GetClassNameW(w, classe, 64);
-         if (pid == GetCurrentProcessId() && wcsncmp(classe, L"SDL_app", 7) == 0)
+         if (pid == GetCurrentProcessId() && wcsncmp(classe, L"SDL_app", 7) == 0 && (!reinterpret_cast<Trouvees*>(p)->visibles || IsWindowVisible(w)))
          {
             RECT r {};
             GetWindowRect(w, &r);
@@ -1114,12 +1165,21 @@ bool ecrirePng(const std::wstring& chemin, int w, int h, const std::vector<uint8
    return ok;
 }
 
-/** La fenêtre d'aperçu VR de VPX, capturée à moitié de sa taille, en PNG ; rien n'est montré à l'écran. */
-void capturer(const char* nom)
+/**
+ * La fenêtre d'aperçu VR de VPX, capturée à moitié de sa taille, en PNG ; rien n'est montré à l'écran.
+ * Seulement quand l'aperçu recopie la vue du casque (fenêtre montrée, d'au moins APERCU_MIN) : réduit à un timbre
+ * (recopie éteinte, le réglage par défaut), il n'a rien à montrer, et la capture visait alors la fenêtre cachée
+ * du fronton, la plus grande du processus (13 novembre 2026 : la capture « prise sur l'écran » de chaque partie
+ * était celle de l'écran du fronton de la borne).
+ */
+constexpr int APERCU_MIN_L = 640, APERCU_MIN_H = 360;
+
+void capturer(const char* nom, bool commeAvant = false)
 {
    if (!dossierCaptures_Val[0])
       return;
-   const std::vector<HWND> fenetres = fenetresVpx();
+   // `commeAvant` (essai de cadence) : la plus grande fenêtre, même cachée, quelle que soit sa taille.
+   const std::vector<HWND> fenetres = fenetresVpx(!commeAvant);
    if (fenetres.empty())
    {
       ecrire(std::string("capture nom=") + nom + " resultat=aucune_fenetre");
@@ -1131,6 +1191,13 @@ void capturer(const char* nom)
    const int L2 = rc.right - rc.left, H2 = rc.bottom - rc.top;
    if (L2 < 4 || H2 < 4)
       return;
+   if (!commeAvant && (L2 < APERCU_MIN_L || H2 < APERCU_MIN_H))
+   {
+      char reduit[96];
+      std::snprintf(reduit, sizeof(reduit), "capture nom=%s taille=%dx%d resultat=apercu_reduit", nom, L2, H2);
+      ecrire(reduit);
+      return;
+   }
    HDC dcFenetre = GetDC(w);
    HDC dc = CreateCompatibleDC(dcFenetre);
    HBITMAP bmp = CreateCompatibleBitmap(dcFenetre, L2, H2);
@@ -1277,6 +1344,41 @@ void capturesDuJour(double t)
       mesures.menuDepuis = -1.0;
 }
 
+/** L'essai de cadence ([Plugin.CyberPinball] CadenceTest) : ses trois phases, à 20, 40 et 60 s de partie. */
+void essayerCadence(double t)
+{
+   if (!essaiCadence_Val || mesures.debut < 0.0 || mesures.essai >= 4)
+      return;
+   const double d = t - mesures.debut;
+   const auto dire = [d](const char* etape, const char* suite)
+   {
+      char ligne[96];
+      std::snprintf(ligne, sizeof(ligne), "essai etape=%s t=%.1f%s", etape, d, suite);
+      ecrire(ligne);
+   };
+   if (mesures.essai == 0)
+   {
+      mesures.essai = 1;
+      dire("debut", "");
+   }
+   else if (mesures.essai == 1 && d >= 20.0)
+   {
+      mesures.essai = 2;
+      dire("capture", "");
+      capturer("essai", true);
+   }
+   else if (mesures.essai == 2 && d >= 40.0)
+   {
+      mesures.essai = 3;
+      dire("garde", reglerMinuterie(Minuterie::Gardee) ? " resultat=ok" : " resultat=refuse");
+   }
+   else if (mesures.essai == 3 && d >= 60.0)
+   {
+      mesures.essai = 4;
+      dire("fin", "");
+   }
+}
+
 void appliquer(const Ordre& o)
 {
    if (o.garder)
@@ -1388,6 +1490,16 @@ void MSGPIAPI onAction(const unsigned int, void*, void* data)
       std::snprintf(ligne, sizeof(ligne), "calage-clic %s=%d fiable=%d", c == Commande::CalageG ? "gauche" : "droit", ev->isPressed ? 1 : 0, pause.estFiable() ? 1 : 0);
       ecrire(ligne);
    }
+   // La sortie demandée (Échap, bouton de la borne), à son instant, et depuis quand VPX n'a plus préparé d'image :
+   // casque retiré, la session OpenXR arrêtée ne demande plus d'image et VPX 10.8.1 en attend une pour finir
+   // (player.cpp, « Flush any pending frame ») : il se fige en quittant. Cyber Pinball le dit tel quel au journal.
+   if (c == Commande::Sortie && ev->isPressed)
+   {
+      const double t = maintenant();
+      char ligne[96];
+      std::snprintf(ligne, sizeof(ligne), "sortie t=%.1f sans_image_ms=%.0f", mesures.debut < 0.0 ? 0.0 : t - mesures.debut, mesures.derniere < 0.0 ? -1.0 : (t - mesures.derniere) * 1000.0);
+      ecrire(ligne);
+   }
    if (pause.avaler(c))
       ev->enableVPXProcessing = 0;
    const Ordre o = pause.action(c, ev->isPressed != 0, maintenant(), estGachette(static_cast<int>(ev->action)));
@@ -1427,7 +1539,9 @@ void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
    avancerCalage();
    pomper(t);
    mesurer(t, jeu);
+   suivreMinuterie(t);
    capturesDuJour(t);
+   essayerCadence(t);
    if (!pause.affichee(t))
       notifiee = false;
    else if (!notifiee && t - derniereDemande > 0.3)
@@ -1467,6 +1581,8 @@ void MSGPIAPI onGameStart(const unsigned int, void*, void*)
    frontonSource.clear();
    mesures = Mesures {};
    ecrire(std::string("debut zone=") + zoneFronton_Val + " ordre=" + ordreFronton_Val + " table=" + (idTable_Val[0] ? idTable_Val : "?"));
+   garderMinuterie("debut");
+   sondeMinuterie.demarrer();
    // Réglages des écrans enregistrés pour cette table (« fronton=dx,dy,taille;dmd=… »).
    {
       const std::string tout = reglagesEcrans_Val;
@@ -1507,6 +1623,8 @@ void MSGPIAPI onGameStart(const unsigned int, void*, void*)
 void MSGPIAPI onGameEnd(const unsigned int, void*, void*)
 {
    enPartie = false;
+   sondeMinuterie.arreter();
+   reglerMinuterie(Minuterie::Systeme);
    pause.remiseAZero();
    publierSalle(false);
 }
@@ -1816,7 +1934,7 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballPluginLoad(const uint32_t sessionId, cons
       msgApi->RegisterSetting(endpointId, reglage);
    for (auto* reglage : { &reglagesEcrans, &idTable, &libelleAjuster, &libelleEcranFronton, &libelleEcranDmd, &aideChoixEcran, &aideReglage, &libelleCaler, &aideCaler, &imageCaler, &imageCalee, &libelleCale })
       msgApi->RegisterSetting(endpointId, reglage);
-   for (auto* reglage : { &hauteurCalage, &calageActif })
+   for (auto* reglage : { &hauteurCalage, &calageActif, &gardeMinuterie, &essaiCadence })
       msgApi->RegisterSetting(endpointId, reglage);
    msgApi->BroadcastMsg(endpointId, getVpxApiId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_MSG_GET_API), &vpxApi);
    msgApi->SubscribeMsg(endpointId, onGameStartId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_GAME_START), onGameStart, nullptr);
@@ -1833,6 +1951,7 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballPluginLoad(const uint32_t sessionId, cons
 MSGPI_EXPORT void MSGPIAPI CyberPinballPluginUnload()
 {
    enPartie = false;
+   sondeMinuterie.arreter();
    publierSalle(false);
    msgApi->UnsubscribeMsg(getDisplaysId, onGetDisplays, nullptr);
    msgApi->UnsubscribeMsg(displaysChangedId, onDisplaysChanged, nullptr);

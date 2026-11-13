@@ -11,10 +11,12 @@ import {
   dmdMenuFrame,
   dmdMenuKey,
   dmdMenuPanel,
+  dmdParkedRect,
   dmdPlaceOf,
   dmdPlaceSettings,
   dmdSpotOfRect,
   dmdSpotRect,
+  dmdWindowHidden,
   markDmdSaved,
   readDmdPlaces,
   saveDmdPlaces,
@@ -27,6 +29,7 @@ import {
 import { IniDocument } from '../ini';
 import { zoneRect } from '../zones';
 import { devPcDisplays } from './fixtures';
+import { REPO_ROOT } from './i18n-scan';
 
 // Écrans du PC de développement : S22E450 à gauche (-1920), l'écran intégré (0), PLX2283HSU à droite (1920).
 const displays = devPcDisplays();
@@ -85,8 +88,45 @@ test('[ScoreView] de la table : une fenêtre à sa place, seuls les points du DM
     ScoreViewHeight: '128',
     'Priority.B2S': '0',
   });
-  assert.equal(dmdPlaceSettings({ ...place, hidden: true }, displays[0]!, 'name').ScoreViewOutput, '0');
   assert.equal(dmdPlaceSettings(place, displays[0]!, 'name').ScoreViewDisplay, 'S22E450');
+});
+
+test('DMD masqué : VPX ouvre quand même sa fenêtre, à sa place, pour la réafficher en partie', () => {
+  // Avec Output = 0, VPX n'ouvre aucune fenêtre : « DMD : affiché » en partie ne montrait rien
+  // jusqu'au redémarrage de la table (13/11/2026).
+  const keys = dmdPlaceSettings({ screen: 'fp1', zone: band, hidden: true, at: '' }, displays[0]!, 'name');
+  assert.equal(keys.ScoreViewOutput, '1', 'jamais 0 : la fenêtre doit exister');
+  assert.equal(keys.ScoreViewFullScreen, '0');
+  // À sa vraie taille : ScoreView choisit sa mise en page sur la fenêtre à son premier rendu.
+  assert.deepEqual([keys.ScoreViewWndX, keys.ScoreViewWndY, keys.ScoreViewWidth, keys.ScoreViewHeight], ['704', '476', '512', '128']);
+  // Aucune place, masquée ou non, n'éteint la fenêtre.
+  for (const hidden of [false, true]) for (const zone of [band, { x: 0, y: 0, width: 1, height: 1 }]) assert.equal(dmdPlaceSettings({ screen: 'fp1', zone, hidden, at: '' }, displays[0]!, 'name').ScoreViewOutput, '1');
+  // Un .ini écrit par une version d'avant (Output = 0) est réécrit à la partie suivante.
+  const old = { ...keys, ScoreViewOutput: '0' };
+  const update = dmdIniUpdate(['[ScoreView]', ...Object.entries(old).map(([k, v]) => `${k} = ${v}`), ''].join('\n'), keys, old);
+  assert.equal(IniDocument.parse(update.content!).get('ScoreView', 'ScoreViewOutput'), '1');
+});
+
+test('DMD masqué en partie : fenêtre rangée hors de tout écran, jamais cachée (VPX la remontrerait)', () => {
+  const desk = displays.map((d) => d.bounds);
+  const parked = dmdParkedRect(desk, { width: 512, height: 128 });
+  assert.deepEqual([parked.width, parked.height], [512, 128], 'à sa taille : la réafficher ne la redimensionne pas');
+  assert.ok(dmdWindowHidden(desk, parked), 'sur aucun écran');
+  assert.equal(dmdSpotOfRect(host().screens, parked), undefined, 'aucune place lue sur une fenêtre rangée');
+  // Une vraie place, même au bord d'un écran, n'est pas masquée.
+  assert.ok(!dmdWindowHidden(desk, dmdSpotRect(host(), { screen: 0, zone: band, hidden: false })));
+  assert.ok(!dmdWindowHidden(desk, dmdSpotRect(host(), { screen: 0, zone: { x: 0, y: 0.9, width: 1, height: 0.1 }, hidden: false })));
+  // Un écran à gauche de tout (coordonnées négatives) : rangée encore plus à gauche.
+  assert.ok(dmdParkedRect([{ x: -3840, y: -200, width: 3840, height: 2160 }, ...desk], { width: 1, height: 1 }).x < -3840);
+});
+
+test('cadre du DMD : un aperçu quand VPX n’a pas de fenêtre pour le DMD dans cette partie', () => {
+  const s = startDmdMenu({ screen: 0, zone: band, hidden: false });
+  assert.equal(dmdMenuFrame(host(), s, 0)?.preview, false, 'le vrai DMD est sous le cadre');
+  const none = host({ live: 'pas de fenêtre' });
+  assert.equal(dmdMenuFrame(none, s, 0)?.preview, true);
+  s.spot.hidden = true;
+  assert.equal(dmdMenuFrame(none, s, 0)?.preview, false, 'masqué : pas d’aperçu');
 });
 
 test('.ini de la table : la place écrite, puis retirée sans toucher à ce que VPX a changé', () => {
@@ -305,4 +345,15 @@ test('menu en partie : « Recentrer la vue 3D » seulement avec la Vision 3D, gr
   assert.equal(press(quiet, q, 'Digit1'), 'handled');
   assert.equal(q.notice, 'aucune tête');
   assert.equal(dmdMenuPanel(quiet, q, (c) => c[0]!).sections.find((x) => x.title === 'Partie')!.items[0]!.disabled, 'aucune tête');
+});
+
+test('fenêtres annexes de VPX : jamais cachées par ShowWindow, rangées hors des écrans', () => {
+  // VPX 10.8.1 remontre à chaque image une fenêtre annexe cachée (Renderer::RenderAncillaryWindow) :
+  // « DMD : masqué » en partie ne tenait pas. Le menu en partie range la fenêtre, il ne la cache pas.
+  const source = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'in-game-menu.ts'), 'utf8');
+  assert.ok(!/\bhideWindow\s*\(/.test(source), 'in-game-menu.ts ne cache aucune fenêtre de VPX');
+  assert.ok(/dmdParkedRect\s*\(/.test(source), 'le DMD masqué est rangé hors des écrans');
+  // Guetté dès le lancement de VPX, pas seulement quand la table est à l'écran (elle s'y montrerait).
+  const frontend = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  assert.ok(/launchVpx\([\s\S]{0,1500}?inGameMenu\.watchHiddenDmd\(/.test(frontend), 'watchHiddenDmd juste après launchVpx');
 });

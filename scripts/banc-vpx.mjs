@@ -4,7 +4,16 @@
 // plugin sans le vrai Link. À lancer par scripts/banc-vpx.ps1, sur le bureau caché : VPX y ouvre sa fenêtre
 // d'aperçu, que personne ne voit.
 //   node scripts/banc-vpx.mjs --vpx <dossier de VPX 10.8.1> --table <fichier.vpx> [--scenario <fichier>] [--duree <ms>]
-// Construit d'abord : npm run casque-vr (runtime factice), node scripts/vision3d.mjs (plugin).
+// Cadence de VPX (13 novembre 2026, palier à 28 images par seconde sur une borne) :
+//   --scenario repos     casque porté, aucun geste : la cadence seule
+//   --cadence exacte     runtime factice dont l'attente d'une image ne dépend pas de la minuterie de Windows
+//                        (packages/vpx-vision3d/test/runtime-cadence.cpp), comme un vrai runtime
+//   --garde 0|1|2        [Plugin.CyberPinball] TimerGuard : 1 la garde de la minuterie (défaut du plugin), 0 Windows
+//                        décide, 2 minuterie ignorée d'office (ce que Windows fait à un processus sans fenêtre visible)
+//   --plugin 0           partie sans le plugin de Cyber Pinball ; --captures 0 : sans ses captures
+//   --essai 1            [Plugin.CyberPinball] CadenceTest : l'essai de cadence d'une minute (--duree 70000)
+// La cadence est lue dans les mesures du plugin et, sans lui, dans la trace du runtime (cadenceDeLaTrace).
+// Construit d'abord : npm run casque-vr (runtime factice), node scripts/vision3d.mjs (plugin, runtime à cadence exacte).
 // VPX est copié une fois dans le dossier temporaire (jamais de jonction vers l'original) ; le plugin construit y
 // remplace celui de la copie à chaque passage.
 
@@ -17,6 +26,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const BANC_RUNTIME = path.join(repo, 'build', 'casque-vr', 'Release', 'runtime-factice.dll');
 export const BANC_PLUGIN = path.join(repo, 'build', 'vision3d', 'Release', 'plugin-cyberpinball64.dll');
+export const BANC_RUNTIME_CADENCE = path.join(repo, 'build', 'vision3d', 'Release', 'runtime-cadence.dll');
 const VPX_EXE = 'VPinballX_BGFX64.exe';
 
 /** Le geste du calage en partie : les deux clics des joysticks tenus 4 s, gâchette, puis A. */
@@ -35,6 +45,23 @@ export const SCENARIO_CALAGE = [
   '15000 bouton /user/hand/right/input/a/click 1',
   '15200 bouton /user/hand/right/input/a/click 0',
 ].join('\n');
+
+/** Casque porté, manettes posées, aucun geste : pour mesurer la cadence de VPX. */
+export const SCENARIO_REPOS = ['0 porte 1', '0 limite fixe', '0 tete 0 1.6 0 0', '0 manette gauche -0.3 1.02 -0.35', '0 manette droite 0.3 1.02 -0.35'].join('\n');
+
+/**
+ * Images par seconde d'après la trace du runtime (« <ms> <pid> image <n> … », une ligne toutes les 360 images),
+ * par tranche : la cadence de VPX sans rien demander au plugin.
+ */
+export function cadenceDeLaTrace(trace) {
+  const points = [...trace.matchAll(/^(\d+) \d+ image (\d+)/gm)].map((m) => ({ ms: Number(m[1]), n: Number(m[2]) }));
+  const out = [];
+  for (let i = 1; i < points.length; i++) {
+    const d = points[i].ms - points[i - 1].ms;
+    if (d > 0) out.push({ deMs: points[i - 1].ms, aMs: points[i].ms, images: ((points[i].n - points[i - 1].n) * 1000) / d });
+  }
+  return out;
+}
 
 function args(argv) {
   const out = {};
@@ -60,7 +87,7 @@ function copieVpx(source) {
 }
 
 /** L'INI d'une partie dans le casque, comme Cyber Pinball l'écrit (vr.ts, manettes.ts, frontend.ts). */
-async function iniPartie(dir, imageCalage) {
+async function iniPartie(dir, imageCalage, { garde, plugin = true, captures = true, essai = false } = {}) {
   const core = await import(pathToFileURL(path.join(repo, 'packages', 'core', 'dist', 'index.js')).href);
   const log = path.join(dir, 'casque-vpx.txt');
   const settings = [
@@ -68,7 +95,9 @@ async function iniPartie(dir, imageCalage) {
     { section: 'PlayerVR', key: 'ControllerLockbarScale', value: '1' },
     { section: 'PlayerVR', key: 'ControllerCabYOffset', value: '0' },
     { section: 'Player', key: 'VRPreview', value: '0' },
-    { section: 'Plugin.CyberPinball', key: 'Enable', value: '1' },
+    { section: 'Plugin.CyberPinball', key: 'Enable', value: plugin ? '1' : '0' },
+    ...(garde === undefined ? [] : [{ section: 'Plugin.CyberPinball', key: 'TimerGuard', value: String(garde) }]),
+    ...(essai ? [{ section: 'Plugin.CyberPinball', key: 'CadenceTest', value: '1' }] : []),
     { section: 'Plugin.CyberPinball', key: 'LogFile', value: log },
     { section: 'Plugin.CyberPinball', key: 'Calibrate', value: '1' },
     { section: 'Plugin.CyberPinball', key: 'CalibrateHeight', value: '0' },
@@ -76,7 +105,7 @@ async function iniPartie(dir, imageCalage) {
     // Le schéma des manettes sous « Caler la borne » (image faite par Cyber Pinball), et la capture de l'étape.
     { section: 'Plugin.CyberPinball', key: 'CalibrateImage', value: imageCalage ?? '' },
     { section: 'Plugin.CyberPinball', key: 'CalibratedImage', value: imageCalage ? imageCalage.replace(/pause-image\.png$/, 'pause-image-calee.png') : '' },
-    { section: 'Plugin.CyberPinball', key: 'CaptureDir', value: dir },
+    { section: 'Plugin.CyberPinball', key: 'CaptureDir', value: captures ? dir : '' },
     ...core.vpxHeadsetInput(''),
   ];
   const ini = path.join(dir, 'VPinballX.ini');
@@ -86,14 +115,15 @@ async function iniPartie(dir, imageCalage) {
   return { ini, log };
 }
 
-export async function jouerVpx({ vpx, table, scenario = SCENARIO_CALAGE, dureeMs = 40000, imageCalage }) {
-  if (!fs.existsSync(BANC_RUNTIME)) throw new Error('Runtime factice absent : npm run casque-vr.');
+export async function jouerVpx({ vpx, table, scenario = SCENARIO_CALAGE, dureeMs = 40000, imageCalage, garde, plugin = true, captures = true, cadenceExacte = false, essai = false }) {
+  const runtime = cadenceExacte ? BANC_RUNTIME_CADENCE : BANC_RUNTIME;
+  if (!fs.existsSync(runtime)) throw new Error(cadenceExacte ? 'Runtime à cadence exacte absent : node scripts/vision3d.mjs.' : 'Runtime factice absent : npm run casque-vr.');
   if (!fs.existsSync(BANC_PLUGIN)) throw new Error('Plugin absent : node scripts/vision3d.mjs.');
   const copie = copieVpx(vpx);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-vpx-'));
-  const { ini, log } = await iniPartie(dir, imageCalage);
+  const { ini, log } = await iniPartie(dir, imageCalage, { garde, plugin, captures, essai });
   const manifeste = path.join(dir, 'runtime.json');
-  fs.writeFileSync(manifeste, JSON.stringify({ file_format_version: '1.0.0', runtime: { name: 'Banc Cyber Pinball', library_path: BANC_RUNTIME } }, null, 2));
+  fs.writeFileSync(manifeste, JSON.stringify({ file_format_version: '1.0.0', runtime: { name: 'Banc Cyber Pinball', library_path: runtime } }, null, 2));
   const scenarioFile = path.join(dir, 'scenario.txt');
   const traceFile = path.join(dir, 'trace.txt');
   fs.writeFileSync(scenarioFile, scenario.trim() + '\n');
@@ -133,8 +163,20 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error('node scripts/banc-vpx.mjs --vpx <dossier de VPX> --table <fichier.vpx> [--scenario <fichier>] [--duree <ms>]');
     process.exit(2);
   }
-  const r = await jouerVpx({ vpx: a.vpx, table: a.table, scenario: a.scenario ? fs.readFileSync(a.scenario, 'utf8') : undefined, dureeMs: a.duree ? Number(a.duree) : undefined, imageCalage: a['image-calage'] });
+  const r = await jouerVpx({
+    vpx: a.vpx,
+    table: a.table,
+    scenario: a.scenario === 'repos' ? SCENARIO_REPOS : a.scenario ? fs.readFileSync(a.scenario, 'utf8') : undefined,
+    dureeMs: a.duree ? Number(a.duree) : undefined,
+    imageCalage: a['image-calage'],
+    garde: a.garde === undefined ? undefined : Number(a.garde),
+    plugin: a.plugin !== '0',
+    captures: a.captures !== '0',
+    cadenceExacte: a.cadence === 'exacte',
+    essai: a.essai === '1',
+  });
   console.log(`Dossier : ${r.dir}\nSortie de VPX : ${r.code}\nJournal de VPX : ${r.vpxLogFile ?? '(introuvable)'}`);
+  console.log('--- cadence (trace du runtime) ---\n' + cadenceDeLaTrace(r.trace).map((c) => `${(c.deMs / 1000).toFixed(1)} s à ${(c.aMs / 1000).toFixed(1)} s : ${c.images.toFixed(1)} images/s`).join('\n'));
   console.log('--- plugin (casque-vpx.txt) ---\n' + r.plugin);
   console.log('--- runtime (trace) ---\n' + r.trace.split('\n').filter((l) => !/ image /.test(l)).slice(0, 200).join('\n'));
   console.log('--- VPX (extraits) ---\n' + r.vpxLog.split('\n').filter((l) => /OpenXR|XR|binding|Plugin|CyberPinball|Input|ERROR|WARN/i.test(l)).slice(0, 120).join('\n'));

@@ -121,6 +121,12 @@ import {
   vrGraphicsProfile,
   cachedVrBackglassView,
   FULL_BACKGLASS_ZONE,
+  describeVrCadence,
+  describeVrCadenceTest,
+  parseVrCadence,
+  vrCadenceCapped,
+  vrCadenceTest,
+  vrQuitWithoutHeadset,
   parseVrMeasures,
   lastVrMeasuresBlock,
   airLinkOverWifi,
@@ -4160,13 +4166,22 @@ function noteVrMeasures(late = false): void {
     return;
   }
   const f = (v: number, d = 1) => v.toFixed(d).replace('.', ',');
+  // La cadence : palier (VPX bridé à une cadence fixe) et minuterie de Windows, dits avant le verdict.
+  const cadence = parseVrCadence(block.text, lastLinkNetwork?.hz ?? 72);
+  const capped = vrCadenceCapped(cadence);
+  if (cadence) for (const line of describeVrCadence(cadence)) (capped ? console.warn : console.log)(`Casque, cadence de VPX${when} : ${line}.`); // i18n-ignore : journal
+  const cadenceTest = vrCadenceTest(block.text, cadence);
+  if (cadenceTest) console.log(`Casque, essai de cadence${when} : ${describeVrCadenceTest(cadenceTest)}.`); // i18n-ignore : journal
+  // Sortie demandée casque retiré : VPX se fige en quittant (il attend une image que le casque ne demande plus).
+  const quit = vrQuitWithoutHeadset(block.text);
+  if (quit) console.log(`Casque, sortie${when} : demandée à ${Math.round(quit.at)} s de partie, casque retiré (VPX sans image depuis ${f(quit.idleMs / 1000)} s) ; VPX attend alors une image que le casque ne demande plus et se fige en quittant, jusqu’à ce que Cyber Pinball le ferme : la partie était finie, ce n’est pas un plantage en jeu.`); // i18n-ignore : journal
   if (m.samples && !late) {
     const verdict = fluidityVerdict(lastLinkNetwork, m.vpx.mean);
     const pct = lastLinkNetwork ? `${(lastLinkNetwork.lostShare * 100).toFixed(1).replace('.', ',')} %` : '';
     const fps = m.vpx.mean.toFixed(1).replace('.', ',');
     if (verdict === 'network') console.log(`Casque, verdict : réseau en cause (${pct} d'images perdues par Link alors que VPX tient sa cadence, ${fps} images/s)${airLinkOverWifi(lastLinkNetwork?.transport, pcNetwork) ? ' ; Air Link sur un PC en Wi-Fi : reliez le PC au routeur par un câble Ethernet, ou passez au câble USB Link' : ''}.`); // i18n-ignore : journal
-    else if (verdict === 'render') console.log(`Casque, verdict : rendu en cause (VPX à ${fps} images/s, sous la cadence du casque ; Link perd ${pct} des images).`); // i18n-ignore : journal
-    else if (verdict === 'both') console.log(`Casque, verdict : réseau et rendu en cause (${pct} d'images perdues par Link, VPX à ${fps} images/s).`); // i18n-ignore : journal
+    else if (verdict === 'render') console.log(`Casque, verdict : ${capped ? 'VPX bridé' : 'rendu en cause'} (VPX à ${fps} images/s, sous la cadence du casque ; Link perd ${pct} des images).`); // i18n-ignore : journal
+    else if (verdict === 'both') console.log(`Casque, verdict : réseau et ${capped ? 'bridage de VPX' : 'rendu'} en cause (${pct} d'images perdues par Link, VPX à ${fps} images/s).`); // i18n-ignore : journal
     else if (verdict === 'ok') console.log(`Casque, verdict : fluide (VPX ${fps} images/s, ${pct} d'images perdues par Link).`); // i18n-ignore : journal
   }
   if (m.samples)
@@ -4183,7 +4198,7 @@ function noteVrMeasures(late = false): void {
         .sort()
     : [];
   for (const c of m.captures)
-    console.log(`Casque, capture de l'aperçu VR${when} (${c.name === 'pause' ? 'au menu de pause' : '8 s après le début'}) : ${c.ok ? `prise ${c.source === 'ecran' ? "sur l'écran" : 'dans la fenêtre'}, luminosité ${c.brightness}${c.brightness < 2 ? ' (noire)' : ''}, ${shots.filter((x) => x.endsWith(`-${c.name}.png`)).pop() ?? '?'}` : 'échec'}.`); // i18n-ignore : journal
+    console.log(`Casque, capture de l'aperçu VR${when} (${c.name === 'pause' ? 'au menu de pause' : c.name === 'essai' ? 'essai de cadence, fenêtre cachée' : '8 s après le début'}) : ${c.ok ? `prise ${c.source === 'ecran' ? "sur l'écran" : 'dans la fenêtre'}, luminosité ${c.brightness}${c.brightness < 2 ? ' (noire)' : ''}, ${shots.filter((x) => x.endsWith(`-${c.name}.png`)).pop() ?? '?'}` : c.reason === 'apercu_reduit' ? 'pas prise (aperçu réduit à un timbre : la recopie sur l’écran du plateau est éteinte)' : 'échec'}.`); // i18n-ignore : journal
 }
 
 /** Profil graphique appliqué à la partie dans le casque en cours (vr-profil.ts), dit au relevé de Link. */
@@ -4672,6 +4687,8 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
         { section: 'Plugin.CyberPinball', key: 'Zone', value: zoneSetting(zone) },
         { section: 'Plugin.CyberPinball', key: 'LogFile', value: vrMeasuresFile() },
         { section: 'Plugin.CyberPinball', key: 'CaptureDir', value: vrCapturesDir() },
+        // Essai de cadence (vr-cadence.ts) : une partie d'une minute qui fait la preuve du bridage sur la borne.
+        ...(process.env.CYBERPINBALL_ESSAI_CADENCE === '1' ? [{ section: 'Plugin.CyberPinball', key: 'CadenceTest', value: '1' }] : []),
       ]);
       if (view) details.push(describeBackglassView(view)); // i18n-ignore : journal
       const missing = missingVrSources(sources.sources);
@@ -6287,6 +6304,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}) })
       : launchVpx({ exe: install.exe, ini: vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onVr, onPlaying, onForeground, onWindows });
+  // DMD masqué pour cette table : sa fenêtre rangée hors des écrans avant même de paraître (in-game-menu.ts).
+  if (configuration && simulated === undefined) inGameMenu.watchHiddenDmd({ pid: game.pid, table, cabinet: configuration, displays: observedDisplays(), dataDir: loc.dataDir });
   if (launch) {
     launch.stop = () => game.stop();
     launchStep('launched');

@@ -14,6 +14,15 @@ $('panel-icon').append(cyberIcon('dmd'));
 /** Dernier état reçu. */
 let state;
 
+/**
+ * Où est l'écran dans cette page, en pixels CSS (in-game-menu.ts, screenBox) : la fenêtre le couvre
+ * d'ordinaire exactement, mais le cadre du DMD se pose sur l'écran même quand Windows l'a placée ou
+ * taillée autrement (13/11/2026 : cadre qui n'atteignait pas le bas de l'écran du DMD).
+ */
+function box() {
+  return state?.box ?? { x: 0, y: 0, width: innerWidth, height: innerHeight };
+}
+
 function act(action) {
   window.cyberInGame.act(action);
 }
@@ -25,15 +34,18 @@ function renderFrame(f) {
   frame.classList.toggle('away', !f);
   if (!f) return;
   frame.classList.toggle('hidden-dmd', Boolean(f.hidden));
-  frame.style.left = `${f.zone.x * 100}%`;
-  frame.style.top = `${f.zone.y * 100}%`;
-  frame.style.width = `${f.zone.width * 100}%`;
-  frame.style.height = `${f.zone.height * 100}%`;
+  // Aucune fenêtre du DMD de VPX dans cette partie : le cadre montre un aperçu de ce qui le remplira.
+  frame.classList.toggle('preview', Boolean(f.preview));
+  const b = box();
+  frame.style.left = `${b.x + f.zone.x * b.width}px`;
+  frame.style.top = `${b.y + f.zone.y * b.height}px`;
+  frame.style.width = `${f.zone.width * b.width}px`;
+  frame.style.height = `${f.zone.height * b.height}px`;
   const label = $('frame-label');
   label.textContent = f.label;
   // Étiquette sous le cadre ; dessus quand la place manque en bas ; dedans quand le DMD prend tout
   // l'écran en hauteur (la bande DMD d'une borne).
-  const need = (label.offsetHeight + 16) / innerHeight;
+  const need = (label.offsetHeight + 16) / b.height;
   const below = 1 - (f.zone.y + f.zone.height);
   frame.dataset.label = below >= need ? 'below' : f.zone.y >= need ? 'above' : 'inside';
 }
@@ -133,15 +145,16 @@ function renderPanel(s) {
   zoneBox.hidden = !s.panel;
   if (!s.panel) return;
   const p = s.panel;
-  zoneBox.style.left = `${s.zone.x * 100}%`;
-  zoneBox.style.top = `${s.zone.y * 100}%`;
-  zoneBox.style.width = `${s.zone.width * 100}%`;
-  zoneBox.style.height = `${s.zone.height * 100}%`;
+  const b = box();
+  zoneBox.style.left = `${b.x + s.zone.x * b.width}px`;
+  zoneBox.style.top = `${b.y + s.zone.y * b.height}px`;
+  zoneBox.style.width = `${s.zone.width * b.width}px`;
+  zoneBox.style.height = `${s.zone.height * b.height}px`;
   // Cadre vu du joueur : couché quand le plateau l'est.
   const r = ((s.rotation % 360) + 360) % 360;
   const quarter = r === 90 || r === 270;
-  const w = s.zone.width * innerWidth;
-  const h = s.zone.height * innerHeight;
+  const w = s.zone.width * b.width;
+  const h = s.zone.height * b.height;
   turn.style.setProperty('--w', `${quarter ? h : w}px`);
   turn.style.setProperty('--h', `${quarter ? w : h}px`);
   turn.style.setProperty('--turn', `${r}deg`);
@@ -206,7 +219,7 @@ window.cyberInGame.onState((s) => {
 
 // Le DMD tiré à la souris. Le rectangle part toujours de celui du début du geste ; le processus
 // principal le ramène dans l'écran, au format verrouillé, et l'aimante (sauf Alt). Le pointeur est
-// aussi donné en fractions de cette fenêtre, hors de 0..1 quand il l'a quittée : tiré hors de son
+// aussi donné en fractions de cet écran, hors de 0..1 quand il l'a quitté : tiré hors de son
 // écran, le DMD passe sur l'écran visé (planDrag, packages/core/src/zones.ts).
 let drag;
 let pending;
@@ -233,11 +246,13 @@ document.addEventListener('pointermove', (event) => {
   const w = h === 'move' ? width : h === 'nw' || h === 'sw' ? width - dx : width + dx;
   const hh = h === 'move' ? height : h === 'nw' || h === 'ne' ? height - dy : height + dy;
   const first = !pending;
+  // En fractions de l'écran (pas de la fenêtre) : celles que le processus principal attend.
+  const b = box();
   pending = {
     op: 'drag',
     handle: h,
-    rect: { x: x / innerWidth, y: y / innerHeight, width: w / innerWidth, height: hh / innerHeight },
-    pointer: { x: event.clientX / innerWidth, y: event.clientY / innerHeight },
+    rect: { x: (x - b.x) / b.width, y: (y - b.y) / b.height, width: w / b.width, height: hh / b.height },
+    pointer: { x: (event.clientX - b.x) / b.width, y: (event.clientY - b.y) / b.height },
     free: event.altKey,
   };
   if (first) {

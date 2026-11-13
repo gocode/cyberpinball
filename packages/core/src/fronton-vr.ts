@@ -518,7 +518,8 @@ export interface VrMeasures {
   video: { mean: number; min: number; max: number };
   /** Vitesse du temps de jeu (1 : temps réel). */
   gameTime: number;
-  captures: { name: string; source: string; brightness: number; ok: boolean }[];
+  /** `reason` : pourquoi la capture n'a pas été prise (« apercu_reduit » : aperçu réduit à un timbre, rien à montrer). */
+  captures: { name: string; source: string; brightness: number; ok: boolean; reason?: string }[];
   /** Ce que le plugin a dessiné en dernier : la source du fronton et celle du DMD (« sources fronton=… dmd=… »). */
   drawn?: { backglass: string; dmd: string; scores?: string };
   /** Ce que le plugin a dessiné en dernier dans le cadre DMD de la pièce VR (« PUP », « image », « aucune »). */
@@ -552,7 +553,7 @@ export function parseVrMeasures(text: string): VrMeasures | undefined {
     .split(/\r?\n/)
     .filter((l) => l.startsWith('capture '))
     .map(values)
-    .map((v) => ({ name: v.nom ?? '?', source: v.source ?? '?', brightness: Number(v.luminosite ?? 0), ok: v.resultat === 'ok' }));
+    .map((v) => ({ name: v.nom ?? '?', source: v.source ?? '?', brightness: Number(v.luminosite ?? 0), ok: v.resultat === 'ok', ...(v.resultat && v.resultat !== 'ok' && v.resultat !== 'echec' && { reason: v.resultat }) }));
   const last = text
     .split(/\r?\n/)
     .filter((l) => l.startsWith('sources '))

@@ -32,3 +32,11 @@ target_link_libraries(cyberpinball PRIVATE version)
 # Banc de la pause (logique, sans VPX ni casque).
 add_executable(banc-pause test/banc-pause.cpp)
 target_include_directories(banc-pause PRIVATE src)
+
+# Runtime OpenXR factice à cadence exacte (test/runtime-cadence.cpp) : celui du compagnon, dont l'attente d'une
+# image ne dépend plus de la minuterie de Windows. Pour le banc de VPX (scripts/banc-vpx.mjs --cadence exacte).
+add_library(runtime-cadence SHARED test/runtime-cadence.cpp)
+target_include_directories(runtime-cadence PRIVATE ../casque-vr/third_party)
+target_compile_options(runtime-cadence PRIVATE /wd4505) # la fonction d'attente remplace Sleep : une seule fois utilisée
+target_link_libraries(runtime-cadence PRIVATE d3d11 dxgi)
+set_target_properties(runtime-cadence PROPERTIES OUTPUT_NAME "runtime-cadence" PREFIX "")

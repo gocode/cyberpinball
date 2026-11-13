@@ -65,6 +65,8 @@ test('ni rôle confondu, ni fenêtre réduite, ni rôle sans écran : rien ne bo
   assert.deepEqual(vpxWindowMoves([scoreView], screens, [], displays), []);
   // Fenêtre réduite (GetWindowRect la met à -32000).
   assert.deepEqual(vpxWindowMoves([{ ...scoreView, minimized: true }], screens, ['dmd'], displays), []);
+  // DMD masqué pour la table : sa fenêtre rangée hors de tout écran (dmdParkedRect) y reste.
+  assert.deepEqual(vpxWindowMoves([{ ...scoreView, rect: { x: -1280 - 256, y: 0, width: 1280, height: 400 } }], screens, ['dmd'], displays), []);
   // Topper ouvert alors que la borne n'a pas de topper.
   const topper = { title: 'Visual Pinball Topper', rect: { x: 1920, y: 0, width: 800, height: 300 } };
   assert.deepEqual(vpxWindowMoves([topper], screens, ['topper'], displays), []);

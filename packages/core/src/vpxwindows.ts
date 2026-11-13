@@ -243,8 +243,9 @@ const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(ma
  * (confusableRoles) dont le centre n'est pas sur son écran (`screens`, bornes de l'écran de
  * chaque rôle). Chacune garde sa taille et sa place dans l'écran où VPX l'a ouverte (WndX, WndY
  * de VPinballX.ini sont relatifs à l'écran), sans en déborder. Une fenêtre déjà sur son écran
- * n'est jamais touchée : ce que le joueur y règle dans le menu de VPX reste. `displays` : les
- * écrans branchés, pour retrouver celui où VPX l'a ouverte.
+ * n'est jamais touchée : ce que le joueur y règle dans le menu de VPX reste, une fenêtre hors de
+ * tout écran (DMD masqué, rangé) non plus. `displays` : les écrans branchés, pour retrouver celui où
+ * VPX l'a ouverte.
  */
 export function vpxWindowMoves<W extends PlacedVpxWindow>(
   windows: readonly W[],
@@ -260,7 +261,10 @@ export function vpxWindowMoves<W extends PlacedVpxWindow>(
     const center = centerOf(window.rect);
     if (holds(target, center)) continue;
     const from = displays.find((d) => holds(d, center));
-    const offset = from ? { x: window.rect.x - from.x, y: window.rect.y - from.y } : { x: 0, y: 0 };
+    // Sur aucun écran : VPX ouvre toujours ses fenêtres dans un écran (Window.cpp) ; c'est le DMD
+    // masqué, rangé hors des écrans par Cyber Pinball (dmdParkedRect), à laisser où il est.
+    if (!from) continue;
+    const offset = { x: window.rect.x - from.x, y: window.rect.y - from.y };
     const { width, height } = window.rect;
     const to = {
       x: target.x + clamp(offset.x, 0, Math.max(0, target.width - width)),

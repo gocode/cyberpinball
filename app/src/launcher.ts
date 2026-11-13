@@ -195,9 +195,14 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
       }
 
       // Partie dans le casque : VPX 10.8.1 se fige en quittant (journal du 9 novembre 2026, trois
-      // parties sur trois, rien après la dernière image). Sa fenêtre ne répond plus depuis
-      // HUNG_KILL_MS, après que la partie a tourné un moment (un chargement long ne compte pas) :
-      // Cyber Pinball le ferme, au lieu de laisser Windows proposer « Fermer le programme ».
+      // parties sur trois, rien après la dernière image). Cause établie le 13 novembre 2026 (journal de
+      // performance d'Oculus) : la sortie demandée casque retiré. La session OpenXR arrêtée ne demande
+      // plus d'image, et VPX en attend une pour finir sa partie (player.cpp, « Flush any pending
+      // frame »), sans plus lire ses messages : il ne repart que si le casque est remis. Sa fenêtre ne
+      // répond plus depuis HUNG_KILL_MS, après que la partie a tourné un moment (un chargement long ne
+      // compte pas) : Cyber Pinball le ferme, au lieu de laisser Windows proposer « Fermer le
+      // programme ». Casque retiré sans sortie demandée, VPX lit toujours ses messages : il n'est pas
+      // fermé. Le journal de fin de partie dit le cas (vrQuitWithoutHeadset, vr-cadence.ts).
       if (player?.title === VR_PREVIEW_TITLE && playingSince && Date.now() - playingSince > HUNG_GRACE_MS && !hungKilled) {
         let hung = false;
         try {

@@ -107,14 +107,20 @@ const SECTION = 'ScoreView';
 
 /**
  * Clés [ScoreView] qui posent le DMD de la table à sa place : une fenêtre (Output = 1) sur l'écran
- * choisi, jamais plein écran, à la position et à la taille réglées ; masqué : Output = 0, VPX n'ouvre
- * pas la fenêtre. Priority.B2S = 0 : seuls les points du DMD y sont dessinés, jamais l'image
- * FullDMD du .directb2s (l'écran FullDMD garde son image autour, montrée par le fond de partie).
+ * choisi, jamais plein écran, à la position et à la taille réglées. Priority.B2S = 0 : seuls les
+ * points du DMD y sont dessinés, jamais l'image FullDMD du .directb2s (l'écran FullDMD garde son
+ * image autour, montrée par le fond de partie).
+ *
+ * Masqué : la fenêtre existe quand même (Output = 1), à sa place ; Cyber Pinball la range hors des
+ * écrans dès que VPX la crée, avant son premier affichage (in-game-menu.ts, parkHiddenDmd). Avec
+ * Output = 0, VPX n'ouvre aucune fenêtre : « DMD affiché » dans le menu en partie ne montrait rien
+ * jusqu'au redémarrage de la table (13/11/2026). À sa vraie taille, et non réduite : le plugin
+ * ScoreView choisit sa mise en page sur la taille de la fenêtre à son premier rendu.
  */
 export function dmdPlaceSettings(place: DmdPlace, display: ObservedDisplay, format: VpxDisplayIdFormat): Record<string, string> {
   const rect = zoneRect(place.zone, display.bounds);
   return {
-    ScoreViewOutput: place.hidden ? '0' : '1',
+    ScoreViewOutput: '1',
     ScoreViewDisplay: vpxDisplayId(display, format),
     ScoreViewFullScreen: '0',
     ScoreViewWndX: String(rect.x),
@@ -123,6 +129,22 @@ export function dmdPlaceSettings(place: DmdPlace, display: ObservedDisplay, form
     ScoreViewHeight: String(rect.height),
     'Priority.B2S': '0',
   };
+}
+
+/**
+ * Où ranger la fenêtre du DMD de VPX masqué : hors de tout écran, à gauche du bureau, à sa taille.
+ * Pas ShowWindow(SW_HIDE) : VPX 10.8.1 remontre à chaque image une fenêtre annexe cachée
+ * (Renderer::RenderAncillaryWindow : « if (!IsVisible()) Show() ») ; elle ne bouge pas, elle.
+ */
+export function dmdParkedRect(displays: readonly Rect[], size: { width: number; height: number }): Rect {
+  const left = displays.length ? Math.min(...displays.map((d) => d.x)) : 0;
+  const top = displays.length ? Math.min(...displays.map((d) => d.y)) : 0;
+  return { x: left - size.width - 256, y: top, width: size.width, height: size.height };
+}
+
+/** La fenêtre est rangée : le DMD ne se voit sur aucun écran. */
+export function dmdWindowHidden(displays: readonly Rect[], rect: Rect): boolean {
+  return !displays.some((d) => rect.x < d.x + d.width && rect.x + rect.width > d.x && rect.y < d.y + d.height && rect.y + rect.height > d.y);
 }
 
 export interface DmdIniUpdate {
@@ -684,6 +706,11 @@ export interface DmdMenuFrame {
   zone: ScreenZone;
   label: string;
   hidden: boolean;
+  /**
+   * Aucune fenêtre du DMD de VPX dans cette partie : le cadre se remplit d'un aperçu (points du DMD),
+   * pour voir la place qu'il prendra à la prochaine partie.
+   */
+  preview: boolean;
 }
 
 /** Cadre à dessiner sur l'écran `index`, s'il porte le DMD. */
@@ -694,6 +721,7 @@ export function dmdMenuFrame(host: DmdMenuHost, s: DmdMenuState, index: number):
     zone: s.spot.zone,
     label: s.spot.hidden ? t('DMD masqué · {width} × {height}', { width: r.width, height: r.height }) : t('DMD · {width} × {height} en {x}, {y}', { width: r.width, height: r.height, x: r.x, y: r.y }),
     hidden: s.spot.hidden,
+    preview: host.live !== true && !s.spot.hidden,
   };
 }
 

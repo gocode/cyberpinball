@@ -213,10 +213,10 @@ export const WINDOWS_CHANGES: WindowsChange[] = [
   { call: 'setDisplayOrientation', files: ['app/src/display-orientation.ts'] },
   // Appel Windows de setDisplayOrientation.
   { call: 'ChangeDisplaySettingsExW', files: ['packages/win-displays/src/orientation.ts'] },
-  // Barres des tâches masquées pendant une partie, puis seulement celles-là réaffichées ; fenêtres de l’éditeur de VPX masquées ; fenêtre du DMD de VPX masquée pendant la partie, à la demande du joueur (« Position du DMD », in-game-menu.ts). Seulement des fenêtres de VPX ou de l’Explorateur, rien d’enregistré.
-  { call: 'hideWindow', files: ['app/src/screen-guard.ts', 'app/src/launcher.ts', 'app/src/in-game-menu.ts'] },
-  // Réaffiche les barres des tâches que Cyber Pinball a masquées (taskbarsToRestore), et la fenêtre du DMD de VPX qu’il a masquée dans la même partie.
-  { call: 'showWindowInactive', files: ['app/src/screen-guard.ts', 'app/src/in-game-menu.ts'] },
+  // Barres des tâches masquées pendant une partie, puis seulement celles-là réaffichées ; fenêtres de l’éditeur de VPX masquées. Seulement des fenêtres de VPX ou de l’Explorateur, rien d’enregistré. (La fenêtre du DMD de VPX n’est jamais masquée : VPX la remontrerait ; « Position du DMD » la range hors des écrans, in-game-menu.ts.)
+  { call: 'hideWindow', files: ['app/src/screen-guard.ts', 'app/src/launcher.ts'] },
+  // Réaffiche les barres des tâches que Cyber Pinball a masquées (taskbarsToRestore).
+  { call: 'showWindowInactive', files: ['app/src/screen-guard.ts'] },
   // Borne lancée au démarrage de Windows (06/11/2026) : les barres des tâches restent masquées toute la session, rendues au bureau Windows (menu ou Ctrl+Maj+D) et à la fermeture (restoresTaskbarsAt). Si Cyber Pinball s’arrête sans les rendre, un PowerShell caché les réaffiche d’après le témoin (taskbarRescueScript) ; rien d’enregistré.
   { call: 'taskbarRescueScript', files: ['app/src/screen-guard.ts'] },
   // Barre des tâches passée devant une fenêtre du menu : rangée juste sous elle, comme l’Explorateur le fait devant une fenêtre plein écran active (taskbarguard.ts). Seulement l’ordre des fenêtres, jamais quand un autre programme a le premier plan ; l’Explorateur la remet devant à la bascule suivante, rien n’est enregistré.

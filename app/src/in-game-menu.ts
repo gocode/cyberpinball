@@ -28,10 +28,12 @@ import {
   dmdMenuFrame,
   dmdMenuKey,
   dmdMenuPanel,
+  dmdParkedRect,
   dmdPlaceOf,
   dmdPlaceSettings,
   dmdSpotOfRect,
   dmdSpotRect,
+  dmdWindowHidden,
   findTableIni,
   IniDocument,
   inGameMenuButtons,
@@ -64,10 +66,11 @@ import {
   type TableEntry,
   type VpxDisplayIdFormat,
 } from '@cyberpinball/core';
-import { bringToFront, hideWindow, keysDown, listWindows, setWindowBounds, showWindowInactive, tapKey, type WindowInfo } from '@cyberpinball/win-displays';
+import { bringToFront, keysDown, listWindows, setWindowBounds, tapKey, type WindowInfo } from '@cyberpinball/win-displays';
 import { app, ipcMain, type BrowserWindow, type Input } from 'electron';
 import { keyboardFollows } from './foreground';
 import { joystickButtonsHeld, onJoystickInput, watchJoystickButtons } from './joystick-input';
+import { keepOverlayOnScreen } from './cover-display';
 import { createWindow, OFFSCREEN, windowRect } from './offscreen';
 
 /** Titres des fenêtres de VPX 10.8.1 (Window.cpp). */
@@ -77,6 +80,9 @@ const SCORE_VIEW_TITLE = 'Visual Pinball Score View';
 const COMBO_POLL_MS = 25;
 /** VPX reprend le premier plan avant qu'on lui appuie la touche de son menu. */
 const VPX_MENU_DELAY_MS = 200;
+/** DMD masqué pour la table : sa fenêtre, guettée dès le lancement, est rangée hors des écrans. */
+const PARK_POLL_MS = 40;
+const PARK_GIVE_UP_MS = 120_000;
 
 /** La partie en cours, telle que le menu en a besoin. */
 export interface InGameContext {
@@ -107,6 +113,12 @@ export interface InGameMenu {
   arm(game: InGameContext): void;
   /** Fin de la partie : plus de guet, le menu se ferme. */
   disarm(): void;
+  /**
+   * VPX vient d'être lancé : si la table a son DMD masqué, sa fenêtre est guettée dès maintenant et
+   * rangée hors des écrans avant même son premier affichage (le menu n'est armé qu'une fois la table
+   * à l'écran).
+   */
+  watchHiddenDmd(launch: HiddenDmdLaunch): void;
   /** Essais sans opérateur : ouvre le menu comme la combinaison. */
   open(): void;
   isOpen(): boolean;
@@ -119,6 +131,16 @@ export interface InGameMenu {
   remote(): InGameRemote | undefined;
   /** Un bouton tenu au téléphone, comme celui de la borne (flippers, Start, Exit ; MagnaSave : la hauteur). */
   button(b: RemoteButton, repeat: boolean): void;
+}
+
+/** Ce que le guet du DMD masqué demande au lancement de VPX. */
+export interface HiddenDmdLaunch {
+  /** Processus de VPX ; undefined : partie simulée, rien à guetter. */
+  pid: number | undefined;
+  table: TableEntry;
+  cabinet: CabinetConfiguration;
+  displays: ObservedDisplay[];
+  dataDir: string;
 }
 
 /** Le menu ouvert, vu du téléphone. */
@@ -193,7 +215,9 @@ export function createInGameMenu(opts: {
   let stopWatch: (() => void) | undefined;
   /** Combinaison vue enfoncée : elle doit être relâchée avant de rouvrir le menu. */
   let latched = false;
-  let menu: { host: DmdMenuHost; state: DmdMenuState; windows: ScreenWindow[]; panel: number; vpx?: WindowInfo; applied: string; vpxHidden: boolean } | undefined;
+  let menu: { host: DmdMenuHost; state: DmdMenuState; windows: ScreenWindow[]; panel: number; vpx?: WindowInfo; applied: string; vpxHidden: boolean; desktop: Rect[] } | undefined;
+  /** Guet de la fenêtre du DMD de VPX, à ranger hors des écrans (DMD masqué pour la table). */
+  let parkTimer: NodeJS.Timeout | undefined;
 
   function comboCodes(cabinet: CabinetConfiguration): string[] {
     const keys = buttonKeys(cabinet.buttons);
@@ -257,10 +281,14 @@ export function createInGameMenu(opts: {
     const own = dmdPlaceOf(places, g.cabinet.id, g.table.id);
     const general = generalSpot(g.cabinet, screens);
     const vpx = vpxWindow(SCORE_VIEW_TITLE);
+    const desktop = g.displays.map((d) => d.bounds);
+    // Fenêtre du DMD rangée hors des écrans (ou encore d'un pixel) : le DMD est masqué.
+    const vpxHidden = Boolean(vpx && (!vpx.visible || dmdWindowHidden(desktop, vpx.rect)));
     // Départ : la fenêtre du DMD telle que VPX l'a ouverte, sinon la place enregistrée, sinon la générale.
     const ownSpot = own && screens.findIndex((s) => s.fingerprint === own.screen) >= 0 ? { screen: screens.findIndex((s) => s.fingerprint === own.screen), zone: own.zone, hidden: Boolean(own.hidden) } : undefined;
-    const fromVpx = vpx && dmdSpotOfRect(screens, vpx.rect, !vpx.visible);
-    const spot = fromVpx ?? ownSpot ?? general ?? { screen: 0, zone: { x: 0.3, y: 0.4, width: 0.4, height: 0.1, aspect: 4 }, hidden: false };
+    const fromVpx = vpx && !vpxHidden ? dmdSpotOfRect(screens, vpx.rect) : undefined;
+    const stored = ownSpot ?? general ?? { screen: 0, zone: { x: 0.3, y: 0.4, width: 0.4, height: 0.1, aspect: 4 }, hidden: false };
+    const spot = fromVpx ?? (vpxHidden ? { ...stored, hidden: true } : stored);
     const vpxKey = vpxMenuKeys(IniDocument.parse(readTextIfExists(g.configurationIni))).find((c) => windowsVk(c) !== undefined);
     const keys = buttonKeys(g.cabinet.buttons);
     const group = (...codes: (string | undefined)[]) => codes.filter((c): c is string => Boolean(c));
@@ -285,8 +313,8 @@ export function createInGameMenu(opts: {
     const playfield = screens.findIndex((s) => s.fingerprint === g.cabinet.roles.playfield);
     const panel = Math.max(0, playfield);
     const windows = screens.map((screen, index) => overlay(screen, index, index === panel));
-    menu = { host, state: startDmdMenu(spot), windows, panel, ...(vpx && { vpx }), applied: '', vpxHidden: Boolean(vpx && !vpx.visible) };
-    opts.log(`Réglages en partie (${g.table.id}) : menu ouvert, DMD ${vpx ? `de VPX en ${vpx.rect.width} × ${vpx.rect.height} à ${vpx.rect.x}, ${vpx.rect.y}` : 'sans fenêtre dans cette partie'}${own ? ', place de la table' : ''}.`); // i18n-ignore : journal
+    menu = { host, state: startDmdMenu(spot), windows, panel, ...(vpx && { vpx }), applied: '', vpxHidden, desktop };
+    opts.log(`Réglages en partie (${g.table.id}) : menu ouvert, DMD ${vpx ? `de VPX ${vpxHidden ? 'masqué (fenêtre rangée hors des écrans)' : `en ${vpx.rect.width} × ${vpx.rect.height} à ${vpx.rect.x}, ${vpx.rect.y}`}` : 'sans fenêtre dans cette partie'}${own ? ', place de la table' : ''}.`); // i18n-ignore : journal
   }
 
   /**
@@ -333,6 +361,9 @@ export function createInGameMenu(opts: {
         // Le premier plan de Windows : VPX le perd et se met en pause, le clavier vient ici.
         keyboardFollows(win, 'les réglages en partie s’ouvraient'); // i18n-ignore : console
       } else win.showInactive();
+      // Montré, le calque doit couvrir tout son écran : sinon reposé, et le journal dit l'écart.
+      const gap = keepOverlayOnScreen(win, windowRect(screen.bounds));
+      if (gap) opts.log(`Réglages en partie : fenêtre de l'écran ${screen.label} : ${gap}.`); // i18n-ignore : journal
       render();
     });
     if (panel) {
@@ -348,6 +379,18 @@ export function createInGameMenu(opts: {
     }
     void win.loadFile(path.join(__dirname, '..', 'renderer', 'in-game-menu.html'));
     return sw;
+  }
+
+  /**
+   * Où est l'écran dans la page de sa fenêtre (pixels CSS) : le cadre du DMD s'y dessine, à la place
+   * de l'écran même si la fenêtre ne le couvre pas exactement (keepOverlayOnScreen).
+   */
+  function screenBox(sw: ScreenWindow, screen: DmdScreen): Rect {
+    const wanted = windowRect(screen.bounds);
+    // Hors écran, la fenêtre (rendue sans bureau) est l'écran simulé lui-même.
+    if (OFFSCREEN || sw.win.isDestroyed()) return { x: 0, y: 0, width: wanted.width, height: wanted.height };
+    const content = sw.win.getContentBounds();
+    return { x: wanted.x - content.x, y: wanted.y - content.y, width: wanted.width, height: wanted.height };
   }
 
   function key(input: Input): void {
@@ -400,7 +443,10 @@ export function createInGameMenu(opts: {
     opts.log(`Réglages en partie (${game.table.id}) : DMD enregistré pour la table, ${s.spot.hidden ? 'masqué' : `${r.width} × ${r.height} à ${r.x}, ${r.y}`} (configuration ${game.cabinet.id}).`); // i18n-ignore : journal
   }
 
-  /** La fenêtre du DMD de VPX suit la place montrée. */
+  /**
+   * La fenêtre du DMD de VPX suit la place montrée ; masqué, elle est rangée hors des écrans à sa
+   * taille, prête à revenir (cachée, VPX la remontrerait à l'image suivante : dmdParkedRect).
+   */
   function applyLive(spot: DmdSpot): void {
     if (!menu?.vpx) return;
     const r = dmdSpotRect(menu.host, spot);
@@ -409,12 +455,11 @@ export function createInGameMenu(opts: {
     menu.applied = applied;
     try {
       if (spot.hidden) {
-        if (!menu.vpxHidden) hideWindow(menu.vpx);
+        if (!menu.vpxHidden) setWindowBounds(menu.vpx, dmdParkedRect(menu.desktop, r));
         menu.vpxHidden = true;
         return;
       }
       setWindowBounds(menu.vpx, r);
-      if (menu.vpxHidden) showWindowInactive(menu.vpx);
       menu.vpxHidden = false;
     } catch (error) {
       opts.log(`Réglages en partie : fenêtre du DMD de VPX pas déplacée (${(error as Error).message}).`); // i18n-ignore : journal
@@ -434,6 +479,7 @@ export function createInGameMenu(opts: {
       const zone = isPanel && place ? { x: (place.zone.x - bounds.x) / bounds.width, y: (place.zone.y - bounds.y) / bounds.height, width: place.zone.width / bounds.width, height: place.zone.height / bounds.height } : { x: 0, y: 0, width: 1, height: 1 };
       sw.win.webContents.send('in-game:state', {
         screen: sw.index,
+        box: screenBox(sw, menu.host.screens[sw.index]!),
         frame: dmdMenuFrame(menu.host, menu.state, sw.index),
         dirty: dmdMenuDirty(menu.state),
         ...(isPanel && { panel, zone, rotation: place?.rotation ?? 0 }),
@@ -502,6 +548,48 @@ export function createInGameMenu(opts: {
     return true;
   }
 
+  function stopParking(): void {
+    if (parkTimer) clearInterval(parkTimer);
+    parkTimer = undefined;
+  }
+
+  /**
+   * DMD masqué pour cette table (place enregistrée, son écran branché) : VPX ouvre quand même sa
+   * fenêtre, à sa place (dmdPlaceSettings), cachée jusqu'à son premier rendu (SDL_WINDOW_HIDDEN) ;
+   * guettée dès le lancement, elle est rangée hors des écrans à sa taille avant de paraître. Elle
+   * existe donc pendant toute la partie, et « DMD : affiché » dans le menu la ramène aussitôt, sa
+   * mise en page ScoreView déjà faite pour sa place.
+   */
+  function parkHiddenDmd(g: HiddenDmdLaunch): void {
+    stopParking();
+    if (!g.pid || OFFSCREEN) return;
+    const place = dmdPlaceOf(readDmdPlaces(g.dataDir), g.cabinet.id, g.table.id);
+    if (!place?.hidden || !menuScreens(g.cabinet, g.displays).some((s) => s.fingerprint === place.screen)) return;
+    const started = Date.now();
+    const desktop = g.displays.map((d) => d.bounds);
+    const pid = g.pid;
+    parkTimer = setInterval(() => {
+      let w: WindowInfo | undefined;
+      try {
+        w = listWindows((x) => x.pid === pid && x.title === SCORE_VIEW_TITLE)[0];
+      } catch {
+        w = undefined;
+      }
+      if (!w) {
+        if (Date.now() - started < PARK_GIVE_UP_MS) return;
+        stopParking();
+        return void opts.log(`Position du DMD (${g.table.id}) : masqué, mais VPX n'a pas ouvert de fenêtre pour le DMD en ${PARK_GIVE_UP_MS / 1000} s.`); // i18n-ignore : journal
+      }
+      stopParking();
+      try {
+        setWindowBounds(w, dmdParkedRect(desktop, w.rect));
+        opts.log(`Position du DMD (${g.table.id}) : masqué, fenêtre de VPX rangée hors des écrans ${Date.now() - started} ms après le lancement (réaffichable en partie).`); // i18n-ignore : journal
+      } catch (error) {
+        opts.log(`Position du DMD (${g.table.id}) : fenêtre de VPX pas rangée (${(error as Error).message}).`); // i18n-ignore : journal
+      }
+    }, PARK_POLL_MS);
+  }
+
   ipcMain.on('in-game:act', (event, action: DmdMenuAction) => {
     if (!menu?.windows.some((sw) => !sw.win.isDestroyed() && sw.win.webContents === event.sender)) return;
     act(action);
@@ -517,11 +605,13 @@ export function createInGameMenu(opts: {
     disarm() {
       if (menu) close(false);
       game = undefined;
+      stopParking();
       if (comboTimer) clearInterval(comboTimer);
       comboTimer = undefined;
       stopWatch?.();
       stopWatch = undefined;
     },
+    watchHiddenDmd: parkHiddenDmd,
     open,
     isOpen: () => Boolean(menu),
     openable,
