@@ -1763,7 +1763,7 @@ The Jukebox and Community medallions are animated (maintainer's choice, 11/13/20
 
 **Still images**: `medaillons/juke-box.png`, `communaute.png` and their 512 px WebP versions are the first frame of these insides, drawn from the same code by the generator (`npx electron docs/design-system/src/medaillons.cjs`, `CyberMedaillons.paint`). They are used where the medallion stays still (the Jukebox's entrance cinematic), and as a fallback without a canvas.
 
-**Tests**: [medaillons-vivants-chromium.test.ts](../packages/core/src/test/medaillons-vivants-chromium.test.ts) opens the real menu page in an off-screen Chromium, with both medallions in the wheel. It checks that the ring covers the canvas centered in its hole, that the center medallion animates and its neighbor stays still, with no error and no refusal from the security policy.
+**Tests**: [medaillons-vivants-chromium.test.ts](../packages/core/src/test/medaillons-vivants-chromium.test.ts) opens the real menu page in an off-screen Chromium, with both medallions in the wheel. It checks that the ring covers the canvas centered in its hole, that the center medallion animates and its neighbor stays still, with no error and no refusal from the security policy. A second test lays out the Jukebox header and its bar with the real style sheet: no glow touches the edge of its canvas. Each canvas overflows its element to give a `b`-pixel blur its 1.5 `b` reach, and the threads' amplitude is capped by that room (`reach`, `TRACK_PAD`).
 
 ### Wheel: its settings
 

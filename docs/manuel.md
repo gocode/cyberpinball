@@ -1763,7 +1763,7 @@ Les médaillons du Juke-box et de la Communauté sont animés (choix du maintene
 
 **Images fixes** : `medaillons/juke-box.png`, `communaute.png` et leurs versions WebP de 512 px sont la première image de ces intérieurs, tirée du même code par le générateur (`npx electron docs/design-system/src/medaillons.cjs`, `CyberMedaillons.paint`). Elles servent là où le médaillon reste fixe (cinématique d'entrée du Juke-box), et de repli sans canevas.
 
-**Essais** : [medaillons-vivants-chromium.test.ts](../packages/core/src/test/medaillons-vivants-chromium.test.ts) ouvre la vraie page du menu dans un Chromium hors écran, avec les deux médaillons dans la roue. Il vérifie que l'anneau couvre le canevas centré dans son trou, que le médaillon du centre s'anime et que son voisin reste immobile, sans erreur ni refus de la politique de sécurité.
+**Essais** : [medaillons-vivants-chromium.test.ts](../packages/core/src/test/medaillons-vivants-chromium.test.ts) ouvre la vraie page du menu dans un Chromium hors écran, avec les deux médaillons dans la roue. Il vérifie que l'anneau couvre le canevas centré dans son trou, que le médaillon du centre s'anime et que son voisin reste immobile, sans erreur ni refus de la politique de sécurité. Un second essai pose l'en-tête du Juke-box et sa barre avec la vraie feuille de style : aucune lueur ne touche le bord de son canevas. Chaque canevas déborde de son élément pour laisser à un flou de `b` pixels sa portée de 1,5 `b`, et l'amplitude des fils est plafonnée par cette place (`reach`, `TRACK_PAD`).
 
 ### Roue : ses réglages
 

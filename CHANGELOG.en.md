@@ -10,6 +10,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 ## 0.1.11
 
 - Virtual reality: on the "Put the headset on" screen, the cabinet's Exit now stops the game and goes back to the wheel (like Esc and Ctrl+Shift+K); the two instructions at the bottom are on two lines.
+- Jukebox: the glow of the progress bar's green thread is no longer cut off by a dark rectangle; it fades out smoothly.
 - Living medallions: in the wheel, the Jukebox medallion is animated (three glowing threads wave around the note), and so is the Community one (chat bubbles with emojis rise behind the player). Only the medallion in the center moves; its neighbors stay still.
 - Jukebox: the animated medallion heads the screen, its threads cross the backglass poster, and the progress bar becomes a green thread with a spark as the playhead.
 - Room moderation: on a line, "Report this message" with its reason; the report is sent encrypted to the moderators only, and the reported player does not know who. Moderators (a charter signed by the project, shipped with Cyber Pinball) have System menu > Friends > Moderation: the report queue, the context, and the decisions (hide the message, mute for 1 h, 24 h or 7 days, ban, lift, dismiss), applied by every cabinet; they also set each room's topic. A sanctioned player can still read, and sees why they can no longer write and until when.

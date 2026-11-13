@@ -315,11 +315,24 @@
 
   // ---------- Fils d'Onde sur une zone, barre de progression ----------
 
+  /*
+   * Lueurs jamais coupées (13/11/2026, la barre du Juke-box sur le PinCab : le halo du fil s'arrêtait
+   * net au bord de son canevas, un rectangle sombre autour de l'onde). Règle de ce module : un flou de
+   * `b` pixels CSS (shadowBlur multiplié par la densité de pixels, sinon il change d'un écran à
+   * l'autre) s'étend jusqu'à 1,5 b ; tout ce qui est dessiné, lueur comprise, reste à cette distance du
+   * bord. Les canevas débordent de leur élément pour la donner, et l'amplitude est plafonnée par elle.
+   * Preuve : medaillons-vivants-chromium.test.ts (aucun pixel allumé au bord d'un canevas).
+   */
+  const reach = (blur) => 1.5 * blur;
+
   /** Fils de bord à bord, centrés sur la hauteur de `anchor` (le médaillon, la pochette). */
   function drawWaves(c, W, H, t, opts, geo) {
     const s = geo.unit;
+    const k = opts.canvas.width / W;
     const y0 = geo.y;
-    const A = geo.amp * (opts.playing() ? 0.85 : 0.07);
+    // Place laissée à la lueur de l'étincelle (la plus large) au-dessus et au-dessous des fils.
+    const room = reach(12 * s) + 2.6 * s;
+    const A = Math.min(geo.amp * (opts.playing() ? 0.85 : 0.07), Math.max(0, Math.min(y0, H - y0) - room));
     const tt = opts.playing() ? t : t * 0.25;
     const Y = (o, u, off) => y0 + A * (o.A / 66) * Math.pow(Math.sin(Math.PI * u), 1.1) * Math.sin(TAU * o.cyc * u - o.w * tt + o.ph + off);
     for (const o of WAVE_THREADS) {
@@ -332,7 +345,7 @@
         c.strokeStyle = rgba(o.col, o.a * opts.alpha * (j === mid ? 1 : 0.5));
         if (o.glow) {
           c.shadowColor = 'rgba(139,226,58,.7)';
-          c.shadowBlur = 8 * s;
+          c.shadowBlur = 8 * s * k;
         }
         c.beginPath();
         for (let i = 0; i <= 200; i++) {
@@ -351,7 +364,7 @@
       c.globalAlpha = Math.sin(Math.PI * u) * opts.alpha;
       c.fillStyle = '#fff';
       c.shadowColor = '#e9ffd2';
-      c.shadowBlur = 12 * s;
+      c.shadowBlur = 12 * s * k;
       c.beginPath();
       c.arc(W * u, Y(WAVE_THREADS[2], u, 0), 2.6 * s, 0, TAU);
       c.fill();
@@ -365,33 +378,43 @@
   ];
 
   /** La barre de progression en fil vert : ondulée sur la part jouée, plate ensuite, l'étincelle en tête. */
+  /*
+   * Le canevas de la barre déborde d'elle (jukebox.css, .jb-fil-trace) : 32 unités de chaque côté et
+   * 64 de haut, soit 16 s de marge pour s = H / 32. Lueur du fil : 3,6 s d'amplitude + 0,9 s de trait
+   * + reach(5 s) = 12 s ; étincelle : reach(8 s) + 2,6 s = 14,6 s. Les deux tiennent dans 16 s.
+   */
+  const TRACK_PAD = 16;
+
   function drawTrack(c, W, H, t, opts) {
     const fill = opts.bar.querySelector(':scope > span');
     const p = clamp((parseFloat(fill?.style.width) || 0) / 100);
     const playing = opts.playing();
-    const s = H / 12;
+    const s = H / 32;
+    const k = opts.canvas.width / W;
     const y = H / 2;
-    const xp = W * p;
+    const x0 = TRACK_PAD * s;
+    const x1 = W - TRACK_PAD * s;
+    const xp = x0 + (x1 - x0) * p;
     c.save();
     c.lineCap = 'round';
     c.strokeStyle = 'rgba(230,240,236,.18)';
     c.lineWidth = 1.6 * s;
     c.beginPath();
-    c.moveTo(Math.max(xp, s), y);
-    c.lineTo(W - s, y);
+    c.moveTo(xp, y);
+    c.lineTo(x1, y);
     c.stroke();
-    if (xp > s) {
+    if (xp > x0 + s) {
       c.strokeStyle = '#8be23a';
       c.lineWidth = 1.8 * s;
       if (playing) {
         c.shadowColor = 'rgba(139,226,58,.8)';
-        c.shadowBlur = 5 * s;
+        c.shadowBlur = 5 * s * k;
       }
       const amp = (playing ? 3.6 : 0) * s;
       c.beginPath();
       for (let i = 0; i <= 80; i++) {
         const u = i / 80;
-        const x = s + (xp - s) * u;
+        const x = x0 + (xp - x0) * u;
         const yy = y + amp * Math.sin(Math.PI * u) * Math.sin(TAU * 2.2 * u - 2 * t);
         if (i) c.lineTo(x, yy);
         else c.moveTo(x, yy);
@@ -403,14 +426,14 @@
     if (playing) {
       c.fillStyle = '#fff';
       c.shadowColor = '#e9ffd2';
-      c.shadowBlur = 8 * s;
+      c.shadowBlur = 8 * s * k;
       c.beginPath();
-      c.arc(Math.max(xp, s), y, 2.6 * s, 0, TAU);
+      c.arc(xp, y, 2.6 * s, 0, TAU);
       c.fill();
     } else {
       c.fillStyle = 'rgba(139,226,58,.75)';
       c.beginPath();
-      c.arc(Math.max(xp, s), y, 2.2 * s, 0, TAU);
+      c.arc(xp, y, 2.2 * s, 0, TAU);
       c.fill();
     }
     c.restore();

@@ -135,6 +135,88 @@ for (const center of ['communaute', 'juke-box'] as const) {
   });
 }
 
+// Lueurs jamais coupées (13/11/2026) : sur le PinCab, le halo du fil vert de la barre de progression
+// s'arrêtait net au bord de son canevas (un rectangle sombre autour de l'onde). Ici, l'en-tête du
+// Juke-box et sa barre, posés avec la vraie feuille de style, à trois positions de lecture : sur
+// plusieurs images, aucun pixel allumé au bord d'un canevas (en haut et en bas pour les fils, qui vont
+// d'un bord de l'écran à l'autre ; sur les quatre côtés pour la barre).
+const GLOW_BENCH = String.raw`
+const { app, BrowserWindow } = require('electron');
+const fs = require('node:fs');
+const path = require('node:path');
+const dir = process.env.CP_DIR;
+app.whenReady().then(async () => {
+  const win = new BrowserWindow({
+    show: false, frame: false, skipTaskbar: true, focusable: false, width: 1080, height: 1920, useContentSize: true, enableLargerThanScreen: true,
+    webPreferences: { offscreen: true, preload: path.join(dir, 'preload.cjs'), contextIsolation: false, sandbox: false },
+  });
+  win.setBounds({ x: 0, y: 0, width: 1080, height: 1920 });
+  await win.loadFile(process.env.CP_PAGE, { query: { role: 'playfield' } });
+  await win.webContents.executeJavaScript(${'`'}(() => {
+    const host = document.createElement('div');
+    host.style.cssText = 'position:fixed;left:0;top:0;width:1080px;height:1920px;container-type:size;z-index:99';
+    host.innerHTML = [1, 60, 100].map((p) => '<section class="jb jb-cab jb-avec-onde jb-playing" style="position:absolute"><div class="jb-onde"></div><div class="jb-zone jb-now"><div class="jb-now-text"><div class="jb-progress jb-fil"><span style="width:' + p + '%"></span></div></div></div></section>').join('');
+    document.body.append(host);
+    for (const cab of host.querySelectorAll('.jb-cab')) {
+      const med = CyberMedaillons.medallion('juke-box', 'jb-onde-med');
+      const fils = document.createElement('canvas');
+      fils.className = 'jb-onde-fils';
+      cab.querySelector('.jb-onde').append(fils, med);
+      CyberMedaillons.waves(fils, med, { alpha: 0.75, amp: 0.5, reference: 1080, playing: () => true });
+      const bar = cab.querySelector('.jb-progress');
+      const trace = document.createElement('canvas');
+      trace.className = 'jb-fil-trace';
+      bar.append(trace);
+      CyberMedaillons.track(trace, bar, () => true);
+    }
+  })()${'`'});
+  // Alpha le plus fort sur chaque bord de chaque canevas, sur plusieurs images.
+  const edges = () => win.webContents.executeJavaScript(${'`'}[...document.querySelectorAll('canvas.jb-onde-fils, canvas.jb-fil-trace')].map((cv) => {
+    const g = cv.getContext('2d'), w = cv.width, h = cv.height;
+    const max = (x, y, ww, hh) => { const d = g.getImageData(x, y, ww, hh).data; let m = 0; for (let i = 3; i < d.length; i += 4) m = Math.max(m, d[i]); return m; };
+    return { kind: cv.className, w, h, top: max(0, 0, w, 1), bottom: max(0, h - 1, w, 1), left: max(0, 0, 1, h), right: max(w - 1, 0, 1, h) };
+  })${'`'});
+  const out = [];
+  for (let i = 0; i < 6; i++) {
+    await new Promise((r) => setTimeout(r, 350));
+    out.push(...(await edges()));
+  }
+  fs.writeFileSync(path.join(dir, 'out.json'), JSON.stringify(out));
+  app.exit(0);
+});
+`;
+
+interface Edges {
+  kind: string;
+  w: number;
+  h: number;
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+test('Juke-box, vrai Chromium : les lueurs des fils et de la barre de progression ne touchent jamais le bord de leur canevas', { skip: electron ? false : 'Electron sous Windows requis', timeout: 120_000 }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-lueurs-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'preload.cjs'), PRELOAD);
+    const script = path.join(dir, 'banc.cjs');
+    fs.writeFileSync(script, GLOW_BENCH);
+    const env: NodeJS.ProcessEnv = { ...process.env, CP_DIR: dir, CP_PAGE: path.join(APP, 'renderer', 'frontend.html') };
+    delete env.ELECTRON_RUN_AS_NODE;
+    const run = runElectron(electron!, [script, `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 110_000 });
+    assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
+    const out = JSON.parse(fs.readFileSync(path.join(dir, 'out.json'), 'utf8')) as Edges[];
+    assert.ok(out.some((e) => e.kind === 'jb-fil-trace' && e.w > 0) && out.some((e) => e.kind === 'jb-onde-fils' && e.w > 0), `canevas dessinés : ${JSON.stringify(out.slice(0, 6))}`);
+    for (const e of out) {
+      const sides = e.kind === 'jb-fil-trace' ? (['top', 'bottom', 'left', 'right'] as const) : (['top', 'bottom'] as const);
+      for (const side of sides) assert.ok(e[side] <= 2, `${e.kind} : lueur coupée au bord ${side} (alpha ${e[side]}, canevas ${e.w} × ${e.h})`);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('médaillons vivants : le module est chargé par la page du menu avant la roue et le Juke-box, et les images fixes en viennent', () => {
   const html = fs.readFileSync(path.join(APP, 'renderer', 'frontend.html'), 'utf8');
   const at = (name: string) => html.indexOf(`<script src="${name}"></script>`);
