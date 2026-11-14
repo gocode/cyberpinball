@@ -36,7 +36,7 @@ import {
   localBackupDir,
   markLastRestoreShown,
   nextAutoSlot,
-  planRestore,
+  planFromSurvey,
   prepareRestore,
   prepareUndoLastRestore,
   pruneBackups,
@@ -44,6 +44,7 @@ import {
   samePath,
   saveBackupSettings,
   scanRoot,
+  surveyRestore,
   t,
   tn,
   createTransferMeter,
@@ -58,9 +59,11 @@ import {
   type BackupPart,
   type BackupProgress,
   type BackupSettings,
+  type BackupEstimate,
   type DriveInfo,
   type RestorePlan,
   type RestoreProgress,
+  type RestoreSurvey,
   type ScanEntry,
 } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
@@ -134,6 +137,8 @@ interface Choice {
   parts: Set<BackupPart>;
   /** Autre borne : garder l'identité de celle-ci (sans ses amis) ou prendre la sienne. */
   identity: 'keep' | 'take';
+  /** Relevé des fichiers fait à l'ouverture du plan : chaque partie incluse ou exclue le recombine sans lire le disque. */
+  survey?: RestoreSurvey;
   plan?: RestorePlan;
 }
 
@@ -144,11 +149,40 @@ export function createBackupsMenu(host: BackupsMenuHost) {
   let job: Job | undefined;
   let finished: Finished | undefined;
   let entries: ScanEntry[] | undefined;
+  /** Taille des tables et de leurs fichiers, d'après `entries` (avertissement d'un lecteur trop petit). */
+  let tablesBytes: number | undefined;
   let choice: Choice | undefined;
   let found: BackupInfo[] = [];
   let shown = 0;
   /** Dernier échec d'une restauration, sur le plan jusqu'à ce qu'on en ouvre un autre. */
   let restoreError: string | undefined;
+
+  // Un écran est reconstruit à chaque touche, plusieurs fois : rien de ce qui lit le disque à
+  // proportion des fichiers (estimations, listes de sauvegardes, relevé d'un plan) ne s'y fait.
+  // C'est lu une fois, à l'ouverture de l'écran ou à la fin d'une copie, et gardé ici.
+  /** Estimations des trois niveaux, pour une destination (et sa limite FAT32). */
+  let estimates: { key: string; byLevel: Partial<Record<BackupLevel, BackupEstimate>> } | undefined;
+  /** Sauvegardes déjà lues d'un dossier (écran principal, sauvegarde automatique). */
+  const listedCache = new Map<string, BackupInfo[]>();
+  /** Où se trouvent les sauvegardes trouvées, et ce qu'on sait de la dernière restauration : lus avec la liste. */
+  let foundSources: { dest: string; where: string }[] = [];
+  let foundMine = new Set<BackupInfo>();
+  let lastRestore: { undo: boolean; last: ReturnType<typeof loadLastRestore> } = { undo: false, last: undefined };
+
+  function listed(dest: string): BackupInfo[] {
+    let list = listedCache.get(dest);
+    if (!list) {
+      list = listBackups(dest, false);
+      listedCache.set(dest, list);
+    }
+    return list;
+  }
+
+  /** Ce qui a pu changer sur les lecteurs (clé branchée, copie finie) : relu au prochain affichage. */
+  function forgetListed(): void {
+    listedCache.clear();
+    estimates = undefined;
+  }
 
   const settings = (): BackupSettings => loadBackupSettings(host.dataDir);
   const save = (s: BackupSettings) => saveBackupSettings(host.dataDir, s);
@@ -208,6 +242,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
   const maxFileOf = (d: DriveInfo | undefined) => (d?.fs && /^fat(32)?$/i.test(d.fs) ? FAT32_MAX : undefined);
 
   async function readDrives(): Promise<void> {
+    forgetListed();
     try {
       drives = (await host.listDrives()).filter((d) => d.type !== 'cd');
     } catch {
@@ -250,7 +285,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     const s = settings();
     const drive = destinationDrive();
     const dest = drive ? destOf(drive) : undefined;
-    const here = dest ? listBackups(dest, false).filter((b) => b.manifest.cabinet.id === identity().id) : [];
+    const here = dest ? listed(dest).filter((b) => b.manifest.cabinet.id === identity().id) : [];
     const sections: Section[] = [];
     if (restoredFlash) sections.push({ rows: restoredFlash });
     if (job) sections.push({ rows: [{ icon: 'info', text: job.auto ? `${t('Sauvegarde automatique')} · ${jobLine()}` : jobLine(), tone: 'info', progress: { value: jobValue(), tone: 'info' } }] });
@@ -349,6 +384,11 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     void host.library
       .task(t('Calcul de la place nécessaire…'), async () => {
         entries = host.root ? await scanRoot(host.root, LEVEL_PARTS.all, host.dataDir) : [];
+        tablesBytes = entries.filter((e) => LEVEL_PARTS.tables.includes(e.part)).reduce((s, e) => s + e.size, 0);
+        estimates = undefined;
+        // Les trois estimations ici, sous le message d'attente : l'écran des niveaux n'a plus qu'à les montrer.
+        const drive = destinationDrive();
+        if (drive) estimateFor(level, drive);
       })
       .then(() => host.library.openCustom(buildLevel, 0));
   }
@@ -362,10 +402,26 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     return undefined;
   }
 
-  function estimateFor(l: BackupLevel, drive: DriveInfo) {
+  /**
+   * Estimation d'un niveau vers ce lecteur. Elle relit tout le cache d'empreintes et cherche chaque
+   * fichier sur la destination : faite une fois pour les trois niveaux, puis gardée tant que la
+   * destination ne change pas (l'écran se reconstruit à chaque flipper).
+   */
+  function estimateFor(l: BackupLevel, drive: DriveInfo): BackupEstimate | undefined {
     if (!entries) return undefined;
-    const parts = new Set(LEVEL_PARTS[l]);
-    return estimateBackup(entries.filter((e) => parts.has(e.part)), destOf(drive), loadHashCache(host.dataDir), maxFileOf(drive));
+    const dest = destOf(drive);
+    const max = maxFileOf(drive);
+    const key = `${dest}|${max ?? ''}`;
+    if (estimates?.key !== key) {
+      const cache = loadHashCache(host.dataDir);
+      const byLevel: Partial<Record<BackupLevel, BackupEstimate>> = {};
+      for (const lv of BACKUP_LEVELS) {
+        const parts = new Set(LEVEL_PARTS[lv]);
+        byLevel[lv] = estimateBackup(entries.filter((e) => parts.has(e.part)), dest, cache, max);
+      }
+      estimates = { key, byLevel };
+    }
+    return estimates.byLevel[l];
   }
 
   function buildLevel(): Built {
@@ -491,6 +547,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     const done: Finished = { kind: 'backup', ok: outcome.ok, level: l, where, ...(drive ? { drive } : {}), info: outcome.info, written: outcome.written, ...(outcome.ok ? {} : { reason: outcome.reason, error: outcome.error }), at };
     if (!auto) finished = done;
     job = undefined;
+    forgetListed();
     if (outcome.ok) {
       const s = settings();
       save({ ...s, last: { at, level: l, where } });
@@ -499,6 +556,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
       } catch {
         // rangement impossible (clé retirée) : il se fera la prochaine fois
       }
+      forgetListed();
     }
     host.broadcast();
     return done;
@@ -653,7 +711,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
 
   /** Ce qui ne va pas avec ce lecteur comme destination (même disque, FAT32, place), ou undefined. */
   function driveWarning(d: DriveInfo): string | undefined {
-    const total = entries ? entries.filter((e) => LEVEL_PARTS.tables.includes(e.part)).reduce((s, e) => s + e.size, 0) : undefined;
+    const total = tablesBytes;
     const free = freeOf(d);
     if (isRootDrive(d)) return t('Le même disque que Cyber Pinball : cette copie ne protège pas d’une panne du disque');
     if (maxFileOf(d)) return t('FAT32 : réglages et scores seulement si une table a un fichier de plus de 4 Go');
@@ -787,15 +845,23 @@ export function createBackupsMenu(host: BackupsMenuHost) {
   }
 
   function whereOf(b: BackupInfo): string {
-    return sources().find((s) => samePath(s.dest, b.dest))?.where ?? b.dest;
+    return foundSources.find((s) => samePath(s.dest, b.dest))?.where ?? b.dest;
+  }
+
+  /** La dernière restauration et sa corbeille : relues avec la liste, pas à chaque touche. */
+  function readLastRestore(): void {
+    lastRestore = { undo: canUndoLastRestore(host.dataDir), last: loadLastRestore(host.dataDir) };
   }
 
   function openRestoreList(): void {
     void host.library
       .task(t('Recherche des sauvegardes…'), async () => {
         await readDrives();
-        found = sources().flatMap((s) => listBackups(s.dest));
+        foundSources = sources();
+        found = foundSources.flatMap((s) => listBackups(s.dest));
         found.sort((a, b) => (a.manifest.createdAt < b.manifest.createdAt ? 1 : -1));
+        foundMine = new Set(found.filter((b) => isSameCabinet(b.manifest, host.dataDir)));
+        readLastRestore();
       })
       .then(() => host.library.openCustom(buildRestoreList, 0));
   }
@@ -815,8 +881,8 @@ export function createBackupsMenu(host: BackupsMenuHost) {
   }
 
   function buildRestoreList(): Built {
-    const mine = found.filter((b) => isSameCabinet(b.manifest, host.dataDir));
-    const others = found.filter((b) => !isSameCabinet(b.manifest, host.dataDir));
+    const mine = found.filter((b) => foundMine.has(b));
+    const others = found.filter((b) => !foundMine.has(b));
     const ordered = [...mine, ...others];
     const sections: Section[] = [];
     if (mine.length) sections.push({ title: t('Cette borne · « {name} »', { name: identity().name }), rows: mine.map((b) => backupRow(b, ordered.indexOf(b))) });
@@ -827,8 +893,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
       });
     }
     if (!ordered.length) sections.push({ rows: [{ icon: 'usb', text: t('Aucune sauvegarde trouvée'), detail: t('Branchez la clé ou le disque qui la contient, puis « Chercher de nouveau »'), tone: 'info' }] });
-    const undo = canUndoLastRestore(host.dataDir);
-    const last = loadLastRestore(host.dataDir);
+    const { undo, last } = lastRestore;
     const actions: Action[] = [
       ...ordered.map((b) => ({ label: `${b.manifest.cabinet.name} ${b.manifest.createdAt}`, key: b.dir, run: () => void openPlan(b) })),
       undo && last
@@ -853,23 +918,29 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     const same = isSameCabinet(b.manifest, host.dataDir);
     const present = new Set(b.manifest.files.map((f) => f.part));
     const parts = new Set(BACKUP_PARTS.filter((p) => present.has(p) && (same || (p !== 'cabinet' && p !== 'friends'))));
-    choice = { backup: b, same, parts, identity: 'keep' };
+    const c: Choice = { backup: b, same, parts, identity: 'keep' };
+    choice = c;
     restoreError = undefined;
-    await computePlan();
+    if (host.root) {
+      // La seule lecture du disque du plan : chaque fichier comparé une fois, sous le message d'attente.
+      await host.library.task(t('Préparation du plan…'), async () => {
+        c.survey = await surveyRestore(b, host.root!, host.dataDir);
+      });
+    }
+    computePlan();
     host.library.openCustom(buildPlan, 0);
   }
 
-  async function computePlan(): Promise<void> {
-    if (!choice || !host.root) return;
+  /** Le plan des parties choisies, recombiné depuis le relevé : instantané, les touches restent libres. */
+  function computePlan(): void {
     const c = choice;
-    await host.library.task(t('Préparation du plan…'), async () => {
-      const wanted = new Set(c.parts);
-      if (!c.same) {
-        if (c.identity === 'take') wanted.add('friends');
-        else wanted.delete('friends');
-      }
-      c.plan = await planRestore(c.backup, host.root!, host.dataDir, wanted);
-    });
+    if (!c?.survey) return;
+    const wanted = new Set(c.parts);
+    if (!c.same) {
+      if (c.identity === 'take') wanted.add('friends');
+      else wanted.delete('friends');
+    }
+    c.plan = planFromSurvey(c.survey, wanted);
   }
 
   function partEffect(part: BackupPart, c: Choice): string {
@@ -904,10 +975,10 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     const actions: Action[] = present.map((part) => ({
       label: backupPartLabel(part),
       key: `part:${part}`,
-      run: async () => {
+      run: () => {
         if (c.parts.has(part)) c.parts.delete(part);
         else c.parts.add(part);
-        await computePlan();
+        computePlan();
         host.library.openCustom(buildPlan, present.indexOf(part));
       },
     }));
@@ -925,9 +996,9 @@ export function createBackupsMenu(host: BackupsMenuHost) {
         actions.push({
           label: id === 'keep' ? t('Garder mes amis et l’identité de cette borne') : t('Remplacer « {name} » sur le réseau', { name: c.backup.manifest.cabinet.name }),
           key: `identity:${id}`,
-          run: async () => {
+          run: () => {
             c.identity = id;
-            await computePlan();
+            computePlan();
             host.library.openCustom(buildPlan, base + (id === 'keep' ? 0 : 1));
           },
         });
@@ -1064,7 +1135,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     const choices: AutoBackup[] = ['off', 'daily', 'weekly'];
     const label: Record<AutoBackup, string> = { off: t('Désactivée'), daily: t('Chaque jour'), weekly: t('Chaque semaine') };
     const local = localBackupDir(host.dataDir);
-    const localLast = listBackups(local, false).find((b) => b.manifest.auto && b.manifest.complete);
+    const localLast = listed(local).find((b) => b.manifest.auto && b.manifest.complete);
     const drive = destinationDrive();
     const actions: Action[] = [];
     const sections: Section[] = [];

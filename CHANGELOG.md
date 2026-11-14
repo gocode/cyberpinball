@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.13
 
+- Sauvegardes : choisir un niveau dans « Sauvegarder maintenant » suit de nouveau les flippers, sans attente ni appui perdu ; sur le plan d'une restauration, inclure ou exclure une partie est immédiat.
 - Réalité virtuelle : le calage en partie est vérifié ; s'il n'a pas pris, l'étape le dit au lieu d'afficher « Borne calée ».
 - Réalité virtuelle : après une mise en veille du casque en pleine partie, la table revient seule à sa place ; casque posé, plus de relances en boucle ; une table dont les réglages demandent le SMAA (refusé par VPX dans le casque) passe en FXAA pour la partie dans le casque, sans toucher à ses réglages.
 - Réalité virtuelle : une session du casque qui échoue au démarrage ne fait plus croire à une limite fixe ni à un calage périmé, et Cyber Pinball ne prend plus Air Link pour le câble au début d'une connexion. Si une partie dans le casque se ferme brutalement avec la correction de la table, les suivantes se lancent sans elle jusqu'à la prochaine mise à jour.

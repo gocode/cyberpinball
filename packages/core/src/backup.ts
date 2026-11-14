@@ -737,21 +737,31 @@ function tableOf(rel: string): string | undefined {
  * d'une table absente ici sont ignorés (ses réglages, ses scores attendraient une table qui n'existe pas).
  */
 export async function planRestore(backup: BackupInfo, root: string, dataDir: string, parts: Iterable<BackupPart>): Promise<RestorePlan> {
-  const wanted = new Set(parts);
+  return planFromSurvey(await surveyRestore(backup, root, dataDir), parts);
+}
+
+/**
+ * Relevé d'une sauvegarde face à la borne : pour chaque fichier, s'il manque ici, s'il diffère ou
+ * s'il est identique, et si le dossier de sa table existe. C'est la seule lecture du disque d'un
+ * plan : fait une fois à l'ouverture de l'écran, il est recombiné par planFromSurvey à chaque
+ * partie incluse ou exclue, sans relire les fichiers (un écran qui relit à chaque touche ne suit
+ * plus les flippers).
+ */
+export interface RestoreSurvey {
+  backup: BackupInfo;
+  files: { file: ManifestFile; table?: string; tableHere: boolean; state: 'add' | 'replace' | 'same' }[];
+}
+
+export async function surveyRestore(backup: BackupInfo, root: string, dataDir: string): Promise<RestoreSurvey> {
   const cache = loadHashCache(dataDir);
-  const plans = new Map<BackupPart, PartPlan>();
-  const files: ManifestFile[] = [];
-  for (const part of BACKUP_PARTS) {
-    if (wanted.has(part) && backup.manifest.files.some((f) => f.part === part)) plans.set(part, { part, replace: 0, add: 0, same: 0, skipped: 0, bytes: 0, tables: [] });
-  }
-  const tablesThere = wanted.has('tables');
+  const tablesHere = new Map<string, boolean>();
+  const files: RestoreSurvey['files'] = [];
   for (const f of backup.manifest.files) {
-    const plan = plans.get(f.part);
-    if (!plan) continue;
     const table = tableOf(f.rel);
-    if (table && !tablesThere && !fs.existsSync(path.join(root, 'tables', table))) {
-      plan.skipped++;
-      continue;
+    let tableHere = true;
+    if (table) {
+      if (!tablesHere.has(table)) tablesHere.set(table, fs.existsSync(path.join(root, 'tables', table)));
+      tableHere = tablesHere.get(table)!;
     }
     const abs = rootPath(root, dataDir, f.rel);
     let st: fs.Stats | undefined;
@@ -760,9 +770,8 @@ export async function planRestore(backup: BackupInfo, root: string, dataDir: str
     } catch {
       st = undefined;
     }
-    if (!st) {
-      plan.add++;
-    } else {
+    let state: 'add' | 'replace' | 'same' = 'add';
+    if (st) {
       let same = st.size === f.size;
       if (same) {
         const known = cachedHash(cache, { rel: f.rel, size: st.size, mtimeMs: Math.floor(st.mtimeMs) });
@@ -770,17 +779,41 @@ export async function planRestore(backup: BackupInfo, root: string, dataDir: str
         if (!known) cache[f.rel] = { size: st.size, mtimeMs: Math.floor(st.mtimeMs), sha256: sha };
         same = sha === f.sha256;
       }
-      if (same) {
-        plan.same++;
-        continue;
-      }
-      plan.replace++;
+      state = same ? 'same' : 'replace';
     }
+    files.push({ file: f, ...(table ? { table } : {}), tableHere, state });
+  }
+  saveHashCache(dataDir, cache);
+  return { backup, files };
+}
+
+/** Le plan pour ces parties, d'après le relevé : sans lire le disque, donc instantané. */
+export function planFromSurvey(survey: RestoreSurvey, parts: Iterable<BackupPart>): RestorePlan {
+  const { backup } = survey;
+  const wanted = new Set(parts);
+  const plans = new Map<BackupPart, PartPlan>();
+  const files: ManifestFile[] = [];
+  for (const part of BACKUP_PARTS) {
+    if (wanted.has(part) && backup.manifest.files.some((f) => f.part === part)) plans.set(part, { part, replace: 0, add: 0, same: 0, skipped: 0, bytes: 0, tables: [] });
+  }
+  const tablesThere = wanted.has('tables');
+  for (const { file: f, table, tableHere, state } of survey.files) {
+    const plan = plans.get(f.part);
+    if (!plan) continue;
+    if (table && !tablesThere && !tableHere) {
+      plan.skipped++;
+      continue;
+    }
+    if (state === 'same') {
+      plan.same++;
+      continue;
+    }
+    if (state === 'add') plan.add++;
+    else plan.replace++;
     plan.bytes += f.size;
     if (table && !plan.tables.includes(table)) plan.tables.push(table);
     files.push(f);
   }
-  saveHashCache(dataDir, cache);
   const list = [...plans.values()];
   return { backup, parts: list, files, bytes: list.reduce((s, p) => s + p.bytes, 0) };
 }

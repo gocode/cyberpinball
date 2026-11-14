@@ -867,6 +867,8 @@ type PagesScreen = Extract<Screen, { kind: 'pages' }>;
 type ScoresScreen = Extract<Screen, { kind: 'scores' }>;
 /** Le retour, dans les actions du tableau des scores : après les quatre périodes et les quatre portées. */
 const SCORES_BACK = 8;
+/** Au-delà, la construction d'un écran est dite au journal : plusieurs par touche, les flippers ne suivent plus. */
+export const SLOW_BUILD_MS = 40;
 
 /** Page préc. / Page suiv. d'un clavier : le texte de l'écran défile de partout (reading.ts). */
 const PAGE_KEYS: Record<string, -1 | 1> = { PageUp: -1, PageDown: 1 };
@@ -2413,7 +2415,9 @@ export function createLibrary(host: LibraryHost) {
 
   /** L'écran affiché ; en mode invité, sans les actions dont la porte est fermée (ou qui n'en ont pas). */
   function build(): Built {
+    const started = performance.now();
     const built = buildScreen();
+    warnSlowBuild(built, performance.now() - started);
     return host.guest.active ? { ...built, actions: built.actions.filter((a) => host.guest.allows(a.door)) } : built;
   }
 
@@ -4781,6 +4785,20 @@ export function createLibrary(host: LibraryHost) {
    * peut les suivre que par leur rang, et une liste qui bouge ferait valider une autre
    * carte (focus.ts). Signalé une fois par écran dans le journal, pour le corriger.
    */
+  /**
+   * Un écran est reconstruit plusieurs fois à chaque touche (la touche, la vue, le téléphone) et les
+   * touches attendent sa fin : une construction qui lit le disque à proportion des fichiers (une
+   * estimation, une liste de sauvegardes, un relevé) rend les flippers lents et fait perdre des
+   * appuis. Le journal le dit une fois par écran ; le correctif est de lire à l'ouverture de
+   * l'écran (task) et de garder le résultat.
+   */
+  const slowWarned = new Set<string>();
+  function warnSlowBuild(built: Built, ms: number): void {
+    if (ms < SLOW_BUILD_MS || slowWarned.has(built.heading)) return;
+    slowWarned.add(built.heading);
+    console.warn(`Écran « ${built.heading} » lent à construire : ${Math.round(ms)} ms, refaits à chaque touche. Lire le disque à son ouverture, pas en le construisant.`); // i18n-ignore : journal
+  }
+
   const unkeyedWarned = new Set<string>();
   function warnUnkeyed(built: Built, ids: (string | undefined)[]): void {
     const loose = (built.media?.cards ?? []).filter((c) => c.action !== undefined && ids[c.action] === undefined);

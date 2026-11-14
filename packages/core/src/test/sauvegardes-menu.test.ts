@@ -83,13 +83,16 @@ function harness(options: { root?: string; drives?: Drive[]; now?: Date; pick?: 
   let relaunched = 0;
   /** Tâches d'écran en cours (recherche des lecteurs, calcul de la place, plan) : settle les attend. */
   let inflight = 0;
+  /** Messages d'attente montrés (« Préparation du plan… ») : chacun bloque les touches. */
+  const tasks: string[] = [];
   const notices: string[] = [];
   const picks: { startDir?: string }[] = [];
   const menu = createBackupsMenu({
     library: {
       openCustom: (build: () => Built, at = 0) => (screen = { build, at }),
       openSystem: () => (screen = undefined),
-      task: async (_m: string, work: () => Promise<void> | void) => {
+      task: async (message: string, work: () => Promise<void> | void) => {
+        tasks.push(message);
         inflight++;
         try {
           await work();
@@ -134,7 +137,28 @@ function harness(options: { root?: string; drives?: Drive[]; now?: Date; pick?: 
     await settle();
   };
   const focused = () => shown().actions[screen!.at];
-  return { menu, root, dataDir, drives, shown, action, choose, settle, focused, relaunched: () => relaunched, notices, picks, open: async () => { menu.systemItem.run(); await settle(); } };
+  return { menu, root, dataDir, drives, shown, action, choose, settle, focused, tasks, relaunched: () => relaunched, notices, picks, open: async () => { menu.systemItem.run(); await settle(); } };
+}
+
+/**
+ * Lectures synchrones du disque faites par `work` (le module fs réel, que l'application voit aussi) :
+ * un écran se reconstruit plusieurs fois par touche, il ne doit pas relire les fichiers de la borne.
+ */
+function diskReads(work: () => void): number {
+  const real = require('node:fs') as Record<string, unknown>;
+  const names = ['existsSync', 'statSync', 'lstatSync', 'readFileSync', 'readdirSync', 'statfsSync'];
+  const saved = names.map((n) => real[n]);
+  let count = 0;
+  names.forEach((n, i) => {
+    const original = saved[i] as (...args: unknown[]) => unknown;
+    real[n] = (...args: unknown[]) => (count++, original(...args));
+  });
+  try {
+    work();
+  } finally {
+    names.forEach((n, i) => (real[n] = saved[i]));
+  }
+  return count;
 }
 
 function usb(name = 'SAUVEGARDE', letter = 'E:', extra: Partial<Drive> = {}): Drive {
@@ -365,4 +389,55 @@ test('écran automatique : chaque jour, à heure fixe, l’heure choisie ; le jo
   assert.deepEqual([s.auto, s.moment, s.hour, s.weekday], ['weekly', 'fixed', 22, 2]);
   h.shown().back();
   assert.ok(h.action('Automatique : le mardi à 22 h'));
+});
+test('une borne pleine de fichiers : les écrans se reconstruisent sans relire le disque, inclure ou exclure une partie est immédiat', async () => {
+  // Le 14/11/2026 : sur « Sauvegarder maintenant », chaque flipper relisait le cache d'empreintes et
+  // cherchait chaque fichier sur la clé, pour chaque niveau, plusieurs fois par touche ; sur le plan
+  // d'une restauration, chaque partie incluse relançait le relevé de tous les fichiers, touches
+  // ignorées. Les appuis se perdaient et la sélection mettait des secondes à suivre.
+  const FILES = 400;
+  const root = fakeRoot();
+  for (let i = 0; i < FILES; i++) write(root, `tables/Medieval Madness/media/image-${i}.png`, `image ${i}`);
+  const key = usb();
+  const h = harness({ root, drives: [key] });
+  saveBackupSettings(h.dataDir, { auto: 'off', copyToDestination: true, destination: { path: path.join(key.path!, BACKUP_DIR_NAME), serial: key.serial } });
+  await h.open();
+  await h.choose('Sauvegarder maintenant');
+  await h.choose('Avec les tables');
+  await h.choose('Lancer la sauvegarde');
+  assert.equal(h.shown().heading, 'Sauvegarde terminée');
+  // Le cache d'empreintes est plein : c'est là que l'estimation cherchait chaque fichier sur la clé.
+  await h.choose('Revenir aux sauvegardes');
+  await h.choose('Sauvegarder maintenant');
+  assert.equal(h.shown().heading, 'Sauvegarder maintenant');
+  const BUILDS = 10;
+  const levelReads = diskReads(() => {
+    for (let i = 0; i < BUILDS; i++) h.shown();
+  });
+  assert.ok(levelReads < BUILDS * 20, `${levelReads} lectures du disque pour ${BUILDS} constructions de l'écran des niveaux (${FILES} fichiers)`);
+  assert.match(h.shown().sections[0]!.rows[1]!.text, /^Avec les tables · /, 'les estimations sont toujours montrées');
+  const mainReads = diskReads(() => {
+    h.shown().back();
+    for (let i = 0; i < BUILDS; i++) h.shown();
+  });
+  assert.equal(h.shown().heading, 'Sauvegardes');
+  assert.ok(mainReads < BUILDS * 20, `${mainReads} lectures du disque pour ${BUILDS} constructions de l'écran principal`);
+
+  await h.choose('Restaurer une sauvegarde');
+  await h.choose(/^Borne du salon /);
+  assert.equal(h.shown().heading, 'Vérifier la restauration');
+  const before = h.tasks.length;
+  const planReads = diskReads(() => {
+    for (let i = 0; i < BUILDS; i++) h.shown();
+  });
+  assert.ok(planReads < BUILDS * 20, `${planReads} lectures du disque pour ${BUILDS} constructions du plan`);
+  const tables = () => h.shown().sections[0]!.rows.find((r) => r.text === 'Tables, ROM, PuP-Packs, sons et médias')!;
+  assert.ok(tables().badges?.includes('✓ Inclus'));
+  let toggleReads = 0;
+  const run = h.action('Tables, ROM, PuP-Packs, sons et médias').run();
+  assert.equal(run, undefined, 'inclure ou exclure se fait sur-le-champ, sans attente');
+  toggleReads += diskReads(() => void h.shown());
+  assert.ok(tables().badges?.includes('Exclu'));
+  assert.deepEqual(h.tasks.slice(before), [], 'aucun message d’attente : les touches restent libres');
+  assert.ok(toggleReads < 20, `${toggleReads} lectures du disque pour une partie exclue`);
 });
