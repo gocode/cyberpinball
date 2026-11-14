@@ -15,14 +15,16 @@ export type LinkTransport = 'air' | 'cable';
  * relève le Wi-Fi du casque (wifi_rssi, wifi_tx_link_speed…), le câble non. undefined sans relevé.
  */
 /**
- * Le transport d'un relevé d'Oculus : son champ « transmission_type » d'abord (« USB » : câble ; TCP, UDP : Air
- * Link), une seule vérité pour toute l'application ; sans lui, la présence du Wi-Fi du casque (wifi_rssi…), qui peut
- * aussi paraître en câble, le Wi-Fi du Quest restant allumé.
+ * Le transport d'un relevé d'Oculus, une seule vérité pour toute l'application : son champ « transmission_type »
+ * d'abord (« USB » : câble ; TCP, UDP : Air Link) ; sans lui, le Wi-Fi du casque (wifi_rssi…) dit Air Link ; sans
+ * l'un ni l'autre, inconnu. Journal réel du 13 novembre 2026 (Air Link, PC en Wi-Fi) : le premier relevé de chaque
+ * connexion, une ouverture de 20 champs, a « TCP » mais pas encore le Wi-Fi ; lu par le Wi-Fi seul, il faisait dire
+ * « Link par câble USB » (23:39:23 et 23:48:18) ; jamais « câble » sans relevé qui le dise.
  */
-export function blockTransport(block: string): LinkTransport {
+export function blockTransport(block: string): LinkTransport | undefined {
   const type = /"transmission_type":\s*"([^"]*)"/.exec(block)?.[1]?.trim().toUpperCase();
   if (type) return type === 'USB' ? 'cable' : 'air';
-  return /"wifi_(rssi|tx_link_speed_mbps)_p50"/.test(block) ? 'air' : 'cable';
+  return /"wifi_(rssi|tx_link_speed_mbps)_p50"/.test(block) ? 'air' : undefined;
 }
 
 export function linkTransport(perfLogText: string, since?: number): LinkTransport | undefined {
@@ -41,7 +43,8 @@ export function linkTransportSince(perfLogText: string, since = -Infinity): { tr
     const m = /"timestamp_epoch":\s*"?(-?[\d.]+)"?/.exec(block);
     const at = m ? Number(m[1]) : undefined;
     if (since !== -Infinity && (at === undefined || !(at >= since))) return undefined;
-    return { transport: blockTransport(block), at };
+    const transport = blockTransport(block);
+    if (transport) return { transport, at };
   }
   return undefined;
 }
@@ -96,7 +99,7 @@ export interface LinkMinute {
   rttP99?: number;
   /** Fréquence du casque (Hz). */
   hz?: number;
-  transport: LinkTransport;
+  transport?: LinkTransport;
 }
 
 export function linkMinutesBetween(text: string, from: number, to: number): LinkMinute[] {
@@ -122,7 +125,7 @@ export function linkMinutesBetween(text: string, from: number, to: number): Link
       ...(opt('total_network_video_goodput_Mbps') !== undefined && { goodput: opt('total_network_video_goodput_Mbps') }),
       ...(opt('network_rtt_ms_p99') !== undefined && { rttP99: opt('network_rtt_ms_p99') }),
       ...(opt('fps') !== undefined && { hz: opt('fps') }),
-      transport: blockTransport(block),
+      ...(blockTransport(block) && { transport: blockTransport(block) }),
     });
   }
   return out;
@@ -138,7 +141,8 @@ export interface LinkNetworkSummary {
   /** Pire aller-retour au 99e centile sur la partie (ms). */
   worstRttP99?: number;
   hz?: number;
-  transport: LinkTransport;
+  /** Inconnu si aucun relevé de la partie ne le dit. */
+  transport?: LinkTransport;
 }
 
 export function linkNetworkSummary(rows: readonly LinkMinute[]): LinkNetworkSummary | undefined {
@@ -161,7 +165,7 @@ export function linkNetworkSummary(rows: readonly LinkMinute[]): LinkNetworkSumm
     ...(goodput !== undefined && { goodput }),
     ...(rtts.length && { worstRttP99: Math.max(...rtts) }),
     ...(hz !== undefined && { hz }),
-    transport: rows.some((r) => r.transport === 'air') ? 'air' : 'cable',
+    ...(rows.some((r) => r.transport === 'air') ? { transport: 'air' as const } : rows.some((r) => r.transport === 'cable') ? { transport: 'cable' as const } : {}),
   };
 }
 

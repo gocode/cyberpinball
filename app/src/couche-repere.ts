@@ -61,3 +61,29 @@ export class GameRoom {
     return roomLayerCorrected(this.journalText());
   }
 }
+
+/** La couche mise à l'écart après une partie finie anormalement : pour cette version de l'application seulement. */
+const SET_ASIDE = 'couche-repere-ecartee.json';
+
+/**
+ * La couche est-elle écartée pour cette version ? Une autre version (mise à jour faite) : l'écart est levé, le fichier
+ * effacé, et la couche essayée de nouveau.
+ */
+export function roomLayerSetAside(vrDir: string, version: string): { since: string; why: string } | undefined {
+  const file = path.join(vrDir, SET_ASIDE);
+  let read: { version?: string; since?: string; why?: string };
+  try {
+    read = JSON.parse(fs.readFileSync(file, 'utf8')) as typeof read;
+  } catch {
+    return undefined;
+  }
+  if (read.version === version) return { since: read.since ?? '?', why: read.why ?? '?' };
+  fs.rmSync(file, { force: true });
+  return undefined;
+}
+
+/** Écarte la couche pour cette version de l'application (les parties suivantes se lancent sans elle). */
+export function setRoomLayerAside(vrDir: string, version: string, why: string, now = new Date()): void {
+  fs.mkdirSync(vrDir, { recursive: true });
+  writeFileAtomic(path.join(vrDir, SET_ASIDE), JSON.stringify({ version, since: now.toISOString(), why }, null, 2) + '\n');
+}

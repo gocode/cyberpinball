@@ -284,11 +284,55 @@ export async function preuveRepere({ vpx, table, couche = true, dureeMs = 40000 
   return { ...r, sauts, poses, ecart, mains, ok: Boolean(ecart && sauts.length === 3 && ecart.cm < 1 && ecart.deg < 0.5 && mainsOk) };
 }
 
+/**
+ * La garde de la couche (--garde-couche 1), règle « plantage de VPX : module fautif » : une première partie lancée avec
+ * la couche, où VPX tombe (verbe planter du runtime factice, code 0xC0000005) ; jugée comme l'application la juge
+ * (roomLayerFault), la couche est écartée (setRoomLayerAside) ; la partie suivante se lance sans elle et se joue.
+ */
+export async function preuveGardeCouche({ vpx, table }) {
+  const req = (await import('node:module')).createRequire(import.meta.url);
+  const core = req('../packages/core/dist/index.js');
+  const couche = req('../app/dist/couche-repere.js');
+  const vrDir = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-garde-couche-'));
+  const version = 'banc';
+  const avec = !couche.roomLayerSetAside(vrDir, version);
+  const t0 = Date.now();
+  const r1 = await jouerVpx({ vpx, table, scenario: `${SCENARIO_REPOS}\n8000 planter`, dureeMs: 25000, couche: avec });
+  // Comme le lanceur de l'application : un code de sortie d'erreur sans arrêt demandé est un plantage.
+  const failure = r1.code !== 0 && r1.code !== null ? 'crash' : undefined;
+  const faute = avec ? core.roomLayerFault({ failure, exitCode: r1.code, seconds: (Date.now() - t0) / 1000, stopAsked: false }) : undefined;
+  if (faute) couche.setRoomLayerAside(vrDir, version, faute);
+  const ecartee = couche.roomLayerSetAside(vrDir, version);
+  const r2 = await jouerVpx({ vpx, table, scenario: SCENARIO_REPOS, dureeMs: 15000, couche: !ecartee });
+  const images2 = Math.max(0, ...[...r2.trace.matchAll(/^\d+ \d+ image (\d+)/gm)].map((m) => Number(m[1])));
+  // Une autre version de l'application : l'écart est levé.
+  const leveeApresMiseAJour = !couche.roomLayerSetAside(vrDir, 'version-suivante');
+  fs.rmSync(vrDir, { recursive: true, force: true });
+  return {
+    r1,
+    r2,
+    faute,
+    ecartee,
+    images2,
+    leveeApresMiseAJour,
+    ok: Boolean(avec && r1.code === 0xc0000005 && /couche chargée par VPX/.test(r1.couche) && faute && ecartee && !r2.couche && images2 > 0 && leveeApresMiseAJour),
+  };
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const a = args(process.argv.slice(2));
   if (!a.vpx || !a.table) {
     console.error('node scripts/banc-vpx.mjs --vpx <dossier de VPX> --table <fichier.vpx> [--scenario <fichier>] [--duree <ms>]');
     process.exit(2);
+  }
+  if (a['garde-couche'] === '1') {
+    const g = await preuveGardeCouche({ vpx: a.vpx, table: a.table });
+    console.log(`Partie 1, avec la couche : sortie de VPX ${g.r1.code} (0x${(g.r1.code >>> 0).toString(16).toUpperCase()})\n${g.r1.couche || '(journal de la couche vide)'}`);
+    console.log(`Jugée : ${g.faute ?? 'rien d’anormal'} ; couche écartée : ${g.ecartee ? `oui (${g.ecartee.why})` : 'non'}`);
+    console.log(`Partie 2 : ${g.r2.couche ? 'avec la couche (FAUX)' : 'sans la couche'}, ${g.images2} image(s) rendue(s), sortie ${g.r2.code}`);
+    console.log(`Autre version de l'application : écart ${g.leveeApresMiseAJour ? 'levé' : 'maintenu (FAUX)'}`);
+    console.log(`Verdict : ${g.ok ? 'OK' : 'ÉCHEC'}.`);
+    process.exit(g.ok ? 0 : 1);
   }
   if (a.repere === '1') {
     const p = await preuveRepere({ vpx: a.vpx, table: a.table, couche: a.couche !== '0', ...(a.duree && { dureeMs: Number(a.duree) }) });

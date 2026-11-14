@@ -39,6 +39,8 @@
 //                                   casque=0 pour elles, entrées en erreur -3003) puis revenu (sessions neuves saines)
 //   sonde-perimee                   LibOVR : les sessions déjà créées ne voient plus le casque (casque=0), sans erreur
 //   sonde-gelee                     LibOVR : les sessions déjà créées ne répondent plus (ovr_GetSessionStatus bloque)
+//   planter                         l'application tombe à son image suivante (code 0xC0000005, comme une violation
+//                                   d'accès dans un module chargé chez elle)
 //   tete-tourne V                   LibOVR : la tête tourne sur elle-même à V rad/s (lacet), vitesse donnée comme LibOVR
 //   tete-suivie 1|0                 LibOVR : la tête suivie en position (drapeaux 15) ou en orientation seule (3)
 //   contour-fige 1|0                LibOVR : le contour lu (ovr_GetBoundaryGeometry) figé dans l'espace de suivi du
@@ -160,6 +162,7 @@ struct World
    float headPitch = 0.f; // tete-penche : tangage de la tête (rad)
    // Instants du scénario (ms) où les sessions LibOVR déjà créées sont coupées (link 0), périmées ou gelées ; -1 : jamais.
    long long ovrCutAt = -1, ovrStaleAt = -1, ovrFrozenAt = -1;
+   bool crash = false; // planter : l'application tombe à son image suivante
    float headSpin = 0.f; // tete-tourne : rad/s autour de la verticale, depuis headSpinAt (ms du scénario)
    long long headSpinAt = 0;
 };
@@ -431,6 +434,8 @@ void advance(bool silent = false)
          world.ovrStaleAt = st.ms;
       else if (st.verb == "sonde-gelee")
          world.ovrFrozenAt = st.ms;
+      else if (st.verb == "planter")
+         world.crash = !silent;
       else if (st.verb == "tete-tourne")
       {
          // La rotation déjà faite reste acquise : la tête ne revient pas d'un coup à son cap de départ.
@@ -774,6 +779,11 @@ XrResult XRAPI_CALL endFrame(XrSession h, const XrFrameEndInfo* info)
    if (!s->running)
       return XR_ERROR_SESSION_NOT_RUNNING;
    s->frames++;
+   if (world.crash)
+   {
+      trace("planter : l'application tombe");
+      TerminateProcess(GetCurrentProcess(), 0xC0000005);
+   }
    if (s->frames == 1 || s->frames % 360 == 0)
       trace("image " + std::to_string(s->frames) + " couches=" + std::to_string(info->layerCount));
    // L'espace de la projection, dans le monde : dit à la première image et à chaque changement (plus de 1 mm ou

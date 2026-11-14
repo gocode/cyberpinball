@@ -85,3 +85,26 @@ test('Link, une seule vérité (essai réel du 13 novembre 2026 : « câble USB 
   assert.match(front, /function companionReady\(\): void \{\s*linkConnectedAt \?\?= Date\.now\(\) \/ 1000;/);
   assert.doesNotMatch(front, /linkTransport\(readOculusPerfLog\(\)\)/);
 });
+
+test('Link, cas réel du 13 novembre 2026 (Air Link, PC en Wi-Fi) : le relevé d’ouverture de la connexion n’est pas le câble', () => {
+  // Recopiés du journal de performance de la borne (champs utiles seulement) : 23:39:18 et 23:48:14, l'ouverture de
+  // chaque connexion (« TCP », pas encore de Wi-Fi), puis 23:49:11 et 23:50:11, les minutes (Wi-Fi du casque).
+  const ouverture = (at: number) => `{ "timestamp_epoch": ${at}, "event": "oculus_pc_xrs_stats_event", "pid": 4242, "transmission_type": "TCP", "encode_width": 3664, "encode_height": 1920, "fps": 72, "codec": "h264", "num_slices": 1, "dynamic_bitrate_enabled": 1, "report_index": 0 }`;
+  const minuteAir = (at: number, rssi: number) => `{ "timestamp_epoch": ${at}, "event": "oculus_pc_xrs_stats_event", "transmission_type": "TCP", "num_pc_presented_frames": "4300", "lost_pc_presented_frames": "120", "num_glitches": "9", "wifi_rssi_p50": "${rssi}", "wifi_tx_link_speed_mbps_p50": "866" }`;
+  const t2339 = Date.UTC(2026, 10, 13, 23, 39, 18) / 1000;
+  const t2348 = Date.UTC(2026, 10, 13, 23, 48, 14) / 1000;
+  const debut = `[${ouverture(t2339)},${minuteAir(t2339 + 48, -35)},${ouverture(t2348)}]`;
+  // 23:48:18, connexion ouverte à 23:48:11 : seul le relevé d'ouverture compte, il dit Air Link (avant : « câble USB »).
+  assert.deepEqual(linkTransportSince(debut, t2348 - 5), { transport: 'air', at: t2348 });
+  assert.equal(blockTransport(ouverture(t2339)), 'air');
+  // Sans type de transmission ni Wi-Fi : inconnu, jamais le câble.
+  assert.equal(blockTransport(`{ "timestamp_epoch": ${t2339}, "event": "oculus_pc_xrs_stats_event", "fps": 72 }`), undefined);
+  assert.equal(linkTransportSince(`[{ "timestamp_epoch": ${t2348}, "event": "oculus_pc_xrs_stats_event" }]`, t2348 - 5), undefined);
+  // La partie de 23:50 : les minutes disent Air Link, le PC est en Wi-Fi (Intel Wireless-AC 9560) : l'avertissement est juste.
+  const partie = `${debut.slice(0, -1)},${minuteAir(t2348 + 57, -35)},${minuteAir(t2348 + 117, -38)}]`;
+  const resume = linkNetworkSummary(linkMinutesBetween(partie, t2348, t2348 + 180))!;
+  assert.equal(resume.transport, 'air');
+  assert.equal(airLinkOverWifi(linkTransportSince(partie, t2348 - 5)?.transport, { adapter: 'Intel(R) Wireless-AC 9560 160MHz', wireless: true }), true);
+  // Un bilan sans aucun relevé qui dise le transport ne l'invente pas.
+  assert.equal(linkNetworkSummary(linkMinutesBetween(`[{ "timestamp_epoch": 100, "event": "oculus_pc_xrs_stats_event", "num_pc_presented_frames": "10", "lost_pc_presented_frames": "0" }]`, 90, 200))!.transport, undefined);
+});

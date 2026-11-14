@@ -1022,3 +1022,20 @@ export function roomCorrectionText(journal: string, jump: JumpTransform): string
 export function roomLayerCorrected(journal: string): boolean {
   return /^\S+ correction appliquée \(/m.test(journal);
 }
+
+/**
+ * Une partie dans le casque lancée avec la couche finie en moins de ce temps de jeu (secondes), sans que Cyber
+ * Pinball l'ait arrêtée : comptée comme une fin anormale (la couche n'est prouvée que sur le runtime factice).
+ */
+export const ROOM_LAYER_EARLY_S = 10;
+
+/**
+ * Un module chargé dans VPX qui le fait tomber (règle « plantage de VPX : module fautif ») : une partie lancée avec la
+ * couche du repère et finie anormalement (VPX planté, code de sortie d'erreur, ou fin dans les premières secondes sans
+ * arrêt demandé) rend la raison ; les parties suivantes se lancent sans elle jusqu'à la prochaine mise à jour.
+ */
+export function roomLayerFault(game: { failure?: string; exitCode: number | null; seconds: number; stopAsked: boolean }): string | undefined {
+  if (game.failure === 'crash') return `VPX s’est arrêté brutalement${game.exitCode !== null ? ` (code ${game.exitCode >= 0 ? `0x${game.exitCode.toString(16).toUpperCase()}` : game.exitCode})` : ''}`; // i18n-ignore : journal
+  if (!game.stopAsked && game.seconds < ROOM_LAYER_EARLY_S) return `partie finie après ${game.seconds.toFixed(0)} s sans que le joueur l’ait quittée`; // i18n-ignore : journal
+  return undefined;
+}

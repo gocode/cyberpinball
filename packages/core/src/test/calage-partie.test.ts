@@ -53,6 +53,8 @@ import {
   RoomFrame,
   ROOM_LAYER,
   roomCorrectionText,
+  ROOM_LAYER_EARLY_S,
+  roomLayerFault,
   roomLayerCorrected,
   roomLayerEnv,
   type JumpTransform,
@@ -800,7 +802,7 @@ test('couche du repère pour VPX (essai réel du 13 novembre 2026, 23:50-23:52 :
   assert.match(front, /const vpxEnv = roomEnv \? \{ env: roomEnv \} : \{\};/);
   assert.match(front, /vpxPrefDir: vpxPrefDir\(install\.version\), \.\.\.vpxEnv, onVr,/);
   assert.match(front, /if \(gameRoom && \(playing \|\| launch\)\) \{\s*try \{\s*gameRoom\.onJump\(jump\);/);
-  assert.match(front, /const room = endGameRoom\(\);\s*if \(playedVr && vrGame\) checkVrPlaceAfterGame\(vrGame\.ini, played\.file, room\);/);
+  assert.match(front, /const room = endGameRoom\(\{ \.\.\.result, stopAsked: gameStopAsked \}\);\s*if \(playedVr && vrGame\) checkVrPlaceAfterGame\(vrGame\.ini, played\.file, room\);/);
   assert.match(front, /const carried = room && room\.jumps && room\.corrected\(\) \? room\.jump : undefined;/);
   assert.match(front, /const next = carried \? movePlace\(inVpx, carried\) : inVpx;/);
   assert.match(front, /const moved = placeVpxSettings\(launched,/);
@@ -827,4 +829,23 @@ test('faux verdict « limite fixe » (essai réel du 13 novembre 2026, 23:26 : s
   const place: CabinetPlace = { ...lockbarPlace({ x: -0.2, y: 1.0, z: -0.1 }, { x: 0.35, y: 1.0, z: -0.25 }), room: { width: 2.494715, depth: 3.382814 }, boundary: 'piece' };
   assert.equal(staleCalibration(place, 'kept', { width: 2.494715, depth: 3.382814 }), undefined);
   assert.ok(staleCalibration(place, 'recentred', undefined));
+});
+
+test('couche du repère qui ferait tomber VPX (règle « module fautif ») : nommée au journal, écartée jusqu’à la mise à jour', () => {
+  assert.equal(ROOM_LAYER_EARLY_S, 10);
+  // Plantage : code d'une violation d'accès, comme un module chargé dans VPX.
+  assert.match(roomLayerFault({ failure: 'crash', exitCode: 0xc0000005, seconds: 42, stopAsked: false })!, /arrêté brutalement \(code 0xC0000005\)/);
+  // Fin dans les premières secondes sans arrêt demandé.
+  assert.match(roomLayerFault({ exitCode: 0, seconds: 3, stopAsked: false })!, /finie après 3 s/);
+  // Partie quittée par le joueur, ou jouée : rien d'anormal.
+  assert.equal(roomLayerFault({ exitCode: 0, seconds: 3, stopAsked: true }), undefined);
+  assert.equal(roomLayerFault({ exitCode: 0, seconds: 300, stopAsked: false }), undefined);
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /const fault = room\.layer \? roomLayerFault\(game\) : undefined;/);
+  assert.match(front, /setRoomLayerAside\(path\.join\(loc\.dataDir, 'vr'\), app\.getVersion\(\), fault\);/);
+  assert.match(front, /const aside = roomLayerSetAside\(vrDir, app\.getVersion\(\)\);/);
+  assert.match(front, /const dir = aside \? undefined : roomLayerDir\(/);
+  assert.match(front, /const room = endGameRoom\(\{ \.\.\.result, stopAsked: gameStopAsked \}\);/);
+  assert.match(front, /game\.stop = \(\) => \{\s*gameStopAsked = true;\s*stopGame\(\);/);
+  assert.match(read('packages', 'casque-vr', 'test', 'runtime-factice.cpp'), /TerminateProcess\(GetCurrentProcess\(\), 0xC0000005\);/);
 });

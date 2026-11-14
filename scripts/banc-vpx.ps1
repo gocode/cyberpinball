@@ -2,7 +2,8 @@
 # d'aperçu, que personne ne voit, et rien ne prend le focus.
 #   powershell -File scripts\banc-vpx.ps1 -Vpx <dossier de VPX 10.8.1> -Table <fichier.vpx> [-Scenario <fichier>] [-Duree <ms>]
 # Cadence de VPX : -Scenario repos, -Cadence exacte, -Garde 0|1|2, -Plugin 0, -Captures 0, -Essai 1 (voir banc-vpx.mjs).
-# Couche du repère de la pièce : -Repere 1 (preuve : trois remises d'origine en partie), -Couche 0 (la même sans elle).
+# Couche du repère de la pièce : -Repere 1 (preuve : trois remises d'origine en partie), -Couche 0 (la même sans elle),
+# -GardeCouche 1 (VPX qui tombe avec la couche : écartée, la partie suivante sans elle).
 param(
   [Parameter(Mandatory = $true)][string]$Vpx,
   [Parameter(Mandatory = $true)][string]$Table,
@@ -15,7 +16,8 @@ param(
   [string]$Captures,
   [string]$Essai,
   [string]$Repere,
-  [string]$Couche
+  [string]$Couche,
+  [string]$GardeCouche
 )
 . "$PSScriptRoot\bureau-cache.ps1"
 if (Enter-BureauCache $PSCommandPath $PSBoundParameters) { exit $LASTEXITCODE }
@@ -30,5 +32,6 @@ if ($Captures) { $argsNode += @('--captures', $Captures) }
 if ($Essai) { $argsNode += @('--essai', $Essai) }
 if ($Repere) { $argsNode += @('--repere', $Repere) }
 if ($Couche) { $argsNode += @('--couche', $Couche) }
+if ($GardeCouche) { $argsNode += @('--garde-couche', $GardeCouche) }
 & node @argsNode
 exit $LASTEXITCODE

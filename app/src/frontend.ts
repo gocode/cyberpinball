@@ -108,6 +108,8 @@ import {
   inGameCalibration,
   placeFromVpxCentering,
   roomLayerEnv,
+  roomLayerFault,
+  ROOM_LAYER,
   placeGap,
   roomKeepingAdvice,
   shouldOfferCalibration,
@@ -466,7 +468,7 @@ import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
 import { centerWhenStarted, prepareVrGame, probeVr, readVrMirror, readVrMode, rememberVrSettings, writeIniSettings, writeVrCalibration, writeVrMirror, writeVrMode, type VrGame } from './vr';
 import { HEADSET_TRIAL_DIR, HeadsetMenu, readCabinetPlace, type HeadPose } from './casque';
 import { OvrProbe, type OvrJump } from './sonde-ovr';
-import { GameRoom, roomLayerDir } from './couche-repere';
+import { GameRoom, roomLayerDir, roomLayerSetAside, setRoomLayerAside } from './couche-repere';
 import { prepareSchemaImage, schemaImageFile, type SchemaImage } from './schema-image';
 import { installPausePlugin, pauseSettingsFor, QUIT_HOLD_S } from './pause-vr';
 import { DMD_PLUGIN, installVpxPlugin } from './vpx-plugins';
@@ -3784,25 +3786,42 @@ function startGameRoom(): Record<string, string> | undefined {
   gameRoom = undefined;
   const place = headset?.place();
   if (!place || !isCalibrated(place) || place.free || headsetSetting() === 'bureau') return undefined;
-  const dir = roomLayerDir(path.join(__dirname, '..'));
+  const vrDir = path.join(loc.dataDir, 'vr');
+  // Écartée après une partie finie anormalement avec elle : jusqu'à la prochaine mise à jour, sans option à l'écran.
+  const aside = roomLayerSetAside(vrDir, app.getVersion());
+  if (aside) console.warn(`Casque : couche du repère écartée depuis ${aside.since} (${aside.why}) ; VPX part sans elle jusqu’à la prochaine mise à jour.`); // i18n-ignore : journal
+  const dir = aside ? undefined : roomLayerDir(path.join(__dirname, '..'));
   try {
-    gameRoom = new GameRoom(path.join(loc.dataDir, 'vr'), place, Boolean(dir));
+    gameRoom = new GameRoom(vrDir, place, Boolean(dir));
   } catch (error) {
     console.warn(`Casque : couche du repère pas préparée (${(error as Error).message}) ; VPX part sans elle.`); // i18n-ignore : journal
     return undefined;
   }
   if (!dir) {
-    console.warn('Casque : couche du repère absente de l’application ; VPX part sans elle (une remise d’origine en partie ne sera rattrapée qu’à la partie suivante).'); // i18n-ignore : journal
+    if (!aside) console.warn('Casque : couche du repère absente de l’application ; VPX part sans elle (une remise d’origine en partie ne sera rattrapée qu’à la partie suivante).'); // i18n-ignore : journal
     return undefined;
   }
   return roomLayerEnv(dir, gameRoom.file, process.env);
 }
 
-/** La partie finie : le journal de la couche au journal, et le repère de la partie rendu (pour le recalage fait en partie). */
-function endGameRoom(): GameRoom | undefined {
+/**
+ * La partie finie : le journal de la couche au journal, et le repère de la partie rendu (pour le recalage fait en
+ * partie). Lancée avec la couche et finie anormalement (roomLayerFault) : la couche nommée au journal, et écartée
+ * des parties suivantes jusqu'à la prochaine mise à jour, plutôt que de laisser un joueur sans VR.
+ */
+function endGameRoom(game: { failure?: string; exitCode: number | null; seconds: number; stopAsked: boolean }): GameRoom | undefined {
   const room = gameRoom;
   gameRoom = undefined;
   if (!room) return undefined;
+  const fault = room.layer ? roomLayerFault(game) : undefined;
+  if (fault) {
+    console.warn(`Casque : partie dans le casque lancée avec la couche du repère (${ROOM_LAYER}) finie anormalement (${fault}) ; les parties suivantes se lancent sans elle jusqu’à la prochaine mise à jour.`); // i18n-ignore : journal
+    try {
+      setRoomLayerAside(path.join(loc.dataDir, 'vr'), app.getVersion(), fault);
+    } catch (error) {
+      console.warn(`Casque : couche du repère pas écartée (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+  }
   const text = room.journalText().trim();
   for (const line of text ? text.split(/\r?\n/) : []) console.log(`Casque, couche du repère : ${line}`); // i18n-ignore : journal
   if (room.layer && !text) console.warn('Casque, couche du repère : rien écrit ; pas chargée par VPX (son chargeur OpenXR l’a refusée ?), la partie s’est jouée sans elle.'); // i18n-ignore : journal
@@ -4475,7 +4494,7 @@ function noteLinkStats(from: number, to: number): void {
   if (lastLinkNetwork) {
     const n = lastLinkNetwork;
     const f = (v: number | undefined, d = 0) => (v === undefined ? '?' : v.toFixed(d).replace('.', ','));
-    console.log(`Link, réseau de la partie (${n.transport === 'air' ? 'Air Link' : 'câble USB'}) : ${f(n.lostShare * 100, 1)} % d'images perdues, ${f(n.glitchesPerMinute)} coupures par minute, débit d'encodage ${f(n.bitrate)} Mbit/s, débit utile ${f(n.goodput)} Mbit/s, aller-retour réseau au 99e centile jusqu'à ${f(n.worstRttP99)} ms.`); // i18n-ignore : journal
+    console.log(`Link, réseau de la partie (${n.transport === 'air' ? 'Air Link' : n.transport === 'cable' ? 'câble USB' : 'transport inconnu'}) : ${f(n.lostShare * 100, 1)} % d'images perdues, ${f(n.glitchesPerMinute)} coupures par minute, débit d'encodage ${f(n.bitrate)} Mbit/s, débit utile ${f(n.goodput)} Mbit/s, aller-retour réseau au 99e centile jusqu'à ${f(n.worstRttP99)} ms.`); // i18n-ignore : journal
   }
   console.log(sum ? `Link, bilan de la partie (profil VR ${vrProfileApplied ?? 'inconnu'}) : ${sum.minutes} minute(s), par minute ${sum.presented} images présentées, ${sum.lost} perdues, ${sum.stale} réaffichées plus de 5 fois (pire minute : ${sum.worstStale}).` : `Link, bilan de la partie (profil VR ${vrProfileApplied ?? 'inconnu'}) : aucune statistique de Link pour cette partie (journal de performance d’Oculus absent ou partie de moins d’une minute).`); // i18n-ignore : journal
 }
@@ -6547,6 +6566,13 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}) })
       : launchVpx({ exe: install.exe, ini: vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), ...vpxEnv, onVr, onPlaying, onForeground, onWindows });
+  // Arrêt demandé par Cyber Pinball (Exit, casque perdu, partie entre amis…) : une fin voulue, pas un plantage.
+  let gameStopAsked = false;
+  const stopGame = game.stop;
+  game.stop = () => {
+    gameStopAsked = true;
+    stopGame();
+  };
   // DMD masqué pour cette table : sa fenêtre rangée hors des écrans avant même de paraître (in-game-menu.ts).
   if (configuration && simulated === undefined) inGameMenu.watchHiddenDmd({ pid: game.pid, table, cabinet: configuration, displays: observedDisplays(), dataDir: loc.dataDir });
   if (launch) {
@@ -6627,7 +6653,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (load) console.log(load);
   stopWaitExit?.();
   vrGameStop = undefined;
-  const room = endGameRoom();
+  const room = endGameRoom({ ...result, stopAsked: gameStopAsked });
   if (playedVr && vrGame) checkVrPlaceAfterGame(vrGame.ini, played.file, room);
   // La pièce a pu sauter pendant la partie : la borne du menu reposée sur la limite du Quest.
   if (playedVr) setTimeout(anchorCheck, 0);

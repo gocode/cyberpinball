@@ -50,3 +50,15 @@ test('repère d’une partie : correction nulle au lancement, sauts composés, �
   assert.equal(suivante.journalText(), '');
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('couche du repère écartée pour cette version seulement : levée à la mise à jour', () => {
+  const { roomLayerSetAside, setRoomLayerAside } = createRequire(import.meta.url)('../app/dist/couche-repere.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'couche-ecartee-'));
+  assert.equal(roomLayerSetAside(dir, '0.1.13-essai.5'), undefined);
+  setRoomLayerAside(dir, '0.1.13-essai.5', 'VPX s’est arrêté brutalement (code 0xC0000005)', new Date('2026-11-14T02:00:00Z'));
+  assert.deepEqual(roomLayerSetAside(dir, '0.1.13-essai.5'), { since: '2026-11-14T02:00:00.000Z', why: 'VPX s’est arrêté brutalement (code 0xC0000005)' });
+  // Une autre version : l'écart est levé et le fichier effacé (la couche essayée de nouveau).
+  assert.equal(roomLayerSetAside(dir, '0.1.13-essai.6'), undefined);
+  assert.equal(fs.existsSync(path.join(dir, 'couche-repere-ecartee.json')), false);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
