@@ -503,6 +503,10 @@ int main(int argc, char** argv)
             wantContour = true;
       }
       quit = true;
+      // Un appel à LibOVR qui ne rend plus la main (runtime bloqué) ne retient pas la sonde : 3 s après la fin
+      // demandée, ou Cyber Pinball parti (entrée fermée), elle sort d'elle-même, jamais orpheline.
+      Sleep(3000);
+      ExitProcess(0);
    }).detach();
 
    const std::wstring wide(dllPath.begin(), dllPath.end());

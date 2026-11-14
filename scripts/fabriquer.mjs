@@ -100,6 +100,13 @@ for (const name of fs.readdirSync(installerDir)) {
     // Sonde LibOVR (app/src/sonde-ovr.ts), construite avec le compagnon.
     const sonde = path.join(path.dirname(exe), 'cyberpinball-sonde-ovr.exe');
     if (fs.existsSync(sonde)) fs.copyFileSync(sonde, path.join(stage, 'natif', path.basename(sonde)));
+    // Couche OpenXR du repère de la pièce (app/src/couche-repere.ts), chargée par VPX en partie : natif\couche-repere.
+    const couche = ['XR_APILAYER_CYBERPINBALL_repere.dll', 'XR_APILAYER_CYBERPINBALL_repere.json'].map((f) => path.join(path.dirname(exe), f));
+    if (couche.every((f) => fs.existsSync(f))) {
+      fs.mkdirSync(path.join(stage, 'natif', 'couche-repere'), { recursive: true });
+      for (const f of couche) fs.copyFileSync(f, path.join(stage, 'natif', 'couche-repere', path.basename(f)));
+      console.log('Couche du repère de la pièce : natif\\couche-repere');
+    }
     // Textures du décor de la VR (caisse et capsule, packages/core/src/decor.ts) : natif\decor.
     const decorSrc = path.join(repo, 'packages', 'casque-vr', 'decor');
     fs.mkdirSync(path.join(stage, 'natif', 'decor'), { recursive: true });

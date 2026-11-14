@@ -51,6 +51,10 @@ import {
   moveContour,
   composeJumps,
   RoomFrame,
+  ROOM_LAYER,
+  roomCorrectionText,
+  roomLayerCorrected,
+  roomLayerEnv,
   type JumpTransform,
   inverseJump,
   sameContour,
@@ -733,7 +737,7 @@ test('validité du contour (essai réel du 13 novembre 2026, 23:39 : borne repos
   assert.match(front, /if \(kind === 'ecarte'\) return;/);
   assert.match(front, /onReady: \(\) => companionReady\(\),/);
   assert.match(front, /aucun saut ne peut être mesuré/);
-  assert.match(read('app', 'src', 'casque.ts'), /if \(line\.startsWith\('pret'\)\) \{\s*this\.setState\('shown'\);\s*this\.opts\.onReady\?\.\(\);/);
+  assert.match(read('app', 'src', 'casque.ts'), /if \(line\.startsWith\('pret'\)\) \{\s*this\.sessionFault = undefined;\s*this\.stationaryPending = false;\s*this\.setState\('shown'\);\s*this\.opts\.onReady\?\.\(\);/);
   // La garde de l'application : sonde sans le casque, compagnon prêt, 5 s : relancée, au plus une fois par 30 s.
   const sonde = read('app', 'src', 'sonde-ovr.ts');
   assert.match(sonde, /export const PROBE_GUARD_MS = 5000;/);
@@ -746,4 +750,81 @@ test('validité du contour (essai réel du 13 novembre 2026, 23:39 : borne repos
   assert.match(cpp, /why = "affichage-perdu";/);
   assert.match(cpp, /say\("ovr session refaite raison=" \+ why\);/);
   assert.match(cpp, /ovr pouls casque=/);
+});
+
+test('couche du repère pour VPX (essai réel du 13 novembre 2026, 23:50-23:52 : trois remises en partie, table fausse)', () => {
+  // L'environnement de VPX : la couche placée devant celles déjà demandées, rien d'installé pour le poste.
+  assert.equal(ROOM_LAYER, 'XR_APILAYER_CYBERPINBALL_repere');
+  assert.deepEqual(roomLayerEnv('C:\\app\\natif\\couche-repere', 'C:\\d\\vr\\correction-partie.txt', {}), {
+    XR_API_LAYER_PATH: 'C:\\app\\natif\\couche-repere',
+    XR_ENABLE_API_LAYERS: 'XR_APILAYER_CYBERPINBALL_repere',
+    CYBERPINBALL_REPERE: 'C:\\d\\vr\\correction-partie.txt',
+  });
+  const autre = roomLayerEnv('C:\\c', 'f', { XR_API_LAYER_PATH: 'D:\\autre', XR_ENABLE_API_LAYERS: 'XR_APILAYER_autre' });
+  assert.equal(autre.XR_API_LAYER_PATH, 'C:\\c;D:\\autre');
+  assert.equal(autre.XR_ENABLE_API_LAYERS, 'XR_APILAYER_CYBERPINBALL_repere;XR_APILAYER_autre');
+  // Le fichier relu par la couche : son journal, puis la composée des sauts depuis le lancement.
+  assert.equal(roomCorrectionText('C:\\j.txt', { angle: 0.5, tx: 0.1, tz: -0.2, dy: 0.01 }), 'journal C:\\j.txt\nsaut 0.5 0.1 -0.2 0.01\n');
+  assert.equal(roomLayerCorrected('01:45:02.981 couche chargée par VPX\n'), false);
+  assert.equal(roomLayerCorrected('01:45:18.559 correction appliquée (1) : angle=2.98000\n'), true);
+  // Les trois remises réelles composées : la pose que la couche donne à l'espace corrigé (rotation de -angle autour de
+  // la verticale, puis t) envoie toute place d'avant les sauts là où les sauts la mettent (movePlace).
+  const sauts: JumpTransform[] = [
+    { angle: (170.7 * Math.PI) / 180, tx: 0.21, tz: -0.12, dy: 0 },
+    { angle: (-29.6 * Math.PI) / 180, tx: -0.4, tz: 0.42, dy: 0.01 },
+    { angle: (-48.3 * Math.PI) / 180, tx: 1.1, tz: -1.05, dy: 0 },
+  ];
+  let cumul: JumpTransform = { angle: 0, tx: 0, tz: 0, dy: 0 };
+  for (const j of sauts) cumul = composeJumps(cumul, j);
+  const lancee: CabinetPlace = { ...lockbarPlace({ x: -0.3, y: 0.9, z: -0.4 }, { x: 0.3, y: 0.9, z: -0.4 }) };
+  let attendue = lancee;
+  for (const j of sauts) attendue = movePlace(attendue, j);
+  const theta = -cumul.angle;
+  const parCouche = (x: number, z: number) => ({ x: x * Math.cos(theta) + z * Math.sin(theta) + cumul.tx, z: -x * Math.sin(theta) + z * Math.cos(theta) + cumul.tz });
+  const p = parCouche(lancee.x, lancee.z);
+  assert.ok(Math.hypot(p.x - attendue.x, p.z - attendue.z) < 1e-9, JSON.stringify({ p, attendue }));
+  assert.equal(placeGap(movePlace(lancee, cumul), attendue).cm < 1e-6, true);
+  // La couche : l'espace STAGE (et LOCAL) de VPX remplacé partout où il le passe, la correction tenue par image.
+  const cpp = read('packages', 'casque-vr', 'src', 'couche-repere.cpp');
+  assert.match(cpp, /const double h = -0\.5 \* angle;/);
+  assert.match(cpp, /HOOK\(xrWaitFrame, layerWaitFrame\)/);
+  assert.match(cpp, /mine\.space = substitute\(info->space\);/);
+  assert.match(cpp, /a = substitute\(space\);\s*b = substitute\(baseSpace\);/);
+  assert.match(cpp, /mine\.baseSpace = substitute\(info->baseSpace\);/);
+  assert.match(cpp, /projections\.back\(\)\.space = mine;/);
+  assert.match(cpp, /info->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_STAGE \|\| info->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_LOCAL/);
+  // L'application : la couche à chaque partie dans le casque, la correction à chaque saut en partie, et le recalage fait
+  // en partie reporté du repère du lancement par les sauts que la couche a appliqués.
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /const roomEnv = vrGame && simulated === undefined \? startGameRoom\(\) : undefined;/);
+  assert.match(front, /const vpxEnv = roomEnv \? \{ env: roomEnv \} : \{\};/);
+  assert.match(front, /vpxPrefDir: vpxPrefDir\(install\.version\), \.\.\.vpxEnv, onVr,/);
+  assert.match(front, /if \(gameRoom && \(playing \|\| launch\)\) \{\s*try \{\s*gameRoom\.onJump\(jump\);/);
+  assert.match(front, /const room = endGameRoom\(\);\s*if \(playedVr && vrGame\) checkVrPlaceAfterGame\(vrGame\.ini, played\.file, room\);/);
+  assert.match(front, /const carried = room && room\.jumps && room\.corrected\(\) \? room\.jump : undefined;/);
+  assert.match(front, /const next = carried \? movePlace\(inVpx, carried\) : inVpx;/);
+  assert.match(front, /const moved = placeVpxSettings\(launched,/);
+  assert.match(read('app', 'src', 'launcher.ts'), /\.\.\.\(opts\.env && \{ env: \{ \.\.\.process\.env, \.\.\.opts\.env \} \}\),/);
+  assert.match(read('scripts', 'fabriquer.mjs'), /'XR_APILAYER_CYBERPINBALL_repere\.dll', 'XR_APILAYER_CYBERPINBALL_repere\.json'/);
+  assert.match(read('packages', 'casque-vr', 'CMakeLists.txt'), /add_library\(XR_APILAYER_CYBERPINBALL_repere SHARED src\/couche-repere\.cpp\)/);
+});
+
+test('faux verdict « limite fixe » (essai réel du 13 novembre 2026, 23:26 : session mourante) : jugé au port, réparé ensuite', () => {
+  const casque = read('app', 'src', 'casque.ts');
+  // « piece aucune » n'est plus conclu au « pret » : au port du casque, dans une session sans erreur de scène ni d'OpenXR.
+  assert.match(casque, /if \(line === 'piece aucune'\) \{ \/\/ i18n-ignore : protocole du compagnon\s*\/\/[^\n]*\n\s*this\.stationaryPending = true;\s*continue;/);
+  assert.match(casque, /if \(\/\^erreur \(scène\|scene\|xr\)\/\.test\(line\)\) this\.sessionFault \?\?= line\.slice\(7\);/);
+  assert.match(casque, /if \(line === 'porte 1'\) this\.stationaryVerdict\('worn'\);/);
+  assert.match(casque, /this\.opts\.onLost\?\.\(this\.standby\);\s*this\.stationaryVerdict\('lost'\);/);
+  assert.match(casque, /if \(how === 'lost' \|\| this\.sessionFault\) \{/);
+  assert.match(casque, /rien n’est conclu, type de limite inchangé/);
+  // Ce qu'un faux verdict a laissé : l'avis à l'écran et la marque « déjà proposé » retirés quand la limite redevient
+  // celle du calage (un vrai changement futur sera proposé de nouveau).
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /if \(!stale\) \{[\s\S]*?if \(staleNotice\) roomNotice = false;[\s\S]*?fs\.rmSync\(file, \{ force: true \}\);/);
+  assert.match(front, /roomNotice = true;\s*staleNotice = true;/);
+  // La place de la borne réelle (casque-borne.json du PinCab) n'en garde rien : le type de limite y est « piece ».
+  const place: CabinetPlace = { ...lockbarPlace({ x: -0.2, y: 1.0, z: -0.1 }, { x: 0.35, y: 1.0, z: -0.25 }), room: { width: 2.494715, depth: 3.382814 }, boundary: 'piece' };
+  assert.equal(staleCalibration(place, 'kept', { width: 2.494715, depth: 3.382814 }), undefined);
+  assert.ok(staleCalibration(place, 'recentred', undefined));
 });

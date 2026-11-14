@@ -995,3 +995,30 @@ export function inverseJump(j: JumpTransform): JumpTransform {
   const c = Math.cos(-j.angle), s = Math.sin(-j.angle);
   return { angle: -j.angle, tx: -(c * j.tx - s * j.tz), tz: -(s * j.tx + c * j.tz), dy: -(j.dy ?? 0) };
 }
+
+/**
+ * La couche d'API OpenXR du repère de la pièce (packages/casque-vr/src/couche-repere.cpp, essai réel du 13 novembre
+ * 2026 : trois remises d'origine en partie, la table fausse dans le casque jusqu'à la partie suivante). Chargée dans le
+ * seul processus de VPX, elle lui rend un espace de la pièce corrigé par la composée des sauts mesurés depuis son
+ * lancement : la table reste à sa place sans que VPX relise rien.
+ */
+export const ROOM_LAYER = 'XR_APILAYER_CYBERPINBALL_repere';
+
+/**
+ * L'environnement de VPX pour charger la couche : son dossier et son nom placés devant ceux déjà posés (une autre
+ * couche demandée par le joueur reste chargée), et le fichier de la correction. Rien d'installé pour le poste.
+ */
+export function roomLayerEnv(layerDir: string, correctionFile: string, env: Readonly<Record<string, string | undefined>>): Record<string, string> {
+  const first = (head: string, rest: string | undefined) => (rest ? `${head};${rest}` : head);
+  return { XR_API_LAYER_PATH: first(layerDir, env.XR_API_LAYER_PATH), XR_ENABLE_API_LAYERS: first(ROOM_LAYER, env.XR_ENABLE_API_LAYERS), CYBERPINBALL_REPERE: correctionFile };
+}
+
+/** Le fichier de la correction lu par la couche : son journal, puis la composée des sauts depuis le lancement de VPX. */
+export function roomCorrectionText(journal: string, jump: JumpTransform): string {
+  return `journal ${journal}\nsaut ${jump.angle} ${jump.tx} ${jump.tz} ${jump.dy ?? 0}\n`;
+}
+
+/** Le journal de la couche dit-il qu'elle a corrigé l'espace de VPX au moins une fois ? */
+export function roomLayerCorrected(journal: string): boolean {
+  return /^\S+ correction appliquée \(/m.test(journal);
+}

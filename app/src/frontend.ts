@@ -107,6 +107,7 @@ import {
   type GripOffset,
   inGameCalibration,
   placeFromVpxCentering,
+  roomLayerEnv,
   placeGap,
   roomKeepingAdvice,
   shouldOfferCalibration,
@@ -128,7 +129,7 @@ import {
   fluidityVerdict,
   linkMinutesBetween,
   linkNetworkSummary,
-  linkTransport,
+  linkTransportSince,
   parsePcNetwork,
   PC_NETWORK_COMMAND,
   type LinkNetworkSummary,
@@ -465,6 +466,7 @@ import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
 import { centerWhenStarted, prepareVrGame, probeVr, readVrMirror, readVrMode, rememberVrSettings, writeIniSettings, writeVrCalibration, writeVrMirror, writeVrMode, type VrGame } from './vr';
 import { HEADSET_TRIAL_DIR, HeadsetMenu, readCabinetPlace, type HeadPose } from './casque';
 import { OvrProbe, type OvrJump } from './sonde-ovr';
+import { GameRoom, roomLayerDir } from './couche-repere';
 import { prepareSchemaImage, schemaImageFile, type SchemaImage } from './schema-image';
 import { installPausePlugin, pauseSettingsFor, QUIT_HOLD_S } from './pause-vr';
 import { DMD_PLUGIN, installVpxPlugin } from './vpx-plugins';
@@ -3201,6 +3203,8 @@ let lastAnchorAt = 0;
 let anchorRedrawnSaid: string | undefined;
 /** Le dernier saut appliqué : l'instant, et de combien la borne a été reposée (à dire au port). */
 let lastJump: { at: number; jump: OvrJump; gap: { cm: number; deg: number } } | undefined;
+/** Le repère de la partie dans le casque en cours (couche-repere.ts) : la place lue par VPX et les sauts depuis. */
+let gameRoom: GameRoom | undefined;
 /**
  * Le port en cours (headsetOriginReset) : ce qui a reposé la borne (saut mesuré, contour rafraîchi), la session neuve
  * du compagnon demandée pour relire le contour, et ses minuteries.
@@ -3771,6 +3775,41 @@ function noContourCheck(place: CabinetPlace): void {
   }
 }
 
+/**
+ * Une partie dans le casque se lance : la place de la borne que VPX lit dans son INI, et la couche du repère de la
+ * pièce chargée dans le seul processus de VPX (son environnement, rendu ici). Sans place calée, ou sans couche : VPX
+ * part comme sans elle, dit au journal.
+ */
+function startGameRoom(): Record<string, string> | undefined {
+  gameRoom = undefined;
+  const place = headset?.place();
+  if (!place || !isCalibrated(place) || place.free || headsetSetting() === 'bureau') return undefined;
+  const dir = roomLayerDir(path.join(__dirname, '..'));
+  try {
+    gameRoom = new GameRoom(path.join(loc.dataDir, 'vr'), place, Boolean(dir));
+  } catch (error) {
+    console.warn(`Casque : couche du repère pas préparée (${(error as Error).message}) ; VPX part sans elle.`); // i18n-ignore : journal
+    return undefined;
+  }
+  if (!dir) {
+    console.warn('Casque : couche du repère absente de l’application ; VPX part sans elle (une remise d’origine en partie ne sera rattrapée qu’à la partie suivante).'); // i18n-ignore : journal
+    return undefined;
+  }
+  return roomLayerEnv(dir, gameRoom.file, process.env);
+}
+
+/** La partie finie : le journal de la couche au journal, et le repère de la partie rendu (pour le recalage fait en partie). */
+function endGameRoom(): GameRoom | undefined {
+  const room = gameRoom;
+  gameRoom = undefined;
+  if (!room) return undefined;
+  const text = room.journalText().trim();
+  for (const line of text ? text.split(/\r?\n/) : []) console.log(`Casque, couche du repère : ${line}`); // i18n-ignore : journal
+  if (room.layer && !text) console.warn('Casque, couche du repère : rien écrit ; pas chargée par VPX (son chargeur OpenXR l’a refusée ?), la partie s’est jouée sans elle.'); // i18n-ignore : journal
+  if (room.jumps && !room.corrected()) console.warn(`Casque : ${room.jumps} remise(s) d’origine pendant la partie, table de VPX pas corrigée.`); // i18n-ignore : journal
+  return room;
+}
+
 /** Un saut au journal : rotation, déplacement, sol, intervalle des deux relevés. */
 function jumpText(jump: OvrJump): string {
   return `${((jump.angle * 180) / Math.PI).toFixed(1)}°, ${(Math.hypot(jump.tx, jump.tz) * 100).toFixed(0)} cm, sol ${(jump.dy * 100).toFixed(1)} cm, relevés à ${jump.dtMs.toFixed(1)} ms`; // i18n-ignore : journal
@@ -3804,6 +3843,15 @@ function headsetJump(jump: OvrJump): void {
   }
   lastJump = { at: Date.now(), jump, gap };
   if (portWatch) portWatch.jump = gap;
+  // En partie : la couche de VPX corrige son espace de la composée des sauts depuis son lancement (couche-repere.ts).
+  if (gameRoom && (playing || launch)) {
+    try {
+      gameRoom.onJump(jump);
+      console.log(`Casque : ${gameRoom.layer ? 'correction de la table de VPX' : 'saut en partie, couche absente : table fausse jusqu’à la partie suivante'} (${gameRoom.jumps} saut(s) depuis le lancement : ${((gameRoom.jump.angle * 180) / Math.PI).toFixed(1)}°, ${(Math.hypot(gameRoom.jump.tx, gameRoom.jump.tz) * 100).toFixed(0)} cm).`); // i18n-ignore : journal
+    } catch (error) {
+      console.warn(`Casque : correction de la table de VPX pas écrite (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+  }
   originNotice = false;
   console.log(`Casque : saut de l’espace de suivi mesuré par la sonde (${jumpText(jump)})${playing || launch ? ', en partie' : ''} : borne reposée de ${gap.cm.toFixed(0)} cm et ${gap.deg.toFixed(0)}°, de ${placeText(place)} à ${placeText(next)}.`); // i18n-ignore : journal
   if (!playing && !launch && headset.worn) showBanner(t('Borne remise en place'));
@@ -3819,6 +3867,8 @@ function headsetJump(jump: OvrJump): void {
 function probeTracking(on: boolean, why: string): void {
   if (!on) {
     roomFrame.probeLost();
+    // La sonde sans le casque : Link coupé (ou sonde muette) ; la prochaine connexion relira son transport.
+    if (ovrProbe.withoutHeadset()) linkDisconnected();
     if (vrMode === 'auto') console.log(`Casque, sonde LibOVR : ne suit plus le casque (${why}) ; aucun saut ne peut être mesuré, contour de la limite oublié (relu à la prochaine session du compagnon).`); // i18n-ignore : journal
     return;
   }
@@ -3835,6 +3885,7 @@ function probeTracking(on: boolean, why: string): void {
  * la sonde suit le casque à cet instant (les sauts mesurés depuis le gardent juste) ; la sonde le redit aussitôt.
  */
 function companionReady(): void {
+  linkConnectedAt ??= Date.now() / 1000;
   const following = ovrProbe.tracking();
   const before = roomFrame.state();
   roomFrame.companionSession(following);
@@ -4039,6 +4090,7 @@ let vrGameStop: (() => void) | undefined;
  * pas à la perte de sa session) : il est fermé, et le menu revient sur les écrans.
  */
 function headsetLost(inGame: boolean): void {
+  linkDisconnected();
   if (inGame && vrGameStop) {
     console.warn('Casque : éteint ou Link coupé pendant la partie ; VPX est fermé, retour aux écrans du PC.'); // i18n-ignore : journal
     vrGameStop();
@@ -4124,10 +4176,28 @@ let linkMode: LinkTransport | undefined;
 let pcNetwork: PcNetwork | undefined;
 /** L'avertissement « Air Link sur un PC en Wi-Fi » déjà donné dans cette session du casque. */
 let airLinkWarned = false;
+/**
+ * Début de la connexion de Link en cours (secondes depuis 1970) : premier « pret » du compagnon depuis que le casque
+ * était perdu (Link coupé, éteint) ou absent. Le transport n'est lu que dans les relevés d'Oculus d'après lui.
+ */
+let linkConnectedAt: number | undefined;
+
+/** Link coupé ou casque éteint : la connexion suivante dira son propre transport. */
+function linkDisconnected(): void {
+  linkConnectedAt = undefined;
+  linkMode = undefined;
+}
 
 /** Relève, en arrière-plan et sans fenêtre, la carte réseau du PC et le transport de Link. */
 function refreshVrNetwork(): void {
-  linkMode = linkTransport(readOculusPerfLog()) ?? linkMode;
+  // Une seule vérité : le dernier relevé d'Oculus de la connexion en cours ; aucun, et le transport reste inconnu
+  // (jamais l'avertissement « Air Link » d'après une connexion passée).
+  const found = linkConnectedAt !== undefined ? linkTransportSince(readOculusPerfLog(), linkConnectedAt - 5) : undefined;
+  if (found && found.transport !== linkMode) {
+    const at = found.at !== undefined ? new Date(found.at * 1000).toISOString().slice(11, 19) : '?';
+    console.log(`Casque : Link ${found.transport === 'air' ? 'par Air Link' : 'par câble USB'} (relevé d’Oculus de ${at}).`); // i18n-ignore : journal
+  }
+  if (found) linkMode = found.transport;
   execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', PC_NETWORK_COMMAND], { windowsHide: true, timeout: 15_000 }, (error, stdout) => {
     if (error) return;
     const net = parsePcNetwork(String(stdout));
@@ -4496,6 +4566,8 @@ function offerCalibration(reason: CalibrationOfferReason): boolean {
 
 /** Signature du calage périmé déjà dit au journal pendant cette session de Cyber Pinball (staleCalibration). */
 let staleSaid: string | undefined;
+/** L'avis « la limite du Quest a changé » vient du calage périmé (pas d'une limite redessinée) : retiré avec lui. */
+let staleNotice = false;
 
 /**
  * Calage périmé (staleCalibration : la limite du Quest a changé de type ou de taille depuis le calage) : dit une
@@ -4505,8 +4577,24 @@ let staleSaid: string | undefined;
 function checkStaleCalibration(): void {
   if (!headset || headsetSetting() === 'bureau') return;
   const stale = staleCalibration(headset.place(), headset.roomKeeping, headset.room);
-  if (!stale) return;
   const file = path.join(loc.dataDir, 'vr', 'calage-perime.json');
+  if (!stale) {
+    // La limite est de nouveau celle du calage (un verdict passé était faux, ou le joueur l'a remise) : l'avis à
+    // l'écran et la marque « déjà proposé » sont retirés, un vrai changement futur sera proposé de nouveau.
+    if (!boundaryOf(headset.roomKeeping)) return;
+    if (staleNotice) roomNotice = false;
+    staleNotice = false;
+    staleSaid = undefined;
+    if (fs.existsSync(file)) {
+      try {
+        fs.rmSync(file, { force: true });
+        console.log('Casque : limite du Quest de nouveau celle du calage ; la marque du calage périmé est retirée.'); // i18n-ignore : journal
+      } catch {
+        // Dossier de la VR en lecture seule : la marque reste, sans gravité.
+      }
+    }
+    return;
+  }
   let offered: string | undefined;
   try {
     offered = (JSON.parse(fs.readFileSync(file, 'utf8')) as { signature?: string }).signature;
@@ -4519,6 +4607,7 @@ function checkStaleCalibration(): void {
     console.warn(`Casque : calage périmé, ${stale.log} ; le calage est proposé une fois au menu (ou les deux joysticks, « Caler la borne »).`); // i18n-ignore : journal
   }
   roomNotice = true;
+  staleNotice = true;
   if (!offerCalibration('limite-changee')) return;
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -4894,9 +4983,13 @@ function vpxTableGeometry(tableFile: string): VpxTableGeometry | undefined {
   return glass ? { widthCm: (glass.right - glass.left) * vpuCm, glassBottomCm: glass.glassBottom * vpuCm } : undefined;
 }
 
-function checkVrPlaceAfterGame(ini: string, tableFile: string): void {
+function checkVrPlaceAfterGame(ini: string, tableFile: string, room?: GameRoom): void {
   const place = readCabinetPlace(headsetPlaceFile());
   if (!place) return;
+  // La place que VPX a lue au lancement : la référence de ce qu'il a écrit (les sauts ont reposé `place` depuis).
+  const launched = room?.launchPlace ?? place;
+  // La couche a corrigé son espace : ce que VPX a calé l'est dans le repère du lancement, reporté par les sauts.
+  const carried = room && room.jumps && room.corrected() ? room.jump : undefined;
   const doc = IniDocument.parse(readTextIfExists(ini));
   // Borne recalée pendant la partie (le plugin : « calage-partie … resultat=ok ») : VPX a réécrit la place de sa
   // table en quittant ; la barre avant touchée devient celle de la borne du casque et des parties suivantes.
@@ -4907,7 +5000,8 @@ function checkVrPlaceAfterGame(ini: string, tableFile: string): void {
     if ([saved.orientation, saved.tableX, saved.tableY].every(Number.isFinite)) {
       const table = vpxTableGeometry(tableFile);
       const menuWidth = menuPlayfield(headsetSources(), headsetTurn())?.width;
-      const next = placeFromVpxCentering(saved, place, inGameCalibration(place, table, menuWidth), table, menuWidth);
+      const inVpx = placeFromVpxCentering(saved, launched, inGameCalibration(launched, table, menuWidth), table, menuWidth);
+      const next = carried ? movePlace(inVpx, carried) : inVpx;
       const gap = placeGap(place, next);
       headset?.showPlace(next, true, true);
       try {
@@ -4919,7 +5013,7 @@ function checkVrPlaceAfterGame(ini: string, tableFile: string): void {
       return;
     }
   }
-  const moved = placeVpxSettings(place, vpxTableGeometry(tableFile), menuPlayfield(headsetSources(), headsetTurn())?.width)
+  const moved = placeVpxSettings(launched, vpxTableGeometry(tableFile), menuPlayfield(headsetSources(), headsetTurn())?.width)
     .filter((s) => s.section === 'PlayerVR' && s.key !== 'TableZ')
     .map((s) => ({ key: s.key, want: Number(s.value), got: Number(doc.get(s.section, s.key)) }))
     .filter((m) => Number.isFinite(m.got) && Math.abs(m.got - m.want) > 1);
@@ -6446,10 +6540,13 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const simulatedLoadMs = Number(process.env.CYBERPINBALL_PARTIE_SIMULEE_CHARGEMENT_MS) || undefined;
   // Jouer et enregistrer : le balancier simulé de VPX dessinerait son cercle dans la vidéo ; la partie reçoit un INI à part, balancier éteint (recordingini.ts).
   const recordIni = recording && simulated === undefined && !vrGame && !double ? prepareRecordingIni(table) : undefined;
+  // Partie dans le casque : la couche du repère de la pièce garde la table à sa place si le Quest remet l'origine.
+  const roomEnv = vrGame && simulated === undefined ? startGameRoom() : undefined;
+  const vpxEnv = roomEnv ? { env: roomEnv } : {};
   const game =
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}) })
-      : launchVpx({ exe: install.exe, ini: vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onVr, onPlaying, onForeground, onWindows });
+      : launchVpx({ exe: install.exe, ini: vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), ...vpxEnv, onVr, onPlaying, onForeground, onWindows });
   // DMD masqué pour cette table : sa fenêtre rangée hors des écrans avant même de paraître (in-game-menu.ts).
   if (configuration && simulated === undefined) inGameMenu.watchHiddenDmd({ pid: game.pid, table, cabinet: configuration, displays: observedDisplays(), dataDir: loc.dataDir });
   if (launch) {
@@ -6530,7 +6627,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (load) console.log(load);
   stopWaitExit?.();
   vrGameStop = undefined;
-  if (playedVr && vrGame) checkVrPlaceAfterGame(vrGame.ini, played.file);
+  const room = endGameRoom();
+  if (playedVr && vrGame) checkVrPlaceAfterGame(vrGame.ini, played.file, room);
   // La pièce a pu sauter pendant la partie : la borne du menu reposée sur la limite du Quest.
   if (playedVr) setTimeout(anchorCheck, 0);
   if (playedVr && vrGame) checkVrRoomAfterGame(vpxLog, vrLogFrom);

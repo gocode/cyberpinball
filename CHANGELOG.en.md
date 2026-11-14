@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.13
 
+- Virtual reality: a headset session that fails at start no longer passes for a stationary boundary or an outdated alignment, and the "Air Link" warning is no longer given when Link goes through the cable.
+- Virtual reality: in the middle of a game, when the headset is taken off and put back on, the table stays in its place on the cabinet (the Quest redoes the room, Cyber Pinball corrects VPX at once).
 - Virtual reality: Link cut then back, Cyber Pinball finds the room measurement again on its own; the cabinet is never moved again from the boundary of a past connection.
 - Virtual reality: a cabinet aligned before this version says so when the headset is first put on and offers the alignment once; it then puts itself back in place.
 - Virtual reality with Air Link: the cabinet no longer follows the head when the headset is put back on. Cyber Pinball recognises the Quest remaking the room, measured on the head at that very moment, and puts the cabinet back in place at once, at the menu as in a game, height included; the Quest boundary, read again through a new session when needed (a short black), confirms it. Moving the headset around in the hand no longer moves anything.

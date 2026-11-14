@@ -1,0 +1,10 @@
+{
+  "file_format_version": "1.0.0",
+  "api_layer": {
+    "name": "XR_APILAYER_CYBERPINBALL_repere",
+    "library_path": "./XR_APILAYER_CYBERPINBALL_repere.dll",
+    "api_version": "1.0",
+    "implementation_version": "1",
+    "description": "Cyber Pinball : la table de VPX gardée à sa place quand le Quest remet l'origine de la pièce"
+  }
+}

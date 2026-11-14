@@ -759,6 +759,14 @@ XrResult XRAPI_CALL beginFrame(XrSession h, const XrFrameBeginInfo*)
    return s->running ? XR_SUCCESS : XR_ERROR_SESSION_NOT_RUNNING;
 }
 
+/** Le cap (lacet) d'une orientation, comme yawQuat le construit. */
+float yawOfQuat(const XrQuaternionf& q)
+{
+   return std::atan2(2.f * (q.w * q.y + q.x * q.z), 1.f - 2.f * (q.y * q.y + q.x * q.x));
+}
+
+bool worldPose(Space* sp, XrPosef& out);
+
 XrResult XRAPI_CALL endFrame(XrSession h, const XrFrameEndInfo* info)
 {
    std::lock_guard<std::mutex> g(lock);
@@ -768,6 +776,30 @@ XrResult XRAPI_CALL endFrame(XrSession h, const XrFrameEndInfo* info)
    s->frames++;
    if (s->frames == 1 || s->frames % 360 == 0)
       trace("image " + std::to_string(s->frames) + " couches=" + std::to_string(info->layerCount));
+   // L'espace de la projection, dans le monde : dit à la première image et à chaque changement (plus de 1 mm ou
+   // 0,05°). Une application qui dessine sa scène dans un espace fixé à la pièce le garde immobile dans le monde.
+   for (uint32_t i = 0; i < info->layerCount; i++)
+   {
+      const XrCompositionLayerBaseHeader* l = info->layers[i];
+      if (!l || l->type != XR_TYPE_COMPOSITION_LAYER_PROJECTION || l->space == XR_NULL_HANDLE)
+         continue;
+      XrPosef p;
+      if (!worldPose(reinterpret_cast<Space*>(l->space), p))
+         break;
+      const float yaw = yawOfQuat(p.orientation);
+      static XrPosef last {};
+      static float lastYaw = 0.f;
+      static bool said = false;
+      const float d = std::hypot(p.position.x - last.position.x, p.position.y - last.position.y, p.position.z - last.position.z);
+      if (!said || d > 0.001f || std::fabs(yaw - lastYaw) > 0.0009f)
+      {
+         char b[160];
+         std::snprintf(b, sizeof b, "projection espace=%.4f,%.4f,%.4f,%.5f", p.position.x, p.position.y, p.position.z, yaw);
+         trace(b);
+         last = p, lastYaw = yaw, said = true;
+      }
+      break;
+   }
    return XR_SUCCESS;
 }
 
@@ -788,6 +820,12 @@ XrResult XRAPI_CALL createReferenceSpace(XrSession h, const XrReferenceSpaceCrea
 {
    auto* sp = new Space { reinterpret_cast<Session*>(h), SpaceKind::Reference, ci->referenceSpaceType, nullptr, ci->poseInReferenceSpace };
    *out = reinterpret_cast<XrSpace>(sp);
+   {
+      const XrPosef& o = ci->poseInReferenceSpace;
+      char b[160];
+      std::snprintf(b, sizeof b, "espace reference type=%d pose=%.4f,%.4f,%.4f,%.5f", static_cast<int>(ci->referenceSpaceType), o.position.x, o.position.y, o.position.z, yawOfQuat(o.orientation));
+      trace(b);
+   }
    return XR_SUCCESS;
 }
 
@@ -838,17 +876,78 @@ bool worldPose(Space* sp, XrPosef& out)
    return true;
 }
 
-XrResult XRAPI_CALL locateSpace(XrSpace space, XrSpace baseSpace, XrTime, XrSpaceLocation* loc)
+/** Une manette située dans un espace de la pièce : dite quand elle change de plus de 1 cm (ce que l'application voit). */
+void traceHand(Space* space, Space* base, const XrPosef& seen)
 {
-   std::lock_guard<std::mutex> g(lock);
+   if (space->kind != SpaceKind::Action || base->kind != SpaceKind::Reference || base->ref == XR_REFERENCE_SPACE_TYPE_VIEW)
+      return;
+   const std::string path = boundPath(space->session, space->action);
+   const int h = path.find("/user/hand/right") == 0 ? 1 : path.find("/user/hand/left") == 0 ? 0 : -1;
+   const int k = path.find("/aim/pose") != std::string::npos ? 0 : path.find("/grip/pose") != std::string::npos ? 1 : -1;
+   if (h < 0 || k < 0)
+      return;
+   static XrVector3f last[2][2] {};
+   static bool said[2][2] {};
+   const XrVector3f& p = seen.position;
+   if (said[h][k] && std::hypot(p.x - last[h][k].x, p.y - last[h][k].y, p.z - last[h][k].z) <= 0.01f)
+      return;
+   char b[160];
+   std::snprintf(b, sizeof b, "manette %s %s vue=%.4f,%.4f,%.4f", h ? "droite" : "gauche", k ? "prise" : "visee", p.x, p.y, p.z);
+   trace(b);
+   last[h][k] = p, said[h][k] = true;
+}
+
+/** Une pose relative, comme xrLocateSpace la rend (lock tenu). */
+void locateOne(XrSpace space, XrSpace baseSpace, XrSpaceLocation* loc)
+{
+   // Chaque sorte de localisation demandée par l'application, une fois : ce qu'elle situe, et dans quel espace.
+   {
+      const auto name = [](Space* sp) {
+         if (sp->kind == SpaceKind::Reference)
+            return std::string("reference-") + std::to_string(static_cast<int>(sp->ref));
+         const std::string p = boundPath(sp->session, sp->action);
+         return p.empty() ? std::string("action-sans-liaison") : p;
+      };
+      static std::set<std::string> seen;
+      const std::string what = name(reinterpret_cast<Space*>(space)) + " dans " + name(reinterpret_cast<Space*>(baseSpace));
+      if (seen.insert(what).second)
+         trace("situe " + what);
+   }
    XrPosef a, b;
    if (!worldPose(reinterpret_cast<Space*>(space), a) || !worldPose(reinterpret_cast<Space*>(baseSpace), b))
    {
       loc->locationFlags = 0;
-      return XR_SUCCESS;
+      return;
    }
    loc->pose = compose(inverse(b), a);
    loc->locationFlags = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT | XR_SPACE_LOCATION_POSITION_TRACKED_BIT | XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT;
+   traceHand(reinterpret_cast<Space*>(space), reinterpret_cast<Space*>(baseSpace), loc->pose);
+}
+
+XrResult XRAPI_CALL locateSpace(XrSpace space, XrSpace baseSpace, XrTime, XrSpaceLocation* loc)
+{
+   std::lock_guard<std::mutex> g(lock);
+   locateOne(space, baseSpace, loc);
+   return XR_SUCCESS;
+}
+
+// OpenXR 1.1 : plusieurs espaces d'un coup (VPX 10.8.1 le demande ; le runtime de Meta peut l'avoir).
+XrResult XRAPI_CALL locateSpaces(XrSession, const XrSpacesLocateInfo* info, XrSpaceLocations* out)
+{
+   std::lock_guard<std::mutex> g(lock);
+   if (!info || !out || out->locationCount < info->spaceCount)
+      return XR_ERROR_VALIDATION_FAILURE;
+   for (uint32_t i = 0; i < info->spaceCount; i++)
+   {
+      XrSpaceLocation one { XR_TYPE_SPACE_LOCATION };
+      locateOne(info->spaces[i], info->baseSpace, &one);
+      out->locations[i].locationFlags = one.locationFlags;
+      out->locations[i].pose = one.pose;
+   }
+   static bool said = false;
+   if (!said)
+      trace("xrLocateSpaces utilise");
+   said = true;
    return XR_SUCCESS;
 }
 
@@ -1195,6 +1294,8 @@ const std::map<std::string, PFN_xrVoidFunction>& table()
       F("xrCreateActionSpace", createActionSpace),
       F("xrDestroySpace", destroySpace),
       F("xrLocateSpace", locateSpace),
+      F("xrLocateSpaces", locateSpaces),
+      F("xrLocateSpacesKHR", locateSpaces),
       F("xrLocateViews", locateViews),
       F("xrEnumerateViewConfigurationViews", enumerateViewConfigurationViews),
       F("xrEnumerateSwapchainFormats", enumerateSwapchainFormats),

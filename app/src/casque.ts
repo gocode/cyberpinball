@@ -184,6 +184,14 @@ export class HeadsetMenu {
   room: RoomBounds | undefined;
   /** Pièce gardée par le Quest quand le casque est remis (limite de pièce), ou recentrée sur la tête (limite fixe). */
   roomKeeping: RoomKeeping | undefined;
+  /**
+   * « piece aucune » (limite illisible au « pret ») : jugé au port du casque, dans la même session, sans erreur de
+   * scène ni d'OpenXR entre-temps (essai réel du 13 novembre 2026, 23:26 : « limite fixe » et « calage périmé »
+   * conclus d'une session mourante, image d'un œil refusée, perdue 13 s après ; la limite n'avait pas changé).
+   */
+  private stationaryPending = false;
+  /** Erreur de la session (scène, OpenXR) vue depuis son « pret » : rien n'y est conclu de la limite. */
+  private sessionFault: string | undefined;
   /** Casque retiré (la session s'est arrêtée, accueil de Link) : à son retour, la pièce a pu bouger. */
   private takenOff = false;
   /** Le même retrait, pour dire au journal d'où vient le port suivant (« tete-au-port »). */
@@ -286,6 +294,24 @@ export class HeadsetMenu {
    * Repartir sur une session neuve, tout de suite : elle prend le casque d'elle-même (environ 1 s le
    * 10 novembre 2026), dans la pièce d'origine du Quest, celle que VPX reçoit aussi.
    */
+  /**
+   * Le verdict « limite fixe » en attente : conclu au port du casque, dans une session sans erreur ; écarté si la
+   * session est en erreur ou perdue avant (le type de limite connu reste celui d'avant, rien de marqué périmé).
+   */
+  private stationaryVerdict(how: 'worn' | 'lost'): void {
+    if (!this.stationaryPending) return;
+    this.stationaryPending = false;
+    if (how === 'lost' || this.sessionFault) {
+      this.opts.log(`Casque : limite du Quest illisible dans une session ${how === 'lost' ? 'perdue avant le port du casque' : `en erreur (${this.sessionFault})`} ; rien n’est conclu, type de limite inchangé.`); // i18n-ignore : journal
+      return;
+    }
+    if (this.roomKeeping !== 'recentred') this.opts.onStationary?.();
+    if (this.roomKeeping !== 'recentred') this.opts.log('Casque : pièce du Quest sans limite (limite fixe ou désactivée) : le Quest la recentre sur la tête chaque fois que le casque est remis, sans le dire aux applications ; le calage sera proposé à chaque retour du casque.'); // i18n-ignore : journal
+    this.roomKeeping = 'recentred';
+    this.room = undefined;
+    this.opts.onRoom?.(undefined, false);
+  }
+
   restart(): void {
     this.restartAfterGame = false;
     if (!this.child) return;
@@ -551,11 +577,8 @@ export class HeadsetMenu {
           continue;
         }
         if (line === 'piece aucune') { // i18n-ignore : protocole du compagnon
-          if (this.roomKeeping !== 'recentred') this.opts.onStationary?.();
-          if (this.roomKeeping !== 'recentred') this.opts.log('Casque : pièce du Quest sans limite (limite fixe ou désactivée) : le Quest la recentre sur la tête chaque fois que le casque est remis, sans le dire aux applications ; le calage sera proposé à chaque retour du casque.'); // i18n-ignore : journal
-          this.roomKeeping = 'recentred';
-          this.room = undefined;
-          this.opts.onRoom?.(undefined, false);
+          // Jugé au port du casque (stationaryVerdict) : une session qui meurt ne lit pas la limite.
+          this.stationaryPending = true;
           continue;
         }
         const room = /^piece ([\d.]+) ([\d.]+)$/.exec(line);
@@ -620,10 +643,15 @@ export class HeadsetMenu {
           this.opts.log(`[avertissement] Casque : aucune image des écrans n’arrive au compagnon depuis son lancement (${this.target ? 'canal des textures ouvert' : 'canal des textures fermé'}, ${this.frames.size} en attente) : écrans absents du casque.`); // i18n-ignore : journal
         }
         if (line.startsWith('pret')) {
+          this.sessionFault = undefined;
+          this.stationaryPending = false;
           this.setState('shown');
           this.opts.onReady?.();
         }
+        // Une session en erreur (scène refusée, appel d'OpenXR en échec) : rien n'y sera conclu de la limite.
+        if (/^erreur (scène|scene|xr)/.test(line)) this.sessionFault ??= line.slice(7);
         if (line.startsWith('porte ')) {
+          if (line === 'porte 1') this.stationaryVerdict('worn');
           this.worn = line === 'porte 1';
           this.wornOnce ||= this.worn;
           this.opts.onStateChange?.();
@@ -646,6 +674,7 @@ export class HeadsetMenu {
         if (line.startsWith('casque-perdu')) {
           this.lost = true;
           this.opts.onLost?.(this.standby);
+          this.stationaryVerdict('lost');
         }
         // « centre x z lacet yeux=… » : la nouvelle place de la borne, gardée (dans la pièce seulement).
         const centre = /^centre (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)(?!.*sans-piece)/.exec(line);
@@ -684,6 +713,8 @@ export class HeadsetMenu {
       }
       this.handingOver = false;
       this.worn = false;
+      // Session finie avant le port du casque : rien de conclu sur la limite.
+      this.stationaryPending = false;
       this.wornOnce = false;
       this.standby = false;
       this.viewsFlowing = false;

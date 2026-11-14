@@ -71,6 +71,8 @@ export interface LaunchOptions {
   display?: boolean;
   /** Dossier des réglages de cette version de VPX, pour lire son journal (…\VPinballX\10.8). */
   vpxPrefDir: string;
+  /** Variables d'environnement ajoutées pour VPX (couche OpenXR du repère de la pièce, partie dans le casque). */
+  env?: Record<string, string>;
   timeoutMs?: number;
   /** Appelé quand la fenêtre de jeu est à l'écran. */
   onPlaying?: () => void;
@@ -105,6 +107,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
   const child = spawn(opts.exe, args, {
     cwd: path.dirname(opts.exe),
     windowsHide: false,
+    ...(opts.env && { env: { ...process.env, ...opts.env } }),
   });
 
   let player: WindowInfo | undefined;

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { airLinkOverWifi, fluidityVerdict, linkMinutesBetween, linkNetworkSummary, linkTransport, parsePcNetwork, PC_NETWORK_COMMAND } from '../vr-reseau';
+import { airLinkOverWifi, blockTransport, fluidityVerdict, linkMinutesBetween, linkNetworkSummary, linkTransport, linkTransportSince, parsePcNetwork, PC_NETWORK_COMMAND } from '../vr-reseau';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8').replace(/\r\n/g, '\n');
@@ -62,4 +62,26 @@ test('casque : l’avertissement donné une fois par session, sur la carte du ch
   assert.match(frontend, /execFile\('powershell\.exe', \['-NoProfile', '-NonInteractive', '-Command', PC_NETWORK_COMMAND\], \{ windowsHide: true/);
   assert.match(frontend, /Casque, verdict : réseau en cause/);
   assert.match(read('app', 'renderer', 'frontend.js'), /if \(!prompt && s\.headsetNote\) card\.append\(el\('p', 'headset-prompt-problem', s\.headsetNote\)\);/);
+});
+
+test('Link, une seule vérité (essai réel du 13 novembre 2026 : « câble USB » puis « Air Link » dans la même séance)', () => {
+  // Le type de transmission d'abord : un relevé USB qui porte aussi le Wi-Fi du casque (radio restée allumée) est le câble.
+  const usbAvecWifi = minute(2000, { presented: 4320, lost: 0, glitches: 0, bitrate: 200, goodput: 150, rtt99: 3, air: false }).replace(' }', ', "wifi_rssi_p50": "-40" }');
+  assert.equal(blockTransport(usbAvecWifi), 'cable');
+  assert.equal(blockTransport('{ "event": "oculus_pc_xrs_stats_event", "transmission_type": "TCP" }'), 'air');
+  assert.equal(blockTransport('{ "event": "oculus_pc_xrs_stats_event", "wifi_rssi_p50": "-40" }'), 'air');
+  assert.equal(linkMinutesBetween(`[${usbAvecWifi}]`, 1990, 2010)[0]!.transport, 'cable');
+  // Seulement les relevés de la connexion en cours : un relevé d'une connexion passée ne dit rien.
+  const air = minute(1000, { presented: 4310, lost: 10, glitches: 1, bitrate: 30, goodput: 20, rtt99: 20, air: true });
+  const log = `[${air},${usbAvecWifi}]`;
+  assert.deepEqual(linkTransportSince(log, 1500), { transport: 'cable', at: 2000 });
+  assert.equal(linkTransportSince(log, 2500), undefined);
+  assert.equal(linkTransportSince(`[${air}]`, 1500), undefined);
+  assert.equal(linkTransport(log), 'cable');
+  // L'application : le transport lu depuis le début de la connexion, oublié quand Link est coupé.
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /const found = linkConnectedAt !== undefined \? linkTransportSince\(readOculusPerfLog\(\), linkConnectedAt - 5\) : undefined;/);
+  assert.match(front, /function headsetLost\(inGame: boolean\): void \{\s*linkDisconnected\(\);/);
+  assert.match(front, /function companionReady\(\): void \{\s*linkConnectedAt \?\?= Date\.now\(\) \/ 1000;/);
+  assert.doesNotMatch(front, /linkTransport\(readOculusPerfLog\(\)\)/);
 });

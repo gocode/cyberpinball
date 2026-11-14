@@ -124,6 +124,11 @@ export class OvrProbe {
     return Boolean(this.child && this.pulse?.present && Date.now() - this.pulse.at < PROBE_SILENT_MS);
   }
 
+  /** Vivante (pouls récent) mais sans le casque : Link coupé ou casque éteint, pour elle comme pour tous. */
+  withoutHeadset(): boolean {
+    return Boolean(this.child && this.pulse && !this.pulse.present && Date.now() - this.pulse.at < PROBE_SILENT_MS);
+  }
+
   /** Pourquoi elle ne suit pas le casque (journal). */
   private lostWhy(): string {
     if (!this.child) return 'arrêtée'; // i18n-ignore : journal

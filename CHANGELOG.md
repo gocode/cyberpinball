@@ -11,6 +11,8 @@ son interface).
 
 ## 0.1.13
 
+- Réalité virtuelle : une session du casque qui échoue au démarrage ne fait plus croire à une limite fixe ni à un calage périmé, et l'avertissement « Air Link » ne sort plus quand Link passe par le câble.
+- Réalité virtuelle : en pleine partie, quand on retire et remet le casque, la table reste à sa place sur la borne (le Quest refait la pièce, Cyber Pinball corrige VPX aussitôt).
 - Réalité virtuelle : Link coupé puis revenu, Cyber Pinball retrouve seul la mesure de la pièce ; la borne n'est plus jamais déplacée d'après la limite d'une connexion passée.
 - Réalité virtuelle : une borne calée avant cette version le dit au premier port du casque et propose le calage une fois ; ensuite elle se replace seule.
 - Réalité virtuelle en Air Link : la borne ne suit plus la tête quand on remet le casque. Cyber Pinball reconnaît la remise de la pièce par le Quest, mesurée sur la tête au moment même, et remet la borne en place aussitôt, au menu comme en partie, hauteur comprise ; la limite du Quest, relue au besoin par une session neuve (un court noir), le confirme. Les gestes du casque tenu en main ne déplacent plus rien.

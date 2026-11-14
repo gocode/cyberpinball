@@ -14,11 +14,36 @@ export type LinkTransport = 'air' | 'cable';
  * Le transport de la dernière minute relevée par Oculus (oculus_pc_xrs_stats_event du PerfLog) : Air Link
  * relève le Wi-Fi du casque (wifi_rssi, wifi_tx_link_speed…), le câble non. undefined sans relevé.
  */
-export function linkTransport(perfLogText: string): LinkTransport | undefined {
-  const blocks = perfLogText.match(/\{[^{}]*"event":\s*"oculus_pc_xrs_stats_event"[^{}]*\}/g);
-  const last = blocks?.[blocks.length - 1];
-  if (!last) return undefined;
-  return /"wifi_(rssi|tx_link_speed_mbps)_p50"/.test(last) ? 'air' : 'cable';
+/**
+ * Le transport d'un relevé d'Oculus : son champ « transmission_type » d'abord (« USB » : câble ; TCP, UDP : Air
+ * Link), une seule vérité pour toute l'application ; sans lui, la présence du Wi-Fi du casque (wifi_rssi…), qui peut
+ * aussi paraître en câble, le Wi-Fi du Quest restant allumé.
+ */
+export function blockTransport(block: string): LinkTransport {
+  const type = /"transmission_type":\s*"([^"]*)"/.exec(block)?.[1]?.trim().toUpperCase();
+  if (type) return type === 'USB' ? 'cable' : 'air';
+  return /"wifi_(rssi|tx_link_speed_mbps)_p50"/.test(block) ? 'air' : 'cable';
+}
+
+export function linkTransport(perfLogText: string, since?: number): LinkTransport | undefined {
+  return linkTransportSince(perfLogText, since)?.transport;
+}
+
+/**
+ * Le transport de la dernière minute relevée depuis `since` (secondes depuis 1970), et son heure : un relevé d'une
+ * connexion passée ne dit rien de celle en cours (essai réel du 13 novembre 2026 : « Link par câble USB » puis « Air
+ * Link sur un PC en Wi-Fi » dans la même séance). Sans `since`, la dernière du journal. undefined sans relevé.
+ */
+export function linkTransportSince(perfLogText: string, since = -Infinity): { transport: LinkTransport; at: number | undefined } | undefined {
+  const blocks = perfLogText.match(/\{[^{}]*"event":\s*"oculus_pc_xrs_stats_event"[^{}]*\}/g) ?? [];
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const block = blocks[i]!;
+    const m = /"timestamp_epoch":\s*"?(-?[\d.]+)"?/.exec(block);
+    const at = m ? Number(m[1]) : undefined;
+    if (since !== -Infinity && (at === undefined || !(at >= since))) return undefined;
+    return { transport: blockTransport(block), at };
+  }
+  return undefined;
 }
 
 /** La carte réseau qui porte la route par défaut du PC (vers le routeur). */
@@ -97,7 +122,7 @@ export function linkMinutesBetween(text: string, from: number, to: number): Link
       ...(opt('total_network_video_goodput_Mbps') !== undefined && { goodput: opt('total_network_video_goodput_Mbps') }),
       ...(opt('network_rtt_ms_p99') !== undefined && { rttP99: opt('network_rtt_ms_p99') }),
       ...(opt('fps') !== undefined && { hz: opt('fps') }),
-      transport: /"wifi_(rssi|tx_link_speed_mbps)_p50"/.test(block) ? 'air' : 'cable',
+      transport: blockTransport(block),
     });
   }
   return out;

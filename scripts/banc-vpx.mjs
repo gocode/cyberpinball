@@ -12,6 +12,10 @@
 //                        décide, 2 minuterie ignorée d'office (ce que Windows fait à un processus sans fenêtre visible)
 //   --plugin 0           partie sans le plugin de Cyber Pinball ; --captures 0 : sans ses captures
 //   --essai 1            [Plugin.CyberPinball] CadenceTest : l'essai de cadence d'une minute (--duree 70000)
+//   --repere 1           la couche du repère de la pièce (packages/casque-vr/src/couche-repere.cpp) : trois remises
+//                        d'origine en pleine partie, mesurées par la vraie sonde LibOVR, la correction écrite comme
+//                        Cyber Pinball l'écrit ; verdict : l'espace de la projection de VPX revenu à sa place dans
+//                        le monde (moins de 1 cm et 0,5°). Avec --couche 0 : la même partie sans la couche.
 // La cadence est lue dans les mesures du plugin et, sans lui, dans la trace du runtime (cadenceDeLaTrace).
 // Construit d'abord : npm run casque-vr (runtime factice), node scripts/vision3d.mjs (plugin, runtime à cadence exacte).
 // VPX est copié une fois dans le dossier temporaire (jamais de jonction vers l'original) ; le plugin construit y
@@ -27,6 +31,10 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const BANC_RUNTIME = path.join(repo, 'build', 'casque-vr', 'Release', 'runtime-factice.dll');
 export const BANC_PLUGIN = path.join(repo, 'build', 'vision3d', 'Release', 'plugin-cyberpinball64.dll');
 export const BANC_RUNTIME_CADENCE = path.join(repo, 'build', 'vision3d', 'Release', 'runtime-cadence.dll');
+/** La couche du repère de la pièce et la sonde LibOVR, construites avec le compagnon (npm run casque-vr). */
+export const BANC_COUCHE_DIR = path.join(repo, 'build', 'casque-vr', 'Release');
+export const BANC_COUCHE = 'XR_APILAYER_CYBERPINBALL_repere';
+export const BANC_SONDE = path.join(repo, 'build', 'casque-vr', 'Release', 'cyberpinball-sonde-ovr.exe');
 const VPX_EXE = 'VPinballX_BGFX64.exe';
 
 /** Le geste du calage en partie : les deux clics des joysticks tenus 4 s, gâchette, puis A. */
@@ -45,6 +53,49 @@ export const SCENARIO_CALAGE = [
   '15000 bouton /user/hand/right/input/a/click 1',
   '15200 bouton /user/hand/right/input/a/click 0',
 ].join('\n');
+
+/**
+ * Trois remises d'origine en pleine partie (essai réel du 13 novembre 2026, 23:50-23:52 : 170,7°, -29,6°, -48,3°) :
+ * la tête va ailleurs, puis le Quest remet l'origine sur elle (signature : la tête arrive à l'origine même, cap nul).
+ */
+export const SCENARIO_REPERE = [
+  '0 porte 1',
+  '0 limite piece 3 3',
+  '0 tete 0.2 1.6 0.3 0.4',
+  '0 manette gauche -0.3 1.02 -0.35',
+  '0 manette droite 0.3 1.02 -0.35',
+  '14000 tete 0.6 1.62 -0.4 2.98',
+  '15000 origine 0.6 -0.4 2.98',
+  '19000 tete 0.1 1.6 0.9 2.46',
+  '20000 origine 0.1 0.9 2.46',
+  '24000 tete -0.8 1.58 0.2 1.62',
+  '25000 origine -0.8 0.2 1.62',
+  // Puis le geste du calage en partie : VPX situe alors les manettes posées, dans son espace.
+  '28000 bouton /user/hand/left/input/thumbstick/click 1',
+  '28100 bouton /user/hand/right/input/thumbstick/click 1',
+  '32100 bouton /user/hand/left/input/thumbstick/click 0',
+  '32100 bouton /user/hand/right/input/thumbstick/click 0',
+  '34000 valeur /user/hand/right/input/trigger/value 1',
+  '34300 valeur /user/hand/right/input/trigger/value 0',
+].join('\n');
+
+/** La pose de l'espace de la projection de VPX dans le monde, à chaque changement (trace du runtime factice). */
+export function posesProjection(trace) {
+  return [...trace.matchAll(/^(\d+) \d+ projection espace=(-?[\d.]+),(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)/gm)].map((m) => ({ ms: Number(m[1]), x: Number(m[2]), y: Number(m[3]), z: Number(m[4]), yaw: Number(m[5]) }));
+}
+
+/** Les manettes que VPX situe dans son espace, à chaque changement de plus de 1 cm (trace du runtime factice). */
+export function manettesVues(trace) {
+  return [...trace.matchAll(/^(\d+) \d+ manette (gauche|droite) (\w+) vue=(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)/gm)].map((m) => ({ ms: Number(m[1]), main: `${m[2]} ${m[3]}`, x: Number(m[4]), y: Number(m[5]), z: Number(m[6]) }));
+}
+
+/** L'écart entre deux poses au sol (cm) et en cap (degrés). */
+export function ecartPose(a, b) {
+  let d = a.yaw - b.yaw;
+  while (d > Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  return { cm: Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) * 100, deg: (Math.abs(d) * 180) / Math.PI };
+}
 
 /** Casque porté, manettes posées, aucun geste : pour mesurer la cadence de VPX. */
 export const SCENARIO_REPOS = ['0 porte 1', '0 limite fixe', '0 tete 0 1.6 0 0', '0 manette gauche -0.3 1.02 -0.35', '0 manette droite 0.3 1.02 -0.35'].join('\n');
@@ -115,7 +166,7 @@ async function iniPartie(dir, imageCalage, { garde, plugin = true, captures = tr
   return { ini, log };
 }
 
-export async function jouerVpx({ vpx, table, scenario = SCENARIO_CALAGE, dureeMs = 40000, imageCalage, garde, plugin = true, captures = true, cadenceExacte = false, essai = false }) {
+export async function jouerVpx({ vpx, table, scenario = SCENARIO_CALAGE, dureeMs = 40000, imageCalage, garde, plugin = true, captures = true, cadenceExacte = false, essai = false, couche = false, pendant }) {
   const runtime = cadenceExacte ? BANC_RUNTIME_CADENCE : BANC_RUNTIME;
   if (!fs.existsSync(runtime)) throw new Error(cadenceExacte ? 'Runtime à cadence exacte absent : node scripts/vision3d.mjs.' : 'Runtime factice absent : npm run casque-vr.');
   if (!fs.existsSync(BANC_PLUGIN)) throw new Error('Plugin absent : node scripts/vision3d.mjs.');
@@ -134,6 +185,13 @@ export async function jouerVpx({ vpx, table, scenario = SCENARIO_CALAGE, dureeMs
     CYBERPINBALL_XR_TRACE: traceFile,
     CYBERPINBALL_XR_DEBUT_FICHIER: path.join(dir, 'debut.txt'),
   };
+  // La couche du repère de la pièce, comme Cyber Pinball la pose au lancement d'une partie dans le casque.
+  const correction = path.join(dir, 'correction-partie.txt');
+  const journalCouche = path.join(dir, 'couche-repere.txt');
+  if (couche) {
+    fs.writeFileSync(correction, `journal ${journalCouche}\nsaut 0 0 0 0\n`);
+    Object.assign(env, { XR_API_LAYER_PATH: BANC_COUCHE_DIR, XR_ENABLE_API_LAYERS: BANC_COUCHE, CYBERPINBALL_REPERE: correction });
+  }
   // La table jouée est une copie : VPX ne touche jamais à l'original (ni .ini de table, ni fichiers voisins).
   const jouee = path.join(dir, path.basename(table));
   fs.copyFileSync(table, jouee);
@@ -143,6 +201,8 @@ export async function jouerVpx({ vpx, table, scenario = SCENARIO_CALAGE, dureeMs
   const child = spawn(path.join(copie, VPX_EXE), ['-Ini', ini, '-Play', jouee], { cwd: copie, env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   child.stdout.on('data', (c) => sortie.push(String(c)));
   child.stderr.on('data', (c) => sortie.push(String(c)));
+  // Ce qui joue à côté de VPX pendant la partie (la sonde de Cyber Pinball) : arrêté à la fin.
+  const aCote = pendant?.({ dir, env, correction, journalCouche });
   const code = await new Promise((resolve) => {
     const timer = setTimeout(() => {
       spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true });
@@ -152,9 +212,76 @@ export async function jouerVpx({ vpx, table, scenario = SCENARIO_CALAGE, dureeMs
       resolve(c);
     });
   });
+  await aCote?.stop?.();
   const lire = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '');
   const vpxLog = [path.join(dir, 'vpinball.log'), path.join(copie, 'vpinball.log'), path.join(process.env.APPDATA ?? '', 'VPinballX', 'vpinball.log')].find((f) => fs.existsSync(f) && fs.statSync(f).mtimeMs > Date.now() - dureeMs - 60000);
-  return { dir, code, plugin: lire(log), trace: lire(traceFile), vpxLog: vpxLog ? lire(vpxLog) : '', vpxLogFile: vpxLog, sortie: sortie.join('') };
+  return { dir, code, plugin: lire(log), trace: lire(traceFile), couche: lire(journalCouche), vpxLog: vpxLog ? lire(vpxLog) : '', vpxLogFile: vpxLog, sortie: sortie.join('') };
+}
+
+/**
+ * La preuve de la couche du repère (--repere 1) : VPX joue SCENARIO_REPERE ; la vraie sonde LibOVR (OvrProbe de
+ * l'application) mesure les remises d'origine ; chaque saut est composé avec les précédents et la correction écrite
+ * comme Cyber Pinball l'écrit (frontend.ts). Rend les poses de l'espace de la projection et le verdict.
+ */
+export async function preuveRepere({ vpx, table, couche = true, dureeMs = 40000 }) {
+  const req = (await import('node:module')).createRequire(import.meta.url);
+  const sondeOvr = req('../app/dist/sonde-ovr.js');
+  const core = req('../packages/core/dist/index.js');
+  const sauts = [];
+  const r = await jouerVpx({
+    vpx,
+    table,
+    scenario: SCENARIO_REPERE,
+    dureeMs,
+    couche,
+    pendant: ({ dir, env, correction, journalCouche }) => {
+      let probe;
+      let cumul = { angle: 0, tx: 0, tz: 0, dy: 0 };
+      // La sonde part une fois la session de VPX ouverte : le scénario compte depuis elle.
+      const debut = path.join(dir, 'debut.txt');
+      const attente = setInterval(() => {
+        if (!fs.existsSync(debut) || probe) return;
+        clearInterval(attente);
+        probe = new sondeOvr.OvrProbe({
+          appDir: dir,
+          exe: BANC_SONDE,
+          dll: BANC_RUNTIME,
+          env,
+          log: () => undefined,
+          onJump: (j) => {
+            cumul = core.composeJumps(cumul, j);
+            sauts.push({ ...j, ms: Date.now() - Number(fs.readFileSync(debut, 'utf8')) });
+            const tmp = `${correction}.tmp`;
+            fs.writeFileSync(tmp, `journal ${journalCouche}\nsaut ${cumul.angle} ${cumul.tx} ${cumul.tz} ${cumul.dy}\n`);
+            fs.renameSync(tmp, correction);
+          },
+        });
+        probe.set(true);
+      }, 100);
+      return {
+        stop: async () => {
+          clearInterval(attente);
+          probe?.set(false);
+          await new Promise((res) => setTimeout(res, 500));
+        },
+      };
+    },
+  });
+  const poses = posesProjection(r.trace);
+  const depart = poses[0];
+  const fin = poses.at(-1);
+  const ecart = depart && fin ? ecartPose(depart, fin) : undefined;
+  // VPX ne situe les manettes qu'au geste du calage, fait après les trois remises : posées et immobiles dans le monde,
+  // il doit les voir où elles étaient au lancement (origine du monde au départ : leurs prises, 3 cm au-dessus et 8 cm
+  // en arrière des bouts du scénario).
+  const vues = manettesVues(r.trace);
+  const prises = { 'gauche prise': { x: -0.3, y: 1.05, z: -0.27 }, 'droite prise': { x: 0.3, y: 1.05, z: -0.27 } };
+  const mains = Object.entries(prises).map(([main, w]) => {
+    const l = vues.filter((v) => v.main === main);
+    return l.length ? { main, cm: Math.hypot(l.at(-1).x - w.x, l.at(-1).y - w.y, l.at(-1).z - w.z) * 100, vues: l.length } : { main, cm: NaN, vues: 0 };
+  });
+  const mainsOk = mains.every((m) => m.vues > 0 && m.cm < 1);
+  return { ...r, sauts, poses, ecart, mains, ok: Boolean(ecart && sauts.length === 3 && ecart.cm < 1 && ecart.deg < 0.5 && mainsOk) };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -162,6 +289,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (!a.vpx || !a.table) {
     console.error('node scripts/banc-vpx.mjs --vpx <dossier de VPX> --table <fichier.vpx> [--scenario <fichier>] [--duree <ms>]');
     process.exit(2);
+  }
+  if (a.repere === '1') {
+    const p = await preuveRepere({ vpx: a.vpx, table: a.table, couche: a.couche !== '0', ...(a.duree && { dureeMs: Number(a.duree) }) });
+    console.log(`Dossier : ${p.dir}\nSortie de VPX : ${p.code}`);
+    console.log(`--- sauts mesurés par la sonde (${p.sauts.length}) ---\n` + p.sauts.map((s) => `${s.ms} ms : ${((s.angle * 180) / Math.PI).toFixed(1)}°, ${(Math.hypot(s.tx, s.tz) * 100).toFixed(0)} cm`).join('\n'));
+    console.log('--- espace de la projection de VPX dans le monde ---\n' + p.poses.map((q) => `${q.ms} ms : ${q.x.toFixed(4)}, ${q.y.toFixed(4)}, ${q.z.toFixed(4)}, cap ${((q.yaw * 180) / Math.PI).toFixed(2)}°`).join('\n'));
+    console.log('--- manettes vues par VPX au geste du calage, face à leur place au lancement ---\n' + p.mains.map((m) => `${m.main} : ${m.vues ? `${m.cm.toFixed(2)} cm (${m.vues} relevé(s))` : 'jamais située'}`).join('\n'));
+    console.log(`xrLocateSpaces : ${/xrLocateSpaces utilise/.test(p.trace) ? 'utilisé par VPX' : 'pas utilisé par VPX'}`);
+    console.log('--- couche du repère ---\n' + (p.couche || '(rien)'));
+    console.log(p.ecart ? `Verdict : ${p.ok ? 'OK' : 'ÉCHEC'}, projection à ${p.ecart.cm.toFixed(2)} cm et ${p.ecart.deg.toFixed(2)}° de sa place de départ après ${p.sauts.length} saut(s).` : 'Verdict : ÉCHEC, aucune projection tracée.');
+    process.exit(p.ok ? 0 : 1);
   }
   const r = await jouerVpx({
     vpx: a.vpx,

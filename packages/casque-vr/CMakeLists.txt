@@ -20,6 +20,16 @@ target_link_libraries(cyberpinball-casque PRIVATE d3d11 dxgi d3dcompiler windows
 add_executable(cyberpinball-sonde-ovr src/sonde-ovr.cpp)
 target_compile_options(cyberpinball-sonde-ovr PRIVATE /W4 /utf-8 /permissive-)
 
+# Couche d'API OpenXR « repère de la pièce » (src/couche-repere.cpp) : chargée dans le seul processus de VPX quand
+# Cyber Pinball lance une partie dans le casque (XR_API_LAYER_PATH, XR_ENABLE_API_LAYERS), à côté de son manifeste.
+# Elle garde la table à sa place quand le Quest remet l'origine de la pièce en pleine partie.
+add_library(XR_APILAYER_CYBERPINBALL_repere SHARED src/couche-repere.cpp)
+target_include_directories(XR_APILAYER_CYBERPINBALL_repere PRIVATE third_party)
+target_compile_definitions(XR_APILAYER_CYBERPINBALL_repere PRIVATE UNICODE _UNICODE)
+target_compile_options(XR_APILAYER_CYBERPINBALL_repere PRIVATE /W4 /utf-8 /permissive-)
+add_custom_command(TARGET XR_APILAYER_CYBERPINBALL_repere POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/src/XR_APILAYER_CYBERPINBALL_repere.json $<TARGET_FILE_DIR:XR_APILAYER_CYBERPINBALL_repere>)
+
 # Banc d'essai : un runtime OpenXR factice, sans casque ni fenêtre, qui joue un scénario (casque retiré et
 # remis, boutons, poses, limite de la pièce) et trace ce que fait le compagnon (scripts/banc-casque.test.mjs).
 add_library(runtime-factice SHARED test/runtime-factice.cpp)
