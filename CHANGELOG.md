@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.13
 
+- Réalité virtuelle : Link coupé puis revenu, Cyber Pinball retrouve seul la mesure de la pièce ; la borne n'est plus jamais déplacée d'après la limite d'une connexion passée.
 - Réalité virtuelle : une borne calée avant cette version le dit au premier port du casque et propose le calage une fois ; ensuite elle se replace seule.
 - Réalité virtuelle en Air Link : la borne ne suit plus la tête quand on remet le casque. Cyber Pinball reconnaît la remise de la pièce par le Quest, mesurée sur la tête au moment même, et remet la borne en place aussitôt, au menu comme en partie, hauteur comprise ; la limite du Quest, relue au besoin par une session neuve (un court noir), le confirme. Les gestes du casque tenu en main ne déplacent plus rien.
 - Salons : les phrases préparées se règlent (Réglages de la communauté > Phrases préparées, ou « Gérer les phrases… » depuis « Écrire dans le salon ») : ajouter au clavier à l'écran ou au téléphone, modifier, monter, descendre, supprimer, rétablir celles d'origine. `{table}` y devient la table choisie dans la roue. Le téléphone propose les mêmes, « Merci ! » compris.

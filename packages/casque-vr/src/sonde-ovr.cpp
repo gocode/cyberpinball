@@ -14,7 +14,10 @@
 //   ovr charge <dll> | ovr absent <raison>          la DLL et ses fonctions
 //   ovr init <code> [<message>]                      ovr_Initialize (client invisible)
 //   ovr session <code> [<message>]                   ovr_Create (casque branché ou non)
-//   ovr etat visible=… casque=… porte=… regard=… recentrer=…   à chaque changement (ovr_GetSessionStatus)
+//   ovr etat visible=… casque=… porte=… regard=…     à chaque changement (ovr_GetSessionStatus)
+//   ovr pouls casque=0|1 porte=0|1                   chaque seconde : la sonde vit (pour Cyber Pinball, pas pour le journal)
+//   ovr session refaite raison=<…>                   session perdue (erreur d'état ou d'entrées, affichage perdu, casque
+//                                                    absent pour elle depuis 10 s, fin demandée) : LibOVR refait de zéro
 //   ovr origine <code> sol|yeux                      espace de suivi demandé au niveau du sol
 //   ovr contour exterieur|aire n=<points> dims=<l>x<p> pts=<x>,<z> …   à chaque changement, casque porté
 //   ovr tete <x> <y> <z> <lacet> suivi=<bits>        toutes les 5 s, casque porté
@@ -31,11 +34,6 @@
 //   ovr saut-refuse raison=<…> …                     un bond de la tête qui ne passe pas les garde-fous (une fois par s)
 //                                                    seule la signature de la remise d'origine du Quest est un saut :
 //                                                    arrivée à l'origine même, cap nul (9 fois sur 9 le 13 novembre 2026)
-//   ovr origine-defaite code=<r> revenue=1|0 tete=… attendue=…   --defaire-origine : après un saut, l'ancien repère
-//                                                    redonné par ovr_SpecifyTrackingOrigin, puis la tête relue
-//   ovr origine-retablie code=<r>                    « origine-retour » reçu : le repère du runtime rendu à la sonde
-//   ovr session-neuve demandee | ovr contour-apres-session-neuve change=1|0 delai=<ms>
-//                                                    après un saut : la session LibOVR refaite, le contour relu
 //   ovr test-limite code=<r> tete=<distance> calcule=<distance> ecart=<cm> points=<cm> n=<testés>
 //                                                    ovr_TestBoundary (distance de la tête à la limite, par le runtime)
 //                                                    face à la distance calculée sur le contour lu, et l'écart le
@@ -155,7 +153,6 @@ using FnGetTimeInSeconds = double (*)();
 using FnGetLastErrorInfo = void (*)(ErrorInfo*);
 using FnTestBoundary = int (*)(Session, unsigned, unsigned, BoundaryTestResult*);
 using FnTestBoundaryPoint = int (*)(Session, const Vec3*, unsigned, BoundaryTestResult*);
-using FnSpecifyTrackingOrigin = int (*)(Session, Pose);
 
 struct Api
 {
@@ -173,12 +170,11 @@ struct Api
    FnGetLastErrorInfo lastError = nullptr;
    FnTestBoundary testBoundary = nullptr;
    FnTestBoundaryPoint testBoundaryPoint = nullptr;
-   FnSpecifyTrackingOrigin specifyOrigin = nullptr;
 } api;
 
 std::atomic<bool> quit { false };
-/** « origine-retour » reçu de Cyber Pinball : l'ancien repère redonné à la sonde seule, le rendre au runtime. */
-std::atomic<bool> wantRevert { false };
+/** « contour » reçu de Cyber Pinball (session neuve de son compagnon) : le contour redit, même inchangé. */
+std::atomic<bool> wantContour { false };
 
 void say(const std::string& line)
 {
@@ -405,22 +401,6 @@ Jump headJump(const HeadSample& first, const HeadSample& b)
    return j;
 }
 
-/** La pose qui, donnée à ovr_SpecifyTrackingOrigin, redonne le repère d'avant un saut : l'ancienne origine, vue d'après. */
-Pose undoPose(const Jump& j)
-{
-   // Le cap du saut est R(angle) au sol (x' = c x - s z) : un quart de tour autour de la verticale de -angle.
-   const float h = -0.5f * j.angle;
-   return { { 0.f, std::sin(h), 0.f, std::cos(h) }, { j.tx, 0.f, j.tz } };
-}
-
-/** L'inverse d'une pose (pour rendre son repère au runtime). */
-Pose inversePose(const Pose& p)
-{
-   const Quat c { -p.orientation.x, -p.orientation.y, -p.orientation.z, p.orientation.w };
-   const Vec3 t = rotate(c, p.position);
-   return { c, { -t.x, -t.y, -t.z } };
-}
-
 template <typename F>
 bool load(HMODULE dll, const char* name, F& out)
 {
@@ -502,15 +482,9 @@ constexpr ButtonName BUTTONS[] = { { 0x1, "a" }, { 0x2, "b" }, { 0x4, "clic-joys
 int main(int argc, char** argv)
 {
    std::string dllPath;
-   bool undoOrigin = false;
    for (int i = 1; i < argc; i++)
-   {
       if (std::string(argv[i]) == "--ovr" && i + 1 < argc)
          dllPath = argv[i + 1];
-      // Essai a) (13 novembre 2026) : défaire la remise d'origine après un saut (ovr_SpecifyTrackingOrigin).
-      if (std::string(argv[i]) == "--defaire-origine")
-         undoOrigin = true;
-   }
    if (dllPath.empty())
    {
       say("ovr absent pas de dll indiquee (--ovr)");
@@ -525,8 +499,8 @@ int main(int argc, char** argv)
             l.pop_back();
          if (l == "fin")
             break;
-         if (l == "origine-retour")
-            wantRevert = true;
+         if (l == "contour")
+            wantContour = true;
       }
       quit = true;
    }).detach();
@@ -546,7 +520,6 @@ int main(int argc, char** argv)
    load(dll, "ovr_GetLastErrorInfo", api.lastError);
    load(dll, "ovr_TestBoundary", api.testBoundary);
    load(dll, "ovr_TestBoundaryPoint", api.testBoundaryPoint);
-   load(dll, "ovr_SpecifyTrackingOrigin", api.specifyOrigin);
    if (!ok)
    {
       say("ovr absent fonctions manquantes dans " + dllPath);
@@ -559,37 +532,54 @@ int main(int argc, char** argv)
    // fait presque rien à chaque tour, une priorité au-dessus de la normale ne retire rien aux autres.
    SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS);
 
-   // Client invisible ; la version 1.43 demandée d'abord, sinon sans version.
-   InitParams params {};
-   params.flags = INIT_INVISIBLE | INIT_REQUEST_VERSION;
-   params.requestedMinorVersion = 43;
-   int r = -1;
-   while (!quit)
-   {
-      r = api.initialize(&params);
-      if (r < 0)
+   // Le pouls, chaque seconde, où qu'en soit la sonde : Cyber Pinball la sait vivante, et sait si elle a le casque.
+   ULONGLONG pulseAt = 0;
+   const auto pulse = [&pulseAt](bool present, bool mounted) {
+      const ULONGLONG now = GetTickCount64();
+      if (now - pulseAt < 1000)
+         return;
+      pulseAt = now;
+      say(std::string("ovr pouls casque=") + (present ? "1" : "0") + " porte=" + (mounted ? "1" : "0"));
+   };
+   const auto pause = [&pulse](int ms) {
+      for (int i = 0; i < ms / 100 && !quit; i++)
       {
-         params.flags = INIT_INVISIBLE;
-         r = api.initialize(&params);
-      }
-      say("ovr init " + std::to_string(r) + (r < 0 ? " " + lastError() : std::string(params.flags & INIT_REQUEST_VERSION ? " version 1.43" : " sans version")));
-      if (r >= 0)
-         break;
-      for (int i = 0; i < 150 && !quit; i++)
+         pulse(false, false);
          Sleep(100);
-   }
+      }
+   };
 
-   // Casque absent : nouvel essai toutes les 10 s, dit au journal seulement quand le résultat change.
-   int lastCreate = 1;
-   struct
-   {
-      bool pending = false;
-      std::string before;
-      ULONGLONG at = 0;
-   } recreated;
-   std::string lastPoints;
+   // Essai réel du 13 novembre 2026 : Link coupé puis revenu, l'ancienne session LibOVR ne voyait plus le casque
+   // (« casque=0 », une seule erreur d'entrées -3003), la sonde muette toute une séance. Désormais toute session perdue
+   // est refaite de zéro (ovr_Shutdown, ovr_Initialize, ovr_Create), dit au journal quand la raison change.
+   InitParams params {};
+   bool live = false;
+   int lastInit = 1, lastCreate = 1;
+   std::string lastWhy;
    while (!quit)
    {
+      int r = 0;
+      if (!live)
+      {
+         // Client invisible ; la version 1.43 demandée d'abord, sinon sans version.
+         params.flags = INIT_INVISIBLE | INIT_REQUEST_VERSION;
+         params.requestedMinorVersion = 43;
+         r = api.initialize(&params);
+         if (r < 0)
+         {
+            params.flags = INIT_INVISIBLE;
+            r = api.initialize(&params);
+         }
+         if (r != lastInit)
+            say("ovr init " + std::to_string(r) + (r < 0 ? " " + lastError() : std::string(params.flags & INIT_REQUEST_VERSION ? " version 1.43" : " sans version")));
+         lastInit = r;
+         if (r < 0)
+         {
+            pause(3000);
+            continue;
+         }
+         live = true;
+      }
       Session session = nullptr;
       Luid luid {};
       r = api.create(&session, &luid);
@@ -598,8 +588,13 @@ int main(int argc, char** argv)
       lastCreate = r;
       if (r < 0)
       {
-         for (int i = 0; i < 100 && !quit; i++)
-            Sleep(100);
+         // Service de Meta perdu (erreurs -3000 à -3999) : LibOVR refait de zéro ; casque absent : nouvel essai.
+         if (r <= -3000 && r > -4000)
+         {
+            api.shutdown();
+            live = false;
+         }
+         pause(3000);
          continue;
       }
       if (api.setOrigin)
@@ -613,23 +608,24 @@ int main(int argc, char** argv)
       unsigned lastButtons = 0;
       bool triggers[2] {};
       std::string lastOuter, lastArea;
-      ULONGLONG poseAt = 0, boundaryAt = 0, refusedAt = 0, recreateAt = 0;
-      // Essai a) : l'ancien repère redonné à la sonde, en attente de savoir s'il l'est aussi pour les autres.
-      bool undone = false;
-      Pose undoneWith {};
+      ULONGLONG poseAt = 0, boundaryAt = 0, refusedAt = 0, absentSince = 0;
+      std::string why;
       HeadSample prevHead;
       LARGE_INTEGER freq;
       QueryPerformanceFrequency(&freq);
       while (!quit)
       {
          SessionStatus st {};
-         api.sessionStatus(session, &st);
-         if (first || st.isVisible != last.isVisible || st.hmdPresent != last.hmdPresent || st.hmdMounted != last.hmdMounted || st.hasInputFocus != last.hasInputFocus
-            || st.shouldRecenter != last.shouldRecenter)
+         const int sr = api.sessionStatus(session, &st);
+         if (sr < 0)
          {
-            // Essai b) : la remise d'origine est-elle une demande à l'application (ShouldRecenter) ?
+            why = "etat code=" + std::to_string(sr);
+            break;
+         }
+         if (first || st.isVisible != last.isVisible || st.hmdPresent != last.hmdPresent || st.hmdMounted != last.hmdMounted || st.hasInputFocus != last.hasInputFocus)
+         {
             say(std::string("ovr etat visible=") + (st.isVisible ? "1" : "0") + " casque=" + (st.hmdPresent ? "1" : "0") + " porte=" + (st.hmdMounted ? "1" : "0")
-               + " regard=" + (st.hasInputFocus ? "1" : "0") + " recentrer=" + (st.shouldRecenter ? "1" : "0"));
+               + " regard=" + (st.hasInputFocus ? "1" : "0"));
             if (st.hmdMounted && !last.hmdMounted)
             {
                poseAt = 0;
@@ -640,12 +636,33 @@ int main(int argc, char** argv)
          }
          first = false;
          last = st;
+         pulse(st.hmdPresent, st.hmdMounted);
          if (st.shouldQuit)
          {
-            say("ovr session a quitter");
+            why = "fin-demandee";
+            break;
+         }
+         if (st.displayLost)
+         {
+            why = "affichage-perdu";
             break;
          }
          const ULONGLONG now = GetTickCount64();
+         // Casque absent pour cette session depuis 10 s : elle a pu rester d'une connexion de Link passée.
+         absentSince = st.hmdPresent ? 0 : absentSince ? absentSince : now;
+         if (absentSince && now - absentSince >= 10000)
+         {
+            why = "casque-absent";
+            break;
+         }
+         if (st.hmdPresent)
+            lastWhy.clear();
+         // Session neuve du compagnon de Cyber Pinball : le contour redit, même inchangé.
+         if (wantContour.exchange(false))
+         {
+            lastOuter.clear();
+            boundaryAt = 0;
+         }
          // La limite, toutes les 2 s, dite quand elle change (casque porté : le Quest la donne alors).
          if (st.hmdMounted && now - boundaryAt >= 2000)
          {
@@ -654,15 +671,7 @@ int main(int argc, char** argv)
             if (outer != lastOuter)
             {
                say("ovr " + outer);
-               const std::string pts = pointsLine(outerPoints(session));
-               say(pts);
-               // Essai c) : la session refaite après un saut, le contour relu a-t-il changé ?
-               if (recreated.pending)
-               {
-                  recreated.pending = false;
-                  say("ovr contour-apres-session-neuve change=" + std::string(pts != recreated.before ? "1" : "0") + " delai=" + std::to_string(GetTickCount64() - recreated.at));
-               }
-               lastPoints = pts;
+               say(pointsLine(outerPoints(session)));
             }
             if (area != lastArea)
                say("ovr " + area);
@@ -707,25 +716,6 @@ int main(int argc, char** argv)
                {
                   say(jump.line);
                   say(boundaryTest(session, cur.pose));
-                  // Essai a) : redonner l'ancien repère, puis relire la tête ; Cyber Pinball dit s'il vaut pour tous.
-                  if (undoOrigin && api.specifyOrigin && !undone)
-                  {
-                     const Pose p = undoPose(jump);
-                     const int code = api.specifyOrigin(session, p);
-                     Sleep(20);
-                     const Pose h = api.trackingState(session, api.time(), 0).head();
-                     const bool back = std::hypot(h.position.x - jump.before.position.x, h.position.z - jump.before.position.z) < 0.03f
-                        && std::fabs(wrap(yawOf(h.orientation) - yawOf(jump.before.orientation))) < 3.f * 3.14159265f / 180.f;
-                     say("ovr origine-defaite code=" + std::to_string(code) + " revenue=" + (back ? "1" : "0") + " tete=" + poseText(h) + " attendue=" + poseText(jump.before));
-                     if (code >= 0 && back)
-                        undone = true, undoneWith = p;
-                     else if (code >= 0)
-                        api.specifyOrigin(session, inversePose(p)); // pas revenue : rien de changé pour la suite
-                     cur.valid = false; // le repère a changé sous la sonde : pas de bond à lire au relevé suivant
-                  }
-                  // Essai c) : la session LibOVR refaite dans 1,5 s, pour voir si le contour suit (sans essai a) en cours).
-                  if (!undone)
-                     recreateAt = now + 1500;
                }
                else if (!jump.line.empty() && now - refusedAt >= 1000)
                {
@@ -737,22 +727,6 @@ int main(int argc, char** argv)
          }
          else
             prevHead.valid = false;
-         // « origine-retour » : l'ancien repère ne valait que pour la sonde ; le repère du runtime lui est rendu.
-         if (wantRevert.exchange(false) && undone)
-         {
-            undone = false;
-            const int code = api.specifyOrigin(session, inversePose(undoneWith));
-            say("ovr origine-retablie code=" + std::to_string(code));
-            prevHead.valid = false;
-            recreateAt = now + 500;
-         }
-         if (recreateAt && now >= recreateAt && !undone)
-         {
-            recreateAt = 0;
-            say("ovr session-neuve demandee");
-            recreated = { true, lastPoints, GetTickCount64() };
-            break;
-         }
 
          // Boutons bruts, à chaque changement.
          InputState in {};
@@ -760,6 +734,12 @@ int main(int argc, char** argv)
          if (ir != lastInput)
             say("ovr entrees " + std::to_string(ir) + " type=" + std::to_string(in.controllerType));
          lastInput = ir;
+         // Service de Meta perdu (-3003 vu le 13 novembre 2026 à la coupure de Link) : la session ne reviendra pas.
+         if (ir <= -3000 && ir > -4000)
+         {
+            why = "entrees code=" + std::to_string(ir);
+            break;
+         }
          if (ir >= 0)
          {
             for (const ButtonName& b : BUTTONS)
@@ -777,8 +757,21 @@ int main(int argc, char** argv)
          Sleep(4);
       }
       api.destroy(session);
+      if (quit)
+         break;
+      // Refaite de zéro ; dit quand la raison change (Link coupé longtemps : une seule ligne, pas une toutes les 10 s).
+      if (why != lastWhy)
+      {
+         say("ovr session refaite raison=" + why);
+         lastInit = lastCreate = 1;
+      }
+      lastWhy = why;
+      api.shutdown();
+      live = false;
+      pause(1000);
    }
-   api.shutdown();
+   if (live)
+      api.shutdown();
    say("ovr fin");
    return 0;
 }

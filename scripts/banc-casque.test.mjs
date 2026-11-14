@@ -96,7 +96,7 @@ test('banc : sonde LibOVR, client invisible : limite fixée à la pièce, tête,
   assert.equal(r.code, 0, r.lignes.join('\n'));
   assert.equal(l(/^ovr charge /).length, 1);
   assert.deepEqual(l(/^ovr init /), ['ovr init 0 version 1.43']);
-  assert.deepEqual(l(/^ovr etat /), ['ovr etat visible=0 casque=1 porte=1 regard=0 recentrer=0']);
+  assert.deepEqual(l(/^ovr etat /), ['ovr etat visible=0 casque=1 porte=1 regard=0']);
   assert.match(l(/^ovr tete /)[0], /^ovr tete 0\.100 1\.600 0\.200 0\.300 suivi=15$/);
   assert.match(l(/^ovr manettes /)[0], /^ovr manettes -0\.300 1\.000 -0\.350 suivi=15 0\.300 1\.000 -0\.350 suivi=15$/);
   // Le contour et l'aire sont fixés à la pièce : l'origine déplacée (Link), ils changent dans l'espace de suivi.
@@ -353,33 +353,6 @@ test('banc : tête qui tourne vite (344°/s), aucun saut ; la remise d’origine
   else assert.ok(r.lignes.some((l) => /^ovr saut-refuse raison=intervalle-long .*bond=22/.test(l)), tous);
 });
 
-// Essai a) : l'ancien repère redonné par la sonde (ovr_SpecifyTrackingOrigin). Pour elle seule (défaut du runtime
-// factice) : la tête y revient pour elle ; « origine-retour » lui rend le repère du runtime, sans faux saut ensuite.
-test('banc : essai a), origine défaite pour la sonde seule, puis rendue au runtime ; aucun faux saut', banc, async () => {
-  const r = await sonder(['0 porte 1', '0 tete 0.6 1.6 -0.3 0.8', '1000 origine 0.6 -0.3 0.8'].join('\n'), {
-    dureeMs: 6000,
-    args: ['--defaire-origine'],
-    commandes: [[3500, 'origine-retour']],
-  });
-  const defaite = r.lignes.find((l) => l.startsWith('ovr origine-defaite '));
-  assert.match(defaite ?? '', /code=0 revenue=1 /, r.lignes.join('\n'));
-  assert.ok(r.lignes.includes('ovr origine-retablie code=0'), r.lignes.join('\n'));
-  assert.equal(r.lignes.filter((l) => l.startsWith('ovr saut ')).length, 1, r.lignes.filter((l) => l.startsWith('ovr saut')).join('\n'));
-  // Rendue : la tête est de nouveau dans le repère d'après la remise (à l'origine).
-  const tete = r.lignes.filter((l) => l.startsWith('ovr tete ')).at(-1).split(' ').slice(2, 5).map(Number);
-  assert.ok(Math.hypot(tete[0], tete[2]) < 0.02, JSON.stringify(tete));
-  // Sans l'argument : rien n'est tenté.
-  const sans = await sonder(['0 porte 1', '0 tete 0.6 1.6 -0.3 0.8', '1000 origine 0.6 -0.3 0.8'].join('\n'), { dureeMs: 3000 });
-  assert.equal(sans.lignes.some((l) => l.startsWith('ovr origine-defaite')), false);
-});
-
-// Essai c) : après un saut, la session LibOVR de la sonde refaite, le contour relu ; s'il est figé, il ne change pas.
-test('banc : essai c), session LibOVR refaite après le saut, contour relu (inchangé s’il est figé)', banc, async () => {
-  const r = await sonder(['0 porte 1', '0 limite piece 3.4 3.6', `0 contour ${pts(contourMonde())}`, '0 tete 0.6 1.6 -0.3 0.8', '990 contour-fige 1', '1000 origine 0.6 -0.3 0.8'].join('\n'), { dureeMs: 6000 });
-  assert.ok(r.lignes.includes('ovr session-neuve demandee'), sansPoints(r));
-  assert.match(r.lignes.find((l) => l.startsWith('ovr contour-apres-session-neuve')) ?? '', /change=0 /, sansPoints(r));
-});
-
 // Une borne calée avant l'ancrage n'a pas de contour gardé : l'ancrage ne peut rien (anchorPlace undefined, d'où le
 // calage proposé une fois au menu) ; après le calage, la place garde le contour effectif et l'ancrage agit.
 test('banc : place sans contour, contour lu, rien à ancrer ; après le calage, la remise d’origine est rattrapée', banc, async () => {
@@ -396,5 +369,155 @@ test('banc : place sans contour, contour lu, rien à ancrer ; après le calage, 
   const ancre = core.anchorPlace(recalee, frame.effective());
   assert.equal(ancre.kind, 'moved');
   const reste = core.placeGap(ancre.place, run.vraie);
+  assert.ok(reste.cm < 2 && reste.deg < 1, JSON.stringify(reste));
+});
+
+// Le lecteur des sauts de l'application vérifie aussi la signature (13 novembre 2026) : des lignes réelles du journal
+// d'essai.13, les remises (arrivée à l'origine) gardées, les rafales du casque tenu en main (acceptées par la sonde
+// d'alors) écartées, même si une sonde plus ancienne les annonçait encore.
+test('lecteur des sauts : lignes réelles d’essai.13, remises gardées, rafales du casque en main écartées', () => {
+  const remise = 'ovr saut angle=-0.44330 deplacement=-0.4686,0.0369 sol=-0.0013 rotation=-25.4 dt=4.5 bond=45.250cm,25.428deg de=0.429,1.655,-0.165,-0.447 a=0.007,1.654,-0.003,-0.003';
+  const rafale = 'ovr saut angle=-0.17627 deplacement=-0.0322,0.0848 sol=-0.0054 rotation=-10.1 dt=4.1 bond=0.250cm,10.061deg de=-0.485,1.624,0.305,1.609 a=-0.485,1.619,0.303,1.785';
+  const rafaleOrigine = 'ovr saut angle=-1.95096 deplacement=0.0010,0.0002 sol=0.0012 rotation=-111.8 dt=4.1 bond=0.284cm,111.781deg de=-0.002,1.620,0.001,2.675 a=0.002,1.620,0.001,0.724';
+  const j = sondeOvr.parseOvrJump(remise);
+  assert.ok(j && Math.abs(j.angle + 0.4433) < 1e-6 && j.dtMs === 4.5, JSON.stringify(j));
+  assert.equal(sondeOvr.parseOvrJump(rafale), undefined);
+  assert.equal(sondeOvr.parseOvrJump(rafaleOrigine), undefined);
+});
+
+// --- Sonde qui se remet seule, contour valable seulement dans la connexion en cours (essai réel du 13 novembre 2026,
+// 23:35-23:48 : sonde muette toute une séance, borne reposée de 121 cm sur un contour d'une connexion de Link passée).
+
+/** La sonde de l'application (OvrProbe) sur le banc : le runtime factice joue `scenario` ; rend ses journaux et suivis. */
+async function sondeAppli(scenario, { dureeMs, companionReady = () => true, pendant } = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-appli-sonde-'));
+  fs.writeFileSync(path.join(dir, 'scenario.txt'), scenario.trim() + '\n');
+  const env = { ...process.env, CYBERPINBALL_XR_SCENARIO: path.join(dir, 'scenario.txt'), CYBERPINBALL_XR_TRACE: path.join(dir, 'trace.txt'), CYBERPINBALL_XR_DEBUT_FICHIER: path.join(dir, 'debut.txt') };
+  const debut = Date.now();
+  const journal = [];
+  const suivis = [];
+  const contours = [];
+  const probe = new sondeOvr.OvrProbe({
+    appDir: dir,
+    exe: BANC_SONDE,
+    dll: BANC_RUNTIME,
+    env,
+    log: (l) => journal.push({ ms: Date.now() - debut, l }),
+    onContour: (p) => contours.push({ ms: Date.now() - debut, p }),
+    onTracking: (on, why) => suivis.push({ ms: Date.now() - debut, on, why }),
+    companionReady,
+  });
+  pendant?.(probe, { journal, suivis, contours, debut });
+  probe.set(true);
+  await new Promise((r) => setTimeout(r, dureeMs));
+  probe.set(false);
+  await new Promise((r) => setTimeout(r, 500));
+  fs.rmSync(dir, { recursive: true, force: true });
+  return { journal, suivis, contours, lignes: journal.map((j) => j.l) };
+}
+
+test('banc : Link coupé puis revenu (erreur -3003), la sonde refait sa session seule et relit le contour du nouveau repère', banc, async () => {
+  const r = await sonder(
+    ['0 porte 1', '0 limite piece 3.4 3.6', `0 contour ${pts(contourMonde())}`, `0 tete ${TETE.join(' ')} 0`, `0 manette gauche ${GAUCHE.join(' ')}`, `0 manette droite ${DROITE.join(' ')}`, '3000 link 0', '5000 origine 0.9 -0.6 1.9', '6000 link 1'].join('\n'),
+    { dureeMs: 13000 },
+  );
+  assert.ok(r.lignes.includes('ovr entrees -3003 type=3'), sansPoints(r));
+  assert.ok(r.lignes.includes('ovr session refaite raison=entrees code=-3003'), sansPoints(r));
+  // Le casque absent tant que Link est coupé, puis une session neuve qui le voit.
+  assert.ok(r.lignes.some((l) => l.startsWith('ovr session -6000')), sansPoints(r));
+  assert.equal(r.lignes.filter((l) => l === 'ovr session 0').length, 2, sansPoints(r));
+  assert.ok(r.lignes.some((l) => l === 'ovr pouls casque=0 porte=0'));
+  assert.equal(r.lignes.filter((l) => l.startsWith('ovr pouls ')).at(-1), 'ovr pouls casque=1 porte=1');
+  const { points, bouts, tetes } = lire(r);
+  assert.equal(points.length, 2, sansPoints(r));
+  // Le contour relu dans la session neuve est celui du nouveau repère : l'ancrage y repose la borne juste.
+  const ancre = core.anchorPlace(calee(bouts[0], tetes[0], points[0]), points[1]);
+  assert.equal(ancre.kind, 'moved');
+  const reste = core.placeGap(ancre.place, core.lockbarPlace(bouts.at(-1)[0], bouts.at(-1)[1]));
+  assert.ok(reste.cm < 2 && reste.deg < 1, JSON.stringify(reste));
+});
+
+test('banc : session LibOVR restée d’une connexion passée (casque=0 sans erreur), refaite après 10 s', banc, async () => {
+  const r = await sonder(['0 porte 1', '0 tete 0.2 1.6 0.1 0', '2000 sonde-perimee'].join('\n'), { dureeMs: 15000 });
+  assert.ok(r.lignes.includes('ovr session refaite raison=casque-absent'), sansPoints(r));
+  const i = r.lignes.indexOf('ovr session refaite raison=casque-absent');
+  assert.ok(r.lignes.slice(i).includes('ovr etat visible=0 casque=1 porte=1 regard=0'), sansPoints(r));
+});
+
+test('banc : sonde gelée, la garde de l’application la relance (compagnon prêt), le suivi revient', banc, async () => {
+  const r = await sondeAppli(['0 porte 1', '0 tete 0.2 1.6 0.1 0', '2000 sonde-gelee'].join('\n'), { dureeMs: 15000 });
+  const perdu = r.suivis.find((s) => !s.on);
+  assert.ok(perdu && /^muette depuis \d+ s$/.test(perdu.why), JSON.stringify(r.suivis));
+  const relance = r.journal.find((j) => /: muette depuis \d+ s alors que le compagnon a le casque ; relancée \(aucun saut ne peut être mesuré sans elle\)\.$/.test(j.l));
+  assert.ok(relance, r.lignes.join('\n'));
+  // Sans pouls 3 s, puis 5 s de garde : relancée moins de 12 s après le gel.
+  assert.ok(relance.ms > 6000 && relance.ms < 13000, String(relance.ms));
+  assert.ok(r.suivis.some((s) => s.on && s.ms > relance.ms), JSON.stringify(r.suivis));
+  // Une sonde remplacée ne dit pas « arrêtée, relancée dans 30 s ».
+  assert.equal(r.lignes.some((l) => /arrêtée \(code/.test(l)), false, r.lignes.join('\n'));
+});
+
+test('banc : compagnon pas prêt (Link coupé pour lui aussi), la garde ne relance pas la sonde', banc, async () => {
+  const r = await sondeAppli(['0 porte 1', '0 tete 0.2 1.6 0.1 0', '2000 sonde-gelee'].join('\n'), { dureeMs: 11000, companionReady: () => false });
+  assert.ok(r.suivis.some((s) => !s.on), JSON.stringify(r.suivis));
+  assert.equal(r.lignes.some((l) => /relancée \(aucun saut/.test(l)), false, r.lignes.join('\n'));
+});
+
+// 23:39 rejoué : contour lu dans une connexion, la sonde perd le casque (23:35:12), Link coupé (23:38:22) et revenu dans
+// un autre repère (23:39:19), la session du compagnon prête avant que la sonde ne suive de nouveau. Avant : l'ancien
+// contour servait à l'ancrage (borne reposée à tort) et était attaché au calage suivant. Désormais : rien d'ancré, rien
+// d'attaché ; la sonde suit de nouveau, la session du compagnon refaite, le contour relu repose la borne juste.
+test('banc : 23:39 rejoué, ancrage refusé sur le contour périmé, rien d’attaché, puis borne reposée juste', banc, async () => {
+  const frame = new core.RoomFrame();
+  let ancienContour;
+  let blocageVu = false;
+  let refaiteA;
+  let effectif;
+  const etapes = ['0 porte 1', '0 limite piece 3.4 3.6', `0 contour ${pts(contourMonde())}`, `0 tete ${TETE.join(' ')} 0`, `0 manette gauche ${GAUCHE.join(' ')}`, `0 manette droite ${DROITE.join(' ')}`, '2500 sonde-perimee', '4000 link 0', '5000 origine 0.9 -0.6 1.9', '6000 link 1'];
+  const r = await sondeAppli(etapes.join('\n'), {
+    dureeMs: 14000,
+    pendant: (probe, { journal }) => {
+      // L'application : la session du compagnon au départ, puis prête de nouveau à 6,2 s (Link revenu).
+      setTimeout(() => frame.companionSession(probe.tracking()), 1500);
+      setTimeout(() => {
+        frame.companionSession(probe.tracking());
+        blocageVu = frame.state() === 'bloque' && frame.effective() === undefined;
+      }, 6200);
+      probe.opts.onContour = (p) => {
+        const kind = frame.onRead(p);
+        if (!ancienContour && kind === 'premier') ancienContour = p;
+        // Gardé à la lecture : l'arrêt de la sonde en fin d'essai (réalité virtuelle désactivée) oublie tout.
+        if (refaiteA && frame.state() === 'pret') effectif = frame.effective();
+      };
+      probe.opts.onTracking = (on) => {
+        if (!on) return frame.probeLost();
+        // Sonde suivie de nouveau, contour bloqué : session neuve du compagnon (frontend.ts, probeTracking).
+        if (frame.state() === 'bloque' && ancienContour) {
+          refaiteA = Date.now();
+          frame.companionSession(true);
+          probe.send('contour');
+        }
+      };
+      void journal;
+    },
+  });
+  assert.ok(ancienContour, r.lignes.join('\n'));
+  assert.ok(blocageVu, 'à la session du compagnon prête Link revenu, la sonde ne suit pas : pas de contour utilisable');
+  assert.ok(refaiteA, r.lignes.join('\n'));
+  // La place calée dans la première connexion, et la vraie barre dans la seconde.
+  const manettes = r.lignes.filter((l) => / manettes /.test(l)).map((l) => {
+    const v = l.split(' manettes ')[1].split(' ').filter((x) => !x.startsWith('suivi')).map(Number);
+    return [{ x: v[0], y: v[1], z: v[2] }, { x: v[3], y: v[4], z: v[5] }];
+  });
+  const place = { ...core.lockbarPlace(manettes[0][0], manettes[0][1]), contour: ancienContour };
+  const vraie = core.lockbarPlace(manettes.at(-1)[0], manettes.at(-1)[1]);
+  // Le défaut : l'ancien contour n'apprenait rien (« same »), la borne restait à 3 m de sa vraie place.
+  assert.equal(core.anchorPlace(place, ancienContour).kind, 'same');
+  assert.ok(core.placeGap(place, vraie).cm > 50);
+  // Désormais : le contour relu dans la session suivie repose la borne juste.
+  assert.ok(effectif, 'contour relu dans la session suivie');
+  const ancre = core.anchorPlace(place, effectif);
+  assert.equal(ancre.kind, 'moved');
+  const reste = core.placeGap(ancre.place, vraie);
   assert.ok(reste.cm < 2 && reste.deg < 1, JSON.stringify(reste));
 });

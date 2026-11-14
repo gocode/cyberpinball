@@ -913,17 +913,55 @@ export function sameContour(a: ContourPoints, b: ContourPoints): boolean {
  * contour dans le repère courant : le contour effectif. La place calée garde toujours le contour effectif, si bien
  * qu'elle et lui restent du même repère ; un saut mesuré la repose (movePlace), et au rafraîchissement l'ancrage
  * (anchorPlace) rattrape la dérive accumulée ou confirme. J revient à l'identité quand le contour lu change.
+ *
+ * Validité (essai réel du 13 novembre 2026, 23:39 : une borne reposée de 121 cm sur un contour d'une connexion de Link
+ * passée, la sonde muette) : un contour n'est utilisable que lu pendant une session du compagnon où la sonde a suivi le
+ * casque sans interruption ; sinon des remises d'origine ont pu passer sans mesure, et J est faux. La sonde perd le
+ * casque (muette, Link coupé) : tout est oublié, et rien n'est relu (`bloque`) avant une session du compagnon ouverte
+ * sonde suivante. Session neuve, sonde suivante : le contour gardé attend d'être relu (J gardé). Entre-temps, pas de
+ * contour effectif : ni ancrage, ni contour attaché à une place.
  */
 export class RoomFrame {
   private read: [number, number][] | undefined;
   private jump: JumpTransform = { angle: 0, tx: 0, tz: 0, dy: 0 };
   private jumps = 0;
+  private waiting = false;
+  private blocked = false;
 
-  /** Un contour lu : 'premier', 'rafraichi' (son contenu a changé : J repart de l'identité) ou 'inchange'. */
-  onRead(points: ContourPoints): 'premier' | 'rafraichi' | 'inchange' {
+  /** La sonde a perdu le casque (muette, arrêtée, Link coupé) : tout oublié, rien relu avant la prochaine session suivie. */
+  probeLost(): void {
+    this.read = undefined;
+    this.jump = { angle: 0, tx: 0, tz: 0, dy: 0 };
+    this.jumps = 0;
+    this.waiting = false;
+    this.blocked = true;
+  }
+
+  /** Session neuve du compagnon (« pret ») : la sonde suit-elle le casque à cet instant ? */
+  companionSession(probeTracking: boolean): void {
+    if (!probeTracking) return this.probeLost();
+    this.blocked = false;
+    if (this.read) this.waiting = true;
+  }
+
+  /** Bloqué (sonde pas suivie depuis la session du compagnon), aucun contour, en attente d'être relu, ou utilisable. */
+  state(): 'bloque' | 'aucun' | 'attente' | 'pret' {
+    return this.blocked ? 'bloque' : !this.read ? 'aucun' : this.waiting ? 'attente' : 'pret';
+  }
+
+  /**
+   * Un contour lu : 'premier', 'rafraichi' (son contenu a changé : J repart de l'identité), 'inchange', ou 'ecarte'
+   * (bloqué : pas lu dans une session suivie par la sonde).
+   */
+  onRead(points: ContourPoints): 'premier' | 'rafraichi' | 'inchange' | 'ecarte' {
+    if (this.blocked) return 'ecarte';
+    this.waiting = false;
     const copy = points.map((p) => [p[0], p[1]] as [number, number]);
     if (!this.read) {
+      // Lu dans le repère courant : les sauts d'avant lui ne le concernent pas.
       this.read = copy;
+      this.jump = { angle: 0, tx: 0, tz: 0, dy: 0 };
+      this.jumps = 0;
       return 'premier';
     }
     if (sameContour(this.read, copy)) return 'inchange';
@@ -933,15 +971,16 @@ export class RoomFrame {
     return 'rafraichi';
   }
 
-  /** Un saut mesuré (après ceux déjà gardés). */
+  /** Un saut mesuré (après ceux déjà gardés) ; sans contour gardé, rien à reporter. */
   onJump(jump: JumpTransform): void {
+    if (!this.read) return;
     this.jump = composeJumps(this.jump, jump);
     this.jumps++;
   }
 
-  /** Le contour lu, reporté par les sauts mesurés depuis son rafraîchissement ; undefined tant que rien n'est lu. */
+  /** Le contour lu, reporté par les sauts mesurés depuis son rafraîchissement ; undefined tant qu'il n'est pas utilisable. */
   effective(): [number, number][] | undefined {
-    if (!this.read) return undefined;
+    if (!this.read || this.waiting) return undefined;
     return this.jumps ? moveContour(this.read, this.jump) : this.read.map((p) => [p[0], p[1]] as [number, number]);
   }
 

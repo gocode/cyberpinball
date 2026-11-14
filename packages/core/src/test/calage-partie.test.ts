@@ -378,7 +378,7 @@ test('sonde LibOVR (13 novembre 2026) : la DLL du runtime de Meta, lancée avec 
   assert.match(front, /ovrProbe\.set\(vrMode === 'auto'\);/);
   assert.match(front, /headset\?\.dispose\(\);\s*ovrProbe\.set\(false\);/);
   const sonde = read('app', 'src', 'sonde-ovr.ts');
-  assert.match(sonde, /spawn\(exe, \['--ovr', dll, \.\.\.\(this\.opts\.undoOrigin \? \['--defaire-origine'\] : \[\]\)\]/);
+  assert.match(sonde, /spawn\(exe, \['--ovr', dll\]/);
   assert.match(sonde, /this\.opts\.log\(`Casque, sonde LibOVR : \$\{line\.slice\(4\)\}`\)/);
   // Rien de Meta n'est livré : la sonde charge la DLL installée, sans en-tête du SDK.
   const cpp = read('packages', 'casque-vr', 'src', 'sonde-ovr.cpp');
@@ -656,15 +656,17 @@ test('repère de la pièce (essai réel du 13 novembre 2026, Air Link) : le cont
   assert.match(front, /écart entre le saut et le contour/);
   assert.match(front, /ni saut mesuré ni contour rafraîchi/);
   assert.match(front, /headset\.restart\(\);/);
-  assert.match(front, /undoOrigin: true,/);
-  // La sonde : la signature de la remise d'origine seule, et les essais a), b), c).
+  // La sonde : la signature de la remise d'origine seule. Les essais a), b), c) ont répondu (essai réel du 13 novembre
+  // 2026, 23:49) et sont retirés : l'origine redonnée ne vaut que pour la sonde, ShouldRecenter n'est jamais levé, une
+  // session LibOVR neuve ne rafraîchit pas le contour.
   const cpp = read('packages', 'casque-vr', 'src', 'sonde-ovr.cpp');
   assert.match(cpp, /raison=arrivee-hors-origine/);
   assert.match(cpp, /raison=tete-inclinee/);
   assert.match(cpp, /constexpr float JUMP_ORIGIN_M = 0\.02f;/);
-  assert.match(cpp, /api\.specifyOrigin\(session, p\)/);
-  assert.match(cpp, /recentrer=/);
-  assert.match(cpp, /ovr contour-apres-session-neuve change=/);
+  assert.doesNotMatch(cpp, /specifyOrigin|--defaire-origine|recentrer=|contour-apres-session-neuve/);
+  assert.doesNotMatch(front, /undoOrigin|origine-retour|undoWatch/);
+  // Et la même signature dans le lecteur de l'application, par sécurité.
+  assert.match(read('app', 'src', 'sonde-ovr.ts'), /if \(Math\.hypot\(hx, hz\) > JUMP_ARRIVAL_MAX_M \|\| Math\.abs\(hyaw\) > JUMP_ARRIVAL_MAX_RAD\) return undefined;/);
 });
 
 test('borne calée sans contour (avant l’ancrage, 13 novembre 2026) : dit et calage proposé une fois, contour jamais attaché en silence', () => {
@@ -679,4 +681,69 @@ test('borne calée sans contour (avant l’ancrage, 13 novembre 2026) : dit et c
   assert.match(front, /headset\?\.showPlace\(next, true, true\);/);
   const casque = read('app', 'src', 'casque.ts');
   assert.match(casque, /const contour = calibrated \|\| had \? this\.opts\.contour\?\.\(\) : undefined;/);
+});
+
+test('validité du contour (essai réel du 13 novembre 2026, 23:39 : borne reposée de 121 cm sur un contour d’une connexion passée, sonde muette)', () => {
+  const contour: [number, number][] = [];
+  for (let i = 0; i < 120; i++) {
+    const a = (i / 120) * 2 * Math.PI;
+    const r = 1.6 + 0.3 * Math.sin(3 * a) + 0.15 * Math.cos(5 * a + 1);
+    contour.push([0.2 + r * Math.cos(a), -0.1 + r * Math.sin(a)]);
+  }
+  const calee: CabinetPlace = { ...lockbarPlace({ x: -0.3, y: 0.9, z: -0.4 }, { x: 0.3, y: 0.9, z: -0.4 }), contour };
+  // Première connexion : sonde suivante à la session du compagnon, contour lu, utilisable.
+  const frame = new RoomFrame();
+  frame.companionSession(true);
+  assert.equal(frame.onRead(contour), 'premier');
+  assert.equal(frame.state(), 'pret');
+  // 23:35:12 : la sonde perd le casque (muette, puis Link coupé) : tout oublié, rien relu.
+  frame.probeLost();
+  assert.equal(frame.state(), 'bloque');
+  assert.equal(frame.effective(), undefined);
+  assert.equal(frame.onRead(contour), 'ecarte');
+  // 23:39:19 : Link revenu, session du compagnon ; la sonde ne suit toujours pas : pas de contour, pas d'ancrage.
+  frame.companionSession(false);
+  assert.equal(frame.effective(), undefined);
+  // Un saut mesuré sans contour gardé ne laisse rien derrière lui.
+  frame.onJump({ angle: 1, tx: 1, tz: 1, dy: 0 });
+  assert.equal(frame.onRead(contour), 'ecarte');
+  // Session suivante, sonde suivante : le contour lu est le premier de ce repère (J vide), l'ancrage en part.
+  frame.companionSession(true);
+  assert.equal(frame.state(), 'aucun');
+  const moved = moveContour(contour, { angle: 1.88, tx: 1.1, tz: -0.4, dy: 0 });
+  assert.equal(frame.onRead(moved), 'premier');
+  assert.equal(frame.pending().count, 0);
+  const r = anchorPlace(calee, frame.effective()!);
+  assert.equal(r?.kind, 'moved');
+  assert.ok(placeGap((r as { place: CabinetPlace }).place, movePlace(calee, { angle: 1.88, tx: 1.1, tz: -0.4 })).cm < 0.5);
+  // Session neuve, sonde toujours suivante : le contour attend d'être relu (J gardé), puis inchangé, utilisable.
+  frame.onJump({ angle: 0.3, tx: 0.2, tz: 0.1, dy: 0 });
+  frame.companionSession(true);
+  assert.equal(frame.state(), 'attente');
+  assert.equal(frame.effective(), undefined);
+  assert.equal(frame.onRead(moved), 'inchange');
+  assert.equal(frame.pending().count, 1);
+  assert.ok(frame.effective());
+  // L'application : la sonde perdue oublie le contour ; la session du compagnon décide ; contour écarté sans ancrage.
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /onTracking: \(on, why\) => probeTracking\(on, why\),/);
+  assert.match(front, /companionReady: \(\) => headset\?\.state === 'shown',/);
+  assert.match(front, /if \(!on\) \{\s*roomFrame\.probeLost\(\);/);
+  assert.match(front, /roomFrame\.companionSession\(following\);\s*if \(following\) ovrProbe\.send\('contour'\);/);
+  assert.match(front, /if \(kind === 'ecarte'\) return;/);
+  assert.match(front, /onReady: \(\) => companionReady\(\),/);
+  assert.match(front, /aucun saut ne peut être mesuré/);
+  assert.match(read('app', 'src', 'casque.ts'), /if \(line\.startsWith\('pret'\)\) \{\s*this\.setState\('shown'\);\s*this\.opts\.onReady\?\.\(\);/);
+  // La garde de l'application : sonde sans le casque, compagnon prêt, 5 s : relancée, au plus une fois par 30 s.
+  const sonde = read('app', 'src', 'sonde-ovr.ts');
+  assert.match(sonde, /export const PROBE_GUARD_MS = 5000;/);
+  assert.match(sonde, /export const PROBE_GUARD_EVERY_MS = 30_000;/);
+  assert.match(sonde, /alors que le compagnon a le casque ; relancée/);
+  // La sonde se remet seule : session perdue (état, entrées -3xxx, affichage perdu, casque absent 10 s) refaite de zéro.
+  const cpp = read('packages', 'casque-vr', 'src', 'sonde-ovr.cpp');
+  assert.match(cpp, /why = "entrees code=" \+ std::to_string\(ir\);/);
+  assert.match(cpp, /why = "casque-absent";/);
+  assert.match(cpp, /why = "affichage-perdu";/);
+  assert.match(cpp, /say\("ovr session refaite raison=" \+ why\);/);
+  assert.match(cpp, /ovr pouls casque=/);
 });

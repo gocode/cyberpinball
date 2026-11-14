@@ -35,8 +35,10 @@
 //   valeur <chemin> V               un axe ou une gâchette (/user/hand/…/value, …/x, …/y)
 //   quitter                         le runtime met fin à la session (EXITING)
 //   tete-penche T                   la tête basculée de T rad en tangage (casque tenu en main vers ±90° : T = 1.5)
-//   origine-commune 1|0             LibOVR : ovr_SpecifyTrackingOrigin vaut pour tous (OpenXR compris), ou pour la
-//                                   sonde seule (défaut)
+//   link 0|1                        Link coupé (casque absent pour tous, et les sessions LibOVR d'avant périmées :
+//                                   casque=0 pour elles, entrées en erreur -3003) puis revenu (sessions neuves saines)
+//   sonde-perimee                   LibOVR : les sessions déjà créées ne voient plus le casque (casque=0), sans erreur
+//   sonde-gelee                     LibOVR : les sessions déjà créées ne répondent plus (ovr_GetSessionStatus bloque)
 //   tete-tourne V                   LibOVR : la tête tourne sur elle-même à V rad/s (lacet), vitesse donnée comme LibOVR
 //   tete-suivie 1|0                 LibOVR : la tête suivie en position (drapeaux 15) ou en orientation seule (3)
 //   contour-fige 1|0                LibOVR : le contour lu (ovr_GetBoundaryGeometry) figé dans l'espace de suivi du
@@ -156,8 +158,8 @@ struct World
    bool ovrInputs = true; // faux : les entrées rendues à zéro (client sans le regard)
    bool headTracked = true; // faux : la tête suivie en orientation seule (LibOVR, drapeaux 3)
    float headPitch = 0.f; // tete-penche : tangage de la tête (rad)
-   bool sharedOrigin = false; // origine-commune : ovr_SpecifyTrackingOrigin change aussi l'origine d'OpenXR
-   XrPosef ovrOffset = identity(); // ovr_SpecifyTrackingOrigin pour la sonde seule
+   // Instants du scénario (ms) où les sessions LibOVR déjà créées sont coupées (link 0), périmées ou gelées ; -1 : jamais.
+   long long ovrCutAt = -1, ovrStaleAt = -1, ovrFrozenAt = -1;
    float headSpin = 0.f; // tete-tourne : rad/s autour de la verticale, depuis headSpinAt (ms du scénario)
    long long headSpinAt = 0;
 };
@@ -419,8 +421,16 @@ void advance(bool silent = false)
       }
       else if (st.verb == "tete-penche")
          world.headPitch = num(st, 0);
-      else if (st.verb == "origine-commune")
-         world.sharedOrigin = num(st, 0) != 0.f;
+      else if (st.verb == "link")
+      {
+         world.absent = num(st, 0) == 0.f;
+         if (world.absent)
+            world.ovrCutAt = st.ms;
+      }
+      else if (st.verb == "sonde-perimee")
+         world.ovrStaleAt = st.ms;
+      else if (st.verb == "sonde-gelee")
+         world.ovrFrozenAt = st.ms;
       else if (st.verb == "tete-tourne")
       {
          // La rotation déjà faite reste acquise : la tête ne revient pas d'un coup à son cap de départ.
@@ -1281,10 +1291,15 @@ struct ErrorInfo
    int result;
    char text[512];
 };
+/** La session `s` créée avant l'instant `at` du scénario, déjà passé (link 0, sonde-perimee, sonde-gelee). */
+bool before(void* s, long long at)
+{
+   return at >= 0 && static_cast<long long>(reinterpret_cast<intptr_t>(s)) - 1 < at;
+}
 /** Un point du monde dans l'espace de suivi (STAGE). */
 XrVector3f inStage(const XrVector3f& p)
 {
-   return compose(inverse(compose(world.origin, world.ovrOffset)), XrPosef { { 0, 0, 0, 1 }, p }).position;
+   return compose(inverse(world.origin), XrPosef { { 0, 0, 0, 1 }, p }).position;
 }
 void putPose(unsigned char* at, const XrPosef& p)
 {
@@ -1310,18 +1325,28 @@ extern "C" __declspec(dllexport) int ovr_Create(void** session, void* luid)
    if (world.absent)
       return -6000; // casque absent
    std::memset(luid, 0, 8);
-   *session = reinterpret_cast<void*>(1);
+   // La poignée porte l'instant de sa création (ms du scénario, plus un) : link 0, sonde-perimee, sonde-gelee la jugent.
+   *session = reinterpret_cast<void*>(static_cast<intptr_t>(scenarioMs() + 1));
    trace("ovr session creee");
    return 0;
 }
 extern "C" __declspec(dllexport) void ovr_Destroy(void*) { trace("ovr session detruite"); }
-extern "C" __declspec(dllexport) int ovr_GetSessionStatus(void*, ovr::SessionStatus* st)
+extern "C" __declspec(dllexport) int ovr_GetSessionStatus(void* s, ovr::SessionStatus* st)
 {
-   std::lock_guard<std::mutex> g(lock);
+   std::unique_lock<std::mutex> g(lock);
    advance();
+   // Gelée : la session ne rend plus la main (le processus finit par être arrêté).
+   while (ovr::before(s, world.ovrFrozenAt))
+   {
+      g.unlock();
+      Sleep(50);
+      g.lock();
+      advance();
+   }
    std::memset(st, 0, sizeof(*st));
-   st->hmdPresent = world.absent ? 0 : 1;
-   st->hmdMounted = world.worn && !world.absent ? 1 : 0;
+   const bool gone = world.absent || ovr::before(s, world.ovrCutAt) || ovr::before(s, world.ovrStaleAt);
+   st->hmdPresent = gone ? 0 : 1;
+   st->hmdMounted = world.worn && !gone ? 1 : 0;
    st->shouldQuit = world.quit ? 1 : 0;
    return 0;
 }
@@ -1344,7 +1369,7 @@ extern "C" __declspec(dllexport) ovr::TrackingState ovr_GetTrackingState(void*, 
       const float h = 0.5f * world.headPitch;
       head.orientation = mul(head.orientation, XrQuaternionf { std::sin(h), 0.f, 0.f, std::cos(h) });
    }
-   ovr::putPose(ts.bytes, compose(inverse(compose(world.origin, world.ovrOffset)), head));
+   ovr::putPose(ts.bytes, compose(inverse(world.origin), head));
    const unsigned all = world.headTracked ? 15u : 3u;
    std::memcpy(ts.bytes + 88, &all, 4);
    for (int h = 0; h < 2; h++)
@@ -1355,12 +1380,14 @@ extern "C" __declspec(dllexport) ovr::TrackingState ovr_GetTrackingState(void*, 
    }
    return ts;
 }
-extern "C" __declspec(dllexport) int ovr_GetInputState(void*, unsigned type, ovr::InputState* in)
+extern "C" __declspec(dllexport) int ovr_GetInputState(void* s, unsigned type, ovr::InputState* in)
 {
    std::lock_guard<std::mutex> g(lock);
    advance();
    std::memset(in, 0, sizeof(*in));
    in->controllerType = type;
+   if (ovr::before(s, world.ovrCutAt))
+      return -3003; // service de Meta perdu (relevé réel du 13 novembre 2026, Link coupé)
    if (!world.ovrInputs)
       return 0;
    const auto v = [](const char* path) {
@@ -1449,7 +1476,7 @@ extern "C" __declspec(dllexport) int ovr_TestBoundary(void*, unsigned device, un
    std::lock_guard<std::mutex> g(lock);
    if (device != 0x1)
       return 1002; // ovrSuccess_DeviceUnavailable
-   return ovr::testPoint(compose(inverse(compose(world.origin, world.ovrOffset)), world.head).position, r);
+   return ovr::testPoint(compose(inverse(world.origin), world.head).position, r);
 }
 extern "C" __declspec(dllexport) int ovr_TestBoundaryPoint(void*, const ovr::Vec3* p, unsigned, ovr::BoundaryTestResult* r)
 {
@@ -1457,24 +1484,6 @@ extern "C" __declspec(dllexport) int ovr_TestBoundaryPoint(void*, const ovr::Vec
    return ovr::testPoint({ p->x, p->y, p->z }, r);
 }
 extern "C" __declspec(dllexport) int ovr_SetTrackingOriginType(void*, int) { return 0; }
-// L'origine donnée par la sonde (une pose de l'espace de suivi courant devient l'origine) : pour elle seule, ou pour
-// tous selon « origine-commune ».
-struct OvrPose
-{
-   XrQuaternionf orientation;
-   XrVector3f position;
-};
-extern "C" __declspec(dllexport) int ovr_SpecifyTrackingOrigin(void*, OvrPose p)
-{
-   std::lock_guard<std::mutex> g(lock);
-   const XrPosef pose { p.orientation, p.position };
-   if (world.sharedOrigin)
-      world.origin = compose(compose(world.origin, world.ovrOffset), pose), world.ovrOffset = identity();
-   else
-      world.ovrOffset = compose(world.ovrOffset, pose);
-   trace(std::string("ovr origine donnee ") + (world.sharedOrigin ? "pour tous" : "pour la sonde"));
-   return 0;
-}
 extern "C" __declspec(dllexport) double ovr_GetTimeInSeconds() { return static_cast<double>(GetTickCount64()) / 1000.0; }
 extern "C" __declspec(dllexport) void ovr_GetLastErrorInfo(ovr::ErrorInfo* e)
 {
