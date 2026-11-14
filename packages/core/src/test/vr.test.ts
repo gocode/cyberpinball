@@ -7,7 +7,7 @@ import { IniDocument } from '../ini';
 import { SYSTEM_GROUPS, SYSTEM_ITEMS } from '../systemmenu';
 import { VPX_PLAY_SETTINGS } from '../vpx';
 import { VPX_GAME_TITLES } from '../vpxwindows';
-import { ANCILLARY_OUTPUTS, openXrRuntimeName, planVrIni, screensFallbackGaps, screensFallbackViewMode, tableHasVrRoom, VR_PREVIEW_TITLE, vrCarriedSettings, vrCenterKey, vrHasSavedPlace, vrMenuText, vrPreviewSettings, vrReadiness } from '../vr';
+import { ANCILLARY_OUTPUTS, openXrRuntimeName, planVrIni, screensFallbackGaps, screensFallbackViewMode, tableHasVrRoom, tableIniRefusedInStereo, VR_PREVIEW_TITLE, VR_REFUSED_FXAA, VR_STEREO_FXAA, vrCarriedSettings, vrCenterKey, vrHasSavedPlace, vrMenuText, vrPreviewSettings, vrReadiness } from '../vr';
 
 const CABINET_INI = '[Player]\r\nSecurityLevel = 0\r\nVRPreview = 1\r\n\r\n[PlayerVR]\r\nAskToTurnOn = 2\r\n\r\n[Input]\r\nMapping.InGameUI = F12\r\n';
 
@@ -180,4 +180,18 @@ test('l’entrée « Réalité virtuelle » de la rubrique Borne : grisée avec 
 
 test("l'aperçu de la VR est une fenêtre de jeu de VPX, jamais une fenêtre inconnue", () => {
   assert.ok((VPX_GAME_TITLES as readonly string[]).includes(VR_PREVIEW_TITLE));
+});
+
+test('SMAA refusé par VPX en stéréo (Indiana Jones, 14 novembre 2026) : jamais dans une partie dans le casque', () => {
+  assert.equal(VR_REFUSED_FXAA, '6');
+  assert.equal(VR_STEREO_FXAA, '3');
+  // Le réglage de la borne : « Quality SMAA » devient « Quality FXAA » dans l'INI de la partie VR, changement dit.
+  const plan = planVrIni('[Player]\nFXAA = 6\n', undefined, { addBackglass: true });
+  assert.equal(IniDocument.parse(plan.text).get('Player', 'FXAA'), '3');
+  assert.ok(plan.changes.some((c) => c.key === 'FXAA'), JSON.stringify(plan.changes));
+  // Tout autre réglage d'anticrénelage est gardé tel quel.
+  assert.equal(IniDocument.parse(planVrIni('[Player]\nFXAA = 5\n', undefined, { addBackglass: true }).text).get('Player', 'FXAA'), '5');
+  // L'INI propre à une table, qui prime : signalé.
+  assert.deepEqual(tableIniRefusedInStereo('[Player]\nFXAA = 6\n'), ['FXAA=6 (Quality SMAA)']);
+  assert.deepEqual(tableIniRefusedInStereo('[Player]\nFXAA = 3\n'), []);
 });

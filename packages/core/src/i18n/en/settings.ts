@@ -48,6 +48,7 @@ export const messages: Record<string, string> = {
   'Gâchette': 'Trigger',
   'Borne remise en place sur la limite du Quest': 'Cabinet put back in place from the Quest boundary',
   'Borne remise en place': 'Cabinet put back in place',
+  'Pas calée : manettes immobiles sur les coins de la barre, gâchette de nouveau': 'Not aligned: controllers still on the lockbar corners, trigger again',
   'Calez la borne une fois : elle se replacera ensuite seule.': 'Align the cabinet once: it will then put itself back in place.',
   'Le Quest a déplacé la pièce en remettant le casque : recalez.': 'The Quest moved the room when the headset was put back on: align again.',
   'Manettes du casque · étape {n} sur {total}': 'Headset controllers · step {n} of {total}',

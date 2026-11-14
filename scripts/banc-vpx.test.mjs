@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { cadenceDeLaTrace, ecartPose, manettesVues, posesProjection, SCENARIO_REPOS } from './banc-vpx.mjs';
+import { cadenceDeLaTrace, dossierCopieVpx, ecartPose, manettesVues, posesProjection, SCENARIO_REPOS } from './banc-vpx.mjs';
 
 test('banc de VPX : cadence par tranche de 360 images, lue dans la trace du runtime', () => {
   const trace = ['0 4242 runtime charge, scenario de 5 etapes', '62 4242 image 1 couches=1', '5062 4242 image 360 couches=1', '5100 4242 scenario bouton', '17862 4242 image 720 couches=1'].join('\n');
@@ -60,5 +60,38 @@ test('couche du repère écartée pour cette version seulement : levée à la mi
   // Une autre version : l'écart est levé et le fichier effacé (la couche essayée de nouveau).
   assert.equal(roomLayerSetAside(dir, '0.1.13-essai.6'), undefined);
   assert.equal(fs.existsSync(path.join(dir, 'couche-repere-ecartee.json')), false);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('banc de VPX : une copie de VPX par dépôt, jamais partagée entre le checkout principal et un worktree', () => {
+  const vpx = 'D:\\CyberPinball\\emulators\\vpx\\10.8.1-5436';
+  const principal = dossierCopieVpx(vpx, 'D:\\wamp\\www\\cyberpinball');
+  const worktree = dossierCopieVpx(vpx, 'D:\\wamp\\www\\cyberpinball\\.claude\\worktrees\\mode-vr-suite');
+  assert.notEqual(principal, worktree);
+  assert.equal(dossierCopieVpx(vpx, 'D:\\WAMP\\www\\cyberpinball'), principal);
+  assert.match(path.basename(principal), /^10\.8\.1-5436-[0-9a-f]{8}$/);
+});
+
+test('INI de la table neutralisé pour le casque (Indiana Jones, FXAA = 6) : une copie, le fichier du joueur intact, réglages changés en jeu reportés', () => {
+  const { prepareVrTableIni, restoreVrTableIni } = createRequire(import.meta.url)('../app/dist/vr.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ini-table-vr-'));
+  const original = path.join(dir, 'Indiana Jones.ini');
+  const texte = '[Player]\nFXAA = 6\nBallTrail = 1\n\n[TableOverride]\nViewCabMode = 1\n';
+  fs.writeFileSync(original, texte);
+  const t = prepareVrTableIni(dir, original);
+  assert.ok(t, 'copie préparée');
+  assert.deepEqual(t.refused, ['FXAA=6 (Quality SMAA)']);
+  assert.match(fs.readFileSync(t.file, 'utf8'), /FXAA = 3/);
+  assert.equal(fs.readFileSync(original, 'utf8'), texte, 'le fichier du joueur n’est pas touché');
+  // VPX change un réglage pendant la partie dans la copie : reporté, sauf le réglage neutralisé.
+  fs.writeFileSync(t.file, fs.readFileSync(t.file, 'utf8').replace('BallTrail = 1', 'BallTrail = 0'));
+  assert.equal(restoreVrTableIni(t), 1);
+  const apres = fs.readFileSync(original, 'utf8');
+  assert.match(apres, /BallTrail = 0/);
+  assert.match(apres, /FXAA = 6/);
+  // Sans réglage refusé en stéréo : aucune copie.
+  fs.writeFileSync(original, '[Player]\nFXAA = 3\n');
+  assert.equal(prepareVrTableIni(dir, original), undefined);
+  assert.equal(prepareVrTableIni(dir, undefined), undefined);
   fs.rmSync(dir, { recursive: true, force: true });
 });

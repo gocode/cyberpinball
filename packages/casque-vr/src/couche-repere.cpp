@@ -232,6 +232,25 @@ FILETIME seenWrite {};
 unsigned corrections = 0;
 bool saidFailure = false, saidOtherSpace = false, saidLayerType = false;
 
+/**
+ * Ce que VPX fait de son calage sur les manettes, vu d'ici (essai réel du 14 novembre 2026 : 46 calages « ok » en
+ * partie, la table ailleurs). VPX 10.8.1 ne situe ses manettes que pendant son calage continu (VRDevice.cpp,
+ * `if (m_controllerViewCentering)`, xrLocateSpace des deux manettes dans son espace de la pièce) : chaque image où il
+ * le fait, le calage tourne, et les deux poses sont celles d'où il tire la table. Lu par le plugin de Cyber Pinball,
+ * dans le même processus (CyberPinballRepereCalage), pour vérifier chaque calage au lieu de le supposer fait.
+ */
+struct CalageVu
+{
+   uint64_t image = 0;          // images de VPX (xrWaitFrame)
+   uint64_t derniereImage = 0;  // dernière image où VPX a situé une manette dans son espace de la pièce
+   uint32_t valides = 0;        // manettes situées avec une position valable
+   uint32_t invalides = 0;      // manettes situées sans position valable (pas suivies)
+   float a[3] {}, b[3] {};      // les deux dernières manettes situées (dans l'espace de VPX), dans l'ordre de leurs espaces
+   uint32_t paires = 0;         // images où les deux manettes ont été situées avec une position valable
+};
+CalageVu calageVu;
+std::map<XrSpace, std::pair<uint64_t, XrVector3f>> manettesVues; // espace d'une manette : dernière image valable, pose
+
 /** L'espace à donner au runtime à la place de celui de VPX (lui-même hors substitution). */
 XrSpace substitute(XrSpace s)
 {
@@ -383,6 +402,7 @@ XRAPI_ATTR XrResult XRAPI_CALL layerWaitFrame(XrSession session, const XrFrameWa
    const XrResult r = nextWaitFrame(session, info, state);
    std::lock_guard<std::mutex> lock(stateMutex);
    latch();
+   calageVu.image++;
    return r;
 }
 
@@ -398,6 +418,34 @@ XRAPI_ATTR XrResult XRAPI_CALL layerLocateViews(XrSession session, const XrViewL
    return nextLocateViews(session, &mine, state, capacity, count, views);
 }
 
+/** Une manette (un espace qui n'est pas de la pièce) située par VPX dans son espace de la pièce : son calage tourne. */
+void noterManette(XrSpace space, XrSpace baseSpace, XrResult r, const XrSpaceLocation* location)
+{
+   std::lock_guard<std::mutex> lock(stateMutex);
+   if (!rooms.count(baseSpace) || rooms.count(space) || !location)
+      return;
+   calageVu.derniereImage = calageVu.image;
+   if (XR_FAILED(r) || !(location->locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT))
+   {
+      calageVu.invalides++;
+      return;
+   }
+   calageVu.valides++;
+   manettesVues[space] = { calageVu.image, location->pose.position };
+   if (manettesVues.size() < 2)
+      return;
+   // Les deux manettes situées à la même image : une paire, celle d'où VPX tire la table.
+   auto it = manettesVues.begin();
+   const auto& p = it->second;
+   const auto& q = std::next(it)->second;
+   if (p.first == calageVu.image && q.first == calageVu.image)
+   {
+      calageVu.paires++;
+      calageVu.a[0] = p.second.x, calageVu.a[1] = p.second.y, calageVu.a[2] = p.second.z;
+      calageVu.b[0] = q.second.x, calageVu.b[1] = q.second.y, calageVu.b[2] = q.second.z;
+   }
+}
+
 XRAPI_ATTR XrResult XRAPI_CALL layerLocateSpace(XrSpace space, XrSpace baseSpace, XrTime time, XrSpaceLocation* location)
 {
    XrSpace a, b;
@@ -406,7 +454,9 @@ XRAPI_ATTR XrResult XRAPI_CALL layerLocateSpace(XrSpace space, XrSpace baseSpace
       a = substitute(space);
       b = substitute(baseSpace);
    }
-   return nextLocateSpace(a, b, time, location);
+   const XrResult r = nextLocateSpace(a, b, time, location);
+   noterManette(space, baseSpace, r, location);
+   return r;
 }
 
 /** Les espaces à situer et la base, remplacés ; `next` fait le reste. */
@@ -581,4 +631,18 @@ extern "C" __declspec(dllexport) XrResult XRAPI_CALL xrNegotiateLoaderApiLayerIn
    request->getInstanceProcAddr = layerGetInstanceProcAddr;
    request->createApiLayerInstance = layerCreateApiLayerInstance;
    return XR_SUCCESS;
+}
+
+/**
+ * Le calage de VPX vu par la couche (CalageVu), pour le plugin de Cyber Pinball chargé dans le même processus :
+ * GetProcAddress(GetModuleHandle("XR_APILAYER_CYBERPINBALL_repere.dll"), "CyberPinballRepereCalage"). Rend 1 et
+ * remplit `out` (taille `size`, 0 si elle ne correspond pas).
+ */
+extern "C" __declspec(dllexport) int CyberPinballRepereCalage(void* out, uint32_t size)
+{
+   if (!out || size != sizeof(CalageVu))
+      return 0;
+   std::lock_guard<std::mutex> lock(stateMutex);
+   std::memcpy(out, &calageVu, sizeof(CalageVu));
+   return 1;
 }

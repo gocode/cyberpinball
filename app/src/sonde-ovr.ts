@@ -99,6 +99,8 @@ export class OvrProbe {
       log(line: string): void;
       onContour?(points: [number, number][]): void;
       onJump?(jump: OvrJump): void;
+      /** Un bond de la tête refusé par les garde-fous (« ovr saut-refuse ») : une remise d'origine a pu passer sans mesure. */
+      onRefused?(): void;
       /** La sonde suit le casque, ou plus (muette, arrêtée, sans casque) : à chaque changement, avec la raison. */
       onTracking?(on: boolean, why: string): void;
       /** Le compagnon a le casque (« pret ») : la garde relance une sonde qui ne le suit pas. */
@@ -220,6 +222,7 @@ export class OvrProbe {
         // Un saut accepté par la sonde (garde-fous passés) : la borne reposée (frontend.ts, headsetJump).
         const jump = line.startsWith('ovr saut ') ? parseOvrJump(line) : undefined;
         if (jump) this.opts.onJump?.(jump);
+        if (line.startsWith('ovr saut-refuse ')) this.opts.onRefused?.();
       }
     });
     child.stderr.on('data', () => undefined);

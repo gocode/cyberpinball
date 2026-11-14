@@ -720,10 +720,11 @@ export function inGameCalibrationReport(block: string): string | undefined {
   const opened = count(/^calage-etape ouverte/gm);
   const triggers = count(/^calage-gachette/gm);
   const done = count(/^calage-partie .*resultat=ok/gm);
+  const failed = count(/^calage-partie .*resultat=echec/gm);
   // Les actions de VPX arrivées au plugin (« action-vue id=… », la première de chacune dans la partie).
   const seen = [...block.matchAll(/^action-vue id=(\d+)/gm)].map((m) => Number(m[1]));
   const seenText = seen.length ? ` ; actions de VPX reçues : ${[...new Set(seen)].sort((a, b) => a - b).join(', ')}` : ''; // i18n-ignore : journal
-  const facts = `${clicks} clic(s) des joysticks reçu(s) par le plugin, combinaison tenue ${held} fois, calage ouvert ${opened} fois, ${triggers} gâchette(s), ${done} calage(s) fait(s)${seenText}`; // i18n-ignore : journal
+  const facts = `${clicks} clic(s) des joysticks reçu(s) par le plugin, combinaison tenue ${held} fois, calage ouvert ${opened} fois, ${triggers} gâchette(s), ${done} calage(s) fait(s) et vérifié(s)${failed ? `, ${failed} pas fait(s) par VPX` : ''}${seenText}`; // i18n-ignore : journal
   const flippers = seen.some((id) => id <= 3);
   const why =
     armed[1] !== '1'
@@ -742,6 +743,8 @@ export function inGameCalibrationReport(block: string): string | undefined {
               ? 'combinaison tenue, mais l’étape du calage ne s’est pas ouverte (pause de VPX pas venue)' // i18n-ignore : journal
               : triggers === 0
                 ? 'calage ouvert, aucune gâchette' // i18n-ignore : journal
+                : done === 0 && failed
+                  ? 'VPX n’a fait aucun des calages demandés (voir chaque calage)' // i18n-ignore : journal
                 : done === 0
                   ? 'gâchette sans calage fini (touche F13 pas postée à VPX)' // i18n-ignore : journal
                   : 'calage fait'; // i18n-ignore : journal
@@ -1038,4 +1041,24 @@ export function roomLayerFault(game: { failure?: string; exitCode: number | null
   if (game.failure === 'crash') return `VPX s’est arrêté brutalement${game.exitCode !== null ? ` (code ${game.exitCode >= 0 ? `0x${game.exitCode.toString(16).toUpperCase()}` : game.exitCode})` : ''}`; // i18n-ignore : journal
   if (!game.stopAsked && game.seconds < ROOM_LAYER_EARLY_S) return `partie finie après ${game.seconds.toFixed(0)} s sans que le joueur l’ait quittée`; // i18n-ignore : journal
   return undefined;
+}
+
+/**
+ * Chaque calage en partie tel que VPX l'a fait (essai réel du 14 novembre 2026 : 46 calages « ok » sans retour de VPX,
+ * la table ailleurs) : le plugin le vérifie dans la couche du repère (VPX a-t-il vu les deux manettes ? son calage
+ * continu s'est-il arrêté ?) et l'écrit (« calage-partie n=… resultat=ok|echec|non_verifie … ») ; une ligne par calage.
+ */
+export function inGameCalibrationLines(block: string): string[] {
+  return [...block.matchAll(/^calage-partie n=(\d+) hauteur=(-?\d+) resultat=(\w+)(.*)$/gm)].map((m) => {
+    const field = (k: string) => new RegExp(`\\b${k}=(\\S+)`).exec(m[4]!)?.[1];
+    const presses = field('appuis');
+    const how = presses ? `, ${presses} appui(s) F13` : ''; // i18n-ignore : journal
+    if (m[3] === 'ok' && !field('paires')) return `calage ${m[1]} : « ok » écrit sans vérification (plugin d'avant la vérification), ${m[2]} cm de hauteur`; // i18n-ignore : journal
+    if (m[3] === 'ok')
+      return `calage ${m[1]} : fait par VPX, ${field('paires') ?? '?'} image(s) avec les deux manettes, manettes à ${field('ecart') ?? '?'} cm l'une de l'autre, puis ${m[2]} cm de hauteur${how}`; // i18n-ignore : journal
+    if (m[3] === 'echec')
+      return `calage ${m[1]} : PAS fait par VPX (${field('raison') === 'manettes_non_vues' ? 'aucune image avec les deux manettes suivies' : field('raison') === 'calage_continu_reste_allume' ? 'son calage continu est resté allumé' : (field('raison') ?? '?')})${how}, ${field('invalides') ?? '0'} manette(s) pas suivie(s)`; // i18n-ignore : journal
+    if (m[3] === 'non_verifie') return `calage ${m[1]} : pas vérifié (couche du repère absente)${how}`; // i18n-ignore : journal
+    return `calage ${m[1]} : ${m[3]}`; // i18n-ignore : journal
+  });
 }

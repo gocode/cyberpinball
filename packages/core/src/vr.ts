@@ -229,6 +229,26 @@ export interface VrIniPlan {
 }
 
 /**
+ * Ce que VPX 10.8.1 refuse en stéréo, dans le casque ([Player] FXAA, Renderer.cpp, ApplyPostProcessedAntialiasing) :
+ * « Quality SMAA » (6) n'y est pas appliqué, sans aucun anticrénelage, et une notification « SMAA is not supported
+ * in stereo modes » s'affiche (Indiana Jones, 14 novembre 2026). Dans l'INI d'une partie dans le casque, il devient
+ * « Quality FXAA » (3), le plus proche que VPX accepte en stéréo. Le flou de mouvement de la bille est aussi sauté en
+ * stéréo (ApplyBallMotionBlur), sans message ni réglage à changer.
+ */
+export const VR_REFUSED_FXAA = '6';
+export const VR_STEREO_FXAA = '3';
+
+/** Le réglage d'anticrénelage pour le casque : SMAA remplacé, tout autre gardé. */
+export function vrStereoFxaa(doc: IniDocument): VpxSetting[] {
+  return doc.get('Player', 'FXAA')?.trim() === VR_REFUSED_FXAA ? [{ section: 'Player', key: 'FXAA', value: VR_STEREO_FXAA }] : [];
+}
+
+/** L'INI propre à une table impose-t-il ce que VPX refuse en stéréo ? Il prime sur celui de la partie (VPX le lit après). */
+export function tableIniRefusedInStereo(text: string): string[] {
+  return IniDocument.parse(text).get('Player', 'FXAA')?.trim() === VR_REFUSED_FXAA ? ['FXAA=6 (Quality SMAA)'] : [];
+}
+
+/**
  * Le VPinballX.ini d'une partie en VR : `base` (celui de la borne, ou du double), les réglages de la
  * VR de `previous` (la partie précédente : orientation et place de la table, aperçu…), puis
  * AskToTurnOn = 1 et AddBackglass selon la table.
@@ -240,6 +260,8 @@ export function planVrIni(base: string, previous: string | undefined, opts: { ad
     { section: VR_SECTION, key: 'AskToTurnOn', value: VR_AUTODETECT },
     { section: VR_SECTION, key: 'AddBackglass', value: opts.addBackglass ? '1' : '0' },
     VR_VIEW_MODE,
+    // Rien de ce que VPX refuse en stéréo (SMAA) n'atteint une partie dans le casque.
+    ...vrStereoFxaa(doc),
     // Recopie sur le playfield : la vue d'un œil, en paysage (option « Recopie sur le playfield »), ou rien.
     ...(opts.mirror ? [{ section: 'Player', key: 'VRPreview', value: '1' }, ...vrPreviewSettings(doc)] : [...vrPreviewSettings(doc).filter((x) => x.key === 'PreviewDisplay'), ...VR_NO_MIRROR]),
     // Les sorties des fenêtres annexes restent celles de la borne (ANCILLARY_OUTPUTS).

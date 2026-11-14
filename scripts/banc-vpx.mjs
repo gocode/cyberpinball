@@ -22,6 +22,7 @@
 // remplace celui de la copie à chaque passage.
 
 import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -121,9 +122,19 @@ function args(argv) {
 }
 
 /** La copie de VPX du banc, faite une fois par version (robocopy /XJ : aucune jonction suivie ni recopiée). */
-export function copieVpx(source) {
+/**
+ * Le dossier de la copie de VPX du banc : un par version de VPX et par dépôt (checkout principal, chaque worktree).
+ * Deux bancs de deux dépôts ne se partagent jamais une copie : chacun y met son propre plugin, qui peut être chargé
+ * par son VPX à cet instant (nuit du 14 novembre 2026, deux bancs en même temps).
+ */
+export function dossierCopieVpx(source, depot = repo) {
   const nom = path.basename(path.resolve(source)).replace(/[^\w.-]/g, '_');
-  const dest = path.join(os.tmpdir(), 'cyberpinball-banc-vpx', nom);
+  const cle = createHash('sha1').update(path.resolve(depot).toLowerCase()).digest('hex').slice(0, 8);
+  return path.join(os.tmpdir(), 'cyberpinball-banc-vpx', `${nom}-${cle}`);
+}
+
+export function copieVpx(source) {
+  const dest = dossierCopieVpx(source);
   if (!fs.existsSync(path.join(dest, VPX_EXE))) {
     fs.mkdirSync(dest, { recursive: true });
     const r = spawnSync('robocopy', [source, dest, '/E', '/XJ', '/XD', 'docs', '/NFL', '/NDL', '/NJH', '/NJS', '/NP'], { windowsHide: true });
@@ -131,7 +142,10 @@ export function copieVpx(source) {
   }
   const plugin = path.join(dest, 'plugins', 'cyberpinball');
   fs.mkdirSync(plugin, { recursive: true });
-  fs.copyFileSync(BANC_PLUGIN, path.join(plugin, 'plugin-cyberpinball64.dll'));
+  // Recopié seulement s'il a changé : deux bancs du même dépôt en même temps ne touchent pas au plugin que l'autre
+  // VPX a chargé (un fichier chargé ne se remplace pas sous Windows).
+  const dll = path.join(plugin, 'plugin-cyberpinball64.dll');
+  if (!fs.existsSync(dll) || !fs.readFileSync(dll).equals(fs.readFileSync(BANC_PLUGIN))) fs.copyFileSync(BANC_PLUGIN, dll);
   if (!fs.existsSync(path.join(plugin, 'plugin.cfg')))
     fs.writeFileSync(path.join(plugin, 'plugin.cfg'), '[configuration]\nid = "CyberPinball"\nname = "Cyber Pinball"\nversion = "1.0"\n\n[libraries]\nwindows.x64 = "plugin-cyberpinball64.dll"\n');
   return dest;
@@ -223,7 +237,7 @@ export async function jouerVpx({ vpx, table, scenario = SCENARIO_CALAGE, dureeMs
  * l'application) mesure les remises d'origine ; chaque saut est composé avec les précédents et la correction écrite
  * comme Cyber Pinball l'écrit (frontend.ts). Rend les poses de l'espace de la projection et le verdict.
  */
-export async function preuveRepere({ vpx, table, couche = true, dureeMs = 40000 }) {
+export async function preuveRepere({ vpx, table, couche = true, dureeMs = 40000, scenario = SCENARIO_REPERE }) {
   const req = (await import('node:module')).createRequire(import.meta.url);
   const sondeOvr = req('../app/dist/sonde-ovr.js');
   const core = req('../packages/core/dist/index.js');
@@ -231,7 +245,7 @@ export async function preuveRepere({ vpx, table, couche = true, dureeMs = 40000 
   const r = await jouerVpx({
     vpx,
     table,
-    scenario: SCENARIO_REPERE,
+    scenario,
     dureeMs,
     couche,
     pendant: ({ dir, env, correction, journalCouche }) => {
@@ -285,6 +299,50 @@ export async function preuveRepere({ vpx, table, couche = true, dureeMs = 40000 
 }
 
 /**
+ * Le calage en partie fait et vérifié (--calage 1, essai réel du 14 novembre 2026 : 46 calages « ok » sans retour de
+ * VPX) : deux remises d'origine (correction non nulle), puis le geste du calage et cinq gâchettes de suite (appuis
+ * pairs et impairs). Chaque calage doit finir « ok », VPX ayant vu les deux manettes à leur place du lancement (prises
+ * à 3 cm au-dessus et 8 cm en arrière des bouts), et son calage continu arrêté.
+ */
+export const SCENARIO_CALAGE_REPERE = [
+  '0 porte 1',
+  '0 limite piece 3 3',
+  '0 tete 0.2 1.6 0.3 0.4',
+  '0 manette gauche -0.3 1.02 -0.35',
+  '0 manette droite 0.3 1.02 -0.35',
+  '12000 tete 0.6 1.62 -0.4 2.98',
+  '13000 origine 0.6 -0.4 2.98',
+  '16000 tete 0.1 1.6 0.9 2.46',
+  '17000 origine 0.1 0.9 2.46',
+  '22000 bouton /user/hand/left/input/thumbstick/click 1',
+  '22100 bouton /user/hand/right/input/thumbstick/click 1',
+  '26100 bouton /user/hand/left/input/thumbstick/click 0',
+  '26100 bouton /user/hand/right/input/thumbstick/click 0',
+  ...[28000, 30500, 33000, 35500, 38000].flatMap((ms) => [`${ms} valeur /user/hand/right/input/trigger/value 1`, `${ms + 300} valeur /user/hand/right/input/trigger/value 0`]),
+].join('\n');
+
+export async function preuveCalage({ vpx, table }) {
+  const p = await preuveRepere({ vpx, table, scenario: SCENARIO_CALAGE_REPERE, dureeMs: 44000 });
+  const calages = [...p.plugin.matchAll(/^calage-partie n=(\d+) .*resultat=(\w+)(.*)$/gm)].map((m) => {
+    const champ = (k) => new RegExp(`${k}=(\\S+)`).exec(m[3])?.[1];
+    const pos = (k) => champ(k)?.split(',').map(Number);
+    return { n: Number(m[1]), resultat: m[2], raison: champ('raison'), appuis: Number(champ('appuis')), m1: pos('manette1'), m2: pos('manette2') };
+  });
+  // Les prises dans le monde, exprimées dans l'espace réel de VPX (la pose de sa projection dans le monde, trace du
+  // runtime) : VPX doit les voir là, quelle que soit la correction ; il pose alors la table sous les vraies manettes.
+  const prisesMonde = [[-0.3, 1.05, -0.27], [0.3, 1.05, -0.27]];
+  const S = p.poses.at(-1) ?? { x: 0, y: 0, z: 0, yaw: 0 };
+  const prises = prisesMonde.map(([x, y, z]) => {
+    const dx = x - S.x, dz = z - S.z, c = Math.cos(S.yaw), s = Math.sin(S.yaw);
+    return [dx * c - dz * s, y - S.y, dx * s + dz * c];
+  });
+  const ecartCm = (c) => (c.m1 && c.m2 ? Math.max(...[c.m1, c.m2].map((m) => Math.min(...prises.map((w) => Math.hypot(m[0] - w[0], m[1] - w[1], m[2] - w[2]) * 100)))) : NaN);
+  // Une correction non nulle (au moins un saut), cinq calages faits et vérifiés, les manettes à leur vraie place.
+  const ok = calages.length === 5 && calages.every((c) => c.resultat === 'ok' && ecartCm(c) < 1) && p.sauts.length >= 1;
+  return { ...p, calages, ecartCm, ok };
+}
+
+/**
  * La garde de la couche (--garde-couche 1), règle « plantage de VPX : module fautif » : une première partie lancée avec
  * la couche, où VPX tombe (verbe planter du runtime factice, code 0xC0000005) ; jugée comme l'application la juge
  * (roomLayerFault), la couche est écartée (setRoomLayerAside) ; la partie suivante se lance sans elle et se joue.
@@ -325,6 +383,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error('node scripts/banc-vpx.mjs --vpx <dossier de VPX> --table <fichier.vpx> [--scenario <fichier>] [--duree <ms>]');
     process.exit(2);
   }
+  if (a.calage === '1') {
+    const c = await preuveCalage({ vpx: a.vpx, table: a.table });
+    console.log(`Dossier : ${c.dir}\nSortie de VPX : ${c.code}\nSauts mesurés : ${c.sauts.length}`);
+    console.log('--- calages en partie (plugin) ---\n' + c.calages.map((k) => `n=${k.n} ${k.resultat}${k.raison ? ` (${k.raison})` : ''}, ${k.appuis} appui(s) F13, manettes à ${c.ecartCm(k).toFixed(2)} cm de leur vraie place (espace de VPX)`).join('\n'));
+    console.log('--- plugin (calage) ---\n' + c.plugin.split('\n').filter((l) => /^calage/.test(l)).join('\n'));
+    console.log(`Verdict : ${c.ok ? 'OK' : 'ÉCHEC'}.`);
+    process.exit(c.ok ? 0 : 1);
+  }
   if (a['garde-couche'] === '1') {
     const g = await preuveGardeCouche({ vpx: a.vpx, table: a.table });
     console.log(`Partie 1, avec la couche : sortie de VPX ${g.r1.code} (0x${(g.r1.code >>> 0).toString(16).toUpperCase()})\n${g.r1.couche || '(journal de la couche vide)'}`);
@@ -335,7 +401,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     process.exit(g.ok ? 0 : 1);
   }
   if (a.repere === '1') {
-    const p = await preuveRepere({ vpx: a.vpx, table: a.table, couche: a.couche !== '0', ...(a.duree && { dureeMs: Number(a.duree) }) });
+    const p = await preuveRepere({ vpx: a.vpx, table: a.table, couche: a.couche !== '0', ...(a.duree && { dureeMs: Number(a.duree) }), ...(a.scenario && { scenario: fs.readFileSync(a.scenario, 'utf8') }) });
     console.log(`Dossier : ${p.dir}\nSortie de VPX : ${p.code}`);
     console.log(`--- sauts mesurés par la sonde (${p.sauts.length}) ---\n` + p.sauts.map((s) => `${s.ms} ms : ${((s.angle * 180) / Math.PI).toFixed(1)}°, ${(Math.hypot(s.tx, s.tz) * 100).toFixed(0)} cm`).join('\n'));
     console.log('--- espace de la projection de VPX dans le monde ---\n' + p.poses.map((q) => `${q.ms} ms : ${q.x.toFixed(4)}, ${q.y.toFixed(4)}, ${q.z.toFixed(4)}, cap ${((q.yaw * 180) / Math.PI).toFixed(2)}°`).join('\n'));

@@ -18,6 +18,8 @@ import {
   vrNeedsVpxBackglass,
   samePath,
   tableHasVrRoom,
+  tableIniRefusedInStereo,
+  vrStereoFxaa,
   vrCarriedSettings,
   windowsVk,
   vrReadiness,
@@ -99,6 +101,8 @@ export function probeVr(): VrReadiness {
 export interface VrGame {
   /** Le VPinballX.ini à passer à VPX par -Ini. */
   ini: string;
+  /** L'INI propre à la table, neutralisé pour le casque : sa copie à passer par -TableIni (prepareVrTableIni). */
+  tableIni?: VrTableIni;
   /** La table a sa propre pièce VR. */
   room: boolean;
   /** Flashers de la table qui montrent le fronton en VR (undefined : table illisible). */
@@ -229,4 +233,48 @@ export function centerWhenStarted(opts: { logFile: string; fromOffset: number; p
   };
   wait();
   return stop;
+}
+
+/**
+ * L'INI propre à une table prime sur celui de la partie (VPX 10.8.1 : m_table->m_settings) : ce qu'il impose et que VPX
+ * refuse en stéréo (SMAA : Indiana Jones, 14 novembre 2026, « FXAA = 6 » dans l'INI à côté de la table) est neutralisé
+ * dans une copie, passée à VPX par -TableIni pour la seule partie dans le casque. Le fichier du joueur n'est pas touché.
+ */
+export interface VrTableIni {
+  /** L'INI de la table, à côté d'elle. */
+  original: string;
+  /** La copie passée à VPX. */
+  file: string;
+  /** Le texte écrit dans la copie (pour retrouver ce que VPX y a changé pendant la partie). */
+  written: string;
+  /** Ce qui a été neutralisé (journal). */
+  refused: string[];
+}
+
+export function prepareVrTableIni(dataDir: string, tableIni: string | undefined): VrTableIni | undefined {
+  if (!tableIni || !fs.existsSync(tableIni)) return undefined;
+  const text = readTextIfExists(tableIni);
+  const refused = tableIniRefusedInStereo(text);
+  if (!refused.length) return undefined;
+  const doc = IniDocument.parse(text);
+  applyVpxSettings(doc, vrStereoFxaa(doc));
+  const written = doc.toString();
+  const file = path.join(folder(dataDir), 'table-partie.ini');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  writeFileAtomic(file, written);
+  return { original: tableIni, file, written, refused };
+}
+
+/**
+ * Après la partie : ce que VPX a réécrit dans la copie (réglages changés en jeu) est reporté dans l'INI de la table,
+ * sauf ce qui a été neutralisé pour le casque. Rend le nombre de réglages reportés.
+ */
+export function restoreVrTableIni(t: VrTableIni): number {
+  const before = IniDocument.parse(t.written);
+  const changed: VpxSetting[] = IniDocument.parse(readTextIfExists(t.file))
+    .entries()
+    .filter((e) => !(e.section.toLowerCase() === 'player' && e.key.toLowerCase() === 'fxaa') && before.get(e.section, e.key) !== e.value)
+    .map((e) => ({ section: e.section, key: e.key, value: e.value }));
+  if (changed.length) writeIniSettings(t.original, changed);
+  return changed.length;
 }

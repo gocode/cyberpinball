@@ -87,6 +87,7 @@ MSGPI_STRING_VAL_SETTING(imageCaler, "CalibrateImage", "Calibrate image", "Contr
 MSGPI_STRING_VAL_SETTING(imageCalee, "CalibratedImage", "Calibrated image", "The same drawing once calibrated (prepared by Cyber Pinball)", true, "", 1024);
 MSGPI_STRING_VAL_SETTING(aideCaler, "CalibrateHelp", "Calibrate help", "Keys reminder while calibrating", true, "Controllers on the lockbar corners - Trigger: calibrate - A or B: resume", 128);
 MSGPI_STRING_VAL_SETTING(libelleCale, "CalibratedLabel", "Calibrated label", "Shown once the table was aligned", true, "Table aligned", 64);
+MSGPI_STRING_VAL_SETTING(libelleCalageRate, "CalibrateFailedLabel", "Calibration failed label", "Shown when VPX did not align the table on the controllers", true, "Not aligned: controllers still on the lockbar corners, trigger again", 128);
 MSGPI_INT_VAL_SETTING(hauteurCalage, "CalibrateHeight", "Calibrate height steps", "Centimetres to move the table up (negative: down) after aligning it on the controllers", true, -60, 60, 0);
 MSGPI_INT_VAL_SETTING(calageActif, "Calibrate", "Calibrate", "1 when Cyber Pinball bound the keys of the calibration (F13, F14, F15)", true, 0, 1, 0);
 // Minuterie de Windows (minuterie.h) : 1, ses demandes comptent toujours (défaut) ; 0, Windows décide ; 2, ignorées
@@ -112,17 +113,59 @@ double derniereDemande = -1.0;
 bool notifiee = false;
 
 /**
- * Calage en cours (gâchette à l'étape du calage) : l'alignement de VPX sur les manettes mis en marche (F13),
- * laissé CALAGE_IMAGES images, arrêté (F13), puis la hauteur reprise d'un pas par image (F14 monte, F15 descend).
+ * Le calage de VPX vu par la couche du repère (packages/casque-vr/src/couche-repere.cpp, CyberPinballRepereCalage),
+ * chargée dans le même processus : VPX 10.8.1 ne situe ses manettes que pendant son calage continu ; chaque image où
+ * il le fait, le calage tourne, et la dernière paire est celle d'où il tire la table. Même forme que dans la couche.
  */
+struct CalageVu
+{
+   uint64_t image = 0;
+   uint64_t derniereImage = 0;
+   uint32_t valides = 0;
+   uint32_t invalides = 0;
+   float a[3] {}, b[3] {};
+   uint32_t paires = 0;
+};
+
+/** Lu dans la couche ; faux sans elle (partie lancée sans la couche, ou couche écartée). */
+bool lireCalageVu(CalageVu& out)
+{
+   using Lire = int(__cdecl*)(void*, uint32_t);
+   static Lire lire = nullptr;
+   if (!lire)
+      if (HMODULE m = GetModuleHandleW(L"XR_APILAYER_CYBERPINBALL_repere.dll"))
+         lire = reinterpret_cast<Lire>(GetProcAddress(m, "CyberPinballRepereCalage"));
+   return lire && lire(&out, sizeof(CalageVu)) == 1;
+}
+
+/** Le calage continu de VPX tourne : il a situé ses manettes à l'image d'avant ou à celle-ci. */
+bool calageContinuEnMarche(const CalageVu& v)
+{
+   return v.derniereImage > 0 && v.image <= v.derniereImage + 1;
+}
+
+/**
+ * Calage en cours (gâchette à l'étape du calage), fait et vérifié (essai réel du 14 novembre 2026 : 46 calages écrits
+ * « ok » sans retour de VPX, la table ailleurs). F13 est une bascule du calage continu de VPX (InputManager.cpp,
+ * VRControllerCalibration) : il n'est appuyé que si l'état lu dans la couche le demande, jamais d'après une parité.
+ * Mis en marche, laissé tourner jusqu'à une paire de manettes valables (au plus CALAGE_IMAGES_MAX images), arrêté et
+ * vérifié arrêté, puis la hauteur reprise d'un pas par image (F14 monte, F15 descend), puis le résultat écrit.
+ */
+constexpr int CALAGE_IMAGES_MAX = 30;
 struct CalageEnCours
 {
-   int etape = 0; // 0 rien, 1 à mettre en marche, 2 en marche, 3 hauteur
+   int etape = 0; // 0 rien, 1 à mettre en marche, 2 en marche, 3 hauteur, 4 vérification
    int images = 0;
    int pas = 0;
    int fait = 0;
+   bool verifiable = false; // la couche est là : le calage se vérifie
+   CalageVu avant;
+   int appuisF13 = 0;
+   bool rattrape = false;
 };
 CalageEnCours calageVpx;
+/** Le dernier calage n'a pas été fait par VPX : l'étape le dit au joueur au lieu de « Borne calée ». */
+bool calageRate = false;
 
 // --- Son des vidéos de PuP dans le casque ----------------------------------------------------
 //
@@ -1407,22 +1450,65 @@ void appliquer(const Ordre& o)
       quitterPartie(o.quitter);
 }
 
+/** Une coordonnée de manette au journal. */
+std::string pos3(const float v[3])
+{
+   char b[64];
+   std::snprintf(b, sizeof(b), "%.3f,%.3f,%.3f", v[0], v[1], v[2]);
+   return b;
+}
+
+/** F13 appuyé (bascule du calage continu de VPX), compté. */
+void basculerCalage(CalageEnCours& c, const char* pourquoi)
+{
+   posterTouche(TOUCHE_ALIGNER, BALAYAGE_ALIGNER);
+   c.appuisF13++;
+   ecrire(std::string("calage-touche F13 ") + pourquoi);
+}
+
 /** Le calage en cours, une étape par image (VPX lit le clavier entre deux images). */
 void avancerCalage()
 {
    CalageEnCours& c = calageVpx;
+   CalageVu vu;
    switch (c.etape)
    {
    case 1:
-      c.etape = posterTouche(TOUCHE_ALIGNER, BALAYAGE_ALIGNER) ? 2 : 0;
-      ecrire(c.etape ? "calage-touche F13 marche" : "calage-partie resultat=aucune_fenetre");
+      if (fenetresVpx().empty())
+      {
+         ecrire("calage-partie resultat=aucune_fenetre");
+         c.etape = 0;
+         return;
+      }
+      c.verifiable = lireCalageVu(c.avant);
+      // Déjà en marche (un appui perdu, une bascule inversée) : un appui l'arrêterait ; il tourne, on le laisse.
+      if (c.verifiable && calageContinuEnMarche(c.avant))
+         ecrire("calage-touche F13 deja_en_marche");
+      else
+         basculerCalage(c, "marche");
+      c.etape = 2;
       c.images = 0;
       return;
    case 2:
-      if (++c.images < CALAGE_IMAGES)
+      ++c.images;
+      if (!c.verifiable)
+      {
+         // Sans la couche : comme avant, CALAGE_IMAGES images puis l'arrêt.
+         if (c.images < CALAGE_IMAGES)
+            return;
+         basculerCalage(c, "arret");
+         c.etape = 3;
          return;
-      posterTouche(TOUCHE_ALIGNER, BALAYAGE_ALIGNER);
-      ecrire("calage-touche F13 arret");
+      }
+      lireCalageVu(vu);
+      // Une paire de manettes valables vue par VPX depuis la gâchette, et CALAGE_IMAGES images au moins.
+      if ((vu.paires == c.avant.paires || c.images < CALAGE_IMAGES) && c.images < CALAGE_IMAGES_MAX)
+         return;
+      // Arrêté seulement s'il tourne : un appui sur un calage arrêté le mettrait en marche.
+      if (calageContinuEnMarche(vu))
+         basculerCalage(c, "arret");
+      else
+         ecrire("calage-touche F13 pas_en_marche");
       c.etape = 3;
       return;
    case 3:
@@ -1433,16 +1519,50 @@ void avancerCalage()
          c.fait += monter ? 1 : -1;
          return;
       }
+      c.etape = 4;
+      c.images = 0;
+      return;
+   case 4:
+   {
+      if (++c.images < 3)
+         return;
+      char ligne[512];
+      if (!c.verifiable)
       {
-         char ligne[96];
-         std::snprintf(ligne, sizeof(ligne), "calage-partie n=%d hauteur=%d resultat=ok", pause.calagesFaits(), c.pas);
-         ecrire(ligne);
+         std::snprintf(ligne, sizeof(ligne), "calage-partie n=%d hauteur=%d resultat=non_verifie raison=couche_absente appuis=%d", pause.calagesFaits(), c.pas, c.appuisF13);
+         calageRate = false;
       }
+      else
+      {
+         lireCalageVu(vu);
+         // Encore en marche après l'arrêt (appui perdu) : arrêté une fois de plus, puis revérifié.
+         if (calageContinuEnMarche(vu) && !c.rattrape)
+         {
+            c.rattrape = true;
+            basculerCalage(c, "arret_rattrape");
+            c.images = 0;
+            return;
+         }
+         const uint32_t paires = vu.paires - c.avant.paires;
+         const uint32_t invalides = vu.invalides - c.avant.invalides;
+         const float dx = vu.b[0] - vu.a[0], dz = vu.b[2] - vu.a[2];
+         const float largeur = std::sqrt(dx * dx + dz * dz) * 100.f;
+         const char* raison = calageContinuEnMarche(vu) ? "calage_continu_reste_allume" : paires == 0 ? "manettes_non_vues" : nullptr;
+         calageRate = raison != nullptr;
+         if (raison)
+            std::snprintf(ligne, sizeof(ligne), "calage-partie n=%d hauteur=%d resultat=echec raison=%s paires=%u invalides=%u appuis=%d", pause.calagesFaits(), c.pas, raison,
+               paires, invalides, c.appuisF13);
+         else
+            std::snprintf(ligne, sizeof(ligne), "calage-partie n=%d hauteur=%d resultat=ok paires=%u invalides=%u appuis=%d manette1=%s manette2=%s ecart=%.1f",
+               pause.calagesFaits(), c.pas, paires, invalides, c.appuisF13, pos3(vu.a).c_str(), pos3(vu.b).c_str(), largeur);
+      }
+      ecrire(ligne);
       c.etape = 0;
       // La première fois : l'étape telle qu'elle se montre après un calage (« Borne calée »), en capture.
       if (pause.calagesFaits() == 1)
          capturerCalage("calee");
       return;
+   }
    default: return;
    }
 }
@@ -1558,6 +1678,7 @@ void MSGPIAPI onGameStart(const unsigned int, void*, void*)
 {
    pause.remiseAZero();
    calageVpx = CalageEnCours {};
+   calageRate = false;
    actionsVues[0] = actionsVues[1] = 0;
    if (!versionConnue())
    {
@@ -1639,7 +1760,7 @@ struct Image
 };
 
 VPXTexture blanc = nullptr;
-Image titre, reprendre, quitter, marque, rappel, ajuster, etapeAjuster, aideAjuster, caler, aideCalage, cale;
+Image titre, reprendre, quitter, marque, rappel, ajuster, etapeAjuster, aideAjuster, caler, aideCalage, cale, calageRateTexte;
 Image aide[3];
 int lignesAide = 0;
 
@@ -1666,6 +1787,7 @@ void preparerTout()
    preparer(caler, libelleCaler_Val, 8);
    preparer(aideCalage, aideCaler_Val, 6);
    preparer(cale, libelleCale_Val, 6);
+   preparer(calageRateTexte, libelleCalageRate_Val, 6);
    {
       const Etape e = pause.etape();
       const std::string nom = pause.ecran() == Ecran::Dmd ? libelleEcranDmd_Val : libelleEcranFronton_Val;
@@ -1843,7 +1965,9 @@ int dessinerCalage(VPXRenderContext2D* ctx, double t)
    const Rect zone = zoneVisible(ctx);
    const Rect rr = cadrer(L, H, zone.l, zone.h, { 0.f, 0.f, L, H });
    cible = { zone.x + rr.x, zone.y + rr.y, rr.l, rr.h };
-   const bool fait = pause.calagesFaits() > 0 && calageVpx.etape == 0;
+   // « Borne calée » seulement quand VPX l'a fait (calage vérifié dans la couche) ; sinon l'étape le dit.
+   const bool rate = pause.calagesFaits() > 0 && calageVpx.etape == 0 && calageRate;
+   const bool fait = pause.calagesFaits() > 0 && calageVpx.etape == 0 && !calageRate;
    // Le schéma des manettes (maquette validée le 13 novembre 2026) : le voile sur tout le fronton, puis l'image que
    // Cyber Pinball a préparée avec le vrai composant (le titre, les manettes, les gâchettes en vert, la ligne d'aide),
    // centrée ; après un calage, la même avec « Borne calée » en vert. Sans image (autres manettes) : le texte en haut.
@@ -1855,10 +1979,15 @@ int dessinerCalage(VPXRenderContext2D* ctx, double t)
       const float w = std::min(940.f, img.l * 640.f / img.h);
       const float h = w * img.h / img.l;
       ctx->DrawImage(ctx, img.tex, 1.f, 1.f, 1.f, 1.f, 0.f, 0.f, img.l, img.h, 0.f, 0.f, 0.f, cible.x + (L - w) / 2.f * s, cible.y + (H - h) / 2.f * s, w * s, h * s);
+      if (rate)
+      {
+         rectangle(ctx, 0.f, 0.f, L, 110.f, FOND[0], FOND[1], FOND[2], 0.92f);
+         texte(ctx, calageRateTexte, L / 2.f, 55.f, 44.f, SIGNAL[0], SIGNAL[1], SIGNAL[2]);
+      }
       return 1;
    }
    rectangle(ctx, 0.f, 0.f, L, 230.f, FOND[0], FOND[1], FOND[2], 0.85f);
-   texte(ctx, fait ? cale : caler, L / 2.f, 60.f, 70.f, SIGNAL[0], SIGNAL[1], SIGNAL[2]);
+   texte(ctx, fait ? cale : rate ? calageRateTexte : caler, L / 2.f, 60.f, rate ? 44.f : 70.f, SIGNAL[0], SIGNAL[1], SIGNAL[2]);
    texte(ctx, aideCalage, L / 2.f, 160.f, 44.f, ENCRE[0], ENCRE[1], ENCRE[2]);
    return 1;
 }
@@ -1932,7 +2061,7 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballPluginLoad(const uint32_t sessionId, cons
    msgApi->RegisterSetting(endpointId, &salleRatio);
    for (auto* reglage : { &pupDmdRatio })
       msgApi->RegisterSetting(endpointId, reglage);
-   for (auto* reglage : { &reglagesEcrans, &idTable, &libelleAjuster, &libelleEcranFronton, &libelleEcranDmd, &aideChoixEcran, &aideReglage, &libelleCaler, &aideCaler, &imageCaler, &imageCalee, &libelleCale })
+   for (auto* reglage : { &reglagesEcrans, &idTable, &libelleAjuster, &libelleEcranFronton, &libelleEcranDmd, &aideChoixEcran, &aideReglage, &libelleCaler, &aideCaler, &imageCaler, &imageCalee, &libelleCale, &libelleCalageRate })
       msgApi->RegisterSetting(endpointId, reglage);
    for (auto* reglage : { &hauteurCalage, &calageActif, &gardeMinuterie, &essaiCadence })
       msgApi->RegisterSetting(endpointId, reglage);

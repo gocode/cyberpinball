@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.13
 
+- Virtual reality: the alignment during a game is checked; if it did not take, the step says so instead of showing "Borne calée".
+- Virtual reality: after the headset sleeps in the middle of a game, the table comes back to its place on its own; headset lying down, no more restart loop; a table whose settings ask for SMAA (refused by VPX in the headset) switches to FXAA for the game in the headset, without touching its settings.
 - Virtual reality: a headset session that fails at start no longer passes for a stationary boundary or an outdated alignment, and Cyber Pinball no longer takes Air Link for the cable at the start of a connection. If a game in the headset closes abruptly with the table correction, the next ones start without it until the next update.
 - Virtual reality: in the middle of a game, when the headset is taken off and put back on, the table stays in its place on the cabinet (the Quest redoes the room, Cyber Pinball corrects VPX at once).
 - Virtual reality: Link cut then back, Cyber Pinball finds the room measurement again on its own; the cabinet is never moved again from the boundary of a past connection.

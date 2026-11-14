@@ -73,6 +73,8 @@ export interface LaunchOptions {
   vpxPrefDir: string;
   /** Variables d'environnement ajoutées pour VPX (couche OpenXR du repère de la pièce, partie dans le casque). */
   env?: Record<string, string>;
+  /** L'INI de la table à passer par -TableIni (copie neutralisée pour une partie dans le casque). */
+  tableIni?: string;
   timeoutMs?: number;
   /** Appelé quand la fenêtre de jeu est à l'écran. */
   onPlaying?: () => void;
@@ -103,7 +105,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
   const t0 = Date.now();
   // VPX doit pouvoir prendre le premier plan même si Windows hésite.
   allowAnyForeground();
-  const args = ['-Ini', opts.ini, opts.display ? '-PovEdit' : '-Play', opts.table];
+  const args = ['-Ini', opts.ini, ...(opts.tableIni ? ['-TableIni', opts.tableIni] : []), opts.display ? '-PovEdit' : '-Play', opts.table];
   const child = spawn(opts.exe, args, {
     cwd: path.dirname(opts.exe),
     windowsHide: false,

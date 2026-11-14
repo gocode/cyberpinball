@@ -521,3 +521,26 @@ test('banc : 23:39 rejoué, ancrage refusé sur le contour périmé, rien d’at
   const reste = core.placeGap(ancre.place, vraie);
   assert.ok(reste.cm < 2 && reste.deg < 1, JSON.stringify(reste));
 });
+
+// Deux bancs en même temps (nuit du 14 novembre 2026, deux sessions sur le même poste) : chacun a son scénario, sa
+// trace et son instant zéro, et n'arrête que ses propres processus (par PID) ; aucun ne voit ni ne gêne l'autre.
+test('banc : deux bancs en même temps, chacun son scénario, aucun ne gêne l’autre', banc, async () => {
+  const [a, b, c, d] = await Promise.all([
+    sonder(['0 porte 1', '0 tete 0.111 1.6 0.222 0'].join('\n'), { dureeMs: 6000 }),
+    sonder(['0 porte 1', '0 tete -0.333 1.6 0.444 0', '2000 link 0'].join('\n'), { dureeMs: 6000 }),
+    jouer('0 porte 1\n0 limite piece 2.49 3.38', { dureeMs: 5000 }),
+    jouer('0 porte 1\n0 limite fixe', { dureeMs: 5000 }),
+  ]);
+  assert.ok(a.lignes.includes('ovr tete 0.111 1.600 0.222 0.000 suivi=15'), a.lignes.join('\n'));
+  assert.ok(!a.lignes.some((l) => l.startsWith('ovr session refaite')), a.lignes.join('\n'));
+  assert.ok(b.lignes.includes('ovr tete -0.333 1.600 0.444 0.000 suivi=15'), b.lignes.join('\n'));
+  assert.ok(b.lignes.includes('ovr session refaite raison=entrees code=-3003'), b.lignes.join('\n'));
+  assert.equal(c.lignes.filter((l) => /^piece 2\.49\d* 3\.38\d*$/.test(l.ligne)).length, 1);
+  assert.equal(c.lignes.filter((l) => l.ligne === 'piece aucune').length, 0);
+  assert.equal(d.lignes.filter((l) => l.ligne === 'piece aucune').length, 1);
+  // Les arrêts des bancs visent un PID, jamais un nom de processus.
+  for (const f of ['banc-casque.mjs', 'banc-vpx.mjs', 'bureau-cache.ps1', 'banc-dmd.mjs']) {
+    const text = fs.readFileSync(new URL(f, import.meta.url), 'utf8');
+    assert.doesNotMatch(text, /taskkill[^\n]*\/IM|Stop-Process[^\n]*-Name|killall/i, f);
+  }
+});

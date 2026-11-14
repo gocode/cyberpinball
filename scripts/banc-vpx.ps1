@@ -3,7 +3,8 @@
 #   powershell -File scripts\banc-vpx.ps1 -Vpx <dossier de VPX 10.8.1> -Table <fichier.vpx> [-Scenario <fichier>] [-Duree <ms>]
 # Cadence de VPX : -Scenario repos, -Cadence exacte, -Garde 0|1|2, -Plugin 0, -Captures 0, -Essai 1 (voir banc-vpx.mjs).
 # Couche du repère de la pièce : -Repere 1 (preuve : trois remises d'origine en partie), -Couche 0 (la même sans elle),
-# -GardeCouche 1 (VPX qui tombe avec la couche : écartée, la partie suivante sans elle).
+# -GardeCouche 1 (VPX qui tombe avec la couche : écartée, la partie suivante sans elle),
+# -Calage 1 (calage en partie fait et vérifié après une correction non nulle, cinq gâchettes de suite).
 param(
   [Parameter(Mandatory = $true)][string]$Vpx,
   [Parameter(Mandatory = $true)][string]$Table,
@@ -17,7 +18,8 @@ param(
   [string]$Essai,
   [string]$Repere,
   [string]$Couche,
-  [string]$GardeCouche
+  [string]$GardeCouche,
+  [string]$Calage
 )
 . "$PSScriptRoot\bureau-cache.ps1"
 if (Enter-BureauCache $PSCommandPath $PSBoundParameters) { exit $LASTEXITCODE }
@@ -33,5 +35,6 @@ if ($Essai) { $argsNode += @('--essai', $Essai) }
 if ($Repere) { $argsNode += @('--repere', $Repere) }
 if ($Couche) { $argsNode += @('--couche', $Couche) }
 if ($GardeCouche) { $argsNode += @('--garde-couche', $GardeCouche) }
+if ($Calage) { $argsNode += @('--calage', $Calage) }
 & node @argsNode
 exit $LASTEXITCODE

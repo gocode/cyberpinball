@@ -49,11 +49,13 @@ import {
   anchorPlace,
   movePlace,
   moveContour,
+  fitContour,
   composeJumps,
   RoomFrame,
   ROOM_LAYER,
   roomCorrectionText,
   ROOM_LAYER_EARLY_S,
+  inGameCalibrationLines,
   roomLayerFault,
   roomLayerCorrected,
   roomLayerEnv,
@@ -245,7 +247,7 @@ test('invariant : la même combinaison, la même durée et les mêmes touches da
 
 test('détection de la panne du geste en partie (13 novembre 2026, « rien du tout ») : chaque étape au journal du plugin, bilan à la fin de la partie', () => {
   const plugin = read('packages', 'vpx-vision3d', 'src', 'cyberpinball.cpp');
-  for (const line of ['calage actif=%d hauteur=%d', 'calage-clic %s=%d fiable=%d', 'calage-combinaison tenue', 'calage-etape ouverte', 'calage-gachette', 'calage-touche F13 marche', 'calage-touche F13 arret', 'passif raison=version', 'passif raison=actions'])
+  for (const line of ['calage actif=%d hauteur=%d', 'calage-clic %s=%d fiable=%d', 'calage-combinaison tenue', 'calage-etape ouverte', 'calage-gachette', 'basculerCalage(c, "marche")', 'basculerCalage(c, "arret")', 'passif raison=version', 'passif raison=actions'])
     assert.ok(plugin.includes(line), line);
   // Plugin d'avant : rien à dire. Aucun clic arrivé : VPX ne les transmet pas.
   assert.equal(inGameCalibrationReport('debut table=x\nmesure t=5'), undefined);
@@ -254,7 +256,7 @@ test('détection de la panne du geste en partie (13 novembre 2026, « rien du to
   assert.match(inGameCalibrationReport('calage actif=0 hauteur=0')!, /touches du calage pas liées/);
   assert.match(inGameCalibrationReport('calage actif=1 hauteur=13\ncalage-clic gauche=1 fiable=1\ncalage-clic gauche=0 fiable=1')!, /1 clic\(s\)[\s\S]*jamais été tenus ensemble/);
   const full = ['calage actif=1 hauteur=13', 'calage-clic gauche=1 fiable=1', 'calage-clic droit=1 fiable=1', 'calage-combinaison tenue', 'calage-combinaison pause demandee', 'calage-etape ouverte', 'calage-gachette', 'calage-touche F13 marche', 'calage-touche F13 arret', 'calage-partie n=1 hauteur=13 resultat=ok'].join('\n');
-  assert.match(inGameCalibrationReport(full)!, /2 clic\(s\)[\s\S]*1 calage\(s\) fait\(s\) ; calage fait$/);
+  assert.match(inGameCalibrationReport(full)!, /2 clic\(s\)[\s\S]*1 calage\(s\) fait\(s\) et vérifié\(s\) ; calage fait$/);
   assert.match(inGameCalibrationReport(full.replace('calage-partie n=1 hauteur=13 resultat=ok', ''))!, /touche F13 pas postée/);
   assert.match(read('app', 'src', 'frontend.ts'), /const calibrationReport = inGameCalibrationReport\(block\.text\);/);
   // Les actions vues par le plugin (première de chacune, « action-vue ») : dit sur la borne si les manettes l'atteignent.
@@ -459,7 +461,7 @@ test('schéma des manettes, planches d’adaptation validées (13 novembre 2026)
   const plugin = read('packages', 'vpx-vision3d', 'src', 'cyberpinball.cpp');
   assert.match(plugin, /MSGPI_STRING_VAL_SETTING\(imageCaler, "CalibrateImage"/);
   assert.match(plugin, /MSGPI_STRING_VAL_SETTING\(imageCalee, "CalibratedImage"/);
-  assert.match(plugin, /&aideCaler, &imageCaler, &imageCalee, &libelleCale \}/);
+  assert.match(plugin, /&aideCaler, &imageCaler, &imageCalee, &libelleCale, &libelleCalageRate \}/);
   // Sans image (autres manettes), la consigne en texte d'avant ; l'étape se capture au banc de VPX.
   assert.match(plugin, /texte\(ctx, aideCalage, L \/ 2\.f, 160\.f, 44\.f/);
   assert.match(plugin, /capturerCalage\("calage"\);/);
@@ -799,10 +801,10 @@ test('couche du repère pour VPX (essai réel du 13 novembre 2026, 23:50-23:52 :
   // en partie reporté du repère du lancement par les sauts que la couche a appliqués.
   const front = read('app', 'src', 'frontend.ts');
   assert.match(front, /const roomEnv = vrGame && simulated === undefined \? startGameRoom\(\) : undefined;/);
-  assert.match(front, /const vpxEnv = roomEnv \? \{ env: roomEnv \} : \{\};/);
+  assert.match(front, /const vpxEnv = \{ \.\.\.\(roomEnv \? \{ env: roomEnv \} : \{\}\), \.\.\.\(vrGame\?\.tableIni \? \{ tableIni: vrGame\.tableIni\.file \} : \{\}\) \};/);
   assert.match(front, /vpxPrefDir: vpxPrefDir\(install\.version\), \.\.\.vpxEnv, onVr,/);
   assert.match(front, /if \(gameRoom && \(playing \|\| launch\)\) \{\s*try \{\s*gameRoom\.onJump\(jump\);/);
-  assert.match(front, /const room = endGameRoom\(\{ \.\.\.result, stopAsked: gameStopAsked \}\);\s*if \(playedVr && vrGame\) checkVrPlaceAfterGame\(vrGame\.ini, played\.file, room\);/);
+  assert.match(front, /const room = endGameRoom\(\{ \.\.\.result, stopAsked: gameStopAsked \}\);[\s\S]*?if \(playedVr && vrGame\) checkVrPlaceAfterGame\(vrGame\.ini, played\.file, room\);/);
   assert.match(front, /const carried = room && room\.jumps && room\.corrected\(\) \? room\.jump : undefined;/);
   assert.match(front, /const next = carried \? movePlace\(inVpx, carried\) : inVpx;/);
   assert.match(front, /const moved = placeVpxSettings\(launched,/);
@@ -848,4 +850,84 @@ test('couche du repère qui ferait tomber VPX (règle « module fautif ») : nom
   assert.match(front, /const room = endGameRoom\(\{ \.\.\.result, stopAsked: gameStopAsked \}\);/);
   assert.match(front, /game\.stop = \(\) => \{\s*gameStopAsked = true;\s*stopGame\(\);/);
   assert.match(read('packages', 'casque-vr', 'test', 'runtime-factice.cpp'), /TerminateProcess\(GetCurrentProcess\(\), 0xC0000005\);/);
+});
+
+test('veille du casque en partie (essai réel du 14 novembre 2026, Indiana Jones) : le contour rafraîchi mesure la remise non vue', () => {
+  // Rejoué sur les deux contours du journal du PinCab (02:16:52.005, lu au port juste avant le saut mesuré, et
+  // 02:18:17.429, redonné par le runtime 31 ms après le réveil d'une veille de 32 s) : recalés à 0,05 cm, -112,3° et 93 cm.
+  // La forme de la pièce du joueur ne sort pas de la borne : ici un contour de synthèse, avec le saut et la remise réels.
+  const avant: [number, number][] = [];
+  for (let i = 0; i < 68; i++) {
+    const a = (i / 68) * 2 * Math.PI;
+    const r = 2 + 0.4 * Math.sin(3 * a) + 0.25 * Math.cos(5 * a + 1);
+    avant.push([0.3 + r * Math.cos(a), 1.1 + r * Math.sin(a)]);
+  }
+  const saut: JumpTransform = { angle: -2.41462, tx: -0.0707, tz: 0.8846, dy: 0.0006 };
+  const remise: JumpTransform = { angle: -1.95952, tx: 0.5872, tz: 0.7235, dy: 0 };
+  const apres = moveContour(moveContour(avant, saut), remise);
+  const frame = new RoomFrame();
+  frame.companionSession(true);
+  frame.onRead(avant);
+  frame.onJump(saut);
+  const effectif = frame.effective()!;
+  // Le contour effectif d'avant recalé sur le contour relu : un déplacement rigide, la remise que la sonde n'a pas vue.
+  const fit = fitContour(effectif, apres)!;
+  assert.ok(fit.residualCm < 0.5, JSON.stringify(fit));
+  assert.ok(Math.abs((fit.angle * 180) / Math.PI + 112.3) < 0.2, JSON.stringify(fit));
+  assert.ok(Math.abs(Math.hypot(fit.tx, fit.tz) * 100 - 93) < 1, JSON.stringify(fit));
+  assert.equal(frame.onRead(apres), 'rafraichi');
+  // La place reposée par ce changement garde le contour relu : l'ancrage n'a ensuite plus rien à faire.
+  const calee: CabinetPlace = { ...lockbarPlace({ x: -0.3, y: 1.0, z: -0.4 }, { x: 0.3, y: 1.0, z: -0.4 }), contour: effectif };
+  const reposee: CabinetPlace = { ...movePlace(calee, fit), contour: frame.effective()! };
+  assert.deepEqual(anchorPlace(reposee, frame.effective()!), { kind: 'same' });
+  // L'application : en partie, le contour rafraîchi corrige la couche, la place et l'INI ; les têtes suivent le repère.
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /const previous = roomFrame\.effective\(\);\s*const kind = roomFrame\.onRead\(points\);/);
+  assert.match(front, /if \(kind === 'rafraichi' && previous && \(playing \|\| launch\)\) contourFrameChange\(previous, points\);/);
+  assert.match(front, /function headsetJump\(jump: OvrJump\): void \{\s*roomFrame\.onJump\(jump\);\s*applyFrameChange\(jump,/);
+  assert.match(front, /if \(playing \|\| launch\) gameHeads = gameHeads\.map\(/);
+  assert.match(front, /if \(gameRoom && \(playing \|\| launch\)\) \{\s*try \{\s*gameRoom\.onJump\(jump\);/);
+});
+
+test('boucle des sessions neuves (essai réel du 14 novembre 2026, 02:25 : casque posé, 8 relances en 40 s) : jamais d’elle-même', () => {
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /if \(!afterRemoval && Date\.now\(\) - portRestartAt < PORT_SETTLE_MS \+ 5000\) \{/);
+  assert.match(front, /if \(!afterRemoval && ovrProbe\.tracking\(\) && roomFrame\.state\(\) === 'pret' && !\(lastJump && Date\.now\(\) - lastJump\.at < 3000\) && Date\.now\(\) - lastRefusedAt > 3000\) \{/);
+  assert.match(front, /if \(Date\.now\(\) - portRestartAt < 60_000\) \{/);
+  assert.match(front, /watch\.restartAt = portRestartAt = Date\.now\(\);/);
+  assert.match(read('app', 'src', 'sonde-ovr.ts'), /if \(line\.startsWith\('ovr saut-refuse '\)\) this\.opts\.onRefused\?\.\(\);/);
+});
+
+test('calage en partie fait et vérifié (essai réel du 14 novembre 2026 : 46 « ok » sans retour de VPX, la table ailleurs)', () => {
+  // Une ligne par calage : fait par VPX (manettes vues, calage continu arrêté), pas fait, pas vérifié, ou ancien « ok ».
+  const lignes = inGameCalibrationLines(
+    [
+      'calage-partie n=1 hauteur=14 resultat=ok paires=4 invalides=0 appuis=2 manette1=-0.329,1.050,-1.217 manette2=0.192,1.050,-1.515 ecart=60.0',
+      'calage-partie n=2 hauteur=14 resultat=echec raison=manettes_non_vues paires=0 invalides=8 appuis=1',
+      'calage-partie n=3 hauteur=14 resultat=echec raison=calage_continu_reste_allume paires=2 invalides=0 appuis=3',
+      'calage-partie n=4 hauteur=0 resultat=non_verifie raison=couche_absente appuis=2',
+      'calage-partie n=5 hauteur=14 resultat=ok',
+    ].join('\n'),
+  );
+  assert.equal(lignes.length, 5);
+  assert.match(lignes[0]!, /^calage 1 : fait par VPX, 4 image\(s\) avec les deux manettes, manettes à 60\.0 cm/);
+  assert.match(lignes[1]!, /^calage 2 : PAS fait par VPX \(aucune image avec les deux manettes suivies\)/);
+  assert.match(lignes[2]!, /^calage 3 : PAS fait par VPX \(son calage continu est resté allumé\)/);
+  assert.match(lignes[3]!, /^calage 4 : pas vérifié \(couche du repère absente\)/);
+  assert.match(lignes[4]!, /^calage 5 : « ok » écrit sans vérification/);
+  // La couche voit ce que VPX fait : il ne situe ses manettes que pendant son calage continu (VRDevice.cpp).
+  const couche = read('packages', 'casque-vr', 'src', 'couche-repere.cpp');
+  assert.match(couche, /extern "C" __declspec\(dllexport\) int CyberPinballRepereCalage\(void\* out, uint32_t size\)/);
+  assert.match(couche, /noterManette\(space, baseSpace, r, location\);/);
+  // Le plugin : F13 appuyé seulement si l'état lu le demande (jamais d'après une parité), « ok » seulement vérifié.
+  const plugin = read('packages', 'vpx-vision3d', 'src', 'cyberpinball.cpp');
+  assert.match(plugin, /if \(c\.verifiable && calageContinuEnMarche\(c\.avant\)\)\s*ecrire\("calage-touche F13 deja_en_marche"\);/);
+  assert.match(plugin, /if \(calageContinuEnMarche\(vu\)\)\s*basculerCalage\(c, "arret"\);/);
+  assert.match(plugin, /basculerCalage\(c, "arret_rattrape"\);/);
+  assert.match(plugin, /resultat=echec raison=%s/);
+  assert.match(plugin, /const bool fait = pause\.calagesFaits\(\) > 0 && calageVpx\.etape == 0 && !calageRate;/);
+  // L'application : le texte de l'échec écrit pour le plugin, une ligne par calage au journal après la partie.
+  const front = read('app', 'src', 'frontend.ts');
+  assert.match(front, /key: 'CalibrateFailedLabel', value: t\('Pas calée : manettes immobiles sur les coins de la barre, gâchette de nouveau'\)/);
+  assert.match(front, /for \(const line of inGameCalibrationLines\(block\.text\)\) console\.log\(/);
 });
