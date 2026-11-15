@@ -15,8 +15,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { renameWithRetry, writeFileAtomic } from './atomicwrite';
 import { decodeAvatarData, isAvatarFileName, isAvatarHash } from './avatar';
-import { dmdScore } from './highscores';
-import { t } from './i18n';
+import { formatNumber, t } from './i18n';
 import { parseRate, type ByteRate } from './ratelimit';
 import { createPlayerKey, isPlayerPublicKey, playerFingerprint, signText, tableIdentity, verifyText, type PlayerKey } from './sharing';
 import type { TableEntry } from './tables';
@@ -894,8 +893,8 @@ export function eventText(e: SocialEvent, badgeLabel: (id: string) => string): s
   switch (e.kind) {
     case 'record':
       return e.rank === 1
-        ? t('Nouveau meilleur score sur {table} : {score}', { table: e.table!.title, score: dmdScore(e.score!) })
-        : t('Entré au tableau d’honneur de {table} : {score}, place {rank}', { table: e.table!.title, score: dmdScore(e.score!), rank: e.rank! });
+        ? t('Nouveau meilleur score sur {table} : {score}', { table: e.table!.title, score: formatNumber(e.score!) })
+        : t('Entré au tableau d’honneur de {table} : {score}, place {rank}', { table: e.table!.title, score: formatNumber(e.score!), rank: e.rank! });
     case 'badge':
       return t('Badge reçu : {badge}', { badge: badgeLabel(e.badge!) });
     case 'played':

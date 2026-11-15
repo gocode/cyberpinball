@@ -265,6 +265,26 @@ export function formatSize(bytes: number, fine = false): string {
   return t('{n} octets', { n: bytes });
 }
 
+const SIZE_UNITS: Record<string, number> = { o: 1, b: 1, octets: 1, bytes: 1, ko: 1024, kb: 1024, kio: 1024, kib: 1024, mo: 1024 ** 2, mb: 1024 ** 2, mio: 1024 ** 2, mib: 1024 ** 2, go: 1024 ** 3, gb: 1024 ** 3, gio: 1024 ** 3, gib: 1024 ** 3, to: 1024 ** 4, tb: 1024 ** 4 };
+
+/**
+ * Octets d'une taille écrite par un site (« 4.67 MB », « 6.5MB », « 1,234.5 KB », « 381,1 Mo ») ;
+ * undefined si le texte n'en est pas une. Les sites comptent en 1024, comme formatSize : une taille
+ * venue d'ailleurs ne s'affiche jamais telle quelle, elle repasse par formatSize (langue de la borne).
+ */
+export function parseSizeText(text: string | undefined): number | undefined {
+  const m = text && /^\s*(\d[\d\s.,  ]*)\s*([a-z]+)\s*$/i.exec(text);
+  if (!m) return undefined;
+  const unit = SIZE_UNITS[m[2]!.toLowerCase()];
+  if (!unit) return undefined;
+  let digits = m[1]!.replace(/[\s  ]/g, '');
+  if (digits.includes('.') && digits.includes(',')) digits = digits.replace(/,/g, '');
+  // Virgule seule : décimale (« 381,1 »), sauf suivie de trois chiffres exactement (« 1,234 »).
+  else if (digits.includes(',')) digits = /,\d{3}$/.test(digits) ? digits.replace(/,/g, '') : digits.replace(',', '.');
+  const value = Number(digits);
+  return Number.isFinite(value) ? Math.round(value * unit) : undefined;
+}
+
 /** Supprime les dossiers vides restés derrière un déplacement, jusqu'à stop exclu. */
 export function pruneEmptyDirs(dir: string, stop: string): void {
   let current = dir;

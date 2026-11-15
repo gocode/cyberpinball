@@ -15,6 +15,7 @@
 // la même galerie (app/src/file-gallery.ts), et webFileTile en dit le contenu.
 
 import { formatDay, liveLinks, linkHost, versionLabel, type NeedKind } from './acquisition';
+import { formatSize, parseSizeText } from './fileops';
 import { formatNumber, t, tn } from './i18n';
 import type { MediaSiteId } from './mediasites';
 import type { VpsTableFile } from './vps';
@@ -34,7 +35,7 @@ export interface SiteFileInfo extends SiteFileRef {
   /** Publication et dernière mise à jour (ISO). */
   date?: string;
   updated?: string;
-  /** Taille, telle que la page l'écrit (« 4.67 MB »). */
+  /** Taille, telle que la page l'écrit (« 4.67 MB ») : jamais affichée ainsi, voir siteSize. */
   size?: string;
   category?: string;
   downloads?: number;
@@ -205,6 +206,15 @@ export interface WebFileTile {
   gone?: boolean;
 }
 
+/**
+ * Taille d'une fiche dans la langue de la borne (« 4.67 MB » du site devient « 4,7 Mo ») ; un
+ * texte qui n'est pas une taille ne s'affiche pas, plutôt qu'en anglais.
+ */
+function siteSize(text: string | undefined): string | undefined {
+  const bytes = parseSizeText(text);
+  return bytes !== undefined ? formatSize(bytes) : undefined;
+}
+
 /** « 4,5/5 » */
 const ratingText = (r: { value: number }) => t('{value}/5', { value: formatNumber(r.value, { maximumFractionDigits: 1 }) });
 
@@ -243,7 +253,7 @@ export function webFileTile(kind: NeedKind, file: VpsTableFile, info: SiteFileSt
     [
       page?.rating ? tn(page.rating.count, 'note {value}/5 sur {n} avis', 'note {value}/5 sur {n} avis', { value: formatNumber(page.rating.value, { maximumFractionDigits: 1 }) }) : undefined,
       page?.views !== undefined ? tn(page.views, '{n} vue', '{n} vues') : undefined,
-      page?.size,
+      siteSize(page?.size),
       host?.account ? t('compte nécessaire') : undefined,
       page?.category,
     ]

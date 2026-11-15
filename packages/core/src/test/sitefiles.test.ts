@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { formatSize, parseSizeText } from '../fileops';
 import { setLanguage } from '../i18n';
 import { fileRefOf, parseSiteFile, siteFileRef, sortWebFiles, webFileTile, type SiteFileInfo } from '../sitefiles';
 import type { VpsTableFile } from '../vps';
@@ -91,8 +92,10 @@ test('tuile d’un fichier : aperçu, popularité, auteur, date et version dès 
   assert.equal(tile.facts, 'le 07/05/2023 · vpuniverse.com');
   assert.equal(webFileTile('b2s', { ...MATRIX_B2S, updatedAt: undefined }, info).facts, 'le 21/03/2023 · vpuniverse.com');
   const detail = tile.detail.join('\n').replace(/ | /g, ' ');
-  for (const said of ['par TableMaker', 'version 1.0.0', 'note 5/5 sur 1 avis', '1 862 vues', '4.67 MB', 'B2S Alternate / Original']) assert.ok(detail.includes(said), `détail : ${said}\n${detail}`);
+  for (const said of ['par TableMaker', 'version 1.0.0', 'note 5/5 sur 1 avis', '1 862 vues', '4,7 Mo', 'B2S Alternate / Original']) assert.ok(detail.includes(said), `détail : ${said}\n${detail}`);
   assert.ok(!detail.includes('téléchargements'), detail);
+  // La taille du site (« 4.67 MB ») passe par la langue de la borne, jamais telle quelle.
+  assert.ok(!detail.includes(' MB'), detail);
   // Sans vignette VPS (ROM, PuP-Pack, couleurs, sons) : la capture de l'auteur.
   const pup = webFileTile('pup', { ...MATRIX_B2S, imgUrl: undefined }, info);
   assert.deepEqual(pup.previews, [info.thumb, info.screenshot]);
@@ -144,4 +147,28 @@ test('fiche muette : ni popularité ni aperçu inventés', () => {
   assert.equal(tile.popularity, undefined);
   assert.deepEqual(tile.previews, []);
   assert.match(tile.detail.join(' '), /Sa fiche ne dit ni téléchargements ni note/);
+});
+
+test('taille écrite par un site : lue en octets, affichée dans la langue de la borne (« 381.1 MB » de Metallica, 15/11/2026)', () => {
+  assert.equal(parseSizeText('4.67 MB'), Math.round(4.67 * 1024 ** 2));
+  assert.equal(parseSizeText('6.5MB'), Math.round(6.5 * 1024 ** 2));
+  assert.equal(parseSizeText('381,1 Mo'), Math.round(381.1 * 1024 ** 2));
+  assert.equal(parseSizeText('1,234.5 KB'), Math.round(1234.5 * 1024));
+  assert.equal(parseSizeText('1,234 KB'), 1234 * 1024);
+  assert.equal(parseSizeText('1.2 GB'), Math.round(1.2 * 1024 ** 3));
+  assert.equal(parseSizeText('812 bytes'), 812);
+  for (const bad of [undefined, '', 'MB', 'environ 3 MB', 'Visual Pinball X', '12 parsecs']) assert.equal(parseSizeText(bad), undefined, String(bad));
+  const ref = siteFileRef(MATRIX_B2S.urls![0]!.url)!;
+  const metallica = { ...ref, size: '381.1 MB' };
+  try {
+    const fr = webFileTile('table', MATRIX_B2S, metallica).detail.join(' ');
+    assert.ok(fr.includes(formatSize(parseSizeText('381.1 MB')!)) && fr.includes('381 Mo'), fr);
+    setLanguage('en');
+    const en = webFileTile('table', MATRIX_B2S, metallica).detail.join(' ');
+    assert.ok(en.includes('381 MB') && !en.includes('Mo'), en);
+  } finally {
+    setLanguage('fr');
+  }
+  // Une taille illisible ne s'affiche pas plutôt que de passer en anglais.
+  assert.ok(!webFileTile('table', MATRIX_B2S, { ...ref, size: 'n/a' }).detail.join(' ').includes('n/a'));
 });

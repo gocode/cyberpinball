@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { dmdScore, newRecords, readTableRecords, recordsOf, vpRegFile } from '../highscores';
 import { cfb } from './fixtures';
+import { interfaceSources, REPO_ROOT } from './i18n-scan';
 
 function tableWith(reg: Buffer | undefined, file = 'GOTG_2.1.1.vpx', title = 'Guardians of the Galaxy') {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-records-'));
@@ -77,4 +78,20 @@ test('score à la manière des DMD : chiffres groupés par trois', () => {
   assert.equal(dmdScore(75000000), '75,000,000');
   assert.equal(dmdScore(999), '999');
   assert.equal(dmdScore(1000), '1,000');
+});
+
+test('dmdScore reste au DMD : un score écrit dans l’interface passe par formatNumber (« 3,215,480,250 » dans Mes amis, 15/11/2026)', () => {
+  // Les seuls fichiers qui dessinent un DMD ; tout autre usage écrirait un score à l'anglaise dans un texte.
+  const allowed = new Set(['packages/core/src/highscores.ts', 'packages/core/src/livedmd.ts']);
+  const found = interfaceSources()
+    .filter((file) => !allowed.has(file))
+    .flatMap((file) =>
+      fs
+        .readFileSync(path.join(REPO_ROOT, file), 'utf8')
+        .split('\n')
+        .map((line, i) => ({ file, line: i + 1, text: line }))
+        .filter((l) => /\bdmdScore\s*\(/.test(l.text) && !/^\s*(\/\/|\*)/.test(l.text)),
+    )
+    .map((l) => `${l.file}:${l.line}`);
+  assert.deepEqual(found, [], 'dmdScore hors du DMD : utiliser formatNumber (i18n.ts)');
 });

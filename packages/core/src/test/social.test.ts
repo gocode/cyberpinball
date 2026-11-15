@@ -271,7 +271,8 @@ test('fichiers d’une table reçus d’un ami : chemin sous le dossier de la ta
 
 test('évènements : phrases du record, du badge, de la partie', () => {
   const at = new Date().toISOString();
-  assert.equal(eventText({ id: '1', kind: 'record', at, table: { title: 'The Goonies' }, score: 12_345_670, rank: 1 }, (id) => id), 'Nouveau meilleur score sur The Goonies : 12,345,670');
+  // Le score dans la langue de la borne, comme au tableau des scores ; jamais à la manière du DMD (« 12,345,670 »).
+  assert.equal(eventText({ id: '1', kind: 'record', at, table: { title: 'The Goonies' }, score: 12_345_670, rank: 1 }, (id) => id), 'Nouveau meilleur score sur The Goonies : 12 345 670');
   assert.match(eventText({ id: '2', kind: 'record', at, table: { title: 'T2' }, score: 5_000_000, rank: 3 }, (id) => id), /place 3/);
   assert.equal(eventText({ id: '3', kind: 'badge', at, badge: 'first-game' }, () => 'Première partie'), 'Badge reçu : Première partie');
   assert.match(eventText({ id: '4', kind: 'played', at, table: { title: 'T2' }, seconds: 4000 }, (id) => id), /1 h 07 min/);
