@@ -62,7 +62,10 @@ test('conditions : acceptées dans le menu, gardées, et redemandées pour une v
 test('conditions : l’installeur écrit le même fichier, dans le format que l’application relit', () => {
   const nsi = fs.readFileSync(path.join(REPO, 'scripts', 'installeur', 'cyberpinball.nsi'), 'utf8');
   assert.ok(nsi.includes(`$Racine\\data\\${TERMS_FILE}`), 'nom du fichier');
-  assert.ok(nsi.includes('MUI_PAGE_LICENSE "${CONDITIONS}"'), 'page des conditions');
+  assert.ok(nsi.includes('MUI_PAGE_LICENSE "$(L_CONDITIONS_FICHIER)"'), 'page des conditions, dans la langue choisie');
+  const langues = fs.readFileSync(path.join(REPO, 'scripts', 'installeur', 'langues.nsh'), 'utf8');
+  assert.match(langues, /LicenseLangString L_CONDITIONS_FICHIER \$\{LANG_FRENCH\} "\$\{CONDITIONS_FR\}"/);
+  assert.match(langues, /LicenseLangString L_CONDITIONS_FICHIER \$\{LANG_ENGLISH\} "\$\{CONDITIONS_EN\}"/);
   const line = nsi.split(/\r?\n/).find((l) => l.includes('FileWrite') && l.includes('CONDITIONS_VERSION'));
   assert.ok(line, 'écriture de l’acceptation');
   // Le JSON que l'installeur écrit, avec la version qu'installeur.mjs lui donne.

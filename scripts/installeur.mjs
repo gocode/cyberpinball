@@ -133,15 +133,21 @@ async function vcRedist() {
 
 /**
  * Page « Conditions d'utilisation » de l'installeur : le texte du cœur (packages/core/src/terms.ts),
- * en français comme l'installeur, écrit en UTF-16 avec sa marque d'ordre pour NSIS.
+ * dans chaque langue de l'installeur (français, anglais : son catalogue i18n/en/terms.ts), écrit en
+ * UTF-16 avec sa marque d'ordre pour NSIS. La page montre celui de la langue choisie au début.
  */
 export function termsPage(dir = work) {
   const core = require(path.join(repo, 'packages', 'core', 'dist', 'index.js'));
-  core.setLanguage('fr');
-  const file = path.join(dir, 'conditions.txt');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(file, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(core.termsPlainText(), 'utf16le')]));
-  return { CONDITIONS: file, CONDITIONS_VERSION: core.TERMS_VERSION };
+  const write = (lang) => {
+    core.setLanguage(lang);
+    const file = path.join(dir, `conditions-${lang}.txt`);
+    fs.writeFileSync(file, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(core.termsPlainText(), 'utf16le')]));
+    return file;
+  };
+  const pages = { CONDITIONS_FR: write('fr'), CONDITIONS_EN: write('en') };
+  core.setLanguage('fr');
+  return { ...pages, CONDITIONS_VERSION: core.TERMS_VERSION };
 }
 
 export async function buildInstallers({ complete = true } = {}) {

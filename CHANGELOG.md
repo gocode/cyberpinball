@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.13
 
+- L’installeur parle français ou anglais : une petite fenêtre propose la langue dès le début (celle de Windows par défaut), et ce choix devient aussi celui de Cyber Pinball. Pages, conditions d’utilisation et désinstalleur suivent ; `/LANGUE=fr` ou `/LANGUE=en` pour une installation en ligne de commande.
 - Les scores écrits dans l’interface (Mes amis, messagerie, activité) suivent la langue de la borne : « 3 215 480 250 » en français au lieu de « 3,215,480,250 ». Le catalogue en ligne donne aussi la taille des fichiers dans la langue de la borne (« 381 Mo » au lieu de « 381.1 MB »).
 - Télécommande du téléphone : sur Android, le raccourci de l'écran d'accueil retrouve la borne même quand le routeur change son adresse, sans scanner le QR. Le téléphone le propose une fois (puis dans son menu ⋮) ; il passe par t.cyberpinball.com, qui ne voit ni la clé du téléphone ni l'adresse de la borne : tout est chiffré. Se coupe dans Menu système > Borne > Télécommande du téléphone.
 - Sauvegardes : choisir un niveau dans « Sauvegarder maintenant » suit de nouveau les flippers, sans attente ni appui perdu ; sur le plan d'une restauration, inclure ou exclure une partie est immédiat.

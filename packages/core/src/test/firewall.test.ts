@@ -31,7 +31,7 @@ test('ligne de commande : chaque valeur entre guillemets, la règle limitée à 
 
 test('l’installeur pose la même règle, jamais en mise à jour, en silence ni dans un bac à sable', () => {
   const nsi = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'installeur', 'cyberpinball.nsi'), 'utf8');
-  const section = nsi.slice(nsi.indexOf('Section "Partage entre bornes'), nsi.indexOf('Function RegleParefeuPresente'));
+  const section = nsi.slice(nsi.indexOf('Section "$(L_NOM_PAREFEU)" SEC_PAREFEU'), nsi.indexOf('Function RegleParefeuPresente'));
   assert.ok(section.length > 100, 'section du pare-feu');
   // Même nom et mêmes réglages que firewall.ts.
   assert.match(section, new RegExp(`delete rule name="${FIREWALL_RULE}"`));

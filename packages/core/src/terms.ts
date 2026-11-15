@@ -1,8 +1,9 @@
 // Conditions d'utilisation de Cyber Pinball : le texte, et son acceptation.
 //
 // Un seul texte, ici, traduit comme le reste de l'interface (i18n/en/terms.ts) :
-// - l'installeur le montre en français sur sa page « Conditions d'utilisation » (scripts/installeur.mjs
-//   l'écrit avec termsPlainText, à chaque fabrication) ; l'accepter y écrit <données>\conditions.json ;
+// - l'installeur le montre dans la langue choisie à son début, sur sa page « Conditions d'utilisation »
+//   (scripts/installeur.mjs l'écrit en français et en anglais avec termsPlainText, à chaque fabrication) ;
+//   l'accepter y écrit <données>\conditions.json ;
 // - le menu le montre au démarrage tant que la version en cours n'est pas acceptée (app/src/terms-menu.ts) :
 //   installation sans l'installeur, mise à jour vers une version qui change le texte ;
 // - il reste consultable dans Menu système > Cyber Pinball > Conditions d’utilisation.

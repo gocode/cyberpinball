@@ -12,8 +12,9 @@
 ;             et pour la version complète : COMPLET, VPX_ARCHIVE, VPX_ARCHIVE_NOM, VPX_NOTICE, VPX_VERSION,
 ;             VCREDIST, VCREDIST_NOM (installateur du runtime Visual C++ de Microsoft).
 ;   SITE : adresse du dépôt (« repository » du package.json racine).
-;   CONDITIONS : texte des conditions d'utilisation (UTF-16), CONDITIONS_VERSION : sa version
-;   (packages/core/src/terms.ts) ; les accepter écrit <racine>\data\conditions.json.
+;   CONDITIONS_VERSION : version des conditions d'utilisation (packages/core/src/terms.ts) ; les
+;   accepter écrit <racine>\data\conditions.json.
+;   CONDITIONS_FR, CONDITIONS_EN : le même texte dans chaque langue de l'installeur.
 ;   VPX_PAREFEU_REEL, VPX_PAREFEU_JONCTION : l'exécutable de VPX sous la racine, par le dossier de sa
 ;   version et par la jonction current (règle « Cyber Pinball VPX » du pare-feu).
 ;
@@ -22,6 +23,12 @@
 ; attend que Cyber Pinball se ferme, garde les raccourcis choisis à l'installation
 ; précédente, remet l'ancien dossier app en place s'il échoue, puis relance Cyber Pinball
 ; avec les arguments de CYBERPINBALL_MAJ_ARGS.
+;
+; Langue : français ou anglais, choisie dans une petite fenêtre au tout début (présélection : la
+; langue déjà choisie dans Cyber Pinball, sinon celle de Windows si c'est le français, l'anglais
+; sinon, comme l'application), ou par /LANGUE=fr|en. Le choix vaut aussi pour Cyber Pinball : il est
+; écrit dans <racine>\data\language.json. Jamais de fenêtre en mise à jour (/MAJ) ni en silence (/S) :
+; la langue de l'application reste alors celle qu'elle a. Textes : langues.nsh, dans les deux langues.
 ;
 ; Toute l'installation vit dans une racine choisie (D:\CyberPinball par défaut) :
 ; l'application dans <racine>\app, le reste (tables, médias, configuration,
@@ -42,7 +49,7 @@ SetCompressor /FINAL lzma
 
 !define PRODUIT "Cyber Pinball"
 !define EXE "CyberPinball.exe"
-!define DESINSTALLEUR_NOM "Désinstaller Cyber Pinball.exe"
+!define DESINSTALLEUR_NOM "Désinstaller Cyber Pinball.exe" ; i18n-ignore : nom de fichier gardé par les mises à jour
 !define CLE_DESINSTALLATION "Software\Microsoft\Windows\CurrentVersion\Uninstall\CyberPinball"
 
 Name "${PRODUIT}"
@@ -76,6 +83,9 @@ Var ParefeuSilencieux
 ; « 1 » : conditions d'utilisation acceptées sur leur page (jamais en mise à jour ni en silencieux :
 ; l'application les présente alors elle-même).
 Var ConditionsAcceptees
+; « fr » ou « en » : langue choisie (fenêtre du début ou /LANGUE=), écrite dans data\language.json ;
+; vide : rien à écrire, l'application garde la sienne.
+Var LangueChoisie
 
 ; ---------------------------------------------------------------------------
 ; Interface
@@ -85,80 +95,89 @@ Var ConditionsAcceptees
 !define MUI_WELCOMEFINISHPAGE_BITMAP "${BANDEAU}"
 !define MUI_UNWELCOMEFINISHPAGE_BITMAP "${BANDEAU}"
 !define MUI_ABORTWARNING
-!define MUI_ABORTWARNING_TEXT "Abandonner l'installation de Cyber Pinball ?"
+!define MUI_ABORTWARNING_TEXT "$(L_ABANDON)"
+; Fenêtre du choix de la langue, avant toute page : écrite dans les deux langues.
+!define MUI_LANGDLL_ALLLANGUAGES
+!define MUI_LANGDLL_WINDOWTITLE "Cyber Pinball"
+!define MUI_LANGDLL_INFO "Langue de l'installation et de Cyber Pinball :$\r$\nSetup and Cyber Pinball language:" ; i18n-ignore : bilingue
 
 !ifndef ECRIRE_DESINSTALLEUR
-  !define MUI_WELCOMEPAGE_TITLE "Installation de Cyber Pinball ${VERSION}"
-  !ifdef COMPLET
-    !define TEXTE_VPX "Cette version complète contient aussi Visual Pinball X ${VPX_VERSION} : la borne l'installe au premier lancement, sans connexion à Internet."
-  !else
-    !define TEXTE_VPX "Visual Pinball X sera téléchargé au premier lancement (environ 170 Mo), depuis sa page officielle, et vérifié avant installation."
-  !endif
-  !define MUI_WELCOMEPAGE_TEXT "Cyber Pinball configure toute la borne de flipper virtuel à partir d'un seul modèle.$\r$\n$\r$\nTout s'installe dans un dossier racine que vous choisissez : l'application dans le sous-dossier app, et à côté les tables, médias, configuration, données et émulateurs.$\r$\n$\r$\n${TEXTE_VPX}$\r$\n$\r$\nLa désinstallation retire l'application seulement : vos tables, médias, configuration et données restent dans le dossier racine."
+  !define MUI_WELCOMEPAGE_TITLE "$(L_ACCUEIL_TITRE)"
+  !define MUI_WELCOMEPAGE_TEXT "$(L_ACCUEIL_TEXTE)"
   !define MUI_PAGE_CUSTOMFUNCTION_PRE PasserEnMiseAJour
   !insertmacro MUI_PAGE_WELCOME
 
-  !define MUI_PAGE_HEADER_TEXT "Conditions d'utilisation"
-  !define MUI_PAGE_HEADER_SUBTEXT "À lire avant d'installer Cyber Pinball."
-  !define MUI_LICENSEPAGE_TEXT_TOP "Contenus de tiers, partage entre bornes, usage commercial, santé et garantie :"
-  !define MUI_LICENSEPAGE_TEXT_BOTTOM "Si vous acceptez ces conditions et vous engagez à les respecter, cliquez sur J'accepte. Sinon, l'installation s'arrête. Elles restent à lire dans Menu système > Cyber Pinball > Conditions d’utilisation."
+  !define MUI_PAGE_HEADER_TEXT "$(L_CONDITIONS_TITRE)"
+  !define MUI_PAGE_HEADER_SUBTEXT "$(L_CONDITIONS_SOUS_TITRE)"
+  !define MUI_LICENSEPAGE_TEXT_TOP "$(L_CONDITIONS_HAUT)"
+  !define MUI_LICENSEPAGE_TEXT_BOTTOM "$(L_CONDITIONS_BAS)"
+  ; Même libellé que le bouton du menu (« J’accepte », « I accept »), que le texte des conditions cite.
+  !define MUI_LICENSEPAGE_BUTTON "$(L_CONDITIONS_BOUTON)"
   !define MUI_PAGE_CUSTOMFUNCTION_PRE PasserEnMiseAJour
   !define MUI_PAGE_CUSTOMFUNCTION_LEAVE PageConditionsQuitter
-  !insertmacro MUI_PAGE_LICENSE "${CONDITIONS}"
+  !insertmacro MUI_PAGE_LICENSE "$(L_CONDITIONS_FICHIER)"
 
-  !define MUI_PAGE_HEADER_TEXT "Dossier racine de la borne"
-  !define MUI_PAGE_HEADER_SUBTEXT "Cyber Pinball, ses émulateurs, les tables et les médias vivront dans ce dossier."
-  !define MUI_DIRECTORYPAGE_TEXT_TOP "Choisissez le dossier racine, de préférence sur un disque local rapide (par exemple D:\CyberPinball). L'application ira dans le sous-dossier app ; les tables, médias, configuration, données, émulateurs et téléchargements à côté.$\r$\n$\r$\nRefusés : Program Files et Windows (protégés en écriture, alors que VPX et les tables écrivent à côté d'eux), et les dossiers réseau (VPX doit lire ses fichiers en local)."
-  !define MUI_DIRECTORYPAGE_TEXT_DESTINATION "Dossier racine"
+  !define MUI_PAGE_HEADER_TEXT "$(L_RACINE_TITRE)"
+  !define MUI_PAGE_HEADER_SUBTEXT "$(L_RACINE_SOUS_TITRE)"
+  !define MUI_DIRECTORYPAGE_TEXT_TOP "$(L_RACINE_HAUT)"
+  !define MUI_DIRECTORYPAGE_TEXT_DESTINATION "$(L_RACINE_DESTINATION)"
   !define MUI_PAGE_CUSTOMFUNCTION_PRE PasserEnMiseAJour
   !define MUI_PAGE_CUSTOMFUNCTION_LEAVE PageRacineQuitter
   !insertmacro MUI_PAGE_DIRECTORY
 
   !define MUI_COMPONENTSPAGE_SMALLDESC
-  !define MUI_COMPONENTSPAGE_TEXT_TOP "Cochez les options souhaitées."
+  !define MUI_COMPONENTSPAGE_TEXT_TOP "$(L_OPTIONS_HAUT)"
   !define MUI_PAGE_CUSTOMFUNCTION_PRE PasserEnMiseAJour
   !insertmacro MUI_PAGE_COMPONENTS
 
   !insertmacro MUI_PAGE_INSTFILES
 
-  !define MUI_FINISHPAGE_TITLE "Cyber Pinball est installé"
-  !define MUI_FINISHPAGE_TEXT "Cyber Pinball est installé dans $Racine\app.$\r$\n$\r$\nAu premier lancement, il propose d'installer Visual Pinball X puis de configurer les écrans de la borne."
+  !define MUI_FINISHPAGE_TITLE "$(L_FIN_TITRE)"
+  !define MUI_FINISHPAGE_TEXT "$(L_FIN_TEXTE)"
   !define MUI_FINISHPAGE_RUN "$Racine\app\${EXE}"
-  !define MUI_FINISHPAGE_RUN_TEXT "Lancer Cyber Pinball"
+  !define MUI_FINISHPAGE_RUN_TEXT "$(L_FIN_LANCER)"
   !define MUI_PAGE_CUSTOMFUNCTION_PRE PasserEnMiseAJour
   !insertmacro MUI_PAGE_FINISH
 !else
   ; L'explication complète va sur la page d'accueil : celle de confirmation n'a
   ; que trois lignes de texte.
-  !define MUI_WELCOMEPAGE_TITLE "Désinstaller Cyber Pinball"
-  !define MUI_WELCOMEPAGE_TEXT "Seule l'application est retirée : le dossier app et ses raccourcis (menu Démarrer, bureau, démarrage de Windows).$\r$\n$\r$\nRien d'autre n'est supprimé. Vos tables, médias, configuration, données (modèle de borne, sauvegardes), émulateurs et téléchargements restent dans le dossier racine :$\r$\n$Racine$\r$\n$\r$\nPour tout effacer, supprimez vous-même ce dossier après la désinstallation."
+  !define MUI_WELCOMEPAGE_TITLE "$(L_DESINST_TITRE)"
+  !define MUI_WELCOMEPAGE_TEXT "$(L_DESINST_ACCUEIL)"
   !insertmacro MUI_UNPAGE_WELCOME
-  !define MUI_PAGE_HEADER_TEXT "Désinstaller Cyber Pinball"
-  !define MUI_PAGE_HEADER_SUBTEXT "Seule l'application est retirée : vos tables et vos données restent."
-  !define MUI_UNCONFIRMPAGE_TEXT_TOP "L'application va être retirée de l'emplacement ci-dessous. Vos tables, médias, configuration et données ne sont pas touchés."
-  !define MUI_UNCONFIRMPAGE_TEXT_LOCATION "Application :"
+  !define MUI_PAGE_HEADER_TEXT "$(L_DESINST_TITRE)"
+  !define MUI_PAGE_HEADER_SUBTEXT "$(L_DESINST_SOUS_TITRE)"
+  !define MUI_UNCONFIRMPAGE_TEXT_TOP "$(L_DESINST_CONFIRMATION)"
+  !define MUI_UNCONFIRMPAGE_TEXT_LOCATION "$(L_DESINST_EMPLACEMENT)"
   !insertmacro MUI_UNPAGE_CONFIRM
   !insertmacro MUI_UNPAGE_INSTFILES
-  !define MUI_FINISHPAGE_TITLE "Cyber Pinball est désinstallé"
-  !define MUI_FINISHPAGE_TEXT "L'application est retirée.$\r$\n$\r$\nVos tables, médias, configuration et données sont toujours dans le dossier racine :$\r$\n$Racine$\r$\n$\r$\nUne réinstallation dans ce dossier les retrouve telles quelles."
+  !define MUI_FINISHPAGE_TITLE "$(L_DESINST_FIN_TITRE)"
+  !define MUI_FINISHPAGE_TEXT "$(L_DESINST_FIN_TEXTE)"
   !insertmacro MUI_UNPAGE_FINISH
 !endif
 
+; Le français d'abord : langue des sources. Les textes de chaque langue : langues.nsh.
 !insertmacro MUI_LANGUAGE "French"
+!insertmacro MUI_LANGUAGE "English"
+!include "${__FILEDIR__}\langues.nsh"
 
+; Propriétés du fichier (Explorateur), dans les deux langues.
 VIProductVersion "${VERSION_WIN}"
-VIAddVersionKey /LANG=${LANG_FRENCH} "ProductName" "${PRODUIT}"
-VIAddVersionKey /LANG=${LANG_FRENCH} "CompanyName" "${PRODUIT}"
-VIAddVersionKey /LANG=${LANG_FRENCH} "LegalCopyright" "Cyber Pinball, logiciel libre"
-VIAddVersionKey /LANG=${LANG_FRENCH} "FileVersion" "${VERSION}"
-VIAddVersionKey /LANG=${LANG_FRENCH} "ProductVersion" "${VERSION}"
-!ifdef ECRIRE_DESINSTALLEUR
-  VIAddVersionKey /LANG=${LANG_FRENCH} "FileDescription" "Désinstalleur de ${PRODUIT}"
-!else ifdef COMPLET
-  VIAddVersionKey /LANG=${LANG_FRENCH} "FileDescription" "Installeur de ${PRODUIT} (version complète, avec Visual Pinball X)"
-!else
-  VIAddVersionKey /LANG=${LANG_FRENCH} "FileDescription" "Installeur de ${PRODUIT}"
-!endif
+!macro INFORMATIONS_VERSION LANGUE TXT_LIBRE TXT_DESINST TXT_INST TXT_INST_COMPLET
+  VIAddVersionKey /LANG=${LANGUE} "ProductName" "${PRODUIT}"
+  VIAddVersionKey /LANG=${LANGUE} "CompanyName" "${PRODUIT}"
+  VIAddVersionKey /LANG=${LANGUE} "LegalCopyright" "${TXT_LIBRE}"
+  VIAddVersionKey /LANG=${LANGUE} "FileVersion" "${VERSION}"
+  VIAddVersionKey /LANG=${LANGUE} "ProductVersion" "${VERSION}"
+  !ifdef ECRIRE_DESINSTALLEUR
+    VIAddVersionKey /LANG=${LANGUE} "FileDescription" "${TXT_DESINST}"
+  !else ifdef COMPLET
+    VIAddVersionKey /LANG=${LANGUE} "FileDescription" "${TXT_INST_COMPLET}"
+  !else
+    VIAddVersionKey /LANG=${LANGUE} "FileDescription" "${TXT_INST}"
+  !endif
+!macroend
+!insertmacro INFORMATIONS_VERSION ${LANG_FRENCH} "Cyber Pinball, logiciel libre" "Désinstalleur de ${PRODUIT}" "Installeur de ${PRODUIT}" "Installeur de ${PRODUIT} (version complète, avec Visual Pinball X)" ; i18n-ignore : propriétés en français
+!insertmacro INFORMATIONS_VERSION ${LANG_ENGLISH} "Cyber Pinball, free software" "${PRODUIT} uninstaller" "${PRODUIT} setup" "${PRODUIT} setup (full edition, with Visual Pinball X)"
 
 ; ---------------------------------------------------------------------------
 ; Fonctions communes à l'installeur et au désinstalleur (préfixe « un. »)
@@ -171,9 +190,9 @@ Function ${un}Emplacements
   SetShellVarContext current
   ${If} $BacASable != ""
     StrCpy $Pointeur "$BacASable\root.json"
-    StrCpy $MenuDir "$BacASable\Menu Démarrer"
+    StrCpy $MenuDir "$BacASable\Menu Démarrer" ; i18n-ignore : dossier d'essai
     StrCpy $BureauDir "$BacASable\Bureau"
-    StrCpy $DemarrageDir "$BacASable\Démarrage"
+    StrCpy $DemarrageDir "$BacASable\Démarrage" ; i18n-ignore : dossier d'essai
     StrCpy $AnciennesDonnees "$BacASable"
   ${Else}
     StrCpy $Pointeur "$APPDATA\CyberPinball\root.json"
@@ -208,8 +227,8 @@ Function ${un}ApplicationFermee
     Sleep 500
     Goto essai
   ${EndIf}
-  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Cyber Pinball est ouvert. Fermez-le, puis cliquez sur Réessayer." /SD IDCANCEL IDRETRY essai
-  Abort "Cyber Pinball est ouvert : rien n'a été modifié."
+  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(L_APPLI_OUVERTE)" /SD IDCANCEL IDRETRY essai
+  Abort "$(L_APPLI_OUVERTE_RIEN)"
 FunctionEnd
 !macroend
 
@@ -234,6 +253,57 @@ Function ${un}ArreterVeilleur
 FunctionEnd
 !macroend
 
+; Langue proposée : celle déjà choisie dans Cyber Pinball (<racine>\data\language.json, écrit par
+; l'application ou par cet installeur), sinon celle de Windows si c'est le français, l'anglais sinon
+; (comme systemLanguage, packages/core/src/i18n.ts). Entrée : $R9 = racine. Sortie : $LANGUAGE, et
+; $0 = « fr » ou « en ».
+!macro FONCTION_LANGUE un
+Function ${un}LangueParDefaut
+  StrCpy $0 ""
+  ClearErrors
+  FileOpen $1 "$R9\data\language.json" r
+  ${IfNot} ${Errors}
+    StrCpy $2 ""
+    ${Do}
+      ClearErrors
+      FileRead $1 $3
+      ${If} ${Errors}
+        ${ExitDo}
+      ${EndIf}
+      StrCpy $2 "$2$3"
+    ${Loop}
+    FileClose $1
+    ; {"language": "en"} : le premier texte entre guillemets après "language".
+    ClearErrors
+    ${WordFind} $2 '"language"' "E+1}" $3
+    ${IfNot} ${Errors}
+      ${WordFind} $3 '"' "E+2" $3
+      ${IfNot} ${Errors}
+        ${If} $3 == "fr"
+        ${OrIf} $3 == "en"
+          StrCpy $0 $3
+        ${EndIf}
+      ${EndIf}
+    ${EndIf}
+  ${EndIf}
+  ${If} $0 == ""
+    ; Langue principale de l'interface de Windows (LANG_FRENCH = 0x0C, quelle que soit la région).
+    System::Call "kernel32::GetUserDefaultUILanguage() i .r1"
+    IntOp $1 $1 & 0x3FF
+    ${If} $1 == 12
+      StrCpy $0 "fr"
+    ${Else}
+      StrCpy $0 "en"
+    ${EndIf}
+  ${EndIf}
+  ${If} $0 == "fr"
+    StrCpy $LANGUAGE ${LANG_FRENCH}
+  ${Else}
+    StrCpy $LANGUAGE ${LANG_ENGLISH}
+  ${EndIf}
+FunctionEnd
+!macroend
+
 ; ---------------------------------------------------------------------------
 !ifdef ECRIRE_DESINSTALLEUR
 ; Passe 1 : écrit le désinstalleur, puis quitte.
@@ -249,16 +319,20 @@ SectionEnd
 !insertmacro FONCTION_EMPLACEMENTS "un."
 !insertmacro FONCTION_APPLICATION_FERMEE "un."
 !insertmacro FONCTION_ARRET_VEILLEUR "un."
+!insertmacro FONCTION_LANGUE "un."
 
 ; Le désinstalleur reste dans <racine>\app : $INSTDIR est ce dossier.
 Function un.onInit
   ${GetParent} "$INSTDIR" $Racine
+  ; La langue de Cyber Pinball sur cette borne, avant tout message.
+  StrCpy $R9 $Racine
+  Call un.LangueParDefaut
   ${GetFileName} "$INSTDIR" $0
   ; Sécurité : on ne supprime qu'un dossier app\ créé par cet installeur.
   ${If} $0 != "app"
   ${OrIfNot} ${FileExists} "$INSTDIR\installation.ini"
   ${OrIfNot} ${FileExists} "$INSTDIR\${EXE}"
-    MessageBox MB_ICONSTOP "Ce désinstalleur doit se trouver dans le dossier app de Cyber Pinball, à côté de ${EXE} et d'installation.ini. Rien n'a été supprimé." /SD IDOK
+    MessageBox MB_ICONSTOP "$(L_DESINST_MAUVAIS_DOSSIER)" /SD IDOK
     SetErrorLevel 2
     Quit
   ${EndIf}
@@ -269,7 +343,7 @@ Function un.onInit
   ; n'a pas les droits pour la défaire : on le dit, et on n'avance qu'à la demande.
   ${If} ${FileExists} "$Racine\data\borne-dediee\etat.json"
   ${OrIf} ${FileExists} "$Racine\data\borne-dediee\reglages-windows.json"
-    MessageBox MB_YESNO|MB_ICONEXCLAMATION|MB_DEFBUTTON2 "Cyber Pinball s'ouvre encore avec Windows (menu Borne > « Borne dédiée »).$\r$\n$\r$\nDésactivez-le d'abord dans Cyber Pinball : sans lui, la session de ce compte pourrait s'ouvrir sur un écran noir. En secours, les scripts du dossier :$\r$\n$Racine\data\borne-dediee$\r$\n$\r$\nDésinstaller quand même ?" /SD IDYES IDYES +3
+    MessageBox MB_YESNO|MB_ICONEXCLAMATION|MB_DEFBUTTON2 "$(L_DESINST_BORNE_DEDIEE)" /SD IDYES IDYES +3
     SetErrorLevel 2
     Quit
   ${EndIf}
@@ -280,11 +354,11 @@ Section "Uninstall"
   StrCpy $0 "$INSTDIR\${EXE}"
   Call un.ApplicationFermee
 
-  DetailPrint "Raccourcis"
+  DetailPrint "$(L_DESINST_RACCOURCIS)"
   Delete "$MenuDir\${PRODUIT}.lnk"
   Delete "$BureauDir\${PRODUIT}.lnk"
   Delete "$DemarrageDir\${PRODUIT}.lnk"
-  Delete "$DemarrageDir\${PRODUIT} - relance par Start.lnk"
+  Delete "$DemarrageDir\${PRODUIT} - relance par Start.lnk" ; i18n-ignore : nom du raccourci posé par l'application
   Delete "$Racine\${PRODUIT}.lnk"
 
   ; L'entrée de Programmes et fonctionnalités, si elle désigne bien cette racine.
@@ -323,30 +397,30 @@ Section "Uninstall"
       StrCpy $4 '$4netsh advfirewall firewall delete rule name="Cyber Pinball VPX"'
     ${EndIf}
     ; La tâche de réparation des règles (posée par l'application), sous la même autorisation.
-    nsExec::ExecToStack '"$SYSDIR\schtasks.exe" /query /tn "Cyber Pinball pare-feu"'
+    nsExec::ExecToStack '"$SYSDIR\schtasks.exe" /query /tn "Cyber Pinball pare-feu"' ; i18n-ignore : nom de la tâche
     Pop $1
     Pop $2
     ${If} $1 == "0"
       ${If} $4 != ""
         StrCpy $4 "$4 & "
       ${EndIf}
-      StrCpy $4 '$4schtasks /delete /tn "Cyber Pinball pare-feu" /f'
+      StrCpy $4 '$4schtasks /delete /tn "Cyber Pinball pare-feu" /f' ; i18n-ignore : nom de la tâche
     ${EndIf}
     ${If} $4 != ""
-      DetailPrint "Pare-feu de Windows : règles de Cyber Pinball retirées (autorisation demandée)."
+      DetailPrint "$(L_DESINST_PAREFEU)"
       ExecShellWait "runas" "$SYSDIR\cmd.exe" '/d /c $4' SW_HIDE
     ${EndIf}
   ${EndIf}
 
-  DetailPrint "Application : $INSTDIR"
+  DetailPrint "$(L_DESINST_APPLICATION)"
   SetOutPath "$TEMP"
   RMDir /r "$INSTDIR"
   ${If} ${FileExists} "$INSTDIR\*.*"
-    DetailPrint "Certains fichiers de $INSTDIR sont encore utilisés : supprimez-les après un redémarrage."
+    DetailPrint "$(L_DESINST_FICHIERS_UTILISES)"
   ${EndIf}
 
   ; root.json est gardé : une réinstallation retrouve la même racine.
-  DetailPrint "Conservés dans $Racine : tables, media, config, data, emulators, downloads, import, trash."
+  DetailPrint "$(L_DESINST_CONSERVES)"
 SectionEnd
 
 !else
@@ -356,6 +430,7 @@ SectionEnd
 !insertmacro FONCTION_EMPLACEMENTS ""
 !insertmacro FONCTION_APPLICATION_FERMEE ""
 !insertmacro FONCTION_ARRET_VEILLEUR ""
+!insertmacro FONCTION_LANGUE ""
 
 ; Lit la racine mémorisée dans root.json (UTF-8). Sortie : $0, vide si absente.
 Function LirePointeur
@@ -396,7 +471,7 @@ Function EcrirePointeur
   ClearErrors
   FileOpen $2 "$Pointeur" w
   ${If} ${Errors}
-    DetailPrint "Impossible d'écrire $Pointeur : l'application le fera à son premier lancement."
+    DetailPrint "$(L_POINTEUR_ECHEC)"
     Return
   ${EndIf}
   System::Call "kernel32::WideCharToMultiByte(i 65001, i 0, w r1, i -1, p 0, i 0, p 0, p 0) i .r3"
@@ -407,7 +482,7 @@ Function EcrirePointeur
   System::Call "kernel32::WriteFile(p r2, p r4, i r3, *i .r5, p 0)"
   System::Free $4
   FileClose $2
-  DetailPrint "Racine mémorisée dans $Pointeur"
+  DetailPrint "$(L_POINTEUR_OK)"
 FunctionEnd
 
 ; Refuse un dossier situé dans DOSSIER (ou égal à lui). $0 reçoit le message.
@@ -420,7 +495,8 @@ FunctionEnd
     ${If} $3 == "${DOSSIER}"
       ${If} $4 == ""
       ${OrIf} $4 == "\"
-        StrCpy $0 "${DOSSIER} est protégé en écriture ; VPX et les tables ont besoin d'écrire à côté d'eux (scores, réglages)."
+        StrCpy $5 "${DOSSIER}"
+        StrCpy $0 "$(L_RACINE_PROTEGEE)"
       ${EndIf}
     ${EndIf}
   ${EndIf}
@@ -445,21 +521,21 @@ Function VerifierRacine
   StrCpy $2 $Racine 1 1
   StrCpy $3 $Racine 1 2
   ${If} $1 == "\\"
-    StrCpy $0 "Un dossier réseau ne convient pas : VPX doit lire ses fichiers en local."
+    StrCpy $0 "$(L_RACINE_RESEAU)"
     Return
   ${ElseIf} $2 != ":"
   ${OrIf} $3 != "\"
-    StrCpy $0 "Le dossier doit être un chemin complet, par exemple D:\CyberPinball."
+    StrCpy $0 "$(L_RACINE_INCOMPLETE)"
     Return
   ${EndIf}
 
   StrCpy $1 $Racine 3
   System::Call "kernel32::GetDriveTypeW(w r1) i .r2"
   ${If} $2 == 4
-    StrCpy $0 "$1 est un lecteur réseau : VPX doit lire ses fichiers en local."
+    StrCpy $0 "$(L_RACINE_LECTEUR_RESEAU)"
     Return
   ${ElseIf} $2 == 1
-    StrCpy $0 "Le disque $1 n'existe pas."
+    StrCpy $0 "$(L_RACINE_DISQUE_ABSENT)"
     Return
   ${EndIf}
 
@@ -505,7 +581,7 @@ Function PageRacineQuitter
   ${EndIf}
   ${If} ${FileExists} "$Racine\app\*.*"
   ${AndIfNot} ${FileExists} "$Racine\app\${EXE}"
-    MessageBox MB_ICONEXCLAMATION "$Racine\app existe déjà et ne contient pas Cyber Pinball. Choisissez un autre dossier racine, ou videz ce dossier app."
+    MessageBox MB_ICONEXCLAMATION "$(L_RACINE_APP_ETRANGER)"
     Abort
   ${EndIf}
 FunctionEnd
@@ -529,7 +605,7 @@ Section "Cyber Pinball" SEC_APP
   SetOutPath "$TEMP"
   RMDir /r "$Racine\app.precedente"
   ${If} ${FileExists} "$Racine\app\${EXE}"
-    DetailPrint "Remplacement de la version installée"
+    DetailPrint "$(L_REMPLACEMENT)"
     ; Un antivirus ou l'Explorateur peut tenir un fichier un instant : jusqu'à 10 s d'essais.
     StrCpy $2 0
     renommer:
@@ -543,12 +619,12 @@ Section "Cyber Pinball" SEC_APP
       ${EndIf}
       ${If} $Maj == "1"
         ; Mise à jour : rien n'a changé ; Cyber Pinball repart tel quel, sans clic à faire.
-        DetailPrint "Des fichiers de $Racine\app sont encore utilisés : rien n'a été modifié, Cyber Pinball redémarre."
+        DetailPrint "$(L_MAJ_FICHIERS_UTILISES)"
         Call Relancer
         SetErrorLevel 3
         Quit
       ${EndIf}
-      Abort "Des fichiers de $Racine\app sont encore utilisés : rien n'a été modifié."
+      Abort "$(L_FICHIERS_UTILISES)"
     ${EndIf}
   ${EndIf}
   SetOutPath "$Racine\app"
@@ -577,11 +653,23 @@ Section "Cyber Pinball" SEC_APP
     ${EndIf}
   ${EndIf}
 
+  ; Langue choisie au début de l'installation : celle de Cyber Pinball aussi, au même format que
+  ; l'application (saveLanguageSetting, packages/core/src/i18n.ts).
+  ${If} $LangueChoisie != ""
+    ClearErrors
+    FileOpen $1 "$Racine\data\language.json" w
+    ${IfNot} ${Errors}
+      FileWrite $1 '{$\n  "language": "$LangueChoisie"$\n}$\n'
+      FileClose $1
+      DetailPrint "$(L_LANGUE_OK)"
+    ${EndIf}
+  ${EndIf}
+
   ; Données d'avant le choix d'une racine (comme setupRoot) : modèle de borne,
   ; sauvegardes, VPinballX.ini du bac à sable. Copiées si absentes, jamais écrasées.
   ${If} ${FileExists} "$AnciennesDonnees\cabinet.json"
   ${AndIfNot} ${FileExists} "$Racine\data\cabinet.json"
-    DetailPrint "Reprise du modèle de borne de $AnciennesDonnees"
+    DetailPrint "$(L_REPRISE_MODELE)"
     CopyFiles /SILENT "$AnciennesDonnees\cabinet.json" "$Racine\data"
   ${EndIf}
   ${If} ${FileExists} "$AnciennesDonnees\backups\*.*"
@@ -601,9 +689,9 @@ Section "Cyber Pinball" SEC_APP
   WriteINIStr "$Racine\app\installation.ini" "installation" "racine" "$Racine"
   WriteINIStr "$Racine\app\installation.ini" "installation" "bac_a_sable" "$BacASable"
   !ifdef COMPLET
-    WriteINIStr "$Racine\app\installation.ini" "installation" "edition" "complète"
+    WriteINIStr "$Racine\app\installation.ini" "installation" "edition" "complète" ; i18n-ignore : valeur du journal
   !else
-    WriteINIStr "$Racine\app\installation.ini" "installation" "edition" "légère"
+    WriteINIStr "$Racine\app\installation.ini" "installation" "edition" "légère" ; i18n-ignore : valeur du journal
   !endif
 
   ; Raccourcis : à la racine (comme le déploiement) et dans le menu Démarrer.
@@ -611,7 +699,7 @@ Section "Cyber Pinball" SEC_APP
   SetOutPath "$Racine\app"
   CreateShortCut "$Racine\${PRODUIT}.lnk" "$Racine\app\${EXE}" "" "$Racine\app\${EXE}" 0
   CreateDirectory "$MenuDir"
-  CreateShortCut "$MenuDir\${PRODUIT}.lnk" "$Racine\app\${EXE}" "" "$Racine\app\${EXE}" 0 SW_SHOWNORMAL "" "Frontend de borne de flipper virtuel"
+  CreateShortCut "$MenuDir\${PRODUIT}.lnk" "$Racine\app\${EXE}" "" "$Racine\app\${EXE}" 0 SW_SHOWNORMAL "" "$(L_RACCOURCI_DESCRIPTION)"
   Delete "$BureauDir\${PRODUIT}.lnk"
   Delete "$DemarrageDir\${PRODUIT}.lnk"
 
@@ -631,7 +719,7 @@ Section "Cyber Pinball" SEC_APP
     WriteRegDWORD HKCU "${CLE_DESINSTALLATION}" "EstimatedSize" $1
     WriteINIStr "$Racine\app\installation.ini" "installation" "registre" "1"
   ${Else}
-    DetailPrint "Bac à sable ($BacASable) : pas d'entrée dans Programmes et fonctionnalités."
+    DetailPrint "$(L_BAC_A_SABLE)"
     WriteINIStr "$Racine\app\installation.ini" "installation" "registre" "0"
   ${EndIf}
 SectionEnd
@@ -661,40 +749,40 @@ SectionEnd
 ; téléchargement vérifié et même signature de Microsoft que depuis le menu ; l'installeur complet a
 ; déjà déposé le fichier dans downloads\. Rien n'est demandé si le runtime suffit déjà. Jamais en
 ; mise à jour (/MAJ), en silence (/S) ni dans un bac à sable d'essai : le menu le propose alors.
-Section "Runtime Visual C++ de Microsoft, pour VPX (s'il manque)" SEC_RUNTIME
+Section "$(L_NOM_RUNTIME)" SEC_RUNTIME
   SectionIn RO
   ${If} $BacASable != ""
-    DetailPrint "Runtime Visual C++ : bac à sable d'essai, rien n'est installé."
+    DetailPrint "$(L_RUNTIME_BAC)"
     Return
   ${EndIf}
   ${If} $Maj == "1"
   ${OrIf} ${Silent}
-    DetailPrint "Runtime Visual C++ : vérifié par Cyber Pinball au démarrage."
+    DetailPrint "$(L_RUNTIME_PLUS_TARD)"
     Return
   ${EndIf}
-  DetailPrint "Runtime Visual C++ : vérification ; Windows demande votre accord s'il faut l'installer."
+  DetailPrint "$(L_RUNTIME_VERIFICATION)"
   System::Call 'kernel32::SetEnvironmentVariable(t "ELECTRON_RUN_AS_NODE", t "1")'
   nsExec::Exec '"$Racine\app\${EXE}" "$Racine\app\resources\app\dist\runtime-vc.js" "$Racine\downloads"'
   Pop $0
   ; Jamais hérité par la suite : « Lancer Cyber Pinball » ouvrirait sinon l'exécutable en mode Node.
   System::Call 'kernel32::SetEnvironmentVariable(t "ELECTRON_RUN_AS_NODE", p 0)'
   ${If} $0 == "0"
-    DetailPrint "Runtime Visual C++ : prêt."
+    DetailPrint "$(L_RUNTIME_PRET)"
   ${ElseIf} $0 == "2"
-    DetailPrint "Runtime Visual C++ : pas d'accord de Windows ; Cyber Pinball le redemandera."
+    DetailPrint "$(L_RUNTIME_REFUS)"
   ${Else}
-    DetailPrint "Runtime Visual C++ : pas installé (code $0) ; Cyber Pinball le redemandera."
+    DetailPrint "$(L_RUNTIME_ECHEC)"
   ${EndIf}
 SectionEnd
 
-Section "Raccourci sur le bureau" SEC_BUREAU
+Section "$(L_NOM_BUREAU)" SEC_BUREAU
   SetOutPath "$Racine\app"
   CreateDirectory "$BureauDir"
   CreateShortCut "$BureauDir\${PRODUIT}.lnk" "$Racine\app\${EXE}" "" "$Racine\app\${EXE}" 0
   WriteINIStr "$Racine\app\installation.ini" "installation" "bureau" "1"
 SectionEnd
 
-Section /o "Lancer au démarrage de Windows (borne dédiée)" SEC_DEMARRAGE
+Section /o "$(L_NOM_DEMARRAGE)" SEC_DEMARRAGE
   SetOutPath "$Racine\app"
   CreateDirectory "$DemarrageDir"
   CreateShortCut "$DemarrageDir\${PRODUIT}.lnk" "$Racine\app\${EXE}" "" "$Racine\app\${EXE}" 0
@@ -715,34 +803,34 @@ SectionEnd
 ; celles, bloquantes, que Windows pose quand son invite « Autoriser l'accès » reste sans réponse).
 ; En mise à jour, c'est l'application qui vérifie les règles à sa relance et les repose
 ; (app/src/firewall-guard.ts : par la tâche de réparation, sans invite, ou en le demandant une fois).
-Section "Partage entre bornes : autoriser dans le pare-feu de Windows" SEC_PAREFEU
+Section "$(L_NOM_PAREFEU)" SEC_PAREFEU
   ${If} $BacASable != ""
-    DetailPrint "Pare-feu de Windows : bac à sable d'essai, rien n'est demandé."
+    DetailPrint "$(L_PAREFEU_BAC)"
     Return
   ${EndIf}
   Call RegleParefeuPresente
   ${If} $0 == "1"
-    DetailPrint "Pare-feu de Windows : Cyber Pinball est déjà autorisé, VPX déjà fermé au réseau."
+    DetailPrint "$(L_PAREFEU_DEJA)"
     WriteINIStr "$Racine\app\installation.ini" "installation" "pare_feu" "1"
     Return
   ${EndIf}
   ${If} $Maj == "1"
-    DetailPrint "Pare-feu de Windows : à autoriser depuis Menu système > Amis > Partage et réseau."
+    DetailPrint "$(L_PAREFEU_PLUS_TARD)"
     Return
   ${EndIf}
   ${If} ${Silent}
   ${AndIf} $ParefeuSilencieux != "1"
-    DetailPrint "Pare-feu de Windows : à autoriser depuis Menu système > Amis > Partage et réseau."
+    DetailPrint "$(L_PAREFEU_PLUS_TARD)"
     Return
   ${EndIf}
-  DetailPrint "Pare-feu de Windows : autorisation demandée à Windows."
+  DetailPrint "$(L_PAREFEU_DEMANDE)"
   ExecShellWait "runas" "$SYSDIR\cmd.exe" '/d /c netsh advfirewall firewall delete rule name="Cyber Pinball" >nul 2>&1 & netsh advfirewall firewall delete rule name="all" dir=in program="$Racine\app\${EXE}" >nul 2>&1 & netsh advfirewall firewall add rule name="Cyber Pinball" dir=in action=allow program="$Racine\app\${EXE}" enable=yes profile=any & netsh advfirewall firewall delete rule name="Cyber Pinball VPX" >nul 2>&1 & netsh advfirewall firewall add rule name="Cyber Pinball VPX" dir=in action=block program="$Racine\${VPX_PAREFEU_REEL}" enable=yes profile=any & netsh advfirewall firewall add rule name="Cyber Pinball VPX" dir=in action=block program="$Racine\${VPX_PAREFEU_JONCTION}" enable=yes profile=any' SW_HIDE
   Call RegleParefeuPresente
   WriteINIStr "$Racine\app\installation.ini" "installation" "pare_feu" "$0"
   ${If} $0 == "1"
-    DetailPrint "Pare-feu de Windows : Cyber Pinball autorisé, VPX fermé au réseau."
+    DetailPrint "$(L_PAREFEU_OK)"
   ${Else}
-    DetailPrint "Pare-feu de Windows : pas autorisé (refusé ?) ; Menu système > Amis > Partage et réseau le propose."
+    DetailPrint "$(L_PAREFEU_REFUS)"
   ${EndIf}
 SectionEnd
 
@@ -775,13 +863,13 @@ Function RegleParefeuPresente
 FunctionEnd
 
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
-  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_APP} "L'application, dans le sous-dossier app de la racine, avec un raccourci dans le menu Démarrer."
+  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_APP} "$(L_DESC_APP)"
   !ifdef COMPLET
-    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_VPX} "Archive officielle de Visual Pinball X ${VPX_VERSION}, vérifiée, copiée dans downloads : installée au premier lancement sans connexion. Licence : redistribution gratuite, sans usage commercial."
+    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_VPX} "$(L_DESC_VPX)"
   !endif
-  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_BUREAU} "Un raccourci Cyber Pinball sur le bureau."
-  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_DEMARRAGE} "Pour une borne dédiée : Cyber Pinball s'ouvre dès l'ouverture de la session Windows."
-  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_PAREFEU} "Amis et partage entre bornes : Windows demande une fois son autorisation, pour que son pare-feu ne bloque pas Cyber Pinball, ferme VPX au réseau, et n'affiche pas son invite sur la borne."
+  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_BUREAU} "$(L_DESC_BUREAU)"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_DEMARRAGE} "$(L_DESC_DEMARRAGE)"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_PAREFEU} "$(L_DESC_PAREFEU)"
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 Function PasserEnMiseAJour
@@ -824,6 +912,7 @@ Function .onInit
   ;   /SANSBUREAU pas de raccourci sur le bureau
   ;   /D=dossier  dossier racine (en dernier, sans guillemets)
   ;   /MAJ        mise à jour depuis l'application (voir l'en-tête)
+;   /LANGUE=fr|en langue de l'installeur et de Cyber Pinball, sans fenêtre de choix
   ${GetParameters} $R0
   ClearErrors
   ${GetOptions} $R0 "/MAJ" $R1
@@ -900,6 +989,33 @@ Function .onInit
   ${GetOptions} $R0 "/SANSBUREAU" $R1
   ${IfNot} ${Errors}
     !insertmacro UnselectSection ${SEC_BUREAU}
+  ${EndIf}
+
+  ; Langue : /LANGUE=fr|en, sinon proposée dans une petite fenêtre (présélection : celle de
+  ; Cyber Pinball dans cette racine, sinon celle de Windows). En mise à jour et en silence, pas de
+  ; fenêtre : la langue déjà choisie, et rien n'est écrit.
+  StrCpy $R9 $INSTDIR
+  Call LangueParDefaut
+  ClearErrors
+  ${GetOptions} $R0 "/LANGUE=" $R1
+  ${IfNot} ${Errors}
+    ${If} $R1 == "fr"
+      StrCpy $LANGUAGE ${LANG_FRENCH}
+      StrCpy $LangueChoisie "fr"
+    ${ElseIf} $R1 == "en"
+      StrCpy $LANGUAGE ${LANG_ENGLISH}
+      StrCpy $LangueChoisie "en"
+    ${EndIf}
+  ${EndIf}
+  ${If} $LangueChoisie == ""
+  ${AndIf} $Maj != "1"
+  ${AndIfNot} ${Silent}
+    !insertmacro MUI_LANGDLL_DISPLAY
+    ${If} $LANGUAGE == ${LANG_FRENCH}
+      StrCpy $LangueChoisie "fr"
+    ${Else}
+      StrCpy $LangueChoisie "en"
+    ${EndIf}
   ${EndIf}
 FunctionEnd
 

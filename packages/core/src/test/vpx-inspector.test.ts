@@ -86,7 +86,7 @@ test('une seule élévation : la règle de Cyber Pinball puis celle de VPX, chac
 
 test('l’installeur pose la règle de VPX sous la même autorisation, pour la version que l’application installera', () => {
   const nsi = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'installeur', 'cyberpinball.nsi'), 'utf8');
-  const section = nsi.slice(nsi.indexOf('Section "Partage entre bornes'), nsi.indexOf('!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN'));
+  const section = nsi.slice(nsi.indexOf('Section "$(L_NOM_PAREFEU)" SEC_PAREFEU'), nsi.indexOf('!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN'));
   const runas = /ExecShellWait "runas" "\$SYSDIR\\cmd\.exe" '\/d \/c ([^']*)'/.exec(section)?.[1] ?? '';
   const parts = runas.split(' & ');
   // Mêmes commandes que firewallCommandLine, les chemins sous la racine choisie.

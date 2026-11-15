@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.13
 
+- The installer speaks French or English: a small window offers the language at the very start (Windows’ language by default), and this choice also becomes Cyber Pinball’s. Pages, terms of use and uninstaller follow; `/LANGUE=fr` or `/LANGUE=en` for a command-line install.
 - Scores written in the interface (My friends, messages, activity) follow the cabinet’s language: “3 215 480 250” in French instead of “3,215,480,250”. The online catalogue also gives file sizes in the cabinet’s language (“381 Mo” instead of “381.1 MB” in French).
 - Phone remote: on Android, the Home screen shortcut finds the cabinet even when the router changes its address, without scanning the QR code. The phone offers it once (then in its ⋮ menu); it goes through t.cyberpinball.com, which sees neither the phone's key nor the cabinet's address: everything is encrypted. Can be turned off in System menu > Cabinet > Phone remote.
 - Backups: choosing a level in "Sauvegarder maintenant" (Back up now) follows the flippers again, with no wait and no lost press; on a restore plan, including or excluding a part is immediate.
