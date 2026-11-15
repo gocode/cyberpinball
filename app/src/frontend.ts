@@ -497,6 +497,7 @@ import { handOverOnQuit, shellSession } from './dedicated-session';
 import { syncRelaunchWatcher, watchDesktopButton, watchStartHold } from './start-relaunch';
 import { createPowerMenu } from './power';
 import { readWakeDevices } from './arcade-hours';
+import { createPhoneRelay } from './phone-relay';
 import { createPhoneRemote, phoneRemoteMode, type MenuEntries, type MenuEntry, type RemoteJukebox } from './phone-remote';
 
 /**
@@ -1195,8 +1196,11 @@ const socialFirewall = createFirewallRule({ exe: process.execPath, simulated: so
 /** Fichier qui arrive du téléphone : le bandeau du menu et l'écran de la télécommande le suivent. */
 let phoneUpload: { name: string; received: number; size: number } | undefined;
 const keptPhones = createKeptPhones(loc.dataDir, { log: (line) => console.log(line) });
+// L'adresse stable par Internet (phone-relay.ts) : seulement sur le vrai réseau local, jamais pendant un essai.
+const phoneRelay = phoneRemoteMode(process.env) === 'lan' ? createPhoneRelay({ kept: keptPhones, ...(process.env.CYBERPINBALL_RELAIS ? { origin: process.env.CYBERPINBALL_RELAIS } : {}), log: (line) => console.log(line) }) : undefined;
 const phoneRemote = createPhoneRemote({
   kept: keptPhones,
+  ...(phoneRelay ? { relay: phoneRelay } : {}),
   // Le nom de la borne sur le réseau local (« cyberpinball.local »), par le répondeur de Cyber Pinball.
   names: createMdnsResponder({ log: (line) => console.log(line), preferred: () => keptPhones.localName(), remember: (name) => keptPhones.noteLocalName(name) }),
   mode: () => phoneRemoteMode(process.env),

@@ -392,9 +392,11 @@ test('Android ne trouve pas les noms en « .local » : la page le dit, la borne 
 
 test('la page : pourquoi elle reste sur l’adresse IP, dit une fois et dans le menu ⋮ ; rapport à la borne', () => {
   const src = fs.readFileSync(path.join(REPO_ROOT, 'app', 'renderer', 'telephone', 'telephone.js'), 'utf8');
-  // Le résultat du nom part à la borne, et la page le dit (une fois par cas).
-  assert.match(src, /send\(\{ t: 'name', r \}\);\s*noteName\(r, m\.name\)/);
-  assert.match(src, /typeof m\.nameIssue === 'string'\) noteName\(m\.nameIssue\)/);
+  // Le résultat du nom part toujours à la borne. La page le dit (une fois par cas), sauf si elle
+  // propose à la place le raccourci qui suit la borne (adresse stable par Internet) : la raison
+  // reste alors dans le menu ⋮ (nameStatus).
+  assert.match(src, /send\(\{ t: 'name', r \}\);[\s\S]{0,200}if \(!fresh && offerRelay\(\)\) nameStatus = r;\s*else noteName\(r, m\.name\)/);
+  assert.match(src, /typeof m\.nameIssue === 'string'\) \{\s*if \(!fresh && offerRelay\(\)\) nameStatus = m\.nameIssue;\s*else noteName\(m\.nameIssue\)/);
   assert.match(src, /if \(stored\(NAME_NOTE_STORE\) === kind\) return;/);
   // Android : la raison est dite telle quelle.
   assert.match(src, /onAndroid\(\) \? t\('Les navigateurs d’Android ne trouvent pas la borne par son nom/);
@@ -403,7 +405,7 @@ test('la page : pourquoi elle reste sur l’adresse IP, dit une fois et dans le 
   // Injoignable à son adresse : la page cherche la borne par le nom retenu (preuve à l'appui), de temps en temps.
   assert.match(src, /retry >= UNREACHABLE_AFTER[^\n]*stored\(NAME_STORE\)\) void moveToName\(stored\(NAME_STORE\), false\)/);
   // La clé ne part vers le nom qu'après la preuve.
-  assert.match(src, /if \(result === 'ok' && kept\) location\.replace/);
+  assert.match(src, /if \(result === 'ok' && kept\) \{\s*leaving = true;\s*location\.replace/);
 });
 
 test('mDNS : la requête de sondage, la réponse, et leur lecture', () => {

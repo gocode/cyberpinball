@@ -181,6 +181,7 @@ export * from './dmdscore';
 export * from './remote';
 export * from './remote-name';
 export * from './remote-kept';
+export * from './remote-relay';
 export * from './remote-menus';
 export * from './websocket';
 export * from './lifetime';

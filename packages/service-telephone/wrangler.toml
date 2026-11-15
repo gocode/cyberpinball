@@ -1,0 +1,29 @@
+# Service de l'adresse stable du téléphone (worker.mjs). Déployé par scripts/service-telephone.mjs,
+# qui copie d'abord dans public/ le chiffrement et les icônes de la page du téléphone. Aucun secret
+# ici : le compte Cloudflare est celui de `npx wrangler login`, gardé hors du dépôt.
+name = "cyberpinball-telephone"
+main = "worker.mjs"
+compatibility_date = "2026-11-01"
+workers_dev = false
+
+routes = [{ pattern = "t.cyberpinball.com", custom_domain = true }]
+
+[assets]
+directory = "public"
+binding = "ASSETS"
+html_handling = "auto-trailing-slash"
+run_worker_first = ["/api/*", "/b/*"]
+
+# Identifiant de l'espace KV : donné par `wrangler kv namespace create ADRESSES`, à la première mise en ligne.
+[[kv_namespaces]]
+binding = "ADRESSES"
+id = "9486f531637642a89539b14f22668f45"
+
+# Écritures limitées par adresse IP (une borne écrit à chaque changement d'adresse et une fois par semaine).
+[[ratelimits]]
+name = "LIMITE"
+namespace_id = "4782"
+simple = { limit = 20, period = 60 }
+
+[observability]
+enabled = false

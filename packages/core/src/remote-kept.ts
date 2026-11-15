@@ -65,6 +65,12 @@ export function createKeptPhones(dataDir: string | undefined, opts: KeptPhonesOp
   let lastAddress: string | undefined;
   /** Nom annoncé par la borne sur le réseau local (mdns-responder.ts) : redemandé d'abord au démarrage suivant. */
   let lastName: string | undefined;
+  /**
+   * Adresse stable par Internet (remote-relay.ts) : la graine de la clé de la borne (secrète, comme les
+   * clés des téléphones), la fonction coupée par l'utilisateur, et la dernière déclaration acceptée
+   * par le service (son résumé, relaySum, et quand).
+   */
+  let relay: { seed?: string; off?: boolean; sum?: string; at?: number } = {};
   if (file) {
     const read = readKeptJson(file);
     if (read.setAside) opts.log?.(`Télécommande : liste des téléphones gardés illisible, mise de côté (${path.basename(read.setAside)}).`); // i18n-ignore : journal
@@ -73,12 +79,22 @@ export function createKeptPhones(dataDir: string | undefined, opts: KeptPhonesOp
     if (typeof a === 'string' && /^[0-9a-f.:]{2,45}$/i.test(a)) lastAddress = a;
     const n = (read.value as { name?: unknown } | undefined)?.name;
     if (typeof n === 'string' && /^[a-z0-9-]{1,63}\.local$/.test(n)) lastName = n;
+    const r = (read.value as { relay?: Record<string, unknown> } | undefined)?.relay;
+    if (r && typeof r === 'object') {
+      relay = {
+        ...(fromBase64Url(r.seed, 32) ? { seed: r.seed as string } : {}),
+        ...(r.off === true ? { off: true } : {}),
+        ...(typeof r.sum === 'string' && /^[A-Za-z0-9_-]{22}$/.test(r.sum) ? { sum: r.sum } : {}),
+        ...(typeof r.at === 'number' && Number.isFinite(r.at) ? { at: r.at } : {}),
+      };
+    }
   }
 
   function save(): void {
     if (!file) return;
     try {
-      writeFileAtomic(file, JSON.stringify({ version: 1, phones: entries, ...(lastAddress ? { address: lastAddress } : {}), ...(lastName ? { name: lastName } : {}) }, null, 2) + '\n');
+      const hasRelay = Object.keys(relay).length > 0;
+      writeFileAtomic(file, JSON.stringify({ version: 1, phones: entries, ...(lastAddress ? { address: lastAddress } : {}), ...(lastName ? { name: lastName } : {}), ...(hasRelay ? { relay } : {}) }, null, 2) + '\n');
     } catch (error) {
       opts.log?.(`Télécommande : liste des téléphones gardés non enregistrée (${(error as Error).message}).`); // i18n-ignore : journal
     }
@@ -140,6 +156,32 @@ export function createKeptPhones(dataDir: string | undefined, opts: KeptPhonesOp
     noteLocalName(name: string): void {
       if (name === lastName) return;
       lastName = name;
+      save();
+    },
+    /** Graine de la clé de la borne pour l'adresse stable : tirée et enregistrée la première fois. */
+    relaySeed(): Buffer {
+      const known = fromBase64Url(relay.seed, 32);
+      if (known) return known;
+      const seed = crypto.randomBytes(32);
+      relay = { ...relay, seed: toBase64Url(seed) };
+      save();
+      return seed;
+    },
+    /** L'adresse stable est-elle activée (elle l'est par défaut) ? */
+    relayOn: (): boolean => !relay.off,
+    setRelayOn(on: boolean): void {
+      if (on === !relay.off) return;
+      // Coupée : la dernière déclaration reste notée tant que le service ne l'a pas effacée (phone-relay.ts).
+      const { off: _off, ...rest } = relay;
+      relay = on ? rest : { ...rest, off: true };
+      save();
+    },
+    /** Dernière déclaration acceptée par le service : son résumé (relaySum) et quand ; undefined si aucune. */
+    relayPublished: (): { sum: string; at: number } | undefined => (relay.sum && relay.at !== undefined ? { sum: relay.sum, at: relay.at } : undefined),
+    /** Le service a accepté cette déclaration (`sum` undefined : il a effacé celle de la borne). */
+    noteRelayPublished(sum: string | undefined, at: number): void {
+      const { sum: _s, at: _a, ...rest } = relay;
+      relay = sum ? { ...rest, sum, at } : rest;
       save();
     },
     /** « Oublier » : faux s'il n'était pas gardé. */

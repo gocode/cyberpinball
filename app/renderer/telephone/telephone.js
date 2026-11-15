@@ -31,6 +31,13 @@
 // d'Android ne trouvent pas les noms en « .local » : la page reste alors à l'adresse, le dit une
 // fois, et le menu ⋮ dit pourquoi (« Adresse de la borne »).
 //
+// Adresse stable par Internet (13/11/2026) : la borne déclare son adresse locale au service du
+// projet (packages/service-telephone), chiffrée pour chaque téléphone gardé. Elle donne au téléphone
+// l'entrée stable de son raccourci (« relay », https://t.cyberpinball.com/b/<id>). Un téléphone qui ne
+// passe pas par le nom (Android) y fait son raccourci : la page du service lit la clé dans le fragment,
+// déchiffre l'adresse du moment sur le téléphone et revient ici (#g=…&d=1). La clé ne quitte jamais
+// le téléphone : le fragment n'est pas envoyé, le service ne voit que des données chiffrées.
+//
 // Démonstration hors écran : window.cyberRemoteDemo fixe un état sans borne.
 'use strict';
 
@@ -185,6 +192,10 @@ const KEPT_MESSAGES = {
 const KEPT_STORE = 'cyberpinball.telecommande';
 /** « Ajouter à l'écran d'accueil » déjà proposé une fois. */
 const HINT_STORE = 'cyberpinball.astuce-accueil';
+/** L'entrée stable du raccourci donnée par la borne (https://…/b/<id>), et le raccourci déjà proposé une fois. */
+const RELAY_STORE = 'cyberpinball.raccourci';
+const RELAY_HINT_STORE = 'cyberpinball.astuce-raccourci';
+const RELAY_URL = /^https:\/\/[a-z0-9.-]+(?::\d+)?\/b\/[A-Za-z0-9_-]{22}$/;
 function stored(name) {
   try {
     return localStorage.getItem(name) ?? '';
@@ -209,7 +220,38 @@ function homeScreenHow() {
   if (/Android/.test(ua)) return t('Dans le menu du navigateur (⋮) : « Ajouter à l’écran d’accueil ».');
   return t('Dans le menu du navigateur : « Ajouter à l’écran d’accueil ».');
 }
+/**
+ * Le raccourci qui suit la borne : l'entrée stable donnée par la borne, si la page n'est pas déjà
+ * sous le nom de la borne (qui suit aussi son adresse). Sinon rien.
+ */
+function relayShortcut() {
+  const url = stored(RELAY_STORE);
+  return kept && key && RELAY_URL.test(url) && !/\.local$/.test(location.hostname) ? url : '';
+}
+/** Ouvre la page du service, la clé dans le fragment (jamais envoyée) : on y ajoute le raccourci à l'écran d'accueil. */
+function goRelay() {
+  const url = relayShortcut();
+  if (url) location.href = `${url}#g=${core.toB64(key)}&r=1`;
+}
+/**
+ * Propose le raccourci qui suit la borne : `again`, depuis le menu ⋮ (toujours) ; sinon une fois,
+ * quand la page reste sur l'adresse IP (Android). Faux sans entrée stable.
+ */
+function offerRelay(again = false) {
+  const url = relayShortcut();
+  if (!url) return false;
+  if (!again && stored(RELAY_HINT_STORE)) return true;
+  store(RELAY_HINT_STORE, '1');
+  const host = new URL(url).host;
+  openSheet(t('Un raccourci qui suit la borne'), [{ id: 'relay', label: t('Créer le raccourci'), current: true, run: goRelay }, { id: 'later', label: t('Plus tard'), run: () => undefined }], {
+    text: t('Si le routeur change l’adresse de la borne, ce raccourci la retrouve sans QR code. Il passe par {host}, qui ne voit ni votre clé ni l’adresse de la borne : tout est chiffré sur ce téléphone.', { host }),
+    cancel: false,
+  });
+  return true;
+}
 function offerHomeScreen(moved = false) {
+  // Sur l'adresse IP avec l'entrée stable : c'est ce raccourci-là qu'il faut ajouter.
+  if (offerRelay(true)) return;
   openSheet(t('Gardez la télécommande sous la main'), [{ id: 'ok', label: t('Compris'), run: () => undefined }], {
     text: `${moved ? t('La télécommande passe maintenant par le nom de la borne : elle la retrouve même si son adresse change. Ajoutez-la de nouveau à l’écran d’accueil, puis supprimez l’ancien raccourci.') : t('Ce téléphone est gardé par la borne : il revient sans QR code. Ajoutez la télécommande à l’écran d’accueil pour l’ouvrir d’un geste.')}
 
@@ -719,6 +761,12 @@ let hintAfterMode = false;
 let movedToName = '';
 /** Le nom de la borne déjà essayé depuis l'ouverture de la page. */
 let nameTried = false;
+/** Arrivée par le raccourci qui suit la borne (d=1) : le nom n'est pas essayé, le raccourci est déjà le bon. */
+let viaRelay = false;
+/** L'essai du nom en cours : l'astuce de l'écran d'accueil l'attend (elle dépend de son issue). */
+let nameAttempt = Promise.resolve();
+/** La page part vers le nom de la borne : plus rien ne s'ouvre ici. */
+let leaving = false;
 
 function readFragment() {
   const params = new URLSearchParams(location.hash.slice(1));
@@ -730,7 +778,8 @@ function readFragment() {
     kept = true;
     store(KEPT_STORE, core.toB64(g));
     movedToName = /^[12]$/.test(params.get('nom') ?? '') ? params.get('nom') : '';
-    if (!params.get('g') || movedToName) history.replaceState(null, '', `#g=${core.toB64(g)}`);
+    viaRelay = params.get('d') === '1';
+    if (!params.get('g') || movedToName || viaRelay) history.replaceState(null, '', `#g=${core.toB64(g)}`);
     return g;
   }
   const s = core.fromB64(params.get('s') ?? '');
@@ -772,7 +821,10 @@ async function moveToName(name, fresh) {
   } finally {
     clearTimeout(timer);
   }
-  if (result === 'ok' && kept) location.replace(`${base}/#g=${core.toB64(key)}&nom=${fresh ? 2 : 1}`);
+  if (result === 'ok' && kept) {
+    leaving = true;
+    location.replace(`${base}/#g=${core.toB64(key)}&nom=${fresh ? 2 : 1}`);
+  }
   return result;
 }
 
@@ -802,8 +854,11 @@ const onAndroid = () => /Android/.test(navigator.userAgent);
  * menu ⋮ (« Adresse de la borne »).
  */
 function nameWhy(kind, name = stored(NAME_STORE)) {
-  const after = t('Si le routeur change cette adresse, scannez le QR une fois.');
+  const relay = relayShortcut();
+  const after = relay ? t('Le raccourci qui suit la borne la retrouve même si le routeur change cette adresse (menu ⋮).') : t('Si le routeur change cette adresse, scannez le QR une fois.');
   switch (kind) {
+    case 'relay':
+      return t('Ce téléphone est venu par le raccourci qui suit la borne ({host}) : il la retrouve même si le routeur change son adresse.', { host: relay ? new URL(relay).host : '' });
     case 'name':
       return t('Ce téléphone passe par le nom de la borne ({name}) : il la retrouve même si le routeur change son adresse.', { name: location.hostname });
     case 'unreachable':
@@ -938,20 +993,27 @@ function handle(m) {
       if (navigator.vibrate) navigator.vibrate(30);
       // Gardé et ouvert par l'adresse IP : la page passe par le nom de la borne s'il la mène à elle.
       // Sinon elle le dit une fois, et à la borne (Santé) ; sous le nom, elle confirme à la borne.
+      // L'entrée stable du raccourci (adresse stable par Internet) ; plus donnée, oubliée (coupée à la borne).
+      if (m.kept) store(RELAY_STORE, typeof m.relay === 'string' && RELAY_URL.test(m.relay) ? m.relay : '');
       if (m.kept && !nameTried) {
         nameTried = true;
         if (typeof m.name === 'string' && core.nameUrl(location, m.name)) store(NAME_STORE, m.name);
         if (/\.local$/.test(location.hostname)) {
           nameStatus = 'name';
           send({ t: 'name', r: 'ok' });
-        }
+        } else if (viaRelay && relayShortcut()) nameStatus = 'relay';
         else if (m.name)
-          void moveToName(m.name, fresh).then((r) => {
+          nameAttempt = moveToName(m.name, fresh).then((r) => {
             if (!r || r === 'ok') return;
             send({ t: 'name', r });
-            noteName(r, m.name);
+            // Sur l'adresse IP : le raccourci qui suit la borne, s'il existe, plutôt que « scannez le QR ».
+            if (!fresh && offerRelay()) nameStatus = r;
+            else noteName(r, m.name);
           });
-        else if (typeof m.nameIssue === 'string') noteName(m.nameIssue);
+        else if (typeof m.nameIssue === 'string') {
+          if (!fresh && offerRelay()) nameStatus = m.nameIssue;
+          else noteName(m.nameIssue);
+        }
       }
       // Une fois, juste après l'appairage : comment le garder sous la main (après le mode, qui suit).
       // Passée par le nom : une fois aussi sous ce nom, le raccourci d'avant menant à l'adresse.
@@ -971,7 +1033,10 @@ function handle(m) {
       if (document.body.dataset.view === 'thread' && community.open && m.mode !== 'browser') send({ t: 'chat-open', key: community.open });
       if (hintAfterMode && state === 'paired') {
         hintAfterMode = false;
-        offerHomeScreen(movedToName === '1');
+        // Après l'essai du nom : passée par le nom, la page part ; restée sur l'adresse, le raccourci qui suit la borne.
+        void nameAttempt.then(() => {
+          if (!leaving && state === 'paired') offerHomeScreen(movedToName === '1');
+        });
       } else if (nameNote && $('sheet').hidden) showNameNote();
       break;
     case 'screen':
@@ -1641,7 +1706,9 @@ $('top-more').addEventListener('click', () => {
   const items = [
     ...(mode === 'menu' && fieldShown ? [{ id: 'keys', label: t('Clavier : taper dans le champ ouvert à la borne'), run: () => openKeys(fieldShown, false, sameField(openedField, fieldShown)) }] : []),
     ...(mode === 'menu' || sending ? [{ id: 'send', label: sending && upload.phase === 'sending' ? t('Envoi {pct} %', { pct: uploadPct() }) : t('Envoyer un fichier à la borne'), run: () => $('nav-send').click() }] : []),
-    ...(kept && !standalone() ? [{ id: 'home', label: t('Ajouter à l’écran d’accueil'), run: offerHomeScreen }] : []),
+    ...(kept && !standalone() && !relayShortcut() ? [{ id: 'home', label: t('Ajouter à l’écran d’accueil'), run: offerHomeScreen }] : []),
+    // Le raccourci qui suit la borne (adresse stable par Internet), toujours là quand la borne le donne.
+    ...(relayShortcut() ? [{ id: 'relay', label: t('Raccourci qui suit la borne'), run: () => offerRelay(true) }] : []),
     // Par le nom ou par l'adresse IP, et pourquoi (Android : les noms en « .local » ne passent pas).
     ...(kept ? [{ id: 'address', label: t('Adresse de la borne : {host}', { host: location.hostname }), run: () => openSheet(t('Adresse de la borne'), [{ id: 'ok', label: t('Compris'), run: () => undefined }], { text: nameWhy(nameStatus), cancel: false }) }] : []),
     // Android : le plein écran, à prendre ou à quitter d'ici (jamais repris de lui-même une fois quitté exprès).

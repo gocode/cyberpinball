@@ -1,0 +1,6 @@
+# Copiés de app/renderer/telephone par scripts/service-telephone.mjs (preparer) avant la mise en ligne.
+public/telephone-core.js
+public/icone-180.png
+public/icone-192.png
+# Dossier de travail de wrangler.
+.wrangler/

@@ -129,6 +129,7 @@ import { settleWithin, typeChars } from './page-input';
 import { pointerWindow } from './remote-pointer';
 import { qrRows } from './remote-qr';
 import type { MdnsResponder } from './mdns-responder';
+import type { PhoneRelay } from './phone-relay';
 import { createRemoteImages, REMOTE_IMAGE_PATH, type RemoteImage } from './remote-images';
 import { remoteAvatar, type RemoteRanks } from './remote-ranks';
 import { journalIncident } from './uncaught';
@@ -384,6 +385,11 @@ export interface PhoneRemoteOptions {
    * (« cyberpinball.local »), lancé sur la carte où la page est servie. Sans lui, pas de nom.
    */
   names?: Pick<MdnsResponder, 'start' | 'name' | 'facts' | 'phoneResult' | 'close'>;
+  /**
+   * L'adresse stable par Internet (phone-relay.ts) : la borne y déclare son adresse locale pour ses
+   * téléphones gardés, et leur donne l'entrée stable de leur raccourci. Seulement sur le vrai réseau local.
+   */
+  relay?: Pick<PhoneRelay, 'update' | 'url' | 'state'>;
 }
 
 /**
@@ -428,6 +434,8 @@ const IMAGE_PATH = new RegExp(`^${REMOTE_IMAGE_PATH}([A-Za-z0-9_-]{22})$`);
 /** Port de la télécommande encore pris (relève, mise à jour) : attendu jusqu'à 45 s, essayé chaque seconde. */
 const PORT_WAIT_MS = 45_000;
 const PORT_RETRY_MS = 1_000;
+/** L'adresse stable relue au plus toutes les 30 s par le battement de la télécommande (phone-relay.ts ne fait rien tant que rien ne change). */
+const RELAY_CHECK_MS = 30_000;
 /** Écoute qui n'a pas pu s'ouvrir : nouveaux essais après 5 s, 15 s, 30 s, puis chaque minute. */
 const LISTEN_RETRY_MS = [5_000, 15_000, 30_000, 60_000];
 /** Au plus, images réduites gardées en mémoire (une miniature se redemande à chaque passage dans la liste). */
@@ -569,6 +577,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   /** L'adresse de la borne a changé depuis la dernière écoute (DHCP) : l'ancienne, que le QR mentionne. */
   let addressMoved: string | undefined;
   let listenTries = 0;
+  /** Dernière relecture de l'adresse stable (RELAY_CHECK_MS). */
+  let relayAt = 0;
   /** Nom de la borne sur le réseau local (« cyberpinball.local »), une fois annoncé (mdns-responder.ts). */
   const localName = () => opts.names?.name();
   /** Ce que chaque téléphone a déjà dit du nom pendant ce lancement : le journal ne le répète pas. */
@@ -934,7 +944,10 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     const isKept = Boolean(pairing?.current()?.kept);
     const name = isKept ? localName() : undefined;
     const nameIssue = isKept && !name ? 'none' : undefined;
-    sendTo(link, { t: 'ready', kept: isKept, ...(name ? { name } : {}), ...(nameIssue ? { nameIssue } : {}) });
+    // `relay` : l'entrée stable du raccourci (https://…/b/<id>), qui retrouve la borne quelle que soit
+    // son adresse ; seulement une fois que le service a accepté la déclaration de la borne.
+    const relay = isKept ? opts.relay?.url() : undefined;
+    sendTo(link, { t: 'ready', kept: isKept, ...(name ? { name } : {}), ...(nameIssue ? { nameIssue } : {}), ...(relay ? { relay } : {}) });
     lastActivity = Date.now();
     // Une liaison neuve : la vue Scores redemande ce qu'elle montre (« ranks »).
     ranksWatch = undefined;
@@ -1988,6 +2001,9 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     addressMoved = mode === 'lan' ? kept?.noteAddress(host) : undefined;
     if (addressMoved) log(`Télécommande : adresse de la borne changée (${addressMoved} → ${host}) ; un iPhone gardé passé par le nom de la borne revient seul ; un téléphone Android, ou ouvert par l'ancienne adresse, scanne le QR une fois.`); // i18n-ignore : journal
     if (mode === 'lan') void opts.names?.start(host);
+    // L'adresse stable : la borne déclare la nouvelle adresse à ses téléphones gardés.
+    relayAt = Date.now();
+    opts.relay?.update(address);
   }
 
   /**
@@ -2036,6 +2052,11 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   /** Toutes les 700 ms : QR à renouveler, champ de la page, mode et écran du menu, inactivité, envoi en panne. */
   function heartbeat(): void {
     tick();
+    // L'adresse stable, relue de temps en temps (téléphones changés, renouvellement hebdomadaire, nouvel essai).
+    if (Date.now() - relayAt > RELAY_CHECK_MS) {
+      relayAt = Date.now();
+      opts.relay?.update(address);
+    }
     if (target) void probeField();
     // L'écran du menu part à chaque redessin (menuChanged) : ici, seulement un changement de mode.
     if (mode() !== modeSent) pushState();
@@ -2244,6 +2265,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       // Accepté une fois, gardé : il reviendra sans QR (sa clé de session devient la sienne).
       const now = pairing.current();
       if (kept && now) pairing.markKept(kept.add(now.key, now.device, now.prev));
+      // Un téléphone de plus : la déclaration de l'adresse stable l'inclut, avant même qu'il la demande.
+      if (kept && now) opts.relay?.update(address);
       log(`Télécommande : téléphone accepté à la borne${kept ? ', gardé' : ''}.`); // i18n-ignore : journal
       if (active) ready(active);
       tick();
@@ -2273,6 +2296,19 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     pending: () => pairing?.session() === 'pending',
     /** Le nom de la borne sur le réseau (Santé, écran de la télécommande) ; undefined avant l'annonce. */
     nameFacts: (): RemoteNameFacts | undefined => opts.names?.facts(),
+    /**
+     * L'adresse stable par Internet (phone-relay.ts) : active, déclarée, et sinon pourquoi ; undefined
+     * hors du vrai réseau local (essais) ou sans téléphones gardés possibles.
+     */
+    relayState: () => (opts.relay && kept ? opts.relay.state() : undefined),
+    /** Active ou coupe l'adresse stable ; coupée, la borne demande au service d'effacer sa déclaration. */
+    setRelayOn(on: boolean): void {
+      if (!kept || !opts.relay) return;
+      kept.setRelayOn(on);
+      log(`Télécommande : adresse stable par Internet ${on ? 'activée' : 'coupée'} à la borne.`); // i18n-ignore : journal
+      opts.relay.update(address);
+      menu?.changed();
+    },
     /** Téléphones gardés (le plus récemment vu d'abord), et celui qui pilote. */
     keptPhones(): (KeptPhone & { connected: boolean })[] {
       const now = active && pairing?.session() === 'paired' ? pairing.current()?.kept : undefined;
@@ -2282,6 +2318,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     forget(id: string): void {
       if (!kept?.forget(id)) return;
       log('Télécommande : un téléphone gardé a été oublié à la borne.'); // i18n-ignore : journal
+      // Son entrée quitte la déclaration de l'adresse stable : il ne retrouve même plus l'adresse.
+      opts.relay?.update(address);
       if (pairing?.current()?.kept === id) {
         if (active) endLink(active, 'forgotten');
         pairing.end();

@@ -131,6 +131,18 @@ export function createPhoneRemoteMenu(host: PhoneRemoteMenuHost) {
     if (name && said && said.state !== 'ok') {
       nameSection = { title: t('Nom de la borne sur le réseau'), rows: [{ text: said.title, detail: said.detail, tone: 'warning' as const, badges: [t('À vérifier')], icon: 'network' as const }] };
     }
+    // L'adresse stable par Internet (phone-relay.ts) : active par défaut, coupée ici.
+    const relay = host.remote.relayState();
+    if (relay) {
+      const detail = !relay.on
+        ? t('Coupée : le raccourci du téléphone mène à l’adresse IP du moment')
+        : relay.error && !relay.published
+          ? t('Pas encore déclarée ({why}) : nouvel essai automatique', { why: relay.error })
+          : relay.published
+            ? t('Le raccourci du téléphone retrouve la borne même si son adresse change ({host})', { host: relay.host })
+            : t('Déclarée dès qu’un téléphone est gardé ({host})', { host: relay.host });
+      actions.push({ label: relay.on ? t('Couper l’adresse stable par Internet') : t('Activer l’adresse stable par Internet'), detail, icon: 'network', key: 'remote:relay', run: () => host.remote.setRelayOn(!relay.on) });
+    }
     actions.push({ label: t('Retour'), icon: 'back', key: 'remote:back', run: back });
     // Téléphones gardés : chacun une ligne à choisir, qui ouvre « Oublier ce téléphone ».
     const kept = host.remote.keptPhones();
