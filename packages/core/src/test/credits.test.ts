@@ -3,6 +3,7 @@
 // classement des auteurs d'une borne. Données inventées sur le modèle de la base VPS.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import * as path from 'node:path';
 import { setTableSource } from '../acquisition';
 import {
   attractCredits,
@@ -22,6 +23,7 @@ import {
 } from '../credits';
 import { setLanguage } from '../i18n';
 import type { VpsGame } from '../vps';
+import { REPO_ROOT } from './i18n-scan';
 
 const GAME: VpsGame = {
   id: 'game1',
@@ -174,4 +176,39 @@ test('crédits : la communauté, des plus présents aux moins présents, sans la
   );
   assert.equal(ranked[0]!.roles, '2 frontons · 1 colorisation');
   assert.deepEqual(ranked[0]!.tables, ['Autre', 'Retour Express']);
+});
+
+test('crédits : Start sur une ligne qui a une page l’ouvre ; son QR code accompagne la ligne choisie ; l’invité garde le QR code', () => {
+  setLanguage('fr');
+  type Built = { lead?: string; actions: { label: string; qr?: { url: string; title: string }; run(): void }[]; remote?: { url: string } };
+  const { createCreditsMenu } = require(path.join(REPO_ROOT, 'app', 'dist', 'credits-menu.js')) as {
+    createCreditsMenu(host: unknown): { open(table: unknown): void };
+  };
+  const table = { title: 'Retour Express', manufacturer: 'Data West', year: '1990', file: 'x.vpx' };
+  let shown: Built | undefined;
+  const browsed: { url: string; site: string; game: string; role: string; authors: readonly string[] }[] = [];
+  let guest = false;
+  const menu = createCreditsMenu({
+    library: { openCustom: (build: () => Built) => void (shown = build()), openSystem: () => {} },
+    input: () => ({ ...BASE, vpxAuthor: 'Alice', vpxVersion: '1.05' }),
+    tables: () => [table],
+    openSheet: () => {},
+    browse: (page: (typeof browsed)[number]) => (guest ? false : (browsed.push(page), true)),
+  });
+  menu.open(table);
+  const page = shown!;
+  assert.match(page.lead!, /Start sur une ligne ouvre sa page ; son QR code, à côté, l’ouvre sur le téléphone/);
+  const linked = page.actions.find((a) => a.qr);
+  assert.ok(linked, 'la recréation a une page : son action porte son QR code');
+  assert.deepEqual(linked.qr, { url: 'https://vpuniverse.com/files/file/1-retour/', title: 'Sa page sur VPUniverse' });
+  // Start : la page s'ouvre dans le navigateur intégré, sans passer par l'écran du QR code.
+  linked.run();
+  assert.equal(shown, page, 'aucun écran intermédiaire');
+  assert.deepEqual(browsed, [{ url: 'https://vpuniverse.com/files/file/1-retour/', site: 'VPUniverse', game: 'Retour Express', role: linked.label, authors: ['Alice', 'Bruno', 'Chloé', 'David', 'Eve'] }]);
+  // Invité (navigateur fermé) : les auteurs et le QR code de la page, comme avant.
+  guest = true;
+  linked.run();
+  assert.notEqual(shown, page);
+  assert.equal(shown!.remote?.url, 'https://vpuniverse.com/files/file/1-retour/');
+  assert.equal(browsed.length, 1);
 });

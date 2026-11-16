@@ -3735,6 +3735,51 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   white-space: nowrap;
 }
 
+/*
+ * Page web de l'élément choisi (ligne des crédits, Action.qr) : sous les actions, séparée d'elles
+ * par un filet, le titre, le QR code (clair, net à toute taille), l'adresse et l'aide. Jamais
+ * choisi lui-même : les flippers ne s'y arrêtent pas.
+ */
+.lib-actions-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1cqmin;
+  margin-top: 1.2cqmin;
+  padding-top: 2.4cqmin;
+  border-top: 0.2cqmin solid var(--line);
+}
+
+.lib-actions-qr-title {
+  margin: 0;
+  font-size: 2.2cqmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.lib-actions-qr-code {
+  width: min(24cqmin, 100%);
+  height: auto;
+  border-radius: 0.6cqmin;
+  image-rendering: pixelated;
+}
+
+.lib-actions-qr-url,
+.lib-actions-qr-hint {
+  margin: 0;
+  max-width: 100%;
+  font-size: max(2.2cqmin, 1.6vmin);
+  color: var(--quiet);
+  overflow-wrap: anywhere;
+}
+
+.lib-actions-qr-url {
+  color: var(--ink);
+}
+
 /* Colonne latérale du contenu (Section.side) : à droite au bureau, sous le reste en borne. */
 .lib-content.with-side {
   display: grid;

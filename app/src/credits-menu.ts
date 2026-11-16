@@ -1,6 +1,8 @@
 // Crédits de la communauté à l'écran (packages/core/src/credits.ts, décidés le 12/11/2026) :
 // - fiche d'une table > « Crédits » : une ligne par rôle, de la vraie machine aux règles. Start sur
-//   une ligne : tous ses auteurs, et la page d'où vient la pièce en QR code, à viser au téléphone ;
+//   une ligne ouvre la page d'où vient la pièce dans le navigateur intégré ; tant que la ligne est
+//   choisie, son QR code est sous les actions, à viser au téléphone. Une ligne sans page : tous ses
+//   auteurs. En mode invité (navigateur fermé) : les auteurs et le QR code ;
 // - Menu système > Cyber Pinball > La communauté : les auteurs de la borne, des plus présents aux
 //   moins présents, puis les logiciels et les sites sans lesquels rien ne marche ;
 // - la ligne de la roue (« par TastyWasps ») et celle du mode attente, demandées par le menu.
@@ -37,6 +39,11 @@ export interface CreditsMenuHost {
   tables(): TableEntry[];
   /** Fiche de la table, où « Retour » ramène. */
   openSheet(table: TableEntry): void;
+  /**
+   * Page d'où vient une pièce, ouverte dans le navigateur intégré (fenêtre « Récupérer ») : faux
+   * quand elle ne peut pas l'être (mode invité), la ligne montre alors ses auteurs et son QR code.
+   */
+  browse(page: { url: string; site: string; game: string; role: string; authors: readonly string[] }): boolean;
 }
 
 /** Logiciels et sites crédités par « La communauté » : noms propres, rôles traduits. */
@@ -93,7 +100,22 @@ export function createCreditsMenu(host: CreditsMenuHost) {
     }));
     const back = () => host.openSheet(table);
     const actions: Action[] = [
-      ...picks.map((row, i): Action => ({ label: row.role, door: 'sheet.credits', run: () => openRow(table, row, () => open(table, i)) })),
+      // Start sur une ligne qui a une page : la page s'ouvre, son QR code est à côté tant que la ligne
+      // est choisie ; sans page (plus de quatre auteurs), tous ses auteurs.
+      ...picks.map((row, i): Action => {
+        const detail = () => openRow(table, row, () => open(table, i));
+        if (!row.url) return { label: row.role, door: 'sheet.credits', run: detail };
+        const url = row.url;
+        const site = siteName(url);
+        return {
+          label: row.role,
+          door: 'sheet.credits',
+          qr: { url, title: t('Sa page sur {site}', { site }) },
+          run: () => {
+            if (!host.browse({ url, site, game: table.title, role: row.role, authors: row.authors })) detail();
+          },
+        };
+      }),
       { label: t('La communauté'), detail: t('Tous les auteurs de la borne, les logiciels, les sites'), icon: 'friends', door: 'sheet.credits', run: () => openCommunity(() => open(table, picks.length)) },
       { label: t('Retour à la fiche'), icon: 'back', door: 'sheet.credits', run: back },
     ];
@@ -101,9 +123,11 @@ export function createCreditsMenu(host: CreditsMenuHost) {
       heading: t('Crédits'),
       icon: 'credits',
       subheading: [table.title, table.manufacturer, table.year].filter(Boolean).join(' · '),
-      lead: picks.length
-        ? t('Les auteurs de cette table et de tout ce qui l’entoure. Start sur une ligne : tous ses auteurs, et sa page en QR code pour le téléphone.')
-        : t('Les auteurs de cette table et de tout ce qui l’entoure.'),
+      lead: picks.some((row) => row.url)
+        ? t('Les auteurs de cette table et de tout ce qui l’entoure. Start sur une ligne ouvre sa page ; son QR code, à côté, l’ouvre sur le téléphone.')
+        : picks.length
+          ? t('Les auteurs de cette table et de tout ce qui l’entoure. Start sur une ligne : tous ses auteurs.')
+          : t('Les auteurs de cette table et de tout ce qui l’entoure.'),
       // Une colonne de rôles commune à tous les groupes : les noms partent du même bord (library.css, .lib-credits).
       variant: 'credits',
       sections,
@@ -112,7 +136,10 @@ export function createCreditsMenu(host: CreditsMenuHost) {
     };
   }
 
-  /** Start sur une ligne : la page source en QR code, tous les auteurs, leurs autres travaux sur la borne. */
+  /**
+   * Start sur une ligne sans page (ou toute ligne, en mode invité) : tous les auteurs, leurs autres
+   * travaux sur la borne, et la page source en QR code quand elle existe.
+   */
   function openRow(table: TableEntry, row: CreditRow, back: () => void): void {
     host.library.openCustom(() => {
       const sections: Section[] = [];
@@ -144,7 +171,7 @@ export function createCreditsMenu(host: CreditsMenuHost) {
   function siteName(url: string): string {
     try {
       const host = new URL(url).hostname.replace(/^www\./, '');
-      return host.endsWith('vpuniverse.com') ? 'VPUniverse' : host.endsWith('vpforums.org') ? 'VPForums' : host.endsWith('youtube.com') ? 'YouTube' : host;
+      return host.endsWith('vpuniverse.com') ? 'VPUniverse' : host.endsWith('vpforums.org') ? 'VPForums' : host.endsWith('youtube.com') ? 'YouTube' : host === 'github.com' ? 'GitHub' : host;
     } catch {
       return url;
     }

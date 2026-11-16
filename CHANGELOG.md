@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.14
 
+- Crédits d'une table : Start sur une ligne qui a une page (VPUniverse, VPForums…) l'ouvre directement dans le navigateur de la borne, avec tous ses auteurs dans le bandeau. Tant que la ligne est sélectionnée, son QR code s'affiche à côté des options, pour l'ouvrir aussi sur le téléphone. En mode invité, le navigateur reste fermé : Start montre les auteurs et le QR code.
 - Pinball FX (bêta) : « Installer Pinball FX » trouve de nouveau Steam ; il était grisé (« Ni Steam ni Epic sur ce PC ») sur un PC qui l’avait. Horaire de la borne : la liste des boutons qui peuvent réveiller la borne donne enfin leur nom.
 - Bureau Windows : au retour, vous êtes là où vous l'aviez quitté (la rubrique « Borne » sur « Bureau Windows », l'écran ouvert, la table sélectionnée), et non plus sur la roue. Aussi quand le menu se relance pour retourner l'écran, ou après un changement de langue ou de type de DMD. Au clavier, Ctrl et Maj de Ctrl+Maj+D ne changent plus de collection et ne déplacent plus la sélection : seuls, appuyés ou tenus, ils restent MagnaSave et flippers comme avant.
 - Installation d'une table : pendant qu'un fichier se télécharge, sa carte (« Table », « Fronton »…) le montre elle-même, avec le badge « Téléchargement en cours », une barre verte et le pourcentage, le volume et le débit. De même dans la liste d'attente et dans les parties du jeu d'une table installée. Le message en tête de l'écran reste.

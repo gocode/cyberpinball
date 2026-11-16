@@ -59,6 +59,7 @@ export const GUEST_DOORS = {
   'sheet.collections': false, // Ajouter à une collection personnelle, l'en retirer, en créer une
   'sheet.read': true, // Prospectus et règles, page par page
   'sheet.credits': true, // Crédits de la table : qui a fait la table, son habillage, ses médias (lecture seule)
+  'sheet.credits-web': false, // Page d'une ligne des crédits ouverte dans le navigateur intégré (on peut s'y connecter, y télécharger) ; l'invité a le QR code
   'sheet.scores': true, // Tableau des scores (quatre périodes), le lire
   'sheet.back': true, // Retour au menu
   'sheet.missing': false, // Ce qu’il manque pour jouer (téléchargements)

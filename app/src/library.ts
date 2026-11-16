@@ -267,6 +267,7 @@ import { createCatalog } from './catalog';
 import { createGameParts, type PupSwitchView } from './game-parts';
 import type { RecordingOutcome } from './game-recording';
 import { createRecordingMenu } from './recording-menu';
+import { qrRows } from './remote-qr';
 import { createJourney } from './journey';
 import { createMediaDownload, mediaOffersLabel, type MediaDbGameOffer } from './media-download';
 import { createMediaSearch } from './media-search';
@@ -647,6 +648,11 @@ export interface Action {
   key?: string;
   /** Issue vers le web de cet écran d'ajout ou de choix (« Chercher sur le web… », ADD_SCREENS). */
   web?: AddScreenId;
+  /**
+   * Page web de l'élément (une ligne des crédits) : tant qu'il est choisi, son QR code s'affiche
+   * sous les actions, pour l'ouvrir aussi sur le téléphone.
+   */
+  qr?: { url: string; title: string };
   run: () => void | Promise<void>;
 }
 
@@ -1422,6 +1428,20 @@ export function createLibrary(host: LibraryHost) {
     input: creditsInput,
     tables: () => host.tables(),
     openSheet: (table) => openSheet(table),
+    // La page d'une ligne des crédits, dans le navigateur intégré ; fermé à l'invité (on peut s'y
+    // connecter, y télécharger) : il garde la page du QR code.
+    browse: ({ url, site, game, role, authors }) => {
+      if (!host.guest.allows('sheet.credits-web')) return false;
+      catalogUi.acquirer.show({
+        url,
+        game,
+        expected: authors.length ? t('{role} : {authors}', { role, authors: authors.join(', ') }) : role,
+        host: site,
+        status: t('La page de « {role} » : ses mises à jour, ses commentaires. Un merci y fait toujours plaisir. Fermer (Échap) revient aux crédits.', { role }),
+        info: true,
+      });
+      return true;
+    },
   });
 
   // ---------- Gestionnaire de téléchargements ----------
@@ -5000,6 +5020,12 @@ export function createLibrary(host: LibraryHost) {
 
   // ---------- Vue envoyée au rendu ----------
 
+  /** QR code de l'élément choisi : calculé pour lui seul, l'adresse montrée sans « https:// » ni « www. ». */
+  function actionQrView(qr: Action['qr']) {
+    if (!qr) return undefined;
+    return { qr: qrRows(qr.url), title: qr.title, url: qr.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '') };
+  }
+
   function view() {
     if (!screen) {
       arrived(undefined);
@@ -5042,6 +5068,8 @@ export function createLibrary(host: LibraryHost) {
       // Dans la liste d'un écran à deux zones, Exit n'y ramène pas : il passe aux actions, le bouton le dit (et fait de même au clic).
       backTag: zone?.active === 'list' ? { key: 'Exit', text: t('actions') } : undefined,
       actions: built.actions.map(({ label, detail, tone, icon, flag, web, attention, badge, shortcut, run }, i) => ({ label: shownLabel({ label, run }, built.back), detail, tone, icon: web && !iconMenu ? undefined : icon, flag, attention: attention || undefined, badge: badge ? menuBadgeLabel(badge) : undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
+      // La page web de l'élément choisi (une ligne des crédits) : son QR code sous les actions.
+      actionQr: actionQrView(built.actions[cursor]?.qr),
       media: built.media,
       variant: built.variant,
       actionsTitle: built.actionsTitle,

@@ -299,6 +299,15 @@ function renderLibrary(v) {
     if (a.detail) li.append(libEl('span', 'detail', a.detail));
     actions.append(li);
   });
+  // La page web de l'élément choisi (une ligne des crédits) : Start l'ouvre ici, son QR code sur le téléphone.
+  if (v.actionQr) {
+    const li = libEl('li', 'lib-actions-qr');
+    const qr = remoteQr(v.actionQr.qr);
+    qr.className = 'lib-actions-qr-code';
+    qr.setAttribute('aria-label', t('QR code de la page'));
+    li.append(libEl('p', 'lib-actions-qr-title', v.actionQr.title), qr, libEl('p', 'lib-actions-qr-url', v.actionQr.url), libEl('p', 'lib-actions-qr-hint', t('Start l’ouvre ici. Visez ce code pour l’ouvrir sur votre téléphone.')));
+    actions.append(li);
+  }
   body.append(actions);
   o.append(body, v.commands ? appCommands(v.commands) : libEl('footer', 'lib-hint', v.hint));
 
