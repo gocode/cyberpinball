@@ -197,7 +197,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **An optional Pause button**: one press pauses the game, another resumes it.
 
 <p align="center">
-  <img src="images/en/features/buttons.webp?v=56b64279a0" width="300" alt="Game buttons: each button with its key (flippers, Start, Exit, coin, plunger, MagnaSave, Extra Ball, pause, tilt, nudges, volume, mute), and Save, Previous, Default keys, Map all.">
+  <img src="images/en/features/buttons.webp?v=56b64279a0" width="300" alt="Game buttons: each button with its key (flippers, Start, Exit, coin, plunger, MagnaSave, Extra Ball, pause, tilt, nudges, volume, mute), and Save, Previous, Default keys, Change all.">
   <img src="images/en/features/interface-buttons.webp?v=f7defa8123" width="300" alt="Interface buttons: Previous, Next, Confirm, Back and menu, Cheat sheet and VPX settings, with the keyboard fallback keys always active.">
 </p>
 

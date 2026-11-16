@@ -7,12 +7,17 @@
 // ni son lanceur au premier lancement (« Joysticks lus une fois VPX installé »), ni même avancer
 // dans l'assistant sans clavier. Désormais l'assistant installe VPX dès son ouverture, sans rien
 // demander (aucune autorisation de Windows n'est nécessaire, et personne ne pourrait répondre aux
-// boutons), et le relevé des boutons attend la fin de l'installation avant de garder les touches
-// par défaut. Le runtime Visual C++ de Microsoft, que SDL364.dll importe aussi, est installé par
+// boutons). Jusqu'en 0.1.12, le délai du premier écran des boutons était suspendu tant que VPX se
+// téléchargeait : un antivirus qui bloquait le téléchargement, ou une connexion lente, figeait cet
+// écran sans explication (retour d'un testeur, 16/11/2026). Le délai court désormais toujours, et
+// un bouton de joystick lu une fois VPX installé ramène au relevé (joystickReturnsToButtons). Le runtime Visual C++ de Microsoft, que SDL364.dll importe aussi, est installé par
 // l'installeur, où l'utilisateur a forcément une souris pour répondre à Windows
 // (scripts/installeur/cyberpinball.nsi, section « Runtime Visual C++ ») ; à défaut, par le menu.
 
 import { offscreenMode } from './offscreen';
+import type { WizardPhase } from './wizardsteps';
+
+type KeyMap = Readonly<Record<string, string | undefined>>;
 
 /** Variables d'un essai sans opérateur : rien n'y est téléchargé (le bac à sable n'a pas de VPX). */
 const TRIAL_VARS = ['CYBERPINBALL_AUTOPILOT', 'CYBERPINBALL_CAPTURE', 'CYBERPINBALL_STRESS', 'CYBERPINBALL_HOME', 'NODE_TEST_CONTEXT'];
@@ -53,12 +58,22 @@ export type WizardVpx =
   | { state: 'failed'; reason: string };
 
 /**
- * Le délai du relevé des boutons (20 s sans appui : touches par défaut gardées) est-il suspendu ?
- * Oui tant que VPX s'installe : une borne qui n'a que des boutons de joystick ne peut pas encore
- * répondre, et passerait aux écrans sans avoir pu relever un seul bouton.
+ * Étapes où un bouton de joystick n'a aucun rôle tant qu'aucun bouton de la borne n'est un bouton
+ * de joystick : le premier écran des boutons, les écrans, la disposition, le son, le récapitulatif.
+ * Le lanceur et le tilt lisent le joystick (axes, balancier) : ils n'en sont pas. Ni « flip », où
+ * l'écran vient d'être tourné dans Windows et attend sa confirmation.
  */
-export function buttonsWaitForVpx(vpx: WizardVpx): boolean {
-  return vpx.state === 'installing';
+export const JOYSTICK_RETURN_PHASES: readonly WizardPhase[] = ['buttonsChoice', 'assign', 'orient', 'size', 'arrange', 'sound', 'channels', 'summary'];
+
+/**
+ * Un bouton de joystick vient d'être pressé : ramène-t-il au relevé des boutons ? Oui quand aucun
+ * bouton du jeu ni de l'interface n'est un bouton de joystick, à une étape où il n'a pas de rôle. Une
+ * borne qui n'a qu'un Pinscape ne peut rien presser tant que VPX s'installe : le délai du premier
+ * écran garde alors les touches par défaut, et ses boutons, lus dès VPX installé, la ramènent ici.
+ */
+export function joystickReturnsToButtons(phase: WizardPhase, code: string, inForce: { buttons?: KeyMap; navigation?: KeyMap } | undefined): boolean {
+  if (!code.startsWith('SDLJoy_') || !JOYSTICK_RETURN_PHASES.includes(phase)) return false;
+  return ![inForce?.buttons, inForce?.navigation].some((keys) => Object.values(keys ?? {}).some((c) => c?.startsWith('SDLJoy_')));
 }
 
 /**

@@ -4,7 +4,7 @@
 const $ = (id) => document.getElementById(id);
 
 // Étapes où un seul écran porte la question, les autres restent en retrait.
-const STEP_PHASES = ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'gate'];
+const STEP_PHASES = ['buttonsChoice', 'buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'gate'];
 
 function text(id, value) {
   $(id).textContent = value ?? '';
@@ -48,10 +48,24 @@ function renderButtons(state) {
   for (const a of state.actions ?? []) {
     const button = document.createElement('button');
     button.textContent = a.label;
-    button.className = a.selected ? 'selected' : '';
+    // Indisponible (« Valider » tant qu'un bouton reste à essayer) : grisé, sa raison dessous, toujours visible.
+    button.className = [a.selected && 'selected', a.disabled && 'disabled'].filter(Boolean).join(' ');
+    if (a.reason) {
+      const reason = document.createElement('small');
+      reason.className = 'action-reason';
+      reason.textContent = a.reason;
+      button.append(reason);
+    }
     button.dataset.act = JSON.stringify({ type: 'buttons', action: a.id });
     actions.append(button);
   }
+}
+
+// Compte à rebours : une barre qui se vide, sous le texte qui dit ce qui se passera à la fin.
+function renderCountdown(state) {
+  const box = $('countdown');
+  box.hidden = state.countdown === undefined;
+  if (state.countdown !== undefined) $('countdown-fill').style.width = `${Math.max(0, Math.min(1, state.countdown)) * 100}%`;
 }
 
 // Étape « Lanceur » : la position du lanceur telle que VPX la lira, de l'avant (-1/3) à tiré
@@ -368,10 +382,12 @@ function render(state) {
   // Panneau (récapitulatif, résultat) : sur le playfield, sauf quand l'état en décide (étape « Boutons »).
   const report = state.report ?? (['summary', 'done'].includes(state.phase) && state.assignedRole === 'playfield');
   root.classList.toggle('report', report);
-  root.classList.toggle('buttons', ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt'].includes(state.phase));
+  root.classList.toggle('choice', state.phase === 'buttonsChoice');
+  root.classList.toggle('buttons', ['buttonsChoice', 'buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt'].includes(state.phase));
   // Lanceur et tilt : une colonne de réglages sous la jauge ou le balancier.
   root.classList.toggle('plunger', state.phase === 'plunger' || state.phase === 'tilt');
   renderButtons(state);
+  renderCountdown(state);
   renderGauge(state);
   renderPlumb(state);
   root.classList.toggle('orient', ['orient', 'flip'].includes(state.phase) && state.highlight);

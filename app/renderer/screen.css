@@ -414,6 +414,57 @@ body {
   box-shadow: 0 0 2vmin var(--signal-haze);
 }
 
+/* Indisponible : grisé, la raison dessous, toujours visible (jamais seulement après l'appui). */
+.actions button.disabled {
+  color: var(--ink-faint);
+  background: var(--surface-sunken);
+  border-color: var(--line-soft);
+  box-shadow: none;
+}
+
+.actions button.disabled.selected {
+  border-color: var(--ink-faint);
+  font-weight: 500;
+}
+
+.action-reason {
+  display: block;
+  margin-top: 0.4vmin;
+  font-size: 1.9vmin;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--warning);
+}
+
+/* Écran de choix (« Vos boutons sont-ils déjà les bons ? ») : deux grands choix. */
+#screen.choice .actions button {
+  font-size: 3vmin;
+  padding: 1.4vmin 3.4vmin;
+  min-width: 34vmin;
+}
+
+#screen.choice .buttons-list li.done b {
+  color: var(--ink);
+}
+
+/* Compte à rebours : la barre se vide jusqu'à ce qui est annoncé au-dessous. */
+.countdown {
+  width: min(60%, 80vmin);
+  height: 0.6vmin;
+  margin: 0 auto 1vmin;
+  border-radius: 0.3vmin;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.countdown-fill {
+  display: block;
+  height: 100%;
+  background: var(--warning);
+  transition: width 1s linear;
+}
+
 /* Souris : le pointeur apparaît quand on la bouge, les lignes et actions se cliquent. */
 body.pointer {
   cursor: default;

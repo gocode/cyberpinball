@@ -197,7 +197,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Bouton Pause** facultatif : un appui met la partie en pause, un autre la reprend.
 
 <p align="center">
-  <img src="images/fr/features/buttons.webp?v=1262855226" width="300" alt="Boutons du jeu : chaque bouton avec sa touche (flippers, Start, Exit, crédit, lanceur, MagnaSave, Extra Ball, pause, tilt, tremblements, volume, muet), et Enregistrer, Précédent, Touches par défaut, Tout relever.">
+  <img src="images/fr/features/buttons.webp?v=1262855226" width="300" alt="Boutons du jeu : chaque bouton avec sa touche (flippers, Start, Exit, crédit, lanceur, MagnaSave, Extra Ball, pause, tilt, tremblements, volume, muet), et Enregistrer, Précédent, Touches par défaut, Tout modifier.">
   <img src="images/fr/features/interface-buttons.webp?v=5808179f5a" width="300" alt="Boutons de l'interface : Précédent, Suivant, Valider, Retour et menu, Aide-mémoire et Réglages de VPX, avec les touches de secours du clavier toujours actives.">
 </p>
 

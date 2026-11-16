@@ -125,7 +125,8 @@ import {
   formatList,
   t,
   tn,
-  buttonsWaitForVpx,
+  joystickReturnsToButtons,
+  JOYSTICK_RETURN_PHASES,
   menuWaitsForVpx,
   wizardInstallsVpx,
   type WizardVpx,
@@ -442,8 +443,9 @@ export function startWizard(): void {
 
 /**
  * Premier lancement : VPX installé en arrière-plan dès l'ouverture de l'assistant, sans rien
- * demander (wizardInstallsVpx). Le relevé des boutons attend la fin avant de garder les touches
- * par défaut (buttonsWaitForVpx) ; les joysticks se relisent aussitôt VPX installé. Un échec
+ * demander (wizardInstallsVpx). Le délai du premier écran des boutons ne l'attend pas ; les
+ * joysticks se relisent aussitôt VPX installé, et l'un de leurs boutons ramène au relevé
+ * (joystickReturnsToButtons). Un échec
  * (pas de connexion) n'arrête rien : le clavier reste, et le menu repropose l'installation.
  */
 function prepareVpx(): void {
@@ -647,6 +649,22 @@ function handleKey(input: Input): boolean {
 
   if (wizard.phase === 'done') return continueToTables();
 
+  // Un bouton de joystick quand aucun bouton de la borne n'en est un : VPX vient d'être installé et
+  // lit un Pinscape dont les boutons n'ont pas pu être relevés. Retour au relevé.
+  // Assistant complet seulement : une étape refaite seule garde les boutons enregistrés.
+  if (!only && wizard.phase !== 'buttonsChoice' && joystickReturnsToButtons(wizard.phase, input.code, inForce())) {
+    if (!input.isAutoRepeat) redoButtonsFromJoystick();
+    broadcast();
+    return true;
+  }
+
+  // Premier écran des boutons : l'appui choisit à son relâchement (handleKeyUp), jamais relevé ;
+  // maintenu, Exit ouvre la question de sortie sans rien choisir (watchHold).
+  if (wizard.phase === 'buttonsChoice') {
+    if (!input.isAutoRepeat) pressed.add(input.code);
+    return true;
+  }
+
   // Relevé des boutons : la touche compte au relâchement (handleKeyUp).
   if (CAPTURE_PHASES.includes(wizard.phase)) {
     if (!input.isAutoRepeat) {
@@ -758,7 +776,13 @@ function handleKey(input: Input): boolean {
 function handleKeyUp(input: Input): boolean {
   if (held?.code === input.code) stopHold();
   if (!pressed.delete(input.code)) return false;
-  if (busy || wizard.quit || wizard.leaving || !CAPTURE_PHASES.includes(wizard.phase)) return true;
+  if (busy || wizard.quit || wizard.leaving) return true;
+  if (wizard.phase === 'buttonsChoice') {
+    handleChoiceKey(input.code);
+    broadcast();
+    return true;
+  }
+  if (!CAPTURE_PHASES.includes(wizard.phase)) return true;
   if (isSummaryPhase(wizard.phase)) handleButtonsSummaryKey(input);
   else handleButtonKey(input);
   broadcast();
@@ -998,7 +1022,7 @@ function quitView() {
 // ligne, ou précédent / suivant puis valider). Sur une nouvelle borne, relevé bouton par
 // bouton, la touche en vigueur rappelée en retrait. Une erreur se corrige sans les boutons
 // de la borne : clic sur une ligne, Retour arrière ou « Précédent », « Touches par défaut »
-// et « Tout relever ». Au récapitulatif, les boutons à essayer du jeu relevé (flippers,
+// et « Tout modifier ». Au récapitulatif, les boutons à essayer du jeu relevé (flippers,
 // Start, Exit ; précédent, suivant, valider, retour) dont la touche vient d'être relevée
 // doivent avoir été pressés avant de valider (keysToTry) : un mauvais relevé ne peut pas
 // être enregistré sans que le joueur s'en aperçoive ; les touches gardées ou celles par
@@ -1006,7 +1030,9 @@ function quitView() {
 
 /** Actions du récapitulatif, choisies aux boutons ou à la souris. */
 const SUMMARY_ACTIONS = ['save', 'previous', 'defaults', 'restart'] as const;
-type ButtonsAction = (typeof SUMMARY_ACTIONS)[number];
+/** Premier écran d'une borne sans boutons enregistrés : garder les touches actuelles, ou les modifier. */
+const CHOICE_ACTIONS = ['keep', 'modify'] as const;
+type ButtonsAction = (typeof SUMMARY_ACTIONS)[number] | (typeof CHOICE_ACTIONS)[number];
 
 /** Marque de « Relevé : … » après « Touches par défaut » (le texte affiché est lastLabel). */
 const DEFAULTS_LAST = 'defaults';
@@ -1041,7 +1067,7 @@ function startButtons(initial = false): void {
  * y en a (ou à l'étape seule, où ce sont au pire celles par défaut ; toujours pour
  * l'interface, proposée sur les boutons du jeu), sinon le relevé du premier bouton. Délai
  * de 20 s pour les boutons du jeu de l'assistant complet, pas à l'étape seule où l'on est
- * venu exprès. « Tout relever » : relevé complet, rien de gardé.
+ * venu exprès. « Tout modifier » : relevé complet, rien de gardé.
  */
 function startCapture(set: KeySet, initial = false): void {
   const game = set === GAME_KEYS;
@@ -1049,7 +1075,8 @@ function startCapture(set: KeySet, initial = false): void {
   const keep = initial && ((game ? wizard.buttons : wizard.navigation) !== undefined || stepOnly || !game);
   const keys = keep ? inForceKeys(set) : {};
   const timed = initial && game && !(keep && stepOnly);
-  wizard.phase = keep ? summaryPhase(set) : capturePhase(set);
+  // Borne neuve : d'abord « Vos boutons sont-ils déjà les bons ? », jamais le relevé d'emblée.
+  wizard.phase = keep ? summaryPhase(set) : timed ? 'buttonsChoice' : capturePhase(set);
   wizard.capture = {
     set,
     index: 0,
@@ -1064,16 +1091,33 @@ function startCapture(set: KeySet, initial = false): void {
   };
   stopButtonsCountdown();
   if (!timed) return;
+  // Le délai court même pendant le téléchargement de VPX : suspendu, il figeait l'écran sans
+  // explication quand le téléchargement n'aboutissait pas (antivirus, connexion lente). Une borne
+  // qui n'a qu'un Pinscape revient au relevé par l'un de ses boutons, dès VPX installé.
   buttonsCountdown = setInterval(() => {
     const deadline = wizard.capture?.deadline;
-    if (!CAPTURE_PHASES.includes(wizard.phase) || deadline === undefined) stopButtonsCountdown();
-    // VPX s'installe : les boutons d'un Pinscape ne sont pas encore lus, le délai attend.
-    else if (buttonsWaitForVpx(vpxPrep)) {
-      wizard.capture!.deadline = Date.now() + BUTTONS_TIMEOUT_MS;
-      broadcast();
-    } else if (Date.now() >= deadline) buttonsTimeout();
+    if (!(wizard.phase === 'buttonsChoice' || CAPTURE_PHASES.includes(wizard.phase)) || deadline === undefined) stopButtonsCountdown();
+    else if (Date.now() >= deadline) buttonsTimeout();
     else broadcast();
   }, 1000);
+}
+
+/**
+ * Premier écran : Start, Entrée ou un flipper gardent les touches affichées ; Exit (Échap) ou un
+ * bouton de joystick qui n'en est aucune ouvrent le relevé. Une autre touche ne fait rien, et le
+ * délai continue : personne n'est retenu sur cet écran.
+ */
+function handleChoiceKey(code: string): void {
+  const is = (group: string[]) => group.includes(code);
+  if (is(KEYS.confirm) || is(KEYS.previous) || is(KEYS.next)) runButtonsAction('keep');
+  else if (is(KEYS.exit) || joystickReturnsToButtons('buttonsChoice', code, inForce())) runButtonsAction('modify');
+}
+
+/** Un bouton de joystick lu après le premier écran : le relevé, puis la suite de l'assistant depuis le lanceur. */
+function redoButtonsFromJoystick(): void {
+  console.log('Assistant : bouton de joystick sans bouton relevé ; retour au relevé des boutons.'); // i18n-ignore : journal
+  restart();
+  startCapture(GAME_KEYS);
 }
 
 function stopButtonsCountdown(): void {
@@ -1227,9 +1271,13 @@ function handleWizardAction(action: WizardAction): void {
     return;
   }
   const capture = wizard.capture;
-  if (!capture || !CAPTURE_PHASES.includes(wizard.phase)) return;
+  if (!capture || !(wizard.phase === 'buttonsChoice' || CAPTURE_PHASES.includes(wizard.phase))) return;
   touched(capture);
-  if (action.type === 'button') redoButton(capture, action.index);
+  // Premier écran : un clic sur une ligne la modifie, relevé à partir de ce bouton.
+  if (wizard.phase === 'buttonsChoice' && action.type === 'button') {
+    runButtonsAction('modify');
+    redoButton(wizard.capture!, action.index);
+  } else if (action.type === 'button') redoButton(capture, action.index);
   else runButtonsAction(action.action as ButtonsAction);
   broadcast();
 }
@@ -1238,6 +1286,15 @@ function runButtonsAction(action: ButtonsAction): void {
   const capture = wizard.capture!;
   const set = capture.set;
   switch (action) {
+    case 'keep':
+      // Les touches affichées, comme « Touches par défaut » puis « Valider » : l'assistant continue.
+      if (wizard.phase !== 'buttonsChoice') return;
+      stopButtonsCountdown();
+      wizard.capture = undefined;
+      return startCapture(INTERFACE_KEYS, true);
+    case 'modify':
+      if (wizard.phase !== 'buttonsChoice') return;
+      return startCapture(GAME_KEYS);
     case 'previous':
       return previousButton();
     case 'restart':
@@ -1505,7 +1562,9 @@ const ACTION_LABELS: Record<ButtonsAction, string> = {
   get save() { return t('Valider'); },
   get previous() { return t('◀ Précédent'); },
   get defaults() { return t('Touches par défaut'); },
-  get restart() { return t('Tout relever'); },
+  get restart() { return t('Tout modifier'); },
+  get keep() { return t('Garder ces touches'); },
+  get modify() { return t('Modifier mes boutons'); },
 };
 
 /**
@@ -1545,18 +1604,30 @@ function buttonsView(index: number, base: Record<string, unknown>) {
       tried: summary && capture.tried.has(b.id),
     };
   });
+  // « Valider » indisponible tant qu'un bouton changé reste à essayer : grisé, sa raison dessous dès l'arrivée.
+  const problems = summary ? keyProblems(set, capture.keys) : [];
+  const untried = summary ? keysToTry(set, capture.keys, capture.reference).filter((id) => !capture.tried.has(id)) : [];
+  const saveReason = problems.length
+    ? t('Impossible : {problems}', { problems: problems.join(' ; ') })
+    : untried.length
+      ? t('Faire : {buttons}', { buttons: untried.map((id) => `${itemLabel(set, id)} ○`).join(' · ') })
+      : undefined;
   const actions = (summary ? SUMMARY_ACTIONS : (['previous', 'defaults', 'restart'] as const)).map((id, i) => ({
     id,
     label: id === 'save' && only ? t('Enregistrer') : ACTION_LABELS[id],
     selected: summary && i === capture.action,
+    ...(id === 'save' && saveReason && { disabled: true, reason: saveReason }),
   }));
-  const common = { ...base, rotation, highlight: true, name: '', details: '', buttons: list, actions };
+  // Compte à rebours toujours visible : une barre, et la phrase qui dit ce qui se passera à la fin.
+  const countdown = capture.deadline === undefined ? undefined : Math.max(0, capture.deadline - Date.now()) / BUTTONS_TIMEOUT_MS;
+  const common = { ...base, rotation, highlight: true, name: '', details: '', buttons: list, actions, countdown };
   const keyOf = (role: keyof KeySet['move']) => keyLabel(capture.keys[set.move[role]]);
+
+  if (wizard.phase === 'buttonsChoice') return choiceView(common, inForceSet);
 
   if (summary) {
     const keys = capture.keys;
     const toTry = keysToTry(set, keys, capture.reference);
-    const tried = toTry.map((id) => `${itemLabel(set, id)} ${capture.tried.has(id) ? '✓' : '○'}`).join(' · ');
     const silenced = game ? silencedPreview(keys as CabinetButtons) : [];
     const seconds = capture.deadline === undefined ? undefined : Math.max(0, Math.ceil((capture.deadline - Date.now()) / 1000));
     const choose = { left: keyOf('previous'), right: keyOf('next'), start: keyOf('confirm'), exit: keyOf('exit') };
@@ -1569,8 +1640,9 @@ function buttonsView(index: number, base: Record<string, unknown>) {
           ? t('Perdent leur touche dans VPX : {actions}', { actions: silenced.join(', ') })
           : t('Les autres touches de VPX ne changent pas.'),
       notice: capture.notice ?? capture.taken ?? (keyProblems(set, keys).join(' ; ') || (seconds === undefined ? undefined : t('Sans réponse dans {n} s : touches actuelles gardées.', { n: seconds }))),
-      step: toTry.length
-        ? t('Essai des touches relevées : {buttons}', { buttons: tried })
+      // Boutons encore à presser : dits une seule fois, sous « Valider » (« Faire : … ») ; la liste coche ✓.
+      step: untried.length
+        ? ''
         : t('{last} · choisissez un bouton pour lui donner une autre touche.', {
             last:
               capture.last === DEFAULTS_LAST
@@ -1582,12 +1654,8 @@ function buttonsView(index: number, base: Record<string, unknown>) {
                   : t('Touches actuelles'),
           }),
       hint: game
-        ? toTry.includes('exit')
-          ? t('Flippers ({left} / {right}) : choisir · Start ({start}) : lancer · Exit ({exit}) : à essayer aussi · Clic ou Start sur un bouton : le refaire', choose)
-          : t('Flippers ({left} / {right}) : choisir · Start ({start}) : lancer · Clic ou Start sur un bouton : le refaire', choose)
-        : toTry.includes('back')
-          ? t('Précédent / Suivant ({left} / {right}) : choisir · Valider ({start}) : lancer · Retour ({exit}) : à essayer aussi · Clic ou Valider sur un bouton : le refaire', choose)
-          : t('Précédent / Suivant ({left} / {right}) : choisir · Valider ({start}) : lancer · Clic ou Valider sur un bouton : le refaire', choose),
+        ? t('Flippers ({left} / {right}) : choisir · Start ({start}) : lancer · Clic ou Start sur un bouton : le refaire', choose)
+        : t('Précédent / Suivant ({left} / {right}) : choisir · Valider ({start}) : lancer · Clic ou Valider sur un bouton : le refaire', choose),
     };
   }
 
@@ -1635,6 +1703,48 @@ function buttonsView(index: number, base: Record<string, unknown>) {
 }
 
 /**
+ * Premier écran d'une borne neuve : les touches en vigueur (celles des encodeurs), « Garder ces
+ * touches » choisi d'office, « Modifier mes boutons ». Les appuis choisissent, aucun n'est relevé.
+ */
+function choiceView(common: Record<string, unknown>, inForceSet: SetKeys) {
+  const capture = wizard.capture!;
+  const seconds = capture.deadline === undefined ? undefined : Math.max(0, Math.ceil((capture.deadline - Date.now()) / 1000));
+  const label = (codes: string[]) => keyLabel(codes[0]);
+  const offer = joystickOffer();
+  return {
+    ...common,
+    prompt: t('Vos boutons sont-ils déjà les bons ?'),
+    details: t('Touches par défaut des encodeurs de borne : la plupart des bornes les envoient déjà.'),
+    buttons: GAME_KEYS.items.map((b) => ({ label: b.label, key: keyLabel(inForceSet[b.id]), state: 'done' })),
+    actions: CHOICE_ACTIONS.map((id, i) => ({ id, label: ACTION_LABELS[id], selected: i === 0 })),
+    notice: seconds === undefined ? undefined : t('Sans réponse dans {n} s : ces touches sont gardées, l’assistant passe aux écrans.', { n: seconds }),
+    // VPX en cours d'installation : le clavier marche tout de suite, les joysticks seront lus à la fin.
+    step: vpxPrep.state === 'installing' ? joystickLine() : (offer ?? t('Sur cet écran, les boutons choisissent : rien n’est relevé.')),
+    hint: t('Start ({start}), Entrée ou un flipper ({left} / {right}) : garder ces touches · Exit ({exit}) : modifier mes boutons · Clic : l’un ou l’autre', {
+      start: label(KEYS.confirm),
+      left: label(KEYS.previous),
+      right: label(KEYS.next),
+      exit: label(KEYS.exit),
+    }),
+  };
+}
+
+/**
+ * VPX installé par l'assistant, un joystick lu, aucun bouton de la borne n'en étant un : l'un de
+ * ses boutons ramène au relevé (joystickReturnsToButtons). Dit à chaque étape où il le fait.
+ */
+function joystickOffer(): string | undefined {
+  if (only || vpxPrep.state !== 'ready' || !JOYSTICK_RETURN_PHASES.includes(wizard.phase)) return undefined;
+  const status = joystickStatus();
+  if (status.state !== 'ready' || !status.devices.length) return undefined;
+  if (!joystickReturnsToButtons(wizard.phase, 'SDLJoy_', inForce())) return undefined;
+  const names = status.devices.map((d) => d.name || d.id).join(', ');
+  return wizard.phase === 'buttonsChoice'
+    ? t('Joystick lu : {names} · l’un de ses boutons : modifier mes boutons', { names })
+    : t('Visual Pinball X est installé · Joystick lu : {names} · l’un de ses boutons : retour au relevé des boutons', { names });
+}
+
+/**
  * Joysticks pendant le relevé : une borne à Pinscape (KL25Z) ou à encodeur en mode manette
  * envoie des boutons de joystick, lus par la bibliothèque SDL de VPX (joystick-input.ts).
  */
@@ -1655,7 +1765,12 @@ function joystickLine(): string {
     return t('Joysticks illisibles : {error}', { error: status.error });
   }
   if (status.state === 'no-vpx') {
-    if (vpxPrep.state === 'installing') return t('Joysticks lus dès que Visual Pinball X est installé ({percent} %) : le relevé attend.', { percent: vpxPrep.percent });
+    if (vpxPrep.state === 'installing') {
+      const progress = vpxPrep.offline
+        ? t('Installation de Visual Pinball X depuis la borne : {percent} %', { percent: vpxPrep.percent })
+        : t('Téléchargement de Visual Pinball X : {percent} %', { percent: vpxPrep.percent });
+      return t('{progress} · joysticks (Pinscape…) lus à la fin · le clavier marche tout de suite', { progress });
+    }
     if (vpxPrep.state === 'failed') return t('Visual Pinball X n’a pas pu s’installer ({reason}) : boutons du clavier seulement. Le menu repropose l’installation, puis « Boutons du jeu » se refait.', { reason: vpxPrep.reason });
     return t('Joysticks lus une fois VPX installé');
   }
@@ -2676,7 +2791,9 @@ function viewFor(index: number) {
     assignedLabel: shown.length ? formatList(shown.map(wizardRoleLabel)) : undefined,
     zones: zonesView(index, option),
     phase: wizard.phase,
-    notice: continueAfterVpx ? vpxNotice() : (wizard.notice ?? vpxNotice()),
+    // Le retour au relevé par le joystick passe devant l'avis « touches gardées » : une borne à
+    // Pinscape seul ne peut pas l'effacer d'un appui.
+    notice: continueAfterVpx ? vpxNotice() : (joystickOffer() ?? wizard.notice ?? vpxNotice()),
     // Dès que le bord des flippers est connu, le playfield s'affiche droit pour le joueur.
     rotation: assignedRole === 'playfield' && wizard.phase !== 'assign' ? edgeRotation(wizard.flipperEdge) : 0,
   };
@@ -2685,7 +2802,7 @@ function viewFor(index: number) {
   // (une orientation remise n'a plus de compte à rebours).
   if (wizard.leaving) return { ...base, highlight: false, report: false, prompt: '', step: '', hint: '', notice: undefined };
 
-  if (CAPTURE_PHASES.includes(wizard.phase)) return buttonsView(index, base);
+  if (wizard.phase === 'buttonsChoice' || CAPTURE_PHASES.includes(wizard.phase)) return buttonsView(index, base);
   if (wizard.phase === 'plunger') return plungerViewFor(index, base);
   if (wizard.phase === 'tilt') return tiltViewFor(index, base);
 

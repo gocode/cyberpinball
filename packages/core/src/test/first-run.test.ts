@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { buttonsWaitForVpx, joystickButtonsUnrecorded, JOYSTICK_STEPS, menuWaitsForVpx, wizardInstallsVpx, type WizardVpx } from '../first-run';
+import { JOYSTICK_RETURN_PHASES, joystickButtonsUnrecorded, joystickReturnsToButtons, JOYSTICK_STEPS, menuWaitsForVpx, wizardInstallsVpx, type WizardVpx } from '../first-run';
+import { WIZARD_PHASES } from '../wizardsteps';
 import { REPO_ROOT } from './i18n-scan';
 
 const read = (...parts: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...parts), 'utf8');
@@ -36,10 +37,22 @@ test('l’assistant installe VPX dès son ouverture, quand il manque et que l’
   }
 });
 
-test('pendant l’installation de VPX, le relevé des boutons attend et le menu aussi', () => {
+test('pendant l’installation de VPX, le menu attend sa fin', () => {
   const states: WizardVpx[] = [{ state: 'none' }, { state: 'installing', percent: 40, offline: false }, { state: 'ready', version: '10.8.1-5436' }, { state: 'failed', reason: 'pas de réseau' }];
-  assert.deepEqual(states.map(buttonsWaitForVpx), [false, true, false, false]);
   assert.deepEqual(states.map(menuWaitsForVpx), [false, true, false, false]);
+});
+
+test('un bouton de joystick ramène au relevé tant qu’aucun bouton de la borne n’en est un, aux étapes où il n’a pas de rôle', () => {
+  const joy = 'SDLJoy_0300f1c2fa2a0000eaf7000000010000_1;3';
+  const clavier = { buttons: { leftFlipper: 'ShiftLeft', start: 'Digit1' } };
+  for (const phase of WIZARD_PHASES) assert.equal(joystickReturnsToButtons(phase, joy, clavier), JOYSTICK_RETURN_PHASES.includes(phase), phase);
+  // Le lanceur et le tilt lisent le joystick ; le relevé le relève ; « flip » attend sa confirmation.
+  for (const phase of ['plunger', 'tilt', 'buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'flip', 'done'] as const) assert.ok(!JOYSTICK_RETURN_PHASES.includes(phase), phase);
+  assert.equal(joystickReturnsToButtons('assign', joy, undefined), true, 'borne neuve, touches par défaut gardées');
+  assert.equal(joystickReturnsToButtons('assign', 'KeyA', clavier), false, 'une touche du clavier');
+  // Un bouton du jeu ou de l'interface déjà au joystick : ses boutons ont un rôle.
+  assert.equal(joystickReturnsToButtons('assign', joy, { buttons: { leftFlipper: joy } }), false);
+  assert.equal(joystickReturnsToButtons('assign', joy, { ...clavier, navigation: { confirm: 'SDLJoy_x_1;8' } }), false);
 });
 
 test('un joystick lu pour la première fois au menu fait proposer le relevé de ses boutons', () => {
@@ -59,7 +72,9 @@ test('l’assistant installe VPX avant le relevé, suspend son délai et retient
   assert.match(prepare, /wizardInstallsVpx\(/);
   assert.match(prepare, /installVpx\(/);
   assert.match(prepare, /retryJoysticks\(\)/, 'joysticks relus dès VPX installé');
-  assert.match(body(wizard, 'startCapture'), /buttonsWaitForVpx\(vpxPrep\)/, 'le délai de 20 s attend VPX');
+  // Le délai du premier écran court pendant l'installation (16/11/2026 : suspendu, il figeait l'écran
+  // quand le téléchargement n'aboutissait pas) ; le retour au relevé par le joystick prend le relais.
+  assert.doesNotMatch(body(wizard, 'startCapture'), /vpxPrep|buttonsWaitForVpx/, 'le délai ne dépend pas de VPX');
   assert.match(body(wizard, 'continueToTables'), /menuWaitsForVpx\(vpxPrep\)/, 'la relance du menu attend VPX');
   // Aucune demande de Windows dans l'assistant : personne ne pourrait y répondre aux boutons.
   assert.doesNotMatch(wizard, /ensureVcRuntime|startElevated|askElevation/);
@@ -91,4 +106,42 @@ test('l’installeur pose le runtime Visual C++ avant le premier lancement, jama
   // Le script est regroupé dans l'application et passe par la même installation vérifiée que le menu.
   assert.match(read('scripts', 'fabriquer.mjs'), /'runtime-vc\.js'/);
   assert.match(read('app', 'src', 'runtime-vc.ts'), /ensureVcRuntime\(/);
+});
+
+// Invariant (16/11/2026, retour d'un testeur) : le premier écran des boutons d'une borne neuve se
+// quitte toujours, sans relever ni attendre VPX. Le parcours réel est essayé au clavier par
+// clavier-reel.test.ts ; ici, ce qui le garantit dans le code.
+test('premier écran des boutons : un choix, jamais un relevé, et toujours une sortie', () => {
+  const wizard = read('app', 'src', 'wizard.ts');
+  // Borne neuve, assistant complet : le choix d'abord, jamais le relevé d'emblée.
+  assert.match(body(wizard, 'startCapture'), /timed \? 'buttonsChoice' : capturePhase\(set\)/);
+  // Les appuis de ce premier écran choisissent au relâchement, avant tout relevé.
+  const key = body(wizard, 'handleKey');
+  const choiceAt = key.indexOf("if (wizard.phase === 'buttonsChoice') {");
+  assert.ok(choiceAt >= 0 && choiceAt < key.indexOf('if (CAPTURE_PHASES.includes(wizard.phase))'), 'le choix passe avant le relevé');
+  const up = body(wizard, 'handleKeyUp');
+  assert.ok(up.indexOf('handleChoiceKey(') >= 0 && up.indexOf('handleChoiceKey(') < up.indexOf('handleButtonKey('), 'aucun appui du premier écran n’est relevé');
+  // Start, Entrée ou un flipper : garder ; Exit : modifier.
+  const choice = body(wizard, 'handleChoiceKey');
+  assert.match(choice, /is\(KEYS\.confirm\) \|\| is\(KEYS\.previous\) \|\| is\(KEYS\.next\)\) runButtonsAction\('keep'\)/);
+  assert.match(choice, /is\(KEYS\.exit\)[^\n]*runButtonsAction\('modify'\)/);
+  // Garder : l'assistant continue, comme après « Touches par défaut » puis Valider.
+  assert.match(body(wizard, 'runButtonsAction'), /case 'keep':[\s\S]*?startCapture\(INTERFACE_KEYS, true\)/);
+  // Le délai court pendant ce premier écran, et dit ce qui se passera à la fin.
+  assert.match(body(wizard, 'startCapture'), /wizard\.phase === 'buttonsChoice' \|\| CAPTURE_PHASES\.includes/);
+  assert.match(body(wizard, 'choiceView'), /Sans réponse dans \{n\} s : ces touches sont gardées/);
+  // Pendant l'installation de VPX, l'écran dit que le clavier marche tout de suite.
+  assert.match(body(wizard, 'joystickLine'), /le clavier marche tout de suite/);
+});
+
+test('récapitulatif des boutons : « Valider » grisé avec sa raison dès l’arrivée', () => {
+  const wizard = read('app', 'src', 'wizard.ts');
+  const view = body(wizard, 'buttonsView');
+  assert.match(view, /Faire : \{buttons\}/);
+  // Dit une seule fois : ni la ligne d'étape ni l'aide ne répètent les boutons à presser.
+  assert.doesNotMatch(view, /Essai des touches relevées|à essayer aussi/);
+  assert.match(view, /id === 'save' && saveReason && \{ disabled: true, reason: saveReason \}/);
+  const screen = read('app', 'renderer', 'screen.js');
+  assert.match(screen, /a\.disabled && 'disabled'/);
+  assert.match(screen, /reason\.className = 'action-reason'/);
 });

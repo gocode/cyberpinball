@@ -21,8 +21,12 @@ import { analogLines, isAnalogKey, isNudgeAxisKey } from './plunger';
 import { isTiltKey, tiltLines } from './tilt';
 import { VPX_LAYOUT_KEYS } from './vpx';
 
-/** Étapes de l'assistant (états de wizard.ts) ; « done » : enregistré, résultat affiché. */
-export const WIZARD_PHASES = ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'summary', 'done'] as const;
+/**
+ * Étapes de l'assistant (états de wizard.ts) ; « done » : enregistré, résultat affiché.
+ * « buttonsChoice » : premier écran d'une borne sans boutons enregistrés, « Vos boutons sont-ils
+ * déjà les bons ? » ; ses appuis choisissent, aucun n'est relevé.
+ */
+export const WIZARD_PHASES = ['buttonsChoice', 'buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'summary', 'done'] as const;
 export type WizardPhase = (typeof WIZARD_PHASES)[number];
 
 /**

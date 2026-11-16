@@ -129,7 +129,7 @@ test('boutons du jeu au clavier : chaque action relevée et enregistrée, un bou
         // « Quitter sans enregistrer ? » : Échap répond non, l'étape reprend.
         'click:#quit',
         ...keyboard('Escape'),
-        // « Tout relever » (quatrième action) : chaque bouton au clavier.
+        // « Tout modifier » (quatrième action) : chaque bouton au clavier.
         ...keyboard(...repeat('ArrowRight', 3), 'Enter'),
         // A, déjà au flipper gauche, reprise par Start : le flipper gauche est vidé, redemandé à la fin.
         // Retour arrière revient à Start, relevé sur 2.
@@ -171,10 +171,12 @@ test('assistant complet au clavier : boutons du jeu puis de l’interface relev�
     const output = runWizard(
       home,
       [
-        // Borne neuve : l'assistant commence par les boutons du jeu.
+        // Borne neuve : « Vos boutons sont-ils déjà les bons ? » ; Échap (Exit) : modifier mes
+        // boutons, sans être relevé. Puis les boutons du jeu.
+        ...keyboard('Escape'),
         ...keyboard(...Object.values(GAME_BY_KEYBOARD)),
         ...keyboard('KeyA', 'KeyS', 'KeyQ', 'Digit2'),
-        // Boutons de l'interface, proposés sur ceux du jeu : « Tout relever », puis au clavier ;
+        // Boutons de l'interface, proposés sur ceux du jeu : « Tout modifier », puis au clavier ;
         // Retour (U) passe les boutons des réglages, du bureau Windows et de la sortie sans enregistrer.
         'click:#actions button:nth-child(4)',
         ...keyboard(...Object.values(navigation), 'KeyU', 'KeyU', 'KeyU'),
@@ -201,6 +203,37 @@ test('assistant complet au clavier : boutons du jeu puis de l’interface relev�
   }
 });
 
+// Premier écran d'une borne neuve (16/11/2026) : l'assistant ouvrait directement le relevé, qui
+// aurait pris Entrée pour un bouton ; un testeur dont les touches étaient déjà bonnes ne trouvait pas
+// comment continuer. Invariant : ce premier écran se quitte toujours, sans relever ni attendre VPX.
+test('premier écran d’une borne neuve : Entrée, Start ou un flipper gardent les touches, sans rien relever', { skip, timeout: 400_000 }, () => {
+  // Maj gauche ne passe pas par webContents.sendInputEvent (touche de modification) : appui direct de l'autopilote.
+  for (const key of ['Clavier:Enter', 'Clavier:Digit1', 'ShiftLeft']) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-premier-ecran-'));
+    try {
+      const home = path.join(dir, 'home');
+      const output = runWizard(home, [key, 'CtrlQ'], []);
+      assert.doesNotMatch(output, /Assistant : relevé game/, `${key} n’est pas relevé\n${output}`);
+      // Touches gardées : l'assistant est passé aux boutons de l'interface, proposés sur ceux du jeu.
+      assert.match(output, /Assistant : « Quitter sans enregistrer \? » \(navigationSummary\)/, `${key}\n${output}`);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test('premier écran d’une borne neuve : sans réponse, le délai garde les touches et l’assistant continue', { skip, timeout: 200_000 }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-premier-delai-'));
+  try {
+    const home = path.join(dir, 'home');
+    const output = runWizard(home, ['Attendre21', 'CtrlQ'], []);
+    assert.doesNotMatch(output, /Assistant : relevé game/, output);
+    assert.match(output, /Assistant : « Quitter sans enregistrer \? » \(assign\)/, output);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 const dll = electron ? sdlLibrary() : undefined;
 
 test('boutons du jeu au joystick (Pinscape, croix d’une manette) et au clavier mélangés : relevés et enregistrés', { skip: skip || (dll ? false : 'aucune bibliothèque SDL de VPX sur ce poste'), timeout: 200_000 }, () => {
@@ -211,7 +244,7 @@ test('boutons du jeu au joystick (Pinscape, croix d’une manette) et au clavier
     const output = runWizard(
       home,
       [
-        'click:#actions button:nth-child(4)', // « Tout relever »
+        'click:#actions button:nth-child(4)', // « Tout modifier »
         'Joy0', 'Joy1', 'Joy2', 'Joy3', // flippers, Start, Exit au joystick
         'Clavier:Digit5', // crédit au clavier
         'JoyCroix:up', // lanceur à la croix (manette en XInput)
