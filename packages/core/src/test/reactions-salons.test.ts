@@ -24,7 +24,7 @@ import {
   reactionsByLine,
   roomReactions,
   saveRooms,
-  shownPresent,
+  shownCrowd,
   signRoomLine,
   signRoomReaction,
   verifyRoomReaction,
@@ -125,9 +125,9 @@ test('salon : réactions et réglage des notifications relus du fichier ; 7 jour
 });
 
 test('le nombre de présents ne se dit qu’au-delà de cinq ; un salon quitté reste annoncé une minute', () => {
-  assert.equal(shownPresent(0), undefined);
-  assert.equal(shownPresent(5), undefined);
-  assert.equal(shownPresent(6), 6);
+  assert.equal(shownCrowd(0), undefined);
+  assert.equal(shownCrowd(5), undefined);
+  assert.equal(shownCrowd(6), 6);
   assert.equal(ROOM_LINGER_MS, 60_000);
 });
 

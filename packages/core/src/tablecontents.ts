@@ -179,7 +179,7 @@ export function tableContents(tableFile: string, opts: TableContentsOptions): Ta
       const kind = classifyDir(name, full, [], dmd ? [dmd] : []);
       if (kind === 'ignored') continue;
       if (kind === 'dmdFolder') dirEntry(name, kind, 'ok', dmd && lower(dmd) === ln ? t('chargé par le script de la table') : t('contenu FlexDMD / UltraDMD'));
-      else if (kind === 'media') dirEntry(name, kind, 'ok', t('médias du menu'));
+      else if (kind === 'media') dirEntry(name, kind, 'ok', t('médias du front-end'));
       else if (kind === 'user') dirEntry(name, kind, 'quiet', t('données enregistrées par VPX'));
       else if (kind === 'pup') dirEntry(name, kind, 'warning', t('PuP-Pack hors de pupvideos : il ne sera pas chargé'));
       else if (kind === 'altsound') dirEntry(name, kind, 'warning', t('sons alternatifs hors de leur dossier : ils ne seront pas chargés'));

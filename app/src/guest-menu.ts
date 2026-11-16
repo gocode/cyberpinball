@@ -55,7 +55,7 @@ export function createGuestMenu(host: GuestMenuHost): ProvidedSystemItem {
               {
                 icon: 'lock',
                 text: tn(seconds, 'Maintenir les quatre boutons pendant {n} seconde', 'Maintenir les quatre boutons pendant {n} secondes'),
-                detail: t('Depuis le menu, hors partie : l’anneau du cadenas se remplit.'),
+                detail: t('Depuis le front-end, hors partie : l’anneau du cadenas se remplit.'),
               },
             ],
           },
@@ -77,7 +77,7 @@ export function createGuestMenu(host: GuestMenuHost): ProvidedSystemItem {
           },
           {
             label: t('Activer le mode invité'),
-            detail: chosen ? t('Ouvre le menu des tables, verrouillé sur « {collection} »', { collection: chosen.label }) : t('Ouvre le menu des tables, verrouillé'),
+            detail: chosen ? t('Ouvre l’écran des tables, verrouillé sur « {collection} »', { collection: chosen.label }) : t('Ouvre l’écran des tables, verrouillé'),
             icon: 'lock',
             tone: 'ok',
             run: () => {

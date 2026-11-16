@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
-import { setLanguage } from '../index';
+import { createPlayerKey, newSocialState, setLanguage } from '../index';
 
 interface Built {
   heading: string;
@@ -65,4 +65,51 @@ test('Communauté : sans service des retours, pas de porte', () => {
   const labels = harness(false).built().actions.map((a) => a.label);
   assert.ok(!labels.includes('Avis et propositions'));
   assert.equal(labels.at(-1), 'Retour');
+});
+
+// Joueurs en ligne (16/11/2026) : leur nombre, et celui de mon pays, ne se disent qu'au-delà de cinq
+// (shownCrowd) : sur l'affiche du médaillon, l'entrée du menu système et les onglets de l'écran ; mes
+// amis en ligne se comptent toujours.
+test('Communauté : le nombre de joueurs en ligne ne se dit qu’au-delà de cinq', () => {
+  setLanguage('fr');
+  const base = newSocialState(new Date(0));
+  const at = new Date().toISOString();
+  const friend = { key: 'f'.repeat(64), name: 'Bruno', since: at, events: [] };
+  const views = (n: number) => {
+    const beacons = Array.from({ length: n }, (_, i) => ({ key: String(i).padStart(64, 'a'), name: `Joueur${i}`, country: 'FR', status: 'online', at }));
+    let screen: (() => Built & { tabs?: { label: string; count: string }[]; subheading?: string }) | undefined;
+    const menu = createCommunityMenu({
+      library: { openCustom: (build: () => Built) => (screen = build), openSystem: () => undefined },
+      net: {
+        state: () => ({ ...base, enabled: true, key: createPlayerKey(), friends: [friend] }),
+        country: () => 'FR',
+        rankings: () => ({ scores: [] }),
+        livePlayers: () => beacons,
+        online: (k: string) => k === friend.key,
+        presenceOf: () => undefined,
+        publicCard: () => undefined,
+        avatarFile: () => undefined,
+        status: () => ({ running: true }),
+      },
+      zoneKeys: () => [],
+      tables: () => [],
+      openProfile: () => {},
+      openFriend: () => {},
+      messages: { detail: () => '', attention: () => false, quiet: () => true, open: () => {} },
+      rankings: { detail: () => '', open: () => {} },
+      openSharing: () => {},
+    }) as unknown as { poster(): { stats: string }; item: { detail: string }; openPlayers(back?: () => void): void };
+    menu.openPlayers(() => undefined);
+    const shown = screen!();
+    return { stats: menu.poster().stats, item: menu.item.detail, tabs: (shown.tabs ?? []).map((t) => t.count), sub: shown.subheading };
+  };
+  // Trois inconnus et Bruno : quatre en ligne, rien de chiffré sauf l'ami.
+  const few = views(3);
+  assert.equal(few.stats, '1 ami');
+  assert.equal(few.item, '1 ami');
+  assert.ok(few.tabs.every((c) => c === ''), few.tabs.join('|'));
+  // Huit inconnus et Bruno : neuf en ligne, dont neuf en France.
+  const many = views(8);
+  assert.match(many.stats, /^9 joueurs en ligne · 8 en France · 1 ami$/);
+  assert.equal(many.tabs[0], '9');
 });

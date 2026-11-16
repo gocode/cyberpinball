@@ -152,7 +152,7 @@ test('sans prises mesurées (calage d’avant) : le calage en partie marche, l�
   const ig = inGameCalibration(place, TABLE, MENU_WIDTH);
   assert.equal(ig.measured, false);
   assert.ok(ig.lockbarScale >= 0.5 && ig.lockbarScale <= 2 && ig.cabYOffset >= -150 && ig.cabYOffset <= 50 && Math.abs(ig.heightSteps) <= 60);
-  assert.match(read('app', 'src', 'frontend.ts'), /prises des manettes pas encore mesurées : recalez au menu/);
+  assert.match(read('app', 'src', 'frontend.ts'), /prises des manettes pas encore mesurées : recalez dans le front-end/);
 });
 
 test('détection : pièce recentrée par le Quest (limite fixe) dite au journal, calage proposé au casque remis', () => {

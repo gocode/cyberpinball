@@ -16,12 +16,12 @@ export const messages: Record<string, string> = {
   '{n} page à l’enregistrement, numérotées dans l’ordre choisi.': '{n} page on save, numbered in the chosen order.',
   '{n} pages à l’enregistrement, numérotées dans l’ordre choisi.': '{n} pages on save, numbered in the chosen order.',
   'Rangé sous « {name} » à l’enregistrement.': 'Saved as “{name}”.',
-  'Ignoré : {files} (format que le menu ne lit pas).': 'Ignored: {files} (format the menu can’t read).',
+  'Ignoré : {files} (format que le front-end ne lit pas).': 'Ignored: {files} (format the menu can’t read).',
   'de {origin}': 'from {origin}',
   'demi-tour': 'rotated 180°',
-  'Nom sans « (Type) » : le menu ne sait pas à quoi il sert.': 'Name without “(Type)”: the menu doesn’t know what it’s for.',
+  'Nom sans « (Type) » : le front-end ne sait pas à quoi il sert.': 'Name without “(Type)”: the menu doesn’t know what it’s for.',
   'Porte le nom d’un autre jeu ou d’une autre version : ce jeu ne s’en sert pas.': 'Named after another game or version: this game doesn’t use it.',
-  'Format .{ext} que le menu ne lit pas pour {label}.': '.{ext} format the menu can’t read for {label}.',
+  'Format .{ext} que le front-end ne lit pas pour {label}.': '.{ext} format the menu can’t read for {label}.',
   '{label} n’a qu’une page : ce fichier n’est pas montré.': '{label} has only one page: this file isn’t shown.',
   'Volume de ce jeu': 'This game’s volume',
   '100 % : comme les autres jeux': '100%: same as other games',
@@ -33,7 +33,7 @@ export const messages: Record<string, string> = {
   '{n} changement : voir le plan avant d’écrire': '{n} change: see the plan before writing',
   '{n} changements : voir le plan avant d’écrire': '{n} changes: see the plan before writing',
   'Autres fichiers dans medias\\': 'Other files in medias\\',
-  'Ce que le menu montre pour ce jeu, écran par écran. Choisissez un média pour le remplacer, le retirer ou le régler, ou glissez un fichier sur cette fenêtre. Rien n’est écrit avant « Enregistrer ».':
+  'Ce que le front-end montre pour ce jeu, écran par écran. Choisissez un média pour le remplacer, le retirer ou le régler, ou glissez un fichier sur cette fenêtre. Rien n’est écrit avant « Enregistrer ».':
     'What the menu shows for this game, screen by screen. Pick a media to replace, remove or adjust it, or drop a file on this window. Nothing is written until “Save”.',
   'Changements annulés : rien n’a été écrit.': 'Changes discarded: nothing was written.',
   '{n} changement pas encore enregistré. Rien n’a été écrit.': '{n} unsaved change. Nothing was written.',
@@ -58,7 +58,7 @@ export const messages: Record<string, string> = {
   'Repli intégré : {what}': 'Built-in fallback: {what}',
   'Formats : {formats}.': 'Formats: {formats}.',
   'Sans fichier : {what}.': 'Without a file: {what}.',
-  'Un fichier en hauteur a les flippers en bas, en largeur à droite : le menu le tourne. L’aperçu le montre tel qu’il apparaîtra, vu du joueur.':
+  'Un fichier en hauteur a les flippers en bas, en largeur à droite : le front-end le tourne. L’aperçu le montre tel qu’il apparaîtra, vu du joueur.':
     'A portrait file has the flippers at the bottom, a landscape one on the right: the menu rotates it. The preview shows it as it will appear, from the player’s side.',
   'Remplacer depuis le dossier d’import': 'Replace from the import folder',
   'Prendre dans le dossier d’import': 'Take from the import folder',
@@ -94,7 +94,7 @@ export const messages: Record<string, string> = {
   'Copiez dans {dir} un fichier {formats}, depuis une clé USB par exemple, puis « Actualiser ».': 'Copy a {formats} file into {dir}, from a USB stick for example, then “Refresh”.',
   '{n} autre fichier ignoré': '{n} other file ignored',
   '{n} autres fichiers ignorés': '{n} other files ignored',
-  'Format que le menu ne lit pas pour {label} ({formats}).': 'Format the menu can’t read for {label} ({formats}).',
+  'Format que le front-end ne lit pas pour {label} ({formats}).': 'Format the menu can’t read for {label} ({formats}).',
   '{label} : prendre dans le dossier d’import': '{label}: take from the import folder',
   'Le fichier choisi quittera le dossier d’import à l’enregistrement, et sera rangé sous « {name} » avec son extension.':
     'The chosen file will leave the import folder on save, and be saved as “{name}” with its extension.',
@@ -105,7 +105,7 @@ export const messages: Record<string, string> = {
   ' ; ': '; ',
   'Non reconnu : {files}. Choisissez d’abord le média, puis déposez le fichier.': 'Not recognized: {files}. Pick the media first, then drop the file.',
   'Aucun fichier dans ce dépôt.': 'No file in this drop.',
-  'Vidéos et musique de ce jeu dans le menu, par rapport au réglage général : pour une vidéo enregistrée trop fort ou trop bas.':
+  'Vidéos et musique de ce jeu dans le front-end, par rapport au réglage général : pour une vidéo enregistrée trop fort ou trop bas.':
     'This game’s videos and music in the menu, relative to the main setting: for a video recorded too loud or too quiet.',
   '0 % : muet': '0%: muted',
   '{percent} %': '{percent}%',
@@ -215,10 +215,10 @@ export const messages: Record<string, string> = {
   Partie: 'Game',
   Attente: 'Attract mode',
   Logo: 'Wheel logo',
-  'Logo du jeu sur fond transparent, qui identifie la table dans la liste du menu.': 'Game logo on a transparent background, identifying the table in the menu list.',
+  'Logo du jeu sur fond transparent, qui identifie la table dans la roue ou la liste des tables.': 'Game logo on a transparent background, identifying the table in the menu list.',
   'Titre en texte stylisé': 'Title in styled text',
   Plateau: 'Playfield',
-  'La table qui joue, en fond du menu derrière la liste.': 'The table in motion, as the menu background behind the list.',
+  'La table qui joue, en fond du front-end derrière la liste.': 'The table in motion, as the menu background behind the list.',
   'Verre fumé sarcelle, discret': 'Subtle teal smoked glass',
   "L'image ou l'animation du fronton du jeu.": 'The game’s backglass image or animation.',
   'Carte générée : titre, fabricant, année': 'Generated card: title, manufacturer, year',
@@ -290,11 +290,11 @@ export const messages: Record<string, string> = {
   'Provenance notée : {origin}': 'Source noted: {origin}',
   'Demi-tour ajouté': '180° rotation added',
   'Demi-tour retiré': '180° rotation removed',
-  'le menu tourne ce média d’un demi-tour de plus': 'the menu turns this media an extra 180°',
-  'le menu tourne ce média d’après ses proportions seulement': 'the menu turns this media by its proportions only',
+  'le front-end tourne ce média d’un demi-tour de plus': 'the menu turns this media an extra 180°',
+  'le front-end tourne ce média d’après ses proportions seulement': 'the menu turns this media by its proportions only',
   'Volume de ce jeu : {before} % → {after} %': 'This game’s volume: {before}% → {after}%',
   'comme les autres jeux': 'same as other games',
-  'vidéos et musique de ce jeu dans le menu, par rapport au réglage général': 'this game’s videos and music in the menu, relative to the main setting',
+  'vidéos et musique de ce jeu dans le front-end, par rapport au réglage général': 'this game’s videos and music in the menu, relative to the main setting',
   'image du .directb2s': '.directb2s image',
   'afficheur du .directb2s': '.directb2s DMD',
   'défaut de la borne ({label})': 'cabinet default ({label})',
@@ -459,7 +459,7 @@ export const messages: Record<string, string> = {
   // Afficheur que la borne ne montre pas, décompte des résultats par média, recherche sur le web
   '« {file} » est identique au média {label} actuel : rien ne changerait à l’enregistrement.': '“{file}” is identical to the current {label}: saving would change nothing.',
   '« {file} » est déjà l’une des pages : rien d’ajouté.': '“{file}” is already one of the pages: nothing added.',
-  'C’est le fichier que le menu montre aujourd’hui : le reprendre ne changerait rien.': 'This is the file the menu shows today: taking it again would change nothing.',
+  'C’est le fichier que le front-end montre aujourd’hui : le reprendre ne changerait rien.': 'This is the file the menu shows today: taking it again would change nothing.',
   'Téléchargé dans la fenêtre « Récupérer » ; gardé dans les téléchargements, copié dans medias\\ à l’enregistrement.':
     'Downloaded in the “Get” window; kept in the downloads, copied into medias\\ when saving.',
   'Propositions : {label}': 'Suggestions: {label}',
@@ -481,10 +481,10 @@ export const messages: Record<string, string> = {
   'PuP-Pack, médias, vidéos avec du son : écouter, puis choisir': 'PuP-Pack, media, videos with sound: listen, then choose',
   'ce n’est pas une vidéo MP4 lisible': 'it is not a readable MP4 video',
   'la vidéo n’a pas de piste son': 'the video has no audio track',
-  'son dans un format que le menu ne lit pas': 'sound in a format the menu cannot play',
+  'son dans un format que le front-end ne lit pas': 'sound in a format the menu cannot play',
   'vidéo découpée en fragments, non prise en charge': 'fragmented video, not supported',
   'vidéo abîmée': 'damaged video',
-  'Médias du menu (medias)': 'Menu media (medias)',
+  'Médias du front-end (medias)': 'Menu media (medias)',
   'Dossier de la table': 'Table folder',
   'PuP-Pack {pack}': 'PuP-Pack {pack}',
   '{n} vidéo avec du son': '{n} video with sound',
@@ -492,7 +492,7 @@ export const messages: Record<string, string> = {
   'son · {size}': 'sound · {size}',
   'vidéo : son seulement · {duration} · {size}': 'video: sound only · {duration} · {size}',
   'Aucun son dans le dossier de la table': 'No sound in the table folder',
-  'Ni fichier son, ni vidéo avec du son (PuP-Pack, médias du menu). Les vidéos de VPinMediaDB n’en ont pas.':
+  'Ni fichier son, ni vidéo avec du son (PuP-Pack, médias du front-end). Les vidéos de VPinMediaDB n’en ont pas.':
     'Neither a sound file nor a video with sound (PuP-Pack, menu media). VPinMediaDB videos have none.',
   '{label} : sons de la table': '{label}: table sounds',
   'Les sons que la table a déjà, et les vidéos qui ont du son, rangés par dossier. Choisissez un dossier, puis écoutez : le son de la carte choisie se joue.':

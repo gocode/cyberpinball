@@ -57,7 +57,7 @@ const SOFTWARE: [string, () => string, () => string | undefined][] = [
 ];
 const SITES: [string, () => string][] = [
   ['VPS', () => t('Virtual Pinball Spreadsheet : la base qui relie tout')],
-  ['VPinMediaDB', () => t('Les images et vidéos du menu')],
+  ['VPinMediaDB', () => t('Les images et vidéos du front-end')],
   ['VPUniverse', () => t('Les tables et leur habillage')],
   ['VPForums', () => t('Les tables et leur habillage')],
   ['IPDB', () => t('L’histoire des vraies machines')],

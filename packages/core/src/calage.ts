@@ -214,7 +214,7 @@ export function anchorHeight(place: CabinetPlace): number {
  */
 export function calibrateMenuText(opts: { vrReady: boolean; headset?: HeadsetMenuState; place?: CabinetPlace; setting?: CalibrationSetting; combo?: string }): { detail: string; unavailable: boolean } {
   if (!opts.vrReady) return { detail: t('Réalité virtuelle indisponible : rien à caler'), unavailable: true };
-  if (opts.headset !== 'shown') return { detail: t('Mettez le casque, le menu de Cyber Pinball dedans : le calage se fait aux manettes'), unavailable: true };
+  if (opts.headset !== 'shown') return { detail: t('Mettez le casque, le front-end de Cyber Pinball dedans : le calage se fait aux manettes'), unavailable: true };
   const p = opts.place;
   const status =
     p?.lockbarWidth !== undefined && p.lockbarHeight !== undefined
@@ -228,7 +228,7 @@ export function calibrateMenuText(opts: { vrReady: boolean; headset?: HeadsetMen
       opts.setting === 'bureau'
         ? t('Au bureau : la borne se pose devant vous (A), ou sur deux points du bord du bureau touchés du bout de la manette. Dans le casque : ≡ de la manette gauche')
         : t('Touchez la vraie barre avant du bout de la manette, gâchette appuyée : coin gauche, coin droit, puis le milieu. Dans le casque : ≡ de la manette gauche'),
-      ...(opts.combo ? [t('À tout moment, au menu comme en partie : {combo}', { combo: opts.combo })] : []),
+      ...(opts.combo ? [t('À tout moment, dans le front-end comme en partie : {combo}', { combo: opts.combo })] : []),
       t('Le Quest garde ce calage avec une limite de pièce ; en limite fixe, il déplace la pièce chaque fois que le casque est remis, et le calage revient d’office'),
     ].join(' · '),
     unavailable: false,

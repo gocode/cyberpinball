@@ -53,7 +53,7 @@ export const UI_SOUNDS: Readonly<Record<UiSoundId, UiSoundSpec>> = {
       return t('Clic de solénoïde');
     },
     get when() {
-      return t('Changement de table dans le menu');
+      return t('Changement de table dans le front-end');
     },
     source: SYNTH_SOURCE,
     license: OWN_LICENSE,
@@ -105,7 +105,7 @@ export const UI_SOUNDS: Readonly<Record<UiSoundId, UiSoundSpec>> = {
       return t('Tintement de la partie entre amis');
     },
     get when() {
-      return t('Une nouvelle de la partie entre amis, au menu comme pendant une partie : un invité accepte ou décline, la partie est finie');
+      return t('Une nouvelle de la partie entre amis, dans le front-end comme pendant une partie : un invité accepte ou décline, la partie est finie');
     },
     source: SYNTH_SOURCE,
     license: OWN_LICENSE,
@@ -116,7 +116,7 @@ export const UI_SOUNDS: Readonly<Record<UiSoundId, UiSoundSpec>> = {
       return t('Signal d’un ami');
     },
     get when() {
-      return t('Un ami vient de se connecter, au menu comme pendant une partie ; une fois par ami en un quart d’heure');
+      return t('Un ami vient de se connecter, dans le front-end comme pendant une partie ; une fois par ami en un quart d’heure');
     },
     source: SYNTH_SOURCE,
     license: OWN_LICENSE,

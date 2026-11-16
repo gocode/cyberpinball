@@ -142,7 +142,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
     const rows: Record<Row, Action> = {
       music: {
         label: v.music ? t('Musique des jeux : jouée') : t('Musique des jeux : coupée'),
-        detail: v.music ? t('Musique du jeu choisi pendant la navigation (Start : couper)') : t('Borne silencieuse dans le menu (Start : jouer la musique de chaque jeu)'),
+        detail: v.music ? t('Musique du jeu choisi pendant la navigation (Start : couper)') : t('Borne silencieuse dans le front-end (Start : jouer la musique de chaque jeu)'),
         icon: 'music',
         run: () => set({ music: !v.music }),
       },
@@ -153,7 +153,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
         run: () => openVolume('musicVolume'),
       },
       videoVolume: {
-        label: t('Son des vidéos du menu : {volume}', { volume: volumeLabel(v.videoVolume) }),
+        label: t('Son des vidéos du front-end : {volume}', { volume: volumeLabel(v.videoVolume) }),
         detail: t('Vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée'),
         icon: 'video',
         run: () => openVolume('videoVolume'),
@@ -186,7 +186,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
         label: v.uiSounds ? t('Sons de l’interface : joués') : t('Sons de l’interface : coupés'),
         detail: v.uiSounds
           ? t('Clic de solénoïde au changement de table, pièce au Start, knocker sur un record, coup de bobine au lancement en cinéma ; rien pendant la partie (Start : couper)')
-          : t('Aucun bruit de flipper dans le menu (Start : les jouer)'),
+          : t('Aucun bruit de flipper dans le front-end (Start : les jouer)'),
         icon: 'flipper',
         run: () => {
           set({ uiSounds: !v.uiSounds });
@@ -200,7 +200,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
         run: () => openVolume('uiSoundsVolume'),
       },
       notices: {
-        label: v.notices === 'all' ? t('Notifications du menu : affichées') : v.notices === 'count' ? t('Notifications du menu : compteur seul') : t('Notifications du menu : coupées'),
+        label: v.notices === 'all' ? t('Notifications du front-end : affichées') : v.notices === 'count' ? t('Notifications du front-end : compteur seul') : t('Notifications du front-end : coupées'),
         detail:
           v.notices === 'all'
             ? t('Nombre d’amis en ligne et un message discret, sur chaque écran, quand un ami se connecte, une demande arrive, un téléchargement finit ; pendant une partie, seulement une invitation, un ami qui se connecte et la partie entre amis (Start : compteur seul)')
@@ -248,7 +248,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
   /** « une table toutes les 20 s · son coupé · crédits affichés · horaire activé » : la ligne de l'écran principal. */
   function attractSummary(): string {
     const v = s();
-    if (!v.attractDelay) return t('Désactivé : la borne reste sur le menu');
+    if (!v.attractDelay) return t('Désactivé : la borne reste sur le front-end');
     return [
       t('une table toutes les {duration}', { duration: durationLabel(v.attractInterval) }),
       v.attractSound === 'reduced' ? t('son réduit') : t('son coupé'),
@@ -262,7 +262,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
     const rows: Record<AttractRow, Action> = {
       attractDelay: {
         label: t('Mode attente : {delay}', { delay: attractDelayLabel(v.attractDelay) }),
-        detail: t('Tables tirées au hasard avec leurs médias ; n’importe quel bouton revient au menu'),
+        detail: t('Tables tirées au hasard avec leurs médias ; n’importe quel bouton revient au front-end'),
         icon: 'attract',
         run: () => openChoice('attractDelay', ATTRACT_DELAY_CHOICES, (x) => (x ? t('Après {duration} sans bouton', { duration: durationLabel(x) }) : t('Jamais'))),
       },
@@ -301,7 +301,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
       () => ({
         heading: t('Mode attente'),
         icon: 'attract',
-        lead: t('Quand personne ne joue, la borne présente ses tables au hasard. N’importe quel bouton revient au menu.'),
+        lead: t('Quand personne ne joue, la borne présente ses tables au hasard. N’importe quel bouton revient au front-end.'),
         sections: [],
         actions: [...attractActions(), { label: t('Retour'), icon: 'back', run: () => open(row('attract')) }],
         back: () => open(row('attract')),
@@ -315,7 +315,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
     return {
       heading: heading(),
       icon: 'music',
-      lead: t('Sortie du son : {output}. Volume propre à un jeu : sa fiche, « Médias du jeu ». Le DMD du menu et sa couleur : Borne > DMD.', {
+      lead: t('Sortie du son : {output}. Volume propre à un jeu : sa fiche, « Médias du jeu ». Le DMD du front-end et sa couleur : Borne > DMD.', {
         output: output ?? t('sortie par défaut de Windows (aucune sortie affectée au fronton par l’assistant)'),
       }),
       sections: [],
@@ -333,11 +333,11 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
       case 'musicVolume':
         return { heading: t('Volume de la musique'), icon: 'volume', lead: t('Musique du jeu choisi pendant la navigation, avant le volume propre à chaque jeu.') };
       case 'videoVolume':
-        return { heading: t('Son des vidéos du menu'), icon: 'video', lead: t('Son de la vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée. 0 % : vidéos muettes.') };
+        return { heading: t('Son des vidéos du front-end'), icon: 'video', lead: t('Son de la vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée. 0 % : vidéos muettes.') };
       case 'launchVolume':
         return { heading: t('Volume du lancement'), icon: 'rocket', lead: t('Son joué au lancement d’une table, ou son de sa vidéo de chargement. Rien pendant la partie : VPX a la parole.') };
       case 'uiSoundsVolume':
-        return { heading: t('Volume des sons de l’interface'), icon: 'sound', lead: t('Clic de solénoïde, pièce, knocker et coup de bobine, sur la sortie du son du menu. Rien pendant la partie : VPX a la parole.') };
+        return { heading: t('Volume des sons de l’interface'), icon: 'sound', lead: t('Clic de solénoïde, pièce, knocker et coup de bobine, sur la sortie du son du front-end. Rien pendant la partie : VPX a la parole.') };
     }
   }
 
@@ -369,7 +369,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
 
   function choiceTitles(key: ChoiceKey): { heading: string; icon: IconName; lead: string } {
     return key === 'attractDelay'
-      ? { heading: t('Mode attente'), icon: 'attract', lead: t('Après ce temps sans bouton sur le menu des tables, la borne présente des tables au hasard. Le premier bouton revient au menu, sans rien lancer.') }
+      ? { heading: t('Mode attente'), icon: 'attract', lead: t('Après ce temps sans bouton sur l’écran des tables, la borne présente des tables au hasard. Le premier bouton revient au front-end, sans rien lancer.') }
       : { heading: t('Table suivante en attente'), icon: 'shuffle', lead: t('Temps passé sur chaque table tirée au hasard.') };
   }
 
@@ -414,7 +414,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
       () => ({
         heading: t('Couleur du DMD'),
         icon: 'palette',
-        lead: t('Couleur des points du DMD du menu et des DMD que Cyber Pinball dessine pour un jeu sans média. Le DMD de VPX, en partie, garde la couleur de la table.'),
+        lead: t('Couleur des points du DMD du front-end et des DMD que Cyber Pinball dessine pour un jeu sans média. Le DMD de VPX, en partie, garde la couleur de la table.'),
         sections: [],
         actions: [
           ...DMD_COLOR_PRESETS.map((preset) => ({
@@ -429,8 +429,8 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
           {
             label: t('Couleur de la table'),
             detail: table()
-              ? t('Les points prennent la couleur du fronton de chaque table, plus vive que celle du menu ; vert signal pour une table sans couleur · choix actuel')
-              : t('Les points prennent la couleur du fronton de chaque table, plus vive que celle du menu ; vert signal pour une table sans couleur'),
+              ? t('Les points prennent la couleur du fronton de chaque table, plus vive que celle du front-end ; vert signal pour une table sans couleur · choix actuel')
+              : t('Les points prennent la couleur du fronton de chaque table, plus vive que celle du front-end ; vert signal pour une table sans couleur'),
             tone: table() ? ('ok' as const) : undefined,
             run: () => {
               set({ dmdColor: DMD_TABLE_COLOR });
@@ -538,7 +538,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
             : v.stopAt === null
               ? t('Utilisé si une heure d’arrêt est choisie (Start : changer)')
               : v.stopBy === 'sleep'
-                ? t('Le menu revient au réveil (Start : extinction)')
+                ? t('Le front-end revient au réveil (Start : extinction)')
                 : t('Cyber Pinball se ferme, puis Windows éteint le PC (Start : mise en veille)'),
         tone: v.stopBy === 'sleep' && !host.sleepAllowed() ? 'warning' : undefined,
         icon: v.stopBy === 'sleep' ? 'moon' : 'power',
@@ -662,7 +662,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
   // Basculé sur place, comme « Recopie sur le playfield » : le menu système se redessine, le curseur reste dessus.
   const menuDmd: ProvidedSystemItem = {
     get label() {
-      return t('DMD du menu : {mode}', { mode: MENU_DMD_LABELS[s().dmd] });
+      return t('DMD du front-end : {mode}', { mode: MENU_DMD_LABELS[s().dmd] });
     },
     get detail() {
       return s().dmd === 'live'
@@ -678,7 +678,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
     get label() {
       return t('Couleur du DMD : {color}', { color: dmdColorLabel(s().dmdColor) });
     },
-    detail: t('Les points de l’afficheur que Cyber Pinball dessine : DMD du menu, DMD d’un jeu sans média ; pas celui de VPX en partie (Start : choisir)'),
+    detail: t('Les points de l’afficheur que Cyber Pinball dessine : DMD du front-end, DMD d’un jeu sans média ; pas celui de VPX en partie (Start : choisir)'),
     run: () => openDmdColor(),
   };
   return { item, menuDmd, dmdColor };

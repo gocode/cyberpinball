@@ -71,7 +71,7 @@ export const messages: Record<string, string> = {
   'Place automatique, affiché · le DMD en partie se règle à part': 'Automatic position, shown · the in-game DMD is set separately',
   'Masqué pour cette table': 'Hidden for this table',
   'Place réglée pour cette table': 'Position set for this table',
-  '« DMD du menu » est réglé sur « classique » : la roue montre le média DMD de la table, sans points (Menu système > Médias > « Médias, son et attente »).':
+  '« DMD du front-end » est réglé sur « classique » : la roue montre le média DMD de la table, sans points (Menu système > Médias > « Médias, son et attente »).':
     '“Menu DMD” is set to “classic”: the wheel shows the table’s DMD media, without dots (System menu > Media > “Media, sound and attract mode”).',
   // packages/core/src/dmdplace.ts, app/src/in-game-menu.ts : Vision 3D en partie
   'Recentrer la vue 3D': 'Recenter the 3D view',

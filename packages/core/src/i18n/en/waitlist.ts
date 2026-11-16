@@ -216,7 +216,7 @@ export const messages: Record<string, string> = {
   'musique de la table': 'table music',
   'chargé par le script de la table': 'loaded by the table script',
   'contenu FlexDMD / UltraDMD': 'FlexDMD / UltraDMD content',
-  'médias du menu': 'menu media',
+  'médias du front-end': 'menu media',
   'données enregistrées par VPX': 'data saved by VPX',
   'PuP-Pack hors de pupvideos : il ne sera pas chargé': 'PuP-Pack outside pupvideos: it will not be loaded',
   'sons alternatifs hors de leur dossier : ils ne seront pas chargés': 'alternative sounds outside their folder: they will not be loaded',

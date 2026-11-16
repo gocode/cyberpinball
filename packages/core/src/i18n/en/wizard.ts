@@ -45,7 +45,7 @@ export const messages: Record<string, string> = {
   'Touche par défaut : {key}': 'Default key: {key}',
   'Sans réponse dans {n} s : touches par défaut des encodeurs gardées (Maj, 1, Échap…).': 'No answer in {n} s: encoder default keys kept (Shift, 1, Esc…).',
   'Chaque bouton une seule fois : ce que VPX recevra pendant une partie.': 'Each button once: what VPX will receive during a game.',
-  'Chaque bouton une seule fois : ce qui pilotera le menu et la suite de l’assistant.': 'Each button once: what will drive the menu and the rest of the wizard.',
+  'Chaque bouton une seule fois : ce qui pilotera le front-end et la suite de l’assistant.': 'Each button once: what will drive the menu and the rest of the wizard.',
   'Boutons du jeu': 'Game buttons',
   'Boutons de l’interface': 'Interface buttons',
   'Touches de secours du clavier toujours actives : Tab, flèches, Entrée, Échap.': 'Keyboard fallback keys always active: Tab, arrows, Enter, Esc.',
@@ -105,7 +105,7 @@ export const messages: Record<string, string> = {
   'Étape {n} sur {total} : quel écran affiche le DMD ou le FullDMD ?': 'Step {n} of {total}: which screen shows the DMD or the FullDMD?',
   'Écran du DMD : {kind}': 'DMD screen: {kind}',
   // packages/core/src/dmdscreen.ts
-  'DMD : bande {zone} au milieu de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Si c’est un FullDMD, dites-le dans Configuration de la borne > Écran du DMD : le menu, VPX et les PuP-Packs le traiteront comme tel.':
+  'DMD : bande {zone} au milieu de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Si c’est un FullDMD, dites-le dans Configuration de la borne > Écran du DMD : le front-end, VPX et les PuP-Packs le traiteront comme tel.':
     'DMD: {zone} strip in the middle of the “{screen}” screen ({ratio}), which shows nothing else. If it’s a FullDMD, say so in Cabinet setup > DMD screen: the menu, VPX and PuP-Packs will treat it as one.',
   'FullDMD dans une zone {ratio} : les médias 16:9 y seront réduits. Écran du DMD (Configuration de la borne) lui rend tout son écran.':
     'FullDMD in a {ratio} area: 16:9 media will be shrunk into it. DMD screen (Cabinet setup) gives it back its whole screen.',
@@ -114,7 +114,7 @@ export const messages: Record<string, string> = {
   'incrusté dans le playfield': 'embedded in the playfield',
   'incrusté dans le playfield, comme enregistré': 'embedded in the playfield, as saved',
   'sur cet écran avec le Backglass, comme enregistré': 'on this screen with the Backglass, as saved',
-  'Nouvelle configuration « {name} », avec son propre VPinballX.ini : renommez-la dans Menu et configuration > Configurations de la borne.':
+  'Nouvelle configuration « {name} », avec son propre VPinballX.ini : renommez-la dans Menu système > Borne > Configuration de la borne > Configurations de la borne.':
     'New configuration “{name}”, with its own VPinballX.ini: rename it in Menu and setup > Cabinet configurations.',
   'Configuration « {name} » mise à jour.': 'Configuration “{name}” updated.',
   'Aucune modification : VPinballX.ini est déjà à jour.': 'No changes: VPinballX.ini is already up to date.',
@@ -175,7 +175,7 @@ export const messages: Record<string, string> = {
   'Start : enregistrer ({step} seulement) · Exit : recommencer l’étape · Retour arrière : revenir': 'Start: save ({step} only) · Exit: restart the step · Backspace: back',
   'Start : enregistrer et écrire VPinballX.ini · Exit : recommencer': 'Start: save and write VPinballX.ini · Exit: start over',
   'Modifications écrites': 'Changes written',
-  "N'importe quel bouton : revenir au menu": 'Any button: back to the menu',
+  "N'importe quel bouton : revenir au front-end": 'Any button: back to the menu',
   "N'importe quel bouton : continuer vers les tables": 'Any button: go to the tables',
   Boutons: 'Buttons',
   Son: 'Sound',
@@ -387,7 +387,7 @@ export const messages: Record<string, string> = {
   'Aucun joystick branché': 'No joystick connected',
   'Joysticks illisibles : {error}': 'Joysticks unreadable: {error}',
   'Joysticks lus une fois VPX installé': 'Joysticks are read once VPX is installed',
-  'Joysticks lus une fois le runtime Visual C++ de Microsoft installé : le menu le propose juste après l’assistant. En attendant, le clavier.': 'Joysticks are read once the Microsoft Visual C++ runtime is installed: the menu offers it right after the wizard. Until then, use the keyboard.',
+  'Joysticks lus une fois le runtime Visual C++ de Microsoft installé : le front-end le propose juste après l’assistant. En attendant, le clavier.': 'Joysticks are read once the Microsoft Visual C++ runtime is installed: the menu offers it right after the wizard. Until then, use the keyboard.',
   '{progress} · joysticks (Pinscape…) lus à la fin · le clavier marche tout de suite': '{progress} · joysticks (Pinscape…) are read at the end · the keyboard works right away',
   'Joystick lu : {names} · l’un de ses boutons : modifier mes boutons': 'Joystick read: {names} · any of its buttons: change my buttons',
   'Visual Pinball X est installé · Joystick lu : {names} · l’un de ses boutons : retour au relevé des boutons': 'Visual Pinball X is installed · Joystick read: {names} · any of its buttons: back to button mapping',
@@ -400,16 +400,16 @@ export const messages: Record<string, string> = {
   'Flippers ({left} / {right}) ou flèches : choisir · Start ({start}) ou Entrée : valider · Exit ({exit}) : modifier mes boutons · Clic : l’un ou l’autre': 'Flippers ({left} / {right}) or arrows: choose · Start ({start}) or Enter: confirm · Exit ({exit}): change my buttons · Click: either one',
   'Impossible : {problems}': 'Not possible: {problems}',
   'Première étape': 'First step',
-  'Ceux qui font circuler dans les menus et dans l’assistant. Touches par défaut des encodeurs : la plupart des bornes les envoient déjà.': 'The ones that move you around the menus and the wizard. Default keys of the encoders: most cabinets already send them.',
+  'Ceux qui font circuler dans le front-end et dans l’assistant. Touches par défaut des encodeurs : la plupart des bornes les envoient déjà.': 'The ones that move you around the menus and the wizard. Default keys of the encoders: most cabinets already send them.',
   'étape précédente': 'previous step',
   'rien avant': 'nothing before',
   'mêmes boutons que précédent, suivant, valider et retour de l’interface': 'same buttons as the interface previous, next, confirm and back',
   'Mêmes boutons que précédent, suivant, valider et retour de l’interface': 'Same buttons as the interface previous, next, confirm and back',
   'Faire : {buttons}': 'To press: {buttons}',
-  'Visual Pinball X n’a pas pu s’installer ({reason}) : boutons du clavier seulement. Le menu repropose l’installation, puis « Boutons du jeu » se refait.': 'Visual Pinball X could not be installed ({reason}): keyboard keys only. The menu offers the installation again, then “Game buttons” can be redone.',
+  'Visual Pinball X n’a pas pu s’installer ({reason}) : boutons du clavier seulement. Le front-end repropose l’installation, puis « Boutons du jeu » se refait.': 'Visual Pinball X could not be installed ({reason}): keyboard keys only. The menu offers the installation again, then “Game buttons” can be redone.',
   'Installation de Visual Pinball X depuis la borne : {percent} %': 'Installing Visual Pinball X from the cabinet: {percent}%',
   'Téléchargement de Visual Pinball X : {percent} %': 'Downloading Visual Pinball X: {percent}%',
-  'le menu s’ouvre à la fin de l’installation': 'the menu opens when the installation is done',
+  'le front-end s’ouvre à la fin de l’installation': 'the menu opens when the installation is done',
   'Joysticks en cours de lecture…': 'Reading joysticks…',
   'clavier repris à {holder}': 'keyboard taken back from {holder}',
   'clavier retenu par {holder}': 'keyboard held by {holder}',
@@ -431,7 +431,7 @@ export const messages: Record<string, string> = {
   'Son de la borne': 'Cabinet sound',
   'Sortie audio du fronton et du plateau, test des haut-parleurs': 'Backbox and playfield audio output, speaker test',
   'Son enregistré': 'Sound saved',
-  'Retour au menu des tables, configuration enregistrée inchangée.': 'Back to the table menu, saved configuration unchanged.',
+  'Retour à l’écran des tables, configuration enregistrée inchangée.': 'Back to the table menu, saved configuration unchanged.',
   'Aucune borne n’est encore configurée : Cyber Pinball se ferme, l’assistant reprendra au prochain démarrage.':
     'No cabinet is set up yet: Cyber Pinball will close, and the wizard will resume at next startup.',
   '{button} sur {key}': '{button} on {key}',
@@ -506,9 +506,9 @@ export const messages: Record<string, string> = {
   // app/src/wizard.ts : autre menu de borne installé
   'Retourner l’écran dans Windows ?': 'Flip the screen in Windows?',
   'Tourner l’écran dans Windows ?': 'Rotate the screen in Windows?',
-  '{names} est installé sur ce PC. L’orientation de l’écran est un réglage de Windows : la changer met aussi ses tables et son menu à l’envers.':
+  '{names} est installé sur ce PC. L’orientation de l’écran est un réglage de Windows : la changer met aussi ses tables et son front-end à l’envers.':
     '{names} is installed on this PC. The screen orientation is a Windows setting: changing it turns its tables and menu upside down too.',
-  '{names} sont installés sur ce PC. L’orientation de l’écran est un réglage de Windows : la changer met aussi leurs tables et leur menu à l’envers.':
+  '{names} sont installés sur ce PC. L’orientation de l’écran est un réglage de Windows : la changer met aussi leurs tables et leur front-end à l’envers.':
     '{names} are installed on this PC. The screen orientation is a Windows setting: changing it turns their tables and menus upside down too.',
   'Start : retourner l’écran quand même · Exit : garder l’orientation de Windows (tables à l’envers dans Cyber Pinball)':
     'Start: flip the screen anyway · Exit: keep the Windows orientation (tables upside down in Cyber Pinball)',

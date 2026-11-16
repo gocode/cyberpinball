@@ -619,7 +619,7 @@ export class HeadsetMenu {
         // Casque retiré au menu : le compagnon garde sa session, qui reprend quand le casque revient (13 novembre
         // 2026 ; avant, une session neuve à chaque retrait, et l'accueil de Link restait à l'écran).
         if (line === 'session-suspendue') {
-          this.opts.log('Casque : retiré au menu ; la même session attend son retour (pas de compagnon relancé).'); // i18n-ignore : journal
+          this.opts.log('Casque : retiré dans le front-end ; la même session attend son retour (pas de compagnon relancé).'); // i18n-ignore : journal
           if (!this.worn) this.takenOff = this.takenOffSeen = true;
           continue;
         }

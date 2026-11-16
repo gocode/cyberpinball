@@ -495,7 +495,7 @@ export const NEED_LABELS: Record<NeedKind, string> = {
     return t('Point de vue (POV)');
   },
   get media() {
-    return t('Médias du menu');
+    return t('Médias du front-end');
   },
 };
 
@@ -569,7 +569,7 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
       ? tn(b2s.length, 'conseillé : {n} fronton, le premier va avec les écrans de la borne', 'conseillé : {n} frontons, le premier va avec les écrans de la borne')
       : tn(b2s.length, 'conseillé : {n} fronton, aucun annoncé pour les écrans de la borne', 'conseillé : {n} frontons, aucun annoncé pour les écrans de la borne');
     needs.push({ kind: 'b2s', required: requiredForPlay('b2s'), state: 'todo', detail, files: b2s });
-  } else needs.push({ kind: 'b2s', required: requiredForPlay('b2s'), state: 'unavailable', detail: t('aucun fronton connu de VPS : le menu en dessinera un'), files: [] });
+  } else needs.push({ kind: 'b2s', required: requiredForPlay('b2s'), state: 'unavailable', detail: t('aucun fronton connu de VPS : le front-end en dessinera un'), files: [] });
 
   // ROM.
   if (!versionWithoutRom(game, version)) {
@@ -876,7 +876,7 @@ export const EXPECTED_LABELS: Record<NeedKind, string> = {
     return t('un fichier .pov');
   },
   get media() {
-    return t('des images ou des vidéos pour le menu');
+    return t('des images ou des vidéos pour le front-end');
   },
 };
 

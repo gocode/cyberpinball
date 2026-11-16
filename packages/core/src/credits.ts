@@ -342,7 +342,7 @@ export function tableCredits(input: TableCreditsInput): CreditGroup[] {
         ? { kind: 'media', role: m.label, authors: m.authors, detail: versionDetail(m.origin, m.detail), url: m.url }
         : { kind: 'media', role: m.label, authors: [], text: m.origin, detail: versionDetail(t('auteur non renseigné'), m.detail), url: m.url },
   );
-  if (menu.length) groups.push({ id: 'menu', title: t('Le menu'), rows: menu });
+  if (menu.length) groups.push({ id: 'menu', title: t('Le front-end'), rows: menu });
 
   const rules: CreditRow[] = input.rules.map((r) => ({ kind: r.kind, role: r.label, authors: r.authors ?? [], ...(r.authors?.length ? {} : { text: r.text ?? t('Auteur non renseigné') }), detail: r.detail, url: r.url }));
   if (rules.length) groups.push({ id: 'rules', title: t('Règles et explications'), rows: rules });

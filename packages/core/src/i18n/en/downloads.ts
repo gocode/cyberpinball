@@ -59,7 +59,7 @@ export const messages: Record<string, string> = {
   'Rien ne change pour ce média.': 'Nothing changes for this media.',
   'Aperçu : image du même jeu ; la vidéo arrive avec le téléchargement.': 'Preview: an image of the same game; the video comes with the download.',
   'Aperçu : la même image en 1k ; le fichier 4k arrive avec le téléchargement.': 'Preview: the same image in 1k; the 4k file comes with the download.',
-  'En largeur, les flippers sont à droite : le menu le tourne d’après l’écran du plateau. L’aperçu le montre vu du joueur.':
+  'En largeur, les flippers sont à droite : le front-end le tourne d’après l’écran du plateau. L’aperçu le montre vu du joueur.':
     'In landscape, the flippers are on the right: the menu rotates it to suit the playfield screen. The preview shows it from the player’s side.',
   'Source : {url}': 'Source: {url}',
   '{n} variantes': '{n} variants',
@@ -163,8 +163,8 @@ export const messages: Record<string, string> = {
   'Choisissez le dossier de l’installation.': 'Choose the installation folder.',
   'Recherche des médias…': 'Searching for media…',
   'Rapprochement avec les tables installées…': 'Matching with installed tables…',
-  'Non copié : {n} vidéo dans un format que le menu ne lit pas': 'Not copied: {n} video in a format the menu can’t play',
-  'Non copié : {n} vidéos dans un format que le menu ne lit pas': 'Not copied: {n} videos in a format the menu can’t play',
+  'Non copié : {n} vidéo dans un format que le front-end ne lit pas': 'Not copied: {n} video in a format the menu can’t play',
+  'Non copié : {n} vidéos dans un format que le front-end ne lit pas': 'Not copied: {n} videos in a format the menu can’t play',
   'Non copié': 'Not copied',
   'Sans table : {n} jeu': 'No table: {n} game',
   'Sans table : {n} jeux': 'No table: {n} games',
@@ -255,7 +255,7 @@ export const messages: Record<string, string> = {
   // packages/core/src/mediaimport.ts
   'nom « (Type) »': '“(Type)” name',
   'Média de « {emulator} », un autre émulateur que Visual Pinball : non repris.': 'Media from “{emulator}”, an emulator other than Visual Pinball: not imported.',
-  'Format {ext} : le menu ne sait pas le lire. Non rangé ; convertissez-le en mp4 (ou webm) puis importez-le de nouveau.':
+  'Format {ext} : le front-end ne sait pas le lire. Non rangé ; convertissez-le en mp4 (ou webm) puis importez-le de nouveau.':
     '{ext} format: the menu can’t play it. Not installed; convert it to mp4 (or webm) and import it again.',
   'Format {ext} non prévu pour « {type} » (attendu : {formats}). Non rangé.': '{ext} format not supported for “{type}” (expected: {formats}). Not installed.',
   'Doublon : « {file} » est gardé pour « {type} ».': 'Duplicate: “{file}” is kept for “{type}”.',

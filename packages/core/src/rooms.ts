@@ -46,12 +46,13 @@ export const ROOM_HERE_FRESH_MS = 5 * 60_000;
  */
 export const ROOM_LINGER_MS = 60_000;
 /**
- * Le nombre de présents d'un salon ne s'affiche qu'au-delà de cinq (16/11/2026) : un salon presque vide,
- * chiffré, découragerait d'y entrer. Les présents restent nommés dans le salon.
+ * Un nombre de joueurs connectés (présents d'un salon, joueurs en ligne, ceux de mon pays) ne s'affiche
+ * qu'au-delà de cinq (16/11/2026) : un salon ou un réseau presque vide, chiffré, découragerait d'entrer.
+ * Les joueurs restent nommés ; le nombre de mes amis en ligne, lui, se dit toujours.
  */
-export const ROOM_COUNT_SHOWN_ABOVE = 5;
-/** Le nombre de présents à afficher ; undefined : cinq ou moins, on ne le dit pas. */
-export const shownPresent = (n: number): number | undefined => (n > ROOM_COUNT_SHOWN_ABOVE ? n : undefined);
+export const CROWD_SHOWN_ABOVE = 5;
+/** Le nombre de joueurs connectés à afficher ; undefined : cinq ou moins, on ne le dit pas. */
+export const shownCrowd = (n: number): number | undefined => (n > CROWD_SHOWN_ABOVE ? n : undefined);
 const FUTURE_MS = 60_000;
 const DAY = 86_400_000;
 

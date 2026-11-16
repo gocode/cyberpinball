@@ -18,7 +18,7 @@ export interface LanguageMenuHost {
 
 /** Ce que fait le choix d'une autre langue, dit dans cette langue. */
 const SWITCH_TO: Record<Language, string> = {
-  fr: 'Passer la borne en français ; le menu redémarre', // i18n-ignore : dit en français, quelle que soit la langue affichée
+  fr: 'Passer la borne en français ; le front-end redémarre', // i18n-ignore : dit en français, quelle que soit la langue affichée
   en: 'Switch the cabinet to English; the menu restarts', // i18n-ignore : said in English, whatever the current language
 };
 
@@ -34,7 +34,7 @@ export function createLanguageMenu(host: LanguageMenuHost): ProvidedSystemItem {
       () => ({
         heading: t('Langue / Language'),
         icon: 'language',
-        lead: t('Langue de tous les écrans de Cyber Pinball : menu, fiches, assistant et réglages.'),
+        lead: t('Langue de tous les écrans de Cyber Pinball : roue des tables, fiches, assistant et réglages.'),
         sections: [],
         actions: [
           ...LANGUAGES.map((lang) => ({

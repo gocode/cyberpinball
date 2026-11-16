@@ -227,7 +227,8 @@ function renderCommunity() {
   if (others.length) {
     const head = document.createElement('li');
     head.className = 'conv-section';
-    head.textContent = t('Autres joueurs en ligne ({n})', { n: others.length });
+    // Le nombre au-delà de cinq seulement, comme à la borne (shownCrowd).
+    head.textContent = others.length > 5 ? t('Autres joueurs en ligne ({n})', { n: others.length }) : t('Autres joueurs en ligne');
     list.append(head, ...others.map((r) => playerRow(r)));
   }
   if (!rows.length && !others.length) showEmpty('conv', 'friend-add', friends ? t('Personne en ligne pour l’instant') : t('Pas encore d’ami à qui écrire'), t('À la borne : Amis > Trouver un joueur.'));

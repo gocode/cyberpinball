@@ -39,7 +39,7 @@ import {
   pendingReports,
   roomTopic,
   ROOM_LINGER_MS,
-  shownPresent,
+  shownCrowd,
   sanctionOf,
   TOPIC_MAX,
   countReactions,
@@ -110,14 +110,14 @@ export interface RoomsMenu {
   /** Clic sur la notification d'un signalement : la file, son « Retour » vers `back`. */
   openModeration(back: () => void): void;
   /** Le salon pour le téléphone : celui à l'écran, sinon celui par défaut ; ses 60 dernières lignes. */
-  /** `present` : le nombre de présents, au-delà de cinq seulement (shownPresent). */
+  /** `present` : le nombre de présents, au-delà de cinq seulement (shownCrowd). */
   remote(): { room: RoomId; name: string; present?: number; lines: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' }[]; phrases: string[]; blocked?: string };
 }
 
 /** Le salon par défaut d'un coup d'œil : la dernière ligne visible (filtre de mots appliqué), ou la raison d'un salon fermé. */
 export interface RoomGlance {
   name: string;
-  /** Le nombre de présents, au-delà de cinq seulement (shownPresent). */
+  /** Le nombre de présents, au-delà de cinq seulement (shownCrowd). */
   present?: number;
   last?: { name: string; text: string };
   problem?: string;
@@ -344,8 +344,8 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
     // Les présents, dans la colonne latérale (à droite au bureau, dessous en borne).
     const present = net.roomPresent(room).filter((h) => !ignored(h.key));
     sections.push({
-      // Le nombre, au-delà de cinq seulement (shownPresent) ; les noms, toujours.
-      title: shownPresent(present.length) ? t('Présents ({n})', { n: present.length }) : t('Présents'),
+      // Le nombre, au-delà de cinq seulement (shownCrowd) ; les noms, toujours.
+      title: shownCrowd(present.length) ? t('Présents ({n})', { n: present.length }) : t('Présents'),
       side: true,
       kind: 'players',
       rows: present.length
@@ -379,7 +379,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
     return {
       heading: roomName(room),
       icon: 'globe',
-      subheading: shownPresent(present.length) ? tn(present.length, '{n} présent', '{n} présents') + ' · ' + t('les lignes vivent sur les bornes, 7 jours au plus') : t('Les lignes vivent sur les bornes, 7 jours au plus'),
+      subheading: shownCrowd(present.length) ? tn(present.length, '{n} présent', '{n} présents') + ' · ' + t('les lignes vivent sur les bornes, 7 jours au plus') : t('Les lignes vivent sur les bornes, 7 jours au plus'),
       sections,
       actions,
       back: () => leave(back),
@@ -714,7 +714,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       const entry = (room: RoomId, detail: string): Action => {
         const c = roomCountry(room);
         const n = net.roomPresent(room).length;
-        return { label: roomName(room), detail: [shownPresent(n) ? tn(n, '{n} présent', '{n} présents') : undefined, detail].filter(Boolean).join(' · '), ...(c ? { flag: flagView(c, locale()) } : { icon: 'globe' as const }), key: `room:${room}`, run: () => openRoom(room, () => openList(back)) };
+        return { label: roomName(room), detail: [shownCrowd(n) ? tn(n, '{n} présent', '{n} présents') : undefined, detail].filter(Boolean).join(' · '), ...(c ? { flag: flagView(c, locale()) } : { icon: 'globe' as const }), key: `room:${room}`, run: () => openRoom(room, () => openList(back)) };
       };
       const actions: Action[] = [
         ...(mine ? [entry(mine, t('le salon de votre pays'))] : []),
@@ -955,7 +955,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         { label: t('Salon par défaut : {room}', { room: roomName(defaultRoom()) }), detail: t('Celui où l’on entre depuis la Communauté'), icon: 'pin', run: () => { net.setRooms({ defaultRoom: defaultRoom() === WORLD_ROOM && myCountry() ? roomOfCountry(myCountry()!) : WORLD_ROOM }); here(2); } },
         { label: s.filter ? t('Filtre de mots : activé') : t('Filtre de mots : désactivé'), detail: t('Masque les mots grossiers par des étoiles'), icon: 'filter', run: () => { net.setRooms({ filter: !s.filter }); here(3); } },
         { label: s.mentionsInGame ? t('Mentions pendant les parties : carte et son') : t('Mentions pendant les parties : rien'), detail: t('Quand on vous cite dans un salon, en haut du plateau'), icon: 'bell', run: () => { net.setRooms({ mentionsInGame: !s.mentionsInGame }); here(4); } },
-        { label: s.lineNotices !== false ? t('Nouveaux messages de mes salons : notification') : t('Nouveaux messages de mes salons : rien'), detail: t('Votre salon et ceux où vous avez écrit depuis hier · au menu, deux minutes au plus'), icon: 'inbox', run: () => { net.setRooms({ lineNotices: s.lineNotices === false ? undefined : false }); here(5); } },
+        { label: s.lineNotices !== false ? t('Nouveaux messages de mes salons : notification') : t('Nouveaux messages de mes salons : rien'), detail: t('Votre salon et ceux où vous avez écrit depuis hier · dans le front-end, deux minutes au plus'), icon: 'inbox', run: () => { net.setRooms({ lineNotices: s.lineNotices === false ? undefined : false }); here(5); } },
         { label: t('Phrases préparées'), detail: tn(roomPhrases(s).length, '{n} phrase, en badges dans « Écrire dans le salon » et au téléphone', '{n} phrases, en badges dans « Écrire dans le salon » et au téléphone'), icon: 'message', run: () => openPhrases(() => here(6)) },
         { label: tn(s.ignored.length, '{n} joueur ignoré', '{n} joueurs ignorés'), detail: s.ignored.length ? t('Start : ne plus les ignorer') : t('Leurs lignes disparaissent de vos salons'), icon: 'eye', ...(s.ignored.length ? {} : { tone: 'quiet' as const }), run: () => (s.ignored.length ? openIgnored(() => here(7)) : here(7)) },
         { label: t('Règles des salons'), detail: s.rulesAt ? t('Acceptées le {date}', { date: new Date(s.rulesAt).toLocaleDateString(locale()) }) : t('Pas encore acceptées'), icon: 'rules', run: () => openRules(() => here(8)) },
@@ -991,7 +991,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       const problem = !me().enabled ? t('Indisponible : partage désactivé (Partage et réseau)') : !s.enabled ? t('Salons désactivés : Réglages de la communauté') : undefined;
       const mentionsN = unreadMentions();
       const last = roomLines(s, room).filter(visible).at(-1);
-      const present = shownPresent(net.roomPresent(room).length);
+      const present = shownCrowd(net.roomPresent(room).length);
       return {
         label: roomName(room),
         detail: problem ?? [mentionsN ? tn(mentionsN, '{n} mention', '{n} mentions') : undefined, present ? tn(present, '{n} présent', '{n} présents') : undefined, last ? `<${last.name}> ${shownText(last.text)}` : t('rien de neuf pour l’instant')].filter(Boolean).join(' · '),
@@ -1004,7 +1004,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       const s = net.rooms();
       const problem = !me().enabled ? t('Indisponible : partage désactivé (Partage et réseau)') : !s.enabled ? t('Salons désactivés : Réglages de la communauté') : undefined;
       const last = roomLines(s, room).filter(visible).at(-1);
-      const present = shownPresent(net.roomPresent(room).length);
+      const present = shownCrowd(net.roomPresent(room).length);
       return { name: roomName(room), ...(present ? { present } : {}), ...(last ? { last: { name: last.name, text: shownText(last.text) } } : {}), ...(problem ? { problem } : {}) };
     },
     settingsItem: {
@@ -1048,7 +1048,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       return {
         room,
         name: roomName(room),
-        ...(shownPresent(net.roomPresent(room).length) ? { present: net.roomPresent(room).length } : {}),
+        ...(shownCrowd(net.roomPresent(room).length) ? { present: net.roomPresent(room).length } : {}),
         lines,
         // Les mêmes phrases qu'à la borne (Réglages de la communauté > Phrases préparées).
         phrases: readyPhrases(),

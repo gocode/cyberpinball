@@ -607,7 +607,7 @@ export function createProposals(ctx: ProposalsContext) {
       facts = [choice.detail, d ? `${d.width} × ${d.height}` : undefined, size === undefined ? t('taille inconnue') : formatSize(size)].filter(Boolean).join(' · ');
     } else facts = ctx.facts(choice.file!);
     const extra: string[] = [];
-    if (current) extra.push(t('C’est le fichier que le menu montre aujourd’hui : le reprendre ne changerait rien.'));
+    if (current) extra.push(t('C’est le fichier que le front-end montre aujourd’hui : le reprendre ne changerait rien.'));
     // Même titre, autre table de la base VPS (The Matrix « Original 2026 » de VPW pour la table de 2023) : dit avant tout.
     const own = table.info.Info?.VPSId;
     if (lead && own && lead.game.id !== own) {

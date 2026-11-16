@@ -21,7 +21,7 @@ export const messages: Record<string, string> = {
   'Installé avant que Cyber Pinball note les auteurs, ou à la main': 'Installed before Cyber Pinball recorded authors, or by hand',
   'L’habillage': 'Dressing',
   'auteur non renseigné': 'author unknown',
-  'Le menu': 'The menu',
+  'Le front-end': 'The menu',
   'Auteur non renseigné': 'Author unknown',
   'Règles et explications': 'Rules and explanations',
   '{names} et {n} autre': '{names} and {n} more',
@@ -64,7 +64,7 @@ export const messages: Record<string, string> = {
   'Les vidéos des PuP-Packs': 'PuP-Pack videos',
   'Les toys de la borne': 'The cabinet’s toys',
   'Virtual Pinball Spreadsheet : la base qui relie tout': 'Virtual Pinball Spreadsheet: the database that ties it all together',
-  'Les images et vidéos du menu': 'Menu images and videos',
+  'Les images et vidéos du front-end': 'Menu images and videos',
   'Les tables et leur habillage': 'Tables and their dressing',
   'L’histoire des vraies machines': 'The history of the real machines',
   'Les feuilles de règles': 'Rule sheets',
@@ -108,7 +108,7 @@ export const messages: Record<string, string> = {
 
   // app/src/menu-settings.ts : écran « Mode attente »
   '{summary} (Start : régler)': '{summary} (Start: adjust)',
-  'Désactivé : la borne reste sur le menu': 'Off: the cabinet stays on the menu',
+  'Désactivé : la borne reste sur le front-end': 'Off: the cabinet stays on the menu',
   'une table toutes les {duration}': 'one table every {duration}',
   'son réduit': 'sound reduced',
   'son coupé': 'sound off',
@@ -119,5 +119,5 @@ export const messages: Record<string, string> = {
   'Crédits de la table : masqués': 'Table credits: hidden',
   'Une ligne discrète en bas : table, fronton, couleurs du DMD (Start : masquer)': 'A discreet line at the bottom: table, backglass, DMD colours (Start: hide)',
   'Rien sous le logo de la table montrée (Start : afficher)': 'Nothing under the shown table’s logo (Start: show)',
-  'Quand personne ne joue, la borne présente ses tables au hasard. N’importe quel bouton revient au menu.': 'When nobody is playing, the cabinet shows its tables at random. Any button returns to the menu.',
+  'Quand personne ne joue, la borne présente ses tables au hasard. N’importe quel bouton revient au front-end.': 'When nobody is playing, the cabinet shows its tables at random. Any button returns to the menu.',
 };

@@ -50,7 +50,7 @@ const REFUSALS = {
     return t('la vidéo n’a pas de piste son');
   },
   get unplayable() {
-    return t('son dans un format que le menu ne lit pas');
+    return t('son dans un format que le front-end ne lit pas');
   },
   get fragmented() {
     return t('vidéo découpée en fragments, non prise en charge');
@@ -61,7 +61,7 @@ const REFUSALS = {
 };
 
 function folderLabel(f: TableSoundFolder): string {
-  if (f.medias) return t('Médias du menu (medias)');
+  if (f.medias) return t('Médias du front-end (medias)');
   if (!f.rel) return t('Dossier de la table');
   const parts = f.rel.split(path.sep);
   // Un dossier de PuP-Pack se nomme d'après son pack : « PuP-Pack gotg_2020 › Topper » ; désactivé, il le dit.
@@ -123,7 +123,7 @@ export function createTableSounds(ctx: TableSoundsContext) {
     if (!s.folders.length) {
       rows.push({
         text: t('Aucun son dans le dossier de la table'),
-        detail: t('Ni fichier son, ni vidéo avec du son (PuP-Pack, médias du menu). Les vidéos de VPinMediaDB n’en ont pas.'),
+        detail: t('Ni fichier son, ni vidéo avec du son (PuP-Pack, médias du front-end). Les vidéos de VPinMediaDB n’en ont pas.'),
         tone: 'quiet',
       });
     }

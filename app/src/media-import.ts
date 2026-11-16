@@ -118,7 +118,7 @@ export function createMediaImport(host: MediaImportHost) {
         sections.push(
           capped(
             unreadable
-              ? tn(unreadable, 'Non copié : {n} vidéo dans un format que le menu ne lit pas', 'Non copié : {n} vidéos dans un format que le menu ne lit pas')
+              ? tn(unreadable, 'Non copié : {n} vidéo dans un format que le front-end ne lit pas', 'Non copié : {n} vidéos dans un format que le front-end ne lit pas')
               : t('Non copié'),
             skipped.map((s) => ({ text: s.source, detail: s.reason, badges: s.type ? [mediaTypeInfo(s.type).label] : undefined, tone: s.unreadable ? 'warning' : 'quiet' })),
           ),

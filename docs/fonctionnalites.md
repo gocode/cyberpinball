@@ -4,7 +4,7 @@
 
 Le [README](../README.fr.md) présente Cyber Pinball en quelques images. Cette page détaille tout ce qu'il sait faire, rubrique par rubrique, tel que vous le trouvez sur la borne. Pour le fonctionnement interne (fichiers écrits, commandes, essais), voyez le [manuel technique](manuel.md).
 
-<p align="center"><img src="images/fr/cabinet.webp?v=7cf14b1872" width="900" alt="Le menu des tables sur une borne à quatre écrans. Sur le playfield, montré à la verticale : le plateau de la table sélectionnée, la roue de médaillons ronds et les commandes. À côté, le topper et le fronton du même jeu, Neon Abyss, et le DMD animé du menu."></p>
+<p align="center"><img src="images/fr/cabinet.webp?v=7cf14b1872" width="900" alt="L'écran des tables sur une borne à quatre écrans. Sur le playfield, montré à la verticale : le plateau de la table sélectionnée, la roue de médaillons ronds et les commandes. À côté, le topper et le fronton du même jeu, Neon Abyss, et le DMD animé du front-end."></p>
 
 <p align="center"><sub>Les tables présentées sont fictives.</sub></p>
 
@@ -14,7 +14,7 @@ Le [README](../README.fr.md) présente Cyber Pinball en quelques images. Cette p
 - [Classements](#classements)
 - [Installer et mettre à jour](#installer-et-mettre-à-jour)
 - [Configurer la borne](#configurer-la-borne)
-- [Le menu des tables](#le-menu-des-tables)
+- [L'écran des tables](#lécran-des-tables)
 - [Juke-box](#juke-box)
 - [Tout se fait aux boutons](#tout-se-fait-aux-boutons)
 - [Le téléphone comme télécommande](#le-téléphone-comme-télécommande)
@@ -42,7 +42,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 - **Demandes d'amis** : envoyées tout de suite, ou à la prochaine connexion de l'autre borne. Une demande faite des deux côtés vous rend amis aussitôt ; un refus est retenu 30 jours. « Bloquer » coupe toute liaison avec une borne.
 - **« Mes amis »** : en ligne puis hors ligne, la table que chacun joue en ce moment, son dernier événement (« Nouveau meilleur score sur … », « Badge reçu : … »), et depuis quand il n'a pas été vu.
 - **Une présence stable** : un ami reste en ligne tant qu'une liaison le relie à vous (15 s de tolérance quand elle tombe). La liste dit si elle est sûre : « Recherche des amis… », « Mise à jour en cours… », puis « Liste à jour : 1 ami en ligne ». La fiche d'un ami dit par où il est relié (Internet, réseau local).
-- **Une pastille au menu des tables** : le nombre d'amis en ligne ; un clic ouvre « Mes amis ».
+- **Une pastille à l'écran des tables** : le nombre d'amis en ligne ; un clic ouvre « Mes amis ».
 - **« Mes badges »** : huit badges (Première partie, Dix tables, Cent parties, Une heure sur une table, Dix heures de jeu, Au tableau d'honneur, Grand Champion, Cinq fois champion).
 - **Un nom à soi** : de 2 à 24 caractères, affiché seul, avec l'avatar. Deux joueurs du même nom se départagent par l'identifiant unique de leur fiche. Au premier démarrage, juste après l'assistant d'écrans, Cyber Pinball propose de choisir son pseudo et son avatar ; rien d'obligatoire, tout se change ensuite.
 - **« Mon avatar »** : une photo ou une image à vous, prise sur le PC ou dans le navigateur intégré, recadrée aux boutons de la borne (zoom, déplacer, recentrer) ou à la souris. Une photo y perd ses métadonnées, position GPS comprise. Sans avatar, vos initiales sur une teinte qui vous est propre. Tous les joueurs le voient, amis ou non, partout où vous apparaissez : Joueurs en ligne, salons, classements, profil public, demandes d'ami.
@@ -72,7 +72,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 - **Une bande des scores en direct** : le score et la bille de chacun, le meilleur en tête. Elle va sur le fronton (même pris par le backglass ou le PuP-Pack, discrète, en bas), sinon le topper, sinon le bas du plateau. Elle ne cache jamais la bille.
 - **Les scores sur le DMD** aux moments calmes, seulement quand il montre l'écran de score de la table ; réglage « Scores sur le DMD », activé par défaut.
 - **Réglage « Scores des amis pendant la partie »** : Automatique, Sur le fronton, Sur le topper, En bas du plateau, Sur le côté du plateau. Une place impossible sur votre borne est grisée avec sa raison.
-- **Des notifications en une ligne**, en haut du plateau et par-dessus VPX, sans lui prendre la main : un ami qui se connecte, une invitation, un invité qui accepte ou décline (avec la raison), une partie finie avec le gagnant et votre place. Chacune a son petit son. « Masquer les notifications pendant les parties » les garde pour le retour au menu.
+- **Des notifications en une ligne**, en haut du plateau et par-dessus VPX, sans lui prendre la main : un ami qui se connecte, une invitation, un invité qui accepte ou décline (avec la raison), une partie finie avec le gagnant et votre place. Chacune a son petit son. « Masquer les notifications pendant les parties » les garde pour le retour au front-end.
 - **« Activité récente » pour relire ce qu'on a manqué**, en tête du menu système : chaque notification en entier, par jour, l'heure, ce qui se répète regroupé (« Chloé : 3 connexions »), et Start fait ce qu'elle annonce (la fiche de l'ami, l'invitation tant qu'elle vaut, les résultats, les téléchargements, la mise à jour). Ce qui ne vaut plus reste, grisé avec sa raison (« Invitation expirée »). Le non-lu y est marqué sans pastille rouge (chaque chose qui attend a la sienne là où on y répond) ; les 50 dernières gardées d'un démarrage à l'autre.
 - **Une table sans relevé** est annoncée « Départ manuel, pas de score en direct », avec la raison : son score compte s'il entre au tableau d'honneur de la table.
 - **Une borne restée sur une ancienne version** est signalée dans le salon, l'invitation et la bande, au lieu de sembler boguée.
@@ -95,7 +95,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 - **Un fil comme sur un téléphone** : les messages de l'ami à gauche, les vôtres à droite, et au milieu les évènements de l'amitié (un record, un badge). MagnaSave passe à l'ami précédent ou suivant ; le fronton montre la carte de l'ami pendant que son fil est ouvert.
 - **Répondre aux boutons** : sept réactions par emoji posées sur un message (👍 J'aime, ❤️ J'adore, 🥰 Solidaire, 😆 Haha, 😮 Waouh, 😢 Triste, 😡 Grrr), les mêmes que dans les salons, six phrases toutes prêtes, ou « Écrire un message… » au clavier à l'écran ou au téléphone, dont le texte s'écrit en direct. Au bureau, le vrai clavier.
 - **Un ami hors ligne** : le message attend, « En attente », et part tout seul dès que les deux bornes sont allumées en même temps, puis passe à « Reçu ».
-- **Pendant une partie**, les boutons restent à VPX : le téléphone appairé montre le fil le plus récent, avec réactions, phrases et champ pour écrire. Un message arrivé s'annonce par une notification, au menu par le DMD aussi.
+- **Pendant une partie**, les boutons restent à VPX : le téléphone appairé montre le fil le plus récent, avec réactions, phrases et champ pour écrire. Un message arrivé s'annonce par une notification, dans le front-end par le DMD aussi.
 - **Options** : couper les notifications d'un ami, effacer une conversation, bloquer ; désactiver la messagerie, couper son son, garder les messages 30 jours, un an ou toujours.
 
 ### Profil public et « J'aime »
@@ -147,7 +147,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 - **Installeur complet** (environ 280 Mio) : l'archive officielle de VPX incluse, pour une borne sans Internet.
 - **Sans droits d'administrateur** : installation pour l'utilisateur courant, entrée dans « Programmes et fonctionnalités ».
 - **Options** : raccourci sur le bureau, lancement au démarrage de Windows ; installation silencieuse en ligne de commande.
-- **Conditions d'utilisation** présentées par l'installeur, puis par le menu tant qu'elles ne sont pas acceptées, et à relire dans Menu système > Cyber Pinball > Conditions d’utilisation.
+- **Conditions d'utilisation** présentées par l'installeur, puis par le front-end tant qu'elles ne sont pas acceptées, et à relire dans Menu système > Cyber Pinball > Conditions d’utilisation.
 - **La désinstallation ne retire que l'application** : tables, médias, configuration et données restent, et une réinstallation dans le même dossier les retrouve.
 
 ### Un seul dossier racine
@@ -155,7 +155,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 - **Tout vit dans un dossier que vous choisissez** (par exemple `D:\CyberPinball`) : l'application, une version de VPX par dossier, les tables, les médias, la bibliothèque de ROM, la configuration, les données, les téléchargements, et un dossier `import\` pour une clé USB.
 - **Une copie de VPX à part** et son propre `VPinballX.ini` : rien n'est enregistré dans Windows. Program Files, les dossiers de Windows et les partages réseau sont refusés.
 - **Chaque composant téléchargé est vérifié** : une archive dont l'empreinte ne correspond pas est supprimée, jamais installée. Les archives gardées permettent de réinstaller sans réseau.
-- **`VPinballX.ini` sauvegardé** avant chaque écriture (10 versions gardées). Seules les clés de Cyber Pinball sont modifiées ; une valeur changée à la main n'est jamais écrasée en silence : le menu demande s'il faut la garder.
+- **`VPinballX.ini` sauvegardé** avant chaque écriture (10 versions gardées). Seules les clés de Cyber Pinball sont modifiées ; une valeur changée à la main n'est jamais écrasée en silence : le front-end demande s'il faut la garder.
 
 ### Mises à jour signées
 
@@ -192,7 +192,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Deux jeux de boutons** : ceux du jeu (flippers, Start, Exit, crédit, lanceur, MagnaSave, Extra Ball, pause, tilt, tremblements, volume, muet) et ceux de l'interface (Précédent, Suivant, Valider, Retour). Un même bouton peut servir aux deux.
 - **Clavier et joystick mélangés** : encodeurs clavier, encodeurs en mode manette, Pinscape KL25Z, VirtuaPin. Le relevé dit quel joystick il lit (« Joystick lu : … »).
 - **Relevé sûr** : doublons, touche Windows et touches que VPX ne lit pas sont refusés.
-- **Après chaque partie**, si VPX n'a pas vu le joystick relevé, le menu le dit et rouvre l'étape « Boutons ».
+- **Après chaque partie**, si VPX n'a pas vu le joystick relevé, le front-end le dit et rouvre l'étape « Boutons ».
 - **Touches par défaut des encodeurs** en recours, en un geste, même sans aucun bouton.
 - **Bouton Pause** facultatif : un appui met la partie en pause, un autre la reprend.
 
@@ -228,7 +228,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 ### DMD, FullDMD et DMD matériels
 
-- **« Écran du DMD »** : dites une fois s'il s'agit d'un FullDMD (écran 16:9, DMD du jeu incrusté) ou d'un DMD seul (bande 4:1). Le menu, VPX et les PuP-Packs le respectent ; un cas ambigu est signalé « À vérifier ».
+- **« Écran du DMD »** : dites une fois s'il s'agit d'un FullDMD (écran 16:9, DMD du jeu incrusté) ou d'un DMD seul (bande 4:1). Le front-end, VPX et les PuP-Packs le respectent ; un cas ambigu est signalé « À vérifier ».
 - **Habillage FullDMD en partie** : l'image FullDMD de la table reste affichée et le DMD du jeu se pose dans son cadre, détecté tout seul dans l'image ou la vidéo.
 - **DMD matériels reconnus** sans ouvrir de port (ZeDMD, PIN2DMD, Pixelcade) : le plugin qui les alimente est activé pour vous.
 
@@ -236,7 +236,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 ### Orientation et cadrage
 
-- **Le joueur dit où il se tient** : les flippers tournent l'affichage jusqu'à ce que le texte soit à l'endroit. Menu, fiche et réglages pivotent pour lui ; fronton, DMD et topper restent droits.
+- **Le joueur dit où il se tient** : les flippers tournent l'affichage jusqu'à ce que le texte soit à l'endroit. Écran des tables, fiche et réglages pivotent pour lui ; fronton, DMD et topper restent droits.
 - **Cadrage automatique de VPX** imposé en vue borne et rétabli tout seul ; un avertissement dit si VPX dessinerait les flippers du mauvais côté.
 - **Le bureau Windows rendu dans son sens** : l'écran du playfield n'est tourné que le temps de la session, et chaque sortie, même après un plantage, rend l'orientation d'avant.
 - **Tables dans votre sens**, gardées d'un démarrage à l'autre ; « Santé de la borne » répare celles qu'on aurait retournées dans le menu de VPX.
@@ -248,8 +248,8 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **L'étape « Son »** joue n bips sur la sortie n : flipper gauche pour le fronton, flipper droit pour le plateau, Start pour les deux. Sorties virtuelles et Bluetooth écartées.
 - **Test des haut-parleurs d'une carte 5.1 ou 7.1**, paire par paire, pour choisir stéréo, surround ou SSF ; un câblage inversé est signalé.
 - **Sorties retrouvées par identifiant**, jamais par leur nom ; Cyber Pinball ne change jamais la sortie par défaut de Windows.
-- **Tout le son du menu passe par les haut-parleurs de la borne** : musiques, vidéos, aperçus, pages web.
-- **Boutons de volume** : le volume de toute la borne, au menu comme en partie, 5 % par appui ; Volume − maintenu une seconde coupe ou rétablit le son ; une pastille montre le niveau en haut du plateau.
+- **Tout le son du front-end passe par les haut-parleurs de la borne** : musiques, vidéos, aperçus, pages web.
+- **Boutons de volume** : le volume de toute la borne, dans le front-end comme en partie, 5 % par appui ; Volume − maintenu une seconde coupe ou rétablit le son ; une pastille montre le niveau en haut du plateau.
 
 <p align="center"><img src="images/fr/features/sound.webp?v=dc66c38900" width="360" alt="L'étape Son : la sortie 1 sur 2 joue un bip ; flipper gauche pour le fronton, flipper droit pour le plateau, Start pour les deux."></p>
 
@@ -266,7 +266,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Reconnue toute seule** au démarrage et avant chaque partie, d'après les écrans branchés ; le choix est expliqué, et un doute ouvre « Quelle configuration est branchée ? ».
 - **« Configurations de la borne »** : utiliser, forcer, renommer, supprimer (corbeille restaurable), créer.
 
-## Le menu des tables
+## L'écran des tables
 
 ### La roue et les écrans
 
@@ -276,21 +276,21 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Changements en direct** : un média ou une table ajouté, remplacé, renommé ou retiré se voit aussitôt sur tous les écrans, sans redémarrer.
 - **Médias des tables voisines préchargés** et fondu de 280 ms au changement de table.
 - **« Médias pendant la partie »** : figés (par défaut), animés ou éteints, sur les écrans que VPX n'occupe pas.
-- **Hors du menu des tables** (menu système, réglages, aide), les écrans passent à l'affichage de la marque, en silence ; la fiche d'une table garde ses médias.
+- **Hors de l'écran des tables** (menu système, réglages, aide), les écrans passent à l'affichage de la marque, en silence ; la fiche d'une table garde ses médias.
 
 <p align="center"><img src="images/fr/launch.webp?v=d9a0c78278" width="900" alt="Animation du lancement sur une borne à quatre écrans : après Start, le logo de Neon Abyss s'allume sur le plateau, traverse le DMD et se pose sur le fronton, puis les écrans s'effacent quand Visual Pinball X prend la main."></p>
 
 ### DMD vivant et couleurs de la marque
 
-- **Le DMD du menu dessiné par Cyber Pinball**, sur une grille de 128 × 32 points : le titre, PRESS START, les records (« HIGH SCORE #1 » à #4), l'horloge, les crédits, sans jamais s'effacer : le média DMD de la table se voit autour des points sur un FullDMD, ou seul en DMD « classique ».
+- **Le DMD du front-end dessiné par Cyber Pinball**, sur une grille de 128 × 32 points : le titre, PRESS START, les records (« HIGH SCORE #1 » à #4), l'horloge, les crédits, sans jamais s'effacer : le média DMD de la table se voit autour des points sur un FullDMD, ou seul en DMD « classique ».
 - **Le DMD prend vie** : à l'arrivée sur une table, un détail de sa wheel en points (souvent son logotype) s'allume, glisse et laisse place au titre ; les pages alternent trois effets (des fils de lumière qui courent sur chaque rangée, un volet lumineux, un scintillement en diagonale), et d'une table à l'autre la nouvelle glisse dans le sens de la roue ; un cycle sur deux, une courte scène de jeu : bumpers, lanceur, flippers, « BANK COMPLETE », « BALL LOCKED », multibille.
 - **Records lus dans la table**, jamais inventés.
 - **« DMD sur la roue », table par table** (fiche de la table > « Gérer la table… ») : les points affichés ou masqués (l'écran du FullDMD montre alors son média seul), et leur place sur l'écran du DMD, réglée aux boutons en voyant l'écran du DMD en direct. À part du DMD en partie, qui garde son propre réglage.
 - **« Couleur du DMD »** : vert signal par défaut, préréglages (sarcelle, encre claire, bleu glacier, ambre doux, orange plasma) ou couleur libre.
-- **Chaque table a sa couleur** au menu : la lumière de la roue, le halo des cadres et le fond des écrans sans média prennent la teinte de son fronton, en fondu ; la table choisie reste en vert. Le DMD peut la prendre aussi (« Couleur de la table »). Réglage : « Couleur de chaque table au menu ».
+- **Chaque table a sa couleur** dans le front-end : la lumière de la roue, le halo des cadres et le fond des écrans sans média prennent la teinte de son fronton, en fondu ; la table choisie reste en vert. Le DMD peut la prendre aussi (« Couleur de la table »). Réglage : « Couleur de chaque table dans le front-end ».
 - **Une police à points** dessinée pour Cyber Pinball.
 
-<p align="center"><img src="images/fr/live-dmd.webp?v=7a6e43e169" width="760" alt="Le DMD vivant du menu : le titre du jeu, PRESS START, le premier record et l'horloge, à tour de rôle."></p>
+<p align="center"><img src="images/fr/live-dmd.webp?v=7a6e43e169" width="760" alt="Le DMD vivant du front-end : le titre du jeu, PRESS START, le premier record et l'horloge, à tour de rôle."></p>
 
 ### Ouverture, lancement en cinéma et sons
 
@@ -326,10 +326,10 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **« Ordre des tables »** : par titre, dernières jouées, plus jouées, année, fabricant, ou mélangé à chaque démarrage.
 - **« Table au démarrage »** : la première, une table au hasard, ou la dernière jouée.
 - **« Start sur la roue »** : ouvrir la fiche (par défaut), ou jouer directement ; la fiche reste à Start maintenu (ou F6).
-- **Mode attente** après 5 minutes (de 1 à 30 minutes, ou jamais) : une table au hasard toutes les 20 s, avec ses médias, et le premier bouton ramène au menu tel qu'il était.
+- **Mode attente** après 5 minutes (de 1 à 30 minutes, ou jamais) : une table au hasard toutes les 20 s, avec ses médias, et le premier bouton ramène au front-end tel qu'il était.
 
 <p align="center">
-  <img src="images/fr/features/wheel-settings.webp?v=1b731682e3" width="300" alt="Roue : présentation du menu, ordre des tables, table au démarrage, Start sur la roue, logos animés, couleur de chaque table, Juke-box dans la roue.">
+  <img src="images/fr/features/wheel-settings.webp?v=1b731682e3" width="300" alt="Roue : présentation des tables, ordre des tables, table au démarrage, Start sur la roue, logos animés, couleur de chaque table, Juke-box dans la roue.">
   <img src="images/fr/features/menu-settings.webp?v=f909af7172" width="300" alt="Médias, son et attente : visualiseur du Juke-box, musique des jeux et son volume, son des vidéos, lancement en cinéma, ouverture, sons de l'interface…">
 </p>
 
@@ -339,14 +339,14 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Quatre roues** au choix : « Médaillons », « Bandeau », « Minimaliste », « Arche ».
 - **Mise en page adaptée** du 16:9 et plus jusqu'au 5:4, vérifiée de 1366 × 768 à la 4K.
 
-<p align="center"><img src="images/fr/desktop.webp?v=29ca7206fd" width="900" alt="Le menu des tables sur un PC de bureau : le plateau de Neon Abyss dans un cadre 9:16 à gauche, le fronton, la roue de médaillons et le panneau du titre à droite."></p>
+<p align="center"><img src="images/fr/desktop.webp?v=29ca7206fd" width="900" alt="L'écran des tables sur un PC de bureau : le plateau de Neon Abyss dans un cadre 9:16 à gauche, le fronton, la roue de médaillons et le panneau du titre à droite."></p>
 
 ### Jamais d'écran clair, jamais le bureau
 
 - **Un voile noir par écran**, du démarrage à la fin d'une partie : aucun écran ne montre le bureau Windows.
 - **Pas de flash blanc** : une fenêtre reste transparente jusqu'à sa première image.
-- **Barres des tâches masquées** pendant la partie, puis rendues ; remises derrière le menu au retour. Sur une borne lancée au démarrage de Windows, masquées toute la session, rendues au bureau Windows et quand on quitte.
-- **« Bureau Windows »** (Ctrl+Maj+D) libère tous les écrans du PC, et Cyber Pinball se tait tant que vous y êtes ; le même raccourci ramène le menu.
+- **Barres des tâches masquées** pendant la partie, puis rendues ; remises derrière le front-end au retour. Sur une borne lancée au démarrage de Windows, masquées toute la session, rendues au bureau Windows et quand on quitte.
+- **« Bureau Windows »** (Ctrl+Maj+D) libère tous les écrans du PC, et Cyber Pinball se tait tant que vous y êtes ; le même raccourci ramène le front-end.
 
 ## Juke-box
 
@@ -379,7 +379,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Toujours une sortie** : Exit ferme « Récupérer » même quand Windows a pris le premier plan, et tenu deux secondes il le ferme de force. Avant chaque demande d'autorisation de Windows, un écran prévient qu'il faudra répondre au clavier ou à la souris.
 - **Longues listes** : Exit ramène aux actions de l'écran, MagnaSave passe de la liste aux actions en retrouvant sa place, un flipper tenu fait défiler de lettre en lettre.
 - **Textes longs** (nouveautés, messages) lus page par page aux flippers, avec la part déjà lue.
-- **Un retour qui dit où il mène** au-dessus du titre de chaque écran, cliquable : « ‹ Neon Abyss », « ‹ Téléchargements », « ‹ Menu des tables » ; dans une liste, « Exit : actions ».
+- **Un retour qui dit où il mène** au-dessus du titre de chaque écran, cliquable : « ‹ Neon Abyss », « ‹ Téléchargements », « ‹ Écran des tables » ; dans une liste, « Exit : actions ».
 - **Une fonction indisponible reste visible**, grisée, avec sa raison.
 - **Raccourcis clavier** affichés à côté des entrées : R pour les réglages de VPX, H pour les commandes, Ctrl+Maj+D pour le bureau, Ctrl+Maj+K pour arrêter une partie bloquée.
 - **Une icône par menu**, dessinée pour Cyber Pinball.
@@ -387,7 +387,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 <p align="center"><img src="images/fr/system-menu.webp?v=5646ca729d" width="360" alt="Le menu système : Activité récente, Collections, Amis, Tables, Médias, Juke-box, Téléchargements, Télécommande du téléphone, Borne et Cyber Pinball, chacune avec un résumé de son contenu."></p>
 
-<p align="center"><img src="images/fr/features/controls.webp?v=b76db12917" width="360" alt="L'aide-mémoire des commandes : dans le menu (choisir une table, fiche, réglages de VPX, bureau Windows, partie bloquée) et pendant une partie (flippers, lanceur, crédit, MagnaSave, pause, tilt, volume)."></p>
+<p align="center"><img src="images/fr/features/controls.webp?v=b76db12917" width="360" alt="L'aide-mémoire des commandes : dans le front-end (choisir une table, fiche, réglages de VPX, bureau Windows, partie bloquée) et pendant une partie (flippers, lanceur, crédit, MagnaSave, pause, tilt, volume)."></p>
 
 ## Le téléphone comme télécommande
 
@@ -398,7 +398,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Accepté une fois, le téléphone est gardé** : il revient ensuite sans QR ni acceptation, d'un raccourci sur son écran d'accueil (Android comme iPhone, avec l'icône de Cyber Pinball, toujours sans rien installer) ; il se reconnecte seul quand Cyber Pinball redémarre ou se met à jour, et retrouve la borne quand le routeur lui a donné une autre adresse : par son nom sur le réseau local (iPhone), ou par un raccourci qui suit la borne sur Internet (Android), sans que rien de lisible ne quitte la maison. Borne éteinte ou autre Wi-Fi : la page réessaie seule et reprend dès que la borne répond. Les téléphones gardés sont listés dans Menu système > Télécommande du téléphone, où « Oublier ce téléphone » retire l'un d'eux.
 - **Cinq onglets fins en bas** : Écran, Menus, Juke-box, Communauté et Boutons ; en haut, une seule barre fine, avec « Clavier » quand la borne attend une saisie et le menu ⋮ (envoyer un fichier, plein écran sur Android, se déconnecter).
 - **Chaque menu en un toucher** : la vue Écran montre les entrées de l’écran ouvert à la borne, qu’on touche directement ; la vue Menus range tous les menus comme le menu système et ouvre directement celui qu’on touche ; la vue Boutons tient **les boutons de la borne** (Start, flippers, Exit, MagnaSave ; un flipper tenu fait défiler vite). Pendant une partie, seuls les réglages en partie s'ouvrent du téléphone. Un menu indisponible est grisé avec sa raison.
-- **Les tables en images** : le menu des tables montre le médaillon de chaque table, ou en grille l’image de son fronton (toucher pour choisir, encore pour Start) ; une table ajoutée a les siens tout de suite. Un bouton en tête change de collection, comme MagnaSave à la borne.
+- **Les tables en images** : l'écran des tables montre le médaillon de chaque table, ou en grille l’image de son fronton (toucher pour choisir, encore pour Start) ; une table ajoutée a les siens tout de suite. Un bouton en tête change de collection, comme MagnaSave à la borne.
 - **Le Juke-box dans la main** : les playlists avec leurs pochettes, les morceaux, lecture et pause, précédent et suivant, aléatoire et répétition, avancer dans un morceau. Un mini-lecteur suit le morceau en cours au-dessus des onglets ; « Gérer » range clairement les ajouts, le compte YouTube et les playlists.
 - **La Communauté dans la main** : messages, amis et scores. Les conversations s’ouvrent en fil, comme sur un téléphone : les messages de l’ami à gauche, les vôtres à droite, réactions et phrases rapides d’un appui, et un champ pour écrire, même pendant une partie. Une pastille rouge signale un message non lu, depuis n’importe quel onglet.
 - **Les classements dans la main** : la vue Scores montre le tableau des scores de chaque table, exactement comme à la borne : cette borne, amis, national et mondial, les quatre périodes, drapeaux, avatars et présence. La table choisie ou lancée à la borne s’ouvre d’abord, une autre se choisit dans la liste, aussi pendant une partie.
@@ -419,7 +419,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **« Ajouter une table »** (Menu système > « Tables ») réunit tout : « Prêt à installer », le dossier d'import (clé USB), « Trouver une table en ligne », « Reprendre un fichier téléchargé », « Choisir des fichiers… », glisser-déposer, « Récupérés et attendus », « Mises à jour des tables », « Comptes des sites », et « Depuis un ami… » (la bibliothèque d'un ami, ses tables que vous n'avez pas en tête).
 - **Chaque table nommée d'après la base VPS** (Virtual Pinball Spreadsheet, environ 2 600 jeux) : dossier « Titre (Fabricant Année) », fiche remplie (fabricant, année, auteurs, identifiant IPDB). Un doute ouvre « Quel jeu est-ce ? » avec cinq propositions.
 - **« Mises à jour des tables »** : les tables dont une version plus récente existe.
-- **« Depuis une autre installation… »** : les tables d'un autre menu de borne, listées une à une ; on coche celles qu'on veut, et chacune arrive avec ce que cette installation rangeait ailleurs (PuP-Pack, ROM, couleurs et sons du DMD, dossier DMD, fronton, médias). Rien n'est repris en bloc, l'installation d'origine ne change pas.
+- **« Depuis une autre installation… »** : les tables d'un autre front-end de borne, listées une à une ; on coche celles qu'on veut, et chacune arrive avec ce que cette installation rangeait ailleurs (PuP-Pack, ROM, couleurs et sons du DMD, dossier DMD, fronton, médias). Rien n'est repris en bloc, l'installation d'origine ne change pas.
 - **Une partie du jeu se choisit aussi en dossier** (« Parties du jeu » > « Chercher un fichier ou un dossier… ») : un PuP-Pack, des sons ou des couleurs, même pris dans un dossier qui en contient beaucoup.
 
 ### Le catalogue en ligne
@@ -455,7 +455,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 ### Gestionnaire de téléchargements
 
-- **Un seul endroit** pour tout ce qui arrive, d'un site ou d'un ami, et une pastille au menu des tables (« 2 en cours · 45 % »).
+- **Un seul endroit** pour tout ce qui arrive, d'un site ou d'un ami, et une pastille à l'écran des tables (« 2 en cours · 45 % »).
 - **Reprise sans perte** si la connexion tombe, même le lendemain, avec de nouveaux essais espacés ; un téléchargement mis en pause ne repart jamais seul.
 - **Jamais deux fois** : un téléchargement déjà demandé n'est pas relancé.
 - **Vérifié après une reprise** (SHA-256 ou MD5) : jamais un fichier faux n'est rendu.
@@ -534,7 +534,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 ## Médias des jeux
 
 <p align="center">
-  <img src="images/fr/game-media.webp?v=587ec90bc4" width="360" alt="Médias du jeu de Neon Abyss : chaque média avec son aperçu, où le menu le montre et son rôle, et les actions Chercher les médias et Chercher sur le web.">
+  <img src="images/fr/game-media.webp?v=587ec90bc4" width="360" alt="Médias du jeu de Neon Abyss : chaque média avec son aperçu, où le front-end le montre et son rôle, et les actions Chercher les médias et Chercher sur le web.">
 </p>
 
 ### Les rôles des médias
@@ -597,12 +597,12 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 - **L'écran de chargement** : sur la borne, la vidéo de chargement du jeu seule, plein écran ; au bureau, la vidéo et les commandes de la partie à côté.
 - **Une table qui tarde le dit**, au bureau : passé 8 s, l'encart du chargement donne l'étape réellement vue (VPX lancé, ses fenêtres ouvertes), le temps écoulé, et comment arrêter (Ctrl+Maj+K ou Exit). Jamais de pourcentage inventé ; sur la borne, le média de chargement reste seul.
-- **Les fenêtres du menu ne prennent jamais la main à VPX** ; la notification d'une invitation, d'un ami ou d'une partie entre amis s'affiche par-dessus sans voler le focus.
+- **Les fenêtres du front-end ne prennent jamais la main à VPX** ; la notification d'une invitation, d'un ami ou d'une partie entre amis s'affiche par-dessus sans voler le focus.
 - **Ctrl+Maj+K arrête une partie bloquée** : fermeture polie, puis forcée après 5 s.
 - **Une partie qui échoue dit pourquoi** : erreur du script de la table (ligne et message) ou arrêt de VPX expliqué, et Start rejoue la table ou ouvre « Ce qu'il manque pour jouer ».
 - **Scripts anciens corrigés** sans modifier la table (par exemple un `vpmInit` appelé deux fois, que VPX 10.8 refuse).
 - **Statistiques gardées** pour chaque table : nombre de parties, temps de jeu.
-- **Un écran que Windows débranche puis rebranche**, pendant une partie ou au menu, retrouve son rôle et son image ; au retour d'une partie, chaque fenêtre reprend son écran.
+- **Un écran que Windows débranche puis rebranche**, pendant une partie ou dans le front-end, retrouve son rôle et son image ; au retour d'une partie, chaque fenêtre reprend son écran.
 - **VPX sur un Windows neuf** : le runtime Visual C++ de Microsoft, s'il manque, est détecté et installé (version officielle, sans fenêtre, avec l'accord de Windows) ; si VPX s'arrête faute d'une bibliothèque, l'écran d'échec le dit.
 
 ## Réalité virtuelle et Vision 3D
@@ -612,12 +612,12 @@ Deux fonctions en bêta (badge « BÊTA » dans Menu système > Borne) : sans le
 ### Réalité virtuelle
 
 - **Les tables dans le casque** : avec un Meta Quest (par Link ou Virtual Desktop) ou un casque SteamVR, les tables se lancent dans le casque quand il est prêt, sinon sur les écrans, sans jamais de question de VPX. Le fronton s'affiche au-dessus du plateau des tables sans pièce VR, dans la partie que la pièce de la table laisse voir.
-- **Le menu dans le casque** : hors partie, les écrans de la borne posés devant vous à leur taille réelle (plateau en portrait, DMD, fronton et topper debout), sur un sol sobre, avec un léger halo à la teinte de la table choisie. Casque porté, les écrans du PC se mettent au repos ; casque retiré, le PC reprend la main. Pendant une partie, le casque passe à VPX, puis revient au menu.
-- **« Caler la borne »** : une manette sur chaque coin de votre vraie barre avant, une gâchette, et la borne du casque se pose dessus ; menu et parties restent ensuite au même endroit, un calage par configuration. Au bureau, sans vraie borne, elle se pose une fois devant vous.
-- **Les manettes** suivent une seule règle, au menu comme en partie : A valide, B revient (en partie : pause), les joysticks déplacent la sélection, les gâchettes sont les flippers, les poignées les MagnaSave, X la collection suivante au menu ; ≡ ouvre le menu du casque. Un assistant propose les boutons par défaut de chaque modèle de manettes (Touch, Index, Vive, Windows Mixed Reality), puis permet de les choisir un par un.
+- **Le front-end dans le casque** : hors partie, les écrans de la borne posés devant vous à leur taille réelle (plateau en portrait, DMD, fronton et topper debout), sur un sol sobre, avec un léger halo à la teinte de la table choisie. Casque porté, les écrans du PC se mettent au repos ; casque retiré, le PC reprend la main. Pendant une partie, le casque passe à VPX, puis revient au front-end.
+- **« Caler la borne »** : une manette sur chaque coin de votre vraie barre avant, une gâchette, et la borne du casque se pose dessus ; front-end et parties restent ensuite au même endroit, un calage par configuration. Au bureau, sans vraie borne, elle se pose une fois devant vous.
+- **Les manettes** suivent une seule règle, dans le front-end comme en partie : A valide, B revient (en partie : pause), les joysticks déplacent la sélection, les gâchettes sont les flippers, les poignées les MagnaSave, X la collection suivante dans le front-end ; ≡ ouvre le menu du casque. Un assistant propose les boutons par défaut de chaque modèle de manettes (Touch, Index, Vive, Windows Mixed Reality), puis permet de les choisir un par un.
 - **Pause en partie** : Reprendre ou Quitter, sur le fronton de la scène ; tenir Pause 1,5 s remplit un cercle et sort de la partie.
 - **Pour les spectateurs**, l'écran du plateau montre ce que voit le joueur. Le son passe dans les écouteurs du casque.
-- **Une partie fluide** : VPX reçoit un profil graphique adapté à la carte de la machine, Air Link en Wi-Fi est signalé, et chaque partie note sa fluidité au journal. Casque éteint ou Link coupé, la partie se ferme et le menu revient aux écrans du PC.
+- **Une partie fluide** : VPX reçoit un profil graphique adapté à la carte de la machine, Air Link en Wi-Fi est signalé, et chaque partie note sa fluidité au journal. Casque éteint ou Link coupé, la partie se ferme et le front-end revient aux écrans du PC.
 
 ### Vision 3D
 
@@ -678,31 +678,31 @@ Deux fonctions en bêta (badge « BÊTA » dans Menu système > Borne) : sans le
 - **« Borne dédiée »** (désactivée par défaut) : la session Windows s'ouvre directement sur Cyber Pinball, sans bureau ni barre des tâches, et un surveillant le relance s'il se ferme. Sous Windows Pro et Famille comme sous Entreprise et IoT.
 - **« Lancement au démarrage »** : Cyber Pinball s'ouvre avec Windows, le bureau masqué derrière.
 - **Barres des tâches masquées toute la session** sur une borne lancée au démarrage ; elles reviennent au bureau Windows (Ctrl+Maj+D) et quand on quitte, et seules après un arrêt brutal.
-- **Relance par Start** : quand Start est un bouton de joystick (Pinscape, encodeur en mode manette), un appui long de 2 s rouvre Cyber Pinball depuis Windows, ou ramène le menu depuis le bureau Windows. Un petit processus sans fenêtre veille, réglable dans Menu système > Borne > Relance par Start.
+- **Relance par Start** : quand Start est un bouton de joystick (Pinscape, encodeur en mode manette), un appui long de 2 s rouvre Cyber Pinball depuis Windows, ou ramène le front-end depuis le bureau Windows. Un petit processus sans fenêtre veille, réglable dans Menu système > Borne > Relance par Start.
 - **Chaque réglage de Windows sauvegardé** avant d'écrire ; « Désactiver » le remet tel quel et le vérifie, et un script de secours fait de même hors de Cyber Pinball.
 
 <p align="center"><img src="images/fr/features/dedicated.webp?v=e5b46c9705" width="360" alt="Borne dédiée : désactivée, ce qu'il faut avant d'activer, deux façons au choix (remplacer le bureau, lancer au démarrage de Windows), et le secours pour accéder à Windows."></p>
 
 ### Éteindre, mettre en veille, redémarrer
 
-- **Depuis la rubrique « Cyber Pinball »** : une confirmation, puis les réglages sont enregistrés et tous les écrans passent au noir, sans montrer le bureau. Au réveil, le menu revient tel quel.
-- **« Redémarrer Cyber Pinball »** relance le logiciel seul, sans redémarrer le PC : après un réglage changé hors du menu, un écran ou une manette rebranchés.
+- **Depuis la rubrique « Cyber Pinball »** : une confirmation, puis les réglages sont enregistrés et tous les écrans passent au noir, sans montrer le bureau. Au réveil, le front-end revient tel quel.
+- **« Redémarrer Cyber Pinball »** relance le logiciel seul, sans redémarrer le PC : après un réglage changé hors du front-end, un écran ou une manette rebranchés.
 
 ### Langue
 
-- **Français ou anglais**, tout compris (menus, assistant, réglages de VPX, navigateur, messages), dates et nombres assortis : Menu système > « Cyber Pinball » > « Langue / Language ».
+- **Français ou anglais**, tout compris (front-end, assistant, réglages de VPX, navigateur, messages), dates et nombres assortis : Menu système > « Cyber Pinball » > « Langue / Language ».
 
 <p align="center"><img src="images/fr/features/language.webp?v=135f61fd23" width="360" alt="Langue / Language : Français ou English, chaque langue dans la sienne."></p>
 
 ### À côté d'un autre frontend
 
-- **S'installe à côté d'un autre menu de borne** sans rien changer chez lui : sa propre copie de VPX, de ses ROM et de leur mémoire.
-- **Attend qu'un autre menu ouvert soit fermé** avant de démarrer ou de lancer une partie, et prévient avant de tourner un écran dans Windows.
+- **S'installe à côté d'un autre front-end de borne** sans rien changer chez lui : sa propre copie de VPX, de ses ROM et de leur mémoire.
+- **Attend qu'un autre front-end ouvert soit fermé** avant de démarrer ou de lancer une partie, et prévient avant de tourner un écran dans Windows.
 
 ### Journal
 
 - **Un journal de l'application** (`data\logs\journal.txt`) : tout ce qu'elle fait, daté, pour comprendre après coup ce qui s'est passé sur une borne. Une erreur ne fige jamais la borne sur une boîte de dialogue.
-- **Les incidents à part** (`data\logs\erreurs.txt`) : les erreurs rattrapées et les plantages. Une fenêtre du menu qui plante est rechargée au lieu de rester noire ; en borne dédiée, Cyber Pinball figé est relancé tout seul.
+- **Les incidents à part** (`data\logs\erreurs.txt`) : les erreurs rattrapées et les plantages. Une fenêtre du front-end qui plante est rechargée au lieu de rester noire ; en borne dédiée, Cyber Pinball figé est relancé tout seul.
 
 ## Limites actuelles
 
@@ -710,7 +710,7 @@ Cyber Pinball est un premier prototype (0.1.x). Ce qui n'est pas encore là :
 
 - **Windows seulement**, et seulement Visual Pinball X 10.8.1 en mode plugins : pas de mode classique, pas d'autres émulateurs pour l'instant.
 - **Installeurs non signés** : Windows SmartScreen avertit à l'installation.
-- **DMD matériels** (ZeDMD, PIN2DMD, Pixelcade) : alimentés par VPX pendant les parties, pas encore par le menu.
+- **DMD matériels** (ZeDMD, PIN2DMD, Pixelcade) : alimentés par VPX pendant les parties, pas encore par le front-end.
 - **Knocker** : il ne sonne pas encore pour un record battu sur une table dont la ROM garde ses records (le tableau des scores, lui, les lit après chaque partie).
 - **Réalité virtuelle et Vision 3D** sont en bêta. La Kinect pour Xbox One est reconnue, mais pas encore prise en charge.
 - **Avatars** : une image à soi seulement, pas encore d'avatars tout faits ; une image animée devient fixe.

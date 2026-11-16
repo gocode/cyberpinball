@@ -77,7 +77,7 @@ export const messages: Record<string, string> = {
   'Vu {ago}': 'Seen {ago}',
   'Pas encore vu en ligne': 'Not seen online yet',
   'En partie : {table} · depuis {duration}': 'Playing: {table} · for {duration}',
-  'Dans le menu des tables': 'In the table menu',
+  'Dans l’écran des tables': 'In the table menu',
   'En ligne': 'Online',
   'Hors ligne': 'Offline',
   'Pas encore d’ami': 'No friends yet',

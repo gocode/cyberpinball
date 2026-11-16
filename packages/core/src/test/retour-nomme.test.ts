@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import { BackTrail, type BackPlace } from '../backtrail';
 import { REPO_ROOT } from './i18n-scan';
 
-const HOME: BackPlace = { key: 'wheel', kind: 'wheel', heading: 'Menu des tables' };
+const HOME: BackPlace = { key: 'wheel', kind: 'wheel', heading: 'Écran des tables' };
 const place = (heading: string, kind = 'custom'): BackPlace => ({ key: `${kind}|${heading}`, kind, heading });
 const SHEET = place('Neon Abyss', 'sheet');
 const MANAGE = place('Gérer la table', 'sheet+manage');
@@ -25,7 +25,7 @@ const open = (trail: BackTrail<object>, p: BackPlace) => trail.arrive(p, {});
 test('retour nommé : le bouton mène à l’écran d’où l’on vient, la roue tout en haut', () => {
   const trail = new BackTrail<object>(() => HOME);
   open(trail, SHEET);
-  assert.equal(trail.destination().heading, 'Menu des tables');
+  assert.equal(trail.destination().heading, 'Écran des tables');
   open(trail, MANAGE);
   assert.equal(trail.destination().heading, 'Neon Abyss');
   open(trail, MEDIAS);
@@ -34,7 +34,7 @@ test('retour nommé : le bouton mène à l’écran d’où l’on vient, la rou
   open(trail, MANAGE);
   assert.equal(trail.destination().heading, 'Neon Abyss');
   open(trail, SHEET);
-  assert.equal(trail.destination().heading, 'Menu des tables');
+  assert.equal(trail.destination().heading, 'Écran des tables');
 });
 
 test('retour nommé : un écran d’en haut rouvert par une action (enregistrer, annuler) coupe la suite', () => {
@@ -45,7 +45,7 @@ test('retour nommé : un écran d’en haut rouvert par une action (enregistrer,
   assert.equal(trail.destination().heading, 'Téléchargements');
   // Le fichier supprimé, l'écran rouvre le menu système par openSystem, pas par son retour.
   open(trail, SYSTEM);
-  assert.equal(trail.destination().heading, 'Menu des tables');
+  assert.equal(trail.destination().heading, 'Écran des tables');
   // Le même écran redessiné (son titre change, son objet reste) ou rouvert : rien ne s'empile.
   const screen = {};
   trail.arrive(DOWNLOADS, screen);
@@ -59,10 +59,10 @@ test('retour nommé : un retour qui arrive ailleurs que là où il l’annonçai
   // Parcours ouvert depuis un message de fin de partie (rien dans le parcours) : son retour mène à la fiche.
   const journey = place('Ce qu’il manque pour jouer');
   open(trail, journey);
-  assert.equal(trail.destination().heading, 'Menu des tables');
+  assert.equal(trail.destination().heading, 'Écran des tables');
   trail.expect();
   const surprise = open(trail, SHEET);
-  assert.deepEqual(surprise, { from: 'Ce qu’il manque pour jouer', announced: 'Menu des tables', landed: 'Neon Abyss' });
+  assert.deepEqual(surprise, { from: 'Ce qu’il manque pour jouer', announced: 'Écran des tables', landed: 'Neon Abyss' });
   // La fois suivante, le bouton le dit, même ouvert d'ailleurs.
   trail.reset();
   open(trail, journey);

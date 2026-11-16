@@ -136,7 +136,7 @@ export function guardScreens(): void {
   process.on('exit', () => (hiddenTaskbars.length > 0 || taskbarWatch) && restoreTaskbars(desktopAllowed === 'fermeture' && !relaunching ? 'quit' : 'relay'));
   placeVeils();
   if (cabinetTaskbars) {
-    console.log('Borne lancée au démarrage de Windows : barres des tâches masquées tant que le menu est là.');
+    console.log('Borne lancée au démarrage de Windows : barres des tâches masquées tant que le front-end est là.');
     hideTaskbars();
   }
   // Relancé par relaunchCovered : l'ancien processus attend que nos fenêtres soient peintes.
@@ -263,7 +263,7 @@ export function recoverScreens(moment: TaskbarMoment): number {
     for (const s of veiledScreens(screens, listWindows((w) => w.visible), [process.pid], VEIL_TITLE)) {
       const veil = veils.get(s.display.id);
       if (veil && !veil.isDestroyed()) tuckVeil(veil);
-      lines.push(`Écran « ${s.name} » : resté noir sous son voile (${when}) ; la fenêtre du menu repasse devant.`); // i18n-ignore : constat pour la console et le bilan d’endurance
+      lines.push(`Écran « ${s.name} » : resté noir sous son voile (${when}) ; la fenêtre du front-end repasse devant.`); // i18n-ignore : constat pour la console et le bilan d’endurance
     }
   } catch {
     // API de Windows indisponible : seule la reprise des fenêtres a eu lieu.
@@ -594,7 +594,7 @@ function checkVeils(stack: WindowInfo[], now: number): void {
     const due = veilAloneDue(veiledSince, veiled, now, screensBusy(), VEIL_ALONE_MS);
     if (!due.length) return;
     const named = screens.filter((s) => due.includes(s.id)).map((s) => `« ${s.name} »`).join(', ');
-    journalIncident(`Écrans ${named} : seul le voile noir depuis ${VEIL_ALONE_MS / 1000} s, hors partie ; fenêtres du menu remises devant`); // i18n-ignore : journal
+    journalIncident(`Écrans ${named} : seul le voile noir depuis ${VEIL_ALONE_MS / 1000} s, hors partie ; fenêtres du front-end remises devant`); // i18n-ignore : journal
     recoverScreens('watch');
   } catch {
     // API de Windows indisponible : le constat des écrans découverts suffit.

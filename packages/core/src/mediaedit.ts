@@ -405,13 +405,13 @@ export function planMediaChanges(table: TableEntry, draft: MediaDraft, context: 
   else delete after.halfTurn;
   for (const [type, on] of Object.entries(draft.halfTurn) as [MediaType, boolean][]) {
     if ((before.halfTurn?.[type] === true) === on) continue;
-    infoSteps.push({ kind: 'info', type, text: on ? t('Demi-tour ajouté') : t('Demi-tour retiré'), detail: on ? t('le menu tourne ce média d’un demi-tour de plus') : t('le menu tourne ce média d’après ses proportions seulement') });
+    infoSteps.push({ kind: 'info', type, text: on ? t('Demi-tour ajouté') : t('Demi-tour retiré'), detail: on ? t('le front-end tourne ce média d’un demi-tour de plus') : t('le front-end tourne ce média d’après ses proportions seulement') });
   }
   if (draft.volume !== undefined && (before.volume ?? 100) !== draft.volume) {
     infoSteps.push({
       kind: 'info',
       text: t('Volume de ce jeu : {before} % → {after} %', { before: before.volume ?? 100, after: draft.volume }),
-      detail: draft.volume === 100 ? t('comme les autres jeux') : t('vidéos et musique de ce jeu dans le menu, par rapport au réglage général'),
+      detail: draft.volume === 100 ? t('comme les autres jeux') : t('vidéos et musique de ce jeu dans le front-end, par rapport au réglage général'),
     });
   }
   const ops = [...trash, ...toTemp, ...fromTemp, ...incoming];

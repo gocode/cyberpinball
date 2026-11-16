@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Wording (French interface): Cyber Pinball's interface is now called "le front-end" instead of "le menu" across every screen, the manual and the project page; "menu" now only names real menus (System menu, VPX menu, service menu). The English interface is unchanged.
 - Project page on GitHub: the Cyber Pinball trailer now shows at the top, right after "Download", in English on the English page and in French on the French page. Clicking the thumbnail opens the video on YouTube.
 - A table's credits: Start on a line that has a page (VPUniverse, VPForums…) opens it directly in the cabinet's browser, with all its authors in the banner. While the line is selected, its QR code shows next to the options, to open it on your phone too. In guest mode the browser stays closed: Start shows the authors and the QR code.
 - Pinball FX (beta): "Install Pinball FX" finds Steam again; it was greyed out ("Neither Steam nor Epic on this PC") on a PC that had it. Cabinet schedule: the list of buttons that can wake the cabinet finally gives their names.

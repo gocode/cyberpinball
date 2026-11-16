@@ -8,10 +8,10 @@ export const messages: Record<string, string> = {
   'Réglages de VPX': 'VPX settings',
   '{keys}, ou Exit puis « Réglages de VPX »': '{keys}, or Exit then “VPX settings”',
   'Exit puis « Réglages de VPX »': 'Exit then “VPX settings”',
-  'Menu et configuration (tables, réglages, boutons, écrans, Bureau Windows, quitter)': 'Menu and setup (tables, settings, buttons, screens, Windows desktop, quit)',
+  'Menu système (tables, réglages, boutons, écrans, Bureau Windows, quitter)': 'Menu and setup (tables, settings, buttons, screens, Windows desktop, quit)',
   'Exit ({keys}), Tab, ou clic sur ⚙ en haut à droite': 'Exit ({keys}), Tab, or click ⚙ top right',
   'Arrêter une partie bloquée': 'Stop a stuck game',
-  'Bureau Windows (tous les écrans du PC), puis retour au menu': 'Windows desktop (every PC screen), then back to the menu',
+  'Bureau Windows (tous les écrans du PC), puis retour au front-end': 'Windows desktop (every PC screen), then back to the menu',
   'Flippers : choisir': 'Flippers: choose',
   'Start : fiche': 'Start: game page',
   // Chargement qui tarde (packages/core/src/loadingprogress.ts, app/renderer/frontend.js)
@@ -27,7 +27,7 @@ export const messages: Record<string, string> = {
   'Start maintenu, ou {keys}': 'Hold Start, or {keys}',
   'Start maintenu': 'Hold Start',
   'Fiche de la table': 'Game page',
-  'Exit : menu': 'Exit: menu',
+  'Exit : Menu système': 'Exit: menu',
   'Son, vue, performances, pour toutes les tables': 'Sound, view, performance, for every table',
   'Configuration de la borne': 'Cabinet setup',
   // packages/core/src/systemmenu.ts : rubriques du menu système
@@ -35,7 +35,7 @@ export const messages: Record<string, string> = {
   'Toutes les tables et leur fiche, collections, réglages de la roue, ajouter une table, téléchargements, bibliothèque de ROM': 'Every table and its page, collections, wheel settings, add a table, downloads, ROM library',
   'Toutes les tables': 'All tables',
   'Migration': 'Migration',
-  'Images et vidéos des tables, musique et mode attente du menu, Juke-box et ses réglages': 'Table images and videos, menu music and attract mode, Juke-box and its settings',
+  'Images et vidéos des tables, musique et mode attente du front-end, Juke-box et ses réglages': 'Table images and videos, menu music and attract mode, Juke-box and its settings',
   'Reprendre les médias de PinUP Popper ou PinballX, regrouper les ROM': 'Import media from PinUP Popper or PinballX, gather ROMs',
   'Menu système': 'System menu',
   'Trouver les médias manquants': 'Find missing media',
@@ -80,22 +80,22 @@ export const messages: Record<string, string> = {
   'Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son': 'Every step in a row: buttons, screens, playfield, layout, sound',
   'Touches par défaut des encodeurs': 'Encoder default keys',
   'Si les boutons ne répondent plus comme prévu (aussi à la souris)': 'If the buttons no longer respond as expected (mouse works too)',
-  'Chaque étape se refait seule, puis revient au menu des tables. Exit maintenu 2 s (ou le bouton « Quitter sans enregistrer » des boutons de l’interface) en sort sans rien changer, à toute étape.':
+  'Chaque étape se refait seule, puis revient à l’écran des tables. Exit maintenu 2 s (ou le bouton « Quitter sans enregistrer » des boutons de l’interface) en sort sans rien changer, à toute étape.':
     'Each step can be redone on its own, then returns to the table menu. Holding Exit for 2 s (or the “Quit without saving” interface button) leaves without changing anything, at any step.',
   'Bureau Windows': 'Windows desktop',
   'Commandes de la borne': 'Cabinet controls',
-  'Les boutons du menu et de la partie': 'The buttons of the menu and of the game',
-  'Libère tous les écrans du PC ; {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu': 'Frees every PC screen; {keys} or the Cyber Pinball taskbar button brings the menu back',
+  'Les boutons du front-end et de la partie': 'The buttons of the menu and of the game',
+  'Libère tous les écrans du PC ; {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le front-end': 'Frees every PC screen; {keys} or the Cyber Pinball taskbar button brings the menu back',
   'Bouton de la borne : {button}': 'Cabinet button: {button}',
   '{button} de nouveau': '{button} again',
   'Touches par défaut des encodeurs remises': 'Encoder default keys restored',
   'Configuration « {name} » reconnue (avant : « {previous} »).': 'Configuration “{name}” detected (was “{previous}”).',
   'Boutons de la borne à refaire': 'Cabinet buttons need redoing',
   'Les touches par défaut des encodeurs servent en attendant.': 'Encoder default keys are used in the meantime.',
-  'Start : refaire l’étape « Boutons » · Exit : menu': 'Start: redo the “Buttons” step · Exit: menu',
+  'Start : refaire l’étape « Boutons » · Exit : Menu système': 'Start: redo the “Buttons” step · Exit: menu',
   'Boutons de l’interface à refaire': 'Interface buttons need redoing',
   'Les flippers, Start et Exit du jeu servent en attendant.': 'The game flippers, Start and Exit are used in the meantime.',
-  'Start : refaire l’étape « Boutons de l’interface » · Exit : menu': 'Start: redo the “Interface buttons” step · Exit: menu',
+  'Start : refaire l’étape « Boutons de l’interface » · Exit : Menu système': 'Start: redo the “Interface buttons” step · Exit: menu',
   'Interface : précédent, suivant, valider, retour sur les flippers, Start et Exit.': 'Interface: previous, next, confirm, back on the flippers, Start and Exit.',
   "VPX n'est pas installé": 'VPX is not installed',
   'Cyber Pinball a besoin de Visual Pinball X pour jouer. Son archive est déjà sur la borne : l’installation se passe de connexion.':
@@ -106,17 +106,17 @@ export const messages: Record<string, string> = {
   'Le test d’endurance': 'The endurance test',
   'Aucune table': 'No tables',
   'Start : ajouter une table.': 'Start: add a table.',
-  'Exit : menu.': 'Exit: menu.',
+  'Exit : Menu système.': 'Exit: menu.',
   'Écrans à revoir': 'Screens need checking',
   'Configuration {summary}': 'Configuration {summary}',
-  'Start : relancer l’assistant d’écrans · Exit : menu (Configurations de la borne pour en changer).': 'Start: rerun the screen wizard · Exit: menu (Cabinet configurations to switch).',
+  'Start : relancer l’assistant d’écrans · Exit : Menu système (Configurations de la borne pour en changer).': 'Start: rerun the screen wizard · Exit: menu (Cabinet configurations to switch).',
   'VPinballX.ini modifié à la main': 'VPinballX.ini edited by hand',
   'Cyber Pinball n’a rien écrasé.': 'Cyber Pinball overwrote nothing.',
   'Start : garder ces valeurs · Exit : remettre celles de Cyber Pinball': 'Start: keep these values · Exit: restore Cyber Pinball’s',
   'Erreur de lecture': 'Playback error',
   'Lancer une partie de VPX': 'Launching a VPX game',
   'Partie impossible hors écran': 'Can’t play off-screen',
-  'Start ou Exit : revenir au menu.': 'Start or Exit: back to the menu.',
+  'Start ou Exit : revenir au front-end.': 'Start or Exit: back to the menu.',
   'Avant de jouer, choisissez la configuration branchée : elle décide des écrans de VPX.': 'Before playing, choose the connected configuration: it sets VPX’s screens.',
   'Erreur inconnue.': 'Unknown error.',
   'La ROM de cette table est introuvable : elle doit être dans le dossier pinmame\\roms de la table.': 'This table’s ROM is missing: it must be in the table’s pinmame\\roms folder.',
@@ -164,7 +164,7 @@ export const messages: Record<string, string> = {
   'Vidéos du jeu sur les écrans que VPX n’occupe pas ; plus de travail pour la carte graphique (Start : changer)':
     'Game videos on screens VPX doesn’t use; more work for the graphics card (Start: change)',
   'Écrans que VPX n’occupe pas laissés noirs (Start : changer)': 'Screens VPX doesn’t use stay black (Start: change)',
-  'Présentation du menu : {layout}': 'Menu layout: {layout}',
+  'Présentation des tables : {layout}': 'Menu layout: {layout}',
   // Ordre des tables et table au démarrage (packages/core/src/tableorder.ts, app/src/menu-settings.ts)
   'dernières jouées d’abord': 'last played first',
   'plus jouées d’abord': 'most played first',
@@ -213,10 +213,10 @@ export const messages: Record<string, string> = {
   'Musique des jeux : jouée': 'Game music: on',
   'Musique des jeux : coupée': 'Game music: off',
   'Musique du jeu choisi pendant la navigation (Start : couper)': 'Selected game’s music while browsing (Start: mute)',
-  'Borne silencieuse dans le menu (Start : jouer la musique de chaque jeu)': 'Silent cabinet in the menu (Start: play each game’s music)',
+  'Borne silencieuse dans le front-end (Start : jouer la musique de chaque jeu)': 'Silent cabinet in the menu (Start: play each game’s music)',
   'Volume de la musique : {volume}': 'Music volume: {volume}',
   'Musique coupée pour l’instant': 'Music off for now',
-  'Son des vidéos du menu : {volume}': 'Menu video sound: {volume}',
+  'Son des vidéos du front-end : {volume}': 'Menu video sound: {volume}',
   'Vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée': 'Playfield video, when the game has no music or it’s off',
   'Volume du lancement : {volume}': 'Launch volume: {volume}',
   'Son de lancement du jeu, sinon son de sa vidéo de chargement': 'Game’s launch sound, or else its loading video’s sound',
@@ -229,14 +229,14 @@ export const messages: Record<string, string> = {
   'Sons de l’interface : coupés': 'Interface sounds: off',
   'Clic de solénoïde au changement de table, pièce au Start, knocker sur un record, coup de bobine au lancement en cinéma ; rien pendant la partie (Start : couper)':
     'Solenoid click when changing tables, coin on Start, knocker on a new high score, coil thump on the cinematic launch; nothing during play (Start: mute)',
-  'Aucun bruit de flipper dans le menu (Start : les jouer)': 'No pinball noises in the menu (Start: play them)',
+  'Aucun bruit de flipper dans le front-end (Start : les jouer)': 'No pinball noises in the menu (Start: play them)',
   'Volume des sons de l’interface : {volume}': 'Interface sound volume: {volume}',
   'Sons de l’interface coupés pour l’instant': 'Interface sounds off for now',
   'Volume des sons de l’interface': 'Interface sound volume',
-  'Clic de solénoïde, pièce, knocker et coup de bobine, sur la sortie du son du menu. Rien pendant la partie : VPX a la parole.':
+  'Clic de solénoïde, pièce, knocker et coup de bobine, sur la sortie du son du front-end. Rien pendant la partie : VPX a la parole.':
     'Solenoid click, coin, knocker and coil thump, on the menu’s sound output. Nothing during play: VPX takes over.',
   'Clic de solénoïde': 'Solenoid click',
-  'Changement de table dans le menu': 'Changing tables in the menu',
+  'Changement de table dans le front-end': 'Changing tables in the menu',
   'Pièce qui tombe': 'Coin drop',
   'Start : lancement d’une partie': 'Start: launching a game',
   Knocker: 'Knocker',
@@ -246,13 +246,13 @@ export const messages: Record<string, string> = {
   'Carillon d’invitation': 'Invitation chime',
   'Invitation d’un ami à une partie en direct, même pendant une partie': 'A friend’s invitation to a live game, even during a game',
   'Tintement de la partie entre amis': 'Game-with-friends chime',
-  'Une nouvelle de la partie entre amis, au menu comme pendant une partie : un invité accepte ou décline, la partie est finie': 'News of a game with friends, in the menu as well as during a game: a guest accepts or declines, the game is over',
+  'Une nouvelle de la partie entre amis, dans le front-end comme pendant une partie : un invité accepte ou décline, la partie est finie': 'News of a game with friends, in the menu as well as during a game: a guest accepts or declines, the game is over',
   'Signal d’un ami': 'Friend signal',
   'Souffle de l’ouverture': 'Opening breath',
   'Ouverture au démarrage, quand les fils s’allument ; pas avec une musique d’ouverture choisie': 'Startup opening, as the threads light up; not with a chosen opening music',
-  'Un ami vient de se connecter, au menu comme pendant une partie ; une fois par ami en un quart d’heure': 'A friend just came online, in the menu as well as during a game; once per friend in a quarter of an hour',
+  'Un ami vient de se connecter, dans le front-end comme pendant une partie ; une fois par ami en un quart d’heure': 'A friend just came online, in the menu as well as during a game; once per friend in a quarter of an hour',
   'Mode attente : {delay}': 'Attract mode: {delay}',
-  'Tables tirées au hasard avec leurs médias ; n’importe quel bouton revient au menu': 'Random tables with their media; any button returns to the menu',
+  'Tables tirées au hasard avec leurs médias ; n’importe quel bouton revient au front-end': 'Random tables with their media; any button returns to the menu',
   'Après {duration} sans bouton': 'After {duration} idle',
   Jamais: 'Never',
   'Table suivante en attente : toutes les {duration}': 'Next attract table: every {duration}',
@@ -262,7 +262,7 @@ export const messages: Record<string, string> = {
   'Musique et vidéos à 30 % de leur volume (Start : couper)': 'Music and videos at 30% volume (Start: mute)',
   'Rien ne joue en attente (Start : son réduit)': 'Nothing plays in attract mode (Start: reduced sound)',
   'Médias pendant la partie : {mode}': 'Media during play: {mode}',
-  'DMD du menu : {mode}': 'Menu DMD: {mode}',
+  'DMD du front-end : {mode}': 'Menu DMD: {mode}',
   vivant: 'live',
   classique: 'classic',
   'Cyber Pinball dessine l’afficheur en continu : titre, records, PRESS START, horloge, crédits (Start : média seul)':
@@ -273,23 +273,23 @@ export const messages: Record<string, string> = {
     '4k if the playfield screen exceeds {pixels} pixels, else 1k; only the playfield image comes in 4k (Start: change)',
   'Image du plateau en 4k, environ 4 fois plus lourde (Start : changer)': 'Playfield image in 4k, about 4 times larger (Start: change)',
   'Image du plateau en 1k, la plus légère (Start : changer)': 'Playfield image in 1k, the lightest (Start: change)',
-  'Sortie du son : {output}. Volume propre à un jeu : sa fiche, « Médias du jeu ». Le DMD du menu et sa couleur : Borne > DMD.': 'Sound output: {output}. Per-game volume: its game page, “Game media”. The menu DMD and its colour: Cabinet > DMD.',
+  'Sortie du son : {output}. Volume propre à un jeu : sa fiche, « Médias du jeu ». Le DMD du front-end et sa couleur : Borne > DMD.': 'Sound output: {output}. Per-game volume: its game page, “Game media”. The menu DMD and its colour: Cabinet > DMD.',
   'sortie par défaut de Windows (aucune sortie affectée au fronton par l’assistant)': 'Windows default output (the wizard assigned none to the backbox)',
   'Volume de la musique': 'Music volume',
   'Musique du jeu choisi pendant la navigation, avant le volume propre à chaque jeu.': 'Selected game’s music while browsing, before each game’s own volume.',
-  'Son des vidéos du menu': 'Menu video sound',
+  'Son des vidéos du front-end': 'Menu video sound',
   'Son de la vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée. 0 % : vidéos muettes.':
     'Playfield video sound, when the game has no music or it’s off. 0%: videos muted.',
   'Volume du lancement': 'Launch volume',
   'Son joué au lancement d’une table, ou son de sa vidéo de chargement. Rien pendant la partie : VPX a la parole.':
     'Sound played when a table launches, or its loading video’s sound. Nothing during play: VPX takes over.',
   'choix actuel': 'current choice',
-  'Présentation du menu': 'Menu layout',
-  'Comment les tables défilent dans le menu. Les roues font glisser les logos d’une place à l’autre ; la liste montre les titres.':
+  'Présentation des tables': 'Menu layout',
+  'Comment les tables défilent dans le front-end. Les roues font glisser les logos d’une place à l’autre ; la liste montre les titres.':
     'How tables scroll in the menu. Wheels slide the logos from slot to slot; the list shows titles.',
   '{detail} · choix actuel': '{detail} · current choice',
   'Mode attente': 'Attract mode',
-  'Après ce temps sans bouton sur le menu des tables, la borne présente des tables au hasard. Le premier bouton revient au menu, sans rien lancer.':
+  'Après ce temps sans bouton sur l’écran des tables, la borne présente des tables au hasard. Le premier bouton revient au front-end, sans rien lancer.':
     'After this long with no button pressed on the table menu, the cabinet shows random tables. The first button returns to the menu without launching anything.',
   'Table suivante en attente': 'Next attract table',
   'Temps passé sur chaque table tirée au hasard.': 'Time spent on each random table.',
@@ -309,7 +309,7 @@ export const messages: Record<string, string> = {
   'Nouvelle configuration': 'New configuration',
   'Assistant complet pour les écrans branchés': 'Full wizard for the connected screens',
   'Plus tard': 'Later',
-  'Le menu reste sur l’écran principal ; une partie redemandera la configuration': 'The menu stays on the main screen; playing a game will ask again',
+  'Le front-end reste sur l’écran principal ; une partie redemandera la configuration': 'The menu stays on the main screen; playing a game will ask again',
   'Quelle configuration est branchée ?': 'Which configuration is connected?',
   'Écrans branchés': 'Connected screens',
   active: 'active',
@@ -336,7 +336,7 @@ export const messages: Record<string, string> = {
   Écrans: 'Screens',
   Fichiers: 'Files',
   'Supprimer « {name} » ?': 'Delete “{name}”?',
-  "Elle va dans la corbeille des configurations, d'où elle se restaure telle quelle. C’est la configuration active : le menu redémarre et reconnaît celle qui correspond aux écrans branchés.":
+  "Elle va dans la corbeille des configurations, d'où elle se restaure telle quelle. C’est la configuration active : le front-end redémarre et reconnaît celle qui correspond aux écrans branchés.":
     'It goes to the configuration trash and can be restored as is. It’s the active configuration: the menu restarts and detects the one matching the connected screens.',
   "Elle va dans la corbeille des configurations, d'où elle se restaure telle quelle.": 'It goes to the configuration trash and can be restored as is.',
   Annuler: 'Cancel',
@@ -352,19 +352,18 @@ export const messages: Record<string, string> = {
   'Table sélectionnée': 'Selected table',
   'Commandes de la partie': 'Game controls',
   'Chargement de la table…': 'Loading table…',
-  'Appuyez sur un bouton pour revenir au menu': 'Press any button to return to the menu',
+  'Appuyez sur un bouton pour revenir au front-end': 'Press any button to return to the menu',
   'Menu système (Tab)': 'System menu (Tab)',
   'Menu système (Tab) : un élément attend votre intervention': 'System menu (Tab): something needs your attention',
   'Attend votre intervention': 'Needs your attention',
   Commandes: 'Controls',
-  'Dans le menu': 'In the menu',
+  'Dans le front-end': 'In the menu',
   'Pendant une partie': 'During a game',
   'Exit : fermer': 'Exit: close',
   'Quitter Cyber Pinball ?': 'Quit Cyber Pinball?',
   'Start : quitter · Exit : rester': 'Start: quit · Exit: stay',
   'Ajouter une table': 'Add a table',
-  Menu: 'Menu',
-  'Revenir au menu': 'Back to the menu',
+  'Revenir au front-end': 'Back to the menu',
 
   // packages/core/src/configurations.ts
   Borne: 'Cabinet',
@@ -380,7 +379,7 @@ export const messages: Record<string, string> = {
   '{n} écrans branchés en plus': '{n} extra screens connected',
   ' ; ': '; ',
   '{parts} — score {points}': '{parts} — score {points}',
-  '{name} imposée depuis le menu (reconnaissance automatique suspendue) : {score}.': '{name} forced from the menu (automatic detection paused): {score}.',
+  '{name} imposée depuis le front-end (reconnaissance automatique suspendue) : {score}.': '{name} forced from the menu (automatic detection paused): {score}.',
   ', devant {name} (score {points})': ', ahead of {name} (score {points})',
   '{name} retrouvée en partie : {score}{versus}.': '{name} partly found: {score}{versus}.',
   '{name} reconnue : {score}{versus}.': '{name} detected: {score}{versus}.',
@@ -400,9 +399,9 @@ export const messages: Record<string, string> = {
   // app/src/frontend-gate.ts, app/src/frontend.ts : autre menu de borne ouvert
   '{names} est ouvert': '{names} is running',
   '{names} sont ouverts': '{names} are running',
-  'Les deux menus se disputeraient les écrans, l’afficheur DMD et les boutons de la borne. Fermez {names} depuis son menu (Quitter) : Cyber Pinball démarre tout seul dès qu’il est fermé.':
+  'Les deux front-ends se disputeraient les écrans, l’afficheur DMD et les boutons de la borne. Fermez {names} depuis son menu (Quitter) : Cyber Pinball démarre tout seul dès qu’il est fermé.':
     'The two frontends would fight over the screens, the DMD display and the cabinet buttons. Close {names} from its menu (Quit): Cyber Pinball starts on its own as soon as it is closed.',
-  'Les menus se disputeraient les écrans, l’afficheur DMD et les boutons de la borne. Fermez {names} depuis leur menu (Quitter) : Cyber Pinball démarre tout seul dès qu’ils sont fermés.':
+  'Les front-ends se disputeraient les écrans, l’afficheur DMD et les boutons de la borne. Fermez {names} depuis leur menu (Quitter) : Cyber Pinball démarre tout seul dès qu’ils sont fermés.':
     'The frontends would fight over the screens, the DMD display and the cabinet buttons. Close {names} from their menus (Quit): Cyber Pinball starts on its own as soon as they are closed.',
   'Rien n’est fermé ni modifié chez {names}.': 'Nothing is closed or changed in {names}.',
   'Start : continuer quand même · Exit : quitter Cyber Pinball': 'Start: continue anyway · Exit: quit Cyber Pinball',
@@ -414,7 +413,7 @@ export const messages: Record<string, string> = {
     'During the game, {names} would also react to the cabinet buttons and could take over the screens or the DMD display.',
   'Fermez {names} depuis son menu (Quitter), puis relancez la partie.': 'Close {names} from its menu (Quit), then start the game again.',
   'Fermez {names} depuis leur menu (Quitter), puis relancez la partie.': 'Close {names} from their menus (Quit), then start the game again.',
-  'Start : jouer quand même · Exit : revenir au menu': 'Start: play anyway · Exit: back to the menu',
+  'Start : jouer quand même · Exit : revenir au front-end': 'Start: play anyway · Exit: back to the menu',
   // app/src/frontend.ts : réglage de l’affichage en partie
   'Réglage de l’affichage': 'Display adjustment',
   // app/src/frontend.ts : joystick des boutons que VPX n'a pas vu
@@ -441,7 +440,7 @@ export const messages: Record<string, string> = {
   'Fronton': 'Backglass',
   'l’écran principal': 'the main screen',
   'Écran du navigateur intégré : {role} n’est pas branché, ouvert sur {screen} (automatique).': 'Built-in browser screen: {role} is not connected, opened on {screen} (automatic).',
-  'Playfield tourné : la page et la souris y vont de travers. Autre écran : menu, Configurations de la borne, « Écran du navigateur intégré ».':
+  'Playfield tourné : la page et la souris y vont de travers. Autre écran : Menu système > Borne > Configuration de la borne > « Écran du navigateur intégré ».':
     'Playfield turned: the page and the mouse go sideways there. Another screen: menu, Cabinet configurations, “Built-in browser screen”.',
   'Pas branché : la fenêtre prendrait l’écran automatique': 'Not connected: the window would take the automatic screen',
   'maintenant : {roles}': 'now: {roles}',
@@ -467,12 +466,12 @@ export const messages: Record<string, string> = {
   'Main droite': 'Right hand',
   'Maintenir les quatre boutons pendant {n} seconde': 'Hold all four buttons for {n} second',
   'Maintenir les quatre boutons pendant {n} secondes': 'Hold all four buttons for {n} seconds',
-  'Depuis le menu, hors partie : l’anneau du cadenas se remplit.': 'From the menu, outside a game: the ring around the padlock fills up.',
+  'Depuis le front-end, hors partie : l’anneau du cadenas se remplit.': 'From the menu, outside a game: the ring around the padlock fills up.',
   'Fermé en mode invité': 'Closed in guest mode',
   'Menu système, réglages de VPX, Bureau Windows, quitter, fichiers glissés': 'System menu, VPX settings, Windows desktop, quitting, dragged files',
   'Dans la fiche : modifier, médias, fichiers, réglages, diagnostic, supprimer': 'On the game page: edit, media, files, settings, diagnosis, delete',
   'Activer le mode invité': 'Turn on guest mode',
-  'Ouvre le menu des tables, verrouillé': 'Opens the table menu, locked',
+  'Ouvre l’écran des tables, verrouillé': 'Opens the table menu, locked',
   'Pour une soirée ou les enfants : on joue, rien d’autre': 'For a party or the kids: play, nothing else',
   'Fiche de la table (Jouer, Prospectus, Règles)': 'Game page (Play, Flyer, Rules)',
   // packages/core/src/dmdcolor.ts et app/src/menu-settings.ts : couleur du DMD
@@ -492,21 +491,21 @@ export const messages: Record<string, string> = {
   // packages/core/src/dmdcolor.ts, packages/core/src/tabletint.ts et app/src/menu-settings.ts : couleur de chaque table
   'couleur de la table': 'table colour',
   'Couleur de la table': 'Table colour',
-  'Les points prennent la couleur du fronton de chaque table, plus vive que celle du menu ; vert signal pour une table sans couleur':
+  'Les points prennent la couleur du fronton de chaque table, plus vive que celle du front-end ; vert signal pour une table sans couleur':
     'The dots take the colour of each table’s backglass, brighter than the menu’s; signal green for a table without a colour',
-  'Les points prennent la couleur du fronton de chaque table, plus vive que celle du menu ; vert signal pour une table sans couleur · choix actuel':
+  'Les points prennent la couleur du fronton de chaque table, plus vive que celle du front-end ; vert signal pour une table sans couleur · choix actuel':
     'The dots take the colour of each table’s backglass, brighter than the menu’s; signal green for a table without a colour · current choice',
-  'Couleur de chaque table au menu : affichée': 'Colour of each table in the menu: shown',
-  'Couleur de chaque table au menu : coupée': 'Colour of each table in the menu: off',
+  'Couleur de chaque table dans le front-end : affichée': 'Colour of each table in the menu: shown',
+  'Couleur de chaque table dans le front-end : coupée': 'Colour of each table in the menu: off',
   'La lumière du bandeau de la roue, le halo des cadres et le fond des replis prennent la couleur du fronton de la table ; la table choisie reste en vert (Start : couper)':
     'The light of the wheel band, the glow of the frames and the background of stand-in screens take the colour of the table’s backglass; the chosen table stays green (Start: turn off)',
-  'Le menu garde la sarcelle de Cyber Pinball pour toutes les tables (Start : la couleur de chaque table)':
+  'Le front-end garde la sarcelle de Cyber Pinball pour toutes les tables (Start : la couleur de chaque table)':
     'The menu keeps Cyber Pinball’s teal for every table (Start: each table’s colour)',
   'Couleur du DMD : {color}': 'DMD colour: {color}',
-  'Les points de l’afficheur que Cyber Pinball dessine : DMD du menu, DMD d’un jeu sans média ; pas celui de VPX en partie (Start : choisir)':
+  'Les points de l’afficheur que Cyber Pinball dessine : DMD du front-end, DMD d’un jeu sans média ; pas celui de VPX en partie (Start : choisir)':
     'The dots of the display Cyber Pinball draws: menu DMD, DMD of a game without media; not VPX’s during play (Start: choose)',
   'Couleur du DMD': 'DMD colour',
-  'Couleur des points du DMD du menu et des DMD que Cyber Pinball dessine pour un jeu sans média. Le DMD de VPX, en partie, garde la couleur de la table.':
+  'Couleur des points du DMD du front-end et des DMD que Cyber Pinball dessine pour un jeu sans média. Le DMD de VPX, en partie, garde la couleur de la table.':
     'Colour of the dots of the menu DMD and of the DMDs Cyber Pinball draws for a game without media. VPX’s DMD, during play, keeps the table’s colour.',
   'Couleur libre : {hex}': 'Custom colour: {hex}',
   'Couleur libre…': 'Custom colour…',

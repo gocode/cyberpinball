@@ -226,7 +226,7 @@ export function judgeWebFile(file: string, type: MediaType): WebFileVerdict {
     if (AUDIO_FROM_VIDEO.has(format)) return { status: 'convert', kind, to: 'wav', from: 'video' };
     return { status: 'refused', reason: tLater('vidéo .{ext} dont le navigateur intégré ne sait pas lire le son', { ext: format }) };
   }
-  if (accepts('video')) return { status: 'refused', reason: tLater('vidéo .{ext} que le menu ne lit pas ; la convertir demanderait un outil externe (ffmpeg)', { ext: format }) };
+  if (accepts('video')) return { status: 'refused', reason: tLater('vidéo .{ext} que le front-end ne lit pas ; la convertir demanderait un outil externe (ffmpeg)', { ext: format }) };
   return wrong();
 }
 

@@ -143,7 +143,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     if (!online) return offlineText(net.listSync(), f.lastSeen, now());
     const p = net.presenceOf(key);
     if (p?.status === 'playing' && p.table) return t('En partie : {table}', { table: presenceTableLabel(p.table) });
-    return t('En ligne · Dans le menu des tables');
+    return t('En ligne · Dans l’écran des tables');
   }
 
   /** Pourquoi on ne peut pas écrire à cet ami en ce moment ; undefined : on peut. */
@@ -540,8 +540,8 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     const conversations = Object.values(s.conversations).filter((c) => threadLines(c).length).length;
     const actions: Action[] = [
       { label: t('Messagerie'), icon: 'message', detail: s.enabled ? t('Activée · vos amis peuvent vous écrire') : t('Désactivée · vos amis voient « N’accepte pas de messages »'), run: () => { chat.setEnabled(!s.enabled); here(0); } },
-      { label: t('Son des messages'), icon: 'sound', detail: s.sound ? t('Activé · au menu et en partie') : t('Désactivé'), run: () => { chat.setSound(!s.sound); here(1); } },
-      { label: t('Répondre depuis le téléphone pendant une partie'), icon: 'phone', detail: s.phoneInGame ? t('Activé · le téléphone appairé lit et répond, les boutons restent à VPX') : t('Désactivé · les messages se lisent au retour au menu'), run: () => { chat.setPhoneInGame(!s.phoneInGame); here(2); } },
+      { label: t('Son des messages'), icon: 'sound', detail: s.sound ? t('Activé · dans le front-end et en partie') : t('Désactivé'), run: () => { chat.setSound(!s.sound); here(1); } },
+      { label: t('Répondre depuis le téléphone pendant une partie'), icon: 'phone', detail: s.phoneInGame ? t('Activé · le téléphone appairé lit et répond, les boutons restent à VPX') : t('Désactivé · les messages se lisent au retour au front-end'), run: () => { chat.setPhoneInGame(!s.phoneInGame); here(2); } },
       { label: t('Garder les messages'), icon: 'history', detail: t('{keep} · sur cette borne seulement, puis effacés', { keep: keepLabel(s.keep) }), run: () => { const i = CHAT_KEEP_CHOICES.indexOf(s.keep); chat.setKeep(CHAT_KEEP_CHOICES[(i + 1) % CHAT_KEEP_CHOICES.length]!); here(3); } },
       conversations
         ? { label: t('Effacer toutes les conversations…'), icon: 'trash', tone: 'warning', detail: tn(conversations, 'Sur cette borne seulement · {n} conversation', 'Sur cette borne seulement · {n} conversations'), run: () => confirm(t('Effacer toutes les conversations ?'), t('Sur cette borne seulement : vos amis gardent les leurs.'), t('Tout effacer'), () => { chat.clearAll(); flash = { text: t('Conversations effacées'), tone: 'ok' }; here(4); }, () => here(4)) }

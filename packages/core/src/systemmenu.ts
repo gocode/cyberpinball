@@ -138,7 +138,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'medias',
     icon: 'image',
     get label() { return t('Médias'); },
-    get detail() { return t('Images et vidéos des tables, musique et mode attente du menu, Juke-box et ses réglages'); },
+    get detail() { return t('Images et vidéos des tables, musique et mode attente du front-end, Juke-box et ses réglages'); },
     // Les réglages du Juke-box à côté de sa gestion (13/11/2026 : sorties du son, visualiseur, médaillon).
     entries: ['missing-media', 'menu-media', 'jukebox', 'jukebox-settings'],
   },
@@ -173,7 +173,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'dmd',
     icon: 'dmd',
     label: 'DMD', // i18n-ignore : sigle, le même en anglais
-    get detail() { return t('Écran du DMD, DMD du menu et sa couleur, DMD réel (ZeDMD, PIN2DMD, Pixelcade)'); },
+    get detail() { return t('Écran du DMD, DMD du front-end et sa couleur, DMD réel (ZeDMD, PIN2DMD, Pixelcade)'); },
     entries: ['dmd-screen', 'menu-dmd', 'dmd-color', 'hardware-dmd'],
   },
   cyberpinball: {
@@ -247,7 +247,7 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   // ZeDMD, PIN2DMD, Pixelcade : choix par modèle, ZeDMD en wifi, pilotes (app/src/hardware-dmd-menu.ts).
   // Borne > DMD : forme de l'écran (FullDMD ou DMD seul), DMD du menu et sa couleur (menu-settings.ts).
   'dmd-screen': { icon: 'screens', get label() { return t('Écran du DMD'); } },
-  'menu-dmd': { icon: 'pulse', get label() { return t('DMD du menu'); } },
+  'menu-dmd': { icon: 'pulse', get label() { return t('DMD du front-end'); } },
   'dmd-color': { icon: 'palette', get label() { return t('Couleur du DMD'); } },
   'hardware-dmd': { icon: 'usb', get label() { return t('DMD réel'); } },
   dof: { icon: 'bulb', get label() { return t('LED et retours (DOF)'); } },

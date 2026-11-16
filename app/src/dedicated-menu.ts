@@ -159,7 +159,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
         rows: [
           ...blockers,
           ...(others
-            ? [{ text: t('Autre menu installé : {names}', { names: others }), detail: t('S’il se lance lui aussi à l’ouverture de session, les deux se disputeront les écrans : retirez son lancement automatique'), tone: 'warning' as const, badges: [t('À vérifier')] }]
+            ? [{ text: t('Autre front-end installé : {names}', { names: others }), detail: t('S’il se lance lui aussi à l’ouverture de session, les deux se disputeront les écrans : retirez son lancement automatique'), tone: 'warning' as const, badges: [t('À vérifier')] }]
             : []),
         ],
       },
@@ -283,7 +283,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
           icon: 'restore',
           run: () => uninstall(record),
         },
-        ...(host.shellSession ? [{ label: t('Ouvrir l’Explorateur'), detail: t('Une fenêtre de fichiers ; {keys} ramène le menu', { keys: host.desktopKeys }), icon: 'folder' as const, run: () => host.showDesktop() }] : []),
+        ...(host.shellSession ? [{ label: t('Ouvrir l’Explorateur'), detail: t('Une fenêtre de fichiers ; {keys} ramène le front-end', { keys: host.desktopKeys }), icon: 'folder' as const, run: () => host.showDesktop() }] : []),
         rescueAction(),
         backAction(),
       ],
@@ -310,7 +310,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
       ],
       actions: [
         { label: t('Désactiver et rétablir le bureau'), detail: t('Windows demande votre autorisation ; le bureau revient à la prochaine ouverture de session'), icon: 'restore', run: () => confirmThen(t('Désactiver la borne dédiée et rétablir le bureau.'), () => deactivate(record)) },
-        ...(host.shellSession ? [{ label: t('Ouvrir l’Explorateur'), detail: t('Une fenêtre de fichiers ; {keys} ramène le menu', { keys: host.desktopKeys }), icon: 'folder' as const, run: () => host.showDesktop() }] : []),
+        ...(host.shellSession ? [{ label: t('Ouvrir l’Explorateur'), detail: t('Une fenêtre de fichiers ; {keys} ramène le front-end', { keys: host.desktopKeys }), icon: 'folder' as const, run: () => host.showDesktop() }] : []),
         rescueAction(),
         backAction(),
       ],
@@ -692,7 +692,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
 
   const explorerItem: ProvidedSystemItem = {
     get detail() {
-      return t('Cyber Pinball est le shell : une fenêtre de fichiers, tous les écrans libérés ; {keys} ramène le menu', { keys: host.desktopKeys });
+      return t('Cyber Pinball est le shell : une fenêtre de fichiers, tous les écrans libérés ; {keys} ramène le front-end', { keys: host.desktopKeys });
     },
     run: () => host.showDesktop(),
   };

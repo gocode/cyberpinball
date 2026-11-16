@@ -227,7 +227,7 @@ export function arrangeMedias(dest: MediaDestination, incoming: IncomingMedia[])
     const skip = (reason: string, unreadable = false) => skipped.push({ from: m.from, source: m.source, type: media.type, reason, ...(unreadable ? { unreadable } : {}) });
     if (media.foreign) skip(t('Média de « {emulator} », un autre émulateur que Visual Pinball : non repris.', { emulator: media.emulator ?? '' }));
     else if (UNREADABLE_FORMATS.includes(media.ext)) {
-      skip(t('Format {ext} : le menu ne sait pas le lire. Non rangé ; convertissez-le en mp4 (ou webm) puis importez-le de nouveau.', { ext: media.ext }), true);
+      skip(t('Format {ext} : le front-end ne sait pas le lire. Non rangé ; convertissez-le en mp4 (ou webm) puis importez-le de nouveau.', { ext: media.ext }), true);
     } else if (!isAcceptedFormat(media.type, `x.${media.ext}`)) skip(t('Format {ext} non prévu pour « {type} » (attendu : {formats}). Non rangé.', { ext: media.ext, type: info.label, formats: info.formats.join(', ') }));
     else byType.set(media.type, [...(byType.get(media.type) ?? []), m]);
   }

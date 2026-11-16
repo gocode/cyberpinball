@@ -467,7 +467,7 @@ function prepareVpx(): void {
     })
     .catch((error: Error) => {
       vpxPrep = { state: 'failed', reason: error.message };
-      console.error(`Assistant : installation de VPX impossible (${error.message}) ; le menu la reproposera.`); // i18n-ignore : journal
+      console.error(`Assistant : installation de VPX impossible (${error.message}) ; le front-end la reproposera.`); // i18n-ignore : journal
     })
     .finally(afterVpx);
 }
@@ -490,7 +490,7 @@ function vpxNotice(): string | undefined {
   const line = vpxPrep.offline
     ? t('Installation de Visual Pinball X depuis la borne : {percent} %', { percent: vpxPrep.percent })
     : t('Téléchargement de Visual Pinball X : {percent} %', { percent: vpxPrep.percent });
-  return continueAfterVpx ? `${line} · ${t('le menu s’ouvre à la fin de l’installation')}` : line;
+  return continueAfterVpx ? `${line} · ${t('le front-end s’ouvre à la fin de l’installation')}` : line;
 }
 
 /** Touche que l'autopilote rejoue en ce moment par le chemin d'une vraie touche (« Clavier:KeyA »). */
@@ -907,7 +907,7 @@ function leaveWithoutSaving(): boolean {
   restoreOrientation();
   wizard.leaving = destination.text;
   broadcast();
-  console.log(`Assistant : quitté sans enregistrer (${destination.action === 'menu' ? 'retour au menu' : 'fermeture'}).`);
+  console.log(`Assistant : quitté sans enregistrer (${destination.action === 'menu' ? 'retour au front-end' : 'fermeture'}).`);
   // Sans opérateur, on reste sur cet écran pour la capture : l'autopilote finit puis ferme.
   if (process.env.CYBERPINBALL_AUTOPILOT) return true;
   if (destination.action === 'menu') setTimeout(() => continueToTables(), 600);
@@ -1778,7 +1778,7 @@ function buttonsView(index: number, base: Record<string, unknown>) {
       ? t('Relevé : {last}', { last: lastLabel(set, capture.last) })
       : game
         ? t('Chaque bouton une seule fois : ce que VPX recevra pendant une partie.')
-        : t('Chaque bouton une seule fois : ce qui pilotera le menu et la suite de l’assistant.'),
+        : t('Chaque bouton une seule fois : ce qui pilotera le front-end et la suite de l’assistant.'),
     hint: button.required
       ? t('Clic sur un bouton : le refaire · Retour arrière : {back}', { back })
       : game
@@ -1800,7 +1800,7 @@ function choiceView(common: Record<string, unknown>, inForceSet: SetKeys) {
     ...common,
     prompt: t('Vos boutons sont-ils déjà les bons ?'),
     name: t('Boutons de l’interface'),
-    details: t('Ceux qui font circuler dans les menus et dans l’assistant. Touches par défaut des encodeurs : la plupart des bornes les envoient déjà.'),
+    details: t('Ceux qui font circuler dans le front-end et dans l’assistant. Touches par défaut des encodeurs : la plupart des bornes les envoient déjà.'),
     buttons: capture.set.items.map((b) => ({ label: b.label, key: inForceSet[b.id] ? keyLabel(inForceSet[b.id]) : b.required ? t('aucune') : t('facultatif'), state: 'done' })),
     actions: CHOICE_ACTIONS.map((id, i) => ({ id, label: ACTION_LABELS[id], selected: i === capture.action })),
     notice: seconds === undefined ? undefined : t('Sans réponse dans {n} s : ces touches sont gardées, l’assistant passe aux écrans.', { n: seconds }),
@@ -1847,7 +1847,7 @@ function joystickLine(): string {
   }
   if (status.state === 'error') {
     // La bibliothèque SDL de VPX importe le runtime Visual C++ : absent, elle ne se charge pas.
-    if (!vcRuntimeReady().ok) return t('Joysticks lus une fois le runtime Visual C++ de Microsoft installé : le menu le propose juste après l’assistant. En attendant, le clavier.');
+    if (!vcRuntimeReady().ok) return t('Joysticks lus une fois le runtime Visual C++ de Microsoft installé : le front-end le propose juste après l’assistant. En attendant, le clavier.');
     return t('Joysticks illisibles : {error}', { error: status.error });
   }
   if (status.state === 'no-vpx') {
@@ -1857,7 +1857,7 @@ function joystickLine(): string {
         : t('Téléchargement de Visual Pinball X : {percent} %', { percent: vpxPrep.percent });
       return t('{progress} · joysticks (Pinscape…) lus à la fin · le clavier marche tout de suite', { progress });
     }
-    if (vpxPrep.state === 'failed') return t('Visual Pinball X n’a pas pu s’installer ({reason}) : boutons du clavier seulement. Le menu repropose l’installation, puis « Boutons du jeu » se refait.', { reason: vpxPrep.reason });
+    if (vpxPrep.state === 'failed') return t('Visual Pinball X n’a pas pu s’installer ({reason}) : boutons du clavier seulement. Le front-end repropose l’installation, puis « Boutons du jeu » se refait.', { reason: vpxPrep.reason });
     return t('Joysticks lus une fois VPX installé');
   }
   return t('Joysticks en cours de lecture…');
@@ -2661,7 +2661,7 @@ function save(): void {
       {
         severity: 'info',
         message: created
-          ? t('Nouvelle configuration « {name} », avec son propre VPinballX.ini : renommez-la dans Menu et configuration > Configurations de la borne.', { name: configuration.name })
+          ? t('Nouvelle configuration « {name} », avec son propre VPinballX.ini : renommez-la dans Menu système > Borne > Configuration de la borne > Configurations de la borne.', { name: configuration.name })
           : t('Configuration « {name} » mise à jour.', { name: configuration.name }),
       },
       ...channelNotices(),
@@ -2910,8 +2910,8 @@ function viewFor(index: number) {
           step: t("Flippers {edge} de l'image Windows", { edge: EDGE_LABELS[edge] }),
           notice:
             otherFrontends.length > 1
-              ? t('{names} sont installés sur ce PC. L’orientation de l’écran est un réglage de Windows : la changer met aussi leurs tables et leur menu à l’envers.', { names })
-              : t('{names} est installé sur ce PC. L’orientation de l’écran est un réglage de Windows : la changer met aussi ses tables et son menu à l’envers.', { names }),
+              ? t('{names} sont installés sur ce PC. L’orientation de l’écran est un réglage de Windows : la changer met aussi leurs tables et leur front-end à l’envers.', { names })
+              : t('{names} est installé sur ce PC. L’orientation de l’écran est un réglage de Windows : la changer met aussi ses tables et son front-end à l’envers.', { names }),
           hint: flip
             ? t('Start : retourner l’écran quand même · Exit : garder l’orientation de Windows (tables à l’envers dans Cyber Pinball)')
             : t('Start : tourner l’écran quand même · Exit : garder l’orientation de Windows (tables à l’envers dans Cyber Pinball)'),
@@ -3082,7 +3082,7 @@ function viewFor(index: number) {
       findings: wizard.result?.findings ?? [],
       target: wizard.result?.iniPath,
       backup: wizard.result?.backup,
-      hint: t("N'importe quel bouton : revenir au menu"),
+      hint: t("N'importe quel bouton : revenir au front-end"),
     };
   }
 

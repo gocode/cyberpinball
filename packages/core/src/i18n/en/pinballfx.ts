@@ -13,7 +13,7 @@ export const messages: Record<string, string> = {
   // app/src/pinballfx-launcher.ts
   'Impossible de lancer Pinball FX : {error}': 'Couldn’t start Pinball FX: {error}',
   'Pinball FX n’a pas ouvert sa fenêtre de jeu après {n} s.': 'Pinball FX didn’t open its game window after {n} s.',
-  'Appui long sur Exit : Pinball FX fermé, retour au menu.': 'Exit held: Pinball FX closed, back to the menu.',
+  'Appui long sur Exit : Pinball FX fermé, retour au front-end.': 'Exit held: Pinball FX closed, back to the menu.',
   // app/src/library.ts : fiche d'une table de Pinball FX
   'Pinball FX, table n° {n}': 'Pinball FX, table no. {n}',
   'Fiche illisible : numéro de table absent': 'Unreadable entry: no table number',
@@ -27,7 +27,7 @@ export const messages: Record<string, string> = {
   'Tables VPX seulement : Pinball FX ne donne pas son DMD': 'VPX tables only: Pinball FX doesn’t share its DMD',
   'Tables VPX seulement pour l’instant': 'VPX tables only for now',
   'Rien à diagnostiquer : Pinball FX gère la table': 'Nothing to diagnose: Pinball FX manages the table',
-  'Retirée du menu ; elle reste dans Pinball FX': 'Removed from the menu; it stays in Pinball FX',
+  'Retirée du front-end ; elle reste dans Pinball FX': 'Removed from the menu; it stays in Pinball FX',
   'Parties entre amis : tables VPX seulement': 'Games with friends: VPX tables only',
   'Pinball FX ne donne pas ses scores': 'Pinball FX doesn’t share its scores',
   // app/src/library.ts : écran « Tables de Pinball FX »
@@ -38,13 +38,13 @@ export const messages: Record<string, string> = {
   'Bêta : Pinball FX est en phase de test dans Cyber Pinball': 'Beta: Pinball FX is being tested in Cyber Pinball',
   'Ouvert dans {store} : installez-le là-bas, ses tables apparaissent ici ensuite': 'Opened in {store}: install it there, its tables then show up here',
   'Ouvre {store} sur son installation ; vous y achetez le jeu et ses tables': 'Opens {store} on its installation; the game and its tables are bought there',
-  '{n} table dans le menu · choisir celles que vous possédez': '{n} table in the menu · choose the ones you own',
-  '{n} tables dans le menu · choisir celles que vous possédez': '{n} tables in the menu · choose the ones you own',
+  '{n} table dans le front-end · choisir celles que vous possédez': '{n} table in the menu · choose the ones you own',
+  '{n} tables dans le front-end · choisir celles que vous possédez': '{n} tables in the menu · choose the ones you own',
   'Choisir les tables que vous possédez dans Pinball FX': 'Choose the tables you own in Pinball FX',
-  '« {title} » ajoutée au menu.': '“{title}” added to the menu.',
-  'Dans le menu': 'In the menu',
-  '{n} table dans le menu': '{n} table in the menu',
-  '{n} tables dans le menu': '{n} tables in the menu',
-  'Start : ajouter au menu une table que vous possédez dans Pinball FX. Une table déjà dans le menu : Start ouvre sa fiche. Les écrans et le DMD se règlent dans le mode borne de Pinball FX.':
+  '« {title} » ajoutée au front-end.': '“{title}” added to the menu.',
+  'Dans le front-end': 'In the menu',
+  '{n} table dans le front-end': '{n} table in the menu',
+  '{n} tables dans le front-end': '{n} tables in the menu',
+  'Start : ajouter au front-end une table que vous possédez dans Pinball FX. Une table déjà dans le front-end : Start ouvre sa fiche. Les écrans et le DMD se règlent dans le mode borne de Pinball FX.':
     'Start: add to the menu a table you own in Pinball FX. A table already in the menu: Start opens its page. Screens and DMD are set in Pinball FX’s cabinet mode.',
 };

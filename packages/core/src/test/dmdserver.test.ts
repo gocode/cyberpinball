@@ -234,7 +234,7 @@ test('cyberpinball-dmdserver : aide, DLL de VPX absente (code 3) ou inconnue (co
 test('santé : « Image du menu » demandée mais serveur impossible, dit avec sa raison', () => {
   setLanguage('fr');
   const problem = 'Version de VPX non prise en charge par le serveur du DMD (VPX 10.8.1 attendu)';
-  assert.deepEqual(hardwareDmdFacts([PIN2DMD], { menu: true }, problem).problems, [`Image du menu sur le DMD réel : ${problem}`]);
+  assert.deepEqual(hardwareDmdFacts([PIN2DMD], { menu: true }, problem).problems, [`Image du front-end sur le DMD réel : ${problem}`]);
   assert.deepEqual(hardwareDmdFacts([PIN2DMD], undefined, problem).problems, [], 'image du menu non demandée : rien à dire');
   assert.deepEqual(hardwareDmdFacts([], { menu: true }, problem).problems, [], 'aucun DMD : rien à dire');
   assert.deepEqual(hardwareDmdFacts([PIN2DMD], { menu: true }).problems, [], 'serveur prêt');

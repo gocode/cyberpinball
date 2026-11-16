@@ -2587,7 +2587,7 @@ export function createLibrary(host: LibraryHost) {
     const table = find(s.file);
     // Ouverte depuis « Toutes les tables » : Exit et « Retour » y ramènent.
     const exit = sheetReturn ?? leave;
-    const exitLabel = sheetReturn ? t('Retour à la liste des tables') : t('Retour au menu');
+    const exitLabel = sheetReturn ? t('Retour à la liste des tables') : t('Retour au front-end');
     if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: exitLabel, door: 'sheet.back', run: exit }], back: exit };
     const own = !samePath(table.folder, tablesDir());
     const inv = inventory(table.file, own);
@@ -2690,7 +2690,7 @@ export function createLibrary(host: LibraryHost) {
     // « Gérer la table… » : tout ce qui ne sert pas à jouer, rangé à part pour que la fiche tienne en quelques choix.
     const manage: SheetAction[] = [
       ...further,
-      { label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le menu montre'), icon: 'image', door: 'sheet.medias', run: () => medias.open(table) },
+      { label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le front-end montre'), icon: 'image', door: 'sheet.medias', run: () => medias.open(table) },
       notFx({ label: t('Parties du jeu'), detail: t('Table, PuP-Pack, fronton, ROM… : ajouter, remplacer, retirer'), icon: 'table-add', door: 'sheet.parts', run: () => gameParts.open(table) }, t('Pinball FX fournit toute la table : rien à ajouter')),
       notFx({ label: t('Fichiers de la table'), detail: tableFiles.summary(contents), tone: contents.problems ? 'warning' : undefined, icon: 'folder', door: 'sheet.files', run: () => tableFiles.open(table, 0, contents) }, t('Une table de Pinball FX n’a pas de fichiers à elle')),
       ...(fx ? [] : pupAction(table, s)),
@@ -2708,7 +2708,7 @@ export function createLibrary(host: LibraryHost) {
         : []),
       notFx({ label: t('Diagnostiquer et réparer'), icon: 'pulse', door: 'sheet.doctor', run: () => openDoctor(table.file) }, t('Rien à diagnostiquer : Pinball FX gère la table')),
       { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), icon: 'edit', door: 'sheet.edit', run: () => openEdit(table) },
-      { label: t('Supprimer la table'), detail: fx ? t('Retirée du menu ; elle reste dans Pinball FX') : t('Mise à la corbeille'), tone: 'error', icon: 'trash', door: 'sheet.remove', run: () => go({ kind: 'remove', file: table.file }) },
+      { label: t('Supprimer la table'), detail: fx ? t('Retirée du front-end ; elle reste dans Pinball FX') : t('Mise à la corbeille'), tone: 'error', icon: 'trash', door: 'sheet.remove', run: () => go({ kind: 'remove', file: table.file }) },
     ];
     if (s.manage) {
       // Exit et « Retour » : la fiche, sans plus y revenir depuis les écrans ouverts ensuite.
@@ -2812,7 +2812,7 @@ export function createLibrary(host: LibraryHost) {
   function buildScores(s: ScoresScreen): Built {
     const table = find(s.file);
     const back = s.back ?? (() => (table ? openSheet(table) : leave()));
-    if (!table || !host.scores) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), door: 'sheet.back', run: leave }], back };
+    if (!table || !host.scores) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au front-end'), door: 'sheet.back', run: leave }], back };
     // Un onglet cliqué : le curseur revient sur « Retour à la fiche », le seul choix en vert.
     const show = (change: Partial<Pick<ScoresScreen, 'period' | 'scope'>>) => go({ kind: 'scores', file: s.file, period: s.period, scope: s.scope, ...(s.back ? { back: s.back } : {}), ...change }, SCORES_BACK);
     const scope = s.scope;
@@ -2970,7 +2970,7 @@ export function createLibrary(host: LibraryHost) {
   function buildPages(s: PagesScreen): Built {
     const table = find(s.file);
     const back = () => (table ? openSheet(table) : leave());
-    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), door: 'sheet.back', run: leave }], back };
+    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au front-end'), door: 'sheet.back', run: leave }], back };
     const counts = bookletCounts(table);
     const count = counts[SHEET_PAGE_TYPES.indexOf(s.type)]!;
     s.index = Math.min(s.index, count - 1);
@@ -3048,7 +3048,7 @@ export function createLibrary(host: LibraryHost) {
     const own = layout() ? MANAGED_MEDIA_TYPES.filter((type) => ownMediaPages(table, host.root!, type).length).length : 0;
     return {
       text: t('Médias'),
-      detail: own ? t('{own} sur {count} fournis par le jeu ; replis pour les autres', { own, count: MANAGED_MEDIA_TYPES.length }) : t('aucun : le menu montre ses replis'),
+      detail: own ? t('{own} sur {count} fournis par le jeu ; replis pour les autres', { own, count: MANAGED_MEDIA_TYPES.length }) : t('aucun : le front-end montre ses replis'),
       tone: own ? 'ok' : 'quiet',
     };
   }
@@ -3112,7 +3112,7 @@ export function createLibrary(host: LibraryHost) {
   function buildPupOptions(s: Extract<Screen, { kind: 'pupOptions' }>): Built {
     const table = find(s.file);
     const back = () => (table ? openSheet(table) : leave());
-    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), run: leave }], back: leave };
+    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au front-end'), run: leave }], back: leave };
     const packs = pupPacksOf(table, s);
     const cabinet = pupCabinet(loadCabinet(host.dataDir));
     const sections: Section[] = packs.map((p) => ({
@@ -3392,7 +3392,7 @@ export function createLibrary(host: LibraryHost) {
   function buildRoms(s: Extract<Screen, { kind: 'roms' }>): Built {
     const back = () => openSystem();
     const scan = s.scan;
-    if (!scan) return { heading: t('Bibliothèque de ROM'), sections: [], actions: [{ label: t('Retour au menu'), run: back }], back };
+    if (!scan) return { heading: t('Bibliothèque de ROM'), sections: [], actions: [{ label: t('Retour au front-end'), run: back }], back };
     const unused = unusedRoms(scan);
     const missing = missingRoms(scan);
     const tidy = romsToTidy(scan);
@@ -3412,7 +3412,7 @@ export function createLibrary(host: LibraryHost) {
       actions.push({ label: t('Mettre toutes les ROM inutilisées à la corbeille'), detail: t('{n} ROM · {size}', { n: formatNumber(unused.length), size: formatSize(total) }), run: () => trashRoms(unused) });
     }
     actions.push(catalogUi.webAction('roms', { query: partWebQuery('pinmame', 'rom'), received: (file) => startImport([file], 'copy') }, () => openRoms()));
-    actions.push({ label: t('Actualiser'), run: () => openRoms() }, { label: t('Retour au menu'), run: back });
+    actions.push({ label: t('Actualiser'), run: () => openRoms() }, { label: t('Retour au front-end'), run: back });
 
     const sections: Section[] = [];
     if (missing.length) {
@@ -3496,7 +3496,7 @@ export function createLibrary(host: LibraryHost) {
 
   function buildRomMigrate(s: Extract<Screen, { kind: 'romMigrate' }>): Built {
     const back = () => openSystem();
-    if (!s.scan) return { heading: t('Ranger les ROM'), sections: [], actions: [{ label: t('Retour au menu'), run: back }], back };
+    if (!s.scan) return { heading: t('Ranger les ROM'), sections: [], actions: [{ label: t('Retour au front-end'), run: back }], back };
     const plan = planRomMigration(s.scan, s.choices);
     if (!plan.items.length) {
       return {
@@ -3504,7 +3504,7 @@ export function createLibrary(host: LibraryHost) {
         subheading: plan.library,
         lead: t('Chaque ROM est dans la bibliothèque, et chaque table qui la joue en a un lien.'),
         sections: [],
-        actions: [{ label: t('Voir la bibliothèque de ROM'), run: () => openRoms() }, { label: t('Retour au menu'), run: back }],
+        actions: [{ label: t('Voir la bibliothèque de ROM'), run: () => openRoms() }, { label: t('Retour au front-end'), run: back }],
         back,
       };
     }
@@ -3778,7 +3778,7 @@ export function createLibrary(host: LibraryHost) {
     }
     return {
       ...base,
-      detail: inMenu ? tn(inMenu, '{n} table dans le menu · choisir celles que vous possédez', '{n} tables dans le menu · choisir celles que vous possédez') : t('Choisir les tables que vous possédez dans Pinball FX'),
+      detail: inMenu ? tn(inMenu, '{n} table dans le front-end · choisir celles que vous possédez', '{n} tables dans le front-end · choisir celles que vous possédez') : t('Choisir les tables que vous possédez dans Pinball FX'),
       run: () => openPinballFx(),
     };
   }
@@ -3848,8 +3848,8 @@ export function createLibrary(host: LibraryHost) {
               return;
             }
             const added = addPinballFxTable(tablesDir(), fx.id);
-            console.log(`Pinball FX : table ${fx.id} (${fx.title}) ajoutée au menu, ${added.id}.`); // i18n-ignore : journal
-            pinballFxFlash = t('« {title} » ajoutée au menu.', { title: fx.title });
+            console.log(`Pinball FX : table ${fx.id} (${fx.title}) ajoutée au front-end, ${added.id}.`); // i18n-ignore : journal
+            pinballFxFlash = t('« {title} » ajoutée au front-end.', { title: fx.title });
             host.reload(added.file);
             openPinballFx(fx.id);
           },
@@ -3857,7 +3857,7 @@ export function createLibrary(host: LibraryHost) {
       return {
         text: fx.title,
         detail: [fx.manufacturer, fx.year].filter(Boolean).join(' · '),
-        badges: entry ? [t('Dans le menu')] : [],
+        badges: entry ? [t('Dans le front-end')] : [],
         tone: entry ? 'ok' : undefined,
         action,
         pick: true,
@@ -3868,10 +3868,10 @@ export function createLibrary(host: LibraryHost) {
     return {
       heading: t('Tables de Pinball FX'),
       icon: 'table-add',
-      subheading: [t('Bêta : Pinball FX est en phase de test dans Cyber Pinball'), inMenu ? tn(inMenu, '{n} table dans le menu', '{n} tables dans le menu') : undefined].filter(Boolean).join(' · '),
+      subheading: [t('Bêta : Pinball FX est en phase de test dans Cyber Pinball'), inMenu ? tn(inMenu, '{n} table dans le front-end', '{n} tables dans le front-end') : undefined].filter(Boolean).join(' · '),
       lead:
         pinballFxFlash ??
-        t('Start : ajouter au menu une table que vous possédez dans Pinball FX. Une table déjà dans le menu : Start ouvre sa fiche. Les écrans et le DMD se règlent dans le mode borne de Pinball FX.'),
+        t('Start : ajouter au front-end une table que vous possédez dans Pinball FX. Une table déjà dans le front-end : Start ouvre sa fiche. Les écrans et le DMD se règlent dans le mode borne de Pinball FX.'),
       sections: [{ title: tn(rows.length, '{n} table', '{n} tables'), rows }],
       actions,
       back,
@@ -5190,7 +5190,7 @@ export function createLibrary(host: LibraryHost) {
   // ---------- Retour nommé : le parcours des écrans (backtrail.ts) ----------
 
   /** Le parcours : le menu des tables (la roue, ou la liste des titres) quand plus rien n'est ouvert. */
-  const backTrail = new BackTrail<Screen>(() => ({ key: 'wheel', kind: 'wheel', heading: t('Menu des tables') }));
+  const backTrail = new BackTrail<Screen>(() => ({ key: 'wheel', kind: 'wheel', heading: t('Écran des tables') }));
 
   /** L'écran affiché, reconnu par sa sorte, sa table et son titre : le même écran rouvert a la même clé. */
   function placeOf(s: Screen, built: Built): BackPlace {
@@ -5346,7 +5346,7 @@ export function createLibrary(host: LibraryHost) {
    * borne, leur détail et leur indisponibilité. Fermé à l'invité, comme le menu système.
    */
   function remoteMenus(): RemoteMenus {
-    if (!host.guest.allows('menu.system')) return { nodes: [], locked: t('Mode invité : seul le menu des tables est ouvert. Le menu système se déverrouille à la borne.') };
+    if (!host.guest.allows('menu.system')) return { nodes: [], locked: t('Mode invité : seul l’écran des tables est ouvert. Le menu système se déverrouille à la borne.') };
     return {
       nodes: remoteMenuTree((id) => {
         const item = systemItems.get(id);

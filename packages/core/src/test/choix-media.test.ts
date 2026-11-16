@@ -74,9 +74,9 @@ test('une carte insérée au-dessus : Start valide celle que le curseur montrait
 test('un écran qui se charge : le curseur ne suit pas la seule action montrée le temps du chargement (Bibliothèque de ROM, 29/10/2026)', () => {
   const screen = {};
   // Inventaire en cours : l'écran n'a que son retour.
-  const loading = actionIds([{ label: 'Retour au menu' }]);
+  const loading = actionIds([{ label: 'Retour au front-end' }]);
   const anchor = anchorOf(screen, 0, loading, true);
-  const loaded = actionIds([{ label: 'Ranger les ROM dans la bibliothèque' }, { label: 'Ajouter' }, { label: 'Actualiser' }, { label: 'Retour au menu' }]);
+  const loaded = actionIds([{ label: 'Ranger les ROM dans la bibliothèque' }, { label: 'Ajouter' }, { label: 'Actualiser' }, { label: 'Retour au front-end' }]);
   assert.equal(followCursor(loaded, 0, screen, anchor), 0, 'la première action, pas le retour');
   // Hors chargement, l'élément montré est suivi comme avant.
   assert.equal(followCursor(loaded, 0, screen, anchorOf(screen, 0, loading, false)), 3);

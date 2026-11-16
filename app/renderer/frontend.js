@@ -1021,7 +1021,7 @@ function attractScreen(s) {
     box.append(line);
   }
   // Pendant le préavis d'arrêt de l'horaire, sa propre invite seule : pas deux consignes à la fois.
-  if (!s.stop) box.append(el('div', 'attract-hint', t('Appuyez sur un bouton pour revenir au menu')));
+  if (!s.stop) box.append(el('div', 'attract-hint', t('Appuyez sur un bouton pour revenir au front-end')));
   return box;
 }
 
@@ -1284,7 +1284,7 @@ function drawPlayfield(s) {
     cover = el('section', 'overlay');
     cover.append(el('h1', '', t('Commandes')));
     const keys = el('div', 'keys');
-    keys.append(keysTable(t('Dans le menu'), s.menuKeys), keysTable(t('Pendant une partie'), s.gameKeys));
+    keys.append(keysTable(t('Dans le front-end'), s.menuKeys), keysTable(t('Pendant une partie'), s.gameKeys));
     // Exit seul dans le badge : le nom du bouton de l'aide (« Bouton 14 du joystick ») n'y tient pas ; il ferme aussi.
     cover.append(keys, footer([[t('Exit : fermer'), s.nav.exit]]));
   } else if (s.phase === 'confirmQuit') {
@@ -1301,13 +1301,13 @@ function drawPlayfield(s) {
     cover.append(box);
     // Une partie échouée : un flipper ouvre le formulaire des retours (Avis et propositions), ce problème rappelé.
     const report = s.message.report ? [[t('Flipper : signaler ce problème'), s.nav.next]] : [];
-    if (s.message.action === 'addTable') cover.append(footer([[t('Ajouter une table'), s.nav.confirm], [t('Menu'), s.nav.exit]]));
+    if (s.message.action === 'addTable') cover.append(footer([[t('Ajouter une table'), s.nav.confirm], [t('Menu système'), s.nav.exit]]));
     // Partie échouée : Start mène au parcours « Ce qu'il manque pour jouer » (clic compris).
-    else if (s.message.action === 'journey') cover.append(footer([[t('Start : voir ce qu’il manque pour jouer'), s.nav.confirm], [t('Exit : revenir au menu'), s.nav.exit], ...report]));
+    else if (s.message.action === 'journey') cover.append(footer([[t('Start : voir ce qu’il manque pour jouer'), s.nav.confirm], [t('Exit : revenir au front-end'), s.nav.exit], ...report]));
     // Arrêt reconnu (script de la table, VPX fermé) : rien ne manque, Start relance la table, ou ouvre la partie entre amis.
-    else if (s.message.action === 'replay') cover.append(footer([[t('Start : rejouer la table'), s.nav.confirm], [t('Exit : revenir au menu'), s.nav.exit], ...report]));
-    else if (s.message.action === 'live') cover.append(footer([[t('Start : voir la partie entre amis'), s.nav.confirm], [t('Exit : revenir au menu'), s.nav.exit], ...report]));
-    else if (!s.message.action) cover.append(footer([[t('Revenir au menu'), s.nav.exit], ...report]));
+    else if (s.message.action === 'replay') cover.append(footer([[t('Start : rejouer la table'), s.nav.confirm], [t('Exit : revenir au front-end'), s.nav.exit], ...report]));
+    else if (s.message.action === 'live') cover.append(footer([[t('Start : voir la partie entre amis'), s.nav.confirm], [t('Exit : revenir au front-end'), s.nav.exit], ...report]));
+    else if (!s.message.action) cover.append(footer([[t('Revenir au front-end'), s.nav.exit], ...report]));
   }
   // Constat bref (configuration de la borne changée, mise à jour installée) : il s'efface seul.
   // Un écran plein le recouvrirait : il passe alors dans son flux, sous la marque, au-dessus du titre.

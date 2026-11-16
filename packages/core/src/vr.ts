@@ -330,11 +330,11 @@ export function vrMenuText(mode: VrMode, readiness: VrReadiness, headset?: Heads
   if (!readiness.ready) return { label: t('Réalité virtuelle : indisponible'), detail: readiness.reason, unavailable: true };
   const menu =
     headset === 'shown'
-      ? t('menu de Cyber Pinball dans le casque')
+      ? t('front-end de Cyber Pinball dans le casque')
       : headset === 'waiting'
-        ? t('menu dans le casque dès qu’il est prêt')
+        ? t('front-end dans le casque dès qu’il est prêt')
         : headset === 'missing'
-          ? t('menu dans le casque indisponible : compagnon absent de cette version')
+          ? t('front-end dans le casque indisponible : compagnon absent de cette version')
           : undefined;
   return mode === 'auto'
     ? {

@@ -148,7 +148,7 @@ test('Santé de la borne : barres remises derrière, en clair ; rien sans incide
   const some = healthLines({ ...base, screens: { configurations: 1, plugged: 3, taskbars: { repaired: 2, hidden: [], last: { screen: 'DMD', moment: 'return', at: '2026-10-29T20:00:00.000Z' } } } });
   const line = some.find((l) => /barre des tâches/i.test(l.title));
   assert.equal(line?.state, 'ok');
-  assert.match(line!.title, /Barre des tâches remise derrière le menu 2 fois/);
+  assert.match(line!.title, /Barre des tâches remise derrière le front-end 2 fois/);
   assert.match(line!.detail ?? '', /la dernière sur « DMD » \(retour d’une partie\)/);
 });
 

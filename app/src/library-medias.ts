@@ -471,7 +471,7 @@ export function createMedias(ctx: MediasContext) {
     card.thumb = thumbOf(s, table, type, r.file, info.fallbackLabel);
     const pages = info.pages && r.files.length > 1 ? ` · ${tn(r.files.length, '{n} page', '{n} pages')}` : '';
     card.facts = r.file ? `${state.detail} · ${factsOf(s, r.file)}${pages}` : state.detail;
-    if (r.skipped.length) card.pending = t('Ignoré : {files} (format que le menu ne lit pas).', { files: r.skipped.map((f) => path.basename(f)).join(', ') });
+    if (r.skipped.length) card.pending = t('Ignoré : {files} (format que le front-end ne lit pas).', { files: r.skipped.map((f) => path.basename(f)).join(', ') });
     if (mediaOriginOf(table, type, r.file)) card.facts += ` · ${t('de {origin}', { origin: mediaOriginOf(table, type, r.file)!.origin })}`;
     if (halfTurnOf(s, table, type)) card.facts += ` · ${t('demi-tour')}`;
     const turn = halfTurnPending(s, table, type);
@@ -488,10 +488,10 @@ export function createMedias(ctx: MediasContext) {
     for (const f of scanTableMedias(table)) {
       const name = path.basename(f.file);
       if (name.startsWith('.')) continue;
-      if (!f.type) rows.push({ text: name, detail: t('Nom sans « (Type) » : le menu ne sait pas à quoi il sert.'), tone: 'quiet' });
+      if (!f.type) rows.push({ text: name, detail: t('Nom sans « (Type) » : le front-end ne sait pas à quoi il sert.'), tone: 'quiet' });
       else if (!MANAGED_MEDIA_TYPES.includes(f.type)) rows.push({ text: name, detail: `${mediaTypeInfo(f.type).description}`, tone: 'quiet' });
       else if (f.match === 'other-name') rows.push({ text: name, detail: t('Porte le nom d’un autre jeu ou d’une autre version : ce jeu ne s’en sert pas.'), tone: 'quiet' });
-      else if (!f.accepted) rows.push({ text: name, detail: t('Format .{ext} que le menu ne lit pas pour {label}.', { ext: path.extname(name).slice(1).toLowerCase(), label: mediaTypeInfo(f.type).label }), tone: 'warning' });
+      else if (!f.accepted) rows.push({ text: name, detail: t('Format .{ext} que le front-end ne lit pas pour {label}.', { ext: path.extname(name).slice(1).toLowerCase(), label: mediaTypeInfo(f.type).label }), tone: 'warning' });
       else if (f.page && f.page > 1 && !mediaTypeInfo(f.type).pages) rows.push({ text: name, detail: t('{label} n’a qu’une page : ce fichier n’est pas montré.', { label: mediaTypeInfo(f.type).label }), tone: 'quiet' });
     }
     return rows;
@@ -532,7 +532,7 @@ export function createMedias(ctx: MediasContext) {
     return {
       heading: t('Médias du jeu'),
       subheading: table.title,
-      lead: t('Ce que le menu montre pour ce jeu, écran par écran. Choisissez un média pour le remplacer, le retirer ou le régler, ou glissez un fichier sur cette fenêtre. Rien n’est écrit avant « Enregistrer ».'),
+      lead: t('Ce que le front-end montre pour ce jeu, écran par écran. Choisissez un média pour le remplacer, le retirer ou le régler, ou glissez un fichier sur cette fenêtre. Rien n’est écrit avant « Enregistrer ».'),
       sections,
       actions,
       back: leave,
@@ -723,7 +723,7 @@ export function createMedias(ctx: MediasContext) {
         extra: [
           t('Formats : {formats}.', { formats: info.formats.join(', ') }),
           t('Sans fichier : {what}.', { what: lowerFirst(info.fallbackLabel) }),
-          ...(info.orientable ? [t('Un fichier en hauteur a les flippers en bas, en largeur à droite : le menu le tourne. L’aperçu le montre tel qu’il apparaîtra, vu du joueur.')] : []),
+          ...(info.orientable ? [t('Un fichier en hauteur a les flippers en bas, en largeur à droite : le front-end le tourne. L’aperçu le montre tel qu’il apparaîtra, vu du joueur.')] : []),
           ...sourceLines(table, type, changed ? undefined : r?.file),
         ],
       });
@@ -942,7 +942,7 @@ export function createMedias(ctx: MediasContext) {
     if (others) {
       rows.push({
         text: tn(others, '{n} autre fichier ignoré', '{n} autres fichiers ignorés'),
-        detail: t('Format que le menu ne lit pas pour {label} ({formats}).', { label: info.label, formats: info.formats.join(', ') }),
+        detail: t('Format que le front-end ne lit pas pour {label} ({formats}).', { label: info.label, formats: info.formats.join(', ') }),
         tone: 'quiet',
       });
     }
@@ -1026,7 +1026,7 @@ export function createMedias(ctx: MediasContext) {
       () => ({
         heading: t('Volume de ce jeu'),
         subheading: table.title,
-        lead: t('Vidéos et musique de ce jeu dans le menu, par rapport au réglage général : pour une vidéo enregistrée trop fort ou trop bas.'),
+        lead: t('Vidéos et musique de ce jeu dans le front-end, par rapport au réglage général : pour une vidéo enregistrée trop fort ou trop bas.'),
         sections: [],
         actions: [
           ...MEDIA_VOLUME_STEPS.map((v) => ({
@@ -1073,7 +1073,7 @@ export function createMedias(ctx: MediasContext) {
     host.reload(table.file);
     const name = mediaFileName(table, type, path.extname(source).slice(1), info.pages ? now.length + 1 : 1);
     return {
-      text: [t('Enregistré : « {name} » est maintenant le média {label}, le menu le montre.', { name, label: info.label }), plan.steps.some((st) => st.kind === 'trash') ? t('Ancien fichier dans la corbeille : {dir}.', { dir: path.relative(root(), trashDir) }) : '']
+      text: [t('Enregistré : « {name} » est maintenant le média {label}, le front-end le montre.', { name, label: info.label }), plan.steps.some((st) => st.kind === 'trash') ? t('Ancien fichier dans la corbeille : {dir}.', { dir: path.relative(root(), trashDir) }) : '']
         .filter(Boolean)
         .join(' '),
       tone: 'ok',

@@ -51,7 +51,7 @@ if (!selection?.configuration || !sync || !iniPath) {
   console.log(`Écrans branchés : ${describeDisplays(displays)}.`);
   console.log(`[BLOQUANT] ${selection?.summary ?? 'Aucune configuration.'}`);
   for (const score of selection?.choice.scores ?? []) console.log(`  « ${score.name} » : ${explainScore(score)}`);
-  console.log("Choisissez-la au démarrage du menu, ou : npm run sync -- --configuration \"Nom\". Pour ces écrans, une nouvelle configuration se crée avec l'assistant (menu > Configurations de la borne).");
+  console.log("Choisissez-la au démarrage du front-end, ou : npm run sync -- --configuration \"Nom\". Pour ces écrans, une nouvelle configuration se crée avec l'assistant (Menu système > Borne > Configuration de la borne > Configurations de la borne).");
   process.exit(3);
 }
 const { plan, report } = sync;

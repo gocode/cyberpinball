@@ -399,7 +399,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     const extra: string[] = [];
     if (shown.kind === 'video') extra.push(t('Aperçu : image du même jeu ; la vidéo arrive avec le téléchargement.'));
     if (shown.quality === '4k') extra.push(t('Aperçu : la même image en 1k ; le fichier 4k arrive avec le téléchargement.'));
-    if (info.orientable) extra.push(t('En largeur, les flippers sont à droite : le menu le tourne d’après l’écran du plateau. L’aperçu le montre vu du joueur.'));
+    if (info.orientable) extra.push(t('En largeur, les flippers sont à droite : le front-end le tourne d’après l’écran du plateau. L’aperçu le montre vu du joueur.'));
     extra.push(t('Source : {url}', { url: shown.file.url }));
     return {
       action,

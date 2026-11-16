@@ -44,7 +44,7 @@ export const messages: Record<string, string> = {
 
   // Le fil d'un ami
   'En partie : {table}': 'Playing: {table}',
-  'En ligne · Dans le menu des tables': 'Online · In the table menu',
+  'En ligne · Dans l’écran des tables': 'Online · In the table menu',
   'Messagerie désactivée sur cette borne : Réglages de la messagerie': 'Messaging turned off on this cabinet: Messaging settings',
   'N’est plus dans vos amis : conversation en lecture seule': 'No longer your friend: read-only conversation',
   '{name} n’accepte pas de messages': '{name} does not accept messages',
@@ -108,7 +108,7 @@ export const messages: Record<string, string> = {
   'Activée · vos amis peuvent vous écrire': 'On · your friends can write to you',
   'Désactivée · vos amis voient « N’accepte pas de messages »': 'Off · your friends see "Does not accept messages"',
   'Son des messages': 'Message sound',
-  'Activé · au menu et en partie': 'On · in the menu and during games',
+  'Activé · dans le front-end et en partie': 'On · in the menu and during games',
   'Garder les messages': 'Keep messages',
   '{keep} · sur cette borne seulement, puis effacés': '{keep} · on this cabinet only, then deleted',
   'Effacer toutes les conversations…': 'Delete all conversations…',
@@ -194,7 +194,7 @@ export const messages: Record<string, string> = {
 
   'Répondre depuis le téléphone pendant une partie': 'Reply from the phone during a game',
   'Activé · le téléphone appairé lit et répond, les boutons restent à VPX': 'On · the paired phone reads and replies, the buttons stay with VPX',
-  'Désactivé · les messages se lisent au retour au menu': 'Off · messages are read back in the menu',
+  'Désactivé · les messages se lisent au retour au front-end': 'Off · messages are read back in the menu',
 
   // app/renderer/frontend.js : la carte de l'ami au fronton
   'Votre ami': 'Your friend',

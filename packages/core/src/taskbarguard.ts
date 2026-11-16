@@ -30,7 +30,7 @@ export type TaskbarMoment = (typeof TASKBAR_MOMENTS)[number];
 export function taskbarMomentLabel(moment: TaskbarMoment): string {
   switch (moment) {
     case 'start':
-      return t('démarrage du menu');
+      return t('démarrage du front-end');
     case 'game':
       return t('début d’une partie');
     case 'vpx':
@@ -44,7 +44,7 @@ export function taskbarMomentLabel(moment: TaskbarMoment): string {
     case 'displays':
       return t('changement d’écrans ou de zone de travail');
     case 'focus':
-      return t('premier plan rendu au menu');
+      return t('premier plan rendu au front-end');
     case 'watch':
       return t('relecture du gardien des écrans');
   }

@@ -100,11 +100,11 @@ export function noticeZone(screen: ZoneScreen, facts: ZoneFacts = {}): NoticeZon
     case 'confirmQuit':
       return { place: 'head', count: true, notices: waiting };
     case 'browser':
-      return { place: 'over', count: false, notices: 'all', why: 'une page web plein écran : la notification passe devant, le compteur reste au menu dessous' }; // i18n-ignore : raison (tests, documentation)
+      return { place: 'over', count: false, notices: 'all', why: 'une page web plein écran : la notification passe devant, le compteur reste dessous, dans le front-end' }; // i18n-ignore : raison (tests, documentation)
     case 'loading':
     case 'playing':
       return facts.quietInGame
-        ? { place: 'none', count: false, notices: 'wait', why: 'notifications masquées pendant les parties : tout attend le menu' } // i18n-ignore : raison (tests, documentation)
+        ? { place: 'none', count: false, notices: 'wait', why: 'notifications masquées pendant les parties : tout attend le front-end' } // i18n-ignore : raison (tests, documentation)
         : { place: 'over', count: false, notices: 'away', why: 'en partie : plus de compteur, seulement ce qui compte, par-dessus VPX' }; // i18n-ignore : raison (tests, documentation)
     case 'intro':
       return { place: 'none', count: false, notices: 'wait', why: 'l’ouverture du démarrage, quelques secondes' }; // i18n-ignore : raison (tests, documentation)

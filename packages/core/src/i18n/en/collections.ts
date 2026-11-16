@@ -33,7 +33,7 @@ export const messages: Record<string, string> = {
   'Tables proposées : toutes': 'Tables offered: all',
   'Start : choix suivant · les MagnaSave ne changent pas de collection': 'Start: next choice · MagnaSave does not change collection',
   'Start : choix suivant · les MagnaSave passent d’une collection à l’autre': 'Start: next choice · MagnaSave moves from one collection to another',
-  'Ouvre le menu des tables, verrouillé sur « {collection} »': 'Opens the table menu, locked to “{collection}”',
+  'Ouvre l’écran des tables, verrouillé sur « {collection} »': 'Opens the table menu, locked to “{collection}”',
   // app/src/library.ts
   'Retirer des favoris': 'Remove from favourites',
   'Ajouter aux favoris': 'Add to favourites',

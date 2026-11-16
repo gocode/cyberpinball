@@ -328,7 +328,7 @@ export function createTechSheet(ctx: TechSheetContext) {
       icon,
       subheading,
       sections: [{ rows }],
-      actions: [...extra, { label: t('Retour à la fiche technique'), icon: 'report', tone: extra.length ? undefined : 'ok', run: back }, { label: t('Retour au menu'), icon: 'back', run: () => ctx.openSystem() }],
+      actions: [...extra, { label: t('Retour à la fiche technique'), icon: 'report', tone: extra.length ? undefined : 'ok', run: back }, { label: t('Retour au front-end'), icon: 'back', run: () => ctx.openSystem() }],
       back,
     }));
   }

@@ -620,7 +620,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
         { rows: [{ icon: 'info', text: t('Parties indisponibles pendant la sauvegarde'), detail: t('Une partie écrit ses scores : vous pourrez jouer dès la fin de la copie et de sa vérification'), tone: 'info' }] },
       ],
       actions: [
-        { label: t('Retour au menu'), detail: t('La sauvegarde continue ; son avancée reste sur « Sauvegardes »'), icon: 'back', run: back },
+        { label: t('Retour au front-end'), detail: t('La sauvegarde continue ; son avancée reste sur « Sauvegardes »'), icon: 'back', run: back },
         job.stop
           ? { label: t('Arrêt demandé'), detail: t('Le fichier en cours se termine'), icon: 'close', tone: 'quiet', run: () => undefined }
           : { label: t('Arrêter la sauvegarde'), detail: t('Ce qui est copié reste, marqué incomplet'), icon: 'close', run: () => void stopJob() },

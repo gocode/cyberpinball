@@ -404,6 +404,7 @@ import {
   remoteMenuTarget,
   toRemoteEntry,
   tn,
+  shownCrowd,
   REMOTE_ENTRIES_MAX,
   isJukeboxAction,
   type RemoteJukeboxOp,
@@ -564,8 +565,8 @@ function menuKeys(): [string, string][] {
       : ([['menu.sheet', guest.active ? t('Fiche de la table (Jouer, Prospectus, Règles)') : t('Fiche de la table (Jouer, Modifier…)'), `Start (${or(KEYS.confirm.filter((k) => k !== 'NumpadEnter'))})`]] as [GuestDoor, string, string][])),
     ...(KEYS.help.length ? [['menu.commands', t('Afficher les commandes'), or(KEYS.help)] as [GuestDoor, string, string]] : []),
     ['menu.vpx-settings', t('Réglages de VPX'), KEYS.settings.length ? t('{keys}, ou Exit puis « Réglages de VPX »', { keys: or(KEYS.settings) }) : t('Exit puis « Réglages de VPX »')],
-    ['menu.system', t('Menu et configuration (tables, réglages, boutons, écrans, Bureau Windows, quitter)'), t('Exit ({keys}), Tab, ou clic sur ⚙ en haut à droite', { keys: or(KEYS.exit) })],
-    ['shortcut.desktop', t('Bureau Windows (tous les écrans du PC), puis retour au menu'), formatList([...KEYS.desktop.map(keyLabel), shortcutLabel(SHORTCUTS.desktop)], 'or')],
+    ['menu.system', t('Menu système (tables, réglages, boutons, écrans, Bureau Windows, quitter)'), t('Exit ({keys}), Tab, ou clic sur ⚙ en haut à droite', { keys: or(KEYS.exit) })],
+    ['shortcut.desktop', t('Bureau Windows (tous les écrans du PC), puis retour au front-end'), formatList([...KEYS.desktop.map(keyLabel), shortcutLabel(SHORTCUTS.desktop)], 'or')],
     ['game.force-stop', t('Arrêter une partie bloquée'), shortcutLabel(SHORTCUTS.forceStop)],
   ];
   return rows.filter(([door]) => guest.allows(door)).map(([, what, how]) => [what, how]);
@@ -585,7 +586,7 @@ function menuFooter(): [string, string?][] {
       [t('Flippers : choisir')],
       ...(!collections.locked() && (magna.previous.length || magna.next.length) ? [[t('MagnaSave : collections')] as [string]] : []),
       [t('Start : ouvrir'), KEYS.confirm[0]],
-      ...(guest.allows('menu.system') ? [[t('Exit : menu'), KEYS.exit[0]] as [string, string]] : []),
+      ...(guest.allows('menu.system') ? [[t('Exit : Menu système'), KEYS.exit[0]] as [string, string]] : []),
     ];
   // Médaillon Juke-box : Start ouvre le lecteur (ou l'invitation à importer).
   if (onJukebox())
@@ -593,7 +594,7 @@ function menuFooter(): [string, string?][] {
       [t('Flippers : choisir')],
       ...(!collections.locked() && (magna.previous.length || magna.next.length) ? [[t('MagnaSave : collections')] as [string]] : []),
       [library.jukebox.store().playlists.length ? t('Start : ouvrir') : t('Start : importer'), KEYS.confirm[0]],
-      ...(guest.allows('menu.system') ? [[t('Exit : menu'), KEYS.exit[0]] as [string, string]] : []),
+      ...(guest.allows('menu.system') ? [[t('Exit : Menu système'), KEYS.exit[0]] as [string, string]] : []),
     ];
   return [
     [t('Flippers : choisir')],
@@ -607,7 +608,7 @@ function menuFooter(): [string, string?][] {
         ] as [string, string?][])
       : ([[t('Start : fiche'), KEYS.confirm[0]]] as [string, string?][])),
     // Mode invité : Exit n'ouvre pas le menu système.
-    ...(guest.allows('menu.system') ? [[t('Exit : menu'), KEYS.exit[0]] as [string, string]] : []),
+    ...(guest.allows('menu.system') ? [[t('Exit : Menu système'), KEYS.exit[0]] as [string, string]] : []),
   ];
 }
 
@@ -1515,8 +1516,10 @@ function openCollectionsMedallion(): void {
 /** Ce que le menu dit du médaillon Communauté : joueurs en ligne, amis en ligne. */
 function communityCard() {
   const s = communityMenu.summary();
-  const parts = socialNet.state().enabled ? [tn(s.online, '{n} joueur en ligne', '{n} joueurs en ligne'), ...(s.friends ? [tn(s.friends, '{n} ami', '{n} amis')] : [])] : [t('Partage désactivé')];
-  return { title: t('Communauté'), subtitle: parts.join(' · '), community: true, favorite: false, plays: 0 };
+  // Les joueurs en ligne au-delà de cinq seulement (shownCrowd) ; mes amis en ligne, toujours.
+  const online = shownCrowd(s.online);
+  const parts = socialNet.state().enabled ? [...(online ? [tn(online, '{n} joueur en ligne', '{n} joueurs en ligne')] : []), ...(s.friends ? [tn(s.friends, '{n} ami', '{n} amis')] : [])] : [t('Partage désactivé')];
+  return { title: t('Communauté'), subtitle: parts.length ? parts.join(' · ') : t('Joueurs, salons, classements.'), community: true, favorite: false, plays: 0 };
 }
 
 /** Start sur le médaillon Communauté : l'accueil (Joueurs en ligne, Messages, Salon, Classements) ; Exit revient à la roue. */
@@ -1733,7 +1736,7 @@ function remoteScreen(): { title: string; item?: string; zone?: string } {
   // Juke-box : MagnaSave y passe à la playlist suivante, dans une playlist ouverte et si la borne a ce bouton.
   if (state.phase === 'jukebox') return { title: t('Juke-box'), ...(jukeboxPlayer.level() === 'tracks' && collectionKeys().next.length ? { zone: t('Playlist suivante') } : {}) };
   // La roue : la collection active, la table choisie ; MagnaSave y passe à la collection suivante.
-  return { title: collections.current().label || t('Menu des tables'), item: tables[state.index]?.title, zone: collections.locked() ? undefined : t('Collection suivante') };
+  return { title: collections.current().label || t('Écran des tables'), item: tables[state.index]?.title, zone: collections.locked() ? undefined : t('Collection suivante') };
 }
 
 // --- Accès direct depuis le téléphone (remote-menus.ts) ---------------------------------------
@@ -1823,7 +1826,7 @@ function wheelEntries(media = false): MenuEntries {
   const chosen = selectedMedallion();
   const current = chosen ? leads.indexOf(chosen) : shelf.tables.length ? leads.length + shelf.index : -1;
   const again = wheelPlays() ? t('Touchez une table pour la choisir, puis touchez-la encore pour jouer.') : t('Touchez une table pour la choisir, puis touchez-la encore pour ouvrir sa fiche.');
-  return { kind: 'wheel', title: collections.current().label || t('Menu des tables'), icon: 'tables', items, current, note: items.length ? again : t('Aucune table dans cette collection.'), collections: choices };
+  return { kind: 'wheel', title: collections.current().label || t('Écran des tables'), icon: 'tables', items, current, note: items.length ? again : t('Aucune table dans cette collection.'), collections: choices };
 }
 
 /** Une collection choisie au téléphone : comme un clic sur la ligne de la liste des collections à la borne. */
@@ -2062,7 +2065,7 @@ function triggersHintButton(name: string, down: boolean): void {
   triggersTimer = setTimeout(() => {
     triggersTimer = undefined;
     if (!triggersHold.due(Date.now()) || calibration || controllerWizard || playing || launch) return;
-    console.log(`Casque : les deux gâchettes tenues ${TRIGGERS_HINT_S} s au menu ; aide « les sticks, pas les gâchettes » montrée.`); // i18n-ignore : journal
+    console.log(`Casque : les deux gâchettes tenues ${TRIGGERS_HINT_S} s dans le front-end ; aide « les sticks, pas les gâchettes » montrée.`); // i18n-ignore : journal
     if (!showGestureCard()) showBanner(t('Pour recaler la borne : enfoncez les deux sticks, pas les gâchettes'));
   }, TRIGGERS_HINT_S * 1000 + 20);
 }
@@ -2476,7 +2479,7 @@ function openCabinetSetup(): void {
   library.openCustom(() => ({
     heading: SYSTEM_ITEMS.cabinet.label,
     icon: SYSTEM_ITEMS.cabinet.icon,
-    lead: t('Chaque étape se refait seule, puis revient au menu des tables. Exit maintenu 2 s (ou le bouton « Quitter sans enregistrer » des boutons de l’interface) en sort sans rien changer, à toute étape.'),
+    lead: t('Chaque étape se refait seule, puis revient à l’écran des tables. Exit maintenu 2 s (ou le bouton « Quitter sans enregistrer » des boutons de l’interface) en sort sans rien changer, à toute étape.'),
     sections: [],
     actions: [...cabinetSetupItems().map((i) => ({ label: i.label, detail: i.detail, icon: i.icon, attention: i.attention, run: i.run })), { label: t('Retour'), icon: 'back', run: () => library.openSystem() }],
     back: () => library.openSystem(),
@@ -2647,7 +2650,7 @@ library.provideSystemItem('backups', backups.systemItem);
 // Aide-mémoire des boutons : aussi ici, puisque le pied du menu ne nomme que Flippers, Start et Exit.
 library.provideSystemItem('controls', {
   get detail() {
-    return t('Les boutons du menu et de la partie');
+    return t('Les boutons du front-end et de la partie');
   },
   get shortcut() {
     return interfaceShortcut(KEYS.help);
@@ -2688,8 +2691,8 @@ if (shellSession()) {
     const button = own ? t('Bouton de la borne : {button}', { button: keyLabel(own) }) + ' · ' : '';
     const keys = own && joystickButton(own) ? formatList([t('{button} de nouveau', { button: keyLabel(own) }), shortcutLabel(SHORTCUTS.desktop)], 'or') : shortcutLabel(SHORTCUTS.desktop);
     return button + (startHoldCode()
-      ? t('Libère tous les écrans du PC ; un appui long sur Start, {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu', { keys })
-      : t('Libère tous les écrans du PC ; {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu', { keys }));
+      ? t('Libère tous les écrans du PC ; un appui long sur Start, {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le front-end', { keys })
+      : t('Libère tous les écrans du PC ; {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le front-end', { keys }));
   },
   // Touches lues dans la définition du raccourci (SHORTCUTS) : celles que reconnaissent handleKey et le raccourci global.
   get shortcut() {
@@ -2716,7 +2719,7 @@ library.provideSystemItem('start-relaunch', {
     if (shellSession()) return t('Inutile en borne dédiée : Cyber Pinball y est relancé de lui-même');
     if (!joystickStartCode(buttons)) return t('Start doit être un bouton de joystick (Pinscape, encodeur en mode manette) : relevez-le dans l’étape « Boutons »');
     return relaunchEnabled(loc.dataDir)
-      ? t('Appui long ({seconds} s) sur Start : rouvre Cyber Pinball fermé, ou le menu depuis le bureau Windows', { seconds: START_HOLD_MS / 1000 })
+      ? t('Appui long ({seconds} s) sur Start : rouvre Cyber Pinball fermé, ou le front-end depuis le bureau Windows', { seconds: START_HOLD_MS / 1000 })
       : t('Désactivée : Start ne rouvre pas Cyber Pinball depuis Windows');
   },
   get tone() {
@@ -3005,7 +3008,7 @@ const liveGames = createLiveGames({
   // se pose sur le plateau, par-dessus VPX : quitter sa partie ramène au menu, où l'invitation s'ouvre.
   onInvite: (invite) => {
     // Pendant une partie, notifications masquées : ni carillon ni carte ; l'invitation attend au menu, où elle s'ouvre au retour.
-    if (playing && quietInGame) return void console.log(`Invitation pendant la partie : ${invite.host.name}, ${invite.title}, gardée pour le menu (notifications masquées pendant les parties).`); // i18n-ignore : journal
+    if (playing && quietInGame) return void console.log(`Invitation pendant la partie : ${invite.host.name}, ${invite.title}, gardée pour le front-end (notifications masquées pendant les parties).`); // i18n-ignore : journal
     playUiSound('invite');
     if (playing) gameNotices.show(invite);
     else if (!openArrivedInvite(invite.id)) console.log(`Invitation de ${invite.host.name} : annoncée par la notification (écran « ${zoneScreen()} » laissé tel quel).`); // i18n-ignore : journal
@@ -3047,7 +3050,7 @@ const menuDmd = createMenuDmd({
   auto: (table) => autoDmdPlace(table),
   unseen: () =>
     mediaSettings.dmd !== 'live'
-      ? t('« DMD du menu » est réglé sur « classique » : la roue montre le média DMD de la table, sans points (Menu système > Médias > « Médias, son et attente »).')
+      ? t('« DMD du front-end » est réglé sur « classique » : la roue montre le média DMD de la table, sans points (Menu système > Médias > « Médias, son et attente »).')
       : undefined,
   keys: () => {
     // Les MagnaSave lus comme sur la roue : relevés, sinon Ctrl gauche et Ctrl droit.
@@ -3291,7 +3294,7 @@ library.provideAddFromFriend(friendsMenu.addFromFriend);
 library.provideSystemItem('quiet-in-game', {
   get detail() {
     return quietInGame
-      ? t('Activé · connexion d’un ami, demande de rejoindre une partie, etc. : rien pendant une partie, tout reste au menu')
+      ? t('Activé · connexion d’un ami, demande de rejoindre une partie, etc. : rien pendant une partie, tout reste dans le front-end')
       : t('Désactivé · connexion d’un ami, demande de rejoindre une partie, etc.');
   },
   run: () => {
@@ -3744,7 +3747,7 @@ function calibrationComboTip(): void {
   } catch {
     // Dossier de la VR en lecture seule : l'astuce reviendra, sans gravité.
   }
-  if (!showGestureCard()) showBanner(t('Recaler la borne à tout moment, au menu comme en partie : {combo}.', { combo }));
+  if (!showGestureCard()) showBanner(t('Recaler la borne à tout moment, dans le front-end comme en partie : {combo}.', { combo }));
 }
 
 /**
@@ -4233,7 +4236,7 @@ function openHeadsetMenu(): void {
       icon: 'vr' as const,
       lead: t('Les mêmes boutons partout : A valide, B revient, les joysticks déplacent la sélection.'),
       sections: [
-        { title: t('Au menu'), kind: legendKind(), rows: [...headsetControls(controllerSetting()).filter((c) => c.menu).map((c) => ({ text: c.label, detail: c.menu, ...legendControls([c.element]) })), ...comboRows()] },
+        { title: t('Dans le front-end'), kind: legendKind(), rows: [...headsetControls(controllerSetting()).filter((c) => c.menu).map((c) => ({ text: c.label, detail: c.menu, ...legendControls([c.element]) })), ...comboRows()] },
         { title: t('En partie'), kind: legendKind(), rows: [...headsetControls(controllerSetting()).map((c) => ({ text: c.label, detail: c.game, ...legendControls([c.element]) })), ...comboRows(true)] },
       ],
       actions: [
@@ -4800,7 +4803,7 @@ function checkStaleCalibration(): void {
   if (offered === stale.signature) return;
   if (staleSaid !== stale.signature) {
     staleSaid = stale.signature;
-    console.warn(`Casque : calage périmé, ${stale.log} ; le calage est proposé une fois au menu (ou les deux joysticks, « Caler la borne »).`); // i18n-ignore : journal
+    console.warn(`Casque : calage périmé, ${stale.log} ; le calage est proposé une fois dans le front-end (ou les deux joysticks, « Caler la borne »).`); // i18n-ignore : journal
   }
   roomNotice = true;
   staleNotice = true;
@@ -4864,7 +4867,7 @@ function showCalibration(problem?: string): void {
     keys: c.place && keys ? t('A : valider · Gâchette : replacer') : keys,
     ...(schema && { schema, keysLead: lead }),
     ...(issue && { problem: issue }),
-    ...(combo && !desk && { band: { ...(drawn && { schema: [...combo] }), text: t('À tout moment, enfoncez les deux sticks 3 s'), detail: t('pour recaler la borne, au menu comme en partie') } }),
+    ...(combo && !desk && { band: { ...(drawn && { schema: [...combo] }), text: t('À tout moment, enfoncez les deux sticks 3 s'), detail: t('pour recaler la borne, dans le front-end comme en partie') } }),
   };
   state = { ...state, phase: 'message', help: false, message: { title: t('Caler la borne'), lines: [text, ...(issue ? [issue] : []), ...(keys ? [keys] : [])], prompt } };
   broadcast();
@@ -5131,7 +5134,7 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
       const table = vpxTableGeometry(tableFile);
       const menuWidth = menuPlayfield(headsetSources(), headsetTurn())?.width;
       const settings = placeVpxSettings(place, table, menuWidth);
-      if (table) details.push(`table : plateau de ${table.widthCm.toFixed(1)} cm, vitre du bas à ${table.glassBottomCm.toFixed(1)} cm ; plateau recalé sur celui du menu${menuWidth ? `, ${Math.round(menuWidth * 100)} cm de large` : ''}`); // i18n-ignore : journal
+      if (table) details.push(`table : plateau de ${table.widthCm.toFixed(1)} cm, vitre du bas à ${table.glassBottomCm.toFixed(1)} cm ; plateau recalé sur celui du front-end${menuWidth ? `, ${Math.round(menuWidth * 100)} cm de large` : ''}`); // i18n-ignore : journal
       writeIniSettings(vr.ini, settings);
       details.push(`place de la borne du casque${isCalibrated(place) ? ' calée' : ''} : ${settings.map((s) => `${s.key} ${s.value}`).join(', ')}`); // i18n-ignore : journal
       // Caler la borne en partie (les deux joysticks, ou « Caler la borne » de la pause) : VPX aligné sur les prises
@@ -5152,7 +5155,7 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
           // VPX n'a pas calé (calage vérifié dans la couche du repère) : l'étape le dit au lieu de « Borne calée ».
           { section: 'Plugin.CyberPinball', key: 'CalibrateFailedLabel', value: t('Pas calée : manettes immobiles sur les coins de la barre, gâchette de nouveau') },
         ]);
-        details.push(`calage en partie : ${calibrationCombo(controllerSetting().profile) ? 'les deux joysticks tenus 3 s, ou ' : ''}« Caler la borne » de la pause ; ControllerLockbarScale ${ig.lockbarScale}, ControllerCabYOffset ${ig.cabYOffset}, hauteur ${ig.heightSteps} cm${ig.measured ? '' : ' (prises des manettes pas encore mesurées : recalez au menu)'}`); // i18n-ignore : journal
+        details.push(`calage en partie : ${calibrationCombo(controllerSetting().profile) ? 'les deux joysticks tenus 3 s, ou ' : ''}« Caler la borne » de la pause ; ControllerLockbarScale ${ig.lockbarScale}, ControllerCabYOffset ${ig.cabYOffset}, hauteur ${ig.heightSteps} cm${ig.measured ? '' : ' (prises des manettes pas encore mesurées : recalez dans le front-end)'}`); // i18n-ignore : journal
       }
       const far = vpxPlaceProblem(settings);
       if (far) details.push(`attention : ${far}`); // i18n-ignore : journal
@@ -5169,7 +5172,7 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
     const input = vpxHeadsetInput(readTextIfExists(vr.ini), controllerSetting());
     if (input.length) {
       writeIniSettings(vr.ini, input);
-      details.push(`manettes : ${input.length} liaison(s) de VPX alignée(s) sur celles du menu`); // i18n-ignore : journal
+      details.push(`manettes : ${input.length} liaison(s) de VPX alignée(s) sur celles du front-end`); // i18n-ignore : journal
     }
     console.log(`Réalité virtuelle : ${readiness.runtime}, INI de la partie ${vr.ini} (${details.join(' ; ')}).`); // i18n-ignore : journal
     return vr;
@@ -5216,7 +5219,7 @@ function checkVrPlaceAfterGame(ini: string, tableFile: string, room?: GameRoom):
       } catch (error) {
         console.warn(`Casque : calage fait en partie pas écrit dans l’INI de la VR (${(error as Error).message}).`); // i18n-ignore : journal
       }
-      console.log(`Casque : borne recalée pendant la partie (les deux joysticks ou la pause) ; barre avant déplacée de ${gap.cm.toFixed(0)} cm, tournée de ${gap.deg.toFixed(0)}° ; la borne du menu et les parties suivantes la suivent.`); // i18n-ignore : journal
+      console.log(`Casque : borne recalée pendant la partie (les deux joysticks ou la pause) ; barre avant déplacée de ${gap.cm.toFixed(0)} cm, tournée de ${gap.deg.toFixed(0)}° ; la borne du front-end et les parties suivantes la suivent.`); // i18n-ignore : journal
       return;
     }
   }
@@ -5441,7 +5444,7 @@ function showDesktop(): boolean {
   orientationForDesktop();
   console.log(`Mode bureau : ${away.length} fenêtres de Cyber Pinball rangées (${away.filter(isVeil).length} voiles), tous les écrans libres, ${desktop.silenced} pages muettes.`);
   if (!OFFSCREEN && !globalShortcut.register(accelerator(SHORTCUTS.desktop), () => restoreFromDesktop())) {
-    console.warn(`Mode bureau : ${shortcutLabel(SHORTCUTS.desktop)} est déjà pris par un autre programme ; la barre des tâches ramène le menu.`);
+    console.warn(`Mode bureau : ${shortcutLabel(SHORTCUTS.desktop)} est déjà pris par un autre programme ; la barre des tâches ramène le front-end.`);
   }
   const startCode = startHoldCode();
   if (startCode) desktopStartHold = watchStartHold(startCode, () => restoreFromDesktop());
@@ -5468,7 +5471,7 @@ function restoreFromDesktop(): void {
   const moved = orientationFromDesktop();
   desktop.leave();
   setDesktopMode(false);
-  console.log('Mode bureau : retour au menu.');
+  console.log('Mode bureau : retour au front-end.');
   if (moved) return relaunchMenu();
   // Rappelé par le raccourci global, depuis une autre application : Windows ne laisse pas toujours le focus.
   // Les barres des tâches, visibles au bureau, repassent derrière le menu.
@@ -5824,7 +5827,7 @@ export function startFrontend(): void {
       phase: 'message',
       message: {
         title: t('Boutons de la borne à refaire'),
-        lines: [...buttonProblems(buttons), t('Les touches par défaut des encodeurs servent en attendant.'), t('Start : refaire l’étape « Boutons » · Exit : menu')],
+        lines: [...buttonProblems(buttons), t('Les touches par défaut des encodeurs servent en attendant.'), t('Start : refaire l’étape « Boutons » · Exit : Menu système')],
         action: 'buttons',
       },
     };
@@ -5835,7 +5838,7 @@ export function startFrontend(): void {
       phase: 'message',
       message: {
         title: t('Boutons de l’interface à refaire'),
-        lines: [...navigationProblems(navigation), t('Les flippers, Start et Exit du jeu servent en attendant.'), t('Start : refaire l’étape « Boutons de l’interface » · Exit : menu')],
+        lines: [...navigationProblems(navigation), t('Les flippers, Start et Exit du jeu servent en attendant.'), t('Start : refaire l’étape « Boutons de l’interface » · Exit : Menu système')],
         action: 'interface',
       },
     };
@@ -5927,7 +5930,7 @@ function scanOrdered(): TableEntry[] {
 }
 
 function noTables(): Message {
-  return { title: t('Aucune table'), lines: [t('Start : ajouter une table.'), t('Exit : menu.')], action: 'addTable' };
+  return { title: t('Aucune table'), lines: [t('Start : ajouter une table.'), t('Exit : Menu système.')], action: 'addTable' };
 }
 
 /** Relit les tables après un ajout, une réparation ou une suppression, en gardant la sélection. */
@@ -5973,7 +5976,7 @@ function syncScreens(overwriteManual = false): {
         lines: [
           ...blocking.map((f) => f.message),
           t('Configuration {summary}', { summary: selection!.summary }),
-          t('Start : relancer l’assistant d’écrans · Exit : menu (Configurations de la borne pour en changer).'),
+          t('Start : relancer l’assistant d’écrans · Exit : Menu système (Configurations de la borne pour en changer).'),
         ],
         action: 'wizard',
       },
@@ -6486,7 +6489,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
           ? t('Pinball FX n’est pas installé sur ce PC. Menu système > Tables > Ajouter une table > « Installer Pinball FX ».')
           : undefined;
   if (why) {
-    state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible'), lines: [why, t('Start ou Exit : revenir au menu.')] } };
+    state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible'), lines: [why, t('Start ou Exit : revenir au front-end.')] } };
     broadcast();
     return undefined;
   }
@@ -6600,7 +6603,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
         lines: [
           ...(result.message ? [result.message] : []),
           t('Vérifiez que la table est achetée dans Pinball FX et que Steam (ou Epic) est connecté.'),
-          t('Start ou Exit : revenir au menu.'),
+          t('Start ou Exit : revenir au front-end.'),
         ],
       },
     };
@@ -6622,7 +6625,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   await backups.yieldToGame();
   const copying = backups.busy();
   if (copying) {
-    state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible pour l’instant'), lines: [copying, t('Start ou Exit : revenir au menu.')] } };
+    state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible pour l’instant'), lines: [copying, t('Start ou Exit : revenir au front-end.')] } };
     broadcast();
     return undefined;
   }
@@ -6631,7 +6634,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const simulated = OFFSCREEN ? process.env.CYBERPINBALL_PARTIE_SIMULEE : undefined;
   const refused = simulated === undefined ? refuseOffscreen(t('Lancer une partie de VPX')) : undefined;
   if (refused) {
-    state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible hors écran'), lines: [refused, t('Start ou Exit : revenir au menu.')] } };
+    state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible hors écran'), lines: [refused, t('Start ou Exit : revenir au front-end.')] } };
     broadcast();
     return undefined;
   }
@@ -6652,7 +6655,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
               lines: [
                 t('Pendant la partie, {names} réagiraient aussi aux boutons de la borne et pourraient prendre les écrans ou l’afficheur DMD.', { names }),
                 t('Fermez {names} depuis leur menu (Quitter), puis relancez la partie.', { names }),
-                t('Start : jouer quand même · Exit : revenir au menu'),
+                t('Start : jouer quand même · Exit : revenir au front-end'),
               ],
               action: 'otherFrontend',
             }
@@ -6661,7 +6664,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
               lines: [
                 t('Pendant la partie, {names} réagirait aussi aux boutons de la borne et pourrait prendre les écrans ou l’afficheur DMD.', { names }),
                 t('Fermez {names} depuis son menu (Quitter), puis relancez la partie.', { names }),
-                t('Start : jouer quand même · Exit : revenir au menu'),
+                t('Start : jouer quand même · Exit : revenir au front-end'),
               ],
               action: 'otherFrontend',
             },
@@ -7491,7 +7494,7 @@ function joystickMessage(version: string): Message | undefined {
     title: t('Boutons du joystick introuvables dans VPX'),
     lines: [
       t('VPX a vu {seen}, mais pas le joystick des boutons relevés ({unseen}) : ces boutons n’ont pas répondu pendant la partie.', { seen: formatList(seen.map((j) => j.name), 'and'), unseen: unseen.join(', ') }),
-      t('Start : refaire l’étape « Boutons » · Exit : menu'),
+      t('Start : refaire l’étape « Boutons » · Exit : Menu système'),
     ],
     action: 'buttons',
   };

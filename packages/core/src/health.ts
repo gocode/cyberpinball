@@ -554,7 +554,7 @@ function taskbarLines(facts: TaskbarFacts): HealthLine[] {
     {
       check: 'screens',
       state: 'ok',
-      title: tn(facts.repaired, 'Barre des tâches remise derrière le menu une fois', 'Barre des tâches remise derrière le menu {n} fois'),
+      title: tn(facts.repaired, 'Barre des tâches remise derrière le front-end une fois', 'Barre des tâches remise derrière le front-end {n} fois'),
       detail: [t('Windows l’avait fait passer devant un écran, le gardien des écrans l’a remise derrière'), last, journal].filter(Boolean).join(t(' ; ')),
       go,
       target,

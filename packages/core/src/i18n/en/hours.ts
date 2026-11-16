@@ -42,7 +42,7 @@ export const messages: Record<string, string> = {
   'Mode d’arrêt : {action}': 'Stop mode: {action}',
   'Ce PC n’a que la veille moderne : la borne ne pourra pas se mettre en veille (Start : extinction)': 'This PC only has Modern Standby: the cabinet will not be able to sleep (Start: shutdown)',
   'Utilisé si une heure d’arrêt est choisie (Start : changer)': 'Used if a stop time is chosen (Start: change)',
-  'Le menu revient au réveil (Start : extinction)': 'The menu comes back on wake (Start: shutdown)',
+  'Le front-end revient au réveil (Start : extinction)': 'The menu comes back on wake (Start: shutdown)',
   'Cyber Pinball se ferme, puis Windows éteint le PC (Start : mise en veille)': 'Cyber Pinball closes, then Windows shuts the PC down (Start: sleep)',
   'Horaire de la borne': 'Cabinet schedule',
   'La nuit, l’attente devient muette et les écrans peuvent s’assombrir. Un arrêt automatique laisse 30 s pour garder la borne allumée.':

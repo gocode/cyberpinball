@@ -192,7 +192,7 @@ export const messages: Record<string, string> = {
   'Scores des amis pendant la partie': 'Friends’ scores during the game',
   'Sur le fronton, même quand la table s’en sert (la bande passe devant) ; sans fronton, sur le topper ; sinon en bas du plateau': 'On the backglass, even when the table uses it (the strip goes in front); without a backglass, on the topper; otherwise at the bottom of the playfield',
   'Masquer les notifications pendant les parties': 'Hide notifications during games',
-  'Activé · connexion d’un ami, demande de rejoindre une partie, etc. : rien pendant une partie, tout reste au menu': 'On · a friend coming online, a request to join a game, etc.: nothing during a game, everything waits in the menu',
+  'Activé · connexion d’un ami, demande de rejoindre une partie, etc. : rien pendant une partie, tout reste dans le front-end': 'On · a friend coming online, a request to join a game, etc.: nothing during a game, everything waits in the menu',
   'Désactivé · connexion d’un ami, demande de rejoindre une partie, etc.': 'Off · a friend coming online, a request to join a game, etc.',
   'Sur le fronton': 'On the backglass',
   'Scores sur le DMD : activés': 'Scores on the DMD: on',

@@ -338,16 +338,16 @@ export function powerTexts(action: PowerAction): PowerTexts {
     case 'sleep':
       return {
         label: t('Mettre en veille'),
-        detail: t('Écrans et PC en veille ; le menu revient au réveil'),
+        detail: t('Écrans et PC en veille ; le front-end revient au réveil'),
         question: t('Mettre la borne en veille ?'),
         steps: [
           t('Cyber Pinball enregistre ses réglages et reste ouvert.'),
           t('Le PC et les écrans passent en veille.'),
-          t('Pour reprendre, appuyez sur le bouton d’alimentation du PC. Le menu revient au réveil.'),
+          t('Pour reprendre, appuyez sur le bouton d’alimentation du PC. Le front-end revient au réveil.'),
         ],
         hint: t('Start : mettre en veille · Exit : annuler'),
         progress: t('Mise en veille…'),
-        progressLine: t('Réglages enregistrés ; le menu revient au réveil.'),
+        progressLine: t('Réglages enregistrés ; le front-end revient au réveil.'),
         simulated: t('Mode essai : mise en veille simulée, le PC reste allumé.'),
       };
     case 'restart':

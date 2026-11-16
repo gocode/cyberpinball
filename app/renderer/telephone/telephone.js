@@ -166,7 +166,7 @@ const MESSAGES = {
   used: { icon: 'alert', title: () => t('QR code déjà utilisé'), text: () => t('Ce QR code ne peut plus servir. Scannez celui qui est maintenant affiché sur la borne.'), again: true },
   busy: { icon: 'alert', title: () => t('Un téléphone est déjà connecté'), text: () => t('Sur la borne, choisissez Déconnecter avant de connecter ce téléphone.'), again: true },
   ended: { icon: 'phone', title: () => t('Téléphone déconnecté'), text: () => t('Pour reprendre le contrôle, scannez un QR code Télécommande sur la borne.'), again: true },
-  idle: { icon: 'clock', title: () => t('Télécommande déconnectée'), text: () => t('Aucun geste au menu depuis 20 minutes. Scannez un nouveau QR code sur la borne.'), again: true },
+  idle: { icon: 'clock', title: () => t('Télécommande déconnectée'), text: () => t('Aucun geste dans le front-end depuis 20 minutes. Scannez un nouveau QR code sur la borne.'), again: true },
   quit: { icon: 'info', title: () => t('Cyber Pinball fermé'), text: () => t('Une fois Cyber Pinball relancé, scannez un nouveau QR code sur la borne.'), again: true },
   closed: { icon: 'info', title: () => t('Navigateur de la borne fermé'), text: () => t('Rouvrez-le sur la borne, puis scannez son QR code pour vous reconnecter.'), again: true },
   replaced: { icon: 'phone', title: () => t('Un autre téléphone a pris la main'), text: () => t('Ce téléphone ne pilote plus la borne.'), again: true },
@@ -180,9 +180,9 @@ const MESSAGES = {
  */
 const KEPT_MESSAGES = {
   ended: () => t('La borne a déconnecté ce téléphone. Il reste gardé : touchez Reprendre pour revenir.'),
-  idle: () => t('Aucun geste au menu depuis 20 minutes. Touchez Reprendre pour revenir.'),
+  idle: () => t('Aucun geste dans le front-end depuis 20 minutes. Touchez Reprendre pour revenir.'),
   quit: () => t('Ce téléphone se reconnectera tout seul dès que Cyber Pinball sera relancé.'),
-  closed: () => t('Touchez Reprendre pour revenir aux commandes du menu.'),
+  closed: () => t('Touchez Reprendre pour revenir aux commandes du front-end.'),
   replaced: () => t('Ce téléphone ne pilote plus la borne. Touchez Reprendre pour reprendre la main.'),
 };
 
@@ -615,7 +615,7 @@ function renderMenus() {
   }
   // À la racine, le menu des tables d'abord : toujours ouvert, même à l'invité.
   // Son icône, le plateau : celle des tables est à la rubrique Tables, juste dessous.
-  const shown = root ? [{ id: 'wheel', label: t('Menu des tables'), detail: t('La roue des tables, pour choisir et jouer'), icon: 'playfield' }, ...nodes] : nodes;
+  const shown = root ? [{ id: 'wheel', label: t('Écran des tables'), detail: t('La roue des tables, pour choisir et jouer'), icon: 'playfield' }, ...nodes] : nodes;
   const icons = shown.some((n) => n.icon);
   list.replaceChildren(
     ...shown.map((node) =>
@@ -1719,7 +1719,7 @@ $('top-more').addEventListener('click', () => {
   openSheet(t('Télécommande'), items, {
     search: true,
     text: [
-      mode === 'game' ? t('Les commandes reviendront à la fin de la partie.') : t('Ce téléphone pilote le menu de la borne.'),
+      mode === 'game' ? t('Les commandes reviendront à la fin de la partie.') : t('Ce téléphone pilote le front-end de la borne.'),
       sending ? t('Un envoi est en cours. Déconnecter ce téléphone l’annulera.') : '',
     ]
       .filter(Boolean)
@@ -1730,7 +1730,7 @@ $('top-more').addEventListener('click', () => {
 $('top-keys').addEventListener('click', () => ($('keys').hidden ? openKeys(fieldShown, !fieldShown, sameField(openedField, fieldShown)) : hideKeys()));
 // Fermer coupe la liaison : une feuille le dit et le fait confirmer.
 $('nav-close').addEventListener('click', () =>
-  openSheet(t('Fermer le navigateur de la borne ?'), [{ id: 'close', label: t('Fermer le navigateur') }], { text: t('La télécommande reviendra aux commandes du menu.'), opener: $('nav-close'), bye: false }),
+  openSheet(t('Fermer le navigateur de la borne ?'), [{ id: 'close', label: t('Fermer le navigateur') }], { text: t('La télécommande reviendra aux commandes du front-end.'), opener: $('nav-close'), bye: false }),
 );
 
 let sheetOpener;

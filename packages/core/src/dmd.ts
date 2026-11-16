@@ -217,7 +217,7 @@ export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmd
   const detected = detectHardwareDmds(devices);
   const findings: SyncFinding[] = [];
   if (server) {
-    findings.push({ severity: 'info', message: t('DMD réel : dmdserver tient l’afficheur (image du menu, bêta) ; VPX lui envoie ses images pendant les parties.') });
+    findings.push({ severity: 'info', message: t('DMD réel : dmdserver tient l’afficheur (image du front-end, bêta) ; VPX lui envoie ses images pendant les parties.') });
     for (const d of detected.filter((x) => hardwareDmdChoice(setup, x.model) !== 'off')) {
       const driver = hardwareDmdDriverProblem(d);
       if (driver) findings.push({ severity: 'warning', message: driver });
@@ -282,7 +282,7 @@ export function hardwareDmdFacts(devices: ObservedUsbDevice[], setup?: HardwareD
   const names = on.map((d) => hardwareDmdName(d));
   if (setup?.zedmdWifi?.enabled) names.push(t('ZeDMD en wifi ({address})', { address: setup.zedmdWifi.address }));
   const problems = on.map((d) => hardwareDmdDriverProblem(d)).filter((p): p is string => Boolean(p));
-  if (setup?.menu && names.length && serverProblem) problems.push(t('Image du menu sur le DMD réel : {problem}', { problem: serverProblem }));
+  if (setup?.menu && names.length && serverProblem) problems.push(t('Image du front-end sur le DMD réel : {problem}', { problem: serverProblem }));
   return { devices: names, problems };
 }
 

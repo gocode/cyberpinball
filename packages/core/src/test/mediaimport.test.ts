@@ -133,7 +133,7 @@ test('archive rangée à la Popper : médias renommés « (Type) <dossier> », f
   ]);
   assert.ok(t.steps.filter((s) => s.media).every((s) => s.kind === 'media' && s.renamed && !s.replaces));
   // Le flv/f4v est dans le plan, mais n'est pas rangé.
-  assert.ok(t.warnings.some((w) => w.includes(`${T2}.f4v`) && w.includes('le menu ne sait pas le lire')), t.warnings.join('\n'));
+  assert.ok(t.warnings.some((w) => w.includes(`${T2}.f4v`) && w.includes('le front-end ne sait pas le lire')), t.warnings.join('\n'));
   assert.ok(!t.steps.some((s) => s.from.endsWith('.f4v')));
   // Ce qui n'est pas un média garde sa place habituelle.
   assert.ok(t.steps.some((s) => s.from.endsWith('notes.txt') && s.kind === 'doc'));

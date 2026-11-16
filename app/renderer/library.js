@@ -740,7 +740,8 @@ function renderTabs(tabs, cursor) {
     const label = libEl('span', 'lib-tab-label');
     if (tab.flag) label.append(flagNode(tab.flag.code, tab.flag.src, tab.flag.name, 'lib-tab-flag'));
     label.append(libEl('span', '', tab.label));
-    node.append(label, libEl('span', 'lib-tab-count', tab.count));
+    // Un nombre tu (moins de six joueurs en ligne) : la case reste, vide, pour garder la hauteur des onglets.
+    node.append(label, libEl('span', 'lib-tab-count', tab.count || ' '));
     box.append(node);
   }
   return box;

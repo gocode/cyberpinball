@@ -216,7 +216,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     // Hors ligne : « vu » date la chute de sa dernière liaison ; pendant une recherche, le libellé le dit.
     if (!online) return offlineText(net.listSync(), friend.lastSeen, now());
     if (p?.status === 'playing' && p.table) return t('En partie : {table} · depuis {duration}', { table: presenceTableLabel(p.table), duration: playDuration((now().getTime() - Date.parse(p.since)) / 1000) });
-    return t('Dans le menu des tables');
+    return t('Dans l’écran des tables');
   }
 
   /** Par où passe sa présence : « Relié par Internet et le réseau local », ou la tolérance après une liaison tombée. */

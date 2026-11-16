@@ -347,7 +347,7 @@ test('Windows Pro : remplacer le bureau par le réglage du compte, sauvegardé, 
 test('lancer au démarrage : raccourci, fond noir et icônes masquées sans UAC ; « Ne plus lancer » remet tout', async () => {
   const h = harness({ ...PRO, otherFrontends: 'PinUP Popper' });
   await h.open();
-  assert.ok(h.rows().some((r) => r.text === 'Autre menu installé : PinUP Popper' && r.tone === 'warning'));
+  assert.ok(h.rows().some((r) => r.text === 'Autre front-end installé : PinUP Popper' && r.tone === 'warning'));
   assert.equal(h.menu.startupItem.label, 'Lancement au démarrage : non');
   await h.choose('Lancer au démarrage de Windows');
   assert.deepEqual(h.settingsWrites.map((w) => w.elevate), [false]);

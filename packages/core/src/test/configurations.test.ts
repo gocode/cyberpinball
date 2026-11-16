@@ -151,7 +151,7 @@ test('configuration forcée : utilisée quels que soient les écrans, jusqu’au
   let set = forceConfiguration(threeConfigurations(), 'second-poste');
   const forced = chooseConfiguration(set, devPcDisplays());
   assert.deepEqual([forced.status, 'id' in forced && forced.id], ['forced', 'second-poste']);
-  assert.match(explainChoice(set, forced), /imposée depuis le menu/);
+  assert.match(explainChoice(set, forced), /imposée depuis le front-end/);
   set = forceConfiguration(set, undefined);
   assert.equal(set.forced, undefined);
   assert.equal(chooseConfiguration(set, devPcDisplays()).status, 'recognized');

@@ -462,7 +462,7 @@ function backglassStep(input: JourneyInput): JourneyStep | undefined {
   if (misnamed?.fix) return { id: 'backglass', title, state: 'todo', required: false, detail: `${misnamed.title}. ${misnamed.detail}`, choices: [repairChoice(misnamed, true)] };
   if (!input.findings.some((f) => f.code === 'backglassMissing')) return { id: 'backglass', title, state: 'done', required: false, detail: t('Présent : VPX l’affiche sur l’écran du fronton.'), choices: [] };
   if (!input.screens.backglass) return { id: 'backglass', title, state: 'done', required: false, detail: t('Inutile : la borne n’a pas d’écran de fronton.'), choices: [] };
-  return extraStep(input, 'backglass', 'b2s', title, t('Facultatif : sans lui, le menu garde son image sur l’écran du fronton pendant la partie.'), (s) => t('Récupérer le fronton : {label}', { label: versionLabel(s.file) }));
+  return extraStep(input, 'backglass', 'b2s', title, t('Facultatif : sans lui, le front-end garde son image sur l’écran du fronton pendant la partie.'), (s) => t('Récupérer le fronton : {label}', { label: versionLabel(s.file) }));
 }
 
 const PUP_FIXES: readonly Finding['code'][] = ['pupMissing', 'pupNotLoaded', 'pupNested', 'pupDisabledByScript', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];

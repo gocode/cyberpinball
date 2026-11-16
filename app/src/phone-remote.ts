@@ -221,7 +221,7 @@ export interface RemoteCommunityRow {
 /** Le salon montré au téléphone : à l'ancienne, une ligne par message ; pourquoi on ne peut pas écrire. */
 export interface RemoteRoom {
   name: string;
-  /** Au-delà de cinq présents seulement (shownPresent) : un salon presque vide ne se chiffre pas. */
+  /** Au-delà de cinq présents seulement (shownCrowd) : un salon presque vide ne se chiffre pas. */
   present?: number;
   lines: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' }[];
   phrases: string[];
@@ -1191,7 +1191,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     try {
       e = menu.entries({ media: wantsMedia });
     } catch (error) {
-      journalIncident('Télécommande : écran du menu illisible pour le téléphone', error); // i18n-ignore : journal
+      journalIncident('Télécommande : écran du front-end illisible pour le téléphone', error); // i18n-ignore : journal
       return;
     }
     gameButtons = mode() === 'game' && e.kind === 'ingame' && Boolean(e.buttons);
@@ -1744,7 +1744,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     const no = (text: string) => {
       if (active === link) sendTo(link, { t: 'up-no', text });
     };
-    if (!menu) return no(t('Envoi indisponible : ouvrez le menu de la borne.'));
+    if (!menu) return no(t('Envoi indisponible : ouvrez le front-end de la borne.'));
     if (upload) return no(t('Un envoi est déjà en cours.'));
     const where = menu.uploadDir();
     if ('refused' in where) return no(where.refused);
@@ -2186,7 +2186,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       log('Télécommande : navigateur intégré fermé, liaison coupée.'); // i18n-ignore : journal
       return;
     }
-    log('Télécommande : navigateur intégré fermé, le téléphone revient au menu.'); // i18n-ignore : journal
+    log('Télécommande : navigateur intégré fermé, le téléphone revient au front-end.'); // i18n-ignore : journal
     pushState();
     settle();
     tick();
@@ -2224,7 +2224,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     if (!external || (next && next !== external)) return;
     external = undefined;
     if (!target) surfaces.delete('browser');
-    log('Télécommande : fenêtre externe fermée, le téléphone revient au menu.'); // i18n-ignore : journal
+    log('Télécommande : fenêtre externe fermée, le téléphone revient au front-end.'); // i18n-ignore : journal
     pushState();
     settle();
     tick();

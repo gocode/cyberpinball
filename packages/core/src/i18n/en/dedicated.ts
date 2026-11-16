@@ -47,7 +47,7 @@ export const messages: Record<string, string> = {
   'Désactiver et rétablir le bureau': 'Turn off and bring back the desktop',
   'Windows demande votre autorisation ; le bureau revient à la prochaine ouverture de session': 'Windows asks for your permission; the desktop comes back at the next sign-in',
   'Ouvrir l’Explorateur': 'Open Explorer',
-  'Une fenêtre de fichiers ; {keys} ramène le menu': 'A file window; {keys} brings back the menu',
+  'Une fenêtre de fichiers ; {keys} ramène le front-end': 'A file window; {keys} brings back the menu',
   'Activation commencée le {date} · Windows doit redémarrer': 'Turning on started on {date} · Windows must restart',
   'Fonctions de Windows « Shell Launcher » activées : redémarrez le PC, puis revenez ici terminer l’activation':
     'Windows “Shell Launcher” features enabled: restart the PC, then come back here to finish turning on',
@@ -97,7 +97,7 @@ export const messages: Record<string, string> = {
   'Désactivée par le script de secours : état d’avant vérifié': 'Turned off by the rescue script: previous state checked',
   'Activation commencée : redémarrez le PC, puis terminez-la ici': 'Turning on started: restart the PC, then finish it here',
   'Cyber Pinball à la place du bureau Windows, pour le compte « {user} »': 'Cyber Pinball instead of the Windows desktop, for account “{user}”',
-  'Cyber Pinball est le shell : une fenêtre de fichiers, tous les écrans libérés ; {keys} ramène le menu': 'Cyber Pinball is the shell: a file window, every screen freed; {keys} brings back the menu',
+  'Cyber Pinball est le shell : une fenêtre de fichiers, tous les écrans libérés ; {keys} ramène le front-end': 'Cyber Pinball is the shell: a file window, every screen freed; {keys} brings back the menu',
 
   // Sans Shell Launcher (Windows Pro, Famille), lancement au démarrage, sauvegarde des réglages
   'Lancement au démarrage': 'Launch at startup',
@@ -118,7 +118,7 @@ export const messages: Record<string, string> = {
   'réglage de Windows': 'Windows setting',
   noir: 'black',
   masquées: 'hidden',
-  'Autre menu installé : {names}': 'Another front end installed: {names}',
+  'Autre front-end installé : {names}': 'Another front end installed: {names}',
   'S’il se lance lui aussi à l’ouverture de session, les deux se disputeront les écrans : retirez son lancement automatique': 'If it also starts at sign-in, the two will fight over the screens: remove its automatic start',
   'Deux façons, au choix': 'Two ways, your choice',
   'Remplacer le bureau': 'Replace the desktop',
@@ -179,7 +179,7 @@ export const messages: Record<string, string> = {
   'Relance par Start : non': 'Relaunch with Start: no',
   'Inutile en borne dédiée : Cyber Pinball y est relancé de lui-même': 'Not needed on a dedicated cabinet: Cyber Pinball relaunches by itself there',
   'Start doit être un bouton de joystick (Pinscape, encodeur en mode manette) : relevez-le dans l’étape « Boutons »': 'Start must be a joystick button (Pinscape, encoder in gamepad mode): record it in the “Buttons” step',
-  'Appui long ({seconds} s) sur Start : rouvre Cyber Pinball fermé, ou le menu depuis le bureau Windows': 'Long press ({seconds} s) on Start: reopens Cyber Pinball when closed, or the menu from the Windows desktop',
+  'Appui long ({seconds} s) sur Start : rouvre Cyber Pinball fermé, ou le front-end depuis le bureau Windows': 'Long press ({seconds} s) on Start: reopens Cyber Pinball when closed, or the menu from the Windows desktop',
   'Désactivée : Start ne rouvre pas Cyber Pinball depuis Windows': 'Off: Start does not reopen Cyber Pinball from Windows',
-  'Libère tous les écrans du PC ; un appui long sur Start, {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu': 'Frees every PC screen; a long press on Start, {keys} or the Cyber Pinball taskbar button brings the menu back',
+  'Libère tous les écrans du PC ; un appui long sur Start, {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le front-end': 'Frees every PC screen; a long press on Start, {keys} or the Cyber Pinball taskbar button brings the menu back',
 };

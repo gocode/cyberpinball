@@ -28,7 +28,7 @@ export const messages: Record<string, string> = {
   'Retour aux tables': 'Back to tables',
   Continuer: 'Continue',
   'Table introuvable': 'Table not found',
-  'Retour au menu': 'Back to menu',
+  'Retour au front-end': 'Back to menu',
   // Menu système > Tables > Toutes les tables (app/src/library.ts)
   'Retour à la liste des tables': 'Back to the table list',
   '{n} table : sa fiche, comme depuis la roue (Jouer, Modifier, médias…)': '{n} table: its page, as from the wheel (Play, Edit, media…)',
@@ -61,7 +61,7 @@ export const messages: Record<string, string> = {
   'Modifier les informations': 'Edit info',
   'Titre, fabricant, année': 'Title, manufacturer, year',
   'Médias du jeu': 'Game media',
-  'Logo, fronton, vidéos, règles : ce que le menu montre': 'Logo, backglass, videos, rules: what the menu shows',
+  'Logo, fronton, vidéos, règles : ce que le front-end montre': 'Logo, backglass, videos, rules: what the menu shows',
   'Réglages de cette table': 'Settings for this table',
   'Diagnostiquer et réparer': 'Diagnose and fix',
   'Supprimer la table': 'Remove table',
@@ -76,7 +76,7 @@ export const messages: Record<string, string> = {
   // Fiche resserrée (library.ts, buildSheet) : jouer en tête, le reste sous « Gérer la table… »
   'Gérer la table': 'Manage the table',
   // Retour nommé (library.ts, backLabel) : l'écran où mène le bouton en tête ; dans la liste, ce que fait Exit
-  'Menu des tables': 'Table menu',
+  'Écran des tables': 'Table menu',
   'actions': 'actions',
   'Retour : {screen}': 'Back: {screen}',
   'Gérer la table…': 'Manage the table…',
@@ -87,7 +87,7 @@ export const messages: Record<string, string> = {
   'fiche générée': 'generated sheet',
   Médias: 'Media',
   '{own} sur {count} fournis par le jeu ; replis pour les autres': '{own} of {count} supplied by the game; fallbacks for the rest',
-  'aucun : le menu montre ses replis': 'none: the menu shows its fallbacks',
+  'aucun : le front-end montre ses replis': 'none: the menu shows its fallbacks',
   'Quitter sans enregistrer': 'Quit without saving',
   'erreur inconnue': 'unknown error',
   'Enregistrées dans « {file} », partagé avec les autres frontends ; les autres informations du fichier sont conservées.': 'Saved in “{file}”, shared with other frontends; the file’s other info is kept.',

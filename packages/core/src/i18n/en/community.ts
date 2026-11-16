@@ -7,6 +7,7 @@ export const messages: Record<string, string> = {
   '{n} joueur en ligne': '{n} player online',
   '{n} joueurs en ligne': '{n} players online',
   '{n} en {country}': '{n} in {country}',
+  'Joueurs, amis et salons du réseau des bornes': 'Players, friends and rooms of the cabinet network',
   'Salon {country}': '{country} room',
   'Salons par pays': 'Rooms by country',
   'Les salons de discussion par pays arrivent dans une prochaine version': 'Chat rooms by country are coming in a later version',
@@ -60,6 +61,7 @@ export const messages: Record<string, string> = {
   // Téléphone : la partie « Joueurs » de la Communauté
   'Joueurs': 'Players',
   'Autres joueurs en ligne ({n})': 'Other players online ({n})',
+  'Autres joueurs en ligne': 'Other players online',
 
   // Garde-fou des essais sans opérateur (install-vpx.ts)
   'Essai sans opérateur : pas de téléchargement de VPX': 'Unattended test: no VPX download',

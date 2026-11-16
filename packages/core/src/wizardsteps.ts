@@ -252,7 +252,7 @@ export function isQuitShortcut(input: { code: string; control?: boolean }): bool
 /** Où mène « Quitter sans enregistrer » : le menu, ou la fermeture quand aucune borne n'est configurée. */
 export function quitDestination(hasModel: boolean): { action: 'menu' | 'close'; text: string } {
   return hasModel
-    ? { action: 'menu', text: t('Retour au menu des tables, configuration enregistrée inchangée.') }
+    ? { action: 'menu', text: t('Retour à l’écran des tables, configuration enregistrée inchangée.') }
     : { action: 'close', text: t('Aucune borne n’est encore configurée : Cyber Pinball se ferme, l’assistant reprendra au prochain démarrage.') };
 }
 

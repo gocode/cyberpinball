@@ -202,7 +202,7 @@ export class DmdServerHost {
     this.socket = socket;
     socket.once('connect', () => {
       this.connected = true;
-      this.options.log('dmdserver : le menu tient l’afficheur.'); // i18n-ignore : journal
+      this.options.log('dmdserver : le front-end tient l’afficheur.'); // i18n-ignore : journal
       if (this.last) this.write(this.last);
     });
     socket.on('error', () => undefined);

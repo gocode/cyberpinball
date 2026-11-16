@@ -61,7 +61,7 @@ export function createTableFiles(ctx: TableFilesContext) {
 
   function build(file: string, contents: TableContents): Built {
     const table = ctx.find(file);
-    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), run: ctx.leave }], back: ctx.leave };
+    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au front-end'), run: ctx.leave }], back: ctx.leave };
     const back = () => ctx.sheet(table);
     const actions: Action[] = [];
     // Une section par sorte, dans l'ordre de l'inventaire (la table, ses frontons, ses ROM…).

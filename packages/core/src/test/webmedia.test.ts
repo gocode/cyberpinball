@@ -139,7 +139,7 @@ test('judgeWebFile : écrans et logo, le contenu prime sur le nom', () => {
   assert.deepEqual(judgeWebFile(make(dir, 'topper webm.mp4', 'webm'), 'Topper'), { status: 'accepted', kind: 'video', ext: 'webm' });
   assert.deepEqual(judgeWebFile(make(dir, 'topper.m4v', 'mp4'), 'Topper'), { status: 'accepted', kind: 'video' });
   const mkv = judgeWebFile(make(dir, 'topper.mkv', 'mkv'), 'Topper');
-  assert.match(mkv.status === 'refused' ? say(mkv.reason) : '', /que le menu ne lit pas ; la convertir demanderait un outil externe \(ffmpeg\)/);
+  assert.match(mkv.status === 'refused' ? say(mkv.reason) : '', /que le front-end ne lit pas ; la convertir demanderait un outil externe \(ffmpeg\)/);
   const sound = judgeWebFile(make(dir, 'topper.mp3', 'mp3'), 'Topper');
   assert.match(sound.status === 'refused' ? say(sound.reason) : '', /^un son, alors que « Topper »/);
   // Chargement : vidéo seulement.

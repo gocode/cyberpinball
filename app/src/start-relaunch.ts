@@ -121,7 +121,7 @@ export function watchDesktopButton(code: string, onPress: () => void): () => voi
   const check = (): void => {
     if (!press.update(joystickButtonsHeld().includes(code), Date.now())) return;
     if (vpxPlaying()) return void console.log('Bureau Windows : bouton appuyé pendant une partie de VPX, ignoré.'); // i18n-ignore : journal
-    console.log('Bureau Windows : bouton appuyé au bureau, retour au menu.'); // i18n-ignore : journal
+    console.log('Bureau Windows : bouton appuyé au bureau, retour au front-end.'); // i18n-ignore : journal
     onPress();
   };
   const stopWatch = watchJoystickButtons(() => check());
@@ -143,7 +143,7 @@ export function watchStartHold(code: string, onHold: () => void): () => void {
   const check = (): void => {
     if (!hold.update(joystickButtonsHeld().includes(code), Date.now())) return;
     if (vpxPlaying()) return void console.log('Relance par Start : appui long pendant une partie de VPX, ignoré.'); // i18n-ignore : journal
-    console.log('Relance par Start : appui long au bureau, retour au menu.'); // i18n-ignore : journal
+    console.log('Relance par Start : appui long au bureau, retour au front-end.'); // i18n-ignore : journal
     onHold();
   };
   const stopWatch = watchJoystickButtons(() => check());

@@ -98,7 +98,7 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
         },
       }));
       actions.push({ label: t('Nouvelle configuration'), detail: t('Assistant complet pour les écrans branchés'), icon: 'plus', run: () => host.relaunch(true) });
-      actions.push({ label: t('Plus tard'), detail: t('Le menu reste sur l’écran principal ; une partie redemandera la configuration'), run: () => host.library.leave() });
+      actions.push({ label: t('Plus tard'), detail: t('Le front-end reste sur l’écran principal ; une partie redemandera la configuration'), run: () => host.library.leave() });
       return {
         heading: t('Quelle configuration est branchée ?'),
         icon: 'layers',
@@ -234,7 +234,7 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
       return {
         heading: t('Supprimer « {name} » ?', { name: nameOf(s, id) }),
         lead: isActive
-          ? t("Elle va dans la corbeille des configurations, d'où elle se restaure telle quelle. C’est la configuration active : le menu redémarre et reconnaît celle qui correspond aux écrans branchés.")
+          ? t("Elle va dans la corbeille des configurations, d'où elle se restaure telle quelle. C’est la configuration active : le front-end redémarre et reconnaît celle qui correspond aux écrans branchés.")
           : t("Elle va dans la corbeille des configurations, d'où elle se restaure telle quelle."),
         sections: [],
         actions: [

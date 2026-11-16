@@ -184,7 +184,7 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
       opts.onForeground?.();
     }
     if (opts.exitHeld && hold.update(opts.exitHeld(), sys.now()) && !stopAsked) {
-      notices.push(t('Appui long sur Exit : Pinball FX fermé, retour au menu.'));
+      notices.push(t('Appui long sur Exit : Pinball FX fermé, retour au front-end.'));
       stop();
     }
   }, POLL_MS);

@@ -328,7 +328,7 @@ export function createWebSearch(ctx: WebSearchContext) {
     };
     const target = u.convert ? u.convert.to : ext;
     let lead: string;
-    if (!u.convert) lead = t('« {file} » convient tel quel. « Affecter » l’écrit aussitôt : le menu le montre sans attendre.', { file: name });
+    if (!u.convert) lead = t('« {file} » convient tel quel. « Affecter » l’écrit aussitôt : le front-end le montre sans attendre.', { file: name });
     else if (u.convert.to === 'png') {
       lead = t('« {file} » est une image .{ext} que « {label} » ne lit pas : elle sera redessinée en PNG, à l’identique, puis rangée.', { file: name, ext, label });
       if (type === 'Wheel' && /^(jpe?g|jfif|bmp)$/.test(ext)) lead += ` ${t('Ce format n’a pas de transparence : le logo gardera son fond.')}`;
@@ -336,7 +336,7 @@ export function createWebSearch(ctx: WebSearchContext) {
       lead = t('« {file} » est une vidéo : son son sera extrait en WAV, découpé à votre guise, puis rangé.', { file: name });
       if (isMp4(u)) lead += ` ${t('Sa piste son peut aussi être prise telle quelle, en .m4a, sans réencodage.')}`;
     }
-    else lead = t('« {file} » est un son .{ext} que le menu ne lit pas : il sera converti en WAV, découpé à votre guise, puis rangé.', { file: name, ext });
+    else lead = t('« {file} » est un son .{ext} que le front-end ne lit pas : il sera converti en WAV, découpé à votre guise, puis rangé.', { file: name, ext });
     const sections: Section[] = asideSections(r);
     const actions: Action[] = [];
     const entry = (file: string): MediaPageEntry => ({ from: file, mode: 'copy', origin: originOf(r) });
@@ -426,7 +426,7 @@ export function createWebSearch(ctx: WebSearchContext) {
     const got = extractMp4Sound(u.file, out);
     if (!got.ok) {
       const reason =
-        got.reason === 'no-sound' ? t('la vidéo n’a pas de piste son') : got.reason === 'unplayable' ? t('son dans un codec que le menu ne lit pas') : got.reason === 'fragmented' ? t('vidéo fragmentée') : t('vidéo illisible');
+        got.reason === 'no-sound' ? t('la vidéo n’a pas de piste son') : got.reason === 'unplayable' ? t('son dans un codec que le front-end ne lit pas') : got.reason === 'fragmented' ? t('vidéo fragmentée') : t('vidéo illisible');
       return ctx.back(r.type, { text: t('Son non extrait tel quel : {reason}. « Découper puis affecter… » le convertit en WAV.', { reason }), tone: 'warning' });
     }
     ctx.sites.addWebFile(key, out, 'audio');

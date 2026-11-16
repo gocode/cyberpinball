@@ -194,7 +194,7 @@ export function createGameParts(ctx: GamePartsContext) {
 
   function build(file: string): Built {
     const table = ctx.find(file);
-    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), run: ctx.leave }], back: ctx.leave };
+    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au front-end'), run: ctx.leave }], back: ctx.leave };
     const back = () => {
       ctx.catalog.setRefresh(undefined);
       ctx.sheet(table);
@@ -365,7 +365,7 @@ export function createGameParts(ctx: GamePartsContext) {
 
   function buildPart(file: string, part: GamePart, from: number): Built {
     const table = ctx.find(file);
-    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), run: ctx.leave }], back: ctx.leave };
+    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au front-end'), run: ctx.leave }], back: ctx.leave };
     const back = () => open(table, from);
     const here = partsOf(table).get(part);
     const item = itemsOf(table).find((i) => i.kind === part);
@@ -421,7 +421,7 @@ export function createGameParts(ctx: GamePartsContext) {
     if (item?.state === 'received') actions.push({ label: t('Installer ce qui est reçu'), detail: t('Voir le plan'), tone: 'ok', run: () => ctx.catalog.installGame(item.gameId) });
     if (part === 'pup' && here) actions.push({ label: t('Options du PuP-Pack'), detail: t('Disposition des écrans'), run: () => ctx.pupOptions(table) });
     if (part === 'pup' && here) actions.push(pupSwitchAction(table, from));
-    if (part === 'media') actions.push({ label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le menu montre'), run: () => ctx.medias(table) });
+    if (part === 'media') actions.push({ label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le front-end montre'), run: () => ctx.medias(table) });
     if (here && part !== 'table' && part !== 'media') actions.push({ label: t('Réaffecter à une autre table'), detail: t('Elle quitte cette table pour une autre'), run: () => openMove(table, part, from) });
     if (here && part !== 'table') actions.push({ label: t('Retirer de la table'), detail: t('Corbeille de Cyber Pinball'), tone: 'error', run: () => confirmRemove(table, part, from) });
     actions.push({ label: t('Retour : parties du jeu'), run: back });
@@ -809,7 +809,7 @@ const PART_LEADS: Record<GamePart, () => string> = {
   pov: () => t('Point de vue de la caméra (.pov), nommé comme la table.'),
   topper: () => t('Animation du topper.'),
   ini: () => t('Réglages propres à cette table (.ini nommé comme elle) ; sans eux, ceux de VPX servent.'),
-  media: () => t('Logo, fronton, vidéos, règles : ce que montre le menu. Ils se choisissent dans « Médias du jeu ».'),
+  media: () => t('Logo, fronton, vidéos, règles : ce que montre le front-end. Ils se choisissent dans « Médias du jeu ».'),
 };
 
 const samePathText = (a: string, b: string) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();

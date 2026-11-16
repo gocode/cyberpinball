@@ -165,7 +165,7 @@ export function dmdKindFindings(cabinet: Cabinet): SyncFinding[] {
       {
         severity: 'warning',
         message: t(
-          'DMD : bande {zone} au milieu de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Si c’est un FullDMD, dites-le dans Configuration de la borne > Écran du DMD : le menu, VPX et les PuP-Packs le traiteront comme tel.',
+          'DMD : bande {zone} au milieu de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Si c’est un FullDMD, dites-le dans Configuration de la borne > Écran du DMD : le front-end, VPX et les PuP-Packs le traiteront comme tel.',
           { zone: ratioLabel(question.zoneRatio), screen: question.screen, ratio: ratioLabel(question.screenRatio) },
         ),
       },

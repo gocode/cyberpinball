@@ -15,7 +15,7 @@ export const messages: Record<string, string> = {
   '{what}, alors que « {label} » demande : {formats}': '{what}, whereas “{label}” needs: {formats}',
   'son .{ext} que le navigateur intégré ne sait pas lire': '.{ext} sound the built-in browser cannot read',
   'vidéo .{ext} dont le navigateur intégré ne sait pas lire le son': '.{ext} video whose sound the built-in browser cannot read',
-  'vidéo .{ext} que le menu ne lit pas ; la convertir demanderait un outil externe (ffmpeg)': '.{ext} video the menu does not play; converting it would need an external tool (ffmpeg)',
+  'vidéo .{ext} que le front-end ne lit pas ; la convertir demanderait un outil externe (ffmpeg)': '.{ext} video the menu does not play; converting it would need an external tool (ffmpeg)',
   ',': '.',
   'page web': 'web page',
 
@@ -45,7 +45,7 @@ export const messages: Record<string, string> = {
   '« {file} » est identique au média {label} actuel : rien n’a été écrit.': '“{file}” is identical to the current {label} media: nothing was written.',
   'Rien n’a été écrit : {problems}': 'Nothing was written: {problems}',
   'Écriture interrompue : {error}. Ce qui a déjà été fait est resté ; les fichiers retirés sont dans {dir}.': 'Writing interrupted: {error}. What was already done stays; removed files are in {dir}.',
-  'Enregistré : « {name} » est maintenant le média {label}, le menu le montre.': 'Saved: “{name}” is now the {label} media, the menu shows it.',
+  'Enregistré : « {name} » est maintenant le média {label}, le front-end le montre.': 'Saved: “{name}” is now the {label} media, the menu shows it.',
   'Ancien fichier dans la corbeille : {dir}.': 'Old file in the trash: {dir}.',
 
   // app/src/media-convert.ts
@@ -70,7 +70,7 @@ export const messages: Record<string, string> = {
   'Sa piste son peut aussi être prise telle quelle, en .m4a, sans réencodage.': 'Its sound track can also be taken as is, as .m4a, with no re-encoding.',
   'Prendre son son tel quel (.m4a) et affecter': 'Take its sound as is (.m4a) and assign',
   'Sans réencodage ; le son entier': 'No re-encoding; the whole sound',
-  'son dans un codec que le menu ne lit pas': 'sound in a codec the menu does not play',
+  'son dans un codec que le front-end ne lit pas': 'sound in a codec the menu does not play',
   'vidéo fragmentée': 'fragmented video',
   'vidéo illisible': 'unreadable video',
   'Son non extrait tel quel : {reason}. « Découper puis affecter… » le convertit en WAV.': 'Sound not taken as is: {reason}. “Trim, then assign…” converts it to WAV.',
@@ -97,12 +97,12 @@ export const messages: Record<string, string> = {
   'Aperçu après la conversion': 'Preview after conversion',
   'vidéo {ext}': '{ext} video',
   'son {ext}': '{ext} sound',
-  '« {file} » convient tel quel. « Affecter » l’écrit aussitôt : le menu le montre sans attendre.': '“{file}” fits as is. “Assign” writes it at once: the menu shows it straight away.',
+  '« {file} » convient tel quel. « Affecter » l’écrit aussitôt : le front-end le montre sans attendre.': '“{file}” fits as is. “Assign” writes it at once: the menu shows it straight away.',
   '« {file} » est une image .{ext} que « {label} » ne lit pas : elle sera redessinée en PNG, à l’identique, puis rangée.':
     '“{file}” is a .{ext} image that “{label}” does not read: it will be redrawn as an identical PNG, then stored.',
   'Ce format n’a pas de transparence : le logo gardera son fond.': 'This format has no transparency: the logo will keep its background.',
   '« {file} » est une vidéo : son son sera extrait en WAV, découpé à votre guise, puis rangé.': '“{file}” is a video: its sound will be extracted to WAV, trimmed as you like, then stored.',
-  '« {file} » est un son .{ext} que le menu ne lit pas : il sera converti en WAV, découpé à votre guise, puis rangé.':
+  '« {file} » est un son .{ext} que le front-end ne lit pas : il sera converti en WAV, découpé à votre guise, puis rangé.':
     '“{file}” is a .{ext} sound the menu does not play: it will be converted to WAV, trimmed as you like, then stored.',
   'Découper puis affecter…': 'Trim, then assign…',
   'Début, fin, fondu de fin : l’extrait s’écoute avant d’être écrit': 'Start, end, fade-out: you hear the excerpt before it is written',

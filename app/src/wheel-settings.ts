@@ -105,7 +105,7 @@ export function createWheelSettings(host: WheelSettingsHost): ProvidedSystemItem
     const v = s();
     const rows: Record<Row, Action> = {
       menuLayout: {
-        label: t('Présentation du menu : {layout}', { layout: MENU_LAYOUT_LABELS[v.menuLayout] }),
+        label: t('Présentation des tables : {layout}', { layout: MENU_LAYOUT_LABELS[v.menuLayout] }),
         detail: t('{detail} (Start : choisir)', { detail: LAYOUT_DETAILS[v.menuLayout] }),
         icon: 'layout-menu',
         run: () => openLayout(),
@@ -142,10 +142,10 @@ export function createWheelSettings(host: WheelSettingsHost): ProvidedSystemItem
         run: () => set({ wheelMotion: v.wheelMotion === 'selected' ? 'all' : 'selected' }),
       },
       tableColor: {
-        label: v.tableColor ? t('Couleur de chaque table au menu : affichée') : t('Couleur de chaque table au menu : coupée'),
+        label: v.tableColor ? t('Couleur de chaque table dans le front-end : affichée') : t('Couleur de chaque table dans le front-end : coupée'),
         detail: v.tableColor
           ? t('La lumière du bandeau de la roue, le halo des cadres et le fond des replis prennent la couleur du fronton de la table ; la table choisie reste en vert (Start : couper)')
-          : t('Le menu garde la sarcelle de Cyber Pinball pour toutes les tables (Start : la couleur de chaque table)'),
+          : t('Le front-end garde la sarcelle de Cyber Pinball pour toutes les tables (Start : la couleur de chaque table)'),
         icon: 'bulb',
         run: () => set({ tableColor: !v.tableColor }),
       },
@@ -195,9 +195,9 @@ export function createWheelSettings(host: WheelSettingsHost): ProvidedSystemItem
   function openLayout(): void {
     host.library.openCustom(
       () => ({
-        heading: t('Présentation du menu'),
+        heading: t('Présentation des tables'),
         icon: 'layout-menu',
-        lead: t('Comment les tables défilent dans le menu. Les roues font glisser les logos d’une place à l’autre ; la liste montre les titres.'),
+        lead: t('Comment les tables défilent dans le front-end. Les roues font glisser les logos d’une place à l’autre ; la liste montre les titres.'),
         sections: [],
         actions: [
           ...MENU_LAYOUTS.map((layout) => ({

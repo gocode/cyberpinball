@@ -92,9 +92,9 @@ export const messages: Record<string, string> = {
   '{n} joueurs partis': '{n} players left',
   '{n} amis en ligne : {names}': '{n} friends online: {names}',
   // app/src/menu-settings.ts
-  'Notifications du menu : affichées': 'Menu notifications: shown',
-  'Notifications du menu : compteur seul': 'Menu notifications: counter only',
-  'Notifications du menu : coupées': 'Menu notifications: off',
+  'Notifications du front-end : affichées': 'Menu notifications: shown',
+  'Notifications du front-end : compteur seul': 'Menu notifications: counter only',
+  'Notifications du front-end : coupées': 'Menu notifications: off',
   'Nombre d’amis en ligne et un message discret, sur chaque écran, quand un ami se connecte, une demande arrive, un téléchargement finit ; pendant une partie, seulement une invitation, un ami qui se connecte et la partie entre amis (Start : compteur seul)':
     'Number of friends online and a discreet message, on every screen, when a friend comes online, a request arrives or a download finishes; during a game, only an invitation, a friend coming online and the game with friends (Start: counter only)',
   'Le nombre d’amis en ligne ; seulement les nouvelles d’une partie entre amis (Start : rien)': 'The number of friends online; only news of a game with friends (Start: nothing)',

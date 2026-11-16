@@ -131,7 +131,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
         problem
           ? { icon: 'monitor', text: t('Serveur du DMD'), detail: t('{problem} ; VPX ouvre le DMD lui-même pendant les parties', { problem }), tone: 'warning' }
           : host.menuServer.ready()
-            ? { icon: 'monitor', text: t('Serveur du DMD'), detail: t('Le menu tient le DMD réel ; VPX le reprend pendant les parties'), tone: 'ok' }
+            ? { icon: 'monitor', text: t('Serveur du DMD'), detail: t('Le front-end tient le DMD réel ; VPX le reprend pendant les parties'), tone: 'ok' }
             : { icon: 'monitor', text: t('Serveur du DMD'), detail: t('Démarre, ou attend que le DMD réponde ; en attendant, VPX ouvre le DMD lui-même') },
       );
     }
@@ -189,16 +189,16 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
     const menuOn = Boolean(s?.menu);
     const serverProblem = host.menuServer.problem();
     actions.push({
-      label: menuOn ? t('Image du menu : oui') : t('Image du menu : non'),
+      label: menuOn ? t('Image du front-end : oui') : t('Image du front-end : non'),
       detail: !cabinet
         ? t('Indisponible : configurez d’abord la borne (assistant d’écrans)')
         : menuOn
-          ? t('Le DMD réel montre aussi le DMD du menu ; VPX le reprend pendant les parties (Start : non)')
+          ? t('Le DMD réel montre aussi le DMD du front-end ; VPX le reprend pendant les parties (Start : non)')
           : !anyOn
             ? t('Indisponible : aucun DMD réel allumé (branchez-le, ou choisissez « oui » pour son modèle)')
             : serverProblem
               ? t('Indisponible : {problem}', { problem: serverProblem })
-              : t('Le DMD réel montre aussi le DMD du menu, entre les parties (Start : oui)'),
+              : t('Le DMD réel montre aussi le DMD du front-end, entre les parties (Start : oui)'),
       icon: 'monitor',
       key: 'menu',
       ...(cabinet && (menuOn || (anyOn && !serverProblem)) ? {} : { tone: 'quiet' as const }),
@@ -211,7 +211,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
       heading: t('DMD réel'),
       icon: 'usb',
       // Dit franchement : la prise en charge attend les bornes équipées.
-      lead: t('Un afficheur à LED branché à la borne (ZeDMD, PIN2DMD, Pixelcade). VPX l’allume pendant les parties ; « Image du menu » lui fait aussi montrer le menu. Bêta : à confirmer sur les bornes équipées.'),
+      lead: t('Un afficheur à LED branché à la borne (ZeDMD, PIN2DMD, Pixelcade). VPX l’allume pendant les parties ; « Image du front-end » lui fait aussi montrer le front-end. Bêta : à confirmer sur les bornes équipées.'),
       sections,
       actions,
       back,
@@ -245,15 +245,15 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
   function toggleMenu(anyOn: boolean): void {
     const s = setup();
     if (s?.menu) {
-      save({ ...s, menu: false }, t('Image du menu : non. VPX ouvre de nouveau le DMD lui-même.'));
+      save({ ...s, menu: false }, t('Image du front-end : non. VPX ouvre de nouveau le DMD lui-même.'));
       return open();
     }
     if (!anyOn) {
-      return library.openNotice(t('Image du menu'), [t('Aucun DMD réel n’est allumé : branchez-le (puis « Vérifier de nouveau »), ou choisissez « oui » pour son modèle, ou indiquez un ZeDMD en wifi.')], () => open());
+      return library.openNotice(t('Image du front-end'), [t('Aucun DMD réel n’est allumé : branchez-le (puis « Vérifier de nouveau »), ou choisissez « oui » pour son modèle, ou indiquez un ZeDMD en wifi.')], () => open());
     }
     const problem = host.menuServer.problem();
-    if (problem) return library.openNotice(t('Image du menu'), [problem, t('Le DMD réel reste piloté par VPX pendant les parties.')], () => open());
-    save({ ...s, menu: true }, t('Image du menu : oui. Le serveur du DMD démarre ; le DMD réel montre le menu dès qu’il répond.'));
+    if (problem) return library.openNotice(t('Image du front-end'), [problem, t('Le DMD réel reste piloté par VPX pendant les parties.')], () => open());
+    save({ ...s, menu: true }, t('Image du front-end : oui. Le serveur du DMD démarre ; le DMD réel montre le front-end dès qu’il répond.'));
     open();
   }
 

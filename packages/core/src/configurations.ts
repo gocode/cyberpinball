@@ -222,7 +222,7 @@ export function explainChoice(set: CabinetSet, choice: ConfigurationChoice): str
   const runnerUp = (id: string) => choice.scores.find((s) => s.id !== id);
   switch (choice.status) {
     case 'forced':
-      return t('{name} imposée depuis le menu (reconnaissance automatique suspendue) : {score}.', { name: name(choice.id), score: explainScore(scoreOf(choice.id)) });
+      return t('{name} imposée depuis le front-end (reconnaissance automatique suspendue) : {score}.', { name: name(choice.id), score: explainScore(scoreOf(choice.id)) });
     case 'recognized': {
       const other = runnerUp(choice.id);
       const params = {

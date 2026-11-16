@@ -360,7 +360,7 @@ export const messages: Record<string, string> = {
   'conseillé : {n} frontons, le premier va avec les écrans de la borne': 'recommended: {n} backglasses, the first suits the cabinet’s screens',
   'conseillé : {n} fronton, aucun annoncé pour les écrans de la borne': 'recommended: {n} backglass, none listed for the cabinet’s screens',
   'conseillé : {n} frontons, aucun annoncé pour les écrans de la borne': 'recommended: {n} backglasses, none listed for the cabinet’s screens',
-  'aucun fronton connu de VPS : le menu en dessinera un': 'no backglass known to VPS: the menu will draw one',
+  'aucun fronton connu de VPS : le front-end en dessinera un': 'no backglass known to VPS: the menu will draw one',
   'fournie avec la table': 'included with the table',
   '{roms} : déjà sur la borne': '{roms}: already on the cabinet',
   '{roms} : à récupérer, si vous y avez droit': '{roms}: to get, if you have the right to',

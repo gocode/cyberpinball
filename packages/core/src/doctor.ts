@@ -946,7 +946,7 @@ function emptyBackglassFinding(file: string | undefined): Finding | undefined {
     severity: 'warning',
     title: t('Fronton sans image : VPX planterait au lancement'),
     detail: t(
-      '« {file} » ne contient aucune image de fronton (un fichier de remplacement, souvent laissé par un autre menu de borne). Le plugin B2S de VPX s’arrête dessus dès la première image de la partie. Sans lui, la table se joue normalement ; le PuP-Pack et le DMD ne changent pas.',
+      '« {file} » ne contient aucune image de fronton (un fichier de remplacement, souvent laissé par un autre front-end de borne). Le plugin B2S de VPX s’arrête dessus dès la première image de la partie. Sans lui, la table se joue normalement ; le PuP-Pack et le DMD ne changent pas.',
       params,
     ),
     fix: { label: t('Mettre « {file} » à la corbeille', params), ops: [{ op: 'trash', path: file }] },
@@ -2110,19 +2110,19 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     findings.push({
       code: 'mediaUnreadable',
       severity: 'warning',
-      title: tn(unreadable.length, 'Média dans un format que le menu ne lit pas', 'Médias dans un format que le menu ne lit pas'),
+      title: tn(unreadable.length, 'Média dans un format que le front-end ne lit pas', 'Médias dans un format que le front-end ne lit pas'),
       detail: [
         old.length
           ? tn(
               new Set(old.map((i) => i.ext)).size,
-              '{files} : {exts}, ancien format de PinUP Popper que le menu (Chromium) ne lit pas. Convertissez en mp4 (H.264) ou en webm, par exemple avec HandBrake.',
-              '{files} : {exts}, anciens formats de PinUP Popper que le menu (Chromium) ne lit pas. Convertissez en mp4 (H.264) ou en webm, par exemple avec HandBrake.',
+              '{files} : {exts}, ancien format de PinUP Popper que le front-end (Chromium) ne lit pas. Convertissez en mp4 (H.264) ou en webm, par exemple avec HandBrake.',
+              '{files} : {exts}, anciens formats de PinUP Popper que le front-end (Chromium) ne lit pas. Convertissez en mp4 (H.264) ou en webm, par exemple avec HandBrake.',
               { files: quoteList(old.map((i) => i.name)), exts: [...new Set(old.map((i) => i.ext))].join(', ') },
             )
           : '',
         ...wrong.map((i) => t('« {name} » : un média « {type} » se lit en {formats}.', { name: i.name, type: label(i.type!), formats: mediaTypeInfo(i.type!).formats.join(', ') })),
         redundant.length ? t('{files} : une version lisible porte le même nom, c’est elle qui est montrée.', { files: quoteList(redundant.map((i) => i.name)) }) : '',
-        redundant.length < unreadable.length ? t('En attendant, le menu passe au média suivant ou à son repli.') : '',
+        redundant.length < unreadable.length ? t('En attendant, le front-end passe au média suivant ou à son repli.') : '',
       ]
         .filter(Boolean)
         .join(' '),
@@ -2172,7 +2172,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
           }),
           ...(s.to ? [] : [t('Un fichier ({type}) de ce nom existe déjà : gardez l’un des deux.', { type: s.actual })]),
         ]),
-        t('Le menu montre le média DMD sur un écran DMD seul, et le média FullDMD sur un écran FullDMD (Configuration de la borne > Écran du DMD).'),
+        t('Le front-end montre le média DMD sur un écran DMD seul, et le média FullDMD sur un écran FullDMD (Configuration de la borne > Écran du DMD).'),
       ].join(' '),
       fix: fixable.length
         ? {
@@ -2225,14 +2225,14 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
           ? own[1]
             ? tn(
                 misnamed.length,
-                'Le menu cherche les médias sous le nom du .vpx (« {vpx} ») ou du dossier (« {folder} ») : {files} n’est pas montré.',
-                'Le menu cherche les médias sous le nom du .vpx (« {vpx} ») ou du dossier (« {folder} ») : {files} ne sont pas montrés.',
+                'Le front-end cherche les médias sous le nom du .vpx (« {vpx} ») ou du dossier (« {folder} ») : {files} n’est pas montré.',
+                'Le front-end cherche les médias sous le nom du .vpx (« {vpx} ») ou du dossier (« {folder} ») : {files} ne sont pas montrés.',
                 { vpx: own[0]!, folder: own[1], files: quoteList(misnamed.map((i) => i.name)) },
               )
             : tn(
                 misnamed.length,
-                'Le menu cherche les médias sous le nom du .vpx (« {vpx} ») : {files} n’est pas montré.',
-                'Le menu cherche les médias sous le nom du .vpx (« {vpx} ») : {files} ne sont pas montrés.',
+                'Le front-end cherche les médias sous le nom du .vpx (« {vpx} ») : {files} n’est pas montré.',
+                'Le front-end cherche les médias sous le nom du .vpx (« {vpx} ») : {files} ne sont pas montrés.',
                 { vpx: own[0]!, files: quoteList(misnamed.map((i) => i.name)) },
               )
           : '',
@@ -2311,8 +2311,8 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
       detail: [
         tn(
           strays.length,
-          'Le menu ne cherche les médias que dans medias\\, sous le nom « (Type) {folder} » : {files} n’est pas montré (rangement de PinUP Popper ou de PinballX, ou fichier posé à côté de la table).',
-          'Le menu ne cherche les médias que dans medias\\, sous le nom « (Type) {folder} » : {files} ne sont pas montrés (rangement de PinUP Popper ou de PinballX, ou fichier posé à côté de la table).',
+          'Le front-end ne cherche les médias que dans medias\\, sous le nom « (Type) {folder} » : {files} n’est pas montré (rangement de PinUP Popper ou de PinballX, ou fichier posé à côté de la table).',
+          'Le front-end ne cherche les médias que dans medias\\, sous le nom « (Type) {folder} » : {files} ne sont pas montrés (rangement de PinUP Popper ou de PinballX, ou fichier posé à côté de la table).',
           { folder: folderName, files: quoteList(strays.map(rel)) },
         ),
         ...left.map((l) =>
@@ -2355,13 +2355,13 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
         const lost = Math.round((1 - Math.min(rm, rs) / Math.max(rm, rs)) * 100);
         const orientation =
           rm < 1.1
-            ? t('Presque carré : le menu ne peut pas savoir où sont les flippers, il le montre tel quel.')
+            ? t('Presque carré : le front-end ne peut pas savoir où sont les flippers, il le montre tel quel.')
             : d.width > d.height
-              ? t('En paysage, les flippers sont supposés à droite : le menu le tourne ; s’il apparaît à l’envers, « Demi-tour » dans les médias de la table.')
+              ? t('En paysage, les flippers sont supposés à droite : le front-end le tourne ; s’il apparaît à l’envers, « Demi-tour » dans les médias de la table.')
               : '';
         lines.push(
           [
-            t('« {name} » ({size}, {ratio}) sur le plateau ({screen}) : le menu le recadre, {lost} % de l’image coupés.', {
+            t('« {name} » ({size}, {ratio}) sur le plateau ({screen}) : le front-end le recadre, {lost} % de l’image coupés.', {
               name: item.name,
               size,
               ratio: ratioLabel(rm),
@@ -2416,7 +2416,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
         code: 'mediaRatio',
         severity: 'info',
         title: tn(lines.length, 'Proportions du média différentes de son écran', 'Proportions des médias différentes de leurs écrans'),
-        detail: t('{lines} Le menu ne déforme jamais un média ; un fichier aux proportions de l’écran l’occupe en entier.', { lines: lines.join(' ') }),
+        detail: t('{lines} Le front-end ne déforme jamais un média ; un fichier aux proportions de l’écran l’occupe en entier.', { lines: lines.join(' ') }),
       });
     }
   }
@@ -2442,8 +2442,8 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
       title: tn(heavy.length, 'Média très lourd', 'Médias très lourds'),
       detail: tn(
         heavy.length,
-        '{list} Le menu relit ce fichier à chaque passage sur la table, ce qui ralentit la navigation : une vidéo en 1080p ou en 4K (réencodée avec HandBrake, par exemple), une image en 4K au plus et un son en mp3 ou en ogg suffisent.',
-        '{list} Le menu relit ces fichiers à chaque passage sur la table, ce qui ralentit la navigation : une vidéo en 1080p ou en 4K (réencodée avec HandBrake, par exemple), une image en 4K au plus et un son en mp3 ou en ogg suffisent.',
+        '{list} Le front-end relit ce fichier à chaque passage sur la table, ce qui ralentit la navigation : une vidéo en 1080p ou en 4K (réencodée avec HandBrake, par exemple), une image en 4K au plus et un son en mp3 ou en ogg suffisent.',
+        '{list} Le front-end relit ces fichiers à chaque passage sur la table, ce qui ralentit la navigation : une vidéo en 1080p ou en 4K (réencodée avec HandBrake, par exemple), une image en 4K au plus et un son en mp3 ou en ogg suffisent.',
         { list: heavy.join(' ') },
       ),
     });
@@ -2467,7 +2467,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
       [
         tn(shown.length, '{type} : {files} est montré', '{type} : {files} sont montrés', { type: info.label, files: quoteList(shown.map((s) => s.name)) }),
         sameKind.length ? tn(sameKind.length, ', {files} ne sert pas', ', {files} ne servent pas', { files: quoteList(sameKind.map((u) => u.name)) }) : '',
-        other.length ? t(' ; {files} : le menu prend la vidéo quand il y en a une', { files: quoteList(other.map((u) => u.name)) }) : '',
+        other.length ? t(' ; {files} : le front-end prend la vidéo quand il y en a une', { files: quoteList(other.map((u) => u.name)) }) : '',
         '.',
       ].join(''),
     );
@@ -2504,13 +2504,13 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     findings.push({
       code: 'mediaPlaybackError',
       severity: 'warning',
-      title: tn(errors.length, 'Média que le menu n’a pas pu lire', 'Médias que le menu n’a pas pu lire'),
+      title: tn(errors.length, 'Média que le front-end n’a pas pu lire', 'Médias que le front-end n’a pas pu lire'),
       detail: [
         ...errors.map((e) => {
           const params = { file: path.relative(folder, e.file), error: MEDIA_ERROR_LABELS[e.kind], count: e.count, date: formatDateTime(e.last), message: e.message ? ` (${e.message})` : '' };
           return e.count > 1 ? t('« {file} » : {error}, {count} fois, la dernière le {date}{message}.', params) : t('« {file} » : {error}, le {date}{message}.', params);
         }),
-        t('Le menu passe alors au média suivant, ou à son repli. Remplacez le fichier par un mp4 (H.264) ou un webm, ou réencodez-le.'),
+        t('Le front-end passe alors au média suivant, ou à son repli. Remplacez le fichier par un mp4 (H.264) ou un webm, ou réencodez-le.'),
       ].join(' '),
       fix: broken.length
         ? {
@@ -2928,7 +2928,7 @@ function checkRomCopy(file: string, library: string): Finding[] {
           severity: 'warning',
           title: t('Autre version de la ROM que celle de la bibliothèque'),
           detail: t(
-            'pinmame\\roms\\{name} ({size}, {date}) n’a pas le même contenu que celle de la bibliothèque ({librarySize}, {libraryDate}). Pour garder plutôt celle de la table, « Ranger les ROM » dans le menu laisse choisir.',
+            'pinmame\\roms\\{name} ({size}, {date}) n’a pas le même contenu que celle de la bibliothèque ({librarySize}, {libraryDate}). Pour garder plutôt celle de la table, « Ranger les ROM » dans le front-end laisse choisir.',
             { name, size: formatSize(own.size), date: formatDate(own.mtimeMs), librarySize: formatSize(stored.size), libraryDate: formatDate(stored.mtimeMs) },
           ),
           fix: { label: t('Utiliser la ROM de la bibliothèque (celle de la table va à la corbeille)'), ops: [{ op: 'link', from: stored.path, to: file }] },

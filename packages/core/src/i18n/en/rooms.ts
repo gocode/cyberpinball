@@ -185,7 +185,7 @@ export const messages: Record<string, string> = {
   'Réaction impossible pour l’instant': 'Cannot react for now',
   'Nouveaux messages de mes salons : notification': 'New messages in my rooms: notification',
   'Nouveaux messages de mes salons : rien': 'New messages in my rooms: nothing',
-  'Votre salon et ceux où vous avez écrit depuis hier · au menu, deux minutes au plus': 'Your room and those you wrote in since yesterday · in the menu, two minutes at most',
+  'Votre salon et ceux où vous avez écrit depuis hier · dans le front-end, deux minutes au plus': 'Your room and those you wrote in since yesterday · in the menu, two minutes at most',
 
   // packages/core/src/notices.ts : notification des nouveaux messages de salon
   '{name} · {room}': '{name} · {room}',

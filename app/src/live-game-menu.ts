@@ -332,7 +332,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       const fetch = fit.fit === 'other-version' && host.openFriendTable;
       const run = fit.fit === 'same' || fit.fit === 'unknown' ? () => inviteOn(table, f.key, reopen) : fetch ? () => fetchVersion(f.key, table, reopen) : () => undefined;
       const index = actions.push({ label: f.name, key: `friend:${f.key}`, icon: 'friend-list', run }) - 1;
-      const doing = playingNow(f.key) ? t('En partie : notifié sur sa table') : t('Dans le menu des tables');
+      const doing = playingNow(f.key) ? t('En partie : notifié sur sa table') : t('Dans l’écran des tables');
       const detail = [doing, liveFitLabel(fit), fetch ? t('Start : récupérer sa version chez {name}', { name: f.name }) : undefined].filter(Boolean).join(' · ');
       return { text: f.name, ...face(f.key, f.name), detail, icon: 'friend-list', tone: fitTone(fit), action: index, pick: true };
     });
@@ -608,7 +608,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       ],
       actions: [
         { label: hosting ? t('Annuler la partie') : t('Quitter la partie'), icon: 'close', run: () => { games.leave(); back(); } },
-        { label: t('Retour au menu'), detail: t('Le départ reste prévu'), icon: 'back', run: back },
+        { label: t('Retour au front-end'), detail: t('Le départ reste prévu'), icon: 'back', run: back },
       ],
       back,
     };

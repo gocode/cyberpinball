@@ -3,8 +3,8 @@
 // « Ajouter à un jeu »). Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
   // packages/core/src/acquisition.ts, gameparts.ts
-  'Médias du menu': 'Menu media',
-  'des images ou des vidéos pour le menu': 'images or videos for the menu',
+  'Médias du front-end': 'Menu media',
+  'des images ou des vidéos pour le front-end': 'images or videos for the menu',
   'Réglages propres (.ini)': 'Own settings (.ini)',
   // app/src/catalog.ts
   '« {file} » est {content} : rangé comme {kind} de {game} ; {from} est de nouveau attendu.': '“{file}” is {content}: filed as {kind} of {game}; {from} is expected again.',
@@ -95,7 +95,7 @@ export const messages: Record<string, string> = {
   'Point de vue de la caméra (.pov), nommé comme la table.': 'Camera point of view (.pov), named like the table.',
   'Animation du topper.': 'Topper animation.',
   'Réglages propres à cette table (.ini nommé comme elle) ; sans eux, ceux de VPX servent.': 'Settings for this table only (.ini named like it); without them, VPX’s own apply.',
-  'Logo, fronton, vidéos, règles : ce que montre le menu. Ils se choisissent dans « Médias du jeu ».': 'Logo, backglass, videos, rules: what the menu shows. They are chosen in “Game media”.',
+  'Logo, fronton, vidéos, règles : ce que montre le front-end. Ils se choisissent dans « Médias du jeu ».': 'Logo, backglass, videos, rules: what the menu shows. They are chosen in “Game media”.',
   // Recherche libre, propositions des parties de toutes les sources, jeu VPS d’une table
   'Recherche libre': 'Free search',
   'Ce que vous choisirez : table, fronton, PuP-Pack, ROM, médias…': 'What you choose: table, backglass, PuP-Pack, ROM, media…',

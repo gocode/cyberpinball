@@ -98,7 +98,7 @@ export function createPowerMenu(host: PowerMenuHost) {
 
   /** Fait l'action ; pour un arrêt, attend que Windows ferme l'application. */
   function act(action: PowerAction): Promise<PowerOutcome> {
-    host.log(`Alimentation : ${action} demandé depuis le menu.`); // i18n-ignore : journal
+    host.log(`Alimentation : ${action} demandé depuis le front-end.`); // i18n-ignore : journal
     return control.run(action);
   }
 

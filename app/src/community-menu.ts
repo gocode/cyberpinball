@@ -11,6 +11,7 @@
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec un réseau d'essai.
 
 import {
+  shownCrowd,
   avatarView,
   commonTables,
   countryName,
@@ -179,14 +180,20 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     return { online: list.length, country: c ? list.filter((p) => p.country === c).length : 0, friends: list.filter((p) => p.friend).length, attention: host.messages.attention() || Boolean(host.rooms?.door().attention) };
   }
 
-  /** « 47 en ligne · 12 en France · 3 amis » */
+  /**
+   * « 47 en ligne · 12 en France · 3 amis ». Les joueurs en ligne et ceux de mon pays ne se comptent
+   * qu'au-delà de cinq (shownCrowd, 16/11/2026) ; mes amis en ligne, toujours quand il y en a.
+   */
   function countsLine(list: readonly OnlinePlayer[]): string {
     const c = myCountry();
-    const parts = [tn(list.length, '{n} joueur en ligne', '{n} joueurs en ligne')];
-    if (c) parts.push(t('{n} en {country}', { n: list.filter((p) => p.country === c).length, country: countryLabel(c)! }));
+    const parts: string[] = [];
+    const all = shownCrowd(list.length);
+    if (all) parts.push(tn(all, '{n} joueur en ligne', '{n} joueurs en ligne'));
+    const mine = c ? shownCrowd(list.filter((p) => p.country === c).length) : undefined;
+    if (mine) parts.push(t('{n} en {country}', { n: mine, country: countryLabel(c)! }));
     const friends = list.filter((p) => p.friend).length;
-    parts.push(tn(friends, '{n} ami', '{n} amis'));
-    return parts.join(' · ');
+    if (friends || parts.length) parts.push(tn(friends, '{n} ami', '{n} amis'));
+    return parts.length ? parts.join(' · ') : t('Joueurs, amis et salons du réseau des bornes');
   }
 
   // ---------- Joueurs en ligne ----------
@@ -261,7 +268,9 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     const tabs = ONLINE_FILTERS.map((f) => {
       const problem = filterProblem(f);
       const action = actions.push({ label: t('Filtre {name}', { name: filterLabel(f) }), key: `filter-${f}`, run: () => ((filter = f), here()) }) - 1;
-      return { label: filterLabel(f), count: problem ?? String(counts[f]), current: f === filter, disabled: Boolean(problem), action, ...(f === 'country' && myCountry() ? { flag: flagView(myCountry()!, locale()) } : {}) };
+      // Des joueurs connectés : le nombre au-delà de cinq seulement (shownCrowd).
+      const count = shownCrowd(counts[f]);
+      return { label: filterLabel(f), count: problem ?? (count === undefined ? '' : String(count)), current: f === filter, disabled: Boolean(problem), action, ...(f === 'country' && myCountry() ? { flag: flagView(myCountry()!, locale()) } : {}) };
     });
     for (const g of groups) {
       sections.push({

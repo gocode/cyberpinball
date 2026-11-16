@@ -183,7 +183,7 @@ export function createPhoneRemoteMenu(host: PhoneRemoteMenuHost) {
   const item: ProvidedSystemItem = {
     get detail() {
       const connected = host.remote.connected();
-      return connected ? t('Téléphone connecté : il pilote le menu, tape, envoie des fichiers') : t('Piloter la borne, taper et envoyer un fichier depuis son téléphone');
+      return connected ? t('Téléphone connecté : il pilote le front-end, tape, envoie des fichiers') : t('Piloter la borne, taper et envoyer un fichier depuis son téléphone');
     },
     run: () => host.library.openCustom(build),
   };

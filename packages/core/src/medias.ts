@@ -126,7 +126,7 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
       return t('Logo');
     },
     get description() {
-      return t('Logo du jeu sur fond transparent, qui identifie la table dans la liste du menu.');
+      return t('Logo du jeu sur fond transparent, qui identifie la table dans la roue ou la liste des tables.');
     },
     target: 'playfield',
     moments: ['browse', 'attract'],
@@ -146,7 +146,7 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
       return t('Plateau');
     },
     get description() {
-      return t('La table qui joue, en fond du menu derrière la liste.');
+      return t('La table qui joue, en fond du front-end derrière la liste.');
     },
     target: 'playfield',
     moments: ['browse', 'attract'],
