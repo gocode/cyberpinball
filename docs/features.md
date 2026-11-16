@@ -93,7 +93,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 
 - **Between friends, with no server**: System menu > Friends > "Messages", or "Write" on a friend's page. Messages go straight from one cabinet to the other, encrypted, and stay on both cabinets.
 - **A thread like on a phone**: the friend's messages on the left, yours on the right, and in between the friendship's events (a high score, a badge). MagnaSave goes to the previous or next friend; the backglass shows the friend's card while their thread is open.
-- **Reply from the buttons**: six reactions placed on a message (Bravo, Rematch?, TILT!, Wow, OK, Like), six ready-made phrases, or "Write a message…" with the on-screen keyboard or the phone, whose text appears as you type. At a desk, the real keyboard.
+- **Reply from the buttons**: seven emoji reactions placed on a message (👍 Like, ❤️ Love, 🥰 Care, 😆 Haha, 😮 Wow, 😢 Sad, 😡 Angry), the same as in the rooms, six ready-made phrases, or "Write a message…" with the on-screen keyboard or the phone, whose text appears as you type. At a desk, the real keyboard.
 - **A friend offline**: the message waits, "Waiting", and leaves by itself as soon as both cabinets are on at the same time, then turns to "Received".
 - **During a game**, the buttons stay with VPX: the paired phone shows the most recent thread, with reactions, phrases and a field to write. An incoming message is announced by a notification, and in the menu by the DMD too.
 - **Options**: mute a friend's notifications, clear a conversation, block; turn messaging off, mute its sound, keep messages 30 days, a year or forever.

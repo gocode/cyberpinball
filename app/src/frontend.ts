@@ -2932,6 +2932,8 @@ const menuNotices = createMenuNotices({
   activity: { record: (events, quiet) => activityMenu.record(events, quiet), shown: (events) => activityMenu.shown(events) },
   // Le son d'un message suit « Son des messages » (Réglages de la messagerie).
   messages: { unread: (key) => chatService.state().conversations[key]?.unread ?? 0, onScreen: (key) => chatMenu.threadOnScreen(key), sound: () => chatService.state().sound },
+  // Créé plus bas : la file ne le lit qu'à l'affichage, une fois tout en place.
+  rooms: { onScreen: (room) => roomsMenu.inRoom() === room, unread: (id) => roomsMenu.lineUnread(id) },
   log: (line) => console.log(line),
 });
 /**
@@ -3224,6 +3226,10 @@ socialNet.onRoomLines((lines) => {
   if (playingNow && !s.mentionsInGame) return;
   const hits = lines.filter((l) => !s.ignored.includes(l.key) && mentions(l.text, name) && roomsMenu.shown() !== l.room);
   if (hits.length) menuNotices.push(hits.map((l) => ({ kind: 'room-mention' as const, key: l.id, at: Date.now(), who: l.name, player: l.key, subject: roomsMenu.roomName(l.room), extra: s.filter ? maskWords(l.text) : l.text })));
+  // Les autres lignes de mes salons (16/11/2026) : au menu seulement, tenues jusqu'à deux minutes (NoticeRule.holdMs).
+  if (playingNow) return;
+  const news = roomsMenu.newsOf(lines);
+  if (news.length) menuNotices.push(news.map((l) => ({ kind: 'room-line' as const, key: `${l.room}|${l.id}`, at: Date.now(), who: l.name, player: l.key, subject: roomsMenu.roomName(l.room), extra: s.filter ? maskWords(l.text) : l.text })));
 });
 // Classements de toutes mes tables (rankings-menu.ts) : la porte « Classements » de l'accueil Communauté.
 const rankingsMenu = createRankingsMenu({

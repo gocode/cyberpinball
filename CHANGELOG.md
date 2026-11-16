@@ -25,6 +25,11 @@ son interface).
 - Partage et réseau : « Supprimer mon compte… » efface votre compte, ici et chez les autres joueurs (nom, amis, messages, salons, scores publiés, propositions et votes), puis Cyber Pinball repart avec un compte neuf.
 - Communauté : « Avis et propositions » est aussi tout en bas de l'accueil de la Communauté ; son « Retour » y ramène.
 - Changement de PC : sur un PC neuf (ni ami ni message), restaurer la sauvegarde de l'ancien (Sauvegardes > Restaurer une sauvegarde) propose d'office « Reprendre l'identité de « … » » : votre pseudo, vos amis et vos messages passent sur le nouveau PC, après confirmation. L'ancien PC ne doit plus se connecter.
+- Clavier à l'écran : les flippers parcourent de nouveau les lettres après un texte tapé au clavier, au téléphone ou par le panneau des emojis ; ils ne répondaient plus dès que le champ avait reçu un texte.
+- Réactions par emoji : 👍 J'aime, ❤️ J'adore, 🥰 Solidaire, 😆 Haha, 😮 Waouh, 😢 Triste, 😡 Grrr, dans les messages privés (elles remplacent Bravo, Revanche ?…) et dans les salons : Start sur une ligne, puis « Réagir ». Les réactions s'affichent en pastilles sous la ligne.
+- Salons : quand une ligne arrive dans votre salon (ou dans un salon où vous avez écrit depuis hier), une notification discrète l'annonce au menu, jusqu'à deux minutes. Réglage : Réglages de la communauté > « Nouveaux messages de mes salons ».
+- Salons : en quittant un salon, vous y restez présent encore une minute, et vous ne disparaissez plus pendant que vous écrivez. Le nombre de présents ne s'affiche qu'au-delà de cinq.
+- Salons : « Clavier à l'écran… » devient « Écrire… », avec un exemple de /me (« /me arrive » s'affiche « <Pseudo> arrive », en italique). Une ligne déjà lue dans le salon ne s'annonce plus ensuite.
 
 ## 0.1.13
 

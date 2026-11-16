@@ -44,6 +44,7 @@ export type NoticeKind =
   | 'friend-message'
   | 'player-like'
   | 'room-mention'
+  | 'room-line'
   | 'room-report'
   | 'friend-request' | 'friend-accepted' | 'download-failed' | 'download-done' | 'friend-online' | 'friend-playing' | 'friend-record' | 'friend-badge';
 
@@ -113,6 +114,13 @@ export interface NoticeRule {
   sound?: UiSoundId;
   /** Attente avant de se montrer (NOTICE_GATHER_MS par défaut) : 0 pour ce qui doit paraître avec son son. */
   gatherMs?: number;
+  /**
+   * Reste à l'écran jusqu'à ce délai (au lieu de NOTICE_SHOW_MS), mais cède sa place dès qu'une autre
+   * attend (après NOTICE_SHOW_MS) ou quand elle n'a plus lieu d'être (le salon ouvert).
+   */
+  holdMs?: number;
+  /** false : n'entre pas au journal d'Activité récente (les lignes d'un salon y resteraient en double). */
+  journal?: false;
 }
 
 const MIN = 60_000;
@@ -134,6 +142,9 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   // Un « J'aime » sur mon activité publique (publicprofile.ts) : au menu, regroupés, jamais un par un.
   // Mon pseudo cité dans un salon (rooms.ts) : partout, par-dessus VPX compris si le réglage le permet.
   'room-mention': { priority: 9, ttlMs: 30 * MIN, quietMs: MIN, icon: 'globe', tone: 'info', act: { type: 'rooms' }, away: true, sound: 'news' },
+  // Une ligne dans un de mes salons (16/11/2026) : au menu seulement, sans son ; tenue jusqu'à deux minutes,
+  // oubliée au-delà si elle n'a pas pu se montrer. Le salon garde la ligne : rien au journal d'Activité récente.
+  'room-line': { priority: 14, ttlMs: 2 * MIN, quietMs: MIN, icon: 'globe', tone: 'info', act: { type: 'rooms' }, holdMs: 2 * MIN, journal: false },
   // Un signalement reçu par un modérateur : au menu, regroupés.
   'room-report': { priority: 8, ttlMs: 60 * MIN, quietMs: MIN, icon: 'alert', tone: 'warning', act: { type: 'moderation' }, sound: 'news' },
   'player-like': { priority: 18, ttlMs: 60 * MIN, quietMs: MIN, icon: 'star', tone: 'ok', act: { type: 'my-profile' } },
@@ -362,6 +373,14 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
       if (one) return fit({ title: t('{name} vous cite · {room}', { name: who(one), room: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
       return fit({ title: tn(n, '{n} mention dans les salons', '{n} mentions dans les salons'), detail: last.extra ? `${who(last)} : ${last.extra}` : names() });
     }
+    case 'room-line': {
+      // `subject` : le salon ; `extra` : la ligne ; `who` : son auteur.
+      const last = events[events.length - 1]!;
+      const rooms = [...new Set(events.map((e) => e.subject ?? ''))];
+      if (one) return fit({ title: t('{name} · {room}', { name: who(one), room: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
+      const title = rooms.length === 1 ? tn(n, '{n} nouveau message · {room}', '{n} nouveaux messages · {room}', { room: rooms[0]! }) : tn(n, '{n} nouveau message dans les salons', '{n} nouveaux messages dans les salons');
+      return fit({ title, detail: last.extra ? `${who(last)} : ${last.extra}` : names() });
+    }
     case 'room-report': {
       const last = events[events.length - 1]!;
       if (one) return fit({ title: t('Signalement · {room}', { room: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
@@ -419,6 +438,8 @@ function digestPart(kind: NoticeKind, n: number): string {
       return tn(n, '{n} « J’aime »', '{n} « J’aime »');
     case 'room-mention':
       return tn(n, '{n} mention', '{n} mentions');
+    case 'room-line':
+      return tn(n, '{n} message de salon', '{n} messages de salon');
     case 'room-report':
       return tn(n, '{n} signalement', '{n} signalements');
     case 'friend-online':
@@ -478,6 +499,8 @@ interface Showing {
   view: NoticeView;
   shownAt: number;
   showMs: number;
+  /** Tenue longtemps (NoticeRule.holdMs) : les évènements qu'elle dit, pour savoir s'ils ont encore lieu d'être. */
+  held?: readonly NoticeEvent[];
 }
 
 export interface NoticeCenter {
@@ -531,6 +554,16 @@ export function createNoticeCenter(): NoticeCenter {
       showing = undefined;
     }
     if (showing) {
+      // Tenue longtemps : elle part dès qu'elle n'a plus lieu d'être, ou, passé NOTICE_SHOW_MS, dès qu'une autre
+      // attend. Son départ, une fois décidé, est figé (showMs raccourci) : il ne recule plus d'un passage à l'autre.
+      if (showing.held) {
+        const waiting = (ctx.away ? pending.filter((e) => isAwayNotice(e.kind)) : pending).length > 0;
+        const early = !showing.held.some(still) ? now : waiting ? Math.max(showing.shownAt + NOTICE_SHOW_MS, now) : undefined;
+        if (early !== undefined && early < showing.shownAt + showing.showMs) {
+          showing = { ...showing, showMs: early - showing.shownAt };
+          delete showing.held;
+        }
+      }
       const leaveAt = showing.shownAt + showing.showMs;
       const goneAt = leaveAt + NOTICE_LEAVE_MS;
       if (now < leaveAt) return { view: showing.view, nextAt: leaveAt };
@@ -573,8 +606,9 @@ export function createNoticeCenter(): NoticeCenter {
       pending = pending.filter((e) => e.kind !== group.kind);
     }
     serial++;
-    const showMs = view.live ? NOTICE_LIVE_SHOW_MS : NOTICE_SHOW_MS;
-    showing = { id: `n${serial}`, view: { id: `n${serial}`, ...view }, shownAt: now, showMs };
+    const hold = entered.digest ? undefined : NOTICE_RULES[groups[0]!.kind].holdMs;
+    const showMs = hold ?? (view.live ? NOTICE_LIVE_SHOW_MS : NOTICE_SHOW_MS);
+    showing = { id: `n${serial}`, view: { id: `n${serial}`, ...view }, shownAt: now, showMs, ...(hold ? { held: entered.events } : {}) };
     return { view: showing.view, nextAt: now + showMs, entered };
   }
 

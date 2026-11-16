@@ -23,6 +23,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Sharing and network: “Delete my account…” erases your account, here and on other players' cabinets (name, friends, messages, rooms, published scores, suggestions and votes), then Cyber Pinball starts again with a new account.
 - Community: “Feedback and ideas” is now also at the bottom of the Community home; its “Back” returns there.
 - Moving to a new PC: on a new PC (no friends, no messages), restoring the old one's backup (Backups > Restore a backup) now offers “Take over “…”'s identity” by default: your nickname, friends and messages come over to the new PC, after a confirmation. The old PC must not connect again.
+- On-screen keyboard: the flippers browse the letters again after text typed on a keyboard, on the phone or through the emoji panel; they stopped responding once the field had received text.
+- Emoji reactions: 👍 Like, ❤️ Love, 🥰 Care, 😆 Haha, 😮 Wow, 😢 Sad, 😡 Angry, in private messages (they replace Bravo, Rematch?…) and in the rooms: Start on a line, then "Réagir" (React). Reactions show as chips under the line.
+- Rooms: when a line arrives in your room (or in a room you wrote in since yesterday), a discreet notification announces it in the menu, for up to two minutes. Setting: Community settings > "Nouveaux messages de mes salons" (New messages in my rooms).
+- Rooms: when you leave a room, you stay present there for one more minute, and you no longer vanish while typing. The number of people present only shows above five.
+- Rooms: "Clavier à l'écran…" becomes "Écrire…" (Write…), with an example of /me ("/me arrives" shows as "<Name> arrives", in italics). A line already read in the room is no longer announced afterwards.
 
 ## 0.1.13
 

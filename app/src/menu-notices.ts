@@ -104,6 +104,8 @@ export interface MenuNoticesHost {
   activity?: { record(events: readonly NoticeEvent[], quiet: boolean): void; shown(events: readonly NoticeEvent[]): void };
   /** La messagerie (chat-menu.ts) : un message déjà lu, ou dont le fil est ouvert, ne s'annonce plus. */
   messages?: { unread(key: string): number; onScreen(key: string): boolean; /** « Son des messages » : false, la notification d'un message entre sans son. */ sound?(): boolean };
+  /** Les salons (rooms-menu.ts) : celui à l'écran montre déjà ses nouvelles lignes. */
+  rooms?: { onScreen(room: string): boolean; /** La ligne (son id) est encore là et pas encore lue dans son salon. */ unread(id: string): boolean };
   now?: () => number;
   log?: (line: string) => void;
 }
@@ -167,6 +169,14 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
       case 'live-invite-ended':
         // Son écran ouvert dit déjà la fin (« Invitation annulée par … »).
         return !host.live?.inviteOnScreen?.(tagId(e.key));
+      case 'room-line': {
+        // Son salon à l'écran, ou la ligne lue entre-temps (salon ouvert puis quitté), ou retirée : plus rien à annoncer (`key` : « salon|ligne »).
+        const [room, id] = e.key.split('|');
+        return !host.rooms?.onScreen(room!) && (host.rooms?.unread(id!) ?? true);
+      }
+      case 'room-mention':
+        // La ligne qui me cite, lue dans son salon entre-temps : plus rien à annoncer.
+        return host.rooms?.unread(e.key) ?? true;
       case 'friend-message':
         // Lu entre-temps, ou son fil à l'écran : plus rien à annoncer.
         return !!e.player && (host.messages?.unread(e.player) ?? 1) > 0 && !host.messages?.onScreen(e.player);
@@ -222,7 +232,8 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
       // Au démarrage, et tant que la borne cherche ses amis, c'est elle qui arrive : pas une nouvelle.
       .filter((e) => (t >= quietUntil && host.social.listSync?.() !== 'searching') || e.kind !== 'friend-online');
     // Au journal, toutes : affichées, retenues pour la fin de la partie, ou notifications coupées.
-    if (news.length) host.activity?.record(news, host.mode() !== 'all');
+    const journal = news.filter((e) => NOTICE_RULES[e.kind].journal !== false);
+    if (journal.length) host.activity?.record(journal, host.mode() !== 'all');
     // Notifications coupées : seule la partie entre amis reste.
     const events = news.filter((e) => host.mode() === 'all' || isLiveNotice(e.kind));
     social = nextSocial;
@@ -265,7 +276,9 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
 
   function push(events: readonly NoticeEvent[]): void {
     if (stopped || !events.length) return;
-    host.activity?.record(events, host.mode() !== 'all');
+    // Les lignes d'un salon n'entrent pas au journal (NoticeRule.journal) : le salon les garde.
+    const journal = events.filter((e) => NOTICE_RULES[e.kind].journal !== false);
+    if (journal.length) host.activity?.record(journal, host.mode() !== 'all');
     const shown = events.filter((e) => host.mode() === 'all' || isLiveNotice(e.kind));
     if (!shown.length) return;
     center.push(shown);

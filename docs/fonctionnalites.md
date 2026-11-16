@@ -93,7 +93,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 
 - **Entre amis, sans serveur** : Menu système > Amis > « Messages », ou « Écrire » sur la fiche d'un ami. Les messages passent directement d'une borne à l'autre, chiffrés, et restent sur les deux bornes.
 - **Un fil comme sur un téléphone** : les messages de l'ami à gauche, les vôtres à droite, et au milieu les évènements de l'amitié (un record, un badge). MagnaSave passe à l'ami précédent ou suivant ; le fronton montre la carte de l'ami pendant que son fil est ouvert.
-- **Répondre aux boutons** : six réactions posées sur un message (Bravo, Revanche ?, TILT !, Waouh, OK, J'aime), six phrases toutes prêtes, ou « Écrire un message… » au clavier à l'écran ou au téléphone, dont le texte s'écrit en direct. Au bureau, le vrai clavier.
+- **Répondre aux boutons** : sept réactions par emoji posées sur un message (👍 J'aime, ❤️ J'adore, 🥰 Solidaire, 😆 Haha, 😮 Waouh, 😢 Triste, 😡 Grrr), les mêmes que dans les salons, six phrases toutes prêtes, ou « Écrire un message… » au clavier à l'écran ou au téléphone, dont le texte s'écrit en direct. Au bureau, le vrai clavier.
 - **Un ami hors ligne** : le message attend, « En attente », et part tout seul dès que les deux bornes sont allumées en même temps, puis passe à « Reçu ».
 - **Pendant une partie**, les boutons restent à VPX : le téléphone appairé montre le fil le plus récent, avec réactions, phrases et champ pour écrire. Un message arrivé s'annonce par une notification, au menu par le DMD aussi.
 - **Options** : couper les notifications d'un ami, effacer une conversation, bloquer ; désactiver la messagerie, couper son son, garder les messages 30 jours, un an ou toujours.

@@ -221,7 +221,8 @@ export interface RemoteCommunityRow {
 /** Le salon montré au téléphone : à l'ancienne, une ligne par message ; pourquoi on ne peut pas écrire. */
 export interface RemoteRoom {
   name: string;
-  present: number;
+  /** Au-delà de cinq présents seulement (shownPresent) : un salon presque vide ne se chiffre pas. */
+  present?: number;
   lines: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' }[];
   phrases: string[];
   /** On ne peut pas écrire (règles à accepter à la borne, salons désactivés…) : pourquoi. */

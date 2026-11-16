@@ -173,6 +173,8 @@ function renderLibrary(v) {
         if (row.flag) line.append(flagNode(row.flag.code, row.flag.src, row.flag.name, 'lib-row-flag'));
         else if (flagged && !row.icon && !row.avatar) line.append(libEl('span', 'flag lib-row-flag none'));
         else if (row.icon && !row.avatar) line.append(cyberIcon(row.icon, 'lib-row-icon'));
+        // Une réaction : son emoji en grand à la place de l'icône, son mot dessous (tuiles « Réagir »).
+        else if (row.emoji) line.append(libEl('span', 'lib-row-emoji', row.emoji));
         line.append(libEl('span', 'lib-row-text', row.text));
         // Pas encore lue (Activité récente) : la pastille rouge des entrées du menu, et son mot dans les badges.
         if (row.unread) line.append(libEl('span', 'lib-attention'));
@@ -703,6 +705,12 @@ function roomLogLine(row, cursor) {
   }
   body.append(libEl('span', l.kind === 'me' ? 'room-say room-act' : 'room-say', l.text));
   li.append(body);
+  // Ses réactions : des pastilles sous le texte, alignées sur lui ; la mienne cerclée.
+  if (l.reactions?.length) {
+    const chips = libEl('span', 'room-reactions');
+    for (const r of l.reactions) chips.append(libEl('span', `room-reaction${r.mine ? ' mine' : ''}`, r.text));
+    li.append(chips);
+  }
   return li;
 }
 

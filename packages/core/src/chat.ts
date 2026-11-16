@@ -4,7 +4,7 @@
 //
 // Choix retenus :
 // - conversations à deux, entre amis seulement ; texte (CHAT_TEXT_MAX caractères) ou réaction
-//   (six réactions maison) posée sur un message ;
+//   (sept réactions par emoji, reactions.ts) posée sur un message ;
 // - un message pour un ami hors ligne attend sur la borne et part dès que les deux bornes sont
 //   reliées (renvoyé tant que l'accusé « chat-ok » n'est pas revenu), CHAT_PENDING_DAYS au plus ;
 // - « Reçu » quand la borne de l'ami l'a enregistré ; pas de « Lu » ;
@@ -22,6 +22,7 @@ import { randomBytes } from 'node:crypto';
 import { writeFileAtomic } from './atomicwrite';
 import { signText, verifyText, type PlayerKey } from './sharing';
 import { t } from './i18n';
+import { isReaction, REACTION_EMOJI, REACTIONS, reactionText, type Reaction } from './reactions';
 
 /** Longueur d'un message, en caractères (émojis compris : un émoji compte pour un). */
 export const CHAT_TEXT_MAX = 500;
@@ -35,11 +36,27 @@ export const CHAT_BATCH = 50;
 export const CHAT_KEEP_CHOICES = [30, 365, 0] as const;
 export type ChatKeep = (typeof CHAT_KEEP_CHOICES)[number];
 
-/** Réactions maison : pictogramme du design system et mot (l'étoile est aussi le « J'aime » du profil public). */
-export const CHAT_REACTIONS = ['bravo', 'revanche', 'tilt', 'waouh', 'ok', 'like'] as const;
-export type ChatReaction = (typeof CHAT_REACTIONS)[number];
-export const CHAT_REACTION_ICONS: Readonly<Record<ChatReaction, string>> = { bravo: 'trophy', revanche: 'flipper', tilt: 'tilt', waouh: 'sparkle', ok: 'check', like: 'star' };
+/**
+ * Réactions : les sept de reactions.ts (16/11/2026), proposées partout. Les six réactions maison
+ * d'avant (Bravo, Revanche ?, TILT !, Waouh, OK, J'aime) restent lues : messages gardés sur la borne,
+ * et réactions d'une borne pas encore à jour. `like` est commun aux deux : il passe chez une borne
+ * d'avant ; les six autres nouvelles n'y arrivent pas (elle les refuse sans rien montrer).
+ */
+export const CHAT_REACTIONS: readonly Reaction[] = REACTIONS;
+const LEGACY_REACTIONS = ['bravo', 'revanche', 'tilt', 'waouh', 'ok'] as const;
+type LegacyReaction = (typeof LEGACY_REACTIONS)[number];
+export type ChatReaction = Reaction | LegacyReaction;
+const LEGACY_EMOJI: Readonly<Record<LegacyReaction, string>> = { bravo: '👏', revanche: '🔁', tilt: '⚠️', waouh: '😮', ok: '👌' };
+/** Une réaction en emoji et en mot (« 👍 J'aime ») ; une ancienne garde son mot d'origine. */
 export function reactionLabel(r: ChatReaction): string {
+  if (isReaction(r)) return reactionText(r);
+  return `${LEGACY_EMOJI[r]} ${legacyName(r)}`;
+}
+/** L'emoji seul d'une réaction (pastille sous la bulle). */
+export function reactionEmoji(r: ChatReaction): string {
+  return isReaction(r) ? REACTION_EMOJI[r] : LEGACY_EMOJI[r];
+}
+function legacyName(r: LegacyReaction): string {
   switch (r) {
     case 'bravo':
       return t('Bravo');
@@ -51,8 +68,6 @@ export function reactionLabel(r: ChatReaction): string {
       return t('Waouh');
     case 'ok':
       return t('OK');
-    case 'like':
-      return t('J’aime');
   }
 }
 
@@ -116,7 +131,7 @@ export const chatFile = (dataDir: string) => path.join(dataDir, 'amis', 'message
 const isIso = (v: unknown): v is string => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
 const isKey = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
 export const isChatId = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{16}$/.test(v);
-const isReaction = (v: unknown): v is ChatReaction => typeof v === 'string' && (CHAT_REACTIONS as readonly string[]).includes(v);
+const isChatReaction = (v: unknown): v is ChatReaction => isReaction(v) || (typeof v === 'string' && (LEGACY_REACTIONS as readonly string[]).includes(v));
 
 /** Texte accepté : sans caractère de contrôle (sauf le retour à la ligne), bords nettoyés, borné. */
 export function cleanChatText(raw: unknown): string | undefined {
@@ -132,7 +147,7 @@ function parseLine(raw: unknown): ChatLine | undefined {
   if (!isChatId(r.id) || !isIso(r.at) || typeof r.out !== 'boolean') return undefined;
   const text = r.text === undefined ? undefined : cleanChatText(r.text);
   const re = r.react as Record<string, unknown> | undefined;
-  const react = re && typeof re === 'object' && isChatId(re.target) && (re.kind === null || isReaction(re.kind)) ? { target: re.target, kind: re.kind as ChatReaction | null } : undefined;
+  const react = re && typeof re === 'object' && isChatId(re.target) && (re.kind === null || isChatReaction(re.kind)) ? { target: re.target, kind: re.kind as ChatReaction | null } : undefined;
   const del = isChatId(r.del) ? r.del : undefined;
   if ([text, react, del].filter(Boolean).length !== 1) return undefined;
   const delivery = r.delivery === 'pending' || r.delivery === 'received' || r.delivery === 'expired' ? r.delivery : undefined;
@@ -210,7 +225,7 @@ export function parseChatMessage(m: Record<string, unknown>): ChatMessage | unde
         const text = r.text === undefined ? undefined : cleanChatText(r.text);
         if (r.text !== undefined && text !== r.text) continue; // déjà nettoyé par l'auteur : sinon, la signature ne vaudrait pas
         const re = r.react as Record<string, unknown> | undefined;
-        const react = re && typeof re === 'object' && isChatId(re.target) && (re.kind === null || isReaction(re.kind)) ? { target: re.target, kind: re.kind as ChatReaction | null } : undefined;
+        const react = re && typeof re === 'object' && isChatId(re.target) && (re.kind === null || isChatReaction(re.kind)) ? { target: re.target, kind: re.kind as ChatReaction | null } : undefined;
         const del = isChatId(r.del) ? r.del : undefined;
         if ([text, react, del].filter(Boolean).length !== 1) continue;
         lines.push({ id: r.id, at: r.at, ...(text ? { text } : {}), ...(react ? { react } : {}), ...(del ? { del } : {}), sig: r.sig });

@@ -1845,6 +1845,22 @@ html.menu-desktop .status-corner {
   }
 }
 
+/* La sortie de même (16/11/2026) : sa glissade de 0,74 cqmin la poussait aussi hors de la fenêtre. */
+.status-corner.on-head .notice-toast.leaving {
+  animation-name: notice-out-head;
+}
+
+@keyframes notice-out-head {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-0.4cqmin);
+  }
+}
+
 /* La ligne de la notification : toute la largeur en borne (elle passe à la ligne), sa place au bureau. */
 .notice-line {
   display: flex;

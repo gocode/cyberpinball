@@ -4293,16 +4293,38 @@ body.mouse button.lib-command:hover .lib-command-text {
 .chat-card-title { font-size: 2.2cqmin; font-weight: 600; overflow-wrap: anywhere; }
 .chat-card-detail { color: var(--ink-muted); font-size: 1.9cqmin; }
 
-/* Répondre : les six réactions en tuiles, puis les phrases sur deux colonnes. */
+/*
+ * Réagir : les sept réactions en tuiles sur une rangée (quatre puis trois quand la place manque),
+ * l'emoji en grand au-dessus de son mot, centrés ; puis les phrases sur deux colonnes.
+ */
 .kind-reactions .lib-rows {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(14cqmin, 1fr));
   gap: 1cqmin;
 }
 .kind-reactions .lib-row {
   border: 1px solid var(--line-strong);
   border-radius: 0.7cqmin;
-  padding: 1.4cqmin 1.2cqmin;
+  padding: 1.2cqmin 0.8cqmin;
+  text-align: center;
+}
+.kind-reactions .lib-row-line {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5cqmin;
+}
+.kind-reactions .lib-row-text {
+  max-width: 100%;
+  font-size: 1.9cqmin;
+}
+.lib-row-emoji {
+  font-size: 2.6cqmin;
+  line-height: 1;
+  align-self: center;
+}
+.kind-reactions .lib-row-emoji {
+  font-size: 4.6cqmin;
 }
 .kind-phrases .lib-rows {
   display: grid;
@@ -4662,6 +4684,31 @@ body.mouse .lib-tab:not(.current):hover {
 
 body.mouse .room-line.pick:not(.selected):hover {
   border-color: var(--halo);
+}
+
+/* Réactions d'une ligne (16/11/2026) : des pastilles sous le texte, dans sa colonne ; la mienne cerclée de bleu méta. */
+.room-reactions {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6cqmin;
+  margin-top: 0.3cqmin;
+}
+
+.room-reaction {
+  padding: 0.1cqmin 1cqmin;
+  border: 1px solid #315665;
+  border-radius: 99cqmin;
+  background: #0c2024;
+  /* 1,9 cqmin : le plancher de 20 px des textes, comme les pastilles de la messagerie. */
+  font-size: 1.9cqmin;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.room-reaction.mine {
+  border-color: var(--meta);
+  box-shadow: inset 0 0 0 0.12cqmin var(--meta);
 }
 
 /* Ligne masquée par la modération : le pseudo reste, le texte dit la décision, en italique et éteint. */

@@ -18,7 +18,6 @@ import {
   badgeLabel,
   CHAT_KEEP_CHOICES,
   CHAT_REACTIONS,
-  CHAT_REACTION_ICONS,
   chatPhrases,
   eventText,
   lastLine,
@@ -26,14 +25,17 @@ import {
   offlineText,
   pendingFor,
   presenceTableLabel,
+  reactionEmoji,
   reactionLabel,
   reactionsOf,
+  reactionName,
+  REACTION_EMOJI,
   t,
   threadLines,
   tn,
   type ChatKeep,
   type ChatLine,
-  type ChatReaction,
+  type Reaction,
   type Conversation,
   type Friend,
   type IconName,
@@ -326,7 +328,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
       }
       const line = item.line!;
       const r = reactions.get(line.id);
-      const chips = [r?.theirs ? t('{reaction} · {name}', { reaction: reactionLabel(r.theirs), name: plain }) : undefined, r?.mine ? t('{reaction} · vous', { reaction: reactionLabel(r.mine) }) : undefined].filter((x): x is string => !!x);
+      const chips = [r?.theirs ? t('{reaction} · {name}', { reaction: reactionEmoji(r.theirs), name: plain }) : undefined, r?.mine ? t('{reaction} · vous', { reaction: reactionEmoji(r.mine) }) : undefined].filter((x): x is string => !!x);
       const meta = line.out
         ? line.delivery === 'received'
           ? t('{time} · Reçu', { time: time(line.at) })
@@ -448,10 +450,10 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     const actions: Action[] = [];
     const sections: Section[] = [];
     if (targetLine) {
-      const rows: Row[] = CHAT_REACTIONS.map((r: ChatReaction) => {
+      const rows: Row[] = CHAT_REACTIONS.map((r: Reaction) => {
         const on = mine === r;
-        const index = actions.push({ label: reactionLabel(r), key: `react:${r}`, icon: CHAT_REACTION_ICONS[r] as IconName, run: () => { chat.react(key, target!, on ? null : r); back(); } }) - 1;
-        return { text: reactionLabel(r), icon: CHAT_REACTION_ICONS[r] as IconName, ...(on ? { current: true, detail: t('Votre réaction · Start la retire') } : {}), action: index, pick: true };
+        const index = actions.push({ label: reactionLabel(r), key: `react:${r}`, run: () => { chat.react(key, target!, on ? null : r); back(); } }) - 1;
+        return { text: reactionName(r), emoji: REACTION_EMOJI[r], ...(on ? { current: true, detail: t('Votre réaction · Start la retire') } : {}), action: index, pick: true };
       });
       sections.push({ title: t('Réagir à « {text} »', { text: oneLine(targetLine.text ?? '').slice(0, 60) }), kind: 'reactions', rows });
     }

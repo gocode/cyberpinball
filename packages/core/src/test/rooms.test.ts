@@ -160,6 +160,7 @@ interface Net {
   roomOpen(room: string | undefined): void;
   roomPresent(room: string): { key: string; name: string }[];
   setRooms(change: Partial<RoomsState>): void;
+  roomReact(id: string, kind: string | null): boolean;
 }
 /* eslint-disable @typescript-eslint/no-require-imports */
 const netModule = require(path.join(REPO_ROOT, 'app', 'dist', 'social-net.js')) as { createSocialNet(o: object): Net };
@@ -200,6 +201,13 @@ test('entre deux bornes qui ne sont pas amies : la ligne arrive, l’historique 
     b.setRooms({ rulesAt: new Date().toISOString() });
     assert.ok('line' in b.roomSend(FR, '@Kiko j’arrive'));
     await until('ligne de Sillage chez Kiko', () => roomLines(a.rooms(), FR).some((l) => l.text === '@Kiko j’arrive' && l.name === 'Sillage'));
+    // Sillage réagit à la ligne de Kiko (16/11/2026) : la réaction arrive chez Kiko, la retirer aussi.
+    const target = roomLines(b.rooms(), FR).find((l) => l.name === 'Kiko')!;
+    assert.ok(b.roomReact(target.id, 'haha'));
+    await until('réaction de Sillage chez Kiko', () => (a.rooms().reactions ?? []).some((r) => r.id === target.id && r.kind === 'haha' && r.name === 'Sillage'));
+    assert.ok(b.roomReact(target.id, null));
+    await until('réaction retirée chez Kiko', () => (a.rooms().reactions ?? []).some((r) => r.id === target.id && r.kind === null));
+    assert.equal(b.roomReact('0123456789abcdef', 'like'), false, 'ligne inconnue : rien');
     // Sillage quitte le salon : il n'en demande plus l'historique, il reçoit quand même les lignes (relais).
     b.roomOpen(undefined);
   } finally {

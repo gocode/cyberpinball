@@ -8,6 +8,12 @@ export const messages: Record<string, string> = {
   'TILT !': 'TILT!',
   'Waouh': 'Wow',
   'J’aime': 'Like',
+  // packages/core/src/reactions.ts : les sept réactions par emoji (J'aime et Waouh ci-dessus)
+  'J’adore': 'Love',
+  'Solidaire': 'Care',
+  'Haha': 'Haha',
+  'Triste': 'Sad',
+  'Grrr': 'Angry',
   'Bien joué !': 'Well played!',
   'On fait une partie ?': 'Up for a game?',
   'J’arrive dans 5 minutes': 'Be there in 5 minutes',

@@ -353,7 +353,7 @@ function communityTop(shown) {
     const row = th ?? community.data?.rows.find((r) => r.key === community.open);
     return { title: row?.name ?? '', detail: row?.presence ?? '', face: row ? communityFace(row, 'top-face') : undefined };
   }
-  if (shown === 'room' && community.data?.room) return { title: community.data.room.name, detail: tn(community.data.room.present, '{n} présent', '{n} présents') };
+  if (shown === 'room' && community.data?.room) return { title: community.data.room.name, detail: community.data.room.present ? tn(community.data.room.present, '{n} présent', '{n} présents') : '' };
   if (!['messages', 'friends', 'room', 'ranks'].includes(shown)) return undefined;
   const unread = community.data?.unread ?? 0;
   return { title: t('Communauté'), detail: unread ? tn(unread, '{n} message non lu', '{n} messages non lus') : '' };

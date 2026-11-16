@@ -19,6 +19,7 @@ import { signAvatarClaim, verifyAvatarClaim } from './avatar';
 import { writeFileAtomic } from './atomicwrite';
 import { isPlayerPublicKey, signText, verifyText, type PlayerKey } from './sharing';
 import { normalizeName } from './social';
+import { isReaction, type Reaction } from './reactions';
 
 /** Longueur d'une ligne, en caractères. */
 export const ROOM_TEXT_MAX = 300;
@@ -39,6 +40,18 @@ export const ROOM_BATCH = 100;
 /** Présents : un signal toutes les deux minutes tant qu'on est dans le salon, frais cinq minutes. */
 export const ROOM_HERE_MS = 120_000;
 export const ROOM_HERE_FRESH_MS = 5 * 60_000;
+/**
+ * Un salon quitté reste annoncé encore une minute (16/11/2026) : qui passe voit que quelqu'un vient
+ * d'y être. Chez les autres bornes, le dernier signal reste ensuite frais ROOM_HERE_FRESH_MS.
+ */
+export const ROOM_LINGER_MS = 60_000;
+/**
+ * Le nombre de présents d'un salon ne s'affiche qu'au-delà de cinq (16/11/2026) : un salon presque vide,
+ * chiffré, découragerait d'y entrer. Les présents restent nommés dans le salon.
+ */
+export const ROOM_COUNT_SHOWN_ABOVE = 5;
+/** Le nombre de présents à afficher ; undefined : cinq ou moins, on ne le dit pas. */
+export const shownPresent = (n: number): number | undefined => (n > ROOM_COUNT_SHOWN_ABOVE ? n : undefined);
 const FUTURE_MS = 60_000;
 const DAY = 86_400_000;
 
@@ -76,6 +89,26 @@ export interface RoomRetraction {
   at: string;
   sig: string;
 }
+
+/**
+ * Réaction d'un joueur à une ligne (16/11/2026, reactions.ts) : signée par sa clé, relayée comme les
+ * lignes et gardée 7 jours. Seule la plus récente de chaque joueur sur une ligne compte ; `kind` null :
+ * réaction retirée. Une par joueur et par ligne : le nombre de réactions reste borné par les lignes.
+ */
+export interface RoomReaction {
+  /** La ligne visée. */
+  id: string;
+  room: RoomId;
+  key: string;
+  name: string;
+  kind: Reaction | null;
+  at: string;
+  sig: string;
+}
+
+/** Réactions gardées au plus sur la borne, et données à qui entre dans un salon. */
+export const ROOM_REACTIONS_MAX = 5000;
+export const ROOM_REACTIONS_BATCH = 300;
 
 export interface RoomHere {
   key: string;
@@ -126,6 +159,30 @@ export function verifyRoomRetraction(raw: unknown, now = new Date()): RoomRetrac
   const d: RoomRetraction = { id: r.id, room: r.room, key: r.key, at: r.at, sig: r.sig };
   const { sig, ...base } = d;
   return verifyText(retractionText(base), sig, d.key) ? d : undefined;
+}
+
+function reactionSignedText(r: Omit<RoomReaction, 'sig'>): string {
+  return JSON.stringify({ app: 'cyberpinball', kind: 'room-react', id: r.id, room: r.room, key: r.key, name: r.name, react: r.kind, at: r.at });
+}
+
+/** Ma réaction à la ligne `line` (null : la retirer), signée maintenant. */
+export function signRoomReaction(me: { key: PlayerKey; name: string }, line: Pick<RoomLine, 'id' | 'room'>, kind: Reaction | null, now = new Date()): RoomReaction {
+  const base: Omit<RoomReaction, 'sig'> = { id: line.id, room: line.room, key: me.key.publicKey, name: me.name, kind, at: now.toISOString() };
+  return { ...base, sig: signText(reactionSignedText(base), me.key) };
+}
+
+/** Réaction reçue : forme, date et signature vérifiées ; plus vieille que 7 jours ou du futur : refusée. */
+export function verifyRoomReaction(raw: unknown, now = new Date()): RoomReaction | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const name = normalizeName(r.name);
+  if (!isId(r.id) || !isRoomId(r.room) || !isPlayerPublicKey(r.key) || !name || name !== r.name || !isIso(r.at) || typeof r.sig !== 'string' || r.sig.length > 200) return undefined;
+  if (r.kind !== null && !isReaction(r.kind)) return undefined;
+  const at = Date.parse(r.at);
+  if (at > now.getTime() + FUTURE_MS || now.getTime() - at > ROOM_KEEP_DAYS * DAY) return undefined;
+  const d: RoomReaction = { id: r.id, room: r.room, key: r.key, name, kind: r.kind as Reaction | null, at: r.at, sig: r.sig };
+  const { sig, ...base } = d;
+  return verifyText(reactionSignedText(base), sig, d.key) ? d : undefined;
 }
 
 function hereText(h: Omit<RoomHere, 'sig' | 'avatar' | 'asig'>): string {
@@ -187,6 +244,8 @@ export interface RoomsState {
   mentionsInGame: boolean;
   /** Règles des salons acceptées (ISO) : sans elles, on lit sans écrire. */
   rulesAt?: string;
+  /** Nouvelles lignes de mes salons notifiées au menu (par défaut) ; false : rien. */
+  lineNotices?: false;
   /** Le salon où l'on entre depuis la Communauté ; absent : celui de mon pays, sinon Monde. */
   defaultRoom?: RoomId;
   /** Joueurs ignorés dans les salons (clés) : leurs lignes ne s'affichent plus ici. */
@@ -198,6 +257,8 @@ export interface RoomsState {
   lines: RoomLine[];
   /** Lignes retirées par leur auteur, 7 jours (RoomRetraction) ; absent : aucune. */
   retracted?: RoomRetraction[];
+  /** Réactions aux lignes, la plus récente de chaque joueur par ligne, 7 jours (RoomReaction) ; absent : aucune. */
+  reactions?: RoomReaction[];
 }
 
 // ---------------------------------------------------------------------------
@@ -268,12 +329,17 @@ export function loadRooms(dataDir: string, now = new Date()): RoomsState {
     const r = d as Record<string, unknown>;
     return !!r && typeof r === 'object' && isId(r.id) && isRoomId(r.room) && isPlayerPublicKey(r.key) && isIso(r.at) && typeof r.sig === 'string';
   });
+  const reactions = (Array.isArray(s.reactions) ? s.reactions : []).filter((d): d is RoomReaction => {
+    const r = d as Record<string, unknown>;
+    return !!r && typeof r === 'object' && isId(r.id) && isRoomId(r.room) && isPlayerPublicKey(r.key) && typeof r.name === 'string' && (r.kind === null || isReaction(r.kind)) && isIso(r.at) && typeof r.sig === 'string';
+  });
   return tidyRooms(
     {
       version: 1,
       enabled: s.enabled !== false,
       filter: s.filter !== false,
       mentionsInGame: s.mentionsInGame !== false,
+      ...(s.lineNotices === false ? { lineNotices: false as const } : {}),
       ...(isIso(s.rulesAt) ? { rulesAt: s.rulesAt } : {}),
       ...(isRoomId(s.defaultRoom) ? { defaultRoom: s.defaultRoom } : {}),
       ignored: Array.isArray(s.ignored) ? s.ignored.filter(isPlayerPublicKey).slice(0, 1000) : [],
@@ -282,6 +348,7 @@ export function loadRooms(dataDir: string, now = new Date()): RoomsState {
       ...(phrases ? { phrases } : {}),
       lines,
       ...(retracted.length ? { retracted } : {}),
+      ...(reactions.length ? { reactions } : {}),
     },
     now,
   );
@@ -291,9 +358,14 @@ export function saveRooms(dataDir: string, state: RoomsState): void {
   writeFileAtomic(roomsFile(dataDir), JSON.stringify(state));
 }
 
-/** Ménage : 7 jours de lignes, 300 par salon, 60 salons au plus (les plus récemment actifs) ; 7 jours de retraits. */
+/** Ménage : 7 jours de lignes, 300 par salon, 60 salons au plus (les plus récemment actifs) ; 7 jours de retraits et de réactions. */
 export function tidyRooms(s: RoomsState, now = new Date()): RoomsState {
   const limit = now.getTime() - ROOM_KEEP_DAYS * DAY;
+  if (s.reactions && (s.reactions.length > ROOM_REACTIONS_MAX || s.reactions.some((d) => Date.parse(d.at) < limit))) {
+    const reactions = s.reactions.filter((d) => Date.parse(d.at) >= limit).slice(-ROOM_REACTIONS_MAX);
+    const { reactions: _, ...rest } = s;
+    s = reactions.length ? { ...rest, reactions } : rest;
+  }
   if (s.retracted?.some((d) => Date.parse(d.at) < limit)) {
     const retracted = s.retracted.filter((d) => Date.parse(d.at) >= limit);
     const { retracted: _, ...rest } = s;
@@ -376,6 +448,37 @@ export function retractRoomLines(s: RoomsState, dels: readonly RoomRetraction[],
  */
 export function roomRetractions(s: RoomsState, room: RoomId): RoomRetraction[] {
   return (s.retracted ?? []).filter((d) => d.room === room).slice(-ROOM_BATCH);
+}
+
+/**
+ * Réactions reçues, déjà vérifiées : pour chaque joueur et chaque ligne, seule la plus récente reste ;
+ * rend les nouvelles (plus récentes que celle gardée), à relayer. Les miennes passent par le même chemin.
+ */
+export function mergeRoomReactions(s: RoomsState, list: readonly RoomReaction[], now = new Date()): { state: RoomsState; fresh: RoomReaction[] } {
+  const slot = (r: Pick<RoomReaction, 'id' | 'key'>) => `${r.id}|${r.key}`;
+  const kept = new Map((s.reactions ?? []).map((r) => [slot(r), r]));
+  const fresh: RoomReaction[] = [];
+  for (const r of [...list].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) {
+    const had = kept.get(slot(r));
+    if (had && Date.parse(had.at) >= Date.parse(r.at)) continue;
+    kept.set(slot(r), r);
+    fresh.push(r);
+  }
+  if (!fresh.length) return { state: s, fresh };
+  const reactions = [...kept.values()].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  return { state: tidyRooms({ ...s, reactions }, now), fresh };
+}
+
+/** Les réactions d'un salon (les 300 dernières), jointes à l'historique demandé par une borne qui entre. */
+export function roomReactions(s: RoomsState, room: RoomId): RoomReaction[] {
+  return (s.reactions ?? []).filter((r) => r.room === room).slice(-ROOM_REACTIONS_BATCH);
+}
+
+/** Les réactions de chaque ligne (son id), la plus récente de chaque joueur ; les retirées (null) comprises. */
+export function reactionsByLine(s: RoomsState): Map<string, RoomReaction[]> {
+  const out = new Map<string, RoomReaction[]>();
+  for (const r of s.reactions ?? []) out.set(r.id, [...(out.get(r.id) ?? []), r]);
+  return out;
 }
 
 /** Les lignes d'un salon, de la plus ancienne à la plus récente. */

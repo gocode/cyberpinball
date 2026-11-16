@@ -411,3 +411,45 @@ test('activité : une ligne est vue quand le curseur s’y pose ; son repère re
   again.record([ev('friend-online', BRUNO, T0 + 5), ev('download-failed', 'j3', T0 + 6, { who: undefined, player: undefined })], true);
   assert.equal(again.unread(), 1);
 });
+
+test('salons : une ligne de salon se montre sans entrer au journal, et tombe dès qu’elle est lue', () => {
+  setLanguage('fr');
+  let clock = T0;
+  const unread = new Set(['l1', 'l2']);
+  let shownRoom: string | undefined;
+  const recorded: NoticeEvent[] = [];
+  const notices = createMenuNotices({
+    social: { state: () => newSocialState(new Date(0)), online: () => false, presenceOf: () => undefined },
+    jobs: () => [],
+    mode: () => 'all',
+    zone: () => noticeZone('menu', { quietInGame: false }),
+    redraw: () => undefined,
+    now: () => clock,
+    activity: { record: (events: readonly NoticeEvent[]) => recorded.push(...events), shown: () => undefined },
+    rooms: { onScreen: (room: string) => room === shownRoom, unread: (id: string) => unread.has(id) },
+  }) as unknown as { push(events: NoticeEvent[]): void; view(): { notice?: { title: string } }; stop(): void };
+  try {
+    clock += NOTICE_STARTUP_QUIET_MS + 1000;
+    const line = (id: string): NoticeEvent => ({ kind: 'room-line', key: `pays-FR|${id}`, at: clock, who: 'Kiko', subject: 'Salon France', extra: 'Bonsoir' });
+    notices.push([line('l1')]);
+    clock += NOTICE_GATHER_MS + 100;
+    assert.equal(notices.view().notice?.title, 'Kiko · Salon France');
+    assert.deepEqual(recorded, [], 'pas au journal d’Activité récente');
+    // Lue (le salon ouvert puis quitté) : la notification n'a plus lieu d'être.
+    unread.delete('l1');
+    clock += 1000;
+    const after = notices.view().notice as { leaving?: boolean } | undefined;
+    assert.ok(!after || after.leaving, 'elle part');
+    clock += 1000;
+    assert.equal(notices.view().notice, undefined, 'partie');
+    // Une ligne arrivée pendant que son salon est à l'écran, puis lue : jamais annoncée plus tard.
+    shownRoom = 'pays-FR';
+    notices.push([line('l2')]);
+    unread.delete('l2');
+    shownRoom = undefined;
+    clock += 60_000;
+    assert.equal(notices.view().notice, undefined);
+  } finally {
+    notices.stop();
+  }
+});

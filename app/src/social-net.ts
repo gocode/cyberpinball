@@ -74,6 +74,12 @@ import {
   retractRoomLines,
   signRoomRetraction,
   verifyRoomRetraction,
+  mergeRoomReactions,
+  roomReactions,
+  signRoomReaction,
+  verifyRoomReaction,
+  type RoomReaction,
+  type Reaction,
   type RoomRetraction,
   saveRooms,
   signRoomHere,
@@ -105,6 +111,7 @@ import {
   isRoomId,
   roomsFile,
   ROOM_BATCH,
+  ROOM_REACTIONS_BATCH,
   ROOM_HERE_FRESH_MS,
   ROOM_HERE_MS,
   type RoomHere,
@@ -360,7 +367,9 @@ type RoomMessage =
   | { t: 'room-ask'; room: RoomId; since?: string }
   | { t: 'room-here'; here: RoomHere[] }
   /** Lignes retirées par leur auteur (rooms.ts, RoomRetraction) ; une borne d'avant les retraits l'ignore. */
-  | { t: 'room-del'; dels: RoomRetraction[] };
+  | { t: 'room-del'; dels: RoomRetraction[] }
+  /** Réactions aux lignes (rooms.ts, RoomReaction) ; une borne d'avant les réactions l'ignore. */
+  | { t: 'room-react'; reacts: RoomReaction[] };
 /** Parties instantanées (instantgames.ts) : annonces signées, relayées entre toutes les bornes. */
 type InstantMessage = { t: 'instant'; games: InstantGame[] };
 /** Modération (moderation.ts) : charte et décisions entre toutes les bornes ; signalements chiffrés pour les modérateurs. */
@@ -527,6 +536,8 @@ export interface SocialNet {
   roomSend(room: RoomId, text: string, action?: boolean): { line: RoomLine } | { reason: 'disabled' | 'rules' | 'gap' | 'burst' | 'text' | 'offline' | 'muted' };
   /** Retirer ma ligne (son id) : ici et chez toutes les bornes reliées, qui relaient le retrait ; false si elle n'est pas à moi. */
   roomRetract(id: string): boolean;
+  /** Réagir à une ligne (son id) ; null : retirer ma réaction. Ici et chez toutes les bornes reliées ; false si la ligne est inconnue ou si je ne peux pas écrire. */
+  roomReact(id: string, kind: Reaction | null): boolean;
   /**
    * Le salon à l'écran (undefined : aucun) : j'y suis présent (signal toutes les deux minutes), et son
    * historique des 24 dernières heures est demandé aux bornes reliées.
@@ -537,7 +548,7 @@ export interface SocialNet {
   /** Arrivées et départs vus d'un salon (en mémoire), pour le journal. */
   roomMoves(room: RoomId): { at: string; key: string; name: string; join: boolean }[];
   /** Réglages et état des salons sur cette borne : règles acceptées, joueurs ignorés, filtre… */
-  setRooms(change: Partial<Pick<RoomsState, 'enabled' | 'filter' | 'mentionsInGame' | 'rulesAt' | 'defaultRoom' | 'ignored' | 'read' | 'phrases'>>): void;
+  setRooms(change: Partial<Pick<RoomsState, 'enabled' | 'filter' | 'mentionsInGame' | 'lineNotices' | 'rulesAt' | 'defaultRoom' | 'ignored' | 'read' | 'phrases'>>): void;
   /** De nouvelles lignes dans les salons (pas les miennes) : les mentions de mon pseudo. */
   onRoomLines(listener: (lines: RoomLine[]) => void): () => void;
   /** Modération des salons (moderation.ts) : la charte connue, les décisions, les signalements reçus (modérateur). */
@@ -1373,6 +1384,25 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       // Les retraits du salon : une ligne gardée par la borne qui entre, retirée depuis, disparaît aussi chez elle.
       const dels = roomRetractions(rooms, m.room);
       if (dels.length) link.send({ t: 'room-del', dels });
+      // Les réactions du salon : toutes, une réaction pouvant viser une ligne ancienne.
+      const reacts = roomReactions(rooms, m.room);
+      if (reacts.length) link.send({ t: 'room-react', reacts });
+      return;
+    }
+    if (m.t === 'room-react') {
+      if (!Array.isArray(m.reacts)) return;
+      // Comme une ligne : celle d'un joueur exclu, ou en sourdine à son heure, n'est ni gardée ni relayée.
+      const reacts = m.reacts
+        .slice(0, ROOM_REACTIONS_BATCH)
+        .map((r) => verifyRoomReaction(r, now()))
+        .filter((r): r is RoomReaction => !!r && !shunned(r.key) && r.key !== state.key.publicKey && !lineRefused(moderation.acts, r));
+      if (!reacts.length) return;
+      const merged = mergeRoomReactions(rooms, reacts, now());
+      if (!merged.fresh.length) return;
+      rooms = merged.state;
+      saveRoomsSoon();
+      for (const l of greetedLinks(from)) l.send({ t: 'room-react', reacts: merged.fresh });
+      changed();
       return;
     }
     if (m.t === 'room-del') {
@@ -2084,6 +2114,17 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       rooms = retractRoomLines(rooms, [del], now()).state;
       saveRoomsSoon();
       for (const link of greetedLinks()) link.send({ t: 'room-del', dels: [del] });
+      changed();
+      return true;
+    },
+    roomReact(id, kind) {
+      const line = rooms.lines.find((l) => l.id === id);
+      if (!line || !state.enabled || cannotWrite(rooms, state.key.publicKey, line.room, now()) === 'disabled' || !rooms.rulesAt) return false;
+      if (sanctionOf(moderation.acts, state.key.publicKey, now())) return false;
+      const react = signRoomReaction(state, line, kind, now());
+      rooms = mergeRoomReactions(rooms, [react], now()).state;
+      saveRoomsSoon();
+      for (const link of greetedLinks()) link.send({ t: 'room-react', reacts: [react] });
       changed();
       return true;
     },

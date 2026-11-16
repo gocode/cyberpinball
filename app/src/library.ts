@@ -236,6 +236,7 @@ import {
   eraseAfterCaret,
   eraseBeforeCaret,
   insertAtCaret,
+  flipperMovesKey,
   moveCaret,
   type VrNetworkFacts,
   mediaOriginOf,
@@ -565,6 +566,8 @@ export interface Row {
   icon?: IconName;
   /** Un pays : son drapeau à la place de l'icône. */
   flag?: FlagView;
+  /** Un emoji en grand à la place de l'icône (les réactions : « 👍 », puis son mot en texte). */
+  emoji?: string;
   /** Repère neutre (filet clair) : l'emplacement ouvert, un fichier coché ; jamais en vert, réservé au choix courant. */
   current?: boolean;
   /** Seconde ligne, mot et signe : à quoi sert un fichier (« ✓ Installé avec… », « ! À installer… »). */
@@ -601,9 +604,10 @@ export interface Row {
   /**
    * Ligne d'un salon (rooms-menu.ts), à l'ancienne : l'heure, le drapeau, « <pseudo> » à la teinte de
    * sa clé, le texte. `kind` : une ligne, une action (/me), une ligne qui me cite, la mienne, ou une
-   * ligne de service (arrivée, départ) plus discrète.
+   * ligne de service (arrivée, départ) plus discrète. `reactions` : ses pastilles de réactions
+   * (« 👍 2 »), sous le texte ; `mine` : celle que j'ai posée, cerclée.
    */
-  log?: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' | 'masked'; flag?: FlagView };
+  log?: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' | 'masked'; flag?: FlagView; reactions?: { text: string; mine: boolean }[] };
 }
 export interface Section {
   title?: string;
@@ -4753,7 +4757,8 @@ export function createLibrary(host: LibraryHost) {
       else if (arrow) moveCaret(e, input.code === 'ArrowLeft' ? -1 : 1);
       else if (input.code === 'Home' || input.code === 'End') moveCaret(e, input.code === 'Home' ? 'start' : 'end');
       else if (input.code === 'Enter' || input.code === 'NumpadEnter') closeEditor(s, true);
-      else if ((is(KEYS.previous) || is(KEYS.next)) && !e.typed) moveKeyCursor(e, is(KEYS.previous) ? -1 : 1);
+      // Flippers : toujours la touche précédente ou suivante, même après un texte tapé (flipperMovesKey).
+      else if ((is(KEYS.previous) || is(KEYS.next)) && flipperMovesKey(e.typed, input)) moveKeyCursor(e, is(KEYS.previous) ? -1 : 1);
       else if (is(KEYS.confirm)) pressKey(s, e.cursor);
     } else if (e.kind === 'choice') {
       if (is(KEYS.previous)) e.cursor = (e.cursor - 1 + e.choices.length) % e.choices.length;
@@ -5698,6 +5703,8 @@ export function createLibrary(host: LibraryHost) {
     attention: () => SYSTEM_ROOT_ENTRIES.some(systemAttention),
     /** L'écran décrit affiché est celui-ci (un transfert qui finit sous les yeux de l'utilisateur). */
     isShowing: (build: () => Built) => screen?.kind === 'custom' && screen.build === build,
+    /** Une saisie au clavier à l'écran (openPrompt) est à l'écran. */
+    isPrompting: () => screen?.kind === 'prompt',
     /** Juke-box : playlists, bibliothèque, YouTube, fichiers locaux (jukebox-library.ts). */
     jukebox,
     /** Gestion et import du Juke-box (jukebox-menu.ts) : « Récupérer » y envoie un lien. */

@@ -432,7 +432,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
       : host.messages.attention()
         ? host.messages.detail()
         : t('Joueurs en ligne, messages, salon, classements');
-    const eyebrow = room ? (room.problem ? room.name : `${room.name} · ${tn(room.present, '{n} présent', '{n} présents')}`) : t('Joueurs en ligne');
+    const eyebrow = room ? (room.problem || !room.present ? room.name : `${room.name} · ${tn(room.present, '{n} présent', '{n} présents')}`) : t('Joueurs en ligne');
     const heading = room?.problem ?? (room?.last ? `<${room.last.name}> ${room.last.text}` : room ? t('Rien de neuf pour l’instant') : t('Start pour ouvrir la Communauté'));
     return { ...frame, stats: countsLine(list), empty: false, eyebrow, heading, detail };
   }

@@ -39,12 +39,12 @@ export const messages: Record<string, string> = {
   'Bonne soirée !': 'Have a good evening!',
   'Répondre à @{name}': 'Reply to @{name}',
   'Il vous a cité à {time}': 'They mentioned you at {time}',
-  'Clavier à l’écran…': 'On-screen keyboard…',
-  '« /me … » pour une action': '"/me …" for an action',
+  'Écrire…': 'Write…',
+  'Au clavier à l’écran · « /me arrive » s’affiche « {name} arrive »': 'With the on-screen keyboard · "/me arrives" shows as "{name} arrives"',
   'Communauté › Salon : le champ est prêt sur le téléphone': 'Community › Room: the field is ready on the phone',
   'Retour au salon': 'Back to the room',
   '300 caractères, une ligne · @pseudo prévient le joueur · aucun lien': '300 characters, one line · @name notifies the player · no links',
-  'Une ligne, 300 caractères au plus. « /me » pour une action, « /ignorer pseudo » pour ignorer un joueur.': 'One line, 300 characters at most. "/me" for an action, "/ignorer name" to ignore a player.',
+  'Une ligne, 300 caractères au plus. « /me arrive » : une action, affichée « {name} arrive » en italique. « /ignorer pseudo » : ignorer un joueur.': 'One line, 300 characters at most. "/me arrives": an action, shown as "{name} arrives" in italics. "/ignorer name": ignore a player.',
 
   // Une ligne
   'Votre ligne commencera par @{name}': 'Your line will start with @{name}',
@@ -177,4 +177,22 @@ export const messages: Record<string, string> = {
   'Supprimer votre ligne ?': 'Delete your line?',
   '« {text} » disparaît du salon, ici et chez les autres joueurs à mesure que leurs bornes le reçoivent. Rien ne la rétablit.': '“{text}” disappears from the room, here and for the other players as their cabinets receive the deletion. Nothing brings it back.',
   'Ligne supprimée': 'Line deleted',
+
+  // app/src/rooms-menu.ts : réactions, nouveaux messages de mes salons
+  'Réagir': 'React',
+  'Présents': 'Present',
+  'Les lignes vivent sur les bornes, 7 jours au plus': 'Lines live on the cabinets, 7 days at most',
+  'Réaction impossible pour l’instant': 'Cannot react for now',
+  'Nouveaux messages de mes salons : notification': 'New messages in my rooms: notification',
+  'Nouveaux messages de mes salons : rien': 'New messages in my rooms: nothing',
+  'Votre salon et ceux où vous avez écrit depuis hier · au menu, deux minutes au plus': 'Your room and those you wrote in since yesterday · in the menu, two minutes at most',
+
+  // packages/core/src/notices.ts : notification des nouveaux messages de salon
+  '{name} · {room}': '{name} · {room}',
+  '{n} nouveau message · {room}': '{n} new message · {room}',
+  '{n} nouveaux messages · {room}': '{n} new messages · {room}',
+  '{n} nouveau message dans les salons': '{n} new message in the rooms',
+  '{n} nouveaux messages dans les salons': '{n} new messages in the rooms',
+  '{n} message de salon': '{n} room message',
+  '{n} messages de salon': '{n} room messages',
 };

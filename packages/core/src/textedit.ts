@@ -1,3 +1,4 @@
+import { isModifierCode } from './modifier-chords';
 // Saisie de texte du clavier à l'écran : un point d'insertion dans le texte, déplacé par les
 // flèches (celles d'un clavier, ou les touches ◀ ▶ du clavier à l'écran), et les emojis.
 //
@@ -113,3 +114,14 @@ export const KEYBOARD_EMOJIS: readonly string[] = [
   '🔥', '⭐', '🏆', '🎉', '🎯', '💯', '⚡', '💥', '🚀', '🍀',
   '❤️', '💔', '😴', '🤯', '🥳', '😬', '🙃', '🕹️', '✅', '❌',
 ];
+
+/**
+ * Un flipper (touche précédente ou suivante) fait-il défiler les touches du clavier à l'écran ?
+ * Toujours, même une fois du texte arrivé par un vrai clavier, le téléphone ou le panneau des emojis
+ * de Windows (16/11/2026 : ils ne répondaient plus dès que le champ avait reçu un texte). Seule
+ * exception : la répétition d'un modificateur tenu (Maj, le flipper par défaut) pendant qu'on tape
+ * au clavier, pour une majuscule : un seul pas, pas un défilement.
+ */
+export function flipperMovesKey(typed: boolean, input: { code: string; isAutoRepeat?: boolean }): boolean {
+  return !(typed && input.isAutoRepeat && isModifierCode(input.code));
+}

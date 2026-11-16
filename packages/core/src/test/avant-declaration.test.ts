@@ -50,6 +50,8 @@ const REVIEWED = new Set([
   'playing',
   'power',
   'profileMenu',
+  // Salons : lus par la file des notifications quand une ligne de salon s'affiche, jamais pendant l'initialisation.
+  'roomsMenu',
   'SIMULATED_MANUAL',
   'socialNet',
   'stopNotice',

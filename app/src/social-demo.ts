@@ -53,7 +53,7 @@
 import { generateKeyPairSync } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { acknowledge, addEvent, addToHistory, newChatState, readAvatarImage, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, PUP_FOLDER, readHostSettings, receiveLines, saveChat, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, toWire, verifyWire, writeLine, type LiveGame, type SocialState, type TableEntry, signCharter, type Charter } from '@cyberpinball/core';
+import { acknowledge, addEvent, addToHistory, newChatState, readAvatarImage, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, PUP_FOLDER, readHostSettings, receiveLines, saveChat, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, toWire, verifyWire, writeLine, type LiveGame, type SocialState, type TableEntry, signCharter, type Charter, type Reaction } from '@cyberpinball/core';
 import { createChatService, type ChatService } from './chat-service';
 import { createFriendContent, type FriendContent } from './friend-content';
 import { createLiveGames, createTableVersions, type LiveGames } from './live-game';
@@ -121,6 +121,8 @@ const NOTICES_CHUNK_MS = 70;
 const CUT_AFTER_BYTES = 9 * 1024 * 1024;
 /** Au démarrage suivant, Bruno revient après ce délai. */
 const RETURN_AFTER_MS = 7000;
+/** Salon France : la ligne qui arrive une fois la borne revenue à la roue (notification « nouveau message »). */
+const ROOM_DEMO_LATE_MS = 120_000;
 
 /**
  * Démonstration des notifications du menu des tables : ce que font les bornes fictives, en
@@ -346,6 +348,18 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     say(vortex!, 'salut de Bruxelles, je passe par le salon France', 6000); // i18n-ignore : ligne d'un joueur fictif
     say(kiko!, 'lance une partie de Star Courier, qui me suit ?', 7500, true); // i18n-ignore : ligne d'un joueur fictif
     say(bruno, `@${me.name} tu viens ? je finis ma bille et je lance une partie en direct`, 9000); // i18n-ignore : ligne d'un joueur fictif
+    // Réactions (16/11/2026) : trois joueurs réagissent à la question de Kiko, Dora à celle de Ressort.
+    const react = (net: SocialNet, author: SocialNet, kind: Reaction, ms: number) =>
+      timersLater.push(setTimeout(() => {
+        const line = net.rooms().lines.find((l) => l.room === room && l.key === author.state().key.publicKey);
+        if (line) net.roomReact(line.id, kind);
+      }, ms));
+    react(ressort!, kiko!, 'like', 10_000);
+    react(dora, kiko!, 'like', 10_300);
+    react(vortex!, kiko!, 'haha', 10_600);
+    react(dora, ressort!, 'love', 10_900);
+    // Une ligne plus tard, quand la borne a quitté le salon : la notification « nouveau message ».
+    say(ressort!, 'tournoi vendredi soir sur Thunder Reef, qui est partant ?', ROOM_DEMO_LATE_MS); // i18n-ignore : ligne d'un joueur fictif
     // Parties instantanées : Kiko ouvre une partie à quatre sur une table de la borne (la même version),
     // Ressort la rejoint ; Vortex en annonce une sur une table que la borne n'a pas ; Tiltman rejoint
     // la partie que la borne ouvre (une place reste libre : elle ne part pas pendant les captures).
@@ -464,7 +478,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       onArrive: (key, lines) => {
         const last = lines.at(-1)!;
         timers.push(setTimeout(() => {
-          brunoChat?.react(key, last.id, 'bravo');
+          brunoChat?.react(key, last.id, 'love');
           brunoChat?.send(key, 'Parfait, je lance Star Courier.'); // i18n-ignore : message d'un joueur fictif
         }, 1500));
       },
