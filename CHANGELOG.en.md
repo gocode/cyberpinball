@@ -21,6 +21,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - On-screen keyboard: a 😀 key opens an emoji panel next to the keys, without hiding the text. On a desktop, the Windows panel (Win + period) also types into the field.
 - Messages and rooms: delete your message (Start on it, then “Delete this message…” or “Delete my line…”); it also disappears for the other players.
 - Sharing and network: “Delete my account…” erases your account, here and on other players' cabinets (name, friends, messages, rooms, published scores, suggestions and votes), then Cyber Pinball starts again with a new account.
+- Community: “Feedback and ideas” is now also at the bottom of the Community home; its “Back” returns there.
 
 ## 0.1.13
 

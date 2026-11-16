@@ -23,6 +23,7 @@ son interface).
 - Clavier à l'écran : une touche 😀 ouvre un panneau d'emojis à côté des touches, sans cacher le texte. Au bureau, le panneau de Windows (Win + point) écrit aussi dans le champ.
 - Messages et salons : supprimez votre message (Start sur lui, puis « Supprimer ce message… » ou « Supprimer ma ligne… ») ; il disparaît aussi chez les autres joueurs.
 - Partage et réseau : « Supprimer mon compte… » efface votre compte, ici et chez les autres joueurs (nom, amis, messages, salons, scores publiés, propositions et votes), puis Cyber Pinball repart avec un compte neuf.
+- Communauté : « Avis et propositions » est aussi tout en bas de l'accueil de la Communauté ; son « Retour » y ramène.
 
 ## 0.1.13
 
