@@ -15,6 +15,10 @@
 
 Windows 10 ou 11, 64 bits. Ces liens téléchargent toujours la dernière version, directement. Déjà installé ? La borne se met à jour depuis son menu système. Versions précédentes et nouveautés : [toutes les versions](https://github.com/gocode/cyberpinball/releases).
 
+<p align="center"><a href="https://www.youtube.com/watch?v=nXr4ikaEhh4"><img src="docs/images/fr/trailer.webp?v=fdbef74fd3" width="760" alt="Le trailer de Cyber Pinball sur YouTube : TON PINCAB CONNECTÉ, à côté d'une partie entre amis en direct et de son départ commun. Bouton Regarder le trailer."></a></p>
+
+<p align="center"><sub><a href="https://www.youtube.com/watch?v=nXr4ikaEhh4">▶ Le trailer de Cyber Pinball, sur YouTube</a></sub></p>
+
 <p align="center"><img src="docs/images/fr/cabinet.webp?v=7cf14b1872" width="900" alt="Le menu des tables sur une borne à quatre écrans. Sur le playfield, montré à la verticale : le plateau de la table sélectionnée, la roue de médaillons ronds et les commandes. À côté, le topper et le fronton du même jeu, Neon Abyss, et le DMD animé du menu."></p>
 
 <p align="center"><sub>Les tables présentées sont fictives.</sub></p>

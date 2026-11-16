@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Project page on GitHub: the Cyber Pinball trailer now shows at the top, right after "Download", in English on the English page and in French on the French page. Clicking the thumbnail opens the video on YouTube.
 - A table's credits: Start on a line that has a page (VPUniverse, VPForums…) opens it directly in the cabinet's browser, with all its authors in the banner. While the line is selected, its QR code shows next to the options, to open it on your phone too. In guest mode the browser stays closed: Start shows the authors and the QR code.
 - Pinball FX (beta): "Install Pinball FX" finds Steam again; it was greyed out ("Neither Steam nor Epic on this PC") on a PC that had it. Cabinet schedule: the list of buttons that can wake the cabinet finally gives their names.
 - Windows desktop: on return, you are where you left off (the "Borne" (Cabinet) section on "Bureau Windows" (Windows desktop), the open screen, the selected table), no longer on the wheel. Also when the menu relaunches to turn the screen, or after changing the language or the DMD type. On a keyboard, the Ctrl and Shift of Ctrl+Shift+D no longer change collection or move the selection: on their own, pressed or held, they stay MagnaSave and flippers as before.

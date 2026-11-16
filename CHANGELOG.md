@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.14
 
+- Page du projet sur GitHub : le trailer de Cyber Pinball s'affiche en tête, juste après « Télécharger », en français sur la page française et en anglais sur la page anglaise. Un clic sur la vignette ouvre la vidéo sur YouTube.
 - Crédits d'une table : Start sur une ligne qui a une page (VPUniverse, VPForums…) l'ouvre directement dans le navigateur de la borne, avec tous ses auteurs dans le bandeau. Tant que la ligne est sélectionnée, son QR code s'affiche à côté des options, pour l'ouvrir aussi sur le téléphone. En mode invité, le navigateur reste fermé : Start montre les auteurs et le QR code.
 - Pinball FX (bêta) : « Installer Pinball FX » trouve de nouveau Steam ; il était grisé (« Ni Steam ni Epic sur ce PC ») sur un PC qui l’avait. Horaire de la borne : la liste des boutons qui peuvent réveiller la borne donne enfin leur nom.
 - Bureau Windows : au retour, vous êtes là où vous l'aviez quitté (la rubrique « Borne » sur « Bureau Windows », l'écran ouvert, la table sélectionnée), et non plus sur la roue. Aussi quand le menu se relance pour retourner l'écran, ou après un changement de langue ou de type de DMD. Au clavier, Ctrl et Maj de Ctrl+Maj+D ne changent plus de collection et ne déplacent plus la sélection : seuls, appuyés ou tenus, ils restent MagnaSave et flippers comme avant.
