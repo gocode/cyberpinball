@@ -1071,8 +1071,23 @@ type WizardAction = { type: 'button'; index: number } | { type: 'buttons'; actio
  * jeu (16/11/2026).
  */
 function startButtons(initial = false): void {
-  if (only || wizard.buttons === undefined) return startCapture(GAME_KEYS, initial);
+  if (only) return startCapture(GAME_KEYS, initial);
+  // Borne neuve : « Vos boutons sont-ils déjà les bons ? », sur les boutons de l'interface.
+  if (wizard.buttons === undefined) return startChoice();
   startCapture(INTERFACE_KEYS, initial, true);
+}
+
+/**
+ * Premier écran d'une borne neuve : les boutons de l'interface en vigueur (ceux des encodeurs :
+ * flippers, Start, Exit), « Garder ces touches » ou « Modifier mes boutons », et le délai de 20 s.
+ * Jusqu'en 0.1.14-essai.3, cet écran montrait les boutons du jeu : l'interface, qui pilote les
+ * menus et toute la suite, ne venait qu'après (16/11/2026).
+ */
+function startChoice(): void {
+  const keys = inForceKeys(INTERFACE_KEYS);
+  wizard.phase = 'buttonsChoice';
+  wizard.capture = { set: INTERFACE_KEYS, index: 0, keys, answered: new Set(), reference: { ...keys }, action: 0, tried: new Set(), deadline: Date.now() + BUTTONS_TIMEOUT_MS };
+  startButtonsCountdown();
 }
 
 /** Marque de « Relevé : … » des boutons du jeu proposés sur ceux de l'interface (gameFromNavigation). */
@@ -1104,7 +1119,7 @@ function previousStepOf(set: KeySet): 'interface' | 'choice' | undefined {
 function previousStep(): void {
   const target = previousStepOf(wizard.capture!.set);
   if (target === 'interface') reviewSet(INTERFACE_KEYS, inForceKeys(INTERFACE_KEYS), wizard.navigation ? undefined : DEFAULTS_LAST);
-  else if (target === 'choice') startCapture(GAME_KEYS, true);
+  else if (target === 'choice') startChoice();
 }
 
 /**
@@ -1122,7 +1137,7 @@ function startCapture(set: KeySet, initial = false, first = false): void {
   // Délai : à la première étape des boutons de l'assistant complet (jamais à l'étape seule).
   const timed = initial && (first || (game && !(keep && stepOnly)));
   // Borne neuve : d'abord « Vos boutons sont-ils déjà les bons ? », jamais le relevé d'emblée.
-  wizard.phase = keep ? summaryPhase(set) : timed ? 'buttonsChoice' : capturePhase(set);
+  wizard.phase = keep ? summaryPhase(set) : capturePhase(set);
   wizard.capture = {
     set,
     index: 0,
@@ -1136,10 +1151,17 @@ function startCapture(set: KeySet, initial = false, first = false): void {
     ...(timed && { deadline: Date.now() + BUTTONS_TIMEOUT_MS }),
   };
   stopButtonsCountdown();
-  if (!timed) return;
-  // Le délai court même pendant le téléchargement de VPX : suspendu, il figeait l'écran sans
-  // explication quand le téléchargement n'aboutissait pas (antivirus, connexion lente). Une borne
-  // qui n'a qu'un Pinscape revient au relevé par l'un de ses boutons, dès VPX installé.
+  if (timed) startButtonsCountdown();
+}
+
+/**
+ * Le délai de 20 s de la première étape des boutons. Il court même pendant le téléchargement de
+ * VPX : suspendu, il figeait l'écran sans explication quand le téléchargement n'aboutissait pas
+ * (antivirus, connexion lente). Une borne qui n'a qu'un Pinscape revient au relevé par l'un de ses
+ * boutons, dès VPX installé.
+ */
+function startButtonsCountdown(): void {
+  stopButtonsCountdown();
   buttonsCountdown = setInterval(() => {
     const deadline = wizard.capture?.deadline;
     if (!(wizard.phase === 'buttonsChoice' || CAPTURE_PHASES.includes(wizard.phase)) || deadline === undefined) stopButtonsCountdown();
@@ -1337,10 +1359,9 @@ function runButtonsAction(action: ButtonsAction): void {
   switch (action) {
     case 'keep':
       // Les touches affichées, comme « Touches par défaut » puis « Valider » : l'assistant continue.
+      // Les boutons de l'interface gardés : ceux du jeu proposés sur les mêmes boutons, à valider.
       if (wizard.phase !== 'buttonsChoice') return;
-      stopButtonsCountdown();
-      wizard.capture = undefined;
-      return startPlunger();
+      return reviewSet(GAME_KEYS, gameFromNavigation(wizard.navigation), FROM_INTERFACE_LAST);
     case 'modify':
       // Les boutons de l'interface d'abord : ils pilotent toute la suite. Ceux du jeu sont proposés dessus.
       if (wizard.phase !== 'buttonsChoice') return;
@@ -1778,8 +1799,9 @@ function choiceView(common: Record<string, unknown>, inForceSet: SetKeys) {
   return {
     ...common,
     prompt: t('Vos boutons sont-ils déjà les bons ?'),
-    details: t('Touches par défaut des encodeurs de borne : la plupart des bornes les envoient déjà.'),
-    buttons: GAME_KEYS.items.map((b) => ({ label: b.label, key: keyLabel(inForceSet[b.id]), state: 'done' })),
+    name: t('Boutons de l’interface'),
+    details: t('Ceux qui font circuler dans les menus et dans l’assistant. Touches par défaut des encodeurs : la plupart des bornes les envoient déjà.'),
+    buttons: capture.set.items.map((b) => ({ label: b.label, key: inForceSet[b.id] ? keyLabel(inForceSet[b.id]) : b.required ? t('aucune') : t('facultatif'), state: 'done' })),
     actions: CHOICE_ACTIONS.map((id, i) => ({ id, label: ACTION_LABELS[id], selected: i === capture.action })),
     notice: seconds === undefined ? undefined : t('Sans réponse dans {n} s : ces touches sont gardées, l’assistant passe aux écrans.', { n: seconds }),
     // VPX en cours d'installation : le clavier marche tout de suite, les joysticks seront lus à la fin.

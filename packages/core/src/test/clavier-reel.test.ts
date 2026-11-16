@@ -212,14 +212,16 @@ test('assistant complet au clavier : boutons de l’interface puis du jeu relev�
 // passait aux boutons de l'interface, sans que le joueur l'ait voulu).
 test('premier écran d’une borne neuve : flippers et flèches choisissent sans changer d’écran, Start ou Entrée valident, rien n’est relevé', { skip, timeout: 600_000 }, () => {
   // Maj gauche et droite ne passent pas par webContents.sendInputEvent (touches de modification) : appui direct de l'autopilote.
-  // Garder : l'assistant continue (sans lanceur ni tilt à régler ici, jusqu'aux écrans) ; modifier :
-  // les boutons de l'interface d'abord ; Retour arrière au premier bouton : l'étape d'avant.
+  // Le premier écran porte sur les boutons de l'interface. Garder : ceux du jeu proposés dessus,
+  // à valider ; modifier : le relevé de l'interface ; Retour arrière au premier bouton : l'étape d'avant.
   const cases: [string[], string][] = [
-    [['Clavier:Enter'], 'assign'],
-    [['Clavier:Digit1'], 'assign'],
+    [['Clavier:Enter'], 'buttonsSummary'],
+    [['Clavier:Digit1'], 'buttonsSummary'],
     [['Clavier:ArrowRight'], 'buttonsChoice'],
     [['ShiftLeft', 'ShiftRight'], 'buttonsChoice'],
-    [['Clavier:ArrowRight', 'Clavier:ArrowLeft', 'Clavier:Enter'], 'assign'],
+    [['Clavier:ArrowRight', 'Clavier:ArrowLeft', 'Clavier:Enter'], 'buttonsSummary'],
+    // Jeu validé sur les touches des encodeurs : le balancier de tilt (T) en fait partie, l'étape « Tilt » suit.
+    [['Clavier:Enter', 'Clavier:Digit1'], 'tilt'],
     [['ShiftRight', 'Clavier:Digit1'], 'navigation'],
     [['Clavier:Escape', 'Clavier:Backspace'], 'buttonsChoice'],
   ];

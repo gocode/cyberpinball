@@ -74,7 +74,7 @@ test('l’assistant installe VPX avant le relevé, suspend son délai et retient
   assert.match(prepare, /retryJoysticks\(\)/, 'joysticks relus dès VPX installé');
   // Le délai du premier écran court pendant l'installation (16/11/2026 : suspendu, il figeait l'écran
   // quand le téléchargement n'aboutissait pas) ; le retour au relevé par le joystick prend le relais.
-  assert.doesNotMatch(body(wizard, 'startCapture'), /vpxPrep|buttonsWaitForVpx/, 'le délai ne dépend pas de VPX');
+  assert.doesNotMatch(body(wizard, 'startButtonsCountdown'), /vpxPrep|buttonsWaitForVpx/, 'le délai ne dépend pas de VPX');
   assert.match(body(wizard, 'continueToTables'), /menuWaitsForVpx\(vpxPrep\)/, 'la relance du menu attend VPX');
   // Aucune demande de Windows dans l'assistant : personne ne pourrait y répondre aux boutons.
   assert.doesNotMatch(wizard, /ensureVcRuntime|startElevated|askElevation/);
@@ -113,8 +113,11 @@ test('l’installeur pose le runtime Visual C++ avant le premier lancement, jama
 // clavier-reel.test.ts ; ici, ce qui le garantit dans le code.
 test('premier écran des boutons : un choix, jamais un relevé, et toujours une sortie', () => {
   const wizard = read('app', 'src', 'wizard.ts');
-  // Borne neuve, assistant complet : le choix d'abord, jamais le relevé d'emblée.
-  assert.match(body(wizard, 'startCapture'), /timed \? 'buttonsChoice' : capturePhase\(set\)/);
+  // Borne neuve, assistant complet : le choix d'abord, jamais le relevé d'emblée, et sur les boutons
+  // de l'interface, qui pilotent les menus et toute la suite (16/11/2026 : il portait sur ceux du jeu).
+  assert.match(body(wizard, 'startButtons'), /if \(wizard\.buttons === undefined\) return startChoice\(\);/);
+  assert.match(body(wizard, 'startChoice'), /wizard\.phase = 'buttonsChoice';\s*wizard\.capture = \{ set: INTERFACE_KEYS,/);
+  assert.match(body(wizard, 'startChoice'), /deadline: Date\.now\(\) \+ BUTTONS_TIMEOUT_MS/);
   // Les appuis de ce premier écran choisissent au relâchement, avant tout relevé.
   const key = body(wizard, 'handleKey');
   const choiceAt = key.indexOf("if (wizard.phase === 'buttonsChoice') {");
@@ -129,14 +132,14 @@ test('premier écran des boutons : un choix, jamais un relevé, et toujours une 
   assert.match(choice, /is\(KEYS\.confirm\)\) runButtonsAction\(CHOICE_ACTIONS\[capture\.action\]/);
   assert.match(choice, /is\(KEYS\.exit\)[^\n]*runButtonsAction\('modify'\)/);
   // Garder : l'assistant continue ; modifier : les boutons de l'interface d'abord (16/11/2026).
-  assert.match(body(wizard, 'runButtonsAction'), /case 'keep':[\s\S]*?return startPlunger\(\);\s*case 'modify':[\s\S]*?return startCapture\(INTERFACE_KEYS\);/);
+  assert.match(body(wizard, 'runButtonsAction'), /case 'keep':[\s\S]*?return reviewSet\(GAME_KEYS, gameFromNavigation\(wizard\.navigation\), FROM_INTERFACE_LAST\);\s*case 'modify':[\s\S]*?return startCapture\(INTERFACE_KEYS\);/);
   // Après l'interface, les boutons du jeu proposés sur les mêmes boutons.
   assert.match(body(wizard, 'acceptButtons'), /capture\.set === INTERFACE_KEYS\)[\s\S]*?gameFromNavigation\(wizard\.navigation\)/);
   // « ◀ Précédent » au récapitulatif ou au premier bouton : l'étape d'avant, jamais un tour sur place.
   assert.match(body(wizard, 'previousButton'), /if \(summary \|\| capture\.index === 0\) return previousStep\(\);/);
   assert.match(body(wizard, 'previousStepOf'), /if \(set === GAME_KEYS\) return 'interface';/);
   // Le délai court pendant ce premier écran, et dit ce qui se passera à la fin.
-  assert.match(body(wizard, 'startCapture'), /wizard\.phase === 'buttonsChoice' \|\| CAPTURE_PHASES\.includes/);
+  assert.match(body(wizard, 'startButtonsCountdown'), /wizard\.phase === 'buttonsChoice' \|\| CAPTURE_PHASES\.includes/);
   assert.match(body(wizard, 'choiceView'), /Sans réponse dans \{n\} s : ces touches sont gardées/);
   // Pendant l'installation de VPX, l'écran dit que le clavier marche tout de suite.
   assert.match(body(wizard, 'joystickLine'), /le clavier marche tout de suite/);

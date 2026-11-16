@@ -393,7 +393,6 @@ export const messages: Record<string, string> = {
   'Visual Pinball X est installé · Joystick lu : {names} · l’un de ses boutons : retour au relevé des boutons': 'Visual Pinball X is installed · Joystick read: {names} · any of its buttons: back to button mapping',
   // app/src/wizard.ts : premier écran des boutons d'une borne neuve, et « Valider » indisponible
   'Vos boutons sont-ils déjà les bons ?': 'Are your buttons already right?',
-  'Touches par défaut des encodeurs de borne : la plupart des bornes les envoient déjà.': 'Default keys of cabinet encoders: most cabinets already send them.',
   'Garder ces touches': 'Keep these keys',
   'Modifier mes boutons': 'Change my buttons',
   'Sans réponse dans {n} s : ces touches sont gardées, l’assistant passe aux écrans.': 'No answer within {n} s: these keys are kept and the wizard moves on to the screens.',
@@ -401,6 +400,7 @@ export const messages: Record<string, string> = {
   'Flippers ({left} / {right}) ou flèches : choisir · Start ({start}) ou Entrée : valider · Exit ({exit}) : modifier mes boutons · Clic : l’un ou l’autre': 'Flippers ({left} / {right}) or arrows: choose · Start ({start}) or Enter: confirm · Exit ({exit}): change my buttons · Click: either one',
   'Impossible : {problems}': 'Not possible: {problems}',
   'Première étape': 'First step',
+  'Ceux qui font circuler dans les menus et dans l’assistant. Touches par défaut des encodeurs : la plupart des bornes les envoient déjà.': 'The ones that move you around the menus and the wizard. Default keys of the encoders: most cabinets already send them.',
   'étape précédente': 'previous step',
   'rien avant': 'nothing before',
   'mêmes boutons que précédent, suivant, valider et retour de l’interface': 'same buttons as the interface previous, next, confirm and back',
