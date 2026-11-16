@@ -30,13 +30,15 @@ import { startIdleCursor } from './idle-cursor';
 import { startSettingsAlone } from './settings';
 import { beatPulse, superviseCabinet } from './supervisor';
 import { noteAppRunning, runRelaunchWatcher } from './start-relaunch';
-import { noApplicationMenu } from './app-menu';
+import { focusSafeLookup, noApplicationMenu } from './app-menu';
 import { journalConsole } from './journal';
 import { journalIncidents, journalNativeCrashes, journalPolicyViolations, journalProcessesGone, journalUncaught, reviveCrashedWindows } from './uncaught';
 import { startWizard } from './wizard';
 
 // Aucun menu d'application : les raccourcis du menu par défaut d'Electron faisaient tomber la borne (app-menu.ts).
 noApplicationMenu();
+// Un clic dans un menu natif cherche la page qui a le focus : jamais parmi les pages hors écran (app-menu.ts).
+focusSafeLookup();
 const loc = locations();
 // Tout ce que l'application écrit dans sa console, aussi dans <données>\logs\journal.txt : un essai sur la borne s'explique après coup.
 journalConsole(loc.dataDir);

@@ -14,10 +14,40 @@
 //
 // Les raccourcis d'édition des champs (Ctrl+C, Ctrl+V, Ctrl+A, Ctrl+Z) n'en dépendent pas sous
 // Windows : la page les traite elle-même. Garde-fou : packages/core/src/test/saisie-robuste.test.ts.
+//
+// La cause commune reste : tout clic dans un menu natif passe par webContents.getFocusedWebContents()
+// (Menu._executeCommand, dans Electron), qui appelle isFocused() sur chaque page vivante. Le
+// 16/11/2026, sur le poste de développement (0.1.14-essai.4), « Mon avatar » > « Chercher une image
+// sur le web… », clic droit sur une image, « Télécharger cette image » : tout Cyber Pinball tombait,
+// même pile (Menu::ExecuteCommand → WebContents::IsFocused → GetToplevelWindow). La page hors écran
+// du convertisseur (media-convert.ts), restée ouverte après la musique de la ROM, suffisait ; après
+// une relance, sans conversion encore faite, le même geste passait. Aucune page hors écran ne peut
+// avoir le focus : focusSafeLookup() les écarte de cette recherche, pour tout menu natif présent et à
+// venir. Garde-fous : packages/core/src/test/focus-hors-ecran.test.ts, de bout en bout dans Electron.
 
-import { Menu } from 'electron';
+import { Menu, webContents, type WebContents } from 'electron';
 
 /** À appeler avant app.whenReady : Electron ne pose alors pas son menu par défaut. */
 export function noApplicationMenu(): void {
   Menu.setApplicationMenu(null);
+}
+
+/**
+ * La page qui a le focus, comme Electron la cherche (une <webview> l'emporte sur la page qui la
+ * contient), sans jamais interroger une page détruite ni une page hors écran : isFocused() y lit un
+ * pointeur nul et le processus principal tombe.
+ */
+export function focusedWebContents(all: readonly WebContents[]): WebContents | null {
+  let focused: WebContents | null = null;
+  for (const contents of all) {
+    if (contents.isDestroyed() || contents.isOffscreen() || !contents.isFocused()) continue;
+    focused ??= contents;
+    if (contents.getType() === 'webview') return contents;
+  }
+  return focused;
+}
+
+/** À appeler au démarrage, avant tout menu : la recherche d'Electron remplacée par focusedWebContents. */
+export function focusSafeLookup(): void {
+  webContents.getFocusedWebContents = () => focusedWebContents(webContents.getAllWebContents());
 }

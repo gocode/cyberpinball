@@ -13,6 +13,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - First buttons screen ("Are your buttons already right?"): the flippers and arrows move from one choice to the other, as in any menu, without ever changing screen; Start or Enter confirm the selected choice. In 0.1.13, an arrow or a flipper kept the keys and moved on to the next screen.
 - Wizard: the interface buttons (previous, next, confirm, back) are set first, since they drive the menus and the rest of the wizard; the game buttons are then offered on the same buttons. "◀ Previous" goes back to the step before instead of going round in circles, and each screen bears its step's name ("Interface buttons · Button 2 of 4").
 - Wizard, new cabinet: the first screen "Are your buttons already right?" now shows the interface buttons (previous, next, confirm, back) instead of the game ones. "Keep these keys" then offers the game buttons on these same buttons; "Change my buttons" opens the interface mapping.
+- My avatar: taking a picture from the web (right-click, "Download this image") no longer closes Cyber Pinball. The crash came from any context menu clicked after an image or sound conversion (the ROM's music, for instance): fixed for all of those menus.
 
 ## 0.1.13
 

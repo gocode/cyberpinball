@@ -15,6 +15,7 @@ son interface).
 - Premier écran des boutons (« Vos boutons sont-ils déjà les bons ? ») : les flippers et les flèches passent d'un choix à l'autre, comme dans tout menu, sans jamais changer d'écran ; Start ou Entrée valident le choix sélectionné. En 0.1.13, une flèche ou un flipper gardait les touches et passait à l'écran suivant.
 - Assistant : les boutons de l'interface (précédent, suivant, valider, retour) se règlent d'abord, puisqu'ils pilotent les menus et toute la suite ; ceux du jeu sont ensuite proposés sur les mêmes boutons. « ◀ Précédent » revient à l'étape d'avant au lieu de tourner en rond, et chaque écran porte le nom de son étape (« Boutons de l'interface · Bouton 2 sur 4 »).
 - Assistant, borne neuve : le premier écran « Vos boutons sont-ils déjà les bons ? » montre maintenant les boutons de l'interface (précédent, suivant, valider, retour), et non plus ceux du jeu. « Garder ces touches » propose ensuite les boutons du jeu sur ces mêmes boutons ; « Modifier mes boutons » ouvre le relevé de l'interface.
+- Mon avatar : prendre une image sur le web (clic droit, « Télécharger cette image ») ne ferme plus Cyber Pinball. Le plantage venait de tout menu contextuel cliqué après une conversion d'image ou de son (musique de la ROM, par exemple) : corrigé pour tous ces menus.
 
 ## 0.1.13
 
