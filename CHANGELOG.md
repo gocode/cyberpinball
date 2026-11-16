@@ -13,6 +13,7 @@ son interface).
 
 - Parties instantanées (Communauté) : ouvrez une partie en direct à tous, sur la table de votre choix, en choisissant le nombre de joueurs (2 à 4). Elle s'affiche chez tous les joueurs en ligne ; n'importe qui la rejoint, ami ou non, s'il a la même version de la table, et elle part d'elle-même pour tout le monde dès qu'elle est complète. Aussi depuis la fiche d'une table (« Partie instantanée »). L'hôte est prévenu de chaque arrivée.
 - Premier écran des boutons (« Vos boutons sont-ils déjà les bons ? ») : les flippers et les flèches passent d'un choix à l'autre, comme dans tout menu, sans jamais changer d'écran ; Start ou Entrée valident le choix sélectionné. En 0.1.13, une flèche ou un flipper gardait les touches et passait à l'écran suivant.
+- Assistant : les boutons de l'interface (précédent, suivant, valider, retour) se règlent d'abord, puisqu'ils pilotent les menus et toute la suite ; ceux du jeu sont ensuite proposés sur les mêmes boutons. « ◀ Précédent » revient à l'étape d'avant au lieu de tourner en rond, et chaque écran porte le nom de son étape (« Boutons de l'interface · Bouton 2 sur 4 »).
 
 ## 0.1.13
 

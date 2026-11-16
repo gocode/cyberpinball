@@ -26,6 +26,7 @@ import {
   refusedKey,
   refusedNavigationKey,
   defaultNavigation,
+  gameFromNavigation,
   interfaceKeys,
   collectionKeys,
   zoneSwitchKeys,
@@ -690,6 +691,20 @@ test('interface : sans boutons de l’interface, elle suit les flippers, Start e
   assert.deepEqual(navigationButtons({ buttons: game }), { previous: joy(0), next: joy(1), confirm: joy(2), back: joy(3) });
   assert.deepEqual(defaultNavigation(game), navigationButtons({ buttons: game }));
   assert.deepEqual(navigationKeys({ buttons: game }).previous, [joy(0), 'ArrowLeft', 'ArrowUp']);
+});
+
+test('assistant complet : les boutons du jeu proposés sur ceux de l’interface, relevés d’abord', () => {
+  const navigation = { previous: 'KeyJ', next: 'KeyL', confirm: 'Enter', back: 'KeyU', help: 'KeyB' };
+  const game = gameFromNavigation(navigation);
+  assert.equal(game.leftFlipper, 'KeyJ');
+  assert.equal(game.rightFlipper, 'KeyL');
+  assert.equal(game.start, 'Enter');
+  assert.equal(game.exit, 'KeyU');
+  // Les autres gardent la touche des encodeurs, sauf celle que l'interface a prise : sans touche, à donner.
+  assert.equal(game.credit, DEFAULT_BUTTONS.credit);
+  assert.equal(game.plunger, undefined, 'Entrée est valider');
+  assert.equal(game.extraBall, undefined, 'B est l’aide-mémoire');
+  assert.deepEqual(gameFromNavigation(undefined), DEFAULT_BUTTONS);
 });
 
 test('interface : ses boutons sont indépendants de ceux du jeu', () => {

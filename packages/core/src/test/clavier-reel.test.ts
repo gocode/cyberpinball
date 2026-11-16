@@ -163,7 +163,7 @@ test('boutons du jeu au clavier : chaque action relevée et enregistrée, un bou
   }
 });
 
-test('assistant complet au clavier : boutons du jeu puis de l’interface relevés, l’assistant passe à la suite', { skip, timeout: 200_000 }, () => {
+test('assistant complet au clavier : boutons de l’interface puis du jeu relevés, « Précédent » revient à l’étape d’avant, l’assistant passe à la suite', { skip, timeout: 200_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-clavier-complet-'));
   try {
     const home = path.join(dir, 'home');
@@ -172,15 +172,17 @@ test('assistant complet au clavier : boutons du jeu puis de l’interface relev�
       home,
       [
         // Borne neuve : « Vos boutons sont-ils déjà les bons ? » ; Échap (Exit) : modifier mes
-        // boutons, sans être relevé. Puis les boutons du jeu.
+        // boutons, sans être relevé. Les boutons de l'interface d'abord (16/11/2026) : ils pilotent
+        // toute la suite. Retour (U) passe les réglages, le bureau Windows et la sortie sans enregistrer.
         ...keyboard('Escape'),
-        ...keyboard(...Object.values(GAME_BY_KEYBOARD)),
-        ...keyboard('KeyA', 'KeyS', 'KeyQ', 'Digit2'),
-        // Boutons de l'interface, proposés sur ceux du jeu : « Tout modifier », puis au clavier ;
-        // Retour (U) passe les boutons des réglages, du bureau Windows et de la sortie sans enregistrer.
-        'click:#actions button:nth-child(4)',
         ...keyboard(...Object.values(navigation), 'KeyU', 'KeyU', 'KeyU'),
         ...keyboard('KeyJ', 'KeyL', 'KeyU', 'KeyK'),
+        // Boutons du jeu proposés sur ceux de l'interface ; Retour arrière revient à l'interface,
+        // valider (K) la garde, puis « Tout modifier » et le jeu au clavier.
+        ...keyboard('Backspace', 'KeyK'),
+        'click:#actions button:nth-child(4)',
+        ...keyboard(...Object.values(GAME_BY_KEYBOARD)),
+        ...keyboard('KeyA', 'KeyS', 'KeyQ', 'Digit2'),
         'CtrlQ',
       ],
       [],
@@ -210,13 +212,16 @@ test('assistant complet au clavier : boutons du jeu puis de l’interface relev�
 // passait aux boutons de l'interface, sans que le joueur l'ait voulu).
 test('premier écran d’une borne neuve : flippers et flèches choisissent sans changer d’écran, Start ou Entrée valident, rien n’est relevé', { skip, timeout: 600_000 }, () => {
   // Maj gauche et droite ne passent pas par webContents.sendInputEvent (touches de modification) : appui direct de l'autopilote.
+  // Garder : l'assistant continue (sans lanceur ni tilt à régler ici, jusqu'aux écrans) ; modifier :
+  // les boutons de l'interface d'abord ; Retour arrière au premier bouton : l'étape d'avant.
   const cases: [string[], string][] = [
-    [['Clavier:Enter'], 'navigationSummary'],
-    [['Clavier:Digit1'], 'navigationSummary'],
+    [['Clavier:Enter'], 'assign'],
+    [['Clavier:Digit1'], 'assign'],
     [['Clavier:ArrowRight'], 'buttonsChoice'],
     [['ShiftLeft', 'ShiftRight'], 'buttonsChoice'],
-    [['Clavier:ArrowRight', 'Clavier:ArrowLeft', 'Clavier:Enter'], 'navigationSummary'],
-    [['ShiftRight', 'Clavier:Digit1'], 'buttons'],
+    [['Clavier:ArrowRight', 'Clavier:ArrowLeft', 'Clavier:Enter'], 'assign'],
+    [['ShiftRight', 'Clavier:Digit1'], 'navigation'],
+    [['Clavier:Escape', 'Clavier:Backspace'], 'buttonsChoice'],
   ];
   for (const [keys, phase] of cases) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-premier-ecran-'));

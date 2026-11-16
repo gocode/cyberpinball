@@ -19,6 +19,7 @@ import {
   BUTTONS,
   PREVIOUS_KEY,
   buttonKeys,
+  gameFromNavigation,
   defaultNavigation,
   GAME_KEYS,
   INTERFACE_KEYS,
@@ -680,7 +681,7 @@ function handleKey(input: Input): boolean {
     const outcome = plungerKey(wizard.plunger!, { previous: is(KEYS.previous), next: is(KEYS.next), confirm: is(KEYS.confirm) });
     if (outcome === 'unhandled') {
       if (is(KEYS.exit)) askQuit();
-      else if (is(KEYS.back) && !only) startCapture(INTERFACE_KEYS, true);
+      else if (is(KEYS.back) && !only) reviewSet(GAME_KEYS, inForceKeys(GAME_KEYS), wizard.buttons ? undefined : DEFAULTS_LAST);
       else return false;
     } else afterPlunger(outcome);
     broadcast();
@@ -1039,7 +1040,13 @@ const DEFAULTS_LAST = 'defaults';
 
 /** Dernier bouton relevé ou passé, en clair. */
 const lastLabel = (set: KeySet, last: string) =>
-  last !== DEFAULTS_LAST ? last : set === GAME_KEYS ? t('touches par défaut des encodeurs') : t('mêmes boutons que flippers, Start et Exit du jeu');
+  last === FROM_INTERFACE_LAST
+    ? t('mêmes boutons que précédent, suivant, valider et retour de l’interface')
+    : last !== DEFAULTS_LAST
+      ? last
+      : set === GAME_KEYS
+        ? t('touches par défaut des encodeurs')
+        : t('mêmes boutons que flippers, Start et Exit du jeu');
 
 /** Phase du relevé d'un jeu de boutons, et de son récapitulatif. */
 const capturePhase = (set: KeySet): Phase => (set === GAME_KEYS ? 'buttons' : 'navigation');
@@ -1057,9 +1064,47 @@ function inForceKeys(set: KeySet): SetKeys {
 /** Ce que la souris envoie depuis screen.js. */
 type WizardAction = { type: 'button'; index: number } | { type: 'buttons'; action: ButtonsAction | PlungerAction | TiltAction } | { type: 'quit'; op: 'ask' | 'yes' | 'no' } | ArrangeAction;
 
-/** Arrivée sur l'étape « Boutons du jeu » (startCapture). */
+/**
+ * Arrivée sur les boutons. Étape seule « Boutons du jeu », ou borne neuve : les boutons du jeu
+ * (pour une borne neuve, « Vos boutons sont-ils déjà les bons ? »). Borne déjà configurée,
+ * assistant complet : les boutons de l'interface d'abord, qui pilotent toute la suite, puis ceux du
+ * jeu (16/11/2026).
+ */
 function startButtons(initial = false): void {
-  startCapture(GAME_KEYS, initial);
+  if (only || wizard.buttons === undefined) return startCapture(GAME_KEYS, initial);
+  startCapture(INTERFACE_KEYS, initial, true);
+}
+
+/** Marque de « Relevé : … » des boutons du jeu proposés sur ceux de l'interface (gameFromNavigation). */
+const FROM_INTERFACE_LAST = 'interface';
+
+/**
+ * Récapitulatif d'un jeu de boutons sur ces touches, sans relevé ni délai : en revenant à une étape
+ * (« ◀ Précédent »), ou pour les boutons du jeu proposés après ceux de l'interface. Les touches
+ * montrées n'ont pas à être essayées.
+ */
+function reviewSet(set: KeySet, keys: SetKeys = inForceKeys(set), last?: string): void {
+  stopButtonsCountdown();
+  wizard.phase = summaryPhase(set);
+  wizard.capture = { set, index: 0, keys, answered: new Set(set.items.map((b) => b.id)), reference: { ...keys }, action: 0, tried: new Set(), ...(last && { last }) };
+}
+
+/**
+ * Étape d'avant un jeu de boutons, dans l'assistant complet : les boutons de l'interface avant
+ * ceux du jeu ; avant l'interface, sur une borne neuve, « Vos boutons sont-ils déjà les bons ? ».
+ * Rien avant la première étape (étape seule, ou interface d'une borne configurée).
+ */
+function previousStepOf(set: KeySet): 'interface' | 'choice' | undefined {
+  if (only) return undefined;
+  if (set === GAME_KEYS) return 'interface';
+  return wizard.buttons === undefined ? 'choice' : undefined;
+}
+
+/** « ◀ Précédent » au récapitulatif, ou au premier bouton du relevé : l'étape d'avant. */
+function previousStep(): void {
+  const target = previousStepOf(wizard.capture!.set);
+  if (target === 'interface') reviewSet(INTERFACE_KEYS, inForceKeys(INTERFACE_KEYS), wizard.navigation ? undefined : DEFAULTS_LAST);
+  else if (target === 'choice') startCapture(GAME_KEYS, true);
 }
 
 /**
@@ -1069,12 +1114,13 @@ function startButtons(initial = false): void {
  * de 20 s pour les boutons du jeu de l'assistant complet, pas à l'étape seule où l'on est
  * venu exprès. « Tout modifier » : relevé complet, rien de gardé.
  */
-function startCapture(set: KeySet, initial = false): void {
+function startCapture(set: KeySet, initial = false, first = false): void {
   const game = set === GAME_KEYS;
   const stepOnly = only?.id === (game ? 'boutons' : 'interface');
   const keep = initial && ((game ? wizard.buttons : wizard.navigation) !== undefined || stepOnly || !game);
   const keys = keep ? inForceKeys(set) : {};
-  const timed = initial && game && !(keep && stepOnly);
+  // Délai : à la première étape des boutons de l'assistant complet (jamais à l'étape seule).
+  const timed = initial && (first || (game && !(keep && stepOnly)));
   // Borne neuve : d'abord « Vos boutons sont-ils déjà les bons ? », jamais le relevé d'emblée.
   wizard.phase = keep ? summaryPhase(set) : timed ? 'buttonsChoice' : capturePhase(set);
   wizard.capture = {
@@ -1122,7 +1168,7 @@ function handleChoiceKey(code: string): void {
 function redoButtonsFromJoystick(): void {
   console.log('Assistant : bouton de joystick sans bouton relevé ; retour au relevé des boutons.'); // i18n-ignore : journal
   restart();
-  startCapture(GAME_KEYS);
+  startCapture(INTERFACE_KEYS);
 }
 
 function stopButtonsCountdown(): void {
@@ -1213,9 +1259,9 @@ function previousButton(): void {
   const capture = wizard.capture!;
   const summary = isSummaryPhase(wizard.phase);
   if (!summary && redoingOne(capture)) return enterButtonsSummary(capture);
-  if (summary) capture.index = capture.set.items.length - 1;
-  else capture.index = Math.max(0, capture.index - 1);
-  wizard.phase = capturePhase(capture.set);
+  // Au récapitulatif ou au premier bouton : l'étape d'avant, jamais un tour sur place (16/11/2026).
+  if (summary || capture.index === 0) return previousStep();
+  capture.index -= 1;
 }
 
 /**
@@ -1279,10 +1325,8 @@ function handleWizardAction(action: WizardAction): void {
   if (!capture || !(wizard.phase === 'buttonsChoice' || CAPTURE_PHASES.includes(wizard.phase))) return;
   touched(capture);
   // Premier écran : un clic sur une ligne la modifie, relevé à partir de ce bouton.
-  if (wizard.phase === 'buttonsChoice' && action.type === 'button') {
-    runButtonsAction('modify');
-    redoButton(wizard.capture!, action.index);
-  } else if (action.type === 'button') redoButton(capture, action.index);
+  if (wizard.phase === 'buttonsChoice' && action.type === 'button') runButtonsAction('modify');
+  else if (action.type === 'button') redoButton(capture, action.index);
   else runButtonsAction(action.action as ButtonsAction);
   broadcast();
 }
@@ -1296,10 +1340,11 @@ function runButtonsAction(action: ButtonsAction): void {
       if (wizard.phase !== 'buttonsChoice') return;
       stopButtonsCountdown();
       wizard.capture = undefined;
-      return startCapture(INTERFACE_KEYS, true);
+      return startPlunger();
     case 'modify':
+      // Les boutons de l'interface d'abord : ils pilotent toute la suite. Ceux du jeu sont proposés dessus.
       if (wizard.phase !== 'buttonsChoice') return;
-      return startCapture(GAME_KEYS);
+      return startCapture(INTERFACE_KEYS);
     case 'previous':
       return previousButton();
     case 'restart':
@@ -1341,7 +1386,8 @@ function buttonsTimeout(): void {
 
 /**
  * Valider au récapitulatif. Les boutons de l'interface pilotent aussitôt la suite de
- * l'assistant ; après ceux du jeu, l'assistant complet propose ceux de l'interface.
+ * l'assistant ; après eux, l'assistant complet propose ceux du jeu : sur une borne neuve, sur les
+ * mêmes boutons (gameFromNavigation), sinon ceux en vigueur.
  */
 function acceptButtons(): void {
   const capture = wizard.capture!;
@@ -1350,8 +1396,10 @@ function acceptButtons(): void {
   KEYS = wizardKeys(inForce());
   wizard.capture = undefined;
   if (only) saveStep();
-  else if (capture.set === GAME_KEYS) startCapture(INTERFACE_KEYS, true);
-  else startPlunger();
+  else if (capture.set === INTERFACE_KEYS) {
+    if (wizard.buttons) reviewSet(GAME_KEYS);
+    else reviewSet(GAME_KEYS, gameFromNavigation(wizard.navigation), FROM_INTERFACE_LAST);
+  } else startPlunger();
 }
 
 // ---------------------------------------------------------------------------
@@ -1617,11 +1665,17 @@ function buttonsView(index: number, base: Record<string, unknown>) {
     : untried.length
       ? t('Faire : {buttons}', { buttons: untried.map((id) => `${itemLabel(set, id)} ○`).join(' · ') })
       : undefined;
+  // Une étape avant celle-ci (« ◀ Précédent » y revient), ou un bouton avant dans le relevé.
+  const hasPrevious = (!summary && (capture.index > 0 || redoingOne(capture))) || previousStepOf(set) !== undefined;
+  // Le nom de l'étape, sur chacun de ses écrans : relevé comme récapitulatif (16/11/2026).
+  const stepTitle = game ? t('Boutons du jeu') : t('Boutons de l’interface');
   const actions = (summary ? SUMMARY_ACTIONS : (['previous', 'defaults', 'restart'] as const)).map((id, i) => ({
     id,
     label: id === 'save' && only ? t('Enregistrer') : ACTION_LABELS[id],
     selected: summary && i === capture.action,
     ...(id === 'save' && saveReason && { disabled: true, reason: saveReason }),
+    // « ◀ Précédent » sans étape avant (première étape, étape seule) : grisé, avec sa raison.
+    ...(id === 'previous' && !hasPrevious && { disabled: true, reason: t('Première étape') }),
   }));
   // Compte à rebours toujours visible : une barre, et la phrase qui dit ce qui se passera à la fin.
   const countdown = capture.deadline === undefined ? undefined : Math.max(0, capture.deadline - Date.now()) / BUTTONS_TIMEOUT_MS;
@@ -1638,7 +1692,8 @@ function buttonsView(index: number, base: Record<string, unknown>) {
     const choose = { left: keyOf('previous'), right: keyOf('next'), start: keyOf('confirm'), exit: keyOf('exit') };
     return {
       ...common,
-      prompt: toTry.length ? t('Essayez les boutons') : game ? t('Boutons du jeu') : t('Boutons de l’interface'),
+      prompt: toTry.length ? t('Essayez les boutons') : stepTitle,
+      name: toTry.length ? stepTitle : '',
       details: !game
         ? t('Touches de secours du clavier toujours actives : Tab, flèches, Entrée, Échap.')
         : silenced.length
@@ -1650,7 +1705,9 @@ function buttonsView(index: number, base: Record<string, unknown>) {
         ? ''
         : t('{last} · choisissez un bouton pour lui donner une autre touche.', {
             last:
-              capture.last === DEFAULTS_LAST
+              capture.last === FROM_INTERFACE_LAST
+                ? t('Mêmes boutons que précédent, suivant, valider et retour de l’interface')
+                : capture.last === DEFAULTS_LAST
                 ? game
                   ? t('Touches par défaut des encodeurs')
                   : t('Mêmes boutons que flippers, Start et Exit du jeu')
@@ -1669,14 +1726,16 @@ function buttonsView(index: number, base: Record<string, unknown>) {
   const current = inForceSet[button.id];
   const recorded = game ? wizard.buttons : wizard.navigation;
   const seconds = capture.deadline === undefined ? undefined : Math.max(0, Math.ceil((capture.deadline - Date.now()) / 1000));
-  const back = redoingOne(capture) ? t('annuler') : t('bouton précédent');
+  const back = redoingOne(capture) ? t('annuler') : capture.index > 0 ? t('bouton précédent') : previousStepOf(set) ? t('étape précédente') : t('rien avant');
   return {
     ...common,
     prompt: ('prompt' in button && button.prompt) || t('Appuyez sur le bouton'),
     measure: button.label,
-    name: button.required
-      ? t('Bouton {n} sur {total}', { n: capture.index + 1, total: required })
-      : t('Bouton facultatif {n} sur {total}', { n: capture.index + 1 - required, total: set.items.length - required }),
+    name: `${stepTitle} · ${
+      button.required
+        ? t('Bouton {n} sur {total}', { n: capture.index + 1, total: required })
+        : t('Bouton facultatif {n} sur {total}', { n: capture.index + 1 - required, total: set.items.length - required })
+    }`,
     details: [
       ...('how' in button && button.how ? [button.how] : []),
       holderOf(button.id)

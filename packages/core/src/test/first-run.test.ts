@@ -128,8 +128,13 @@ test('premier écran des boutons : un choix, jamais un relevé, et toujours une 
   assert.doesNotMatch(choice.slice(0, choice.indexOf('is(KEYS.confirm)')), /runButtonsAction/, 'un flipper ou une flèche ne lance rien');
   assert.match(choice, /is\(KEYS\.confirm\)\) runButtonsAction\(CHOICE_ACTIONS\[capture\.action\]/);
   assert.match(choice, /is\(KEYS\.exit\)[^\n]*runButtonsAction\('modify'\)/);
-  // Garder : l'assistant continue, comme après « Touches par défaut » puis Valider.
-  assert.match(body(wizard, 'runButtonsAction'), /case 'keep':[\s\S]*?startCapture\(INTERFACE_KEYS, true\)/);
+  // Garder : l'assistant continue ; modifier : les boutons de l'interface d'abord (16/11/2026).
+  assert.match(body(wizard, 'runButtonsAction'), /case 'keep':[\s\S]*?return startPlunger\(\);\s*case 'modify':[\s\S]*?return startCapture\(INTERFACE_KEYS\);/);
+  // Après l'interface, les boutons du jeu proposés sur les mêmes boutons.
+  assert.match(body(wizard, 'acceptButtons'), /capture\.set === INTERFACE_KEYS\)[\s\S]*?gameFromNavigation\(wizard\.navigation\)/);
+  // « ◀ Précédent » au récapitulatif ou au premier bouton : l'étape d'avant, jamais un tour sur place.
+  assert.match(body(wizard, 'previousButton'), /if \(summary \|\| capture\.index === 0\) return previousStep\(\);/);
+  assert.match(body(wizard, 'previousStepOf'), /if \(set === GAME_KEYS\) return 'interface';/);
   // Le délai court pendant ce premier écran, et dit ce qui se passera à la fin.
   assert.match(body(wizard, 'startCapture'), /wizard\.phase === 'buttonsChoice' \|\| CAPTURE_PHASES\.includes/);
   assert.match(body(wizard, 'choiceView'), /Sans réponse dans \{n\} s : ces touches sont gardées/);

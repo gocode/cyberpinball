@@ -687,6 +687,23 @@ export function defaultNavigation(buttons: CabinetButtons | undefined): Navigati
   return nav;
 }
 
+/**
+ * Boutons du jeu proposés sur ceux de l'interface, relevés en premier dans l'assistant complet
+ * (16/11/2026) : flippers sur précédent et suivant, Start sur valider, Exit sur retour ; les autres
+ * gardent la touche par défaut des encodeurs, sauf celle qu'un bouton de l'interface a prise (le
+ * bouton reste alors sans touche, et le récapitulatif le dit).
+ */
+export function gameFromNavigation(navigation: NavigationButtons | undefined): CabinetButtons {
+  const keys: CabinetButtons = { ...DEFAULT_BUTTONS };
+  const taken = new Set(Object.values(navigation ?? {}).filter((code): code is string => Boolean(code)));
+  for (const id of Object.keys(keys) as ButtonId[]) if (keys[id] && taken.has(keys[id]!)) delete keys[id];
+  for (const n of NAVIGATION) {
+    const code = navigation?.[n.id];
+    if (n.game && code) keys[n.game] = code;
+  }
+  return keys;
+}
+
 /** Ce qui rend un relevé des boutons de l'interface inutilisable. Vide : relevé valable. */
 export function navigationProblems(navigation: NavigationButtons): string[] {
   return keyProblems(INTERFACE_KEYS, navigation);
