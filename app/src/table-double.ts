@@ -32,6 +32,7 @@ import {
   planTableDouble,
   readVpxScript,
   removeTableDouble,
+  scriptVolumeKeys,
   t,
   usesPinmameCode,
   type GroupRecord,
@@ -123,8 +124,20 @@ export function createTableDoubles(opts: TableDoublesOptions) {
       const plan = planned.plan;
       if (settings) {
         try {
-          applyHostSettings(plan.dir, settings);
-          log(`Partie entre amis (${table.id}) : réglages de l'hôte posés dans le double (${settings.map((s) => `${s.rel}${s.data ? '' : ' retiré'}`).join(', ')}).`); // i18n-ignore : journal
+          // Le volume de l'invité reste le sien (décision du 16/11/2026) : la carte mémoire de sa ROM, les volumes de son menu de service.
+          let script: string | undefined;
+          try {
+            const base = path.basename(plan.file, path.extname(plan.file)).toLowerCase();
+            const vbs = fs.readdirSync(plan.dir).find((f) => f.toLowerCase() === `${base}.vbs`);
+            script = vbs ? fs.readFileSync(path.join(plan.dir, vbs), 'latin1') : readVpxScript(plan.file);
+          } catch {
+            script = undefined;
+          }
+          const notes = applyHostSettings(plan.dir, settings, {
+            ...(opts.memoryCacheDir ? { memory: (rom: string) => cachedRomMemory(opts.memoryCacheDir!, rom) } : {}),
+            vpRegKeys: script ? scriptVolumeKeys(script) : [],
+          });
+          log(`Partie entre amis (${table.id}) : réglages de l'hôte posés dans le double, volume de l'invité gardé : ${notes.join(' ; ')}.`); // i18n-ignore : journal
         } catch (error) {
           removeTableDouble(path.join(parties, id), parties);
           dropIfEmpty(parties);

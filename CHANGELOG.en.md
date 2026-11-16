@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Game with friends: each cabinet keeps its own volume. The table's sound no longer drops (or rises) on the guest's cabinet: only the host's game settings travel (balls, ball save, tilt, extras), never their sound level.
 - Pinball FX (beta): the "Pinball FX tables" list shows a thumbnail of each table. A table added to the menu gets its media in the background when they exist (logo, backglass, videos), otherwise at least its playfield image; tables added earlier find them through "Find missing media".
 - Wording (French interface): Cyber Pinball's interface is now called "le front-end" instead of "le menu" across every screen, the manual and the project page; "menu" now only names real menus (System menu, VPX menu, service menu). The English interface is unchanged.
 - Project page on GitHub: the Cyber Pinball trailer now shows at the top, right after "Download", in English on the English page and in French on the French page. Clicking the thumbnail opens the video on YouTube.

@@ -194,6 +194,20 @@ function storedChecksum(p: ReturnType<typeof parts>, nv: Buffer, c: { sumAt: num
   return c.bits === 8 ? nv[c.sumAt]! : p.little ? nv.readUInt16LE(c.sumAt) : nv.readUInt16BE(c.sumAt);
 }
 
+/** Les copies en miroir d'une zone écrite reçoivent ses nouveaux octets. */
+function copyMirrors(p: ReturnType<typeof parts>, out: Buffer, written: readonly { at: number; length: number }[]): void {
+  for (const m of p.validation?.mirror ?? []) {
+    const offsets = Array.isArray(m.offsets) ? m.offsets.map(num).filter((o): o is number => o !== undefined) : [];
+    const count = num(m.repeat?.count) ?? 1;
+    const step = num(m.repeat?.step) ?? 0;
+    for (let i = 0; i < count; i++) {
+      const first = place(p, { start: (num(m.start) ?? NaN) + i * step + (offsets[0] ?? 0), length: m.length, end: m.end }, out);
+      if (!first || !written.some((w) => w.at < first.at + first.length && first.at < w.at + w.length)) continue;
+      for (const o of offsets.slice(1)) out.copy(out, first.at + (o - (offsets[0] ?? 0)), first.at, first.at + first.length);
+    }
+  }
+}
+
 /** Les sommes de contrôle de la mémoire que la carte décrit, justes ou fausses (pour les essais et la relecture). */
 export function romChecksums(memory: RomMemory, nv: Buffer): { label: string; ok: boolean }[] {
   const p = parts(memory);
@@ -227,16 +241,7 @@ export function writeRomRecords(memory: RomMemory, nv: Buffer, records: readonly
     }
   }
   // Les copies en miroir d'abord (une somme peut les couvrir), puis les sommes.
-  for (const m of p.validation.mirror ?? []) {
-    const offsets = Array.isArray(m.offsets) ? m.offsets.map(num).filter((o): o is number => o !== undefined) : [];
-    const count = num(m.repeat?.count) ?? 1;
-    const step = num(m.repeat?.step) ?? 0;
-    for (let i = 0; i < count; i++) {
-      const first = place(p, { start: (num(m.start) ?? NaN) + i * step + (offsets[0] ?? 0), length: m.length, end: m.end }, out);
-      if (!first || !written.some((w) => w.at < first.at + first.length && first.at < w.at + w.length)) continue;
-      for (const o of offsets.slice(1)) out.copy(out, first.at + (o - (offsets[0] ?? 0)), first.at, first.at + first.length);
-    }
-  }
+  copyMirrors(p, out, written);
   const touched = (c: { at: number; length: number; sumAt: number; bits: number }) => written.some((w) => w.at < c.at + c.length && c.at < w.at + w.length);
   const sums = checksums(p, out);
   for (const c of sums.filter(touched)) {
@@ -251,6 +256,113 @@ export function writeRomRecords(memory: RomMemory, nv: Buffer, records: readonly
   const back = readRomRecords(memory, out);
   if (!back || back.some((s, i) => s.score !== (best[i]?.score ?? 0))) return undefined;
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Le volume de l'invité dans la mémoire de l'hôte (décision du 16/11/2026)
+//
+// Dans une partie entre amis, chaque borne garde son niveau sonore : la mémoire de l'hôte voyage
+// pour ses réglages de jeu (billes, sauvetage, tilt, extras), mais ses octets de volume sont ceux de
+// l'invité. Mesuré au banc libpinmame le 16/11/2026 sur The Addams Family (taf_l7, WPC) : le volume
+// est un octet (0x1C9C) protégé par sa propre somme de contrôle ; recopié sans elle, la ROM le
+// refuse au démarrage ; sans mémoire, le bloc reste vierge et la ROM joue son volume d'usine.
+
+/** Un niveau sonore dans la carte : « Volume », « Master Volume », « Knocker Volume », « Min. Vol. Override »… */
+const SOUND_LEVEL = /\bvol(ume)?\b/i;
+
+/**
+ * Plateformes sans volume dans leur mémoire (le son se règle par un potentiomètre de la carte son) :
+ * leur mémoire voyage entière. Toutes les autres, sans volume situé par leur carte, gardent celle de
+ * l'invité : WPC, Stern SAM, Whitestar, Data East, Capcom, System 11, Gottlieb System 3…
+ */
+const NO_SOUND_LEVEL_PLATFORM = /^(alving|atari-|bally-|gottlieb-system(1|80)|rowamet|stern-m[12]00|taito|williams-system[4-9]-|zaccaria-)/i;
+
+/** Les réglages de volume que la carte situe (état de la machine et réglages ; jamais les compteurs). */
+export function romVolumeEntries(memory: RomMemory): (Descriptor & { label: string; default?: unknown })[] {
+  const out: (Descriptor & { label: string; default?: unknown })[] = [];
+  const take = (e: unknown) => {
+    if (e && typeof e === 'object' && !Array.isArray(e) && typeof (e as { label?: unknown }).label === 'string' && SOUND_LEVEL.test((e as { label: string }).label)) out.push(e as Descriptor & { label: string });
+  };
+  const map = memory.map as { game_state?: Record<string, unknown>; adjustments?: Record<string, Record<string, unknown>> };
+  for (const e of Object.values(map.game_state ?? {})) take(e);
+  for (const group of Object.values(map.adjustments ?? {})) for (const e of Object.values(group ?? {})) take(e);
+  return out;
+}
+
+export type RomVolumeMerge =
+  /** La mémoire de l'hôte, les octets de volume de l'invité (ou son volume d'usine), sommes de contrôle refaites. */
+  | { kind: 'merged'; data: Buffer; labels: string[] }
+  /** La machine n'a pas de volume dans sa mémoire : celle de l'hôte, entière. */
+  | { kind: 'host' }
+  /** Le volume ne se repose pas sûrement : la mémoire de l'invité telle quelle (ou aucune, s'il n'en a pas). */
+  | { kind: 'guest'; reason: string };
+
+/**
+ * La mémoire de l'hôte avec le volume de l'invité. `guest` absent : l'invité n'a jamais joué cette
+ * table, son volume est celui d'usine (la valeur par défaut de la carte). Le volume se repose quand
+ * la carte le situe, octets entiers, chaque zone écrite couverte par une somme de contrôle qu'on sait
+ * refaire ; un bloc de volume que la ROM de l'invité tient pour vierge (somme fausse) est recopié tel
+ * quel. Sinon, rien de l'hôte : la mémoire de l'invité.
+ */
+export function mergeRomVolume(memory: RomMemory | undefined, host: Buffer, guest: Buffer | undefined): RomVolumeMerge {
+  const refuse = (reason: string): RomVolumeMerge => ({ kind: 'guest', reason });
+  if (!memory) return refuse('pas de carte mémoire de cette ROM en cache'); // i18n-ignore : journal
+  const entries = romVolumeEntries(memory);
+  const platform = String(memory.map._metadata?.platform ?? '');
+  if (!entries.length) return NO_SOUND_LEVEL_PLATFORM.test(platform) ? { kind: 'host' } : refuse(`la carte ne situe pas le volume (${platform || 'plateforme inconnue'})`); // i18n-ignore : journal
+  const p = parts(memory);
+  if (p.base === undefined || !p.validation?.checksum?.length) return refuse('la carte ne décrit pas les sommes de contrôle de la mémoire'); // i18n-ignore : journal
+  const out = Buffer.from(host);
+  const written: { at: number; length: number }[] = [];
+  // Volume d'usine sans valeur dans la carte (WPC) : son bloc laissé vierge, comme PinMAME le crée
+  // sans mémoire (0xFF, somme fausse) ; la ROM joue alors son volume par défaut.
+  const blank: { at: number; length: number }[] = [];
+  for (const e of entries) {
+    const where = place(p, e, out);
+    if (!where || (e.nibble ?? 'both') !== 'both') return refuse(`« ${e.label} » hors de la mémoire lisible`); // i18n-ignore : journal
+    let bytes: Buffer | undefined;
+    if (guest) bytes = guest.length >= where.at + where.length ? guest.subarray(where.at, where.at + where.length) : undefined;
+    else if (num(e.default) !== undefined) bytes = encodeScore(p, { ...e, encoding: e.encoding === 'enum' ? 'int' : e.encoding }, where.length, num(e.default)!);
+    else {
+      bytes = Buffer.alloc(where.length, 0xff);
+      blank.push(where);
+    }
+    if (!bytes) return refuse(guest ? 'mémoire de l’invité trop courte' : `volume d’usine de « ${e.label} » impossible à écrire`); // i18n-ignore : journal
+    bytes.copy(out, where.at);
+    written.push(where);
+  }
+  copyMirrors(p, out, written);
+  const covers = (c: { at: number; length: number }) => written.some((w) => w.at < c.at + c.length && c.at < w.at + w.length);
+  const sums = checksums(p, out).filter(covers);
+  if (!written.every((w) => sums.some((c) => c.at <= w.at && w.at + w.length <= c.at + c.length))) return refuse('volume hors des sommes de contrôle de la carte'); // i18n-ignore : journal
+  // Un bloc qui ne tient que du volume : celui de l'invité peut se recopier tel quel, somme comprise.
+  const onlyVolume = (c: { at: number; length: number }) => {
+    for (let i = c.at; i < c.at + c.length; i++) if (!written.some((w) => w.at <= i && i < w.at + w.length)) return false;
+    return true;
+  };
+  const valid = (nv: Buffer, c: Parameters<typeof checksumOf>[1] & { sumAt: number }) => nv.length >= Math.max(c.at + c.length, c.sumAt + c.bits / 8) && checksumOf(nv, c) === storedChecksum(p, nv, c);
+  const raw = new Set<(typeof sums)[number]>();
+  for (const c of sums) {
+    if (blank.some((b) => b.at < c.at + c.length && c.at < b.at + b.length)) {
+      if (!onlyVolume(c)) return refuse(`volume d’usine de « ${c.label || 'bloc sans nom'} » inconnu de la carte`); // i18n-ignore : journal
+      out.fill(0xff, c.sumAt, c.sumAt + c.bits / 8);
+      if (valid(out, c)) return refuse('bloc de volume vierge impossible à écrire'); // i18n-ignore : journal
+      raw.add(c);
+    } else if (guest && !valid(guest, c)) {
+      if (!onlyVolume(c)) return refuse(`somme de contrôle de l’invité fausse (${c.label || 'bloc sans nom'})`); // i18n-ignore : journal
+      guest.copy(out, c.sumAt, c.sumAt, c.sumAt + c.bits / 8);
+      raw.add(c);
+    } else if (!valid(host, c) && !onlyVolume(c)) return refuse(`somme de contrôle de l’hôte fausse (${c.label || 'bloc sans nom'})`); // i18n-ignore : journal
+  }
+  for (const c of sums) {
+    if (raw.has(c)) continue;
+    const value = checksumOf(out, c);
+    if (c.bits === 8) out[c.sumAt] = value;
+    else if (p.little) out.writeUInt16LE(value, c.sumAt);
+    else out.writeUInt16BE(value, c.sumAt);
+  }
+  if (sums.some((c) => !raw.has(c) && !valid(out, c))) return refuse('somme de contrôle impossible à refaire'); // i18n-ignore : journal
+  return { kind: 'merged', data: out, labels: [...new Set(entries.map((e) => e.label))] };
 }
 
 /** Carte d'une ROM déjà en cache (loadRomMemory l'y a mise), sans réseau ; undefined sinon. */

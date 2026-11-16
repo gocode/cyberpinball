@@ -137,7 +137,7 @@ const { createLiveGames } = require(path.join(REPO_ROOT, 'app', 'dist', 'live-ga
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
-function terminator(root: string, nv: string, cfg?: string, reg?: string): TableEntry {
+function terminator(root: string, nv: string | Buffer, cfg?: string | Buffer, reg?: string): TableEntry {
   const folder = path.join(root, 'tables', 'Terminator 2');
   write(path.join(folder, 'Terminator 2.vpx'), 'table');
   write(path.join(folder, 'pinmame', 'roms', 't2_l8.zip'), 'rom');
@@ -149,9 +149,16 @@ function terminator(root: string, nv: string, cfg?: string, reg?: string): Table
 
 test('double de l’invité : les réglages de l’hôte à la place des siens, les absents retirés ; son dossier habituel ne bouge pas', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-reglages-double-'));
-  const table = terminator(root, 'ma mémoire : 5 billes', 'mes interrupteurs', 'mes records');
+  // Les interrupteurs de l'invité : ses niveaux de son d'usine (fin du .cfg), rien à garder.
+  const levels = Buffer.alloc(25, 0xff);
+  const table = terminator(root, 'ma mémoire : 5 billes', Buffer.concat([Buffer.from('MAMECFG\x09mes interrupteurs', 'latin1'), levels, levels]));
   const before = folderPrint(table.folder, { full: true });
-  const doubles = createTableDoubles({ root: () => root, tablesDir: () => path.join(root, 'tables'), romsOf: () => ['t2_l8'] });
+  // Une machine sans volume dans sa mémoire (Bally, potentiomètre de la carte son) : la mémoire de l'hôte voyage entière.
+  const cache = path.join(root, 'cartes');
+  write(path.join(cache, 'index.json'), JSON.stringify({ t2_l8: 'maps/bally/t2_l8.map.json' }));
+  write(path.join(cache, 'maps_bally_t2_l8.map.json'), JSON.stringify({ _metadata: { platform: 'bally-35-8K' } }));
+  write(path.join(cache, 'platform_bally-35-8K.json'), JSON.stringify({ memory_layout: [{ type: 'nvram', address: 0, size: 256 }] }));
+  const doubles = createTableDoubles({ root: () => root, tablesDir: () => path.join(root, 'tables'), romsOf: () => ['t2_l8'], memoryCacheDir: cache });
   const settings: HostSetting[] = [{ rel: 'pinmame/nvram/t2_l8.nv', data: Buffer.from('mémoire de l’hôte : 3 billes') }, { rel: 'pinmame/cfg/t2_l8.cfg' }, { rel: 'user/VPReg.stg', data: Buffer.from('records de l’hôte') }];
   const started = doubles.start(table, 'partie', settings);
   assert.ok(started.ok);

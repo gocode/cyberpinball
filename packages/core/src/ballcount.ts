@@ -64,6 +64,26 @@ export function scriptBallSetting(script: string): { balls?: number; service?: {
   };
 }
 
+/**
+ * Les clés de VPReg.stg où le menu de service de VPW range un niveau sonore (« MUSIC VOLUME »,
+ * « KNOCKER VOL. »…) : « DMDStd_<n> », d'après « Const kDMDStd_X = n » et « .Setup "…", kDMDStd_X ».
+ * Une partie entre amis les garde à l'invité (hostsettings.ts).
+ */
+export function scriptVolumeKeys(script: string): string[] {
+  const constants = new Map<string, string>();
+  const labelled: string[] = [];
+  for (const raw of script.split(/\r?\n/)) {
+    const line = raw.replace(/'.*$/, '');
+    for (const statement of line.split(':').map((s) => s.trim())) {
+      const key = /^const\s+(kDMDStd_[a-z0-9_]+)\s*=\s*(&h[0-9a-f]+|\d+)$/i.exec(statement);
+      if (key) constants.set(key[1]!.toLowerCase(), String(key[2]!.toLowerCase().startsWith('&h') ? parseInt(key[2]!.slice(2), 16) : Number(key[2])));
+      const setup = /\.Setup\s+"([^"]*)"\s*,\s*(kDMDStd_[a-z0-9_]+)\s*,/i.exec(statement);
+      if (setup && /\bvol(ume)?\b/i.test(setup[1]!)) labelled.push(setup[2]!.toLowerCase());
+    }
+  }
+  return [...new Set(labelled.map((name) => constants.get(name)).filter((n): n is string => n !== undefined).map((n) => `DMDStd_${n}`))];
+}
+
 // ---------------------------------------------------------------------------
 // La ROM : cartes de Pinball Memory Maps
 
