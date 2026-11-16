@@ -1,5 +1,5 @@
 // Communauté (décidée le 12/11/2026) : l'accueil ouvert par le médaillon
-// de la roue (Joueurs en ligne, Parties instantanées, Messages, Salon de mon pays, Classements) et la liste
+// de la roue (Joueurs en ligne, Parties instantanées, Messages, Salon de mon pays, Classements, Avis et propositions) et la liste
 // « Joueurs en ligne », amis ou non (livepresence.ts).
 //
 // La liste réunit mes amis en ligne (leur présence entre amis, friendpresence.ts) et les joueurs dont
@@ -56,6 +56,8 @@ export interface CommunityMenuHost {
   instant?: { door(): { label: string; detail: string; quiet: boolean }; open(back: () => void): void };
   /** Les classements de toutes mes tables (rankings-menu.ts) : ce que dit la porte, et les ouvrir. */
   rankings: { detail(): string; open(back: () => void): void };
+  /** Avis et propositions (feedback-menu.ts), la même entrée que dans le Menu système : tout en bas de l'accueil. */
+  feedback?: { detail(): string; open(back: () => void): void };
   /** Partage et réseau (activer le partage, le réseau local, la présence publique). */
   openSharing(back: () => void): void;
   now?(): Date;
@@ -399,6 +401,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
         icon: 'trophy',
         run: () => host.rankings.open(here),
       },
+      ...(host.feedback ? [{ label: t('Avis et propositions'), detail: host.feedback.detail(), icon: 'inbox' as const, run: () => host.feedback!.open(here) }] : []),
       { label: t('Retour'), icon: 'back', run: back },
     ];
     return {

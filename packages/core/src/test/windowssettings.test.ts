@@ -37,7 +37,7 @@ import {
 
 const SID = 'S-1-5-21-1111111111-2222222222-3333333333-1001';
 const EXE = 'D:\\CyberPinball\\app\\CyberPinball.exe';
-const STARTUP = 'D:\Borne\Démarrage';
+const STARTUP = 'D:\\Borne\\Démarrage';
 
 function tmp(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'cp-reglages-'));

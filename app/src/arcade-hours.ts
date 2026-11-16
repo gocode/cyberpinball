@@ -6,7 +6,10 @@
 import { execFile } from 'node:child_process';
 import { parseWakeDevices } from '@cyberpinball/core';
 
-const WAKE_SCRIPT = `
+// String.raw : le script garde ses barres obliques inverses telles quelles (« \d », « \\ » dans le
+// filtre WQL). Sans lui, « '_\d+$' » devenait « '_d+$' » et « -replace '\\' » une expression
+// invalide : aucun nom de bouton n'était trouvé (26/10 – 16/11/2026).
+const WAKE_SCRIPT = String.raw`
 $w = Get-CimInstance -Namespace root/wmi -ClassName MSPower_DeviceWakeEnable -ErrorAction Stop | Where-Object Enable
 $out = foreach ($d in $w) {
   $id = $d.InstanceName -replace '_\d+$', ''

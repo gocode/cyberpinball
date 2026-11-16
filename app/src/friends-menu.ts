@@ -96,6 +96,15 @@ export interface FriendsMenuHost {
   chat?: { openThread(key: string, back: () => void): void; writeDetail(key: string): string };
   /** Le profil public d'un joueur (profile-menu.ts) : son activité récente et ses « J'aime ». */
   profile?: { open(key: string, back: () => void): void };
+  /** Supprimer mon compte (account-delete.ts) ; absent : l'action n'est pas proposée (essais). */
+  account?: {
+    /** Le service des retours : mes propositions et mes votes. */
+    forgetFeedback(): Promise<{ ok: boolean; why?: string }>;
+    /** Avis d'oubli, arrêt du réseau et de la messagerie, fichiers effacés. */
+    erase(feedback: boolean): Promise<{ feedback: boolean; reached: number; failed: string[] }>;
+    /** Redémarrer Cyber Pinball : une clé neuve naît au démarrage. */
+    relaunch(): void;
+  };
   now?(): Date;
 }
 
@@ -701,6 +710,8 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     actions.push({ label: t('Choisir mon pays…'), detail: t('Pour le classement national'), icon: 'globe', run: () => openCountry() });
     actions.push({ label: t('Limiter le débit des téléchargements…'), detail: t('Actuellement : {rate}', { rate: rateLabel(s.downloadRate ?? 0) }), icon: 'gauge', run: () => openDownloadRate() });
     actions.push({ label: s.lan ? t('Désactiver le réseau local') : t('Activer le réseau local'), icon: 'monitor', run: async () => { await net.setLan(!s.lan); host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } });
+    // Supprimer mon compte (RGPD) : avant la coupure, jamais sélectionné d'office ; confirmé sur un écran à part.
+    if (host.account) actions.push({ label: t('Supprimer mon compte…'), detail: t('Votre nom, vos amis, vos messages, vos scores publiés : effacés ici et chez les autres'), icon: 'trash', tone: 'warning', run: () => openDeleteAccount() });
     // La coupure en dernier, juste avant « Retour » (sélection d'office).
     actions.push(
       s.enabled
@@ -736,6 +747,112 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       actions,
       back,
     };
+  }
+
+  // ---------- Supprimer mon compte (account-delete.ts, forget.ts) ----------
+
+  const toSharing = () => host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER);
+
+  /** Ce qui part et ce qui reste, puis la confirmation ; le curseur sur « Annuler ». */
+  function openDeleteAccount(): void {
+    const s = net.state();
+    host.library.openCustom(
+      () => ({
+        heading: t('Supprimer mon compte ?'),
+        icon: 'alert',
+        lead: t('Rien ne pourra le rétablir. Cyber Pinball redémarre ensuite avec un compte neuf, sans nom ni ami.'),
+        sections: [
+          {
+            title: t('Effacé de cette borne'),
+            rows: [
+              { text: t('Votre compte « {name} » et son identifiant {id}', { name: s.name, id: playerId(s.key.publicKey) }), icon: 'account' },
+              { text: t('Vos amis, vos demandes, vos conversations, vos salons, votre avatar'), icon: 'friend-list' },
+              { text: t('Vos scores publiés et votre profil public'), icon: 'trophy' },
+            ],
+          },
+          {
+            title: t('Effacé chez les autres joueurs'),
+            rows: [
+              { text: t('Votre nom, votre avatar, vos lignes de salon, vos messages, vos scores et vos « J’aime »'), detail: t('Chez les bornes reliées tout de suite, puis chez les autres à mesure qu’elles se relient'), icon: 'network' },
+              { text: t('Vos propositions et vos votes du tableau des retours'), detail: t('Sur le service des retours, qui demande Internet'), icon: 'message' },
+            ],
+          },
+          {
+            title: t('Gardé'),
+            rows: [
+              { text: t('Vos tables, leurs scores et vos réglages'), icon: 'tables' },
+              { text: t('Les sauvegardes déjà faites : elles contiennent votre compte'), detail: t('Menu système > Cyber Pinball > Sauvegardes, pour les effacer'), tone: 'warning', icon: 'alert' },
+            ],
+          },
+        ],
+        actions: [
+          { label: t('Supprimer définitivement mon compte'), icon: 'trash', tone: 'warning', run: () => void startDelete() },
+          { label: t('Annuler'), icon: 'back', run: toSharing },
+        ],
+        back: toSharing,
+      }),
+      1,
+    );
+  }
+
+  /** Écran d'attente pendant une étape : rien à choisir. */
+  function deleting(text: string): void {
+    host.library.openCustom(() => ({ heading: t('Suppression du compte…'), icon: 'trash', sections: [{ rows: [{ text, icon: 'clock' }] }], actions: [{ label: t('Patientez…'), tone: 'quiet', run: () => undefined }], back: () => undefined }), 0);
+  }
+
+  async function startDelete(): Promise<void> {
+    const account = host.account!;
+    deleting(t('Effacement de vos propositions et de vos votes sur le service des retours'));
+    const r = await account.forgetFeedback();
+    if (r.ok) return finishDelete(true);
+    // Injoignable : le joueur choisit. Après l'effacement de la clé, plus rien ne pourrait les retirer.
+    host.library.openCustom(
+      () => ({
+        heading: t('Service des retours injoignable'),
+        icon: 'alert',
+        lead: r.why === 'offline' ? t('Pas de connexion à Internet pour le moment.') : t('Le service a refusé la demande ; réessayez dans un instant.'),
+        sections: [{ rows: [{ text: t('Sans lui, vos propositions et vos votes y resteraient, sans plus aucun moyen de les retirer'), tone: 'warning', icon: 'alert' }] }],
+        actions: [
+          { label: t('Réessayer'), icon: 'refresh', run: () => void startDelete() },
+          { label: t('Supprimer quand même'), detail: t('Le reste du compte est effacé'), icon: 'trash', tone: 'warning', run: () => void finishDelete(false) },
+          { label: t('Annuler'), icon: 'back', run: toSharing },
+        ],
+        back: toSharing,
+      }),
+      0,
+    );
+  }
+
+  async function finishDelete(feedback: boolean): Promise<void> {
+    deleting(t('Avis d’effacement envoyé aux bornes reliées, puis effacement de vos fichiers'));
+    const report = await host.account!.erase(feedback);
+    const relaunch = () => host.account!.relaunch();
+    host.library.openCustom(
+      () => ({
+        heading: t('Compte supprimé'),
+        icon: 'check',
+        lead: t('Cyber Pinball redémarre avec un compte neuf.'),
+        sections: [
+          {
+            rows: [
+              report.reached
+                ? { text: tn(report.reached, 'Avis d’effacement remis à {n} borne reliée', 'Avis d’effacement remis à {n} bornes reliées'), detail: t('Elles le transmettent aux autres à mesure qu’elles se relient'), tone: 'ok', icon: 'network' }
+                : { text: t('Aucune borne reliée en ce moment'), detail: t('Vos amis l’apprennent par la fin de votre amitié à leur prochaine connexion avec un joueur qui le sait'), tone: 'quiet', icon: 'network' },
+              report.feedback
+                ? { text: t('Propositions et votes effacés du service des retours'), tone: 'ok', icon: 'message' }
+                : { text: t('Propositions et votes restés sur le service des retours'), tone: 'warning', icon: 'alert' },
+              report.failed.length
+                ? { text: tn(report.failed.length, '{n} fichier n’a pas pu être effacé', '{n} fichiers n’ont pas pu être effacés'), detail: report.failed.join(' · '), tone: 'warning', icon: 'alert' }
+                : { text: t('Fichiers du compte effacés de cette borne'), tone: 'ok', icon: 'check' },
+              { text: t('Les sauvegardes déjà faites contiennent encore votre compte'), detail: t('Menu système > Cyber Pinball > Sauvegardes, pour les effacer'), tone: 'warning', icon: 'alert' },
+            ],
+          },
+        ],
+        actions: [{ label: t('Redémarrer Cyber Pinball'), icon: 'refresh', tone: 'ok', run: relaunch }],
+        back: relaunch,
+      }),
+      0,
+    );
   }
 
   /** Publication de mes scores aux classements national et mondial (rankings.ts). */

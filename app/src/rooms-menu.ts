@@ -400,6 +400,9 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         actions.push({ label: t('Signaler ce message'), detail: t('Envoyé chiffré aux modérateurs, avec la raison ; {name} ne saura pas qui', { name: l.name }), icon: 'alert', run: () => askReason(t('Signaler ce message'), (reason) => { net.report(l, reason); notice = { text: t('Signalement envoyé aux modérateurs'), tone: 'ok' }; backToRoom(); }, here) });
         if (net.amModerator()) for (const a of decisions(l, backToRoom)) actions.push(a);
         actions.push({ label: t('Bloquer {name}', { name: l.name }), detail: t('Plus de demande, plus de connexion avec sa borne'), icon: 'lock', tone: 'warning', run: () => confirmBlock(l, here, backToRoom) });
+      } else {
+        // Ma ligne : je peux la retirer, pour tous (confirmé d'abord : rien ne la rétablit).
+        actions.push({ label: t('Supprimer ma ligne…'), detail: t('Pour tous les joueurs du salon'), icon: 'trash', tone: 'warning', run: () => confirmRetract(l, here, backToRoom) });
       }
       actions.push({ label: t('Retour au salon'), icon: 'back', run: backToRoom });
       return {
@@ -412,6 +415,23 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       };
     };
     lib.openCustom(build);
+  }
+
+  function confirmRetract(l: RoomLine, cancel: () => void, after: () => void): void {
+    lib.openCustom(
+      () => ({
+        heading: t('Supprimer votre ligne ?'),
+        icon: 'alert',
+        lead: t('« {text} » disparaît du salon, ici et chez les autres joueurs à mesure que leurs bornes le reçoivent. Rien ne la rétablit.', { text: shownText(l.text).slice(0, 80) }),
+        sections: [],
+        actions: [
+          { label: t('Supprimer'), icon: 'trash', tone: 'warning', run: () => { if (net.roomRetract(l.id)) notice = { text: t('Ligne supprimée'), tone: 'ok' }; after(); } },
+          { label: t('Annuler'), icon: 'back', run: cancel },
+        ],
+        back: cancel,
+      }),
+      1,
+    );
   }
 
   function confirmBlock(l: RoomLine, cancel: () => void, after: () => void): void {

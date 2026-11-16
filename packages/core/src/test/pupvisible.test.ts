@@ -185,7 +185,7 @@ function gooniesOptions(pack: string): void {
 1,1,${name}
 `);
     fs.writeFileSync(path.join(pack, `${name}.bat`), `rem echo off
-xcopy /y "PuP-Pack_Options\${name}\*.pup"
+xcopy /y "PuP-Pack_Options\\${name}\\*.pup"
 `);
   }
 }

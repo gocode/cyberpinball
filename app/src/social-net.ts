@@ -70,6 +70,11 @@ import {
   mergeRoomLines,
   roomBacklog,
   roomLines,
+  roomRetractions,
+  retractRoomLines,
+  signRoomRetraction,
+  verifyRoomRetraction,
+  type RoomRetraction,
   saveRooms,
   signRoomHere,
   signRoomLine,
@@ -154,6 +159,20 @@ import {
   receiveReply,
   relationOf,
   removeFriend,
+  forgetInProfiles,
+  forgetInRankings,
+  forgetInRooms,
+  forgetInSocial,
+  forgetsFile,
+  forgetsSample,
+  forgottenKeys,
+  loadForgets,
+  mergeForgets,
+  saveForgets,
+  signForget,
+  verifyForget,
+  FORGET_BATCH,
+  type ForgetNotice,
   requestFriend,
   saveOrWarn,
   saveSocial,
@@ -318,6 +337,10 @@ export interface SocialNetOptions {
   systemLocale?: () => string | undefined;
   /** De nouveaux « J'aime » sur mes évènements publics (publicprofile.ts) : la notification. */
   onLike?: (likes: Like[]) => void;
+  /** Essais : attente avant de fermer les liaisons après l'avis d'oubli de mon compte (1,5 s). */
+  forgetFlushMs?: number;
+  /** Comptes supprimés appris (forget.ts) : leurs traces hors du réseau (messagerie) à effacer aussi. */
+  onForget?: (keys: ReadonlySet<string>) => void;
   /** Essais : la charte des modérateurs à utiliser (signée par une clé de projet d'essai), à la place de la livrée. */
   charter?: Charter;
 }
@@ -330,7 +353,14 @@ type LikesMessage = { t: 'likes'; likes: Like[]; ttl: number };
 /** Présence publique (livepresence.ts) : « en ligne » ou « en partie », entre toutes les bornes. */
 type LiveMessage_ = { t: 'live'; live: LiveBeacon[] };
 /** Salons par pays (rooms.ts) : lignes, demande d'historique, présents ; entre toutes les bornes. */
-type RoomMessage = { t: 'room'; lines: RoomLine[] } | { t: 'room-ask'; room: RoomId; since?: string } | { t: 'room-here'; here: RoomHere[] };
+/** Comptes supprimés par leur joueur (forget.ts), entre toutes les bornes ; une borne d'avant les ignore. */
+type ForgetMessage = { t: 'forget'; notices: ForgetNotice[] };
+type RoomMessage =
+  | { t: 'room'; lines: RoomLine[] }
+  | { t: 'room-ask'; room: RoomId; since?: string }
+  | { t: 'room-here'; here: RoomHere[] }
+  /** Lignes retirées par leur auteur (rooms.ts, RoomRetraction) ; une borne d'avant les retraits l'ignore. */
+  | { t: 'room-del'; dels: RoomRetraction[] };
 /** Parties instantanées (instantgames.ts) : annonces signées, relayées entre toutes les bornes. */
 type InstantMessage = { t: 'instant'; games: InstantGame[] };
 /** Modération (moderation.ts) : charte et décisions entre toutes les bornes ; signalements chiffrés pour les modérateurs. */
@@ -344,7 +374,7 @@ export type FriendMessage = LibraryMessage | LiveMessage | ChatMessage;
 
 interface Link {
   stream: Duplex;
-  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage | LiveMessage_ | RoomMessage | ModMessage | InstantMessage): void;
+  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage | LiveMessage_ | RoomMessage | ModMessage | InstantMessage | ForgetMessage): void;
   /** Morceau de fichier (friendlibrary.ts, chunkFrame) ; false : le flux est plein, attendre « drain ». */
   sendChunk(frame: Buffer): boolean;
   via: 'internet' | 'lan';
@@ -385,6 +415,12 @@ export interface SocialNet {
   linksOf(key: string): Link['via'][];
   start(): Promise<void>;
   stop(): Promise<void>;
+  /**
+   * Supprimer mon compte (forget.ts) : l'avis d'oubli signé part vers toutes les bornes reliées, un
+   * « unfriend » vers mes amis et demandes, puis le réseau s'arrête. `reached` : bornes reliées à ce moment.
+   * Les fichiers de la borne, eux, sont effacés par account-delete.ts.
+   */
+  forgetMe(): Promise<{ reached: number }>;
   setEnabled(on: boolean): Promise<void>;
   setLan(on: boolean): Promise<void>;
   rename(name: string): boolean;
@@ -489,6 +525,8 @@ export interface SocialNet {
    * pourquoi pas (salons désactivés, règles pas acceptées, trop tôt, trop de lignes, texte refusé).
    */
   roomSend(room: RoomId, text: string, action?: boolean): { line: RoomLine } | { reason: 'disabled' | 'rules' | 'gap' | 'burst' | 'text' | 'offline' | 'muted' };
+  /** Retirer ma ligne (son id) : ici et chez toutes les bornes reliées, qui relaient le retrait ; false si elle n'est pas à moi. */
+  roomRetract(id: string): boolean;
   /**
    * Le salon à l'écran (undefined : aucun) : j'y suis présent (signal toutes les deux minutes), et son
    * historique des 24 dernières heures est demandé aux bornes reliées.
@@ -546,6 +584,11 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   }
   // Profils publics et « J'aime » (publicprofile.ts) : relus une fois, écrits peu après chaque changement.
   let profiles = loadProfiles(opts.dataDir, now());
+  // Comptes supprimés (forget.ts) : rien de ce qui vient de leur clé n'est plus gardé ni relayé.
+  let forgets = loadForgets(opts.dataDir);
+  let forgotten = forgottenKeys(forgets);
+  /** Un joueur dont on ne prend rien : bloqué ici, ou compte supprimé. */
+  const shunned = (key: string) => state.blocked.includes(key) || forgotten.has(key);
   let profilesTimer: NodeJS.Timeout | undefined;
   function saveProfilesSoon(): void {
     if (profilesTimer) return;
@@ -716,7 +759,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
    * est refusée) ; l'empreinte, que le joueur a signée ou annoncée lui-même, contrôle l'image.
    */
   function sendAvatar(key: string, hash: string): void {
-    if (state.blocked.includes(key)) return;
+    if (shunned(key)) return;
     const own = state.enabled && ownAvatarHash() === hash;
     if (!own && !publicAvatars().has(hash)) return;
     const file = own ? state.avatar! : heldAvatar(hash);
@@ -736,7 +779,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
    * score le plus récent (publicAvatarHash). undefined : ses initiales.
    */
   function knownAvatarHash(key: string): string | undefined {
-    if (state.blocked.includes(key)) return undefined;
+    if (shunned(key)) return undefined;
     return publicAvatarHash([peers.get(key)?.avatar, liveBoard.get(key)?.avatar, hereBoard.get(key)?.avatar, profiles.cards.find((c) => c.key === key)?.avatar, rankedAvatars().get(key)]);
   }
 
@@ -754,7 +797,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
    */
   function publicAvatars(): Set<string> {
     const own = state.enabled ? ownAvatarHash() : undefined;
-    const announced = [...peers.values()].filter((p) => !state.blocked.includes(p.key)).map((p) => p.avatar);
+    const announced = [...peers.values()].filter((p) => !shunned(p.key)).map((p) => p.avatar);
     const held = Object.values(state.peerAvatars ?? {}).map(avatarHashOf);
     const signals = [...[...liveBoard.values()].map((b) => b.avatar), ...[...hereBoard.values()].map((h) => h.avatar)];
     return new Set([...rankedAvatars().values(), ...profiles.cards.map((c) => c.avatar), ...signals, ...announced, ...held, own].filter((h): h is string => !!h));
@@ -908,7 +951,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   function attach(stream: Duplex, via: Link['via']): void {
     const key = hex(stream.remotePublicKey);
-    if (key === state.key.publicKey || state.blocked.includes(key)) {
+    if (key === state.key.publicKey || shunned(key)) {
       stream.destroy();
       return;
     }
@@ -929,6 +972,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         } catch {
           return;
         }
+        // Comptes supprimés : de toute borne reliée, chaque avis vérifié par la signature de la clé qu'il efface.
+        if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'forget') return receiveForgets(key, (raw as { notices?: unknown }).notices);
         // Scores des classements : de toute borne reliée, chacun vérifié par sa signature.
         if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'scores') return receiveScores(key, (raw as { scores?: unknown }).scores);
         // Profils publics et « J'aime » : de toute borne reliée, chacun vérifié par sa signature.
@@ -1003,12 +1048,55 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     if (cards.length) link.send({ t: 'cards', cards });
     // La charte des modérateurs et les décisions en vigueur ; une borne d'avant la modération ignore ce message.
     link.send(moderationSample());
+    // Les comptes supprimés, pour une borne restée éteinte ; une borne d'avant la suppression des comptes l'ignore.
+    const forgetsKnown = forgetsSample(forgets);
+    if (forgetsKnown.length) link.send({ t: 'forget', notices: forgetsKnown });
     // Qui est en ligne : mon signal et les plus récents connus ; une borne d'avant la présence publique ignore ce message.
     const live = liveSample(liveBoard, ownBeacon(), now());
     if (live.length) link.send({ t: 'live', live });
     // Les parties instantanées ouvertes ; une borne d'avant ignore ce message.
     const instant = instantSample(instantBoard, ownInstant(), now());
     if (instant.length) link.send({ t: 'instant', games: instant });
+    changed();
+  }
+
+  // ---------- Comptes supprimés (forget.ts) ----------
+
+  function receiveForgets(from: string, raw: unknown): void {
+    if (!Array.isArray(raw)) return;
+    const notices = raw.slice(0, FORGET_BATCH).map((n) => verifyForget(n, now())).filter((n): n is ForgetNotice => !!n && n.key !== state.key.publicKey);
+    const merged = mergeForgets(forgets, notices);
+    if (!merged.fresh.length) return;
+    forgets = merged.store;
+    saveOrWarn(forgetsFile(opts.dataDir), () => saveForgets(opts.dataDir, forgets));
+    forgetPlayers(new Set(merged.fresh.map((n) => n.key)));
+    for (const link of greetedLinks(from)) link.send({ t: 'forget', notices: merged.fresh });
+    log(`Réseau des bornes : ${merged.fresh.length} compte(s) supprimé(s) par leur joueur, effacé(s) de cette borne.`); // i18n-ignore : journal
+  }
+
+  /** Efface de cette borne tout ce qui vient de ces clés, et les refuse désormais. */
+  function forgetPlayers(keys: ReadonlySet<string>): void {
+    forgotten = forgottenKeys(forgets);
+    commitQuietly(forgetInSocial(state, keys));
+    if (forgetInRankings(rankings, keys)) saveRankingsSoon();
+    const p = forgetInProfiles(profiles, keys);
+    if (p !== profiles) {
+      profiles = p;
+      saveProfilesSoon();
+    }
+    const r = forgetInRooms(rooms, keys);
+    if (r !== rooms) {
+      rooms = r;
+      saveRoomsSoon();
+    }
+    for (const key of keys) {
+      liveBoard.delete(key);
+      hereBoard.delete(key);
+      instantBoard.delete(key);
+      partners.delete(key);
+    }
+    tidyAvatars();
+    opts.onForget?.(keys);
     changed();
   }
 
@@ -1022,7 +1110,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   /** Joueurs de ma partie instantanée : rejoints par leur clé, la partie en direct passe avec eux. */
   const partners = new Set<string>();
   /** Un joueur bloqué, ou exclu des salons par la modération : ni ses annonces ni ses arrivées. */
-  const refusedPlayer = (key: string) => state.blocked.includes(key) || sanctionOf(moderation.acts, key, now())?.kind === 'ban';
+  const refusedPlayer = (key: string) => shunned(key) || sanctionOf(moderation.acts, key, now())?.kind === 'ban';
 
   /** Mon annonce signée maintenant (ouverte ou fermée) ; undefined sans partie, ou partage coupé. */
   function signedInstant(): InstantGame | undefined {
@@ -1041,7 +1129,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   /** Annonces reçues : vérifiées, celles d'un joueur écarté laissées ; les nouvelles gardées et relayées. */
   function receiveInstant(from: string, raw: unknown): void {
-    if (!Array.isArray(raw) || state.blocked.includes(from)) return;
+    if (!Array.isArray(raw) || shunned(from)) return;
     const games = raw.slice(0, INSTANT_BATCH).map((g) => verifyInstant(g, now())).filter((g): g is InstantGame => !!g && !refusedPlayer(g.key));
     if (!games.length) return;
     const fresh = mergeInstant(instantBoard, games, state.key.publicKey, now());
@@ -1197,7 +1285,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   }
 
   function receiveModeration(from: string, m: Record<string, unknown>): void {
-    if (state.blocked.includes(from)) return;
+    if (shunned(from)) return;
     if (m.t === 'mod') {
       let changedAny = false;
       if (m.charter !== undefined) {
@@ -1262,11 +1350,11 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   }
 
   function receiveRoom(from: string, m: Record<string, unknown>, link: Link): void {
-    if (state.blocked.includes(from)) return;
+    if (shunned(from)) return;
     if (m.t === 'room') {
       if (!Array.isArray(m.lines)) return;
       // Une ligne d'un joueur exclu, ou en sourdine à son heure, n'est ni gardée ni relayée.
-      const lines = m.lines.slice(0, ROOM_BATCH).map((l) => verifyRoomLine(l, now())).filter((l): l is RoomLine => !!l && !state.blocked.includes(l.key) && l.key !== state.key.publicKey && !lineRefused(moderation.acts, l));
+      const lines = m.lines.slice(0, ROOM_BATCH).map((l) => verifyRoomLine(l, now())).filter((l): l is RoomLine => !!l && !shunned(l.key) && l.key !== state.key.publicKey && !lineRefused(moderation.acts, l));
       if (!lines.length) return;
       const merged = mergeRoomLines(rooms, lines, now());
       if (!merged.fresh.length) return;
@@ -1282,6 +1370,21 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       const since = typeof m.since === 'string' && !Number.isNaN(Date.parse(m.since)) ? m.since : undefined;
       const lines = roomBacklog(rooms, m.room, since, now());
       if (lines.length) link.send({ t: 'room', lines });
+      // Les retraits du salon : une ligne gardée par la borne qui entre, retirée depuis, disparaît aussi chez elle.
+      const dels = roomRetractions(rooms, m.room);
+      if (dels.length) link.send({ t: 'room-del', dels });
+      return;
+    }
+    if (m.t === 'room-del') {
+      if (!Array.isArray(m.dels)) return;
+      const dels = m.dels.slice(0, ROOM_BATCH).map((d) => verifyRoomRetraction(d, now())).filter((d): d is RoomRetraction => !!d);
+      if (!dels.length) return;
+      const r = retractRoomLines(rooms, dels, now());
+      if (!r.fresh.length) return;
+      rooms = r.state;
+      saveRoomsSoon();
+      for (const l of greetedLinks(from)) l.send({ t: 'room-del', dels: r.fresh });
+      changed();
       return;
     }
     if (m.t === 'room-here') {
@@ -1291,7 +1394,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       let newAvatar = false;
       for (const raw of m.here.slice(0, ROOM_BATCH)) {
         const h = verifyRoomHere(raw, now());
-        if (!h || h.key === state.key.publicKey || state.blocked.includes(h.key)) continue;
+        if (!h || h.key === state.key.publicKey || shunned(h.key)) continue;
         const had = hereBoard.get(h.key);
         if (had && Date.parse(had.at) >= Date.parse(h.at)) continue;
         hereBoard.set(h.key, h);
@@ -1312,8 +1415,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   /** Signaux reçus : vérifiés, ceux d'un joueur bloqué laissés ; les nouveaux gardés et relayés. */
   function receiveLive(from: string, raw: unknown): void {
-    if (!Array.isArray(raw) || state.blocked.includes(from)) return;
-    const beacons = raw.slice(0, LIVE_BATCH).map((b) => verifyBeacon(b, now())).filter((b): b is LiveBeacon => !!b && !state.blocked.includes(b.key));
+    if (!Array.isArray(raw) || shunned(from)) return;
+    const beacons = raw.slice(0, LIVE_BATCH).map((b) => verifyBeacon(b, now())).filter((b): b is LiveBeacon => !!b && !shunned(b.key));
     if (!beacons.length) return;
     const before = new Map(beacons.map((b) => [b.key, liveBoard.get(b.key)?.avatar]));
     const fresh = mergeBeacons(liveBoard, beacons, state.key.publicKey, now());
@@ -1329,8 +1432,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
    * gardés, puis relayés aux autres bornes reliées. Ce qui est déjà connu s'arrête là.
    */
   function receiveScores(from: string, raw: unknown): void {
-    if (!Array.isArray(raw) || state.blocked.includes(from)) return;
-    const scores = raw.slice(0, RANKINGS_BATCH).map((s) => verifyScore(s, now())).filter((s): s is RankedScore => !!s && !state.blocked.includes(s.key));
+    if (!Array.isArray(raw) || shunned(from)) return;
+    const scores = raw.slice(0, RANKINGS_BATCH).map((s) => verifyScore(s, now())).filter((s): s is RankedScore => !!s && !shunned(s.key));
     const fresh = mergeRankings(rankings, scores, state.key.publicKey, now());
     if (!fresh.length) return;
     saveRankingsSoon();
@@ -1377,8 +1480,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   /** Cartes reçues : vérifiées, celles d'un joueur bloqué laissées ; les nouvelles gardées et relayées. */
   function receiveCards(from: string, raw: unknown): void {
-    if (!Array.isArray(raw) || state.blocked.includes(from)) return;
-    const cards = raw.slice(0, CARDS_BATCH).map((c) => verifyCard(c, now())).filter((c): c is PublicCard => !!c && !state.blocked.includes(c.key));
+    if (!Array.isArray(raw) || shunned(from)) return;
+    const cards = raw.slice(0, CARDS_BATCH).map((c) => verifyCard(c, now())).filter((c): c is PublicCard => !!c && !shunned(c.key));
     if (!cards.length) return;
     const before = new Map(profiles.cards.map((c) => [c.key, c.avatar]));
     const merged = mergeCards(profiles, cards, state.key.publicKey, now());
@@ -1408,8 +1511,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   /** « J'aime » relayés récemment (signature) : un relais ne repasse pas deux fois. */
   const likesRelayed = new Set<string>();
   function receiveLikes(from: string, raw: unknown, ttl: unknown): void {
-    if (!Array.isArray(raw) || state.blocked.includes(from)) return;
-    const likes = raw.slice(0, LIKES_BATCH).map((l) => verifyLike(l, now())).filter((l): l is Like => !!l && !state.blocked.includes(l.from));
+    if (!Array.isArray(raw) || shunned(from)) return;
+    const likes = raw.slice(0, LIKES_BATCH).map((l) => verifyLike(l, now())).filter((l): l is Like => !!l && !shunned(l.from));
     const me = state.key.publicKey;
     const news: Like[] = [];
     let mine = false;
@@ -1439,7 +1542,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   function receive(key: string, message: SocialMessage, link: Link): void {
     const peer = peers.get(key);
-    if (!peer || state.blocked.includes(key)) return;
+    if (!peer || shunned(key)) return;
     switch (message.t) {
       case 'hello': {
         // Le profil doit être celui de la clé de la connexion.
@@ -1525,6 +1628,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
    * vaut pour la demande qui le suit).
    */
   function learn(profiles: readonly RelayedProfile[], how: { lan?: boolean; relayed?: boolean }): void {
+    profiles = profiles.filter((p) => !forgotten.has(plainProfile(p).key));
+    if (!profiles.length) return;
     commit(learnProfiles(state, profiles, { now: now(), ...how }));
     for (const relayed of profiles) {
       const profile = plainProfile(relayed);
@@ -1536,7 +1641,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   /** Amis et demandes en cours : Hyperswarm les rejoint par leur clé ; les autres sont laissés. */
   function followPeers(): void {
     if (!swarm) return;
-    const want = new Set([...state.friends.map((f) => f.key), ...state.outgoing.map((r) => r.key), ...state.incoming.map((r) => r.key), ...[...partners].filter((k) => !state.blocked.includes(k))]);
+    const want = new Set([...state.friends.map((f) => f.key), ...state.outgoing.map((r) => r.key), ...state.incoming.map((r) => r.key), ...[...partners].filter((k) => !shunned(k))]);
     for (const key of want) if (!followed.has(key)) swarm.joinPeer(Buffer.from(key, 'hex'));
     for (const key of followed) if (!want.has(key)) swarm.leavePeer(Buffer.from(key, 'hex'));
     followed.clear();
@@ -1584,7 +1689,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   function onBeacon(beacon: Beacon, host: string): void {
     const profile = verifyProfile(beacon.profile, now());
-    if (!profile || profile.key === state.key.publicKey || state.blocked.includes(profile.key)) return;
+    if (!profile || profile.key === state.key.publicKey || shunned(profile.key)) return;
     const peer = peers.get(profile.key) ?? { key: profile.key, links: new Set<Link>() };
     peers.set(profile.key, peer);
     const moved = peer.lan?.host !== host || peer.lan?.port !== beacon.port;
@@ -1707,7 +1812,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       beginSearch();
       changed();
     });
-    swarm = new Hyperswarm({ keyPair: DHT.keyPair(playerSeed(state.key)), dht: node, maxPeers: 32, firewall: (key: Buffer) => state.blocked.includes(hex(key)) }) as Swarm;
+    swarm = new Hyperswarm({ keyPair: DHT.keyPair(playerSeed(state.key)), dht: node, maxPeers: 32, firewall: (key: Buffer) => shunned(hex(key)) }) as Swarm;
     swarm.on('connection', (conn) => (opts.refuseIncoming && !conn.isInitiator ? conn.destroy() : attach(conn, 'internet')));
     const discovery = swarm.join(topicOf(DIRECTORY_TOPIC), { server: true, client: true });
     const refresh = () => discovery.refresh({ server: true, client: true }).catch(() => undefined);
@@ -1853,6 +1958,20 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       if (on) await start();
       else await stop();
     },
+    async forgetMe() {
+      // Les amis et les demandes d'une borne d'avant la suppression des comptes l'apprennent par « unfriend ».
+      for (const key of new Set([...state.friends.map((f) => f.key), ...state.incoming.map((r) => r.key), ...state.outgoing.map((r) => r.key)])) sendTo(key, { t: 'unfriend' });
+      const notice = signForget(state.key, now());
+      let reached = 0;
+      for (const link of greetedLinks()) {
+        link.send({ t: 'forget', notices: [notice] });
+        reached++;
+      }
+      // Le temps que les messages partent avant de fermer les liaisons.
+      if (reached) await new Promise((resolve) => setTimeout(resolve, opts.forgetFlushMs ?? 1500));
+      await stop();
+      return { reached };
+    },
     async setLan(on) {
       commit({ ...state, lan: on });
       if (!status.running) return;
@@ -1894,7 +2013,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     publicCard: (key) => (key === state.key.publicKey ? ownCard() : profiles.hidden.includes(key) ? undefined : cardOf(profiles, key)),
     cardSeen: (key) => profiles.seen[key],
     like(key, event, on) {
-      if (key === state.key.publicKey || state.blocked.includes(key)) return;
+      if (key === state.key.publicKey || shunned(key)) return;
       profiles = giveLike(profiles, signLike(state.key, state.name, key, event, on, now()));
       saveProfilesSoon();
       deliverLikes(key);
@@ -1958,6 +2077,16 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       changed();
       return { line };
     },
+    roomRetract(id) {
+      const line = rooms.lines.find((l) => l.id === id);
+      const del = line && signRoomRetraction(state, line, now());
+      if (!del) return false;
+      rooms = retractRoomLines(rooms, [del], now()).state;
+      saveRoomsSoon();
+      for (const link of greetedLinks()) link.send({ t: 'room-del', dels: [del] });
+      changed();
+      return true;
+    },
     roomOpen(room) {
       if (room === roomShown) return;
       roomShown = room;
@@ -1974,7 +2103,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     },
     roomPresent(room) {
       expireHere();
-      const others = [...hereBoard.values()].filter((h) => h.room === room && !state.blocked.includes(h.key));
+      const others = [...hereBoard.values()].filter((h) => h.room === room && !shunned(h.key));
       const me = roomShown === room && state.enabled ? [signRoomHere(state, room, myCountry(), now(), ownAvatarHash())] : [];
       return [...me, ...others.sort((a, b) => Date.parse(b.at) - Date.parse(a.at))];
     },
@@ -1988,7 +2117,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       roomListeners.add(listener);
       return () => roomListeners.delete(listener);
     },
-    livePlayers: () => liveNow(liveBoard, now()).filter((b: LiveBeacon) => !state.blocked.includes(b.key)),
+    livePlayers: () => liveNow(liveBoard, now()).filter((b: LiveBeacon) => !shunned(b.key)),
     setPublicPresence(on) {
       const { publicPresence: _, ...rest } = state;
       commit(on ? rest : { ...rest, publicPresence: false });
@@ -2072,7 +2201,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       return hash ? publicAvatarFile(key, hash) : undefined;
     },
     rankingAvatar(key, hash) {
-      if (state.blocked.includes(key)) return undefined;
+      if (shunned(key)) return undefined;
       return publicAvatarFile(key, hash);
     },
     setDownloadRate: (rate) => {

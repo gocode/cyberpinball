@@ -122,7 +122,7 @@ export type LiveManualReason = 'script' | 'rom' | 'inspector' | 'other';
  */
 export function liveStateSupport(script: string | undefined, elements: readonly { type: number; name: string }[], opts: { rom?: RomMemory; roms?: number; inspector?: boolean } = {}): { live: true } | { live: false; reason: LiveManualReason; detail: string } {
   if (!script) return { live: false, reason: 'other', detail: 'script illisible ou protégé' }; // i18n-ignore : journal
-  const hook = liveStateHook(script, elements, 'C:\cyberpinball-etat.txt', opts.rom, opts.inspector ? { port: 50_000 } : undefined, 'C:\cyberpinball-partez.txt');
+  const hook = liveStateHook(script, elements, 'C:\\cyberpinball-etat.txt', opts.rom, opts.inspector ? { port: 50_000 } : undefined, 'C:\\cyberpinball-partez.txt');
   if (hook.ok) return { live: true };
   // Une table à ROM sans carte en cache : c'est la carte qui manque, pas le script.
   const reason = hook.code === 'script' && opts.roms && !opts.rom ? 'rom' : hook.code;

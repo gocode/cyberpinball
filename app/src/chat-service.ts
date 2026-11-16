@@ -16,6 +16,8 @@ import {
   acknowledge,
   clearAll,
   clearConversation,
+  deleteMine,
+  forgetInChat,
   CHAT_BATCH,
   loadChat,
   markRead,
@@ -62,6 +64,10 @@ export interface ChatService {
   send(key: string, text: string): boolean;
   /** Réagir à un message (son id) ; null : retirer ma réaction. */
   react(key: string, target: string, kind: ChatReaction | null): boolean;
+  /** Supprimer mon message (son id) : ici, et chez l'ami dès que sa borne reçoit le retrait ; false si ce n'est pas un des miens. */
+  remove(key: string, target: string): boolean;
+  /** Comptes supprimés par leur joueur (forget.ts) : leurs conversations effacées. */
+  forget(keys: ReadonlySet<string>): void;
   markRead(key: string): void;
   setMuted(key: string, muted: boolean): void;
   clear(key: string): void;
@@ -197,6 +203,14 @@ export function createChatService(opts: ChatServiceOptions): ChatService {
     state: () => state,
     send: (key, text) => write(key, { text }),
     react: (key, target, kind) => write(key, { react: { target, kind } }),
+    remove: (key, target) => {
+      const r = deleteMine(state, me(), key, target, now());
+      if (r.state === state) return false;
+      commit(r.state);
+      if (r.line) flush(key);
+      return true;
+    },
+    forget: (keys) => commit(forgetInChat(state, keys)),
     markRead: (key) => commit(markRead(state, key)),
     setMuted: (key, muted) => commit(setMuted(state, key, muted)),
     clear: (key) => commit(clearConversation(state, key)),

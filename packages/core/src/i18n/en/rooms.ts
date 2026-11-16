@@ -170,4 +170,11 @@ export const messages: Record<string, string> = {
   '{name} vous cite · {room}': '{name} mentions you · {room}',
   '{n} mention dans les salons': '{n} mention in the rooms',
   '{n} mentions dans les salons': '{n} mentions in the rooms',
+
+  // app/src/rooms-menu.ts : supprimer ma ligne
+  'Supprimer ma ligne…': 'Delete my line…',
+  'Pour tous les joueurs du salon': 'For every player in the room',
+  'Supprimer votre ligne ?': 'Delete your line?',
+  '« {text} » disparaît du salon, ici et chez les autres joueurs à mesure que leurs bornes le reçoivent. Rien ne la rétablit.': '“{text}” disappears from the room, here and for the other players as their cabinets receive the deletion. Nothing brings it back.',
+  'Ligne supprimée': 'Line deleted',
 };

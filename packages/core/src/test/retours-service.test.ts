@@ -469,6 +469,30 @@ test('retours : une fusion additionne les voix sans doublon, et les voix suivant
   );
 });
 
+test('retours : un compte supprimé efface ses propositions et ses votes, signé par sa clé, jamais rejoué', async () => {
+  const s = await service();
+  const [gone, other, fan] = [keys(), keys(), keys()];
+  const mine = (await s.propose(gone, { title: 'Ma proposition' })).json.id as string;
+  const theirs = (await s.propose(other, { title: 'Celle d’un autre' })).json.id as string;
+  const dup = (await s.propose(other, { title: 'Doublon de la mienne' })).json.id as string;
+  await s.vote(fan, mine, true);
+  await s.vote(gone, theirs, true);
+  s.state.clock += 1000;
+  assert.equal((await s.edit(dup, { mergeInto: mine })).status, 200);
+  const body = s.signed(gone, { op: 'forget' });
+  const r = await s.call('POST', '/api/oubli', body);
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { propositions: 1 });
+  // Plus rien de lui : ni sa proposition, ni son vote ; le doublon d'un autre fusionné chez lui redevient visible seul.
+  const pub = (await s.list(gone.pk)).propositions;
+  assert.deepEqual(pub.map((p) => [p.title, p.votes, p.voted, p.mine]).sort(), [['Celle d’un autre', 1, false, false], ['Doublon de la mienne', 0, false, false]].sort());
+  assert.equal(await s.d1.prepare('SELECT COUNT(*) AS n FROM votes WHERE voter = ?1').bind(gone.pk).first('n'), 0);
+  // Rejoué : refusé ; signé par une autre clé que celle qu'il prétend effacer : refusé.
+  assert.equal((await s.call('POST', '/api/oubli', body)).status, 409);
+  const forged = JSON.parse(s.signed(other, { op: 'forget' })) as { b: string; s: string };
+  assert.equal((await s.call('POST', '/api/oubli', JSON.stringify({ b: forged.b.replace(other.pk, fan.pk), s: forged.s }))).status, 403);
+});
+
 test("retours : l'administrateur relève, lit et efface les rapports", async () => {
   const s = await service();
   const box = report(500);

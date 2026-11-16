@@ -228,6 +228,15 @@ import {
   type ScorePeriod,
   isFullAddress,
   prefixedText,
+  KEYBOARD_EMOJIS,
+  atWordStart,
+  afterCaret,
+  beforeCaret,
+  cleanInserted,
+  eraseAfterCaret,
+  eraseBeforeCaret,
+  insertAtCaret,
+  moveCaret,
   type VrNetworkFacts,
   mediaOriginOf,
   MEDIADB_NAME,
@@ -294,8 +303,11 @@ const KEYBOARD = [
   ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
   ...'0123456789',
   'É', 'È', 'À', 'Ç', '-', '_', "'", '&', '.', ':', '!', '?', // i18n-ignore : lettres du clavier
-  'Espace', 'Effacer', 'Maj', 'OK', 'Annuler', // i18n-ignore : identifiants des touches
+  // ◀ ▶ : le point d'insertion dans le texte ; Emoji : le panneau des emojis, à côté des touches.
+  'Espace', 'Effacer', 'Maj', '◀', '▶', 'Emoji', 'OK', 'Annuler', // i18n-ignore : identifiants des touches
 ];
+/** Après les emojis du panneau : sa touche qui le ferme (retour aux lettres). */
+const EMOJI_CLOSE = KEYBOARD_EMOJIS.length;
 const NUMPAD = [...'0123456789', 'Effacer', '−', '+', 'OK', 'Annuler']; // i18n-ignore : identifiants des touches
 
 /** Libellé affiché d'une touche du clavier à l'écran. */
@@ -307,6 +319,8 @@ function keyLabel(key: string): string {
       return t('Effacer');
     case 'Maj':
       return t('Maj');
+    case 'Emoji':
+      return '😀';
     case 'Annuler': // i18n-ignore : identifiant de touche
       return t('Annuler');
     default:
@@ -498,6 +512,8 @@ export type UiAction =
   /** Le curseur posé sur cet élément sans l'activer (téléphone : les actions d'une playlist de la gestion). */
   | { type: 'focus'; index: number; id?: string }
   | { type: 'editor'; index: number }
+  /** Texte arrivé sans touche dans la page (panneau des emojis de Windows, méthode de saisie) : au point d'insertion. */
+  | { type: 'editor-text'; text: string }
   | { type: 'drop'; paths: string[] }
   | { type: 'key'; code: string }
   /** Bouton « ‹ Retour » de l'en-tête : comme Exit, sans redescendre au bas de la liste. */
@@ -785,7 +801,8 @@ export interface PromptOptions {
 type TextPrefix = { prefixes?: { label: string; text: string }[]; prefixAt?: number; prefixOff?: boolean; armed?: boolean };
 type Editor =
   /** Sans `field` : saisie libre d'un écran « prompt ». */
-  | ({ kind: 'text'; field?: Field; label: string; value: string; cursor: number; shift: boolean; typed: boolean } & TextPrefix)
+  /** `at` : point d'insertion (textedit.ts, absent : à la fin) ; `emoji` : panneau des emojis ouvert. */
+  | ({ kind: 'text'; field?: Field; label: string; value: string; at?: number; emoji?: boolean; cursor: number; shift: boolean; typed: boolean } & TextPrefix)
   | { kind: 'choice'; field: Field; label: string; choices: string[]; cursor: number }
   | { kind: 'number'; field: Field; label: string; value: number; typed: string; cursor: number };
 
@@ -4713,7 +4730,10 @@ export function createLibrary(host: LibraryHost) {
         const pasted = text.replace(/\s+/g, ' ').trim();
         if (!pasted || screen !== s || s.editor !== e) return;
         // Champ à préfixe : une adresse entière collée remplace ce qui est tapé (pas de préfixe en double).
-        e.value = e.prefixes && isFullAddress(pasted) ? pasted : e.value + pasted;
+        if (e.prefixes && isFullAddress(pasted)) {
+          e.value = pasted;
+          delete e.at;
+        } else insertAtCaret(e, pasted);
         e.typed = true;
         e.armed = false;
         host.broadcast();
@@ -4721,15 +4741,19 @@ export function createLibrary(host: LibraryHost) {
       return;
     }
     if (e.kind === 'text') {
-      const count = keyCount(e);
+      // Flèches gauche et droite d'un clavier (pas celles relevées comme boutons de la borne),
+      // Début, Fin : le point d'insertion. Haut et bas parcourent toujours les touches à l'écran.
+      const arrow = (input.code === 'ArrowLeft' || input.code === 'ArrowRight') && !button;
       if (typing) {
-        e.value += char;
+        insertAtCaret(e, char!);
         e.typed = true;
         e.armed = false;
       } else if (input.code === 'Backspace') eraseChar(e);
+      else if (input.code === 'Delete') eraseAfterCaret(e);
+      else if (arrow) moveCaret(e, input.code === 'ArrowLeft' ? -1 : 1);
+      else if (input.code === 'Home' || input.code === 'End') moveCaret(e, input.code === 'Home' ? 'start' : 'end');
       else if (input.code === 'Enter' || input.code === 'NumpadEnter') closeEditor(s, true);
-      else if (is(KEYS.previous) && !e.typed) e.cursor = (e.cursor - 1 + count) % count;
-      else if (is(KEYS.next) && !e.typed) e.cursor = (e.cursor + 1) % count;
+      else if ((is(KEYS.previous) || is(KEYS.next)) && !e.typed) moveKeyCursor(e, is(KEYS.previous) ? -1 : 1);
       else if (is(KEYS.confirm)) pressKey(s, e.cursor);
     } else if (e.kind === 'choice') {
       if (is(KEYS.previous)) e.cursor = (e.cursor - 1 + e.choices.length) % e.choices.length;
@@ -4780,6 +4804,15 @@ export function createLibrary(host: LibraryHost) {
       return;
     }
     e.cursor = index;
+    // Panneau des emojis, après les touches : l'emoji au point d'insertion, ou sa touche « Lettres ».
+    if (e.emoji && index >= keyCount(e)) {
+      const at = index - keyCount(e);
+      if (at === EMOJI_CLOSE) return closeEmojis(e);
+      const emoji = KEYBOARD_EMOJIS[at];
+      if (emoji) insertAtCaret(e, emoji);
+      e.shift = false;
+      return;
+    }
     // Touches de préfixe, après le clavier : « Playlist », « Vidéo » (le préfixe revient s'il était retiré).
     if (index >= KEYBOARD.length) {
       if (!e.prefixes?.[index - KEYBOARD.length]) return;
@@ -4792,18 +4825,65 @@ export function createLibrary(host: LibraryHost) {
     if (key === 'OK') return closeEditor(s, true);
     if (key === 'Annuler') return closeEditor(s, false); // i18n-ignore : identifiant de touche
     if (key === 'Effacer') return eraseChar(e);
+    if (key === '◀' || key === '▶') return moveCaret(e, key === '◀' ? -1 : 1);
+    if (key === 'Emoji') {
+      // Pas d'emoji dans un lien ou un identifiant (champ à préfixe) : la touche y est grisée.
+      if (e.prefixes) return;
+      if (e.emoji) return closeEmojis(e);
+      e.emoji = true;
+      e.cursor = keyCount(e);
+      return;
+    }
     e.armed = false;
     if (key === 'Maj') e.shift = !e.shift;
     else if (e.prefixes) {
       // Un identifiant : la lettre telle que montrée, Maj reste enclenché (verrou).
       const ch = key === 'Espace' ? ' ' : key;
-      e.value += e.shift ? ch.toUpperCase() : ch.toLowerCase();
+      insertAtCaret(e, e.shift ? ch.toUpperCase() : ch.toLowerCase());
     } else {
       const ch = key === 'Espace' ? ' ' : key;
       // Majuscule en début de mot, minuscule ailleurs ; Maj inverse pour un caractère.
-      const wordStart = e.value === '' || e.value.endsWith(' ');
-      e.value += wordStart !== e.shift ? ch.toUpperCase() : ch.toLowerCase();
+      insertAtCaret(e, atWordStart(e) !== e.shift ? ch.toUpperCase() : ch.toLowerCase());
       e.shift = false;
+    }
+  }
+
+  /** Ferme le panneau des emojis : le curseur revient sur la touche qui l'ouvre. */
+  function closeEmojis(e: Extract<Editor, { kind: 'text' }>): void {
+    e.emoji = false;
+    e.cursor = KEYBOARD.indexOf('Emoji');
+  }
+
+  /**
+   * Flippers sur le clavier à l'écran : la touche précédente ou suivante. Panneau des emojis
+   * ouvert : ils parcourent ses emojis et sa touche « Lettres » (un clic ailleurs y ramène).
+   */
+  function moveKeyCursor(e: Extract<Editor, { kind: 'text' }>, step: -1 | 1): void {
+    const count = keyCount(e);
+    if (!e.emoji) {
+      e.cursor = (e.cursor + step + count) % count;
+      return;
+    }
+    const panel = EMOJI_CLOSE + 1;
+    const at = e.cursor - count;
+    e.cursor = count + (at < 0 || at >= panel ? 0 : (at + step + panel) % panel);
+  }
+
+  /**
+   * Texte arrivé sans touche (panneau des emojis de Windows, Win + point ; méthode de saisie
+   * d'une autre langue), remis par la page : au point d'insertion, sur une seule ligne.
+   */
+  function insertText(s: EditorScreen, text: string): void {
+    const e = s.editor!;
+    const clean = cleanInserted(text);
+    if (!clean) return;
+    if (e.kind === 'text') {
+      insertAtCaret(e, clean);
+      e.typed = true;
+      e.armed = false;
+    } else if (e.kind === 'number' && /\d/.test(clean)) {
+      e.typed = (e.typed + clean.replace(/\D/g, '')).slice(-4);
+      e.value = Number(e.typed);
     }
   }
 
@@ -4823,8 +4903,9 @@ export function createLibrary(host: LibraryHost) {
    * retour arrière de suite (le premier prévient) : jamais effacé par erreur d'un seul appui.
    */
   function eraseChar(e: Extract<Editor, { kind: 'text' }>): void {
+    // Le caractère avant le point d'insertion ; au début d'un texte non vide, rien (le préfixe reste).
     if (e.value || !shownPrefix(e)) {
-      e.value = e.value.slice(0, -1);
+      eraseBeforeCaret(e);
       e.armed = false;
       return;
     }
@@ -4861,6 +4942,10 @@ export function createLibrary(host: LibraryHost) {
     if (action.type === 'editor' && (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) {
       userGesture();
       pressKey(screen, action.index);
+      host.broadcast();
+    } else if (action.type === 'editor-text' && (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor && typeof action.text === 'string') {
+      userGesture();
+      insertText(screen, action.text);
       host.broadcast();
     } else if (action.type === 'crop') {
       // Glisser ou molette sur l'image d'un recadrage : l'écran décrit s'en charge, puis se redessine.
@@ -5099,22 +5184,27 @@ export function createLibrary(host: LibraryHost) {
   function viewEditor(e: Editor) {
     if (e.kind === 'choice') return { kind: e.kind, label: e.label, keys: e.choices, cursor: e.cursor, value: undefined as string | undefined };
     if (e.kind === 'number') return { kind: e.kind, label: e.label, keys: NUMPAD.map(keyLabel), cursor: e.cursor, value: String(e.value) };
-    const wordStart = e.value === '' || e.value.endsWith(' ');
-    const upper = e.prefixes ? e.shift : wordStart !== e.shift;
+    const upper = e.prefixes ? e.shift : atWordStart(e) !== e.shift;
     // Le préfixe affiché : sa touche cochée (son état se lit sans couleur).
     const keys = [...KEYBOARD.map((k) => (k.length === 1 ? (upper ? k : k.toLowerCase()) : keyLabel(k))), ...(e.prefixes ?? []).map((p, i) => (!e.prefixOff && i === (e.prefixAt ?? 0) ? `✓ ${p.label}` : p.label))];
     const prefix = shownPrefix(e);
     // Touche du préfixe affiché : allumée, comme Maj enclenché.
-    const on = e.prefixes && !e.prefixOff ? [KEYBOARD.length + (e.prefixAt ?? 0)] : [];
+    const on = e.prefixes && !e.prefixOff ? [KEYBOARD.length + (e.prefixAt ?? 0)] : e.emoji ? [KEYBOARD.indexOf('Emoji')] : [];
     // La touche Maj est repérée par son rang : son libellé suit la langue.
     return {
       kind: e.kind,
       label: e.label,
       keys,
       cursor: e.cursor,
-      value: e.value,
+      // Le texte de part et d'autre du point d'insertion.
+      value: beforeCaret(e),
+      after: afterCaret(e),
       shift: e.shift,
       shiftKey: KEYBOARD.indexOf('Maj'),
+      // Champ à préfixe (lien, identifiant) : la touche des emojis grisée, avec sa raison.
+      ...(e.prefixes ? { off: [{ index: KEYBOARD.indexOf('Emoji'), why: t('Pas d’emoji dans un lien') }] } : {}),
+      // Panneau des emojis, à côté des touches : ses touches suivent celles du clavier (rangs à partir de `base`).
+      ...(e.emoji ? { emoji: { base: keyCount(e), keys: [...KEYBOARD_EMOJIS, t('Lettres')] } } : {}),
       ...(prefix ? { prefix } : {}),
       ...(on.length ? { on, firstExtra: KEYBOARD.length } : {}),
       // Ligne réservée sous un champ à préfixe : l'avertissement du retour arrière n'y déplace pas le clavier.
@@ -5141,6 +5231,7 @@ export function createLibrary(host: LibraryHost) {
       // Champ à préfixe : le téléphone montre le préfixe ; ce qui revient est pris sans lui.
       const prefix = shownPrefix(e);
       e.value = prefix && value.startsWith(prefix) ? value.slice(prefix.length) : value;
+      delete e.at;
       e.typed = true;
       e.armed = false;
     } else if (e.kind === 'number') {
@@ -5380,6 +5471,8 @@ export function createLibrary(host: LibraryHost) {
         else if (step.startsWith('action:')) activateByLabel(step.slice(7));
         // Le téléphone remplit le clavier à l'écran (lien d'une playlist…), comme la télécommande.
         else if (step.startsWith('phone:')) remoteSet(step.slice(6));
+        // Texte arrivé sans touche (panneau des emojis de Windows, Win + point), comme la page le remet.
+        else if (step.startsWith('text:')) handleAction({ type: 'editor-text', text: step.slice(5) });
         else if (step.startsWith('hold:')) send('keyDown', step.slice(5));
         else if (step.startsWith('repeat:')) {
           // Bouton maintenu (« repeat:ShiftLeft:25 ») : un appui, puis les répétitions du clavier, puis le relâchement.
@@ -5527,6 +5620,8 @@ export function createLibrary(host: LibraryHost) {
     runSystemItem: (id: SystemItemId, back: () => void) => runSystemItem(id, back),
     /** L'application fournit-elle cette entrée (une borne dédiée n'a pas « Bureau Windows ») ? */
     hasSystemItem: (id: SystemItemId) => systemItems.has(id),
+    /** Ce que dit une entrée du menu système sous son nom (une porte qui la reprend ailleurs, Communauté). */
+    systemItemDetail: (id: SystemItemId) => systemItems.get(id)?.detail ?? '',
     openPrompt,
     remoteField,
     remoteSet,

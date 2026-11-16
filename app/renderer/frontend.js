@@ -1276,6 +1276,8 @@ function drawPlayfield(s) {
   // Écran plein par-dessus le menu (fiche, aide, confirmation, message) : il porte la marque
   // en tête, dans son flux (frontend.css, .brand) ; sinon, la marque du menu.
   let cover;
+  // Zone qui reçoit le texte sans touche (emojis de Windows) : renderLibrary la reprend si le clavier à l'écran est ouvert.
+  keepTextCatcher(false);
   if (s.phase === 'library' && s.library) {
     cover = renderLibrary(s.library);
   } else if (s.help) {

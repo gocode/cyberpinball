@@ -1059,6 +1059,75 @@ body.mouse .lib-row.pick:not(.selected):hover {
   color: var(--accent);
 }
 
+/* Touche indisponible ici (emojis dans un lien) : grisée, sa raison au survol. */
+.key.key-off {
+  color: var(--ink-faint);
+  border-color: var(--line-soft);
+  cursor: default;
+}
+
+/*
+ * Panneau des emojis : à côté des touches, en colonne de cinq ; sur un écran en hauteur (borne),
+ * en dessous, sur toute la largeur. Jamais par-dessus le texte saisi.
+ */
+.editor-keys.with-emoji {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2cqmin;
+  align-items: start;
+}
+
+.lib-editor:has(.with-emoji) .panel {
+  width: min(98%, 190cqmin);
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 6.4cqmin);
+  gap: 0.8cqmin;
+  padding-left: 2cqmin;
+  border-left: 1px solid var(--line-soft);
+}
+
+.emoji-grid .key.emoji {
+  padding: 0.9cqmin 0;
+  font-family: 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  font-size: 3.2cqmin;
+  line-height: 1.2;
+}
+
+.emoji-grid .key.emoji-close {
+  grid-column: 1 / -1;
+  font-size: 2.1cqmin;
+}
+
+@container (aspect-ratio < 1) {
+  .editor-keys.with-emoji {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .emoji-grid {
+    grid-template-columns: repeat(10, 1fr);
+    padding: 2cqmin 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--line-soft);
+  }
+}
+
+/* Le texte arrivé sans touche (panneau des emojis de Windows) : une zone au focus, invisible. */
+.text-catcher {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  resize: none;
+  pointer-events: none;
+}
+
 /* Bascule du début du lien (« Playlist », « Vidéo ») : plus large, l'allumée bordée. */
 .key.wide.mode {
   grid-column: span 3;
@@ -1486,7 +1555,7 @@ body.mouse .media-card[data-act]:hover {
 /* Ce que le fichier sait faire (« 2Screens », « VR ») : neutre, en retrait de l'état. */
 .badge.media-tag {
   color: var(--ink-muted);
-  border-color: var(--line);
+  border-color: var(--line-soft);
 }
 
 /* Date et site d'un fichier, sous sa popularité. */

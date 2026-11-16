@@ -469,4 +469,8 @@ export const messages: Record<string, string> = {
   'Viser': 'Aim',
   'Ensuite': 'Then',
   'en français': 'in French',
+
+  // app/src/library.ts : clavier à l'écran, panneau des emojis
+  'Pas d’emoji dans un lien': 'No emoji in a link',
+  'Lettres': 'Letters',
 };

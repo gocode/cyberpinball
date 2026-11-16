@@ -197,4 +197,12 @@ export const messages: Record<string, string> = {
   'Écrire': 'Write',
   'Il est en ligne : le message part tout de suite': 'They are online: the message leaves right away',
   'Hors ligne : le message partira à son retour': 'Offline: the message will leave when they are back',
+
+  // app/src/chat-menu.ts : supprimer mon message
+  'Supprimer ce message…': 'Delete this message…',
+  'Pour vous et pour {name}': 'For you and for {name}',
+  'Supprimer « {text} » ?': 'Delete “{text}”?',
+  'Le message disparaît ici et chez {name} dès que sa borne le reçoit. Rien ne le rétablit.': 'The message disappears here and on {name}’s cabinet as soon as it receives the deletion. Nothing brings it back.',
+  'Supprimer': 'Delete',
+  'Message supprimé': 'Message deleted',
 };

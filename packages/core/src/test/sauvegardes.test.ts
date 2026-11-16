@@ -414,7 +414,7 @@ test('un dossier des données hors de la racine (bac à sable) est sauvegardé e
   assert.ok((await prepareRestore(plan, home)).ok);
   assert.ok(applyPendingRestore(root, home, path.join(root, 'trash')));
   assert.equal(fs.readFileSync(path.join(home, 'cabinet.json'), 'utf8'), '{"configurations":[]}');
-  assert.ok(!fs.existsSync(path.join(root, 'data')), 'rien n’est posé dans <racine>\data');
+  assert.ok(!fs.existsSync(path.join(root, 'data')), 'rien n’est posé dans <racine>\\data');
 });
 
 test('un fichier qui ne peut être posé au démarrage reste en attente, puis est posé au nouvel essai, dans le même constat', async () => {

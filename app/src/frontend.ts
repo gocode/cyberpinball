@@ -470,6 +470,7 @@ import { createGuestMenu } from './guest-menu';
 import { collectionsPoster, createCollectionsItem, createCollectionsMenu, tableCollectionsAction } from './collections-menu';
 import { createFriendsMenu } from './friends-menu';
 import { createChatService } from './chat-service';
+import { deleteAccount } from './account-delete';
 import { createChatMenu } from './chat-menu';
 import { createProfileMenu } from './profile-menu';
 import { createCommunityMenu } from './community-menu';
@@ -2770,6 +2771,8 @@ const socialNet = createSocialNet({
   mode: socialMode,
   log: (line) => console.log(line),
   onChange: socialChanged,
+  // Un compte supprimé par son joueur (forget.ts) : ses conversations partent aussi.
+  onForget: (keys) => chatService.forget(keys),
   // Le pays par défaut des classements : la région de Windows (format régional, sinon langues préférées).
   systemLocale: () => [app.getSystemLocale(), ...app.getPreferredSystemLanguages()].find((l) => countryOfLocale(l)),
   // Un « J'aime » sur mon activité publique : la notification, regroupée, au menu.
@@ -3142,6 +3145,17 @@ const friendsMenu = createFriendsMenu({
   redraw: socialChanged,
   chat: { openThread: (key, back) => chatMenu.openThread(key, back), writeDetail: (key) => chatMenu.writeDetail(key) },
   profile: { open: (key, back) => profileMenu.openProfile(key, back) },
+  // Supprimer mon compte (account-delete.ts) : retours, avis d'oubli, fichiers, puis redémarrage avec une clé neuve.
+  account: {
+    forgetFeedback: () => feedbackService.forgetMe(),
+    erase: async (feedback) => {
+      const report = await deleteAccount({ forgetNetwork: () => socialNet.forgetMe(), stopChat: () => chatService.stop(), dataDir: loc.dataDir }, feedback);
+      // Comme après une restauration : plus rien ne réécrit le compte effacé (état encore en mémoire) jusqu'au redémarrage.
+      freezeWrites([loc.root ?? loc.dataDir, loc.dataDir], [path.join(loc.dataDir, 'logs')]);
+      return report;
+    },
+    relaunch: () => relaunchMenu(),
+  },
   contents: tableInventory,
   // Une table reçue arrive dans les données avant d'être rangée : la place se compte là.
   freeSpace: () => {
@@ -3253,6 +3267,10 @@ const communityMenu = createCommunityMenu({
   },
   rankings: { detail: () => rankingsMenu.detail(), open: (back) => rankingsMenu.open(back) },
   openSharing: (back) => library.runSystemItem('sharing', back),
+  // La même entrée que Menu système > Cyber Pinball, tout en bas de l'accueil : son « Retour » ramène à la Communauté.
+  ...(library.hasSystemItem('feedback')
+    ? { feedback: { detail: () => library.systemItemDetail('feedback'), open: (back: () => void) => library.runSystemItem('feedback', back) } }
+    : {}),
 });
 library.provideSystemItem('online-players', communityMenu.item);
 library.provideSystemItem('friends', friendsMenu.items.friends);

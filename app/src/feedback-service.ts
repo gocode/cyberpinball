@@ -135,6 +135,19 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
     return r;
   }
 
+  /**
+   * Compte supprimé : le service efface les propositions de cette clé et ses votes. À appeler
+   * avant d'effacer la clé (elle signe la demande). Hors ligne : `offline`, rien n'est effacé là-bas.
+   */
+  async function forgetMe(): Promise<Outcome> {
+    const r = await signed('/api/oubli', { op: 'forget' });
+    if (r.ok) {
+      list = list.filter((p) => !p.mine).map((p) => (p.voted ? { ...p, voted: false, votes: Math.max(0, p.votes - 1) } : p));
+      opts.changed();
+    }
+    return r;
+  }
+
   // ---------- Rapports privés ----------
 
   /** Scelle et envoie ; hors ligne, le rapport attend et repartira. Vrai : parti tout de suite. */
@@ -217,6 +230,7 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
     canWrite: () => Boolean(opts.key()),
     propose,
     vote,
+    forgetMe,
     sendReport,
     queuedCount: () => queued().length,
     flush,
@@ -261,6 +275,13 @@ function simulatedStore(seedFile: string, dataDir: string) {
         if (b.on) row.voters.add(b.pk);
         else row.voters.delete(b.pk);
         return { status: 200, json: { id: row.id, votes: row.voters.size, voted: b.on } };
+      }
+      if (method === 'POST' && route === '/api/oubli' && typeof body === 'string') {
+        const b = JSON.parse((JSON.parse(body) as { b: string }).b) as { pk: string };
+        const mine = rows.filter((r) => r.author === b.pk);
+        rows = rows.filter((r) => r.author !== b.pk);
+        for (const r of rows) r.voters.delete(b.pk);
+        return { status: 200, json: { propositions: mine.length } };
       }
       if (method === 'POST' && route === '/api/rapports' && body instanceof Uint8Array) {
         fs.mkdirSync(sent, { recursive: true });

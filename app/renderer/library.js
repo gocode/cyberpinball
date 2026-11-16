@@ -301,6 +301,7 @@ function renderLibrary(v) {
   o.append(body, v.commands ? appCommands(v.commands) : libEl('footer', 'lib-hint', v.hint));
 
   if (v.editor) o.append(renderEditor(v.editor));
+  keepTextCatcher(Boolean(v.editor && v.editor.kind !== 'choice'));
   if (v.busy) {
     const busy = libEl('div', 'lib-busy');
     busy.append(libEl('div', 'spinner'), libEl('div', '', v.busy));
@@ -1241,8 +1242,10 @@ function renderEditor(e) {
     const value = libEl('div', 'value');
     // Champ à préfixe (lien du Juke-box) : le début fixe, en retrait, puis ce qui est tapé.
     if (e.prefix) value.append(libEl('span', 'prefix', e.prefix));
+    // Le point d'insertion entre le texte avant lui et celui après (flèches, touches ◀ ▶).
     value.append(document.createTextNode(e.value));
     value.append(libEl('span', 'caret'));
+    if (e.after) value.append(document.createTextNode(e.after));
     panel.append(value);
     if (e.warning !== undefined) panel.append(libEl('div', 'editor-warning', e.warning));
   }
@@ -1252,15 +1255,86 @@ function renderEditor(e) {
     // Touches de préfixe, après le clavier (« Playlist », « Vidéo ») : celle du préfixe affiché est allumée.
     const mode = e.firstExtra !== undefined && i >= e.firstExtra ? ' mode' : '';
     const on = (i === e.shiftKey && e.shift) || (e.on ?? []).includes(i) ? ' on' : '';
-    const button = actOn(libEl('button', `key${wide}${mode}${i === e.cursor ? ' current' : ''}${on}`, k), { type: 'editor', index: i });
+    // Touche indisponible ici (emojis dans un lien) : grisée, sa raison au survol.
+    const off = (e.off ?? []).find((o) => o.index === i);
+    const button = actOn(libEl('button', `key${wide}${mode}${i === e.cursor ? ' current' : ''}${on}${off ? ' key-off' : ''}`, k), { type: 'editor', index: i });
+    if (off) button.title = off.why;
     keys.append(button);
   });
-  panel.append(keys);
+  // Panneau des emojis : à côté des touches (en dessous sur un écran en hauteur), jamais sur le texte.
+  if (e.emoji) {
+    const area = libEl('div', 'editor-keys with-emoji');
+    const emojis = libEl('div', 'emoji-grid');
+    e.emoji.keys.forEach((k, n) => {
+      const i = e.emoji.base + n;
+      const close = n === e.emoji.keys.length - 1;
+      emojis.append(actOn(libEl('button', `key ${close ? 'emoji-close' : 'emoji'}${i === e.cursor ? ' current' : ''}`, k), { type: 'editor', index: i }));
+    });
+    area.append(keys, emojis);
+    panel.append(area);
+  } else panel.append(keys);
   // Taper au téléphone : une vraie rangée sous les touches, jamais par-dessus.
   if (e.remote) panel.append(renderRemote(e.remote, true));
   box.append(panel);
   return box;
 }
+
+/**
+ * Zone de saisie invisible, tenue au focus tant que le clavier à l'écran est ouvert : elle reçoit
+ * le texte qui n'arrive par aucune touche. Novembre 2026 : le panneau des emojis de Windows
+ * (Win + point) s'ouvrait, mais un emoji cliqué n'allait nulle part, la page n'ayant aucun champ
+ * au focus ; de même pour une méthode de saisie d'une autre langue. Les touches, elles, restent
+ * traitées par le processus principal : celles qu'il traite sont annulées avant d'y écrire
+ * (preload.ts), seul le texte inséré sans touche y arrive, et il lui est remis aussitôt.
+ */
+let textCatcher;
+// Voulue après ce rendu : le focus n'est rendu qu'une fois le rendu fini (frontend.js la retire
+// avant chaque rendu, renderLibrary la reprend), sans quoi chaque emoji inséré ferait perdre
+// sa cible au panneau de Windows resté ouvert.
+let catcherWanted = false;
+function keepTextCatcher(open) {
+  catcherWanted = open;
+  if (!open) {
+    if (textCatcher) (window.requestAnimationFrame ?? setTimeout)(placeTextCatcher);
+    return;
+  }
+  if (!textCatcher) {
+    textCatcher = document.createElement('textarea');
+    textCatcher.className = 'text-catcher';
+    textCatcher.setAttribute('aria-hidden', 'true');
+    textCatcher.tabIndex = -1;
+    const flush = () => {
+      const text = textCatcher.value;
+      textCatcher.value = '';
+      if (text) window.cyber.act({ type: 'editor-text', text });
+    };
+    // Une composition en cours (méthode de saisie) n'est remise qu'une fois validée.
+    textCatcher.addEventListener('input', (event) => {
+      if (!event.isComposing) flush();
+    });
+    textCatcher.addEventListener('compositionend', flush);
+    document.body.append(textCatcher);
+  }
+  // Une fois le clavier à l'écran en place (le rendu le pose après renderLibrary).
+  (window.requestAnimationFrame ?? setTimeout)(placeTextCatcher);
+}
+function placeTextCatcher() {
+  if (!textCatcher) return;
+  const caret = document.querySelector('.lib-editor .caret');
+  if (!catcherWanted || !caret) {
+    if (document.activeElement === textCatcher) textCatcher.blur();
+    return;
+  }
+  // Posée sur le point d'insertion affiché : le panneau de Windows s'ouvre là, sous le texte.
+  const r = caret.getBoundingClientRect();
+  textCatcher.style.left = `${Math.round(r.left)}px`;
+  textCatcher.style.top = `${Math.round(r.bottom)}px`;
+  // Un clic sur une touche à l'écran prend le focus : il revient à la zone, sans faire défiler.
+  if (document.activeElement !== textCatcher) textCatcher.focus({ preventScroll: true });
+}
+document.addEventListener('mouseup', () => {
+  if (textCatcher && document.querySelector('.lib-editor')) textCatcher.focus({ preventScroll: true });
+});
 
 // Souris : le pointeur n'apparaît que lorsqu'on s'en sert (une borne n'en a pas).
 let mouseTimer;

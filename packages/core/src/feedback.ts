@@ -111,7 +111,9 @@ export interface SignedBody {
 
 export type FeedbackOp =
   | { op: 'propose'; kind: ProposalKind; title: string; text: string; lang: string }
-  | { op: 'vote'; id: string; on: boolean };
+  | { op: 'vote'; id: string; on: boolean }
+  /** Compte supprimé (forget.ts, RGPD) : le service efface ses propositions et ses votes. */
+  | { op: 'forget' };
 
 /** Corps signé d'une requête de la borne (POST /api/propositions, /api/votes). */
 export function signFeedback(key: PlayerKey, op: FeedbackOp, now = Date.now()): SignedBody {

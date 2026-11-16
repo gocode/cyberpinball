@@ -496,7 +496,7 @@ test('feuilles du menu : une classe n’est définie que dans une feuille (sauf 
   for (const sheet of sheets) {
     const css = fs.readFileSync(path.join(APP, 'renderer', sheet), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     for (const state of states) {
-      for (const m of css.matchAll(new RegExp(`\.${state}(?![\w-])`, 'g'))) {
+      for (const m of css.matchAll(new RegExp(`\\.${state}(?![\\w-])`, 'g'))) {
         if (!/html(:not\()?$/.test(css.slice(Math.max(0, m.index! - 10), m.index))) misused.push(`${sheet} : .${state} hors de html.${state}`);
       }
     }

@@ -461,6 +461,28 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     });
     sections.push({ title: t('Phrases'), kind: 'phrases', rows: phrases });
     actions.push({ label: t('Écrire un message…'), icon: 'keyboard', detail: t('Clavier à l’écran, ou votre téléphone appairé'), run: () => compose(key) });
+    // Mon message : je peux le supprimer, ici et chez l'ami (confirmé d'abord : rien ne le rétablit).
+    if (targetLine?.out && targetLine.text) {
+      const quoted = oneLine(targetLine.text).slice(0, 60);
+      actions.push({
+        label: t('Supprimer ce message…'),
+        key: 'delete',
+        icon: 'trash',
+        tone: 'warning',
+        detail: t('Pour vous et pour {name}', { name: plain }),
+        run: () =>
+          confirm(
+            t('Supprimer « {text} » ?', { text: quoted }),
+            t('Le message disparaît ici et chez {name} dès que sa borne le reçoit. Rien ne le rétablit.', { name: plain }),
+            t('Supprimer'),
+            () => {
+              if (chat.remove(key, targetLine.id)) flash = { text: t('Message supprimé'), tone: 'ok' };
+              openThread(key);
+            },
+            () => openReply(key, target),
+          ),
+      });
+    }
     actions.push({ label: t('Annuler'), icon: 'back', run: back });
     return { heading: t('Répondre à {name}', { name: plain }), icon: 'message', avatar: avatar(key, plain), sections, actions, back, listStart: t('envoyer') };
   }

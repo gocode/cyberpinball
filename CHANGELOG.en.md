@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Pinball FX (beta): "Install Pinball FX" finds Steam again; it was greyed out ("Neither Steam nor Epic on this PC") on a PC that had it. Cabinet schedule: the list of buttons that can wake the cabinet finally gives their names.
 - Windows desktop: on return, you are where you left off (the "Borne" (Cabinet) section on "Bureau Windows" (Windows desktop), the open screen, the selected table), no longer on the wheel. Also when the menu relaunches to turn the screen, or after changing the language or the DMD type. On a keyboard, the Ctrl and Shift of Ctrl+Shift+D no longer change collection or move the selection: on their own, pressed or held, they stay MagnaSave and flippers as before.
 - Installing a table: while a file is downloading, its card ("Table", "Fronton" (backglass)…) shows it itself, with the "Téléchargement en cours" (Downloading) badge, a green bar and the percentage, amount and rate. Likewise in the waiting list and in the game parts of an installed table. The message at the top of the screen stays.
 - Instant games (Community): open a live game to everyone, on the table of your choice, choosing the number of players (2 to 4). It shows up for every player online; anyone can join, friend or not, if they have the same version of the table, and it starts by itself for everyone as soon as it is full. Also from a table's sheet ("Instant game"). The host is told of each arrival.
@@ -16,6 +17,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Wizard: the interface buttons (previous, next, confirm, back) are set first, since they drive the menus and the rest of the wizard; the game buttons are then offered on the same buttons. "◀ Previous" goes back to the step before instead of going round in circles, and each screen bears its step's name ("Interface buttons · Button 2 of 4").
 - Wizard, new cabinet: the first screen "Are your buttons already right?" now shows the interface buttons (previous, next, confirm, back) instead of the game ones. "Keep these keys" then offers the game buttons on these same buttons; "Change my buttons" opens the interface mapping.
 - My avatar: taking a picture from the web (right-click, "Download this image") no longer closes Cyber Pinball. The crash came from any context menu clicked after an image or sound conversion (the ROM's music, for instance): fixed for all of those menus.
+- On-screen keyboard: the keyboard's left and right arrows, and the new ◀ ▶ keys, move the position in the text; fix a typo in the middle without erasing everything.
+- On-screen keyboard: a 😀 key opens an emoji panel next to the keys, without hiding the text. On a desktop, the Windows panel (Win + period) also types into the field.
+- Messages and rooms: delete your message (Start on it, then “Delete this message…” or “Delete my line…”); it also disappears for the other players.
+- Sharing and network: “Delete my account…” erases your account, here and on other players' cabinets (name, friends, messages, rooms, published scores, suggestions and votes), then Cyber Pinball starts again with a new account.
 
 ## 0.1.13
 

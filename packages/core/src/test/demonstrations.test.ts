@@ -327,7 +327,7 @@ test('une démonstration qui ferme ses fenêtres garde l’application par une f
 test('le script pré-enregistré par les démonstrations est dans la version de lecture de l’application', () => {
   const vbs = fs.readFileSync(path.join(REPO, 'app', 'src', 'vbs.ts'), 'utf8');
   const current = Number(/const FACTS_VERSION = (\d+);/.exec(vbs)?.[1]);
-  assert.ok(current > 0, 'FACTS_VERSION introuvable dans app\src\vbs.ts');
+  assert.ok(current > 0, 'FACTS_VERSION introuvable dans app\\src\\vbs.ts');
   const seeds = fs
     .readdirSync(DOCS)
     .filter((f) => /\.(ps1|cjs|js|mjs)$/.test(f))

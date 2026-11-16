@@ -63,6 +63,20 @@ export interface RoomLine {
   sig: string;
 }
 
+/**
+ * Retrait d'une ligne par son auteur (novembre 2026) : signé par la même clé que la ligne, relayé
+ * comme elle, et gardé aussi longtemps qu'elle (7 jours) pour qu'une borne qui la relaierait encore
+ * ne la fasse pas revenir. Personne d'autre ne peut retirer la ligne d'un joueur (la modération la masque).
+ */
+export interface RoomRetraction {
+  /** La ligne retirée. */
+  id: string;
+  room: RoomId;
+  key: string;
+  at: string;
+  sig: string;
+}
+
 export interface RoomHere {
   key: string;
   name: string;
@@ -89,6 +103,29 @@ export function cleanRoomText(raw: unknown): string | undefined {
 
 function lineText(l: Omit<RoomLine, 'sig'>): string {
   return JSON.stringify({ app: 'cyberpinball', kind: 'room', id: l.id, room: l.room, key: l.key, name: l.name, country: l.country ?? null, text: l.text, me: l.me === true, at: l.at });
+}
+
+function retractionText(r: Omit<RoomRetraction, 'sig'>): string {
+  return JSON.stringify({ app: 'cyberpinball', kind: 'room-del', id: r.id, room: r.room, key: r.key, at: r.at });
+}
+
+/** Le retrait signé de ma ligne `line` ; undefined si elle n'est pas à moi. */
+export function signRoomRetraction(me: { key: PlayerKey }, line: Pick<RoomLine, 'id' | 'room' | 'key'>, now = new Date()): RoomRetraction | undefined {
+  if (line.key !== me.key.publicKey) return undefined;
+  const base: Omit<RoomRetraction, 'sig'> = { id: line.id, room: line.room, key: line.key, at: now.toISOString() };
+  return { ...base, sig: signText(retractionText(base), me.key) };
+}
+
+/** Retrait reçu : forme, date et signature de l'auteur vérifiées ; plus vieux que 7 jours ou du futur : refusé. */
+export function verifyRoomRetraction(raw: unknown, now = new Date()): RoomRetraction | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  if (!isId(r.id) || !isRoomId(r.room) || !isPlayerPublicKey(r.key) || !isIso(r.at) || typeof r.sig !== 'string' || r.sig.length > 200) return undefined;
+  const at = Date.parse(r.at);
+  if (at > now.getTime() + FUTURE_MS || now.getTime() - at > ROOM_KEEP_DAYS * DAY) return undefined;
+  const d: RoomRetraction = { id: r.id, room: r.room, key: r.key, at: r.at, sig: r.sig };
+  const { sig, ...base } = d;
+  return verifyText(retractionText(base), sig, d.key) ? d : undefined;
 }
 
 function hereText(h: Omit<RoomHere, 'sig' | 'avatar' | 'asig'>): string {
@@ -159,6 +196,8 @@ export interface RoomsState {
   /** Phrases préparées d'« Écrire dans le salon », dans l'ordre ; absent : celles d'origine (DEFAULT_PHRASES). */
   phrases?: string[];
   lines: RoomLine[];
+  /** Lignes retirées par leur auteur, 7 jours (RoomRetraction) ; absent : aucune. */
+  retracted?: RoomRetraction[];
 }
 
 // ---------------------------------------------------------------------------
@@ -225,6 +264,10 @@ export function loadRooms(dataDir: string, now = new Date()): RoomsState {
     const r = l as Record<string, unknown>;
     return !!r && typeof r === 'object' && isId(r.id) && isRoomId(r.room) && isPlayerPublicKey(r.key) && typeof r.name === 'string' && typeof r.text === 'string' && isIso(r.at) && typeof r.sig === 'string';
   });
+  const retracted = (Array.isArray(s.retracted) ? s.retracted : []).filter((d): d is RoomRetraction => {
+    const r = d as Record<string, unknown>;
+    return !!r && typeof r === 'object' && isId(r.id) && isRoomId(r.room) && isPlayerPublicKey(r.key) && isIso(r.at) && typeof r.sig === 'string';
+  });
   return tidyRooms(
     {
       version: 1,
@@ -238,6 +281,7 @@ export function loadRooms(dataDir: string, now = new Date()): RoomsState {
       // Fichier abîmé ou écrit à la main : chaque phrase relue comme une ligne, la liste bornée.
       ...(phrases ? { phrases } : {}),
       lines,
+      ...(retracted.length ? { retracted } : {}),
     },
     now,
   );
@@ -247,9 +291,14 @@ export function saveRooms(dataDir: string, state: RoomsState): void {
   writeFileAtomic(roomsFile(dataDir), JSON.stringify(state));
 }
 
-/** Ménage : 7 jours de lignes, 300 par salon, 60 salons au plus (les plus récemment actifs). */
+/** Ménage : 7 jours de lignes, 300 par salon, 60 salons au plus (les plus récemment actifs) ; 7 jours de retraits. */
 export function tidyRooms(s: RoomsState, now = new Date()): RoomsState {
   const limit = now.getTime() - ROOM_KEEP_DAYS * DAY;
+  if (s.retracted?.some((d) => Date.parse(d.at) < limit)) {
+    const retracted = s.retracted.filter((d) => Date.parse(d.at) >= limit);
+    const { retracted: _, ...rest } = s;
+    s = retracted.length ? { ...rest, retracted } : rest;
+  }
   const byRoom = new Map<RoomId, RoomLine[]>();
   for (const l of s.lines) {
     if (Date.parse(l.at) < limit) continue;
@@ -282,7 +331,8 @@ export function roomLimit(lines: readonly RoomLine[], line: Pick<RoomLine, 'key'
  * leur auteur sont gardées ; rend celles-là, à relayer. Les miennes passent par le même chemin.
  */
 export function mergeRoomLines(s: RoomsState, lines: readonly RoomLine[], now = new Date()): { state: RoomsState; fresh: RoomLine[] } {
-  const known = new Set(s.lines.map((l) => l.id));
+  // Une ligne retirée par son auteur ne revient pas, même relayée par une borne qui l'ignore encore.
+  const known = new Set([...s.lines.map((l) => l.id), ...(s.retracted ?? []).map((d) => d.id)]);
   const kept = [...s.lines];
   const fresh: RoomLine[] = [];
   for (const l of [...lines].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) {
@@ -293,6 +343,39 @@ export function mergeRoomLines(s: RoomsState, lines: readonly RoomLine[], now = 
   }
   if (!fresh.length) return { state: s, fresh };
   return { state: tidyRooms({ ...s, lines: kept }, now), fresh };
+}
+
+/**
+ * Retraits reçus, déjà vérifiés : chacun efface la ligne de son auteur (jamais celle d'un autre) et
+ * est gardé ; rend les nouveaux, à relayer, et les lignes effacées (pour redessiner).
+ */
+export function retractRoomLines(s: RoomsState, dels: readonly RoomRetraction[], now = new Date()): { state: RoomsState; fresh: RoomRetraction[]; removed: RoomLine[] } {
+  const known = new Set((s.retracted ?? []).map((d) => d.id));
+  const fresh: RoomRetraction[] = [];
+  const removed: RoomLine[] = [];
+  let lines = s.lines;
+  for (const d of dels) {
+    if (known.has(d.id)) continue;
+    const line = lines.find((l) => l.id === d.id);
+    // La ligne d'un autre joueur sous le même identifiant : le retrait n'y peut rien.
+    if (line && (line.key !== d.key || line.room !== d.room)) continue;
+    known.add(d.id);
+    fresh.push(d);
+    if (line) {
+      removed.push(line);
+      lines = lines.filter((l) => l !== line);
+    }
+  }
+  if (!fresh.length) return { state: s, fresh, removed };
+  return { state: tidyRooms({ ...s, lines, retracted: [...(s.retracted ?? []), ...fresh] }, now), fresh, removed };
+}
+
+/**
+ * Les retraits d'un salon (les 100 derniers), joints à l'historique demandé par une borne qui entre :
+ * tous, quelle que soit sa dernière ligne, car elle a pu garder une ligne retirée pendant son absence.
+ */
+export function roomRetractions(s: RoomsState, room: RoomId): RoomRetraction[] {
+  return (s.retracted ?? []).filter((d) => d.room === room).slice(-ROOM_BATCH);
 }
 
 /** Les lignes d'un salon, de la plus ancienne à la plus récente. */

@@ -21,23 +21,33 @@ function simulatedSteam(): string | undefined {
   return process.env.CYBERPINBALL_STEAM_SIMULE || undefined;
 }
 
+/**
+ * Dossier de Steam : celui que le registre de l'utilisateur donne (SteamPath), puis celui de la
+ * machine (InstallPath), puis l'emplacement par défaut ; le premier qui contient steam.exe. Une
+ * valeur du registre périmée (Steam déplacé) ne cache donc pas un Steam bien installé.
+ */
 function steamDir(): string | undefined {
   const simulated = simulatedSteam();
   if (simulated) return simulated;
-  try {
-    const user = hkcuValue('Software\Valve\Steam', 'SteamPath');
-    if (typeof user === 'string' && user.trim()) return path.normalize(user);
-    const machine = hklmValue('SOFTWARE\WOW6432Node\Valve\Steam', 'InstallPath');
-    if (typeof machine === 'string' && machine.trim()) return path.normalize(machine);
-  } catch {
-    // Registre illisible : pas de Steam connu.
-  }
-  return undefined;
+  const candidates: string[] = [];
+  const read = (get: () => unknown): void => {
+    try {
+      const value = get();
+      if (typeof value === 'string' && value.trim()) candidates.push(path.normalize(value.trim()));
+    } catch {
+      // Registre illisible : on passe au suivant.
+    }
+  };
+  read(() => hkcuValue('Software\\Valve\\Steam', 'SteamPath'));
+  read(() => hklmValue('SOFTWARE\\WOW6432Node\\Valve\\Steam', 'InstallPath'));
+  read(() => hklmValue('SOFTWARE\\Valve\\Steam', 'InstallPath'));
+  candidates.push(path.join(process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)', 'Steam'));
+  return candidates.find((dir) => fs.existsSync(path.join(dir, 'steam.exe'))) ?? candidates[0];
 }
 
 function epicDataDir(): string | undefined {
   if (simulatedSteam()) return undefined;
-  return path.join(process.env.ProgramData ?? 'C:\ProgramData', 'Epic', 'EpicGamesLauncher');
+  return path.join(process.env.ProgramData ?? 'C:\\ProgramData', 'Epic', 'EpicGamesLauncher');
 }
 
 export function detectPinballFx(): PinballFxInstall | undefined {

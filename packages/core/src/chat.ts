@@ -9,7 +9,10 @@
 //   reliées (renvoyé tant que l'accusé « chat-ok » n'est pas revenu), CHAT_PENDING_DAYS au plus ;
 // - « Reçu » quand la borne de l'ami l'a enregistré ; pas de « Lu » ;
 // - gardés sur cette borne seulement, 365 jours par défaut (30 jours, 1 an ou toujours) ;
-// - chaque message est signé par la clé de son auteur et vérifié à l'arrivée.
+// - chaque message est signé par la clé de son auteur et vérifié à l'arrivée ;
+// - l'auteur peut supprimer son message (novembre 2026) : un retrait signé (`del`) part comme un
+//   message, attend de même la borne de l'ami et y efface le message et ses réactions. Une borne
+//   d'avant le retrait ne l'accuse pas : il reste « en attente », puis est abandonné, sans rien montrer.
 //
 // Fichier : <données>\amis\messagerie.json (réglages et conversations).
 
@@ -71,6 +74,8 @@ export interface ChatLine {
   text?: string;
   /** Réaction posée sur un message (son id) ; `kind` null : réaction retirée. */
   react?: { target: string; kind: ChatReaction | null };
+  /** Retrait par son auteur du message `del` (son id) : jamais affiché, il efface sa cible chez l'ami. */
+  del?: string;
   /** Pour un message à moi : où il en est. */
   delivery?: ChatDelivery;
   /** Signature de l'auteur, gardée telle quelle pour pouvoir renvoyer le message. */
@@ -128,10 +133,11 @@ function parseLine(raw: unknown): ChatLine | undefined {
   const text = r.text === undefined ? undefined : cleanChatText(r.text);
   const re = r.react as Record<string, unknown> | undefined;
   const react = re && typeof re === 'object' && isChatId(re.target) && (re.kind === null || isReaction(re.kind)) ? { target: re.target, kind: re.kind as ChatReaction | null } : undefined;
-  if (!text === !react) return undefined;
+  const del = isChatId(r.del) ? r.del : undefined;
+  if ([text, react, del].filter(Boolean).length !== 1) return undefined;
   const delivery = r.delivery === 'pending' || r.delivery === 'received' || r.delivery === 'expired' ? r.delivery : undefined;
   const sig = typeof r.sig === 'string' && r.sig.length <= 200 ? r.sig : undefined;
-  return { id: r.id, at: r.at, out: r.out, ...(text ? { text } : {}), ...(react ? { react } : {}), ...(r.out && delivery ? { delivery } : {}), ...(sig ? { sig } : {}) };
+  return { id: r.id, at: r.at, out: r.out, ...(text ? { text } : {}), ...(react ? { react } : {}), ...(del ? { del } : {}), ...(r.out && delivery ? { delivery } : {}), ...(sig ? { sig } : {}) };
 }
 
 export function loadChat(dataDir: string): ChatState {
@@ -169,8 +175,9 @@ export function saveChat(dataDir: string, state: ChatState): void {
 // ---------------------------------------------------------------------------
 // Signature : l'auteur, le destinataire, l'identifiant, la date et le contenu.
 
-function lineText(from: string, to: string, line: Pick<ChatLine, 'id' | 'at' | 'text' | 'react'>): string {
-  return JSON.stringify({ app: 'cyberpinball', kind: 'chat', from, to, id: line.id, at: line.at, text: line.text ?? null, react: line.react ?? null });
+function lineText(from: string, to: string, line: Pick<ChatLine, 'id' | 'at' | 'text' | 'react' | 'del'>): string {
+  // `del` n'entre dans le texte signé que s'il est là : celui d'un message ou d'une réaction reste celui d'avant le retrait.
+  return JSON.stringify({ app: 'cyberpinball', kind: 'chat', from, to, id: line.id, at: line.at, text: line.text ?? null, react: line.react ?? null, ...(line.del ? { del: line.del } : {}) });
 }
 
 /** Ce qui voyage : la ligne sans ce qui ne regarde que l'auteur (sens, état). */
@@ -179,6 +186,7 @@ export interface ChatWire {
   at: string;
   text?: string;
   react?: { target: string; kind: ChatReaction | null };
+  del?: string;
   sig: string;
 }
 
@@ -203,8 +211,9 @@ export function parseChatMessage(m: Record<string, unknown>): ChatMessage | unde
         if (r.text !== undefined && text !== r.text) continue; // déjà nettoyé par l'auteur : sinon, la signature ne vaudrait pas
         const re = r.react as Record<string, unknown> | undefined;
         const react = re && typeof re === 'object' && isChatId(re.target) && (re.kind === null || isReaction(re.kind)) ? { target: re.target, kind: re.kind as ChatReaction | null } : undefined;
-        if (!text === !react) continue;
-        lines.push({ id: r.id, at: r.at, ...(text ? { text } : {}), ...(react ? { react } : {}), sig: r.sig });
+        const del = isChatId(r.del) ? r.del : undefined;
+        if ([text, react, del].filter(Boolean).length !== 1) continue;
+        lines.push({ id: r.id, at: r.at, ...(text ? { text } : {}), ...(react ? { react } : {}), ...(del ? { del } : {}), sig: r.sig });
       }
       return lines.length ? { t: 'chat', m: lines } : undefined;
     }
@@ -219,7 +228,7 @@ export function parseChatMessage(m: Record<string, unknown>): ChatMessage | unde
 
 /** La ligne prête à partir vers `to`. */
 export function toWire(line: ChatLine): ChatWire {
-  return { id: line.id, at: line.at, ...(line.text ? { text: line.text } : {}), ...(line.react ? { react: line.react } : {}), sig: line.sig ?? '' };
+  return { id: line.id, at: line.at, ...(line.text ? { text: line.text } : {}), ...(line.react ? { react: line.react } : {}), ...(line.del ? { del: line.del } : {}), sig: line.sig ?? '' };
 }
 
 /** Une ligne reçue de `from` (vérifiée par la clé de la connexion) ; undefined : signature fausse. */
@@ -227,7 +236,7 @@ export function verifyWire(wire: ChatWire, from: string, me: string, now = new D
   if (!verifyText(lineText(from, me, wire), wire.sig, from)) return undefined;
   // Une date dans le futur passerait devant tout le fil : ramenée à maintenant.
   const at = Date.parse(wire.at) > now.getTime() + 10 * 60_000 ? now.toISOString() : wire.at;
-  return { id: wire.id, at, out: false, ...(wire.text ? { text: wire.text } : {}), ...(wire.react ? { react: wire.react } : {}), sig: wire.sig };
+  return { id: wire.id, at, out: false, ...(wire.text ? { text: wire.text } : {}), ...(wire.react ? { react: wire.react } : {}), ...(wire.del ? { del: wire.del } : {}), sig: wire.sig };
 }
 
 // ---------------------------------------------------------------------------
@@ -238,13 +247,38 @@ const withConv = (s: ChatState, key: string, c: Conversation): ChatState => ({ .
 const newId = () => randomBytes(8).toString('hex');
 
 /** J'écris à `to` : la ligne signée, en attente jusqu'à l'accusé de sa borne. */
-export function writeLine(s: ChatState, me: PlayerKey, to: string, content: { text: string } | { react: { target: string; kind: ChatReaction | null } }, now = new Date()): { state: ChatState; line?: ChatLine } {
+export function writeLine(s: ChatState, me: PlayerKey, to: string, content: { text: string } | { react: { target: string; kind: ChatReaction | null } } | { del: string }, now = new Date()): { state: ChatState; line?: ChatLine } {
   const text = 'text' in content ? cleanChatText(content.text) : undefined;
   if ('text' in content && !text) return { state: s };
-  const base = { id: newId(), at: now.toISOString(), ...(text ? { text } : {}), ...('react' in content ? { react: content.react } : {}) };
+  const base = { id: newId(), at: now.toISOString(), ...(text ? { text } : {}), ...('react' in content ? { react: content.react } : {}), ...('del' in content ? { del: content.del } : {}) };
   const line: ChatLine = { ...base, out: true, delivery: 'pending', sig: signText(lineText(me.publicKey, to, base), me) };
   const c = conv(s, to);
   return { state: withConv(s, to, { ...c, lines: [...c.lines, line].slice(-CHAT_LINES_MAX) }), line };
+}
+
+/** Retire de la conversation le message `target` et toutes les réactions posées dessus. */
+function withoutLine(c: Conversation, target: string): Conversation {
+  const texts = threadLines(c);
+  const at = texts.findIndex((l) => l.id === target);
+  const lines = c.lines.filter((l) => l.id !== target && l.react?.target !== target);
+  if (lines.length === c.lines.length) return c;
+  // Un message à lui encore non lu : il ne compte plus parmi les non lus.
+  const unread = at >= 0 && !texts[at]!.out && at >= texts.length - c.unread ? c.unread - 1 : c.unread;
+  return { ...c, lines, unread: Math.max(0, unread) };
+}
+
+/**
+ * Je supprime mon message `target` : effacé ici avec ses réactions, et un retrait signé part vers
+ * sa borne (en attente comme un message, jusqu'à son accusé). Pas un message à moi : rien.
+ */
+export function deleteMine(s: ChatState, me: PlayerKey, to: string, target: string, now = new Date()): { state: ChatState; line?: ChatLine } {
+  const c = s.conversations[to];
+  const line = c?.lines.find((l) => l.id === target);
+  if (!c || !line?.out || !line.text) return { state: s };
+  // Abandonné (jamais remis) : rien à retirer chez lui. En attente, il a pu partir sans que l'accusé
+  // soit revenu : le retrait part quand même (une cible inconnue chez lui n'y fait rien).
+  if (line.delivery === 'expired') return { state: withConv(s, to, withoutLine(c, target)) };
+  return writeLine(withConv(s, to, withoutLine(c, target)), me, to, { del: target }, now);
 }
 
 /**
@@ -260,7 +294,13 @@ export function receiveLines(s: ChatState, from: string, lines: readonly ChatLin
   if (!fresh.length) return { state: s, ack, fresh };
   const all = [...c.lines, ...fresh].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).slice(-CHAT_LINES_MAX);
   const unread = c.unread + fresh.filter((l) => l.text).length;
-  return { state: withConv(s, from, { ...c, lines: all, unread }), ack, fresh };
+  // Ses retraits : chacun efface son message à lui (jamais un des miens) ; le retrait reste, pour reconnaître un renvoi.
+  let next: Conversation = { ...c, lines: all, unread };
+  for (const d of fresh) {
+    const target = d.del ? next.lines.find((l) => l.id === d.del) : undefined;
+    if (target && !target.out) next = withoutLine(next, target.id);
+  }
+  return { state: withConv(s, from, next), ack, fresh };
 }
 
 /** Accusé de la borne de `from` : ces messages à moi sont reçus. */

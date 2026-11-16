@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.14
 
+- Pinball FX (bêta) : « Installer Pinball FX » trouve de nouveau Steam ; il était grisé (« Ni Steam ni Epic sur ce PC ») sur un PC qui l’avait. Horaire de la borne : la liste des boutons qui peuvent réveiller la borne donne enfin leur nom.
 - Bureau Windows : au retour, vous êtes là où vous l'aviez quitté (la rubrique « Borne » sur « Bureau Windows », l'écran ouvert, la table sélectionnée), et non plus sur la roue. Aussi quand le menu se relance pour retourner l'écran, ou après un changement de langue ou de type de DMD. Au clavier, Ctrl et Maj de Ctrl+Maj+D ne changent plus de collection et ne déplacent plus la sélection : seuls, appuyés ou tenus, ils restent MagnaSave et flippers comme avant.
 - Installation d'une table : pendant qu'un fichier se télécharge, sa carte (« Table », « Fronton »…) le montre elle-même, avec le badge « Téléchargement en cours », une barre verte et le pourcentage, le volume et le débit. De même dans la liste d'attente et dans les parties du jeu d'une table installée. Le message en tête de l'écran reste.
 - Parties instantanées (Communauté) : ouvrez une partie en direct à tous, sur la table de votre choix, en choisissant le nombre de joueurs (2 à 4). Elle s'affiche chez tous les joueurs en ligne ; n'importe qui la rejoint, ami ou non, s'il a la même version de la table, et elle part d'elle-même pour tout le monde dès qu'elle est complète. Aussi depuis la fiche d'une table (« Partie instantanée »). L'hôte est prévenu de chaque arrivée.
@@ -18,6 +19,10 @@ son interface).
 - Assistant : les boutons de l'interface (précédent, suivant, valider, retour) se règlent d'abord, puisqu'ils pilotent les menus et toute la suite ; ceux du jeu sont ensuite proposés sur les mêmes boutons. « ◀ Précédent » revient à l'étape d'avant au lieu de tourner en rond, et chaque écran porte le nom de son étape (« Boutons de l'interface · Bouton 2 sur 4 »).
 - Assistant, borne neuve : le premier écran « Vos boutons sont-ils déjà les bons ? » montre maintenant les boutons de l'interface (précédent, suivant, valider, retour), et non plus ceux du jeu. « Garder ces touches » propose ensuite les boutons du jeu sur ces mêmes boutons ; « Modifier mes boutons » ouvre le relevé de l'interface.
 - Mon avatar : prendre une image sur le web (clic droit, « Télécharger cette image ») ne ferme plus Cyber Pinball. Le plantage venait de tout menu contextuel cliqué après une conversion d'image ou de son (musique de la ROM, par exemple) : corrigé pour tous ces menus.
+- Clavier à l'écran : les flèches gauche et droite du clavier, et les nouvelles touches ◀ ▶, déplacent la position dans le texte ; on corrige une faute au milieu sans tout effacer.
+- Clavier à l'écran : une touche 😀 ouvre un panneau d'emojis à côté des touches, sans cacher le texte. Au bureau, le panneau de Windows (Win + point) écrit aussi dans le champ.
+- Messages et salons : supprimez votre message (Start sur lui, puis « Supprimer ce message… » ou « Supprimer ma ligne… ») ; il disparaît aussi chez les autres joueurs.
+- Partage et réseau : « Supprimer mon compte… » efface votre compte, ici et chez les autres joueurs (nom, amis, messages, salons, scores publiés, propositions et votes), puis Cyber Pinball repart avec un compte neuf.
 
 ## 0.1.13
 

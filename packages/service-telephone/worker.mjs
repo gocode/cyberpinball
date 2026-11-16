@@ -372,6 +372,30 @@ async function vote(request, env, now) {
   return reply(200, { id: target, votes, voted: on });
 }
 
+/**
+ * Compte supprimé par son joueur (RGPD, droit à l'effacement) : ses propositions (et les votes qu'elles
+ * avaient) et ses votes partent. Une proposition d'un autre fusionnée dans l'une des siennes redevient
+ * visible seule. Signée par la clé effacée, comme un vote.
+ */
+async function forget(request, env, now) {
+  if (await limited(request, env)) return reply(429, { erreur: 'trop' });
+  const checked = await signedRequest(request, 'forget', now);
+  if (!checked.body) return reply(checked.status, { erreur: checked.why });
+  const { pk, t } = checked.body;
+  const db = env.RETOURS;
+  if (await seen(db, pk, t)) return reply(409, { erreur: 'rejeu' });
+  const propositions = await db.prepare('SELECT COUNT(*) AS n FROM propositions WHERE author = ?1').bind(pk).first('n');
+  const refused = await writeOnce(db, pk, t, [
+    ...markSeen(db, pk, t, now),
+    db.prepare('UPDATE propositions SET merged_into = NULL WHERE merged_into IN (SELECT id FROM propositions WHERE author = ?1)').bind(pk),
+    db.prepare('DELETE FROM votes WHERE proposition IN (SELECT id FROM propositions WHERE author = ?1)').bind(pk),
+    db.prepare('DELETE FROM propositions WHERE author = ?1').bind(pk),
+    db.prepare('DELETE FROM votes WHERE voter = ?1').bind(pk),
+  ]);
+  if (refused) return refused;
+  return reply(200, { propositions: propositions ?? 0 });
+}
+
 async function report(request, env, now) {
   if (await limited(request, env)) return reply(429, { erreur: 'trop' });
   if (Number(request.headers.get('Content-Length') ?? 0) > REPORT_MAX) return reply(413, { erreur: 'taille' });
@@ -514,7 +538,7 @@ async function admin(request, env, url, now) {
 /** Les routes des retours (/api/propositions, /api/votes, /api/rapports, /api/admin/…) ; undefined pour les autres. */
 async function retours(request, env, url, now) {
   const path = url.pathname;
-  const known = path === '/api/propositions' || path === '/api/votes' || path === '/api/rapports' || path.startsWith('/api/admin/');
+  const known = path === '/api/propositions' || path === '/api/votes' || path === '/api/oubli' || path === '/api/rapports' || path.startsWith('/api/admin/');
   if (!known) return undefined;
   if (!env.RETOURS) return reply(503, { erreur: 'indisponible' });
   try {
@@ -524,6 +548,7 @@ async function retours(request, env, url, now) {
       return request.method === 'POST' ? await propose(request, env, now) : reply(405, { erreur: 'méthode' });
     }
     if (request.method !== 'POST') return reply(405, { erreur: 'méthode' });
+    if (path === '/api/oubli') return await forget(request, env, now);
     return path === '/api/votes' ? await vote(request, env, now) : await report(request, env, now);
   } catch {
     // Rien n'est journalisé : ni la requête, ni l'erreur (qui pourrait citer un contenu).

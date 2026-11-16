@@ -98,9 +98,9 @@ const BNQ: EdidInfo = { manufacturer: 'BNQ', productCode: 0x7f53, serialNumber: 
  */
 export function secondDeskDisplays(): ObservedDisplay[] {
   return [
-    display('\\.\DISPLAY1', '', { x: 0, y: 0, width: 1920, height: 1080 }, AUO, '5&5e6f7a8b&0&UID4357'),
-    display('\\.\DISPLAY5', 'DELL P2422H', { x: 1920, y: 0, width: 1920, height: 1080 }, DEL, '8&1a2b3c4d&0&UID260'),
-    display('\\.\DISPLAY6', 'BenQ GW2480', { x: 3840, y: 0, width: 1920, height: 1080 }, BNQ, '8&1a2b3c4d&0&UID261'),
+    display('\\\\.\\DISPLAY1', '', { x: 0, y: 0, width: 1920, height: 1080 }, AUO, '5&5e6f7a8b&0&UID4357'),
+    display('\\\\.\\DISPLAY5', 'DELL P2422H', { x: 1920, y: 0, width: 1920, height: 1080 }, DEL, '8&1a2b3c4d&0&UID260'),
+    display('\\\\.\\DISPLAY6', 'BenQ GW2480', { x: 3840, y: 0, width: 1920, height: 1080 }, BNQ, '8&1a2b3c4d&0&UID261'),
   ];
 }
 
@@ -111,9 +111,9 @@ const DMD: EdidInfo = { manufacturer: 'HSD', productCode: 0x0b2c, serialNumber: 
 /** Borne typique : téléviseur 43″ sans numéro de série (playfield, principal), backglass 32″, écran DMD 12,3″. */
 export function cabinetDisplays(): ObservedDisplay[] {
   return [
-    display('\\.\DISPLAY1', 'SAMSUNG', { x: 0, y: 0, width: 3840, height: 2160 }, TV, '4&2f0e1c&0&UID4352'),
-    display('\\.\DISPLAY2', 'LG FULL HD', { x: 3840, y: 0, width: 1920, height: 1080 }, LG, '4&2f0e1c&0&UID4353'),
-    display('\\.\DISPLAY3', 'LCD 12.3', { x: 5760, y: 0, width: 1920, height: 720 }, DMD, '4&2f0e1c&0&UID4354'),
+    display('\\\\.\\DISPLAY1', 'SAMSUNG', { x: 0, y: 0, width: 3840, height: 2160 }, TV, '4&2f0e1c&0&UID4352'),
+    display('\\\\.\\DISPLAY2', 'LG FULL HD', { x: 3840, y: 0, width: 1920, height: 1080 }, LG, '4&2f0e1c&0&UID4353'),
+    display('\\\\.\\DISPLAY3', 'LCD 12.3', { x: 5760, y: 0, width: 1920, height: 720 }, DMD, '4&2f0e1c&0&UID4354'),
   ];
 }
 
