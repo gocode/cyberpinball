@@ -13,6 +13,7 @@ import { t } from './i18n';
 import type { ObservedUsbDevice } from './model';
 import type { SyncFinding } from './sync';
 import type { VpxSetting } from './vpx';
+import { vpxDmdServerSettings } from './dmdserver';
 
 export type HardwareDmdModel = 'ZeDMD' | 'PIN2DMD' | 'Pixelcade';
 
@@ -109,6 +110,11 @@ export interface HardwareDmdSetup {
    * touchées ; l'adresse reste gardée quand on l'éteint.
    */
   zedmdWifi?: { enabled: boolean; address: string };
+  /**
+   * « Image du menu » (bêta) : le DMD réel montre aussi le DMD du menu, par dmdserver (dmdserver.ts).
+   * Absent : jamais réglé, [Plugin.DMDUtil] DMDServer reste tel quel ; false : écrit à 0.
+   */
+  menu?: boolean;
 }
 
 export function hardwareDmdChoice(setup: HardwareDmdSetup | undefined, model: HardwareDmdModel): HardwareDmdChoice {
@@ -198,16 +204,26 @@ export interface VpxDmdPlan {
 const DMDUTIL = 'Plugin.DMDUtil';
 
 /** Clés de [Plugin.DMDUtil] que Cyber Pinball peut écrire. */
-export const VPX_DMD_OWNED_KEYS = ['Enable', ...HARDWARE_DMD_MODELS, 'ZeDMDWiFiEnabled', 'ZeDMDWiFiAddr'];
+export const VPX_DMD_OWNED_KEYS = ['Enable', ...HARDWARE_DMD_MODELS, 'ZeDMDWiFiEnabled', 'ZeDMDWiFiAddr', 'DMDServer', 'DMDServerAddr', 'DMDServerPort'];
 
 /**
  * En automatique, sans DMD réel, rien n'est écrit : DMDUtil reste tel que VPX ou l'utilisateur
  * l'a laissé. « Oui » et « Non » s'écrivent toujours. Le port n'est pas fixé : DMDUtil le cherche
  * lui-même parmi les ports série.
+ * server : dmdserver tient le DMD et répond (image du menu) ; VPX lui envoie alors ses images au lieu
+ * d'ouvrir le matériel. Sinon, VPX ouvre le DMD lui-même, comme sans l'image du menu.
  */
-export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmdSetup): VpxDmdPlan {
+export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmdSetup, server = false): VpxDmdPlan {
   const detected = detectHardwareDmds(devices);
   const findings: SyncFinding[] = [];
+  if (server) {
+    findings.push({ severity: 'info', message: t('DMD réel : dmdserver tient l’afficheur (image du menu, bêta) ; VPX lui envoie ses images pendant les parties.') });
+    for (const d of detected.filter((x) => hardwareDmdChoice(setup, x.model) !== 'off')) {
+      const driver = hardwareDmdDriverProblem(d);
+      if (driver) findings.push({ severity: 'warning', message: driver });
+    }
+    return { detected, settings: vpxDmdServerSettings(), findings };
+  }
   const values: VpxSetting[] = [];
   for (const m of HARDWARE_DMD_MODELS) {
     const choice = hardwareDmdChoice(setup, m);
@@ -220,6 +236,8 @@ export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmd
     values.push({ section: DMDUTIL, key: 'ZeDMDWiFiEnabled', value: wifi.enabled ? '1' : '0' });
     if (wifi.enabled) values.push({ section: DMDUTIL, key: 'ZeDMDWiFiAddr', value: wifi.address.trim() });
   }
+  // Image du menu réglée (oui ou non) mais serveur absent : VPX ouvre lui-même le DMD.
+  if (setup?.menu !== undefined) values.push({ section: DMDUTIL, key: 'DMDServer', value: '0' });
   const anyOn = values.some((s) => s.value === '1') || Boolean(wifi?.enabled);
   const settings: VpxSetting[] = anyOn ? [{ section: DMDUTIL, key: 'Enable', value: '1' }, ...values] : values;
 
@@ -258,11 +276,14 @@ export interface HardwareDmdFacts {
   problems: string[];
 }
 
-export function hardwareDmdFacts(devices: ObservedUsbDevice[], setup?: HardwareDmdSetup): HardwareDmdFacts {
+/** serverProblem : pourquoi le serveur du DMD ne peut pas tourner (app/src/dmd-server.ts), lu si « Image du menu » est demandée. */
+export function hardwareDmdFacts(devices: ObservedUsbDevice[], setup?: HardwareDmdSetup, serverProblem?: string): HardwareDmdFacts {
   const on = detectHardwareDmds(devices).filter((d) => hardwareDmdChoice(setup, d.model) !== 'off');
   const names = on.map((d) => hardwareDmdName(d));
   if (setup?.zedmdWifi?.enabled) names.push(t('ZeDMD en wifi ({address})', { address: setup.zedmdWifi.address }));
-  return { devices: names, problems: on.map((d) => hardwareDmdDriverProblem(d)).filter((p): p is string => Boolean(p)) };
+  const problems = on.map((d) => hardwareDmdDriverProblem(d)).filter((p): p is string => Boolean(p));
+  if (setup?.menu && names.length && serverProblem) problems.push(t('Image du menu sur le DMD réel : {problem}', { problem: serverProblem }));
+  return { devices: names, problems };
 }
 
 /** « ZeDMD (COM3) », « PIN2DMD HD » */

@@ -1,17 +1,35 @@
-// Service de l'adresse stable du téléphone (packages/core/src/remote-relay.ts) : un Worker
-// Cloudflare, à https://t.cyberpinball.com. Il ne fait que deux choses :
-// - garder, pour chaque borne, sa dernière déclaration (adresse locale chiffrée pour chacun de ses
-//   téléphones gardés, signée par la borne) : PUT /api/b/<id> l'écrit, GET /api/b/<id> la rend ;
-// - servir la page du raccourci (/b/<id>, public/index.html et page.js), qui déchiffre l'adresse sur
-//   le téléphone et y renvoie.
+// Service de t.cyberpinball.com : un Worker Cloudflare qui fait deux choses distinctes.
 //
-// Il ne lit rien : sans la clé d'un téléphone, une déclaration est illisible. Il ne liste rien : une
-// borne ne se trouve que par son identifiant, l'empreinte de sa clé publique. Il ne journalise ni
-// adresse IP ni contenu. Une écriture n'est acceptée que signée par la clé dont l'empreinte est
-// l'identifiant, datée à dix minutes près, et plus récente que la précédente (rejeu refusé).
+// 1. L'adresse stable du téléphone (packages/core/src/remote-relay.ts) :
+//    - garder, pour chaque borne, sa dernière déclaration (adresse locale chiffrée pour chacun de ses
+//      téléphones gardés, signée par la borne) : PUT /api/b/<id> l'écrit, GET /api/b/<id> la rend ;
+//    - servir la page du raccourci (/b/<id>, public/index.html et page.js), qui déchiffre l'adresse sur
+//      le téléphone et y renvoie.
+//    Il ne lit rien : sans la clé d'un téléphone, une déclaration est illisible. Il ne liste rien : une
+//    borne ne se trouve que par son identifiant, l'empreinte de sa clé publique. Une écriture n'est
+//    acceptée que signée par la clé dont l'empreinte est l'identifiant, datée à dix minutes près, et
+//    plus récente que la précédente (rejeu refusé).
 //
-// Liaisons (wrangler.toml) : ADRESSES (KV), ASSETS (public/), LIMITE (limite d'écritures par
-// adresse IP, facultative).
+// 2. Les retours des joueurs (base D1 « RETOURS », schema.sql), en deux circuits :
+//    - public : le tableau des propositions (bugs, améliorations, nouvelles fonctions) et leurs votes.
+//      GET /api/propositions les liste ; POST /api/propositions en publie une tout de suite (pas de
+//      validation préalable) ; POST /api/votes donne ou retire une voix. Chaque écriture est signée par
+//      la clé Ed25519 de la borne (protocole v1, RETOURS_PREFIX), datée à dix minutes près, jamais
+//      rejouée. Le service garde la clé publique de l'auteur et des votants, pour compter une voix par
+//      borne et limiter les propositions par jour, mais ne la rend jamais dans une réponse ;
+//    - privé : les rapports chiffrés (POST /api/rapports), des boîtes scellées binaires « CPR1 » que
+//      le service ne peut pas lire (seul l'administrateur a la clé) ; il ne garde que la boîte et sa
+//      date, sans auteur, et seulement les plus récentes.
+//    L'administrateur (requêtes /api/admin/…, signées par ADMIN_PUBLIC_KEY) masque, change le statut,
+//    répond, fusionne les doublons, et relève les rapports.
+//
+// Il ne journalise ni adresse IP ni contenu : l'adresse IP ne sert que de clé à la limite d'écritures.
+//
+// Liaisons (wrangler.toml) : ADRESSES (KV), ASSETS (public/), RETOURS (D1 ; sans elle, les routes
+// des retours répondent 503), LIMITE (limite d'écritures par adresse IP, facultative).
+// ADMIN_PUBLIC_KEY (variable, facultative) : clé publique d'administration en hexadécimal, qui
+// remplace la constante du même nom. Elle ne se règle que par le déploiement (wrangler.toml ou
+// tableau de bord Cloudflare) : les essais s'en servent pour signer avec une clé de test.
 
 export const ID = /^[A-Za-z0-9_-]{22}$/;
 /** Texte signé : ce préfixe, puis la déclaration. Le même que RELAY_SIGNED_PREFIX (remote-relay.ts). */
@@ -124,11 +142,402 @@ async function api(request, env, id, now) {
   return reply(204);
 }
 
+// ─── Retours des joueurs ────────────────────────────────────────────────────────────────────────
+
+/** Texte signé par une borne : ce préfixe, puis le champ `b` (JSON) de la requête. */
+export const RETOURS_PREFIX = 'cyberpinball:retours:v1\n';
+/** Texte signé par l'administrateur : ce préfixe, puis méthode, chemin, date et SHA-256 du corps. */
+export const ADMIN_PREFIX = 'cyberpinball:retours-admin:v1\n';
+/** Clé publique Ed25519 de l'administrateur (hexadécimal). env.ADMIN_PUBLIC_KEY la remplace s'il est réglé. */
+export const ADMIN_PUBLIC_KEY = '9039d503e01125f2db79014217d9c044b354b2be1741ff8eb69383ee5af2d1e1';
+export const KINDS = ['bug', 'improvement', 'feature'];
+export const STATUSES = ['new', 'review', 'planned', 'progress', 'done', 'declined'];
+export const LANGS = ['fr', 'en'];
+export const TITLE_MIN = 4;
+export const TITLE_MAX = 90;
+export const TEXT_MAX = 2000;
+export const REPLY_MAX = 1000;
+/** Taille d'un rapport chiffré, en octets. */
+export const REPORT_MIN = 64;
+export const REPORT_MAX = 1_900_000;
+/** Rapports gardés : au-delà de ce nombre, ou de ce total d'octets, les plus anciens sont effacés. */
+export const REPORTS_KEPT = 2000;
+export const REPORTS_BYTES_MAX = 400_000_000;
+export const PROPOSALS_PER_DAY = 5;
+/** Taille du texte signé `b` d'une borne, en octets UTF-8. */
+export const SIGNED_MAX = 8192;
+/** Propositions rendues par la liste publique. */
+export const LIST_MAX = 500;
+const ADMIN_BODY_MAX = 65_536;
+const DAY_MS = 86_400_000;
+const PID = /^[A-Za-z0-9_-]{10}$/;
+const HEX64 = /^[0-9a-f]{64}$/;
+const CONTROL = /\p{Cc}/u;
+const CONTROL_BUT_NEWLINE = /[^\P{Cc}\n]/u;
+
+function fromB64(text, bytes) {
+  if (typeof text !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(text) || text.length % 4 === 1) return undefined;
+  let bin;
+  try {
+    bin = atob(text);
+  } catch {
+    return undefined;
+  }
+  const out = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  return bytes === undefined || out.length === bytes ? out : undefined;
+}
+
+function fromHex(hex) {
+  return Uint8Array.from(hex.match(/../g), (h) => parseInt(h, 16));
+}
+
+async function sha256hex(bytes) {
+  return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function ed25519(publicKey, signature, text) {
+  try {
+    const key = await crypto.subtle.importKey('raw', publicKey, { name: 'Ed25519' }, false, ['verify']);
+    return await crypto.subtle.verify({ name: 'Ed25519' }, key, signature, encoder.encode(text));
+  } catch {
+    return false;
+  }
+}
+
+/** Identifiant d'une proposition ou d'un rapport : 10 caractères base64url aléatoires. */
+function newId() {
+  return toB64u(crypto.getRandomValues(new Uint8Array(8))).slice(0, 10);
+}
+
+/** Titre : espaces (retours à la ligne compris) réduits à un seul, bords ôtés ; aucun autre caractère de contrôle. */
+export function cleanTitle(value) {
+  if (typeof value !== 'string') return undefined;
+  const s = value.normalize('NFC').replace(/\s+/g, ' ').trim();
+  return CONTROL.test(s) || s.length < TITLE_MIN || s.length > TITLE_MAX ? undefined : s;
+}
+
+/** Texte libre : retours à la ligne permis (\r\n ramené à \n), bords ôtés ; tout autre caractère de contrôle refusé. */
+export function cleanText(value, max = TEXT_MAX) {
+  if (typeof value !== 'string') return undefined;
+  const s = value.normalize('NFC').replace(/\r\n?/g, '\n').trim();
+  return CONTROL_BUT_NEWLINE.test(s) || s.length > max ? undefined : s;
+}
+
+/** Lit le corps texte d'une requête, borné (undefined : trop long). */
+async function boundedText(request, max) {
+  if (Number(request.headers.get('Content-Length') ?? 0) > max) return undefined;
+  const text = await request.text();
+  return text.length > max ? undefined : text;
+}
+
+/**
+ * Vérifie une requête signée d'une borne : { b, s }, `b` le JSON { v: 1, op, pk, t, … }, `s` la
+ * signature Ed25519 (base64) de RETOURS_PREFIX + b par `pk`. Rend { body } ou { status, why }.
+ */
+export async function verifySigned(payload, op, now) {
+  if (!payload || typeof payload.b !== 'string' || typeof payload.s !== 'string') return { status: 400, why: 'forme' };
+  if (encoder.encode(payload.b).length > SIGNED_MAX) return { status: 413, why: 'taille' };
+  let body;
+  try {
+    body = JSON.parse(payload.b);
+  } catch {
+    return { status: 400, why: 'forme' };
+  }
+  const sig = fromB64(payload.s, 64);
+  if (!body || typeof body !== 'object' || body.v !== 1 || body.op !== op || typeof body.pk !== 'string' || !HEX64.test(body.pk) || !Number.isSafeInteger(body.t) || !sig) return { status: 400, why: 'forme' };
+  if (!(await ed25519(fromHex(body.pk), sig, RETOURS_PREFIX + payload.b))) return { status: 403, why: 'signature' };
+  if (Math.abs(body.t - now) > CLOCK_SKEW_MS) return { status: 422, why: 'date' };
+  return { body };
+}
+
+async function signedRequest(request, op, now) {
+  const text = await boundedText(request, SIGNED_MAX * 3);
+  if (text === undefined) return { status: 413, why: 'taille' };
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    return { status: 400, why: 'forme' };
+  }
+  return verifySigned(payload, op, now);
+}
+
+// Rejeu : chaque (clé, date) acceptée est notée le temps où sa date reste admise (deux fois l'écart
+// d'horloge), pour toutes les écritures signées, votes retirés compris.
+const seen = async (db, pk, t) => (await db.prepare('SELECT 1 AS x FROM signatures WHERE pk = ?1 AND t = ?2').bind(pk, t).first()) !== null;
+const markSeen = (db, pk, t, now) => [db.prepare('DELETE FROM signatures WHERE t < ?1').bind(now - 2 * CLOCK_SKEW_MS), db.prepare('INSERT INTO signatures (pk, t) VALUES (?1, ?2)').bind(pk, t)];
+
+/** Écrit un lot ; s'il échoue parce que la même signature vient d'être notée, c'est un rejeu. */
+async function writeOnce(db, pk, t, statements) {
+  try {
+    await db.batch(statements);
+    return undefined;
+  } catch (e) {
+    if (await seen(db, pk, t)) return reply(409, { erreur: 'rejeu' });
+    throw e;
+  }
+}
+
+async function limited(request, env) {
+  if (!env.LIMITE) return false;
+  const { success } = await env.LIMITE.limit({ key: `retours:${request.headers.get('CF-Connecting-IP') ?? 'inconnue'}` });
+  return !success;
+}
+
+const SELECT_PROPOSITIONS = `SELECT p.id, p.kind, p.title, p.text, p.lang, p.status, p.at, p.updated, p.reply, p.hidden, p.merged_into,
+  (SELECT COUNT(*) FROM votes v WHERE v.proposition = p.id) AS n_votes,
+  (SELECT COUNT(*) FROM propositions m WHERE m.merged_into = p.id) AS n_merged,
+  p.author = ?1 AS is_mine,
+  EXISTS (SELECT 1 FROM votes w WHERE w.proposition = p.id AND w.voter = ?1) AS has_voted
+FROM propositions p`;
+
+/** Une proposition telle que rendue : jamais la clé de l'auteur ni celles des votants. */
+function present(row, { admin = false, pk } = {}) {
+  const out = { id: row.id, kind: row.kind, title: row.title, text: row.text, lang: row.lang, votes: row.n_votes, status: row.status, at: row.at, updated: row.updated };
+  if (row.reply !== null && row.reply !== undefined) out.reply = row.reply;
+  out.merged = row.n_merged;
+  if (pk) {
+    out.mine = !!row.is_mine;
+    out.voted = !!row.has_voted;
+  }
+  if (admin) {
+    out.hidden = !!row.hidden;
+    out.merged_into = row.merged_into ?? null;
+  }
+  return out;
+}
+
+async function listPropositions(env, url) {
+  const asked = url.searchParams.get('pk');
+  const pk = asked && HEX64.test(asked) ? asked : undefined;
+  const { results } = await env.RETOURS.prepare(`${SELECT_PROPOSITIONS} WHERE p.hidden = 0 AND p.merged_into IS NULL ORDER BY n_votes DESC, p.at DESC LIMIT ?2`).bind(pk ?? '', LIST_MAX).all();
+  return reply(200, { propositions: results.map((r) => present(r, { pk })) });
+}
+
+async function propose(request, env, now) {
+  if (await limited(request, env)) return reply(429, { erreur: 'trop' });
+  const checked = await signedRequest(request, 'propose', now);
+  if (!checked.body) return reply(checked.status, { erreur: checked.why });
+  const { pk, t } = checked.body;
+  const kind = KINDS.includes(checked.body.kind) ? checked.body.kind : undefined;
+  const lang = LANGS.includes(checked.body.lang) ? checked.body.lang : undefined;
+  const title = cleanTitle(checked.body.title);
+  const text = checked.body.text === undefined ? '' : cleanText(checked.body.text);
+  if (!kind || !lang || title === undefined || text === undefined) return reply(400, { erreur: 'forme' });
+  const db = env.RETOURS;
+  if (await seen(db, pk, t)) return reply(409, { erreur: 'rejeu' });
+  const count = await db.prepare('SELECT COUNT(*) AS n FROM propositions WHERE author = ?1 AND at > ?2').bind(pk, now - DAY_MS).first('n');
+  if (count >= PROPOSALS_PER_DAY) return reply(429, { erreur: 'quota' });
+  const id = newId();
+  // L'auteur vote pour sa proposition, dans la même transaction.
+  const refused = await writeOnce(db, pk, t, [
+    ...markSeen(db, pk, t, now),
+    db.prepare('INSERT INTO propositions (id, kind, title, text, lang, author, t, at, updated) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)').bind(id, kind, title, text, lang, pk, t, now),
+    db.prepare('INSERT INTO votes (proposition, voter, at) VALUES (?1, ?2, ?3)').bind(id, pk, t),
+  ]);
+  return refused ?? reply(201, { id });
+}
+
+/** La proposition visible qui reçoit les voix de `id` : elle-même, ou celle où elle a été fusionnée. */
+async function resolveVisible(db, id) {
+  for (let hops = 0; hops < 8; hops++) {
+    const row = await db.prepare('SELECT id, hidden, merged_into FROM propositions WHERE id = ?1').bind(id).first();
+    if (!row || row.hidden) return undefined;
+    if (!row.merged_into) return row.id;
+    id = row.merged_into;
+  }
+  return undefined;
+}
+
+async function vote(request, env, now) {
+  if (await limited(request, env)) return reply(429, { erreur: 'trop' });
+  const checked = await signedRequest(request, 'vote', now);
+  if (!checked.body) return reply(checked.status, { erreur: checked.why });
+  const { pk, t, id, on } = checked.body;
+  if (typeof id !== 'string' || !PID.test(id) || typeof on !== 'boolean') return reply(400, { erreur: 'forme' });
+  const db = env.RETOURS;
+  const target = await resolveVisible(db, id);
+  if (!target) return reply(404, { erreur: 'inconnue' });
+  if (await seen(db, pk, t)) return reply(409, { erreur: 'rejeu' });
+  const last = await db.prepare('SELECT at FROM votes WHERE proposition = ?1 AND voter = ?2').bind(target, pk).first('at');
+  if (last !== null && last !== undefined && t <= last) return reply(409, { erreur: 'rejeu' });
+  const refused = await writeOnce(db, pk, t, [
+    ...markSeen(db, pk, t, now),
+    on
+      ? db.prepare('INSERT INTO votes (proposition, voter, at) VALUES (?1, ?2, ?3) ON CONFLICT (proposition, voter) DO UPDATE SET at = excluded.at').bind(target, pk, t)
+      : db.prepare('DELETE FROM votes WHERE proposition = ?1 AND voter = ?2').bind(target, pk),
+  ]);
+  if (refused) return refused;
+  const votes = await db.prepare('SELECT COUNT(*) AS n FROM votes WHERE proposition = ?1').bind(target).first('n');
+  return reply(200, { id: target, votes, voted: on });
+}
+
+async function report(request, env, now) {
+  if (await limited(request, env)) return reply(429, { erreur: 'trop' });
+  if (Number(request.headers.get('Content-Length') ?? 0) > REPORT_MAX) return reply(413, { erreur: 'taille' });
+  const data = await request.arrayBuffer();
+  if (data.byteLength > REPORT_MAX) return reply(413, { erreur: 'taille' });
+  const head = new Uint8Array(data, 0, Math.min(4, data.byteLength));
+  if (data.byteLength < REPORT_MIN || String.fromCharCode(...head) !== 'CPR1') return reply(400, { erreur: 'forme' });
+  const db = env.RETOURS;
+  const id = newId();
+  // Les plus anciens partent au-delà de REPORTS_KEPT rapports ou de REPORTS_BYTES_MAX octets en tout.
+  await db.batch([
+    db.prepare('INSERT INTO rapports (id, at, size, data) VALUES (?1, ?2, ?3, ?4)').bind(id, now, data.byteLength, data),
+    db
+      .prepare('DELETE FROM rapports WHERE id IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER w AS n, SUM(size) OVER w AS total FROM rapports WINDOW w AS (ORDER BY at DESC, rowid DESC)) WHERE n > ?1 OR total > ?2)')
+      .bind(REPORTS_KEPT, REPORTS_BYTES_MAX),
+  ]);
+  return reply(201, { id });
+}
+
+/** Vérifie la signature d'administration (en-têtes X-Retours-Date et X-Retours-Signature) ; rend la raison d'un refus. */
+export async function verifyAdmin(request, env, raw, now) {
+  const date = request.headers.get('X-Retours-Date') ?? '';
+  const sig = fromB64(request.headers.get('X-Retours-Signature') ?? '', 64);
+  const keyHex = typeof env.ADMIN_PUBLIC_KEY === 'string' && env.ADMIN_PUBLIC_KEY ? env.ADMIN_PUBLIC_KEY.toLowerCase() : ADMIN_PUBLIC_KEY;
+  if (!/^\d{1,16}$/.test(date) || !sig || !HEX64.test(keyHex)) return 'signature';
+  const url = new URL(request.url);
+  const head = `${ADMIN_PREFIX}${request.method}\n${url.pathname}${url.search}\n${date}\n`;
+  const key = fromHex(keyHex);
+  // Corps : son SHA-256 ; sans corps, celui de la chaîne vide (une chaîne vide à sa place est aussi admise).
+  const good = (await ed25519(key, sig, head + (await sha256hex(raw)))) || (raw.byteLength === 0 && (await ed25519(key, sig, head)));
+  if (!good) return 'signature';
+  if (Math.abs(Number(date) - now) > CLOCK_SKEW_MS) return 'date';
+  return undefined;
+}
+
+async function adminEdit(env, id, raw, date, now) {
+  const db = env.RETOURS;
+  const row = await db.prepare('SELECT id, merged_into FROM propositions WHERE id = ?1').bind(id).first();
+  if (!row) return reply(404, { erreur: 'inconnue' });
+  let body;
+  try {
+    body = JSON.parse(new TextDecoder().decode(raw));
+  } catch {
+    return reply(400, { erreur: 'forme' });
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return reply(400, { erreur: 'forme' });
+  // Colonnes à changer : ?1 est l'identifiant, les valeurs suivent.
+  const sets = [];
+  const values = [];
+  const set = (column, value) => {
+    values.push(value);
+    sets.push(`${column} = ?${values.length + 1}`);
+  };
+  if (body.status !== undefined) {
+    if (!STATUSES.includes(body.status)) return reply(400, { erreur: 'forme' });
+    set('status', body.status);
+  }
+  if (body.hidden !== undefined) {
+    if (typeof body.hidden !== 'boolean') return reply(400, { erreur: 'forme' });
+    set('hidden', body.hidden ? 1 : 0);
+  }
+  if (body.kind !== undefined) {
+    if (!KINDS.includes(body.kind)) return reply(400, { erreur: 'forme' });
+    set('kind', body.kind);
+  }
+  if (body.title !== undefined) {
+    const title = cleanTitle(body.title);
+    if (title === undefined) return reply(400, { erreur: 'forme' });
+    set('title', title);
+  }
+  if (body.text !== undefined) {
+    const text = cleanText(body.text);
+    if (text === undefined) return reply(400, { erreur: 'forme' });
+    set('text', text);
+  }
+  if (body.reply !== undefined) {
+    const answer = cleanText(body.reply, REPLY_MAX);
+    if (answer === undefined) return reply(400, { erreur: 'forme' });
+    set('reply', answer === '' ? null : answer);
+  }
+  const statements = [];
+  if (body.mergeInto !== undefined) {
+    const target = typeof body.mergeInto === 'string' && PID.test(body.mergeInto) ? await db.prepare('SELECT id, merged_into FROM propositions WHERE id = ?1').bind(body.mergeInto).first() : null;
+    // Ni dans elle-même, ni dans une proposition déjà fusionnée, ni depuis une source déjà fusionnée.
+    if (!target || target.id === id || target.merged_into || row.merged_into) return reply(400, { erreur: 'fusion' });
+    statements.push(
+      // Les voix passent à la cible, sans double voix ; les propositions déjà fusionnées dans la source la suivent.
+      db.prepare('INSERT OR IGNORE INTO votes (proposition, voter, at) SELECT ?1, voter, at FROM votes WHERE proposition = ?2').bind(target.id, id),
+      db.prepare('DELETE FROM votes WHERE proposition = ?1').bind(id),
+      db.prepare('UPDATE propositions SET merged_into = ?1, updated = ?2 WHERE merged_into = ?3').bind(target.id, now, id),
+      db.prepare('UPDATE propositions SET merged_into = ?1 WHERE id = ?2').bind(target.id, id),
+      db.prepare('UPDATE propositions SET updated = ?1 WHERE id = ?2').bind(now, target.id),
+    );
+  }
+  set('updated', now);
+  statements.push(db.prepare(`UPDATE propositions SET ${sets.join(', ')} WHERE id = ?1`).bind(id, ...values));
+  const refused = await writeOnce(db, 'admin', date, [...markSeen(db, 'admin', date, now), ...statements]);
+  if (refused) return refused;
+  const after = await db.prepare(`${SELECT_PROPOSITIONS} WHERE p.id = ?2`).bind('', id).first();
+  return reply(200, present(after, { admin: true }));
+}
+
+async function admin(request, env, url, now) {
+  if (Number(request.headers.get('Content-Length') ?? 0) > ADMIN_BODY_MAX) return reply(413, { erreur: 'taille' });
+  const raw = await request.arrayBuffer();
+  if (raw.byteLength > ADMIN_BODY_MAX) return reply(413, { erreur: 'taille' });
+  const refused = await verifyAdmin(request, env, raw, now);
+  if (refused) return reply(403, { erreur: refused });
+  const date = Number(request.headers.get('X-Retours-Date'));
+  const db = env.RETOURS;
+  // Une écriture d'administration ne se rejoue pas plus que celle d'une borne.
+  if (request.method !== 'GET' && (await seen(db, 'admin', date))) return reply(409, { erreur: 'rejeu' });
+  const route = url.pathname.slice('/api/admin/'.length);
+  if (route === 'propositions') {
+    if (request.method !== 'GET') return reply(405, { erreur: 'méthode' });
+    const { results } = await db.prepare(`${SELECT_PROPOSITIONS} ORDER BY n_votes DESC, p.at DESC`).bind('').all();
+    return reply(200, { propositions: results.map((r) => present(r, { admin: true })) });
+  }
+  const edit = /^propositions\/([A-Za-z0-9_-]{10})$/.exec(route);
+  if (edit) return request.method === 'POST' ? adminEdit(env, edit[1], raw, date, now) : reply(405, { erreur: 'méthode' });
+  if (route === 'rapports') {
+    if (request.method !== 'GET') return reply(405, { erreur: 'méthode' });
+    const { results } = await db.prepare('SELECT id, at, size FROM rapports ORDER BY at DESC, rowid DESC').all();
+    return reply(200, { rapports: results.map((r) => ({ id: r.id, at: r.at, size: r.size })) });
+  }
+  const one = /^rapports\/([A-Za-z0-9_-]{10})$/.exec(route);
+  if (one && request.method === 'GET') {
+    // D1 rend un BLOB en tableau d'octets.
+    const data = await db.prepare('SELECT data FROM rapports WHERE id = ?1').bind(one[1]).first('data');
+    if (data === null || data === undefined) return reply(404, { erreur: 'inconnu' });
+    return new Response(new Uint8Array(data), { status: 200, headers: { ...API_HEADERS, 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="${one[1]}.cpr"` } });
+  }
+  if (one && request.method === 'DELETE') {
+    const again = await writeOnce(db, 'admin', date, [...markSeen(db, 'admin', date, now), db.prepare('DELETE FROM rapports WHERE id = ?1').bind(one[1])]);
+    return again ?? reply(204);
+  }
+  return one ? reply(405, { erreur: 'méthode' }) : reply(404, { erreur: 'inconnue' });
+}
+
+/** Les routes des retours (/api/propositions, /api/votes, /api/rapports, /api/admin/…) ; undefined pour les autres. */
+async function retours(request, env, url, now) {
+  const path = url.pathname;
+  const known = path === '/api/propositions' || path === '/api/votes' || path === '/api/rapports' || path.startsWith('/api/admin/');
+  if (!known) return undefined;
+  if (!env.RETOURS) return reply(503, { erreur: 'indisponible' });
+  try {
+    if (path.startsWith('/api/admin/')) return await admin(request, env, url, now);
+    if (path === '/api/propositions') {
+      if (request.method === 'GET') return await listPropositions(env, url);
+      return request.method === 'POST' ? await propose(request, env, now) : reply(405, { erreur: 'méthode' });
+    }
+    if (request.method !== 'POST') return reply(405, { erreur: 'méthode' });
+    return path === '/api/votes' ? await vote(request, env, now) : await report(request, env, now);
+  } catch {
+    // Rien n'est journalisé : ni la requête, ni l'erreur (qui pourrait citer un contenu).
+    return reply(500, { erreur: 'service' });
+  }
+}
+
 export default {
   async fetch(request, env, _ctx, now = Date.now()) {
     const url = new URL(request.url);
     const call = /^\/api\/b\/([^/]+)$/.exec(url.pathname);
     if (call) return ID.test(call[1]) ? api(request, env, call[1], now) : reply(404, { erreur: 'inconnue' });
+    const answered = await retours(request, env, url, now);
+    if (answered) return answered;
     // La page du raccourci d'une borne : la même pour toutes (page.js lit l'identifiant dans l'adresse).
     if (/^\/b\/[A-Za-z0-9_-]{22}\/?$/.test(url.pathname)) {
       const page = await env.ASSETS.fetch(new Request(new URL('/', url), { headers: request.headers }));

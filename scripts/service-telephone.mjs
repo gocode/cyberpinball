@@ -1,10 +1,14 @@
-// Mise en ligne du service de l'adresse stable du téléphone (packages/service-telephone), sur
-// Cloudflare Workers. Le compte est celui de `npx wrangler login` (gardé par wrangler dans le profil
-// de l'utilisateur, jamais dans le dépôt) ; rien ici n'est secret.
+// Mise en ligne du service de t.cyberpinball.com (packages/service-telephone : adresse stable du
+// téléphone et retours des joueurs), sur Cloudflare Workers. Le compte est celui de
+// `npx wrangler login` (gardé par wrangler dans le profil de l'utilisateur, jamais dans le dépôt) ;
+// rien ici n'est secret.
 //
 //   node scripts/service-telephone.mjs preparer   copie dans public/ le chiffrement et les icônes de la page du téléphone
 //   node scripts/service-telephone.mjs kv         crée l'espace KV « ADRESSES » et inscrit son identifiant dans wrangler.toml
-//   node scripts/service-telephone.mjs deployer   prépare, puis met le service en ligne (wrangler deploy)
+//   node scripts/service-telephone.mjs d1         crée la base D1 « cyberpinball-retours », inscrit son identifiant dans
+//                                                 wrangler.toml, puis lui applique schema.sql (rejouable)
+//   node scripts/service-telephone.mjs deployer   prépare, applique schema.sql à la base D1, puis met le service en ligne
+//                                                 (wrangler deploy)
 //
 // Les fichiers copiés ne sont pas suivis par git (packages/service-telephone/.gitignore) : la page
 // du service et celle de la borne partagent ainsi le même chiffrement, sans double à tenir.
@@ -30,6 +34,9 @@ function wrangler(args) {
 
 const toml = path.join(SERVICE_DIR, 'wrangler.toml');
 const PLACEHOLDER = 'A_REMPLIR_A_LA_PREMIERE_MISE_EN_LIGNE';
+/** Marqueur propre à la base D1, distinct de celui de l'espace KV : chaque commande ne remplit que le sien. */
+export const D1_PLACEHOLDER = 'A_REMPLIR_D1';
+export const D1_NAME = 'cyberpinball-retours';
 
 function createKv() {
   const text = fs.readFileSync(toml, 'utf8');
@@ -41,9 +48,34 @@ function createKv() {
   console.log(`Espace KV ADRESSES créé (${id}) et inscrit dans wrangler.toml.`);
 }
 
+/** Inscrit l'identifiant de la base D1 à la place de son marqueur (et de lui seul). */
+export function writeD1Id(text, out) {
+  const id = /database_id\s*[=:]\s*"([0-9a-f-]{36})"/.exec(out)?.[1];
+  if (!id) throw new Error(`identifiant de la base D1 introuvable dans la réponse de wrangler :\n${out}`);
+  return { id, text: text.replace(`database_id = "${D1_PLACEHOLDER}"`, `database_id = "${id}"`) };
+}
+
+/** Applique schema.sql à la base en ligne : rejouable (CREATE … IF NOT EXISTS). */
+function applySchema() {
+  process.stdout.write(wrangler(['d1', 'execute', D1_NAME, '--remote', '--file', 'schema.sql']));
+}
+
+function createD1() {
+  const text = fs.readFileSync(toml, 'utf8');
+  if (text.includes(D1_PLACEHOLDER)) {
+    const { id, text: next } = writeD1Id(text, wrangler(['d1', 'create', D1_NAME]));
+    fs.writeFileSync(toml, next);
+    console.log(`Base D1 ${D1_NAME} créée (${id}) et inscrite dans wrangler.toml.`);
+  } else console.log('Base D1 déjà inscrite dans wrangler.toml.');
+  applySchema();
+}
+
 function deploy() {
-  if (fs.readFileSync(toml, 'utf8').includes(PLACEHOLDER)) throw new Error('espace KV pas encore créé : node scripts/service-telephone.mjs kv');
+  const text = fs.readFileSync(toml, 'utf8');
+  if (text.includes(PLACEHOLDER)) throw new Error('espace KV pas encore créé : node scripts/service-telephone.mjs kv');
+  if (text.includes(D1_PLACEHOLDER)) throw new Error('base D1 des retours pas encore créée : node scripts/service-telephone.mjs d1');
   prepare();
+  applySchema();
   process.stdout.write(wrangler(['deploy']));
 }
 
@@ -51,9 +83,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const what = process.argv[2];
   if (what === 'preparer') prepare();
   else if (what === 'kv') createKv();
+  else if (what === 'd1') createD1();
   else if (what === 'deployer') deploy();
   else {
-    console.error('Usage : node scripts/service-telephone.mjs preparer | kv | deployer');
+    console.error('Usage : node scripts/service-telephone.mjs preparer | kv | d1 | deployer');
     process.exit(2);
   }
 }

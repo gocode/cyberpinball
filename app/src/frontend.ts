@@ -362,6 +362,8 @@ import {
   type IntroFiles,
   volumeOutputIds,
   diagnoseVpxFailure,
+  crashSignature,
+  vpxExitName,
   readVpxScript as readTableScript,
   readVpxGlass,
   type VpxTableGeometry,
@@ -417,10 +419,13 @@ import { armRecording, type RecordingOutcome, type RecordingRun, type RecordingS
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
 import { watchGameLoad, type GameLoadWatch } from './game-load';
 import { createLibrary, type ActionShortcut, type Row, type SystemItem, type UiAction } from './library';
+import { createFeedbackService } from './feedback-service';
+import { onAppCrash } from './uncaught';
 import { createMenuDmd } from './menu-dmd';
 import { cachedScript } from './vbs';
 import { mediaFrame, prepareDressing } from './fulldmd';
 import { LiveDmd, type LiveDmdAnimationHandle } from './live-dmd';
+import { applyMenuDmdServer, menuDmdServer } from './dmd-server';
 import { DmdWheels } from './dmd-wheel';
 import { createConverter } from './media-convert';
 import { RomMusic } from './rom-music';
@@ -718,6 +723,12 @@ type Phase = MenuPhase;
 interface Message {
   title: string;
   lines: string[];
+  /**
+   * Partie échouée : un flipper ouvre le formulaire des retours, ce problème rappelé (Avis et
+   * propositions, feedback-menu.ts) ; `consent` : la question des rapports automatiques est à poser
+   * en quittant (premier plantage).
+   */
+  report?: { about: string; table: string; signature: string; consent?: boolean };
   /** Ce que fait Start sur ce message. */
   action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'interface' | 'otherFrontend' | 'journey' | 'replay' | 'live' | 'power' | 'orientation';
   /**
@@ -1212,7 +1223,19 @@ const phoneRemote = createPhoneRemote({
   firewall: async () => socialFirewall.state() ?? (await socialFirewall.check()),
   fromSources: !app.isPackaged,
 });
+// Retours des joueurs (feedback-service.ts) : propositions publiques, votes, rapports privés chiffrés.
+// La clé du joueur (réseau des amis) signe les propositions et les votes : une voix par borne.
+const feedbackService = createFeedbackService({
+  dataDir: loc.dataDir,
+  key: () => socialNet.state().key,
+  ...(process.env.CYBERPINBALL_RELAIS ? { origin: process.env.CYBERPINBALL_RELAIS } : {}),
+  // Essais : un service en mémoire (rien ne sort sur le vrai réseau), avec les propositions de départ du fichier donné.
+  ...(process.env.CYBERPINBALL_RETOURS_SIMULES !== undefined || process.env.CYBERPINBALL_RESEAU === 'simule' || OFFSCREEN ? { simulated: process.env.CYBERPINBALL_RETOURS_SIMULES ?? '' } : {}),
+  changed: () => library.feedback?.changed(),
+  log: (line) => console.log(line),
+});
 const library = createLibrary({
+  feedbackService,
   romMusic: () => romMusic,
   vrNetwork: () => vrNetworkFacts(),
   root: loc.root,
@@ -1746,6 +1769,10 @@ function remoteEntries(media = false): MenuEntries {
   if (!message || message.action === 'power') return none(message?.title ?? '', t('Rien à faire ici depuis le téléphone.'));
   const items: MenuEntry[] = [];
   if (message.action && guest.allows(MESSAGE_DOORS[message.action])) items.push({ ...toRemoteEntry({ label: t('Valider (Start)'), detail: message.lines[0], icon: 'start' }), pick: () => remotePress('confirm') });
+  if (message.report && library.feedback) {
+    const r = message.report;
+    items.push({ ...toRemoteEntry({ label: t('Signaler ce problème'), detail: t('Avis et propositions, ce problème rappelé'), icon: 'alert' }), pick: () => library.feedback?.openForm({ about: r.about, table: r.table, signature: r.signature, attach: true }, () => library.leave()) });
+  }
   items.push({ ...toRemoteEntry({ label: t('Fermer (Exit)'), icon: 'close', back: true }), pick: () => remotePress('exit') });
   return { kind: 'screen', title: message.title, items, current: -1 };
 }
@@ -2743,6 +2770,11 @@ const socialNet = createSocialNet({
     }));
   },
 });
+// Plantages de Cyber Pinball (uncaught.ts) : rapport automatique avec l’accord donné au premier plantage
+// de VPX (la question n’est jamais posée pour eux : une exception ne montre rien à l’écran). Les rapports
+// restés en attente repartent peu après le démarrage, puis toutes les 30 minutes.
+onAppCrash((c) => library.feedback?.crashed(crashSignature('app', c.code, c.detail), undefined, c.about));
+feedbackService.watch();
 // Messagerie entre amis (Menu système > Amis > Messages) : un message pour un ami absent attend et
 // part à son retour ; l'arrivée d'un message passe par les notifications (menu-notices.ts).
 /** Le DMD annonce un message arrivé au menu pendant ce temps (« MESSAGE DE NOVA »), puis reprend son affichage. */
@@ -5503,6 +5535,8 @@ export function startFrontend(): void {
   const cabinet = loadCabinet(loc.dataDir);
   menuDmdKind = cabinet && !choose ? dmdKindOf(cabinet) : undefined;
   menuConfiguration = cabinet && !choose ? cabinet.id : undefined;
+  // DMD réel dans le menu (bêta) : dmdserver lancé caché si « Image du menu : oui » et un DMD est allumé.
+  applyMenuDmdServer();
   // Rotation d'après l'écran du playfield tel que Windows le décrit maintenant : une
   // orientation changée hors de l'assistant fait aussi tourner le menu.
   rotation = menuRotation(choose ? undefined : cabinet, choose ? undefined : assignments.playfield);
@@ -5573,6 +5607,8 @@ export function startFrontend(): void {
   }
   app.on('before-quit', () => {
     closing = true;
+    // dmdserver ne survit pas au menu : VPX lancé ailleurs retrouverait le DMD en direct.
+    menuDmdServer().stop();
     headset?.dispose();
     ovrProbe.set(false);
     // Le téléphone apprend que Cyber Pinball se ferme ; plus rien n'écoute.
@@ -6138,7 +6174,19 @@ function handleKey(input: Input, fromPhone = false): boolean {
     case 'jukebox':
       return jukeboxPlayer.handleKey(input);
     case 'message':
+      // Partie échouée : un flipper ouvre le formulaire des retours, ce problème déjà rappelé.
+      if (state.message?.report && library.feedback && (is(KEYS.next) || is(KEYS.previous))) {
+        const r = state.message.report;
+        library.feedback.openForm({ about: r.about, table: r.table, signature: r.signature, attach: true }, () => library.leave());
+        return true;
+      }
       if (!is(KEYS.confirm) && !is(KEYS.exit)) return false;
+      // Premier plantage : en quittant l'écran, la question des rapports automatiques (une seule fois).
+      if (is(KEYS.exit) && state.message?.report?.consent && library.feedback?.consent() === 'ask') {
+        const r = state.message.report;
+        library.feedback.askConsent(r.signature, r.table, r.about, () => library.leave());
+        return true;
+      }
       // Mode invité, action du message fermée : Start ne la fait pas ; Exit ferme le message sans rien changer.
       if (state.message?.action && !guest.allows(MESSAGE_DOORS[state.message.action])) {
         if (is(KEYS.confirm)) guest.knock(MESSAGE_DOORS[state.message.action]);
@@ -6536,6 +6584,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // chargement jusqu'à ce que sa fenêtre de jeu s'affiche, puis le fond de partie de chaque
   // écran (viewFor). Celui que VPX n'occupe pas (topper, backglass sans .directb2s) reste couvert.
   playing = table;
+  // Le DMD réel passe à VPX : le menu lâche dmdserver avant que VPX ne s'y connecte.
+  menuDmdServer().pause();
   realign = simulated === undefined ? realignPlan(assignments) : undefined;
   hideTaskbars();
   settleScreens('game');
@@ -6667,7 +6717,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const vpxEnv = { ...(roomEnv ? { env: roomEnv } : {}), ...(vrGame?.tableIni ? { tableIni: vrGame.tableIni.file } : {}) };
   const game =
     simulated !== undefined
-      ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}) })
+      ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}), ...(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE ? { crashCode: Number(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE) } : {}) })
       : launchVpx({ exe: install.exe, ini: vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), ...vpxEnv, onVr, onPlaying, onForeground, onWindows });
   // Arrêt demandé par Cyber Pinball (Exit, casque perdu, partie entre amis…) : une fin voulue, pas un plantage.
   let gameStopAsked = false;
@@ -6812,6 +6862,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   stopWatchOccupied();
   socialNet.setPresence({ status: 'menu', since: new Date().toISOString() });
   playing = undefined;
+  // Le menu reprend le DMD réel ; un DMD branché ou débranché pendant la partie est pris en compte.
+  menuDmdServer().resume();
+  applyMenuDmdServer();
   dressing = undefined;
   displayMode = false;
 
@@ -6881,7 +6934,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     // Family arrêtés sur sa fenêtre d'options n'y avaient rien laissé.
     console.log(`Partie (${table.id}) : échec (${result.failure ?? 'inconnu'}) : ${result.message ?? ''}`); // i18n-ignore : journal
     const repaired = result.failure === 'dialog' && result.message ? repairScriptStop(table, result.message) : undefined;
-    state = { ...state, phase: 'message', message: explain(result, table, repaired, Boolean(double)) };
+    const message = explain(result, table, repaired, Boolean(double));
+    // Plantage de VPX : le rapport automatique (avec l'accord), ou la question au premier plantage, en quittant l'écran.
+    if (result.failure === 'crash' && message.report && library.feedback?.crashed(message.report.signature, table.title, message.report.about)) message.report.consent = true;
+    state = { ...state, phase: 'message', message };
   }
   // Configuration de la borne changée juste avant la partie : VPX avait déjà les bons
   // écrans, le menu les reprend en redémarrant.
@@ -7272,7 +7328,7 @@ function explain(result: LaunchResult, table: TableEntry, repaired?: string, liv
     if (live) lines.push(t('Partie entre amis : les autres continuent ; votre score compte jusqu’à l’arrêt.'));
     lines.push(...result.notices);
     if (result.logTail.length) lines.push(t('Fin du journal de VPX :'), ...result.logTail.slice(-5));
-    return { title: known.title, lines, action: live ? 'live' : 'replay', table: table.file };
+    return { title: known.title, lines, action: live ? 'live' : 'replay', table: table.file, report: failureReport(result, table, known.title) };
   }
   const lines = [result.message ?? t('Erreur inconnue.')];
   if (repaired) lines.push(t('Cyber Pinball a corrigé le script de la table ({fix}) : relancez-la.', { fix: repaired }));
@@ -7286,7 +7342,17 @@ function explain(result: LaunchResult, table: TableEntry, repaired?: string, liv
   }
   lines.push(...result.notices);
   if (result.logTail.length) lines.push(t('Fin du journal de VPX :'), ...result.logTail.slice(-5));
-  return { title: t('La partie n’a pas pu se dérouler'), lines, action: 'journey', table: table.file };
+  return { title: t('La partie n’a pas pu se dérouler'), lines, action: 'journey', table: table.file, report: failureReport(result, table, result.message ?? t('Erreur inconnue.')) };
+}
+
+/** Ce qu'une partie échouée confie au formulaire des retours : la table, la raison, et de quoi regrouper ce plantage. */
+function failureReport(result: LaunchResult, table: TableEntry, reason: string): Message['report'] {
+  const code = vpxExitName(result.exitCode);
+  return {
+    about: [table.title, code ? t('VPX arrêté : {code}', { code }) : reason].join(' · '),
+    table: table.title,
+    signature: crashSignature('vpx', code?.split(',')[0] ?? result.failure ?? 'inconnu', table.id),
+  };
 }
 
 /**
@@ -7683,7 +7749,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     loadingKeys: displayMode ? { title: t('Réglage de l’affichage'), rows: displayKeys(buttons), display: true } : { title: t('Commandes de la partie'), rows: gameKeys(buttons, tilt), display: false },
     menuKeys: menuKeys(),
     footer: menuFooter(),
-    nav: { confirm: KEYS.confirm[0], exit: KEYS.exit[0], help: KEYS.help[0] },
+    nav: { confirm: KEYS.confirm[0], exit: KEYS.exit[0], help: KEYS.help[0], next: KEYS.next[0] },
   };
 }
 
@@ -7816,8 +7882,12 @@ function soundView() {
 // horloge, crédits) ; « classique » dans Médias, son et attente revient au média seul. Rien
 // pendant la partie : VPX a l'afficheur.
 
+// Image du menu sur le DMD réel (bêta, dmd-server.ts) : dmdserver reçoit les mêmes points, même en
+// DMD « classique » (une LED ne joue pas de vidéo) ; la fenêtre de l'écran du DMD, seulement en vivant.
 const liveDmd = new LiveDmd({
   send: (shot) => {
+    if (menuDmdServer().active()) menuDmdServer().send(shot.dots, menuDmdColor(), shot.rgb);
+    if (!liveDmdOn()) return;
     const win = dmdWindow();
     if (win && !win.isDestroyed()) win.webContents.send('dmd', shot);
   },
@@ -7946,7 +8016,9 @@ function liveDmdView(role: RoleId): { area: ReturnType<typeof liveDmdArea>; fram
 
 /** Programme du DMD vivant d'après l'état du menu : la table montrée, le chargement, la partie. */
 function syncLiveDmd(): void {
-  if (!liveDmdOn()) {
+  // Le DMD réel montre le menu hors partie, même sans fenêtre de DMD vivant (DMD classique, pas d'écran de DMD).
+  const hardware = menuDmdServer().active() && state.phase !== 'playing' && !desktop.active;
+  if (!liveDmdOn() && !hardware) {
     loadingDmd?.stop();
     loadingDmd = undefined;
     return liveDmd.pause();

@@ -154,6 +154,18 @@ for (const name of fs.readdirSync(installerDir)) {
   }
   copyTree(path.join(repo, 'app', 'ressources', 'vision3d'), path.join(stage, 'ressources', 'vision3d'));
 }
+// Serveur du DMD réel (app/src/dmd-server.ts) : cyberpinball-dmdserver (packages/dmdserver), construit
+// avec les mêmes outils ; il charge le dmdutil64.dll de VPX. Sans eux, « Image du menu » dit qu'il manque.
+{
+  const { buildDmdServer } = await import('./dmdserver.mjs');
+  const exe = buildDmdServer({ quiet: true });
+  if (exe) {
+    const dir = path.join(stage, 'natif', 'dmdserver');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.copyFileSync(exe, path.join(dir, path.basename(exe)));
+    console.log(`Serveur du DMD : ${path.join('natif', 'dmdserver', path.basename(exe))}`);
+  }
+}
 // koffi et son binaire natif, livré à part dans un paquet propre à la plateforme
 // (seul celui de win32-x64 est copié). Du paquet koffi, on ne garde que le
 // JavaScript chargé à l'exécution : ni sources C++, ni en-têtes, ni documentation.

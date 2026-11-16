@@ -37,6 +37,8 @@ const REVIEWED = new Set([
   'jukeboxPlayer',
   // Réglages du Juke-box : ouverts depuis sa gestion, par l'utilisateur.
   'jukeboxSettings',
+  // Rappel du service des retours : appelé au chargement du tableau, jamais pendant l'initialisation.
+  'library',
   'liveDmd',
   'liveGames',
   'menuConfiguration',

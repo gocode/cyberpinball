@@ -14,6 +14,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { readAvatarImage, type AvatarImage } from '../avatar';
+import { DMDSERVER_ADDR } from '../dmdserver';
 import { loadSocial, nearbyPlayers, newSocialState, searchDirectory, type Presence, type SocialEvent, type SocialNetMode, type SocialState } from '../social';
 
 const APP_DIST = path.join(REPO_ROOT, 'app', 'dist');
@@ -248,6 +249,13 @@ test('seul social-net.ts ouvre des sockets réseau, et Hyperswarm n’est charg�
       if (name === 'vision3d.ts' && dir.endsWith(path.join('app', 'src'))) {
         const sends = [...text.matchAll(/\.send\(([^;]*)\);/g)].map((m) => m[1]!);
         if (/dgram\.createSocket\('udp4'\)/.test(text) && sends.length === 1 && sends[0]!.endsWith("'127.0.0.1'") && !/\.bind\(|\.listen\(|createServer|node:net/.test(text)) continue;
+      }
+      // dmd-server.ts : le menu, client de dmdserver (image du menu sur le DMD réel) sur 127.0.0.1 seulement
+      // (DMDSERVER_ADDR), jamais d'écoute ; le serveur lui-même n'écoute que sur 127.0.0.1 (dmdserver.ini, Addr).
+      if (name === 'dmd-server.ts' && dir.endsWith(path.join('app', 'src'))) {
+        const uses = [...text.matchAll(/\bnet\.(\w+)\(([^)]{0,60})/g)].map((m) => `${m[1]}(${m[2]}`);
+        const local = uses.length > 0 && uses.every((u) => u.startsWith('connect({ host: this.options.host ?? DMDSERVER_ADDR,'));
+        if (local && DMDSERVER_ADDR === '127.0.0.1' && !/\.listen\(|createServer|node:dgram/.test(text)) continue;
       }
       // mdns-responder.ts : le nom de la borne (« cyberpinball.local ») sur UDP 5353, partagé avec Windows ;
       // il ne répond qu'à son nom, par son adresse, et n'ouvre ni serveur ni connexion.

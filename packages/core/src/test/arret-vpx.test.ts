@@ -84,7 +84,7 @@ test('application : l’inspector n’est pas posé pour le DMD d’une table sa
 test('écran d’échec : arrêt reconnu = vraie raison, Start rejoue (ou ouvre la partie entre amis), jamais « ce qu’il manque »', () => {
   const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
   assert.match(front, /const known = repaired \? undefined : diagnoseVpxFailure\(result\.logTail, result\.exitCode,/);
-  assert.match(front, /return \{ title: known\.title, lines, action: live \? 'live' : 'replay', table: table\.file \};/);
+  assert.match(front, /return \{ title: known\.title, lines, action: live \? 'live' : 'replay', table: table\.file, report: failureReport\(result, table, known\.title\) \};/);
   assert.match(front, /explain\(result, table, repaired, Boolean\(double\)\)/);
   assert.match(front, /state\.message\?\.action === 'replay' && is\(KEYS\.confirm\)/);
   assert.match(front, /state\.message\?\.action === 'live' && is\(KEYS\.confirm\)/);

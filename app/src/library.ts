@@ -237,6 +237,7 @@ import { createCreditsMenu, type CreditsDepth } from './credits-menu';
 import { prepareImport, unpackArchive, type PreparedImport } from './archives';
 import { createDofMenu } from './dof-menu';
 import { createHardwareDmdMenu } from './hardware-dmd-menu';
+import { applyMenuDmdServer, dmdServerProblem, dmdServerReady } from './dmd-server';
 import { dofDir, readDof, vpxWorkDir } from './dof-files';
 import { backupDir, locations } from './paths';
 import { activeVpxIni, usbDevices } from './vpx-ini';
@@ -273,6 +274,8 @@ import { findComponent } from '@cyberpinball/installer';
 import { createHealth, type HealthView } from './health';
 import { collectTechFacts, loadTechFacts, recentErrors, saveTechFacts, type DisplayLinkFacts } from './tech-facts';
 import { createTechSheet, type ReportFriend } from './tech-sheet';
+import { createFeedbackMenu } from './feedback-menu';
+import type { FeedbackService } from './feedback-service';
 import { isShown, primaryRect, refuseOffscreen } from './offscreen';
 import { installationHints } from './installation-hints';
 
@@ -322,6 +325,8 @@ export interface LibraryHost {
   sendFriendReport?(key: string, text: string): void;
   /** Noms que le rapport remplace : le joueur, la borne, ses amis. */
   reportNames?(): string[];
+  /** Le service des retours (feedback-service.ts) : propositions, votes, rapports privés. */
+  feedbackService?: FeedbackService;
   /** Lecteurs de la borne (clés USB pour le rapport). */
   listDrives?(): Promise<DriveInfo[]>;
   ejectDrive?(drive: DriveInfo): Promise<boolean>;
@@ -1705,7 +1710,7 @@ export function createLibrary(host: LibraryHost) {
     },
     hardwareDmd: () => {
       const devices = usbDevices();
-      return devices ? hardwareDmdFacts(devices, loadCabinet(host.dataDir)?.hardwareDmd) : undefined;
+      return devices ? hardwareDmdFacts(devices, loadCabinet(host.dataDir)?.hardwareDmd, dmdServerProblem()) : undefined;
     },
     vr: () => host.vrNetwork?.(),
     remote: () => host.phoneRemote?.nameFacts(),
@@ -1787,7 +1792,32 @@ export function createLibrary(host: LibraryHost) {
     sendFriend: (key, text) => host.sendFriendReport?.(key, text),
     names: () => host.reportNames?.() ?? [],
     attachments: () => reportAttachments(),
+    feedback: host.feedbackService ? (text, back) => feedback!.openForm({ attach: true, ...(text ? { text } : {}) }, back) : undefined,
   });
+
+  // Avis et propositions (Menu système > Cyber Pinball) : le formulaire des retours et le tableau des propositions.
+  const feedback = host.feedbackService
+    ? createFeedbackMenu({
+        dataDir: host.dataDir,
+        service: host.feedbackService,
+        version: app.getVersion(),
+        language: () => language(),
+        openCustom: (build, at) => openCustom(build, at),
+        openSystem: () => openSystem(),
+        prompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
+        showing: (build) => screen?.kind === 'custom' && screen.build === build,
+        techReport: (text) => techSheet.reportZip(text),
+        openReportContents: (back) => techSheet.openContents(back),
+        log: (line) => console.log(line),
+      })
+    : undefined;
+  if (feedback)
+    provideSystemItem('feedback', {
+      get detail() {
+        return feedback.detail();
+      },
+      run: () => feedback.open(),
+    });
   provideSystemItem('tech-sheet', {
     get detail() {
       return techSheet.summary();
@@ -1876,7 +1906,14 @@ export function createLibrary(host: LibraryHost) {
     usb: () => usbDevices(),
     cabinet: () => loadCabinet(host.dataDir),
     save: (cabinet) => saveCabinet(host.dataDir, cabinet),
-    changed: () => void health.refresh(),
+    changed: () => {
+      applyMenuDmdServer();
+      void health.refresh();
+    },
+    menuServer: {
+      problem: () => dmdServerProblem(),
+      ready: () => dmdServerReady(),
+    },
   });
   provideSystemItem('hardware-dmd', hardwareDmdMenu.item);
 
@@ -5286,6 +5323,8 @@ export function createLibrary(host: LibraryHost) {
   }
 
   return {
+    /** Avis et propositions : le formulaire (plantage, téléphone), la question du premier plantage ; undefined sans service. */
+    feedback,
     provideSystemItem,
     withdrawSystemItem,
     provideAddFromFriend,

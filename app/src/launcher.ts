@@ -274,7 +274,11 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
  * jusqu'à stop(). Le menu passe ainsi par le chargement, la partie et le retour, comme
  * avec VPX, sans rien ouvrir sur les écrans du poste.
  */
-export function simulateVpx(opts: { onPlaying?: () => void; onForeground?: () => void; onWindows?: () => void; loadMs?: number }): RunningGame {
+/**
+ * Partie simulée hors écran (essais). `crashCode` : VPX « plante » peu après le début de la partie
+ * avec ce code de sortie (démonstration des retours : écran d'échec, question du premier plantage).
+ */
+export function simulateVpx(opts: { onPlaying?: () => void; onForeground?: () => void; onWindows?: () => void; loadMs?: number; crashCode?: number }): RunningGame {
   const t0 = Date.now();
   let playingSince: number | undefined;
   let finish: (result: LaunchResult) => void = () => undefined;
@@ -287,13 +291,21 @@ export function simulateVpx(opts: { onPlaying?: () => void; onForeground?: () =>
     opts.onPlaying?.();
     // Sans fenêtre de VPX, la « fenêtre de jeu » simulée a le premier plan dès qu'elle paraît.
     opts.onForeground?.();
+    if (opts.crashCode !== undefined) crashTimer = setTimeout(crash, 1500);
   }, loadMs);
+  let crashTimer: NodeJS.Timeout | undefined;
   let stopped = false;
+  const crash = () => {
+    if (stopped) return;
+    stopped = true;
+    finish({ ok: false, failure: 'crash', exitCode: opts.crashCode!, message: t("VPX s'est terminé avec le code {code}.", { code: opts.crashCode! }), seconds: 1.5, notices: [], logTail: [] });
+  };
   const stop = () => {
     if (stopped) return;
     stopped = true;
     clearTimeout(shown);
     clearTimeout(timer);
+    if (crashTimer) clearTimeout(crashTimer);
     finish({
       ok: true,
       exitCode: 0,

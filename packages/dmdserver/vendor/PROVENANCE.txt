@@ -1,0 +1,16 @@
+En-têtes copiés sans modification, pour construire cyberpinball-dmdserver sur le dmdutil64.dll que
+Visual Pinball X 10.8.1-5436 installe dans plugins\dmdutil (même version de libdmdutil, même disposition
+des classes) :
+
+- libdmdutil/DMDUtil/ : Config.h, DMD.h, DMDServer.h, Logger.h, depuis
+  https://github.com/vpinball/libdmdutil, commit 3485e2e (celui de VPX 10.8.1-5436), dossier
+  include/DMDUtil/. Licence : GPLv3+ (libdmdutil/LICENSE).
+- sockpp/sockpp/ : les en-têtes de sockpp qu'inclut tcp_acceptor.h (membre de DMDServer), depuis https://github.com/fpagliughi/sockpp, commit
+  e6c4688a576d95f42dd7628cefe68092f6c5cd0f (celui de libzedmd e8466d2, dont libdmdutil 3485e2e tire
+  sockpp64.dll), dossier include/sockpp/. Licence : BSD 3-Clause (sockpp/LICENSE).
+
+src/dmdserver.cpp est tiré de src/server.cpp de libdmdutil au même commit (GPLv3+), modifié : voir son
+en-tête. dmdutil64.def : la liste des exports de la DLL de VPX (dumpbin /exports).
+
+Un changement de version de VPX demande de recopier ces en-têtes au commit de libdmdutil qu'il épingle,
+de refaire dmdutil64.def, et de relancer node scripts/dmdserver.mjs --verifier.

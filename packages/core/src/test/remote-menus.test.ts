@@ -122,5 +122,5 @@ test('accès direct : mêmes portes que la borne, rien ne se déverrouille du t�
   // Un rang ne vaut que pour l'écran envoyé sous cette version.
   assert.match(remote, /case 'pick': \{[\s\S]*?if \(message\.v !== entriesVersion\) return;/);
   // La page n'envoie que des nombres et des identifiants de l'arbre.
-  assert.deepEqual(page.match(/send\(\{ t: '(pick|open)'[^}]*\}\)/g), ["send({ t: 'pick', v, i })", "send({ t: 'open', id: node.id })", "send({ t: 'open', id: 'in-game' })"]);
+  assert.deepEqual(page.match(/send\(\{ t: '(pick|open)'[^}]*\}\)/g), ["send({ t: 'pick', v, i })", "send({ t: 'open', id: node.id })", "send({ t: 'open', id: 'in-game' })", "send({ t: 'open', id: 'feedback' })"]);
 });

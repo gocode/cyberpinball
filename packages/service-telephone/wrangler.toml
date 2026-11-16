@@ -1,6 +1,7 @@
-# Service de l'adresse stable du téléphone (worker.mjs). Déployé par scripts/service-telephone.mjs,
-# qui copie d'abord dans public/ le chiffrement et les icônes de la page du téléphone. Aucun secret
-# ici : le compte Cloudflare est celui de `npx wrangler login`, gardé hors du dépôt.
+# Service de t.cyberpinball.com (worker.mjs) : adresse stable du téléphone et retours des joueurs.
+# Déployé par scripts/service-telephone.mjs, qui copie d'abord dans public/ le chiffrement et les
+# icônes de la page du téléphone, et applique schema.sql à la base D1. Aucun secret ici : le compte
+# Cloudflare est celui de `npx wrangler login`, gardé hors du dépôt.
 name = "cyberpinball-telephone"
 main = "worker.mjs"
 compatibility_date = "2026-11-01"
@@ -18,6 +19,13 @@ run_worker_first = ["/api/*", "/b/*"]
 [[kv_namespaces]]
 binding = "ADRESSES"
 id = "9486f531637642a89539b14f22668f45"
+
+# Base D1 des retours des joueurs (schéma : schema.sql). Identifiant donné par `wrangler d1 create
+# cyberpinball-retours`, inscrit à la première mise en ligne par `node scripts/service-telephone.mjs d1`.
+[[d1_databases]]
+binding = "RETOURS"
+database_name = "cyberpinball-retours"
+database_id = "74cbab96-7403-4137-8f46-b100c6d420b7"
 
 # Écritures limitées par adresse IP (une borne écrit à chaque changement d'adresse et une fois par semaine).
 [[ratelimits]]

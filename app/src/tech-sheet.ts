@@ -4,7 +4,8 @@
 // « Envoyer un rapport » fait un ZIP anonymisé (packages/core/src/techsheet.ts, buildReport) et le
 // donne au téléphone connecté (il le télécharge, prépare un e-mail ou copie le résumé : la borne n'a
 // pas de messagerie), l'écrit sur une clé USB ou dans un dossier de la borne, ou envoie son résumé à
-// un ami dans la messagerie.
+// un ami dans la messagerie, ou le confie au formulaire des retours (« À l'équipe de Cyber Pinball »,
+// feedback-menu.ts), qui l'envoie chiffré au service du projet.
 //
 // Le relevé (tech-facts.ts) tourne en arrière-plan : la page s'ouvre sur le dernier, gardé dans
 // <données>\cache\fiche.json, et le refait. La santé de la borne s'en sert pour son groupe « PC et
@@ -77,6 +78,8 @@ export interface TechSheetContext {
   names(): string[];
   /** Fichiers à joindre : journal de VPX de la dernière partie, VPinballX.ini, configurations (anonymisées ici). */
   attachments(): { name: string; text: string; about: string }[];
+  /** « À l'équipe de Cyber Pinball » : le formulaire des retours, rapport joint, la description reprise. */
+  feedback?(text: string, back: () => void): void;
 }
 
 const TONE: Record<TechRowState, Tone | undefined> = { ok: undefined, check: 'warning', blocking: 'error', info: 'info', quiet: 'quiet' };
@@ -150,7 +153,7 @@ export function createTechSheet(ctx: TechSheetContext) {
     const checks = blocks.filter((b) => b.state !== 'ok').length;
     const rows: Row[] = blocks.map((b, i) => ({ action: i, pick: true, icon: b.icon, text: b.title, detail: b.summary, tone: b.state === 'ok' ? 'ok' : b.state === 'check' ? 'warning' : 'error', badges: [stateBadge(b.state)] }));
     const actions: Action[] = blocks.map((b) => ({ label: b.title, key: `sheet:${b.id}`, run: () => openBlock(b.id) }));
-    actions.push({ label: t('Envoyer un rapport'), detail: t('Au téléphone, sur une clé USB ou à un ami · anonymisé'), icon: 'upload', tone: 'ok', key: 'sheet:report', run: () => openReport() });
+    actions.push({ label: t('Envoyer un rapport'), detail: ctx.feedback ? t('À l’équipe, au téléphone, sur une clé USB ou à un ami · anonymisé') : t('Au téléphone, sur une clé USB ou à un ami · anonymisé'), icon: 'upload', tone: 'ok', key: 'sheet:report', run: () => openReport() });
     actions.push({ label: SYSTEM_ITEMS.health.label, icon: SYSTEM_ITEMS.health.icon, key: 'sheet:health', run: () => ctx.runSystemItem('health', () => open(false)) });
     actions.push({ label: running ? t('Relevé en cours…') : t('Relever à nouveau'), icon: 'refresh', tone: running ? 'quiet' : undefined, key: 'sheet:refresh', run: () => void refresh() });
     actions.push({ label: t('Retour'), icon: 'back', run: back });
@@ -198,22 +201,27 @@ export function createTechSheet(ctx: TechSheetContext) {
   /** Le rapport tel qu'il partirait maintenant (refait si la description ou le relevé a changé). */
   function current(): Report | undefined {
     if (!facts) return undefined;
-    if (report) return report;
+    report ??= make(description);
+    return report;
+  }
+
+  /** Le rapport avec cette description (formulaire des retours, plantage). */
+  function make(text: string): Report | undefined {
+    if (!facts) return undefined;
     const health = ctx.health();
     const lines = health ? healthLines(health) : [];
     const logs = path.join(ctx.dataDir, 'logs');
     const since = Date.now() - 7 * 24 * 3600_000;
     const journal = [readTextIfExists(path.join(logs, 'journal-ancien.txt')), readTextIfExists(path.join(logs, 'journal.txt'))].map((x) => journalSince(x, since)).filter(Boolean).join('\n');
     const attachments = [...(journal ? [{ name: 'journal.txt', text: journal, about: t('le journal de Cyber Pinball, 7 jours') }] : []), ...ctx.attachments()]; // i18n-ignore : nom de fichier
-    report = buildReport({
+    return buildReport({
       facts,
       health: lines,
-      description,
+      description: text,
       attachments,
       healthJson: health,
       secrets: { user: os.userInfo().username, profile: os.homedir(), computer: os.hostname(), names: ctx.names() },
     });
-    return report;
   }
 
   async function openReport(): Promise<void> {
@@ -232,6 +240,7 @@ export function createTechSheet(ctx: TechSheetContext) {
         rows.push({ ...row, action: actions.length, pick: true });
         actions.push(action);
       };
+      if (ctx.feedback) pick({ icon: 'inbox', text: t('À l’équipe de Cyber Pinball'), detail: t('Par Internet, chiffré : seule l’équipe le lit · Avis et propositions') }, { label: t('À l’équipe de Cyber Pinball'), key: 'report:team', run: () => ctx.feedback!(description, self) });
       if (phone) pick({ icon: 'phone', text: t('Sur le téléphone connecté'), detail: t('{phone} · il le partage ensuite par e-mail, WhatsApp, Messenger…', { phone }) }, { label: t('Sur le téléphone connecté'), key: 'report:phone', run: () => sendPhone() });
       else pick({ icon: 'phone', text: t('Connecter un téléphone'), detail: t('Start : un QR code à lire avec l’appareil photo, le téléphone sur le même réseau que la borne'), tone: 'info' }, { label: t('Connecter un téléphone'), key: 'report:phone', run: () => ctx.runSystemItem('phone-remote', self) });
       for (const d of drives)
@@ -285,8 +294,7 @@ export function createTechSheet(ctx: TechSheetContext) {
     return path.join(ctx.dataDir, 'rapports');
   }
 
-  function openContents(): void {
-    const back = () => void openReport();
+  function openContents(back: () => void = () => void openReport()): void {
     ctx.openCustom(() => {
       const r = current();
       if (!r) return build();
@@ -428,5 +436,8 @@ export function createTechSheet(ctx: TechSheetContext) {
     summary,
     facts: () => facts,
     running: () => Boolean(running),
+    /** Le ZIP du rapport avec cette description, pour le service des retours ; undefined avant le premier relevé. */
+    reportZip: (text: string) => make(text)?.zip,
+    openContents,
   };
 }

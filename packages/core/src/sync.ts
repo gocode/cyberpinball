@@ -66,6 +66,8 @@ export interface SyncOptions {
   audio?: ObservedAudioOutput[];
   /** Périphériques USB présents, pour reconnaître un DMD réel. Sans eux, [Plugin.DMDUtil] n'est pas touché. */
   usb?: ObservedUsbDevice[];
+  /** dmdserver tient le DMD réel et répond (image du menu, dmdserver.ts) : VPX lui envoie ses images. */
+  dmdServer?: boolean;
   /** Dossiers communs de ROM et de colorisation (findGlobalDmdFolders), proposés aux plugins. */
   folders?: GlobalDmdFolders;
   /**
@@ -282,7 +284,7 @@ export function planVpxSync(
   // dernière valeur écrite reste en mémoire.
   let dmd: DetectedDmd[] = [];
   if (options.usb) {
-    const plan = vpxDmdSettings(options.usb, cabinet.hardwareDmd);
+    const plan = vpxDmdSettings(options.usb, cabinet.hardwareDmd, options.dmdServer);
     dmd = plan.detected;
     findings.push(...plan.findings);
     applyOwned(plan.settings);

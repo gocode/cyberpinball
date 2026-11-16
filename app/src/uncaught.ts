@@ -13,9 +13,31 @@
 // - au démarrage, les plantages natifs de la séance précédente, dont Crashpad a gardé le rapport
 //   (<données d'Electron>\Crashpad\reports\*.dmp, jamais envoyés nulle part).
 
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { app, BrowserWindow, crashReporter, type WebContents } from 'electron';
 import { appendErrorLog, errorLogEntry, errorLogFile, incidentLogEntry, newCrashReports, type ErrorLogKind } from '@cyberpinball/core';
+
+/**
+ * Plantages de Cyber Pinball pour les rapports automatiques (feedback-menu.ts) : exceptions non
+ * rattrapées et plantages natifs, gardés jusqu'à ce que le service des retours écoute (il naît après).
+ * `detail` : l'empreinte de la première ligne de l'erreur, pour qu'un même plantage parte une fois.
+ */
+export interface AppCrash {
+  code: 'exception' | 'rejection' | 'native';
+  detail: string;
+  about: string;
+}
+const crashes: AppCrash[] = [];
+let crashListener: ((c: AppCrash) => void) | undefined;
+function appCrash(c: AppCrash): void {
+  if (crashListener) crashListener(c);
+  else if (crashes.length < 10) crashes.push(c);
+}
+export function onAppCrash(listener: (c: AppCrash) => void): void {
+  crashListener = listener;
+  for (const c of crashes.splice(0)) listener(c);
+}
 
 /** Journal des incidents : posé au démarrage (journalIncidents), sinon la console seule. */
 let incidentFile: string | undefined;
@@ -35,6 +57,12 @@ export function journalUncaught(dataDir: string): void {
     const entry = errorLogEntry(kind, error);
     console.error(entry.trimEnd());
     write(file, entry);
+    const first = (error instanceof Error ? `${error.name}: ${error.message}` : String(error)).split(/\r?\n/)[0]!;
+    try {
+      appCrash({ code: kind === 'rejection' ? 'rejection' : 'exception', detail: createHash('sha256').update(first).digest('hex').slice(0, 12), about: first.slice(0, 160) });
+    } catch {
+      // Le rapport automatique ne doit jamais faire tomber ce qui note l'erreur.
+    }
   };
   process.on('uncaughtException', note('exception'));
   process.on('unhandledRejection', note('rejection'));
@@ -166,6 +194,7 @@ export function journalNativeCrashes(dataDir: string): void {
   try {
     for (const report of newCrashReports(path.join(app.getPath('crashDumps'), 'reports'), path.join(logs, 'plantages-vus.txt'))) {
       write(errorLogFile(logs), incidentLogEntry(`Plantage natif de Cyber Pinball ou d’un de ses processus le ${report.at.toISOString()} ; rapport : ${report.file}`, undefined, new Date(), 'crash')); // i18n-ignore : journal
+      appCrash({ code: 'native', detail: '', about: `Plantage natif de Cyber Pinball le ${report.at.toISOString()}` }); // i18n-ignore : lu par l'équipe
     }
   } catch (error) {
     console.warn(`Rapports de plantage illisibles : ${(error as Error).message}`); // i18n-ignore : journal

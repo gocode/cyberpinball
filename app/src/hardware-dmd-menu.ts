@@ -40,8 +40,15 @@ export interface HardwareDmdMenuHost {
   /** Configuration active de la borne ; undefined avant l'assistant d'écrans. */
   cabinet(): CabinetConfiguration | undefined;
   save(cabinet: CabinetConfiguration): void;
-  /** Après un changement : santé relevée de nouveau. */
+  /** Après un changement : santé relevée de nouveau, dmdserver relancé ou arrêté selon les choix. */
   changed(): void;
+  /** Image du menu sur le DMD réel (bêta, dmd-server.ts). */
+  menuServer: {
+    /** Pourquoi le serveur du DMD ne peut pas tourner sur cette borne ; undefined s'il le peut. */
+    problem(): string | undefined;
+    /** Le serveur tient le DMD et le menu y est connecté. */
+    ready(): boolean;
+  };
 }
 
 /** Icône de chaque choix : deux actions d'un écran n'ont jamais la même. */
@@ -84,7 +91,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
     const cabinet = host.cabinet();
     if (!cabinet) return;
     const updated: CabinetConfiguration = { ...cabinet, hardwareDmd: next };
-    if (!next.models && !next.zedmdWifi) delete updated.hardwareDmd;
+    if (!next.models && !next.zedmdWifi && next.menu === undefined) delete updated.hardwareDmd;
     host.save(updated);
     flash = { text, tone: 'ok' };
     host.changed();
@@ -117,6 +124,17 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
       return { icon: 'usb' as const, text: hardwareDmdName(d), detail, ...(off ? { tone: 'quiet' as const } : problem ? { tone: 'warning' as const } : {}) };
     });
     if (s?.zedmdWifi?.enabled) found.push({ icon: 'network', text: t('ZeDMD en wifi'), detail: t('{address} · VPX s’y connecte au début de chaque partie', { address: s.zedmdWifi.address }) });
+    // dmdserver, quand l'image du menu est demandée : il tient le DMD, ou il attend qu'on le branche.
+    if (s?.menu && (detected.some((d) => hardwareDmdChoice(s, d.model) !== 'off') || s.zedmdWifi?.enabled)) {
+      const problem = host.menuServer.problem();
+      found.push(
+        problem
+          ? { icon: 'monitor', text: t('Serveur du DMD'), detail: t('{problem} ; VPX ouvre le DMD lui-même pendant les parties', { problem }), tone: 'warning' }
+          : host.menuServer.ready()
+            ? { icon: 'monitor', text: t('Serveur du DMD'), detail: t('Le menu tient le DMD réel ; VPX le reprend pendant les parties'), tone: 'ok' }
+            : { icon: 'monitor', text: t('Serveur du DMD'), detail: t('Démarre, ou attend que le DMD réponde ; en attendant, VPX ouvre le DMD lui-même') },
+      );
+    }
     if (!found.length) found.push({ icon: 'info', text: t('Aucun DMD réel branché en USB'), detail: t('ZeDMD, PIN2DMD, Pixelcade : branchez-le, puis « Vérifier de nouveau ».'), tone: 'quiet' });
     sections.push({ title: t('Reconnus'), rows: found });
 
@@ -166,14 +184,34 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
       ...(cabinet ? {} : { tone: 'quiet' as const }),
       run: () => (cabinet ? askWifi() : noCabinet()),
     });
+    // Image du menu (bêta) : dmdserver tient le DMD, le menu et VPX lui envoient leurs images.
+    const anyOn = detected.some((d) => hardwareDmdChoice(s, d.model) !== 'off') || HARDWARE_DMD_MODELS.some((m) => hardwareDmdChoice(s, m) === 'on') || Boolean(wifi?.enabled);
+    const menuOn = Boolean(s?.menu);
+    const serverProblem = host.menuServer.problem();
+    actions.push({
+      label: menuOn ? t('Image du menu : oui') : t('Image du menu : non'),
+      detail: !cabinet
+        ? t('Indisponible : configurez d’abord la borne (assistant d’écrans)')
+        : menuOn
+          ? t('Le DMD réel montre aussi le DMD du menu ; VPX le reprend pendant les parties (Start : non)')
+          : !anyOn
+            ? t('Indisponible : aucun DMD réel allumé (branchez-le, ou choisissez « oui » pour son modèle)')
+            : serverProblem
+              ? t('Indisponible : {problem}', { problem: serverProblem })
+              : t('Le DMD réel montre aussi le DMD du menu, entre les parties (Start : oui)'),
+      icon: 'monitor',
+      key: 'menu',
+      ...(cabinet && (menuOn || (anyOn && !serverProblem)) ? {} : { tone: 'quiet' as const }),
+      run: () => (cabinet ? toggleMenu(anyOn) : noCabinet()),
+    });
     actions.push({ label: t('Vérifier de nouveau'), detail: t('Relit les périphériques USB et leurs pilotes'), icon: 'refresh', key: 'refresh', run: () => refresh() });
     actions.push({ label: t('Retour'), icon: 'back', run: back });
 
     return {
       heading: t('DMD réel'),
       icon: 'usb',
-      // Dit franchement : le menu ne l'alimente pas encore, et la prise en charge attend les bornes équipées.
-      lead: t('Un afficheur à LED branché à la borne (ZeDMD, PIN2DMD, Pixelcade). VPX l’allume pendant les parties ; dans le menu, le DMD reste sur l’écran de la borne. Bêta : à confirmer sur les bornes équipées.'),
+      // Dit franchement : la prise en charge attend les bornes équipées.
+      lead: t('Un afficheur à LED branché à la borne (ZeDMD, PIN2DMD, Pixelcade). VPX l’allume pendant les parties ; « Image du menu » lui fait aussi montrer le menu. Bêta : à confirmer sur les bornes équipées.'),
       sections,
       actions,
       back,
@@ -201,6 +239,22 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
       },
       t('Le ZeDMD et la borne sur le même réseau local. Sans réglage, le ZeDMD s’annonce sous le nom {name}. Laissez vide pour couper le wifi.', { name: ZEDMD_WIFI_DEFAULT_ADDR }),
     );
+  }
+
+  /** Image du menu : oui (si le serveur du DMD peut tourner) ou non. */
+  function toggleMenu(anyOn: boolean): void {
+    const s = setup();
+    if (s?.menu) {
+      save({ ...s, menu: false }, t('Image du menu : non. VPX ouvre de nouveau le DMD lui-même.'));
+      return open();
+    }
+    if (!anyOn) {
+      return library.openNotice(t('Image du menu'), [t('Aucun DMD réel n’est allumé : branchez-le (puis « Vérifier de nouveau »), ou choisissez « oui » pour son modèle, ou indiquez un ZeDMD en wifi.')], () => open());
+    }
+    const problem = host.menuServer.problem();
+    if (problem) return library.openNotice(t('Image du menu'), [problem, t('Le DMD réel reste piloté par VPX pendant les parties.')], () => open());
+    save({ ...s, menu: true }, t('Image du menu : oui. Le serveur du DMD démarre ; le DMD réel montre le menu dès qu’il répond.'));
+    open();
   }
 
   function refresh(): void {
