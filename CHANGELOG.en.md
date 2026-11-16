@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Windows desktop: on return, you are where you left off (the "Borne" (Cabinet) section on "Bureau Windows" (Windows desktop), the open screen, the selected table), no longer on the wheel. Also when the menu relaunches to turn the screen, or after changing the language or the DMD type. On a keyboard, the Ctrl and Shift of Ctrl+Shift+D no longer change collection or move the selection: on their own, pressed or held, they stay MagnaSave and flippers as before.
 - Installing a table: while a file is downloading, its card ("Table", "Fronton" (backglass)…) shows it itself, with the "Téléchargement en cours" (Downloading) badge, a green bar and the percentage, amount and rate. Likewise in the waiting list and in the game parts of an installed table. The message at the top of the screen stays.
 - Instant games (Community): open a live game to everyone, on the table of your choice, choosing the number of players (2 to 4). It shows up for every player online; anyone can join, friend or not, if they have the same version of the table, and it starts by itself for everyone as soon as it is full. Also from a table's sheet ("Instant game"). The host is told of each arrival.
 - First buttons screen ("Are your buttons already right?"): the flippers and arrows move from one choice to the other, as in any menu, without ever changing screen; Start or Enter confirm the selected choice. In 0.1.13, an arrow or a flipper kept the keys and moved on to the next screen.
