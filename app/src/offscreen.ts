@@ -87,7 +87,13 @@ export function relaunchOnHiddenDesktop(): boolean {
     clearInterval(timer);
     copy();
     const code = run.finish();
-    fs.rmSync(log, { force: true });
+    // Le journal relais peut être encore tenu un instant (poignée du processus fini, antivirus,
+    // indexeur) : EPERM. Un fichier temporaire resté là ne doit jamais changer le résultat d'un essai.
+    try {
+      fs.rmSync(log, { force: true, maxRetries: 5, retryDelay: 100 });
+    } catch (error) {
+      console.log(`Hors écran : journal relais laissé dans le dossier temporaire (${(error as NodeJS.ErrnoException).code ?? (error as Error).message}).`);
+    }
     app.exit(code);
   }, 300);
   return true;

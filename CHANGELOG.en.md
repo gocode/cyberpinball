@@ -22,6 +22,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Messages and rooms: delete your message (Start on it, then “Delete this message…” or “Delete my line…”); it also disappears for the other players.
 - Sharing and network: “Delete my account…” erases your account, here and on other players' cabinets (name, friends, messages, rooms, published scores, suggestions and votes), then Cyber Pinball starts again with a new account.
 - Community: “Feedback and ideas” is now also at the bottom of the Community home; its “Back” returns there.
+- Moving to a new PC: on a new PC (no friends, no messages), restoring the old one's backup (Backups > Restore a backup) now offers “Take over “…”'s identity” by default: your nickname, friends and messages come over to the new PC, after a confirmation. The old PC must not connect again.
 
 ## 0.1.13
 

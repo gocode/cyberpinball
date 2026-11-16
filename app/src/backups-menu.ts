@@ -26,6 +26,7 @@ import {
   formatSize,
   hourLabel,
   isInside,
+  hasNetworkHistory,
   isSameCabinet,
   levelLabel,
   listBackups,
@@ -139,6 +140,11 @@ interface Choice {
   parts: Set<BackupPart>;
   /** Autre borne : garder l'identité de celle-ci (sans ses amis) ou prendre la sienne. */
   identity: 'keep' | 'take';
+  /**
+   * Autre borne, et celle-ci n'a encore ni ami, ni demande, ni conversation (hasNetworkHistory) : un
+   * changement de PC. Reprendre l'identité de la sauvegarde est alors le choix de départ, sous ce nom.
+   */
+  migration: boolean;
   /** Relevé des fichiers fait à l'ouverture du plan : chaque partie incluse ou exclue le recombine sans lire le disque. */
   survey?: RestoreSurvey;
   plan?: RestorePlan;
@@ -920,7 +926,9 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     const same = isSameCabinet(b.manifest, host.dataDir);
     const present = new Set(b.manifest.files.map((f) => f.part));
     const parts = new Set(BACKUP_PARTS.filter((p) => present.has(p) && (same || (p !== 'cabinet' && p !== 'friends'))));
-    const c: Choice = { backup: b, same, parts, identity: 'keep' };
+    // Lu une fois ici, jamais à la reconstruction de l'écran.
+    const migration = !same && present.has('friends') && !hasNetworkHistory(host.dataDir);
+    const c: Choice = { backup: b, same, parts, identity: migration ? 'take' : 'keep', migration };
     choice = c;
     restoreError = undefined;
     if (host.root) {
@@ -986,17 +994,30 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     }));
     if (!c.same) {
       const base = actions.length;
+      const name = c.backup.manifest.cabinet.name;
+      // Changement de PC : cette borne n'a rien sur le réseau, reprendre l'autre ne fait rien perdre.
+      const keepText = c.migration ? t('Garder l’identité neuve de ce PC') : t('Garder mes amis et l’identité de cette borne');
+      const takeText = c.migration ? t('Reprendre l’identité de « {name} »', { name }) : t('Remplacer « {name} » sur le réseau', { name });
       sections.push({
         title: t('Amis et identité sur le réseau'),
         options: true,
         rows: [
-          { action: base, pick: true, current: c.identity === 'keep', text: t('Garder mes amis et l’identité de cette borne'), detail: t('Les amis de « {name} » ne sont pas repris', { name: c.backup.manifest.cabinet.name }), ...(c.identity === 'keep' ? { badges: [t('Choisi')] } : {}) },
-          { action: base + 1, pick: true, current: c.identity === 'take', text: t('Remplacer « {name} » sur le réseau', { name: c.backup.manifest.cabinet.name }), detail: t('Seulement si l’ancienne ne se connectera plus : ses amis verront cette borne à sa place'), tone: 'warning', badges: [c.identity === 'take' ? t('Choisi') : t('À vérifier')] },
+          {
+            action: base,
+            pick: true,
+            current: c.identity === 'keep',
+            text: keepText,
+            detail: c.migration ? t('Sans le pseudo, les amis ni les messages de « {name} »', { name }) : t('Les amis de « {name} » ne sont pas repris', { name }),
+            ...(c.identity === 'keep' ? { badges: [t('Choisi')] } : {}),
+          },
+          c.migration
+            ? { action: base + 1, pick: true, current: c.identity === 'take', text: takeText, detail: t('Changement de PC : son pseudo, ses amis et ses messages passent sur celui-ci'), ...(c.identity === 'take' ? { badges: [t('Choisi')] } : {}) }
+            : { action: base + 1, pick: true, current: c.identity === 'take', text: takeText, detail: t('Seulement si l’ancienne ne se connectera plus : ses amis verront cette borne à sa place'), tone: 'warning', badges: [c.identity === 'take' ? t('Choisi') : t('À vérifier')] },
         ],
       });
       for (const id of ['keep', 'take'] as const) {
         actions.push({
-          label: id === 'keep' ? t('Garder mes amis et l’identité de cette borne') : t('Remplacer « {name} » sur le réseau', { name: c.backup.manifest.cabinet.name }),
+          label: id === 'keep' ? keepText : takeText,
           key: `identity:${id}`,
           run: () => {
             c.identity = id;
@@ -1045,6 +1066,15 @@ export function createBackupsMenu(host: BackupsMenuHost) {
 
   function buildConfirmIdentity(): Built {
     const name = choice?.backup.manifest.cabinet.name ?? '';
+    if (choice?.migration) {
+      return {
+        heading: t('Reprendre l’identité de « {name} » ?', { name }),
+        icon: 'lock',
+        sections: [{ rows: [{ icon: 'alert', text: t('Ce PC devient « {name} » pour ses amis', { name }), detail: t('L’ancien PC ne doit plus se connecter : deux bornes avec la même identité se disputeraient les amis'), tone: 'warning' }] }],
+        actions: [backAction(() => host.library.openCustom(buildPlan, 0)), { label: t('Oui, reprendre et restaurer'), icon: 'restore', run: () => void startRestore() }],
+        back: () => host.library.openCustom(buildPlan, 0),
+      };
+    }
     return {
       heading: t('Remplacer « {name} » sur le réseau ?', { name }),
       icon: 'lock',

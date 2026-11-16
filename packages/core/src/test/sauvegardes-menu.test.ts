@@ -267,7 +267,9 @@ test('la sauvegarde d’une autre borne : ses écrans et son identité ne sont p
   await other.choose('Sauvegarder maintenant');
   await other.choose('Lancer la sauvegarde');
 
+  // Cette borne a déjà un ami : reprendre une autre identité lui ferait perdre le sien.
   const h = harness({ drives: [key] });
+  write(h.root, 'data/social.json', JSON.stringify({ name: 'Borne du salon', key: { publicKey: 'salon' }, friends: [{ key: 'c'.repeat(64), name: 'Chloé' }] }));
   await h.open();
   await h.choose('Restaurer une sauvegarde');
   assert.equal(h.shown().sections[0]!.title, 'Une autre borne');
@@ -284,6 +286,48 @@ test('la sauvegarde d’une autre borne : ses écrans et son identité ne sont p
   assert.match(h.shown().heading, /^Remplacer « Borne du salon » sur le réseau \?$/);
   assert.equal(h.relaunched(), 0, 'rien avant la confirmation');
   assert.equal(h.focused()!.label, 'Retour', 'la confirmation commence sur Retour');
+});
+
+test('changement de PC : sur une borne sans ami ni message, reprendre l’identité de la sauvegarde est le choix de départ, confirmé avant d’écrire', async () => {
+  const key = usb();
+  const old = harness({ root: fakeRoot('ancien'), drives: [key] });
+  write(old.root, 'data/amis/messagerie.json', JSON.stringify({ version: 1, conversations: { ['b'.repeat(64)]: { lines: [{ id: '0123456789abcdef', at: '2026-11-01T10:00:00.000Z', out: true, text: 'salut' }] } } }));
+  saveBackupSettings(old.dataDir, { auto: 'off', copyToDestination: true, destination: { path: path.join(key.path!, BACKUP_DIR_NAME), serial: key.serial } });
+  await old.open();
+  await old.choose('Sauvegarder maintenant');
+  await old.choose('Lancer la sauvegarde');
+
+  // Le nouveau PC : assistant passé (modèle de borne), identité neuve, aucun ami, aucune conversation.
+  const h = harness({ drives: [key] });
+  write(h.root, 'data/amis/messagerie.json', JSON.stringify({ version: 1, conversations: {} }));
+  await h.open();
+  await h.choose('Restaurer une sauvegarde');
+  await h.choose(/^Borne du salon /);
+  const plan = h.shown();
+  const identity = plan.sections.find((s) => s.title === 'Amis et identité sur le réseau')!;
+  assert.deepEqual(identity.rows.map((r) => r.text), ['Garder l’identité neuve de ce PC', 'Reprendre l’identité de « Borne du salon »']);
+  assert.ok(identity.rows[1]!.current && identity.rows[1]!.badges?.includes('Choisi'), 'la reprise est choisie d’office');
+  assert.notEqual(identity.rows[1]!.tone, 'warning');
+  assert.match(identity.rows[1]!.detail ?? '', /Changement de PC/);
+  assert.equal(h.focused()!.label, plan.sections[0]!.rows[0]!.text, 'focus sur la première partie, jamais sur l’identité ni « Restaurer »');
+  await h.choose('Restaurer la sélection');
+  assert.equal(h.shown().heading, 'Reprendre l’identité de « Borne du salon » ?');
+  assert.equal(h.relaunched(), 0, 'rien avant la confirmation');
+  assert.equal(h.focused()!.label, 'Retour', 'la confirmation commence sur Retour');
+  await h.choose('Oui, reprendre et restaurer');
+  assert.equal(h.relaunched(), 1);
+  const staged = loadPendingRestore(h.dataDir)!.items.map((i) => i.rel);
+  assert.ok(staged.includes('data/social.json') && staged.includes('data/amis/messagerie.json'), 'clé, pseudo et messages repris');
+
+  // Garder l'identité neuve : ni la clé ni les messages de l'ancien PC.
+  const k = harness({ drives: [key] });
+  await k.open();
+  await k.choose('Restaurer une sauvegarde');
+  await k.choose(/^Borne du salon /);
+  await k.choose('Garder l’identité neuve de ce PC');
+  await k.choose('Restaurer la sélection');
+  assert.equal(k.relaunched(), 1, 'garder ne demande pas de confirmation');
+  assert.ok(!loadPendingRestore(k.dataDir)!.items.some((i) => i.rel === 'data/social.json' || i.rel.startsWith('data/amis/')));
 });
 
 test('sauvegarde automatique : due, borne libre, faite sur la borne puis copiée sur la clé ; occupée, elle attend', async () => {

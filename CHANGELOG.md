@@ -24,6 +24,7 @@ son interface).
 - Messages et salons : supprimez votre message (Start sur lui, puis « Supprimer ce message… » ou « Supprimer ma ligne… ») ; il disparaît aussi chez les autres joueurs.
 - Partage et réseau : « Supprimer mon compte… » efface votre compte, ici et chez les autres joueurs (nom, amis, messages, salons, scores publiés, propositions et votes), puis Cyber Pinball repart avec un compte neuf.
 - Communauté : « Avis et propositions » est aussi tout en bas de l'accueil de la Communauté ; son « Retour » y ramène.
+- Changement de PC : sur un PC neuf (ni ami ni message), restaurer la sauvegarde de l'ancien (Sauvegardes > Restaurer une sauvegarde) propose d'office « Reprendre l'identité de « … » » : votre pseudo, vos amis et vos messages passent sur le nouveau PC, après confirmation. L'ancien PC ne doit plus se connecter.
 
 ## 0.1.13
 

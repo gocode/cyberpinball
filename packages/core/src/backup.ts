@@ -26,8 +26,10 @@ import * as path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
 import { renameWithRetryAsync, writeFileAtomic } from './atomicwrite';
+import { chatFile } from './chat';
 import { movePath, safeName, samePath, trashDirFor } from './fileops';
 import { t } from './i18n';
+import { SOCIAL_FILE } from './social';
 import { readJsonFile } from './store';
 
 // ---------- Ce qu'on sauvegarde ----------
@@ -701,6 +703,33 @@ export function isSameCabinet(manifest: BackupManifest, dataDir: string): boolea
     // sans identité : installation neuve si aucun modèle de borne
   }
   return !fs.existsSync(path.join(dataDir, 'cabinet.json'));
+}
+
+/**
+ * Cette borne a-t-elle déjà une vie sur le réseau des amis : un ami, une demande en attente, une
+ * conversation ? Sans rien de tout cela (un PC neuf), reprendre l'identité d'une autre borne ne fait
+ * rien perdre : c'est un changement de PC, et l'écran de restauration le propose d'abord. Un fichier
+ * illisible compte comme une vie (ne jamais proposer d'écraser ce qu'on ne sait pas lire). Lecture
+ * seule : rien n'est créé.
+ */
+export function hasNetworkHistory(dataDir: string): boolean {
+  const read = (file: string): Record<string, unknown> | undefined | 'unreadable' => {
+    if (!fs.existsSync(file)) return undefined;
+    try {
+      const raw = readJsonFile(file);
+      return raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : 'unreadable';
+    } catch {
+      return 'unreadable';
+    }
+  };
+  const filled = (v: unknown) => Array.isArray(v) && v.length > 0;
+  const social = read(path.join(dataDir, SOCIAL_FILE));
+  if (social === 'unreadable') return true;
+  if (social && (filled(social.friends) || filled(social.incoming) || filled(social.outgoing))) return true;
+  const chat = read(chatFile(dataDir));
+  if (chat === 'unreadable') return true;
+  const conversations = chat?.conversations && typeof chat.conversations === 'object' ? Object.values(chat.conversations as Record<string, unknown>) : [];
+  return conversations.some((c) => !!c && typeof c === 'object' && filled((c as { lines?: unknown }).lines));
 }
 
 export interface PartPlan {

@@ -14,6 +14,7 @@ import {
   autoBackupDue,
   canUndoLastRestore,
   estimateBackup,
+  hasNetworkHistory,
   isSameCabinet,
   lastAutoSlot,
   nextAutoSlot,
@@ -322,6 +323,31 @@ test('reconnaître ses sauvegardes : même identité, ou installation neuve', ()
   assert.equal(isSameCabinet(manifest, dataOf(root)), false);
   const fresh = tmp('cp-neuve-');
   assert.equal(isSameCabinet(manifest, fresh), true);
+});
+
+test('vie sur le réseau : un ami, une demande ou une conversation ; un fichier illisible compte ; rien n’est créé', () => {
+  const dir = tmp('cp-reseau-');
+  assert.equal(hasNetworkHistory(dir), false, 'PC neuf, aucun fichier');
+  assert.ok(!fs.existsSync(path.join(dir, 'social.json')), 'lecture seule');
+  const social = (extra: object) => fs.writeFileSync(path.join(dir, 'social.json'), JSON.stringify({ name: 'Borne', friends: [], incoming: [], outgoing: [], ...extra }));
+  social({});
+  assert.equal(hasNetworkHistory(dir), false, 'identité neuve, sans ami');
+  for (const field of ['friends', 'incoming', 'outgoing']) {
+    social({ [field]: [{ key: 'a'.repeat(64), name: 'Chloé' }] });
+    assert.equal(hasNetworkHistory(dir), true, field);
+  }
+  social({});
+  fs.mkdirSync(path.join(dir, 'amis'));
+  const chat = path.join(dir, 'amis', 'messagerie.json');
+  fs.writeFileSync(chat, JSON.stringify({ version: 1, conversations: { ['a'.repeat(64)]: { lines: [] } } }));
+  assert.equal(hasNetworkHistory(dir), false, 'conversation vide');
+  fs.writeFileSync(chat, JSON.stringify({ version: 1, conversations: { ['a'.repeat(64)]: { lines: [{ id: '0123456789abcdef', at: '2026-11-01T10:00:00.000Z', out: false, text: 'salut' }] } } }));
+  assert.equal(hasNetworkHistory(dir), true, 'un message');
+  fs.writeFileSync(chat, '{ abîmé');
+  assert.equal(hasNetworkHistory(dir), true, 'messagerie illisible');
+  fs.rmSync(chat);
+  fs.writeFileSync(path.join(dir, 'social.json'), '{ abîmé');
+  assert.equal(hasNetworkHistory(dir), true, 'identité illisible');
 });
 
 test('les sauvegardes automatiques au-delà des dix dernières sont rangées, jamais celles faites à la main', async () => {
