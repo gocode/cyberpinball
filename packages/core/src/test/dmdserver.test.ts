@@ -192,19 +192,41 @@ test('serveur du DMD : arguments, et codes de sortie qui ne se règlent pas en r
   // 0 (DMD débranché), 1 (port pris), 2 (pas de DMD), plantage : relancé.
   for (const code of [0, 1, 2, null, 0xc0000005]) assert.equal(dmdServerExitProblem(code), undefined, `code ${code}`);
   assert.match(dmdServerExitProblem(3)!, /Visual C\+\+/);
-  assert.match(dmdServerExitProblem(4)!, /VPX 10\.8\.1/);
+  // 4 (fonction manquante) et 6 (empreinte inconnue) : la version de VPX installée, dite par son numéro.
+  const vpxVersion = vpxComponent().version.split('-')[0];
+  for (const code of [4, 6]) assert.ok(dmdServerExitProblem(code)!.includes(`VPX ${vpxVersion}`), `code ${code} : VPX ${vpxVersion} attendu`);
 });
 
+// Invariant : la version de VPX que Cyber Pinball installe a l'empreinte de son dmdutil64.dll dans
+// packages/dmdserver/src/empreintes.h. Sans elle, « Image du menu » serait indisponible pour tous.
+test('serveur du DMD : empreinte connue pour la version de VPX installée', () => {
+  const known = fs.readFileSync(path.join(REPO_ROOT, 'packages', 'dmdserver', 'src', 'empreintes.h'), 'utf8');
+  const rows = [...known.matchAll(/\{"([0-9a-f]{64})", "VPX ([^"]+)"\}/g)].map((m) => m[2]);
+  assert.ok(rows.includes(vpxComponent().version), `empreintes.h : aucune ligne pour VPX ${vpxComponent().version} (${rows.join(', ') || 'aucune'}) ; voir packages/dmdserver/vendor/PROVENANCE.txt`);
+});
+
+function vpxComponent(): { version: string } {
+  const list = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'packages', 'installer', 'components.json'), 'utf8')) as { components: { id: string; version: string }[] };
+  return list.components.find((c) => c.id === 'vpx')!;
+}
+
 // Le vrai serveur (packages/dmdserver), s'il est construit (node scripts/dmdserver.mjs) : sans la DLL de VPX,
-// il s'arrête avec le code 3, sans fenêtre d'erreur ni recherche de DMD.
+// il s'arrête avec le code 3 ; avec une DLL inconnue (un autre fichier sous ce nom), avec le code 6 sans
+// la charger ; jamais de fenêtre d'erreur ni de recherche de DMD.
 const builtServer = path.join(REPO_ROOT, 'build', 'dmdserver', 'Release', 'cyberpinball-dmdserver.exe');
-test('cyberpinball-dmdserver : aide, et DLL de VPX absente dite par le code 3', { skip: !fs.existsSync(builtServer) && 'non construit' }, () => {
+test('cyberpinball-dmdserver : aide, DLL de VPX absente (code 3) ou inconnue (code 6)', { skip: !fs.existsSync(builtServer) && 'non construit' }, () => {
   const help = spawnSync(builtServer, ['--help'], { encoding: 'utf8', windowsHide: true });
   assert.equal(help.status, 0);
   assert.match(help.stdout, /--dmdutil/);
   const missing = spawnSync(builtServer, ['--verifier', '-d', path.join(REPO_ROOT, 'tmp', 'aucun-vpx')], { encoding: 'utf8', windowsHide: true });
   assert.equal(missing.status, 3);
   assert.match(missing.stderr, /dmdutil64\.dll absent/);
+  const otherDir = path.join(REPO_ROOT, 'tmp', 'dmdutil-inconnu');
+  fs.mkdirSync(otherDir, { recursive: true });
+  fs.writeFileSync(path.join(otherDir, 'dmdutil64.dll'), 'pas la DLL de VPX');
+  const other = spawnSync(builtServer, ['--verifier', '-d', otherDir], { encoding: 'utf8', windowsHide: true });
+  assert.equal(other.status, 6);
+  assert.match(other.stderr, /non prise en charge \(empreinte [0-9a-f]{64}\)/);
   const unknown = spawnSync(builtServer, ['--inconnue'], { encoding: 'utf8', windowsHide: true });
   assert.equal(unknown.status, 5);
 });

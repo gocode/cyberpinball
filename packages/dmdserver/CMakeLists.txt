@@ -26,6 +26,6 @@ add_custom_target(dmdutil64-import DEPENDS "${DMDUTIL_LIB}")
 add_executable(cyberpinball-dmdserver src/dmdserver.cpp)
 add_dependencies(cyberpinball-dmdserver dmdutil64-import)
 target_include_directories(cyberpinball-dmdserver PRIVATE vendor/libdmdutil vendor/sockpp)
-target_link_libraries(cyberpinball-dmdserver PRIVATE "${DMDUTIL_LIB}" delayimp ws2_32)
+target_link_libraries(cyberpinball-dmdserver PRIVATE "${DMDUTIL_LIB}" delayimp ws2_32 bcrypt)
 # Chargée à la demande, depuis le dossier passé par -d (plugins\dmdutil de VPX).
 target_link_options(cyberpinball-dmdserver PRIVATE /DELAYLOAD:dmdutil64.dll)

@@ -12,5 +12,12 @@ des classes) :
 src/dmdserver.cpp est tiré de src/server.cpp de libdmdutil au même commit (GPLv3+), modifié : voir son
 en-tête. dmdutil64.def : la liste des exports de la DLL de VPX (dumpbin /exports).
 
-Un changement de version de VPX demande de recopier ces en-têtes au commit de libdmdutil qu'il épingle,
-de refaire dmdutil64.def, et de relancer node scripts/dmdserver.mjs --verifier.
+Le serveur n'accepte que les dmdutil64.dll dont l'empreinte SHA-256 est dans src/empreintes.h (code 6
+sinon, DLL jamais chargée) : une autre version de libdmdutil peut changer la disposition de ses classes
+sans changer ses fonctions.
+
+Un changement de version de VPX, plus récente ou plus ancienne, demande de recopier ces en-têtes au commit
+de libdmdutil qu'il épingle, de refaire dmdutil64.def, d'ajouter à src/empreintes.h l'empreinte que donne
+« node scripts/dmdserver.mjs --verifier --vpx <VPX> » (code 6 tant qu'elle manque), puis de relancer cette
+même commande. packages/core/src/test/dmdserver.test.ts échoue tant que la version de VPX de
+packages/installer/components.json n'a pas sa ligne dans src/empreintes.h.

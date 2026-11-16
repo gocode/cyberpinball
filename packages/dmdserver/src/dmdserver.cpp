@@ -5,13 +5,17 @@
 // modifié pour Cyber Pinball :
 //   - dmdutil64.dll chargé à la demande (/DELAYLOAD) depuis le dossier passé par -d : aucune DLL copiée,
 //     exactement la version de libdmdutil de VPX (ZeDMD, ZeDMD en wifi, PIN2DMD, Pixelcade) ;
-//   - avant tout, ses fonctions sont toutes liées : une DLL absente ou d'une autre version arrête le
-//     serveur avec un code dit (3, 4), sans fenêtre d'erreur de Windows ;
+//   - avant tout, son empreinte SHA-256 est comparée à celles de src/empreintes.h : une DLL inconnue
+//     n'est jamais chargée (code 6), car une autre version de libdmdutil peut changer la disposition de
+//     ses classes sans changer ses fonctions ;
+//   - puis ses fonctions sont toutes liées : une DLL absente ou à qui il en manque arrête le serveur avec
+//     un code dit (3, 4), sans fenêtre d'erreur de Windows ;
 //   - --verifier : contrôle seul de cette DLL, sans chercher de DMD ;
 //   - options lues sans cargs (même syntaxe que le dmdserver d'origine).
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <bcrypt.h>
 #include <delayimp.h>
 
 #include <chrono>
@@ -22,10 +26,12 @@
 #include <cstring>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "DMDUtil/Config.h"
 #include "DMDUtil/DMDServer.h"
 #include "DMDUtil/Logger.h"
+#include "empreintes.h"
 
 namespace
 {
@@ -41,6 +47,7 @@ enum Exit : int
   kDllMissing = 3,   // dmdutil64.dll introuvable ou impossible à charger (dossier, Visual C++)
   kDllMismatch = 4,  // dmdutil64.dll d'une autre version : une fonction manque
   kUsage = 5,
+  kDllUnknown = 6,   // dmdutil64.dll dont l'empreinte n'est pas dans src/empreintes.h : jamais chargé
 };
 
 volatile std::sig_atomic_t running = 1;
@@ -93,7 +100,7 @@ void Usage()
       "  -w, --wait-for-displays    attendre un DMD plutot que s'arreter\n"
       "  -l, --logging              journal sur la sortie d'erreur\n"
       "  -v, --verbose-logging\n"
-      "      --verifier             controle seul de dmdutil64.dll (code 0, 3 ou 4)\n"
+      "      --verifier             controle seul de dmdutil64.dll et de son empreinte (code 0, 3, 4 ou 6)\n"
       "  -h, --help\n");
 }
 
@@ -115,11 +122,52 @@ std::wstring Widen(const char* s)
   return w;
 }
 
+/** Empreinte SHA-256 (hexadécimal, minuscules) de ce fichier, ou chaîne vide s'il ne se lit pas. */
+std::string Sha256(const std::wstring& file)
+{
+  HANDLE h = CreateFileW(file.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+  if (h == INVALID_HANDLE_VALUE) return {};
+  std::string hex;
+  BCRYPT_ALG_HANDLE alg = nullptr;
+  BCRYPT_HASH_HANDLE hash = nullptr;
+  if (BCRYPT_SUCCESS(BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, nullptr, 0)) &&
+      BCRYPT_SUCCESS(BCryptCreateHash(alg, &hash, nullptr, 0, nullptr, 0, 0)))
+  {
+    std::vector<unsigned char> buffer(1 << 16);
+    DWORD read = 0;
+    bool ok = true;
+    while (ok && ReadFile(h, buffer.data(), static_cast<DWORD>(buffer.size()), &read, nullptr) && read > 0)
+      ok = BCRYPT_SUCCESS(BCryptHashData(hash, buffer.data(), read, 0));
+    unsigned char digest[32];
+    if (ok && BCRYPT_SUCCESS(BCryptFinishHash(hash, digest, sizeof(digest), 0)))
+    {
+      static const char* digits = "0123456789abcdef";
+      for (unsigned char b : digest)
+      {
+        hex += digits[b >> 4];
+        hex += digits[b & 15];
+      }
+    }
+  }
+  if (hash) BCryptDestroyHash(hash);
+  if (alg) BCryptCloseAlgorithmProvider(alg, 0);
+  CloseHandle(h);
+  return hex;
+}
+
+/** La version de VPX de cette empreinte, ou nullptr si elle n'est pas dans src/empreintes.h. */
+const char* KnownVpx(const std::string& sha256)
+{
+  for (const KnownDmdUtil& known : kKnownDmdUtil)
+    if (sha256 == known.sha256) return known.vpx;
+  return nullptr;
+}
+
 /**
  * Charge dmdutil64.dll depuis ce dossier (ses propres DLL, zedmd64, libusb…, cherchées à côté d'elle),
  * puis lie toutes les fonctions dont ce programme a besoin.
  */
-int LoadDmdUtil(const std::wstring& dir)
+int LoadDmdUtil(const std::wstring& dir, const char** vpx)
 {
   SetDllDirectoryW(dir.c_str());
   std::wstring dll = dir + L"\\dmdutil64.dll";
@@ -127,6 +175,19 @@ int LoadDmdUtil(const std::wstring& dir)
   {
     fprintf(stderr, "dmdutil64.dll absent de ce dossier.\n");
     return kDllMissing;
+  }
+  // Avant tout chargement : une DLL inconnue n'exécute rien, pas même son DllMain.
+  std::string sha256 = Sha256(dll);
+  if (sha256.empty())
+  {
+    fprintf(stderr, "dmdutil64.dll illisible (erreur %lu).\n", GetLastError());
+    return kDllMissing;
+  }
+  *vpx = KnownVpx(sha256);
+  if (!*vpx)
+  {
+    fprintf(stderr, "dmdutil64.dll d'une version de VPX non prise en charge (empreinte %s).\n", sha256.c_str());
+    return kDllUnknown;
   }
   if (!LoadLibraryExW(dll.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH))
   {
@@ -199,10 +260,11 @@ int main(int argc, char* argv[])
     }
   }
 
-  if (int loaded = LoadDmdUtil(dmdutilDir); loaded != kOk) return loaded;
+  const char* vpx = nullptr;
+  if (int loaded = LoadDmdUtil(dmdutilDir, &vpx); loaded != kOk) return loaded;
   if (verifyOnly)
   {
-    printf("dmdutil64.dll : compatible.\n");
+    printf("dmdutil64.dll : compatible (%s).\n", vpx);
     return kOk;
   }
 
