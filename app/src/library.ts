@@ -51,6 +51,8 @@ import {
   applyImport,
   applyOps,
   applyRomImport,
+  addPinballFxTable,
+  PINBALLFX_TABLES,
   readInfo,
   readDmdPlaces,
   setTableSource,
@@ -180,6 +182,7 @@ import {
   type RomTable,
   type ScriptFacts,
   type SheetPageType,
+  type PinballFxTable,
   type TableEntry,
   type TablePlan,
   type VpsDb,
@@ -242,6 +245,7 @@ import { dofDir, readDof, vpxWorkDir } from './dof-files';
 import { backupDir, locations } from './paths';
 import { activeVpxIni, usbDevices } from './vpx-ini';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
+import { detectPinballFx, openPinballFxStore, pinballFxSetup } from './pinballfx-install';
 import { LayoutReport } from './layout-check';
 import { createJukeboxLibrary } from './jukebox-library';
 import { createJukeboxMenu } from './jukebox-menu';
@@ -2548,6 +2552,10 @@ export function createLibrary(host: LibraryHost) {
     // Statistiques sur une ligne : la fiche tient sur l'écran, en borne comme au bureau.
     const played = [user.LastRun ? t('dernière partie le {date}', { date: formatDateTime(user.LastRun) }) : undefined, user.RunTime ? t('{duration} de jeu', { duration: formatDuration(user.RunTime) }) : undefined].filter(Boolean).join(' · ');
     const stats: Row[] = [{ text: user.StartCount ? tn(user.StartCount, 'Jouée {n} fois', 'Jouée {n} fois') : t('Jamais jouée'), detail: played || undefined }];
+    // Table de Pinball FX : ni script, ni ROM, ni fichiers de VPX. Ce qui ne s'y applique pas reste à sa
+    // place, grisé, avec la raison (jamais caché).
+    const fx = table.emulator === 'pinballfx';
+    const notFx = (action: SheetAction, reason: string): SheetAction => (fx ? { ...action, detail: reason, tone: 'quiet', attention: undefined, run: () => undefined } : action);
 
     const script = cachedScript(table.file, host.dataDir);
     // Seule la ROM peut empêcher de jouer (playable.ts) : la règle du médecin, sans relire la table.
@@ -2600,6 +2608,16 @@ export function createLibrary(host: LibraryHost) {
     if (inv.crashReports.length) check.push(t('un rapport de plantage laissé par VPX'));
     if (absent.length) files.push({ text: t('Absents'), detail: absent.join(', '), tone: 'quiet' });
     if (check.length) files.push({ text: t('À vérifier'), detail: check.join(', '), tone: 'warning' });
+    const fxInstall = fx ? detectPinballFx() : undefined;
+    const fxFiles: Row[] = [
+      table.pinballFxTable !== undefined
+        ? { text: t('Table'), detail: t('Pinball FX, table n° {n}', { n: table.pinballFxTable }), tone: 'ok' }
+        : { text: t('Table'), detail: t('Fiche illisible : numéro de table absent'), tone: 'error' },
+      fxInstall
+        ? { text: 'Pinball FX', detail: fxInstall.store === 'steam' ? t('Installé par Steam') : t('Installé par Epic'), tone: 'ok', badges: [menuBadgeLabel('beta')] }
+        : { text: 'Pinball FX', detail: t('Pas installé sur ce PC'), tone: 'error', badges: [menuBadgeLabel('beta')] },
+      mediaRow(table),
+    ];
     s.contents ??= tableFiles.contentsOf(table);
     const contents = s.contents;
     // Ce qui empêche de jouer (la ROM), déjà connu sans relire la table ; ou un parcours commencé
@@ -2630,24 +2648,24 @@ export function createLibrary(host: LibraryHost) {
     const manage: SheetAction[] = [
       ...further,
       { label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le menu montre'), icon: 'image', door: 'sheet.medias', run: () => medias.open(table) },
-      { label: t('Parties du jeu'), detail: t('Table, PuP-Pack, fronton, ROM… : ajouter, remplacer, retirer'), icon: 'table-add', door: 'sheet.parts', run: () => gameParts.open(table) },
-      { label: t('Fichiers de la table'), detail: tableFiles.summary(contents), tone: contents.problems ? 'warning' : undefined, icon: 'folder', door: 'sheet.files', run: () => tableFiles.open(table, 0, contents) },
-      ...pupAction(table, s),
+      notFx({ label: t('Parties du jeu'), detail: t('Table, PuP-Pack, fronton, ROM… : ajouter, remplacer, retirer'), icon: 'table-add', door: 'sheet.parts', run: () => gameParts.open(table) }, t('Pinball FX fournit toute la table : rien à ajouter')),
+      notFx({ label: t('Fichiers de la table'), detail: tableFiles.summary(contents), tone: contents.problems ? 'warning' : undefined, icon: 'folder', door: 'sheet.files', run: () => tableFiles.open(table, 0, contents) }, t('Une table de Pinball FX n’a pas de fichiers à elle')),
+      ...(fx ? [] : pupAction(table, s)),
       ...(host.tableSettings
-        ? [{ label: t('Réglages de cette table'), detail: t('Son, jeu… pour cette table seulement'), icon: 'sliders' as const, door: 'sheet.table-settings' as const, run: () => host.tableSettings!(table) }]
+        ? [notFx({ label: t('Réglages de cette table'), detail: t('Son, jeu… pour cette table seulement'), icon: 'sliders' as const, door: 'sheet.table-settings' as const, run: () => host.tableSettings!(table) }, t('Ils se règlent dans Pinball FX'))]
         : []),
-      ...(host.adjustDisplay && host.vpxExe()
-        ? [{ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, door: 'sheet.display' as const, run: () => adjustDisplay(table) }]
+      ...(host.adjustDisplay && (fx || host.vpxExe())
+        ? [notFx({ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, door: 'sheet.display' as const, run: () => adjustDisplay(table) }, t('Écrans et cadrage : dans le mode borne de Pinball FX'))]
         : []),
       ...(host.menuDmd
-        ? [{ label: t('DMD sur la roue'), detail: host.menuDmd.detail(table), icon: 'dmd' as const, door: 'sheet.menu-dmd' as const, run: () => host.menuDmd!.open(table, () => openSheet(table)) }]
+        ? [notFx({ label: t('DMD sur la roue'), detail: host.menuDmd.detail(table), icon: 'dmd' as const, door: 'sheet.menu-dmd' as const, run: () => host.menuDmd!.open(table, () => openSheet(table)) }, t('Tables VPX seulement : Pinball FX ne donne pas son DMD'))]
         : []),
-      ...(host.playAndRecord && host.vpxExe()
-        ? [{ label: t('Jouer et enregistrer'), detail: t('Filmer la partie pour la présentation de la table sur la roue'), icon: 'record' as const, door: 'sheet.record' as const, run: () => recording.setup(table) }]
+      ...(host.playAndRecord && (fx || host.vpxExe())
+        ? [notFx({ label: t('Jouer et enregistrer'), detail: t('Filmer la partie pour la présentation de la table sur la roue'), icon: 'record' as const, door: 'sheet.record' as const, run: () => recording.setup(table) }, t('Tables VPX seulement pour l’instant'))]
         : []),
-      { label: t('Diagnostiquer et réparer'), icon: 'pulse', door: 'sheet.doctor', run: () => openDoctor(table.file) },
+      notFx({ label: t('Diagnostiquer et réparer'), icon: 'pulse', door: 'sheet.doctor', run: () => openDoctor(table.file) }, t('Rien à diagnostiquer : Pinball FX gère la table')),
       { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), icon: 'edit', door: 'sheet.edit', run: () => openEdit(table) },
-      { label: t('Supprimer la table'), detail: t('Mise à la corbeille'), tone: 'error', icon: 'trash', door: 'sheet.remove', run: () => go({ kind: 'remove', file: table.file }) },
+      { label: t('Supprimer la table'), detail: fx ? t('Retirée du menu ; elle reste dans Pinball FX') : t('Mise à la corbeille'), tone: 'error', icon: 'trash', door: 'sheet.remove', run: () => go({ kind: 'remove', file: table.file }) },
     ];
     if (s.manage) {
       // Exit et « Retour » : la fiche, sans plus y revenir depuis les écrans ouverts ensuite.
@@ -2682,8 +2700,8 @@ export function createLibrary(host: LibraryHost) {
           host.play(table);
         },
       },
-      ...(host.playWithFriend ? [{ ...host.playWithFriend(table, () => openSheet(table)), door: 'sheet.friends' as const }] : []),
-      ...(host.scores ? [scoresAction(table)] : []),
+      ...(host.playWithFriend ? [notFx({ ...host.playWithFriend(table, () => openSheet(table)), door: 'sheet.friends' as const }, t('Parties entre amis : tables VPX seulement'))] : []),
+      ...(host.scores ? [notFx(scoresAction(table), t('Pinball FX ne donne pas ses scores'))] : []),
       pagesAction(table),
       { label: t('Crédits'), detail: credits.summary(table), icon: 'credits', door: 'sheet.credits', run: () => credits.open(table) },
       ...(host.favorite ? [favoriteAction(table)] : []),
@@ -2707,7 +2725,7 @@ export function createLibrary(host: LibraryHost) {
       favorite: isFavorite(table.info),
       subheading: [table.manufacturer, table.year].filter(Boolean).join(' · ') || undefined,
       lead: s.flash ?? table.version,
-      sections: [{ title: t('Statistiques'), rows: stats }, ...(guest ? [] : [{ title: t('Fichiers'), rows: files }])],
+      sections: [{ title: t('Statistiques'), rows: stats }, ...(guest ? [] : [{ title: t('Fichiers'), rows: fx ? fxFiles : files }])],
       actions,
       back: exit,
     };
@@ -3661,6 +3679,7 @@ export function createLibrary(host: LibraryHost) {
       { label: t('Reprendre un fichier téléchargé'), detail: downloadsDetail(), icon: 'download', run: () => void pick('downloads') },
       { label: t('Choisir des fichiers…'), detail: t('Clé USB, Téléchargements, Bureau, disques ; ou glissez-les ici'), icon: 'import', run: () => void pick('files') },
       { label: t('Choisir un dossier…'), detail: t('Tout le dossier d’une table, depuis une clé USB ou un disque'), icon: 'folder', run: () => void pick('folder') },
+      pinballFxAction(),
       { label: t('Depuis une autre installation…'), detail: t('PinUP Popper, PinballX : les tables une à une, avec leur PuP-Pack, leur ROM et leurs médias'), icon: 'layers', run: () => installationImport.open() },
       ...(addFromFriend ? [{ label: t('Depuis un ami…'), detail: addFromFriend.detail(), icon: 'friend-list' as const, run: () => addFromFriend!.open(() => openAdd()) }] : []),
       { label: t('Récupérés et attendus'), detail: catalogUi.summary(), icon: 'inbox', run: () => catalogUi.openWaitList(() => openAdd()) },
@@ -3678,6 +3697,140 @@ export function createLibrary(host: LibraryHost) {
       sections,
       actions,
       back: () => openSystem(),
+    };
+  }
+
+  /**
+   * « Tables de Pinball FX » dans l'entonnoir. Jeu pas installé : « Installer Pinball FX » ouvre Steam
+   * (ou le lanceur d'Epic) sur son installation, puis l'entonnoir guette le jeu et se redessine quand
+   * il paraît ; ni Steam ni Epic, ou téléchargement en cours : grisée, avec la raison. Cyber Pinball
+   * ne télécharge ni le jeu ni ses tables : jeu commercial, lié au compte du joueur.
+   */
+  function pinballFxAction(): Action {
+    const setup = pinballFxSetup();
+    const install = setup.install;
+    const inMenu = host.tables().filter((x) => x.emulator === 'pinballfx').length;
+    // En phase de test (16/11/2026) : pastille « BÊTA » dans tous ses états, comme la VR.
+    const base = { label: t('Tables de Pinball FX'), icon: 'table-add' as const, badge: 'beta' as const };
+    if (!install) {
+      if (setup.downloading) return { ...base, detail: t('Téléchargement en cours dans Steam : la liste des tables s’ouvre une fois le jeu installé'), tone: 'quiet', run: () => undefined };
+      const getter = setup.getter;
+      if (!getter) return { ...base, detail: t('Ni Steam ni Epic sur ce PC : installez l’un des deux, puis Pinball FX'), tone: 'quiet', run: () => undefined };
+      const store = getter.store === 'steam' ? 'Steam' : 'Epic';
+      return {
+        label: t('Installer Pinball FX'),
+        icon: 'pinball-app',
+        badge: 'beta',
+        detail: pinballFxStoreOpened
+          ? t('Ouvert dans {store} : installez-le là-bas, ses tables apparaissent ici ensuite', { store })
+          : t('Ouvre {store} sur son installation ; vous y achetez le jeu et ses tables', { store }),
+        run: () => {
+          if (!openPinballFxStore(getter)) return;
+          pinballFxStoreOpened = true;
+          watchPinballFxInstall();
+          host.broadcast();
+        },
+      };
+    }
+    return {
+      ...base,
+      detail: inMenu ? tn(inMenu, '{n} table dans le menu · choisir celles que vous possédez', '{n} tables dans le menu · choisir celles que vous possédez') : t('Choisir les tables que vous possédez dans Pinball FX'),
+      run: () => openPinballFx(),
+    };
+  }
+
+  /** La boutique a été ouverte sur Pinball FX (le détail de l'entrée le rappelle). */
+  let pinballFxStoreOpened = false;
+  let pinballFxWatch: NodeJS.Timeout | undefined;
+
+  /**
+   * Après « Installer Pinball FX » : l'état du jeu relu toutes les 5 s (deux heures au plus) ;
+   * l'entonnoir, s'il est affiché, se redessine à chaque changement (téléchargement, puis installé).
+   */
+  function watchPinballFxInstall(): void {
+    if (pinballFxWatch) clearInterval(pinballFxWatch);
+    const state = () => {
+      const s = pinballFxSetup();
+      return s.install ? 'installed' : s.downloading ? 'downloading' : 'absent';
+    };
+    let last = state();
+    const t0 = Date.now();
+    pinballFxWatch = setInterval(() => {
+      const now = state();
+      if (now !== last) {
+        last = now;
+        console.log(`Pinball FX : ${now === 'installed' ? 'installé' : now === 'downloading' ? 'téléchargement en cours' : 'absent'}.`); // i18n-ignore : journal
+        if (screen?.kind === 'addSource') host.broadcast();
+      }
+      if (now === 'installed' || Date.now() - t0 > 2 * 3600_000) {
+        clearInterval(pinballFxWatch);
+        pinballFxWatch = undefined;
+        pinballFxStoreOpened = false;
+      }
+    }, 5000);
+    pinballFxWatch.unref?.();
+  }
+
+  /** Dernier message de l'écran des tables de Pinball FX (table ajoutée). */
+  let pinballFxFlash: string | undefined;
+
+  /** Tables de Pinball FX : le catalogue de Zen ; Start ajoute la table au menu, ou ouvre sa fiche si elle y est. */
+  function openPinballFx(focus?: number): void {
+    const list = pinballFxList();
+    openCustom(buildPinballFx, focus === undefined ? undefined : Math.max(0, list.findIndex((x) => x.id === focus)));
+  }
+
+  function pinballFxList(): PinballFxTable[] {
+    return [...PINBALLFX_TABLES].sort((a, b) => a.title.localeCompare(b.title, 'fr'));
+  }
+
+  function buildPinballFx(): Built {
+    const back = () => {
+      pinballFxFlash = undefined;
+      openAdd();
+    };
+    const present = new Map(host.tables().flatMap((x) => (x.pinballFxTable === undefined ? [] : [[x.pinballFxTable, x] as const])));
+    const actions: Action[] = [];
+    const rows: Row[] = pinballFxList().map((fx) => {
+      const entry = present.get(fx.id);
+      const action =
+        actions.push({
+          label: fx.title,
+          key: `pinballfx:${fx.id}`,
+          run: () => {
+            if (entry) {
+              sheetReturn = () => openPinballFx(fx.id);
+              openSheet(entry);
+              return;
+            }
+            const added = addPinballFxTable(tablesDir(), fx.id);
+            console.log(`Pinball FX : table ${fx.id} (${fx.title}) ajoutée au menu, ${added.id}.`); // i18n-ignore : journal
+            pinballFxFlash = t('« {title} » ajoutée au menu.', { title: fx.title });
+            host.reload(added.file);
+            openPinballFx(fx.id);
+          },
+        }) - 1;
+      return {
+        text: fx.title,
+        detail: [fx.manufacturer, fx.year].filter(Boolean).join(' · '),
+        badges: entry ? [t('Dans le menu')] : [],
+        tone: entry ? 'ok' : undefined,
+        action,
+        pick: true,
+      };
+    });
+    actions.push({ label: t('Retour'), icon: 'back', key: 'back', run: back });
+    const inMenu = present.size;
+    return {
+      heading: t('Tables de Pinball FX'),
+      icon: 'table-add',
+      subheading: [t('Bêta : Pinball FX est en phase de test dans Cyber Pinball'), inMenu ? tn(inMenu, '{n} table dans le menu', '{n} tables dans le menu') : undefined].filter(Boolean).join(' · '),
+      lead:
+        pinballFxFlash ??
+        t('Start : ajouter au menu une table que vous possédez dans Pinball FX. Une table déjà dans le menu : Start ouvre sa fiche. Les écrans et le DMD se règlent dans le mode borne de Pinball FX.'),
+      sections: [{ title: tn(rows.length, '{n} table', '{n} tables'), rows }],
+      actions,
+      back,
     };
   }
 

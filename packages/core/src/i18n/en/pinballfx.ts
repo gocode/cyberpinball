@@ -1,0 +1,50 @@
+// Catalogue anglais : tables de Pinball FX (app/src/frontend.ts playPinballFx, app/src/pinballfx-launcher.ts,
+// app/src/library.ts : fiche et écran « Tables de Pinball FX »).
+// Clé : le texte français tel qu'il est passé à t() ou tn().
+export const messages: Record<string, string> = {
+  // app/src/frontend.ts
+  'Le cadrage d’une table de Pinball FX se règle dans le jeu (mode borne).': 'A Pinball FX table’s framing is set in the game (cabinet mode).',
+  'La fiche de cette table ne dit pas quelle table de Pinball FX ouvrir.': 'This table’s entry doesn’t say which Pinball FX table to open.',
+  'Pinball FX n’est pas installé sur ce PC. Menu système > Tables > Ajouter une table > « Installer Pinball FX ».': 'Pinball FX isn’t installed on this PC. System menu > Tables > Add a table > "Install Pinball FX".',
+  'Partie impossible': 'Can’t play',
+  'Pinball FX n’a pas ouvert la table': 'Pinball FX didn’t open the table',
+  'Vérifiez que la table est achetée dans Pinball FX et que Steam (ou Epic) est connecté.': 'Check that the table is owned in Pinball FX and that Steam (or Epic) is signed in.',
+  '{keys} ou Exit : arrêter · en partie, appui long sur Exit : quitter Pinball FX': '{keys} or Exit: stop · during the game, hold Exit: quit Pinball FX',
+  // app/src/pinballfx-launcher.ts
+  'Impossible de lancer Pinball FX : {error}': 'Couldn’t start Pinball FX: {error}',
+  'Pinball FX n’a pas ouvert sa fenêtre de jeu après {n} s.': 'Pinball FX didn’t open its game window after {n} s.',
+  'Appui long sur Exit : Pinball FX fermé, retour au menu.': 'Exit held: Pinball FX closed, back to the menu.',
+  // app/src/library.ts : fiche d'une table de Pinball FX
+  'Pinball FX, table n° {n}': 'Pinball FX, table no. {n}',
+  'Fiche illisible : numéro de table absent': 'Unreadable entry: no table number',
+  'Installé par Steam': 'Installed through Steam',
+  'Installé par Epic': 'Installed through Epic',
+  'Pas installé sur ce PC': 'Not installed on this PC',
+  'Pinball FX fournit toute la table : rien à ajouter': 'Pinball FX provides the whole table: nothing to add',
+  'Une table de Pinball FX n’a pas de fichiers à elle': 'A Pinball FX table has no files of its own',
+  'Ils se règlent dans Pinball FX': 'They are set in Pinball FX',
+  'Écrans et cadrage : dans le mode borne de Pinball FX': 'Screens and framing: in Pinball FX’s cabinet mode',
+  'Tables VPX seulement : Pinball FX ne donne pas son DMD': 'VPX tables only: Pinball FX doesn’t share its DMD',
+  'Tables VPX seulement pour l’instant': 'VPX tables only for now',
+  'Rien à diagnostiquer : Pinball FX gère la table': 'Nothing to diagnose: Pinball FX manages the table',
+  'Retirée du menu ; elle reste dans Pinball FX': 'Removed from the menu; it stays in Pinball FX',
+  'Parties entre amis : tables VPX seulement': 'Games with friends: VPX tables only',
+  'Pinball FX ne donne pas ses scores': 'Pinball FX doesn’t share its scores',
+  // app/src/library.ts : écran « Tables de Pinball FX »
+  'Tables de Pinball FX': 'Pinball FX tables',
+  'Téléchargement en cours dans Steam : la liste des tables s’ouvre une fois le jeu installé': 'Downloading in Steam: the table list opens once the game is installed',
+  'Ni Steam ni Epic sur ce PC : installez l’un des deux, puis Pinball FX': 'Neither Steam nor Epic on this PC: install one of them, then Pinball FX',
+  'Installer Pinball FX': 'Install Pinball FX',
+  'Bêta : Pinball FX est en phase de test dans Cyber Pinball': 'Beta: Pinball FX is being tested in Cyber Pinball',
+  'Ouvert dans {store} : installez-le là-bas, ses tables apparaissent ici ensuite': 'Opened in {store}: install it there, its tables then show up here',
+  'Ouvre {store} sur son installation ; vous y achetez le jeu et ses tables': 'Opens {store} on its installation; the game and its tables are bought there',
+  '{n} table dans le menu · choisir celles que vous possédez': '{n} table in the menu · choose the ones you own',
+  '{n} tables dans le menu · choisir celles que vous possédez': '{n} tables in the menu · choose the ones you own',
+  'Choisir les tables que vous possédez dans Pinball FX': 'Choose the tables you own in Pinball FX',
+  '« {title} » ajoutée au menu.': '“{title}” added to the menu.',
+  'Dans le menu': 'In the menu',
+  '{n} table dans le menu': '{n} table in the menu',
+  '{n} tables dans le menu': '{n} tables in the menu',
+  'Start : ajouter au menu une table que vous possédez dans Pinball FX. Une table déjà dans le menu : Start ouvre sa fiche. Les écrans et le DMD se règlent dans le mode borne de Pinball FX.':
+    'Start: add to the menu a table you own in Pinball FX. A table already in the menu: Start opens its page. Screens and DMD are set in Pinball FX’s cabinet mode.',
+};

@@ -72,7 +72,8 @@ test('VPX n’attend jamais l’animation : play() lance VPX comme sans elle', (
   assert.match(play, /const loadingMs = Number\(process\.env\.CYBERPINBALL_LOADING_MS \?\? 2500\);/, 'délai du chargement indépendant du cinéma');
   // Nulle part dans le menu on n'attend une animation (DMD, chorégraphie) : seule la partie s'attend.
   for (const m of main.matchAll(/await ([^;\n]+)/g)) assert.doesNotMatch(m[1]!, /cinema|Cinema|loadingDmd|liveDmd|playDmdAnimation|\.done\b(?<!game\.done)/, m[0]);
-  assert.equal([...main.matchAll(/\.done\b/g)].length, 1, 'seul game.done est attendu');
+  // Une partie par émulateur (VPX dans play(), Pinball FX dans playPinballFx()) : seul game.done est attendu.
+  assert.deepEqual([...main.matchAll(/\w+\.done\b/g)].map((m) => m[0]), ['game.done', 'game.done'], 'seul game.done est attendu');
   // Le relais : le lanceur le donne (partie réelle comme simulée), il fait sonner la bobine.
   // Il fait aussi partir le délai de l'enregistrement d'une partie (« Jouer et enregistrer »), sans rien attendre.
   assert.match(play, /const onForeground = \(\) => \{\n\s+if \(cinema\.handover\(\)\) playUiSound\('coil'\);\n(?:\s+recording\?\.shown\(\);\n)?\s+\};/);

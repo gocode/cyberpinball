@@ -14,6 +14,7 @@ import { mediaKind, tableMediaDir } from './medias';
 import { MP4_VIDEO_EXTENSIONS, mp4Sound } from './mp4audio';
 import { isJunkName } from './puppack';
 import type { TableEntry } from './tables';
+import { tableBaseName } from './tables';
 
 export interface TableSound {
   file: string;
@@ -53,7 +54,7 @@ const compare = (a: string, b: string) => a.localeCompare(b, 'fr', { numeric: tr
 export function tableSounds(table: TableEntry, opts: TableSoundsOptions): TableSoundFolder[] {
   const own = path.resolve(table.folder).toLowerCase() !== path.resolve(opts.tablesDir).toLowerCase();
   const mediaDir = path.resolve(tableMediaDir(table)).toLowerCase();
-  const base = path.basename(table.file).replace(/\.vpx$/i, '').toLowerCase();
+  const base = tableBaseName(table.file).toLowerCase();
   const maxDepth = opts.depth ?? 5;
   let budget = opts.maxEntries ?? 20_000;
   const folders = new Map<string, TableSoundFolder>();

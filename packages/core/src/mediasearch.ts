@@ -21,6 +21,7 @@ import type { MediaDb, MediaDbCandidate } from './mediadb';
 import type { TableEntry } from './tables';
 import type { VpxTableInfo } from './vpxinfo';
 import { ipdbIdOf, matchVps, searchVps, vpsKey, vpsLabel, vpsSiblings, type VpsDb, type VpsGame, type VpsHow } from './vps';
+import { tableBaseName } from './tables';
 
 export type ClueKind = 'info' | 'vpx-file' | 'folder' | 'b2s-file' | 'vpx-info' | 'pup' | 'dmd-folder' | 'query';
 
@@ -79,7 +80,7 @@ export function tableClues(table: TableEntry, evidence: TableEvidence = {}): Tab
   };
   add('vpx-info', evidence.vpxInfo?.name);
   add('info', table.manufacturer && table.year ? `${table.title} (${table.manufacturer} ${table.year})` : table.title);
-  add('vpx-file', path.basename(table.file).replace(/\.vpx$/i, ''));
+  add('vpx-file', tableBaseName(table.file));
   if (table.id.includes('/')) add('folder', path.basename(table.folder));
   add('b2s-file', evidence.backglass?.replace(/\.directb2s$/i, ''));
   for (const p of [...(evidence.script?.pup?.packNames ?? []), ...(evidence.pupDirs ?? [])]) add('pup', p);

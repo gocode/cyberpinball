@@ -12,7 +12,7 @@ import { saveOrWarn, writeFileAtomic } from './atomicwrite';
 import { registerTextRef, t } from './i18n';
 import { layoutOf } from './locations';
 import { edgeRotation, type Cabinet, type FlipperEdge, type RoleId, type Rotation } from './model';
-import { readInfo, type TableEntry, type TableInfoFile } from './tables';
+import { readInfo, type TableEntry, type TableInfoFile, tableBaseName } from './tables';
 import { dmdKindForRatio, dmdKindOf } from './dmdscreen';
 
 /** Types de VPX, tels qu'ils apparaissent entre parenthèses dans les noms de fichiers. */
@@ -453,7 +453,7 @@ export function tableMediaDir(table: TableEntry): string {
 
 /** Nom du .vpx sans extension : premier nom cherché (règle commune de VPX, FileLayout l. 58-61). */
 function vpxName(table: TableEntry): string {
-  return path.basename(table.file).replace(/\.vpx$/i, '');
+  return tableBaseName(table.file);
 }
 
 /** La table a son propre dossier (et pas en vrac à la racine des tables). */

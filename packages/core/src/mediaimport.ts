@@ -29,7 +29,7 @@ import {
 } from './medias';
 import { isPupFolderName } from './pupdisabled';
 import { nameKey } from './tablefiles';
-import { parseTableName, type TableEntry } from './tables';
+import { parseTableName, type TableEntry, tableBaseName } from './tables';
 import { matchVps, type VpsDb } from './vps';
 
 /** D'où vient la façon de ranger un média : un autre frontend, ou le nom « (Type) » de VPX. */
@@ -322,7 +322,7 @@ export function installedTables(entries: TableEntry[], romsOf: (t: TableEntry) =
   const out: InstalledTable[] = [];
   for (const t of entries) {
     const own = t.id.includes('/');
-    const vpx = path.basename(t.file).replace(/\.vpx$/i, '');
+    const vpx = tableBaseName(t.file);
     const existing = own ? out.find((o) => samePath(o.folder, t.folder)) : undefined;
     if (existing) {
       if (!existing.dest.names.some((n) => n.toLowerCase() === vpx.toLowerCase())) existing.dest.names.push(vpx);

@@ -1,11 +1,14 @@
 // Inventaire des tables. Une table = un fichier .vpx, en principe dans son
-// propre dossier (organisation officielle de VPX 10.8.1, docs/FileLayout.md).
+// propre dossier (organisation officielle de VPX 10.8.1, docs/FileLayout.md),
+// ou une fiche .pinballfx : table de Pinball FX (contenu de Steam ou d'Epic, sans
+// fichier à elle), rangée de la même façon pour garder son .info et ses médias.
 // Les métadonnées et statistiques vivent dans le fichier .info partagé entre
 // frontends, nommé comme la table ou comme son dossier.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
+import { pinballFxTable } from './pinballfx';
 import { readJsonFile } from './store';
 
 /** Format .info de VPX : champs connus, les autres sont conservés tels quels. */
@@ -32,10 +35,31 @@ export interface TableInfoFile {
   [key: string]: unknown;
 }
 
+export type TableEmulator = 'vpx' | 'pinballfx';
+
+/** Extension d'une fiche de table de Pinball FX (JSON : { "PinballFX": { "Table": 156 } }). */
+export const PINBALLFX_EXT = '.pinballfx';
+
+const TABLE_FILE = /\.(vpx|pinballfx)$/i;
+
+/** Nom d'un fichier de table sans son extension (.vpx ou .pinballfx). */
+export function tableBaseName(file: string): string {
+  return path.basename(file).replace(TABLE_FILE, '');
+}
+
+/** Fichier de table reconnu par l'inventaire, et son émulateur. */
+export function tableFileEmulator(name: string): TableEmulator | undefined {
+  const m = TABLE_FILE.exec(name);
+  return m ? (m[1]!.toLowerCase() as TableEmulator) : undefined;
+}
+
 export interface TableEntry {
   /** Chemin relatif au dossier des tables, séparateurs « / » : identifiant stable. */
   id: string;
-  emulator: 'vpx';
+  emulator: TableEmulator;
+  /** Numéro de la table dans Pinball FX (fiche .pinballfx lisible) ; absent pour VPX. */
+  pinballFxTable?: number;
+  /** Fichier .vpx, ou fiche .pinballfx. */
   file: string;
   folder: string;
   title: string;
@@ -67,10 +91,11 @@ export function scanTables(tablesDir: string): TableEntry[] {
     if (dirent.isDirectory()) {
       const folder = path.join(tablesDir, dirent.name);
       for (const f of fs.readdirSync(folder)) {
-        if (f.toLowerCase().endsWith('.vpx')) entries.push(describeTable(tablesDir, folder, f));
+        if (tableFileEmulator(f)) entries.push(describeTable(tablesDir, folder, f));
       }
     } else if (dirent.name.toLowerCase().endsWith('.vpx')) {
-      // Ancienne organisation : tables en vrac à la racine.
+      // Ancienne organisation : tables en vrac à la racine. Une fiche .pinballfx vit
+      // toujours dans son dossier : à la racine, elle est ignorée.
       entries.push(describeTable(tablesDir, tablesDir, dirent.name));
     }
   }
@@ -79,7 +104,8 @@ export function scanTables(tablesDir: string): TableEntry[] {
 
 function describeTable(tablesDir: string, folder: string, fileName: string): TableEntry {
   const file = path.join(folder, fileName);
-  const base = fileName.replace(/\.vpx$/i, '');
+  const base = fileName.replace(TABLE_FILE, '');
+  const emulator = tableFileEmulator(fileName) ?? 'vpx';
   const inOwnFolder = path.resolve(folder) !== path.resolve(tablesDir);
   const folderName = path.basename(folder);
 
@@ -90,16 +116,20 @@ function describeTable(tablesDir: string, folder: string, fileName: string): Tab
 
   const fromFile = parseTableName(base);
   const fromFolder = inOwnFolder ? parseTableName(folderName) : undefined;
+  const fx = emulator === 'pinballfx' ? readPinballFxFile(file) : undefined;
+  const known = fx === undefined ? undefined : pinballFxTable(fx);
   return {
     id: path.relative(tablesDir, file).split(path.sep).join('/'),
-    emulator: 'vpx',
+    emulator,
+    ...(fx === undefined ? {} : { pinballFxTable: fx }),
     file,
     folder,
     // Le dossier porte le nom lisible (c'est Cyber Pinball qui le crée à l'import).
-    title: info.Info?.Title ?? fromFolder?.title ?? fromFile.title,
-    manufacturer: info.Info?.Manufacturer ?? fromFolder?.manufacturer ?? fromFile.manufacturer,
-    year: info.Info?.Year ?? fromFolder?.year ?? fromFile.year,
-    version: fromFile.rest ?? (fromFolder && fromFile.title !== fromFolder.title ? base.replace(/^\d{6,}_/, '') : undefined),
+    // Table de Pinball FX : le catalogue de Zen passe avant le nom du dossier.
+    title: info.Info?.Title ?? known?.title ?? fromFolder?.title ?? fromFile.title,
+    manufacturer: info.Info?.Manufacturer ?? known?.manufacturer ?? fromFolder?.manufacturer ?? fromFile.manufacturer,
+    year: info.Info?.Year ?? (known ? known.year : (fromFolder?.year ?? fromFile.year)),
+    version: emulator === 'pinballfx' ? undefined : fromFile.rest ?? (fromFolder && fromFile.title !== fromFolder.title ? base.replace(/^\d{6,}_/, '') : undefined),
     infoFile,
     info,
   };
@@ -163,14 +193,54 @@ export function updateInfo(file: string, fields: InfoFields): TableInfoFile {
  */
 export function removalTargets(entry: TableEntry, tablesDir: string): { whole: boolean; paths: string[] } {
   const ownFolder = path.resolve(entry.folder).toLowerCase() !== path.resolve(tablesDir).toLowerCase();
-  const versions = fs.readdirSync(entry.folder).filter((f) => f.toLowerCase().endsWith('.vpx'));
+  const versions = fs.readdirSync(entry.folder).filter((f) => tableFileEmulator(f));
   if (ownFolder && versions.length <= 1) return { whole: true, paths: [entry.folder] };
-  const base = path.basename(entry.file).replace(/\.vpx$/i, '').toLowerCase();
+  const base = path.basename(entry.file).replace(TABLE_FILE, '').toLowerCase();
   const paths = fs
     .readdirSync(entry.folder)
     .filter((f) => f.toLowerCase().startsWith(`${base}.`))
     .map((f) => path.join(entry.folder, f));
-  const cache = path.join(entry.folder, 'cache', path.basename(entry.file).replace(/\.vpx$/i, ''));
+  const cache = path.join(entry.folder, 'cache', path.basename(entry.file).replace(TABLE_FILE, ''));
   if (fs.existsSync(cache)) paths.push(cache);
   return { whole: false, paths };
+}
+
+// ---------------------------------------------------------------------------
+// Fiches de Pinball FX
+// ---------------------------------------------------------------------------
+
+/** Numéro de table d'une fiche .pinballfx, ou undefined si elle est illisible. */
+export function readPinballFxFile(file: string): number | undefined {
+  try {
+    const data = readJsonFile(file) as { PinballFX?: { Table?: unknown } };
+    const n = data.PinballFX?.Table;
+    return typeof n === 'number' && Number.isInteger(n) && n > 0 ? n : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Nom de dossier lisible et valable sous Windows : « Titre (Fabricant Année) ». */
+export function pinballFxFolderName(tableId: number): string {
+  const t = pinballFxTable(tableId);
+  const label = t ? `${t.title} (${t.manufacturer}${t.year ? ` ${t.year}` : ''})` : `Pinball FX ${tableId}`;
+  return label.replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').replace(/[ .]+$/, '').trim();
+}
+
+/**
+ * Ajoute une table de Pinball FX à l'inventaire : dossier « Titre (Fabricant Année) »
+ * et sa fiche. Une table déjà présente (même numéro, n'importe quel dossier) est
+ * rendue telle quelle.
+ */
+export function addPinballFxTable(tablesDir: string, tableId: number): TableEntry {
+  const existing = scanTables(tablesDir).find((e) => e.pinballFxTable === tableId);
+  if (existing) return existing;
+  const name = pinballFxFolderName(tableId);
+  let folder = path.join(tablesDir, name);
+  // Un dossier VPX du même nom (même machine) reste à part : la fiche prend un nom distinct.
+  if (fs.existsSync(folder) && fs.readdirSync(folder).some((f) => tableFileEmulator(f) === 'vpx')) folder = path.join(tablesDir, `${name} Pinball FX`);
+  fs.mkdirSync(folder, { recursive: true });
+  const file = path.join(folder, `${path.basename(folder)}${PINBALLFX_EXT}`);
+  writeFileAtomic(file, JSON.stringify({ PinballFX: { Table: tableId } }, null, 2) + '\n');
+  return describeTable(tablesDir, folder, path.basename(file));
 }

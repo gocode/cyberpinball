@@ -213,6 +213,7 @@ import {
   loadCabinet,
   joystickButtonsUnrecorded,
   playfieldOrientation,
+  pinballFxCommand,
   readInfo,
   isFavorite,
   setFavorite,
@@ -417,6 +418,8 @@ import { installVpx, vpxArchivePresent } from './install-vpx';
 import { describeVcRuntime, ensureVcRuntime, vcRuntimeReady } from './vc-runtime';
 import { armRecording, type RecordingOutcome, type RecordingRun, type RecordingScreen } from './game-recording';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
+import { launchPinballFx, runningPinballFx } from './pinballfx-launcher';
+import { detectPinballFx } from './pinballfx-install';
 import { watchGameLoad, type GameLoadWatch } from './game-load';
 import { createLibrary, type ActionShortcut, type Row, type SystemItem, type UiAction } from './library';
 import { createFeedbackService } from './feedback-service';
@@ -4123,27 +4126,34 @@ function headsetPutBackOn(): void {
 }
 
 /**
+ * Exit de la borne tenu en ce moment, quelle que soit la fenêtre au premier plan : ses touches lues par Windows
+ * (GetAsyncKeyState), ses boutons de joystick par SDL (le sondage doit tourner : watchJoystickButtons).
+ */
+function exitHeldNow(): boolean {
+  const list = KEYS.exit;
+  const joystick = new Set(joystickButtonsHeld());
+  const vks = list.filter((c) => !c.startsWith('SDLJoy_')).map(windowsVk).filter((v): v is number => v !== undefined);
+  let keyboard: number[] = [];
+  try {
+    keyboard = vks.length ? keysDown(vks) : [];
+  } catch {
+    keyboard = [];
+  }
+  return list.some((c) => (c.startsWith('SDLJoy_') ? joystick.has(c) : keyboard.includes(windowsVk(c) ?? -1)));
+}
+
+/**
  * Exit de la borne pendant une attente où aucune fenêtre de Cyber Pinball n'a le clavier (VPX attend le casque) :
  * les touches d'Exit de cette borne lues par Windows (GetAsyncKeyState), ses boutons de joystick par SDL, toutes
  * les 50 ms tant que `active()` ; un appui (pas un bouton déjà tenu au départ) appelle `onExit` une fois.
  */
 function watchExitWhileWaiting(active: () => boolean, onExit: () => void): () => void {
-  const codes = () => KEYS.exit;
   let wasDown = true;
   let done = false;
   const stopJoystick = watchJoystickButtons(() => undefined);
   const timer = setInterval(() => {
     if (done || !active()) return void (wasDown = true);
-    const list = codes();
-    const joystick = new Set(joystickButtonsHeld());
-    const vks = list.filter((c) => !c.startsWith('SDLJoy_')).map(windowsVk).filter((v): v is number => v !== undefined);
-    let keyboard: number[] = [];
-    try {
-      keyboard = vks.length ? keysDown(vks) : [];
-    } catch {
-      keyboard = [];
-    }
-    const down = list.some((c) => (c.startsWith('SDLJoy_') ? joystick.has(c) : keyboard.includes(windowsVk(c) ?? -1)));
+    const down = exitHeldNow();
     if (down && !wasDown) {
       done = true;
       onExit();
@@ -4254,7 +4264,7 @@ function auditVrBackglass(): void {
   const uncertain: string[] = [];
   const noSource: string[] = [];
   const roomDmd: string[] = [];
-  for (const table of tables) {
+  for (const table of tables.filter((t) => t.emulator === 'vpx')) {
     try {
       const script = readTableScript(table.file);
       const room = tableHasVrRoom(script);
@@ -4294,7 +4304,7 @@ function auditVrBackglass(): void {
 function auditPupPacks(): void {
   const found: string[] = [];
   let packs = 0;
-  for (const table of tables) {
+  for (const table of tables.filter((t) => t.emulator === 'vpx')) {
     const folder = path.dirname(table.file);
     const pupvideos = pupVideosDir(folder);
     if (!pupvideos) continue;
@@ -6403,13 +6413,153 @@ let liveManual = false;
 const SIMULATED_MANUAL = OFFSCREEN && !!process.env.CYBERPINBALL_PARTIE_SIMULEE_SANS_RELEVE;
 
 /**
+ * Partie d'une table de Pinball FX. Chargement, cinéma, écrans et retour comme pour VPX ; rien de ce
+ * qui lui est propre (INI, ROM, PuP-Pack, DMD, VR, réglages en partie, scores lus dans la ROM) :
+ * Pinball FX règle lui-même ses écrans et son DMD dans son mode borne. La partie compte dans les
+ * statistiques de la table ; son score n'est pas lisible, ni tableau ni classement.
+ */
+async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefined, mode: 'display' | undefined, simulated: string | undefined): Promise<PlayReport | undefined> {
+  const fx = simulated === undefined ? detectPinballFx() : undefined;
+  const why =
+    mode === 'display'
+      ? t('Le cadrage d’une table de Pinball FX se règle dans le jeu (mode borne).')
+      : table.pinballFxTable === undefined
+        ? t('La fiche de cette table ne dit pas quelle table de Pinball FX ouvrir.')
+        : simulated === undefined && !fx
+          ? t('Pinball FX n’est pas installé sur ce PC. Menu système > Tables > Ajouter une table > « Installer Pinball FX ».')
+          : undefined;
+  if (why) {
+    state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible'), lines: [why, t('Start ou Exit : revenir au menu.')] } };
+    broadcast();
+    return undefined;
+  }
+  displayMode = false;
+  guest.releaseAll();
+  state = { ...state, phase: 'loading', help: false };
+  romMusic?.pause();
+  startLaunch();
+  launchCount++;
+  const pressedAt = Date.now();
+  if (mediaSettings.cinema) cinema.start(launchCount, { title: table.title, manufacturer: table.manufacturer, year: table.year, logo: medias?.wheel(table) });
+  broadcast();
+  playUiSound('coin');
+  const loadingMs = Number(process.env.CYBERPINBALL_LOADING_MS ?? 2500);
+  await delay(Math.min(400, loadingMs));
+  await capture('chargement');
+  await delay(Math.max(0, loadingMs - 400));
+  if (launch?.stopped) {
+    endLaunch();
+    cinema.stop();
+    state = { ...state, phase: 'menu' };
+    broadcast();
+    return undefined;
+  }
+
+  // Un Pinball FX resté ouvert (partie précédente quittée dans son menu) ouvrirait sa table à lui : fermé d'abord.
+  const left = simulated === undefined ? runningPinballFx() : undefined;
+  if (left !== undefined) {
+    console.log(`Pinball FX (${table.id}) : jeu déjà ouvert (processus ${left}), fermé avant la partie.`); // i18n-ignore : journal
+    try {
+      process.kill(left);
+    } catch {
+      // Déjà parti.
+    }
+    await delay(1500);
+  }
+
+  closeTopmostWindows();
+  playing = table;
+  realign = undefined;
+  hideTaskbars();
+  settleScreens('game');
+  const startedAt = new Date();
+  const onPlaying = () => {
+    playingSince = Date.now();
+    state = { ...state, phase: 'playing' };
+    endLaunch();
+    settleScreens('vpx');
+    socialNet.setPresence({ status: 'playing', table: presenceTable(table), since: new Date().toISOString() });
+    broadcast();
+    if (autoStopAfterMs) setTimeout(() => game.stop(), autoStopAfterMs);
+  };
+  const onForeground = () => {
+    if (cinema.handover()) playUiSound('coil');
+  };
+  // Exit tenu se lit quel que soit le premier plan : le sondage des joysticks tourne pendant la partie.
+  const stopJoystick = watchJoystickButtons(() => undefined);
+  const command = fx && table.pinballFxTable !== undefined ? pinballFxCommand(fx, table.pinballFxTable) : undefined;
+  console.log(`Lancement : Pinball FX (${table.id}) lancé ${Date.now() - pressedAt} ms après le Start${command ? ` : ${command.file} ${command.args.join(' ')}` : ' (partie simulée)'}.`); // i18n-ignore : journal
+  const game =
+    simulated !== undefined || !command
+      ? simulateVpx({ onPlaying, onForeground })
+      : launchPinballFx({ command, exitHeld: exitHeldNow, onPlaying, onForeground });
+  if (launch) {
+    launch.stop = () => game.stop();
+    launchStep('launched');
+    if (launch.stopped) game.stop();
+  }
+  if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
+  const result = await game.done;
+  stopJoystick();
+  const stoppedLoading = launch?.stopped === true;
+  endLaunch();
+  if (simulated === undefined) globalShortcut.unregister(accelerator(SHORTCUTS.forceStop));
+  cinema.stop();
+  stopWatchOccupied();
+  socialNet.setPresence({ status: 'menu', since: new Date().toISOString() });
+  playing = undefined;
+  restoreTaskbars('game-end');
+  const focusReturned = await showMenuAgain();
+  settleScreens('return');
+  recoverScreens('return');
+  setTimeout(() => playing || recoverScreens('return'), SCREENS_SETTLE_MS);
+  cabinetVolume?.remindIfMuted();
+  for (const notice of result.notices) console.log(`Pinball FX (${table.id}) : ${notice}`);
+
+  if (stoppedLoading) {
+    state = { ...state, phase: 'menu' };
+    broadcast();
+    return { result, focusReturned, entered: [] };
+  }
+  if (result.ok) {
+    if (!autoStopAfterMs) {
+      recordPlay(table, startedAt, result.seconds);
+      try {
+        if (result.seconds >= 60) socialNet.publish({ kind: 'played', table: presenceTable(table), seconds: Math.round(result.seconds) });
+        socialNet.checkBadges(playStats(tables));
+      } catch (error) {
+        console.log(`Partie (${table.id}) : nouvelles pour les amis et badges pas mis à jour (${(error as Error).message}) ; la partie compte quand même.`); // i18n-ignore : journal
+      }
+    }
+    tables = tables.map((t) => (t.id === table.id ? { ...t, info: readInfo(t.infoFile) } : t));
+    state = { ...state, phase: 'menu' };
+  } else {
+    console.log(`Partie (${table.id}) : échec de Pinball FX (${result.failure ?? 'inconnu'}) : ${result.message ?? ''}`); // i18n-ignore : journal
+    state = {
+      ...state,
+      phase: 'message',
+      message: {
+        title: t('Pinball FX n’a pas ouvert la table'),
+        lines: [
+          ...(result.message ? [result.message] : []),
+          t('Vérifiez que la table est achetée dans Pinball FX et que Steam (ou Epic) est connecté.'),
+          t('Start ou Exit : revenir au menu.'),
+        ],
+      },
+    };
+  }
+  broadcast();
+  return { result, focusReturned, entered: [] };
+}
+
+/**
  * Partie d'une table. En mode réglage de l'affichage (`display`), VPX démarre son menu ouvert
  * sur le cadrage ; la partie ne compte pas dans les statistiques et, à la fin, l'écran qui
  * l'a demandée (la fiche) reprend la main.
  */
 async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[]; board?: GroupRecord[]; onProgress?(p: LiveProgress): void; gate?: LiveStartGate } = {}): Promise<PlayReport | undefined> {
   const install = vpxInstall(loc);
-  if (!install) return undefined;
+  if (!install && table.emulator === 'vpx') return undefined;
   // Une sauvegarde automatique cède la place (elle reprendra au prochain moment libre) ; une sauvegarde
   // à la main ou une restauration en cours : la partie écrirait ses scores pendant la copie.
   await backups.yieldToGame();
@@ -6462,6 +6612,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     broadcast();
     return undefined;
   }
+
+  // Table de Pinball FX : sa propre partie, sans rien de ce qui est propre à VPX (pinballfx.ts).
+  if (table.emulator === 'pinballfx') return playPinballFx(table, autoStopAfterMs, mode, simulated);
+  if (!install) return undefined;
 
   // Dès le chargement : son écran rappelle les boutons du menu de VPX, pas ceux du jeu.
   displayMode = mode === 'display';
@@ -7695,7 +7849,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
       state.phase === 'loading' && role === 'playfield' && launch?.slow
         ? launch.stopped
           ? { step: t('Arrêt demandé : VPX se ferme'), since: launch.since }
-          : { step: loadingStepLabel(launch.step), since: launch.since, stop: t('{keys} ou Exit : arrêter', { keys: shortcutLabel(SHORTCUTS.forceStop) }) }
+          : { step: loadingStepLabel(launch.step), since: launch.since, stop: playing?.emulator === 'pinballfx' ? t('{keys} ou Exit : arrêter · en partie, appui long sur Exit : quitter Pinball FX', { keys: shortcutLabel(SHORTCUTS.forceStop) }) : t('{keys} ou Exit : arrêter', { keys: shortcutLabel(SHORTCUTS.forceStop) }) }
         : undefined,
     // Fronton du jeu choisi (image Backglass), en fond du menu au bureau, à côté du plateau.
     backglass: role === 'playfield' && m && table && !shown && !onMedallion() ? m.typeMedia(table, 'backglass', 'Backglass') : undefined,

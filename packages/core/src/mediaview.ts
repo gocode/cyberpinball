@@ -40,6 +40,7 @@ import { ROLES, type Cabinet, type FlipperEdge, type RoleId, type Rotation } fro
 import { companion } from './tablefiles';
 import type { TableEntry } from './tables';
 import { START_TABLES, TABLE_ORDERS, WHEEL_STARTS, type StartTable, type TableOrder, type WheelStart } from './tableorder';
+import { tableBaseName } from './tables';
 
 // ---------------------------------------------------------------------------
 // Adresse des fichiers
@@ -368,7 +369,7 @@ export class MenuMedias {
     const key = table.file.toLowerCase();
     const entry = this.b2s.get(key);
     if (entry && !entry.stale) return entry[kind];
-    const base = path.basename(table.file).replace(/\.vpx$/i, '');
+    const base = tableBaseName(table.file);
     const file = companion(table.folder, base, table.id.includes('/'), '.directb2s');
     if (!file) {
       this.b2s.set(key, { state: 'done' });

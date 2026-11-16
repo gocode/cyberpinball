@@ -232,7 +232,9 @@ test('attente du casque : Exit de la borne (touche ou bouton du joystick), Écha
   assert.match(main, /const stopWaitExit = vrGame !== undefined \? watchExitWhileWaiting\(\(\) => Boolean\(vrWearHint\) && !headset\?\.worn, \(\) => \{[\s\S]{0,200}game\.stop\(\);/);
   assert.match(main, /if \(load\) console\.log\(load\);\s*stopWaitExit\?\.\(\);/);
   // Les touches d'Exit de la borne : clavier par Windows, joystick par SDL ; un bouton déjà tenu au départ ne compte pas.
-  assert.match(main, /function watchExitWhileWaiting\(active: \(\) => boolean, onExit: \(\) => void\): \(\) => void \{\s*const codes = \(\) => KEYS\.exit;\s*let wasDown = true;/);
+  assert.match(main, /function watchExitWhileWaiting\(active: \(\) => boolean, onExit: \(\) => void\): \(\) => void \{\s*let wasDown = true;[\s\S]{0,300}const down = exitHeldNow\(\);/);
+  // Exit lu partout de la même façon (attente du casque, partie de Pinball FX) : les touches et boutons d'Exit de la borne.
+  assert.match(main, /function exitHeldNow\(\): boolean \{\s*const list = KEYS\.exit;/);
   assert.match(main, /keysDown\(vks\)/);
   assert.match(main, /joystickButtonsHeld\(\)/);
   // Échap et le raccourci affiché : raccourcis globaux pour toute partie dans le casque.

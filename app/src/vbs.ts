@@ -7,6 +7,8 @@
 // n'est pas modifiée ; VPX écrit aussi un fichier de réglages complet là où -Ini
 // le désigne, d'où un -Ini temporaire pour ne pas toucher au vrai.
 // Le script dit aussi quel PuP-Pack la table charge (B2SInit, Init).
+// Une table d'un autre émulateur (fiche .pinballfx) n'a pas de script : ses faits
+// sont vides (ni ROM ni PuP-Pack), sans lancer VPX ni la compter comme illisible.
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -31,8 +33,16 @@ function fresh(entry: CacheEntry | undefined, stat: fs.Stats): entry is CacheEnt
 
 const TIMEOUT_MS = 60_000;
 
+/** Faits d'une table sans script VPX : rien à charger. */
+const NO_SCRIPT: ScriptFacts = scriptFacts('');
+
+function isVpxFile(table: string): boolean {
+  return /\.vpx$/i.test(table);
+}
+
 /** Lit (ou reprend du cache) ce que le script d'une table dit de sa ROM. */
 export async function readScript(exe: string, table: string, dataDir: string): Promise<ScriptResult> {
+  if (!isVpxFile(table)) return NO_SCRIPT;
   const cacheFile = path.join(dataDir, 'cache', 'scripts.json');
   const cache = loadCache(cacheFile);
   const stat = fs.statSync(table);
@@ -120,6 +130,7 @@ export function rememberScript(table: string, facts: ScriptFacts, dataDir: strin
  * Une lecture d'une version précédente sert encore : la ROM y est, seuls les appels PuP manquent.
  */
 export function cachedScript(table: string, dataDir: string): ScriptFacts | undefined {
+  if (!isVpxFile(table)) return NO_SCRIPT;
   const cacheFile = path.join(dataDir, 'cache', 'scripts.json');
   const cache = loadCache(cacheFile);
   const entry: CacheEntry | undefined = cache[table.toLowerCase()];

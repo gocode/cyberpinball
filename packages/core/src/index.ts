@@ -21,6 +21,7 @@ export * from './store';
 export * from './configurations';
 export * from './locations';
 export * from './tables';
+export * from './pinballfx';
 export * from './tableorder';
 export * from './backtrail';
 export * from './loadingprogress';

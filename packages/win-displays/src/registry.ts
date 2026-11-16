@@ -10,6 +10,8 @@ type NativeFn = (...args: any[]) => any;
 
 /** HKEY_LOCAL_MACHINE, étendu sur 64 bits comme le fait winreg.h ((HKEY)(LONG)0x80000002). */
 const HKEY_LOCAL_MACHINE = -0x7ffffffe;
+/** HKEY_CURRENT_USER ((HKEY)(LONG)0x80000001) : réglages de l'utilisateur (dossier de Steam). */
+const HKEY_CURRENT_USER = -0x7fffffff;
 const KEY_READ = 0x20019;
 const KEY_WOW64_64KEY = 0x0100;
 const RRF_RT_ANY = 0x0000ffff;
@@ -78,13 +80,22 @@ export function hklmSubkeys(path: string): string[] {
  * pour REG_QWORD, octets bruts sinon ; undefined si elle est absente ou illisible.
  */
 export function hklmValue(path: string, name: string): RegistryValue | undefined {
+  return valueAt(HKEY_LOCAL_MACHINE, path, name);
+}
+
+/** Valeur HKCU\<path>\<name>, lue comme hklmValue. */
+export function hkcuValue(path: string, name: string): RegistryValue | undefined {
+  return valueAt(HKEY_CURRENT_USER, path, name);
+}
+
+function valueAt(root: number, path: string, name: string): RegistryValue | undefined {
   const w = loadApi();
   let size = 1024;
   for (let attempt = 0; attempt < 3; attempt++) {
     const data = Buffer.alloc(size);
     const type = [0];
     const length = [size];
-    const rc = w.RegGetValueW(HKEY_LOCAL_MACHINE, path, name, RRF_RT_ANY, type, data, length);
+    const rc = w.RegGetValueW(root, path, name, RRF_RT_ANY, type, data, length);
     if (rc === ERROR_MORE_DATA) {
       size = length[0]! + 2;
       continue;

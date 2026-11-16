@@ -290,4 +290,4 @@ export * from './system-volume';
 export * from './openxr';
 export * from './handles';
 export * from './device-guard';
-export { hklmValue } from './registry';
+export { hkcuValue, hklmValue } from './registry';

@@ -24,6 +24,7 @@ import { dmdMediaType, type MediaType } from './medias';
 import { edgeRotation, type Cabinet, type FlipperEdge, type Rect, type Rotation } from './model';
 import { readJsonFile } from './store';
 import type { TableEntry } from './tables';
+import { tableBaseName } from './tables';
 
 // ---------------------------------------------------------------------------
 // Réglages
@@ -446,7 +447,7 @@ export function recordingsRoot(dataDir: string): string {
 
 /** Dossier des enregistrements d'une table : au nom de son .vpx, stable tant que la table l'est. */
 export function recordingDir(dataDir: string, table: Pick<TableEntry, 'file'>): string {
-  return path.join(recordingsRoot(dataDir), path.basename(table.file).replace(/\.vpx$/i, ''));
+  return path.join(recordingsRoot(dataDir), tableBaseName(table.file));
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
