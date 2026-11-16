@@ -30,6 +30,7 @@ export const messages: Record<string, string> = {
   'Inutile ici': 'Not needed here',
   Introuvable: 'Not found',
   Attendu: 'Waiting',
+  'Téléchargement en cours': 'Downloading',
   Reçu: 'Received',
   Installé: 'Installed',
   '{site} · compte nécessaire': '{site} · account required',

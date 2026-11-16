@@ -5241,6 +5241,31 @@ export function createLibrary(host: LibraryHost) {
   }
 
   /**
+   * Où en est le menu système (reprise après une relance, menu-resume.ts) : sa rubrique et l'entrée
+   * choisie ; undefined quand la gestion des tables est fermée (la roue).
+   */
+  function systemPlace(): { group?: string; chosen?: string } | undefined {
+    if (!screen) return undefined;
+    return { ...(systemGroup ? { group: systemGroup } : {}), ...(systemChosen ? { chosen: systemChosen } : {}) };
+  }
+
+  /**
+   * Reprise après une relance : la rubrique où l'on était, la sélection sur l'entrée choisie, sans la
+   * relancer (« Bureau Windows » ne repart pas au bureau). Une rubrique ou une entrée inconnue de
+   * cette version (ou fermée à l'invité) : rien, le menu reste sur la roue.
+   */
+  function reopenSystem(place: { group?: string; chosen?: string }): boolean {
+    if (!host.guest.allows('menu.system') || busy) return false;
+    const group = place.group && isSystemGroup(place.group as SystemEntryId) ? (place.group as SystemGroupId) : undefined;
+    if (place.group && !group) return false;
+    const chosen = place.chosen && systemEntries(group).includes(place.chosen as SystemEntryId) ? (place.chosen as SystemEntryId) : undefined;
+    systemReturn = undefined;
+    systemChosen = chosen;
+    openSystemGroup(group, chosen);
+    return true;
+  }
+
+  /**
    * Une entrée ou une rubrique du menu système ouverte directement (téléphone) : comme si on l'avait
    * choisie dans sa rubrique, dont son « Retour » ramène. Rien en mode invité, ni pour une entrée que
    * l'application ne fournit pas sur cette borne.
@@ -5511,6 +5536,8 @@ export function createLibrary(host: LibraryHost) {
     remoteEntries,
     remoteMenus,
     openSystemEntry,
+    systemPlace,
+    reopenSystem,
     /** Essais : ouvrir l'écran de la télécommande. */
     openPhoneRemote: () => remoteMenu?.item.run(),
     /** Sélecteur de fichiers de Cyber Pinball ; undefined à l'abandon, l'écran d'où l'on vient revient tel quel. */

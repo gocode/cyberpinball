@@ -44,6 +44,8 @@ import {
   formatNumber,
   formatSize,
   formatTransfer,
+  transferPercent,
+  type TransferProgress,
   infoFileFor,
   installedGames,
   installedParts,
@@ -355,6 +357,26 @@ export function createCatalog(ctx: CatalogContext) {
   /** Élément pour lequel la fenêtre « Récupérer » est ouverte. */
   let windowItem: string | undefined;
 
+  /**
+   * Téléchargements en cours de la fenêtre « Récupérer », par nom de fichier : l'élément pour
+   * lequel la page était ouverte quand il a commencé, et où il en est. La carte, la ligne de
+   * la liste d'attente et celle des parties du jeu y lisent leur barre (16/11/2026 : seul le
+   * bandeau du haut disait qu'un fichier arrivait, la carte de la table restait « Attendu »).
+   */
+  const transfers = new Map<string, { item: string; progress: TransferProgress }>();
+
+  /** Où en est le téléchargement d'un élément attendu ; undefined s'il n'y en a pas. */
+  function transferOf(itemId: string): TransferProgress | undefined {
+    for (const tr of transfers.values()) if (tr.item === itemId) return tr.progress;
+    return undefined;
+  }
+
+  /** Barre d'un téléchargement en cours : verte, remplie à son pourcentage ; hachurée si la taille n'est pas annoncée. */
+  function transferBar(p: TransferProgress): { value?: number; tone: Tone } {
+    const percent = transferPercent(p);
+    return percent === undefined ? { tone: 'ok' } : { value: percent / 100, tone: 'ok' };
+  }
+
   // ---------- Contenu des fichiers reçus ----------
 
   type Seen = { content: ContentKind; summary?: ContentCounts; parts?: NeedKind[] };
@@ -461,6 +483,7 @@ export function createCatalog(ctx: CatalogContext) {
    * remplace ; l'ancien fichier est gardé de côté, rien n'est perdu.
    */
   async function received(file: string, facts: { urls?: string[]; filename: string }, via: 'window' | 'watch', vps: VpsDb | undefined): Promise<void> {
+    if (via === 'window') transfers.delete(facts.filename);
     const seen = await inspect(file);
     const l = waitList();
     const url = facts.urls?.at(-1);
@@ -526,6 +549,8 @@ export function createCatalog(ctx: CatalogContext) {
     adBlocker,
     received: (file, facts) => void received(file, facts, 'window', vpsCache),
     progress: (filename, progress) => {
+      const item = transfers.get(filename)?.item ?? windowItem;
+      if (item) transfers.set(filename, { item, progress });
       notice = {
         text: t('Téléchargement de « {file} » : {progress}…', { file: filename, progress: formatTransfer(progress, true) }),
         tone: 'info',
@@ -533,6 +558,7 @@ export function createCatalog(ctx: CatalogContext) {
       host.broadcast();
     },
     failed: (filename, reason) => {
+      transfers.delete(filename);
       notice = {
         text: reason === 'cancelled' ? t('Téléchargement annulé : « {file} ». Rien n’a été gardé.', { file: filename }) : t('Téléchargement interrompu : « {file} ». Rien n’a été gardé.', { file: filename }),
         tone: 'warning',
@@ -1130,10 +1156,13 @@ export function createCatalog(ctx: CatalogContext) {
       const canGet = need.files.length > 0 && (need.state === 'todo' || need.state === 'optional' || need.state === 'useless');
       const label = `${NEED_LABELS[need.kind]}${need.kind === 'rom' && need.roms?.length ? ` ${formatList(need.roms, 'or')}` : ''}`;
       const host1 = need.files[0] && liveLinks(need.files[0])[0] ? linkHost(liveLinks(need.files[0])[0]!.url) : undefined;
+      // Fichier en route pour cet élément : la barre et le chiffre sur sa carte, pas seulement en haut.
+      const moving = item?.state === 'waiting' ? transferOf(item.id) : undefined;
       const card: MediaCard = {
         title: label,
         code: need.required ? t('indispensable') : undefined,
-        state: { label: st.label, tone: st.tone },
+        state: moving ? { label: t('Téléchargement en cours'), tone: 'ok' } : { label: st.label, tone: st.tone },
+        ...(moving ? { transfer: { ...transferBar(moving), text: formatTransfer(moving, true) } } : {}),
         facts: item?.received
           ? issue
             ? t('reçu : {file} — {problem}', { file: path.basename(item.received.file), problem: problemText(issue) })
@@ -1571,6 +1600,8 @@ export function createCatalog(ctx: CatalogContext) {
             : t('attendu depuis le {date} · {site}', { date: formatDay(Date.parse(i.addedAt)), site: linkHost(i.page).label });
           const along = (i.received?.parts ?? []).filter((k) => k !== i.kind);
           const detail = along.length ? t('{when} · apporte aussi : {parts}', { when, parts: formatList(along.map((k) => NEED_LABELS[k].toLowerCase())) }) : when;
+          const moving = i.state === 'waiting' && !issue ? transferOf(i.id) : undefined;
+          if (moving) return { text: itemName(i), detail: formatTransfer(moving, true), badges: [t('Téléchargement en cours')], tone: 'ok', progress: transferBar(moving), action, pick: true };
           return {
             text: itemName(i),
             detail: issue ? `${when} — ${problemText(issue)}` : detail,
@@ -2383,6 +2414,10 @@ export function createCatalog(ctx: CatalogContext) {
     },
     /** Dernier message du catalogue (fichier reçu, téléchargement direct…), pour un autre écran ; il reste jusqu'au geste suivant. */
     currentNotice: () => notice,
+    /** Téléchargement en cours d'un élément attendu (fenêtre « Récupérer ») : où il en est. */
+    transferOf,
+    /** Barre verte de ce téléchargement (Row.progress, MediaCard.transfer). */
+    transferBar,
     /** Pour les essais : fenêtre « Récupérer », réception d'un fichier comme par la surveillance. */
     acquirer,
     receive: (file: string, via: 'window' | 'watch') => received(file, { filename: path.basename(file) }, via, vpsCache),

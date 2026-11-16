@@ -678,7 +678,9 @@ test('touches du clavier : le relâchement d’un appui traité arrive toujours 
     if (/onKeyInput\(/.test(text)) assert.match(text, /'preload\.js'/, `${file} : onKeyInput sans preload.js`);
   }
   assert.match(read('wizard.ts'), /onKeyInput\(/);
-  assert.match(read('frontend.ts'), /onKeyInput\(win, handleKey, handleKeyUp\)/);
+  // Par le filtre des modificateurs (modifier-chords.ts), qui remet tout à handleKey et handleKeyUp.
+  assert.match(read('frontend.ts'), /onKeyInput\(win, keyboardChords\.down, keyboardChords\.up\)/);
+  assert.match(read('frontend.ts'), /const keyboardChords = createModifierChords<Input>\(\{ down: \(input\) => handleKey\(input\), up: \(input\) => handleKeyUp\(input\), isShortcut: isAppShortcut \}\);/);
 });
 
 // ---------------------------------------------------------------------------

@@ -49,6 +49,16 @@ export function shownKeys(codes: readonly string[]): string[] {
   return code ? [keyLabel(code)] : [];
 }
 
+/**
+ * Vrai si cet appui est un raccourci de Cyber Pinball fait de modificateurs et d'une touche :
+ * ceux de SHORTCUTS, et Ctrl+Q (quitter, reconnu avec tout autre modificateur par handleKey).
+ * Leurs modificateurs, qui sont aussi des boutons du menu, n'y agissent pas (modifier-chords.ts).
+ */
+export function isAppShortcut(input: { code: string; control?: boolean; shift?: boolean; alt?: boolean; meta?: boolean }): boolean {
+  if (input.control && input.code === 'KeyQ') return true;
+  return Object.values(SHORTCUTS).some((s: Shortcut) => (s.control || s.shift || s.alt) && matchesShortcut(input, s));
+}
+
 /** Vrai si la touche appuyée (événement d'Electron ou du clavier) est ce raccourci, sans autre modificateur. */
 export function matchesShortcut(input: { code: string; control?: boolean; shift?: boolean; alt?: boolean; meta?: boolean }, shortcut: Shortcut): boolean {
   return (

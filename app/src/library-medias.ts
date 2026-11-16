@@ -143,6 +143,12 @@ export interface MediaCard {
   thumb: MediaThumb;
   /** Avancement d'une attente ou d'un téléchargement, de 0 à 1 (barre sous les faits). */
   progress?: number;
+  /**
+   * Téléchargement en cours de la partie (carte « Table » de l'installation) : la barre des
+   * Téléchargements, verte, sous les faits ; sans valeur, hachurée (taille non annoncée). `text` :
+   * « 92 % · 273 Mo sur environ 295 Mo · 4,5 Mo/s », sous la barre, en couleur neutre.
+   */
+  transfer?: { value?: number; tone?: Tone; text?: string };
   /** Signe à part de l'état (« Autre jeu » : une proposition d'un autre jeu que la table). */
   flag?: { label: string; tone: Tone };
   /** Popularité sur le site de la fiche (« 510 téléchargements »). */

@@ -156,6 +156,8 @@ export * from './power';
 export * from './arcadehours';
 export * from './cinema';
 export * from './intro';
+export * from './menu-resume';
+export * from './modifier-chords';
 export * from './sessionorientation';
 export * from './sharing';
 export * from './mediapack';

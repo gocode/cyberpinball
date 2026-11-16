@@ -1064,6 +1064,10 @@ function renderMediaCards(m, cursor) {
       bar.append(fill);
       text.append(bar);
     }
+    if (c.transfer) {
+      text.append(rowProgress(c.transfer));
+      if (c.transfer.text) line('media-facts', '', c.transfer.text);
+    }
     if (c.pending) line('media-pending', '', c.pending);
     for (const extra of c.extra ?? []) line('media-extra', '', extra);
     li.append(text);

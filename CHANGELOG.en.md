@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Installing a table: while a file is downloading, its card ("Table", "Fronton" (backglass)…) shows it itself, with the "Téléchargement en cours" (Downloading) badge, a green bar and the percentage, amount and rate. Likewise in the waiting list and in the game parts of an installed table. The message at the top of the screen stays.
 - Instant games (Community): open a live game to everyone, on the table of your choice, choosing the number of players (2 to 4). It shows up for every player online; anyone can join, friend or not, if they have the same version of the table, and it starts by itself for everyone as soon as it is full. Also from a table's sheet ("Instant game"). The host is told of each arrival.
 - First buttons screen ("Are your buttons already right?"): the flippers and arrows move from one choice to the other, as in any menu, without ever changing screen; Start or Enter confirm the selected choice. In 0.1.13, an arrow or a flipper kept the keys and moved on to the next screen.
 - Wizard: the interface buttons (previous, next, confirm, back) are set first, since they drive the menus and the rest of the wizard; the game buttons are then offered on the same buttons. "◀ Previous" goes back to the step before instead of going round in circles, and each screen bears its step's name ("Interface buttons · Button 2 of 4").

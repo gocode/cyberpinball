@@ -353,6 +353,12 @@ import {
   IntroRun,
   type IntroView,
   INTRO_SKIP_FLAG,
+  createModifierChords,
+  isAppShortcut,
+  type MenuResume,
+  readResume,
+  resumeArg,
+  withoutResume,
   introAtStartup,
   introFiles,
   introMediaView,
@@ -5395,10 +5401,13 @@ function applyRelaunchWatcher(): void {
  * se libèrent, le bureau et les barres des tâches reviennent. Le même raccourci (global tant
  * que dure le mode bureau), le bouton du playfield dans la barre des tâches ou Alt+Tab
  * ramènent le menu sur tous ses écrans (restoreFromDesktop).
+ *
+ * L'écran ouvert reste tel quel (16/11/2026) : on revient du bureau là où on l'avait quitté (la
+ * rubrique « Borne » sur « Bureau Windows », la Vision 3D…), jamais sur la roue faute de mieux.
+ * Une relance au retour (quart de tour de l'écran) reprend la même place (relaunchMenu).
  */
 function showDesktop(): boolean {
   if (desktop.active || state.phase === 'loading' || state.phase === 'playing') return true;
-  library.leave();
   // Borne dédiée : sans Explorateur, il n'y a pas de bureau ; une fenêtre de fichiers en tient
   // lieu (sous Shell Launcher, explorer.exe n'ouvre que cela, sans barre des tâches).
   if (shellSession() && !dedicatedSystem.explorerShown()) dedicatedSystem.openExplorer();
@@ -5866,6 +5875,8 @@ export function startFrontend(): void {
     // Conditions et profil attendent la fin de l'ouverture : rien ne se pose sur les animations.
     pendingStartupScreens = startupScreens;
   } else if (startupScreens) openStartupScreens(startupScreens);
+  // Relance par le menu lui-même (retour du bureau, langue…) : la table et la rubrique d'avant.
+  resumeMenuPlace(readResume(process.argv), Boolean(startupScreens));
 
   const stress = process.env.CYBERPINBALL_STRESS;
   // L'endurance lance de vraies parties : jamais hors écran.
@@ -6035,7 +6046,8 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
     nameScreen(bounds, role.label);
     win.on('page-title-updated', (e) => e.preventDefault());
     // Relâchements compris (combinaison du mode invité) : onKeyInput les fait arriver (key-input.ts).
-    onKeyInput(win, handleKey, handleKeyUp);
+    // Ctrl et Maj d'un raccourci (Ctrl+Maj+D…) n'y agissent pas en MagnaSave ni en flipper (keyboardChords).
+    onKeyInput(win, keyboardChords.down, keyboardChords.up);
     // Boutons d'un joystick (Pinscape…) : comme des touches.
     onJoystickInput(win, (input) => (input.type === 'keyDown' ? handleKey(input) : handleKeyUp(input)));
     // Mode invité : Alt+F4 ne ferme pas le menu. Cyber Pinball seul se ferme (quitter, relance), et Windows à son arrêt.
@@ -6127,6 +6139,13 @@ function handleKeyUp(input: Input, fromPhone = false): void {
 }
 
 /**
+ * Touches du clavier des fenêtres du menu : Ctrl et Maj, qui sont aussi MagnaSave et flippers,
+ * attendent un instant ; suivis d'un raccourci de Cyber Pinball (Ctrl+Maj+D…), ils n'agissent pas
+ * (modifier-chords.ts, 16/11/2026). Joystick, téléphone et casque n'y passent pas.
+ */
+const keyboardChords = createModifierChords<Input>({ down: (input) => handleKey(input), up: (input) => handleKeyUp(input), isShortcut: isAppShortcut });
+
+/**
  * Touches et boutons du menu. En mode invité, chaque porte (GUEST_DOORS) laisse passer ou non :
  * fermée, rien ne se passe que l'indice « Verrouillé » près du cadenas.
  */
@@ -6152,7 +6171,8 @@ function handleKey(input: Input, fromPhone = false): boolean {
     return true;
   }
   // Raccourci du mode bureau, de n'importe quel écran du menu (sauf pendant une partie) ; une fenêtre rouverte au bureau le reçoit aussi : retour.
-  if (matchesShortcut(input, SHORTCUTS.desktop)) return desktop.active ? (restoreFromDesktop(), true) : guest.knock('shortcut.desktop') ? showDesktop() : true;
+  // Une touche tenue n'y revient pas : D encore enfoncé au retour du bureau (raccourci global) ne repartait pas aussitôt au bureau.
+  if (matchesShortcut(input, SHORTCUTS.desktop)) return input.isAutoRepeat ? true : desktop.active ? (restoreFromDesktop(), true) : guest.knock('shortcut.desktop') ? showDesktop() : true;
   // Bouton « Bureau Windows » de la borne (Boutons de l'interface, facultatif) : de même, d'un appui, de n'importe quel écran du menu.
   if (is(KEYS.desktop)) return input.isAutoRepeat ? true : desktop.active ? (restoreFromDesktop(), true) : guest.knock('shortcut.desktop') ? showDesktop() : true;
   // N'importe quel bouton en mode attente y met fin, sans autre effet ; sinon il remet le compte à zéro.
@@ -7725,8 +7745,28 @@ function relaunchMenu(withIntro = false): void {
   // Par le gardien des écrans, comme toute relance : aucun écran ne montre le bureau entre les deux.
   // app.exit ferme l'ancien processus sans before-quit : ce qu'il garde est enregistré ici.
   saveSettings();
-  const args = process.argv.slice(1).filter((a) => a !== INTRO_SKIP_FLAG);
-  relaunchCovered(withIntro ? args : [...args, INTRO_SKIP_FLAG]);
+  const args = withoutResume(process.argv.slice(1)).filter((a) => a !== INTRO_SKIP_FLAG);
+  // Relance technique (retour du bureau, langue, DMD…) : le menu reprend sa place (menu-resume.ts) ; un redémarrage demandé repart de zéro.
+  const resume = withIntro ? undefined : resumeArg(menuPlace());
+  relaunchCovered(withIntro ? args : [...args, INTRO_SKIP_FLAG, ...(resume ? [resume] : [])]);
+}
+
+/** Où est le menu : la table sélectionnée, et la rubrique du menu système ouverte (relaunchMenu). */
+function menuPlace(): MenuResume {
+  const table = tables[state.index]?.file;
+  const system = state.phase === 'library' ? library.systemPlace() : undefined;
+  return { ...(table ? { table } : {}), ...(system ? { system } : {}) };
+}
+
+/** Au démarrage, après une relance par le menu lui-même : la table et la rubrique d'avant (menuPlace). */
+function resumeMenuPlace(resume: MenuResume | undefined, screensFirst: boolean): void {
+  if (!resume) return;
+  const table = resume.table ? tables.find((entry) => entry.file === resume.table) : undefined;
+  if (table) state = { ...state, index: tables.indexOf(table) };
+  // Conditions ou profil à présenter d'abord : ils ramènent à la roue, la rubrique n'est pas reprise.
+  const reopened = state.phase === 'menu' && !screensFirst && resume.system ? library.reopenSystem(resume.system) : false;
+  console.log(`Reprise du menu après la relance : table ${table ? table.id : 'de départ'}${resume.system ? (reopened ? `, menu système (${resume.system.group ?? 'racine'})` : ', menu système non repris') : ''}.`); // i18n-ignore : journal
+  broadcast();
 }
 
 /** Les règles du pare-feu au démarrage (firewall-guard.ts) ; après une mise à jour, l'écran qui demande de les reposer. */

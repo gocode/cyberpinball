@@ -52,6 +52,7 @@ import {
   type InstalledPart,
   type Layout,
   type MediaSiteId,
+  formatTransfer,
   type NeedKind,
   type PartOffer,
   type PartWanted,
@@ -252,6 +253,8 @@ export function createGameParts(ctx: GamePartsContext) {
       return { text, detail: [shown, formatSize(here.size), extra].filter(Boolean).join(' · '), badges: [t('Présent')], tone: 'ok' };
     }
     if (item?.state === 'received') return { text, detail: t('{file} · reçu le {date}', { file: path.basename(item.received!.file), date: formatDay(Date.parse(item.received!.at)) }), badges: [t('Reçu, à installer')], tone: 'info' };
+    const moving = item ? ctx.catalog.transferOf(item.id) : undefined;
+    if (moving) return { text, detail: formatTransfer(moving, true), badges: [t('Téléchargement en cours')], tone: 'ok', progress: ctx.catalog.transferBar(moving) };
     if (item) return { text, detail: t('{label} · {site}', { label: item.label, site: linkHost(item.page).label }), badges: [t('Attendu')], tone: 'warning' };
     if (part === 'rom' && usesRom === false) return { text, detail: t('cette table n’utilise pas de ROM'), badges: [t('Inutile')], tone: 'quiet' };
     const web = webFiles(part).length;
@@ -426,7 +429,10 @@ export function createGameParts(ctx: GamePartsContext) {
     const rows: Row[] = [];
     if (here) rows.push({ text: t('Dans la table'), detail: [here.entries.map((e) => (e.dir ? `${e.rel}${path.sep}` : e.rel)).join(' · '), formatSize(here.size)].join(' · '), tone: 'ok' });
     if (item?.received) rows.push({ text: t('Reçu, à installer'), detail: t('{file} · le {date}', { file: path.basename(item.received.file), date: formatDay(Date.parse(item.received.at)) }), tone: 'info' });
-    else if (item) rows.push({ text: t('Attendu'), detail: t('{label} · {site}', { label: item.label, site: linkHost(item.page).label }), tone: 'warning' });
+    else if (item && ctx.catalog.transferOf(item.id)) {
+      const moving = ctx.catalog.transferOf(item.id)!;
+      rows.push({ text: t('Téléchargement en cours'), detail: formatTransfer(moving, true), tone: 'ok', progress: ctx.catalog.transferBar(moving) });
+    } else if (item) rows.push({ text: t('Attendu'), detail: t('{label} · {site}', { label: item.label, site: linkHost(item.page).label }), tone: 'warning' });
     rows.push(...sourceRows(part, p));
     return {
       heading: partLabel(part),
