@@ -53,6 +53,9 @@ import {
   applyRomImport,
   addPinballFxTable,
   PINBALLFX_TABLES,
+  pinballFxVpsImage,
+  placeMissingMedia,
+  mediaUrl,
   readInfo,
   readDmdPlaces,
   setTableSource,
@@ -255,7 +258,7 @@ import { dofDir, readDof, vpxWorkDir } from './dof-files';
 import { backupDir, locations } from './paths';
 import { activeVpxIni, usbDevices } from './vpx-ini';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
-import { detectPinballFx, openPinballFxStore, pinballFxSetup } from './pinballfx-install';
+import { openPinballFxStore, pinballFxSetup } from './pinballfx-install';
 import { LayoutReport } from './layout-check';
 import { createJukeboxLibrary } from './jukebox-library';
 import { createJukeboxMenu } from './jukebox-menu';
@@ -271,6 +274,7 @@ import { qrRows } from './remote-qr';
 import { createJourney } from './journey';
 import { createMediaDownload, mediaOffersLabel, type MediaDbGameOffer } from './media-download';
 import { createMediaSearch } from './media-search';
+import { allowPreview } from './media-protocol';
 import { createTableRules, type HelpPage } from './table-rules';
 import { createConverter } from './media-convert';
 import { analyseDressing } from './fulldmd';
@@ -590,6 +594,8 @@ export interface Row {
    * d'une icône dessinée à sa place quand il n'y a pas d'image.
    */
   thumb?: string;
+  /** Icône à la place d'une vignette illisible (« music » sans elle, pour le Juke-box). */
+  thumbIcon?: string;
   /** Valeur courte à droite de la ligne (« 1080p », « 4:12 », « 21 / 24 retenus »), jamais coupée. */
   aside?: string;
   /** Seconde ligne de détail, plus discrète (dernière synchro, raison d'une indisponibilité). */
@@ -1272,6 +1278,8 @@ export function createLibrary(host: LibraryHost) {
 
   /** La fiche de la table ; « Gérer la table… » quand c'est de là qu'on revient (sheetManage). */
   function openSheet(table: TableEntry, flash?: string): void {
+    // Fiche d'une table de Pinball FX : le jeu installé ou non, relu ici, une fois.
+    if (table.emulator === 'pinballfx') pinballFxNow = pinballFxSetup();
     go({ kind: 'sheet', file: table.file, flash, ...(sheetManage && samePath(sheetManage, table.file) ? { manage: true } : {}) });
   }
 
@@ -2257,6 +2265,8 @@ export function createLibrary(host: LibraryHost) {
     fs.mkdirSync(layout()!.import, { recursive: true });
     // La base VPS se met à jour pendant qu'on choisit les fichiers.
     void refreshVps();
+    // Pinball FX installé ou non : relu ici, une fois, pas à chaque dessin de l'entonnoir.
+    pinballFxNow = pinballFxSetup();
     go({ kind: 'addSource' });
   }
 
@@ -2651,7 +2661,8 @@ export function createLibrary(host: LibraryHost) {
     if (inv.crashReports.length) check.push(t('un rapport de plantage laissé par VPX'));
     if (absent.length) files.push({ text: t('Absents'), detail: absent.join(', '), tone: 'quiet' });
     if (check.length) files.push({ text: t('À vérifier'), detail: check.join(', '), tone: 'warning' });
-    const fxInstall = fx ? detectPinballFx() : undefined;
+    // Lu à l'ouverture de la fiche (openSheet), pas à chaque dessin.
+    const fxInstall = fx ? (pinballFxNow ??= pinballFxSetup()).install : undefined;
     const fxFiles: Row[] = [
       table.pinballFxTable !== undefined
         ? { text: t('Table'), detail: t('Pinball FX, table n° {n}', { n: table.pinballFxTable }), tone: 'ok' }
@@ -3750,8 +3761,14 @@ export function createLibrary(host: LibraryHost) {
    * il paraît ; ni Steam ni Epic, ou téléchargement en cours : grisée, avec la raison. Cyber Pinball
    * ne télécharge ni le jeu ni ses tables : jeu commercial, lié au compte du joueur.
    */
+  /**
+   * État de Pinball FX sur ce PC : lu à l'ouverture de l'entonnoir (openAdd) et par la veille après
+   * « Installer Pinball FX », jamais en dessinant l'écran (refait à chaque touche).
+   */
+  let pinballFxNow: ReturnType<typeof pinballFxSetup> | undefined;
+
   function pinballFxAction(): Action {
-    const setup = pinballFxSetup();
+    const setup = (pinballFxNow ??= pinballFxSetup());
     const install = setup.install;
     const inMenu = host.tables().filter((x) => x.emulator === 'pinballfx').length;
     // En phase de test (16/11/2026) : pastille « BÊTA » dans tous ses états, comme la VR.
@@ -3794,7 +3811,7 @@ export function createLibrary(host: LibraryHost) {
   function watchPinballFxInstall(): void {
     if (pinballFxWatch) clearInterval(pinballFxWatch);
     const state = () => {
-      const s = pinballFxSetup();
+      const s = (pinballFxNow = pinballFxSetup());
       return s.install ? 'installed' : s.downloading ? 'downloading' : 'absent';
     };
     let last = state();
@@ -3818,14 +3835,119 @@ export function createLibrary(host: LibraryHost) {
   /** Dernier message de l'écran des tables de Pinball FX (table ajoutée). */
   let pinballFxFlash: string | undefined;
 
-  /** Tables de Pinball FX : le catalogue de Zen ; Start ajoute la table au menu, ou ouvre sa fiche si elle y est. */
+  /** Vignettes des tables de Pinball FX : adresse de la capture de VPS -> fichier reçu et vérifié. */
+  const pinballFxThumbs = new Map<string, string>();
+  /** Captures déjà demandées : une adresse en échec n'est pas redemandée à chaque dessin de l'écran. */
+  const pinballFxAsked = new Set<string>();
+  /** La base VPS a été demandée une fois (sans réseau, l'écran s'ouvre sans vignettes, sans redemander). */
+  let pinballFxVpsTried = false;
+
+  /**
+   * Tables de Pinball FX : le catalogue de Zen ; Start ajoute la table au menu, ou ouvre sa fiche si
+   * elle y est. Vignettes et médias viennent de la base VPS : téléchargée une fois (8 Mo), gardée ensuite.
+   */
   function openPinballFx(focus?: number): void {
-    const list = pinballFxList();
-    openCustom(buildPinballFx, focus === undefined ? undefined : Math.max(0, list.findIndex((x) => x.id === focus)));
+    // Vignettes rangées ou nettoyées depuis (dossier de réception) : redemandées. Le disque est lu
+    // ici, à l'ouverture, jamais en dessinant l'écran (refait à chaque touche).
+    for (const [url, local] of pinballFxThumbs) {
+      if (fs.existsSync(local)) continue;
+      pinballFxThumbs.delete(url);
+      pinballFxAsked.delete(url);
+    }
+    const show = () => {
+      // Catalogue trié et captures de VPS calculés ici, à l'ouverture, pas au premier dessin.
+      pinballFxImageMap();
+      const list = pinballFxList();
+      openCustom(buildPinballFx, focus === undefined ? undefined : Math.max(0, list.findIndex((x) => x.id === focus)));
+    };
+    if ((vpsLoaded && vpsDb) || pinballFxVpsTried || !layout()) return show();
+    pinballFxVpsTried = true;
+    void task(t('Base VPS…'), async () => {
+      await vpsForImport().catch(() => undefined);
+      show();
+    });
+  }
+
+  /**
+   * Captures de VPS des tables de la liste, par paquets dans l'ordre de la liste, sans bloquer
+   * l'écran (une ligne sans vignette montre son icône) ; il se redessine à chaque paquet reçu.
+   */
+  function loadPinballFxThumbs(urls: string[]): void {
+    const wanted = urls.filter((u) => !pinballFxAsked.has(u));
+    if (!wanted.length) return;
+    for (const u of wanted) pinballFxAsked.add(u);
+    void (async () => {
+      for (let i = 0; i < wanted.length; i += 12) {
+        await mediaSearch.stagePreviews(wanted.slice(i, i + 12).map((url) => ({ url })), pinballFxThumbs, t('Vignettes'), { quiet: true, atOnce: 4 }).catch(() => undefined);
+        for (const url of wanted.slice(i, i + 12)) {
+          const local = pinballFxThumbs.get(url);
+          if (local) allowPreview(local);
+        }
+        host.broadcast();
+      }
+    })();
+  }
+
+  /**
+   * Vignette d'une table de Pinball FX : sa capture reçue, sinon l'icône de Pinball FX. Sans lecture du
+   * disque (vérifiée à l'ouverture de l'écran ; une image disparue entre-temps montre l'icône).
+   */
+  function pinballFxThumb(url: string | undefined): string {
+    const local = url ? pinballFxThumbs.get(url) : undefined;
+    return local ? mediaUrl(local) : 'pinball-app';
+  }
+
+  /** Catalogue trié et capture de VPS de chaque table : calculés une fois par base VPS. */
+  let pinballFxSorted: PinballFxTable[] | undefined;
+  let pinballFxImages: { db: VpsDb | undefined; map: Map<number, string> } | undefined;
+  function pinballFxImageMap(): Map<number, string> {
+    if (pinballFxImages && pinballFxImages.db === vpsDb) return pinballFxImages.map;
+    const map = new Map(pinballFxList().flatMap((fx) => {
+      const url = vpsDb ? pinballFxVpsImage(vpsDb, fx) : undefined;
+      return url ? [[fx.id, url] as const] : [];
+    }));
+    pinballFxImages = { db: vpsDb, map };
+    return map;
+  }
+
+  /**
+   * Médias d'une table de Pinball FX qu'on vient d'ajouter, en arrière-plan et suivis dans les
+   * téléchargements : ceux de VPinMediaDB qui lui manquent (logo, fronton, DMD, vidéos), puis, sans
+   * image du plateau, la capture de la table que donne VPS. Rien n'est remplacé.
+   */
+  async function fetchPinballFxMedias(fx: PinballFxTable, file: string, flash: string): Promise<void> {
+    if (!fx.vps) return;
+    let installed = 0;
+    let placed = false;
+    const failed: string[] = [];
+    try {
+      const got = await mediaDownload.fillMissing([file], { quiet: true });
+      installed = got.installed;
+      failed.push(...got.failed);
+      const table = find(file);
+      const url = vpsDb ? pinballFxVpsImage(vpsDb, fx) : undefined;
+      if (table && url) {
+        await mediaSearch.stagePreviews([{ url }], pinballFxThumbs, t('Vignettes'), { quiet: true });
+        const staged = pinballFxThumbs.get(url);
+        if (staged) allowPreview(staged);
+        if (staged && fs.existsSync(staged)) placed = Boolean(placeMissingMedia(table, infoFileFor(table, tablesDir()), 'Playfield', staged, { origin: 'VPS', url, vpsId: fx.vps }));
+      }
+    } catch (error) {
+      failed.push((error as Error).message);
+    }
+    host.reload(file);
+    console.log(`Pinball FX : médias de « ${fx.title} » : ${installed} de VPinMediaDB${placed ? ', image du plateau de VPS' : ''}${failed.length ? ` ; non reçus : ${failed.join(' ; ')}` : ''}.`); // i18n-ignore : journal
+    if (pinballFxFlash !== flash) return;
+    const n = installed + (placed ? 1 : 0);
+    pinballFxFlash = n
+      ? tn(n, '« {title} » ajoutée au front-end, avec {n} média.', '« {title} » ajoutée au front-end, avec {n} médias.', { title: fx.title })
+      : t('« {title} » ajoutée au front-end. Aucun média trouvé pour elle : Start ouvre sa fiche, « Médias du jeu » en cherche sur le web.', { title: fx.title });
+    host.broadcast();
   }
 
   function pinballFxList(): PinballFxTable[] {
-    return [...PINBALLFX_TABLES].sort((a, b) => a.title.localeCompare(b.title, 'fr'));
+    pinballFxSorted ??= [...PINBALLFX_TABLES].sort((a, b) => a.title.localeCompare(b.title, 'fr'));
+    return pinballFxSorted;
   }
 
   function buildPinballFx(): Built {
@@ -3835,7 +3957,10 @@ export function createLibrary(host: LibraryHost) {
     };
     const present = new Map(host.tables().flatMap((x) => (x.pinballFxTable === undefined ? [] : [[x.pinballFxTable, x] as const])));
     const actions: Action[] = [];
-    const rows: Row[] = pinballFxList().map((fx) => {
+    const list = pinballFxList();
+    const images = pinballFxImageMap();
+    loadPinballFxThumbs([...images.values()]);
+    const rows: Row[] = list.map((fx) => {
       const entry = present.get(fx.id);
       const action =
         actions.push({
@@ -3849,8 +3974,9 @@ export function createLibrary(host: LibraryHost) {
             }
             const added = addPinballFxTable(tablesDir(), fx.id);
             console.log(`Pinball FX : table ${fx.id} (${fx.title}) ajoutée au front-end, ${added.id}.`); // i18n-ignore : journal
-            pinballFxFlash = t('« {title} » ajoutée au front-end.', { title: fx.title });
+            pinballFxFlash = fx.vps ? t('« {title} » ajoutée au front-end : ses médias arrivent (Téléchargements).', { title: fx.title }) : t('« {title} » ajoutée au front-end.', { title: fx.title });
             host.reload(added.file);
+            void fetchPinballFxMedias(fx, added.file, pinballFxFlash);
             openPinballFx(fx.id);
           },
         }) - 1;
@@ -3859,6 +3985,8 @@ export function createLibrary(host: LibraryHost) {
         detail: [fx.manufacturer, fx.year].filter(Boolean).join(' · '),
         badges: entry ? [t('Dans le front-end')] : [],
         tone: entry ? 'ok' : undefined,
+        thumb: pinballFxThumb(images.get(fx.id)),
+        thumbIcon: 'pinball-app',
         action,
         pick: true,
       };

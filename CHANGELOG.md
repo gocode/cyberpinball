@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.14
 
+- Pinball FX (bêta) : la liste « Tables de Pinball FX » montre une vignette de chaque table. Une table ajoutée au front-end reçoit ses médias en arrière-plan quand ils existent (logo, fronton, vidéos), sinon au moins l’image de son plateau ; les tables déjà ajoutées les trouvent par « Trouver les médias manquants ».
 - Vocabulaire : en français, l'interface de Cyber Pinball s'appelle désormais « le front-end » et non plus « le menu », dans tous les écrans, le manuel et la page du projet. « Revenir au menu » devient « Revenir au front-end », le « Menu des tables » devient l'« Écran des tables », et « Exit : menu » devient « Exit : Menu système ». « Menu » ne désigne plus que les vrais menus : Menu système, menu de VPX, menu de service.
 - Page du projet sur GitHub : le trailer de Cyber Pinball s'affiche en tête, juste après « Télécharger », en français sur la page française et en anglais sur la page anglaise. Un clic sur la vignette ouvre la vidéo sur YouTube.
 - Crédits d'une table : Start sur une ligne qui a une page (VPUniverse, VPForums…) l'ouvre directement dans le navigateur de la borne, avec tous ses auteurs dans le bandeau. Tant que la ligne est sélectionnée, son QR code s'affiche à côté des options, pour l'ouvrir aussi sur le téléphone. En mode invité, le navigateur reste fermé : Start montre les auteurs et le QR code.
@@ -33,6 +34,7 @@ son interface).
 - Salons : quand une ligne arrive dans votre salon (ou dans un salon où vous avez écrit depuis hier), une notification discrète l'annonce dans le front-end, jusqu'à deux minutes. Réglage : Réglages de la communauté > « Nouveaux messages de mes salons ».
 - Salons : en quittant un salon, vous y restez présent encore une minute, et vous ne disparaissez plus pendant que vous écrivez. Le nombre de présents ne s'affiche qu'au-delà de cinq.
 - Salons : « Clavier à l'écran… » devient « Écrire… », avec un exemple de /me (« /me arrive » s'affiche « <Pseudo> arrive », en italique). Une ligne déjà lue dans le salon ne s'annonce plus ensuite.
+- Communauté : le nombre de joueurs en ligne, et celui de votre pays, ne s'affiche qu'au-delà de cinq (médaillon, affiche, Menu système, téléphone) ; vos amis en ligne se comptent toujours.
 
 ## 0.1.13
 

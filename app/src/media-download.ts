@@ -940,17 +940,19 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
    * Après l'ajout, sans autre plan (celui de l'ajout les a montrés) : les médias qui
    * manquent à ces tables, depuis VPinMediaDB. Seulement les tables reconnues par leur
    * identifiant VPS ; un média déjà là n'est jamais remplacé. L'avertissement, montré
-   * dans le plan, vaut lecture.
+   * dans le plan, vaut lecture. `quiet` : en arrière-plan, sans message d'attente ni téléchargement
+   * de la base VPS (les tables sont reconnues à leur identifiant VPS) ; le suivi reste dans les
+   * téléchargements (tables de Pinball FX ajoutées au menu).
    */
-  async function fillMissing(files: string[]): Promise<{ installed: number; bytes: number; tables: number; failed: string[] }> {
+  async function fillMissing(files: string[], opts: { quiet?: boolean } = {}): Promise<{ installed: number; bytes: number; tables: number; failed: string[] }> {
     const out = { installed: 0, bytes: 0, tables: 0, failed: [] as string[] };
-    const { db: found, problem } = await index();
+    const { db: found, problem } = await ctx.search.index(opts);
     if (!found) {
       out.failed.push(problem ?? t('index de VPinMediaDB indisponible'));
       return out;
     }
     acceptMediaDbNotice(host.dataDir);
-    const vps = await ctx.search.vps();
+    const vps = opts.quiet ? undefined : await ctx.search.vps();
     const tables = oneByFolder(files.map((f) => ctx.find(f)).filter((x): x is TableEntry => Boolean(x)));
     const trashDir = trashDirFor(ctx.layout()!.trash, 'Remplacé par les médias de VPinMediaDB'); // i18n-ignore : nom de dossier de la corbeille
     for (const [i, table] of tables.entries()) {
@@ -966,7 +968,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
         trashDir,
         stagingDir: staging(),
         entry: entryOf(o).entry,
-        onProgress: (p) => (report(p), job.progress(p)),
+        onProgress: (p) => (opts.quiet ? undefined : report(p), job.progress(p)),
       });
       job.finish(result);
       out.tables++;

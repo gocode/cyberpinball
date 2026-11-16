@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Pinball FX (beta): the "Pinball FX tables" list shows a thumbnail of each table. A table added to the menu gets its media in the background when they exist (logo, backglass, videos), otherwise at least its playfield image; tables added earlier find them through "Find missing media".
 - Wording (French interface): Cyber Pinball's interface is now called "le front-end" instead of "le menu" across every screen, the manual and the project page; "menu" now only names real menus (System menu, VPX menu, service menu). The English interface is unchanged.
 - Project page on GitHub: the Cyber Pinball trailer now shows at the top, right after "Download", in English on the English page and in French on the French page. Clicking the thumbnail opens the video on YouTube.
 - A table's credits: Start on a line that has a page (VPUniverse, VPForums…) opens it directly in the cabinet's browser, with all its authors in the banner. While the line is selected, its QR code shows next to the options, to open it on your phone too. In guest mode the browser stays closed: Start shows the authors and the QR code.
@@ -31,6 +32,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Rooms: when a line arrives in your room (or in a room you wrote in since yesterday), a discreet notification announces it in the menu, for up to two minutes. Setting: Community settings > "Nouveaux messages de mes salons" (New messages in my rooms).
 - Rooms: when you leave a room, you stay present there for one more minute, and you no longer vanish while typing. The number of people present only shows above five.
 - Rooms: "Clavier à l'écran…" becomes "Écrire…" (Write…), with an example of /me ("/me arrives" shows as "<Name> arrives", in italics). A line already read in the room is no longer announced afterwards.
+- Community: the number of players online, and that of your country, only shows above five (medallion, poster, System menu, phone); your online friends are always counted.
 
 ## 0.1.13
 

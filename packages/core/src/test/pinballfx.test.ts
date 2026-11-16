@@ -15,8 +15,10 @@ import {
   pinballFxEntryId,
   pinballFxTable,
   pinballFxTableId,
+  pinballFxVpsImage,
   steamPinballFxDownloading,
 } from '../pinballfx';
+import { placeMissingMedia } from '../medias';
 import { addPinballFxTable, pinballFxFolderName, removalTargets, scanTables } from '../tables';
 
 function tempDir(): string {
@@ -30,7 +32,7 @@ test('catalogue : numéros uniques, titres non vides', () => {
     assert.ok(t.title.trim() && t.manufacturer.trim(), `table ${t.id}`);
     assert.ok(Number.isInteger(t.id) && t.id > 0);
   }
-  assert.deepEqual(pinballFxTable(156), { id: 156, title: 'The Addams Family', manufacturer: 'Bally', year: 1992 });
+  assert.deepEqual(pinballFxTable(156), { id: 156, title: 'The Addams Family', manufacturer: 'Bally', year: 1992, vps: 'aT_GONvw' });
   assert.equal(pinballFxTable(9999), undefined);
 });
 
@@ -182,6 +184,58 @@ test('inventaire : même machine en VPX, la fiche de Pinball FX prend son propre
   assert.deepEqual(all.map((e) => e.emulator).sort(), ['pinballfx', 'vpx']);
   // Supprimer la table de Pinball FX n'emporte pas le dossier VPX.
   assert.deepEqual(removalTargets(fx, tables), { whole: true, paths: [fx.folder] });
+  fs.rmSync(tables, { recursive: true });
+});
+
+test('base VPS : presque toutes les tables ont leur jeu, un jeu par table', () => {
+  const ids = PINBALLFX_TABLES.flatMap((t) => (t.vps ? [t.vps] : []));
+  // 133 sur 146 le 16/11/2026 : seules les tables trop récentes pour VPS n'en ont pas.
+  assert.ok(ids.length >= 130, `${ids.length} tables reliées à VPS`);
+  assert.equal(new Set(ids).size, ids.length, 'deux tables sur le même jeu VPS');
+  for (const id of ids) assert.match(id, /^[\w-]{6,12}$/);
+  assert.equal(pinballFxTable(156)?.vps, 'aT_GONvw');
+  assert.equal(pinballFxTable(191)?.vps, undefined);
+});
+
+test('capture de VPS : version Pinball FX d’abord, puis FX3, puis une recréation ; jamais une image d’un autre site', () => {
+  const img = (name: string) => `https://virtualpinballspreadsheet.github.io/vps-db/img/${name}.webp`;
+  const table = { id: 1, title: 'T', manufacturer: 'Williams', vps: 'g1' };
+  const vps = (files: { tableFormat?: string; imgUrl?: string }[]) => ({ games: [{ id: 'g1', name: 'T', tableFiles: files.map((f, i) => ({ id: `f${i}`, ...f })) }] });
+  assert.equal(pinballFxVpsImage(vps([{ tableFormat: 'VPX', imgUrl: img('vpx') }, { tableFormat: 'FX3', imgUrl: img('fx3') }, { tableFormat: 'FX', imgUrl: img('fx') }]), table), img('fx'));
+  assert.equal(pinballFxVpsImage(vps([{ tableFormat: 'VPX', imgUrl: img('vpx') }, { tableFormat: 'FX3', imgUrl: img('fx3') }]), table), img('fx3'));
+  assert.equal(pinballFxVpsImage(vps([{ tableFormat: 'VPX', imgUrl: img('vpx') }]), table), img('vpx'));
+  assert.equal(pinballFxVpsImage(vps([{ tableFormat: 'FX', imgUrl: 'https://exemple.example/fx.webp' }]), table), undefined);
+  assert.equal(pinballFxVpsImage(vps([{ tableFormat: 'FX', imgUrl: img('fx') }]), { ...table, vps: undefined }), undefined);
+});
+
+test('fiche : le jeu VPS du catalogue, sauf si le .info en donne un ; tables déjà ajoutées comprises', () => {
+  const tables = tempDir();
+  const added = addPinballFxTable(tables, 156);
+  assert.equal(added.info.Info?.VPSId, 'aT_GONvw');
+  // Rien n'est écrit : le .info n'existe pas (le jeu vient du catalogue à chaque lecture).
+  assert.equal(fs.existsSync(added.infoFile), false);
+  fs.writeFileSync(added.infoFile, JSON.stringify({ Info: { VPSId: 'autreJeu' } }));
+  assert.equal(scanTables(tables)[0]!.info.Info?.VPSId, 'autreJeu');
+  const zen = addPinballFxTable(tables, 191);
+  assert.equal(zen.info.Info?.VPSId, undefined);
+  fs.rmSync(tables, { recursive: true });
+});
+
+test('média manquant rangé avec sa source ; un média déjà là n’est jamais remplacé', () => {
+  const tables = tempDir();
+  const added = addPinballFxTable(tables, 156);
+  const staged = path.join(tables, 'capture.webp');
+  fs.writeFileSync(staged, 'image');
+  const origin = { origin: 'VPS', url: 'https://virtualpinballspreadsheet.github.io/vps-db/img/x.webp', vpsId: 'aT_GONvw' };
+  const placed = placeMissingMedia(added, added.infoFile, 'Playfield', staged, origin, new Date('2026-11-16T12:00:00Z'));
+  assert.ok(placed);
+  assert.equal(path.basename(placed), '(Playfield) The Addams Family (Bally 1992).webp');
+  assert.equal(path.basename(path.dirname(placed)), 'medias');
+  const info = JSON.parse(fs.readFileSync(added.infoFile, 'utf8'));
+  assert.deepEqual(info.CyberPinball.medias.sources.Playfield, { ...origin, date: '2026-11-16T12:00:00.000Z', file: path.basename(placed) });
+  fs.writeFileSync(staged, 'autre image');
+  assert.equal(placeMissingMedia(scanTables(tables)[0]!, added.infoFile, 'Playfield', staged, origin), undefined);
+  assert.equal(fs.readFileSync(placed, 'utf8'), 'image');
   fs.rmSync(tables, { recursive: true });
 });
 

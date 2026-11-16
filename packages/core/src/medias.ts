@@ -879,6 +879,24 @@ export function saveHalfTurn(infoFile: string, type: MediaType, halfTurn: boolea
   return written;
 }
 
+/**
+ * Range une image déjà reçue comme média d'un type que la table n'a pas encore (rien n'est
+ * remplacé), source notée dans le .info (CyberPinball.medias.sources). Sert aux tables de Pinball
+ * FX : la capture de la table que donne la base VPS, à défaut d'image du plateau. Renvoie le
+ * fichier rangé, ou undefined si la table avait déjà ce média.
+ */
+export function placeMissingMedia(table: TableEntry, infoFile: string, type: MediaType, staged: string, origin: Omit<MediaOrigin, 'file' | 'date'>, now = new Date()): string | undefined {
+  if (scanTableMedias(table).some((m) => m.type === type)) return undefined;
+  const dest = mediaWritePath(table, type, path.extname(staged) || '.webp');
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(staged, dest);
+  const info = readInfo(infoFile);
+  const memory = mediaMemory(info);
+  const sources = { ...memory.sources, [type]: { ...origin, date: now.toISOString(), file: path.basename(dest) } };
+  writeFileAtomic(infoFile, JSON.stringify(setMediaMemory(info, { ...memory, sources }), null, 2) + '\n');
+  return dest;
+}
+
 // ---------------------------------------------------------------------------
 // Dimensions lues dans l'en-tête, sans dépendance
 

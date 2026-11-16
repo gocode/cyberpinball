@@ -207,7 +207,7 @@ function renderLibrary(v) {
           li.classList.add('with-parts');
           if (row.label) li.append(libEl('span', 'lib-row-label', row.label));
           if (row.check) li.append(rowCheck(row.check));
-          if (row.thumb) li.append(rowThumb(row.thumb));
+          if (row.thumb) li.append(rowThumb(row.thumb, row.thumbIcon));
           li.append(main);
           if (row.aside) li.append(libEl('span', 'lib-row-aside', row.aside));
         }
@@ -1173,7 +1173,7 @@ function rowCheck(state) {
 }
 
 /** Vignette carrée d'une ligne : l'image (protocole des médias), sinon l'icône nommée, sur un fond sombre. */
-function rowThumb(thumb) {
+function rowThumb(thumb, icon = 'music') {
   const box = libEl('span', 'lib-thumb');
   if (/^cyber-media:/.test(thumb)) {
     const img = document.createElement('img');
@@ -1181,7 +1181,10 @@ function rowThumb(thumb) {
     img.alt = '';
     img.decoding = 'async';
     // Image illisible : l'icône à sa place, jamais un carré blanc ni cassé.
-    img.addEventListener('error', () => img.replaceWith(cyberIcon('music', 'lib-thumb-icon')));
+    img.addEventListener('error', () => {
+      box.classList.add('placeholder');
+      img.replaceWith(cyberIcon(icon, 'lib-thumb-icon'));
+    });
     box.append(img);
   } else {
     box.classList.add('placeholder');

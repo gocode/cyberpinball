@@ -10,6 +10,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { VpsDb, VpsTableFile } from './vps';
 
 export const PINBALLFX_STEAM_APPID = '2328760';
 /** Nom de la fenêtre de jeu (Unreal Engine) ; repris des scripts de fermeture des frontends. */
@@ -24,6 +25,11 @@ export interface PinballFxTable {
   manufacturer: string;
   /** Année de la machine réelle (tables Williams et Bally) ; absente pour les créations de Zen. */
   year?: number;
+  /**
+   * Jeu de la base VPS : sa capture de la table dans Pinball FX (vignette de la liste) et ses
+   * médias (VPinMediaDB, « Médias manquants »). Absent : table trop récente pour VPS.
+   */
+  vps?: string;
 }
 
 /** Modes de partie acceptés par -GameMode (FAQ de Zen). Pro : tables Williams seulement. */
@@ -200,11 +206,166 @@ const TABLES: [number, string, string, number?][] = [
   [59, 'Marvel Pinball: X-Men', ZEN],
 ];
 
-export const PINBALLFX_TABLES: readonly PinballFxTable[] = TABLES.map(([id, title, manufacturer, year]) =>
-  year === undefined ? { id, title, manufacturer } : { id, title, manufacturer, year },
-);
+// Jeu VPS de chaque table (base VPS du 16/11/2026) : celui qui a une version « FX » du même titre ;
+// pour une machine Williams ou Bally qui n’en a pas, le jeu de la machine (même titre, fabricant et
+// année : mêmes logo et fronton). Les tables que VPS ne connaît pas encore n’en ont pas.
+const VPS_IDS: Record<number, string> = {
+199: 'sfiWmEeN', // Comet
+  194: 'u3bADyBV', // PIN·BOT
+  200: 'HGEZhWjM', // Fire!
+  129: 'UvueodZg', // Space Station
+  188: 'D7db6H4M', // Banzai Run
+  149: 'UQ6dnKLa', // Swords of Fury
+  196: '7eRiA3gK', // Taxi
+  190: '8ND2ag4u', // Black Knight 2000
+  189: 'HB-50MQb', // Earthshaker
+  197: '3LNcE1yH', // Elvira and the Party Monsters
+  201: '2qcWVEi9', // Diner
+  135: 'klXtdvkv', // Dr. Dude and His Excellent Ray
+  134: 'O1-qbuxg', // FunHouse
+  168: 'JcJtmz2q', // Whirlwind
+  126: 'DEp2LBTL', // Hurricane
+  120: 'd4FUrVlu', // The Party Zone
+  148: 'MKZNH4Rl', // The Machine: Bride of Pin·Bot
+  118: 'qQNywC8u', // Black Rose
+  131: 'OiRcNWYu', // Creature from the Black Lagoon
+  108: 'tV1GotAP', // Fish Tales
+  111: 'cCV4A6uc', // The Getaway: High Speed II
+  156: 'aT_GONvw', // The Addams Family
+  133: 'lkSumsrF', // Indiana Jones: The Pinball Adventure
+  202: 'aGzQHF72', // Judge Dredd
+  163: 'eKpfZo80', // Star Trek: The Next Generation
+  162: 'WMwkA7_p', // Twilight Zone
+  124: 'LJRH3fKk', // White Water
+  125: 'LMK5EL-k', // Red & Ted's Road Show
+  157: 'GXsgeoz_', // World Cup Soccer
+  119: '9Paf7-CL', // Attack from Mars
+  117: 'Tc_1PRrM', // Theatre of Magic
+  195: 'n7aheBtw', // WHO dunnit
+  110: 'WX9RToIR', // Junk Yard
+  122: 'sx604oSu', // Safe Cracker
+  198: 'EC_7xF96', // Scared Stiff
+  132: '3CvHz8Fa', // Tales of the Arabian Nights
+  127: 'amqQVZGq', // Cirqus Voltaire
+  109: '-5yMpqSy', // Medieval Madness
+  128: 'AV8W-O2R', // No Good Gofers
+  121: '2HPDN_tT', // The Champion Pub
+  130: 'F1Skyh5h', // Monster Bash
+  29: 'IisAylS2', // Adventure Land
+  27: 'xBRVRUkm', // Biolab
+  40: 'hw8c55mW', // CastleStorm
+  112: '0QFtwlS1Sg', // Curse of the Mummy
+  67: 'EXdJ6CPT', // Epic Quest
+  20: 'Xdg7bo_y', // Excalibur
+  155: 'PMMTFLL2Sv', // Grimm Tales
+  23: 'YIjARuli', // Pasha
+  123: 'WCiFOdmdGp', // Pinball Noir
+  31: '-YvvPVSn', // Rome
+  165: 'IcO8o0iTWx', // A Samurai's Vengeance
+  66: 'ckwfgv9u', // Secrets of the Deep
+  113: '91OqFMMLwT', // Sky Pirates: Treasures of the Clouds
+  80: 'aHEbWqso', // Son of Zeus
+  33: 'q9Pywo-y', // Sorcerer's Lair
+  36: 'Py45rx2y', // Super League Football
+  164: 'x2d9uK4Z6D', // Verne's Mysterious Island
+  75: '9C9EMQDj', // Wild West Rampage
+  147: 'vowocZpLev', // Wrath of the Elder Gods
+  97: 'OLJJqhmH', // Back to the Future Pinball
+  170: 'Olb9_xOyHI', // Battlestar Galactica Pinball
+  152: 'BwyxFoXrWB', // Borderlands: Vault Hunter Pinball
+  151: 'MEsTwjO3Co', // Brothers in Arms: Win the War Pinball
+  161: 'U4yraMCAm4', // Crypt of the NecroDancer Pinball
+  92: 'afSJlqcJ', // DOOM Pinball
+  141: 'm0PXAdgeoN', // DreamWorks How to Train Your Dragon Pinball
+  139: 'LuGjuCO8X5', // DreamWorks Kung Fu Panda Pinball
+  140: 'WMT9p6SoA4', // DreamWorks Trolls Pinball
+  96: 'Q0eoaNi8', // E.T. Pinball
+  90: 'r-AaNHEG', // Fallout Pinball
+  145: 'ac1sVe4NuU', // Garfield Pinball
+  158: 'QMLNe1qCrN', // Godzilla Pinball
+  160: '4VaNRfBCyN', // Godzilla vs. Kong Pinball
+  150: 'jxiVspOPjc', // Homeworld: Journey to Hiigara Pinball
+  95: 'XWuSTJd_', // Jaws Pinball
+  100: 'CIyg-Fkr', // Jurassic Park Pinball
+  102: 'l5NF9UsQ', // Jurassic Park Pinball Mayhem
+  101: 'yZxX7BhI', // Jurassic World Pinball
+  177: 'iBh5ImB1GE', // Knight Rider Pinball
+  153: '-e2yRulgXR', // Kong Pinball
+  138: 'Iar1iFvVkh', // My Little Pony Pinball
+  186: '4Ixrmq5_eS', // Pacific Rim Pinball
+  146: 'EKrqbaCT5u', // Peanuts' Snoopy Pinball
+  4: 'vCarNqyA', // South Park: Super Sweet Pinball
+  55: 'ym4kiB_D', // South Park: Butters' Very Own Pinball Game
+  91: 'Gda1Ftiy', // The Elder Scrolls V: Skyrim Pinball
+  154: 'UxqQoD3Fd0', // World War Z Pinball
+  167: '0BxxyhvO1Q', // Xena: Warrior Princess Pinball
+  106: 'aEKL3AQS', // Star Wars Pinball: Calrissian Chronicles
+  107: '-ADs8A2T', // Star Wars Pinball: Battle of Mimban
+  104: 'RP516eQB', // Star Wars Pinball: Ahch-To Island
+  53: 'UNmAoob8', // Star Wars Pinball: Boba Fett
+  137: 'NQBEdl2_LU', // Star Wars Pinball: Classic Collectibles
+  28: 'XZYNNi6Q', // Star Wars Pinball: Darth Vader
+  58: 'IBo3BQ9R', // Star Wars Pinball: Droids
+  12: '2X4QrVSl', // Star Wars Pinball: Episode IV A New Hope
+  43: 'X8tW8BSq', // Star Wars Pinball: Episode V The Empire Strikes Back
+  24: '2HRbDI1s', // Star Wars Pinball: Episode VI Return of the Jedi
+  10: 'wOcpiLN5', // Star Wars Pinball: Han Solo
+  2: 'zM2gyg3v', // Star Wars Pinball: Masters of the Force
+  89: 'aD15MFIl', // Star Wars Pinball: Might of the First Order
+  98: 'Wq6-Ja_Z', // Star Wars Pinball: Rogue One
+  105: 'YOnTzG4i', // Star Wars Pinball: Solo
+  77: '5-Xujd2f', // Star Wars Pinball: Star Wars Rebels
+  6: '-QapTUxg', // Star Wars Pinball: Starfighter Assault
+  47: 'gc_fCLKX', // Star Wars Pinball: The Clone Wars
+  88: 'l_Goj8OT', // Star Wars Pinball: The Force Awakens
+  103: '9OiBgvNc', // Star Wars Pinball: The Last Jedi
+  136: 'ASNPgDCBTL', // Star Wars Pinball: The Mandalorian
+  79: '2_JLJXjg', // Marvel's Ant-Man
+  78: 'EtvgYOOC', // Marvel's Avengers: Age of Ultron
+  45: 'SPr7u47N', // Marvel Pinball: Blade
+  48: 'ZmBDqqWq', // Marvel Pinball: Captain America
+  1: 'lJZbvtXM', // Marvel Pinball: Civil War
+  22: '-bv6-HSX', // Marvel Pinball: Deadpool
+  30: 'ag17FVP8', // Marvel Pinball: Doctor Strange
+  38: 'hXrY9de4', // Marvel Pinball: Fantastic Four
+  5: 'WHFVK2U2', // Marvel Pinball: Fear Itself
+  21: 'HrBzAuzI', // Marvel Pinball: Ghost Rider
+  50: 'pCiHQy7m', // Marvel Pinball: Guardians of the Galaxy
+  65: '81x-JmcS', // Marvel Pinball: Iron Man
+  49: 'sO1oqiw2', // Marvel Pinball: Moon Knight
+  46: 'Em0MXlrN', // Marvel Pinball: Spider-Man
+  17: 'eeD6wgDQ', // Marvel Pinball: The Avengers
+  60: 'rjPOmeGe', // Marvel Pinball: The Infinity Gauntlet
+  7: 'P6DNo4w2', // Marvel Pinball: Thor
+  73: 'ZQ23Ls6t', // Marvel Pinball: Venom
+  71: '8be3V_4N', // Marvel Pinball: Wolverine
+  93: 'YDtIBV05', // Marvel's Women of Power: A-Force
+  94: 'fOUA_24M', // Marvel's Women of Power: Champions
+  56: 'wN2A3iiB', // Marvel Pinball: World War Hulk
+  59: 'phOiYA09', // Marvel Pinball: X-Men
+};
+
+export const PINBALLFX_TABLES: readonly PinballFxTable[] = TABLES.map(([id, title, manufacturer, year]) => {
+  const vps = VPS_IDS[id];
+  return { id, title, manufacturer, ...(year === undefined ? {} : { year }), ...(vps ? { vps } : {}) };
+});
 
 const BY_ID = new Map(PINBALLFX_TABLES.map((t) => [t.id, t]));
+
+/** Images de la base VPS : seules celles de son site sont téléchargées (même règle que le catalogue). */
+const VPS_IMAGE = /^https:\/\/virtualpinballspreadsheet\.github\.io\/vps-db\/img\//;
+
+/**
+ * Capture de la table que donne la base VPS : celle de sa version Pinball FX, sinon de Pinball
+ * FX3, sinon (machine Williams ou Bally sans version FX chez VPS) d'une recréation de la même
+ * machine. Une vue du plateau, en hauteur : vignette de la liste, image du plateau à défaut.
+ */
+export function pinballFxVpsImage(vps: Pick<VpsDb, 'games'>, table: PinballFxTable): string | undefined {
+  const game = table.vps ? vps.games.find((g) => g.id === table.vps) : undefined;
+  const files = (game?.tableFiles ?? []).filter((f) => f.imgUrl && VPS_IMAGE.test(f.imgUrl));
+  const rank = (f: VpsTableFile) => ['FX', 'FX3', 'FX2'].indexOf(f.tableFormat ?? '') + 1 || 9;
+  return [...files].sort((a, b) => rank(a) - rank(b))[0]?.imgUrl;
+}
 
 export function pinballFxTable(id: number): PinballFxTable | undefined {
   return BY_ID.get(id);

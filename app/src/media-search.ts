@@ -90,8 +90,12 @@ export function createMediaSearch(ctx: MediaSearchContext) {
     return refreshing;
   }
 
-  /** L'index en cache tout de suite (mis à jour en arrière-plan, au plus toutes les 12 h), sinon le premier téléchargement. */
-  async function index(): Promise<{ db?: MediaDb; problem?: string }> {
+  /**
+   * L'index en cache tout de suite (mis à jour en arrière-plan, au plus toutes les 12 h), sinon le
+   * premier téléchargement. `quiet` : sans message d'attente (appel en arrière-plan, hors d'une
+   * opération qui l'effacerait ensuite).
+   */
+  async function index(opts: { quiet?: boolean } = {}): Promise<{ db?: MediaDb; problem?: string }> {
     const load = () => {
       if (!loaded) {
         db = loadMediaDb(downloads());
@@ -103,7 +107,7 @@ export function createMediaSearch(ctx: MediaSearchContext) {
       void refresh();
       return { db };
     }
-    ctx.progress(t('Téléchargement de l’index de VPinMediaDB (environ 2 Mo, une seule fois)…'));
+    if (!opts.quiet) ctx.progress(t('Téléchargement de l’index de VPinMediaDB (environ 2 Mo, une seule fois)…'));
     const r = await refresh();
     loaded = false;
     return load() ? { db } : { problem: r.message };

@@ -42,6 +42,12 @@ export const messages: Record<string, string> = {
   '{n} tables dans le front-end · choisir celles que vous possédez': '{n} tables in the menu · choose the ones you own',
   'Choisir les tables que vous possédez dans Pinball FX': 'Choose the tables you own in Pinball FX',
   '« {title} » ajoutée au front-end.': '“{title}” added to the menu.',
+  '« {title} » ajoutée au front-end : ses médias arrivent (Téléchargements).': '“{title}” added to the menu: its media are on their way (Downloads).',
+  '« {title} » ajoutée au front-end, avec {n} média.': '“{title}” added to the menu, with {n} media file.',
+  '« {title} » ajoutée au front-end, avec {n} médias.': '“{title}” added to the menu, with {n} media files.',
+  '« {title} » ajoutée au front-end. Aucun média trouvé pour elle : Start ouvre sa fiche, « Médias du jeu » en cherche sur le web.':
+    '“{title}” added to the menu. No media found for it: Start opens its page, "Game media" searches the web for some.',
+  'Base VPS…': 'VPS database…',
   'Dans le front-end': 'In the menu',
   '{n} table dans le front-end': '{n} table in the menu',
   '{n} tables dans le front-end': '{n} tables in the menu',

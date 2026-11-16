@@ -118,6 +118,10 @@ function describeTable(tablesDir: string, folder: string, fileName: string): Tab
   const fromFolder = inOwnFolder ? parseTableName(folderName) : undefined;
   const fx = emulator === 'pinballfx' ? readPinballFxFile(file) : undefined;
   const known = fx === undefined ? undefined : pinballFxTable(fx);
+  // Table de Pinball FX : son jeu VPS vient du catalogue tant que le .info n'en donne pas d'autre
+  // (en mémoire seulement) ; les médias (VPinMediaDB, « Médias manquants ») la reconnaissent ainsi,
+  // y compris les tables ajoutées avant que le catalogue ne le connaisse.
+  if (known?.vps && !info.Info?.VPSId) info.Info = { ...info.Info, VPSId: known.vps };
   return {
     id: path.relative(tablesDir, file).split(path.sep).join('/'),
     emulator,
