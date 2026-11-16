@@ -11,7 +11,7 @@
 
 import { formatSize } from './fileops';
 import type { HealthLine, HealthState, HealthTarget } from './health';
-import { formatDate, formatDateTime, formatNumber, language, t, tn } from './i18n';
+import { formatDate, formatDateTime, formatNumber, language, t, tn, type Language } from './i18n';
 import type { IconName } from './icons';
 import type { RoleId, Rotation } from './model';
 import { zipBuffers } from './romzip';
@@ -47,6 +47,8 @@ export interface TechDisplay {
 export interface TechFacts {
   /** Date du relevé (ISO). */
   at: string;
+  /** Langue de ses textes (clavier, runtime, contrôleurs) : un relevé d'une autre langue est oublié à la lecture (loadTechFacts). */
+  language?: Language;
   pc?: {
     cpu?: { name: string; cores?: number; threads?: number; mhz?: number };
     memory?: { total: number; free?: number; modules?: number; mhz?: number };

@@ -53,6 +53,7 @@ import {
   type SocialSnapshot,
   type SocialState,
   type UiSoundId,
+  type StoredText,
 } from '@cyberpinball/core';
 
 export interface MenuNoticesHost {
@@ -67,8 +68,8 @@ export interface MenuNoticesHost {
   };
   jobs(): readonly DownloadJob[];
   /** Raison d'un téléchargement bloqué, courte (« plus de place »). */
-  reason?(job: DownloadJob): string | undefined;
-  badgeLabel?(id: string): string;
+  /** Raison d'un échec, gardée sans traduction (Activité récente). */
+  reason?(job: DownloadJob): StoredText | undefined;
   mode(): NoticesMode;
   /** La zone des notifications de l'écran du moment (noticezone.ts) : où, le compteur, quelles notifications. */
   zone(): NoticeZone;
@@ -217,7 +218,7 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     const received = born ? (host.live?.invites?.() ?? []) : [];
     born = true;
     const nextLive = liveSnapshot(game, me);
-    const news = [...inviteNotices(invites, received, t, (id) => host.live?.inviteEnd?.(id)), ...liveNotices(live, nextLive, game, me, t), ...socialNotices(social, nextSocial, s, t, host.badgeLabel), ...downloadNotices(downloads, jobs, t, host.reason)]
+    const news = [...inviteNotices(invites, received, t, (id) => host.live?.inviteEnd?.(id)), ...liveNotices(live, nextLive, game, me, t), ...socialNotices(social, nextSocial, s, t), ...downloadNotices(downloads, jobs, t, host.reason)]
       // Au démarrage, et tant que la borne cherche ses amis, c'est elle qui arrive : pas une nouvelle.
       .filter((e) => (t >= quietUntil && host.social.listSync?.() !== 'searching') || e.kind !== 'friend-online');
     // Au journal, toutes : affichées, retenues pour la fin de la partie, ou notifications coupées.

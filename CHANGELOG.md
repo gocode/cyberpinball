@@ -11,6 +11,9 @@ son interface).
 
 ## 0.1.13
 
+- Mise à jour de Cyber Pinball : « Versions reçues » choisit entre les versions finales et les préversions. Pour qui maintient Cyber Pinball, un canal d'essai privé ajoute les « Essais privés », que seules ses bornes voient. Une borne ne revient jamais à une version plus ancienne.
+- Changer de langue ne laisse plus de texte dans l'ancienne : « Ce qu'il manque pour jouer » sur la fiche (« Reprendre : étape 3 sur 4 »), la liste d'attente, l'Activité récente, les téléchargements et leur journal, les médias refusés de la recherche web et l'orientation des écrans se disent dans la langue choisie, y compris ce qui a été noté avant la mise à jour.
+- Communauté : l'avatar de chaque joueur se voit partout, ami ou non (Joueurs en ligne, salons, classements, profils publics, demandes d'ami). Un joueur bloqué ne reçoit rien ; « Apparaître en ligne pour tous » s'applique toujours.
 - L’installeur parle français ou anglais : une petite fenêtre propose la langue dès le début (celle de Windows par défaut), et ce choix devient aussi celui de Cyber Pinball. Pages, conditions d’utilisation et désinstalleur suivent ; `/LANGUE=fr` ou `/LANGUE=en` pour une installation en ligne de commande.
 - Les scores écrits dans l’interface (Mes amis, messagerie, activité) suivent la langue de la borne : « 3 215 480 250 » en français au lieu de « 3,215,480,250 ». Le catalogue en ligne donne aussi la taille des fichiers dans la langue de la borne (« 381 Mo » au lieu de « 381.1 MB »).
 - Télécommande du téléphone : sur Android, le raccourci de l'écran d'accueil retrouve la borne même quand le routeur change son adresse, sans scanner le QR. Le téléphone le propose une fois (puis dans son menu ⋮) ; il passe par t.cyberpinball.com, qui ne voit ni la clé du téléphone ni l'adresse de la borne : tout est chiffré. Se coupe dans Menu système > Borne > Télécommande du téléphone.

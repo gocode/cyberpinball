@@ -327,7 +327,7 @@ export const messages: Record<string, string> = {
   'DMD sur son écran': 'DMD on its own screen',
   'DMD dans le backglass': 'DMD in the backglass',
   'sans DMD': 'no DMD',
-  'DMD réel': 'real DMD',
+  'DMD réel': 'Real DMD',
   'disposition non décrite': 'layout not described',
   'ROM non vérifiée : VPX n’est pas installé.': 'ROM not checked: VPX is not installed.',
   'La table n’utilise pas de ROM.': 'The table uses no ROM.',

@@ -1,6 +1,7 @@
 // Modèle de borne : la seule source de vérité. Tous les fichiers des outils
 // tiers (VPinballX.ini, plus tard ScreenRes.txt, PinUP, dmddevice.ini) en sont dérivés.
 
+import type { HardwareDmdSetup } from './dmd';
 import { t } from './i18n';
 
 export type RoleId = 'playfield' | 'backglass' | 'dmd' | 'topper';
@@ -213,6 +214,11 @@ export interface Cabinet {
    * automatique, le playfield s'il est droit, sinon le plus grand des autres écrans.
    */
   browserScreen?: RoleId;
+  /**
+   * DMD réels (Menu système > Borne > DMD > DMD réel, dmd.ts) : chaque modèle automatique, forcé ou
+   * éteint, et le ZeDMD en wifi. Absent : tout automatique, d'après les identifiants USB.
+   */
+  hardwareDmd?: HardwareDmdSetup;
   vpx: {
     iniPath: string;
   };
@@ -385,4 +391,10 @@ export interface ObservedUsbDevice {
   port?: string;
   /** Classe de pilote de Windows (« Camera », « Image », « HIDClass »…) ; absente sans pilote installé. */
   deviceClass?: string;
+  /** Service du pilote (« usbser », « WinUSB », « libusbK »…) ; absent sans pilote installé. */
+  service?: string;
+  /** Code du Gestionnaire de périphériques quand le pilote ne tourne pas (28 : aucun pilote) ; absent : rien à signaler. */
+  problem?: number;
+  /** Nom que le périphérique donne lui-même à l'USB (« PIN2DMD HD »), quand Windows le connaît. */
+  product?: string;
 }

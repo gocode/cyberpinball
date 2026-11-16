@@ -45,7 +45,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 - **A badge on the table menu**: the number of friends online; a click opens "My friends".
 - **"My badges"**: eight badges (First game, Ten tables, A hundred games, An hour on one table, Ten hours of play, On the high-score board, Grand Champion, Five-time champion).
 - **A name of your own**: 2 to 24 characters, shown alone, with the avatar. Two players with the same name are told apart by the unique ID on their page. On first start, right after the screens wizard, Cyber Pinball offers to choose your nickname and avatar; nothing is required, and everything can be changed later.
-- **"My avatar"**: a photo or a picture of your own, taken from the PC or in the built-in browser, cropped with the cabinet buttons (zoom, move, recentre) or the mouse. A photo loses its metadata, GPS position included. Without an avatar, your initials on a hue of your own. Only your friends and the players of a pending request receive it, and the players who see your scores in the leaderboards.
+- **"My avatar"**: a photo or a picture of your own, taken from the PC or in the built-in browser, cropped with the cabinet buttons (zoom, move, recentre) or the mouse. A photo loses its metadata, GPS position included. Without an avatar, your initials on a hue of your own. Every player sees it, friend or not, wherever you appear: Players online, rooms, leaderboards, public profile, friend requests.
 
 <p align="center"><img src="images/en/friends.webp?v=9353564220" width="760" alt="My friends: Bruno online, playing Star Courier with his new high score, and Émile offline; next to it, Bruno's page with his latest events and See their library."></p>
 
@@ -165,7 +165,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 - **Signed**: the cabinet only reads a feed signed (Ed25519) by the publishing key, and only runs the installer if its size and SHA-256 match.
 - **Light updates**: when only the application changes, a package of about 1.5 MiB installs in a few seconds, with no installer.
 - **Roll-back**: the previous version is set aside during the install and put back if it fails. At the next start, a banner says which version is installed.
-- **Pre-releases**, received or not ("Pre-releases: not received / received").
+- **Versions received**: final versions (the default) or pre-releases too; for whoever maintains Cyber Pinball, tests from a private channel that only their own cabinets see.
 
 <p align="center"><img src="images/en/update.webp?v=fa0c1e19dd" width="360" alt="An update is available: Cyber Pinball 0.2.0, its release date, what's new, the size of the signed installer, and the Update now and Later buttons."></p>
 

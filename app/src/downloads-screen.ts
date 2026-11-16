@@ -10,6 +10,8 @@
 import * as path from 'node:path';
 import {
   CONTENT_LABELS,
+  contentSummaryText,
+  type ContentCounts,
   DOWNLOAD_KIND_LABELS,
   DOWNLOAD_ORIGIN_LABELS,
   DOWNLOAD_SORT_LABELS,
@@ -49,7 +51,7 @@ export interface DownloadsScreenContext {
   /** Reprendre un fichier comme nouvelle table (plan d'ajout). */
   install(paths: string[]): void;
   /** Ce que contient un fichier : sa partie principale et toutes celles qu'il apporte (archive listée). */
-  inspect(file: string): Promise<{ content: ContentKind; summary?: string; parts?: NeedKind[] }>;
+  inspect(file: string): Promise<{ content: ContentKind; summary?: ContentCounts; parts?: NeedKind[] }>;
   /** Le jeu auquel il revient sans doute : sa table installée, ou un jeu de la liste d'attente. */
   suggest(file: string): { table?: TableEntry; game?: { gameId: string; label: string } };
   /** Tables installées, une par dossier. */
@@ -172,7 +174,7 @@ export function createDownloadsScreen(ctx: DownloadsScreenContext) {
     if (e.url) rows.push({ text: t('Adresse'), detail: e.url });
     const seen = seenOf.get(file.toLowerCase());
     const parts = partsOf(seen);
-    if (seen) rows.push({ text: t('Contient'), detail: [CONTENT_LABELS[seen.content], seen.summary].filter(Boolean).join(' : ') });
+    if (seen) rows.push({ text: t('Contient'), detail: [CONTENT_LABELS[seen.content], contentSummaryText(seen.summary)].filter(Boolean).join(' : ') });
     const sug = ctx.suggest(e.file);
     if (sug.table ?? sug.game) rows.push({ text: t('Jeu'), detail: sug.table?.title ?? sug.game!.label });
     rows.push({ text: t('Usage'), detail: `${note.sign} ${note.text}`, tone: note.tone === 'quiet' ? undefined : note.tone });

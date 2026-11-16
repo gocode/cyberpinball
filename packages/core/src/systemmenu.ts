@@ -49,6 +49,10 @@ export const SYSTEM_ITEM_IDS = [
   'vr-mirror',
   'controls',
   'phone-remote',
+  'dmd-screen',
+  'menu-dmd',
+  'dmd-color',
+  'hardware-dmd',
   'dof',
   'desktop',
   'explorer',
@@ -72,7 +76,7 @@ export const SYSTEM_ITEM_IDS = [
 export type SystemItemId = (typeof SYSTEM_ITEM_IDS)[number];
 
 /** Rubriques (et sous-rubrique) : l'arbre les ouvre lui-même. */
-export const SYSTEM_GROUP_IDS = ['tables', 'medias', 'amis', 'borne', 'realite-virtuelle', 'cyberpinball', 'migration'] as const;
+export const SYSTEM_GROUP_IDS = ['tables', 'medias', 'amis', 'borne', 'realite-virtuelle', 'dmd', 'cyberpinball', 'migration'] as const;
 export type SystemGroupId = (typeof SYSTEM_GROUP_IDS)[number];
 
 export type SystemEntryId = SystemItemId | SystemGroupId;
@@ -149,8 +153,8 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'borne',
     icon: 'cabinet',
     get label() { return t('Borne'); },
-    get detail() { return t('Santé, fiche technique, boutons, écrans, son, réglages de VPX, réalité virtuelle, vision 3D, télécommande du téléphone, bureau Windows, mode invité'); },
-    entries: ['health', 'tech-sheet', 'cabinet', 'vpx-settings', 'vision3d', 'realite-virtuelle', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'start-relaunch', 'guest-mode'],
+    get detail() { return t('Santé, fiche technique, boutons, écrans, son, réglages de VPX, réalité virtuelle, vision 3D, télécommande du téléphone, DMD, bureau Windows, mode invité'); },
+    entries: ['health', 'tech-sheet', 'cabinet', 'vpx-settings', 'vision3d', 'realite-virtuelle', 'controls', 'phone-remote', 'dmd', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'start-relaunch', 'guest-mode'],
   },
   // Tous les réglages du casque ensemble, l'activation en tête (12/11/2026 : « les options VR doivent être
   // dans VR », règle générale : un réglage est dans la rubrique de la fonction qu'il règle).
@@ -161,6 +165,15 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     get detail() { return t('Activer le casque, caler la borne, manettes du casque, recopie sur le playfield'); },
     entries: ['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror'],
     lead: 'vr',
+  },
+  // Tous les réglages du DMD ensemble (16/11/2026) : la forme de son écran, le DMD que dessine le menu et
+  // sa couleur, le DMD réel (ZeDMD, PIN2DMD, Pixelcade). Le DMD sur la roue reste sur la fiche de chaque table.
+  dmd: {
+    id: 'dmd',
+    icon: 'dmd',
+    label: 'DMD', // i18n-ignore : sigle, le même en anglais
+    get detail() { return t('Écran du DMD, DMD du menu et sa couleur, DMD réel (ZeDMD, PIN2DMD, Pixelcade)'); },
+    entries: ['dmd-screen', 'menu-dmd', 'dmd-color', 'hardware-dmd'],
   },
   cyberpinball: {
     id: 'cyberpinball',
@@ -230,6 +243,12 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   controls: { icon: 'gamepad', get label() { return t('Commandes de la borne'); } },
   // Le téléphone pilote la borne : boutons, clavier, envoi d'un fichier (app/src/phone-remote-menu.ts).
   'phone-remote': { icon: 'phone', get label() { return t('Télécommande du téléphone'); } },
+  // ZeDMD, PIN2DMD, Pixelcade : choix par modèle, ZeDMD en wifi, pilotes (app/src/hardware-dmd-menu.ts).
+  // Borne > DMD : forme de l'écran (FullDMD ou DMD seul), DMD du menu et sa couleur (menu-settings.ts).
+  'dmd-screen': { icon: 'screens', get label() { return t('Écran du DMD'); } },
+  'menu-dmd': { icon: 'pulse', get label() { return t('DMD du menu'); } },
+  'dmd-color': { icon: 'palette', get label() { return t('Couleur du DMD'); } },
+  'hardware-dmd': { icon: 'usb', get label() { return t('DMD réel'); } },
   dof: { icon: 'bulb', get label() { return t('LED et retours (DOF)'); } },
   desktop: { icon: 'desktop', get label() { return t('Bureau Windows'); } },
   // Seulement quand Cyber Pinball est le shell de Windows (borne dédiée) : à la place de « Bureau Windows ».

@@ -21,7 +21,7 @@
 import * as path from 'node:path';
 import { downloadReasonText, fileReceived, isActive, type DownloadJob, type DownloadReturn } from './downloadqueue';
 import type { DownloadSpec } from './downloadmanager';
-import { t, tn } from './i18n';
+import { say, t, tLater, tn } from './i18n';
 import {
   addTracks,
   createPlaylist,
@@ -541,12 +541,12 @@ export function jukeboxDownloadSpec(root: string, playlist: Pick<JukeboxPlaylist
     const before = files.length;
     const url = `https://www.youtube.com/watch?v=${s.id}`;
     if (!s.have.audio) {
-      files.push({ ref: url, name: t('{title} · son', { title: s.title }), ...songFilePaths(root, s.id, 'audio'), optional: true, meta: { song: s.id, want: 'audio', estimate: estimateSongBytes(s.duration, 0) } });
+      files.push({ ref: url, name: tLater('{title} · son', { title: s.title }), ...songFilePaths(root, s.id, 'audio'), optional: true, meta: { song: s.id, want: 'audio', estimate: estimateSongBytes(s.duration, 0) } });
     }
     if (s.height && !s.have.video) {
       files.push({
         ref: url,
-        name: t('{title} · vidéo {height}p', { title: s.title, height: s.height }),
+        name: tLater('{title} · vidéo {height}p', { title: s.title, height: s.height }),
         ...songFilePaths(root, s.id, 'video'),
         optional: true,
         meta: { song: s.id, want: 'video', height: s.height, format: YTDLP_VIDEO_FORMATS[s.height], estimate: estimateSongBytes(s.duration, s.height, { audio: true }) },
@@ -609,7 +609,7 @@ export function songDownloads(jobs: readonly DownloadJob[]): Map<string, SongDow
     for (const [id, files] of songs) {
       const skipped = files.find((f) => f.skipped);
       if (skipped) {
-        out.set(id, { state: 'failed', reason: skipped.skipped!.detail ?? downloadReasonText({ reason: skipped.skipped!.reason, source: j.source }) ?? t('Téléchargement impossible') });
+        out.set(id, { state: 'failed', reason: (skipped.skipped!.detail !== undefined ? say(skipped.skipped!.detail) : undefined) ?? downloadReasonText({ reason: skipped.skipped!.reason, source: j.source }) ?? t('Téléchargement impossible') });
         continue;
       }
       if (files.every((f) => f.done)) continue;

@@ -29,7 +29,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { t, tn } from './i18n';
+import { readStoredText, say, t, tn, type StoredText } from './i18n';
 import type { IconName } from './icons';
 import { NOTICE_RULES, noticeText, type LiveNoticeReason, type NoticeEvent, type NoticeKind, type NoticeTone } from './notices';
 import { tagId } from './livenotices';
@@ -70,8 +70,9 @@ export interface ActivityFacts {
   key: string;
   who?: string;
   player?: string;
-  subject?: string;
-  extra?: string;
+  /** Titre, précision : un texte de l'interface y est un LaterText (notices.ts), dit à l'affichage. */
+  subject?: StoredText;
+  extra?: StoredText;
   from?: string;
   reason?: LiveNoticeReason;
   end?: LiveInviteEnd;
@@ -80,8 +81,8 @@ export interface ActivityFacts {
   /** Une version (mise à jour) : celle d'avant, et celle d'après. */
   version?: string;
   previous?: string;
-  /** Constat du démarrage (`note`) : son texte, déjà dans la langue du moment où il est dit. */
-  text?: string;
+  /** Constat du démarrage (`note`) : son texte, dit dans la langue du moment (say). */
+  text?: StoredText;
   /** Constat : l'entrée du menu système qu'il nomme. */
   item?: SystemItemId;
 }
@@ -115,7 +116,7 @@ function repeatKey(kind: ActivityKind, f: ActivityFacts): string | undefined {
       return f.player ?? f.key;
     case 'friend-playing':
       // Ses parties sur une même table : la clé de l'évènement porte l'heure du lancement.
-      return `${f.player ?? f.key.split('|')[0]}|${f.subject ?? ''}`;
+      return `${f.player ?? f.key.split('|')[0]}|${typeof f.subject === 'string' || f.subject === undefined ? (f.subject ?? '') : JSON.stringify(f.subject)}`;
     case 'download-failed':
       return f.key;
     default:
@@ -282,7 +283,7 @@ export function activityText(e: ActivityEntry): { title: string; detail?: string
       const name = e.who ?? '?';
       // « Chloé : 3 connexions » : le jour est celui de la section, et rien ne s'accorde au nom.
       if (kind === 'friend-online') return { title: tn(e.count, '{name} : {n} connexion', '{name} : {n} connexions', { name }) };
-      if (kind === 'friend-playing') return { title: tn(e.count, '{name} : {n} partie lancée', '{name} : {n} parties lancées', { name }), ...(e.subject ? { detail: e.subject } : {}) };
+      if (kind === 'friend-playing') return { title: tn(e.count, '{name} : {n} partie lancée', '{name} : {n} parties lancées', { name }), ...(e.subject ? { detail: say(e.subject) } : {}) };
       if (kind === 'download-failed') return { title: t('Téléchargement bloqué {n} fois', { n: e.count }), ...(text.detail ? { detail: text.detail } : {}) };
     }
     return text;
@@ -295,7 +296,7 @@ export function activityText(e: ActivityEntry): { title: string; detail?: string
     case 'update-failed':
       return { title: t('La mise à jour vers {version} n’a pas abouti', { version: e.version ?? '?' }), ...(e.previous ? { detail: t('La version {version} est restée en place', { version: e.previous }) } : {}) };
     default:
-      return { title: e.text ?? '' };
+      return { title: say(e.text) };
   }
 }
 
@@ -350,6 +351,11 @@ export function parseActivityEntry(raw: unknown): ActivityEntry | undefined {
   const times = (Array.isArray(r.times) ? r.times : []).filter(isTime).slice(0, ACTIVITY_TIMES_MAX);
   const place = r.place as Record<string, unknown> | undefined;
   const text = (k: string, max = 200) => (isText(r[k], max) ? { [k]: r[k] as string } : {});
+  // Texte montré : LaterText gardé, ou ancienne phrase déjà traduite reconnue pour être redite dans la langue du moment.
+  const stored = (k: string, max: number) => {
+    const v = isText(r[k], max) || (r[k] && typeof r[k] === 'object') ? readStoredText(r[k]) : undefined;
+    return v !== undefined && JSON.stringify(v).length <= max * 4 ? { [k]: v } : {};
+  };
   return {
     id: r.id,
     kind: r.kind as ActivityKind,
@@ -360,12 +366,12 @@ export function parseActivityEntry(raw: unknown): ActivityEntry | undefined {
     read: r.read === true,
     ...text('who', 80),
     ...text('player', 128),
-    ...text('subject', 300),
-    ...text('extra', 300),
+    ...stored('subject', 300),
+    ...stored('extra', 300),
     ...text('from', 120),
     ...text('version', 60),
     ...text('previous', 60),
-    ...text('text', 600),
+    ...stored('text', 600),
     ...(REASONS.includes(r.reason as LiveNoticeReason) ? { reason: r.reason as LiveNoticeReason } : {}),
     ...(ENDS.includes(r.end as LiveInviteEnd) ? { end: r.end as LiveInviteEnd } : {}),
     ...(r.won === true ? { won: true as const } : {}),

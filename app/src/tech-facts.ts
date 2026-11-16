@@ -16,6 +16,7 @@ import * as path from 'node:path';
 import {
   IniDocument,
   journalErrors,
+  language,
   matchScreens,
   parseTechProbe,
   readJsonFile,
@@ -195,7 +196,8 @@ export function techCacheFile(dataDir: string): string {
 export function loadTechFacts(dataDir: string): TechFacts | undefined {
   try {
     const raw = readJsonFile(techCacheFile(dataDir)) as TechFacts | undefined;
-    return raw && typeof raw.at === 'string' ? raw : undefined;
+    // Relevé dans une autre langue (ou d'avant que la langue y soit notée) : ses textes la garderaient ; le suivant le refait.
+    return raw && typeof raw.at === 'string' && raw.language === language() ? raw : undefined;
   } catch {
     return undefined;
   }
@@ -203,7 +205,7 @@ export function loadTechFacts(dataDir: string): TechFacts | undefined {
 
 export function saveTechFacts(dataDir: string, facts: TechFacts): void {
   fs.mkdirSync(path.dirname(techCacheFile(dataDir)), { recursive: true });
-  writeFileAtomic(techCacheFile(dataDir), JSON.stringify(facts));
+  writeFileAtomic(techCacheFile(dataDir), JSON.stringify({ ...facts, language: language() }));
 }
 
 /** Essais : un relevé tout fait (CYBERPINBALL_FICHE, fichier JSON de TechFacts) remplace celui du système. */

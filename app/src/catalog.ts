@@ -31,6 +31,8 @@ import {
   CONTENT_LABELS,
   contentFits,
   contentSummary,
+  contentSummaryText,
+  type ContentCounts,
   EXPECTED_LABELS,
   forgetStray,
   forgetDownloads,
@@ -79,6 +81,7 @@ import {
   SOURCE_SITES,
   saveWaitList,
   t,
+  tLater,
   tn,
   tableContents,
   tableRomsDir,
@@ -354,7 +357,7 @@ export function createCatalog(ctx: CatalogContext) {
 
   // ---------- Contenu des fichiers reçus ----------
 
-  type Seen = { content: ContentKind; summary?: string; parts?: NeedKind[] };
+  type Seen = { content: ContentKind; summary?: ContentCounts; parts?: NeedKind[] };
   /** Contenu reconnu de chaque fichier déjà lu (une archive est listée une fois), selon sa taille et sa date. */
   const inspected = new Map<string, { size: number; mtimeMs: number; seen: Seen }>();
 
@@ -1523,7 +1526,7 @@ export function createCatalog(ctx: CatalogContext) {
     return t('{file} · {size} · le {date}, {via}', { file: path.basename(r.file), size, date: formatDay(Date.parse(r.at)), via });
   }
 
-  const contentLine = (seen: { content?: ContentKind; summary?: string }) => (seen.content ? [CONTENT_LABELS[seen.content], seen.summary].filter(Boolean).join(' : ') : t('pas encore vérifié'));
+  const contentLine = (seen: { content?: ContentKind; summary?: ContentCounts }) => (seen.content ? [CONTENT_LABELS[seen.content], contentSummaryText(seen.summary)].filter(Boolean).join(' : ') : t('pas encore vérifié'));
   const itemName = (i: WaitItem) => t('{kind} : {label}', { kind: NEED_LABELS[i.kind], label: i.label });
 
   /** Récupérés et attendus (liste d'attente) ; `back` : là où revenir (le catalogue par défaut). */
@@ -1801,7 +1804,7 @@ export function createCatalog(ctx: CatalogContext) {
   }
 
   /** Le fichier ne convient pas à l'élément choisi : on le dit, et l'on demande. */
-  function confirmMismatch(file: string, seen: { content?: ContentKind; summary?: string }, item: WaitItem, go: () => void, back: () => void): void {
+  function confirmMismatch(file: string, seen: { content?: ContentKind; summary?: ContentCounts }, item: WaitItem, go: () => void, back: () => void): void {
     refresh = undefined;
     ctx.show(() => ({
       heading: t('Ce fichier ne convient pas'),
@@ -1913,7 +1916,7 @@ export function createCatalog(ctx: CatalogContext) {
             label: t('Chercher ailleurs…'),
             detail: t('Téléchargements de Cyber Pinball, clé USB, disques'),
             run: async () => {
-              const paths = await ctx.pick!({ title: t('Choisir un fichier : {item}', { item: itemName(item) }), icon: 'inbox', purpose: t('Liste d’attente : {item}', { item: itemName(item) }), mode: 'file', filter: { label: EXPECTED_LABELS[item.kind], extensions: ['vpx', 'directb2s', 'zip', '7z', 'rar', 'mp3', 'ogg', 'wav', 'pov', 'pac', 'vni', 'pal', 'crz', 'cromc', 'mp4', 'png', 'jpg'] }, start: 'cp' });
+              const paths = await ctx.pick!({ title: t('Choisir un fichier : {item}', { item: itemName(item) }), icon: 'inbox', purpose: tLater('Liste d’attente : {item}', { item: tLater('{kind} : {label}', { kind: { ref: 'need', id: item.kind }, label: item.label }) }), mode: 'file', filter: { label: EXPECTED_LABELS[item.kind], extensions: ['vpx', 'directb2s', 'zip', '7z', 'rar', 'mp3', 'ogg', 'wav', 'pov', 'pac', 'vni', 'pal', 'crz', 'cromc', 'mp4', 'png', 'jpg'] }, start: 'cp' });
               if (paths?.[0]) assign(paths[0], id, 'manual', () => openReplace(id));
             },
           });

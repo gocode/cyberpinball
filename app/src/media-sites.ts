@@ -45,7 +45,9 @@ import {
   sourceSite,
   SITE_SEARCH_PAGES,
   SITE_SEARCH_PROBES,
+  readStoredText,
   t,
+  tLater,
   type MediaSiteId,
   type MediaType,
   type SiteHit,
@@ -543,7 +545,9 @@ export function createMediaSites(ctx: MediaSitesContext) {
         for (const r of JSON.parse(fs.readFileSync(file, 'utf8')) as WebReceipt[]) {
           // Un fichier effacé depuis n'est plus proposé.
           const files = r.files.filter((f) => fs.existsSync(f.file));
-          if (files.length) webReceipts.push({ ...r, files });
+          // Ancien relevé : raison du refus déjà traduite, reconnue pour être redite dans la langue du moment.
+          const refused = r.refused?.map((x) => ({ ...x, reason: readStoredText(x.reason) ?? '' }));
+          if (files.length) webReceipts.push({ ...r, files, ...(refused ? { refused } : {}) });
         }
       }
     } catch {
@@ -659,7 +663,7 @@ export function createMediaSites(ctx: MediaSitesContext) {
     } catch (error) {
       fs.rmSync(file, { force: true });
       fs.rmSync(path.dirname(files), { recursive: true, force: true });
-      const receipt: WebReceipt = { ...base, files: [], refused: [{ name: filename, reason: t('archive illisible ({error})', { error: (error as Error).message.split('\n')[0]! }) }] };
+      const receipt: WebReceipt = { ...base, files: [], refused: [{ name: filename, reason: tLater('archive illisible ({error})', { error: (error as Error).message.split('\n')[0]! }) }] };
       for (const listener of webListeners) listener(receipt);
       return ctx.changed();
     }

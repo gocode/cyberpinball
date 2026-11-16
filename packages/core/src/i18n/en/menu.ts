@@ -274,7 +274,7 @@ export const messages: Record<string, string> = {
     '4k if the playfield screen exceeds {pixels} pixels, else 1k; only the playfield image comes in 4k (Start: change)',
   'Image du plateau en 4k, environ 4 fois plus lourde (Start : changer)': 'Playfield image in 4k, about 4 times larger (Start: change)',
   'Image du plateau en 1k, la plus légère (Start : changer)': 'Playfield image in 1k, the lightest (Start: change)',
-  'Sortie du son : {output}. Volume propre à un jeu : sa fiche, « Médias du jeu ».': 'Sound output: {output}. Per-game volume: its game page, “Game media”.',
+  'Sortie du son : {output}. Volume propre à un jeu : sa fiche, « Médias du jeu ». Le DMD du menu et sa couleur : Borne > DMD.': 'Sound output: {output}. Per-game volume: its game page, “Game media”. The menu DMD and its colour: Cabinet > DMD.',
   'sortie par défaut de Windows (aucune sortie affectée au fronton par l’assistant)': 'Windows default output (the wizard assigned none to the backbox)',
   'Volume de la musique': 'Music volume',
   'Musique du jeu choisi pendant la navigation, avant le volume propre à chaque jeu.': 'Selected game’s music while browsing, before each game’s own volume.',

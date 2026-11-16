@@ -356,7 +356,7 @@ interface BuiltLike {
 
 test('réglages du menu : chaque sous-écran revient sur sa propre ligne ; aperçu des sons', () => {
   const { createMenuSettings, MENU_SETTINGS_ROWS, ATTRACT_ROWS } = require(path.join(REPO_ROOT, 'app', 'dist', 'menu-settings.js')) as {
-    createMenuSettings(host: unknown): { run(): void };
+    createMenuSettings(host: unknown): { item: { run(): void } };
     MENU_SETTINGS_ROWS: readonly string[];
     ATTRACT_ROWS: readonly string[];
   };
@@ -373,7 +373,7 @@ test('réglages du menu : chaque sous-écran revient sur sa propre ligne ; aper�
     sleepAllowed: () => true,
     intro: { open() {}, summary: () => 'jouée' },
     recording: { quality: () => '4k', setQuality() {} },
-  });
+  }).item;
   item.run();
   const main = opened[0]!.build;
   assert.equal(main().actions.length, MENU_SETTINGS_ROWS.length + 1, 'une ligne par réglage, plus Retour');

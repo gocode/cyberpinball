@@ -46,6 +46,8 @@ import {
   scanRoot,
   surveyRestore,
   t,
+  tLater,
+  type LaterText,
   tn,
   createTransferMeter,
   BACKUP_DIR_NAME,
@@ -75,7 +77,7 @@ export interface BackupsMenuHost {
     /** Opération courte : le message à l'écran, les touches ignorées. */
     task(message: string, work: () => Promise<void> | void): Promise<void>;
     /** Sélecteur de fichiers de Cyber Pinball, en mode dossier : undefined à l'abandon. */
-    pick?(request: { title: string; icon?: 'usb'; purpose: string; mode: 'folder'; startDir?: string }): Promise<string[] | undefined>;
+    pick?(request: { title: string; icon?: 'usb'; purpose: LaterText; mode: 'folder'; startDir?: string }): Promise<string[] | undefined>;
   };
   /** Redessine l'écran affiché (progression d'une copie). */
   broadcast(): void;
@@ -798,7 +800,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     const current = destinationDrive();
     const first = current ?? [...drives].sort((a, b) => Number(isRootDrive(a)) - Number(isRootDrive(b)))[0];
     const startDir = current ? path.join(drivePath(current), folderOn(current) ?? '') : first ? drivePath(first) : undefined;
-    const picked = await pick({ title: t('Destination : choisir un dossier'), icon: 'usb', purpose: t('Destination des sauvegardes'), mode: 'folder', ...(startDir ? { startDir } : {}) });
+    const picked = await pick({ title: t('Destination : choisir un dossier'), icon: 'usb', purpose: tLater('Destination des sauvegardes'), mode: 'folder', ...(startDir ? { startDir } : {}) });
     if (!picked?.[0]) return;
     let dir = path.resolve(picked[0]);
     if (path.basename(dir).toLowerCase() === BACKUP_DIR_NAME.toLowerCase()) dir = path.dirname(dir);
@@ -1304,10 +1306,10 @@ export function createBackupsMenu(host: BackupsMenuHost) {
   };
 
   /** Texte du bandeau au démarrage qui suit une restauration (ou son annulation) ; undefined sinon. */
-  function restoredNotice(): string | undefined {
+  function restoredNotice(): LaterText | undefined {
     const last = loadLastRestore(host.dataDir);
     if (!last || last.shown) return undefined;
-    return last.kind === 'undo' ? t('Restauration annulée : l’état d’avant est revenu') : t('Restauration terminée : le constat est dans Sauvegardes');
+    return last.kind === 'undo' ? tLater('Restauration annulée : l’état d’avant est revenu') : tLater('Restauration terminée : le constat est dans Sauvegardes');
   }
 
   /**

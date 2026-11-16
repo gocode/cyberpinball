@@ -13,7 +13,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import type { Cabinet } from './model';
-import { formatDate, formatList, t, tn } from './i18n';
+import { formatDate, formatList, recognizeText, registerTextRef, t, tn } from './i18n';
 import { dmdMediaType } from './medias';
 import { requiredForPlay } from './playable';
 import { romContent } from './romzip';
@@ -469,6 +469,9 @@ export type NeedKind = 'table' | 'b2s' | 'rom' | 'pup' | 'altsound' | 'altcolor'
  */
 export const PART_KINDS: readonly NeedKind[] = ['table', 'b2s', 'rom', 'pup', 'altcolor', 'altsound', 'music', 'pov', 'topper', 'media'];
 
+// Nom d'une partie dans un texte enregistré ({ ref: 'need', id: 'b2s' }), dit à l'affichage.
+registerTextRef('need', (id) => (NEED_LABELS as Record<string, string | undefined>)[id]);
+
 export const NEED_LABELS: Record<NeedKind, string> = {
   get table() {
     return t('Table');
@@ -653,8 +656,8 @@ export interface ReceivedFile {
   url?: string;
   /** Ce que contient le fichier, reconnu à la réception (classifyContent). */
   content?: ContentKind;
-  /** « 14 images, 9 vidéos, aucun .vpx » */
-  summary?: string;
+  /** Ce qu'il contient, compté (contentSummaryText le dit : « 14 images, 9 vidéos, aucun .vpx »). */
+  summary?: ContentCounts;
   /** Toutes les parties qu'il apporte (contentParts) : une archive complète fournit la table, le fronton, la ROM… */
   parts?: NeedKind[];
   /** Rattaché à la demande expresse de l'utilisateur alors qu'il ne convient pas : jamais réorienté d'office. */
@@ -668,8 +671,8 @@ export interface StrayFile {
   via: 'window' | 'watch' | 'manual';
   url?: string;
   content?: ContentKind;
-  /** « 14 images, 9 vidéos, aucun .vpx » */
-  summary?: string;
+  /** Ce qu'il contient, compté (contentSummaryText le dit : « 14 images, 9 vidéos, aucun .vpx »). */
+  summary?: ContentCounts;
   /** Élément auquel il semblait revenir, refusé faute de convenir (confirmation demandée). */
   expected?: string;
   /** Élément attendu auquel il conviendrait. */
@@ -707,9 +710,16 @@ export function loadWaitList(dataDir: string): WaitList {
   try {
     const raw = JSON.parse(fs.readFileSync(waitListFile(dataDir), 'utf8').replace(/^﻿/, '')) as { items?: unknown };
     const items = Array.isArray(raw.items) ? raw.items.filter((i): i is WaitItem => Boolean(i) && typeof (i as WaitItem).id === 'string' && typeof (i as WaitItem).gameId === 'string') : [];
+    for (const i of items) {
+      // Anciens fichiers : résumé déjà traduit, relu en comptes.
+      if (i.received) setCounts(i.received);
+      // « version sans auteur » : jamais enregistré (vide), dit dans la langue du moment.
+      if (unnamed(i)) i.label = versionLabel(i);
+    }
     const r = raw as WaitList;
     const list: WaitList = { items };
     const strays = Array.isArray(r.strays) ? r.strays.filter((s): s is StrayFile => Boolean(s) && typeof s.file === 'string' && typeof s.at === 'string') : [];
+    strays.forEach(setCounts);
     if (strays.length) list.strays = strays;
     if (typeof r.noticeAcceptedAt === 'string') list.noticeAcceptedAt = r.noticeAcceptedAt;
     if (r.watchDownloads === true) list.watchDownloads = true;
@@ -720,10 +730,20 @@ export function loadWaitList(dataDir: string): WaitList {
   }
 }
 
+/** Fichier sans auteur ni version : son libellé (« version sans auteur ») se traduit à la lecture, il s'enregistre vide. */
+const unnamed = (i: WaitItem) => i.kind !== 'rom' && !i.authors?.length && !i.version;
+
+function setCounts(f: { summary?: ContentCounts }): void {
+  const counts = readContentCounts(f.summary);
+  if (counts) f.summary = counts;
+  else delete f.summary;
+}
+
 export function saveWaitList(dataDir: string, list: WaitList): void {
   const file = waitListFile(dataDir);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  writeFileAtomic(file, JSON.stringify(list, null, 2) + '\n');
+  const neutral: WaitList = { ...list, items: list.items.map((i) => (unnamed(i) ? { ...i, label: '' } : i)) };
+  writeFileAtomic(file, JSON.stringify(neutral, null, 2) + '\n');
 }
 
 /**
@@ -899,23 +919,92 @@ export function classifyContent(name: string, entries?: string[]): ContentKind {
   return 'unknown';
 }
 
-/** « 14 images, 9 vidéos, aucun .vpx » : ce que contient une archive, pour qu'on juge soi-même. */
-export function contentSummary(name: string, entries?: string[]): string | undefined {
+/**
+ * Ce que contient une archive, compté : enregistré tel quel (acquisition.json), dit dans la
+ * langue du moment par contentSummaryText (« 14 images, 9 vidéos, aucun .vpx »).
+ */
+export interface ContentCounts {
+  files: number;
+  vpx: number;
+  b2s: number;
+  pup: number;
+  images: number;
+  videos: number;
+  sounds: number;
+}
+
+/** Ce que contient une archive, pour qu'on juge soi-même ; undefined si ce n'en est pas une, ou illisible. */
+export function contentSummary(name: string, entries?: string[]): ContentCounts | undefined {
   if (!ARCHIVES.test(name) || !entries) return undefined;
   const files = entries.map((e) => e.replace(/\\/g, '/')).filter((e) => !e.endsWith('/'));
   const count = (re: RegExp) => files.filter((e) => re.test(e)).length;
   const [vpx, b2s, pup, images, videos, sounds] = [/\.vpx$/i, /\.directb2s$/i, /\.pup$/i, IMAGES, VIDEOS, AUDIO].map(count) as [number, number, number, number, number, number];
+  return { files: files.length, vpx, b2s, pup, images, videos, sounds };
+}
+
+/** « 14 images, 9 vidéos, aucun .vpx » */
+export function contentSummaryText(c: ContentCounts | undefined): string | undefined {
+  if (!c) return undefined;
   const shown = [
-    vpx ? tn(vpx, '{n} .vpx', '{n} .vpx') : '',
-    b2s ? tn(b2s, '{n} .directb2s', '{n} .directb2s') : '',
-    pup ? tn(pup, '{n} fichier .pup', '{n} fichiers .pup') : '',
-    images ? tn(images, '{n} image', '{n} images') : '',
-    videos ? tn(videos, '{n} vidéo', '{n} vidéos') : '',
-    sounds ? tn(sounds, '{n} son', '{n} sons') : '',
+    c.vpx ? tn(c.vpx, '{n} .vpx', '{n} .vpx') : '',
+    c.b2s ? tn(c.b2s, '{n} .directb2s', '{n} .directb2s') : '',
+    c.pup ? tn(c.pup, '{n} fichier .pup', '{n} fichiers .pup') : '',
+    c.images ? tn(c.images, '{n} image', '{n} images') : '',
+    c.videos ? tn(c.videos, '{n} vidéo', '{n} vidéos') : '',
+    c.sounds ? tn(c.sounds, '{n} son', '{n} sons') : '',
   ].filter(Boolean);
-  if (!shown.length) shown.push(tn(files.length, '{n} fichier', '{n} fichiers'));
-  if (!vpx) shown.push(t('aucun .vpx'));
+  if (!shown.length) shown.push(tn(c.files, '{n} fichier', '{n} fichiers'));
+  if (!c.vpx) shown.push(t('aucun .vpx'));
   return shown.join(', ');
+}
+
+/** Clés de contentSummaryText, et ce que compte chacune : pour relire un ancien résumé déjà traduit. */
+const SUMMARY_KEYS: Record<string, keyof ContentCounts> = {
+  '{n} .vpx': 'vpx', // i18n-ignore : clé du catalogue (tn de contentSummaryText)
+  '{n} .directb2s': 'b2s', // i18n-ignore : clé du catalogue (tn de contentSummaryText)
+  '{n} fichier .pup': 'pup', // i18n-ignore : clé du catalogue (tn de contentSummaryText)
+  '{n} fichiers .pup': 'pup', // i18n-ignore : clé du catalogue (tn de contentSummaryText)
+  '{n} image': 'images', // i18n-ignore : clé du catalogue (tn de contentSummaryText)
+  '{n} images': 'images', // i18n-ignore : clé du catalogue (tn de contentSummaryText)
+  '{n} vidéo': 'videos', // i18n-ignore : clé du catalogue (tn de contentSummaryText)
+  '{n} vidéos': 'videos', // i18n-ignore : clé du catalogue (tn de contentSummaryText)
+  '{n} son': 'sounds', // i18n-ignore : clé du catalogue (tn de contentSummaryText)
+  '{n} sons': 'sounds', // i18n-ignore : clé du catalogue (tn de contentSummaryText)
+  '{n} fichier': 'files', // i18n-ignore : clé du catalogue (tn de contentSummaryText)
+  '{n} fichiers': 'files', // i18n-ignore : clé du catalogue (tn de contentSummaryText)
+};
+
+/**
+ * Résumé lu dans acquisition.json : les comptes, ou, dans un ancien fichier, la phrase déjà
+ * traduite (« 1 image, 3 vidéos, aucun .vpx », « 18 .pup files ») relue en comptes. Le
+ * total des fichiers, absent de la phrase, vaut la somme reconnue. undefined si rien n'est reconnu.
+ */
+export function readContentCounts(value: unknown): ContentCounts | undefined {
+  const zero: ContentCounts = { files: 0, vpx: 0, b2s: 0, pup: 0, images: 0, videos: 0, sounds: 0 };
+  if (value && typeof value === 'object') {
+    const c = { ...zero };
+    for (const k of Object.keys(zero) as (keyof ContentCounts)[]) {
+      const v = (value as Record<string, unknown>)[k];
+      if (typeof v === 'number' && Number.isInteger(v) && v >= 0) c[k] = v;
+    }
+    return c;
+  }
+  if (typeof value !== 'string') return undefined;
+  const c = { ...zero };
+  let known = 0;
+  let filesSaid = false;
+  for (const piece of value.split(/,\s*/)) {
+    const said = recognizeText(piece.trim(), Object.keys(SUMMARY_KEYS));
+    const n = said?.params?.n;
+    if (!said || typeof n !== 'number') continue;
+    const field = SUMMARY_KEYS[said.key]!;
+    c[field] = n;
+    if (field === 'files') filesSaid = true;
+    known++;
+  }
+  if (!known) return undefined;
+  if (!filesSaid) c.files = c.vpx + c.b2s + c.pup + c.images + c.videos + c.sounds;
+  return c;
 }
 
 /**
@@ -1002,7 +1091,7 @@ export function matchDownload(list: WaitList, d: DownloadFacts, vps?: VpsDb): Wa
 }
 
 /** Marque un élément reçu, avec le fichier, d'où il vient et ce qu'il contient. */
-export function markReceived(item: WaitItem, file: string, via: 'window' | 'watch' | 'manual', now = new Date(), url?: string, content?: { content?: ContentKind; summary?: string; parts?: NeedKind[]; forced?: boolean }): void {
+export function markReceived(item: WaitItem, file: string, via: 'window' | 'watch' | 'manual', now = new Date(), url?: string, content?: { content?: ContentKind; summary?: ContentCounts; parts?: NeedKind[]; forced?: boolean }): void {
   item.state = 'received';
   item.received = { file, at: now.toISOString(), via, url };
   if (content?.content) item.received.content = content.content;

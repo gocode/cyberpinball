@@ -21,9 +21,11 @@ import {
   STOP_NOTICE_MS,
   arcadeHoursClock,
   badgeLabel,
+  eventLater,
   eventText,
   CHAT_REACTIONS,
   type ChatReaction,
+  downloadReasonLater,
   downloadReasonText,
   avatarsDir,
   avatarView,
@@ -306,6 +308,9 @@ import {
   formatList,
   frontendNames,
   t,
+  tLater,
+  say,
+  type StoredText,
   type OtherFrontend,
   pupCabinet,
   repairPupForPlay,
@@ -1604,7 +1609,7 @@ phoneRemote.setMenu({
     phoneUploadShown = now;
     broadcast();
   },
-  uploaded: (name) => showBanner(t('Reçu du téléphone : {name}, dans le dossier d’import', { name }), 'add-table'),
+  uploaded: (name) => showBanner(tLater('Reçu du téléphone : {name}, dans le dossier d’import', { name }), 'add-table'),
   // Le bloc de la télécommande a changé : un redessin, après le geste en cours (jamais pendant broadcast).
   changed: () => {
     if (phoneRedraw) return;
@@ -2321,7 +2326,7 @@ library.provideSystemItem('cabinet', {
  */
 function cabinetSetupItems(): SystemItem[] {
   const steps: SystemItem[] = WIZARD_STEPS.map((step) => ({ label: step.label, detail: step.detail, icon: step.icon, run: () => relaunchWizard(step.flag) }));
-  // « Écran du DMD » après la disposition des écrans, quand la borne a un DMD.
+  // « Écran du DMD » après la disposition des écrans, quand la borne a un DMD (aussi dans Borne > DMD).
   const dmd = dmdScreenItem();
   if (dmd) steps.splice(WIZARD_STEPS.findIndex((s) => s.id === 'disposition') + 1, 0, dmd);
   return [
@@ -2348,15 +2353,31 @@ function dmdScreenItem(): SystemItem | undefined {
   };
 }
 
+// « Écran du DMD » dans Borne > DMD : son retour ramène à la rubrique ; sans écran de DMD, grisée avec sa raison.
+library.provideSystemItem('dmd-screen', {
+  get detail() {
+    const cabinet = loadCabinet(loc.dataDir);
+    if (!cabinet?.roles.dmd) return t('Indisponible : la borne n’a pas d’écran de DMD (assistant d’écrans, étape « Disposition »)');
+    return t('FullDMD 16:9 ou DMD seul : ce que montre l’écran du DMD');
+  },
+  get tone() {
+    return loadCabinet(loc.dataDir)?.roles.dmd ? undefined : ('quiet' as const);
+  },
+  get attention() {
+    const cabinet = loadCabinet(loc.dataDir);
+    return Boolean(cabinet?.roles.dmd && dmdKindQuestion(cabinet));
+  },
+  run: () => (loadCabinet(loc.dataDir)?.roles.dmd ? openDmdScreen(() => library.openSystem()) : library.openSystem()),
+});
+
 /**
  * Écran « Écran du DMD » : l'état actuel (ambigu : « À vérifier »), puis les deux réponses avec
  * leur schéma. Start enregistre le choix (zone ajustée seulement si elle n'a pas la bonne forme,
  * withDmdKind) et relance le menu : ses fenêtres, VPinballX.ini et les PuP-Packs suivent.
  */
-function openDmdScreen(): void {
+function openDmdScreen(back: () => void = () => openCabinetSetup()): void {
   library.openCustom(() => {
     const cabinet = loadCabinet(loc.dataDir);
-    const back = () => openCabinetSetup();
     if (!cabinet?.roles.dmd) return { heading: t('Écran du DMD'), icon: 'dmd', sections: [], actions: [{ label: t('Retour'), icon: 'back', run: back }], back };
     const question = dmdKindQuestion(cabinet);
     const current = dmdKindOf(cabinet);
@@ -2462,31 +2483,32 @@ const introMenu = createIntroMenu({
   preview: () => beginIntro('library'),
 });
 // Médias, son et attente (musique, volumes, mode attente, médias pendant la partie) : un écran à part.
-library.provideSystemItem(
-  'menu-media',
-  createMenuSettings({
-    library,
-    settings: () => mediaSettings,
-    save: (next) => saveMediaSettings(next),
-    output: () => menuOutput(),
-    preview: (id) => playUiSound(id),
-    wakeDevices: () => wakeDevices(),
-    sleepAllowed: () => !powerUnavailable('sleep', power.capabilities()),
-    intro: introMenu,
-    recording: {
-      quality: () => loadRecordingSettings(loc.dataDir).quality,
-      setQuality: (quality) => {
-        try {
-          saveRecordingSettings(loc.dataDir, { ...loadRecordingSettings(loc.dataDir), quality });
-          console.log(`Enregistrement : qualité ${quality}.`);
-        } catch (error) {
-          console.log(`Enregistrement : qualité non enregistrée (${(error as Error).message}).`);
-        }
-        broadcast();
-      },
+const menuSettings = createMenuSettings({
+  library,
+  settings: () => mediaSettings,
+  save: (next) => saveMediaSettings(next),
+  output: () => menuOutput(),
+  preview: (id) => playUiSound(id),
+  wakeDevices: () => wakeDevices(),
+  sleepAllowed: () => !powerUnavailable('sleep', power.capabilities()),
+  intro: introMenu,
+  recording: {
+    quality: () => loadRecordingSettings(loc.dataDir).quality,
+    setQuality: (quality) => {
+      try {
+        saveRecordingSettings(loc.dataDir, { ...loadRecordingSettings(loc.dataDir), quality });
+        console.log(`Enregistrement : qualité ${quality}.`);
+      } catch (error) {
+        console.log(`Enregistrement : qualité non enregistrée (${(error as Error).message}).`);
+      }
+      broadcast();
     },
-  }),
-);
+  },
+});
+library.provideSystemItem('menu-media', menuSettings.item);
+// Borne > DMD : le DMD du menu et sa couleur, avec l'écran du DMD et le DMD réel (tous les réglages du DMD ensemble).
+library.provideSystemItem('menu-dmd', menuSettings.menuDmd);
+library.provideSystemItem('dmd-color', menuSettings.dmdColor);
 // Roue des tables (Tables > Roue) : présentation, ordre, Start, logos animés, couleur, Juke-box ; dans medias.json aussi.
 library.provideSystemItem('wheel', createWheelSettings({ library, settings: () => mediaSettings, save: (next) => saveMediaSettings(next) }));
 // Réglages du Juke-box (Médias > Réglages du Juke-box, et depuis sa gestion) : sorties du son, visualiseur, médaillon.
@@ -2717,7 +2739,7 @@ const socialNet = createSocialNet({
     const mine = socialNet.publicCard(socialNet.state().key.publicKey);
     menuNotices.push(likes.map((l) => {
       const e = mine?.events.find((x) => x.id === l.event);
-      return { kind: 'player-like' as const, key: `${l.from}|${l.event}`, at: Date.now(), who: l.name, player: l.from, ...(e ? { subject: eventText(e, badgeLabel) } : {}) };
+      return { kind: 'player-like' as const, key: `${l.from}|${l.event}`, at: Date.now(), who: l.name, player: l.from, ...(e ? { subject: eventLater(e) } : {}) };
     }));
   },
 });
@@ -2843,8 +2865,7 @@ library.provideSystemItem('activity', activityMenu.item);
 const menuNotices = createMenuNotices({
   social: socialNet,
   jobs: () => library.downloads.manager.jobs(),
-  reason: (j) => downloadReasonText(j),
-  badgeLabel,
+  reason: (j) => downloadReasonLater(j),
   mode: () => mediaSettings.notices,
   zone: () => currentZone(),
   redraw: () => {
@@ -5692,10 +5713,10 @@ export function startFrontend(): void {
   // Bande DMD seule sur un écran large, jamais tranchée : l'utilisateur dit une fois ce qu'est l'écran.
   // Orientation des écrans : ce que le démarrage (ou la dernière fermeture) n'a pas pu rendre.
   const orientationProblems = takeOrientationProblems();
-  if (orientationProblems.length) showBanner(orientationProblems.join(' '), 'cabinet');
+  if (orientationProblems.length) showBanner(orientationProblems, 'cabinet');
   const legacy = choose ? undefined : legacyDesktopTurned();
-  if (cabinet && !choose && dmdKindQuestion(cabinet)) showBanner(t('Écran du DMD à vérifier : FullDMD ou DMD seul ? Menu système > Borne > Configuration de la borne > Écran du DMD.'), 'cabinet');
-  if (selection?.previous && selection.configuration) showBanner(t('Configuration « {name} » reconnue (avant : « {previous} »).', { name: selection.configuration.name, previous: selection.previous.name }), 'cabinet');
+  if (cabinet && !choose && dmdKindQuestion(cabinet)) showBanner(tLater('Écran du DMD à vérifier : FullDMD ou DMD seul ? Menu système > Borne > Configuration de la borne > Écran du DMD.'), 'cabinet');
+  if (selection?.previous && selection.configuration) showBanner(tLater('Configuration « {name} » reconnue (avant : « {previous} »).', { name: selection.configuration.name, previous: selection.previous.name }), 'cabinet');
   // Après une mise à jour : la nouvelle version est-elle là ?
   const updateNotice = updates.startupNotice();
   updates.startBackgroundChecks();
@@ -7481,7 +7502,7 @@ async function checkFirewallAtStart(): Promise<void> {
   const report = await guardFirewall(socialFirewall, { ...(update ? { update } : {}), log: (line) => console.log(line) });
   if (socialFirewall.simulated || !report.problems.length) return;
   if (update && state.phase === 'menu' && !guest.active && !closing) friendsMenu.openFirewall(() => library.leave());
-  else showBanner(t('Pare-feu de Windows : {reason}. Menu système > Amis > Partage et réseau.', { reason: report.problems[0]!.reason }), 'sharing');
+  else showBanner(tLater('Pare-feu de Windows : {reason}. Menu système > Amis > Partage et réseau.', { reason: report.problems[0]!.reason }), 'sharing');
 }
 
 /**
@@ -7489,8 +7510,10 @@ async function checkFirewallAtStart(): Promise<void> {
  * aussi à Activité récente, Start y ouvrant l'entrée du menu système qu'il nomme (un constat du
  * démarrage) ; la réponse immédiate à un geste (orientation rendue, veille simulée) n'y entre pas.
  */
-function showBanner(text: string, note?: SystemItemId): void {
-  if (note) activityMenu.note({ kind: 'note', facts: { key: text, text, item: note } });
+function showBanner(said: StoredText, note?: SystemItemId): void {
+  // Gardé à l'Activité récente tel quel (LaterText) : dit dans la langue du moment à chaque lecture.
+  if (note) activityMenu.note({ kind: 'note', facts: { key: typeof said === 'string' ? said : JSON.stringify(said), text: said, item: note } });
+  const text = say(said);
   // Pendant l'ouverture, il attend la roue : rien ne se pose sur les animations.
   if (state.phase === 'intro') return void pendingBanners.push(text);
   state = { ...state, banner: text };

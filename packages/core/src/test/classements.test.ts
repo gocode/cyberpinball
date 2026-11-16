@@ -263,7 +263,7 @@ function avatarImage(n: number): AvatarImage {
   return readAvatarImage(Buffer.concat([head, Buffer.alloc(64, n)]))!;
 }
 
-test('deux bornes : l’avatar joint à mes scores se voit au classement d’un joueur qui n’est pas mon ami ; rien d’autre ne se donne', async () => {
+test('deux bornes : l’avatar joint à mes scores se voit au classement d’un joueur qui n’est pas mon ami, et partout ailleurs ; une empreinte que personne n’annonce ne se donne pas', async () => {
   const testnet = await createTestnet(3, { host: '127.0.0.1' });
   const dirs = ['Ana', 'Bob'].map((n) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), `cp-classement-avatar-${n}-`));
@@ -287,14 +287,20 @@ test('deux bornes : l’avatar joint à mes scores se voit au classement d’un 
       const file = bob.rankingAvatar(keyA, photo.hash);
       return !!file && fs.existsSync(file) && fs.readFileSync(file).equals(photo.bytes);
     });
-    // Pas amis : l'avatar « d'ami » reste inconnu ; seul celui joint aux scores se montre.
-    assert.equal(bob.avatarFile(keyA), undefined);
-    // Une empreinte qu'aucun score ne porte ne se demande pas, et rien ne vient.
-    const secret = avatarImage(2);
-    ana.setAvatar(secret);
-    assert.equal(bob.rankingAvatar(keyA, secret.hash), undefined);
+    // Avatar public (15/11/2026) : pas amis, Bob voit aussi la photo d'Ana partout ailleurs.
+    assert.equal(fs.readFileSync(bob.avatarFile(keyA)!).equals(photo.bytes), true);
+    // Ana en change : Bob voit le nouveau, même si aucun score ne le porte encore.
+    const next = avatarImage(2);
+    ana.setAvatar(next);
+    await until('Bob voit le nouvel avatar d’Ana', () => {
+      const file = bob.avatarFile(keyA);
+      return !!file && fs.existsSync(file) && fs.readFileSync(file).equals(next.bytes);
+    });
+    // Une empreinte que personne n'annonce ne se donne jamais.
+    const unknown = avatarImage(3);
+    assert.equal(bob.rankingAvatar(keyA, unknown.hash), undefined);
     await new Promise((r) => setTimeout(r, 1500));
-    assert.equal(bob.rankingAvatar(keyA, secret.hash), undefined, 'avatar non publié : jamais donné');
+    assert.equal(bob.rankingAvatar(keyA, unknown.hash), undefined, 'avatar que personne n’annonce : jamais donné');
   } finally {
     await Promise.all([ana.stop(), bob.stop()]);
     await testnet.destroy();

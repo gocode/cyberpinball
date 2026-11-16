@@ -111,16 +111,18 @@ interface BuiltLike {
 test('réglage « Couleur du DMD » : préréglage, couleur libre, couleur refusée ; envoyé aux fenêtres', () => {
   setLanguage('fr');
   const { createMenuSettings, MENU_SETTINGS_ROWS } = require(path.join(REPO_ROOT, 'app', 'dist', 'menu-settings.js')) as {
-    createMenuSettings(host: unknown): { run(): void };
+    createMenuSettings(host: unknown): { item: { run(): void }; dmdColor: { readonly label: string; run(): void } };
     MENU_SETTINGS_ROWS: readonly string[];
   };
   let settings: MenuMediaSettings = { ...DEFAULT_MENU_MEDIA_SETTINGS };
   const opened: { build: () => BuiltLike; at: number }[] = [];
+  // Retours à la rubrique Borne > DMD (16/11/2026 : la couleur y est rangée, plus dans « Médias, son et attente »).
+  let systemOpened = 0;
   const prompts: { value: string; done: (v: string | undefined) => void; lead?: string }[] = [];
-  createMenuSettings({
+  const items = createMenuSettings({
     library: {
       openCustom: (build: () => BuiltLike, at = 0) => opened.push({ build, at }),
-      openSystem() {},
+      openSystem: () => systemOpened++,
       openPrompt: (_h: string, _l: string, value: string, done: (v: string | undefined) => void, lead?: string) => prompts.push({ value, done, lead }),
     },
     settings: () => settings,
@@ -131,12 +133,12 @@ test('réglage « Couleur du DMD » : préréglage, couleur libre, couleur refus
     sleepAllowed: () => true,
     intro: { open() {}, summary: () => 'jouée' },
     recording: { quality: () => '4k', setQuality() {} },
-  }).run();
-  const row = MENU_SETTINGS_ROWS.indexOf('dmdColor');
-  assert.ok(row >= 0);
-  const main = opened[0]!.build;
-  assert.equal(main().actions[row]!.label, 'Couleur du DMD : Vert signal');
-  main().actions[row]!.run();
+  });
+  assert.ok(!MENU_SETTINGS_ROWS.includes('dmdColor') && !MENU_SETTINGS_ROWS.includes('dmd'), 'les réglages du DMD sont dans Borne > DMD');
+  const entry = items.dmdColor;
+  const back = () => systemOpened;
+  assert.equal(entry.label, 'Couleur du DMD : Vert signal');
+  entry.run();
   const colors = opened.at(-1)!.build();
   assert.equal(colors.heading, 'Couleur du DMD');
   assert.deepEqual(
@@ -144,26 +146,26 @@ test('réglage « Couleur du DMD » : préréglage, couleur libre, couleur refus
     DMD_COLOR_PRESETS.map((p) => p.label),
   );
   assert.equal(colors.actions[0]!.tone, 'ok', 'le choix actuel est marqué');
-  // Un préréglage : enregistré, retour sur la ligne.
+  // Un préréglage : enregistré, retour à la rubrique Borne > DMD.
   colors.actions[DMD_COLOR_PRESETS.findIndex((p) => p.id === 'plasma')]!.run();
   assert.equal(settings.dmdColor, '#ff8a1f');
-  assert.equal(opened.at(-1)!.at, row);
-  assert.equal(main().actions[row]!.label, 'Couleur du DMD : Orange plasma');
+  assert.equal(back(), 1);
+  assert.equal(entry.label, 'Couleur du DMD : Orange plasma');
   // Couleur de la table (06/11/2026) : juste après les préréglages ; gardée telle quelle, sans couleur fixe.
-  main().actions[row]!.run();
+  entry.run();
   const tableChoice = opened.at(-1)!.build().actions[DMD_COLOR_PRESETS.length]!;
   assert.equal(tableChoice.label, 'Couleur de la table');
   tableChoice.run();
   assert.equal(settings.dmdColor, 'table');
-  assert.equal(opened.at(-1)!.at, row);
-  assert.equal(main().actions[row]!.label, 'Couleur du DMD : couleur de la table');
-  main().actions[row]!.run();
+  assert.equal(back(), 2);
+  assert.equal(entry.label, 'Couleur du DMD : couleur de la table');
+  entry.run();
   assert.equal(opened.at(-1)!.at, DMD_COLOR_PRESETS.length, 'la liste rouvre sur « Couleur de la table »');
   assert.equal(opened.at(-1)!.build().actions[DMD_COLOR_PRESETS.length]!.tone, 'ok');
   assert.notEqual(opened.at(-1)!.build().actions[DMD_COLOR_PRESETS.length + 1]!.tone, 'ok', 'ce n’est pas une couleur libre');
   colors.actions[DMD_COLOR_PRESETS.findIndex((p) => p.id === 'plasma')]!.run();
   // Couleur libre : clavier à l'écran, valeur actuelle proposée.
-  main().actions[row]!.run();
+  entry.run();
   opened.at(-1)!.build().actions[DMD_COLOR_PRESETS.length + 1]!.run();
   assert.equal(prompts.at(-1)!.value, '#FF8A1F');
   prompts.at(-1)!.done('#123');
@@ -173,9 +175,9 @@ test('réglage « Couleur du DMD » : préréglage, couleur libre, couleur refus
   assert.match(prompts.at(-1)!.lead ?? '', /n’est pas une couleur/);
   prompts.at(-1)!.done('a1b2c3');
   assert.equal(settings.dmdColor, '#a1b2c3');
-  assert.equal(opened.at(-1)!.at, row);
-  assert.equal(main().actions[row]!.label, 'Couleur du DMD : couleur libre #A1B2C3');
-  const again = (main().actions[row]!.run(), opened.at(-1)!);
+  assert.equal(back(), 4, "couleur libre : retour à la rubrique");
+  assert.equal(entry.label, 'Couleur du DMD : couleur libre #A1B2C3');
+  const again = (entry.run(), opened.at(-1)!);
   assert.equal(again.at, DMD_COLOR_PRESETS.length + 1, 'une couleur libre rouvre la liste sur « Couleur libre »');
   assert.equal(again.build().actions[DMD_COLOR_PRESETS.length + 1]!.tone, 'ok');
   // Abandon de la saisie : retour à la liste, rien de changé.

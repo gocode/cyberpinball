@@ -21,6 +21,7 @@ import {
   compareVersions,
   contentFits,
   contentSummary,
+  contentSummaryText,
   forgetStray,
   placeDownload,
   reassignFile,
@@ -295,7 +296,7 @@ test('contenu d’un fichier reçu : table, fronton, ROM, PuP-Pack, pack de méd
   assert.equal(classifyContent('T2 topper.zip', ['topper.mp4']), 'topper');
   assert.equal(classifyContent('T2 music.zip', ['music/1.mp3', 'music/2.mp3']), 'music');
   assert.equal(classifyContent('archive.rar'), 'unknown', 'archive illisible : on ne sait pas');
-  assert.equal(contentSummary('T2 Media Pack.zip', MEDIA_PACK), '1 image, 3 vidéos, 1 son, aucun .vpx');
+  assert.equal(contentSummaryText(contentSummary('T2 Media Pack.zip', MEDIA_PACK)), '1 image, 3 vidéos, 1 son, aucun .vpx');
   assert.equal(contentFits('table', 'media'), 'no');
   assert.equal(contentFits('table', 'table'), 'yes');
   assert.equal(contentFits('topper', 'media'), 'yes');

@@ -147,7 +147,7 @@ test('la borne du 27/10/2026 : The Matrix se range sans manipulation', () => {
   const v114 = addToWaitList(l, MATRIX, { kind: 'table' }, MATRIX.tableFiles![1]!, page(18478, PAGE), new Date('2026-10-27T15:28:18Z'));
   markReceived(v100, 'D:\\acq\\VP_Cooks- The Matrix_PuPevents-v1.0.14.vpx', 'window', new Date('2026-10-27T15:30:02Z'), download(18478, PAGE, 187406), { content: 'table' });
   v100.state = 'installed';
-  l.strays = [{ file: 'D:\\acq\\TheMatrixPupPackv1.0.14.zip', via: 'window', url: download(18478, PAGE, 187407), content: 'pup', summary: '18 fichiers .pup', at: '2026-10-27T15:33:17Z' }];
+  l.strays = [{ file: 'D:\\acq\\TheMatrixPupPackv1.0.14.zip', via: 'window', url: download(18478, PAGE, 187407), content: 'pup', summary: { files: 18, vpx: 0, b2s: 0, pup: 18, images: 0, videos: 0, sounds: 0 }, at: '2026-10-27T15:33:17Z' }];
   const table = 'D:\\tables\\The Matrix (Original 2023)\\VP_Cooks- The Matrix_PuPevents-v1.0.14.vpx';
   const repairs = repairWaitList(l, { exists: () => true, vps, tableOf: (id) => (id === MATRIX.id ? { file: table, has: (k) => k === 'table' || k === 'pup' } : undefined) });
   assert.deepEqual(

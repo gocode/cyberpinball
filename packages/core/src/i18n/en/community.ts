@@ -11,8 +11,8 @@ export const messages: Record<string, string> = {
   'Salons par pays': 'Rooms by country',
   'Les salons de discussion par pays arrivent dans une prochaine version': 'Chat rooms by country are coming in a later version',
   'Classements': 'Leaderboards',
-  'Ce que voient les autres joueurs : votre pseudo, votre pays, « En ligne » ou « En partie ». Table en cours, bibliothèque et messages : entre amis seulement.':
-    'What other players see: your name, your country, "Online" or "Playing". Current table, library and messages: friends only.',
+  'Ce que voient les autres joueurs : votre pseudo, votre avatar, votre pays, « En ligne » ou « En partie ». Table en cours, bibliothèque et messages : entre amis seulement.':
+    'What other players see: your name, your avatar, your country, "Online" or "Playing". Current table, library and messages: friends only.',
 
   // Joueurs en ligne : filtres et groupes
   'Tous': 'All',

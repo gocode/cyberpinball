@@ -18,7 +18,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { t } from './i18n';
+import { t, type StoredText } from './i18n';
 import { scanInstallation } from './mediaimport';
 import { isAcceptedFormat, mediaKind, type MediaKind, type MediaType } from './medias';
 import type { MediaChoice } from './mediachoices';
@@ -729,7 +729,8 @@ export interface WebReceipt {
   /** Fichiers à convertir pour ce média avant de s'en servir (image en PNG, son ou son d'une vidéo en WAV). */
   convert?: { file: string; kind: MediaKind; to: 'png' | 'wav'; from: 'image' | 'audio' | 'video' }[];
   /** Fichiers refusés pour ce média, et pourquoi (ils ne sont pas gardés). */
-  refused?: { name: string; reason: string }[];
+  /** Raison traduite à l'affichage (say) ; un ancien web.json la tient déjà traduite (readStoredText). */
+  refused?: { name: string; reason: StoredText }[];
   /** Arrivé dans Téléchargements de Windows (navigateur de l'utilisateur), pas dans la fenêtre « Récupérer ». */
   windows?: boolean;
 }

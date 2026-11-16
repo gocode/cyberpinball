@@ -34,6 +34,7 @@ import {
   skippedFiles,
   summarize,
   summaryText,
+  say,
   t,
   tn,
   type DownloadJob,
@@ -148,7 +149,7 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
     const tone = downloadTone(j);
     const fraction = downloadFraction(j);
     return {
-      text: j.title,
+      text: say(j.title),
       detail: facts(j),
       badges: [downloadStateLabel(j)],
       icon: sourceIcon(j),
@@ -172,7 +173,7 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
         .map((id) => jobs.get(id))
         .filter((j): j is DownloadJob => !!j)
         .map((j) => {
-          const index = actions.push({ label: j.title, key: `job:${j.id}`, run: () => openJob(j.id) }) - 1;
+          const index = actions.push({ label: say(j.title), key: `job:${j.id}`, run: () => openJob(j.id) }) - 1;
           return row(j, index);
         });
     const sections: Section[] = [];
@@ -320,7 +321,7 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
     const head = [t('de {source}', { source: j.source.label }), j.state === 'done' && j.finished ? t('terminé à {time}', { time: downloadClock(j.finished) }) : fraction !== undefined ? t('{pct} %', { pct: Math.floor(fraction * 100) }) : undefined, (step?.state ?? downloadStateLabel(j)).toLowerCase()]
       .filter(Boolean)
       .join(' · ');
-    return { heading: j.title, icon: 'download', subheading: head, sections: [{ rows }], actions, back: list, variant: 'facts' };
+    return { heading: say(j.title), icon: 'download', subheading: head, sections: [{ rows }], actions, back: list, variant: 'facts' };
   }
 
   /** Annuler efface ce qui est reçu : confirmation, le curseur sur « Garder ». */
@@ -329,7 +330,7 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
     if (!j) return open();
     ctx.show(
       () => ({
-        heading: t('Annuler « {title} » ?', { title: j.title }),
+        heading: t('Annuler « {title} » ?', { title: say(j.title) }),
         icon: 'close',
         sections: [{ rows: [{ text: t('Reçu'), detail: downloadVolume(j) }, { text: t('Après l’annulation'), detail: t('Ce qui est reçu est effacé ; il faudra tout recevoir de nouveau.'), tone: 'warning' }] }],
         actions: [

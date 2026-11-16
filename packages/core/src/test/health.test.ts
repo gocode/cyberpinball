@@ -195,6 +195,9 @@ function everyCase(): HealthFacts[] {
     { at, disks: [], screens: { configurations: 1, plugged: 3, active, homonyms: [{ name: 'PL2294H', roles: ['backglass', 'dmd'] }] }, vpx: {} },
     // Le playfield et le fronton : la fenêtre du playfield n'est pas déplacée.
     { at, disks: [], screens: { configurations: 1, plugged: 3, active, homonyms: [{ name: 'PL2294H', roles: ['playfield', 'backglass'] }] }, vpx: {} },
+    // DMD réel (bêta) : un PIN2DMD HD prêt avec un ZeDMD en wifi ; puis un PIN2DMD sans pilote (code 28).
+    { at, disks: [], hardwareDmd: { devices: ['PIN2DMD HD', 'ZeDMD en wifi (zedmd-wifi.local)'], problems: [] }, vpx: {} },
+    { at, disks: [], hardwareDmd: { devices: ['PIN2DMD'], problems: ['PIN2DMD : Windows ne lui a pas donné de pilote USB générique (WinUSB ou libusbK) (code 28 du Gestionnaire de périphériques).'] }, vpx: {} },
     // LED et retours (DOF) : prêt ; puis le cas réel du 04/11/2026, une KL25Z sans configuration ni contrôleur de LED adressables.
     { at, disks: [], dof: { controllers: ['Pinscape (KL25Z) · 51'], ini: 2, problems: [] }, vpx: {} },
     { at, disks: [], dof: { controllers: ['Pinscape (KL25Z) · 51', 'Teensy (TeensyStripController) (COM7) · 30'], ini: 0, problems: ['Aucun fichier directoutputconfig.ini', 'Teensy branché (COM7) mais aucun Cabinet.xml ne le déclare'] }, vpx: {} },
@@ -221,7 +224,7 @@ test('chaque contrôle passe par ses états, et chaque ligne mène à un écran 
     assert.ok((HEALTH_TARGET_KINDS as readonly string[]).includes(l.target.kind), `${l.check} « ${l.title} » : cible inconnue`);
     assert.ok(targetReachable(l.target), `${l.check} « ${l.title} » : l'entrée ${JSON.stringify(l.target)} n'est dans aucune rubrique du menu système`);
   }
-  const expected: Record<string, HealthState[]> = { disk: ['ok', 'check', 'blocking'], tables: ['ok', 'check', 'blocking'], pup: ['ok', 'check'], media: ['ok', 'check'], screens: ['ok', 'check', 'blocking'], dof: ['ok', 'check'], remote: ['ok', 'check'], vr: ['ok', 'check'], pc: ['ok', 'check'], vpx: ['ok', 'check', 'blocking'] };
+  const expected: Record<string, HealthState[]> = { disk: ['ok', 'check', 'blocking'], tables: ['ok', 'check', 'blocking'], pup: ['ok', 'check'], media: ['ok', 'check'], screens: ['ok', 'check', 'blocking'], dmd: ['ok', 'check'], dof: ['ok', 'check'], remote: ['ok', 'check'], vr: ['ok', 'check'], pc: ['ok', 'check'], vpx: ['ok', 'check', 'blocking'] };
   for (const check of HEALTH_CHECKS) assert.deepEqual([...(seen.get(check) ?? [])].sort(), [...expected[check]!].sort(), `états du contrôle ${check}`);
   // Chaque sorte de cible sert.
   assert.deepEqual([...new Set(lines.map((l) => l.target.kind))].sort(), [...HEALTH_TARGET_KINDS].sort());
@@ -262,8 +265,16 @@ test('relevé gardé d’un lancement à l’autre ; un fichier abîmé est igno
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-sante-'));
   assert.equal(loadHealthFacts(dir), undefined);
   const facts = everyCase()[0]!;
+  setLanguage('fr');
   saveHealthFacts(dir, facts);
-  assert.deepEqual(loadHealthFacts(dir), facts);
+  assert.deepEqual(loadHealthFacts(dir), { ...facts, language: 'fr' });
+  // Ses textes (constats du médecin, DOF) sont dans la langue du relevé : relu dans une autre, il est oublié.
+  setLanguage('en');
+  assert.equal(loadHealthFacts(dir), undefined);
+  setLanguage('fr');
+  // Ancien relevé, sans langue notée : oublié aussi, le suivant le refait.
+  fs.writeFileSync(path.join(dir, 'cache', 'sante.json'), JSON.stringify(facts));
+  assert.equal(loadHealthFacts(dir), undefined);
   fs.writeFileSync(path.join(dir, 'cache', 'sante.json'), '{"at": 3');
   assert.equal(loadHealthFacts(dir), undefined);
   fs.writeFileSync(path.join(dir, 'cache', 'sante.json'), '{"at": "x"}');

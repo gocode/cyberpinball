@@ -44,6 +44,7 @@ import {
   readMediaDimensions,
   samePath,
   t,
+  tLater,
   tn,
   trashDirFor,
   vpsLabel,
@@ -596,8 +597,8 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
    * Une coupure garde ses partiels ; « Revenir à Médias du jeu » puis le même plan les reprend.
    */
   function trackInstall(table: TableEntry, choices: MediaDbChoice[]) {
-    const files = choices.map((c) => ({ ref: c.offer.file.url, name: mediaTypeInfo(c.offer.type).label, dest: mediaDbStagedFile(staging(), c.offer.file), part: `${mediaDbStagedFile(staging(), c.offer.file)}.part` }));
-    const job = ctx.downloads?.track({ id: `mediadb-${table.file.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-60)}`, kind: 'mediadb', title: t('Médias de VPinMediaDB : {table}', { table: table.title }), source: { kind: 'http', label: MEDIADB_NAME }, files, back: { screen: 'table-medias', table: table.file }, resumable: true });
+    const files = choices.map((c) => ({ ref: c.offer.file.url, name: { ref: 'mediaType', id: c.offer.type }, dest: mediaDbStagedFile(staging(), c.offer.file), part: `${mediaDbStagedFile(staging(), c.offer.file)}.part` }));
+    const job = ctx.downloads?.track({ id: `mediadb-${table.file.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-60)}`, kind: 'mediadb', title: tLater('Médias de VPinMediaDB : {table}', { table: table.title }), source: { kind: 'http', label: MEDIADB_NAME }, files, back: { screen: 'table-medias', table: table.file }, resumable: true });
     const got = new Map<number, number>();
     const sizes = new Map<number, number>();
     return {

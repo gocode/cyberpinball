@@ -71,6 +71,8 @@ import {
   MANAGED_MEDIA_TYPES,
   ownMediaPages,
   loadCabinet,
+  saveCabinet,
+  hardwareDmdFacts,
   loadVpsDb,
   mediaTypeInfo,
   missingRoms,
@@ -151,7 +153,9 @@ import {
   playBlockers,
   romBlockers,
   messagesOf,
+  say,
   t,
+  tLater,
   tn,
   type Finding,
   type AddScreenId,
@@ -199,6 +203,7 @@ import {
   visualOrder,
   entersReading,
   readingStep,
+  recordPosition,
   type ReadingEdges,
   type ReadingMove,
   type ZoneMemory,
@@ -230,6 +235,7 @@ import {
 import { createCreditsMenu, type CreditsDepth } from './credits-menu';
 import { prepareImport, unpackArchive, type PreparedImport } from './archives';
 import { createDofMenu } from './dof-menu';
+import { createHardwareDmdMenu } from './hardware-dmd-menu';
 import { dofDir, readDof, vpxWorkDir } from './dof-files';
 import { backupDir, locations } from './paths';
 import { activeVpxIni, usbDevices } from './vpx-ini';
@@ -1016,7 +1022,7 @@ export function createLibrary(host: LibraryHost) {
   const installationImport = createInstallationImport({
     root: () => host.root,
     tables: () => host.tables(),
-    pickFolder: async () => (await pickPaths({ title: t('Dossier de l’autre installation'), icon: 'folder', purpose: t('Reprise de tables d’une autre installation'), mode: 'folder', start: 'desktop' }))?.[0],
+    pickFolder: async () => (await pickPaths({ title: t('Dossier de l’autre installation'), icon: 'folder', purpose: tLater('Reprise de tables d’une autre installation'), mode: 'folder', start: 'desktop' }))?.[0],
     openCustom: (build, at) => openCustom(build, at),
     cursor: () => cursor,
     task: (message, work) => task(message, work),
@@ -1030,7 +1036,7 @@ export function createLibrary(host: LibraryHost) {
     tables: () => host.tables(),
     romsOf: (t) => cachedScript(t.file, host.dataDir)?.roms ?? [],
     vps: () => vpsForImport(),
-    pickDirectory: async () => (await pickPaths({ title: t('Dossier de PinUP Popper ou de PinballX'), icon: 'import', purpose: t('Reprise des médias d’un autre frontend'), mode: 'folder', start: 'desktop' }))?.[0],
+    pickDirectory: async () => (await pickPaths({ title: t('Dossier de PinUP Popper ou de PinballX'), icon: 'import', purpose: tLater('Reprise des médias d’un autre frontend'), mode: 'folder', start: 'desktop' }))?.[0],
     openCustom: (build, at) => openCustom(build, at),
     openSystem: () => openSystem(),
     openNotice: (heading, lines) => openNotice(heading, lines),
@@ -1410,7 +1416,7 @@ export function createLibrary(host: LibraryHost) {
     finished: (job) => {
       // Rendu de lui-même (son écran est ouvert) ; sinon une notification ou un bandeau le dit, la pastille le garde « prêt ».
       if (downloadFinishers.get(job.kind)?.(job)) return;
-      host.notify?.(t('Téléchargement terminé : {title}. Téléchargements, dans le menu système, pour y revenir.', { title: job.title }), job);
+      host.notify?.(t('Téléchargement terminé : {title}. Téléchargements, dans le menu système, pour y revenir.', { title: say(job.title) }), job);
     },
     onChange: () => host.downloadsChanged?.(),
     log: (line) => console.log(line),
@@ -1692,6 +1698,10 @@ export function createLibrary(host: LibraryHost) {
       const devices = usbDevices() ?? [];
       return dofHealthFacts(setup, detectDofControllers(devices, cabinetJoystickHids(loadCabinet(host.dataDir))), devices);
     },
+    hardwareDmd: () => {
+      const devices = usbDevices();
+      return devices ? hardwareDmdFacts(devices, loadCabinet(host.dataDir)?.hardwareDmd) : undefined;
+    },
     vr: () => host.vrNetwork?.(),
     remote: () => host.phoneRemote?.nameFacts(),
     pc: () => {
@@ -1849,6 +1859,21 @@ export function createLibrary(host: LibraryHost) {
     changed: () => void health.refresh(),
   });
   provideSystemItem('dof', dofMenu.item);
+
+  // DMD réel (bêta) : ZeDMD, PIN2DMD, Pixelcade reconnus, leurs pilotes, un choix par modèle, le ZeDMD en wifi.
+  const hardwareDmdMenu = createHardwareDmdMenu({
+    library: {
+      openCustom: (build, at) => openCustom(build, at),
+      openSystem: () => openSystem(),
+      openPrompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
+      openNotice: (heading, lines, then) => openNotice(heading, lines, then),
+    },
+    usb: () => usbDevices(),
+    cabinet: () => loadCabinet(host.dataDir),
+    save: (cabinet) => saveCabinet(host.dataDir, cabinet),
+    changed: () => void health.refresh(),
+  });
+  provideSystemItem('hardware-dmd', hardwareDmdMenu.item);
 
   // Télécommande du téléphone (Menu système > Borne) : le QR code hors du navigateur intégré.
   const remoteMenu = host.phoneRemote
@@ -2545,8 +2570,8 @@ export function createLibrary(host: LibraryHost) {
             {
               label: t('Ce qu’il manque pour jouer'),
               detail:
-                started && !started.ready && started.position
-                  ? t('Reprendre : {position}', { position: started.position })
+                started && !started.ready && recordPosition(started)
+                  ? t('Reprendre : {position}', { position: recordPosition(started)! })
                   : t('ROM {rom} absente : où la trouver, étape par étape', { rom: script!.roms[0]! }),
               tone: 'ok',
               attention: true,
@@ -3637,10 +3662,10 @@ export function createLibrary(host: LibraryHost) {
   async function pick(kind: 'files' | 'folder' | 'downloads' | 'rom', journey?: string): Promise<void> {
     const request: Omit<PickRequest, 'done' | 'cancel'> =
       kind === 'folder'
-        ? { title: t('Choisir un dossier'), icon: 'folder', purpose: t('Ajout d’une table'), mode: 'folder' }
+        ? { title: t('Choisir un dossier'), icon: 'folder', purpose: tLater('Ajout d’une table'), mode: 'folder' }
         : kind === 'rom'
-          ? { title: t('Choisir des ROM'), icon: 'chip', purpose: t('Ajout d’une ROM'), mode: 'files-or-folder', filter: { label: t('ROM et archives'), extensions: ['zip', '7z', 'rar'] }, start: 'cp' }
-          : { title: t('Choisir des fichiers'), icon: 'import', purpose: journey ? t('Ajout de ce qu’il manque à {table}', { table: find(journey)?.title ?? path.basename(journey) }) : t('Ajout d’une table'), mode: 'files-or-folder', filter: tableFilter(), start: kind === 'downloads' ? 'cp' : undefined };
+          ? { title: t('Choisir des ROM'), icon: 'chip', purpose: tLater('Ajout d’une ROM'), mode: 'files-or-folder', filter: { label: t('ROM et archives'), extensions: ['zip', '7z', 'rar'] }, start: 'cp' }
+          : { title: t('Choisir des fichiers'), icon: 'import', purpose: journey ? tLater('Ajout de ce qu’il manque à {table}', { table: find(journey)?.title ?? path.basename(journey) }) : tLater('Ajout d’une table'), mode: 'files-or-folder', filter: tableFilter(), start: kind === 'downloads' ? 'cp' : undefined };
     const paths = await pickPaths(request);
     if (paths?.length) startImport(paths, 'copy', undefined, journey, !journey);
   }

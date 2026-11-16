@@ -14,7 +14,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { t } from './i18n';
+import { registerTextRef, t } from './i18n';
 import type { FlipperEdge, RoleId, Rotation } from './model';
 
 /** Écrans qui ont une ouverture : le DMD de la borne joue celle de l'afficheur 4:1 ou celle du FullDMD. */
@@ -52,6 +52,9 @@ export function introFileKind(file: string): IntroFileKind | undefined {
   if ((AUDIO_FORMATS as readonly string[]).includes(ext)) return 'audio';
   return undefined;
 }
+
+// Nom d'un emplacement d'ouverture dans un texte enregistré ({ ref: 'introSlot', id: 'playfield' }), dit à l'affichage.
+registerTextRef('introSlot', (id) => (INTRO_SLOT_LABELS as Record<string, string | undefined>)[id]);
 
 export const INTRO_SLOT_LABELS: Readonly<Record<IntroSlot, string>> = {
   get playfield() {

@@ -145,7 +145,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
    * les scores ou les amis. Deux joueurs du même nom s'y départagent ; il se cherche dans l'annuaire.
    */
   const idRow = (key: string): Row => ({ text: t('Identifiant : {id}', { id: playerId(key) }), detail: t('Unique à sa borne : départage deux joueurs du même nom'), icon: 'info', tone: 'quiet' });
-  /** Pastille d'un joueur : son avatar s'il est un ami ou en demande et qu'on l'a reçu, sinon ses initiales. */
+  /** Pastille d'un joueur, ami ou non : son avatar s'il en a un et qu'on l'a reçu, sinon ses initiales. */
   const avatar = (key: string, plain: string) => avatarView(key, plain, net.avatarFile(key));
   const live = createLiveMenu({
     library: host.library,
@@ -657,7 +657,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const rows: Row[] = [
       s.enabled ? { text: t('Partage activé'), detail: status.mode === 'off' ? t('Réseau coupé pendant les essais sans opérateur') : status.running ? tn(status.peers, 'Relié à {n} borne', 'Relié à {n} bornes') : status.error ? t('Réseau indisponible : {error}', { error: status.error }) : t('Connexion au réseau…'), tone: 'ok', badges: [t('Activé')], icon: 'network' } : { text: t('Partage désactivé'), detail: t('Personne ne vous voit ; vos amis vous voient hors ligne'), tone: 'warning', badges: [t('Désactivé')], icon: 'network' },
       { text: t('Votre nom : {name}', { name: s.name }), detail: t('Visible dans l’annuaire · votre identifiant : {id}', { id: playerId(s.key.publicKey) }), icon: 'friend-list' },
-      { text: s.avatar ? t('Votre avatar : une image à vous') : t('Votre avatar : vos initiales'), detail: t('Vu par vos amis et les joueurs d’une demande en cours ; « Changer d’avatar… » le montre'), icon: 'avatar' },
+      { text: s.avatar ? t('Votre avatar : une image à vous') : t('Votre avatar : vos initiales'), detail: t('Vu par tous les joueurs, amis ou non ; « Changer d’avatar… » le montre'), icon: 'avatar' },
       s.lan && lanDown
         ? { text: t('Réseau local : indisponible'), detail: t('{reason} · Internet continue sans lui ; nouvel essai tout seul', { reason: lanDown }), tone: 'warning', badges: [t('Indisponible')], icon: 'monitor' }
         : { text: s.lan ? t('Réseau local : activé') : t('Réseau local : désactivé'), detail: s.lan ? tn(near, '{n} borne à proximité', '{n} bornes à proximité') : t('Les bornes de votre réseau ne vous trouvent pas sans Internet'), tone: s.lan ? 'ok' : 'quiet', icon: 'monitor' },
@@ -720,7 +720,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
           rows: [
             { text: t('Réseau : votre nom') },
             { text: t('Amis : présence, table en cours, records, badges et parties') },
-            { text: t('Amis et demandes d’ami en cours : votre avatar'), detail: t('Jamais l’annuaire : les autres joueurs voient vos initiales') },
+            { text: t('Réseau : votre avatar'), detail: t('Partout où vous apparaissez : Joueurs en ligne, salons, classements, profil public') },
 
             ...(s.shareLibrary
               ? [

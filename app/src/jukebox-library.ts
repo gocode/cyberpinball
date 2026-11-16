@@ -48,6 +48,7 @@ import {
   songRequests,
   SONG_VIDEO_STEM,
   t,
+  tLater,
   trackInfo,
   trackStatus,
   unavailableFromMessage,
@@ -226,12 +227,12 @@ export function createJukeboxLibrary(opts: JukeboxLibraryOptions) {
       const root = opts.root();
       const id = file.meta?.song;
       const want = file.meta?.want === 'video' ? 'video' : 'audio';
-      if (!root) return { ok: false, reason: 'refused', detail: t('Cyber Pinball n’est pas installé') };
-      if (typeof id !== 'string' || !isYoutubeId(id)) return { ok: false, reason: 'refused', detail: t('morceau inconnu') };
+      if (!root) return { ok: false, reason: 'refused', detail: tLater('Cyber Pinball n’est pas installé') };
+      if (typeof id !== 'string' || !isYoutubeId(id)) return { ok: false, reason: 'refused', detail: tLater('morceau inconnu') };
       // Plus voulu sur la borne (playlist libérée, passée au son seul) : sauté, rien n'est téléchargé.
       const height = wantedHeight(current(), id);
       const wanted = current().playlists.some((p) => p.tracks.some((tr) => tr.youtube === id && tr.source === 'download'));
-      if (!wanted || (want === 'video' && height === 0)) return { ok: false, reason: 'refused', detail: t('plus demandé sur la borne') };
+      if (!wanted || (want === 'video' && height === 0)) return { ok: false, reason: 'refused', detail: tLater('plus demandé sur la borne') };
       const dir = songDir(root, id);
       const format = want === 'video' && typeof file.meta?.format === 'string' ? file.meta.format : undefined;
       const r = await opts.ytdlp.grab({

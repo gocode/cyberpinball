@@ -4,7 +4,20 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { VPX_INPUT_DEFAULTS } from '../buttons';
-import { detectHardwareDmds, findGlobalDmdFolders, vpxDmdSettings } from '../dmd';
+import {
+  detectHardwareDmds,
+  findGlobalDmdFolders,
+  hardwareDmdDriverProblem,
+  hardwareDmdFacts,
+  hardwareDmdName,
+  nextHardwareDmdChoice,
+  pin2dmdSize,
+  vpxDmdSettings,
+  withHardwareDmdChoice,
+  zedmdWifiAddressProblem,
+  ZEDMD_WIFI_DEFAULT_ADDR,
+} from '../dmd';
+import { hardwareDmdLines } from '../health';
 import { toPhysicalScreen } from '../fingerprint';
 import { IniDocument } from '../ini';
 import type { Cabinet, ObservedUsbDevice } from '../model';
@@ -347,4 +360,95 @@ test('chaque clé écrite pour VPX 10.8.1-5436 existe dans son schéma', () => {
   const owned = vpxOwnedKeys(PROFILE, [], false, { roles: ['playfield', 'backglass', 'dmd', 'topper'], dmdKeys: ['Enable', 'ZeDMD', 'PIN2DMD', 'Pixelcade'], inputKeys: Object.keys(plan.memory).filter((id) => id.startsWith('Input.')).map((id) => id.slice('Input.'.length)) });
   const proposed = ['CabinetAutofitMode', 'ScoreViewDMDOverlay', 'ScoreViewDMDAutoPos', 'PinMAMEPath', 'VniPath', 'Cheat'];
   for (const e of written) if (!proposed.includes(e.key)) assert.ok(isOwned(owned, e.section, e.key), `[${e.section}] ${e.key}`);
+});
+
+// ---------------------------------------------------------------------------
+// DMD réel : choix par modèle, ZeDMD en wifi, pilotes (Menu système > Borne > DMD > DMD réel)
+
+const PIN2DMD_WINUSB = usb('USB\\VID_0314&PID_E457\\5&1&0&2', { service: 'WinUSB', product: 'PIN2DMD HD' });
+const PIN2DMD_SANS_PILOTE = usb('USB\\VID_0314&PID_E457\\5&1&0&2', { problem: 28 });
+const CH340 = usb('USB\\VID_1A86&PID_7523\\5&3&0&4', { name: 'USB-SERIAL CH340 (COM3)', port: 'COM3', service: 'CH341SER_A64' });
+
+test('DMD réel : « non » écrit 0 même branché, « oui » écrit 1 même absent', () => {
+  const off = vpxDmdSettings([CH340], { models: { ZeDMD: 'off' } });
+  assert.deepEqual(off.settings, [{ section: 'Plugin.DMDUtil', key: 'ZeDMD', value: '0' }]);
+  assert.ok(off.findings.some((f) => f.message.includes('éteint')));
+  assert.ok(!off.findings.some((f) => f.message.includes('convertisseur USB-série courant')));
+  const on = vpxDmdSettings(DEV_PC_USB, { models: { PIN2DMD: 'on' } });
+  assert.deepEqual(on.settings, [
+    { section: 'Plugin.DMDUtil', key: 'Enable', value: '1' },
+    { section: 'Plugin.DMDUtil', key: 'PIN2DMD', value: '1' },
+  ]);
+  // Automatique, puce courante : allumé, avec le conseil de passer à « non » dans le menu (plus dans l'ini).
+  const auto = vpxDmdSettings([CH340]);
+  assert.ok(auto.findings.some((f) => f.message.includes('Menu système > Borne > DMD > DMD réel')));
+});
+
+test('DMD réel : ZeDMD en wifi, adresse gardée quand on le coupe', () => {
+  const wifi = vpxDmdSettings(DEV_PC_USB, { zedmdWifi: { enabled: true, address: ' 192.168.1.50 ' } });
+  assert.deepEqual(wifi.settings, [
+    { section: 'Plugin.DMDUtil', key: 'Enable', value: '1' },
+    { section: 'Plugin.DMDUtil', key: 'ZeDMDWiFiEnabled', value: '1' },
+    { section: 'Plugin.DMDUtil', key: 'ZeDMDWiFiAddr', value: '192.168.1.50' },
+  ]);
+  const cut = vpxDmdSettings(DEV_PC_USB, { zedmdWifi: { enabled: false, address: '192.168.1.50' } });
+  assert.deepEqual(cut.settings, [{ section: 'Plugin.DMDUtil', key: 'ZeDMDWiFiEnabled', value: '0' }]);
+  assert.equal(zedmdWifiAddressProblem('zedmd-wifi.local'), undefined);
+  assert.equal(zedmdWifiAddressProblem('192.168.1.50'), undefined);
+  assert.ok(zedmdWifiAddressProblem('http://192.168.1.50'));
+  assert.ok(zedmdWifiAddressProblem('192.168.1.300'));
+  assert.ok(zedmdWifiAddressProblem('mon zedmd'));
+  assert.ok(zedmdWifiAddressProblem('  '));
+});
+
+test('DMD réel : les choix suivent la configuration de la borne jusqu’à VPinballX.ini', () => {
+  const c = cabinet();
+  c.hardwareDmd = { models: { ZeDMD: 'off' }, zedmdWifi: { enabled: true, address: ZEDMD_WIFI_DEFAULT_ADDR } };
+  const plan = planVpxSync(c, devPcDisplays(), '', PROFILE, { usb: [CH340] });
+  assert.equal(get(plan.nextIni, 'Plugin.DMDUtil', 'ZeDMD'), '0');
+  assert.equal(get(plan.nextIni, 'Plugin.DMDUtil', 'ZeDMDWiFiEnabled'), '1');
+  assert.equal(get(plan.nextIni, 'Plugin.DMDUtil', 'ZeDMDWiFiAddr'), ZEDMD_WIFI_DEFAULT_ADDR);
+  assert.equal(get(plan.nextIni, 'Plugin.DMDUtil', 'Enable'), '1');
+  assert.equal(plan.memory['Plugin.DMDUtil.ZeDMDWiFiAddr'], ZEDMD_WIFI_DEFAULT_ADDR);
+});
+
+test('DMD réel : le choix revient à « automatique » sans laisser de clé vide', () => {
+  const s = withHardwareDmdChoice(undefined, 'PIN2DMD', 'on');
+  assert.deepEqual(s, { models: { PIN2DMD: 'on' } });
+  assert.equal(nextHardwareDmdChoice('auto'), 'on');
+  assert.equal(nextHardwareDmdChoice('on'), 'off');
+  assert.equal(nextHardwareDmdChoice('off'), 'auto');
+  assert.deepEqual(withHardwareDmdChoice(s, 'PIN2DMD', 'auto'), {});
+});
+
+test('DMD réel : pilote manquant signalé (PIN2DMD sans WinUSB, ZeDMD sans port COM)', () => {
+  const [ok] = detectHardwareDmds([PIN2DMD_WINUSB]);
+  assert.equal(hardwareDmdDriverProblem(ok!), undefined);
+  assert.equal(hardwareDmdName(ok!), 'PIN2DMD HD');
+  assert.deepEqual(pin2dmdSize('PIN2DMD XL'), { width: 192, height: 64, label: 'PIN2DMD XL' });
+  assert.equal(pin2dmdSize('Autre chose'), undefined);
+  const [missing] = detectHardwareDmds([PIN2DMD_SANS_PILOTE]);
+  assert.match(hardwareDmdDriverProblem(missing!)!, /WinUSB ou libusbK.*code 28/);
+  const [hid] = detectHardwareDmds([usb('USB\\VID_0314&PID_E457\\5&1&0&2', { service: 'HidUsb' })]);
+  assert.match(hardwareDmdDriverProblem(hid!)!, /pilote actuel : HidUsb/);
+  const [noPort] = detectHardwareDmds([usb('USB\\VID_1A86&PID_7523\\5&3&0&4', { problem: 28 })]);
+  assert.match(hardwareDmdDriverProblem(noPort!)!, /port COM.*CH340\/CH343 de WCH/);
+  assert.equal(hardwareDmdDriverProblem(detectHardwareDmds([CH340])[0]!), undefined);
+  // Dans la synchronisation : un avertissement, la clé écrite quand même (VPX réessaiera une fois le pilote installé).
+  const plan = vpxDmdSettings([PIN2DMD_SANS_PILOTE]);
+  assert.ok(plan.findings.some((f) => f.severity === 'warning' && f.message.startsWith('PIN2DMD')));
+  assert.ok(plan.settings.some((s) => s.key === 'PIN2DMD' && s.value === '1'));
+});
+
+test('DMD réel : santé de la borne, prêt ou pilote à installer, rien sans DMD', () => {
+  assert.deepEqual(hardwareDmdLines(hardwareDmdFacts(DEV_PC_USB)), []);
+  const ready = hardwareDmdLines(hardwareDmdFacts([PIN2DMD_WINUSB], { zedmdWifi: { enabled: true, address: 'zedmd-wifi.local' } }));
+  assert.equal(ready.length, 1);
+  assert.equal(ready[0]!.state, 'ok');
+  assert.match(ready[0]!.title, /PIN2DMD HD, ZeDMD en wifi \(zedmd-wifi\.local\)/);
+  assert.deepEqual(ready[0]!.target, { kind: 'system', item: 'hardware-dmd' });
+  const missing = hardwareDmdLines(hardwareDmdFacts([PIN2DMD_SANS_PILOTE]));
+  assert.equal(missing[0]!.state, 'check');
+  // Éteint par l'utilisateur : ni ligne, ni pilote réclamé.
+  assert.deepEqual(hardwareDmdLines(hardwareDmdFacts([PIN2DMD_SANS_PILOTE], { models: { PIN2DMD: 'off' } })), []);
 });

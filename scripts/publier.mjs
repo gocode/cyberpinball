@@ -8,6 +8,10 @@
 //   npm run publier -- --rapide           -> sans refaire les installeurs (une à deux minutes) : le
 //                                            paquet léger seul, le flux désignant les installeurs
 //                                            de la dernière publication complète
+//   npm run publier -- --prive [--depot <proprietaire/nom>] -> préversion d'essai dans le dépôt privé du
+//                                            canal d'essai (sinon : celui de %USERPROFILE%\.cyberpinball\canal-essai.json) :
+//                                            seules les bornes qui ont ce canal la voient ; le code n'est pas
+//                                            envoyé sur le dépôt public (il le sera avec la publication publique suivante)
 //   npm run publier -- --local <dossier> --url <adresse> -> flux, installeur et paquet léger dans
 //                                            un dossier servi à cette adresse, sans GitHub (essais ;
 //                                            --leger : sans fabriquer la version complète ;
@@ -23,6 +27,11 @@
 // Version finale : elle porte toujours ses deux installeurs, que donnent les liens de
 // téléchargement direct en tête des README (releases/latest/download/…, scripts/telechargement-direct.mjs) :
 // --rapide et --leger sont refusés pour elle, et ces liens sont vérifiés une fois la version publiée.
+//
+// Essai privé (--prive) : préversion seulement. Le dépôt privé doit déjà avoir un commit (un
+// README suffit) : ses releases y sont toutes posées. Le jeton de publication doit pouvoir écrire
+// dans ce dépôt (« Contents » en lecture et écriture). Les bornes le lisent avec un autre jeton,
+// en lecture seule (packages/core/src/update.ts, « Source des mises à jour »).
 //
 // Publication rapide : refusée si le socle (Electron, exécutable : scripts/fabriquer.mjs) n'est
 // plus celui du dernier flux publié, puisque les bornes ne pourraient pas prendre le paquet léger.
@@ -78,6 +87,14 @@ if (!update.isVersion(version)) fail(`version illisible : ${version}`);
 const repository = /github\.com\/([^/]+\/[^/.]+)/.exec(pkg.repository?.url ?? '')?.[1];
 if (repository !== update.UPDATE_REPOSITORY) fail(`le dépôt de package.json (${repository}) n'est pas celui que lisent les bornes (${update.UPDATE_REPOSITORY}).`);
 const privateKey = loadPrivateKey();
+// Essai privé : le dépôt du canal d'essai, au lieu du dépôt public.
+const privateRepo = argv.includes('--prive') ? (option('--depot') ?? update.loadPrivateChannel()?.repository) : undefined;
+if (argv.includes('--prive')) {
+  if (!privateRepo || !/^[\w.-]+\/[\w.-]+$/.test(privateRepo)) fail(`--prive : dépôt du canal d'essai inconnu. Passez --depot <proprietaire/nom>, ou écrivez-le dans ${update.privateChannelFile()} ({ "depot": "proprietaire/nom", "jeton": "…" }).`);
+  if (!prerelease) fail(`${version} est une version finale : un essai privé est une préversion (${version}-essai.1).`);
+  if (local) fail('--prive et --local ne vont pas ensemble.');
+}
+const target = privateRepo ?? repository;
 
 step('Contrôle de publication');
 const audit = auditRepository();
@@ -89,7 +106,7 @@ console.log(`${audit.files} fichiers suivis : rien de personnel ni de secret.`);
 const found = githubToken();
 const token = found?.token;
 const api = async (method, url, body, headers = {}) => {
-  const response = await fetch(url.startsWith('https://') ? url : `https://api.github.com/repos/${repository}${url}`, {
+  const response = await fetch(url.startsWith('https://') ? url : `https://api.github.com/repos/${target}${url}`, {
     method,
     headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', ...headers },
     body: body === undefined ? undefined : body instanceof Blob ? body : JSON.stringify(body),
@@ -112,6 +129,16 @@ if (!local) {
   }
   const existing = await api('GET', `/releases/tags/v${version}`);
   if (existing.status === 200) fail(`la release v${version} existe déjà : changez la version de package.json.`);
+  if (privateRepo) {
+    // Une numérotation pour les deux dépôts : un essai privé ne reprend pas un numéro déjà publié.
+    const pub = await api('GET', `https://api.github.com/repos/${repository}/releases/tags/v${version}`);
+    if (pub.status === 200) fail(`la release v${version} existe déjà sur github.com/${repository} : changez la version de package.json.`);
+    const info = await api('GET', '');
+    if (info.status !== 200) fail(`dépôt privé ${privateRepo} illisible (HTTP ${info.status}) : créez-le, et donnez au jeton de publication l'accès « Contents » en lecture et écriture.`);
+    if (!info.json.private) fail(`${privateRepo} est public : un essai privé doit aller dans un dépôt privé.`);
+    const commits = await api('GET', '/commits?per_page=1');
+    if (commits.status !== 200) fail(`le dépôt privé ${privateRepo} n'a aucun commit (HTTP ${commits.status}) : ajoutez-y un README depuis GitHub, ses releases y seront posées.`);
+  }
 }
 
 // Le verrou de fabrication tenu jusqu'à la fin : aucune autre fabrication ne refait release\ entre la
@@ -147,10 +174,15 @@ if (packageMissing.length) fail(`${update.UPDATE_APP_NAME} incomplet, rien n'est
 let reference;
 if (rapid) {
   step('Installeurs de la dernière publication complète');
-  const source = option('--reference') ?? (local ? undefined : prerelease ? await update.prereleaseFeedUrl() : update.updateFeedUrl({}));
-  if (!source) fail('--rapide avec --local demande --reference <fichier ou adresse du flux publié>.');
-  const text = /^https?:\/\//.test(source) ? await fetch(source, { redirect: 'follow' }).then((r) => (r.ok ? r.text() : fail(`flux publié illisible (HTTP ${r.status}) : ${source}`))) : fs.readFileSync(source, 'utf8');
-  reference = update.openEnvelope(text, update.updatePublicKey({}));
+  if (privateRepo && !option('--reference')) {
+    // Le plus récent des deux dépôts, lu comme une borne qui a ce canal d'essai.
+    reference = (await update.checkForUpdate({ current: '0.0.0', prereleases: true, channel: { repository: privateRepo, token } }).catch((error) => fail(`flux publié illisible : ${error.message}`))).latest;
+  } else {
+    const source = option('--reference') ?? (local ? undefined : prerelease ? await update.prereleaseFeedUrl() : update.updateFeedUrl({}));
+    if (!source) fail('--rapide avec --local demande --reference <fichier ou adresse du flux publié>.');
+    const text = /^https?:\/\//.test(source) ? await fetch(source, { redirect: 'follow' }).then((r) => (r.ok ? r.text() : fail(`flux publié illisible (HTTP ${r.status}) : ${source}`))) : fs.readFileSync(source, 'utf8');
+    reference = update.openEnvelope(text, update.updatePublicKey({}));
+  }
   const installs = reference.installer.version ?? reference.version;
   if (!reference.app) fail(`le flux publié (${reference.version}) n'a pas de paquet léger : faites d'abord une publication complète (sans --rapide).`);
   if (reference.app.socle !== socle) {
@@ -203,13 +235,13 @@ const manifest = {
     ? { ...reference.installer, version: reference.installer.version ?? reference.version }
     : {
         name: update.UPDATE_INSTALLER_NAME,
-        url: local ? `${urlBase.replace(/\/$/, '')}/${update.UPDATE_INSTALLER_NAME}` : update.releaseAssetUrl(version, update.UPDATE_INSTALLER_NAME),
+        url: local ? `${urlBase.replace(/\/$/, '')}/${update.UPDATE_INSTALLER_NAME}` : update.releaseAssetUrl(version, update.UPDATE_INSTALLER_NAME, target),
         size: fs.statSync(installer).size,
         sha256: await update.sha256File(installer),
       },
   app: {
     name: update.UPDATE_APP_NAME,
-    url: local ? `${urlBase.replace(/\/$/, '')}/${update.UPDATE_APP_NAME}` : update.releaseAssetUrl(version, update.UPDATE_APP_NAME),
+    url: local ? `${urlBase.replace(/\/$/, '')}/${update.UPDATE_APP_NAME}` : update.releaseAssetUrl(version, update.UPDATE_APP_NAME, target),
     size: fs.statSync(appPackage).size,
     sha256: await update.sha256File(appPackage),
     socle,
@@ -232,14 +264,20 @@ if (local) {
   process.exit(0);
 }
 
-step('Code sur GitHub (instantané, sans l’historique)');
-const commit = option('--commit') ?? snapshotAndPush({ message: `Cyber Pinball ${version}` });
+let commit;
+if (privateRepo) {
+  // Le code ne part pas sur le dépôt public : la release est posée sur la branche du dépôt privé.
+  commit = (await api('GET', '')).json.default_branch;
+} else {
+  step('Code sur GitHub (instantané, sans l’historique)');
+  commit = option('--commit') ?? snapshotAndPush({ message: `Cyber Pinball ${version}` });
+}
 
-step(`Release v${version} sur github.com/${repository}`);
+step(`Release v${version} sur github.com/${target}${privateRepo ? ' (essai privé)' : ''}`);
 const installs = manifest.installer.version ?? version;
 const installersText = reference
   ? [
-      `**Installeurs** : ceux de la [${installs}](https://github.com/${repository}/releases/tag/v${installs}) ; une borne installée avec eux reçoit ensuite la mise à jour légère vers ${version}.`,
+      `**Installeurs** : ceux de la [${installs}](${manifest.installer.url.replace(/\/download\/(v[^/]+)\/.*$/, '/tag/$1')}) ; une borne installée avec eux reçoit ensuite la mise à jour légère vers ${version}.`,
       '',
     ]
   : [
@@ -313,12 +351,12 @@ if (argv.includes('--brouillon')) {
   let check;
   for (let attempt = 0; attempt < 12; attempt++) {
     if (attempt) await new Promise((resolve) => setTimeout(resolve, 5000));
-    check = await update.checkForUpdate({ current: '0.0.0', prereleases: prerelease }).catch((error) => error);
+    check = await update.checkForUpdate({ current: '0.0.0', prereleases: prerelease, ...(privateRepo && { channel: { repository: privateRepo, token } }) }).catch((error) => error);
     if (!(check instanceof Error) && check.latest.version === version) break;
   }
   if (check instanceof Error) console.log(`Attention : le flux n'est pas encore lisible par les bornes (${check.message}).`);
   else if (check.latest.version !== version) console.log(`Attention : au bout d'une minute, les bornes lisent encore la version ${check.latest.version}, pas ${version} : à vérifier sur GitHub.`);
-  else console.log(`Flux lu comme une borne : version ${check.latest.version}${prerelease ? ' (préversion : seules les bornes qui acceptent les préversions la voient)' : ''}.`);
+  else console.log(`Flux lu comme une borne : version ${check.latest.version}${privateRepo ? ' (essai privé : seules les bornes qui ont ce canal d’essai la voient)' : prerelease ? ' (préversion : seules les bornes qui acceptent les préversions la voient)' : ''}.`);
   if (!prerelease) {
     const problems = await directDownloadProblems(repository, version);
     if (problems.length) console.log(`Attention : téléchargement direct des README pas encore sur ${version} :\n  ${problems.join('\n  ')}`);
@@ -328,5 +366,7 @@ if (argv.includes('--brouillon')) {
 
 // Description et sujets du dépôt, d'après package.json. Sans la permission « Administration »,
 // la release est faite quand même : seul ce point reste à refaire (npm run decrire).
-step('Description et sujets du dépôt');
-await describeRepository().catch((error) => console.log(`Non appliqués : ${error.message}`));
+if (!privateRepo) {
+  step('Description et sujets du dépôt');
+  await describeRepository().catch((error) => console.log(`Non appliqués : ${error.message}`));
+}

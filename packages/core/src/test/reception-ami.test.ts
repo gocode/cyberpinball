@@ -20,7 +20,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
-import { createDownloadManager, downloadReasonText, encodePng, jobBytes, layoutOf, partLabel, pendingDownload, scanTables, screenZones, setLanguage, skippedFiles, tableContents, type DownloadJob, type DownloadTransport } from '../index';
+import { createDownloadManager, downloadReasonText, encodePng, jobBytes, layoutOf, partLabel, pendingDownload, say, scanTables, screenZones, setLanguage, skippedFiles, tableContents, type DownloadJob, type DownloadTransport } from '../index';
 import type { TableEntry } from '../tables';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -192,7 +192,7 @@ test('écran des parties : ouvert dans la liste, cochée ou non en toutes lettre
     const queued = s.manager.jobs();
     assert.equal(queued.length, 1);
     assert.ok(queued[0]!.files.some((f) => f.name === 'roms/comet.zip'), 'la ROM attestée part avec la table');
-    assert.ok(!queued[0]!.files.some((f) => f.name.startsWith('pupvideos/')), 'le PuP-Pack non attesté reste chez l’ami');
+    assert.ok(!queued[0]!.files.some((f) => say(f.name).startsWith('pupvideos/')), 'le PuP-Pack non attesté reste chez l’ami');
     // Tout fichier sauf la table elle-même est facultatif : refusé, il serait sauté sans arrêter les autres.
     assert.deepEqual(queued[0]!.files.map((f) => `${f.name}:${f.optional ? 'facultatif' : 'requis'}`), ['Comet Lounge.vpx:requis', 'Comet Lounge.directb2s:facultatif', 'roms/comet.zip:facultatif']);
   } finally {
@@ -366,7 +366,7 @@ test('un fichier facultatif refusé est sauté avec sa raison exacte ; la table 
   const transport: DownloadTransport = {
     available: () => true,
     fetch: async (run) => {
-      if (run.file.ref.startsWith('bad')) return { ok: false, reason: 'check', detail: sources.friendDetail('refused', run.file.name)! };
+      if (run.file.ref.startsWith('bad')) return { ok: false, reason: 'check', detail: sources.friendDetail('refused', say(run.file.name))! };
       fs.writeFileSync(run.file.dest!, 'ok');
       return { ok: true, file: run.file.dest! };
     },

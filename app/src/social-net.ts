@@ -39,6 +39,7 @@ import {
   decodeAvatarData,
   keepAvatars,
   pruneAvatarFiles,
+  publicAvatarHash,
   readAvatarFile,
   setOwnAvatar,
   setPeerAvatar,
@@ -399,10 +400,15 @@ export interface SocialNet {
   sendChunk(key: string, frame: Buffer): Promise<boolean>;
   /**
    * Mon avatar (image contrôlée par readAvatarImage), ou undefined pour le retirer : enregistré,
-   * annoncé aux bornes reliées ; mes amis et les joueurs d'une demande en cours le redemandent.
+   * annoncé aux bornes reliées et joint à ma présence publique, à celle du salon et à ma carte :
+   * toute borne qui l'affiche le redemande (avatar public, 15/11/2026).
    */
   setAvatar(image: AvatarImage | undefined): void;
-  /** Fichier de l'avatar d'un joueur (soi compris) ; undefined : pas d'avatar connu, ses initiales. */
+  /**
+   * Fichier de l'avatar d'un joueur (soi compris), ami ou non ; undefined : pas d'avatar connu, ses
+   * initiales. Celui d'un joueur qui n'est ni ami ni en demande se demande s'il manque (à sa borne,
+   * ou à des bornes qui l'ont), et l'écran se redessine à son arrivée. Un joueur bloqué : rien.
+   */
   avatarFile(key: string): string | undefined;
   /**
    * Avatar d'un joueur classé, d'après l'empreinte jointe à ses scores : le fichier s'il est là ;
@@ -655,8 +661,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   /**
    * L'avatar qu'un ami (ou un joueur d'une demande en cours) annonce : demandé s'il manque ou a
-   * changé, retiré s'il n'en a plus. Des autres joueurs, seul l'avatar joint à leurs scores se
-   * demande (askRankingAvatar).
+   * changé, retiré s'il n'en a plus, gardé dans l'état. Celui des autres joueurs se demande quand il
+   * s'affiche (avatarFile, askPublicAvatar).
    */
   function syncAvatar(key: string): void {
     const peer = peers.get(key);
@@ -678,12 +684,13 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   }
 
   /**
-   * Un avatar, à qui le demande : le mien à un ami ou un joueur d'une demande en cours ; et, à toute
-   * borne, celui que des scores publiés aux classements portent (le mien ou celui d'un autre joueur,
-   * s'il est ici) : ces avatars-là sont publics, l'empreinte jointe au score signé les contrôle.
+   * Un avatar, à toute borne qui le demande (avatar public, 15/11/2026) : le mien, et celui d'un
+   * autre joueur s'il est ici. Un joueur bloqué ne reçoit rien (receive l'écarte déjà, et sa liaison
+   * est refusée) ; l'empreinte, que le joueur a signée ou annoncée lui-même, contrôle l'image.
    */
   function sendAvatar(key: string, hash: string): void {
-    const own = ownAvatarHash() === hash && avatarPeers(state).has(key);
+    if (state.blocked.includes(key)) return;
+    const own = state.enabled && ownAvatarHash() === hash;
     if (!own && !publicAvatars().has(hash)) return;
     const file = own ? state.avatar! : heldAvatar(hash);
     const image = file ? readAvatarFile(opts.dataDir, file) : undefined;
@@ -694,13 +701,36 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     sendTo(key, { t: 'avatar-data', avatar: hash, data: image.bytes.toString('base64') });
   }
 
-  // ---------- Avatars des classements ----------
+  // ---------- Avatars publics ----------
 
-  /** Empreintes des avatars que portent les scores des classements : publiques. */
+  /**
+   * Empreinte de l'avatar d'un joueur qui n'est ni moi, ni un ami, ni une demande : d'après sa borne
+   * reliée, son signal de présence publique, son signal dans un salon, sa carte publique, puis son
+   * score le plus récent (publicAvatarHash). undefined : ses initiales.
+   */
+  function knownAvatarHash(key: string): string | undefined {
+    if (state.blocked.includes(key)) return undefined;
+    return publicAvatarHash([peers.get(key)?.avatar, liveBoard.get(key)?.avatar, hereBoard.get(key)?.avatar, profiles.cards.find((c) => c.key === key)?.avatar, rankedAvatars().get(key)]);
+  }
+
+  /** Avatars des classements par joueur (rankingAvatars), recalculés seulement quand les scores changent : un écran de 200 joueurs le lit à chaque ligne. */
+  let rankedMemo: { scores: unknown; count: number; map: Map<string, string | undefined> } | undefined;
+  function rankedAvatars(): Map<string, string | undefined> {
+    if (!rankedMemo || rankedMemo.scores !== rankings.scores || rankedMemo.count !== rankings.scores.length) rankedMemo = { scores: rankings.scores, count: rankings.scores.length, map: rankingAvatars(rankings) };
+    return rankedMemo.map;
+  }
+
+  /**
+   * Empreintes des avatars connus, tous publics : ceux qu'annoncent les bornes reliées, les signaux
+   * de présence (publique et des salons), les cartes publiques et les scores des classements, ceux
+   * des amis et des demandes, et le mien. Seuls ceux-là se donnent à qui les demande, et se gardent.
+   */
   function publicAvatars(): Set<string> {
-    // Ceux des profils publics aussi : la carte signée porte l'empreinte, comme un score.
-    const own = state.enabled && state.publicProfile !== false ? ownAvatarHash() : undefined;
-    return new Set([...rankingAvatars(rankings).values(), ...profiles.cards.map((c) => c.avatar), own].filter((h): h is string => !!h));
+    const own = state.enabled ? ownAvatarHash() : undefined;
+    const announced = [...peers.values()].filter((p) => !state.blocked.includes(p.key)).map((p) => p.avatar);
+    const held = Object.values(state.peerAvatars ?? {}).map(avatarHashOf);
+    const signals = [...[...liveBoard.values()].map((b) => b.avatar), ...[...hereBoard.values()].map((h) => h.avatar)];
+    return new Set([...rankedAvatars().values(), ...profiles.cards.map((c) => c.avatar), ...signals, ...announced, ...held, own].filter((h): h is string => !!h));
   }
 
   /** Fichier d'avatar de cette empreinte, s'il est dans <données>\avatars. */
@@ -708,33 +738,42 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     return ['jpg', 'png', 'webp'].map((ext) => `${hash}.${ext}`).find((name) => fs.existsSync(avatarPath(opts.dataDir, name)));
   }
 
-  /** Avatars des classements demandés : empreinte -> heure de la demande. */
-  const rankingAsked = new Map<string, number>();
-  /** Bornes interrogées au plus pour un avatar de classement dont la borne du joueur n'est pas reliée. */
-  const RANKING_ASK_PEERS = 3;
+  /** Avatars publics demandés : empreinte -> heure de la demande. */
+  const publicAsked = new Map<string, number>();
+  /** Bornes interrogées au plus pour un avatar public dont la borne du joueur n'est pas reliée. */
+  const PUBLIC_ASK_PEERS = 3;
 
-  function askRankingAvatar(key: string, hash: string): void {
-    const asked = rankingAsked.get(hash);
+  /** Fichier d'un avatar public s'il est ici ; sinon demandé, et undefined en attendant (ses initiales). */
+  function publicAvatarFile(key: string, hash: string): string | undefined {
+    const held = heldAvatar(hash);
+    if (held) return avatarPath(opts.dataDir, held);
+    askPublicAvatar(key, hash);
+    return undefined;
+  }
+
+  /** L'image d'un avatar public : demandée à la borne du joueur si elle est reliée, sinon à quelques bornes qui l'ont peut-être. */
+  function askPublicAvatar(key: string, hash: string): void {
+    const asked = publicAsked.get(hash);
     if (asked !== undefined && ms() - asked < AVATAR_ASK_MS) return;
     if (!publicAvatars().has(hash)) return;
     // Sa borne d'abord ; sinon quelques bornes reliées, qui l'ont peut-être déjà.
     const greeted = (k: string) => [...(peers.get(k)?.links ?? [])].some((l) => l.greeted);
-    const to = greeted(key) ? [key] : [...peers.keys()].filter(greeted).slice(0, RANKING_ASK_PEERS);
+    const to = greeted(key) ? [key] : [...peers.keys()].filter(greeted).slice(0, PUBLIC_ASK_PEERS);
     let sent = false;
     for (const k of to) sent = sendTo(k, { t: 'avatar-get', avatar: hash }) || sent;
-    if (sent) rankingAsked.set(hash, ms());
+    if (sent) publicAsked.set(hash, ms());
   }
 
-  /** Image d'un avatar de classement demandé : contrôlée par son empreinte, gardée. */
-  function receiveRankingAvatar(hash: string, data: string): boolean {
-    if (!rankingAsked.has(hash) || !publicAvatars().has(hash)) return false;
-    rankingAsked.delete(hash);
+  /** Image d'un avatar public demandé : contrôlée par son empreinte, gardée. */
+  function receivePublicAvatar(hash: string, data: string): boolean {
+    if (!publicAsked.has(hash) || !publicAvatars().has(hash)) return false;
+    publicAsked.delete(hash);
     const image = decodeAvatarData(data, hash);
     if (!image) return false;
     try {
       writeAvatarFile(opts.dataDir, image);
     } catch (error) {
-      log(`Réseau des bornes : avatar d'un classement pas enregistré (${(error as Error).message}).`); // i18n-ignore : journal
+      log(`Réseau des bornes : avatar d'un joueur pas enregistré (${(error as Error).message}).`); // i18n-ignore : journal
       return false;
     }
     changed();
@@ -742,11 +781,11 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   }
 
   /**
-   * Image reçue (parseSocialMessage l'a déjà contrôlée) : un avatar de classement demandé, et celle
+   * Image reçue (parseSocialMessage l'a déjà contrôlée) : un avatar public demandé, et celle
    * qu'un ami ou un joueur d'une demande en cours annonce, gardées.
    */
   function receiveAvatar(key: string, hash: string, data: string): void {
-    receiveRankingAvatar(hash, data);
+    receivePublicAvatar(hash, data);
     const peer = peers.get(key);
     if (!peer || peer.avatar !== hash || !avatarPeers(state).has(key)) return;
     avatarAsked.delete(key);
@@ -942,7 +981,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   function ownBeacon(): LiveBeacon | undefined {
     if (!state.enabled || state.publicPresence === false) return undefined;
     const country = myCountry();
-    return signBeacon(state, { status: presence.status === 'playing' ? 'playing' : 'online', ...(country ? { country } : {}) }, now());
+    const avatar = ownAvatarHash();
+    return signBeacon(state, { status: presence.status === 'playing' ? 'playing' : 'online', ...(country ? { country } : {}), ...(avatar ? { avatar } : {}) }, now());
   }
 
   /** Mon signal à toutes les bornes reliées (toutes les deux minutes, et quand j'entre en partie ou en sors). */
@@ -979,7 +1019,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   /** Mon signal de présence dans le salon à l'écran, à toutes les bornes reliées. */
   function announceHere(): void {
     if (!roomShown || !state.enabled) return;
-    const here = signRoomHere(state, roomShown, myCountry(), now());
+    const here = signRoomHere(state, roomShown, myCountry(), now(), ownAvatarHash());
     for (const link of greetedLinks()) link.send({ t: 'room-here', here: [here] });
   }
 
@@ -1170,6 +1210,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       if (!Array.isArray(m.here)) return;
       expireHere();
       const fresh: RoomHere[] = [];
+      let newAvatar = false;
       for (const raw of m.here.slice(0, ROOM_BATCH)) {
         const h = verifyRoomHere(raw, now());
         if (!h || h.key === state.key.publicKey || state.blocked.includes(h.key)) continue;
@@ -1177,6 +1218,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         if (had && Date.parse(had.at) >= Date.parse(h.at)) continue;
         hereBoard.set(h.key, h);
         fresh.push(h);
+        if (had && had.avatar !== h.avatar) newAvatar = true;
         if (!had || had.room !== h.room) {
           if (had) noteMove(had.room, h.key, had.name, false);
           noteMove(h.room, h.key, h.name, true);
@@ -1184,6 +1226,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       }
       if (!fresh.length) return;
       for (const l of greetedLinks(from)) l.send({ t: 'room-here', here: fresh });
+      // Un joueur a changé d'avatar : l'ancien n'est peut-être plus à personne, son fichier peut partir.
+      if (newAvatar) tidyAvatars();
       changed();
     }
   }
@@ -1193,9 +1237,12 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     if (!Array.isArray(raw) || state.blocked.includes(from)) return;
     const beacons = raw.slice(0, LIVE_BATCH).map((b) => verifyBeacon(b, now())).filter((b): b is LiveBeacon => !!b && !state.blocked.includes(b.key));
     if (!beacons.length) return;
+    const before = new Map(beacons.map((b) => [b.key, liveBoard.get(b.key)?.avatar]));
     const fresh = mergeBeacons(liveBoard, beacons, state.key.publicKey, now());
     if (!fresh.length) return;
     for (const link of greetedLinks(from)) link.send({ t: 'live', live: fresh });
+    // Un joueur a changé d'avatar : l'ancien n'est peut-être plus à personne, son fichier peut partir.
+    if (fresh.some((b) => before.get(b.key) !== undefined && before.get(b.key) !== b.avatar)) tidyAvatars();
     changed();
   }
 
@@ -1350,7 +1397,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
           // Salon à l'écran : son historique demandé à cette borne, et ma présence annoncée.
           if (roomShown) {
             askBacklog([link]);
-            if (state.enabled) link.send({ t: 'room-here', here: [signRoomHere(state, roomShown, myCountry(), now())] });
+            if (state.enabled) link.send({ t: 'room-here', here: [signRoomHere(state, roomShown, myCountry(), now(), ownAvatarHash())] });
           }
           changed();
         }
@@ -1376,10 +1423,15 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       case 'events':
         commit(receiveEvents(state, key, message.events));
         return;
-      case 'avatar':
+      case 'avatar': {
+        const had = peer.avatar;
         peer.avatar = message.avatar ?? null;
         syncAvatar(key);
+        // L'ancien n'est peut-être plus à personne ; pour tous : l'écran se redessine, et redemande l'image s'il l'affiche.
+        if (had && had !== peer.avatar) tidyAvatars();
+        changed();
         return;
+      }
       case 'avatar-get':
         sendAvatar(key, message.avatar);
         return;
@@ -1837,7 +1889,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     roomPresent(room) {
       expireHere();
       const others = [...hereBoard.values()].filter((h) => h.room === room && !state.blocked.includes(h.key));
-      const me = roomShown === room && state.enabled ? [signRoomHere(state, room, myCountry(), now())] : [];
+      const me = roomShown === room && state.enabled ? [signRoomHere(state, room, myCountry(), now(), ownAvatarHash())] : [];
       return [...me, ...others.sort((a, b) => Date.parse(b.at) - Date.parse(a.at))];
     },
     roomMoves: (room) => moves.get(room) ?? [],
@@ -1917,21 +1969,25 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     setAvatar(image) {
       const file = image ? writeAvatarFile(opts.dataDir, image) : undefined;
       tidyAfter(setOwnAvatar(state, file));
-      // Toutes les bornes reliées l'apprennent ; seuls mes amis et les demandes en cours le redemandent.
+      // Toutes les bornes reliées l'apprennent, et le redemandent si elles l'affichent.
       const notice: SocialMessage = { t: 'avatar', ...(image ? { avatar: image.hash } : {}) };
       for (const peer of peers.values()) for (const link of peer.links) if (link.greeted) link.send(notice);
-      // Ma carte publique porte l'empreinte de mon avatar.
+      // Ma carte publique, ma présence publique et celle du salon portent l'empreinte de mon avatar.
       announceCard();
+      announceLive();
+      announceHere();
     },
     avatarFile(key) {
       const file = avatarFileOf(state, key);
-      return file ? avatarPath(opts.dataDir, file) : undefined;
+      if (file) return avatarPath(opts.dataDir, file);
+      // Ni moi, ni un ami, ni une demande : son avatar public, s'il en a un (demandé s'il manque).
+      if (key === state.key.publicKey) return undefined;
+      const hash = knownAvatarHash(key);
+      return hash ? publicAvatarFile(key, hash) : undefined;
     },
     rankingAvatar(key, hash) {
-      const held = heldAvatar(hash);
-      if (held) return avatarPath(opts.dataDir, held);
-      askRankingAvatar(key, hash);
-      return undefined;
+      if (state.blocked.includes(key)) return undefined;
+      return publicAvatarFile(key, hash);
     },
     setDownloadRate: (rate) => {
       const { downloadRate: _, ...rest } = state;

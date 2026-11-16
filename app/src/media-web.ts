@@ -33,6 +33,7 @@ import {
   mediaKind,
   mediaTypeInfo,
   mediaUrl,
+  say,
   t,
   tn,
   TRIM_FADE,
@@ -204,7 +205,7 @@ export function createWebSearch(ctx: WebSearchContext) {
   /** Lignes des fichiers refusés, et de ceux qui vont à d'autres écrans. */
   function asideSections(r: WebReceipt): Section[] {
     const sections: Section[] = [];
-    if (r.refused?.length) sections.push({ title: t('Refusé'), rows: r.refused.map((x) => ({ text: x.name, detail: x.reason, tone: 'error' as const })) });
+    if (r.refused?.length) sections.push({ title: t('Refusé'), rows: r.refused.map((x) => ({ text: x.name, detail: say(x.reason), tone: 'error' as const })) });
     const others = r.files.filter((f) => f.type && f.type !== r.type);
     if (others.length) {
       const labels = [...new Set(others.map((f) => typeLabel(f.type!)))].join(t(', '));

@@ -34,7 +34,7 @@ import {
   tableFilter,
   toggleSelection,
 } from '../filepicker';
-import { setLanguage } from '../i18n';
+import { setLanguage, tLater } from '../i18n';
 import { parseMediaDbIndex } from '../mediadb';
 
 const MD5 = '0123456789abcdef0123456789abcdef';
@@ -159,10 +159,10 @@ test('téléchargements : d’où vient chaque fichier, et à quoi il sert', () 
 
 test('téléchargements : le journal dit ce qu’on a fait d’un fichier repris', () => {
   const s = sandbox();
-  noteDownloadUse(s.dl, s.files.orphan, 'Ajout d’une table : Attack from Mars');
-  noteDownloadUse(s.dl, s.files.rom, 'Ajout d’une table');
+  noteDownloadUse(s.dl, s.files.orphan, tLater('Ajout de ce qu’il manque à {table}', { table: 'Attack from Mars' }));
+  noteDownloadUse(s.dl, s.files.rom, tLater('Ajout d’une table'));
   const entries = downloadInventory({ downloadsDir: s.dl, dataDir: s.data });
-  assert.deepEqual(entries.find((e) => e.name === 'inconnu.7z')!.use, { state: 'used', text: 'Ajout d’une table : Attack from Mars' });
+  assert.deepEqual(entries.find((e) => e.name === 'inconnu.7z')!.use, { state: 'used', text: 'Ajout de ce qu’il manque à Attack from Mars' });
   // Attendu par la liste d'attente : c'est ce qui compte d'abord.
   assert.equal(entries.find((e) => e.name === 'mm_109c.zip')!.use.state, 'waiting');
   // Le journal lui-même est interne.

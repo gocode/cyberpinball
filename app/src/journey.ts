@@ -235,7 +235,7 @@ export function createJourney(ctx: JourneyContext) {
   return {
     /** Ouvre le parcours d'une table (fiche, partie échouée, médecin, liste d'attente). */
     open: (file: string, notice?: { text: string; tone: Tone }) => show(file, notice),
-    /** Position retenue au dernier passage (« Étape 3 sur 5 »), pour la fiche et la liste d'attente. */
+    /** Parcours retenu au dernier passage (étape, total, prête) ; recordPosition le dit dans la langue du moment. */
     position: (file: string) => journeyRecord(memory(), file),
   };
 }

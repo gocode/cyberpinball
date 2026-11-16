@@ -28,10 +28,12 @@
 // Préversions (0.2.0-essai.1) : une borne qui les accepte (réglage gardé dans
 // <données>\preversions.json) cherche le flux de la release la plus récente, préversions
 // comprises, par l'API GitHub ; les autres ne lisent que celui de la dernière version finale.
+// Canal d'essai privé : voir « Source des mises à jour » plus bas.
 
 import { spawnSync } from 'node:child_process';
 import { createHash, createPublicKey, createPrivateKey, sign, verify } from 'node:crypto';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { renameWithRetry } from './atomicwrite';
@@ -50,7 +52,7 @@ export const UPDATE_INSTALLER_NAME = 'CyberPinball-Setup.exe';
 export const UPDATE_APP_NAME = 'CyberPinball-application.zip';
 /** Suivi d'une mise à jour lancée, dans le dossier de données. */
 export const UPDATE_PENDING_FILE = 'mise-a-jour.json';
-/** Réglage des préversions, dans le dossier de données. */
+/** Source des mises à jour (préversions, canal d'essai), dans le dossier de données. */
 export const UPDATE_PRERELEASES_FILE = 'preversions.json';
 
 /** Fichier joint à une release : adresse, taille et empreinte, vérifiées au téléchargement. */
@@ -260,25 +262,151 @@ export function missedReleases(manifest: UpdateManifest, current: string, lang: 
   return [{ version: manifest.version, notes: updateNotes(manifest, lang) }, ...older.map((e) => ({ version: e.version, notes: updateNotes(e, lang) }))];
 }
 
-// ---------- Préversions ----------
+// ---------- Source des mises à jour et canal d'essai privé ----------
+//
+// Trois sources, de la plus sûre à la plus fraîche, chacune comprenant la précédente :
+// - « finales » : la dernière version finale du dépôt public (réglage par défaut) ;
+// - « preversions » : la release la plus récente du dépôt public, préversions comprises ;
+// - « essais » : en plus, les releases d'un dépôt GitHub privé, lues avec un jeton en lecture
+//   seule. Pour qui maintient Cyber Pinball et veut essayer ses versions sur ses propres bornes
+//   avant de les publier. Le dépôt et le jeton sont dans un fichier hors des données de la borne
+//   (canal-essai.json dans %USERPROFILE%\.cyberpinball : ni sauvegardé, ni partagé, ni dans un
+//   rapport). Sans ce fichier, la source « essais » n'est pas proposée.
+// Quelle que soit la source, le flux est vérifié par la même signature : un jeton volé ne permet
+// pas de faire installer autre chose que ce que l'éditeur a signé.
 
-/** La borne accepte-t-elle les préversions ? Non tant que rien n'est réglé. */
-export function loadPrereleaseSetting(dataDir: string): boolean {
+/** Source des mises à jour d'une borne. */
+export type UpdateSource = 'finales' | 'preversions' | 'essais';
+export const UPDATE_SOURCES: readonly UpdateSource[] = ['finales', 'preversions', 'essais'];
+
+/** Canal d'essai privé : dépôt GitHub et jeton qui le lit. */
+export interface PrivateChannel {
+  repository: string;
+  token: string;
+  /** Adresse de l'API GitHub (essais : un serveur local). */
+  api?: string;
+}
+
+/** Fichier du canal d'essai privé : CYBERPINBALL_CANAL_ESSAI le remplace (essais). */
+export function privateChannelFile(env: NodeJS.ProcessEnv = process.env): string {
+  return env.CYBERPINBALL_CANAL_ESSAI || path.join(os.homedir(), '.cyberpinball', 'canal-essai.json');
+}
+
+/**
+ * Le canal d'essai privé de ce poste, ou undefined : fichier absent ou incomplet. Le fichier :
+ * { "depot": "proprietaire/nom", "jeton": "github_pat_…" } (ou "repository" et "token").
+ */
+export function loadPrivateChannel(file = privateChannelFile()): PrivateChannel | undefined {
   try {
-    return JSON.parse(fs.readFileSync(path.join(dataDir, UPDATE_PRERELEASES_FILE), 'utf8').replace(/^﻿/, '')).preversions === true;
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, '')) as Record<string, unknown>;
+    const repository = String(raw.depot ?? raw.repository ?? '').trim();
+    const token = String(raw.jeton ?? raw.token ?? '').trim();
+    const api = typeof raw.api === 'string' && raw.api ? raw.api.replace(/\/$/, '') : undefined;
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repository) || !token) return undefined;
+    return { repository, token, ...(api && { api }) };
   } catch {
-    return false;
+    return undefined;
   }
 }
 
-export function savePrereleaseSetting(dataDir: string, on: boolean): void {
-  fs.mkdirSync(dataDir, { recursive: true });
-  fs.writeFileSync(path.join(dataDir, UPDATE_PRERELEASES_FILE), `${JSON.stringify({ preversions: on }, null, 2)}\n`, 'utf8');
+/** Source réglée sur la borne : « finales » tant que rien n'est réglé. */
+export function loadUpdateSource(dataDir: string): UpdateSource {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(dataDir, UPDATE_PRERELEASES_FILE), 'utf8').replace(/^﻿/, '')) as { preversions?: unknown; source?: unknown };
+    if (UPDATE_SOURCES.includes(raw.source as UpdateSource)) return raw.source as UpdateSource;
+    return raw.preversions === true ? 'preversions' : 'finales';
+  } catch {
+    return 'finales';
+  }
 }
 
+/** Garde la source ; « preversions » reste écrit pour les versions qui ne connaissent pas « source ». */
+export function saveUpdateSource(dataDir: string, source: UpdateSource): void {
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(path.join(dataDir, UPDATE_PRERELEASES_FILE), `${JSON.stringify({ preversions: source !== 'finales', source }, null, 2)}\n`, 'utf8');
+}
+
+/** La borne accepte-t-elle les préversions ? Non tant que rien n'est réglé. */
+export function loadPrereleaseSetting(dataDir: string): boolean {
+  return loadUpdateSource(dataDir) !== 'finales';
+}
+
+export function savePrereleaseSetting(dataDir: string, on: boolean): void {
+  saveUpdateSource(dataDir, on ? 'preversions' : 'finales');
+}
+
+/**
+ * Source effectivement suivie : « essais » sans canal d'essai sur ce poste (fichier retiré)
+ * revient aux préversions publiques.
+ */
+export function effectiveUpdateSource(source: UpdateSource, channel: PrivateChannel | undefined): UpdateSource {
+  return source === 'essais' && !channel ? 'preversions' : source;
+}
+
+const GITHUB_API = 'https://api.github.com';
+
 /** Liste des releases du dépôt, préversions comprises (API GitHub, sans jeton : 60 requêtes par heure). */
-export function releasesApiUrl(repository = UPDATE_REPOSITORY): string {
-  return `https://api.github.com/repos/${repository}/releases?per_page=30`;
+export function releasesApiUrl(repository = UPDATE_REPOSITORY, api = GITHUB_API): string {
+  return `${api}/repos/${repository}/releases?per_page=30`;
+}
+
+/**
+ * fetch qui lit le dépôt du canal d'essai : le jeton est joint aux seules adresses de l'API de ce
+ * dépôt, et un fichier joint est demandé en binaire. GitHub redirige alors vers un stockage
+ * externe, suivi ici sans le jeton (il ne doit pas sortir de l'API ; le stockage le refuserait).
+ * Toute autre adresse passe telle quelle.
+ */
+export function channelFetch(channel: PrivateChannel | undefined, base: typeof fetch = fetch): typeof fetch {
+  if (!channel) return base;
+  const prefix = `${channel.api ?? GITHUB_API}/repos/${channel.repository}/`;
+  return (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    if (!url.startsWith(prefix)) return base(input, init);
+    const headers = new Headers(init?.headers);
+    headers.set('authorization', `Bearer ${channel.token}`);
+    headers.set('x-github-api-version', '2022-11-28');
+    if (url.startsWith(`${prefix}releases/assets/`)) headers.set('accept', 'application/octet-stream');
+    else if (!headers.has('accept')) headers.set('accept', 'application/vnd.github+json');
+    let response = await base(url, { ...init, headers, redirect: 'manual' });
+    for (let hops = 0; hops < 5 && response.status >= 300 && response.status < 400 && response.headers.get('location'); hops++) {
+      const next = new URL(response.headers.get('location')!, url).href;
+      const plain = new Headers(init?.headers);
+      plain.delete('authorization');
+      response = await base(next, { ...init, headers: plain, redirect: 'follow' });
+    }
+    return response;
+  }) as typeof fetch;
+}
+
+/** Release la plus récente d'une liste de l'API GitHub, et l'adresse API de chaque fichier joint de la liste. */
+interface NewestRelease {
+  version: string;
+  /** Adresse du flux : de téléchargement (dépôt public), ou de l'API (dépôt privé). */
+  feed: string;
+  /** Adresse de téléchargement d'un fichier joint → son adresse dans l'API (pour un dépôt privé). */
+  apiUrls: Map<string, string>;
+}
+
+async function newestRelease(listUrl: string, get: typeof fetch, signal: AbortSignal | undefined, viaApi: boolean): Promise<NewestRelease | undefined> {
+  const response = await get(listUrl, {
+    signal: signal ?? AbortSignal.timeout(20_000),
+    headers: { accept: 'application/vnd.github+json', 'cache-control': 'no-cache' },
+  });
+  if (!response.ok) throw new Error(t('Le site des mises à jour répond HTTP {status}.', { status: response.status }));
+  type Listed = { tag_name?: string; draft?: boolean; assets?: { name?: string; browser_download_url?: string; url?: string }[] };
+  const listed = (await response.json()) as Listed[];
+  let best: NewestRelease | undefined;
+  const apiUrls = new Map<string, string>();
+  for (const r of Array.isArray(listed) ? listed : []) {
+    if (r.draft) continue;
+    for (const a of r.assets ?? []) if (a.browser_download_url && a.url) apiUrls.set(a.browser_download_url, a.url);
+    const version = r.tag_name?.replace(/^v/, '');
+    const asset = r.assets?.find((a) => a.name === UPDATE_FEED_NAME);
+    const feed = viaApi ? asset?.url : asset?.browser_download_url;
+    if (!version || !isVersion(version) || !feed) continue;
+    if (!best || compareAppVersions(version, best.version) > 0) best = { version, feed, apiUrls };
+  }
+  return best;
 }
 
 /**
@@ -287,23 +415,9 @@ export function releasesApiUrl(repository = UPDATE_REPOSITORY): string {
  * par sa signature : la liste ne fait que dire où le chercher.
  */
 export async function prereleaseFeedUrl(opts: { releasesUrl?: string; fetch?: typeof fetch; signal?: AbortSignal } = {}): Promise<string> {
-  const get = opts.fetch ?? fetch;
-  const response = await get(opts.releasesUrl ?? releasesApiUrl(), {
-    signal: opts.signal ?? AbortSignal.timeout(20_000),
-    headers: { accept: 'application/vnd.github+json', 'cache-control': 'no-cache' },
-  });
-  if (!response.ok) throw new Error(t('Le site des mises à jour répond HTTP {status}.', { status: response.status }));
-  type Listed = { tag_name?: string; draft?: boolean; assets?: { name?: string; browser_download_url?: string }[] };
-  const listed = (await response.json()) as Listed[];
-  let best: { version: string; url: string } | undefined;
-  for (const r of Array.isArray(listed) ? listed : []) {
-    const version = r.tag_name?.replace(/^v/, '');
-    const feed = r.assets?.find((a) => a.name === UPDATE_FEED_NAME)?.browser_download_url;
-    if (r.draft || !version || !isVersion(version) || !feed) continue;
-    if (!best || compareAppVersions(version, best.version) > 0) best = { version, url: feed };
-  }
+  const best = await newestRelease(opts.releasesUrl ?? releasesApiUrl(), opts.fetch ?? fetch, opts.signal, false);
   if (!best) throw new Error(t('Aucune version publiée pour l’instant sur le site des mises à jour.'));
-  return best.url;
+  return best.feed;
 }
 
 /** Cherche la dernière version publiée et la compare à celle qui tourne. */
@@ -312,16 +426,37 @@ export async function checkForUpdate(opts: {
   feedUrl?: string;
   /** Préversions comprises : le flux de la release la plus récente (CYBERPINBALL_MAJ_URL les remplace aussi). */
   prereleases?: boolean;
+  /**
+   * Canal d'essai privé : ses releases s'ajoutent aux préversions publiques, la plus récente
+   * l'emporte. Un canal illisible (jeton refusé…) est une erreur : jamais un repli silencieux.
+   */
+  channel?: PrivateChannel;
   releasesUrl?: string;
   publicKey?: string;
   fetch?: typeof fetch;
   signal?: AbortSignal;
 }): Promise<UpdateCheck> {
   let url = opts.feedUrl ?? updateFeedUrl();
-  const get = opts.fetch ?? fetch;
-  if (opts.prereleases && !opts.feedUrl && !process.env.CYBERPINBALL_MAJ_URL) {
+  const plain = opts.fetch ?? fetch;
+  let get = plain;
+  let privateRelease: NewestRelease | undefined;
+  const listed = !opts.feedUrl && !process.env.CYBERPINBALL_MAJ_URL;
+  if ((opts.prereleases || opts.channel) && listed) {
     // Liste illisible (limite de l'API atteinte…) : le flux des versions finales, toujours lisible.
-    url = await prereleaseFeedUrl({ releasesUrl: opts.releasesUrl, fetch: get, signal: opts.signal }).catch(() => url);
+    const pub = await newestRelease(opts.releasesUrl ?? releasesApiUrl(), plain, opts.signal, false).catch(() => undefined);
+    if (pub) url = pub.feed;
+    if (opts.channel) {
+      const channel = opts.channel;
+      get = channelFetch(channel, plain);
+      try {
+        privateRelease = await newestRelease(releasesApiUrl(channel.repository, channel.api), get, opts.signal, true);
+      } catch (error) {
+        if ((error as Error).name === 'AbortError' && opts.signal?.aborted) throw error;
+        throw new Error(t('Canal d’essai {repository} illisible : {message} Vérifiez le jeton de canal-essai.json, ou revenez aux versions publiques.', { repository: channel.repository, message: (error as Error).message }));
+      }
+      if (privateRelease && (!pub || compareAppVersions(privateRelease.version, pub.version) > 0)) url = privateRelease.feed;
+      else privateRelease = undefined;
+    }
   }
   let response: Response;
   try {
@@ -333,6 +468,13 @@ export async function checkForUpdate(opts: {
   if (response.status === 404) throw new Error(t('Aucune version publiée pour l’instant sur le site des mises à jour.'));
   if (!response.ok) throw new Error(t('Le site des mises à jour répond HTTP {status}.', { status: response.status }));
   const latest = openEnvelope(await response.text(), opts.publicKey ?? updatePublicKey());
+  // Dépôt privé : ses fichiers ne se téléchargent que par l'API, avec le jeton (channelFetch).
+  // L'adresse seule change : taille et empreinte restent celles du flux signé.
+  if (privateRelease) {
+    const viaApi = <A extends UpdateAsset>(asset: A): A => ({ ...asset, url: privateRelease.apiUrls.get(asset.url) ?? asset.url });
+    latest.installer = viaApi(latest.installer);
+    if (latest.app) latest.app = viaApi(latest.app);
+  }
   return { status: compareAppVersions(latest.version, opts.current) > 0 ? 'available' : 'up-to-date', current: opts.current, latest };
 }
 

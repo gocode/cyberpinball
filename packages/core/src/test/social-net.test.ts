@@ -466,7 +466,7 @@ test('présence : entrant bloqué d’un côté (pare-feu), la liaison sortante 
   }
 });
 
-test('avatar : reçu par les amis et les demandes en cours, jamais par l’annuaire ; changé, retiré, puis oublié', async () => {
+test('avatar : public, vu par tout joueur relié, ami ou non ; changé, retiré, bloqué', async () => {
   const testnet = await createTestnet(3, { host: '127.0.0.1' });
   const a = cabinet('Alice', { bootstrap: testnet.bootstrap, lan: false });
   const b = cabinet('Bruno', { bootstrap: testnet.bootstrap, lan: false });
@@ -497,26 +497,38 @@ test('avatar : reçu par les amis et les demandes en cours, jamais par l’annua
     await until('avatar d’Alice chez Bruno', () => bytesOf(nb.avatarFile(keyA))?.equals(image(1).bytes) === true);
     nb.accept(keyA);
     await until('amis', () => na.state().friends.length === 1 && nb.state().friends.length === 1);
-    // Chloé ne connaît Alice que par l'annuaire : ses initiales, pas sa photo.
-    assert.equal(nc.avatarFile(keyA), undefined);
+    // Avatar public (15/11/2026) : Chloé, ni amie ni en demande, voit aussi la photo d'Alice, et
+    // Alice celle de Chloé. L'écran la demande en l'affichant (avatarFile), elle arrive peu après.
+    await until('avatar d’Alice chez Chloé, sans être amies', () => bytesOf(nc.avatarFile(keyA))?.equals(image(1).bytes) === true);
+    await until('avatar de Chloé chez Alice, sans être amies', () => bytesOf(na.avatarFile(keyC))?.equals(image(3).bytes) === true);
+    // L'état n'en garde que ceux des amis et des demandes ; l'image de Chloé est au cache public.
+    assert.equal(na.state().peerAvatars?.[keyC], undefined);
 
-    // Changé : le nouveau arrive, l'ancien fichier est rangé.
+    // Changé : le nouveau arrive chez l'ami comme chez les autres, l'ancien fichier est rangé.
     const old = nb.avatarFile(keyA)!;
+    const oldAtC = nc.avatarFile(keyA)!;
     na.setAvatar(image(2));
     await until('nouvel avatar d’Alice chez Bruno', () => bytesOf(nb.avatarFile(keyA))?.equals(image(2).bytes) === true);
-    await until('ancien fichier rangé', () => !fs.existsSync(old));
+    await until('nouvel avatar d’Alice chez Chloé', () => bytesOf(nc.avatarFile(keyA))?.equals(image(2).bytes) === true);
+    await until('ancien fichier rangé', () => !fs.existsSync(old) && !fs.existsSync(oldAtC));
 
-    // Chloé demande Alice : Alice reçoit son avatar avec la demande.
+    // Chloé demande Alice : Alice garde son avatar avec la demande.
     nc.request(profileOf(na));
-    await until('avatar de Chloé chez Alice', () => bytesOf(na.avatarFile(keyC))?.equals(image(3).bytes) === true);
-    // Refusée : son avatar sort de chez Alice.
+    await until('avatar de Chloé gardé chez Alice', () => na.state().peerAvatars?.[keyC] !== undefined);
+    // Refusée : l'état l'oublie, mais sa photo reste, publique comme celle de tout joueur.
     na.decline(keyC);
-    await until('avatar de Chloé oublié', () => na.avatarFile(keyC) === undefined);
+    await until('avatar de Chloé sorti de l’état', () => na.state().peerAvatars?.[keyC] === undefined);
+    assert.equal(bytesOf(na.avatarFile(keyC))?.equals(image(3).bytes), true);
 
-    // Retiré : Bruno voit de nouveau les initiales d'Alice.
+    // Retiré : Bruno et Chloé voient de nouveau les initiales d'Alice.
     na.setAvatar(undefined);
     await until('avatar d’Alice retiré chez Bruno', () => nb.avatarFile(keyA) === undefined);
+    await until('avatar d’Alice retiré chez Chloé', () => nc.avatarFile(keyA) === undefined);
     assert.equal(na.avatarFile(keyA), undefined);
+
+    // Bloquée : Alice ne montre plus rien de Chloé, et ne lui donne plus rien.
+    na.block(keyC);
+    assert.equal(na.avatarFile(keyC), undefined);
   } finally {
     await Promise.all(nets.map((n) => n.stop()));
     await testnet.destroy();

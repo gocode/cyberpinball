@@ -9,7 +9,7 @@
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec un réseau d'essai.
 
 import * as fs from 'node:fs';
-import { fetchResumable, renameWithRetry, ResumableError, t, type DownloadReason, type DownloadTransport, type LibraryMedia, type TransportResult } from '@cyberpinball/core';
+import { fetchResumable, renameWithRetry, ResumableError, say, t, type DownloadReason, type DownloadTransport, type LibraryMedia, type TransportResult } from '@cyberpinball/core';
 import type { FetchFailure, FriendContent } from './friend-content';
 import type { SocialNet } from './social-net';
 
@@ -69,7 +69,7 @@ export function friendTransport(content: Pick<FriendContent, 'fetchFile'>, net: 
       if (!target) return { ok: false, reason: 'refused', detail: 'destination inconnue' }; // i18n-ignore : journal
       const r = await content.fetchFile(key, table, file.ref, target, file.part, (bytes) => progress(bytes, file.bytes), signal, file.bytes);
       if ('file' in r) return { ok: true, file: r.file, bytes: r.bytes, sha256: r.sha256 };
-      const detail = friendDetail(r.reason, file.name);
+      const detail = friendDetail(r.reason, say(file.name));
       return { ok: false, reason: friendReason(r.reason), ...(detail ? { detail } : {}) };
     },
   };

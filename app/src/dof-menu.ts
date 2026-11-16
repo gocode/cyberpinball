@@ -40,6 +40,8 @@ import {
   serialPortCandidates,
   stripLedCount,
   t,
+  tLater,
+  type LaterText,
   tn,
   writeFileAtomic,
   type CabinetLeds,
@@ -63,7 +65,7 @@ export interface DofMenuHost {
     openSystem(): void;
     openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void;
     openNotice(heading: string, lines: string[], then?: () => void): void;
-    pick(request: { title: string; icon?: IconName; purpose: string; filter?: { label: string; extensions: string[] }; mode: 'file'; start?: 'cp' | 'windows' }): Promise<string[] | undefined>;
+    pick(request: { title: string; icon?: IconName; purpose: LaterText; filter?: { label: string; extensions: string[] }; mode: 'file'; start?: 'cp' | 'windows' }): Promise<string[] | undefined>;
     task(message: string, work: () => Promise<void> | void): Promise<void>;
   };
   /** Dossier que lit le plugin DOF ; undefined sans VPX. */
@@ -259,7 +261,7 @@ export function createDofMenu(host: DofMenuHost) {
     const paths = await library.pick({
       title: t('Configuration DOF : choisir le ZIP du configtool'),
       icon: 'import',
-      purpose: t('Import de la configuration DOF'),
+      purpose: tLater('Import de la configuration DOF'),
       filter: { label: t('Archives ZIP'), extensions: ['zip'] },
       mode: 'file',
       start: 'windows',

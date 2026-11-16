@@ -25,6 +25,7 @@ interface Api {
   list: NativeFn;
   locate: NativeFn;
   status: NativeFn;
+  property: NativeFn;
 }
 
 let api: Api | undefined;
@@ -37,6 +38,9 @@ function loadApi(): Api {
     list: cfgmgr32.func('uint32_t __stdcall CM_Get_Device_ID_ListW(const char16_t *filter, void *buffer, uint32_t length, uint32_t flags)'),
     locate: cfgmgr32.func('uint32_t __stdcall CM_Locate_DevNodeW(_Out_ uint32_t *devInst, const char16_t *deviceId, uint32_t flags)'),
     status: cfgmgr32.func('uint32_t __stdcall CM_Get_DevNode_Status(_Out_ uint32_t *status, _Out_ uint32_t *problem, uint32_t devInst, uint32_t flags)'),
+    property: cfgmgr32.func(
+      'uint32_t __stdcall CM_Get_DevNode_PropertyW(uint32_t devInst, const void *key, _Out_ uint32_t *type, void *buffer, _Inout_ uint32_t *size, uint32_t flags)',
+    ),
   };
   return api;
 }
@@ -81,6 +85,11 @@ export function probeUsbDevices(): ObservedUsbDevice[] {
     const port = text(`${key}\\Device Parameters`, 'PortName');
     // Classe du pilote : « Camera » ou « Image » pour une webcam (Vision 3D, vision3d.ts du cœur).
     const deviceClass = text(key, 'Class');
+    // Service du pilote, état du nœud et nom donné par le périphérique : un DMD réel sans le bon
+    // pilote (PIN2DMD sans WinUSB, ZeDMD sans pilote CH340) est signalé avant la partie (dmd.ts du cœur).
+    const service = text(key, 'Service');
+    const status = deviceStatus(instanceId);
+    const product = busReportedName(instanceId);
     devices.push({
       instanceId,
       vid: parseInt(ids[1]!, 16),
@@ -88,6 +97,9 @@ export function probeUsbDevices(): ObservedUsbDevice[] {
       ...(name ? { name } : {}),
       ...(port ? { port } : {}),
       ...(deviceClass ? { deviceClass } : {}),
+      ...(service ? { service } : {}),
+      ...(status?.problem ? { problem: status.problem } : {}),
+      ...(product ? { product } : {}),
     });
   }
   return devices;
@@ -118,4 +130,31 @@ export function deviceStatus(instanceId: string): { started: boolean; problem: n
   if (w.status(status, problem, node[0]!, 0) !== CR_SUCCESS) return undefined;
   const has = (status[0]! & DN_HAS_PROBLEM) !== 0;
   return { started: (status[0]! & DN_STARTED) !== 0 && !has, problem: has ? problem[0]! : 0 };
+}
+
+// devpkey.h : DEVPKEY_Device_BusReportedDeviceDesc, le nom que le périphérique donne lui-même
+// (chaîne « iProduct » de l'USB), lu par Windows au branchement : rien n'est ouvert.
+const BUS_REPORTED_DEVICE_DESC = (() => {
+  const key = Buffer.alloc(20);
+  key.writeUInt32LE(0x540b947e, 0);
+  key.writeUInt16LE(0x8b40, 4);
+  key.writeUInt16LE(0x45bc, 6);
+  Buffer.from([0xa8, 0xa2, 0x6a, 0x0b, 0x89, 0x4c, 0xbd, 0xa2]).copy(key, 8);
+  key.writeUInt32LE(4, 16);
+  return key;
+})();
+const DEVPROP_TYPE_STRING = 0x12;
+
+/** Nom que le périphérique donne à l'USB (« PIN2DMD HD ») ; undefined s'il n'en donne pas. */
+export function busReportedName(instanceId: string): string | undefined {
+  if (process.platform !== 'win32') return undefined;
+  const w = loadApi();
+  const node = [0];
+  if (w.locate(node, instanceId, 0) !== CR_SUCCESS) return undefined;
+  const type = [0];
+  const buffer = Buffer.alloc(512);
+  const size = [buffer.length];
+  if (w.property(node[0]!, BUS_REPORTED_DEVICE_DESC, type, buffer, size, 0) !== CR_SUCCESS || type[0] !== DEVPROP_TYPE_STRING) return undefined;
+  const name = buffer.toString('utf16le', 0, size[0]!).replace(/\0+$/, '').trim();
+  return name || undefined;
 }

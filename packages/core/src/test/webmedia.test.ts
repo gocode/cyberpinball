@@ -12,7 +12,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
 import { parseHTML } from 'linkedom';
-import { setLanguage } from '../i18n';
+import { say, setLanguage } from '../i18n';
 import { applyOps } from '../fileops';
 import { planSingleMedia } from '../mediaedit';
 import { mediaMemory } from '../medias';
@@ -116,7 +116,7 @@ test('judgeWebFile : musique du jeu, accepté, à convertir en WAV, refusé avec
   const refused = (name: string, format: keyof typeof HEADS | 'text', pattern: RegExp) => {
     const v = judge(name, format);
     assert.equal(v.status, 'refused', name);
-    assert.match(v.status === 'refused' ? v.reason : '', pattern, name);
+    assert.match(v.status === 'refused' ? say(v.reason) : '', pattern, name);
   };
   refused('theme.wma', 'asf', /ne sait pas lire/);
   refused('Dropbox - theme.mp3', 'html', /page web/);
@@ -132,16 +132,16 @@ test('judgeWebFile : écrans et logo, le contenu prime sur le nom', () => {
   assert.deepEqual(judgeWebFile(make(dir, 'logo.jpg', 'jpg'), 'Wheel'), { status: 'convert', kind: 'image', to: 'png', from: 'image' });
   assert.deepEqual(judgeWebFile(make(dir, 'logo.jpeg', 'jpg'), 'Wheel'), { status: 'convert', kind: 'image', to: 'png', from: 'image' });
   const video = judgeWebFile(make(dir, 'logo.webm', 'webm'), 'Wheel');
-  assert.equal(video.status === 'refused' && video.reason, 'une vidéo, alors que « Logo » demande : apng, png, webp, gif');
+  assert.equal(video.status === 'refused' && say(video.reason), 'une vidéo, alors que « Logo » demande : apng, png, webp, gif');
   // Topper : vidéo ou image ; une vidéo WebM nommée .mp4 est rangée en .webm.
   assert.deepEqual(judgeWebFile(make(dir, 'topper.mp4', 'mp4'), 'Topper'), { status: 'accepted', kind: 'video' });
   assert.deepEqual(judgeWebFile(make(dir, 'topper.jpg', 'jpg'), 'Topper'), { status: 'accepted', kind: 'image' });
   assert.deepEqual(judgeWebFile(make(dir, 'topper webm.mp4', 'webm'), 'Topper'), { status: 'accepted', kind: 'video', ext: 'webm' });
   assert.deepEqual(judgeWebFile(make(dir, 'topper.m4v', 'mp4'), 'Topper'), { status: 'accepted', kind: 'video' });
   const mkv = judgeWebFile(make(dir, 'topper.mkv', 'mkv'), 'Topper');
-  assert.match(mkv.status === 'refused' ? mkv.reason : '', /que le menu ne lit pas ; la convertir demanderait un outil externe \(ffmpeg\)/);
+  assert.match(mkv.status === 'refused' ? say(mkv.reason) : '', /que le menu ne lit pas ; la convertir demanderait un outil externe \(ffmpeg\)/);
   const sound = judgeWebFile(make(dir, 'topper.mp3', 'mp3'), 'Topper');
-  assert.match(sound.status === 'refused' ? sound.reason : '', /^un son, alors que « Topper »/);
+  assert.match(sound.status === 'refused' ? say(sound.reason) : '', /^un son, alors que « Topper »/);
   // Chargement : vidéo seulement.
   assert.equal(judgeWebFile(make(dir, 'chargement.png', 'png'), 'Loading').status, 'refused');
   // Prospectus : images et MP4, pas de WebM.

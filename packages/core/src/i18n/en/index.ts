@@ -17,6 +17,7 @@ import { messages as files } from './files';
 import { messages as webmedia } from './webmedia';
 import { messages as health } from './health';
 import { messages as dof } from './dof';
+import { messages as hardwaredmd } from './hardwaredmd';
 import { messages as dedicated } from './dedicated';
 import { messages as power } from './power';
 import { messages as terms } from './terms';
@@ -52,6 +53,6 @@ import { messages as moderation } from './moderation';
 import { messages as jukeboxsettings } from './jukeboxsettings';
 
 /** Chaque partie du catalogue, par nom de fichier (pour le test des doublons). */
-export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dof, dedicated, power, hours, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame, backups, installation, avatar, activity, remote, collections, scores, jukebox, jukeboxplayer, jukeboxmanage, youtubeaccount, jukeboxdesign, chat, techsheet, terms, credits, community, rooms, moderation, jukeboxsettings };
+export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dof, hardwaredmd, dedicated, power, hours, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame, backups, installation, avatar, activity, remote, collections, scores, jukebox, jukeboxplayer, jukeboxmanage, youtubeaccount, jukeboxdesign, chat, techsheet, terms, credits, community, rooms, moderation, jukeboxsettings };
 
 export const EN_MESSAGES: Catalog = Object.assign({}, ...Object.values(EN_PARTS));

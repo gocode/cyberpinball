@@ -9,14 +9,17 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { addToWaitList, markReceived, type CabinetScreens, type WaitList } from '../acquisition';
 import { diagnose, scriptFacts, type ScriptFacts } from '../doctor';
+import { setLanguage } from '../i18n';
 import {
   forgetJourney,
   journeyChoices,
   journeyPosition,
   journeyRecord,
+  journeysFile,
   journeySummary,
   loadJourneys,
   planJourney,
+  recordPosition,
   rememberJourney,
   romSources,
   saveJourneys,
@@ -328,7 +331,7 @@ test('parcours repris : une étape réglée depuis reste dans la liste, cochée,
     const reloaded = loadJourneys(data);
     const record = journeyRecord(reloaded, box.file.toUpperCase())!;
     assert.deepEqual(record.steps, ['setup', 'table', 'rom', 'tidy', 'backglass', 'play']);
-    assert.equal(record.position, 'Étape 3 sur 4');
+    assert.equal(recordPosition(record), 'Étape 3 sur 4');
     assert.equal(step(before, 'tidy').required, false);
     const after = planJourney(inputOf(box, { seen: record.steps }));
     assert.equal(after.steps.length, 4);
@@ -339,6 +342,69 @@ test('parcours repris : une étape réglée depuis reste dans la liste, cochée,
     assert.equal(journeyRecord(reloaded, box.file), undefined);
   } finally {
     fs.rmSync(box.root, { recursive: true, force: true });
+    fs.rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('parcours retenu en français, relu en anglais : la position suit la langue du moment', () => {
+  const box = sandbox();
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-parcours-langue-'));
+  try {
+    setLanguage('fr');
+    const journey = planJourney(inputOf(box));
+    assert.equal(journeyPosition(journey), 'Étape 3 sur 4');
+    const memory = loadJourneys(data);
+    rememberJourney(memory, box.file, 'Terminator 2', journey, new Date('2026-11-16T10:00:00Z'));
+    saveJourneys(data, memory);
+    // Sur le disque : des nombres, aucun texte traduit.
+    const saved = fs.readFileSync(journeysFile(data), 'utf8');
+    assert.doesNotMatch(saved, /Étape|Step|"position"/);
+    const raw = JSON.parse(saved) as { tables: Record<string, { step: number; total: number }> };
+    assert.deepEqual(Object.values(raw.tables).map((r) => [r.step, r.total]), [[3, 4]]);
+    setLanguage('en');
+    assert.equal(recordPosition(journeyRecord(loadJourneys(data), box.file)), 'Step 3 of 4');
+  } finally {
+    setLanguage('fr');
+    fs.rmSync(box.root, { recursive: true, force: true });
+    fs.rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('ancien parcours.json (position déjà traduite) : converti en nombres à la lecture, puis réécrit sans texte', () => {
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-parcours-ancien-'));
+  try {
+    const old = (position: unknown, extra: object = {}) => ({ title: 'Table', steps: ['setup', 'table', 'rom', 'inconnue', 'play'], startedAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-02T00:00:00.000Z', position, ready: false, ...extra });
+    fs.writeFileSync(
+      journeysFile(data),
+      String.fromCharCode(0xfeff) +
+        JSON.stringify({
+          tables: {
+            'c:/tables/fr.vpx': old('Étape 3 sur 4'),
+            'c:/tables/en.vpx': old('Step 2 of 5'),
+            'c:/tables/illisible.vpx': old('Étape ? sur ?'),
+            'c:/tables/absurde.vpx': old('Étape 9 sur 4'),
+            'c:/tables/pas-texte.vpx': old(42),
+            'c:/tables/neuf.vpx': old(undefined, { step: 1, total: 3 }),
+          },
+        }),
+    );
+    setLanguage('en');
+    const memory = loadJourneys(data);
+    const at = (name: string) => journeyRecord(memory, `C:/tables/${name}.vpx`)!;
+    assert.deepEqual([at('fr').step, at('fr').total], [3, 4]);
+    assert.equal(recordPosition(at('fr')), 'Step 3 of 4');
+    assert.equal(recordPosition(at('en')), 'Step 2 of 5');
+    assert.equal(recordPosition(at('neuf')), 'Step 1 of 3');
+    for (const name of ['illisible', 'absurde', 'pas-texte']) {
+      assert.equal(recordPosition(at(name)), undefined, name);
+      assert.equal(at(name).title, 'Table', name);
+    }
+    assert.deepEqual(at('fr').steps, ['setup', 'table', 'rom', 'play']);
+    assert.equal('position' in at('fr'), false);
+    saveJourneys(data, memory);
+    assert.doesNotMatch(fs.readFileSync(journeysFile(data), 'utf8'), /Étape|Step|"position"/);
+  } finally {
+    setLanguage('fr');
     fs.rmSync(data, { recursive: true, force: true });
   }
 });

@@ -122,7 +122,7 @@ export const messages: Record<string, string> = {
   "Rapport de la borne": "Cabinet report",
   "Téléchargez-le, puis joignez-le à un e-mail ou à un message.": "Download it, then attach it to an email or a message.",
   "PC et Windows": "PC and Windows",
-  "Santé, fiche technique, boutons, écrans, son, réglages de VPX, réalité virtuelle, vision 3D, télécommande du téléphone, bureau Windows, mode invité": "Health, tech sheet, buttons, screens, sound, VPX settings, virtual reality, 3D vision, phone remote, Windows desktop, guest mode",
+  "Santé, fiche technique, boutons, écrans, son, réglages de VPX, réalité virtuelle, vision 3D, télécommande du téléphone, DMD, bureau Windows, mode invité": "Health, tech sheet, buttons, screens, sound, VPX settings, virtual reality, 3D vision, phone remote, DMD, Windows desktop, guest mode",
   "Fiche technique": "Tech sheet",
   "AZERTY (France)": "AZERTY (France)",
   "AZERTY (Belgique)": "AZERTY (Belgium)",

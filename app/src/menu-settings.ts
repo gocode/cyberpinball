@@ -1,7 +1,9 @@
 // Réglages des médias, du son et du mode attente du menu,
 // dans le menu système : musique des jeux, volumes, lancement en cinéma, mode attente et
 // horaire de la borne (nuit voilée, arrêt à heure fixe : packages/core/src/arcadehours.ts),
-// médias pendant la partie, DMD du menu (vivant ou classique) et sa couleur, qualité téléchargée depuis VPinMediaDB.
+// médias pendant la partie, qualité téléchargée depuis VPinMediaDB. Le DMD du menu (vivant ou classique)
+// et sa couleur sont rangés depuis le 16/11/2026 dans Menu système > Borne > DMD (tous les réglages
+// du DMD ensemble) : ce fichier les fournit encore, comme entrées de cette rubrique (MenuSettingsItems).
 // La roue des tables (présentation, ordre, Start, logos animés, couleur, Juke-box) a son propre
 // écran depuis le 12/11/2026 : Menu système > Tables > Roue (wheel-settings.ts).
 // Tout se règle aux boutons : Start change un choix ou ouvre la liste des valeurs, Exit revient.
@@ -101,8 +103,6 @@ export const MENU_SETTINGS_ROWS = [
   'notices',
   'attract',
   'game',
-  'dmd',
-  'dmdColor',
   'downloadQuality',
   'recordQuality',
 ] as const;
@@ -117,7 +117,14 @@ export const ATTRACT_ROWS = ['attractDelay', 'attractInterval', 'attractSound', 
 type AttractRow = (typeof ATTRACT_ROWS)[number];
 const attractRow = (key: AttractRow) => ATTRACT_ROWS.indexOf(key);
 
-export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
+/** L'entrée « Médias, son et attente » (rubrique Médias) ; les deux réglages du DMD du menu, entrées de Borne > DMD. */
+export interface MenuSettingsItems {
+  item: ProvidedSystemItem;
+  menuDmd: ProvidedSystemItem;
+  dmdColor: ProvidedSystemItem;
+}
+
+export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
   const s = () => host.settings();
   const set = (patch: Partial<MenuMediaSettings>) => host.save({ ...s(), ...patch });
 
@@ -210,21 +217,6 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         run: () => openAttract(),
       },
       game: { label: t('Médias pendant la partie : {mode}', { mode: GAME_MEDIA_LABELS[v.game] }), detail: gameDetail(), icon: 'film', run: () => set({ game: nextGameMediaMode(v.game) }) },
-      dmd: {
-        label: t('DMD du menu : {mode}', { mode: MENU_DMD_LABELS[v.dmd] }),
-        detail:
-          v.dmd === 'live'
-            ? t('Cyber Pinball dessine l’afficheur en continu : titre, records, PRESS START, horloge, crédits (Start : média seul)')
-            : t('Le média DMD du jeu, sinon son titre qui défile (Start : DMD vivant)'),
-        icon: 'dmd',
-        run: () => set({ dmd: v.dmd === 'live' ? 'classic' : 'live' }),
-      },
-      dmdColor: {
-        label: t('Couleur du DMD : {color}', { color: dmdColorLabel(v.dmdColor) }),
-        detail: t('Les points de l’afficheur que Cyber Pinball dessine : DMD du menu, DMD d’un jeu sans média ; pas celui de VPX en partie (Start : choisir)'),
-        icon: 'palette',
-        run: () => openDmdColor(),
-      },
       downloadQuality: {
         label: t('Qualité téléchargée (VPinMediaDB) : {quality}', { quality: MEDIADB_QUALITY_LABELS[v.downloadQuality] }),
         icon: 'quality',
@@ -323,7 +315,7 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
     return {
       heading: heading(),
       icon: 'music',
-      lead: t('Sortie du son : {output}. Volume propre à un jeu : sa fiche, « Médias du jeu ».', {
+      lead: t('Sortie du son : {output}. Volume propre à un jeu : sa fiche, « Médias du jeu ». Le DMD du menu et sa couleur : Borne > DMD.', {
         output: output ?? t('sortie par défaut de Windows (aucune sortie affectée au fronton par l’assistant)'),
       }),
       sections: [],
@@ -413,7 +405,8 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
    * (aucune table) : la couleur choisie s'y voit dès le retour sur la ligne.
    */
   function openDmdColor(at?: number): void {
-    const back = row('dmdColor');
+    // Retour à la rubrique Borne > DMD, sur la ligne « Couleur du DMD ».
+    const done = () => host.library.openSystem();
     const current = () => s().dmdColor;
     const table = () => current() === DMD_TABLE_COLOR;
     const free = () => !table() && !dmdColorPreset(current());
@@ -430,7 +423,7 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
             tone: preset.hex === current() ? ('ok' as const) : undefined,
             run: () => {
               set({ dmdColor: preset.hex });
-              open(back);
+              done();
             },
           })),
           {
@@ -441,7 +434,7 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
             tone: table() ? ('ok' as const) : undefined,
             run: () => {
               set({ dmdColor: DMD_TABLE_COLOR });
-              open(back);
+              done();
             },
           },
           {
@@ -451,9 +444,9 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
             icon: 'edit',
             run: () => openFreeDmdColor(),
           },
-          { label: t('Retour'), icon: 'back', run: () => open(back) },
+          { label: t('Retour'), icon: 'back', run: done },
         ],
-        back: () => open(back),
+        back: done,
       }),
       at ?? (table() ? DMD_COLOR_PRESETS.length : free() ? DMD_COLOR_PRESETS.length + 1 : Math.max(0, DMD_COLOR_PRESETS.findIndex((p) => p.hex === current()))),
     );
@@ -473,7 +466,7 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         if (!color) return openFreeDmdColor(t('« {value} » n’est pas une couleur : six chiffres hexadécimaux (0 à 9, A à F), comme #8BE23A.', { value }));
         if (!dmdColorReadable(color)) return openFreeDmdColor(t('{hex} est trop sombre : les points ne se verraient pas sur le noir de l’afficheur.', { hex: color.toUpperCase() }));
         set({ dmdColor: color });
-        open(row('dmdColor'));
+        host.library.openSystem();
       },
       error ?? t('Six chiffres hexadécimaux, rouge puis vert puis bleu : #8BE23A est le vert signal, #FF8A1F l’orange plasma.'),
     );
@@ -653,7 +646,7 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
     );
   }
 
-  return {
+  const item: ProvidedSystemItem = {
     get detail() {
       const v = s();
       const params = { delay: attractDelayLabel(v.attractDelay), mode: GAME_MEDIA_LABELS[v.game] };
@@ -663,4 +656,30 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
     },
     run: () => open(),
   };
+
+  // ---------- Rubrique Borne > DMD ----------
+
+  // Basculé sur place, comme « Recopie sur le playfield » : le menu système se redessine, le curseur reste dessus.
+  const menuDmd: ProvidedSystemItem = {
+    get label() {
+      return t('DMD du menu : {mode}', { mode: MENU_DMD_LABELS[s().dmd] });
+    },
+    get detail() {
+      return s().dmd === 'live'
+        ? t('Cyber Pinball dessine l’afficheur en continu : titre, records, PRESS START, horloge, crédits (Start : média seul)')
+        : t('Le média DMD du jeu, sinon son titre qui défile (Start : DMD vivant)');
+    },
+    run: () => {
+      set({ dmd: s().dmd === 'live' ? 'classic' : 'live' });
+      host.library.openSystem();
+    },
+  };
+  const dmdColor: ProvidedSystemItem = {
+    get label() {
+      return t('Couleur du DMD : {color}', { color: dmdColorLabel(s().dmdColor) });
+    },
+    detail: t('Les points de l’afficheur que Cyber Pinball dessine : DMD du menu, DMD d’un jeu sans média ; pas celui de VPX en partie (Start : choisir)'),
+    run: () => openDmdColor(),
+  };
+  return { item, menuDmd, dmdColor };
 }

@@ -15,7 +15,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { renameWithRetry, writeFileAtomic } from './atomicwrite';
 import { decodeAvatarData, isAvatarFileName, isAvatarHash } from './avatar';
-import { formatNumber, t } from './i18n';
+import { formatNumber, laterNumber, t, tLater, type LaterText } from './i18n';
 import { parseRate, type ByteRate } from './ratelimit';
 import { createPlayerKey, isPlayerPublicKey, playerFingerprint, signText, tableIdentity, verifyText, type PlayerKey } from './sharing';
 import type { TableEntry } from './tables';
@@ -886,6 +886,26 @@ export function socialAgo(iso: string, now = new Date()): string {
 export function playDuration(seconds: number): string {
   const minutes = Math.max(1, Math.round(seconds / 60));
   return minutes < 60 ? t('{n} min', { n: minutes }) : t('{h} h {m} min', { h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0') });
+}
+
+/** Durée d'une partie, gardée sans traduction (Activité récente) : dite par say. */
+export function playDurationLater(seconds: number): LaterText {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  return minutes < 60 ? tLater('{n} min', { n: minutes }) : tLater('{h} h {m} min', { h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0') });
+}
+
+/** Phrase d'un évènement, gardée sans traduction (Activité récente) : dite par say dans la langue du moment. */
+export function eventLater(e: SocialEvent): LaterText {
+  switch (e.kind) {
+    case 'record':
+      return e.rank === 1
+        ? tLater('Nouveau meilleur score sur {table} : {score}', { table: e.table!.title, score: laterNumber(e.score!) })
+        : tLater('Entré au tableau d’honneur de {table} : {score}, place {rank}', { table: e.table!.title, score: laterNumber(e.score!), rank: e.rank! });
+    case 'badge':
+      return tLater('Badge reçu : {badge}', { badge: { ref: 'badge', id: e.badge! } });
+    case 'played':
+      return tLater('A joué à {table} ({duration})', { table: e.table!.title, duration: playDurationLater(e.seconds!) });
+  }
 }
 
 /** Phrase d'un évènement ; `badgeLabel` donne le nom d'un badge (badges.ts). */

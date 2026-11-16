@@ -9,7 +9,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { saveOrWarn, writeFileAtomic } from './atomicwrite';
-import { t } from './i18n';
+import { registerTextRef, t } from './i18n';
 import { layoutOf } from './locations';
 import { edgeRotation, type Cabinet, type FlipperEdge, type RoleId, type Rotation } from './model';
 import { readInfo, type TableEntry, type TableInfoFile } from './tables';
@@ -402,6 +402,8 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
 ];
 
 const BY_TYPE = new Map(MEDIA_TYPES.map((t) => [t.type.toLowerCase(), t]));
+// Nom d'un type de média dans un texte enregistré ({ ref: 'mediaType', id: 'Wheel' }), dit à l'affichage.
+registerTextRef('mediaType', (id) => BY_TYPE.get(id.toLowerCase())?.label);
 
 export function mediaTypeInfo(type: MediaType): MediaTypeInfo {
   return BY_TYPE.get(type.toLowerCase())!;

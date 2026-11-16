@@ -5,7 +5,7 @@
 // Au premier calcul, les badges déjà mérités par l'historique sont donnés sans évènement :
 // les amis ne voient « Badge reçu » que pour ce qui arrive ensuite (grantBadges).
 
-import { t } from './i18n';
+import { registerTextRef, t } from './i18n';
 import type { IconName } from './icons';
 import { addEvent, type EarnedBadge, type SocialEvent, type SocialState } from './social';
 import type { TableEntry } from './tables';
@@ -77,6 +77,9 @@ export function badgeDefinition(id: string): BadgeDefinition | undefined {
 export function badgeLabel(id: string): string {
   return badgeDefinition(id)?.label ?? id;
 }
+
+// Nom d'un badge dans un texte enregistré ({ ref: 'badge', id }), dit à l'affichage (Activité récente).
+registerTextRef('badge', badgeLabel);
 
 /** Badges à ajouter : ceux mérités et pas encore tenus. */
 export function evaluateBadges(held: readonly EarnedBadge[], play: PlayStats, records: RecordStats, now = new Date()): EarnedBadge[] {

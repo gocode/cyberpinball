@@ -16,6 +16,7 @@ import * as path from 'node:path';
 import {
   applyOps,
   CONTENT_LABELS,
+  contentSummaryText,
   expectedPackNames,
   formatDay,
   formatNumber,
@@ -40,6 +41,7 @@ import {
   PUP_FOLDER,
   searchVps,
   t,
+  tLater,
   tableContents,
   tn,
   trashDirFor,
@@ -397,7 +399,7 @@ export function createGameParts(ctx: GamePartsContext) {
         title: path.basename(c.file),
         code: t('Téléchargé'),
         state: { label: t('Convient'), tone: 'ok' },
-        facts: [c.origin, c.seen.summary ?? (c.seen.content ? CONTENT_LABELS[c.seen.content] : undefined), formatSize(fileSize(c.file))].filter(Boolean).join(' · '),
+        facts: [c.origin, contentSummaryText(c.seen.summary) ?? (c.seen.content ? CONTENT_LABELS[c.seen.content] : undefined), formatSize(fileSize(c.file))].filter(Boolean).join(' · '),
         thumb: { kind: 'fallback', rotation: 0, text: partLabel(part) },
       });
       actions.push({ label: path.basename(c.file), key: `file:${c.file}`, run: () => ctx.install([c.file], table, after) });
@@ -486,7 +488,7 @@ export function createGameParts(ctx: GamePartsContext) {
    */
   async function pickFile(table: TableEntry, part: GamePart, from: number): Promise<void> {
     const back = () => openPart(table, part, from);
-    const paths = await ctx.pick!({ title: t('{part} : {title}', { part: partLabel(part), title: table.title }), icon: 'inbox', purpose: t('Parties du jeu : {part}', { part: partLabel(part) }), mode: 'files-or-folder', start: 'cp' });
+    const paths = await ctx.pick!({ title: t('{part} : {title}', { part: partLabel(part), title: table.title }), icon: 'inbox', purpose: tLater('Parties du jeu : {part}', { part: { ref: 'part', id: part } }), mode: 'files-or-folder', start: 'cp' });
     if (!paths?.length) return back();
     const dir = paths.length === 1 && isDirectory(paths[0]!) ? paths[0]! : undefined;
     const pick = dir ? partFolderPick(dir, part, wantedOf(table)) : { use: paths };

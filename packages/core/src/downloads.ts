@@ -18,7 +18,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { CONTENT_LABELS, clearItem, forgetStray, isPartialDownload, linkHost, loadWaitList, NEED_LABELS, type WaitList } from './acquisition';
 import { formatSize, moveToTrash, samePath, trashDirFor } from './fileops';
-import { formatDate, t, tn } from './i18n';
+import { formatDate, readStoredText, say, t, tn, type LaterText, type StoredText } from './i18n';
 import type { MediaDb } from './mediadb';
 import { mediaTypeInfo, type MediaType } from './medias';
 import { mediaSite, type SiteReceipt, type WebReceipt } from './mediasites';
@@ -63,7 +63,8 @@ export interface DownloadEntry {
 export interface DownloadNote {
   file: string;
   at: string;
-  text: string;
+  /** Ce qu'on en a fait, traduit à l'affichage (say) ; un ancien journal le tient déjà traduit. */
+  text: StoredText;
 }
 
 const JOURNAL = 'journal.json';
@@ -77,14 +78,19 @@ function readNotes(downloadsDir: string): DownloadNote[] {
   if (!fs.existsSync(file)) return [];
   try {
     const raw = readJsonFile(file) as { notes?: unknown };
-    return Array.isArray(raw.notes) ? (raw.notes as DownloadNote[]).filter((n) => n && typeof n.file === 'string' && typeof n.text === 'string') : [];
+    if (!Array.isArray(raw.notes)) return [];
+    // Ancien journal : texte déjà traduit, reconnu pour être redit dans la langue du moment.
+    return (raw.notes as DownloadNote[]).filter((n) => n && typeof n.file === 'string' && n.text !== undefined).flatMap((n) => {
+      const text = readStoredText(n.text);
+      return text === undefined ? [] : [{ ...n, text }];
+    });
   } catch {
     return [];
   }
 }
 
 /** Note ce qu'on a fait d'un fichier téléchargé (la plus récente utilisation est montrée). */
-export function noteDownloadUse(downloadsDir: string, file: string, text: string, now = new Date()): void {
+export function noteDownloadUse(downloadsDir: string, file: string, text: LaterText, now = new Date()): void {
   const notes = readNotes(downloadsDir).filter((n) => fs.existsSync(n.file));
   notes.push({ file: path.resolve(file), at: now.toISOString(), text });
   fs.mkdirSync(downloadsDir, { recursive: true });
@@ -311,7 +317,7 @@ export function downloadInventory(src: DownloadSources): DownloadEntry[] {
       entry.use = { state: 'kept', text: t('Gardée pour réinstaller VPX sans réseau') };
     }
     const note = notes.get(k);
-    if (note && entry.use.state !== 'installed' && entry.use.state !== 'waiting') entry.use = { state: 'used', text: note.text };
+    if (note && entry.use.state !== 'installed' && entry.use.state !== 'waiting') entry.use = { state: 'used', text: say(note.text) };
     return entry;
   };
 

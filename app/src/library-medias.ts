@@ -57,6 +57,7 @@ import {
   sameFileContent,
   scanTableMedias,
   t,
+  tLater,
   tableMediaDir,
   tn,
   trashDirFor,
@@ -960,7 +961,7 @@ export function createMedias(ctx: MediasContext) {
     const paths = await ctx.pick({
       title: t('{label} : choisir un fichier', { label: info.label }),
       icon: 'image',
-      purpose: t('{label} de {table}', { label: info.label, table: before.title }),
+      purpose: tLater('{label} de {table}', { label: { ref: 'mediaType', id: info.type }, table: before.title }),
       mode: 'file',
       filter: { label: info.label, extensions: [...info.formats] },
     });

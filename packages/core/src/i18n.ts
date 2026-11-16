@@ -149,3 +149,149 @@ export function resolveLanguage(opts: { env?: NodeJS.ProcessEnv; dataDir?: strin
   if (isLanguage(forced)) return forced;
   return (opts.dataDir ? loadLanguageSetting(opts.dataDir) : undefined) ?? systemLanguage(opts.system);
 }
+
+// ---------------------------------------------------------------------------
+// Textes enregistrés : jamais traduits sur le disque
+//
+// Un texte traduit puis écrit dans un fichier de données garde la langue du moment où il a
+// été écrit : après un changement de langue, l'écran mélange les deux (« Resume: Étape 3 sur
+// 4 »). Ce qui est enregistré est donc soit une donnée neutre (nombres, codes), soit un
+// LaterText : la clé française et ses paramètres, traduits à l'affichage par say().
+// Les anciens fichiers qui contiennent déjà le texte traduit se convertissent à la lecture
+// par recognizeText (le catalogue lu à l'envers, français ou anglais).
+
+/** Texte à traduire à l'affichage : clé française (t) ou paire singulier/pluriel (tn), et paramètres. */
+export interface LaterText {
+  key: string;
+  /** Forme plurielle (tn) : `key` est la forme singulière, `count` choisit. */
+  many?: string;
+  count?: number;
+  params?: Readonly<Record<string, number | StoredText>>;
+}
+
+/**
+ * Libellé d'une table de constantes (type de média, badge…), désigné par son identifiant et
+ * dit à l'affichage par la fonction enregistrée pour `ref` (registerTextRef).
+ */
+export interface TextRef {
+  ref: string;
+  id: string;
+}
+
+const textRefs = new Map<string, (id: string) => string | undefined>();
+
+/** Déclare comment dire un libellé désigné par { ref, id } ; appelé au chargement du module qui tient la table. */
+export function registerTextRef(ref: string, label: (id: string) => string | undefined): void {
+  textRefs.set(ref, label);
+}
+
+// Un nombre gardé brut ({ ref: 'number', id: '84520310' }), écrit à la façon de la langue à l'affichage.
+registerTextRef('number', (id) => (Number.isFinite(Number(id)) ? formatNumber(Number(id)) : id));
+
+/** Un nombre dans un texte enregistré (score) : écrit à la façon de la langue du moment (« 84 520 310 », « 84,520,310 »). */
+export function laterNumber(value: number): TextRef {
+  return { ref: 'number', id: String(value) };
+}
+
+const isTextRef = (value: unknown): value is TextRef => Boolean(value) && typeof value === 'object' && typeof (value as TextRef).ref === 'string' && typeof (value as TextRef).id === 'string';
+
+/**
+ * Ce qu'un fichier de données peut contenir comme texte montré : un LaterText, un libellé de
+ * table de constantes (TextRef), un texte non traduit (nom, chemin), ou une suite d'entre eux
+ * (dite séparée d'une espace).
+ */
+export type StoredText = LaterText | TextRef | string | readonly StoredText[];
+
+/** Comme t(), mais traduit plus tard (say) : pour ce qui est enregistré. `source` : le texte français, littéral. */
+export function tLater(source: string, params?: LaterText['params']): LaterText {
+  return params ? { key: source, params } : { key: source };
+}
+
+/** Comme tn(), mais traduit plus tard (say). */
+export function tnLater(count: number, one: string, many: string, params?: LaterText['params']): LaterText {
+  return params ? { key: one, many, count, params } : { key: one, many, count };
+}
+
+export function isLaterText(value: unknown): value is LaterText {
+  return Boolean(value) && typeof value === 'object' && typeof (value as LaterText).key === 'string';
+}
+
+/** Un texte enregistré, dans la langue du moment. Une chaîne est montrée telle quelle (nom, chemin, texte de l'utilisateur). */
+export function say(text: StoredText | undefined): string {
+  if (text === undefined) return '';
+  if (typeof text === 'string') return text;
+  if (Array.isArray(text)) return text.map(say).filter(Boolean).join(' ');
+  if (isTextRef(text)) return textRefs.get(text.ref)?.(text.id) ?? text.id;
+  if (!isLaterText(text)) return '';
+  const params: Record<string, string | number> = {};
+  for (const [name, value] of Object.entries(text.params ?? {})) {
+    params[name] = typeof value === 'number' ? value : say(value);
+  }
+  if (text.many !== undefined && typeof text.count === 'number') return tn(text.count, text.key, text.many, params); // i18n-ignore : clés relevées dans l'appel de tnLater
+  return t(text.key, params); // i18n-ignore : clé relevée dans l'appel de tLater
+}
+
+/** Lit un texte enregistré : LaterText gardé, chaîne d'un ancien fichier reconnue si elle sort du catalogue, sinon gardée. */
+export function readStoredText(value: unknown): StoredText | undefined {
+  if (isLaterText(value) || isTextRef(value)) return value;
+  if (Array.isArray(value)) {
+    const parts = value.map(readStoredText).filter((p): p is StoredText => p !== undefined);
+    return parts.length ? parts : undefined;
+  }
+  if (typeof value !== 'string') return undefined;
+  return recognizeText(value) ?? value;
+}
+
+/** `piece` : le plus long morceau de texte hors paramètres, cherché avant l'expression (bien plus rapide). */
+type Pattern = { key: string; re: RegExp; names: string[]; weight: number; piece: string };
+let patterns: Pattern[] | undefined;
+
+/** Gabarit (« Étape {n} sur {total} ») → expression qui le reconnaît, paramètres en groupes. */
+function patternOf(key: string, text: string): Pattern | undefined {
+  const names: string[] = [];
+  const literal = text.replace(/\{\w+\}/g, '');
+  // Au moins quelques lettres hors paramètres : « {a} : {b} » reconnaîtrait n'importe quoi.
+  if (literal.replace(/[\s\p{P}]/gu, '').length < 3) return undefined;
+  const body = text.split(/(\{\w+\})/).map((part) => {
+    const m = /^\{(\w+)\}$/.exec(part);
+    if (!m) return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    names.push(m[1]!);
+    return m[1] === 'n' ? '(-?[\\d\\s\\u00a0\\u202f.,]+)' : '(.+?)';
+  });
+  const piece = text.split(/\{\w+\}/).reduce((a, b) => (b.length > a.length ? b : a), '');
+  return { key, re: new RegExp(`^${body.join('')}$`, 'su'), names, weight: literal.length, piece };
+}
+
+/**
+ * Texte d'un ancien fichier, déjà traduit en français ou en anglais : la clé et les
+ * paramètres qui le donnent, pour le redire dans la langue du moment. Le gabarit le plus
+ * précis (le plus de texte hors paramètres) l'emporte ; undefined si aucun ne convient
+ * (nom de table, texte tapé par l'utilisateur). Un nombre {n} redevient un nombre.
+ */
+export function recognizeText(text: string, keys?: readonly string[]): LaterText | undefined {
+  if (!text) return undefined;
+  let list: Pattern[];
+  if (keys) {
+    list = keys.flatMap((key) => [patternOf(key, key), ...LANGUAGES.map((l) => messagesOf(l)[key]).filter((x): x is string => Boolean(x)).map((x) => patternOf(key, x))]).filter((p): p is Pattern => Boolean(p));
+  } else {
+    patterns ??= LANGUAGES.flatMap((l) => Object.entries(messagesOf(l)).flatMap(([key, x]) => [patternOf(key, key), patternOf(key, x)]))
+      .filter((p): p is Pattern => Boolean(p))
+      .sort((a, b) => b.weight - a.weight);
+    list = patterns;
+  }
+  let best: { p: Pattern; m: RegExpExecArray } | undefined;
+  for (const p of list) {
+    if (best && p.weight <= best.p.weight) continue;
+    if (!text.includes(p.piece)) continue;
+    const m = p.re.exec(text);
+    if (m) best = { p, m };
+  }
+  if (!best) return undefined;
+  const params: Record<string, string | number> = {};
+  best.p.names.forEach((name, i) => {
+    const raw = best!.m[i + 1]!;
+    const digits = raw.replace(/[\s\u00a0\u202f.,]/g, '');
+    params[name] = name === 'n' && /^-?\d+$/.test(digits) ? Number(digits) : raw;
+  });
+  return best.p.names.length ? { key: best.p.key, params } : { key: best.p.key };
+}

@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { t, VC_RUNTIME_DLLS, peFileVersion, vcRuntimeStatus, type DownloadManager, type VcRuntimeStatus } from '@cyberpinball/core';
+import { t, tLater, VC_RUNTIME_DLLS, peFileVersion, vcRuntimeStatus, type DownloadManager, type VcRuntimeStatus } from '@cyberpinball/core';
 import { downloadComponent, findComponent, type Component } from '@cyberpinball/installer';
 import { CANCELLED, startElevated, signerOf, SYSTEM32 } from './elevation';
 
@@ -52,7 +52,7 @@ async function downloadVcRedist(downloadsDir: string, downloads?: DownloadManage
   const job = downloads?.track({
     id: component.id,
     kind: 'component',
-    title: t('Runtime Visual C++ (Microsoft)'),
+    title: tLater('Runtime Visual C++ (Microsoft)'),
     source: { kind: 'http', label: 'microsoft.com' },
     files: [{ ref: component.url, name: path.basename(file), bytes: component.size, dest: file, part: `${file}.part` }],
     back: { screen: 'downloads' },

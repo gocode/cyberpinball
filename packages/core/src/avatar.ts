@@ -1,7 +1,7 @@
 // Avatar des joueurs du réseau des bornes (rubrique Amis) : une image carrée que chacun choisit
 // (photo ou image de son disque, ou prise dans le navigateur intégré), recadrée aux boutons, et que
-// ses amis voient partout où son nom s'affiche (Mes amis, sa fiche, les demandes, l'historique
-// des parties, la partie en direct, les notifications).
+// tous les joueurs voient partout où son nom s'affiche (Mes amis, Joueurs en ligne, salons, classements,
+// profils publics, sa fiche, les demandes, l'historique des parties, la partie en direct, les notifications).
 //
 // Ici, ce qui se décide sur des données : le cadrage (un carré dans l'image, déplacé et agrandi
 // pas à pas), le contrôle d'une image reçue d'une autre borne (type reconnu à ses premiers
@@ -11,15 +11,16 @@
 //
 // Fichiers : <données>\avatars\<empreinte>.<ext>, nommés par l'empreinte SHA-256 de leur contenu.
 // Une image ne change donc jamais sous un même nom (rien à invalider dans le cache du rendu), et
-// deux amis qui ont la même image ne la gardent qu'une fois.
+// deux joueurs qui ont la même image ne la gardent qu'une fois.
 
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import { mediaUrl } from './mediaview';
+import { signText, verifyText, type PlayerKey } from './sharing';
 
-/** Côté de l'image envoyée aux amis, en pixels. */
+/** Côté de l'image envoyée aux autres bornes, en pixels. */
 export const AVATAR_SIZE = 256;
 /** Au plus, pour un fichier d'avatar reçu (un JPEG de 256 px pèse de 10 à 40 Ko). */
 export const AVATAR_MAX_BYTES = 96 * 1024;
@@ -289,4 +290,46 @@ export function cropRect(crop: AvatarCrop, width: number, height: number): { x: 
 export function cropBox(crop: AvatarCrop, width: number, height: number): { left: number; top: number; width: number; height: number } {
   const c = clampCrop(crop, width, height);
   return { left: (c.cx - c.side / 2) / width, top: (c.cy - c.side / 2) / height, width: c.side / width, height: c.side / height };
+}
+
+// ---------------------------------------------------------------------------
+// Avatar public (décidé le 15/11/2026) : l'avatar de chaque joueur est visible de tous, partout où
+// il s'affiche (Joueurs en ligne, salons, classements, profils publics, demandes, résultats), ami
+// ou non. Son empreinte voyage avec ce que le joueur signe déjà : son bonjour, son signal de
+// présence publique, son signal de présence dans un salon, sa carte publique, ses scores. L'image
+// se demande ensuite à sa borne, ou à une borne qui l'a déjà ; l'empreinte la contrôle.
+
+/**
+ * Signature de l'empreinte jointe à un signal de présence (publique, ou dans un salon) : à part de
+ * la signature du signal, pour qu'une borne d'avant les avatars publics vérifie toujours le signal
+ * (elle ignore et ne relaie pas l'empreinte) ; une empreinte retouchée en route est refusée.
+ */
+export function avatarClaimText(kind: string, key: string, at: string, avatar: string): string {
+  return JSON.stringify({ app: 'cyberpinball', kind: `${kind}-avatar`, key, at, avatar });
+}
+
+/** Empreinte et sa signature à joindre à un signal ; rien si le joueur n'a pas d'avatar. */
+export function signAvatarClaim(kind: string, key: PlayerKey, at: string, avatar: string | undefined): { avatar?: string; asig?: string } {
+  return avatar && isAvatarHash(avatar) ? { avatar, asig: signText(avatarClaimText(kind, key.publicKey, at, avatar), key) } : {};
+}
+
+/** Empreinte d'un signal reçu, si sa signature est bonne ; sinon rien (le signal reste valable, sans avatar). */
+export function verifyAvatarClaim(kind: string, key: string, at: string, raw: { avatar?: unknown; asig?: unknown }): { avatar?: string; asig?: string } {
+  const { avatar, asig } = raw;
+  if (!isAvatarHash(avatar) || typeof asig !== 'string' || asig.length > 200) return {};
+  return verifyText(avatarClaimText(kind, key, at, avatar), asig, key) ? { avatar, asig } : {};
+}
+
+/**
+ * L'empreinte de l'avatar d'un joueur, d'après ce que l'on sait de lui, de la source la plus sûre
+ * et la plus fraîche à la moins fraîche : ce que sa borne reliée annonce elle-même (null : aucun
+ * avatar), son signal de présence publique, son signal dans un salon, sa carte publique, son score
+ * le plus récent. La première source qui en dit quelque chose l'emporte ; undefined : ses initiales.
+ */
+export function publicAvatarHash(sources: readonly (string | null | undefined)[]): string | undefined {
+  for (const s of sources) {
+    if (s === null) return undefined;
+    if (s !== undefined) return isAvatarHash(s) ? s : undefined;
+  }
+  return undefined;
 }

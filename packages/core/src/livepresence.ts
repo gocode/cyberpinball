@@ -8,7 +8,9 @@
 // relayé de nouveau, ce qui arrête la diffusion.
 //
 // La table en cours reste entre amis (friendpresence.ts, message « presence ») : elle n'est jamais ici.
+// L'empreinte de l'avatar y est jointe (avatar public, 15/11/2026), signée à part (avatar.ts).
 
+import { signAvatarClaim, verifyAvatarClaim } from './avatar';
 import { isPlayerPublicKey, signText, verifyText, type PlayerKey } from './sharing';
 import { normalizeName, type PresenceTable } from './social';
 
@@ -33,6 +35,9 @@ export interface LiveBeacon {
   status: BeaconStatus;
   at: string;
   sig: string;
+  /** Empreinte de son avatar (avatar.ts) et sa signature à part ; absentes : ses initiales. */
+  avatar?: string;
+  asig?: string;
 }
 
 /** Les signaux reçus, par clé de joueur (le plus récent de chacun). */
@@ -41,14 +46,14 @@ export type LiveBoard = Map<string, LiveBeacon>;
 const isIso = (v: unknown): v is string => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
 const isCountry = (v: unknown): v is string => typeof v === 'string' && /^[A-Z]{2}$/.test(v);
 
-function beaconText(b: Omit<LiveBeacon, 'sig'>): string {
+function beaconText(b: Omit<LiveBeacon, 'sig' | 'avatar' | 'asig'>): string {
   return JSON.stringify({ app: 'cyberpinball', kind: 'live', key: b.key, name: b.name, country: b.country ?? null, status: b.status, at: b.at });
 }
 
 /** Mon signal, signé maintenant. */
-export function signBeacon(me: { key: PlayerKey; name: string }, extra: { status: BeaconStatus; country?: string }, now = new Date()): LiveBeacon {
-  const base: Omit<LiveBeacon, 'sig'> = { key: me.key.publicKey, name: me.name, ...(extra.country ? { country: extra.country } : {}), status: extra.status, at: now.toISOString() };
-  return { ...base, sig: signText(beaconText(base), me.key) };
+export function signBeacon(me: { key: PlayerKey; name: string }, extra: { status: BeaconStatus; country?: string; avatar?: string }, now = new Date()): LiveBeacon {
+  const base: Omit<LiveBeacon, 'sig' | 'avatar' | 'asig'> = { key: me.key.publicKey, name: me.name, ...(extra.country ? { country: extra.country } : {}), status: extra.status, at: now.toISOString() };
+  return { ...base, sig: signText(beaconText(base), me.key), ...signAvatarClaim('live', me.key, base.at, extra.avatar) };
 }
 
 /** Signal reçu : forme, fraîcheur et signature vérifiées ; undefined sinon. */
@@ -63,7 +68,8 @@ export function verifyBeacon(raw: unknown, now = new Date()): LiveBeacon | undef
   if (at > now.getTime() + FUTURE_MS || now.getTime() - at > LIVE_FRESH_MS) return undefined;
   const beacon: LiveBeacon = { key: r.key, name, ...(r.country ? { country: r.country as string } : {}), status: r.status, at: r.at, sig: r.sig };
   const { sig, ...base } = beacon;
-  return verifyText(beaconText(base), sig, beacon.key) ? beacon : undefined;
+  // Une empreinte mal signée est laissée, le signal reste : le joueur garde ses initiales.
+  return verifyText(beaconText(base), sig, beacon.key) ? { ...beacon, ...verifyAvatarClaim('live', beacon.key, beacon.at, r) } : undefined;
 }
 
 /**

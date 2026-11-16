@@ -1,0 +1,71 @@
+// Catalogue anglais : DMD réel (packages/core/src/dmd.ts, app/src/hardware-dmd-menu.ts, santé et réglages).
+// Clé : le texte français tel qu'il est passé à t() ou tn().
+export const messages: Record<string, string> = {
+  // dmd.ts
+  'Indiquez le nom ou l’adresse IP du ZeDMD.': 'Enter the name or IP address of the ZeDMD.',
+  'Le nom ou l’adresse seuls, sans « http:// » ni chemin : par exemple {example} ou 192.168.1.50.': 'Just the name or address, without “http://” or a path: for example {example} or 192.168.1.50.',
+  'Lettres, chiffres, points et tirets seulement : par exemple {example} ou 192.168.1.50.': 'Letters, digits, dots and hyphens only: for example {example} or 192.168.1.50.',
+  'Adresse IP impossible : chaque nombre va de 0 à 255.': 'Impossible IP address: each number goes from 0 to 255.',
+  'code {code} du Gestionnaire de périphériques': 'Device Manager code {code}',
+  ' (pilote actuel : {service})': ' (current driver: {service})',
+  'PIN2DMD : Windows ne lui a pas donné de pilote USB générique (WinUSB ou libusbK){why}. VPX ne pourra pas l’ouvrir et le DMD restera noir. Installez ce pilote avec l’outil fourni avec le PIN2DMD ou avec Zadig, puis « Vérifier de nouveau ».':
+    'PIN2DMD: Windows has not given it a generic USB driver (WinUSB or libusbK){why}. VPX will not be able to open it and the DMD will stay dark. Install that driver with the tool that comes with the PIN2DMD or with Zadig, then “Check again”.',
+  'pilote CH340/CH343 de WCH': 'WCH CH340/CH343 driver',
+  'pilote CP210x de Silicon Labs': 'Silicon Labs CP210x driver',
+  'pilote du port série USB': 'USB serial port driver',
+  '{model} : Windows ne lui a pas donné de port COM{why}. VPX ne pourra pas l’ouvrir. Installez le {chip} (souvent proposé par Windows Update), débranchez et rebranchez, puis « Vérifier de nouveau ».':
+    '{model}: Windows has not given it a COM port{why}. VPX will not be able to open it. Install the {chip} (often offered by Windows Update), unplug and plug it back in, then “Check again”.',
+  '{model} reconnu ({usb}), mais éteint : « {model} : non » dans Menu système > Borne > DMD > DMD réel.': '{model} recognized ({usb}), but turned off: “{model}: no” in System menu > Cabinet > DMD > Real DMD.',
+  "{model} : {usb} est un convertisseur USB-série courant. Si ce n'est pas un {model} (carte Arduino, contrôleur de boutons…), DMDUtil lui enverra quand même sa demande de connexion : choisissez « {model} : non » dans Menu système > Borne > DMD > DMD réel.":
+    '{model}: {usb} is a common USB-serial converter. If it is not a {model} (Arduino board, button controller…), DMDUtil will still send it its connection request: choose “{model}: no” in System menu > Cabinet > DMD > Real DMD.',
+  'ZeDMD en wifi ({address})': 'ZeDMD over Wi-Fi ({address})',
+  // health.ts
+  'Ouvrir DMD réel': 'Open Real DMD',
+  'DMD réel prêt : {devices}': 'Real DMD ready: {devices}',
+  'VPX l’alimente pendant les parties (prise en charge en bêta)': 'VPX drives it during games (beta support)',
+  // settings.ts
+  'Elle suit le DMD réel reconnu à son identifiant USB (ZeDMD, PIN2DMD, Pixelcade) et les choix de « DMD réel ».': 'It follows the real DMD recognized by its USB ID (ZeDMD, PIN2DMD, Pixelcade) and the choices in “Real DMD”.',
+  'Elle change quand on branche le DMD, ou dans Menu système > Borne > DMD > DMD réel (automatique, oui, non, ZeDMD en wifi). {keep}': 'It changes when the DMD is plugged in, or in System menu > Cabinet > DMD > Real DMD (automatic, yes, no, ZeDMD over Wi-Fi). {keep}',
+  // Rubrique Borne > DMD (systemmenu.ts, frontend.ts)
+  'Écran du DMD, DMD du menu et sa couleur, DMD réel (ZeDMD, PIN2DMD, Pixelcade)': 'DMD screen, menu DMD and its colour, real DMD (ZeDMD, PIN2DMD, Pixelcade)',
+  'DMD du menu': 'Menu DMD',
+  'Indisponible : la borne n’a pas d’écran de DMD (assistant d’écrans, étape « Disposition »)': 'Unavailable: the cabinet has no DMD screen (screen wizard, “Disposition” (Layout) step)',
+  // hardware-dmd-menu.ts
+  'Toujours allumé, même s’il n’est pas reconnu : DMDUtil le cherche au début de chaque partie (Start : non)': 'Always on, even when not recognized: DMDUtil looks for it at the start of each game (Start: no)',
+  'Jamais allumé : DMDUtil ne lui envoie rien, même branché (Start : automatique)': 'Never on: DMDUtil sends it nothing, even when plugged in (Start: automatic)',
+  'Reconnu ({names}) : allumé pendant les parties (Start : oui)': 'Recognized ({names}): on during games (Start: yes)',
+  'Allumé dès qu’un {model} est reconnu à son identifiant USB (Start : oui)': 'On as soon as a {model} is recognized by its USB ID (Start: yes)',
+  'Borne à configurer': 'Cabinet to set up',
+  'Les choix du DMD réel sont gardés avec la configuration de la borne : faites d’abord l’assistant d’écrans (Menu système > Borne > Configuration de la borne).':
+    'The real DMD choices are kept with the cabinet configuration: run the screen wizard first (System menu > Cabinet > Cabinet setup).',
+  '{width} × {height} points': '{width} × {height} dots',
+  'éteint par « {model} : non »': 'turned off by “{model}: no”',
+  'pilote à installer': 'driver to install',
+  'pilote prêt': 'driver ready',
+  'ZeDMD en wifi': 'ZeDMD over Wi-Fi',
+  '{address} · VPX s’y connecte au début de chaque partie': '{address} · VPX connects to it at the start of each game',
+  'Aucun DMD réel branché en USB': 'No real DMD plugged in over USB',
+  'ZeDMD, PIN2DMD, Pixelcade : branchez-le, puis « Vérifier de nouveau ».': 'ZeDMD, PIN2DMD, Pixelcade: plug it in, then “Check again”.',
+  Reconnus: 'Recognized',
+  '{usb} est une puce USB-série courante : si ce n’est pas un {model} (carte Arduino, contrôleur de boutons…), choisissez « {model} : non ».':
+    '{usb} is a common USB-serial chip: if it is not a {model} (Arduino board, button controller…), choose “{model}: no”.',
+  '{model} : {choice}': '{model}: {choice}',
+  'Indisponible : configurez d’abord la borne (assistant d’écrans)': 'Unavailable: set up the cabinet first (screen wizard)',
+  '{model} : {choice}. Appliqué au lancement de la prochaine partie.': '{model}: {choice}. Applied when the next game starts.',
+  'ZeDMD en wifi : {address}': 'ZeDMD over Wi-Fi: {address}',
+  'ZeDMD en wifi : non': 'ZeDMD over Wi-Fi: no',
+  'VPX s’y connecte au début de chaque partie (Start : changer l’adresse, ou la vider pour couper)': 'VPX connects to it at the start of each game (Start: change the address, or clear it to turn off)',
+  'Un ZeDMD relié par le réseau, que l’USB ne voit pas (Start : indiquer son adresse)': 'A ZeDMD connected over the network, which USB cannot see (Start: enter its address)',
+  'Relit les périphériques USB et leurs pilotes': 'Reads the USB devices and their drivers again',
+  'Un afficheur à LED branché à la borne (ZeDMD, PIN2DMD, Pixelcade). VPX l’allume pendant les parties ; dans le menu, le DMD reste sur l’écran de la borne. Bêta : à confirmer sur les bornes équipées.':
+    'An LED display connected to the cabinet (ZeDMD, PIN2DMD, Pixelcade). VPX lights it during games; in the menu, the DMD stays on the cabinet screen. Beta: to be confirmed on equipped cabinets.',
+  'Nom ou adresse IP du ZeDMD': 'Name or IP address of the ZeDMD',
+  'ZeDMD en wifi coupé. Appliqué au lancement de la prochaine partie.': 'ZeDMD over Wi-Fi turned off. Applied when the next game starts.',
+  'Adresse refusée': 'Address refused',
+  'ZeDMD en wifi : {address}. Appliqué au lancement de la prochaine partie.': 'ZeDMD over Wi-Fi: {address}. Applied when the next game starts.',
+  'Le ZeDMD et la borne sur le même réseau local. Sans réglage, le ZeDMD s’annonce sous le nom {name}. Laissez vide pour couper le wifi.':
+    'The ZeDMD and the cabinet on the same local network. Without any setting, the ZeDMD announces itself as {name}. Leave empty to turn Wi-Fi off.',
+  'ZeDMD, PIN2DMD, Pixelcade : aucun reconnu': 'ZeDMD, PIN2DMD, Pixelcade: none recognized',
+  '{n} pilote à installer': '{n} driver to install',
+  '{n} pilotes à installer': '{n} drivers to install',
+};

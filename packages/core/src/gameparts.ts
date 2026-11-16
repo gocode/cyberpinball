@@ -5,7 +5,7 @@
 // (acquisition.ts, NeedKind), plus les réglages propres de la table (.ini), que VPS ne liste pas.
 
 import { liveLinks, NEED_LABELS, partFiles, tableSourceOf, type NeedKind } from './acquisition';
-import { t } from './i18n';
+import { registerTextRef, t } from './i18n';
 import { deepSearchGames, type GameLead, type TableEvidence } from './mediasearch';
 import { hitGameName, siteQuery, siteSearchText, type MediaSiteId, type SiteHit } from './mediasites';
 import type { TableContents, TableFileEntry } from './tablecontents';
@@ -19,6 +19,9 @@ export type GamePart = NeedKind | 'ini';
 export const GAME_PARTS: readonly GamePart[] = ['table', 'b2s', 'rom', 'pup', 'altcolor', 'altsound', 'music', 'pov', 'ini', 'media'];
 
 /** « PuP-Pack », « Réglages propres (.ini) » */
+// Nom d'une partie du jeu dans un texte enregistré ({ ref: 'part', id: 'ini' }), dit à l'affichage.
+registerTextRef('part', (id) => partLabel(id as GamePart));
+
 export function partLabel(part: GamePart): string {
   return part === 'ini' ? t('Réglages propres (.ini)') : NEED_LABELS[part];
 }

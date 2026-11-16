@@ -203,7 +203,7 @@ Au premier lancement, Cyber Pinball installe VPX pendant qu'il vous guide pour r
 
 Depuis la borne : **menu système > « Cyber Pinball » > « Mise à jour de Cyber Pinball »**. Rien ne s'installe sans votre accord. Cyber Pinball vérifie discrètement s'il existe une nouvelle version peu après le démarrage, puis toutes les 6 heures. S'il en trouve une, une pastille rouge apparaît sur la roue dentée du menu et sur cette entrée. Vous y lisez les nouveautés de chaque version manquée, et « Mettre à jour maintenant » l'installe en un seul geste. Quand seule l'application a changé, un paquet léger s'installe en quelques secondes ; sinon Cyber Pinball se ferme le temps de l'installation (environ une minute), redémarre tout seul et indique la version installée. Si l'installation échoue, la version précédente est rétablie.
 
-Chaque version publiée s'accompagne d'un flux signé (`cyberpinball-maj.json`, Ed25519). L'installeur n'est téléchargé que si la signature correspond à la clé fournie avec l'application, et il n'est exécuté que si sa taille et son SHA-256 sont les bons. Les préversions (`0.2.0-essai.1`) ne sont proposées qu'aux bornes réglées sur « Préversions : reçues ».
+Chaque version publiée s'accompagne d'un flux signé (`cyberpinball-maj.json`, Ed25519). L'installeur n'est téléchargé que si la signature correspond à la clé fournie avec l'application, et il n'est exécuté que si sa taille et son SHA-256 sont les bons. Les préversions (`0.2.0-essai.1`) ne sont proposées qu'aux bornes réglées sur « Versions reçues : préversions ».
 
 ## Commandes
 

@@ -27,6 +27,8 @@ import {
   type Cabinet,
   type LegacyOrientation,
   type ObservedDisplay,
+  say,
+  type LaterText,
   type OrientationReport,
   type Rotation,
 } from '@cyberpinball/core';
@@ -51,10 +53,10 @@ export const orientation = new SessionOrientation({
 });
 
 /** Constats à montrer au prochain écran du menu (bandeau) : ce qui n'a pas pu être rendu ou tourné. */
-let pending: string[] = [];
+let pending: LaterText[] = [];
 
 function log(what: string, report: OrientationReport): void {
-  for (const turn of report.turned) console.log(`Orientation : ${what}, ${turn.label} ${turn.from}° → ${turn.to}°${simulated ? ' (simulée)' : ''}.`); // i18n-ignore : journal
+  for (const turn of report.turned) console.log(`Orientation : ${what}, ${say(turn.label)} ${turn.from}° → ${turn.to}°${simulated ? ' (simulée)' : ''}.`); // i18n-ignore : journal
   for (const problem of report.problems) console.warn(`Orientation : ${problem}`); // i18n-ignore : journal
 }
 
@@ -77,7 +79,7 @@ export async function startOrientation(): Promise<void> {
 }
 
 /** Ce que le démarrage ou une vérification n'a pas pu faire, une fois. */
-export function takeOrientationProblems(): string[] {
+export function takeOrientationProblems(): LaterText[] {
   const out = pending;
   pending = [];
   return out;

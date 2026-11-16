@@ -30,6 +30,7 @@ import {
   readJsonFile,
   shortPath,
   t,
+  type LaterText,
   tn,
   toggleSelection,
   type DownloadEntry,
@@ -46,7 +47,8 @@ export interface PickRequest {
   title: string;
   icon?: IconName;
   /** À quoi servira le fichier, noté dans le journal des téléchargements : « Ajout d’une table ». */
-  purpose: string;
+  /** Pour quoi le fichier est choisi : noté dans le journal des téléchargements, traduit à l'affichage. */
+  purpose: LaterText;
   /** Ce qu'on attend ; absent : tous les fichiers. */
   filter?: PickFilter;
   /** Un fichier, plusieurs, un dossier, ou des fichiers et un dossier entier (ajout d'une table). */

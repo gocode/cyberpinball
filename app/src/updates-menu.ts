@@ -12,27 +12,32 @@
 // puis le relance : au démarrage suivant, le menu dit si la nouvelle version est là.
 // Mise à jour légère (même socle : Electron et l'exécutable inchangés) : le paquet de
 // l'application est téléchargé, vérifié et déplié à côté, puis maj-legere.ts le met en place
-// une fois Cyber Pinball fermé et le relance. Les préversions se règlent ici aussi.
+// une fois Cyber Pinball fermé et le relance. La source se règle ici aussi (« Versions reçues ») :
+// versions finales, préversions, ou essais d'un canal privé quand ce poste en a un (update.ts).
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   type DownloadManager,
+  channelFetch,
   checkForUpdate,
   downloadAppPackage,
   downloadUpdate,
   formatDate,
   formatMebibytes,
   installedSocle,
+  effectiveUpdateSource,
   layoutOf,
-  loadPrereleaseSetting,
+  loadPrivateChannel,
+  loadUpdateSource,
   recordPendingUpdate,
   relaunchArguments,
   removePreviousApp,
-  savePrereleaseSetting,
+  saveUpdateSource,
   stagedAppDir,
   t,
+  tLater,
   takeUpdateOutcome,
   unpackAppPackage,
   updateDownloadsDir,
@@ -43,6 +48,7 @@ import {
   type Locations,
   type UpdateManifest,
   type UpdatePlan,
+  type UpdateSource,
 } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
 import { stopRelaunchWatcher } from './start-relaunch';
@@ -124,13 +130,23 @@ export function createUpdatesMenu(host: UpdatesHost) {
   /** Socle de l'application qui tourne, s'il peut recevoir la mise à jour légère. */
   const socle = () => (swappable() ? installedSocle(host.appDir) : undefined);
 
-  const prereleases = () => loadPrereleaseSetting(host.loc.dataDir);
+  /** Canal d'essai privé de ce poste (canal-essai.json), relu à chaque fois : posé ou retiré sans redémarrer. */
+  const channel = () => loadPrivateChannel();
+  /** Source suivie : « essais » sans canal sur ce poste revient aux préversions publiques. */
+  const source = (): UpdateSource => effectiveUpdateSource(loadUpdateSource(host.loc.dataDir), channel());
+  /** Options de recherche de la source suivie. */
+  const sourceOptions = () => {
+    const s = source();
+    return { prereleases: s !== 'finales', ...(s === 'essais' && { channel: channel() }) };
+  };
   const plan = (latest: UpdateManifest): UpdatePlan => updatePlan(latest, host.version, socle());
 
-  /** Préversions reçues ou non : le choix est gardé, puis une recherche repart. */
-  function togglePrereleases(): void {
+  const sourceName = (s: UpdateSource) => ({ finales: t('versions finales'), preversions: t('préversions'), essais: t('essais privés') })[s];
+
+  /** La source choisie est gardée, puis une recherche repart. */
+  function chooseSource(chosen: UpdateSource): void {
     try {
-      savePrereleaseSetting(host.loc.dataDir, !prereleases());
+      saveUpdateSource(host.loc.dataDir, chosen);
     } catch (error) {
       state = { kind: 'error', message: (error as Error).message };
       return show();
@@ -138,10 +154,46 @@ export function createUpdatesMenu(host: UpdatesHost) {
     void check();
   }
 
-  const prereleaseAction = (): Action =>
-    prereleases()
-      ? { label: t('Préversions : reçues'), detail: t('Les versions d’essai sont proposées aussi ; choisir pour ne plus les recevoir'), icon: 'flask', run: togglePrereleases }
-      : { label: t('Préversions : non reçues'), detail: t('Choisir pour recevoir aussi les versions d’essai (0.2.0-essai.1…)'), icon: 'flask', run: togglePrereleases };
+  /** Écran « Versions reçues » : les sources, le curseur sur celle suivie. */
+  function openSources(): void {
+    const build = (): Built => {
+      const current = source();
+      const c = channel();
+      const choices: { source: UpdateSource; label: string; detail: string; icon: Action['icon'] }[] = [
+        { source: 'finales', label: t('Versions finales'), detail: t('Seulement les versions publiées pour tous'), icon: 'medal' },
+        { source: 'preversions', label: t('Préversions'), detail: t('Les versions d’essai publiques aussi (0.2.0-essai.1…)'), icon: 'flask' },
+        ...(c ? [{ source: 'essais' as const, label: t('Essais privés'), detail: t('Les versions d’essai du canal privé {repository} aussi, et les préversions', { repository: c.repository }), icon: 'lock' as const }] : []),
+      ];
+      const lost = loadUpdateSource(host.loc.dataDir) === 'essais' && !c;
+      return {
+        icon: 'upgrade',
+        heading: t('Versions reçues'),
+        subheading: t('Version installée : {version}', { version: host.version }),
+        lead: t('Une borne ne revient jamais à une version plus ancienne : en changeant de source, elle garde la sienne jusqu’à ce que la source choisie en publie une plus récente.'),
+        sections: lost ? [{ rows: [{ text: t('Canal d’essai privé introuvable sur ce poste'), detail: t('Fichier {file} absent ou incomplet : les préversions publiques sont suivies', { file: 'canal-essai.json' }), tone: 'warning' }] }] : [],
+        actions: [
+          ...choices.map((choice): Action => ({
+            label: choice.label,
+            detail: choice.source === current ? t('Choix actuel · {detail}', { detail: choice.detail }) : choice.detail,
+            ...(choice.source === current && { tone: 'ok' as const }),
+            icon: choice.icon,
+            run: () => chooseSource(choice.source),
+          })),
+          { label: t('Retour'), icon: 'back', run: () => show() },
+        ],
+        back: () => show(),
+      };
+    };
+    const at = Math.max(0, (['finales', 'preversions', 'essais'] as UpdateSource[]).indexOf(source()));
+    host.library.openCustom(build, at);
+  }
+
+  const sourceAction = (): Action => ({
+    label: t('Versions reçues : {source}', { source: sourceName(source()) }),
+    detail: t('Choisir entre versions finales, préversions{essais}', { essais: channel() ? t(' et essais privés') : '' }),
+    icon: 'flask',
+    run: openSources,
+  });
 
   const systemItem: ProvidedSystemItem = {
     /** Pastille rouge : une version plus récente attend l'utilisateur, ou la dernière mise à jour n'a pas abouti. */
@@ -149,7 +201,13 @@ export function createUpdatesMenu(host: UpdatesHost) {
       return state.kind === 'available' || failed !== undefined;
     },
     get detail() {
-      const installed = prereleases() ? t('Version {version} installée, préversions reçues', { version: host.version }) : t('Version {version} installée', { version: host.version });
+      const s = source();
+      const installed =
+        s === 'essais'
+          ? t('Version {version} installée, essais privés reçus', { version: host.version })
+          : s === 'preversions'
+            ? t('Version {version} installée, préversions reçues', { version: host.version })
+            : t('Version {version} installée', { version: host.version });
       if (state.kind === 'available' || state.kind === 'downloading') return t('{installed} · {version} disponible', { installed, version: state.latest.version });
       if (failed) return t('{installed} · la mise à jour vers {to} n’a pas abouti', { installed, to: failed.to });
       if (state.kind === 'up-to-date') return t('{installed}, la dernière', { installed });
@@ -185,7 +243,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
   async function checkQuietly(): Promise<boolean> {
     if (!quietAllowed()) return true;
     try {
-      const result = await checkForUpdate({ current: host.version, prereleases: prereleases() });
+      const result = await checkForUpdate({ current: host.version, ...sourceOptions() });
       // L'utilisateur a pu lancer une opération entre-temps : son état prime.
       if (!quietAllowed()) return true;
       state = result.status === 'available' ? { kind: 'available', latest: result.latest } : { kind: 'up-to-date', latest: result.latest };
@@ -214,7 +272,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
     state = { kind: 'checking' };
     show();
     try {
-      const result = await checkForUpdate({ current: host.version, prereleases: prereleases() });
+      const result = await checkForUpdate({ current: host.version, ...sourceOptions() });
       state = result.status === 'available' ? { kind: 'available', latest: result.latest } : { kind: 'up-to-date', latest: result.latest };
       checkedAt = Date.now();
     } catch (error) {
@@ -237,14 +295,16 @@ export function createUpdatesMenu(host: UpdatesHost) {
     const job = host.downloads?.track({
       id: `maj-${latest.version}`,
       kind: 'update',
-      title: t('Cyber Pinball {version}', { version: latest.version }),
+      title: tLater('Cyber Pinball {version}', { version: latest.version }),
       source: { kind: 'http', label: 'github.com' },
-      files: [{ ref: how.asset.url, name: path.basename(new URL(how.asset.url).pathname), bytes: how.asset.size, part: path.join(dir, `${path.basename(new URL(how.asset.url).pathname)}.part`) }],
+      files: [{ ref: how.asset.url, name: how.asset.name, bytes: how.asset.size, part: path.join(dir, `${how.asset.name}.part`) }],
       back: { screen: 'updates' },
       resumable: true,
     });
     const progress = {
       signal: abort.signal,
+      // Fichier d'un canal d'essai privé : lu avec son jeton ; toute autre adresse, telle quelle.
+      fetch: channelFetch(channel()),
       onProgress: (received: number, total: number) => {
         job?.progress(received, total);
         if (state.kind !== 'downloading') return;
@@ -423,7 +483,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
               rows: [{ text: t('Cyber Pinball est à jour'), detail: t('Dernière version publiée : {version}, le {date}', { version: state.latest.version, date: date(state.latest.date) }), tone: 'ok' }],
             },
           ],
-          actions: [{ label: t('Rechercher à nouveau'), icon: 'refresh', run: () => void check() }, prereleaseAction(), retour],
+          actions: [{ label: t('Rechercher à nouveau'), icon: 'refresh', run: () => void check() }, sourceAction(), retour],
           back,
         };
       case 'available': {
@@ -455,7 +515,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
             tone: 'warning',
           });
         }
-        actions.push(prereleaseAction(), { label: t('Plus tard'), icon: 'back', run: back });
+        actions.push(sourceAction(), { label: t('Plus tard'), icon: 'back', run: back });
         return {
           heading: t('Cyber Pinball {version} est disponible', { version: latest.version }),
           subheading: t('{subheading} · publiée le {date}', { subheading, date: date(latest.date) }),
@@ -500,7 +560,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
             state.latest
               ? { label: t('Réessayer le téléchargement'), icon: 'download', run: () => void download((state as { latest: UpdateManifest }).latest) }
               : { label: t('Réessayer'), icon: 'refresh', run: () => void check() },
-            prereleaseAction(),
+            sourceAction(),
             retour,
           ],
           back,

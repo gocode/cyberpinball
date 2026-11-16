@@ -24,7 +24,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import { fingerprintOf } from './fingerprint';
-import { t } from './i18n';
+import { readStoredText, say, tLater, type LaterText, type StoredText } from './i18n';
 import { edgeAfterRotation, rotatedDisplay, rotationDelta } from './layout';
 import type { Cabinet, ObservedDisplay, Rotation } from './model';
 import { vpxOrientationFix } from './vpx';
@@ -38,7 +38,8 @@ export interface SessionScreen {
   gdiName: string;
   /** Empreinte (fingerprintOf) : elle, ne change pas. */
   fingerprint: string;
-  label: string;
+  /** Nom montré : le nom GDI, ou « écran du playfield (…) », traduit à l'affichage (say). */
+  label: StoredText;
   rotation: Rotation;
 }
 
@@ -46,7 +47,7 @@ export interface SessionScreen {
 export interface RecordedOrientation {
   fingerprint: string;
   gdiName: string;
-  label: string;
+  label: StoredText;
   /** Orientation que Windows avait avant Cyber Pinball : celle du bureau, rendue à la sortie. */
   origin: Rotation;
   /** Orientation que Cyber Pinball lui a donnée. */
@@ -57,8 +58,8 @@ export interface RecordedOrientation {
 export interface OrientationRecordFile {
   version: 1;
   screens: RecordedOrientation[];
-  /** Ce que la dernière sortie n'a pas pu rendre : dit au démarrage suivant. */
-  problems?: string[];
+  /** Ce que la dernière sortie n'a pas pu rendre : dit au démarrage suivant, dans la langue du moment. */
+  problems?: StoredText[];
 }
 
 export interface WantedOrientation {
@@ -67,15 +68,15 @@ export interface WantedOrientation {
 }
 
 export interface OrientationTurn {
-  label: string;
+  label: StoredText;
   from: Rotation;
   to: Rotation;
 }
 
 export interface OrientationReport {
   turned: OrientationTurn[];
-  /** Ce qui n'a pas pu se faire, expliqué : à afficher (bandeau) ou à noter (journal). */
-  problems: string[];
+  /** Ce qui n'a pas pu se faire, expliqué : à afficher (bandeau, say) ou à noter (journal). */
+  problems: LaterText[];
 }
 
 export interface SessionOrientationOptions {
@@ -111,13 +112,14 @@ function readOrientationFile(file: string): OrientationRecordFile {
   } catch {
     return { version: 1, screens: [] };
   }
-  const problems = Array.isArray(raw?.problems) ? raw.problems.filter((p): p is string => typeof p === 'string') : [];
+  // Un ancien fichier tient les textes déjà traduits : reconnus pour être redits dans la langue du moment.
+  const problems = Array.isArray(raw?.problems) ? raw.problems.map(readStoredText).filter((p): p is StoredText => p !== undefined) : [];
   const screens = raw?.screens;
   if (!Array.isArray(screens)) return { version: 1, screens: [], problems };
   return { version: 1, problems, screens: screens.filter(
     (s): s is RecordedOrientation =>
       typeof s?.fingerprint === 'string' && typeof s.gdiName === 'string' && isRotation(s.origin) && isRotation(s.applied),
-  ).map((s) => ({ ...s, label: typeof s.label === 'string' ? s.label : s.gdiName, since: typeof s.since === 'string' ? s.since : '' })) };
+  ).map((s) => ({ ...s, label: readStoredText(s.label) ?? s.gdiName, since: typeof s.since === 'string' ? s.since : '' })) };
 }
 
 /** Écrans de Windows vus par la session : leur empreinte, et le rôle comme nom quand il est connu. */
@@ -125,7 +127,7 @@ export function sessionScreens(displays: ObservedDisplay[], cabinet?: Cabinet): 
   return displays.map((d) => {
     const fingerprint = fingerprintOf(d).key;
     const playfield = cabinet?.roles.playfield === fingerprint;
-    return { gdiName: d.gdiName, fingerprint, label: playfield ? t('écran du playfield ({name})', { name: d.gdiName }) : d.gdiName, rotation: d.rotation };
+    return { gdiName: d.gdiName, fingerprint, label: playfield ? tLater('écran du playfield ({name})', { name: d.gdiName }) : d.gdiName, rotation: d.rotation };
   });
 }
 
@@ -169,7 +171,7 @@ export class SessionOrientation {
    */
   start(wanted: WantedOrientation[]): OrientationReport {
     const previous = readOrientationFile(this.options.file);
-    const report: OrientationReport = { turned: [], problems: (previous.problems ?? []).map((problem) => t('À la dernière fermeture de Cyber Pinball : {problem}', { problem })) };
+    const report: OrientationReport = { turned: [], problems: (previous.problems ?? []).map((problem) => tLater('À la dernière fermeture de Cyber Pinball : {problem}', { problem })) };
     this.records = [];
     for (const r of previous.screens) {
       const screen = this.find(r);
@@ -217,7 +219,7 @@ export class SessionOrientation {
     const report: OrientationReport = { turned: [], problems: [] };
     const screen = this.screen(fingerprint);
     if (!screen) {
-      report.problems.push(t('Écran introuvable : son orientation n’a pas été rendue à Windows.'));
+      report.problems.push(tLater('Écran introuvable : son orientation n’a pas été rendue à Windows.'));
       return report;
     }
     const playing = this.wanted.get(fingerprint) ?? screen.rotation;
@@ -225,7 +227,7 @@ export class SessionOrientation {
       this.options.rotate(screen.gdiName, origin, true);
       report.turned.push({ label: screen.label, from: screen.rotation, to: origin });
     } catch (error) {
-      report.problems.push(t('Windows n’a pas repris l’orientation {origin}° pour {label} : {reason}', { origin, label: screen.label, reason: (error as Error).message }));
+      report.problems.push(tLater('Windows n’a pas repris l’orientation {origin}° pour {label} : {reason}', { origin, label: screen.label, reason: (error as Error).message }));
       return report;
     }
     this.records = this.records.filter((r) => r.fingerprint !== fingerprint);
@@ -290,7 +292,7 @@ export class SessionOrientation {
     for (const r of [...this.records]) {
       const screen = this.find(r);
       if (!screen) {
-        report.problems.push(t('{label} est débranché : il reprendra son orientation d’origine ({origin}°) au prochain démarrage de Cyber Pinball.', { label: r.label, origin: r.origin }));
+        report.problems.push(tLater('{label} est débranché : il reprendra son orientation d’origine ({origin}°) au prochain démarrage de Cyber Pinball.', { label: r.label, origin: r.origin }));
         continue;
       }
       if (screen.rotation !== r.origin) {
@@ -299,7 +301,7 @@ export class SessionOrientation {
           report.turned.push({ label: r.label, from: screen.rotation, to: r.origin });
         } catch (error) {
           report.problems.push(
-            t('{label} n’a pas repris son orientation d’origine ({origin}°) : {reason} Paramètres > Affichage > Orientation de l’écran la rétablit.', {
+            tLater('{label} n’a pas repris son orientation d’origine ({origin}°) : {reason} Paramètres > Affichage > Orientation de l’écran la rétablit.', {
               label: r.label,
               origin: r.origin,
               reason: (error as Error).message,
@@ -345,12 +347,12 @@ export class SessionOrientation {
       report.turned.push({ label: screen.label, from: screen.rotation, to: rotation });
     } catch (error) {
       if (recorded) recorded.applied = screen.rotation;
-      report.problems.push(t('Windows n’a pas tourné {label} à {rotation}° : {reason}', { label: screen.label, rotation, reason: (error as Error).message }));
+      report.problems.push(tLater('Windows n’a pas tourné {label} à {rotation}° : {reason}', { label: screen.label, rotation, reason: (error as Error).message }));
     }
   }
 
   /** Fichier à jour : seulement les écrans encore tournés ; aucun, plus de fichier. */
-  private save(problems: string[] = []): void {
+  private save(problems: LaterText[] = []): void {
     this.records = this.records.filter((r) => r.applied !== r.origin || this.wanted.has(r.fingerprint));
     const turned = this.records.filter((r) => r.applied !== r.origin);
     try {

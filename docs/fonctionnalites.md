@@ -45,7 +45,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 - **Une pastille au menu des tables** : le nombre d'amis en ligne ; un clic ouvre « Mes amis ».
 - **« Mes badges »** : huit badges (Première partie, Dix tables, Cent parties, Une heure sur une table, Dix heures de jeu, Au tableau d'honneur, Grand Champion, Cinq fois champion).
 - **Un nom à soi** : de 2 à 24 caractères, affiché seul, avec l'avatar. Deux joueurs du même nom se départagent par l'identifiant unique de leur fiche. Au premier démarrage, juste après l'assistant d'écrans, Cyber Pinball propose de choisir son pseudo et son avatar ; rien d'obligatoire, tout se change ensuite.
-- **« Mon avatar »** : une photo ou une image à vous, prise sur le PC ou dans le navigateur intégré, recadrée aux boutons de la borne (zoom, déplacer, recentrer) ou à la souris. Une photo y perd ses métadonnées, position GPS comprise. Sans avatar, vos initiales sur une teinte qui vous est propre. Seuls vos amis et les joueurs d'une demande en cours le reçoivent, et les joueurs qui voient vos scores dans les classements.
+- **« Mon avatar »** : une photo ou une image à vous, prise sur le PC ou dans le navigateur intégré, recadrée aux boutons de la borne (zoom, déplacer, recentrer) ou à la souris. Une photo y perd ses métadonnées, position GPS comprise. Sans avatar, vos initiales sur une teinte qui vous est propre. Tous les joueurs le voient, amis ou non, partout où vous apparaissez : Joueurs en ligne, salons, classements, profil public, demandes d'ami.
 
 <p align="center"><img src="images/fr/friends.webp?v=8306cc0c9e" width="760" alt="Mes amis : Bruno en ligne, en partie sur Star Courier avec son nouveau record, et Émile hors ligne ; à côté, la fiche de Bruno avec ses derniers événements et « Voir sa bibliothèque »."></p>
 
@@ -165,7 +165,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 - **Signée** : la borne ne lit qu'un flux signé (Ed25519) par la clé de publication, et ne lance l'installeur que si sa taille et son SHA-256 correspondent.
 - **Mises à jour légères** : quand seule l'application change, un paquet d'environ 1,5 Mio s'installe en quelques secondes, sans installeur.
 - **Retour en arrière** : l'ancienne version est mise de côté pendant l'installation et remise si elle échoue. Au démarrage suivant, un bandeau dit quelle version est installée.
-- **Préversions** à recevoir ou non (« Préversions : non reçues / reçues »).
+- **Versions reçues** : versions finales (par défaut) ou préversions aussi ; pour qui maintient Cyber Pinball, les essais d'un canal privé, que seules ses bornes voient.
 
 <p align="center"><img src="images/fr/update.webp?v=678c1b367b" width="360" alt="Une mise à jour disponible : Cyber Pinball 0.2.0, sa date, ses nouveautés, la taille de l'installeur signé, et les boutons Mettre à jour maintenant et Plus tard."></p>
 

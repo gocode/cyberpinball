@@ -861,8 +861,8 @@ function afterColon(text: string): string {
 function ownedOrigin(def: VpxSettingDef): { why: string; how: string; wizard?: WizardKind } {
   if (def.section === 'Plugin.DMDUtil') {
     return {
-      why: t('Elle suit le DMD réel reconnu à son identifiant USB (ZeDMD, PIN2DMD, Pixelcade).'),
-      how: t('Elle change quand on branche le DMD. {keep}', { keep: keepYours() }),
+      why: t('Elle suit le DMD réel reconnu à son identifiant USB (ZeDMD, PIN2DMD, Pixelcade) et les choix de « DMD réel ».'),
+      how: t('Elle change quand on branche le DMD, ou dans Menu système > Borne > DMD > DMD réel (automatique, oui, non, ZeDMD en wifi). {keep}', { keep: keepYours() }),
     };
   }
   if (def.section === 'Plugin.DOF') {

@@ -51,6 +51,14 @@ export interface FileScan {
   dynamic: TextProblem[];
 }
 
+/** Fonctions qui traduisent, et la place de leurs clés : t et tn à l'écran, tLater et tnLater pour ce qui est enregistré (i18n.ts). */
+const TRANSLATING = new Map<string, number[]>([
+  ['t', [0]],
+  ['tn', [1, 2]],
+  ['tLater', [0]],
+  ['tnLater', [1, 2]],
+]);
+
 const ACCENTED = /[àâäçéèêëîïôöûùüÿœæÀÂÄÇÉÈÊËÎÏÔÖÛÙÜŸŒÆ«»’]/;
 // Mots qui trahissent une phrase française (sans accent, pour ceux qui n'en ont pas).
 const FRENCH_WORDS = new Set(
@@ -142,15 +150,15 @@ export function scanCode(file: string, src: string): FileScan {
       const arg = currentArg(frame);
       if (!arg.literal && !arg.other) arg.literal = lit;
       else arg.other = true;
-      if (frame.callee === 't' || frame.callee === 'tn') return; // relevé à la fermeture de l'appel
+      if (frame.callee !== undefined && TRANSLATING.has(frame.callee)) return; // relevé à la fermeture de l'appel
     }
     if (ignoreFile || ignored.has(lit.line) || inConsole()) return;
     if (looksFrench(lit.value)) result.hardcoded.push({ file, line: lit.line, text: lit.value });
   };
   const closeCall = (frame: Frame) => {
-    if (frame.callee !== 't' && frame.callee !== 'tn') return;
+    if (frame.callee === undefined || !TRANSLATING.has(frame.callee)) return;
     const args = frame.args ?? [];
-    const wanted = frame.callee === 't' ? [0] : [1, 2];
+    const wanted = TRANSLATING.get(frame.callee)!;
     for (const index of wanted) {
       const arg = args[index];
       if (!arg?.literal || arg.other || arg.literal.hasExpr) {

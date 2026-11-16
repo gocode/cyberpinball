@@ -151,7 +151,7 @@ $Actions = [ordered]@{
     Run   = {
       $file = Join-Path $env:USERPROFILE '.cyberpinball\jeton-github.txt'
       Write-Host 'Jeton à grain fin, créé sur https://github.com/settings/personal-access-tokens/new :'
-      Write-Host '  dépôt gocode/cyberpinball seulement ; Contents et Administration en lecture et écriture.'
+      Write-Host '  dépôt gocode/cyberpinball (et le dépôt privé du canal d''essai, s''il y en a un) ; Contents et Administration en lecture et écriture.'
       $secure = Read-Host 'Collez le jeton (il ne s''affiche pas)' -AsSecureString
       $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)).Trim()
       if ($token -notmatch '^(github_pat_|ghp_)') { throw 'Ce n''est pas un jeton GitHub (il commence par github_pat_) : rien n''est rangé.' }
@@ -201,7 +201,27 @@ $Actions = [ordered]@{
       $version = (Get-Content (Join-Path $PSScriptRoot 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version
       Invoke-Checked { git add package.json package-lock.json CHANGELOG.md CHANGELOG.en.md } 'git add'
       Invoke-Checked { git commit -m "Version $version" } "L'enregistrement (git commit)"
-      Step "Préversion $version enregistrée. « publier-rapide » la met en ligne : seules les bornes réglées sur « Préversions : reçues » la voient."
+      Step "Préversion $version enregistrée. « publier-rapide » la met en ligne pour les bornes réglées sur « Préversions » ; « publier-essai » la garde pour les bornes qui ont le canal d'essai privé."
+    }
+  }
+  'publier-essai' = @{
+    Label = 'Publier la préversion dans le dépôt privé du canal d''essai (1 à 2 min) : seules les bornes qui ont ce canal la voient'
+    Run   = { Confirm-Publication; Invoke-Checked { node scripts/publier.mjs --rapide --prive } 'La publication' }
+  }
+  'canal-essai' = @{
+    Label = 'Ranger le dépôt privé du canal d''essai et son jeton de lecture (une fois par poste ou borne)'
+    Run   = {
+      $file = Join-Path $env:USERPROFILE '.cyberpinball\canal-essai.json'
+      $repository = (Read-Host 'Dépôt privé (propriétaire/nom)').Trim()
+      if ($repository -notmatch '^[\w.-]+/[\w.-]+$') { throw 'Ce n''est pas un dépôt (propriétaire/nom) : rien n''est rangé.' }
+      Write-Host 'Jeton à grain fin, créé sur https://github.com/settings/personal-access-tokens/new :'
+      Write-Host "  dépôt $repository seulement ; Contents en lecture seule."
+      $secure = Read-Host 'Collez le jeton (il ne s''affiche pas)' -AsSecureString
+      $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)).Trim()
+      if ($token -notmatch '^(github_pat_|ghp_)') { throw 'Ce n''est pas un jeton GitHub (il commence par github_pat_) : rien n''est rangé.' }
+      New-Item -ItemType Directory -Force (Split-Path $file) | Out-Null
+      [IO.File]::WriteAllText($file, (@{ depot = $repository; jeton = $token } | ConvertTo-Json))
+      Step "Canal d'essai rangé dans $file, hors du dépôt et des données de la borne. Sur la borne : Mise à jour de Cyber Pinball > Versions reçues > Essais privés."
     }
   }
   'publier-brouillon' = @{

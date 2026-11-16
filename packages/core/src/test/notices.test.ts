@@ -17,7 +17,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import type { DownloadJob } from '../downloadqueue';
-import { setLanguage } from '../i18n';
+import { say, setLanguage } from '../i18n';
+import { badgeLabel } from '../badges';
 import {
   NOTICE_DETAIL_MAX,
   NOTICE_GAP_MS,
@@ -222,11 +223,11 @@ test('relevé du réseau : un record frais d’un ami se dit, un vieux renvoyé 
   const s1 = social({ friends: [friend('a', 'Bruno')] });
   const snap1 = socialSnapshot(s1, () => true, () => undefined);
   const s2 = social({ friends: [friend('a', 'Bruno', [badge, fresh, old])] });
-  const got = socialNotices(snap1, socialSnapshot(s2, () => true, () => undefined), s2, now, (id) => `« ${id} »`);
+  const got = socialNotices(snap1, socialSnapshot(s2, () => true, () => undefined), s2, now);
   assert.deepEqual(
-    got.map((e) => [e.kind, e.subject, e.extra]),
+    got.map((e) => [e.kind, e.subject, say(e.extra)]),
     [
-      ['friend-badge', undefined, '« first-game »'],
+      ['friend-badge', undefined, badgeLabel('first-game')],
       ['friend-record', 'Medieval Madness', (84_520_310).toLocaleString('fr-FR')],
     ],
   );

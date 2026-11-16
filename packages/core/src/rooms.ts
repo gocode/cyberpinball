@@ -15,6 +15,7 @@
 import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { signAvatarClaim, verifyAvatarClaim } from './avatar';
 import { writeFileAtomic } from './atomicwrite';
 import { isPlayerPublicKey, signText, verifyText, type PlayerKey } from './sharing';
 import { normalizeName } from './social';
@@ -69,6 +70,9 @@ export interface RoomHere {
   room: RoomId;
   at: string;
   sig: string;
+  /** Empreinte de son avatar (avatar.ts, avatar public) et sa signature à part ; absentes : ses initiales. */
+  avatar?: string;
+  asig?: string;
 }
 
 const isIso = (v: unknown): v is string => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
@@ -87,7 +91,7 @@ function lineText(l: Omit<RoomLine, 'sig'>): string {
   return JSON.stringify({ app: 'cyberpinball', kind: 'room', id: l.id, room: l.room, key: l.key, name: l.name, country: l.country ?? null, text: l.text, me: l.me === true, at: l.at });
 }
 
-function hereText(h: Omit<RoomHere, 'sig'>): string {
+function hereText(h: Omit<RoomHere, 'sig' | 'avatar' | 'asig'>): string {
   return JSON.stringify({ app: 'cyberpinball', kind: 'room-here', key: h.key, name: h.name, country: h.country ?? null, room: h.room, at: h.at });
 }
 
@@ -115,9 +119,9 @@ export function verifyRoomLine(raw: unknown, now = new Date()): RoomLine | undef
   return verifyText(lineText(base), sig, line.key) ? line : undefined;
 }
 
-export function signRoomHere(me: { key: PlayerKey; name: string }, room: RoomId, country: string | undefined, now = new Date()): RoomHere {
-  const base: Omit<RoomHere, 'sig'> = { key: me.key.publicKey, name: me.name, ...(country ? { country } : {}), room, at: now.toISOString() };
-  return { ...base, sig: signText(hereText(base), me.key) };
+export function signRoomHere(me: { key: PlayerKey; name: string }, room: RoomId, country: string | undefined, now = new Date(), avatar?: string): RoomHere {
+  const base: Omit<RoomHere, 'sig' | 'avatar' | 'asig'> = { key: me.key.publicKey, name: me.name, ...(country ? { country } : {}), room, at: now.toISOString() };
+  return { ...base, sig: signText(hereText(base), me.key), ...signAvatarClaim('room-here', me.key, base.at, avatar) };
 }
 
 export function verifyRoomHere(raw: unknown, now = new Date()): RoomHere | undefined {
@@ -130,7 +134,7 @@ export function verifyRoomHere(raw: unknown, now = new Date()): RoomHere | undef
   if (at > now.getTime() + FUTURE_MS || now.getTime() - at > ROOM_HERE_FRESH_MS) return undefined;
   const here: RoomHere = { key: r.key, name, ...(r.country ? { country: r.country as string } : {}), room: r.room, at: r.at, sig: r.sig };
   const { sig, ...base } = here;
-  return verifyText(hereText(base), sig, here.key) ? here : undefined;
+  return verifyText(hereText(base), sig, here.key) ? { ...here, ...verifyAvatarClaim('room-here', here.key, here.at, r) } : undefined;
 }
 
 // ---------------------------------------------------------------------------

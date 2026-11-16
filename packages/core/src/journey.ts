@@ -555,9 +555,14 @@ export function journeyChoices(journey: Journey): { step: JourneyStep; choice: J
   return out;
 }
 
+/** « Étape 3 sur 4 », dans la langue du moment : traduit à l'affichage, jamais enregistré tel quel. */
+export function formatJourneyPosition(step: number, total: number): string {
+  return t('Étape {n} sur {total}', { n: step, total });
+}
+
 /** « Étape 3 sur 4 » : le chemin jusqu'à « Jouer » seulement. */
 export function journeyPosition(journey: Journey): string {
-  return t('Étape {n} sur {total}', { n: journey.current + 1, total: journey.steps.length });
+  return formatJourneyPosition(journey.current + 1, journey.steps.length);
 }
 
 /** « 2 étapes réglées · 1 indispensable à faire », et les améliorations proposées. */
@@ -576,9 +581,41 @@ export interface JourneyRecord {
   steps: JourneyStepId[];
   startedAt: string;
   updatedAt: string;
-  /** Position au dernier passage, pour la reprendre sans recalculer (« étape 3 sur 5 »). */
-  position?: string;
+  /**
+   * Position au dernier passage, pour la reprendre sans recalculer : des nombres seulement,
+   * traduits à l'affichage (recordPosition). Un texte déjà traduit garderait la langue du
+   * moment où il a été écrit (« Resume: Étape 3 sur 4 » après passage à l'anglais).
+   */
+  step?: number;
+  total?: number;
   ready?: boolean;
+}
+
+/** « Étape 3 sur 5 » retenue, dans la langue du moment ; undefined si rien n'est retenu. */
+export function recordPosition(record: JourneyRecord | undefined): string | undefined {
+  return record?.step && record.total ? formatJourneyPosition(record.step, record.total) : undefined;
+}
+
+const positiveInt = (v: unknown): number | undefined => (typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : undefined);
+
+/**
+ * Un parcours lu sur le disque, données neutres seulement. Les anciens fichiers retenaient
+ * la position déjà traduite (« position » : « Étape 3 sur 4 » ou « Step 3 of 4 ») : ses deux
+ * nombres sont repris, le texte est oublié ; le prochain enregistrement l'efface.
+ */
+function readRecord(r: JourneyRecord & { position?: unknown }): JourneyRecord {
+  const { position, ...rest } = r;
+  const record: JourneyRecord = { ...rest, steps: r.steps.filter((s) => JOURNEY_STEPS.includes(s)) };
+  let step = positiveInt(r.step);
+  let total = positiveInt(r.total);
+  if ((!step || !total) && typeof position === 'string') {
+    const m = /(\d+)\D+(\d+)/.exec(position);
+    if (m) [step, total] = [Number(m[1]), Number(m[2])];
+  }
+  delete record.step;
+  delete record.total;
+  if (step && total && step <= total) Object.assign(record, { step, total });
+  return record;
 }
 
 export interface JourneyMemory {
@@ -596,7 +633,7 @@ export function loadJourneys(dataDir: string): JourneyMemory {
     const tables: Record<string, JourneyRecord> = {};
     if (raw.tables && typeof raw.tables === 'object') {
       for (const [file, r] of Object.entries(raw.tables as Record<string, JourneyRecord>)) {
-        if (r && Array.isArray(r.steps) && typeof r.title === 'string') tables[file] = { ...r, steps: r.steps.filter((s) => JOURNEY_STEPS.includes(s)) };
+        if (r && Array.isArray(r.steps) && typeof r.title === 'string') tables[file] = readRecord(r);
       }
     }
     return { tables };
@@ -620,7 +657,7 @@ export function rememberJourney(memory: JourneyMemory, file: string, title: stri
   const key = file.toLowerCase();
   const previous = memory.tables[key];
   const steps = JOURNEY_STEPS.filter((id) => previous?.steps.includes(id) || [...journey.steps, ...journey.extras].some((s) => s.id === id));
-  const record: JourneyRecord = { title, steps, startedAt: previous?.startedAt ?? now.toISOString(), updatedAt: now.toISOString(), position: journeyPosition(journey), ready: journey.ready };
+  const record: JourneyRecord = { title, steps, startedAt: previous?.startedAt ?? now.toISOString(), updatedAt: now.toISOString(), step: journey.current + 1, total: journey.steps.length, ready: journey.ready };
   memory.tables[key] = record;
   return record;
 }

@@ -30,6 +30,7 @@ import {
   tablesFacts,
   tn,
   type DofFacts,
+  type HardwareDmdFacts,
   type VrNetworkFacts,
   type Finding,
   type HealthFacts,
@@ -62,6 +63,8 @@ export interface HealthContext {
   media(pause: () => Promise<void>): Promise<MediaFacts | undefined>;
   /** LED et retours (DOF) : contrôleurs et constats ; undefined sans VPX. */
   dof?(): DofFacts | undefined;
+  /** DMD réels : reconnus, en wifi, et leurs pilotes ; undefined si l'USB est illisible. */
+  hardwareDmd?(): HardwareDmdFacts | undefined;
   /** Le réseau du casque (vr-reseau.ts) : transport de Link et carte réseau du PC ; undefined sans casque. */
   vr?(): VrNetworkFacts | undefined;
   /** Le PC et Windows, d'après le dernier relevé de la fiche technique ; undefined avant le premier. */
@@ -176,10 +179,16 @@ export function createHealth(ctx: HealthContext) {
     } catch (error) {
       console.error(`Santé de la borne, DOF : ${(error as Error).message}`); // i18n-ignore : journal
     }
+    let hardwareDmd: HardwareDmdFacts | undefined;
+    try {
+      hardwareDmd = ctx.hardwareDmd?.();
+    } catch (error) {
+      console.error(`Santé de la borne, DMD réel : ${(error as Error).message}`); // i18n-ignore : journal
+    }
     const vr = ctx.vr?.();
     const remote = ctx.remote?.();
     const pc = ctx.pc?.();
-    return { at: new Date().toISOString(), disks, ...(pc ? { pc } : {}), tables, pup, media, screens, ...(dof ? { dof } : {}), ...(vr ? { vr } : {}), ...(remote ? { remote } : {}), vpx };
+    return { at: new Date().toISOString(), disks, ...(pc ? { pc } : {}), tables, pup, media, screens, ...(hardwareDmd ? { hardwareDmd } : {}), ...(dof ? { dof } : {}), ...(vr ? { vr } : {}), ...(remote ? { remote } : {}), vpx };
   }
 
   /** Relève tout en arrière-plan ; un relevé en cours n'est pas doublé. */

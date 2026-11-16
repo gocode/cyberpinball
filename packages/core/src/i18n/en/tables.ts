@@ -346,7 +346,6 @@ export const messages: Record<string, string> = {
   // packages/core/src/dmd.ts
   'ESP32-S3, USB natif': 'ESP32-S3, native USB',
   'DMD réel : {model} reconnu à son identifiant USB ({usb}). VPX l\'alimente par le plugin DMDUtil.': 'Real DMD: {model} recognized by its USB ID ({usb}). VPX drives it through the DMDUtil plugin.',
-  '{model} : {usb} est un convertisseur USB-série courant. Si ce n\'est pas un {model} (carte Arduino, contrôleur de boutons…), DMDUtil lui enverra quand même sa demande de connexion : passez [Plugin.DMDUtil] {model} à 0 et gardez cette valeur.': '{model}: {usb} is a common USB-serial converter. If it isn’t a {model} (Arduino board, button controller…), DMDUtil will still send it its connection request: set [Plugin.DMDUtil] {model} to 0 and keep that value.',
   // packages/core/src/fileops.ts
   'Go': 'GB',
   'Mo': 'MB',

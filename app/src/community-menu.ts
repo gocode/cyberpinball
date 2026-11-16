@@ -395,7 +395,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
       heading: t('Communauté'),
       icon: 'friends',
       subheading: s.enabled ? countsLine(list) : t('Partage désactivé'),
-      lead: t('Ce que voient les autres joueurs : votre pseudo, votre pays, « En ligne » ou « En partie ». Table en cours, bibliothèque et messages : entre amis seulement.'),
+      lead: t('Ce que voient les autres joueurs : votre pseudo, votre avatar, votre pays, « En ligne » ou « En partie ». Table en cours, bibliothèque et messages : entre amis seulement.'),
       sections: [],
       actions,
       back,

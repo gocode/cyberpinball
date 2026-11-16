@@ -8,8 +8,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import {
+  channelFetch,
   checkForUpdate,
   compareAppVersions,
+  effectiveUpdateSource,
+  loadPrivateChannel,
+  loadUpdateSource,
+  saveUpdateSource,
   downloadAppPackage,
   downloadUpdate,
   installedSocle,
@@ -401,5 +406,126 @@ test('préversions : réglage gardé ; flux de la release la plus récente, pré
   } finally {
     await site.close();
     await api.close();
+  }
+});
+
+test('source des mises à jour : finales par défaut, ancien réglage relu, essais sans canal = préversions', () => {
+  const dir = temp();
+  try {
+    assert.equal(loadUpdateSource(dir), 'finales');
+    // Réglage d'une version précédente : { preversions: true } seul.
+    fs.writeFileSync(path.join(dir, 'preversions.json'), JSON.stringify({ preversions: true }));
+    assert.equal(loadUpdateSource(dir), 'preversions');
+    saveUpdateSource(dir, 'essais');
+    assert.equal(loadUpdateSource(dir), 'essais');
+    // Une version précédente relit « préversions reçues ».
+    assert.equal(loadPrereleaseSetting(dir), true);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'preversions.json'), 'utf8')).preversions, true);
+    saveUpdateSource(dir, 'finales');
+    assert.equal(loadPrereleaseSetting(dir), false);
+    fs.writeFileSync(path.join(dir, 'preversions.json'), JSON.stringify({ preversions: false, source: 'autre' }));
+    assert.equal(loadUpdateSource(dir), 'finales');
+    assert.equal(effectiveUpdateSource('essais', undefined), 'preversions');
+    assert.equal(effectiveUpdateSource('essais', { repository: 'o/essais', token: 'x' }), 'essais');
+    assert.equal(effectiveUpdateSource('finales', { repository: 'o/essais', token: 'x' }), 'finales');
+
+    const file = path.join(dir, 'canal-essai.json');
+    assert.equal(loadPrivateChannel(file), undefined);
+    fs.writeFileSync(file, '﻿' + JSON.stringify({ depot: 'gocode/cyberpinball-essais', jeton: ' github_pat_abc ' }));
+    assert.deepEqual(loadPrivateChannel(file), { repository: 'gocode/cyberpinball-essais', token: 'github_pat_abc' });
+    fs.writeFileSync(file, JSON.stringify({ repository: 'o/r', token: 't', api: 'http://127.0.0.1:1/' }));
+    assert.deepEqual(loadPrivateChannel(file), { repository: 'o/r', token: 't', api: 'http://127.0.0.1:1' });
+    fs.writeFileSync(file, JSON.stringify({ depot: 'pas un dépôt', jeton: 't' }));
+    assert.equal(loadPrivateChannel(file), undefined);
+    fs.writeFileSync(file, JSON.stringify({ depot: 'o/r' }));
+    assert.equal(loadPrivateChannel(file), undefined);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('canal d’essai privé : releases lues avec le jeton, la plus récente des deux dépôts, fichiers par l’API sans jeton hors de l’API', async () => {
+  const k = keys();
+  const zip = Buffer.from('paquet de l’application');
+  const sha = createHash('sha256').update(zip).digest('hex');
+  const tag = 'v0.3.0-essai.3';
+  const browser = (name: string) => `https://github.com/o/essais/releases/download/${tag}/${name}`;
+  const manifest: UpdateManifest = {
+    ...manifestFor(Buffer.from('exe'), 'https://github.com/o/public/releases/download/v0.3.0-essai.1/CyberPinball-Setup.exe', '0.3.0-essai.3'),
+    app: { name: 'CyberPinball-application.zip', url: browser('CyberPinball-application.zip'), size: zip.length, sha256: sha, socle: 's1' },
+  };
+  const publicFeed = (version: string) => JSON.stringify(signManifest(manifestFor(Buffer.from('exe'), 'https://example.org/x.exe', version), k.priv));
+  // Stockage externe vers lequel l'API redirige : il refuse le jeton, comme celui de GitHub.
+  const storageSeen: (string | undefined)[] = [];
+  const storage = http.createServer((req, res) => {
+    storageSeen.push(req.headers.authorization);
+    if (req.headers.authorization) return void res.writeHead(400).end('jeton refusé');
+    const body = req.url === '/feed' ? JSON.stringify(signManifest(manifest, k.priv)) : req.url === '/zip' ? zip : undefined;
+    if (body === undefined) return void res.writeHead(404).end();
+    res.writeHead(200, { 'content-length': Buffer.byteLength(body) }).end(body);
+  });
+  await new Promise<void>((resolve) => storage.listen(0, '127.0.0.1', () => resolve()));
+  const storageUrl = `http://127.0.0.1:${(storage.address() as AddressInfo).port}`;
+  let publicReleases: unknown[] = [];
+  const apiSeen: { url: string; auth?: string }[] = [];
+  const api = http.createServer((req, res) => {
+    apiSeen.push({ url: req.url ?? '', auth: req.headers.authorization });
+    const base = `http://127.0.0.1:${(api.address() as AddressInfo).port}`;
+    if (req.url === '/repos/o/public/releases?per_page=30') return void res.writeHead(200).end(JSON.stringify(publicReleases));
+    if (req.url?.startsWith('/public/')) return void res.writeHead(200).end(publicFeed(req.url.split('/')[2] ?? ''));
+    if (req.headers.authorization !== 'Bearer bon-jeton') return void res.writeHead(401).end('{"message":"Bad credentials"}');
+    if (req.url === '/repos/o/essais/releases?per_page=30') {
+      return void res.writeHead(200).end(
+        JSON.stringify([
+          {
+            tag_name: tag,
+            draft: false,
+            assets: [
+              { name: 'cyberpinball-maj.json', url: `${base}/repos/o/essais/releases/assets/11`, browser_download_url: browser('cyberpinball-maj.json') },
+              { name: 'CyberPinball-application.zip', url: `${base}/repos/o/essais/releases/assets/12`, browser_download_url: browser('CyberPinball-application.zip') },
+            ],
+          },
+        ]),
+      );
+    }
+    if (req.headers.accept !== 'application/octet-stream') return void res.writeHead(415).end();
+    if (req.url === '/repos/o/essais/releases/assets/11') return void res.writeHead(302, { location: `${storageUrl}/feed` }).end();
+    if (req.url === '/repos/o/essais/releases/assets/12') return void res.writeHead(302, { location: `${storageUrl}/zip` }).end();
+    res.writeHead(404).end();
+  });
+  await new Promise<void>((resolve) => api.listen(0, '127.0.0.1', () => resolve()));
+  const apiUrl = `http://127.0.0.1:${(api.address() as AddressInfo).port}`;
+  const releasesUrl = `${apiUrl}/repos/o/public/releases?per_page=30`;
+  const publicAsset = (v: string) => [{ name: 'cyberpinball-maj.json', browser_download_url: `${apiUrl}/public/${v}` }];
+  const channel = { repository: 'o/essais', token: 'bon-jeton', api: apiUrl };
+  const dir = temp();
+  try {
+    publicReleases = [{ tag_name: 'v0.3.0-essai.2', draft: false, assets: publicAsset('0.3.0-essai.2') }];
+    // Sans canal : les préversions publiques seules.
+    assert.equal((await checkForUpdate({ current: '0.2.0', prereleases: true, releasesUrl, publicKey: k.pub })).latest.version, '0.3.0-essai.2');
+    // Avec le canal : l'essai privé, plus récent, et son paquet désigné par l'API.
+    const check = await checkForUpdate({ current: '0.2.0', prereleases: true, channel, releasesUrl, publicKey: k.pub });
+    assert.equal(check.status, 'available');
+    assert.equal(check.latest.version, '0.3.0-essai.3');
+    assert.equal(check.latest.app?.url, `${apiUrl}/repos/o/essais/releases/assets/12`);
+    // L'installeur d'une autre release (dépôt public) garde son adresse.
+    assert.equal(check.latest.installer.url, manifest.installer.url);
+    const file = await downloadAppPackage(check.latest, dir, { fetch: channelFetch(channel) });
+    assert.deepEqual(fs.readFileSync(file), zip);
+    // Le jeton va à l'API du dépôt privé, jamais au stockage ni au dépôt public.
+    assert.ok(storageSeen.length >= 2 && storageSeen.every((a) => a === undefined));
+    assert.ok(apiSeen.filter((r) => r.url.includes('/o/essais/')).every((r) => r.auth === 'Bearer bon-jeton'));
+    assert.ok(apiSeen.filter((r) => !r.url.includes('/o/essais/')).every((r) => r.auth === undefined));
+
+    // Une version publique plus récente passe devant l'essai privé.
+    publicReleases = [{ tag_name: 'v0.3.0', draft: false, assets: publicAsset('0.3.0') }];
+    assert.equal((await checkForUpdate({ current: '0.2.0', channel, releasesUrl, publicKey: k.pub })).latest.version, '0.3.0');
+
+    // Jeton refusé : une erreur qui le dit, jamais un repli silencieux.
+    await assert.rejects(checkForUpdate({ current: '0.2.0', channel: { ...channel, token: 'mauvais' }, releasesUrl, publicKey: k.pub }), /Canal d’essai o\/essais illisible.*HTTP 401/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    await new Promise((resolve) => api.close(resolve));
+    await new Promise((resolve) => storage.close(resolve));
   }
 });

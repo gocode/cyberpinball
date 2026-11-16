@@ -9,7 +9,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { t } from './i18n';
+import { t, tLater, type LaterText } from './i18n';
 import { isAcceptedFormat, mediaKind, mediaTypeInfo, type MediaKind, type MediaType } from './medias';
 import { encodePng } from './png';
 import { isJunkName } from './puppack';
@@ -177,12 +177,12 @@ export type WebFileVerdict =
       /** Ce qui est converti : une image redessinée, un son décodé, le son d'une vidéo. */
       from: 'image' | 'audio' | 'video';
     }
-  | { status: 'refused'; reason: string };
+  | { status: 'refused'; reason: LaterText };
 
 const extOf = (file: string) => path.extname(file).slice(1).toLowerCase();
 
-function kindLabel(kind: MediaKind): string {
-  return kind === 'image' ? t('une image') : kind === 'audio' ? t('un son') : t('une vidéo');
+function kindLabel(kind: MediaKind): LaterText {
+  return kind === 'image' ? tLater('une image') : kind === 'audio' ? tLater('un son') : tLater('une vidéo');
 }
 
 /**
@@ -197,18 +197,18 @@ export function judgeWebFile(file: string, type: MediaType): WebFileVerdict {
   const info = mediaTypeInfo(type);
   const sniffed = sniffMedia(file);
   const named = extOf(file);
-  if (sniffed.kind === 'html') return { status: 'refused', reason: t('page web enregistrée sous un nom de fichier : le site a renvoyé une page au lieu du fichier') };
-  if (sniffed.kind === 'archive') return { status: 'refused', reason: t('archive restée fermée') };
+  if (sniffed.kind === 'html') return { status: 'refused', reason: tLater('page web enregistrée sous un nom de fichier : le site a renvoyé une page au lieu du fichier') };
+  if (sniffed.kind === 'archive') return { status: 'refused', reason: tLater('archive restée fermée') };
   // Le contenu dit le format, sauf quand le nom en précise une variante du même conteneur
   // (« .jpeg », « .m4a » pour un MP4 sans image, « .opus » pour un Ogg, « .weba » pour un WebM).
   const variant = Boolean(sniffed.format && SAME_CONTAINER[sniffed.format]?.includes(named));
   const format = sniffed.format && !variant ? sniffed.format : named;
   const media = (k: SniffKind): k is MediaKind => k === 'image' || k === 'video' || k === 'audio';
   const kind: MediaKind | undefined = media(sniffed.kind) && !variant ? sniffed.kind : (mediaKind(file) ?? EXTRA_KINDS[named]);
-  if (!kind) return { status: 'refused', reason: named ? t('format inconnu (.{ext})', { ext: named }) : t('format inconnu') };
+  if (!kind) return { status: 'refused', reason: named ? tLater('format inconnu (.{ext})', { ext: named }) : tLater('format inconnu') };
   const accepts = (k: MediaKind) => info.formats.some((f) => mediaKind(`x.${f}`) === k);
   const accepted = isAcceptedFormat(type, `x.${format}`);
-  const wrong = (): WebFileVerdict => ({ status: 'refused', reason: t('{what}, alors que « {label} » demande : {formats}', { what: kindLabel(kind), label: info.label, formats: info.formats.join(', ') }) });
+  const wrong = (): WebFileVerdict => ({ status: 'refused', reason: tLater('{what}, alors que « {label} » demande : {formats}', { what: kindLabel(kind), label: { ref: 'mediaType', id: type }, formats: info.formats.join(', ') }) });
   if (kind === 'image') {
     if (accepted) return { status: 'accepted', kind, ...(format !== named ? { ext: format } : {}) };
     if (accepts('image') && CONVERTIBLE_IMAGES.has(format)) return { status: 'convert', kind, to: 'png', from: 'image' };
@@ -218,15 +218,15 @@ export function judgeWebFile(file: string, type: MediaType): WebFileVerdict {
     if (accepted) return { status: 'accepted', kind, ...(format !== named ? { ext: format } : {}) };
     if (!accepts('audio')) return wrong();
     if (DECODABLE_AUDIO.has(format)) return { status: 'convert', kind, to: 'wav', from: 'audio' };
-    return { status: 'refused', reason: t('son .{ext} que le navigateur intégré ne sait pas lire', { ext: format }) };
+    return { status: 'refused', reason: tLater('son .{ext} que le navigateur intégré ne sait pas lire', { ext: format }) };
   }
   // Une vidéo.
   if (accepted && accepts('video')) return { status: 'accepted', kind, ...(format !== named ? { ext: format } : {}) };
   if (accepts('audio')) {
     if (AUDIO_FROM_VIDEO.has(format)) return { status: 'convert', kind, to: 'wav', from: 'video' };
-    return { status: 'refused', reason: t('vidéo .{ext} dont le navigateur intégré ne sait pas lire le son', { ext: format }) };
+    return { status: 'refused', reason: tLater('vidéo .{ext} dont le navigateur intégré ne sait pas lire le son', { ext: format }) };
   }
-  if (accepts('video')) return { status: 'refused', reason: t('vidéo .{ext} que le menu ne lit pas ; la convertir demanderait un outil externe (ffmpeg)', { ext: format }) };
+  if (accepts('video')) return { status: 'refused', reason: tLater('vidéo .{ext} que le menu ne lit pas ; la convertir demanderait un outil externe (ffmpeg)', { ext: format }) };
   return wrong();
 }
 

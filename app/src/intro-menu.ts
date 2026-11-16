@@ -20,6 +20,7 @@ import {
   introPlaceOps,
   introSource,
   t,
+  tLater,
   tn,
   trashDirFor,
   withIntroChoice,
@@ -224,7 +225,7 @@ export function createIntroMenu(host: IntroMenuHost) {
     const paths = await host.library.pick({
       title: slot === 'music' ? t('Musique de fond : choisir un fichier') : t('Ouverture, {screen} : choisir un fichier', { screen: label }),
       icon: slot === 'music' ? 'music' : 'image',
-      purpose: t('Ouverture au démarrage : {screen}', { screen: label }),
+      purpose: tLater('Ouverture au démarrage : {screen}', { screen: { ref: 'introSlot', id: slot } }),
       mode: 'file',
       filter: { label, extensions: [...introFormats(slot)] },
     });

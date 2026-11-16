@@ -71,6 +71,7 @@ import {
   zoneStep,
   toggleChoice,
   t,
+  tLater,
   tn,
   youtubeBlocker,
   type ImportChoices,
@@ -876,7 +877,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       picking = true;
       let paths: string[] | undefined;
       try {
-        paths = host.landscape() && host.pickNative ? await host.pickNative(mode, title) : await host.pick({ title, icon: mode === 'folder' ? 'folder' : 'music', purpose: t('Fichiers du Juke-box'), mode, filter: MEDIA_FILTER(), start: 'desktop' });
+        paths = host.landscape() && host.pickNative ? await host.pickNative(mode, title) : await host.pick({ title, icon: mode === 'folder' ? 'folder' : 'music', purpose: tLater('Fichiers du Juke-box'), mode, filter: MEDIA_FILTER(), start: 'desktop' });
       } finally {
         picking = false;
       }

@@ -198,7 +198,7 @@ test('avatar : messages entre bornes, contrôlés à la réception', () => {
   assert.equal(parseSocialMessage({ t: 'avatar-data', avatar: image.hash, data: Buffer.from('bonjour').toString('base64') }), undefined);
 });
 
-test('avatar : ne circule qu’entre amis et demandes en cours ; l’état le garde, et l’oublie avec eux', () => {
+test('avatar : l’état garde ceux des amis et des demandes en cours, et les oublie avec eux (les autres sont publics, au cache)', () => {
   const friend = createPlayerKey().publicKey;
   const stranger = createPlayerKey().publicKey;
   const now = new Date().toISOString();

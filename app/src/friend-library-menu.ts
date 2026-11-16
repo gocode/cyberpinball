@@ -56,7 +56,10 @@ import {
   ownMediaPages,
   parseTableIdentity,
   sameTable,
+  say,
   t,
+  tLater,
+  type StoredText,
   tableIdentity,
   tn,
   type FriendLibrary,
@@ -655,7 +658,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       kind: 'friend-table',
       // Déjà demandée (deux Start, une autre entrée) : la même réception, montrée, jamais une seconde.
       dedupe: tableKey(key, tableId),
-      title: owned ? t('Parties de {table}', { table: owned.title }) : t('Toute la table : {table}', { table: identity?.title ?? folder }),
+      title: owned ? tLater('Parties de {table}', { table: owned.title }) : tLater('Toute la table : {table}', { table: identity?.title ?? folder }),
       source: { kind: 'friend', label: friendName(key), key },
       files: tableJobFiles(dir, files),
       back: owned ? { screen: 'game-parts', table: owned.file } : { screen: 'friend-library', friend: key, table: tableId },
@@ -669,12 +672,13 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
   /** Médias d'une table d'un ami : un téléchargement de la file, rendu au brouillon de « Médias du jeu ». */
   function startFetch(key: string, table: TableEntry, tableId: string, medias: readonly LibraryMedia[], back: () => void): void {
     const id = `amis-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
-    const label = (m: LibraryMedia) => (m.page ? t('{label}, page {page}', { label: mediaTypeInfo(m.type).label, page: m.page }) : mediaTypeInfo(m.type).label);
+    // Gardés dans la file des téléchargements : dits dans la langue du moment (say).
+    const label = (m: LibraryMedia): StoredText => (m.page ? tLater('{label}, page {page}', { label: { ref: 'mediaType', id: m.type }, page: m.page }) : { ref: 'mediaType', id: m.type });
     const job = downloads.manager.add({
       id,
       kind: 'friend-media',
       dedupe: mediaKey(key, tableId),
-      title: medias.length === 1 ? t('{label} de {table}', { label: label(medias[0]!), table: table.title }) : t('{n} médias de {table}', { n: medias.length, table: table.title }),
+      title: medias.length === 1 ? tLater('{label} de {table}', { label: label(medias[0]!), table: table.title }) : tLater('{n} médias de {table}', { n: medias.length, table: table.title }),
       source: { kind: 'friend', label: friendName(key), key },
       files: medias.map((m, i) => ({ ref: m.id, name: label(m), bytes: m.bytes, part: path.join(content.receivedDir(), `${id}-${i}.part`), meta: { media: m }, optional: true })),
       back: { screen: 'table-medias', table: table.file },
@@ -825,7 +829,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     return {
       heading: whole ? t('Réception de la table') : t('Réception des médias'),
       icon: whole ? 'table-add' : 'image-download',
-      subheading: job ? t('de {name} · {table}', { name: plain, table: job.title }) : undefined,
+      subheading: job ? t('de {name} · {table}', { name: plain, table: say(job.title) }) : undefined,
       lead: whole
         ? t('Chaque fichier est vérifié à l’arrivée (taille, empreinte), puis le plan d’ajout montre tout avant d’installer. Si {name} se déconnecte, la réception reprend seule à son retour.', { name: plain })
         : t('Chaque fichier est vérifié à l’arrivée (taille, empreinte, contenu) avant d’entrer dans le brouillon des médias de votre table. Si {name} se déconnecte, la réception reprend seule à son retour.', { name: plain }),

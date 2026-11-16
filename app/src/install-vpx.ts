@@ -4,7 +4,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { compareVersions, layoutOf, t, vpxRuntimeNeeds, type DownloadManager, type PeFile } from '@cyberpinball/core';
+import { compareVersions, layoutOf, t, tLater, vpxRuntimeNeeds, type DownloadManager, type PeFile } from '@cyberpinball/core';
 import { findComponent, installComponent } from '@cyberpinball/installer';
 
 export interface InstallProgress {
@@ -75,7 +75,7 @@ export async function installVpx(root: string, onProgress: (p: InstallProgress) 
   const job = downloads?.track({
     id: `vpx-${component.version}`,
     kind: 'component',
-    title: t('Visual Pinball X {version}', { version: component.version }),
+    title: tLater('Visual Pinball X {version}', { version: component.version }),
     source: { kind: 'http', label: 'github.com' },
     files: [{ ref: component.url, name: path.basename(archive), bytes: component.size, dest: archive, part: `${archive}.part` }],
     back: { screen: 'downloads' },

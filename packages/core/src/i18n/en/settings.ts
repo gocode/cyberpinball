@@ -206,8 +206,6 @@ export const messages: Record<string, string> = {
     'Key managed by Cyber Pinball: it follows the cabinet buttons. To change it, redo the wizard’s “Buttons” step. A key added in VPX for a gamepad is kept.',
   'Touche de VPX, que Cyber Pinball ne gère pas. Elle se change dans le menu de VPX (F12, puis « Input Settings »).':
     'VPX key, not managed by Cyber Pinball. Change it in the VPX menu (F12, then “Input Settings”).',
-  'Elle suit le DMD réel reconnu à son identifiant USB (ZeDMD, PIN2DMD, Pixelcade).': 'It follows the real DMD, detected by its USB ID (ZeDMD, PIN2DMD, Pixelcade).',
-  'Elle change quand on branche le DMD. {keep}': 'It changes when a DMD is plugged in. {keep}',
   'Elle choisit le plugin qui dessine sur cette fenêtre : un pack PuP d’abord, puis le .directb2s, puis ScoreView.':
     'It picks the plugin that draws in this window: a PuP-Pack first, then the .directb2s, then ScoreView.',
   'Cyber Pinball active les plugins dont la borne a besoin et éteint ceux qui les gênent (B2SLegacy tant que B2S est actif).':

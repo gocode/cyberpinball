@@ -1,6 +1,7 @@
-// Menu système > Amis > Mon avatar (packages/core/src/avatar.ts) : l'image que vos amis voient à
-// côté de votre nom, partout (Mes amis, votre fiche chez eux, les demandes, l'historique des
-// parties, la partie en direct, les notifications). Pour l'instant, toujours une image à soi : une
+// Menu système > Amis > Mon avatar (packages/core/src/avatar.ts) : l'image que tous les joueurs
+// voient à côté de votre nom, partout (Mes amis, Joueurs en ligne, salons, classements, profil
+// public, votre fiche, les demandes, l'historique des parties, la partie en direct, les
+// notifications ; avatar public, 15/11/2026). Pour l'instant, toujours une image à soi : une
 // photo ou une image choisie sur ce PC (sélecteur de fichiers de Cyber Pinball), ou prise dans le
 // navigateur intégré (clic droit sur une image : « Télécharger cette image »).
 //
@@ -32,6 +33,7 @@ import {
   moveCrop,
   readAvatarImage,
   t,
+  tLater,
   webEngineUrl,
   zoomCrop,
   type AvatarCrop,
@@ -173,8 +175,8 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
     rows.push(
       has
         ? { text: t('Votre avatar : une image à vous'), detail: t('Vos amis la voient à côté de votre nom'), tone: 'ok', badges: [t('Choisi')] }
-        : { text: t('Pas encore d’avatar : vos initiales'), detail: t('Choisissez une photo ou une image : vos amis la verront à côté de votre nom'), tone: 'info' },
-      { text: t('Qui le voit'), detail: t('Vos amis, et les joueurs d’une demande d’ami en cours. Jamais l’annuaire : les autres joueurs voient vos initiales.'), icon: 'eye' },
+        : { text: t('Pas encore d’avatar : vos initiales'), detail: t('Choisissez une photo ou une image : tous les joueurs la verront à côté de votre nom'), tone: 'info' },
+      { text: t('Qui le voit'), detail: t('Tous les joueurs, amis ou non : Joueurs en ligne, salons, classements, profil public, demandes d’ami.'), icon: 'eye' },
     );
     const actions: Action[] = [
       { label: t('Choisir une image sur ce PC…'), detail: t('Une photo ou une image : {formats}', { formats: AVATAR_PICK_EXTENSIONS.map((e) => `.${e}`).join(', ') }), icon: 'image', tone: has ? undefined : 'ok', run: () => void pickFile() },
@@ -183,7 +185,7 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
         ? { label: t('Recadrer mon avatar'), detail: t('Reprend la dernière image choisie et son cadrage'), icon: 'crop', run: () => openCrop(0) }
         : { label: t('Recadrer mon avatar'), detail: t('Indisponible : choisissez d’abord une image'), icon: 'crop', tone: 'quiet', run: () => undefined },
     ];
-    if (has) actions.push({ label: t('Retirer mon avatar'), detail: t('Vos amis voient de nouveau vos initiales'), icon: 'trash', run: () => confirmRemove() });
+    if (has) actions.push({ label: t('Retirer mon avatar'), detail: t('Les autres joueurs voient de nouveau vos initiales'), icon: 'trash', run: () => confirmRemove() });
     actions.push({ label: t('Retour'), icon: 'back', run: () => back() });
     return {
       heading: t('Mon avatar'),
@@ -201,7 +203,7 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
     const paths = await host.library.pick({
       title: t('Mon avatar : choisir une image'),
       icon: 'image',
-      purpose: t('Avatar'),
+      purpose: tLater('Avatar'),
       filter: { label: t('Images'), extensions: AVATAR_PICK_EXTENSIONS },
       mode: 'file',
       start: 'desktop',
@@ -225,7 +227,7 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
         heading: t('Retirer votre avatar ?'),
         icon: 'alert',
         avatar: myView(),
-        sections: [{ rows: [{ text: t('Vos amis verront de nouveau vos initiales'), tone: 'info' }] }],
+        sections: [{ rows: [{ text: t('Les autres joueurs verront de nouveau vos initiales'), tone: 'info' }] }],
         actions: [
           {
             label: t('Retirer'),
@@ -233,7 +235,7 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
             tone: 'warning',
             run: () => {
               host.net.setAvatar(undefined);
-              flash = { text: t('Avatar retiré : vos amis voient vos initiales'), tone: 'ok' };
+              flash = { text: t('Avatar retiré : les autres joueurs voient vos initiales'), tone: 'ok' };
               openMain();
             },
           },
@@ -322,7 +324,7 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
         }
         if (!image) throw new Error(t('image trop lourde même réduite'));
         host.net.setAvatar(image);
-        flash = { text: t('Avatar enregistré : vos amis le reçoivent'), detail: t('Ceux qui ne sont pas en ligne le recevront à leur prochaine connexion'), tone: 'ok' };
+        flash = { text: t('Avatar enregistré : les autres joueurs le reçoivent'), detail: t('Ceux qui ne sont pas en ligne le recevront à leur prochaine connexion'), tone: 'ok' };
       } catch (error) {
         flash = { text: t('Avatar pas enregistré : {error}', { error: (error as Error).message }), tone: 'error' };
       }

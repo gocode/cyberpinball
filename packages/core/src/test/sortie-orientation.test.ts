@@ -17,6 +17,7 @@ import { toPhysicalScreen } from '../fingerprint';
 import { edgeAfterRotation, rotatedDisplay, rotationDelta } from '../layout';
 import type { Cabinet, FlipperEdge, ObservedDisplay, Rotation } from '../model';
 import { parseSimulatedDisplays } from '../offscreen';
+import { say } from '../i18n';
 import {
   legacyOrientation,
   ORIENTATION_FILE,
@@ -243,8 +244,8 @@ test('orientation : une sortie qui n’a pas pu rendre l’orientation le dit, e
   b.windows.refuses.add(b.playfield.gdiName);
   const report = session.end();
   assert.equal(report.problems.length, 1);
-  assert.match(report.problems[0]!, /orientation d’origine/);
-  assert.match(report.problems[0]!, /Paramètres > Affichage/);
+  assert.match(say(report.problems[0]), /orientation d’origine/);
+  assert.match(say(report.problems[0]), /Paramètres > Affichage/);
   assert.ok(fs.existsSync(b.file), 'l’origine reste notée pour la reprise');
   b.windows.refuses.clear();
   const next = new SessionOrientation({
@@ -253,7 +254,7 @@ test('orientation : une sortie qui n’a pas pu rendre l’orientation le dit, e
     rotate: (gdi, rotation, persist) => b.windows.rotate(gdi, rotation, persist),
   });
   const start = next.start(wantedOrientations(b.cabinet));
-  assert.ok(start.problems.some((p) => p.startsWith('À la dernière fermeture de Cyber Pinball')), start.problems.join('\n'));
+  assert.ok(start.problems.some((p) => say(p).startsWith('À la dernière fermeture de Cyber Pinball')), start.problems.map(say).join('\n'));
   next.end();
   assert.deepEqual(b.windows.desktop(), b.origin);
 });

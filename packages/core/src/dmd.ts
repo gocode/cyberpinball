@@ -87,9 +87,110 @@ export function detectHardwareDmds(devices: ObservedUsbDevice[]): DetectedDmd[] 
   return found;
 }
 
+// ---------------------------------------------------------------------------
+// Choix de l'utilisateur (Menu système > Borne > DMD > DMD réel)
+
+/**
+ * Pour chaque modèle : « auto », allumé quand il est reconnu à son identifiant USB (et ses clés
+ * gardées telles quelles une fois débranché) ; « on », toujours allumé ; « off », jamais (une carte
+ * Arduino au CH340 n'est pas un ZeDMD : DMDUtil ne lui enverra plus sa poignée de main).
+ */
+export type HardwareDmdChoice = 'auto' | 'on' | 'off';
+export const HARDWARE_DMD_CHOICES: readonly HardwareDmdChoice[] = ['auto', 'on', 'off'];
+
+/** Adresse que libzedmd prend sans réglage (DMDUtilPlugin.cpp, ZeDMDWiFiAddr). */
+export const ZEDMD_WIFI_DEFAULT_ADDR = 'zedmd-wifi.local';
+
+/** Réglages des DMD réels d'une configuration de la borne (cabinet.json) ; absent : tout automatique. */
+export interface HardwareDmdSetup {
+  models?: Partial<Record<HardwareDmdModel, HardwareDmdChoice>>;
+  /**
+   * ZeDMD relié par le wifi, que la détection USB ne voit pas. Absent : ses clés ne sont pas
+   * touchées ; l'adresse reste gardée quand on l'éteint.
+   */
+  zedmdWifi?: { enabled: boolean; address: string };
+}
+
+export function hardwareDmdChoice(setup: HardwareDmdSetup | undefined, model: HardwareDmdModel): HardwareDmdChoice {
+  return setup?.models?.[model] ?? 'auto';
+}
+
+/** Le choix suivant au Start : Automatique, Oui, Non. */
+export function nextHardwareDmdChoice(choice: HardwareDmdChoice): HardwareDmdChoice {
+  return HARDWARE_DMD_CHOICES[(HARDWARE_DMD_CHOICES.indexOf(choice) + 1) % HARDWARE_DMD_CHOICES.length]!;
+}
+
+export function withHardwareDmdChoice(setup: HardwareDmdSetup | undefined, model: HardwareDmdModel, choice: HardwareDmdChoice): HardwareDmdSetup {
+  const models = { ...setup?.models, [model]: choice };
+  if (choice === 'auto') delete models[model];
+  const next: HardwareDmdSetup = { ...setup, models };
+  if (!Object.keys(models).length) delete next.models;
+  return next;
+}
+
+/** Adresse du ZeDMD en wifi : nom (zedmd-wifi.local) ou adresse IPv4, sans espace ni schéma. */
+export function zedmdWifiAddressProblem(address: string): string | undefined {
+  const a = address.trim();
+  if (!a) return t('Indiquez le nom ou l’adresse IP du ZeDMD.');
+  if (/^[a-z]+:\/\//i.test(a) || a.includes('/')) return t('Le nom ou l’adresse seuls, sans « http:// » ni chemin : par exemple {example} ou 192.168.1.50.', { example: ZEDMD_WIFI_DEFAULT_ADDR });
+  if (!/^[A-Za-z0-9.-]+$/.test(a)) return t('Lettres, chiffres, points et tirets seulement : par exemple {example} ou 192.168.1.50.', { example: ZEDMD_WIFI_DEFAULT_ADDR });
+  if (/^\d+(\.\d+){3}$/.test(a) && a.split('.').some((n) => Number(n) > 255)) return t('Adresse IP impossible : chaque nombre va de 0 à 255.');
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Pilotes (lus passivement : nom du service et code du Gestionnaire de périphériques)
+
+/** Pilotes USB génériques que libusb sait ouvrir sous Windows (le PIN2DMD passe par libusb). */
+const LIBUSB_SERVICES = ['winusb', 'libusbk', 'libusb0'];
+
+/** Le pilote empêchera-t-il VPX d'ouvrir ce DMD ? undefined : rien à signaler. */
+export function hardwareDmdDriverProblem(d: DetectedDmd): string | undefined {
+  const { device } = d;
+  const problem = device.problem ?? 0;
+  const code = problem ? t('code {code} du Gestionnaire de périphériques', { code: problem }) : undefined;
+  if (d.model === 'PIN2DMD') {
+    const service = device.service?.toLowerCase();
+    if (problem || !service || !LIBUSB_SERVICES.includes(service)) {
+      return t(
+        'PIN2DMD : Windows ne lui a pas donné de pilote USB générique (WinUSB ou libusbK){why}. VPX ne pourra pas l’ouvrir et le DMD restera noir. Installez ce pilote avec l’outil fourni avec le PIN2DMD ou avec Zadig, puis « Vérifier de nouveau ».',
+        { why: code ? ` (${code})` : service ? t(' (pilote actuel : {service})', { service: device.service! }) : '' },
+      );
+    }
+    return undefined;
+  }
+  // ZeDMD et Pixelcade : un port série. Sans port, le pilote du convertisseur manque.
+  if (problem || !device.port) {
+    const chip = d.usb.includes('CH34') ? t('pilote CH340/CH343 de WCH') : d.usb.includes('CP210x') ? t('pilote CP210x de Silicon Labs') : t('pilote du port série USB');
+    return t('{model} : Windows ne lui a pas donné de port COM{why}. VPX ne pourra pas l’ouvrir. Installez le {chip} (souvent proposé par Windows Update), débranchez et rebranchez, puis « Vérifier de nouveau ».', {
+      model: d.model,
+      why: code ? ` (${code})` : '',
+      chip,
+    });
+  }
+  return undefined;
+}
+
+/** Taille du PIN2DMD d'après le nom que la carte donne à l'USB (libdmdutil, PIN2DMD.cpp). */
+export function pin2dmdSize(product: string | undefined): { width: number; height: number; label: string } | undefined {
+  switch (product?.trim()) {
+    case 'PIN2DMD':
+      return { width: 128, height: 32, label: 'PIN2DMD' };
+    case 'PIN2DMD XL':
+      return { width: 192, height: 64, label: 'PIN2DMD XL' };
+    case 'PIN2DMD HD':
+      return { width: 256, height: 64, label: 'PIN2DMD HD' };
+    default:
+      return undefined;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// [Plugin.DMDUtil]
+
 export interface VpxDmdPlan {
   detected: DetectedDmd[];
-  /** [Plugin.DMDUtil] Enable et la clé de chaque modèle détecté ; vide sans DMD réel. */
+  /** [Plugin.DMDUtil] Enable et la clé de chaque modèle allumé ou éteint ; vide sans DMD réel ni choix. */
   settings: VpxSetting[];
   findings: SyncFinding[];
 }
@@ -97,38 +198,77 @@ export interface VpxDmdPlan {
 const DMDUTIL = 'Plugin.DMDUtil';
 
 /** Clés de [Plugin.DMDUtil] que Cyber Pinball peut écrire. */
-export const VPX_DMD_OWNED_KEYS = ['Enable', ...HARDWARE_DMD_MODELS];
+export const VPX_DMD_OWNED_KEYS = ['Enable', ...HARDWARE_DMD_MODELS, 'ZeDMDWiFiEnabled', 'ZeDMDWiFiAddr'];
 
 /**
- * Sans DMD réel, rien n'est écrit : DMDUtil reste tel que VPX ou l'utilisateur l'a
- * laissé. Le port n'est pas fixé : DMDUtil le cherche lui-même parmi les ports série.
+ * En automatique, sans DMD réel, rien n'est écrit : DMDUtil reste tel que VPX ou l'utilisateur
+ * l'a laissé. « Oui » et « Non » s'écrivent toujours. Le port n'est pas fixé : DMDUtil le cherche
+ * lui-même parmi les ports série.
  */
-export function vpxDmdSettings(devices: ObservedUsbDevice[]): VpxDmdPlan {
+export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmdSetup): VpxDmdPlan {
   const detected = detectHardwareDmds(devices);
   const findings: SyncFinding[] = [];
-  if (!detected.length) return { detected, settings: [], findings };
-  const models = HARDWARE_DMD_MODELS.filter((m) => detected.some((d) => d.model === m));
-  const settings: VpxSetting[] = [
-    { section: DMDUTIL, key: 'Enable', value: '1' },
-    ...models.map((m) => ({ section: DMDUTIL, key: m, value: '1' })),
-  ];
+  const values: VpxSetting[] = [];
+  for (const m of HARDWARE_DMD_MODELS) {
+    const choice = hardwareDmdChoice(setup, m);
+    const on = choice === 'on' || (choice === 'auto' && detected.some((d) => d.model === m));
+    if (on) values.push({ section: DMDUTIL, key: m, value: '1' });
+    else if (choice === 'off') values.push({ section: DMDUTIL, key: m, value: '0' });
+  }
+  const wifi = setup?.zedmdWifi;
+  if (wifi) {
+    values.push({ section: DMDUTIL, key: 'ZeDMDWiFiEnabled', value: wifi.enabled ? '1' : '0' });
+    if (wifi.enabled) values.push({ section: DMDUTIL, key: 'ZeDMDWiFiAddr', value: wifi.address.trim() });
+  }
+  const anyOn = values.some((s) => s.value === '1') || Boolean(wifi?.enabled);
+  const settings: VpxSetting[] = anyOn ? [{ section: DMDUTIL, key: 'Enable', value: '1' }, ...values] : values;
+
   for (const d of detected) {
+    const choice = hardwareDmdChoice(setup, d.model);
     const where = [d.device.name, d.device.port].filter(Boolean).join(', ');
-    findings.push({
-      severity: 'info',
-      message: t("DMD réel : {model} reconnu à son identifiant USB ({usb}). VPX l'alimente par le plugin DMDUtil.", { model: d.model, usb: where ? `${d.usb}${t(' ; ')}${where}` : d.usb }),
-    });
-    if (d.generic) {
+    const usb = where ? `${d.usb}${t(' ; ')}${where}` : d.usb;
+    if (choice === 'off') {
+      findings.push({ severity: 'info', message: t('{model} reconnu ({usb}), mais éteint : « {model} : non » dans Menu système > Borne > DMD > DMD réel.', { model: d.model, usb }) });
+      continue;
+    }
+    findings.push({ severity: 'info', message: t("DMD réel : {model} reconnu à son identifiant USB ({usb}). VPX l'alimente par le plugin DMDUtil.", { model: d.model, usb }) });
+    const driver = hardwareDmdDriverProblem(d);
+    if (driver) findings.push({ severity: 'warning', message: driver });
+    if (d.generic && choice === 'auto') {
       findings.push({
         severity: 'info',
         message: t(
-          "{model} : {usb} est un convertisseur USB-série courant. Si ce n'est pas un {model} (carte Arduino, contrôleur de boutons…), DMDUtil lui enverra quand même sa demande de connexion : passez [Plugin.DMDUtil] {model} à 0 et gardez cette valeur.",
+          "{model} : {usb} est un convertisseur USB-série courant. Si ce n'est pas un {model} (carte Arduino, contrôleur de boutons…), DMDUtil lui enverra quand même sa demande de connexion : choisissez « {model} : non » dans Menu système > Borne > DMD > DMD réel.",
           { model: d.model, usb: usbIdLabel(d.device.vid, d.device.pid) },
         ),
       });
     }
   }
   return { detected, settings, findings };
+}
+
+// ---------------------------------------------------------------------------
+// Santé de la borne
+
+/** Les DMD réels pour la santé de la borne : reconnus, allumés en wifi, et ce qui empêchera VPX de les ouvrir. */
+export interface HardwareDmdFacts {
+  /** En clair : « ZeDMD (COM3) », « PIN2DMD HD », « ZeDMD en wifi (zedmd-wifi.local) ». */
+  devices: string[];
+  /** Pilotes manquants ou refusés, tels quels. */
+  problems: string[];
+}
+
+export function hardwareDmdFacts(devices: ObservedUsbDevice[], setup?: HardwareDmdSetup): HardwareDmdFacts {
+  const on = detectHardwareDmds(devices).filter((d) => hardwareDmdChoice(setup, d.model) !== 'off');
+  const names = on.map((d) => hardwareDmdName(d));
+  if (setup?.zedmdWifi?.enabled) names.push(t('ZeDMD en wifi ({address})', { address: setup.zedmdWifi.address }));
+  return { devices: names, problems: on.map((d) => hardwareDmdDriverProblem(d)).filter((p): p is string => Boolean(p)) };
+}
+
+/** « ZeDMD (COM3) », « PIN2DMD HD » */
+export function hardwareDmdName(d: DetectedDmd): string {
+  const name = d.model === 'PIN2DMD' ? (pin2dmdSize(d.device.product)?.label ?? d.model) : d.model;
+  return d.device.port ? `${name} (${d.device.port})` : name;
 }
 
 // ---------------------------------------------------------------------------

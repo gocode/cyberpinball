@@ -17,10 +17,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { compareVersions } from './acquisition';
 import { activeConfiguration, chooseConfiguration, chosenId, scoreConfiguration, type CabinetSet } from './configurations';
+import type { HardwareDmdFacts } from './dmd';
 import type { Finding } from './doctor';
 import { formatSize } from './fileops';
 import { orientationFacts, orientationVerdict, type OrientationFacts } from './gameorientation';
-import { formatDate, formatList, t, tn } from './i18n';
+import { formatDate, formatList, language, t, tn, type Language } from './i18n';
 import type { IconName } from './icons';
 import { matchScreens } from './match';
 import { ROLES, type ObservedDisplay, type RoleId } from './model';
@@ -35,7 +36,7 @@ import { airLinkOverWifi, type LinkTransport, type PcNetwork } from './vr-reseau
 export type HealthState = 'ok' | 'check' | 'blocking';
 
 /** Les contrôles, dans l'ordre de la page. */
-export const HEALTH_CHECKS = ['disk', 'pc', 'tables', 'pup', 'media', 'screens', 'dof', 'remote', 'vr', 'vpx'] as const;
+export const HEALTH_CHECKS = ['disk', 'pc', 'tables', 'pup', 'media', 'screens', 'dmd', 'dof', 'remote', 'vr', 'vpx'] as const;
 export type HealthCheckId = (typeof HEALTH_CHECKS)[number];
 
 /** Où mène une ligne. */
@@ -162,12 +163,19 @@ export interface DofFacts {
 export interface HealthFacts {
   /** Fin du relevé (ISO). */
   at: string;
+  /**
+   * Langue de ses textes (constats du médecin, DOF, runtime) : un relevé d'une autre langue est
+   * oublié à la lecture, le suivant le refait (15 s après le démarrage, ou à l'ouverture de la page).
+   */
+  language?: Language;
   disks: DiskFact[];
   tables?: TablesFacts;
   /** PuP-Packs des tables ; absent d'un relevé plus ancien. */
   pup?: PupFacts;
   media?: MediaFacts;
   screens?: ScreensFacts;
+  /** DMD réels (dmd.ts) : reconnus ou en wifi, et leurs pilotes ; absent sans DMD réel. */
+  hardwareDmd?: HardwareDmdFacts;
   /** Absent d'un relevé plus ancien, ou sans dossier de DOF lisible. */
   dof?: DofFacts;
   /** Le réseau du casque (vr-reseau.ts) ; absent sans casque relevé. */
@@ -583,6 +591,24 @@ function orientationLines(facts: OrientationFacts): HealthLine[] {
   return [{ check: 'screens', state: verdict.state, title: verdict.title, detail: verdict.detail, go: t('Ouvrir la configuration de la borne'), target: SYSTEM('cabinet') }];
 }
 
+/** DMD réels : un pilote manquant empêche VPX de les ouvrir (écran noir en partie). Prise en charge en bêta. */
+export function hardwareDmdLines(facts: HardwareDmdFacts): HealthLine[] {
+  if (!facts.devices.length && !facts.problems.length) return [];
+  const go = t('Ouvrir DMD réel');
+  const target = SYSTEM('hardware-dmd');
+  if (facts.problems.length) return facts.problems.map((title) => ({ check: 'dmd', state: 'check', title, go, target }));
+  return [
+    {
+      check: 'dmd',
+      state: 'ok',
+      title: t('DMD réel prêt : {devices}', { devices: facts.devices.join(', ') }),
+      detail: t('VPX l’alimente pendant les parties (prise en charge en bêta)'),
+      go,
+      target,
+    },
+  ];
+}
+
 /**
  * LED et retours (DOF) : rien sur une borne sans contrôleur ni configuration (DOF est facultatif) ;
  * sinon une ligne par point à vérifier, ou une ligne « prêt ». Chacune ouvre « LED et retours (DOF) ».
@@ -707,6 +733,7 @@ export function healthLines(facts: HealthFacts): HealthLine[] {
     ...(facts.pup ? pupLines(facts.pup) : []),
     ...(facts.media ? mediaLines(facts.media) : []),
     ...(facts.screens ? screensLines(facts.screens) : []),
+    ...(facts.hardwareDmd ? hardwareDmdLines(facts.hardwareDmd) : []),
     ...(facts.dof ? dofLines(facts.dof) : []),
     ...(facts.remote ? remoteLines(facts.remote) : []),
     ...(facts.vr ? vrLines(facts.vr) : []),
@@ -732,6 +759,8 @@ export function healthCheckInfo(check: HealthCheckId): { title: string; icon: Ic
       return { title: t('Médias'), icon: 'image' };
     case 'screens':
       return { title: t('Écrans'), icon: 'screens' };
+    case 'dmd':
+      return { title: t('DMD réel'), icon: 'dmd' };
     case 'dof':
       return { title: t('LED et retours (DOF)'), icon: 'bulb' };
     case 'remote':
@@ -772,6 +801,8 @@ export function healthCacheFile(dataDir: string): string {
 export function loadHealthFacts(dataDir: string): HealthFacts | undefined {
   try {
     const raw = JSON.parse(fs.readFileSync(healthCacheFile(dataDir), 'utf8')) as Partial<HealthFacts>;
+    // Relevé dans une autre langue (ou d'avant que la langue y soit notée) : ses textes la garderaient.
+    if (raw.language !== language()) return undefined;
     return typeof raw.at === 'string' && Array.isArray(raw.disks) && raw.vpx && typeof raw.vpx === 'object' ? (raw as HealthFacts) : undefined;
   } catch {
     return undefined;
@@ -781,7 +812,7 @@ export function loadHealthFacts(dataDir: string): HealthFacts | undefined {
 export function saveHealthFacts(dataDir: string, facts: HealthFacts): void {
   const file = healthCacheFile(dataDir);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(facts, null, 2));
+  fs.writeFileSync(file, JSON.stringify({ ...facts, language: language() }, null, 2));
 }
 
 /** « Vérifié il y a 3 min », « à l'instant », « il y a 2 h », sinon la date. */

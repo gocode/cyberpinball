@@ -21,7 +21,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import { formatSize } from './fileops';
-import { formatDateTime, formatNumber, t, tn } from './i18n';
+import { formatDateTime, formatNumber, readStoredText, say, t, tLater, tn, type StoredText } from './i18n';
 import { partSize } from './resumable';
 import { readJsonFile } from './store';
 
@@ -85,8 +85,8 @@ export type DownloadReason =
 export interface DownloadFile {
   /** Identifiant chez la source : celui du fichier chez l'ami, l'adresse pour un site. */
   ref: string;
-  /** Nom montré : « Medieval Madness.vpx », « Plateau (vidéo) ». */
-  name: string;
+  /** Nom montré : « Medieval Madness.vpx », « Plateau (vidéo) » (un texte de l'interface y est un LaterText, dit par say). */
+  name: StoredText;
   /** Taille annoncée par la source, si elle la donne. */
   bytes?: number;
   /** Fichier partiel : les octets reçus s'y accumulent, gardés entre deux sessions. */
@@ -106,7 +106,7 @@ export interface DownloadFile {
    */
   optional?: boolean;
   /** Sauté : pourquoi. Compté fini, sans octet reçu. */
-  skipped?: { reason: DownloadReason; detail?: string };
+  skipped?: { reason: DownloadReason; detail?: StoredText };
 }
 
 /**
@@ -136,14 +136,14 @@ export type DownloadScreen = DownloadReturn['screen'];
 export interface DownloadJob {
   id: string;
   kind: DownloadJobKind;
-  /** « 4 médias de Medieval Madness », « Toute la table : Attack from Mars ». */
-  title: string;
+  /** « 4 médias de Medieval Madness », « Toute la table : Attack from Mars » : gardé sans traduction (LaterText), dit par say. */
+  title: StoredText;
   source: DownloadSource;
   files: DownloadFile[];
   state: DownloadState;
   reason?: DownloadReason;
-  /** Précision de la raison (« HTTP 404 », message du site). */
-  detail?: string;
+  /** Précision de la raison (« HTTP 404 », message du site, ou texte de l'interface en LaterText). */
+  detail?: StoredText;
   back: DownloadReturn;
   /** Données de la sorte, pour son finisseur (table de l'ami, dossier reçu, table de la borne…). */
   data?: Record<string, unknown>;
@@ -199,16 +199,32 @@ function validJob(j: unknown): j is DownloadJob {
   const r = j as Partial<DownloadJob>;
   return (
     typeof r.id === 'string' &&
-    typeof r.title === 'string' &&
+    readStoredText(r.title) !== undefined &&
     typeof r.kind === 'string' &&
     STATES.includes(r.state as DownloadState) &&
     !!r.source &&
     typeof r.source.label === 'string' &&
     Array.isArray(r.files) &&
-    r.files.every((f) => f && typeof f.ref === 'string' && typeof f.part === 'string' && typeof f.name === 'string') &&
+    r.files.every((f) => f && typeof f.ref === 'string' && typeof f.part === 'string' && readStoredText(f.name) !== undefined) &&
     !!r.back &&
     SCREENS.includes(r.back.screen)
   );
+}
+
+/**
+ * Un téléchargement relu : un ancien fichier tient les titres, noms et précisions déjà traduits,
+ * reconnus ici (readStoredText) pour être redits dans la langue du moment.
+ */
+function readJob(j: DownloadJob): DownloadJob {
+  const stored = (v: unknown) => readStoredText(v)!;
+  const detail = (v: unknown) => (v === undefined ? {} : { detail: stored(v) });
+  return {
+    ...j,
+    tries: j.tries ?? 0,
+    title: stored(j.title),
+    ...detail(j.detail),
+    files: j.files.map((f) => ({ ...f, name: stored(f.name), ...(f.skipped ? { skipped: { ...f.skipped, ...detail(f.skipped.detail) } } : {}) })),
+  };
 }
 
 /** La file écrite ; vide si absente ou illisible (un téléchargement illisible est oublié, jamais une erreur). */
@@ -217,7 +233,7 @@ export function loadDownloadQueue(dataDir: string): DownloadQueue {
   try {
     if (!fs.existsSync(file)) return { version: 1, jobs: [] };
     const raw = readJsonFile(file) as { jobs?: unknown };
-    return { version: 1, jobs: Array.isArray(raw.jobs) ? raw.jobs.filter(validJob).map((j) => ({ ...j, tries: j.tries ?? 0 })) : [] };
+    return { version: 1, jobs: Array.isArray(raw.jobs) ? raw.jobs.filter(validJob).map(readJob) : [] };
   } catch {
     return { version: 1, jobs: [] };
   }
@@ -313,7 +329,7 @@ export const SKIPPABLE_REASONS: readonly DownloadReason[] = ['refused', 'check',
 
 /** Fichiers sautés d'un téléchargement, avec leur raison en mots (« média refusé par les contrôles : … »). */
 export function skippedFiles(j: Pick<DownloadJob, 'files' | 'source'>): { file: DownloadFile; why: string }[] {
-  return j.files.filter((f) => f.skipped).map((f) => ({ file: f, why: downloadReasonText({ reason: f.skipped!.reason, ...(f.skipped!.detail ? { detail: f.skipped!.detail } : {}), source: j.source }) ?? f.name }));
+  return j.files.filter((f) => f.skipped).map((f) => ({ file: f, why: downloadReasonText({ reason: f.skipped!.reason, ...(f.skipped!.detail ? { detail: f.skipped!.detail } : {}), source: j.source }) ?? say(f.name) }));
 }
 
 /** Rang du fichier en cours (de 1 à n) : le premier pas fini. */
@@ -463,36 +479,42 @@ export function downloadTone(j: DownloadJob): 'info' | 'warning' | 'ok' | 'error
   return 'quiet';
 }
 
-/** Raison dite à l'utilisateur. */
-export function downloadReasonText(j: Pick<DownloadJob, 'reason' | 'detail' | 'source' | 'since'>): string | undefined {
+/** Raison dite à l'utilisateur, à traduire à l'affichage (gardée par l'Activité récente). */
+export function downloadReasonLater(j: Pick<DownloadJob, 'reason' | 'detail' | 'source' | 'since'>): StoredText | undefined {
   const name = j.source.label;
   const at = j.since ? downloadClock(j.since) : undefined;
   switch (j.reason) {
     case 'offline':
-      return at ? t('La borne de {name} s’est déconnectée à {time}', { name, time: at }) : t('{name} n’est pas en ligne', { name });
+      return at ? tLater('La borne de {name} s’est déconnectée à {time}', { name, time: at }) : tLater('{name} n’est pas en ligne', { name });
     case 'closed':
-      return t('Cyber Pinball a été fermé pendant le téléchargement');
+      return tLater('Cyber Pinball a été fermé pendant le téléchargement');
     case 'network':
-      return t('le site ne répond plus');
+      return tLater('le site ne répond plus');
     case 'busy':
-      return t('{name} envoie déjà un autre fichier', { name });
+      return tLater('{name} envoie déjà un autre fichier', { name });
     case 'http':
-      return j.detail ? t('le site refuse ({detail})', { detail: j.detail }) : t('le site refuse le fichier');
+      return j.detail ? tLater('le site refuse ({detail})', { detail: j.detail }) : tLater('le site refuse le fichier');
     case 'size':
-      return t('le fichier ne fait pas la taille annoncée');
+      return tLater('le fichier ne fait pas la taille annoncée');
     case 'sha':
-      return t('empreinte différente : fichier abîmé ou changé');
+      return tLater('empreinte différente : fichier abîmé ou changé');
     case 'check':
-      return j.detail ?? t('le contenu ne correspond pas à ce qui était annoncé');
+      return j.detail ?? tLater('le contenu ne correspond pas à ce qui était annoncé');
     case 'refused':
-      return j.detail ?? t('{name} ne le partage plus', { name });
+      return j.detail ?? tLater('{name} ne le partage plus', { name });
     case 'login':
-      return t('la page demande de se reconnecter');
+      return tLater('la page demande de se reconnecter');
     case 'disk':
-      return t('plus de place sur le disque');
+      return tLater('plus de place sur le disque');
     default:
       return j.detail;
   }
+}
+
+/** Raison dite à l'utilisateur, dans la langue du moment. */
+export function downloadReasonText(j: Pick<DownloadJob, 'reason' | 'detail' | 'source' | 'since'>): string | undefined {
+  const said = downloadReasonLater(j);
+  return said === undefined ? undefined : say(said);
 }
 
 /** Volume : « 412 Mo sur 1,2 Go », « 14 Mo reçus, taille non annoncée », « 38 Mo ». */

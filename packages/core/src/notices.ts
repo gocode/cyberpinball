@@ -24,7 +24,7 @@
 //   seul pour un regroupement, jamais redit avant le délai de l'évènement.
 // Le processus principal (app/src/menu-notices.ts) fournit l'horloge et dessine `view`.
 
-import { t, tn, formatNumber } from './i18n';
+import { formatNumber, laterNumber, say, t, tLater, tn, type StoredText } from './i18n';
 import type { IconName } from './icons';
 import type { DownloadJob } from './downloadqueue';
 import type { SocialEvent, SocialState, Presence } from './social';
@@ -62,10 +62,13 @@ export interface NoticeEvent {
   who?: string;
   /** Clé du joueur dont parle l'évènement : sa pastille (avatar.ts) dans la notification. */
   player?: string;
-  /** Titre de la table, nom du téléchargement. */
-  subject?: string;
-  /** Précision : score, place, raison d'un échec, nom d'un badge. */
-  extra?: string;
+  /**
+   * Titre de la table, nom du téléchargement. Gardé dans l'Activité récente (activity.ts) :
+   * un texte de l'interface y reste un LaterText, dit dans la langue du moment par noticeText.
+   */
+  subject?: StoredText;
+  /** Précision : score, place, raison d'un échec, nom d'un badge (même règle que `subject`). */
+  extra?: StoredText;
   /** Provenance d'un téléchargement (l'ami, le site). */
   from?: string;
   /** Partie entre amis : pourquoi un invité ne vient pas, ou pourquoi un joueur ne joue plus (livenotices.ts). */
@@ -76,6 +79,9 @@ export interface NoticeEvent {
   won?: true;
   place?: { rank: number; of: number };
 }
+
+/** Évènement dont les textes gardés sont dits (noticeText). */
+type SaidEvent = Omit<NoticeEvent, 'subject' | 'extra'> & { subject?: string; extra?: string };
 
 /** Invitation sans la même version, sans la table, occupé, sans réponse, passé hors ligne ; partie pas démarrée. */
 export type LiveNoticeReason = 'missing' | 'other-version' | 'busy' | 'expired' | 'offline' | 'failed';
@@ -286,13 +292,15 @@ const livePath = () => t('Menu système > Amis > Mes amis');
  * `full` : le texte entier, rien de raccourci (Activité récente, activity.ts) ; sans lui, chacun
  * tient sur la ligne de la notification.
  */
-export function noticeText(kind: NoticeKind, events: readonly NoticeEvent[], opts: { full?: boolean } = {}): { title: string; detail?: string } {
+export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opts: { full?: boolean } = {}): { title: string; detail?: string } {
+  // Textes gardés (LaterText) dits dans la langue du moment.
+  const events: SaidEvent[] = stored.map(({ subject, extra, ...e }) => ({ ...e, ...(subject !== undefined ? { subject: say(subject) } : {}), ...(extra !== undefined ? { extra: say(extra) } : {}) }));
   const one = events.length === 1 ? events[0] : undefined;
   const n = events.length;
   const full = opts.full === true;
   const names = () => nameList(events.map((e) => e.who ?? '?'), full ? Number.MAX_SAFE_INTEGER : NOTICE_DETAIL_MAX);
-  const who = (e: NoticeEvent) => (full ? (e.who ?? '?') : shortened(e.who ?? '?', NAME_MAX));
-  const subject = (e: NoticeEvent) => (full ? (e.subject ?? '') : shortened(e.subject ?? '', SUBJECT_MAX));
+  const who = (e: SaidEvent) => (full ? (e.who ?? '?') : shortened(e.who ?? '?', NAME_MAX));
+  const subject = (e: SaidEvent) => (full ? (e.subject ?? '') : shortened(e.subject ?? '', SUBJECT_MAX));
   const fit = (r: { title: string; detail?: string }) => (full ? { title: r.title, ...(r.detail ? { detail: r.detail } : {}) } : { title: shortened(r.title, NOTICE_TITLE_MAX), ...(r.detail ? { detail: shortened(r.detail, NOTICE_DETAIL_MAX) } : {}) });
   switch (kind) {
     case 'live-invite':
@@ -633,7 +641,7 @@ export const FRIEND_EVENT_FRESH_MS = 15 * MIN;
  * Ce qui a changé dans le réseau des amis entre deux relevés. Le premier relevé (prev
  * undefined) ne dit rien : ce qui était déjà là au démarrage n'est pas une nouvelle.
  */
-export function socialNotices(prev: SocialSnapshot | undefined, next: SocialSnapshot, state: Pick<SocialState, 'friends'>, now: number, badgeLabel: (id: string) => string = (id) => id): NoticeEvent[] {
+export function socialNotices(prev: SocialSnapshot | undefined, next: SocialSnapshot, state: Pick<SocialState, 'friends'>, now: number): NoticeEvent[] {
   if (!prev || !next.enabled) return [];
   const out: NoticeEvent[] = [];
   const name = (key: string) => next.friends.get(key) ?? next.incoming.get(key) ?? '?';
@@ -651,7 +659,7 @@ export function socialNotices(prev: SocialSnapshot | undefined, next: SocialSnap
     if (!prev.friends.has(f.key)) continue; // un nouvel ami envoie ses derniers évènements : déjà annoncé comme ami
     for (const e of f.events) {
       if (prev.events.has(e.id) || now - Date.parse(e.at) > FRIEND_EVENT_FRESH_MS) continue;
-      const ev = friendEventNotice(f.name, e, now, badgeLabel);
+      const ev = friendEventNotice(f.name, e, now);
       if (ev) out.push({ ...ev, player: f.key });
 
     }
@@ -659,12 +667,13 @@ export function socialNotices(prev: SocialSnapshot | undefined, next: SocialSnap
   return out;
 }
 
-function friendEventNotice(who: string, e: SocialEvent, now: number, badgeLabel: (id: string) => string): NoticeEvent | undefined {
+function friendEventNotice(who: string, e: SocialEvent, now: number): NoticeEvent | undefined {
   if (e.kind === 'record' && e.table && e.score !== undefined) {
-    const extra = e.rank === 1 ? formatNumber(e.score) : t('place {rank}', { rank: e.rank ?? '?' });
+    const extra = e.rank === 1 ? laterNumber(e.score) : tLater('place {rank}', { rank: e.rank ?? '?' });
     return { kind: 'friend-record', key: e.id, at: now, who, subject: e.table.title, extra };
   }
-  if (e.kind === 'badge' && e.badge) return { kind: 'friend-badge', key: e.id, at: now, who, extra: badgeLabel(e.badge) };
+  // Le nom du badge se dit à l'affichage, gardé par son identifiant (badges.ts, registerTextRef).
+  if (e.kind === 'badge' && e.badge) return { kind: 'friend-badge', key: e.id, at: now, who, extra: { ref: 'badge', id: e.badge } };
   return undefined;
 }
 
@@ -680,7 +689,7 @@ export function downloadSnapshot(jobs: readonly DownloadJob[]): DownloadSnapshot
  * sous les yeux de l'utilisateur (attached : VPX, mise à jour, yt-dlp) ne sont pas annoncés :
  * leur écran le dit. Le premier relevé ne dit rien (ce qui était fini au démarrage).
  */
-export function downloadNotices(prev: DownloadSnapshot | undefined, jobs: readonly DownloadJob[], now: number, reason: (j: DownloadJob) => string | undefined = () => undefined): NoticeEvent[] {
+export function downloadNotices(prev: DownloadSnapshot | undefined, jobs: readonly DownloadJob[], now: number, reason: (j: DownloadJob) => StoredText | undefined = () => undefined): NoticeEvent[] {
   if (!prev) return [];
   const out: NoticeEvent[] = [];
   for (const j of jobs) {

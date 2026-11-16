@@ -36,6 +36,7 @@ import {
 } from './downloadqueue';
 import { createTransferMeter, type TransferMeter, type TransferProgress } from './transfer';
 import { partSize, resumeOffset } from './resumable';
+import { say, type StoredText } from './i18n';
 
 export interface TransportRun {
   job: Readonly<DownloadJob>;
@@ -51,7 +52,7 @@ export interface TransportRun {
 
 export type TransportResult =
   | { ok: true; file: string; bytes?: number; sha256?: string }
-  | { ok: false; reason: DownloadReason; detail?: string };
+  | { ok: false; reason: DownloadReason; detail?: StoredText };
 
 export interface DownloadTransport {
   /** La source est là (ami relié, réseau démarré). */
@@ -91,7 +92,7 @@ export interface TrackedDownload {
   remember(meta: Record<string, unknown>): void;
   done(files?: readonly { index: number; file: string }[]): void;
   /** Coupure ou refus : `retries` (coupure) le met en attente, sinon en échec. */
-  fail(reason: DownloadReason, detail?: string): void;
+  fail(reason: DownloadReason, detail?: StoredText): void;
   cancel(): void;
 }
 
@@ -273,14 +274,14 @@ export function createDownloadManager(opts: DownloadManagerOptions): DownloadMan
         if ((result.reason === 'sha' || result.reason === 'size') && !restarted.has(index)) {
           restarted.add(index);
           fs.rmSync(file.part, { force: true });
-          log(`Téléchargements : « ${file.name} » repris faux (${result.reason}), reçu de nouveau depuis le début.`); // i18n-ignore : journal
+          log(`Téléchargements : « ${say(file.name)} » repris faux (${result.reason}), reçu de nouveau depuis le début.`); // i18n-ignore : journal
           continue;
         }
         // Un fichier facultatif refusé (contrôles, introuvable, abîmé) est sauté, avec sa raison : les autres arrivent.
         if (file.optional && SKIPPABLE_REASONS.includes(result.reason)) {
           update(id, { files: current.files.map((f, k) => (k === index ? { ...f, done: true, skipped: { reason: result.reason, ...(result.detail ? { detail: result.detail } : {}) } } : f)) });
           fs.rmSync(file.part, { force: true });
-          log(`Téléchargements : « ${file.name} » sauté (${result.reason}${result.detail ? ` : ${result.detail}` : ''}), la suite continue.`); // i18n-ignore : journal
+          log(`Téléchargements : « ${say(file.name)} » sauté (${result.reason}${result.detail ? ` : ${say(result.detail)}` : ''}), la suite continue.`); // i18n-ignore : journal
           save();
           changed();
           continue;
@@ -289,10 +290,10 @@ export function createDownloadManager(opts: DownloadManagerOptions): DownloadMan
           const tries = current.tries + 1;
           const retryAt = current.source.kind === 'friend' && result.reason !== 'busy' ? undefined : new Date(now().getTime() + retryDelayMs(tries)).toISOString();
           update(id, { state: 'waiting', reason: result.reason, detail: result.detail, tries, since: current.since ?? now().toISOString(), ...(retryAt ? { retryAt } : { retryAt: undefined }) });
-          log(`Téléchargements : « ${current.title} » en attente (${result.reason}${result.detail ? ` : ${result.detail}` : ''}).`); // i18n-ignore : journal
+          log(`Téléchargements : « ${say(current.title)} » en attente (${result.reason}${result.detail ? ` : ${say(result.detail)}` : ''}).`); // i18n-ignore : journal
         } else {
           update(id, { state: 'failed', reason: result.reason, detail: result.detail, seen: false });
-          log(`Téléchargements : « ${current.title} » en échec (${result.reason}${result.detail ? ` : ${result.detail}` : ''}).`); // i18n-ignore : journal
+          log(`Téléchargements : « ${say(current.title)} » en échec (${result.reason}${result.detail ? ` : ${say(result.detail)}` : ''}).`); // i18n-ignore : journal
         }
         save();
         changed();
