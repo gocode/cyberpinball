@@ -9,6 +9,10 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.14
+
+- Premier écran des boutons (« Vos boutons sont-ils déjà les bons ? ») : les flippers et les flèches passent d'un choix à l'autre, comme dans tout menu, sans jamais changer d'écran ; Start ou Entrée valident le choix sélectionné. En 0.1.13, une flèche ou un flipper gardait les touches et passait à l'écran suivant.
+
 ## 0.1.13
 
 - Boutons de la borne : la croix d'une manette (I-PAC, Pinscape Pico ou carte à Raspberry Pico réglés en manette XInput) se relève comme un bouton. Deux cartes de boutons identiques sont signalées à l'étape « Boutons » et dans la Santé de la borne : Windows peut les intervertir d'un démarrage à l'autre.

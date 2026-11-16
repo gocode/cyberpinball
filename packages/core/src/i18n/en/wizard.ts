@@ -398,7 +398,7 @@ export const messages: Record<string, string> = {
   'Modifier mes boutons': 'Change my buttons',
   'Sans réponse dans {n} s : ces touches sont gardées, l’assistant passe aux écrans.': 'No answer within {n} s: these keys are kept and the wizard moves on to the screens.',
   'Sur cet écran, les boutons choisissent : rien n’est relevé.': 'On this screen, buttons choose: nothing is mapped.',
-  'Start ({start}), Entrée ou un flipper ({left} / {right}) : garder ces touches · Exit ({exit}) : modifier mes boutons · Clic : l’un ou l’autre': 'Start ({start}), Enter or a flipper ({left} / {right}): keep these keys · Exit ({exit}): change my buttons · Click: either one',
+  'Flippers ({left} / {right}) ou flèches : choisir · Start ({start}) ou Entrée : valider · Exit ({exit}) : modifier mes boutons · Clic : l’un ou l’autre': 'Flippers ({left} / {right}) or arrows: choose · Start ({start}) or Enter: confirm · Exit ({exit}): change my buttons · Click: either one',
   'Impossible : {problems}': 'Not possible: {problems}',
   'Faire : {buttons}': 'To press: {buttons}',
   'Visual Pinball X n’a pas pu s’installer ({reason}) : boutons du clavier seulement. Le menu repropose l’installation, puis « Boutons du jeu » se refait.': 'Visual Pinball X could not be installed ({reason}): keyboard keys only. The menu offers the installation again, then “Game buttons” can be redone.',

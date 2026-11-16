@@ -7,6 +7,10 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.1.14
+
+- First buttons screen ("Are your buttons already right?"): the flippers and arrows move from one choice to the other, as in any menu, without ever changing screen; Start or Enter confirm the selected choice. In 0.1.13, an arrow or a flipper kept the keys and moved on to the next screen.
+
 ## 0.1.13
 
 - Cabinet buttons: a gamepad's D-pad (I-PAC, Pinscape Pico or Raspberry Pico board set to XInput gamepad) can be set up as buttons. Two identical button boards are flagged in the "Buttons" step and in Cabinet health: Windows can swap them from one start-up to the next.

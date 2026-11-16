@@ -121,9 +121,12 @@ test('premier écran des boutons : un choix, jamais un relevé, et toujours une 
   assert.ok(choiceAt >= 0 && choiceAt < key.indexOf('if (CAPTURE_PHASES.includes(wizard.phase))'), 'le choix passe avant le relevé');
   const up = body(wizard, 'handleKeyUp');
   assert.ok(up.indexOf('handleChoiceKey(') >= 0 && up.indexOf('handleChoiceKey(') < up.indexOf('handleButtonKey('), 'aucun appui du premier écran n’est relevé');
-  // Start, Entrée ou un flipper : garder ; Exit : modifier.
+  // Comme tout menu : flippers et flèches choisissent sans changer d'écran (16/11/2026 : une flèche
+  // gardait les touches et passait aux boutons de l'interface) ; Start ou Entrée valident ; Exit : modifier.
   const choice = body(wizard, 'handleChoiceKey');
-  assert.match(choice, /is\(KEYS\.confirm\) \|\| is\(KEYS\.previous\) \|\| is\(KEYS\.next\)\) runButtonsAction\('keep'\)/);
+  assert.match(choice, /if \(is\(KEYS\.previous\) \|\| is\(KEYS\.next\)\) \{\s*touched\(capture\);\s*capture\.action = [^;]+;\s*\}/);
+  assert.doesNotMatch(choice.slice(0, choice.indexOf('is(KEYS.confirm)')), /runButtonsAction/, 'un flipper ou une flèche ne lance rien');
+  assert.match(choice, /is\(KEYS\.confirm\)\) runButtonsAction\(CHOICE_ACTIONS\[capture\.action\]/);
   assert.match(choice, /is\(KEYS\.exit\)[^\n]*runButtonsAction\('modify'\)/);
   // Garder : l'assistant continue, comme après « Touches par défaut » puis Valider.
   assert.match(body(wizard, 'runButtonsAction'), /case 'keep':[\s\S]*?startCapture\(INTERFACE_KEYS, true\)/);

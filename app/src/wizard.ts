@@ -1103,13 +1103,18 @@ function startCapture(set: KeySet, initial = false): void {
 }
 
 /**
- * Premier écran : Start, Entrée ou un flipper gardent les touches affichées ; Exit (Échap) ou un
- * bouton de joystick qui n'en est aucune ouvrent le relevé. Une autre touche ne fait rien, et le
- * délai continue : personne n'est retenu sur cet écran.
+ * Premier écran, comme tout menu : les flippers et les flèches passent d'un choix à l'autre, sans
+ * jamais changer d'écran ; Start ou Entrée lancent le choix sélectionné (« Garder ces touches »
+ * d'office). Exit (Échap) ou un bouton de joystick qui n'est aucune de ces touches ouvrent le
+ * relevé. Une autre touche ne fait rien, et le délai continue : personne n'est retenu ici.
  */
 function handleChoiceKey(code: string): void {
+  const capture = wizard.capture!;
   const is = (group: string[]) => group.includes(code);
-  if (is(KEYS.confirm) || is(KEYS.previous) || is(KEYS.next)) runButtonsAction('keep');
+  if (is(KEYS.previous) || is(KEYS.next)) {
+    touched(capture);
+    capture.action = is(KEYS.previous) ? 0 : CHOICE_ACTIONS.length - 1;
+  } else if (is(KEYS.confirm)) runButtonsAction(CHOICE_ACTIONS[capture.action] ?? 'keep');
   else if (is(KEYS.exit) || joystickReturnsToButtons('buttonsChoice', code, inForce())) runButtonsAction('modify');
 }
 
@@ -1716,11 +1721,11 @@ function choiceView(common: Record<string, unknown>, inForceSet: SetKeys) {
     prompt: t('Vos boutons sont-ils déjà les bons ?'),
     details: t('Touches par défaut des encodeurs de borne : la plupart des bornes les envoient déjà.'),
     buttons: GAME_KEYS.items.map((b) => ({ label: b.label, key: keyLabel(inForceSet[b.id]), state: 'done' })),
-    actions: CHOICE_ACTIONS.map((id, i) => ({ id, label: ACTION_LABELS[id], selected: i === 0 })),
+    actions: CHOICE_ACTIONS.map((id, i) => ({ id, label: ACTION_LABELS[id], selected: i === capture.action })),
     notice: seconds === undefined ? undefined : t('Sans réponse dans {n} s : ces touches sont gardées, l’assistant passe aux écrans.', { n: seconds }),
     // VPX en cours d'installation : le clavier marche tout de suite, les joysticks seront lus à la fin.
     step: vpxPrep.state === 'installing' ? joystickLine() : (offer ?? t('Sur cet écran, les boutons choisissent : rien n’est relevé.')),
-    hint: t('Start ({start}), Entrée ou un flipper ({left} / {right}) : garder ces touches · Exit ({exit}) : modifier mes boutons · Clic : l’un ou l’autre', {
+    hint: t('Flippers ({left} / {right}) ou flèches : choisir · Start ({start}) ou Entrée : valider · Exit ({exit}) : modifier mes boutons · Clic : l’un ou l’autre', {
       start: label(KEYS.confirm),
       left: label(KEYS.previous),
       right: label(KEYS.next),

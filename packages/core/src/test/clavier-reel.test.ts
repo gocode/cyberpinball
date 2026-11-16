@@ -206,16 +206,26 @@ test('assistant complet au clavier : boutons du jeu puis de l’interface relev�
 // Premier écran d'une borne neuve (16/11/2026) : l'assistant ouvrait directement le relevé, qui
 // aurait pris Entrée pour un bouton ; un testeur dont les touches étaient déjà bonnes ne trouvait pas
 // comment continuer. Invariant : ce premier écran se quitte toujours, sans relever ni attendre VPX.
-test('premier écran d’une borne neuve : Entrée, Start ou un flipper gardent les touches, sans rien relever', { skip, timeout: 400_000 }, () => {
-  // Maj gauche ne passe pas par webContents.sendInputEvent (touche de modification) : appui direct de l'autopilote.
-  for (const key of ['Clavier:Enter', 'Clavier:Digit1', 'ShiftLeft']) {
+// Les flippers et les flèches ne font que choisir (16/11/2026 : une flèche gardait les touches et
+// passait aux boutons de l'interface, sans que le joueur l'ait voulu).
+test('premier écran d’une borne neuve : flippers et flèches choisissent sans changer d’écran, Start ou Entrée valident, rien n’est relevé', { skip, timeout: 600_000 }, () => {
+  // Maj gauche et droite ne passent pas par webContents.sendInputEvent (touches de modification) : appui direct de l'autopilote.
+  const cases: [string[], string][] = [
+    [['Clavier:Enter'], 'navigationSummary'],
+    [['Clavier:Digit1'], 'navigationSummary'],
+    [['Clavier:ArrowRight'], 'buttonsChoice'],
+    [['ShiftLeft', 'ShiftRight'], 'buttonsChoice'],
+    [['Clavier:ArrowRight', 'Clavier:ArrowLeft', 'Clavier:Enter'], 'navigationSummary'],
+    [['ShiftRight', 'Clavier:Digit1'], 'buttons'],
+  ];
+  for (const [keys, phase] of cases) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-premier-ecran-'));
     try {
       const home = path.join(dir, 'home');
-      const output = runWizard(home, [key, 'CtrlQ'], []);
-      assert.doesNotMatch(output, /Assistant : relevé game/, `${key} n’est pas relevé\n${output}`);
-      // Touches gardées : l'assistant est passé aux boutons de l'interface, proposés sur ceux du jeu.
-      assert.match(output, /Assistant : « Quitter sans enregistrer \? » \(navigationSummary\)/, `${key}\n${output}`);
+      const output = runWizard(home, [...keys, 'CtrlQ'], []);
+      assert.doesNotMatch(output, /Assistant : relevé game/, `${keys} : rien n’est relevé\n${output}`);
+      // Garder : boutons de l'interface ; modifier : relevé ; flippers et flèches seuls : toujours le premier écran.
+      assert.ok(output.includes(`Assistant : « Quitter sans enregistrer ? » (${phase})`), `${keys} : ${phase} attendu\n${output}`);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
