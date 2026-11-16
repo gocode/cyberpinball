@@ -1,0 +1,81 @@
+// Catalogue anglais : parties instantanées (app/src/instant-menu.ts : porte de la Communauté, liste
+// des parties ouvertes, ouverture d'une partie ; leur salon dans live-game-menu.ts ; notifications
+// dans notices.ts). Clé : le texte français tel qu'il est passé à t() ou tn().
+export const messages: Record<string, string> = {
+  // Porte et liste
+  'Parties instantanées': 'Instant games',
+  'Votre partie : {title} · {n} sur {max}': 'Your game: {title} · {n} of {max}',
+  '{n} partie ouverte : rejoignez-la': '{n} open game: join it',
+  '{n} parties ouvertes : rejoignez-en une': '{n} open games: join one',
+  'Aucune partie ouverte : lancez la vôtre': 'No open game: start yours',
+  '{n} sur {max} joueurs': '{n} of {max} players',
+  'Même table, autre script : la partie demande le même': 'Same table, different script: the game needs the same one',
+  'Autre version de cette table chez vous': 'You have another version of this table',
+  'Même version chez vous': 'Same version on your cabinet',
+  'Ouverte par {name} {ago}': 'Opened by {name} {ago}',
+  'avec {names}': 'with {names}',
+  '{n} place': '{n} seat',
+  '{n} places': '{n} seats',
+  'Votre partie : {title}': 'Your game: {title}',
+  '{n} sur {max} joueurs · départ dès qu’elle est complète': '{n} of {max} players · starts as soon as it is full',
+  'Ouvrir une partie instantanée': 'Open an instant game',
+  'Choisissez la table et le nombre de joueurs : elle s’affiche chez tous les joueurs en ligne': 'Choose the table and the number of players: it shows up for every player online',
+  'Ouvertes en ce moment ({n})': 'Open right now ({n})',
+  'Aucune partie ouverte pour l’instant': 'No open game right now',
+  'Ouvrez la vôtre : elle s’affiche chez tous les joueurs en ligne, et part dès qu’elle est complète': 'Open yours: it shows up for every player online, and starts as soon as it is full',
+  'Une partie en direct ouverte à tous : chacun joue sur sa borne, la même version de la table, au même moment. Elle part d’elle-même dès qu’elle est complète.':
+    'A live game open to everyone: each player plays on their own cabinet, the same version of the table, at the same time. It starts by itself as soon as it is full.',
+  'Flippers : choisir · Start : rejoindre · Exit : retour': 'Flippers: choose · Start: join · Exit: back',
+  'Vérification de la table…': 'Checking the table…',
+  'La partie se joue sur la même version pour tous': 'The game is played on the same version for everyone',
+
+  // Ouvrir une partie
+  'Choisissez la table. Ceux qui ont la même version pourront vous rejoindre.': 'Choose the table. Players who have the same version can join you.',
+  'Vos tables ({n})': 'Your tables ({n})',
+  'Aucune table VPX sur cette borne': 'No VPX table on this cabinet',
+  'Vous et {n} autre joueur': 'You and {n} other player',
+  'Vous et {n} autres joueurs': 'You and {n} other players',
+  'Nombre de joueurs': 'Number of players',
+  'Joueurs, vous compris': 'Players, including you',
+  'La partie part d’elle-même dès que ce nombre est atteint, pour tout le monde.': 'The game starts by itself for everyone as soon as this number is reached.',
+  'Partie instantanée': 'Instant game',
+  'Parties en direct : tables VPX seulement': 'Live games: VPX tables only',
+  'Ouverte à tous : elle part dès qu’elle est complète': 'Open to everyone: it starts as soon as it is full',
+
+  // Salon
+  '{name} a rejoint la partie': '{name} joined the game',
+  'Encore {n} joueur et elle part': '{n} more player and it starts',
+  'Encore {n} joueurs et elle part': '{n} more players and it starts',
+  'Complète : départ pour tout le monde': 'Full: starting for everyone',
+  'Connexion à la borne de {name}…': 'Connecting to {name}’s cabinet…',
+  'Vous entrez dans la partie dès qu’elle répond': 'You join the game as soon as it answers',
+  'En attente de {n} joueur': 'Waiting for {n} player',
+  'En attente de {n} joueurs': 'Waiting for {n} players',
+  'Annoncée à tous les joueurs en ligne : elle part d’elle-même dès qu’elle est complète': 'Announced to every player online: it starts by itself as soon as it is full',
+  'Elle part d’elle-même dès qu’elle est complète': 'It starts by itself as soon as it is full',
+  'Place libre': 'Free seat',
+  'N’importe quel joueur qui a cette version': 'Any player who has this version',
+  'Elle disparaît de la liste ; ceux qui l’ont rejointe en sont prévenus': 'It leaves the list; players who joined it are told',
+  'Votre place se libère pour un autre joueur': 'Your seat opens up for another player',
+  'Vous restez dans la partie : le départ vous ramène ici': 'You stay in the game: the start brings you back here',
+  'Ouverte à tous les joueurs en ligne qui ont cette version de la table. Chacun joue sur sa borne, au même moment.': 'Open to every player online who has this version of the table. Each player plays on their own cabinet, at the same time.',
+  'Ouverte par {name}. Chacun joue sur sa borne, au même moment.': 'Opened by {name}. Each player plays on their own cabinet, at the same time.',
+
+  // Fin sans partie
+  'La partie de {name} est complète': '{name}’s game is full',
+  'Une autre place s’ouvrira peut-être : revoyez les parties ouvertes': 'A seat may open up again: check the open games',
+  'La partie de {name} est déjà partie': '{name}’s game has already started',
+  'Pas complète en trente minutes : partie fermée': 'Not full within thirty minutes: game closed',
+  'Ouvrez-en une autre, ou rejoignez une partie ouverte': 'Open another one, or join an open game',
+  'Pas de réponse de la borne de {name}': 'No answer from {name}’s cabinet',
+  'Elle s’est peut-être éteinte, ou son réseau est coupé': 'It may have been switched off, or its network is down',
+  'Partie complète': 'Game full',
+
+  // Notifications
+  '{name} a rejoint votre partie': '{name} joined your game',
+  '{names} ont rejoint votre partie': '{names} joined your game',
+  '{n} joueur a rejoint votre partie': '{n} player joined your game',
+  '{n} joueurs ont rejoint votre partie': '{n} players joined your game',
+  '{n} joueur arrivé': '{n} player joined',
+  '{n} joueurs arrivés': '{n} players joined',
+};

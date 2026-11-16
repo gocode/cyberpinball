@@ -42,6 +42,9 @@
 // CYBERPINBALL_RESEAU_DEMO=moderation : la même chose, et la borne est modératrice d'une charte
 // d'essai (signée par une clé de projet créée pour l'essai, jamais la vraie) ; Kiko écrit une ligne
 // injurieuse, Dora et Ressort la signalent.
+// CYBERPINBALL_RESEAU_DEMO=instantanees (Communauté > Parties instantanées) : les mêmes joueurs ;
+// Kiko ouvre une partie à quatre sur une table de la borne, que Ressort rejoint ; Vortex en ouvre une
+// sur une table que la borne n'a pas (grisée) ; Tiltman rejoint la partie que la borne ouvre.
 // Leurs dossiers sont dans <données>\reseau-simule\ (le bac à sable de l'essai).
 // Leurs tables sont inventées, comme celles des captures de la page du projet : les captures
 // de ces démonstrations vont sur la page publique du projet, aucun vrai jeu ne doit y paraître
@@ -57,7 +60,7 @@ import { createLiveGames, createTableVersions, type LiveGames } from './live-gam
 import { createSocialNet, type SocialNet } from './social-net';
 
 export function simulatedPlayersWanted(env: NodeJS.ProcessEnv): boolean {
-  return ['1', ...LIVE_DEMOS, 'coupure', 'retour', 'notifications', 'messagerie', 'communaute', 'moderation'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
+  return ['1', ...LIVE_DEMOS, 'coupure', 'retour', 'notifications', 'messagerie', 'communaute', 'moderation', 'instantanees'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
 }
 
 /** Charte d'essai de la démonstration de la modération : toutes les bornes du réseau simulé la reçoivent. */
@@ -311,7 +314,9 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
 
   /** Minuteurs posés avant ceux des scénarios (le « J'aime » de Dora) : arrêtés avec eux. */
   const timersLater: NodeJS.Timeout[] = [];
-  const community = mode === 'communaute' || mode === 'moderation';
+  /** Services des parties instantanées des bornes fictives : arrêtés avec elles. */
+  const instantStops: (() => void)[] = [];
+  const community = mode === 'communaute' || mode === 'moderation' || mode === 'instantanees';
   const dora = await bot(dataDir, 'Dora', true, bootstrap, community ? { country: 'FR' } : {});
   // Communauté : des joueurs qui ne sont pas des amis, de plusieurs pays ; deux en partie (jamais la table chez les autres).
   const strangers: SocialNet[] = [];
@@ -341,6 +346,46 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     say(vortex!, 'salut de Bruxelles, je passe par le salon France', 6000); // i18n-ignore : ligne d'un joueur fictif
     say(kiko!, 'lance une partie de Star Courier, qui me suit ?', 7500, true); // i18n-ignore : ligne d'un joueur fictif
     say(bruno, `@${me.name} tu viens ? je finis ma bille et je lance une partie en direct`, 9000); // i18n-ignore : ligne d'un joueur fictif
+    // Parties instantanées : Kiko ouvre une partie à quatre sur une table de la borne (la même version),
+    // Ressort la rejoint ; Vortex en annonce une sur une table que la borne n'a pas ; Tiltman rejoint
+    // la partie que la borne ouvre (une place reste libre : elle ne part pas pendant les captures).
+    if (mode === 'instantanees') {
+      const [kiko, ressort, vortex, tiltman] = strangers;
+      const playLater = async () => ({ ok: true, seconds: 1, records: [] });
+      const gamesOf = (net: SocialNet, name: string) =>
+        createLiveGames({ net, dataDir: path.join(dataDir, 'reseau-simule', name), log: (line) => log(`${name} : ${line}`), tables: mine, play: playLater }); // i18n-ignore : journal
+      const kikoGames = gamesOf(kiko!, 'Kiko');
+      const ressortGames = gamesOf(ressort!, 'Ressort');
+      const tiltGames = gamesOf(tiltman!, 'Tiltman');
+      instantStops.push(() => kikoGames.stop(), () => ressortGames.stop(), () => tiltGames.stop());
+      timersLater.push(setTimeout(() => {
+        const vpx = mine().filter((t) => t.emulator !== 'pinballfx');
+        const table = vpx.find((t) => /Atlas Rising/.test(t.title)) ?? vpx[0];
+        if (!table) return log('Réseau simulé : aucune table pour la partie de Kiko.'); // i18n-ignore : journal
+        void kikoGames.openInstant(table, 4).then(() => log(`Réseau simulé : Kiko ouvre une partie instantanée sur ${table.title}.`)); // i18n-ignore : journal
+      }, 2000));
+      // Ressort rejoint la partie de Kiko dès qu'elle lui arrive.
+      const ressortWatch = setInterval(() => {
+        const g = ressortGames.instantGames().find((x) => x.key === kiko!.state().key.publicKey);
+        if (!g) return;
+        clearInterval(ressortWatch);
+        void ressortGames.joinInstant(g).then((m) => log(`Réseau simulé : Ressort rejoint la partie de Kiko (${m.match}).`)); // i18n-ignore : journal
+      }, 500);
+      timersLater.push(ressortWatch);
+      // Vortex : une table que personne n'a ici (inventée), annoncée à trois.
+      timersLater.push(setTimeout(() => {
+        vortex!.announceInstant({ id: 'a1b2c3d4e5f60718', title: 'Neon Harbor (Lumen 1988)', table: { table: { title: 'Neon Harbor', manufacturer: 'Lumen', year: 1988 }, print: 'e'.repeat(64), bytes: 81_234_567 }, max: 3, seats: [{ key: vortex!.state().key.publicKey, name: 'Vortex' }], opened: new Date(Date.now() - 4 * 60_000).toISOString(), state: 'open' }); // i18n-ignore : table inventée
+        log('Réseau simulé : Vortex ouvre une partie sur une table que la borne n’a pas.'); // i18n-ignore : journal
+      }, 2500));
+      // Tiltman rejoint la partie que la borne ouvre, quelques secondes après qu'elle paraît.
+      const tiltWatch = setInterval(() => {
+        const g = tiltGames.instantGames().find((x) => x.key === me.key);
+        if (!g) return;
+        clearInterval(tiltWatch);
+        timersLater.push(setTimeout(() => void tiltGames.joinInstant(g).then((m) => log(`Réseau simulé : Tiltman rejoint la partie de la borne (${m.match}).`)), 4000)); // i18n-ignore : journal
+      }, 500);
+      timersLater.push(tiltWatch);
+    }
     // Modération : une ligne injurieuse de Kiko, signalée par Dora et Ressort.
     if (mode === 'moderation') {
       say(kiko!, 'Ressort t’es vraiment un gros nul, retourne jouer à la console', 11_000); // i18n-ignore : ligne d'un joueur fictif
@@ -636,6 +681,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
   return async () => {
     clearInterval(accept);
     for (const timer of [...timers, ...timersLater]) clearTimeout(timer);
+    for (const stop of instantStops) stop();
     brunoChat?.stop();
     content.stop();
     games?.stop();

@@ -310,6 +310,7 @@ export function activityAct(e: ActivityEntry): ActivityAct | undefined {
     case 'live-finished':
     case 'live-cancelled':
     case 'live-accepted':
+    case 'live-joined':
     case 'live-declined':
     case 'live-left':
       return { type: 'live-game', id: e.key.split('|')[0]! };
@@ -338,7 +339,7 @@ export function activityAct(e: ActivityEntry): ActivityAct | undefined {
 
 const KINDS = new Set<string>([...Object.keys(NOTICE_RULES), 'update-available', 'update-installed', 'update-failed', 'note']);
 const REASONS: readonly LiveNoticeReason[] = ['missing', 'other-version', 'busy', 'expired', 'offline', 'failed'];
-const ENDS: readonly LiveInviteEnd[] = ['cancelled', 'started', 'replaced', 'expired', 'offline', 'host-offline'];
+const ENDS: readonly LiveInviteEnd[] = ['cancelled', 'started', 'replaced', 'expired', 'offline', 'host-offline', 'full'];
 const isText = (v: unknown, max: number): v is string => typeof v === 'string' && v.length > 0 && v.length <= max && !/[\x00-\x08\x0b-\x1f\x7f]/.test(v);
 const isTime = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v > 0;
 const isCount = (v: unknown, max: number): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 1 && v <= max;

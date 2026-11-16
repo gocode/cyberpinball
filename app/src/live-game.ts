@@ -34,6 +34,13 @@
 // constate aussi seul l'expiration et le départ de l'autre hors ligne. L'invité garde la fin de
 // chaque invitation (inviteEnd) : son écran et sa notification la disent.
 //
+// Partie instantanée (packages/core/src/instantgames.ts, 16/11/2026) : la même partie, ouverte à
+// tous. L'hôte l'annonce à toutes les bornes (social-net.ts, announceInstant) avec le nombre de
+// joueurs choisi ; un joueur, ami ou non, qui a la même version de la table la rejoint (game-join) et
+// entre aussitôt dans la salle ; complète, elle part d'elle-même. Les joueurs de la partie sont ses
+// « partenaires » (setPartners) : leurs bornes se rejoignent et les messages de la partie passent
+// entre eux comme entre amis. Rien d'autre ne passe : ni bibliothèque, ni messagerie.
+//
 // Sans electron à l'exécution : les tests du cœur le chargent avec un réseau d'essai.
 
 import { createHash } from 'node:crypto';
@@ -61,6 +68,11 @@ import {
   liveWaitView,
   LIVE_RESEND_MS,
   guestGame,
+  instantComplete,
+  instantInvite,
+  instantMax,
+  INSTANT_OPEN_MS,
+  joinGame,
   inviteExpired,
   inviteToGame,
   liveInvite,
@@ -86,6 +98,7 @@ import {
   type GroupRecord,
   type HistoryGame,
   type HostSetting,
+  type InstantGame,
   type LiveGame,
   type LiveInvite,
   type LiveInviteEnd,
@@ -132,7 +145,7 @@ export interface LiveProgress {
 }
 
 export interface LiveGamesOptions {
-  net: Pick<SocialNet, 'state' | 'online' | 'send' | 'onMessage'>;
+  net: Pick<SocialNet, 'state' | 'online' | 'send' | 'onMessage'> & Partial<Pick<SocialNet, 'setPartners' | 'announceInstant' | 'instantGames'>>;
   dataDir: string;
   tables(): readonly TableEntry[];
   romsOf?(table: TableEntry): readonly string[];
@@ -185,6 +198,17 @@ export interface LiveGames {
   inviteEnd(id: string): (LiveInviteEndInfo & { next?: string }) | undefined;
   /** Crée un salon sur cette table (l'empreinte du .vpx se calcule d'abord). */
   create(table: TableEntry): Promise<LiveGame>;
+  /** Ouvre une partie instantanée sur cette table, à `max` joueurs (2 à 4, moi compris), annoncée à toutes les bornes. */
+  openInstant(table: TableEntry, max: number): Promise<LiveGame>;
+  /** Les parties instantanées ouvertes par d'autres, en ce moment. */
+  instantGames(): InstantGame[];
+  /**
+   * Rejoindre une partie instantanée annoncée : ma table vérifiée (la même version), puis j'entre
+   * dans la salle de l'hôte ; sinon ce que j'ai de sa table, et rien ne part.
+   */
+  joinInstant(game: InstantGame): Promise<LiveTableFound>;
+  /** Partie instantanée rejointe : la salle de l'hôte ne me compte pas encore (sa borne se rejoint). */
+  joinPending(): boolean;
   /** Invite un ami dans mon salon ; false : salon plein, ami pas relié, ou partie déjà partie. */
   invite(key: string, name: string): boolean;
   /** Ce que j'ai de la table d'une invitation. */
@@ -217,6 +241,10 @@ export interface LiveTableFound {
 const TICK_MS = 1000;
 /** Une invitation sans réponse repart à ce rythme : l'invité la lit peut-être encore, elle ne sonne pas deux fois. */
 const INVITE_RESEND_MS = 10_000;
+/** Partie instantanée : « je rejoins » redit à ce rythme tant que l'hôte ne m'a pas compté… */
+const JOIN_RESEND_MS = 3000;
+/** … et abandonné au-delà (borne de l'hôte injoignable). */
+const JOIN_GIVE_UP_MS = 45_000;
 
 export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   const now = () => opts.now?.() ?? new Date();
@@ -258,6 +286,10 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   };
   /** La carte de l'attente avait quelque chose à montrer au dernier tour : sa fin aussi doit être portée (essai réel du 01/11/2026). */
   let waitWas = false;
+  /** Ma dernière annonce de partie instantanée (hôte), pour la fermer quand la partie s'en va. */
+  let announced: Parameters<NonNullable<SocialNet['announceInstant']>>[0];
+  /** Invité d'une partie instantanée : « je rejoins » envoyé (le premier, le dernier), et la salle de l'hôte m'a compté. */
+  let joining: { id: string; since: number; sentAt: number; message: Extract<LiveMessage, { t: 'game-join' }>; seen: boolean } | undefined;
   const strict = createTableVersions(opts.dataDir);
   // Le tableau du groupe : chaque partie finie y entre, une fois (groupboard.ts).
   const boardsFile = path.join(opts.dataDir, 'amis', 'records.json');
@@ -294,8 +326,35 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   };
   const changed = () => {
     remember();
+    syncInstant();
     opts.onChange?.();
   };
+
+  /**
+   * Partie instantanée : les joueurs de la partie rejoints par leur clé (l'hôte pour un invité, tous
+   * pour l'hôte), et mon annonce à jour (ouverte pendant le salon, fermée dès le départ ou l'annulation).
+   */
+  function syncInstant(): void {
+    const g = game;
+    const hosting = !!g?.instant && g.host === me().key;
+    if (!g?.instant || !hosting) {
+      // Ma partie ouverte quittée (annulée, une autre ouverte) : fermée partout, sans attendre qu'elle vieillisse.
+      if (announced?.state === 'open') net.announceInstant?.({ ...announced, state: 'closed' });
+      else if (announced) net.announceInstant?.(undefined);
+      announced = undefined;
+    }
+    if (!g?.instant) {
+      net.setPartners?.([]);
+      return;
+    }
+    net.setPartners?.(hosting ? g.players.filter((p) => !p.host && !['declined', 'busy', 'expired'].includes(p.state)).map((p) => p.key) : [g.host]);
+    if (!hosting) return;
+    const seats = g.players.filter((p) => p.host || p.state === 'accepted').map((p) => ({ key: p.key, name: p.name }));
+    // Une autre partie ouverte à la place : la précédente se ferme d'abord.
+    if (announced && announced.id !== g.id && announced.state === 'open') net.announceInstant?.({ ...announced, state: 'closed' });
+    announced = { id: g.id, title: g.title, table: g.table, max: g.instant.max, seats, opened: g.instant.opened, state: g.phase === 'gathering' ? 'open' : 'closed' };
+    net.announceInstant?.(announced);
+  }
 
   const isHost = () => !!game && game.host === me().key;
   const ongoing = () => !!game && game.phase !== 'finished' && game.phase !== 'cancelled';
@@ -597,6 +656,33 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
         if (before === 'invited' && game.players.find((p) => p.key === key)?.state === 'accepted' && mine) sendSettings(key, game.id, mine);
         return;
       }
+      case 'game-join': {
+        const name = m.name;
+        if (!game || !isHost() || m.game !== game.id) {
+          net.send(key, { t: 'game-cancel', game: m.game, why: 'cancelled' });
+          return;
+        }
+        const before = game.players.find((p) => p.key === key);
+        const joined = joinGame(game, { key, name }, m.balls, { ...(m.proto ? { proto: m.proto } : {}), ...(m.app ? { app: m.app } : {}) }, now());
+        if ('refused' in joined) {
+          log(`Partie instantanée : ${name} ne peut pas entrer (${joined.refused}).`); // i18n-ignore : journal
+          net.send(key, { t: 'game-cancel', game: m.game, why: joined.refused });
+          return;
+        }
+        const fresh = !before || before.state !== 'accepted';
+        if (fresh) log(`Partie instantanée : ${name} a rejoint la partie (${joined.game.players.filter((p) => p.state === 'accepted').length} sur ${game.instant!.max}).`); // i18n-ignore : journal
+        // Déjà là (message renvoyé) : la salle repart vers lui seul.
+        if (!fresh) return broadcastRoom(key);
+        setGame(joined.game);
+        // Mes réglages vers lui, à poser dans le double de sa table.
+        if (mine) sendSettings(key, game.id, mine);
+        // Complète : le départ, pour tout le monde.
+        if (instantComplete(game)) {
+          log('Partie instantanée : complète, départ automatique.'); // i18n-ignore : journal
+          start();
+        }
+        return;
+      }
       case 'game-settings-ok':
         if (game && isHost() && m.game === game.id) {
           log(`Partie en direct : réglages ${m.ok ? 'reçus' : 'NON reçus'} par ${game.players.find((p) => p.key === key)?.name ?? key}.`); // i18n-ignore : journal
@@ -620,6 +706,10 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
           const before = game;
           game = applyRoom(game, m, now(), me().key);
           const after = game;
+          if (joining?.id === after.id && !joining.seen && after.players.some((p) => p.key === me().key && p.state !== 'left')) {
+            joining.seen = true;
+            log('Partie instantanée : entré dans la salle de l’hôte.'); // i18n-ignore : journal
+          }
           if (after.goAt && !before.goAt) log(`Départ commun : « partez » reçu de l'hôte (${after.goWhy === 'timeout' ? `délai passé, sans ${after.players.filter((p) => after.goLate?.includes(p.key)).map((p) => p.name).join(', ') || 'personne'}` : 'tous prêts'}).`); // i18n-ignore : journal
           // « game-start » perdu : la salle dit que la partie est lancée, elle part d'ici.
           if (before.phase === 'gathering' && after.phase === 'countdown') {
@@ -655,7 +745,8 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
         if (game && m.game === game.id && key === game.host && !isHost()) {
           if (launch && game.phase === 'countdown') clearTimeout(launch);
           if (game.phase !== 'cancelled') log(`Partie en direct : partie annulée par ${game.players.find((p) => p.host)?.name ?? key}${m.why ? ` (${m.why})` : ''}.`); // i18n-ignore : journal
-          game = { ...game, phase: 'cancelled' };
+          game = { ...game, phase: 'cancelled', ...(m.why ? { endWhy: m.why } : {}) };
+          if (joining?.id === game.id) joining = undefined;
         } else if (game && isHost() && m.game === game.id) setGame(gameStatus(game, key, { state: 'left' }, now()));
         const invite = invites.find((i) => i.id === m.game && i.host.key === key);
         if (invite) endInvite(invite, m.why ?? 'cancelled');
@@ -703,6 +794,19 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       const expired = expireInvites(offline, now());
       tellEnds(before, expired, (p) => (p.offline ? 'offline' : 'expired'));
       setGame(closeIfDone(expired, now()));
+      // Partie instantanée : un joueur entré puis passé hors ligne libère sa place ; trente minutes sans être complète, elle se ferme.
+      if (game?.instant && game.phase === 'gathering') {
+        for (const p of game.players) {
+          if (p.host || p.state !== 'accepted' || net.online(p.key)) continue;
+          log(`Partie instantanée : ${p.name} est passé hors ligne, sa place est libérée.`); // i18n-ignore : journal
+          setGame(gameStatus(game, p.key, { state: 'left' }, now()));
+        }
+        if (game && now().getTime() - Date.parse(game.instant!.opened) > INSTANT_OPEN_MS) {
+          log('Partie instantanée : pas complète en trente minutes, fermée.'); // i18n-ignore : journal
+          cancelAsHost(game, []);
+          setGame({ ...game, phase: 'cancelled', endWhy: 'expired' });
+        }
+      }
       // Une réponse en tête du salon : il se redessine jusqu'à ce qu'elle en parte.
       if (game?.phase === 'gathering' && game.players.some((p) => p.answeredAt && now().getTime() - Date.parse(p.answeredAt) < LIVE_ANSWER_SHOW_MS + 2 * TICK_MS)) changed();
       maybeGo();
@@ -736,6 +840,18 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       const back = online && own().wasOnline.get(game.host) === false;
       own().wasOnline.set(game.host, online);
       if (online) resendStatus(back ? 'retour' : 'tour');
+      // Partie instantanée : « je rejoins » redit tant que la salle de l'hôte ne me compte pas ; sans nouvelles, j'abandonne.
+      if (joining?.id === game.id && !joining.seen && game.phase === 'gathering') {
+        if (now().getTime() - joining.since > JOIN_GIVE_UP_MS) {
+          log('Partie instantanée : pas de réponse de l’hôte, partie abandonnée.'); // i18n-ignore : journal
+          game = { ...game, phase: 'cancelled', endWhy: 'expired' };
+          joining = undefined;
+          changed();
+        } else if (now().getTime() - joining.sentAt >= JOIN_RESEND_MS) {
+          joining.sentAt = now().getTime();
+          net.send(game.host, joining.message);
+        }
+      }
     }
     // Invité : un hôte resté muet se voit au fil du temps.
     if (running && !running.released) released();
@@ -758,6 +874,33 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     }
   }
 
+  /** Départ commun (celui qui invite ; tout seul quand une partie instantanée est complète). */
+  function start(): boolean {
+    if (!game || !isHost()) return false;
+    const next = startGame(game, now());
+    if (next === game) return false;
+    for (const p of next.players) if (!p.host && p.state === 'accepted') net.send(p.key, { t: 'game-start', game: next.id, in: LIVE_COUNTDOWN_S * 1000 });
+    // Ceux qui n'avaient pas encore répondu : la partie part sans eux, ils l'apprennent.
+    tellEnds(game, next, () => 'started');
+    setGame(next);
+    scheduleLaunch();
+    return true;
+  }
+
+  /** Un nouveau salon sur cette table ; `max` : une partie instantanée, ouverte à tous. */
+  async function createGame(table: TableEntry, max?: number): Promise<LiveGame> {
+    if (game && ongoing() && !isHost()) net.send(game.host, { t: 'game-cancel', game: game.id });
+    // Un salon encore ouvert : ses invités apprennent sa fin (inviteAll l'a déjà fermé d'ordinaire).
+    if (game && isHost() && (game.phase === 'gathering' || game.phase === 'countdown')) cancelAsHost(game, []);
+    const live = await liveTable(table);
+    mine = table;
+    joining = undefined;
+    const created = newLiveGame({ ...me(), ...version }, live, displayTitle(table), now());
+    setGame(max ? { ...created, instant: { max, opened: now().toISOString() } } : created);
+    log(`Partie en direct : salon ouvert sur ${table.title}.`); // i18n-ignore : journal
+    return game!;
+  }
+
   function waitView(opts: { manual?: boolean } = {}): LiveWaitView | undefined {
     const run = running;
     return game && run?.id === game.id ? liveWaitView(game, me().key, now(), { ...opts, ...(run.readyAt !== undefined ? { readyAt: run.readyAt } : {}) }) : undefined;
@@ -777,15 +920,39 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       const e = ended.get(id);
       return e ? { why: e.why, name: e.name, title: e.title, host: e.host, ...(e.next ? { next: e.next } : {}) } : undefined;
     },
-    async create(table) {
-      if (game && ongoing() && !isHost()) net.send(game.host, { t: 'game-cancel', game: game.id });
-      // Un salon encore ouvert : ses invités apprennent sa fin (inviteAll l'a déjà fermé d'ordinaire).
-      if (game && isHost() && (game.phase === 'gathering' || game.phase === 'countdown')) cancelAsHost(game, []);
-      const live = await liveTable(table);
-      mine = table;
-      setGame(newLiveGame({ ...me(), ...version }, live, displayTitle(table), now()));
-      log(`Partie en direct : salon ouvert sur ${table.title}.`); // i18n-ignore : journal
-      return game!;
+    create: (table) => createGame(table),
+    async openInstant(table, max) {
+      const g = await createGame(table, instantMax(max));
+      log(`Partie instantanée : ouverte à tous sur ${table.title}, ${g.instant!.max} joueurs.`); // i18n-ignore : journal
+      return g;
+    },
+    instantGames: () => (net.instantGames?.() ?? []).filter((g) => g.id !== game?.id),
+    joinPending: () => !!joining && !joining.seen && game?.id === joining.id && game.phase === 'gathering',
+    async joinInstant(ad) {
+      const invite = instantInvite(ad, now());
+      const found = await matchFor(invite);
+      if (found.match !== 'same' || !found.table) return found;
+      // Une partie où j'étais : je la quitte (l'hôte, ou mes invités, l'apprennent).
+      if (game && ongoing()) {
+        if (isHost()) cancelAsHost(game, []);
+        else net.send(game.host, { t: 'game-cancel', game: game.id });
+      }
+      mine = found.table;
+      game = { ...guestGame(invite, { ...me(), ...version }, 'same', found.balls), players: [], instant: { max: ad.max, opened: ad.opened } };
+      // Ceux déjà là, d'après l'annonce, puis moi : la salle de l'hôte les remplace dès qu'elle arrive.
+      game.players = [
+        ...ad.seats.map((s) => ({ key: s.key, name: s.name, state: 'accepted' as const, ...(s.key === ad.key ? { host: true as const, match: 'same' as const } : {}) })),
+        { ...me(), ...version, state: 'accepted', match: 'same', ...(found.balls ? { balls: found.balls } : {}) },
+      ];
+      receiver = createSettingsReceiver(ad.id);
+      hostSettings = undefined;
+      const message: Extract<LiveMessage, { t: 'game-join' }> = { t: 'game-join', game: ad.id, name: me().name, ...(found.balls ? { balls: found.balls } : {}), ...version };
+      joining = { id: ad.id, since: now().getTime(), sentAt: now().getTime(), message, seen: false };
+      // Les partenaires d'abord : la borne de l'hôte se rejoint, « je rejoins » part dès qu'elle est reliée (renvoyé au besoin).
+      changed();
+      const sent = net.send(ad.key, message);
+      log(`Partie instantanée : je rejoins la partie de ${ad.name} sur « ${ad.title} »${sent ? '' : ' (sa borne pas encore reliée : redit toutes les 3 s)'}.`); // i18n-ignore : journal
+      return found;
     },
     invite(key, name) {
       if (!game || !isHost() || !net.online(key)) return false;
@@ -834,17 +1001,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       }
       changed();
     },
-    start() {
-      if (!game || !isHost()) return false;
-      const next = startGame(game, now());
-      if (next === game) return false;
-      for (const p of next.players) if (!p.host && p.state === 'accepted') net.send(p.key, { t: 'game-start', game: next.id, in: LIVE_COUNTDOWN_S * 1000 });
-      // Ceux qui n'avaient pas encore répondu : la partie part sans eux, ils l'apprennent.
-      tellEnds(game, next, () => 'started');
-      setGame(next);
-      scheduleLaunch();
-      return true;
-    },
+    start,
     leave(opts) {
       if (!game) return;
       if (launch) clearTimeout(launch);
@@ -858,6 +1015,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       } else if (ongoing()) net.send(game.host, { t: 'game-cancel', game: game.id });
       game = undefined;
       mine = undefined;
+      joining = undefined;
       changed();
     },
     close() {

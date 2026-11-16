@@ -38,6 +38,7 @@ export type NoticeKind =
   | 'live-finished'
   | 'live-cancelled'
   | 'live-accepted'
+  | 'live-joined'
   | 'live-declined'
   | 'live-left'
   | 'friend-message'
@@ -124,6 +125,8 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   'live-finished': { priority: 0, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'star', tone: 'ok', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
   'live-cancelled': { priority: 1, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'close', tone: 'warning', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
   'live-accepted': { priority: 2, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'ok', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
+  // Un joueur, ami ou non, rejoint ma partie instantanée (instantgames.ts).
+  'live-joined': { priority: 2, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'ok', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
   'live-declined': { priority: 3, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'info', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
   'live-left': { priority: 4, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'warning', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
   // Un message d'un ami (messagerie, chat.ts) : partout, par-dessus VPX compris ; ceux qui arrivent ensemble n'en font qu'une.
@@ -316,10 +319,13 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
         expired: { title: t('Invitation de {name} expirée', { name }), detail: t('Pas de réponse en deux minutes') },
         offline: { title: t('Invitation de {name} retirée', { name }), detail: t('Vous sembliez hors ligne de son côté') },
         'host-offline': { title: t('{name} est passé hors ligne', { name }), detail: t('Son invitation est retirée') },
+        full: { title: t('La partie de {name} est complète', { name }) },
       };
       const r = said[last.end ?? 'cancelled'];
       return fit({ title: r.title, ...(r.detail ? { detail: r.detail } : last.subject ? { detail: subject(last) } : {}) });
     }
+    case 'live-joined':
+      return fit({ title: one ? t('{name} a rejoint votre partie', { name: who(one) }) : namesTitle((names) => t('{names} ont rejoint votre partie', { names }), () => tn(n, '{n} joueur a rejoint votre partie', '{n} joueurs ont rejoint votre partie'), events), detail: t('Elle part d’elle-même dès qu’elle est complète') });
     case 'live-accepted':
       return fit({ title: one ? t('{name} a accepté votre invitation', { name: who(one) }) : namesTitle((names) => t('{names} ont accepté', { names }), () => tn(n, '{n} invité a accepté', '{n} invités ont accepté'), events), detail: t('Pour lancer : {path}', { path: livePath() }) });
     case 'live-declined': {
@@ -401,6 +407,8 @@ function digestPart(kind: NoticeKind, n: number): string {
       return tn(n, '{n} partie annulée', '{n} parties annulées');
     case 'live-accepted':
       return tn(n, '{n} invitation acceptée', '{n} invitations acceptées');
+    case 'live-joined':
+      return tn(n, '{n} joueur arrivé', '{n} joueurs arrivés');
     case 'live-declined':
       return tn(n, '{n} invitation déclinée', '{n} invitations déclinées');
     case 'live-left':

@@ -467,6 +467,7 @@ import { createChatService } from './chat-service';
 import { createChatMenu } from './chat-menu';
 import { createProfileMenu } from './profile-menu';
 import { createCommunityMenu } from './community-menu';
+import { createInstantMenu } from './instant-menu';
 import { createRoomsMenu } from './rooms-menu';
 import { createRankingsMenu } from './rankings-menu';
 import { createFirewallRule } from './firewall-rule';
@@ -1267,6 +1268,7 @@ const library = createLibrary({
   recordableRoles: () => (['backglass', 'dmd'] as RecordedRole[]).filter((role) => menuAssignments[role]),
   tableSettings: (table) => openVpxSettings(table),
   playWithFriend: (table, back) => friendsMenu.live.sheetAction(table, back),
+  ...(socialNetMode(process.env) === 'off' ? {} : { instantGame: (table: TableEntry, back: () => void) => instantMenu.sheetAction(table, back) }),
   scores: (table, period) => tableScores.board(table, period),
   rankings: (table, scope, period) => tableRankings.view(table, scope, period),
   hideScore: (id) => socialNet.hideScore(id),
@@ -3213,7 +3215,18 @@ const rankingsMenu = createRankingsMenu({
   openSharing: (back) => library.runSystemItem('sharing', back),
 });
 // Communauté (community-menu.ts) : l'accueil du médaillon de la roue, et « Joueurs en ligne », amis ou non.
+// Parties instantanées (instant-menu.ts) : ouvertes à tous, dans la Communauté et sur la fiche d'une table.
+const instantMenu = createInstantMenu({
+  library,
+  net: socialNet,
+  games: liveGames,
+  live: friendsMenu.live,
+  tables: () => tables,
+  openSharing: (back) => library.runSystemItem('sharing', back),
+  redraw: () => broadcast(),
+});
 const communityMenu = createCommunityMenu({
+  instant: { door: () => instantMenu.door(), open: (back) => instantMenu.open(back) },
   rooms: { door: () => roomsMenu.door(), glance: () => roomsMenu.glance(), open: (back) => roomsMenu.openDefault(back) },
   friends: {
     detail: () => friendsMenu.items.friends.detail ?? '',

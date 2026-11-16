@@ -166,6 +166,7 @@ export * from './badges';
 export * from './firewall';
 export * from './friendlibrary';
 export * from './livegame';
+export * from './instantgames';
 export * from './chat';
 export * from './publicprofile';
 export * from './livepresence';

@@ -1,5 +1,5 @@
 // Communauté (décidée le 12/11/2026) : l'accueil ouvert par le médaillon
-// de la roue (quatre portes : Joueurs en ligne, Messages, Salon de mon pays, Classements) et la liste
+// de la roue (Joueurs en ligne, Parties instantanées, Messages, Salon de mon pays, Classements) et la liste
 // « Joueurs en ligne », amis ou non (livepresence.ts).
 //
 // La liste réunit mes amis en ligne (leur présence entre amis, friendpresence.ts) et les joueurs dont
@@ -52,6 +52,8 @@ export interface CommunityMenuHost {
   messages: { detail(): string; attention(): boolean; quiet(): boolean; open(back: () => void): void };
   /** Le salon de mon pays (rooms-menu.ts) : ce que dit sa porte, et l'ouvrir. */
   rooms?: { door(): { label: string; detail: string; attention: boolean; quiet: boolean }; glance?(): RoomGlance; open(back: () => void): void };
+  /** Les parties instantanées, ouvertes à tous (instant-menu.ts) : ce que dit la porte, et les ouvrir. */
+  instant?: { door(): { label: string; detail: string; quiet: boolean }; open(back: () => void): void };
   /** Les classements de toutes mes tables (rankings-menu.ts) : ce que dit la porte, et les ouvrir. */
   rankings: { detail(): string; open(back: () => void): void };
   /** Partage et réseau (activer le partage, le réseau local, la présence publique). */
@@ -358,6 +360,14 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
         ...(s.enabled ? {} : { tone: 'quiet' as const }),
         run: () => openPlayers(here),
       },
+      ...(host.instant
+        ? [
+            (() => {
+              const door = host.instant!.door();
+              return { label: door.label, detail: door.detail, icon: 'rocket' as const, ...(door.quiet ? { tone: 'quiet' as const } : {}), run: () => host.instant!.open(here) };
+            })(),
+          ]
+        : []),
       ...(host.friends
         ? [
             {

@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.14
 
+- Parties instantanées (Communauté) : ouvrez une partie en direct à tous, sur la table de votre choix, en choisissant le nombre de joueurs (2 à 4). Elle s'affiche chez tous les joueurs en ligne ; n'importe qui la rejoint, ami ou non, s'il a la même version de la table, et elle part d'elle-même pour tout le monde dès qu'elle est complète. Aussi depuis la fiche d'une table (« Partie instantanée »). L'hôte est prévenu de chaque arrivée.
 - Premier écran des boutons (« Vos boutons sont-ils déjà les bons ? ») : les flippers et les flèches passent d'un choix à l'autre, comme dans tout menu, sans jamais changer d'écran ; Start ou Entrée valident le choix sélectionné. En 0.1.13, une flèche ou un flipper gardait les touches et passait à l'écran suivant.
 
 ## 0.1.13

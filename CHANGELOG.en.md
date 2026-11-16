@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Instant games (Community): open a live game to everyone, on the table of your choice, choosing the number of players (2 to 4). It shows up for every player online; anyone can join, friend or not, if they have the same version of the table, and it starts by itself for everyone as soon as it is full. Also from a table's sheet ("Instant game"). The host is told of each arrival.
 - First buttons screen ("Are your buttons already right?"): the flippers and arrows move from one choice to the other, as in any menu, without ever changing screen; Start or Enter confirm the selected choice. In 0.1.13, an arrow or a flipper kept the keys and moved on to the next screen.
 
 ## 0.1.13

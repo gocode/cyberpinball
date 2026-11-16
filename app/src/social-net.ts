@@ -115,6 +115,17 @@ import {
   LIVE_BEACON_MS,
   type LiveBeacon,
   type LiveBoard,
+  INSTANT_BATCH,
+  INSTANT_RESIGN_MS,
+  instantSample,
+  mergeInstant,
+  openInstant,
+  signInstant,
+  verifyInstant,
+  type InstantBoard,
+  type InstantGame,
+  type InstantSeat,
+  type LiveTable,
   giveLike,
   likedByMe,
   likersOf,
@@ -320,6 +331,8 @@ type LikesMessage = { t: 'likes'; likes: Like[]; ttl: number };
 type LiveMessage_ = { t: 'live'; live: LiveBeacon[] };
 /** Salons par pays (rooms.ts) : lignes, demande d'historique, présents ; entre toutes les bornes. */
 type RoomMessage = { t: 'room'; lines: RoomLine[] } | { t: 'room-ask'; room: RoomId; since?: string } | { t: 'room-here'; here: RoomHere[] };
+/** Parties instantanées (instantgames.ts) : annonces signées, relayées entre toutes les bornes. */
+type InstantMessage = { t: 'instant'; games: InstantGame[] };
 /** Modération (moderation.ts) : charte et décisions entre toutes les bornes ; signalements chiffrés pour les modérateurs. */
 type ModMessage = { t: 'mod'; charter?: unknown; acts?: ModAct[] } | { t: 'report'; boxes: { to: string; box: string }[]; ttl: number };
 /** Un score à publier : le reste (clé, nom, pays, signature) vient de la borne. */
@@ -331,7 +344,7 @@ export type FriendMessage = LibraryMessage | LiveMessage | ChatMessage;
 
 interface Link {
   stream: Duplex;
-  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage | LiveMessage_ | RoomMessage | ModMessage): void;
+  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage | LiveMessage_ | RoomMessage | ModMessage | InstantMessage): void;
   /** Morceau de fichier (friendlibrary.ts, chunkFrame) ; false : le flux est plein, attendre « drain ». */
   sendChunk(frame: Buffer): boolean;
   via: 'internet' | 'lan';
@@ -393,9 +406,23 @@ export interface SocialNet {
   setDownloadRate(rate: ByteRate): void;
   /**
    * Message d'un service (bibliothèque, partie en direct) à un ami relié ; false : pas relié,
-   * ou pas un ami. Rien de ces services ne part vers un joueur qui n'est pas un ami.
+   * ou pas un ami. Rien de ces services ne part vers un joueur qui n'est pas un ami, sauf la
+   * partie en direct vers les joueurs de ma partie instantanée (setPartners).
    */
   send(key: string, message: FriendMessage): boolean;
+  /**
+   * Les joueurs de ma partie instantanée, amis ou non (instantgames.ts) : leur borne est rejointe
+   * par sa clé, et les messages de la partie en direct passent avec eux ; vide : plus personne.
+   */
+  setPartners(keys: readonly string[]): void;
+  /**
+   * Ma partie instantanée, à annoncer à toutes les bornes (signée, redite toutes les
+   * INSTANT_RESIGN_MS tant qu'elle est ouverte) ; `state: 'closed'` la retire partout (lancée,
+   * annulée) ; undefined : plus rien à annoncer.
+   */
+  announceInstant(game: { id: string; title: string; table: LiveTable; max: number; seats: readonly InstantSeat[]; opened: string; state: InstantGame['state'] } | undefined): void;
+  /** Les parties instantanées ouvertes par d'autres en ce moment, la plus récente d'abord. */
+  instantGames(): InstantGame[];
   /** Morceau de fichier à un ami, en respectant le débit du flux ; false : plus relié. */
   sendChunk(key: string, frame: Buffer): Promise<boolean>;
   /**
@@ -913,8 +940,18 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         if (raw && typeof raw === 'object' && typeof (raw as { t?: unknown }).t === 'string' && ((raw as { t: string }).t === 'room' || (raw as { t: string }).t.startsWith('room-'))) return receiveRoom(key, raw as Record<string, unknown>, link);
         // Modération : charte et décisions vérifiées par leurs signatures ; signalements chiffrés.
         if (raw && typeof raw === 'object' && ((raw as { t?: unknown }).t === 'mod' || (raw as { t?: unknown }).t === 'report')) return receiveModeration(key, raw as Record<string, unknown>);
+        // Parties instantanées : de toute borne reliée, chaque annonce vérifiée par sa signature.
+        if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'instant') return receiveInstant(key, (raw as { games?: unknown }).games);
         const parsed = parseSocialMessage(raw, now());
         if (parsed) return receive(key, parsed, link);
+        // Partie instantanée : les joueurs de ma partie, amis ou non ; « je rejoins » de tout joueur
+        // ni bloqué ni exclu (le service vérifie qu'il vise ma partie ouverte). Rien d'autre.
+        if (raw && typeof raw === 'object' && relationOf(state, key) !== 'friend') {
+          if (!state.enabled || refusedPlayer(key)) return;
+          const live = parseLiveMessage(raw as Record<string, unknown>);
+          if (live && (partners.has(key) || live.t === 'game-join')) for (const listener of messageListeners) listener(key, live);
+          return;
+        }
         // Bibliothèque partagée, partie en direct et messagerie : entre amis seulement.
         if (!raw || typeof raw !== 'object' || relationOf(state, key) !== 'friend') return;
         const extra = parseLibraryMessage(raw as Record<string, unknown>) ?? parseLiveMessage(raw as Record<string, unknown>) ?? parseChatMessage(raw as Record<string, unknown>);
@@ -969,6 +1006,47 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     // Qui est en ligne : mon signal et les plus récents connus ; une borne d'avant la présence publique ignore ce message.
     const live = liveSample(liveBoard, ownBeacon(), now());
     if (live.length) link.send({ t: 'live', live });
+    // Les parties instantanées ouvertes ; une borne d'avant ignore ce message.
+    const instant = instantSample(instantBoard, ownInstant(), now());
+    if (instant.length) link.send({ t: 'instant', games: instant });
+    changed();
+  }
+
+  // ---------- Parties instantanées ----------
+
+  /** Annonces des autres (instantgames.ts), en mémoire seulement. */
+  const instantBoard: InstantBoard = new Map();
+  /** Ma partie à annoncer (redite par instantTimer tant qu'elle est ouverte). */
+  let instantBody: Parameters<SocialNet['announceInstant']>[0];
+  let instantTimer: NodeJS.Timeout | undefined;
+  /** Joueurs de ma partie instantanée : rejoints par leur clé, la partie en direct passe avec eux. */
+  const partners = new Set<string>();
+  /** Un joueur bloqué, ou exclu des salons par la modération : ni ses annonces ni ses arrivées. */
+  const refusedPlayer = (key: string) => state.blocked.includes(key) || sanctionOf(moderation.acts, key, now())?.kind === 'ban';
+
+  /** Mon annonce signée maintenant (ouverte ou fermée) ; undefined sans partie, ou partage coupé. */
+  function signedInstant(): InstantGame | undefined {
+    if (!instantBody || !state.enabled) return undefined;
+    const country = myCountry();
+    return signInstant(state, { ...instantBody, ...(country ? { country } : {}) }, now());
+  }
+  /** Mon annonce pour le bonjour d'une liaison : seulement ouverte. */
+  const ownInstant = () => (instantBody?.state === 'open' ? signedInstant() : undefined);
+
+  /** Mon annonce (ouverte ou fermée) à toutes les bornes reliées. */
+  function sendInstant(): void {
+    const signed = signedInstant();
+    if (signed) for (const link of greetedLinks()) link.send({ t: 'instant', games: [signed] });
+  }
+
+  /** Annonces reçues : vérifiées, celles d'un joueur écarté laissées ; les nouvelles gardées et relayées. */
+  function receiveInstant(from: string, raw: unknown): void {
+    if (!Array.isArray(raw) || state.blocked.includes(from)) return;
+    const games = raw.slice(0, INSTANT_BATCH).map((g) => verifyInstant(g, now())).filter((g): g is InstantGame => !!g && !refusedPlayer(g.key));
+    if (!games.length) return;
+    const fresh = mergeInstant(instantBoard, games, state.key.publicKey, now());
+    if (!fresh.length) return;
+    for (const link of greetedLinks(from)) link.send({ t: 'instant', games: fresh });
     changed();
   }
 
@@ -1458,7 +1536,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   /** Amis et demandes en cours : Hyperswarm les rejoint par leur clé ; les autres sont laissés. */
   function followPeers(): void {
     if (!swarm) return;
-    const want = new Set([...state.friends.map((f) => f.key), ...state.outgoing.map((r) => r.key), ...state.incoming.map((r) => r.key)]);
+    const want = new Set([...state.friends.map((f) => f.key), ...state.outgoing.map((r) => r.key), ...state.incoming.map((r) => r.key), ...[...partners].filter((k) => !state.blocked.includes(k))]);
     for (const key of want) if (!followed.has(key)) swarm.joinPeer(Buffer.from(key, 'hex'));
     for (const key of followed) if (!want.has(key)) swarm.leavePeer(Buffer.from(key, 'hex'));
     followed.clear();
@@ -1656,6 +1734,11 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         beginSearch();
         liveTimer = setInterval(announceLive, LIVE_BEACON_MS);
         liveTimer.unref?.();
+        // Une partie instantanée ouverte avant un arrêt du réseau : son annonce reprend.
+        if (instantBody?.state === 'open' && !instantTimer) {
+          instantTimer = setInterval(sendInstant, INSTANT_RESIGN_MS);
+          instantTimer.unref?.();
+        }
         log(`Réseau des bornes : démarré (${opts.mode}, borne ${signProfile(state).name}, ${state.friends.length} ami(s) à chercher).`); // i18n-ignore : journal
       } catch (error) {
         const message = (error as Error).message;
@@ -1713,6 +1796,9 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     if (liveTimer) clearInterval(liveTimer);
     liveTimer = undefined;
     liveBoard.clear();
+    if (instantTimer) clearInterval(instantTimer);
+    instantTimer = undefined;
+    instantBoard.clear();
     if (hereTimer) clearInterval(hereTimer);
     hereTimer = undefined;
     hereBoard.clear();
@@ -1994,11 +2080,34 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       commit(rate > 0 ? { ...rest, downloadRate: rate } : rest);
     },
     send(key, message) {
-      const link = friendLink(key);
+      // La partie en direct passe aussi avec les joueurs de ma partie instantanée ; « je rejoins », vers l'hôte annoncé.
+      const live = typeof message.t === 'string' && message.t.startsWith('game-');
+      const link = friendLink(key) ?? (live && state.enabled && (partners.has(key) || message.t === 'game-join' || message.t === 'game-cancel') && !refusedPlayer(key) ? bestLink(key) : undefined);
       if (!link) return false;
       link.send(message);
       return true;
     },
+    setPartners(keys) {
+      const next = new Set(keys.filter((k) => k !== state.key.publicKey));
+      if (next.size === partners.size && [...next].every((k) => partners.has(k))) return;
+      partners.clear();
+      for (const k of next) partners.add(k);
+      followPeers();
+    },
+    announceInstant(game) {
+      const was = instantBody;
+      instantBody = game;
+      if (instantTimer) clearInterval(instantTimer);
+      instantTimer = undefined;
+      // Plus rien à annoncer sans l'avoir fermée : elle s'efface d'elle-même (fraîcheur).
+      if (!game) return;
+      if (JSON.stringify(was) !== JSON.stringify(game)) sendInstant();
+      if (game.state === 'open') {
+        instantTimer = setInterval(sendInstant, INSTANT_RESIGN_MS);
+        instantTimer.unref?.();
+      }
+    },
+    instantGames: () => (state.enabled ? openInstant(instantBoard, state.key.publicKey, refusedPlayer, now()) : []),
     async sendChunk(key, frame) {
       const link = friendLink(key);
       if (!link) return false;

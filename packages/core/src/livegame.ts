@@ -218,6 +218,13 @@ export interface LiveGame {
   goAt?: string;
   goWhy?: LiveGoReason;
   goLate?: string[];
+  /**
+   * Partie instantanée (instantgames.ts) : ouverte à tous, `max` joueurs au plus (l'hôte compris),
+   * ouverte le `opened` (ISO) ; elle part d'elle-même quand elle est complète.
+   */
+  instant?: { max: number; opened: string };
+  /** Invité : pourquoi l'hôte a mis fin à la partie avant son départ (game-cancel `why`). */
+  endWhy?: LiveInviteEnd;
 }
 
 /** Une invitation reçue, telle que l'invité la voit. */
@@ -241,8 +248,8 @@ export type LiveAnswer = 'accept' | 'decline' | 'busy';
  * vu passer hors ligne (`offline`) ; chez l'invité seulement, celui qui invite est passé hors
  * ligne (`host-offline`).
  */
-export type LiveInviteEnd = 'cancelled' | 'started' | 'replaced' | 'expired' | 'offline' | 'host-offline';
-const INVITE_ENDS: readonly LiveInviteEnd[] = ['cancelled', 'started', 'replaced', 'expired', 'offline', 'host-offline'];
+export type LiveInviteEnd = 'cancelled' | 'started' | 'replaced' | 'expired' | 'offline' | 'host-offline' | 'full';
+const INVITE_ENDS: readonly LiveInviteEnd[] = ['cancelled', 'started', 'replaced', 'expired', 'offline', 'host-offline', 'full'];
 export type LiveStatus = 'loading' | 'playing' | 'done' | 'failed' | 'left';
 
 export type LiveMessage =
@@ -253,7 +260,12 @@ export type LiveMessage =
    * Départ commun (livestart.ts) : `readyFor`, depuis combien de millisecondes le premier joueur est
    * prêt ; `go`, « partez » est donné, et ceux qui n'étaient pas prêts.
    */
-  | { t: 'game-room'; game: string; phase: LivePhase; players: LivePlayer[]; readyFor?: number; go?: { why: 'all-ready' | 'timeout'; late: string[] }; startIn?: number }
+  | { t: 'game-room'; game: string; phase: LivePhase; players: LivePlayer[]; readyFor?: number; go?: { why: 'all-ready' | 'timeout'; late: string[] }; startIn?: number; max?: number }
+  /**
+   * Partie instantanée : un joueur, ami ou non, rejoint la partie annoncée (instantgames.ts) ; il a
+   * la même version de la table (vérifiée chez lui, comme pour accepter une invitation).
+   */
+  | { t: 'game-join'; game: string; name: string; balls?: number; proto?: number; app?: string }
   /** Départ dans `in` millisecondes, à compter de la réception. */
   | { t: 'game-start'; game: string; in: number }
   /** `ready` (avec « loading ») : sa table est chargée, elle attend « partez » ; `manual` : sa table n'a pas de relevé. */
@@ -280,7 +292,8 @@ const MATCHES: readonly LiveTableMatch[] = ['same', 'other-version', 'missing'];
 const MANUAL: readonly LiveManualReason[] = ['script', 'rom', 'inspector', 'other'];
 const isIso = (v: unknown): v is string => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
 
-function parseLiveTable(raw: unknown): LiveTable | undefined {
+/** La table d'une partie (invitation, annonce d'une partie instantanée), vérifiée champ par champ. */
+export function parseLiveTable(raw: unknown): LiveTable | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const r = raw as Record<string, unknown>;
   const table = parseTableIdentity(r.table);
@@ -391,7 +404,12 @@ export function parseLiveMessage(m: Record<string, unknown>): LiveMessage | unde
       const why = go?.why === 'all-ready' || go?.why === 'timeout' ? go.why : undefined;
       const late = Array.isArray(go?.late) ? go.late.filter((k): k is string => typeof k === 'string' && players.some((p) => p.key === k)).slice(0, LIVE_MAX_PLAYERS) : [];
       const startIn = typeof m.startIn === 'number' && Number.isFinite(m.startIn) && m.startIn >= 0 && m.startIn <= 60_000 ? Math.round(m.startIn) : undefined;
-      return { t: 'game-room', game: m.game, phase: m.phase as LivePhase, players, ...(readyFor !== undefined ? { readyFor } : {}), ...(why ? { go: { why, late } } : {}), ...(startIn !== undefined ? { startIn } : {}) };
+      const max = typeof m.max === 'number' && Number.isInteger(m.max) && m.max >= 2 && m.max <= LIVE_MAX_PLAYERS ? m.max : undefined;
+      return { t: 'game-room', game: m.game, phase: m.phase as LivePhase, players, ...(readyFor !== undefined ? { readyFor } : {}), ...(why ? { go: { why, late } } : {}), ...(startIn !== undefined ? { startIn } : {}), ...(max ? { max } : {}) };
+    }
+    case 'game-join': {
+      const name = normalizeName(m.name);
+      return isId(m.game) && name ? { t: 'game-join', game: m.game, name, ...(isBallCount(m.balls) ? { balls: m.balls } : {}), ...parseVersion(m) } : undefined;
     }
     case 'game-start':
       return isId(m.game) && typeof m.in === 'number' && m.in >= 0 && m.in <= 60_000 ? { t: 'game-start', game: m.game, in: m.in } : undefined;
@@ -503,6 +521,48 @@ export function answerGame(game: LiveGame, key: string, answer: LiveAnswer, matc
   return setPlayer(game, key, (x) => ({ ...x, state, answeredAt: now.toISOString(), ...(match ? { match } : {}), ...(isBallCount(balls) ? { balls } : {}), ...(version.proto ? { proto: version.proto } : {}), ...(version.app ? { app: version.app } : {}) }));
 }
 
+// ---------------------------------------------------------------------------
+// Partie instantanée (instantgames.ts) : ouverte à tous, elle part d'elle-même quand elle est complète
+
+/** Places prises : l'hôte, ceux qui ont rejoint ou accepté, et les invitations en cours. */
+export function liveSeats(game: Pick<LiveGame, 'players'>): number {
+  return game.players.filter((p) => !['declined', 'busy', 'expired', 'left'].includes(p.state)).length;
+}
+
+/** Joueurs au plus dans cette partie : le nombre choisi pour une partie instantanée, sinon quatre. */
+export function liveMax(game: Pick<LiveGame, 'instant'>): number {
+  return game.instant?.max ?? LIVE_MAX_PLAYERS;
+}
+
+/**
+ * Un joueur rejoint ma partie instantanée : il y entre, prêt (il a vérifié la même version chez lui) ;
+ * sinon pourquoi pas : complète (`full`), déjà partie (`started`), ou plus ouverte (`cancelled`).
+ * Le même joueur revenu (message renvoyé) : la partie telle qu'elle est.
+ */
+export function joinGame(game: LiveGame, peer: { key: string; name: string }, balls?: number, version: { proto?: number; app?: string } = {}, now = new Date()): { game: LiveGame } | { refused: LiveInviteEnd } {
+  if (!game.instant || game.phase === 'cancelled' || game.phase === 'finished') return { refused: 'cancelled' };
+  const there = game.players.find((p) => p.key === peer.key);
+  if (there && !['declined', 'busy', 'expired', 'left'].includes(there.state)) return { game };
+  if (game.phase !== 'gathering') return { refused: 'started' };
+  if (liveSeats(game) >= game.instant.max) return { refused: 'full' };
+  const player: LivePlayer = {
+    key: peer.key,
+    name: peer.name,
+    state: 'accepted',
+    match: 'same',
+    answeredAt: now.toISOString(),
+    ...(isBallCount(balls) ? { balls } : {}),
+    ...(version.proto ? { proto: version.proto } : {}),
+    ...(version.app ? { app: version.app } : {}),
+  };
+  return { game: { ...game, players: [...game.players.filter((p) => p.key !== peer.key), player] } };
+}
+
+/** Partie instantanée complète, pas encore partie : le départ se donne tout seul. */
+export function instantComplete(game: LiveGame): boolean {
+  return !!game.instant && game.phase === 'gathering' && game.players.filter((p) => p.state === 'accepted').length >= game.instant.max;
+}
+
 /**
  * Pourquoi la réponse de cet invité arrive trop tard, dit en retour (game-cancel) : son invitation a
  * déjà pris fin chez moi (essai réel du 04/11/2026 : l'invité accepte une invitation déjà annulée et
@@ -612,7 +672,8 @@ export function roomMessage(game: LiveGame, now = new Date()): Extract<LiveMessa
   const readyFor = game.firstReadyAt && !game.goAt ? { readyFor: Math.max(0, now.getTime() - Date.parse(game.firstReadyAt)) } : {};
   // Le temps avant le lancement : un invité dont « game-start » s'est perdu part avec la salle.
   const startIn = game.phase === 'countdown' && game.startAt ? { startIn: Math.max(0, Date.parse(game.startAt) - now.getTime()) } : {};
-  return { t: 'game-room', game: game.id, phase: game.phase, players: game.players.map(({ invitedAt: _invitedAt, answeredAt: _answeredAt, ...p }) => p), ...readyFor, ...go, ...startIn };
+  const max = game.instant ? { max: game.instant.max } : {};
+  return { t: 'game-room', game: game.id, phase: game.phase, players: game.players.map(({ invitedAt: _invitedAt, answeredAt: _answeredAt, ...p }) => p), ...readyFor, ...go, ...startIn, ...max };
 }
 
 /** Côté invité : la salle reçue de celui qui invite remplace la sienne ; « partez » s'y lit, une fois. */
@@ -630,7 +691,8 @@ export function applyRoom(game: LiveGame, room: Extract<LiveMessage, { t: 'game-
   // Les heures, à l'horloge de cette borne : celle de l'hôte peut avancer ou retarder.
   const ready = room.readyFor !== undefined && !game.goAt ? { firstReadyAt: new Date(now.getTime() - room.readyFor).toISOString() } : {};
   const go = room.go && !game.goAt ? { goAt: now.toISOString(), goWhy: room.go.why, goLate: room.go.late } : {};
-  return { ...game, phase, players: room.players, ...start, ...ready, ...go };
+  const instant = room.max && game.instant ? { instant: { ...game.instant, max: room.max } } : {};
+  return { ...game, phase, players: room.players, ...start, ...ready, ...go, ...instant };
 }
 
 /** Côté invité : la partie telle qu'il la suit après avoir accepté. */

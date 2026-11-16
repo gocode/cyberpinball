@@ -352,6 +352,8 @@ export interface LibraryHost {
    * ligne, grisée avec sa raison sinon ; `back` rouvre la fiche.
    */
   playWithFriend?(table: TableEntry, back: () => void): Action;
+  /** « Partie instantanée » (instant-menu.ts) : ouverte à tous ; grisée avec sa raison (partage coupé, Pinball FX). */
+  instantGame?(table: TableEntry, back: () => void): Action;
   /** « Tableau des scores » (table-scores.ts) : le tableau d'une période. */
   scores?(table: TableEntry, period: ScorePeriod): TableBoard;
   /** Classements en réseau d'une table (table-rankings.ts) : amis, pays, monde. */
@@ -2701,6 +2703,7 @@ export function createLibrary(host: LibraryHost) {
         },
       },
       ...(host.playWithFriend ? [notFx({ ...host.playWithFriend(table, () => openSheet(table)), door: 'sheet.friends' as const }, t('Parties entre amis : tables VPX seulement'))] : []),
+      ...(host.instantGame ? [notFx({ ...host.instantGame(table, () => openSheet(table)), door: 'sheet.instant' as const }, t('Parties en direct : tables VPX seulement'))] : []),
       ...(host.scores ? [notFx(scoresAction(table), t('Pinball FX ne donne pas ses scores'))] : []),
       pagesAction(table),
       { label: t('Crédits'), detail: credits.summary(table), icon: 'credits', door: 'sheet.credits', run: () => credits.open(table) },

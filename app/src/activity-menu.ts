@@ -207,6 +207,7 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
           expired: t('Invitation expirée'),
           offline: t('Invitation retirée'),
           'host-offline': t('Invitation retirée'),
+          full: t('Partie complète'),
         };
         return { gone: (why && gone[why]) ?? t('Invitation expirée') };
       }

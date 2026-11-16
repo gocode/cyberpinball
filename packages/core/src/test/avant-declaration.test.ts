@@ -34,6 +34,8 @@ const REVIEWED = new Set([
   'gameNotices',
   'hours',
   'inGameMenu',
+  // Parties instantanées : l'entrée de la fiche d'une table, construite à l'ouverture d'une fiche.
+  'instantMenu',
   'jukeboxPlayer',
   // Réglages du Juke-box : ouverts depuis sa gestion, par l'utilisateur.
   'jukeboxSettings',
