@@ -383,6 +383,10 @@ export const messages: Record<string, string> = {
   'aucune touche': 'no key',
   'bouton de manette': 'gamepad button',
   'Bouton {n} du joystick': 'Joystick button {n}',
+  'Croix {arrow} du joystick': 'Joystick D-pad {arrow}',
+  'Croix {n} {arrow} du joystick': 'Joystick D-pad {n} {arrow}',
+  joystick: 'joystick',
+  '{n} cartes identiques ({name}) : VPX les distingue par leur ordre de branchement, qui peut s’inverser. Donnez-leur un identifiant USB différent si leur outil le permet, sinon relevez tous les boutons sur une seule.': '{n} identical boards ({name}): VPX tells them apart by the order they were plugged in, which can swap. Give each one a different USB ID if its tool allows it; otherwise set up all the buttons on just one.',
   // app/src/wizard.ts : joysticks pendant le relevé des boutons
   'Joystick lu : {names}': 'Joystick read: {names}',
   'Aucun joystick branché': 'No joystick connected',

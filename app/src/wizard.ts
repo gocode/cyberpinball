@@ -31,6 +31,9 @@ import {
   withoutButtonKeys,
   IniDocument,
   keyLabel,
+  type HatDirection,
+  twinJoysticks,
+  twinJoysticksAdvice,
   loadOwnedMemory,
   navigationKeys,
   type ButtonsSource,
@@ -146,7 +149,7 @@ import { observedDisplays, orientationSimulated } from './displays';
 import { createWindow, isShown, OFFSCREEN, readyToShow, whenReadyToShow, windowRect } from './offscreen';
 import { keyboardFollows, keyboardIncident } from './foreground';
 import { onKeyInput, sendableKey } from './key-input';
-import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton, pressVirtualPinscapeButton, retryJoysticks } from './joystick-input';
+import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton, pressVirtualHat, pressVirtualPinscapeButton, retryJoysticks } from './joystick-input';
 import { installVpx, vpxArchivePresent } from './install-vpx';
 import { vcRuntimeReady } from './vc-runtime';
 import { plungerClick, plungerKey, plungerTick, plungerView, startPlungerStep, type PlungerAction, type PlungerOutcome, type PlungerStep } from './plunger-step';
@@ -600,6 +603,10 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
     // « Joy3 » : bouton 3 (numéro SDL) d'un joystick virtuel, par le chemin d'un vrai Pinscape.
     else if (/^Joy\d+$/.test(code)) {
       if (!(await pressVirtualButton(Number(code.slice(3))))) console.error(`Autopilote : ${code} sans joystick lisible (${JSON.stringify(joystickStatus())})`); // i18n-ignore : console de l'autopilote
+    }
+    // « JoyCroix:up » : la croix du même joystick virtuel, poussée vers le haut puis relâchée.
+    else if (/^JoyCroix:(left|right|up|down)$/.test(code)) {
+      if (!(await pressVirtualHat(code.slice(9) as HatDirection))) console.error(`Autopilote : ${code} sans joystick lisible (${JSON.stringify(joystickStatus())})`); // i18n-ignore : console de l'autopilote
     }
     else if (step > 0) {
       // Un appui : enfoncée puis relâchée (le relevé des boutons se fait au relâchement).
@@ -1635,9 +1642,12 @@ function joystickLine(): string {
   const status = joystickStatus();
   if (status.state === 'ready') {
     const read = status.devices.length ? t('Joystick lu : {names}', { names: status.devices.map((d) => d.name || d.id).join(', ') }) : t('Aucun joystick branché');
+    // Deux cartes du même modèle : VPX peut les confondre d'un démarrage à l'autre, à dire avant le relevé.
+    const twins = twinJoysticks(status.devices).map(twinJoysticksAdvice);
     // Le clavier allait ailleurs (foreground.ts) : à noter, c'est ce qui empêchait de relever ses touches.
     const lost = keyboardIncident();
-    return lost ? `${read} · ${lost.back ? t('clavier repris à {holder}', { holder: lost.holder }) : t('clavier retenu par {holder}', { holder: lost.holder })}` : read;
+    const keyboard = lost ? [lost.back ? t('clavier repris à {holder}', { holder: lost.holder }) : t('clavier retenu par {holder}', { holder: lost.holder })] : [];
+    return [read, ...keyboard, ...twins].join(' · ');
   }
   if (status.state === 'error') {
     // La bibliothèque SDL de VPX importe le runtime Visual C++ : absent, elle ne se charge pas.

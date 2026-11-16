@@ -16,6 +16,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { compareVersions } from './acquisition';
+import { twinJoysticks, twinJoysticksAdvice, twinJoysticksInUse } from './buttons';
 import { activeConfiguration, chooseConfiguration, chosenId, scoreConfiguration, type CabinetSet } from './configurations';
 import type { HardwareDmdFacts } from './dmd';
 import type { Finding } from './doctor';
@@ -24,7 +25,7 @@ import { orientationFacts, orientationVerdict, type OrientationFacts } from './g
 import { formatDate, formatList, language, t, tn, type Language } from './i18n';
 import type { IconName } from './icons';
 import { matchScreens } from './match';
-import { ROLES, type ObservedDisplay, type RoleId } from './model';
+import { ROLES, type Cabinet, type ObservedDisplay, type RoleId } from './model';
 import { playBlockers } from './playable';
 import { systemPathOf, type SystemItemId } from './systemmenu';
 import { taskbarMomentLabel, type TaskbarFacts } from './taskbarguard';
@@ -36,7 +37,7 @@ import { airLinkOverWifi, type LinkTransport, type PcNetwork } from './vr-reseau
 export type HealthState = 'ok' | 'check' | 'blocking';
 
 /** Les contrôles, dans l'ordre de la page. */
-export const HEALTH_CHECKS = ['disk', 'pc', 'tables', 'pup', 'media', 'screens', 'dmd', 'dof', 'remote', 'vr', 'vpx'] as const;
+export const HEALTH_CHECKS = ['disk', 'pc', 'tables', 'pup', 'media', 'screens', 'buttons', 'dmd', 'dof', 'remote', 'vr', 'vpx'] as const;
 export type HealthCheckId = (typeof HEALTH_CHECKS)[number];
 
 /** Où mène une ligne. */
@@ -150,6 +151,21 @@ export interface VpxFacts {
   runtime?: { ok: boolean; detail?: string };
 }
 
+/**
+ * Boutons de la borne (buttons.ts) : cartes identiques dont la borne se sert, que VPX ne distingue
+ * que par leur ordre de branchement. Absent tant que les joysticks n'ont pas été lus.
+ */
+export interface ButtonsHealthFacts {
+  /** Joysticks branchés, lus par la bibliothèque SDL de VPX. */
+  joysticks: number;
+  twins: { name: string; count: number }[];
+}
+
+/** Ce que la Santé retient des joysticks branchés et du relevé de la borne. */
+export function buttonsHealthFacts(devices: readonly { id: string; name: string }[], cabinet: Pick<Cabinet, 'buttons' | 'navigation' | 'analog'> | undefined): ButtonsHealthFacts {
+  return { joysticks: devices.length, twins: twinJoysticksInUse(twinJoysticks(devices), cabinet).map((g) => ({ name: g.name, count: g.devices.length })) };
+}
+
 /** LED et retours de la borne (dof.ts) : ce que DOF trouve, et ce qui l'empêchera d'allumer. */
 export interface DofFacts {
   /** Contrôleurs branchés ou déclarés dans Cabinet.xml, en clair (« Pinscape (KL25Z) · 51 »). */
@@ -174,6 +190,8 @@ export interface HealthFacts {
   pup?: PupFacts;
   media?: MediaFacts;
   screens?: ScreensFacts;
+  /** Boutons de la borne : cartes identiques ; absent tant que les joysticks n'ont pas été lus. */
+  buttons?: ButtonsHealthFacts;
   /** DMD réels (dmd.ts) : reconnus ou en wifi, et leurs pilotes ; absent sans DMD réel. */
   hardwareDmd?: HardwareDmdFacts;
   /** Absent d'un relevé plus ancien, ou sans dossier de DOF lisible. */
@@ -610,6 +628,27 @@ export function hardwareDmdLines(facts: HardwareDmdFacts): HealthLine[] {
 }
 
 /**
+ * Boutons de la borne : une ligne « à vérifier » par modèle de carte branché en plusieurs
+ * exemplaires dont viennent des boutons ou le lanceur ; sinon une ligne « prêt » avec les joysticks lus.
+ */
+export function buttonsLines(facts: ButtonsHealthFacts): HealthLine[] {
+  const go = t('Ouvrir Commandes de la borne');
+  const target = SYSTEM('controls');
+  if (!facts.twins.length) {
+    const title = facts.joysticks ? tn(facts.joysticks, '{n} joystick lu', '{n} joysticks lus') : t('Aucun joystick branché : boutons du clavier');
+    return [{ check: 'buttons', state: 'ok', title, go, target }];
+  }
+  return facts.twins.map((twin) => ({
+    check: 'buttons',
+    state: 'check',
+    title: t('Cartes de boutons identiques : {name}', { name: twin.name || t('joystick') }),
+    detail: twinJoysticksAdvice({ name: twin.name, devices: new Array<string>(twin.count).fill('') }),
+    go,
+    target,
+  }));
+}
+
+/**
  * LED et retours (DOF) : rien sur une borne sans contrôleur ni configuration (DOF est facultatif) ;
  * sinon une ligne par point à vérifier, ou une ligne « prêt ». Chacune ouvre « LED et retours (DOF) ».
  */
@@ -733,6 +772,7 @@ export function healthLines(facts: HealthFacts): HealthLine[] {
     ...(facts.pup ? pupLines(facts.pup) : []),
     ...(facts.media ? mediaLines(facts.media) : []),
     ...(facts.screens ? screensLines(facts.screens) : []),
+    ...(facts.buttons ? buttonsLines(facts.buttons) : []),
     ...(facts.hardwareDmd ? hardwareDmdLines(facts.hardwareDmd) : []),
     ...(facts.dof ? dofLines(facts.dof) : []),
     ...(facts.remote ? remoteLines(facts.remote) : []),
@@ -759,6 +799,8 @@ export function healthCheckInfo(check: HealthCheckId): { title: string; icon: Ic
       return { title: t('Médias'), icon: 'image' };
     case 'screens':
       return { title: t('Écrans'), icon: 'screens' };
+    case 'buttons':
+      return { title: t('Boutons de la borne'), icon: 'gamepad' };
     case 'dmd':
       return { title: t('DMD réel'), icon: 'dmd' };
     case 'dof':

@@ -29,6 +29,7 @@ import {
   t,
   tablesFacts,
   tn,
+  type ButtonsHealthFacts,
   type DofFacts,
   type HardwareDmdFacts,
   type VrNetworkFacts,
@@ -61,6 +62,8 @@ export interface HealthContext {
   doctor(): (table: TableEntry) => Finding[] | undefined;
   /** Ce que VPinMediaDB ajouterait aux tables, hors ligne (media-download.ts, offlineSurvey). */
   media(pause: () => Promise<void>): Promise<MediaFacts | undefined>;
+  /** Boutons de la borne : cartes identiques ; undefined tant que les joysticks ne sont pas lus. */
+  buttons?(): ButtonsHealthFacts | undefined;
   /** LED et retours (DOF) : contrôleurs et constats ; undefined sans VPX. */
   dof?(): DofFacts | undefined;
   /** DMD réels : reconnus, en wifi, et leurs pilotes ; undefined si l'USB est illisible. */
@@ -179,6 +182,12 @@ export function createHealth(ctx: HealthContext) {
     } catch (error) {
       console.error(`Santé de la borne, DOF : ${(error as Error).message}`); // i18n-ignore : journal
     }
+    let buttons: ButtonsHealthFacts | undefined;
+    try {
+      buttons = ctx.buttons?.();
+    } catch (error) {
+      console.error(`Santé de la borne, boutons : ${(error as Error).message}`); // i18n-ignore : journal
+    }
     let hardwareDmd: HardwareDmdFacts | undefined;
     try {
       hardwareDmd = ctx.hardwareDmd?.();
@@ -188,7 +197,7 @@ export function createHealth(ctx: HealthContext) {
     const vr = ctx.vr?.();
     const remote = ctx.remote?.();
     const pc = ctx.pc?.();
-    return { at: new Date().toISOString(), disks, ...(pc ? { pc } : {}), tables, pup, media, screens, ...(hardwareDmd ? { hardwareDmd } : {}), ...(dof ? { dof } : {}), ...(vr ? { vr } : {}), ...(remote ? { remote } : {}), vpx };
+    return { at: new Date().toISOString(), disks, ...(pc ? { pc } : {}), tables, pup, media, screens, ...(buttons ? { buttons } : {}), ...(hardwareDmd ? { hardwareDmd } : {}), ...(dof ? { dof } : {}), ...(vr ? { vr } : {}), ...(remote ? { remote } : {}), vpx };
   }
 
   /** Relève tout en arrière-plan ; un relevé en cours n'est pas doublé. */

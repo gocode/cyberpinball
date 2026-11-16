@@ -203,7 +203,7 @@ test('assistant complet au clavier : boutons du jeu puis de l’interface relev�
 
 const dll = electron ? sdlLibrary() : undefined;
 
-test('boutons du jeu au joystick (Pinscape) et au clavier mélangés : relevés et enregistrés', { skip: skip || (dll ? false : 'aucune bibliothèque SDL de VPX sur ce poste'), timeout: 200_000 }, () => {
+test('boutons du jeu au joystick (Pinscape, croix d’une manette) et au clavier mélangés : relevés et enregistrés', { skip: skip || (dll ? false : 'aucune bibliothèque SDL de VPX sur ce poste'), timeout: 200_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-joystick-'));
   try {
     const home = path.join(dir, 'home');
@@ -214,7 +214,7 @@ test('boutons du jeu au joystick (Pinscape) et au clavier mélangés : relevés 
         'click:#actions button:nth-child(4)', // « Tout relever »
         'Joy0', 'Joy1', 'Joy2', 'Joy3', // flippers, Start, Exit au joystick
         'Clavier:Digit5', // crédit au clavier
-        'Joy5', // lanceur
+        'JoyCroix:up', // lanceur à la croix (manette en XInput)
         ...repeat('Joy3', BUTTONS.length - 6), // Exit passe les boutons facultatifs
         'Joy0', 'Joy1', 'Joy3', 'Joy2', // essai, Start enregistre
       ],
@@ -224,7 +224,7 @@ test('boutons du jeu au joystick (Pinscape) et au clavier mélangés : relevés 
     const buttons = loadCabinet(home)!.buttons!;
     assert.deepEqual(Object.keys(buttons).sort(), ['credit', 'exit', 'leftFlipper', 'plunger', 'rightFlipper', 'start'], output);
     assert.equal(buttons.credit, 'Digit5');
-    for (const [id, n] of [['leftFlipper', 0], ['rightFlipper', 1], ['start', 2], ['exit', 3], ['plunger', 5]] as const)
+    for (const [id, n] of [['leftFlipper', 0], ['rightFlipper', 1], ['start', 2], ['exit', 3], ['plunger', 258]] as const)
       assert.match(buttons[id]!, new RegExp(`^SDLJoy_[0-9a-f]{32}_\\d+;${n}$`), `${id} : ${buttons[id]}`);
     assert.ok(output.includes(recorded('game', 'credit', 'Digit5')), output);
   } finally {

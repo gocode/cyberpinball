@@ -38,6 +38,12 @@ export const messages: Record<string, string> = {
   '{n} médias qui leur manquent (index du {day})': '{n} media they lack (index from {day})',
   // écrans
   'Ouvrir la configuration de la borne': 'Open cabinet setup',
+  'Boutons de la borne': 'Cabinet buttons',
+  'Cartes de boutons identiques : {name}': 'Identical button boards: {name}',
+  '{n} joystick lu': '{n} joystick read',
+  '{n} joysticks lus': '{n} joysticks read',
+  'Aucun joystick branché : boutons du clavier': 'No joystick connected: keyboard buttons',
+  'Ouvrir Commandes de la borne': 'Open Cabinet controls',
   '{n} écran branché': '{n} screen plugged in',
   '{n} écrans branchés': '{n} screens plugged in',
   'Aucune configuration de la borne': 'No cabinet setup',

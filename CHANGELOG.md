@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.13
 
+- Boutons de la borne : la croix d'une manette (I-PAC, Pinscape Pico ou carte à Raspberry Pico réglés en manette XInput) se relève comme un bouton. Deux cartes de boutons identiques sont signalées à l'étape « Boutons » et dans la Santé de la borne : Windows peut les intervertir d'un démarrage à l'autre.
 - Mise à jour de Cyber Pinball : « Versions reçues » choisit entre les versions finales et les préversions. Pour qui maintient Cyber Pinball, un canal d'essai privé ajoute les « Essais privés », que seules ses bornes voient. Une borne ne revient jamais à une version plus ancienne.
 - Changer de langue ne laisse plus de texte dans l'ancienne : « Ce qu'il manque pour jouer » sur la fiche (« Reprendre : étape 3 sur 4 »), la liste d'attente, l'Activité récente, les téléchargements et leur journal, les médias refusés de la recherche web et l'orientation des écrans se disent dans la langue choisie, y compris ce qui a été noté avant la mise à jour.
 - Communauté : l'avatar de chaque joueur se voit partout, ami ou non (Joueurs en ligne, salons, classements, profils publics, demandes d'ami). Un joueur bloqué ne reçoit rien ; « Apparaître en ligne pour tous » s'applique toujours.

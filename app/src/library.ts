@@ -73,6 +73,7 @@ import {
   loadCabinet,
   saveCabinet,
   hardwareDmdFacts,
+  buttonsHealthFacts,
   loadVpsDb,
   mediaTypeInfo,
   missingRoms,
@@ -246,7 +247,7 @@ import { createJukeboxMenu } from './jukebox-menu';
 import { createYoutubeAccount } from './youtube-account';
 import type { EdgeSession } from './edge-login';
 import type { JukeboxPreview } from './jukebox-menu';
-import { watchJoystickButtons } from './joystick-input';
+import { joystickStatus, watchJoystickButtons } from './joystick-input';
 import { createCatalog } from './catalog';
 import { createGameParts, type PupSwitchView } from './game-parts';
 import type { RecordingOutcome } from './game-recording';
@@ -1697,6 +1698,10 @@ export function createLibrary(host: LibraryHost) {
       if (!setup) return undefined;
       const devices = usbDevices() ?? [];
       return dofHealthFacts(setup, detectDofControllers(devices, cabinetJoystickHids(loadCabinet(host.dataDir))), devices);
+    },
+    buttons: () => {
+      const joysticks = joystickStatus();
+      return joysticks.state === 'ready' ? buttonsHealthFacts(joysticks.devices, loadCabinet(host.dataDir)) : undefined;
     },
     hardwareDmd: () => {
       const devices = usbDevices();

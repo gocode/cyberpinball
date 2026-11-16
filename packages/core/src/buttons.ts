@@ -442,7 +442,12 @@ export function keyLabel(code: string | undefined): string {
   if (!code) return t('aucune');
   const joy = joystickButton(code);
   // Numéroté à partir de 1, comme le panneau « Contrôleurs de jeu » de Windows et l'outil de configuration du Pinscape.
-  if (joy) return t('Bouton {n} du joystick', { n: joy.button + 1 });
+  if (joy) {
+    const hat = joystickHat(joy.button);
+    if (!hat) return t('Bouton {n} du joystick', { n: joy.button + 1 });
+    const arrow = HAT_ARROWS[hat.direction];
+    return hat.hat ? t('Croix {n} {arrow} du joystick', { n: hat.hat + 1, arrow }) : t('Croix {arrow} du joystick', { arrow });
+  }
   if (KEY_LABELS[code]) return KEY_LABELS[code]!;
   const m = /^(?:Key|Digit)(.)$/.exec(code) ?? /^(F\d+)$/.exec(code);
   if (m) return m[1]!;
@@ -489,6 +494,98 @@ export function joystickButton(code: string): { device: string; button: number }
 /** Code d'un bouton de joystick, tel que VPX l'écrit dans [Input]. */
 export function joystickCode(device: string, button: number): string {
   return `${device};${button}`;
+}
+
+// Croix (chapeaux SDL) : VPX 10.8.1 en fait quatre boutons par croix, numérotés
+// 0x100 + 4 × croix + direction, gauche, droite, haut, bas (SDLInputHandler.h,
+// SDL_EVENT_JOYSTICK_HAT_MOTION, commit af26b2d93). C'est la croix d'une manette en mode
+// XInput (I-PAC, Pinscape Pico, cartes à Raspberry Pico) ou les entrées « POV » d'un
+// encodeur : relevée comme un bouton, elle s'écrit dans [Input] comme VPX la lit.
+
+/** Directions d'une croix, dans l'ordre de VPX. */
+export const HAT_DIRECTIONS = ['left', 'right', 'up', 'down'] as const;
+export type HatDirection = (typeof HAT_DIRECTIONS)[number];
+
+/** Premier numéro de bouton de croix (VPX) ; les axes commencent à 0x200. */
+export const JOYSTICK_HAT_FIRST = 0x100;
+const JOYSTICK_AXIS_FIRST = 0x200;
+
+/** Bits de chaque direction dans la valeur d'une croix SDL (SDL_HAT_UP 1, RIGHT 2, DOWN 4, LEFT 8). */
+const HAT_MASKS: Record<HatDirection, number> = { left: 8, right: 2, up: 1, down: 4 };
+
+/** Numéro de VPX de la direction `direction` de la croix `hat` (à partir de 0). */
+export function hatButton(hat: number, direction: HatDirection): number {
+  return JOYSTICK_HAT_FIRST + hat * 4 + HAT_DIRECTIONS.indexOf(direction);
+}
+
+/** Croix et direction d'un numéro de bouton de VPX ; undefined pour un vrai bouton. */
+export function joystickHat(button: number): { hat: number; direction: HatDirection } | undefined {
+  if (button < JOYSTICK_HAT_FIRST || button >= JOYSTICK_AXIS_FIRST) return undefined;
+  const n = button - JOYSTICK_HAT_FIRST;
+  return { hat: Math.floor(n / 4), direction: HAT_DIRECTIONS[n % 4]! };
+}
+
+/**
+ * Directions appuyées ou relâchées quand la croix `hat` passe de `before` à `now` (valeurs SDL) :
+ * une diagonale tient deux directions, comme dans VPX.
+ */
+export function hatChanges(hat: number, before: number, now: number): { button: number; down: boolean }[] {
+  return HAT_DIRECTIONS.filter((d) => (before & HAT_MASKS[d]) !== (now & HAT_MASKS[d])).map((d) => ({ button: hatButton(hat, d), down: (now & HAT_MASKS[d]) !== 0 }));
+}
+
+/** Valeur SDL d'une croix dont les directions `directions` sont tenues (essais au joystick virtuel). */
+export function hatValue(directions: readonly HatDirection[]): number {
+  return directions.reduce((value, d) => value | HAT_MASKS[d], 0);
+}
+
+const HAT_ARROWS: Record<HatDirection, string> = { left: '←', right: '→', up: '↑', down: '↓' };
+
+/**
+ * Cartes identiques (même GUID SDL : deux Zero Delay, deux I-PAC en mode manette, deux Pinscape au
+ * même numéro d'unité) : VPX ne les distingue que par leur rang, l'ordre où SDL les voit. Ce rang
+ * peut s'inverser après un débranchement ou un redémarrage (VPX le dit lui-même, SDLInputHandler.h,
+ * OnJoystickAdded) : les boutons et le lanceur relevés passent alors à l'autre carte.
+ */
+export interface TwinJoysticks {
+  /** Nom donné par SDL (« Generic USB Joystick »). */
+  name: string;
+  /** Identifiants de VPX des cartes de ce modèle, par rang. */
+  devices: string[];
+}
+
+/** GUID d'un identifiant de joystick de VPX (« SDLJoy_<GUID>_<rang> »), en minuscules. */
+export function joystickGuid(device: string): string | undefined {
+  return /^SDLJoy_([0-9a-f]{32})_\d+$/i.exec(device)?.[1]?.toLowerCase();
+}
+
+/** Joysticks branchés qui partagent leur GUID avec un autre, groupés par modèle. */
+export function twinJoysticks(devices: readonly { id: string; name: string }[]): TwinJoysticks[] {
+  const groups = new Map<string, TwinJoysticks>();
+  for (const d of devices) {
+    const guid = joystickGuid(d.id);
+    if (!guid) continue;
+    const group = groups.get(guid) ?? { name: d.name, devices: [] };
+    group.devices.push(d.id);
+    groups.set(guid, group);
+  }
+  return [...groups.values()].filter((g) => g.devices.length > 1);
+}
+
+/**
+ * Cartes identiques dont la borne se sert : un bouton du jeu ou de l'interface, le lanceur ou
+ * l'accéléromètre y sont relevés. Une carte identique dont rien ne vient est sans risque.
+ */
+export function twinJoysticksInUse(twins: readonly TwinJoysticks[], cabinet: Pick<Cabinet, 'buttons' | 'navigation' | 'analog'> | undefined): TwinJoysticks[] {
+  if (!cabinet) return [];
+  const codes = [...Object.values(cabinet.buttons ?? {}), ...Object.values(cabinet.navigation ?? {})];
+  const used = new Set(codes.flatMap((code) => (code ? [joystickButton(code)?.device.toLowerCase()] : [])));
+  for (const sensor of [cabinet.analog?.plunger, cabinet.analog?.nudge]) if (sensor) used.add(sensor.device.toLowerCase());
+  return twins.filter((g) => g.devices.some((d) => used.has(d.toLowerCase())));
+}
+
+/** Ce qu'il faut dire de cartes identiques, en une phrase, avec le remède. */
+export function twinJoysticksAdvice(twin: TwinJoysticks): string {
+  return t('{n} cartes identiques ({name}) : VPX les distingue par leur ordre de branchement, qui peut s’inverser. Donnez-leur un identifiant USB différent si leur outil le permet, sinon relevez tous les boutons sur une seule.', { n: twin.devices.length, name: twin.name || t('joystick') });
 }
 
 /**

@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.13
 
+- Cabinet buttons: a gamepad's D-pad (I-PAC, Pinscape Pico or Raspberry Pico board set to XInput gamepad) can be set up as buttons. Two identical button boards are flagged in the "Buttons" step and in Cabinet health: Windows can swap them from one start-up to the next.
 - Cyber Pinball update: "Versions received" chooses between final versions and pre-releases. For whoever maintains Cyber Pinball, a private test channel adds "Private tests", which only their own cabinets see. A cabinet never goes back to an older version.
 - Switching language no longer leaves text in the old one: "What's missing to play" on the sheet ("Resume: step 3 of 4"), the waiting list, Recent activity, downloads and their log, refused web search media and screen orientation all speak the chosen language, including what was recorded before the update.
 - Community: every player's avatar shows everywhere, friend or not (Players online, rooms, leaderboards, public profiles, friend requests). A blocked player receives nothing; "Appear online to everyone" still applies.

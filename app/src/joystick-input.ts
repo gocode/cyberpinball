@@ -16,7 +16,7 @@
 
 import * as path from 'node:path';
 import { BrowserWindow, type Input } from 'electron';
-import { joystickCode, type AxisReading } from '@cyberpinball/core';
+import { hatValue, joystickCode, type AxisReading, type HatDirection } from '@cyberpinball/core';
 import { openJoysticks, sdlLibraryIn, type JoystickDevice, type JoystickReader } from '@cyberpinball/win-displays';
 import { keyboardFollows } from './foreground';
 import { isShown, OFFSCREEN } from './offscreen';
@@ -107,11 +107,28 @@ export async function pressVirtualButton(button: number): Promise<boolean> {
   start();
   if (!reader && status.state !== 'error') open();
   if (!reader) return false;
-  virtualId ??= reader.attachVirtual('Cyber Pinball (joystick virtuel)', 32);
+  virtualId ??= reader.attachVirtual('Cyber Pinball (joystick virtuel)', 32, 0, 1);
   const pause = () => new Promise((resolve) => setTimeout(resolve, POLL_MS * 5));
   reader.pressVirtual(virtualId, button, true);
   await pause();
   reader.pressVirtual(virtualId, button, false);
+  await pause();
+  return true;
+}
+
+/**
+ * Essai sans opérateur (autopilote « JoyCroix:up ») : la croix du même joystick virtuel est
+ * poussée dans la direction `direction` puis relâchée, comme la croix d'une manette en XInput.
+ */
+export async function pressVirtualHat(direction: HatDirection): Promise<boolean> {
+  start();
+  if (!reader && status.state !== 'error') open();
+  if (!reader) return false;
+  virtualId ??= reader.attachVirtual('Cyber Pinball (joystick virtuel)', 32, 0, 1);
+  const pause = () => new Promise((resolve) => setTimeout(resolve, POLL_MS * 5));
+  reader.moveVirtualHat(virtualId, 0, hatValue([direction]));
+  await pause();
+  reader.moveVirtualHat(virtualId, 0, 0);
   await pause();
   return true;
 }

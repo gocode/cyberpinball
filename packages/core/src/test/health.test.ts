@@ -200,6 +200,8 @@ function everyCase(): HealthFacts[] {
     { at, disks: [], hardwareDmd: { devices: ['PIN2DMD'], problems: ['PIN2DMD : Windows ne lui a pas donné de pilote USB générique (WinUSB ou libusbK) (code 28 du Gestionnaire de périphériques).'] }, vpx: {} },
     // LED et retours (DOF) : prêt ; puis le cas réel du 04/11/2026, une KL25Z sans configuration ni contrôleur de LED adressables.
     { at, disks: [], dof: { controllers: ['Pinscape (KL25Z) · 51'], ini: 2, problems: [] }, vpx: {} },
+    { at, disks: [], buttons: { joysticks: 1, twins: [] }, vpx: {} },
+    { at, disks: [], buttons: { joysticks: 2, twins: [{ name: 'Generic USB Joystick', count: 2 }] }, vpx: {} },
     { at, disks: [], dof: { controllers: ['Pinscape (KL25Z) · 51', 'Teensy (TeensyStripController) (COM7) · 30'], ini: 0, problems: ['Aucun fichier directoutputconfig.ini', 'Teensy branché (COM7) mais aucun Cabinet.xml ne le déclare'] }, vpx: {} },
     // Casque : Air Link sur un PC en Wi-Fi (la borne, 11/11/2026), puis Air Link sur un PC en Ethernet.
     { at, disks: [], vr: { transport: 'air', network: { adapter: 'Intel(R) Wireless-AC 9560 160MHz', wireless: true } }, vpx: {} },
@@ -224,7 +226,7 @@ test('chaque contrôle passe par ses états, et chaque ligne mène à un écran 
     assert.ok((HEALTH_TARGET_KINDS as readonly string[]).includes(l.target.kind), `${l.check} « ${l.title} » : cible inconnue`);
     assert.ok(targetReachable(l.target), `${l.check} « ${l.title} » : l'entrée ${JSON.stringify(l.target)} n'est dans aucune rubrique du menu système`);
   }
-  const expected: Record<string, HealthState[]> = { disk: ['ok', 'check', 'blocking'], tables: ['ok', 'check', 'blocking'], pup: ['ok', 'check'], media: ['ok', 'check'], screens: ['ok', 'check', 'blocking'], dmd: ['ok', 'check'], dof: ['ok', 'check'], remote: ['ok', 'check'], vr: ['ok', 'check'], pc: ['ok', 'check'], vpx: ['ok', 'check', 'blocking'] };
+  const expected: Record<string, HealthState[]> = { disk: ['ok', 'check', 'blocking'], tables: ['ok', 'check', 'blocking'], pup: ['ok', 'check'], media: ['ok', 'check'], screens: ['ok', 'check', 'blocking'], buttons: ['ok', 'check'], dmd: ['ok', 'check'], dof: ['ok', 'check'], remote: ['ok', 'check'], vr: ['ok', 'check'], pc: ['ok', 'check'], vpx: ['ok', 'check', 'blocking'] };
   for (const check of HEALTH_CHECKS) assert.deepEqual([...(seen.get(check) ?? [])].sort(), [...expected[check]!].sort(), `états du contrôle ${check}`);
   // Chaque sorte de cible sert.
   assert.deepEqual([...new Set(lines.map((l) => l.target.kind))].sort(), [...HEALTH_TARGET_KINDS].sort());
