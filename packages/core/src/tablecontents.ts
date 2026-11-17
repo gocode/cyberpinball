@@ -11,6 +11,7 @@ import { romBlockers } from './doctor';
 import { t } from './i18n';
 import { isPupFolderName, PUP_FOLDER, isDisabledPupFolderName } from './pupdisabled';
 import { isJunkName } from './puppack';
+import { historicAlias, loadedRoms } from './romalias';
 import { romFile, sameRomFile, storedRom } from './romlibrary';
 import { readScriptPatchFile } from './scriptpatch';
 import { classifyDir, classifyFile, companion, type FileKind } from './tablefiles';
@@ -48,6 +49,13 @@ export interface TableContents {
   size: number;
   /** Entrées à vérifier (état warning ou error). */
   problems: number;
+  /**
+   * ROM que la table joue depuis la bibliothèque commune (<racine>\pinmame\roms), sans lien dans son
+   * dossier : le dossier commun de PinMAME la trouve. Pas une entrée (le dossier ne l'a pas), mais
+   * une partie de la table : elle part avec elle chez un ami, sous `rel` (17/11/2026 : la ROM de
+   * Monster Bash, rangée ainsi chez l'ami, n'était jamais proposée).
+   */
+  libraryRoms?: { rel: string; file: string }[];
 }
 
 export interface TableContentsOptions {
@@ -224,10 +232,23 @@ export function tableContents(tableFile: string, opts: TableContentsOptions): Ta
     return fileEntry(rel, 'rom', 'ok', t('propre à la table, pas dans la bibliothèque') + why);
   }
 
+  // La ROM jouée sans être dans le dossier : celle de la bibliothèque commune, sous le nom que
+  // PinMAME charge (alias de la table, ancien nom de VPinMAME), comme la cherche le médecin.
+  const libraryRoms: { rel: string; file: string }[] = [];
+  if (opts.ownFolder && opts.romLibrary && wanted.length) {
+    const loaded = loadedRoms(folder, wanted);
+    const names = [...new Set([...loaded, ...loaded.map(historicAlias).filter((r): r is string => !!r)])];
+    if (!names.some((r) => roms.includes(`${lower(r)}.zip`))) {
+      const stored = names.map((r) => storedRom(opts.romLibrary!, r)).find(Boolean);
+      if (stored) libraryRoms.push({ rel: path.join('pinmame', 'roms', path.basename(stored.path)), file: stored.path });
+    }
+  }
+
   const rank = (k: FileKind) => (ORDER.indexOf(k) < 0 ? ORDER.length : ORDER.indexOf(k));
   const weight = (e: TableFileEntry) => (e.missing ? 0 : e.state === 'ok' && e.kind === 'table' ? 1 : 2);
   entries.sort((a, b) => rank(a.kind) - rank(b.kind) || weight(a) - weight(b) || a.rel.localeCompare(b.rel, 'en', { numeric: true, sensitivity: 'base' }));
   return {
+    ...(libraryRoms.length ? { libraryRoms } : {}),
     entries,
     files: entries.reduce((n, e) => n + (e.missing ? 0 : e.dir ? (e.files ?? 0) : 1), 0),
     size: entries.reduce((n, e) => n + e.size, 0),

@@ -1307,7 +1307,7 @@ function drawPlayfield(s) {
     const box = el('div', 'message');
     for (const line of s.message.lines) box.append(el('p', /^\d{4}-\d\d-\d\d /.test(line) ? 'log' : '', line));
     cover.append(box);
-    // Une partie échouée : un flipper ouvre le formulaire des retours (Avis et propositions), ce problème rappelé.
+    // Une partie échouée : un flipper ouvre le formulaire des retours (Retours et propositions), ce problème rappelé.
     const report = s.message.report ? [[t('Flipper : signaler ce problème'), s.nav.next]] : [];
     if (s.message.action === 'addTable') cover.append(footer([[t('Ajouter une table'), s.nav.confirm], [t('Menu système'), s.nav.exit]]));
     // Partie échouée : Start mène au parcours « Ce qu'il manque pour jouer » (clic compris).

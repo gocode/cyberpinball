@@ -11,6 +11,13 @@ son interface).
 
 ## 0.1.14
 
+- Jouer une table depuis la Bibliothèque, un groupe ou une partie entre amis pendant que la roue montrait un médaillon (Communauté, Juke-box, Collections) : le chargement porte le nom de la table, et la roue revient sur elle après la partie.
+- « Avis et propositions » devient « Retours et propositions » : le nom dit enfin qu’on y signale aussi un problème, pas seulement une idée.
+- Pinball FX3 (« Pinball FX Classic » sur Steam) en bêta : Menu système > Tables > Ajouter une table > « Tables de Pinball FX3 » liste les tables installées avec le jeu ; vous choisissez celles que vous possédez, avec leurs médias, comme pour Pinball FX.
+- Pinball FX3 : les tables Williams et Bally se lancent dans leur mode classique ; un appui long sur Exit ferme le jeu et revient à la roue.
+- Pinball FX3 : plus aucun code borne à demander à Zen depuis novembre 2024 ; il suffit d'activer une fois le mode borne dans le jeu, et Cyber Pinball l'explique sur l'écran des tables et sur leur fiche.
+- Pinball FX3 : une partie de moins de 45 s affiche au retour les causes possibles d'un jeu resté sur son écran d'accueil (table pas sur ce compte Steam, mode borne pas activé) au lieu d'un retour muet.
+- Pinball FX et Pinball FX3 partagent désormais le même code (détection Steam, fiche, partie, fermeture) ; une même machine dans les deux jeux, ou en VPX, garde son propre dossier.
 - Classements : « Empreintes de … tables en calcul… » ne reste plus affiché une fois les empreintes arrivées, et des classements reçus du réseau juste après l'ouverture s'affichent sans avoir à rouvrir l'écran.
 - Tables reprises d'une autre installation (PinUP Popper, PinballX, VPX rangé à l'ancienne) : elles arrivent avec leurs réglages. Les interrupteurs DIP de leur ROM (`VPinMAME\cfg`) et ce que leur script avait enregistré dans VPX (options du menu de la table, tableau d'honneur des tables originales, crédits) sont repris, seulement ceux de chaque table ; plus besoin de tout régler de nouveau.
 - PuP-Packs sans `screens.pup` : PinUP Player prenait ses écrans par défaut, le plugin PUP de VPX n'en crée aucun et le pack restait éteint. Les écrans que le pack utilise sont maintenant déclarés d'eux-mêmes avant la partie.

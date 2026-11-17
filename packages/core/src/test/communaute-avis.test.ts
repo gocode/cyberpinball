@@ -1,14 +1,15 @@
-// Accueil Communauté (app/src/community-menu.ts) : « Avis et propositions » tout en bas (16/11/2026), la même
+// Accueil Communauté (app/src/community-menu.ts) : « Retours et propositions » tout en bas (16/11/2026), la même
 // entrée que Menu système > Cyber Pinball. Ces tests fixent :
 // - la porte est la dernière avant « Retour », avec ce que dit l'entrée du menu système ;
 // - Start l'ouvre avec un « Retour » qui ramène à l'accueil Communauté ;
 // - sans service des retours, pas de porte (jamais une entrée morte).
 
 import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { REPO_ROOT } from './i18n-scan';
-import { createPlayerKey, newSocialState, setLanguage } from '../index';
+import { REPO_ROOT, interfaceSources } from './i18n-scan';
+import { SYSTEM_ITEMS, createPlayerKey, newSocialState, setLanguage } from '../index';
 
 interface Built {
   heading: string;
@@ -39,22 +40,22 @@ function harness(withFeedback: boolean) {
   return { built: () => screen!(), feedbackOpened };
 }
 
-test('Communauté : « Avis et propositions » tout en bas, juste avant « Retour »', () => {
+test('Communauté : « Retours et propositions » tout en bas, juste avant « Retour »', () => {
   setLanguage('fr');
   const h = harness(true);
   const b = h.built();
   assert.equal(b.heading, 'Communauté');
   const labels = b.actions.map((a) => a.label);
-  assert.deepEqual(labels.slice(-2), ['Avis et propositions', 'Retour']);
+  assert.deepEqual(labels.slice(-2), ['Retours et propositions', 'Retour']);
   const door = b.actions.at(-2)!;
   assert.equal(door.detail, '3 propositions · 1 de vous');
   assert.equal(door.icon, 'inbox');
 });
 
-test('Communauté : « Avis et propositions » revient à l’accueil Communauté', () => {
+test('Communauté : « Retours et propositions » revient à l’accueil Communauté', () => {
   setLanguage('fr');
   const h = harness(true);
-  h.built().actions.find((a) => a.label === 'Avis et propositions')!.run();
+  h.built().actions.find((a) => a.label === 'Retours et propositions')!.run();
   assert.equal(h.feedbackOpened.length, 1);
   h.feedbackOpened[0]!();
   assert.equal(h.built().heading, 'Communauté');
@@ -63,7 +64,7 @@ test('Communauté : « Avis et propositions » revient à l’accueil Communaut�
 test('Communauté : sans service des retours, pas de porte', () => {
   setLanguage('fr');
   const labels = harness(false).built().actions.map((a) => a.label);
-  assert.ok(!labels.includes('Avis et propositions'));
+  assert.ok(!labels.includes('Retours et propositions'));
   assert.equal(labels.at(-1), 'Retour');
 });
 
@@ -112,4 +113,20 @@ test('Communauté : le nombre de joueurs en ligne ne se dit qu’au-delà de cin
   const many = views(8);
   assert.match(many.stats, /^9 joueurs en ligne · 8 en France · 1 ami$/);
   assert.equal(many.tabs[0], '9');
+});
+
+// Le nom de la porte (17/11/2026) : « Avis » ne disait pas qu'on y signale aussi un problème ; « Retours et
+// propositions » couvre les deux. L'ancien nom ne revient nulle part : écrans, téléphone, cœur, manuels.
+test('Retours et propositions : l’ancien nom « Avis et propositions » ne reparaît nulle part', () => {
+  const manuals = ['docs/manuel', 'docs/manual'].flatMap((dir) =>
+    fs.readdirSync(path.join(REPO_ROOT, dir)).filter((name) => name.endsWith('.md')).map((name) => `${dir}/${name}`),
+  );
+  const files = [...interfaceSources(), ...manuals, 'docs/manuel.md', 'docs/manual.md'];
+  const stale = files.filter((file) => /avis et propositions/i.test(fs.readFileSync(path.join(REPO_ROOT, file), 'utf8')));
+  assert.deepEqual(stale, []);
+  setLanguage('fr');
+  assert.equal(SYSTEM_ITEMS.feedback.label, 'Retours et propositions');
+  setLanguage('en');
+  assert.equal(SYSTEM_ITEMS.feedback.label, 'Feedback and ideas');
+  setLanguage('fr');
 });

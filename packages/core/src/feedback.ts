@@ -1,4 +1,4 @@
-// Retours des joueurs (« Avis et propositions », app/src/feedback-menu.ts) : le cœur, sans réseau ni
+// Retours des joueurs (« Retours et propositions », app/src/feedback-menu.ts) : le cœur, sans réseau ni
 // Electron. Deux circuits vers le service du projet (packages/service-telephone/worker.mjs, base D1) :
 // - public : le tableau des propositions (bug, amélioration, nouvelle fonction), publié tout de suite,
 //   où chaque borne vote une fois par proposition ; les requêtes sont signées par la clé du joueur

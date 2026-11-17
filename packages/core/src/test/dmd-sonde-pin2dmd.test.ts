@@ -27,7 +27,7 @@ test('sonde du PIN2DMD : chaque étape manquée devient une phrase qui dit quoi 
   assert.match(pin2dmdProbeProblem({ stage: 'claim', code: -6 })!, /déjà ouvert par un autre programme \(dmdext, un autre front-end/);
   // Pilote que la libusb de VPX ne sait pas utiliser (NOT_SUPPORTED -12) : WinUSB par Zadig.
   assert.match(pin2dmdProbeProblem({ stage: 'open', code: -12 }, 'libusb0')!, /pilote actuel \(libusb0\).*WinUSB avec Zadig/);
-  assert.match(pin2dmdProbeProblem({ stage: 'open', code: -1 })!, /erreur -1, étape open.*Avis et propositions/);
+  assert.match(pin2dmdProbeProblem({ stage: 'open', code: -1 })!, /erreur -1, étape open.*Retours et propositions/);
 });
 
 test('sonde du PIN2DMD : son verdict passe par le contrôle du pilote, donc partout où il est lu', () => {

@@ -666,6 +666,8 @@ export interface NamedTarget {
   titles: readonly string[];
   /** Les packs Pinball FX de la communauté nomment leurs fichiers d'après lui : « Table_97.png ». */
   pinballFx?: number;
+  /** Les packs Pinball FX3 les nomment d'après le fichier de la table : « WMS_Fish_Tales.png ». */
+  pinballFx3?: string;
 }
 
 /**
@@ -677,7 +679,8 @@ export interface NamedTarget {
 export function namedMediaFiles(files: readonly ReceivedMedia[], type: MediaType, target: NamedTarget): ReceivedMedia[] {
   const typed = files.filter((f) => f.type === type && !isPackThumb(f.file));
   const base = (f: ReceivedMedia) => path.basename(f.file, path.extname(f.file));
-  const byNumber = target.pinballFx === undefined ? [] : typed.filter((f) => new RegExp(`^table[_\\s-]?0*${target.pinballFx}$`, 'i').test(base(f)));
+  const fx3 = target.pinballFx3?.toLowerCase();
+  const byNumber = typed.filter((f) => (target.pinballFx !== undefined && new RegExp(`^table[_\\s-]?0*${target.pinballFx}$`, 'i').test(base(f))) || (fx3 !== undefined && base(f).toLowerCase() === fx3));
   const wanted = target.titles.map(namedWords).filter((w) => w.length);
   const byName = typed.filter((f) => {
     const own = new Set(namedWords(base(f)));
@@ -886,7 +889,7 @@ export function siteMediaChoices(
   /** Recherche élargie : les textes cherchés (siteOffers). */
   loose?: readonly string[],
   /** La table : un pack reçu ne propose que ses fichiers à elle (titre, numéro dans Pinball FX). */
-  own?: { title?: string; pinballFx?: number },
+  own?: { title?: string; pinballFx?: number; pinballFx3?: string },
 ): MediaChoice[] {
   const out: MediaChoice[] = [];
   for (const site of MEDIA_SITES) {
@@ -904,7 +907,7 @@ export function siteMediaChoices(
         const named = namedMediaFiles(
           files.map((f) => ({ ...f, type })),
           type,
-          { titles: [offer.game.name, ...(own?.title ? [own.title] : [])], ...(own?.pinballFx !== undefined ? { pinballFx: own.pinballFx } : {}) },
+          { titles: [offer.game.name, ...(own?.title ? [own.title] : [])], ...(own?.pinballFx !== undefined ? { pinballFx: own.pinballFx } : {}), ...(own?.pinballFx3 !== undefined ? { pinballFx3: own.pinballFx3 } : {}) },
         );
         if (!named.length) continue;
         files = named;

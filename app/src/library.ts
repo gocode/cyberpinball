@@ -52,8 +52,16 @@ import {
   applyImport,
   applyOps,
   applyRomImport,
-  addPinballFxTable,
+  addZenTable,
+  isZenEmulator,
   PINBALLFX_TABLES,
+  PINBALLFX3_CABINET_HELP_URL,
+  pinballFx3InstalledTables,
+  ZEN_GAMES,
+  zenEntryKey,
+  zenFromPinballFx,
+  zenFromPinballFx3,
+  zenTableOfEntry,
   pinballFxVpsImage,
   pickNamedMedia,
   parseSizeText,
@@ -197,7 +205,8 @@ import {
   type RomTable,
   type ScriptFacts,
   type SheetPageType,
-  type PinballFxTable,
+  type ZenGameKey,
+  type ZenTable,
   type TableEntry,
   type TablePlan,
   type VpsDb,
@@ -271,7 +280,7 @@ import { dofDir, readDof, vpxWorkDir } from './dof-files';
 import { backupDir, locations } from './paths';
 import { activeVpxIni, usbDevices } from './vpx-ini';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
-import { openPinballFxStore, pinballFxSetup } from './pinballfx-install';
+import { openPinballFxStore, zenSetup, type ZenSetup } from './pinballfx-install';
 import { LayoutReport } from './layout-check';
 import { createJukeboxLibrary } from './jukebox-library';
 import { createJukeboxMenu } from './jukebox-menu';
@@ -1338,8 +1347,8 @@ export function createLibrary(host: LibraryHost) {
 
   /** La fiche de la table ; « Gérer la table… » quand c'est de là qu'on revient (sheetManage). */
   function openSheet(table: TableEntry, flash?: string): void {
-    // Fiche d'une table de Pinball FX : le jeu installé ou non, relu ici, une fois.
-    if (table.emulator === 'pinballfx') pinballFxNow = pinballFxSetup();
+    // Fiche d'une table d'un jeu de Zen : le jeu installé ou non, relu ici, une fois.
+    if (isZenEmulator(table.emulator)) zenUi[table.emulator].now = zenSetup(table.emulator);
     go({ kind: 'sheet', file: table.file, flash, ...(sheetManage && samePath(sheetManage, table.file) ? { manage: true } : {}) });
   }
 
@@ -1922,7 +1931,7 @@ export function createLibrary(host: LibraryHost) {
     feedback: host.feedbackService ? (text, back) => feedback!.openForm({ attach: true, ...(text ? { text } : {}) }, back) : undefined,
   });
 
-  // Avis et propositions (Menu système > Cyber Pinball) : le formulaire des retours et le tableau des propositions.
+  // Retours et propositions (Menu système > Cyber Pinball) : le formulaire des retours et le tableau des propositions.
   const feedback = host.feedbackService
     ? createFeedbackMenu({
         dataDir: host.dataDir,
@@ -2356,8 +2365,8 @@ export function createLibrary(host: LibraryHost) {
     fs.mkdirSync(layout()!.import, { recursive: true });
     // La base VPS se met à jour pendant qu'on choisit les fichiers.
     void refreshVps();
-    // Pinball FX installé ou non : relu ici, une fois, pas à chaque dessin de l'entonnoir.
-    pinballFxNow = pinballFxSetup();
+    // Jeux de Zen installés ou non : relus ici, une fois, pas à chaque dessin de l'entonnoir.
+    for (const game of Object.keys(zenUi) as ZenGameKey[]) zenUi[game].now = zenSetup(game);
     go({ kind: 'addSource' });
   }
 
@@ -2777,9 +2786,10 @@ export function createLibrary(host: LibraryHost) {
     // Statistiques sur une ligne : la fiche tient sur l'écran, en borne comme au bureau.
     const played = [user.LastRun ? t('dernière partie le {date}', { date: formatDateTime(user.LastRun) }) : undefined, user.RunTime ? t('{duration} de jeu', { duration: formatDuration(user.RunTime) }) : undefined].filter(Boolean).join(' · ');
     const stats: Row[] = [{ text: user.StartCount ? tn(user.StartCount, 'Jouée {n} fois', 'Jouée {n} fois') : t('Jamais jouée'), detail: played || undefined }];
-    // Table de Pinball FX : ni script, ni ROM, ni fichiers de VPX. Ce qui ne s'y applique pas reste à sa
-    // place, grisé, avec la raison (jamais caché).
-    const fx = table.emulator === 'pinballfx';
+    // Table d'un jeu de Zen (Pinball FX, Pinball FX3) : ni script, ni ROM, ni fichiers de VPX. Ce qui ne
+    // s'y applique pas reste à sa place, grisé, avec la raison (jamais caché).
+    const fx = isZenEmulator(table.emulator);
+    const zenName = isZenEmulator(table.emulator) ? ZEN_GAMES[table.emulator].name : '';
     const notFx = (action: SheetAction, reason: string): SheetAction => (fx ? { ...action, detail: reason, tone: 'quiet', attention: undefined, run: () => undefined } : action);
 
     const script = kept('script', () => cachedScript(table.file, host.dataDir));
@@ -2835,14 +2845,23 @@ export function createLibrary(host: LibraryHost) {
     if (absent.length) files.push({ text: t('Absents'), detail: absent.join(', '), tone: 'quiet' });
     if (check.length) files.push({ text: t('À vérifier'), detail: check.join(', '), tone: 'warning' });
     // Lu à l'ouverture de la fiche (openSheet), pas à chaque dessin.
-    const fxInstall = fx ? (pinballFxNow ??= pinballFxSetup()).install : undefined;
+    const fxInstall = isZenEmulator(table.emulator) ? zenNow(table.emulator).install : undefined;
+    const zenKey = fx ? zenEntryKey(table) : undefined;
+    const zen = fx ? zenTableOfEntry(table) : undefined;
     const fxFiles: Row[] = [
-      table.pinballFxTable !== undefined
-        ? { text: t('Table'), detail: t('Pinball FX, table n° {n}', { n: table.pinballFxTable }), tone: 'ok' }
-        : { text: t('Table'), detail: t('Fiche illisible : numéro de table absent'), tone: 'error' },
+      zenKey !== undefined && isZenEmulator(table.emulator)
+        ? { text: t('Table'), detail: zenTableFacts({ game: table.emulator, key: zenKey }), tone: 'ok' }
+        : { text: t('Table'), detail: table.emulator === 'pinballfx3' ? t('Fiche illisible : nom de table absent') : t('Fiche illisible : numéro de table absent'), tone: 'error' },
       fxInstall
-        ? { text: 'Pinball FX', detail: fxInstall.store === 'steam' ? t('Installé par Steam') : t('Installé par Epic'), tone: 'ok', badges: [menuBadgeLabel('beta')] }
-        : { text: 'Pinball FX', detail: t('Pas installé sur ce PC'), tone: 'error', badges: [menuBadgeLabel('beta')] },
+        ? { text: zenName, detail: fxInstall.store === 'steam' ? t('Installé par Steam') : t('Installé par Epic'), tone: 'ok', badges: [menuBadgeLabel('beta')] }
+        : { text: zenName, detail: t('Pas installé sur ce PC'), tone: 'error', badges: [menuBadgeLabel('beta')] },
+      // Pinball FX3 : ce qu'il faut savoir pour que la table s'ouvre directement, sans le menu du jeu.
+      ...(table.emulator === 'pinballfx3'
+        ? [
+            { text: t('Mode borne'), detail: t('À activer une fois dans {game} : icône de borne à côté du profil. Sans lui, ou sans la table sur ce compte Steam, le jeu s’ouvre sur son écran d’accueil.', { game: zenName }), tone: 'quiet' as const },
+            ...(zen?.williams ? [{ text: t('Mode classique'), detail: t('Règles de la machine, sans les améliorations de Zen'), tone: 'ok' as const }] : []),
+          ]
+        : []),
       mediaRow(table),
     ];
     s.contents ??= tableFiles.contentsOf(table);
@@ -2875,24 +2894,24 @@ export function createLibrary(host: LibraryHost) {
     const manage: SheetAction[] = [
       ...further,
       { label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le front-end montre'), icon: 'image', door: 'sheet.medias', run: () => medias.open(table) },
-      notFx({ label: t('Parties du jeu'), detail: t('Table, PuP-Pack, fronton, ROM… : ajouter, remplacer, retirer'), icon: 'table-add', door: 'sheet.parts', run: () => gameParts.open(table) }, t('Pinball FX fournit toute la table : rien à ajouter')),
-      notFx({ label: t('Fichiers de la table'), detail: tableFiles.summary(contents), tone: contents.problems ? 'warning' : undefined, icon: 'folder', door: 'sheet.files', run: () => tableFiles.open(table, 0, contents) }, t('Une table de Pinball FX n’a pas de fichiers à elle')),
+      notFx({ label: t('Parties du jeu'), detail: t('Table, PuP-Pack, fronton, ROM… : ajouter, remplacer, retirer'), icon: 'table-add', door: 'sheet.parts', run: () => gameParts.open(table) }, t('{game} fournit toute la table : rien à ajouter', { game: zenName })),
+      notFx({ label: t('Fichiers de la table'), detail: tableFiles.summary(contents), tone: contents.problems ? 'warning' : undefined, icon: 'folder', door: 'sheet.files', run: () => tableFiles.open(table, 0, contents) }, t('Une table de {game} n’a pas de fichiers à elle', { game: zenName })),
       ...(fx ? [] : pupAction(table, s)),
       ...(host.tableSettings
-        ? [notFx({ label: t('Réglages de cette table'), detail: t('Son, jeu… pour cette table seulement'), icon: 'sliders' as const, door: 'sheet.table-settings' as const, run: () => host.tableSettings!(table) }, t('Ils se règlent dans Pinball FX'))]
+        ? [notFx({ label: t('Réglages de cette table'), detail: t('Son, jeu… pour cette table seulement'), icon: 'sliders' as const, door: 'sheet.table-settings' as const, run: () => host.tableSettings!(table) }, t('Ils se règlent dans {game}', { game: zenName }))]
         : []),
       ...(host.adjustDisplay && (fx || kept('vpx', () => host.vpxExe()))
-        ? [notFx({ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, door: 'sheet.display' as const, run: () => adjustDisplay(table) }, t('Écrans et cadrage : dans le mode borne de Pinball FX'))]
+        ? [notFx({ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, door: 'sheet.display' as const, run: () => adjustDisplay(table) }, t('Écrans et cadrage : dans le mode borne de {game}', { game: zenName }))]
         : []),
       ...(host.menuDmd
-        ? [notFx({ label: t('DMD sur la roue'), detail: host.menuDmd.detail(table), icon: 'dmd' as const, door: 'sheet.menu-dmd' as const, run: () => host.menuDmd!.open(table, () => openSheet(table)) }, t('Tables VPX seulement : Pinball FX ne donne pas son DMD'))]
+        ? [notFx({ label: t('DMD sur la roue'), detail: host.menuDmd.detail(table), icon: 'dmd' as const, door: 'sheet.menu-dmd' as const, run: () => host.menuDmd!.open(table, () => openSheet(table)) }, t('Tables VPX seulement : {game} ne donne pas son DMD', { game: zenName }))]
         : []),
       ...(host.playAndRecord && (fx || kept('vpx', () => host.vpxExe()))
         ? [notFx({ label: t('Jouer et enregistrer'), detail: t('Filmer la partie pour la présentation de la table sur la roue'), icon: 'record' as const, door: 'sheet.record' as const, run: () => recording.setup(table) }, t('Tables VPX seulement pour l’instant'))]
         : []),
-      notFx({ label: t('Diagnostiquer et réparer'), icon: 'pulse', door: 'sheet.doctor', run: () => openDoctor(table.file) }, t('Rien à diagnostiquer : Pinball FX gère la table')),
+      notFx({ label: t('Diagnostiquer et réparer'), icon: 'pulse', door: 'sheet.doctor', run: () => openDoctor(table.file) }, t('Rien à diagnostiquer : {game} gère la table', { game: zenName })),
       { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), icon: 'edit', door: 'sheet.edit', run: () => openEdit(table) },
-      { label: t('Supprimer la table'), detail: fx ? t('Retirée du front-end ; elle reste dans Pinball FX') : t('Mise à la corbeille'), tone: 'error', icon: 'trash', door: 'sheet.remove', run: () => go({ kind: 'remove', file: table.file }) },
+      { label: t('Supprimer la table'), detail: fx ? t('Retirée du front-end ; elle reste dans {game}', { game: zenName }) : t('Mise à la corbeille'), tone: 'error', icon: 'trash', door: 'sheet.remove', run: () => go({ kind: 'remove', file: table.file }) },
     ];
     if (s.manage) {
       // Exit et « Retour » : la fiche, sans plus y revenir depuis les écrans ouverts ensuite.
@@ -2929,7 +2948,7 @@ export function createLibrary(host: LibraryHost) {
       },
       ...(host.playWithFriend ? [notFx({ ...host.playWithFriend(table, () => openSheet(table)), door: 'sheet.friends' as const }, t('Parties entre amis : tables VPX seulement'))] : []),
       ...(host.instantGame ? [notFx({ ...host.instantGame(table, () => openSheet(table)), door: 'sheet.instant' as const }, t('Parties en direct : tables VPX seulement'))] : []),
-      ...(host.scores ? [notFx(scoresAction(table), t('Pinball FX ne donne pas ses scores'))] : []),
+      ...(host.scores ? [notFx(scoresAction(table), t('{game} ne donne pas ses scores', { game: zenName }))] : []),
       pagesAction(table),
       { label: t('Crédits'), detail: kept('credits', () => credits.summary(table)), icon: 'credits', door: 'sheet.credits', run: () => credits.open(table) },
       ...(host.favorite ? [favoriteAction(table)] : []),
@@ -3935,7 +3954,8 @@ export function createLibrary(host: LibraryHost) {
       { label: t('Reprendre un fichier téléchargé'), detail: downloadsDetail(), icon: 'download', run: () => void pick('downloads') },
       { label: t('Choisir des fichiers…'), detail: t('Clé USB, Téléchargements, Bureau, disques ; ou glissez-les ici'), icon: 'import', run: () => void pick('files') },
       { label: t('Choisir un dossier…'), detail: t('Tout le dossier d’une table, depuis une clé USB ou un disque'), icon: 'folder', run: () => void pick('folder') },
-      pinballFxAction(),
+      zenAction('pinballfx'),
+      zenAction('pinballfx3'),
       { label: t('Depuis une autre installation…'), detail: t('PinUP Popper, PinballX : les tables une à une, avec leur PuP-Pack, leur ROM et leurs médias'), icon: 'layers', run: () => installationImport.open() },
       ...(addFromFriend ? [{ label: t('Depuis un ami…'), detail: addFromFriend.detail(), icon: 'friend-list' as const, run: () => addFromFriend!.open(() => openAdd()) }] : []),
       { label: t('Récupérés et attendus'), detail: kept('attendus', () => catalogUi.summary()), icon: 'inbox', run: () => catalogUi.openWaitList(() => openAdd()) },
@@ -3957,97 +3977,126 @@ export function createLibrary(host: LibraryHost) {
   }
 
   /**
-   * « Tables de Pinball FX » dans l'entonnoir. Jeu pas installé : « Installer Pinball FX » ouvre Steam
-   * (ou le lanceur d'Epic) sur son installation, puis l'entonnoir guette le jeu et se redessine quand
-   * il paraît ; ni Steam ni Epic, ou téléchargement en cours : grisée, avec la raison. Cyber Pinball
-   * ne télécharge ni le jeu ni ses tables : jeu commercial, lié au compte du joueur.
+   * « Tables de Pinball FX » et « Tables de Pinball FX3 » dans l'entonnoir (17/11/2026 : FX3 en
+   * second jeu de Zen, même écran). Jeu pas installé : « Installer … » ouvre Steam (ou le lanceur
+   * d'Epic, Pinball FX seulement) sur son installation, puis l'entonnoir guette le jeu et se
+   * redessine quand il paraît ; sans boutique, ou téléchargement en cours : grisée, avec la raison.
+   * Cyber Pinball ne télécharge ni le jeu ni ses tables : jeux commerciaux, liés au compte du joueur.
    */
   /**
-   * État de Pinball FX sur ce PC : lu à l'ouverture de l'entonnoir (openAdd) et par la veille après
-   * « Installer Pinball FX », jamais en dessinant l'écran (refait à chaque touche).
+   * État de chaque jeu de Zen sur ce PC : lu à l'ouverture de l'entonnoir (openAdd) et par la veille
+   * après « Installer … », jamais en dessinant l'écran (refait à chaque touche).
    */
-  let pinballFxNow: ReturnType<typeof pinballFxSetup> | undefined;
+  interface ZenUi {
+    now?: ZenSetup;
+    /** La boutique a été ouverte sur le jeu (le détail de l'entrée le rappelle). */
+    storeOpened: boolean;
+    watch?: NodeJS.Timeout;
+    /** Dernier message de l'écran des tables (table ajoutée). */
+    flash?: string;
+    /** Tables de l'écran, triées : catalogue (Pinball FX) ou fichiers du jeu (FX3), lus à l'ouverture. */
+    list?: ZenTable[];
+    /** Capture de VPS de chaque table, calculée une fois par base VPS. */
+    images?: { db: VpsDb | undefined; map: Map<string, string> };
+    /** Où en est « Chercher les médias manquants » ; undefined : jamais lancé. */
+    hunt?: string;
+  }
+  const zenUi: Record<ZenGameKey, ZenUi> = { pinballfx: { storeOpened: false }, pinballfx3: { storeOpened: false } };
 
-  function pinballFxAction(): Action {
-    const setup = (pinballFxNow ??= pinballFxSetup());
+  function zenNow(game: ZenGameKey): ZenSetup {
+    return (zenUi[game].now ??= zenSetup(game));
+  }
+
+  function zenAction(game: ZenGameKey): Action {
+    const ui = zenUi[game];
+    const name = ZEN_GAMES[game].name;
+    const setup = zenNow(game);
     const install = setup.install;
-    const inMenu = host.tables().filter((x) => x.emulator === 'pinballfx').length;
+    const inMenu = host.tables().filter((x) => x.emulator === game).length;
     // En phase de test (16/11/2026) : pastille « BÊTA » dans tous ses états, comme la VR.
-    const base = { label: t('Tables de Pinball FX'), icon: 'table-add' as const, badge: 'beta' as const };
+    const base = { label: t('Tables de {game}', { game: name }), icon: 'table-add' as const, badge: 'beta' as const };
     if (!install) {
       if (setup.downloading) return { ...base, detail: t('Téléchargement en cours dans Steam : la liste des tables s’ouvre une fois le jeu installé'), tone: 'quiet', run: () => undefined };
       const getter = setup.getter;
-      if (!getter) return { ...base, detail: t('Ni Steam ni Epic sur ce PC : installez l’un des deux, puis Pinball FX'), tone: 'quiet', run: () => undefined };
+      if (!getter)
+        return {
+          ...base,
+          detail: game === 'pinballfx' ? t('Ni Steam ni Epic sur ce PC : installez l’un des deux, puis {game}', { game: name }) : t('Steam absent de ce PC : installez-le, puis {game}', { game: name }),
+          tone: 'quiet',
+          run: () => undefined,
+        };
       const store = getter.store === 'steam' ? 'Steam' : 'Epic';
       return {
-        label: t('Installer Pinball FX'),
+        label: t('Installer {game}', { game: name }),
         icon: 'pinball-app',
         badge: 'beta',
-        detail: pinballFxStoreOpened
+        detail: ui.storeOpened
           ? t('Ouvert dans {store} : installez-le là-bas, ses tables apparaissent ici ensuite', { store })
           : t('Ouvre {store} sur son installation ; vous y achetez le jeu et ses tables', { store }),
         run: () => {
           if (!openPinballFxStore(getter)) return;
-          pinballFxStoreOpened = true;
-          watchPinballFxInstall();
+          ui.storeOpened = true;
+          watchZenInstall(game);
           host.broadcast();
         },
       };
     }
     return {
       ...base,
-      detail: inMenu ? tn(inMenu, '{n} table dans le front-end · choisir celles que vous possédez', '{n} tables dans le front-end · choisir celles que vous possédez') : t('Choisir les tables que vous possédez dans Pinball FX'),
-      run: () => openPinballFx(),
+      detail: inMenu
+        ? tn(inMenu, '{n} table dans le front-end · choisir celles que vous possédez', '{n} tables dans le front-end · choisir celles que vous possédez')
+        : t('Choisir les tables que vous possédez dans {game}', { game: name }),
+      run: () => openZen(game),
     };
   }
 
-  /** La boutique a été ouverte sur Pinball FX (le détail de l'entrée le rappelle). */
-  let pinballFxStoreOpened = false;
-  let pinballFxWatch: NodeJS.Timeout | undefined;
-
   /**
-   * Après « Installer Pinball FX » : l'état du jeu relu toutes les 5 s (deux heures au plus) ;
-   * l'entonnoir, s'il est affiché, se redessine à chaque changement (téléchargement, puis installé).
+   * Après « Installer … » : l'état du jeu relu toutes les 5 s (deux heures au plus) ; l'entonnoir,
+   * s'il est affiché, se redessine à chaque changement (téléchargement, puis installé).
    */
-  function watchPinballFxInstall(): void {
-    if (pinballFxWatch) clearInterval(pinballFxWatch);
+  function watchZenInstall(game: ZenGameKey): void {
+    const ui = zenUi[game];
+    if (ui.watch) clearInterval(ui.watch);
     const state = () => {
-      const s = (pinballFxNow = pinballFxSetup());
+      const s = (ui.now = zenSetup(game));
       return s.install ? 'installed' : s.downloading ? 'downloading' : 'absent';
     };
     let last = state();
     const t0 = Date.now();
-    pinballFxWatch = setInterval(() => {
+    ui.watch = setInterval(() => {
       const now = state();
       if (now !== last) {
         last = now;
-        console.log(`Pinball FX : ${now === 'installed' ? 'installé' : now === 'downloading' ? 'téléchargement en cours' : 'absent'}.`); // i18n-ignore : journal
+        console.log(`${ZEN_GAMES[game].name} : ${now === 'installed' ? 'installé' : now === 'downloading' ? 'téléchargement en cours' : 'absent'}.`); // i18n-ignore : journal
         if (screen?.kind === 'addSource') host.broadcast();
       }
       if (now === 'installed' || Date.now() - t0 > 2 * 3600_000) {
-        clearInterval(pinballFxWatch);
-        pinballFxWatch = undefined;
-        pinballFxStoreOpened = false;
+        clearInterval(ui.watch);
+        ui.watch = undefined;
+        ui.storeOpened = false;
       }
     }, 5000);
-    pinballFxWatch.unref?.();
+    ui.watch.unref?.();
   }
 
-  /** Dernier message de l'écran des tables de Pinball FX (table ajoutée). */
-  let pinballFxFlash: string | undefined;
-
-  /** Vignettes des tables de Pinball FX : adresse de la capture de VPS -> fichier reçu et vérifié. */
+  /** Vignettes des tables de Zen : adresse de la capture de VPS -> fichier reçu et vérifié. */
   const pinballFxThumbs = new Map<string, string>();
   /** Captures déjà demandées : une adresse en échec n'est pas redemandée à chaque dessin de l'écran. */
   const pinballFxAsked = new Set<string>();
   /** La base VPS a été demandée une fois (sans réseau, l'écran s'ouvre sans vignettes, sans redemander). */
   let pinballFxVpsTried = false;
 
+  /** Écran des tables de chaque jeu : une fonction par jeu, pour que chacun garde sa place du curseur. */
+  const zenListBuilders: Record<ZenGameKey, () => Built> = { pinballfx: () => buildZen('pinballfx'), pinballfx3: () => buildZen('pinballfx3') };
+
   /**
-   * Tables de Pinball FX : le catalogue de Zen ; Start ajoute la table au menu, ou ouvre sa fiche si
-   * elle y est. Vignettes et médias viennent de la base VPS : téléchargée une fois (8 Mo), gardée ensuite.
+   * Tables d'un jeu de Zen : Pinball FX, le catalogue de Zen ; Pinball FX3, les fichiers de tables
+   * installés avec le jeu (toutes, achetées ou non). Start ajoute la table au menu, ou ouvre sa
+   * fiche si elle y est. Vignettes et médias viennent de la base VPS : téléchargée une fois (8 Mo),
+   * gardée ensuite.
    */
-  function openPinballFx(focus?: number): void {
+  function openZen(game: ZenGameKey, focus?: string): void {
+    const ui = zenUi[game];
     // Vignettes rangées ou nettoyées depuis (dossier de réception) : redemandées. Le disque est lu
     // ici, à l'ouverture, jamais en dessinant l'écran (refait à chaque touche).
     for (const [url, local] of pinballFxThumbs) {
@@ -4055,11 +4104,17 @@ export function createLibrary(host: LibraryHost) {
       pinballFxThumbs.delete(url);
       pinballFxAsked.delete(url);
     }
+    // FX3 : les fichiers du jeu relus à chaque ouverture (une mise à jour peut en ajouter).
+    if (game === 'pinballfx3') {
+      const tablesDir = (ui.now = zenSetup(game)).install?.tablesDir;
+      ui.list = tablesDir ? pinballFx3InstalledTables({ tablesDir }).map(zenFromPinballFx3) : [];
+      ui.images = undefined;
+    }
     const show = () => {
-      // Catalogue trié et captures de VPS calculés ici, à l'ouverture, pas au premier dessin.
-      pinballFxImageMap();
-      const list = pinballFxList();
-      openCustom(buildPinballFx, focus === undefined ? undefined : Math.max(0, list.findIndex((x) => x.id === focus)));
+      // Liste triée et captures de VPS calculées ici, à l'ouverture, pas au premier dessin.
+      zenImageMap(game);
+      const list = zenList(game);
+      openCustom(zenListBuilders[game], focus === undefined ? undefined : Math.max(0, list.findIndex((x) => x.key === focus)));
     };
     if ((vpsLoaded && vpsDb) || pinballFxVpsTried || !layout()) return show();
     pinballFxVpsTried = true;
@@ -4091,8 +4146,8 @@ export function createLibrary(host: LibraryHost) {
   }
 
   /**
-   * Vignette d'une table de Pinball FX : sa capture reçue, sinon l'icône de Pinball FX. Sans lecture du
-   * disque (vérifiée à l'ouverture de l'écran ; une image disparue entre-temps montre l'icône).
+   * Vignette d'une table de Zen : sa capture reçue, sinon l'icône du jeu. Sans lecture du disque
+   * (vérifiée à l'ouverture de l'écran ; une image disparue entre-temps montre l'icône).
    */
   function pinballFxThumb(url: string | undefined): string {
     const local = url ? pinballFxThumbs.get(url) : undefined;
@@ -4100,26 +4155,36 @@ export function createLibrary(host: LibraryHost) {
     return local ? kept(`vignette:${local}`, () => mediaUrl(local)) : 'pinball-app';
   }
 
-  /** Catalogue trié et capture de VPS de chaque table : calculés une fois par base VPS. */
-  let pinballFxSorted: PinballFxTable[] | undefined;
-  let pinballFxImages: { db: VpsDb | undefined; map: Map<number, string> } | undefined;
-  function pinballFxImageMap(): Map<number, string> {
-    if (pinballFxImages && pinballFxImages.db === vpsDb) return pinballFxImages.map;
-    const map = new Map(pinballFxList().flatMap((fx) => {
-      const url = vpsDb ? pinballFxVpsImage(vpsDb, fx) : undefined;
-      return url ? [[fx.id, url] as const] : [];
+  /** Capture de VPS d'une table, la version du même jeu d'abord (FX pour Pinball FX, FX3 pour FX3). */
+  function zenVpsImage(fx: ZenTable): string | undefined {
+    return vpsDb ? pinballFxVpsImage(vpsDb, fx, ZEN_GAMES[fx.game].vpsFormats) : undefined;
+  }
+
+  /** Capture de VPS de chaque table de l'écran : calculées une fois par base VPS. */
+  function zenImageMap(game: ZenGameKey): Map<string, string> {
+    const ui = zenUi[game];
+    if (ui.images && ui.images.db === vpsDb) return ui.images.map;
+    const map = new Map(zenList(game).flatMap((fx) => {
+      const url = zenVpsImage(fx);
+      return url ? [[fx.key, url] as const] : [];
     }));
-    pinballFxImages = { db: vpsDb, map };
+    ui.images = { db: vpsDb, map };
     return map;
   }
 
+  /** Qui chercher dans un pack reçu pour cette table : ses titres, et ce que le jeu en dit. */
+  function zenTarget(fx: ZenTable, titles: string[]): { titles: string[]; pinballFx?: number; pinballFx3?: string } {
+    return { titles, ...(fx.game === 'pinballfx' ? { pinballFx: Number(fx.key) } : { pinballFx3: fx.key }) };
+  }
+
   /**
-   * Médias d'une table de Pinball FX qu'on vient d'ajouter, en arrière-plan et suivis dans les
+   * Médias d'une table de Zen qu'on vient d'ajouter, en arrière-plan et suivis dans les
    * téléchargements : ceux de VPinMediaDB qui lui manquent (logo, fronton, DMD, vidéos), puis, sans
    * image du plateau, la capture de la table que donne VPS. Rien n'est remplacé.
    */
-  async function fetchPinballFxMedias(fx: PinballFxTable, file: string, flash: string, types?: readonly MediaType[]): Promise<void> {
+  async function fetchPinballFxMedias(fx: ZenTable, file: string, flash: string, types?: readonly MediaType[]): Promise<void> {
     if (!fx.vps) return;
+    const ui = zenUi[fx.game];
     let installed = 0;
     let placed = false;
     let sites: SiteFill = { placed: [], missing: [], login: [] };
@@ -4129,7 +4194,7 @@ export function createLibrary(host: LibraryHost) {
       installed = got.installed;
       failed.push(...got.failed);
       const table = find(file);
-      const url = vpsDb && (!types || types.includes('Playfield')) ? pinballFxVpsImage(vpsDb, fx) : undefined;
+      const url = !types || types.includes('Playfield') ? zenVpsImage(fx) : undefined;
       if (table && url) {
         await mediaSearch.stagePreviews([{ url }], pinballFxThumbs, t('Vignettes'), { quiet: true });
         const staged = pinballFxThumbs.get(url);
@@ -4146,14 +4211,14 @@ export function createLibrary(host: LibraryHost) {
     reloadTables(file);
     const siteNote = sites.placed.length ? `, ${sites.placed.join(', ')} des sites` : ''; // i18n-ignore : journal
     const loginNote = sites.login.length ? ` ; compte à connecter : ${sites.login.join(', ')}` : ''; // i18n-ignore : journal
-    console.log(`Pinball FX : médias de « ${fx.title} » : ${installed} de VPinMediaDB${placed ? ', image du plateau de VPS' : ''}${siteNote}${loginNote}${failed.length ? ` ; non reçus : ${failed.join(' ; ')}` : ''}.`); // i18n-ignore : journal
-    if (pinballFxFlash !== flash) return;
+    console.log(`${ZEN_GAMES[fx.game].name} : médias de « ${fx.title} » : ${installed} de VPinMediaDB${placed ? ', image du plateau de VPS' : ''}${siteNote}${loginNote}${failed.length ? ` ; non reçus : ${failed.join(' ; ')}` : ''}.`); // i18n-ignore : journal
+    if (ui.flash !== flash) return;
     const n = installed + (placed ? 1 : 0) + sites.placed.length;
     const got = n
       ? tn(n, '« {title} » ajoutée au front-end, avec {n} média.', '« {title} » ajoutée au front-end, avec {n} médias.', { title: fx.title })
       : t('« {title} » ajoutée au front-end.', { title: fx.title });
     const missing = sites.missing.map((type) => lowerFirst(mediaTypeInfo(type).label)).join(', ');
-    pinballFxFlash = sites.login.length
+    ui.flash = sites.login.length
       ? `${got} ${t('Pour le reste ({missing}) : connectez votre compte {site} (Ajouter une table > Comptes des sites), puis « Chercher les médias manquants » ici.', { missing, site: sites.login.join(', ') })}`
       : sites.missing.length
         ? `${got} ${t('Introuvable : {missing}. Start ouvre sa fiche, « Médias du jeu » en cherche sur le web.', { missing })}`
@@ -4161,7 +4226,7 @@ export function createLibrary(host: LibraryHost) {
     host.broadcast();
   }
 
-  /** Médias de la fiche d'ajout d'une table de Pinball FX, ceux de la roue d'abord. */
+  /** Médias de la fiche d'ajout d'une table de Zen, ceux de la roue d'abord. */
   const PINBALLFX_DETAIL_TYPES: MediaType[] = ['Wheel', 'Backglass', 'Playfield', 'DMD', 'FullDMD', 'Topper', 'Loading', 'GameHelp', 'GameInfo', 'Audio', 'AudioLaunch'];
 
   /** Un média de la fiche d'ajout : d'où il viendrait (rien : introuvable), et le site où se connecter. */
@@ -4181,21 +4246,21 @@ export function createLibrary(host: LibraryHost) {
   }
 
   /** Fiche d'ajout ouverte : la table, ses médias, ceux qu'on prend (cochés par défaut quand ils viennent sans compte). */
-  let pinballFxDetail: { fx: PinballFxTable; elements: FxElement[]; chosen: Set<MediaType>; bytes: number; unknown: number; previews: Map<string, string> } | undefined;
+  let pinballFxDetail: { fx: ZenTable; elements: FxElement[]; chosen: Set<MediaType>; bytes: number; unknown: number; previews: Map<string, string> } | undefined;
 
   /**
-   * Choisir une table de Pinball FX (17/11/2026), comme une table VPX : sa fiche d'abord, avec ses
-   * médias et leur provenance (VPinMediaDB, fiche d'un site rattachée par VPS, capture de VPS),
-   * chacun pris ou laissé à Start ; la table n'est ajoutée qu'à « Ajouter au front-end ». Le disque
-   * et le réseau sont lus ici, à l'ouverture.
+   * Choisir une table d'un jeu de Zen (17/11/2026), comme une table VPX : sa fiche d'abord, avec
+   * ses médias et leur provenance (VPinMediaDB, fiche d'un site rattachée par VPS, capture de
+   * VPS), chacun pris ou laissé à Start ; la table n'est ajoutée qu'à « Ajouter au front-end ».
+   * Le disque et le réseau sont lus ici, à l'ouverture.
    */
-  function openPinballFxDetail(fx: PinballFxTable, at = 0): void {
+  function openPinballFxDetail(fx: ZenTable, at = 0): void {
     void task(t('Médias de la table…'), async () => {
       const db = fx.vps ? await mediaDownload.forGames([fx.vps]) : undefined;
       const offers = fx.vps ? db?.games.get(fx.vps) : undefined;
       const game = fx.vps ? vpsDb?.games.find((g) => g.id === fx.vps) : undefined;
       const hits = game ? vpsSiteHits([game]).filter((h) => h.vps && !h.vps.pack) : [];
-      const capture = vpsDb ? pinballFxVpsImage(vpsDb, fx) : undefined;
+      const capture = zenVpsImage(fx);
       const elements: FxElement[] = [];
       for (const type of PINBALLFX_DETAIL_TYPES) {
         const offer = offers?.offers.find((o) => o.type === type);
@@ -4210,7 +4275,7 @@ export function createLibrary(host: LibraryHost) {
         }
         // Fiches des sites (17/11/2026) : une déjà reçue qui a le fichier de la table d'abord (rien à
         // télécharger, aperçu réel) ; une reçue sans lui est écartée ; sinon la première à télécharger.
-        const target = { titles: [fx.title, ...(game ? [game.name] : [])], pinballFx: fx.id };
+        const target = zenTarget(fx, [fx.title, ...(game ? [game.name] : [])]);
         let site: FxElement | undefined;
         for (const hit of SITE_FILL_TYPES.includes(type) ? hits.filter((h) => h.vps!.types.includes(type)) : []) {
           const receipt = mediaSites.receipt(jobKey(hit));
@@ -4295,10 +4360,16 @@ export function createLibrary(host: LibraryHost) {
     return n;
   }
 
+  /** Ce que la fiche dit de la table dans son jeu : « Pinball FX, table n° 156 », « Pinball FX3, fichier « WMS_Fish_Tales » ». */
+  function zenTableFacts(fx: Pick<ZenTable, 'game' | 'key'>): string {
+    return fx.game === 'pinballfx' ? t('Pinball FX, table n° {n}', { n: fx.key }) : t('Pinball FX3, fichier « {name} »', { name: fx.key });
+  }
+
   function buildPinballFxDetail(): Built {
     const d = pinballFxDetail!;
     const { fx } = d;
-    const back = () => openPinballFx(fx.id);
+    const name = ZEN_GAMES[fx.game].name;
+    const back = () => openZen(fx.game, fx.key);
     const thumbOf = (e: FxElement | undefined, text: string): MediaThumb => {
       const local = e?.preview ? d.previews.get(e.preview.url) : undefined;
       return local ? { kind: 'image', url: mediaUrl(local), rotation: 0 } : { kind: 'fallback', rotation: 0, text };
@@ -4313,15 +4384,18 @@ export function createLibrary(host: LibraryHost) {
         : t('sans média : le titre seul sur la roue'),
       tone: 'ok',
       icon: 'table-add',
-      key: 'pinballfx:add',
+      key: `${fx.game}:add`,
       run: () => addPinballFx(fx, [...d.chosen]),
     });
     const cards: MediaCard[] = [
       {
         title: t('Table'),
-        state: { label: 'Pinball FX', tone: 'ok' },
-        facts: t('Pinball FX, table n° {n}', { n: fx.id }),
-        extra: [t('Jouée par Pinball FX : elle s’achète dans le jeu, Cyber Pinball ne peut pas vérifier que vous l’avez.')],
+        state: { label: name, tone: 'ok' },
+        facts: zenTableFacts(fx),
+        extra: [
+          t('Jouée par {game} : elle s’achète dans le jeu, Cyber Pinball ne peut pas vérifier que vous l’avez.', { game: name }),
+          ...(fx.williams ? [t('Lancée dans son mode classique : les règles de la machine, sans les améliorations de Zen.')] : []),
+        ],
         thumb: thumbOf(d.elements.find((e) => e.source === 'vps') ?? d.elements.find((e) => e.type === 'Playfield'), fx.title),
       },
     ];
@@ -4360,7 +4434,7 @@ export function createLibrary(host: LibraryHost) {
       card.action = actions.length;
       actions.push({
         label: on ? t('{type} : laisser', { type: label }) : t('{type} : prendre', { type: label }),
-        key: `pinballfx:media:${e.type}`,
+        key: `${fx.game}:media:${e.type}`,
         run: () => {
           if (on) d.chosen.delete(e.type);
           else d.chosen.add(e.type);
@@ -4373,7 +4447,7 @@ export function createLibrary(host: LibraryHost) {
     return {
       heading: fx.title,
       icon: 'pinball-app',
-      subheading: [fx.manufacturer, fx.year, t('Pinball FX (bêta)')].filter(Boolean).join(' · '),
+      subheading: [fx.manufacturer, fx.year, t('{game} (bêta)', { game: name })].filter(Boolean).join(' · '),
       lead: t('Start sur un média : le prendre ou le laisser. « Ajouter au front-end » ajoute la table ; ses médias arrivent ensuite en arrière-plan (Téléchargements). Rien n’est écrit avant.'),
       sections: [],
       actions,
@@ -4383,33 +4457,32 @@ export function createLibrary(host: LibraryHost) {
   }
 
   /** « Ajouter au front-end » : la fiche de la table écrite, puis les médias choisis, en arrière-plan. */
-  function addPinballFx(fx: PinballFxTable, types: MediaType[]): void {
-    const added = addPinballFxTable(tablesDir(), fx.id);
-    console.log(`Pinball FX : table ${fx.id} (${fx.title}) ajoutée au front-end, ${added.id} ; médias choisis : ${types.join(', ') || 'aucun'}.`); // i18n-ignore : journal
-    pinballFxFlash = fx.vps && types.length ? t('« {title} » ajoutée au front-end : ses médias arrivent (Téléchargements).', { title: fx.title }) : t('« {title} » ajoutée au front-end.', { title: fx.title });
+  function addPinballFx(fx: ZenTable, types: MediaType[]): void {
+    const ui = zenUi[fx.game];
+    const added = addZenTable(tablesDir(), fx);
+    console.log(`${ZEN_GAMES[fx.game].name} : table ${fx.key} (${fx.title}) ajoutée au front-end, ${added.id} ; médias choisis : ${types.join(', ') || 'aucun'}.`); // i18n-ignore : journal
+    ui.flash = fx.vps && types.length ? t('« {title} » ajoutée au front-end : ses médias arrivent (Téléchargements).', { title: fx.title }) : t('« {title} » ajoutée au front-end.', { title: fx.title });
     reloadTables(added.file);
-    if (types.length) void fetchPinballFxMedias(fx, added.file, pinballFxFlash, types);
+    if (types.length) void fetchPinballFxMedias(fx, added.file, ui.flash, types);
     pinballFxDetail = undefined;
-    openPinballFx(fx.id);
+    openZen(fx.game, fx.key);
   }
 
-  /** Où en est « Chercher les médias manquants » (détail de l'entrée) ; undefined : jamais lancé. */
-  let pinballFxHunt: string | undefined;
-
   /**
-   * « Chercher les médias manquants » : pour chaque table de Pinball FX du front-end, ce qui lui
-   * manque, de VPinMediaDB puis des fiches des sites rattachées par VPS, l'une après l'autre en
+   * « Chercher les médias manquants » : pour chaque table de ce jeu de Zen dans le front-end, ce qui
+   * lui manque, de VPinMediaDB puis des fiches des sites rattachées par VPS, l'une après l'autre en
    * arrière-plan ; le détail de l'entrée dit l'avancée, puis le bilan.
    */
-  async function huntPinballFxMedias(entries: TableEntry[]): Promise<void> {
-    if (pinballFxHunt === t('Recherche en cours…')) return;
-    pinballFxHunt = t('Recherche en cours…');
+  async function huntPinballFxMedias(game: ZenGameKey, entries: TableEntry[]): Promise<void> {
+    const ui = zenUi[game];
+    if (ui.hunt === t('Recherche en cours…')) return;
+    ui.hunt = t('Recherche en cours…');
     host.broadcast();
     let count = 0;
     const login = new Set<string>();
     const missing = new Set<MediaType>();
     for (const entry of entries) {
-      const fx = PINBALLFX_TABLES.find((x) => x.id === entry.pinballFxTable);
+      const fx = zenTableOfEntry(entry);
       if (!fx?.vps) continue;
       try {
         count += (await mediaDownload.fillMissing([entry.file], { quiet: true })).installed;
@@ -4421,18 +4494,18 @@ export function createLibrary(host: LibraryHost) {
           for (const m of got.missing) missing.add(m);
         }
       } catch (error) {
-        console.log(`Pinball FX : médias manquants de « ${fx.title} » : ${(error as Error).message}.`); // i18n-ignore : journal
+        console.log(`${ZEN_GAMES[game].name} : médias manquants de « ${fx.title} » : ${(error as Error).message}.`); // i18n-ignore : journal
       }
       reloadTables(entry.file);
     }
     const got = tn(count, '{n} média reçu', '{n} médias reçus');
     const what = [...missing].map((type) => lowerFirst(mediaTypeInfo(type).label)).join(', ');
-    pinballFxHunt = login.size
+    ui.hunt = login.size
       ? `${got} · ${t('le reste ({missing}) demande votre compte {site} : Ajouter une table > Comptes des sites', { missing: what, site: [...login].join(', ') })}`
       : missing.size
         ? `${got} · ${t('introuvable : {missing}', { missing: what })}`
         : got;
-    console.log(`Pinball FX : médias manquants : ${pinballFxHunt}.`); // i18n-ignore : journal
+    console.log(`${ZEN_GAMES[game].name} : médias manquants : ${ui.hunt}.`); // i18n-ignore : journal
     host.broadcast();
   }
 
@@ -4443,7 +4516,7 @@ export function createLibrary(host: LibraryHost) {
     login: string[];
   }
 
-  /** Médias de menu qu'une table de Pinball FX reçoit des sites : logo, fronton, topper (pas les packs entiers). */
+  /** Médias de menu qu'une table de Zen reçoit des sites : logo, fronton, topper (pas les packs entiers). */
   const SITE_FILL_TYPES: MediaType[] = ['Wheel', 'Backglass', 'Topper'];
 
   /**
@@ -4460,6 +4533,7 @@ export function createLibrary(host: LibraryHost) {
     const wanted = SITE_FILL_TYPES.filter((type) => !have.has(type) && (!types || types.includes(type)));
     if (!game || !wanted.length) return out;
     const hits = vpsSiteHits([game]).filter((h) => h.vps && !h.vps.pack);
+    const zen = zenTableOfEntry(table);
     for (const type of wanted) {
       const offers = hits.filter((h) => h.vps!.types.includes(type));
       // Une fiche déjà reçue d'abord (un pack de logos de Zen sert à toutes les tables).
@@ -4475,7 +4549,8 @@ export function createLibrary(host: LibraryHost) {
         continue;
       }
       const receipt = mediaSites.receipt(jobKey(hit)) ?? (await receiveSiteFile(hit, type));
-      const pick = receipt ? pickNamedMedia(receipt.files, type, { titles: [title, game.name], ...(table.pinballFxTable !== undefined ? { pinballFx: table.pinballFxTable } : {}) }) : undefined;
+      const titles = [title, game.name];
+      const pick = receipt ? pickNamedMedia(receipt.files, type, zen ? zenTarget(zen, titles) : { titles }) : undefined;
       const done = pick && placeMissingMedia(table, infoFileFor(table, tablesDir()), type, pick.file, { origin: mediaSite(hit.site).name, url: hit.url, vpsId, ...(hit.author ? { author: hit.author } : {}) });
       (done ? out.placed : out.missing).push(type);
     }
@@ -4495,30 +4570,37 @@ export function createLibrary(host: LibraryHost) {
     return undefined;
   }
 
-  function pinballFxList(): PinballFxTable[] {
-    pinballFxSorted ??= [...PINBALLFX_TABLES].sort((a, b) => a.title.localeCompare(b.title, 'fr'));
-    return pinballFxSorted;
+  /** Tables de l'écran d'un jeu : le catalogue de Zen (Pinball FX) ; les fichiers installés (FX3, lus à l'ouverture). */
+  function zenList(game: ZenGameKey): ZenTable[] {
+    const ui = zenUi[game];
+    ui.list ??= game === 'pinballfx' ? [...PINBALLFX_TABLES].sort((a, b) => a.title.localeCompare(b.title, 'fr')).map(zenFromPinballFx) : [];
+    return ui.list;
   }
 
-  function buildPinballFx(): Built {
+  function buildZen(game: ZenGameKey): Built {
+    const ui = zenUi[game];
+    const name = ZEN_GAMES[game].name;
     const back = () => {
-      pinballFxFlash = undefined;
+      ui.flash = undefined;
       openAdd();
     };
-    const present = new Map(host.tables().flatMap((x) => (x.pinballFxTable === undefined ? [] : [[x.pinballFxTable, x] as const])));
+    const present = new Map(host.tables().flatMap((x) => {
+      const key = x.emulator === game ? zenEntryKey(x) : undefined;
+      return key === undefined ? [] : [[key, x] as const];
+    }));
     const actions: Action[] = [];
-    const list = pinballFxList();
-    const images = pinballFxImageMap();
+    const list = zenList(game);
+    const images = zenImageMap(game);
     loadPinballFxThumbs([...images.values()]);
     const rows: Row[] = list.map((fx) => {
-      const entry = present.get(fx.id);
+      const entry = present.get(fx.key);
       const action =
         actions.push({
           label: fx.title,
-          key: `pinballfx:${fx.id}`,
+          key: `${game}:${fx.key}`,
           run: () => {
             if (entry) {
-              sheetReturn = () => openPinballFx(fx.id);
+              sheetReturn = () => openZen(game, fx.key);
               openSheet(entry);
               return;
             }
@@ -4529,10 +4611,10 @@ export function createLibrary(host: LibraryHost) {
         }) - 1;
       return {
         text: fx.title,
-        detail: [fx.manufacturer, fx.year].filter(Boolean).join(' · '),
+        detail: [fx.manufacturer, fx.year, ...(game === 'pinballfx3' && fx.unknown ? [fx.key] : [])].filter(Boolean).join(' · '),
         badges: entry ? [t('Dans le front-end')] : [],
         tone: entry ? 'ok' : undefined,
-        thumb: pinballFxThumb(images.get(fx.id)),
+        thumb: pinballFxThumb(images.get(fx.key)),
         thumbIcon: 'pinball-app',
         action,
         pick: true,
@@ -4543,21 +4625,32 @@ export function createLibrary(host: LibraryHost) {
     if (present.size)
       actions.push({
         label: t('Chercher les médias manquants'),
-        detail: pinballFxHunt ?? t('Logo, fronton, topper, vidéos… des tables de Pinball FX déjà dans le front-end'),
+        detail: ui.hunt ?? t('Logo, fronton, topper, vidéos… des tables de {game} déjà dans le front-end', { game: name }),
         icon: 'image-download',
-        key: 'pinballfx:missing',
-        run: () => void huntPinballFxMedias([...present.values()]),
+        key: `${game}:missing`,
+        run: () => void huntPinballFxMedias(game, [...present.values()]),
       });
     actions.push({ label: t('Retour'), icon: 'back', key: 'back', run: back });
     const inMenu = present.size;
+    // FX3 : toutes les tables sont installées, achetées ou non ; le lancement direct demande le mode
+    // borne, activé une fois dans le jeu (plus de code à demander à Zen depuis le 4 novembre 2024).
+    const lead =
+      game === 'pinballfx'
+        ? t('Start : ajouter au front-end une table que vous possédez dans Pinball FX. Une table déjà dans le front-end : Start ouvre sa fiche. Les écrans et le DMD se règlent dans le mode borne de Pinball FX.')
+        : t('Start : ajouter au front-end une table que vous possédez dans {game}. Le jeu installe toutes ses tables, même celles que vous n’avez pas achetées : Cyber Pinball ne peut pas savoir lesquelles sont à vous. Mode borne : à activer une fois dans le jeu (icône de borne à côté du profil), sans code à demander à Zen ; aide de Zen : {url}.', { game: name, url: PINBALLFX3_CABINET_HELP_URL.replace(/^https:\/\/(www\.)?/, '') });
     return {
-      heading: t('Tables de Pinball FX'),
+      heading: t('Tables de {game}', { game: name }),
       icon: 'table-add',
-      subheading: [t('Bêta : Pinball FX est en phase de test dans Cyber Pinball'), inMenu ? tn(inMenu, '{n} table dans le front-end', '{n} tables dans le front-end') : undefined].filter(Boolean).join(' · '),
-      lead:
-        pinballFxFlash ??
-        t('Start : ajouter au front-end une table que vous possédez dans Pinball FX. Une table déjà dans le front-end : Start ouvre sa fiche. Les écrans et le DMD se règlent dans le mode borne de Pinball FX.'),
-      sections: [{ title: tn(rows.length, '{n} table', '{n} tables'), rows }],
+      subheading: [t('Bêta : {game} est en phase de test dans Cyber Pinball', { game: name }), inMenu ? tn(inMenu, '{n} table dans le front-end', '{n} tables dans le front-end') : undefined].filter(Boolean).join(' · '),
+      lead: ui.flash ?? lead,
+      sections: [
+        {
+          title: tn(rows.length, '{n} table', '{n} tables'),
+          rows: rows.length
+            ? rows
+            : [{ text: t('Aucune table trouvée'), detail: t('Le dossier des tables de {game} est vide ou illisible : vérifiez le jeu dans Steam (Propriétés > Fichiers installés > Vérifier).', { game: name }), tone: 'quiet' }],
+        },
+      ],
       actions,
       back,
     };
@@ -6358,7 +6451,7 @@ export function createLibrary(host: LibraryHost) {
   }
 
   return {
-    /** Avis et propositions : le formulaire (plantage, téléphone), la question du premier plantage ; undefined sans service. */
+    /** Retours et propositions : le formulaire (plantage, téléphone), la question du premier plantage ; undefined sans service. */
     feedback,
     provideSystemItem,
     withdrawSystemItem,

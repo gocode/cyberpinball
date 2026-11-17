@@ -23,6 +23,7 @@ import { MANAGED_MEDIA_TYPES, ownMediaPages } from './mediaedit';
 import { mediaKind, mediaTypeInfo, type MediaKind, type MediaType } from './medias';
 import { isJunkName } from './puppack';
 import { parseRate } from './ratelimit';
+import { ALIAS_FILE } from './romalias';
 import { isShareableType, parseTableIdentity, sameTable, shareableType, SHARE_MAX_BYTES, tableIdentity, type SameTableHow, type TableIdentity } from './sharing';
 import type { TableContents } from './tablecontents';
 import type { FileKind } from './tablefiles';
@@ -539,5 +540,13 @@ export function shareableTableFiles(contents: TableContents, folder: string): Sh
     const file = !entry.missing && fs.existsSync(entry.path) ? entry.path : entry.kind === 'rom' && entry.library && fs.existsSync(entry.library) ? entry.library : undefined;
     if (file) add(file, entry.rel || path.relative(folder, file), part);
   }
+  // La ROM que la table joue depuis la bibliothèque commune, sans lien dans son dossier : elle part
+  // aussi, sous pinmame/roms, comme si elle y était (17/11/2026 : jamais proposée à l'ami).
+  const sent = (rel: string) => out.some((f) => f.rel.toLowerCase() === rel.split(path.sep).join('/').toLowerCase());
+  for (const rom of contents.libraryRoms ?? []) if (!sent(rom.rel)) add(rom.file, rom.rel, 'rom');
+  // Les alias de la table disent quelle ROM PinMAME charge : ils suivent la ROM, jamais sans elle
+  // (une ROM chargée sous un autre nom, reçue sans eux, ne serait jamais lue).
+  const aliases = path.join('pinmame', ALIAS_FILE);
+  if (out.some((f) => f.part === 'rom') && !sent(aliases)) add(path.join(folder, aliases), aliases, 'rom');
   return out;
 }

@@ -1,4 +1,4 @@
-// « Avis et propositions » (Menu système > Cyber Pinball) : le seul formulaire des retours, où mènent
+// « Retours et propositions » (Menu système > Cyber Pinball) : le seul formulaire des retours, où mènent
 // aussi l'écran d'un plantage de VPX, la fiche technique et l'appli du téléphone :
 // chaque porte peut y mener, sans y obliger.
 //   - L'accueil : le tableau public des propositions, les plus demandées d'abord, par nature (onglets) ;
@@ -139,7 +139,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       // Rapports en attente (le dossier d'envoi relu) : à l'ouverture de l'écran, gardé pour les touches.
       const queued = ctx.kept ? ctx.kept('rapports-en-attente', () => ctx.service.queuedCount()) : ctx.service.queuedCount();
       return {
-        heading: t('Avis et propositions'),
+        heading: t('Retours et propositions'),
         icon: 'inbox',
         subheading:
           net === 'offline'
@@ -289,7 +289,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       return {
         heading: draft.kind === 'bug' ? t('Signaler un problème') : t('Proposer une idée'),
         icon: draft.kind === 'bug' ? 'alert' : 'plus',
-        subheading: t('Avis et propositions'),
+        subheading: t('Retours et propositions'),
         lead: t('Le titre et la description sont publics ; le rapport technique reste privé.'),
         hint: t('Flippers : choisir · Start : écrire, changer, envoyer · Exit : revenir'),
         sections,
@@ -347,7 +347,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     show(() => ({
       heading: t('Merci !'),
       icon: 'check',
-      subheading: t('Avis et propositions'),
+      subheading: t('Retours et propositions'),
       sections: [{ rows }],
       actions: [
         ...(id ? [{ label: t('Voir ma proposition'), icon: 'eye' as const, tone: 'ok' as const, run: () => openProposal(id, home) }] : []),
@@ -390,7 +390,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       heading: t('Envoyer les rapports de plantage ?'),
       icon: 'report',
       subheading: about,
-      lead: t('Un rapport anonymisé aide l’équipe à corriger ce plantage pour tout le monde. La réponse est retenue ; elle se change dans Avis et propositions.'),
+      lead: t('Un rapport anonymisé aide l’équipe à corriger ce plantage pour tout le monde. La réponse est retenue ; elle se change dans Retours et propositions.'),
       sections: [
         {
           title: t('Ce qui part'),

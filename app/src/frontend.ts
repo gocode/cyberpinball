@@ -224,6 +224,11 @@ import {
   joystickButtonsUnrecorded,
   playfieldOrientation,
   pinballFxCommand,
+  pinballFx3Command,
+  pinballFx3ShortGameMessage,
+  isZenEmulator,
+  ZEN_GAMES,
+  type ZenGameKey,
   readInfo,
   isFavorite,
   TABLE_ENGINES,
@@ -437,8 +442,8 @@ import { installVpx, vpxArchivePresent } from './install-vpx';
 import { describeVcRuntime, ensureVcRuntime, vcRuntimeReady } from './vc-runtime';
 import { armRecording, type RecordingOutcome, type RecordingRun, type RecordingScreen } from './game-recording';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
-import { launchPinballFx, runningPinballFx } from './pinballfx-launcher';
-import { detectPinballFx } from './pinballfx-install';
+import { launchPinballFx, runningPinballFx, ZEN_LAUNCH_GAMES } from './pinballfx-launcher';
+import { detectPinballFx, detectPinballFx3 } from './pinballfx-install';
 import { watchGameLoad, type GameLoadWatch } from './game-load';
 import { createLibrary, type ActionShortcut, type Row, type SystemItem, type UiAction } from './library';
 import { createFeedbackService } from './feedback-service';
@@ -707,7 +712,6 @@ function wheelConfirm(table: TableEntry, sheet: boolean): void {
   if (sheet) {
     if (guest.knock('menu.sheet')) library.openSheet(table);
   } else if (guest.knock('sheet.play')) {
-    state = { ...state, index: Math.max(0, tables.indexOf(table)) };
     void play(table, process.env.CYBERPINBALL_AUTOPILOT ? Number(process.env.CYBERPINBALL_PARTIE_MS) || 10_000 : undefined);
   }
 }
@@ -1101,7 +1105,7 @@ const collections = createCollectionsMenu({
   selected: () => tables[state.index],
   select: (table) => {
     const index = tables.indexOf(table);
-    if (index >= 0) state = { ...state, index };
+    if (index >= 0) state = { ...state, index }; // garde le médaillon : la table de la collection, recalée aussi pendant le dessin de la roue
   },
   // Réseau coupé (essais) : « Avec mes amis en ligne » le dit, grisée.
   ...(socialNetMode(process.env) === 'off' ? {} : { friends: (list: readonly TableEntry[]) => friendsMenu.live.playableWithFriends(list) }),
@@ -1278,13 +1282,11 @@ const library = createLibrary({
   enter: () => (state = { ...state, phase: 'library', help: false, message: undefined }),
   leave: () => (state = tables.length ? { ...state, phase: 'menu' } : { ...state, phase: 'message', message: noTables() }),
   play: (table) => {
-    state = { ...state, index: Math.max(0, tables.indexOf(table)) };
     // Sans opérateur, la partie s'arrête seule après 10 s, ou CYBERPINBALL_PARTIE_MS (et ne compte pas dans les statistiques).
     void play(table, process.env.CYBERPINBALL_AUTOPILOT ? Number(process.env.CYBERPINBALL_PARTIE_MS) || 10_000 : undefined);
   },
   // Jouer et enregistrer : la même partie, l'enregistrement armé ; son écran s'ouvre au retour.
   playAndRecord: (table, settings) => {
-    state = { ...state, index: Math.max(0, tables.indexOf(table)) };
     // Sans opérateur, la partie dure le délai et la durée de l'enregistrement, plus 3 s (fin à la
     // durée) ; CYBERPINBALL_PARTIE_MS la raccourcit, pour une fin par la sortie de la table.
     const unattended = process.env.CYBERPINBALL_AUTOPILOT ? Number(process.env.CYBERPINBALL_PARTIE_MS) || (settings.delay + settings.duration + 3) * 1000 : undefined;
@@ -1309,7 +1311,6 @@ const library = createLibrary({
     reloadTables(table.file);
   },
   adjustDisplay: async (table) => {
-    state = { ...state, index: Math.max(0, tables.indexOf(table)) };
     const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, 'display');
     return report?.result;
   },
@@ -1503,6 +1504,18 @@ function wheelLeads(): Medallion[] {
 
 function selectedMedallion(): Medallion | undefined {
   return onJukebox() ? 'jukebox' : onCommunity() ? 'community' : onCollections() ? 'collections' : undefined;
+}
+
+/**
+ * La roue passe sur cette table : son rang, et plus aucun médaillon choisi. Tout ce qui agit sur une
+ * table (la jouer, l'installer, la reprendre après une relance) passe par là : un médaillon resté
+ * choisi dessus donnait son nom au chargement et la roue revenait sur lui après la partie (installée
+ * depuis la Bibliothèque pendant que la roue montrait la Communauté, 17/11/2026). Garder le médaillon
+ * en changeant de rang est un choix qui se dit sur la ligne (« garde le médaillon : <raison> »).
+ */
+function pointAtTable(table: TableEntry | number): void {
+  const index = typeof table === 'number' ? table : tables.indexOf(table);
+  state = { ...state, index: Math.max(0, index), medallion: undefined };
 }
 
 /** Ce que le menu dit du médaillon Collections : combien il y en a, et celle que montre la roue. */
@@ -1813,7 +1826,7 @@ function remoteEntries(media = false): MenuEntries {
   if (message.action && guest.allows(MESSAGE_DOORS[message.action])) items.push({ ...toRemoteEntry({ label: t('Valider (Start)'), detail: message.lines[0], icon: 'start' }), pick: () => remotePress('confirm') });
   if (message.report && library.feedback) {
     const r = message.report;
-    items.push({ ...toRemoteEntry({ label: t('Signaler ce problème'), detail: t('Avis et propositions, ce problème rappelé'), icon: 'alert' }), pick: () => library.feedback?.openForm({ about: r.about, table: r.table, signature: r.signature, attach: true }, () => library.leave()) });
+    items.push({ ...toRemoteEntry({ label: t('Signaler ce problème'), detail: t('Retours et propositions, ce problème rappelé'), icon: 'alert' }), pick: () => library.feedback?.openForm({ about: r.about, table: r.table, signature: r.signature, attach: true }, () => library.leave()) });
   }
   items.push({ ...toRemoteEntry({ label: t('Fermer (Exit)'), icon: 'close', back: true }), pick: () => remotePress('exit') });
   return { kind: 'screen', title: message.title, items, current: -1 };
@@ -1880,7 +1893,7 @@ function remotePickTable(file: string): void {
   const at = shelf.tables.findIndex((x) => x.file === file);
   if (at < 0) return;
   const picked = collections.move(at - shelf.index);
-  state = { ...state, index: picked ? Math.max(0, tables.indexOf(picked)) : index, medallion: undefined };
+  pointAtTable(picked ?? index);
   playUiSound('solenoid');
   broadcast();
 }
@@ -2521,7 +2534,7 @@ function saveMediaSettings(next: MenuMediaSettings): void {
   if (reorder) {
     const current = tables[state.index];
     tables = sortTables(tables, next.tableOrder, shuffleKeys);
-    state = { ...state, index: Math.max(0, current ? tables.indexOf(current) : 0) };
+    state = { ...state, index: Math.max(0, current ? tables.indexOf(current) : 0) }; // garde le médaillon : la même table, rangée autrement
   }
   attract.reschedule();
   hours.update();
@@ -3111,7 +3124,6 @@ const liveGames = createLiveGames({
   play: async (table, onPlaying, settings, board, progress, gate) => {
     // Le départ commun ferme l'écran ouvert (le compte à rebours), comme Start sur une table.
     if (library.isActive()) library.leave();
-    state = { ...state, index: Math.max(0, tables.indexOf(table)) };
     const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, undefined, { onPlaying, double: `${Date.now().toString(36)}`, ...(settings ? { settings } : {}), ...(board ? { board } : {}), ...(progress ? { onProgress: progress } : {}), ...(gate ? { gate } : {}) });
     // De retour au menu : les résultats, qui se complètent à mesure que les autres reviennent.
     if (report && state.phase === 'menu') setImmediate(() => friendsMenu.live.open(() => library.leave()));
@@ -3328,7 +3340,6 @@ const groupsMenu = createGroupsMenu({
   tables: () => tables,
   wheel: (table) => medias?.wheel(table),
   play: (table) => {
-    state = { ...state, index: Math.max(0, tables.indexOf(table)) };
     void play(table);
   },
   openProfile: (key, back) => profileMenu.openProfile(key, back),
@@ -5758,7 +5769,7 @@ export function startFrontend(): void {
   const { assignments, problem, manual, choose, selection } = syncScreens();
   tables = scanOrdered();
   // Table au démarrage : la première de l'ordre choisi, une au hasard, ou la dernière jouée.
-  state = { ...state, index: startIndex(tables, mediaSettings.startTable) };
+  state = { ...state, index: startIndex(tables, mediaSettings.startTable) }; // garde le médaillon : celui du démarrage (Juke-box) se pose ensuite
   // Collection gardée du dernier démarrage (ou imposée par le mode invité) : la table de départ y est prise.
   collections.start();
   logCollectionKeys();
@@ -6123,6 +6134,7 @@ function reloadTables(selectFile?: string): void {
   mediaWatch?.rearm();
   const wanted = selectFile ?? current;
   const index = tables.findIndex((t) => t.file.toLowerCase() === wanted?.toLowerCase());
+  // garde le médaillon : une relecture vient aussi d'un téléchargement fini en arrière-plan ; elle ne fait pas quitter la Communauté ou le Juke-box qu'on regarde
   state = { ...state, index: index >= 0 ? index : Math.min(state.index, Math.max(0, tables.length - 1)) };
 }
 
@@ -6490,7 +6502,6 @@ function handleKey(input: Input, fromPhone = false): boolean {
         const again = tables.find((x) => x.file === state.message?.table);
         state = { ...state, phase: 'menu', message: undefined };
         if (again) {
-          state = { ...state, index: Math.max(0, tables.indexOf(again)) };
           void play(again);
           return true;
         }
@@ -6657,20 +6668,25 @@ let liveManual = false;
 const SIMULATED_MANUAL = OFFSCREEN && !!process.env.CYBERPINBALL_PARTIE_SIMULEE_SANS_RELEVE;
 
 /**
- * Partie d'une table de Pinball FX. Chargement, cinéma, écrans et retour comme pour VPX ; rien de ce
- * qui lui est propre (INI, ROM, PuP-Pack, DMD, VR, réglages en partie, scores lus dans la ROM) :
- * Pinball FX règle lui-même ses écrans et son DMD dans son mode borne. La partie compte dans les
+ * Partie d'une table d'un jeu de Zen (Pinball FX, Pinball FX3). Chargement, cinéma, écrans et retour
+ * comme pour VPX ; rien de ce qui lui est propre (INI, ROM, PuP-Pack, DMD, VR, réglages en partie,
+ * scores lus dans la ROM) : le jeu règle lui-même ses écrans et son DMD dans son mode borne. La partie compte dans les
  * statistiques de la table ; son score n'est pas lisible, ni tableau ni classement.
  */
 async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefined, mode: 'display' | undefined, simulated: string | undefined): Promise<PlayReport | undefined> {
-  const fx = simulated === undefined ? detectPinballFx() : undefined;
+  // Pinball FX ou Pinball FX3 (17/11/2026) : même partie, chacun sa détection et sa commande.
+  const zenKey = table.emulator as ZenGameKey;
+  const zenName = ZEN_GAMES[zenKey].name;
+  const fx = simulated === undefined && zenKey === 'pinballfx' ? detectPinballFx() : undefined;
+  const fx3 = simulated === undefined && zenKey === 'pinballfx3' ? detectPinballFx3() : undefined;
+  const tableKey = zenKey === 'pinballfx' ? table.pinballFxTable : table.pinballFx3Table;
   const why =
     mode === 'display'
-      ? t('Le cadrage d’une table de Pinball FX se règle dans le jeu (mode borne).')
-      : table.pinballFxTable === undefined
-        ? t('La fiche de cette table ne dit pas quelle table de Pinball FX ouvrir.')
-        : simulated === undefined && !fx
-          ? t('Pinball FX n’est pas installé sur ce PC. Menu système > Tables > Ajouter une table > « Installer Pinball FX ».')
+      ? t('Le cadrage d’une table de {game} se règle dans le jeu (mode borne).', { game: zenName })
+      : tableKey === undefined
+        ? t('La fiche de cette table ne dit pas quelle table de {game} ouvrir.', { game: zenName })
+        : simulated === undefined && !fx && !fx3
+          ? t('{game} n’est pas installé sur ce PC. Menu système > Tables > Ajouter une table > « Installer {game} ».', { game: zenName })
           : undefined;
   if (why) {
     state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible'), lines: [why, t('Start ou Exit : revenir au front-end.')] } };
@@ -6699,10 +6715,11 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     return undefined;
   }
 
-  // Un Pinball FX resté ouvert (partie précédente quittée dans son menu) ouvrirait sa table à lui : fermé d'abord.
-  const left = simulated === undefined ? runningPinballFx() : undefined;
+  // Un jeu resté ouvert (partie précédente quittée dans son menu) ouvrirait sa table à lui : fermé
+  // d'abord. Pinball FX3 déjà ouvert ignorerait même la table demandée (Steam ne fait que le montrer).
+  const left = simulated === undefined ? runningPinballFx(undefined, ZEN_LAUNCH_GAMES[zenKey]) : undefined;
   if (left !== undefined) {
-    console.log(`Pinball FX (${table.id}) : jeu déjà ouvert (processus ${left}), fermé avant la partie.`); // i18n-ignore : journal
+    console.log(`${zenName} (${table.id}) : jeu déjà ouvert (processus ${left}), fermé avant la partie.`); // i18n-ignore : journal
     try {
       process.kill(left);
     } catch {
@@ -6731,12 +6748,17 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   };
   // Exit tenu se lit quel que soit le premier plan : le sondage des joysticks tourne pendant la partie.
   const stopJoystick = watchJoystickButtons(() => undefined);
-  const command = fx && table.pinballFxTable !== undefined ? pinballFxCommand(fx, table.pinballFxTable) : undefined;
-  console.log(`Lancement : Pinball FX (${table.id}) lancé ${Date.now() - pressedAt} ms après le Start${command ? ` : ${command.file} ${command.args.join(' ')}` : ' (partie simulée)'}.`); // i18n-ignore : journal
+  const command =
+    fx && table.pinballFxTable !== undefined
+      ? pinballFxCommand(fx, table.pinballFxTable)
+      : fx3 && table.pinballFx3Table !== undefined
+        ? pinballFx3Command(fx3, table.pinballFx3Table)
+        : undefined;
+  console.log(`Lancement : ${zenName} (${table.id}) lancé ${Date.now() - pressedAt} ms après le Start${command ? ` : ${command.file} ${command.args.join(' ')}` : ' (partie simulée)'}.`); // i18n-ignore : journal
   const game =
     simulated !== undefined || !command
       ? simulateVpx({ onPlaying, onForeground })
-      : launchPinballFx({ command, exitHeld: exitHeldNow, onPlaying, onForeground });
+      : launchPinballFx({ command, game: ZEN_LAUNCH_GAMES[zenKey], exitHeld: exitHeldNow, onPlaying, onForeground });
   if (launch) {
     launch.stop = () => game.stop();
     launchStep('launched');
@@ -6758,7 +6780,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   recoverScreens('return');
   setTimeout(() => playing || recoverScreens('return'), SCREENS_SETTLE_MS);
   cabinetVolume?.remindIfMuted();
-  for (const notice of result.notices) console.log(`Pinball FX (${table.id}) : ${notice}`);
+  for (const notice of result.notices) console.log(`${zenName} (${table.id}) : ${notice}`);
 
   if (stoppedLoading) {
     state = { ...state, phase: 'menu' };
@@ -6775,7 +6797,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
       }
     }
     tables = tables.map((t) => (t.id === table.id ? { ...t, info: readInfo(t.infoFile) } : t));
-    // Le niveau : la partie (Pinball FX ne donne pas ses scores), puis les badges qu'elle vaut.
+    // Le niveau : la partie (Pinball FX et FX3 ne donnent pas leurs scores), puis les badges qu'elle vaut.
     if (!autoStopAfterMs) {
       try {
         levelTracker.gameEnded({ table: presenceTable(table), seconds: result.seconds, entered: [], newTable: (table.info.User?.StartCount ?? 0) === 0, at: new Date() });
@@ -6783,17 +6805,24 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
         console.log(`Partie (${table.id}) : niveau et badges pas mis à jour (${(error as Error).message}) ; la partie compte quand même.`); // i18n-ignore : journal
       }
     }
-    state = { ...state, phase: 'menu' };
+    // Pinball FX3 resté sur son écran d'accueil (table pas sur le compte, mode borne pas activé) :
+    // rien ne le distingue d'une table ouverte, sauf une partie très courte. Les causes possibles,
+    // plutôt qu'un retour muet au front-end.
+    const stuck = command && fx3 && !autoStopAfterMs && table.pinballFx3Table ? pinballFx3ShortGameMessage(result.seconds, table.pinballFx3Table) : undefined;
+    if (stuck) console.log(`${zenName} (${table.id}) : partie de ${Math.round(result.seconds)} s, jeu peut-être resté sur son écran d'accueil ; causes possibles affichées.`); // i18n-ignore : journal
+    state = stuck ? { ...state, phase: 'message', message: stuck } : { ...state, phase: 'menu' };
   } else {
-    console.log(`Partie (${table.id}) : échec de Pinball FX (${result.failure ?? 'inconnu'}) : ${result.message ?? ''}`); // i18n-ignore : journal
+    console.log(`Partie (${table.id}) : échec de ${zenName} (${result.failure ?? 'inconnu'}) : ${result.message ?? ''}`); // i18n-ignore : journal
     state = {
       ...state,
       phase: 'message',
       message: {
-        title: t('Pinball FX n’a pas ouvert la table'),
+        title: t('{game} n’a pas ouvert la table', { game: zenName }),
         lines: [
           ...(result.message ? [result.message] : []),
-          t('Vérifiez que la table est achetée dans Pinball FX et que Steam (ou Epic) est connecté.'),
+          zenKey === 'pinballfx3'
+            ? t('Vérifiez que Steam est connecté, que la table est sur ce compte Steam et que le mode borne est activé dans {game}.', { game: zenName })
+            : t('Vérifiez que la table est achetée dans Pinball FX et que Steam (ou Epic) est connecté.'),
           t('Start ou Exit : revenir au front-end.'),
         ],
       },
@@ -6809,6 +6838,9 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
  * l'a demandée (la fiche) reprend la main.
  */
 async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[]; board?: GroupRecord[]; onProgress?(p: LiveProgress): void; gate?: LiveStartGate } = {}): Promise<PlayReport | undefined> {
+  // Une partie est celle d'une table, d'où qu'elle parte (roue, fiche, Bibliothèque, groupe, partie
+  // entre amis) : la roue passe dessus et quitte le médaillon, pour le chargement comme pour le retour.
+  pointAtTable(table);
   const install = vpxInstall(loc);
   if (!install && table.emulator === 'vpx') return undefined;
   // Une sauvegarde automatique cède la place (elle reprendra au prochain moment libre) ; une sauvegarde
@@ -6865,7 +6897,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   }
 
   // Table de Pinball FX : sa propre partie, sans rien de ce qui est propre à VPX (pinballfx.ts).
-  if (table.emulator === 'pinballfx') return playPinballFx(table, autoStopAfterMs, mode, simulated);
+  if (isZenEmulator(table.emulator)) return playPinballFx(table, autoStopAfterMs, mode, simulated);
   if (!install) return undefined;
 
   // Dès le chargement : son écran rappelle les boutons du menu de VPX, pas ceux du jeu.
@@ -7787,7 +7819,7 @@ async function runStress(spec: string, tableFilter?: string): Promise<void> {
     return void quit();
   }
   await delay(2000);
-  state = { ...state, index };
+  pointAtTable(index);
   broadcast();
   await delay(300);
   await capture('menu');
@@ -7994,7 +8026,7 @@ function menuPlace(): MenuResume {
 function resumeMenuPlace(resume: MenuResume | undefined, screensFirst: boolean): void {
   if (!resume) return;
   const table = resume.table ? tables.find((entry) => entry.file === resume.table) : undefined;
-  if (table) state = { ...state, index: tables.indexOf(table) };
+  if (table) pointAtTable(table);
   // Conditions ou profil à présenter d'abord : ils ramènent à la roue, la rubrique n'est pas reprise.
   const reopened = state.phase === 'menu' && !screensFirst && resume.system ? library.reopenSystem(resume.system) : false;
   console.log(`Reprise du menu après la relance : table ${table ? table.id : 'de départ'}${resume.system ? (reopened ? `, menu système (${resume.system.group ?? 'racine'})` : ', menu système non repris') : ''}.`); // i18n-ignore : journal
@@ -8136,7 +8168,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
       state.phase === 'loading' && role === 'playfield' && launch?.slow
         ? launch.stopped
           ? { step: t('Arrêt demandé : VPX se ferme'), since: launch.since }
-          : { step: loadingStepLabel(launch.step), since: launch.since, stop: playing?.emulator === 'pinballfx' ? t('{keys} ou Exit : arrêter · en partie, appui long sur Exit : quitter Pinball FX', { keys: shortcutLabel(SHORTCUTS.forceStop) }) : t('{keys} ou Exit : arrêter', { keys: shortcutLabel(SHORTCUTS.forceStop) }) }
+          : { step: loadingStepLabel(launch.step), since: launch.since, stop: isZenEmulator(playing?.emulator) ? t('{keys} ou Exit : arrêter · en partie, appui long sur Exit : quitter {game}', { keys: shortcutLabel(SHORTCUTS.forceStop), game: ZEN_GAMES[playing!.emulator as ZenGameKey].name }) : t('{keys} ou Exit : arrêter', { keys: shortcutLabel(SHORTCUTS.forceStop) }) }
         : undefined,
     // Fronton du jeu choisi (image Backglass), en fond du menu au bureau, à côté du plateau.
     backglass: role === 'playfield' && m && table && !shown && !onMedallion() ? m.typeMedia(table, 'backglass', 'Backglass') : undefined,
@@ -8349,13 +8381,13 @@ function moveSelection(offset: number): void {
     const picked = collections.move(target.table - shelf.index);
     const index = picked ? tables.indexOf(picked) : -1;
     if (index < 0 || (index === state.index && !chosen)) return;
-    state = { ...state, index, medallion: undefined };
+    pointAtTable(index);
     return playUiSound('solenoid');
   }
   const next = collections.move(offset);
   const index = next ? tables.indexOf(next) : -1;
   if (index < 0 || index === state.index) return;
-  state = { ...state, index };
+  pointAtTable(index);
   playUiSound('solenoid');
 }
 

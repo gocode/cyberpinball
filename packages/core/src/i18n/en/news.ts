@@ -1,9 +1,9 @@
 // Catalogue anglais : Nouveautés (Menu système > Nouveautés : packages/core/src/news.ts,
 // app/src/news-menu.ts). Clé : le texte français. Les noms déjà traduits ailleurs (Nouveautés,
-// Parties instantanées, Groupes privés, Avis et propositions…) ne sont pas répétés ici.
+// Parties instantanées, Groupes privés, Retours et propositions…) ne sont pas répétés ici.
 export const messages: Record<string, string> = {
   // packages/core/src/systemmenu.ts
-  'Langue, mise à jour, nouveautés, avis et propositions, activité récente, sauvegardes, migration, conditions d’utilisation, la communauté, quitter ou redémarrer, veille et extinction':
+  'Langue, mise à jour, nouveautés, retours et propositions, activité récente, sauvegardes, migration, conditions d’utilisation, la communauté, quitter ou redémarrer, veille et extinction':
     'Language, update, what’s new, feedback and ideas, recent activity, backups, migration, terms of use, the community, quit or restart, sleep and shutdown',
 
   // packages/core/src/news.ts : les nouveautés
@@ -34,7 +34,7 @@ export const messages: Record<string, string> = {
     'A public board of the ideas and problems reported by players. Vote for an idea, or post your own with the on-screen keyboard or your phone: similar ideas show up while you type.',
   'Un problème se signale aussi depuis l’écran d’une partie qui n’a pas pu se dérouler, avec un rapport technique lu par l’équipe seule.':
     'A problem can also be reported from the screen of a game that could not run, with a technical report read by the team only.',
-  'Menu système › Cyber Pinball › Avis et propositions': 'System menu › Cyber Pinball › Feedback and ideas',
+  'Menu système › Cyber Pinball › Retours et propositions': 'System menu › Cyber Pinball › Feedback and ideas',
 
   'La Communauté': 'The Community',
   'Les joueurs en ligne du monde entier, et un salon de discussion par pays.': 'Players online from all over the world, and a chat room for each country.',

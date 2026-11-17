@@ -240,7 +240,7 @@ export function createTechSheet(ctx: TechSheetContext) {
         rows.push({ ...row, action: actions.length, pick: true });
         actions.push(action);
       };
-      if (ctx.feedback) pick({ icon: 'inbox', text: t('À l’équipe de Cyber Pinball'), detail: t('Par Internet, chiffré : seule l’équipe le lit · Avis et propositions') }, { label: t('À l’équipe de Cyber Pinball'), key: 'report:team', run: () => ctx.feedback!(description, self) });
+      if (ctx.feedback) pick({ icon: 'inbox', text: t('À l’équipe de Cyber Pinball'), detail: t('Par Internet, chiffré : seule l’équipe le lit · Retours et propositions') }, { label: t('À l’équipe de Cyber Pinball'), key: 'report:team', run: () => ctx.feedback!(description, self) });
       if (phone) pick({ icon: 'phone', text: t('Sur le téléphone connecté'), detail: t('{phone} · il le partage ensuite par e-mail, WhatsApp, Messenger…', { phone }) }, { label: t('Sur le téléphone connecté'), key: 'report:phone', run: () => sendPhone() });
       else pick({ icon: 'phone', text: t('Connecter un téléphone'), detail: t('Start : un QR code à lire avec l’appareil photo, le téléphone sur le même réseau que la borne'), tone: 'info' }, { label: t('Connecter un téléphone'), key: 'report:phone', run: () => ctx.runSystemItem('phone-remote', self) });
       for (const d of drives)

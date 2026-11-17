@@ -1705,8 +1705,8 @@ $('top-more').addEventListener('click', () => {
   const sending = upload && (upload.phase === 'asking' || upload.phase === 'sending');
   const items = [
     ...(mode === 'menu' && fieldShown ? [{ id: 'keys', label: t('Clavier : taper dans le champ ouvert à la borne'), run: () => openKeys(fieldShown, false, sameField(openedField, fieldShown)) }] : []),
-    // Avis et propositions : le formulaire des retours, ouvert à la borne (on écrit au clavier du téléphone).
-    ...(mode === 'menu' ? [{ id: 'feedback', label: t('Avis et propositions'), run: () => send({ t: 'open', id: 'feedback' }) }] : []),
+    // Retours et propositions : le formulaire des retours, ouvert à la borne (on écrit au clavier du téléphone).
+    ...(mode === 'menu' ? [{ id: 'feedback', label: t('Retours et propositions'), run: () => send({ t: 'open', id: 'feedback' }) }] : []),
     ...(mode === 'menu' || sending ? [{ id: 'send', label: sending && upload.phase === 'sending' ? t('Envoi {pct} %', { pct: uploadPct() }) : t('Envoyer un fichier à la borne'), run: () => $('nav-send').click() }] : []),
     ...(kept && !standalone() && !relayShortcut() ? [{ id: 'home', label: t('Ajouter à l’écran d’accueil'), run: offerHomeScreen }] : []),
     // Le raccourci qui suit la borne (adresse stable par Internet), toujours là quand la borne le donne.

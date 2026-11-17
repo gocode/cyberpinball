@@ -37,7 +37,7 @@ Les numéros de version, de pilote et les heures restent lisibles.
 « Voir le contenu du rapport » liste chaque fichier, sa taille et ce qui est remplacé.
 Cinq destinations, la borne n'ayant pas de messagerie :
 
-- **À l'équipe de Cyber Pinball** : le formulaire d'[Avis et propositions](avis-et-propositions.md#avis-et-propositions), le rapport joint et la description reprise ; il part chiffré au service du projet.
+- **À l'équipe de Cyber Pinball** : le formulaire de [Retours et propositions](retours-et-propositions.md#retours-et-propositions), le rapport joint et la description reprise ; il part chiffré au service du projet.
 - **Sur le téléphone connecté** (la télécommande, [Le téléphone comme télécommande du front-end](le-telephone-comme-telecommande-du-front-end.md#le-téléphone-comme-télécommande-du-front-end)) : le téléphone reçoit une feuille « Rapport de la borne » avec « Télécharger le rapport », « Préparer un e-mail » (un lien `mailto:` qui ouvre sa messagerie avec le résumé, `reportMailto` ; on y joint le fichier téléchargé) et « Copier le résumé » (pour un forum ou WhatsApp).
   La page du téléphone est en HTTP : le partage du système (`navigator.share`) et le presse-papiers moderne n'y sont pas permis, d'où ces trois gestes.
   Le ZIP est servi par la borne sous un jeton tiré au hasard, à l'adresse de ce téléphone seulement, pendant dix minutes (`offerReport`, `REPORT_MS`, [phone-remote.ts](../../app/src/phone-remote.ts)) ; il passe en clair sur le réseau local, comme tout téléchargement, mais il est déjà anonymisé.

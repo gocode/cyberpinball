@@ -378,7 +378,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       const tiltGames = gamesOf(tiltman!, 'Tiltman');
       instantStops.push(() => kikoGames.stop(), () => ressortGames.stop(), () => tiltGames.stop());
       timersLater.push(setTimeout(() => {
-        const vpx = mine().filter((t) => t.emulator !== 'pinballfx');
+        const vpx = mine().filter((t) => t.emulator === 'vpx');
         const table = vpx.find((t) => /Atlas Rising/.test(t.title)) ?? vpx[0];
         if (!table) return log('Réseau simulé : aucune table pour la partie de Kiko.'); // i18n-ignore : journal
         void kikoGames.openInstant(table, 4).then(() => log(`Réseau simulé : Kiko ouvre une partie instantanée sur ${table.title}.`)); // i18n-ignore : journal
@@ -459,7 +459,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       try {
         const friendsOfBruno = () => bruno.state().friends.map((f) => f.key);
         await until('amitiés de Bruno', () => [me.key, ...members.map((n) => n.state().key.publicKey)].every((k) => friendsOfBruno().includes(k))); // i18n-ignore : journal
-        const vpx = mine().filter((t) => t.emulator !== 'pinballfx');
+        const vpx = mine().filter((t) => t.emulator === 'vpx');
         const table = vpx.find((t) => /Star Courier/.test(t.title)) ?? vpx[0];
         const invitees = [...members.map((n) => ({ key: n.state().key.publicKey, name: n.state().name })), me];
         const g = brunoGroups.create('Les flippeurs du jeudi', invitees); // i18n-ignore : nom d'un groupe fictif

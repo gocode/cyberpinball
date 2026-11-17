@@ -140,6 +140,9 @@ Start sur l'une d'elles ouvre sa mention légale (« La ROM : vos droits », « 
 « Prendre la ROM » ou « Prendre le PuP-Pack » ne fait rien tant qu'il n'est pas coché ; cochée, le curseur passe dessus, puis l'écran des parties revient sur la ligne de la ROM, « Cochée », « ✓ Droits attestés ».
 Une partie demandée par une invitation n'est cochée d'office que si elle n'est pas sous droits.
 L'attestation vaut pour cette table le temps de l'écran ; elle suit le téléchargement (`attested`, `attestedAt` dans sa fiche de la file), et un fichier d'une partie sous droits non attestée n'y entre jamais (`attestedTableFiles`).
+La ROM proposée est celle que la table joue chez l'ami, où qu'elle soit : dans `pinmame\roms` de la table, ou seulement dans sa bibliothèque de ROM, trouvée par le dossier commun de PinMAME (`libraryRoms` de l'inventaire) ; elle arrive sous `pinmame\roms`, et le plan d'ajout la range dans votre bibliothèque.
+Les alias de la table (`pinmame\alias.txt`, la ROM chargée sous un autre nom) font partie de la ROM : ils viennent avec elle, jamais sans elle.
+Une table de l'ami qui demande une ROM que sa borne ne propose pas (version plus ancienne, ROM introuvable chez lui) le dit sous la liste, « ROM … : pas proposée par sa borne », avant toute réception.
 Sous la liste, « Récupérer les n parties cochées » (le poids ; refusé s'il ne reste pas la place, plus 1 Gio, sur le lecteur des données).
 **Une réception ne part qu'une fois** : elle porte une clé, la table et l'ami (`dedupe`), et tant qu'elle tourne, attend son ami, est en pause, ou est reçue sans être installée, rien ne la relance.
 Elle se voit là où on l'a lancée : dans la bibliothèque de l'ami, la ligne de la table porte son état (« Réception en cours », « En attente de Bruno », « Reçue · à installer »), sa barre et « 42 % · 120 Mo sur 300 Mo · fichier 3 sur 14 · Start : voir la réception » ; Start y mène.

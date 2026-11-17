@@ -189,7 +189,7 @@ export function buildCollections<T extends Shelved & { id?: string }>(tables: re
     return { id: m.id, group: 'mine', label: m.name, icon: 'list', tables: list, ...(list.length ? {} : { reason: t('Vide : sur la fiche d’une table, « Ajouter à une collection… »') }) };
   });
 
-  // Types de jeu (17/11/2026) : une collection par logiciel (VPX, Pinball FX), seulement sur une
+  // Types de jeu (17/11/2026) : une collection par logiciel (VPX, Pinball FX, Pinball FX3), seulement sur une
   // borne qui en mêle plusieurs ; sinon elle ferait doublon avec Toutes les tables.
   const engines = new Map<TableEmulator, T[]>();
   for (const x of tables) {
@@ -207,7 +207,7 @@ export function buildCollections<T extends Shelved & { id?: string }>(tables: re
             label: TABLE_ENGINES[e].long,
             icon: TABLE_ENGINES[e].icon,
             tables: engines.get(e)!,
-            ...(e === 'pinballfx' ? { detail: t('bêta') } : {}),
+            ...(e !== 'vpx' ? { detail: t('bêta') } : {}),
           }));
 
   return [...fixed, ...mine, ...byEngine, ...byMaker, ...byDecade];

@@ -552,9 +552,24 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
         startTableFetch(key, tableId, owned, match?.entry.table, chosen.flatMap((p) => p.files), job.attested, back);
       },
     });
+    // Sa table demande une ROM que sa borne ne propose pas (version d'avant le 17/11/2026, ROM
+    // introuvable chez lui) : dit ici, jamais découvert après l'installation.
+    const wantedRom = match?.entry.table.roms?.[0];
+    const romNotOffered: Row[] =
+      wantedRom && !all.some((p) => p.part === 'rom') && !have.has('rom')
+        ? [
+            {
+              text: t('ROM {rom} : pas proposée par sa borne', { rom: wantedRom }),
+              detail: t('La table ne démarre pas sans elle. Une fois la table installée, « Ce qu’il manque pour jouer » vous aide à la récupérer.'),
+              tone: 'warning',
+              icon: 'alert',
+            },
+          ]
+        : [];
     sections.push({ title: tn(chosen.length, 'Ses parties · {n} cochée sur {total}', 'Ses parties · {n} cochées sur {total}', { total: all.length }), rows });
     sections.push({
       rows: [
+        ...romNotOffered,
         { text: t('Une table contient un script que VPX exécute'), detail: t('Ne prenez que les tables d’amis en qui vous avez confiance'), tone: 'warning', icon: 'alert' },
         ...(room ? [] : [{ text: t('Pas assez de place : {size} libres pour {need}', { size: formatSize(free!), need: formatSize(bytes) }), tone: 'error' as const, icon: 'drive' as const }]),
       ],

@@ -1,14 +1,14 @@
-// Lancement d'une table de Pinball FX et surveillance jusqu'à la fin de la partie.
-// La commande (pinballFxCommand, packages/core/src/pinballfx.ts) passe par Steam
-// (steam.exe -applaunch) ou par l'exécutable d'Epic : le processus lancé n'est pas
-// le jeu. Le jeu est reconnu à sa fenêtre (titre « PinballFX ») ; la partie dure tant
-// que ce processus vit.
+// Lancement d'une table d'un jeu de Zen (Pinball FX, Pinball FX3) et surveillance jusqu'à la
+// fin de la partie. La commande (pinballFxCommand, pinballFx3Command dans packages/core) passe
+// par Steam (steam.exe -applaunch) ou par l'exécutable d'Epic : le processus lancé n'est pas
+// le jeu. Le jeu est reconnu à sa fenêtre (« PinballFX » ; « Pinball FX Classic » ou
+// « Pinball FX3 ») ; la partie dure tant que ce processus vit.
 // Quitter la table dans le jeu ramène à son propre menu, pas à Cyber Pinball : un
 // appui long sur Exit (bouton de la borne) ferme le jeu et rend la main au menu. Le
 // geste est écrit au chargement de la partie.
 
 import { spawn } from 'node:child_process';
-import { HoldDetector, PINBALLFX_WINDOW_TITLE, t } from '@cyberpinball/core';
+import { HoldDetector, isPinballFx3WindowTitle, PINBALLFX_WINDOW_TITLE, t, ZEN_GAMES, type ZenGameKey } from '@cyberpinball/core';
 import { allowAnyForeground, bringToFront, closeWindow, foregroundWindow, listWindows, type WindowInfo } from '@cyberpinball/win-displays';
 import type { LaunchResult, RunningGame } from './launcher';
 
@@ -32,8 +32,16 @@ export interface PinballFxSystem {
   now(): number;
 }
 
+/** Le jeu de Zen lancé : son nom (messages) et sa fenêtre de jeu. */
+export interface ZenLaunchGame {
+  name: string;
+  isWindow(w: Pick<WindowInfo, 'title' | 'className' | 'visible'>): boolean;
+}
+
 export interface PinballFxLaunchOptions {
   command: { file: string; args: string[] };
+  /** Pinball FX par défaut. */
+  game?: ZenLaunchGame;
   /** Le bouton Exit de la borne est tenu, maintenant (clavier ou joystick). */
   exitHeld?: () => boolean;
   timeoutMs?: number;
@@ -48,6 +56,19 @@ export function isPinballFxWindow(w: Pick<WindowInfo, 'title' | 'className' | 'v
   const title = w.title.trim();
   return title === PINBALLFX_WINDOW_TITLE || (w.className === 'UnrealWindow' && /^pinball ?fx$/i.test(title));
 }
+
+/**
+ * Fenêtre de jeu de Pinball FX3 : « Pinball FX Classic » depuis avril 2026, « Pinball FX3 » avant ;
+ * le titre exact, jamais une page de Steam qui le nommerait (« Pinball FX Classic - Steam »).
+ */
+export function isPinballFx3Window(w: Pick<WindowInfo, 'title' | 'className' | 'visible'>): boolean {
+  return w.visible && isPinballFx3WindowTitle(w.title);
+}
+
+export const ZEN_LAUNCH_GAMES: Readonly<Record<ZenGameKey, ZenLaunchGame>> = {
+  pinballfx: { name: ZEN_GAMES.pinballfx.name, isWindow: isPinballFxWindow },
+  pinballfx3: { name: ZEN_GAMES.pinballfx3.name, isWindow: isPinballFx3Window },
+};
 
 function pidAlive(pid: number): boolean {
   try {
@@ -77,13 +98,14 @@ export const realPinballFxSystem: PinballFxSystem = {
   now: () => Date.now(),
 };
 
-/** Pinball FX déjà ouvert (partie précédente mal fermée) : son processus, s'il y en a un. */
-export function runningPinballFx(system: PinballFxSystem = realPinballFxSystem): number | undefined {
-  return system.windows().find(isPinballFxWindow)?.pid;
+/** Jeu de Zen déjà ouvert (partie précédente mal fermée) : son processus, s'il y en a un. */
+export function runningPinballFx(system: PinballFxSystem = realPinballFxSystem, game: ZenLaunchGame = ZEN_LAUNCH_GAMES.pinballfx): number | undefined {
+  return system.windows().find(game.isWindow)?.pid;
 }
 
 export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
   const sys = opts.system ?? realPinballFxSystem;
+  const zen = opts.game ?? ZEN_LAUNCH_GAMES.pinballfx;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const t0 = sys.now();
   if (!opts.system) allowAnyForeground();
@@ -116,8 +138,9 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
       ok: !failure,
       ...(failure ? { failure, message } : {}),
       exitCode: null,
-      seconds: playingSince ? (now - playingSince) / 1000 : 0,
-      ...(playingSince ? { loadSeconds: (playingSince - t0) / 1000 } : {}),
+      // undefined, pas 0 : une horloge à 0 (essais) est un instant comme un autre.
+      seconds: playingSince !== undefined ? (now - playingSince) / 1000 : 0,
+      ...(playingSince !== undefined ? { loadSeconds: (playingSince - t0) / 1000 } : {}),
       notices,
       logTail: [],
     });
@@ -144,20 +167,20 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
     child = sys.launch(opts.command.file, opts.command.args);
   } catch (error) {
     failure = 'spawn';
-    message = t('Impossible de lancer Pinball FX : {error}', { error: (error as Error).message });
+    message = t('Impossible de lancer {game} : {error}', { game: zen.name, error: (error as Error).message });
     queueMicrotask(end);
     return { pid: undefined, stop, done };
   }
   child.on('error', (error) => {
     failure = 'spawn';
-    message = t('Impossible de lancer Pinball FX : {error}', { error: error.message });
+    message = t('Impossible de lancer {game} : {error}', { game: zen.name, error: error.message });
     end();
   });
 
   poll = setInterval(() => {
     if (finished) return;
     if (gamePid === undefined) {
-      const w = sys.windows().find(isPinballFxWindow);
+      const w = sys.windows().find(zen.isWindow);
       if (w) {
         gamePid = w.pid;
         gameWindow = w;
@@ -170,7 +193,7 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
         opts.onPlaying?.();
       } else if (sys.now() - t0 > timeoutMs) {
         failure = 'timeout';
-        message = t('Pinball FX n’a pas ouvert sa fenêtre de jeu après {n} s.', { n: Math.round(timeoutMs / 1000) });
+        message = t('{game} n’a pas ouvert sa fenêtre de jeu après {n} s.', { game: zen.name, n: Math.round(timeoutMs / 1000) });
         end();
       }
       return;
@@ -184,7 +207,7 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
       opts.onForeground?.();
     }
     if (opts.exitHeld && hold.update(opts.exitHeld(), sys.now()) && !stopAsked) {
-      notices.push(t('Appui long sur Exit : Pinball FX fermé, retour au front-end.'));
+      notices.push(t('Appui long sur Exit : {game} fermé, retour au front-end.', { game: zen.name }));
       stop();
     }
   }, POLL_MS);

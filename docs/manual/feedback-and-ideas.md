@@ -1,8 +1,8 @@
-[Français](../manuel/avis-et-propositions.md) · English · [Manual contents](../manual.md)
+[Français](../manuel/retours-et-propositions.md) · English · [Manual contents](../manual.md)
 
 ## Feedback and ideas
 
-System menu > Cyber Pinball > "Avis et propositions" (Feedback and ideas): the public board of players' ideas and the feedback form, the same wherever you come from.
+System menu > Cyber Pinball > "Retours et propositions" (Feedback and ideas): the public board of players' ideas and the feedback form, the same wherever you come from.
 Four doors can lead there, never forcing you: this system menu entry; the screen of a failed game ("Flipper : signaler ce problème" (Flipper: report this problem), with the table and the VPX exit code already filled in); the tech sheet ("Envoyer un rapport" > "À l'équipe de Cyber Pinball" (To the Cyber Pinball team), technical report attached and description carried over); the phone app (⋮ menu > Feedback and ideas, and "Report this problem" on the failure screen).
 
 **The board.**

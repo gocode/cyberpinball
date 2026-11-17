@@ -232,7 +232,7 @@ export function pin2dmdProbeProblem(probe: LibusbProbe | undefined, service?: st
       service: service ?? t('inconnu'),
     });
   }
-  return t('PIN2DMD : la libusb de VPX n’arrive pas à l’ouvrir (erreur {code}, étape {stage}). Le DMD restera sans doute noir. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Cyber Pinball > Avis et propositions).', {
+  return t('PIN2DMD : la libusb de VPX n’arrive pas à l’ouvrir (erreur {code}, étape {stage}). Le DMD restera sans doute noir. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions).', {
     code: probe.code,
     stage: probe.stage,
   });

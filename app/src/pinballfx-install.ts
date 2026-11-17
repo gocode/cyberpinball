@@ -8,10 +8,15 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   findPinballFx,
+  findSteamPinballFx3,
+  pinballFx3Getter,
   pinballFxGetter,
+  steamPinballFx3Downloading,
   steamPinballFxDownloading,
+  type PinballFx3Install,
   type PinballFxGetter,
   type PinballFxInstall,
+  type ZenGameKey,
 } from '@cyberpinball/core';
 import { allowAnyForeground, hkcuValue, hklmValue, type WindowInfo } from '@cyberpinball/win-displays';
 import { realPinballFxSystem, type PinballFxSystem } from './pinballfx-launcher';
@@ -75,6 +80,33 @@ export function pinballFxSetup(): PinballFxSetup {
   const epic = epicDataDir();
   const getter = pinballFxGetter({ ...(steam ? { steamDir: steam } : {}), epic: !!epic && fs.existsSync(epic) });
   return { downloading: !!steam && steamPinballFxDownloading(steam), ...(getter ? { getter } : {}) };
+}
+
+/** Pinball FX3 installé par Steam (seule version qui a le mode borne et le lancement direct). */
+export function detectPinballFx3(): PinballFx3Install | undefined {
+  const steam = steamDir();
+  return steam ? findSteamPinballFx3(steam) : undefined;
+}
+
+/** Pinball FX3 sur ce PC : installé, en cours de téléchargement, ou Steam à ouvrir sur son installation. */
+export function pinballFx3Setup(): { install?: PinballFx3Install; downloading: boolean; getter?: PinballFxGetter } {
+  const steam = steamDir();
+  const install = steam ? findSteamPinballFx3(steam) : undefined;
+  if (install) return { install, downloading: false };
+  const getter = pinballFx3Getter(steam);
+  return { downloading: !!steam && steamPinballFx3Downloading(steam), ...(getter ? { getter } : {}) };
+}
+
+/** Un jeu de Zen sur ce PC, quel qu'il soit : installé (et par quelle boutique), en téléchargement, ou comment l'obtenir. */
+export interface ZenSetup {
+  /** `tablesDir` : Pinball FX3, dossier de ses fichiers de tables. */
+  install?: { store: 'steam' | 'epic'; tablesDir?: string };
+  downloading: boolean;
+  getter?: PinballFxGetter;
+}
+
+export function zenSetup(game: ZenGameKey): ZenSetup {
+  return game === 'pinballfx' ? pinballFxSetup() : pinballFx3Setup();
 }
 
 /** Fenêtre de la boutique : Steam (sa fenêtre « Installer », sa connexion) ou le lanceur d'Epic. */

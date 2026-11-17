@@ -4,6 +4,7 @@
 
 Cyber Pinball lance aussi les tables de **Pinball FX** (Zen Studios, 2023), acheté sur Steam ou sur Epic.
 **En bêta** : l'entrée de l'entonnoir et la ligne « Pinball FX » de la fiche portent la pastille « BÊTA », l'écran des tables le dit en tête.
+Pinball FX3 (« Pinball FX Classic ») a sa rubrique : [Tables de Pinball FX3](tables-de-pinball-fx3.md).
 Ses tables ne sont pas des fichiers : ce sont des contenus du jeu, désignés par un numéro.
 Chacune a dans le dossier des tables un dossier « Titre (Fabricant Année) » avec une **fiche** `.pinballfx` (JSON : `{ "PinballFX": { "Table": 156 } }`), son `.info` et ses médias, comme une table VPX ; la roue, les collections, les favoris, les statistiques et les médias marchent donc de la même façon.
 

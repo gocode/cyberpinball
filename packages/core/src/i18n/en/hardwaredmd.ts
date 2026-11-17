@@ -21,7 +21,7 @@ export const messages: Record<string, string> = {
   'PIN2DMD : la libusb de VPX ne sait pas l’ouvrir avec son pilote actuel ({service}). Le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».':
     'PIN2DMD: VPX’s libusb cannot open it with its current driver ({service}). The DMD will stay dark. Replace that driver with WinUSB using Zadig (Options > List All Devices, pick the PIN2DMD, WinUSB, Replace Driver), then “Check again”.',
   'inconnu': 'unknown',
-  'PIN2DMD : la libusb de VPX n’arrive pas à l’ouvrir (erreur {code}, étape {stage}). Le DMD restera sans doute noir. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Cyber Pinball > Avis et propositions).':
+  'PIN2DMD : la libusb de VPX n’arrive pas à l’ouvrir (erreur {code}, étape {stage}). Le DMD restera sans doute noir. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions).':
     'PIN2DMD: VPX’s libusb cannot open it (error {code}, step {stage}). The DMD will probably stay dark. Unplug it, plug it back in, then “Check again”; if nothing changes, send a report (System menu > Cyber Pinball > Feedback and ideas).',
   'DMD réel : {programs} est ouvert et garde peut-être le DMD réel ; VPX ne pourrait pas l’allumer. Fermez-le avant de jouer.':
     'Real DMD: {programs} is open and may be holding the real DMD; VPX could not light it. Close it before playing.',

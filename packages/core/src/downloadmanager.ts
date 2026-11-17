@@ -303,7 +303,7 @@ export function createDownloadManager(opts: DownloadManagerOptions): DownloadMan
       save();
       changed();
       if (done) {
-        log(`Téléchargements : « ${done.title} » fini (${done.files.length} fichier(s)).`); // i18n-ignore : journal
+        log(`Téléchargements : « ${say(done.title)} » fini (${done.files.length} fichier(s)).`); // i18n-ignore : journal
         try {
           opts.finished?.(done);
         } catch (error) {
@@ -348,7 +348,7 @@ export function createDownloadManager(opts: DownloadManagerOptions): DownloadMan
     add(s) {
       const twin = s.dedupe ? pendingDownload(queue.jobs, s.dedupe) : undefined;
       if (twin) {
-        log(`Téléchargements : « ${twin.title} » déjà demandé (${twin.state}), pas relancé.`); // i18n-ignore : journal
+        log(`Téléchargements : « ${say(twin.title)} » déjà demandé (${twin.state}), pas relancé.`); // i18n-ignore : journal
         return twin;
       }
       const job = spec(s, {});
@@ -359,7 +359,7 @@ export function createDownloadManager(opts: DownloadManagerOptions): DownloadMan
     track(s, relaunch) {
       // Un écran qui relance le téléchargement qu'il suit déjà : deux propriétaires écriraient le
       // même partiel. Signalé au journal pour le corriger (chaque écran ne lance qu'une fois).
-      if (s.id && running.has(s.id)) log(`Téléchargements : « ${s.title} » relancé alors qu'il tournait déjà (${s.id}).`); // i18n-ignore : journal
+      if (s.id && running.has(s.id)) log(`Téléchargements : « ${say(s.title)} » relancé alors qu'il tournait déjà (${s.id}).`); // i18n-ignore : journal
       let job = spec({ ...s, attached: s.attached ?? true }, { state: 'running' });
       const id = job.id;
       const meter = createTransferMeter();

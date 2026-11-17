@@ -103,7 +103,7 @@ export const NEWS: readonly NewsItem[] = [
     id: 'avis-et-propositions',
     date: '2026-11-16',
     version: '0.1.13',
-    get title() { return t('Avis et propositions'); },
+    get title() { return t('Retours et propositions'); },
     get detail() { return t('Les idées des joueurs, les plus demandées en tête : votez, ou proposez la vôtre.'); },
     get more() {
       return [
@@ -111,7 +111,7 @@ export const NEWS: readonly NewsItem[] = [
         t('Un problème se signale aussi depuis l’écran d’une partie qui n’a pas pu se dérouler, avec un rapport technique lu par l’équipe seule.'),
       ];
     },
-    get where() { return t('Menu système › Cyber Pinball › Avis et propositions'); },
+    get where() { return t('Menu système › Cyber Pinball › Retours et propositions'); },
     reach: { kind: 'system', id: 'feedback' },
     preview: true,
   },

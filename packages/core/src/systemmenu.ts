@@ -183,7 +183,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'cyberpinball',
     icon: 'pinball-app',
     label: 'Cyber Pinball', // i18n-ignore : le nom de l'application
-    get detail() { return t('Langue, mise à jour, nouveautés, avis et propositions, activité récente, sauvegardes, migration, conditions d’utilisation, la communauté, quitter ou redémarrer, veille et extinction'); },
+    get detail() { return t('Langue, mise à jour, nouveautés, retours et propositions, activité récente, sauvegardes, migration, conditions d’utilisation, la communauté, quitter ou redémarrer, veille et extinction'); },
     // Les sorties à la fin, de la plus légère à la plus lourde : quitter ou relancer Cyber Pinball, veille, redémarrage, arrêt.
     entries: ['language', 'updates', 'news', 'feedback', 'activity', 'backups', 'migration', 'terms', 'community', 'quit', 'relaunch', 'sleep', 'restart', 'shutdown'],
   },
@@ -271,7 +271,7 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   // Les grandes nouveautés, choisies à la main (news.ts, app/src/news-menu.ts) : une chronologie.
   news: { icon: 'sparkle', get label() { return t('Nouveautés'); } },
   // Le tableau public des propositions et le formulaire des retours (app/src/feedback-menu.ts).
-  feedback: { icon: 'inbox', get label() { return t('Avis et propositions'); } },
+  feedback: { icon: 'inbox', get label() { return t('Retours et propositions'); } },
   terms: { icon: 'rules', get label() { return t('Conditions d’utilisation'); } },
   // Crédits de la communauté (app/src/credits-menu.ts) : les auteurs des tables de la borne, les logiciels, les sites.
   community: { icon: 'credits', get label() { return t('La communauté'); } },

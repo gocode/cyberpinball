@@ -341,9 +341,13 @@ export function createProposals(ctx: ProposalsContext) {
    * puis VPUniverse, lent), puis les vignettes VPS, en basse définition.
    */
   /** La table de ces propositions, pour qu'un pack reçu ne propose que ses fichiers à elle. */
-  function ownOf(st: State): { title?: string; pinballFx?: number } {
+  function ownOf(st: State): { title?: string; pinballFx?: number; pinballFx3?: string } {
     const table = ctx.find(st.file);
-    return { ...(table?.title ? { title: table.title } : {}), ...(table?.pinballFxTable !== undefined ? { pinballFx: table.pinballFxTable } : {}) };
+    return {
+      ...(table?.title ? { title: table.title } : {}),
+      ...(table?.pinballFxTable !== undefined ? { pinballFx: table.pinballFxTable } : {}),
+      ...(table?.pinballFx3Table !== undefined ? { pinballFx3: table.pinballFx3Table } : {}),
+    };
   }
 
   function allChoicesFor(st: State, type: MediaType): MediaChoice[] {

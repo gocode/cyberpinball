@@ -33,3 +33,7 @@
   A gamepad's D-pads are captured as buttons, not yet its axes (a Zero Delay's stick directions, triggers); an encoder button that sends a key combination is not supported.
 - Sound: videos and menu music still play on the Windows default output, as do COM components outside plugins (standalone VPinMAME, B2S, PinUP Player).
   Nothing checks yet that the default output is the backglass one.
+- Pinball FX3 (beta, see [Pinball FX3 tables](pinball-fx3-tables.md)): not yet tried on a real installation; direct launch, `-class` and the "Pinball FX Classic" window title come from front-ends and Zen, not from a test.
+  Cyber Pinball can't tell which tables are bought (Steam installs them all) or whether the game stayed on its home screen: it assumes so from a game shorter than 45 s.
+  Real DMD: only through `dmdext`, which reads the game's memory, and which Cyber Pinball doesn't start yet.
+  "Mars" opens "Attack from Mars" when the account has both tables (game bug).

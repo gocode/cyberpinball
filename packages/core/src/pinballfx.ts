@@ -10,7 +10,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { findSteamGame, steamGameDownloading, steamInstallUrl } from './steam';
 import type { VpsDb, VpsTableFile } from './vps';
+
+// Lecture de Steam, commune à Pinball FX et à Pinball FX3 (steam.ts) : reprise ici pour ceux qui
+// l'importaient de ce module.
+export { parseVdf, steamLibraries } from './steam';
 
 export const PINBALLFX_STEAM_APPID = '2328760';
 /** Nom de la fenêtre de jeu (Unreal Engine) ; repris des scripts de fermeture des frontends. */
@@ -360,10 +365,10 @@ const VPS_IMAGE = /^https:\/\/virtualpinballspreadsheet\.github\.io\/vps-db\/img
  * FX3, sinon (machine Williams ou Bally sans version FX chez VPS) d'une recréation de la même
  * machine. Une vue du plateau, en hauteur : vignette de la liste, image du plateau à défaut.
  */
-export function pinballFxVpsImage(vps: Pick<VpsDb, 'games'>, table: PinballFxTable): string | undefined {
+export function pinballFxVpsImage(vps: Pick<VpsDb, 'games'>, table: { vps?: string }, formats: readonly string[] = ['FX', 'FX3', 'FX2']): string | undefined {
   const game = table.vps ? vps.games.find((g) => g.id === table.vps) : undefined;
   const files = (game?.tableFiles ?? []).filter((f) => f.imgUrl && VPS_IMAGE.test(f.imgUrl));
-  const rank = (f: VpsTableFile) => ['FX', 'FX3', 'FX2'].indexOf(f.tableFormat ?? '') + 1 || 9;
+  const rank = (f: VpsTableFile) => formats.indexOf(f.tableFormat ?? '') + 1 || 9;
   return [...files].sort((a, b) => rank(a) - rank(b))[0]?.imgUrl;
 }
 
@@ -399,94 +404,15 @@ export interface PinballFxInstall {
   cabinetDir: string;
 }
 
-type VdfNode = { [key: string]: string | VdfNode };
-
-/** Lecture des fichiers texte de Steam (KeyValues : "clé" "valeur" et "clé" { … }). */
-export function parseVdf(text: string): VdfNode {
-  const tokens: string[] = [];
-  const re = /"((?:[^"\\]|\\.)*)"|([{}])|\/\/[^\n]*/g;
-  for (let m = re.exec(text); m; m = re.exec(text)) {
-    if (m[1] !== undefined) tokens.push(m[1].replace(/\\\\/g, '\\').replace(/\\"/g, '"'));
-    else if (m[2]) tokens.push(m[2]);
-  }
-  let i = 0;
-  const readObject = (): VdfNode => {
-    const node: VdfNode = {};
-    while (i < tokens.length) {
-      const key = tokens[i++]!;
-      if (key === '}') return node;
-      if (key === '{') continue;
-      const next = tokens[i++];
-      if (next === undefined) break;
-      node[key] = next === '{' ? readObject() : next;
-    }
-    return node;
-  };
-  return readObject();
-}
-
-function readText(file: string): string | undefined {
-  try {
-    return fs.readFileSync(file, 'utf8');
-  } catch {
-    return undefined;
-  }
-}
-
-/** Bibliothèques de Steam (steamapps\libraryfolders.vdf), dossier principal compris. */
-export function steamLibraries(steamDir: string): string[] {
-  const libs = [steamDir];
-  const text = readText(path.join(steamDir, 'steamapps', 'libraryfolders.vdf'));
-  if (text) {
-    const root = parseVdf(text);
-    const folders = (root['libraryfolders'] ?? root['LibraryFolders']) as VdfNode | undefined;
-    for (const value of Object.values(folders ?? {})) {
-      const p = typeof value === 'string' ? value : typeof value['path'] === 'string' ? value['path'] : undefined;
-      if (p && !libs.some((l) => path.resolve(l).toLowerCase() === path.resolve(p).toLowerCase())) libs.push(p);
-    }
-  }
-  return libs;
-}
-
 /** Pinball FX installé par Steam : manifeste appmanifest_2328760.acf dans l'une des bibliothèques. */
 export function findSteamPinballFx(steamDir: string): PinballFxInstall | undefined {
-  const steamExe = path.join(steamDir, 'steam.exe');
-  for (const lib of steamLibraries(steamDir)) {
-    const state = steamAppState(lib);
-    if (!state || !steamAppComplete(state)) continue;
-    const installdir = typeof state['installdir'] === 'string' ? state['installdir'] : 'Pinball FX';
-    const gameDir = path.join(lib, 'steamapps', 'common', installdir);
-    if (!fs.existsSync(gameDir)) continue;
-    return { store: 'steam', gameDir, launcher: steamExe, cabinetDir: cabinetDirOf(gameDir) };
-  }
-  return undefined;
-}
-
-/** AppState du manifeste de Pinball FX dans une bibliothèque de Steam, s'il y en a un. */
-function steamAppState(lib: string): VdfNode | undefined {
-  const text = readText(path.join(lib, 'steamapps', `appmanifest_${PINBALLFX_STEAM_APPID}.acf`));
-  const state = text ? parseVdf(text)['AppState'] : undefined;
-  return state && typeof state === 'object' ? state : undefined;
-}
-
-/**
- * Jeu entièrement installé : drapeau 4 (« FullyInstalled ») de StateFlags. Steam écrit le manifeste
- * dès le début du téléchargement ; sans ce contrôle, une table se lancerait sur un jeu à moitié
- * reçu. Un manifeste sans StateFlags (ancien format) vaut installé.
- */
-function steamAppComplete(state: VdfNode): boolean {
-  const flags = state['StateFlags'];
-  if (typeof flags !== 'string') return true;
-  const n = Number(flags);
-  return Number.isFinite(n) && (n & 4) === 4;
+  const gameDir = findSteamGame(steamDir, PINBALLFX_STEAM_APPID, 'Pinball FX');
+  return gameDir ? { store: 'steam', gameDir, launcher: path.join(steamDir, 'steam.exe'), cabinetDir: cabinetDirOf(gameDir) } : undefined;
 }
 
 /** Pinball FX en cours de téléchargement ou de mise à jour dans Steam (manifeste présent, jeu incomplet). */
 export function steamPinballFxDownloading(steamDir: string): boolean {
-  return steamLibraries(steamDir).some((lib) => {
-    const state = steamAppState(lib);
-    return state !== undefined && !steamAppComplete(state);
-  });
+  return steamGameDownloading(steamDir, PINBALLFX_STEAM_APPID);
 }
 
 /** Pinball FX installé par Epic : manifeste *.item dont le nom affiché est « Pinball FX ». */
@@ -531,7 +457,7 @@ export function findPinballFx(search: PinballFxSearch): PinballFxInstall | undef
 }
 
 /** Installation par Steam : sa fenêtre « Installer », ou la page du jeu en boutique s'il n'est pas sur le compte. */
-export const PINBALLFX_STEAM_INSTALL_URL = `steam://install/${PINBALLFX_STEAM_APPID}`;
+export const PINBALLFX_STEAM_INSTALL_URL = steamInstallUrl(PINBALLFX_STEAM_APPID);
 /** Page de Pinball FX dans le lanceur d'Epic. */
 export const PINBALLFX_EPIC_STORE_URL = 'com.epicgames.launcher://store/p/pinball-fx';
 

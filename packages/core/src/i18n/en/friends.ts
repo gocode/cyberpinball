@@ -287,6 +287,8 @@ export const messages: Record<string, string> = {
   'Disponible, à cocher vous-même : Start, puis l’attestation de vos droits': 'Available, tick it yourself: Start, then the declaration of your rights',
   'Disponible : Start pour prendre la sienne à la place de la vôtre': 'Available: Start to take theirs instead of yours',
   'Disponible : Start pour la cocher': 'Available: Start to tick it',
+  'ROM {rom} : pas proposée par sa borne': 'ROM {rom}: not offered by their cabinet',
+  'La table ne démarre pas sans elle. Une fois la table installée, « Ce qu’il manque pour jouer » vous aide à la récupérer.': 'The table won’t start without it. Once the table is installed, “What’s missing to play” helps you get it.',
   'Ses parties · {n} cochée sur {total}': 'Their parts · {n} ticked of {total}',
   'Ses parties · {n} cochées sur {total}': 'Their parts · {n} ticked of {total}',
   'Une table contient un script que VPX exécute': 'A table contains a script that VPX runs',

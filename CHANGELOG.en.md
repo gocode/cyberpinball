@@ -9,6 +9,13 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Playing a table from the Library, a group or a game with friends while the wheel showed a medallion (Community, Jukebox, Collections): the loading screen now shows the table's name, and the wheel returns to it after the game.
+- The French name of “Feedback and ideas” now says that problems can be reported there too, not only ideas.
+- Pinball FX3 ("Pinball FX Classic" on Steam) in beta: System menu > Tables > Add a table > "Pinball FX3 tables" lists the tables installed with the game; you choose the ones you own, with their media, as for Pinball FX.
+- Pinball FX3: Williams and Bally tables start in their classic mode; holding Exit closes the game and returns to the wheel.
+- Pinball FX3: no cabinet code to ask Zen for since November 2024; turning cabinet mode on once in the game is enough, and Cyber Pinball explains it on the tables screen and on their page.
+- Pinball FX3: a game shorter than 45 s shows on return the possible causes of a game stuck on its home screen (table not on this Steam account, cabinet mode not turned on) instead of a silent return.
+- Pinball FX and Pinball FX3 now share the same code (Steam detection, entry, game, closing); the same machine in both games, or in VPX, keeps its own folder.
 - Leaderboards: "Fingerprints of … tables being computed…" no longer stays on screen once the fingerprints are ready, and leaderboards received from the network right after opening show up without reopening the screen.
 - Tables taken over from another installation (PinUP Popper, PinballX, old-style VPX): they now come with their settings. Their ROM's DIP switches (`VPinMAME\cfg`) and what their script had saved in VPX (table menu options, high scores of original tables, credits) are carried over, only each table's own; no more setting everything up again.
 - PuP-Packs without `screens.pup`: PinUP Player used its default screens, VPX's PUP plugin creates none and the pack stayed dark. The screens the pack uses are now declared automatically before the game.

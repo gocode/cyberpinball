@@ -1,5 +1,5 @@
 // Le service des retours vu de la borne (packages/core/src/feedback.ts, packages/service-telephone) :
-// la liste des propositions (gardée en mémoire, relue à l'ouverture de « Avis et propositions »),
+// la liste des propositions (gardée en mémoire, relue à l'ouverture de « Retours et propositions »),
 // proposer, voter, et les rapports privés scellés. Un rapport qui ne part pas (borne hors ligne,
 // service injoignable) attend dans <données>\retours\attente et repart au démarrage, puis toutes les
 // 30 minutes ; vingt au plus, oubliés après 30 jours.

@@ -1,0 +1,50 @@
+[Français](../manuel/tables-de-pinball-fx3.md) · English · [Manual contents](../manual.md)
+
+## Pinball FX3 tables
+
+Cyber Pinball also launches **Pinball FX3** tables (Zen Studios, 2017), renamed **"Pinball FX Classic"** on Steam in April 2026.
+Many cabinets still have it, with bought tables that don't carry over to [Pinball FX](pinball-fx-tables.md).
+**In beta**, like Pinball FX: "BETA" badge on the funnel entry and on the table page.
+Pinball FX2 isn't supported: old, with no reliable direct launch.
+Everything below applies to the Steam version: the Microsoft Store and console versions have neither cabinet mode nor direct launch (the game left Microsoft's stores in May 2026).
+
+Pinball FX and Pinball FX3 are two variants of the same code, the "Zen games" ([packages/core/src/zen.ts](../../packages/core/src/zen.ts)): same adding screen, same adding page with its media, same game, same return.
+What differs from one game to the other is described here.
+
+- **What the game asks of the player**: nothing from Zen.
+  The **cabinet code** that had to be requested from Zen no longer exists since update 1.0.26.1 of November 4, 2024: cabinet mode unlocks for everyone (commercial use still needs Zen's approval).
+  It still has to be **turned on once** in the game: cabinet icon next to the profile, then "Activate".
+  Without cabinet mode, or without the table on the Steam account, the game opens on its home screen instead of the table.
+  The "Pinball FX3 tables" screen says so at the top, with the address of Zen's help (`pinballfx.com/?page_id=7754`); a table's page has a "Cabinet mode" line.
+- **Adding tables**: System menu > Tables > Add a table > **"Pinball FX3 tables"**.
+  The list is made of the **table files installed with the game** (`data\steam\*.pxp`), read again at each opening, without the game's own files (`gui`, `sfx`, `txt`, `preview`, `PTSData`, `game_cfg`, `*_cfg`, `*_sfx`, `*Assets`).
+  Steam installs **all** tables, bought or not (they are used for in-game trials): nothing on disk says which ones the player owns, and Cyber Pinball doesn't guess.
+  The player chooses, as for Pinball FX; the adding page reminds it.
+  An empty or unreadable folder gives a "No table found" line pointing to the file check in Steam.
+- **Catalog**: 100 known files (Steam depot 442121, manifest of April 1, 2026), each linked to the same Pinball FX table when it exists (84 with their VPS game; title, manufacturer, year: `WMS_Fish_Tales` = "Fish Tales (Williams 1992)"); otherwise its title ("Family Guy Pinball", Zen Studios).
+  Cryptic names are translated (`Citadel` = Sorcerer's Lair, `SpaceBear1` = The Last Jedi, `RedCup1` = Solo, `STARWARS_LAPB` = Rogue One…).
+  An unknown file (newer table) shows under its name ("STARWARS New Table"), and can be launched.
+  Captures and media come from the VPS database as for Pinball FX, the "FX3" version first; in a received pack, the file named after the table (`WMS_Fish_Tales.png`) is taken.
+- **Entry**: `.pinballfx3` (JSON: `{ "PinballFX3": { "Table": "WMS_Fish_Tales" } }`) in a "Title (Manufacturer Year)" folder.
+  The same machine already present in VPX or Pinball FX keeps its folder: the FX3 entry takes a folder ending in "Pinball FX3", otherwise both would share their `.info` and media.
+  An invalid table name in the entry (space, quote) leaves it in the inventory without a key: it is never launched with a guessed name.
+- **Installation found**: Steam only, complete `appmanifest_442120.acf` manifest (flag 4 of `StateFlags`) in one of the libraries; the folder keeps its install name (`Pinball FX3`) despite the game's new name.
+  Missing: **"Install Pinball FX3"** opens Steam on `steam://install/442120` (the game is free, tables are bought there); without Steam, the entry is greyed out with its reason.
+- **Launch**: `steam.exe -applaunch 442120 -class -table_<file>`, `-class` for **Williams and Bally** tables only (their **classic mode**: the machine's rules, without Zen's upgrades; the page says so).
+  These arguments aren't documented by Zen: they come from front-ends (PinUP Popper, PinballX, RetroBat) and the Zen support they quote.
+  A table name containing anything other than letters, digits, "_" and "-" is refused before any launch.
+  The game is recognized by its window: **"Pinball FX Classic"** since April 2026, "Pinball FX3" before; never a Steam page naming it.
+  A Pinball FX3 left open is closed before the game (Steam would only show it, without opening the table).
+- **Table stuck on the game's home screen**: the window is the same on the home screen and on a table, Cyber Pinball can't see it.
+  A game shorter than 45 s shows on return **"Did Pinball FX3 stay on its home screen?"** with the possible causes, in the conditional: table not on this Steam account, cabinet mode not turned on, and for "Mars" the game's known bug that opens "Attack from Mars" when the account has both tables.
+  A window that never shows up (120 s) fails with its explanation, as for Pinball FX.
+- **Quitting**: as for Pinball FX, **holding Exit** (2 s) closes the game and returns to the wheel; the loading card says so with the game's name.
+- **DMD**: the game's own, on the cabinet's DMD screen (cabinet mode, "Dot Matrix" repositioned).
+  A **real DMD** (ZeDMD, PIN2DMD, PinDMD) only gets FX3's image through `dmdext mirror --source=pinballfx3` from dmd-extensions, which **reads the game's memory**: no official Zen interface (unlike Pinball FX and its `DmdDevice64.dll`), and a game update can break it (the April 2026 rename caused trouble).
+  Cyber Pinball doesn't start `dmdext` for now; "DMD on the wheel" stays greyed out with its reason.
+- **What Pinball FX3 doesn't provide**: no ROM or NVRAM (no scoreboard or ranking), no VR, no in-game settings, no games with friends or live games; all of these stay in place on the page, greyed out, with the reason, as for Pinball FX.
+  "Delete the table" removes it from the menu; it stays in Pinball FX3.
+- **Code**: catalog, detection, installed tables, command and short-game message in [packages/core/src/pinballfx3.ts](../../packages/core/src/pinballfx3.ts); shared Steam reading in [packages/core/src/steam.ts](../../packages/core/src/steam.ts); what both games share in [packages/core/src/zen.ts](../../packages/core/src/zen.ts) (`ZEN_GAMES`, `ZenTable`, `zenTableOfEntry`); entry in `addZenTable` ([packages/core/src/tables.ts](../../packages/core/src/tables.ts)); window in `isPinballFx3Window` and `ZEN_LAUNCH_GAMES` ([app/src/pinballfx-launcher.ts](../../app/src/pinballfx-launcher.ts)); installation in `pinballFx3Setup` ([app/src/pinballfx-install.ts](../../app/src/pinballfx-install.ts)).
+  Tests: `pinballfx3.test.ts`, `pinballfx-launcher.test.ts` (simulated system).
+- **Not yet tried on a real installation** (development PC without FX3): direct launch of a table, `-class`, "Pinball FX Classic" window title, closing by holding Exit, short-game message.
+  File names come from the published Steam manifest, not from a folder read on a cabinet.

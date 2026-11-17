@@ -195,7 +195,7 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
   // ---------- Ouvrir une partie ----------
 
   /** Les tables jouables en partie en direct : celles de VPX (Pinball FX ne se lance pas à plusieurs). */
-  const playable = () => host.tables().filter((table) => table.emulator !== 'pinballfx');
+  const playable = () => host.tables().filter((table) => table.emulator === 'vpx');
   const fullTitle = (table: TableEntry) => (table.manufacturer && table.year ? `${table.title} (${table.manufacturer} ${table.year})` : table.title);
 
   function openChooseTable(from: () => void): void {
@@ -265,7 +265,7 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
       const base = { label: t('Partie instantanée'), icon: 'rocket' as const };
       const problem = unavailable();
       if (problem) return { ...base, detail: problem, tone: 'quiet', run: () => undefined };
-      if (table.emulator === 'pinballfx') return { ...base, detail: t('Parties en direct : tables VPX seulement'), tone: 'quiet', run: () => undefined };
+      if (table.emulator !== 'vpx') return { ...base, detail: t('Parties en direct : tables VPX seulement'), tone: 'quiet', run: () => undefined };
       return { ...base, detail: t('Ouverte à tous : elle part dès qu’elle est complète'), run: () => ((back = from), openChooseCount(table, from)) };
     },
     count: () => (unavailable() ? 0 : games.instantGames().filter((g) => g.key !== myKey()).length),

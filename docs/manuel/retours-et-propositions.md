@@ -1,9 +1,9 @@
 [English](../manual/feedback-and-ideas.md) · Français · [Sommaire du manuel](../manuel.md)
 
-## Avis et propositions
+## Retours et propositions
 
-Menu système > Cyber Pinball > Avis et propositions : le tableau public des propositions des joueurs et le formulaire des retours, le même d'où que l'on vienne.
-Quatre portes peuvent y mener, sans jamais y obliger : cette entrée du menu système ; l'écran d'une partie échouée (« Flipper : signaler ce problème », la table et le code d'arrêt de VPX déjà rappelés) ; la fiche technique (« Envoyer un rapport » > « À l'équipe de Cyber Pinball », rapport technique joint et description reprise) ; l'appli du téléphone (menu ⋮ > « Avis et propositions », et « Signaler ce problème » sur l'écran d'échec).
+Menu système > Cyber Pinball > Retours et propositions : le tableau public des propositions des joueurs et le formulaire des retours, le même d'où que l'on vienne.
+Quatre portes peuvent y mener, sans jamais y obliger : cette entrée du menu système ; l'écran d'une partie échouée (« Flipper : signaler ce problème », la table et le code d'arrêt de VPX déjà rappelés) ; la fiche technique (« Envoyer un rapport » > « À l'équipe de Cyber Pinball », rapport technique joint et description reprise) ; l'appli du téléphone (menu ⋮ > « Retours et propositions », et « Signaler ce problème » sur l'écran d'échec).
 
 **Le tableau.**
 Les propositions de tous les joueurs, les plus demandées d'abord, avec des onglets par nature (Problème, Amélioration, Nouvelle fonction) et « Les miennes » (proposées ou votées depuis cette borne).
@@ -25,7 +25,7 @@ Hors ligne, il attend dans `<données>\retours\attente` et repart au démarrage,
 
 **Rapports de plantage automatiques.**
 Au premier plantage de VPX, en quittant l'écran d'échec, une question : « Envoyer les rapports de plantage ? » (« Oui, à chaque plantage », « Non », « Décrire ce qui s'est passé », « Voir le contenu du rapport »).
-La réponse est retenue dans `<données>\retours.json` et se change dans Avis et propositions.
+La réponse est retenue dans `<données>\retours.json` et se change dans Retours et propositions.
 Avec l'accord, chaque plantage de VPX, et ceux de Cyber Pinball (exception non rattrapée, plantage natif relevé au démarrage suivant), part seul, un même plantage une fois par jour au plus (`crashDue`).
 
 **Le service.**

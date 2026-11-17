@@ -33,3 +33,7 @@
   Les croix d'une manette se relèvent comme des boutons, pas encore ses axes (directions du stick d'un Zero Delay, gâchettes) ; un bouton d'encodeur qui envoie une combinaison de touches n'est pas pris en charge.
 - Son : les vidéos et la musique du front-end jouent encore sur la sortie par défaut de Windows, comme les composants COM hors plugins (VPinMAME, B2S, PinUP Player autonomes).
   Rien ne vérifie encore que la sortie par défaut est celle du fronton.
+- Pinball FX3 (bêta, voir [Tables de Pinball FX3](tables-de-pinball-fx3.md)) : pas encore essayé sur une vraie installation ; lancement direct, `-class` et titre de fenêtre « Pinball FX Classic » viennent des front-ends et de Zen, pas d'un essai.
+  Cyber Pinball ne sait pas quelles tables sont achetées (Steam les installe toutes) ni si le jeu est resté sur son écran d'accueil : il le suppose d'une partie de moins de 45 s.
+  Vrai DMD : seulement par `dmdext`, qui lit la mémoire du jeu, et que Cyber Pinball ne lance pas encore.
+  « Mars » ouvre « Attack from Mars » quand le compte a les deux tables (défaut du jeu).

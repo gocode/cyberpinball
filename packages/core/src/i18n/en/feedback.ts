@@ -1,8 +1,8 @@
-// Catalogue anglais : Avis et propositions (Menu système > Cyber Pinball), le formulaire des retours,
+// Catalogue anglais : Retours et propositions (Menu système > Cyber Pinball), le formulaire des retours,
 // la question des rapports de plantage automatiques (app/src/feedback-menu.ts, packages/core/src/feedback.ts),
 // et leurs portes (écran d'échec d'une partie, fiche technique, téléphone). Clé : le texte français.
 export const messages: Record<string, string> = {
-  'Avis et propositions': 'Feedback and ideas',
+  'Retours et propositions': 'Feedback and ideas',
   'Votez pour les idées des joueurs, proposez les vôtres, signalez un problème': 'Vote for players’ ideas, suggest your own, report a problem',
   'Votez et proposez · {n} proposition': 'Vote and suggest · {n} idea',
   'Votez et proposez · {n} propositions': 'Vote and suggest · {n} ideas',
@@ -105,7 +105,7 @@ export const messages: Record<string, string> = {
   'Toutes les propositions': 'All ideas',
   // Premier plantage
   'Envoyer les rapports de plantage ?': 'Send crash reports?',
-  'Un rapport anonymisé aide l’équipe à corriger ce plantage pour tout le monde. La réponse est retenue ; elle se change dans Avis et propositions.':
+  'Un rapport anonymisé aide l’équipe à corriger ce plantage pour tout le monde. La réponse est retenue ; elle se change dans Retours et propositions.':
     'An anonymised report helps the team fix this crash for everyone. Your answer is kept; change it in Feedback and ideas.',
   'Ce qui part': 'What is sent',
   'La fiche technique, la santé de la borne et les journaux': 'The tech sheet, the cabinet health and the logs',
@@ -119,9 +119,9 @@ export const messages: Record<string, string> = {
   // Les portes
   'Flipper : signaler ce problème': 'Flipper: report this problem',
   'Signaler ce problème': 'Report this problem',
-  'Avis et propositions, ce problème rappelé': 'Feedback and ideas, with this problem filled in',
+  'Retours et propositions, ce problème rappelé': 'Feedback and ideas, with this problem filled in',
   'VPX arrêté : {code}': 'VPX stopped: {code}',
   'À l’équipe de Cyber Pinball': 'To the Cyber Pinball team',
-  'Par Internet, chiffré : seule l’équipe le lit · Avis et propositions': 'Over the Internet, encrypted: only the team reads it · Feedback and ideas',
+  'Par Internet, chiffré : seule l’équipe le lit · Retours et propositions': 'Over the Internet, encrypted: only the team reads it · Feedback and ideas',
   'À l’équipe, au téléphone, sur une clé USB ou à un ami · anonymisé': 'To the team, the phone, a USB stick or a friend · anonymised',
 };

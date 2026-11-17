@@ -24,6 +24,7 @@
 import {
   avatarView,
   NOTICE_RULES,
+  say,
   NOTICE_STARTUP_QUIET_MS,
   createNoticeCenter,
   downloadNotices,
@@ -246,7 +247,7 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     const told = events.find((e) => isLiveNotice(e.kind) && NOTICE_RULES[e.kind].sound && (e.kind === 'live-invite-ended' ? host.live?.inviteOnScreen?.(tagId(e.key)) : e.kind !== 'live-invite' && host.live?.onScreen()));
     if (told && host.zone().notices !== 'wait') host.sound?.(NOTICE_RULES[told.kind].sound!);
     center.push(events);
-    for (const e of events) host.log?.(`Notifications : ${e.kind} ${e.who ?? e.subject ?? ''} (priorité ${NOTICE_RULES[e.kind].priority})`); // i18n-ignore : journal
+    for (const e of events) host.log?.(`Notifications : ${e.kind} ${e.who ?? (e.subject ? say(e.subject) : '')} (priorité ${NOTICE_RULES[e.kind].priority})`); // i18n-ignore : journal
     poke();
   }
 
@@ -282,7 +283,7 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     const shown = events.filter((e) => host.mode() === 'all' || isLiveNotice(e.kind));
     if (!shown.length) return;
     center.push(shown);
-    for (const e of shown) host.log?.(`Notifications : ${e.kind} ${e.who ?? e.subject ?? ''} (priorité ${NOTICE_RULES[e.kind].priority})`); // i18n-ignore : journal
+    for (const e of shown) host.log?.(`Notifications : ${e.kind} ${e.who ?? (e.subject ? say(e.subject) : '')} (priorité ${NOTICE_RULES[e.kind].priority})`); // i18n-ignore : journal
     poke();
   }
 

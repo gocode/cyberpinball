@@ -31,6 +31,7 @@ const launcher = require(path.join(REPO_ROOT, 'app', 'dist', 'pinballfx-launcher
   isPinballFxWindow(w: Pick<FakeWindow, 'title' | 'className' | 'visible'>): boolean;
   launchPinballFx(opts: {
     command: { file: string; args: string[] };
+    game?: unknown;
     exitHeld?: () => boolean;
     timeoutMs?: number;
     onPlaying?: () => void;
@@ -169,6 +170,51 @@ test('arrêt demandé : fermeture polie, puis processus forcé', async () => {
   const result = await game.done;
   assert.deepEqual(sys.killed, [9]);
   assert.equal(result.ok, true);
+});
+
+const zen = require(path.join(REPO_ROOT, 'app', 'dist', 'pinballfx-launcher.js')) as {
+  isPinballFx3Window(w: Pick<FakeWindow, 'title' | 'className' | 'visible'>): boolean;
+  ZEN_LAUNCH_GAMES: Record<'pinballfx' | 'pinballfx3', unknown>;
+  runningPinballFx(system: unknown, game: unknown): number | undefined;
+};
+
+test('Pinball FX3 : sa fenêtre (« Pinball FX Classic » ou « Pinball FX3 »), jamais celle de Pinball FX ; messages à son nom', async () => {
+  assert.equal(zen.isPinballFx3Window(win(1, 'Pinball FX Classic', 'Pinball FX Classic')), true);
+  assert.equal(zen.isPinballFx3Window(win(1, 'Pinball FX3', 'Pinball FX3')), true);
+  assert.equal(zen.isPinballFx3Window(win(1, 'PinballFX')), false);
+  assert.equal(zen.isPinballFx3Window(win(1, 'Pinball FX Classic - Steam', 'SDL_app')), false);
+  assert.equal(launcher.isPinballFxWindow(win(1, 'Pinball FX Classic', 'Pinball FX Classic')), false);
+  const sys = fakeSystem();
+  // Une fenêtre de Pinball FX ouverte ne passe pas pour FX3 : déjà ouvert = FX3 seulement.
+  sys.shown.push(win(5, 'PinballFX'));
+  assert.equal(zen.runningPinballFx(sys, zen.ZEN_LAUNCH_GAMES.pinballfx3), undefined);
+  let playing = 0;
+  const game = launcher.launchPinballFx({
+    command: { file: 'steam.exe', args: ['-applaunch', '442120', '-class', '-table_WMS_Fish_Tales'] },
+    game: zen.ZEN_LAUNCH_GAMES.pinballfx3,
+    system: sys,
+    timeoutMs: 60_000,
+    onPlaying: () => playing++,
+  });
+  await tick();
+  assert.equal(playing, 0);
+  sys.shown.push(win(77, 'Pinball FX Classic', 'Pinball FX Classic'));
+  sys.living.add(77);
+  await tick();
+  assert.equal(playing, 1);
+  assert.equal(game.pid, 77);
+  assert.equal(zen.runningPinballFx(sys, zen.ZEN_LAUNCH_GAMES.pinballfx3), 77);
+  sys.advance(30_000);
+  sys.living.delete(77);
+  const result = await game.done;
+  assert.equal(result.ok, true);
+  assert.equal(result.seconds, 30);
+  // Fenêtre jamais parue : le message nomme Pinball FX3.
+  const sys2 = fakeSystem();
+  const late = launcher.launchPinballFx({ command: { file: 'steam.exe', args: [] }, game: zen.ZEN_LAUNCH_GAMES.pinballfx3, system: sys2, timeoutMs: 1000 });
+  await tick();
+  sys2.advance(2000);
+  assert.match((await late.done).message ?? '', /Pinball FX3/);
 });
 
 const install = require(path.join(REPO_ROOT, 'app', 'dist', 'pinballfx-install.js')) as {
