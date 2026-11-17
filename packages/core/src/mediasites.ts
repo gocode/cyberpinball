@@ -23,6 +23,7 @@ import { scanInstallation } from './mediaimport';
 import { isAcceptedFormat, mediaKind, type MediaKind, type MediaType } from './medias';
 import type { MediaChoice } from './mediachoices';
 import { isJunkName } from './puppack';
+import type { SiteFileState } from './sitefiles';
 import { COMMON_PROBE } from './sitesessions';
 import { matchVps, vpsKey, vpsWords, type VpsCandidate, type VpsDb, type VpsGame } from './vps';
 
@@ -546,7 +547,8 @@ function siteFileOf(url: string): { site: MediaSiteId; id: string; url: string }
  * titre (« any », le « Wheel Mega Pack » de Blackval rangé sous The Matrix). La recherche
  * de VPForums est réservée aux membres ; ses fiches liées par la base se voient sans
  * compte. Titre : le jeu et le commentaire de la base (« The Matrix · Diagonal ») ; pas
- * de vignette. Un lien signalé mort, ou vers un autre hôte (mega.nz), n'est pas repris.
+ * de vignette : la capture de l'auteur se lit sur la page de la fiche (`hitPreview`).
+ * Un lien signalé mort, ou vers un autre hôte (mega.nz), n'est pas repris.
  */
 export function vpsSiteHits(games: VpsGame[]): SiteHit[] {
   const out: SiteHit[] = [];
@@ -577,6 +579,20 @@ export function vpsSiteHits(games: VpsGame[]): SiteHit[] {
     }
   }
   return out;
+}
+
+/**
+ * Aperçu d'un résultat : la vignette de la page de résultats, sinon la capture que
+ * l'auteur a déposée sur la fiche (lue par app/src/site-files.ts). Les fiches rangées par
+ * la base VPS n'ont jamais de vignette, et pour un visiteur ce sont les seules de
+ * VPForums (recherche réservée aux membres) : sans la fiche, tout VPForums restait
+ * « Pas d'aperçu » alors que sa page montre l'image (17/11/2026). `pending` : la fiche
+ * ou sa capture est en route, l'aperçu peut encore venir.
+ */
+export function hitPreview(hit: Pick<SiteHit, 'thumb'>, fiche: SiteFileState): { url?: string; pending: boolean } {
+  if (hit.thumb) return { url: hit.thumb, pending: false };
+  if (fiche === 'loading') return { pending: true };
+  return { url: typeof fiche === 'object' ? fiche.thumb ?? fiche.screenshot : undefined, pending: false };
 }
 
 // ---------------------------------------------------------------------------

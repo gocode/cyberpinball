@@ -11,7 +11,8 @@ import * as vm from 'node:vm';
 import { test } from 'node:test';
 import { parseHTML } from 'linkedom';
 import type { MediaType } from '../medias';
-import { ANIMATABLE_MEDIA_TYPES, checkSiteSearch, hitAnimated, hitGameName, hitTypes, mediaChoiceAnimated, MEDIA_SITES, receivedMedias, siteHitSummary, siteMediaChoices, siteOffers, siteQuery, siteSearchByType, siteSearchTerms, siteSearchUrl, SITE_SEARCH_MORE_PAGES, SITE_SEARCH_PAGES, SITE_SEARCH_PROBES, vpsSiteHits, webHost, webMediaChoices, webSearchQuery, webSearchUrl, type SiteHit, type SiteReceipt, type WebReceipt } from '../mediasites';
+import { ANIMATABLE_MEDIA_TYPES, checkSiteSearch, hitAnimated, hitGameName, hitPreview, hitTypes, mediaChoiceAnimated, MEDIA_SITES, receivedMedias, siteHitSummary, siteMediaChoices, siteOffers, siteQuery, siteSearchByType, siteSearchTerms, siteSearchUrl, SITE_SEARCH_MORE_PAGES, SITE_SEARCH_PAGES, SITE_SEARCH_PROBES, vpsSiteHits, webHost, webMediaChoices, webSearchQuery, webSearchUrl, type SiteHit, type SiteReceipt, type WebReceipt } from '../mediasites';
+import { parseSiteFile, siteFileRef } from '../sitefiles';
 import { WAIT_PROBES } from '../sitesessions';
 import { createVpsDb, type VpsGame } from '../vps';
 
@@ -386,6 +387,34 @@ test('fiches rangées par la base VPS : sans recherche, attribuées à leur jeu 
   // Après les résultats de recherche rapprochés (qui ont une vignette).
   const found = vpu('29591', 'The Matrix Wheel', ['70', 'Wheel Images']);
   assert.equal(siteOffers([found, ...hits], [matrix], vpsdb).Wheel?.[0]?.hit.id, '29591');
+});
+
+test('aperçu d’un résultat sans vignette : la capture de sa fiche', () => {
+  // Les fiches de la base VPS n'ont pas de vignette ; chacune doit avoir une fiche lisible.
+  const hits = vpsSiteHits([
+    {
+      id: 'taf',
+      name: 'The Addams Family',
+      wheelArtFiles: [
+        { id: 'a', authors: ['Devorian'], urls: [{ url: 'https://www.vpforums.org/index.php?app=downloads&showfile=13911' }] },
+        { id: 'b', urls: [{ url: 'https://vpuniverse.com/files/file/31738-the-matrix-animated-glass-orb/' }] },
+      ],
+    },
+  ]);
+  for (const h of hits) {
+    assert.equal(h.thumb, undefined);
+    assert.equal(siteFileRef(h.url)?.id, h.id, `fiche lisible pour ${h.site}:${h.id}`);
+  }
+  // Page témoin de VPForums : la capture du fichier lui-même, sans identifiant de session.
+  const page = fs.readFileSync(path.join(__dirname, '..', '..', 'test-pages', 'vpforums-fiche.html'), 'utf8');
+  const fiche = parseSiteFile(siteFileRef(hits[0]!.url)!, page);
+  assert.deepEqual(hitPreview(hits[0]!, fiche), { url: 'https://www.vpforums.org/index.php?app=downloads&module=display&section=screenshot&record=65816&id=13911', pending: false });
+  // Fiche en lecture : l'aperçu est en route ; fiche muette ou disparue : rien.
+  assert.deepEqual(hitPreview(hits[0]!, 'loading'), { pending: true });
+  assert.deepEqual(hitPreview(hits[0]!, 'gone'), { url: undefined, pending: false });
+  assert.deepEqual(hitPreview(hits[0]!, undefined), { url: undefined, pending: false });
+  // La vignette de la page de résultats passe avant la fiche.
+  assert.deepEqual(hitPreview({ thumb: 'https://vpuniverse.com/screenshots/a.png' }, fiche), { url: 'https://vpuniverse.com/screenshots/a.png', pending: false });
 });
 
 test('recherche sur le web : les mots ajoutés et « animated » suivent le titre', () => {

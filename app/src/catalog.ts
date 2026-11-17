@@ -2336,6 +2336,8 @@ export function createCatalog(ctx: CatalogContext) {
   return {
     /** yt-dlp de la borne, partagé avec le Juke-box (une seule installation, une seule mise à jour). */
     ytdlp,
+    /** Fiches des fichiers sur leur site, partagées avec les propositions de médias (un seul relevé fiches.json). */
+    siteFiles,
     /** Le catalogue (avertissement au premier usage) ; `text` : recherche toute faite (titre, initiales, nom de ROM). */
     open: (text?: string) => {
       if (!ctx.layout()) return open();

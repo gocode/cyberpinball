@@ -529,7 +529,7 @@ export function createProposals(ctx: ProposalsContext) {
 
   /** Carte d'une fiche d'un site, pas encore reçue : vignette de l'auteur, état dans la file. */
   /** « 510 téléchargements » : la popularité que le site donne pour sa fiche. */
-  const popularity = (hit: SiteHit) => (hit.downloads !== undefined ? tn(hit.downloads, '{n} téléchargement', '{n} téléchargements') : undefined);
+  const popularity = (hit: Pick<SiteHit, 'downloads'>) => (hit.downloads !== undefined ? tn(hit.downloads, '{n} téléchargement', '{n} téléchargements') : undefined);
 
   /** Proposition d'un autre jeu de la base VPS que celui de la table (même titre, autres auteurs, autre année). */
   function otherGame(st: State, table: TableEntry, choice: MediaChoice): MediaCard['flag'] {
@@ -544,8 +544,9 @@ export function createProposals(ctx: ProposalsContext) {
     const job = ctx.sites?.job(jobKey(hit));
     const receipt = ctx.sites?.receipt(jobKey(hit));
     const account = st.sites[hit.site]?.account;
-    const file = ctx.sites?.thumb(hit.thumb);
-    let thumb: MediaThumb = { kind: 'fallback', rotation: 0, text: t('Pas d’aperçu') };
+    // Sans vignette dans les résultats, la capture de la fiche (lue à part, elle redessine l'écran en arrivant).
+    const { file, pending } = ctx.sites?.hitThumb(hit) ?? { pending: false };
+    let thumb: MediaThumb = { kind: 'fallback', rotation: 0, text: pending ? t('Aperçu en route…') : t('Pas d’aperçu') };
     if (file && fs.existsSync(file)) {
       allowPreview(file);
       thumb = { kind: 'image', url: mediaUrl(file), rotation: 0 };
@@ -588,10 +589,11 @@ export function createProposals(ctx: ProposalsContext) {
     }
     if (pack) extra.push(t('Pack complet : les médias de tous les écrans ; reçus, les autres écrans les proposeront aussi.'));
     else if (choice.kind === 'video') extra.push(t('Aperçu : image fixe déposée par l’auteur ; la vidéo arrive au téléchargement.'));
-    if (hit.vps) extra.push(t('Fiche rangée sous ce jeu par la base VPS : son titre n’a pas été cherché, son aperçu arrive au téléchargement.'));
+    if (hit.vps) extra.push(t('Fiche rangée sous ce jeu par la base VPS : son titre n’a pas été cherché.'));
     if (choice.site?.loose) extra.push(t('Recherche élargie : le titre a les mots cherchés, sans désigner sûrement l’un des jeux retenus.'));
     const flag = otherGame(st, table, choice) ?? (choice.site?.loose ? { label: t('Titre approché'), tone: 'warning' as const } : undefined);
-    return { action, title: choice.label, code: site.name, state, flag, popularity: popularity(hit), facts: facts.filter(Boolean).join(' · '), extra, thumb, progress };
+    const fiche = ctx.sites?.fiche(hit);
+    return { action, title: choice.label, code: site.name, state, flag, popularity: popularity({ downloads: hit.downloads ?? (typeof fiche === 'object' ? fiche.downloads : undefined) }), facts: facts.filter(Boolean).join(' · '), extra, thumb, progress };
   }
 
   function cardFor(st: State, table: TableEntry, choice: MediaChoice, action: number): MediaCard {

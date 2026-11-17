@@ -6,7 +6,9 @@
 //   dans une vue cachée de la session « Récupérer », quand l'utilisateur ouvre les
 //   propositions d'un média ; sur VPUniverse, dans les seules catégories de ce média.
 //   Gardée une demi-heure : revenir sur un média ne relance rien.
-// - Vignettes : l'image fixe que l'auteur a déposée, reçue avec les cookies de la session.
+// - Vignettes : l'image fixe que l'auteur a déposée, reçue avec les cookies de la session ;
+//   sans vignette dans les résultats (fiche rangée par la base VPS, VPForums), celle de
+//   la page de la fiche (site-files.ts).
 // - File : un fichier à la fois par site, chaque site de son côté. Le minuteur de
 //   VPUniverse (environ 45 s) se déroule dans la page, les secondes restantes sont
 //   montrées sur la carte ; un plafond de téléchargements arrête la file de ce site.
@@ -29,6 +31,7 @@ import {
   siteQuery,
   type NeedKind,
   formatTransfer,
+  hitPreview,
   hitTypes,
   mediaKind,
   isMediaDownload,
@@ -63,6 +66,7 @@ import {
 import type { Acquirer } from './acquire-window';
 import { unpackArchive } from './archives';
 import { watchDownloads } from './downloads-watch';
+import type { SiteFiles } from './site-files';
 
 export interface MediaSitesContext {
   acquirer: Acquirer;
@@ -72,6 +76,8 @@ export interface MediaSitesContext {
   changed(): void;
   /** Téléchargements de Windows, surveillé pendant une recherche libre ; absent : pas de surveillance. */
   windowsDownloads?(): string | undefined;
+  /** Fiches des fichiers sur leur site (celles du catalogue) : capture d'un résultat sans vignette. */
+  siteFiles?: SiteFiles;
 }
 
 /** Recherche libre en cours : d'où elle part et pour quel média. */
@@ -250,8 +256,13 @@ export function createMediaSites(ctx: MediaSitesContext) {
     return result;
   }
 
-  /** Vignettes de ces résultats, reçues une fois dans <téléchargements>\sites\apercus. */
+  /**
+   * Vignettes de ces résultats, reçues une fois dans <téléchargements>\sites\apercus. Un
+   * résultat sans vignette (fiche rangée par la base VPS, résultat de VPForums) fait lire
+   * sa fiche : la capture de l'auteur arrive ensuite, et redessine l'écran (hitThumb).
+   */
   async function stageThumbs(hits: SiteHit[]): Promise<void> {
+    ctx.siteFiles?.want(hits.filter((h) => !h.thumb).map((h) => h.url));
     const dir = root();
     if (!dir) return;
     const todo = hits.filter((h) => h.thumb && !thumbs.has(h.thumb));
@@ -264,6 +275,21 @@ export function createMediaSites(ctx: MediaSitesContext) {
         if (got) thumbs.set(url, got);
       }),
     );
+  }
+
+  /**
+   * Aperçu d'un résultat sur le disque : sa vignette reçue, sinon la capture de sa fiche
+   * (demandée si elle manque). `pending` : la fiche ou la capture est en route.
+   */
+  function hitThumb(hit: SiteHit): { file?: string; pending: boolean } {
+    if (hit.thumb) {
+      const file = thumbs.get(hit.thumb);
+      return { file, pending: false };
+    }
+    const preview = hitPreview(hit, ctx.siteFiles?.state(hit.url));
+    if (!preview.url) return { pending: preview.pending };
+    const file = ctx.siteFiles?.shot(preview.url);
+    return { file, pending: !file };
   }
 
   // ---------- Reçus ----------
@@ -723,6 +749,9 @@ export function createMediaSites(ctx: MediaSitesContext) {
     searchPart,
     stageThumbs,
     thumb: (url: string | undefined) => (url ? thumbs.get(url) : undefined),
+    hitThumb,
+    /** Ce que la fiche d'un résultat a dit (téléchargements, capture), une fois lue. */
+    fiche: (hit: SiteHit) => ctx.siteFiles?.state(hit.url),
     enqueue,
     openPage,
     /** Appelé à chaque fichier reçu (la carte qui l'a demandé le met dans le brouillon). */

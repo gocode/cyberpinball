@@ -52,6 +52,7 @@ import {
   type InstalledPart,
   type Layout,
   type MediaSiteId,
+  type SiteHit,
   formatTransfer,
   type NeedKind,
   type PartOffer,
@@ -390,7 +391,7 @@ export function createGameParts(ctx: GamePartsContext) {
           popularity: o.hit.downloads ? tn(o.hit.downloads, '{n} téléchargement', '{n} téléchargements', { n: formatNumber(o.hit.downloads) }) : undefined,
           facts: [o.hit.category?.label, o.hit.author ? t('par {author}', { author: o.hit.author }) : undefined, o.hit.date ? formatDay(Date.parse(o.hit.date)) : undefined].filter(Boolean).join(' · '),
           extra: mediaSite(o.hit.site).wait ? [t('≈ {n} s d’attente imposée par le site', { n: mediaSite(o.hit.site).wait })] : undefined,
-          thumb: siteThumb(o.hit.thumb, partLabel(part)),
+          thumb: siteThumb(o.hit, partLabel(part)),
         });
         actions.push({ label: o.hit.title, key: `${o.hit.site}:${o.hit.id}`, run: () => ctx.catalog.fetchPart({ ...target(table, kind), kind }, { url: o.hit.url, label: o.hit.title }, after) });
       }
@@ -479,9 +480,10 @@ export function createGameParts(ctx: GamePartsContext) {
     return rows;
   }
 
-  function siteThumb(url: string | undefined, text: string): MediaThumb {
-    const local = ctx.sites?.thumb(url);
-    if (!local || !fs.existsSync(local)) return { kind: 'fallback', rotation: 0, text };
+  /** Vignette du résultat, sinon capture de sa fiche (VPForums, fiches de la base VPS), dès qu'elle est reçue. */
+  function siteThumb(hit: SiteHit, text: string): MediaThumb {
+    const { file: local, pending } = ctx.sites?.hitThumb(hit) ?? { pending: false };
+    if (!local || !fs.existsSync(local)) return { kind: 'fallback', rotation: 0, text: pending ? t('Aperçu en route…') : text };
     allowPreview(local);
     return { kind: 'image', url: mediaUrl(local), rotation: 0 };
   }

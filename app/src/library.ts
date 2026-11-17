@@ -1723,6 +1723,7 @@ export function createLibrary(host: LibraryHost) {
   // Médias des sites communautaires (VPForums, VPUniverse), dans la session de « Récupérer ».
   const mediaSites = createMediaSites({
     acquirer: catalogUi.acquirer,
+    siteFiles: catalogUi.siteFiles,
     downloadsDir: () => layout()?.downloads,
     changed: () => host.broadcast(),
     // Recherche libre : ce qui arrive dans Téléchargements de Windows pendant ce temps (navigateur de l'utilisateur).

@@ -507,8 +507,7 @@ export const messages: Record<string, string> = {
   // app/src/media-proposals.ts : « Chercher plus », « Animés seulement », mots ajoutés, fiches de la base VPS
   'lien de la base VPS': 'VPS database link',
   'animée': 'animated',
-  'Fiche rangée sous ce jeu par la base VPS : son titre n’a pas été cherché, son aperçu arrive au téléchargement.':
-    'Listed under this game by the VPS database: its title was not searched, its preview arrives with the download.',
+  'Fiche rangée sous ce jeu par la base VPS : son titre n’a pas été cherché.': 'Listed under this game by the VPS database: its title was not searched.',
   'Recherche élargie : le titre a les mots cherchés, sans désigner sûrement l’un des jeux retenus.':
     'Wider search: the title has the searched words, without surely naming one of the selected games.',
   'Titre approché': 'Close title',
