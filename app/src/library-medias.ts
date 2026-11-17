@@ -123,7 +123,7 @@ export interface MediasContext {
   };
 }
 
-/** Aperçu d'un média : fichier image ou vidéo (vignette), son, ou repli intégré décrit en texte. */
+/** Aperçu d'un média : fichier image ou vidéo (vignette), son, ou affichage par défaut décrit en texte. */
 export interface MediaThumb {
   /** drawn : l'habillage que Cyber Pinball dessine quand le jeu n'a pas ce média (fallback.js). */
   kind: 'image' | 'video' | 'audio' | 'fallback' | 'drawn';
@@ -354,8 +354,8 @@ export function createMedias(ctx: MediasContext) {
     const bare = { ...table, folder: path.join(table.folder, '.sans-medias') };
     const r = resolveMedia(bare, root(), type, { b2sImage: b2sImage(s), romAudio: romAudio() && (() => host.romMusic?.()?.file(table)) });
     const state = mediaStateLabel(r, root());
-    if (r.source === 'fallback') return info.fallback === 'none' ? t('rien') : t('repli intégré : {what}', { what: lowerFirst(info.fallbackLabel) });
-    // Le repli seul (sans « Repli : »), repris dans la phrase.
+    if (r.source === 'fallback') return info.fallback === 'none' ? t('rien') : t('affichage par défaut : {what}', { what: lowerFirst(info.fallbackLabel) });
+    // Le média montré à la place seul (sans « À la place : »), repris dans la phrase.
     return `${lowerFirst(mediaFallbackName(r) ?? state.label)} (${state.detail})`;
   }
 
@@ -782,7 +782,7 @@ export function createMedias(ctx: MediasContext) {
       }
       if (!pages.length) {
         const r = resolved(s, table, type);
-        cards.push({ title: t('Aucune page'), facts: t('Repli : {what}', { what: mediaStateLabel(r, root()).detail }), thumb: thumbOf(s, table, type, r.file, info.fallbackLabel) });
+        cards.push({ title: t('Aucune page'), facts: t('À la place : {what}', { what: mediaStateLabel(r, root()).detail }), thumb: thumbOf(s, table, type, r.file, info.fallbackLabel) });
       }
     } else {
       const file = pages[0] ? entrySource(pages[0]) : undefined;
@@ -799,7 +799,7 @@ export function createMedias(ctx: MediasContext) {
         state: changed || turn ? { label: t('À enregistrer'), tone: 'warning' } : state && { label: state.label, tone: state.present ? 'ok' : 'info' },
         facts: file ? factsOf(s, file) : r?.file ? `${r.source === 'b2s' || r.foundType !== type ? `${state!.detail} · ` : ''}${factsOf(s, r.file)}` : state?.detail,
         pending: [what, turn].filter(Boolean).join(' ') || undefined,
-        thumb: thumbOf(s, table, type, file ?? r?.file, t('Repli intégré : {what}', { what: info.fallbackLabel })),
+        thumb: thumbOf(s, table, type, file ?? r?.file, t('Affichage par défaut : {what}', { what: info.fallbackLabel })),
         note: placeInfo.note,
         extra: [
           t('Formats : {formats}.', { formats: info.formats.join(', ') }),

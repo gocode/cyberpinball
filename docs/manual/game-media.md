@@ -4,7 +4,7 @@
 
 Each game can have its own presentation media: logo, playfield video, backglass, display, topper, loading video, music, launch sound, flyer and rules.
 The menu shows each one on the intended screen at the right moment.
-When a media item is missing, the menu shows a fallback drawn by Cyber Pinball in its place: never an empty screen, never the Windows desktop.
+When a media item is missing, the menu shows a default display drawn by Cyber Pinball in its place: never an empty screen, never the Windows desktop.
 
 A game's media go in its table's folder, in a `medias\` subfolder, and are named after the folder, `(Type) <nom du dossier>.ext`, as VPX 10.8.1 suggests: `medias\(Backglass) Terminator 2 (Williams 1991).mp4`.
 The `.vpx` name works too, for media specific to one version.
@@ -28,7 +28,7 @@ No per-screen setting: each media item's screen, proportions and rotation come f
 `(Other)`, `(RealDMD)` and `(RealColorDMD)` (Popper, PinballX) have no screen in Cyber Pinball: they are read, kept and ignored.
 Popper's old formats (`flv`, `f4v`, `avi`, `mov`, `wmv`, `mpg`, `mpeg`) cannot be played: the media doctor reports them, and the import leaves them aside.
 
-For each screen, the menu takes the first media found: `(Type) <nom du .vpx>` (the `.vpx` name), `(Type) <nom du dossier>` (the folder name), VPinFE's fixed names (`bg.png`, `wheel.png`, `table.mp4`…), the `.directb2s` image (backglass only), the **cabinet default** `<racine>\media\(Type).ext`, and finally the built-in fallback.
+For each screen, the menu takes the first media found: `(Type) <nom du .vpx>` (the `.vpx` name), `(Type) <nom du dossier>` (the folder name), VPinFE's fixed names (`bg.png`, `wheel.png`, `table.mp4`…), the `.directb2s` image (backglass only), the **cabinet shared media** `<racine>\media\(Type).ext`, and finally the default display.
 
 ### Adding media
 
@@ -44,8 +44,8 @@ For each screen, the menu takes the first media found: `(Type) <nom du .vpx>` (t
 - **By hand**: copy the file into `medias\` under the name `(Type) <nom du dossier>.ext`.
   The menu shows it immediately on every screen, without restarting (see "Live changes").
   The doctor (details screen > "Diagnostiquer et réparer" (Diagnose and repair)) reports a name that does not match the game, a file stored outside `medias\`, an unreadable format, proportions that do not fit the screen, and offers the rename.
-- **Cabinet defaults**: a file `<racine>\media\(Type).ext`, with no game name, is used for every game that lacks that media type: a topper in your game room's colors, ambient music, a background video.
-  It takes precedence over the built-in fallback.
+- **Cabinet shared media**: a file `<racine>\media\(Type).ext`, with no game name, is used for every game that lacks that media type: a topper in your game room's colors, ambient music, a background video.
+  It takes precedence over the default display.
 
 - **Online, on demand**: "Chercher les médias" (Search for media) takes everything VPinMediaDB has for the game, with a plan to approve ("Media from VPinMediaDB").
   For one specific media item, "Voir les propositions" (See suggestions) shows every version found, online and on the cabinet, and you choose from the previews ("Suggestions for each media item and deep search").
@@ -93,7 +93,7 @@ Tests: [tablerules.test.ts](../../packages/core/src/test/tablerules.test.ts).
 ### In the menu windows
 
 On the table menu, each menu window shows the media of the selected table (elsewhere, see "Outside the table menu: the default display").
-The lookup follows this order (`resolveMedia`, [packages/core/src/medias.ts](../../packages/core/src/medias.ts)): `.vpx` name, folder name, VPinFE names, `.directb2s` image (backglass), cabinet defaults, then the built-in fallback.
+The lookup follows this order (`resolveMedia`, [packages/core/src/medias.ts](../../packages/core/src/medias.ts)): `.vpx` name, folder name, VPinFE names, `.directb2s` image (backglass), cabinet shared media, then the default display.
 
 | Screen | Media | Display |
 | --- | --- | --- |
@@ -106,12 +106,12 @@ The lookup follows this order (`resolveMedia`, [packages/core/src/medias.ts](../
 - **Zones**: each role of a shared screen (backglass and DMD strip, DMD embedded in the playfield) has its own media in its zone.
 - **Playback** (`app/renderer/media.js`): videos loop, muted, except the playfield background video when the "Son des vidéos du menu" (Menu video sound) setting asks for it (see "Menu sound"); 280 ms crossfade on table change; the media of the two neighboring tables on each side are preloaded, and a video you just left is kept ready for a while (eight items at most, four of them videos); the playfield background is paused under an opaque overlay (help, details screen, message); all videos are paused when the window is hidden.
   Fast navigation stacks nothing up: a layer still waiting for its first frame is dropped.
-- **Fallback** when there is no media or on a playback error: the components of `app/renderer/fallback.js` (task T3) as soon as `frontend.html` has loaded them (`window.CyberFallback`), otherwise a minimal fallback: title, manufacturer and year on black, shrunk until they fit their zone, and nothing on the playfield background.
+- **Default display** when there is no media or on a playback error: the components of `app/renderer/fallback.js` (task T3) as soon as `frontend.html` has loaded them (`window.CyberFallback`), otherwise a minimal display: title, manufacturer and year on black, shrunk until they fit their zone, and nothing on the playfield background.
   The drawn topper shows the brand and the **game's title** (two lines at most), not the manufacturer and year, which are already on the backglass and in the menu.
 - **Background during play**, the "Médias pendant la partie" (Media during play) setting on the "Médias, son et attente" (Media, sound and attract mode) screen (system menu; Start moves to the next choice, saved in `<données>\medias.json`): **frozen** by default (first frame, drawn once on a canvas, with no video decoder open during play), **animated** (the playfield and the screens VPX occupies stay frozen), or **off** (black, with a discreet title).
   See "Loading and play".
 - **`cyber-media://` protocol** ([app/src/media-protocol.ts](../../app/src/media-protocol.ts), rules in [packages/core/src/mediaview.ts](../../packages/core/src/mediaview.ts)): the only path from the windows to the files (the CSP of `frontend.html` allows nothing else for images and videos).
-  It only serves a media file (an extension from the catalog) placed directly in the `medias\` folder of a known table, in `<racine>\media\` or in the `.directb2s` image cache (`<données>\cache\medias\`), plus, one at a time, the files that "Médias du jeu" (Game media) previews before storing them (import folder, file picked on this PC, `allowPreview`); built-in fallbacks are drawn by the window, with no file.
+  It only serves a media file (an extension from the catalog) placed directly in the `medias\` folder of a known table, in `<racine>\media\` or in the `.directb2s` image cache (`<données>\cache\medias\`), plus, one at a time, the files that "Médias du jeu" (Game media) previews before storing them (import folder, file picked on this PC, `allowPreview`); default displays are drawn by the window, with no file.
   Subfolders, escaping with `..`, alternate data streams, symbolic links and any other extension are refused (403).
   It answers range requests (206), which video playback needs.
   The address changes with the file's date and size: a media file replaced under the same name is not served from the cache.
@@ -159,13 +159,13 @@ Outside the table menu, nothing of the last table on the wheel stays on screen o
 | Failed game ("La partie n'a pas pu se dérouler" (The game could not run)) | media of the table that was played | its music |
 | System menu and everything that opens from it (adding, catalogue, downloads, ROMs, settings, cabinet configuration, language, updates…), global VPX settings, controls help, messages, quit confirmation | default display | nothing |
 
-- **Default display** (`defaultMediaView`, [packages/core/src/mediaview.ts](../../packages/core/src/mediaview.ts)): each screen's built-in fallback with no game title, which draws the brand in the art direction (`app/renderer/fallback.js`, teal black background, signal green rules): backglass with the brand's cover ("CYBER" above "PINBALL" in signal green, light, wide and widely spaced Saira, the art direction's illustration on the right, see [Brand backglass and DMD](#brand-backglass-and-dmd)); DMD display with the stacked brand in its dot font; FullDMD with the stacked brand inside its lamp frame (live menu DMD: the brand, PRESS START and the clock, see [Menu DMD](#menu-dmd)); topper with the logo and the brand; playfield background in smoked glass.
+- **Default display** (`defaultMediaView`, [packages/core/src/mediaview.ts](../../packages/core/src/mediaview.ts)): the one of each screen with no game title, which draws the brand in the art direction (`app/renderer/fallback.js`, teal black background, signal green rules): backglass with the brand's cover ("CYBER" above "PINBALL" in signal green, light, wide and widely spaced Saira, the art direction's illustration on the right, see [Brand backglass and DMD](#brand-backglass-and-dmd)); DMD display with the stacked brand in its dot font; FullDMD with the stacked brand inside its lamp frame (live menu DMD: the brand, PRESS START and the clock, see [Menu DMD](#menu-dmd)); topper with the logo and the brand; playfield background in smoked glass.
   No table file is read, no video runs; the display follows its screen (DMD only or FullDMD).
   Dark from the first frame: never white at the switch.
 - **Rule** (`screensTable`, [packages/core/src/menumoments.ts](../../packages/core/src/menumoments.ts)): each menu phase states which table it is about, in an exhaustive table (a new phase does not compile until it is declared there).
   The system menu only keeps a table for a screen that declares it: a table's own screens (details, flyer, editing, doctor, removal) carry it, a described screen gives it when it opens (`openCustom(build, at, table)` in `app/src/library.ts`), an input or a notice keeps the one of the screen it opens from.
   Any new screen that says nothing gets the default display.
-- **Trials**: the layer report (`cyberEtat()`) says "marque" (brand) for the default display, "repli" (fallback) for a table that lacks that media.
+- **Trials**: the layer report (`cyberEtat()`) says "marque" (brand) for the default display with no table, "repli" (internal value) for the one of a table that lacks that media.
 - **Tests**: [ecrans-par-defaut.test.ts](../../packages/core/src/test/ecrans-par-defaut.test.ts) (each phase, each screen, a renderer component for each, `frontend.ts` wiring).
 
 ### Menu sound
@@ -698,7 +698,7 @@ Scrolling fast through the wheel never doubles a medallion, and a press costs th
 ### Manager: "Médias du jeu"
 
 Details screen > "Médias du jeu" (Game media): what the menu shows for this game, screen by screen, without handling any file.
-One card per media item: its label ("Logo", "Plateau" (Playfield), "Fronton" (Backglass), "Afficheur" (Display), "Afficheur large" (Wide display), "Topper", "Chargement" (Loading), "Musique du jeu" (Game music), "Son de lancement" (Launch sound), "Prospectus" (Flyer), "Règles" (Rules)) and its file name in parentheses, **where** it appears (screen and moment, in plain words, instead of Popper's screen names), its **role** in one sentence, a preview (the image, a frame from the video, or the description of the fallback), and the status: "Présent" (Present), or the fallback in use and which one ("Repli : image du .directb2s" (Fallback: .directb2s image), "Repli : défaut de la borne" (Fallback: cabinet default), "Repli : Afficheur large" (Fallback: Wide display), "Repli intégré" (Built-in fallback)), with dimensions and file size.
+One card per media item: its label ("Logo", "Plateau" (Playfield), "Fronton" (Backglass), "Afficheur" (Display), "Afficheur large" (Wide display), "Topper", "Chargement" (Loading), "Musique du jeu" (Game music), "Son de lancement" (Launch sound), "Prospectus" (Flyer), "Règles" (Rules)) and its file name in parentheses, **where** it appears (screen and moment, in plain words, instead of Popper's screen names), its **role** in one sentence, a preview (the image, a frame from the video, or the description of the default display), and the status: "Présent" (Present), or what is shown instead ("À la place : image du .directb2s" (Instead: .directb2s image), "À la place : média commun de la borne" (Instead: cabinet shared media), "À la place : Afficheur large" (Instead: Wide display), "Affichage par défaut" (Default display)), with dimensions and file size.
 A media item the cabinet does not show says so ("Cette borne n'a pas d'écran topper" (This cabinet has no topper screen), or a narrow display that shows the "Afficheur" rather than the "Afficheur large").
 The files in `medias\` that the game does not use are listed with the reason (another game's name, unreadable format, type with no screen).
 
@@ -970,7 +970,7 @@ To keep it as the game's real music, or to record it right away: table details s
 - **What is kept**: from Start on (the coins before it are dropped), from the first sound to the last one before 3 s of silence, at most 30 s.
   The DC offset is removed (WPC sound boards output an offset of about −20 dBFS even when silent, which hid every silence), the sound is normalized to 80% of full scale and ends with a 1.5 s fade.
   It is encoded in **Opus** into an `.ogg` (96 kbit/s, about 360 KB for 30 s) by the Chromium engine, in the converter's hidden page (`audioToOggOpus`, `app/src/media-convert.ts`; container written by `oggOpusFile`), and stored in `<données>\cache\musiques-rom\<rom>.ogg`.
-- **In the menu**: played as the fallback of the game music, after the game's own and before the cabinet's (`resolveMedia`, source `rom`); "Médias du jeu" (Game media) shows it as "Repli : musique de la ROM" (Fallback: ROM music).
+- **In the menu**: played when the game has no music of its own, before the cabinet's (`resolveMedia`, source `rom`); "Médias du jeu" (Game media) shows it as "À la place : musique de la ROM" (Instead: ROM music).
   It stays in the cache: "Trouver les médias manquants" (Find missing media) and VPinMediaDB can still set real music.
 - **"Musique de la ROM" (ROM music)** (table details screen > "Médias du jeu" > "Musique du jeu"): already recorded, "t2_l8, 30 s, enregistrée le … : Start pour la prendre" (t2_l8, 30 s, recorded on …: Start to take it) puts it in the draft, copied into `medias\` as `(Audio) <table>.ogg` on save; it is also among the suggestions ("Voir les propositions" (See suggestions), source "Musique de la ROM").
   Not made yet: Start records it right away (about a minute), and the screen updates when it is ready.

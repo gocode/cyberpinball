@@ -165,7 +165,7 @@ test('supprimer : vers la corbeille, et le repli reprend la place', () => {
   assert.deepEqual(list(trashDir), [`(Topper) ${FOLDER}.png`]);
   const r = resolveMedia(f.table(), f.root, 'Topper');
   assert.equal(r.source, 'fallback');
-  assert.deepEqual(mediaStateLabel(r), { label: 'Repli intégré', detail: 'Logo animé de Cyber Pinball avec le fabricant et l’année', present: false });
+  assert.deepEqual(mediaStateLabel(r), { label: 'Affichage par défaut', detail: 'Logo animé de Cyber Pinball avec le fabricant et l’année', present: false });
 });
 
 test('ordre des pages : renumérotées en deux temps, aucune n’en écrase une autre', () => {
@@ -351,10 +351,10 @@ test('état : présent, ou le repli utilisé et lequel', () => {
   f.put(path.join(f.root, 'media'), '(Topper).png');
   const t = f.table();
   assert.deepEqual(mediaStateLabel(resolveMedia(t, f.root, 'FullDMD')), { label: 'Présent', detail: `(FullDMD) ${FOLDER}.png`, present: true });
-  assert.deepEqual(mediaStateLabel(resolveMedia(t, f.root, 'DMD')), { label: 'Repli : Afficheur large', detail: `(FullDMD) ${FOLDER}.png, adapté à cet écran`, present: false });
+  assert.deepEqual(mediaStateLabel(resolveMedia(t, f.root, 'DMD')), { label: 'À la place : Afficheur large', detail: `(FullDMD) ${FOLDER}.png, adapté à cet écran`, present: false });
   assert.deepEqual(ownMediaPages(t, f.root, 'DMD'), [], 'le FullDMD n’est pas le fichier propre du DMD');
-  assert.deepEqual(mediaStateLabel(resolveMedia(t, f.root, 'Topper'), f.root), { label: 'Repli : défaut de la borne', detail: path.join('media', '(Topper).png'), present: false });
+  assert.deepEqual(mediaStateLabel(resolveMedia(t, f.root, 'Topper'), f.root), { label: 'À la place : média commun de la borne', detail: path.join('media', '(Topper).png'), present: false });
   const b2s = f.put(path.join(f.root, 'data', 'cache'), 'bg.png');
-  assert.equal(mediaStateLabel(resolveMedia(t, f.root, 'Backglass', { b2sImage: () => b2s })).label, 'Repli : image du .directb2s');
+  assert.equal(mediaStateLabel(resolveMedia(t, f.root, 'Backglass', { b2sImage: () => b2s })).label, 'À la place : image du .directb2s');
   assert.equal(mediaStateLabel(resolveMedia(t, f.root, 'AudioLaunch')).label, 'Absent');
 });

@@ -59,7 +59,7 @@ export type MediaTarget = RoleId | 'audio';
 export type MediaKind = 'image' | 'video' | 'audio';
 
 /**
- * Repli intégré, dessiné par l'application quand aucun fichier n'est trouvé
+ * Affichage par défaut, dessiné par l'application quand aucun fichier n'est trouvé
  * (composants de app/renderer/fallback.js). « none » : rien, ou le silence.
  */
 export type MediaFallback =
@@ -594,15 +594,15 @@ export type RomAudioProvider = (table: TableEntry) => string | undefined;
 export interface ResolvedMedia {
   /** Type demandé. */
   type: MediaType;
-  /** Type du fichier trouvé : FullDMD à la place de DMD, et inversement. Absent pour le repli intégré. */
+  /** Type du fichier trouvé : FullDMD à la place de DMD, et inversement. Absent pour l'affichage par défaut. */
   foundType?: MediaType;
   source: MediaSource;
-  /** Pages dans l'ordre (une seule hors prospectus et règles) ; vide pour le repli intégré. */
+  /** Pages dans l'ordre (une seule hors prospectus et règles) ; vide pour l'affichage par défaut. */
   files: string[];
   /** Première page. */
   file?: string;
   kind?: MediaKind;
-  /** Repli intégré à dessiner quand files est vide. */
+  /** Affichage par défaut à dessiner quand files est vide. */
   fallback?: MediaFallback;
   fit?: 'cover' | 'contain';
   /**
@@ -697,7 +697,7 @@ function dmdPartner(type: MediaType): MediaType | undefined {
  * 1. medias\(Type) <nom du .vpx>.* ; 2. medias\(Type) <nom du dossier>.* ;
  * 3. noms de VPinFE dans medias\ ; 4. image du .directb2s (fronton ; DMDImage pour
  * l'afficheur), musique tirée de la ROM (musique du jeu) ; 5. <racine>\media\(Type).* ;
- * 6. repli intégré.
+ * 6. affichage par défaut.
  * Pour DMD et FullDMD, l'autre type est essayé aux étapes 1 à 3 avant l'étape 4.
  */
 export function resolveMedia(table: TableEntry, root: string, type: MediaType, options: ResolveOptions = {}): ResolvedMedia {

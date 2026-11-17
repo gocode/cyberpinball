@@ -1,5 +1,5 @@
 // Couleurs de la direction artistique (docs/design-system, 22 octobre 2026) dans ce qui
-// est dessiné sans média : replis intégrés (app/renderer/fallback.*) et icône de
+// est dessiné sans média : affichages par défaut (app/renderer/fallback.*) et icône de
 // l'application (app/renderer/icone.svg, rendue par scripts/icone.mjs). L'ancienne palette cyan, rose, jaune et violet ne
 // doit revenir nulle part dans l'interface ; les dessins n'emploient que les teintes
 // de la DA : neutres et surfaces noir sarcelle, sarcelle, bleu des métadonnées, vert

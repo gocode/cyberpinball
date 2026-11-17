@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.14
 
+- « Médias du jeu » parle clair : ce que Cyber Pinball dessine quand un média manque s'appelle désormais « Affichage par défaut », ce qui remplace le fichier du jeu s'affiche « À la place : … », et le fichier commun à toutes les tables devient le « média commun de la borne ».
 - DMD réel (bêta) : un ZeDMD, un PIN2DMD ou un Pixelcade branché à la borne est reconnu tout seul, sans ouvrir son port, et VPX l'allume pendant les parties. Tout se règle dans Menu système > Borne > DMD > « DMD réel » : un choix par modèle (automatique, oui, non), le ZeDMD en wifi, et le pilote qui manque dit à l'écran et dans la Santé de la borne.
 - DMD réel (bêta) : « Image du front-end : oui » lui fait aussi montrer le DMD du front-end entre les parties (horloge, crédits, Juke-box…) ; VPX le reprend dès qu'une partie commence, puis le rend au retour.
 - DMD réel (bêta) : un PIN2DMD resté sur le pilote libusb-win32 des anciens outils, que VPX ne peut pas ouvrir sur la plupart des PC, est signalé avec la marche à suivre (passer à WinUSB avec Zadig). La Santé de la borne dit aussi où allumer l'image du front-end.

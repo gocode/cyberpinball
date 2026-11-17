@@ -141,7 +141,7 @@ export function isServedMedia(file: string, allowedDirs: readonly string[]): boo
 /**
  * Dossiers que le protocole peut lire : medias\ de chaque table, <racine>\media\
  * (défauts de la borne), le cache des images du .directb2s et les musiques tirées des ROM
- * (romaudio.ts : leur dossier seul, pas celui de travail de PinMAME). Les replis intégrés sont
+ * (romaudio.ts : leur dossier seul, pas celui de travail de PinMAME). Les affichages par défaut sont
  * dessinés par le rendu (fallback.js) : aucun fichier de l'application à servir.
  */
 export function allowedMediaDirs(opts: { root?: string; dataDir: string; tables: readonly TableEntry[] }): string[] {
@@ -155,7 +155,7 @@ export function allowedMediaDirs(opts: { root?: string; dataDir: string; tables:
 // ---------------------------------------------------------------------------
 // Ce que montre chaque rôle
 
-/** Textes des replis intégrés (app/renderer/fallback.js). */
+/** Textes des affichages par défaut (app/renderer/fallback.js). */
 export interface MediaCard {
   title: string;
   manufacturer?: string;
@@ -168,7 +168,7 @@ export interface MediaView {
   type: MediaType;
   found?: MediaType;
   source: MediaSource;
-  /** Absent : repli intégré. */
+  /** Absent : affichage par défaut. */
   url?: string;
   kind?: 'image' | 'video';
   /** `cover` pour le fond du playfield, `contain` sur fond noir ailleurs. */
@@ -226,7 +226,7 @@ export function toMediaView(table: TableEntry, role: RoleId, resolved: ResolvedM
 /**
  * Affichage par défaut de Cyber Pinball sur l'écran d'un rôle, quand l'écran ouvert ne parle
  * d'aucune table (menu système, réglages, aide, messages : screensTable de menumoments.ts).
- * C'est le repli intégré du rôle sans titre de jeu, qui dessine la marque (app/renderer/fallback.js) :
+ * C'est l'affichage par défaut du rôle sans titre de jeu, qui dessine la marque (app/renderer/fallback.js) :
  * fronton « CYBER PINBALL » sous son verre fumé, afficheur avec le logo et la marque en points
  * (DMD ou FullDMD selon son écran), topper avec le logo et la marque, plateau en verre fumé.
  * Jamais un fichier : ni image, ni vidéo, ni son d'une table ne reste à l'écran.

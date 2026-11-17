@@ -157,7 +157,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 - **Galleries, not guesses.** Each item lists what [VPinMediaDB](https://github.com/superhac/vpinmediadb), VPForums and VPUniverse offer, with previews, download counts, ratings, authors and dates; you pick, and the file you picked is the one saved. Sites that need an account use your own free account; their waiting times are queued for you.
 - **A built-in browser** on every add or choice screen, with the search already filled in. A YouTube or Vimeo page? "Get the sound" or "Get the video", trimmed and assigned in one go.
 - **Play and record.** From a table's page, Cyber Pinball films your game; back in the menu, the video can become the table's presentation on the wheel.
-- **Never an empty wheel.** When a media file is missing, a fallback is drawn in the table's colours. Already have media from another frontend? Import it.
+- **Never an empty wheel.** When a media file is missing, a default display is drawn in the table's colours. Already have media from another frontend? Import it.
 
 ## A cabinet that looks after itself
 

@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- "Game media" now speaks plainly: what Cyber Pinball draws when a media item is missing is now called "Default display", what stands in for the game's file shows as "Instead: …", and the file shared by every table becomes the "cabinet shared media".
 - Real DMD (beta): a ZeDMD, PIN2DMD or Pixelcade plugged into the cabinet is recognised on its own, without opening its port, and VPX lights it during games. Everything is set in System menu > Cabinet > DMD > "Real DMD": one choice per model (automatic, yes, no), the ZeDMD over Wi-Fi, and a missing driver shown on screen and in cabinet health.
 - Real DMD (beta): "Menu image: yes" makes it show the menu's DMD between games too (clock, credits, Jukebox…); VPX takes it over as soon as a game starts, then hands it back afterwards.
 - Real DMD (beta): a PIN2DMD still on the libusb-win32 driver of older tools, which VPX cannot open on most PCs, is reported with what to do (switch to WinUSB with Zadig). Cabinet health also says where to turn on the menu image.

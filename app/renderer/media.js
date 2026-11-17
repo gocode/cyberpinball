@@ -2,7 +2,7 @@
 // Chaque rôle affiché (fond du playfield, backglass, DMD, topper, et chaque zone d'un
 // écran partagé) a sa couche : image ou vidéo en boucle, fondu enchaîné court au
 // changement de table, rotation d'après le bord des flippers, `cover` pour le fond
-// du playfield, `contain` sur fond noir ailleurs. Sans média, le repli intégré
+// du playfield, `contain` sur fond noir ailleurs. Sans média, l'affichage par défaut
 // (fallback.js, quand il est chargé), sinon un repli minimal : le titre.
 //
 //   const layer = CyberMedia.layer(conteneur, { role: 'backglass', minimal });

@@ -255,7 +255,7 @@ test('alias : dossiers de Popper et de PinballX, noms fixes de VPinFE', () => {
 
 // --- Résolution ---
 
-test('ordre de recherche : .vpx, dossier, VPinFE, .directb2s, défaut de la borne, repli intégré', () => {
+test('ordre de recherche : .vpx, dossier, VPinFE, .directb2s, média commun de la borne, affichage par défaut', () => {
   const f = fixture();
   const b2s = f.put('b2s-cache.png');
   const asked: B2sImageKind[] = [];

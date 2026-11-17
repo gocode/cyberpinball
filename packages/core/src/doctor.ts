@@ -2122,7 +2122,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
           : '',
         ...wrong.map((i) => t('« {name} » : un média « {type} » se lit en {formats}.', { name: i.name, type: label(i.type!), formats: mediaTypeInfo(i.type!).formats.join(', ') })),
         redundant.length ? t('{files} : une version lisible porte le même nom, c’est elle qui est montrée.', { files: quoteList(redundant.map((i) => i.name)) }) : '',
-        redundant.length < unreadable.length ? t('En attendant, le front-end passe au média suivant ou à son repli.') : '',
+        redundant.length < unreadable.length ? t('En attendant, le front-end passe au média suivant ou à l’affichage par défaut.') : '',
       ]
         .filter(Boolean)
         .join(' '),
@@ -2510,7 +2510,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
           const params = { file: path.relative(folder, e.file), error: MEDIA_ERROR_LABELS[e.kind], count: e.count, date: formatDateTime(e.last), message: e.message ? ` (${e.message})` : '' };
           return e.count > 1 ? t('« {file} » : {error}, {count} fois, la dernière le {date}{message}.', params) : t('« {file} » : {error}, le {date}{message}.', params);
         }),
-        t('Le front-end passe alors au média suivant, ou à son repli. Remplacez le fichier par un mp4 (H.264) ou un webm, ou réencodez-le.'),
+        t('Le front-end passe alors au média suivant, ou à l’affichage par défaut. Remplacez le fichier par un mp4 (H.264) ou un webm, ou réencodez-le.'),
       ].join(' '),
       fix: broken.length
         ? {

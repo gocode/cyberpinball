@@ -4,7 +4,7 @@
 
 Chaque jeu peut avoir ses médias de présentation : logo, vidéo du plateau, fronton, afficheur, topper, vidéo de chargement, musique, son de lancement, prospectus et règles.
 Le front-end montre chacun sur l'écran prévu et au bon moment.
-Quand un média manque, il montre à sa place un repli dessiné par Cyber Pinball : jamais un écran vide, jamais le bureau Windows.
+Quand un média manque, il montre à sa place un affichage par défaut dessiné par Cyber Pinball : jamais un écran vide, jamais le bureau Windows.
 
 Les médias d'un jeu se rangent dans le dossier de sa table, sous-dossier `medias\`, et s'appellent `(Type) <nom du dossier>.ext`, comme le propose VPX 10.8.1 : `medias\(Backglass) Terminator 2 (Williams 1991).mp4`.
 Le nom du `.vpx` convient aussi, pour un média propre à une version.
@@ -28,7 +28,7 @@ Aucun réglage par écran : l'écran de chaque média, ses proportions et sa rot
 `(Other)`, `(RealDMD)` et `(RealColorDMD)` (Popper, PinballX) n'ont pas d'écran chez Cyber Pinball : ils sont lus, gardés et ignorés.
 Les anciens formats de Popper (`flv`, `f4v`, `avi`, `mov`, `wmv`, `mpg`, `mpeg`) ne se lisent pas : le médecin les signale, l'import les laisse de côté.
 
-Pour chaque écran, le front-end prend le premier média trouvé : `(Type) <nom du .vpx>`, `(Type) <nom du dossier>`, les noms fixes de VPinFE (`bg.png`, `wheel.png`, `table.mp4`…), l'image du `.directb2s` (fronton seulement), le **défaut de la borne** `<racine>\media\(Type).ext`, et enfin le repli intégré.
+Pour chaque écran, le front-end prend le premier média trouvé : `(Type) <nom du .vpx>`, `(Type) <nom du dossier>`, les noms fixes de VPinFE (`bg.png`, `wheel.png`, `table.mp4`…), l'image du `.directb2s` (fronton seulement), le **média commun de la borne** `<racine>\media\(Type).ext`, et enfin l'affichage par défaut.
 
 ### Ajouter des médias
 
@@ -44,8 +44,8 @@ Pour chaque écran, le front-end prend le premier média trouvé : `(Type) <nom 
 - **À la main** : copier le fichier dans `medias\` sous son nom `(Type) <nom du dossier>.ext`.
   Le front-end le montre aussitôt sur chaque écran, sans redémarrer (voir « Changements en direct »).
   Le médecin (fiche > « Diagnostiquer et réparer ») signale un nom qui ne correspond pas au jeu, un fichier rangé hors de `medias\`, un format illisible, des proportions qui ne collent pas à l'écran, et propose le renommage.
-- **Défauts de la borne** : un fichier `<racine>\media\(Type).ext`, sans nom de jeu, sert à tous les jeux qui n'ont pas ce média : un topper aux couleurs de la salle, une musique d'ambiance, une vidéo de fond.
-  Il passe avant le repli intégré.
+- **Médias communs de la borne** : un fichier `<racine>\media\(Type).ext`, sans nom de jeu, sert à tous les jeux qui n'ont pas ce média : un topper aux couleurs de la salle, une musique d'ambiance, une vidéo de fond.
+  Il passe avant l'affichage par défaut.
 
 - **En ligne, à la demande** : « Chercher les médias » prend dans VPinMediaDB tout ce qu'il a pour le jeu, avec un plan à valider (« Médias depuis VPinMediaDB »).
   Pour un média précis, « Voir les propositions » montre toutes les versions trouvées, en ligne et sur la borne, et l'on choisit sur les aperçus (« Propositions de chaque média et recherche approfondie »).
@@ -93,7 +93,7 @@ Tests : [tablerules.test.ts](../../packages/core/src/test/tablerules.test.ts).
 ### Dans les fenêtres du front-end
 
 Sur l'écran des tables, chaque fenêtre du front-end montre les médias de la table choisie (ailleurs, voir « Hors de l'écran des tables : l'affichage par défaut »).
-La recherche suit cet ordre (`resolveMedia`, [packages/core/src/medias.ts](../../packages/core/src/medias.ts)) : nom du `.vpx`, nom du dossier, noms de VPinFE, image du `.directb2s` (fronton), défauts de la borne, puis repli intégré.
+La recherche suit cet ordre (`resolveMedia`, [packages/core/src/medias.ts](../../packages/core/src/medias.ts)) : nom du `.vpx`, nom du dossier, noms de VPinFE, image du `.directb2s` (fronton), médias communs de la borne, puis affichage par défaut.
 
 | Écran | Média | Affichage |
 | --- | --- | --- |
@@ -106,12 +106,12 @@ La recherche suit cet ordre (`resolveMedia`, [packages/core/src/medias.ts](../..
 - **Zones** : chaque rôle d'un écran partagé (fronton et bande DMD, DMD incrusté dans le playfield) a son propre média dans sa zone.
 - **Lecture** (`app/renderer/media.js`) : vidéos en boucle, muettes, sauf celle du fond du playfield quand le réglage « Son des vidéos du front-end » le demande (voir « Son du front-end ») ; fondu enchaîné de 280 ms au changement de table ; médias des deux tables voisines de chaque côté préchargés, et une vidéo quittée gardée prête un moment (huit éléments au plus, dont quatre vidéos) ; fond du playfield en pause sous une superposition opaque (aide, fiche, message) ; toutes les vidéos en pause quand la fenêtre est cachée.
   Une navigation rapide n'empile rien : une couche qui attend encore sa première image est abandonnée.
-- **Repli** sans média ou sur erreur de lecture : les composants de `app/renderer/fallback.js` (tâche T3) dès qu'ils sont chargés par `frontend.html` (`window.CyberFallback`), sinon un repli minimal : le titre, le fabricant et l'année sur fond noir, réduits jusqu'à tenir dans leur zone, et rien sur le fond du playfield.
+- **Affichage par défaut** sans média ou sur erreur de lecture : les composants de `app/renderer/fallback.js` (tâche T3) dès qu'ils sont chargés par `frontend.html` (`window.CyberFallback`), sinon un affichage minimal : le titre, le fabricant et l'année sur fond noir, réduits jusqu'à tenir dans leur zone, et rien sur le fond du playfield.
   Le topper dessiné porte la marque et le **titre du jeu** (deux lignes au plus), pas le fabricant et l'année, déjà sur le fronton et dans le front-end.
 - **Fond de partie**, réglage « Médias pendant la partie » de l'écran « Médias, son et attente » (menu système ; Start passe au choix suivant, enregistré dans `<données>\medias.json`) : **figés** par défaut (première image, dessinée une fois sur un canvas, sans décodeur vidéo ouvert pendant la partie), **animés** (le playfield et les écrans que VPX occupe restent figés), ou **éteints** (noir et titre en discret).
   Voir « Chargement et partie ».
 - **Protocole `cyber-media://`** ([app/src/media-protocol.ts](../../app/src/media-protocol.ts), règles dans [packages/core/src/mediaview.ts](../../packages/core/src/mediaview.ts)) : seul chemin des fenêtres vers les fichiers (la CSP de `frontend.html` n'autorise rien d'autre pour les images et les vidéos).
-  Il ne sert qu'un fichier de média (extension du catalogue) posé directement dans `medias\` d'une table connue, dans `<racine>\media\` ou dans le cache des images du `.directb2s` (`<données>\cache\medias\`), plus, un par un, les fichiers que « Médias du jeu » montre en aperçu avant de les ranger (dossier d'import, fichier choisi sur ce PC, `allowPreview`) ; les replis intégrés sont dessinés par la fenêtre, sans fichier : sous-dossier, sortie par `..`, flux de données alternatif, lien symbolique et autre extension sont refusés (403).
+  Il ne sert qu'un fichier de média (extension du catalogue) posé directement dans `medias\` d'une table connue, dans `<racine>\media\` ou dans le cache des images du `.directb2s` (`<données>\cache\medias\`), plus, un par un, les fichiers que « Médias du jeu » montre en aperçu avant de les ranger (dossier d'import, fichier choisi sur ce PC, `allowPreview`) ; les affichages par défaut sont dessinés par la fenêtre, sans fichier : sous-dossier, sortie par `..`, flux de données alternatif, lien symbolique et autre extension sont refusés (403).
   Il répond aux requêtes partielles (206), dont la lecture des vidéos a besoin.
   L'adresse change avec la date et la taille du fichier : un média remplacé sous le même nom n'est pas repris du cache.
 - **Changements en direct** ([packages/core/src/mediawatch.ts](../../packages/core/src/mediawatch.ts)) : un média ajouté, remplacé ou retiré (n'importe quel type : logo de la roue, plateau, fronton, DMD, FullDMD, topper, vidéo de chargement, musique, son de lancement, `.directb2s`) et une table ajoutée, renommée ou supprimée se voient aussitôt sur chaque écran, sans redémarrer, quel que soit le chemin : « Médias du jeu », « Chercher les médias », propositions, ajout par « Récupérer », fichier copié à la main.
@@ -158,13 +158,13 @@ Hors de l'écran des tables, rien de la dernière table de la roue ne reste à l
 | Partie échouée (« La partie n'a pas pu se dérouler ») | médias de la table jouée | sa musique |
 | Menu système et tout ce qui s'en ouvre (ajout, catalogue, téléchargements, ROM, réglages, configuration de la borne, langue, mises à jour…), réglages de VPX généraux, aide des commandes, messages, confirmation de sortie | affichage par défaut | rien |
 
-- **Affichage par défaut** (`defaultMediaView`, [packages/core/src/mediaview.ts](../../packages/core/src/mediaview.ts)) : le repli intégré de chaque écran sans titre de jeu, qui dessine la marque dans la direction artistique (`app/renderer/fallback.js`, fond noir sarcelle, filets vert signal) : fronton à la couverture de la marque (« CYBER » au-dessus de « PINBALL » en vert signal, Saira légère élargie et très espacée, l'illustration de la DA à droite, voir [Fronton et DMD de la marque](#fronton-et-dmd-de-la-marque)) ; afficheur DMD avec la marque empilée dans sa police à points ; FullDMD avec la marque empilée dans son cadre de lampes (DMD du front-end vivant : la marque, PRESS START et l’horloge, voir [DMD du front-end](#dmd-du-front-end)) ; topper avec le logo et la marque ; fond du playfield en verre fumé.
+- **Affichage par défaut** (`defaultMediaView`, [packages/core/src/mediaview.ts](../../packages/core/src/mediaview.ts)) : celui de chaque écran sans titre de jeu, qui dessine la marque dans la direction artistique (`app/renderer/fallback.js`, fond noir sarcelle, filets vert signal) : fronton à la couverture de la marque (« CYBER » au-dessus de « PINBALL » en vert signal, Saira légère élargie et très espacée, l'illustration de la DA à droite, voir [Fronton et DMD de la marque](#fronton-et-dmd-de-la-marque)) ; afficheur DMD avec la marque empilée dans sa police à points ; FullDMD avec la marque empilée dans son cadre de lampes (DMD du front-end vivant : la marque, PRESS START et l’horloge, voir [DMD du front-end](#dmd-du-front-end)) ; topper avec le logo et la marque ; fond du playfield en verre fumé.
   Aucun fichier de table n'est lu, aucune vidéo ne tourne ; l'afficheur suit son écran (DMD seul ou FullDMD).
   Fond sombre dès la première image : jamais de blanc à la bascule.
 - **Règle** (`screensTable`, [packages/core/src/menumoments.ts](../../packages/core/src/menumoments.ts)) : chaque phase du front-end dit de quelle table elle parle, dans un tableau exhaustif (une nouvelle phase ne compile pas sans y être déclarée).
   Le menu système ne garde une table que pour un écran qui la déclare : les écrans d'une table (fiche, prospectus, modification, médecin, suppression) la portent, un écran décrit la donne à son ouverture (`openCustom(build, at, table)` dans `app/src/library.ts`), une saisie ou un message garde celle de l'écran d'où il s'ouvre.
   Tout nouvel écran qui ne dit rien prend l'affichage par défaut.
-- **Essais** : le relevé des couches (`cyberEtat()`) dit « marque » pour l'affichage par défaut, « repli » pour celui d'une table sans ce média.
+- **Essais** : le relevé des couches (`cyberEtat()`) dit « marque » pour l'affichage par défaut sans table, « repli » (valeur interne) pour celui d'une table sans ce média.
 - **Tests** : [ecrans-par-defaut.test.ts](../../packages/core/src/test/ecrans-par-defaut.test.ts) (chaque phase, chaque écran, composant du rendu pour chacun, branchements de `frontend.ts`).
 
 ### Son du front-end
@@ -698,7 +698,7 @@ Défiler vite dans la roue ne dédouble jamais un médaillon, et un appui coûte
 ### Gestionnaire : « Médias du jeu »
 
 Fiche d'une table > « Médias du jeu » : ce que le front-end montre pour ce jeu, écran par écran, sans manipuler de fichier.
-Une carte par média : son libellé (Logo, Plateau, Fronton, Afficheur, Afficheur large, Topper, Chargement, Musique du jeu, Son de lancement, Prospectus, Règles) et son nom de fichier entre parenthèses, **où** il s'affiche (écran et moment, en clair, au lieu des noms d'écran de Popper), son **rôle** en une phrase, un aperçu (l'image, une image de la vidéo, ou la description du repli), et l'état : « Présent », ou le repli utilisé et lequel (« Repli : image du .directb2s », « Repli : défaut de la borne », « Repli : Afficheur large », « Repli intégré »), avec dimensions et poids.
+Une carte par média : son libellé (Logo, Plateau, Fronton, Afficheur, Afficheur large, Topper, Chargement, Musique du jeu, Son de lancement, Prospectus, Règles) et son nom de fichier entre parenthèses, **où** il s'affiche (écran et moment, en clair, au lieu des noms d'écran de Popper), son **rôle** en une phrase, un aperçu (l'image, une image de la vidéo, ou la description de l'affichage par défaut), et l'état : « Présent », ou ce qui est montré à la place (« À la place : image du .directb2s », « À la place : média commun de la borne », « À la place : Afficheur large », « Affichage par défaut »), avec dimensions et poids.
 Un média que la borne ne montre pas le dit (« Cette borne n'a pas d'écran topper », afficheur étroit qui montre l'Afficheur et non l'Afficheur large).
 Les fichiers de `medias\` que le jeu n'utilise pas sont listés avec la raison (nom d'un autre jeu, format illisible, type sans écran).
 
@@ -970,7 +970,7 @@ Pour la ranger comme vraie musique du jeu, ou pour l'enregistrer tout de suite :
 - **Ce qui est gardé** : à partir de Start (les pièces avant sont écartées), du premier son jusqu'au dernier avant 3 s de silence, 30 s au plus.
   La composante continue est retirée (les cartes son WPC sortent un décalage d'environ −20 dBFS même muettes, qui cachait tout silence), le son normalisé à 80 % de la pleine échelle et terminé par un fondu de 1,5 s.
   Il est encodé en **Opus** dans un `.ogg` (96 kbit/s, environ 360 ko pour 30 s) par le moteur de Chromium, dans la page cachée du convertisseur (`audioToOggOpus`, `app/src/media-convert.ts` ; conteneur écrit par `oggOpusFile`), et rangé dans `<données>\cache\musiques-rom\<rom>.ogg`.
-- **Dans le front-end** : jouée en repli de la musique du jeu, après la sienne et avant celle de la borne (`resolveMedia`, source `rom`) ; « Médias du jeu » la montre « Repli : musique de la ROM ».
+- **Dans le front-end** : jouée quand le jeu n’a pas sa propre musique, avant celle de la borne (`resolveMedia`, source `rom`) ; « Médias du jeu » la montre « À la place : musique de la ROM ».
   Elle reste dans le cache : « Trouver les médias manquants » et VPinMediaDB peuvent toujours poser une vraie musique.
 - **« Musique de la ROM »** (fiche > « Médias du jeu » > « Musique du jeu ») : déjà enregistrée, « t2_l8, 30 s, enregistrée le … : Start pour la prendre » la met dans le brouillon, copiée dans `medias\` sous `(Audio) <table>.ogg` à l'enregistrement ; elle est aussi parmi les propositions (« Voir les propositions », source « Musique de la ROM »).
   Pas encore faite : Start l'enregistre tout de suite (environ une minute), et l'écran se met à jour quand elle est prête.

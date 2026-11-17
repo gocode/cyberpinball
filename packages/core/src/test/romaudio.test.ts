@@ -331,7 +331,7 @@ test('musique de la ROM : repli de la musique du jeu, après la sienne et avant 
   const r = resolveMedia(table, root, 'Audio', { romAudio });
   assert.equal(r.source, 'rom');
   assert.equal(r.file, music);
-  assert.equal(mediaStateLabel(r, root).label, 'Repli : musique de la ROM');
+  assert.equal(mediaStateLabel(r, root).label, 'À la place : musique de la ROM');
   assert.equal(resolveMedia(table, root, 'Audio').source, 'default', 'sans le service : la musique de la borne');
   assert.equal(resolveMedia(table, root, 'AudioLaunch', { romAudio }).source, 'fallback', 'jamais pour le son de lancement');
   fs.writeFileSync(path.join(folder, 'medias', '(Audio) Terminator 2.mp3'), 'la sienne');

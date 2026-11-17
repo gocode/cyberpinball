@@ -562,8 +562,8 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 | Prospectus | sur demande, page par page | une fiche tirée des informations du jeu |
 | Règles | sur demande, page par page | les règles trouvées seules, puis les commandes de la partie |
 
-- **Jamais un écran vide** : un média manquant est remplacé par un repli dessiné aux couleurs de la table.
-- **« Médias du jeu »** : une carte par média avec son aperçu, son état (« Présent », « Repli : … »), ses dimensions et son poids. Prendre dans le dossier d'import, choisir sur le PC, glisser, remplacer, mettre à la corbeille ; rien n'est écrit avant « Enregistrer », qui montre le plan.
+- **Jamais un écran vide** : un média manquant est remplacé par un affichage par défaut, dessiné aux couleurs de la table.
+- **« Médias du jeu »** : une carte par média avec son aperçu, son état (« Présent », « À la place : … »), ses dimensions et son poids. Prendre dans le dossier d'import, choisir sur le PC, glisser, remplacer, mettre à la corbeille ; rien n'est écrit avant « Enregistrer », qui montre le plan.
 
 ### Galeries de propositions
 

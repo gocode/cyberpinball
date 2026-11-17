@@ -1,5 +1,5 @@
 /*
- * Replis intégrés (fallback.js). Tout est mesuré dans le composant lui-même
+ * Affichages par défaut (fallback.js). Tout est mesuré dans le composant lui-même
  * (container-type: size, unités cq*) : il se met en page dans sa zone, quelle que
  * soit la fenêtre, et suit la rotation du playfield faite par son parent.
  * Les animations ne touchent que transform et opacity, pour rester sur le GPU.

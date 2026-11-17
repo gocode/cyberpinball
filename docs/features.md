@@ -562,8 +562,8 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 | Flyer | on request, page by page | a page drawn from the game's details |
 | Rules | on request, page by page | the rules found automatically, then the game's controls |
 
-- **Never an empty screen**: a missing media item is replaced by a fallback drawn in the table's colours.
-- **"Game media"**: one card per item with its preview, its state ("Present", "Fallback: …"), its dimensions and weight. Take from the import folder, pick on the PC, drag in, replace, move to the bin; nothing is written before "Save", which shows the plan first.
+- **Never an empty screen**: a missing media item is replaced by a default display drawn in the table's colours.
+- **"Game media"**: one card per item with its preview, its state ("Present", "Instead: …"), its dimensions and weight. Take from the import folder, pick on the PC, drag in, replace, move to the bin; nothing is written before "Save", which shows the plan first.
 
 ### Galleries of suggestions
 

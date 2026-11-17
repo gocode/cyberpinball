@@ -1,4 +1,4 @@
-// Page de démonstration des replis intégrés (fallback-demo.html).
+// Page de démonstration des affichages par défaut (fallback-demo.html).
 
 /** Jeux d'exemple : titres très courts et très longs, accents, champs absents ; le dernier, aucun jeu (la marque). */
 const SAMPLES = [
@@ -99,7 +99,7 @@ function gallery() {
     const game = SAMPLES[index];
     const head = el('header', 'demo-head');
     head.append(
-      el('h1', '', 'Replis intégrés'),
+      el('h1', '', 'Affichages par défaut'),
       el('p', '', `Exemple ${index + 1} / ${SAMPLES.length} : ${game.title ?? 'aucun jeu (la marque)'}${game.manufacturer ? `, ${game.manufacturer}` : ''}${game.year ? `, ${game.year}` : ''}`),
       el('p', 'demo-hint', `← → : autre exemple · A : ${animate ? 'figer' : 'animer'}`),
     );

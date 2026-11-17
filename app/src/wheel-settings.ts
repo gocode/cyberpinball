@@ -144,7 +144,7 @@ export function createWheelSettings(host: WheelSettingsHost): ProvidedSystemItem
       tableColor: {
         label: v.tableColor ? t('Couleur de chaque table dans le front-end : affichée') : t('Couleur de chaque table dans le front-end : coupée'),
         detail: v.tableColor
-          ? t('La lumière du bandeau de la roue, le halo des cadres et le fond des replis prennent la couleur du fronton de la table ; la table choisie reste en vert (Start : couper)')
+          ? t('La lumière du bandeau de la roue, le halo des cadres et le fond des affichages par défaut prennent la couleur du fronton de la table ; la table choisie reste en vert (Start : couper)')
           : t('Le front-end garde la sarcelle de Cyber Pinball pour toutes les tables (Start : la couleur de chaque table)'),
         icon: 'bulb',
         run: () => set({ tableColor: !v.tableColor }),

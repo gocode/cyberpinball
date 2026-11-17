@@ -199,7 +199,7 @@ test('écrans annexes : contain, jamais tournés ; DMD ou FullDMD selon les prop
   assert.match(narrow.roleMedia(alpha, 'dmd').url ?? '', /\(DMD\)%20Alpha/);
 });
 
-test('sans média : le repli intégré du catalogue, avec titre, fabricant et année pour le dessiner', () => {
+test('sans média : l’affichage par défaut du catalogue, avec titre, fabricant et année pour le dessiner', () => {
   const b = borne();
   const charlie = b.tables[2]!;
   const m = new MenuMedias({ root: b.root, dataDir: b.dataDir, rotation: 0, b2s: false });
@@ -334,7 +334,7 @@ test('rendu : CSP ouverte au seul protocole des médias, composant chargé, erre
   assert.match(csp, /media-src cyber-media:(;|$)/);
   assert.doesNotMatch(csp, /file:|\*/, 'aucun accès direct au disque');
   assert.ok(html.indexOf('media.js') > 0 && html.indexOf('media.js') < html.indexOf('frontend.js'), 'media.js avant frontend.js');
-  // Replis intégrés (T3) : sans eux, un écran sans média n'affiche que le titre.
+  // Affichages par défaut (T3) : sans eux, un écran sans média n'affiche que le titre.
   assert.ok(html.indexOf('fallback.js') > 0 && html.indexOf('fallback.js') < html.indexOf('frontend.js'), 'fallback.js avant frontend.js');
   assert.ok(html.indexOf('fallback.css') > 0, 'fallback.css chargé');
   const media = fs.readFileSync(path.join(APP, 'renderer', 'media.js'), 'utf8');

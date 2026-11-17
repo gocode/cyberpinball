@@ -124,7 +124,7 @@ Les tests (`pare-feu-maj.test.ts`) simulent PowerShell, netsh et schtasks : jama
 Activée par défaut entre amis : deux joueurs devenus amis voient chacun la bibliothèque de l'autre sans rien régler.
 « Partage et réseau » > « Ne plus partager ma bibliothèque » la coupe, « Partager ma bibliothèque avec mes amis » la remet ; ce choix du joueur est gardé (`shareLibraryChosen`), et un `social.json` écrit avant ce défaut, qui portait « non » sans que personne l'ait choisi, est relu « partagée ».
 L'écran rappelle de ne partager que ce qu'on a le droit de partager (captures d'œuvres, ROM et PuP-Packs restent à leurs ayants droit).
-Les amis voient la liste des tables et, pour chacune, ses médias propres (ceux de `medias\` : logo, fronton, vidéos, règles, musique ; ni les défauts de la borne ni l'image tirée du `.directb2s`).
+Les amis voient la liste des tables et, pour chacune, ses médias propres (ceux de `medias\` : logo, fronton, vidéos, règles, musique ; ni les médias communs de la borne ni l'image tirée du `.directb2s`).
 Fiche d'un ami > « Voir sa bibliothèque » : « Sur votre borne » (même jeu : identifiant VPS, ROM, ou titre et année ; « 2 manquants ») et « Absentes de votre borne ».
 Une de ses tables : ses médias, « Déjà équipé » (votre table a déjà ce type de média, pas forcément le même fichier) ou « Manquant », puis « Récupérer les n médias manquants », « Récupérer les n médias » ou « Inviter … à jouer ».
 La réception montre sa progression et s'annule (Exit) ; chaque fichier arrive dans `<données>\amis\recus\` et n'en sort que s'il a la taille et l'empreinte SHA-256 annoncées et des premiers octets qui disent un média de son type (les contrôles de l'import).

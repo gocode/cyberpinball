@@ -3225,7 +3225,7 @@ export function createLibrary(host: LibraryHost) {
     const own = kept(`own-medias:${table.file}`, () => (layout() ? MANAGED_MEDIA_TYPES.filter((type) => ownMediaPages(table, host.root!, type).length).length : 0));
     return {
       text: t('Médias'),
-      detail: own ? t('{own} sur {count} fournis par le jeu ; replis pour les autres', { own, count: MANAGED_MEDIA_TYPES.length }) : t('aucun : le front-end montre ses replis'),
+      detail: own ? t('{own} sur {count} fournis par le jeu ; affichage par défaut pour les autres', { own, count: MANAGED_MEDIA_TYPES.length }) : t('aucun : le front-end montre son affichage par défaut'),
       tone: own ? 'ok' : 'quiet',
     };
   }

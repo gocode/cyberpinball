@@ -459,9 +459,9 @@ export function lowerFirst(text: string): string {
 }
 
 /**
- * Le repli montré à la place du fichier du jeu, sans « Repli : », à reprendre dans une
+ * Le média montré à la place du fichier du jeu, sans « À la place : », à reprendre dans une
  * phrase (« ensuite : image du .directb2s ») ; undefined si le jeu a son fichier, ou
- * pour le repli intégré (fallbackLabel du type).
+ * pour l'affichage par défaut (fallbackLabel du type).
  */
 export function mediaFallbackName(resolved: ResolvedMedia): string | undefined {
   const partner = resolved.foundType && resolved.foundType !== resolved.type ? mediaTypeInfo(resolved.foundType) : undefined;
@@ -475,13 +475,13 @@ export function mediaFallbackName(resolved: ResolvedMedia): string | undefined {
     case 'rom':
       return t('musique de la ROM');
     case 'default':
-      return partner ? t('défaut de la borne ({label})', { label: partner.label }) : t('défaut de la borne');
+      return partner ? t('média commun de la borne ({label})', { label: partner.label }) : t('média commun de la borne');
     case 'fallback':
       return undefined;
   }
 }
 
-/** « Présent », ou le repli utilisé et lequel, en clair. */
+/** « Présent », ou ce qui est montré à la place, en clair. */
 export function mediaStateLabel(resolved: ResolvedMedia, root?: string): { label: string; detail: string; present: boolean } {
   const info = mediaTypeInfo(resolved.type);
   const what = mediaFallbackName(resolved);
@@ -490,19 +490,19 @@ export function mediaStateLabel(resolved: ResolvedMedia, root?: string): { label
     case 'vpx-name':
     case 'folder-name':
     case 'vpinfe':
-      if (what) return { label: t('Repli : {what}', { what }), detail: t('{name}, adapté à cet écran', { name }), present: false };
+      if (what) return { label: t('À la place : {what}', { what }), detail: t('{name}, adapté à cet écran', { name }), present: false };
       return {
         label: t('Présent'),
         detail: resolved.source === 'vpinfe' ? t('{name} (nom de VPinFE)', { name }) : resolved.source === 'vpx-name' ? t('{name} (nom de ce .vpx)', { name }) : name,
         present: true,
       };
     case 'b2s':
-      return { label: t('Repli : {what}', { what: what! }), detail: t('Image tirée du fichier du backglass de la table'), present: false };
+      return { label: t('À la place : {what}', { what: what! }), detail: t('Image tirée du fichier du backglass de la table'), present: false };
     case 'rom':
-      return { label: t('Repli : {what}', { what: what! }), detail: t('Enregistrée en faisant tourner la ROM de la table ({name})', { name }), present: false };
+      return { label: t('À la place : {what}', { what: what! }), detail: t('Enregistrée en faisant tourner la ROM de la table ({name})', { name }), present: false };
     case 'default':
-      return { label: t('Repli : {what}', { what: what! }), detail: root ? path.relative(root, resolved.file!) : name, present: false };
+      return { label: t('À la place : {what}', { what: what! }), detail: root ? path.relative(root, resolved.file!) : name, present: false };
     case 'fallback':
-      return { label: info.fallback === 'none' ? t('Absent') : t('Repli intégré'), detail: info.fallbackLabel, present: false };
+      return { label: info.fallback === 'none' ? t('Absent') : t('Affichage par défaut'), detail: info.fallbackLabel, present: false };
   }
 }

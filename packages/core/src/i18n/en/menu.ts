@@ -497,8 +497,8 @@ export const messages: Record<string, string> = {
     'The dots take the colour of each table’s backglass, brighter than the menu’s; signal green for a table without a colour · current choice',
   'Couleur de chaque table dans le front-end : affichée': 'Colour of each table in the menu: shown',
   'Couleur de chaque table dans le front-end : coupée': 'Colour of each table in the menu: off',
-  'La lumière du bandeau de la roue, le halo des cadres et le fond des replis prennent la couleur du fronton de la table ; la table choisie reste en vert (Start : couper)':
-    'The light of the wheel band, the glow of the frames and the background of stand-in screens take the colour of the table’s backglass; the chosen table stays green (Start: turn off)',
+  'La lumière du bandeau de la roue, le halo des cadres et le fond des affichages par défaut prennent la couleur du fronton de la table ; la table choisie reste en vert (Start : couper)':
+    'The light of the wheel band, the glow of the frames and the background of default displays take the colour of the table’s backglass; the chosen table stays green (Start: turn off)',
   'Le front-end garde la sarcelle de Cyber Pinball pour toutes les tables (Start : la couleur de chaque table)':
     'The menu keeps Cyber Pinball’s teal for every table (Start: each table’s colour)',
   'Couleur du DMD : {color}': 'DMD colour: {color}',
