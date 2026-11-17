@@ -62,6 +62,13 @@ La prise en charge reste en bêta tant que des bornes équipées ne l'ont pas co
   Le PIN2DMD passe par libusb, qui demande un pilote générique (WinUSB, libusbK ou libusb0) ; un autre pilote, ou aucun, est signalé avec l'outil du PIN2DMD ou Zadig.
   libusb n'ouvre libusb0 (le libusb-win32 des anciens outils du PIN2DMD) et libusbK que par `libusbK.dll`, chargée depuis `System32` seulement (`windows_winusb.c`, `winusbx_init`) : sans elle, le pilote est signalé avec le conseil de passer à WinUSB par Zadig (`libusbKDll`, relevé par `packages/win-displays/src/usb.ts`).
   Un ZeDMD ou un Pixelcade sans port COM manque du pilote de sa puce (CH340/CH343 de WCH, CP210x de Silicon Labs).
+- **Sonde du PIN2DMD** : libdmdutil abandonne en silence quand `libusb_open` ou `libusb_claim_interface` échoue (`PIN2DMD.cpp`, `PIN2DMDInit`) ; le journal de VPX ne dit rien et le DMD reste noir.
+  La sonde (`app/src/sonde-pin2dmd.ts`, l'exécutable en mode Node, sans fenêtre) fait les mêmes étapes avec la `libusb64-1.0.dll` de VPX, puis relâche tout.
+  Elle tourne au démarrage du front-end, au retour d'une partie et après un choix de « DMD réel » (`applyMenuDmdServer`), jamais pendant une partie ni quand le serveur du DMD tient la carte.
+  Son verdict est joint au PIN2DMD (`libusbProbe`) : carte déjà ouverte par un autre programme (codes `-3` et `-6`, avec les programmes ouverts reconnus), pilote que libusb ne sait pas utiliser (`-12`), carte introuvable, autre erreur.
+  L'écran, la Santé et les points à vérifier avant la partie le disent ; ouverte puis relâchée, la ligne dit « VPX pourra l'allumer ».
+- **Programmes qui gardent un DMD réel** (`DMD_HOLDER_PROGRAMS`, `dmd.ts`) : dmdext, PinUP Popper, PinballX, PinballY, un autre VPX, Future Pinball.
+  Ouverts au moment de la synchronisation, ils sont signalés avant la partie pour tous les modèles : un seul programme à la fois tient un PIN2DMD ou un port série.
 - **Taille du PIN2DMD** : le nom que la carte donne à l'USB, lu par Windows au branchement (`DEVPKEY_Device_BusReportedDeviceDesc`) : « PIN2DMD » 128 × 32, « PIN2DMD XL » 192 × 64, « PIN2DMD HD » 256 × 64, comme libdmdutil (`PIN2DMD.cpp`).
   Le ZeDMD donne sa taille à la connexion seulement.
 

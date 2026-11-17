@@ -10,6 +10,7 @@ import * as net from 'node:net';
 import * as path from 'node:path';
 import { DMDSERVER_ADDR, DMDSERVER_PORT, dmdServerFrame, dmdServerIni, dmdServerWanted, loadCabinet, t, type DmdColors, type DmdDots } from '@cyberpinball/core';
 import { locations, vpxInstall } from './paths';
+import { clearPin2dmdProbe, refreshPin2dmdProbe } from './pin2dmd-probe';
 import { usbDevices } from './vpx-ini';
 
 /** cyberpinball-dmdserver.exe (packages/dmdserver) et le dossier plugins\dmdutil de VPX qu'il charge. */
@@ -286,4 +287,8 @@ export function applyMenuDmdServer(): void {
   const server = menuDmdServer();
   if (dmdServerWanted(devices, setup)) server.start(dmdServerIni(devices, setup));
   else server.stop();
+  // Le serveur tient la carte : une sonde la trouverait occupée (par lui). Sinon, le PIN2DMD est sondé
+  // comme VPX l'ouvrira à la prochaine partie (pin2dmd-probe.ts).
+  if (server.active()) clearPin2dmdProbe();
+  else refreshPin2dmdProbe(devices);
 }

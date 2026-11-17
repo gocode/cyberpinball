@@ -12,6 +12,7 @@ import {
   hardwareDmdName,
   HARDWARE_DMD_MODELS,
   nextHardwareDmdChoice,
+  pin2dmdProbeProblem,
   pin2dmdSize,
   t,
   tn,
@@ -34,6 +35,8 @@ export interface HardwareDmdMenuHost {
     openSystem(): void;
     openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void;
     openNotice(heading: string, lines: string[], then?: () => void): void;
+    /** Cet écran est-il celui qui est affiché ? */
+    showing?(build: () => Built): boolean;
   };
   /** Périphériques USB présents ; undefined : illisibles. */
   usb(): ObservedUsbDevice[] | undefined;
@@ -117,7 +120,16 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
       const detail = [
         size ? t('{width} × {height} points', { width: size.width, height: size.height }) : undefined,
         t('USB {usb}', { usb: d.usb }),
-        off ? t('éteint par « {model} : non »', { model: d.model }) : problem ? t('pilote à installer') : t('pilote prêt'),
+        off
+          ? t('éteint par « {model} : non »', { model: d.model })
+          : problem
+            ? // La sonde (pin2dmd-probe.ts) a vu le pilote en place, mais la carte refuse de s'ouvrir.
+              problem === pin2dmdProbeProblem(d.device.libusbProbe, d.device.service)
+              ? t('ne s’ouvre pas : voir « À vérifier »')
+              : t('pilote à installer')
+            : d.device.libusbProbe?.stage === 'ok'
+              ? t('ouvert puis relâché : VPX pourra l’allumer')
+              : t('pilote prêt'),
       ]
         .filter(Boolean)
         .join(' · ');
@@ -273,7 +285,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
       if (s?.zedmdWifi?.enabled) names.push(t('ZeDMD en wifi'));
       if (!names.length) return t('ZeDMD, PIN2DMD, Pixelcade : aucun reconnu');
       const problems = on.filter((d) => hardwareDmdDriverProblem(d)).length;
-      return [names.join(', '), problems ? tn(problems, '{n} pilote à installer', '{n} pilotes à installer') : t('prêt')].join(' · ');
+      return [names.join(', '), problems ? tn(problems, '{n} point à vérifier', '{n} points à vérifier') : t('prêt')].join(' · ');
     },
     run: () => {
       flash = undefined;
@@ -286,5 +298,10 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
     item,
     /** Essais : ce que la page montre. */
     build,
+    /** La sonde du PIN2DMD a répondu (pin2dmd-probe.ts) : la page affichée se redessine, curseur gardé. */
+    probed(): void {
+      cache = undefined;
+      if (library.showing?.(build)) open();
+    },
   };
 }

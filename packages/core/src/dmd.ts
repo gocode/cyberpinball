@@ -9,8 +9,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { t } from './i18n';
-import type { ObservedUsbDevice } from './model';
+import { formatList, t, tn } from './i18n';
+import type { LibusbProbe, ObservedUsbDevice } from './model';
 import type { SyncFinding } from './sync';
 import type { VpxSetting } from './vpx';
 import { vpxDmdServerSettings } from './dmdserver';
@@ -171,7 +171,7 @@ export function hardwareDmdDriverProblem(d: DetectedDmd): string | undefined {
         { service: device.service! },
       );
     }
-    return undefined;
+    return pin2dmdProbeProblem(device.libusbProbe, device.service);
   }
   // ZeDMD et Pixelcade : un port série. Sans port, le pilote du convertisseur manque.
   if (problem || !device.port) {
@@ -183,6 +183,59 @@ export function hardwareDmdDriverProblem(d: DetectedDmd): string | undefined {
     });
   }
   return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Sonde du PIN2DMD (app/src/sonde-pin2dmd.ts) et programmes qui gardent un DMD réel
+
+/** Codes d'erreur de libusb (libusb.h, enum libusb_error) qui disent « déjà ouvert ailleurs ». */
+const LIBUSB_ERROR_ACCESS = -3;
+const LIBUSB_ERROR_BUSY = -6;
+/** Pilote que la libusb de VPX ne sait pas utiliser. */
+const LIBUSB_ERROR_NOT_SUPPORTED = -12;
+
+/**
+ * Programmes qui ouvrent souvent un DMD réel et le gardent : tant qu'ils tournent, DMDUtil ne peut pas
+ * l'ouvrir. Un seul programme à la fois tient un PIN2DMD (WinUSB) ou un port série (ZeDMD, Pixelcade).
+ */
+export const DMD_HOLDER_PROGRAMS: readonly { name: string; processes: RegExp }[] = [
+  { name: 'dmdext', processes: /^dmdext\.exe$/i },
+  { name: 'PinUP Popper', processes: /^pinup(menu|display|player)\.exe$/i },
+  { name: 'PinballX', processes: /^pinballx\.exe$/i },
+  { name: 'PinballY', processes: /^pinbally\.exe$/i },
+  { name: 'Visual Pinball X', processes: /^vpinballx.*\.exe$/i },
+  { name: 'Future Pinball', processes: /^future pinball\.exe$/i },
+  { name: 'Freezy DMD', processes: /^(dmddevice|freezy).*\.exe$/i },
+];
+
+/** Noms des programmes ouverts qui gardent souvent un DMD réel, d'après les noms des processus. */
+export function dmdHolders(processNames: string[]): string[] {
+  return DMD_HOLDER_PROGRAMS.filter((p) => processNames.some((n) => p.processes.test(n))).map((p) => p.name);
+}
+
+/**
+ * Ce que la sonde du PIN2DMD dit de ce que verra VPX ; undefined : il s'ouvre (ou pas encore sondé).
+ * libdmdutil (PIN2DMD.cpp, PIN2DMDInit) abandonne en silence quand libusb_open ou libusb_claim_interface
+ * échoue : sans la sonde, le journal de VPX ne dit rien et le DMD reste noir.
+ */
+export function pin2dmdProbeProblem(probe: LibusbProbe | undefined, service?: string): string | undefined {
+  if (!probe || probe.stage === 'ok') return undefined;
+  if (probe.stage === 'list') return t('PIN2DMD : Windows le voit, mais la libusb de VPX ne le trouve pas. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau ».');
+  if (probe.code === LIBUSB_ERROR_ACCESS || probe.code === LIBUSB_ERROR_BUSY) {
+    const holders = probe.holders ?? [];
+    return holders.length
+      ? t('PIN2DMD : déjà ouvert par un autre programme ({programs}). VPX ne pourra pas l’allumer et le DMD restera noir. Fermez-le, ou retirez-le du démarrage de Windows, puis « Vérifier de nouveau ».', { programs: formatList(holders) })
+      : t('PIN2DMD : déjà ouvert par un autre programme (dmdext, un autre front-end, l’éditeur du PIN2DMD…). VPX ne pourra pas l’allumer et le DMD restera noir. Fermez-le, ou retirez-le du démarrage de Windows, puis « Vérifier de nouveau ».');
+  }
+  if (probe.code === LIBUSB_ERROR_NOT_SUPPORTED) {
+    return t('PIN2DMD : la libusb de VPX ne sait pas l’ouvrir avec son pilote actuel ({service}). Le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».', {
+      service: service ?? t('inconnu'),
+    });
+  }
+  return t('PIN2DMD : la libusb de VPX n’arrive pas à l’ouvrir (erreur {code}, étape {stage}). Le DMD restera sans doute noir. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Cyber Pinball > Avis et propositions).', {
+    code: probe.code,
+    stage: probe.stage,
+  });
 }
 
 /** Taille du PIN2DMD d'après le nom que la carte donne à l'USB (libdmdutil, PIN2DMD.cpp). */
@@ -221,9 +274,20 @@ export const VPX_DMD_OWNED_KEYS = ['Enable', ...HARDWARE_DMD_MODELS, 'ZeDMDWiFiE
  * server : dmdserver tient le DMD et répond (image du menu) ; VPX lui envoie alors ses images au lieu
  * d'ouvrir le matériel. Sinon, VPX ouvre le DMD lui-même, comme sans l'image du menu.
  */
-export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmdSetup, server = false): VpxDmdPlan {
+export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmdSetup, server = false, holders: string[] = []): VpxDmdPlan {
   const detected = detectHardwareDmds(devices);
   const findings: SyncFinding[] = [];
+  // Un programme ouvert qui garde souvent le DMD réel (dmdext, PinUP Popper…) : DMDUtil ne pourra pas
+  // l'ouvrir, et libdmdutil n'en dit rien. Dit avant la partie, pour tous les modèles.
+  const lit = detected.some((d) => hardwareDmdChoice(setup, d.model) !== 'off') || Boolean(setup?.zedmdWifi?.enabled);
+  if (lit && holders.length) {
+    findings.push({
+      severity: 'warning',
+      message: tn(holders.length, 'DMD réel : {programs} est ouvert et garde peut-être le DMD réel ; VPX ne pourrait pas l’allumer. Fermez-le avant de jouer.', 'DMD réel : {programs} sont ouverts et gardent peut-être le DMD réel ; VPX ne pourrait pas l’allumer. Fermez-les avant de jouer.', {
+        programs: formatList(holders),
+      }),
+    });
+  }
   if (server) {
     findings.push({ severity: 'info', message: t('DMD réel : dmdserver tient l’afficheur (image du front-end, bêta) ; VPX lui envoie ses images pendant les parties.') });
     for (const d of detected.filter((x) => hardwareDmdChoice(setup, x.model) !== 'off')) {

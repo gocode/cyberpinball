@@ -12,6 +12,22 @@ export const messages: Record<string, string> = {
     'PIN2DMD: Windows has not given it a generic USB driver (WinUSB or libusbK){why}. VPX will not be able to open it and the DMD will stay dark. Install that driver with the tool that comes with the PIN2DMD or with Zadig, then “Check again”.',
   'PIN2DMD : son pilote {service} ne s’ouvre que par libusbK.dll, absente de Windows. VPX ne pourra pas l’ouvrir et le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».':
     'PIN2DMD: its {service} driver can only be opened through libusbK.dll, which Windows does not have. VPX will not be able to open it and the DMD will stay dark. Replace that driver with WinUSB using Zadig (Options > List All Devices, pick the PIN2DMD, WinUSB, Replace Driver), then “Check again”.',
+  'PIN2DMD : Windows le voit, mais la libusb de VPX ne le trouve pas. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau ».':
+    'PIN2DMD: Windows sees it, but VPX’s libusb cannot find it. Unplug it, plug it back in, then “Check again”.',
+  'PIN2DMD : déjà ouvert par un autre programme ({programs}). VPX ne pourra pas l’allumer et le DMD restera noir. Fermez-le, ou retirez-le du démarrage de Windows, puis « Vérifier de nouveau ».':
+    'PIN2DMD: already opened by another program ({programs}). VPX will not be able to light it and the DMD will stay dark. Close it, or remove it from Windows startup, then “Check again”.',
+  'PIN2DMD : déjà ouvert par un autre programme (dmdext, un autre front-end, l’éditeur du PIN2DMD…). VPX ne pourra pas l’allumer et le DMD restera noir. Fermez-le, ou retirez-le du démarrage de Windows, puis « Vérifier de nouveau ».':
+    'PIN2DMD: already opened by another program (dmdext, another frontend, the PIN2DMD editor…). VPX will not be able to light it and the DMD will stay dark. Close it, or remove it from Windows startup, then “Check again”.',
+  'PIN2DMD : la libusb de VPX ne sait pas l’ouvrir avec son pilote actuel ({service}). Le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».':
+    'PIN2DMD: VPX’s libusb cannot open it with its current driver ({service}). The DMD will stay dark. Replace that driver with WinUSB using Zadig (Options > List All Devices, pick the PIN2DMD, WinUSB, Replace Driver), then “Check again”.',
+  'inconnu': 'unknown',
+  'PIN2DMD : la libusb de VPX n’arrive pas à l’ouvrir (erreur {code}, étape {stage}). Le DMD restera sans doute noir. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Cyber Pinball > Avis et propositions).':
+    'PIN2DMD: VPX’s libusb cannot open it (error {code}, step {stage}). The DMD will probably stay dark. Unplug it, plug it back in, then “Check again”; if nothing changes, send a report (System menu > Cyber Pinball > Feedback and ideas).',
+  'DMD réel : {programs} est ouvert et garde peut-être le DMD réel ; VPX ne pourrait pas l’allumer. Fermez-le avant de jouer.':
+    'Real DMD: {programs} is open and may be holding the real DMD; VPX could not light it. Close it before playing.',
+  'DMD réel : {programs} sont ouverts et gardent peut-être le DMD réel ; VPX ne pourrait pas l’allumer. Fermez-les avant de jouer.':
+    'Real DMD: {programs} are open and may be holding the real DMD; VPX could not light it. Close them before playing.',
+  'ouvert puis relâché : VPX pourra l’allumer': 'opened then released: VPX will be able to light it',
   'pilote CH340/CH343 de WCH': 'WCH CH340/CH343 driver',
   'pilote CP210x de Silicon Labs': 'Silicon Labs CP210x driver',
   'pilote du port série USB': 'USB serial port driver',
@@ -70,8 +86,7 @@ export const messages: Record<string, string> = {
   'Le ZeDMD et la borne sur le même réseau local. Sans réglage, le ZeDMD s’annonce sous le nom {name}. Laissez vide pour couper le wifi.':
     'The ZeDMD and the cabinet on the same local network. Without any setting, the ZeDMD announces itself as {name}. Leave empty to turn Wi-Fi off.',
   'ZeDMD, PIN2DMD, Pixelcade : aucun reconnu': 'ZeDMD, PIN2DMD, Pixelcade: none recognized',
-  '{n} pilote à installer': '{n} driver to install',
-  '{n} pilotes à installer': '{n} drivers to install',
+  'ne s’ouvre pas : voir « À vérifier »': 'does not open: see “To check”',
   // Image du menu : le serveur du DMD (app/src/dmd-server.ts, packages/core/src/dmdserver.ts)
   'Le module DMD de VPX ne se charge pas (Visual C++ 2015-2022 x64 manquant ?)': 'The VPX DMD module does not load (Visual C++ 2015-2022 x64 missing?)',
   'Version de VPX non prise en charge par le serveur du DMD (VPX 10.8.1 attendu)': 'VPX version not supported by the DMD server (VPX 10.8.1 expected)',

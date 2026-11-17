@@ -266,6 +266,7 @@ import { prepareImport, unpackArchive, type PreparedImport } from './archives';
 import { createDofMenu } from './dof-menu';
 import { createHardwareDmdMenu } from './hardware-dmd-menu';
 import { applyMenuDmdServer, dmdServerProblem, dmdServerReady } from './dmd-server';
+import { onPin2dmdProbe } from './pin2dmd-probe';
 import { dofDir, readDof, vpxWorkDir } from './dof-files';
 import { backupDir, locations } from './paths';
 import { activeVpxIni, usbDevices } from './vpx-ini';
@@ -2007,6 +2008,7 @@ export function createLibrary(host: LibraryHost) {
       openSystem: () => openSystem(),
       openPrompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
       openNotice: (heading, lines, then) => openNotice(heading, lines, then),
+      showing: (build) => screen?.kind === 'custom' && screen.build === build,
     },
     usb: () => usbDevices(),
     cabinet: () => loadCabinet(host.dataDir),
@@ -2021,6 +2023,12 @@ export function createLibrary(host: LibraryHost) {
     },
   });
   provideSystemItem('hardware-dmd', hardwareDmdMenu.item);
+  // La sonde du PIN2DMD a répondu (démarrage, retour de partie, « Vérifier de nouveau ») : la Santé et
+  // l'écran « DMD réel » disent ce que VPX verra en ouvrant la carte.
+  onPin2dmdProbe(() => {
+    hardwareDmdMenu.probed();
+    void health.refresh();
+  });
 
   // Télécommande du téléphone (Menu système > Borne) : le QR code hors du navigateur intégré.
   const remoteMenu = host.phoneRemote

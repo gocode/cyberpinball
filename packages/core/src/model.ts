@@ -380,6 +380,18 @@ export interface CabinetAudio {
  * Périphérique USB présent, vu passivement par le gestionnaire de configuration de
  * Windows (identifiants et registre seulement : aucun port n'est ouvert).
  */
+/**
+ * Sonde d'un PIN2DMD par la libusb de VPX : `stage` est l'étape où elle s'est arrêtée (`list` : libusb
+ * ne le voit pas ; `open` : libusb_open ; `claim` : libusb_claim_interface ; `ok` : ouvert et relâché),
+ * `code` le code d'erreur de libusb (0 si tout va bien). `holders` : programmes ouverts à ce moment-là
+ * qui gardent souvent un DMD réel (dmdext, PinUP Popper…).
+ */
+export interface LibusbProbe {
+  stage: 'list' | 'open' | 'claim' | 'ok';
+  code: number;
+  holders?: string[];
+}
+
 export interface ObservedUsbDevice {
   /** Identifiant d'instance PnP, par exemple « USB\VID_1A86&PID_7523\5&2C1E9F&0&3 » (…&MI_00\… pour une interface). */
   instanceId: string;
@@ -398,6 +410,11 @@ export interface ObservedUsbDevice {
    * VPX) n'ouvre ces deux pilotes que par elle (libusb, windows_winusb.c, winusbx_init). Absent : non relevé.
    */
   libusbKDll?: boolean;
+  /**
+   * PIN2DMD seulement : ce que la libusb de VPX a dit en l'ouvrant puis en le relâchant, comme le fait
+   * DMDUtil au début d'une partie (app/src/sonde-pin2dmd.ts). Absent : pas encore sondé.
+   */
+  libusbProbe?: LibusbProbe;
   /** Code du Gestionnaire de périphériques quand le pilote ne tourne pas (28 : aucun pilote) ; absent : rien à signaler. */
   problem?: number;
   /** Nom que le périphérique donne lui-même à l'USB (« PIN2DMD HD »), quand Windows le connaît. */

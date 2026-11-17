@@ -69,8 +69,9 @@ await esbuild.build({ ...common, entryPoints: [path.join(repo, 'app', 'dist', 'm
 // Un preload par type de fenêtre (preload.js, settings-preload.js…) : on les prend tous. Et la
 // mise en place de la mise à jour légère, le veilleur de la relance par Start, l'installation du
 // runtime Visual C++ par l'installeur (runtime-vc.ts) et l'enregistreur de la
-// musique des ROM (rom-music.ts), lancés à part par l'exécutable en mode Node.
-for (const name of fs.readdirSync(path.join(repo, 'app', 'dist')).filter((f) => /preload\.js$/.test(f) || f === 'maj-legere.js' || f === 'veilleur.js' || f === 'enregistreur-rom.js' || f === 'runtime-vc.js')) {
+// musique des ROM (rom-music.ts) et la sonde du PIN2DMD (pin2dmd-probe.ts), lancés à part par
+// l'exécutable en mode Node.
+for (const name of fs.readdirSync(path.join(repo, 'app', 'dist')).filter((f) => /preload\.js$/.test(f) || f === 'maj-legere.js' || f === 'veilleur.js' || f === 'enregistreur-rom.js' || f === 'runtime-vc.js' || f === 'sonde-pin2dmd.js')) {
   await esbuild.build({ ...common, entryPoints: [path.join(repo, 'app', 'dist', name)], outfile: path.join(stage, 'dist', name) });
 }
 // Script préchargé du bloqueur de publicités (app/src/ad-blocker.ts), injecté par la session

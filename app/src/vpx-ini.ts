@@ -27,6 +27,7 @@ import {
 import { probeAudioOutputs, probeUsbDevices } from '@cyberpinball/win-displays';
 import { readDof } from './dof-files';
 import { dmdServerReady } from './dmd-server';
+import { dmdHolderNames, withPin2dmdProbe } from './pin2dmd-probe';
 import { backupDir, locations, vpxInstall } from './paths';
 
 export type VpxIniSync = VpxSyncWrite;
@@ -53,7 +54,7 @@ export function syncVpxIni(
     cabinet,
     displays,
     profile,
-    { overwriteManual, audio, usb: usbDevices(), dmdServer: dmdServerReady(), folders, dof: readDof(loc), hidNames: cabinetJoystickHids(cabinet), only },
+    { overwriteManual, audio, usb: usbDevices(), dmdServer: dmdServerReady(), dmdHolders: dmdHolderNames(), folders, dof: readDof(loc), hidNames: cabinetJoystickHids(cabinet), only },
     backupDir(dataDir),
   );
 }
@@ -125,7 +126,8 @@ export function usbDevices(): ObservedUsbDevice[] | undefined {
   const fixture = process.env.CYBERPINBALL_USB_DEVICES;
   if (fixture) return readJsonFile(fixture) as ObservedUsbDevice[];
   try {
-    return probeUsbDevices();
+    // Le PIN2DMD porte le résultat de la dernière sonde (pin2dmd-probe.ts) : ce que VPX verra en l'ouvrant.
+    return withPin2dmdProbe(probeUsbDevices());
   } catch {
     return undefined;
   }

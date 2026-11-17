@@ -62,6 +62,13 @@ Support stays in beta until equipped cabinets have confirmed it: the "BÊTA" (BE
   The PIN2DMD goes through libusb, which needs a generic driver (WinUSB, libusbK or libusb0); another driver, or none, is reported with the PIN2DMD tool or Zadig.
   libusb only opens libusb0 (the libusb-win32 of older PIN2DMD tools) and libusbK through `libusbK.dll`, loaded from `System32` only (`windows_winusb.c`, `winusbx_init`): without it, the driver is reported with the advice to switch to WinUSB with Zadig (`libusbKDll`, read by `packages/win-displays/src/usb.ts`).
   A ZeDMD or a Pixelcade without a COM port lacks its chip's driver (WCH CH340/CH343, Silicon Labs CP210x).
+- **PIN2DMD probe**: libdmdutil gives up silently when `libusb_open` or `libusb_claim_interface` fails (`PIN2DMD.cpp`, `PIN2DMDInit`); the VPX log says nothing and the DMD stays dark.
+  The probe (`app/src/sonde-pin2dmd.ts`, the executable in Node mode, with no window) takes the same steps with VPX's `libusb64-1.0.dll`, then releases everything.
+  It runs when the front-end starts, after a game and after a "Real DMD" choice (`applyMenuDmdServer`), never during a game nor while the DMD server holds the board.
+  Its verdict is attached to the PIN2DMD (`libusbProbe`): board already opened by another program (codes `-3` and `-6`, with the open programs recognised), driver libusb cannot use (`-12`), board not found, other error.
+  The page, cabinet health and the points to check before the game say it; opened then released, the row says "VPX will be able to light it".
+- **Programs that hold a real DMD** (`DMD_HOLDER_PROGRAMS`, `dmd.ts`): dmdext, PinUP Popper, PinballX, PinballY, another VPX, Future Pinball.
+  Open at synchronization time, they are reported before the game for every model: only one program at a time holds a PIN2DMD or a serial port.
 - **PIN2DMD size**: the name the board gives to USB, read by Windows when it is plugged in (`DEVPKEY_Device_BusReportedDeviceDesc`): "PIN2DMD" 128 × 32, "PIN2DMD XL" 192 × 64, "PIN2DMD HD" 256 × 64, as libdmdutil does (`PIN2DMD.cpp`).
   The ZeDMD gives its size only when connected.
 
