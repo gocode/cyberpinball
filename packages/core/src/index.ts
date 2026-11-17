@@ -178,6 +178,7 @@ export * from './reactions';
 export * from './publicprofile';
 export * from './livepresence';
 export * from './rooms';
+export * from './typing';
 export * from './moderation';
 export * from './livechoice';
 export * from './livestart';

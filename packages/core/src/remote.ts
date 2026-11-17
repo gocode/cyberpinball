@@ -455,6 +455,11 @@ export type PhoneMessage =
   /** Salon par pays (rooms-menu.ts) : écrire une ligne dans le salon montré au téléphone ; la borne vérifie tout. */
   | { t: 'room-send'; s: number; text: string }
   /**
+   * « En train d'écrire » (typing.ts) depuis un champ du téléphone : à un ami ou dans un groupe (`key`),
+   * dans le salon montré (sans `key`) ; `on`, il reste du texte. La borne vérifie tout.
+   */
+  | { t: 'typing'; s: number; key?: string; on: boolean }
+  /**
    * Communauté (messages, amis) : le fil ouvert au téléphone, la clé publique d'un ami, ou aucun
    * (`key` absent : la liste). La borne envoie ce fil tant qu'il est ouvert, et le marque lu.
    */
@@ -544,6 +549,9 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       return isChatKey(m.key) && typeof m.text === 'string' && m.text.length <= 4000 ? { t: 'chat-send', s, key: m.key, text: m.text } : undefined;
     case 'room-send':
       return typeof m.text === 'string' && m.text.length <= 1000 ? { t: 'room-send', s, text: m.text } : undefined;
+    case 'typing':
+      if (typeof m.on !== 'boolean' || (m.key !== undefined && !isChatKey(m.key))) return undefined;
+      return { t: 'typing', s, ...(m.key !== undefined ? { key: m.key as string } : {}), on: m.on };
     case 'chat-react':
       return isChatKey(m.key) && typeof m.target === 'string' && /^[0-9a-f]{16}$/.test(m.target) && typeof m.kind === 'string' && /^[a-z]{1,20}$/.test(m.kind) ? { t: 'chat-react', s, key: m.key, target: m.target, kind: m.kind } : undefined;
     case 'jb': {

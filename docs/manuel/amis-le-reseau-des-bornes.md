@@ -463,6 +463,15 @@ Le retrait est un message signé (`del` : l'identifiant du message) qui part et 
 Une borne d'avant cette version ne l'accuse pas : il reste en attente, sans rien montrer, puis est abandonné.
 Essais : [suppression-messages.test.ts](../../packages/core/src/test/suppression-messages.test.ts).
 
+**En train d'écrire.**
+Tant qu'un ami a du texte dans son champ (clavier à l'écran, vrai clavier ou téléphone), son badge apparaît sous le dernier message : son avatar, son pseudo et trois points qui s'allument l'un après l'autre.
+De même dans un groupe (chaque membre qui écrit, sous la discussion) et dans un salon (sous le journal, trois badges au plus, puis « +2 » ; les joueurs ignorés n'y sont pas).
+Le téléphone le montre aussi, sous le fil, le salon ou la messagerie de la partie, et ses propres champs l'envoient.
+Les points partent avec le message, quand le champ est vidé ou fermé, ou d'eux-mêmes 8 secondes après le dernier signal.
+C'est un signal éphémère, jamais gardé : `chat-typing` vers un ami, `grp-typing` vers les membres joignables d'un groupe, `room-typing` dans un salon (signé par son auteur, relayé comme la présence) ; un toutes les 3 secondes au plus pendant la frappe.
+Une borne d'avant cette version ne l'envoie pas et ne l'affiche pas.
+Essais : [en-train-d-ecrire.test.ts](../../packages/core/src/test/en-train-d-ecrire.test.ts).
+
 **Ce qui circule.**
 Chaque message est signé par la clé de son auteur et vérifié à l'arrivée ; une borne qui reçoit deux fois le même message ne le garde qu'une fois.
 Les messages sont gardés dans `<données>\amis\messagerie.json`.

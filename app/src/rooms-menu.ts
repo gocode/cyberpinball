@@ -40,6 +40,7 @@ import {
   pendingReports,
   roomTopic,
   ROOM_LINGER_MS,
+  TYPING_SHOWN_MAX,
   shownCrowd,
   sanctionOf,
   TOPIC_MAX,
@@ -66,7 +67,7 @@ export interface RoomsMenuHost {
     isShowing(build: () => Built): boolean;
     /** Une saisie au clavier à l'écran est ouverte ; absent : on ne sait pas (essais). */
     isPrompting?(): boolean;
-    openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void;
+    openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string, options?: { onInput?: (active: boolean) => void }): void;
   };
   net: SocialNet;
   openProfile(key: string, back: () => void): void;
@@ -112,7 +113,8 @@ export interface RoomsMenu {
   openModeration(back: () => void): void;
   /** Le salon pour le téléphone : celui à l'écran, sinon celui par défaut ; ses 60 dernières lignes. */
   /** `present` : le nombre de présents, au-delà de cinq seulement (shownCrowd). */
-  remote(): { room: RoomId; name: string; present?: number; lines: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' }[]; phrases: string[]; blocked?: string };
+  /** `typing` : les pseudos de qui écrit en ce moment (typing.ts). */
+  remote(): { room: RoomId; name: string; present?: number; lines: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' }[]; phrases: string[]; blocked?: string; typing?: string[] };
 }
 
 /** Le salon par défaut d'un coup d'œil : la dernière ligne visible (filtre de mots appliqué), ou la raison d'un salon fermé. */
@@ -342,7 +344,9 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       const index = actions.push({ label: t('Ligne de {name} à {time}', { name: l.name, time: time(l.at) }), key: `line:${l.id}`, run: () => openLine(l) }) - 1;
       return { ...logRow(l, acts, reacts), action: index, pick: true } satisfies Row;
     });
-    if (!rows.length) rows.push({ text: t('Rien de neuf pour l’instant'), detail: t('Soyez le premier : « Écrire dans le salon »'), icon: 'message', tone: 'quiet' });
+    const typing = typingRow(room);
+    if (!rows.length && !typing) rows.push({ text: t('Rien de neuf pour l’instant'), detail: t('Soyez le premier : « Écrire dans le salon »'), icon: 'message', tone: 'quiet' });
+    if (typing) rows.push(typing);
     sections.push({ kind: 'room', rows });
     // Les présents, dans la colonne latérale (à droite au bureau, dessous en borne).
     const present = net.roomPresent(room).filter((h) => !ignored(h.key));
@@ -469,7 +473,21 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       prompting = false;
       if (text && text.trim()) done(text);
       else openWrite(room);
-    }, t('Une ligne, 300 caractères au plus. « /me arrive » : une action, affichée « {name} arrive » en italique. « /ignorer pseudo » : ignorer un joueur.', { name: me().name }));
+    }, t('Une ligne, 300 caractères au plus. « /me arrive » : une action, affichée « {name} arrive » en italique. « /ignorer pseudo » : ignorer un joueur.', { name: me().name }),
+    // Tant qu'il reste du texte : « en train d'écrire » dans le salon (typing.ts). Une commande (/ignorer) n'en est pas une ligne.
+    { onInput: (active) => net.roomTyping(room, active) });
+  }
+
+  /** Qui écrit dans le salon, en badges sous le journal (typing.ts) : trois au plus, puis « +n » ; les ignorés laissés. */
+  function typingRow(room: RoomId): Row | undefined {
+    const who = net.roomTypers(room).filter((x) => !ignored(x.key));
+    if (!who.length) return undefined;
+    const shown = who.slice(0, TYPING_SHOWN_MAX);
+    const names = shown.map((x) => x.name).join(', ');
+    return {
+      text: who.length > shown.length ? t('{names} et {n} autres écrivent…', { names, n: who.length - shown.length }) : tn(who.length, '{names} écrit…', '{names} écrivent…', { names }),
+      typing: { players: shown.map((x) => ({ name: x.name, avatar: avatarView(x.key, x.name, net.avatarFile(x.key)) })), ...(who.length > shown.length ? { more: who.length - shown.length } : {}) },
+    };
   }
 
   // ---------- Une ligne ----------
@@ -1048,11 +1066,13 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         .slice(-60)
         .map((l) => ({ time: time(l.at), nick: l.name, hue: hueOf(l.key, l.name), text: shownText(l.text), kind: (l.key === self ? 'own' : l.me ? 'me' : mentions(l.text, me().name) ? 'mention' : 'line') as 'own' | 'me' | 'mention' | 'line' }));
       const problem = writeProblem(room) ?? (net.rooms().rulesAt ? undefined : t('Acceptez d’abord les règles des salons, à la borne : Écrire dans le salon'));
+      const typing = net.roomTypers(room).filter((x) => !ignored(x.key)).map((x) => x.name);
       return {
         room,
         name: roomName(room),
         ...(shownCrowd(net.roomPresent(room).length) ? { present: net.roomPresent(room).length } : {}),
         lines,
+        ...(typing.length ? { typing } : {}),
         // Les mêmes phrases qu'à la borne (Réglages de la communauté > Phrases préparées).
         phrases: readyPhrases(),
         ...(problem ? { blocked: problem } : {}),

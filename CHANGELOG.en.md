@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- "Typing": in messages between friends, groups and rooms, the badge of whoever is typing (avatar, nickname and three animated dots) appears under the last message, on the cabinet as on the phone.
 - **Public profile**: at the top, the player's level and its bar; their badges as medals, rarest first; then their country, number of friends, records, public groups and activity. A player whose cabinet does not have this version yet: "Level not known yet".
 - Table received from a friend: its ROM is offered even when it is only in the friend's ROM library (found through PinMAME's shared folder); it used to arrive missing.
 - A friend's ROM comes with their table's aliases (`pinmame\alias.txt`): a ROM loaded under another name starts on your side too.

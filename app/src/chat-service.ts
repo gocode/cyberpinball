@@ -32,6 +32,9 @@ import {
   toWire,
   verifyWire,
   writeLine,
+  createTypingBoard,
+  createTypingSender,
+  type TypingSender,
   type ChatKeep,
   type ChatLine,
   type ChatReaction,
@@ -66,6 +69,13 @@ export interface ChatService {
   react(key: string, target: string, kind: ChatReaction | null): boolean;
   /** Supprimer mon message (son id) : ici, et chez l'ami dès que sa borne reçoit le retrait ; false si ce n'est pas un des miens. */
   remove(key: string, target: string): boolean;
+  /**
+   * « En train d'écrire » (typing.ts) : mon champ pour cet ami a changé (`active` : il reste du texte).
+   * Le signal part au plus toutes les 3 s, s'il est relié et accepte les messages ; jamais gardé.
+   */
+  typing(key: string, active: boolean): void;
+  /** Cet ami m'écrit-il en ce moment (du texte en cours dans son champ) ? */
+  typingOf(key: string): boolean;
   /** Comptes supprimés par leur joueur (forget.ts) : leurs conversations effacées. */
   forget(keys: ReadonlySet<string>): void;
   markRead(key: string): void;
@@ -153,9 +163,18 @@ export function createChatService(opts: ChatServiceOptions): ChatService {
   const tidyTimer = setInterval(() => commit(tidyChat(state, now())), TIDY_MS);
   tidyTimer.unref?.();
 
+  // « En train d'écrire » : qui m'écrit en ce moment (en mémoire), et mon signal vers chaque ami.
+  const typers = createTypingBoard(() => opts.onChange?.());
+  const signals = new Map<string, TypingSender>();
+
   const unsubscribe = opts.net.onMessage((key, message) => {
-    if (message.t !== 'chat' && message.t !== 'chat-ok' && message.t !== 'chat-hi') return;
+    if (message.t !== 'chat' && message.t !== 'chat-ok' && message.t !== 'chat-hi' && message.t !== 'chat-typing') return;
     switch (message.t) {
+      case 'chat-typing':
+        // Messagerie coupée ici : ses points ne s'affichent pas (il voit « N'accepte pas de messages »).
+        if (!state.enabled || !isFriend(key)) return;
+        if (typers.note(key, key, '', message.on)) opts.onChange?.();
+        return;
       case 'chat-hi': {
         const was = state.conversations[key]?.accepts;
         commit(setAccepts(state, key, message.on));
@@ -181,6 +200,8 @@ export function createChatService(opts: ChatServiceOptions): ChatService {
         if (lines.length < message.m.length) log(`Messagerie : ${message.m.length - lines.length} message(s) de ${key.slice(0, 8)} à la signature fausse, écartés.`); // i18n-ignore : journal
         if (!lines.length) return;
         const r = receiveLines(state, key, lines);
+        // Son message est là : ses trois points partent (redessiné par commit, ou ci-dessous).
+        if (typers.clear(key, key) && r.state === state) opts.onChange?.();
         commit(r.state);
         send(key, { t: 'chat-ok', ids: r.ack });
         const texts = r.fresh.filter((l) => l.text);
@@ -210,6 +231,15 @@ export function createChatService(opts: ChatServiceOptions): ChatService {
       if (r.line) flush(key);
       return true;
     },
+    typing: (key, active) => {
+      let signal = signals.get(key);
+      // Rien ne partirait : messagerie coupée ici ou chez lui, plus un ami, hors ligne. Un signal en cours se termine.
+      const may = state.enabled && isFriend(key) && opts.net.online(key) && state.conversations[key]?.accepts !== false;
+      if (!may && !signal?.on) return;
+      if (!signal) signals.set(key, (signal = createTypingSender((on) => send(key, { t: 'chat-typing', on }))));
+      signal.input(may && active);
+    },
+    typingOf: (key) => typers.who(key).length > 0,
     forget: (keys) => commit(forgetInChat(state, keys)),
     markRead: (key) => commit(markRead(state, key)),
     setMuted: (key, muted) => commit(setMuted(state, key, muted)),
@@ -227,6 +257,7 @@ export function createChatService(opts: ChatServiceOptions): ChatService {
     stop: () => {
       stopped = true;
       unsubscribe();
+      typers.stop();
       clearInterval(resendTimer);
       clearInterval(tidyTimer);
       if (saveTimer) {

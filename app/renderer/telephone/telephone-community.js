@@ -45,6 +45,74 @@ for (const [id, label] of [
 document.getElementById('community-seg').setAttribute('aria-label', t('Communauté'));
 document.getElementById('thread-send').textContent = t('Envoyer');
 
+// ---------- En train d'écrire (typing.ts) ----------
+
+/** Durée d'un tour des trois points (telephone.css, phone-typing-dot). */
+const PHONE_TYPING_CYCLE_MS = 1200;
+
+/**
+ * Qui écrit (les pseudos donnés par la borne), en bas d'un fil ou d'un salon : les pseudos et trois
+ * points qui s'allument l'un après l'autre ; undefined si personne. La liste est redessinée à chaque
+ * envoi de la borne : les points partent avec un retard tiré de l'horloge, pour ne pas sauter.
+ */
+function typingItem(names, className) {
+  if (!Array.isArray(names) || !names.length) return undefined;
+  const li = document.createElement('li');
+  li.className = `phone-typing${className ? ` ${className}` : ''}`;
+  const shown = names.slice(0, 3).join(', ');
+  const more = names.length - 3;
+  li.setAttribute('role', 'status');
+  li.setAttribute('aria-label', more > 0 ? t('{names} et {n} autres écrivent…', { names: shown, n: more }) : tn(names.length, '{names} écrit…', '{names} écrivent…', { names: shown }));
+  const who = document.createElement('span');
+  who.className = 'phone-typing-names';
+  who.textContent = more > 0 ? `${shown} +${more}` : shown;
+  const dots = document.createElement('span');
+  dots.className = 'phone-typing-dots';
+  dots.setAttribute('aria-hidden', 'true');
+  dots.style.setProperty('--typing-phase', `${-(Date.now() % PHONE_TYPING_CYCLE_MS)}ms`);
+  for (let i = 0; i < 3; i++) dots.append(document.createElement('i'));
+  li.append(who, dots);
+  return li;
+}
+
+/**
+ * Le signal « j'écris » d'un champ du téléphone, vers la cible que rend `target` (`{ key }` : un ami ou
+ * un groupe ; `{}` : le salon montré ; null : rien) : « oui » au plus une fois par seconde tant qu'il
+ * reste du texte (la borne n'en relaie qu'un toutes les 3 s), « non » quand le champ se vide. Rend la
+ * fonction qui l'arrête (message envoyé, fil quitté).
+ */
+function typingWatch(field, target) {
+  let on = false;
+  let last = 0;
+  let to = null;
+  const tell = (value) => {
+    if (!to) return;
+    send({ t: 'typing', ...(to.key ? { key: to.key } : {}), on: value });
+  };
+  const stop = () => {
+    if (on) tell(false);
+    on = false;
+    to = null;
+  };
+  field.addEventListener('input', () => {
+    if (state !== 'paired') return;
+    const now = target();
+    // La cible a changé (autre fil) : la précédente apprend qu'on n'y écrit plus.
+    if (on && (!now || now.key !== to?.key)) stop();
+    if (!now) return;
+    if (field.value.trim()) {
+      if (on && Date.now() - last < 1000) return;
+      to = now;
+      on = true;
+      last = Date.now();
+      tell(true);
+    } else stop();
+  });
+  return stop;
+}
+const stopThreadTyping = typingWatch(document.getElementById('thread-field'), () => (community.data?.thread && community.data.thread.key === community.open && !community.data.thread.blocked ? { key: community.data.thread.key } : null));
+const stopRoomTyping = typingWatch(document.getElementById('room-field'), () => (community.data?.room && !community.data.room.blocked ? {} : null));
+
 /** La pastille d'un ami et sa marque de présence (en ligne, en partie, hors ligne), comme dans les classements. */
 function communityFace(row, className) {
   const face = document.createElement('span');
@@ -173,6 +241,9 @@ function renderRoom() {
       return li;
     }),
   );
+  // Qui écrit dans le salon, sous la dernière ligne.
+  const typing = typingItem(r.typing, 'room');
+  if (typing) list.append(typing);
   if (atBottom || community.roomShown !== r.name) list.scrollTop = list.scrollHeight;
   community.roomShown = r.name;
   status.hidden = !r.blocked;
@@ -197,6 +268,7 @@ document.getElementById('room-form').addEventListener('submit', (e) => {
   if (!text || !community.data?.room || community.data.room.blocked) return;
   send({ t: 'room-send', text });
   field.value = '';
+  stopRoomTyping();
 });
 
 /** Messages ou Joueurs : la liste, ou pourquoi elle est vide (chargement, messagerie fermée, aucun ami). */
@@ -288,6 +360,9 @@ function renderThread() {
       return li;
     }),
   );
+  // Qui écrit (l'ami, des membres du groupe), sous le dernier message.
+  const typing = typingItem(th.typing, 'thread');
+  if (typing) lines.append(typing);
   // Ouvert : en bas, sur le dernier message ; ensuite, seulement si on y était déjà.
   if (community.shownKey !== th.key || atBottom) lines.scrollTop = lines.scrollHeight;
   community.shownKey = th.key;
@@ -345,6 +420,7 @@ function communityOpenThread(key) {
 /** Le fil est quitté (retour, autre onglet) : la borne cesse de l'envoyer. */
 function communityLeaveThread() {
   if (!community.open) return;
+  stopThreadTyping();
   community.open = undefined;
   send({ t: 'chat-open' });
 }
@@ -371,4 +447,5 @@ document.getElementById('thread-form').addEventListener('submit', (e) => {
   if (!th || th.blocked || !text) return;
   send({ t: 'chat-send', key: th.key, text });
   field.value = '';
+  stopThreadTyping();
 });

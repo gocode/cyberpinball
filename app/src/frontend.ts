@@ -1662,6 +1662,16 @@ phoneRemote.setMenu({
     if (key.startsWith('g:')) groupService.send(key.slice(2), text);
     else chatService.send(key, text);
   },
+  // « En train d'écrire » depuis un champ du téléphone (typing.ts) : chaque service vérifie l'ami, le groupe, le salon.
+  typing: (key, on) => {
+    if (on && !phoneMayWrite()) return;
+    if (key === undefined) {
+      if (guest.active || !socialNet.state().enabled) return;
+      const r = roomsMenu.remote();
+      socialNet.roomTyping(r.room, on && !r.blocked);
+    } else if (key.startsWith('g:')) groupService.typing(key.slice(2), on);
+    else chatService.typing(key, on);
+  },
   chatReact: (key, target, kind) => {
     if (!phoneMayWrite() || !(CHAT_REACTIONS as readonly string[]).includes(kind)) return;
     if (key.startsWith('g:')) groupService.react(key.slice(2), target, kind as Reaction);

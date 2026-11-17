@@ -18,6 +18,9 @@ import {
   acceptInvitation,
   addMine,
   createGroup,
+  createTypingBoard,
+  createTypingSender,
+  type TypingSender,
   declineInvitation,
   dropOutbox,
   forgetInGroups,
@@ -118,6 +121,13 @@ export interface GroupService {
   /** Inviter des amis dans un groupe dont je suis membre ; rend le nombre d'invitations écrites. */
   invite(g: string, friends: readonly { key: string; name: string }[]): number;
   send(g: string, text: string): GroupSendResult;
+  /**
+   * « En train d'écrire » (typing.ts) : mon champ pour ce groupe a changé (`active` : il reste du texte).
+   * Le signal part aux membres joignables, au plus toutes les 3 s ; jamais gardé ni relayé.
+   */
+  typing(g: string, active: boolean): void;
+  /** Les membres qui écrivent en ce moment dans ce groupe (pas moi), le premier arrivé d'abord. */
+  typers(g: string): { key: string; name: string }[];
   /** Réagir à un message (son id) ; null : retirer ma réaction. */
   react(g: string, target: string, kind: Reaction | null): boolean;
   /** Supprimer mon message, pour tous. */
@@ -325,13 +335,27 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
     }
   }
 
+  // « En train d'écrire » : qui écrit dans chaque groupe (en mémoire), et mon signal pour chacun.
+  const typingBoard = createTypingBoard(() => opts.onChange?.());
+  const signals = new Map<string, TypingSender>();
+
   const unsubscribe = opts.net.onMessage((key, message) => {
     if (typeof message.t !== 'string' || !message.t.startsWith('grp')) return;
     const m = message as GroupMessage;
     switch (m.t) {
       case 'grp':
+        // Ses messages sont là : ses trois points partent (redessiné par receiveLines s'il y a du nouveau).
+        for (const l of m.lines) if (l && typeof l === 'object' && l.by === key && typeof l.g === 'string') typingBoard.clear(l.g, key);
         receiveLines(key, m.lines);
         return;
+      case 'grp-typing': {
+        const v = viewOf(m.g);
+        // D'un membre, dans un groupe dont je suis membre : rien d'autre ne s'affiche.
+        if (!v || !isMember(v, key) || !isMember(v, myKey()) || state.groups[m.g]?.gone) return;
+        const name = v.members.find((x) => x.key === key)?.name ?? '';
+        if (typingBoard.note(m.g, key, name, m.on)) opts.onChange?.();
+        return;
+      }
       case 'grp-sum': {
         const v = viewOf(m.g);
         if (!v || !isMember(v, key) || !isMember(v, myKey())) return;
@@ -465,6 +489,22 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
       if ('line' in r) opts.onOwnLine?.();
       return r;
     },
+    typing(g, active) {
+      let signal = signals.get(g);
+      const v = viewOf(g);
+      const may = opts.net.state().enabled && !!v && isMember(v, myKey());
+      if (!may && !signal?.on) return;
+      // Aux membres joignables, ceux d'au moment de chaque signal (un membre qui arrive reçoit le suivant).
+      if (!signal)
+        signals.set(
+          g,
+          (signal = createTypingSender((on) => {
+            for (const m of viewOf(g)?.members ?? []) if (m.key !== myKey() && opts.net.reachable(m.key)) send(m.key, { t: 'grp-typing', g, on });
+          })),
+        );
+      signal.input(may && active);
+    },
+    typers: (g) => typingBoard.who(g).map(({ key, name }) => ({ key, name })),
     react: (g, target, kind) => 'line' in write(g, { k: 'react', target, kind }),
     remove(g, target) {
       const v = viewOf(g);
@@ -540,6 +580,7 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
     stop: () => {
       stopped = true;
       unsubscribe();
+      typingBoard.stop();
       clearInterval(syncTimer);
       clearInterval(tidyTimer);
       if (saveTimer) {

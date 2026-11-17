@@ -146,6 +146,8 @@ function harness(opts: { table?: string } = {}) {
     onRoomLines: () => () => undefined,
     roomOpen: () => undefined,
     roomPresent: () => [],
+    roomTyping: () => undefined,
+    roomTypers: () => [],
     roomMoves: () => [],
     avatarFile: () => undefined,
     roomSend: () => ({ reason: 'text' }),

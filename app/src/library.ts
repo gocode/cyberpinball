@@ -653,6 +653,12 @@ export interface Row {
    */
   log?: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' | 'masked'; flag?: FlagView; reactions?: { text: string; mine: boolean }[] };
   /**
+   * « En train d'écrire » (typing.ts), en bas d'un fil ou d'un journal : un badge par joueur (avatar,
+   * pseudo, trois points animés) ; `more`, les autres au-delà des badges (« +2 »). `text` dit la même
+   * chose en toutes lettres, pour les lecteurs d'écran. Jamais choisi par le curseur.
+   */
+  typing?: { players: { name: string; avatar: AvatarView }[]; more?: number };
+  /**
    * Ligne de la chronologie des Nouveautés (news-menu.ts) : la date et la version, dites sur la
    * première ligne de leur jour seulement (`first`), un petit aperçu s'il y en a un (adresse relative
    * à la page : nouveautes/<id>-<langue>.webp), ses badges (« Nouveau », « BÊTA »), et ce que fait Start
@@ -856,6 +862,12 @@ export interface PromptOptions {
   prefixes?: { label: string; text: string }[];
   /** Préfixe de départ (0 par défaut). */
   prefix?: number;
+  /**
+   * Le texte a changé, par quelque voie que ce soit (touche, clavier à l'écran, téléphone, collage) :
+   * `active`, il en reste ; false aussi quand la saisie se ferme ou cède la place à un autre écran.
+   * Pour « en train d'écrire » (typing.ts). Le texte donné à l'ouverture ne compte pas.
+   */
+  onInput?: (active: boolean) => void;
 }
 
 /**
@@ -939,7 +951,7 @@ type Screen =
   /** Écran décrit hors de la gestion des tables (configurations de la borne), recalculé à chaque affichage. */
   | { kind: 'custom'; build: () => Built; table?: string }
   /** Saisie d'un texte au clavier à l'écran ; `done` reçoit undefined à l'annulation. */
-  | { kind: 'prompt'; heading: string; lead?: string; editor: Editor; done: (value: string | undefined) => void; table?: string };
+  | { kind: 'prompt'; heading: string; lead?: string; editor: Editor; done: (value: string | undefined) => void; table?: string; onInput?: (active: boolean) => void };
 
 type EditorScreen = Extract<Screen, { kind: 'edit' | 'prompt' }>;
 
@@ -1199,6 +1211,7 @@ export function createLibrary(host: LibraryHost) {
     // Mode invité : un écran fermé ne s'ouvre pas, le cadenas le dit.
     if (!host.guest.knock(GUEST_SCREENS[next.kind])) return;
     if (screen?.kind === 'custom' && anchor?.screen === screen && anchor.id !== undefined) lastFocus.set((screen as Extract<Screen, { kind: 'custom' }>).build, anchor.id);
+    if (screen !== next) endPromptInput(screen);
     screen = next;
     cursor = at;
     host.enter();
@@ -1208,6 +1221,7 @@ export function createLibrary(host: LibraryHost) {
   function leave(): void {
     // Le menu se ferme : un message laissé ne revient pas à sa prochaine ouverture (gesture-flash.ts).
     userGesture();
+    endPromptInput(screen);
     screen = undefined;
     lastFocus = new WeakMap();
     section = undefined;
@@ -1340,7 +1354,24 @@ export function createLibrary(host: LibraryHost) {
   /** Saisie d'un nom avec le clavier à l'écran (ou un vrai clavier). */
   function openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string, options?: PromptOptions): void {
     const prefix = options?.prefixes?.length ? { prefixes: options.prefixes, prefixAt: Math.min(options.prefix ?? 0, options.prefixes.length - 1) } : {};
-    go({ kind: 'prompt', heading, lead, editor: { kind: 'text', label, value, cursor: 0, shift: false, typed: false, ...prefix }, done, table: tableOf(screen) });
+    const next: Screen = { kind: 'prompt', heading, lead, editor: { kind: 'text', label, value, cursor: 0, shift: false, typed: false, ...prefix }, done, table: tableOf(screen), ...(options?.onInput ? { onInput: options.onInput } : {}) };
+    promptSeen.set(next, value);
+    go(next);
+  }
+
+  /** Le dernier texte signalé de chaque saisie (onInput) : un signal par changement, pas par dessin. */
+  const promptSeen = new WeakMap<Screen, string>();
+  /** Après un geste sur une saisie : son texte a-t-il changé ? Alors onInput le dit. */
+  function notePromptInput(): void {
+    if (screen?.kind !== 'prompt' || !screen.onInput || screen.editor?.kind !== 'text') return;
+    const value = screen.editor.value;
+    if (promptSeen.get(screen) === value) return;
+    promptSeen.set(screen, value);
+    screen.onInput(value.trim().length > 0);
+  }
+  /** La saisie se ferme ou cède la place (validée, annulée, remplacée par un autre écran) : plus de texte en cours. */
+  function endPromptInput(s: Screen | undefined): void {
+    if (s?.kind === 'prompt' && s.onInput) s.onInput(false);
   }
 
   function openNotice(heading: string, lines: string[], then: () => void = leave): void {
@@ -3514,6 +3545,7 @@ export function createLibrary(host: LibraryHost) {
     const e = s.editor;
     if (s.kind === 'prompt') {
       const value = e?.kind === 'text' ? prefixedText(shownPrefix(e), e.value) : '';
+      endPromptInput(s);
       s.done(save && value ? value : undefined);
       host.broadcast();
       return;
@@ -5323,6 +5355,7 @@ export function createLibrary(host: LibraryHost) {
       // Toute touche d'une saisie est un geste : sa validation pose le message qui suit (gesture-flash.ts).
       userGesture();
       editorKey(screen, input);
+      notePromptInput();
       host.broadcast();
       return true;
     }
@@ -5552,6 +5585,7 @@ export function createLibrary(host: LibraryHost) {
         } else insertAtCaret(e, pasted);
         e.typed = true;
         e.armed = false;
+        notePromptInput();
         host.broadcast();
       });
       return;
@@ -5759,10 +5793,12 @@ export function createLibrary(host: LibraryHost) {
     if (action.type === 'editor' && (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) {
       userGesture();
       pressKey(screen, action.index);
+      notePromptInput();
       host.broadcast();
     } else if (action.type === 'editor-text' && (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor && typeof action.text === 'string') {
       userGesture();
       insertText(screen, action.text);
+      notePromptInput();
       host.broadcast();
     } else if (action.type === 'crop') {
       // Glisser ou molette sur l'image d'un recadrage : l'écran décrit s'en charge, puis se redessine.
@@ -6094,6 +6130,7 @@ export function createLibrary(host: LibraryHost) {
       e.typed = value.replace(/\D/g, '').slice(-4);
       if (e.typed) e.value = Number(e.typed);
     } else return;
+    notePromptInput();
     host.broadcast();
   }
 

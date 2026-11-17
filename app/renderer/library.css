@@ -4688,6 +4688,79 @@ body.mouse button.lib-command:hover .lib-command-text {
 .chat-card-title { font-size: 2.2cqmin; font-weight: 600; overflow-wrap: anywhere; }
 .chat-card-detail { color: var(--ink-muted); font-size: 1.9cqmin; }
 
+/* ---------- En train d'écrire (typing.ts) ----------
+   Sous le dernier message d'un fil, d'un groupe ou d'un salon : un badge par joueur, taillé comme une
+   bulle reçue (fond, bord, coin bas gauche), avec sa pastille, son pseudo et trois points en bleu méta
+   qui s'allument l'un après l'autre. Pas de lueur : rien à couper au bord de la liste. Jamais choisi :
+   le vert reste au curseur. */
+.typing-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9cqmin;
+  min-width: 0;
+}
+.kind-chat .typing-line { align-self: flex-start; max-width: 72%; }
+.typing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 1cqmin;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.6cqmin 1.6cqmin 0.6cqmin 0.6cqmin;
+  border: 1px solid var(--line-strong);
+  border-radius: 99cqmin;
+  border-bottom-left-radius: 0.6cqmin;
+  background: var(--surface-raised);
+}
+.typing-avatar {
+  flex: none;
+  width: 3.8cqmin;
+  height: 3.8cqmin;
+  font-size: 1.9cqmin;
+}
+.typing-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 2cqmin;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.typing-dots {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.5cqmin;
+  height: 2.4cqmin;
+  padding-top: 0.5cqmin;
+}
+.typing-dot {
+  width: 0.8cqmin;
+  height: 0.8cqmin;
+  border-radius: 50%;
+  background: var(--meta);
+  opacity: 0.35;
+  animation: typing-dot 1200ms ease-in-out infinite;
+  animation-delay: var(--typing-phase, 0ms);
+}
+.typing-dot:nth-child(2) { animation-delay: calc(var(--typing-phase, 0ms) + 160ms); }
+.typing-dot:nth-child(3) { animation-delay: calc(var(--typing-phase, 0ms) + 320ms); }
+@keyframes typing-dot {
+  0%, 50%, 100% { opacity: 0.35; transform: translateY(0); }
+  25% { opacity: 1; transform: translateY(-0.45cqmin); }
+}
+.typing-more {
+  color: var(--ink-muted);
+  font-size: 1.9cqmin;
+  font-variant-numeric: tabular-nums;
+}
+/* Salon : le badge part du même bord que le texte des lignes (après la colonne de l'heure). */
+.kind-room .typing-line { padding: 0.5cqmin 0.9cqmin 0.3cqmin calc(0.9cqmin + 6.2cqmin + 1.1cqmin + 0.18cqmin); }
+@media (prefers-reduced-motion: reduce) {
+  .typing-dot { animation: none; opacity: 0.8; }
+}
+
 /*
  * Réagir : les sept réactions en tuiles sur une rangée (quatre puis trois quand la place manque),
  * l'emoji en grand au-dessus de son mot, centrés ; puis les phrases sur deux colonnes.

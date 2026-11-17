@@ -465,6 +465,15 @@ The deletion is a signed message (`del`: the message ID) that is sent and waits 
 A cabinet older than this version does not acknowledge it: it stays pending, showing nothing, then is dropped.
 Tests: [suppression-messages.test.ts](../../packages/core/src/test/suppression-messages.test.ts).
 
+**Typing.**
+While a friend has text in their field (on-screen keyboard, real keyboard or phone), their badge appears under the last message: their avatar, their nickname and three dots lighting up one after the other.
+The same goes in a group (each member typing, under the discussion) and in a room (under the log, three badges at most, then "+2"; ignored players are left out).
+The phone shows it too, under the thread, the room or the in-game chat, and its own fields send it.
+The dots leave with the message, when the field is emptied or closed, or by themselves 8 seconds after the last signal.
+It is a short-lived signal, never stored: `chat-typing` to a friend, `grp-typing` to the reachable members of a group, `room-typing` in a room (signed by its author, relayed like presence); one every 3 seconds at most while typing.
+A cabinet older than this version neither sends nor shows it.
+Tests: [en-train-d-ecrire.test.ts](../../packages/core/src/test/en-train-d-ecrire.test.ts).
+
 **What travels.**
 Each message is signed by its author's key and checked on arrival; a cabinet that receives the same message twice keeps it once.
 Messages are kept in `<data>\amis\messagerie.json`.

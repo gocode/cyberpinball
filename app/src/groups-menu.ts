@@ -34,6 +34,7 @@ import {
   reactionName,
   REACTION_EMOJI,
   REACTIONS,
+  TYPING_SHOWN_MAX,
   sameGroupTable,
   socialAgo,
   t,
@@ -57,7 +58,7 @@ export interface GroupsMenuHost {
   library: {
     openCustom(build: () => Built, at?: number): void;
     isShowing(build: () => Built): boolean;
-    openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void;
+    openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string, options?: { onInput?: (active: boolean) => void }): void;
   };
   net: Pick<SocialNet, 'state' | 'online' | 'reachable' | 'presenceOf' | 'avatarFile' | 'rankings' | 'livePlayers' | 'rooms' | 'report'>;
   groups: GroupService;
@@ -491,7 +492,17 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       const c = chips(v, line);
       chat.push({ text, detail: `${mine ? t('Vous') : line.name} · ${time(line.at)}`, bubble: mine ? 'out' : 'in', ...(c.length ? { badges: c } : {}), action: index, pick: true });
     }
-    if (!chat.length) chat.push({ text: t('Pas encore de message : écrivez le premier'), bubble: 'day' });
+    // Les membres qui écrivent en ce moment : leurs badges et les trois points, sous le dernier message (typing.ts).
+    const typers = groups.typers(g);
+    if (!chat.length && !typers.length) chat.push({ text: t('Pas encore de message : écrivez le premier'), bubble: 'day' });
+    if (typers.length) {
+      const shown = typers.slice(0, TYPING_SHOWN_MAX);
+      const names = shown.map((x) => x.name).join(', ');
+      chat.push({
+        text: typers.length > shown.length ? t('{names} et {n} autres écrivent…', { names, n: typers.length - shown.length }) : tn(typers.length, '{names} écrit…', '{names} écrivent…', { names }),
+        typing: { players: shown.map((x) => ({ name: x.name, avatar: avatar(x.key, x.name) })), ...(typers.length > shown.length ? { more: typers.length - shown.length } : {}) },
+      });
+    }
     sections.push({ title: t('Discussion'), kind: 'chat', rows: chat });
 
     // Le classement du groupe sur la table de la semaine.
@@ -575,6 +586,8 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
         openGroup(g);
       },
       t('Le clavier à l’écran, ou votre téléphone appairé : son texte s’écrit ici en direct. 500 caractères au plus.'),
+      // Tant qu'il reste du texte : « en train d'écrire » chez les membres (typing.ts).
+      { onInput: (active) => groups.typing(g, active) },
     );
   }
 
@@ -918,6 +931,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
           presence: [tn(v.members.length, '{n} membre', '{n} membres'), accessText(v)].join(' · '),
           state: on ? 'online' : 'offline',
           status: on ? { text: tn(on, '{n} membre en ligne', '{n} membres en ligne'), detail: t('Vos messages leur arrivent tout de suite'), tone: 'ok' } : { text: t('Aucun autre membre en ligne'), detail: t('Vos messages partiront dès qu’un membre sera en ligne'), tone: 'info' },
+          ...(groups.typers(v.id).length ? { typing: groups.typers(v.id).map((x) => x.name) } : {}),
           items,
           reactions: REACTIONS.map((r) => ({ id: r, label: reactionLabel(r) })),
           phrases: chatPhrases(),

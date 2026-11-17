@@ -671,6 +671,9 @@ function renderChat() {
       return li;
     }),
   );
+  // L'ami écrit : les trois points sous son dernier message (telephone-community.js, typingItem).
+  const typing = typingItem(chat.typing, 'in-game');
+  if (typing) list.append(typing);
   list.scrollTop = list.scrollHeight;
   const lastIn = [...chat.lines].reverse().find((l) => !l.out);
   const chip = (label, run) => {
@@ -696,7 +699,10 @@ $('phone-chat-form').addEventListener('submit', (e) => {
   if (!chat || !text) return;
   send({ t: 'chat-send', key: chat.key, text });
   field.value = '';
+  stopGameChatTyping();
 });
+// « En train d'écrire » chez l'ami du fil, pendant la partie (typing.ts).
+const stopGameChatTyping = typingWatch($('phone-chat-field'), () => (chat ? { key: chat.key } : null));
 
 /** Pendant une partie : les réglages en partie à ouvrir, ou pourquoi ils ne s'ouvrent pas. */
 function renderGame() {

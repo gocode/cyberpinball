@@ -197,6 +197,8 @@ export interface RemoteChat {
   key: string;
   name: string;
   lines: { id: string; text: string; out: boolean; time: string; note?: string }[];
+  /** « En train d'écrire » (typing.ts) : les pseudos de qui écrit en ce moment. */
+  typing?: string[];
   reactions: { id: string; label: string }[];
   phrases: string[];
 }
@@ -229,6 +231,8 @@ export interface RemoteRoom {
   phrases: string[];
   /** On ne peut pas écrire (règles à accepter à la borne, salons désactivés…) : pourquoi. */
   blocked?: string;
+  /** « En train d'écrire » (typing.ts) : les pseudos de qui écrit en ce moment. */
+  typing?: string[];
 }
 
 /** Le fil d'un ami ouvert au téléphone : jours, évènements de l'ami et messages, comme à la borne. */
@@ -242,6 +246,8 @@ export interface RemoteThread {
   status: { text: string; detail?: string; tone: 'ok' | 'info' | 'warning' };
   /** On ne peut pas écrire : pourquoi (partage coupé, ancien ami…). */
   blocked?: string;
+  /** « En train d'écrire » (typing.ts) : les pseudos de qui écrit en ce moment. */
+  typing?: string[];
   items: ({ kind: 'day'; text: string } | { kind: 'event'; text: string; time: string } | { kind: 'line'; id: string; text: string; out: boolean; meta: string; bubble: 'in' | 'out' | 'pending' | 'expired'; chips?: string[] })[];
   reactions: { id: string; label: string }[];
   phrases: string[];
@@ -314,6 +320,11 @@ export interface MenuTarget {
   chatSend?(key: string, text: string): void;
   /** Une ligne écrite au téléphone dans le salon qu'il montre. */
   roomSend?(text: string): void;
+  /**
+   * « En train d'écrire » depuis un champ du téléphone (typing.ts) : à un ami (`key`), dans un groupe
+   * (`key` « g: » et son identifiant) ou dans le salon qu'il montre (sans `key`) ; `on`, il reste du texte.
+   */
+  typing?(key: string | undefined, on: boolean): void;
   chatReact?(key: string, target: string, kind: string): void;
   /** Communauté : les conversations et le fil ouvert au téléphone (`open`) ; sans elle, l'onglet le dit. */
   community?(open?: string): RemoteCommunity;
@@ -1612,6 +1623,10 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       case 'room-send':
         menu.roomSend?.(message.text);
         pushCommunity(true);
+        return;
+      case 'typing':
+        // Le menu vérifie tout (ami, membre, salon, réglages) ; un signal de trop n'envoie rien (au plus un toutes les 3 s).
+        menu.typing?.(message.key, message.on);
         return;
       case 'set':
         // Le clavier à l'écran n'a qu'une ligne : un saut de ligne (permis pour une zone de texte d'une page) y devient une espace.

@@ -211,7 +211,9 @@ export type ChatMessage =
   /** Accusé de réception : ces messages sont enregistrés. */
   | { t: 'chat-ok'; ids: string[] }
   /** Ma borne a la messagerie ; `on` : elle accepte les messages. */
-  | { t: 'chat-hi'; on: boolean };
+  | { t: 'chat-hi'; on: boolean }
+  /** « En train d'écrire » (typing.ts) : `on`, j'ai du texte en cours pour toi ; jamais gardé. */
+  | { t: 'chat-typing'; on: boolean };
 
 export function parseChatMessage(m: Record<string, unknown>): ChatMessage | undefined {
   switch (m.t) {
@@ -236,6 +238,8 @@ export function parseChatMessage(m: Record<string, unknown>): ChatMessage | unde
       return Array.isArray(m.ids) ? { t: 'chat-ok', ids: m.ids.slice(0, CHAT_BATCH).filter(isChatId) } : undefined;
     case 'chat-hi':
       return typeof m.on === 'boolean' ? { t: 'chat-hi', on: m.on } : undefined;
+    case 'chat-typing':
+      return typeof m.on === 'boolean' ? { t: 'chat-typing', on: m.on } : undefined;
     default:
       return undefined;
   }

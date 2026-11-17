@@ -88,8 +88,16 @@ import {
   saveRooms,
   signRoomHere,
   signRoomLine,
+  signRoomTyping,
   verifyRoomHere,
   verifyRoomLine,
+  verifyRoomTyping,
+  createTypingBoard,
+  createTypingSender,
+  TYPING_FRESH_MS,
+  type RoomTyping,
+  type Typist,
+  type TypingSender,
   cannotWrite,
   actsSample,
   handleReports,
@@ -376,7 +384,9 @@ type RoomMessage =
   /** Lignes retirées par leur auteur (rooms.ts, RoomRetraction) ; une borne d'avant les retraits l'ignore. */
   | { t: 'room-del'; dels: RoomRetraction[] }
   /** Réactions aux lignes (rooms.ts, RoomReaction) ; une borne d'avant les réactions l'ignore. */
-  | { t: 'room-react'; reacts: RoomReaction[] };
+  | { t: 'room-react'; reacts: RoomReaction[] }
+  /** « En train d'écrire » dans un salon (typing.ts) : signé, relayé, jamais gardé. */
+  | { t: 'room-typing'; typing: RoomTyping[] };
 /** Parties instantanées (instantgames.ts) : annonces signées, relayées entre toutes les bornes. */
 type InstantMessage = { t: 'instant'; games: InstantGame[] };
 /** Modération (moderation.ts) : charte et décisions entre toutes les bornes ; signalements chiffrés pour les modérateurs. */
@@ -576,6 +586,13 @@ export interface SocialNet {
   roomOpen(room: RoomId | undefined): void;
   /** Les présents d'un salon en ce moment (soi compris, s'il y est), le plus récent d'abord. */
   roomPresent(room: RoomId): RoomHere[];
+  /**
+   * « En train d'écrire » (typing.ts) : mon champ pour ce salon a changé (`active` : il reste du
+   * texte). Le signal signé part au plus toutes les 3 s ; rien si je ne peux pas écrire dans le salon.
+   */
+  roomTyping(room: RoomId, active: boolean): void;
+  /** Qui écrit en ce moment dans ce salon (pas moi), le premier arrivé d'abord. */
+  roomTypers(room: RoomId): Typist[];
   /** Arrivées et départs vus d'un salon (en mémoire), pour le journal. */
   roomMoves(room: RoomId): { at: string; key: string; name: string; join: boolean }[];
   /** Réglages et état des salons sur cette borne : règles acceptées, joueurs ignorés, filtre… */
@@ -1231,6 +1248,33 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   const moves = new Map<RoomId, { at: string; key: string; name: string; join: boolean }[]>();
   const roomListeners = new Set<(lines: RoomLine[]) => void>();
   let hereTimer: NodeJS.Timeout | undefined;
+  // « En train d'écrire » dans les salons : qui écrit (en mémoire), le dernier signal relayé de chacun,
+  // et mon signal pour le salon où j'écris.
+  const roomTypingBoard = createTypingBoard(() => changed());
+  const typingSeen = new Map<string, { at: number; on: boolean }>();
+  let mySignal: { room: RoomId; sender: TypingSender } | undefined;
+
+  /** Signaux reçus : vérifiés, ceux d'un joueur bloqué ou sanctionné laissés ; les nouveaux montrés et relayés. */
+  function receiveTyping(from: string, raw: unknown): void {
+    if (!Array.isArray(raw)) return;
+    const fresh: RoomTyping[] = [];
+    let shown = false;
+    for (const item of raw.slice(0, 20)) {
+      const typing = verifyRoomTyping(item, now());
+      if (!typing || typing.key === state.key.publicKey || shunned(typing.key) || sanctionOf(moderation.acts, typing.key, now())) continue;
+      const at = Date.parse(typing.at);
+      const seen = typingSeen.get(typing.key);
+      // Déjà vu, ou le même signal redit trop vite (une borne qui inonderait le réseau) : ni montré ni relayé.
+      if (seen && (seen.at >= at || (seen.on === typing.on && at - seen.at < 1500))) continue;
+      typingSeen.set(typing.key, { at, on: typing.on });
+      fresh.push(typing);
+      shown = roomTypingBoard.note(typing.room, typing.key, typing.name, typing.on) || shown;
+    }
+    if (typingSeen.size > 500) for (const [key, s] of typingSeen) if (ms() - s.at > TYPING_FRESH_MS) typingSeen.delete(key);
+    if (!fresh.length) return;
+    for (const l of greetedLinks(from)) l.send({ t: 'room-typing', typing: fresh });
+    if (shown) changed();
+  }
 
   function noteMove(room: RoomId, key: string, name: string, join: boolean): void {
     const list = moves.get(room) ?? [];
@@ -1416,6 +1460,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       if (!merged.fresh.length) return;
       rooms = merged.state;
       saveRoomsSoon();
+      // Sa ligne est là : ses trois points partent.
+      for (const l of merged.fresh) roomTypingBoard.clear(l.room, l.key);
       for (const l of greetedLinks(from)) l.send({ t: 'room', lines: merged.fresh });
       for (const listener of roomListeners) listener(merged.fresh);
       changed();
@@ -1462,6 +1508,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       changed();
       return;
     }
+    if (m.t === 'room-typing') return receiveTyping(from, m.typing);
     if (m.t === 'room-here') {
       if (!Array.isArray(m.here)) return;
       expireHere();
@@ -1985,6 +2032,9 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     if (hereTimer) clearInterval(hereTimer);
     hereTimer = undefined;
     hereBoard.clear();
+    roomTypingBoard.reset();
+    typingSeen.clear();
+    mySignal = undefined;
     for (const timer of [graceTimer, searchTimer, redialTimer]) if (timer) clearTimeout(timer);
     graceTimer = searchTimer = redialTimer = undefined;
     redialsSoon.clear();
@@ -2210,6 +2260,24 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       const me = roomShown === room && state.enabled ? [signRoomHere(state, room, myCountry(), now(), ownAvatarHash())] : [];
       return [...me, ...others.sort((a, b) => Date.parse(b.at) - Date.parse(a.at))];
     },
+    roomTyping(room, active) {
+      // Je ne peux pas écrire dans ce salon (partage ou salons coupés, règles pas acceptées, sanction) : aucun signal.
+      const may = state.enabled && rooms.enabled && !!rooms.rulesAt && !sanctionOf(moderation.acts, state.key.publicKey, now());
+      if (mySignal && (mySignal.room !== room || !may)) {
+        mySignal.sender.stop();
+        mySignal = undefined;
+      }
+      if (!may || (!active && !mySignal)) return;
+      mySignal ??= {
+        room,
+        sender: createTypingSender((on) => {
+          const typing = signRoomTyping(state, room, on, now());
+          for (const link of greetedLinks()) link.send({ t: 'room-typing', typing: [typing] });
+        }),
+      };
+      mySignal.sender.input(active);
+    },
+    roomTypers: (room) => roomTypingBoard.who(room).filter((x) => !shunned(x.key)),
     roomMoves: (room) => moves.get(room) ?? [],
     setRooms(change) {
       rooms = { ...rooms, ...change };

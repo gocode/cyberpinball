@@ -522,7 +522,9 @@ export type GroupMessage =
   /** Annonces de groupes publics, entre toutes les bornes (vérifiées par verifyAnnounce à l'arrivée). */
   | { t: 'grp-pub'; ann: unknown[] }
   /** Donnez-moi votre annuaire des groupes publics (l'écran « Groupes » s'ouvre). */
-  | { t: 'grp-pub-ask' };
+  | { t: 'grp-pub-ask' }
+  /** « En train d'écrire » dans un groupe (typing.ts), aux membres joignables ; jamais gardé ni relayé. */
+  | { t: 'grp-typing'; g: string; on: boolean };
 
 export function parseGroupMessage(m: Record<string, unknown>): GroupMessage | undefined {
   switch (m.t) {
@@ -542,6 +544,8 @@ export function parseGroupMessage(m: Record<string, unknown>): GroupMessage | un
       return Array.isArray(m.ann) && m.ann.length ? { t: 'grp-pub', ann: m.ann.slice(0, GROUP_ANNOUNCE_BATCH) } : undefined;
     case 'grp-pub-ask':
       return { t: 'grp-pub-ask' };
+    case 'grp-typing':
+      return isGroupId(m.g) && typeof m.on === 'boolean' ? { t: 'grp-typing', g: m.g, on: m.on } : undefined;
     default:
       return undefined;
   }

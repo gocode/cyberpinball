@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.14
 
+- « En train d'écrire » : dans les messages entre amis, les groupes et les salons, le badge de qui écrit (avatar, pseudo et trois petits points animés) apparaît sous le dernier message, à la borne comme au téléphone.
 - **Profil public** : en tête, le niveau du joueur et sa barre ; ses badges en médailles, les plus rares d'abord ; puis son pays, son nombre d'amis, ses records, ses groupes publics et son activité. Un joueur dont la borne n'a pas encore cette version : « Niveau pas encore connu ».
 - Table récupérée chez un ami : sa ROM est proposée même quand elle n'est que dans la bibliothèque de ROM de l'ami (trouvée par le dossier commun de PinMAME) ; elle arrivait absente.
 - La ROM d'un ami part avec les alias de sa table (`pinmame\alias.txt`) : une ROM chargée sous un autre nom démarre chez vous aussi.

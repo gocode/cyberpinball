@@ -151,6 +151,11 @@ function renderLibrary(v) {
       const flagged = section.rows.some((r) => r.flag) || section.kind === 'players';
       if (flagged) list.classList.add('has-flags');
       for (const row of section.rows) {
+        // Quelqu'un écrit (fil, groupe, salon) : son badge et les trois points, sous le dernier message.
+        if (row.typing) {
+          list.append(typingLine(row));
+          continue;
+        }
         // Salon : une ligne du journal, à l'ancienne.
         if (row.log) {
           list.append(roomLogLine(row, v.cursor));
@@ -650,6 +655,41 @@ function chatBubble(row, cursor) {
   }
   if (row.detail) li.append(libEl('div', 'chat-meta', row.detail));
   return li;
+}
+
+// ---------- En train d'écrire ----------
+
+/** Durée d'un tour des trois points (library.css, typing-dot). */
+const TYPING_CYCLE_MS = 1200;
+
+/**
+ * « En train d'écrire » (Row.typing, typing.ts) : sous le dernier message d'un fil, d'un groupe ou d'un
+ * salon, un badge par joueur (sa pastille, son pseudo, trois points qui s'allument l'un après l'autre),
+ * puis « +2 » au-delà. Jamais choisi par le curseur ; annoncé aux lecteurs d'écran par son texte.
+ */
+function typingLine(row) {
+  const li = libEl('li', 'typing-line');
+  li.setAttribute('role', 'status');
+  li.setAttribute('aria-label', row.text);
+  for (const p of row.typing.players) {
+    const badge = libEl('span', 'typing-badge');
+    badge.append(avatarNode(p.avatar, 'typing-avatar'), libEl('span', 'typing-name', p.name), typingDots());
+    li.append(badge);
+  }
+  if (row.typing.more) li.append(libEl('span', 'typing-more', `+${row.typing.more}`));
+  return li;
+}
+
+/**
+ * Les trois points. L'écran est redessiné à chaque changement (une frappe, une ligne qui arrive) : leur
+ * animation part avec un retard négatif tiré de l'horloge, pour reprendre exactement où elle en était.
+ */
+function typingDots() {
+  const dots = libEl('span', 'typing-dots');
+  dots.setAttribute('aria-hidden', 'true');
+  dots.style.setProperty('--typing-phase', `${-(Date.now() % TYPING_CYCLE_MS)}ms`);
+  for (let i = 0; i < 3; i++) dots.append(libEl('i', 'typing-dot'));
+  return dots;
 }
 
 // ---------- Drapeaux ----------

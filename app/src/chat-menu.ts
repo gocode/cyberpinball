@@ -52,7 +52,7 @@ export interface ChatMenuHost {
     openCustom(build: () => Built, at?: number): void;
     isShowing(build: () => Built): boolean;
     openSystem(): void;
-    openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void;
+    openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string, options?: { onInput?: (active: boolean) => void }): void;
   };
   net: SocialNet;
   chat: ChatService;
@@ -381,7 +381,9 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
         pick: true,
       });
     }
-    if (!items.length) rows.push({ text: t('Pas encore de message : écrivez le premier'), bubble: 'day' });
+    if (!items.length && !chat.typingOf(key)) rows.push({ text: t('Pas encore de message : écrivez le premier'), bubble: 'day' });
+    // Il écrit en ce moment : son badge et les trois points, sous le dernier message (typing.ts).
+    if (chat.typingOf(key)) rows.push({ text: t('{name} écrit…', { name: plain }), typing: { players: [{ name: plain, avatar: avatar(key, plain) }] } });
     // Écrire : toujours là, grisé avec sa raison quand on ne peut pas.
     actions.push(
       blocked
@@ -432,6 +434,8 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
         openThread(key);
       },
       t('Le clavier à l’écran, ou votre téléphone appairé : son texte s’écrit ici en direct. 500 caractères au plus.'),
+      // Tant qu'il reste du texte : « en train d'écrire » chez l'ami (typing.ts).
+      { onInput: (active) => chat.typing(key, active) },
     );
   }
 
@@ -606,7 +610,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
         time: time(l.at),
         ...(l.out && l.delivery === 'pending' ? { note: t('En attente') } : l.out && l.delivery === 'received' ? { note: t('Reçu') } : {}),
       }));
-      return { key, name: friendOf(key)!.name, lines, reactions: CHAT_REACTIONS.map((r) => ({ id: r, label: reactionLabel(r) })), phrases: chatPhrases() };
+      return { key, name: friendOf(key)!.name, lines, ...(chat.typingOf(key) ? { typing: [friendOf(key)!.name] } : {}), reactions: CHAT_REACTIONS.map((r) => ({ id: r, label: reactionLabel(r) })), phrases: chatPhrases() };
     },
     remoteCommunity: (open) => {
       const closed = !net.state().enabled ? t('Partage désactivé : personne ne vous voit, vous ne voyez personne') : !chat.state().enabled ? t('Messagerie désactivée sur cette borne : Réglages de la messagerie') : undefined;
@@ -641,6 +645,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
           state: presenceState(open),
           status: { text: status.text, ...(status.detail ? { detail: status.detail } : {}), tone: status.tone === 'warning' ? 'warning' : status.tone === 'ok' ? 'ok' : 'info' },
           ...(blocked ? { blocked } : {}),
+          ...(chat.typingOf(open) ? { typing: [plain] } : {}),
           items: threadItems(open)
             .slice(-THREAD_PHONE)
             .map((it) => (it.kind === 'line' ? { kind: 'line' as const, id: it.line.id, text: it.line.text!, out: it.line.out, meta: it.meta, bubble: it.bubble, ...(it.chips.length ? { chips: it.chips } : {}) } : it.kind === 'event' ? { kind: 'event' as const, text: it.text, time: it.time } : { kind: 'day' as const, text: it.text })),

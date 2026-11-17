@@ -60,6 +60,11 @@ export const messages: Record<string, string> = {
   '{time} · En attente : il n’accepte pas de messages': '{time} · Waiting: they do not accept messages',
   '{time} · En attente · partira quand {name} sera en ligne': '{time} · Waiting · will leave when {name} is online',
   'Pas encore de message : écrivez le premier': 'No message yet: write the first one',
+  // « En train d'écrire » (typing.ts) : fil d'un ami, groupe, salon, téléphone
+  '{name} écrit…': '{name} is typing…',
+  '{names} écrit…': '{names} is typing…',
+  '{names} écrivent…': '{names} are typing…',
+  '{names} et {n} autres écrivent…': '{names} and {n} others are typing…',
   'Écrire un message…': 'Write a message…',
   'Clavier à l’écran, ou votre téléphone appairé': 'On-screen keyboard, or your paired phone',
   'Réponse rapide…': 'Quick reply…',

@@ -20,6 +20,7 @@ import { writeFileAtomic } from './atomicwrite';
 import { isPlayerPublicKey, signText, verifyText, type PlayerKey } from './sharing';
 import { normalizeName } from './social';
 import { isReaction, type Reaction } from './reactions';
+import { TYPING_FRESH_MS } from './typing';
 
 /** Longueur d'une ligne, en caractères. */
 export const ROOM_TEXT_MAX = 300;
@@ -121,6 +122,19 @@ export interface RoomHere {
   /** Empreinte de son avatar (avatar.ts, avatar public) et sa signature à part ; absentes : ses initiales. */
   avatar?: string;
   asig?: string;
+}
+
+/**
+ * « En train d'écrire » dans un salon (typing.ts, 17/11/2026) : signé par sa clé et relayé comme la
+ * présence, jamais gardé. `on` false : il a vidé son champ ou l'a quitté sans écrire.
+ */
+export interface RoomTyping {
+  key: string;
+  name: string;
+  room: RoomId;
+  on: boolean;
+  at: string;
+  sig: string;
 }
 
 const isIso = (v: unknown): v is string => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
@@ -230,6 +244,29 @@ export function verifyRoomHere(raw: unknown, now = new Date()): RoomHere | undef
   const here: RoomHere = { key: r.key, name, ...(r.country ? { country: r.country as string } : {}), room: r.room, at: r.at, sig: r.sig };
   const { sig, ...base } = here;
   return verifyText(hereText(base), sig, here.key) ? { ...here, ...verifyAvatarClaim('room-here', here.key, here.at, r) } : undefined;
+}
+
+function typingText(r: Omit<RoomTyping, 'sig'>): string {
+  return JSON.stringify({ app: 'cyberpinball', kind: 'room-typing', key: r.key, name: r.name, room: r.room, on: r.on, at: r.at });
+}
+
+/** Mon signal « j'écris » (ou « je n'écris plus ») dans ce salon, signé maintenant. */
+export function signRoomTyping(me: { key: PlayerKey; name: string }, room: RoomId, on: boolean, now = new Date()): RoomTyping {
+  const base: Omit<RoomTyping, 'sig'> = { key: me.key.publicKey, name: me.name, room, on, at: now.toISOString() };
+  return { ...base, sig: signText(typingText(base), me.key) };
+}
+
+/** Signal reçu : forme et signature vérifiées ; plus vieux que TYPING_FRESH_MS ou du futur : refusé (il ne voyagerait plus pour rien). */
+export function verifyRoomTyping(raw: unknown, now = new Date()): RoomTyping | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const name = normalizeName(r.name);
+  if (!isPlayerPublicKey(r.key) || !name || name !== r.name || !isRoomId(r.room) || typeof r.on !== 'boolean' || !isIso(r.at) || typeof r.sig !== 'string' || r.sig.length > 200) return undefined;
+  const at = Date.parse(r.at);
+  if (at > now.getTime() + FUTURE_MS || now.getTime() - at > TYPING_FRESH_MS) return undefined;
+  const d: RoomTyping = { key: r.key, name, room: r.room, on: r.on, at: r.at, sig: r.sig };
+  const { sig, ...base } = d;
+  return verifyText(typingText(base), sig, d.key) ? d : undefined;
 }
 
 // ---------------------------------------------------------------------------
