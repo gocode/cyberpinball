@@ -121,3 +121,15 @@ La page « Point Of View » ne propose donc que ce que le cadrage relit (d'aprè
   Au retour, la fiche dit « Affichage enregistré pour cette table » si ce fichier a changé.
 - **Hors partie**, ces clés ne se modifient plus pour une table : dans « Réglages de cette table », elles ont le badge « En partie » et seule leur valeur propre à la table peut être retirée (`isLiveVisual`, `packages/core/src/vpx-settings.ts`) ; les essentiels de la table ne les montrent plus.
 - **Médecin** : « Cadrage manuel imposé par la table » quand le `.ini` de la table (souvent livré avec elle, réglé pour l'écran de son auteur) contient `CabinetAutofitMode = 0` ; la réparation retire la clé, l'ancien fichier part à la corbeille.
+  Quand ce `.ini` a aussi sa propre vue de borne (`[TableOverride] ViewCabHOfs`, `ViewCabVOfs`, `ViewCabScale…`, `hasOwnCabinetView`), réglée en partie ou reprise, ce n'est plus un problème mais une information, « Cadrage réglé pour cette table » (`manualView`) : VPX la joue telle qu'elle a été enregistrée pour elle.
+  Sa correction, « Passer cette table au cadrage automatique », écrit `CabinetAutofitMode = 1` au lieu de retirer la clé : le retour à l'automatique tient d'une partie à l'autre.
+
+### Cadrage d'une table reprise
+
+Une table reprise d'une autre installation (PinUP Popper, PinballX, VPX seul) peut avoir dans son `.ini` le cadrage réglé pour elle sur l'ancienne borne : sous VPX 10.7 ou 10.8.0, la vue de borne retouchée et enregistrée pour cette table seule (`[TableOverride] ViewCab…`).
+VPX 10.8.1 ajoute le cadrage automatique, que Cyber Pinball impose pour le sens des tables : en cadrage automatique, ces valeurs ne sont plus lues, et la table arrivait « non réglée ».
+Le point de vue de VPX 10.8.1 enregistre le mode de cadrage avec la vue : un `.ini` qui a la vue sans `CabinetAutofitMode` vient d'un VPX plus ancien.
+Cyber Pinball y pose alors le cadrage manuel (`CabinetAutofitMode = 0`) pour cette table seule, **si le sens de la partie reste le bon** sur votre borne (`importedViewFinding`, [tableview.ts](../../packages/core/src/tableview.ts), d'après le bord des flippers que VPX dessinerait avec cette vue) ; sinon, rien n'est repris.
+C'est le constat « Cadrage réglé pour cette table » (`importedView`, information), réparé avant chaque partie (`PUP_PLAY_REPAIRS`) et à l'installation, donc aussi pour les tables déjà importées.
+Un cadrage déjà choisi pour la table (clé présente) n'est jamais touché ; « Régler l'affichage en partie » permet de le retoucher ou de passer au cadrage automatique.
+Test : [cadrage-repris.test.ts](../../packages/core/src/test/cadrage-repris.test.ts).

@@ -37,6 +37,15 @@ Rien n'est fermé ni modifié chez l'autre front-end.
 Avant chaque partie, le front-end vérifie de nouveau : un menu ouvert depuis donne « PinUP Popper est ouvert » (Start : jouer quand même · Exit : revenir au front-end).
 Un front-end accepté une fois n'est plus signalé jusqu'à la fermeture de Cyber Pinball, relances front-end ↔ assistant comprises (`CYBERPINBALL_AUTRES_MENUS_ACCEPTES`, transmis au nouveau processus).
 
+**Programmes ouverts pendant la partie.**
+Accepté au démarrage, un autre programme de borne peut encore ralentir les parties : il prend par moments le processeur, le disque ou le DMD réel (un joueur venu de PinUP Popper avait des arrêts de 1 à 2 s sur presque toutes les tables).
+À chaque partie, Cyber Pinball relève ceux qui sont ouverts (`GAME_INTRUDERS`, `programsDuringGame`, [coexistence.ts](../../packages/core/src/coexistence.ts)) : les front-ends ci-dessus, PinUP Player (`PinUpPlayer.exe`, le lecteur des PuP-Packs), dmdext et le serveur B2S hors de VPX (`B2SBackglassServerEXE.exe`).
+- **Par-dessus la partie**, une notification « Ouvert pendant la partie : PinUP Popper et dmdext », précisée « Il peut ralentir la partie : fermez-le », une fois par jour et par programme, même si vous aviez choisi « Continuer quand même » au démarrage.
+- **Avec la mesure de la partie** (`cadence-parties.json`, champ `others`) : le constat « La table rame sur cette borne » le rappelle en premier, comme une cause à écarter d'abord (voir [Santé de la borne](sante-de-la-borne.md#santé-de-la-borne)).
+- **Dans le journal** : « Partie (…) : ouverts pendant la partie : … ».
+
+Tests : [programmes-ouverts.test.ts](../../packages/core/src/test/programmes-ouverts.test.ts).
+
 **Front-ends installés** (`installedFrontends`, pour l'avertissement de l'orientation) : l'exécutable, ou le dossier `POPMedia` ou `Media`, aux emplacements par défaut (`vPinball\PinUPSystem`, `PinUPSystem`, `PinballX`, `PinballY`…, sur C:, D: et E:).
 
 **Front-ends simulés** : hors écran, seuls les front-ends simulés comptent : `CYBERPINBALL_AUTRES_MENUS` (ouverts, noms d'exécutables séparés par des virgules ; avec `CYBERPINBALL_AUTRES_MENUS_FICHIER`, fermés quand ce fichier disparaît) et `CYBERPINBALL_AUTRES_MENUS_INSTALLES` (installés).

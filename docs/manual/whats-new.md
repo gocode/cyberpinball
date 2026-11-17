@@ -15,9 +15,11 @@ It is not the list of fixes: that one stays in each version's notes ("Mise à jo
   Opening the screen marks them all seen; the "Nouveau" marker stays until you leave it.
   A new cabinet, or one updated from a version that did not have this screen, sees only those of the latest date as new.
   What has been seen is kept from one startup to the next (`<data>\nouveautes.json`); an unreadable file starts again from the initial state.
+  A line added afterwards lights the red dot again, even on a cabinet that had seen everything: so **levels**, released with 0.1.14 without their line, got it later, with a badge moment as the preview; their "Try it" opens "My level" (see [Levels and badges](levels-and-badges.md#levels-and-badges)).
 - **Its place**: at the top of the system menu as long as a new thing has not been seen or the latest is less than three weeks old; after that, only in the Cyber Pinball section, after "Mise à jour de Cyber Pinball" (Cyber Pinball update).
 - **What goes in**: one line per real new capability, never a fix, a speed gain or a setting.
   A feature improved over several versions has a single line, dated when it arrived.
   Lines are not added with every version, only when a feature deserves it: never more than four on the same day, nor more than twenty-four in all (the oldest go).
   The texts are written for the player, in French and English; the previews show Cyber Pinball's invented tables, never a real game.
+  Each release, pre-releases included, recalls the lines of its version and the latest line, and asks whether a feature deserves one; nothing is added automatically (`packages/core/src/news.ts`).
 - **Guest mode**: the screen is closed, like the whole system menu.

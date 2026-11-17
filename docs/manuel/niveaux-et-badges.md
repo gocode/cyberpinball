@@ -92,9 +92,16 @@ Les rivets et les étoiles brillent à la couleur de la rareté.
   Là, « +85 XP » ne s'affiche pas (il tomberait sur le titre de l'écran), et en borne la carte cède sa place le temps d'une notification.
   La roue dentée du Menu système, à leur droite, est une pastille ronde du même gabarit (voir [Menu système](menu-systeme-cinq-rubriques.md#menu-système--cinq-rubriques)).
 - **Mon niveau**, en tête de l'accueil Communauté : la barre et les XP restants, les XP de la semaine, les quatre derniers gains, les classements de la semaine en cours avec les XP prévus, les deux badges les plus proches ; puis « Mes badges », « Comment gagner des XP » et « Mon profil public ».
+- **Mes badges** : chaque ligne porte le dessin du badge, dans sa forme et sa rareté ([app/src/level-menu.ts](../../app/src/level-menu.ts), `Row.medal`).
+  Un badge reçu brille, avec un halo à la couleur de sa rareté et un reflet qui passe ; un badge pas encore reçu reste gris et éteint, sans reflet ; un secret pas encore reçu ne montre que son cadenas.
+  Les deux badges les plus proches, dans « Mon niveau », ont le même dessin.
+  Un badge pas encore reçu dit ce qu'il rapporte (« Jouer à 100 tables différentes · +1 000 XP à gagner »), badges secrets compris, après leur indice.
 - **Profil public** (voir [Amis : le réseau des bornes](amis-le-reseau-des-bornes.md#profil-public-et--jaime-)) : le palier et le niveau sous le pseudo ; puis, après le pays, le nombre d'amis (jamais leur liste) et les records, la ligne du niveau avec sa barre (« Flippeur · niveau 14 », « 350 / 750 XP ») et ses badges en médailles, les plus rares d'abord (douze au plus, « 23 badges sur 56 »).
+  Sous chaque médaille, son nom entier, sur deux lignes au besoin, jamais coupé au milieu d'un mot (« Ambassadeu / r »), puis les XP qu'elle rapporte (« +150 XP »), à la couleur de sa rareté.
   La carte d'une borne qui n'a pas encore cette version n'a pas de niveau : « Niveau pas encore connu ».
   Ses personnes invitées viennent ensuite (« A fait découvrir Cyber Pinball à 3 joueurs », avec leurs avatars).
+  Sur son propre profil, la ligne rappelle le barème : « +100 XP par personne invitée, +25 XP à chacun de ses paliers ; badge Ambassadeur dès la première ».
+  Tant qu'on n'a invité personne, la section dit « Faites découvrir Cyber Pinball à vos amis », avec ce même barème ; le profil d'un autre joueur n'a pas de section sans personne invitée.
   Ses **groupes publics** suivent, tels que cette borne les connaît par l'annuaire des groupes (`playerPublicGroups`, [packages/core/src/groups.ts](../../packages/core/src/groups.ts)) : nom, nombre de membres, table de la semaine ; Start ouvre le groupe, ou sa page de l'annuaire avec « Rejoindre ».
   Un groupe privé n'y paraît jamais, ni même leur nombre.
 - **Tableaux de scores** en réseau : une colonne « niveau » entre le nom et le score, une pastille à la couleur du palier, « ? » en pointillés pour un niveau invraisemblable.
@@ -107,6 +114,7 @@ Quand le niveau monte pendant le moment, des rayons à la couleur du palier s'aj
 Le badge arrive, un faisceau en suit le bord exact (cercle ou hexagone) avec une étincelle en tête, puis viennent le nom, la condition, la rareté, les XP qui défilent et la barre du niveau.
 Plusieurs badges passent l'un après l'autre (« 1 / 3 ») ; un bouton ferme le moment, sauf dans la première seconde et demie, et il se ferme seul huit secondes après la fin.
 Au bureau, le badge et le texte tiennent dans une colonne 9:16 au milieu de l'écran ; le fond couvre tout l'écran.
+Ses étoiles et ses poussières se répartissent sur toute la largeur, de part et d'autre du badge, et l'essaim se centre sur la colonne (test : [moment-fond.test.ts](../../packages/core/src/test/moment-fond.test.ts), pour chaque fond).
 
 Deux musiques synthétisées l'accompagnent (sons de l'interface, voir [Médias des jeux](medias-des-jeux.md#sons-de-linterface)) : « Tintement » pour un badge commun, « Fanfare » pour un rare, un épique ou un légendaire, et « Passage de niveau » quand le niveau monte.
 

@@ -335,6 +335,9 @@ Buttons in VPX's menu (`InputManager.cpp`), listed on the adjustment's loading s
 | Plunger | default value |
 | Exit | previous page, then close the menu; with the menu closed, quit the game |
 
+VPX only lights up "Save" after a change (`InGameUIPage::IsModified`): after Credit (cancel), it stays greyed out.
+The reminder says so, "Save greyed out: nothing changed; Launch turns it back on": the Launch button (default value) is enough to light it up again.
+
 | The role is… | Adjustable live | Note |
 | --- | --- | --- |
 | on a zone of a screen ("Windowed" window) | position and size | the case of the DMD placed on the backglass |

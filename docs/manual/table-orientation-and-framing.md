@@ -121,3 +121,15 @@ The "Point Of View" page therefore only offers what the framing reads again (acc
   Back on the details screen, it says "Affichage enregistré pour cette table" (Display saved for this table) if that file changed.
 - **Outside a game**, these keys can no longer be changed for a table: in "Réglages de cette table" (This table's settings), they carry the "En partie" (In game) badge and only the table's own value can be removed (`isLiveVisual`, `packages/core/src/vpx-settings.ts`); the table's essentials no longer list them.
 - **Doctor**: "Cadrage manuel imposé par la table" (Manual framing forced by the table) when the table's `.ini` (often shipped with it, set up for its author's screen) contains `CabinetAutofitMode = 0`; the repair removes the key, and the old file goes to the trash.
+  When that `.ini` also has its own cabinet view (`[TableOverride] ViewCabHOfs`, `ViewCabVOfs`, `ViewCabScale…`, `hasOwnCabinetView`), set in game or brought in, it is no longer a problem but information, "Framing set for this table" (`manualView`): VPX plays it as it was saved for it.
+  Its fix, "Switch this table to automatic framing", writes `CabinetAutofitMode = 1` instead of removing the key: going back to automatic lasts from one game to the next.
+
+### Framing of a table brought in
+
+A table brought in from another installation (PinUP Popper, PinballX, VPX alone) may have in its `.ini` the framing set for it on the old cabinet: under VPX 10.7 or 10.8.0, the cabinet view touched up and saved for that table alone (`[TableOverride] ViewCab…`).
+VPX 10.8.1 adds automatic framing, which Cyber Pinball enforces for the direction of tables: in automatic framing, those values are no longer read, and the table arrived "not set up".
+VPX 10.8.1's point of view saves the framing mode with the view: an `.ini` that has the view without `CabinetAutofitMode` comes from an older VPX.
+Cyber Pinball then sets manual framing (`CabinetAutofitMode = 0`) there for that table alone, **as long as the game still faces the right way** on your cabinet (`importedViewFinding`, [tableview.ts](../../packages/core/src/tableview.ts), from the flipper edge VPX would draw with that view); otherwise, nothing is kept.
+This is the finding "Framing set for this table" (`importedView`, information), repaired before each game (`PUP_PLAY_REPAIRS`) and at installation, so also for tables already imported.
+A framing already chosen for the table (key present) is never touched; "Adjust display in game" lets you touch it up or switch to automatic framing.
+Test: [cadrage-repris.test.ts](../../packages/core/src/test/cadrage-repris.test.ts).

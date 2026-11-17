@@ -92,9 +92,16 @@ Rivets and stars glow in the rarity colour.
   There, "+85 XP" does not show (it would fall on the screen's title), and on a cabinet the card gives way while a notification is shown.
   The System menu gear, on their right, is a round pill of the same size (see [System menu](system-menu-five-sections.md#system-menu-five-sections)).
 - **My level**, first in the Community home: the bar and XP to go, this week's XP, the four latest gains, the current week's rankings with the expected XP, the two closest badges; then "My badges", "How to earn XP" and "My public profile".
+- **My badges**: each row carries the badge's drawing, in its shape and rarity ([app/src/level-menu.ts](../../app/src/level-menu.ts), `Row.medal`).
+  An earned badge shines, with a halo in its rarity colour and a passing gleam; a badge not earned yet stays grey and unlit, without a gleam; a secret not earned yet shows only its padlock.
+  The two closest badges, in "My level", have the same drawing.
+  A badge not earned yet says what it is worth ("Play 100 different tables · +1,000 XP to earn"), secret badges included, after their hint.
 - **Public profile** (see [Friends: the cabinet network](friends-the-cabinet-network.md#public-profile-and-likes)): the tier and level under the name; then, after the country, the number of friends (never the list) and the high scores, the level line with its bar ("Flippeur · niveau 14", "350 / 750 XP") and their badges as medals, the rarest first (twelve at most, "23 badges sur 56", 23 badges out of 56).
+  Under each medal, its full name, on two lines if needed, never cut in the middle of a word ("Ambassado / r"), then the XP it is worth ("+150 XP"), in its rarity colour.
   The card of a cabinet that does not have this version yet has no level: "Niveau pas encore connu" (Level not known yet).
   Their invited players come next ("A fait découvrir Cyber Pinball à 3 joueurs", Introduced 3 players to Cyber Pinball, with their avatars).
+  On your own profile, the row recalls the scale: "+100 XP per invited player, +25 XP for each of their tiers; Ambassador badge from the first one".
+  As long as you have invited no one, the section says "Introduce your friends to Cyber Pinball", with the same scale; another player's profile has no section without invited players.
   Their **public groups** follow, as this cabinet knows them from the group directory (`playerPublicGroups`, [packages/core/src/groups.ts](../../packages/core/src/groups.ts)): name, number of members, table of the week; Start opens the group, or its directory page with "Join".
   A private group never shows there, not even their number.
 - **Network score tables**: a "level" column between the name and the score, a pill in the tier colour, a dashed "?" for an implausible level.
@@ -107,6 +114,7 @@ When the level goes up during the moment, rays in the tier colour join in and "L
 The badge arrives, a beam follows its exact edge (circle or hexagon) with a spark at its head, then come the name, the condition, the rarity, the XP counting up and the level bar.
 Several badges play one after another ("1 / 3"); any button closes the moment, except during the first second and a half, and it closes by itself eight seconds after the end.
 On a desktop, the badge and text sit in a 9:16 column in the middle of the screen; the background covers the whole screen.
+Its stars and dust spread over the whole width, on both sides of the badge, and the swarm centres on the column (test: [moment-fond.test.ts](../../packages/core/src/test/moment-fond.test.ts), for each background).
 
 Two synthesized tunes go with it (interface sounds, see [Game media](game-media.md#interface-sounds)): "Chime" for a common badge, "Fanfare" for a rare, epic or legendary one, and "Level up" when the level rises.
 

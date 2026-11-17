@@ -335,6 +335,9 @@ Boutons du menu de VPX (`InputManager.cpp`), rappelés sur l'écran de chargemen
 | Lanceur | valeur par défaut |
 | Exit | page précédente, puis fermer le menu ; menu fermé, quitter la partie |
 
+VPX n'allume « Enregistrer » qu'après un changement (`InGameUIPage::IsModified`) : après Crédit (annuler), il reste grisé.
+L'aide-mémoire le dit, « Enregistrer grisé : rien n'a changé ; Lancer le rallume » : le Lanceur (valeur par défaut) suffit à le rallumer.
+
 | Le rôle est… | Réglable en direct | Remarque |
 | --- | --- | --- |
 | sur une zone d'un écran (fenêtre « Windowed ») | position et taille | le cas du DMD posé sur le fronton |

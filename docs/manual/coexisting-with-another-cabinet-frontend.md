@@ -37,6 +37,15 @@ Nothing is closed or changed in the other frontend.
 Before each game, the menu checks again: a frontend opened in the meantime gives "PinUP Popper est ouvert" (Start: play anyway · Exit: back to the menu).
 A frontend accepted once is no longer reported until Cyber Pinball closes, menu ↔ wizard relaunches included (`CYBERPINBALL_AUTRES_MENUS_ACCEPTES`, passed on to the new process).
 
+**Programs open during the game.**
+Accepted at startup, another cabinet program can still slow games down: at times it takes the processor, the disk or the real DMD (a player coming from PinUP Popper had freezes of 1 to 2 s on almost every table).
+At each game, Cyber Pinball notes those that are open (`GAME_INTRUDERS`, `programsDuringGame`, [coexistence.ts](../../packages/core/src/coexistence.ts)): the frontends above, PinUP Player (`PinUpPlayer.exe`, the PuP-Pack player), dmdext and the B2S server outside VPX (`B2SBackglassServerEXE.exe`).
+- **Over the game**, a notification "Open during the game: PinUP Popper and dmdext", detailed "It may slow the game down: close it", once a day and per program, even if you chose "Continue anyway" at startup.
+- **With the game's measurement** (`cadence-parties.json`, field `others`): the finding "The table is sluggish on this cabinet" mentions it first, as a cause to rule out first (see [Cabinet health](cabinet-health.md#cabinet-health)).
+- **In the log**: "Partie (…) : ouverts pendant la partie : …".
+
+Tests: [programmes-ouverts.test.ts](../../packages/core/src/test/programmes-ouverts.test.ts).
+
 **Installed frontends** (`installedFrontends`, for the orientation warning): the executable, or the `POPMedia` or `Media` folder, in the default locations (`vPinball\PinUPSystem`, `PinUPSystem`, `PinballX`, `PinballY`…, on C:, D: and E:).
 
 **Simulated frontends**: offscreen, only simulated frontends count: `CYBERPINBALL_AUTRES_MENUS` (running, executable names separated by commas; with `CYBERPINBALL_AUTRES_MENUS_FICHIER`, closed when that file disappears) and `CYBERPINBALL_AUTRES_MENUS_INSTALLES` (installed).
