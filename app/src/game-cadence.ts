@@ -33,7 +33,7 @@ function linesSince(file: string, from: number): string[] {
 }
 
 /** Après la partie : la cadence au journal, et dans le relevé de la table. */
-export function noteGameCadence(opts: { logsDir: string; tableFile: string; tableId: string; vpxLog: string; from: number; vr: boolean }): void {
+export function noteGameCadence(opts: { logsDir: string; tableFile: string; tableId: string; vpxLog: string; from: number; vr: boolean; others?: string[] }): void {
   const lines = linesSince(opts.vpxLog, opts.from);
   const cadence = readVpxCadence(lines);
   if (!cadence) {
@@ -41,9 +41,9 @@ export function noteGameCadence(opts: { logsDir: string; tableFile: string; tabl
     return;
   }
   const target = readVpxTargetFps(lines);
-  console.log(cadenceJournal(opts.tableId, cadence, target));
+  console.log(cadenceJournal(opts.tableId, cadence, target, opts.others));
   try {
-    recordGameCadence(opts.logsDir, opts.tableFile, cadence, target, new Date(), opts.vr);
+    recordGameCadence(opts.logsDir, opts.tableFile, cadence, target, new Date(), opts.vr, opts.others);
   } catch (error) {
     console.warn(`Cadence de la partie (${opts.tableId}) : relevé pas enregistré (${(error as Error).message}).`); // i18n-ignore : journal
   }

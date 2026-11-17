@@ -3,7 +3,7 @@
 // installation ramaient sur une borne et pas sur une autre, sans que rien ne le dise : le joueur l'apprend désormais
 // de Cyber Pinball, avec les chiffres ; le journal de VPX (donc chaque rapport) garde l'heure de chaque à-coup.
 
-import { formatDateTime, formatNumber, t, tn } from './i18n';
+import { formatDateTime, formatList, formatNumber, t, tn } from './i18n';
 import type { Finding } from './doctor';
 import { tableCadence, type TableCadenceEntry } from './vpxcadence';
 
@@ -23,6 +23,11 @@ export function slowTableFinding(logsDir: string | undefined, tableFile: string)
   ];
   if (last.worst10s !== undefined && last.worst10s < last.fps) parts.push(t('Au pire moment : {worst} images par seconde.', { worst: num(last.worst10s) }));
   if (last.stalls) parts.push(tn(last.stalls, '{n} arrêt de l’image d’au moins un dixième de seconde (le plus long : {max} ms).', '{n} arrêts de l’image d’au moins un dixième de seconde (le plus long : {max} ms).', { n: last.stalls, max: last.max }));
+  // Autres programmes de borne ouverts pendant cette partie (coexistence.ts, programsDuringGame) : une cause à écarter d'abord.
+  if (last.others?.length)
+    parts.push(
+      tn(last.others.length, '{names} était ouvert pendant la partie : il peut prendre le processeur, le disque ou le DMD réel par moments. Fermez-le, ou retirez-le du démarrage de Windows.', '{names} étaient ouverts pendant la partie : ils peuvent prendre le processeur, le disque ou le DMD réel par moments. Fermez-les, ou retirez-les du démarrage de Windows.', { names: formatList(last.others) }),
+    );
   parts.push(t('Chaque partie est mesurée : ce constat disparaît dès qu’une partie tient la cadence.'));
   return {
     code: 'slowTable',

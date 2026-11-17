@@ -11,6 +11,8 @@ son interface).
 
 ## 0.1.15
 
+- Un autre programme de borne encore ouvert pendant la partie (PinUP Popper, son lecteur de PuP-Packs, dmdext…) est signalé par-dessus la partie, même si vous aviez choisi de continuer au démarrage ; il est noté avec la mesure de la partie et rappelé dans « La table rame sur cette borne ».
+- Réglage de l'affichage en partie : l'aide-mémoire dit pourquoi « Enregistrer » est grisé (rien n'a changé) et que Lancer le rallume.
 - Badge débloqué et niveau gagné : au bureau, les étoiles et les poussières du fond se répartissent sur tout l'écran, de part et d'autre du badge, au lieu de se tasser sur la gauche.
 - Catalogue : l'édition d'une version (« Galaxy Edition » de JP's Space Cadet, par exemple) s'affiche devant ses auteurs et se cherche. « Space Cadet Galaxy Edition » trouve le jeu et met cette version en tête, et un fichier qui cite l'édition est reconnu comme elle. La note de VPS d'une version (« Pup Pack installation is REQUIRED ») s'affiche aussi.
 - Médecin : un PuP-Pack fait pour une autre version du jeu est signalé (« PuP-Pack fait pour une autre version de la table »). Quand le script de la table ne pilote pas PuP, le pack n'affiche rien sans des événements que ce script n'envoie jamais, et le fronton reste noir : le constat le dit, avec les numéros attendus et ceux que le script envoie.

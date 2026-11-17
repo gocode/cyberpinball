@@ -31,6 +31,25 @@ export const OTHER_FRONTENDS: OtherFrontend[] = [
   { id: 'pinbally', name: 'PinballY', processes: ['PinballY.exe'] },
 ];
 
+/**
+ * Programmes d'une autre installation de borne qui, ouverts pendant une partie, peuvent la ralentir ou lui prendre le
+ * DMD réel : les menus, le lecteur des PuP-Packs de PinUP Popper, dmdext, le serveur B2S hors de VPX. Relevés à chaque
+ * partie, même acceptés au démarrage (17/11/2026 : joueur venu de PinUP Popper, arrêts de 1 à 2 s sur presque toutes
+ * les tables) : écrits avec la cadence de la partie, dits par-dessus VPX et dans le constat « La table rame ».
+ */
+export const GAME_INTRUDERS: { name: string; processes: string[] }[] = [
+  ...OTHER_FRONTENDS.map((f) => ({ name: f.name, processes: f.processes })),
+  { name: 'PinUP Player', processes: ['PinUpPlayer.exe'] },
+  { name: 'dmdext', processes: ['dmdext.exe'] },
+  { name: 'B2S Server', processes: ['B2SBackglassServerEXE.exe'] },
+];
+
+/** Les programmes de GAME_INTRUDERS ouverts, d'après les noms des processus en cours (noms affichés, sans doublon). */
+export function programsDuringGame(processNames: string[]): string[] {
+  const open = new Set(processNames.map((n) => n.toLowerCase()));
+  return GAME_INTRUDERS.filter((p) => p.processes.some((x) => open.has(x.toLowerCase()))).map((p) => p.name);
+}
+
 /** Menus ouverts, d'après les noms des processus en cours. */
 export function runningFrontends(processNames: string[]): OtherFrontend[] {
   const open = new Set(processNames.map((n) => n.toLowerCase()));

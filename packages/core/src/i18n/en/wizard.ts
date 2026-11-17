@@ -215,6 +215,7 @@ export const messages: Record<string, string> = {
   Aligner: 'Align',
   Aimantation: 'Snapping',
   'Annuler les changements': 'Discard changes',
+  'Enregistrer grisé : rien n’a changé ; Lancer le rallume': 'Save greyed out: nothing changed; Launch turns it back on',
   Terminer: 'Done',
   'En haut de l’écran': 'Top of the screen',
   'En bas de l’écran': 'Bottom of the screen',

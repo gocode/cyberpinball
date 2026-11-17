@@ -32,6 +32,10 @@ export const messages: Record<string, string> = {
   '{n} personne invitée': '{n} invited player',
   '{n} personnes invitées': '{n} invited players',
   '{n} idée arrivée': '{n} idea shipped',
+  'Ouvert pendant la partie : {names}': 'Open during the game: {names}',
+  'Il peut ralentir la partie : fermez-le': 'It may slow the game down: close it',
+  '{n} programme ouvert': '{n} program open',
+  '{n} programmes ouverts': '{n} programs open',
   '{n} idées arrivées': '{n} ideas shipped',
   // « Qui vous a fait découvrir Cyber Pinball ? »
   'Qui vous a fait découvrir Cyber Pinball ?': 'Who introduced you to Cyber Pinball?',

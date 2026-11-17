@@ -57,6 +57,10 @@ export const messages: Record<string, string> = {
   'Au pire moment : {worst} images par seconde.': 'At its worst: {worst} frames per second.',
   '{n} arrêt de l’image d’au moins un dixième de seconde (le plus long : {max} ms).': '{n} freeze of the picture of at least a tenth of a second (longest: {max} ms).',
   '{n} arrêts de l’image d’au moins un dixième de seconde (le plus long : {max} ms).': '{n} freezes of the picture of at least a tenth of a second (longest: {max} ms).',
+  '{names} était ouvert pendant la partie : il peut prendre le processeur, le disque ou le DMD réel par moments. Fermez-le, ou retirez-le du démarrage de Windows.':
+    '{names} was open during the game: it may take the processor, the disk or the real DMD at times. Close it, or remove it from Windows startup.',
+  '{names} étaient ouverts pendant la partie : ils peuvent prendre le processeur, le disque ou le DMD réel par moments. Fermez-les, ou retirez-les du démarrage de Windows.':
+    '{names} were open during the game: they may take the processor, the disk or the real DMD at times. Close them, or remove them from Windows startup.',
   'Chaque partie est mesurée : ce constat disparaît dès qu’une partie tient la cadence.': 'Every game is measured: this notice goes away as soon as a game keeps up.',
   'VPX a planté sur cette table le {date} ({reason}). {files} : {size}.': 'VPX crashed on this table on {date} ({reason}). {files}: {size}.',
   'VPX a planté sur cette table le {date}. {files} : {size}.': 'VPX crashed on this table on {date}. {files}: {size}.',

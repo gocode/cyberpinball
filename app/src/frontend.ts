@@ -192,6 +192,7 @@ import {
   type MediaTarget,
   type MediaType,
   formatList,
+  programsDuringGame,
   frontendNames,
   t,
   tLater,
@@ -285,7 +286,7 @@ import {
   jukeboxRoutes,
   type JukeboxAudioRoute,
 } from '@cyberpinball/core';
-import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, visibleWindowsOf } from '@cyberpinball/win-displays';
+import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, runningProcessNames, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
 import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, whenReadyToShow, windowRect } from './offscreen';
@@ -4893,6 +4894,13 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const vrLogFrom = vrGame && fs.existsSync(vpxLog) ? fs.statSync(vpxLog).size : 0;
   // Cadence des images de la partie (game-cadence.ts) : le bilan que le plugin du DMD écrira, à partir d'ici.
   const cadenceLogFrom = simulated === undefined ? vpxLogSize(vpxLog) : undefined;
+  // Autres programmes de borne ouverts pendant la partie (PinUP Popper, dmdext…), même acceptés au démarrage : dits
+  // par-dessus VPX (une fois par jour et par programme), et écrits avec la cadence de la partie (coexistence.ts).
+  const openDuringGame = simulated === undefined ? programsDuringGame(runningProcessNames()) : [];
+  if (openDuringGame.length) {
+    console.log(`Partie (${table.id}) : ouverts pendant la partie : ${openDuringGame.join(', ')}.`); // i18n-ignore : journal
+    menuNotices.push([{ kind: 'program-open' as const, key: `program|${openDuringGame.join('|')}`, at: Date.now(), subject: formatList(openDuringGame) }]);
+  }
   let stopCentering: (() => void) | undefined;
   // La fenêtre de jeu est l'aperçu de la VR (launcher.ts) : la partie est dans le casque.
   const onVr = () => {
@@ -5020,7 +5028,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   vrFront.headsetExitNote = undefined;
   vrFront.vrWearHint = undefined;
   if (vision3dSource) noteVision3dGame(vision3dLog, vision3dLogFrom);
-  if (cadenceLogFrom !== undefined) noteGameCadence({ logsDir: path.join(loc.dataDir, 'logs'), tableFile: played.file, tableId: table.id, vpxLog, from: cadenceLogFrom, vr: playedVr });
+  if (cadenceLogFrom !== undefined) noteGameCadence({ logsDir: path.join(loc.dataDir, 'logs'), tableFile: played.file, tableId: table.id, vpxLog, from: cadenceLogFrom, vr: playedVr, others: openDuringGame });
   if (playedVr && vrGame) vrFront.noteVrMeasures();
   // Gardé allumé deux minutes : la partie suivante a le joueur déjà repéré (partie dans le casque : éteint).
   if (vision3dSource && !playedVr) headTracker.release();

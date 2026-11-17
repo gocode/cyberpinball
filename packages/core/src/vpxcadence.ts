@@ -150,6 +150,8 @@ export interface TableCadenceEntry {
   stutters: boolean;
   /** Partie dans le casque. */
   vr?: boolean;
+  /** Autres programmes de borne ouverts pendant la partie (programsDuringGame, coexistence.ts). */
+  others?: string[];
 }
 
 interface CadenceLog {
@@ -176,7 +178,7 @@ export function tableCadence(logsDir: string, file: string): TableCadenceEntry[]
 }
 
 /** Range le bilan d'une partie ; undefined (rien d'écrit) quand la partie était trop courte pour juger. */
-export function recordGameCadence(logsDir: string, file: string, c: VpxCadence, targetFps: number | undefined, at = new Date(), vr = false): TableCadenceEntry | undefined {
+export function recordGameCadence(logsDir: string, file: string, c: VpxCadence, targetFps: number | undefined, at = new Date(), vr = false, others: string[] = []): TableCadenceEntry | undefined {
   const verdict = cadenceVerdict(c, targetFps ?? 60);
   if (!verdict) return undefined;
   const entry: TableCadenceEntry = {
@@ -193,13 +195,14 @@ export function recordGameCadence(logsDir: string, file: string, c: VpxCadence, 
     slow: verdict.slow,
     stutters: verdict.stutters,
     ...(vr ? { vr: true } : {}),
+    ...(others.length ? { others } : {}),
   };
-  const others = readCadenceLog(logsDir).filter((g) => !sameFile(g.file, file));
+  const rest = readCadenceLog(logsDir).filter((g) => !sameFile(g.file, file));
   const mine = [entry, ...tableCadence(logsDir, file)].slice(0, CADENCE_PER_TABLE);
   // Les tables jouées le plus récemment sont gardées.
   const kept = new Set<string>();
-  for (const g of [...others].sort((a, b) => b.at.localeCompare(a.at))) if (kept.size < CADENCE_TABLES - 1) kept.add(g.file.toLowerCase());
-  const games = [...mine, ...others.filter((g) => kept.has(g.file.toLowerCase()))];
+  for (const g of [...rest].sort((a, b) => b.at.localeCompare(a.at))) if (kept.size < CADENCE_TABLES - 1) kept.add(g.file.toLowerCase());
+  const games = [...mine, ...rest.filter((g) => kept.has(g.file.toLowerCase()))];
   fs.mkdirSync(logsDir, { recursive: true });
   writeFileAtomic(path.join(logsDir, CADENCE_FILE), JSON.stringify({ version: 1, games } satisfies CadenceLog, null, 1) + '\n');
   return entry;
@@ -208,7 +211,7 @@ export function recordGameCadence(logsDir: string, file: string, c: VpxCadence, 
 const fr = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 
 /** La ligne du journal de la borne (en français, pour le diagnostic à distance). */
-export function cadenceJournal(table: string, c: VpxCadence, targetFps: number | undefined): string {
+export function cadenceJournal(table: string, c: VpxCadence, targetFps: number | undefined, others: readonly string[] = []): string {
   const verdict = cadenceVerdict(c, targetFps ?? 60);
   const judged = !verdict ? 'trop courte pour juger' : verdict.slow ? (verdict.stutters ? 'RAME, avec des à-coups' : 'RAME') : verdict.stutters ? 'À-COUPS' : 'tenue'; // i18n-ignore : journal
   const target = targetFps ? `${fr(targetFps)} visées` : 'une cible inconnue'; // i18n-ignore : journal
@@ -217,5 +220,6 @@ export function cadenceJournal(table: string, c: VpxCadence, targetFps: number |
   const head = `Cadence de la partie (${table}) : ${judged} — ${fr(c.fps)} images/s pour ${target}, `; // i18n-ignore : journal
   const body = `médiane ${c.p50} ms, 99e centile ${c.p99} ms, pire écart ${c.max} ms, ${fr(c.late)} % d'images en retard, ${c.stalls} à-coup(s)`; // i18n-ignore : journal
   const mem = c.memMB !== undefined ? `, mémoire de VPX ${c.memMB} Mo` : ''; // i18n-ignore : journal
-  return `${head}${body}${worst}${mem} ; ${fr(c.durationS)} s mesurées${step}.`; // i18n-ignore : journal
+  const open = others.length ? ` ; ouverts pendant la partie : ${others.join(', ')}` : ''; // i18n-ignore : journal
+  return `${head}${body}${worst}${mem} ; ${fr(c.durationS)} s mesurées${step}${open}.`; // i18n-ignore : journal
 }

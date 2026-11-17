@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.15
 
+- Another cabinet program still open during the game (PinUP Popper, its PuP-Pack player, dmdext…) is now shown over the game, even if you chose to carry on at startup; it is noted with the game's measurement and mentioned in “The table is sluggish on this cabinet”.
+- Adjusting the display in game: the reminder says why “Save” is greyed out (nothing changed) and that Launch turns it back on.
 - Badge unlocked and level gained: on the desktop, the stars and dust of the background spread across the whole screen, on both sides of the badge, instead of crowding on the left.
 - Catalog: a version's edition (JP's Space Cadet's "Galaxy Edition", for example) is shown before its authors and can be searched. "Space Cadet Galaxy Edition" finds the game and puts that version first, and a file that names the edition is recognised as it. A version's VPS note ("Pup Pack installation is REQUIRED") is shown too.
 - Doctor: a PuP-Pack made for another version of the game is reported ("PuP-Pack made for another version of the table"). When the table script doesn't drive PuP, the pack shows nothing without events this script never sends, and the backglass stays black: the finding says so, with the expected numbers and the ones the script sends.

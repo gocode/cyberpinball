@@ -895,6 +895,9 @@ export function displayKeys(buttons: CabinetButtons | undefined): [string, strin
     [t('Changer de ligne'), `${label('leftMagna')} / ${label('rightMagna')}`],
     [t('Régler'), `${label('leftFlipper')} / ${label('rightFlipper')}`],
     [t('Enregistrer : cette table ou toutes'), label('start')],
+    // VPX n'allume « Enregistrer » qu'après un changement (InGameUIPage::IsModified) : après Annuler, il reste gris, et
+    // Lancer (valeur par défaut) suffit à le rallumer (geste trouvé par un joueur, 17/11/2026).
+    [t('Enregistrer grisé : rien n’a changé ; Lancer le rallume'), label('plunger')],
     [t('Annuler les changements'), label('credit')],
     [t('Valeur par défaut'), label('plunger')],
     [t('Page précédente, puis fermer'), label('exit')],

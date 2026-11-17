@@ -45,6 +45,7 @@ export type NoticeKind =
   | 'player-like'
   | 'player-invited'
   | 'idea-shipped'
+  | 'program-open'
   | 'room-mention'
   | 'room-line'
   | 'room-report'
@@ -164,6 +165,10 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   // Une personne que j'ai invitée a fini sa première partie (invitations.ts) : un vrai moment, avec son son.
   'player-invited': { priority: 12, ttlMs: 24 * 60 * MIN, quietMs: MIN, icon: 'friend-add', tone: 'ok', act: { type: 'my-profile' }, sound: 'news' },
   // Une de mes propositions est passée « fait » (feedback.ts, contributions).
+  // Un autre programme de borne ouvert pendant la partie (PinUP Popper, dmdext… : coexistence.ts, programsDuringGame),
+  // même accepté au démarrage : il peut prendre le processeur, le disque ou le DMD réel par moments (17/11/2026, joueur venu
+  // de PinUP Popper : arrêts de 1 à 2 s sur presque toutes les tables). Par-dessus VPX, une fois par jour et par programme.
+  'program-open': { priority: 6, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'alert', tone: 'warning', act: { type: 'activity' }, away: true, journal: false },
   'idea-shipped': { priority: 12, ttlMs: 24 * 60 * MIN, quietMs: MIN, icon: 'sparkle', tone: 'ok', act: { type: 'my-profile' }, sound: 'news' },
   'friend-request': { priority: 10, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friend-request', tone: 'warning', act: { type: 'friend-requests' } },
   'friend-accepted': { priority: 11, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friends', tone: 'ok', act: { type: 'friends' } },
@@ -423,6 +428,9 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
     case 'player-invited':
       // `who` : la personne invitée.
       return fit(one ? { title: t('{name}, que vous avez invité, vient de finir sa première partie', { name: who(one) }), detail: t('Elle compte parmi vos personnes invitées') } : { title: tn(n, '{n} personne invitée a fini sa première partie', '{n} personnes invitées ont fini leur première partie'), detail: names() });
+    case 'program-open':
+      // `subject` : les programmes ouverts (« PinUP Popper et dmdext »).
+      return fit({ title: t('Ouvert pendant la partie : {names}', { names: events[events.length - 1]!.subject ?? '' }), detail: t('Il peut ralentir la partie : fermez-le') });
     case 'idea-shipped':
       // `subject` : le titre de la proposition.
       return fit(one ? { title: t('Votre idée est arrivée dans Cyber Pinball'), ...(one.subject ? { detail: subject(one) } : {}) } : { title: tn(n, '{n} de vos idées est arrivée dans Cyber Pinball', '{n} de vos idées sont arrivées dans Cyber Pinball'), detail: subjectList(events.map(subject)) });
@@ -472,6 +480,8 @@ function digestPart(kind: NoticeKind, n: number): string {
       return tn(n, '{n} « J’aime »', '{n} « J’aime »');
     case 'player-invited':
       return tn(n, '{n} personne invitée', '{n} personnes invitées');
+    case 'program-open':
+      return tn(n, '{n} programme ouvert', '{n} programmes ouverts');
     case 'idea-shipped':
       return tn(n, '{n} idée arrivée', '{n} idées arrivées');
     case 'room-mention':
