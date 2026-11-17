@@ -1,4 +1,4 @@
-// Règles du contrôle de publication (scripts/audit-publication.mjs), lancées par npm test :
+// Règles du contrôle de publication (scripts/audit-publication.mjs), testées par npm test :
 // ce qui est interne, ce qui est public, et ce qu'un fichier publié n'a pas le droit de citer.
 // Le 06/11/2026, des scripts rangés dans docs/ étaient partis sur GitHub sans que rien ne les
 // arrête : tout fichier hors des emplacements publics déclarés est désormais refusé.

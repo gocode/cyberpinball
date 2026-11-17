@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { fetchResumable, ResumableError, t } from '@cyberpinball/core';
+import { fetchResumable, renameWithRetry, ResumableError, t } from '@cyberpinball/core';
 import { sha256OfFile } from './fsutil';
 import type { Component } from './manifest';
 
@@ -34,6 +34,6 @@ export async function downloadComponent(component: Component, downloadsDir: stri
     fs.rmSync(part);
     throw new Error(t('Empreinte SHA-256 incorrecte pour {name} : attendu {expected}, obtenu {actual}. Fichier supprimé.', { name: component.name, expected: component.sha256, actual }));
   }
-  fs.renameSync(part, file);
+  renameWithRetry(part, file);
   return file;
 }

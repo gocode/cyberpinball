@@ -16,6 +16,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { CONTENT_LABELS, clearItem, forgetStray, isPartialDownload, linkHost, loadWaitList, NEED_LABELS, type WaitList } from './acquisition';
 import { formatSize, moveToTrash, samePath, trashDirFor } from './fileops';
 import { formatDate, readStoredText, say, t, tn, type LaterText, type StoredText } from './i18n';
@@ -94,7 +95,7 @@ export function noteDownloadUse(downloadsDir: string, file: string, text: LaterT
   const notes = readNotes(downloadsDir).filter((n) => fs.existsSync(n.file));
   notes.push({ file: path.resolve(file), at: now.toISOString(), text });
   fs.mkdirSync(downloadsDir, { recursive: true });
-  fs.writeFileSync(downloadJournalFile(downloadsDir), `${JSON.stringify({ notes: notes.slice(-500) }, null, 2)}\n`, 'utf8');
+  writeFileAtomic(downloadJournalFile(downloadsDir), `${JSON.stringify({ notes: notes.slice(-500) }, null, 2)}\n`);
 }
 
 /** Le fichier est-il dans la zone de téléchargements (et pas dans un dossier interne) ? */

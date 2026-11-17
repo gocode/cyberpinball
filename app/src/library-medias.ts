@@ -96,6 +96,13 @@ export interface MediasContext {
   sheet(table: TableEntry, flash?: string): void;
   /** Retour au menu des tables. */
   leave(): void;
+  /**
+   * Lecture du disque d'un écran (médias de la table, dossier d'import, dimensions) : faite à son
+   * ouverture, gardée pour les touches qui suivent (kept de library.ts). `key` la nomme dans l'écran.
+   */
+  kept<T>(key: string, read: () => T): T;
+  /** Le disque a changé (image du fronton extraite) : l'écran affiché relit ce qu'il montre. */
+  changed(): void;
   /** Sélecteur de fichiers de Cyber Pinball (file-picker.ts) ; undefined à l'abandon. */
   pick?(request: Omit<PickRequest, 'done' | 'cancel'>): Promise<string[] | undefined>;
   /** « Chercher sur le web… » pour les médias de cette table (catalog.ts) ; `back` redessine l'écran. */
@@ -278,7 +285,8 @@ export function createMedias(ctx: MediasContext) {
 
   const root = () => ctx.layout()?.root ?? '';
   const tableOf = (s: Session) => ctx.find(s.file);
-  const cabinet = () => loadCabinet(host.dataDir);
+  // Ce que les écrans des médias lisent du disque : à leur ouverture, gardé pour les touches qui suivent (ctx.kept).
+  const cabinet = () => ctx.kept('borne', () => loadCabinet(host.dataDir));
   const dims = (s: Session) => (s.dims ??= new MediaDimensionCache(root() ? MediaDimensionCache.fileFor(root()) : undefined));
 
   function b2sImage(s: Session) {
@@ -292,7 +300,7 @@ export function createMedias(ctx: MediasContext) {
     if (!name) return (s.b2sDone = Promise.resolve(undefined));
     return (s.b2sDone = b2sImages(path.join(table.folder, name), b2sCacheDir(host.dataDir)).then((images) => {
       s.b2s = images;
-      if (session === s) host.broadcast();
+      if (session === s) ctx.changed();
       return images;
     }));
   }
@@ -315,7 +323,7 @@ export function createMedias(ctx: MediasContext) {
     return out;
   }
 
-  const current = (s: Session, table: TableEntry, type: MediaType) => ownMediaPages(table, root(), type, { b2sImage: b2sImage(s) });
+  const current = (s: Session, table: TableEntry, type: MediaType) => ctx.kept(`actuels:${type}:${table.file}`, () => ownMediaPages(table, root(), type, { b2sImage: b2sImage(s) }));
 
   /** Musique tirée de la ROM (rom-music.ts), repli de la musique du jeu ; undefined sans le service (essais). */
   const romAudio = () => {
@@ -324,14 +332,17 @@ export function createMedias(ctx: MediasContext) {
   };
 
   function resolved(s: Session, table: TableEntry, type: MediaType): ResolvedMedia {
-    return resolveMedia(table, root(), type, {
-      b2sImage: b2sImage(s),
-      romAudio: romAudio(),
-      cabinet: cabinet(),
-      dimensions: dims(s),
-      measure: true,
-      memory: nextMemory(mediaMemory(table.info), s.draft),
-    });
+    const memory = nextMemory(mediaMemory(table.info), s.draft);
+    return ctx.kept(`resolved:${type}:${table.file}:${JSON.stringify(memory)}`, () =>
+      resolveMedia(table, root(), type, {
+        b2sImage: b2sImage(s),
+        romAudio: romAudio(),
+        cabinet: cabinet(),
+        dimensions: dims(s),
+        measure: true,
+        memory,
+      }),
+    );
   }
 
   /** Ce qui serait montré si le jeu n'avait plus son propre fichier de ce type (après « Mettre à la corbeille »). */
@@ -372,15 +383,21 @@ export function createMedias(ctx: MediasContext) {
     if (!file) return { kind: 'fallback', rotation: 0, text: fallbackText };
     const kind = mediaKind(file);
     if (kind === 'audio') return { kind: 'audio', rotation: 0, text: '♪' };
-    if (!kind || !isAcceptedFormat(type, file) || !fs.existsSync(file)) return { kind: 'fallback', rotation: 0, text: t('Format illisible') };
+    if (!kind || !isAcceptedFormat(type, file) || !ctx.kept(`existe:${file}`, () => fs.existsSync(file))) return { kind: 'fallback', rotation: 0, text: t('Format illisible') };
     // Par le protocole des médias, comme le menu : la CSP de la fenêtre n'autorise rien d'autre.
-    allowPreview(file);
-    const url = mediaUrl(file);
-    return { kind, url: kind === 'video' ? `${url}#t=0.5` : url, rotation: previewRotation(s, table, type, dims(s).get(file)) };
+    const url = ctx.kept(`adresse:${file}`, () => {
+      allowPreview(file);
+      return mediaUrl(file);
+    });
+    return { kind, url: kind === 'video' ? `${url}#t=0.5` : url, rotation: previewRotation(s, table, type, ctx.kept(`dimensions:${file}`, () => dims(s).get(file))) };
   }
 
   /** « vidéo 1920 × 1080 · 12,4 Mo » */
   function factsOf(s: Session, file: string): string {
+    return ctx.kept(`faits:${file}`, () => readFacts(s, file));
+  }
+
+  function readFacts(s: Session, file: string): string {
     const kind = mediaKind(file);
     const d = dims(s).get(file);
     let size = '';
@@ -418,7 +435,7 @@ export function createMedias(ctx: MediasContext) {
       pages.forEach((f, i) => place(s, table, type, { from: f.file, mode: 'move', origin }, i === 0 ? { kind: 'set' } : { kind: 'add' }));
     }
     s.notice = { text: notice, tone: 'info' };
-    host.broadcast();
+    ctx.changed();
   }
 
   // Recherche libre de chaque média (navigateur intégré), sur la session en cours.
@@ -432,7 +449,7 @@ export function createMedias(ctx: MediasContext) {
           progress: ctx.proposals.progress,
           show: (build, at) => (session ? nav(session, build, at) : ctx.show(build, at)),
           cursor: () => ctx.cursor(),
-          broadcast: () => host.broadcast(),
+          broadcast: () => ctx.changed(),
           find: (file) => ctx.find(file),
           active: (table) => session?.file === table.file,
           thumb: (table, type, file) => thumbOf(session!, table, type, file),
@@ -549,7 +566,7 @@ export function createMedias(ctx: MediasContext) {
   /** Fichiers de medias\ que ce jeu n'utilise pas, et pourquoi. */
   function strayRows(table: TableEntry): Row[] {
     const rows: Row[] = [];
-    for (const f of scanTableMedias(table)) {
+    for (const f of ctx.kept(`folder-medias:${table.file}`, () => scanTableMedias(table))) {
       const name = path.basename(f.file);
       if (name.startsWith('.')) continue;
       if (!f.type) rows.push({ text: name, detail: t('Nom sans « (Type) » : le front-end ne sait pas à quoi il sert.'), tone: 'quiet' });
@@ -607,7 +624,7 @@ export function createMedias(ctx: MediasContext) {
 
   function notify(s: Session, text: string): void {
     s.notice = { text, tone: 'warning' };
-    host.broadcast();
+    ctx.changed();
   }
 
   /** VPinMediaDB : son propre plan, puis retour ici sur l'action, avec le résultat. */
@@ -815,11 +832,11 @@ export function createMedias(ctx: MediasContext) {
           if (!on === saved) delete s.draft.halfTurn[type];
           else s.draft.halfTurn[type] = !on;
           s.notice = undefined;
-          host.broadcast();
+          ctx.changed();
         },
       });
     }
-    if (changed) actions.push({ label: t('Annuler le changement de ce média'), run: () => { delete s.draft.pages[type]; host.broadcast(); } });
+    if (changed) actions.push({ label: t('Annuler le changement de ce média'), run: () => { delete s.draft.pages[type]; ctx.changed(); } });
     actions.push({ label: t('Retour aux médias'), run: back });
 
     const sections: Section[] = [];
@@ -863,7 +880,7 @@ export function createMedias(ctx: MediasContext) {
       web: 'medias.type',
       run: () => {
         s.notice = { text: web!.open(table, type), tone: 'info' };
-        host.broadcast();
+        ctx.changed();
       },
     };
   }
@@ -889,7 +906,7 @@ export function createMedias(ctx: MediasContext) {
 
   function remove(s: Session, table: TableEntry, type: MediaType): void {
     setPages(s, table, type, []);
-    host.broadcast();
+    ctx.changed();
   }
 
   // ---------- Une page (prospectus, règles) ----------
@@ -950,6 +967,10 @@ export function createMedias(ctx: MediasContext) {
 
   /** Fichiers du dossier d'import (sous-dossiers compris) qui conviennent à ce type, et les autres. */
   function importFiles(type: MediaType): { accepted: string[]; others: number } {
+    return ctx.kept(`import:${type}`, () => readImportFiles(type));
+  }
+
+  function readImportFiles(type: MediaType): { accepted: string[]; others: number } {
     const dir = ctx.layout()?.import;
     const accepted: string[] = [];
     let others = 0;
@@ -994,7 +1015,7 @@ export function createMedias(ctx: MediasContext) {
       },
     }));
     const cards: MediaCard[] = accepted.map((file, i) => ({ action: i, title: path.relative(dir, file), facts: factsOf(s, file), thumb: thumbOf(s, table, type, file) }));
-    actions.push({ label: t('Actualiser'), detail: t('Après avoir copié un fichier dans le dossier d’import'), run: () => host.broadcast() }, { label: t('Retour'), run: back });
+    actions.push({ label: t('Actualiser'), detail: t('Après avoir copié un fichier dans le dossier d’import'), run: () => ctx.changed() }, { label: t('Retour'), run: back });
     const rows: Row[] = [];
     if (!accepted.length) {
       rows.push({
@@ -1050,7 +1071,7 @@ export function createMedias(ctx: MediasContext) {
       returnTo(s, type, target);
     } else {
       s.notice = { text: t('Aucun fichier {formats} dans ce dépôt : {label} ne peut pas s’en servir.', { formats: info.formats.join(', '), label: info.label }), tone: 'error' };
-      host.broadcast();
+      ctx.changed();
     }
   }
 
@@ -1075,7 +1096,7 @@ export function createMedias(ctx: MediasContext) {
     if (placed.length) parts.push(t('{files}, à enregistrer.', { files: placed.join(t(' ; ')) }));
     if (refused.length) parts.push(t('Non reconnu : {files}. Choisissez d’abord le média, puis déposez le fichier.', { files: refused.join(', ') }));
     s.notice = { text: parts.join(' ') || t('Aucun fichier dans ce dépôt.'), tone: refused.length ? 'warning' : 'info' };
-    host.broadcast();
+    ctx.changed();
   }
 
   // ---------- Volume ----------

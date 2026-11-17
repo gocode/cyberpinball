@@ -231,7 +231,8 @@ Il vous faut Windows 10 ou 11 et Node.js 22 ou plus récent.
 
 ```bash
 npm install
-npm test            # compile, passe le contrôle de publication et les tests du cœur
+npm test            # compile et lance tous les tests du cœur
+npm run verifier    # les tests rapides seulement, pendant le travail
 npm start           # écran des tables (assistant d'écrans au premier démarrage)
 npm run assistant   # assistant complet de la borne
 npm run probe       # liste les écrans et les sorties audio détectés

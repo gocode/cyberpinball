@@ -7,7 +7,8 @@
 // en clair, chemins d'un profil Windows (C:\Users\<nom>), adresses e-mail hors de la liste
 // ci-dessous, et les noms de la liste privée %USERPROFILE%\.cyberpinball\audit-noms.txt
 // (un par ligne ; hors du dépôt, sinon elle les publierait elle-même ; CYBERPINBALL_AUDIT_NOMS
-// la remplace). Lancé par npm test et par scripts/publier.mjs.
+// la remplace). Lancé par npm run avant-fusion (avant chaque fusion), npm run envoyer et
+// scripts/publier.mjs ; plus par npm test depuis le 17/11/2026 (13 à 18 s à chaque passage).
 //
 // Documents de travail internes (isPrivate : interne/, docs/recherche/, docs/Design/) :
 // suivis par git sur ce poste, jamais publiés. L'instantané envoyé sur GitHub les retire

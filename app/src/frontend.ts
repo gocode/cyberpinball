@@ -2549,7 +2549,7 @@ const menuSettings = createMenuSettings({
   sleepAllowed: () => !powerUnavailable('sleep', power.capabilities()),
   intro: introMenu,
   recording: {
-    quality: () => loadRecordingSettings(loc.dataDir).quality,
+    quality: () => library.kept('recording-quality', () => loadRecordingSettings(loc.dataDir).quality),
     setQuality: (quality) => {
       try {
         saveRecordingSettings(loc.dataDir, { ...loadRecordingSettings(loc.dataDir), quality });
@@ -2868,7 +2868,8 @@ function downloadsChanged(): void {
     }
   }, 250);
 }
-const romsOf = (table: TableEntry) => cachedScript(table.file, loc.dataDir)?.roms ?? [];
+// Dans un écran de la gestion des tables (bibliothèque d'un ami, sa table) : lu à son ouverture, gardé pour les touches (library.kept).
+const romsOf = (table: TableEntry) => library.kept(`roms:${table.file}`, () => cachedScript(table.file, loc.dataDir)?.roms ?? []);
 // Bibliothèque partagée entre amis : la mienne servie si je la partage, la leur et leurs médias.
 /** L'inventaire du dossier d'une table, celui de « Fichiers de la table » : ses parties, à transmettre ou déjà là. */
 function tableInventory(table: TableEntry) {
@@ -3000,7 +3001,8 @@ const tableScores = createTableScores({
   dataDir: loc.dataDir,
   romsOf,
   pinmameDirs: () => (loc.root ? [path.join(loc.root, 'pinmame')] : []),
-  changed: () => broadcast(),
+  // Scores relevés : l'écran ouvert (fiche, Classements) relit ce qu'il montre (library.ts, kept).
+  changed: () => (library.isActive() ? library.changed() : broadcast()),
   log: (line) => console.log(line),
 });
 // Classements des amis, du pays et du monde au tableau des scores : la version exacte de chaque table, calculée une fois.
@@ -3008,7 +3010,7 @@ const tableRankings = createTableRankings({
   net: socialNet,
   versionOf: (table) => liveGames.versionOf(table),
   ballsOf: async (table) => (await ballCounts.of(table))?.balls,
-  changed: () => broadcast(),
+  changed: () => (library.isActive() ? library.changed() : broadcast()),
 });
 // Une partie entre amis se joue sur un double de la table : sa mémoire de ROM, ses records et ses
 // réglages habituels ne sont jamais ouverts en écriture (table-double.ts). Ceux d'une partie
@@ -4350,12 +4352,28 @@ function headsetLost(inGame: boolean): void {
 
 /** Tête du joueur déjà notée pour la partie dans le casque en cours. */
 let headLogged = false;
+
+/** Une partie se prépare ou se joue : les relevés au journal attendent. */
+function auditWaits(): boolean {
+  return state.phase === 'intro' || state.phase === 'loading' || state.phase === 'playing';
+}
+
+/**
+ * Entre deux tables d'un relevé au journal (auditVrBackglass, auditPupPacks) : rend la main aux
+ * boutons et aux fenêtres, et attend la fin de la partie s'il y en a une. Ces relevés lisaient
+ * toutes les tables d'une traite, 60 s après le démarrage, en figeant l'écran des tables pendant
+ * plusieurs secondes, ou le lancement d'une table (17/11/2026).
+ */
+async function auditTurn(): Promise<void> {
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  while (auditWaits()) await new Promise<void>((resolve) => setTimeout(resolve, 5_000));
+}
 /**
  * Diagnostic des frontons en VR, une fois par lancement, au journal : les tables installées dont la pièce
  * VR montre le fronton par la capture de PuP, sans flasher du fronton (vides dans VPX 10.8 : The Matrix,
  * 10 novembre 2026). Cyber Pinball leur ajoute le fronton de VPX à chaque partie dans le casque.
  */
-function auditVrBackglass(): void {
+async function auditVrBackglass(): Promise<void> {
   if (vrMode !== 'auto') return;
   const empty: string[] = [];
   const hidden: string[] = [];
@@ -4363,6 +4381,7 @@ function auditVrBackglass(): void {
   const noSource: string[] = [];
   const roomDmd: string[] = [];
   for (const table of tables.filter((t) => t.emulator === 'vpx')) {
+    await auditTurn();
     try {
       const script = readTableScript(table.file);
       const room = tableHasVrRoom(script);
@@ -4399,10 +4418,11 @@ function auditVrBackglass(): void {
  * mais vides (emptyPlayedPlaylists) ; jamais bloquant : le diagnostic de la table propose de recompléter
  * le pack (« Ce qu'il manque pour jouer », étape PuP-Pack).
  */
-function auditPupPacks(): void {
+async function auditPupPacks(): Promise<void> {
   const found: string[] = [];
   let packs = 0;
   for (const table of tables.filter((t) => t.emulator === 'vpx')) {
+    await auditTurn();
     const folder = path.dirname(table.file);
     const pupvideos = pupVideosDir(folder);
     if (!pupvideos) continue;
@@ -5327,7 +5347,7 @@ library.provideSystemItem(
   'live-scores',
   createLiveScoresMenu({
     library,
-    get: () => readLiveScoresSettings(loc.dataDir),
+    get: () => library.kept('scores-en-partie', () => readLiveScoresSettings(loc.dataDir)),
     set: (settings) => writeLiveScoresSettings(loc.dataDir, settings),
     cabinet: () => ({
       backglass: Boolean(menuAssignments.backglass),
@@ -5715,6 +5735,8 @@ export function startFrontend(): void {
         if (changes.has('tables')) reloadTables();
         else medias?.invalidate();
         headsetMedias?.invalidate();
+        // L'écran de la gestion des tables ouvert relit ce qu'il montre (ses lectures sont gardées, library.ts).
+        library.changed();
         broadcast();
       },
     });
@@ -5845,9 +5867,12 @@ export function startFrontend(): void {
   hours.start();
   // Diagnostic : les tables dont le fronton serait vide dans le casque (capture de PuP, sans flasher du fronton),
   // et les PuP-Packs incomplets (fichiers absents, playlists jouées mais vides).
+  // Table par table, en rendant la main entre deux, et jamais pendant une partie (auditTurn).
   setTimeout(() => {
-    auditVrBackglass();
-    auditPupPacks();
+    void (async () => {
+      await auditVrBackglass();
+      await auditPupPacks();
+    })().catch((error: unknown) => console.warn(`Relevés du démarrage interrompus : ${String(error)}`)); // i18n-ignore : journal
   }, 60_000);
   // Réseau des bornes : présence aux amis, annuaire ; un échec s'affiche dans « Partage et réseau ».
   void socialNet.start().then(async () => {

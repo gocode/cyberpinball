@@ -13,7 +13,7 @@ import { IniDocument } from './ini';
 import { resolveRoleMedia, type ResolvedMedia } from './medias';
 import type { Cabinet, DmdKind, Rect } from './model';
 import { pupVideosDir } from './pupdisabled';
-import { analysePack, findPackRoot, pupWindows } from './puppack';
+import { packDrawsDmd } from './puppack';
 import { readInfo, type TableEntry } from './tables';
 import { findTableIni } from './vpx-settings';
 import { isFullZone, roleZone, zoneRect, type ZonePlacement } from './zones';
@@ -70,8 +70,7 @@ export function pupInDmdWindow(entry: TableEntry, facts: ScriptFacts | undefined
     const dir = path.join(pupvideos, pack);
     try {
       if (!fs.statSync(dir).isDirectory()) return false;
-      const info = analysePack(findPackRoot(dir) ?? dir);
-      return info.screens.length > 0 && pupWindows(info.screens).dmd;
+      return packDrawsDmd(dir);
     } catch {
       return false;
     }

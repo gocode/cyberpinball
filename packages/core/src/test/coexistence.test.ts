@@ -26,8 +26,18 @@ import { resolveLocations } from '../locations';
 
 const REPO = path.join(__dirname, '..', '..', '..', '..');
 
-/** Sources de l'application et des paquets (sans les tests ni ce registre), et l'installeur. */
-function sources(): { file: string; text: string }[] {
+/** Une ligne de code (hors commentaires et imports) d'un fichier source. */
+type CodeLine = { file: string; number: number; text: string };
+
+let codeLinesCache: CodeLine[] | undefined;
+
+/**
+ * Lignes de code des sources de l'application et des paquets (sans les tests ni ce registre), et
+ * de l'installeur. Lues une seule fois pour tout le fichier : `callers` est appelé pour chaque
+ * appel déclaré ou interdit, et relire le dépôt à chaque fois coûtait trois minutes (17/11/2026).
+ */
+function codeLines(): CodeLine[] {
+  if (codeLinesCache) return codeLinesCache;
   const found: { file: string; text: string }[] = [];
   const walk = (dir: string) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -41,7 +51,17 @@ function sources(): { file: string; text: string }[] {
   };
   for (const dir of ['app/src', 'app/renderer', 'packages/core/src', 'packages/win-displays/src', 'packages/installer/src', 'scripts']) walk(path.join(REPO, dir));
   found.push({ file: 'lanceur.ps1', text: fs.readFileSync(path.join(REPO, 'lanceur.ps1'), 'utf8') });
-  return found.filter((s) => s.file !== 'packages/core/src/coexistence.ts');
+  codeLinesCache = found
+    .filter((s) => s.file !== 'packages/core/src/coexistence.ts')
+    .flatMap((s) =>
+      s.text.split('\n').flatMap((text, i) => {
+        const code = text.trim();
+        if (code.startsWith('//') || code.startsWith('*') || code.startsWith(';') || code.startsWith('#') || code.startsWith('rem ')) return [];
+        if (/^\s*import\b/.test(text)) return [];
+        return [{ file: s.file, number: i + 1, text }];
+      }),
+    );
+  return codeLinesCache;
 }
 
 /** Lignes de code (hors commentaires) où l'appel figure, définition de la fonction exclue. */
@@ -51,14 +71,10 @@ function callers(call: string): string[] {
   const command = /^[a-z]+$/.test(call) || /[\s/']/.test(call);
   const escaped = call.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+');
   const pattern = new RegExp(`${/^\w/.test(call) ? '\\b' : ''}${escaped}${/\w$/.test(call) ? '\\b' : ''}`, command ? 'i' : '');
-  return sources().flatMap((s) =>
-    s.text.split('\n').flatMap((line, i) => {
-      const code = line.trim();
-      if (code.startsWith('//') || code.startsWith('*') || code.startsWith(';') || code.startsWith('#') || code.startsWith('rem ')) return [];
-      if (!pattern.test(line) || new RegExp(`function\\s+${name}\\b`).test(line) || /^\s*import\b/.test(line)) return [];
-      return [`${s.file}:${i + 1}`];
-    }),
-  );
+  const definition = new RegExp(`function\\s+${name}\\b`);
+  return codeLines()
+    .filter((line) => pattern.test(line.text) && !definition.test(line.text))
+    .map((line) => `${line.file}:${line.number}`);
 }
 
 test('autres menus ouverts : reconnus par leur exécutable, sans casse ; le lecteur des PuP-Packs seul ne compte pas', () => {

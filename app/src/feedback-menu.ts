@@ -56,6 +56,8 @@ export interface FeedbackMenuContext {
   version: string;
   language(): string;
   openCustom(build: () => Built, at?: number): void;
+  /** Lecture d'un écran faite à son ouverture, gardée pour les touches qui suivent (library.ts). */
+  kept?<T>(key: string, read: () => T): T;
   openSystem(): void;
   prompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void;
   showing(build: () => Built): boolean;
@@ -134,7 +136,8 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         },
       });
       actions.push({ label: t('Retour'), icon: 'back', run: back });
-      const queued = ctx.service.queuedCount();
+      // Rapports en attente (le dossier d'envoi relu) : à l'ouverture de l'écran, gardé pour les touches.
+      const queued = ctx.kept ? ctx.kept('rapports-en-attente', () => ctx.service.queuedCount()) : ctx.service.queuedCount();
       return {
         heading: t('Avis et propositions'),
         icon: 'inbox',

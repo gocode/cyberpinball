@@ -19,6 +19,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { formatDateTime, t, tn } from './i18n';
 import { dmdMediaType, type MediaType } from './medias';
 import { edgeRotation, type Cabinet, type FlipperEdge, type Rect, type Rotation } from './model';
@@ -200,7 +201,7 @@ export function loadRecordingSettings(dataDir: string): RecordingSettings {
 
 export function saveRecordingSettings(dataDir: string, settings: RecordingSettings): void {
   fs.mkdirSync(dataDir, { recursive: true });
-  fs.writeFileSync(recordingSettingsFile(dataDir), JSON.stringify(normalizeRecordingSettings(settings), null, 2) + '\n', 'utf8');
+  writeFileAtomic(recordingSettingsFile(dataDir), JSON.stringify(normalizeRecordingSettings(settings), null, 2) + '\n');
 }
 
 /** Écran filmé ou non : le plateau ne se retire pas. */

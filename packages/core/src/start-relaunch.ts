@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import type { CabinetButtons } from './model';
 
 /** Option du veilleur : CyberPinball.exe --veilleur n'ouvre aucune fenêtre. */
@@ -96,7 +97,7 @@ export function relaunchEnabled(dataDir: string): boolean {
 
 export function saveRelaunchEnabled(dataDir: string, enabled: boolean): void {
   fs.mkdirSync(relaunchDir(dataDir), { recursive: true });
-  fs.writeFileSync(relaunchSettingsFile(dataDir), `${JSON.stringify({ enabled }, null, 2)}\n`, 'utf8');
+  writeFileAtomic(relaunchSettingsFile(dataDir), `${JSON.stringify({ enabled }, null, 2)}\n`);
 }
 
 /** Pid écrit dans `file`, ou undefined. */
@@ -110,8 +111,7 @@ export function readPidFile(file: string): number | undefined {
 }
 
 export function writePidFile(file: string, pid: number): void {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${pid}\n`, 'utf8');
+  writeFileAtomic(file, `${pid}\n`);
 }
 
 /** Ce que fait le veilleur quand l'appui long est reconnu. */

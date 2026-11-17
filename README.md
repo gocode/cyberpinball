@@ -231,7 +231,8 @@ You need Windows 10 or 11 and Node.js 22 or later.
 
 ```bash
 npm install
-npm test            # builds, runs the publication check and the core tests
+npm test            # builds and runs all the core tests
+npm run verifier    # the fast tests only, while working
 npm start           # table menu (screen wizard on first start)
 npm run assistant   # full cabinet wizard
 npm run probe       # lists detected screens and audio outputs

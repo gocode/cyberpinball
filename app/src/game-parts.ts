@@ -85,6 +85,8 @@ export interface GamePartsContext {
   show(build: () => Built, at?: number, table?: string): void;
   /** Cet écran est-il celui affiché ? */
   isShowing(build: () => Built): boolean;
+  /** Lecture du disque d'un écran : faite à son ouverture, gardée pour les touches qui suivent (kept de library.ts). */
+  kept<T>(key: string, read: () => T): T;
   cursor(): number;
   sheet(table: TableEntry): void;
   leave(): void;
@@ -159,7 +161,8 @@ export function createGameParts(ctx: GamePartsContext) {
 
   const game = (): VpsGame | undefined => identified.game;
   const ownFolder = (table: TableEntry) => !samePathText(table.folder, ctx.tablesDir());
-  const partsOf = (table: TableEntry) => installedParts(tableContents(table.file, { ownFolder: ownFolder(table), romLibrary: ctx.layout()?.roms }));
+  // Le dossier de la table, parcouru à l'ouverture de l'écran (des milliers de fichiers pour un PuP-Pack), gardé pour les touches qui suivent.
+  const partsOf = (table: TableEntry) => ctx.kept(`parties:${table.file}`, () => installedParts(tableContents(table.file, { ownFolder: ownFolder(table), romLibrary: ctx.layout()?.roms })));
   /** Jeu de la liste d'attente pour cette table : celui de la base VPS, sinon son dossier. */
   const gameIdOf = (table: TableEntry) => game()?.id ?? ctx.catalog.localGameId(table.file);
   const target = (table: TableEntry, kind?: NeedKind): WebTarget => ({ gameId: game()?.id, gameLabel: game() ? vpsLabel(game()!) : table.title, kind, table: table.file });
@@ -525,13 +528,17 @@ export function createGameParts(ctx: GamePartsContext) {
    * Vignette d'une proposition : celle du résultat, sinon la capture de sa fiche (VPForums,
    * fiches de la base VPS), sinon l'aperçu de la base VPS (`also`), dès que l'une est reçue.
    * Un fichier que seule la base connaît n'a que ce dernier (pas de résultat de site).
+   * Présence et adresse du fichier : lues à l'ouverture de l'écran, gardées pour les touches qui suivent.
    */
   function siteThumb(hit: SiteHit | undefined, text: string, also?: string): MediaThumb {
     const got = hit ? ctx.sites?.hitThumb(hit) : undefined;
-    const local = [got?.file, ctx.sites?.thumb(also)].find((f): f is string => Boolean(f) && fs.existsSync(f!));
+    const local = [got?.file, ctx.sites?.thumb(also)].find((f): f is string => Boolean(f) && ctx.kept(`existe:${f}`, () => fs.existsSync(f!)));
     if (!local) return { kind: 'fallback', rotation: 0, text: got?.pending ? t('Aperçu en route…') : text };
-    allowPreview(local);
-    return { kind: 'image', url: mediaUrl(local), rotation: 0 };
+    const shown = ctx.kept(`adresse:${local}`, () => {
+      allowPreview(local);
+      return mediaUrl(local);
+    });
+    return { kind: 'image', url: shown, rotation: 0 };
   }
 
   /**

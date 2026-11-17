@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Snappier table-management screens: a table's sheet, “Add a table”, game media and game parts, and Leaderboards read the disk when they open, then answer the flippers without reading it again. On a loaded cabinet (a PuP-Pack of thousands of files, hundreds of downloads), each press no longer freezes the screen.
+- Faster, safer: launching a table no longer starts a Windows tool for each screen; table and PuP-Pack checks read far less from the disk; the checks run after startup no longer freeze the table screen or a game launch. Cabinet settings, files repaired by Cyber Pinball and those of a game between friends are written in one go: a power cut no longer leaves them half-written.
 - Adding a table, “What it takes”: the screen is arranged by cabinet screen (backglass, display, playfield, wheel, sound). Each one first shows what is planned by default, with no account: the VPinMediaDB media, or else artwork drawn with the table’s name. Below, an “Other choices” block already shows their previews; Start opens the gallery. A banner at the top says what is really missing to play.
 - Animated content: a play icon marks every video, GIF or APNG, and a note every sound. Already on the cabinet, the animation plays right away; still to download, the preview stays a picture and Start fetches the video or music, then plays it full size.
 - Game parts: every known file for a part (backglass, PuP-Pack…) is in the list itself, with its preview, even when the site shows none. There is no separate list to open any more.

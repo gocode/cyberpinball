@@ -103,17 +103,53 @@ function run(exe: string, args: string[]): Promise<void> {
   });
 }
 
+/**
+ * scripts.json déjà lu, par fichier, avec sa taille et sa date : relu seulement s'il a changé sur le
+ * disque. `cachedScript` est appelé pour chaque table, en boucle (santé, musique des ROM, médecin) :
+ * relire et analyser tout le fichier à chaque appel faisait croître le coût comme le carré du nombre
+ * de tables (17/11/2026). Le même objet sert à tous les appels : deux lectures de scripts en cours en
+ * même temps ne s'effacent plus l'une l'autre en l'enregistrant.
+ */
+const loaded = new Map<string, { size: number; mtimeMs: number; cache: Record<string, CacheEntry> }>();
+
 function loadCache(file: string): Record<string, CacheEntry> {
+  let stat: fs.Stats;
   try {
-    return JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, CacheEntry>;
+    stat = fs.statSync(file);
   } catch {
-    return {};
+    // Pas encore de fichier : un objet gardé, que le premier enregistrement écrira.
+    const known = loaded.get(file);
+    if (known && known.size === -1) return known.cache;
+    const cache: Record<string, CacheEntry> = {};
+    loaded.set(file, { size: -1, mtimeMs: -1, cache });
+    return cache;
   }
+  const known = loaded.get(file);
+  if (known && known.size === stat.size && known.mtimeMs === stat.mtimeMs) return known.cache;
+  let cache: Record<string, CacheEntry>;
+  try {
+    cache = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, CacheEntry>;
+  } catch {
+    cache = {};
+  }
+  loaded.set(file, { size: stat.size, mtimeMs: stat.mtimeMs, cache });
+  return cache;
 }
 
 /** Un cache refusé (fichier tenu un instant, disque plein) ne fait jamais échouer la lecture du script. */
 function saveCache(file: string, cache: Record<string, CacheEntry>): void {
   saveOrWarn(file, () => writeFileAtomic(file, JSON.stringify(cache, null, 2) + '\n'));
+  try {
+    const stat = fs.statSync(file);
+    loaded.set(file, { size: stat.size, mtimeMs: stat.mtimeMs, cache });
+  } catch {
+    loaded.delete(file);
+  }
+}
+
+/** Oublie les scripts.json déjà lus (essais). */
+export function forgetScriptCache(): void {
+  loaded.clear();
 }
 
 /** Reporte la lecture d'un script sur le chemin d'arrivée d'une table importée. */

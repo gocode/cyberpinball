@@ -624,8 +624,20 @@ function pupRoots(screens: PupScreen[]): (root: number) => boolean {
 
 /** Le pack rangé dans `dir` (racine retrouvée sous les imbrications) occupe la fenêtre du DMD avec l'option en place. */
 export function packDrawsDmd(dir: string): boolean {
-  const screens = analysePack(findPackRoot(dir) ?? dir).screens;
+  const screens = packScreens(findPackRoot(dir) ?? dir);
   return screens.length > 0 && pupWindows(screens).dmd;
+}
+
+/**
+ * Écrans de la racine d'un pack (screens.pup appliqué), sans le reste de l'analyse : ni les .bat,
+ * ni les dossiers d'options, ni le parcours de tout le pack à la recherche des fichiers inutiles.
+ * Les questions « le pack occupe-t-il la fenêtre du DMD ? » ne lisaient que `.screens` d'un
+ * analysePack complet, refait pour chaque pack à chaque diagnostic (17/11/2026). Même résultat
+ * que analysePack(root).screens.
+ */
+export function packScreens(root: string): PupScreen[] {
+  const screensFile = readDirents(root).find((d) => d.isFile() && d.name.toLowerCase() === 'screens.pup');
+  return screensFile ? parseScreens(readText(path.join(root, screensFile.name))) : [];
 }
 
 /**
@@ -1440,14 +1452,68 @@ function sameScreensFile(actual: string, expected: string): boolean {
   }
 }
 
+/** Jusqu'à cette taille, deux fichiers sont comparés en entier (.pup, .txt, petites images). */
+const FULL_COMPARE = 256 * 1024;
+/** Au-delà : trois extraits de cette taille, au début, au milieu et à la fin. */
+const SAMPLE = 64 * 1024;
+
+/**
+ * Comparaisons déjà faites, par chemins, tailles et dates : le médecin, la fiche et « Appliquer »
+ * comparent les mêmes options plusieurs fois de suite. Vidée au-delà de COMPARISONS_KEPT.
+ */
+const comparisons = new Map<string, boolean>();
+const COMPARISONS_KEPT = 20_000;
+
+/**
+ * Même contenu ? Comparer chaque fichier d'une option en entier lisait tout le pack (des centaines
+ * de vidéos de quelques Mo, des deux côtés) à chaque diagnostic (17/11/2026). Les fichiers d'une
+ * option sont des copies (copy, xcopy) : même taille et mêmes extraits suffisent au-delà de
+ * FULL_COMPARE ; au-delà de COMPARE_LIMIT, la taille seule.
+ */
 function sameFile(a: string, b: string): boolean {
   try {
-    const size = fs.statSync(a).size;
-    if (size !== fs.statSync(b).size) return false;
-    return size > COMPARE_LIMIT || fs.readFileSync(a).equals(fs.readFileSync(b));
+    const statA = fs.statSync(a);
+    const statB = fs.statSync(b);
+    const size = statA.size;
+    if (size !== statB.size) return false;
+    if (size > COMPARE_LIMIT) return true;
+    const key = `${a}\0${statA.mtimeMs}\0${b}\0${statB.mtimeMs}\0${size}`;
+    const known = comparisons.get(key);
+    if (known !== undefined) return known;
+    const same = size <= FULL_COMPARE ? fs.readFileSync(a).equals(fs.readFileSync(b)) : sameSamples(a, b, size);
+    if (comparisons.size >= COMPARISONS_KEPT) comparisons.clear();
+    comparisons.set(key, same);
+    return same;
   } catch {
     return false;
   }
+}
+
+/** Début, milieu et fin identiques (fichiers de même taille, plus grands que SAMPLE). */
+function sameSamples(a: string, b: string, size: number): boolean {
+  const fa = fs.openSync(a, 'r');
+  try {
+    const fb = fs.openSync(b, 'r');
+    try {
+      const bufA = Buffer.alloc(SAMPLE);
+      const bufB = Buffer.alloc(SAMPLE);
+      for (const at of [0, Math.floor((size - SAMPLE) / 2), size - SAMPLE]) {
+        const readA = fs.readSync(fa, bufA, 0, SAMPLE, at);
+        const readB = fs.readSync(fb, bufB, 0, SAMPLE, at);
+        if (readA !== readB || !bufA.subarray(0, readA).equals(bufB.subarray(0, readB))) return false;
+      }
+      return true;
+    } finally {
+      fs.closeSync(fb);
+    }
+  } finally {
+    fs.closeSync(fa);
+  }
+}
+
+/** Oublie les comparaisons gardées (essais). */
+export function forgetFileComparisons(): void {
+  comparisons.clear();
 }
 
 // ---------- Utilitaires ----------

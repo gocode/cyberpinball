@@ -36,7 +36,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { renameWithRetry } from './atomicwrite';
+import { renameWithRetry, writeFileAtomic } from './atomicwrite';
 import { copyTree } from './copytree';
 import { formatNumber, language, t, type Language } from './i18n';
 import { UPDATE_PUBLIC_KEY } from './update-key';
@@ -323,7 +323,7 @@ export function loadUpdateSource(dataDir: string): UpdateSource {
 /** Garde la source ; « preversions » reste écrit pour les versions qui ne connaissent pas « source ». */
 export function saveUpdateSource(dataDir: string, source: UpdateSource): void {
   fs.mkdirSync(dataDir, { recursive: true });
-  fs.writeFileSync(path.join(dataDir, UPDATE_PRERELEASES_FILE), `${JSON.stringify({ preversions: source !== 'finales', source }, null, 2)}\n`, 'utf8');
+  writeFileAtomic(path.join(dataDir, UPDATE_PRERELEASES_FILE), `${JSON.stringify({ preversions: source !== 'finales', source }, null, 2)}\n`);
 }
 
 /** La borne accepte-t-elle les préversions ? Non tant que rien n'est réglé. */
@@ -623,6 +623,9 @@ export function windowsTar(): string {
   return path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
 }
 
+/** Délai pour déplier le paquet léger (une vingtaine de Mo, quelques secondes d'ordinaire). */
+export const UNPACK_TIMEOUT_MS = 2 * 60_000;
+
 /**
  * Déplie le paquet léger dans `target` (vidé d'abord), puis vérifie qu'il contient bien la
  * version du flux, au socle annoncé : un paquet qui ne correspond pas est effacé, jamais mis en place.
@@ -630,7 +633,8 @@ export function windowsTar(): string {
 export function unpackAppPackage(zip: string, target: string, manifest: UpdateManifest): void {
   fs.rmSync(target, { recursive: true, force: true });
   fs.mkdirSync(target, { recursive: true });
-  const run = spawnSync(windowsTar(), ['-x', '-f', zip, '-C', target], { encoding: 'utf8', windowsHide: true });
+  // Jamais sans fin (17/11/2026) : un tar suspendu gelait l'application sans rien dire.
+  const run = spawnSync(windowsTar(), ['-x', '-f', zip, '-C', target], { encoding: 'utf8', windowsHide: true, timeout: UNPACK_TIMEOUT_MS });
   let problem: string | undefined;
   if (run.status !== 0) problem = (run.error?.message ?? run.stderr) || `tar ${run.status}`;
   else {
@@ -766,7 +770,7 @@ export interface PendingUpdate {
 
 export function recordPendingUpdate(dataDir: string, pending: PendingUpdate): void {
   fs.mkdirSync(dataDir, { recursive: true });
-  fs.writeFileSync(path.join(dataDir, UPDATE_PENDING_FILE), `${JSON.stringify(pending, null, 2)}\n`, 'utf8');
+  writeFileAtomic(path.join(dataDir, UPDATE_PENDING_FILE), `${JSON.stringify(pending, null, 2)}\n`);
 }
 
 export type UpdateOutcome =

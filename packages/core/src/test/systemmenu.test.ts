@@ -32,7 +32,9 @@ test('menu système : une rubrique qui s’allume montre son état et son badge 
   }
   const library = fs.readFileSync(path.join(APP, 'library.ts'), 'utf8');
   assert.match(library, /const lead = isSystemGroup\(id\) && SYSTEM_GROUPS\[id\]\.lead \? systemItems\.get\(SYSTEM_GROUPS\[id\]\.lead!\) : undefined;\s*const item = isSystemGroup\(id\) \? lead : systemItems\.get\(id\);/);
-  assert.match(library, /\.\.\.\(item\?\.badge && \{ badge: item\.badge \}\),/);
+  // Ce que dit l'entrée (son badge compris) est lu à l'ouverture de la rubrique et gardé (kept, 17/11/2026).
+  assert.match(library, /\s+badge: item\?\.badge,\s/);
+  assert.match(library, /\.\.\.\(shown\.badge && \{ badge: shown\.badge \}\),/);
   // L'entrée d'activation garde son badge et son état (frontend.ts).
   assert.match(fs.readFileSync(path.join(APP, 'frontend.ts'), 'utf8'), /library\.provideSystemItem\('vr', \{\s*\/\/[^\n]*\n\s*badge: 'beta',\s*get label\(\) \{\s*return vrMenuText\(vrMode, probeVr\(\)\)\.label;/);
 });

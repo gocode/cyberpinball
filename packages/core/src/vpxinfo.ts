@@ -11,6 +11,7 @@
 // d'images et de sons.
 
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 export interface VpxTableInfo {
   name?: string;
@@ -87,7 +88,7 @@ export class CompoundFile {
       for (let i = 0; i < perDifat && fatSectors.length < fatCount; i++) fatSectors.push(sector.readUInt32LE(i * 4));
       difat = sector.readUInt32LE(perDifat * 4);
     }
-    const fat = Buffer.concat(fatSectors.map((s) => this.sector(s)));
+    const fat = this.readSectors(fatSectors);
     this.fat = new Uint32Array(fat.buffer, fat.byteOffset, fat.length / 4);
 
     this.dirStart = header.readUInt32LE(0x30);
@@ -126,19 +127,37 @@ export class CompoundFile {
     return this.read(offset, this.sectorSize);
   }
 
-  /** Chaîne de secteurs depuis `start`, jusqu'à `limit` octets. */
-  private chain(start: number, limit = Infinity): Buffer {
+  /**
+   * Ces secteurs, dans l'ordre, mis bout à bout. Les secteurs qui se suivent dans le fichier sont
+   * lus d'un seul appel : la table d'allocation d'un .vpx de 200 Mo (1,6 Mo) se lisait en 3 200
+   * lectures de 512 octets, à chaque ouverture (17/11/2026). Même résultat que sector() un à un.
+   */
+  private readSectors(list: number[]): Buffer {
     const parts: Buffer[] = [];
-    let total = 0;
-    const seen = new Set<number>();
-    for (let s = start; s <= MAX_SECTOR && total < limit; s = this.fat[s] ?? END_OF_CHAIN) {
-      if (seen.has(s)) throw new Error('chaîne de secteurs en boucle'); // i18n-ignore : erreur interne, toujours rattrapée
-      seen.add(s);
-      const sector = this.sector(s);
-      parts.push(sector);
-      total += sector.length;
+    for (let i = 0; i < list.length; ) {
+      let j = i;
+      while (j + 1 < list.length && list[j + 1] === list[j]! + 1) j++;
+      const first = list[i]!;
+      const last = list[j]!;
+      for (const n of [first, last]) {
+        if (n > MAX_SECTOR || (n + 1) * this.sectorSize >= this.fileSize) throw new Error(`secteur ${n} hors du fichier`); // i18n-ignore : erreur interne, toujours rattrapée
+      }
+      parts.push(this.read((first + 1) * this.sectorSize, (j - i + 1) * this.sectorSize));
+      i = j + 1;
     }
     return Buffer.concat(parts);
+  }
+
+  /** Chaîne de secteurs depuis `start`, jusqu'à `limit` octets. */
+  private chain(start: number, limit = Infinity): Buffer {
+    const list: number[] = [];
+    const seen = new Set<number>();
+    for (let s = start; s <= MAX_SECTOR && list.length * this.sectorSize < limit; s = this.fat[s] ?? END_OF_CHAIN) {
+      if (seen.has(s)) throw new Error('chaîne de secteurs en boucle'); // i18n-ignore : erreur interne, toujours rattrapée
+      seen.add(s);
+      list.push(s);
+    }
+    return this.readSectors(list);
   }
 
   /** Contenu d'un flux, au plus `limit` octets. */
@@ -513,6 +532,37 @@ const DISABLE_EVERYTHING = 0x80000000;
  * n'est pas lisible, n'a pas de script, ou si son script est protégé (chiffré).
  */
 export function readVpxScript(file: string): string | undefined {
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(file);
+  } catch {
+    return undefined;
+  }
+  // Un même diagnostic relit le script de la table jusqu'à six fois (médecin, PuP, DMD, VR) :
+  // gardé tant que la table ne change pas (taille et date), pour les dernières tables lues.
+  const key = `${path.resolve(file).toLowerCase()}\0${stat.size}\0${stat.mtimeMs}`;
+  if (scriptsRead.has(key)) {
+    const text = scriptsRead.get(key);
+    scriptsRead.delete(key);
+    scriptsRead.set(key, text);
+    return text;
+  }
+  const text = readVpxScriptFromFile(file);
+  scriptsRead.set(key, text);
+  if (scriptsRead.size > SCRIPTS_KEPT) scriptsRead.delete(scriptsRead.keys().next().value!);
+  return text;
+}
+
+/** Scripts déjà lus, du plus ancien au plus récent (clé : chemin, taille, date). */
+const scriptsRead = new Map<string, string | undefined>();
+const SCRIPTS_KEPT = 16;
+
+/** Oublie les scripts déjà lus (essais). */
+export function forgetVpxScripts(): void {
+  scriptsRead.clear();
+}
+
+function readVpxScriptFromFile(file: string): string | undefined {
   let fd: number | undefined;
   try {
     fd = fs.openSync(file, 'r');

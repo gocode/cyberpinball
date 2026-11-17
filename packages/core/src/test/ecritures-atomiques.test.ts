@@ -22,6 +22,7 @@ import {
   writeFileAtomic,
   writeFileAtomicAsync,
 } from '../atomicwrite';
+import { applyOps } from '../fileops';
 import { REPO_ROOT } from './i18n-scan';
 
 /** Un renommage de fichier, synchrone ou non. */
@@ -48,7 +49,9 @@ function* sources(dir: string): Generator<string> {
 test('aucun renommage de fichier hors de l’écriture partagée (atomicwrite.ts), sauf les exceptions inscrites', () => {
   const found: string[] = [];
   const used = new Set<string>();
-  for (const top of ['app/src', 'packages/core/src']) {
+  // L'installeur et les écrans aussi depuis le 17/11/2026 : l'installeur renommait directement le
+  // dossier d'un composant tout juste extrait, que l'antivirus tient souvent un instant.
+  for (const top of ['app/src', 'packages/core/src', 'packages/installer/src', 'packages/win-displays/src']) {
     for (const file of sources(path.join(REPO_ROOT, top))) {
       const rel = path.relative(REPO_ROOT, file).replace(/\\/g, '/');
       if (rel === 'packages/core/src/atomicwrite.ts') continue;
@@ -65,6 +68,63 @@ test('aucun renommage de fichier hors de l’écriture partagée (atomicwrite.ts
   assert.deepEqual(found, []);
   // Une exception qui ne sert plus est retirée de la liste.
   assert.deepEqual(EXCEPTIONS.filter((e) => !used.has(`${e.file} ${e.line}`)).map((e) => e.file), []);
+});
+
+/**
+ * Modules qui gardent un état ou un réglage de la borne (pointeur vers les données, mode dédié,
+ * réglages de Windows à défaire, mise à jour en cours, réglages des parties, fichiers des tables
+ * réparés par le médecin, réglages de l'hôte posés dans le double d'une partie entre amis…). Une
+ * coupure de courant pendant une écriture directe y laissait un fichier tronqué ou absent
+ * (17/11/2026) : ils n'écrivent que par writeFileAtomic (ou un temporaire renommé ensuite).
+ */
+const STATE_MODULES = [
+  'fileops.ts',
+  'locations.ts',
+  'hostsettings.ts',
+  'dedicated.ts',
+  'windowssettings.ts',
+  'update.ts',
+  'gamerecording.ts',
+  'sessionorientation.ts',
+  'start-relaunch.ts',
+  'vps.ts',
+  'downloads.ts',
+];
+
+test('les modules qui gardent un état de la borne n’écrivent jamais un fichier directement', () => {
+  const found: string[] = [];
+  for (const name of STATE_MODULES) {
+    const text = fs.readFileSync(path.join(REPO_ROOT, 'packages', 'core', 'src', name), 'utf8');
+    text.split('\n').forEach((line, i) => {
+      if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
+      if (!/\bfs\.(writeFileSync|appendFileSync)\s*\(|\bfs\.promises\.writeFile\s*\(/.test(line)) return;
+      // Écrire le temporaire d'une écriture atomique faite ici même est permis.
+      if (/\(\s*tmp\b/.test(line)) return;
+      found.push(`packages/core/src/${name}:${i + 1} : ${line.trim()} (passer par writeFileAtomic)`);
+    });
+  }
+  assert.deepEqual(found, []);
+});
+
+test('le médecin remplace un fichier de table d’un coup : jamais tronqué, l’ancien à la corbeille', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-ecriture-medecin-'));
+  try {
+    const file = path.join(dir, 'Table', 'Table.info');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, 'ancien');
+    const trashDir = path.join(dir, 'trash', 'essai');
+    applyOps([{ op: 'write', path: file, content: 'nouveau' }], { trashDir });
+    assert.equal(fs.readFileSync(file, 'utf8'), 'nouveau');
+    assert.equal(fs.readFileSync(path.join(trashDir, 'Table.info'), 'utf8'), 'ancien', 'l’ancien à la corbeille');
+    assert.deepEqual(fs.readdirSync(path.dirname(file)), ['Table.info'], 'aucun temporaire laissé');
+    // Le renommage échoue (dossier tenu) : l'ancien fichier reste entier, sans temporaire.
+    const blocked = path.join(dir, 'Bloquée', 'Table.ini');
+    fs.mkdirSync(blocked, { recursive: true });
+    assert.throws(() => applyOps([{ op: 'write', path: blocked, content: 'x' }], { trashDir: path.join(dir, 'trash', 'b') }));
+    assert.deepEqual(fs.readdirSync(path.dirname(blocked)), ['Table.ini']);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('les attentes du renommage partagé restent sous une seconde en tout', () => {

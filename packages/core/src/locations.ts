@@ -5,6 +5,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { t } from './i18n';
 import { readJsonFile } from './store';
 
@@ -141,5 +142,5 @@ export function readRootPointer(pointerFile: string): string | undefined {
 
 export function writeRootPointer(pointerFile: string, root: string): void {
   fs.mkdirSync(path.dirname(pointerFile), { recursive: true });
-  fs.writeFileSync(pointerFile, JSON.stringify({ root }, null, 2) + '\n', 'utf8');
+  writeFileAtomic(pointerFile, JSON.stringify({ root }, null, 2) + '\n');
 }

@@ -7,6 +7,7 @@ import {
   layoutOf,
   configIniPath,
   copyTree,
+  renameWithRetry,
   t,
   updateCabinetSet,
   writeRootPointer,
@@ -140,7 +141,8 @@ export async function installComponent(root: string, component: Component, onPro
       JSON.stringify({ ...component, installedAt: new Date().toISOString() }, null, 2) + '\n',
     );
     fs.mkdirSync(paths.base, { recursive: true });
-    fs.renameSync(staging, paths.version);
+    // L'antivirus tient souvent l'exécutable qui vient d'être extrait : renommage réessayé (atomicwrite.ts).
+    renameWithRetry(staging, paths.version);
   }
 
   pointJunction(paths.current, paths.version);

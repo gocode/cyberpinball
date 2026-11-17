@@ -445,7 +445,7 @@ export function rotateSimulated(file: string, gdiName: string, rotation: Rotatio
     delete state.session[gdiName];
   } else state.session[gdiName] = rotation;
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(state, null, 2) + '\n');
+  writeFileAtomic(file, JSON.stringify(state, null, 2) + '\n');
 }
 
 /** Les écrans simulés dans l'orientation que la session ou le réglage de Windows leur donne. */

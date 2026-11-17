@@ -39,6 +39,7 @@ import {
   decodeAvatarData,
   keepAvatars,
   pruneAvatarFiles,
+  heldAvatarFile,
   publicAvatarHash,
   readAvatarFile,
   setOwnAvatar,
@@ -826,7 +827,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   /** Fichier d'avatar de cette empreinte, s'il est dans <données>\avatars. */
   function heldAvatar(hash: string): string | undefined {
-    return ['jpg', 'png', 'webp'].map((ext) => `${hash}.${ext}`).find((name) => fs.existsSync(avatarPath(opts.dataDir, name)));
+    // Présence gardée (avatar.ts) : un écran qui montre des joueurs ne relit pas le dossier à chaque touche.
+    return heldAvatarFile(opts.dataDir, hash);
   }
 
   /** Avatars publics demandés : empreinte -> heure de la demande. */

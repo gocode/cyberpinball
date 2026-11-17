@@ -316,7 +316,7 @@ function readMeta(downloadsDir: string): Meta {
 
 function writeMeta(downloadsDir: string, meta: Meta): void {
   fs.mkdirSync(downloadsDir, { recursive: true });
-  fs.writeFileSync(path.join(downloadsDir, META_FILE), JSON.stringify(meta, null, 2) + '\n', 'utf8');
+  writeFileAtomic(path.join(downloadsDir, META_FILE), JSON.stringify(meta, null, 2) + '\n');
 }
 
 // ---------- Rapprochement ----------

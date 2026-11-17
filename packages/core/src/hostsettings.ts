@@ -22,6 +22,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import type { RomMemory } from './ballcount';
 import { patchVpRegValues } from './groupboard';
 import { readVpReg } from './highscores';
@@ -100,12 +101,10 @@ export function applyHostSettings(dir: string, settings: readonly HostSetting[],
     const guest = readIfFile(file);
     const merged = s.rel === 'user/VPReg.stg' ? mergeVpRegVolume(file, s.data, guest, guestVolume.vpRegKeys ?? []) : s.rel.endsWith('.cfg') ? mergeCfgVolume(s.data, guest) : mergeNvramVolume(s.rel, s.data, guest, guestVolume);
     if (merged.data !== guest) {
-      // Le fichier du double est une copie (jamais un lien vers l'original) : remplacé, pas réécrit sur place.
-      fs.rmSync(file, { force: true });
-      if (merged.data) {
-        fs.mkdirSync(path.dirname(file), { recursive: true });
-        fs.writeFileSync(file, merged.data);
-      }
+      // Le fichier du double est une copie (jamais un lien vers l'original) : remplacé d'un coup
+      // (writeFileAtomic : temporaire puis renommage), jamais un instant sans fichier ni tronqué.
+      if (merged.data) writeFileAtomic(file, merged.data);
+      else fs.rmSync(file, { force: true });
       merged.after?.(file);
     }
     notes.push(`${s.rel} : ${merged.note}`);
@@ -183,8 +182,8 @@ function mergeVpRegVolume(file: string, host: Buffer | undefined, guest: Buffer 
       const kept = [...patches.values()].flatMap((m) => [...m.keys()]);
       if (missing.length || skipped.length) {
         // Le volume de l'invité ne se pose pas dans le fichier de l'hôte : le sien, tel quel.
-        fs.rmSync(posed, { force: true });
-        if (guest) fs.writeFileSync(posed, guest);
+        if (guest) writeFileAtomic(posed, guest);
+        else fs.rmSync(posed, { force: true });
         this.note = guestAsIs(guest, `${missing.length ? `clé de volume absente chez l’hôte : ${missing.map((v) => v.key).join(', ')}` : `valeur trop longue : ${skipped.join(', ')}`} ; valeurs de l’hôte non reprises`).note; // i18n-ignore : journal
       } else this.note = kept.length ? `celui de l’hôte, volume de l’invité gardé (${kept.join(', ')})` : 'celui de l’hôte (pas de volume enregistré)'; // i18n-ignore : journal
     },

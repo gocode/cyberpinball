@@ -307,6 +307,7 @@ import { createFeedbackMenu } from './feedback-menu';
 import type { FeedbackService } from './feedback-service';
 import { isShown, primaryRect, refuseOffscreen } from './offscreen';
 import { installationHints } from './installation-hints';
+import { countDiskReads, describeDiskReads, diskWatchEnabled, type DiskReads } from './build-guard';
 
 const MANUFACTURERS = [
   'Williams', 'Bally', 'Gottlieb', 'Stern', 'Data East', 'Sega', 'Midway', 'Capcom', 'Atari', 'Zaccaria',
@@ -932,6 +933,8 @@ type ScoresScreen = Extract<Screen, { kind: 'scores' }>;
 const SCORES_BACK = 8;
 /** Au-delà, la construction d'un écran est dite au journal : plusieurs par touche, les flippers ne suivent plus. */
 export const SLOW_BUILD_MS = 40;
+/** L'ouverture d'un écran lit le disque une fois (kept) : au-delà, elle est dite au journal. */
+export const SLOW_OPENING_MS = 500;
 
 /** Page préc. / Page suiv. d'un clavier : le texte de l'écran défile de partout (reading.ts). */
 const PAGE_KEYS: Record<string, -1 | 1> = { PageUp: -1, PageDown: 1 };
@@ -965,6 +968,17 @@ export function createLibrary(host: LibraryHost) {
   let reading: { screen: unknown; key: number; edges?: ReadingEdges; active: boolean; move: { id: number; dir: -1 | 1 } } = { screen: undefined, key: 0, active: false, move: { id: 0, dir: 1 } };
   /** L'écran affiché fait écouter des sons (propositions, sons de la table) : relevé à chaque vue. */
   let soundPreview = false;
+  /**
+   * Ce que l'écran affiché a lu du disque (kept), par clé. Un écran est reconstruit plusieurs fois à
+   * chaque touche, et les touches attendent : sa première construction, à l'ouverture, lit le disque
+   * et garde ses lectures ici ; les suivantes s'en servent, sans plus rien lire (relevé du 17/11/2026 :
+   * la fiche d'une table à PuP-Pack relisait ses milliers de fichiers à chaque flipper). Relu quand
+   * l'écran change, après une action qui le laisse affiché (elle a pu changer ce qu'il montre), et
+   * quand l'application dit que le disque a changé (changed : guet des dossiers, téléchargement fini).
+   */
+  let reads = { of: undefined as Screen | undefined, values: new Map<string, unknown>(), fresh: false };
+  /** Constructions en cours (une construction peut en faire une autre) : kept ne garde que ce qu'elles lisent. */
+  let buildDepth = 0;
   // Opérations longues en cours (l'installation enchaîne sur l'analyse) et leur message.
   let busyCount = 0;
   let busy: string | undefined;
@@ -1102,7 +1116,7 @@ export function createLibrary(host: LibraryHost) {
       busy = message;
       host.broadcast();
     },
-    reload: () => host.reload(),
+    reload: () => reloadTables(),
   });
 
   // Base VPS : lue dans downloads au premier ajout, mise à jour en arrière-plan.
@@ -1185,6 +1199,8 @@ export function createLibrary(host: LibraryHost) {
       cursor = 0;
     } finally {
       if (--busyCount === 0) busy = undefined;
+      // L'opération a pu remplir ou changer l'écran (inventaire des ROM, analyse) : il relit ce qu'il montre.
+      reads.fresh = false;
       host.broadcast();
     }
   }
@@ -1274,8 +1290,15 @@ export function createLibrary(host: LibraryHost) {
     }
     // Retour sur un écran déjà visité : le curseur sur l'élément qu'on y avait choisi, s'il est encore là.
     const known = at === undefined ? lastFocus.get(build) : undefined;
-    const back = known !== undefined ? indexOfId(actionIds(shownActions(build())), known) : -1;
-    go({ kind: 'custom', build, table }, at ?? Math.max(0, back));
+    const next: Screen = { kind: 'custom', build, table };
+    let back = -1;
+    if (known !== undefined) {
+      // Cette construction est l'ouverture du nouvel écran : ses lectures (kept) sont les siennes.
+      reads = { of: next, values: new Map(), fresh: false };
+      back = indexOfId(actionIds(shownActions(building(build))), known);
+      reads.fresh = true;
+    }
+    go(next, at ?? Math.max(0, back));
   }
 
   /** Saisie d'un nom avec le clavier à l'écran (ou un vrai clavier). */
@@ -1366,7 +1389,8 @@ export function createLibrary(host: LibraryHost) {
     vpxRules: (table) => mediaSearch.vpxInfo(table.file)?.rules,
     playfield: (table) => readVpxPlayfield(table.file),
     playfieldImage: (table) => mediaSearch.vpxImages(table).find((i) => i.type === 'Playfield')?.file,
-    broadcast: () => host.broadcast(),
+    // Règles trouvées : la fiche et le livret relisent ce qu'ils montrent (kept).
+    broadcast: () => changed(),
   });
 
   // ---------- Crédits de la communauté (credits-menu.ts) ----------
@@ -1417,7 +1441,12 @@ export function createLibrary(host: LibraryHost) {
    * communauté, mode attente), `table` avec ce que l'auteur a écrit dans la table (résumé de la
    * fiche), `full` avec les fichiers du dossier, les médias et les règles (page « Crédits »).
    */
+  /** Lu à l'ouverture de l'écran qui montre les crédits (fiche, page Crédits), gardé pour les touches qui suivent. */
   function creditsInput(table: TableEntry, depth: CreditsDepth): TableCreditsInput {
+    return kept(`credits:${depth}:${table.file}`, () => readCreditsInput(table, depth));
+  }
+
+  function readCreditsInput(table: TableEntry, depth: CreditsDepth): TableCreditsInput {
     const input: TableCreditsInput = {
       game: vpsGameOf(table),
       source: tableSourceOf(table.info),
@@ -1487,6 +1516,8 @@ export function createLibrary(host: LibraryHost) {
     dataDir: host.dataDir,
     transports: { http: httpTransport() },
     finished: (job) => {
+      // Un fichier de plus dans les téléchargements : l'écran ouvert (Téléchargements, Ajouter une table) le relit.
+      changed();
       // Rendu de lui-même (son écran est ouvert) ; sinon une notification ou un bandeau le dit, la pastille le garde « prêt ».
       if (downloadFinishers.get(job.kind)?.(job)) return;
       host.notify?.(t('Téléchargement terminé : {title}. Téléchargements, dans le menu système, pour y revenir.', { title: say(job.title) }), job);
@@ -1689,11 +1720,13 @@ export function createLibrary(host: LibraryHost) {
       // Essais : CYBERPINBALL_DISQUE_LIBRE (octets) simule un disque presque plein.
       const simulated = Number(process.env.CYBERPINBALL_DISQUE_LIBRE);
       const free = Number.isFinite(simulated) && process.env.CYBERPINBALL_DISQUE_LIBRE ? simulated : jukebox.usage().free;
-      return { installed: Boolean(host.root), online: jukeboxOnline(), ytdlp: catalogUi.ytdlp.installed(), ...(free !== undefined ? { free } : {}) };
+      // yt-dlp installé : lu à l'ouverture de l'écran du Juke-box, gardé pour les touches qui suivent.
+      return { installed: Boolean(host.root), online: jukeboxOnline(), ytdlp: kept('yt-dlp', () => catalogUi.ytdlp.installed()), ...(free !== undefined ? { free } : {}) };
     },
     task: (message, work) => task(message, work),
     phone: () => host.phoneRemote?.connected() === 'menu',
-    account: youtubeAccount,
+    // Edge présent ou non : lu à l'ouverture de l'écran, gardé pour les touches qui suivent.
+    account: { ...youtubeAccount, edgeMissing: () => kept('edge-absent', () => youtubeAccount.edgeMissing()) },
     signIn: () => youtubeSignIn(),
     remoteBar: () => host.phoneRemote?.bar(),
     preview: host.jukeboxPreview,
@@ -1737,7 +1770,8 @@ export function createLibrary(host: LibraryHost) {
     acquirer: catalogUi.acquirer,
     siteFiles: catalogUi.siteFiles,
     downloadsDir: () => layout()?.downloads,
-    changed: () => host.broadcast(),
+    // Résultats et aperçus reçus (fichiers posés sur le disque) : l'écran ouvert relit ce qu'il montre (kept).
+    changed: () => changed(),
     // Recherche libre : ce qui arrive dans Téléchargements de Windows pendant ce temps (navigateur de l'utilisateur).
     windowsDownloads: () => host.downloadsDir?.() ?? app.getPath('downloads'),
   });
@@ -1871,6 +1905,7 @@ export function createLibrary(host: LibraryHost) {
         version: app.getVersion(),
         language: () => language(),
         openCustom: (build, at) => openCustom(build, at),
+        kept,
         openSystem: () => openSystem(),
         prompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
         showing: (build) => screen?.kind === 'custom' && screen.build === build,
@@ -2008,6 +2043,8 @@ export function createLibrary(host: LibraryHost) {
     cursor: () => cursor,
     sheet: (table, flash) => openSheet(table, flash),
     leave: () => leave(),
+    kept,
+    changed,
     pick: (request) => pickPaths(request),
     download: (table, back) => mediaDownload.openTable(table, back),
     webGame: webForTable('medias'),
@@ -2053,7 +2090,7 @@ export function createLibrary(host: LibraryHost) {
       screen = undefined;
       host.playAndRecord?.(table, settings);
     },
-    reload: (file) => host.reload(file),
+    reload: (file) => reloadTables(file),
   });
 
   // « Parties du jeu » de la fiche : chaque partie ajoutée, remplacée, réaffectée ou retirée.
@@ -2062,9 +2099,10 @@ export function createLibrary(host: LibraryHost) {
     tablesDir,
     find,
     tables: () => host.tables(),
-    script: (table) => cachedScript(table.file, host.dataDir),
+    script: (table) => kept(`script:${table.file}`, () => cachedScript(table.file, host.dataDir)),
     show: (build, at, table) => openCustom(build, at, table),
     isShowing: (build) => screen?.kind === 'custom' && screen.build === build,
+    kept,
     cursor: () => cursor,
     sheet: (table) => openSheet(table),
     leave: () => leave(),
@@ -2079,7 +2117,7 @@ export function createLibrary(host: LibraryHost) {
       const infoFile = infoFileFor(table, tablesDir());
       const info = readInfo(infoFile);
       applyOps([{ op: 'write', path: infoFile, content: JSON.stringify({ ...info, Info: { ...info.Info, VPSId: gameId } }, null, 2) + '\n' }], { trashDir: trashDirFor(layout()!.trash, 'Remplacé à l’import') }); // i18n-ignore : nom de dossier
-      host.reload(table.file);
+      reloadTables(table.file);
     },
     prompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
     catalog: catalogUi,
@@ -2090,7 +2128,7 @@ export function createLibrary(host: LibraryHost) {
     pupSwitch: (table) => pupSwitchView(table),
     setPup: (table, enable) => setPupEnabled(table, enable),
     medias: (table) => medias.open(table),
-    reload: (file) => host.reload(file),
+    reload: (file) => reloadTables(file),
   });
 
   // ---------- Téléchargements et sélecteur de fichiers ----------
@@ -2116,7 +2154,15 @@ export function createLibrary(host: LibraryHost) {
   }
 
   /** Inventaire des téléchargements ; `windows` : avec les fichiers du dernier mois de Téléchargements de Windows. */
+  /**
+   * Inventaire des téléchargements (des centaines de fichiers, chacun relevé) : lu à l'ouverture de
+   * l'écran qui le montre (Téléchargements, Ajouter une table, sélecteur), gardé pour les touches qui suivent.
+   */
   function inventoryOf(windows = false) {
+    return kept(`downloads-inventory:${windows}`, () => readInventoryOf(windows));
+  }
+
+  function readInventoryOf(windows: boolean) {
     const l = layout();
     if (!l) return [];
     const winDir = host.downloadsDir?.() ?? app.getPath('downloads');
@@ -2392,7 +2438,7 @@ export function createLibrary(host: LibraryHost) {
         if (samePath(op.from, file)) file = op.to;
       }
     }
-    host.reload(file);
+    reloadTables(file);
     return file;
   }
 
@@ -2475,7 +2521,12 @@ export function createLibrary(host: LibraryHost) {
   }
 
   /** Le PuP-Pack de la table pour « Parties du jeu » : actif ou désactivé, ce que le changement touche. */
+  /** Lu à l'ouverture de l'écran qui le montre (fiche, parties du jeu), gardé pour les touches qui suivent. */
   function pupSwitchView(table: TableEntry): PupSwitchView {
+    return kept(`pup:${table.file}`, () => readPupSwitchView(table));
+  }
+
+  function readPupSwitchView(table: TableEntry): PupSwitchView {
     const own = !samePath(table.folder, tablesDir());
     if (!own) return { sw: { active: [], disabled: [], shared: [] }, off: false, blocked: t('La table n’a pas de dossier à elle : son PuP-Pack ne se range pas à part'), global: [] };
     const facts = cachedScript(table.file, host.dataDir);
@@ -2516,7 +2567,7 @@ export function createLibrary(host: LibraryHost) {
         console.log(`PuP-Pack (${one.id}) : script non remis d'accord (${(error as Error).message}).`); // i18n-ignore : journal
       }
     }
-    host.reload(table.file);
+    reloadTables(table.file);
     const list = moved.join(', ');
     const rest = skipped.map((s) => t('{pack} : {reason}', s)).join(' ; ');
     if (!moved.length) return { ok: false, text: t('Rien n’a changé : {reasons}.', { reasons: rest }) };
@@ -2533,13 +2584,22 @@ export function createLibrary(host: LibraryHost) {
       // Une rubrique qui a une entrée de tête (l'activation) montre son état et son badge sur sa propre ligne.
       const lead = isSystemGroup(id) && SYSTEM_GROUPS[id].lead ? systemItems.get(SYSTEM_GROUPS[id].lead!) : undefined;
       const item = isSystemGroup(id) ? lead : systemItems.get(id);
-      return {
+      // Ce que dit chaque entrée (ses accesseurs lisent souvent le disque : sauvegardes, versions,
+      // réglages) : lu à l'ouverture de la rubrique, gardé pour les touches qui suivent.
+      const shown = kept(`entry:${id}`, () => ({
         label: item?.label ?? entry.label,
         detail: isSystemGroup(id) ? SYSTEM_GROUPS[id].detail : item?.detail,
-        icon: entry.icon,
         attention: systemAttention(id),
-        ...(item?.tone && { tone: item.tone }),
-        ...(item?.badge && { badge: item.badge }),
+        tone: item?.tone,
+        badge: item?.badge,
+      }));
+      return {
+        label: shown.label,
+        detail: shown.detail,
+        icon: entry.icon,
+        attention: shown.attention,
+        ...(shown.tone && { tone: shown.tone }),
+        ...(shown.badge && { badge: shown.badge }),
         shortcut: isSystemGroup(id) ? undefined : item?.shortcut,
         run: () => runSystemEntry(id),
       };
@@ -2553,9 +2613,75 @@ export function createLibrary(host: LibraryHost) {
   /** L'écran affiché ; en mode invité, sans les actions dont la porte est fermée (ou qui n'en ont pas). */
   function build(): Built {
     const started = performance.now();
-    const built = buildScreen();
-    warnSlowBuild(built, performance.now() - started);
+    // Ouverture de l'écran, ou première construction après une action ou un changement du disque :
+    // elle lit ce qu'il montre et le garde (kept). Les reconstructions suivantes, celles des touches,
+    // ne lisent plus rien : chronométrées, et guettées en essai.
+    const opening = reads.of !== screen || !reads.fresh;
+    let built: Built;
+    if (opening) {
+      reads = { of: screen, values: new Map(), fresh: false };
+      built = building(buildScreen);
+      reads.fresh = true;
+      warnSlowOpening(built, performance.now() - started);
+    } else {
+      built = building(diskWatch ? watchedBuild : buildScreen);
+      warnSlowBuild(built, performance.now() - started);
+    }
     return host.guest.active ? { ...built, actions: built.actions.filter((a) => host.guest.allows(a.door)) } : built;
+  }
+
+  /**
+   * Lecture du disque d'un écran (inventaire d'une table, dossier d'import, médias…), faite à son
+   * ouverture et gardée tant qu'il reste affiché : `key` la nomme dans l'écran (« inventaire »,
+   * « médias:<table> »). Lue pendant une reconstruction (clé absente à l'ouverture) : le guet le dit.
+   */
+  function kept<T>(key: string, read: () => T): T {
+    // Hors construction (une action, la roue, le mode attente) : lu tel quel, rien n'est gardé.
+    if (!buildDepth) return read();
+    if (reads.values.has(key)) return reads.values.get(key) as T;
+    const value = read();
+    reads.values.set(key, value);
+    return value;
+  }
+
+  /** Une construction est en cours (kept ne garde que ce qu'elle lit). */
+  function building<T>(work: () => T): T {
+    buildDepth++;
+    try {
+      return work();
+    } finally {
+      buildDepth--;
+    }
+  }
+
+  /**
+   * Une action vient de tourner : si l'écran reste affiché, sa prochaine construction relit ce qu'il
+   * montre (une suppression, un réglage écrit). Une action qui finit plus tard (promesse) : relu à sa fin.
+   */
+  function afterRun(result: unknown, before: Screen | undefined): void {
+    if (screen === before) reads.fresh = false;
+    if (result instanceof Promise)
+      void result.then(
+        () => afterSettled(before),
+        () => afterSettled(before),
+      );
+  }
+  function afterSettled(before: Screen | undefined): void {
+    if (screen !== before || !screen) return;
+    reads.fresh = false;
+    host.broadcast();
+  }
+
+  /** Le disque a changé (guet des dossiers, téléchargement fini, table relue) : l'écran affiché relit ce qu'il montre. */
+  function changed(): void {
+    reads.fresh = false;
+    if (screen) host.broadcast();
+  }
+
+  /** Les tables relues après un changement de leurs fichiers : l'écran affiché relit aussi ce qu'il montre. */
+  function reloadTables(selectFile?: string): void {
+    host.reload(selectFile);
+    reads.fresh = false;
   }
 
   /** Les actions montrées : en mode invité, sans celles dont la porte est fermée. */
@@ -2613,7 +2739,8 @@ export function createLibrary(host: LibraryHost) {
     const exitLabel = sheetReturn ? t('Retour à la liste des tables') : t('Retour au front-end');
     if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: exitLabel, door: 'sheet.back', run: exit }], back: exit };
     const own = !samePath(table.folder, tablesDir());
-    const inv = inventory(table.file, own);
+    // Ce que la fiche lit du disque : à son ouverture, gardé pour les touches qui suivent (kept).
+    const inv = kept('inventaire', () => inventory(table.file, own));
     const user = table.info.User ?? {};
     // Statistiques sur une ligne : la fiche tient sur l'écran, en borne comme au bureau.
     const played = [user.LastRun ? t('dernière partie le {date}', { date: formatDateTime(user.LastRun) }) : undefined, user.RunTime ? t('{duration} de jeu', { duration: formatDuration(user.RunTime) }) : undefined].filter(Boolean).join(' · ');
@@ -2623,9 +2750,9 @@ export function createLibrary(host: LibraryHost) {
     const fx = table.emulator === 'pinballfx';
     const notFx = (action: SheetAction, reason: string): SheetAction => (fx ? { ...action, detail: reason, tone: 'quiet', attention: undefined, run: () => undefined } : action);
 
-    const script = cachedScript(table.file, host.dataDir);
+    const script = kept('script', () => cachedScript(table.file, host.dataDir));
     // Seule la ROM peut empêcher de jouer (playable.ts) : la règle du médecin, sans relire la table.
-    const romMissing = Boolean(script?.usesPinmame && romBlockers(table.folder, script.roms, layout()?.roms).length);
+    const romMissing = kept('rom-absente', () => Boolean(script?.usesPinmame && romBlockers(table.folder, script.roms, layout()?.roms).length));
     // Résumé borné : une ligne par sorte présente, une pour les absentes, une pour ce qui est à
     // vérifier ; trois noms au plus par ligne. Le détail de chaque fichier est dans « Fichiers ».
     const list = (items: string[]) => (items.length > 3 ? t('{names} et {n} autres', { names: items.slice(0, 2).join(', '), n: items.length - 2 }) : items.join(', '));
@@ -2641,13 +2768,14 @@ export function createLibrary(host: LibraryHost) {
       const library = layout()?.roms;
       const names = inv.roms.map((r) => {
         const name = r.replace(/\.zip$/i, '');
-        const linked = library && sameFile(path.join(table.folder, 'pinmame', 'roms', r), path.join(library, r));
+        const linked = library && kept(`rom-linked:${r}`, () => sameFile(path.join(table.folder, 'pinmame', 'roms', r), path.join(library, r)));
         return linked ? t('{name} (bibliothèque)', { name }) : name;
       });
       files.push({ text: 'ROM', detail: list(names), tone: 'ok' });
     } else if (!script || script.usesPinmame) absent.push('ROM');
+    const dmdHere = kept('dmd', () => Boolean(script?.dmdFolder && dmdPresent(table.folder, script.dmdFolder)));
     if (script?.dmdFolder) {
-      const present = dmdPresent(table.folder, script.dmdFolder);
+      const present = dmdHere;
       files.push({ text: t('Contenu du DMD'), detail: present ? script.dmdFolder : t('dossier {folder} absent (facultatif)', { folder: script.dmdFolder }), tone: present ? 'ok' : 'warning' });
     }
     const pup = inv.pup.map((p) => {
@@ -2689,8 +2817,8 @@ export function createLibrary(host: LibraryHost) {
     const contents = s.contents;
     // Ce qui empêche de jouer (la ROM), déjà connu sans relire la table ; ou un parcours commencé
     // et pas fini. Le contenu du DMD manquant est proposé, après « Jouer », jamais en tête.
-    const dmdMissing = Boolean(script?.dmdFolder && !dmdPresent(table.folder, script.dmdFolder));
-    const started = journeyUi.position(table.file);
+    const dmdMissing = Boolean(script?.dmdFolder && !dmdHere);
+    const started = kept('parcours', () => journeyUi.position(table.file));
     const missing: SheetAction[] =
       romMissing || (started && !started.ready)
         ? [
@@ -2721,13 +2849,13 @@ export function createLibrary(host: LibraryHost) {
       ...(host.tableSettings
         ? [notFx({ label: t('Réglages de cette table'), detail: t('Son, jeu… pour cette table seulement'), icon: 'sliders' as const, door: 'sheet.table-settings' as const, run: () => host.tableSettings!(table) }, t('Ils se règlent dans Pinball FX'))]
         : []),
-      ...(host.adjustDisplay && (fx || host.vpxExe())
+      ...(host.adjustDisplay && (fx || kept('vpx', () => host.vpxExe()))
         ? [notFx({ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, door: 'sheet.display' as const, run: () => adjustDisplay(table) }, t('Écrans et cadrage : dans le mode borne de Pinball FX'))]
         : []),
       ...(host.menuDmd
         ? [notFx({ label: t('DMD sur la roue'), detail: host.menuDmd.detail(table), icon: 'dmd' as const, door: 'sheet.menu-dmd' as const, run: () => host.menuDmd!.open(table, () => openSheet(table)) }, t('Tables VPX seulement : Pinball FX ne donne pas son DMD'))]
         : []),
-      ...(host.playAndRecord && (fx || host.vpxExe())
+      ...(host.playAndRecord && (fx || kept('vpx', () => host.vpxExe()))
         ? [notFx({ label: t('Jouer et enregistrer'), detail: t('Filmer la partie pour la présentation de la table sur la roue'), icon: 'record' as const, door: 'sheet.record' as const, run: () => recording.setup(table) }, t('Tables VPX seulement pour l’instant'))]
         : []),
       notFx({ label: t('Diagnostiquer et réparer'), icon: 'pulse', door: 'sheet.doctor', run: () => openDoctor(table.file) }, t('Rien à diagnostiquer : Pinball FX gère la table')),
@@ -2771,7 +2899,7 @@ export function createLibrary(host: LibraryHost) {
       ...(host.instantGame ? [notFx({ ...host.instantGame(table, () => openSheet(table)), door: 'sheet.instant' as const }, t('Parties en direct : tables VPX seulement'))] : []),
       ...(host.scores ? [notFx(scoresAction(table), t('Pinball FX ne donne pas ses scores'))] : []),
       pagesAction(table),
-      { label: t('Crédits'), detail: credits.summary(table), icon: 'credits', door: 'sheet.credits', run: () => credits.open(table) },
+      { label: t('Crédits'), detail: kept('credits', () => credits.summary(table)), icon: 'credits', door: 'sheet.credits', run: () => credits.open(table) },
       ...(host.favorite ? [favoriteAction(table)] : []),
       ...(host.tableCollections ? [{ ...host.tableCollections(table, () => openSheet(table)), door: 'sheet.collections' as const }] : []),
       {
@@ -2824,7 +2952,7 @@ export function createLibrary(host: LibraryHost) {
   function scoresAction(table: TableEntry): SheetAction {
     return {
       label: t('Tableau des scores'),
-      detail: scoresSummary(host.scores!(table, 'all'), host.scores!(table, 'today')),
+      detail: kept('scores', () => scoresSummary(host.scores!(table, 'all'), host.scores!(table, 'today'))),
       icon: 'trophy',
       door: 'sheet.scores',
       run: () => {
@@ -2857,7 +2985,7 @@ export function createLibrary(host: LibraryHost) {
     const network = scope !== 'cabinet';
     const view = (period: ScorePeriod): RankingView =>
       host.rankings ? host.rankings(table, scope as Exclude<RankingScope, 'cabinet'>, period) : { lines: [], players: 0, unavailable: t('Réseau des bornes absent') };
-    const scoreboard = network ? rankingScoreboardView(view, scope as Exclude<RankingScope, 'cabinet'>, s.period) : scoreboardView((period) => host.scores!(table, period), s.period);
+    const scoreboard = network ? rankingScoreboardView(view, scope as Exclude<RankingScope, 'cabinet'>, s.period) : scoreboardView((period) => kept(`scores:${period}`, () => host.scores!(table, period)), s.period);
     const lines = network ? view(s.period).lines.filter((l) => !l.mine) : [];
     return {
       heading: t('Tableau des scores'),
@@ -2954,14 +3082,18 @@ export function createLibrary(host: LibraryHost) {
 
   // ---------- Prospectus et règles, page par page ----------
 
-  const pagesOf = (table: TableEntry, type: SheetPageType) => sheetPages(table, host.root, host.dataDir, type);
+  // Lues à l'ouverture de l'écran (fiche, livret), gardées pour les touches qui suivent (kept).
+  const pagesOf = (table: TableEntry, type: SheetPageType) => kept(`pages:${type}:${table.file}`, () => sheetPages(table, host.root, host.dataDir, type));
 
   /** Pages des règles : cartes, textes et vidéo trouvés, puis les commandes de la partie. */
   function helpPages(table: TableEntry): HelpPage[] {
-    const own = pagesOf(table, 'GameHelp');
-    tableRules.ensure(table, own.length > 0);
-    const cabinet = loadCabinet(host.dataDir);
-    return tableRules.pages(table, own, gameKeys(cabinet?.buttons, cabinet?.tilt));
+    // Lues à l'ouverture du livret, gardées pour les pages qu'on tourne ; les règles trouvées le relisent (changed).
+    return kept(`rules:${table.file}`, () => {
+      const own = pagesOf(table, 'GameHelp');
+      tableRules.ensure(table, own.length > 0);
+      const cabinet = loadCabinet(host.dataDir);
+      return tableRules.pages(table, own, gameKeys(cabinet?.buttons, cabinet?.tilt));
+    });
   }
 
   /**
@@ -2970,12 +3102,15 @@ export function createLibrary(host: LibraryHost) {
    * Ouvrir la fiche lance la recherche des règles (table-rules.ts).
    */
   function pagesAction(table: TableEntry): SheetAction {
-    const own = pagesOf(table, 'GameHelp').length;
-    tableRules.ensure(table, own > 0);
-    const parts = SHEET_PAGE_TYPES.map((type) => {
-      const n = pagesOf(table, type).length;
-      const what = type === 'GameHelp' ? tableRules.summary(table, own) : n ? tn(n, '{n} page', '{n} pages') : t('fiche générée');
-      return t('{label} : {what}', { label: mediaTypeInfo(type).label, what });
+    // La recherche des règles part à l'ouverture de la fiche ; elle relit l'écran quand elle aboutit (changed).
+    const parts = kept(`livret:${table.file}`, () => {
+      const own = pagesOf(table, 'GameHelp').length;
+      tableRules.ensure(table, own > 0);
+      return SHEET_PAGE_TYPES.map((type) => {
+        const n = pagesOf(table, type).length;
+        const what = type === 'GameHelp' ? tableRules.summary(table, own) : n ? tn(n, '{n} page', '{n} pages') : t('fiche générée');
+        return t('{label} : {what}', { label: mediaTypeInfo(type).label, what });
+      });
     });
     return {
       label: t('Prospectus et règles'),
@@ -3085,7 +3220,7 @@ export function createLibrary(host: LibraryHost) {
 
   /** « Médias : 4 sur 11 fournis par le jeu ; replis pour les autres » */
   function mediaRow(table: TableEntry): Row {
-    const own = layout() ? MANAGED_MEDIA_TYPES.filter((type) => ownMediaPages(table, host.root!, type).length).length : 0;
+    const own = kept(`own-medias:${table.file}`, () => (layout() ? MANAGED_MEDIA_TYPES.filter((type) => ownMediaPages(table, host.root!, type).length).length : 0));
     return {
       text: t('Médias'),
       detail: own ? t('{own} sur {count} fournis par le jeu ; replis pour les autres', { own, count: MANAGED_MEDIA_TYPES.length }) : t('aucun : le front-end montre ses replis'),
@@ -3253,7 +3388,7 @@ export function createLibrary(host: LibraryHost) {
       s.flash = t('Option non appliquée : {message}', { message: (error as Error).message });
     }
     s.pup = undefined;
-    host.reload(table.file);
+    reloadTables(table.file);
     host.broadcast();
   }
 
@@ -3282,7 +3417,7 @@ export function createLibrary(host: LibraryHost) {
     const table = find(s.file);
     const back = () => (table ? openSheet(table) : leave());
     if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour'), run: back }], back };
-    const infoFile = infoFileFor(table, tablesDir());
+    const infoFile = kept('fiche-info', () => infoFileFor(table, tablesDir()));
     const f = s.fields;
     return {
       heading: t('Modifier les informations'),
@@ -3298,7 +3433,7 @@ export function createLibrary(host: LibraryHost) {
           tone: 'ok',
           run: () => {
             updateInfo(infoFile, { Title: f.Title, Manufacturer: f.Manufacturer, Year: f.Year });
-            host.reload(table.file);
+            reloadTables(table.file);
             const updated = find(table.file);
             if (updated) openSheet(updated, t('Informations enregistrées.'));
             else leave();
@@ -3417,7 +3552,7 @@ export function createLibrary(host: LibraryHost) {
     if (!table) return;
     const infoFile = infoFileFor(table, tablesDir());
     writeFileAtomic(infoFile, JSON.stringify(setFindingIgnored(readInfo(infoFile), code, ignored), null, 2) + '\n');
-    host.reload(table.file);
+    reloadTables(table.file);
     void analyse();
   }
 
@@ -3435,7 +3570,7 @@ export function createLibrary(host: LibraryHost) {
     if (!scan) return { heading: t('Bibliothèque de ROM'), sections: [], actions: [{ label: t('Retour au front-end'), run: back }], back };
     const unused = unusedRoms(scan);
     const missing = missingRoms(scan);
-    const tidy = romsToTidy(scan);
+    const tidy = kept('roms-to-tidy', () => romsToTidy(scan));
     const stored = scan.entries.filter((e) => e.stored && !unused.includes(e));
     const space = romSpace(scan);
     const actions: Action[] = [];
@@ -3672,8 +3807,10 @@ export function createLibrary(host: LibraryHost) {
     const table = find(s.file);
     if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour'), run: leave }], back: leave };
     const back = () => openSheet(table);
-    const targets = removalTargets(table, tablesDir());
-    const total = targets.paths.reduce((sum, p) => sum + sizeOf(p), 0);
+    // Ce qui partirait à la corbeille, et sa taille : relevés à l'ouverture, gardés.
+    const targets = kept('removal-targets', () => removalTargets(table, tablesDir()));
+    const sizes = kept('tailles', () => new Map(targets.paths.map((p) => [p, sizeOf(p)])));
+    const total = targets.paths.reduce((sum, p) => sum + (sizes.get(p) ?? 0), 0);
     return {
       heading: t('Supprimer « {title} » ?', { title: table.title }),
       subheading: table.version,
@@ -3683,7 +3820,7 @@ export function createLibrary(host: LibraryHost) {
       sections: [
         {
           title: targets.whole ? t('Dossier mis à la corbeille') : t('Fichiers mis à la corbeille (les autres versions restent)'),
-          rows: targets.paths.map((p) => ({ text: path.relative(tablesDir(), p), detail: formatSize(sizeOf(p)) })),
+          rows: targets.paths.map((p) => ({ text: path.relative(tablesDir(), p), detail: formatSize(sizes.get(p) ?? 0) })),
         },
         { rows: [{ text: t('Total : {size}', { size: formatSize(total) }), tone: 'quiet' }] },
       ],
@@ -3695,7 +3832,7 @@ export function createLibrary(host: LibraryHost) {
           run: () => {
             const trashDir = trashDirFor(layout()!.trash, `Table ${table.title}`); // i18n-ignore : nom de dossier
             applyOps(targets.paths.map((p) => ({ op: 'trash', path: p })), { trashDir });
-            host.reload();
+            reloadTables();
             // Supprimée depuis « Toutes les tables » : la liste, sinon la roue.
             go({ kind: 'notice', heading: t('« {title} » est dans la corbeille', { title: table.title }), lines: [trashDir], then: sheetReturn ?? leave });
           },
@@ -3714,7 +3851,7 @@ export function createLibrary(host: LibraryHost) {
   function buildAddSource(): Built {
     const importDir = layout()!.import;
     const entries = listImport();
-    const ready = catalogUi.ready();
+    const ready = kept('ready', () => catalogUi.ready());
     const actions: Action[] = [];
     const sections: Section[] = [];
     if (ready.length) {
@@ -3746,12 +3883,15 @@ export function createLibrary(host: LibraryHost) {
         run: () => startImport(entries.map((e) => path.join(importDir, e)), 'move'),
       });
     }
-    const rows: Row[] = entries.map((name) => {
-      const p = path.join(importDir, name);
-      const dir = fs.statSync(p).isDirectory();
-      const kind = dir ? t('Dossier') : ARCHIVE_EXT.has(path.extname(name).toLowerCase()) ? t('Archive') : KIND_LABELS[classifyFile(name)];
-      return { text: name, detail: `${kind} · ${formatSize(sizeOf(p))}`, action: importAction };
-    });
+    // Sorte et taille de chaque élément (un dossier se parcourt en entier) : lues à l'ouverture, gardées.
+    const rows: Row[] = kept('import-details', () =>
+      entries.map((name) => {
+        const p = path.join(importDir, name);
+        const dir = fs.statSync(p).isDirectory();
+        const kind = dir ? t('Dossier') : ARCHIVE_EXT.has(path.extname(name).toLowerCase()) ? t('Archive') : KIND_LABELS[classifyFile(name)];
+        return { text: name, detail: `${kind} · ${formatSize(sizeOf(p))}`, action: importAction };
+      }),
+    );
     sections.push({
       // Le chemin en clair, pas dans le titre : en capitales, il prendrait trois lignes.
       title: t('Dossier d’import'),
@@ -3766,7 +3906,7 @@ export function createLibrary(host: LibraryHost) {
       pinballFxAction(),
       { label: t('Depuis une autre installation…'), detail: t('PinUP Popper, PinballX : les tables une à une, avec leur PuP-Pack, leur ROM et leurs médias'), icon: 'layers', run: () => installationImport.open() },
       ...(addFromFriend ? [{ label: t('Depuis un ami…'), detail: addFromFriend.detail(), icon: 'friend-list' as const, run: () => addFromFriend!.open(() => openAdd()) }] : []),
-      { label: t('Récupérés et attendus'), detail: catalogUi.summary(), icon: 'inbox', run: () => catalogUi.openWaitList(() => openAdd()) },
+      { label: t('Récupérés et attendus'), detail: kept('attendus', () => catalogUi.summary()), icon: 'inbox', run: () => catalogUi.openWaitList(() => openAdd()) },
       { label: t('Mises à jour des tables'), detail: t('Nouvelles versions des tables installées'), icon: 'refresh', run: () => catalogUi.openUpdates() },
       { label: t('Comptes des sites'), detail: t('vpuniverse.com, vpforums.org… : connexions gardées'), icon: 'account', run: () => catalogUi.openAccounts() },
       catalogUi.webAction('add.funnel', { query: partWebQuery('table', 'table'), received: (file) => startImport([file], 'copy', undefined, undefined, true) }, () => openAdd()),
@@ -3912,7 +4052,8 @@ export function createLibrary(host: LibraryHost) {
           const local = pinballFxThumbs.get(url);
           if (local) allowPreview(local);
         }
-        host.broadcast();
+        // Vignettes reçues : l'écran relit leurs adresses (kept).
+        changed();
       }
     })();
   }
@@ -3923,7 +4064,8 @@ export function createLibrary(host: LibraryHost) {
    */
   function pinballFxThumb(url: string | undefined): string {
     const local = url ? pinballFxThumbs.get(url) : undefined;
-    return local ? mediaUrl(local) : 'pinball-app';
+    // L'adresse relève le fichier (sa date) : lue à l'ouverture de l'écran, gardée pour les touches qui suivent.
+    return local ? kept(`vignette:${local}`, () => mediaUrl(local)) : 'pinball-app';
   }
 
   /** Catalogue trié et capture de VPS de chaque table : calculés une fois par base VPS. */
@@ -3969,7 +4111,7 @@ export function createLibrary(host: LibraryHost) {
     } catch (error) {
       failed.push((error as Error).message);
     }
-    host.reload(file);
+    reloadTables(file);
     const siteNote = sites.placed.length ? `, ${sites.placed.join(', ')} des sites` : ''; // i18n-ignore : journal
     const loginNote = sites.login.length ? ` ; compte à connecter : ${sites.login.join(', ')}` : ''; // i18n-ignore : journal
     console.log(`Pinball FX : médias de « ${fx.title} » : ${installed} de VPinMediaDB${placed ? ', image du plateau de VPS' : ''}${siteNote}${loginNote}${failed.length ? ` ; non reçus : ${failed.join(' ; ')}` : ''}.`); // i18n-ignore : journal
@@ -4147,7 +4289,7 @@ export function createLibrary(host: LibraryHost) {
     const added = addPinballFxTable(tablesDir(), fx.id);
     console.log(`Pinball FX : table ${fx.id} (${fx.title}) ajoutée au front-end, ${added.id} ; médias choisis : ${types.join(', ') || 'aucun'}.`); // i18n-ignore : journal
     pinballFxFlash = fx.vps && types.length ? t('« {title} » ajoutée au front-end : ses médias arrivent (Téléchargements).', { title: fx.title }) : t('« {title} » ajoutée au front-end.', { title: fx.title });
-    host.reload(added.file);
+    reloadTables(added.file);
     if (types.length) void fetchPinballFxMedias(fx, added.file, pinballFxFlash, types);
     pinballFxDetail = undefined;
     openPinballFx(fx.id);
@@ -4183,7 +4325,7 @@ export function createLibrary(host: LibraryHost) {
       } catch (error) {
         console.log(`Pinball FX : médias manquants de « ${fx.title} » : ${(error as Error).message}.`); // i18n-ignore : journal
       }
-      host.reload(entry.file);
+      reloadTables(entry.file);
     }
     const got = tn(count, '{n} média reçu', '{n} médias reçus');
     const what = [...missing].map((type) => lowerFirst(mediaTypeInfo(type).label)).join(', ');
@@ -4324,13 +4466,22 @@ export function createLibrary(host: LibraryHost) {
   }
 
   /** « 4 fichiers de table déjà reçus » : ce que l'entonnoir peut reprendre sans rien télécharger. */
+  /** Lu à l'ouverture de l'écran qui le montre (Ajouter une table), gardé pour les touches qui suivent. */
   function downloadsDetail(): string {
+    return kept('downloads-detail', readDownloadsDetail);
+  }
+
+  function readDownloadsDetail(): string {
     const filter = tableFilter();
     const n = inventoryOf(false).filter((e) => filter.extensions.includes(path.extname(e.name).slice(1).toLowerCase())).length;
     return n ? tn(n, 'Téléchargements de Cyber Pinball : {n} fichier, sans le télécharger de nouveau', 'Téléchargements de Cyber Pinball : {n} fichiers, sans les télécharger de nouveau') : t('Téléchargements de Cyber Pinball : rien pour le moment');
   }
 
   function listImport(): string[] {
+    return kept('import', readImport);
+  }
+
+  function readImport(): string[] {
     try {
       return fs.readdirSync(layout()!.import).filter((n) => !n.startsWith('.'));
     } catch {
@@ -4900,7 +5051,7 @@ export function createLibrary(host: LibraryHost) {
       }
       for (const archive of prepared.archives) if (archive.mode === 'move' && fs.existsSync(archive.path)) moveToTrash(archive.path, { trashDir });
       fs.rmSync(prepared.staging, { recursive: true, force: true });
-      host.reload(checked[0]);
+      reloadTables(checked[0]);
       // Les réparations des PuP-Packs que le menu fait avant chaque partie (PUP_PLAY_REPAIRS), faites
       // dès l'installation : pack renommé et lancé, option, images nommées comme des vidéos…
       const borne = pupCabinet(loadCabinet(host.dataDir));
@@ -4962,7 +5113,7 @@ export function createLibrary(host: LibraryHost) {
         if (Object.keys(parts).length) next = setPartSources(next, parts);
         applyOps([{ op: 'write', path: infoFile, content: JSON.stringify(next, null, 2) + '\n' }], { trashDir: trashDirFor(layout()!.trash, 'Remplacé à l’import') }); // i18n-ignore : nom de dossier
       }
-      host.reload(files[0]);
+      reloadTables(files[0]);
     }
     catalogUi.installed(acquisition.items);
   }
@@ -5040,7 +5191,8 @@ export function createLibrary(host: LibraryHost) {
       else {
         userGesture();
         if (built.actions[cursor]?.run === built.back) expectBack();
-        void built.actions[cursor]?.run();
+        const before = screen;
+        afterRun(built.actions[cursor]?.run(), before);
       }
     }
     // Exit dans le texte ou dans la liste de contenu : retour aux actions de l'écran ; Exit dans les actions : l'écran se ferme.
@@ -5059,7 +5211,8 @@ export function createLibrary(host: LibraryHost) {
       if (!hit) return false;
       reading.active = false;
       userGesture();
-      void hit.run();
+      const before = screen;
+      afterRun(hit.run(), before);
     }
     host.broadcast();
     return true;
@@ -5459,7 +5612,8 @@ export function createLibrary(host: LibraryHost) {
       userGesture();
       host.broadcast();
       if (built.actions[index]!.run === built.back) expectBack();
-      void built.actions[index]!.run();
+      const before = screen;
+      afterRun(built.actions[index]!.run(), before);
     }
   }
 
@@ -5583,6 +5737,35 @@ export function createLibrary(host: LibraryHost) {
     if (ms < SLOW_BUILD_MS || slowWarned.has(built.heading)) return;
     slowWarned.add(built.heading);
     console.warn(`Écran « ${built.heading} » lent à construire : ${Math.round(ms)} ms, refaits à chaque touche. Lire le disque à son ouverture, pas en le construisant.`); // i18n-ignore : journal
+  }
+
+  /**
+   * L'ouverture d'un écran (sa première construction, qui lit le disque) : une fois par écran, pas à
+   * chaque touche ; dite au journal quand elle se fait attendre (dossier de milliers de fichiers).
+   */
+  const openingWarned = new Set<string>();
+  function warnSlowOpening(built: Built, ms: number): void {
+    if (ms < SLOW_OPENING_MS || openingWarned.has(built.heading)) return;
+    openingWarned.add(built.heading);
+    console.warn(`Écran « ${built.heading} » long à ouvrir : ${Math.round(ms)} ms.`); // i18n-ignore : journal
+  }
+
+  /**
+   * En essai (démonstrations, bancs hors écran), chaque lecture du disque faite en construisant un
+   * écran est comptée (build-guard.ts) : le chronomètre ne voit que les gros cas, sur une borne chargée.
+   * Dit une fois par écran, avec les fonctions et le premier chemin lu de chacune.
+   */
+  const diskWatch = diskWatchEnabled();
+  const diskWarned = new Set<string>();
+  function watchedBuild(): Built {
+    const { value: built, reads } = countDiskReads(buildScreen);
+    warnDiskReads(built, reads);
+    return built;
+  }
+  function warnDiskReads(built: Built, reads: DiskReads): void {
+    if (!reads.count || diskWarned.has(built.heading)) return;
+    diskWarned.add(built.heading);
+    console.warn(`Écran « ${built.heading} » lit le disque en se construisant : ${describeDiskReads(reads)}. Lire à son ouverture, pas en le construisant.`); // i18n-ignore : journal
   }
 
   const unkeyedWarned = new Set<string>();
@@ -5858,7 +6041,7 @@ export function createLibrary(host: LibraryHost) {
   function remoteSurfaces(): { menu: boolean; keyboard: boolean } {
     const editor = (screen?.kind === 'edit' || screen?.kind === 'prompt') && screen.editor && screen.editor.kind !== 'choice';
     // Un écran décrit qui montre le bloc du téléphone (Built.phone) le réveille comme l'écran de la télécommande.
-    const phone = screen?.kind === 'custom' && Boolean(screen.build().phone);
+    const phone = screen?.kind === 'custom' && Boolean(build().phone);
     return { menu: Boolean(remoteMenu?.shown()) || phone, keyboard: Boolean(editor) };
   }
 
@@ -6090,6 +6273,10 @@ export function createLibrary(host: LibraryHost) {
     openSystem,
     openSystemRoot,
     openCustom,
+    /** Lecture du disque d'un écran fourni : faite à son ouverture, gardée tant qu'il reste affiché. */
+    kept,
+    /** Le disque a changé (guet des dossiers, téléchargement fini) : l'écran affiché relit ce qu'il montre. */
+    changed,
     /** Crédits de la communauté : page d'une table, La communauté, lignes de la roue et du mode attente. */
     credits,
     /** Position du curseur de l'écran ouvert (Activité récente : la ligne qu'on regarde est vue). */

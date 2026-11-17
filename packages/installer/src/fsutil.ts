@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { t } from '@cyberpinball/core';
+import { renameWithRetry, t } from '@cyberpinball/core';
 
 export function sha256OfFile(file: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -14,6 +14,9 @@ export function sha256OfFile(file: string): Promise<string> {
   });
 }
 
+/** Délai d'une extraction (VPX complet compris, sur un disque lent). */
+export const EXTRACT_TIMEOUT_MS = 10 * 60_000;
+
 /**
  * Extrait une archive zip avec le tar de Windows (bsdtar, présent depuis Windows 10 1803).
  * On appelle celui de System32 explicitement : celui de Git pour Windows ne lit pas les zip.
@@ -21,7 +24,8 @@ export function sha256OfFile(file: string): Promise<string> {
 export function extractZip(archive: string, destination: string): void {
   fs.mkdirSync(destination, { recursive: true });
   const tar = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
-  execFileSync(tar, ['-xf', archive, '-C', destination], { stdio: 'ignore', windowsHide: true });
+  // Jamais sans fin : une archive illisible ou un disque bloqué arrête l'installation avec une erreur.
+  execFileSync(tar, ['-xf', archive, '-C', destination], { stdio: 'ignore', windowsHide: true, timeout: EXTRACT_TIMEOUT_MS });
 }
 
 /** Si l'archive contient un seul dossier de premier niveau, on remonte son contenu. */
@@ -29,7 +33,7 @@ export function flattenSingleFolder(dir: string): void {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   if (entries.length !== 1 || !entries[0]!.isDirectory()) return;
   const inner = path.join(dir, entries[0]!.name);
-  for (const name of fs.readdirSync(inner)) fs.renameSync(path.join(inner, name), path.join(dir, name));
+  for (const name of fs.readdirSync(inner)) renameWithRetry(path.join(inner, name), path.join(dir, name));
   fs.rmdirSync(inner);
 }
 

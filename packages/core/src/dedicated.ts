@@ -18,6 +18,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { readJsonFile } from './store';
 import { t } from './i18n';
 
@@ -126,7 +127,7 @@ const RELAUNCH_FRESH_MS = 60_000;
  */
 export function writeShellRelaunch(dataDir: string, args: string[], now = Date.now()): void {
   fs.mkdirSync(dedicatedDir(dataDir), { recursive: true });
-  fs.writeFileSync(path.join(dedicatedDir(dataDir), RELAUNCH_FILE), JSON.stringify({ args, at: now }) + '\n', 'utf8');
+  writeFileAtomic(path.join(dedicatedDir(dataDir), RELAUNCH_FILE), JSON.stringify({ args, at: now }) + '\n');
 }
 
 /** Arguments laissés par la relance précédente, s'ils sont récents ; le fichier est consommé. */
@@ -200,7 +201,7 @@ export function loadDedicatedRecord(dataDir: string): DedicatedRecord | undefine
 
 export function saveDedicatedRecord(dataDir: string, record: DedicatedRecord): void {
   fs.mkdirSync(dedicatedDir(dataDir), { recursive: true });
-  fs.writeFileSync(path.join(dedicatedDir(dataDir), RECORD_FILE), JSON.stringify(record, null, 2) + '\n', 'utf8');
+  writeFileAtomic(path.join(dedicatedDir(dataDir), RECORD_FILE), JSON.stringify(record, null, 2) + '\n');
 }
 
 export function removeDedicatedRecord(dataDir: string): void {

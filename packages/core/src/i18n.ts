@@ -100,22 +100,50 @@ export function tn(count: number, one: string, many: string, params?: TextParams
 }
 
 export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {
-  return value.toLocaleString(locale(), options);
+  return formatter(`n|${locale()}|${options ? JSON.stringify(options) : ''}`, () => new Intl.NumberFormat(locale(), options)).format(value);
+}
+
+/**
+ * Formateurs gardés par langue et options : en créer un coûte cher (un relevé de 460 téléchargements
+ * prenait 700 ms à ses seules dates et tailles, refaites à chaque touche, 17/11/2026). Même texte que
+ * toLocaleString et toLocaleDateString, qui en créent un à chaque appel.
+ */
+const formatters = new Map<string, { format(value: never): string }>();
+function formatter<F extends { format(value: never): string }>(key: string, make: () => F): F {
+  let f = formatters.get(key) as F | undefined;
+  if (!f) {
+    f = make();
+    formatters.set(key, f);
+  }
+  return f;
+}
+
+const DATE_FIELDS = ['weekday', 'year', 'month', 'day', 'dateStyle', 'timeStyle'] as const;
+const ANY_FIELDS = [...DATE_FIELDS, 'dayPeriod', 'hour', 'minute', 'second', 'fractionalSecondDigits'] as const;
+
+/** Une date (toLocaleDateString, `date` ; toLocaleString, `any`), options complétées comme les leurs. */
+function formatDateValue(value: Date | number | string, kind: 'date' | 'any', options: Intl.DateTimeFormatOptions): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(date);
+  const fields = kind === 'date' ? DATE_FIELDS : ANY_FIELDS;
+  const given = fields.some((f) => (options as Record<string, unknown>)[f] !== undefined);
+  const full: Intl.DateTimeFormatOptions = given ? options : { ...options, year: 'numeric', month: 'numeric', day: 'numeric', ...(kind === 'any' ? { hour: 'numeric', minute: 'numeric', second: 'numeric' } : {}) };
+  return formatter(`d|${kind}|${locale()}|${JSON.stringify(full)}`, () => new Intl.DateTimeFormat(locale(), full)).format(date as never);
 }
 
 /** Liste dite à la façon de la langue : « a, b et c », « a, b and c » (`or` : « ou », « or »). */
 export function formatList(items: readonly string[], kind: 'and' | 'or' = 'and'): string {
-  return new Intl.ListFormat(locale(), { type: kind === 'and' ? 'conjunction' : 'disjunction' }).format(items);
+  return formatter(`l|${kind}|${locale()}`, () => new Intl.ListFormat(locale(), { type: kind === 'and' ? 'conjunction' : 'disjunction' })).format(items as never);
 }
 
 /** Date seule, longue par défaut (« 24 octobre 2026 », « 24 October 2026 »). */
 export function formatDate(value: Date | number | string, options: Intl.DateTimeFormatOptions = { dateStyle: 'long' }): string {
-  return new Date(value).toLocaleDateString(locale(), options);
+  return formatDateValue(value, 'date', options);
 }
 
 /** Date et heure (« 24 octobre 2026 à 14:05 », « 24 October 2026 at 14:05 »). */
 export function formatDateTime(value: Date | number | string, options: Intl.DateTimeFormatOptions = { dateStyle: 'long', timeStyle: 'short' }): string {
-  return new Date(value).toLocaleString(locale(), options);
+  return formatDateValue(value, 'any', options);
 }
 
 /** Langue par défaut : celle de Windows si c'est le français, l'anglais sinon. */

@@ -63,8 +63,42 @@ export function avatarHue(key: string): number {
 
 /** La pastille d'un joueur : son image si on l'a (`file`), sinon ses initiales. */
 export function avatarView(key: string, name: string, file?: string): AvatarView {
-  return { ...(file ? { src: mediaUrl(file) } : {}), initials: avatarInitials(name), hue: avatarHue(key) };
+  return { ...(file ? { src: avatarUrl(file) } : {}), initials: avatarInitials(name), hue: avatarHue(key) };
 }
+
+/**
+ * Adresses des avatars, gardées : un avatar est nommé par l'empreinte de son image, il ne change
+ * jamais. Les écrans qui en montrent beaucoup (Joueurs en ligne, un salon, les classements) sont
+ * reconstruits à chaque touche ; relever chaque fichier à chaque fois les ralentissait (17/11/2026).
+ */
+const avatarUrls = new Map<string, string>();
+function avatarUrl(file: string): string {
+  if (!isAvatarFileName(path.basename(file))) return mediaUrl(file);
+  const known = avatarUrls.get(file);
+  if (known) return known;
+  const url = mediaUrl(file);
+  // Gardée seulement quand le fichier a été trouvé (l'adresse porte sa date et sa taille).
+  if (url.includes('?v=')) avatarUrls.set(file, url);
+  return url;
+}
+
+/** Avatars présents ou absents du dossier, par nom : relevés une fois, tenus à jour par writeAvatarFile et pruneAvatarFiles. */
+const avatarHeld = new Map<string, boolean>();
+
+/** Le fichier de cet avatar (empreinte) s'il est dans le dossier, sans relire le disque à chaque écran. */
+export function heldAvatarFile(dataDir: string, hash: string): string | undefined {
+  for (const ext of AVATAR_FILE_EXTS) {
+    const file = avatarPath(dataDir, `${hash}.${ext}`);
+    let held = avatarHeld.get(file);
+    if (held === undefined) {
+      held = fs.existsSync(file);
+      avatarHeld.set(file, held);
+    }
+    if (held) return `${hash}.${ext}`;
+  }
+  return undefined;
+}
+const AVATAR_FILE_EXTS = ['jpg', 'png', 'webp'] as const;
 
 // ---------------------------------------------------------------------------
 // Fichiers
@@ -98,6 +132,7 @@ export function writeAvatarFile(dataDir: string, image: AvatarImage): string {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     writeFileAtomic(file, image.bytes);
   }
+  avatarHeld.set(file, true);
   return name;
 }
 
@@ -131,6 +166,8 @@ export function pruneAvatarFiles(dataDir: string, keep: Iterable<string>): strin
     if (!isAvatarFileName(name) || wanted.has(name.toLowerCase())) continue;
     try {
       fs.rmSync(avatarPath(dataDir, name), { force: true });
+      avatarHeld.delete(avatarPath(dataDir, name));
+      avatarUrls.delete(avatarPath(dataDir, name));
       removed.push(name);
     } catch {
       // Fichier tenu par le rendu : il partira au prochain rangement.

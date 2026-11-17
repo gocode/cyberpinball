@@ -178,7 +178,7 @@ $Actions = [ordered]@{
   'verifier' = @{
     Label = 'Vérifier avant de publier (tests, contrôle de publication, nouveautés de la version)'
     Run   = {
-      Invoke-Checked { npm test } 'Les tests'
+      Invoke-Checked { npm run avant-fusion } 'Le contrôle de publication et les tests'
       Invoke-Checked { node scripts/version-suivante.mjs --verifier } 'La vérification des nouveautés'
     }
   }

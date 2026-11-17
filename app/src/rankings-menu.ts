@@ -23,6 +23,8 @@ export interface RankingsMenuHost {
     openCustom(build: () => Built, at?: number): void;
     /** Le tableau des scores d'une table, à cette portée et cette période ; son « Retour » vers `back`. */
     openScores(table: TableEntry, scope: RankingScope, period: ScorePeriod, back: () => void): void;
+    /** Lecture d'un écran faite à son ouverture, gardée pour les touches qui suivent (library.ts). */
+    kept?<T>(key: string, read: () => T): T;
   };
   tables(): readonly TableEntry[];
   /** Les scores relevés sur cette borne (table-scores.ts). */
@@ -122,7 +124,17 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
     return { ranked, without: without + unranked, pending, ...(unavailable ? { unavailable } : {}) };
   }
 
+  /**
+   * Chaque table relit ses scores (sa mémoire de ROM) : lu à l'ouverture de l'écran, pour les quatre
+   * portées (les onglets les comptent), gardé pour les touches qui suivent ; MagnaSave change de portée
+   * sans rien relire. Une période choisie (Start) ou des classements arrivés du réseau relisent tout.
+   */
   function boardOf(sc: RankingScope, p: ScorePeriod): Board {
+    const keep = host.library.kept ?? (<T>(_key: string, read: () => T) => read());
+    return keep(`classement:${sc}|${p}`, () => freshBoard(sc, p));
+  }
+
+  function freshBoard(sc: RankingScope, p: ScorePeriod): Board {
     const key = `${sc}|${p}`;
     const known = cache.get(key);
     if (known && now() - known.at < BOARD_TTL_MS) return known.board;

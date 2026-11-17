@@ -5,11 +5,11 @@
 // déclarées à koffi : leurs tailles sont figées par l'ABI Windows et c'est plus
 // facile à vérifier contre la documentation.
 
-import { execFileSync } from 'node:child_process';
 import * as koffi from 'koffi';
-import { edidFromHex, edidMaxRefresh, parseEdid, t, type Connection, type EdidInfo, type ObservedDisplay, type Rotation } from '@cyberpinball/core';
+import { edidMaxRefresh, parseEdid, t, type Connection, type EdidInfo, type ObservedDisplay, type Rotation } from '@cyberpinball/core';
 import { displayRefresh } from './orientation';
 import { monitorContainerId } from './audio';
+import { hklmValue } from './registry';
 
 const QDC_ONLY_ACTIVE_PATHS = 0x2;
 const ERROR_INSUFFICIENT_BUFFER = 122;
@@ -256,17 +256,42 @@ function readEdid(devicePath: string): EdidInfo | undefined {
   return bytes ? parseEdid(bytes) : undefined;
 }
 
-function readEdidBytes(devicePath: string): Uint8Array | undefined {
+/**
+ * EDID déjà lus, par chemin de périphérique (modèle et instance : un même écran branché au même
+ * endroit). Les écrans sont relevés plusieurs fois à chaque lancement d'une table ; l'EDID était lu
+ * en lançant reg.exe, un processus bloquant par écran et par relevé (17/11/2026). Un échec n'est
+ * pas gardé : l'écran peut finir de s'annoncer au relevé suivant.
+ */
+const edidCache = new Map<string, Uint8Array>();
+
+/** Oublie les EDID déjà lus (essais). */
+export function clearEdidCache(): void {
+  edidCache.clear();
+}
+
+/** Clé du registre (sous HKLM) où Windows range l'EDID d'un écran, d'après son chemin de périphérique. */
+export function edidRegistryKey(devicePath: string): string | undefined {
   const parts = devicePath.split('#');
-  if (parts.length < 3) return undefined;
-  const key = `HKLM\\SYSTEM\\CurrentControlSet\\Enum\\DISPLAY\\${parts[1]}\\${parts[2]}\\Device Parameters`;
+  if (parts.length < 3 || !parts[1] || !parts[2]) return undefined;
+  return `SYSTEM\\CurrentControlSet\\Enum\\DISPLAY\\${parts[1]}\\${parts[2]}\\Device Parameters`;
+}
+
+/** EDID brut, lu par l'API du registre (registry.ts), sans lancer de processus ; `read` remplaçable pour les essais. */
+export function readEdidBytes(devicePath: string, read: (key: string, name: string) => unknown = hklmValue): Uint8Array | undefined {
+  const known = edidCache.get(devicePath);
+  if (known) return known;
+  const key = edidRegistryKey(devicePath);
+  if (!key) return undefined;
+  let value: unknown;
   try {
-    const out = execFileSync('reg', ['query', key, '/v', 'EDID'], { encoding: 'utf8', windowsHide: true });
-    const hex = /EDID\s+REG_BINARY\s+([0-9A-Fa-f]+)/.exec(out)?.[1];
-    return hex ? edidFromHex(hex) : undefined;
+    value = read(key, 'EDID');
   } catch {
     return undefined;
   }
+  // Un EDID fait au moins un bloc de 128 octets ; autre chose (valeur absente ou d'un autre type) n'en est pas un.
+  if (!(value instanceof Uint8Array) || value.length < 128) return undefined;
+  edidCache.set(devicePath, value);
+  return value;
 }
 
 function wideString(buf: Buffer, offset: number, length: number): string {

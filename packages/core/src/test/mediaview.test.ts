@@ -297,7 +297,8 @@ test('tout type montré sur la fiche y a son écran : Prospectus et Règles', ()
   const library = fs.readFileSync(path.join(APP, 'src', 'library.ts'), 'utf8');
   // Un seul livret, « Prospectus et règles » : chaque type y a ses pages, tournées d'un type à l'autre.
   assert.match(library, /\r?\n\s+pagesAction\(table\),\r?\n/, 'action de la fiche');
-  assert.match(library, /const parts = SHEET_PAGE_TYPES\.map\(/, 'chaque type dit dans le détail de l’action');
+  // Lu à l'ouverture de la fiche et gardé pour les touches qui suivent (kept, 17/11/2026).
+  assert.match(library, /const parts = kept\(`livret:\$\{table\.file\}`, \(\) => \{[\s\S]{0,200}?return SHEET_PAGE_TYPES\.map\(/, 'chaque type dit dans le détail de l’action');
   assert.match(library, /function turnBooklet\(s: PagesScreen, counts: number\[\], step: number\): void \{\r?\n\s+const total = counts\.reduce/, 'livret tourné à travers les types');
   assert.match(fs.readFileSync(path.join(APP, 'renderer', 'library.js'), 'utf8'), /function renderPages\(/, 'rendu des pages');
 });

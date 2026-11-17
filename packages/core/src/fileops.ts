@@ -5,7 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { renameWithRetry } from './atomicwrite';
+import { atomicTempPath, renameWithRetry } from './atomicwrite';
 import { copyTree } from './copytree';
 import { formatNumber, t } from './i18n';
 import { buildZip, writeZipData, type RomZipMember } from './romzip';
@@ -70,9 +70,7 @@ export function applyOps(ops: FileOp[], ctx: OpContext): void {
         fs.rmSync(op.path, { recursive: true, force: true });
         break;
       case 'write':
-        if (fs.existsSync(op.path)) moveToTrash(op.path, ctx);
-        fs.mkdirSync(path.dirname(op.path), { recursive: true });
-        fs.writeFileSync(op.path, op.content, op.encoding ?? 'utf8');
+        writeReplacing(op.path, op.content, op.encoding ?? 'utf8', ctx);
         break;
       case 'link':
         linkFile(op.from, op.to, ctx);
@@ -86,6 +84,34 @@ export function applyOps(ops: FileOp[], ctx: OpContext): void {
       }
     }
   }
+}
+
+/**
+ * Écrit un fichier de table (.info, .vbs, .ini, screens.pup…) sans jamais le laisser tronqué ni
+ * absent : le nouveau contenu entier dans un temporaire, une copie de l'ancien à la corbeille, puis
+ * le temporaire renommé à sa place. Avant le 17/11/2026, l'ancien partait d'abord à la corbeille et
+ * le nouveau s'écrivait directement : une coupure de courant entre les deux (une borne s'éteint à
+ * l'interrupteur) laissait la table sans son fichier, ou avec un fichier à moitié écrit.
+ */
+function writeReplacing(file: string, content: string, encoding: BufferEncoding, ctx: OpContext): void {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const tmp = atomicTempPath(file);
+  fs.writeFileSync(tmp, content, encoding);
+  try {
+    if (fs.existsSync(file)) copyToTrash(file, ctx);
+    renameWithRetry(tmp, file);
+  } catch (error) {
+    fs.rmSync(tmp, { force: true });
+    throw error;
+  }
+}
+
+/** Copie à la corbeille (l'original reste en place) ; rend la copie. */
+function copyToTrash(target: string, ctx: OpContext): string {
+  fs.mkdirSync(ctx.trashDir, { recursive: true });
+  const dest = path.join(ctx.trashDir, uniqueTrashName(ctx.trashDir, target));
+  fs.copyFileSync(target, dest);
+  return dest;
 }
 
 /**

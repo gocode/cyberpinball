@@ -19,6 +19,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { dedicatedDir, HANDOVER_EXIT_CODE } from './dedicated';
 import { t } from './i18n';
 import { readJsonFile } from './store';
@@ -167,7 +168,7 @@ export function loadSettingsRecord(dataDir: string): SettingsRecord | undefined 
 
 export function saveSettingsRecord(dataDir: string, record: SettingsRecord): void {
   fs.mkdirSync(dedicatedDir(dataDir), { recursive: true });
-  fs.writeFileSync(path.join(dedicatedDir(dataDir), SETTINGS_FILE), JSON.stringify(record, null, 2) + '\n', 'utf8');
+  writeFileAtomic(path.join(dedicatedDir(dataDir), SETTINGS_FILE), JSON.stringify(record, null, 2) + '\n');
 }
 
 export function removeSettingsRecord(dataDir: string): void {
