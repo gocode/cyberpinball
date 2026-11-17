@@ -163,6 +163,14 @@ export function hardwareDmdDriverProblem(d: DetectedDmd): string | undefined {
         { why: code ? ` (${code})` : service ? t(' (pilote actuel : {service})', { service: device.service! }) : '' },
       );
     }
+    // libusb n'ouvre libusb0 (libusb-win32, le pilote des anciens outils du PIN2DMD) et libusbK que par
+    // libusbK.dll ; sans elle, seul WinUSB marche (libusb, windows_winusb.c, winusbx_init).
+    if (service !== 'winusb' && device.libusbKDll === false) {
+      return t(
+        'PIN2DMD : son pilote {service} ne s’ouvre que par libusbK.dll, absente de Windows. VPX ne pourra pas l’ouvrir et le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».',
+        { service: device.service! },
+      );
+    }
     return undefined;
   }
   // ZeDMD et Pixelcade : un port série. Sans port, le pilote du convertisseur manque.
@@ -274,6 +282,8 @@ export interface HardwareDmdFacts {
   devices: string[];
   /** Pilotes manquants ou refusés, tels quels. */
   problems: string[];
+  /** « Image du front-end : oui » : le DMD réel montre aussi le front-end entre les parties. */
+  menu?: boolean;
 }
 
 /** serverProblem : pourquoi le serveur du DMD ne peut pas tourner (app/src/dmd-server.ts), lu si « Image du menu » est demandée. */
@@ -283,7 +293,7 @@ export function hardwareDmdFacts(devices: ObservedUsbDevice[], setup?: HardwareD
   if (setup?.zedmdWifi?.enabled) names.push(t('ZeDMD en wifi ({address})', { address: setup.zedmdWifi.address }));
   const problems = on.map((d) => hardwareDmdDriverProblem(d)).filter((p): p is string => Boolean(p));
   if (setup?.menu && names.length && serverProblem) problems.push(t('Image du front-end sur le DMD réel : {problem}', { problem: serverProblem }));
-  return { devices: names, problems };
+  return { devices: names, problems, ...(setup?.menu ? { menu: true } : {}) };
 }
 
 /** « ZeDMD (COM3) », « PIN2DMD HD » */

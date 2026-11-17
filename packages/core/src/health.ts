@@ -620,7 +620,10 @@ export function hardwareDmdLines(facts: HardwareDmdFacts): HealthLine[] {
       check: 'dmd',
       state: 'ok',
       title: t('DMD réel prêt : {devices}', { devices: facts.devices.join(', ') }),
-      detail: t('VPX l’alimente pendant les parties (prise en charge en bêta)'),
+      // Sans « Image du front-end », la Santé dit où l'allumer : un joueur équipé n'a pas à le deviner.
+      detail: facts.menu
+        ? t('VPX l’alimente pendant les parties, le front-end entre elles (prise en charge en bêta)')
+        : t('VPX l’alimente pendant les parties ; « Image du front-end » lui fait aussi montrer le front-end (prise en charge en bêta)'),
       go,
       target,
     },

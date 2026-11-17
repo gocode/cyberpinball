@@ -434,6 +434,15 @@ test('DMD réel : pilote manquant signalé (PIN2DMD sans WinUSB, ZeDMD sans port
   const [noPort] = detectHardwareDmds([usb('USB\\VID_1A86&PID_7523\\5&3&0&4', { problem: 28 })]);
   assert.match(hardwareDmdDriverProblem(noPort!)!, /port COM.*CH340\/CH343 de WCH/);
   assert.equal(hardwareDmdDriverProblem(detectHardwareDmds([CH340])[0]!), undefined);
+  // libusb0 (libusb-win32 d'autrefois) et libusbK : ouverts par libusbK.dll seulement ; sans elle, noir.
+  const PIN2DMD_ID = 'USB\\VID_0314&PID_E457\\5&1&0&2';
+  const [libusb0Sans] = detectHardwareDmds([usb(PIN2DMD_ID, { service: 'libusb0', libusbKDll: false })]);
+  assert.match(hardwareDmdDriverProblem(libusb0Sans!)!, /pilote libusb0 ne s’ouvre que par libusbK\.dll.*WinUSB avec Zadig/);
+  const [libusbKSans] = detectHardwareDmds([usb(PIN2DMD_ID, { service: 'libusbK', libusbKDll: false })]);
+  assert.match(hardwareDmdDriverProblem(libusbKSans!)!, /pilote libusbK ne s’ouvre que par libusbK\.dll/);
+  assert.equal(hardwareDmdDriverProblem(detectHardwareDmds([usb(PIN2DMD_ID, { service: 'libusb0', libusbKDll: true })])[0]!), undefined);
+  // Non relevé (fichier d'essai, ancienne sonde) : rien à signaler, comme avant.
+  assert.equal(hardwareDmdDriverProblem(detectHardwareDmds([usb(PIN2DMD_ID, { service: 'libusb0' })])[0]!), undefined);
   // Dans la synchronisation : un avertissement, la clé écrite quand même (VPX réessaiera une fois le pilote installé).
   const plan = vpxDmdSettings([PIN2DMD_SANS_PILOTE]);
   assert.ok(plan.findings.some((f) => f.severity === 'warning' && f.message.startsWith('PIN2DMD')));
@@ -447,6 +456,10 @@ test('DMD réel : santé de la borne, prêt ou pilote à installer, rien sans DM
   assert.equal(ready[0]!.state, 'ok');
   assert.match(ready[0]!.title, /PIN2DMD HD, ZeDMD en wifi \(zedmd-wifi\.local\)/);
   assert.deepEqual(ready[0]!.target, { kind: 'system', item: 'hardware-dmd' });
+  // Image du front-end pas encore demandée : la Santé dit où l'allumer ; demandée : ce que fait le DMD.
+  assert.match(ready[0]!.detail!, /« Image du front-end » lui fait aussi montrer le front-end/);
+  const withMenu = hardwareDmdLines(hardwareDmdFacts([PIN2DMD_WINUSB], { menu: true }));
+  assert.match(withMenu[0]!.detail!, /le front-end entre elles/);
   const missing = hardwareDmdLines(hardwareDmdFacts([PIN2DMD_SANS_PILOTE]));
   assert.equal(missing[0]!.state, 'check');
   // Éteint par l'utilisateur : ni ligne, ni pilote réclamé.

@@ -5,6 +5,8 @@
 // un DMD réel sans déranger le matériel (les détecteurs de libdmdutil, eux,
 // ouvrent chaque port et envoient une poignée de main).
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import * as koffi from 'koffi';
 import { t, type ObservedUsbDevice } from '@cyberpinball/core';
 import { hklmValue } from './registry';
@@ -90,6 +92,9 @@ export function probeUsbDevices(): ObservedUsbDevice[] {
     const service = text(key, 'Service');
     const status = deviceStatus(instanceId);
     const product = busReportedName(instanceId);
+    // libusb0 et libusbK ne s'ouvrent que par libusbK.dll (libusb la charge depuis System32 seulement) :
+    // un PIN2DMD au pilote libusb-win32 d'autrefois, sans elle, reste noir sous VPX.
+    const libusbKDll = service && /^libusb(0|k)$/i.test(service) ? libusbKInstalled() : undefined;
     devices.push({
       instanceId,
       vid: parseInt(ids[1]!, 16),
@@ -98,11 +103,17 @@ export function probeUsbDevices(): ObservedUsbDevice[] {
       ...(port ? { port } : {}),
       ...(deviceClass ? { deviceClass } : {}),
       ...(service ? { service } : {}),
+      ...(libusbKDll !== undefined ? { libusbKDll } : {}),
       ...(status?.problem ? { problem: status.problem } : {}),
       ...(product ? { product } : {}),
     });
   }
   return devices;
+}
+
+/** libusbK.dll dans le dossier système de Windows (installée avec les pilotes libusbK, pas avec libusb-win32). */
+function libusbKInstalled(): boolean {
+  return fs.existsSync(path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'libusbK.dll'));
 }
 
 /** DeviceDesc est souvent une référence au pilote : « @oem12.inf,%ch340.devicedesc%;USB-SERIAL CH340 » -> le texte après le dernier « ; ». */

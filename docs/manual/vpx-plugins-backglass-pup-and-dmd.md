@@ -60,12 +60,14 @@ Support stays in beta until equipped cabinets have confirmed it: the "BÊTA" (BE
   Start asks for its name or IP address (`zedmd-wifi.local` without any setting, libzedmd's name); empty, Wi-Fi is turned off and the address kept. libdmdutil opens it even without `ZeDMD = 1` (`DMD::FindDisplays`).
 - **Drivers**, read without opening anything: the driver service (registry `Service`) and the Device Manager code (`CM_Get_DevNode_Status`).
   The PIN2DMD goes through libusb, which needs a generic driver (WinUSB, libusbK or libusb0); another driver, or none, is reported with the PIN2DMD tool or Zadig.
+  libusb only opens libusb0 (the libusb-win32 of older PIN2DMD tools) and libusbK through `libusbK.dll`, loaded from `System32` only (`windows_winusb.c`, `winusbx_init`): without it, the driver is reported with the advice to switch to WinUSB with Zadig (`libusbKDll`, read by `packages/win-displays/src/usb.ts`).
   A ZeDMD or a Pixelcade without a COM port lacks its chip's driver (WCH CH340/CH343, Silicon Labs CP210x).
 - **PIN2DMD size**: the name the board gives to USB, read by Windows when it is plugged in (`DEVPKEY_Device_BusReportedDeviceDesc`): "PIN2DMD" 128 × 32, "PIN2DMD XL" 192 × 64, "PIN2DMD HD" 256 × 64, as libdmdutil does (`PIN2DMD.cpp`).
   The ZeDMD gives its size only when connected.
 
 The choices are kept with the cabinet configuration (`cabinet.json`, `hardwareDmd`) and picked up by the synchronization that precedes each game.
 Cabinet health has a "DMD réel" (Real DMD) check: ready, or a driver to install.
+Ready without "Menu image", it says that this choice makes the real DMD show the menu too.
 
 **Menu image (beta).**
 The "Image du menu" (Menu image) setting of "DMD réel" (Real DMD), off by default: the real DMD also shows the menu DMD between games, not only during them.

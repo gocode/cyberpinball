@@ -239,6 +239,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **"DMD screen"**: say once whether it is a FullDMD (16:9 screen, the game's DMD inset) or a DMD only (4:1 strip). The menu, VPX and PuP-Packs follow it; an ambiguous case is flagged "To check".
 - **FullDMD frame during the game**: the table's FullDMD image stays on screen and the game's DMD sits in its frame, found on its own in the image or video.
 - **Real DMDs recognised** without opening a port (ZeDMD, PIN2DMD, Pixelcade): the plugin that drives them is switched on for you.
+- **Real DMD (beta)**, in System menu > Cabinet > DMD > "Real DMD": one choice per model (automatic, yes, no), the ZeDMD over Wi-Fi, the missing driver shown on screen. "Menu image: yes" makes it show the menu's DMD between games too; VPX takes it back during a game.
 
 <p align="center"><img src="images/en/features/dmd-screen.webp?v=d12e559721" width="360" alt="DMD screen: “It's a FullDMD” or “It's a DMD only”, each with its diagram."></p>
 
@@ -718,7 +719,7 @@ Cyber Pinball is an early prototype (0.1.x). What isn't there yet:
 
 - **Windows only**, and only Visual Pinball X 10.8.1 in plugin mode: no classic mode, no other emulators for now.
 - **Unsigned installers**: Windows SmartScreen warns when you install.
-- **Real DMDs** (ZeDMD, PIN2DMD, Pixelcade): driven by VPX during games, not by the menu yet.
+- **Real DMDs** (ZeDMD, PIN2DMD, Pixelcade): in beta, during games as in the menu, until cabinets fitted with them have confirmed it.
 - **Knocker**: it doesn't fire yet for a high score beaten on a table whose ROM keeps its high scores (the scoreboard, for its part, reads them after every game).
 - **Virtual reality and 3D vision** are in beta. The Kinect for Xbox One is recognised, but not supported yet.
 - **Avatars**: only a picture of your own, no ready-made avatars yet; an animated picture becomes still.

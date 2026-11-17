@@ -11,6 +11,9 @@ son interface).
 
 ## 0.1.14
 
+- DMD réel (bêta) : un ZeDMD, un PIN2DMD ou un Pixelcade branché à la borne est reconnu tout seul, sans ouvrir son port, et VPX l'allume pendant les parties. Tout se règle dans Menu système > Borne > DMD > « DMD réel » : un choix par modèle (automatique, oui, non), le ZeDMD en wifi, et le pilote qui manque dit à l'écran et dans la Santé de la borne.
+- DMD réel (bêta) : « Image du front-end : oui » lui fait aussi montrer le DMD du front-end entre les parties (horloge, crédits, Juke-box…) ; VPX le reprend dès qu'une partie commence, puis le rend au retour.
+- DMD réel (bêta) : un PIN2DMD resté sur le pilote libusb-win32 des anciens outils, que VPX ne peut pas ouvrir sur la plupart des PC, est signalé avec la marche à suivre (passer à WinUSB avec Zadig). La Santé de la borne dit aussi où allumer l'image du front-end.
 - Pseudo obligatoire : au démarrage, l'écran « Votre profil de joueur » ne se quitte plus sans avoir choisi son pseudo (« Continuer » grisé, Exit le rappelle) ; il revient tant que le profil garde le nom donné d'office, l'avatar reste facultatif.
 - Groupes (Communauté) : les « Groupes privés » deviennent « Groupes », publics ou privés. Un groupe privé n'apparaît nulle part, on y entre sur invitation ; un groupe public paraît dans la liste des groupes publics de toutes les bornes, et n'importe quel joueur le rejoint d'un appui. Le créateur choisit l'accès en créant le groupe et le change ensuite dans « Membres ». La discussion, la table de la semaine et le classement restent entre membres.
 - Pinball FX (bêta), fiche d’ajout : un média qui se télécharge depuis un site (VPUniverse, VPForums) n’est plus pris d’office ; sa carte dit sa taille, si c’est un pack commun à plusieurs tables (Cyber Pinball n’y prend que le fichier de la table) et que la page du site s’ouvre pendant son attente. Un pack de logos Pinball FX déjà reçu donne le logo de chaque table, d’après son numéro dans le jeu (« Table_97.png »).

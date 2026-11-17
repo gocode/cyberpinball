@@ -26,6 +26,7 @@
   Un réglage général de VPX changé après la création d'une configuration ne vaut que pour la configuration active.
   L'écran de choix, la gestion des configurations et le bandeau n'ont pas encore été capturés (en attente du mode de test hors écran, pour ne pas occuper les écrans du poste).
 - Mode plugins de VPX 10.8.1 seulement : pas encore de `ScreenRes.txt`, `DmdDevice.ini` ni `B2STableSettings.xml` pour le mode classique ; DOF par le plugin de VPX seulement (pas de DirectOutput.dll classique), sans essai des LED hors partie.
+  Le DMD réel n'en a pas besoin : en mode plugins, VPX l'alimente par son plugin DMDUtil (`[Plugin.DMDUtil]`), et `DmdDevice.ini` n'est lu que par le `DmdDevice64.dll` de VPinMAME, en mode classique.
 - Zones : l'ordre de superposition de deux zones qui se chevauchent et la rotation d'une zone ne se règlent pas (VPX n'en a pas de réglage).
   Le rendu réel dans VPX reste à vérifier sur une borne, en particulier le playfield fenêtré d'un poste de bureau.
 - Boutons : touches du clavier et boutons de joystick (Pinscape, encodeur en mode manette ; voir « Boutons de la borne »).

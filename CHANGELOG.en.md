@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Real DMD (beta): a ZeDMD, PIN2DMD or Pixelcade plugged into the cabinet is recognised on its own, without opening its port, and VPX lights it during games. Everything is set in System menu > Cabinet > DMD > "Real DMD": one choice per model (automatic, yes, no), the ZeDMD over Wi-Fi, and a missing driver shown on screen and in cabinet health.
+- Real DMD (beta): "Menu image: yes" makes it show the menu's DMD between games too (clock, credits, Jukebox…); VPX takes it over as soon as a game starts, then hands it back afterwards.
+- Real DMD (beta): a PIN2DMD still on the libusb-win32 driver of older tools, which VPX cannot open on most PCs, is reported with what to do (switch to WinUSB with Zadig). Cabinet health also says where to turn on the menu image.
 - Mandatory nickname: at start, the "Your player profile" screen can no longer be left without choosing a nickname ("Continue" greyed out, Exit reminds you); it comes back as long as the profile keeps the default name, the avatar stays optional.
 - Groups (Community): "Private groups" become "Groups", public or private. A private group appears nowhere, you get in by invitation; a public group appears in the public group list of every cabinet, and any player joins it with one press. The creator chooses the access when creating the group and changes it later in "Members". The chat, the table of the week and the leaderboard stay between members.
 - Pinball FX (beta), add page: a media file downloaded from a site (VPUniverse, VPForums) is no longer taken by default; its card says its size, whether it is a pack shared by several tables (Cyber Pinball only takes the table's file from it) and that the site page opens during its wait. A Pinball FX logo pack already received gives each table its logo, from its number in the game ("Table_97.png").

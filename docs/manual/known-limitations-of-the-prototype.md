@@ -26,6 +26,7 @@
   A general VPX setting changed after a configuration was created only applies to the active configuration.
   The selection screen, configuration management and the banner have not been captured yet (waiting for the off-screen test mode, so as not to occupy the machine's screens).
 - VPX 10.8.1 plugin mode only: no `ScreenRes.txt`, `DmdDevice.ini` or `B2STableSettings.xml` yet for classic mode; DOF through the VPX plugin only (no classic DirectOutput.dll), with no LED test outside a game.
+  The real DMD does not need it: in plugin mode, VPX drives it through its DMDUtil plugin (`[Plugin.DMDUtil]`), and `DmdDevice.ini` is only read by VPinMAME's `DmdDevice64.dll`, in classic mode.
 - Zones: the stacking order of two overlapping zones and the rotation of a zone cannot be set (VPX has no setting for them).
   The actual rendering in VPX still has to be checked on a cabinet, in particular the windowed playfield of a desktop PC.
 - Buttons: keyboard keys and joystick buttons (Pinscape, encoder in gamepad mode; see "Cabinet buttons").

@@ -60,12 +60,14 @@ La prise en charge reste en bêta tant que des bornes équipées ne l'ont pas co
   Start demande son nom ou son adresse IP (`zedmd-wifi.local` sans réglage, nom de libzedmd) ; vide, le wifi est coupé et l'adresse gardée. libdmdutil l'ouvre même sans `ZeDMD = 1` (`DMD::FindDisplays`).
 - **Pilotes**, lus sans rien ouvrir : le service du pilote (`Service` du registre) et le code du Gestionnaire de périphériques (`CM_Get_DevNode_Status`).
   Le PIN2DMD passe par libusb, qui demande un pilote générique (WinUSB, libusbK ou libusb0) ; un autre pilote, ou aucun, est signalé avec l'outil du PIN2DMD ou Zadig.
+  libusb n'ouvre libusb0 (le libusb-win32 des anciens outils du PIN2DMD) et libusbK que par `libusbK.dll`, chargée depuis `System32` seulement (`windows_winusb.c`, `winusbx_init`) : sans elle, le pilote est signalé avec le conseil de passer à WinUSB par Zadig (`libusbKDll`, relevé par `packages/win-displays/src/usb.ts`).
   Un ZeDMD ou un Pixelcade sans port COM manque du pilote de sa puce (CH340/CH343 de WCH, CP210x de Silicon Labs).
 - **Taille du PIN2DMD** : le nom que la carte donne à l'USB, lu par Windows au branchement (`DEVPKEY_Device_BusReportedDeviceDesc`) : « PIN2DMD » 128 × 32, « PIN2DMD XL » 192 × 64, « PIN2DMD HD » 256 × 64, comme libdmdutil (`PIN2DMD.cpp`).
   Le ZeDMD donne sa taille à la connexion seulement.
 
 Les choix sont gardés avec la configuration de la borne (`cabinet.json`, `hardwareDmd`) et repris par la synchronisation qui précède chaque partie.
 La santé de la borne a un contrôle « DMD réel » : prêt, ou un pilote à installer.
+Prêt sans « Image du front-end », il dit que ce choix fait aussi montrer le front-end au DMD réel.
 
 **Image du front-end (bêta).**
 Réglage « Image du front-end » de « DMD réel », non par défaut : le DMD réel montre aussi le DMD du front-end entre les parties, pas seulement pendant celles-ci.

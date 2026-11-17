@@ -10,6 +10,8 @@ export const messages: Record<string, string> = {
   ' (pilote actuel : {service})': ' (current driver: {service})',
   'PIN2DMD : Windows ne lui a pas donné de pilote USB générique (WinUSB ou libusbK){why}. VPX ne pourra pas l’ouvrir et le DMD restera noir. Installez ce pilote avec l’outil fourni avec le PIN2DMD ou avec Zadig, puis « Vérifier de nouveau ».':
     'PIN2DMD: Windows has not given it a generic USB driver (WinUSB or libusbK){why}. VPX will not be able to open it and the DMD will stay dark. Install that driver with the tool that comes with the PIN2DMD or with Zadig, then “Check again”.',
+  'PIN2DMD : son pilote {service} ne s’ouvre que par libusbK.dll, absente de Windows. VPX ne pourra pas l’ouvrir et le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».':
+    'PIN2DMD: its {service} driver can only be opened through libusbK.dll, which Windows does not have. VPX will not be able to open it and the DMD will stay dark. Replace that driver with WinUSB using Zadig (Options > List All Devices, pick the PIN2DMD, WinUSB, Replace Driver), then “Check again”.',
   'pilote CH340/CH343 de WCH': 'WCH CH340/CH343 driver',
   'pilote CP210x de Silicon Labs': 'Silicon Labs CP210x driver',
   'pilote du port série USB': 'USB serial port driver',
@@ -22,7 +24,9 @@ export const messages: Record<string, string> = {
   // health.ts
   'Ouvrir DMD réel': 'Open Real DMD',
   'DMD réel prêt : {devices}': 'Real DMD ready: {devices}',
-  'VPX l’alimente pendant les parties (prise en charge en bêta)': 'VPX drives it during games (beta support)',
+  'VPX l’alimente pendant les parties, le front-end entre elles (prise en charge en bêta)': 'VPX drives it during games, the menu between them (beta support)',
+  'VPX l’alimente pendant les parties ; « Image du front-end » lui fait aussi montrer le front-end (prise en charge en bêta)':
+    'VPX drives it during games; “Menu image” makes it show the menu too (beta support)',
   // settings.ts
   'Elle suit le DMD réel reconnu à son identifiant USB (ZeDMD, PIN2DMD, Pixelcade) et les choix de « DMD réel ».': 'It follows the real DMD recognized by its USB ID (ZeDMD, PIN2DMD, Pixelcade) and the choices in “Real DMD”.',
   'Elle change quand on branche le DMD, ou dans Menu système > Borne > DMD > DMD réel (automatique, oui, non, ZeDMD en wifi). {keep}': 'It changes when the DMD is plugged in, or in System menu > Cabinet > DMD > Real DMD (automatic, yes, no, ZeDMD over Wi-Fi). {keep}',

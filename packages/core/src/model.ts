@@ -393,6 +393,11 @@ export interface ObservedUsbDevice {
   deviceClass?: string;
   /** Service du pilote (« usbser », « WinUSB », « libusbK »…) ; absent sans pilote installé. */
   service?: string;
+  /**
+   * Pilote libusb0 ou libusbK seulement : libusbK.dll est-elle dans System32 ? libusb (le PIN2DMD de
+   * VPX) n'ouvre ces deux pilotes que par elle (libusb, windows_winusb.c, winusbx_init). Absent : non relevé.
+   */
+  libusbKDll?: boolean;
   /** Code du Gestionnaire de périphériques quand le pilote ne tourne pas (28 : aucun pilote) ; absent : rien à signaler. */
   problem?: number;
   /** Nom que le périphérique donne lui-même à l'USB (« PIN2DMD HD »), quand Windows le connaît. */

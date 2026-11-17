@@ -239,6 +239,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **« Écran du DMD »** : dites une fois s'il s'agit d'un FullDMD (écran 16:9, DMD du jeu incrusté) ou d'un DMD seul (bande 4:1). Le front-end, VPX et les PuP-Packs le respectent ; un cas ambigu est signalé « À vérifier ».
 - **Habillage FullDMD en partie** : l'image FullDMD de la table reste affichée et le DMD du jeu se pose dans son cadre, détecté tout seul dans l'image ou la vidéo.
 - **DMD matériels reconnus** sans ouvrir de port (ZeDMD, PIN2DMD, Pixelcade) : le plugin qui les alimente est activé pour vous.
+- **DMD réel (bêta)**, dans Menu système > Borne > DMD > « DMD réel » : un choix par modèle (automatique, oui, non), le ZeDMD en wifi, le pilote qui manque dit à l'écran. « Image du front-end : oui » lui fait aussi montrer le DMD du front-end entre les parties ; VPX le reprend en partie.
 
 <p align="center"><img src="images/fr/features/dmd-screen.webp?v=3936da5aad" width="360" alt="Écran du DMD : « C'est un FullDMD » ou « C'est un DMD seul », chacun avec son schéma."></p>
 
@@ -718,7 +719,7 @@ Cyber Pinball est un premier prototype (0.1.x). Ce qui n'est pas encore là :
 
 - **Windows seulement**, et seulement Visual Pinball X 10.8.1 en mode plugins : pas de mode classique, pas d'autres émulateurs pour l'instant.
 - **Installeurs non signés** : Windows SmartScreen avertit à l'installation.
-- **DMD matériels** (ZeDMD, PIN2DMD, Pixelcade) : alimentés par VPX pendant les parties, pas encore par le front-end.
+- **DMD matériels** (ZeDMD, PIN2DMD, Pixelcade) : en bêta, en partie comme dans le front-end, tant que des bornes équipées ne les ont pas confirmés.
 - **Knocker** : il ne sonne pas encore pour un record battu sur une table dont la ROM garde ses records (le tableau des scores, lui, les lit après chaque partie).
 - **Réalité virtuelle et Vision 3D** sont en bêta. La Kinect pour Xbox One est reconnue, mais pas encore prise en charge.
 - **Avatars** : une image à soi seulement, pas encore d'avatars tout faits ; une image animée devient fixe.
