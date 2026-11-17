@@ -131,8 +131,8 @@ export function mediaPlacement(type: MediaType, cabinet?: Cabinet): MediaPlaceme
         shown: false,
         note:
           used === 'DMD'
-            ? t('L’afficheur de cette borne est étroit (4:1) : il montre l’Afficheur ; celui-ci ne sert que si l’Afficheur manque.')
-            : t('L’afficheur de cette borne est large (16:9) : il montre l’Afficheur large ; celui-ci ne sert que si l’Afficheur large manque.'),
+            ? t('L’afficheur de cette borne est étroit (4:1) : il montre l’Afficheur, ou celui-ci quand ses proportions le remplissent mieux ou que l’Afficheur manque.')
+            : t('L’afficheur de cette borne est large (16:9) : il montre l’Afficheur large, ou celui-ci quand ses proportions le remplissent mieux ou que l’Afficheur large manque.'),
       };
     }
   }

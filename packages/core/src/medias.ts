@@ -13,7 +13,7 @@ import { registerTextRef, t } from './i18n';
 import { layoutOf } from './locations';
 import { edgeRotation, type Cabinet, type FlipperEdge, type RoleId, type Rotation } from './model';
 import { readInfo, type TableEntry, type TableInfoFile, tableBaseName } from './tables';
-import { dmdKindForRatio, dmdKindOf } from './dmdscreen';
+import { dmdAspect, dmdKindForRatio, dmdKindOf } from './dmdscreen';
 
 /** Types de VPX, tels qu'ils apparaissent entre parenthèses dans les noms de fichiers. */
 export type MediaType =
@@ -633,6 +633,37 @@ export interface ResolveOptions {
   measure?: boolean;
   /** Demi-tours mémorisés (sinon lus dans table.info). */
   memory?: MediaMemory;
+  /**
+   * Proportions (largeur sur hauteur) de l'écran à remplir, pour un afficheur (DMD ou FullDMD) :
+   * quand la table a les deux, celui qui va le mieux à l'écran est pris, quel que soit son
+   * libellé (bestDmdMedia). Posé par resolveRoleMedia pour le rôle dmd.
+   */
+  fitAspect?: number;
+}
+
+/**
+ * Écart entre les proportions d'un afficheur et celles de son écran, en rapport (0 : identiques),
+ * grand côté sur petit côté : un écran de DMD couché compte comme le même écran debout (dmdKindOf).
+ */
+export function dmdAspectGap(dimensions: MediaDimensions, aspect: number): number {
+  const long = (ratio: number) => Math.max(ratio, 1 / ratio);
+  return Math.abs(Math.log(long(dimensions.width / dimensions.height) / long(aspect)));
+}
+
+/**
+ * Parmi des afficheurs candidats (dans l'ordre de préférence), celui dont les proportions vont
+ * le mieux à l'écran ; à égalité ou si l'un n'a pas pu être mesuré, le premier. Un « (DMD) » en
+ * 21:9 et un « (FullDMD) » en 16:9 sur un DMD 4:1 : le 21:9, qui remplit davantage l'écran.
+ */
+export function bestDmdMedia<T>(candidates: readonly T[], aspect: number, dimensionsOf: (candidate: T) => MediaDimensions | undefined): T | undefined {
+  let best: { candidate: T; gap: number } | undefined;
+  for (const candidate of candidates) {
+    const d = dimensionsOf(candidate);
+    if (!d || !d.width || !d.height) return candidates[0];
+    const gap = dmdAspectGap(d, aspect);
+    if (!best || gap < best.gap - 1e-9) best = { candidate, gap };
+  }
+  return best?.candidate;
 }
 
 /** Un fichier par type, ou toutes les pages ; les formats illisibles sont mis de côté. */
@@ -709,11 +740,22 @@ export function resolveMedia(table: TableEntry, root: string, type: MediaType, o
     finish(table, info, { source, files: found, foundType, skipped }, options);
 
   const own = findInTable(table, info, files, skipped);
-  if (own) return done(own.source, own.files, info.type);
-  if (partner) {
-    const other = findInTable(table, mediaTypeInfo(partner), files, skipped);
-    if (other) return done(other.source, other.files, partner);
+  // Formats illisibles de l'autre afficheur : comptés seulement s'il est celui qu'on cherche à montrer.
+  const otherSkipped: string[] = [];
+  const other = partner ? findInTable(table, mediaTypeInfo(partner), files, otherSkipped) : undefined;
+  if (own && other && options.fitAspect) {
+    // Les deux afficheurs : celui qui va le mieux à l'écran, quel que soit son libellé.
+    const measure = (file: string) => (options.dimensions ? options.dimensions.get(file) : readMediaDimensions(file));
+    const both = [
+      { found: own, type: info.type },
+      { found: other, type: partner! },
+    ];
+    const best = bestDmdMedia(both, options.fitAspect, (c) => measure(c.found.files[0]!))!;
+    return done(best.found.source, best.found.files, best.type);
   }
+  if (own) return done(own.source, own.files, info.type);
+  skipped.push(...otherSkipped);
+  if (other) return done(other.source, other.files, partner!);
   const b2sKind: B2sImageKind | undefined = info.type === 'Backglass' ? 'backglass' : partner ? 'dmd' : undefined;
   if (b2sKind && options.b2sImage) {
     const image = options.b2sImage(table, b2sKind);
@@ -765,10 +807,20 @@ function finish(
 
 /**
  * Média de chaque rôle de la borne : Playfield, Backglass, Topper, et pour le DMD
- * le type de son écran, FullDMD ou DMD seul (dmdMediaType).
+ * le type de son écran, FullDMD ou DMD seul (dmdMediaType). Quand la table a les deux, l'écran
+ * du DMD prend celui dont les proportions vont le mieux à sa zone (dmdAspect), quel que soit son
+ * libellé : un « (DMD) » en 21:9 rangé à côté d'un « (FullDMD) » en 16:9 (tables reprises de
+ * PinUP Popper, 17/11/2026) remplit mieux un DMD 4:1 que le 16:9.
  */
 export function resolveRoleMedia(table: TableEntry, root: string, role: RoleId, options: ResolveOptions = {}): ResolvedMedia {
-  return resolveMedia(table, root, roleMediaType(role, options.cabinet), options);
+  const type = roleMediaType(role, options.cabinet);
+  if (role !== 'dmd') return resolveMedia(table, root, type, options);
+  return resolveMedia(table, root, type, { ...options, fitAspect: dmdScreenAspect(options.cabinet, type) });
+}
+
+/** Proportions de l'écran du DMD : sa zone dans le modèle de la borne, sinon celles de son type (4:1 ou 16:9). */
+export function dmdScreenAspect(cabinet: Cabinet | undefined, type: MediaType = (cabinet && dmdMediaType(cabinet)) ?? 'DMD'): number {
+  return (cabinet && dmdAspect(cabinet)) ?? (type === 'FullDMD' ? 16 / 9 : 4);
 }
 
 /** Type de média de l'écran d'un rôle : Playfield, Backglass, Topper, et DMD ou FullDMD selon l'écran du DMD. */

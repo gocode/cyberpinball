@@ -16,7 +16,12 @@ export const messages: Record<string, string> = {
   'VPX cherche « {base}.directb2s » ou « {wanted} » : « {best} » ne sera pas affiché.': 'VPX looks for “{base}.directb2s” or “{wanted}”: “{best}” won’t be shown.',
   'Renommer en « {name} »': 'Rename to “{name}”',
   'Pas de backglass': 'No backglass',
-  'Le second écran restera sur l’image de Cyber Pinball. Ajoutez un fichier .directb2s avec « Ajouter une table » pour l’animer.': 'The second screen will keep the Cyber Pinball image. Add a .directb2s file with “Add a table” to bring it to life.',
+  'Sans fichier .directb2s, VPX n’anime pas l’écran du fronton : pendant la partie, il montre « {name} », le média Backglass de la table.':
+    'Without a .directb2s file, VPX doesn’t animate the backglass screen: during the game, it shows “{name}”, the table’s Backglass media.',
+  'Sans fichier .directb2s, VPX n’anime pas l’écran du fronton : pendant la partie, il montre le titre de la table, ou le média de fronton commun à la borne s’il y en a un.':
+    'Without a .directb2s file, VPX doesn’t animate the backglass screen: during the game, it shows the table’s title, or the cabinet’s shared backglass media if there is one.',
+  'En VR, la table montre le fronton de sa propre pièce.': 'In VR, the table shows the backglass of its own room.',
+  'Un fichier .directb2s ajouté avec « Ajouter une table » l’anime.': 'A .directb2s file added with “Add a table” brings it to life.',
   'Backglass inutilisé': 'Unused backglass',
   'Backglass inutilisés': 'Unused backglasses',
   'VPX affiche « {shown} » ; {list} ne sert à rien ({size}).': 'VPX shows “{shown}”; {list} is unused ({size}).',
@@ -179,9 +184,8 @@ export const messages: Record<string, string> = {
   'Afficheur rangé sous le mauvais type': 'DMD media filed under the wrong type',
   'Afficheurs rangés sous le mauvais type': 'DMD media filed under the wrong type',
   '« {name} » est en {ratio} : c’est un média « {actual} » ({type}), pas « {wrong} ».': '“{name}” is {ratio}: it’s “{actual}” media ({type}), not “{wrong}”.',
-  'Un fichier ({type}) de ce nom existe déjà : gardez l’un des deux.': 'A ({type}) file with that name already exists: keep one of them.',
-  'Le front-end montre le média DMD sur un écran DMD seul, et le média FullDMD sur un écran FullDMD (Configuration de la borne > Écran du DMD).':
-    'The menu shows the DMD media on a DMD-only screen, and the FullDMD media on a FullDMD screen (Cabinet setup > DMD screen).',
+  'Le front-end le montre déjà sur l’écran du DMD s’il le remplit mieux que l’autre afficheur ; renommé, il retrouve sa place dans les médias de la table.':
+    'The front-end already shows it on the DMD screen if it fills it better than the other DMD media; once renamed, it’s filed in its right place in the table’s media.',
   'Renommer les {n} fichiers selon leurs proportions': 'Rename the {n} files to match their proportions',
   'Média mal nommé': 'Misnamed media file',
   'Médias mal nommés': 'Misnamed media files',
@@ -210,6 +214,7 @@ export const messages: Record<string, string> = {
   'bandes noires sur les côtés': 'black bars on the sides',
   '« {name} » ({size}, {ratio}) sur {role} ({screen}){note} : {how}, {lost} % de l’écran inutilisé.': '“{name}” ({size}, {ratio}) on {role} ({screen}){note}: {how}, {lost}% of the screen unused.',
   ', faute de média « {type} » ({code})': ', for lack of “{type}” media ({code})',
+  ', qui le remplit mieux que « {name} »': ', which fills it better than “{name}”',
   'Proportions du média différentes de son écran': 'Media proportions don’t match the screen',
   'Proportions des médias différentes de leurs écrans': 'Media proportions don’t match the screens',
   '{lines} Le front-end ne déforme jamais un média ; un fichier aux proportions de l’écran l’occupe en entier.': '{lines} The menu never stretches media; a file with the screen’s proportions fills it entirely.',

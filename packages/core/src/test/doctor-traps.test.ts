@@ -100,6 +100,9 @@ function mp4(width: number, height: number): Buffer {
 /** Fichier de medias\ de la table. */
 const media = (folder: string, name: string) => path.join(folder, 'medias', name);
 
+/** Texte à chercher tel quel dans une expression régulière. */
+const reEscape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /** Médias sains : chaque type au bon nom, aux proportions de son écran. */
 function healthyMedias(folder: string): void {
   write(media(folder, `(Wheel) ${TABLE}.png`), png(512, 512));
@@ -1068,6 +1071,74 @@ test('médecin des médias : proportions, orientation du plateau et DMD selon la
   assert.match(ratio({ ...band, fullDmd: false })!.detail, /faute de média « Afficheur » \(DMD\)/);
   // Borne non configurée : pas de comparaison.
   assert.equal(ratio({ backglass: true, dmd: true, topper: false }), undefined);
+  fs.rmSync(tablesDir, { recursive: true });
+});
+
+test('afficheurs DMD et FullDMD : le médecin parle de celui que l’écran montre, et ne demande jamais d’en garder un', () => {
+  // Table reprise de PinUP Popper (17/11/2026) : « (DMD) » en 21:9 et « (FullDMD) » en 16:9, sur un DMD 4:1.
+  // Le constat disait « gardez l’un des deux » et les proportions parlaient du 16:9, « faute de média DMD ».
+  const tablesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-traps-'));
+  const folder = healthyTable(tablesDir);
+  const run = (cabinet: PupCabinet = CABINET) => diagnose(scanTables(tablesDir)[0]!, { tablesDir, script: scriptFacts(SCRIPT), cabinet });
+  write(media(folder, `(DMD) ${TABLE}.mp4`), mp4(2560, 1080));
+  write(media(folder, `(FullDMD) ${TABLE}.mp4`), mp4(1440, 810));
+  let found = run();
+  assert.equal(found.find((f) => f.code === 'mediaDmdSwapped'), undefined, 'les deux libellés sont pris : rien à faire');
+  const ratio = found.find((f) => f.code === 'mediaRatio')!;
+  assert.match(ratio.detail, new RegExp(`« \\(DMD\\) ${reEscape(TABLE)}\\.mp4 » \\(2560×1080`));
+  assert.doesNotMatch(ratio.detail, /FullDMD\) .*sur le DMD|faute de média/);
+  assert.equal(ratio.note, true, 'information discrète');
+  assert.equal(ratio.fix, undefined);
+  // Sur un FullDMD 16:9, le 16:9 y est chez lui : rien à dire.
+  assert.equal(run({ ...CABINET, dmdRatio: 16 / 9, fullDmd: true, aspects: { ...CABINET.aspects, dmd: 16 / 9 } }).find((f) => f.code === 'mediaRatio'), undefined);
+  // Libellés inversés, les deux pris : le 4:1 rangé en FullDMD remplit le DMD 4:1, montré à la place du 16:9.
+  write(media(folder, `(DMD) ${TABLE}.mp4`), mp4(1920, 1080));
+  write(media(folder, `(FullDMD) ${TABLE}.mp4`), mp4(1024, 256));
+  found = run();
+  assert.equal(found.find((f) => f.code === 'mediaDmdSwapped'), undefined);
+  assert.equal(found.find((f) => f.code === 'mediaRatio'), undefined);
+  // Un seul afficheur mal libellé : renommé en un geste, sans « gardez l’un des deux ».
+  fs.rmSync(media(folder, `(FullDMD) ${TABLE}.mp4`));
+  const swapped = run().find((f) => f.code === 'mediaDmdSwapped')!;
+  assert.equal(swapped.severity, 'info', 'le front-end le montre déjà où il va le mieux');
+  assert.ok(swapped.fix);
+  for (const f of run()) assert.doesNotMatch(`${f.detail} ${f.fix?.label ?? ''}`, /gardez l’un des deux|Configuration de la borne > Écran du DMD/, f.code);
+  fs.rmSync(tablesDir, { recursive: true });
+});
+
+test('« Pas de backglass » : ce que montre vraiment le fronton, sans inviter une table VR ni doubler un PuP-Pack', () => {
+  const tablesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-traps-'));
+  const folder = healthyTable(tablesDir);
+  fs.rmSync(path.join(folder, `${TABLE}.directb2s`));
+  const missing = (script = SCRIPT, cabinet: PupCabinet = CABINET) =>
+    diagnose(scanTables(tablesDir)[0]!, { tablesDir, script: scriptFacts(script), cabinet }).find((f) => f.code === 'backglassMissing');
+  // Ni .directb2s ni média : le titre de la table. Plus jamais « l’image de Cyber Pinball ».
+  let found = missing()!;
+  assert.match(found.detail, /titre de la table/);
+  assert.match(found.detail, /Ajouter une table/);
+  assert.doesNotMatch(found.detail, /image de Cyber Pinball/);
+  assert.equal(found.note, true);
+  // Avec son média Backglass : c'est lui que montre le fronton pendant la partie.
+  write(media(folder, `(Backglass) ${TABLE}.mp4`), mp4(1920, 1080));
+  assert.match(missing()!.detail, new RegExp(`« \\(Backglass\\) ${reEscape(TABLE)}\\.mp4 », le média Backglass de la table`));
+  // Table VR à pièce : son fronton est dans la pièce, pas d'invitation à un .directb2s.
+  const vr = `${SCRIPT}Dim VRRoom : VRRoom = 1\r\n`;
+  assert.equal(scriptFacts(vr).vrRoom, true);
+  found = missing(vr)!;
+  assert.match(found.detail, /fronton de sa propre pièce/);
+  assert.doesNotMatch(found.detail, /directb2s ajouté|Ajouter une table/);
+  // Borne sans écran de fronton : rien à dire.
+  assert.equal(missing(SCRIPT, { ...CABINET, backglass: false }), undefined);
+  // PuP-Pack de la table qui occupe le fronton : ses vidéos le remplissent.
+  const pack = healthyPack(folder);
+  assert.equal(missing(), undefined);
+  // Pack sans screens.pup dont les playlists visent le fronton : Cyber Pinball écrit ses écrans avant la partie.
+  fs.rmSync(pack, { recursive: true });
+  write(path.join(pack, 'playlists.pup'), 'ScreenNum,Folder,Des,AlphaSort,RestSeconds,Volume,Priority\r\n2,Backglass,Fond,0,0,100,1\r\n');
+  assert.equal(missing(), undefined);
+  // Pack qui n'occupe que le DMD : le fronton reste au front-end.
+  write(path.join(pack, 'screens.pup'), `${HEADER}\r\n5,FullDMD,,,0,ForceON,0,\r\n`);
+  assert.ok(missing());
   fs.rmSync(tablesDir, { recursive: true });
 });
 

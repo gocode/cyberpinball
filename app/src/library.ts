@@ -2957,7 +2957,9 @@ export function createLibrary(host: LibraryHost) {
       else leave();
     };
     if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour'), run: next }], back: next };
-    const findings = s.findings ?? [];
+    // Informations discrètes (Finding.note) : à part, en bas, sans « Ignorer » ; rien à y régler.
+    const notes = (s.findings ?? []).filter((f) => f.note && !f.fix);
+    const findings = (s.findings ?? []).filter((f) => !notes.includes(f));
     const actions: Action[] = [];
     // Un constat qui empêche de jouer (la ROM seule, playable.ts) : le parcours mène jusqu'à « Jouer ».
     if (playBlockers(findings).length) {
@@ -3007,6 +3009,7 @@ export function createLibrary(host: LibraryHost) {
     if (s.added?.length) sections.push({ title: t('Ajouté avec la table'), rows: s.added });
     if (s.log.length) sections.push({ title: t('Réparé'), rows: s.log.map((text) => ({ text, tone: 'ok' as const })) });
     sections.push({ title: t('Constats'), rows });
+    if (notes.length) sections.push({ title: t('À savoir'), rows: notes.map((f) => ({ text: f.title, detail: f.detail, tone: 'quiet' as const })) });
     if (ignoredRows.length) sections.push({ title: t('Ignorés ({n})', { n: ignoredRows.length }), rows: ignoredRows });
     return {
       heading: s.afterImport ? t('Vérification de la table ajoutée') : t('Diagnostic'),

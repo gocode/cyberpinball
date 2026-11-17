@@ -59,6 +59,17 @@ export function dmdKindOf(cabinet: Cabinet): DmdKind | undefined {
   return ratio === undefined ? undefined : dmdKindForRatio(ratio);
 }
 
+/**
+ * Proportions (largeur sur hauteur) de la zone du DMD, telle que le front-end et VPX la remplissent ;
+ * undefined sans rôle dmd, ou si son écran n'est pas dans le modèle.
+ */
+export function dmdAspect(cabinet: Cabinet): number | undefined {
+  const screen = dmdScreen(cabinet);
+  if (!screen) return undefined;
+  const zone = roleZone(cabinet, 'dmd');
+  return (zone.width * screen.widthPx) / (zone.height * screen.heightPx);
+}
+
 /** Libellé d'un rôle pour cette borne : « FullDMD » pour le rôle dmd d'un FullDMD. */
 export function cabinetRoleLabel(cabinet: Cabinet | undefined, role: RoleId, fallback: string): string {
   return role === 'dmd' && cabinet && dmdKindOf(cabinet) === 'fulldmd' ? 'FullDMD' : fallback;

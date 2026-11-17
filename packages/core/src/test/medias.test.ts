@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import {
   MEDIA_TYPES,
   MediaDimensionCache,
+  dmdAspectGap,
   dmdMediaType,
   dmdTypeForRatio,
   mediaFileName,
@@ -403,6 +404,66 @@ test('afficheur : le type qui colle à l’écran, puis l’autre, avant l’ima
   // Les autres rôles.
   assert.equal(resolveRoleMedia(f.t2, f.root, 'topper').fallback, 'topper-logo');
   assert.equal(resolveRoleMedia(f.t2, f.root, 'playfield').fallback, 'playfield-gradient');
+  fs.rmSync(f.root, { recursive: true });
+});
+
+test('afficheur : des deux, celui qui remplit le mieux l’écran du DMD, quel que soit son libellé', () => {
+  // Table reprise de PinUP Popper (17/11/2026) : « (DMD) » en 21:9 et « (FullDMD) » en 16:9. Sur un DMD
+  // 4:1, le front-end montrait le 16:9 (56 % de l'écran perdu) alors que le 21:9 le remplit mieux.
+  const narrow = cabinet({ width: 1280, height: 320 });
+  const wide = cabinet({ width: 1920, height: 1080 });
+  const lying = cabinet({ width: 320, height: 1280 });
+  // Bande 4:1 sous le fronton d'un écran 16:10 partagé (fronton 2,67:1 au-dessus).
+  const shared = cabinet(undefined, {
+    screens: [screen('pf', 3840, 2160), screen('bg', 1920, 1200)],
+    roles: { playfield: 'pf', backglass: 'bg', dmd: 'bg' },
+    zones: { backglass: { x: 0, y: 0, width: 1, height: 0.6 }, dmd: { x: 0, y: 0.6, width: 1, height: 0.4 } },
+  });
+  const cases: { files: [string, Buffer][]; cabinet: Cabinet | undefined; shown: string; type: 'DMD' | 'FullDMD' }[] = [
+    { files: [[`(DMD) ${T2}.mp4`, mp4(2560, 1080)], [`(FullDMD) ${T2}.mp4`, mp4(1440, 810)]], cabinet: narrow, shown: `(DMD) ${T2}.mp4`, type: 'DMD' },
+    { files: [[`(DMD) ${T2}.mp4`, mp4(2560, 1080)], [`(FullDMD) ${T2}.mp4`, mp4(1440, 810)]], cabinet: shared, shown: `(DMD) ${T2}.mp4`, type: 'DMD' },
+    { files: [[`(DMD) ${T2}.mp4`, mp4(2560, 1080)], [`(FullDMD) ${T2}.mp4`, mp4(1440, 810)]], cabinet: wide, shown: `(FullDMD) ${T2}.mp4`, type: 'FullDMD' },
+    // Libellés inversés : le 4:1 rangé en FullDMD va au DMD 4:1, le 16:9 rangé en DMD au FullDMD.
+    { files: [[`(DMD) ${T2}.mp4`, mp4(1920, 1080)], [`(FullDMD) ${T2}.png`, png(1024, 256)]], cabinet: narrow, shown: `(FullDMD) ${T2}.png`, type: 'FullDMD' },
+    { files: [[`(DMD) ${T2}.mp4`, mp4(1920, 1080)], [`(FullDMD) ${T2}.png`, png(1024, 256)]], cabinet: wide, shown: `(DMD) ${T2}.mp4`, type: 'DMD' },
+    // Écran couché : le même qu'un 4:1 debout.
+    { files: [[`(DMD) ${T2}.png`, png(1024, 256)], [`(FullDMD) ${T2}.mp4`, mp4(1920, 1080)]], cabinet: lying, shown: `(DMD) ${T2}.png`, type: 'DMD' },
+    // Sans modèle de borne : un DMD 4:1.
+    { files: [[`(DMD) ${T2}.mp4`, mp4(1920, 1080)], [`(FullDMD) ${T2}.png`, png(1024, 256)]], cabinet: undefined, shown: `(FullDMD) ${T2}.png`, type: 'FullDMD' },
+    // Un fichier illisible : le libellé de l'écran l'emporte, comme avant.
+    { files: [[`(DMD) ${T2}.png`, Buffer.from('rien')], [`(FullDMD) ${T2}.mp4`, mp4(1920, 1080)]], cabinet: narrow, shown: `(DMD) ${T2}.png`, type: 'DMD' },
+  ];
+  for (const [i, c] of cases.entries()) {
+    const f = fixture();
+    for (const [name, data] of c.files) f.put(name, data);
+    const r = resolveRoleMedia(f.t2, f.root, 'dmd', { cabinet: c.cabinet });
+    assert.equal(path.basename(r.file ?? ''), c.shown, `cas ${i}`);
+    assert.equal(r.foundType, c.type, `cas ${i}`);
+    // Le cache des dimensions donne le même choix.
+    const cached = resolveRoleMedia(f.t2, f.root, 'dmd', { cabinet: c.cabinet, dimensions: new MediaDimensionCache(undefined) });
+    assert.equal(cached.file, r.file, `cas ${i}, cache`);
+    // Un type demandé hors rôle (médias de la table) garde son libellé.
+    assert.equal(resolveMedia(f.t2, f.root, 'DMD').foundType, 'DMD', `cas ${i}, type DMD`);
+    fs.rmSync(f.root, { recursive: true });
+  }
+});
+
+test('afficheur : jamais un fichier plus loin des proportions de l’écran que l’autre (invariant)', () => {
+  const sizes = [[1280, 320], [1920, 1080], [2560, 1080], [1024, 256], [1920, 1200], [1440, 810], [800, 600]] as const;
+  const f = fixture();
+  for (const [sw, sh] of sizes) {
+    for (const [aw, ah] of sizes) {
+      for (const [bw, bh] of sizes) {
+        f.put(`(DMD) ${T2}.png`, png(aw, ah));
+        f.put(`(FullDMD) ${T2}.png`, png(bw, bh));
+        const aspect = sw / sh;
+        const r = resolveRoleMedia(f.t2, f.root, 'dmd', { cabinet: cabinet({ width: sw, height: sh }) });
+        const chosen = r.foundType === 'DMD' ? { width: aw, height: ah } : { width: bw, height: bh };
+        const other = r.foundType === 'DMD' ? { width: bw, height: bh } : { width: aw, height: ah };
+        assert.ok(dmdAspectGap(chosen, aspect) <= dmdAspectGap(other, aspect) + 1e-9, `écran ${sw}×${sh}, DMD ${aw}×${ah}, FullDMD ${bw}×${bh} : ${r.foundType}`);
+      }
+    }
+  }
   fs.rmSync(f.root, { recursive: true });
 });
 

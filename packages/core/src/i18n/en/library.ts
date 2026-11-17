@@ -103,6 +103,7 @@ export const messages: Record<string, string> = {
   'Ne plus ignorer « {title} »': 'Stop ignoring "{title}"',
   'Le signaler à nouveau': 'Report it again',
   'Ignorés ({n})': 'Ignored ({n})',
+  'À savoir': 'Good to know',
   '{n} correction': '{n} fix',
   '{n} corrections': '{n} fixes',
   'Analyser à nouveau': 'Analyze again',

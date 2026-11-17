@@ -128,11 +128,12 @@ test('avant la partie : le pack est allumé et mis sur le fronton, sans rien dem
   // Rien de plus à faire, ni pour le menu ni pour le médecin.
   assert.deepEqual(repairPupForPlay(entry(), { tablesDir, cabinet: PC }, { trashDir }), []);
   // Le pack de test ne livre pas les vidéos que nomment ses .pup (« Fichiers du PuP-Pack absents »).
+  // Sans .directb2s, rien à dire du fronton : le pack, mis dessus, le remplit (backglassMissing se tait).
   assert.deepEqual(
     diagnose(entry(), { tablesDir, cabinet: PC, script: scriptFacts(SCRIPT) })
       .map((f) => f.code)
       .filter((c) => c !== 'pupFilesMissing'),
-    ['backglassMissing'],
+    [],
   );
   // Option choisie dans la fiche : le menu la respecte.
   fs.writeFileSync(infoFile, JSON.stringify({ CyberPinball: { pup: { HAL9000: { option: B2S_USERS, origin: 'HAL9000', chosen: 'user' } } } }));

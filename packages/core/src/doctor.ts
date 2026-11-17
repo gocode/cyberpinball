@@ -12,6 +12,7 @@ import { IniDocument } from './ini';
 import { slowTableFinding } from './slowtable';
 import { isCurrentMediaError, mediaErrorsFile, readMediaErrors, type MediaErrorEntry, type MediaErrorKind } from './mediaerrors';
 import {
+  bestDmdMedia,
   dmdTypeForRatio,
   isAcceptedFormat,
   mediaFileName,
@@ -47,6 +48,7 @@ import {
   findPackRoot,
   isVisible,
   packDrawsDmd,
+  packScreens,
   captureTriggers,
   pupLoaderNeeded,
   pupScriptFacts,
@@ -93,6 +95,7 @@ import { readVpxScript, readVpxTableName } from './vpxinfo';
 import { describeRenames, emptyPlayedPlaylists, missingPackFiles, packFileFixes, type PackFileFixes } from './pupfiles';
 import { activePacks, disabledPacks, isPupFolderName, packsOfTable, PUP_DISABLED_FOLDER, PUP_FOLDER, pupVideosDir } from './pupdisabled';
 import { ratioLabel } from './zones';
+import { tableHasVrRoom } from './vr';
 import { isFactoryRomVolume, isLowRomVolume, romVolumeText, type RomVolumeStatus } from './romvolume';
 
 export type FindingSeverity = 'error' | 'warning' | 'info';
@@ -179,6 +182,12 @@ export interface Finding {
   detail: string;
   fix?: Fix;
   /**
+   * Information discrète : rien à faire dans Cyber Pinball (proportions d'un média, fronton absent).
+   * Le Diagnostic et la vérification d'une table ajoutée la montrent à part, en bas (« À savoir »),
+   * sans « Ignorer » : elle n'encombre pas les constats à régler.
+   */
+  note?: boolean;
+  /**
    * Constats de ROM : la ROM qui manque ou qu'il faut lier (`rom`), et la révision voisine
    * présente sur la borne (`neighbour`), pour le parcours « Ce qu'il manque pour jouer » (journey.ts).
    */
@@ -225,6 +234,8 @@ export interface ScriptFacts {
    * valeur qui l'envoie à la fenêtre du DMD de la borne (tableoptions.ts, constat dmdDesktopOption).
    */
   dmdOptions?: CabinetDmdOption[];
+  /** La table a sa pièce VR (tableHasVrRoom) : en VR, son fronton est dans la pièce, sans .directb2s. */
+  vrRoom?: boolean;
 }
 
 export interface DoctorContext {
@@ -464,6 +475,7 @@ export function scriptFacts(vbs: string): ScriptFacts {
   if (music.length) facts.music = music;
   const dmdOptions = cabinetDmdOptions(vbs);
   if (dmdOptions.length) facts.dmdOptions = dmdOptions;
+  if (tableHasVrRoom(vbs)) facts.vrRoom = true;
   return facts;
 }
 
@@ -612,12 +624,8 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
       fix: { label: t('Renommer en « {name} »', { name: wanted }), ops: [{ op: 'move', from: path.join(folder, best), to: path.join(folder, wanted) }] },
     });
   } else if (!backglass) {
-    findings.push({
-      code: 'backglassMissing',
-      severity: 'info',
-      title: t('Pas de backglass'),
-      detail: t('Le second écran restera sur l’image de Cyber Pinball. Ajoutez un fichier .directb2s avec « Ajouter une table » pour l’animer.'),
-    });
+    const missing = backglassMissingFinding(entry, ctx, ownFolder);
+    if (missing) findings.push(missing);
   } else if (strays.length) {
     const size = strays.reduce((sum, f) => sum + sizeOf(path.join(folder, f)), 0);
     const params = { shown: path.basename(backglass), list: strays.map(quote).join(', '), size: formatSize(size) };
@@ -982,6 +990,48 @@ function emptyBackglassFinding(file: string | undefined): Finding | undefined {
     ),
     fix: { label: t('Mettre « {file} » à la corbeille', params), ops: [{ op: 'trash', path: file }] },
   };
+}
+
+/**
+ * Table sans .directb2s : ce que montre vraiment l'écran du fronton pendant la partie. VPX ne
+ * l'occupe pas ; le front-end y laisse le média Backglass de la table (première image, figée, par
+ * défaut : renderGame d'app/renderer/frontend.js), sinon le titre de la table ou le média commun
+ * de la borne. Rien à dire quand la borne n'a pas d'écran de fronton, ni quand un PuP-Pack de la
+ * table occupe le fronton (ses vidéos le remplissent). Une table VR dont la pièce a son propre
+ * fronton (tableHasVrRoom) n'est pas invitée à recevoir un .directb2s. Information discrète.
+ */
+function backglassMissingFinding(entry: TableEntry, ctx: DoctorContext, ownFolder: boolean): Finding | undefined {
+  if (ctx.cabinet && !ctx.cabinet.backglass) return undefined;
+  const facts = ctx.script && !('error' in ctx.script) ? ctx.script : undefined;
+  if (ownFolder && pupShowsBackglass(entry, facts)) return undefined;
+  const shown = shownMedia(mediaItems(tableMediaDir(entry)), 'Backglass', mediaNames(entry))[0];
+  return {
+    code: 'backglassMissing',
+    severity: 'info',
+    note: true,
+    title: t('Pas de backglass'),
+    detail: [
+      shown
+        ? t('Sans fichier .directb2s, VPX n’anime pas l’écran du fronton : pendant la partie, il montre « {name} », le média Backglass de la table.', { name: shown.name })
+        : t('Sans fichier .directb2s, VPX n’anime pas l’écran du fronton : pendant la partie, il montre le titre de la table, ou le média de fronton commun à la borne s’il y en a un.'),
+      facts?.vrRoom ? t('En VR, la table montre le fronton de sa propre pièce.') : t('Un fichier .directb2s ajouté avec « Ajouter une table » l’anime.'),
+    ].join(' '),
+  };
+}
+
+/** Un PuP-Pack de la table (celui que son script ou sa ROM charge) occupe l'écran du fronton. */
+function pupShowsBackglass(entry: TableEntry, facts: ScriptFacts | undefined): boolean {
+  const dir = pupVideosDir(entry.folder);
+  if (!dir) return false;
+  const alone = listSafe(entry.folder).filter((f) => f.toLowerCase().endsWith('.vpx')).length <= 1;
+  const packs = packsOfTable(activePacks(entry.folder), facts ? expectedPackNames(facts) : undefined, alone);
+  return packs.some((pack) => {
+    const root = findPackRoot(path.join(dir, pack)) ?? path.join(dir, pack);
+    // Sans screens.pup, celui que Cyber Pinball écrit avant la partie (pupNoScreens).
+    const own = packScreens(root);
+    const screens = own.length ? own : parseScreens(defaultScreensPup(root) ?? '');
+    return screens.length > 0 && pupWindows(screens).backglass;
+  });
 }
 
 /**
@@ -2233,10 +2283,15 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     });
   }
 
-  // DMD 4:1 rangé en FullDMD 16:9, ou l'inverse : le menu le montrerait sur le mauvais écran.
+  // DMD 4:1 rangé en FullDMD 16:9, ou l'inverse. L'écran du DMD prend déjà, parmi les afficheurs
+  // de la table, celui qui le remplit le mieux, quel que soit son libellé (resolveRoleMedia) : le
+  // libellé ne change rien à ce qui est montré. Le constat ne paraît que si le fichier peut être
+  // renommé selon ses proportions (il retrouve sa place dans les médias de la table) ; quand
+  // l'autre libellé est déjà pris, il n'y a rien à faire : chaque écran prend celui qui lui va
+  // (« (DMD) » en 21:9 et « (FullDMD) » en 16:9 d'une table reprise de PinUP Popper, 17/11/2026).
   // Un média mal nommé est d'abord renommé ; son type est vérifié à l'analyse suivante.
   const named = (i: MediaItem) => i.stem !== undefined && allNames.some((n) => pageOf(i.stem!, n) !== undefined);
-  const swapped: { item: MediaItem; actual: MediaType; ratio: number; to?: string }[] = [];
+  const swapped: { item: MediaItem; actual: MediaType; ratio: number; to: string }[] = [];
   for (const item of items.filter((i) => (i.type === 'DMD' || i.type === 'FullDMD') && named(i) && i.accepted)) {
     const d = dimsOf(item.file);
     if (!d) continue;
@@ -2244,20 +2299,18 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     if (actual === item.type) continue;
     const target = `(${actual}) ${item.stem}.${item.ext}`;
     const conflict = items.some((o) => o.type === actual && (o.stem ?? '').toLowerCase() === item.stem!.toLowerCase()) || taken.has(target.toLowerCase());
-    if (!conflict) {
-      taken.add(target.toLowerCase());
-      claim(item.file);
-    }
-    swapped.push({ item, actual, ratio: d.width / d.height, to: conflict ? undefined : path.join(dir, target) });
+    if (conflict) continue;
+    taken.add(target.toLowerCase());
+    claim(item.file);
+    swapped.push({ item, actual, ratio: d.width / d.height, to: path.join(dir, target) });
   }
   if (swapped.length) {
-    const fixable = swapped.filter((s) => s.to);
     findings.push({
       code: 'mediaDmdSwapped',
-      severity: 'warning',
+      severity: 'info',
       title: tn(swapped.length, 'Afficheur rangé sous le mauvais type', 'Afficheurs rangés sous le mauvais type'),
       detail: [
-        ...swapped.flatMap((s) => [
+        ...swapped.map((s) =>
           t('« {name} » est en {ratio} : c’est un média « {actual} » ({type}), pas « {wrong} ».', {
             name: s.item.name,
             ratio: ratioLabel(s.ratio),
@@ -2265,21 +2318,16 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
             type: s.actual,
             wrong: label(s.item.type!),
           }),
-          ...(s.to ? [] : [t('Un fichier ({type}) de ce nom existe déjà : gardez l’un des deux.', { type: s.actual })]),
-        ]),
-        t('Le front-end montre le média DMD sur un écran DMD seul, et le média FullDMD sur un écran FullDMD (Configuration de la borne > Écran du DMD).'),
+        ),
+        t('Le front-end le montre déjà sur l’écran du DMD s’il le remplit mieux que l’autre afficheur ; renommé, il retrouve sa place dans les médias de la table.'),
       ].join(' '),
-      fix: fixable.length
-        ? {
-            label:
-              fixable.length > 1
-                ? t('Renommer les {n} fichiers selon leurs proportions', { n: fixable.length })
-                : t('Renommer en « {name} »', { name: path.basename(fixable[0]!.to!) }),
-            ops: fixable.map((s) => move(s.item.file, s.to!)),
-          }
-        : undefined,
+      fix: {
+        label: swapped.length > 1 ? t('Renommer les {n} fichiers selon leurs proportions', { n: swapped.length }) : t('Renommer en « {name} »', { name: path.basename(swapped[0]!.to) }),
+        ops: swapped.map((s) => move(s.item.file, s.to)),
+      },
     });
   }
+  // Renommés plus haut : ils ne comptent pas parmi les doublons de leur ancien type.
   const swappedFiles = new Set(swapped.map((s) => s.item.file));
 
   // Nom qui ne correspond ni à un .vpx du dossier ni au dossier.
@@ -2435,10 +2483,9 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
   if (aspects) {
     const lines: string[] = [];
     const tolerance = Math.log(1 + MEDIA_RATIO_TOLERANCE);
-    const check = (type: MediaType, role: RoleId, note = '') => {
+    const check = (type: MediaType, role: RoleId, note = '', item = shownMedia(items, type, own)[0]) => {
       const screen = aspects[role];
-      const item = shownMedia(items, type, own)[0];
-      if (!screen || !item || swappedFiles.has(item.file)) return false;
+      if (!screen || !item) return false;
       const d = dimsOf(item.file);
       if (!d) return true;
       const size = `${d.width}×${d.height}`;
@@ -2504,12 +2551,20 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
       const full = ctx.cabinet && cabinetFullDmd(ctx.cabinet);
       const wanted: MediaType = full === undefined ? dmdTypeForRatio(Math.max(aspects.dmd, 1 / aspects.dmd)) : full ? 'FullDMD' : 'DMD';
       const partner: MediaType = wanted === 'DMD' ? 'FullDMD' : 'DMD';
-      if (!check(wanted, 'dmd')) check(partner, 'dmd', t(', faute de média « {type} » ({code})', { type: label(wanted), code: wanted }));
+      // Le média que l'écran du DMD montre vraiment : des deux afficheurs, celui qui le remplit le mieux (resolveRoleMedia).
+      const mine = shownMedia(items, wanted, own)[0];
+      const theirs = shownMedia(items, partner, own)[0];
+      const shown = mine && theirs ? bestDmdMedia([mine, theirs], aspects.dmd, (i) => dimsOf(i.file)) : (mine ?? theirs);
+      if (shown === mine) check(wanted, 'dmd', '', mine);
+      else if (mine) check(partner, 'dmd', t(', qui le remplit mieux que « {name} »', { name: mine.name }), theirs);
+      else check(partner, 'dmd', t(', faute de média « {type} » ({code})', { type: label(wanted), code: wanted }), theirs);
     }
     if (lines.length) {
+      // Information discrète : rien à réparer dans Cyber Pinball, seul un autre fichier y changerait quelque chose.
       findings.push({
         code: 'mediaRatio',
         severity: 'info',
+        note: true,
         title: tn(lines.length, 'Proportions du média différentes de son écran', 'Proportions des médias différentes de leurs écrans'),
         detail: t('{lines} Le front-end ne déforme jamais un média ; un fichier aux proportions de l’écran l’occupe en entier.', { lines: lines.join(' ') }),
       });

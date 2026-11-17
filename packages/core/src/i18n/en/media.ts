@@ -248,10 +248,10 @@ export const messages: Record<string, string> = {
   'Cette borne n’a pas d’écran fronton : ce média n’est montré nulle part.': 'This cabinet has no backglass screen: this media isn’t shown anywhere.',
   'Cette borne n’a pas d’écran afficheur : ce média n’est montré nulle part.': 'This cabinet has no DMD screen: this media isn’t shown anywhere.',
   'Cette borne n’a pas d’écran topper : ce média n’est montré nulle part.': 'This cabinet has no topper screen: this media isn’t shown anywhere.',
-  'L’afficheur de cette borne est étroit (4:1) : il montre l’Afficheur ; celui-ci ne sert que si l’Afficheur manque.':
-    'This cabinet’s DMD is narrow (4:1): it shows the DMD media; this one is only used if the DMD media is missing.',
-  'L’afficheur de cette borne est large (16:9) : il montre l’Afficheur large ; celui-ci ne sert que si l’Afficheur large manque.':
-    'This cabinet’s DMD is wide (16:9): it shows the Full DMD media; this one is only used if the Full DMD media is missing.',
+  'L’afficheur de cette borne est étroit (4:1) : il montre l’Afficheur, ou celui-ci quand ses proportions le remplissent mieux ou que l’Afficheur manque.':
+    'This cabinet’s DMD is narrow (4:1): it shows the DMD media, or this one when its proportions fill it better or the DMD media is missing.',
+  'L’afficheur de cette borne est large (16:9) : il montre l’Afficheur large, ou celui-ci quand ses proportions le remplissent mieux ou que l’Afficheur large manque.':
+    'This cabinet’s DMD is wide (16:9): it shows the Full DMD media, or this one when its proportions fill it better or the Full DMD media is missing.',
   '{label} : une seule image ou vidéo possible.': '{label}: only one image or video allowed.',
   '{name} → corbeille': '{name} → trash',
   'montré aujourd’hui': 'shown today',
