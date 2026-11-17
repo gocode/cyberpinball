@@ -72,17 +72,19 @@ export const messages: Record<string, string> = {
   'Clic droit sur une image : « Télécharger cette image ». Elle revient à « Mon avatar » pour le recadrage. Fermer (Échap) garde la page.':
     'Right-click a picture: "Download this image". It comes back to "My avatar" to be cropped. Close (Esc) keeps the page.',
   'Télécharger cette image': 'Download this image',
-  // Premier démarrage : « Votre profil de joueur » (app/src/profile-welcome.ts)
+  // Démarrage : « Votre profil de joueur », pseudo obligatoire (app/src/profile-welcome.ts)
   'Votre profil de joueur': 'Your player profile',
-  'Bienvenue ! Choisissez le pseudo et l’avatar que verront les autres joueurs. Rien d’obligatoire : vous pourrez les changer à tout moment.':
-    'Welcome! Choose the nickname and avatar other players will see. Nothing is mandatory: you can change them at any time.',
+  'Bienvenue ! Choisissez votre pseudo : c’est le nom que verront les autres joueurs, dans les classements, la Communauté et entre amis. L’avatar est facultatif. Tout se change plus tard.':
+    'Welcome! Choose your nickname: it is the name other players will see, in the leaderboards, the Community and among friends. The avatar is optional. Everything can be changed later.',
   'Pseudo : {name}': 'Nickname: {name}',
   'Vu tel quel par les autres joueurs, à côté de votre avatar': 'Seen as is by other players, next to your avatar',
-  'Donné d’office : choisissez le vôtre': 'Given by default: choose your own',
+  'Pseudo : à choisir': 'Nickname: to be chosen',
+  'Obligatoire : c’est le nom que verront les autres joueurs': 'Mandatory: it is the name other players will see',
+  'Obligatoire': 'Mandatory',
   'Avatar : une image à vous': 'Avatar: a picture of your own',
   'Recadrée en carré, vue à côté de votre pseudo': 'Cropped square, shown next to your nickname',
   'Avatar : vos initiales en attendant': 'Avatar: your initials for now',
-  'Une photo ou une image, recadrée aux boutons de la borne': 'A photo or a picture, cropped with the cabinet buttons',
+  'Facultatif : une photo ou une image, recadrée aux boutons de la borne': 'Optional: a photo or a picture, cropped with the cabinet buttons',
   'Qui les voit': 'Who sees them',
   'Vos amis et les classements : votre pseudo et votre avatar, à côté de vos scores publiés. L’annuaire des joueurs : votre pseudo seulement.':
     'Your friends and the leaderboards: your nickname and avatar, next to your published scores. The player directory: your nickname only.',
@@ -92,7 +94,9 @@ export const messages: Record<string, string> = {
   'Mettre un avatar…': 'Add an avatar…',
   'Une image de ce PC ou du web, recadrée aux boutons': 'A picture from this PC or the web, cropped with the buttons',
   'Tout se change plus tard : Menu système > Amis > Partage et réseau': 'Everything can be changed later: System menu > Friends > Sharing and network',
-  'Plus tard : Menu système > Amis > Partage et réseau': 'Later: System menu > Friends > Sharing and network',
+  'Choisissez d’abord votre pseudo': 'Choose your nickname first',
+  'Choisissez d’abord votre pseudo : il est obligatoire pour jouer': 'Choose your nickname first: it is mandatory to play',
+  'C’est le nom donné d’office : choisissez le vôtre': 'That is the default name: choose your own',
   'Votre pseudo': 'Your nickname',
   'Pseudo': 'Nickname',
   'De {min} à {max} caractères : lettres, chiffres, espaces, tirets ou points.': '{min} to {max} characters: letters, digits, spaces, hyphens or dots.',

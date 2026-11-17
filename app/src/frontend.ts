@@ -3151,7 +3151,7 @@ library.provideSystemItem('avatar', {
   },
   run: () => avatarMenu.open(() => library.openSystem()),
 });
-// Premier démarrage du menu : pseudo et avatar proposés une fois (profile-welcome.ts).
+// Démarrage du menu : pseudo obligatoire tant qu'il n'est pas choisi, avatar proposé (profile-welcome.ts).
 const profileWelcome = createProfileWelcome({ library, net: socialNet, avatarMenu });
 
 /**
@@ -5964,8 +5964,9 @@ export function startFrontend(): void {
     state = { ...state, phase: 'message', message: noTables() };
   }
 
-  // Premier démarrage (juste après l'assistant de l'installation) : pseudo et avatar proposés une
-  // fois, avant la suite. Jamais en mode invité ; pas pendant un essai sans opérateur, sauf demandé.
+  // Pseudo pas encore choisi (premier démarrage, juste après l'assistant de l'installation, ou profil
+  // resté au nom d'office) : il est obligatoire, l'écran du profil passe avant la suite. Jamais en
+  // mode invité ; pas pendant un essai sans opérateur, sauf demandé.
   const unattended = Boolean(process.env.CYBERPINBALL_AUTOPILOT || process.env.CYBERPINBALL_STRESS);
   const welcome = !choose && !guest.active && (!unattended || process.env.CYBERPINBALL_PROFIL === '1') && profileWelcomeDue(socialNet.state());
   // Conditions d'utilisation pas encore acceptées dans leur version en cours (installation sans

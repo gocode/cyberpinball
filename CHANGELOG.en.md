@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Mandatory nickname: at start, the "Your player profile" screen can no longer be left without choosing a nickname ("Continue" greyed out, Exit reminds you); it comes back as long as the profile keeps the default name, the avatar stays optional.
 - Groups (Community): "Private groups" become "Groups", public or private. A private group appears nowhere, you get in by invitation; a public group appears in the public group list of every cabinet, and any player joins it with one press. The creator chooses the access when creating the group and changes it later in "Members". The chat, the table of the week and the leaderboard stay between members.
 - Pinball FX (beta), add page: a media file downloaded from a site (VPUniverse, VPForums) is no longer taken by default; its card says its size, whether it is a pack shared by several tables (Cyber Pinball only takes the table's file from it) and that the site page opens during its wait. A Pinball FX logo pack already received gives each table its logo, from its number in the game ("Table_97.png").
 - Media suggestions: a received pack of several games now only offers the table's file (1 instead of 386 for Back to the Future Pinball). Searches you resume ("Search for another title…", "Add words to the search…") show the title currently searched, and their field opens pre-filled with it.

@@ -32,10 +32,14 @@ Every cabinet that receives the notice checks its signature, erases everything t
 Modules: [forget.ts](../../packages/core/src/forget.ts), `app/src/account-delete.ts`.
 Tests: [suppression-compte.test.ts](../../packages/core/src/test/suppression-compte.test.ts) (signature, erasure of each piece of data, and between two cabinets on 127.0.0.1: the notice erases the player and their lines) and `retours-service.test.ts` (suggestions, votes, replay).
 
-**Profile at first start.**
-Right after the installation's screen wizard, the menu offers the "Votre profil de joueur" (Your player profile) screen once: "Choisir mon pseudo…" (Choose my nickname…) (on-screen keyboard, an empty field rather than the default name "Joueur A1B2"), "Mettre un avatar…" (Add an avatar…) (the "Mon avatar" screen, see "Player avatars") and "Continuer" (Continue), which resumes the first start where it was (install VPX, add a table, the wheel); Exit does the same, nothing is mandatory.
-It is offered only to a profile that is still anonymous (default name, no avatar), never in guest mode nor during an unattended test (unless `CYBERPINBALL_PROFIL=1`), and after the opening when the start lands on the wheel.
-The date it was offered (`profileOffered` in `social.json`) is recorded as soon as it opens: it never comes back.
+**Mandatory nickname at start.**
+Right after the installation's screen wizard, the front-end opens the "Votre profil de joueur" (Your player profile) screen: "Choisir mon pseudo…" (Choose my nickname…) (on-screen keyboard, an empty field rather than the default name "Joueur A1B2"), "Mettre un avatar…" (Add an avatar…) (the "Mon avatar" screen, see "Player avatars") and "Continuer" (Continue), which resumes the start where it was (install VPX, add a table, the wheel).
+The nickname is mandatory: as long as it is not chosen, the nickname line reads "to be chosen", "Continuer" stays greyed out, and both "Continuer" and Exit only remind the player of the nickname, with the selection back on "Choisir mon pseudo…".
+The default name typed again as is ("Joueur A1B2", "Player A1B2") is refused.
+The avatar stays optional.
+The screen comes back at every start as long as the profile has the default name, even if already seen and even with an avatar; a profile that had skipped the screen without a nickname therefore gets it again at the next start.
+Never in guest mode nor during an unattended test (unless `CYBERPINBALL_PROFIL=1`), and after the opening when the start lands on the wheel.
+The date of the first opening (`profileOffered` in `social.json`) stays recorded, for reference.
 Code: `app/src/profile-welcome.ts`, rule `profileWelcomeDue` in [packages/core/src/social.ts](../../packages/core/src/social.ts), test `packages/core/src/test/profile-welcome.test.ts`.
 
 **Directory with no server.**

@@ -32,10 +32,14 @@ Chaque borne qui reçoit l'avis vérifie sa signature, efface tout ce qui vient 
 Modules : [forget.ts](../../packages/core/src/forget.ts), `app/src/account-delete.ts`.
 Essais : [suppression-compte.test.ts](../../packages/core/src/test/suppression-compte.test.ts) (signature, effacement de chaque donnée, et entre deux bornes en 127.0.0.1 : l'avis efface le joueur et ses lignes) et `retours-service.test.ts` (propositions, votes, rejeu).
 
-**Profil au premier démarrage.**
-Juste après l'assistant d'écrans de l'installation, le front-end propose une fois l'écran « Votre profil de joueur » : « Choisir mon pseudo… » (clavier à l'écran, champ vide plutôt que le nom donné d'office « Joueur A1B2 »), « Mettre un avatar… » (l'écran « Mon avatar », voir « Avatar des joueurs ») et « Continuer », qui reprend le premier démarrage là où il en était (installer VPX, ajouter une table, la roue) ; Exit fait de même, rien n'est obligatoire.
-Il n'est proposé qu'à un profil encore anonyme (nom d'office, aucun avatar), jamais en mode invité ni pendant un essai sans opérateur (sauf `CYBERPINBALL_PROFIL=1`), et après l'ouverture quand le démarrage arrive sur la roue.
-La date où il a été proposé (`profileOffered` dans `social.json`) est notée dès qu'il s'ouvre : il ne revient jamais.
+**Pseudo obligatoire au démarrage.**
+Juste après l'assistant d'écrans de l'installation, le front-end ouvre l'écran « Votre profil de joueur » : « Choisir mon pseudo… » (clavier à l'écran, champ vide plutôt que le nom donné d'office « Joueur A1B2 »), « Mettre un avatar… » (l'écran « Mon avatar », voir « Avatar des joueurs ») et « Continuer », qui reprend le démarrage là où il en était (installer VPX, ajouter une table, la roue).
+Le pseudo est obligatoire : tant qu'il n'est pas choisi, la ligne du pseudo affiche « à choisir », « Continuer » reste grisé, et « Continuer » comme Exit ne font que rappeler le pseudo, la sélection revenue sur « Choisir mon pseudo… ».
+Le nom d'office retapé tel quel (« Joueur A1B2 », « Player A1B2 ») est refusé.
+L'avatar reste facultatif.
+L'écran revient à chaque démarrage tant que le profil porte le nom d'office, même déjà vu et même avec un avatar ; un profil qui avait passé l'écran sans pseudo le retrouve donc au démarrage suivant.
+Jamais en mode invité ni pendant un essai sans opérateur (sauf `CYBERPINBALL_PROFIL=1`), et après l'ouverture quand le démarrage arrive sur la roue.
+La date de la première ouverture (`profileOffered` dans `social.json`) reste notée, pour mémoire.
 Code : `app/src/profile-welcome.ts`, règle `profileWelcomeDue` de [packages/core/src/social.ts](../../packages/core/src/social.ts), test `packages/core/src/test/profile-welcome.test.ts`.
 
 **Annuaire sans serveur.**

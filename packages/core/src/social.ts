@@ -853,12 +853,12 @@ export function hasDefaultName(state: { name: string; key: { publicKey: string }
 }
 
 /**
- * L'écran « Votre profil de joueur » est-il à proposer ? Une seule fois, au premier démarrage du
- * menu, et seulement si ni le pseudo ni l'avatar n'ont encore été choisis (une borne déjà
- * personnalisée ne le voit jamais).
+ * L'écran « Votre profil de joueur » est-il à ouvrir au démarrage ? Le pseudo est obligatoire :
+ * tant que le profil porte le nom donné d'office, l'écran revient à chaque démarrage, même s'il a
+ * déjà été vu (`profileOffered`) ou si un avatar a été mis. Un pseudo choisi : plus jamais.
  */
-export function profileWelcomeDue(state: { name: string; key: { publicKey: string } } & Pick<SocialState, 'avatar' | 'profileOffered'>): boolean {
-  return !state.profileOffered && !state.avatar && hasDefaultName(state);
+export function profileWelcomeDue(state: { name: string; key: { publicKey: string } }): boolean {
+  return hasDefaultName(state);
 }
 
 export function setName(state: SocialState, name: string, now = new Date()): SocialState | undefined {
