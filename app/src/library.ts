@@ -5958,18 +5958,21 @@ export function createLibrary(host: LibraryHost) {
     installReceived: (dir: string, table?: TableEntry, back?: () => void) => startImport([dir], 'move', undefined, undefined, false, table?.folder, back),
     isActive: () => screen !== undefined,
     /**
-     * Un écran qui s'ouvre de lui-même par-dessus celui-ci (une invitation à jouer) : `open` reçoit le
-     * retour qui rend l'écran d'avant tel qu'il était, curseur compris. Refusé (false) pendant une
-     * opération longue ou une saisie : l'écran du moment ne se perd pas.
+     * Un écran qui s'ouvre par-dessus celui-ci (une invitation à jouer, une pastille du coin d'état
+     * cliquée) : `open` reçoit le retour qui rend l'écran d'avant tel qu'il était, curseur compris, et
+     * son propre « Retour » (rubrique, entrée choisie, écran d'où il venait). Refusé (false) pendant
+     * une opération longue ou une saisie : l'écran du moment ne se perd pas.
      */
     interrupt: (open: (back: () => void) => void): boolean => {
       if (busyCount > 0 || screen?.kind === 'prompt' || (screen?.kind === 'edit' && screen.editor)) return false;
       const was = screen;
       const at = cursor;
+      const ways = { section, systemGroup, systemChosen, systemReturn, sheetReturn, sheetManage };
       open(() => {
         if (!was) return leave();
         screen = was;
         cursor = at;
+        ({ section, systemGroup, systemChosen, systemReturn, sheetReturn, sheetManage } = ways);
         host.enter();
         host.broadcast();
       });
@@ -5994,12 +5997,15 @@ export function createLibrary(host: LibraryHost) {
     /** Gestionnaire de téléchargements : la file, son écran, et ce que les autres écrans y posent. */
     downloads: {
       manager: downloads,
-      /** Le gestionnaire, depuis le menu des tables (pastille) : « Retour » y ramène. */
-      open: (focus?: string) => {
+      /**
+       * Le gestionnaire, depuis la pastille : « Retour » ramène à `back` (l'écran quitté), sinon à
+       * l'écran des tables quand on en vient, sinon au menu système.
+       */
+      open: (focus?: string, back?: () => void) => {
         if (!host.guest.knock('menu.system')) return;
         const from = screen;
         systemChosen = 'downloads';
-        systemReturn = from ? undefined : () => leave();
+        systemReturn = back ?? (from ? undefined : () => leave());
         openDownloads(focus);
       },
       /** La pastille du menu des tables ; undefined quand il n'y a rien à suivre. */

@@ -2588,6 +2588,21 @@ const menuNotices = createMenuNotices({
  * mode attente, opération longue, saisie), la notification l'annonce et l'entrée du menu système
  * y mène. Pendant une partie : la carte sur le plateau (game-notice.ts).
  */
+/**
+ * Pastille du coin d'état cliquée (téléchargements, amis, badges, carte du joueur) : l'écran
+ * qu'elle annonce, depuis la roue (ou son aide) comme depuis un écran plein, où le coin est aussi
+ * (17/11/2026). Son « Retour » ramène là d'où l'on vient : la roue, ou l'écran plein tel qu'il
+ * était (library.interrupt, comme une invitation). Rien sur un message ou une confirmation, qui
+ * attendent leur réponse, ni pendant une opération longue ou une saisie.
+ */
+function openFromCorner(open: (back: () => void) => void): void {
+  if (state.phase === 'menu') {
+    if (!guest.knock('menu.system')) return;
+    if (state.help) state = { ...state, help: false };
+    open(() => library.leave());
+  } else if (state.phase === 'library' && guest.knock('menu.system')) library.interrupt(open);
+}
+
 function openArrivedInvite(id: string): boolean {
   if (closing || guest.active || desktop.active) return false;
   if (state.phase === 'menu' && !attract.active) {
@@ -3450,18 +3465,16 @@ export function startFrontend(): void {
     else if (action.type === 'key') handleKey({ type: 'keyDown', code: action.code, key: '' } as Input);
     // Roue dentée (ou cadenas, en mode invité).
     else if (action.type === 'config') guest.knock('menu.system') && openConfig();
-    // Pastille des téléchargements du menu des tables.
-    else if (action.type === 'downloads') {
-      if (state.phase === 'menu' && guest.knock('menu.system')) library.downloads.open();
-    }
+    // Pastille des téléchargements.
+    else if (action.type === 'downloads') openFromCorner((back) => library.downloads.open(undefined, back));
     // Pastille des amis en ligne, notification d'un ami ou d'une demande : l'écran qu'elle annonce.
     else if (action.type === 'friends' || action.type === 'friend-requests') {
-      if (state.phase === 'menu' && guest.knock('menu.system')) friendsMenu.items[action.type].run();
+      const id = action.type;
+      openFromCorner((back) => library.runSystemItem(id, back));
     }
     // Carte du joueur (coin d'état) : Mon niveau ; pastille des badges : Mes badges.
-    else if (action.type === 'level' || action.type === 'badges') {
-      if (state.phase === 'menu' && guest.knock('menu.system')) (action.type === 'level' ? levelMenu.open : levelMenu.openBadges)(() => library.leave());
-    }
+    else if (action.type === 'level') openFromCorner((back) => levelMenu.open(back));
+    else if (action.type === 'badges') openFromCorner((back) => levelMenu.openBadges(back));
     // Le moment d'un badge ou d'un niveau, vu : il ne revient plus.
     else if (action.type === 'level-seen') levelTracker.seen();
     // « J'aime » sur mon activité : Mon profil public, qui dit qui a aimé.

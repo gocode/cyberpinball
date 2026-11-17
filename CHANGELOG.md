@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.15
 
+- Les pastilles du haut de l'écran (profil, badges, amis en ligne, téléchargements) se cliquent aussi depuis le Menu système et les autres écrans pleins, plus seulement depuis la roue ; « Retour » ramène à l'écran d'où l'on vient.
 - Un autre programme de borne encore ouvert pendant la partie (PinUP Popper, son lecteur de PuP-Packs, dmdext…) est signalé par-dessus la partie, même si vous aviez choisi de continuer au démarrage ; il est noté avec la mesure de la partie et rappelé dans « La table rame sur cette borne ».
 - Réglage de l'affichage en partie : l'aide-mémoire dit pourquoi « Enregistrer » est grisé (rien n'a changé) et que Lancer le rallume.
 - Badge débloqué et niveau gagné : au bureau, les étoiles et les poussières du fond se répartissent sur tout l'écran, de part et d'autre du badge, au lieu de se tasser sur la gauche.

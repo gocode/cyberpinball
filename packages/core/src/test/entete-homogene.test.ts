@@ -71,6 +71,33 @@ test('en-tête : sur un écran plein, la roue suit les pastilles de la ligne de 
   assert.match(read('app', 'renderer', 'frontend.js'), /el\('button', `gear\$\{s\.zone === 'head' \? ' on-head' : ''\}`\)/);
 });
 
+test('en-tête : chaque pastille du coin se clique depuis la roue comme depuis un écran plein, et « Retour » ramène là d’où l’on vient', () => {
+  // Vu le 17/11/2026 : sur les écrans pleins, les pastilles s'affichaient mais un clic ne faisait rien
+  // (chaque action exigeait state.phase === 'menu').
+  const main = read('app', 'src', 'frontend.ts');
+  const acts = main.slice(main.indexOf("ipcMain.on('action'"), main.indexOf("action.type === 'level-seen'"));
+  // Chaque action posée par le coin d'état (frontend.js, niveau.js) passe par la même porte.
+  const renderer = read('app', 'renderer', 'frontend.js') + read('app', 'renderer', 'niveau.js');
+  const cornerActs = ['downloads', 'friends', 'level', 'badges'];
+  for (const type of cornerActs) {
+    assert.match(renderer, new RegExp(`JSON\\.stringify\\(\\{ type: '${type}' \\}\\)`), `le coin pose l'action ${type}`);
+    const at = acts.indexOf(`action.type === '${type}'`);
+    assert.ok(at >= 0, `action ${type} reçue`);
+    const branch = acts.slice(at, acts.indexOf('else if', at));
+    assert.match(branch, /openFromCorner\(/, `${type} passe par openFromCorner`);
+  }
+  assert.doesNotMatch(acts, /state\.phase === 'menu' && guest\.knock/, 'plus aucune pastille réservée à la roue');
+  const open = main.slice(main.indexOf('function openFromCorner('), main.indexOf('function openArrivedInvite('));
+  assert.match(open, /if \(state\.phase === 'menu'\) \{[\s\S]*open\(\(\) => library\.leave\(\)\);/, 'depuis la roue : Retour y ramène');
+  assert.match(open, /state\.phase === 'library' && guest\.knock\('menu\.system'\)\) library\.interrupt\(open\)/, 'depuis un écran plein : par-dessus, Retour le rend');
+  // L'écran rendu retrouve aussi son propre « Retour » (rubrique, entrée, écran d'où il venait).
+  const library = read('app', 'src', 'library.ts');
+  const interrupt = library.slice(library.indexOf('interrupt: (open'), library.indexOf('browserOpen:'));
+  for (const way of ['section', 'systemGroup', 'systemChosen', 'systemReturn', 'sheetReturn', 'sheetManage']) assert.ok(new RegExp(`const ways = \\{[^}]*\\b${way}\\b`).test(interrupt) && new RegExp(`\\(\\{[^}]*\\b${way}\\b[^}]*\\} = ways\\)`).test(interrupt), `interrupt garde et rend ${way}`);
+  // Le gestionnaire de téléchargements accepte le retour donné.
+  assert.match(library, /open: \(focus\?: string, back\?: \(\) => void\) => \{[\s\S]{0,200}systemReturn = back \?\? /);
+});
+
 test('en-tête : la carte du joueur et ses badges, sur l’écran des tables comme sur les écrans pleins', () => {
   const main = frontendSource();
   const corner = main.slice(main.indexOf('function menuCorner('), main.indexOf('function cinemaFor('));

@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.15
 
+- The pills at the top of the screen (profile, badges, friends online, downloads) can now be clicked from the System menu and other full-screen pages, not only from the wheel; "Back" returns to the page you came from.
 - Another cabinet program still open during the game (PinUP Popper, its PuP-Pack player, dmdext…) is now shown over the game, even if you chose to carry on at startup; it is noted with the game's measurement and mentioned in “The table is sluggish on this cabinet”.
 - Adjusting the display in game: the reminder says why “Save” is greyed out (nothing changed) and that Launch turns it back on.
 - Badge unlocked and level gained: on the desktop, the stars and dust of the background spread across the whole screen, on both sides of the badge, instead of crowding on the left.
