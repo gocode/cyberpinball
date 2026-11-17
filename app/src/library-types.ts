@@ -317,7 +317,7 @@ export interface Row {
   /** Barre d'un téléchargement sous la ligne (Téléchargements) : `value` de 0 à 1, absente si la taille est inconnue. */
   progress?: { value?: number; tone?: Tone; busy?: boolean };
   /** Badges d'un joueur (profil public) : chacun dessiné dans sa forme et sa rareté (niveau.js), son nom dessous. */
-  medals?: { icon: IconName; rarity: string; label: string }[];
+  medals?: { icon: IconName; rarity: string; label: string; /** XP que le badge rapporte, montrés sous son nom. */ xp?: number }[];
   /**
    * Le badge dessiné à gauche de la ligne, à la place de l'icône (Mes badges, Badges les plus
    * proches) : dans sa forme et sa rareté (niveau.js) ; reçu, il brille ; pas encore, il est gris et éteint.

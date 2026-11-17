@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { BADGES, badgeShape, badgeXp, FAMILY_BACKDROP, nearestBadges, RARITY_XP } from '../badges';
 import { ICON_NAMES } from '../icons';
+import { setLanguage } from '../i18n';
 import {
   BADGES_XP_ALL,
   celebrate,
@@ -188,4 +189,25 @@ test('badges : 56 badges, identifiants uniques, icônes connues, XP et formes pa
   const near = nearestBadges([], { games: 7, tables: 19, seconds: 0, longestTable: 0, records: 0, championTables: 0 });
   assert.equal(near[0]?.badge.id, 'explorer', '19 tables sur 25 : le plus proche');
   assert.ok(!near.some((x) => x.badge.secret));
+});
+
+test('badges : un nom tient dans sa colonne du profil sans se couper au milieu d’un mot (FR et EN)', () => {
+  // La colonne de .lib-medals (minmax(14cqmin)) tient 12 lettres en 1,86 cqmin ; au-delà, le nom
+  // déborderait ou se couperait (« Ambassadeu / r », 17/11/2026).
+  const css = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'app', 'renderer', 'library.css'), 'utf8');
+  const rule = (sel: string) => new RegExp(`\\n${sel.replace('.', '\\.')}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+  const label = rule('.lib-medal-label');
+  assert.ok(label, 'règle .lib-medal-label');
+  assert.doesNotMatch(label, /overflow-wrap:\s*(anywhere|break-word)|word-break:\s*break-all|hyphens:\s*auto/, 'jamais de coupure dans un mot');
+  assert.match(rule('.lib-medals'), /minmax\(14cqmin/, 'colonne de 14 cqmin');
+  try {
+    for (const lang of ['fr', 'en'] as const) {
+      setLanguage(lang);
+      for (const b of BADGES) {
+        for (const word of b.label.split(/[\s ]+/)) assert.ok([...word].length <= 12, `${lang} : « ${word} » (${b.id}) dépasse 12 lettres`);
+      }
+    }
+  } finally {
+    setLanguage('fr');
+  }
 });

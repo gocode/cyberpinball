@@ -21,6 +21,8 @@ import {
   invitedOf,
   levelOf,
   locale,
+  RARITY_XP,
+  XP,
   shownLevel,
   tierLabel,
   tierOf,
@@ -124,12 +126,14 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
    */
   function invitedSection(key: string, card: PublicCard, mine: boolean): Section[] {
     const { count, players } = invitedOf(key, card.invited, card.invitedTotal);
-    if (!count) return [];
+    // Ce que rapporte une personne invitée : rappelé à moi seul, pour donner envie d'en inviter.
+    const reward = t('+{xp} XP par personne invitée, +{tier} XP à chacun de ses paliers ; badge Ambassadeur dès la première', { xp: XP.invited, tier: XP.inviteeTier });
+    if (!count) return mine ? [{ title: t('Personnes invitées'), rows: [{ text: t('Faites découvrir Cyber Pinball à vos amis'), detail: t('À son arrivée, chacun peut dire que c’est vous : {reward}', { reward }), icon: 'friend-add', tone: 'info' }] }] : [];
     const shown = [...players].reverse().slice(0, 8).map((p) => avatarOf(p.me, nameOf(p.me, net.publicCard(p.me)) || p.name, net.publicCard(p.me)));
     const text = mine
       ? tn(count, 'Vous avez fait découvrir Cyber Pinball à {n} joueur', 'Vous avez fait découvrir Cyber Pinball à {n} joueurs')
       : tn(count, 'A fait découvrir Cyber Pinball à {n} joueur', 'A fait découvrir Cyber Pinball à {n} joueurs');
-    return [{ title: t('Personnes invitées'), rows: [{ text, icon: 'friend-add', tone: 'ok', avatars: shown, ...(count > shown.length ? { aside: `+${count - shown.length}` } : {}) }] }];
+    return [{ title: t('Personnes invitées'), rows: [{ text, icon: 'friend-add', tone: 'ok', avatars: shown, ...(mine ? { detail: reward } : {}), ...(count > shown.length ? { aside: `+${count - shown.length}` } : {}) }] }];
   }
   const levelLine = (level: number | '?' | undefined) => (level === undefined ? undefined : level === '?' ? t('Niveau ?') : t('{tier} · niveau {level}', { tier: tierLabel(tierOf(level)), level }));
   const avatarOf = (key: string, name: string, card?: PublicCard) => {
@@ -159,7 +163,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       .filter((b): b is NonNullable<typeof b> => !!b)
       .sort((a, b) => rank[a.rarity] - rank[b.rarity])
       .slice(0, 12)
-      .map((b) => ({ icon: b.icon, rarity: b.rarity, label: b.label }));
+      .map((b) => ({ icon: b.icon, rarity: b.rarity, label: b.label, xp: RARITY_XP[b.rarity] }));
     out.push({
       title: t('Badges'),
       rows: medals.length

@@ -66,4 +66,8 @@ export const messages: Record<string, string> = {
   'Vous avez fait découvrir Cyber Pinball à {n} joueurs': 'You introduced {n} players to Cyber Pinball',
   'A fait découvrir Cyber Pinball à {n} joueur': 'Introduced {n} player to Cyber Pinball',
   'A fait découvrir Cyber Pinball à {n} joueurs': 'Introduced {n} players to Cyber Pinball',
+  '+{xp} XP par personne invitée, +{tier} XP à chacun de ses paliers ; badge Ambassadeur dès la première': '+{xp} XP per invited player, +{tier} XP for each of their tiers; Ambassador badge from the first one',
+  '{detail} · +{xp} XP à gagner': '{detail} · +{xp} XP to earn',
+  'Faites découvrir Cyber Pinball à vos amis': 'Introduce your friends to Cyber Pinball',
+  'À son arrivée, chacun peut dire que c’est vous : {reward}': 'When they arrive, each of them can say it was you: {reward}',
 };

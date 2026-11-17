@@ -1564,13 +1564,16 @@ body.mouse .media-card[data-act]:hover {
 /* Badges d'un joueur (profil public) : une rangée de médailles, leur nom dessous, sur toute la largeur. */
 .lib-medals {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11cqmin, 1fr));
+  /* Une colonne tient le plus long mot d'un nom de badge (12 lettres, levels.test.ts) : jamais coupé. */
+  grid-template-columns: repeat(auto-fill, minmax(14cqmin, 1fr));
   gap: 1.4cqmin;
   margin-top: 1.2cqmin;
 }
 
 .lib-medal {
   display: grid;
+  /* Médaille, nom (une ou deux lignes), XP : les XP d'une même rangée sur une seule ligne, en bas. */
+  grid-template-rows: auto 1fr auto;
   justify-items: center;
   gap: 0.6cqmin;
   text-align: center;
@@ -1593,7 +1596,32 @@ body.mouse .media-card[data-act]:hover {
   font-size: 1.86cqmin;
   line-height: 1.2;
   color: var(--ink-muted);
-  overflow-wrap: anywhere;
+  /* Un nom se coupe entre deux mots, jamais au milieu d'un mot (« Ambassadeu / r »). */
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+}
+
+/* Les XP que le badge rapporte, sous son nom : à la couleur de sa rareté (comme .lib-row-medal). */
+.lib-medal-xp {
+  font-size: 1.86cqmin;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgb(var(--medal-rgb, 205 218 214));
+  white-space: nowrap;
+}
+
+.lib-medal.rarity-rare {
+  --medal-rgb: 95 180 207;
+}
+
+.lib-medal.rarity-epic {
+  --medal-rgb: 169 139 255;
+}
+
+.lib-medal.rarity-legendary {
+  --medal-rgb: 240 210 122;
 }
 
 /*

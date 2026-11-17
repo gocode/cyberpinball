@@ -11,6 +11,9 @@ son interface).
 
 ## 0.1.15
 
+- Profil : le nom d'un badge ne se coupe plus au milieu d'un mot (« Ambassadeu / r »), et chaque médaille rappelle dessous les XP qu'elle rapporte, à la couleur de sa rareté.
+- Mes badges : un badge pas encore reçu dit ce qu'il rapporte (« +400 XP à gagner »), badges secrets compris.
+- Mon profil public : le barème des personnes invitées est rappelé (+100 XP par personne invitée, +25 XP à chacun de ses paliers, badge Ambassadeur dès la première), avec une invitation à faire découvrir Cyber Pinball tant qu'on n'a invité personne.
 - Les pastilles du haut de l'écran (profil, badges, amis en ligne, téléchargements) se cliquent aussi depuis le Menu système et les autres écrans pleins, plus seulement depuis la roue ; « Retour » ramène à l'écran d'où l'on vient.
 - Un autre programme de borne encore ouvert pendant la partie (PinUP Popper, son lecteur de PuP-Packs, dmdext…) est signalé par-dessus la partie, même si vous aviez choisi de continuer au démarrage ; il est noté avec la mesure de la partie et rappelé dans « La table rame sur cette borne ».
 - Réglage de l'affichage en partie : l'aide-mémoire dit pourquoi « Enregistrer » est grisé (rien n'a changé) et que Lancer le rallume.

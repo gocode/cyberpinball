@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.15
 
+- Profile: a badge name no longer breaks in the middle of a word ("Ambassado / r"), and each medal shows below it the XP it awards, in the colour of its rarity.
+- My badges: a badge not yet earned says what it awards ("+400 XP to earn"), secret badges included.
+- My public profile: the reward for invited players is shown (+100 XP per invited player, +25 XP for each of their tiers, Ambassador badge from the first one), with a nudge to introduce Cyber Pinball to friends while nobody has been invited yet.
 - The pills at the top of the screen (profile, badges, friends online, downloads) can now be clicked from the System menu and other full-screen pages, not only from the wheel; "Back" returns to the page you came from.
 - Another cabinet program still open during the game (PinUP Popper, its PuP-Pack player, dmdext…) is now shown over the game, even if you chose to carry on at startup; it is noted with the game's measurement and mentioned in “The table is sluggish on this cabinet”.
 - Adjusting the display in game: the reminder says why “Save” is greyed out (nothing changed) and that Launch turns it back on.

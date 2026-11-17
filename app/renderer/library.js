@@ -1412,16 +1412,20 @@ function rowThumb(thumb, icon = 'music') {
  * valeur une bande qui n'avance pas, hachurée ; `tone` : la couleur de l'état (en cours, en
  * attente, en pause, fini). Le mot de l'état est dans la ligne : la couleur ne le dit jamais seule.
  */
-/** Rangée de médailles (Row.medals) : chaque badge dans sa forme et sa rareté, son nom dessous. */
+/**
+ * Rangée de médailles (Row.medals) : chaque badge dans sa forme et sa rareté, son nom dessous, puis
+ * les XP qu'il rapporte (« +150 XP », à la couleur de sa rareté), pour donner envie de l'avoir.
+ */
 function rowMedals(medals) {
   const strip = libEl('div', 'lib-medals');
   for (const m of medals) {
-    const cell = libEl('div', 'lib-medal');
+    const cell = libEl('div', `lib-medal rarity-${m.rarity}`);
     const art = libEl('span', 'lib-medal-art');
     // Le dessin vient du registre des badges (niveau.js) ; sans lui, l'icône seule.
     if (window.CyberLevels) art.innerHTML = CyberLevels.badgeSvg(m.icon, m.rarity);
     else art.append(cyberIcon(m.icon));
     cell.append(art, libEl('span', 'lib-medal-label', m.label));
+    if (m.xp) cell.append(libEl('span', 'lib-medal-xp', `+${m.xp.toLocaleString(document.documentElement.lang || undefined)} XP`));
     strip.append(cell);
   }
   return strip;
