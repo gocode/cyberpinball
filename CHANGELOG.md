@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.15
 
+- Badge débloqué et niveau gagné : au bureau, les étoiles et les poussières du fond se répartissent sur tout l'écran, de part et d'autre du badge, au lieu de se tasser sur la gauche.
 - Catalogue : l'édition d'une version (« Galaxy Edition » de JP's Space Cadet, par exemple) s'affiche devant ses auteurs et se cherche. « Space Cadet Galaxy Edition » trouve le jeu et met cette version en tête, et un fichier qui cite l'édition est reconnu comme elle. La note de VPS d'une version (« Pup Pack installation is REQUIRED ») s'affiche aussi.
 - Médecin : un PuP-Pack fait pour une autre version du jeu est signalé (« PuP-Pack fait pour une autre version de la table »). Quand le script de la table ne pilote pas PuP, le pack n'affiche rien sans des événements que ce script n'envoie jamais, et le fronton reste noir : le constat le dit, avec les numéros attendus et ceux que le script envoie.
 - Nouveautés : les niveaux y ont leur ligne, avec le moment d'un badge en aperçu ; « Essayer » ouvre « Mon niveau ». Une borne qui avait déjà tout vu retrouve la pastille rouge pour cette nouveauté.
