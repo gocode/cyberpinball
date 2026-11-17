@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Pinball FX (beta), add page: a media file downloaded from a site (VPUniverse, VPForums) is no longer taken by default; its card says its size, whether it is a pack shared by several tables (Cyber Pinball only takes the table's file from it) and that the site page opens during its wait. A Pinball FX logo pack already received gives each table its logo, from its number in the game ("Table_97.png").
+- Media suggestions: a received pack of several games now only offers the table's file (1 instead of 386 for Back to the Future Pinball). Searches you resume ("Search for another title…", "Add words to the search…") show the title currently searched, and their field opens pre-filled with it.
 - Technical manual: one page per section, lighter to open on GitHub; the contents page keeps the same links.
 - Snappier table-management screens: a table's sheet, “Add a table”, game media and game parts, and Leaderboards read the disk when they open, then answer the flippers without reading it again. On a loaded cabinet (a PuP-Pack of thousands of files, hundreds of downloads), each press no longer freezes the screen.
 - Faster, safer: launching a table no longer starts a Windows tool for each screen; table and PuP-Pack checks read far less from the disk; the checks run after startup no longer freeze the table screen or a game launch. Cabinet settings, files repaired by Cyber Pinball and those of a game between friends are written in one go: a power cut no longer leaves them half-written.

@@ -343,7 +343,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
         },
       ],
       actions: [
-        { label: t('Chercher un autre titre…'), detail: t('Titre en anglais, initiales ou nom de ROM'), tone: 'ok', run: () => askTitle(table, back, () => showNothing(table, reason, deep, back)) },
+        { label: t('Chercher un autre titre…'), detail: t('Titre cherché : « {query} » · titre en anglais, initiales ou nom de ROM', { query: table.title }), tone: 'ok', run: () => askTitle(table, back, () => showNothing(table, reason, deep, back), table.title) },
         ...(ctx.webGame ? [ctx.webGame(table, () => showNothing(table, reason, deep, back))] : []),
         { label: t('Retour aux médias'), run: leave },
       ],
@@ -556,14 +556,14 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
           })),
           {
             label: t('Chercher un autre titre…'),
-            detail: t('Titre en anglais, initiales ou nom de ROM'),
+            detail: t('Titre cherché : « {query} » · titre en anglais, initiales ou nom de ROM', { query: o.query ?? o.title }),
             run: () => {
               const table = ctx.find(o.file);
               if (!table) return back();
               askTitle(table, (message) => {
                 forget([o]);
                 mode.back(message);
-              }, () => openCandidates(o, mode), o.query ?? '');
+              }, () => openCandidates(o, mode), o.query ?? o.title);
             },
           },
           { label: t('Retour'), run: back },

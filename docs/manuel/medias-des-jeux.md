@@ -913,6 +913,8 @@ Fiche d'une table > « Médias du jeu » > un média > **« Voir les proposition
 - **« Autres jeux… »** : les jeux possibles, le plus probable d'abord, avec leur logo (ou une vignette), ce qu'ils ont en ligne et leurs raisons ; Start ajoute ou retire un jeu des propositions.
   Sont retenus d'office le premier jeu, ses autres éditions et ceux presque aussi probables (quatre au plus).
 - **« Chercher un autre titre… »** : saisie au clavier de l'écran (ou au vrai clavier) d'un titre en anglais (« lord of the rings »), d'initiales (« TMNT ») ou d'un nom de ROM (« t2_l8 ») ; le premier jeu trouvé s'ajoute aux propositions.
+  Comme toute recherche qu'on reprend (« Ajouter des mots à la recherche… », « Chercher un titre… » des parties du jeu, plan de VPinMediaDB), l'entrée dit dans son détail le titre cherché en ce moment (« Titre cherché : « … » »), et le champ s'ouvre prérempli avec lui ; pour les mots ajoutés, la recherche entière, titre en tête : on voit ce qu'on complète (17/11/2026).
+  Un pack reçu de plusieurs jeux ne propose que les fichiers de la table (`namedMediaFiles`, au-delà de `PACK_FILES` fichiers).
 - **Recherche approfondie** : tous les indices que la table donne d'elle-même, confrontés un par un à la base VPS, chaque piste gardant ses raisons en clair :
   - le **nom écrit dans la table** par son auteur (Fichier > Informations de la table dans l'éditeur de VPX : stockage `TableInfo` du `.vpx`, lu sans charger la table) : « GOTG_2.1.1.vpx » s'y appelle « Guardians Of The Galaxy » ; son **auteur et sa version** désignent la recréation exacte chez VPS ; un **numéro IPDB** cité dans sa description désigne le jeu ;
   - le titre de la fiche, le nom du `.vpx`, du dossier et du `.directb2s` ;

@@ -341,6 +341,12 @@ export function createProposals(ctx: ProposalsContext) {
    * En ligne d'abord (VPinMediaDB), puis ce que la borne a, puis les sites (VPForums,
    * puis VPUniverse, lent), puis les vignettes VPS, en basse définition.
    */
+  /** La table de ces propositions, pour qu'un pack reçu ne propose que ses fichiers à elle. */
+  function ownOf(st: State): { title?: string; pinballFx?: number } {
+    const table = ctx.find(st.file);
+    return { ...(table?.title ? { title: table.title } : {}), ...(table?.pinballFxTable !== undefined ? { pinballFx: table.pinballFxTable } : {}) };
+  }
+
   function allChoicesFor(st: State, type: MediaType): MediaChoice[] {
     const games = includedGames(st);
     const mediadb = mediaDbChoices(
@@ -362,6 +368,7 @@ export function createProposals(ctx: ProposalsContext) {
           st.deep?.vps,
           (key) => ctx.sites!.receipt(key),
           st.wide ? siteQueries(st) : undefined,
+          ownOf(st),
         )
       : [];
     // Téléchargés par l'utilisateur depuis la recherche web : en tête, il les a cherchés exprès.
@@ -747,10 +754,14 @@ export function createProposals(ctx: ProposalsContext) {
         },
       });
     }
+    // La recherche en cours, dite sur l'entrée (17/11/2026) : on sait ce qu'on change.
+    const searched = [baseQuery(st, table), st.extra].filter(Boolean).join(' ');
     actions.push({
       key: 'extra',
       label: st.extra ? t('Mots ajoutés : « {words} »', { words: st.extra }) : t('Ajouter des mots à la recherche…'),
-      detail: st.extra ? t('Start pour les changer ; vide pour les retirer') : t('Un style, un auteur, une couleur : « neon », « tarcisio », « glass »…'),
+      detail: st.extra
+        ? t('Recherche : « {query} » · Start pour les changer ; vide pour les retirer', { query: searched })
+        : t('Recherche : « {query} » · un style, un auteur, une couleur : « neon », « tarcisio »…', { query: searched }),
       tone: st.extra ? 'ok' : undefined,
       run: () => askWords(table, type),
     });
@@ -805,7 +816,7 @@ export function createProposals(ctx: ProposalsContext) {
         }),
         run: () => openGames(table, type),
       },
-      { label: t('Chercher un autre titre…'), detail: t('Titre en anglais, initiales ou nom de ROM'), run: () => askTitle(table, type, () => ctx.show(() => build(type))) },
+      { label: t('Chercher un autre titre…'), detail: t('Titre cherché : « {query} » · titre en anglais, initiales ou nom de ROM', { query: baseQuery(st, table) }), run: () => askTitle(table, type, () => ctx.show(() => build(type))) },
       { label: t('Retour : {label}', { label: info.label }), run: back },
     );
     const rows: Row[] = [];
@@ -1103,17 +1114,39 @@ export function createProposals(ctx: ProposalsContext) {
   function askWords(table: TableEntry, type: MediaType): void {
     const st = state!;
     const at = ctx.cursor();
+    const base = baseQuery(st, table);
+    // Le champ reprend la recherche en cours (17/11/2026) : les mots s'ajoutent après le titre.
     ctx.prompt(
       t('Ajouter des mots à la recherche'),
-      t('Mots'),
-      st.extra ?? '',
+      t('Recherche'),
+      `${[base, st.extra].filter(Boolean).join(' ')} `,
       (text) => {
         if (text === undefined) return ctx.show(() => build(type), at);
-        st.extra = cleanWords(text) || undefined;
-        reopen(table, type, at);
+        const typed = text.trim();
+        // Le titre gardé en tête : seuls les mots après lui comptent ; le titre changé, c'est une autre recherche.
+        if (!base || typed.toLowerCase().startsWith(base.toLowerCase()) || !typed) {
+          st.extra = cleanWords(base ? typed.slice(Math.min(base.length, typed.length)) : typed) || undefined;
+          reopen(table, type, at);
+          return;
+        }
+        st.extra = undefined;
+        searchTitle(table, type, typed);
       },
-      t('Ajoutés au titre du jeu sur VPForums et VPUniverse, et dans « Chercher sur le web… » : un style (« tarcisio », « diagonal », « glass orb »), un auteur, une couleur, « animated ». Les propositions qui ne les ont pas sont masquées. Laissez vide pour les retirer.'),
+      t('La recherche en cours, titre du jeu en tête : ajoutez après lui un style (« tarcisio », « diagonal », « glass orb »), un auteur, une couleur, « animated ». Cherchés sur VPForums et VPUniverse et dans « Chercher sur le web… » ; les propositions qui ne les ont pas sont masquées. Le titre seul : mots retirés ; un autre titre : nouvelle recherche.'),
     );
+  }
+
+  /** Le titre que cherchent les sites en ce moment : celui demandé au clavier, sinon celui du jeu retenu, sinon de la table. */
+  function baseQuery(st: State, table: TableEntry): string {
+    return st.query ?? siteQueries(st)[0] ?? table.title;
+  }
+
+  function searchTitle(table: TableEntry, type: MediaType, query: string): void {
+    void ctx.task(t('Recherche de « {query} »…', { query }), async () => {
+      const st = await ensure(table, query);
+      await prepareType(st, type);
+      ctx.show(() => build(type));
+    });
   }
 
   // ---------- Jeux retenus ----------
@@ -1122,14 +1155,11 @@ export function createProposals(ctx: ProposalsContext) {
     ctx.prompt(
       t('Chercher un autre titre'),
       t('Titre du jeu'),
-      state?.query ?? '',
+      // Le titre cherché en ce moment, à corriger ou remplacer (17/11/2026).
+      state ? baseQuery(state, table) : table.title,
       (text) => {
         if (!text?.trim()) return cancel();
-        void ctx.task(t('Recherche de « {query} »…', { query: text.trim() }), async () => {
-          const st = await ensure(table, text.trim());
-          await prepareType(st, type);
-          ctx.show(() => build(type));
-        });
+        searchTitle(table, type, text.trim());
       },
       t('Le titre en anglais, tel que le fabricant l’a sorti (« Guardians of the Galaxy »), ses initiales (« GOTG ») ou le nom de sa ROM (« t2_l8 »). Le premier jeu trouvé s’ajoute aux propositions ; « Autres jeux… » pour choisir.'),
     );
@@ -1204,7 +1234,7 @@ export function createProposals(ctx: ProposalsContext) {
       });
     }
     actions.push(
-      { label: t('Chercher un autre titre…'), detail: t('Titre en anglais, initiales ou nom de ROM'), run: () => askTitle(table, type, () => ctx.show(() => buildGames(type))) },
+      { label: t('Chercher un autre titre…'), detail: t('Titre cherché : « {query} » · titre en anglais, initiales ou nom de ROM', { query: baseQuery(st, table) }), run: () => askTitle(table, type, () => ctx.show(() => buildGames(type))) },
       { label: t('Retour aux propositions'), tone: 'ok', run: back },
     );
     return {

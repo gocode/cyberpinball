@@ -523,8 +523,10 @@ export const messages: Record<string, string> = {
   'Start : ne garder que les vidéos et les images animées (APNG, GIF)': 'Start: keep only videos and animated images (APNG, GIF)',
   'Mots ajoutés : « {words} »': 'Added words: “{words}”',
   'Ajouter des mots à la recherche…': 'Add words to the search…',
-  'Start pour les changer ; vide pour les retirer': 'Start to change them; empty to remove them',
-  'Un style, un auteur, une couleur : « neon », « tarcisio », « glass »…': 'A style, an author, a color: “neon”, “tarcisio”, “glass”…',
+  // La recherche en cours, dite sur l'entrée et reprise dans le champ (17/11/2026).
+  'Recherche : « {query} » · Start pour les changer ; vide pour les retirer': 'Search: “{query}” · Start to change them; empty to remove them',
+  'Recherche : « {query} » · un style, un auteur, une couleur : « neon », « tarcisio »…': 'Search: “{query}” · a style, an author, a color: “neon”, “tarcisio”…',
+  'Titre cherché : « {query} » · titre en anglais, initiales ou nom de ROM': 'Searched title: “{query}” · title, initials or ROM name',
   'animés seulement': 'animated only',
   'mots « {words} »': 'words “{words}”',
   'Filtre : {filters}': 'Filter: {filters}',
@@ -538,9 +540,8 @@ export const messages: Record<string, string> = {
   'Jusqu’à {n} pages de résultats par titre, les fiches de toutes les éditions reconnues du jeu, et celles dont le titre a les mots cherchés sans désigner un jeu sûr (« Titre approché »).':
     'Up to {n} result pages per title, entries for every recognized edition of the game, and those whose title has the searched words without surely naming a game (“Close title”).',
   'Ajouter des mots à la recherche': 'Add words to the search',
-  'Mots': 'Words',
-  'Ajoutés au titre du jeu sur VPForums et VPUniverse, et dans « Chercher sur le web… » : un style (« tarcisio », « diagonal », « glass orb »), un auteur, une couleur, « animated ». Les propositions qui ne les ont pas sont masquées. Laissez vide pour les retirer.':
-    'Added to the game’s title on VPForums and VPUniverse, and in “Search the web…”: a style (“tarcisio”, “diagonal”, “glass orb”), an author, a color, “animated”. Suggestions without them are hidden. Leave empty to remove them.',
+  'La recherche en cours, titre du jeu en tête : ajoutez après lui un style (« tarcisio », « diagonal », « glass orb »), un auteur, une couleur, « animated ». Cherchés sur VPForums et VPUniverse et dans « Chercher sur le web… » ; les propositions qui ne les ont pas sont masquées. Le titre seul : mots retirés ; un autre titre : nouvelle recherche.':
+    'The current search, game title first: add after it a style (“tarcisio”, “diagonal”, “glass orb”), an author, a color, “animated”. Searched on VPForums and VPUniverse and in “Search the web…”; suggestions without them are hidden. The title alone: words removed; another title: a new search.',
   // Musique de la ROM (rom-music.ts, romaudio.ts)
   'Musique de la ROM': 'ROM music',
   'musique de la ROM': 'ROM music',

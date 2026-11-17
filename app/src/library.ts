@@ -56,6 +56,8 @@ import {
   PINBALLFX_TABLES,
   pinballFxVpsImage,
   pickNamedMedia,
+  parseSizeText,
+  siteFileRef,
   vpsSiteHits,
   mediaSite,
   lowerFirst,
@@ -4140,6 +4142,10 @@ export function createLibrary(host: LibraryHost) {
     hit?: SiteHit;
     /** Fiche d'un site sans compte connecté : son nom. */
     login?: string;
+    /** Fichier de la table dans une fiche déjà reçue (rien à télécharger). */
+    received?: string;
+    /** Nombre de jeux de la base VPS qui renvoient à cette fiche : au-delà d'un, un pack commun. */
+    shared?: number;
     /** Aperçu distant (VPinMediaDB 1k, capture de VPS). */
     preview?: { url: string; md5?: string };
   }
@@ -4172,10 +4178,26 @@ export function createLibrary(host: LibraryHost) {
           elements.push({ type, source: 'vps', preview: { url: capture } });
           continue;
         }
-        const hit = SITE_FILL_TYPES.includes(type) ? hits.find((h) => h.vps!.types.includes(type)) : undefined;
-        if (hit) {
-          const ready = Boolean(mediaSites.receipt(jobKey(hit))) || (await mediaSites.state(hit.site)).connected;
-          elements.push({ type, source: 'site', hit, ...(ready ? {} : { login: mediaSite(hit.site).name }) });
+        // Fiches des sites (17/11/2026) : une déjà reçue qui a le fichier de la table d'abord (rien à
+        // télécharger, aperçu réel) ; une reçue sans lui est écartée ; sinon la première à télécharger.
+        const target = { titles: [fx.title, ...(game ? [game.name] : [])], pinballFx: fx.id };
+        let site: FxElement | undefined;
+        for (const hit of SITE_FILL_TYPES.includes(type) ? hits.filter((h) => h.vps!.types.includes(type)) : []) {
+          const receipt = mediaSites.receipt(jobKey(hit));
+          if (receipt) {
+            const named = pickNamedMedia(receipt.files, type, target);
+            if (!named) continue;
+            allowPreview(named.file);
+            site = { type, source: 'site', hit, received: named.file, shared: sharedBy(hit) };
+            break;
+          }
+          if (!site) {
+            const ready = (await mediaSites.state(hit.site)).connected;
+            site = { type, source: 'site', hit, shared: sharedBy(hit), ...(ready ? {} : { login: mediaSite(hit.site).name }) };
+          }
+        }
+        if (site) {
+          elements.push(site);
           continue;
         }
         // Ceux de la roue restent montrés, introuvables : on sait ce qui manquera.
@@ -4185,16 +4207,62 @@ export function createLibrary(host: LibraryHost) {
       const wanted = elements.flatMap((e) => (e.preview ? [e.preview] : []));
       if (wanted.length) await mediaSearch.stagePreviews(wanted, previews, t('Vignettes'), { quiet: true }).catch(() => undefined);
       for (const f of previews.values()) allowPreview(f);
+      // Fiches à télécharger propres à la table : leur page est lue (capture de l'auteur, taille),
+      // l'écran se redessine à son arrivée. Un pack commun à plusieurs tables n'a pas d'aperçu trompeur.
+      void mediaSites.stageThumbs(elements.flatMap((e) => (e.hit && !e.received ? [e.hit] : []))).catch(() => undefined);
       pinballFxDetail = {
         fx,
         elements,
-        chosen: new Set(elements.filter((e) => e.source && !e.login).map((e) => e.type)),
+        // Pris d'office : ce qui ne télécharge rien d'un site (VPinMediaDB, capture VPS, fichier déjà
+        // reçu). Une fiche à télécharger ouvre la page du site et compte dans son quota : on la choisit.
+        chosen: new Set(elements.filter((e) => e.source && (e.source !== 'site' || e.received)).map((e) => e.type)),
         bytes: offers?.bytes ?? 0,
         unknown: offers?.unknown ?? 0,
         previews,
       };
       openCustom(buildPinballFxDetail, at);
     });
+  }
+
+  /**
+   * Ce qu'une fiche de site fera si on la prend (17/11/2026) : déjà reçue, rien ; sinon sa taille,
+   * le pack commun dont la table ne prend qu'un fichier, la page du site ouverte le temps de son
+   * attente et le quota du jour ; sans compte, où se connecter.
+   */
+  function siteExtra(e: FxElement): string[] {
+    const site = mediaSite(e.hit!.site).name;
+    if (e.received) return [t('Déjà reçu : « {file} », rien à télécharger', { file: path.basename(e.received) })];
+    const fiche = mediaSites.fiche(e.hit!);
+    const bytes = typeof fiche === 'object' ? parseSizeText(fiche.size) : undefined;
+    return [
+      ...(e.shared && e.shared > 1 ? [t('Pack commun à {n} tables : Cyber Pinball n’y prend que le fichier de celle-ci.', { n: e.shared })] : []),
+      ...(bytes ? [t('{size} à télécharger', { size: formatSize(bytes) })] : []),
+      e.login
+        ? t('Connectez votre compte : Ajouter une table > Comptes des sites.')
+        : t('Pris : la page de {site} s’ouvre le temps de son attente, et le fichier compte dans votre quota du jour sur ce site.', { site }),
+    ];
+  }
+
+  /** Aperçu d'une fiche de site : le fichier reçu ; sinon la capture de sa page, jamais celle d'un pack commun (elle montrerait une autre table). */
+  function siteThumb(e: FxElement, label: string): MediaThumb {
+    if (e.received) return { kind: 'image', url: mediaUrl(e.received), rotation: 0 };
+    if (e.shared && e.shared > 1) return { kind: 'fallback', rotation: 0, text: t('Pack de {n} tables', { n: e.shared }) };
+    const shot = mediaSites.hitThumb(e.hit!);
+    if (shot.file) {
+      allowPreview(shot.file);
+      return { kind: 'image', url: mediaUrl(shot.file), rotation: 0 };
+    }
+    return { kind: 'fallback', rotation: 0, text: shot.pending ? t('Aperçu en route…') : label };
+  }
+
+  /** Jeux de la base VPS qui renvoient à la fiche de ce résultat (logos, toppers, frontons, packs). */
+  function sharedBy(hit: SiteHit): number {
+    let n = 0;
+    for (const g of vpsDb?.games ?? []) {
+      const lists = [g.wheelArtFiles, g.topperFiles, g.b2sFiles, g.mediaPackFiles];
+      if (lists.some((list) => (list ?? []).some((f) => (f.urls ?? []).some((u) => { const ref = siteFileRef(u.url); return ref?.site === hit.site && ref.id === hit.id; })))) n++;
+    }
+    return n;
   }
 
   function buildPinballFxDetail(): Built {
@@ -4256,8 +4324,8 @@ export function createLibrary(host: LibraryHost) {
             : e.source === 'vps'
               ? t('Capture de la table, base VPS')
               : t('{site} : {title}', { site: mediaSite(e.hit!.site).name, title: e.hit!.title }),
-        ...(e.login ? { extra: [t('Connectez votre compte : Ajouter une table > Comptes des sites.')] } : {}),
-        thumb: thumbOf(e, label),
+        ...(e.source === 'site' ? { extra: siteExtra(e) } : {}),
+        thumb: e.source === 'site' ? siteThumb(e, label) : thumbOf(e, label),
       };
       card.action = actions.length;
       actions.push({
@@ -4377,7 +4445,7 @@ export function createLibrary(host: LibraryHost) {
         continue;
       }
       const receipt = mediaSites.receipt(jobKey(hit)) ?? (await receiveSiteFile(hit, type));
-      const pick = receipt ? pickNamedMedia(receipt.files, type, title) : undefined;
+      const pick = receipt ? pickNamedMedia(receipt.files, type, { titles: [title, game.name], ...(table.pinballFxTable !== undefined ? { pinballFx: table.pinballFxTable } : {}) }) : undefined;
       const done = pick && placeMissingMedia(table, infoFileFor(table, tablesDir()), type, pick.file, { origin: mediaSite(hit.site).name, url: hit.url, vpsId, ...(hit.author ? { author: hit.author } : {}) });
       (done ? out.placed : out.missing).push(type);
     }

@@ -62,6 +62,12 @@ export const messages: Record<string, string> = {
   'Compte {site} nécessaire': '{site} account needed',
   'VPinMediaDB · {kind}': 'VPinMediaDB · {kind}',
   'Capture de la table, base VPS': 'Table capture, VPS database',
+  'Déjà reçu : « {file} », rien à télécharger': 'Already received: “{file}”, nothing to download',
+  'Pack commun à {n} tables : Cyber Pinball n’y prend que le fichier de celle-ci.': 'Pack shared by {n} tables: Cyber Pinball only takes this table’s file from it.',
+  '{size} à télécharger': '{size} to download',
+  'Pris : la page de {site} s’ouvre le temps de son attente, et le fichier compte dans votre quota du jour sur ce site.':
+    'Taken: the {site} page opens for its waiting time, and the file counts toward your daily quota on that site.',
+  'Pack de {n} tables': 'Pack of {n} tables',
   '{site} : {title}': '{site}: {title}',
   'Ni VPinMediaDB ni la base VPS : après l’ajout, « Médias du jeu » en cherche sur le web': 'Neither VPinMediaDB nor the VPS database: after adding, "Game media" searches the web',
   'Connectez votre compte : Ajouter une table > Comptes des sites.': 'Sign in to your account: Add a table > Site accounts.',

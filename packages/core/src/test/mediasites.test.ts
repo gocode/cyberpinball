@@ -11,7 +11,7 @@ import * as vm from 'node:vm';
 import { test } from 'node:test';
 import { parseHTML } from 'linkedom';
 import type { MediaType } from '../medias';
-import { ANIMATABLE_MEDIA_TYPES, checkSiteSearch, hitAnimated, hitGameName, hitPreview, hitTypes, mediaChoiceAnimated, MEDIA_SITES, pickNamedMedia, receivedMedias, siteHitSummary, siteMediaChoices, siteOffers, siteQuery, siteSearchByType, siteSearchTerms, siteSearchUrl, SITE_SEARCH_MORE_PAGES, SITE_SEARCH_PAGES, SITE_SEARCH_PROBES, vpsSiteHits, webHost, webMediaChoices, webSearchQuery, webSearchUrl, type ReceivedMedia, type SiteHit, type SiteReceipt, type WebReceipt } from '../mediasites';
+import { ANIMATABLE_MEDIA_TYPES, checkSiteSearch, hitAnimated, hitGameName, hitPreview, hitTypes, mediaChoiceAnimated, MEDIA_SITES, namedMediaFiles, pickNamedMedia, receivedMedias, siteHitSummary, siteMediaChoices, siteOffers, siteQuery, siteSearchByType, siteSearchTerms, siteSearchUrl, SITE_SEARCH_MORE_PAGES, SITE_SEARCH_PAGES, SITE_SEARCH_PROBES, vpsSiteHits, webHost, webMediaChoices, webSearchQuery, webSearchUrl, type ReceivedMedia, type SiteHit, type SiteReceipt, type WebReceipt } from '../mediasites';
 import { parseSiteFile, siteFileRef } from '../sitefiles';
 import { WAIT_PROBES } from '../sitesessions';
 import { createVpsDb, type VpsGame } from '../vps';
@@ -407,12 +407,19 @@ test('fronton rangé par la base VPS : le .directb2s du jeu, proposé pour l’i
 test('pack reçu : le fichier au nom de la table, jamais un fichier deviné', () => {
   const wheel = (name: string): ReceivedMedia => ({ file: path.join('D:\\recus\\zen', name), type: 'Wheel', kind: 'image' });
   const pack = [wheel('Attack from Mars.png'), wheel('Back to the Future.png'), wheel('Back to the Future (Alt).png'), wheel('Star Wars - Episode IV.png'), { file: 'D:\\recus\\zen\\lisez-moi.txt', kind: 'image' as const }];
+  const bttf = { titles: ['Back to the Future Pinball'] };
   // « Pinball » ne compte pas : « Back to the Future Pinball » est « Back to the Future.png » (le plus court).
-  assert.equal(path.basename(pickNamedMedia(pack, 'Wheel', 'Back to the Future Pinball')!.file), 'Back to the Future.png');
-  assert.equal(pickNamedMedia(pack, 'Wheel', 'Twilight Zone'), undefined);
+  assert.equal(path.basename(pickNamedMedia(pack, 'Wheel', bttf)!.file), 'Back to the Future.png');
+  assert.equal(pickNamedMedia(pack, 'Wheel', { titles: ['Twilight Zone'] }), undefined);
   // Un seul fichier de ce type (une fiche propre à la table) : lui, quel que soit son nom.
-  assert.equal(path.basename(pickNamedMedia([wheel('logo.png')], 'Wheel', 'Back to the Future Pinball')!.file), 'logo.png');
-  assert.equal(pickNamedMedia(pack, 'Backglass', 'Attack from Mars'), undefined);
+  assert.equal(path.basename(pickNamedMedia([wheel('logo.png')], 'Wheel', bttf)!.file), 'logo.png');
+  assert.equal(pickNamedMedia(pack, 'Backglass', { titles: ['Attack from Mars'] }), undefined);
+  // Pack Pinball FX de la communauté (Ronindoc37, 368 fichiers, 17/11/2026) : nommé d'après le numéro
+  // de la table dans le jeu, vignettes dans pthumbs ; BTTF est la table 97.
+  const zen = [wheel('Wheel\\Table_9.png'), wheel('Wheel\\Table_97.png'), wheel('Wheel\\Table_970.png'), wheel('Wheel\\pthumbs\\Table_97_thumb.png'), wheel('Wheel\\pthumbs\\Table_97_thumb_sm.png')];
+  assert.equal(path.basename(pickNamedMedia(zen, 'Wheel', { ...bttf, pinballFx: 97 })!.file), 'Table_97.png');
+  assert.equal(pickNamedMedia(zen, 'Wheel', bttf), undefined, 'sans numéro, rien de deviné');
+  assert.deepEqual(namedMediaFiles(zen, 'Wheel', { titles: [], pinballFx: 97 }).map((f) => path.basename(f.file)), ['Table_97.png']);
 });
 
 test('aperçu d’un résultat sans vignette : la capture de sa fiche', () => {

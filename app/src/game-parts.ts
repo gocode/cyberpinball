@@ -277,7 +277,7 @@ export function createGameParts(ctx: GamePartsContext) {
         const actions: Action[] = leads.map((l) => ({ label: vpsLabel(l.game), detail: l.reasons[0], tone: l.game.id === game()?.id ? 'ok' : undefined, run: () => choose(table, l.game.id) }));
         actions.push({
           label: t('Chercher un titre…'),
-          detail: t('Titre en anglais, initiales ou nom de ROM'),
+          detail: t('Titre cherché : « {query} » · titre en anglais, initiales ou nom de ROM', { query: table.title }),
           run: () =>
             ctx.prompt(t('Quel jeu est-ce ?'), t('Titre du jeu'), table.title, (text) => {
               const found = text && vpsDb ? vpsDb.games.find((g) => g.name.toLowerCase() === text.trim().toLowerCase()) : undefined;

@@ -656,24 +656,50 @@ function namedWords(name: string): string[] {
   return vpsWords(name.replace(/\([^)]*\)/g, ' ')).filter((w) => !skip.has(w));
 }
 
-/**
- * Dans ce qu'un site a envoyé (un pack de logos de Zen, un pack de médias), le fichier de ce type
- * qui porte le nom de la table (17/11/2026, tables de Pinball FX sans VPinMediaDB) : tous les mots
- * du titre dans le nom du fichier, le nom le plus court à égalité (« Back to the Future » plutôt que
- * « Back to the Future Pinball (Alt) ») ; aucun : undefined, jamais un fichier deviné. Seul fichier
- * de ce type reçu (une fiche propre à la table) : lui.
- */
-export function pickNamedMedia(files: readonly ReceivedMedia[], type: MediaType, title: string): ReceivedMedia | undefined {
-  const typed = files.filter((f) => f.type === type);
-  if (typed.length === 1) return typed[0];
-  const wanted = namedWords(title);
-  if (!wanted.length) return undefined;
-  const hits = typed.filter((f) => {
-    const own = new Set(namedWords(path.basename(f.file, path.extname(f.file))));
-    return wanted.every((w) => own.has(w));
-  });
-  return hits.sort((a, b) => path.basename(a.file).length - path.basename(b.file).length || a.file.localeCompare(b.file))[0];
+/** Vignette d'un pack (« pthumbs\Table_97_thumb.png ») : jamais un média de la table. */
+function isPackThumb(file: string): boolean {
+  return /(^|[\\/])p?thumbs?([\\/]|$)/i.test(path.dirname(file)) || /[_\s.-]thumb(_sm|_small)?$/i.test(path.basename(file, path.extname(file)));
 }
+
+/** Qui chercher dans un pack : les titres possibles, et le numéro de la table dans Pinball FX. */
+export interface NamedTarget {
+  titles: readonly string[];
+  /** Les packs Pinball FX de la communauté nomment leurs fichiers d'après lui : « Table_97.png ». */
+  pinballFx?: number;
+}
+
+/**
+ * Dans ce qu'un site a envoyé (un pack de logos, un pack de médias), les fichiers de ce type qui
+ * désignent la table (17/11/2026) : « Table_<n> » pour un pack Pinball FX (numéro de la table dans
+ * le jeu), sinon tous les mots d'un des titres dans le nom du fichier ; les vignettes du pack
+ * (pthumbs) jamais. Le nom le plus court d'abord (« Back to the Future » avant « … (Alt) »).
+ */
+export function namedMediaFiles(files: readonly ReceivedMedia[], type: MediaType, target: NamedTarget): ReceivedMedia[] {
+  const typed = files.filter((f) => f.type === type && !isPackThumb(f.file));
+  const base = (f: ReceivedMedia) => path.basename(f.file, path.extname(f.file));
+  const byNumber = target.pinballFx === undefined ? [] : typed.filter((f) => new RegExp(`^table[_\\s-]?0*${target.pinballFx}$`, 'i').test(base(f)));
+  const wanted = target.titles.map(namedWords).filter((w) => w.length);
+  const byName = typed.filter((f) => {
+    const own = new Set(namedWords(base(f)));
+    return wanted.some((words) => words.every((w) => own.has(w)));
+  });
+  const all = [...byNumber, ...byName.filter((f) => !byNumber.includes(f))];
+  return [...byNumber, ...all.slice(byNumber.length).sort((a, b) => base(a).length - base(b).length || a.file.localeCompare(b.file))];
+}
+
+/**
+ * Le fichier de ce type pour la table (tables de Pinball FX sans VPinMediaDB) : le seul reçu
+ * (une fiche propre à la table), sinon le premier qui la désigne (namedMediaFiles) ; aucun :
+ * undefined, jamais un fichier deviné.
+ */
+export function pickNamedMedia(files: readonly ReceivedMedia[], type: MediaType, target: NamedTarget): ReceivedMedia | undefined {
+  const typed = files.filter((f) => f.type === type && !isPackThumb(f.file));
+  if (typed.length === 1) return typed[0];
+  return namedMediaFiles(typed, type, target)[0];
+}
+
+/** Au-delà, un envoi est un pack de plusieurs jeux : seuls ses fichiers qui désignent la table sont proposés. */
+export const PACK_FILES = 8;
 
 /** Ce qu'un site a envoyé pour une fiche, une fois déballé ; gardé d'une visite à l'autre. */
 export interface SiteReceipt {
@@ -859,6 +885,8 @@ export function siteMediaChoices(
   receipt: (key: string) => SiteReceipt | undefined,
   /** Recherche élargie : les textes cherchés (siteOffers). */
   loose?: readonly string[],
+  /** La table : un pack reçu ne propose que ses fichiers à elle (titre, numéro dans Pinball FX). */
+  own?: { title?: string; pinballFx?: number },
 ): MediaChoice[] {
   const out: MediaChoice[] = [];
   for (const site of MEDIA_SITES) {
@@ -869,7 +897,18 @@ export function siteMediaChoices(
       if (seen.has(key)) continue;
       seen.add(key);
       const got = receipt(key);
-      const files = got?.files.filter((f) => (f.type ? f.type === type : got.type === type && isAcceptedFormat(type, f.file))) ?? [];
+      let files = got?.files.filter((f) => (f.type ? f.type === type : got.type === type && isAcceptedFormat(type, f.file)) && !isPackThumb(f.file)) ?? [];
+      // Un pack de plusieurs jeux (368 logos de Zen, 17/11/2026) : ses seuls fichiers qui désignent
+      // la table, sinon rien de lui (une liste de 400 logos d'autres jeux noie la proposition).
+      if (files.length > PACK_FILES) {
+        const named = namedMediaFiles(
+          files.map((f) => ({ ...f, type })),
+          type,
+          { titles: [offer.game.name, ...(own?.title ? [own.title] : [])], ...(own?.pinballFx !== undefined ? { pinballFx: own.pinballFx } : {}) },
+        );
+        if (!named.length) continue;
+        files = named;
+      }
       for (const f of files) {
         let bytes: number | undefined;
         try {

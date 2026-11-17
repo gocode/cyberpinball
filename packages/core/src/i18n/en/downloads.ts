@@ -38,7 +38,6 @@ export const messages: Record<string, string> = {
   'Chaque média propose aussi ce que la table a déjà (PuP-Pack, dossier du DMD, .directb2s) : Médias du jeu, puis le média, puis « Voir les propositions ». Les médias de VPUniverse se téléchargent depuis leur site (connexion obligatoire) ; déposez ensuite le fichier dans le dossier d’import, ou glissez-le sur l’écran des médias.':
     'Each media type also offers what the table already has (PuP-Pack, DMD folder, .directb2s): Game media, then the media type, then “See suggestions”. VPUniverse media is downloaded from their site (login required); then drop the file in the import folder, or drag it onto the media screen.',
   'Chercher un autre titre…': 'Search for another title…',
-  'Titre en anglais, initiales ou nom de ROM': 'Title, initials or ROM name',
   'Retour aux médias': 'Back to media',
   'Aperçu indisponible': 'No preview',
   '« {name} »': '“{name}”',

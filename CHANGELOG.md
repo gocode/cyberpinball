@@ -11,6 +11,8 @@ son interface).
 
 ## 0.1.14
 
+- Pinball FX (bêta), fiche d’ajout : un média qui se télécharge depuis un site (VPUniverse, VPForums) n’est plus pris d’office ; sa carte dit sa taille, si c’est un pack commun à plusieurs tables (Cyber Pinball n’y prend que le fichier de la table) et que la page du site s’ouvre pendant son attente. Un pack de logos Pinball FX déjà reçu donne le logo de chaque table, d’après son numéro dans le jeu (« Table_97.png »).
+- Propositions d’un média : un pack reçu de plusieurs jeux ne propose plus que le fichier de la table (1 au lieu de 386 pour Back to the Future Pinball). Les recherches qu’on reprend (« Chercher un autre titre… », « Ajouter des mots à la recherche… ») disent le titre cherché en ce moment, et leur champ s’ouvre prérempli avec lui.
 - Manuel technique : une page par rubrique, plus légère à ouvrir sur GitHub ; le sommaire garde les mêmes liens.
 - Écrans de gestion des tables plus vifs : la fiche d'une table, « Ajouter une table », les médias et les parties du jeu, les Classements lisent le disque à leur ouverture, puis répondent aux flippers sans le relire. Sur une borne chargée (PuP-Pack de milliers de fichiers, centaines de téléchargements), chaque appui ne fige plus l'écran.
 - Plus rapide, plus sûr : le lancement d'une table ne lance plus un outil de Windows pour chaque écran ; les vérifications des tables et des PuP-Packs lisent beaucoup moins le disque ; les relevés faits après le démarrage ne figent plus l'écran des tables ni le lancement d'une partie. Les réglages de la borne, les fichiers réparés par Cyber Pinball et ceux d'une partie entre amis s'écrivent d'un coup : une coupure de courant ne les laisse plus à moitié écrits.
