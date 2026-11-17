@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.14
 
+- Une version VR de table jouée sur les écrans ne dessine plus sa pièce VR (meuble, salle, fronton en 3D) pour rien : Cyber Pinball la réserve au casque, sans modifier la table, et le dit dans sa fiche.
 - DMD visible sur les tables qui le règlent pour le mode bureau : certaines tables (JP's Space Cadet v7.0 de JPSalas, par exemple) choisissent leur DMD par une option du menu de VPX (F12) qui vaut par défaut « Desktop DMD », un DMD dessiné dans le décor du mode bureau, invisible sur une borne. Sur une borne qui a un écran ou une zone de DMD, Cyber Pinball règle désormais ces options sur FlexDMD dans le .ini de la table, dès l'installation et avant chaque partie, sans toucher à la table et sans jamais écraser un choix fait dans le menu de VPX. Le médecin montre ce réglage (« DMD réglé pour le mode bureau »).
 - Réglages en partie : un DMD que la table n'envoie pas n'est plus affiché « Masqué ». VPX ne montre la fenêtre du DMD qu'à sa première image ; le menu le prenait pour un DMD masqué, qui revenait à chaque partie même après « Afficher ». Il garde maintenant la place enregistrée et explique que la table n'envoie aucun DMD.
 - Chaque partie est mesurée : Cyber Pinball note dans son journal combien d'images par seconde VPX a tenues, les arrêts de l'image et la mémoire prise par VPX, et chaque rapport envoyé le contient.

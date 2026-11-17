@@ -16,7 +16,7 @@
 import { commentStart } from './vbscript';
 
 /** Correctifs connus, nommés dans la dernière ligne du .vbs de Cyber Pinball. */
-export type CompatFix = 'vpmInitOnce';
+export type CompatFix = 'vpmInitOnce' | 'vrRoomOnScreens';
 
 interface CompatRule {
   id: CompatFix;
@@ -97,7 +97,98 @@ const vpmInitOnce: CompatRule = {
   stop: /cvpmFlips2\.Init is called twice/i,
 };
 
-const RULES: readonly CompatRule[] = [vpmInitOnce];
+// ---------- Pièce VR dessinée sur les écrans ----------
+//
+// Une version VR de table (« … VR », « VR ROOM … ») affiche sa pièce (meuble, salle, fronton 3D) selon un
+// interrupteur du script : les tables hybrides le gardent pour le casque (« If RenderingMode = 2 or VRTest = 1 »),
+// mais une version faite pour le casque seul l'allume d'office (« Const VR_Room = 1 », sans regarder RenderingMode),
+// et un interrupteur d'essai laissé à 1 (VRTest, LiveViewVRSim) l'allume même dans une table hybride. Sur une borne
+// sans casque, VPX dessine alors toute la pièce à chaque image, pour rien (banc du 17/11/2026, scripts/banc-cadence :
+// petite pièce d'Addams Family forcée, aucun coût mesurable à 1280 × 720 ; une grande pièce n'a pas été mesurée).
+// Relevé le 17/11/2026 : « AC-DC LUCI Premium VR » jouée sur une borne sans casque. Le .vbs de Cyber Pinball garde
+// l'interrupteur pour le casque seul : sa valeur multipliée par Abs(RenderingMode = 2), qui vaut 1 en VR et 0 sur les
+// écrans (VPX connaît RenderingMode dès le chargement du script) ; une Const devient une variable, sur la même ligne.
+
+/** Interrupteurs qui allument la pièce VR (noms relevés dans les scripts de VPW, de JP, des versions « VR Room »). */
+const VR_FLAG = /^(VR_?Test|LiveView_?VR_?Sim|VR_?Sim|VR_?Room|VR_?Mode|Use_?VR|VR_?Enabled|VR_?On)$/i;
+const VR_GUARD = 'Abs(RenderingMode = 2)';
+
+interface VrFlag {
+  /** Ligne (à partir de 0) où le script lui donne sa valeur, hors de toute Sub. */
+  line: number;
+  name: string;
+}
+
+/** Les interrupteurs de pièce VR allumés au chargement du script : nom et ligne de leur dernière valeur, hors Sub. */
+function topLevelVrFlags(code: string): VrFlag[] {
+  const found = new Map<string, VrFlag & { on: boolean }>();
+  let depth = 0;
+  code.split('\n').forEach((line, index) => {
+    if (/^\s*(?:(?:public|private)\s+)?(?:sub|function|property\s+\w+)\s/i.test(line)) depth++;
+    if (/^\s*end\s+(?:sub|function|property)\b/i.test(line)) depth = Math.max(0, depth - 1);
+    if (depth) return;
+    for (const st of line.split(':')) {
+      const m = /^\s*(?:const\s+)?([A-Za-z_]\w*)\s*=\s*(\d+|true|false)\s*$/i.exec(st);
+      if (!m || !VR_FLAG.test(m[1]!)) continue;
+      const value = m[2]!.toLowerCase();
+      found.set(m[1]!.toLowerCase(), { line: index, name: m[1]!, on: value === 'true' || (value !== 'false' && Number(value) !== 0) });
+    }
+  });
+  return [...found.values()].filter((f) => f.on).map(({ line, name }) => ({ line, name }));
+}
+
+/** Interrupteurs qui allument la pièce VR sur les écrans aussi. */
+function vrFlagsForcingRoom(code: string): VrFlag[] {
+  const guarded = /\bRenderingMode\b/i.test(code);
+  // La pièce est montrée par le script : des objets VR rendus visibles.
+  const showsRoom = code.split('\n').some((l) => /\bVR/i.test(l) && /\.visible\s*=\s*(1|true)\b/i.test(l));
+  return topLevelVrFlags(code).filter((flag) => {
+    const name = flag.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const conditions = code.split('\n').filter((l) => new RegExp(`\\b(?:else)?if\\b.*\\b${name}\\b`, 'i').test(l));
+    if (!conditions.length) return false;
+    // Table hybride : l'interrupteur ne compte que s'il s'ajoute au mode VR (« RenderingMode = 2 or VRTest = 1 »).
+    if (guarded) return conditions.some((l) => new RegExp(`RenderingMode\\s*=\\s*2\\s+or\\b.*\\b${name}\\b|\\b${name}\\b.*\\bor\\s+RenderingMode\\s*=\\s*2`, 'i').test(l));
+    // Version faite pour le casque seul : rien ne regarde le mode de rendu.
+    return showsRoom;
+  });
+}
+
+const vrRoomOnScreens: CompatRule = {
+  id: 'vrRoomOnScreens',
+  found: (code) => vrFlagsForcingRoom(code).length > 0,
+  applicable: (code) => vrFlagsForcingRoom(code).length > 0,
+  applied: (text) => text.includes(VR_GUARD) && vrFlagsForcingRoom(text.split(/\r?\n/).map((l) => (commentStart(l) < 0 ? l : l.slice(0, commentStart(l)))).join('\n')).length === 0,
+  apply(text) {
+    const code = text.split(/\r?\n/).map((l) => (commentStart(l) < 0 ? l : l.slice(0, commentStart(l)))).join('\n');
+    const flags = vrFlagsForcingRoom(code);
+    if (!flags.length) return undefined;
+    const parts = text.split(/(\r?\n)/);
+    for (const flag of flags) {
+      const i = flag.line * 2;
+      const before = parts[i];
+      if (before === undefined) return undefined;
+      const name = flag.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      let edited = false;
+      parts[i] = editCode(before, (piece) =>
+        piece.replace(new RegExp(`\\b(const\\s+)?(${name})\\s*=\\s*(\\d+|true)\\b`, 'i'), (_, isConst: string | undefined, n: string, value: string) => {
+          edited = true;
+          return `${isConst ? `Dim ${n} : ` : ''}${n} = ${value} * ${VR_GUARD}`;
+        }),
+      );
+      if (!edited) return undefined;
+    }
+    return parts.join('');
+  },
+  // Aucun message de VPX : la pièce se dessine sans erreur.
+  stop: /(?!)/,
+};
+
+/** Interrupteurs de pièce VR que le .vbs de Cyber Pinball garde pour le casque (pour le dire à l'utilisateur). */
+export function vrRoomFlags(code: string): string[] {
+  return vrFlagsForcingRoom(code).map((f) => f.name);
+}
+
+const RULES: readonly CompatRule[] = [vpmInitOnce, vrRoomOnScreens];
 
 /** Correctifs dont le script a besoin, d'après son seul texte (code sans commentaires). */
 export function compatFixesFound(code: string): CompatFix[] {

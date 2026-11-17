@@ -74,7 +74,7 @@ import {
 } from './puppack';
 import { addCaptureWatch, backgroundTriggers, captureBlock, captureSettings, captureWatchLines, readCaptures, sameCapture, type CaptureBlocker } from './pupcapture';
 import { buildScriptPatch, ownCapture, readScriptPatch, scriptPatchState, type ScriptPatchState } from './scriptpatch';
-import { applyCompatFixes, compatFixesApplicable, compatFixesApplied, compatFixesForStop, compatFixesFound, vpmInitCallCount, type CompatFix } from './scriptcompat';
+import { applyCompatFixes, compatFixesApplicable, compatFixesApplied, compatFixesForStop, compatFixesFound, vpmInitCallCount, vrRoomFlags, type CompatFix } from './scriptcompat';
 import { aliasComment, aliasFor, historicAlias, IMPORTED_ALIAS_COMMENT, neighbourRom, neighbourWarning, readTableAliases, romFamilyOf, tableAliasFile, withAlias, withoutAlias } from './romalias';
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
 import { isChipName, listRelative, readZipEntries, romContent, type RomZipMember } from './romzip';
@@ -1105,6 +1105,25 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
   else if (source !== undefined) {
     const compat = [...new Set([...own.compat, ...missing])];
     content = buildScriptPatch(source, own.switches, own.loader, own.capture, compat) ?? buildScriptPatch(source, own.switches, own.loader, undefined, compat);
+  }
+  // Pièce VR allumée sur les écrans (version VR de la table, ou interrupteur d'essai laissé à 1) : seule, ou avec vpmInit.
+  if (!missing.includes('vpmInitOnce')) {
+    const flags = code !== undefined ? vrRoomFlags(code) : [];
+    const detail = [
+      t('Version VR de la table : son script allume sa pièce VR (meuble, salle, fronton en 3D) même sans casque ({flags}). Sur les écrans, VPX la dessine à chaque image alors qu’elle ne sert que dans le casque.', { flags: formatList(flags.length ? flags : ['VR_Room']) }),
+      !content
+        ? t('Le script de la table est protégé : prenez sa version sans VR, ou mettez cet interrupteur à 0 dans l’éditeur de VPX.')
+        : foreign
+          ? t('Corrigé dans {file}, le script que VPX joue à la place de celui de la table : la pièce ne s’allume plus que dans le casque.', { file })
+          : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où la pièce ne s’allume que dans le casque.', { file }),
+    ];
+    return {
+      code: 'scriptCoreCompat',
+      severity: 'warning',
+      title: t('Pièce VR dessinée hors du casque'),
+      detail: detail.join(' '),
+      fix: content ? { label: t('Réserver la pièce VR au casque (dans {file})', { file }), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
+    };
   }
   const calls = code !== undefined ? vpmInitCallCount(code) : 0;
   const detail = [

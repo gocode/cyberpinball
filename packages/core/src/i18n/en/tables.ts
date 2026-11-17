@@ -32,6 +32,13 @@ export const messages: Record<string, string> = {
     'When the table was brought in from {from}, that installation had no known ROM folder (no VPinMAME\\roms, no VPinMAME rompath in the registry, no Popper ROM folder).',
   'La table utilise PinMAME, mais le nom de sa ROM n’apparaît pas clairement dans son script.': 'The table uses PinMAME, but its script doesn’t clearly name its ROM.',
   'Rapport de plantage de VPX': 'VPX crash report',
+  'Pièce VR dessinée hors du casque': 'VR room drawn without the headset',
+  'Version VR de la table : son script allume sa pièce VR (meuble, salle, fronton en 3D) même sans casque ({flags}). Sur les écrans, VPX la dessine à chaque image alors qu’elle ne sert que dans le casque.':
+    'VR version of the table: its script turns on its VR room (cabinet, room, 3D backglass) even without a headset ({flags}). On the screens, VPX draws it every frame although it is only of use in the headset.',
+  'Le script de la table est protégé : prenez sa version sans VR, ou mettez cet interrupteur à 0 dans l’éditeur de VPX.': 'The table’s script is protected: use its non-VR version, or set this switch to 0 in the VPX editor.',
+  'Corrigé dans {file}, le script que VPX joue à la place de celui de la table : la pièce ne s’allume plus que dans le casque.': 'Fixed in {file}, the script VPX plays instead of the table’s: the room now only turns on in the headset.',
+  'La table n’est pas modifiée : VPX joue {file}, une copie de son script où la pièce ne s’allume que dans le casque.': 'The table is not modified: VPX plays {file}, a copy of its script where the room only turns on in the headset.',
+  'Réserver la pièce VR au casque (dans {file})': 'Keep the VR room for the headset (in {file})',
   'La table rame sur cette borne': 'The table is sluggish on this cabinet',
   'La table saccade sur cette borne': 'The table stutters on this cabinet',
   'À la dernière partie ({date}), VPX a tenu {fps} images par seconde pour {target} visées.': 'In the last game ({date}), VPX held {fps} frames per second for a target of {target}.',
