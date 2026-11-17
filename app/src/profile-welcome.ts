@@ -28,6 +28,11 @@ export interface ProfileWelcomeHost {
     markProfileOffered(): void;
   };
   avatarMenu: Pick<AvatarMenu, 'open'>;
+  /**
+   * « Qui vous a fait découvrir Cyber Pinball ? » (invite-menu.ts) : proposé ici tant que la question
+   * se pose (invitations.ts, inviterAsked) ; `chosen`, le pseudo déjà choisi.
+   */
+  invite?: { asked(): boolean; chosen(): string | undefined; open(back: () => void): void };
 }
 
 export interface ProfileWelcome {
@@ -38,9 +43,11 @@ export interface ProfileWelcome {
 /** Place des actions : la sélection y revient après chaque geste. */
 const NAME_AT = 0;
 const AVATAR_AT = 1;
-const CONTINUE_AT = 2;
 
 export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
+  // « Qui vous a fait découvrir… » se glisse avant « Continuer » tant que la question se pose.
+  const inviteShown = () => Boolean(host.invite && (host.invite.asked() || host.invite.chosen()));
+  const CONTINUE_AT_ = () => (inviteShown() ? 3 : 2);
   let done: () => void = () => undefined;
   let flash: Row | undefined;
   // Montré à chaque dessin jusqu'au geste suivant, jamais effacé par build() (gesture-flash.ts).
@@ -65,7 +72,7 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
         return show(NAME_AT);
       }
       flash = { text: t('Pseudo choisi : {name}', { name: me().name }), tone: 'ok' };
-      show(me().avatar ? CONTINUE_AT : AVATAR_AT);
+      show(me().avatar ? CONTINUE_AT_() : AVATAR_AT);
     }, t('De {min} à {max} caractères : lettres, chiffres, espaces, tirets ou points.', { min: NAME_MIN, max: NAME_MAX }));
   }
 
@@ -100,8 +107,18 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
         icon: 'image',
         ...(hasName && !pictured ? { tone: 'ok' as const } : {}),
         // Revenu sans avatar : la sélection reste dessus, pas sur « Continuer ».
-        run: () => host.avatarMenu.open(() => show(me().avatar ? CONTINUE_AT : AVATAR_AT)),
+        run: () => host.avatarMenu.open(() => show(me().avatar ? CONTINUE_AT_() : AVATAR_AT)),
       },
+      ...(inviteShown() && host.invite
+        ? [
+            {
+              label: host.invite.chosen() ? t('Découvert grâce à {name}', { name: host.invite.chosen()! }) : t('Qui vous a fait découvrir Cyber Pinball ?'),
+              detail: t('Facultatif : il le verra sur son profil, le vôtre n’en dit rien'),
+              icon: 'friend-add' as const,
+              run: () => host.invite!.open(() => show(CONTINUE_AT_())),
+            } satisfies Action,
+          ]
+        : []),
       hasName
         ? { label: t('Continuer'), detail: t('Tout se change plus tard : Menu système > Amis > Partage et réseau'), icon: 'check', ...(pictured ? { tone: 'ok' as const } : {}), run: leave }
         : { label: t('Continuer'), detail: t('Choisissez d’abord votre pseudo'), icon: 'check', tone: 'quiet', run: leave },

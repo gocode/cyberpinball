@@ -46,7 +46,7 @@ export const GAINS_MAX = 40;
 /** Jours gardés pour le plafond quotidien, Marathon et « Cette semaine ». */
 export const DAYS_KEEP = 45;
 /** Somme des XP de tous les badges (badges.ts), comptée dans la vraisemblance (vérifié par levels.test.ts). */
-export const BADGES_XP_ALL = 13_650;
+export const BADGES_XP_ALL = 15_800;
 /** XP de la vie sociale au plus par jour (hors parties en ligne, comptées dans le jeu). */
 export const DAILY_SOCIAL_CAP = 100;
 
@@ -64,7 +64,14 @@ export const XP = {
   friend: 25,
   like: 2,
   reaction: 1,
+  /** Une personne invitée confirmée (invitations.ts), hors plafond : chacune ne compte qu'une fois. */
+  invited: 100,
+  /** Une personne invitée passe un palier (Flippeur, Habitué…), hors plafond. */
+  inviteeTier: 25,
 } as const;
+
+/** XP qu'une personne invitée rapporte au plus : sa confirmation, puis chacun de ses six paliers. */
+export const INVITED_XP_MAX = XP.invited + 6 * XP.inviteeTier;
 
 export type RankingScopeXp = 'world' | 'country' | 'friends';
 
@@ -140,7 +147,7 @@ export function levelOf(xp: number): LevelView {
 // ---------------------------------------------------------------------------
 // État
 
-export type XpKind = 'play' | 'game' | 'first-of-day' | 'new-table' | 'personal-best' | 'honor' | 'champion' | 'live' | 'live-win' | 'ranking' | 'badge' | 'start' | 'room-day' | 'friend' | 'like' | 'reaction';
+export type XpKind = 'play' | 'game' | 'first-of-day' | 'new-table' | 'personal-best' | 'honor' | 'champion' | 'live' | 'live-win' | 'ranking' | 'badge' | 'start' | 'room-day' | 'friend' | 'like' | 'reaction' | 'invited' | 'invitee-tier';
 
 export interface XpGain {
   kind: XpKind;
@@ -155,6 +162,8 @@ export interface XpGain {
   rank?: number;
   /** badge : son identifiant. */
   badge?: string;
+  /** invited, invitee-tier : le pseudo de la personne invitée. */
+  name?: string;
 }
 
 export interface Place {
@@ -207,6 +216,8 @@ export interface LevelState {
   /** Leurs identifiants déjà comptés (receivedGains). */
   seenLikes: string[];
   seenReactions: string[];
+  /** Personnes invitées déjà payées (clé → dernier palier payé, 0 : Novice). */
+  invitees: Record<string, number>;
   /** Meilleur score de chaque table (tableKey) relevé par Cyber Pinball. */
   bests: Record<string, number>;
   /** Dernier jour où un record personnel a rapporté, par table. */
@@ -239,6 +250,7 @@ export const emptyLevels = (): LevelState => ({
   reactionsCounted: 0,
   seenLikes: [],
   seenReactions: [],
+  invitees: {},
   bests: {},
   bestPaid: {},
   beaten: 0,
@@ -433,6 +445,28 @@ export function receivedGains(state: LevelState, ids: { likes: readonly string[]
   return socialGains(next, wanted, at);
 }
 
+/**
+ * Mes personnes invitées confirmées, avec leur palier quand leur carte publique le dit : chacune
+ * rapporte une fois à sa confirmation, puis à chaque palier passé (Flippeur, Habitué…), hors plafond.
+ * `quiet` : noter sans rien verser.
+ */
+export function invitedGains(state: LevelState, invitees: readonly { key: string; name: string; tier?: number }[], at: Date, quiet = false): { state: LevelState; gains: XpGain[] } {
+  const paid = { ...state.invitees };
+  const gains: XpGain[] = [];
+  const iso = at.toISOString();
+  for (const p of invitees) {
+    const tier = Math.max(0, Math.min(TIER_IDS.length - 1, Math.floor(p.tier ?? 0)));
+    const had = paid[p.key];
+    if (had === undefined) gains.push({ kind: 'invited', xp: XP.invited, at: iso, name: p.name });
+    if (had !== undefined && tier <= had) continue;
+    for (let i = had ?? 0; i < tier; i++) gains.push({ kind: 'invitee-tier', xp: XP.inviteeTier, at: iso, name: p.name });
+    paid[p.key] = Math.max(tier, had ?? 0);
+  }
+  if (!gains.length) return { state, gains: [] };
+  const next = { ...state, invitees: paid };
+  return quiet ? { state: next, gains: [] } : { state: addGains(next, gains), gains };
+}
+
 /** Badges reçus : leurs XP, hors plafond (chaque badge ne se gagne qu'une fois). */
 export function badgeGains(state: LevelState, badges: readonly { id: string; xp: number }[], now: Date): { state: LevelState; gains: XpGain[] } {
   const gains = badges.map((b) => ({ kind: 'badge' as const, xp: b.xp, at: now.toISOString(), badge: b.id }));
@@ -556,10 +590,13 @@ export function celebrate(state: LevelState, from: number, badges: readonly stri
   return { ...state, pending: { badges: [...(p?.badges ?? []), ...badges.filter((b) => !p?.badges.includes(b))], from: p?.from ?? from, to: state.xp, at: now.toISOString(), ...(p?.start ? { start: true as const } : {}) } };
 }
 
-/** XP qu'un joueur peut avoir au plus, vu pour la première fois il y a `days` jours. */
-export function plausibleXp(days: number): number {
+/**
+ * XP qu'un joueur peut avoir au plus, vu pour la première fois il y a `days` jours ; `invited` : ses
+ * personnes invitées vérifiées sur sa carte (invitations.ts), qui rapportent hors plafond.
+ */
+export function plausibleXp(days: number, invited = 0): number {
   const d = Math.max(0, Math.floor(days)) + 1;
-  return START_XP_MAX + BADGES_XP_ALL + d * (DAILY_PLAY_CAP + DAILY_SOCIAL_CAP) + Math.ceil(d / 7) * WEEK_RANKING_MAX;
+  return START_XP_MAX + BADGES_XP_ALL + d * (DAILY_PLAY_CAP + DAILY_SOCIAL_CAP) + Math.ceil(d / 7) * WEEK_RANKING_MAX + Math.max(0, Math.floor(invited)) * INVITED_XP_MAX;
 }
 
 /**
@@ -576,11 +613,11 @@ export const LEVELS_SINCE = '2026-11-17T00:00:00Z';
 export const levelsXpCeiling = (now: Date): number => plausibleXp((now.getTime() - Date.parse(LEVELS_SINCE)) / 86_400_000);
 
 /** Le niveau à montrer d'un autre joueur : undefined (« ? ») s'il n'est pas vraisemblable. */
-export function shownLevel(xp: number | undefined, firstSeen: string | undefined, now: Date): number | undefined {
+export function shownLevel(xp: number | undefined, firstSeen: string | undefined, now: Date, invited = 0): number | undefined {
   if (xp === undefined) return undefined;
   const since = firstSeen ? Date.parse(firstSeen) : now.getTime();
   const days = Number.isFinite(since) ? (now.getTime() - since) / 86_400_000 : 0;
-  return xp <= plausibleXp(days) ? levelOf(xp).level : undefined;
+  return xp <= plausibleXp(days, invited) ? levelOf(xp).level : undefined;
 }
 
 /** XP de la semaine en cours (récap). */
@@ -604,7 +641,7 @@ export function playedSpanDays(state: LevelState): number {
 const num = (v: unknown, max = Number.MAX_SAFE_INTEGER): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.min(max, Math.floor(v)) : 0);
 const isIso = (v: unknown): v is string => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
 const isDay = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
-const XP_KINDS = new Set<string>(['play', 'game', 'first-of-day', 'new-table', 'personal-best', 'honor', 'champion', 'live', 'live-win', 'ranking', 'badge', 'start', 'room-day', 'friend', 'like', 'reaction']);
+const XP_KINDS = new Set<string>(['play', 'game', 'first-of-day', 'new-table', 'personal-best', 'honor', 'champion', 'live', 'live-win', 'ranking', 'badge', 'start', 'room-day', 'friend', 'like', 'reaction', 'invited', 'invitee-tier']);
 const isKey = (v: unknown): v is string => typeof v === 'string' && v.length >= 8 && v.length <= 200;
 const SCOPES = new Set<string>(['world', 'country', 'friends']);
 
@@ -622,6 +659,7 @@ function parseGain(raw: unknown): XpGain | undefined {
     ...(typeof r.scope === 'string' && SCOPES.has(r.scope) ? { scope: r.scope as RankingScopeXp } : {}),
     ...(typeof r.rank === 'number' ? { rank: num(r.rank, 100_000) } : {}),
     ...(typeof r.badge === 'string' && /^[a-z0-9-]{1,40}$/.test(r.badge) ? { badge: r.badge } : {}),
+    ...(typeof r.name === 'string' && r.name.length <= 40 ? { name: r.name } : {}),
   };
 }
 
@@ -675,6 +713,7 @@ export function parseLevels(raw: unknown): LevelState | undefined {
     reactionsCounted: num(r.reactionsCounted),
     seenLikes: Array.isArray(r.seenLikes) ? r.seenLikes.filter((x): x is string => typeof x === 'string' && x.length <= 300).slice(-SEEN_IDS_MAX) : [],
     seenReactions: Array.isArray(r.seenReactions) ? r.seenReactions.filter((x): x is string => typeof x === 'string' && x.length <= 300).slice(-SEEN_IDS_MAX) : [],
+    invitees: record(r.invitees, (x) => typeof x === 'number' && Number.isInteger(x) && x >= 0 && x < TIER_IDS.length) as Record<string, number>,
     bests: record(r.bests, (x) => typeof x === 'number' && Number.isSafeInteger(x) && x >= 0) as Record<string, number>,
     bestPaid: record(r.bestPaid, isDay) as Record<string, string>,
     beaten: num(r.beaten),
@@ -774,6 +813,10 @@ export function gainText(g: XpGain, badgeLabel: (id: string) => string): { text:
       return { text: tn(g.value ?? 1, '{n} « J’aime » reçu', '{n} « J’aime » reçus') };
     case 'reaction':
       return { text: tn(g.value ?? 1, '{n} réaction reçue', '{n} réactions reçues') };
+    case 'invited':
+      return { text: t('Personne invitée'), ...(g.name ? { detail: t('{name} a fini sa première partie', { name: g.name }) } : {}) };
+    case 'invitee-tier':
+      return { text: t('Une personne invitée progresse'), ...(g.name ? { detail: t('{name} passe un palier', { name: g.name }) } : {}) };
   }
 }
 

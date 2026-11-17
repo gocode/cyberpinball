@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { frontendSource } from './frontend-source';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8');
@@ -15,7 +16,7 @@ test('plugin du DMD : activé dans toutes les parties, installé avant chacune, 
   assert.match(read('packages', 'vpx-vision3d', 'cyberpinball-dmd.cfg'), /id = "CyberPinballDmd"[\s\S]*windows\.x64 = "plugin-cyberpinballdmd64\.dll"/);
   assert.match(read('packages', 'vpx-vision3d', 'CMakeLists.txt'), /OUTPUT_NAME "plugin-cyberpinballdmd64"/);
   assert.match(read('app', 'src', 'vpx-plugins.ts'), /DMD_PLUGIN: VpxPluginSpec = \{ folder: 'cyberpinball-dmd', dll: 'plugin-cyberpinballdmd64\.dll', cfg: 'cyberpinball-dmd\.cfg' \}/);
-  assert.match(read('app', 'src', 'frontend.ts'), /installVpxPlugin\(DMD_PLUGIN, path\.dirname\(install\.exe\)/);
+  assert.match(frontendSource(), /installVpxPlugin\(DMD_PLUGIN, path\.dirname\(install\.exe\)/);
   assert.match(read('scripts', 'fabriquer.mjs'), /copyFileSync\(path\.join\(VISION3D_SOURCE, 'cyberpinball-dmd\.cfg'\), path\.join\(dmdDir, 'plugin\.cfg'\)\)/);
 });
 
@@ -40,7 +41,7 @@ test('plugin du DMD : la taille donnée à SDL, la diffusion, et rien d’autre 
   // SDL n'est appelé que pour un cadre qui diffère de la zone cliente.
   assert.match(cpp, /\(cadreL == l && cadreH == h\)\)\s*return;/);
   // Jamais écrit par Cyber Pinball : la sonde et Follow ne servent qu'au banc.
-  for (const file of [['app', 'src', 'frontend.ts'], ['packages', 'core', 'src', 'vpx.ts']]) assert.doesNotMatch(read(...file), /CyberPinballDmd', key: '(Probe|Follow)'/);
+  for (const file of [['app', 'src', 'frontend.ts'], ['app', 'src', 'vr-frontend.ts'], ['app', 'src', 'vision3d-menu.ts'], ['packages', 'core', 'src', 'vpx.ts']]) assert.doesNotMatch(read(...file), /CyberPinballDmd', key: '(Probe|Follow)'/);
 });
 
 test('schéma de VPX : chaque source de packages/vpx-vision3d appartient à un seul plugin (ses réglages jamais rangés sous un autre)', () => {

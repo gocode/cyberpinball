@@ -6,6 +6,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { headsetAudioOutput, vrAudioSettings } from '../vr-profil';
+import { frontendSource } from './frontend-source';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8');
@@ -32,7 +33,7 @@ test('son dans le casque : la sortie du casque trouvée sur des critères géné
 });
 
 test('son dans le casque : le menu, le Juke-box et la partie dans le casque y passent, la borne garde sa sortie hors du casque', () => {
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   // Le menu (musique, sons de l'interface, Juke-box) : la sortie du casque tant que le menu y est.
   assert.match(frontend, /function menuOutput\(\): string \| undefined \{\s*return headset\?\.inUse \? \(findHeadsetAudio\(\) \?\? audioOutput\) : audioOutput;/);
   assert.doesNotMatch(frontend, /output: \(\) => audioOutput,/);

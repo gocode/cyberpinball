@@ -6,6 +6,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { airLinkOverWifi, blockTransport, fluidityVerdict, linkMinutesBetween, linkNetworkSummary, linkTransport, linkTransportSince, parsePcNetwork, PC_NETWORK_COMMAND } from '../vr-reseau';
+import { frontendSource } from './frontend-source';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8').replace(/\r\n/g, '\n');
@@ -54,7 +55,7 @@ test('PC en Wi-Fi : reconnu par le support physique de la carte de la route par 
 });
 
 test('casque : l’avertissement donné une fois par session, sur la carte du chargement, et le verdict au journal', () => {
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.match(frontend, /if \(vrGame && headset\?\.inUse && !airLinkWarned && airLinkOverWifi\(linkMode, pcNetwork\)\) \{\s*airLinkWarned = true;/);
   // Session du casque : remise à zéro casque retiré au menu, jamais pendant une partie.
   assert.match(frontend, /if \(!headset\?\.worn && headsetWornBefore && !playing && !launch\) airLinkWarned = false;/);
@@ -79,7 +80,7 @@ test('Link, une seule vérité (essai réel du 13 novembre 2026 : « câble USB 
   assert.equal(linkTransportSince(`[${air}]`, 1500), undefined);
   assert.equal(linkTransport(log), 'cable');
   // L'application : le transport lu depuis le début de la connexion, oublié quand Link est coupé.
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /const found = linkConnectedAt !== undefined \? linkTransportSince\(readOculusPerfLog\(\), linkConnectedAt - 5\) : undefined;/);
   assert.match(front, /function headsetLost\(inGame: boolean\): void \{\s*linkDisconnected\(\);/);
   assert.match(front, /function companionReady\(\): void \{\s*linkConnectedAt \?\?= Date\.now\(\) \/ 1000;/);

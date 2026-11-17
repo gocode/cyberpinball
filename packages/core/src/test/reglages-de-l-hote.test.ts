@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 import {
   applyHostSettings,
   createSettingsReceiver,
@@ -232,7 +233,7 @@ test('deux bornes : l’invité accepte, reçoit les réglages de l’hôte, le 
 });
 
 test('application : les réglages lus pour l’hôte, posés dans le double pour l’invité', () => {
-  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   assert.match(front, /settingsOf: \(table\) => readHostSettings\(/);
   assert.match(front, /tableDoubles\.start\(table, hooks\.double, hooks\.settings, hooks\.board, inspector && \{ \.\.\.inspector, dmd: readDmd \}\)/);
 });

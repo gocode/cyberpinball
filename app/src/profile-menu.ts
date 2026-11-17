@@ -18,6 +18,7 @@ import {
   BADGES,
   countryName,
   eventText,
+  invitedOf,
   levelOf,
   locale,
   shownLevel,
@@ -78,6 +79,11 @@ export interface ProfileMenuHost {
     of(key: string): { id: string; name: string; members: number; week?: string; mine: boolean }[];
     open(id: string, mine: boolean, back: () => void): void;
   };
+  /**
+   * « Qui vous a fait découvrir Cyber Pinball ? » (invite-menu.ts) : proposé dans « Mon profil public »
+   * tant que la question se pose ou que le choix n'est pas encore confirmé.
+   */
+  invite?: { asked(): boolean; chosen(): string | undefined; open(back: () => void): void };
   now?(): Date;
 }
 
@@ -110,7 +116,21 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
   };
   /** Pastille : l'avatar d'un ami, sinon celui de sa carte (public, contrôlé par son empreinte), sinon ses initiales. */
   /** Son niveau, s'il est vraisemblable depuis le jour où cette borne a vu sa carte ; « ? » sinon. */
-  const levelOfCard = (key: string, card?: PublicCard) => (card?.xp === undefined ? undefined : shownLevel(card.xp, net.cardFirstSeen(key), now()) ?? ('?' as const));
+  const levelOfCard = (key: string, card?: PublicCard) => (card?.xp === undefined ? undefined : shownLevel(card.xp, net.cardFirstSeen(key), now(), invitedOf(key, card.invited, card.invitedTotal).count) ?? ('?' as const));
+
+  /**
+   * Ses personnes invitées (invitations.ts) : le nombre, vérifié sur les attestations de sa carte, et
+   * leurs pastilles. Rien tant qu'il n'a invité personne. Jamais « invité par » sur le profil d'un invité.
+   */
+  function invitedSection(key: string, card: PublicCard, mine: boolean): Section[] {
+    const { count, players } = invitedOf(key, card.invited, card.invitedTotal);
+    if (!count) return [];
+    const shown = [...players].reverse().slice(0, 8).map((p) => avatarOf(p.me, nameOf(p.me, net.publicCard(p.me)) || p.name, net.publicCard(p.me)));
+    const text = mine
+      ? tn(count, 'Vous avez fait découvrir Cyber Pinball à {n} joueur', 'Vous avez fait découvrir Cyber Pinball à {n} joueurs')
+      : tn(count, 'A fait découvrir Cyber Pinball à {n} joueur', 'A fait découvrir Cyber Pinball à {n} joueurs');
+    return [{ title: t('Personnes invitées'), rows: [{ text, icon: 'friend-add', tone: 'ok', avatars: shown, ...(count > shown.length ? { aside: `+${count - shown.length}` } : {}) }] }];
+  }
   const levelLine = (level: number | '?' | undefined) => (level === undefined ? undefined : level === '?' ? t('Niveau ?') : t('{tier} · niveau {level}', { tier: tierLabel(tierOf(level)), level }));
   const avatarOf = (key: string, name: string, card?: PublicCard) => {
     const level = levelOfCard(key, card);
@@ -188,7 +208,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     if (part.id) head.push(part.id);
     if (head.length) sections.push({ rows: head });
     // Puis son niveau et ses badges, ses groupes, et une seule liste d'activité.
-    if (card && !hidden) sections.push(...levelSections(key, card, false));
+    if (card && !hidden) sections.push(...levelSections(key, card, false), ...invitedSection(key, card, false));
     sections.push(...groupsSection(key, actions, here));
     if (hidden) sections.push({ rows: [{ text: t('Activité masquée sur cette borne'), detail: t('Ses évènements et ses « J’aime » ne s’affichent plus ici'), tone: 'quiet', icon: 'eye' }] });
     else if (card || part.events?.length || friend) sections.push(activitySection(key, card, part.events ?? [], friend, actions, here));
@@ -256,7 +276,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     else {
       const facts = [card.country ? countryName(card.country, locale()) : undefined, card.friends !== undefined ? tn(card.friends, '{n} ami', '{n} amis') : undefined, tn(card.records, '{n} record publié', '{n} records publiés')].filter(Boolean).join(' · ');
       sections.push({ rows: [{ text: t('Ce que voient les joueurs qui ne sont pas vos amis'), detail: facts, icon: 'eye' }] });
-      sections.push(...levelSections(me(), card, true));
+      sections.push(...levelSections(me(), card, true), ...invitedSection(me(), card, true));
       sections.push(...groupsSection(me(), actions, (at) => openMine(undefined, at)));
       const rows: Row[] = card.events.map((e) => {
         const n = card.likes[e.id] ?? 0;
@@ -264,6 +284,10 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
         return { text: eventText(e, badgeLabel), detail: socialAgo(e.at, now()), icon: eventIcon(e), aside: `★ ${n}`, ...(n ? {} : { sub: t('Pas encore de « J’aime »') }), action: index, pick: true };
       });
       sections.push({ title: t('Votre activité récente'), rows: rows.length ? rows : [{ text: t('Ni record ni badge ces derniers jours'), tone: 'quiet' }] });
+    }
+    if (host.invite && (host.invite.asked() || host.invite.chosen())) {
+      const chosen = host.invite.chosen();
+      actions.push({ label: chosen ? t('Découvert grâce à {name}', { name: chosen }) : t('Qui vous a fait découvrir Cyber Pinball ?'), detail: t('Il le verra sur son profil ; le vôtre n’en dit rien'), icon: 'friend-add', run: () => host.invite!.open(() => openMine()) });
     }
     actions.push(
       on

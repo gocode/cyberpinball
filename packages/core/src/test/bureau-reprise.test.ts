@@ -13,6 +13,7 @@ import { test } from 'node:test';
 import { CHORD_HOLD_MS, createModifierChords, type ChordKey } from '../modifier-chords';
 import { RESUME_FLAG, readResume, resumeArg, withoutResume } from '../menu-resume';
 import { isAppShortcut, SHORTCUTS } from '../shortcuts';
+import { frontendSource } from './frontend-source';
 
 const APP = path.join(__dirname, '..', '..', '..', '..', 'app');
 
@@ -135,7 +136,7 @@ test('Reprise : la place passe par la ligne de commande et ne s’hérite pas d�
 });
 
 test('frontend : le bureau garde l’écran ouvert, la relance reprend sa place, D tenu ne repart pas au bureau', () => {
-  const frontend = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   const showDesktop = /\nfunction showDesktop\(\): boolean \{([\s\S]*?)\r?\n\}/.exec(frontend)![1]!;
   assert.doesNotMatch(showDesktop, /library\.leave\(\)/, 'le bureau ne ferme pas l’écran ouvert');
   assert.match(frontend, /if \(moved\) return relaunchMenu\(\);/);

@@ -34,6 +34,7 @@ import { MENU_PHASES, introSound, screensTable } from '../menumoments';
 import type { TableEntry } from '../tables';
 import { REPO_ROOT } from './i18n-scan';
 import { menuRenderer } from './menu-renderer';
+import { frontendSource } from './frontend-source';
 
 const read = (...parts: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...parts), 'utf8').replace(/\r\n/g, '\n');
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'cp-ouverture-'));
@@ -136,7 +137,7 @@ test('démarrage : seulement en arrivant sur la roue, ni à une relance du menu,
   assert.equal(at({ env: { CYBERPINBALL_AUTOPILOT: 'key:Enter', CYBERPINBALL_OUVERTURE: '1' } }), true, 'sauf demandée');
   assert.equal(at({ env: { CYBERPINBALL_OUVERTURE: '0' } }), false);
   // La relance du menu (langue, configuration) le dit ; le démarrage le décide une fois, avant l'autopilote.
-  const main = read('app', 'src', 'frontend.ts');
+  const main = frontendSource();
   assert.match(body(main, 'function relaunchMenu'), /INTRO_SKIP_FLAG/);
   const start = body(main, 'export function startFrontend');
   assert.ok(start.indexOf('introAtStartup(') > 0 && start.indexOf('introAtStartup(') < start.indexOf('library.autopilot('));
@@ -191,7 +192,7 @@ test('écrans de la borne : l’ouverture ne parle d’aucune table ; son son es
 });
 
 test('boutons : pendant l’ouverture, n’importe quel bouton ou clic affiche la roue et rien d’autre', () => {
-  const main = read('app', 'src', 'frontend.ts');
+  const main = frontendSource();
   const keys = body(main, 'function handleKey(');
   const leave = keys.indexOf("if (state.phase === 'intro') return leaveIntro();");
   assert.ok(leave > 0 && leave < keys.indexOf('CONFIG_KEY') && leave < keys.indexOf('switch (state.phase)'), 'avant Tab et avant tout autre bouton');

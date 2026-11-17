@@ -6,6 +6,7 @@ import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { frontendSource } from './frontend-source';
 import {
   controllerOddity,
   controllerOddityKept,
@@ -64,7 +65,7 @@ test('sortie garantie : avec tout réglage des manettes, Échap reste lié à la
 });
 
 test('sortie garantie : Échap ferme la partie dans le casque côté Cyber Pinball, quel que soit le clavier de VPX', () => {
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.match(frontend, /const vrEscape = vrGame !== undefined && simulated === undefined && globalShortcut\.register\(accelerator\(SHORTCUTS\.vrExit\), \(\) => \{[\s\S]{0,300}game\.stop\(\);/);
   assert.match(frontend, /if \(vrEscape\) globalShortcut\.unregister\(accelerator\(SHORTCUTS\.vrExit\)\);/);
 });
@@ -105,7 +106,7 @@ test('réglage des manettes à l’envers (A et B croisés) : dit, réglage par 
   assert.equal(controllerOddityKept(JSON.stringify(crossed)), false);
   assert.equal(controllerOddityKept('pas du json'), false);
   // L'assistant le propose au démarrage du casque, le réglage par défaut en avant, le sien à un bouton.
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.match(frontend, /const odd = controllerOddity\(kept\);\s*if \(!odd \|\| controllerOddityKept\(text\)\) return;/);
   assert.match(frontend, /JSON\.stringify\(\{ \.\.\.kept, keptAsIs: true \}/);
 });

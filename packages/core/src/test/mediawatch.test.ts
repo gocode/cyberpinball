@@ -13,6 +13,7 @@ import { MEDIA_WATCH_DEBOUNCE_MS, mediaChangeOf, watchMediaChanges, type MediaCh
 import { MenuMedias, mediaPathFromUrl, mediaUrl } from '../mediaview';
 import { scanTables } from '../tables';
 import { APP, menuRenderer, menuState } from './menu-renderer';
+import { frontendSource } from './frontend-source';
 
 
 function png(width: number, height: number): Buffer {
@@ -203,7 +204,7 @@ test('roue : le logo ajouté à une table déjà dans la roue s’affiche aussit
 });
 
 test('menu : le guet des dossiers est branché sur la relecture des tables et des médias', () => {
-  const source = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
+  const source = frontendSource();
   assert.match(source, /watchMediaChanges\(\{[\s\S]*?dirs: \[layout\.tables, layout\.media\][\s\S]*?reloadTables\(\)[\s\S]*?medias\?\.invalidate\(\)[\s\S]*?broadcast\(\)/);
   assert.match(source, /function reloadTables[\s\S]*?mediaWatch\?\.rearm\(\)/, 'dossiers créés depuis le démarrage : guettés');
   assert.match(source, /before-quit[\s\S]*?mediaWatch\?\.close\(\)/);

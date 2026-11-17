@@ -17,6 +17,7 @@ import { NOTICE_RULES } from '../notices';
 import { UI_SOUND_IDS, UI_SOUNDS, uiSoundCue } from '../uisounds';
 import { DEFAULT_MENU_MEDIA_SETTINGS, normalizeMenuMediaSettings, type MenuMediaSettings } from '../mediaview';
 import { playVolume, type MenuMoment } from '../menumoments';
+import { frontendSource } from './frontend-source';
 
 const MOMENTS: MenuMoment[] = ['browse', 'loading', 'game', 'attract'];
 
@@ -299,7 +300,7 @@ test('fenêtre : le souffle de l’ouverture, daté, ouvre son accord sur l’ig
 // Branchements
 
 test('branchements : le processus principal ne joue un son que par uiSoundCue, au playfield', () => {
-  const main = read('app', 'src', 'frontend.ts');
+  const main = frontendSource();
   assert.equal(main.match(/'ui-sound'/g)?.length, 1, 'un seul envoi du canal ui-sound');
   const fn = main.slice(main.indexOf('function playUiSound('), main.indexOf('function moment('));
   assert.match(fn, /uiSoundCue\(id, mediaSettings, moment\(\), hitAt\)/);
@@ -336,7 +337,7 @@ test('registre : source et licence de chaque son, écrites dans le manuel en fra
 // Records (highscores.ts, testé par highscores.test.ts) : le knocker suit newRecords
 
 test('knocker : records lus avant la partie et au retour, sonné seulement si un score est entré au tableau', () => {
-  const main = read('app', 'src', 'frontend.ts');
+  const main = frontendSource();
   const start = main.indexOf('async function play(');
   // Jusqu'à l'accolade qui ferme la fonction, en début de ligne.
   const play = main.slice(start, start + main.slice(start).search(/\r?\n\}\r?\n/));

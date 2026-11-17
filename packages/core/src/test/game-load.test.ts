@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { cpuPercent, gameLoadReport, loadPart, loadSample } from '../game-load';
+import { frontendSource } from './frontend-source';
 
 test('charge pendant la partie : chaque processus d’Electron dans sa part', () => {
   assert.equal(loadPart('Browser'), 'main');
@@ -44,7 +45,7 @@ test('charge pendant la partie : moyenne, pointe, détail et VPX dans une ligne 
 
 test('charge pendant la partie : relevée pour chaque vraie partie, notée à sa fin', () => {
   const app = path.join(__dirname, '..', '..', '..', '..', 'app', 'src');
-  const frontend = fs.readFileSync(path.join(app, 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   assert.match(frontend, /if \(simulated === undefined && !gameLoad\) gameLoad = watchGameLoad\(game\.pid\);/);
   assert.match(frontend, /inGameMenu\.disarm\(\);\s*const load = gameLoad\?\.stop\(playedVr \? 'casque' : 'ecrans'\);\s*if \(load\) console\.log\(load\);/);
   // Rien n'est lancé pour mesurer : ni programme, ni page réveillée.

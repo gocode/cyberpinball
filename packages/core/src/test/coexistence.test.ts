@@ -19,6 +19,7 @@ import {
   type TaskbarState,
 } from '../coexistence';
 import { resolveLocations } from '../locations';
+import { frontendSource } from './frontend-source';
 
 // Cohabitation avec un autre menu de borne (PinUP Popper, PinballX, PinballY) sur le même
 // PC. L'invariant : Cyber Pinball ne change dans Windows que ce que WINDOWS_CHANGES déclare,
@@ -150,7 +151,7 @@ test('le gardien des écrans rend les barres au bureau et à la fermeture, et le
   assert.ok(desktop.indexOf('if (cabinetTaskbars) hideTaskbars()') > desktop.indexOf("restoreTaskbars('desktop')"), 'retour du bureau : barres masquées de nouveau');
   assert.match(guard, /process\.on\('exit'[^\n]*'quit'[^\n]*'relay'/, 'fermeture : quit ; app.exit d’une relève : relay');
   // Chaque appel dit son moment : aucun restoreTaskbars() sans argument dans l'application.
-  for (const file of ['screen-guard.ts', 'frontend.ts']) {
+  for (const file of ['screen-guard.ts', 'frontend.ts', 'vr-frontend.ts', 'vision3d-menu.ts']) {
     const code = fs.readFileSync(path.join(REPO, 'app', 'src', file), 'utf8');
     assert.doesNotMatch(code, /restoreTaskbars\(\)/, `${file} : restoreTaskbars sans moment`);
   }
@@ -197,7 +198,7 @@ test('autre menu ouvert : vérifié avant de couvrir les écrans et avant chaque
   const main = fs.readFileSync(path.join(REPO, 'app', 'src', 'main.ts'), 'utf8');
   const ready = main.slice(main.indexOf('app.whenReady()'));
   assert.ok(ready.indexOf('otherFrontendsGate(') >= 0 && ready.indexOf('otherFrontendsGate(') < ready.indexOf('guardScreens('), 'otherFrontendsGate() avant guardScreens()');
-  const frontend = fs.readFileSync(path.join(REPO, 'app', 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   const play = frontend.slice(frontend.indexOf('async function play('));
   assert.ok(play.indexOf('unacceptedFrontends(') >= 0 && play.indexOf('unacceptedFrontends(') < play.indexOf('launchVpx('), 'vérifié avant launchVpx');
 });

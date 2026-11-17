@@ -13,6 +13,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 import {
   applyRoom,
   gameStatus,
@@ -92,7 +93,7 @@ test('la carte part toujours : le service porte la fin de la vue, la carte se fe
   assert.match(notice, /« Partez ! » \$\{s\(waitSeen\.partez, end\)\} ; partie : \$\{why\}\./);
   // Une fin de partie en erreur (EPERM sur social.json après la partie) ne perd plus le résultat.
   assert.match(live, /fin de partie en erreur .* mon retour part quand même/);
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   // Le niveau et les badges d'après la partie : une erreur (écriture refusée) ne perd jamais la partie.
   assert.equal((front.match(/levelTracker\.gameEnded\([^\n]*\);\r?\n\s+\} catch \(error\) \{/g) ?? []).length, 2);
 });

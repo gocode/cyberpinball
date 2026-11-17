@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { coverNotice, screenCover, veiledScreens, type StackedWindow } from '../screencover';
+import { frontendSource } from './frontend-source';
 
 // Écrans du PC de développement (pixels physiques) : playfield principal, topper à droite.
 const PLAYFIELD = { x: 0, y: 0, width: 1920, height: 1080 };
@@ -100,7 +101,7 @@ test('écran rebranché : voile neuf sous les fenêtres du menu, fenêtres repri
   assert.match(guard, /for \(const listener of settledListeners\) listener\(\);/);
   assert.match(guard, /recoverCovered\(present, \(win\) => !veilSet\.has\(win\)\)/);
   assert.match(guard, /veiledScreens\(screens, listWindows/);
-  const frontend = fs.readFileSync(path.join(SOURCES, 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   // Hors lancement et hors partie seulement : le premier plan va à VPX.
   assert.match(frontend, /onScreensSettled\(\(\) => playing \|\| launch \|\| recoverScreens\('displays'\)\)/);
   // Au retour d'une partie, aussitôt puis une fois les écrans posés.

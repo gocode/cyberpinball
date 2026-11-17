@@ -22,6 +22,9 @@ import type { Cabinet, PhysicalScreen } from '../model';
 import { encodePng } from '../png';
 import { buildScriptPatch } from '../scriptpatch';
 import { PUP_DISABLED_FOLDER } from '../pupdisabled';
+import { writeRomVolume } from '../romscores';
+import { romVolumeStatus } from '../romvolume';
+import { realMemory, realNv } from './memoires-rom';
 
 const SCRIPT = 'Const cGameName="afm_113b"\r\nLoadVPM "01560000", "WPC.VBS", 3.26\r\nController.GameName = cGameName\r\n';
 const TABLE = 'Attack from Mars (Bally 1995)';
@@ -556,6 +559,12 @@ const TRAPS: Trap[] = [
   { code: 'dofNoPinmame', arm: () => {}, script: scriptFacts(NO_PUP_SCRIPT), ctx: (folder) => ({ dof: dofSetupWith(folder, ['afm']) }) },
   // DOF : un directoutputconfig51.ini resté dans le dossier de la table masque celui de la borne.
   { code: 'dofLocalIni', arm: (folder) => write(path.join(folder, 'directoutputconfig51.ini'), '[Config DOF]\r\nafm,0\r\n'), ctx: (folder) => ({ dof: dofSetupWith(folder, ['afm']) }) },
+  // Volume de la ROM (romvolume.ts) : réglé à 6 sur 31 hors de Cyber Pinball (mémoire réelle de Monster Bash, WPC).
+  {
+    code: 'lowRomVolume',
+    arm: (folder) => write(path.join(folder, 'pinmame', 'nvram', 'mb_106b.nv'), (writeRomVolume(realMemory('mb_106'), realNv('mb_106b-usine'), 6) as { data: Buffer }).data),
+    ctx: (folder) => ({ romVolume: { status: romVolumeStatus({ roms: ['mb_106b'], pinmameDir: path.join(folder, 'pinmame'), memory: () => realMemory('mb_106') }) } }),
+  },
 ];
 
 test('table témoin : aucune règle ne se déclenche', () => {

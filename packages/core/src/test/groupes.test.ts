@@ -40,6 +40,7 @@ import {
   type GroupView,
 } from '../groups';
 import { newSocialState, setName, type SocialState } from '../social';
+import { frontendSource } from './frontend-source';
 
 const T0 = new Date('2026-11-17T18:00:00Z');
 const at = (min: number) => new Date(T0.getTime() + min * 60_000);
@@ -411,7 +412,7 @@ test('profil public : les groupes publics d’un joueur, jamais un groupe privé
   // Le profil branché : section « Groupes publics », Start ouvre le groupe ou sa page de l'annuaire.
   const profile = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'profile-menu.ts'), 'utf8');
   assert.match(profile, /title: t\('Groupes publics'\)/);
-  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   assert.match(front, /groupService\.publicGroupsOf\(key\)/);
   assert.match(front, /mine \? groupsMenu\.openGroup\(id, back\) : groupsMenu\.openPublic\(id, back\)/);
 });

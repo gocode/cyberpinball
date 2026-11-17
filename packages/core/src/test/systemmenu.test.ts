@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { setLanguage } from '../i18n';
 import { MANUAL, MANUAL_TESTS_EN, MANUEL, TESTS_MANUELS, splitFiles } from './manuels';
+import { frontendSource } from './frontend-source';
 import {
   isSystemGroup,
   SYSTEM_GROUP_IDS,
@@ -37,7 +38,7 @@ test('menu système : une rubrique qui s’allume montre son état et son badge 
   assert.match(library, /\s+badge: item\?\.badge,\s/);
   assert.match(library, /\.\.\.\(shown\.badge && \{ badge: shown\.badge \}\),/);
   // L'entrée d'activation garde son badge et son état (frontend.ts).
-  assert.match(fs.readFileSync(path.join(APP, 'frontend.ts'), 'utf8'), /library\.provideSystemItem\('vr', \{\s*\/\/[^\n]*\n\s*badge: 'beta',\s*get label\(\) \{\s*return vrMenuText\(vrMode, probeVr\(\)\)\.label;/);
+  assert.match(frontendSource(), /library\.provideSystemItem\('vr', \{\s*\/\/[^\n]*\n\s*badge: 'beta',\s*get label\(\) \{\s*return vrMenuText\(vrMode, probeVr\(\)\)\.label;/);
 });
 
 test('menu système : chaque entrée est rangée une fois, sous une seule rubrique', () => {

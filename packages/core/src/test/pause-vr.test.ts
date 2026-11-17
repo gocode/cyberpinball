@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { decodePng } from '../png';
 import { FALLBACK_RENDERER, pauseVrSettings, PAUSE_RENDERER, tableUsesPupCapture, vrNeedsVpxBackglass, WATCH_RENDERER } from '../vr-profil';
+import { frontendSource } from './frontend-source';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8');
@@ -79,7 +80,7 @@ test('plugin : rien hors du casque (jamais en 2D, activé seulement dans l’INI
   // Hors de la pause et de l'appui tenu : il rend la main (B2S ou PuP dessinent le fronton).
   assert.match(cpp, /if \(!pause\.affichee\(t\)\)\s*return dessinerCadre\(ctx, t\);/);
   // Activé dans l'INI de la partie dans le casque seulement (prepareVr), jamais dans celui de la borne.
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.equal(frontend.match(/pauseSettingsFor\(/g)?.length, 1);
   const prepare = frontend.slice(frontend.indexOf('function prepareVr('), frontend.indexOf('function prepareVr(') + 4000);
   assert.match(prepare, /writeIniSettings\(vr\.ini, pauseSettingsFor\(readTextIfExists\(vr\.ini\)/);

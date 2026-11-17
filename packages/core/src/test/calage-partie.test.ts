@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { MANUAL, MANUEL, splitText } from './manuels';
+import { frontendSource } from './frontend-source';
 import {
   CALIBRATION_HOLD_S,
   calibrationCombo,
@@ -153,7 +154,7 @@ test('sans prises mesurées (calage d’avant) : le calage en partie marche, l�
   const ig = inGameCalibration(place, TABLE, MENU_WIDTH);
   assert.equal(ig.measured, false);
   assert.ok(ig.lockbarScale >= 0.5 && ig.lockbarScale <= 2 && ig.cabYOffset >= -150 && ig.cabYOffset <= 50 && Math.abs(ig.heightSteps) <= 60);
-  assert.match(read('app', 'src', 'frontend.ts'), /prises des manettes pas encore mesurées : recalez dans le front-end/);
+  assert.match(frontendSource(), /prises des manettes pas encore mesurées : recalez dans le front-end/);
 });
 
 test('détection : pièce recentrée par le Quest (limite fixe) dite au journal, calage proposé au casque remis', () => {
@@ -165,7 +166,7 @@ test('détection : pièce recentrée par le Quest (limite fixe) dite au journal,
   assert.match(ts, /if \(line === 'piece aucune'\) \{/);
   assert.match(ts, /if \(!this\.worn\) this\.takenOff = this\.takenOffSeen = true;/);
   assert.match(ts, /this\.opts\.onPutBackOn\?\.\(\);/);
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /onPutBackOn: \(\) => \{\s*checkStaleCalibration\(\);\s*headsetPutBackOn\(\);\s*\},/);
   assert.match(front, /if \(!place \|\| headsetSetting\(\) === 'bureau' \|\| headset\?\.roomKeeping !== 'recentred'\) return;/);
   // L'écart prises-bouts survit à la relecture de casque.json.
@@ -237,7 +238,7 @@ test('invariant : la même combinaison, la même durée et les mêmes touches da
   // Le plugin ne cale que si Cyber Pinball a lié les touches (Calibrate = 1) ; la ligne du journal en sort.
   assert.match(plugin, /if \(calageActif_Val\)/);
   assert.match(plugin, /calage-partie n=%d hauteur=%d resultat=ok/);
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /\/\^calage-partie \.\*resultat=ok\/m/);
   assert.match(front, /key: 'ControllerCabYOffset', value: String\(ig\.cabYOffset\)/);
   assert.match(front, /key: 'CalibrateHeight', value: String\(ig\.heightSteps\)/);
@@ -259,7 +260,7 @@ test('détection de la panne du geste en partie (13 novembre 2026, « rien du to
   const full = ['calage actif=1 hauteur=13', 'calage-clic gauche=1 fiable=1', 'calage-clic droit=1 fiable=1', 'calage-combinaison tenue', 'calage-combinaison pause demandee', 'calage-etape ouverte', 'calage-gachette', 'calage-touche F13 marche', 'calage-touche F13 arret', 'calage-partie n=1 hauteur=13 resultat=ok'].join('\n');
   assert.match(inGameCalibrationReport(full)!, /2 clic\(s\)[\s\S]*1 calage\(s\) fait\(s\) et vérifié\(s\) ; calage fait$/);
   assert.match(inGameCalibrationReport(full.replace('calage-partie n=1 hauteur=13 resultat=ok', ''))!, /touche F13 pas postée/);
-  assert.match(read('app', 'src', 'frontend.ts'), /const calibrationReport = inGameCalibrationReport\(block\.text\);/);
+  assert.match(frontendSource(), /const calibrationReport = inGameCalibrationReport\(block\.text\);/);
   // Les actions vues par le plugin (première de chacune, « action-vue ») : dit sur la borne si les manettes l'atteignent.
   assert.match(inGameCalibrationReport('calage actif=1 hauteur=13\naction-vue id=1 pressee=1\naction-vue id=0 pressee=1\naction-vue id=22 pressee=1')!, /actions de VPX reçues : 0, 1, 22 ; aucun clic des joysticks : geste pas fait, ou VPX ne transmet pas les clics alors que les gâchettes arrivent/);
   assert.match(inGameCalibrationReport('calage actif=1 hauteur=13\naction-vue id=24 pressee=1')!, /ni aucune gâchette : les manettes du casque n’atteignent pas le plugin/);
@@ -292,7 +293,7 @@ test('calage périmé (13 novembre 2026) : limite changée de type ou de taille,
   assert.equal(boundaryOf('kept'), 'piece');
   // Proposé d'office, quel que soit le type de limite ; une seule fois par signature (calage-perime.json).
   assert.equal(shouldOfferCalibration('limite-changee', 'kept'), true);
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /onRoom: \(\) => checkStaleCalibration\(\),/);
   assert.match(front, /if \(offered === stale\.signature\) return;/);
   assert.match(front, /if \(!offerCalibration\('limite-changee'\)\) return;\s*try \{\s*fs\.mkdirSync/);
@@ -323,7 +324,7 @@ test('pièce gardée ou déplacée, mesurée sur des repères physiques (13 nove
   assert.ok(roomFromRecalibration(place, { ...place, x: 0.02 }).kept);
   const deplacee = roomFromRecalibration(place, { ...place, yaw: deg(-53) });
   assert.ok(!deplacee.kept && Math.round(deplacee.deg) === 53);
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /console\.log\(`Casque : recalage, \$\{roomMeasureText\(roomFromRecalibration\(previous, place\), 'barre avant recalée face à la précédente'\)\}\.`\);/);
   assert.match(front, /const measure = roomFromHeads\(place, gameHeads\);/);
   assert.match(front, /c\.head = head;/);
@@ -350,7 +351,7 @@ test('geste au menu (13 novembre 2026, PinCab : rien) : détecté avant l’assi
   assert.equal(hold.press('a', true, 0), undefined);
   hold.reset();
   assert.equal(hold.heldSince(), undefined);
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   // Avant l'assistant des manettes (ouvert d'office sans réglage gardé), qui prenait tous les boutons.
   assert.match(front, /function headsetButton\(name: string, down: boolean\): void \{\s*\/\/[^\n]*\n\s*calibrationComboButton\(name, down\);\s*triggersHintButton\(name, down\);\s*if \(controllerWizard\) \{/);
   // Seulement le profil des manettes, jamais leur réglage.
@@ -364,7 +365,7 @@ test('geste au menu (13 novembre 2026, PinCab : rien) : détecté avant l’assi
 });
 
 test('aide : la combinaison dans le détail de « Caler la borne », dans les manuels et au premier port du casque', () => {
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /function calibrationComboTip\(\): void \{/);
   assert.match(front, /combo: calibrationComboLabel\(headset\?\.profile \?\? 'touch'\)/);
   for (const [file, words] of [
@@ -383,7 +384,7 @@ test('sonde LibOVR (13 novembre 2026) : la DLL du runtime de Meta, lancée avec 
   assert.deepEqual(ovrRuntimeDlls(`${dir}\\oculus_openxr_64.json`, JSON.stringify({ runtime: { library_path: '.\\LibOVRRT64_1.dll' } })), [`${dir}\\LibOVRRT64_1.dll`, `${dir}\\LibOVRRTImpl64_1.dll`]);
   assert.deepEqual(ovrRuntimeDlls('C:\\Steam\\steamxr_win64.json', JSON.stringify({ runtime: { library_path: '..\\bin\\vrclient_x64.dll' } })), []);
   assert.deepEqual(ovrRuntimeDlls('C:\\x\\a.json', 'pas du json'), []);
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /ovrProbe\.set\(vrMode === 'auto'\);/);
   assert.match(front, /headset\?\.dispose\(\);\s*ovrProbe\.set\(false\);/);
   const sonde = read('app', 'src', 'sonde-ovr.ts');
@@ -408,7 +409,7 @@ test('aide des gâchettes (13 novembre 2026 : le geste du calage confondu avec l
   assert.equal(hold.due(2_099), false);
   assert.equal(hold.due(2_100), true);
   assert.equal(hold.due(3_000), false);
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /if \(event !== 'debut' \|\| calibration \|\| controllerWizard \|\| playing \|\| launch \|\| !calibrationCombo\(headset\?\.profile \?\? 'touch'\)\) return;/);
   assert.match(front, /showBanner\(t\('Pour recaler la borne : enfoncez les deux sticks, pas les gâchettes'\)\);/);
   // Toute autre touche annule l'aide.
@@ -433,7 +434,7 @@ test('schéma des manettes (maquette validée le 13 novembre 2026) : un composan
   assert.match(read('app', 'renderer', 'schema-manettes.css'), /\.schema-vert \{ fill: var\(--signal\); stroke: var\(--signal\);/);
   assert.match(html, /<link rel="stylesheet" href="schema-manettes\.css" \/>/);
   // Le calage : gâchettes pour placer, A une fois placée ; en bas, le geste des sticks ; le conseil ne le répète pas.
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /const schema = drawn && !desk && !c\.placing \? \(c\.place \? \['a'\] : \['gachette-gauche', 'gachette-droite'\]\) : undefined;/);
   assert.match(front, /band: \{ \.\.\.\(drawn && \{ schema: \[\.\.\.combo\] \}\), text: t\('À tout moment, enfoncez les deux sticks 3 s'\)/);
   assert.match(front, /calibrationCombo\(headset\?\.profile \?\? 'touch'\) \? undefined : calibrationComboLabel\(headset\?\.profile\)/);
@@ -455,7 +456,7 @@ test('schéma des manettes, planches d’adaptation validées (13 novembre 2026)
   const image = read('app', 'src', 'schema-image.ts');
   assert.match(image, /createHash\('sha1'\)\.update\(JSON\.stringify\(\{ v: SCHEMA_IMAGE_VERSION, \.\.\.image \}\)\)/);
   assert.match(image, /transparent: true, backgroundColor: '#00000000', webPreferences: \{ offscreen: true/);
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /key: 'CalibrateImage', value: readyCalibrateImage\(false\) \?\? '' \}/);
   assert.match(front, /key: 'CalibratedImage', value: readyCalibrateImage\(true\) \?\? '' \}/);
   assert.match(front, /title: done \? t\('Borne calée'\) : t\('Caler la borne'\),/);
@@ -492,7 +493,7 @@ test('la pièce refaite au port du casque, détectée, l’ancrage attendu ou le
   const ts = read('app', 'src', 'casque.ts');
   assert.match(ts, /const reset = originResetAtWear\(line\);\s*if \(reset\) \{/);
   assert.match(ts, /this\.opts\.onOriginReset\?\.\(this\.takenOffSeen\);/);
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /onOriginReset: \(afterRemoval\) => headsetOriginReset\(afterRemoval\),/);
   // Avec un contour gardé : l'ancrage attendu, puis confirmé par la tête ; sinon le calage proposé.
   assert.match(front, /setTimeout\(\(\) => settlePort\(watch, afterRemoval\), PORT_SETTLE_MS\)/);
@@ -558,7 +559,7 @@ test('option « Recalage automatique » retirée (13 novembre 2026, l’ancrage 
   const menu = read('packages', 'core', 'src', 'systemmenu.ts');
   assert.equal(menu.includes('vr-auto-calibrate'), false);
   assert.match(menu, /entries: \['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror'\]/);
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.equal(/vr-auto-calibrate|autoRecalSample|watchRest|Borne recalée sur les manettes posées/.test(front), false);
   const casque = read('app', 'src', 'casque.ts');
   assert.equal(/watchRest|onRest|'repos /.test(casque), false);
@@ -657,7 +658,7 @@ test('repère de la pièce (essai réel du 13 novembre 2026, Air Link) : le cont
   assert.equal(sameContour(contour, contour.map(([x, z]) => [x + 0.001, z] as [number, number])), true);
   assert.equal(sameContour(contour, contour.map(([x, z]) => [x + 0.01, z] as [number, number])), false);
   // Le frontend : le contour effectif gardé avec chaque place, le saut appliqué tout de suite, le port dit lequel.
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /contour: \(\) => roomFrame\.effective\(\),/);
   assert.match(front, /function headsetJump\(jump: OvrJump\): void \{\s*roomFrame\.onJump\(jump\);/);
   assert.match(front, /const next = movePlace\(place, jump\);/);
@@ -680,7 +681,7 @@ test('repère de la pièce (essai réel du 13 novembre 2026, Air Link) : le cont
 
 test('borne calée sans contour (avant l’ancrage, 13 novembre 2026) : dit et calage proposé une fois, contour jamais attaché en silence', () => {
   assert.equal(shouldOfferCalibration('sans-contour', 'kept'), true);
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /if \(!r\) \{\s*noContourCheck\(place\);/);
   assert.match(front, /if \(!offerCalibration\('sans-contour'\)\) return;\s*noContourSaid = signature;/);
   assert.match(front, /'calage-sans-contour\.json'/);
@@ -734,7 +735,7 @@ test('validité du contour (essai réel du 13 novembre 2026, 23:39 : borne repos
   assert.equal(frame.pending().count, 1);
   assert.ok(frame.effective());
   // L'application : la sonde perdue oublie le contour ; la session du compagnon décide ; contour écarté sans ancrage.
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /onTracking: \(on, why\) => probeTracking\(on, why\),/);
   assert.match(front, /companionReady: \(\) => headset\?\.state === 'shown',/);
   assert.match(front, /if \(!on\) \{\s*roomFrame\.probeLost\(\);/);
@@ -800,7 +801,7 @@ test('couche du repère pour VPX (essai réel du 13 novembre 2026, 23:50-23:52 :
   assert.match(cpp, /info->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_STAGE \|\| info->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_LOCAL/);
   // L'application : la couche à chaque partie dans le casque, la correction à chaque saut en partie, et le recalage fait
   // en partie reporté du repère du lancement par les sauts que la couche a appliqués.
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /const roomEnv = vrGame && simulated === undefined \? startGameRoom\(\) : undefined;/);
   assert.match(front, /const vpxEnv = \{ \.\.\.\(roomEnv \? \{ env: roomEnv \} : \{\}\), \.\.\.\(vrGame\?\.tableIni \? \{ tableIni: vrGame\.tableIni\.file \} : \{\}\) \};/);
   assert.match(front, /vpxPrefDir: vpxPrefDir\(install\.version\), \.\.\.vpxEnv, onVr,/);
@@ -825,7 +826,7 @@ test('faux verdict « limite fixe » (essai réel du 13 novembre 2026, 23:26 : s
   assert.match(casque, /rien n’est conclu, type de limite inchangé/);
   // Ce qu'un faux verdict a laissé : l'avis à l'écran et la marque « déjà proposé » retirés quand la limite redevient
   // celle du calage (un vrai changement futur sera proposé de nouveau).
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /if \(!stale\) \{[\s\S]*?if \(staleNotice\) roomNotice = false;[\s\S]*?fs\.rmSync\(file, \{ force: true \}\);/);
   assert.match(front, /roomNotice = true;\s*staleNotice = true;/);
   // La place de la borne réelle (casque-borne.json du PinCab) n'en garde rien : le type de limite y est « piece ».
@@ -843,7 +844,7 @@ test('couche du repère qui ferait tomber VPX (règle « module fautif ») : nom
   // Partie quittée par le joueur, ou jouée : rien d'anormal.
   assert.equal(roomLayerFault({ exitCode: 0, seconds: 3, stopAsked: true }), undefined);
   assert.equal(roomLayerFault({ exitCode: 0, seconds: 300, stopAsked: false }), undefined);
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /const fault = room\.layer \? roomLayerFault\(game\) : undefined;/);
   assert.match(front, /setRoomLayerAside\(path\.join\(loc\.dataDir, 'vr'\), app\.getVersion\(\), fault\);/);
   assert.match(front, /const aside = roomLayerSetAside\(vrDir, app\.getVersion\(\)\);/);
@@ -882,7 +883,7 @@ test('veille du casque en partie (essai réel du 14 novembre 2026, Indiana Jones
   const reposee: CabinetPlace = { ...movePlace(calee, fit), contour: frame.effective()! };
   assert.deepEqual(anchorPlace(reposee, frame.effective()!), { kind: 'same' });
   // L'application : en partie, le contour rafraîchi corrige la couche, la place et l'INI ; les têtes suivent le repère.
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /const previous = roomFrame\.effective\(\);\s*const kind = roomFrame\.onRead\(points\);/);
   assert.match(front, /if \(kind === 'rafraichi' && previous && \(playing \|\| launch\)\) contourFrameChange\(previous, points\);/);
   assert.match(front, /function headsetJump\(jump: OvrJump\): void \{\s*roomFrame\.onJump\(jump\);\s*applyFrameChange\(jump,/);
@@ -891,7 +892,7 @@ test('veille du casque en partie (essai réel du 14 novembre 2026, Indiana Jones
 });
 
 test('boucle des sessions neuves (essai réel du 14 novembre 2026, 02:25 : casque posé, 8 relances en 40 s) : jamais d’elle-même', () => {
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /if \(!afterRemoval && Date\.now\(\) - portRestartAt < PORT_SETTLE_MS \+ 5000\) \{/);
   assert.match(front, /if \(!afterRemoval && ovrProbe\.tracking\(\) && roomFrame\.state\(\) === 'pret' && !\(lastJump && Date\.now\(\) - lastJump\.at < 3000\) && Date\.now\(\) - lastRefusedAt > 3000\) \{/);
   assert.match(front, /if \(Date\.now\(\) - portRestartAt < 60_000\) \{/);
@@ -928,7 +929,7 @@ test('calage en partie fait et vérifié (essai réel du 14 novembre 2026 : 46 �
   assert.match(plugin, /resultat=echec raison=%s/);
   assert.match(plugin, /const bool fait = pause\.calagesFaits\(\) > 0 && calageVpx\.etape == 0 && !calageRate;/);
   // L'application : le texte de l'échec écrit pour le plugin, une ligne par calage au journal après la partie.
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   assert.match(front, /key: 'CalibrateFailedLabel', value: t\('Pas calée : manettes immobiles sur les coins de la barre, gâchette de nouveau'\)/);
   assert.match(front, /for \(const line of inGameCalibrationLines\(block\.text\)\) console\.log\(/);
 });

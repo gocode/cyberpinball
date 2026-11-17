@@ -91,6 +91,7 @@ import { readVpxScript, readVpxTableName } from './vpxinfo';
 import { describeRenames, emptyPlayedPlaylists, missingPackFiles, packFileFixes, type PackFileFixes } from './pupfiles';
 import { activePacks, disabledPacks, isPupFolderName, packsOfTable, PUP_DISABLED_FOLDER, PUP_FOLDER, pupVideosDir } from './pupdisabled';
 import { ratioLabel } from './zones';
+import { isFactoryRomVolume, isLowRomVolume, romVolumeText, type RomVolumeStatus } from './romvolume';
 
 export type FindingSeverity = 'error' | 'warning' | 'info';
 
@@ -164,6 +165,7 @@ export const FINDING_CODES = [
   'dofNoConfig',
   'dofNoPinmame',
   'dofLocalIni',
+  'lowRomVolume',
 ] as const;
 
 export interface Finding {
@@ -256,6 +258,11 @@ export interface DoctorContext {
    * effets ? Absente, ou sans aucun ini (borne sans DOF), les règles DOF se taisent.
    */
   dof?: DofSetup;
+  /**
+   * Volume de la ROM de la table (romvolume.ts, romVolumeStatus) et celui que le joueur a choisi ;
+   * absent, la règle se tait.
+   */
+  romVolume?: { status: RomVolumeStatus; choice?: number };
 }
 
 /** Mémoire de Cyber Pinball dans le .info : option et nom d'origine de chaque pack installé. */
@@ -630,6 +637,11 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   if (ownFolder && ctx.dof?.ini.length && ctx.script && !('error' in ctx.script)) {
     findings.push(...dofFindingsFor(folder, ctx.script, ctx.dof));
   }
+
+  // 4 ter. Volume de la ROM bas, réglé hors de Cyber Pinball (un volume d'usine bas est monté de
+  // lui-même avant la partie, un volume choisi par le joueur est gardé) : signalé, réparable.
+  const volume = romVolumeFinding(ctx.romVolume);
+  if (volume) findings.push(volume);
 
   // 5. Rapports de plantage laissés par VPX.
   const crashes = ['crash.txt', 'crash.dmp'].map(has).filter((f): f is string => Boolean(f));
@@ -3066,4 +3078,17 @@ function readDirents(dir: string): fs.Dirent[] {
   } catch {
     return [];
   }
+}
+
+/** Constat « Volume de la ROM bas » : bas, ni d'usine (monté avant la partie) ni choisi par le joueur. */
+export function romVolumeFinding(v: DoctorContext['romVolume']): Finding | undefined {
+  const s = v?.status;
+  if (!s || s.kind !== 'set' || v.choice !== undefined || !isLowRomVolume(s) || isFactoryRomVolume(s)) return undefined;
+  return {
+    code: 'lowRomVolume',
+    severity: 'warning',
+    title: t('Volume de la ROM bas'),
+    detail: t('{rom} garde son volume dans sa mémoire : {now}, bien en dessous des bruits de la table. Il se règle aussi dans « Réglages de cette table » > Son.', { rom: s.rom, now: romVolumeText(s.value!, s.spot) }),
+    fix: { label: t('Monter le volume de la ROM à {to} sur {max}', { to: s.recommended, max: s.spot.max }), ops: [{ op: 'romVolume', path: s.file, memory: s.memory, value: s.recommended }] },
+  };
 }

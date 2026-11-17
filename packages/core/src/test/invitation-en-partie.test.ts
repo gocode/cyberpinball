@@ -17,6 +17,7 @@ import { indicatorBounds } from '../gamerecording';
 import { LIVE_INVITE_MS, type LiveInvite, type LiveMessage } from '../livegame';
 import type { Rect, Rotation } from '../model';
 import type { TableEntry } from '../tables';
+import { frontendSource } from './frontend-source';
 
 const read = (...parts: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...parts), 'utf8');
 
@@ -131,7 +132,7 @@ test('service : une invitation reçue pendant une partie est gardée et annoncé
 // Branchements
 
 test('branchements : carillon à chaque invitation, carte pendant la partie, fermée à la fin, invitation ouverte au retour', () => {
-  const main = read('app', 'src', 'frontend.ts');
+  const main = frontendSource();
   const live = main.slice(main.indexOf('const liveGames = createLiveGames({'), main.indexOf('const friendsMenu = createFriendsMenu({'));
   assert.doesNotMatch(live, /busy:/, 'plus de réponse « occupé » pendant la partie');
   assert.match(live, /onInvite: \(invite\) => \{[\s\S]{0,400}?playUiSound\('invite'\);\s+if \(playing\) gameNotices\.show\(invite\);\s+else if \(!openArrivedInvite\(invite\.id\)\)/);

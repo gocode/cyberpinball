@@ -1,4 +1,4 @@
-// Badges du joueur : 50 badges en 11 familles (décidés le 17/11/2026, maquette « Niveaux et
+// Badges du joueur : 56 badges en 12 familles (décidés le 17/11/2026, maquette « Niveaux et
 // badges »), tirés de ce que Cyber Pinball relève : parties et temps de jeu de chaque table dans son
 // .info, records entrés au tableau d'honneur (highscores.ts), niveau (levels.ts : records
 // personnels, classements de la semaine, heure et mode des parties), parties en direct
@@ -19,7 +19,7 @@ import { addEvent, type EarnedBadge, type SocialEvent, type SocialState } from '
 import type { TableEntry } from './tables';
 
 /** Série du catalogue : la monter quand des badges s'ajoutent, pour les donner sans annonce la première fois. */
-export const BADGES_SERIES = 2;
+export const BADGES_SERIES = 3;
 
 export interface PlayStats {
   /** Parties jouées, toutes tables. */
@@ -108,13 +108,18 @@ export interface BadgeFacts extends PlayStats, RecordStats {
   longestDay?: number;
   /** Jours entre la première et la dernière partie relevées. */
   playedSpanDays?: number;
+  /** Personnes invitées confirmées (invitations.ts). */
+  invited?: number;
+  /** Avis, retours et propositions envoyés (feedback.ts, contributions), et propositions passées « fait ». */
+  contributions?: number;
+  ideasShipped?: number;
 }
 
 export type BadgeRarity = 'common' | 'rare' | 'epic' | 'legendary';
 export const RARITY_XP: Record<BadgeRarity, number> = { common: 50, rare: 150, epic: 400, legendary: 1000 };
 
-export type BadgeFamily = 'journey' | 'time' | 'explorer' | 'progress' | 'honor' | 'rankings' | 'online' | 'rooms' | 'together' | 'discoveries' | 'secrets';
-export const BADGE_FAMILIES: readonly BadgeFamily[] = ['journey', 'time', 'explorer', 'progress', 'honor', 'rankings', 'online', 'rooms', 'together', 'discoveries', 'secrets'];
+export type BadgeFamily = 'journey' | 'time' | 'explorer' | 'progress' | 'honor' | 'rankings' | 'online' | 'rooms' | 'together' | 'community' | 'discoveries' | 'secrets';
+export const BADGE_FAMILIES: readonly BadgeFamily[] = ['journey', 'time', 'explorer', 'progress', 'honor', 'rankings', 'online', 'rooms', 'together', 'community', 'discoveries', 'secrets'];
 
 /** Le style du badge (retenu le 17/11/2026) : rond pour les communs, hexagone arrondi au-delà. */
 export const badgeShape = (r: BadgeRarity): 'round' | 'hex' => (r === 'common' ? 'round' : 'hex');
@@ -132,6 +137,7 @@ export const FAMILY_BACKDROP: Record<BadgeFamily, CelebrationBackdrop> = {
   online: 'swarm',
   rooms: 'swarm',
   together: 'swarm',
+  community: 'swarm',
   secrets: 'glitch',
 };
 
@@ -209,6 +215,13 @@ export const BADGES: readonly BadgeDefinition[] = [
   { id: 'liked', icon: 'star', family: 'together', rarity: 'common', get label() { return t('Apprécié'); }, get detail() { return t('Recevoir dix « J’aime »'); }, measure: (f) => n(f.likes), target: 10 },
   { id: 'popular', icon: 'star-filled', family: 'together', rarity: 'rare', get label() { return t('Populaire'); }, get detail() { return t('Recevoir cent « J’aime »'); }, measure: (f) => n(f.likes), target: 100 },
   { id: 'generous', icon: 'star', family: 'together', rarity: 'common', get label() { return t('Généreux'); }, get detail() { return t('Donner 25 « J’aime »'); }, measure: (f) => n(f.likesGiven), target: 25 },
+  // Communauté : personnes invitées (invitations.ts), retours et propositions (feedback.ts)
+  { id: 'ambassador', icon: 'friend-add', family: 'community', rarity: 'rare', get label() { return t('Ambassadeur'); }, get detail() { return t('Faire découvrir Cyber Pinball à un joueur'); }, measure: (f) => n(f.invited), target: 1 },
+  { id: 'gatherer', icon: 'friends', family: 'community', rarity: 'epic', get label() { return t('Rassembleur'); }, get detail() { return t('Faire découvrir Cyber Pinball à cinq joueurs'); }, measure: (f) => n(f.invited), target: 5 },
+  { id: 'community-builder', icon: 'network', family: 'community', rarity: 'legendary', get label() { return t('Bâtisseur de communauté'); }, get detail() { return t('Faire découvrir Cyber Pinball à vingt joueurs'); }, measure: (f) => n(f.invited), target: 20 },
+  { id: 'a-voice', icon: 'message', family: 'community', rarity: 'common', get label() { return t('Une voix qui compte'); }, get detail() { return t('Envoyer un avis, un retour ou une proposition'); }, measure: (f) => n(f.contributions), target: 1 },
+  { id: 'proposer', icon: 'edit', family: 'community', rarity: 'rare', get label() { return t('Force de proposition'); }, get detail() { return t('Envoyer dix avis, retours ou propositions'); }, measure: (f) => n(f.contributions), target: 10 },
+  { id: 'idea-shipped', icon: 'sparkle', family: 'community', rarity: 'epic', get label() { return t('Son idée est dans le jeu'); }, get detail() { return t('Voir une de ses propositions arriver dans Cyber Pinball'); }, measure: (f) => n(f.ideasShipped), target: 1 },
   // Découvertes
   { id: 'head-in-stars', icon: 'vr', family: 'discoveries', rarity: 'common', get label() { return t('Tête dans les étoiles'); }, get detail() { return t('Jouer une partie en VR, casque sur la tête'); }, measure: (f) => yes(f.vr), target: 1 },
   { id: 'relief', icon: 'eye', family: 'discoveries', rarity: 'common', get label() { return t('Relief'); }, get detail() { return t('Jouer une partie en vision 3D'); }, measure: (f) => yes(f.vision3d), target: 1 },
@@ -266,6 +279,8 @@ export function familyLabel(f: BadgeFamily): string {
       return t('Salons');
     case 'together':
       return t('Entre joueurs');
+    case 'community':
+      return t('Communauté');
     case 'discoveries':
       return t('Découvertes');
     case 'secrets':

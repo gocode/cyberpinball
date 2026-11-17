@@ -12,6 +12,7 @@ import { CINEMA_TIMELINE, LaunchCinema } from '../cinema';
 import { DMD_HEIGHT, DMD_LEVEL, DMD_WIDTH, dmdAnimation, sameDots } from '../livedmd';
 import { REPO_ROOT } from './i18n-scan';
 import { menuRenderer } from './menu-renderer';
+import { frontendSource } from './frontend-source';
 
 const read = (...parts: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...parts), 'utf8').replace(/\r\n/g, '\n');
 const NEON = { title: 'Neon Galaxy', manufacturer: 'Williams', year: 1992, logo: 'cyber-media://fichier/wheel.png' };
@@ -57,7 +58,7 @@ test('état : le module ne contient ni minuteur, ni promesse, ni attente', () =>
 });
 
 test('VPX n’attend jamais l’animation : play() lance VPX comme sans elle', () => {
-  const main = read('app', 'src', 'frontend.ts');
+  const main = frontendSource();
   const play = body(main, 'async function play(');
   const start = play.indexOf('cinema.start(');
   const launch = play.indexOf('launchVpx(');

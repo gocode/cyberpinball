@@ -10,7 +10,7 @@
 //
 // Sans electron à l'exécution : les tests du cœur le chargent avec un réseau d'essai.
 
-import { avatarView, boardKey, levelOf, rankingBoard, relationOf, shownLevel, socialAgo, t, type AvatarView, type Presence, type RankingLine, type RankingPosition, type RankingScope, type RankingStore, type ScorePeriod, type SocialState, type TableEntry } from '@cyberpinball/core';
+import { avatarView, boardKey, invitedOf, levelOf, rankingBoard, relationOf, shownLevel, socialAgo, t, type AvatarView, type Presence, type RankingLine, type RankingPosition, type RankingScope, type RankingStore, type ScorePeriod, type PublicCard, type SocialState, type TableEntry } from '@cyberpinball/core';
 
 export interface TableRankingsOptions {
   net: {
@@ -21,6 +21,8 @@ export interface TableRankingsOptions {
     /** Borne du joueur reliée à la mienne en ce moment. */
     /** Le jour où cette borne a vu la carte publique d'un joueur pour la première fois (vraisemblance de son niveau). */
     cardFirstSeen?(key: string): string | undefined;
+    /** Sa carte publique : ses personnes invitées comptent dans la vraisemblance de son niveau. */
+    publicCard?(key: string): Pick<PublicCard, 'invited' | 'invitedTotal'> | undefined;
     online?(key: string): boolean;
     /** Présence d'un ami (en partie ou au menu). */
     presenceOf?(key: string): Presence | undefined;
@@ -117,13 +119,19 @@ export function createTableRankings(opts: TableRankingsOptions): TableRankings {
     return versions.get(table.file)!;
   }
 
+  /** Ses personnes invitées vérifiées sur sa carte (invitations.ts) : leurs XP sont hors plafond. */
+  function invitedCount(key: string): number {
+    const card = opts.net.publicCard?.(key);
+    return card?.invited ? invitedOf(key, card.invited, card.invitedTotal).count : 0;
+  }
+
   /** Pastille et statut de chaque joueur classé. */
   function dressed(line: RankingLine, state: SocialState, now: Date): RankingViewLine {
     const net = opts.net;
     const file = net.avatarFile?.(line.key) ?? (line.avatar ? net.rankingAvatar?.(line.key, line.avatar) : undefined);
     // Le niveau : le mien tel quel ; celui d'un autre, s'il est vraisemblable depuis qu'on le connaît.
     const firstSeen = [line.since, net.cardFirstSeen?.(line.key)].filter((x): x is string => !!x).sort()[0];
-    const level = line.xp === undefined ? undefined : line.mine ? levelOf(line.xp).level : shownLevel(line.xp, firstSeen, now);
+    const level = line.xp === undefined ? undefined : line.mine ? levelOf(line.xp).level : shownLevel(line.xp, firstSeen, now, invitedCount(line.key));
     const face = { ...avatarView(line.key, line.name, file), ...(level ? { level } : {}) };
     const rank = { ...(level ? { level } : {}), ...(line.xp !== undefined && !level ? { levelUnsure: true as const } : {}) };
     if (line.mine) return { ...line, face, ...rank };

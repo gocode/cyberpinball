@@ -50,6 +50,7 @@ import { emptyMediaDraft, planMediaChanges } from '../mediaedit';
 import { mediaFlipperEdge, mediaMemory, parseMediaFileName, playfieldMediaRotation } from '../medias';
 import { infoFileFor, readInfo, scanTables } from '../tables';
 import type { FlipperEdge, Rotation } from '../model';
+import { frontendSource } from './frontend-source';
 
 const SETTINGS = { delay: 10, duration: 30 };
 
@@ -344,7 +345,7 @@ test('témoin : en bas à gauche pour le joueur (côté flippers), dans le plate
 test('témoin et bande d’une partie entre amis : jamais ensemble, « Jouer et enregistrer » lance une partie seule', () => {
   // L'encart de la bande (bas-gauche du plateau, sans fronton ni topper) et le témoin prennent le même
   // coin : l'enregistrement n'est armé que sur une partie lancée sans double (hooks.double absent).
-  const source = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'app', 'src', 'frontend.ts'), 'utf8');
+  const source = frontendSource();
   const launches = [...source.matchAll(/play\([^)]*\{[^}]*\brecord:[^}]*\}\)/g)].map((m) => m[0]);
   assert.ok(launches.length > 0, 'un lancement « Jouer et enregistrer »');
   for (const launch of launches) assert.doesNotMatch(launch, /\bdouble\b/, launch);
@@ -370,7 +371,7 @@ test('balancier simulé de VPX éteint pour une partie enregistrée : son cercle
   // INI disparu (VPX planté avant d'écrire) : rien à reprendre.
   assert.deepEqual(recordingIniCarryBack(text, ''), []);
   // Le lancement d'une partie enregistrée passe bien cet INI à VPX (frontend.ts).
-  const front = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   assert.ok(front.includes('ini: vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)'));
   assert.ok(front.includes('if (recordIni) finishRecordingIni(recordIni, table);'));
 });

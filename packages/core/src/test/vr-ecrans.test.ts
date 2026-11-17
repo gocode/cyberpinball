@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import { flasherRatio } from '../fronton-vr';
 import { vrLines } from '../health';
 import { frameRatio, mergeVrScreens, parseVrScreensBlock, poorFillSummary, poorlyFilled, VR_FILL_MIN, vrScreensSettings, vrTableKey } from '../vr-ecrans';
+import { frontendSource } from './frontend-source';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8').replace(/\r\n/g, '\n');
@@ -33,7 +34,7 @@ test('invariant : toute source passe par « remplir » et sa couverture est mesu
   // Le seuil du plugin et celui de Cyber Pinball sont les mêmes.
   assert.match(pause, new RegExp(`constexpr float REMPLI_MIN = ${VR_FILL_MIN}f;`));
   // Le cadre DMD de la pièce VR prend la forme de son flasher.
-  assert.match(read('app', 'src', 'frontend.ts'), /key: 'RoomDmdRatio', value: String\(sources\.dmdFrames\.find\(\(f\) => f\.ratio\)\?\.ratio \?\? 1\.7778\)/);
+  assert.match(frontendSource(), /key: 'RoomDmdRatio', value: String\(sources\.dmdFrames\.find\(\(f\) => f\.ratio\)\?\.ratio \?\? 1\.7778\)/);
 });
 
 test('détection : un cadre mal rempli est relevé à la partie, dit au journal et dans la santé de la borne', () => {

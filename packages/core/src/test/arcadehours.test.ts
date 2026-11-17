@@ -26,6 +26,7 @@ import { DEFAULT_MENU_MEDIA_SETTINGS, normalizeMenuMediaSettings } from '../medi
 import { createPowerControl, powerExecutor, type PowerClock, type PowerOutcome } from '../power';
 import { SYSTEM_GROUPS } from '../systemmenu';
 import { menuRenderer, menuState } from './menu-renderer';
+import { frontendSource } from './frontend-source';
 
 // Horaire de la borne, façon salle d'arcade : la nuit traverse minuit, l'arrêt attend la borne
 // libre et s'annonce 30 s avant, le moindre bouton rend la main, et un essai n'éteint ni ne met
@@ -243,7 +244,7 @@ test('borne en veille ou éteinte pendant la fenêtre : manqué, rien au réveil
 
 test('essais : jamais de vraie extinction ni de vraie veille ; l’horloge décalée n’existe qu’en essai', () => {
   // L'horaire de l'application passe par le module d'alimentation du menu (powerExecutor : simulé en essai).
-  const frontend = fs.readFileSync(path.join(REPO, 'app', 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   assert.match(frontend, /new ArcadeHours\(\{\s*control: power\.control,/);
   assert.match(frontend, /const hoursClock = arcadeHoursClock\(process\.env, powerSimulated\(process\.env\)\);/);
   assert.match(frontend, /createPowerMenu\(\{\s*library,\s*clock: hoursClock,/);

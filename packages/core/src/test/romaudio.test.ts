@@ -36,6 +36,7 @@ import {
   writeRomAudioState,
 } from '../romaudio';
 import { scanTables } from '../tables';
+import { frontendSource } from './frontend-source';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'cp-romaudio-'));
@@ -305,7 +306,7 @@ test('musique de la ROM : le service ne donne à PinMAME que le dossier de trava
   assert.match(service, /ELECTRON_RUN_AS_NODE: '1'/);
   assert.match(service, /windowsHide: true/);
   assert.match(service, /PRIORITY_BELOW_NORMAL/);
-  const frontend = fs.readFileSync(path.join(REPO, 'app', 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   assert.match(frontend, /phase: 'loading', help: false \};\r?\n\s*\/\/[^\n]*\r?\n\s*romMusic\?\.pause\(\);/, 'pause dès le lancement');
   assert.match(frontend, /busy: \(\) => state\.phase === 'loading' \|\| state\.phase === 'playing'/);
   // Regroupé à part par la fabrication, comme le veilleur.

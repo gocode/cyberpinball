@@ -22,6 +22,7 @@ import {
   type HeadsetProfile,
 } from '../manettes';
 import { applyVpxSettings } from '../vpx';
+import { frontendSource } from './frontend-source';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8');
@@ -240,7 +241,7 @@ Mapping.Start = Key;30 | Joy1;3
 });
 
 test('manettes : branchements du compagnon et du menu', () => {
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   // L'INI de chaque partie dans le casque reçoit les liaisons des manettes.
   assert.match(frontend, /const input = vpxHeadsetInput\(readTextIfExists\(vr\.ini\), controllerSetting\(\)\);\s*if \(input\.length\) \{\s*writeIniSettings\(vr\.ini, input\);/);
   // Gâchettes et joysticks se répètent tant qu'on les tient, comme les flippers de la borne.
@@ -269,7 +270,7 @@ test('manettes : l’INI de VPX suit le réglage des manettes (boutons, lanceur 
 });
 
 test('manettes : l’assistant, branché sur les manettes et rouvrable', () => {
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   // D'office au premier port d'un casque sans réglage pour cette configuration ; par ≡ et par le menu système.
   assert.match(frontend, /if \(controllerOffered \|\| !profile \|\| !headset\?\.worn\) return;\s*if \(fs\.existsSync\(controllerFile\(profile\)\)\) \{/);
   assert.match(frontend, /onProfile: \(\) => offerControllerWizard\(\),/);

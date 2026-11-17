@@ -19,6 +19,7 @@ import { DEFAULT_BUTTONS, joystickCode } from '../buttons';
 import { GUEST_DOORS, GUEST_UNLOCK_MS, GuestMode, guestUnlockHands, guestUnlockSlots, loadGuestMode, openGuestDoors, type GuestDoor } from '../guestmode';
 import { SYSTEM_GROUPS } from '../systemmenu';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 
 const SOURCES = path.join(REPO_ROOT, 'app', 'src');
 const read = (file: string) => fs.readFileSync(path.join(SOURCES, file), 'utf8');
@@ -122,7 +123,7 @@ test('mode invité : toute source d’entrées de app/src est revue (une nouvell
 });
 
 test('mode invité : le téléphone (télécommande) passe par les mêmes portes, ne déverrouille rien, n’envoie aucun fichier', () => {
-  const frontend = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'app', 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   // Les boutons tenus au téléphone : le chemin des touches de la borne, donc les portes de handleKey.
   assert.match(frontend, /function remoteButton\([\s\S]*?if \(down\) handleKey\(input, true\);\s*else handleKeyUp\(input, true\);/);
   // Jamais la combinaison de déverrouillage : on ne déverrouille le mode invité qu'à la borne.

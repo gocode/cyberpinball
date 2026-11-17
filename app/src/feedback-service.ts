@@ -12,8 +12,14 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  contributionsCount,
+  loadContributions,
+  noteProposals,
+  noteReport,
   parseProposals,
   REPORT_SEALED_MAX,
+  saveContributions,
+  type Contributions,
   RELAY_ORIGIN,
   sealReport,
   signFeedback,
@@ -36,6 +42,11 @@ export interface FeedbackServiceOptions {
   simulated?: string;
   changed(): void;
   log(line: string): void;
+  /**
+   * Mes contributions ont changé (badges de la famille Communauté) ; `shipped` : mes propositions qui
+   * viennent de passer « fait », à annoncer au joueur.
+   */
+  contributed?(shipped: readonly Proposal[]): void;
 }
 
 type Outcome = { ok: true; id?: string } | { ok: false; why: 'offline' | 'key' | 'quota' | 'refused' };
@@ -84,6 +95,7 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
         list = parseProposals(r.json);
         net = 'ok';
         loadedAt = Date.now();
+        if (pk) noteContributions(noteProposals(contributions, list));
       } catch (error) {
         net = 'offline';
         opts.log(`Retours : liste des propositions injoignable (${(error as Error).message}).`); // i18n-ignore : journal
@@ -93,6 +105,22 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
       }
     })();
     return loading;
+  }
+
+  // ---------- Contributions (badges de la famille Communauté) ----------
+
+  let contributions: Contributions = loadContributions(opts.dataDir);
+
+  function noteContributions(r: { contributions: Contributions; shipped: readonly Proposal[] }): void {
+    const before = JSON.stringify(contributions);
+    contributions = r.contributions;
+    if (JSON.stringify(contributions) === before) return;
+    try {
+      saveContributions(opts.dataDir, contributions);
+    } catch (error) {
+      opts.log(`Retours : contributions non enregistrées (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+    opts.contributed?.(r.shipped);
   }
 
   async function signed(route: string, op: FeedbackOp): Promise<Outcome & { json?: unknown }> {
@@ -152,6 +180,8 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
 
   /** Scelle et envoie ; hors ligne, le rapport attend et repartira. Vrai : parti tout de suite. */
   async function sendReport(envelope: ReportEnvelope, file?: Uint8Array): Promise<'sent' | 'queued' | 'failed'> {
+    // Un rapport écrit par le joueur compte comme contribution (un par jour) ; un plantage automatique, non.
+    if (envelope.kind === 'report') noteContributions({ contributions: noteReport(contributions), shipped: [] });
     let sealed = sealReport(envelope, file);
     // Trop lourd pour le service : sans le fichier, l'enveloppe dit au moins ce qui s'est passé.
     if (sealed.length > REPORT_SEALED_MAX) sealed = sealReport({ ...envelope, text: `${envelope.text ?? ''}\n[rapport technique trop lourd, retiré]`.trim() }, undefined); // i18n-ignore : lu par l'équipe
@@ -219,6 +249,11 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
   function watch(): void {
     setTimeout(() => void flush(), 40_000).unref?.();
     setInterval(() => void flush(), 30 * 60_000).unref?.();
+    // Mes propositions passées « fait » s'annoncent sans ouvrir « Retours et propositions » : la liste
+    // est relue peu après le démarrage, puis deux fois par jour, seulement si j'en ai publié.
+    const mineCheck = () => (contributions.proposals.length && Date.now() - loadedAt > 3600_000 ? void refresh() : undefined);
+    setTimeout(mineCheck, 90_000).unref?.();
+    setInterval(mineCheck, 12 * 3600_000).unref?.();
   }
 
   return {
@@ -235,6 +270,8 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
     queuedCount: () => queued().length,
     flush,
     watch,
+    /** Mes contributions (badges) : envois comptés, et propositions passées « fait ». */
+    contributions: () => ({ count: contributionsCount(contributions), shipped: contributions.shipped.length }),
   };
 }
 

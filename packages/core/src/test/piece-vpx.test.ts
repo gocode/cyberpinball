@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { companionKeyFolder, gameHeadSummary, lockbarPlace, placeLockbar, readCompanionKey, roomMismatchProblem, vpxRoomChanges, type Point3 } from '../calage';
+import { frontendSource } from './frontend-source';
 
 const DEG = Math.PI / 180;
 const close = (a: number, b: number, eps: number, what: string) => assert.ok(Math.abs(a - b) <= eps, `${what} : ${a.toFixed(3)} ≠ ${b.toFixed(3)}`);
@@ -91,7 +92,7 @@ test('correctif : le compagnon sous une clé de runtime neuve à chaque recentra
   assert.match(menu, /if \(line\.startsWith\('session-veille-perdue'\)\) \{\s*this\.opts\.log\([^\n]*\n\s*continue;\s*\}/);
   const cpp = read('packages', 'casque-vr', 'src', 'casque.cpp');
   assert.match(cpp, /if \(standby && r == XR_ERROR_RUNTIME_FAILURE\)\s*\{[\s\S]{0,200}say\("session-veille-perdue xrWaitFrame " \+ hex\(r\)\);/);
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.match(frontend, /keyDir: path\.join\(loc\.dataDir, 'vr'\),/);
   // Toutes les têtes de la partie, et le bilan à la fin ; dit à l'écran du calage.
   assert.match(frontend, /function headInGame\(head: HeadPose\): void \{\s*gameHeads\.push\(head\);/);

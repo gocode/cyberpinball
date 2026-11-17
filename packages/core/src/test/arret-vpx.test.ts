@@ -13,6 +13,7 @@ import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { chooseDmdDisplay, diagnoseVpxFailure, GUEST_DOORS, inspectorDisplayReadable, liveFailedPlaying, livePlayerStateLabel, liveWaitView, vpxExitName, vpxScriptError, vpxShutdownCrash, type InspectorDisplay, type LiveGame } from '../index';
 import { historyStateLabel } from '../gamehistory';
+import { frontendSource } from './frontend-source';
 
 // La fin du journal de VPX, telle que l'écran du PinCab l'a montrée.
 const TAIL = [
@@ -119,7 +120,7 @@ test('application : l’inspector n’est pas posé pour le DMD d’une table sa
 });
 
 test('écran d’échec : arrêt reconnu = vraie raison, Start rejoue (ou ouvre la partie entre amis), jamais « ce qu’il manque »', () => {
-  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   assert.match(front, /const known = repaired \? undefined : diagnoseVpxFailure\(result\.logTail, result\.exitCode,/);
   assert.match(front, /return \{ title: known\.title, lines, action: live \? 'live' : 'replay', table: table\.file, report: failureReport\(result, table, known\.title\) \};/);
   assert.match(front, /explain\(result, table, repaired, Boolean\(double\)\)/);

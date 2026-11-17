@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { calibrationProblem, DESK_EYES_TO_LOCKBAR_M, freePlace, placeVpxSettings } from '../calage';
 import { CONTROLLER_ELEMENTS, defaultControllerSetting, HEADSET_PROFILES, headsetFunctions, readControllerSetting, vpxMappingsFor } from '../manettes';
+import { frontendSource } from './frontend-source';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8');
@@ -41,11 +42,11 @@ test('calage : la hauteur prise dès le premier calage, quel que soit le sol du 
   assert.equal(calibrationProblem({ x: -0.598, y: 1.842, z: 0.734 }, { x: -0.973, y: 1.837, z: 0.416 }), undefined);
   // Le compagnon dit les yeux avec le centre, l'application les passe au calage.
   assert.match(read('app', 'src', 'casque.ts'), /const eyes = \/yeux=\(-\?\[\\d\.\]\+\)\/\.exec\(line\);\s*this\.opts\.onCentre\?\.\(\{ \.\.\.gaze, \.\.\.\(eyes && \{ eyes: Number\(eyes\[1\]\) \}\) \}\);/);
-  assert.match(read('app', 'src', 'frontend.ts'), /c\.place = freePlace\(gaze, gaze\.eyes\);/);
+  assert.match(frontendSource(), /c\.place = freePlace\(gaze, gaze\.eyes\);/);
 });
 
 test('calage : les gâchettes placent la borne (deux coins d’un coup), A valide et sort, sans appui « pour commencer »', () => {
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   const key = frontend.slice(frontend.indexOf('function calibrationKey('), frontend.indexOf('function calibrationCentre('));
   assert.doesNotMatch(key, /calibration\?\.intro\)/);
   assert.match(key, /if \(KEYS\.exit\.includes\(input\.code\)\) closeCalibration\(\);\s*else if \(KEYS\.confirm\.includes\(input\.code\) && calibration\?\.place\) \{\s*applyCalibration\(\);\s*closeCalibration\(\);/);
@@ -59,7 +60,7 @@ test('calage : les gâchettes placent la borne (deux coins d’un coup), A valid
 });
 
 test('calage : une consigne courte, en très gros au milieu du regard ; le détail seulement en cas de problème', () => {
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   const show = frontend.slice(frontend.indexOf('function showCalibration('), frontend.indexOf('function calibrationMarks('));
   assert.doesNotMatch(show, /eyeHeightProblem|roomStale/);
   assert.match(show, /const prompt = \{\s*text,\s*keys:[\s\S]{0,300}\.\.\.\(issue && \{ problem: issue \}\),/);
@@ -93,7 +94,7 @@ test('sortie de partie : la pause, obligatoire et liée pour tout réglage, gard
 });
 
 test('sortie de partie : rappel du bouton Pause en gros sur le fronton pendant le chargement dans le casque', () => {
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.match(frontend, /headsetExitHint = vrGame && headset\?\.inUse \? exitHintText\(\) : undefined;/);
   assert.match(frontend, /const el = controllerSetting\(\)\.functions\.retour;\s*return el \? t\('\{bouton\} : pause · tenu : quitter', \{ bouton: CONTROLLER_ELEMENTS\[el\]\?\.label \?\? el \}\) : undefined;/);
   assert.match(read('app', 'renderer', 'frontend.js'), /const hint = s\.phase === 'loading' \? s\.headsetHint : undefined;/);

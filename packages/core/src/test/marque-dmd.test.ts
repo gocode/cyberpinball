@@ -17,6 +17,7 @@ import { DMD_FONT_ROWS } from '../dmdfont';
 import { setLanguage } from '../i18n';
 import { DEFAULT_MENU_MEDIA_SETTINGS, normalizeMenuMediaSettings, type MenuMediaSettings } from '../mediaview';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 
 const RENDERER = path.join(REPO_ROOT, 'app', 'renderer');
 const read = (...parts: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...parts), 'utf8');
@@ -186,7 +187,7 @@ test('réglage « Couleur du DMD » : préréglage, couleur libre, couleur refus
   assert.equal(settings.dmdColor, '#a1b2c3');
 
   // La couleur part dans l'état de chaque fenêtre, et la fenêtre l'applique avant de poser l'afficheur.
-  const main_ts = read('app', 'src', 'frontend.ts');
+  const main_ts = frontendSource();
   assert.match(main_ts, /dmdColor: menuDmdColor\(\)/);
   // « Couleur de la table » : la teinte de la table montrée, sinon le vert signal (dmdcolor.ts, effectiveDmdColor).
   assert.match(main_ts, /effectiveDmdColor\(mediaSettings\.dmdColor, tints\?\.current\(\)\?\.dmd\)/);

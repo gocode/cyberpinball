@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { folderChanges, folderPrint, makeTableDouble, planTableDouble, removeTableDouble, type TableDoublePlan } from '../index';
+import { frontendSource } from './frontend-source';
 
 function write(file: string, content: string | Buffer): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -162,7 +163,7 @@ test('ménage : rien hors du dossier des parties', () => {
 });
 
 test('application : une partie entre amis joue le double, jamais le dossier habituel ; le journal compare les empreintes', () => {
-  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   assert.match(front, /hooks\.double/);
   assert.match(front, /table: played\.file/);
   const doubles = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'table-double.ts'), 'utf8');

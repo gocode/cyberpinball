@@ -43,6 +43,7 @@ import {
 import { newSocialState, type Presence, type SocialEvent, type SocialState } from '../social';
 import { noticeZone, type NoticeZone } from '../noticezone';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 
 const KINDS = Object.keys(NOTICE_RULES) as NoticeKind[];
 const on = { canShow: true };
@@ -134,7 +135,7 @@ test('notifications : le même évènement n’est pas redit avant son délai', 
 
 test('téléchargement fini : un seul mécanisme, la notification au menu des tables, le bandeau ailleurs sans redite', () => {
   const lib = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'library.ts'), 'utf8');
-  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   // Chaque bandeau d'un téléchargement fini passe le téléchargement : le menu sait ce qu'il annonce.
   for (const call of lib.matchAll(/host\.notify\?\.\(([\s\S]*?)\);\n/g)) assert.match(call[1]!, /, job$/, `host.notify sans le téléchargement : ${call[1]}`);
   const notify = front.match(/notify: \(text, job\) => \{([\s\S]*?)\n  \},/)?.[1];
@@ -270,7 +271,7 @@ test('relevé des téléchargements : fini et bloqué seulement, sans les écran
 });
 
 test('zone des notifications : une seule règle pour chaque écran, nommé une fois (noticezone.ts, frontend.ts) ; le constat bref et le préavis d’arrêt les font attendre', () => {
-  const src = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const src = frontendSource();
   assert.match(src, /zone: \(\) => currentZone\(\),/, 'createMenuNotices suit la zone de l’écran');
   const screen = src.slice(src.indexOf('function zoneScreen('), src.indexOf('function currentZone('));
   for (const need of ['desktop.active', "state.phase === 'playing'", "state.phase === 'intro'", "action === 'power'", 'library.browserOpen()', 'attract.active', "state.phase === 'library'", "state.phase === 'confirmQuit'", "state.phase === 'message'", 'state.help'])

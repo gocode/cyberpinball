@@ -7,6 +7,7 @@ import { setLanguage } from '../i18n';
 import type { ObservedDisplay, Rect, RoleId } from '../model';
 import { vpxSettingsFor } from '../vpx';
 import { confusableRoles, VPX_ANCILLARY_WINDOWS, VPX_GAME_TITLES, vpxWindowMoves } from '../vpxwindows';
+import { frontendSource } from './frontend-source';
 
 // Poste à 3 écrans (27 octobre 2026) : le fronton et le DMD sont deux PL2294H. VPX 10.8.1 ouvre
 // « Window #1 » (Backglass) et « Window #2 » (Score View) sur le premier PL2294H.
@@ -106,7 +107,7 @@ const APP = path.join(__dirname, '..', '..', '..', '..', 'app', 'src');
 const WIN = path.join(__dirname, '..', '..', '..', 'win-displays', 'src', 'windows.ts');
 
 test('pendant la partie, le menu recale les fenêtres de VPX sans leur prendre le focus ni changer leur ordre', () => {
-  const frontend = fs.readFileSync(path.join(APP, 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   const watch = frontend.slice(frontend.indexOf('function watchOccupied('), frontend.indexOf('function watchDressing('));
   assert.match(watch, /realignVpxWindows\(/, 'watchOccupied recale les fenêtres à chaque relecture de la pile');
   assert.match(frontend, /vpxWindowMoves\(/);

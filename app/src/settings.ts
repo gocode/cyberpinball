@@ -48,6 +48,11 @@ import {
   vpxOwnedKeys,
   loadCabinet,
   writeWithBackup,
+  romVolumeGesture,
+  romVolumeNow,
+  romVolumeText,
+  romVolumeTarget,
+  isLowRomVolume,
   type Cabinet,
   type ButtonsSource,
   type EssentialSetting,
@@ -72,6 +77,8 @@ import { createWindow, primaryRect, readyToShow, whenReadyToShow } from './offsc
 import { LayoutReport } from './layout-check';
 import { click } from './library';
 import { relaunchCovered } from './screen-guard';
+import { createRomVolumes, type RomVolumeView } from './rom-volume';
+import { cachedScript } from './vbs';
 
 export type SettingsTarget = { scope: 'global' } | { scope: 'table'; table: TableEntry };
 
@@ -82,6 +89,16 @@ export interface OpenSettingsOptions {
   onClose?: () => void;
   /** Rotation horaire de la mise en page, pour un joueur placé au bord des flippers. */
   rotation?: Rotation;
+  /**
+   * Volume de la ROM de la table (rom-volume.ts), réglé dans le groupe Son : son état, et l'écriture
+   * du volume choisi (`undefined` : automatique). Absent : pas de ligne.
+   */
+  romVolume?: RomVolumeControl;
+}
+
+export interface RomVolumeControl {
+  view(): RomVolumeView;
+  choose(value: number | undefined): { ok: true } | { ok: false; reason: string };
 }
 
 const FLIPPER_EDGES: FlipperEdge[] = ['bottom', 'left', 'top', 'right'];
@@ -132,6 +149,9 @@ let detailMove: { id: number; dir: -1 | 1 } = { id: 0, dir: 1 };
 
 type Tab = 'essentials' | 'advanced';
 
+/** Panneau du volume de la ROM (pas une clé de VPX). */
+const ROM_VOLUME = String.fromCharCode(0) + 'romVolume';
+
 /** Liste « Surcharges de cette table » dans l'onglet Avancé. */
 const OVERRIDES = '\u0000overrides';
 
@@ -152,7 +172,9 @@ type Row =
   | { kind: 'setting'; def: VpxSettingDef; essential?: EssentialSetting }
   | { kind: 'section'; name: string }
   | { kind: 'overrides' }
-  | { kind: 'extra'; section: string; key: string; value: string };
+  | { kind: 'extra'; section: string; key: string; value: string }
+  /** Volume de la ROM, gardé dans sa mémoire (groupe Son, réglages d'une table). */
+  | { kind: 'romVolume' };
 
 interface Session {
   target: SettingsTarget;
@@ -175,6 +197,7 @@ interface Session {
   notice?: { text: string; tone: 'ok' | 'error' };
   onClose?: () => void;
   closed: Promise<void>;
+  romVolume?: RomVolumeControl;
 }
 
 const loc = locations();
@@ -247,6 +270,7 @@ export function openSettings(target: SettingsTarget, options: OpenSettingsOption
     sectionCursor: 0,
     onClose: options.onClose,
     closed: new Promise((resolve) => (resolveClosed = resolve)),
+    ...(target.scope === 'table' && options.romVolume ? { romVolume: options.romVolume } : {}),
   };
   for (const def of s.schema.settings) s.defs.set(settingId(def.section, def.key), def);
   for (const group of VPX_ESSENTIALS) for (const e of group.settings) s.essentials.set(settingId(e.section, e.key), e);
@@ -325,7 +349,9 @@ function rows(): Row[] {
         if (def && s.target.scope === 'table' && isLiveVisual(def)) return [];
         return def ? [{ kind: 'setting' as const, def, essential: e }] : [];
       });
-      return settings.length ? [{ kind: 'group' as const, title: group.title, icon: group.icon }, ...settings] : [];
+      // Groupe Son d'une table à ROM : son volume, gardé par la ROM, à côté de ceux de VPX.
+      const rom: Row[] = group.icon === 'sound' && romVolumeShown() ? [{ kind: 'romVolume' }] : [];
+      return settings.length || rom.length ? [{ kind: 'group' as const, title: group.title, icon: group.icon }, ...settings, ...rom] : [];
     });
   }
   if (s.section === OVERRIDES) {
@@ -399,6 +425,10 @@ function lockOf(def: VpxSettingDef): Lock {
 
 function openRow(row: Row): void {
   const s = session!;
+  if (row.kind === 'romVolume') {
+    openRomVolume();
+    return;
+  }
   if (row.kind === 'section') {
     s.sectionCursor = s.cursor;
     s.section = row.name;
@@ -568,6 +598,103 @@ export function writeTableIni(location: TableIniLocation, doc: IniDocument): voi
   writeWithBackup(target, doc.toString(), backups);
 }
 
+// ---------------------------------------------------------------------------
+// Volume de la ROM (rom-volume.ts) : dans sa mémoire, pas dans le .ini
+
+/** Une ligne pour toute table à ROM (même quand Cyber Pinball ne peut pas l'écrire : il dit pourquoi). */
+function romVolumeShown(): boolean {
+  const v = session?.romVolume?.view();
+  return Boolean(v && (v.status.kind !== 'none' || v.status.rom));
+}
+
+/** Le geste de la machine, avec les touches de la borne, en partie ; undefined sans ces boutons. */
+function romGesture(): string | undefined {
+  return romVolumeGesture(loadCabinet(loc.dataDir)?.buttons);
+}
+
+function openRomVolume(): void {
+  const s = session!;
+  const v = s.romVolume!.view();
+  const st = v.status;
+  if (st.kind === 'none') {
+    const gesture = romGesture();
+    s.panel = info(t('Volume de la ROM'), [
+      t('Cyber Pinball ne peut pas le régler : {reason}.', { reason: st.reason }),
+      gesture ? t('Pour le régler à la machine : {gesture}. La ROM le garde ensuite.', { gesture }) : t('Le volume de VPX (« Volume du backglass ») monte aussi la musique et les voix de la ROM.'),
+    ]);
+    return;
+  }
+  const choices: Choice[] = [{ label: t('Automatique : {to} si le volume d’usine est bas', { to: st.recommended }), value: undefined, note: t('conseillé') }];
+  for (let value = st.spot.min; value <= st.spot.max; value++) {
+    const notes = [...(value === st.factory ? [t('d’usine')] : []), ...(value === st.recommended ? [t('conseillé')] : []), ...(value < st.lowBelow ? [t('bas')] : [])];
+    choices.push({ label: romVolumeText(value, st.spot), value, ...(notes.length ? { note: notes.join(' · ') } : {}) });
+  }
+  const index = v.choice === undefined ? 0 : Math.max(0, choices.findIndex((c, i) => i > 0 && c.value === v.choice));
+  s.panel = { kind: 'choices', id: ROM_VOLUME, choices, index };
+}
+
+function saveRomVolume(value: number | undefined): void {
+  const s = session!;
+  const out = s.romVolume!.choose(value);
+  const v = s.romVolume!.view();
+  const st = v.status;
+  if (!out.ok) {
+    const gesture = romGesture();
+    s.notice = { tone: 'error', text: gesture ? t('Volume de la ROM non écrit : {reason}. À la machine : {gesture}.', { reason: out.reason, gesture }) : t('Volume de la ROM non écrit : {reason}.', { reason: out.reason }) };
+    return;
+  }
+  if (st.kind === 'none') return;
+  const now = romVolumeNow(st);
+  s.notice = {
+    tone: 'ok',
+    text:
+      st.kind === 'absent'
+        ? value === undefined
+          ? t('Volume de la ROM : automatique. La ROM crée sa mémoire à la première partie ; un volume d’usine bas y sera monté à {to} aussitôt après.', { to: st.recommended })
+          : t('Volume de la ROM : {value}, posé à la fin de la première partie (la ROM crée sa mémoire en jouant).', { value: romVolumeText(value, st.spot) })
+        : value === undefined
+          ? t('Volume de la ROM : automatique ({now}).', { now: now !== undefined ? romVolumeText(now, st.spot) : t('d’usine') })
+          : t('Volume de la ROM : {value}, écrit dans sa mémoire.', { value: romVolumeText(value, st.spot) }),
+  };
+}
+
+function romVolumeRow() {
+  const v = session!.romVolume!.view();
+  const st = v.status;
+  if (st.kind === 'none') return { kind: 'setting', label: t('Volume de la ROM'), value: t('Réglé à la machine'), badges: [{ text: t('Lecture seule'), tone: 'locked' }] };
+  const now = romVolumeNow(st);
+  // Un volume d'usine bas que Cyber Pinball monte lui-même avant la partie n'est pas un problème à régler.
+  const raised = v.choice === undefined ? romVolumeTarget(st, undefined) : undefined;
+  const badges: Badge[] =
+    v.choice !== undefined
+      ? [{ text: t('Réglé pour cette table'), tone: 'table' }]
+      : raised !== undefined
+        ? [{ text: t('Monté à {to} avant la partie', { to: raised }), tone: 'owned' }]
+        : isLowRomVolume(st)
+          ? [{ text: t('Bas'), tone: 'warning' }]
+          : [{ text: t('Automatique'), tone: 'owned' }];
+  return { kind: 'setting', label: t('Volume de la ROM'), value: now !== undefined ? romVolumeText(now, st.spot) : t('d’usine'), badges };
+}
+
+function romVolumeDetail() {
+  const v = session!.romVolume!.view();
+  const st = v.status;
+  const gesture = romGesture();
+  const help = t('Le son de la machine elle-même (musique, voix, effets), gardé par sa ROM dans sa mémoire et non par VPX. Cyber Pinball l’écrit hors partie ; en automatique, un volume d’usine bas est monté au volume conseillé avant la partie, et un volume réglé à la porte pendant la partie est gardé.');
+  if (st.kind === 'none') return { title: t('Volume de la ROM'), help, facts: [[t('Non réglable ici'), st.reason], ...(gesture ? [[t('À la machine'), gesture]] : [])] as [string, string][] };
+  const now = romVolumeNow(st);
+  const facts: [string, string][] = [
+    [t('Valeur utilisée'), now !== undefined ? romVolumeText(now, st.spot) : t('d’usine')],
+    [t('Pour cette table'), v.choice !== undefined ? romVolumeText(v.choice, st.spot) : t('automatique')],
+    [t('Plage'), t('{min} à {max}', { min: st.spot.min, max: st.spot.max })],
+    ...(st.factory !== undefined ? [[t('Volume d’usine'), String(st.factory)] as [string, string]] : []),
+    [t('Conseillé'), String(st.recommended)],
+    [t('Mémoire'), st.kind === 'absent' ? t('{file} (créée à la première partie)', { file: st.file }) : st.file],
+    ...(gesture ? [[t('En partie'), gesture] as [string, string]] : []),
+  ];
+  return { title: t('Volume de la ROM'), help, facts };
+}
+
 /** Touches par défaut des encodeurs (cabinet.json et [Input]) ; l'écran suit aussitôt ces touches. */
 function resetButtonsHere(): void {
   const s = session!;
@@ -658,6 +785,7 @@ function switchTab(tab: Tab): void {
 
 function resetSelected(list: Row[]): void {
   const row = list[session!.cursor];
+  if (row?.kind === 'romVolume') return saveRomVolume(undefined);
   if (row?.kind === 'setting' && !lockOf(row.def)) save(row.def, undefined);
 }
 
@@ -670,6 +798,7 @@ function choose(index: number): void {
     panel.actions[index]?.run();
     return;
   }
+  if (panel.id === ROM_VOLUME) return saveRomVolume(panel.choices[index]!.value as number | undefined);
   const def = s.defs.get(panel.id)!;
   save(def, panel.choices[index]!.value);
 }
@@ -738,7 +867,10 @@ function handleAction(action: Action): void {
       handleKey({ code: action.delta < 0 ? 'ArrowUp' : 'ArrowDown', control: false });
       return;
     case 'reset':
-      if (s.panel && s.panel.kind !== 'info' && s.panel.id) {
+      if (s.panel?.kind === 'choices' && s.panel.id === ROM_VOLUME) {
+        s.panel = undefined;
+        saveRomVolume(undefined);
+      } else if (s.panel && s.panel.kind !== 'info' && s.panel.id) {
         const def = s.defs.get(s.panel.id)!;
         s.panel = undefined;
         save(def, undefined);
@@ -937,6 +1069,8 @@ function rowView(row: Row) {
         badges: [{ text: t('Lecture seule'), tone: 'locked' }],
       };
     }
+    case 'romVolume':
+      return romVolumeRow();
     case 'setting': {
       const state = stateOf(row.def);
       return {
@@ -965,6 +1099,7 @@ function detailView(row: Row | undefined) {
     if (mapping) return { title: mapping.label, lines: [t('{name} : {value}', { name: `[${row.section}] ${row.key}`, value: mapping.keys }), mapping.why] };
     return { title: row.key, lines: [`[${row.section}] ${row.key}`, t('Réglage enregistré par un plugin ou une table, absent du schéma de VPX.')] };
   }
+  if (row.kind === 'romVolume') return romVolumeDetail();
   if (row.kind !== 'setting') return undefined;
   const def = row.def;
   const state = stateOf(def);
@@ -995,6 +1130,7 @@ function panelView(panel: Panel | undefined) {
   const s = session!;
   if (!panel) return undefined;
   if (panel.kind === 'info') return { kind: 'info', title: panel.title, lines: panel.lines, actions: panel.actions.map((a) => a.label), index: panel.index };
+  if (panel.id === ROM_VOLUME && panel.kind === 'choices') return { kind: 'choices', title: t('Volume de la ROM'), choices: panel.choices.map((c) => ({ label: c.label, note: c.note })), index: panel.index };
   const def = s.defs.get(panel.id)!;
   const e = s.essentials.get(panel.id);
   const title = s.tab === 'essentials' && e ? e.label : def.label || def.key;
@@ -1079,11 +1215,24 @@ export async function startSettingsAlone(tables: TableEntry[]): Promise<void> {
   }
   // Seul, l'écran s'ouvre sur l'écran principal, qui n'est pas forcément le playfield :
   // il ne pivote que si le bord des flippers est forcé.
-  const closed = openSettings(table ? { scope: 'table', table } : { scope: 'global' }, { rotation: forcedRotation() });
+  const closed = openSettings(table ? { scope: 'table', table } : { scope: 'global' }, { rotation: forcedRotation(), ...(table ? { romVolume: romVolumeControl(table) } : {}) });
   const codes = process.env.CYBERPINBALL_AUTOPILOT;
   if (codes) await runAutopilot(codes.split(','), process.env.CYBERPINBALL_CAPTURE);
   else await closed;
   app.quit();
+}
+
+/** Le volume de la ROM d'une table, pour l'écran ouvert seul (sans le menu, qui a le sien). */
+export function romVolumeControl(table: TableEntry, volumes = createRomVolumes({ dataDir: loc.dataDir, romsOf: (one) => cachedScript(one.file, loc.dataDir)?.roms ?? [], sharedPinmame: () => (loc.root ? path.join(loc.root, 'pinmame') : undefined), log: (line) => console.log(line) })): RomVolumeControl {
+  // Lu une fois par écriture : chaque dessin de l'écran demande la ligne, son détail, sa présence.
+  let memo: RomVolumeView | undefined;
+  return {
+    view: () => (memo ??= volumes.view(table)),
+    choose: (value) => {
+      memo = undefined;
+      return volumes.choose(table, value);
+    },
+  };
 }
 
 async function runAutopilot(codes: string[], captureDir: string | undefined): Promise<void> {

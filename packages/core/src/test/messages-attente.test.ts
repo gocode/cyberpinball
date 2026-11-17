@@ -21,6 +21,7 @@ import { setLanguage } from '../i18n';
 import { ACTIVITY_MESSAGE_KINDS, activityAct, activityFacts, activityText, addActivity, emptyActivity, markThreadRead, parseActivityEntry, type ActivityEntry, type ActivityKind } from '../activity';
 import type { NoticeEvent, NoticeKind } from '../notices';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 
 const NOVA = 'b'.repeat(64);
 const LEA = 'c'.repeat(64);
@@ -82,7 +83,7 @@ test('messages en attente : la conversation lue lit ses lignes, et elles seules 
 });
 
 test('messages en attente : chaque notification de groupe et de salon porte sa conversation', () => {
-  const src = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const src = frontendSource();
   for (const kind of ['group-message', 'room-mention']) {
     const pushes = src.split('\n').filter((l) => l.includes(`kind: '${kind}' as const`));
     assert.ok(pushes.length > 0, kind);
@@ -202,7 +203,7 @@ test('messages en attente : la pastille compte hors sourdine, rien quand rien n�
 });
 
 test('messages en attente : la pastille au coin d’état et sur la ligne de la roue dentée ; son clic ouvre l’écran', () => {
-  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   assert.match(front, /function menuCorner\(\)[\s\S]{0,2500}inboxMenu\.pill\(\)/, 'la pastille vient de l’écran des messages');
   assert.match(front, /action\.type === 'inbox'[\s\S]{0,300}inboxMenu\.open\(/);
   const js = fs.readFileSync(path.join(REPO_ROOT, 'app', 'renderer', 'frontend.js'), 'utf8');

@@ -343,3 +343,61 @@ export function noteCrashSent(state: FeedbackState, signature: string, now = Dat
   const sent = Object.fromEntries(Object.entries(state.sent).filter(([, at]) => now - at < 30 * 86_400_000));
   return { ...state, sent: { ...sent, [signature]: now } };
 }
+
+// ---------------------------------------------------------------------------
+// Contributions du joueur (badges « Une voix qui compte », « Force de proposition », « Son idée est
+// dans le jeu », 17/11/2026) : <données>\retours\contributions.json
+//
+// - une proposition publique compte dès qu'elle paraît à la liste comme la mienne ; elle cesse de
+//   compter quand elle n'y est plus alors que la liste est complète (masquée ou fusionnée par l'équipe) ;
+// - un rapport privé écrit par le joueur (pas un plantage automatique) compte, un par jour au plus ;
+// - une proposition passée « fait » compte pour « Son idée est dans le jeu », une seule fois.
+
+/** Propositions rendues au plus par le service (LIST_MAX de worker.mjs) : en dessous, la liste est complète. */
+export const PROPOSALS_LIST_MAX = 500;
+export const CONTRIBUTIONS_FILE = path.join('retours', 'contributions.json');
+
+export interface Contributions {
+  /** Mes propositions publiques vues à la liste (identifiants). */
+  proposals: string[];
+  /** Jours (AAAA-MM-JJ) où j'ai envoyé un rapport écrit. */
+  reports: string[];
+  /** Mes propositions passées « fait » (identifiants). */
+  shipped: string[];
+}
+
+export const emptyContributions = (): Contributions => ({ proposals: [], reports: [], shipped: [] });
+
+export const contributionsCount = (c: Contributions): number => c.proposals.length + c.reports.length;
+
+/** La liste des propositions vient d'être lue : `shipped`, celles de mes propositions qui viennent de passer « fait ». */
+export function noteProposals(c: Contributions, list: readonly Proposal[]): { contributions: Contributions; shipped: Proposal[] } {
+  const mine = list.filter((p) => p.mine);
+  const ids = new Set(mine.map((p) => p.id));
+  const complete = list.length < PROPOSALS_LIST_MAX;
+  const proposals = [...(complete ? c.proposals.filter((id) => ids.has(id)) : c.proposals), ...mine.map((p) => p.id).filter((id) => !c.proposals.includes(id))];
+  const shipped = mine.filter((p) => p.status === 'done' && !c.shipped.includes(p.id));
+  return { contributions: { ...c, proposals, shipped: [...c.shipped, ...shipped.map((p) => p.id)] }, shipped };
+}
+
+/** Un rapport écrit envoyé : un par jour au plus. */
+export function noteReport(c: Contributions, now = new Date()): Contributions {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const day = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return c.reports.includes(day) ? c : { ...c, reports: [...c.reports, day].slice(-1000) };
+}
+
+export function loadContributions(dataDir: string): Contributions {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(dataDir, CONTRIBUTIONS_FILE), 'utf8')) as Partial<Record<keyof Contributions, unknown>>;
+    const ids = (v: unknown, re: RegExp) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && re.test(x)).slice(-1000) : []);
+    return { proposals: ids(raw.proposals, /^[A-Za-z0-9_-]{1,64}$/), reports: ids(raw.reports, /^\d{4}-\d{2}-\d{2}$/), shipped: ids(raw.shipped, /^[A-Za-z0-9_-]{1,64}$/) };
+  } catch {
+    return emptyContributions();
+  }
+}
+
+export function saveContributions(dataDir: string, c: Contributions): void {
+  fs.mkdirSync(path.join(dataDir, 'retours'), { recursive: true });
+  writeFileAtomic(path.join(dataDir, CONTRIBUTIONS_FILE), JSON.stringify(c));
+}

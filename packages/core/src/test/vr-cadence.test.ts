@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import { parseVrMeasures } from '../fronton-vr';
 import { VR_NO_MIRROR } from '../vr';
 import { describeVrCadence, describeVrCadenceTest, parseVrCadence, vrCadenceCapped, vrCadencePlateau, vrCadenceTest, vrQuitWithoutHeadset, vrTimerDegraded } from '../vr-cadence';
+import { frontendSource } from './frontend-source';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8').replace(/\r\n/g, '\n');
@@ -123,7 +124,7 @@ test('capture de l’aperçu : pas prise quand l’aperçu est réduit à un tim
   // Seul l'essai de cadence refait la capture d'avant, et seulement s'il est demandé.
   assert.equal(plugin.match(/capturer\("\w+", true\)/g)?.length, 1);
   assert.match(plugin, /if \(!essaiCadence_Val \|\| mesures\.debut < 0\.0 \|\| mesures\.essai >= 4\)\s+return;/);
-  assert.match(read('app', 'src', 'frontend.ts'), /process\.env\.CYBERPINBALL_ESSAI_CADENCE === '1' \? \[\{ section: 'Plugin\.CyberPinball', key: 'CadenceTest', value: '1' \}\] : \[\]/);
+  assert.match(frontendSource(), /process\.env\.CYBERPINBALL_ESSAI_CADENCE === '1' \? \[\{ section: 'Plugin\.CyberPinball', key: 'CadenceTest', value: '1' \}\] : \[\]/);
 });
 
 test('garde de la minuterie : posée au début de chaque partie dans le casque, mesurée à chaque relevé', () => {
@@ -140,6 +141,6 @@ test('garde de la minuterie : posée au début de chaque partie dans le casque, 
   assert.match(header, /SetProcessInformation\(GetCurrentProcess\(\), ProcessPowerThrottling, &etat, sizeof\(etat\)\)/);
   assert.match(header, /constexpr ULONG MINUTERIE_IGNOREE = 0x4;/);
   // Le journal de fin de partie dit le palier, la minuterie et la sortie casque retiré.
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   for (const call of ['describeVrCadence(cadence)', 'vrCadenceTest(block.text, cadence)', 'vrQuitWithoutHeadset(block.text)']) assert.ok(frontend.includes(call), call);
 });

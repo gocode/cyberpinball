@@ -36,6 +36,7 @@ import { DMD_HEIGHT, DMD_WIDTH } from '../livedmd';
 import type { Rect, RoleId, Rotation } from '../model';
 import { parseSimulatedDisplays } from '../offscreen';
 import { splitBackglassDmd, zoneRect } from '../zones';
+import { frontendSource } from './frontend-source';
 
 const ROTATIONS: Rotation[] = [0, 90, 180, 270];
 
@@ -439,7 +440,7 @@ test('application : les fenêtres de la bande et du DMD, et ce que frontend.ts l
   assert.match(notice, /keepInFront\(dmd, 'dmd'\);/);
   assert.match(notice, /recouverte par \$\{by\} : remise devant/);
   assert.match(notice, /dmd = layer\(dmd, onDmd, JSON\.stringify\(onDmd\)\);/);
-  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   // Un écran pris par VPX pendant la partie le reste pour la bande (elle sautait sur le fronton rendu à la fermeture).
   assert.match(front, /return zone && !occupiedThisGame\.has\(role\) \? \[\{ role, zone \}\] : \[\];/);
   assert.match(front, /for \(const role of next\) occupiedThisGame\.add\(role\);/);

@@ -17,6 +17,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { LIVE_READY_SIGNAL_MS, LIVE_READY_WAIT_MS, liveGoDeadline, liveGoDue, liveReadyOverdue, liveStateHook, parseLiveState, type LiveGame, type TableEntry } from '../index';
+import { frontendSource } from './frontend-source';
 
 // ---------------------------------------------------------------------------
 // Le relevé d'une table qui ne pose ses valeurs qu'au Start
@@ -108,7 +109,7 @@ test('garde-fou : table à l’écran sans « prêt » du relevé, prête au bou
 });
 
 test('application : le garde-fou dit pourquoi au journal ; la partie simulée lit sa ligne comme une vraie table', () => {
-  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   assert.match(front, /if \(onScreen && hooks\.gate && !liveManual && !readySeen && !readyForced && liveReadyOverdue\(playingSince, Date\.now\(\)\)\) \{/);
   assert.match(front, /le relevé ne dit pas « prêt » \(\$\{why\}\) : prête quand même/);
   // La partie simulée des démonstrations écrit la ligne vide d'avant la partie, et la lit par parseLiveState.

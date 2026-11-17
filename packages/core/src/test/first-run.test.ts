@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import { JOYSTICK_RETURN_PHASES, joystickButtonsUnrecorded, joystickReturnsToButtons, JOYSTICK_STEPS, menuWaitsForVpx, wizardInstallsVpx, type WizardVpx } from '../first-run';
 import { WIZARD_PHASES } from '../wizardsteps';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 
 const read = (...parts: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...parts), 'utf8');
 /** Le corps d'une fonction de `source`, de sa déclaration à la suivante. */
@@ -81,7 +82,7 @@ test('l’assistant installe VPX avant le relevé, suspend son délai et retient
 });
 
 test('VPX ou son runtime installé au menu : les joysticks se relisent aussitôt', () => {
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   const ready = body(frontend, 'vpxReady');
   assert.match(ready, /retryJoysticks\(\)/);
   assert.match(ready, /joystickButtonsUnrecorded\(/);

@@ -26,6 +26,7 @@ import {
   type SystemItemId,
 } from '../index';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 
 const read = (...parts: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...parts), 'utf8');
 const ids = (nodes: RemoteMenuNode[]): string[] => nodes.flatMap((n) => [n.id, ...ids(n.entries ?? [])]);
@@ -102,7 +103,7 @@ test('accès direct : une entrée part bornée, sans caractère de contrôle, sa
 });
 
 test('accès direct : mêmes portes que la borne, rien ne se déverrouille du téléphone, un rang d’un écran dépassé est ignoré', () => {
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   const library = read('app', 'src', 'library.ts');
   const remote = read('app', 'src', 'phone-remote.ts');
   const page = read('app', 'renderer', 'telephone', 'telephone.js');

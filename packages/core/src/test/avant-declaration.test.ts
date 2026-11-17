@@ -63,6 +63,9 @@ const REVIEWED = new Set([
   'socialNet',
   'stopNotice',
   'tableRankings',
+  // Réalité virtuelle (vr-frontend.ts) : le réseau du casque, lu par le relevé de santé de la borne (minuterie
+  // après le démarrage, ou écran ouvert) ; jamais pendant l'initialisation.
+  'vrFront',
   'tableScores',
 ]);
 

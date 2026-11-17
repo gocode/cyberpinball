@@ -173,6 +173,7 @@ import {
   pcHealthFacts,
   playBlockers,
   romBlockers,
+  romVolumeLine,
   messagesOf,
   say,
   t,
@@ -1828,6 +1829,7 @@ export function createLibrary(host: LibraryHost) {
       orientation: host.playfieldOrientation?.(),
       dmdPlaced: Boolean(cabinet && dmdPlaceOf(readDmdPlaces(host.dataDir), cabinet.id, table.id)),
       dof: readDofQuiet(),
+      romVolume: host.romVolume?.(table),
     });
     // Constats ignorés par le joueur pour cette table : hors du compte, gardés pour le Diagnostic.
     const { shown, ignored } = splitIgnoredFindings(findings, table.info);
@@ -1871,6 +1873,7 @@ export function createLibrary(host: LibraryHost) {
         romLibrary: layout()?.roms,
         orientation,
         dof,
+        romVolume: host.romVolume?.(table),
       });
       return splitIgnoredFindings(findings, table.info).shown;
     };
@@ -2225,6 +2228,13 @@ export function createLibrary(host: LibraryHost) {
       });
       files.push({ text: 'ROM', detail: list(names), tone: 'ok' });
     } else if (!script || script.usesPinmame) absent.push('ROM');
+    // Volume de la ROM, gardé dans sa mémoire (rom-volume.ts) : celui qu'elle jouera, et ce que Cyber Pinball en fait.
+    const romVolume = host.romVolume && kept('volume-rom', () => {
+      const v = host.romVolume!(table);
+      return romVolumeLine(v.status, v.choice);
+    });
+    if (romVolume) files.push({ text: t('Volume de la ROM'), detail: romVolume.detail, tone: romVolume.tone });
+    if (romVolume && romVolume.low) check.push(t('volume de la ROM bas'));
     const dmdHere = kept('dmd', () => Boolean(script?.dmdFolder && dmdPresent(table.folder, script.dmdFolder)));
     if (script?.dmdFolder) {
       const present = dmdHere;

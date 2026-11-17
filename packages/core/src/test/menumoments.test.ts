@@ -41,6 +41,7 @@ import type { CabinetAudio, ObservedAudioOutput } from '../model';
 import type { StackedWindow } from '../screencover';
 import { scanTables, type TableEntry } from '../tables';
 import { zoneRect } from '../zones';
+import { frontendSource } from './frontend-source';
 
 const APP = path.join(__dirname, '..', '..', '..', '..', 'app');
 const S = DEFAULT_MENU_MEDIA_SETTINGS;
@@ -420,7 +421,7 @@ test('rendu : son du menu chargé par les fenêtres du menu', () => {
   const html = fs.readFileSync(path.join(APP, 'renderer', 'frontend.html'), 'utf8');
   const at = (name: string) => html.indexOf(name);
   assert.ok(at('menu-audio.js') > 0 && at('menu-audio.js') < at('frontend.js'), 'menu-audio.js chargé avant frontend.js');
-  const frontend = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   // La musique démarre sans geste du joueur : les boutons passent par le processus principal.
   assert.match(frontend, /autoplayPolicy: 'no-user-gesture-required'/);
   // Nom des sorties audio et setSinkId : permissions « media » et « speaker-selection ».
@@ -430,7 +431,7 @@ test('rendu : son du menu chargé par les fenêtres du menu', () => {
 });
 
 test('un seul son : la musique du menu se tait pendant l’écoute d’une carte (propositions, sons de la table)', () => {
-  const frontend = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   // Le plan sonore ne prend la table de l'écran que si celui-ci ne fait rien écouter.
   assert.match(frontend, /const table = state\.phase === 'library' && library\.previewsSound\(\) \? undefined : screensSubject\(\);/);
   const library = fs.readFileSync(path.join(APP, 'src', 'library.ts'), 'utf8');
@@ -446,7 +447,7 @@ test('un seul son : la musique du menu se tait pendant l’écoute d’une carte
 });
 
 test('partie simulée : hors écran seulement ; à l’écran, VPX ; hors écran sans elle, la partie reste refusée', () => {
-  const frontend = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   assert.match(frontend, /const simulated = OFFSCREEN \? process\.env\.CYBERPINBALL_PARTIE_SIMULEE : undefined;/);
   assert.match(frontend, /simulated === undefined \? refuseOffscreen\(t\('Lancer une partie de VPX'\)\)/);
   // Le fond de partie n'arrive qu'avec la fenêtre de jeu : au chargement, les écrans gardent les médias du jeu.

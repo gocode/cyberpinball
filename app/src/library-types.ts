@@ -7,6 +7,7 @@ import { type RemoteWording } from './phone-remote-menu';
 import { type ScoreboardView } from './scoreboard-menu';
 import type { RankingView } from './table-rankings';
 import type { TableBoard } from './table-scores';
+import type { RomVolumeView } from './rom-volume';
 import { BrowserWindow, type Input, type Rectangle } from 'electron';
 import {
   type SystemGroupId,
@@ -87,6 +88,8 @@ export interface LibraryHost {
   play(table: TableEntry): void;
   /** Réglages de VPX propres à cette table (écran des réglages, settings.ts). */
   tableSettings?(table: TableEntry): void;
+  /** Volume de la ROM de la table (rom-volume.ts) : la fiche le dit, le médecin le signale bas. */
+  romVolume?(table: TableEntry): RomVolumeView;
   /**
    * « Jouer avec un ami » (live-game-menu.ts) : l'entrée de la fiche, active quand un ami est en
    * ligne, grisée avec sa raison sinon ; `back` rouvre la fiche.

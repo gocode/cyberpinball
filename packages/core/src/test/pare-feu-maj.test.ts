@@ -35,6 +35,7 @@ import {
   type FirewallRuleInfo,
 } from '../firewall';
 import { newSocialState } from '../social';
+import { frontendSource } from './frontend-source';
 
 const APP_DIST = path.join(REPO_ROOT, 'app', 'dist');
 
@@ -315,7 +316,7 @@ test('autorisation refusée : rien de posé, l’état reste à reposer', async 
 });
 
 test('l’application vérifie les règles à chaque démarrage et juste après une mise à jour, jamais au milieu d’une partie', () => {
-  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   assert.match(front, /if \(socialMode !== 'off'\) void checkFirewallAtStart\(\)/, 'à chaque démarrage, réseau des bornes en marche');
   const check = front.slice(front.indexOf('async function checkFirewallAtStart'), front.indexOf('function showBanner'));
   assert.match(check, /const update = updates\.justInstalled\(\);/, 'la mise à jour constatée au démarrage');

@@ -16,6 +16,7 @@ import { parseSimulatedDisplays } from '../offscreen';
 import { desktopBlockers, screenCover, type CoverRect, type StackedWindow } from '../screencover';
 import { accelerator, matchesShortcut, shortcutKeys, shortcutLabel, shownKeys, SHORTCUTS } from '../shortcuts';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 
 const ME = 4242;
 
@@ -215,7 +216,7 @@ test('mode bureau : réduire seulement les fenêtres du menu laissait les écran
 });
 
 test('mode bureau : toutes les fenêtres de l’application, voiles compris, sans liste à tenir à jour', () => {
-  const source = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const source = frontendSource();
   assert.match(source, /new DesktopMode<BrowserWindow, WebContents>\(\{\s*windows: \(\) => BrowserWindow\.getAllWindows\(\),\s*contents: \(\) => webContents\.getAllWebContents\(\),/, 'le mode bureau parcourt BrowserWindow.getAllWindows() et coupe le son de webContents.getAllWebContents()');
   assert.match(source, /app\.on\('web-contents-created', \(_e, contents\) => desktop\.silence\(contents\)\)/, 'une page ouverte au bureau naît muette');
   assert.match(source, /isShown,\s*isVeil,\s*hideVeil: hideCovered,\s*showVeil: \(win\) => win\.showInactive\(\),\s*minimizeWindow: minimizeCovered,/);

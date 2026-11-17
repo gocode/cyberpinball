@@ -150,6 +150,20 @@ import {
   type InstantGame,
   type InstantSeat,
   type LiveTable,
+  cardInvites,
+  confirmInvitation,
+  declareInviter,
+  declineInviter,
+  forgetInvited,
+  INVITE_TTL,
+  invitationsFile,
+  loadInvitations,
+  receiveInvited,
+  saveInvitations,
+  verifyInvitation,
+  withinBytes,
+  type Invitation,
+  type InvitationStore,
   giveLike,
   likedByMe,
   likersOf,
@@ -360,6 +374,10 @@ export interface SocialNetOptions {
   systemLocale?: () => string | undefined;
   /** De nouveaux « J'aime » sur mes évènements publics (publicprofile.ts) : la notification. */
   onLike?: (likes: Like[]) => void;
+  /** De nouvelles personnes invitées confirmées (invitations.ts) : la notification et les XP. */
+  onInvited?: (invitations: Invitation[]) => void;
+  /** Empreinte de cette machine (invitations.ts, machineTag) ; undefined : pas encore lue, ou illisible. */
+  machine?: () => string | undefined;
   /** Essais : attente avant de fermer les liaisons après l'avis d'oubli de mon compte (1,5 s). */
   forgetFlushMs?: number;
   /** Comptes supprimés appris (forget.ts) : leurs traces hors du réseau (messagerie) à effacer aussi. */
@@ -373,6 +391,8 @@ type ScoresMessage = { t: 'scores'; scores: RankedScore[] };
 /** Profils publics et « J'aime » (publicprofile.ts) : entre toutes les bornes, comme les scores. */
 type CardsMessage = { t: 'cards'; cards: PublicCard[] };
 type LikesMessage = { t: 'likes'; likes: Like[]; ttl: number };
+/** Personnes invitées (invitations.ts) : attestations remises à l'inviteur, ou relayées ; une borne d'avant les ignore. */
+type InvitesMessage = { t: 'invites'; invites: Invitation[]; ttl: number };
 /** Présence publique (livepresence.ts) : « en ligne » ou « en partie », entre toutes les bornes. */
 type LiveMessage_ = { t: 'live'; live: LiveBeacon[] };
 /** Salons par pays (rooms.ts) : lignes, demande d'historique, présents ; entre toutes les bornes. */
@@ -401,7 +421,7 @@ export type FriendMessage = LibraryMessage | LiveMessage | ChatMessage | GroupMe
 
 interface Link {
   stream: Duplex;
-  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage | LiveMessage_ | RoomMessage | ModMessage | InstantMessage | ForgetMessage): void;
+  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage | InvitesMessage | LiveMessage_ | RoomMessage | ModMessage | InstantMessage | ForgetMessage): void;
   /** Morceau de fichier (friendlibrary.ts, chunkFrame) ; false : le flux est plein, attendre « drain ». */
   sendChunk(frame: Buffer): boolean;
   via: 'internet' | 'lan';
@@ -464,6 +484,17 @@ export interface SocialNet {
   setLevel(xp: number, week?: CardWeek): void;
   /** « J'aime » que j'ai donnés (et pas retirés). */
   likesGiven(): number;
+  /** Personnes invitées (invitations.ts) : qui m'a invité, et les personnes que j'ai invitées. */
+  invitations(): InvitationStore;
+  /** « Qui t'a fait découvrir Cyber Pinball ? » : ce joueur (changeable tant que rien n'est confirmé). */
+  declareInviter(key: string, name: string): void;
+  /** « Personne » : la question ne revient plus. */
+  declineInviter(): void;
+  /**
+   * Ma première partie menée au bout : l'invitation déclarée devient une attestation signée, remise
+   * à la borne de l'inviteur (ou relayée, et redonnée à chaque liaison tant qu'elle ne l'a pas reçue).
+   */
+  confirmInvitation(): void;
   /** « J'aime » reçus et réactions reçues sur mes lignes de salon, par identifiant (levels.ts, receivedGains). */
   receivedIds(): { likes: string[]; reactions: string[] };
   request(profile: Pick<Profile, 'key' | 'name'>): void;
@@ -651,6 +682,13 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   let forgotten = forgottenKeys(forgets);
   /** Un joueur dont on ne prend rien : bloqué ici, ou compte supprimé. */
   const shunned = (key: string) => state.blocked.includes(key) || forgotten.has(key);
+  // Personnes invitées (invitations.ts) : relues une fois, écrites à chaque changement (rare).
+  let invitations = loadInvitations(opts.dataDir, now());
+  function setInvitations(next: InvitationStore): void {
+    if (next === invitations) return;
+    invitations = next;
+    saveOrWarn(invitationsFile(opts.dataDir), () => saveInvitations(opts.dataDir, invitations));
+  }
   let profilesTimer: NodeJS.Timeout | undefined;
   function saveProfilesSoon(): void {
     if (profilesTimer) return;
@@ -1042,6 +1080,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         // Profils publics et « J'aime » : de toute borne reliée, chacun vérifié par sa signature.
         if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'cards') return receiveCards(key, (raw as { cards?: unknown }).cards);
         if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'likes') return receiveLikes(key, (raw as { likes?: unknown }).likes, (raw as { ttl?: unknown }).ttl);
+        // Personnes invitées : de toute borne reliée, chaque attestation vérifiée par la signature de la personne invitée.
+        if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'invites') return receiveInvites(key, (raw as { invites?: unknown }).invites, (raw as { ttl?: unknown }).ttl);
         // Présence publique : de toute borne reliée, chaque signal vérifié par sa signature.
         if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'live') return receiveLive(key, (raw as { live?: unknown }).live);
         // Salons par pays : de toute borne reliée, chaque ligne et chaque présent vérifiés par leur signature.
@@ -1161,6 +1201,11 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     if (r !== rooms) {
       rooms = r;
       saveRoomsSoon();
+    }
+    const inv = forgetInvited(invitations, keys);
+    if (inv !== invitations) {
+      setInvitations(inv);
+      announceCard();
     }
     for (const key of keys) {
       liveBoard.delete(key);
@@ -1591,7 +1636,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     const country = myCountry();
     const avatar = ownAvatarHash();
     const records = rankings.scores.filter((s) => s.key === state.key.publicKey).length;
-    return makeCard(state, profiles, { ...(country ? { country } : {}), ...(avatar ? { avatar } : {}), records, ...(myXp !== undefined ? { xp: myXp } : {}), ...(myWeek ? { week: myWeek } : {}), friends: state.friends.length }, now());
+    const invited = invitations.received.filter((i) => !shunned(i.me));
+    return makeCard(state, profiles, { ...(country ? { country } : {}), ...(avatar ? { avatar } : {}), records, ...(myXp !== undefined ? { xp: myXp } : {}), ...(myWeek ? { week: myWeek } : {}), friends: state.friends.length, ...(invited.length ? { invited: { list: cardInvites({ ...invitations, received: invited }), total: invited.length } } : {}) }, now());
   }
 
   const greetedLinks = (except?: string) => [...peers.values()].filter((p) => p.key !== except).map((p) => bestLink(p.key)).filter((l): l is Link => !!l?.greeted);
@@ -1620,7 +1666,54 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     if (!merged.fresh.length) return;
     // Un joueur a changé d'avatar : l'ancien n'est plus public, son fichier peut partir.
     if (merged.fresh.some((c) => before.has(c.key) && before.get(c.key) !== c.avatar)) tidyAvatars();
-    for (const link of greetedLinks(from)) link.send({ t: 'cards', cards: merged.fresh });
+    for (const link of greetedLinks(from)) link.send({ t: 'cards', cards: withinBytes(merged.fresh) });
+    changed();
+  }
+
+  // ---------- Personnes invitées (invitations.ts) ----------
+
+  /**
+   * Mon attestation, pas encore remise à l'inviteur : directement si sa borne est reliée (c'est
+   * fait), sinon par les bornes saluées (`via`, ou toutes), qui la relaient deux fois au plus.
+   */
+  function deliverInvitation(via?: Link): void {
+    const mine = invitations.mine;
+    if (!mine || invitations.sent || !state.enabled) return;
+    const direct = bestLink(mine.by);
+    if (direct?.greeted) {
+      direct.send({ t: 'invites', invites: [mine], ttl: 0 });
+      setInvitations({ ...invitations, sent: true });
+      log(`Personnes invitées : mon attestation remise à ${nameOf(mine.by)}.`); // i18n-ignore : journal
+      return;
+    }
+    for (const link of via ? [via] : greetedLinks(mine.by)) link.send({ t: 'invites', invites: [mine], ttl: INVITE_TTL });
+  }
+
+  const invitesRelayed = new Set<string>();
+  function receiveInvites(from: string, raw: unknown, ttl: unknown): void {
+    if (!Array.isArray(raw) || shunned(from)) return;
+    const me = state.key.publicKey;
+    const news: Invitation[] = [];
+    for (const inv of raw.slice(0, 10).map((i) => verifyInvitation(i, now())).filter((i): i is Invitation => !!i && !shunned(i.me))) {
+      if (inv.by === me) {
+        const r = receiveInvited(invitations, inv, me, opts.machine?.());
+        setInvitations(r.store);
+        if (r.news) news.push(inv);
+        continue;
+      }
+      // Pour un autre inviteur : à sa borne si elle est reliée, sinon un relais de plus tant qu'il en reste.
+      if (invitesRelayed.has(inv.sig)) continue;
+      invitesRelayed.add(inv.sig);
+      if (invitesRelayed.size > 2000) invitesRelayed.clear();
+      const hops = typeof ttl === 'number' && Number.isInteger(ttl) ? Math.min(ttl, INVITE_TTL) : 0;
+      const direct = bestLink(inv.by);
+      if (direct?.greeted) direct.send({ t: 'invites', invites: [inv], ttl: 0 });
+      else if (hops > 0) for (const link of greetedLinks(from)) link.send({ t: 'invites', invites: [inv], ttl: hops - 1 });
+    }
+    if (!news.length) return;
+    log(`Personnes invitées : ${news.map((i) => i.name).join(', ')} a fini sa première partie.`); // i18n-ignore : journal
+    announceCard();
+    opts.onInvited?.(news);
     changed();
   }
 
@@ -1701,6 +1794,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
           if (relationOf(state, key) === 'friend') greetFriend(key);
           // Mes « J'aime » pour ce joueur qui attendaient sa borne.
           deliverLikes(key);
+          // Mon attestation de personne invitée, tant que l'inviteur ne l'a pas reçue directement.
+          deliverInvitation(link);
           // Ma présence publique telle qu'elle est maintenant : elle a pu changer (en partie, au menu)
           // entre l'ouverture de cette liaison et son bonjour.
           const own = ownBeacon();
@@ -2148,6 +2243,24 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       announceCard();
     },
     likesGiven: () => profiles.given.filter((l) => l.on).length,
+    invitations: () => invitations,
+    declareInviter(key, name) {
+      setInvitations(declareInviter(invitations, key, name, state.key.publicKey, now()));
+      changed();
+    },
+    declineInviter() {
+      setInvitations(declineInviter(invitations, now()));
+      changed();
+    },
+    confirmInvitation() {
+      const machine = opts.machine?.();
+      if (!machine) return;
+      const r = confirmInvitation(invitations, state.key, state.name, machine, now());
+      if (!r.invitation) return;
+      setInvitations(r.store);
+      log(`Personnes invitées : première partie menée au bout, attestation signée pour ${r.invitation.by.slice(0, 8)}.`); // i18n-ignore : journal
+      deliverInvitation();
+    },
     receivedIds() {
       const me = state.key.publicKey;
       const mine = new Set(rooms.lines.filter((l) => l.key === me).map((l) => l.id));

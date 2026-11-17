@@ -17,6 +17,7 @@ import {
 } from '../power';
 import { SYSTEM_GROUPS, SYSTEM_ITEMS } from '../systemmenu';
 import { APP, menuRenderer, menuState } from './menu-renderer';
+import { frontendSource } from './frontend-source';
 
 // Alimentation de la borne (éteindre, mettre en veille, redémarrer) : un essai n'éteint jamais
 // le poste qui le fait tourner, et la veille demandée est une vraie veille, pas une hibernation.
@@ -266,7 +267,7 @@ test('menu système : « Redémarrer Cyber Pinball » relance le logiciel seul, 
   // Ni le symbole de sortie ni celui du redémarrage du PC : chaque sortie se reconnaît à son icône.
   const exits = (['quit', 'relaunch', 'sleep', 'restart', 'shutdown'] as const).map((id) => SYSTEM_ITEMS[id].icon);
   assert.equal(new Set(exits).size, exits.length, exits.join(', '));
-  const frontend = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   // Fourni pour toute borne, et par relaunchMenu (relaunchCovered : jamais le bureau entre les deux),
   // avec l'ouverture rejouée comme un démarrage (relaunchMenu(true), 11/11/2026).
   assert.match(frontend, /\nlibrary\.provideSystemItem\('relaunch', \{[\s\S]*?run: \(\) => relaunchMenu\(true\),/);

@@ -14,6 +14,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { RomMemory } from './ballcount';
 import type { HighScore } from './highscores';
+import { t } from './i18n';
 
 interface Descriptor {
   start?: unknown;
@@ -363,6 +364,107 @@ export function mergeRomVolume(memory: RomMemory | undefined, host: Buffer, gues
   }
   if (sums.some((c) => !raw.has(c) && !valid(out, c))) return refuse('somme de contrôle impossible à refaire'); // i18n-ignore : journal
   return { kind: 'merged', data: out, labels: [...new Set(entries.map((e) => e.label))] };
+}
+
+// ---------------------------------------------------------------------------
+// Le volume principal de la machine (romvolume.ts : « Volume de la ROM »)
+//
+// Mesuré au banc libpinmame le 17/11/2026 : Monster Bash (mb_106b, WPC-95), The Addams Family
+// (taf_l7, WPC), Star Trek (st_161h, Stern SAM). Sans mémoire, la ROM pose son volume d'usine
+// au démarrage (12 sur 31 en WPC, 40 sur 63 en SAM), somme juste. Un volume écrit avec sa somme
+// juste est celui que la ROM joue au démarrage suivant (Monster Bash : le niveau envoyé à la carte
+// son DCS suit, 8 × volume + 7) ; avec une somme fausse, elle revient à son volume d'usine.
+
+/** Où la carte situe le volume principal : un octet, sa plage, sa valeur d'usine si elle la donne. */
+export interface RomVolumeSpot {
+  label: string;
+  min: number;
+  max: number;
+  /** Valeur d'usine donnée par la carte (Stern SAM) ; absente en WPC. */
+  factory?: number;
+}
+
+const masterEntry = (memory: RomMemory): (Descriptor & { label: string; min?: unknown; max?: unknown; default?: unknown }) | undefined => {
+  const state = (memory.map as { game_state?: Record<string, unknown> }).game_state;
+  const e = state?.volume as (Descriptor & { label?: unknown; min?: unknown; max?: unknown; default?: unknown }) | undefined;
+  return e && typeof e === 'object' && typeof e.label === 'string' && SOUND_LEVEL.test(e.label) ? (e as Descriptor & { label: string }) : undefined;
+};
+
+/**
+ * Le volume principal que la carte situe (« game_state.volume » : Volume, Master Volume), s'il se
+ * lit et s'écrit sûrement : un octet entier, une plage, une seule zone de NVRAM, des sommes de
+ * contrôle décrites. undefined sinon (la machine n'a pas de volume dans sa mémoire, ou la carte ne
+ * le situe pas : Whitestar, Data East, System 11…).
+ */
+export function romMasterVolume(memory: RomMemory): RomVolumeSpot | undefined {
+  const e = masterEntry(memory);
+  const p = parts(memory);
+  const min = num(e?.min) ?? 0;
+  const max = num(e?.max);
+  if (!e || max === undefined || max <= min || max > 255 || p.base === undefined || !p.validation?.checksum?.length) return undefined;
+  if ((num(e.length) ?? 1) !== 1 || (e.nibble ?? 'both') !== 'both' || (e.encoding !== 'int' && e.encoding !== undefined)) return undefined;
+  const factory = num(e.default);
+  return { label: e.label, min, max, ...(factory !== undefined && factory >= min && factory <= max ? { factory } : {}) };
+}
+
+/** Place de l'octet du volume et les sommes qui le couvrent ; undefined si la mémoire est trop courte. */
+function volumePlace(memory: RomMemory, nv: Buffer) {
+  const e = masterEntry(memory);
+  const p = parts(memory);
+  const where = e ? place(p, { ...e, length: 1 }, nv) : undefined;
+  if (!where) return undefined;
+  const sums = checksums(p, nv).filter((c) => c.at <= where.at && where.at < c.at + c.length);
+  return { p, at: where.at, sums };
+}
+
+/**
+ * Le volume que la ROM jouera au démarrage, d'après sa mémoire : la valeur, ou `blank` quand la
+ * ROM ne la prendra pas (bloc vierge, somme fausse, valeur hors plage : elle remet son volume
+ * d'usine). undefined si la carte ne le situe pas ou si la mémoire est trop courte.
+ */
+export function readRomVolume(memory: RomMemory, nv: Buffer): { value: number } | { blank: true } | undefined {
+  const spot = romMasterVolume(memory);
+  const at = spot ? volumePlace(memory, nv) : undefined;
+  if (!spot || !at || !at.sums.length) return undefined;
+  if (at.sums.some((c) => nv.length < c.sumAt + c.bits / 8 || checksumOf(nv, c) !== storedChecksum(at.p, nv, c))) return { blank: true };
+  const value = nv[at.at]!;
+  return value >= spot.min && value <= spot.max ? { value } : { blank: true };
+}
+
+/**
+ * La mémoire avec ce volume, copies en miroir et sommes de contrôle refaites ; relue avant d'être
+ * rendue. Refusé (avec la raison, pour le joueur) quand l'écriture n'est pas sûre : volume non
+ * situé, hors plage, octet qu'aucune somme ne couvre, ou bloc qui mêle le volume à d'autres
+ * réglages dont la somme est déjà fausse (la refaire validerait des octets que la ROM rejetait).
+ */
+export function writeRomVolume(memory: RomMemory, nv: Buffer, value: number): { ok: true; data: Buffer } | { ok: false; reason: string } {
+  const spot = romMasterVolume(memory);
+  if (!spot) return { ok: false, reason: t('la carte de cette ROM ne situe pas son volume') };
+  if (!Number.isInteger(value) || value < spot.min || value > spot.max) return { ok: false, reason: t('{value} est hors de la plage de la ROM ({min} à {max})', { value, min: spot.min, max: spot.max }) };
+  const at = volumePlace(memory, nv);
+  if (!at) return { ok: false, reason: t('mémoire de la ROM trop courte') };
+  if (!at.sums.length) return { ok: false, reason: t('aucune somme de contrôle connue ne protège le volume') };
+  const valid = (buf: Buffer, c: (typeof at.sums)[number]) => buf.length >= c.sumAt + c.bits / 8 && checksumOf(buf, c) === storedChecksum(at.p, buf, c);
+  const out = Buffer.from(nv);
+  out[at.at] = value;
+  copyMirrors(at.p, out, [{ at: at.at, length: 1 }]);
+  // Chaque somme qui couvre un octet changé (le volume, ses copies en miroir) se refait.
+  const changed = [...out.keys()].filter((i) => out[i] !== nv[i]);
+  const touched = checksums(at.p, out).filter((s) => s.at <= at.at && at.at < s.at + s.length || changed.some((i) => s.at <= i && i < s.at + s.length));
+  for (const c of touched) {
+    // Un bloc qui ne tient que le volume (WPC, SAM) se refait toujours : vierge, il devient juste.
+    const onlyVolume = c.length === 1 && c.at === at.at;
+    if (!onlyVolume && !valid(nv, c)) return { ok: false, reason: t('somme de contrôle déjà fausse dans « {block} » : la ROM remettrait ces réglages', { block: c.label || '?' }) };
+  }
+  for (const c of touched) {
+    const sum = checksumOf(out, c);
+    if (c.bits === 8) out[c.sumAt] = sum;
+    else if (at.p.little) out.writeUInt16LE(sum, c.sumAt);
+    else out.writeUInt16BE(sum, c.sumAt);
+  }
+  const back = readRomVolume(memory, out);
+  if (!back || !('value' in back) || back.value !== value || touched.some((c) => !valid(out, c))) return { ok: false, reason: t('relecture différente après écriture') };
+  return { ok: true, data: out };
 }
 
 /** Carte d'une ROM déjà en cache (loadRomMemory l'y a mise), sans réseau ; undefined sinon. */

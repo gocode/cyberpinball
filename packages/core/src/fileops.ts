@@ -8,6 +8,8 @@ import * as path from 'node:path';
 import { atomicTempPath, renameWithRetry } from './atomicwrite';
 import { copyTree } from './copytree';
 import { formatNumber, t } from './i18n';
+import type { RomMemory } from './ballcount';
+import { writeRomVolume } from './romscores';
 import { buildZip, writeZipData, type RomZipMember } from './romzip';
 
 export type FileOp =
@@ -29,7 +31,13 @@ export type FileOp =
    * ROM refaite à plat : un .zip dont les puces sont à la racine (romzip.ts), à partir
    * de fichiers libres ou des fichiers d'un autre zip. Un fichier déjà là part à la corbeille.
    */
-  | { op: 'zip'; to: string; files: RomZipMember[]; mtimeMs?: number };
+  | { op: 'zip'; to: string; files: RomZipMember[]; mtimeMs?: number }
+  /**
+   * Volume de la ROM (romvolume.ts) : la mémoire relue au moment d'écrire (des records ont pu s'y
+   * écrire depuis le constat), le volume posé, sommes de contrôle refaites (writeRomVolume) ; la
+   * mémoire d'avant à la corbeille. Une écriture refusée lève l'erreur, avec sa raison.
+   */
+  | { op: 'romVolume'; path: string; memory: RomMemory; value: number };
 
 export interface OpContext {
   /** Dossier de la corbeille de cette opération (créé à la première utilisation). */
@@ -80,6 +88,12 @@ export function applyOps(ops: FileOp[], ctx: OpContext): void {
         const data = buildZip(op.files);
         if (fs.existsSync(op.to)) moveToTrash(op.to, ctx);
         writeZipData(op.to, data, op.mtimeMs);
+        break;
+      }
+      case 'romVolume': {
+        const out = writeRomVolume(op.memory, fs.readFileSync(op.path), op.value);
+        if (!out.ok) throw new Error(t('Volume de la ROM non écrit : {reason}', { reason: out.reason }));
+        writeReplacing(op.path, out.data.toString('latin1'), 'latin1', ctx);
         break;
       }
     }

@@ -18,6 +18,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 import {
   addGameToBoard,
   boardFor,
@@ -519,7 +520,7 @@ test('service : la progression de l’hôte entre dans la partie à chaque chang
 });
 
 test('application : le relevé lu pendant la partie, la fin ferme VPX, une partie qui a tourné compte comme jouée', () => {
-  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   assert.match(front, /const liveSource = double\?\.live \? \(\) => double\.liveState\(\)/);
   // Le relevé simulé (hors écran) part, lui aussi, au « partez » posé dans le double (départ commun, depart-commun.test.ts).
   assert.match(front, /simulatedLiveState\(Date\.now\(\), liveRunMs, \(\) => goneAt\)/);

@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { answerGame, LIVE_PROTOCOL, liveBehind, liveBehindLabel, liveBoardView, liveInvite, newLiveGame, parseLiveMessage, type LiveGame, type LiveMessage } from '../index';
+import { frontendSource } from './frontend-source';
 
 const ID = '0123456789abcdef';
 
@@ -57,7 +58,7 @@ test('en retard : avant le relevé en direct, ou sans annonce (une borne d’ava
 });
 
 test('application : la version annoncée ; le salon, l’invitation et les résultats le disent ; plus de « place du tableau »', () => {
-  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   assert.match(front, /appVersion: app\.getVersion\(\),/);
   const service = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'live-game.ts'), 'utf8');
   // La version voyage avec l'invitation ; `round` : son numéro, gardé par ses renvois (parties-enchainees.test.ts).

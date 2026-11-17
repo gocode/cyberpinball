@@ -45,6 +45,7 @@ import { noticeZone } from '../noticezone';
 import { SYSTEM_GROUPS, SYSTEM_ITEMS } from '../systemmenu';
 import { UI_SOUNDS, uiSoundCue } from '../uisounds';
 import type { TableEntry } from '../tables';
+import { frontendSource } from './frontend-source';
 
 const read = (...parts: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...parts), 'utf8');
 const len = (s: string | undefined) => [...(s ?? '')].length;
@@ -374,7 +375,7 @@ test('en partie : la ligne dans le coin du joueur, sous l’invitation sans la t
 });
 
 test('branchements : la ligne par-dessus VPX hors de la bande, le menu système, le clic, le tintement, les résultats au retour', () => {
-  const main = read('app', 'src', 'frontend.ts');
+  const main = frontendSource();
   const notices = main.slice(main.indexOf('const menuNotices = createMenuNotices({'), main.indexOf('function openArrivedInvite'));
   assert.match(notices, /live: \{[\s\S]*onScreen: \(\) => friendsMenu\.live\.onScreen\(\)/);
   // Une seule règle (noticezone.ts) : où, le compteur, quelles notifications ; masquées pendant les parties.
@@ -590,7 +591,7 @@ test('réglage « Masquer les notifications pendant les parties » : dans la rub
   assert.equal(setting.readQuietInGame(dir), true);
   fs.writeFileSync(path.join(dir, 'amis', 'notifications-en-partie.json'), '{ illisible');
   assert.equal(setting.readQuietInGame(dir), false, 'illisible : désactivé');
-  const main = read('app', 'src', 'frontend.ts');
+  const main = frontendSource();
   assert.match(main, /library\.provideSystemItem\('quiet-in-game', \{/);
   // Les places en partie suivent le sens où VPX dessine la table (gameorientation.ts, played).
   assert.match(main, /rotation: playing && cabinet \? playedRotation\(cabinet\) : rotation/);

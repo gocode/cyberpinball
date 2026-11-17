@@ -10,6 +10,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 
 const read = (...p: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...p), 'utf8').replace(/\r\n/g, '\n');
 const css = read('app', 'renderer', 'frontend.css') + read('app', 'renderer', 'niveau.css');
@@ -71,7 +72,7 @@ test('en-tête : sur un écran plein, la roue suit les pastilles de la ligne de 
 });
 
 test('en-tête : la carte du joueur et ses badges, sur l’écran des tables comme sur les écrans pleins', () => {
-  const main = read('app', 'src', 'frontend.ts');
+  const main = frontendSource();
   const corner = main.slice(main.indexOf('function menuCorner('), main.indexOf('function cinemaFor('));
   assert.doesNotMatch(corner, /zone\.place === 'corner' && zoneScreen\(\) === 'menu' \? playerCard\(\)/, 'plus réservée à l’écran des tables');
   assert.match(corner, /const player = screen !== 'attract' && screen !== 'jukebox' \? playerCard\(\) : undefined;/);

@@ -10,6 +10,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { APP, menuRenderer } from './menu-renderer';
+import { frontendSource } from './frontend-source';
 
 const VIDEO = 'cyber-media://fichier/D%3A%5CT%5CNeon%5Cmedias%5C(Loading)%20Neon.webm?v=1';
 const GAME_ROWS: [string, string][] = [
@@ -220,14 +221,14 @@ test('partie dans le casque, casque pas sur la tête : la consigne en grand sur 
 test('la consigne du casque a son style, lisible de loin, et le processus principal la pose sur le playfield et le fronton', () => {
   const css = fs.readFileSync(path.join(APP, 'renderer', 'frontend.css'), 'utf8');
   assert.match(css, /\.vr-wear-text \{ font-size: 9cqmin;/);
-  const main = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
+  const main = frontendSource();
   assert.match(main, /vrGame && !headset\?\.worn/);
   assert.match(main, /vrWear: vrWearHint && \(role === 'playfield' \|\| role === 'backglass'\)/);
   assert.match(main, /if \(!playedVr\) vrWearHint = undefined;/);
 });
 
 test('attente du casque : Exit de la borne (touche ou bouton du joystick), Échap et le raccourci arrêtent la partie et ramènent à la roue', () => {
-  const main = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
+  const main = frontendSource();
   // Exit lu quelle que soit la fenêtre au premier plan, tant que la consigne est là et le casque pas sur la tête.
   assert.match(main, /const stopWaitExit = vrGame !== undefined \? watchExitWhileWaiting\(\(\) => Boolean\(vrWearHint\) && !headset\?\.worn, \(\) => \{[\s\S]{0,200}game\.stop\(\);/);
   assert.match(main, /if \(load\) console\.log\(load\);\s*stopWaitExit\?\.\(\);/);

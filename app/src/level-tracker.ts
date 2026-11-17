@@ -15,9 +15,14 @@ import {
   celebrate,
   closedWeeks,
   emptyLevels,
+  evaluateBadges,
   friendsGains,
   gameGains,
+  invitedGains,
   levelOf,
+  shownLevel,
+  tierOf,
+  TIER_IDS,
   liveGains,
   loadLevels,
   longestDay,
@@ -56,6 +61,8 @@ export interface LevelTrackerHost {
   history(): readonly HistoryGame[];
   /** Groupes dont je suis membre ; tables de la semaine gagnées. */
   groups?(): { count: number; wins: number };
+  /** Mes avis, retours et propositions (feedback-service.ts) : envois comptés, propositions passées « fait ». */
+  contributions?(): { count: number; shipped: number };
   /** Faux en mode invité ou pendant un essai sans opérateur : rien ne compte. */
   active(): boolean;
   /** Le niveau a changé : l'écran se redessine. */
@@ -84,6 +91,8 @@ export interface LevelTracker {
   socialChanged(): void;
   /** Relevé des classements de la semaine (après une partie, et toutes les 30 minutes). */
   noteRankings(): void;
+  /** Au moins une partie menée au bout depuis les niveaux (une invitation déclarée ensuite compte tout de suite). */
+  played(): boolean;
   /** Le moment qui attend d'être montré, s'il y en a un. */
   pending(): Celebration | undefined;
   /** Le joueur l'a vu. */
@@ -120,6 +129,19 @@ export function createLevelTracker(host: LevelTrackerHost): LevelTracker {
     }
   }
 
+  /**
+   * Mes personnes invitées confirmées (invitations.ts), avec le palier que leur carte publique montre,
+   * s'il est vraisemblable (levels.ts, shownLevel) : un palier passé rapporte à celui qui a invité.
+   */
+  function invitees(): { key: string; name: string; tier?: number }[] {
+    const at = now();
+    return host.net.invitations().received.map((i) => {
+      const card = host.net.publicCard(i.me);
+      const level = card ? shownLevel(card.xp, host.net.cardFirstSeen(i.me), at) : undefined;
+      return { key: i.me, name: card?.name ?? i.name, ...(level !== undefined ? { tier: TIER_IDS.indexOf(tierOf(level)) } : {}) };
+    });
+  }
+
   function facts(): BadgeFacts {
     const s = host.net.state();
     const play = playStats(host.tables());
@@ -133,7 +155,11 @@ export function createLevelTracker(host: LevelTrackerHost): LevelTracker {
       if (mine.rank === 1 && g.players.filter((p) => p.rank !== undefined).length >= 2) liveWins++;
     }
     const groups = host.groups?.() ?? { count: 0, wins: 0 };
+    const contributions = host.contributions?.() ?? { count: 0, shipped: 0 };
     return {
+      invited: invitees().length,
+      contributions: contributions.count,
+      ideasShipped: contributions.shipped,
       ...play,
       ...records,
       beaten: state.beaten,
@@ -247,6 +273,8 @@ export function createLevelTracker(host: LevelTrackerHost): LevelTracker {
       let next = startLevels(state, startXp(f, f), at);
       next = friendsGains(next, s.friends.map((x) => x.key), at, true).state;
       next = receivedGains(next, host.net.receivedIds(), at, true).state;
+      // Les personnes invitées d'avant les niveaux n'existent pas (les deux arrivent ensemble) : versées comme les autres.
+      next = invitedGains(next, invitees(), at).state;
       state = next;
       const granted = host.net.checkBadges(facts());
       const badges = granted.fresh.map((b) => b.id).filter((id) => badgeDefinition(id));
@@ -273,7 +301,10 @@ export function createLevelTracker(host: LevelTrackerHost): LevelTracker {
     gameEnded(f) {
       if (frozen || !host.active()) return;
       const r = gameGains(state, f);
+      const done = r.state.lastPlay !== state.lastPlay;
       apply(r.state, r.gains, `partie sur ${f.table.title}${r.capped ? ', plafond du jour atteint' : ''}`); // i18n-ignore : journal
+      // Une partie menée au bout : l'invitation déclarée compte (invitations.ts) ; rien si c'est déjà fait.
+      if (done) host.net.confirmInvitation();
       noteRankings();
     },
     liveFinished(entry) {
@@ -294,9 +325,13 @@ export function createLevelTracker(host: LevelTrackerHost): LevelTracker {
       const at = now();
       const a = friendsGains(state, host.net.state().friends.map((x) => x.key), at);
       const b = receivedGains(a.state, host.net.receivedIds(), at);
-      if (b.state !== state) apply(b.state, [...a.gains, ...b.gains], 'vie sociale'); // i18n-ignore : journal
+      const c = invitedGains(b.state, invitees(), at);
+      if (c.state !== state) apply(c.state, [...a.gains, ...b.gains, ...c.gains], 'vie sociale'); // i18n-ignore : journal
+      // Une contribution comptée (avis, proposition « fait ») : seulement des badges, sans XP à elle.
+      else if (evaluateBadges(host.net.state().badges, facts()).length) apply(state, [], 'badges'); // i18n-ignore : journal
     },
     noteRankings,
+    played: () => Boolean(state.firstPlay),
     pending: () => state.pending,
     seen() {
       if (!state.pending) return;

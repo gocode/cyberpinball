@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import * as zlib from 'node:zlib';
 import { imageMayBeTransparent, implicitBackglass, largestFreeRectangle, lastVrMeasuresBlock, parseVrMeasures, primitiveVertex, vrBackglassView, zoneSetting } from '../fronton-vr';
 import { biff, cfb, u32 } from './fixtures';
+import { frontendSource } from './frontend-source';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const f32 = (...values: number[]) => {
@@ -153,13 +154,13 @@ test('mesures du plugin : jamais effacées ; le dernier bloc (une partie) lu, re
   assert.equal(lastVrMeasuresBlock(`${text}\nrapporte 2026-11-11`)!.reported, true);
   assert.equal(lastVrMeasuresBlock(''), undefined);
   // Le fichier n'est plus vidé avant une partie : la précédente est d'abord reportée.
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.doesNotMatch(frontend, /fs\.writeFileSync\(vrMeasuresFile\(\), ''\)/);
   assert.match(frontend, /function prepareVrMeasures\(\): void \{[\s\S]{0,400}noteVrMeasures\(true\);/);
 });
 
 test('partie dans le casque : la zone, les mesures et les captures réglées pour le plugin, et reportées au journal à la fin', () => {
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.match(frontend, /const view = vr\.addBackglass \? cachedVrBackglassView\(tableFile, vrZonesFile\(\)\) : undefined;/);
   for (const key of ['Zone', 'LogFile', 'CaptureDir']) assert.ok(frontend.includes(`key: '${key}'`), key);
   assert.match(frontend, /if \(playedVr && vrGame\) noteVrMeasures\(\);/);

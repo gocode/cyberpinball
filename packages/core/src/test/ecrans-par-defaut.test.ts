@@ -18,6 +18,7 @@ import { ROLES, type Cabinet } from '../model';
 import type { TableEntry } from '../tables';
 import { devPcDisplays, emptyCabinet } from './fixtures';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 
 const table = (title: string) => ({ file: `C:\\Tables\\${title}.vpx`, title }) as TableEntry;
 const selected = table('Neon Galaxy');
@@ -108,7 +109,7 @@ test('affichage par défaut : le rendu a un composant pour chaque écran (media.
 });
 
 test('menu : les médias et le son de chaque fenêtre passent par screensTable', () => {
-  const frontend = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   // Les phases du menu sont celles de screensTable : une nouvelle phase y déclare sa table.
   assert.match(frontend, /^type Phase = MenuPhase;\r?$/m);
   assert.match(frontend, /medias: subject \? mediasOf\(subject\) : defaults,/);

@@ -7,7 +7,8 @@
 // semaine au-delà de ce qu'une semaine permet, ne se classe pas : il est compté à part, jamais caché.
 // Un total seulement inattendu pour l'ancienneté du joueur sur cette borne se classe, niveau « ? ».
 
-import { levelOf, levelsXpCeiling, shownLevel, weekKey, WEEK_XP_MAX } from './levels';
+import { invitedOf, type CardInvite } from './invitations';
+import { INVITED_XP_MAX, levelOf, levelsXpCeiling, shownLevel, weekKey, WEEK_XP_MAX } from './levels';
 import type { CardWeek } from './publicprofile';
 
 export const PLAYER_SCOPES = ['friends', 'country', 'world'] as const;
@@ -26,6 +27,9 @@ export interface RankedPlayer {
   avatar?: string;
   xp?: number;
   week?: CardWeek;
+  /** Ses personnes invitées (invitations.ts) : leurs XP sont hors plafond, la vraisemblance en tient compte. */
+  invited?: CardInvite[];
+  invitedTotal?: number;
 }
 
 export interface PlayerLine {
@@ -90,11 +94,13 @@ export function playerBoard(cards: readonly RankedPlayer[], opts: PlayerBoardOpt
     // joueur : classé, son niveau en « ? » (comme aux tableaux des tables), jamais écarté (une borne
     // neuve écarterait sinon tous les joueurs anciens).
     const week = weekOf(p, now);
-    if (!mine && ((p.xp !== undefined && p.xp > ceiling) || (week !== undefined && week > WEEK_XP_MAX))) {
+    const invited = p.invited ? invitedOf(p.key, p.invited, p.invitedTotal).count : 0;
+    const extra = invited * INVITED_XP_MAX;
+    if (!mine && ((p.xp !== undefined && p.xp > ceiling + extra) || (week !== undefined && week > WEEK_XP_MAX + extra))) {
       if (opts.period === 'all' ? (p.xp ?? 0) > 0 : (week ?? 0) > 0) doubtful++;
       continue;
     }
-    const level = p.xp === undefined ? undefined : mine ? levelOf(p.xp).level : shownLevel(p.xp, opts.firstSeen?.(p.key), now);
+    const level = p.xp === undefined ? undefined : mine ? levelOf(p.xp).level : shownLevel(p.xp, opts.firstSeen?.(p.key), now, invited);
     const unsure = !mine && p.xp !== undefined && level === undefined;
     const common = { key: p.key, name: p.name, ...(p.country ? { country: p.country } : {}), ...(p.avatar ? { avatar: p.avatar } : {}), ...(level ? { level } : {}), ...(unsure ? { levelUnsure: true as const } : {}), ...(mine ? { mine: true as const } : {}) };
     if (opts.period === 'all') {

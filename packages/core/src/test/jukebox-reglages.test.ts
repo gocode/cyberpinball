@@ -11,6 +11,7 @@ import { REPO_ROOT } from './i18n-scan';
 import { DEFAULT_MENU_MEDIA_SETTINGS, type MenuMediaSettings } from '../mediaview';
 import { SYSTEM_GROUPS, systemPathOf } from '../systemmenu';
 import type { JukeboxAudioRoute } from '../jukebox-audio';
+import { frontendSource } from './frontend-source';
 
 interface BuiltLike {
   heading: string;
@@ -143,7 +144,7 @@ test('sorties : celles de la borne (pas les virtuelles), la sortie du menu suivi
 test('gestion du Juke-box : la ligne « Réglages du Juke-box » y mène, Exit y ramène', () => {
   const src = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'jukebox-menu.ts'), 'utf8');
   assert.match(src, /label: t\('Réglages du Juke-box'\), key: 'settings'[\s\S]{0,120}host\.openSettings!\(\(\) => open\(\)\)/);
-  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   assert.match(front, /jukeboxSettings: \(back\) => jukeboxSettings\.open\(back\)/);
   assert.match(front, /routes: \(\) => jukeboxAudioRoutes\(\)/);
   assert.match(front, /return jukeboxRoutes\(headset\?\.inUse \? \{ outputs: \[\] \} : mediaSettings\.jukeboxAudio, menuOutput\(\)\);/, 'casque en usage : le Juke-box le suit');

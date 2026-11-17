@@ -169,8 +169,8 @@ test('niveaux : le fichier se relit, un fichier illisible est mis de côté', ()
   }
 });
 
-test('badges : 50 badges, identifiants uniques, icônes connues, XP et formes par rareté', () => {
-  assert.equal(BADGES.length, 50);
+test('badges : 56 badges, identifiants uniques, icônes connues, XP et formes par rareté', () => {
+  assert.equal(BADGES.length, 56);
   assert.equal(new Set(BADGES.map((b) => b.id)).size, BADGES.length);
   for (const b of BADGES) {
     assert.ok((ICON_NAMES as readonly string[]).includes(b.icon), `icône de ${b.id}`);
@@ -180,7 +180,7 @@ test('badges : 50 badges, identifiants uniques, icônes connues, XP et formes pa
   }
   assert.equal(BADGES.reduce((a, b) => a + RARITY_XP[b.rarity], 0), BADGES_XP_ALL, 'BADGES_XP_ALL suit le catalogue');
   const count = (r: string) => BADGES.filter((b) => b.rarity === r).length;
-  assert.deepEqual([count('common'), count('rare'), count('epic'), count('legendary')], [17, 16, 11, 6]);
+  assert.deepEqual([count('common'), count('rare'), count('epic'), count('legendary')], [18, 18, 13, 7]);
   for (const id of ['first-game', 'ten-tables', 'hundred-games', 'hour-on-table', 'ten-hours', 'first-record', 'grand-champion', 'five-champion']) assert.ok(BADGES.some((b) => b.id === id), `ancien identifiant gardé : ${id}`);
   assert.equal(badgeXp('explorer'), 150);
   assert.equal(badgeXp('inconnu'), 0);

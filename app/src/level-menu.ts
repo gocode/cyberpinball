@@ -78,6 +78,8 @@ const GAIN_ICON: Record<XpGain['kind'], IconName> = {
   friend: 'friend-add',
   like: 'star',
   reaction: 'sparkle',
+  invited: 'friend-add',
+  'invitee-tier': 'upgrade',
 };
 
 export function createLevelMenu(host: LevelMenuHost): LevelMenu {

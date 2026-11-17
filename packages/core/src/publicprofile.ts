@@ -22,6 +22,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import { isAvatarHash } from './avatar';
+import { INVITES_IN_CARD, INVITES_MAX, isCardInvite, type CardInvite } from './invitations';
 import { isPlayerPublicKey, signText, verifyText, type PlayerKey } from './sharing';
 import { normalizeName, type PresenceTable, type SocialEvent, type SocialState } from './social';
 
@@ -68,6 +69,12 @@ export interface PublicCard {
   week?: CardWeek;
   /** Nombre de ses amis (jamais la liste). */
   friends?: number;
+  /**
+   * Les personnes qu'il a invitées (invitations.ts) : les attestations signées par chacune, les
+   * INVITES_IN_CARD plus récentes, et le total. Absents d'une carte d'avant ou sans personne invitée.
+   */
+  invited?: CardInvite[];
+  invitedTotal?: number;
   events: PublicEvent[];
   /** « J'aime » reçus par évènement (id → nombre). */
   likes: Record<string, number>;
@@ -121,7 +128,7 @@ const DAY = 86_400_000;
 
 function cardText(c: Omit<PublicCard, 'sig'>): string {
   // Niveau, semaine et amis n'entrent au texte que s'ils y sont : les cartes d'avant se vérifient toujours.
-  return JSON.stringify({ app: 'cyberpinball', kind: 'card', key: c.key, name: c.name, country: c.country ?? null, avatar: c.avatar ?? null, badges: c.badges, records: c.records, events: c.events, likes: c.likes, at: c.at, ...(c.xp !== undefined ? { xp: c.xp } : {}), ...(c.friends !== undefined ? { friends: c.friends } : {}), ...(c.week ? { week: { of: c.week.of, xp: c.week.xp } } : {}) });
+  return JSON.stringify({ app: 'cyberpinball', kind: 'card', key: c.key, name: c.name, country: c.country ?? null, avatar: c.avatar ?? null, badges: c.badges, records: c.records, events: c.events, likes: c.likes, at: c.at, ...(c.xp !== undefined ? { xp: c.xp } : {}), ...(c.friends !== undefined ? { friends: c.friends } : {}), ...(c.week ? { week: { of: c.week.of, xp: c.week.xp } } : {}), ...(c.invited ? { invited: c.invited.map((i) => ({ me: i.me, name: i.name, machine: i.machine, at: i.at, sig: i.sig })), invitedTotal: c.invitedTotal ?? c.invited.length } : {}) });
 }
 
 /** Mes évènements publics : records et badges des derniers jours, du plus récent au plus ancien. */
@@ -134,14 +141,14 @@ export function publicEvents(events: readonly SocialEvent[], now = new Date()): 
 }
 
 /** Ma carte, signée : les « J'aime » reçus sur ses évènements comptés à l'instant. */
-export function makeCard(state: Pick<SocialState, 'key' | 'name' | 'events' | 'badges'>, store: ProfileStore, extra: { country?: string; avatar?: string; records: number; xp?: number; week?: CardWeek; friends?: number }, now = new Date()): PublicCard {
+export function makeCard(state: Pick<SocialState, 'key' | 'name' | 'events' | 'badges'>, store: ProfileStore, extra: { country?: string; avatar?: string; records: number; xp?: number; week?: CardWeek; friends?: number; invited?: { list: CardInvite[]; total: number } }, now = new Date()): PublicCard {
   const events = publicEvents(state.events, now);
   const likes: Record<string, number> = {};
   for (const e of events) {
     const n = store.received.filter((l) => l.event === e.id && l.on && !store.hidden.includes(l.from)).length;
     if (n) likes[e.id] = n;
   }
-  const base: Omit<PublicCard, 'sig'> = { key: state.key.publicKey, name: state.name, ...(extra.country ? { country: extra.country } : {}), ...(extra.avatar ? { avatar: extra.avatar } : {}), badges: state.badges.map((b) => b.id), records: extra.records, events, likes, at: now.toISOString(), ...(extra.xp !== undefined ? { xp: Math.max(0, Math.floor(extra.xp)) } : {}), ...(extra.friends !== undefined ? { friends: extra.friends } : {}), ...(extra.week && isDayKey(extra.week.of) ? { week: { of: extra.week.of, xp: Math.max(0, Math.min(Math.floor(extra.week.xp), extra.xp ?? Infinity)) } } : {}) };
+  const base: Omit<PublicCard, 'sig'> = { key: state.key.publicKey, name: state.name, ...(extra.country ? { country: extra.country } : {}), ...(extra.avatar ? { avatar: extra.avatar } : {}), badges: state.badges.map((b) => b.id), records: extra.records, events, likes, at: now.toISOString(), ...(extra.xp !== undefined ? { xp: Math.max(0, Math.floor(extra.xp)) } : {}), ...(extra.friends !== undefined ? { friends: extra.friends } : {}), ...(extra.week && isDayKey(extra.week.of) ? { week: { of: extra.week.of, xp: Math.max(0, Math.min(Math.floor(extra.week.xp), extra.xp ?? Infinity)) } } : {}), ...(extra.invited?.list.length ? { invited: extra.invited.list.slice(-INVITES_IN_CARD), invitedTotal: Math.max(extra.invited.list.length, Math.floor(extra.invited.total)) } : {}) };
   return { ...base, sig: signText(cardText(base), state.key) };
 }
 
@@ -198,7 +205,13 @@ export function verifyCard(raw: unknown, now = new Date()): PublicCard | undefin
     if (!w || !isDayKey(w.of) || wxp === undefined || (r.xp !== undefined && wxp > (r.xp as number))) return undefined;
     week = { of: w.of, xp: wxp };
   }
-  const card: PublicCard = { key: r.key, name, ...(r.country ? { country: r.country as string } : {}), ...(r.avatar ? { avatar: r.avatar as string } : {}), badges: r.badges as string[], records: r.records, events: events as PublicEvent[], likes, at: r.at, ...(r.xp !== undefined ? { xp: r.xp as number } : {}), ...(r.friends !== undefined ? { friends: r.friends as number } : {}), ...(week ? { week } : {}), sig: r.sig };
+  // Les personnes invitées : la forme ici, la signature de chacune à l'affichage (invitedOf).
+  let invited: CardInvite[] | undefined;
+  if (r.invited !== undefined) {
+    if (!Array.isArray(r.invited) || r.invited.length > INVITES_IN_CARD || !r.invited.every(isCardInvite) || count(r.invitedTotal, INVITES_MAX) === undefined) return undefined;
+    invited = (r.invited as CardInvite[]).map((i) => ({ me: i.me, name: i.name, machine: i.machine, at: i.at, sig: i.sig }));
+  }
+  const card: PublicCard = { key: r.key, name, ...(r.country ? { country: r.country as string } : {}), ...(r.avatar ? { avatar: r.avatar as string } : {}), badges: r.badges as string[], records: r.records, events: events as PublicEvent[], likes, at: r.at, ...(r.xp !== undefined ? { xp: r.xp as number } : {}), ...(r.friends !== undefined ? { friends: r.friends as number } : {}), ...(week ? { week } : {}), ...(invited ? { invited, invitedTotal: r.invitedTotal as number } : {}), sig: r.sig };
   const { sig, ...base } = card;
   return verifyText(cardText(base), sig, card.key) ? card : undefined;
 }
@@ -241,7 +254,27 @@ export function pruneCards(store: ProfileStore, now = new Date()): ProfileStore 
 /** Ce qu'une borne envoie au bonjour : ma carte d'abord, puis les plus récemment vues. */
 export function cardsSample(store: ProfileStore, mine: PublicCard | undefined): PublicCard[] {
   const recent = [...store.cards].sort((a, b) => Date.parse(store.seen[b.key] ?? b.at) - Date.parse(store.seen[a.key] ?? a.at));
-  return [...(mine ? [mine] : []), ...recent].slice(0, CARDS_BATCH);
+  return withinBytes([...(mine ? [mine] : []), ...recent].slice(0, CARDS_BATCH));
+}
+
+/**
+ * Taille au plus des cartes d'un même message : sous la limite d'un message du réseau des bornes
+ * (256 Ko, social-net.ts), qui refuse le message entier au-delà. Une carte porte jusqu'à vingt
+ * attestations de personnes invitées et vingt évènements : cinquante cartes pleines la dépasseraient.
+ */
+export const CARDS_BYTES = 180 * 1024;
+
+/** Les premières cartes qui tiennent dans CARDS_BYTES (la première toujours). */
+export function withinBytes(cards: readonly PublicCard[], budget = CARDS_BYTES): PublicCard[] {
+  const out: PublicCard[] = [];
+  let used = 0;
+  for (const c of cards) {
+    const size = Buffer.byteLength(JSON.stringify(c), 'utf8');
+    if (out.length && used + size > budget) break;
+    out.push(c);
+    used += size;
+  }
+  return out;
 }
 
 export function cardOf(store: ProfileStore, key: string): PublicCard | undefined {

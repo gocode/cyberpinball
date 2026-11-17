@@ -16,6 +16,7 @@ import { test } from 'node:test';
 import { analysePack, forgetFileComparisons, packScreens, variantDifferences } from '../puppack';
 import { forgetVpxScripts, readVpxScript } from '../vpxinfo';
 import { gotgPack, starTrekPack, vpxWithScript } from './fixtures';
+import { frontendSource } from './frontend-source';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const nodeFs = require('node:fs') as { readFileSync: typeof fs.readFileSync; openSync: typeof fs.openSync };
@@ -128,7 +129,7 @@ test('.vpx : un long script lu par blocs de secteurs donne le même texte, et n�
 });
 
 test('relevés du démarrage : table par table, en rendant la main, jamais pendant une partie', () => {
-  const frontend = fs.readFileSync(path.join(REPO, 'app', 'src', 'frontend.ts'), 'utf8').replace(/\r\n/g, '\n');
+  const frontend = frontendSource();
   for (const name of ['auditVrBackglass', 'auditPupPacks']) {
     const start = frontend.indexOf(`async function ${name}(): Promise<void> {`);
     assert.ok(start >= 0, `${name} est asynchrone`);

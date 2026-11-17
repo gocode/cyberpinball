@@ -10,8 +10,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 
-const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+const front = frontendSource();
 const lines = front.split(/\r?\n/);
 
 /** Le corps d'une fonction de premier niveau, de sa signature à l'accolade fermante en début de ligne. */

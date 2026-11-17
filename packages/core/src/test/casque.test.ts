@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import { CONTROLLER_ELEMENTS, HEADSET_PROFILES } from '../manettes';
 import { headsetPanels, headsetProtocol, LOCKBAR_DISTANCE_M, MIN_PLAYFIELD_M, panelSize, rotateVector, STANDARD_HEAD, type HeadsetPanel, type HeadsetSource } from '../casque';
 import { edgeRotation } from '../model';
+import { frontendSource } from './frontend-source';
 
 /** Un fichier source, fins de ligne ramenées à LF : le même texte dans un checkout CRLF (core.autocrlf) ou LF. */
 function source(...parts: string[]): string {
@@ -140,7 +141,7 @@ test('manettes du casque : le compagnon lit tout le catalogue, profil par profil
   const app = path.join(repo, 'app', 'src');
   const menu = fs.readFileSync(path.join(app, 'casque.ts'), 'utf8');
   assert.match(menu, /if \(parseControllerEvent\(button\[1\]!\)\) this\.opts\.onButton\?\.\(button\[1\]!, button\[2\] === '1'\);/);
-  const frontend = fs.readFileSync(path.join(app, 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   assert.match(frontend, /onButton: \(button, down\) => headsetButton\(button, down\),/);
   assert.match(frontend, /const action = menuActionOf\(controllerSetting\(\), name\);/);
   assert.match(frontend, /headsetKey\(b, true, false\);/);
@@ -163,7 +164,7 @@ test('casque éteint ou Link coupé : l’affichage revient aux écrans du PC, e
   assert.match(menu, /return Boolean\(this\.child\) && this\.viewsFlowing && this\.wornOnce && !this\.standby;/);
   assert.match(menu, /if \(line\.startsWith\('casque-perdu'\)\) \{\s*this\.lost = true;\s*this\.opts\.onLost\?\.\(this\.standby\);/);
   assert.match(menu, /if \(code !== 0 \|\| this\.lost\) this\.retryAt = Date\.now\(\) \+ RETRY_MS;/);
-  const frontend = fs.readFileSync(path.join(app, 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   assert.match(frontend, /const inHeadset = Boolean\(headset\?\.inUse\);/);
   assert.match(frontend, /onLost: \(inGame\) => headsetLost\(inGame\),/);
   // Partie dans le casque : le casque perdu ferme VPX (qui continuerait sans personne).
@@ -184,7 +185,7 @@ test('pièce du Quest changée ou vue réinitialisée : la borne reste où elle 
   assert.doesNotMatch(menu, /onRoom\?\.\(this\.room, true\)/);
   assert.match(menu, /if \(this\.restartAfterGame\) this\.restart\(\);/);
   assert.match(menu, /if \(this\.roomRestart\) \{\s*this\.roomRestart = false;\s*this\.opts\.onRoomRestart\?\.\(Number\(eyes\[1\]\)\);/);
-  const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   assert.match(frontend, /roomStale = Boolean\(eyeHeightProblem\(eyes\)\);/);
 });
 
@@ -201,7 +202,7 @@ test('fin de partie et accueil de Link : le menu revient sans repasser par Link'
   assert.match(menu, /if \(line === 'session-suspendue'\) \{[\s\S]{0,300}continue;/);
   assert.match(menu, /if \(line\.startsWith\('session-arretee'\)\) \{[\s\S]{0,300}this\.restartNow = true;/);
   assert.match(menu, /if \(this\.restartNow\) \{\s*this\.restartNow = false;\s*this\.retryAt = 0;\s*setImmediate\(\(\) => this\.check\(\)\);/);
-  const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   assert.match(frontend, /headsetPaused = false;[\s\S]{0,500}if \(playedVr && headset\?\.standby\) \{[\s\S]{0,200}headset\.restart\(\);/);
 });
 

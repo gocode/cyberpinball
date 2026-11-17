@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { LOADING_SLOW_MS, LOADING_STEPS, advanceLoadingStep, loadingStepLabel } from '../loadingprogress';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 
 const read = (...parts: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...parts), 'utf8');
 
@@ -26,7 +27,7 @@ test('chargement lisible : des étapes observées, jamais de pourcentage ni de p
   const slow = renderer.slice(renderer.indexOf('function slowMeta('), renderer.indexOf('function fitLoadingCard('));
   assert.ok(slow.length > 0);
   assert.doesNotMatch(slow, /t\('[^']*%|percent|progress/i, 'aucun pourcentage dans le cartouche');
-  const main = read('app', 'src', 'frontend.ts');
+  const main = frontendSource();
   // Les étapes viennent de ce qui est vu : le processus lancé, une fenêtre de VPX (launcher.ts, onWindows).
   assert.match(main, /launchStep\('launched'\);/);
   assert.match(main, /const onWindows = \(\) => launchStep\('windows'\);/);
@@ -37,7 +38,7 @@ test('chargement lisible : des étapes observées, jamais de pourcentage ni de p
 });
 
 test('chargement lisible : Exit (une fois le cartouche affiché) et Ctrl+Maj+K arrêtent, par la porte de l’arrêt forcé ; rien n’est compté', () => {
-  const main = read('app', 'src', 'frontend.ts');
+  const main = frontendSource();
   assert.match(main, /case 'loading':\s+\/\/[^\n]*\n\s+if \(matchesShortcut\(input, SHORTCUTS\.forceStop\) \|\| \(launch\?\.slow && is\(KEYS\.exit\)\)\) \{\s+if \(guest\.knock\('game\.force-stop'\)\) stopLaunch\(\);/);
   // Arrêté avant le lancement de VPX : il ne l'est pas ; après : il se ferme ; dans les deux cas, la roue, sans statistiques.
   assert.match(main, /if \(launch\?\.stopped\) \{\s+endLaunch\(\);/);

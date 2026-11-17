@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { anchorHeight, cabinetPlaceFileName, calibrateMenuText, calibrationSetting, DESK_LOCKBAR_HEIGHT_M, freePlace, calibrationGap, calibrationProblem, eyeHeightProblem, isCalibrated, lockbarMarks, lockbarPlace, lockbarVpxSettings, placeLockbar, placeVpxSettings, roomMoved, shouldOfferCalibration, STANDARD_TABLE_WIDTH_CM } from '../calage';
 import { LOCKBAR_DISTANCE_M, LOCKBAR_HEIGHT_M } from '../casque';
 import { vrCarriedSettings } from '../vr';
+import { frontendSource } from './frontend-source';
 
 const close = (a: number, b: number, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${a} ≠ ${b}`);
 const value = (settings: { section: string; key: string; value: string }[], key: string) => Number(settings.find((s) => s.key === key)!.value);
@@ -89,7 +90,7 @@ test('calage : branchements du compagnon, du casque et du menu', () => {
   assert.match(cpp, /anchor\.position = \{ anchorX, anchorY, anchorZ \};/);
   const casque = read('app', 'src', 'casque.ts');
   assert.match(casque, /return `ancre \$\{place\.x\} \$\{place\.z\} \$\{place\.yaw\} \$\{anchorHeight\(place\)\}\\n`;/);
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.match(frontend, /if \(calibration\) return calibrationKey\(input\);/);
   assert.match(frontend, /writeVrCalibration\(loc\.dataDir, left && right \? lockbarVpxSettings\(left, right\) : placeVpxSettings\(place\)\);/);
   assert.match(frontend, /library\.provideSystemItem\('vr-calibrate', \{/);
@@ -137,7 +138,7 @@ test('limite du Quest changée depuis le calage, sol mal réglé : repérés', (
 test('borne fixe : aucun recentrage automatique, la place imposée à VPX, le calage proposé d’office', () => {
   const repo = path.join(__dirname, '..', '..', '..', '..');
   const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8');
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.match(frontend, /const table = vpxTableGeometry\(tableFile\);\s*const menuWidth = menuPlayfield\(headsetSources\(\), headsetTurn\(\)\)\?\.width;\s*const settings = placeVpxSettings\(place, table, menuWidth\);[\s\S]{0,400}writeIniSettings\(vr\.ini, settings\);/);
   assert.match(frontend, /const vrCenter = vrGame && !readCabinetPlace\(headsetPlaceFile\(\)\) && !vrHasSavedPlace\(vrText\)/);
   // Au port du casque : l'assistant des manettes d'abord ; le calage, seulement s'il est remis en limite fixe.
@@ -165,7 +166,7 @@ test('un calage par configuration ; au bureau, la borne posée librement, puis f
   assert.ok(DESK_LOCKBAR_HEIGHT_M >= 0.85 && DESK_LOCKBAR_HEIGHT_M <= 0.9);
   assert.match(calibrateMenuText({ vrReady: true, headset: 'shown', place: desk, setting: 'bureau' }).detail, /^Posée au bureau, barre avant à 88 cm du sol · Au bureau : la borne se pose devant vous \(A\)/);
   const repo = path.join(__dirname, '..', '..', '..', '..');
-  const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   assert.match(frontend, /return path\.join\(loc\.dataDir, 'vr', cabinetPlaceFileName\(menuConfiguration\)\);/);
   // Start au bureau : recentrage demandé, la place du regard gardée à son retour (« centre »).
   assert.match(frontend, /calibration\.placing = true;\s*showCalibration\(\);\s*headset\?\.recenter\(\);/);
@@ -177,7 +178,7 @@ test('calage proposé d’office seulement casque remis en limite fixe ; gâchet
   // puis remis et que le Quest est en limite fixe ; jamais au premier port, jamais en limite de pièce. Les
   // gâchettes placent et replacent la borne ; un seul bouton (A) valide et sort ; B sort sans rien changer.
   const repo = path.join(__dirname, '..', '..', '..', '..');
-  const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   // Calage périmé (limite changée, staleCalibration) : proposé une fois, quel que soit le type de limite.
   for (const keeping of ['kept', 'recentred', undefined] as const) assert.equal(shouldOfferCalibration('limite-changee', keeping), true);
   for (const reason of ['premier-port', 'piece-perimee'] as const)

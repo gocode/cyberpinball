@@ -9,6 +9,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 import {
   answerGame,
   guestGame,
@@ -195,7 +196,7 @@ test('service : l’invitation dit 3 billes, l’invité répond 5, le journal l
 });
 
 test('application : le nombre de billes est calculé pour la partie en direct, ROM puis script', () => {
-  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   assert.match(front, /ballsOf: async \(table\) => \(await ballCounts\.of\(table\)\)\?\.balls,/);
   const counts = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'ball-count.ts'), 'utf8');
   assert.match(counts, /path\.join\(table\.folder, 'pinmame'\)/, 'le .nv à côté de la table d’abord');

@@ -9,6 +9,7 @@ import type { Cabinet } from '../model';
 import { planVpxSync } from '../sync';
 import { SYSTEM_ITEMS, systemPathOf } from '../systemmenu';
 import { devPcDisplays, emptyCabinet } from './fixtures';
+import { frontendSource } from './frontend-source';
 import {
   CAPTURE_PHASES,
   QUIT_HOLD_MS,
@@ -274,7 +275,7 @@ test('les écrans de l’assistant affichent toujours le bouton « Quitter sans 
 });
 
 test('menu système : chaque étape seule dans « Configuration de la borne »', () => {
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   // L'entrée vient de l'arbre du menu système (systemmenu.ts), rubrique Borne ; son sous-menu, de frontend.ts.
   assert.equal(SYSTEM_ITEMS.cabinet.label, 'Configuration de la borne');
   assert.deepEqual(systemPathOf('cabinet'), ['borne']);

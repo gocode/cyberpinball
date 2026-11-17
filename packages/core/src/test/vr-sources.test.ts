@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { desktopVisibility, dmdFlasherName, parseVrMeasures } from '../fronton-vr';
 import { isVrImage, missingVrSources, roomDmdSetting, scriptDmd, VR_DMD_BAND, vrSources } from '../vr-sources';
+import { frontendSource } from './frontend-source';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8').replace(/\r\n/g, '\n');
@@ -50,14 +51,14 @@ test('plugin : bande DMD sous le fronton seulement quand une source y dessine, i
   assert.match(cpp, /dmdVu = !rendre\(nullptr, chaineDmd,/);
   assert.match(cpp, /if \(f\.empty\(\) && charger\(imageDuFronton, imageFronton_Val\)\)/);
   assert.match(cpp, /Chaine chaineDmd \{ VPXWINDOW_ScoreView \};/);
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.match(frontend, /key: 'DmdBand', value: vr\.addBackglass \? String\(VR_DMD_BAND\) : '0'/);
   assert.match(frontend, /key: 'DmdOrder', value: 'PUP,B2S'/);
   assert.match(frontend, /VR : pas de source \$\{missing\.join\(' ni de '\)\} pour cette table/);
 });
 
 test('casque non détecté au lancement : la partie en mode normal, sans attente, l’option VR gardée', () => {
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.match(frontend, /if \(headset && !HEADSET_TRIAL_DIR && !headsetDetected\(\)\) \{[\s\S]{0,300}showBanner\(t\('Casque non détecté : partie en mode normal'\)\);\s*return undefined;/);
   assert.match(frontend, /function headsetDetected\(\): boolean \{\s*return Boolean\(headset && \(headset\.state === 'shown' \|\| headset\.inUse\)\);/);
   // L'option n'est pas décochée : writeVrMode n'est appelé que par l'entrée du menu.
@@ -65,7 +66,7 @@ test('casque non détecté au lancement : la partie en mode normal, sans attente
 });
 
 test('recopie sur le playfield : une option du menu, éteinte par défaut, passée à la partie', () => {
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.match(frontend, /library\.provideSystemItem\('vr-mirror', \{/);
   assert.match(frontend, /prepareVrGame\(\{[^}]*mirror: vrMirror \}\)/);
   assert.match(read('app', 'src', 'vr.ts'), /\.mirror === true;/);
@@ -119,7 +120,7 @@ test('plugin : source d’affichage du cadre DMD de la pièce VR, PuP seul puis 
   assert.match(cpp, /ecrire\("salle dmd=" \+/);
   const pause = read('packages', 'vpx-vision3d', 'src', 'pause.h');
   assert.match(pause, /constexpr int SALLE_DMD_L = 512, SALLE_DMD_H = 288;/);
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.match(frontend, /key: 'RoomDmd', value: sources\.roomDmd/);
   assert.match(frontend, /table\(s\) au cadre DMD de pièce VR rempli par Cyber Pinball/);
   assert.equal(parseVrMeasures(['salle source=PUP', 'salle dmd=aucune', 'salle dmd=PUP', ''].join('\n'))?.roomDmd, 'PUP');
@@ -141,7 +142,7 @@ test('trois emplacements : fronton, full DMD, et les scores par-dessus, jamais c
   assert.match(cpp, /capturerComposition\("debut"\);/);
   assert.match(cpp, /"sources fronton=" \+[\s\S]{0,200}" scores="/);
   // Jamais de DMD incrusté dans le fronton en VR : il a sa bande.
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.match(frontend, /key: 'BackglassDMDOverlay', value: '0'/);
   assert.match(frontend, /key: 'ScoreViewDMDOverlay', value: '1'/);
   // 2001 : full DMD de PuP et scores d'UltraDMD, les deux dits.

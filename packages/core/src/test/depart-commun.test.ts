@@ -14,6 +14,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 import {
   applyRoom,
   gameStatus,
@@ -494,7 +495,7 @@ test('service : l’hôte prêt attend son invité ; « partez » arrive aux deu
 
 test('application : le fichier « partez » posé au signal, la table sans relevé prête à l’écran, l’attente avant la bande', () => {
   const read = (...p: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...p), 'utf8');
-  const front = read('app', 'src', 'frontend.ts');
+  const front = frontendSource();
   // Prête seulement table à l'écran ; la carte de l'attente chargée d'avance, dès le lancement de VPX (borne lente du 31/10/2026).
   assert.match(front, /if \(onScreen && \(st\?\.ready \|\| st\?\.started\)\) hooks\.gate\?\.ready\(\);/);
   assert.match(front, /onScreen = true;\r?\n\s+if \(liveManual\) hooks\.gate\?\.ready\(\{ manual: true \}\);/);

@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { DEFAULT_MENU_MEDIA_SETTINGS, normalizeMenuMediaSettings } from '../mediaview';
 import { medallionWheel, medallionWheelMove, type Medallion } from '../jukebox-screens';
+import { frontendSource } from './frontend-source';
 
 const LEADS: Medallion[] = ['jukebox', 'community', 'collections'];
 
@@ -155,7 +156,7 @@ test('affiche du médaillon : nombre de collections et de tables, la collection 
 });
 
 test('frontend : le médaillon est câblé comme les deux autres (roue, Start, clic, téléphone, affiche, rendu)', () => {
-  const main = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const main = frontendSource();
   assert.match(main, /collectionsShown\(\) \? \(\['collections'\] as const\)/, 'dans les médaillons de tête, après la Communauté');
   assert.match(main, /button === 'confirm' && onCollections\(\)/, 'Start ouvre la liste');
   assert.match(main, /action\.offset === 0 && onCollections\(\)/, 'clic au centre de la roue');

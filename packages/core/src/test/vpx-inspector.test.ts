@@ -12,6 +12,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 import {
   FIREWALL_RULE,
   INSPECTOR_PORTS,
@@ -146,7 +147,7 @@ test('la règle suit VPX quand sa version change : jonction déplacée, règle �
     await firewall.allow();
     assert.equal(await firewall.checkVpx(), 'closed');
     // L'application relit la règle avant chaque partie entre amis.
-    const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+    const front = frontendSource();
     assert.match(front, /vpx: \(\) => vpxFirewallTargets\(vpxInstall\(loc\)\?\.exe\)/);
     assert.match(front, /const inspectorReady = hooks\.double && !displayMode && simulated === undefined \? inspectorFor\(socialFirewall, /);
     assert.match(fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'vpx-inspector.ts'), 'utf8'), /const state = await firewall\.checkVpx\(\)/);
@@ -194,7 +195,7 @@ test('le double : carte réduite sous les deux noms du jeu, VPinballX.ini copié
   assert.match(doubles, /fs\.rmSync\(out, \{ force: true \}\);\s*fs\.writeFileSync\(out, f\.text, 'utf8'\);/);
   assert.match(doubles, /fs\.writeFileSync\(file, iniWithInspector\(iniText!, offered!\.port\), 'utf8'\);\s*ini = \{ file, text: iniText!, port: offered!\.port \};/);
   assert.ok(!/writeFileSync\(iniSource/.test(doubles), 'le VPinballX.ini de la borne n’est jamais écrit');
-  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   // Le double passe avant l'INI d'une partie enregistrée (jamais ensemble : « Jouer et enregistrer » joue seul).
   assert.match(front, /ini: vrGame\?\.ini \?\? double\?\.ini \?\? recordIni\?\.ini \?\? activeVpxIni\(loc\)/);
 });

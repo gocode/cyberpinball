@@ -21,6 +21,7 @@ import { MENU_PHASES } from '../menumoments';
 import { NOTICE_GATHER_MS, NOTICE_STARTUP_QUIET_MS, type NoticeView } from '../notices';
 import { ZONE_SCREENS, noticeZone, type NoticeZone, type ZoneScreen } from '../noticezone';
 import { newSocialState } from '../social';
+import { frontendSource } from './frontend-source';
 
 const read = (...p: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...p), 'utf8');
 
@@ -52,7 +53,7 @@ test('partout : chaque écran de Cyber Pinball a le compteur et toutes les notif
 });
 
 test('partout : chaque phase du menu est nommée par zoneScreen (frontend.ts), et chaque écran par-dessus aussi', () => {
-  const main = read('app', 'src', 'frontend.ts');
+  const main = frontendSource();
   const body = main.slice(main.indexOf('function zoneScreen(): ZoneScreen {'), main.indexOf('function currentZone('));
   // Chaque phase du menu (menumoments.ts) a sa ligne ; « menu » est l'écran restant.
   for (const phase of MENU_PHASES.filter((p) => p !== 'menu')) assert.ok(body.includes(`state.phase === '${phase}'`), `zoneScreen nomme la phase ${phase}`);
@@ -77,7 +78,7 @@ test('partout : chaque phase du menu est nommée par zoneScreen (frontend.ts), e
 });
 
 test('partout : une invitation s’ouvre d’elle-même sur la roue, le menu système et l’aide, et « Retour » rend l’écran d’avant', () => {
-  const main = read('app', 'src', 'frontend.ts');
+  const main = frontendSource();
   const open = main.slice(main.indexOf('function openArrivedInvite('), main.indexOf('// Partie en direct : invitation'));
   assert.match(open, /if \(state\.help\) state = \{ \.\.\.state, help: false \};/);
   assert.match(open, /library\.interrupt\(\(back\) => friendsMenu\.live\.openInvite\(id, back\)\)/);

@@ -30,6 +30,7 @@ import { IniDocument } from '../ini';
 import { zoneRect } from '../zones';
 import { devPcDisplays } from './fixtures';
 import { REPO_ROOT } from './i18n-scan';
+import { frontendSource } from './frontend-source';
 
 // Écrans du PC de développement : S22E450 à gauche (-1920), l'écran intégré (0), PLX2283HSU à droite (1920).
 const displays = devPcDisplays();
@@ -354,6 +355,6 @@ test('fenêtres annexes de VPX : jamais cachées par ShowWindow, rangées hors d
   assert.ok(!/\bhideWindow\s*\(/.test(source), 'in-game-menu.ts ne cache aucune fenêtre de VPX');
   assert.ok(/dmdParkedRect\s*\(/.test(source), 'le DMD masqué est rangé hors des écrans');
   // Guetté dès le lancement de VPX, pas seulement quand la table est à l'écran (elle s'y montrerait).
-  const frontend = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   assert.ok(/launchVpx\([\s\S]{0,1500}?inGameMenu\.watchHiddenDmd\(/.test(frontend), 'watchHiddenDmd juste après launchVpx');
 });

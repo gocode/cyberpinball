@@ -54,6 +54,7 @@ import type { ButtonId, Cabinet, CabinetButtons, NavigationButtons } from '../mo
 import { keepManualEdits, planVpxSync } from '../sync';
 import { isOwned, vpxOwnedKeys } from '../vpx-settings';
 import { devPcDisplays, emptyCabinet } from './fixtures';
+import { frontendSource } from './frontend-source';
 
 /** Extrait de [Input] tel que VPX 10.8.1 l'écrit au premier lancement : toutes les clés vides. */
 const VPX_FIRST_RUN = [
@@ -796,7 +797,7 @@ test('bouton « Bureau Windows » de l’interface : facultatif, sans touche de 
   assert.deepEqual(collectionKeys(magna).previous, []);
   assert.ok(!zoneSwitchKeys(magna).includes(joy(9)));
   // Le menu l'ouvre de n'importe quel écran, et au bureau le même bouton de joystick ramène le menu.
-  const frontend = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'app', 'src', 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   assert.match(frontend, /function handleKey[\s\S]*?if \(is\(KEYS\.desktop\)\) return[^\n]*restoreFromDesktop\(\)[^\n]*showDesktop\(\)/);
   assert.match(frontend, /function showDesktop[\s\S]*?desktopButton = watchDesktopButton\(/);
   assert.match(frontend, /function restoreFromDesktop[\s\S]*?desktopButton\?\.\(\);/);
@@ -806,13 +807,13 @@ test('bouton « Bureau Windows » de l’interface : facultatif, sans touche de 
 
 test('l’interface lit ses propres boutons partout, jamais ceux du jeu seuls', () => {
   const read = (...parts: string[]) => fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', ...parts), 'utf8');
-  for (const file of ['frontend.ts', 'frontend-gate.ts', 'settings.ts', 'wizard.ts']) {
+  for (const file of ['frontend.ts', 'vr-frontend.ts', 'vision3d-menu.ts', 'frontend-gate.ts', 'settings.ts', 'wizard.ts']) {
     const src = read('app', 'src', file);
     // navigationKeys, interfaceKeys, withoutButtonKeys reçoivent la borne (ses deux jeux), pas ses seuls boutons de jeu.
     assert.doesNotMatch(src, /(navigationKeys|interfaceKeys|withoutButtonKeys)\([^)]*\?\.buttons\b/, file);
     assert.doesNotMatch(src, /(navigationKeys|interfaceKeys)\(buttons\b/, file);
   }
-  assert.match(read('app', 'src', 'frontend.ts'), /function menuKeysFor\(cabinet: ButtonsSource\)[\s\S]*?interfaceKeys\(cabinet\)/);
+  assert.match(frontendSource(), /function menuKeysFor\(cabinet: ButtonsSource\)[\s\S]*?interfaceKeys\(cabinet\)/);
 });
 
 test('fenêtre au-dessus du menu (« Récupérer ») : aucune fenêtre de la borne ne repasse devant elle', () => {

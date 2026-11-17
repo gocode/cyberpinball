@@ -6,6 +6,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { linkStatsBetween, linkStatsSummary, vrGraphicsProfile, vrProfileSettings, VR_PROFILE_VRAM_MB } from '../vr-profil';
+import { frontendSource } from './frontend-source';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8');
@@ -63,7 +64,7 @@ test('branchements : carte dite par le compagnon, profil dans les clés vides, r
   assert.match(cpp, /say\("carte " \+ std::to_string\(d\.DedicatedVideoMemory \/ \(1024 \* 1024\)\) \+ \(battery \? " batterie " : " secteur "\) \+ name\);/);
   const menu = read('app', 'src', 'casque.ts');
   assert.match(menu, /const card = \/\^carte \(\\d\+\) \(batterie\|secteur\) \(\.\*\)\$\/\.exec\(line\);/);
-  const frontend = read('app', 'src', 'frontend.ts');
+  const frontend = frontendSource();
   assert.match(frontend, /const missing = vrProfileSettings\(id\)\.filter\(\(s\) => !doc\.get\(s\.section, s\.key\)\?\.trim\(\)\);/);
   assert.match(frontend, /vrProfileApplied = applyVrProfile\(vr\.ini, details\);/);
   assert.match(frontend, /if \(playedVr && vrGame && vrGameStart\) noteLinkStats\(vrGameStart, Date\.now\(\)\);/);

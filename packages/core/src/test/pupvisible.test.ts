@@ -28,6 +28,7 @@ import { applyImport, planImport } from '../tableimport';
 import { scanTables } from '../tables';
 import { scriptCode } from '../vbscript';
 import { vpxWithScript } from './fixtures';
+import { frontendSource } from './frontend-source';
 
 /** Script des Goonies réduit à ce qui compte : noms, valeurs et structure d'origine. */
 const GOONIES = [
@@ -334,7 +335,7 @@ test('pendant la partie, aucune fenêtre de Cyber Pinball ne reste au-dessus des
   assert.match(recording, /const WITNESS = \{ width: 420, height: 72, margin: 28 \};/);
   assert.match(recording, /setContentProtection\(true\)/);
   assert.match(recording, /setTimeout\(\(\) => witness\.close\(\), VERDICT_MS\)/);
-  const front = fs.readFileSync(path.join(SOURCES, 'frontend.ts'), 'utf8');
+  const front = frontendSource();
   assert.ok(front.indexOf('  closeTopmostWindows();') < front.indexOf('armGameRecording(table, hooks.record'), 'le témoin naît après closeTopmostWindows');
   // Seconde exception : l'invitation d'un ami pendant la partie (game-notice.ts), même règle. Elle ne
   // couvre qu'un coin du plateau (560 × 172 pour 1080 px, l'autre coin que le témoin), ne naît que
@@ -356,7 +357,7 @@ test('pendant la partie, aucune fenêtre de Cyber Pinball ne reste au-dessus des
   assert.match(menu, /for \(const sw of closing\.windows\) if \(!sw\.win\.isDestroyed\(\)\) sw\.win\.close\(\);/);
   assert.ok(front.indexOf('  closeTopmostWindows();') < front.indexOf('inGameMenu.arm('), 'le menu n’est guetté qu’après closeTopmostWindows');
   assert.ok(front.indexOf('const onPlaying = () => {') < front.indexOf('inGameMenu.arm('), 'guetté une fois la table à l’écran');
-  const frontend = fs.readFileSync(path.join(SOURCES, 'frontend.ts'), 'utf8');
+  const frontend = frontendSource();
   const close = frontend.indexOf('  closeTopmostWindows();');
   const launch = frontend.indexOf('launchVpx({');
   assert.ok(close > 0 && launch > close, 'closeTopmostWindows() est appelé avant launchVpx');
