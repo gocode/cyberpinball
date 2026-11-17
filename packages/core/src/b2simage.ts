@@ -820,3 +820,38 @@ export async function pruneB2sCache(cacheDir: string, keep?: Iterable<string>): 
   }
   return { removed };
 }
+
+
+/**
+ * Image du fronton de chaque .directb2s d'un dossier reçu (fiche d'un site, base VPS, 17/11/2026),
+ * posée à côté sous le nom « Nom (Backglass).png » : c'est elle le média du fronton, pas le
+ * .directb2s. Le cache de l'extraction est un dossier temporaire, retiré ensuite. Rend les images
+ * posées ; un fichier sans image n'en donne aucune.
+ */
+export async function b2sBackglassesBeside(dir: string): Promise<string[]> {
+  const found: string[] = [];
+  const walk = (d: string): void => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.directb2s$/i.test(e.name)) found.push(p);
+    }
+  };
+  walk(dir);
+  const out: string[] = [];
+  if (!found.length) return out;
+  const cache = fs.mkdtempSync(path.join(dir, '.b2s-'));
+  try {
+    for (const b2s of found) {
+      const image = (await b2sImages(b2s, cache)).backglass;
+      if (!image) continue;
+      const ext = image.format === 'jpeg' ? 'jpg' : image.format;
+      const target = path.join(path.dirname(b2s), `${path.basename(b2s, path.extname(b2s))} (Backglass).${ext}`);
+      fs.copyFileSync(image.file, target);
+      out.push(target);
+    }
+  } finally {
+    fs.rmSync(cache, { recursive: true, force: true });
+  }
+  return out;
+}

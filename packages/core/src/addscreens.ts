@@ -19,7 +19,6 @@ export const ADD_SCREENS = {
   'parts.part': true, // Une partie du jeu (propositions de toutes les sources)
   'parts.folder': true, // Une partie : lequel des dossiers choisis (PUPVideos entier…)
   'parts.candidates': true, // Une partie : depuis Téléchargements
-  'parts.files': true, // « … : au choix » (fichiers de VPS pour une partie, galerie des fichiers)
   downloads: true, // Téléchargements
   'downloads.games': true, // Ajouter à un jeu (depuis Téléchargements)
   journey: true, // Ce qu’il manque pour jouer

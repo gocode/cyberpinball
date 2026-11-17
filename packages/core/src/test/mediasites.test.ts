@@ -11,7 +11,7 @@ import * as vm from 'node:vm';
 import { test } from 'node:test';
 import { parseHTML } from 'linkedom';
 import type { MediaType } from '../medias';
-import { ANIMATABLE_MEDIA_TYPES, checkSiteSearch, hitAnimated, hitGameName, hitPreview, hitTypes, mediaChoiceAnimated, MEDIA_SITES, receivedMedias, siteHitSummary, siteMediaChoices, siteOffers, siteQuery, siteSearchByType, siteSearchTerms, siteSearchUrl, SITE_SEARCH_MORE_PAGES, SITE_SEARCH_PAGES, SITE_SEARCH_PROBES, vpsSiteHits, webHost, webMediaChoices, webSearchQuery, webSearchUrl, type SiteHit, type SiteReceipt, type WebReceipt } from '../mediasites';
+import { ANIMATABLE_MEDIA_TYPES, checkSiteSearch, hitAnimated, hitGameName, hitPreview, hitTypes, mediaChoiceAnimated, MEDIA_SITES, pickNamedMedia, receivedMedias, siteHitSummary, siteMediaChoices, siteOffers, siteQuery, siteSearchByType, siteSearchTerms, siteSearchUrl, SITE_SEARCH_MORE_PAGES, SITE_SEARCH_PAGES, SITE_SEARCH_PROBES, vpsSiteHits, webHost, webMediaChoices, webSearchQuery, webSearchUrl, type ReceivedMedia, type SiteHit, type SiteReceipt, type WebReceipt } from '../mediasites';
 import { parseSiteFile, siteFileRef } from '../sitefiles';
 import { WAIT_PROBES } from '../sitesessions';
 import { createVpsDb, type VpsGame } from '../vps';
@@ -387,6 +387,32 @@ test('fiches rangées par la base VPS : sans recherche, attribuées à leur jeu 
   // Après les résultats de recherche rapprochés (qui ont une vignette).
   const found = vpu('29591', 'The Matrix Wheel', ['70', 'Wheel Images']);
   assert.equal(siteOffers([found, ...hits], [matrix], vpsdb).Wheel?.[0]?.hit.id, '29591');
+});
+
+test('fronton rangé par la base VPS : le .directb2s du jeu, proposé pour l’image du fronton', () => {
+  // Back to the Future Pinball (Zen Studios) : inconnue de VPinMediaDB, son fronton n'est qu'un .directb2s.
+  const bttf: VpsGame = {
+    id: 'OLJJqhmH',
+    name: 'Back to the Future Pinball',
+    b2sFiles: [{ id: 'b', authors: ['DDH69'], comment: 'For Pinball FX', urls: [{ url: 'https://vpuniverse.com/files/file/12345-back-to-the-future-pinball-fx/' }] }],
+    wheelArtFiles: [{ id: 'w', authors: ['Ronindoc37'], comment: 'Collection of Zen Studios wheels', urls: [{ url: 'https://vpuniverse.com/files/file/6789-zen-wheels/' }] }],
+  };
+  const hits = vpsSiteHits([bttf]);
+  const b2s = hits.find((h) => h.id === '12345')!;
+  assert.equal(b2s.title, 'Back to the Future Pinball · For Pinball FX (DDH69)');
+  assert.deepEqual(hitTypes(b2s), { types: ['Backglass'], kind: 'image', pack: false });
+  assert.deepEqual(hitTypes(hits.find((h) => h.id === '6789')!), { types: ['Wheel'], kind: 'image', pack: false });
+});
+
+test('pack reçu : le fichier au nom de la table, jamais un fichier deviné', () => {
+  const wheel = (name: string): ReceivedMedia => ({ file: path.join('D:\\recus\\zen', name), type: 'Wheel', kind: 'image' });
+  const pack = [wheel('Attack from Mars.png'), wheel('Back to the Future.png'), wheel('Back to the Future (Alt).png'), wheel('Star Wars - Episode IV.png'), { file: 'D:\\recus\\zen\\lisez-moi.txt', kind: 'image' as const }];
+  // « Pinball » ne compte pas : « Back to the Future Pinball » est « Back to the Future.png » (le plus court).
+  assert.equal(path.basename(pickNamedMedia(pack, 'Wheel', 'Back to the Future Pinball')!.file), 'Back to the Future.png');
+  assert.equal(pickNamedMedia(pack, 'Wheel', 'Twilight Zone'), undefined);
+  // Un seul fichier de ce type (une fiche propre à la table) : lui, quel que soit son nom.
+  assert.equal(path.basename(pickNamedMedia([wheel('logo.png')], 'Wheel', 'Back to the Future Pinball')!.file), 'logo.png');
+  assert.equal(pickNamedMedia(pack, 'Backglass', 'Attack from Mars'), undefined);
 });
 
 test('aperçu d’un résultat sans vignette : la capture de sa fiche', () => {

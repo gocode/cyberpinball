@@ -80,7 +80,7 @@ export function createCollectionsItem(host: {
    * collection choisie s'affiche sur la roue, sur sa table (`shown`) ; sans lui, le menu système.
    */
   let wheel: { back: () => void; shown: () => void } | undefined;
-  const groupTitle = (g: string) => (g === 'mine' ? t('Mes collections') : g === 'maker' ? t('Fabricants') : g === 'decade' ? t('Décennies') : undefined);
+  const groupTitle = (g: string) => (g === 'mine' ? t('Mes collections') : g === 'engine' ? t('Types de jeu') : g === 'maker' ? t('Fabricants') : g === 'decade' ? t('Décennies') : undefined);
 
   function open(): void {
     wheel = undefined;

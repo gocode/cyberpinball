@@ -26,6 +26,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  b2sBackglassesBeside,
   checkSiteSearch,
   partSearchUrl,
   siteQuery,
@@ -489,7 +490,11 @@ export function createMediaSites(ctx: MediaSitesContext) {
       );
     }
     fs.rmSync(incoming, { recursive: true, force: true });
-    const medias = receivedMedias(files, hitTypes(job.hit));
+    const offered = hitTypes(job.hit);
+    // Un .directb2s demandé pour le fronton (base VPS, 17/11/2026) : son image, posée à côté, est
+    // le média ; le fichier lui-même n'en est pas un.
+    if (offered.types.includes('Backglass')) await b2sBackglassesBeside(files);
+    const medias = receivedMedias(files, offered);
     if (!medias.length) return fail(t('aucun média dans ce qu’a envoyé le site'));
     loadReceipts().set(job.key, {
       key: job.key,

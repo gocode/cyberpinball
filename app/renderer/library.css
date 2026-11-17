@@ -1194,7 +1194,12 @@ body.mouse .media-card[data-act]:hover {
   opacity: 0.55;
 }
 
-/* Aperçu : le fichier entier, jamais déformé ; tourné comme le menu le montrera (plateau). */
+/*
+ * Aperçu : le fichier entier, jamais déformé ; tourné comme le menu le montrera (plateau).
+ * Le liseré est un calque posé au-dessus du fichier (::after), pas un outline : un outline
+ * intérieur passait sous l'image ou la vidéo, qui semblait déborder de son cadre et de ses
+ * coins arrondis (galerie des frontons, 16/11/2026). isolation borne ce calque à la vignette.
+ */
 .media-thumb {
   position: relative;
   width: 21vmin;
@@ -1202,9 +1207,108 @@ body.mouse .media-card[data-act]:hover {
   container-type: size;
   border-radius: 0.5vmin;
   background: var(--void);
-  outline: 0.2vmin solid var(--line);
-  outline-offset: -0.2vmin;
   overflow: hidden;
+  isolation: isolate;
+  clip-path: inset(0 round 0.5vmin);
+}
+
+.media-thumb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 0.2vmin var(--line);
+  pointer-events: none;
+}
+
+/*
+ * Contenu animé (vidéo, GIF, APNG, son) : l'icône de lecture, à la façon de YouTube (rectangle
+ * arrondi, triangle ; une note pour le son). Le contenu déjà là s'anime de lui-même : l'icône
+ * reste petite, au coin. Le contenu à lire à la demande (lourd, ou pas encore récupéré,
+ * .on-demand) n'est qu'une image fixe : l'icône passe en grand au centre, Start le lit.
+ * Pendant l'écoute d'un son, la note devient deux barres qui battent.
+ * Taille relative à la vignette (cqmin), lisible sur une tuile comme sur une carte.
+ */
+.media-play {
+  position: absolute;
+  right: 4cqmin;
+  top: 4cqmin;
+  z-index: 1;
+  --play: clamp(2.6vmin, 16cqmin, 4.4vmin);
+  width: calc(var(--play) * 1.42);
+  height: var(--play);
+  border-radius: calc(var(--play) * 0.28);
+  background: color-mix(in oklab, var(--void) 80%, transparent);
+  box-shadow: inset 0 0 0 0.22vmin var(--signal);
+}
+
+.media-thumb.on-demand .media-play {
+  right: auto;
+  top: 50%;
+  left: 50%;
+  --play: clamp(4.2vmin, 30cqmin, 9vmin);
+  transform: translate(-50%, -50%);
+  background: color-mix(in oklab, var(--void) 70%, transparent);
+  box-shadow: inset 0 0 0 0.3vmin var(--signal), 0 0 2vmin color-mix(in oklab, var(--void) 60%, transparent);
+}
+
+/* Triangle centré à l'œil : légèrement à droite du centre, comme tout symbole de lecture. */
+.media-play::before {
+  content: '';
+  position: absolute;
+  left: 40%;
+  top: 27%;
+  border-left: calc(var(--play) * 0.4) solid var(--signal);
+  border-top: calc(var(--play) * 0.23) solid transparent;
+  border-bottom: calc(var(--play) * 0.23) solid transparent;
+}
+
+.media-play.note::before {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  content: '♪';
+  font-size: calc(var(--play) * 0.62);
+  line-height: 1;
+  color: var(--signal);
+}
+
+.media-thumb.playing .media-play::before,
+.media-thumb.playing .media-play::after {
+  content: '';
+  position: absolute;
+  top: 30%;
+  width: 11%;
+  height: 40%;
+  border: 0;
+  border-radius: 0.2vmin;
+  background: var(--signal);
+  transform-origin: 50% 100%;
+  animation: lecture-barre 0.9s ease-in-out infinite alternate;
+}
+
+.media-thumb.playing .media-play::before {
+  left: 36%;
+}
+
+.media-thumb.playing .media-play::after {
+  left: 53%;
+  animation-delay: -0.45s;
+}
+
+@keyframes lecture-barre {
+  from {
+    transform: scaleY(0.45);
+  }
+  to {
+    transform: scaleY(1);
+  }
 }
 
 .media-file {
@@ -1290,6 +1394,140 @@ body.mouse .media-card[data-act]:hover {
   font-size: 2.6vmin;
   font-weight: 600;
   word-break: break-word;
+}
+
+/*
+ * Ce qu'il faut, écran par écran (catalog.ts, buildNeeds) : un bandeau qui dit ce qui manque
+ * vraiment, le titre de chaque écran de la borne, la carte de ce qui est prévu, puis le bloc
+ * « Autres choix » en retrait (un seul arrêt des flippers ; Start ouvre la galerie).
+ */
+.media-summary {
+  padding: 1.2vmin 1.8vmin;
+  border-radius: 0.6vmin;
+  border: 0.2vmin solid color-mix(in oklab, var(--signal) 45%, transparent);
+  background: color-mix(in oklab, var(--signal) 9%, transparent);
+  font-size: 1.9vmin;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.media-summary strong {
+  color: var(--signal);
+  font-weight: 600;
+}
+
+.media-group {
+  margin-top: 1.4vmin;
+  font-size: 2.2vmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.media-summary + .media-group {
+  margin-top: 0.6vmin;
+}
+
+/* Une hauteur pour toutes les cartes de l'écran, quel que soit leur texte (lignes coupées au besoin). */
+.media-cards:has(> .media-group) > .media-card {
+  height: 16.4vmin;
+  overflow: hidden;
+  align-content: center;
+}
+
+.media-cards:has(> .media-group) > .media-card .media-facts,
+.media-cards:has(> .media-group) > .media-card .media-extra {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge.media-source-badge {
+  color: var(--meta);
+  border-color: color-mix(in oklab, var(--meta) 50%, transparent);
+}
+
+.badge.media-source-badge.base {
+  color: var(--signal);
+  border-color: color-mix(in oklab, var(--signal) 55%, transparent);
+}
+
+.media-card.media-more {
+  margin-left: 6vmin;
+  grid-template-columns: 34vmin minmax(0, 1fr);
+  align-items: center;
+}
+
+/* La bande d'aperçus du bloc « Autres choix », à la hauteur de la vignette des cartes prévues. */
+.media-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.6vmin;
+  height: 8vmin;
+}
+
+.media-strip.none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1vmin;
+  text-align: center;
+  font-size: 1.86vmin;
+  color: var(--ink-faint);
+  border: 0.2vmin dashed var(--line);
+  border-radius: 0.4vmin;
+}
+
+/* Mini-aperçu : même cadre que les vignettes (liseré au-dessus du fichier, jamais recouvert). */
+.media-mini {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 0.4vmin;
+  clip-path: inset(0 round 0.4vmin);
+  background: var(--void);
+}
+
+.media-mini::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 0.2vmin var(--line);
+  pointer-events: none;
+}
+
+.media-mini .media-file {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: none;
+}
+
+.media-mini.rest {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2vmin;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+/* Rien à choisir : grisé, la raison dit pourquoi ; les flippers le sautent (pas d'action). */
+.media-card.media-off {
+  opacity: 0.45;
+}
+
+/* Habillage dessiné par Cyber Pinball (fallback.js) : il remplit la vignette. */
+.media-drawn {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
 
 .badge.media-state.tone-ok {
@@ -1464,8 +1702,10 @@ body.mouse .media-card[data-act]:hover {
 .media-cards.gallery {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Toutes les tuiles à la hauteur de la plus haute, quelles que soient ses étiquettes. */
+  grid-auto-rows: 1fr;
   gap: 1.2vmin;
-  align-items: start;
+  align-items: stretch;
 }
 
 @container (orientation: portrait) {
@@ -1492,10 +1732,23 @@ body.mouse .media-card[data-act]:hover {
   flex: 1 1 auto;
 }
 
+/* Aperçu, titre et étiquettes en haut ; provenance et date calées en bas (media-foot), alignées d'une tuile à l'autre. */
 .media-card.media-tile {
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
+  /* Chaque ligne à la largeur de la tuile : sans cela (start, hérité de .media-card), une ligne
+     longue sort de la tuile au lieu de finir en points de suspension. */
+  align-items: stretch;
   gap: 0.8vmin;
   padding: 1vmin;
+}
+
+.media-tile > .media-thumb {
+  flex: none;
+}
+
+.media-tile > .media-foot {
+  margin-top: auto;
 }
 
 .media-card.media-tile {

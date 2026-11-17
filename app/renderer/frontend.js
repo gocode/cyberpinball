@@ -742,7 +742,10 @@ function menuPanel(s) {
   v.star.toggleAttribute('data-on', Boolean(s.table.favorite));
   fillShelf(v.shelf, s.shelf, s);
   v.node.classList.toggle('has-shelf', Boolean(s.shelf));
-  v.meta.textContent = s.table.subtitle ?? '';
+  // Le logiciel qui joue la table (« VPX », « Pinball FX ») : une puce devant fabricant · année
+  // (maquette choisie le 17/11/2026). Les médaillons (Juke-box, Communauté…) n'en ont pas.
+  if (s.table.engine) v.meta.replaceChildren(el('span', `menu-engine${s.table.engine === 'VPX' ? '' : ' other'}`, s.table.engine), s.table.subtitle ?? '');
+  else v.meta.textContent = s.table.subtitle ?? '';
   // Dans une boîte flexible, l'espace en tête d'un texte nu disparaîtrait : un seul élément de texte.
   const count = el('span');
   count.append(el('b', '', String(s.position).padStart(String(s.count).length, '0')), ` / ${s.count}`);

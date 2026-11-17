@@ -269,7 +269,8 @@ const INVISION_SEARCH = /* i18n-ignore : script de la page du site, motifs de re
     seen.add(m[1]);
     const cat = item.querySelector('a[href*="/files/category/"]');
     const cm = cat && /\/files\/category\/(\d+)-/.exec(cat.href);
-    const img = item.querySelector('img[src*="/screenshots/"]');
+    // Une vignette chargée en différé porte son adresse dans data-src.
+    const img = item.querySelector('img[src*="/screenshots/"], img[data-src*="/screenshots/"]');
     const authors = [...item.querySelectorAll('.ipsStreamItem_status a[href*="/profile/"]')].map((a) => a.textContent.trim()).filter(Boolean);
     const time = item.querySelector('time[datetime]');
     const dl = /(\d[\d,]*)\s+downloads?/i.exec(item.textContent || '');
@@ -280,7 +281,7 @@ const INVISION_SEARCH = /* i18n-ignore : script de la page du site, motifs de re
       title: link.textContent.replace(/\s+/g, ' ').trim(),
       category: cm ? { id: cm[1], label: cat.textContent.trim() } : undefined,
       author: authors[0],
-      thumb: img ? img.src : undefined,
+      thumb: img ? img.getAttribute('data-src') || img.src : undefined,
       date: time ? time.getAttribute('datetime') : undefined,
       downloads: dl ? Number(dl[1].replace(/[^\d]/g, '')) : undefined,
       version: version ? version[1] : undefined,
@@ -526,14 +527,20 @@ export function siteOffers(hits: SiteHit[], games: VpsGame[], vps?: VpsDb, loose
 }
 
 /** Listes de la base VPS qui renvoient à des fiches de médias de menu, et ce qu'elles portent. */
-const VPS_MEDIA_LISTS: readonly { list: 'wheelArtFiles' | 'topperFiles' | 'mediaPackFiles'; type?: MediaType; word: string }[] = [
+const VPS_MEDIA_LISTS: readonly { list: 'wheelArtFiles' | 'topperFiles' | 'mediaPackFiles' | 'b2sFiles'; type?: MediaType; word: string }[] = [
   { list: 'wheelArtFiles', type: 'Wheel', word: 'Wheel' },
   { list: 'topperFiles', type: 'Topper', word: 'Topper' },
   { list: 'mediaPackFiles', word: 'Media Pack' },
+  // Le .directb2s du jeu, pour l'image du fronton (17/11/2026) : la seule source d'un fronton pour
+  // une table que VPinMediaDB ne connaît pas (Pinball FX : « Back to the Future Pinball »). Reçu,
+  // son image est tirée du fichier (media-sites.ts) ; la table VPX garde son .directb2s par les
+  // parties du jeu.
+  { list: 'b2sFiles', type: 'Backglass', word: 'Backglass' },
 ];
 
 /** Identifiant d'une fiche d'après son adresse, et son site ; rien pour un autre hôte (mega.nz, Google Drive). */
-function siteFileOf(url: string): { site: MediaSiteId; id: string; url: string } | undefined {
+/** Fiche de VPUniverse ou de VPForums désignée par cette adresse : son site et son numéro. */
+export function siteFileOf(url: string): { site: MediaSiteId; id: string; url: string } | undefined {
   const vpu = /^https?:\/\/(?:www\.)?vpuniverse\.com\/files\/file\/(\d+)-/i.exec(url);
   if (vpu) return { site: 'vpuniverse', id: vpu[1]!, url: url.split('?')[0]! };
   const vpf = /^https?:\/\/(?:www\.)?vpforums\.org\/index\.php\?(?:.*&)?showfile=(\d+)/i.exec(url);
@@ -641,6 +648,31 @@ export function receivedMedias(root: string, offered: { types: MediaType[]; kind
   };
   walk(root);
   return out.sort((a, b) => a.file.localeCompare(b.file));
+}
+
+/** Mots d'un titre ou d'un nom de fichier qui désignent un jeu (sans « Pinball », ni petits mots, ni le type de média). */
+function namedWords(name: string): string[] {
+  const skip = new Set(['the', 'of', 'a', 'an', 'and', 'pinball', 'zen', 'studios', 'fx', 'fx3', 'wheel', 'logo', 'backglass', 'topper', 'png', 'apng', 'jpg', 'mp4']);
+  return vpsWords(name.replace(/\([^)]*\)/g, ' ')).filter((w) => !skip.has(w));
+}
+
+/**
+ * Dans ce qu'un site a envoyé (un pack de logos de Zen, un pack de médias), le fichier de ce type
+ * qui porte le nom de la table (17/11/2026, tables de Pinball FX sans VPinMediaDB) : tous les mots
+ * du titre dans le nom du fichier, le nom le plus court à égalité (« Back to the Future » plutôt que
+ * « Back to the Future Pinball (Alt) ») ; aucun : undefined, jamais un fichier deviné. Seul fichier
+ * de ce type reçu (une fiche propre à la table) : lui.
+ */
+export function pickNamedMedia(files: readonly ReceivedMedia[], type: MediaType, title: string): ReceivedMedia | undefined {
+  const typed = files.filter((f) => f.type === type);
+  if (typed.length === 1) return typed[0];
+  const wanted = namedWords(title);
+  if (!wanted.length) return undefined;
+  const hits = typed.filter((f) => {
+    const own = new Set(namedWords(path.basename(f.file, path.extname(f.file))));
+    return wanted.every((w) => own.has(w));
+  });
+  return hits.sort((a, b) => path.basename(a.file).length - path.basename(b.file).length || a.file.localeCompare(b.file))[0];
 }
 
 /** Ce qu'un site a envoyé pour une fiche, une fois déballé ; gardé d'une visite à l'autre. */

@@ -40,6 +40,7 @@ import {
   PUP_DISABLED_FOLDER,
   PUP_FOLDER,
   searchVps,
+  siteFileOf,
   t,
   tLater,
   tableContents,
@@ -259,7 +260,7 @@ export function createGameParts(ctx: GamePartsContext) {
     if (item) return { text, detail: t('{label} · {site}', { label: item.label, site: linkHost(item.page).label }), badges: [t('Attendu')], tone: 'warning' };
     if (part === 'rom' && usesRom === false) return { text, detail: t('cette table n’utilise pas de ROM'), badges: [t('Inutile')], tone: 'quiet' };
     const web = webFiles(part).length;
-    return { text, detail: web ? tn(web, 'absent · {n} sur VPS', 'absent · {n} sur VPS') : t('absent'), tone: 'quiet' };
+    return { text, detail: web ? tn(web, 'absent · {n} fichier connu', 'absent · {n} fichiers connus') : t('absent'), tone: 'quiet' };
   }
 
   // ---------- Le jeu VPS de la table ----------
@@ -342,6 +343,9 @@ export function createGameParts(ctx: GamePartsContext) {
       });
     } else p.downloads = [];
     if (part === 'ini' || !ctx.sites) return;
+    // Les aperçus de la base VPS : la tuile d'un fichier qu'elle seule connaît, ou d'une fiche que le site montre sans vignette.
+    const images: SiteHit[] = webFiles(part).flatMap((f) => (f.imgUrl ? [{ site: 'vpuniverse' as const, id: f.id, url: f.imgUrl, title: f.id, thumb: f.imgUrl }] : []));
+    if (images.length) void ctx.sites.stageThumbs(images).then(done);
     for (const site of MEDIA_SITES) {
       if (!sources.includes(site.id)) continue;
       p.sites[site.id] = { state: 'searching' };
@@ -376,13 +380,51 @@ export function createGameParts(ctx: GamePartsContext) {
     const actions: Action[] = [];
     const cards: MediaCard[] = [];
 
-    // Les propositions, une tuile chacune : VPS, puis les sites (un autre jeu en dernier), puis ce qui est déjà téléchargé.
+    /*
+     * Les propositions, une tuile par fichier, toutes dans la même liste : ce que trouvent les
+     * sites, puis les fichiers que seule la base VPS connaît, puis ceux d'un autre jeu, puis ce
+     * qui est déjà téléchargé. Une fiche que la base VPS connaît aussi (même page du site) ne fait
+     * qu'une tuile, avec l'aperçu de la base quand le site n'en donne pas. Avant le 17/11/2026,
+     * les fichiers de la base étaient rangés derrière une action à part (« Fichiers de VPS »),
+     * et une fiche sans vignette dans les résultats du site restait sans aperçu.
+     */
     const g = game();
     const kind = part === 'ini' ? undefined : (part as NeedKind);
+    const vpsFiles = kind ? webFiles(part) : [];
+    const vpsOf = new Map<string, VpsTableFile>();
+    for (const f of vpsFiles) {
+      for (const link of liveLinks(f)) {
+        const where = siteFileOf(link.url);
+        if (where && !vpsOf.has(`${where.site}:${where.id}`)) vpsOf.set(`${where.site}:${where.id}`, f);
+      }
+    }
+    const listed = new Set<VpsTableFile>();
     if (kind) {
       const offers = (['vpforums', 'vpuniverse'] as MediaSiteId[]).flatMap((s) => (p?.sites[s]?.state === 'done' ? p.sites[s].offers : []));
-      for (const o of [...offers.filter((x) => !x.other), ...offers.filter((x) => x.other)]) {
+      const vpsOnly = () => {
+        for (const f of vpsFiles) {
+          if (listed.has(f) || cards.length >= MAX_PROPOSALS) continue;
+          listed.add(f);
+          const link = liveLinks(f)[0]!;
+          const where = siteFileOf(link.url);
+          const title = versionLabel(f) || partLabel(part);
+          cards.push({
+            action: actions.length,
+            title,
+            code: where ? mediaSite(where.site).name : linkHost(link.url).label,
+            tags: f.features?.length ? f.features : undefined,
+            facts: [f.comment?.trim(), f.updatedAt ? formatDay(f.updatedAt) : undefined].filter(Boolean).join(' · '),
+            thumb: siteThumb(undefined, partLabel(part), f.imgUrl),
+          });
+          actions.push({ label: title, key: `vps:${f.id}`, run: () => ctx.catalog.fetchPart({ ...target(table, kind), kind }, { url: link.url, label: title }, after) });
+        }
+      };
+      for (const [i, o] of [...offers.filter((x) => !x.other), ...offers.filter((x) => x.other)].entries()) {
+        // Les fichiers que seule la base connaît, juste avant ceux d'un autre jeu.
+        if (o.other && !offers[i - 1]?.other) vpsOnly();
         if (cards.length >= MAX_PROPOSALS) break;
+        const known = vpsOf.get(`${o.hit.site}:${o.hit.id}`);
+        if (known) listed.add(known);
         cards.push({
           action: actions.length,
           title: o.hit.title,
@@ -391,10 +433,12 @@ export function createGameParts(ctx: GamePartsContext) {
           popularity: o.hit.downloads ? tn(o.hit.downloads, '{n} téléchargement', '{n} téléchargements', { n: formatNumber(o.hit.downloads) }) : undefined,
           facts: [o.hit.category?.label, o.hit.author ? t('par {author}', { author: o.hit.author }) : undefined, o.hit.date ? formatDay(Date.parse(o.hit.date)) : undefined].filter(Boolean).join(' · '),
           extra: mediaSite(o.hit.site).wait ? [t('≈ {n} s d’attente imposée par le site', { n: mediaSite(o.hit.site).wait })] : undefined,
-          thumb: siteThumb(o.hit, partLabel(part)),
+          tags: known?.features?.length ? known.features : undefined,
+          thumb: siteThumb(o.hit, partLabel(part), known?.imgUrl),
         });
         actions.push({ label: o.hit.title, key: `${o.hit.site}:${o.hit.id}`, run: () => ctx.catalog.fetchPart({ ...target(table, kind), kind }, { url: o.hit.url, label: o.hit.title }, after) });
       }
+      vpsOnly();
     }
     for (const c of p?.downloads ?? []) {
       if (cards.length >= MAX_PROPOSALS) break;
@@ -409,9 +453,6 @@ export function createGameParts(ctx: GamePartsContext) {
       actions.push({ label: path.basename(c.file), key: `file:${c.file}`, run: () => ctx.install([c.file], table, after) });
     }
 
-    // Les fichiers de VPS : la galerie des fichiers (aperçu, popularité, tri).
-    const vpsFiles = webFiles(part);
-    if (kind && vpsFiles.length) actions.push({ label: tn(vpsFiles.length, 'Fichier de VPS : le voir', 'Fichiers de VPS : voir les {n} au choix'), detail: t('Aperçu, popularité, auteur, date ; Start ouvre sa page dans « Récupérer »'), tone: cards.length ? undefined : 'ok', run: () => openWeb(table, kind, from) });
     // Toujours : chercher soi-même sur le web, puis le reste.
     actions.push(ctx.catalog.webAction('parts.part', { query: partWebQuery(titleOf(table), part), target: target(table, kind) }, after));
     for (const site of MEDIA_SITES) {
@@ -480,10 +521,15 @@ export function createGameParts(ctx: GamePartsContext) {
     return rows;
   }
 
-  /** Vignette du résultat, sinon capture de sa fiche (VPForums, fiches de la base VPS), dès qu'elle est reçue. */
-  function siteThumb(hit: SiteHit, text: string): MediaThumb {
-    const { file: local, pending } = ctx.sites?.hitThumb(hit) ?? { pending: false };
-    if (!local || !fs.existsSync(local)) return { kind: 'fallback', rotation: 0, text: pending ? t('Aperçu en route…') : text };
+  /**
+   * Vignette d'une proposition : celle du résultat, sinon la capture de sa fiche (VPForums,
+   * fiches de la base VPS), sinon l'aperçu de la base VPS (`also`), dès que l'une est reçue.
+   * Un fichier que seule la base connaît n'a que ce dernier (pas de résultat de site).
+   */
+  function siteThumb(hit: SiteHit | undefined, text: string, also?: string): MediaThumb {
+    const got = hit ? ctx.sites?.hitThumb(hit) : undefined;
+    const local = [got?.file, ctx.sites?.thumb(also)].find((f): f is string => Boolean(f) && fs.existsSync(f!));
+    if (!local) return { kind: 'fallback', rotation: 0, text: got?.pending ? t('Aperçu en route…') : text };
     allowPreview(local);
     return { kind: 'image', url: mediaUrl(local), rotation: 0 };
   }
@@ -578,27 +624,6 @@ export function createGameParts(ctx: GamePartsContext) {
         table.file,
       );
     });
-  }
-
-  /**
-   * Fichiers de VPS pour cette partie, dans la galerie des fichiers (aperçu, popularité,
-   * auteur, date) : Start ouvre sa page dans « Récupérer », pour cette table.
-   */
-  function openWeb(table: TableEntry, part: NeedKind, from: number): void {
-    const g = game();
-    if (!g) return openPart(table, part, from);
-    const back = () => openPart(table, part, from);
-    ctx.catalog.chooseFor(
-      {
-        game: g,
-        kind: part,
-        files: webFiles(part),
-        heading: t('{part} : au choix', { part: partLabel(part) }),
-        subheading: table.title,
-        lead: t('Les plus récents d’abord. Start ouvre sa page dans la fenêtre « Récupérer » : le fichier téléchargé est rangé pour cette table.'),
-      },
-      { table: table.file, back, web: ctx.catalog.webAction('parts.files', { query: partWebQuery(titleOf(table), part), target: target(table, part) }, back) },
-    );
   }
 
   // ---------- PuP-Pack : le désactiver, le réactiver (pupdisabled.ts) ----------

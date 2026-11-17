@@ -21,6 +21,9 @@ export const messages: Record<string, string> = {
   '{label} : MagnaSave pour changer de collection': '{label}: MagnaSave to change collection',
   Fabricants: 'Manufacturers',
   'Décennies': 'Decades',
+  // Types de jeu (17/11/2026) : une collection par logiciel, sur une borne qui en mêle plusieurs.
+  'Types de jeu': 'Game types',
+  'bêta': 'beta',
   Collections: 'Collections',
   'affichée sur la roue': 'shown on the wheel',
   'Affichée : {collection}': 'Shown: {collection}',

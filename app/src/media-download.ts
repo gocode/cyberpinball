@@ -944,7 +944,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
    * de la base VPS (les tables sont reconnues à leur identifiant VPS) ; le suivi reste dans les
    * téléchargements (tables de Pinball FX ajoutées au menu).
    */
-  async function fillMissing(files: string[], opts: { quiet?: boolean } = {}): Promise<{ installed: number; bytes: number; tables: number; failed: string[] }> {
+  async function fillMissing(files: string[], opts: { quiet?: boolean; types?: readonly MediaType[] } = {}): Promise<{ installed: number; bytes: number; tables: number; failed: string[] }> {
     const out = { installed: 0, bytes: 0, tables: 0, failed: [] as string[] };
     const { db: found, problem } = await ctx.search.index(opts);
     if (!found) {
@@ -959,7 +959,8 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
       const match = matchMediaDb(found, table, vps);
       if (match.how !== 'vps-id') continue;
       const o = prepare(table, match, 0, true);
-      const choices = choicesOf(o);
+      // Les types choisis seulement (fiche d'ajout d'une table de Pinball FX), sinon tous ceux qui manquent.
+      const choices = choicesOf(o).filter((c) => !opts.types || opts.types.includes(c.offer.type));
       if (!choices.length) continue;
       const job = trackInstall(table, choices);
       const report = progressReporter((step) => t('Médias de VPinMediaDB, table {i} sur {total}, {title} : {step}', { i: i + 1, total: tables.length, title: table.title, step }));

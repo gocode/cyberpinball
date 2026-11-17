@@ -9,7 +9,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { b2sCacheDir, b2sImages, pruneB2sCache, scanB2s } from '../b2simage';
+import { b2sBackglassesBeside, b2sCacheDir, b2sImages, pruneB2sCache, scanB2s } from '../b2simage';
+import { receivedMedias } from '../mediasites';
 
 function tmp(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-b2s-'));
@@ -112,6 +113,24 @@ function setup(content: string | Buffer): { table: string; file: string; cache: 
   fs.writeFileSync(file, content);
   return { table, file, cache: b2sCacheDir(path.join(root, 'data')) };
 }
+
+test('fronton reçu d’un site : l’image de chaque .directb2s posée à côté, reconnue comme fronton, sans cache laissé', async () => {
+  // Une fiche « For Pinball FX » de VPUniverse, déballée : un .directb2s dans un sous-dossier, un lisez-moi.
+  const dir = tmp();
+  fs.mkdirSync(path.join(dir, 'BTTF'));
+  const on = png(1920, 1080);
+  fs.writeFileSync(path.join(dir, 'BTTF', 'Back to the Future Pinball.directb2s'), directb2s({ on }));
+  fs.writeFileSync(path.join(dir, 'lisez-moi.txt'), 'merci');
+  const made = await b2sBackglassesBeside(dir);
+  assert.deepEqual(made.map((f) => path.relative(dir, f)), [path.join('BTTF', 'Back to the Future Pinball (Backglass).png')]);
+  assert.deepEqual(fs.readFileSync(made[0]!), on);
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['BTTF', 'lisez-moi.txt']);
+  // La fiche ne propose que le fronton : l'image en est un, le .directb2s lui-même n'est pas un média.
+  const got = receivedMedias(dir, { types: ['Backglass'], kind: 'image' });
+  assert.deepEqual(got.map((m) => [path.basename(m.file), m.type]), [['Back to the Future Pinball (Backglass).png', 'Backglass']]);
+  // Sans .directb2s : rien.
+  assert.deepEqual(await b2sBackglassesBeside(tmp()), []);
+});
 
 test("l'image allumée l'emporte sur l'éteinte ; le DMD est extrait à part ; rien n'est écrit à côté de la table", async () => {
   const on = png(1920, 1080);

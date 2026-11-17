@@ -37,6 +37,16 @@ export interface TableInfoFile {
 
 export type TableEmulator = 'vpx' | 'pinballfx';
 
+/**
+ * Le logiciel qui joue la table, tel que la roue et les collections le nomment (17/11/2026) :
+ * `short` pour la puce de la plaque du titre (« VPX », « Pinball FX »), `long` pour la liste des
+ * collections (« Visual Pinball X »). Des noms propres : pareils dans toutes les langues.
+ */
+export const TABLE_ENGINES: Record<TableEmulator, { short: string; long: string; icon: string }> = {
+  vpx: { short: 'VPX', long: 'Visual Pinball X', icon: 'playfield' },
+  pinballfx: { short: 'Pinball FX', long: 'Pinball FX', icon: 'pinball-app' },
+};
+
 /** Extension d'une fiche de table de Pinball FX (JSON : { "PinballFX": { "Table": 156 } }). */
 export const PINBALLFX_EXT = '.pinballfx';
 

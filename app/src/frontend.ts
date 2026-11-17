@@ -217,6 +217,7 @@ import {
   pinballFxCommand,
   readInfo,
   isFavorite,
+  TABLE_ENGINES,
   setFavorite,
   infoFileFor,
   buttonKeys,
@@ -7911,6 +7912,8 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
       manufacturer: entry.manufacturer,
       year: entry.year,
       subtitle: [entry.manufacturer, entry.year, lead ? t('par {name}', { name: lead }) : undefined].filter(Boolean).join(' · '),
+      // Le logiciel qui la joue : la puce devant fabricant · année, dans la plaque du titre (17/11/2026).
+      engine: TABLE_ENGINES[entry.emulator].short,
       version: entry.version,
       plays: entry.info.User?.StartCount ?? 0,
       lastRun: entry.info.User?.LastRun,

@@ -996,7 +996,10 @@ function mediaNode(kind, url) {
   if (!node) {
     node = libEl(kind === 'video' ? 'video' : kind === 'audio' ? 'audio' : 'img', 'media-file');
     if (kind === 'video') {
+      // Une vidéo déjà sur la borne s'anime d'elle-même, muette et en boucle, comme un GIF.
       node.muted = true;
+      node.loop = true;
+      node.autoplay = true;
       node.preload = 'auto';
     } else if (kind === 'audio') {
       node.preload = 'none';
@@ -1011,11 +1014,28 @@ function mediaNode(kind, url) {
   return node;
 }
 
+/**
+ * Habillage que Cyber Pinball dessine à la place d'un média absent (fallback.js), figé : gardé
+ * d'un affichage à l'autre comme les fichiers, il n'est pas redessiné à chaque bouton.
+ */
+function drawnNode(d) {
+  const key = `drawn ${d.part} ${d.game.title}|${d.game.manufacturer ?? ''}|${d.game.year ?? ''}`;
+  mediaUsed.add(key);
+  let node = mediaNodes.get(key);
+  if (!node) {
+    node = libEl('div', 'media-drawn');
+    mediaNodes.set(key, node);
+    // Le composant mesure son conteneur : dessiné une fois la vignette dans le document.
+    requestAnimationFrame(() => window.CyberFallback?.[d.part]?.(node, d.game, { animate: false }));
+  }
+  return node;
+}
+
 function forgetMediaNodes() {
   for (const [key, node] of mediaNodes) {
     if (mediaUsed.has(key)) continue;
-    // Un son retiré de l'écran continuerait de jouer, détaché.
-    if (node.tagName === 'AUDIO') node.pause();
+    // Un son ou une vidéo retirés de l'écran continueraient de jouer, détachés.
+    if (node.tagName === 'AUDIO' || node.tagName === 'VIDEO') node.pause();
     mediaNodes.delete(key);
   }
   mediaUsed = new Set();
@@ -1025,10 +1045,23 @@ function forgetMediaNodes() {
 
 function renderThumb(t, selected = false) {
   const box = libEl('div', `media-thumb kind-${t.kind} rot-${t.rotation}`);
-  if ((t.kind === 'image' || t.kind === 'video') && t.url) box.append(mediaNode(t.kind, t.url));
+  const file = (t.kind === 'image' || t.kind === 'video') && t.url ? mediaNode(t.kind, t.url) : undefined;
+  if (file) box.append(file);
   // Un son peut montrer une image pendant qu'il s'écoute : sa forme d'onde (recherche libre, découpe).
   else if (t.kind === 'audio' && t.poster) box.append(mediaNode('image', t.poster));
+  else if (t.kind === 'drawn' && t.drawn) box.append(drawnNode(t.drawn));
   else box.append(libEl('span', 'media-placeholder', t.text ?? ''));
+  /*
+   * Contenu animé (vidéo, GIF, APNG, son) : l'icône de lecture au coin. Déjà là et léger, il
+   * s'anime de lui-même ; lourd ou pas encore récupéré (onDemand), l'aperçu reste une image fixe
+   * et Start le récupère et le lit en grand. Le son porte une note.
+   */
+  const motion = t.onDemand ?? (t.kind === 'video' && file ? 'video' : t.animated ? 'image' : t.kind === 'audio' ? 'audio' : undefined);
+  if (motion) {
+    box.classList.add('animated');
+    if (t.onDemand) box.classList.add('on-demand');
+    box.append(libEl('span', `media-play${motion === 'audio' ? ' note' : ''}`));
+  }
   // Un son proposé s'écoute quand sa carte est choisie : on ne choisit pas une musique sans l'entendre.
   if (t.kind === 'audio' && t.url) {
     const audio = mediaNode('audio', t.url);
@@ -1060,14 +1093,23 @@ function syncAudio() {
 function renderMediaCards(m, cursor) {
   if (m.gallery) return renderGallery(m, cursor);
   const list = libEl('ol', `media-cards${m.large ? ' large' : ''}`);
+  if (m.summary) {
+    const sum = libEl('li', 'media-summary');
+    sum.append(libEl('strong', '', m.summary.strong), ` ${m.summary.text}`);
+    list.append(sum);
+  }
+  let group;
   for (const c of m.cards) {
-    const li = libEl('li', `media-card${c.action === cursor ? ' selected' : ''}${c.note ? ' unused' : ''}`);
+    if (c.group && c.group !== group) list.append(libEl('li', 'media-group', c.group));
+    group = c.group;
+    const li = libEl('li', `media-card${c.action === cursor ? ' selected' : ''}${c.note ? ' unused' : ''}${c.more ? ' media-more' : ''}${c.off ? ' media-off' : ''}`);
     if (c.action !== undefined) actOn(li, { type: 'activate', index: c.action });
-    li.append(renderThumb(c.thumb, c.action === cursor));
+    li.append(c.more ? renderMore(c.more) : renderThumb(c.thumb, c.action === cursor));
     const text = libEl('div', 'media-text');
     const top = libEl('div', 'media-top');
     top.append(libEl('span', 'media-title', c.title));
     if (c.code) top.append(libEl('span', 'badge', c.code));
+    if (c.source) top.append(libEl('span', `badge media-source-badge${c.source.base ? ' base' : ''}`, c.source.label));
     if (c.state) top.append(libEl('span', `badge media-state tone-${c.state.tone}`, c.state.label));
     text.append(top);
     const line = (className, label, value) => {
@@ -1099,6 +1141,20 @@ function renderMediaCards(m, cursor) {
   return list;
 }
 
+/** Bande d'aperçus du bloc « Autres choix » : quatre au plus, puis « +n » ; sans aperçu, la raison. */
+function renderMore(more) {
+  if (!more.minis.length) return libEl('div', 'media-strip none', more.none ?? '—');
+  const strip = libEl('div', 'media-strip');
+  for (const t of more.minis.slice(0, 4)) {
+    const mini = libEl('span', 'media-mini');
+    if (t.kind === 'image' && t.url) mini.append(mediaNode('image', t.url));
+    strip.append(mini);
+  }
+  const rest = more.count - Math.min(4, more.minis.length);
+  if (rest > 0) strip.append(libEl('span', 'media-mini rest', `+${rest}`));
+  return strip;
+}
+
 // Propositions d'un média en galerie : chaque aperçu en grand, au format de l'écran qui le
 // montrera ; nom, provenance, état et popularité sur la tuile. Le détail de la tuile choisie
 // (d'où elle vient, ce qui arrivera au téléchargement) reste sous la galerie, toujours visible.
@@ -1123,7 +1179,7 @@ function renderGallery(m, cursor) {
     }
     // Une ligne : d'où vient la proposition, puis sa popularité si le site la donne, sinon ce
     // qu'est le fichier ; le reste au détail, sous la galerie.
-    const line = libEl('div', 'media-facts');
+    const line = libEl('div', 'media-facts media-foot');
     if (c.code) line.append(libEl('span', 'media-source', c.code));
     const what = c.popularity ?? c.facts;
     if (what) line.append(libEl('span', c.popularity ? 'media-pop' : '', `${c.code ? ' · ' : ''}${what}`));

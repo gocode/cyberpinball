@@ -278,6 +278,35 @@ html[data-rotation='270'] #stop {
   color: var(--meta);
 }
 
+/*
+ * Le logiciel qui joue la table, devant fabricant · année (maquette choisie le 17/11/2026) :
+ * VPX en clair, liseré gris ; tout autre (Pinball FX) en vert signal. Hauteur prise dans la ligne
+ * de la plaque (40 u), texte au plancher de 20 px du design system.
+ */
+.menu-engine {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(32 * var(--u));
+  padding: 0 calc(12 * var(--u));
+  margin-right: calc(14 * var(--u));
+  border-radius: calc(5 * var(--u));
+  vertical-align: calc(3 * var(--u));
+  font-size: calc(20 * var(--u));
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 calc(1.5 * var(--u)) color-mix(in srgb, var(--ink-muted) 70%, transparent);
+}
+
+.menu-engine.other {
+  color: var(--signal);
+  box-shadow: inset 0 0 0 calc(1.5 * var(--u)) color-mix(in srgb, var(--signal) 75%, transparent);
+}
+
 /* Bureau : roue à droite du cadre, informations dessous, bandeau d'aide en bas (maquettes). */
 html.menu-desktop .menu-scrim {
   display: none;

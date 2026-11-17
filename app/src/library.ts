@@ -55,6 +55,15 @@ import {
   addPinballFxTable,
   PINBALLFX_TABLES,
   pinballFxVpsImage,
+  pickNamedMedia,
+  vpsSiteHits,
+  mediaSite,
+  lowerFirst,
+  scanTableMedias,
+  type MediaType,
+  type MediaDbOffer,
+  type SiteHit,
+  type SiteReceipt,
   placeMissingMedia,
   mediaUrl,
   readInfo,
@@ -279,11 +288,11 @@ import { allowPreview } from './media-protocol';
 import { createTableRules, type HelpPage } from './table-rules';
 import { createConverter } from './media-convert';
 import { analyseDressing } from './fulldmd';
-import { createMediaSites } from './media-sites';
+import { createMediaSites, jobKey } from './media-sites';
 import { createMediaImport } from './media-import';
 import { createInstallationImport } from './installation-import';
 import { userGesture } from './gesture-flash';
-import { createMedias, playsSoundPreview, type MediaView } from './library-medias';
+import { createMedias, markAnimated, playsSoundPreview, type MediaCard, type MediaThumb, type MediaView } from './library-medias';
 import type { RomMusic } from './rom-music';
 import { createTableFiles } from './table-files';
 import { createFilePicker, type PickRequest } from './file-picker';
@@ -3935,34 +3944,315 @@ export function createLibrary(host: LibraryHost) {
    * téléchargements : ceux de VPinMediaDB qui lui manquent (logo, fronton, DMD, vidéos), puis, sans
    * image du plateau, la capture de la table que donne VPS. Rien n'est remplacé.
    */
-  async function fetchPinballFxMedias(fx: PinballFxTable, file: string, flash: string): Promise<void> {
+  async function fetchPinballFxMedias(fx: PinballFxTable, file: string, flash: string, types?: readonly MediaType[]): Promise<void> {
     if (!fx.vps) return;
     let installed = 0;
     let placed = false;
+    let sites: SiteFill = { placed: [], missing: [], login: [] };
     const failed: string[] = [];
     try {
-      const got = await mediaDownload.fillMissing([file], { quiet: true });
+      const got = await mediaDownload.fillMissing([file], { quiet: true, ...(types ? { types } : {}) });
       installed = got.installed;
       failed.push(...got.failed);
       const table = find(file);
-      const url = vpsDb ? pinballFxVpsImage(vpsDb, fx) : undefined;
+      const url = vpsDb && (!types || types.includes('Playfield')) ? pinballFxVpsImage(vpsDb, fx) : undefined;
       if (table && url) {
         await mediaSearch.stagePreviews([{ url }], pinballFxThumbs, t('Vignettes'), { quiet: true });
         const staged = pinballFxThumbs.get(url);
         if (staged) allowPreview(staged);
         if (staged && fs.existsSync(staged)) placed = Boolean(placeMissingMedia(table, infoFileFor(table, tablesDir()), 'Playfield', staged, { origin: 'VPS', url, vpsId: fx.vps }));
       }
+      // Ce que VPinMediaDB n'a pas (une table propre à Zen, « Back to the Future Pinball ») : les
+      // fiches que la base VPS rattache au jeu, comme « Médias du jeu » les propose.
+      const now = find(file);
+      if (now) sites = await fillFromVpsSites(now, fx.vps, fx.title, types);
     } catch (error) {
       failed.push((error as Error).message);
     }
     host.reload(file);
-    console.log(`Pinball FX : médias de « ${fx.title} » : ${installed} de VPinMediaDB${placed ? ', image du plateau de VPS' : ''}${failed.length ? ` ; non reçus : ${failed.join(' ; ')}` : ''}.`); // i18n-ignore : journal
+    const siteNote = sites.placed.length ? `, ${sites.placed.join(', ')} des sites` : ''; // i18n-ignore : journal
+    const loginNote = sites.login.length ? ` ; compte à connecter : ${sites.login.join(', ')}` : ''; // i18n-ignore : journal
+    console.log(`Pinball FX : médias de « ${fx.title} » : ${installed} de VPinMediaDB${placed ? ', image du plateau de VPS' : ''}${siteNote}${loginNote}${failed.length ? ` ; non reçus : ${failed.join(' ; ')}` : ''}.`); // i18n-ignore : journal
     if (pinballFxFlash !== flash) return;
-    const n = installed + (placed ? 1 : 0);
-    pinballFxFlash = n
+    const n = installed + (placed ? 1 : 0) + sites.placed.length;
+    const got = n
       ? tn(n, '« {title} » ajoutée au front-end, avec {n} média.', '« {title} » ajoutée au front-end, avec {n} médias.', { title: fx.title })
-      : t('« {title} » ajoutée au front-end. Aucun média trouvé pour elle : Start ouvre sa fiche, « Médias du jeu » en cherche sur le web.', { title: fx.title });
+      : t('« {title} » ajoutée au front-end.', { title: fx.title });
+    const missing = sites.missing.map((type) => lowerFirst(mediaTypeInfo(type).label)).join(', ');
+    pinballFxFlash = sites.login.length
+      ? `${got} ${t('Pour le reste ({missing}) : connectez votre compte {site} (Ajouter une table > Comptes des sites), puis « Chercher les médias manquants » ici.', { missing, site: sites.login.join(', ') })}`
+      : sites.missing.length
+        ? `${got} ${t('Introuvable : {missing}. Start ouvre sa fiche, « Médias du jeu » en cherche sur le web.', { missing })}`
+        : got;
     host.broadcast();
+  }
+
+  /** Médias de la fiche d'ajout d'une table de Pinball FX, ceux de la roue d'abord. */
+  const PINBALLFX_DETAIL_TYPES: MediaType[] = ['Wheel', 'Backglass', 'Playfield', 'DMD', 'FullDMD', 'Topper', 'Loading', 'GameHelp', 'GameInfo', 'Audio', 'AudioLaunch'];
+
+  /** Un média de la fiche d'ajout : d'où il viendrait (rien : introuvable), et le site où se connecter. */
+  interface FxElement {
+    type: MediaType;
+    source?: 'mediadb' | 'site' | 'vps';
+    offer?: MediaDbOffer;
+    hit?: SiteHit;
+    /** Fiche d'un site sans compte connecté : son nom. */
+    login?: string;
+    /** Aperçu distant (VPinMediaDB 1k, capture de VPS). */
+    preview?: { url: string; md5?: string };
+  }
+
+  /** Fiche d'ajout ouverte : la table, ses médias, ceux qu'on prend (cochés par défaut quand ils viennent sans compte). */
+  let pinballFxDetail: { fx: PinballFxTable; elements: FxElement[]; chosen: Set<MediaType>; bytes: number; unknown: number; previews: Map<string, string> } | undefined;
+
+  /**
+   * Choisir une table de Pinball FX (17/11/2026), comme une table VPX : sa fiche d'abord, avec ses
+   * médias et leur provenance (VPinMediaDB, fiche d'un site rattachée par VPS, capture de VPS),
+   * chacun pris ou laissé à Start ; la table n'est ajoutée qu'à « Ajouter au front-end ». Le disque
+   * et le réseau sont lus ici, à l'ouverture.
+   */
+  function openPinballFxDetail(fx: PinballFxTable, at = 0): void {
+    void task(t('Médias de la table…'), async () => {
+      const db = fx.vps ? await mediaDownload.forGames([fx.vps]) : undefined;
+      const offers = fx.vps ? db?.games.get(fx.vps) : undefined;
+      const game = fx.vps ? vpsDb?.games.find((g) => g.id === fx.vps) : undefined;
+      const hits = game ? vpsSiteHits([game]).filter((h) => h.vps && !h.vps.pack) : [];
+      const capture = vpsDb ? pinballFxVpsImage(vpsDb, fx) : undefined;
+      const elements: FxElement[] = [];
+      for (const type of PINBALLFX_DETAIL_TYPES) {
+        const offer = offers?.offers.find((o) => o.type === type);
+        if (offer) {
+          const preview = offer.preview ?? (offer.kind === 'image' ? offer.file : undefined);
+          elements.push({ type, source: 'mediadb', offer, ...(preview ? { preview } : {}) });
+          continue;
+        }
+        if (type === 'Playfield' && capture) {
+          elements.push({ type, source: 'vps', preview: { url: capture } });
+          continue;
+        }
+        const hit = SITE_FILL_TYPES.includes(type) ? hits.find((h) => h.vps!.types.includes(type)) : undefined;
+        if (hit) {
+          const ready = Boolean(mediaSites.receipt(jobKey(hit))) || (await mediaSites.state(hit.site)).connected;
+          elements.push({ type, source: 'site', hit, ...(ready ? {} : { login: mediaSite(hit.site).name }) });
+          continue;
+        }
+        // Ceux de la roue restent montrés, introuvables : on sait ce qui manquera.
+        if (type === 'Wheel' || type === 'Backglass' || type === 'Playfield') elements.push({ type });
+      }
+      const previews = new Map<string, string>();
+      const wanted = elements.flatMap((e) => (e.preview ? [e.preview] : []));
+      if (wanted.length) await mediaSearch.stagePreviews(wanted, previews, t('Vignettes'), { quiet: true }).catch(() => undefined);
+      for (const f of previews.values()) allowPreview(f);
+      pinballFxDetail = {
+        fx,
+        elements,
+        chosen: new Set(elements.filter((e) => e.source && !e.login).map((e) => e.type)),
+        bytes: offers?.bytes ?? 0,
+        unknown: offers?.unknown ?? 0,
+        previews,
+      };
+      openCustom(buildPinballFxDetail, at);
+    });
+  }
+
+  function buildPinballFxDetail(): Built {
+    const d = pinballFxDetail!;
+    const { fx } = d;
+    const back = () => openPinballFx(fx.id);
+    const thumbOf = (e: FxElement | undefined, text: string): MediaThumb => {
+      const local = e?.preview ? d.previews.get(e.preview.url) : undefined;
+      return local ? { kind: 'image', url: mediaUrl(local), rotation: 0 } : { kind: 'fallback', rotation: 0, text };
+    };
+    const actions: Action[] = [];
+    const n = d.chosen.size;
+    const fromDb = d.elements.filter((e) => e.source === 'mediadb' && d.chosen.has(e.type)).length;
+    actions.push({
+      label: t('Ajouter au front-end'),
+      detail: n
+        ? [tn(n, 'avec {n} média', 'avec {n} médias'), fromDb && d.bytes ? t('environ {size} depuis VPinMediaDB', { size: formatSize(d.bytes) }) : undefined].filter(Boolean).join(' · ')
+        : t('sans média : le titre seul sur la roue'),
+      tone: 'ok',
+      icon: 'table-add',
+      key: 'pinballfx:add',
+      run: () => addPinballFx(fx, [...d.chosen]),
+    });
+    const cards: MediaCard[] = [
+      {
+        title: t('Table'),
+        state: { label: 'Pinball FX', tone: 'ok' },
+        facts: t('Pinball FX, table n° {n}', { n: fx.id }),
+        extra: [t('Jouée par Pinball FX : elle s’achète dans le jeu, Cyber Pinball ne peut pas vérifier que vous l’avez.')],
+        thumb: thumbOf(d.elements.find((e) => e.source === 'vps') ?? d.elements.find((e) => e.type === 'Playfield'), fx.title),
+      },
+    ];
+    // Les introuvables sur une seule carte, en haut sous la table : rien à y choisir, elle doit se
+    // voir sans défiler (une carte sans action plus bas resterait hors d'atteinte des boutons).
+    const lost = d.elements.filter((e) => !e.source);
+    if (lost.length) {
+      cards.push({
+        title: t('Introuvable'),
+        state: { label: lost.map((e) => mediaTypeInfo(e.type).label).join(', '), tone: 'quiet' },
+        facts: t('Ni VPinMediaDB ni la base VPS : après l’ajout, « Médias du jeu » en cherche sur le web'),
+        thumb: { kind: 'fallback', rotation: 0, text: t('Introuvable') },
+      });
+    }
+    for (const e of d.elements.filter((x) => x.source)) {
+      const label = mediaTypeInfo(e.type).label;
+      const on = d.chosen.has(e.type);
+      const kind = e.offer ? (e.offer.kind === 'video' ? t('vidéo') : e.offer.kind === 'audio' ? t('son') : t('image')) : undefined;
+      const card: MediaCard = {
+        title: label,
+        code: `(${e.type})`,
+        state: on
+            ? { label: t('Pris'), tone: 'ok' }
+            : e.login
+              ? { label: t('Compte {site} nécessaire', { site: e.login }), tone: 'warning' }
+              : { label: t('Laissé'), tone: 'quiet' },
+        facts:
+          e.source === 'mediadb'
+            ? t('VPinMediaDB · {kind}', { kind: kind! })
+            : e.source === 'vps'
+              ? t('Capture de la table, base VPS')
+              : t('{site} : {title}', { site: mediaSite(e.hit!.site).name, title: e.hit!.title }),
+        ...(e.login ? { extra: [t('Connectez votre compte : Ajouter une table > Comptes des sites.')] } : {}),
+        thumb: thumbOf(e, label),
+      };
+      card.action = actions.length;
+      actions.push({
+        label: on ? t('{type} : laisser', { type: label }) : t('{type} : prendre', { type: label }),
+        key: `pinballfx:media:${e.type}`,
+        run: () => {
+          if (on) d.chosen.delete(e.type);
+          else d.chosen.add(e.type);
+          host.broadcast();
+        },
+      });
+      cards.push(card);
+    }
+    actions.push({ label: t('Retour à la liste'), icon: 'back', key: 'back', run: back });
+    return {
+      heading: fx.title,
+      icon: 'pinball-app',
+      subheading: [fx.manufacturer, fx.year, t('Pinball FX (bêta)')].filter(Boolean).join(' · '),
+      lead: t('Start sur un média : le prendre ou le laisser. « Ajouter au front-end » ajoute la table ; ses médias arrivent ensuite en arrière-plan (Téléchargements). Rien n’est écrit avant.'),
+      sections: [],
+      actions,
+      back,
+      media: { cards },
+    };
+  }
+
+  /** « Ajouter au front-end » : la fiche de la table écrite, puis les médias choisis, en arrière-plan. */
+  function addPinballFx(fx: PinballFxTable, types: MediaType[]): void {
+    const added = addPinballFxTable(tablesDir(), fx.id);
+    console.log(`Pinball FX : table ${fx.id} (${fx.title}) ajoutée au front-end, ${added.id} ; médias choisis : ${types.join(', ') || 'aucun'}.`); // i18n-ignore : journal
+    pinballFxFlash = fx.vps && types.length ? t('« {title} » ajoutée au front-end : ses médias arrivent (Téléchargements).', { title: fx.title }) : t('« {title} » ajoutée au front-end.', { title: fx.title });
+    host.reload(added.file);
+    if (types.length) void fetchPinballFxMedias(fx, added.file, pinballFxFlash, types);
+    pinballFxDetail = undefined;
+    openPinballFx(fx.id);
+  }
+
+  /** Où en est « Chercher les médias manquants » (détail de l'entrée) ; undefined : jamais lancé. */
+  let pinballFxHunt: string | undefined;
+
+  /**
+   * « Chercher les médias manquants » : pour chaque table de Pinball FX du front-end, ce qui lui
+   * manque, de VPinMediaDB puis des fiches des sites rattachées par VPS, l'une après l'autre en
+   * arrière-plan ; le détail de l'entrée dit l'avancée, puis le bilan.
+   */
+  async function huntPinballFxMedias(entries: TableEntry[]): Promise<void> {
+    if (pinballFxHunt === t('Recherche en cours…')) return;
+    pinballFxHunt = t('Recherche en cours…');
+    host.broadcast();
+    let count = 0;
+    const login = new Set<string>();
+    const missing = new Set<MediaType>();
+    for (const entry of entries) {
+      const fx = PINBALLFX_TABLES.find((x) => x.id === entry.pinballFxTable);
+      if (!fx?.vps) continue;
+      try {
+        count += (await mediaDownload.fillMissing([entry.file], { quiet: true })).installed;
+        const table = find(entry.file);
+        if (table) {
+          const got = await fillFromVpsSites(table, fx.vps, fx.title);
+          count += got.placed.length;
+          for (const s of got.login) login.add(s);
+          for (const m of got.missing) missing.add(m);
+        }
+      } catch (error) {
+        console.log(`Pinball FX : médias manquants de « ${fx.title} » : ${(error as Error).message}.`); // i18n-ignore : journal
+      }
+      host.reload(entry.file);
+    }
+    const got = tn(count, '{n} média reçu', '{n} médias reçus');
+    const what = [...missing].map((type) => lowerFirst(mediaTypeInfo(type).label)).join(', ');
+    pinballFxHunt = login.size
+      ? `${got} · ${t('le reste ({missing}) demande votre compte {site} : Ajouter une table > Comptes des sites', { missing: what, site: [...login].join(', ') })}`
+      : missing.size
+        ? `${got} · ${t('introuvable : {missing}', { missing: what })}`
+        : got;
+    console.log(`Pinball FX : médias manquants : ${pinballFxHunt}.`); // i18n-ignore : journal
+    host.broadcast();
+  }
+
+  /** Ce que les fiches des sites ont donné à une table : types placés, encore manquants, sites où se connecter. */
+  interface SiteFill {
+    placed: MediaType[];
+    missing: MediaType[];
+    login: string[];
+  }
+
+  /** Médias de menu qu'une table de Pinball FX reçoit des sites : logo, fronton, topper (pas les packs entiers). */
+  const SITE_FILL_TYPES: MediaType[] = ['Wheel', 'Backglass', 'Topper'];
+
+  /**
+   * Les types encore absents (logo, fronton, topper) depuis les fiches de VPUniverse ou de VPForums
+   * que la base VPS rattache à ce jeu (17/11/2026) : une fiche par type, avec le compte de
+   * l'utilisateur (sans compte : rien n'est demandé, le site est rendu pour le message). Un pack de
+   * logos reçu une fois sert à toutes les tables : le fichier au nom de la table y est pris
+   * (pickNamedMedia), jamais un fichier deviné. Rien n'est remplacé (placeMissingMedia).
+   */
+  async function fillFromVpsSites(table: TableEntry, vpsId: string, title: string, types?: readonly MediaType[]): Promise<SiteFill> {
+    const out: SiteFill = { placed: [], missing: [], login: [] };
+    const game = vpsDb?.games.find((g) => g.id === vpsId);
+    const have = new Set(scanTableMedias(table).map((m) => m.type));
+    const wanted = SITE_FILL_TYPES.filter((type) => !have.has(type) && (!types || types.includes(type)));
+    if (!game || !wanted.length) return out;
+    const hits = vpsSiteHits([game]).filter((h) => h.vps && !h.vps.pack);
+    for (const type of wanted) {
+      const offers = hits.filter((h) => h.vps!.types.includes(type));
+      // Une fiche déjà reçue d'abord (un pack de logos de Zen sert à toutes les tables).
+      const hit = offers.find((h) => mediaSites.receipt(jobKey(h))) ?? offers[0];
+      if (!hit) {
+        out.missing.push(type);
+        continue;
+      }
+      if (!mediaSites.receipt(jobKey(hit)) && !(await mediaSites.state(hit.site)).connected) {
+        out.missing.push(type);
+        const site = mediaSite(hit.site).name;
+        if (!out.login.includes(site)) out.login.push(site);
+        continue;
+      }
+      const receipt = mediaSites.receipt(jobKey(hit)) ?? (await receiveSiteFile(hit, type));
+      const pick = receipt ? pickNamedMedia(receipt.files, type, title) : undefined;
+      const done = pick && placeMissingMedia(table, infoFileFor(table, tablesDir()), type, pick.file, { origin: mediaSite(hit.site).name, url: hit.url, vpsId, ...(hit.author ? { author: hit.author } : {}) });
+      (done ? out.placed : out.missing).push(type);
+    }
+    return out;
+  }
+
+  /** Une fiche mise dans la file de son site, attendue jusqu'à sa réception (ou son échec, ou 20 min). */
+  async function receiveSiteFile(hit: SiteHit, type: MediaType): Promise<SiteReceipt | undefined> {
+    const key = mediaSites.enqueue(hit, type).key;
+    const end = Date.now() + 20 * 60_000;
+    while (Date.now() < end) {
+      const job = mediaSites.job(key);
+      if (!job || job.state === 'failed' || job.cancelled) return undefined;
+      if (job.state === 'received') return mediaSites.receipt(key);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    return undefined;
   }
 
   function pinballFxList(): PinballFxTable[] {
@@ -3992,12 +4282,9 @@ export function createLibrary(host: LibraryHost) {
               openSheet(entry);
               return;
             }
-            const added = addPinballFxTable(tablesDir(), fx.id);
-            console.log(`Pinball FX : table ${fx.id} (${fx.title}) ajoutée au front-end, ${added.id}.`); // i18n-ignore : journal
-            pinballFxFlash = fx.vps ? t('« {title} » ajoutée au front-end : ses médias arrivent (Téléchargements).', { title: fx.title }) : t('« {title} » ajoutée au front-end.', { title: fx.title });
-            host.reload(added.file);
-            void fetchPinballFxMedias(fx, added.file, pinballFxFlash);
-            openPinballFx(fx.id);
+            // Comme une table VPX (17/11/2026) : la fiche de la table et ses médias à choisir d'abord ;
+            // elle n'est ajoutée qu'à « Ajouter au front-end ».
+            openPinballFxDetail(fx);
           },
         }) - 1;
       return {
@@ -4011,6 +4298,16 @@ export function createLibrary(host: LibraryHost) {
         pick: true,
       };
     });
+    // Tables déjà dans le front-end (ajoutées avant, ou compte d'un site connecté depuis) : leurs
+    // médias absents, cherchés de nouveau en arrière-plan. Sans lecture du disque ici (écran refait à chaque touche).
+    if (present.size)
+      actions.push({
+        label: t('Chercher les médias manquants'),
+        detail: pinballFxHunt ?? t('Logo, fronton, topper, vidéos… des tables de Pinball FX déjà dans le front-end'),
+        icon: 'image-download',
+        key: 'pinballfx:missing',
+        run: () => void huntPinballFxMedias([...present.values()]),
+      });
     actions.push({ label: t('Retour'), icon: 'back', key: 'back', run: back });
     const inMenu = present.size;
     return {
@@ -5218,7 +5515,7 @@ export function createLibrary(host: LibraryHost) {
       actions: built.actions.map(({ label, detail, tone, icon, flag, web, attention, badge, shortcut, run }, i) => ({ label: shownLabel({ label, run }, built.back), detail, tone, icon: web && !iconMenu ? undefined : icon, flag, attention: attention || undefined, badge: badge ? menuBadgeLabel(badge) : undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
       // La page web de l'élément choisi (une ligne des crédits) : son QR code sous les actions.
       actionQr: actionQrView(built.actions[cursor]?.qr),
-      media: built.media,
+      media: markAnimated(built.media),
       variant: built.variant,
       actionsTitle: built.actionsTitle,
       app: built.app,

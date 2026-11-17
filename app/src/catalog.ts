@@ -113,6 +113,10 @@ import {
   type MediaDbFile,
   type Need,
   type NeedKind,
+  mediaDbOffers,
+  tableMediaDir,
+  type MediaDbOffer,
+  type MediaType,
   type SiteState,
   type SourceSite,
   type TableEntry,
@@ -135,7 +139,7 @@ import { archiveEntries } from './archives';
 import { recentDownloads, watchDownloads } from './downloads-watch';
 import type { PickRequest } from './file-picker';
 import type { Action, Built, LibraryHost, Row, Section, Tone } from './library';
-import type { MediaCard, MediaThumb } from './library-medias';
+import type { DrawnPart, MediaCard, MediaThumb } from './library-medias';
 import { createFileGallery, type FileChoice } from './file-gallery';
 import { allowPreview } from './media-protocol';
 import type { MediaSearch } from './media-search';
@@ -1094,9 +1098,24 @@ export function createCatalog(ctx: CatalogContext) {
       const version = game && vpxVersions(game).find((v) => v.id === versionId);
       if (!game || !version) return openCatalog();
       await noteContents(waitList().items.filter((i) => i.gameId === game.id));
+      // Ce que VPinMediaDB a pour ce jeu : le média prévu de chaque écran (null : index injoignable).
+      if (!needsMedia.has(game.id)) {
+        const { db: mdb } = await ctx.search.index();
+        const entry = mdb?.entries.get(game.id);
+        needsMedia.set(game.id, mdb ? (entry ? mediaDbOffers(entry, ctx.search.quality().quality).map((o) => o.variants[0]!) : []) : null);
+      }
       refresh = () => ctx.show(() => buildNeeds(game, version), ctx.cursor());
       ctx.show(() => buildNeeds(game, version), at);
-      loadThumbs([imageOf(version), ...(game.b2sFiles ?? []).slice(0, 1).map(imageOf)]);
+      const others = (files: { imgUrl?: string }[] | undefined) => (files ?? []).slice(0, 5).map(imageOf);
+      loadThumbs([
+        imageOf(version),
+        ...(needsMedia.get(game.id) ?? []).map((o) => o.preview),
+        ...others(game.b2sFiles),
+        ...others(game.pupPackFiles),
+        ...others(game.altColorFiles),
+        ...others(game.povFiles),
+        ...others(game.topperFiles),
+      ]);
     });
   }
 
@@ -1111,6 +1130,253 @@ export function createCatalog(ctx: CatalogContext) {
   function itemFor(game: VpsGame, need: Need): WaitItem | undefined {
     const items = waitList().items.filter((i) => i.gameId === game.id && i.kind === need.kind && i.state !== 'installed');
     return items.find((i) => need.files.some((f) => f.id === i.fileId)) ?? (need.kind === 'table' ? undefined : items[0]);
+  }
+
+  // ---------- Ce qu'il faut, écran par écran ----------
+
+  /**
+   * Ce que VPinMediaDB a pour un jeu, un fichier par type (la variante retenue d'office, comme
+   * fillMissing) ; null : index injoignable. Lu à l'ouverture de « Ce qu'il faut ».
+   */
+  const needsMedia = new Map<string, MediaDbOffer[] | null>();
+
+  /** Un besoin de « Ce qu'il faut », prêt à ranger : sa carte, son action, l'élément de la liste d'attente. */
+  interface NeedView {
+    need: Need;
+    card: MediaCard;
+    act?: Action;
+    item?: WaitItem;
+    issue: boolean;
+    host?: { label: string; account: boolean };
+  }
+
+  /** Le média d'un type que montre déjà la table installée de ce jeu (medias\), s'il y en a un. */
+  function ownMedia(game: VpsGame, type: MediaType): string | undefined {
+    const here = host.tables().find((tb) => tableSourceOf(tb.info)?.vpsGameId === game.id || tb.info.Info?.VPSId === game.id);
+    if (!here) return undefined;
+    let names: string[] = [];
+    try {
+      names = fs.readdirSync(tableMediaDir(here));
+    } catch {
+      return undefined;
+    }
+    const found = names.find((n) => n.toLowerCase().startsWith(`(${type.toLowerCase()})`));
+    return found ? path.join(tableMediaDir(here), found) : undefined;
+  }
+
+  /**
+   * Bandeau en tête : ce qui manque vraiment pour jouer, et ce qui est déjà réglé. Avant le
+   * 16/11/2026, l'écran ne listait que les fichiers des sites (souvent vpuniverse.com, avec
+   * compte) : on croyait n'avoir rien si on ne les validait pas, sans savoir que VPinMediaDB
+   * fournit d'office un média par écran.
+   */
+  function needsSummary(game: VpsGame, missing: Need[]): { strong: string; text: string } {
+    const offers = needsMedia.get(game.id);
+    const strong = missing.length ? t('Pour jouer, il manque : {items}.', { items: formatList(missing.map((n) => NEED_LABELS[n.kind]), 'and') }) : t('Tout l’indispensable est là ou attendu.');
+    const text =
+      offers === null
+        ? t('VPinMediaDB ne répond pas pour l’instant : Cyber Pinball dessine chaque écran en attendant. Les autres choix sont en plus.')
+        : offers && !offers.length
+          ? t('Cette table n’est pas sur VPinMediaDB : Cyber Pinball dessine chaque écran à son nom, en attendant mieux. Les autres choix sont en plus.')
+          : t('Chaque écran de la borne a déjà son média prévu, sans compte : rien d’autre à valider. Les autres choix sont en plus.');
+    return { strong, text };
+  }
+
+  /** Grand aperçu d'une carte prévue (Start dessus), Retour revient à la même carte. */
+  function openPlanned(game: VpsGame, version: VpsTableFile, card: MediaCard, at: number, playing = false): void {
+    const back = () => openNeeds(game.id, version.id, at);
+    ctx.show(
+      () => ({
+        heading: card.group ?? card.title,
+        subheading: vpsLabel(game),
+        lead: [card.title, card.source?.label, card.facts].filter(Boolean).join(' · '),
+        sections: [],
+        actions: [{ label: t('Retour'), run: back }],
+        back,
+        // Une musique s'écoute quand sa carte est choisie : la carte porte l'action du curseur (Retour).
+        media: { cards: [{ ...card, action: playing ? 0 : undefined, group: undefined }], large: true },
+      }),
+      0,
+    );
+  }
+
+  /**
+   * Vidéo ou musique de VPinMediaDB, lue à la demande : récupérée sans compte (vérifiée par MD5,
+   * dans le dossier de réception, reprise ensuite par l'installation), puis lue en grand.
+   */
+  function playOffer(game: VpsGame, version: VpsTableFile, card: MediaCard, offer: MediaDbOffer, at: number): void {
+    void ctx.task(offer.kind === 'audio' ? t('Musique de VPinMediaDB…') : t('Vidéo de VPinMediaDB…'), async () => {
+      let file: string;
+      try {
+        file = await ctx.search.stage(offer.file);
+      } catch {
+        return ctx.openNotice(t('Lecture impossible'), [t('VPinMediaDB ne répond pas : réessayez quand la borne est reliée à Internet.')], () => openNeeds(game.id, version.id, at));
+      }
+      allowPreview(file);
+      const url = mediaUrl(file);
+      const thumb: MediaThumb = offer.kind === 'audio' ? { kind: 'audio', url, rotation: 0, text: '♪' } : { kind: 'video', url, rotation: 0 };
+      openPlanned(game, version, { ...card, extra: card.extra?.filter((e) => e !== t('Start : la lire')), thumb }, at, true);
+    });
+  }
+
+  /**
+   * Range les cartes de « Ce qu'il faut » par écran de la borne : « Pour jouer » (table, ROM),
+   * puis pour chaque écran la carte de ce qui est prévu (le fichier de la borne, sinon celui de
+   * VPinMediaDB, sinon l'habillage dessiné par Cyber Pinball) et dessous le bloc « Autres
+   * choix » (un arrêt des flippers, Start ouvre la galerie). Les actions suivent l'ordre affiché.
+   */
+  function screenCards(game: VpsGame, version: VpsTableFile, views: Map<NeedKind, NeedView>, cards: MediaCard[], actions: Action[]): void {
+    const screens = cabinetScreens(loadCabinet(dataDir()));
+    const offers = needsMedia.get(game.id);
+    const look = { title: game.name, manufacturer: game.manufacturer, year: game.year ? String(game.year) : undefined };
+    const place = (card: MediaCard, act?: Action) => {
+      if (act) {
+        card.action = actions.length;
+        actions.push(act);
+      }
+      cards.push(card);
+    };
+    const used = new Set<NeedKind>();
+
+    // Ce qui est prévu pour un écran : déjà sur la borne, sinon VPinMediaDB, sinon dessiné.
+    const planned = (group: string, type: MediaType | undefined, drawn: DrawnPart | undefined, where: string, extra: string[] = []) => {
+      const file = type && ownMedia(game, type);
+      const offer = !file && type ? offers?.find((o) => o.type === type) : undefined;
+      let card: MediaCard;
+      if (file) {
+        allowPreview(file);
+        const video = /\.(mp4|webm|m4v|mov|avi|f4v|mkv)$/i.test(file);
+        card = { group, title: video ? t('Vidéo') : type === 'Wheel' ? t('Logo') : t('Image'), source: { label: t('Sur la borne'), base: true }, state: STATE_LABELS.have, facts: where, extra, thumb: { kind: video ? 'video' : 'image', url: mediaUrl(file), rotation: 0 } };
+      } else if (offer) {
+        const title = offer.kind === 'video' ? t('Vidéo') : offer.kind === 'audio' ? t('Musique') : type === 'Wheel' ? t('Logo') : t('Image fixe');
+        // Vidéo ou musique pas encore là : l'aperçu fixe est marqué « à la demande », Start la récupère et la lit.
+        const demand = offer.kind === 'video' || offer.kind === 'audio' ? offer.kind : undefined;
+        const still: MediaThumb = offer.preview ? thumbOf(offer.preview, title) : { kind: 'fallback', rotation: 0, text: '♪' };
+        card = { group, title, source: { label: t('VPinMediaDB · sans compte'), base: true }, state: { label: t('Prévu'), tone: 'ok' }, facts: where, extra: demand ? [t('Start : la lire'), ...extra] : extra, thumb: demand ? { ...still, onDemand: demand } : still };
+        const at = actions.length;
+        place(card, { label: t('{group} : {title}', { group, title }), detail: card.source?.label, run: () => (demand ? playOffer(game, version, card, offer, at) : openPlanned(game, version, card, at)) });
+        return;
+      } else if (drawn) {
+        card = {
+          group,
+          title: t('Habillage dessiné'),
+          source: { label: t('Cyber Pinball · rien à télécharger'), base: true },
+          state: { label: t('Prévu'), tone: 'ok' },
+          facts: offers === null ? t('VPinMediaDB ne répond pas : dessiné en attendant') : t('Titre, fabricant et année, en attendant mieux'),
+          extra: [where, ...extra],
+          thumb: { kind: 'drawn', rotation: 0, drawn: { part: drawn, game: look } },
+        };
+      } else {
+        card = { group, title: t('Sons de la table'), source: { label: t('Fournis par la table') }, state: { label: t('Prévu'), tone: 'ok' }, facts: where, extra, thumb: { kind: 'fallback', rotation: 0, text: '♪' } };
+      }
+      const at = actions.length;
+      place(card, { label: t('{group} : {title}', { group, title: card.title }), detail: card.source?.label, run: () => openPlanned(game, version, card, at) });
+    };
+
+    // Bloc « Autres choix » d'un besoin : ses aperçus en bande ; Start ouvre la galerie (ou le corrige).
+    const more = (group: string, kind: NeedKind, what: string, files?: VpsTableFile[], facts?: string) => {
+      const v = views.get(kind);
+      if (!v) return false;
+      used.add(kind);
+      const list = files ?? v.need.files;
+      const images = list.map(imageOf);
+      const minis = images.map((f) => (f ? thumbOf(f, '') : undefined)).filter((th): th is MediaThumb => th?.kind === 'image');
+      const state = v.issue || v.item ? v.card.state : undefined;
+      const card: MediaCard = {
+        group,
+        title: t('Autres choix : {what}', { what }),
+        source: v.card.source,
+        state,
+        facts: facts ?? v.need.detail,
+        extra: v.card.extra,
+        transfer: v.card.transfer,
+        thumb: v.card.thumb,
+        more: { minis, count: list.length, none: images.some(Boolean) ? t('Aperçus en chargement…') : t('Pas d’aperçu sur la base VPS') },
+      };
+      const act: Action | undefined = v.issue || v.item || !list.length || list.length === v.need.files.length ? v.act : { label: t('{group} : autres choix', { group }), detail: v.act?.detail, run: () => openFiles(game, version, v.need) };
+      place(card, act && { ...act, label: v.issue || v.item ? act.label : t('{group} : {what}', { group, what }) });
+      return true;
+    };
+
+    const off = (group: string, reason: string) => cards.push({ group, title: t('Autres choix'), facts: reason, thumb: { kind: 'fallback', rotation: 0 }, more: { minis: [], count: 0, none: '—' }, off: true });
+    const nothingElse = t('Rien d’autre de connu pour cette table');
+
+    // Pour jouer : la table et la ROM (et tout autre indispensable).
+    const play = t('Pour jouer');
+    for (const [kind, v] of views) {
+      if (kind !== 'table' && kind !== 'rom' && !v.need.required) continue;
+      used.add(kind);
+      place({ ...v.card, group: play }, v.act);
+    }
+
+    // Fronton : le fronton animé conseillé est prévu quand l'installation rapide le prend.
+    if (screens.backglass) {
+      const group = t('Fronton');
+      const b2s = views.get('b2s');
+      const fixed = ownMedia(game, 'Backglass') ? t('l’image de la borne') : offers?.some((o) => o.type === 'Backglass') ? t('l’image fixe de VPinMediaDB') : t('le fronton dessiné');
+      if (b2s && b2s.need.state === 'todo' && b2s.need.files.length) {
+        used.add('b2s');
+        const first = b2s.need.files[0]!;
+        const fileLabel = versionLabel(first);
+        const card: MediaCard = {
+          ...b2s.card,
+          group,
+          title: t('Fronton animé {label}', { label: fileLabel }),
+          code: undefined,
+          state: b2s.item || b2s.issue ? b2s.card.state : { label: t('Prévu'), tone: 'ok' },
+          facts: t('Joue avec la table : lumières et scores suivent la partie'),
+          extra: [t('Avec l’installation rapide ; sans lui, {fallback}', { fallback: fixed })],
+          thumb: thumbOf(imageOf(first), t('Fronton')),
+        };
+        const act: Action | undefined = b2s.issue || b2s.item ? b2s.act : { label: t('Fronton : {label}', { label: fileLabel }), detail: b2s.act?.detail, tone: b2s.act?.tone, run: () => get(game, b2s.need, first, () => openNeeds(game.id, version.id)) };
+        place(card, act);
+        // Les autres : la galerie les montre tous, le conseillé compris (il y est repéré).
+        if (b2s.need.files.length > 1) {
+          const rest = b2s.need.files.slice(1);
+          more(group, 'b2s', tn(rest.length, 'un fronton animé', '{n} frontons animés'), rest, t('Start : tous en grand, le conseillé compris'));
+        } else off(group, t('Pas d’autre fronton connu de VPS'));
+      } else {
+        planned(group, 'Backglass', 'backglass', t('Dans le front-end et pendant la partie'));
+        used.add('b2s');
+        off(group, b2s?.need.state === 'included' ? t('Fronton animé fourni avec la table') : t('Aucun fronton animé connu de VPS'));
+      }
+    }
+
+    // Afficheur : la vidéo ou l'image au format de l'écran ; couleurs du DMD et PuP-Pack en plus.
+    if (screens.dmd !== 'none') {
+      const group = t('Afficheur');
+      planned(group, screens.dmd === 'full' ? 'FullDMD' : undefined, screens.dmd === 'full' ? 'fullDmd' : 'dmd', t('Dans le front-end ; en partie, le DMD de la table'));
+      const a = more(group, 'altcolor', t('couleurs du DMD'));
+      const b = more(group, 'pup', t('PuP-Pack'));
+      if (!a && !b) off(group, nothingElse);
+    }
+
+    const group = t('Plateau');
+    planned(group, 'Playfield', 'playfield', t('Dans le front-end, derrière la roue'));
+    if (!more(group, 'pov', t('point de vue de la caméra'))) off(group, nothingElse);
+
+    if (screens.topper) {
+      const g = t('Topper');
+      planned(g, undefined, 'topper', t('Dans le front-end et pendant la partie'));
+      if (!more(g, 'topper', t('topper animé'))) off(g, nothingElse);
+    }
+
+    const wheel = t('Roue des tables');
+    planned(wheel, 'Wheel', 'wheel', t('Dans la roue de l’écran des tables'));
+    off(wheel, t('Autres logos : dans « Médias du jeu », une fois la table installée'));
+
+    // Son : seulement s'il y a quelque chose à dire (musique de VPinMediaDB, sons ou musique de VPS).
+    const sound = t('Son');
+    const music = offers?.some((o) => o.type === 'Audio') || Boolean(ownMedia(game, 'Audio'));
+    if (music || views.has('altsound') || views.has('music')) {
+      planned(sound, music ? 'Audio' : undefined, undefined, t('Dans le front-end, quand la table est choisie'));
+      const a = more(sound, 'altsound', t('sons remasterisés'));
+      const b = more(sound, 'music', t('musique'));
+      if (!a && !b) off(sound, nothingElse);
+    }
+
+    // Ce qui n'a pas d'écran ici (PuP-Pack sans afficheur…) : en fin de liste, rien n'est perdu.
+    for (const [kind, v] of views) if (!used.has(kind) && v.need.state !== 'useless') place({ ...v.card, group: t('Autres') }, v.act);
   }
 
   function buildNeeds(game: VpsGame, version: VpsTableFile): Built {
@@ -1147,6 +1413,8 @@ export function createCatalog(ctx: CatalogContext) {
       const installedHere = needs.some((n) => n.kind === 'table' && n.state === 'have');
       if (!installedHere && fast.get.some((n) => !itemFor(game, n) || itemFor(game, n)!.state === 'waiting')) actions.push(quickAction(game, version, fast, recommendVersion(game)?.file.id === version.id));
     }
+    // Chaque besoin donne sa carte et son action ; screenCards les range écran par écran, les actions dans l'ordre affiché.
+    const views = new Map<NeedKind, NeedView>();
     for (const need of needs) {
       const item = itemFor(game, need);
       const issue = item && problemOf(item);
@@ -1161,6 +1429,7 @@ export function createCatalog(ctx: CatalogContext) {
       const card: MediaCard = {
         title: label,
         code: need.required ? t('indispensable') : undefined,
+        ...(host1 ? { source: { label: host1.account ? t('{site} · compte', { site: host1.label }) : host1.label } } : {}),
         state: moving ? { label: t('Téléchargement en cours'), tone: 'ok' } : { label: st.label, tone: st.tone },
         ...(moving ? { transfer: { ...transferBar(moving), text: formatTransfer(moving, true) } } : {}),
         facts: item?.received
@@ -1171,26 +1440,24 @@ export function createCatalog(ctx: CatalogContext) {
             ? t('dans « {file} », reçu avec {kind}', { file: path.basename(cover.received.file), kind: NEED_LABELS[cover.kind] })
             : need.detail,
         extra: [
-          ...(canGet && host1 ? [whereToGet(need.files.length, host1)] : []),
           ...(need.kind === 'rom' && need.state === 'todo' ? [t('Protégée par le droit d’auteur : Cyber Pinball n’en fournit aucune ; ne la récupérez que si vous y avez droit.')] : []),
         ],
         thumb: need.kind === 'table' ? thumbOf(imageOf(version), t('Table')) : need.kind === 'b2s' ? thumbOf(need.files.map(imageOf).find(Boolean), t('Fronton')) : { kind: 'fallback', rotation: 0, text: label },
       };
-      if (issue) {
-        // Mauvais fichier rangé : le corriger d'abord (réaffecter, vider, remplacer).
-        card.action = actions.length;
-        actions.push({ label: t('{label} : à corriger', { label }), detail: problemText(issue), tone: 'warning', run: () => openItem(item!.id) });
-      } else if (canGet) {
-        card.action = actions.length;
-        actions.push({
+      let act: Action | undefined;
+      // Mauvais fichier rangé : le corriger d'abord (réaffecter, vider, remplacer).
+      if (issue) act = { label: t('{label} : à corriger', { label }), detail: problemText(issue), tone: 'warning', run: () => openItem(item!.id) };
+      else if (canGet) {
+        act = {
           label: item?.state === 'received' ? t('{label} : récupérer de nouveau', { label }) : t('Récupérer : {label}', { label }),
           detail: need.files.length > 1 ? t('{count} au choix', { count: need.files.length }) : host1 ? (host1.account ? t('{site}, compte nécessaire', { site: host1.label }) : host1.label) : undefined,
           tone: need.required && !item ? 'ok' : undefined,
           run: () => (need.files.length > 1 ? openFiles(game, version, need) : get(game, need, need.files[0]!, () => openNeeds(game.id, version.id))),
-        });
+        };
       }
-      cards.push(card);
+      views.set(need.kind, { need, card, act, item, issue: Boolean(issue), host: host1 });
     }
+    screenCards(game, version, views, cards, actions);
     // Parties ajoutées au jeu d'après le contenu d'un fichier reçu, que VPS ne liste pas pour cette version.
     for (const extra of waitList().items.filter((i) => i.gameId === game.id && i.state !== 'installed' && i.kind !== 'table' && !needs.some((n) => n.kind === i.kind))) {
       const issue = problemOf(extra);
@@ -1232,14 +1499,15 @@ export function createCatalog(ctx: CatalogContext) {
       lead: running
         ? t('Installation rapide : chaque page s’ouvre d’elle-même dans la fenêtre « Récupérer », l’indispensable d’abord ; connectez-vous, téléchargez. Dès que l’indispensable est là, « Installer sans attendre » ouvre le plan.')
         : missing.length
-          ? t('Pour jouer : {items}. Start sur une ligne ouvre sa page dans la fenêtre « Récupérer » : connectez-vous, téléchargez ; le fichier est rangé tout seul dans la liste d’attente.', { items: missing.map((n) => NEED_LABELS[n.kind]).join(', ') })
+          ? // Ce qui manque est dit par le bandeau en tête des cartes (needsSummary) : ici, comment l'obtenir.
+            t('Start sur une carte ouvre sa page dans la fenêtre « Récupérer » : connectez-vous, téléchargez ; le fichier est rangé tout seul dans la liste d’attente.')
           : received.length
             ? t('Tout l’indispensable est là ou attendu. « Préparer l’installation » montre le plan avant d’écrire quoi que ce soit.')
             : t('Tout l’indispensable est là ou attendu : un fichier téléchargé arrive tout seul dans « Récupérés et attendus ».'),
       sections,
       actions,
       back: () => openGame(game.id),
-      media: { cards },
+      media: { cards, summary: running ? undefined : needsSummary(game, missing) },
     };
   }
 
@@ -2445,16 +2713,6 @@ export function createCatalog(ctx: CatalogContext) {
     },
     fileSize,
   };
-}
-
-/** « Sur vpuniverse.com (compte nécessaire). », « 3 fichiers au choix, sur … ». */
-function whereToGet(files: number, host: { label: string; account: boolean }): string {
-  if (files > 1) {
-    return host.account
-      ? t('{count} fichiers au choix, sur {site} (compte nécessaire).', { count: files, site: host.label })
-      : t('{count} fichiers au choix, sur {site}.', { count: files, site: host.label });
-  }
-  return host.account ? t('Sur {site} (compte nécessaire).', { site: host.label }) : t('Sur {site}.', { site: host.label });
 }
 
 function fileSize(file: string): number {

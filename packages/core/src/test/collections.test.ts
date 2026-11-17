@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { ShelfMemory, addMyCollection, removeMyCollection, renameMyCollection, setTableInMyCollection, type CollectionsSettings, buildCollections, shelfView, findCollection, isFavorite, loadCollections, mergeFavorite, saveCollections, setFavorite, stepCollection } from '../collections';
+import { ShelfMemory, parseCollectionsSettings, addMyCollection, removeMyCollection, renameMyCollection, setTableInMyCollection, type CollectionsSettings, buildCollections, shelfView, findCollection, isFavorite, loadCollections, mergeFavorite, saveCollections, setFavorite, stepCollection } from '../collections';
 import { setLanguage } from '../i18n';
 import type { TableEntry } from '../tables';
 
@@ -42,6 +42,29 @@ test('collections : les fixes d’abord, puis fabricants (A → Z) et décennies
   assert.equal(of('friends').tables.length, 0);
   assert.ok(of('friends').reason);
   for (const c of list) assert.equal(Boolean(c.reason), c.tables.length === 0, c.id);
+});
+
+test('collections : un type de jeu par logiciel, seulement sur une borne qui en mêle plusieurs', () => {
+  // Que du VPX (la plupart des bornes) : pas de groupe, il ferait doublon avec Toutes les tables.
+  assert.ok(!buildCollections(ALL).some((c) => c.group === 'engine'));
+  const FX = { ...table('Star Wars Pinball', { manufacturer: 'Zen Studios', year: 2013 }), emulator: 'pinballfx' as const };
+  const AFM_FX = { ...table('Attack from Mars FX', { manufacturer: 'Bally', year: 1995 }), emulator: 'pinballfx' as const };
+  const mixed = buildCollections([AFM, FX, T2, AFM_FX]);
+  const engines = mixed.filter((c) => c.group === 'engine');
+  // VPX d'abord, puis Pinball FX ; une table sans émulateur déclaré est de VPX.
+  assert.deepEqual(ids(engines), ['engine:vpx', 'engine:pinballfx']);
+  assert.equal(engines[0]!.label, 'Visual Pinball X');
+  assert.deepEqual(titles(engines[0]!.tables), ['Attack from Mars', 'Terminator 2']);
+  assert.deepEqual(titles(engines[1]!.tables), ['Star Wars Pinball', 'Attack from Mars FX']);
+  assert.equal(engines[1]!.detail, 'bêta');
+  // Après les collections fixes et personnelles, avant les fabricants.
+  assert.ok(mixed.findIndex((c) => c.group === 'engine') < mixed.findIndex((c) => c.group === 'maker'));
+  assert.ok(mixed.findIndex((c) => c.group === 'engine') > mixed.findIndex((c) => c.id === 'friends'));
+  // Choisie puis gardée d'un démarrage à l'autre ; partie (plus qu'un logiciel) : Toutes.
+  assert.equal(parseCollectionsSettings({ active: 'engine:pinballfx', mine: [] }).active, 'engine:pinballfx');
+  assert.equal(parseCollectionsSettings({ active: 'engine:futurepinball', mine: [] }).active, 'all');
+  assert.equal(findCollection(buildCollections(ALL), 'engine:pinballfx').id, 'all');
+  assert.equal(shelfView(engines[1]!).label, 'Pinball FX');
 });
 
 test('collections : une collection vide dit pourquoi ; aucune table', () => {

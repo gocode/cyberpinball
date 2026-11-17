@@ -17,6 +17,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   applyOps,
+  mediaPathFromUrl,
+  readMediaDimensions,
   b2sCacheDir,
   b2sImages,
   b2sLitImages,
@@ -116,13 +118,65 @@ export interface MediasContext {
 
 /** Aperçu d'un média : fichier image ou vidéo (vignette), son, ou repli intégré décrit en texte. */
 export interface MediaThumb {
-  kind: 'image' | 'video' | 'audio' | 'fallback';
+  /** drawn : l'habillage que Cyber Pinball dessine quand le jeu n'a pas ce média (fallback.js). */
+  kind: 'image' | 'video' | 'audio' | 'fallback' | 'drawn';
   url?: string;
   /** Rotation horaire vue du joueur (plateau et chargement), demi-tour compris. */
   rotation: Rotation;
   text?: string;
   /** Son : image montrée pendant qu'il s'écoute (sa forme d'onde), à la place du texte. */
   poster?: string;
+  /** Habillage dessiné : la partie (composant de fallback.js) et le jeu dont il porte le nom. */
+  drawn?: { part: DrawnPart; game: { title: string; manufacturer?: string; year?: string } };
+  /** Image animée (GIF, APNG, WebP animé) : marquée comme une vidéo, elle s'anime d'elle-même (markAnimated). */
+  animated?: boolean;
+  /**
+   * Contenu animé pas encore là (lourd, ou à télécharger) : l'aperçu est une image fixe, marquée
+   * de ce qu'elle deviendra ; Start le récupère et le lit en grand.
+   */
+  onDemand?: 'video' | 'image' | 'audio';
+}
+
+/**
+ * Marque les images animées d'un écran (GIF, APNG, WebP animé), lues dans l'en-tête du fichier :
+ * toute carte de tout écran porte ainsi l'icône des contenus animés, sans que chaque écran y
+ * pense. Lecture mise en cache par fichier et date de modification.
+ */
+const animatedCache = new Map<string, { mtime: number; animated: boolean }>();
+export function markAnimated(media: MediaView | undefined): MediaView | undefined {
+  if (!media) return media;
+  const mark = (th: MediaThumb): MediaThumb => {
+    if (th.kind !== 'image' || !th.url || th.animated !== undefined) return th;
+    const file = mediaPathFromUrl(th.url);
+    if (!file || !/\.(gif|png|apng|webp)$/i.test(file)) return th;
+    let mtime: number;
+    try {
+      mtime = fs.statSync(file).mtimeMs;
+    } catch {
+      return th;
+    }
+    let known = animatedCache.get(file);
+    if (!known || known.mtime !== mtime) {
+      known = { mtime, animated: Boolean(readMediaDimensions(file)?.animated) };
+      animatedCache.set(file, known);
+    }
+    return known.animated ? { ...th, animated: true } : th;
+  };
+  return { ...media, cards: media.cards.map((c) => ({ ...c, thumb: mark(c.thumb), ...(c.more ? { more: { ...c.more, minis: c.more.minis.map(mark) } } : {}) })) };
+}
+
+/** Composants de fallback.js qu'un aperçu peut dessiner. */
+export type DrawnPart = 'backglass' | 'fullDmd' | 'dmd' | 'playfield' | 'wheel' | 'topper';
+
+/**
+ * Bloc « Autres choix », sous la carte de ce qui est prévu (Ce qu'il faut) : un seul arrêt des
+ * flippers, ses aperçus en bande ; Start ouvre la galerie. Sans aperçu : `none` le dit.
+ */
+export interface MediaMore {
+  minis: MediaThumb[];
+  /** Nombre de choix (le « +n » au bout de la bande). */
+  count: number;
+  none?: string;
 }
 
 /** Carte d'un média ou d'une page, rattachée à une action (Start ou clic l'ouvre). */
@@ -157,10 +211,20 @@ export interface MediaCard {
   meta?: string;
   /** Galerie : étiquettes neutres, ce que le fichier sait faire (« 2Screens », « VR »). */
   tags?: string[];
+  /** Titre du groupe (l'écran de la borne), montré avant la première carte du groupe. */
+  group?: string;
+  /** Provenance, en étiquette après le titre : « VPinMediaDB · sans compte » (base : couleur signal). */
+  source?: { label: string; base?: boolean };
+  /** Bloc « Autres choix » : en retrait sous la carte prévue, ses aperçus en bande. */
+  more?: MediaMore;
+  /** Rien à choisir : grisé, avec la raison (facts), et sauté par les flippers (sans action). */
+  off?: boolean;
 }
 
 export interface MediaView {
   cards: MediaCard[];
+  /** Bandeau en tête des cartes : `strong` en couleur signal, puis `text`. */
+  summary?: { strong: string; text: string };
   /** Grand aperçu (un seul média ou une seule page). */
   large?: boolean;
   /** Galerie : les propositions en tuiles, le détail de la tuile choisie dessous. */

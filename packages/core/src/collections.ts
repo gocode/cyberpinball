@@ -18,20 +18,20 @@ import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import { t, tn } from './i18n';
 import { lastRunOf } from './tableorder';
-import type { TableEntry, TableInfoFile } from './tables';
-import { readInfo } from './tables';
+import type { TableEmulator, TableEntry, TableInfoFile } from './tables';
+import { readInfo, TABLE_ENGINES } from './tables';
 
 /** Collections fixes, dans l'ordre de la liste ; viennent ensuite les fabricants et les décennies. */
 export const FIXED_COLLECTIONS = ['all', 'favorites', 'recent', 'unplayed', 'friends'] as const;
 export type FixedCollection = (typeof FIXED_COLLECTIONS)[number];
-/** « all », « favorites »…, « maker:<clé du fabricant> », « decade:<1990> ». */
-export type CollectionId = FixedCollection | `mine:${string}` | `maker:${string}` | `decade:${number}`;
-export type CollectionGroup = 'fixed' | 'mine' | 'maker' | 'decade';
+/** « all », « favorites »…, « engine:pinballfx », « maker:<clé du fabricant> », « decade:<1990> ». */
+export type CollectionId = FixedCollection | `mine:${string}` | `engine:${TableEmulator}` | `maker:${string}` | `decade:${number}`;
+export type CollectionGroup = 'fixed' | 'mine' | 'engine' | 'maker' | 'decade';
 
 /** Combien de tables garde Récentes. */
 export const RECENT_COUNT = 10;
 
-type Shelved = Pick<TableEntry, 'file' | 'title' | 'manufacturer' | 'year' | 'info'>;
+type Shelved = Pick<TableEntry, 'file' | 'title' | 'manufacturer' | 'year' | 'info'> & { emulator?: TableEmulator };
 
 /** Ce que le réseau des amis sait des tables jouables avec un ami en ligne (live-game-menu.ts). */
 export interface FriendsShelf {
@@ -189,7 +189,28 @@ export function buildCollections<T extends Shelved & { id?: string }>(tables: re
     return { id: m.id, group: 'mine', label: m.name, icon: 'list', tables: list, ...(list.length ? {} : { reason: t('Vide : sur la fiche d’une table, « Ajouter à une collection… »') }) };
   });
 
-  return [...fixed, ...mine, ...byMaker, ...byDecade];
+  // Types de jeu (17/11/2026) : une collection par logiciel (VPX, Pinball FX), seulement sur une
+  // borne qui en mêle plusieurs ; sinon elle ferait doublon avec Toutes les tables.
+  const engines = new Map<TableEmulator, T[]>();
+  for (const x of tables) {
+    const e = x.emulator ?? 'vpx';
+    engines.set(e, [...(engines.get(e) ?? []), x]);
+  }
+  const byEngine =
+    engines.size < 2
+      ? []
+      : (Object.keys(TABLE_ENGINES) as TableEmulator[])
+          .filter((e) => engines.has(e))
+          .map((e): Collection<T> => ({
+            id: `engine:${e}`,
+            group: 'engine',
+            label: TABLE_ENGINES[e].long,
+            icon: TABLE_ENGINES[e].icon,
+            tables: engines.get(e)!,
+            ...(e === 'pinballfx' ? { detail: t('bêta') } : {}),
+          }));
+
+  return [...fixed, ...mine, ...byEngine, ...byMaker, ...byDecade];
 }
 
 /** La collection voulue, sinon Toutes (un fabricant dont la dernière table est partie, par exemple). */
@@ -212,7 +233,7 @@ export function stepCollection<T>(list: readonly Collection<T>[], id: string, st
 
 export function isCollectionId(raw: unknown): raw is CollectionId {
   if (typeof raw !== 'string') return false;
-  return (FIXED_COLLECTIONS as readonly string[]).includes(raw) || /^(maker|mine):.+/.test(raw) || /^decade:\d{4}$/.test(raw);
+  return (FIXED_COLLECTIONS as readonly string[]).includes(raw) || /^(maker|mine):.+/.test(raw) || /^decade:\d{4}$/.test(raw) || Object.keys(TABLE_ENGINES).some((e) => raw === `engine:${e}`);
 }
 
 /**
