@@ -49,18 +49,22 @@
 // Leurs tables sont inventées, comme celles des captures de la page du projet : les captures
 // de ces démonstrations vont sur la page publique du projet, aucun vrai jeu ne doit y paraître
 // (packages\core\src\test\demo-tables-inventees.test.ts).
+// CYBERPINBALL_RESEAU_DEMO=groupes (Communauté > Groupes privés) : Bruno crée « Les flippeurs du
+// jeudi » avec Kiko, Ressort et Dora (ses amis), y invite la borne et choisit la table de la semaine ;
+// ils y écrivent et publient des scores ; une seconde invitation (« Arcade du port ») reste en attente.
 
 import { generateKeyPairSync } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { acknowledge, addEvent, addToHistory, newChatState, readAvatarImage, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, PUP_FOLDER, readHostSettings, receiveLines, saveChat, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, toWire, verifyWire, writeLine, type LiveGame, type SocialState, type TableEntry, signCharter, type Charter, type Reaction } from '@cyberpinball/core';
+import { acknowledge, addEvent, addToHistory, newChatState, presenceTable, readAvatarImage, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, PUP_FOLDER, readHostSettings, receiveLines, saveChat, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, toWire, verifyWire, writeLine, type LiveGame, type SocialState, type TableEntry, signCharter, type Charter, type Reaction } from '@cyberpinball/core';
 import { createChatService, type ChatService } from './chat-service';
+import { createGroupService, type GroupService } from './group-service';
 import { createFriendContent, type FriendContent } from './friend-content';
 import { createLiveGames, createTableVersions, type LiveGames } from './live-game';
 import { createSocialNet, type SocialNet } from './social-net';
 
 export function simulatedPlayersWanted(env: NodeJS.ProcessEnv): boolean {
-  return ['1', ...LIVE_DEMOS, 'coupure', 'retour', 'notifications', 'messagerie', 'communaute', 'moderation', 'instantanees'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
+  return ['1', ...LIVE_DEMOS, 'coupure', 'retour', 'notifications', 'messagerie', 'communaute', 'moderation', 'instantanees', 'groupes'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
 }
 
 /** Charte d'essai de la démonstration de la modération : toutes les bornes du réseau simulé la reçoivent. */
@@ -318,7 +322,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
   const timersLater: NodeJS.Timeout[] = [];
   /** Services des parties instantanées des bornes fictives : arrêtés avec elles. */
   const instantStops: (() => void)[] = [];
-  const community = mode === 'communaute' || mode === 'moderation' || mode === 'instantanees';
+  const community = mode === 'communaute' || mode === 'moderation' || mode === 'instantanees' || mode === 'groupes';
   const dora = await bot(dataDir, 'Dora', true, bootstrap, community ? { country: 'FR' } : {});
   // Communauté : des joueurs qui ne sont pas des amis, de plusieurs pays ; deux en partie (jamais la table chez les autres).
   const strangers: SocialNet[] = [];
@@ -411,6 +415,85 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
         log('Réseau simulé : Dora et Ressort signalent la ligne de Kiko.'); // i18n-ignore : journal
       }, 13_000));
     }
+  }
+  // Groupes privés : Bruno crée « Les flippeurs du jeudi » avec Kiko, Ressort et Dora (ses amis), et y
+  // invite la borne ; ils y parlent avant son arrivée, choisissent la table de la semaine et y publient
+  // des scores ; Bruno invite aussi la borne dans « Arcade du port », qui reste en attente.
+  const groupStops: (() => void)[] = [];
+  let groupsScript: (() => Promise<void>) | undefined;
+  if (mode === 'groupes') {
+    const [kiko, ressort] = strangers;
+    const members = [kiko!, ressort!, dora];
+    const serviceOf = (net: SocialNet, name: string, autoAccept: boolean): GroupService => {
+      const service: GroupService = createGroupService({
+        net,
+        dataDir: path.join(dataDir, 'reseau-simule', name),
+        syncMs: 2000,
+        log: (line) => log(`${name} : ${line}`), // i18n-ignore : journal
+        onInvite: (invitation) => {
+          if (autoAccept) timersLater.push(setTimeout(() => service.accept(invitation.g), 800));
+        },
+      });
+      groupStops.push(() => service.stop());
+      timersLater.push(setInterval(() => service.observe(), 1000));
+      return service;
+    };
+    const brunoGroups = serviceOf(bruno, 'Bruno', false);
+    const memberGroups = members.map((net, i) => serviceOf(net, ['Kiko', 'Ressort', 'Dora'][i]!, true));
+    // Kiko, Ressort et Dora deviennent amis de Bruno (il accepte leur demande).
+    for (const net of members) net.request({ key: bruno.state().key.publicKey, name: bruno.state().name });
+    const befriend = setInterval(() => {
+      for (const r of bruno.state().incoming) bruno.accept(r.key);
+    }, 300);
+    timersLater.push(befriend);
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const until = async (what: string, ok: () => boolean, ms = 60_000) => {
+      const end = Date.now() + ms;
+      while (!ok()) {
+        if (Date.now() > end) throw new Error(`${what} : délai dépassé`); // i18n-ignore : journal
+        await sleep(200);
+      }
+    };
+    groupsScript = async () => {
+      try {
+        const friendsOfBruno = () => bruno.state().friends.map((f) => f.key);
+        await until('amitiés de Bruno', () => [me.key, ...members.map((n) => n.state().key.publicKey)].every((k) => friendsOfBruno().includes(k))); // i18n-ignore : journal
+        const vpx = mine().filter((t) => t.emulator !== 'pinballfx');
+        const table = vpx.find((t) => /Star Courier/.test(t.title)) ?? vpx[0];
+        const invitees = [...members.map((n) => ({ key: n.state().key.publicKey, name: n.state().name })), me];
+        const g = brunoGroups.create('Les flippeurs du jeudi', invitees); // i18n-ignore : nom d'un groupe fictif
+        if (!g) throw new Error('groupe non créé'); // i18n-ignore : journal
+        log('Réseau simulé : Bruno crée « Les flippeurs du jeudi » et invite la borne.'); // i18n-ignore : journal
+        await until('arrivée des amis de Bruno', () => members.every((n) => brunoGroups.view(g)?.members.some((m) => m.key === n.state().key.publicKey))); // i18n-ignore : journal
+        if (table) brunoGroups.setWeek(g, presenceTable(table));
+        const [kikoG, ressortG, doraG] = memberGroups;
+        await until('le groupe chez Kiko et Ressort', () => !!kikoG!.view(g)?.week && !!ressortG!.view(g)?.week); // i18n-ignore : journal
+        kikoG!.send(g, 'Qui bat mon 48 M ce soir ?'); // i18n-ignore : message d'un joueur fictif
+        await sleep(3200);
+        ressortG!.send(g, 'Partie à trois à 22 h ? Je lance la table'); // i18n-ignore : message d'un joueur fictif
+        await sleep(3200);
+        const kikoLine = brunoGroups.view(g)?.messages.find((l) => l.by === kiko!.state().key.publicKey);
+        if (kikoLine) brunoGroups.react(g, kikoLine.id, 'haha');
+        const ressortLine = doraG!.view(g)?.messages.find((l) => l.by === ressort!.state().key.publicKey);
+        if (ressortLine) doraG!.react(g, ressortLine.id, 'like');
+        // Les scores de la semaine, publiés aux classements comme après une partie.
+        if (table) {
+          const board = `${'a'.repeat(64)}:`;
+          const at = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+          kiko!.publishScore({ board, table: presenceTable(table), score: 48_250_110, at: at(40), how: 'record' });
+          bruno.publishScore({ board, table: presenceTable(table), score: 41_870_400, at: at(25), how: 'record' });
+          ressort!.publishScore({ board, table: presenceTable(table), score: 33_104_250, at: at(10), how: 'record' });
+        }
+        // Une seconde invitation, qui reste en attente.
+        brunoGroups.create('Arcade du port', [me]); // i18n-ignore : nom d'un groupe fictif
+        // La borne arrivée : Bruno lui souhaite la bienvenue.
+        await until('arrivée de la borne', () => !!brunoGroups.view(g)?.members.some((m) => m.key === me.key), 180_000); // i18n-ignore : journal
+        await sleep(1500);
+        brunoGroups.send(g, `Bienvenue ${me.name} ! On se fait la table de la semaine ce soir ?`); // i18n-ignore : message d'un joueur fictif
+      } catch (error) {
+        log(`Réseau simulé : scénario des groupes interrompu (${(error as Error).message}).`); // i18n-ignore : journal
+      }
+    };
   }
   // Profil public (messagerie) : Dora, qui n'est pas une amie, publie un record et un badge, puis aime le record de la borne.
   if (mode === 'messagerie') {
@@ -677,6 +760,8 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       }
       // Partie en direct : l'invitation, une fois la borne reliée et le menu affiché ; en-jeu, une
       // fois la borne en partie (sa présence le dit).
+      // Groupes privés : le scénario, une fois Bruno ami de la borne.
+      if (groupsScript) void groupsScript();
       if (games && mode === 'fins-invitation') void endsScript();
       else if (games) {
         if (mode !== 'en-jeu') timers.push(setTimeout(invite, 6000));
@@ -696,6 +781,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     clearInterval(accept);
     for (const timer of [...timers, ...timersLater]) clearTimeout(timer);
     for (const stop of instantStops) stop();
+    for (const stop of groupStops) stop();
     brunoChat?.stop();
     content.stop();
     games?.stop();

@@ -21,6 +21,7 @@ import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import { BUNDLED_CHARTER } from './moderation-charter';
 import { cleanRoomText, isRoomId, verifyRoomLine, type RoomId, type RoomLine } from './rooms';
+import { verifyGroupLine, type GroupLine } from './groups';
 import { isPlayerPublicKey, signText, verifyText, type PlayerKey } from './sharing';
 import { normalizeName } from './social';
 import { UPDATE_PUBLIC_KEY } from './update-key';
@@ -76,8 +77,13 @@ export interface ModReport {
   /** Le joueur qui signale, et son nom. */
   by: string;
   name: string;
-  /** La ligne signalée, telle qu'elle a été signée par son auteur. */
+  /**
+   * La ligne signalée, telle qu'elle a été signée par son auteur. Un message de groupe privé
+   * (groups.ts) y est recopié sous la forme d'une ligne du salon GROUP_REPORT_ROOM, `group` portant
+   * le message signé, seul vérifié.
+   */
   line: RoomLine;
+  group?: GroupLine;
   reason: ModReason;
   at: string;
   sig: string;
@@ -200,8 +206,19 @@ function reportText(r: Omit<ModReport, 'sig'>): string {
   return JSON.stringify({ app: 'cyberpinball', kind: 'report', id: r.id, by: r.by, name: r.name, line: r.line.id, lineSig: r.line.sig, reason: r.reason, at: r.at });
 }
 
-export function signReport(me: { key: PlayerKey; name: string }, line: RoomLine, reason: ModReason, now = new Date()): ModReport {
-  const base: Omit<ModReport, 'sig'> = { id: newId(), by: me.key.publicKey, name: me.name, line, reason, at: now.toISOString() };
+/** Le « salon » d'un message de groupe privé signalé : le modérateur lit « Groupe privé », jamais le nom du groupe. */
+export const GROUP_REPORT_ROOM: RoomId = 'groupe';
+
+/** Un message de groupe, recopié en ligne de salon pour la file des modérateurs ; undefined si ce n'est pas un message. */
+function groupAsRoomLine(g: GroupLine): RoomLine | undefined {
+  if (g.body.k !== 'msg') return undefined;
+  return { id: g.id, room: GROUP_REPORT_ROOM, key: g.by, name: g.name, ...(g.country ? { country: g.country } : {}), text: g.body.text, at: g.at, sig: g.sig };
+}
+
+export function signReport(me: { key: PlayerKey; name: string }, line: RoomLine | GroupLine, reason: ModReason, now = new Date()): ModReport {
+  const group = 'g' in line ? line : undefined;
+  const shown = group ? groupAsRoomLine(group)! : (line as RoomLine);
+  const base: Omit<ModReport, 'sig'> = { id: newId(), by: me.key.publicKey, name: me.name, line: shown, ...(group ? { group } : {}), reason, at: now.toISOString() };
   return { ...base, sig: signText(reportText(base), me.key) };
 }
 
@@ -213,9 +230,12 @@ export function verifyReport(raw: unknown, now = new Date()): ModReport | undefi
   if (!isId(r.id) || !isPlayerPublicKey(r.by) || !name || name !== r.name || !isReason(r.reason) || !isIso(r.at) || typeof r.sig !== 'string' || r.sig.length > 200) return undefined;
   if (Date.parse(r.at) > now.getTime() + FUTURE_MS || now.getTime() - Date.parse(r.at) > REPORT_KEEP_DAYS * DAY) return undefined;
   // La ligne jointe : vérifiée sans limite d'âge propre (celle du signalement suffit).
-  const line = verifyRoomLine(r.line, new Date(Date.parse((r.line as { at?: string })?.at ?? '') + 1000));
+  // Un message de groupe privé : sa signature à lui, la ligne montrée en est tirée.
+  const group = r.group !== undefined ? verifyGroupLine(r.group, new Date(Date.parse((r.group as { at?: string })?.at ?? '') + 1000)) : undefined;
+  if (r.group !== undefined && !group) return undefined;
+  const line = group ? groupAsRoomLine(group) : verifyRoomLine(r.line, new Date(Date.parse((r.line as { at?: string })?.at ?? '') + 1000));
   if (!line) return undefined;
-  const report: ModReport = { id: r.id, by: r.by, name, line, reason: r.reason, at: r.at, sig: r.sig };
+  const report: ModReport = { id: r.id, by: r.by, name, line, ...(group ? { group } : {}), reason: r.reason, at: r.at, sig: r.sig };
   const { sig, ...base } = report;
   return verifyText(reportText(base), sig, report.by) ? report : undefined;
 }

@@ -46,13 +46,15 @@ export type NoticeKind =
   | 'room-mention'
   | 'room-line'
   | 'room-report'
+  | 'group-message'
+  | 'group-invite'
   | 'friend-request' | 'friend-accepted' | 'download-failed' | 'download-done' | 'friend-online' | 'friend-playing' | 'friend-record' | 'friend-badge';
 
 /** Bleu méta : une information ; vert : une réussite ; ambre : à voir ; rouge : bloqué. */
 export type NoticeTone = 'ok' | 'info' | 'warning' | 'error';
 
 /** Ce qu'un clic sur la notification ouvre (action du menu des tables). */
-export type NoticeAct = { type: 'friends' } | { type: 'friend-requests' } | { type: 'downloads' } | { type: 'live-game' } | { type: 'activity' } | { type: 'messages' } | { type: 'my-profile' } | { type: 'rooms' } | { type: 'moderation' };
+export type NoticeAct = { type: 'friends' } | { type: 'friend-requests' } | { type: 'downloads' } | { type: 'live-game' } | { type: 'activity' } | { type: 'messages' } | { type: 'my-profile' } | { type: 'rooms' } | { type: 'moderation' } | { type: 'groups' };
 
 export interface NoticeEvent {
   kind: NoticeKind;
@@ -145,6 +147,10 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   // Une ligne dans un de mes salons (16/11/2026) : au menu seulement, sans son ; tenue jusqu'à deux minutes,
   // oubliée au-delà si elle n'a pas pu se montrer. Le salon garde la ligne : rien au journal d'Activité récente.
   'room-line': { priority: 14, ttlMs: 2 * MIN, quietMs: MIN, icon: 'globe', tone: 'info', act: { type: 'rooms' }, holdMs: 2 * MIN, journal: false },
+  // Un message dans un de mes groupes privés (groups.ts) : partout, par-dessus VPX compris, comme la messagerie.
+  'group-message': { priority: 9, ttlMs: 60 * MIN, quietMs: MIN, icon: 'lock', tone: 'info', act: { type: 'groups' }, away: true, sound: 'news' },
+  // Une invitation dans un groupe privé : dans le front-end, comme une demande d'ami.
+  'group-invite': { priority: 10, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friend-request', tone: 'warning', act: { type: 'groups' }, sound: 'news' },
   // Un signalement reçu par un modérateur : au menu, regroupés.
   'room-report': { priority: 8, ttlMs: 60 * MIN, quietMs: MIN, icon: 'alert', tone: 'warning', act: { type: 'moderation' }, sound: 'news' },
   'player-like': { priority: 18, ttlMs: 60 * MIN, quietMs: MIN, icon: 'star', tone: 'ok', act: { type: 'my-profile' } },
@@ -381,6 +387,17 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
       const title = rooms.length === 1 ? tn(n, '{n} nouveau message · {room}', '{n} nouveaux messages · {room}', { room: rooms[0]! }) : tn(n, '{n} nouveau message dans les salons', '{n} nouveaux messages dans les salons');
       return fit({ title, detail: last.extra ? `${who(last)} : ${last.extra}` : names() });
     }
+    case 'group-message': {
+      // `subject` : le groupe ; `extra` : le message ; `who` : son auteur.
+      const last = events[events.length - 1]!;
+      const groups = [...new Set(events.map((e) => e.subject ?? ''))];
+      if (one) return fit({ title: t('{name} · {group}', { name: who(one), group: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
+      const title = groups.length === 1 ? tn(n, '{n} nouveau message · {group}', '{n} nouveaux messages · {group}', { group: groups[0]! }) : tn(n, '{n} nouveau message dans vos groupes', '{n} nouveaux messages dans vos groupes');
+      return fit({ title, detail: last.extra ? `${who(last)} : ${last.extra}` : names() });
+    }
+    case 'group-invite':
+      // `subject` : le groupe.
+      return fit(one ? { title: t('{name} vous invite dans « {group} »', { name: who(one), group: one.subject ?? '' }), detail: t('Communauté › Groupes privés') } : { title: tn(n, '{n} invitation dans un groupe', '{n} invitations dans des groupes'), detail: names() });
     case 'room-report': {
       const last = events[events.length - 1]!;
       if (one) return fit({ title: t('Signalement · {room}', { room: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
@@ -442,6 +459,10 @@ function digestPart(kind: NoticeKind, n: number): string {
       return tn(n, '{n} message de salon', '{n} messages de salon');
     case 'room-report':
       return tn(n, '{n} signalement', '{n} signalements');
+    case 'group-message':
+      return tn(n, '{n} message de groupe', '{n} messages de groupe');
+    case 'group-invite':
+      return tn(n, '{n} invitation dans un groupe', '{n} invitations dans des groupes');
     case 'friend-online':
       return tn(n, '{n} ami connecté', '{n} amis connectés');
     case 'friend-request':

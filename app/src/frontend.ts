@@ -25,6 +25,7 @@ import {
   eventText,
   CHAT_REACTIONS,
   type ChatReaction,
+  type Reaction,
   downloadReasonLater,
   downloadReasonText,
   avatarsDir,
@@ -473,6 +474,8 @@ import { createFriendsMenu } from './friends-menu';
 import { createChatService } from './chat-service';
 import { deleteAccount } from './account-delete';
 import { createChatMenu } from './chat-menu';
+import { createGroupService } from './group-service';
+import { createGroupsMenu } from './groups-menu';
 import { createProfileMenu } from './profile-menu';
 import { createCommunityMenu } from './community-menu';
 import { createInstantMenu } from './instant-menu';
@@ -1619,13 +1622,23 @@ phoneRemote.setMenu({
   jukebox: () => remoteJukebox(),
   jukeboxAct: (op, key, fraction) => remoteJukeboxAct(op, key, fraction),
   // Communauté au téléphone (messages, amis) : au menu, et pendant une partie si le réglage le permet ; jamais en mode invité.
-  community: (open) => (guest.active ? { closed: t('Fermée en mode invité.'), unread: 0, rows: [] } : { ...chatMenu.remoteCommunity(open), players: remoteOnlinePlayers(), ...remoteRoom() }),
+  community: (open) => {
+    if (guest.active) return { closed: t('Fermée en mode invité.'), unread: 0, rows: [] };
+    // Mes groupes privés en tête des conversations ; leur fil s'ouvre par « g:<id> ».
+    const groups = groupsMenu.remote(open);
+    const chat = chatMenu.remoteCommunity(open?.startsWith('g:') ? undefined : open);
+    return { ...chat, rows: [...groups.rows, ...chat.rows], unread: chat.unread + groups.unread, ...(groups.thread ? { thread: groups.thread } : {}), players: remoteOnlinePlayers(), ...remoteRoom() };
+  },
   roomSend: (text) => remoteRoomSend(text),
   chatSend: (key, text) => {
-    if (phoneMayWrite()) chatService.send(key, text);
+    if (!phoneMayWrite()) return;
+    if (key.startsWith('g:')) groupService.send(key.slice(2), text);
+    else chatService.send(key, text);
   },
   chatReact: (key, target, kind) => {
-    if (phoneMayWrite() && (CHAT_REACTIONS as readonly string[]).includes(kind)) chatService.react(key, target, kind as ChatReaction);
+    if (!phoneMayWrite() || !(CHAT_REACTIONS as readonly string[]).includes(kind)) return;
+    if (key.startsWith('g:')) groupService.react(key.slice(2), target, kind as Reaction);
+    else chatService.react(key, target, kind as ChatReaction);
   },
   setText: (value) => state.phase === 'library' && library.remoteSet(value),
   enter: () => state.phase === 'library' && library.remoteEnter(),
@@ -2760,6 +2773,8 @@ function socialChanged(): void {
     if (closing) return;
     // Un ami revenu en ligne : la messagerie lui envoie ce qui l'attendait (chat-service.ts).
     chatService.observe();
+    // Un membre d'un groupe privé revenu : ses lignes manquantes s'échangent (group-service.ts).
+    groupService.observe();
     // Une charte reçue a pu faire de cette borne un modérateur (ou le contraire).
     syncModerationItem();
     menuNotices.observe();
@@ -2775,7 +2790,10 @@ const socialNet = createSocialNet({
   log: (line) => console.log(line),
   onChange: socialChanged,
   // Un compte supprimé par son joueur (forget.ts) : ses conversations partent aussi.
-  onForget: (keys) => chatService.forget(keys),
+  onForget: (keys) => {
+    chatService.forget(keys);
+    groupService.forget(keys);
+  },
   // Le pays par défaut des classements : la région de Windows (format régional, sinon langues préférées).
   systemLocale: () => [app.getSystemLocale(), ...app.getPreferredSystemLanguages()].find((l) => countryOfLocale(l)),
   // Un « J'aime » sur mon activité publique : la notification, regroupée, au menu.
@@ -2811,6 +2829,23 @@ const chatService = createChatService({
       setTimeout(() => !closing && broadcast(), DMD_MESSAGE_MS + 100);
     }
     menuNotices.push(lines.map((l) => ({ kind: 'friend-message' as const, key: l.id, at: Date.now(), who, player: key, extra: (l.text ?? '').replace(/\s*\n\s*/g, ' ') })));
+  },
+  log: (line) => console.log(line),
+});
+// Groupes privés (Communauté > Groupes privés) : les bornes des membres s'échangent leurs lignes ;
+// un message ou une invitation passe par les notifications (menu-notices.ts).
+const groupService = createGroupService({
+  net: socialNet,
+  dataDir: loc.dataDir,
+  onChange: () => socialChanged(),
+  onArrive: (view, lines) => {
+    if (guest.active || groupsMenu.shown() === view.id) return;
+    menuNotices.push(lines.map((l) => ({ kind: 'group-message' as const, key: l.id, at: Date.now(), who: l.name, player: l.by, subject: view.name, extra: (l.body.k === 'msg' ? l.body.text : '').replace(/\s*\n\s*/g, ' ') })));
+  },
+  onInvite: (invitation, view) => {
+    if (guest.active) return;
+    const who = socialNet.state().friends.find((f) => f.key === invitation.from)?.name ?? invitation.from.slice(0, 8);
+    menuNotices.push([{ kind: 'group-invite' as const, key: `${view.id}|${invitation.arrived}`, at: Date.now(), who, player: invitation.from, subject: view.name }]);
   },
   log: (line) => console.log(line),
 });
@@ -3205,6 +3240,21 @@ const roomsMenu = createRoomsMenu({
   phoneLinked: () => phoneRemote?.connected() === 'menu',
 });
 library.provideSystemItem('community-settings', roomsMenu.settingsItem);
+// Groupes privés (groups-menu.ts) : la porte de l'accueil Communauté, la liste, un groupe, les invitations.
+const groupsMenu = createGroupsMenu({
+  library,
+  net: socialNet,
+  groups: groupService,
+  tables: () => tables,
+  wheel: (table) => medias?.wheel(table),
+  play: (table) => {
+    state = { ...state, index: Math.max(0, tables.indexOf(table)) };
+    void play(table);
+  },
+  openProfile: (key, back) => profileMenu.openProfile(key, back),
+  openFriend: (key, back) => friendsMenu.openFriend(key, back),
+  openSharing: (back) => library.runSystemItem('sharing', back),
+});
 // Modération : l'entrée n'existe que pour un modérateur de la charte (elle peut changer : relue à chaque changement du réseau).
 let moderationShown = false;
 function syncModerationItem(): void {
@@ -3257,6 +3307,7 @@ const instantMenu = createInstantMenu({
 const communityMenu = createCommunityMenu({
   instant: { door: () => instantMenu.door(), open: (back) => instantMenu.open(back) },
   rooms: { door: () => roomsMenu.door(), glance: () => roomsMenu.glance(), open: (back) => roomsMenu.openDefault(back) },
+  groups: { door: () => groupsMenu.door(), open: (back) => groupsMenu.open(back) },
   friends: {
     detail: () => friendsMenu.items.friends.detail ?? '',
     attention: () => Boolean(friendsMenu.items['friend-requests'].attention || friendsMenu.items.friends.attention),
@@ -5551,6 +5602,9 @@ export function startFrontend(): void {
     }
     else if (action.type === 'rooms') {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) roomsMenu.openMention(state.phase === 'menu' ? () => library.leave() : () => library.openSystem());
+    }
+    else if (action.type === 'groups') {
+      if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) groupsMenu.openNews(state.phase === 'menu' ? () => library.leave() : () => library.openSystem());
     }
     else if (action.type === 'messages') {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) chatMenu.openUnread(state.phase === 'menu' ? () => library.leave() : undefined);

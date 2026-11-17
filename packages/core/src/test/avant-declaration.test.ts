@@ -32,6 +32,10 @@ const REVIEWED = new Set([
   'desktop',
   'friendsMenu',
   'gameNotices',
+  // Groupes privés : lus par la télécommande (un message du téléphone), le relevé différé du réseau
+  // (socialChanged, minuteur) et l'arrivée d'un message ; jamais pendant l'initialisation, comme la messagerie.
+  'groupService',
+  'groupsMenu',
   'hours',
   'inGameMenu',
   // Parties instantanées : l'entrée de la fiche d'une table, construite à l'ouverture d'une fiche.

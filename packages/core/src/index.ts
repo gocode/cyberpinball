@@ -170,6 +170,7 @@ export * from './friendlibrary';
 export * from './livegame';
 export * from './instantgames';
 export * from './chat';
+export * from './groups';
 export * from './reactions';
 export * from './publicprofile';
 export * from './livepresence';

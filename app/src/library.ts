@@ -541,6 +541,8 @@ export type UiAction =
   | { type: 'rooms' }
   /** Notification d'un signalement (modérateur) : la file des signalements (rooms-menu.ts). */
   | { type: 'moderation' }
+  /** Notification d'un groupe privé (message, invitation) : ce groupe, ou l'invitation (groups-menu.ts). */
+  | { type: 'groups' }
   /** Résumé « 4 nouveautés » : Activité récente, qui dit chacune en entier. */
   | { type: 'activity' }
   /** Repère de la liste de contenu (« Sortir de la liste », « Revenir à la liste ») : comme MagnaSave. */

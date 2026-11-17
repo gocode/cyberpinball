@@ -63,7 +63,10 @@ import {
   parseLibraryMessage,
   parseLiveMessage,
   parseChatMessage,
+  parseGroupMessage,
   type ChatMessage,
+  type GroupLine,
+  type GroupMessage,
   cardOf,
   cardsSample,
   loadRooms,
@@ -379,7 +382,7 @@ type ModMessage = { t: 'mod'; charter?: unknown; acts?: ModAct[] } | { t: 'repor
 export type ScoreToPublish = Omit<RankedScore, 'key' | 'name' | 'country' | 'avatar' | 'sig'>;
 
 /** Messages des services posés sur le réseau des amis : bibliothèque partagée, partie en direct, messagerie. */
-export type FriendMessage = LibraryMessage | LiveMessage | ChatMessage;
+export type FriendMessage = LibraryMessage | LiveMessage | ChatMessage | GroupMessage;
 
 interface Link {
   stream: Duplex;
@@ -460,6 +463,13 @@ export interface SocialNet {
    * par sa clé, et les messages de la partie en direct passent avec eux ; vide : plus personne.
    */
   setPartners(keys: readonly string[]): void;
+  /**
+   * Les membres de mes groupes privés, amis ou non (groups.ts) : leur borne est rejointe par sa clé,
+   * et les messages des groupes (« grp… ») passent avec eux, et avec eux seulement ; vide : plus personne.
+   */
+  setGroupPeers(keys: readonly string[]): void;
+  /** Une liaison saluée avec cette borne en ce moment, amie ou non (groupes privés). */
+  reachable(key: string): boolean;
   /**
    * Ma partie instantanée, à annoncer à toutes les bornes (signée, redite toutes les
    * INSTANT_RESIGN_MS tant qu'elle est ouverte) ; `state: 'closed'` la retire partout (lancée,
@@ -557,8 +567,8 @@ export interface SocialNet {
   amModerator(): boolean;
   /** Une décision de modérateur : signée, appliquée ici, envoyée à toutes les bornes ; rend false si je ne suis pas modérateur. */
   moderate(act: Omit<ModAct, 'id' | 'by' | 'at' | 'sig'>): boolean;
-  /** Signaler une ligne : le signalement part, chiffré, vers chaque modérateur (directement, ou relayé). */
-  report(line: RoomLine, reason: ModReason): void;
+  /** Signaler une ligne d'un salon, ou un message d'un groupe privé : le signalement part, chiffré, vers chaque modérateur (directement, ou relayé). */
+  report(line: RoomLine | GroupLine, reason: ModReason): void;
   /** Les signalements de cette ligne sont traités (modérateur). */
   handleReports(lineId: string): void;
   /** De nouveaux signalements reçus (modérateur) : la notification. */
@@ -1000,6 +1010,13 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'instant') return receiveInstant(key, (raw as { games?: unknown }).games);
         const parsed = parseSocialMessage(raw, now());
         if (parsed) return receive(key, parsed, link);
+        // Groupes privés : les membres de mes groupes, amis ou non, et mes amis (invitations) ; rien d'autre.
+        if (raw && typeof raw === 'object' && typeof (raw as { t?: unknown }).t === 'string' && (raw as { t: string }).t.startsWith('grp')) {
+          if (!state.enabled || refusedPlayer(key) || (relationOf(state, key) !== 'friend' && !groupPeers.has(key))) return;
+          const grp = parseGroupMessage(raw as Record<string, unknown>);
+          if (grp) for (const listener of messageListeners) listener(key, grp);
+          return;
+        }
         // Partie instantanée : les joueurs de ma partie, amis ou non ; « je rejoins » de tout joueur
         // ni bloqué ni exclu (le service vérifie qu'il vise ma partie ouverte). Rien d'autre.
         if (raw && typeof raw === 'object' && relationOf(state, key) !== 'friend') {
@@ -1105,6 +1122,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       hereBoard.delete(key);
       instantBoard.delete(key);
       partners.delete(key);
+      groupPeers.delete(key);
     }
     tidyAvatars();
     opts.onForget?.(keys);
@@ -1120,6 +1138,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   let instantTimer: NodeJS.Timeout | undefined;
   /** Joueurs de ma partie instantanée : rejoints par leur clé, la partie en direct passe avec eux. */
   const partners = new Set<string>();
+  /** Membres de mes groupes privés : rejoints par leur clé, les messages des groupes passent avec eux. */
+  const groupPeers = new Set<string>();
   /** Un joueur bloqué, ou exclu des salons par la modération : ni ses annonces ni ses arrivées. */
   const refusedPlayer = (key: string) => shunned(key) || sanctionOf(moderation.acts, key, now())?.kind === 'ban';
 
@@ -1671,7 +1691,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   /** Amis et demandes en cours : Hyperswarm les rejoint par leur clé ; les autres sont laissés. */
   function followPeers(): void {
     if (!swarm) return;
-    const want = new Set([...state.friends.map((f) => f.key), ...state.outgoing.map((r) => r.key), ...state.incoming.map((r) => r.key), ...[...partners].filter((k) => !shunned(k))]);
+    const want = new Set([...state.friends.map((f) => f.key), ...state.outgoing.map((r) => r.key), ...state.incoming.map((r) => r.key), ...[...partners, ...groupPeers].filter((k) => !shunned(k))]);
     for (const key of want) if (!followed.has(key)) swarm.joinPeer(Buffer.from(key, 'hex'));
     for (const key of followed) if (!want.has(key)) swarm.leavePeer(Buffer.from(key, 'hex'));
     followed.clear();
@@ -2252,11 +2272,21 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     send(key, message) {
       // La partie en direct passe aussi avec les joueurs de ma partie instantanée ; « je rejoins », vers l'hôte annoncé.
       const live = typeof message.t === 'string' && message.t.startsWith('game-');
-      const link = friendLink(key) ?? (live && state.enabled && (partners.has(key) || message.t === 'game-join' || message.t === 'game-cancel') && !refusedPlayer(key) ? bestLink(key) : undefined);
+      // Les groupes privés passent aussi avec les membres de mes groupes, amis ou non (liaison saluée).
+      const group = typeof message.t === 'string' && message.t.startsWith('grp') && state.enabled && groupPeers.has(key) && !refusedPlayer(key) ? bestLink(key) : undefined;
+      const link = friendLink(key) ?? (group?.greeted ? group : undefined) ?? (live && state.enabled && (partners.has(key) || message.t === 'game-join' || message.t === 'game-cancel') && !refusedPlayer(key) ? bestLink(key) : undefined);
       if (!link) return false;
       link.send(message);
       return true;
     },
+    setGroupPeers(keys) {
+      const next = new Set(keys.filter((k) => k !== state.key.publicKey));
+      if (next.size === groupPeers.size && [...next].every((k) => groupPeers.has(k))) return;
+      groupPeers.clear();
+      for (const k of next) groupPeers.add(k);
+      followPeers();
+    },
+    reachable: (key) => state.enabled && !shunned(key) && !!bestLink(key)?.greeted,
     setPartners(keys) {
       const next = new Set(keys.filter((k) => k !== state.key.publicKey));
       if (next.size === partners.size && [...next].every((k) => partners.has(k))) return;

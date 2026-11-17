@@ -216,6 +216,8 @@ export interface RemoteCommunityRow {
   unread?: number;
   /** Refus, messages en attente, ancien ami. */
   note?: string;
+  /** Un groupe privé (groups-menu.ts) : sa clé est « g: » et son identifiant ; il n'est pas dans « Joueurs ». */
+  group?: true;
 }
 
 /** Le salon montré au téléphone : à l'ancienne, une ligne par message ; pourquoi on ne peut pas écrire. */

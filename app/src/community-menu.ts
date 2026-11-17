@@ -51,6 +51,8 @@ export interface CommunityMenuHost {
   friends?: { detail(): string; attention(): boolean; open(back: () => void): void };
   /** La messagerie (chat-menu.ts) : son état en une ligne et sa liste, « Retour » vers `back`. */
   messages: { detail(): string; attention(): boolean; quiet(): boolean; open(back: () => void): void };
+  /** Les groupes privés (groups-menu.ts) : ce que dit leur porte, et les ouvrir. */
+  groups?: { door(): { detail: string; attention: boolean; quiet: boolean }; open(back: () => void): void };
   /** Le salon de mon pays (rooms-menu.ts) : ce que dit sa porte, et l'ouvrir. */
   rooms?: { door(): { label: string; detail: string; attention: boolean; quiet: boolean }; glance?(): RoomGlance; open(back: () => void): void };
   /** Les parties instantanées, ouvertes à tous (instant-menu.ts) : ce que dit la porte, et les ouvrir. */
@@ -177,7 +179,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
   function summary(): ReturnType<CommunityMenu['summary']> {
     const list = players();
     const c = myCountry();
-    return { online: list.length, country: c ? list.filter((p) => p.country === c).length : 0, friends: list.filter((p) => p.friend).length, attention: host.messages.attention() || Boolean(host.rooms?.door().attention) };
+    return { online: list.length, country: c ? list.filter((p) => p.country === c).length : 0, friends: list.filter((p) => p.friend).length, attention: host.messages.attention() || Boolean(host.rooms?.door().attention) || Boolean(host.groups?.door().attention) };
   }
 
   /**
@@ -399,6 +401,15 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
         ...(host.messages.quiet() ? { tone: 'quiet' as const } : {}),
         run: () => host.messages.open(here),
       },
+      // Les groupes privés, entre Messages et le salon du pays (maquette du 15/11/2026).
+      ...(host.groups
+        ? [
+            (() => {
+              const door = host.groups!.door();
+              return { label: t('Groupes privés'), detail: door.detail, icon: 'lock' as const, ...(door.attention ? { attention: true } : {}), ...(door.quiet ? { tone: 'quiet' as const } : {}), run: () => host.groups!.open(here) };
+            })(),
+          ]
+        : []),
       (() => {
         const door = host.rooms?.door();
         if (!door) return { label: c ? t('Salon {country}', { country: countryLabel(c)! }) : t('Salons par pays'), detail: t('Les salons de discussion par pays arrivent dans une prochaine version'), icon: 'globe' as const, tone: 'quiet' as const, run: here };

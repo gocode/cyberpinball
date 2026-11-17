@@ -54,8 +54,9 @@ import { messages as rooms } from './rooms';
 import { messages as moderation } from './moderation';
 import { messages as jukeboxsettings } from './jukeboxsettings';
 import { messages as instant } from './instant';
+import { messages as groups } from './groups';
 
 /** Chaque partie du catalogue, par nom de fichier (pour le test des doublons). */
-export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dof, hardwaredmd, dedicated, power, hours, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame, backups, installation, avatar, activity, remote, collections, scores, jukebox, jukeboxplayer, jukeboxmanage, youtubeaccount, jukeboxdesign, chat, techsheet, terms, credits, community, rooms, moderation, jukeboxsettings, feedback, pinballfx, instant };
+export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dof, hardwaredmd, dedicated, power, hours, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame, backups, installation, avatar, activity, remote, collections, scores, jukebox, jukeboxplayer, jukeboxmanage, youtubeaccount, jukeboxdesign, chat, techsheet, terms, credits, community, rooms, moderation, jukeboxsettings, feedback, pinballfx, instant, groups };
 
 export const EN_MESSAGES: Catalog = Object.assign({}, ...Object.values(EN_PARTS));

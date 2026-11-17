@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Private groups (Community): create a group with your friends, by invitation only. A chat, a table of the week chosen for everyone (Start launches it) and the group leaderboard on that table, filled by the published scores. Every member can invite their friends; an invitation never shows the messages before it is accepted. Everything goes between the members' cabinets, with no server: an absent member receives the messages when they come back.
 - Media proposals and game parts: VPForums entries (and those the VPS database lists under a game) now show their preview, the image the author posted on their page, instead of "No preview". Their download count shows too.
 - Game with friends: each cabinet keeps its own volume. The table's sound no longer drops (or rises) on the guest's cabinet: only the host's game settings travel (balls, ball save, tilt, extras), never their sound level.
 - Pinball FX (beta): the "Pinball FX tables" list shows a thumbnail of each table. A table added to the menu gets its media in the background when they exist (logo, backglass, videos), otherwise at least its playfield image; tables added earlier find them through "Find missing media".

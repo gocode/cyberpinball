@@ -201,7 +201,11 @@ function renderLibrary(v) {
         }
         if (row.avatar) {
           li.classList.add('with-avatar');
+          // Une case (inviter des amis dans un groupe) devant la pastille, une valeur à droite : elles
+          // restent, comme sur une ligne en colonnes ; sans elles, une case cochée ne se voyait pas.
+          if (row.check) li.append(rowCheck(row.check));
           li.append(avatarNode(row.avatar, 'lib-row-avatar'), main);
+          if (row.aside) li.append(libEl('span', 'lib-row-aside', row.aside));
         }
         if (parts && !row.figure && !row.avatar) {
           li.classList.add('with-parts');

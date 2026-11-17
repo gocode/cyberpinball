@@ -473,6 +473,8 @@ export const REMOTE_JUKEBOX_OPS = ['open', 'row', 'play', 'up', 'pause', 'shuffl
 export type RemoteJukeboxOp = (typeof REMOTE_JUKEBOX_OPS)[number];
 
 const finite = (v: unknown, max: number): v is number => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= max;
+/** Un fil de la Communauté au téléphone : la clé d'un ami, ou « g: » et l'identifiant d'un groupe privé (groups.ts). */
+const isChatKey = (v: unknown): v is string => typeof v === 'string' && /^(?:[0-9a-f]{64}|g:[0-9a-f]{16})$/.test(v);
 
 /** Lit un message ouvert du téléphone : undefined pour tout ce qui n'est pas attendu (type, bornes, longueur). */
 export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
@@ -539,11 +541,11 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
     case 'ranks-off':
       return { t: 'ranks-off', s };
     case 'chat-send':
-      return typeof m.key === 'string' && /^[0-9a-f]{64}$/.test(m.key) && typeof m.text === 'string' && m.text.length <= 4000 ? { t: 'chat-send', s, key: m.key, text: m.text } : undefined;
+      return isChatKey(m.key) && typeof m.text === 'string' && m.text.length <= 4000 ? { t: 'chat-send', s, key: m.key, text: m.text } : undefined;
     case 'room-send':
       return typeof m.text === 'string' && m.text.length <= 1000 ? { t: 'room-send', s, text: m.text } : undefined;
     case 'chat-react':
-      return typeof m.key === 'string' && /^[0-9a-f]{64}$/.test(m.key) && typeof m.target === 'string' && /^[0-9a-f]{16}$/.test(m.target) && typeof m.kind === 'string' && /^[a-z]{1,20}$/.test(m.kind) ? { t: 'chat-react', s, key: m.key, target: m.target, kind: m.kind } : undefined;
+      return isChatKey(m.key) && typeof m.target === 'string' && /^[0-9a-f]{16}$/.test(m.target) && typeof m.kind === 'string' && /^[a-z]{1,20}$/.test(m.kind) ? { t: 'chat-react', s, key: m.key, target: m.target, kind: m.kind } : undefined;
     case 'jb': {
       if (!(REMOTE_JUKEBOX_OPS as readonly unknown[]).includes(m.op)) return undefined;
       const key = typeof m.key === 'string' && m.key.length > 0 && m.key.length <= 200 && !/[\u0000-\u001f\u007f]/.test(m.key) ? m.key : undefined;
@@ -554,7 +556,7 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
     }
     case 'chat-open':
       if (m.key === undefined || m.key === null) return { t: 'chat-open', s };
-      return typeof m.key === 'string' && /^[0-9a-f]{64}$/.test(m.key) ? { t: 'chat-open', s, key: m.key } : undefined;
+      return isChatKey(m.key) ? { t: 'chat-open', s, key: m.key } : undefined;
     case 'ping':
       return { t: 'ping', s };
     case 'bye':

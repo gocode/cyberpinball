@@ -1,8 +1,10 @@
 // Communauté de la page du téléphone (telephone.js) : les messages, les amis et les scores sous un
 // même onglet, et le fil d'un ami en plein écran. La borne (app/src/chat-menu.ts, remoteCommunity)
 // choisit, met en forme et traduit tout ; la page ne fait que dessiner :
-// - Messages : les conversations dans l'ordre de la borne (la plus récente d'abord, puis les amis
-//   sans message), le dernier message, son moment, les non-lus ;
+// - Messages : mes groupes privés en tête (leur clé est « g: » et leur identifiant : ils s'ouvrent dans
+//   le même fil, « chat-send » et « chat-react » allant au groupe), puis les conversations dans l'ordre
+//   de la borne (la plus récente d'abord, puis les amis sans message), le dernier message, son moment,
+//   les non-lus ;
 // - Joueurs : les mêmes amis, en ligne d'abord, avec leur présence, puis les autres joueurs en
 //   ligne (présence publique, jamais leur table), qu'on voit sans pouvoir leur écrire ;
 // - Scores : la vue des classements (telephone-ranks.js).
@@ -220,7 +222,7 @@ function renderCommunity() {
   }
   const friends = shown === 'friends';
   const order = { online: 0, playing: 0, offline: 1, gone: 2 };
-  const rows = friends ? c.rows.filter((r) => r.state !== 'gone').sort((a, b) => order[a.state] - order[b.state] || a.name.localeCompare(b.name)) : c.rows;
+  const rows = friends ? c.rows.filter((r) => r.state !== 'gone' && !r.group).sort((a, b) => order[a.state] - order[b.state] || a.name.localeCompare(b.name)) : c.rows;
   list.replaceChildren(...rows.map((r) => communityRow(r, friends ? r.presence : r.last)));
   // Joueurs : les autres joueurs en ligne, après mes amis ; on ne leur écrit pas (amis seulement).
   const others = friends ? (c.players ?? []) : [];
