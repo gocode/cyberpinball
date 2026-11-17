@@ -9,6 +9,7 @@ import { applyOps, formatSize, isInside, safeName, sameVolume, sizeOf, type File
 import { findMangledDirs } from './copytree';
 import { formatDate, formatDateTime, formatList, t, tn } from './i18n';
 import { IniDocument } from './ini';
+import { slowTableFinding } from './slowtable';
 import { isCurrentMediaError, mediaErrorsFile, readMediaErrors, type MediaErrorEntry, type MediaErrorKind } from './mediaerrors';
 import {
   dmdTypeForRatio,
@@ -165,6 +166,7 @@ export const FINDING_CODES = [
   'dofNoConfig',
   'dofNoPinmame',
   'dofLocalIni',
+  'slowTable',
   'lowRomVolume',
 ] as const;
 
@@ -705,6 +707,10 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
 
   // 9. Médias de présentation (medias\ de la table).
   if (ownFolder) findings.push(...checkMedias(entry, ctx));
+
+  // 10. Cadence des dernières parties sur cette borne (slowtable.ts) : la table rame ou saccade.
+  const slow = slowTableFinding(ctx.logsDir, entry.file);
+  if (slow) findings.push(slow);
 
   // Seule la ROM bloque « Jouer » (playable.ts) : tout autre constat est au plus un avertissement.
   const order: Record<FindingSeverity, number> = { error: 0, warning: 1, info: 2 };

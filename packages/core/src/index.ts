@@ -107,6 +107,7 @@ export * from './journal';
 export * from './livestate';
 export * from './vpxinspector';
 export * from './vpxfailure';
+export * from './vpxcadence';
 export * from './highscores';
 export * from './scoreboard';
 export * from './rankings';

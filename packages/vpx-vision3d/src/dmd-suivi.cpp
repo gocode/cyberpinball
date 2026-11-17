@@ -33,25 +33,37 @@
 //   ShutdownWait : millisecondes laissées à DMDUtil, à la fermeture, pour finir la recherche du DMD réel qu'il relance
 //             quand les sources changent après la partie (onSourcesChanged) ; 0 par défaut, écrit par Cyber Pinball
 //             quand un DMD réel est allumé (dmd.ts). Banc : scripts/banc-fermeture.mjs.
+//
+// Cadence des images (cadence.h) : le plugin compte les images de la partie et en écrit le bilan dans vpinball.log
+// (toutes les minutes, puis à la fin), avec chaque à-coup au moment où il arrive, pour qu'on le rapproche de ce que
+// VPX ou un plugin faisait alors (vidéo de PuP lancée, DMD…). Cyber Pinball le relit après la partie (vpxcadence.ts).
 
 #define _CRT_SECURE_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#include <psapi.h>
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 
 #include "MsgPlugin.h"
 #include "VPXPlugin.h"
 #include "ControllerPlugin.h"
+#include "LoggingPlugin.h"
 #include "suivi-dmd.h"
+#include "cadence.h"
 
 using namespace cyberpinball;
+
+LPI_USE();
+LPI_IMPLEMENT
 
 namespace {
 
@@ -244,11 +256,55 @@ void donnerTaille(HWND hwnd, int l, int h, int cadreL, int cadreH, double t)
    ecrire(ligne);
 }
 
+// --- Cadence des images (cadence.h) -------------------------------------------------------------
+
+Cadence cadence;
+double cadenceDiteA = 0.0;
+int aCoupsDits = 0;
+constexpr int A_COUPS_DITS_MAX = 30;
+constexpr double CADENCE_PERIODE_S = 60.0;
+
+/** Mémoire privée de VPX (Mo) : une table qui en prend sans cesse finit par planter (« fuite de mémoire », 17/11/2026). */
+int memoireMo()
+{
+   PROCESS_MEMORY_COUNTERS_EX m {};
+   m.cb = sizeof(m);
+   if (!K32GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&m), sizeof(m)))
+      return -1;
+   return static_cast<int>(m.PrivateUsage / (1024 * 1024));
+}
+
+/** Le bilan de la cadence, suivi de la mémoire de VPX. */
+void direBilan(const char* quand)
+{
+   char ligne[288];
+   cadence.bilan(ligne, sizeof(ligne) - 32, quand);
+   const size_t n = std::strlen(ligne);
+   std::snprintf(ligne + n, sizeof(ligne) - n, " mem=%dMB", memoireMo());
+   LPI_LOGI("%s", ligne);
+}
+
+void compterImage(double t)
+{
+   if (cadence.image(t) && aCoupsDits < A_COUPS_DITS_MAX)
+   {
+      // Au moment même : l'heure de la ligne le rapproche de ce que VPX et les plugins écrivaient alors.
+      aCoupsDits++;
+      LPI_LOGW("Cadence: stall of %d ms at %.1fs%s", static_cast<int>(cadence.dernierEcart() * 1000.0 + 0.5), cadence.tempsDePartie(t), aCoupsDits == A_COUPS_DITS_MAX ? " (no more stalls logged)" : "");
+   }
+   if (cadence.ecarts() && t - cadenceDiteA >= CADENCE_PERIODE_S)
+   {
+      cadenceDiteA = t;
+      direBilan("running");
+   }
+}
+
 void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
 {
    if (!enPartie)
       return;
    const double t = maintenant();
+   compterImage(t);
    // Banc : les images comptées, dites toutes les 2 s (VPX qui ne rend plus se voit).
    static int images = 0;
    static double imagesA = -10.0;
@@ -421,6 +477,9 @@ void MSGPIAPI onGameStart(const unsigned int, void*, void*)
    partieFinie = false;
    sourcesApresPartie = 0.0;
    debut = maintenant();
+   cadence.remiseAZero();
+   cadenceDiteA = debut;
+   aCoupsDits = 0;
    fenetre = Fenetre {};
    suivi.remiseAZero();
    diffusions = 0;
@@ -449,6 +508,8 @@ void MSGPIAPI onSourcesChanged(const unsigned int, void*, void*)
 
 void MSGPIAPI onGameEnd(const unsigned int, void*, void*)
 {
+   if (enPartie && cadence.ecarts())
+      direBilan("end");
    enPartie = false;
    partieFinie = true;
    fenetre = Fenetre {};
@@ -463,6 +524,7 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballDmdPluginLoad(const uint32_t sessionId, c
 {
    msgApi = api;
    endpointId = sessionId;
+   LPISetup(endpointId, msgApi);
    msgApi->RegisterSetting(endpointId, &fichierJournal);
    msgApi->RegisterSetting(endpointId, &sondeActive);
    msgApi->RegisterSetting(endpointId, &suiviActif);

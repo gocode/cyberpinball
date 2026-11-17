@@ -374,6 +374,7 @@ import { HEADSET_TRIAL_DIR, HeadsetMenu, readCabinetPlace } from './casque';
 import { DMD_PLUGIN, installVpxPlugin } from './vpx-plugins';
 import { askElevation } from './uac-confirm';
 import { createVision3dMenu } from './vision3d-menu';
+import { noteGameCadence, vpxLogSize } from './game-cadence';
 import { createVrFrontend } from './vr-frontend';
 import { closeHeadsetViews, isHeadsetView, openHeadsetViews, sendToHeadsetViews, setHeadsetPainting, type HeadsetPage } from './casque-vues';
 import { createLiveScoresMenu } from './live-scores-menu';
@@ -4885,6 +4886,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const vpxLogOffset = vrCenter && fs.existsSync(vpxLog) ? fs.statSync(vpxLog).size : 0;
   // Ce que VPX écrira de cette partie (changement de pièce reçu en jeu) : à partir d'ici.
   const vrLogFrom = vrGame && fs.existsSync(vpxLog) ? fs.statSync(vpxLog).size : 0;
+  // Cadence des images de la partie (game-cadence.ts) : le bilan que le plugin du DMD écrira, à partir d'ici.
+  const cadenceLogFrom = simulated === undefined ? vpxLogSize(vpxLog) : undefined;
   let stopCentering: (() => void) | undefined;
   // La fenêtre de jeu est l'aperçu de la VR (launcher.ts) : la partie est dans le casque.
   const onVr = () => {
@@ -5012,6 +5015,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   vrFront.headsetExitNote = undefined;
   vrFront.vrWearHint = undefined;
   if (vision3dSource) noteVision3dGame(vision3dLog, vision3dLogFrom);
+  if (cadenceLogFrom !== undefined) noteGameCadence({ logsDir: path.join(loc.dataDir, 'logs'), tableFile: played.file, tableId: table.id, vpxLog, from: cadenceLogFrom, vr: playedVr });
   if (playedVr && vrGame) vrFront.noteVrMeasures();
   // Gardé allumé deux minutes : la partie suivante a le joueur déjà repéré (partie dans le casque : éteint).
   if (vision3dSource && !playedVr) headTracker.release();

@@ -11,6 +11,7 @@ import type { PupCabinet } from '../puppack';
 import { applyOps, sameFile, type FileOp } from '../fileops';
 import { planJourney } from '../journey';
 import { mediaErrorsFile, readMediaErrors, recordMediaError } from '../mediaerrors';
+import { parseVpxCadence, recordGameCadence } from '../vpxcadence';
 import { blocksPlay, playBlockers } from '../playable';
 import { readInfo, scanTables, type TableEntry } from '../tables';
 import { buildZip } from '../romzip';
@@ -559,6 +560,16 @@ const TRAPS: Trap[] = [
   { code: 'dofNoPinmame', arm: () => {}, script: scriptFacts(NO_PUP_SCRIPT), ctx: (folder) => ({ dof: dofSetupWith(folder, ['afm']) }) },
   // DOF : un directoutputconfig51.ini resté dans le dossier de la table masque celui de la borne.
   { code: 'dofLocalIni', arm: (folder) => write(path.join(folder, 'directoutputconfig51.ini'), '[Config DOF]\r\nafm,0\r\n'), ctx: (folder) => ({ dof: dofSetupWith(folder, ['afm']) }) },
+  // Cadence (slowtable.ts) : la dernière partie de la table, mesurée par le plugin du DMD, a ramé (17/11/2026).
+  {
+    code: 'slowTable',
+    arm: (folder) => {
+      const vpx = fs.readdirSync(folder).find((f) => f.toLowerCase().endsWith('.vpx'))!;
+      const slow = parseVpxCadence('Cadence end: frames=2152 duration=55.2s fps=39.0 p50=17ms p95=70ms p99=127ms max=1132ms late=28.9% stalls=49 worst10s=10.1fps')!;
+      recordGameCadence(logsOf(folder), path.join(folder, vpx), slow, 60);
+    },
+    ctx: (folder) => ({ logsDir: logsOf(folder) }),
+  },
   // Volume de la ROM (romvolume.ts) : réglé à 6 sur 31 hors de Cyber Pinball (mémoire réelle de Monster Bash, WPC).
   {
     code: 'lowRomVolume',

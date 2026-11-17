@@ -38,6 +38,10 @@ set_target_properties(cyberpinball-dmd PROPERTIES OUTPUT_NAME "plugin-cyberpinba
 add_executable(banc-suivi-dmd test/banc-suivi-dmd.cpp)
 target_include_directories(banc-suivi-dmd PRIVATE src)
 
+# Banc de la cadence des images (logique, sans VPX).
+add_executable(banc-cadence test/banc-cadence.cpp)
+target_include_directories(banc-cadence PRIVATE src)
+
 # Banc de la pause (logique, sans VPX ni casque).
 add_executable(banc-pause test/banc-pause.cpp)
 target_include_directories(banc-pause PRIVATE src)
