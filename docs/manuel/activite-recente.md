@@ -14,6 +14,11 @@ Elle est aussi rangée dans la rubrique Cyber Pinball, puisqu'elle parle de tout
   Un téléchargement bloqué a la croix rouge des états bloquants.
   « Retour » ramène à l'écran d'où l'on vient ; revenu d'une action, la ligne quittée est choisie.
 - **Regroupé** : ce qui se répète dans la journée ne fait qu'une ligne : « Chloé : 3 connexions », avec les heures (« À 21:31, 19:02 et 14:10 »), « Bruno : 2 parties lancées » sur une même table, « Téléchargement bloqué 2 fois ».
+- **Messages, une ligne par conversation** : un message d'ami, un message de groupe ou une mention dans un salon n'a jamais sa ligne à lui seul.
+  Les messages d'une même conversation se regroupent sur une ligne du jour, qui dit combien et le dernier : « 3 messages de Nova » (« Tu montes sur Comet Chaser ce soir ? »), « 4 messages · Les Flippeurs du Nord » (« Bruno : Table de la semaine choisie »), « 2 mentions · Salon France ».
+  Start ouvre la conversation (« lire la conversation », « ouvrir la discussion du groupe », « ouvrir le salon ») ; la ligne dit ce qui y attend encore (« 3 en attente »), et se lit d'elle-même quand la conversation est lue là où elle se tient.
+  Plus ami, groupe quitté : la ligne reste, grisée avec sa raison (« Vous n'êtes plus dans ce groupe »).
+  Un groupe ou un salon a son icône, pas la pastille du dernier auteur.
   Un même évènement redit (un relevé qui revient, un record renvoyé par un ami qui se reconnecte) ne compte pas deux fois.
 - **Gardé** : les 50 dernières lignes, d'un démarrage à l'autre (`<données>\activite.json`) ; au-delà, les plus anciennes déjà lues partent d'abord.
   Un fichier illisible est mis de côté, jamais écrasé.
@@ -29,5 +34,5 @@ Elle est aussi rangée dans la rubrique Cyber Pinball, puisqu'elle parle de tout
 - **Depuis l'écran des tables** : le résumé « 4 nouveautés » ouvre Activité récente, qui dit chacune en entier ; « Retour » ramène à l'écran des tables.
   Une notification seule garde son action directe (Mes amis, Demandes d'amis, Téléchargements, la partie entre amis).
 - **Mode invité** : l'écran est fermé, comme tout le menu système ; le résumé n'y mène pas.
-- **Code** : le journal dans `packages/core/src/activity.ts` (`addActivity`, `trimActivity`, `markActivityShown`, `markActivityRead`, `activityText`, `activityAct`, `loadActivity`) ; l'écran et ce que fait chaque ligne dans `app/src/activity-menu.ts` ; chaque évènement consigné par `app/src/menu-notices.ts` (`activity`), la notification qui le dit en entier le donnant pour lu (`NoticeTick.entered`).
-- **Tests** : `packages/core/src/test/activite-recente.test.ts` (texte entier, regroupement dans la journée et redites, limite des 50 lignes, fichier gardé et mis de côté, non lu et résumé, chaque genre en français et en anglais, la vraie file sur chaque écran, l'écran avec ses lignes grisées et ses actions, la ligne vue sous le curseur).
+- **Code** : le journal dans `packages/core/src/activity.ts` (`addActivity`, `trimActivity`, `markActivityShown`, `markActivityRead`, `activityText`, `activityAct`, `markThreadRead`, `loadActivity`) ; l'écran et ce que fait chaque ligne dans `app/src/activity-menu.ts` ; chaque évènement consigné par `app/src/menu-notices.ts` (`activity`), la notification qui le dit en entier le donnant pour lu (`NoticeTick.entered`).
+- **Tests** : `packages/core/src/test/activite-recente.test.ts` (texte entier, regroupement dans la journée et redites, limite des 50 lignes, fichier gardé et mis de côté, non lu et résumé, chaque genre en français et en anglais, la vraie file sur chaque écran, l'écran avec ses lignes grisées et ses actions, la ligne vue sous le curseur) ; `packages/core/src/test/messages-attente.test.ts` (une ligne par conversation, la conversation lue qui lit ses lignes, la ligne qui ouvre sa conversation ou se grise).

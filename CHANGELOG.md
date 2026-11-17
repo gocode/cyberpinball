@@ -11,6 +11,8 @@ son interface).
 
 ## 0.1.14
 
+- Messages en attente : une pastille dédiée au coin de l'écran des tables compte les messages non lus de vos amis, de vos groupes et les mentions dans les salons ; un clic ouvre « Messages en attente », une ligne par conversation, avec les accès rapides de la communauté.
+- Activité récente : les messages se regroupent sur une ligne par conversation (« 3 messages de Nova », « 4 messages · Les Flippeurs du Nord »), qui ouvre la conversation et se lit avec elle.
 - Classements : l'écran s'ouvre sur deux portes, « Joueurs » et « Tables ».
 - Classements > Joueurs : les joueurs classés par leurs XP, entre amis, dans votre pays et dans le monde, de la semaine (à zéro chaque lundi) ou de tout temps ; votre place reste toujours visible.
 - Classements > Tables : toutes vos tables apparaissent, les dernières jouées d'abord, puis de A à Z ; une table sans classement reste dans la liste, grisée, avec sa raison, et une recherche par nom les filtre.

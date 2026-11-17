@@ -14,6 +14,11 @@ It is also filed in the Cyber Pinball section, since it covers everything, not o
   A blocked download has the red cross of blocking states.
   "Retour" (Back) returns to the screen you came from; back from an action, the line you left is chosen.
 - **Grouped**: what repeats during the day is a single line: "Chloé : 3 connexions" (Chloé: 3 sign-ins), with the times ("À 21:31, 19:02 et 14:10" (At 21:31, 19:02 and 14:10)), "Bruno : 2 parties lancées" (Bruno: 2 games started) on the same table, "Téléchargement bloqué 2 fois" (Download blocked 2 times).
+- **Messages, one line per conversation**: a message from a friend, a group message or a mention in a room never gets a line of its own.
+  The messages of one conversation are grouped on one line per day, which says how many and shows the last one: "3 messages de Nova" (3 messages from Nova), "4 messages · Les Flippeurs du Nord", "2 mentions · Salon France".
+  Start opens the conversation ("lire la conversation" (read the conversation), "ouvrir la discussion du groupe" (open the group chat), "ouvrir le salon" (open the room)); the line says what still waits there ("3 en attente" (3 pending)), and becomes read by itself once the conversation is read where it lives.
+  No longer a friend, group left: the line stays, greyed with its reason ("Vous n'êtes plus dans ce groupe" (You are no longer in this group)).
+  A group or a room shows its icon, not the pill of its last author.
   The same event said again (a reading that comes back, a record sent again by a friend reconnecting) does not count twice.
 - **Kept**: the last 50 lines, from one start to the next (`<données>\activite.json`); beyond that, the oldest already read go first.
   An unreadable file is set aside, never overwritten.
@@ -29,5 +34,5 @@ It is also filed in the Cyber Pinball section, since it covers everything, not o
 - **From the tables menu**: the "4 nouveautés" (4 new notifications) summary opens Recent activity, which says each one in full; "Retour" (Back) returns to the tables menu.
   A single notification keeps its direct action (My friends, Friend requests, Downloads, the game with friends).
 - **Guest mode**: the screen is closed, like the whole system menu; the summary does not lead there.
-- **Code**: the log in `packages/core/src/activity.ts` (`addActivity`, `trimActivity`, `markActivityShown`, `markActivityRead`, `activityText`, `activityAct`, `loadActivity`); the screen and what each line does in `app/src/activity-menu.ts`; each event recorded by `app/src/menu-notices.ts` (`activity`), the notification that says it in full marking it read (`NoticeTick.entered`).
-- **Tests**: `packages/core/src/test/activite-recente.test.ts` (full text, grouping within the day and repeats, the 50-line limit, file kept and set aside, unread and summary, every kind in French and English, the real queue on every screen, the screen with its greyed lines and its actions, the line seen under the cursor).
+- **Code**: the log in `packages/core/src/activity.ts` (`addActivity`, `trimActivity`, `markActivityShown`, `markActivityRead`, `activityText`, `activityAct`, `markThreadRead`, `loadActivity`); the screen and what each line does in `app/src/activity-menu.ts`; each event recorded by `app/src/menu-notices.ts` (`activity`), the notification that says it in full marking it read (`NoticeTick.entered`).
+- **Tests**: `packages/core/src/test/activite-recente.test.ts` (full text, grouping within the day and repeats, the 50-line limit, file kept and set aside, unread and summary, every kind in French and English, the real queue on every screen, the screen with its greyed lines and its actions, the line seen under the cursor); `packages/core/src/test/messages-attente.test.ts` (one line per conversation, a read conversation reading its lines, the line opening its conversation or greyed).

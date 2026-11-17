@@ -67,6 +67,11 @@ export interface NoticeEvent {
   /** Clé du joueur dont parle l'évènement : sa pastille (avatar.ts) dans la notification. */
   player?: string;
   /**
+   * La conversation d'un message : l'identifiant du groupe (group-message), du salon (room-mention).
+   * Activité récente regroupe sur une ligne les messages d'une même conversation (activity.ts).
+   */
+  thread?: string;
+  /**
    * Titre de la table, nom du téléchargement. Gardé dans l'Activité récente (activity.ts) :
    * un texte de l'interface y reste un LaterText, dit dans la langue du moment par noticeText.
    */

@@ -68,7 +68,8 @@ body.mouse .player-card:not(.player-card-guest):hover {
 }
 .player-card-bar {
   position: relative;
-  width: 13cqmin;
+  /* Raccourcie en borne quand la pastille des messages est là (frontend.css, .status-corner). */
+  width: var(--player-card-bar, 13cqmin);
   height: 0.56cqmin;
   border-radius: 99px;
   background: var(--surface-sunken);

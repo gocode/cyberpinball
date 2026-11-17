@@ -260,6 +260,8 @@ export type UiAction =
   | { type: 'live-game' }
   /** Notification d'un message : le fil de son auteur (chat-menu.ts). */
   | { type: 'messages' }
+  /** Pastille des messages en attente (coin d'état) : l'écran Messages en attente (inbox-menu.ts). */
+  | { type: 'inbox' }
   /** Notification d'un « J'aime » : Mon profil public (profile-menu.ts). */
   | { type: 'my-profile' }
   /** Carte du joueur du coin d'état : Mon niveau (level-menu.ts) ; pastille des badges : Mes badges. */

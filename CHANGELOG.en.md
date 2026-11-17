@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Waiting messages: a dedicated pill in the corner of the tables menu counts the unread messages from your friends and groups and the mentions in rooms; a click opens "Waiting messages", one line per conversation, with the community shortcuts.
+- Recent activity: messages are grouped on one line per conversation ("3 messages from Nova", "4 messages · Les Flippeurs du Nord"), which opens the conversation and becomes read with it.
 - Leaderboards: the screen opens on two doors, "Players" and "Tables".
 - Leaderboards > Players: players ranked by their XP, among friends, in your country and worldwide, for the week (back to zero every Monday) or of all time; your place always stays visible.
 - Leaderboards > Tables: all your tables are listed, the most recently played first, then from A to Z; a table without a ranking stays in the list, greyed, with its reason, and a search by name filters them.

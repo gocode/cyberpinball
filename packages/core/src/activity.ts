@@ -12,6 +12,9 @@
 // - Ce qui se répète dans la journée ne fait qu'une ligne (« Bruno : 3 connexions ») : les
 //   connexions d'un ami, ses parties lancées sur une même table, un téléchargement qui rebloque.
 //   Un même évènement redit (un relevé qui revient) ne compte pas deux fois.
+// - Les messages (d'un ami, d'un groupe, une mention dans un salon) : une ligne par conversation et
+//   par jour, jamais une par message (« 3 messages de Nova », le dernier en précision). Elle se lit
+//   d'elle-même quand la conversation est lue là où elle se tient (markThreadRead).
 // - Au plus ACTIVITY_MAX lignes : les plus anciennes déjà lues partent d'abord, puis les plus
 //   anciennes. Le fichier (<données>\activite.json) garde tout d'un démarrage à l'autre ; illisible,
 //   il est mis de côté, jamais écrasé (readKeptJson).
@@ -62,7 +65,23 @@ export type ActivityAct =
   /** Un téléchargement : le gestionnaire. */
   | { type: 'download'; id: string }
   /** Une entrée du menu système (Mise à jour de Cyber Pinball, Configuration de la borne…). */
-  | { type: 'system'; item: SystemItemId };
+  | { type: 'system'; item: SystemItemId }
+  /** La conversation avec un ami (sa clé). */
+  | { type: 'chat'; key: string }
+  /** La discussion d'un groupe (son identifiant). */
+  | { type: 'group'; id: string }
+  /** Un salon (son identifiant). */
+  | { type: 'room'; id: string };
+
+/** Les messages : une ligne par conversation et par jour (repeatKey), lue avec sa conversation (markThreadRead). */
+export const ACTIVITY_MESSAGE_KINDS: ReadonlySet<ActivityKind> = new Set<ActivityKind>(['friend-message', 'group-message', 'room-mention']);
+
+/** La conversation d'une ligne de messages : la clé de l'ami, l'identifiant du groupe ou du salon. */
+export function activityThread(e: Pick<ActivityFacts, 'player' | 'thread' | 'subject' | 'key'> & { kind: ActivityKind }): string | undefined {
+  if (e.kind === 'friend-message') return e.player;
+  if (e.kind === 'group-message' || e.kind === 'room-mention') return e.thread;
+  return undefined;
+}
 
 /** Ce qui décrit une ligne, gardé tel quel : le texte se refait à l'affichage. */
 export interface ActivityFacts {
@@ -70,6 +89,8 @@ export interface ActivityFacts {
   key: string;
   who?: string;
   player?: string;
+  /** La conversation d'un message de groupe ou d'une mention : le groupe, le salon (NoticeEvent.thread). */
+  thread?: string;
   /** Titre, précision : un texte de l'interface y est un LaterText (notices.ts), dit à l'affichage. */
   subject?: StoredText;
   extra?: StoredText;
@@ -119,6 +140,12 @@ function repeatKey(kind: ActivityKind, f: ActivityFacts): string | undefined {
       return `${f.player ?? f.key.split('|')[0]}|${typeof f.subject === 'string' || f.subject === undefined ? (f.subject ?? '') : JSON.stringify(f.subject)}`;
     case 'download-failed':
       return f.key;
+    // Les messages d'une conversation : une ligne (sans conversation connue, l'ancien journal : le groupe ou le salon par son nom).
+    case 'friend-message':
+      return f.player ?? f.who ?? f.key;
+    case 'group-message':
+    case 'room-mention':
+      return f.thread ?? (typeof f.subject === 'string' ? f.subject : JSON.stringify(f.subject ?? f.key));
     default:
       return undefined;
   }
@@ -143,6 +170,7 @@ export function activityFacts(e: NoticeEvent): ActivityFacts {
     key: e.key,
     ...(e.who !== undefined ? { who: e.who } : {}),
     ...(e.player ? { player: e.player } : {}),
+    ...(e.thread ? { thread: e.thread } : {}),
     ...(e.subject ? { subject: e.subject } : {}),
     ...(e.extra ? { extra: e.extra } : {}),
     ...(e.from ? { from: e.from } : {}),
@@ -218,11 +246,11 @@ export function trimActivity(log: ActivityLog, max = ACTIVITY_MAX): void {
  * téléchargement (ACTIVITY_KEEP_UNREAD). Ceux d'un résumé (« 4 nouveautés ») restent non lus.
  * Rend vrai si quelque chose a changé.
  */
-export function markActivityShown(log: ActivityLog, events: readonly Pick<NoticeEvent, 'kind' | 'key' | 'at' | 'player' | 'subject'>[]): boolean {
+export function markActivityShown(log: ActivityLog, events: readonly Pick<NoticeEvent, 'kind' | 'key' | 'at' | 'player' | 'subject' | 'thread' | 'who'>[]): boolean {
   let changed = false;
   for (const e of events) {
     if (ACTIVITY_KEEP_UNREAD.has(e.kind)) continue;
-    const id = identity(e.kind, { key: e.key, ...(e.player ? { player: e.player } : {}), ...(e.subject ? { subject: e.subject } : {}) }, e.at);
+    const id = identity(e.kind, { key: e.key, ...(e.player ? { player: e.player } : {}), ...(e.who ? { who: e.who } : {}), ...(e.thread ? { thread: e.thread } : {}), ...(e.subject ? { subject: e.subject } : {}) }, e.at);
     const entry = log.entries.find((x) => x.id === id);
     if (entry && !entry.read) {
       entry.read = true;
@@ -237,6 +265,20 @@ export function markActivityRead(log: ActivityLog, ids?: readonly string[]): boo
   let changed = false;
   for (const e of log.entries) {
     if (e.read || (ids && !ids.includes(e.id))) continue;
+    e.read = true;
+    changed = true;
+  }
+  return changed;
+}
+
+/**
+ * La conversation vient d'être lue là où elle se tient (le fil de l'ami, la discussion du groupe,
+ * le salon) : ses lignes de messages aussi. Rend vrai si quelque chose a changé.
+ */
+export function markThreadRead(log: ActivityLog, kind: 'friend-message' | 'group-message' | 'room-mention', thread: string): boolean {
+  let changed = false;
+  for (const e of log.entries) {
+    if (e.read || e.kind !== kind || activityThread(e) !== thread) continue;
     e.read = true;
     changed = true;
   }
@@ -285,6 +327,12 @@ export function activityText(e: ActivityEntry): { title: string; detail?: string
       if (kind === 'friend-online') return { title: tn(e.count, '{name} : {n} connexion', '{name} : {n} connexions', { name }) };
       if (kind === 'friend-playing') return { title: tn(e.count, '{name} : {n} partie lancée', '{name} : {n} parties lancées', { name }), ...(e.subject ? { detail: say(e.subject) } : {}) };
       if (kind === 'download-failed') return { title: t('Téléchargement bloqué {n} fois', { n: e.count }), ...(text.detail ? { detail: text.detail } : {}) };
+      // Une conversation : combien, et le dernier message en précision (son auteur dans un groupe ou un salon).
+      const last = typeof e.extra === 'string' ? e.extra : e.extra ? say(e.extra) : '';
+      const place = typeof e.subject === 'string' ? e.subject : e.subject ? say(e.subject) : '';
+      if (kind === 'friend-message') return { title: tn(e.count, '{n} message de {name}', '{n} messages de {name}', { name }), ...(last ? { detail: last } : {}) };
+      if (kind === 'group-message') return { title: tn(e.count, '{n} message · {group}', '{n} messages · {group}', { group: place }), ...(last ? { detail: t('{name} : {text}', { name, text: last }) } : {}) };
+      if (kind === 'room-mention') return { title: tn(e.count, '{n} mention · {room}', '{n} mentions · {room}', { room: place }), ...(last ? { detail: t('{name} : {text}', { name, text: last }) } : {}) };
     }
     return text;
   }
@@ -325,6 +373,12 @@ export function activityAct(e: ActivityEntry): ActivityAct | undefined {
     case 'download-done':
     case 'download-failed':
       return { type: 'download', id: e.key };
+    case 'friend-message':
+      return e.player ? { type: 'chat', key: e.player } : e.item ? { type: 'system', item: e.item } : undefined;
+    case 'group-message':
+      return e.thread ? { type: 'group', id: e.thread } : e.item ? { type: 'system', item: e.item } : undefined;
+    case 'room-mention':
+      return e.thread ? { type: 'room', id: e.thread } : e.item ? { type: 'system', item: e.item } : undefined;
     case 'update-available':
     case 'update-installed':
     case 'update-failed':
@@ -367,6 +421,7 @@ export function parseActivityEntry(raw: unknown): ActivityEntry | undefined {
     read: r.read === true,
     ...text('who', 80),
     ...text('player', 128),
+    ...text('thread', 128),
     ...stored('subject', 300),
     ...stored('extra', 300),
     ...text('from', 120),

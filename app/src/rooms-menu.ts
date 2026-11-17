@@ -102,6 +102,8 @@ export interface RoomsMenu {
   defaultRoom(): RoomId;
   /** Lignes non lues qui me citent, tous salons confondus. */
   unreadMentions(): number;
+  /** Les salons où des lignes non lues me citent : combien, et la dernière (Messages en attente, inbox-menu.ts). */
+  mentionThreads(): { room: RoomId; name: string; count: number; last: { who: string; text: string; at: number } }[];
   /** Le salon à l'écran (téléphone) ; undefined : aucun. */
   shown(): RoomId | undefined;
   /** Écrire depuis le téléphone (ou un autre clavier) dans un salon : la raison d'un refus, en clair. */
@@ -214,10 +216,29 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
     return news;
   }
 
-  function unreadMentions(): number {
+  /** Les lignes non lues qui me citent. */
+  function mentionLines(): RoomLine[] {
     const s = net.rooms();
     const name = me().name;
-    return s.lines.filter((l) => l.key !== me().key.publicKey && visible(l) && mentions(l.text, name) && (!s.read[l.room] || Date.parse(l.at) > Date.parse(s.read[l.room]!))).length;
+    return s.lines.filter((l) => l.key !== me().key.publicKey && visible(l) && mentions(l.text, name) && (!s.read[l.room] || Date.parse(l.at) > Date.parse(s.read[l.room]!)));
+  }
+
+  function unreadMentions(): number {
+    return mentionLines().length;
+  }
+
+  function mentionThreads(): { room: RoomId; name: string; count: number; last: { who: string; text: string; at: number } }[] {
+    const byRoom = new Map<RoomId, { room: RoomId; name: string; count: number; last: { who: string; text: string; at: number } }>();
+    for (const l of mentionLines()) {
+      const at = Date.parse(l.at);
+      const last = { who: l.name, text: shownText(l.text), at };
+      const found = byRoom.get(l.room);
+      if (found) {
+        found.count++;
+        if (at >= found.last.at) found.last = last;
+      } else byRoom.set(l.room, { room: l.room, name: roomName(l.room), count: 1, last });
+    }
+    return [...byRoom.values()];
   }
 
   /** Pourquoi on ne peut pas écrire, en clair ; undefined : on peut. */
@@ -1036,6 +1057,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
     roomName,
     defaultRoom,
     unreadMentions,
+    mentionThreads,
     newsOf,
     lineUnread(id) {
       const s = net.rooms();

@@ -522,7 +522,8 @@ import { createLevelTracker } from './level-tracker';
 import { createLevelMenu } from './level-menu';
 import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
-import { createActivityMenu } from './activity-menu';
+import { createActivityMenu, type MessageKind } from './activity-menu';
+import { createInboxMenu, type InboxLink, type InboxThread } from './inbox-menu';
 import { createNewsMenu } from './news-menu';
 import { demoCharter, seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
 import { createDedicatedMenu } from './dedicated-menu';
@@ -2806,6 +2807,8 @@ function socialChanged(): void {
     // Une charte reçue a pu faire de cette borne un modérateur (ou le contraire).
     syncModerationItem();
     menuNotices.observe();
+    // Une conversation lue (fil d'un ami, groupe, salon) : ses lignes d'Activité récente aussi.
+    activityMenu.settle();
     // Nouvel ami, « J'aime » ou réaction reçus : leurs XP (level-tracker.ts).
     levelTracker.socialChanged();
     broadcast();
@@ -2873,7 +2876,7 @@ const groupService = createGroupService({
   onOwnLine: () => levelTracker.roomMessage(),
   onArrive: (view, lines) => {
     if (guest.active || groupsMenu.shown() === view.id) return;
-    menuNotices.push(lines.map((l) => ({ kind: 'group-message' as const, key: l.id, at: Date.now(), who: l.name, player: l.by, subject: view.name, extra: (l.body.k === 'msg' ? l.body.text : '').replace(/\s*\n\s*/g, ' ') })));
+    menuNotices.push(lines.map((l) => ({ kind: 'group-message' as const, key: l.id, at: Date.now(), who: l.name, player: l.by, thread: view.id, subject: view.name, extra: (l.body.k === 'msg' ? l.body.text : '').replace(/\s*\n\s*/g, ' ') })));
   },
   onInvite: (invitation, view) => {
     if (guest.active) return;
@@ -2973,6 +2976,8 @@ const activityMenu = createActivityMenu({
     inHistory: (id) => friendsMenu.history.has(id),
     openHistory: (id, back) => friendsMenu.history.openGame(id, back),
   },
+  // Une ligne de messages : ce qui attend encore dans sa conversation, et l'ouvrir (Messages en attente).
+  threads: { pending: (kind, thread) => threadPending(kind, thread), open: (kind, thread, back) => openThread(kind, thread, back) },
   // La pastille de la roue dentée et de l'entrée suit le non lu.
   changed: () => {
     if (!closing && state.phase !== 'playing' && state.phase !== 'loading') broadcast();
@@ -3370,7 +3375,7 @@ socialNet.onRoomLines((lines) => {
   const playingNow = state.phase === 'playing' || state.phase === 'loading';
   if (playingNow && !s.mentionsInGame) return;
   const hits = lines.filter((l) => !s.ignored.includes(l.key) && mentions(l.text, name) && roomsMenu.shown() !== l.room);
-  if (hits.length) menuNotices.push(hits.map((l) => ({ kind: 'room-mention' as const, key: l.id, at: Date.now(), who: l.name, player: l.key, subject: roomsMenu.roomName(l.room), extra: s.filter ? maskWords(l.text) : l.text })));
+  if (hits.length) menuNotices.push(hits.map((l) => ({ kind: 'room-mention' as const, key: l.id, at: Date.now(), who: l.name, player: l.key, thread: l.room, subject: roomsMenu.roomName(l.room), extra: s.filter ? maskWords(l.text) : l.text })));
   // Les autres lignes de mes salons (16/11/2026) : au menu seulement, tenues jusqu'à deux minutes (NoticeRule.holdMs).
   if (playingNow) return;
   const news = roomsMenu.newsOf(lines);
@@ -3460,6 +3465,75 @@ const communityMenu = createCommunityMenu({
     : {}),
 });
 library.provideSystemItem('online-players', communityMenu.item);
+
+/** Un message sur une ligne : ses retours à la ligne deviennent des espaces. */
+const oneLine = (text: string) => text.replace(/\s*\n\s*/g, ' ');
+
+/**
+ * Messages en attente (inbox-menu.ts, 17/11/2026) : les conversations où des messages attendent,
+ * une ligne chacune (fil d'un ami, discussion d'un groupe, mentions dans un salon), et les accès
+ * rapides de la communauté. Ouvert par la pastille des messages du coin d'état.
+ */
+function inboxThreads(): InboxThread[] {
+  if (guest.active) return [];
+  const s = socialNet.state();
+  const me = s.key.publicKey;
+  const out: InboxThread[] = [];
+  const chat = chatService.state();
+  if (chat.enabled) {
+    for (const [key, c] of Object.entries(chat.conversations)) {
+      const friend = s.friends.find((f) => f.key === key);
+      if (!friend || !c.unread) continue;
+      const last = [...c.lines].reverse().find((l) => !l.out && l.text);
+      out.push({ kind: 'friend-message', id: key, name: friend.name, unread: c.unread, ...(c.muted ? { muted: true } : {}), ...(last?.text ? { last: { text: oneLine(last.text), at: Date.parse(last.at) } } : {}), avatar: avatarView(key, friend.name, socialNet.avatarFile(key)) });
+    }
+  }
+  for (const { entry, view } of groupService.groups()) {
+    if (!entry.unread || entry.gone) continue;
+    const last = [...entry.lines].reverse().find((l) => l.by !== me && l.body.k === 'msg');
+    const text = last?.body.k === 'msg' ? last.body.text : undefined;
+    out.push({ kind: 'group-message', id: view.id, name: view.name, unread: entry.unread, ...(entry.muted ? { muted: true } : {}), ...(last && text ? { last: { who: last.name, text: oneLine(text), at: Date.parse(last.at) } } : {}) });
+  }
+  for (const r of roomsMenu.mentionThreads()) out.push({ kind: 'room-mention', id: r.room, name: r.name, unread: r.count, last: r.last });
+  return out;
+}
+
+/** Messages non lus d'une conversation ; undefined : elle n'existe plus (plus ami, groupe quitté). */
+function threadPending(kind: MessageKind, thread: string): number | undefined {
+  if (kind === 'friend-message') return socialNet.state().friends.some((f) => f.key === thread) ? (chatService.state().conversations[thread]?.unread ?? 0) : undefined;
+  if (kind === 'group-message') {
+    const entry = groupService.entry(thread);
+    return !entry || entry.gone ? undefined : entry.unread;
+  }
+  return roomsMenu.mentionThreads().find((r) => r.room === thread)?.count ?? 0;
+}
+
+/** Ouvre une conversation là où elle se tient ; son « Retour » vers `back`. */
+function openThread(kind: MessageKind, thread: string, back: () => void): void {
+  if (kind === 'friend-message') chatMenu.openThread(thread, back);
+  else if (kind === 'group-message') groupsMenu.openGroup(thread, back);
+  else roomsMenu.openRoom(thread, back);
+}
+
+/** Les accès rapides de la communauté, sous les conversations. */
+function inboxLinks(): InboxLink[] {
+  const rooms = roomsMenu.door();
+  const groups = groupsMenu.door();
+  return [
+    { label: t('Messages'), detail: chatMenu.item.detail ?? '', icon: 'message', open: (back) => library.runSystemItem('messages', back) },
+    { label: t('Groupes'), detail: groups.detail, icon: 'group', ...(groups.attention ? { attention: true } : {}), open: (back) => groupsMenu.open(back) },
+    { label: rooms.label, detail: rooms.detail, icon: 'globe', open: (back) => roomsMenu.openDefault(back) },
+    { label: t('Amis'), detail: friendsMenu.items.friends.detail ?? '', icon: 'friends', ...(friendsMenu.items['friend-requests'].attention ? { attention: true } : {}), open: (back) => library.runSystemItem('friends', back) },
+    { label: t('Activité récente'), detail: activityMenu.item.detail ?? '', icon: 'bell', open: (back) => activityMenu.open(back) },
+  ];
+}
+
+const inboxMenu = createInboxMenu({
+  library: { openCustom: (build, at) => library.openCustom(build, at) },
+  threads: inboxThreads,
+  open: openThread,
+  links: inboxLinks,
+});
 library.provideSystemItem('friends', friendsMenu.items.friends);
 library.provideSystemItem('game-history', friendsMenu.items['game-history']);
 library.provideSystemItem('find-player', friendsMenu.items['find-player']);
@@ -5469,6 +5543,10 @@ export function startFrontend(): void {
     }
     else if (action.type === 'groups') {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) groupsMenu.openNews(state.phase === 'menu' ? () => library.leave() : () => library.openSystem());
+    }
+    // Pastille des messages en attente : l'écran qui les réunit.
+    else if (action.type === 'inbox') {
+      if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) inboxMenu.open(state.phase === 'menu' ? () => library.leave() : () => library.openSystem());
     }
     else if (action.type === 'messages') {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) chatMenu.openUnread(state.phase === 'menu' ? () => library.leave() : undefined);
@@ -8002,7 +8080,7 @@ function browserOnPlayfield(): boolean {
  * menu des tables ou sur la ligne de la roue dentée d'un écran plein (`zone`) ; par-dessus VPX
  * ou le navigateur intégré, une ligne posée sur eux (game-notice.ts).
  */
-function menuCorner(): { zone?: 'corner' | 'head'; friendsOnline?: { count: number; title: string; searching?: boolean }; notice?: NoticeView; player?: PlayerCardView; badges?: { count: number; total: number; title: string } } {
+function menuCorner(): { zone?: 'corner' | 'head'; friendsOnline?: { count: number; title: string; searching?: boolean }; inbox?: { count: number; title: string }; notice?: NoticeView; player?: PlayerCardView; badges?: { count: number; total: number; title: string } } {
   const zone = currentZone();
   // La file avance à chaque rendu : une notification ouverte part quand l'écran ne s'y prête plus.
   const corner = menuNotices.view();
@@ -8016,7 +8094,9 @@ function menuCorner(): { zone?: 'corner' | 'head'; friendsOnline?: { count: numb
   // (sa ligne porte son repère, jukebox.css).
   const screen = zoneScreen();
   const player = screen !== 'attract' && screen !== 'jukebox' ? playerCard() : undefined;
-  return { zone: zone.place, ...corner, ...(player ? { player, badges: { count: socialNet.state().badges.length, total: BADGES.length, title: t('Mes badges') } } : {}) };
+  // Les messages en attente : leur pastille, au coin comme sur la ligne de la roue dentée.
+  const inbox = guest.active ? undefined : inboxMenu.pill();
+  return { zone: zone.place, ...corner, ...(inbox ? { inbox } : {}), ...(player ? { player, badges: { count: socialNet.state().badges.length, total: BADGES.length, title: t('Mes badges') } } : {}) };
 }
 
 /** Part d'une fenêtre dans le lancement en cinéma : le logo part du plateau, se pose sur le fronton (sa fenêtre ou sa zone). */

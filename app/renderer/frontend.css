@@ -1881,9 +1881,10 @@ html.menu-desktop .status-corner {
 
 /*
  * En borne, la ligne de la marque est étroite (54 cqmin à droite de la marque) : la carte du joueur
- * cède sa place le temps d'une notification ou d'un téléchargement, qui disent quelque chose de neuf.
+ * cède sa place le temps d'une notification, d'un téléchargement ou de messages en attente, qui disent
+ * quelque chose de neuf.
  */
-html:not(.menu-desktop) .status-corner.on-head:has(> .notice-line, > .downloads-pill) {
+html:not(.menu-desktop) .status-corner.on-head:has(> .notice-line, > .downloads-pill, > .inbox-pill) {
   --player-card-display: none;
 }
 
@@ -1893,7 +1894,8 @@ html:not(.menu-desktop) .status-corner.on-head:has(> .notice-line, > .downloads-
 
 .status-corner.on-head .notice-toast,
 .status-corner.on-head .friends-pill,
-.status-corner.on-head .downloads-pill {
+.status-corner.on-head .downloads-pill,
+.status-corner.on-head .inbox-pill {
   height: var(--pill-height);
   min-height: var(--pill-height);
 }
@@ -2091,6 +2093,80 @@ body.mouse .friends-pill:hover {
   .friends-pill.searching .friends-pill-dot {
     animation: none;
   }
+}
+
+/*
+ * Messages en attente : la forme de la pastille des amis ; la bulle des messages en bleu méta, le
+ * nombre dans une capsule pleine du même bleu (le non-lu, à lire). Le nombre qui monte se pose d'un
+ * léger rebond, une fois.
+ */
+.inbox-pill {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 0.9cqmin;
+  min-height: 5.93cqmin;
+  padding: 0 0.74cqmin 0 1.48cqmin;
+  font: inherit;
+  font-size: 2.22cqmin;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 0.1cqmin solid color-mix(in oklab, var(--meta) 55%, var(--line-strong));
+  border-radius: 2.96cqmin;
+}
+
+body.mouse .inbox-pill {
+  cursor: pointer;
+}
+
+body.mouse .inbox-pill:hover {
+  border-color: var(--meta);
+  box-shadow: 0 0 0 0.18cqmin var(--meta);
+}
+
+.inbox-pill-icon {
+  font-size: 2.22cqmin;
+  color: var(--meta);
+}
+
+.inbox-pill-count {
+  min-width: 3.7cqmin;
+  padding: 0.46cqmin 1.11cqmin;
+  box-sizing: border-box;
+  text-align: center;
+  font-weight: 600;
+  color: var(--void);
+  background: var(--meta);
+  border-radius: 1.85cqmin;
+}
+
+.inbox-pill-count.arrived {
+  animation: inbox-pill-arrived 0.42s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+@keyframes inbox-pill-arrived {
+  from {
+    transform: scale(0.6);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inbox-pill-count.arrived {
+    animation: none;
+  }
+}
+
+/*
+ * En borne, la pastille des messages en attente prend sa place sur la ligne de la marque : la barre
+ * se raccourcit pour que la carte ne recouvre pas « CYBER PINBALL ».
+ */
+html:not(.menu-desktop) .status-corner:has(.inbox-pill) {
+  --player-card-bar: 8cqmin;
 }
 
 /*

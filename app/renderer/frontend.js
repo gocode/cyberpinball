@@ -1108,6 +1108,25 @@ function friendsPill(f) {
 }
 
 /**
+ * Messages en attente, à droite des amis en ligne : la bulle des messages et le nombre de messages non
+ * lus (amis, groupes, mentions dans les salons) dans sa capsule bleue. Un clic ouvre « Messages en
+ * attente » (inbox-menu.ts). Rien quand rien n'attend. Le nombre qui monte rejoue son entrée.
+ */
+let inboxShown;
+
+function inboxPill(m) {
+  const pill = el('button', 'inbox-pill');
+  pill.type = 'button';
+  pill.title = m.title;
+  pill.dataset.act = JSON.stringify({ type: 'inbox' });
+  const count = el('span', 'inbox-pill-count', m.count > 99 ? '99+' : String(m.count));
+  if (inboxShown !== undefined && m.count > inboxShown) count.classList.add('arrived');
+  inboxShown = m.count;
+  pill.append(cyberIcon('message', 'inbox-pill-icon'), count);
+  return pill;
+}
+
+/**
  * Notification du menu des tables (packages/core/src/notices.ts) : une seule à la fois, gardée
  * d'un rendu à l'autre tant que c'est la même (son entrée ne rejoue pas à chaque état) ; elle
  * s'estompe quand le processus principal la dit sur le départ (leaving).
@@ -1178,6 +1197,8 @@ function cornerNodes(s) {
   const nodes = [];
   if (s.downloads) nodes.push(downloadsPill(s.downloads));
   if (s.friendsOnline) nodes.push(friendsPill(s.friendsOnline));
+  if (s.inbox) nodes.push(inboxPill(s.inbox));
+  else inboxShown = 0;
   // Le joueur : ses badges, puis sa carte (avatar, pseudo, niveau, barre), à gauche des pastilles (niveau.js).
   if (s.player && window.CyberLevels) {
     if (s.badges) nodes.push(CyberLevels.badgesPill(s.badges));

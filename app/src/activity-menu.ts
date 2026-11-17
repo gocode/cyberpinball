@@ -18,18 +18,21 @@ import {
   ACTIVITY_FILE,
   ACTIVITY_KEEP_UNREAD,
   ACTIVITY_MAX,
+  ACTIVITY_MESSAGE_KINDS,
   SYSTEM_ITEMS,
   activityAct,
   activityDay,
   activityFacts,
   activityLook,
   activityText,
+  activityThread,
   activityUnread,
   addActivity,
   isLiveNotice,
   language,
   loadActivity,
   markActivityRead,
+  markThreadRead,
   saveActivity,
   saveOrWarn,
   t,
@@ -80,13 +83,29 @@ export interface ActivityMenuHost {
     inHistory(id: string): boolean;
     openHistory(id: string, back: () => void): void;
   };
+  /**
+   * Les conversations (messages d'un ami, discussion d'un groupe, mentions dans un salon) : ce qui
+   * y attend encore, et les ouvrir. Absent (essais) : les lignes de messages n'ouvrent rien.
+   */
+  threads?: {
+    /** Messages non lus de cette conversation ; undefined : elle n'existe plus (plus ami, groupe quitté). */
+    pending(kind: MessageKind, thread: string): number | undefined;
+    open(kind: MessageKind, thread: string, back: () => void): void;
+  };
   /** Le journal a changé (une ligne de plus, une ligne vue) : la pastille de la roue dentée se redessine. */
   changed?(): void;
   now?: () => number;
   log?: (line: string) => void;
 }
 
+export type MessageKind = 'friend-message' | 'group-message' | 'room-mention';
+
 export interface ActivityMenu {
+  /**
+   * Les conversations ont pu être lues (la messagerie, un groupe, un salon a changé) : leurs lignes
+   * de messages qui n'y attendent plus rien deviennent lues.
+   */
+  settle(): void;
   /** Évènements des notifications, à leur arrivée ; `quiet` : notifications coupées, ce qui ne compte pas reste lu. */
   record(events: readonly NoticeEvent[], quiet?: boolean): void;
   /** Une ligne qui ne vient pas d'une notification : version disponible, mise à jour faite, constat. */
@@ -176,7 +195,20 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
     if (x.key === e.key) return true;
     if (e.kind === 'friend-online') return !!e.player && x.player === e.player && activityDay(x.at) === activityDay(e.at);
     if (e.kind === 'friend-playing') return !!e.player && x.player === e.player && x.subject === e.subject && activityDay(x.at) === activityDay(e.at);
+    // Une conversation : sa ligne du jour.
+    if (ACTIVITY_MESSAGE_KINDS.has(e.kind)) return activityThread(x) !== undefined && activityThread(x) === activityThread(e) && activityDay(x.at) === activityDay(e.at);
     return false;
+  }
+
+  function settle(): void {
+    if (!host.threads) return;
+    let changed = false;
+    for (const e of log.entries) {
+      if (e.read || !ACTIVITY_MESSAGE_KINDS.has(e.kind)) continue;
+      const thread = activityThread(e);
+      if (thread !== undefined && host.threads.pending(e.kind as MessageKind, thread) === 0) changed = markThreadRead(log, e.kind as MessageKind, thread) || changed;
+    }
+    if (changed) save();
   }
 
   /** Revenir à cet écran, la ligne qu'on quitte choisie. */
@@ -218,6 +250,18 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
       case 'download':
         if (host.hasDownload(act.id)) return { run: () => host.library.openDownloads(act.id), label: t('ouvrir les téléchargements') };
         return { gone: t('Retiré de la liste des téléchargements') };
+      case 'chat':
+      case 'group':
+      case 'room': {
+        const kind: MessageKind = act.type === 'chat' ? 'friend-message' : act.type === 'group' ? 'group-message' : 'room-mention';
+        const thread = act.type === 'chat' ? act.key : act.id;
+        const threads = host.threads;
+        if (!threads) return {};
+        const waiting = threads.pending(kind, thread);
+        if (waiting === undefined) return { gone: act.type === 'chat' ? t('N’est plus dans vos amis') : act.type === 'group' ? t('Vous n’êtes plus dans ce groupe') : t('Salon fermé') };
+        const label = act.type === 'chat' ? t('lire la conversation') : act.type === 'group' ? t('ouvrir la discussion du groupe') : t('ouvrir le salon');
+        return { run: () => threads.open(kind, thread, back), label, ...(waiting ? { status: tn(waiting, '{n} en attente', '{n} en attente') } : {}) };
+      }
       case 'system':
         if (!host.library.hasSystemItem(act.item)) return {};
         return { run: () => host.library.runSystemItem(act.item, back), label: act.item === 'updates' ? t('voir la mise à jour') : t('ouvrir « {entry} »', { entry: SYSTEM_ITEMS[act.item].label }) };
@@ -255,7 +299,8 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
         text: text.title,
         ...(detail ? { detail } : {}),
         icon: look.icon,
-        ...(e.player && host.friends.avatar ? { avatar: host.friends.avatar(e.player, e.who ?? '?') } : {}),
+        // Un groupe, un salon : plusieurs auteurs sur la ligne, son icône plutôt que la pastille du dernier.
+        ...(e.player && host.friends.avatar && e.kind !== 'group-message' && e.kind !== 'room-mention' ? { avatar: host.friends.avatar(e.player, e.who ?? '?') } : {}),
         tone: r.gone ? 'quiet' : look.tone,
         badges: [time(e.at), ...(r.status ? [r.status] : []), ...(unread ? [t('Non lu')] : [])],
         ...(unread ? { unread: true } : {}),
@@ -329,6 +374,7 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
   }
 
   return {
+    settle,
     record,
     note,
     shown,
