@@ -38,8 +38,9 @@ interface Item {
 }
 
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { createProfileMenu } = require(path.join(APP_DIST, 'profile-menu.js')) as { createProfileMenu(host: object): { openProfile(key: string, back: () => void): void } };
 const { createFriendsMenu } = require(path.join(APP_DIST, 'friends-menu.js')) as {
-  createFriendsMenu(host: object): { items: Record<string, Item>; live: { open(back: () => void): void; sheetAction(table: object, back: () => void): Action; inviteFriends(keys: string[], back: () => void): void } };
+  createFriendsMenu(host: object): { playerPart(key: string, name: string, ctx: object): object; items: Record<string, Item>; live: { open(back: () => void): void; sheetAction(table: object, back: () => void): Action; inviteFriends(keys: string[], back: () => void): void } };
 };
 const { createSocialNet } = require(path.join(APP_DIST, 'social-net.js')) as { createSocialNet(o: object): { state(): { shareLibrary: boolean; key: { publicKey: string } }; status(): object } };
 const { createFirewallRule } = require(path.join(APP_DIST, 'firewall-rule.js')) as { createFirewallRule(o: object): { check(): Promise<string>; checkVpx(): Promise<string | undefined> } };
@@ -82,10 +83,10 @@ function fakeGames() {
  * `presence` : Bruno vu en ligne, dans le menu ou en partie (le réseau reste coupé) ; `vpx` : les
  * programmes de VPX à fermer au réseau ; `extra` : d'autres amis, et les tables de la borne.
  */
-function setup(content?: object, presence?: 'menu' | 'playing', vpx?: () => string[] | undefined, extra: { friends?: { key: string; name: string }[]; tables?: object[]; status?: object } = {}) {
+function setup(content?: object, presence?: 'menu' | 'playing', vpx?: () => string[] | undefined, extra: { friends?: { key: string; name: string }[]; tables?: object[]; status?: object; events?: object[] } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-friends-menu-'));
   // Un ami déjà là (hors ligne : réseau coupé).
-  const friends = [{ key: FRIEND, name: 'Bruno' }, ...(extra.friends ?? [])].map((f) => ({ ...f, since: new Date().toISOString(), events: [] }));
+  const friends = [{ key: FRIEND, name: 'Bruno' }, ...(extra.friends ?? [])].map((f) => ({ ...f, since: new Date().toISOString(), events: f.key === FRIEND ? (extra.events ?? []) : [] }));
   fs.writeFileSync(path.join(dir, 'social.json'), JSON.stringify({ ...newSocialState(), friends }));
   const opened: { build: Build; at?: number }[] = [];
   const off = createSocialNet({ dataDir: dir, mode: 'off' });
@@ -94,7 +95,15 @@ function setup(content?: object, presence?: 'menu' | 'playing', vpx?: () => stri
   const firewall = createFirewallRule({ exe: 'C:\\x\\CyberPinball.exe', simulated: true, vpx });
   const games = fakeGames();
   const manager = createDownloadManager({ dataDir: dir, transports: {} });
+  // Le seul écran d'un joueur : son profil (profile-menu.ts), auquel la relation ajoute la fiche d'ami.
+  const profile = createProfileMenu({
+    library: { openCustom: (build: Build, at?: number) => opened.push({ build, at }), openSystem: () => undefined },
+    net,
+    relation: (key: string, name: string, ctx: object) => menu.playerPart(key, name, ctx),
+    block: () => undefined,
+  });
   const menu = createFriendsMenu({
+    profile: { open: (key: string, back: () => void) => profile.openProfile(key, back) },
     library: {
       openCustom: (build: Build, at?: number) => opened.push({ build, at }),
       openSystem: () => undefined,
@@ -257,6 +266,38 @@ test('fiche d’un ami : l’invitation toujours là, grisée hors ligne, active
   assert.equal(active?.detail, 'En partie : il recevra une notification discrète sur sa table');
   await active!.run();
   assert.equal(playing.last().build().heading, 'Partie en direct avec Bruno');
+});
+
+/**
+ * Un seul écran par joueur (17/11/2026) : la fiche d'ami et le profil public faisaient doublon. Un
+ * ami s'ouvre sur son profil, enrichi de sa présence, de sa bibliothèque, de ses parties jouées dans
+ * la même liste d'activité ; aucun écran ne propose plus « Voir sa fiche » ni « Voir son profil public ».
+ */
+test('un seul écran par joueur : le profil, enrichi pour un ami ; plus de « Voir sa fiche » nulle part', async () => {
+  const played = { id: 'p1', kind: 'played', at: new Date().toISOString(), table: { title: 'Glass Lagoon' }, seconds: 600 };
+  const { menu, last } = setup(undefined, undefined, undefined, { events: [played] });
+  const friend = await friendPage(menu, last);
+  assert.match(friend.subheading ?? '', /Votre ami$/);
+  const labels = friend.actions.map((a) => a.label);
+  for (const want of ['Inviter à une partie en direct', 'Voir sa bibliothèque', 'Écrire un message', 'Retirer de mes amis', 'Retour']) assert.ok(labels.includes(want), `profil d’un ami : « ${want} »`);
+  for (const gone of ['Voir sa fiche', 'Voir son profil public', 'Envoyer une demande d’ami']) assert.ok(!labels.includes(gone), `profil d’un ami : pas de « ${gone} »`);
+  const activity = friend.sections.find((x) => x.title?.startsWith('Activité récente'));
+  assert.ok(activity?.rows.some((r) => r.text.startsWith('A joué à Glass Lagoon')), 'ses parties jouées dans la liste d’activité');
+  assert.ok(!friend.sections.some((x) => x.title === 'Derniers évènements'), 'plus de seconde liste');
+  // Retirer de mes amis : le même écran, devenu celui d'un joueur qui n'est pas un ami.
+  await friend.actions.find((a) => a.label === 'Retirer de mes amis')!.run();
+  await last().build().actions.find((a) => a.label === 'Retirer')!.run();
+  const after = last().build();
+  assert.equal(after.heading, 'Bruno');
+  assert.match(after.subheading ?? '', /pas votre ami$/);
+  assert.ok(after.sections.some((x) => x.rows.some((r) => r.text === 'Bruno retiré de vos amis')));
+  assert.ok(after.actions.some((a) => a.label === 'Envoyer une demande d’ami'));
+  // Aucun écran ne renvoie plus vers un second écran du même joueur.
+  const src = path.join(REPO_ROOT, 'app', 'src');
+  for (const file of fs.readdirSync(src).filter((f) => f.endsWith('.ts'))) {
+    const text = fs.readFileSync(path.join(src, file), 'utf8');
+    assert.doesNotMatch(text, /t\('(Voir sa fiche|voir sa fiche|Voir son profil public)'\)/, `${file} : un second écran du même joueur`);
+  }
 });
 
 test('« Jouer avec un ami » : grisée sans ami en ligne ; sinon le choix de l’ami, en partie compris', async () => {

@@ -152,14 +152,12 @@ export const messages: Record<string, string> = {
   'Activité récente · {n} derniers jours': 'Recent activity · last {n} days',
   'Ni record ni badge ces derniers jours': 'No high score or badge in recent days',
   'Table en cours, parties jouées, bibliothèque : réservées à ses amis': 'Current table, games played, library: for their friends only',
-  'En attente de sa réponse': 'Waiting for their answer',
   'Écrire un message': 'Write a message',
   'Indisponible : entre amis seulement, envoyez d’abord une demande d’ami': 'Unavailable: friends only, send a friend request first',
   'Afficher son activité': 'Show their activity',
   'Masquer son activité': 'Hide their activity',
   'Ses évènements et ses « J’aime » ne s’affichent plus sur cette borne': 'Their events and likes no longer show on this cabinet',
   'Plus de demande, plus de connexion avec sa borne. « Partage et réseau » le débloque.': 'No more requests, no more connection with their cabinet. "Sharing and network" unblocks them.',
-  'Profil public · votre ami': 'Public profile · your friend',
   'Profil public · pas votre ami': 'Public profile · not your friend',
   'j’aime · ne plus aimer': 'like · unlike',
   'Profil public désactivé': 'Public profile turned off',
@@ -186,9 +184,6 @@ export const messages: Record<string, string> = {
   '{n} record publié': '{n} published high score',
   '{n} records publiés': '{n} published high scores',
   'Activé · {n} « J’aime » sur votre activité': 'On · likes on your activity: {n}',
-  'Voir son profil public': 'See their public profile',
-  'Ce que voient ceux qui ne sont pas ses amis, avec vos « J’aime »': 'What those who are not their friends see, with your likes',
-  'Pays, badges, records et activité récente, avec vos « J’aime »': 'Country, badges, high scores and recent activity, with your likes',
   '{name} aime votre activité': '{name} likes your activity',
   '{names} aiment votre activité': '{names} like your activity',
   '{n} « J’aime » sur votre activité': 'Likes on your activity: {n}',
@@ -205,7 +200,6 @@ export const messages: Record<string, string> = {
   'Votre ami': 'Your friend',
 
   // Fiche d'un ami : « Écrire »
-  'Écrire': 'Write',
   'Il est en ligne : le message part tout de suite': 'They are online: the message leaves right away',
   'Hors ligne : le message partira à son retour': 'Offline: the message will leave when they are back',
 

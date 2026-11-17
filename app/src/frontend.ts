@@ -3309,7 +3309,7 @@ const chatMenu = createChatMenu({
   net: socialNet,
   chat: chatService,
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
-  openFriend: (key, back) => friendsMenu.openFriend(key, back),
+  openProfile: (key, back) => profileMenu.openProfile(key, back),
   openFind: () => friendsMenu.openFind(),
   openSharing: () => friendsMenu.items.sharing.run(),
   block: (key) => socialNet.block(key),
@@ -3319,7 +3319,9 @@ library.provideSystemItem('messages', chatMenu.item);
 const profileMenu = createProfileMenu({
   library,
   net: socialNet,
-  request: (key, name) => socialNet.request({ key, name }),
+  // Le seul écran d'un joueur (17/11/2026) : la relation y ajoute présence, bibliothèque et demandes d'ami.
+  relation: (key, name, ctx) => friendsMenu.playerPart(key, name, ctx),
+  writeDetail: (key) => chatMenu.writeDetail(key),
   block: (key) => {
     socialNet.block(key);
     chatService.clear(key);
@@ -3337,7 +3339,6 @@ const roomsMenu = createRoomsMenu({
   library,
   net: socialNet,
   openProfile: (key, back) => profileMenu.openProfile(key, back),
-  openFriend: (key, back) => friendsMenu.openFriend(key, back),
   currentTable: () => tables[state.index],
   phoneLinked: () => phoneRemote?.connected() === 'menu',
 });
@@ -3353,7 +3354,6 @@ const groupsMenu = createGroupsMenu({
     void play(table);
   },
   openProfile: (key, back) => profileMenu.openProfile(key, back),
-  openFriend: (key, back) => friendsMenu.openFriend(key, back),
   openSharing: (back) => library.runSystemItem('sharing', back),
 });
 // Modération : l'entrée n'existe que pour un modérateur de la charte (elle peut changer : relue à chaque changement du réseau).
@@ -3433,7 +3433,6 @@ const communityMenu = createCommunityMenu({
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
   tables: () => tables,
   openProfile: (key, back) => profileMenu.openProfile(key, back),
-  openFriend: (key, back) => friendsMenu.openFriend(key, back),
   messages: {
     detail: () => chatMenu.item.detail ?? '',
     attention: () => Boolean(chatMenu.item.attention),

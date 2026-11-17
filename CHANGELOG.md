@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.14
 
+- Un seul écran par joueur : la fiche d'un ami et son profil public ne font plus qu'un. Le profil d'un ami montre en plus sa présence, sa bibliothèque et ses parties jouées, dans la même liste d'activité que ses records et badges à aimer, avec l'invitation à une partie et « Retirer de mes amis ». Mes amis, l'annuaire, la messagerie, les salons, les groupes et l'Activité récente y mènent tous directement.
 - En-tête homogène : la roue dentée du Menu système est désormais une pastille ronde, de la même taille et à la même hauteur que les pastilles des badges et des amis, avec le même survol ; elle n'est plus décalée par rapport à elles.
 - La carte du joueur (avatar, niveau, barre d'XP) et la pastille des badges restent affichées en haut des écrans pleins (Menu système, Mes badges, aide…), et plus seulement sur l'écran des tables.
 - « En train d'écrire » : dans les messages entre amis, les groupes et les salons, le badge de qui écrit (avatar, pseudo et trois petits points animés) apparaît sous le dernier message, à la borne comme au téléphone.

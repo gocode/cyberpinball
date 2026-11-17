@@ -28,7 +28,7 @@ export const messages: Record<string, string> = {
   'En ligne': 'Online',
   'Hors ligne': 'Offline',
   'Ami': 'Friend',
-  'voir sa fiche': 'see their page',
+  'voir son profil': 'see their profile',
   'répondre à la demande': 'answer the request',
   'Demande déjà traitée ou retirée': 'Request already answered or withdrawn',
   'répondre à l’invitation': 'answer the invitation',

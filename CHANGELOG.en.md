@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- One screen per player: a friend's page and their public profile are now one and the same. A friend's profile also shows their presence, their library and the games they played, in the same activity list as the records and badges you can like, with the live game invitation and "Remove from my friends". My friends, the directory, messages, rooms, groups and Recent activity all lead straight to it.
 - Consistent header: the System menu gear is now a round pill, the same size and height as the badges and friends pills, with the same hover; it is no longer offset from them.
 - The player card (avatar, level, XP bar) and the badges pill now stay at the top of full-screen pages (System menu, My badges, help…), not only on the table screen.
 - "Typing": in messages between friends, groups and rooms, the badge of whoever is typing (avatar, nickname and three animated dots) appears under the last message, on the cabinet as on the phone.

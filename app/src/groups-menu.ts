@@ -69,7 +69,6 @@ export interface GroupsMenuHost {
   /** Lancer une table. */
   play(table: TableEntry): void;
   openProfile?(key: string, back: () => void): void;
-  openFriend?(key: string, back: () => void): void;
   /** Partage et réseau : là où se réactive le partage. */
   openSharing?(back: () => void): void;
   now?(): Date;
@@ -553,8 +552,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
 
   function openPlayer(key: string, back: () => void): void {
     if (key === myKey()) return;
-    if (isFriend(key) && host.openFriend) host.openFriend(key, back);
-    else host.openProfile?.(key, back);
+    host.openProfile?.(key, back);
   }
 
   // ---------- Écrire, réagir, supprimer, signaler ----------

@@ -71,7 +71,6 @@ export interface RoomsMenuHost {
   };
   net: SocialNet;
   openProfile(key: string, back: () => void): void;
-  openFriend(key: string, back: () => void): void;
   /** La table choisie dans la roue : la phrase « Quelqu'un sur … ? ». */
   currentTable(): TableEntry | undefined;
   /** Un téléphone est relié au menu : on y écrit. */
@@ -522,7 +521,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       }
       if (!self) {
         actions.push({ label: t('Répondre à {name}', { name: l.name }), detail: t('Votre ligne commencera par @{name}', { name: l.name }), icon: 'message', run: () => (net.rooms().rulesAt ? askText(room, `@${l.name} `, (text) => { const why = write(room, text); if (why) notice = { text: why, tone: 'warning' }; backToRoom(); }) : openRules(here)) });
-        actions.push(rel === 'friend' ? { label: t('Voir sa fiche'), icon: 'friend-list', run: () => host.openFriend(l.key, here) } : { label: t('Voir son profil public'), detail: t('Pays, badges, records et activité récente'), icon: 'account', run: () => host.openProfile(l.key, here) });
+        actions.push({ label: t('Voir son profil'), detail: rel === 'friend' ? t('Sa présence, sa bibliothèque, son activité récente') : t('Pays, badges, records et activité récente'), icon: 'account', run: () => host.openProfile(l.key, here) });
         if (rel === 'none') actions.push({ label: t('Envoyer une demande d’ami'), detail: t('Il la verra dans « Demandes d’amis »'), icon: 'friend-add', run: () => { net.request({ key: l.key, name: l.name }); notice = { text: t('Demande envoyée à {name}', { name: l.name }), tone: 'ok' }; backToRoom(); } });
         actions.push(isIgnored
           ? { label: t('Ne plus ignorer {name}', { name: l.name }), icon: 'eye', run: () => { setIgnored(l.key, false); backToRoom(); } }

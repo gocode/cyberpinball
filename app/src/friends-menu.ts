@@ -4,8 +4,9 @@
 // chercher un nom, les bornes à proximité sur le réseau local), « Demandes d'amis » (reçues à
 // valider, envoyées en attente), « Mes badges », « Partage et réseau » (activé par défaut, nom,
 // réseau local, bibliothèque partagée, pare-feu de Windows, ce que voient les autres, joueurs
-// bloqués). La fiche d'un ami mène à sa bibliothèque (friend-library-menu.ts) et à la partie en
-// direct (live-game-menu.ts).
+// bloqués). Un joueur, ami ou non, s'ouvre sur son profil (profile-menu.ts), auquel `playerPart`
+// ajoute la relation : la bibliothèque d'un ami (friend-library-menu.ts), la partie en direct
+// (live-game-menu.ts), les demandes d'ami.
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec un réseau d'essai.
 
@@ -57,6 +58,7 @@ import { createGameHistoryMenu } from './game-history-menu';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
 import { askElevation } from './uac-confirm';
 import type { LiveGames } from './live-game';
+import type { PlayerContext, PlayerPart } from './profile-menu';
 import { createLiveMenu, type LiveMenu } from './live-game-menu';
 import type { SocialNet } from './social-net';
 import { onGesture } from './gesture-flash';
@@ -94,8 +96,8 @@ export interface FriendsMenuHost {
   redraw(): void;
   /** La messagerie (chat-menu.ts) : « Écrire » sur la fiche d'un ami, ouvre son fil. */
   chat?: { openThread(key: string, back: () => void): void; writeDetail(key: string): string };
-  /** Le profil public d'un joueur (profile-menu.ts) : son activité récente et ses « J'aime ». */
-  profile?: { open(key: string, back: () => void): void };
+  /** Le profil d'un joueur (profile-menu.ts) : le seul écran d'un joueur, ami ou non ; `playerPart` y ajoute la relation. */
+  profile: { open(key: string, back: () => void): void };
   /** Supprimer mon compte (account-delete.ts) ; absent : l'action n'est pas proposée (essais). */
   account?: {
     /** Le service des retours : mes propositions et mes votes. */
@@ -115,8 +117,10 @@ export interface FriendsMenu {
   openFirewall(back?: () => void): void;
   /** « Ajouter une table > Depuis un ami… » : les amis, puis la bibliothèque de celui qu'on choisit, ses tables absentes d'abord. */
   addFromFriend: { detail(): string; open(back: () => void): void };
-  /** La fiche d'un ami, son « Retour » vers `back` (Activité récente) ; sans lui, Mes amis. */
+  /** Le profil d'un ami, son « Retour » vers `back` (Activité récente) ; sans lui, Mes amis. */
   openFriend(key: string, back?: () => void): void;
+  /** Ce que la relation ajoute au profil d'un joueur (profile-menu.ts) : présence, bibliothèque, demandes d'ami. */
+  playerPart(key: string, name: string, ctx: PlayerContext): PlayerPart;
   /** Les demandes d'amis, leur « Retour » vers `back` ; sans lui, le menu système. */
   openRequests(back?: () => void): void;
   /** « Trouver un joueur » (l'annuaire). */
@@ -243,12 +247,9 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   // ---------- Mes amis ----------
 
   function openFriends(at?: number): void {
-    friendBack = undefined;
     host.library.openCustom(buildFriends, at);
   }
 
-  /** Retour de la fiche d'un ami ouverte d'ailleurs (Activité récente) ; sans lui, Mes amis. */
-  let friendBack: (() => void) | undefined;
   /** Retour des demandes d'amis ouvertes d'ailleurs ; sans lui, le menu système. */
   let requestsBack: (() => void) | undefined;
 
@@ -347,44 +348,79 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     };
   }
 
-  // ---------- Fiche d'un ami ----------
+  // ---------- Un joueur : ce que la relation ajoute à son profil ----------
 
+  /** Le profil d'un ami (profile-menu.ts), son « Retour » vers `back` ; sans lui, Mes amis. */
   function openFriend(key: string, back?: () => void): void {
-    if (back) friendBack = back;
-    host.library.openCustom(() => buildFriend(key), Number.MAX_SAFE_INTEGER);
+    openPlayer(key, back ?? (() => openFriends()));
   }
 
-  function buildFriend(key: string): Built {
-    const f = net.state().friends.find((x) => x.key === key);
-    const up = friendBack ?? (() => openFriends());
-    if (!f) return { heading: t('Mes amis'), icon: 'friend-list', sections: [{ rows: [{ text: t('N’est plus dans vos amis'), tone: 'info' }] }], actions: [backAction(up)], back: up };
-    const online = net.online(key);
-    const p = net.presenceOf(key);
-    const libraryState = host.content.library(key).state;
-    const events: Row[] = f.events.slice(0, 12).map((e) => ({ text: eventText(e, badgeLabel), detail: socialAgo(e.at, now()), icon: e.kind === 'badge' ? (badgeDefinition(e.badge!)?.icon ?? 'medal') : e.kind === 'record' ? 'star' : 'play', tone: e.kind === 'played' ? 'quiet' : 'ok' }));
-    return {
-      heading: f.name,
-      icon: 'friend-list',
-      avatar: avatar(f.key, f.name),
-      subheading: presenceText(p, online, f),
-      sections: [
-        ...flashSections(),
-        { rows: [{ text: online ? (p?.status === 'playing' ? t('En partie') : t('En ligne')) : t('Hors ligne'), detail: [t('Amis depuis le {date}', { date: new Date(f.since).toLocaleDateString() }), online ? linksText(key) : undefined].filter(Boolean).join(' · '), tone: online ? 'ok' : 'quiet' }, { text: t('Bibliothèque'), detail: libraryMenu.detail(key), icon: 'tables', tone: libraryState === 'ready' ? 'ok' : 'quiet' }, idRow(key)] },
-        { title: t('Derniers évènements'), rows: events.length ? events : [{ text: t('Rien encore : ses records, badges et parties s’afficheront ici'), tone: 'quiet' }] },
-      ],
-      actions: [
-        // Toujours là : grisée hors ligne ; en partie, l'ami la reçoit en notification sur sa table.
-        live.friendAction(key, () => openFriend(key)),
-        // La messagerie : même hors ligne, le message partira à son retour.
-        ...(host.chat ? [{ label: t('Écrire'), detail: host.chat.writeDetail(key), icon: 'message' as const, run: () => host.chat!.openThread(key, () => openFriend(key)) }] : []),
-        { label: t('Voir sa bibliothèque'), detail: libraryMenu.detail(key), icon: 'tables', run: () => libraryMenu.open(key, () => openFriend(key)) },
-        ...(host.profile ? [{ label: t('Voir son profil public'), detail: t('Ce que voient ceux qui ne sont pas ses amis, avec vos « J’aime »'), icon: 'star' as const, run: () => host.profile!.open(key, () => openFriend(key)) }] : []),
-        { label: t('Retirer de mes amis'), detail: t('Il ne verra plus votre présence, vous ne verrez plus la sienne'), icon: 'close', run: () => confirm(t('Retirer {name} de vos amis ?', { name: f.name }), t('Retirer'), () => { net.remove(key); flash = { text: t('{name} retiré de vos amis', { name: f.name }), tone: 'ok' }; openFriends(); }, () => openFriend(key)) },
-        { label: t('Bloquer'), detail: t('Plus de demande, plus de connexion avec sa borne'), icon: 'lock', run: () => confirmBlock(key, f.name, () => openFriend(key), () => openFriends()) },
-        backAction(up),
-      ],
-      back: up,
-    };
+  /** Le profil d'un joueur, ami ou non (profile-menu.ts) : le seul écran d'un joueur, d'où qu'on vienne. */
+  function openPlayer(key: string, back: () => void): void {
+    host.profile.open(key, back);
+  }
+
+  /**
+   * Ce que la relation ajoute au profil d'un joueur (17/11/2026 : la fiche d'ami et le profil public
+   * faisaient doublon). Un ami : sa présence, sa bibliothèque, ses évènements (parties jouées
+   * comprises), l'invitation, « Retirer de mes amis ». Un autre joueur : où on l'a vu, la demande
+   * d'ami (envoyer, annuler, accepter, refuser). Toujours : son identifiant.
+   */
+  function playerPart(key: string, plain: string, ctx: PlayerContext): PlayerPart {
+    const s = net.state();
+    const id = idRow(key);
+    const f = s.friends.find((x) => x.key === key);
+    if (f) {
+      const online = net.online(key);
+      const p = net.presenceOf(key);
+      const state = online ? (p?.status === 'playing' ? t('En partie') : t('En ligne')) : t('Hors ligne');
+      return {
+        rows: [
+          { text: presenceText(p, online, f), detail: [t('Amis depuis le {date}', { date: new Date(f.since).toLocaleDateString() }), online ? linksText(key) : undefined].filter(Boolean).join(' · '), icon: 'friend-list', tone: online ? 'ok' : 'quiet', badges: [state] },
+          { text: t('Bibliothèque'), detail: libraryMenu.detail(key), icon: 'tables', tone: host.content.library(key).state === 'ready' ? 'ok' : 'quiet' },
+        ],
+        id,
+        events: f.events,
+        actions: [
+          // Toujours là : grisée hors ligne ; en partie, l'ami la reçoit en notification sur sa table.
+          live.friendAction(key, () => ctx.here()),
+          { label: t('Voir sa bibliothèque'), detail: libraryMenu.detail(key), icon: 'tables', run: () => libraryMenu.open(key, () => ctx.here()) },
+        ],
+        tail: [
+          {
+            label: t('Retirer de mes amis'),
+            detail: t('Il ne verra plus votre présence, vous ne verrez plus la sienne'),
+            icon: 'close',
+            run: () => confirm(t('Retirer {name} de vos amis ?', { name: f.name }), t('Retirer'), () => { net.remove(key); ctx.flash({ text: t('{name} retiré de vos amis', { name: f.name }), tone: 'ok' }); ctx.here(); }, () => ctx.here()),
+          },
+        ],
+      };
+    }
+    const rel = relationOf(s, key);
+    const rows: Row[] = [];
+    const actions: Action[] = [];
+    if (rel === 'self') return { rows, id, actions };
+    const entry = s.directory.find((d) => d.profile.key === key);
+    const nearby = nearbyPlayers(s, now()).some((d) => d.profile.key === key);
+    if (entry) rows.push({ text: nearby ? t('Sur votre réseau local') : t('Vu {ago}', { ago: socialAgo(entry.seen, now()) }), tone: nearby ? 'ok' : 'quiet', icon: nearby ? 'network' : 'clock' });
+    if (rel === 'none') actions.push({ label: t('Envoyer une demande d’ami'), detail: t('Il la verra dans « Demandes d’amis » et pourra l’accepter'), icon: 'friend-add', tone: 'ok', run: () => { net.request({ key, name: plain }); ctx.flash({ text: t('Demande envoyée à {name}', { name: plain }), detail: net.online(key) ? t('Remise à sa borne') : t('Remise dès que sa borne sera en ligne'), tone: 'ok' }); ctx.here(); } });
+    const outgoing = s.outgoing.find((r) => r.key === key);
+    if (rel === 'outgoing' && outgoing) {
+      rows.push({ text: t('Demande envoyée le {date}', { date: new Date(outgoing.at).toLocaleDateString() }), detail: net.online(key) ? t('Remise à sa borne : il ne l’a pas encore acceptée') : t('Remise dès que sa borne sera en ligne'), tone: 'info', icon: 'friend-add' });
+      actions.push({ label: t('Annuler la demande'), icon: 'close', run: () => { net.cancel(key); ctx.flash({ text: t('Demande à {name} annulée', { name: plain }), tone: 'ok' }); ctx.here(); } });
+    }
+    if (rel === 'incoming') {
+      rows.push({ text: t('Demande d’amitié reçue'), tone: 'ok', icon: 'friend-request' });
+      actions.push(...requestActions(key, plain, () => ctx.here(), ctx.flash));
+    }
+    return { rows, id, actions };
+  }
+
+  function requestActions(key: string, plain: string, after: () => void, say: (row: Row) => void): Action[] {
+    return [
+      { label: t('Accepter'), detail: t('Partager votre présence avec ce joueur'), icon: 'check', tone: 'ok', run: () => { net.accept(key); say({ text: t('{name} est maintenant votre ami', { name: plain }), tone: 'ok' }); after(); } },
+      { label: t('Refuser'), detail: t('Nouvelle demande impossible pendant 30 jours'), icon: 'close', run: () => { net.decline(key); say({ text: t('Demande de {name} refusée', { name: plain }), tone: 'ok' }); after(); } },
+    ];
   }
 
   function confirm(question: string, yes: string, run: () => void, cancel: () => void): void {
@@ -392,14 +428,6 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       () => ({ heading: question, icon: 'alert', sections: [], actions: [{ label: yes, icon: 'check', tone: 'warning', run }, { label: t('Annuler'), icon: 'back', run: cancel }], back: cancel }),
       1,
     );
-  }
-
-  function confirmBlock(key: string, plain: string, cancel: () => void, after: () => void): void {
-    confirm(t('Bloquer {name} ?', { name: plain }), t('Bloquer'), () => {
-      net.block(key);
-      flash = { text: t('{name} bloqué : « Partage et réseau » le débloque', { name: plain }), tone: 'ok' };
-      after();
-    }, cancel);
   }
 
   // ---------- Trouver un joueur ----------
@@ -499,43 +527,6 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       actions,
       back: openFind,
     };
-  }
-
-  // ---------- Un joueur de l'annuaire ----------
-
-  function openPlayer(key: string, from: () => void): void {
-    host.library.openCustom(() => buildPlayer(key, from));
-  }
-
-  function buildPlayer(key: string, from: () => void): Built {
-    const s = net.state();
-    const entry = s.directory.find((d) => d.profile.key === key);
-    const request = s.incoming.find((r) => r.key === key) ?? s.outgoing.find((r) => r.key === key);
-    const plain = entry?.profile.name ?? request?.name ?? s.friends.find((f) => f.key === key)?.name ?? '?';
-    const rel = relationOf(s, key);
-    const nearby = nearbyPlayers(s, now()).some((d) => d.profile.key === key);
-    const rows: Row[] = [];
-    if (entry) rows.push({ text: nearby ? t('Sur votre réseau local') : t('Vu {ago}', { ago: socialAgo(entry.seen, now()) }), tone: nearby ? 'ok' : 'quiet', icon: nearby ? 'network' : 'clock' });
-    rows.push(idRow(key));
-    const actions: Action[] = [];
-    if (rel === 'none') actions.push({ label: t('Envoyer une demande d’ami'), detail: t('Il la verra dans « Demandes d’amis » et pourra l’accepter'), icon: 'friend-add', tone: 'ok', run: () => { net.request({ key, name: plain }); flash = { text: t('Demande envoyée à {name}', { name: plain }), detail: net.online(key) ? t('Remise à sa borne') : t('Remise dès que sa borne sera en ligne'), tone: 'ok' }; from(); } });
-    if (rel === 'outgoing') {
-      rows.push({ text: t('Demande envoyée le {date}', { date: new Date(request!.at).toLocaleDateString() }), detail: net.online(key) ? t('Remise à sa borne : il ne l’a pas encore acceptée') : t('Remise dès que sa borne sera en ligne'), tone: 'info' });
-      actions.push({ label: t('Annuler la demande'), icon: 'close', run: () => { net.cancel(key); flash = { text: t('Demande à {name} annulée', { name: plain }), tone: 'ok' }; from(); } });
-    }
-    if (rel === 'incoming') actions.push(...requestActions(key, plain, from));
-    if (rel === 'friend') actions.push({ label: t('Voir sa fiche'), icon: 'friend-list', run: () => openFriend(key) });
-    if (host.profile && rel !== 'self') actions.unshift({ label: t('Voir son profil public'), detail: t('Pays, badges, records et activité récente, avec vos « J’aime »'), icon: 'star', run: () => host.profile!.open(key, () => openPlayer(key, from)) });
-    if (rel !== 'self') actions.push({ label: t('Bloquer'), detail: t('Plus de demande, plus de connexion avec sa borne'), icon: 'lock', run: () => confirmBlock(key, plain, () => openPlayer(key, from), from) });
-    actions.push(backAction(from));
-    return { heading: plain, icon: rel === 'incoming' ? 'friend-request' : 'friend-add', avatar: avatar(key, plain), subheading: rel === 'incoming' ? t('Demande d’amitié reçue') : relationBadge(rel)[0], sections: rows.length ? [{ rows }] : [], actions, back: from };
-  }
-
-  function requestActions(key: string, plain: string, after: () => void): Action[] {
-    return [
-      { label: t('Accepter'), detail: t('Partager votre présence avec ce joueur'), icon: 'check', tone: 'ok', run: () => { net.accept(key); flash = { text: t('{name} est maintenant votre ami', { name: plain }), tone: 'ok' }; after(); } },
-      { label: t('Refuser'), detail: t('Nouvelle demande impossible pendant 30 jours'), icon: 'close', run: () => { net.decline(key); flash = { text: t('Demande de {name} refusée', { name: plain }), tone: 'ok' }; after(); } },
-    ];
   }
 
   // ---------- Demandes d'amis ----------
@@ -986,6 +977,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     openFirewall,
     addFromFriend: { detail: addFromFriendDetail, open: (back) => openAddFromFriend(back) },
     openFriend,
+    playerPart,
     openRequests,
     openFind: () => openFind(),
     history: { has: (id) => host.games.history().some((g) => g.id === id), openGame: (id, back) => historyMenu.openGame(id, back) },

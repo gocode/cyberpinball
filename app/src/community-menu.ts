@@ -47,7 +47,6 @@ export interface CommunityMenuHost {
   /** Les tables de la borne : « tables en commun » avec les joueurs classés. */
   tables(): readonly TableEntry[];
   openProfile(key: string, back: () => void): void;
-  openFriend(key: string, back: () => void): void;
   /** Mes amis (friends-menu.ts) : leur état en une ligne (en ligne, demandes reçues) et la liste, « Retour » vers `back`. */
   friends?: { detail(): string; attention(): boolean; open(back: () => void): void };
   /** La messagerie (chat-menu.ts) : son état en une ligne et sa liste, « Retour » vers `back`. */
@@ -282,7 +281,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
         title: groupTitle(g),
         kind: 'players',
         rows: g.players.map((p) => {
-          const index = actions.push({ label: p.name, key: `player:${p.key}`, icon: p.friend ? 'friend-list' : 'account', run: () => (p.friend ? host.openFriend(p.key, here) : host.openProfile(p.key, here)) }) - 1;
+          const index = actions.push({ label: p.name, key: `player:${p.key}`, icon: p.friend ? 'friend-list' : 'account', run: () => host.openProfile(p.key, here) }) - 1;
           // Son drapeau devant le nom ; sans pays, le drapeau Cyber Pinball (13/11/2026).
           const flag = playerFlag(p.country, locale());
           // Le nom seul sur sa ligne (13/11/2026 : pas de badges les uns derrière les autres). En ligne :

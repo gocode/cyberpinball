@@ -1,7 +1,7 @@
 // Menu système > Activité récente (packages/core/src/activity.ts) : les notifications des derniers
 // jours, en entier, pour relire celles qu'on a manquées. Groupées par jour, les plus récentes en
 // haut ; chaque ligne dit le texte entier, l'heure, ce qui s'est répété, si elle n'est pas lue, et
-// dessous ce que fait Start (« ↩ Start : voir sa fiche »), ou pourquoi il ne fait plus rien
+// dessous ce que fait Start (« ↩ Start : voir son profil »), ou pourquoi il ne fait plus rien
 // (« ✕ Invitation expirée », la ligne grisée).
 //
 // Le journal se tient ici : chaque évènement des notifications (menu-notices.ts), une version
@@ -126,7 +126,7 @@ function timesText(e: ActivityEntry): string {
 /** Ce que Start fait sur une ligne, maintenant : l'ouvrir (`run`, et ce qu'il ouvre), ou pourquoi plus rien. */
 interface Reach {
   run?: () => void;
-  /** « Start : voir sa fiche ». */
+  /** « Start : voir son profil ». */
   label?: string;
   /** Pourquoi plus rien : « Invitation expirée ». */
   gone?: string;
@@ -190,11 +190,11 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
       case 'friend': {
         if (!host.friends.isFriend(act.key)) return { gone: t('N’est plus dans vos amis') };
         const status = host.friends.playing(act.key) ? t('En partie') : host.friends.online(act.key) ? t('En ligne') : t('Hors ligne');
-        return { run: () => host.friends.openFriend(act.key, back), label: t('voir sa fiche'), status };
+        return { run: () => host.friends.openFriend(act.key, back), label: t('voir son profil'), status };
       }
       case 'friend-request':
         if (host.friends.incoming(act.key)) return { run: () => host.friends.openRequests(back), label: t('répondre à la demande') };
-        if (host.friends.isFriend(act.key)) return { run: () => host.friends.openFriend(act.key, back), label: t('voir sa fiche'), status: t('Ami') };
+        if (host.friends.isFriend(act.key)) return { run: () => host.friends.openFriend(act.key, back), label: t('voir son profil'), status: t('Ami') };
         return { gone: t('Demande déjà traitée ou retirée') };
       case 'invite': {
         if (host.live.hasInvite(act.id)) return { run: () => host.live.openInvite(act.id, back), label: t('répondre à l’invitation') };

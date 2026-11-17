@@ -351,7 +351,7 @@ test('activité : l’écran, par jour, chaque action dite ou grisée avec sa ra
     [false, '↩', 'Start : ouvrir les téléchargements'],
     [false, '↩', 'Start : répondre à l’invitation'],
     [true, '✕', 'Invitation expirée'],
-    [false, '↩', 'Start : voir sa fiche'],
+    [false, '↩', 'Start : voir son profil'],
   ]);
   assert.ok(rows[4]!.badges!.includes('En ligne'), 'son état à côté de l’heure, séparé de l’action');
   for (const a of screen.actions.slice(0, 5)) a.run();

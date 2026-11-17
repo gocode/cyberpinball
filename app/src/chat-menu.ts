@@ -58,8 +58,8 @@ export interface ChatMenuHost {
   chat: ChatService;
   /** Touches de la bascule des zones (MagnaSave, F6) : dans le fil, l'ami précédent ou suivant. */
   zoneKeys?(): string[];
-  /** Fiche d'un ami et « Trouver un joueur » (friends-menu.ts). */
-  openFriend?(key: string, back: () => void): void;
+  /** Le profil d'un joueur (profile-menu.ts) et « Trouver un joueur » (friends-menu.ts). */
+  openProfile?(key: string, back: () => void): void;
   openFind?(): void;
   /** « Partage et réseau » (friends-menu.ts) : là où se réactive le partage. */
   openSharing?(): void;
@@ -393,7 +393,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
         ? { label: t('Réponse rapide…'), icon: 'star', tone: 'quiet', detail: t('Indisponible : {reason}', { reason: blocked }), run: () => undefined }
         : { label: t('Réponse rapide…'), icon: 'star', detail: t('Une phrase toute prête, d’un appui'), run: () => openReply(key) },
       { label: t('Options de la conversation'), icon: 'sliders', detail: c.muted ? t('Notifications coupées pour {name}', { name: plain }) : t('Couper ses notifications, effacer, bloquer'), run: () => openOptions(key) },
-      ...(host.openFriend && f ? [{ label: t('Voir sa fiche'), icon: 'friend-list' as IconName, run: () => host.openFriend!(key, () => openThread(key)) }] : []),
+      ...(host.openProfile && f ? [{ label: t('Voir son profil'), detail: t('Sa présence, sa bibliothèque, son activité récente'), icon: 'friend-list' as IconName, run: () => host.openProfile!(key, () => openThread(key)) }] : []),
       { label: t('Retour'), icon: 'back', run: up },
     );
     return {
