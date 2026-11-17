@@ -227,6 +227,8 @@ function renderLibrary(v) {
         const tail = row.avatar || parts ? main : li;
         // Téléchargement : sa barre sous le détail ; sans valeur (taille inconnue), une barre sans fin.
         if (row.progress) tail.append(rowProgress(row.progress));
+        // Badges d'un joueur (profil public) : leurs médailles dessinées (niveau.js), le nom dessous.
+        if (row.medals?.length) tail.append(rowMedals(row.medals));
         // À quoi sert un fichier : signe et mot, jamais la couleur seule.
         if (row.note) {
           const note = libEl('div', `lib-row-note tone-${row.note.tone}`);
@@ -1368,6 +1370,21 @@ function rowThumb(thumb, icon = 'music') {
  * valeur une bande qui n'avance pas, hachurée ; `tone` : la couleur de l'état (en cours, en
  * attente, en pause, fini). Le mot de l'état est dans la ligne : la couleur ne le dit jamais seule.
  */
+/** Rangée de médailles (Row.medals) : chaque badge dans sa forme et sa rareté, son nom dessous. */
+function rowMedals(medals) {
+  const strip = libEl('div', 'lib-medals');
+  for (const m of medals) {
+    const cell = libEl('div', 'lib-medal');
+    const art = libEl('span', 'lib-medal-art');
+    // Le dessin vient du registre des badges (niveau.js) ; sans lui, l'icône seule.
+    if (window.CyberLevels) art.innerHTML = CyberLevels.badgeSvg(m.icon, m.rarity);
+    else art.append(cyberIcon(m.icon));
+    cell.append(art, libEl('span', 'lib-medal-label', m.label));
+    strip.append(cell);
+  }
+  return strip;
+}
+
 function rowProgress(p) {
   // busy : une recherche en cours (Amis : « Recherche des amis… ») ; une bande qui va et vient.
   const bar = libEl('div', `lib-row-progress tone-${p.tone ?? 'info'}${typeof p.value === 'number' ? '' : p.busy ? ' busy' : ' unknown'}`);

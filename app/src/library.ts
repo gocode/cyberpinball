@@ -614,6 +614,8 @@ export interface Row {
   note?: { text: string; sign: string; tone: Tone };
   /** Barre d'un téléchargement sous la ligne (Téléchargements) : `value` de 0 à 1, absente si la taille est inconnue. */
   progress?: { value?: number; tone?: Tone; busy?: boolean };
+  /** Badges d'un joueur (profil public) : chacun dessiné dans sa forme et sa rareté (niveau.js), son nom dessous. */
+  medals?: { icon: IconName; rarity: string; label: string }[];
   /** Schéma de l'écran du DMD à droite de la ligne (« Écran du DMD ») : FullDMD ou DMD seul en bande. */
   figure?: 'fulldmd' | 'dmd';
   /** Schéma des manettes du casque à gauche (légende du menu du casque) : ces commandes en vert ; vide, une case vide. */

@@ -9,6 +9,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- **Public profile**: at the top, the player's level and its bar; their badges as medals, rarest first; then their country, number of friends, records, public groups and activity. A player whose cabinet does not have this version yet: "Level not known yet".
+- Table received from a friend: its ROM is offered even when it is only in the friend's ROM library (found through PinMAME's shared folder); it used to arrive missing.
+- A friend's ROM comes with their table's aliases (`pinmame\alias.txt`): a ROM loaded under another name starts on your side too.
+- The parts screen of a friend's table warns when their cabinet does not offer the ROM the table asks for, before anything is received.
+- Log: a download's title and a notification's subject are written in plain text, no more "[object Object]".
 - Playing a table from the Library, a group or a game with friends while the wheel showed a medallion (Community, Jukebox, Collections): the loading screen now shows the table's name, and the wheel returns to it after the game.
 - The French name of “Feedback and ideas” now says that problems can be reported there too, not only ideas.
 - Pinball FX3 ("Pinball FX Classic" on Steam) in beta: System menu > Tables > Add a table > "Pinball FX3 tables" lists the tables installed with the game; you choose the ones you own, with their media, as for Pinball FX.

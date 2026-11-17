@@ -202,4 +202,11 @@ export const messages: Record<string, string> = {
   // Groupes publics d'un joueur, sur son profil
   'table de la semaine : {table}': 'table of the week: {table}',
   'vous en êtes': 'you are a member',
+  // En-tête du profil public : niveau et badges
+  'Niveau pas encore connu': 'Level not known yet',
+  'Sa borne n’a pas encore la version qui donne le niveau': 'Their cabinet does not have the version that shares the level yet',
+  'Plus haut que ce que permet son ancienneté sur le réseau : pas montré': 'Higher than their time on the network allows: not shown',
+  '{n} badges sur {total}': '{n} badges out of {total}',
+  'Les {n} plus rares': 'The {n} rarest',
+  'Aucun badge pour l’instant': 'No badges yet',
 };

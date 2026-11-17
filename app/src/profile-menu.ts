@@ -10,7 +10,9 @@
 
 import {
   avatarView,
+  badgeDefinition,
   badgeLabel,
+  BADGES,
   countryName,
   eventText,
   levelOf,
@@ -81,6 +83,36 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
 
   const eventIcon = (e: PublicEvent): IconName => (e.kind === 'badge' ? 'medal' : 'trophy');
 
+  /**
+   * L'en-tête du profil, d'après la maquette « Niveaux et badges » : le niveau avec sa barre (son palier,
+   * XP du niveau), puis ses badges en médailles (les plus rares d'abord). Une carte d'avant les niveaux
+   * n'a pas de niveau : la ligne le dit, sa borne n'est pas encore à jour.
+   */
+  function levelSections(key: string, card: PublicCard, trusted: boolean): Section[] {
+    const out: Section[] = [];
+    if (card.xp === undefined) out.push({ rows: [{ icon: 'gauge', text: t('Niveau pas encore connu'), detail: t('Sa borne n’a pas encore la version qui donne le niveau'), tone: 'quiet' }] });
+    else {
+      const v = levelOf(card.xp);
+      const level = trusted ? v.level : levelOfCard(key, card);
+      if (level === '?') out.push({ rows: [{ icon: 'gauge', text: t('Niveau ?'), detail: t('Plus haut que ce que permet son ancienneté sur le réseau : pas montré'), tone: 'quiet' }] });
+      else out.push({ rows: [{ icon: 'gauge', text: t('{tier} · niveau {level}', { tier: tierLabel(v.tier), level: v.level }), detail: t('{into} / {need} XP', { into: v.into.toLocaleString(), need: v.need.toLocaleString() }), progress: { value: v.progress, tone: 'ok' } }] });
+    }
+    const rank = { legendary: 0, epic: 1, rare: 2, common: 3 } as const;
+    const medals = card.badges
+      .map((id) => badgeDefinition(id))
+      .filter((b): b is NonNullable<typeof b> => !!b)
+      .sort((a, b) => rank[a.rarity] - rank[b.rarity])
+      .slice(0, 12)
+      .map((b) => ({ icon: b.icon, rarity: b.rarity, label: b.label }));
+    out.push({
+      title: t('Badges'),
+      rows: medals.length
+        ? [{ text: t('{n} badges sur {total}', { n: card.badges.length, total: BADGES.length }), ...(card.badges.length > medals.length ? { detail: t('Les {n} plus rares', { n: medals.length }) } : {}), medals }]
+        : [{ text: t('Aucun badge pour l’instant'), tone: 'quiet' }],
+    });
+    return out;
+  }
+
   /** Ses groupes publics : une ligne par groupe, Start l'ouvre. Rien quand il n'en a aucun de connu. */
   function groupsSection(key: string, actions: Action[], here: (at: number) => void): Section[] {
     const list = host.groups?.of(key) ?? [];
@@ -110,11 +142,13 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     const facts: string[] = [];
     if (card?.country) facts.push(countryName(card.country, locale()));
     if (card?.friends !== undefined) facts.push(tn(card.friends, '{n} ami', '{n} amis'));
-    if (card) facts.push(tn(card.badges.length, '{n} badge', '{n} badges'), tn(card.records, '{n} record publié', '{n} records publiés'));
+    if (card) facts.push(tn(card.records, '{n} record publié', '{n} records publiés'));
     if (net.activityHidden(key)) sections.push({ rows: [{ text: t('Activité masquée sur cette borne'), detail: t('Ses évènements et ses « J’aime » ne s’affichent plus ici'), tone: 'quiet', icon: 'eye' }] });
     else if (!card) sections.push({ rows: [{ text: t('Profil public pas encore reçu'), detail: t('Il arrive quand sa borne, ou une borne qui l’a vu, est reliée à la vôtre'), tone: 'info', icon: 'clock' }] });
     else {
-      sections.push({ rows: [{ text: facts.join(' · '), detail: seen ? t('Profil actualisé {ago}', { ago: socialAgo(seen, now()) }) : undefined, icon: 'medal' }] });
+      sections.push(...levelSections(key, card, false));
+      sections.push({ rows: [{ text: facts.join(' · '), detail: seen ? t('Profil actualisé {ago}', { ago: socialAgo(seen, now()) }) : undefined, icon: 'friends' }] });
+      sections.push(...groupsSection(key, actions, here));
       const rows: Row[] = card.events.map((e) => {
         const liked = net.likedByMe(key, e.id);
         const index = actions.push({ label: eventText(e, badgeLabel), key: `like:${e.id}`, icon: liked ? 'star-filled' : 'star', run: () => { net.like(key, e.id, !liked); here(index); } }) - 1;
@@ -122,7 +156,6 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       });
       sections.push({ title: t('Activité récente · {n} derniers jours', { n: 30 }), rows: rows.length ? rows : [{ text: t('Ni record ni badge ces derniers jours'), tone: 'quiet' }] });
     }
-    sections.push(...groupsSection(key, actions, here));
     if (!friend) sections.push({ rows: [{ text: t('Table en cours, parties jouées, bibliothèque : réservées à ses amis'), tone: 'quiet', icon: 'lock' }] });
     // Actions : devenir ami, écrire (grisé pour un non-ami, avec sa raison), masquer, bloquer.
     const relation = net.state().outgoing.some((r) => r.key === key) ? 'outgoing' : net.state().incoming.some((r) => r.key === key) ? 'incoming' : friend ? 'friend' : 'none';
@@ -164,9 +197,10 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     if (!s.enabled) sections.push({ rows: [{ text: t('Partage désactivé : personne ne vous voit, vous ne voyez personne'), detail: t('Partage et réseau : « Activer le partage »'), tone: 'warning', badges: [t('Désactivé')] }] });
     else if (!card) sections.push({ rows: [{ text: t('Profil public désactivé'), detail: t('Les autres joueurs ne voient que votre pseudo dans l’annuaire, et vos scores s’ils sont publiés'), tone: 'warning', badges: [t('Désactivé')] }] });
     else {
-      const mine = card.xp !== undefined ? levelOf(card.xp) : undefined;
-      const facts = [mine ? t('{tier} · niveau {level}', { tier: tierLabel(mine.tier), level: mine.level }) : undefined, card.country ? countryName(card.country, locale()) : undefined, card.friends !== undefined ? tn(card.friends, '{n} ami', '{n} amis') : undefined, tn(card.badges.length, '{n} badge', '{n} badges'), tn(card.records, '{n} record publié', '{n} records publiés')].filter(Boolean).join(' · ');
+      const facts = [card.country ? countryName(card.country, locale()) : undefined, card.friends !== undefined ? tn(card.friends, '{n} ami', '{n} amis') : undefined, tn(card.records, '{n} record publié', '{n} records publiés')].filter(Boolean).join(' · ');
       sections.push({ rows: [{ text: t('Ce que voient les joueurs qui ne sont pas vos amis'), detail: facts, icon: 'eye' }] });
+      sections.push(...levelSections(me(), card, true));
+      sections.push(...groupsSection(me(), actions, (at) => openMine(undefined, at)));
       const rows: Row[] = card.events.map((e) => {
         const n = card.likes[e.id] ?? 0;
         const index = actions.push({ label: eventText(e, badgeLabel), key: `mine:${e.id}`, icon: eventIcon(e), ...(n ? {} : { tone: 'quiet' as const }), run: () => (n ? openLikers(e, () => openMine(undefined, index)) : undefined) }) - 1;
@@ -174,7 +208,6 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       });
       sections.push({ title: t('Votre activité récente'), rows: rows.length ? rows : [{ text: t('Ni record ni badge ces derniers jours'), tone: 'quiet' }] });
     }
-    sections.push(...groupsSection(me(), actions, (at) => openMine(undefined, at)));
     actions.push(
       on
         ? { label: t('Désactiver mon profil public'), icon: 'eye', detail: t('Les autres ne verront plus que votre pseudo dans l’annuaire'), run: () => { net.setPublicProfile(false); flash = { text: t('Profil public désactivé'), tone: 'ok' }; openMine(undefined, Number.MAX_SAFE_INTEGER); } }

@@ -1561,6 +1561,41 @@ body.mouse .media-card[data-act]:hover {
  * vert ; en attente de la source ou en pause : ambre ; échec : rouge. Taille inconnue : hachures
  * fixes (rien ne bouge sans geste, sauf ce qui est reçu).
  */
+/* Badges d'un joueur (profil public) : une rangée de médailles, leur nom dessous, sur toute la largeur. */
+.lib-medals {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11cqmin, 1fr));
+  gap: 1.4cqmin;
+  margin-top: 1.2cqmin;
+}
+
+.lib-medal {
+  display: grid;
+  justify-items: center;
+  gap: 0.6cqmin;
+  text-align: center;
+  min-width: 0;
+}
+
+.lib-medal-art {
+  display: block;
+  width: 9cqmin;
+  height: 9cqmin;
+}
+
+.lib-medal-art svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.lib-medal-label {
+  font-size: 1.86cqmin;
+  line-height: 1.2;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
 .lib-row-progress {
   height: 0.74cqmin;
   margin: 0.8cqmin 0 0.2cqmin;

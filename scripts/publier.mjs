@@ -6,6 +6,7 @@
 //                                            de changements/ rassemblées dans les CHANGELOG, commit
 //                                            « Version … » fait ici, puis publication
 //   npm run publier -- --suivante <correctif|mineure|majeure|essai> -> de même, pour une autre sorte de version
+//                                            (version finale : manuels révisés d'abord, scripts/manuels-a-reviser.mjs)
 //   npm run publier                       -> release GitHub v<version> de package.json
 //   npm run publier -- --brouillon        -> release laissée en brouillon (invisible des bornes)
 //   npm run publier -- --sans-fabrication -> reprend release\ tel qu'il est
@@ -57,6 +58,7 @@ import { describeRepository } from './decrire-github.mjs';
 import { githubToken, missingTokenMessage } from './jeton-github.mjs';
 import { snapshotAndPush } from './envoyer-github.mjs';
 import { DIRECT_DOWNLOADS, directDownloadProblems } from './telechargement-direct.mjs';
+import { toReview } from './manuels-a-reviser.mjs';
 import { bulletPoints, changelogNotes, changelogSections } from './traductions.mjs';
 import { FRAGMENTS_DIR, applyVersion, foldFragments, nextVersion, notesVersion } from './version-suivante.mjs';
 
@@ -81,6 +83,28 @@ function step(text) {
 function fail(message) {
   console.error(`\nPublication arrêtée : ${message}`);
   process.exit(1);
+}
+
+// Manuels : révisés d'un bloc avant chaque version finale, jamais pendant les préversions
+// (scripts/manuels-a-reviser.mjs). Une version finale part avec des manuels à jour, sauf
+// --manuels-non-revises, demandé expressément.
+if (bump && bump !== 'essai' && !argv.includes('--manuels-non-revises')) {
+  const { section, remaining } = toReview(repo);
+  if (remaining.length) {
+    fail(`${remaining.length} nouveauté(s)${section ? ` de la ${section}` : ''} ne sont pas encore dans les manuels :\n  - ${remaining.join('\n  - ')}\nRévisez docs/manuel/, docs/manual/ et les tests manuels (FR et EN), puis node scripts/manuels-a-reviser.mjs --fait et commit. Pour publier sans : --manuels-non-revises.`);
+  }
+}
+
+// Le verrou de fabrication (scripts/paquet-application.mjs), pris avant toute écriture et tenu
+// jusqu'à la fin : une seconde publication lancée dans ce dossier s'arrête ici, sans compiler, sans
+// lire les étiquettes, sans toucher à package.json, aux CHANGELOG, à changements/ ni faire de commit
+// (le 17/11/2026, deux publications simultanées ont fait chacune un commit « Version 0.1.14-essai.35 »,
+// la seconde n'étant arrêtée qu'à la fabrication). Il protège aussi release\ entre la fabrication et
+// l'envoi. Un verrou laissé par un processus disparu est repris.
+try {
+  lockBuild(release);
+} catch (error) {
+  fail(error.message);
 }
 
 step('Compilation TypeScript');
@@ -217,13 +241,7 @@ if (!local) {
   }
 }
 
-// Le verrou de fabrication tenu jusqu'à la fin : aucune autre fabrication ne refait release\ entre la
-// fabrication et l'envoi (scripts/paquet-application.mjs).
-try {
-  lockBuild(release);
-} catch (error) {
-  fail(error.message);
-}
+// Le verrou, pris au début, est toujours tenu : fabriquer.mjs le reconnaît par CYBERPINBALL_FABRICATION_PARENT.
 if (!argv.includes('--sans-fabrication')) {
   step(rapid ? 'Fabrication de l’application seule (sans electron-builder ni installeurs)' : 'Fabrication des installeurs');
   const args = [path.join(repo, 'scripts', 'fabriquer.mjs'), ...(rapid ? ['--application'] : ['--installeur', ...(argv.includes('--leger') ? ['--leger'] : [])])];
