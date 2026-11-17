@@ -2539,6 +2539,8 @@ function newsReach(target: NewsReach, back: () => void): { run?: () => void; gon
       const open = { home: () => communityMenu.openHome(back), instant: () => instantMenu.open(back), groups: () => groupsMenu.open(back) }[target.door];
       return { run: open };
     }
+    case 'level':
+      return { run: () => levelMenu.open(back) };
     case 'jukebox':
       return { run: () => openJukebox() };
     case 'sheet': {

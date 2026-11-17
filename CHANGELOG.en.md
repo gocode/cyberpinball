@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.15
 
+- What's new: levels have their line there, with a badge moment as the preview; "Try it" opens "My level". A cabinet that had already seen everything gets the red dot again for this new item.
 - My badges shows each badge's artwork, in its shape and rarity: an earned badge shines, with a glow in its colour and a passing gleam; a badge not yet earned stays grey and dim. The closest badges, in My level, show the same artwork.
 - A table brought in from another installation keeps the framing that had been set for it there: Cyber Pinball switches it to manual framing for that table alone, as long as the game still faces the right way on your cabinet.
 - A framing set for a table, in game or brought in, is no longer shown as a problem on its sheet; switching it back to automatic framing now lasts from one game to the next.

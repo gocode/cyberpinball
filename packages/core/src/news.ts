@@ -22,10 +22,11 @@ import type { SystemEntryId } from './systemmenu';
 
 export const NEWS_FILE = 'nouveautes.json';
 
-/** Où « Essayer » mène : une entrée du menu système, une porte de la Communauté, le Juke-box, une partie de la fiche de la table choisie. */
+/** Où « Essayer » mène : une entrée du menu système, une porte de la Communauté, « Mon niveau », le Juke-box, une partie de la fiche de la table choisie. */
 export type NewsReach =
   | { kind: 'system'; id: SystemEntryId }
   | { kind: 'community'; door: 'home' | 'instant' | 'groups' }
+  | { kind: 'level' }
   | { kind: 'jukebox' }
   | { kind: 'sheet'; part: 'credits' | 'scores' | 'rules' };
 
@@ -51,6 +52,23 @@ export interface NewsItem {
 
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
+  {
+    // Ajoutée après coup (17/11/2026) : les niveaux étaient sortis en préversion sans leur ligne.
+    id: 'niveaux',
+    date: '2026-11-17',
+    version: '0.1.14',
+    get title() { return t('Niveaux'); },
+    get detail() { return t('Vos parties, vos progrès, vos badges et la vie entre joueurs vous font monter de niveau.'); },
+    get more() {
+      return [
+        t('Chaque partie, chaque record battu, chaque classement de la semaine, chaque badge reçu et la vie entre joueurs rapportent des XP. Votre niveau monte et ne baisse jamais ; votre carte de joueur, en haut de l’écran des tables, le montre avec sa barre.'),
+        t('Un badge reçu a son moment au retour de la partie, avec son animation et sa musique, et le passage de niveau a ses rayons. « Mon niveau » dit ce qui rapporte des XP et quels badges sont les plus proches.'),
+      ];
+    },
+    get where() { return t('Communauté › Mon niveau'); },
+    reach: { kind: 'level' },
+    preview: true,
+  },
   {
     id: 'parties-instantanees',
     date: '2026-11-17',
