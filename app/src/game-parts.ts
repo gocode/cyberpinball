@@ -19,7 +19,6 @@ import {
   contentSummaryText,
   expectedPackNames,
   formatDay,
-  formatNumber,
   formatSize,
   GAME_PARTS,
   installedParts,
@@ -433,7 +432,7 @@ export function createGameParts(ctx: GamePartsContext) {
           title: o.hit.title,
           code: mediaSite(o.hit.site).name,
           flag: o.other ? { label: t('Autre jeu'), tone: 'warning' } : undefined,
-          popularity: o.hit.downloads ? tn(o.hit.downloads, '{n} téléchargement', '{n} téléchargements', { n: formatNumber(o.hit.downloads) }) : undefined,
+          downloads: o.hit.downloads || undefined,
           facts: [o.hit.category?.label, o.hit.author ? t('par {author}', { author: o.hit.author }) : undefined, o.hit.date ? formatDay(Date.parse(o.hit.date)) : undefined].filter(Boolean).join(' · '),
           extra: mediaSite(o.hit.site).wait ? [t('≈ {n} s d’attente imposée par le site', { n: mediaSite(o.hit.site).wait })] : undefined,
           tags: known?.features?.length ? known.features : undefined,
@@ -459,7 +458,7 @@ export function createGameParts(ctx: GamePartsContext) {
     // Toujours : chercher soi-même sur le web, puis le reste.
     actions.push(ctx.catalog.webAction('parts.part', { query: partWebQuery(titleOf(table), part), target: target(table, kind) }, after));
     for (const site of MEDIA_SITES) {
-      if (p?.sites[site.id]?.state === 'login' && ctx.sites) actions.push({ label: t('Se connecter à {site}…', { site: site.name }), detail: t('Dans la fenêtre de Cyber Pinball ; votre mot de passe reste au site'), run: () => ctx.sites!.signIn(site.id) });
+      if (p?.sites[site.id]?.state === 'login' && ctx.sites) actions.push({ label: t('Se connecter à {site}…', { site: site.name }), detail: t('Le site réserve sa recherche aux membres ; votre mot de passe reste au site'), run: () => ctx.sites!.signIn(site.id) });
     }
     if (kind) actions.push({ label: t('Tous les fichiers téléchargés…'), detail: t('Ceux qui ne conviennent pas compris'), run: () => openCandidates(table, kind, from) });
     if (ctx.pick) actions.push({ label: t('Chercher un fichier ou un dossier…'), detail: PART_FOLDERS.has(part) ? t('Un fichier, ou tout un dossier (« Prendre ce dossier entier ») : Téléchargements, clé USB, disques, une autre installation') : t('Téléchargements de Cyber Pinball, clé USB, disques ; un dossier aussi'), run: () => void pickFile(table, part, from) });
@@ -471,6 +470,9 @@ export function createGameParts(ctx: GamePartsContext) {
     if (here && part !== 'table') actions.push({ label: t('Retirer de la table'), detail: t('Corbeille de Cyber Pinball'), tone: 'error', run: () => confirmRemove(table, part, from) });
     actions.push({ label: t('Retour : parties du jeu'), run: back });
 
+    // Avant les tuiles : ce qui concerne cette partie de la table (présente, reçue, attendue), puis
+    // une source seulement quand il y a quelque chose à en dire (17/11/2026 : avant, une ligne par
+    // source, « VPS », Téléchargements, VPForums, VPUniverse, Web, passait avant le premier résultat).
     const rows: Row[] = [];
     if (here) rows.push({ text: t('Dans la table'), detail: [here.entries.map((e) => (e.dir ? `${e.rel}${path.sep}` : e.rel)).join(' · '), formatSize(here.size)].join(' · '), tone: 'ok' });
     if (item?.received) rows.push({ text: t('Reçu, à installer'), detail: t('{file} · le {date}', { file: path.basename(item.received.file), date: formatDay(Date.parse(item.received.at)) }), tone: 'info' });
@@ -479,10 +481,15 @@ export function createGameParts(ctx: GamePartsContext) {
       rows.push({ text: t('Téléchargement en cours'), detail: formatTransfer(moving, true), tone: 'ok', progress: ctx.catalog.transferBar(moving) });
     } else if (item) rows.push({ text: t('Attendu'), detail: t('{label} · {site}', { label: item.label, site: linkHost(item.page).label }), tone: 'warning' });
     rows.push(...sourceRows(part, p));
+    const lead = cards.length
+      ? `${tn(cards.length, '{n} proposition', '{n} propositions')} · ${t('Start ouvre sa page dans « Récupérer » ; le fichier reçu est rangé pour cette table.')}`
+      : searchingSites(part, p)
+        ? t('Recherche en cours…')
+        : t('Aucune proposition pour l’instant : « Chercher sur le web… » pour la trouver vous-même.');
     return {
       heading: partLabel(part),
       subheading: [table.title, here ? t('présent') : item?.received ? t('reçu, à installer') : item ? t('attendu') : t('absent')].join(' · '),
-      lead: `${PART_LEADS[part]()} ${cards.length ? t('Start sur une proposition : sa page s’ouvre dans « Récupérer » (un fichier téléchargé ouvre le plan) ; le fichier reçu est rangé pour cette table.') : t('Aucune proposition pour l’instant : « Chercher sur le web… » pour la trouver vous-même.')}`,
+      lead: `${PART_LEADS[part]()} ${lead}`,
       sections: [...flashSections(), { rows }],
       actions,
       back,
@@ -490,37 +497,30 @@ export function createGameParts(ctx: GamePartsContext) {
     };
   }
 
-  /** Une ligne par source : ce qu'elle a donné, ou qu'elle cherche encore. */
+  /** Une source encore en recherche : le chapeau le dit plutôt que « aucune proposition ». */
+  function searchingSites(part: GamePart, p: Proposals | undefined): boolean {
+    const sources = partSources(part);
+    if (sources.includes('downloads') && p?.downloads === undefined) return true;
+    return Boolean(ctx.sites) && MEDIA_SITES.some((site) => sources.includes(site.id) && (!p?.sites[site.id] || p.sites[site.id]!.state === 'searching' || p.sites[site.id]!.state === 'waiting'));
+  }
+
+  /**
+   * Les sources, seulement quand il y a quelque chose à en dire : un site qui cherche encore,
+   * qui fait attendre ou n'a pas répondu, ou le jeu à choisir. Ce qu'elles ont trouvé se voit
+   * aux tuiles ; une connexion à faire est une ligne « Se connecter à … ».
+   */
   function sourceRows(part: GamePart, p: Proposals | undefined): Row[] {
     const rows: Row[] = [];
     const sources = partSources(part);
-    if (sources.includes('vps')) {
-      const n = webFiles(part).length;
-      rows.push({ text: 'VPS', detail: game() ? (n ? tn(n, '{n} fichier connu pour ce jeu', '{n} fichiers connus pour ce jeu') : t('aucun fichier connu pour ce jeu')) : t('jeu à choisir (« Jeu VPS », sur l’écran des parties) ; les sites cherchent par le titre'), tone: n ? 'ok' : 'quiet' });
-    }
-    if (sources.includes('downloads')) {
-      const n = p?.downloads?.length;
-      rows.push({ text: t('Téléchargements'), detail: n === undefined ? t('recherche…') : n ? tn(n, '{n} fichier qui convient', '{n} fichiers qui conviennent') : t('rien qui convienne'), tone: n ? 'ok' : 'quiet' });
-    }
+    if (sources.includes('vps') && !game()) rows.push({ text: t('Jeu à choisir'), detail: t('Sur l’écran des parties ; d’ici là, les sites cherchent par le titre.'), tone: 'quiet' });
+    if (!ctx.sites) return rows;
     for (const site of MEDIA_SITES) {
       if (!sources.includes(site.id)) continue;
       const s = p?.sites[site.id];
-      const detail = !ctx.sites
-        ? t('indisponible ici')
-        : !s || s.state === 'searching'
-          ? t('recherche…')
-          : s.state === 'waiting'
-            ? t('le site impose d’attendre {n} s entre deux recherches : la recherche reprend ensuite', { n: s.seconds })
-          : s.state === 'login'
-            ? t('connectez-vous pour chercher (« Se connecter à {site}… »)', { site: site.name })
-            : s.state === 'failed'
-              ? t('le site n’a pas répondu ({reason}) : « Chercher sur le web… »', { reason: s.reason })
-              : s.offers.length
-                ? tn(s.offers.length, '{n} proposition', '{n} propositions')
-                : t('rien pour ce jeu');
-      rows.push({ text: site.name, detail, tone: s?.state === 'done' && s.offers.length ? 'ok' : s?.state === 'login' ? 'warning' : 'quiet' });
+      if (!s || s.state === 'searching') rows.push({ text: t('{site} : recherche…', { site: site.name }), tone: 'info' });
+      else if (s.state === 'waiting') rows.push({ text: t('{site} : nouvelle recherche dans {n} s', { site: site.name, n: s.seconds }), tone: 'info' });
+      else if (s.state === 'failed') rows.push({ text: t('{site} n’a pas répondu ({reason})', { site: site.name, reason: s.reason }), tone: 'warning' });
     }
-    rows.push({ text: t('Web'), detail: t('« Chercher sur le web… » : navigateur intégré, recherche préremplie'), tone: 'quiet' });
     return rows;
   }
 

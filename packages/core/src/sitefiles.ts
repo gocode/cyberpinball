@@ -202,6 +202,8 @@ export interface WebFileTile {
   /** Date retenue pour le tri (ms) : celle de la base VPS, sinon celle du site. */
   date?: number;
   downloads?: number;
+  /** Note du site (« 4,5/5 »), à côté du nombre de téléchargements que la tuile montre en icône. */
+  rating?: string;
   /** La fiche n'existe plus sur son site : le fichier en a sans doute été retiré. */
   gone?: boolean;
 }
@@ -263,7 +265,7 @@ export function webFileTile(kind: NeedKind, file: VpsTableFile, info: SiteFileSt
     [...(file.features ?? []).slice(0, 6), file.comment].filter(Boolean).join(' · '),
   ].filter(Boolean);
   const previews = [file.imgUrl, page?.thumb, page?.screenshot].filter((u, i, all): u is string => Boolean(u) && all.indexOf(u) === i);
-  return { title: fileTitle(kind, file), popularity, facts, detail, previews, date, downloads: page?.downloads, gone: info === 'gone' || undefined };
+  return { title: fileTitle(kind, file), popularity, facts, detail, previews, date, downloads: page?.downloads, rating: page?.rating ? ratingText(page.rating) : undefined, gone: info === 'gone' || undefined };
 }
 
 /** Ordre d'une liste de fichiers : celui de l'écran (conseillé), le plus téléchargé, le plus récent. */

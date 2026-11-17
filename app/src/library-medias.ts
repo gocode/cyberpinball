@@ -128,6 +128,8 @@ export interface MediaThumb {
   /** drawn : l'habillage que Cyber Pinball dessine quand le jeu n'a pas ce média (fallback.js). */
   kind: 'image' | 'video' | 'audio' | 'fallback' | 'drawn';
   url?: string;
+  /** Tuile qui n'est pas un fichier (« Chercher plus ») : l'icône à montrer à la place d'un aperçu. */
+  icon?: string;
   /** Rotation horaire vue du joueur (plateau et chargement), demi-tour compris. */
   rotation: Rotation;
   text?: string;
@@ -212,7 +214,12 @@ export interface MediaCard {
   transfer?: { value?: number; tone?: Tone; text?: string };
   /** Signe à part de l'état (« Autre jeu » : une proposition d'un autre jeu que la table). */
   flag?: { label: string; tone: Tone };
-  /** Popularité sur le site de la fiche (« 510 téléchargements »). */
+  /**
+   * Téléchargements sur le site de la fiche : le rendu les montre en icône (flèche vers le bas) et
+   * en chiffre, jamais en toutes lettres (17/11/2026 : « 412 télé… » coupé sur la tuile).
+   */
+  downloads?: number;
+  /** Popularité dite autrement que par les téléchargements (la note du site, « 4,5/5 »). */
   popularity?: string;
   /** Galerie : seconde ligne sous la popularité (date et site d'un fichier à choisir). */
   meta?: string;

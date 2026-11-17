@@ -43,10 +43,10 @@ export const MEDIA_CHOICE_SOURCE_LABELS: Record<MediaChoiceSource, string> = {
   },
   mediadb: 'VPinMediaDB',
   get vps() {
-    return t('Vignette VPS');
+    return t('Petite vignette');
   },
   get 'vps-music'() {
-    return t('Musique (base VPS, Dropbox)');
+    return t('Musique (Dropbox)');
   },
   get pup() {
     return t('PuP-Pack de la table');

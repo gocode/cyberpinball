@@ -1870,6 +1870,32 @@ body.mouse .media-card[data-act]:hover {
   color: var(--meta);
 }
 
+/* Tuile sans fichier (« Chercher plus ») : son icône au centre de la vignette, sur le fond des aperçus absents. */
+.media-thumb-icon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  /* Un tiers de la vignette, mais jamais écrasée par une tuile plate (Afficheur 4:1) : la hauteur compte aussi. */
+  width: min(34cqw, 60cqh);
+  height: min(34cqw, 60cqh);
+  color: var(--accent);
+}
+
+/* Téléchargements : la flèche vers le bas, puis le chiffre, sur la ligne du texte. */
+.media-downloads {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.media-pop-icon {
+  flex: none;
+  width: 1em;
+  height: 1em;
+}
+
 .media-detail {
   flex: none;
   display: flex;

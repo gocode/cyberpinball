@@ -45,7 +45,6 @@ import {
   mediaSite,
   mediaChoiceKey,
   pagesSignature,
-  siteHitSummary,
   siteMediaChoices,
   siteQuery,
   webHost,
@@ -534,9 +533,6 @@ export function createProposals(ctx: ProposalsContext) {
 
   const sourceName = (choice: MediaChoice) => (choice.source === 'mediadb' ? MEDIADB_NAME : MEDIA_CHOICE_SOURCE_LABELS[choice.source]);
 
-  /** Carte d'une fiche d'un site, pas encore reçue : vignette de l'auteur, état dans la file. */
-  /** « 510 téléchargements » : la popularité que le site donne pour sa fiche. */
-  const popularity = (hit: Pick<SiteHit, 'downloads'>) => (hit.downloads !== undefined ? tn(hit.downloads, '{n} téléchargement', '{n} téléchargements') : undefined);
 
   /** Proposition d'un autre jeu de la base VPS que celui de la table (même titre, autres auteurs, autre année). */
   function otherGame(st: State, table: TableEntry, choice: MediaChoice): MediaCard['flag'] {
@@ -559,7 +555,7 @@ export function createProposals(ctx: ProposalsContext) {
       thumb = { kind: 'image', url: mediaUrl(file), rotation: 0 };
     }
     const facts = [
-      hit.category?.label ?? (hit.vps ? t('lien de la base VPS') : undefined),
+      hit.category?.label,
       // Une vidéo s'anime d'office ; une image, seulement si la fiche le dit (wheel APNG).
       choice.kind === 'image' && hitAnimated(hit) ? t('animée') : undefined,
       hit.author ? t('par {author}', { author: hit.author }) : undefined,
@@ -584,23 +580,25 @@ export function createProposals(ctx: ProposalsContext) {
         if (pct !== undefined) progress = pct / 100;
         facts.push(ctx.sites!.progressText(job));
       } else if (job.state === 'unpacking') state = { label: t('Déballage…'), tone: 'ok' };
-      extra.push(job.state === 'waiting' ? t('Le site décompte lui-même ; le téléchargement part à la fin, sans rien à faire. Start : retirer de la file.') : t('Start : retirer de la file.'));
+      extra.push(job.state === 'waiting' ? t('Le téléchargement part seul à la fin du décompte. Start : retirer de la file.') : t('Start : retirer de la file.'));
     } else if (job?.state === 'failed') {
       state = { label: job.login ? t('Connexion nécessaire') : t('Échec'), tone: job.login ? 'warning' : 'error' };
       extra.push(job.login ? t('Start ouvre la page de connexion du site.') : t('{error}. Start ouvre la page du site, pour le faire vous-même.', { error: job.error ?? t('raison inconnue') }));
     } else if (account && !account.connected) {
       state = { label: t('Connexion nécessaire'), tone: 'warning' };
-      extra.push(site.wait ? t('Start ouvre la page de connexion du site ; ensuite, environ {n} s d’attente par fichier.', { n: site.wait }) : t('Start ouvre la page de connexion du site.'));
+      extra.push(t('Start ouvre la page de connexion du site.'));
     } else {
-      state = site.wait ? { label: t('≈ {n} s d’attente', { n: site.wait }), tone: 'info' } : { label: t('Sans attente'), tone: 'ok' };
+      // Seulement quand le site impose une attente : « sans attente » sur chaque tuile n'apprenait rien.
+      state = site.wait ? { label: t('≈ {n} s d’attente', { n: site.wait }), tone: 'info' } : undefined;
     }
-    if (pack) extra.push(t('Pack complet : les médias de tous les écrans ; reçus, les autres écrans les proposeront aussi.'));
-    else if (choice.kind === 'video') extra.push(t('Aperçu : image fixe déposée par l’auteur ; la vidéo arrive au téléchargement.'));
-    if (hit.vps) extra.push(t('Fiche rangée sous ce jeu par la base VPS : son titre n’a pas été cherché.'));
-    if (choice.site?.loose) extra.push(t('Recherche élargie : le titre a les mots cherchés, sans désigner sûrement l’un des jeux retenus.'));
+    if (pack) extra.push(t('Pack complet : reçu, il sert aussi aux autres écrans.'));
+    else if (choice.kind === 'video') extra.push(t('Aperçu : image fixe ; la vidéo arrive au téléchargement.'));
     const flag = otherGame(st, table, choice) ?? (choice.site?.loose ? { label: t('Titre approché'), tone: 'warning' as const } : undefined);
     const fiche = ctx.sites?.fiche(hit);
-    return { action, title: choice.label, code: site.name, state, flag, popularity: popularity({ downloads: hit.downloads ?? (typeof fiche === 'object' ? fiche.downloads : undefined) }), facts: facts.filter(Boolean).join(' · '), extra, thumb, progress };
+    const downloads = hit.downloads ?? (typeof fiche === 'object' ? fiche.downloads : undefined);
+    // Sur la tuile : le site, la popularité, puis la date de la fiche (sans popularité, la ligne de faits la dit déjà).
+    const meta = downloads !== undefined && hit.date ? formatDate(hit.date, { month: 'short', year: 'numeric' }) : undefined;
+    return { action, title: choice.label, code: site.name, state, flag, downloads, meta, facts: facts.filter(Boolean).join(' · '), extra, thumb, progress };
   }
 
   function cardFor(st: State, table: TableEntry, choice: MediaChoice, action: number): MediaCard {
@@ -616,40 +614,28 @@ export function createProposals(ctx: ProposalsContext) {
       facts = [choice.detail, d ? `${d.width} × ${d.height}` : undefined, size === undefined ? t('taille inconnue') : formatSize(size)].filter(Boolean).join(' · ');
     } else facts = ctx.facts(choice.file!);
     const extra: string[] = [];
-    if (current) extra.push(t('C’est le fichier que le front-end montre aujourd’hui : le reprendre ne changerait rien.'));
     // Même titre, autre table de la base VPS (The Matrix « Original 2026 » de VPW pour la table de 2023) : dit avant tout.
     const own = table.info.Info?.VPSId;
     if (lead && own && lead.game.id !== own) {
       const yours = [table.info.Info?.Manufacturer, table.info.Info?.Year].filter(Boolean).join(' ');
       extra.push(t('Autre jeu que votre table : {game}, même titre, autres auteurs ; la vôtre : {own}.', { game: vpsLabel(lead.game), own: yours ? `${table.title} (${yours})` : table.title }));
     }
-    if (lead) extra.push(t('Jeu retenu : {reasons}.', { reasons: lead.reasons.slice(0, 2).join(t(' ; ')) }));
-    if (choice.source === 'vps') extra.push(t('Basse définition : vignette de la base VPS, à défaut d’autre chose.'));
+    // Une ligne au plus sur ce que le fichier est : pas de jargon (identifiant, .info, base), pas de chemin interne.
+    if (choice.source === 'vps') extra.push(t('Petite vignette, à défaut d’autre chose.'));
     else if (choice.source === 'vps-music') {
-      extra.push(
-        choice.offer && st.dead.has(choice.offer.file.url)
-          ? t('Lien mort : Dropbox a renvoyé une page au lieu du fichier.')
-          : t('Lien de partage Dropbox donné par la base VPS ; la musique s’écoute dès que la carte est choisie.'),
-      );
-    } else if (choice.offer?.kind === 'video' && !current) extra.push(t('Aperçu : image du même jeu ; la vidéo arrive au téléchargement.'));
-    else if (choice.offer?.quality === '4k') extra.push(t('Aperçu : la même image en 1k ; le fichier 4k arrive au téléchargement.'));
-    if (choice.source === 'web') {
-      extra.push(t('Téléchargé dans la fenêtre « Récupérer » ; gardé dans les téléchargements, copié dans medias\\ à l’enregistrement.'));
-    } else if (choice.source === 'rom') {
-      extra.push(t('Enregistrée sur cette borne en faisant tourner la ROM de la table dans PinMAME, de Start au premier silence ; gardée dans le cache, copiée dans medias\\ à l’enregistrement.'));
-    } else if (choice.site?.received) {
+      if (choice.offer && st.dead.has(choice.offer.file.url)) extra.push(t('Lien mort : Dropbox a renvoyé une page au lieu du fichier.'));
+    } else if (choice.offer?.kind === 'video' && !current) extra.push(t('Aperçu : image fixe ; la vidéo arrive au téléchargement.'));
+    else if (choice.offer?.quality === '4k') extra.push(t('Aperçu en 1k ; le fichier 4k arrive au téléchargement.'));
+    if (choice.source === 'web') extra.push(t('Téléchargé par vous dans « Récupérer ».'));
+    else if (choice.source === 'rom') extra.push(t('Tirée de la ROM de la table, sur cette borne.'));
+    else if (choice.site?.received) {
       const hit = choice.site.hit;
       extra.push(hit.author ? t('De « {title} », par {author}.', { title: hit.title, author: hit.author }) : t('De « {title} ».', { title: hit.title }));
-      extra.push(t('Reçu du site, gardé dans les téléchargements ; copié dans medias\\ à l’enregistrement.'));
     } else if (!choice.offer) {
       const rel = path.relative(table.folder, choice.file!);
-      if (rel.startsWith('..') || path.isAbsolute(rel)) {
-        // Image extraite du .vpx ou du .directb2s, gardée dans le cache des médias : pas un fichier de la table.
-        extra.push(t('Extraite du {file} de la table, gardée dans le cache des médias ; copiée dans medias\\ à l’enregistrement.', { file: choice.source === 'b2s' ? '.directb2s' : '.vpx' }));
-      } else {
-        extra.push(t('Fichier : {file}', { file: rel }));
-        extra.push(t('Copié dans medias\\ ; l’original reste à sa place, la table en a besoin.'));
-      }
+      // Image extraite du .vpx ou du .directb2s, gardée dans le cache des médias : pas un fichier de la table.
+      if (rel.startsWith('..') || path.isAbsolute(rel)) extra.push(t('Extraite du {file} de la table.', { file: choice.source === 'b2s' ? '.directb2s' : '.vpx' }));
+      else extra.push(t('Fichier : {file}', { file: rel }));
     }
     return {
       action,
@@ -657,7 +643,7 @@ export function createProposals(ctx: ProposalsContext) {
       code: choice.site?.received ? t('Reçu de {site}', { site: sourceName(choice) }) : sourceName(choice),
       state: chosen ? { label: t('Choisi, à enregistrer'), tone: 'warning' } : current ? { label: t('Actuel'), tone: 'ok' } : choice.site?.received ? { label: t('Reçu'), tone: 'ok' } : undefined,
       flag: otherGame(st, table, choice),
-      popularity: choice.site ? popularity(choice.site.hit) : undefined,
+      downloads: choice.site?.hit.downloads,
       facts,
       extra,
       // Le fichier actuel se montre lui-même (la vidéo, pas l'image d'aperçu du site) : on voit que c'est le même.
@@ -684,6 +670,40 @@ export function createProposals(ctx: ProposalsContext) {
     // Afficheur que la borne ne montre pas (4:1 sur un écran 16:9) : passage direct à l'autre.
     const placement = ctx.placement(type);
     const partner: MediaType | undefined = type === 'DMD' ? 'FullDMD' : type === 'FullDMD' ? 'DMD' : undefined;
+    // Un site qui n'a pas pu chercher, VPinMediaDB injoignable : dit en peu de mots, là où l'on cherche plus.
+    const problems = [
+      ...MEDIA_SITES.flatMap((site) => {
+        const found = st.sites[site.id];
+        return found?.account.connected && found.problem ? [t('{site} : {problem}', { site: site.name, problem: found.problem })] : [];
+      }),
+      ...(st.problem ? [t('VPinMediaDB indisponible : {problem}', { problem: st.problem })] : []),
+    ];
+
+    /*
+     * « Chercher plus » : la dernière tuile de la galerie (17/11/2026), comme une page suivante.
+     * Start va chercher la suite (plus de pages sur les sites, les autres éditions du jeu, les titres
+     * approchés) ; les nouvelles propositions prennent place avant elle. Avant, c'était une action
+     * de l'écran, à part des résultats. Les filtres et les autres recherches restent des actions.
+     * Recherche déjà élargie : plus de tuile, l'action « Recherche simple » ramène aux premiers résultats.
+     */
+    if (!st.wide) {
+      cards.push({
+        action: actions.length,
+        title: t('Chercher plus'),
+        facts: t('Plus de pages sur les sites, les autres éditions du jeu, les titres approchés'),
+        extra: problems,
+        thumb: { kind: 'fallback', rotation: 0, icon: 'search' },
+      });
+      actions.push({
+        key: 'wide',
+        label: t('Chercher plus'),
+        detail: t('Plus de pages sur les sites, les autres éditions du jeu, les titres approchés'),
+        run: () => {
+          st.wide = true;
+          reopen(table, type, ctx.cursor());
+        },
+      });
+    }
     if (partner && !placement.shown && ctx.placement(partner).shown) {
       actions.push({
         label: t('Propositions : {label}', { label: mediaTypeInfo(partner).label }),
@@ -702,7 +722,7 @@ export function createProposals(ctx: ProposalsContext) {
       actions.push({
         key,
         label: key === 'next-type' ? t('Média suivant : {label}', { label }) : t('Média précédent : {label}', { label }),
-        detail: pending(table, other) ? t('Un choix en attente d’enregistrement') : t('Ses propositions ; vos choix restent dans le brouillon'),
+        detail: pending(table, other) ? t('Un choix en attente d’enregistrement') : t('Vos choix restent dans le brouillon'),
         run: () => open(table, other),
       });
     }
@@ -710,43 +730,30 @@ export function createProposals(ctx: ProposalsContext) {
       actions.push({
         key: 'sort',
         label: sort === 'popularity' ? t('Trier : popularité') : t('Trier : pertinence'),
-        detail: sort === 'popularity' ? t('Les plus téléchargées sur leur site d’abord ; puis : pertinence') : t('Le jeu le plus probable d’abord ; puis : popularité'),
+        detail: sort === 'popularity' ? t('Start : pertinence') : t('Start : popularité'),
         run: () => {
           sort = sort === 'popularity' ? 'relevance' : 'popularity';
           ctx.show(() => build(type), ctx.cursor());
         },
       });
     }
-    // Élargir, filtrer : la recherche des sites est refaite, le curseur reste sur l'action.
-    actions.push(
-      st.wide
-        ? {
-            key: 'wide',
-            label: t('Recherche élargie'),
-            detail: t('Jusqu’à {n} pages par site, tous les jeux reconnus, titres approchés ; Start : revenir à la recherche simple', { n: SITE_SEARCH_MORE_PAGES }),
-            tone: 'ok',
-            run: () => {
-              st.wide = false;
-              reopen(table, type, ctx.cursor());
-            },
-          }
-        : {
-            key: 'wide',
-            label: t('Chercher plus'),
-            detail: t('Plus de pages sur les sites, les autres éditions du jeu, les titres approchés'),
-            run: () => {
-              st.wide = true;
-              reopen(table, type, ctx.cursor());
-            },
-          },
-    );
+    if (st.wide) {
+      actions.push({
+        key: 'wide',
+        label: t('Recherche simple'),
+        detail: [t('Revenir aux premiers résultats'), ...problems].join(' · '),
+        run: () => {
+          st.wide = false;
+          reopen(table, type, ctx.cursor());
+        },
+      });
+    }
+    // Filtrer : la recherche des sites est refaite, le curseur reste sur l'action.
     if (ANIMATABLE_MEDIA_TYPES.includes(type)) {
       actions.push({
         key: 'animated',
         label: animatedOnly ? t('Animés seulement : oui') : t('Animés seulement : non'),
-        detail: animatedOnly
-          ? t('Vidéos et images animées (APNG, GIF) ; les sites cherchent dans leurs catégories animées. Start : tout montrer')
-          : t('Start : ne garder que les vidéos et les images animées (APNG, GIF)'),
+        detail: animatedOnly ? t('Vidéos et images animées (APNG, GIF). Start : tout montrer') : t('Start : ne garder que les vidéos et les images animées (APNG, GIF)'),
         tone: animatedOnly ? 'ok' : undefined,
         run: () => {
           animatedOnly = !animatedOnly;
@@ -775,13 +782,13 @@ export function createProposals(ctx: ProposalsContext) {
         run: () => ctx.save!.open(),
       });
     }
-    // Sites où se connecter : avant le reste, la recherche ou le téléchargement en dépend.
+    // Sites où se connecter : la recherche ou le téléchargement en dépend.
     for (const site of MEDIA_SITES) {
       const found = st.sites[site.id];
       if (!found || found.account.connected) continue;
       actions.push({
         label: t('Se connecter à {site}…', { site: site.name }),
-        detail: t('Dans la fenêtre de Cyber Pinball ; votre mot de passe reste au site'),
+        detail: found.login ? t('Le site réserve sa recherche aux membres ; votre mot de passe reste au site') : t('Pour télécharger ses fichiers ; votre mot de passe reste au site'),
         tone: found.login ? 'ok' : undefined,
         run: () => signIn(table, type, site.id),
       });
@@ -790,7 +797,7 @@ export function createProposals(ctx: ProposalsContext) {
     if (active.length) {
       actions.push({
         label: t('Arrêter la file'),
-        detail: t('Le fichier en cours s’arrête ; rien n’est gardé'),
+        detail: tn(active.length, '{n} fichier en cours ; rien n’est gardé', '{n} fichiers en cours ou en file ; rien n’est gardé'),
         run: () => {
           ctx.sites!.stopAll();
           st.notice = { text: t('File arrêtée. Rien n’a été gardé du fichier en cours.'), tone: 'info' };
@@ -819,45 +826,27 @@ export function createProposals(ctx: ProposalsContext) {
       { label: t('Chercher un autre titre…'), detail: t('Titre cherché : « {query} » · titre en anglais, initiales ou nom de ROM', { query: baseQuery(st, table) }), run: () => askTitle(table, type, () => ctx.show(() => build(type))) },
       { label: t('Retour : {label}', { label: info.label }), run: back },
     );
+
+    // Avant les tuiles, seulement ce qui vient d'arriver et ce qu'il faut savoir avant de choisir.
     const rows: Row[] = [];
     if (st.notice) rows.push({ text: st.notice.text, tone: st.notice.tone });
     if (!placement.shown && placement.note) rows.push({ text: t('Pas montré sur votre borne'), detail: placement.note, tone: 'warning' });
-    rows.push(...siteRows(st, type, choices));
-    if (st.problem) rows.push({ text: t('VPinMediaDB indisponible'), detail: t('{problem}. Restent les médias déjà sur la borne, et les vignettes VPS déjà reçues.', { problem: st.problem }), tone: 'warning' });
     // Ce que les filtres masquent : un écran vide ne doit pas passer pour une source vide.
     const hidden = allChoicesFor(st, type).length - choices.length;
-    const filters = [animatedFor(type) ? t('animés seulement') : undefined, st.extra ? t('mots « {words} »', { words: st.extra }) : undefined].filter(Boolean);
-    if (filters.length) {
-      rows.push({
-        text: t('Filtre : {filters}', { filters: filters.join(t(', ')) }),
-        detail: hidden ? tn(hidden, '{n} proposition masquée ; « Animés seulement » et « Mots ajoutés » la rendent.', '{n} propositions masquées ; « Animés seulement » et « Mots ajoutés » les rendent.') : t('Aucune proposition masquée.'),
-        tone: 'info',
-      });
-    }
     if (!choices.length) {
       rows.push({
         text: t('Aucune proposition pour ce média'),
-        detail: filters.length
-          ? t('Rien ne répond au filtre. « Chercher plus » élargit la recherche, « Chercher sur le web… » la reprend avec le filtre.')
-          : st.games.length
-          ? t('Les jeux retenus n’ont pas de {label}, et la table n’en a pas dans son PuP-Pack ni son dossier du DMD. « Chercher sur le web… » pour le trouver vous-même, ou « Autres jeux… » pour en retenir d’autres.', { label: lowerFirst(info.label) })
-          : t('Aucun jeu de la base VPS ne correspond : « Chercher un autre titre… », ou prenez un fichier dans le dossier d’import.'),
+        detail: hidden ? tn(hidden, '{n} masquée par les filtres (« Animés seulement », « Mots ajoutés »).', '{n} masquées par les filtres (« Animés seulement », « Mots ajoutés »).') : t('Essayez « Chercher plus », ou « Chercher sur le web… ».'),
         tone: 'quiet',
       });
     }
-    const sections: Section[] = rows.length ? [{ rows }] : [];
-    const source = [...new Set(choices.map(sourceName))].join(', ');
-    const fromSites = choices.some((c) => c.site && !c.site.received) ? ` ${t('Les fiches des sites arrivent après leur téléchargement, un fichier à la fois par site.')}` : '';
-    const howMany = tn(choices.length, '{n} proposition', '{n} propositions') + (source ? ` (${source})` : '');
-    const how = info.pages
-      ? t('Start ajoute la proposition comme nouvelle page dans le brouillon et reste ici ; rien n’est écrit avant « Enregistrer ».')
-      : t('Start met la proposition dans le brouillon et reste ici : passez au média suivant, puis « Enregistrer » ; rien n’est écrit avant.');
-    const online = choices.some((c) => c.offer) ? ` ${t('Médias en ligne : sans licence déclarée, pour un usage personnel sur votre borne.')}` : '';
+    const howMany = tn(choices.length, '{n} proposition', '{n} propositions') + (hidden ? ` ${tn(hidden, '({n} masquée)', '({n} masquées)')}` : '');
+    const how = info.pages ? t('Start l’ajoute comme nouvelle page ; rien n’est écrit avant « Enregistrer ».') : t('Start la met dans le brouillon ; rien n’est écrit avant « Enregistrer ».');
     return {
       heading: t('{label} : propositions', { label: info.label }),
       subheading: `${table.title}${st.query ? ` · ${t('recherche « {query} »', { query: st.query })}` : ''}`,
-      lead: `${howMany}. ${how}${online}${fromSites}`,
-      sections,
+      lead: `${howMany} · ${how}`,
+      sections: rows.length ? [{ rows }] : [],
       actions,
       back,
       media: { cards, gallery: true, aspect: PREVIEW_ASPECT[type] },
@@ -933,82 +922,6 @@ export function createProposals(ctx: ProposalsContext) {
     // L'avertissement de VPinMediaDB (aucune licence) est lu une fois avant son premier téléchargement.
     if (choice.source === 'mediadb') ctx.withNotice(download, () => ctx.show(() => build(type), at));
     else download();
-  }
-
-  // ---------- Sites communautaires ----------
-
-  /** Une ligne par site : connexion, résultats, attente ; puis la file, s'il y a quelque chose dedans. */
-  function siteRows(st: State, type: MediaType, choices: MediaChoice[]): Row[] {
-    const rows: Row[] = [];
-    for (const site of MEDIA_SITES) {
-      const found = st.sites[site.id];
-      if (!found) continue;
-      // Fiches rangées sous le jeu par la base VPS, que la recherche n'a pas rendues.
-      const linked = new Set(choices.filter((c) => c.site?.hit.site === site.id && c.site.hit.vps).map((c) => c.site!.hit.id)).size;
-      const linkedText = linked ? ` · ${tn(linked, '{n} fiche de plus, liée au jeu par la base VPS', '{n} fiches de plus, liées au jeu par la base VPS')}` : '';
-      let detail: string;
-      let tone: Tone = 'ok';
-      if (found.login) {
-        detail = t('Recherche réservée aux membres ({holdings}) : connectez-vous pour y chercher.', { holdings: site.holdings });
-        tone = 'warning';
-      } else if (found.problem) {
-        detail = t('Recherche impossible : {problem}.', { problem: found.problem });
-        tone = 'warning';
-      } else {
-        const n = `${tn(found.hits.length, '{n} résultat', '{n} résultats')}${found.hits.length ? ` (${hitSplit(st, found.hits, type)})` : ''}`;
-        const wait = site.wait ? ` · ${t('environ {n} s d’attente par fichier (compte gratuit)', { n: site.wait })}` : '';
-        if (found.account.connected) detail = t('Connecté · {n}', { n }) + wait;
-        else {
-          detail = t('Non connecté · {n} visibles ; le téléchargement demande votre compte (gratuit)', { n });
-          tone = 'warning';
-        }
-      }
-      rows.push({ text: site.name, detail: detail + linkedText, tone });
-    }
-    if (st.wide) {
-      rows.push({
-        text: t('Recherche élargie'),
-        detail: t('Jusqu’à {n} pages de résultats par titre, les fiches de toutes les éditions reconnues du jeu, et celles dont le titre a les mots cherchés sans désigner un jeu sûr (« Titre approché »).', { n: SITE_SEARCH_MORE_PAGES }),
-        tone: 'info',
-      });
-    }
-    const jobs = ctx.sites?.jobs() ?? [];
-    if (jobs.some((j) => j.state !== 'received' && j.state !== 'failed')) {
-      const parts = MEDIA_SITES.flatMap((site) => {
-        const mine = jobs.filter((j) => j.hit.site === site.id);
-        const got = mine.filter((j) => j.state === 'received').length;
-        const waiting = mine.find((j) => j.state === 'waiting');
-        const loading = mine.find((j) => j.state === 'downloading');
-        const queued = mine.filter((j) => j.state === 'queued').length;
-        const bits = [
-          got ? tn(got, '{n} reçu', '{n} reçus') : undefined,
-          waiting ? (waiting.seconds !== undefined ? t('1 en attente du site ({n} s)', { n: waiting.seconds }) : t('1 en attente du site')) : undefined,
-          loading ? t('1 en cours') : undefined,
-          queued ? tn(queued, '{n} en file', '{n} en file') : undefined,
-        ].filter(Boolean);
-        return bits.length ? [`${site.name} : ${bits.join(t(', '))}`] : [];
-      });
-      rows.push({ text: t('File des sites'), detail: parts.join(' · '), tone: 'info' });
-    }
-    return rows;
-  }
-
-  /** « aucun pour ce média ; 1 pack complet, pour tous les écrans ; les autres : Afficheur large 2, Logo 16 ; 3 d’autres jeux ou sans média reconnu » */
-  function hitSplit(st: State, hits: SiteHit[], type: MediaType): string {
-    const sum = siteHitSummary(hits, siteGames(st), st.deep?.vps, st.wide ? siteQueries(st) : undefined);
-    const mine = sum.byType[type] ?? 0;
-    const others = (Object.entries(sum.byType) as [MediaType, number][])
-      .filter(([k]) => k !== type)
-      .sort((a, b) => b[1] - a[1])
-      .map(([k, n]) => `${mediaTypeInfo(k).label} ${n}`);
-    return [
-      mine ? tn(mine, '{n} pour ce média', '{n} pour ce média') : t('aucun pour ce média'),
-      sum.packs ? tn(sum.packs, '{n} pack complet, pour tous les écrans', '{n} packs complets, pour tous les écrans') : undefined,
-      others.length ? t('les autres : {list}', { list: others.join(t(', ')) }) : undefined,
-      sum.elsewhere ? tn(sum.elsewhere, '{n} d’un autre jeu ou sans média reconnu', '{n} d’autres jeux ou sans média reconnu') : undefined,
-    ]
-      .filter(Boolean)
-      .join(t(' ; '));
   }
 
   // ---------- Recherche sur le web ----------
@@ -1216,7 +1129,7 @@ export function createProposals(ctx: ProposalsContext) {
         state: on ? { label: t('Proposé'), tone: 'ok' } : undefined,
         facts: [
           types.length ? t('{source} : {types}', { source: MEDIADB_NAME, types: types.join(', ') }) : undefined,
-          thumbs ? tn(thumbs, '{n} vignette VPS', '{n} vignettes VPS') : undefined,
+          thumbs ? tn(thumbs, '{n} petite vignette', '{n} petites vignettes') : undefined,
         ]
           .filter(Boolean)
           .join(' · '),
@@ -1240,7 +1153,7 @@ export function createProposals(ctx: ProposalsContext) {
     return {
       heading: t('Jeux dont les médias sont proposés'),
       subheading: `${table.title}${st.query ? ` · ${t('recherche « {query} »', { query: st.query })}` : ''}`,
-      lead: t('Jeux de la base VPS que désignent le nom de la table, le nom écrit dedans par son auteur, sa ROM, son PuP-Pack ou votre recherche, le plus probable d’abord, avec leurs raisons. Start ajoute ou retire un jeu des propositions.'),
+      lead: t('Les jeux que désignent la table ou votre recherche, le plus probable d’abord. Start ajoute ou retire un jeu des propositions.'),
       sections,
       actions,
       back,

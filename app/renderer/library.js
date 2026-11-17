@@ -1050,6 +1050,8 @@ function renderThumb(t, selected = false) {
   // Un son peut montrer une image pendant qu'il s'écoute : sa forme d'onde (recherche libre, découpe).
   else if (t.kind === 'audio' && t.poster) box.append(mediaNode('image', t.poster));
   else if (t.kind === 'drawn' && t.drawn) box.append(drawnNode(t.drawn));
+  // Une tuile qui n'est pas un fichier (« Chercher plus », la dernière des propositions) : son icône.
+  else if (t.icon) box.append(cyberIcon(t.icon, 'media-thumb-icon'));
   else box.append(libEl('span', 'media-placeholder', t.text ?? ''));
   /*
    * Contenu animé (vidéo, GIF, APNG, son) : l'icône de lecture au coin. Déjà là et léger, il
@@ -1177,12 +1179,13 @@ function renderGallery(m, cursor) {
       for (const tag of c.tags ?? []) badges.append(libEl('span', 'badge media-tag', tag));
       li.append(badges);
     }
-    // Une ligne : d'où vient la proposition, puis sa popularité si le site la donne, sinon ce
-    // qu'est le fichier ; le reste au détail, sous la galerie.
+    // Une ligne : d'où vient la proposition, puis sa popularité si le site la donne (téléchargements
+    // en icône et en chiffre, note), sinon ce qu'est le fichier ; le reste au détail, sous la galerie.
     const line = libEl('div', 'media-facts media-foot');
     if (c.code) line.append(libEl('span', 'media-source', c.code));
-    const what = c.popularity ?? c.facts;
-    if (what) line.append(libEl('span', c.popularity ? 'media-pop' : '', `${c.code ? ' · ' : ''}${what}`));
+    const popular = c.downloads !== undefined || c.popularity;
+    const what = popular ? popularityNodes(c) : c.facts ? [c.facts] : [];
+    what.forEach((part) => line.append(c.code || line.childNodes.length ? ' · ' : '', part));
     li.append(line);
     // Fichier à choisir : date et site sous la popularité.
     if (c.meta) li.append(libEl('div', 'media-facts media-meta', c.meta));
@@ -1190,6 +1193,25 @@ function renderGallery(m, cursor) {
     list.append(li);
   }
   return list;
+}
+
+/**
+ * Popularité d'une proposition : ses téléchargements en icône (flèche vers le bas) et en chiffre,
+ * jamais le mot (« 412 télé… » coupé sur la tuile, 17/11/2026) ; le mot reste pour le lecteur
+ * d'écran et l'infobulle. Puis la note du site, s'il y en a une.
+ */
+function popularityNodes(c) {
+  const nodes = [];
+  if (c.downloads !== undefined) {
+    const pop = libEl('span', 'media-pop media-downloads');
+    const words = tn(c.downloads, '{n} téléchargement', '{n} téléchargements');
+    pop.title = words;
+    pop.setAttribute('aria-label', words);
+    pop.append(cyberIcon('download', 'media-pop-icon'), libEl('span', '', c.downloads.toLocaleString(I18N.locale)));
+    nodes.push(pop);
+  }
+  if (c.popularity) nodes.push(libEl('span', 'media-pop', c.popularity));
+  return nodes;
 }
 
 /** Détail de la tuile choisie : d'où elle vient, ce qui arrivera au téléchargement ; rien hors des tuiles. */
@@ -1200,8 +1222,14 @@ function galleryDetail(m, cursor) {
   const top = libEl('div', 'media-top');
   top.append(libEl('span', 'media-title', chosen.title));
   // Un fichier à choisir a déjà sa popularité et sa date sur la tuile : le détail ne les redit pas.
-  const facts = m.files ? '' : [chosen.code, chosen.popularity, chosen.facts].filter(Boolean).join(' · ');
-  if (facts) top.append(libEl('span', 'media-facts', facts));
+  if (!m.files) {
+    const parts = [chosen.code, ...popularityNodes(chosen), chosen.facts].filter(Boolean);
+    if (parts.length) {
+      const facts = libEl('span', 'media-facts');
+      parts.forEach((part, i) => facts.append(i ? ' · ' : '', part));
+      top.append(facts);
+    }
+  }
   detail.append(top);
   if (chosen.pending) detail.append(libEl('div', 'media-pending', chosen.pending));
   for (const extra of chosen.extra ?? []) detail.append(libEl('div', 'media-extra', extra));
