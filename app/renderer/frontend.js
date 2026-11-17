@@ -1055,7 +1055,8 @@ function guestLock(g) {
 /** Roue dentée : menu et configuration à la souris (ou Tab), même si les boutons de la borne ne répondent plus comme prévu. */
 function gearButton(s) {
   // Toujours au-dessus des superpositions.
-  const gear = el('button', 'gear');
+  // Écran plein : à la hauteur des pastilles posées sur la ligne de la marque (frontend.css, .gear.on-head).
+  const gear = el('button', `gear${s.zone === 'head' ? ' on-head' : ''}`);
   gear.append(cyberIcon('gear'));
   gear.title = t('Menu système (Tab)');
   gear.dataset.act = JSON.stringify({ type: 'config' });

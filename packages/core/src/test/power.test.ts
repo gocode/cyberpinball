@@ -314,7 +314,7 @@ test('constat en bandeau au menu des tables (essai simulé, configuration reconn
   const banner = rule('.banner');
   assert.doesNotMatch(banner, /\dvmin/, 'aux unités de la zone, comme la marque et la roue dentée');
   const gear = rule('.gear');
-  const gearReach = cq(gear, 'right') + 2 * cq(gear, 'padding') + cq(gear, 'font-size');
+  const gearReach = cq(gear, 'right') + cq(gear, 'width');
   assert.ok(cq(banner, 'right') >= gearReach, `bandeau à ${cq(banner, 'right')}cqmin du bord, roue dentée jusqu'à ${gearReach}cqmin`);
   const brand = rule('.brand');
   assert.ok(cq(banner, 'top') >= 3 + cq(brand, 'font-size'), 'sous la marque');

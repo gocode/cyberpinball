@@ -8286,8 +8286,11 @@ function menuCorner(): { zone?: 'corner' | 'head'; friendsOnline?: { count: numb
   const browser = zoneScreen() === 'browser' ? browserScreenRect()?.bounds : undefined;
   gameNotices.line(over, browser ? { zone: browser, rotation: 0, corner: 'bottom-left' } : undefined);
   if (zone.place !== 'corner' && zone.place !== 'head') return {};
-  // La carte du joueur et ses badges : au coin de l'écran des tables seulement (discrets, 17/11/2026).
-  const player = zone.place === 'corner' && zoneScreen() === 'menu' ? playerCard() : undefined;
+  // La carte du joueur et ses badges : le même en-tête sur l'écran des tables et les écrans pleins (menu
+  // système, Mes badges, aide…), 17/11/2026 ; ni en mode attente (vitrine pour qui passe) ni au Juke-box
+  // (sa ligne porte son repère, jukebox.css).
+  const screen = zoneScreen();
+  const player = screen !== 'attract' && screen !== 'jukebox' ? playerCard() : undefined;
   return { zone: zone.place, ...corner, ...(player ? { player, badges: { count: socialNet.state().badges.length, total: BADGES.length, title: t('Mes badges') } } : {}) };
 }
 

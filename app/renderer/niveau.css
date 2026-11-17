@@ -161,6 +161,23 @@ body.mouse .badges-pill:hover {
   color: #f0d27a;
 }
 
+/*
+ * Sur la ligne de la marque d'un écran plein, le coin d'état (frontend.css) pose --pill-height (58 px,
+ * comme la pastille des amis), --player-card-display (la carte cède sa place en borne le temps d'une
+ * notification) et --player-gain-display (l'XP gagnée tomberait sur le titre de l'écran).
+ */
+.player-card {
+  display: var(--player-card-display, flex);
+}
+.player-card,
+.badges-pill {
+  height: var(--pill-height, auto);
+  min-height: var(--pill-height, 5.93cqmin);
+}
+.player-card-gain {
+  display: var(--player-gain-display, block);
+}
+
 /* ---------- Le moment ---------- */
 #level-moment {
   z-index: 400;

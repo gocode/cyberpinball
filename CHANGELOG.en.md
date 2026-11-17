@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Consistent header: the System menu gear is now a round pill, the same size and height as the badges and friends pills, with the same hover; it is no longer offset from them.
+- The player card (avatar, level, XP bar) and the badges pill now stay at the top of full-screen pages (System menu, My badges, help…), not only on the table screen.
 - "Typing": in messages between friends, groups and rooms, the badge of whoever is typing (avatar, nickname and three animated dots) appears under the last message, on the cabinet as on the phone.
 - **Public profile**: at the top, the player's level and its bar; their badges as medals, rarest first; then their country, number of friends, records, public groups and activity. A player whose cabinet does not have this version yet: "Level not known yet".
 - Table received from a friend: its ROM is offered even when it is only in the friend's ROM library (found through PinMAME's shared folder); it used to arrive missing.
