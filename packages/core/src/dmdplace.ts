@@ -148,6 +148,22 @@ export function dmdWindowHidden(displays: readonly Rect[], rect: Rect): boolean 
   return !displays.some((d) => rect.x < d.x + d.width && rect.x + rect.width > d.x && rect.y < d.y + d.height && rect.y + rect.height > d.y);
 }
 
+/**
+ * État de la fenêtre du DMD de VPX à l'ouverture du menu :
+ * - `parked` : rangée hors des écrans, le DMD masqué par Cyber Pinball (dmdParkedRect) ;
+ * - `empty` : sur un écran mais invisible : VPX ne montre une fenêtre annexe qu'à la première image
+ *   qu'un plugin y dessine (Renderer.cpp au commit af26b2d93, « if (rendered) … Show() ») ; la table
+ *   n'envoie aucun DMD (option de DMD réglée pour le bureau, table sans DMD). Ce n'est pas un DMD
+ *   masqué : le croire faisait revenir « Masqué » à chaque partie, quoi qu'on enregistre (JP's Space
+ *   Cadet, 17/11/2026) ;
+ * - `shown` : visible sur un écran ; `none` : VPX n'a pas ouvert de fenêtre pour le DMD.
+ */
+export function vpxDmdWindowState(displays: readonly Rect[], vpx: { rect: Rect; visible: boolean } | undefined): 'none' | 'parked' | 'empty' | 'shown' {
+  if (!vpx) return 'none';
+  if (dmdWindowHidden(displays, vpx.rect)) return 'parked';
+  return vpx.visible ? 'shown' : 'empty';
+}
+
 export interface DmdIniUpdate {
   /** Nouveau contenu du .ini ; undefined : rien à écrire ; '' : le fichier n'a plus rien. */
   content?: string;

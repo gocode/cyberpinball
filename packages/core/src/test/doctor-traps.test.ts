@@ -39,6 +39,8 @@ const PUP_LABELS_SCRIPT = `${PUP_SCRIPT}PuPlayer.LabelInit 5\r\nPuPlayer.LabelNe
 const PUP_OFF_SCRIPT = `${SCRIPT}usePUP = False\r\nIf usePUP = True Then\r\n  Set PuPlayer = CreateObject("PinUpPlayer.PinDisplay")\r\n  PuPlayer.B2SInit "", cGameName\r\nEnd If\r\n`;
 /** Même table, dont le script appelle vpmInit deux fois : le core.vbs de VPX 10.8 arrête la partie. */
 const VPMINIT_TWICE_SCRIPT = `${SCRIPT}Sub Table1_Init\r\n  vpmInit Me\r\n  vpmInit Me\r\nEnd Sub\r\n`;
+/** Même table, dont l'option de table « DMD Type » vaut par défaut le DMD du mode bureau (JP's Space Cadet v7.0, tableoptions.test.ts). */
+const DESKTOP_DMD_SCRIPT = `${SCRIPT}Sub Table1_OptionEvent(ByVal e)\r\n  x = Table1.Option("DMD Type", 0, 1, 1, 0, 0, Array("Desktop DMD", "FlexDMD"))\r\nEnd Sub\r\n`;
 /** Même table refaite sans ROM, en FlexDMD, dont le script ne lance jamais PuP (Game of Thrones LE, VPW). */
 const NO_PUP_SCRIPT = 'Const cGameName="afm_113b"\r\nSub Table1_Init\r\n  LoadEM\r\n  Set FlexDMD = CreateObject("FlexDMD.FlexDMD")\r\nEnd Sub\r\n';
 /** Borne à trois écrans : backglass, DMD 4:1, pas de topper ; playfield 16:9 couché, Windows en paysage. */
@@ -191,6 +193,12 @@ const TRAPS: Trap[] = [
     code: 'scriptCoreCompat',
     arm: (folder) => write(path.join(folder, `${TABLE}.vpx`), vpxWithScript(VPMINIT_TWICE_SCRIPT)),
     script: scriptFacts(VPMINIT_TWICE_SCRIPT),
+  },
+  // DMD dessiné dans le décor du mode bureau, invisible sur une borne : l'option de table passe sur FlexDMD.
+  {
+    code: 'dmdDesktopOption',
+    arm: (folder) => write(path.join(folder, `${TABLE}.vpx`), vpxWithScript(DESKTOP_DMD_SCRIPT)),
+    script: scriptFacts(DESKTOP_DMD_SCRIPT),
   },
   { code: 'backglassMissing', arm: (folder) => fs.rmSync(path.join(folder, `${TABLE}.directb2s`)) },
   {

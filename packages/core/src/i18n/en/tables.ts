@@ -508,6 +508,10 @@ export const messages: Record<string, string> = {
   'Cyber Pinball a écrit {file} d’après le script d’une version précédente de la table : VPX joue cet ancien script avec la nouvelle table.': 'Cyber Pinball wrote {file} from the script of a previous version of the table: VPX plays that old script with the new table.',
   'Refaire {file} d’après le nouveau script': 'Rewrite {file} from the new script',
   'Script écrit pour un ancien core.vbs': 'Script written for an older core.vbs',
+  'DMD réglé pour le mode bureau': 'DMD set for desktop mode',
+  'Le script de la table choisit son DMD par {options} dans le menu de VPX (F12), réglé par défaut sur {from} : un DMD dessiné dans le décor du mode bureau, invisible sur une borne, et la fenêtre du DMD reste noire. Sur cette borne, l’option passe sur {to} dans {file} : la table n’est pas modifiée, et le menu de VPX permet d’y revenir.':
+    'The table script picks its DMD with {options} in the VPX menu (F12), set by default to {from}: a DMD drawn in the desktop-mode scenery, invisible on a cabinet, so the DMD window stays black. On this cabinet the option is switched to {to} in {file}: the table is not modified, and the VPX menu can switch it back.',
+  'Régler {options} sur {to} dans {file}': 'Set {options} to {to} in {file}',
   'Le script appelle vpmInit {n} fois. Les anciens core.vbs le laissaient faire ; celui de VPX 10.8 arrête la partie dès son lancement (« cvpmFlips2.Init is called twice »).':
     'The script calls vpmInit {n} times. Older core.vbs versions let it through; the one in VPX 10.8 stops the game as soon as it starts (“cvpmFlips2.Init is called twice”).',
   'Le script appelle vpmInit plus d’une fois pendant la partie. Les anciens core.vbs le laissaient faire ; celui de VPX 10.8 arrête la partie (« cvpmFlips2.Init is called twice »).':

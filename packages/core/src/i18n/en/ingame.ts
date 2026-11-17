@@ -45,6 +45,8 @@ export const messages: Record<string, string> = {
   'Cyber Pinball — Réglages en partie': 'Cyber Pinball — In-game settings',
   'VPX n’a pas ouvert de fenêtre pour le DMD dans cette partie (DMD éteint ou incrusté dans le plateau) : la place choisie se verra à la prochaine partie.':
     'VPX didn’t open a window for the DMD in this game (DMD off or embedded in the playfield): the chosen position will show in the next game.',
+  'VPX n’a encore rien dessiné dans la fenêtre du DMD : la table ne lui envoie aucun DMD (réglage de la table pour le mode bureau, ou table sans DMD). La place choisie s’enregistre et servira dès que la table en enverra un.':
+    'VPX hasn’t drawn anything in the DMD window yet: the table sends it no DMD (table set for desktop mode, or a table without a DMD). The chosen position is saved and will be used as soon as the table sends one.',
   'Aucune touche du clavier n’ouvre le menu de VPX : un bouton de la borne a pris F12.': 'No keyboard key opens the VPX menu: a cabinet button took F12.',
   'Enregistré pour cette table dans la configuration « {name} » : elle s’ouvrira ainsi à chaque partie.': 'Saved for this table in the “{name}” configuration: it will open like this in every game.',
 

@@ -25,7 +25,7 @@ interface CacheEntry {
   v?: number;
 }
 
-const FACTS_VERSION = 9;
+const FACTS_VERSION = 10;
 
 function fresh(entry: CacheEntry | undefined, stat: fs.Stats): entry is CacheEntry {
   return Boolean(entry && entry.v === FACTS_VERSION && entry.size === stat.size && entry.mtimeMs === stat.mtimeMs);

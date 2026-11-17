@@ -36,7 +36,7 @@ import {
   dmdPlaceSettings,
   dmdSpotOfRect,
   dmdSpotRect,
-  dmdWindowHidden,
+  vpxDmdWindowState,
   findTableIni,
   IniDocument,
   inGameMenuButtons,
@@ -285,11 +285,13 @@ export function createInGameMenu(opts: {
     const general = generalSpot(g.cabinet, screens);
     const vpx = vpxWindow(SCORE_VIEW_TITLE);
     const desktop = g.displays.map((d) => d.bounds);
-    // Fenêtre du DMD rangée hors des écrans (ou encore d'un pixel) : le DMD est masqué.
-    const vpxHidden = Boolean(vpx && (!vpx.visible || dmdWindowHidden(desktop, vpx.rect)));
+    // Fenêtre du DMD rangée hors des écrans (ou encore d'un pixel) : le DMD est masqué. Invisible sur
+    // un écran, elle attend sa première image : la table n'envoie pas de DMD, il n'est pas masqué.
+    const vpxState = vpxDmdWindowState(desktop, vpx);
+    const vpxHidden = vpxState === 'parked';
     // Départ : la fenêtre du DMD telle que VPX l'a ouverte, sinon la place enregistrée, sinon la générale.
     const ownSpot = own && screens.findIndex((s) => s.fingerprint === own.screen) >= 0 ? { screen: screens.findIndex((s) => s.fingerprint === own.screen), zone: own.zone, hidden: Boolean(own.hidden) } : undefined;
-    const fromVpx = vpx && !vpxHidden ? dmdSpotOfRect(screens, vpx.rect) : undefined;
+    const fromVpx = vpx && vpxState === 'shown' ? dmdSpotOfRect(screens, vpx.rect) : undefined;
     const stored = ownSpot ?? general ?? { screen: 0, zone: { x: 0.3, y: 0.4, width: 0.4, height: 0.1, aspect: 4 }, hidden: false };
     const spot = fromVpx ?? (vpxHidden ? { ...stored, hidden: true } : stored);
     const vpxKey = vpxMenuKeys(IniDocument.parse(readTextIfExists(g.configurationIni))).find((c) => windowsVk(c) !== undefined);
@@ -309,7 +311,11 @@ export function createInGameMenu(opts: {
       configuration: g.cabinet.name,
       ownPlace: Boolean(own),
       ...(general && { general }),
-      live: vpx ? true : t('VPX n’a pas ouvert de fenêtre pour le DMD dans cette partie (DMD éteint ou incrusté dans le plateau) : la place choisie se verra à la prochaine partie.'),
+      live: vpx
+        ? vpxState === 'empty'
+          ? t('VPX n’a encore rien dessiné dans la fenêtre du DMD : la table ne lui envoie aucun DMD (réglage de la table pour le mode bureau, ou table sans DMD). La place choisie s’enregistre et servira dès que la table en enverra un.')
+          : true
+        : t('VPX n’a pas ouvert de fenêtre pour le DMD dans cette partie (DMD éteint ou incrusté dans le plateau) : la place choisie se verra à la prochaine partie.'),
       ...(!vpxKey && { vpxMenuBlocked: t('Aucune touche du clavier n’ouvre le menu de VPX : un bouton de la borne a pris F12.') }),
       ...(g.vision3d && { vision3d: vision3dLine(g.vision3d.state()), vision3dIntensity: g.vision3d.intensity() }),
     };
@@ -317,7 +323,7 @@ export function createInGameMenu(opts: {
     const panel = Math.max(0, playfield);
     const windows = screens.map((screen, index) => overlay(screen, index, index === panel));
     menu = { host, state: startDmdMenu(spot), windows, panel, ...(vpx && { vpx }), applied: '', vpxHidden, desktop };
-    opts.log(`Réglages en partie (${g.table.id}) : menu ouvert, DMD ${vpx ? `de VPX ${vpxHidden ? 'masqué (fenêtre rangée hors des écrans)' : `en ${vpx.rect.width} × ${vpx.rect.height} à ${vpx.rect.x}, ${vpx.rect.y}`}` : 'sans fenêtre dans cette partie'}${own ? ', place de la table' : ''}.`); // i18n-ignore : journal
+    opts.log(`Réglages en partie (${g.table.id}) : menu ouvert, DMD ${vpx ? `de VPX ${vpxHidden ? 'masqué (fenêtre rangée hors des écrans)' : vpxState === 'empty' ? `vide (VPX n'y a rien dessiné : la table n'envoie pas de DMD), fenêtre en ${vpx.rect.width} × ${vpx.rect.height} à ${vpx.rect.x}, ${vpx.rect.y}` : `en ${vpx.rect.width} × ${vpx.rect.height} à ${vpx.rect.x}, ${vpx.rect.y}`}` : 'sans fenêtre dans cette partie'}${own ? ', place de la table' : ''}.`); // i18n-ignore : journal
   }
 
   /**

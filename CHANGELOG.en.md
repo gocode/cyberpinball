@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- DMD shown on tables that set it for desktop mode: some tables (JPSalas's JP's Space Cadet v7.0, for example) pick their DMD with a VPX menu option (F12) that defaults to "Desktop DMD", a DMD drawn in the desktop-mode scenery, invisible on a cabinet. On a cabinet with a DMD screen or zone, Cyber Pinball now sets these options to FlexDMD in the table's .ini, at install time and before every game, without touching the table and never overriding a choice made in the VPX menu. The doctor shows this setting ("DMD set for desktop mode").
+- In-game settings: a DMD the table doesn't send is no longer shown as "Hidden". VPX only shows the DMD window once it gets its first frame; the menu took that for a hidden DMD, which came back every game even after "Show". It now keeps the saved position and explains that the table sends no DMD.
 - Every game is measured: Cyber Pinball logs how many frames per second VPX held, the picture freezes and the memory VPX used, and every report you send includes it.
 - A table that is sluggish or stutters on your cabinet now says so in Cabinet health and on its sheet, with the figures of the last game; the notice goes away as soon as a game keeps up.
 - ROM volume: Williams WPC machines (Monster Bash, The Addams Family…) and some Stern SAM machines keep their volume in their ROM's memory, not in VPX. Without memory, they play their factory volume (12 of 31 on WPC), often nearly silent next to the table's mechanical sounds. Cyber Pinball reads it and shows it on the table's page; it raises a low factory volume to the recommended volume (23 of 31) on its own just before the game, with the checksums redone.

@@ -88,6 +88,7 @@ import { EDGE_LABELS } from './layout';
 import { orientationFinding, type PlayfieldOrientation } from './sync';
 import { vpxPlayedFlipperEdge } from './vpx';
 import { scriptCode } from './vbscript';
+import { cabinetDmdIni, cabinetDmdOptions, type CabinetDmdOption } from './tableoptions';
 import { readVpxScript, readVpxTableName } from './vpxinfo';
 import { describeRenames, emptyPlayedPlaylists, missingPackFiles, packFileFixes, type PackFileFixes } from './pupfiles';
 import { activePacks, disabledPacks, isPupFolderName, packsOfTable, PUP_DISABLED_FOLDER, PUP_FOLDER, pupVideosDir } from './pupdisabled';
@@ -109,6 +110,7 @@ export const FINDING_CODES = [
   'scriptOverride',
   'scriptPatchStale',
   'scriptCoreCompat',
+  'dmdDesktopOption',
   'backglassMissing',
   'backglassMisnamed',
   'backglassStray',
@@ -218,6 +220,11 @@ export interface ScriptFacts {
    * dossier « Akira\ » quand la suite est calculée) : VPX les cherche dans son dossier Music.
    */
   music?: string[];
+  /**
+   * Options de table (menu F12 de VPX) qui laissent le DMD dans le décor du mode bureau, avec la
+   * valeur qui l'envoie à la fenêtre du DMD de la borne (tableoptions.ts, constat dmdDesktopOption).
+   */
+  dmdOptions?: CabinetDmdOption[];
 }
 
 export interface DoctorContext {
@@ -455,6 +462,8 @@ export function scriptFacts(vbs: string): ScriptFacts {
   if (compat.length) facts.coreCompat = compat;
   const music = playedMusic(code);
   if (music.length) facts.music = music;
+  const dmdOptions = cabinetDmdOptions(vbs);
+  if (dmdOptions.length) facts.dmdOptions = dmdOptions;
   return facts;
 }
 
@@ -578,6 +587,8 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     const compat = coreCompatFinding(entry, ctx, override);
     if (compat) findings.push(compat);
   }
+  const desktopDmd = desktopDmdFinding(entry, ctx);
+  if (desktopDmd) findings.push(desktopDmd);
 
   // 3. Backglass.
   const backglass = companion(folder, base, ownFolder, '.directb2s');
@@ -973,6 +984,36 @@ function emptyBackglassFinding(file: string | undefined): Finding | undefined {
   };
 }
 
+/**
+ * DMD de la table réglé pour le mode bureau (tableoptions.ts) : sur une borne qui a un écran ou une
+ * zone de DMD, l'option de table passe sur FlexDMD dans le .ini de la table, tant que le joueur n'y a
+ * pas fait son propre choix. Réglé avant chaque partie et dès l'installation (PUP_PLAY_REPAIRS).
+ */
+function desktopDmdFinding(entry: TableEntry, ctx: DoctorContext): Finding | undefined {
+  const script = ctx.script;
+  if (!ctx.cabinet?.dmd || !script || 'error' in script || !script.dmdOptions?.length) return undefined;
+  const ini = findTableIni(entry.file);
+  const text = ini.exists ? fs.readFileSync(ini.path, 'latin1') : '';
+  const update = cabinetDmdIni(text, script.dmdOptions);
+  if (!update) return undefined;
+  const params = {
+    options: formatList(update.applied.map((o) => `« ${o.name} »`)),
+    from: formatList(update.applied.map((o) => `« ${o.from} »`)),
+    to: formatList(update.applied.map((o) => `« ${o.to} »`)),
+    file: path.basename(ini.path),
+  };
+  return {
+    code: 'dmdDesktopOption',
+    severity: 'warning',
+    title: t('DMD réglé pour le mode bureau'),
+    detail: t(
+      'Le script de la table choisit son DMD par {options} dans le menu de VPX (F12), réglé par défaut sur {from} : un DMD dessiné dans le décor du mode bureau, invisible sur une borne, et la fenêtre du DMD reste noire. Sur cette borne, l’option passe sur {to} dans {file} : la table n’est pas modifiée, et le menu de VPX permet d’y revenir.',
+      params,
+    ),
+    fix: { label: t('Régler {options} sur {to} dans {file}', params), ops: [{ op: 'write', path: ini.path, content: update.content, encoding: 'latin1' }] },
+  };
+}
+
 /** Fichiers d'un pack renommés pour que le plugin PUP commence ses playlists comme PinUP Player (playlistRenames). */
 function playlistOrderFinding(pack: string, root: string, renames: PlaylistRename[]): Finding {
   const first = renames[0]!;
@@ -1157,7 +1198,7 @@ export function repairScriptAfterStop(entry: TableEntry, ctx: DoctorContext, ops
  * 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack), et une table que le core.vbs
  * arrête ne démarre pas (Back to the Future, 30 octobre 2026 : vpmInit appelé deux fois).
  */
-export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['backglassEmpty', 'scriptCoreCompat','pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupNoScreens', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['backglassEmpty', 'scriptCoreCompat', 'dmdDesktopOption','pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupNoScreens', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
 
 /**
  * Constats réparables de PUP_PLAY_REPAIRS pour cette table. Sans script connu (cache
@@ -1180,6 +1221,8 @@ export function pupPlayRepairs(entry: TableEntry, ctx: DoctorContext): Finding[]
   if (compat) found.push(compat);
   const emptyB2s = emptyBackglassFinding(companion(entry.folder, base, true, '.directb2s'));
   if (emptyB2s) found.push(emptyB2s);
+  const desktopDmd = desktopDmdFinding(entry, { ...ctx, script });
+  if (desktopDmd) found.push(desktopDmd);
   found.push(...checkPup(entry, { ...ctx, script, vpxLog: undefined }, override));
   return found.filter((f) => f.fix && PUP_PLAY_REPAIRS.includes(f.code));
 }

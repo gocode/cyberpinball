@@ -67,6 +67,7 @@ export * from './sandbox';
 export * from './zones';
 export * from './dmdscreen';
 export * from './dmdplace';
+export * from './tableoptions';
 export * from './menudmd';
 export * from './scoreviewlayouts';
 export * from './screencover';
