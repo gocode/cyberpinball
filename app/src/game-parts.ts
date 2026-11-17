@@ -224,19 +224,19 @@ export function createGameParts(ctx: GamePartsContext) {
     return {
       heading: t('Parties du jeu'),
       subheading: [table.title, tn(present, '{n} présente', '{n} présentes'), received.length ? tn(received.length, '{n} reçue, à installer', '{n} reçues, à installer') : undefined].filter(Boolean).join(' · '),
-      lead: t('Tout ce qui fait le jeu, partie par partie. Start sur une partie : ses propositions arrivent de toutes les sources (VPS, Téléchargements, VPForums, VPUniverse) ; « Chercher sur le web… » reste toujours possible. Rien n’est installé avant le plan.'),
+      lead: t('Tout ce qui fait le jeu, partie par partie. Start sur une partie : ses propositions arrivent de toutes les sources (base des tables, Téléchargements, VPForums, VPUniverse) ; « Chercher sur le web… » reste toujours possible. Rien n’est installé avant le plan.'),
       sections: [...flashSections(), { rows }],
       actions,
       back,
     };
   }
 
-  /** « Jeu VPS : … » : celui que la table désigne, ou à choisir ; Start pour le changer. */
+  /** « Jeu : … » : celui que la table désigne, ou à choisir ; Start pour le changer. « VPS » n'est jamais nommé à l'écran (17/11/2026). */
   function gameAction(table: TableEntry): Action {
     const g = game();
     const how = identified.how === 'search' ? t('reconnu d’après la table') : identified.how === 'medias' ? t('celui de ses médias') : t('noté dans la table');
     return {
-      label: g ? t('Jeu VPS : {game}', { game: vpsLabel(g) }) : t('Jeu VPS : à choisir'),
+      label: g ? t('Jeu : {game}', { game: vpsLabel(g) }) : t('Jeu : à choisir'),
       detail: g ? t('{how} · Start pour le changer', { how }) : identified.leads.length ? tn(identified.leads.length, '{n} jeu possible ; sans lui, la recherche se fait par le titre', '{n} jeux possibles ; sans lui, la recherche se fait par le titre') : t('Aucun jeu trouvé ; la recherche se fait par le titre'),
       tone: g ? undefined : 'warning',
       run: () => openGame(table),
@@ -289,8 +289,8 @@ export function createGameParts(ctx: GamePartsContext) {
         return {
           heading: t('Quel jeu est-ce ?'),
           subheading: table.title,
-          lead: t('Le jeu de la base VPS donne les fichiers connus de chaque partie et le titre cherché sur les sites. Il est retenu dans le .info de la table.'),
-          sections: leads.length ? [] : [{ rows: [{ text: t('Aucun jeu de la base VPS ne correspond'), detail: t('« Chercher un titre… », ou cherchez les parties par le titre de la table.'), tone: 'quiet' }] }],
+          lead: t('Le jeu reconnu donne les fichiers connus de chaque partie et le titre cherché sur les sites. Il est retenu avec la table.'),
+          sections: leads.length ? [] : [{ rows: [{ text: t('Aucun jeu connu ne correspond'), detail: t('« Chercher un titre… », ou cherchez les parties par le titre de la table.'), tone: 'quiet' }] }],
           actions,
           back,
         };

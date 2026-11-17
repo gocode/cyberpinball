@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.14
 
+- Parties du jeu : l'action du jeu reconnu s'appelle « Jeu : … » et l'écran « Quel jeu est-ce ? » ne nomme plus « VPS ».
 - DMD réel (bêta) : un PIN2DMD reconnu mais qui restait noir en partie dit maintenant pourquoi. Cyber Pinball l'ouvre puis le relâche aussitôt, comme VPX le fera, au démarrage, au retour d'une partie et sur « Vérifier de nouveau ». Déjà ouvert par un autre programme (dmdext, PinUP Popper…), pilote que VPX ne sait pas utiliser, carte introuvable : c'est dit sur l'écran « DMD réel », dans la Santé de la borne et avant la partie, avec quoi faire. Quand tout va bien, la ligne dit « ouvert puis relâché : VPX pourra l'allumer ».
 - DMD réel (bêta) : un programme qui garde souvent le DMD réel (dmdext, PinUP Popper, PinballX, PinballY, un autre VPX) est signalé avant chaque partie, pour le ZeDMD et le Pixelcade aussi.
 - Propositions des médias : l'écran va droit aux résultats. En tête, le titre et une seule ligne ; plus de ligne par site ni de détail technique avant les propositions. « Chercher plus » devient la dernière tuile de la liste, comme une page suivante : Start va chercher la suite. Les téléchargements de chaque fiche s'affichent en icône et en chiffre (aussi dans Parties du jeu et le choix d'un fichier).

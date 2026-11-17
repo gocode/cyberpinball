@@ -132,5 +132,38 @@ test('tests : tout Electron passe par runElectron (tué au délai, aucun process
   const helper = read('packages/core/src/test/electron-run.ts');
   assert.match(helper, /stdio: \['ignore', fdOut, fdErr\]/, 'sortie dans des fichiers : rien à attendre que la fin du processus');
   assert.match(helper, /killAll\(left\)/);
-  assert.match(helper, /for \(let i = 0; i < GRACE_POLLS && left\.length; i\+\+\)[\s\S]*?left = processesWith\(userData\);[\s\S]*?killAll\(left\)/, 'délai de grâce avant de déclarer un processus survivant (Chromium ferme les siens un à un)');
+  assert.match(helper, /for \(const deadline = Date\.now\(\) \+ GRACE_MS; left\.length && Date\.now\(\) < deadline; \)[\s\S]*?left = processesWith\(userData, started\);[\s\S]*?killAll\(left\)/, 'délai de grâce en temps avant de déclarer un processus survivant (Chromium ferme les siens un à un)');
+  // Les processus d'un essai : reconnus à leur marque, jamais à la parenté (un numéro de processus fini est vite redonné).
+  assert.doesNotMatch(helper, /th32ParentProcessID|OFFSET_PARENT/);
+  // Lecture native : PowerShell et sa requête CIM coûtaient le tiers des tests lents sous charge (17/11/2026).
+  assert.doesNotMatch(helper.replace(/\/\/.*$/gm, ''), /powershell/i);
+});
+
+test('relevé natif : un processus marqué, orphelin de son parent, est retrouvé vite par sa ligne de commande, puis tué ; un autre non', { skip: windows ? false : 'Windows requis', timeout: 30_000 }, async () => {
+  const started = Date.now();
+  const marker = `marque-orphelin-${process.pid}-${started}`;
+  // Un node qui lance un petit-enfant détaché (avec la marque), et un autre sans, dit leurs numéros, puis s'arrête.
+  const script = [
+    `const cp = require('child_process');`,
+    `const a = cp.spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)', '${marker}'], { detached: true, stdio: 'ignore' }); a.unref();`,
+    `const b = cp.spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)', 'autre-essai'], { detached: true, stdio: 'ignore' }); b.unref();`,
+    `console.log(a.pid + ' ' + b.pid);`,
+  ].join('\n');
+  const parent = spawn(process.execPath, ['-e', script], { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
+  let out = '';
+  parent.stdout.on('data', (d) => (out += d));
+  await new Promise((resolve) => parent.on('exit', resolve));
+  const [marked, other] = out.trim().split(' ').map(Number);
+  try {
+    assert.ok(marked! > 0 && other! > 0, out);
+    const t0 = Date.now();
+    const found = processesWith(marker, started);
+    assert.ok(Date.now() - t0 < 3000, `relevé en ${Date.now() - t0} ms`);
+    assert.deepEqual(found.map((p) => p.pid), [marked], 'le marqué seul, pas l’autre essai ni celui qui cherche');
+    assert.deepEqual(processesWith(marker, Date.now() + 60_000), [], 'créé avant `since` : sa ligne n’est même pas lue');
+  } finally {
+    killAll([{ pid: marked!, name: 'node' }, { pid: other!, name: 'node' }]);
+  }
+  for (let i = 0; i < 20 && processesWith(marker, started).length; i++) await new Promise((r) => setTimeout(r, 100));
+  assert.deepEqual(processesWith(marker, started), []);
 });

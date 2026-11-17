@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Game parts: the recognised game's action is now called "Game: …" and the "Which game is it?" screen no longer mentions "VPS".
 - Real DMD (beta): a PIN2DMD that was recognised but stayed dark during games now says why. Cyber Pinball opens it then releases it at once, as VPX will, at startup, after a game and on "Check again". Already opened by another program (dmdext, PinUP Popper…), a driver VPX cannot use, board not found: it is shown on the "Real DMD" page, in cabinet health and before the game, with what to do. When all is well, the row says "opened then released: VPX will be able to light it".
 - Real DMD (beta): a program that often holds the real DMD (dmdext, PinUP Popper, PinballX, PinballY, another VPX) is reported before each game, for the ZeDMD and the Pixelcade too.
 - Media suggestions: the screen goes straight to the results. At the top, the title and a single line; no more line per site or technical detail before the suggestions. "Search more" becomes the last tile of the list, like a next page: Start fetches the rest. Each entry's downloads show as an icon and a number (also in Game parts and when choosing a file).
