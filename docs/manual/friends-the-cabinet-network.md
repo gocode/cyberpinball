@@ -562,17 +562,29 @@ The module is [instantgames.ts](../../packages/core/src/instantgames.ts), the sc
 **Tests.**
 [parties-instantanees.test.ts](../../packages/core/src/test/parties-instantanees.test.ts): the announcement is signed and refused if changed, too old or from the future; the list leaves out mine, full ones, closed ones and those of an excluded player; a player gets in while a seat is left, never beyond; on three cabinets that are not friends, everyone joins and the full game starts for all, a fourth one arriving too late is told; a seat that is left opens up again; and on the cabinet network on 127.0.0.1, the announcement travels between strangers, the game too between its players, messaging does not.
 
-### Private groups
+### Groups
 
-Circles of your own, by invitation only: a chat, a table of the week and the group leaderboard, seen by its members only.
-You enter through the "Groupes privés" (Private groups) door of the Community home screen, between Messages and your country's room; it gives the number of groups and the latest news, and carries the red dot when a message is waiting or an invitation has arrived.
+Circles of your own, public or private: a chat, a table of the week and the group leaderboard, seen by its members only.
+You enter through the "Groupes" (Groups) door of the Community home screen, between Messages and your country's room; it gives the number of groups and the latest news (or how many public groups are waiting), and carries the red dot when a message is waiting or an invitation has arrived.
 
-**Private groups.**
-One line per group: its name, its members as badges, how many they are and the latest fact (the last message, or who leads on the table of the week); "2 nouveaux" (2 new) when messages are waiting.
+**Public or private.**
+A private group (the default choice) appears nowhere: you only get in by invitation.
+A public group appears in the public group list of every cabinet, and any player joins it with one press; you can also invite your friends to it.
+Either way, the chat, the table of the week and the leaderboard stay between members: the list only shows the name, the members, the creator and the table of the week.
+The creator chooses the access when creating the group, and changes it later in "Membres" (Members: "Accès : public" or "Accès : privé", Access: public or private); a group made private leaves the list at once, its members stay.
+
+**Groups.**
+First "Mes groupes" (My groups), one line per group: its name (a padlock if it is private, three players if it is public), its members as badges, how many they are and the latest fact (the last message, or who leads on the table of the week); "2 nouveaux" (2 new) when messages are waiting.
+Then "Groupes publics" (Public groups), those the other cabinets have announced and you are not a member of, the biggest first: the name, the members as badges, how many they are, the creator and the table of the week.
 Then "Créer un groupe" (Create a group), "Invitations reçues" (Invitations received, greyed out without an invitation) and "Retour" (Back).
 
+**Joining a public group.**
+Start on a public group: its preview, with the members, their presence and the table of the week ("déjà dans votre borne", already on your cabinet, or not), never the messages.
+"Rejoindre" (Join) brings you into the group: the chat arrives as soon as a member is online.
+It is greyed out, with its reason, when the group has 20 members, or when its creator removed you from it: you then need an invitation.
+
 **Create a group.**
-The name (32 characters at most, with the on-screen keyboard or the phone), the friends to invite (tick boxes, online first; 20 members at most, invitations included), the "Sur invitation seulement" (By invitation only) access.
+The name (32 characters at most, with the on-screen keyboard or the phone), the friends to invite (tick boxes, online first; 20 members at most, invitations included), then the access: "Sur invitation seulement" (By invitation only, private), Start switches it to "Ouvert à tous" (Open to all, public), and back.
 "Créer le groupe" (Create the group) sends the invitations right away; it stays greyed out while the group has no name.
 Only a friend can be invited, by any member.
 
@@ -583,42 +595,48 @@ Then the chat, in bubbles like messaging (yours on the right, the author and tim
 The actions: "Écrire au groupe" (Write to the group: ready-made phrases, or the on-screen keyboard and the phone), "Choisir la table de la semaine", "Inviter des amis" (Invite friends, greyed out when all your friends are members or invited, or at 20 members), "Membres" (Members), "Quitter le groupe" (Leave the group).
 
 **Messages.**
-Start on a message: the seven emoji reactions, the phrases, "Écrire un message…" (Write a message…); on yours, "Supprimer ce message…" (Delete this message…, for everyone, after confirmation); on someone else's, "Signaler ce message…" (Report this message…). 500 characters at most, one line every 3 seconds and 20 in 10 minutes, as in the rooms; the rooms' word filter applies on display.
+Start on a message: the seven emoji reactions, the phrases, "Écrire un message…" (Write a message…); on yours, "Supprimer ce message…" (Delete this message…, for everyone, after confirmation); on someone else's, "Signaler ce message…" (Report this message…).
+500 characters at most, one line every 3 seconds and 20 in 10 minutes, as in the rooms; the rooms' word filter applies on display, and to the names of public groups.
 A message that arrives in a group that is not on screen is announced by a notification ("Kiko · Les flippeurs du jeudi", the message below), everywhere, over VPX included; "Notifications du groupe" (Group notifications, in Members) turns it off for that group.
 
 **Members.**
 Each with their avatar, their flag, "Créateur" (Creator), and their presence (online, in a game, offline).
 Pending invitations follow, with who invited.
+Then the group's access (the creator changes it, the others read it) and the group notifications.
 The creator can remove a member or cancel an invitation (Start on the line); everyone can leave whenever they like.
 A member who was removed or left no longer sees the group; their messages stay, signed with their name.
 
 **Invitation received.**
 A notification announces it ("Bruno vous invite dans « Les flippeurs du jeudi »", Bruno invites you to…), like a friend request.
-The screen shows who invites, the members and the table of the week ("déjà dans votre borne", already on your cabinet, or not), never the messages: they only arrive once the invitation is accepted.
+The screen shows who invites, whether the group is public or private, the members and the table of the week ("déjà dans votre borne", already on your cabinet, or not), never the messages: they only arrive once the invitation is accepted.
 "Accepter" (Accept) joins the group; "Refuser" (Decline) tells the inviter nothing more than "declined".
 
 **On the phone.**
 In the Community tab, "Messages" shows your groups at the top of the conversations (their badge carries the group's initials); a tap opens the group's thread, with each message's author, one-tap reactions and phrases, and a field to write.
-As with messaging, the cabinet checks everything that goes out, in the menu as during a game.
+As with messaging, the cabinet checks everything that goes out, in the front end as during a game.
 
 **Report.**
 The report goes encrypted for each moderator, like a room report (see "Room moderation").
-It carries the message as its author signed it; the moderators see it under "Groupe privé" (Private group), never the group's name.
-A player excluded by the moderation can no longer write in a group: their messages no longer get through.
+It carries the message as its author signed it; the moderators see it under "Groupe" (Group), never the group's name.
+A player excluded by the moderation can no longer write in a group: their messages no longer get through, nor their announcements.
 
 **No server, no outside cabinet.**
-A group is a series of lines each signed by its author (`grp`: creation, invitation, arrival, decline, departure, removal, message, reaction, message deletion, table of the week).
-Each member's cabinet keeps the series and derives the group from it by replaying it in date order: a line from a player who was not a member at that time does not count; only the creator removes.
-The members' cabinets connect directly by their key (like the players of an instant game), friends or not, and nothing goes through a cabinet outside the group.
-Every 20 seconds, and as soon as a member becomes reachable, each one states with a fingerprint what it has of each group (`grp-sum`); a different fingerprint makes the other list its lines (`grp-have`), and the missing ones are sent.
+A group is a series of lines each signed by its author (`grp`: creation with its access, invitation, arrival, decline, departure, removal, access change, message, reaction, message deletion, table of the week).
+Each member's cabinet keeps the series and derives the group from it by replaying it in date order: a line from a player who was not a member at that time does not count; only the creator removes and changes the access; an arrival without invitation only counts if the group is public at that time, has room left and the player was not removed from it.
+The members' cabinets connect directly by their key (like the players of an instant game), friends or not, and the messages go through no cabinet outside the group.
+Every 20 seconds, and as soon as a member becomes reachable, each one first gives it its own lines (its arrival, if the member does not know it yet), then states with a fingerprint what it has of each group (`grp-sum`); a different fingerprint makes the other list its lines (`grp-have`), and the missing ones are sent.
 A written message goes at once to the reachable members, who relay it: an absent member receives it from any other member when they come back.
 An invitation (`grp-invite`: the membership lines and the table of the week, without the messages) goes to the invited friend's cabinet until it is acknowledged (`grp-invite-ok`); a decline goes to the inviter.
-Everything is kept in `<data>\amis\groupes.json`: 3,000 messages per group and one year at most, never the membership lines; a group you left is erased after 14 days, an unanswered invitation after 30.
+A public group announces itself to every cabinet (`grp-pub`): its membership lines and its table of the week, each signed by its author, and the announcement itself signed by the member who makes it; each member repeats it every 30 minutes and at each change, each cabinet relays it and keeps the latest of each group for seven days.
+When "Groupes" opens, the cabinet asks the connected cabinets for their directory (`grp-pub-ask`).
+A group made private announces itself one last time this way: each cabinet removes it from its list, and keeps that last announcement so that an older one still on its way does not bring it back.
+Everything is kept in `<data>\amis\groupes.json`: 3,000 messages per group and one year at most, never the membership lines; a group you left is erased after 14 days, an unanswered invitation after 30, an announcement after seven days; the directory keeps 200 groups at most.
 The module is [groups.ts](../../packages/core/src/groups.ts), the service `app/src/group-service.ts`, the screens `app/src/groups-menu.ts`.
 
 **Tests.**
-[groupes-prives.test.ts](../../packages/core/src/test/groupes-prives.test.ts): only members invite, write, react and choose the table; only the creator removes; a message can only be deleted by its author; the order of arrival does not matter; a wrong signature, an edited text or a date in the future are refused; the invitation does not carry the messages and only counts coming from a member who invites me; and on the test network on 127.0.0.1, Alice and Chloé, who are not friends, talk through the group, a message written while Chloé is off reaches her when she comes back, Dora, outside the group, receives nothing, and her decline goes back to Alice.
-Off-screen demonstration: fictional cabinets in `groupes` mode (Bruno creates the group and invites the cabinet).
+[groupes.test.ts](../../packages/core/src/test/groupes.test.ts): only members invite, write, react and choose the table; only the creator removes and changes the access; a message can only be deleted by its author; the order of arrival does not matter; a wrong signature, an edited text or a date in the future are refused; the invitation does not carry the messages and only counts coming from a member who invites me; a public group can be joined without invitation, never by a removed member; its announcement does not carry the messages, and is refused if edited or made by a non-member; a private group never announces itself; made private again, it leaves the directory and an older announcement does not bring it back.
+On the test network on 127.0.0.1: Alice and Chloé, who are not friends, talk through a private group, a message written while Chloé is off reaches her when she comes back, Dora, outside the group, receives nothing, and her decline goes back to Alice; Eve, a stranger, finds Alice's public group in the directory (never her private group), joins it, receives its history and talks there; closed by Alice, it leaves Dora's directory and can no longer be joined.
+Off-screen demonstration: fictional cabinets in `groupes` mode (Bruno creates a private group and invites the cabinet, Kiko opens a public group).
 
 ### Rooms by country
 

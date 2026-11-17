@@ -51,7 +51,7 @@ export interface CommunityMenuHost {
   friends?: { detail(): string; attention(): boolean; open(back: () => void): void };
   /** La messagerie (chat-menu.ts) : son état en une ligne et sa liste, « Retour » vers `back`. */
   messages: { detail(): string; attention(): boolean; quiet(): boolean; open(back: () => void): void };
-  /** Les groupes privés (groups-menu.ts) : ce que dit leur porte, et les ouvrir. */
+  /** Les groupes (groups-menu.ts) : ce que dit leur porte, et les ouvrir. */
   groups?: { door(): { detail: string; attention: boolean; quiet: boolean }; open(back: () => void): void };
   /** Le salon de mon pays (rooms-menu.ts) : ce que dit sa porte, et l'ouvrir. */
   rooms?: { door(): { label: string; detail: string; attention: boolean; quiet: boolean }; glance?(): RoomGlance; open(back: () => void): void };
@@ -401,12 +401,12 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
         ...(host.messages.quiet() ? { tone: 'quiet' as const } : {}),
         run: () => host.messages.open(here),
       },
-      // Les groupes privés, entre Messages et le salon du pays (maquette du 15/11/2026).
+      // Les groupes, publics ou privés, entre Messages et le salon du pays (maquette du 15/11/2026).
       ...(host.groups
         ? [
             (() => {
               const door = host.groups!.door();
-              return { label: t('Groupes privés'), detail: door.detail, icon: 'lock' as const, ...(door.attention ? { attention: true } : {}), ...(door.quiet ? { tone: 'quiet' as const } : {}), run: () => host.groups!.open(here) };
+              return { label: t('Groupes'), detail: door.detail, icon: 'group' as const, ...(door.attention ? { attention: true } : {}), ...(door.quiet ? { tone: 'quiet' as const } : {}), run: () => host.groups!.open(here) };
             })(),
           ]
         : []),

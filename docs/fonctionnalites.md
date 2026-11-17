@@ -98,9 +98,10 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 - **Pendant une partie**, les boutons restent à VPX : le téléphone appairé montre le fil le plus récent, avec réactions, phrases et champ pour écrire. Un message arrivé s'annonce par une notification, dans le front-end par le DMD aussi.
 - **Options** : couper les notifications d'un ami, effacer une conversation, bloquer ; désactiver la messagerie, couper son son, garder les messages 30 jours, un an ou toujours.
 
-### Groupes privés
+### Groupes
 
-- **Vos cercles à vous, sur invitation seulement** : Communauté > « Groupes privés ». Un nom, des amis à inviter, et le groupe existe ; chaque membre peut inviter ses amis, personne d'autre ne le voit.
+- **Vos cercles à vous, publics ou privés** : Communauté > « Groupes ». Un nom, des amis à inviter, et le groupe existe ; chaque membre peut inviter ses amis.
+- **Privé, il n'apparaît nulle part** : on y entre seulement sur invitation. **Public, il paraît dans la liste des groupes publics** de toutes les bornes, et n'importe quel joueur le rejoint d'un appui. Le créateur change l'accès quand il veut.
 - **Une table de la semaine**, choisie par un membre pour tous, jusqu'à dimanche soir : Start la lance. Le classement du groupe sur cette table se remplit tout seul avec les scores publiés par les membres.
 - **Une discussion de groupe** en bulles, avec les sept réactions, les phrases toutes prêtes, le clavier à l'écran ou le téléphone. Un message arrivé s'annonce par une notification, même pendant une partie.
 - **Entre les bornes des membres seulement**, sans serveur : un membre absent reçoit les messages à son retour, de n'importe quel autre membre. Une invitation ne montre jamais les messages avant d'être acceptée.

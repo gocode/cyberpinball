@@ -109,6 +109,7 @@ export const ICON_NAMES = [
   'usb',
   'gamepad',
   'friends',
+  'group',
   'friend-list',
   'message',
   'friend-add',

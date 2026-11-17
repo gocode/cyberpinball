@@ -1,4 +1,4 @@
-// Groupes privés (packages/core/src/groups.ts) sur le réseau des bornes (social-net.ts).
+// Groupes, publics ou privés (packages/core/src/groups.ts) sur le réseau des bornes (social-net.ts).
 //
 // Les bornes des membres se relient directement par leur clé (setGroupPeers) et s'échangent ce qui
 // leur manque : toutes les GROUP_SYNC_MS, et dès qu'un membre devient joignable, chacune dit d'une
@@ -30,6 +30,15 @@ import {
   groupsFile,
   groupView,
   invitationLines,
+  joinPublic,
+  mergeAnnounces,
+  publicGroups,
+  signAnnounce,
+  verifyAnnounce,
+  GROUP_ANNOUNCE_BATCH,
+  GROUP_ANNOUNCE_MS,
+  type GroupAccess,
+  type GroupAnnounce,
   isInvited,
   isMember,
   leaveGroup,
@@ -67,7 +76,7 @@ const SUM_AGAIN_MS = 60_000;
 const TIDY_MS = 60 * 60_000;
 
 export interface GroupServiceOptions {
-  net: Pick<SocialNet, 'state' | 'online' | 'reachable' | 'send' | 'onMessage' | 'setGroupPeers' | 'country'>;
+  net: Pick<SocialNet, 'state' | 'online' | 'reachable' | 'send' | 'onMessage' | 'setGroupPeers' | 'country' | 'sendGroupDirectory'>;
   dataDir: string;
   now?: () => Date;
   /** Quelque chose a changé : redessiner. */
@@ -92,7 +101,15 @@ export interface GroupService {
   /** Les invitations reçues, la plus récente d'abord, avec ce qu'elles disent du groupe. */
   invitations(): { invitation: GroupInvitation; view: GroupView }[];
   /** Créer un groupe et inviter ces amis ; rend son identifiant, ou undefined (nom refusé, trop de groupes). */
-  create(name: string, friends: readonly { key: string; name: string }[]): string | undefined;
+  create(name: string, friends: readonly { key: string; name: string }[], access?: GroupAccess): string | undefined;
+  /** Le créateur ouvre (public) ou ferme (privé) son groupe ; fermé, il quitte les annuaires. */
+  setAccess(g: string, access: GroupAccess): boolean;
+  /** Les groupes publics de l'annuaire dont je ne suis pas membre. */
+  publicGroups(): { announce: GroupAnnounce; view: GroupView }[];
+  /** Rejoindre un groupe public de l'annuaire ; false s'il n'y est plus, s'il est plein ou si j'en ai été retiré. */
+  joinPublic(g: string): boolean;
+  /** Demander leur annuaire aux bornes reliées (l'écran « Groupes » s'ouvre). */
+  askDirectory(): void;
   /** Inviter des amis dans un groupe dont je suis membre ; rend le nombre d'invitations écrites. */
   invite(g: string, friends: readonly { key: string; name: string }[]): number;
   send(g: string, text: string): GroupSendResult;
@@ -217,12 +234,19 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
         const k = `${g}|${m.key}`;
         const last = told.get(k);
         const fresh = !linked.has(m.key);
+        // Un membre qui devient joignable reçoit d'abord mes propres lignes : il ne me compte peut-être
+        // pas encore parmi les membres (arrivée par l'annuaire, sans membre en ligne) et ignorerait l'empreinte.
+        if (fresh) {
+          const own = validLines(g).filter((l) => l.by === myKey()).slice(-GROUP_BATCH);
+          if (own.length) send(m.key, { t: 'grp', lines: own });
+        }
         if (force || fresh || !last || last.h !== h || t - last.at >= SUM_AGAIN_MS) {
           send(m.key, { t: 'grp-sum', g, h });
           told.set(k, { h, at: t });
         }
       }
       if (!amMember) continue;
+      announce(g, e.lines, t);
       // Mes invitations pas encore remises : à la borne de l'ami, tant qu'elle ne les a pas accusées.
       for (const i of v.invited) {
         if (i.by !== myKey() || state.delivered.includes(i.line)) continue;
@@ -240,6 +264,20 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
     if (outSent.length) commit(dropOutbox(state, outSent));
     linked.clear();
     for (const k of reachableNow) linked.add(k);
+  }
+
+  /** Annonces de mes groupes publics : l'empreinte des lignes annoncées et le moment, par groupe. */
+  const announced = new Map<string, { h: string; at: number }>();
+  /** Mon groupe public (ou redevenu privé) annoncé à toutes les bornes reliées, s'il a changé ou au rythme des annonces. */
+  function announce(g: string, lines: readonly GroupLine[], t: number): void {
+    const a = signAnnounce({ key: opts.net.state().key }, lines, now());
+    if (!a) return;
+    const h = groupDigest(a.lines.map((l) => l.id));
+    const last = announced.get(g);
+    const isPublic = groupView(a.lines, now())?.access === 'public';
+    if (last && last.h === h && (!isPublic || t - last.at < GROUP_ANNOUNCE_MS)) return;
+    // Aucune borne reliée : redit au prochain relevé.
+    if (opts.net.sendGroupDirectory({ t: 'grp-pub', ann: [a] }) > 0) announced.set(g, { h, at: t });
   }
 
   const syncTimer = setInterval(() => tick(), Math.max(1000, opts.syncMs ?? GROUP_SYNC_MS));
@@ -263,7 +301,9 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
     const spreads: { g: string; lines: GroupLine[] }[] = [];
     for (const [g, lines] of byGroup) {
       const v = viewOf(g);
-      if (!v || !mayWrite(v, from)) continue;
+      // Dans un groupe public, n'importe qui arrive : sa ligne d'arrivée (de lui) suffit à l'accepter.
+      const arriving = v?.access === 'public' && lines.some((l) => l.by === from && l.body.k === 'join');
+      if (!v || !(mayWrite(v, from) || arriving)) continue;
       const merged = mergeGroupLines(next, g, lines, myKey(), now());
       if (!merged.fresh.length) continue;
       next = merged.state;
@@ -327,6 +367,20 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
         if (inv && v) opts.onInvite?.(inv, v);
         return;
       }
+      case 'grp-pub': {
+        const list = m.ann.map((a) => verifyAnnounce(a, now())?.announce).filter((a): a is GroupAnnounce => !!a);
+        const merged = mergeAnnounces(state, list, now());
+        if (!merged.fresh.length) return;
+        commit(merged.state);
+        // Relayées aux autres bornes reliées : elles font le tour du réseau comme une partie instantanée.
+        opts.net.sendGroupDirectory({ t: 'grp-pub', ann: merged.fresh }, undefined, key);
+        return;
+      }
+      case 'grp-pub-ask': {
+        const all = Object.values(state.directory);
+        for (let i = 0; i < all.length; i += GROUP_ANNOUNCE_BATCH) opts.net.sendGroupDirectory({ t: 'grp-pub', ann: all.slice(i, i + GROUP_ANNOUNCE_BATCH) }, key);
+        return;
+      }
       case 'grp-invite-ok':
         commit(markDelivered(state, m.ids));
         return;
@@ -378,11 +432,11 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
           const view = groupView(invitation.lines, now());
           return view ? [{ invitation, view }] : [];
         }),
-    create(name, friends) {
+    create(name, friends, access = 'private') {
       if (!opts.net.state().enabled || myGroups(state, myKey(), now()).length >= GROUPS_MAX) return undefined;
       // L'identifiant du groupe est celui de sa ligne de création.
       const id = randomBytes(8).toString('hex');
-      const line = signGroupLine(me(), id, { k: 'create', name }, now(), id);
+      const line = signGroupLine(me(), id, { k: 'create', name, ...(access === 'public' ? { access: 'public' as const } : {}) }, now(), id);
       if (!line) return undefined;
       const v = groupView([line], now())!;
       const invites = inviteLines(line.g, friends, v);
@@ -415,6 +469,28 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
       if (!v || v.creator !== myKey() || key === myKey() || !(isMember(v, key) || isInvited(v, key))) return false;
       return 'line' in write(g, { k: 'remove', who: key });
     },
+    setAccess(g, access) {
+      const v = viewOf(g);
+      if (!v || v.creator !== myKey() || v.access === access) return false;
+      const ok = 'line' in write(g, { k: 'access', access });
+      if (ok) tick(true);
+      return ok;
+    },
+    publicGroups: () => publicGroups(state, myKey(), now()),
+    joinPublic(g) {
+      const a = state.directory[g];
+      if (!a || !opts.net.state().enabled) return false;
+      const line = signGroupLine(me(), g, { k: 'join' }, now());
+      if (!line) return false;
+      // Refusée par le rejeu (groupe plein, retiré par le créateur, redevenu privé) : rien n'entre.
+      const v = groupView([...a.lines, line], now());
+      if (!v || !isMember(v, myKey())) return false;
+      commit(joinPublic(state, a, line));
+      spread(g, [line]);
+      tick(true);
+      return true;
+    },
+    askDirectory: () => void opts.net.sendGroupDirectory({ t: 'grp-pub-ask' }),
     leave(g) {
       const v = viewOf(g);
       if (!v || !isMember(v, myKey())) return false;

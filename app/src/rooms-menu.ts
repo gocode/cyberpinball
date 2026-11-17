@@ -141,8 +141,8 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
   const myCountry = () => net.country();
   const defaultRoom = (): RoomId => net.rooms().defaultRoom ?? (myCountry() ? roomOfCountry(myCountry()!) : WORLD_ROOM);
   const roomName = (room: RoomId): string => {
-    // Un message de groupe privé signalé (file des modérateurs) : jamais le nom du groupe.
-    if (room === GROUP_REPORT_ROOM) return t('Groupe privé');
+    // Un message de groupe signalé (file des modérateurs) : jamais le nom du groupe.
+    if (room === GROUP_REPORT_ROOM) return t('Groupe');
     const c = roomCountry(room);
     return c ? t('Salon {country}', { country: countryName(c, locale()) }) : t('Salon Monde');
   };

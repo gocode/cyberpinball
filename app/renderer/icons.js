@@ -117,6 +117,7 @@ const CYBER_ICONS = {
   gamepad: '<path d="M7 7h10c4 0 5 5 5 10 0 3-3 4-5 1l-2-3H9l-2 3c-2 3-5 2-5-1 0-5 1-10 5-10zM7 9v4M5 11h4M15 10h.01M19 12h.01"/>', // Contrôleur générique, hors touches de l’encodeur.
   // Amis : réseau des bornes
   friends: '<circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6M15.5 4.5a3.5 3.5 0 0 1 0 7M17 14c2.5.5 4 2.5 4 6"/>', // Deux joueurs : la rubrique Amis.
+  group: '<circle cx="12" cy="8" r="3"/><circle cx="5" cy="10" r="2"/><circle cx="19" cy="10" r="2"/><path d="M6.5 20c0-3.5 2.2-5.5 5.5-5.5s5.5 2 5.5 5.5M1.5 19c0-2.4 1.2-3.9 3.3-4.2M22.5 19c0-2.4-1.2-3.9-3.3-4.2"/>', // Trois joueurs : un groupe de la Communauté.
   'friend-list': '<path d="M11.5 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM4 20v-1a4.5 4.5 0 0 1 9 0v1M16 7h4M16 12h4M16 17h4"/>', // Un joueur et sa liste : mes amis.
   message: '<path d="M4 5h16v11H10l-5 4v-4H4z"/><path d="M8 9.5h8M8 12.5h5"/>', // Une bulle : la messagerie entre amis.
   'friend-add': '<path d="M11.5 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM4 20v-1a4.5 4.5 0 0 1 7.5-3.35M17 13v7M13.5 16.5h7"/>', // Un joueur et un plus : trouver un joueur, demander.

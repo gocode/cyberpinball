@@ -98,9 +98,10 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 - **During a game**, the buttons stay with VPX: the paired phone shows the most recent thread, with reactions, phrases and a field to write. An incoming message is announced by a notification, and in the menu by the DMD too.
 - **Options**: mute a friend's notifications, clear a conversation, block; turn messaging off, mute its sound, keep messages 30 days, a year or forever.
 
-### Private groups
+### Groups
 
-- **Circles of your own, by invitation only**: Community > "Private groups". A name, friends to invite, and the group exists; every member can invite their friends, nobody else sees it.
+- **Circles of your own, public or private**: Community > "Groups". A name, friends to invite, and the group exists; every member can invite their friends.
+- **Private, it appears nowhere**: you only get in by invitation. **Public, it appears in the public group list** of every cabinet, and any player joins it with one press. The creator changes the access whenever they like.
 - **A table of the week**, chosen by a member for everyone, until Sunday night: Start launches it. The group leaderboard on that table fills itself with the scores the members publish.
 - **A group chat** in bubbles, with the seven reactions, the ready-made phrases, the on-screen keyboard or the phone. An incoming message is announced by a notification, even during a game.
 - **Between the members' cabinets only**, with no server: an absent member receives the messages when they come back, from any other member. An invitation never shows the messages before it is accepted.

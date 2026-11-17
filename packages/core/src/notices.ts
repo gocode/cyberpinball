@@ -147,9 +147,9 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   // Une ligne dans un de mes salons (16/11/2026) : au menu seulement, sans son ; tenue jusqu'à deux minutes,
   // oubliée au-delà si elle n'a pas pu se montrer. Le salon garde la ligne : rien au journal d'Activité récente.
   'room-line': { priority: 14, ttlMs: 2 * MIN, quietMs: MIN, icon: 'globe', tone: 'info', act: { type: 'rooms' }, holdMs: 2 * MIN, journal: false },
-  // Un message dans un de mes groupes privés (groups.ts) : partout, par-dessus VPX compris, comme la messagerie.
-  'group-message': { priority: 9, ttlMs: 60 * MIN, quietMs: MIN, icon: 'lock', tone: 'info', act: { type: 'groups' }, away: true, sound: 'news' },
-  // Une invitation dans un groupe privé : dans le front-end, comme une demande d'ami.
+  // Un message dans un de mes groupes (groups.ts) : partout, par-dessus VPX compris, comme la messagerie.
+  'group-message': { priority: 9, ttlMs: 60 * MIN, quietMs: MIN, icon: 'group', tone: 'info', act: { type: 'groups' }, away: true, sound: 'news' },
+  // Une invitation dans un groupe : dans le front-end, comme une demande d'ami.
   'group-invite': { priority: 10, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friend-request', tone: 'warning', act: { type: 'groups' }, sound: 'news' },
   // Un signalement reçu par un modérateur : au menu, regroupés.
   'room-report': { priority: 8, ttlMs: 60 * MIN, quietMs: MIN, icon: 'alert', tone: 'warning', act: { type: 'moderation' }, sound: 'news' },
@@ -397,7 +397,7 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
     }
     case 'group-invite':
       // `subject` : le groupe.
-      return fit(one ? { title: t('{name} vous invite dans « {group} »', { name: who(one), group: one.subject ?? '' }), detail: t('Communauté › Groupes privés') } : { title: tn(n, '{n} invitation dans un groupe', '{n} invitations dans des groupes'), detail: names() });
+      return fit(one ? { title: t('{name} vous invite dans « {group} »', { name: who(one), group: one.subject ?? '' }), detail: t('Communauté › Groupes') } : { title: tn(n, '{n} invitation dans un groupe', '{n} invitations dans des groupes'), detail: names() });
     case 'room-report': {
       const last = events[events.length - 1]!;
       if (one) return fit({ title: t('Signalement · {room}', { room: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });

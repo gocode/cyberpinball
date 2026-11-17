@@ -465,12 +465,17 @@ export interface SocialNet {
    */
   setPartners(keys: readonly string[]): void;
   /**
-   * Les membres de mes groupes privés, amis ou non (groups.ts) : leur borne est rejointe par sa clé,
+   * Les membres de mes groupes, amis ou non (groups.ts) : leur borne est rejointe par sa clé,
    * et les messages des groupes (« grp… ») passent avec eux, et avec eux seulement ; vide : plus personne.
    */
   setGroupPeers(keys: readonly string[]): void;
-  /** Une liaison saluée avec cette borne en ce moment, amie ou non (groupes privés). */
+  /** Une liaison saluée avec cette borne en ce moment, amie ou non (groupes). */
   reachable(key: string): boolean;
+  /**
+   * L'annuaire des groupes publics (« grp-pub », « grp-pub-ask ») : vers une borne reliée (`to`), amie
+   * ou non, ou vers toutes les bornes reliées sauf `except` ; rend le nombre de bornes atteintes.
+   */
+  sendGroupDirectory(message: Extract<GroupMessage, { t: 'grp-pub' | 'grp-pub-ask' }>, to?: string, except?: string): number;
   /**
    * Ma partie instantanée, à annoncer à toutes les bornes (signée, redite toutes les
    * INSTANT_RESIGN_MS tant qu'elle est ouverte) ; `state: 'closed'` la retire partout (lancée,
@@ -568,7 +573,7 @@ export interface SocialNet {
   amModerator(): boolean;
   /** Une décision de modérateur : signée, appliquée ici, envoyée à toutes les bornes ; rend false si je ne suis pas modérateur. */
   moderate(act: Omit<ModAct, 'id' | 'by' | 'at' | 'sig'>): boolean;
-  /** Signaler une ligne d'un salon, ou un message d'un groupe privé : le signalement part, chiffré, vers chaque modérateur (directement, ou relayé). */
+  /** Signaler une ligne d'un salon, ou un message d'un groupe : le signalement part, chiffré, vers chaque modérateur (directement, ou relayé). */
   report(line: RoomLine | GroupLine, reason: ModReason): void;
   /** Les signalements de cette ligne sont traités (modérateur). */
   handleReports(lineId: string): void;
@@ -1012,9 +1017,12 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'instant') return receiveInstant(key, (raw as { games?: unknown }).games);
         const parsed = parseSocialMessage(raw, now());
         if (parsed) return receive(key, parsed, link);
-        // Groupes privés : les membres de mes groupes, amis ou non, et mes amis (invitations) ; rien d'autre.
+        // Groupes : de toute borne ni bloquée ni exclue. Le service des groupes (group-service.ts) vérifie
+        // chaque ligne (signée, d'un membre ou d'un invité, ou l'arrivée dans un groupe public), ne
+        // répond à une empreinte que d'un membre et n'accepte une invitation que d'un ami : un joueur qui
+        // rejoint un groupe public n'est encore le membre de personne quand son arrivée part.
         if (raw && typeof raw === 'object' && typeof (raw as { t?: unknown }).t === 'string' && (raw as { t: string }).t.startsWith('grp')) {
-          if (!state.enabled || refusedPlayer(key) || (relationOf(state, key) !== 'friend' && !groupPeers.has(key))) return;
+          if (!state.enabled || refusedPlayer(key)) return;
           const grp = parseGroupMessage(raw as Record<string, unknown>);
           if (grp) for (const listener of messageListeners) listener(key, grp);
           return;
@@ -1140,7 +1148,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   let instantTimer: NodeJS.Timeout | undefined;
   /** Joueurs de ma partie instantanée : rejoints par leur clé, la partie en direct passe avec eux. */
   const partners = new Set<string>();
-  /** Membres de mes groupes privés : rejoints par leur clé, les messages des groupes passent avec eux. */
+  /** Membres de mes groupes : rejoints par leur clé, les messages des groupes passent avec eux. */
   const groupPeers = new Set<string>();
   /** Un joueur bloqué, ou exclu des salons par la modération : ni ses annonces ni ses arrivées. */
   const refusedPlayer = (key: string) => shunned(key) || sanctionOf(moderation.acts, key, now())?.kind === 'ban';
@@ -2274,7 +2282,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     send(key, message) {
       // La partie en direct passe aussi avec les joueurs de ma partie instantanée ; « je rejoins », vers l'hôte annoncé.
       const live = typeof message.t === 'string' && message.t.startsWith('game-');
-      // Les groupes privés passent aussi avec les membres de mes groupes, amis ou non (liaison saluée).
+      // Les groupes passent aussi avec les membres de mes groupes, amis ou non (liaison saluée).
       const group = typeof message.t === 'string' && message.t.startsWith('grp') && state.enabled && groupPeers.has(key) && !refusedPlayer(key) ? bestLink(key) : undefined;
       const link = friendLink(key) ?? (group?.greeted ? group : undefined) ?? (live && state.enabled && (partners.has(key) || message.t === 'game-join' || message.t === 'game-cancel') && !refusedPlayer(key) ? bestLink(key) : undefined);
       if (!link) return false;
@@ -2289,6 +2297,12 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       followPeers();
     },
     reachable: (key) => state.enabled && !shunned(key) && !!bestLink(key)?.greeted,
+    sendGroupDirectory(message, to, except) {
+      if (!state.enabled) return 0;
+      const links = to ? [bestLink(to)].filter((l): l is Link => !!l?.greeted && !refusedPlayer(to)) : greetedLinks(except);
+      for (const link of links) link.send(message as FriendMessage);
+      return links.length;
+    },
     setPartners(keys) {
       const next = new Set(keys.filter((k) => k !== state.key.publicKey));
       if (next.size === partners.size && [...next].every((k) => partners.has(k))) return;

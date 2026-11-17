@@ -560,17 +560,29 @@ Le module est [instantgames.ts](../../packages/core/src/instantgames.ts), les é
 **Essais.**
 [parties-instantanees.test.ts](../../packages/core/src/test/parties-instantanees.test.ts) : l'annonce est signée et refusée si elle est changée, trop vieille ou du futur ; la liste écarte la mienne, les complètes, les fermées et celles d'un joueur écarté ; un joueur entre tant qu'il reste une place, jamais au-delà ; sur trois bornes qui ne sont pas amies, chacun rejoint et la partie complète part pour tous, une quatrième arrivée trop tard l'apprend ; une place quittée se libère ; et sur le réseau des bornes en 127.0.0.1, l'annonce passe entre inconnus, la partie aussi entre ses joueurs, la messagerie non.
 
-### Groupes privés
+### Groupes
 
-Des cercles à soi, sur invitation seulement : une discussion, une table de la semaine et le classement du groupe, que seuls ses membres voient.
-On y entre par la porte « Groupes privés » de l'accueil Communauté, entre Messages et le salon du pays ; elle dit le nombre de groupes et la dernière nouveauté, et porte la pastille rouge quand un message attend ou qu'une invitation est arrivée.
+Des cercles à soi, publics ou privés : une discussion, une table de la semaine et le classement du groupe, que seuls ses membres voient.
+On y entre par la porte « Groupes » de l'accueil Communauté, entre Messages et le salon du pays ; elle dit le nombre de groupes et la dernière nouveauté (ou combien de groupes publics attendent), et porte la pastille rouge quand un message attend ou qu'une invitation est arrivée.
 
-**Groupes privés.**
-Une ligne par groupe : son nom, ses membres en pastilles, leur nombre et le dernier fait (le dernier message, ou qui mène sur la table de la semaine) ; « 2 nouveaux » quand des messages attendent.
+**Public ou privé.**
+Un groupe privé (le choix par défaut) n'apparaît nulle part : on y entre seulement sur invitation.
+Un groupe public paraît dans la liste des groupes publics de toutes les bornes, et n'importe quel joueur le rejoint d'un appui ; on peut aussi y inviter ses amis.
+Dans les deux cas, la discussion, la table de la semaine et le classement restent entre membres : la liste ne montre que le nom, les membres, le créateur et la table de la semaine.
+Le créateur choisit l'accès à la création, et le change ensuite dans « Membres » (« Accès : public » ou « Accès : privé ») ; un groupe rendu privé sort aussitôt de la liste, ses membres restent.
+
+**Groupes.**
+D'abord « Mes groupes », une ligne par groupe : son nom (un cadenas s'il est privé, trois joueurs s'il est public), ses membres en pastilles, leur nombre et le dernier fait (le dernier message, ou qui mène sur la table de la semaine) ; « 2 nouveaux » quand des messages attendent.
+Puis « Groupes publics », ceux que les autres bornes ont annoncés et dont vous n'êtes pas membre, les plus fournis d'abord : le nom, les membres en pastilles, leur nombre, le créateur et la table de la semaine.
 Puis « Créer un groupe », « Invitations reçues » (grisée sans invitation) et « Retour ».
 
+**Rejoindre un groupe public.**
+Start sur un groupe public : son aperçu, avec les membres, leur présence et la table de la semaine (« déjà dans votre borne » ou non), jamais les messages.
+« Rejoindre » fait entrer dans le groupe : la discussion arrive dès qu'un membre est en ligne.
+Il est grisé, avec sa raison, quand le groupe compte 20 membres, ou quand son créateur vous en a retiré : il faut alors une invitation.
+
 **Créer un groupe.**
-Le nom (32 caractères au plus, au clavier à l'écran ou au téléphone), les amis à inviter (cases à cocher, en ligne d'abord ; 20 membres au plus, invitations comprises), l'accès « Sur invitation seulement ».
+Le nom (32 caractères au plus, au clavier à l'écran ou au téléphone), les amis à inviter (cases à cocher, en ligne d'abord ; 20 membres au plus, invitations comprises), puis l'accès : « Sur invitation seulement » (privé), Start le passe à « Ouvert à tous » (public), et inversement.
 « Créer le groupe » envoie les invitations tout de suite ; il est grisé tant que le groupe n'a pas de nom.
 Seul un ami peut être invité, par n'importe quel membre.
 
@@ -581,18 +593,20 @@ Puis la discussion, en bulles comme la messagerie (les vôtres à droite, l'aute
 Les actions : « Écrire au groupe » (phrases prêtes, ou clavier à l'écran et téléphone), « Choisir la table de la semaine », « Inviter des amis » (grisé quand tous vos amis sont membres ou invités, ou à 20 membres), « Membres », « Quitter le groupe ».
 
 **Messages.**
-Start sur un message : les sept réactions par emoji, les phrases, « Écrire un message… » ; sur le vôtre, « Supprimer ce message… » (pour tous, après confirmation) ; sur celui d'un autre, « Signaler ce message… ». 500 caractères au plus, une ligne toutes les 3 secondes et 20 en 10 minutes, comme dans les salons ; le filtre de mots des salons s'applique à l'affichage.
+Start sur un message : les sept réactions par emoji, les phrases, « Écrire un message… » ; sur le vôtre, « Supprimer ce message… » (pour tous, après confirmation) ; sur celui d'un autre, « Signaler ce message… ».
+500 caractères au plus, une ligne toutes les 3 secondes et 20 en 10 minutes, comme dans les salons ; le filtre de mots des salons s'applique à l'affichage, et aux noms des groupes publics.
 Un message arrivé dans un groupe qui n'est pas à l'écran s'annonce par une notification (« Kiko · Les flippeurs du jeudi », le message dessous), partout, par-dessus VPX compris ; « Notifications du groupe » (dans Membres) la coupe pour ce groupe.
 
 **Membres.**
 Chacun avec son avatar, son drapeau, « Créateur », et sa présence (en ligne, en partie, hors ligne).
 Les invitations en attente suivent, avec qui a invité.
+Puis l'accès du groupe (le créateur le change, les autres le lisent) et les notifications du groupe.
 Le créateur peut retirer un membre ou annuler une invitation (Start sur la ligne) ; chacun peut partir quand il veut.
 Un membre retiré ou parti ne voit plus le groupe ; ses messages restent, signés de son nom.
 
 **Invitation reçue.**
 Une notification l'annonce (« Bruno vous invite dans « Les flippeurs du jeudi » »), comme une demande d'ami.
-L'écran montre qui invite, les membres et la table de la semaine (« déjà dans votre borne » ou non), jamais les messages : ils n'arrivent qu'une fois l'invitation acceptée.
+L'écran montre qui invite, si le groupe est public ou privé, les membres et la table de la semaine (« déjà dans votre borne » ou non), jamais les messages : ils n'arrivent qu'une fois l'invitation acceptée.
 « Accepter » fait entrer dans le groupe ; « Refuser » ne dit rien de plus que « refusée » à qui a invité.
 
 **Au téléphone.**
@@ -601,22 +615,26 @@ Comme pour la messagerie, la borne vérifie tout ce qui part, dans le front-end 
 
 **Signaler.**
 Le signalement part chiffré pour chaque modérateur, comme celui d'un salon (voir « Modération des salons »).
-Il joint le message tel que son auteur l'a signé ; les modérateurs le voient sous « Groupe privé », jamais le nom du groupe.
-Un joueur exclu par la modération ne peut plus écrire dans un groupe : ses messages ne passent plus.
+Il joint le message tel que son auteur l'a signé ; les modérateurs le voient sous « Groupe », jamais le nom du groupe.
+Un joueur exclu par la modération ne peut plus écrire dans un groupe : ses messages ne passent plus, ses annonces non plus.
 
 **Sans serveur, sans borne étrangère.**
-Un groupe est une suite de lignes signées chacune par son auteur (`grp` : création, invitation, arrivée, refus, départ, retrait, message, réaction, retrait d'un message, table de la semaine).
-Chaque borne de membre garde la suite et en tire le groupe en la rejouant dans l'ordre des dates : une ligne d'un joueur qui n'était pas membre à ce moment ne compte pas ; seul le créateur retire.
-Les bornes des membres se relient directement par leur clé (comme les joueurs d'une partie instantanée), amies ou non, et rien ne passe par une borne étrangère au groupe.
-Toutes les 20 secondes, et dès qu'un membre devient joignable, chacune dit d'une empreinte ce qu'elle a de chaque groupe (`grp-sum`) ; une empreinte différente fait dire la liste des lignes (`grp-have`), et l'autre envoie celles qui manquent.
+Un groupe est une suite de lignes signées chacune par son auteur (`grp` : création avec son accès, invitation, arrivée, refus, départ, retrait, changement d'accès, message, réaction, retrait d'un message, table de la semaine).
+Chaque borne de membre garde la suite et en tire le groupe en la rejouant dans l'ordre des dates : une ligne d'un joueur qui n'était pas membre à ce moment ne compte pas ; seul le créateur retire et change l'accès ; une arrivée sans invitation ne compte que si le groupe est public à ce moment, qu'il reste de la place et que le joueur n'en a pas été retiré.
+Les bornes des membres se relient directement par leur clé (comme les joueurs d'une partie instantanée), amies ou non, et les messages ne passent par aucune borne étrangère au groupe.
+Toutes les 20 secondes, et dès qu'un membre devient joignable, chacune lui donne d'abord ses propres lignes (son arrivée, si le membre ne la connaît pas encore), puis dit d'une empreinte ce qu'elle a de chaque groupe (`grp-sum`) ; une empreinte différente fait dire la liste des lignes (`grp-have`), et l'autre envoie celles qui manquent.
 Un message écrit part aussitôt vers les membres joignables, qui le relaient : un membre absent le reçoit de n'importe quel autre membre, à son retour.
 Une invitation (`grp-invite` : les lignes d'appartenance et la table de la semaine, sans les messages) part à la borne de l'ami invité jusqu'à son accusé (`grp-invite-ok`) ; un refus part vers qui a invité.
-Tout est gardé dans `<données>\amis\groupes.json` : 3 000 messages par groupe et un an au plus, jamais les lignes d'appartenance ; un groupe quitté s'efface après 14 jours, une invitation sans réponse après 30.
+Un groupe public s'annonce à toutes les bornes (`grp-pub`) : ses lignes d'appartenance et sa table de la semaine, signées une à une par leurs auteurs, et l'annonce elle-même signée par le membre qui la fait ; chaque membre la redit toutes les 30 minutes et à chaque changement, chaque borne la relaie et garde la plus récente de chaque groupe sept jours.
+En ouvrant « Groupes », la borne demande leur annuaire aux bornes reliées (`grp-pub-ask`).
+Un groupe redevenu privé s'annonce une dernière fois ainsi : chaque borne le retire de sa liste, et garde cette dernière annonce pour qu'une plus ancienne encore en route ne l'y ramène pas.
+Tout est gardé dans `<données>\amis\groupes.json` : 3 000 messages par groupe et un an au plus, jamais les lignes d'appartenance ; un groupe quitté s'efface après 14 jours, une invitation sans réponse après 30, une annonce après sept jours ; l'annuaire garde 200 groupes au plus.
 Le module est [groups.ts](../../packages/core/src/groups.ts), le service `app/src/group-service.ts`, les écrans `app/src/groups-menu.ts`.
 
 **Essais.**
-[groupes-prives.test.ts](../../packages/core/src/test/groupes-prives.test.ts) : seuls les membres invitent, écrivent, réagissent et choisissent la table ; seul le créateur retire ; un message ne se retire que par son auteur ; l'ordre d'arrivée ne compte pas ; signature fausse, texte retouché ou date du futur refusés ; l'invitation ne porte pas les messages et ne vaut que venue d'un membre qui m'invite ; et sur le réseau d'essai en 127.0.0.1, Alice et Chloé, qui ne sont pas amies, se parlent par le groupe, un message écrit pendant que Chloé est éteinte lui arrive à son retour, Dora, hors du groupe, ne reçoit rien, et son refus revient à Alice.
-Démonstration hors écran : bornes fictives en mode `groupes` (Bruno crée le groupe et invite la borne).
+[groupes.test.ts](../../packages/core/src/test/groupes.test.ts) : seuls les membres invitent, écrivent, réagissent et choisissent la table ; seul le créateur retire et change l'accès ; un message ne se retire que par son auteur ; l'ordre d'arrivée ne compte pas ; signature fausse, texte retouché ou date du futur refusés ; l'invitation ne porte pas les messages et ne vaut que venue d'un membre qui m'invite ; un groupe public se rejoint sans invitation, jamais par un membre retiré ; son annonce ne porte pas les messages, refusée si elle est retouchée ou faite par un non-membre ; un groupe privé ne s'annonce jamais ; redevenu privé, il quitte l'annuaire et une annonce plus ancienne ne l'y ramène pas.
+Sur le réseau d'essai en 127.0.0.1 : Alice et Chloé, qui ne sont pas amies, se parlent par un groupe privé, un message écrit pendant que Chloé est éteinte lui arrive à son retour, Dora, hors du groupe, ne reçoit rien, et son refus revient à Alice ; Eve, une inconnue, trouve le groupe public d'Alice dans l'annuaire (jamais son groupe privé), le rejoint, en reçoit l'historique et y parle ; fermé par Alice, il quitte l'annuaire de Dora et ne se rejoint plus.
+Démonstration hors écran : bornes fictives en mode `groupes` (Bruno crée un groupe privé et invite la borne, Kiko ouvre un groupe public).
 
 ### Salons par pays
 

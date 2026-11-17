@@ -1,7 +1,10 @@
-// Groupes privés (groups.ts, et app/src/group-service.ts compilé) :
+// Groupes, publics ou privés (groups.ts, et app/src/group-service.ts compilé) :
 // - la suite des lignes fait le groupe : seul un membre invite, écrit, réagit, choisit la table ; seul
 //   le créateur retire ; un message ne se retire que par son auteur ; une signature fausse ne compte pas ;
 // - une invitation ne porte jamais les messages, et ne vaut que si son auteur est membre et m'invite ;
+// - un groupe public se rejoint sans invitation, sauf par un membre retiré ; son annonce, signée par un
+//   membre, ne porte pas les messages ; redevenu privé, il quitte l'annuaire ; un groupe privé n'y entre
+//   jamais ; sur le réseau d'essai, une inconnue le trouve dans l'annuaire, le rejoint et y parle ;
 // - sur un réseau d'essai HyperDHT en 127.0.0.1 : Alice crée un groupe et invite Bruno, qui accepte et
 //   invite Chloé (son amie, pas celle d'Alice) ; Alice et Chloé se parlent par le groupe sans être amies ;
 //   un message écrit pendant que Chloé est éteinte lui arrive à son retour ; Dora, hors du groupe, ne
@@ -27,6 +30,10 @@ import {
   mergeGroupLines,
   createGroup,
   GROUP_LEFT_KEEP_DAYS,
+  signAnnounce,
+  verifyAnnounce,
+  mergeAnnounces,
+  publicGroups,
   type GroupLine,
   type GroupsState,
   type GroupView,
@@ -156,6 +163,59 @@ test('groupes : non-lus, groupe quitté effacé plus tard, fin de la table de la
   assert.equal(isMember(v, bruno.key.publicKey), true);
 });
 
+test('groupes publics : arrivée sans invitation, membre retiré, annonce et annuaire', () => {
+  const alice = player('Alice');
+  const bruno = player('Bruno');
+  const chloe = player('Chloé');
+  const G = 'abcdef0123456789';
+  const P = '9876543210fedcba';
+  const pub = [sign(alice, G, { k: 'create', name: 'Club ouvert', access: 'public' }, 0, G)];
+  const joinB = sign(bruno, G, { k: 'join' }, 1);
+  const msgB = sign(bruno, G, { k: 'msg', text: 'Salut tout le monde' }, 2);
+  let v = groupView([...pub, joinB, msgB], at(3))!;
+  assert.equal(v.access, 'public');
+  assert.deepEqual(v.members.map((m) => m.name), ['Alice', 'Bruno']);
+  assert.equal(v.messages.length, 1);
+  // Retiré par la créatrice : il ne revient pas de lui-même ; une invitation le laisse revenir.
+  const removeB = sign(alice, G, { k: 'remove', who: bruno.key.publicKey }, 4);
+  const rejoinB = sign(bruno, G, { k: 'join' }, 5);
+  v = groupView([...pub, joinB, msgB, removeB, rejoinB], at(6))!;
+  assert.equal(isMember(v, bruno.key.publicKey), false);
+  const inviteB = sign(alice, G, { k: 'invite', who: bruno.key.publicKey, whoName: 'Bruno' }, 7);
+  const backB = sign(bruno, G, { k: 'join' }, 8);
+  assert.equal(isMember(groupView([...pub, joinB, msgB, removeB, rejoinB, inviteB, backB], at(9))!, bruno.key.publicKey), true);
+  // Un groupe privé ne se rejoint pas sans invitation ; seul le créateur change l'accès.
+  const priv = [sign(alice, P, { k: 'create', name: 'Club fermé' }, 0, P)];
+  assert.equal(isMember(groupView([...priv, sign(chloe, P, { k: 'join' }, 1)], at(2))!, chloe.key.publicKey), false);
+  const openByBruno = sign(bruno, G, { k: 'access', access: 'private' }, 10);
+  assert.equal(groupView([...pub, joinB, openByBruno], at(11))!.access, 'public');
+
+  // L'annonce : signée par un membre, sans les messages ; vérifiée, elle entre dans l'annuaire.
+  const lines = [...pub, joinB, msgB];
+  const a = signAnnounce({ key: bruno.key }, lines, at(3))!;
+  assert.ok(a);
+  assert.equal(a.lines.some((l) => l.body.k === 'msg'), false);
+  assert.ok(verifyAnnounce(JSON.parse(JSON.stringify(a)), at(4)));
+  // Retouchée, ou annoncée par un non-membre : refusée.
+  assert.equal(verifyAnnounce({ ...a, at: at(5).toISOString() }, at(6)), undefined);
+  assert.equal(signAnnounce({ key: chloe.key }, lines, at(3)), undefined);
+  // Un groupe privé ne s'annonce jamais.
+  assert.equal(signAnnounce({ key: alice.key }, priv, at(1)), undefined);
+  let s = mergeAnnounces(newGroupsState(), [a], at(4)).state;
+  assert.deepEqual(publicGroups(s, chloe.key.publicKey, at(4)).map((x) => x.view.name), ['Club ouvert']);
+  // Pas pour ses membres : il est déjà dans « Mes groupes ».
+  assert.deepEqual(publicGroups(s, bruno.key.publicKey, at(4)), []);
+  // Redevenu privé : la dernière annonce le retire de l'annuaire.
+  const close = sign(alice, G, { k: 'access', access: 'private' }, 10);
+  const last = signAnnounce({ key: alice.key }, [...lines, close], at(11))!;
+  assert.ok(last);
+  s = mergeAnnounces(s, [last], at(12)).state;
+  assert.deepEqual(publicGroups(s, chloe.key.publicKey, at(12)), []);
+  // Une annonce plus ancienne ne le fait pas revenir.
+  assert.equal(mergeAnnounces(s, [a], at(13)).fresh.length, 0);
+  assert.deepEqual(parseGroupMessage({ t: 'grp-pub-ask' }), { t: 'grp-pub-ask' });
+});
+
 // ---------------------------------------------------------------------------
 // Sur le réseau d'essai
 
@@ -172,8 +232,12 @@ interface Net {
 interface Groups {
   state(): GroupsState;
   view(g: string): GroupView | undefined;
-  create(name: string, friends: { key: string; name: string }[]): string | undefined;
+  create(name: string, friends: { key: string; name: string }[], access?: 'public' | 'private'): string | undefined;
   invite(g: string, friends: { key: string; name: string }[]): number;
+  setAccess(g: string, access: 'public' | 'private'): boolean;
+  publicGroups(): { view: GroupView }[];
+  joinPublic(g: string): boolean;
+  askDirectory(): void;
   send(g: string, text: string): { line: GroupLine } | { reason: string };
   accept(g: string): boolean;
   decline(g: string): boolean;
@@ -273,6 +337,46 @@ test('groupes sur le réseau : invitation, membres non amis, message remis au re
     assert.equal(dora.groups.decline(G), true);
     await until('refus de Dora chez Alice', () => !!alice.groups.view(G)?.declined.has(dora.key()));
     assert.equal(alice.groups.view(G)?.invited.length, 0);
+  } finally {
+    clearInterval(tick);
+    for (const c of all) c.groups.stop();
+    await Promise.all(all.map((c) => c.net.stop()));
+    await testnet.destroy();
+  }
+});
+
+test('groupes publics sur le réseau : trouvé par une inconnue, rejoint, fermé, jamais un groupe privé', async () => {
+  const testnet = await createTestnet(3, { host: '127.0.0.1' });
+  const alice = cabinet('Alice', testnet.bootstrap);
+  const eve = cabinet('Eve', testnet.bootstrap);
+  const dora = cabinet('Dora', testnet.bootstrap);
+  const all = [alice, eve, dora];
+  const tick = setInterval(() => all.forEach((c) => c.groups.observe()), 200);
+  try {
+    await Promise.all(all.map((c) => c.net.start()));
+    // Aucune amitié : seul l'annuaire des groupes publics les rapproche.
+    const G = alice.groups.create('Club ouvert', [], 'public')!;
+    const P = alice.groups.create('Club fermé', [])!;
+    alice.groups.send(G, 'Bienvenue à tous');
+    const listed = (c: ReturnType<typeof cabinet>) => c.groups.publicGroups().map((x) => x.view.name);
+    await until('le groupe public chez Eve et Dora', () => (eve.groups.askDirectory(), dora.groups.askDirectory(), listed(eve).includes('Club ouvert') && listed(dora).includes('Club ouvert')), 60_000);
+    // Le groupe privé n'est nulle part.
+    assert.equal(listed(eve).includes('Club fermé'), false);
+    assert.equal(Object.keys(eve.groups.state().directory).includes(P), false);
+
+    // Eve le rejoint : Alice la compte parmi les membres, l'historique lui arrive, elles se parlent.
+    assert.equal(eve.groups.joinPublic(G), true);
+    await until('Eve membre chez Alice', () => !!alice.groups.view(G)?.members.some((m) => m.key === eve.key()), 60_000);
+    await until('historique chez Eve', () => texts(eve.groups, G).includes('Bienvenue à tous'));
+    eve.groups.send(G, 'Merci Alice !');
+    await until('message d’Eve chez Alice', () => texts(alice.groups, G).includes('Merci Alice !'));
+
+    // Alice le ferme : il quitte l'annuaire de Dora ; Eve reste membre.
+    assert.equal(alice.groups.setAccess(G, 'private'), true);
+    await until('retiré de l’annuaire de Dora', () => !listed(dora).includes('Club ouvert'), 60_000);
+    assert.equal(!!eve.groups.view(G)?.members.some((m) => m.key === eve.key()), true);
+    // Fermé, il ne se rejoint plus sans invitation.
+    assert.equal(dora.groups.joinPublic(G), false);
   } finally {
     clearInterval(tick);
     for (const c of all) c.groups.stop();

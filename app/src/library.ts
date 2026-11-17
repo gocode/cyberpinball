@@ -554,7 +554,7 @@ export type UiAction =
   | { type: 'rooms' }
   /** Notification d'un signalement (modérateur) : la file des signalements (rooms-menu.ts). */
   | { type: 'moderation' }
-  /** Notification d'un groupe privé (message, invitation) : ce groupe, ou l'invitation (groups-menu.ts). */
+  /** Notification d'un groupe (message, invitation) : ce groupe, ou l'invitation (groups-menu.ts). */
   | { type: 'groups' }
   /** Résumé « 4 nouveautés » : Activité récente, qui dit chacune en entier. */
   | { type: 'activity' }

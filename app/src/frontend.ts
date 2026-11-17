@@ -1625,7 +1625,7 @@ phoneRemote.setMenu({
   // Communauté au téléphone (messages, amis) : au menu, et pendant une partie si le réglage le permet ; jamais en mode invité.
   community: (open) => {
     if (guest.active) return { closed: t('Fermée en mode invité.'), unread: 0, rows: [] };
-    // Mes groupes privés en tête des conversations ; leur fil s'ouvre par « g:<id> ».
+    // Mes groupes en tête des conversations ; leur fil s'ouvre par « g:<id> ».
     const groups = groupsMenu.remote(open);
     const chat = chatMenu.remoteCommunity(open?.startsWith('g:') ? undefined : open);
     return { ...chat, rows: [...groups.rows, ...chat.rows], unread: chat.unread + groups.unread, ...(groups.thread ? { thread: groups.thread } : {}), players: remoteOnlinePlayers(), ...remoteRoom() };
@@ -2774,7 +2774,7 @@ function socialChanged(): void {
     if (closing) return;
     // Un ami revenu en ligne : la messagerie lui envoie ce qui l'attendait (chat-service.ts).
     chatService.observe();
-    // Un membre d'un groupe privé revenu : ses lignes manquantes s'échangent (group-service.ts).
+    // Un membre d'un groupe revenu : ses lignes manquantes s'échangent (group-service.ts).
     groupService.observe();
     // Une charte reçue a pu faire de cette borne un modérateur (ou le contraire).
     syncModerationItem();
@@ -2833,7 +2833,7 @@ const chatService = createChatService({
   },
   log: (line) => console.log(line),
 });
-// Groupes privés (Communauté > Groupes privés) : les bornes des membres s'échangent leurs lignes ;
+// Groupes (Communauté > Groupes) : les bornes des membres s'échangent leurs lignes ;
 // un message ou une invitation passe par les notifications (menu-notices.ts).
 const groupService = createGroupService({
   net: socialNet,
@@ -3243,7 +3243,7 @@ const roomsMenu = createRoomsMenu({
   phoneLinked: () => phoneRemote?.connected() === 'menu',
 });
 library.provideSystemItem('community-settings', roomsMenu.settingsItem);
-// Groupes privés (groups-menu.ts) : la porte de l'accueil Communauté, la liste, un groupe, les invitations.
+// Groupes (groups-menu.ts) : la porte de l'accueil Communauté, la liste, un groupe, les invitations.
 const groupsMenu = createGroupsMenu({
   library,
   net: socialNet,

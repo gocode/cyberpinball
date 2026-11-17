@@ -78,7 +78,7 @@ export interface ModReport {
   by: string;
   name: string;
   /**
-   * La ligne signalée, telle qu'elle a été signée par son auteur. Un message de groupe privé
+   * La ligne signalée, telle qu'elle a été signée par son auteur. Un message de groupe
    * (groups.ts) y est recopié sous la forme d'une ligne du salon GROUP_REPORT_ROOM, `group` portant
    * le message signé, seul vérifié.
    */
@@ -206,7 +206,7 @@ function reportText(r: Omit<ModReport, 'sig'>): string {
   return JSON.stringify({ app: 'cyberpinball', kind: 'report', id: r.id, by: r.by, name: r.name, line: r.line.id, lineSig: r.line.sig, reason: r.reason, at: r.at });
 }
 
-/** Le « salon » d'un message de groupe privé signalé : le modérateur lit « Groupe privé », jamais le nom du groupe. */
+/** Le « salon » d'un message de groupe privé signalé : le modérateur lit « Groupe », jamais le nom du groupe. */
 export const GROUP_REPORT_ROOM: RoomId = 'groupe';
 
 /** Un message de groupe, recopié en ligne de salon pour la file des modérateurs ; undefined si ce n'est pas un message. */
@@ -230,7 +230,7 @@ export function verifyReport(raw: unknown, now = new Date()): ModReport | undefi
   if (!isId(r.id) || !isPlayerPublicKey(r.by) || !name || name !== r.name || !isReason(r.reason) || !isIso(r.at) || typeof r.sig !== 'string' || r.sig.length > 200) return undefined;
   if (Date.parse(r.at) > now.getTime() + FUTURE_MS || now.getTime() - Date.parse(r.at) > REPORT_KEEP_DAYS * DAY) return undefined;
   // La ligne jointe : vérifiée sans limite d'âge propre (celle du signalement suffit).
-  // Un message de groupe privé : sa signature à lui, la ligne montrée en est tirée.
+  // Un message de groupe : sa signature à lui, la ligne montrée en est tirée.
   const group = r.group !== undefined ? verifyGroupLine(r.group, new Date(Date.parse((r.group as { at?: string })?.at ?? '') + 1000)) : undefined;
   if (r.group !== undefined && !group) return undefined;
   const line = group ? groupAsRoomLine(group) : verifyRoomLine(r.line, new Date(Date.parse((r.line as { at?: string })?.at ?? '') + 1000));

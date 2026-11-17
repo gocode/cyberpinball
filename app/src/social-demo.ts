@@ -49,9 +49,10 @@
 // Leurs tables sont inventées, comme celles des captures de la page du projet : les captures
 // de ces démonstrations vont sur la page publique du projet, aucun vrai jeu ne doit y paraître
 // (packages\core\src\test\demo-tables-inventees.test.ts).
-// CYBERPINBALL_RESEAU_DEMO=groupes (Communauté > Groupes privés) : Bruno crée « Les flippeurs du
+// CYBERPINBALL_RESEAU_DEMO=groupes (Communauté > Groupes) : Bruno crée « Les flippeurs du
 // jeudi » avec Kiko, Ressort et Dora (ses amis), y invite la borne et choisit la table de la semaine ;
-// ils y écrivent et publient des scores ; une seconde invitation (« Arcade du port ») reste en attente.
+// ils y écrivent et publient des scores ; une seconde invitation (« Arcade du port ») reste en attente ;
+// Kiko ouvre « Club des records », un groupe public que Ressort et Dora rejoignent par l'annuaire.
 
 import { generateKeyPairSync } from 'node:crypto';
 import * as fs from 'node:fs';
@@ -416,7 +417,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       }, 13_000));
     }
   }
-  // Groupes privés : Bruno crée « Les flippeurs du jeudi » avec Kiko, Ressort et Dora (ses amis), et y
+  // Groupes : Bruno crée « Les flippeurs du jeudi » avec Kiko, Ressort et Dora (ses amis), et y
   // invite la borne ; ils y parlent avant son arrivée, choisissent la table de la semaine et y publient
   // des scores ; Bruno invite aussi la borne dans « Arcade du port », qui reste en attente.
   const groupStops: (() => void)[] = [];
@@ -486,6 +487,19 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
         }
         // Une seconde invitation, qui reste en attente.
         brunoGroups.create('Arcade du port', [me]); // i18n-ignore : nom d'un groupe fictif
+        // Un groupe public : Kiko le crée, Ressort et Dora le trouvent dans l'annuaire et le rejoignent ;
+        // la borne, qui ne connaît pas Kiko, l'y trouvera aussi.
+        const club = kikoG!.create('Club des records', [], 'public'); // i18n-ignore : nom d'un groupe fictif
+        if (club) {
+          if (table) kikoG!.setWeek(club, presenceTable(table));
+          for (const other of [ressortG!, doraG!]) {
+            await until('le club dans l’annuaire', () => (other.askDirectory(), other.publicGroups().some((x) => x.view.id === club))); // i18n-ignore : journal
+            other.joinPublic(club);
+          }
+          await sleep(2500);
+          kikoG!.send(club, 'Qui tente le record de la semaine ?'); // i18n-ignore : message d'un joueur fictif
+          log('Réseau simulé : Kiko ouvre « Club des records », un groupe public.'); // i18n-ignore : journal
+        }
         // La borne arrivée : Bruno lui souhaite la bienvenue.
         await until('arrivée de la borne', () => !!brunoGroups.view(g)?.members.some((m) => m.key === me.key), 180_000); // i18n-ignore : journal
         await sleep(1500);
@@ -760,7 +774,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       }
       // Partie en direct : l'invitation, une fois la borne reliée et le menu affiché ; en-jeu, une
       // fois la borne en partie (sa présence le dit).
-      // Groupes privés : le scénario, une fois Bruno ami de la borne.
+      // Groupes : le scénario, une fois Bruno ami de la borne.
       if (groupsScript) void groupsScript();
       if (games && mode === 'fins-invitation') void endsScript();
       else if (games) {

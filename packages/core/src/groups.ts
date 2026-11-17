@@ -1,6 +1,7 @@
-// Groupes privés (Communauté, novembre 2026) : des cercles sur invitation, avec leur discussion, leur
+// Groupes (Communauté, novembre 2026) : des cercles publics ou privés, avec leur discussion, leur
 // table de la semaine et leur classement. Ici, rien du réseau ni de l'écran : les formes, les
-// signatures, l'appartenance, la fusion et le fichier de la borne (<données>\amis\groupes.json).
+// signatures, l'appartenance, l'annuaire des groupes publics, la fusion et le fichier de la borne
+// (<données>\amis\groupes.json).
 //
 // Un groupe n'est qu'une suite de lignes signées chacune par son auteur : la création, les invitations,
 // les arrivées, les départs, les messages, les réactions, les retraits et la table de la semaine. Chaque
@@ -12,9 +13,15 @@
 // arrive par n'importe quel autre membre, à son retour.
 //
 // Règles :
-// - privé : un groupe n'apparaît nulle part pour qui n'en est pas ; seul un ami peut être invité, par
-//   n'importe quel membre ; l'invitation (la suite des lignes d'appartenance, sans les messages) part
-//   à la borne de l'invité, qui l'accepte ou la refuse (« refusée », rien de plus) ;
+// - privé (par défaut) : le groupe n'apparaît nulle part pour qui n'en est pas ; on y entre seulement
+//   sur invitation ;
+// - public : ses membres l'annoncent à toutes les bornes (GroupAnnounce : ses lignes d'appartenance et
+//   sa table de la semaine, jamais les messages) ; il paraît dans l'annuaire des groupes publics et
+//   n'importe quel joueur le rejoint d'un appui, sauf un membre que le créateur a retiré (il lui faut
+//   une invitation) ; le créateur choisit l'accès à la création et peut le changer ;
+// - dans les deux cas, seul un ami peut être invité, par n'importe quel membre ; l'invitation (la suite
+//   des lignes d'appartenance, sans les messages) part à la borne de l'invité, qui l'accepte ou la
+//   refuse (« refusée », rien de plus) ;
 // - le créateur peut retirer un membre ; chacun peut partir quand il veut ;
 // - un message se supprime par son auteur, pour tous ; les réactions sont les sept de reactions.ts ;
 // - limites d'envoi des salons (une ligne toutes les 3 s, 20 en 10 min) ; GROUP_MEMBERS_MAX membres.
@@ -56,7 +63,10 @@ const DAY = 86_400_000;
 const FUTURE_MS = 10 * 60_000;
 
 export type GroupBody =
-  | { k: 'create'; name: string }
+  /** `access` absent : privé (les lignes d'avant les groupes publics restent valides, signature comprise). */
+  | { k: 'create'; name: string; access?: 'public' }
+  /** Le créateur ouvre ou ferme son groupe. */
+  | { k: 'access'; access: GroupAccess }
   | { k: 'invite'; who: string; whoName: string }
   | { k: 'join' }
   | { k: 'decline' }
@@ -66,6 +76,8 @@ export type GroupBody =
   | { k: 'react'; target: string; kind: Reaction | null }
   | { k: 'del'; target: string }
   | { k: 'week'; table: PresenceTable; until: string };
+
+export type GroupAccess = 'public' | 'private';
 
 export interface GroupLine {
   /** Identifiant tiré au hasard par l'auteur ; celui de la création est l'identifiant du groupe. */
@@ -121,8 +133,11 @@ function parseBody(raw: unknown): GroupBody | undefined {
   switch (b.k) {
     case 'create': {
       const name = cleanGroupName(b.name);
-      return name && name === b.name ? { k: 'create', name } : undefined;
+      if (b.access !== undefined && b.access !== 'public') return undefined;
+      return name && name === b.name ? { k: 'create', name, ...(b.access ? { access: 'public' as const } : {}) } : undefined;
     }
+    case 'access':
+      return b.access === 'public' || b.access === 'private' ? { k: 'access', access: b.access } : undefined;
     case 'invite': {
       const whoName = normalizeName(b.whoName);
       return isPlayerPublicKey(b.who) && whoName && whoName === b.whoName ? { k: 'invite', who: b.who, whoName } : undefined;
@@ -162,7 +177,7 @@ export function signGroupLine(me: { key: PlayerKey; name: string; country?: stri
     clean = text ? { k: 'msg', text } : undefined;
   } else if (body.k === 'create') {
     const name = cleanGroupName(body.name);
-    clean = name ? { k: 'create', name } : undefined;
+    clean = name ? { k: 'create', name, ...(body.access === 'public' ? { access: 'public' as const } : {}) } : undefined;
   }
   if (!clean) return undefined;
   const base: Omit<GroupLine, 'sig'> = { id, g, by: me.key.publicKey, name: me.name, ...(me.country ? { country: me.country } : {}), at: now.toISOString(), body: clean };
@@ -219,6 +234,8 @@ export interface GroupView {
   name: string;
   creator: string;
   created: string;
+  /** Public : dans l'annuaire, et n'importe qui le rejoint ; privé : sur invitation seulement. */
+  access: GroupAccess;
   members: GroupMember[];
   invited: GroupInvited[];
   /** Anciens membres (partis ou retirés) : leurs messages restent, signés de leur nom. */
@@ -250,6 +267,9 @@ export function groupView(lines: readonly GroupLine[], now = new Date()): GroupV
   const texts = new Map<string, GroupLine>();
   const reactions = new Map<string, Map<string, Reaction>>();
   let week: GroupWeek | undefined;
+  let access: GroupAccess = create.body.access === 'public' ? 'public' : 'private';
+  /** Retirés par le créateur : ils ne reviennent dans un groupe public que sur invitation. */
+  const banned = new Set<string>();
   for (const l of [...lines].filter((x) => x.g === g && x !== create).sort(byDate)) {
     const b = l.body;
     const member = members.get(l.by);
@@ -266,10 +286,14 @@ export function groupView(lines: readonly GroupLine[], now = new Date()): GroupV
         invited.set(b.who, { key: b.who, name: b.whoName, by: l.by, at: l.at, line: l.id });
         declined.delete(b.who);
         former.delete(b.who);
+        banned.delete(b.who);
         break;
       case 'join': {
-        if (!invited.has(l.by)) continue;
+        // Sur invitation ; ou, dans un groupe public, de soi-même (sauf retiré, et s'il reste de la place).
+        const open = access === 'public' && !banned.has(l.by) && !members.has(l.by) && members.size + invited.size < GROUP_MEMBERS_MAX;
+        if (!invited.has(l.by) && !open) continue;
         invited.delete(l.by);
+        former.delete(l.by);
         members.set(l.by, { key: l.by, name: l.name, ...(l.country ? { country: l.country } : {}), since: l.at });
         break;
       }
@@ -291,8 +315,13 @@ export function groupView(lines: readonly GroupLine[], now = new Date()): GroupV
           former.set(b.who, { name: gone.name, how: 'removed', at: l.at });
         } else if (invited.has(b.who)) invited.delete(b.who);
         else continue;
+        banned.add(b.who);
         break;
       }
+      case 'access':
+        if (l.by !== create.by) continue;
+        access = b.access;
+        break;
       case 'msg':
         if (!member) continue;
         texts.set(l.id, l);
@@ -327,6 +356,7 @@ export function groupView(lines: readonly GroupLine[], now = new Date()): GroupV
     name: create.body.name,
     creator: create.by,
     created: create.at,
+    access,
     members: [...members.values()],
     invited: [...invited.values()],
     former,
@@ -354,6 +384,105 @@ export function invitationLines(lines: readonly GroupLine[], now = new Date()): 
   return [...structural, ...(week ? [week] : [])].sort(byDate);
 }
 
+// ---------------------------------------------------------------------------
+// Annuaire des groupes publics
+
+/**
+ * Annonce d'un groupe public, signée par un de ses membres : ses lignes d'appartenance et sa table
+ * de la semaine (invitationLines), chacune signée par son auteur, jamais les messages. Elle passe de
+ * borne en borne comme une partie instantanée ; une annonce plus récente remplace la précédente. Un
+ * groupe redevenu privé s'annonce une dernière fois ainsi : chaque borne le retire de son annuaire.
+ */
+export interface GroupAnnounce {
+  g: string;
+  by: string;
+  at: string;
+  lines: GroupLine[];
+  sig: string;
+}
+
+/** Un membre redit l'annonce de ses groupes publics à ce rythme ; une annonce plus vieille que GROUP_ANNOUNCE_KEEP_DAYS part. */
+export const GROUP_ANNOUNCE_MS = 30 * 60_000;
+export const GROUP_ANNOUNCE_KEEP_DAYS = 7;
+/** Groupes publics gardés dans l'annuaire, lignes par annonce, annonces par message. */
+export const GROUP_DIRECTORY_MAX = 200;
+const ANNOUNCE_LINES_MAX = 4 * GROUP_MEMBERS_MAX + 10;
+export const GROUP_ANNOUNCE_BATCH = 20;
+
+function announceText(a: Omit<GroupAnnounce, 'sig'>): string {
+  return JSON.stringify({ app: 'cyberpinball', kind: 'group-pub', g: a.g, by: a.by, at: a.at, ids: a.lines.map((l) => l.id).sort() });
+}
+
+/**
+ * L'annonce d'un de mes groupes, signée maintenant : public, ou redevenu privé (pour le retirer des
+ * annuaires) ; undefined pour un groupe toujours privé, ou dont je ne suis pas membre.
+ */
+export function signAnnounce(me: { key: PlayerKey }, lines: readonly GroupLine[], now = new Date()): GroupAnnounce | undefined {
+  const v = groupView(lines, now);
+  if (!v || !isMember(v, me.key.publicKey)) return undefined;
+  const wasPublic = lines.some((l) => v.valid.has(l.id) && (l.body.k === 'access' || (l.body.k === 'create' && l.body.access === 'public')));
+  if (v.access !== 'public' && !wasPublic) return undefined;
+  const base: Omit<GroupAnnounce, 'sig'> = { g: v.id, by: me.key.publicKey, at: now.toISOString(), lines: invitationLines(lines, now) };
+  return { ...base, sig: signText(announceText(base), me.key) };
+}
+
+/** Annonce reçue : signature, lignes, membre qui l'annonce, fraîcheur ; et le groupe qu'elle décrit. */
+export function verifyAnnounce(raw: unknown, now = new Date()): { announce: GroupAnnounce; view: GroupView } | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  if (!isGroupId(r.g) || !isPlayerPublicKey(r.by) || !isIso(r.at) || typeof r.sig !== 'string' || r.sig.length > 200 || !Array.isArray(r.lines) || r.lines.length > ANNOUNCE_LINES_MAX) return undefined;
+  const at = Date.parse(r.at);
+  if (at > now.getTime() + FUTURE_MS || now.getTime() - at > GROUP_ANNOUNCE_KEEP_DAYS * DAY) return undefined;
+  const lines = r.lines.map((l) => verifyGroupLine(l, now)).filter((l): l is GroupLine => !!l && l.g === r.g);
+  if (lines.length !== r.lines.length || lines.some((l) => l.body.k === 'msg' || l.body.k === 'react' || l.body.k === 'del')) return undefined;
+  const announce: GroupAnnounce = { g: r.g, by: r.by, at: r.at, lines, sig: r.sig };
+  if (!verifyText(announceText(announce), announce.sig, announce.by)) return undefined;
+  const view = groupView(lines, now);
+  if (!view || view.id !== r.g || !isMember(view, r.by)) return undefined;
+  return { announce, view };
+}
+
+/**
+ * Annonces reçues : la plus récente de chaque groupe est gardée, même celle d'un groupe redevenu privé
+ * (publicGroups ne le montre pas) : sans cette trace, une annonce plus ancienne encore en route le
+ * ferait revenir dans l'annuaire. Rend celles à relayer.
+ */
+export function mergeAnnounces(s: GroupsState, list: readonly GroupAnnounce[], now = new Date()): { state: GroupsState; fresh: GroupAnnounce[] } {
+  let directory = s.directory;
+  const fresh: GroupAnnounce[] = [];
+  for (const a of list) {
+    const had = directory[a.g];
+    if (had && Date.parse(had.at) >= Date.parse(a.at)) continue;
+    if (!groupView(a.lines, now)) continue;
+    directory = { ...directory, [a.g]: a };
+    fresh.push(a);
+  }
+  if (!fresh.length) return { state: s, fresh };
+  // Au-delà du plafond, les annonces les plus anciennes partent.
+  const kept = Object.values(directory).sort((x, y) => Date.parse(y.at) - Date.parse(x.at)).slice(0, GROUP_DIRECTORY_MAX);
+  return { state: { ...s, directory: Object.fromEntries(kept.map((a) => [a.g, a])) }, fresh };
+}
+
+/** Les groupes publics de l'annuaire dont je ne suis pas membre : les plus fournis d'abord, puis les plus récemment annoncés. */
+export function publicGroups(s: GroupsState, me: string, now = new Date()): { announce: GroupAnnounce; view: GroupView }[] {
+  const out: { announce: GroupAnnounce; view: GroupView }[] = [];
+  for (const a of Object.values(s.directory)) {
+    const mine = s.groups[a.g];
+    const view = groupView(mine && !mine.gone ? mine.lines : a.lines, now);
+    if (!view || view.access !== 'public' || isMember(view, me)) continue;
+    out.push({ announce: a, view });
+  }
+  return out.sort((x, y) => y.view.members.length - x.view.members.length || Date.parse(y.announce.at) - Date.parse(x.announce.at));
+}
+
+/** Je rejoins un groupe public de l'annuaire : il entre sur ma borne avec ma ligne d'arrivée. */
+export function joinPublic(s: GroupsState, announce: GroupAnnounce, join: GroupLine): GroupsState {
+  const had = s.groups[announce.g];
+  const lines = [...new Map([...(had?.lines ?? []), ...announce.lines, join].map((l) => [l.id, l])).values()].sort(byDate);
+  const { [announce.g]: _, ...invitations } = s.invitations;
+  return { ...s, invitations, groups: { ...s.groups, [announce.g]: { lines, unread: 0 } } };
+}
+
 /** Empreinte d'une liste d'identifiants : deux bornes qui ont les mêmes lignes ont la même. */
 export function groupDigest(ids: Iterable<string>): string {
   return createHash('sha256').update([...ids].sort().join(',')).digest('hex').slice(0, 16);
@@ -372,7 +501,11 @@ export type GroupMessage =
   /** Une invitation, à la borne d'un ami : les lignes d'appartenance du groupe. */
   | { t: 'grp-invite'; lines: GroupLine[] }
   /** L'invitation est arrivée (l'identifiant de sa ligne). */
-  | { t: 'grp-invite-ok'; ids: string[] };
+  | { t: 'grp-invite-ok'; ids: string[] }
+  /** Annonces de groupes publics, entre toutes les bornes (vérifiées par verifyAnnounce à l'arrivée). */
+  | { t: 'grp-pub'; ann: unknown[] }
+  /** Donnez-moi votre annuaire des groupes publics (l'écran « Groupes » s'ouvre). */
+  | { t: 'grp-pub-ask' };
 
 export function parseGroupMessage(m: Record<string, unknown>): GroupMessage | undefined {
   switch (m.t) {
@@ -388,6 +521,10 @@ export function parseGroupMessage(m: Record<string, unknown>): GroupMessage | un
       return isGroupId(m.g) && Array.isArray(m.ids) ? { t: 'grp-have', g: m.g, ids: m.ids.slice(0, GROUP_HAVE_MAX).filter(isGroupId) } : undefined;
     case 'grp-invite-ok':
       return Array.isArray(m.ids) ? { t: 'grp-invite-ok', ids: m.ids.slice(0, GROUP_BATCH).filter(isGroupId) } : undefined;
+    case 'grp-pub':
+      return Array.isArray(m.ann) && m.ann.length ? { t: 'grp-pub', ann: m.ann.slice(0, GROUP_ANNOUNCE_BATCH) } : undefined;
+    case 'grp-pub-ask':
+      return { t: 'grp-pub-ask' };
     default:
       return undefined;
   }
@@ -424,9 +561,11 @@ export interface GroupsState {
   delivered: string[];
   /** Mes refus : la ligne part vers qui m'a invité, jusqu'à son accusé. */
   outbox: { to: string; line: GroupLine }[];
+  /** Annuaire des groupes publics connus de cette borne, par groupe (la dernière annonce). */
+  directory: Record<string, GroupAnnounce>;
 }
 
-export const newGroupsState = (): GroupsState => ({ version: 1, groups: {}, invitations: {}, delivered: [], outbox: [] });
+export const newGroupsState = (): GroupsState => ({ version: 1, groups: {}, invitations: {}, delivered: [], outbox: [], directory: {} });
 export const groupsFile = (dataDir: string) => path.join(dataDir, 'amis', 'groupes.json');
 
 export function loadGroups(dataDir: string, now = new Date()): GroupsState {
@@ -465,7 +604,12 @@ export function loadGroups(dataDir: string, now = new Date()): GroupsState {
     const line = r && isPlayerPublicKey(r.to) ? verifyGroupLine(r.line, now) : undefined;
     return line ? [{ to: r!.to as string, line }] : [];
   });
-  return { version: 1, groups, invitations, delivered, outbox };
+  const directory: Record<string, GroupAnnounce> = {};
+  for (const raw of Object.values(s.directory && typeof s.directory === 'object' ? (s.directory as Record<string, unknown>) : {})) {
+    const a = verifyAnnounce(raw, now);
+    if (a) directory[a.announce.g] = a.announce;
+  }
+  return { version: 1, groups, invitations, delivered, outbox, directory };
 }
 
 export function saveGroups(dataDir: string, s: GroupsState): void {
@@ -600,7 +744,8 @@ export function tidyGroups(s: GroupsState, now = new Date()): GroupsState {
     groups[g] = lines.length === e.lines.length ? e : { ...e, lines };
   }
   const invitations = Object.fromEntries(Object.entries(s.invitations).filter(([, i]) => now.getTime() - Date.parse(i.arrived) <= GROUP_INVITE_DAYS * DAY || ((changed = true), false)));
-  return changed ? { ...s, groups, invitations } : s;
+  const directory = Object.fromEntries(Object.entries(s.directory).filter(([, a]) => now.getTime() - Date.parse(a.at) <= GROUP_ANNOUNCE_KEEP_DAYS * DAY || ((changed = true), false)));
+  return changed ? { ...s, groups, invitations, directory } : s;
 }
 
 // ---------------------------------------------------------------------------
