@@ -1,5 +1,11 @@
 // Publie une version de Cyber Pinball : les bornes la trouvent par « Mise à jour de
 // Cyber Pinball » (menu système, packages/core/src/update.ts).
+//   node scripts/publier.mjs --rapide --essai -> le cas courant, après une fusion : préversion d'essai
+//                                            suivante, numéro pris après la plus haute étiquette de
+//                                            GitHub (dépôt public et dépôt du canal d'essai), nouveautés
+//                                            de changements/ rassemblées dans les CHANGELOG, commit
+//                                            « Version … » fait ici, puis publication
+//   npm run publier -- --suivante <correctif|mineure|majeure|essai> -> de même, pour une autre sorte de version
 //   npm run publier                       -> release GitHub v<version> de package.json
 //   npm run publier -- --brouillon        -> release laissée en brouillon (invisible des bornes)
 //   npm run publier -- --sans-fabrication -> reprend release\ tel qu'il est
@@ -52,12 +58,13 @@ import { githubToken, missingTokenMessage } from './jeton-github.mjs';
 import { snapshotAndPush } from './envoyer-github.mjs';
 import { DIRECT_DOWNLOADS, directDownloadProblems } from './telechargement-direct.mjs';
 import { bulletPoints, changelogNotes, changelogSections } from './traductions.mjs';
+import { FRAGMENTS_DIR, applyVersion, foldFragments, nextVersion, notesVersion } from './version-suivante.mjs';
 
 const require = createRequire(import.meta.url);
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const release = path.join(repo, 'release');
 const pkg = JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8'));
-const version = process.env.CYBERPINBALL_VERSION_ESSAI || pkg.version;
+let version = process.env.CYBERPINBALL_VERSION_ESSAI || pkg.version;
 const argv = process.argv.slice(2);
 const option = (name) => {
   const at = argv.indexOf(name);
@@ -65,12 +72,8 @@ const option = (name) => {
 };
 const local = option('--local');
 const rapid = argv.includes('--rapide');
-const prerelease = version.includes('-');
-// Les liens directs des README donnent la dernière version finale : elle doit porter ses installeurs.
-if (!prerelease && !local && (rapid || argv.includes('--leger'))) {
-  console.error(`\nPublication arrêtée : ${version} est une version finale ; elle doit porter ses deux installeurs (${DIRECT_DOWNLOADS.join(', ')}), que donnent les liens de téléchargement direct des README. Publiez-la sans --rapide ni --leger, ou en préversion (${version}-essai.1).`);
-  process.exit(1);
-}
+// Numéro posé par la publication : sorte de la version suivante (--essai, ou --suivante <sorte>).
+const bump = argv.includes('--essai') ? 'essai' : option('--suivante');
 
 function step(text) {
   console.log(`\n> ${text}`);
@@ -83,18 +86,81 @@ function fail(message) {
 step('Compilation TypeScript');
 execFileSync(process.execPath, [path.join(repo, 'node_modules', 'typescript', 'bin', 'tsc'), '-b'], { cwd: repo, stdio: 'inherit' });
 const update = require(path.join(repo, 'packages', 'core', 'dist', 'update.js'));
-if (!update.isVersion(version)) fail(`version illisible : ${version}`);
 const repository = /github\.com\/([^/]+\/[^/.]+)/.exec(pkg.repository?.url ?? '')?.[1];
 if (repository !== update.UPDATE_REPOSITORY) fail(`le dépôt de package.json (${repository}) n'est pas celui que lisent les bornes (${update.UPDATE_REPOSITORY}).`);
 const privateKey = loadPrivateKey();
 // Essai privé : le dépôt du canal d'essai, au lieu du dépôt public.
 const privateRepo = argv.includes('--prive') ? (option('--depot') ?? update.loadPrivateChannel()?.repository) : undefined;
+const target = privateRepo ?? repository;
+const found = githubToken();
+const token = found?.token;
+const git = (args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
+
+/** Versions déjà publiées d'un dépôt GitHub : ses étiquettes v<version>. */
+async function publishedVersions(name, auth) {
+  const response = await fetch(`https://api.github.com/repos/${name}/git/matching-refs/tags/v`, {
+    headers: { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', ...(auth && { authorization: `Bearer ${auth}` }) },
+  });
+  if (!response.ok) throw new Error(`étiquettes de github.com/${name} illisibles (HTTP ${response.status})`);
+  return (await response.json()).map((r) => r.ref.replace(/^refs\/tags\/v/, '')).filter((v) => update.isVersion(v));
+}
+
+// Numéro posé ici, jamais dans une branche : la plus haute étiquette des deux dépôts (une seule
+// numérotation pour le public et le canal d'essai), la version suivante, les nouveautés en attente
+// rassemblées dans les CHANGELOG, et le commit « Version … ».
+if (bump) {
+  step('Numéro de version, d’après les étiquettes de GitHub');
+  if (local) fail('--essai et --suivante ne vont pas avec --local : le numéro vient des étiquettes de GitHub.');
+  if (process.env.CYBERPINBALL_VERSION_ESSAI) fail('--essai et --suivante ne vont pas avec CYBERPINBALL_VERSION_ESSAI.');
+  if (option('--commit')) fail('--essai et --suivante ne vont pas avec --commit : le commit de version est fait ici.');
+  if (!['correctif', 'mineure', 'majeure', 'essai'].includes(bump)) fail(`--suivante ${bump ?? ''} : correctif, mineure, majeure ou essai.`);
+  if (!token) fail(missingTokenMessage());
+  if (git(['status', '--porcelain', '--untracked-files=no']).trim()) fail('des modifications ne sont pas enregistrées (git status) : la version publiée doit correspondre à un commit.');
+  try {
+    git(['rev-parse', '-q', '--verify', 'MERGE_HEAD']);
+    fail('une fusion est en cours (MERGE_HEAD) : terminez-la d’abord.');
+  } catch (error) {
+    if (error?.status === undefined) throw error;
+  }
+  const published = await publishedVersions(repository, token).catch((error) => fail(error.message));
+  const channel = update.loadPrivateChannel();
+  const secret = privateRepo ?? channel?.repository;
+  if (secret) {
+    // Le jeton de publication, sinon celui du canal d'essai (lecture seule) : la numérotation est commune aux deux dépôts.
+    let tags;
+    try {
+      tags = await publishedVersions(secret, token);
+    } catch {
+      tags = await publishedVersions(secret, channel?.token).catch((error) => fail(`${error.message} : la numérotation est commune au dépôt public et au canal d'essai.`));
+    }
+    published.push(...tags);
+  }
+  const latest = [...published].sort((a, b) => update.compareAppVersions(a, b)).at(-1) ?? pkg.version;
+  let next = nextVersion(latest, bump);
+  // Une publication interrompue a pu poser un numéro plus haut sans le publier : il est repris.
+  if (!published.includes(pkg.version) && update.compareAppVersions(pkg.version, next) > 0) next = pkg.version;
+  console.log(`Dernière version publiée : ${latest}${secret ? ` (dépôt public et canal d'essai)` : ''}. Version de cette publication : ${next}.`);
+  if (next !== pkg.version) applyVersion(next);
+  const folded = foldFragments(notesVersion(next));
+  if (folded.files.length) console.log(`Nouveautés rassemblées sous « ## ${notesVersion(next)} » : ${folded.fr} point(s), de ${folded.files.join(', ')}.`);
+  if (git(['status', '--porcelain', '--', 'package.json', 'package-lock.json', 'CHANGELOG.md', 'CHANGELOG.en.md', FRAGMENTS_DIR]).trim()) {
+    git(['add', '-A', '--', 'package.json', 'package-lock.json', 'CHANGELOG.md', 'CHANGELOG.en.md', FRAGMENTS_DIR]);
+    git(['commit', '-q', '-m', `Version ${next}`]);
+    console.log(`Commit « Version ${next} » : ${git(['rev-parse', '--short', 'HEAD']).trim()}.`);
+  }
+  version = next;
+}
+if (!update.isVersion(version)) fail(`version illisible : ${version}`);
+const prerelease = version.includes('-');
+// Les liens directs des README donnent la dernière version finale : elle doit porter ses installeurs.
+if (!prerelease && !local && (rapid || argv.includes('--leger'))) {
+  fail(`${version} est une version finale ; elle doit porter ses deux installeurs (${DIRECT_DOWNLOADS.join(', ')}), que donnent les liens de téléchargement direct des README. Publiez-la sans --rapide ni --leger, ou en préversion (--essai).`);
+}
 if (argv.includes('--prive')) {
   if (!privateRepo || !/^[\w.-]+\/[\w.-]+$/.test(privateRepo)) fail(`--prive : dépôt du canal d'essai inconnu. Passez --depot <proprietaire/nom>, ou écrivez-le dans ${update.privateChannelFile()} ({ "depot": "proprietaire/nom", "jeton": "…" }).`);
-  if (!prerelease) fail(`${version} est une version finale : un essai privé est une préversion (${version}-essai.1).`);
+  if (!prerelease) fail(`${version} est une version finale : un essai privé est une préversion (--essai).`);
   if (local) fail('--prive et --local ne vont pas ensemble.');
 }
-const target = privateRepo ?? repository;
 
 step('Contrôle de publication');
 const audit = auditRepository();
@@ -103,8 +169,6 @@ console.log(`${audit.files} fichiers suivis : rien de personnel ni de secret.`);
 
 // GitHub : la release est posée sur l'instantané du commit local (scripts/envoyer-github.mjs :
 // le dépôt public n'a pas l'historique détaillé), ou sur --commit, déjà sur GitHub.
-const found = githubToken();
-const token = found?.token;
 const api = async (method, url, body, headers = {}) => {
   const response = await fetch(url.startsWith('https://') ? url : `https://api.github.com/repos/${target}${url}`, {
     method,

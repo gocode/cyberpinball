@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { MANUAL, MANUEL, splitText } from './manuels';
 import {
   CALIBRATION_HOLD_S,
   calibrationCombo,
@@ -367,10 +368,10 @@ test('aide : la combinaison dans le détail de « Caler la borne », dans les ma
   assert.match(front, /function calibrationComboTip\(\): void \{/);
   assert.match(front, /combo: calibrationComboLabel\(headset\?\.profile \?\? 'touch'\)/);
   for (const [file, words] of [
-    ['docs/manuel.md', /deux joysticks enfoncés ensemble/],
-    ['docs/manual.md', /both thumbsticks pressed together/],
+    [MANUEL, /deux joysticks enfoncés ensemble/],
+    [MANUAL, /both thumbsticks pressed together/],
   ] as const)
-    assert.match(read(file), words, file);
+    assert.match(splitText(file), words, file);
 });
 
 test('sonde LibOVR (13 novembre 2026) : la DLL du runtime de Meta, lancée avec la VR, au journal, sans rien changer', () => {

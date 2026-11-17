@@ -1,0 +1,14 @@
+[English](../manual/never-stuck-the-web-from-every-adding-screen.md) · Français · [Sommaire du manuel](../manuel.md)
+
+## Jamais enfermé : le web depuis chaque écran d'ajout
+
+Partout où l'on ajoute ou choisit quelque chose, une issue vers le web : **« Chercher sur le web… »** ouvre la fenêtre « Récupérer » sur une recherche libre préremplie (DuckDuckGo ; moteurs au choix dans le bandeau ; « vpinball » et le mot de la partie ajoutés au titre, `partWebQuery`).
+Ce qui y est téléchargé revient au jeu de l'écran, dans la partie que dit son contenu, ajoutée s'il le faut, puis « Installer ce qui est reçu » ; sans jeu (entonnoir, catalogue, liste d'attente, Téléchargements, bibliothèque de ROM), le fichier ouvre le plan d'ajout d'une nouvelle table.
+Sous la recherche, la ligne **« Vos comptes »** donne un accès direct aux sites des tables (vpuniverse.com, vpforums.org, pinballnirvana.com, pinsound-community.org), chacun avec son état lu dans les cookies de la session « Récupérer » : connecté (point vert), la pastille cherche le texte du champ sur ce site, dans ses fichiers quand il le permet (`sourceSearchUrl`, `packages/core/src/sitesessions.ts`) ; pas encore, elle ouvre sa page de connexion.
+L'état est relu à chaque page chargée : une connexion faite dans la page se voit aussitôt.
+
+- **Écrans** (`ADD_SCREENS`, `packages/core/src/addscreens.ts`) : l'entonnoir « Ajouter une table », le catalogue, la fiche d'un jeu de la base VPS, « Ce qu'il faut », « … : au choix », « Récupérés et attendus », un élément de la liste d'attente et son remplacement, « Parties du jeu », une partie et ses fichiers téléchargés, Téléchargements et « Ajouter à un jeu », « Ce qu'il manque pour jouer », « Médias du jeu », l'écran d'un média (« Chercher moi-même sur le web… »), ses propositions, VPinMediaDB et la bibliothèque de ROM.
+  L'action porte l'écran (`Action.web`) ; dans un écran sans icônes, elle n'a pas la sienne.
+- **VPUniverse** : sa recherche ignore les mots de trois lettres ou moins, et en recherche « et » ne rend alors rien (« goonies never say die ») : ils sont retirés de l'adresse (`siteSearchText`), pour les médias comme pour les parties.
+  Un visiteur n'a droit qu'à une recherche toutes les 90 s environ : la page « Please wait 88 seconds… » est reconnue (`reason: 'flood'`), jamais prise pour « aucun résultat » ; les recherches d'un site passent l'une après l'autre, et celle qui a été refusée recommence après l'attente annoncée (150 s au plus), la ligne du site le disant.
+- **Invariants** : `packages/core/src/test/addscreens.test.ts` refuse un écran d'ajout ou de choix sans « Chercher sur le web… » (registre, et titres des écrans d'ajout dans le code), vérifie que chaque partie est cherchée partout (VPS, Téléchargements, VPForums, VPUniverse, le web), que The Goonies est reconnu sans identifiant dans son `.info`, et lit deux pages témoins de VPUniverse (`packages/core/test-pages/vpuniverse-parties.html`, `vpuniverse-attente.html`).

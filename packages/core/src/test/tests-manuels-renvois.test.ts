@@ -7,12 +7,9 @@
 // est maintenant refusée.
 
 import assert from 'node:assert/strict';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { test } from 'node:test';
 import { MANUAL_TESTS, withoutInternal } from './interne';
-
-const REPO = path.join(__dirname, '..', '..', '..', '..');
+import { MANUAL, MANUAL_TESTS_EN, MANUEL, TESTS_MANUELS, splitDocs } from './manuels';
 
 /**
  * Renvois qui prolongent un test, en français puis en anglais : le numéro suivi d'une ponctuation
@@ -20,28 +17,32 @@ const REPO = path.join(__dirname, '..', '..', '..', '..');
  */
 const FOLLOW_UP = /(?:\b(?:Pendant|Après|Comme|pendant|après|comme|l'attente de|During|After|As|Like|during|after|waiting in)\s+)(\d{2,4})(?=\s*[,;:)])/g;
 
-type Section = { rows: { n: string; line: number; text: string }[] };
+type Section = { rows: { n: string; file: string; line: number; text: string }[] };
 
-/** Sections des tests manuels : chaque titre ouvre la sienne ; ses tests sont ses lignes « | N | ». */
-function sectionsOf(file: string): Section[] {
-  const lines = fs.readFileSync(path.join(MANUAL_TESTS, file), 'utf8').split('\n');
+/**
+ * Sections des tests manuels (sommaire et rubriques, scripts/decoupage.mjs) : chaque titre ouvre
+ * la sienne ; ses tests sont ses lignes « | N | ».
+ */
+function sectionsOf(summary: string): Section[] {
   const sections: Section[] = [{ rows: [] }];
-  lines.forEach((text, i) => {
-    if (/^#{1,6}\s/.test(text)) sections.push({ rows: [] });
-    const row = /^\|\s*(\d+[a-z]?)\s*\|/.exec(text);
-    if (row) sections.at(-1)!.rows.push({ n: row[1]!, line: i + 1, text });
-  });
+  for (const { file, text: whole } of splitDocs(summary)) {
+    whole.split('\n').forEach((text, i) => {
+      if (/^#{1,6}\s/.test(text)) sections.push({ rows: [] });
+      const row = /^\|\s*(\d+[a-z]?)\s*\|/.exec(text);
+      if (row) sections.at(-1)!.rows.push({ n: row[1]!, file, line: i + 1, text });
+    });
+  }
   return sections;
 }
 
-function problems(file: string): string[] {
-  const sections = sectionsOf(file);
+function problems(summary: string): string[] {
+  const sections = sectionsOf(summary);
   const found: string[] = [];
   for (const { rows } of sections) {
     const own = new Set(rows.map((r) => r.n));
     for (const row of rows) {
       for (const m of row.text.matchAll(FOLLOW_UP)) {
-        if (!own.has(m[1]!)) found.push(`${file}:${row.line} (test ${row.n}) : « ${m[0].trim()} » ne désigne aucun test de sa section`);
+        if (!own.has(m[1]!)) found.push(`${row.file}:${row.line} (test ${row.n}) : « ${m[0].trim()} » ne désigne aucun test de sa section`);
       }
     }
   }
@@ -49,7 +50,7 @@ function problems(file: string): string[] {
 }
 
 test('tests manuels : « Pendant N », « Après N », « Comme N » renvoient à un test de la même section', { skip: withoutInternal(MANUAL_TESTS) }, () => {
-  assert.deepEqual([...problems('tests-manuels.md'), ...problems('manual-tests.md')], []);
+  assert.deepEqual([...problems(TESTS_MANUELS), ...problems(MANUAL_TESTS_EN)], []);
 });
 
 // Le manuel citait encore « Tests manuels 557 à 562 » pour l'enregistrement d'une partie, renuméroté
@@ -57,17 +58,19 @@ test('tests manuels : « Pendant N », « Après N », « Comme N » renvoient �
 test('manuel : une plage « tests manuels N à M » tient dans une seule section des tests manuels', { skip: withoutInternal(MANUAL_TESTS) }, () => {
   const found: string[] = [];
   for (const [manual, tests, range] of [
-    ['manuel.md', 'tests-manuels.md', /tests manuels (\d+) (?:à|-|–) (\d+)/gi],
-    ['manual.md', 'manual-tests.md', /manual tests (\d+) (?:to|-|–) (\d+)/gi],
+    [MANUEL, TESTS_MANUELS, /tests manuels (\d+) (?:à|-|–) (\d+)/gi],
+    [MANUAL, MANUAL_TESTS_EN, /manual tests (\d+) (?:to|-|–) (\d+)/gi],
   ] as const) {
     const sections = sectionsOf(tests).map((s) => new Set(s.rows.map((r) => r.n)));
-    fs.readFileSync(path.join(REPO, 'docs', manual), 'utf8').split('\n').forEach((line, i) => {
-      for (const m of line.matchAll(range)) {
-        const [from, to] = [Number(m[1]), Number(m[2])];
-        const wanted = Array.from({ length: to - from + 1 }, (_, k) => String(from + k));
-        if (!sections.some((own) => wanted.every((n) => own.has(n)))) found.push(`${manual}:${i + 1} : « ${m[0]} » ne tient dans aucune section de ${tests}`);
-      }
-    });
+    for (const { file, text } of splitDocs(manual)) {
+      text.split('\n').forEach((line, i) => {
+        for (const m of line.matchAll(range)) {
+          const [from, to] = [Number(m[1]), Number(m[2])];
+          const wanted = Array.from({ length: to - from + 1 }, (_, k) => String(from + k));
+          if (!sections.some((own) => wanted.every((n) => own.has(n)))) found.push(`${file}:${i + 1} : « ${m[0]} » ne tient dans aucune section de ${tests}`);
+        }
+      });
+    }
   }
   assert.deepEqual(found, []);
 });
@@ -75,9 +78,9 @@ test('manuel : une plage « tests manuels N à M » tient dans une seule section
 // Deux sessions qui prennent le même numéro libre en même temps (13/11/2026 : 1125 et 1126 deux fois après une
 // fusion) : un numéro n'existe qu'une fois par langue, et les deux langues ont les mêmes numéros.
 test('tests manuels : chaque numéro une seule fois, les mêmes en français et en anglais', { skip: withoutInternal(MANUAL_TESTS) }, () => {
-  const numbers = (file: string) => [...fs.readFileSync(path.join(MANUAL_TESTS, file), 'utf8').matchAll(/^\| (\d+) \|/gm)].map((m) => Number(m[1]));
-  const fr = numbers('tests-manuels.md');
-  const en = numbers('manual-tests.md');
+  const numbers = (summary: string) => splitDocs(summary).flatMap((d) => [...d.text.matchAll(/^\| (\d+) \|/gm)].map((m) => Number(m[1])));
+  const fr = numbers(TESTS_MANUELS);
+  const en = numbers(MANUAL_TESTS_EN);
   const twice = (list: number[]) => [...new Set(list.filter((n, i) => list.indexOf(n) !== i))];
   assert.deepEqual(twice(fr), [], 'tests-manuels.md : numéros en double');
   assert.deepEqual(twice(en), [], 'manual-tests.md : numéros en double');

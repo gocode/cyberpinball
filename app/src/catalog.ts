@@ -412,7 +412,8 @@ export function createCatalog(ctx: CatalogContext) {
 
   /**
    * Note le contenu des fichiers reçus qui ne l'ont pas encore : ceux d'une liste tenue par une
-   * version qui ne vérifiait rien. Un pack de médias rangé comme table se voit alors à corriger.
+   * version qui ne vérifiait rien. Un pack de médias rangé comme table se range alors de lui-même
+   * dans les médias du front-end (repairWaitList), et la table redevient attendue.
    */
   async function noteContents(items: WaitItem[]): Promise<void> {
     let changed = false;
@@ -1246,7 +1247,11 @@ export function createCatalog(ctx: CatalogContext) {
       if (file) {
         allowPreview(file);
         const video = /\.(mp4|webm|m4v|mov|avi|f4v|mkv)$/i.test(file);
-        card = { group, title: video ? t('Vidéo') : type === 'Wheel' ? t('Logo') : t('Image'), source: { label: t('Sur la borne'), base: true }, state: STATE_LABELS.have, facts: where, extra, thumb: { kind: video ? 'video' : 'image', url: mediaUrl(file), rotation: 0 } };
+        // Un son (musique de lancement) n'est ni une image ni une vidéo : sa vignette se lit comme celle d'un son proposé.
+        const audio = /\.(mp3|ogg|wav|m4a|aac|flac)$/i.test(file);
+        const title = video ? t('Vidéo') : audio ? t('Musique') : type === 'Wheel' ? t('Logo') : t('Image');
+        const thumb: MediaThumb = audio ? { kind: 'audio', url: mediaUrl(file), rotation: 0, text: '♪' } : { kind: video ? 'video' : 'image', url: mediaUrl(file), rotation: 0 };
+        card = { group, title, source: { label: t('Sur la borne'), base: true }, state: STATE_LABELS.have, facts: where, extra, thumb };
       } else if (offer) {
         const title = offer.kind === 'video' ? t('Vidéo') : offer.kind === 'audio' ? t('Musique') : type === 'Wheel' ? t('Logo') : t('Image fixe');
         // Vidéo ou musique pas encore là : l'aperçu fixe est marqué « à la demande », Start la récupère et la lit.

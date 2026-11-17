@@ -10,10 +10,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT, interfaceSources } from './i18n-scan';
+import { MANUAL, MANUAL_TESTS_EN, MANUEL, TESTS_MANUELS, splitFiles } from './manuels';
 
 /** Entrées regroupées dans « Ajouter une table » : en français et en anglais. */
 const MOVED = ['Trouver une table', 'Find a table', 'Liste d’attente', 'Download queue', 'Récupérés et attendus', 'Mises à jour des tables', 'Table updates', 'Comptes des sites', 'Site accounts'];
-const DOCS = ['docs/manuel.md', 'docs/manual.md', 'interne/tests-manuels/tests-manuels.md', 'interne/tests-manuels/manual-tests.md', 'README.md', 'README.fr.md'];
+const DOCS = [...[MANUEL, MANUAL, TESTS_MANUELS, MANUAL_TESTS_EN].flatMap(splitFiles), 'README.md', 'README.fr.md'];
 
 test('menu système : les entrées regroupées dans « Ajouter une table » n’y sont plus citées au premier niveau', () => {
   // Apostrophe droite ou typographique : « Liste d'attente » comme « Liste d’attente ».

@@ -1,0 +1,42 @@
+[English](../manual/download-manager.md) · Français · [Sommaire du manuel](../manuel.md)
+
+## Gestionnaire de téléchargements
+
+Un seul endroit où suivre tout ce qui arrive, d'un site ou d'un ami, à la manière d'une console de jeu : **Menu système > Téléchargements** (à la racine, entre Médias et Borne : depuis l'écran des tables, Exit, trois fois le flipper droit, puis Start), aussi rangé dans **Menu système > Tables > Téléchargements**.
+À l'écran des tables, une **pastille** à gauche de la roue dentée le résume (« 2 en cours · 45 % », « En attente », « 1 bloqué », « 1 prêt », un seul texte à la fois, par priorité ; « bloqué » et « prêt » sont des nouvelles, qui partent dès que la liste est ouverte) ; un clic l'ouvre, Exit y ramène.
+
+- **La liste** : « En cours et en attente », puis « Terminés et bloqués », dans l'ordre où ils ont été demandés.
+  Chaque ligne dit sa source (un ami, un site, VPinMediaDB, la mise à jour), son état en mot (« En cours », « En attente de Bruno », « Nouvel essai à 22:31 », « En pause », « Prêt », « Échec »), ce qui est reçu et ce qui reste, sa barre (bleue en cours, ambre en attente, verte prête, rouge bloquée ; hachurée sans taille connue), et l'étape suivante avec son signe : **↩** l'écran où il ramène, **↻** quand il reprend, **‖** en pause, **!** ce qu'il faut faire.
+  Les lignes se mettent à jour sur place : une ligne ne change de section, la liste ne gagne ni ne perd une ligne qu'à un geste (ouverture, action), et le curseur suit le téléchargement.
+  En bas : « Tout mettre en pause » (ou « Tout reprendre »), « Retirer les terminés » (jamais les bloqués), « Fichiers téléchargés » (l'inventaire, ci-dessous) et « Retour ».
+- **La fiche d'un téléchargement** : son état, ce qui est reçu (fichier n sur N, débit, temps restant), sa source, sa reprise, l'écran où il ramène et l'endroit où il est rangé.
+  Actions selon l'état : **« Revenir à … »** (fini : l'écran d'origine avec ce qui a été reçu ; en cours : l'écran d'origine, le téléchargement continue), « Mettre en pause », « Reprendre », « Réessayer maintenant » (un site en attente de son essai suivant), « Annuler le téléchargement » (après confirmation, le curseur sur « Garder le téléchargement » : ce qui est reçu est effacé), « Retirer de la liste ».
+  Un ami absent : « Revenir à … » d'abord, la reprise est automatique.
+- **La suite d'un travail fini d'abord** : chaque sorte de téléchargement peut déclarer sa suite (`DownloadNextStep`, posée par `nextStep`).
+  Une table d'un ami pas encore installée : l'état « Reçue, pas encore installée », la ligne « → Reçue, pas encore installée · Start : Installer dans ma bibliothèque », et dans sa fiche « Installer dans ma bibliothèque » en premier, à la place de « Revenir à … » ; des médias d'un ami pas encore enregistrés : « Vérifier et enregistrer les médias ».
+  Une fois faite (la table installée, son dossier reçu rangé), la fiche revient au « Revenir à … » habituel.
+  Un fichier sauté se lit dans la fiche, avec sa raison.
+- **Retour à l'écran d'origine** : chaque téléchargement retient l'écran d'où il a été demandé, comme une donnée qui survit au redémarrage.
+  Les médias d'une table reçus d'un ami ramènent à « Médias du jeu » de cette table, les fichiers dans le brouillon, prêts à enregistrer ; une table d'un ami, ou des parties, au plan d'ajout (« Annuler » ramène à « Parties du jeu » ou à la bibliothèque de l'ami) ; un fichier de la liste d'attente à la liste d'attente ou aux parties du jeu de sa table ; un média de VPinMediaDB à « Médias du jeu » ; la mise à jour à « Mise à jour de Cyber Pinball ».
+  Si cet écran n'existe plus (table retirée, ami supprimé), un message le dit, puis le repli : la bibliothèque de l'ami d'où venait le téléchargement, sinon le gestionnaire.
+  Un téléchargement qui finit pendant que son écran de réception est ouvert y est rendu tout de suite ; sinon une notification le dit à l'écran des tables (« Téléchargement fini », voir « Notifications de l'écran des tables »), un bandeau sur un écran plein (« Téléchargement terminé : … »), et la pastille et l'entrée du menu système le disent « prêt » (pastille rouge sur l'entrée, sa rubrique Tables et la roue dentée).
+  Ces pastilles sont des notifications : **ouvrir la liste suffit à les lire**, sans ouvrir chaque ligne ; la liste les marque vues à chaque fois qu'elle se dessine, même pour un téléchargement qui finit sous les yeux (`seen`, `DownloadSummary.unseen`, `downloadsAttention`).
+  Ce qui reste prêt se lit ensuite dans le texte de l'entrée (« 3 prêts · prêt : Juke-box »), sans pastille.
+- **Jamais deux fois** : un téléchargement lancé d'un menu porte une clé (`dedupe` : « friend-table:<ami>:<table> », « friend-media:<ami>:<table> ») ; `add` d'une clé déjà en cours, en attente, en pause, ou finie mais pas rendue rend celui-là, sans rien ajouter (`pendingDownload`, le journal dit « déjà demandé, pas relancé »), et l'écran qui l'a lancé montre son état.
+  Un écran qui relance un téléchargement qu'il suit déjà (`track` d'un identifiant en cours) est signalé au journal.
+  Dans le navigateur intégré, le même lien cliqué pendant qu'il se télécharge ne repart pas : « Déjà en cours : … Il continue, rien n'est relancé. ».
+  Test : `packages/core/src/test/reception-ami.test.ts` (aucun doublon, état « en cours » visible sur la table, écran des parties ouvert dans la liste, chemin de la ROM par l'attestation, et la clé exigée de tout `manager.add` de l'application).
+- **Reprise** : chaque fichier s'accumule dans un fichier partiel gardé d'une session à l'autre, et ce qui reprend repart de la taille du partiel sur le disque, jamais d'un compteur : rien n'est perdu, rien n'arrive en double.
+  Un **ami** qui se déconnecte met le téléchargement « En attente de … » ; dès qu'il est de nouveau relié (relevé toutes les trois secondes), la borne lui redemande le fichier à partir de ce qu'elle a, il relit et hache le début puis envoie la suite.
+  Une **page de site** (navigateur intégré, VPUniverse, VPForums…) : une coupure brève, Chromium la reprend seul ; une coupure longue laisse le partiel et l'état du téléchargement (adresses traversées, ETag, date), et le gestionnaire le reprend à l'essai suivant (15 s, 30 s, 1 min, 2 min, 5 min, 10 min, puis toutes les 15 min), dans la même session de cookies, après un redémarrage aussi.
+  Une **adresse directe** (VPinMediaDB, mise à jour, VPX, yt-dlp) demande la suite (en-tête `Range`, `If-Range`) ; si le site renvoie tout, le partiel repart de zéro.
+  Ce qui est suivi par son écran (un plan de VPinMediaDB, la mise à jour, VPX) garde son partiel : relancé depuis cet écran, il reprend là.
+  La file est écrite dans `<données>\telechargements.json` à chaque changement d'état (la progression au plus toutes les deux secondes) : elle survit à la fermeture de Cyber Pinball et au redémarrage du PC ; ce qui tournait attend sa source au démarrage suivant et repart seul.
+  Un téléchargement mis en pause ne repart jamais seul.
+- **Vérification** : un fichier repris est vérifié en entier, comme un fichier reçu d'une traite.
+  Entre amis, l'empreinte SHA-256 envoyée à la fin porte sur le fichier entier, et le receveur hache le début qu'il avait avant d'ajouter la suite ; un média passe en plus le contrôle de son contenu.
+  Une adresse directe : MD5 de l'index (VPinMediaDB), SHA-256 du manifeste (mise à jour, VPX, yt-dlp).
+  Une empreinte fausse après une reprise (le début gardé était abîmé) fait repartir le fichier de zéro, une fois ; jamais un fichier faux n'est rendu.
+  Une borne d'avant la reprise renvoie tout : le partiel repart de zéro.
+- **Invariants** (tests) : toute source de téléchargement de l'application est relevée et passe par le gestionnaire, et seul `resumable.ts` écrit sur le disque le corps d'une réponse HTTP (`downloadsources.test.ts`) ; un téléchargement interrompu (site coupé, ami qui se déconnecte en plein envoi d'une table, redémarrage simulé) reprend sans perte ni doublon, un début abîmé est vu à la fin, une pause n'est jamais relancée, chaque écran de retour est valide ou a son repli (`downloads-resume.test.ts`).
+- **Code** : `packages/core/src/downloadqueue.ts` (file, états, écran de retour et repli, textes), `packages/core/src/downloadmanager.ts` (ordonnancement, reprise, écriture de la file) et `packages/core/src/resumable.ts` (reprise HTTP) ; sources dans `app/src/download-sources.ts` (ami, adresse directe) et `app/src/acquire-window.ts` (`siteTransport`) ; écran dans `app/src/download-center.ts`, pastille dans `app/renderer/frontend.js`.

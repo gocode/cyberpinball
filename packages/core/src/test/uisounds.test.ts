@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import * as vm from 'node:vm';
 import { REPO_ROOT } from './i18n-scan';
+import { MANUAL, MANUEL, splitText } from './manuels';
 import { INTRO_TIMELINE } from '../intro';
 import { NOTICE_RULES } from '../notices';
 import { UI_SOUND_IDS, UI_SOUNDS, uiSoundCue } from '../uisounds';
@@ -312,8 +313,8 @@ test('branchements : le processus principal ne joue un son que par uiSoundCue, a
 });
 
 test('registre : source et licence de chaque son, écrites dans le manuel en français et en anglais', () => {
-  const fr = read('docs', 'manuel.md');
-  const en = read('docs', 'manual.md');
+  const fr = splitText(MANUEL);
+  const en = splitText(MANUAL);
   for (const id of UI_SOUND_IDS) {
     const spec = UI_SOUNDS[id];
     assert.ok(spec.source && spec.license, id);

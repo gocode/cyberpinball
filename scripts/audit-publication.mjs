@@ -45,7 +45,9 @@ const BINARY = /\.(png|jpe?g|webp|gif|bmp|ico|ttf|otf|woff2?|mp4|webm|mp3|wav|og
 export const PUBLIC = [
   /^(README(\.fr)?|CHANGELOG(\.en)?)\.md$/, /^LICENSE$/, /^\.gitignore$/, /^package(-lock)?\.json$/, /^tsconfig(\.base)?\.json$/, /^lanceur\.(cmd|ps1)$/,
   /^app\//, /^packages\//, /^scripts\//,
-  /^docs\/(manuel|manual|fonctionnalites|features)\.md$/, /^docs\/images\//, /^docs\/design-system\//,
+  /^docs\/(manuel|manual|fonctionnalites|features)\.md$/, /^docs\/(manuel|manual)\/[^/]+\.md$/, /^docs\/images\//, /^docs\/design-system\//,
+  // Nouveautés en attente de la prochaine version, une par branche (scripts/version-suivante.mjs).
+  /^changements\/[^/]+\.md$/,
 ];
 
 /**

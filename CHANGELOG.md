@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.14
 
+- Manuel technique : une page par rubrique, plus légère à ouvrir sur GitHub ; le sommaire garde les mêmes liens.
 - Écrans de gestion des tables plus vifs : la fiche d'une table, « Ajouter une table », les médias et les parties du jeu, les Classements lisent le disque à leur ouverture, puis répondent aux flippers sans le relire. Sur une borne chargée (PuP-Pack de milliers de fichiers, centaines de téléchargements), chaque appui ne fige plus l'écran.
 - Plus rapide, plus sûr : le lancement d'une table ne lance plus un outil de Windows pour chaque écran ; les vérifications des tables et des PuP-Packs lisent beaucoup moins le disque ; les relevés faits après le démarrage ne figent plus l'écran des tables ni le lancement d'une partie. Les réglages de la borne, les fichiers réparés par Cyber Pinball et ceux d'une partie entre amis s'écrivent d'un coup : une coupure de courant ne les laisse plus à moitié écrits.
 - Installation d'une table, « Ce qu'il faut » : l'écran est rangé par écran de la borne (fronton, afficheur, plateau, roue, son). Chacun montre d'abord ce qui est prévu d'office, sans compte : le média de VPinMediaDB, ou à défaut un habillage dessiné au nom de la table. Dessous, un bloc « Autres choix » montre déjà leurs aperçus ; Start ouvre la galerie. Un bandeau dit en tête ce qui manque vraiment pour jouer.

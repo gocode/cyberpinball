@@ -58,10 +58,12 @@ function Show-Ini {
 }
 
 # Avant une publication : la version, ses nouveautés, et une confirmation (rien ne part sans « o »).
-function Confirm-Publication {
+# -Suivante : le numéro est posé par la publication (préversion suivante d'après les étiquettes de GitHub).
+function Confirm-Publication([switch]$Suivante) {
   Build
   $version = (Get-Content (Join-Path $PSScriptRoot 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version
-  Invoke-Checked { node scripts/version-suivante.mjs --verifier } "La vérification des nouveautés (action « version » pour les écrire)"
+  Invoke-Checked { node scripts/version-suivante.mjs --verifier } "La vérification des nouveautés (changements/<branche>.md, ou action « version »)"
+  if ($Suivante) { $version = "suivante (après $version, d'après les étiquettes de GitHub)" }
   $answer = Read-Host "Publier la version $version sur GitHub ? (o/N)"
   if ($answer -notmatch '^[oOyY]') { throw 'Publication annulée : rien n''est parti.' }
 }
@@ -161,16 +163,16 @@ $Actions = [ordered]@{
     }
   }
   'version' = @{
-    Label = 'Passer à la version suivante et écrire ses nouveautés (CHANGELOG), puis l''enregistrer'
+    Label = 'Passer à la version suivante (nouveautés de changements/ rassemblées dans les CHANGELOG), les relire, puis l''enregistrer'
     Run   = {
       $kind = Read-Host 'Correctif : Entrée ; sinon « mineure » ou « majeure »'
       Invoke-Checked { node scripts/version-suivante.mjs $kind } 'Le changement de version'
-      Step 'Nouveautés en français, puis les mêmes en anglais : une ligne « - » par point sous la nouvelle version ; enregistrez, puis fermez le Bloc-notes'
+      Step 'Relisez les nouveautés en français, puis les mêmes en anglais (une ligne « - » par point sous la nouvelle version) ; enregistrez, puis fermez le Bloc-notes'
       Start-Process notepad (Join-Path $PSScriptRoot 'CHANGELOG.md') -Wait
       Start-Process notepad (Join-Path $PSScriptRoot 'CHANGELOG.en.md') -Wait
       Invoke-Checked { node scripts/version-suivante.mjs --verifier } 'La vérification des nouveautés (relancez « version » pour les compléter)'
       $version = (Get-Content (Join-Path $PSScriptRoot 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version
-      Invoke-Checked { git add package.json package-lock.json CHANGELOG.md CHANGELOG.en.md } 'git add'
+      Invoke-Checked { git add -A -- package.json package-lock.json CHANGELOG.md CHANGELOG.en.md changements } 'git add'
       Invoke-Checked { git commit -m "Version $version" } "L'enregistrement (git commit)"
       Step "Version $version enregistrée. « Publier » la met en ligne."
     }
@@ -191,22 +193,22 @@ $Actions = [ordered]@{
     Run   = { Confirm-Publication; Invoke-Checked { node scripts/publier.mjs --leger } 'La publication' }
   }
   'publier-rapide' = @{
-    Label = 'Publier sans refaire les installeurs (1 à 2 min) : les bornes reçoivent la mise à jour légère'
-    Run   = { Confirm-Publication; Invoke-Checked { node scripts/publier.mjs --rapide } 'La publication' }
+    Label = 'Publier la préversion suivante sans refaire les installeurs (1 à 2 min) : numéro d''après GitHub, nouveautés de changements/, commit de version'
+    Run   = { Confirm-Publication -Suivante; Invoke-Checked { node scripts/publier.mjs --rapide --essai } 'La publication' }
   }
   'preversion' = @{
     Label = 'Passer à la préversion d''essai suivante (0.1.3-essai.1…), pour les bornes qui acceptent les préversions'
     Run   = {
       Invoke-Checked { node scripts/version-suivante.mjs essai } 'Le changement de version'
       $version = (Get-Content (Join-Path $PSScriptRoot 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version
-      Invoke-Checked { git add package.json package-lock.json CHANGELOG.md CHANGELOG.en.md } 'git add'
+      Invoke-Checked { git add -A -- package.json package-lock.json CHANGELOG.md CHANGELOG.en.md changements } 'git add'
       Invoke-Checked { git commit -m "Version $version" } "L'enregistrement (git commit)"
-      Step "Préversion $version enregistrée. « publier-rapide » la met en ligne pour les bornes réglées sur « Préversions » ; « publier-essai » la garde pour les bornes qui ont le canal d'essai privé."
+      Step "Préversion $version enregistrée. « publier-rapide » la met en ligne pour les bornes réglées sur « Préversions » (il sait aussi le faire d'un coup, sans cette étape) ; « publier-essai » la garde pour les bornes qui ont le canal d'essai privé."
     }
   }
   'publier-essai' = @{
     Label = 'Publier la préversion dans le dépôt privé du canal d''essai (1 à 2 min) : seules les bornes qui ont ce canal la voient'
-    Run   = { Confirm-Publication; Invoke-Checked { node scripts/publier.mjs --rapide --prive } 'La publication' }
+    Run   = { Confirm-Publication -Suivante; Invoke-Checked { node scripts/publier.mjs --rapide --prive --essai } 'La publication' }
   }
   'canal-essai' = @{
     Label = 'Ranger le dépôt privé du canal d''essai et son jeton de lecture (une fois par poste ou borne)'

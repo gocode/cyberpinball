@@ -8,12 +8,18 @@
 // différent de blocs de code ou de lignes de tableau ; une version de CHANGELOG.md sans son
 // pendant, point par point, dans CHANGELOG.en.md ; un lien vers un fichier absent ou vers un
 // titre (#ancre) qui n'existe pas.
+//
+// Documents découpés (SPLITS, scripts/decoupage.mjs) : le sommaire et chaque rubrique sont
+// comparés à leur traduction (la n-ième rubrique du sommaire français avec la n-ième du sommaire
+// anglais) ; une rubrique absente du sommaire, ou écrite avec plusieurs phrases sur une ligne, est
+// refusée. Nouveautés en attente (changements/*.md) : autant de points en français qu'en anglais.
 
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isPrivate } from './audit-publication.mjs';
+import { reflow } from './phrases.mjs';
 import { readmeDownloadProblems } from './telechargement-direct.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -28,6 +34,53 @@ export const PAIRS = [
   { fr: 'interne/tests-manuels/tests-manuels.md', en: 'interne/tests-manuels/manual-tests.md' },
   { fr: 'docs/design-system/README.md', en: 'docs/design-system/README.en.md' },
 ];
+
+/**
+ * Documents découpés : un sommaire (le fichier) et ses rubriques (le dossier du même nom), une par
+ * titre des niveaux `levels`. Libellés de la ligne de tête de chaque rubrique.
+ */
+export const SPLITS = [
+  {
+    fr: 'docs/manuel.md',
+    en: 'docs/manual.md',
+    levels: [2],
+    labels: { fr: { self: 'Français', other: 'English', index: 'Sommaire du manuel' }, en: { self: 'English', other: 'Français', index: 'Manual contents' } },
+  },
+  {
+    fr: 'interne/tests-manuels/tests-manuels.md',
+    en: 'interne/tests-manuels/manual-tests.md',
+    levels: [1, 2],
+    labels: { fr: { self: 'Français', other: 'English', index: 'Sommaire des tests manuels' }, en: { self: 'English', other: 'Français', index: 'Manual tests contents' } },
+  },
+];
+
+/** Rubriques d'un sommaire, dans l'ordre : titres « ## [Titre](dossier/rubrique.md) ». */
+export function splitEntries(text) {
+  const entries = [];
+  let inFence = false;
+  for (const line of text.replace(/\r\n/g, '\n').split('\n')) {
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+    if (inFence) continue;
+    const m = /^(#{1,6}) \[(.+)\]\(([^)\s]+\.md)\)\s*$/.exec(line);
+    if (m) entries.push({ level: m[1].length, title: m[2], file: decodeURI(m[3]) });
+  }
+  return entries;
+}
+
+/** Fichiers d'un document découpé, chemins relatifs au dépôt : le sommaire puis ses rubriques. */
+export function splitFiles(summary, root = repo) {
+  const full = path.join(root, summary);
+  if (!fs.existsSync(full)) return [];
+  return [summary, ...splitEntries(fs.readFileSync(full, 'utf8')).map((e) => path.posix.join(path.posix.dirname(summary), e.file))];
+}
+
+/** Texte entier d'un document découpé : sommaire et rubriques mis bout à bout. */
+export function splitText(summary, root = repo) {
+  return splitFiles(summary, root)
+    .filter((f) => fs.existsSync(path.join(root, f)))
+    .map((f) => fs.readFileSync(path.join(root, f), 'utf8'))
+    .join('\n');
+}
 
 /** Documents publiés sans traduction : générés depuis des sources en français, ou notice de tiers. */
 const UNTRANSLATED = [/^docs\/design-system\/components\/[^/]+\/README\.md$/, /^app\/renderer\/polices\/LISEZMOI\.md$/];
@@ -57,7 +110,7 @@ export function changelogNotes(file, version) {
 
 /** Ancre GitHub d'un titre : minuscules, ponctuation retirée, espaces en tirets. */
 export function slug(title) {
-  return title.trim().toLowerCase().replace(/`/g, '').replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-');
+  return title.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').trim().toLowerCase().replace(/`/g, '').replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-');
 }
 
 /** Plan d'un document Markdown, hors blocs de code : titres, blocs de code, lignes de tableau, liens. */
@@ -90,8 +143,15 @@ export function outline(text) {
   return { headings, fences, tableRows, links, anchors };
 }
 
+const texts = new Map();
 function read(file) {
-  return fs.readFileSync(path.join(repo, file), 'utf8');
+  if (!texts.has(file)) texts.set(file, fs.readFileSync(path.join(repo, file), 'utf8'));
+  return texts.get(file);
+}
+const outlines = new Map();
+function outlineOf(file) {
+  if (!outlines.has(file)) outlines.set(file, outline(read(file)));
+  return outlines.get(file);
 }
 
 /** Liens d'un document vers un fichier absent ou un titre absent. */
@@ -106,7 +166,7 @@ function brokenLinks(file, doc) {
       continue;
     }
     if (anchor === undefined || !/\.md$/i.test(dest)) continue;
-    const anchors = dest === file ? doc.anchors : outline(read(dest)).anchors;
+    const anchors = dest === file ? doc.anchors : outlineOf(dest).anchors;
     if (!anchors.has(decodeURIComponent(anchor).toLowerCase())) problems.push(`${file}:${line} : lien vers un titre absent (${target})`);
   }
   return problems;
@@ -145,7 +205,6 @@ export function comparePair(pair) {
     }
     for (const version of b.keys()) if (!a.has(version)) problems.push(`${pair.en} : section « ## ${version} » absente de ${pair.fr}`);
   }
-  if (/tests-manuels/.test(pair.fr)) problems.push(...testNumberProblems(pair, read(pair.fr), read(pair.en)));
   problems.push(...brokenLinks(pair.fr, fr), ...brokenLinks(pair.en, en));
   return problems;
 }
@@ -175,15 +234,78 @@ export function testNumberProblems(pair, frText, enText) {
   return problems;
 }
 
+/**
+ * Un document découpé : ses rubriques deux à deux (même place dans les deux sommaires), aucune
+ * rubrique hors du sommaire, une phrase par ligne, et pour les tests manuels leurs numéros.
+ */
+export function splitProblems(split) {
+  const problems = [];
+  if (!fs.existsSync(path.join(repo, split.fr))) return problems;
+  const files = { fr: splitFiles(split.fr).slice(1), en: splitFiles(split.en).slice(1) };
+  if (!files.fr.length) problems.push(`${split.fr} : pas de sommaire de rubriques (node scripts/decoupage.mjs --decouper)`);
+  if (files.fr.length !== files.en.length) problems.push(`${split.en} : ${files.en.length} rubriques au sommaire, ${files.fr.length} dans ${split.fr} (même ordre dans les deux)`);
+  for (let i = 0; i < Math.min(files.fr.length, files.en.length); i++) problems.push(...comparePair({ fr: files.fr[i], en: files.en[i] }));
+  for (const lang of ['fr', 'en']) {
+    const dir = split[lang].replace(/\.md$/, '');
+    const listed = new Set(files[lang]);
+    const onDisk = fs.existsSync(path.join(repo, dir)) ? fs.readdirSync(path.join(repo, dir)).filter((f) => f.endsWith('.md')).map((f) => `${dir}/${f}`) : [];
+    for (const f of onDisk.filter((f) => !listed.has(f))) problems.push(`${f} : rubrique absente du sommaire ${split[lang]} (y ajouter « ## [Titre](${path.posix.basename(dir)}/${path.posix.basename(f)}) » à sa place)`);
+    for (const f of [split[lang], ...files[lang]].filter((f) => fs.existsSync(path.join(repo, f)))) {
+      const text = read(f);
+      if (reflow(text) !== text) problems.push(`${f} : plusieurs phrases sur une ligne (node scripts/decoupage.mjs --phrases ${f})`);
+    }
+  }
+  if (split.levels.includes(1)) problems.push(...testNumberProblems(split, splitText(split.fr), splitText(split.en)));
+  return problems;
+}
+
+/** Dossier des nouveautés en attente, un fichier par branche (scripts/version-suivante.mjs). */
+export const FRAGMENTS_DIR = 'changements';
+
+/** Points d'un fichier de nouveautés en attente : { fr, en } (sections « ## Français » puis « ## English »). */
+export function fragmentNotes(text) {
+  const [, fr = '', en = ''] = text.replace(/\r\n/g, '\n').split(/^## (?:Français|English)\s*$/m);
+  return { fr: bulletPoints(fr), en: bulletPoints(en) };
+}
+
+/** Fichiers de nouveautés en attente (chemins relatifs au dépôt), sans le mode d'emploi du dossier. */
+export function fragmentFiles(root = repo) {
+  const dir = path.join(root, FRAGMENTS_DIR);
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter((f) => f.endsWith('.md') && f !== 'LISEZMOI.md').sort().map((f) => `${FRAGMENTS_DIR}/${f}`);
+}
+
+/** Nouveautés en attente : des points dans les deux langues, en nombre égal, pas déjà publiés. */
+export function fragmentProblems(root = repo) {
+  const problems = [];
+  const changelog = path.join(root, 'CHANGELOG.md');
+  const published = new Set([...changelogSections(fs.existsSync(changelog) ? fs.readFileSync(changelog, 'utf8') : '').values()].flat());
+  for (const file of fragmentFiles(root)) {
+    const text = fs.readFileSync(path.join(root, file), 'utf8');
+    if (!/^## Français\s*$/m.test(text) || !/^## English\s*$/m.test(text)) {
+      problems.push(`${file} : sections « ## Français » puis « ## English » attendues`);
+      continue;
+    }
+    const { fr, en } = fragmentNotes(text);
+    if (!fr.length) problems.push(`${file} : aucun point « - » sous « ## Français »`);
+    if (fr.length !== en.length) problems.push(`${file} : ${fr.length} point(s) en français, ${en.length} en anglais`);
+    for (const n of fr.filter((n) => published.has(n))) problems.push(`${file} : point déjà publié dans CHANGELOG.md, à retirer (« ${n.slice(0, 60)} »)`);
+  }
+  return problems;
+}
+
 export function checkTranslations() {
   const problems = [];
   const tracked = execFileSync('git', ['ls-files', '-z', '*.md'], { cwd: repo, encoding: 'utf8' }).split('\0').filter(Boolean);
   const paired = new Set(PAIRS.flatMap((p) => [p.fr, p.en]));
+  for (const split of SPLITS) for (const f of [...splitFiles(split.fr), ...splitFiles(split.en)]) paired.add(f);
   for (const file of tracked) {
-    if (isPrivate(file) || paired.has(file) || UNTRANSLATED.some((re) => re.test(file))) continue;
+    if (isPrivate(file) || paired.has(file) || file.startsWith(`${FRAGMENTS_DIR}/`) || UNTRANSLATED.some((re) => re.test(file))) continue;
     problems.push(`${file} : document publié sans traduction (ajoutez la paire à PAIRS dans scripts/traductions.mjs)`);
   }
   for (const pair of PAIRS.filter((p) => !isPrivate(p.fr) || fs.existsSync(path.join(repo, p.fr)))) problems.push(...comparePair(pair));
+  for (const split of SPLITS) problems.push(...splitProblems(split));
+  problems.push(...fragmentProblems());
   // Liens de téléchargement direct de la dernière version, en tête des deux README.
   problems.push(...readmeDownloadProblems(repo));
   return problems;

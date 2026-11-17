@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { setLanguage } from '../i18n';
+import { MANUAL, MANUAL_TESTS_EN, MANUEL, TESTS_MANUELS, splitFiles } from './manuels';
 import {
   isSystemGroup,
   SYSTEM_GROUP_IDS,
@@ -149,7 +150,7 @@ function checkPath(parts: string[]): string | undefined {
 }
 
 function textFiles(): string[] {
-  const docs = [...['manuel.md', 'manual.md'].map((f) => path.join(REPO, 'docs', f)), ...['tests-manuels.md', 'manual-tests.md'].map((f) => path.join(REPO, 'interne', 'tests-manuels', f))];
+  const docs = [MANUEL, MANUAL, TESTS_MANUELS, MANUAL_TESTS_EN].flatMap(splitFiles).map((f) => path.join(REPO, f));
   const readmes = ['README.md', 'README.fr.md', 'CHANGELOG.md', 'CHANGELOG.en.md'].map((f) => path.join(REPO, f));
   const code = [APP, path.join(REPO, 'packages', 'core', 'src'), path.join(REPO, 'packages', 'core', 'src', 'i18n', 'en')].flatMap((dir) =>
     fs

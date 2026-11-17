@@ -21,6 +21,9 @@ test('un fichier hors des emplacements publics et des dossiers internes est refu
   assert.deepEqual(unplacedFiles(tracked), ['video/x.txt', 'hors-depot/forum/a.md', 'docs/demo-oubli.ps1', 'outils/rendu.mjs', 'docs/notes.md', 'notes.txt', 'app/brief-ecran.md', 'docs/design-system/critique-codex.md']);
   assert.equal(isPublic('docs/fonctionnalites.md'), true);
   assert.equal(isPublic('docs/ecrans/pc-dev.json'), false);
+  // Manuel découpé (une rubrique par fichier) et nouveautés en attente : publics, sans sous-dossier.
+  for (const f of ['docs/manuel/son.md', 'docs/manual/sound.md', 'changements/ma-branche.md']) assert.equal(isPublic(f), true, f);
+  for (const f of ['docs/manuel/notes/brouillon.md', 'changements/x/y.md', 'changements/notes.txt']) assert.equal(isPublic(f), false, f);
 });
 
 test('un fichier publié ne cite aucun document interne, quel que soit le séparateur', () => {

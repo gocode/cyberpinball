@@ -1,0 +1,14 @@
+[Français](../manuel/jamais-enferme-le-web-depuis-chaque-ecran-d.md) · English · [Manual contents](../manual.md)
+
+## Never stuck: the web from every adding screen
+
+Wherever something is added or chosen, a way out to the web: **"Chercher sur le web…"** (Search the web…) opens the "Récupérer" (Get) window on a pre-filled free search (DuckDuckGo; engines to choose in the banner; "vpinball" and the part's word added to the title, `partWebQuery`).
+What is downloaded there goes to the screen's game, in the part its content says, added if needed, then "Installer ce qui est reçu" (Install what was received); without a game (funnel, catalog, waiting list, Downloads, ROM library), the file opens the add plan of a new table.
+Under the search, the **"Vos comptes" (Your accounts)** line gives direct access to the table sites (vpuniverse.com, vpforums.org, pinballnirvana.com, pinsound-community.org), each with its state read from the cookies of the "Récupérer" session: signed in (green dot), the pill searches the field's text on that site, in its files when it allows (`sourceSearchUrl`, `packages/core/src/sitesessions.ts`); not yet, it opens its sign-in page.
+The state is read again on every page loaded: a sign-in made in the page shows at once.
+
+- **Screens** (`ADD_SCREENS`, `packages/core/src/addscreens.ts`): the "Ajouter une table" (Add a table) funnel, the catalog, the page of a VPS database game, "Ce qu'il faut" (What it takes), "… : au choix" (… : choose one), "Récupérés et attendus" (Received and expected), a waiting list item and its replacement, "Parties du jeu" (Game parts), a part and its downloaded files, Downloads and "Ajouter à un jeu" (Add to a game), "Ce qu'il manque pour jouer" (What's missing to play), "Médias du jeu" (Game media), a medium's screen ("Chercher moi-même sur le web…", Search the web myself…), its proposals, VPinMediaDB and the ROM library.
+  The action carries its screen (`Action.web`); in a screen without icons, it has none either.
+- **VPUniverse**: its search ignores words of three letters or fewer, and an "and" search then returns nothing ("goonies never say die"): they are removed from the address (`siteSearchText`), for media as for parts.
+  A visitor gets only one search every 90 s or so: the "Please wait 88 seconds…" page is recognised (`reason: 'flood'`), never taken for "no results"; a site's searches run one after another, and the refused one starts again after the announced wait (150 s at most), the site's line saying so.
+- **Invariants**: `packages/core/src/test/addscreens.test.ts` refuses an adding or choice screen without "Chercher sur le web…" (registry, and adding screen titles in the code), checks that each part is searched everywhere (VPS, Downloads, VPForums, VPUniverse, the web), that The Goonies is recognised with no identifier in its `.info`, and reads two VPUniverse witness pages (`packages/core/test-pages/vpuniverse-parties.html`, `vpuniverse-attente.html`).
