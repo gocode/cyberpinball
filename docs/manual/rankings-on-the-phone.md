@@ -4,6 +4,7 @@
 
 The **Scores** view of the phone page (Community tab) shows the scoreboard of every table, exactly as at the cabinet (table sheet > "Tableau des scores", Scoreboard): the scopes **Cette borne** (This cabinet), **Amis** (Friends), **National** and **Mondial** (World), the four periods (all time, this year, this week, today), the rank, the flag, the player's avatar with its presence mark, the name and the score.
 Read only: "Masquer un score…" (Hide a score…) stays at the cabinet.
+It is, on the phone, the "Tables" door of the cabinet's Leaderboards (Community > Leaderboards > Tables, then a table); the "Joueurs" (Players) door, the ranking of players by their XP, only shows at the cabinet (see "The Community medallion" in [Friends](friends-the-cabinet-network.md#friends-the-cabinet-network)).
 
 - **Which table**: the one the cabinet chose on the wheel, or launched during a game, opens by default, marked "À la borne" (On the cabinet); the page follows it when the wheel turns.
   The table button, at the top, opens the list of all the tables (a "Chercher une table" (Search for a table) field beyond eight); another table chosen there stays, even when the wheel turns, until the cabinet's table is chosen again.

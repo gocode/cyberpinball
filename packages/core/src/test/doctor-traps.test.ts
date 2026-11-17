@@ -513,6 +513,8 @@ const TRAPS: Trap[] = [
     code: 'manualView',
     arm: (folder) => write(path.join(folder, `${TABLE}.ini`), '[Player]\r\nCabinetAutofitMode = 0\r\n\r\n[TableOverride]\r\nViewCabVOfs = 12\r\n'),
   },
+  // Vue de borne réglée pour la table sous un VPX d'avant 10.8.1 (reprise d'une installation PinUP Popper, 17/11/2026).
+  { code: 'importedView', arm: (folder) => write(path.join(folder, `${TABLE}.ini`), '[TableOverride]\r\nViewCabHOfs = 1.5\r\nViewCabVOfs = 8\r\nViewCabScaleY = 1.04\r\n') },
   // Windows en portrait, joueur en bas : cadrage manuel imposé par la table, sa vue garde la rotation de l'auteur.
   {
     code: 'tableOrientation',
@@ -853,9 +855,17 @@ test('cadrage manuel imposé par la table : la clé est retirée, le reste du .i
   const trashDir = `${tablesDir}-corbeille`;
   const repair = () => applyOps(diagnose(scanTables(tablesDir)[0]!, ctx()).find((f) => f.code === 'manualView')!.fix!.ops, { trashDir });
   TRAPS.find((t) => t.code === 'manualView')!.arm(folder, tablesDir);
+  // Avec sa propre vue (ViewCabVOfs) : un cadrage réglé pour la table, gardé ; le retour au cadrage automatique est écrit.
+  assert.equal(diagnose(scanTables(tablesDir)[0]!, ctx()).find((f) => f.code === 'manualView')?.severity, 'info');
   repair();
-  assert.equal(fs.readFileSync(ini, 'utf8'), '[TableOverride]\r\nViewCabVOfs = 12\r\n');
+  assert.equal(fs.readFileSync(ini, 'utf8'), '[Player]\r\nCabinetAutofitMode = 1\r\n\r\n[TableOverride]\r\nViewCabVOfs = 12\r\n');
   assert.equal(fs.readdirSync(trashDir).length, 1);
+  assert.deepEqual(diagnose(scanTables(tablesDir)[0]!, ctx()), []);
+  // Sans vue propre : la vue de l'auteur, peut-être pour un autre écran ; la clé est retirée.
+  write(ini, '[Player]\r\nCabinetAutofitMode = 0\r\n\r\n[TableOverride]\r\nViewCabRotation = 0\r\n');
+  assert.equal(diagnose(scanTables(tablesDir)[0]!, ctx()).find((f) => f.code === 'manualView')?.severity, 'warning');
+  repair();
+  assert.equal(fs.readFileSync(ini, 'utf8'), '[TableOverride]\r\nViewCabRotation = 0\r\n');
   assert.deepEqual(diagnose(scanTables(tablesDir)[0]!, ctx()), []);
   // Seule la clé dans le fichier : il part entier à la corbeille.
   write(ini, '[Player]\nCabinetAutofitMode = Manual\n');

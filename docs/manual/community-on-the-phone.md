@@ -15,6 +15,8 @@ Messaging there is the same as at the cabinet (System menu > Friends > Messages)
   The friend's messages on the left, mine on the right in green, dashed while they wait for the friend's connection, amber if they were not delivered; days and the friend's events (records, badges) in the middle; reactions under their message.
   It is the same conversation as at the cabinet (`threadItems`, shared by both).
   The status line says what will happen to what you write ("Nova est en ligne", online, offline, refusal); above the field, the reactions to the last message received and the ready-made phrases, in one tap.
+  **Typing**: under the last message, who is writing right now, the friend or the members of a group (the nicknames, three at most then "+2", and three dots lighting up one after the other); the same under the room and the in-game chat (see "Typing" in [Friends: the cabinet network](friends-the-cabinet-network.md#messaging)).
+  The phone's field sends it in turn (`typing`, once a second at most while text remains, the cabinet relaying only one every 3 s) and stops it when it is emptied, the message sent or the thread left; the cabinet checks the friend, the group or the room.
   Opened on the phone, the conversation is read, as at the cabinet.
 - **Writing**: in the menu, and during a game if "Messagerie au téléphone pendant la partie" (Messaging on the phone during a game) allows it.
   The field, 500 characters at most, goes through the cabinet, which checks the friend, the text and the reaction (`chat-send`, `chat-react`).

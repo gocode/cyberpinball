@@ -6,11 +6,17 @@ The system menu (Exit, Tab or ⚙ from the table menu) shows only five sections,
 Each section opens on its entries; Exit (or "Retour", Back) goes up one level, with the selection on the section being left.
 A screen opened from an entry returns, through its "Retour", to the section it came from, with the selection on that entry; the gear always reopens the sections.
 
+**The gear.**
+At the top right, to the right of the player card and the pills (badges, friends, downloads), it is itself a round pill of the same size: same height, same top, same background, same border and same hover (green border and ring, never a square background), at the usual gap from the others.
+On a full-screen page (System menu and its screens, My badges, help…), it follows the pills of the brand line, at the same centre as on the tables screen: it does not jump from one screen to the next.
+Up to 0.1.13, it turned square on hover and sat offset from the pills.
+Test: [entete-homogene.test.ts](../../packages/core/src/test/entete-homogene.test.ts).
+
 | Section | Entries |
 | --- | --- |
 | Tables | All tables, Collections, Roue (Wheel, see [Wheel: its settings](game-media.md#wheel-its-settings)), Add a table, Downloads, ROM library |
 | Médias (Media) | Find missing media (on VPinMediaDB); Media, sound and attract mode |
-| Amis (Friends) | My friends, Game history, Find a player, Friend requests, My badges, Sharing and network (see [Friends: the cabinet network](friends-the-cabinet-network.md#friends-the-cabinet-network)) |
+| Amis (Friends) | Players online, Messages, My friends, My avatar, My public profile, Game history, Find a player, Friend requests, My badges, Community settings, Sharing and network, Friends' scores during the game, Hide notifications during games (see [Friends: the cabinet network](friends-the-cabinet-network.md#friends-the-cabinet-network)) |
 | Borne (Cabinet) | Cabinet health, Tech sheet, Cabinet setup, VPX settings, Cabinet controls, DMD (DMD screen, Menu DMD, DMD colour, Real DMD), Windows desktop (Open Windows Explorer on a [dedicated cabinet](dedicated-cabinet.md#dedicated-cabinet)), Dedicated cabinet, Relaunch with Start (see [Relaunch with Start](relaunch-with-start.md#relaunch-with-start)), Guest mode |
 | Cyber Pinball | Langue / Language, Cyber Pinball update, Recent activity (see [Recent activity](recent-activity.md#recent-activity)), Backups (see [Backups](backups.md#backups)), Migration, Quit Cyber Pinball, Restart Cyber Pinball, Sleep, Restart the cabinet, Shut down the cabinet |
 

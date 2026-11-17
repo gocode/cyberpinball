@@ -86,7 +86,46 @@ Le volume est celui de la machine elle-même : sur une WPC, une Stern ou une Dat
 - **Chemin jusqu'à la ROM** : les actions `CoinDoor`, `Service2` et `Service3` de VPX arrivent au script de la table comme `keyCoinDoor`, `keyDown` et `keyUp` (`scripts/VPMKeys.vbs`), que `vpmKeyDown` (`WPC.vbs`…) donne aux interrupteurs de la porte.
   La porte bascule à chaque appui (`toggleKeyCoinDoor`).
 - **En partie** : porte, puis − ou + autant de fois qu'il faut (la ROM affiche le volume sur le DMD), puis porte pour la refermer.
-  Le réglage reste pour cette table, dans sa NVRAM.
+  Le réglage reste pour cette table, dans sa NVRAM, et Cyber Pinball le garde comme choix du joueur (voir [Volume de la ROM](#volume-de-la-rom)).
 - **Limites** : les machines plus anciennes (System 11, Gottlieb, premières électroniques) ont souvent un potentiomètre sur la carte son et pas de volume dans la ROM ; les boutons − et + n'y règlent rien.
   Les boutons Échap et Entrée du menu de service (7 et 0, `Service1` et `Service4`) gardent leurs touches de VPX, sans bouton à relever.
 - Tests : [buttons.test.ts](../../packages/core/src/test/buttons.test.ts) (« porte du monnayeur et ses boutons − et + »).
+
+### Volume de la ROM
+
+Les Williams WPC et une partie des Stern SAM gardent leur volume principal dans la mémoire de la ROM (NVRAM, `<pinmame>\nvram\<rom>.nv`), pas dans VPX.
+Sans mémoire, la ROM pose au démarrage son volume d'usine : 12 sur 31 en WPC, faible à côté des bruits de la table (Monster Bash presque muet, 17/11/2026), 40 sur 63 en Stern SAM.
+Le changer demandait le geste de la porte du monnayeur en partie (ci-dessus), que personne ne connaît.
+Cyber Pinball lit ce volume, le dit sur la fiche de la table, le règle hors partie dans « Réglages de cette table », et monte de lui-même un volume d'usine bas au volume conseillé juste avant la partie.
+Code : [romvolume.ts](../../packages/core/src/romvolume.ts) (état, conseil, choix du joueur), [romscores.ts](../../packages/core/src/romscores.ts) (lecture et écriture de la mémoire), [app/src/rom-volume.ts](../../app/src/rom-volume.ts) (avant et après la partie), [app/src/settings.ts](../../app/src/settings.ts) (réglage).
+
+- **Où est le volume** (`romMasterVolume`) : la carte mémoire de la ROM (Pinball Memory Maps, la même que pour les billes par partie et les records, lue dans le cache `<données>\cache\cartes-memoire`, sans réseau) situe `game_state.volume` (« Volume », « Master Volume »).
+  Il n'est retenu que s'il se lit et s'écrit sûrement : un octet entier, une plage, une seule zone de NVRAM, des sommes de contrôle décrites.
+  Sinon (Whitestar, Data East, System 11…), la machine ne garde pas son volume dans une mémoire que Cyber Pinball sait lire.
+- **Quelle mémoire** (`tablePinmameDir`, `romVolumeStatus`) : `<table>\pinmame\nvram` quand la table a ses ROM à côté d'elle, sinon le dossier PinMAME commun ; la première ROM que PinMAME charge (alias compris) dont la carte situe le volume.
+- **Ce que la ROM jouera** (`readRomVolume`) : la valeur gardée ; sans mémoire (la ROM la crée à sa première partie), avec un bloc vierge, une somme de contrôle fausse ou une valeur hors plage, son volume d'usine.
+  Volume d'usine : celui de la carte (Stern SAM), sinon 12 pour une WPC (`WPC_FACTORY_VOLUME`, mesuré au banc libpinmame sur The Addams Family et Monster Bash).
+- **Bas et conseillé** (`romVolumeAdvice`), d'après la plage de la ROM, jamais d'après une borne : bas sous la moitié de la plage, conseillé aux trois quarts.
+  WPC : bas sous 16, conseillé 23 sur 31 ; Stern SAM : bas sous 32, conseillé 47 sur 63 (leur volume d'usine, 40, n'est pas bas).
+- **Écriture** (`writeRomVolume`, `setRomVolume`) : toujours hors partie, sur la mémoire relue juste avant (des records ont pu s'y écrire) ; l'octet et ses copies en miroir posés, chaque somme de contrôle qui les couvre refaite, le résultat relu, puis écrit d'un bloc (`writeFileAtomic`).
+  Refusée, avec sa raison, quand elle n'est pas sûre : valeur hors plage, octet qu'aucune somme ne couvre, ou bloc qui mêle le volume à d'autres réglages dont la somme est déjà fausse (la refaire validerait des octets que la ROM rejetait).
+  Un bloc qui ne tient que le volume (WPC, SAM) se refait toujours : vierge, il devient juste.
+- **Avant la partie** (`beforeGame`) : le volume voulu est posé, s'il ne l'est pas déjà ; le choix du joueur, sinon, en automatique, le volume conseillé à la place d'un volume d'usine bas.
+  Sans mémoire, rien n'est écrit : la ROM la crée pendant la première partie, au volume d'usine, et Cyber Pinball monte ce volume bas dès la fin de cette partie.
+  Jamais dans le double d'une partie entre amis (son volume est déjà celui de la borne, voir [Amis : le réseau des bornes](amis-le-reseau-des-bornes.md#amis--le-réseau-des-bornes)), ni pour « Régler l'affichage en partie ».
+  Journal : « Volume de la ROM (…, taf_l7) : 12 → 23 sur 31 avant la partie (volume d'usine bas, conseillé). » (« usine → 23 » pour un bloc vierge).
+- **Après la partie** (`afterGame`, `romVolumeChangedInGame`) : un volume changé à la porte du monnayeur pendant la partie devient le choix du joueur, gardé ensuite (journal : « … réglé à la porte pendant la partie, gardé. ») ; un volume resté celui d'usine après une première partie n'est pas un choix.
+  Les choix du joueur sont dans `<données>\volumes-rom.json`, par fichier `.nv`.
+- **Volume bas réglé ailleurs** : un volume bas qui n'est ni d'usine ni choisi dans Cyber Pinball (réglé dans un autre front-end, ou à la porte avant Cyber Pinball) n'est jamais changé seul, il est peut-être voulu.
+  Le médecin le signale : constat « Volume de la ROM bas » (`lowRomVolume`, `romVolumeFinding`), À vérifier dans le diagnostic de la table et dans la ligne « Tables » de la [Santé de la borne](sante-de-la-borne.md#santé-de-la-borne), avec la correction « Monter le volume de la ROM à 23 sur 31 » (opération `romVolume` de `applyOps` : la mémoire relue au moment d'écrire, l'ancienne à la corbeille).
+- **Fiche de la table** (ligne « Volume de la ROM » du résumé de ses fichiers, `romVolumeLine`) : « 12 sur 31, d'usine, faible : monté à 23 avant la partie », « d'usine, 12 sur 31 (faible) : monté à 23 dès la fin de la première partie », « 18 sur 31 (votre réglage) », « … : remis à … (votre réglage) avant la partie », ou « 10 sur 31 : bas », en orange, avec « volume de la ROM bas » dans la ligne « À vérifier ».
+  Une table dont la ROM ne garde pas son volume n'a pas cette ligne.
+- **« Réglages de cette table » > Son** : une ligne « Volume de la ROM », après les volumes de VPX, pour toute table qui joue une ROM.
+  Start ouvre la liste : « Automatique : 23 si le volume d'usine est bas » (conseillé), puis chaque valeur de la plage (« 12 sur 31 »…), annotée « d'usine », « conseillé » ou « bas ».
+  Le choix est écrit aussitôt dans la mémoire ; sans mémoire encore, il est retenu et posé à la fin de la première partie.
+  « Valeur par défaut » (Suppr) revient à l'automatique.
+  Badge : « Réglé pour cette table », « Monté à 23 avant la partie » (volume d'usine bas que Cyber Pinball monte seul), « Bas » ou « Automatique ».
+  Le détail donne la valeur utilisée, le réglage de la table, la plage, le volume d'usine, le conseillé, le fichier de la mémoire (« créée à la première partie » s'il manque) et le geste de la porte avec les touches de la borne.
+- **Machine qui ne garde pas son volume en mémoire** (ou carte pas encore connue, dossier de PinMAME introuvable) : la ligne dit « Réglé à la machine », en lecture seule ; Start dit pourquoi Cyber Pinball ne peut pas le régler et rappelle le geste avec les touches de la borne (« pendant la partie, ouvrir la porte du monnayeur (Fin), puis − (8) ou + (9) », `romVolumeGesture`).
+  Sans ces boutons relevés, il rappelle que le volume de VPX (« Volume du backglass ») monte aussi la musique et les voix de la ROM.
+- Tests : [volume-des-rom.test.ts](../../packages/core/src/test/volume-des-rom.test.ts), sur des mémoires réelles mesurées au banc libpinmame (WPC, Stern SAM, Data East), et le piège `lowRomVolume` de [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).

@@ -8,20 +8,20 @@ Sharing is **on by default**; "Partage et réseau" (Sharing and network) turns i
 | Entry | What it shows |
 | --- | --- |
 | Messages | Conversations with your friends, the most recent first, then the friends you have not written to yet. The red dot and "non lus" (unread) mark what is waiting. Start opens a friend's conversation (see "Messaging" below). |
-| Mes amis (My friends) | Online, then offline. For each: playing and which table (in real time), in the menu, or seen how long ago; their latest event ("Nouveau meilleur score sur …", New high score on; "Badge reçu : …", Badge earned; "A joué à …", Played). Start opens their page: latest events, their library, "Inviter à une partie en direct" (Invite to a live game; greyed out, "Hors ligne", Offline, when they are not), "Voir sa bibliothèque" (See their library), "Retirer de mes amis" (Remove from my friends), "Bloquer" (Block). At the top, an invitation received or the live game in progress. |
+| Mes amis (My friends) | Online, then offline. For each: playing and which table (in real time), in the menu, or seen how long ago; their latest event ("Nouveau meilleur score sur …", New high score on; "Badge reçu : …", Badge earned; "A joué à …", Played). Start opens their profile, the one screen of a player (see "Public profile and likes" below): their presence, their library, their level, their badges, a single activity list, "Inviter à une partie en direct" (Invite to a live game; greyed out, "Hors ligne", Offline, when they are not), "Voir sa bibliothèque" (See their library), "Écrire un message" (Write a message), "Retirer de mes amis" (Remove from my friends), "Bloquer …" (Block …). At the top, an invitation received or the live game in progress. |
 | Mon avatar (My avatar) | The photo or picture every player sees next to your name: "Choisir une image sur ce PC…" (Choose a picture on this PC…), "Chercher une image sur le web…" (Search the web for a picture…), "Recadrer mon avatar" (Crop my avatar), "Retirer mon avatar" (Remove my avatar) (see "Player avatars" below). Without an avatar, your initials on a hue taken from your key. |
-| Mon profil public (My public profile) | What players who are not your friends see (country, badges, high scores, recent activity), and who liked each of your high scores and badges. It can be turned off here (see "Public profile and likes" below). |
+| Mon profil public (My public profile) | What players who are not your friends see (level, badges, country, friends, high scores, invited players, public groups, recent activity), and who liked each of your high scores and badges. During the first month, "Qui vous a fait découvrir Cyber Pinball ?" (Who introduced you to Cyber Pinball?, see "Invited players" below). It can be turned off here (see "Public profile and likes" below). |
 | Historique des parties (Game history) | The games with friends finished on this cabinet, newest first, by day: the table, the time, and below it the players with their rank and score. A game opens to review its details (see "Game history" below). |
-| Trouver un joueur (Find a player) | The directory: "Chercher un nom…" (Search for a name, ignoring accents and case; or the ID shown on a player's page, whole or its first four characters), cabinets "À proximité (réseau local)" (Nearby, local network) and "Vus récemment" (Seen recently). A player: "Envoyer une demande d'ami" (Send a friend request), or cancel, accept, decline, see their page, block. |
+| Trouver un joueur (Find a player) | The directory: "Chercher un nom…" (Search for a name, ignoring accents and case; or the ID shown on a player's profile, whole or its first four characters), cabinets "À proximité (réseau local)" (Nearby, local network) and "Vus récemment" (Seen recently). Start on a player opens their profile: "Envoyer une demande d'ami" (Send a friend request), or cancel, accept, decline, and "Bloquer …" (Block …). |
 | Demandes d'amis (Friend requests) | Received (to answer, red dot up to the gear) and sent ("En attente : remise dès que sa borne sera en ligne", Waiting: delivered as soon as their cabinet is online). |
-| Mes badges (My badges) | Earned and to earn: First game, Ten tables, A hundred games, An hour on one table, Ten hours of play, On the high score table, Grand Champion, Five-time champion. |
+| Mes badges (My badges) | The 56 badges, by family, earned (with their date) or still to earn (with their progress); secret badges only show their hint (see [Levels and badges](levels-and-badges.md#levels-and-badges)). |
 | Partage et réseau (Sharing and network) | Sharing on or off, "Votre nom : Alexis" (Your name, with the cabinet's ID), local network, library shared or not, download speed, Windows Firewall, what others see, blocked players. The selection opens on "Retour" (Back): a stray Start does not turn sharing off. |
 | Masquer les notifications pendant les parties (Hide notifications during games) | Off by default: a friend coming online, a request to join a game, the news of a game with friends also show during games, with their sound (see "Everywhere, even in a game" in [Tables menu notifications](tables-menu-notifications.md#tables-menu-notifications)). Start toggles; on, nothing shows or rings during a game, everything waits for the menu. |
 
 **Identity.**
 Each cabinet has an Ed25519 key, created on first start and kept in `<data>\social.json` (with friends, requests, directory, events and badges; never shared).
 The name (2 to 24 letters, digits, spaces, `'`, `.`, `_`, `-`) is signed by this key; the player's ID ("A1B2-C3D4-E5F6-7890", `playerId`, taken from the key) tells two players with the same name apart.
-It only shows on a player's page ("Identifiant : …" (ID) line) and in "Partage et réseau"; everywhere else (lists, friends, scores, live game, headings), the name shows alone, with the avatar.
+It only shows on a player's profile ("Identifiant : …" (ID) line) and in "Partage et réseau"; everywhere else (lists, friends, scores, live game, headings), the name shows alone, with the avatar.
 A test guard (`noTag`, friends-menu.test.ts) rejects any tag attached to a name.
 An unreadable `social.json` is set aside (`social.json.illisible-<date>`), never overwritten.
 
@@ -37,6 +37,7 @@ Right after the installation's screen wizard, the front-end opens the "Votre pro
 The nickname is mandatory: as long as it is not chosen, the nickname line reads "to be chosen", "Continuer" stays greyed out, and both "Continuer" and Exit only remind the player of the nickname, with the selection back on "Choisir mon pseudo…".
 The default name typed again as is ("Joueur A1B2", "Player A1B2") is refused.
 The avatar stays optional.
+As long as the question is asked (see "Invited players" below), an optional entry slips in before "Continuer": "Qui vous a fait découvrir Cyber Pinball ?" (Who introduced you to Cyber Pinball?), which becomes "Découvert grâce à …" (Discovered thanks to …) once a player is chosen.
 The screen comes back at every start as long as the profile has the default name, even if already seen and even with an avatar; a profile that had skipped the screen without a nickname therefore gets it again at the next start.
 Never in guest mode nor during an unattended test (unless `CYBERPINBALL_PROFIL=1`), and after the opening when the start lands on the wheel.
 The date of the first opening (`profileOffered` in `social.json`) stays recorded, for reference.
@@ -46,7 +47,7 @@ Code: `app/src/profile-welcome.ts`, rule `profileWelcomeDue` in [packages/core/s
 Every cabinet with sharing on joins the same Hyperswarm topic (`cyberpinball/annuaire/1`, on Holepunch's DHT, bootstrap nodes `node1-3.hyperdht.org`).
 On each connection, two cabinets exchange their profile and up to 200 profiles they have seen: the directory travels from cabinet to cabinet.
 A relayed profile only gets in if its signature is valid; the most recent wins; a profile not seen again for 60 days leaves.
-"Vu il y a…" (Seen … ago: directory, player page, rankings) is the last time the player was online: seen by this cabinet (their hello, their local beacon), or by a cabinet relaying them, at the date it gives (`seen` field of each relayed profile, kept between the signed profile's date and now; an older cabinet that does not send it: the profile's date).
+"Vu il y a…" (Seen … ago: directory, player profile, rankings) is the last time the player was online: seen by this cabinet (their hello, their local beacon), or by a cabinet relaying them, at the date it gives (`seen` field of each relayed profile, kept between the signed profile's date and now; an older cabinet that does not send it: the profile's date).
 Receiving a relayed profile never makes it younger: up to 0.1.11-essai.27, each relay reset every received profile to the time of receipt, so all players seemed "seen" at the same moment and none ever left the directory.
 Dates already distorted are brought back, once, to the last sure proof (profile date, local beacon, a friend's last presence, a friend request received; `repairDirectorySeen`, marker `directorySeenChecked`).
 Two players find each other as well as a thousand: the DHT is shared by every Holepunch user.
@@ -85,7 +86,7 @@ A followed friend without a link is asked of Hyperswarm again every 5 s for two 
 These delays are drawn at random around their value (from half to one and a half times): two cabinets calling each other at the same instant get in each other's way, because Hyperswarm keeps, on the larger key's side, its own call still in progress and cuts the other's, even when that call is going to fail (incoming blocked on the other side); at a fixed pace they fell back together at every redial.
 An Internet call cut before the hello, with no other link, is retried 0.3 to 1.5 s later (at most six times a minute), without waiting for Hyperswarm's 1 s, 5 s then 15 s.
 The list says whether it can be trusted ([friendpresence.ts](../../packages/core/src/friendpresence.ts)): "Looking for friends…" at startup (30 s, or until every friend is there) and after a network change, "Updating…" during a grace, then "List up to date: 1 friend online", with a bar sweeping back and forth while it cannot be trusted; a friend offline during a search is "Seen 3 h ago · still looking".
-Everywhere presence shows: "My friends", the system menu ("1 online · still looking"), "Play with a friend", a friend's sheet ("Linked over the Internet and the local network"), the table menu pill (shown even at zero during the search, hollow dot).
+Everywhere presence shows: "My friends", the system menu ("1 online · still looking"), "Play with a friend", a friend's profile ("Linked over the Internet and the local network"), the table menu pill (shown even at zero during the search, hollow dot).
 "Just connected" is not announced during the search: the cabinet is the one arriving.
 Log (`data\logs\journal.txt`), for friends and requests only: each link opened or closed, over what, its reason ("Duplicate connection", "connection timed out", "fin normale"), its duration and what remains; "X en ligne" with, during the search, the delay since it began ("2.4 s après le début de la recherche"); "X hors ligne (dernière liaison fermée il y a 15 s)"; a friend's local beacon and its address; a failed local call (firewall) once every five minutes; a friend Hyperswarm had given up on.
 
@@ -125,7 +126,7 @@ On by default between friends: two players who became friends each see the other
 "Partage et réseau" > "Ne plus partager ma bibliothèque" (Stop sharing my library) turns it off, "Partager ma bibliothèque avec mes amis" (Share my library with my friends) turns it back on; this choice of the player is kept (`shareLibraryChosen`), and a `social.json` written before this default, which said "no" without anyone choosing it, is read back as "shared".
 The screen reminds you to only share what you have the right to share (captures of works, ROMs and PuP-Packs remain their rights holders').
 Friends see the list of tables and, for each, its own media (those in `medias\`: logo, backglass, videos, rules, music; neither the cabinet shared media nor the image taken from the `.directb2s`).
-A friend's page > "Voir sa bibliothèque" (See their library): "Sur votre borne" (On your cabinet: same game by VPS id, ROM, or title and year; "2 manquants", 2 missing) and "Absentes de votre borne" (Not on your cabinet).
+A friend's profile > "Voir sa bibliothèque" (See their library): "Sur votre borne" (On your cabinet: same game by VPS id, ROM, or title and year; "2 manquants", 2 missing) and "Absentes de votre borne" (Not on your cabinet).
 One of their tables: its media, "Déjà équipé" (Already has one: your table already has this type of media, not necessarily the same file) or "Manquant" (Missing), then "Récupérer les n médias manquants" (Get the n missing media), "Récupérer les n médias" (Get the n media) or "Inviter … à jouer" (Invite … to play).
 The transfer shows its progress and can be cancelled (Exit); each file arrives in `<data>\amis\recus\` and only leaves it if it has the announced size and SHA-256 fingerprint and first bytes that say media of its type (the import's checks).
 It then enters the table's "Médias du jeu" (Game media) draft, with its origin ("la borne de Bruno #A1B2", Bruno's cabinet), the cursor on the first media item received ("Afficheur large reçu de Bruno : vérifiez-le, puis enregistrez.", Wide display received from Bruno: check it, then save): you see it, then "Enregistrer" (Save) shows the plan before writing.
@@ -148,7 +149,7 @@ Below the list, "Récupérer les n parties cochées" (Get the n ticked parts: th
 **A transfer starts only once**: it carries a key, the table and the friend (`dedupe`), and while it runs, waits for its friend, is paused, or is received but not installed, nothing starts it again.
 It shows where it was started: in the friend's library, the table's line carries its state ("Réception en cours", Transfer in progress; "En attente de Bruno", Waiting for Bruno; "Reçue · à installer", Received · to install), its bar and "42 % · 120 Mo sur 300 Mo · fichier 3 sur 14 · Start : voir la réception" (Start: see the transfer); Start leads to it.
 On the table's page, "Voir la réception de la table" (See the table transfer, or "Installer la table reçue", Install the received table) replaces "Récupérer toute la table", the cursor on it, with the same bar at the top; likewise "Voir la réception des médias" (See the media transfer).
-The friend's page adds "1 réception en cours" (1 transfer in progress).
+The friend's profile adds it to the line of their library ("1 réception en cours", 1 transfer in progress).
 The transfer screen says "Lancée à 14:02 : rien d'autre à faire" (Started at 14:02: nothing else to do): it carries on if you leave it, and Start on the table comes back here without starting it again; "Continuer en arrière-plan" goes back to the table, "Annuler la réception" (Cancel the transfer) deletes what was received.
 Once received, the screen says "Reçue, pas encore installée" (Received, not installed yet) and offers first **"Installer dans ma bibliothèque"** (Install in my library: this table's add plan); likewise the table's page and Downloads.
 A received table whose plan was cancelled stays "Reçue · à installer" while its folder is there, and "Récupérer de nouveau" (Get it again) is an explicit choice on that screen.
@@ -176,7 +177,7 @@ Code: [packages/core/src/ratelimit.ts](../../packages/core/src/ratelimit.ts), `s
 
 **Live game.**
 Two entries.
-A friend's page > "Inviter à une partie en direct" (Invite to a live game): choose a table (those they have in the same version first, see "Choosing the table of a live game" below).
+A friend's profile > "Inviter à une partie en direct" (Invite to a live game): choose a table (those they have in the same version first, see "Choosing the table of a live game" below).
 A table's page > "Jouer avec un ami" (Play with a friend), right under "Jouer" (Play): choose the friend (online ones first, those who have the table in the same version at the top, offline friends greyed out below).
 Both stay visible when you cannot invite, greyed out with their reason: "Hors ligne : invitez-le quand il sera connecté" (Offline: invite them once they are connected), "Aucun ami en ligne pour l'instant" (No friend online right now), "Pas encore d'ami : Menu système > Amis > Trouver un joueur" (No friend yet: System menu > Friends > Find a player); a friend in a game can be invited too ("En partie : il recevra une notification discrète sur sa table", In a game: they will get a discreet notification on their table).
 A room opens, the invitation leaves; up to four players ("Inviter un autre ami", Invite another friend).
@@ -383,7 +384,7 @@ Connected cabinets see the IP address, as in any peer-to-peer exchange.
 Never the real network during a test: `socialNetMode` turns the network off as soon as a test variable is set (autopilot, captures, stress, `CYBERPINBALL_HOME` sandbox, simulated screens), except `CYBERPINBALL_RESEAU=simule`: an in-process HyperDHT test network and an in-memory local network, on 127.0.0.1 only, with a simulated firewall rule.
 `CYBERPINBALL_RESEAU=non` also turns it off in normal use.
 
-Code: decisions in [packages/core/src/social.ts](../../packages/core/src/social.ts) (profile, messages, directory, friendship, events), [friendlibrary.ts](../../packages/core/src/friendlibrary.ts) (shared library, file messages) and [livegame.ts](../../packages/core/src/livegame.ts) (invitation, room, start, results), transport in `app/src/social-net.ts` (the only module that opens sockets), services in `app/src/friend-content.ts` and `app/src/live-game.ts`, screens in `app/src/friends-menu.ts`, `app/src/friend-library-menu.ts` and `app/src/live-game-menu.ts`.
+Code: decisions in [packages/core/src/social.ts](../../packages/core/src/social.ts) (profile, messages, directory, friendship, events), [friendlibrary.ts](../../packages/core/src/friendlibrary.ts) (shared library, file messages) and [livegame.ts](../../packages/core/src/livegame.ts) (invitation, room, start, results), transport in `app/src/social-net.ts` (the only module that opens sockets), services in `app/src/friend-content.ts` and `app/src/live-game.ts`, screens in `app/src/friends-menu.ts`, `app/src/profile-menu.ts` (a player's profile), `app/src/friend-library-menu.ts` and `app/src/live-game-menu.ts`.
 A player's name always follows their most recent signed profile, wherever it comes from (hello, relayed directory, beacon), never an older one (`learnProfiles`, `renamePeer`).
 Proofs: [social.test.ts](../../packages/core/src/test/social.test.ts) (names, signatures, trapped messages, directory, friendship rules on both sides, badges, network mode), [social-net.test.ts](../../packages/core/src/test/social-net.test.ts) (two cabinets on a test network: directory, request, acceptance even with a cabinet off, presence, high score, removal, local network without the Internet, blocking; local network down at start, the Internet running anyway and the local network retried; beacon that does not throw on a refused or missing adapter; no socket outside 127.0.0.1; no other module loads Hyperswarm, `net` or `dgram`), [firewall.test.ts](../../packages/core/src/test/firewall.test.ts) (netsh output in every language, same rule in the installer, never during an update, silently or in a sandbox), [friend-services.test.ts](../../packages/core/src/test/friend-services.test.ts) (library shared by default and refused once turned off, media received identical to the byte, unknown id refused, whole table part by part with no saves, program or untaken ROM, trapped path refused, live game from invitation to results), [friends-menu.test.ts](../../packages/core/src/test/friends-menu.test.ts) (each screen, sharing by default, each part of a table leading to its own action and the ROM unticked, countdown cursor, invitation greyed out with its reason and "Jouer avec un ami"), [invitation-en-partie.test.ts](../../packages/core/src/test/invitation-en-partie.test.ts) (invitation received during a game: kept, never "busy"; card then pill, playfield corner in all four orientations, window without focus or capture, opened on return to the menu).
 
@@ -415,12 +416,12 @@ The check at acceptance remains the safety net: a table changed in the meantime 
 
 ### Messaging
 
-System menu > Friends > "Messages", or "Écrire" (Write) on a friend's page.
+System menu > Friends > "Messages", or "Écrire un message" (Write a message) on a friend's profile.
 You write **between friends only**, without a server: messages go straight from one cabinet to the other, over the same encrypted connection as presence, and stay on both cabinets.
 
 **A friend's conversation.**
 Their messages on the left, yours on the right, and in the middle the events of the friendship drawn by the cabinet (a high score, a badge).
-The flippers choose a message, Start opens "Répondre" (Reply), MagnaSave goes to the previous or next friend, Exit leaves the conversation for its actions: "Écrire un message…" (Write a message…), "Réponse rapide…" (Quick reply…), "Options de la conversation" (Conversation options), "Voir sa fiche" (See their page).
+The flippers choose a message, Start opens "Répondre" (Reply), MagnaSave goes to the previous or next friend, Exit leaves the conversation for its actions: "Écrire un message…" (Write a message…), "Réponse rapide…" (Quick reply…), "Options de la conversation" (Conversation options), "Voir son profil" (See their profile).
 
 **Replying with the buttons.**
 "Répondre" offers seven emoji reactions placed on the chosen message (👍 Like, ❤️ Love, 🥰 Care, 😆 Haha, 😮 Wow, 😢 Sad, 😡 Angry, the same as in the rooms; Start again on yours removes it; an older reaction, Bravo or TILT!, still shows), six ready-made sentences, and "Écrire un message…": the on-screen keyboard, or the paired phone, whose text appears in the field as you type. 500 characters at most.
@@ -455,6 +456,7 @@ An open conversation announces nothing more.
 
 **Options and settings.**
 A conversation's options mute a friend's notifications, delete the conversation (on this cabinet only) or block the friend (the cabinet network's block, which also deletes the conversation).
+An unread conversation counts in the messages pill of the tables menu, unless muted, and shows on the "Messages en attente" (Waiting messages) screen (see [Tables menu notifications](tables-menu-notifications.md#tables-menu-notifications)).
 "Réglages de la messagerie" (Messaging settings) turns messaging on or off (off, your friends see "N'accepte pas de messages", Does not accept messages, and what they write waits), mutes the message sound, and sets how long messages are kept: 30 days, 1 year (default) or always.
 In guest mode the system menu is closed: no messaging, and message notifications wait until it is unlocked.
 The settings also include "Répondre depuis le téléphone pendant une partie" (Reply from the phone during a game, on by default).
@@ -468,7 +470,7 @@ Tests: [suppression-messages.test.ts](../../packages/core/src/test/suppression-m
 **Typing.**
 While a friend has text in their field (on-screen keyboard, real keyboard or phone), their badge appears under the last message: their avatar, their nickname and three dots lighting up one after the other.
 The same goes in a group (each member typing, under the discussion) and in a room (under the log, three badges at most, then "+2"; ignored players are left out).
-The phone shows it too, under the thread, the room or the in-game chat, and its own fields send it.
+The phone shows it too, under the thread, the room or the in-game chat (the nicknames, three at most then "+2", and the three dots), and its own fields send it.
 The dots leave with the message, when the field is emptied or closed, or by themselves 8 seconds after the last signal.
 It is a short-lived signal, never stored: `chat-typing` to a friend, `grp-typing` to the reachable members of a group, `room-typing` in a room (signed by its author, relayed like presence); one every 3 seconds at most while typing.
 A cabinet older than this version neither sends nor shows it.
@@ -480,18 +482,36 @@ Messages are kept in `<data>\amis\messagerie.json`.
 
 ### Public profile and likes
 
-Every player has a **public profile**, readable by those who are not their friends: their nickname, country, avatar, badges, the number of their published high scores, and their **recent activity** (high scores and badges of the last 30 days).
-Current table, games played, library and messages stay between friends, and the profile says so; "Online" or "Playing" show in "Joueurs en ligne" (Players online, see below).
-It opens with "Voir son profil public" (See their public profile), on the page of a directory player ("Trouver un joueur", Find a player) or of a friend.
+Every player has a **public profile**, readable by those who are not their friends: their nickname, avatar, level, badges, country, number of friends (never the list), the number of their published high scores, their invited players, their public groups and their **recent activity** (high scores and badges of the last 30 days).
+Current table, games played, library and messages stay between friends, and the profile says so ("Table en cours, parties jouées, bibliothèque : réservées à ses amis", Current table, games played, library: for their friends only); "Online" or "Playing" show in "Joueurs en ligne" (Players online, see below).
+
+**One screen per player.**
+Friend or not, a player has only one screen, their profile (`app/src/profile-menu.ts`); up to 0.1.13, a friend's page and their public profile duplicated each other, with two different activity lists.
+My friends, "Joueurs en ligne" (Players online), the directory ("Trouver un joueur", Find a player), friend requests, messaging and groups ("Voir son profil", See their profile), rooms (a line's options) and Recent activity all lead straight to it; its "Retour" (Back) returns where you came from.
+Under the nickname, the tier and level ("Flippeur · niveau 14", Flipper · level 14), then "Votre ami" (Your friend) or "Profil public · pas votre ami" (Public profile · not your friend).
+From top to bottom:
+
+- what the relationship adds (`playerPart` in `app/src/friends-menu.ts`): for a friend, their presence ("En partie", Playing; "En ligne", Online; or "Hors ligne", Offline; since when you have been friends, how their cabinet is linked) and their library (with "1 réception en cours", 1 transfer in progress); for another player, where they were seen ("Sur votre réseau local", On your local network; "Vu il y a 3 j", Seen 3 days ago) and the pending friend request, sent or received;
+- their country, number of friends and published high scores, "Profil actualisé il y a …" (Profile updated … ago), then their ID;
+- their level and its bar ("Flippeur · niveau 14", "350 / 750 XP");
+- their badges as medals, the rarest first, twelve at most ("23 badges sur 56", 23 badges out of 56; "Les 12 plus rares", The 12 rarest);
+- their invited players, if any (see "Invited players" below);
+- their public groups, never a private group (see [Levels and badges](levels-and-badges.md#what-the-player-sees));
+- a single activity list, the most recent at the top: their high scores and badges of the last 30 days, to like, and, for a friend, the games they played over the same 30 days (with no public card received, their friend events alone).
+
+The card of a player whose cabinet does not have the levels version yet has no level: the line reads "Niveau pas encore connu" (Level not known yet; "Sa borne n'a pas encore la version qui donne le niveau", Their cabinet does not have the version that gives the level yet).
+An implausible level shows as "Niveau ?" (Level ?, see [Levels and badges](levels-and-badges.md#starting-level-and-plausibility)).
+The actions: for a friend, "Inviter à une partie en direct" (Invite to a live game), "Voir sa bibliothèque" (See their library), "Écrire un message" (Write a message); for another player, "Envoyer une demande d'ami" (Send a friend request; or cancel, accept, decline) and "Écrire un message", greyed out; then "Masquer son activité" (Hide their activity), "Retirer de mes amis" (Remove from my friends; a friend, with confirmation), "Bloquer …" (Block …) and "Retour" (Back).
 
 **Liking.**
 On the profile, the flippers choose a high score or a badge, Start likes it, Start again unlikes it.
 Everyone sees the number of likes; only the author sees who liked it.
 You cannot write to a player who is not a friend: "Écrire un message" (Write a message) stays visible, greyed out, with its reason; "Envoyer une demande d'ami" (Send a friend request) is next to it.
-"Masquer son activité" (Hide their activity) hides their events and likes on this cabinet; "Bloquer" (Block) cuts everything.
+"Masquer son activité" (Hide their activity) hides their events and likes on this cabinet, along with their level, badges and invited players; "Bloquer" (Block) cuts everything.
 
 **My public profile.**
-System menu > Friends > "Mon profil public" (My public profile) shows what others see and, for each event, who liked it (Start).
+System menu > Friends > "Mon profil public" (My public profile) shows what others see (country, friends and high scores, level and bar, badges as medals, invited players, public groups) and, for each event of "Votre activité récente" (Your recent activity), who liked it (Start).
+During the first month, it also offers "Qui vous a fait découvrir Cyber Pinball ?" (Who introduced you to Cyber Pinball?, see "Invited players" below).
 A like received is announced by a notification in the table menu, grouped ("Dora and Kiko like your activity").
 The public profile is **on by default**; "Désactiver mon profil public" (Turn off my public profile), here or in "Partage et réseau" (Sharing and network), leaves others only the nickname in the directory (and the scores, if they are published).
 
@@ -500,7 +520,43 @@ A player's public card is signed by their key and travels from cabinet to cabine
 A like is a small signed message, delivered straight to the author's cabinet when it is linked, otherwise relayed by one or two cabinets, and retried at every link for 30 days.
 The number shown is the one of the last card received.
 One cabinet cannot give a player more than 100 likes a day.
+Cards sent together stay under 180 KiB per message (`withinBytes`, [publicprofile.ts](../../packages/core/src/publicprofile.ts)): a card carries up to twenty invited player certificates, and a message that is too big would be refused whole.
 Cards and likes are kept in `<data>\amis\profils.json`.
+
+### Invited players
+
+A player who introduced Cyber Pinball to others sees it on their profile, with the Ambassador badge from the first one; the invited player's profile, however, never says who invited them.
+With no server and no account, only the invited player can say who invited them ([invitations.ts](../../packages/core/src/invitations.ts)).
+
+**The question.**
+"Qui vous a fait découvrir Cyber Pinball ?" (Who introduced you to Cyber Pinball?) is asked on the "Votre profil de joueur" (Your player profile) screen at first launch, before "Continuer" (Continue), then in System menu > Friends > "Mon profil public" (My public profile), for the 30 days after that screen first opened (`DECLARE_DAYS`, `profileOffered`); it is always optional.
+The screen (`app/src/invite-menu.ts`) first offers the players "Sur votre réseau local" (On your local network), then "Vos amis" (Your friends; eight at most per list), "Chercher un joueur…" (Search for a player…: their nickname, or the ID shown on their profile, in the directory), "Personne : je l'ai trouvé seul" (Nobody: I found it myself; the question does not come back) and "Plus tard" (Later).
+The chosen player carries "Choisi" (Chosen), the screen says "Vous avez choisi …" (You picked …) and the entry becomes "Découvert grâce à …" (Discovered thanks to …); as long as nothing is confirmed, it can be changed.
+
+**When it counts.**
+The invitation counts after the first completed game (see [Levels and badges](levels-and-badges.md#earning-xp)), or right away if a game has already been completed.
+The cabinet then signs a certificate (`invited`: the inviter, the invited player, their nickname, their machine's fingerprint, the time) and hands it to the inviter's cabinet if it is linked; otherwise the linked cabinets relay it, twice at most (`INVITE_TTL`), and it goes out again at every link until the inviter has received it directly.
+The screen then says "Bruno vous a fait découvrir Cyber Pinball" (Bruno introduced you to Cyber Pinball) and "C'est compté : il le voit sur son profil" (It counts: they can see it on their profile; or "… as soon as their cabinet is online"); nothing can be changed any more.
+
+**A machine only counts once.**
+The machine's fingerprint is derived from the Windows `MachineGuid` in a way that cannot be traced back to it (`machineTag`); the `MachineGuid` never leaves the cabinet.
+If it cannot be read, the declared invitation waits for a later game.
+The inviter keeps one certificate per machine and per player, never their own nor an arrival from their own machine, and attaches the twenty most recent to their public card (`INVITES_IN_CARD`), with their total.
+Every cabinet that shows their profile checks each certificate's signature against the invited player's key (`invitedOf`): an inflated number does not get through; beyond the twenty attached, the announced total is believed, 500 at most.
+A deleted account (erasure notice) withdraws its certificate.
+
+**On the inviter's profile.**
+A "Personnes invitées" (Invited players) part: "A fait découvrir Cyber Pinball à 3 joueurs" (Introduced 3 players to Cyber Pinball; "Vous avez fait découvrir Cyber Pinball à 3 joueurs", You introduced 3 players to Cyber Pinball, in My public profile), with the avatars of the eight most recent and "+N" beyond.
+
+**XP, notification and badges.**
+Each invited player earns the inviter 100 XP, then 25 XP for every tier they reach (Flippeur, Habitué…, read from their public card if it is plausible), outside the cap (see [Levels and badges](levels-and-badges.md#earning-xp)).
+The notification "Nova, que vous avez invité, vient de finir sa première partie" (Nova, whom you invited, just finished their first game; "Elle compte parmi vos personnes invitées", They now count among your invited players) announces it with its sound, grouped if needed ("2 personnes invitées ont fini leur première partie", 2 invited players finished their first game); a click opens My public profile.
+The Ambassador, Gatherer and Community builder badges follow their number.
+
+**Files and tests.**
+The choice, "Nobody", one's own certificate and those received are kept in `<data>\amis\invitations.json`; `app/src/invitations-service.ts` reads the machine's fingerprint (`CYBERPINBALL_MACHINE` replaces it for the dummy cabinets of the tests).
+A cabinet older than this version ignores the certificates (`invites`) and does not show invited players.
+Tests: [invitations.test.ts](../../packages/core/src/test/invitations.test.ts).
 
 ### Community and players online
 
@@ -508,12 +564,22 @@ Cards and likes are kept in `<data>\amis\profils.json`.
 On the wheel, right after the Juke-box and before the Collections medallion and the tables of each collection, a medallion on the shared chrome ring opens the community: its name in green, the number of players online and friends online below.
 Everywhere (medallion, poster, System menu, "Joueurs en ligne" (Players online) tabs, phone), the number of players online, and that of your country, only shows above five, like the people present in a room: a nearly empty network, in figures, would put people off; players stay named, and your online friends are always counted.
 Start opens the **home screen**, six doors: "Joueurs en ligne" (Players online), "Parties instantanées" (Instant games, see below), "Mes amis" (My friends, with the badge of received requests), "Messages" (messaging between friends), your country's room (see "Rooms by country" below) and "Classements" (Leaderboards), which opens on two doors, "Joueurs" (Players) and "Tables".
-"Joueurs" ranks players by their XP, in Friends, National and Worldwide tabs (MagnaSave goes from one to the next), for the week (XP earned since Monday, back to zero every week) or of all time (the flippers switch between them); it counts the players whose public card the cabinet has received, and you, always shown, set apart beyond the first fifty.
-A total that is implausible for how long a player has been known, or a week beyond what a week allows, is not ranked: it is counted under the board.
-"Tables" shows all your tables, the five most recently played first, then all the others from A to Z, in This cabinet, Friends, National and Worldwide tabs, over the chosen period ("Période": All time, This year, This week, Today).
-A ranked table tells the leader, their score, the number of players and your place; a table without a ranking stays in the list, greyed, with its reason (no score over the period, fingerprint being computed, unreadable version).
-"Rechercher une table" (Search for a table), at the top of the list, filters by name with the on-screen keyboard or the PC's, without accents or capitals; "Effacer la recherche" (Clear the search) brings all the tables back.
-Start on a table opens its leaderboard, whose "Back" returns to the list of tables.
+"Joueurs" (Players) ranks players by their XP, in Friends, National and Worldwide tabs (MagnaSave goes from one to the next), for the week (XP earned since Monday, back to zero every Monday) or of all time (the flippers switch between them).
+It opens on National · This week (Worldwide without a chosen country): the week first, where everyone has a chance.
+Each line gives the rank, the flag, the player's avatar with their level and presence, their nickname and their XP, the other period in small print ("12 400 XP au total" (12,400 XP in total), "+850 cette semaine" (+850 this week)); tied players share the same rank.
+It counts the players whose public card the cabinet has received, which carries, signed, the week's XP and its Monday (the card of a cabinet not yet up to date is only ranked in All time), and you, even with your public profile turned off.
+Your line, "(vous)" (you), always stays visible, set apart beyond the first fifty; under the board, your place ("National · Cette semaine : votre place, 37 sur 120 joueurs" (your place, 37 of 120 players)).
+A total impossible for anyone (beyond everything that could be earned since levels arrived, allowing for the XP brought by invited people), or a week beyond what a week allows, is not ranked: it is counted under the board ("1 joueur écarté (XP impossibles)" (1 player set aside, impossible XP)).
+A total that is only unexpected for how long the player has been known to this cabinet is ranked, their level shown as "?".
+With sharing off, the door is greyed with its reason; without a country, National says "Pays non choisi : Amis > Partage et réseau" (Country not chosen); without friends, Friends says "Aucun ami pour l'instant" (No friend yet).
+Start or Exit returns to the two doors, where the "Joueurs" (Players) door sums up your place: "Vous : niveau 14 · 37ᵉ au monde cette semaine · 3ᵉ dans votre pays" (You: level 14 · 37th worldwide this week · 3rd in your country).
+"Tables" shows all your tables, the five most recently played first ("Jouées récemment" (Played recently), with "hier" (yesterday), "il y a 3 j" (3 d ago)), then all the others from A to Z, in This cabinet, Friends, National and Worldwide tabs, each counting its ranked tables ("3 sur 42", 3 of 42), over the chosen period ("Période": All time, This year, This week, Today; Start goes to the next).
+It opens on Worldwide · All time (This cabinet when sharing is off), the cursor on the search.
+A ranked table tells the leader, their score, the number of players (of games, for This cabinet) and your place, with "Premier" (First) in green when you lead; a table without a ranking stays in the list, greyed, with its reason (no score over the period, fingerprint being computed, unreadable version).
+"Rechercher une table" (Search for a table), at the top of the list, filters by name with the on-screen keyboard or the PC's, without accents or capitals: each word typed starts a word of the name or is found in the name written without spaces ("comete" finds "Comète").
+During a search, the tables follow from A to Z; "Effacer la recherche" (Clear the search) brings them all back.
+Start on a table opens its leaderboard at the same scope and period, whose "Back" returns to the list of tables.
+The player ranking is computed by `playerBoard` in `packages/core/src/playerranking.ts`, the screen in `app/src/rankings-menu.ts`; tests: `packages/core/src/test/classement-joueurs.test.ts` and `packages/core/src/test/classements-global.test.ts`.
 Exit goes back to the wheel.
 The medallion can be hidden in System menu > Tables > Wheel ("Communauté dans la roue", Community on the wheel); it never shows in guest mode.
 Chosen on the wheel, it shows its **poster**, like the Juke-box: behind the wheel (the whole playfield on a cabinet, the playfield frame on a desktop) and in place of the backglass media.
@@ -527,7 +593,7 @@ Each line carries the player's badge, their flag before their name (the Cyber Pi
 The **current table** is only shown between friends.
 MagnaSave goes from one **filter** to the next, as tabs above the list: Tous (All), Mon pays (My country), À proximité (Nearby: the local network), Mêmes tables (Same tables: players whose ranked scores are on tables you have, the most tables in common first).
 A filter that cannot show anything stays visible, greyed out, its reason in place of the number ("Réseau local coupé", Local network off; "Pays non choisi", No country chosen).
-Start on a friend opens their page; on another player, their public profile (friend request, likes, blocking).
+Start on a player, friend or not, opens their profile (a friend's presence and library; friend request, likes, blocking).
 
 **Appear online to everyone.**
 On by default.
@@ -671,7 +737,7 @@ An action ("/me starts Star Courier") is written in italics; a line that mention
 Those present, with badge and flag, are in the side column (below on a cabinet); their number only shows (there, on the room door, the medallion poster, the room list and the phone) above five, so that a nearly empty room does not put anyone off.
 A room you leave keeps you present for one more minute (`ROOM_LINGER_MS`): whoever comes by sees that someone was just there, and the "Écrire" (Write) screen does not make you vanish while you type a line.
 Under each line, its reactions as chips ("👍 3", yours circled in blue).
-The flippers browse the lines, Start opens the options of the chosen line: "Réagir" (React), the seven emoji reactions as tiles (👍 Like, ❤️ Love, 🥰 Care, 😆 Haha, 😮 Wow, 😢 Sad, 😡 Angry; one per player and per line, another one replaces it, Start on yours removes it), reply (your line starts with `@name`), see their page or public profile, send a friend request, ignore this player in the rooms (their lines disappear, they are not told), block.
+The flippers browse the lines, Start opens the options of the chosen line: "Réagir" (React), the seven emoji reactions as tiles (👍 Like, ❤️ Love, 🥰 Care, 😆 Haha, 😮 Wow, 😢 Sad, 😡 Angry; one per player and per line, another one replaces it, Start on yours removes it), reply (your line starts with `@name`), see their profile, send a friend request, ignore this player in the rooms (their lines disappear, they are not told), block.
 "Signaler ce message" (Report this message) sends it to the moderators (see "Room moderation").
 
 **Deleting your line.**
@@ -701,6 +767,7 @@ Setting: "Nouveaux messages de mes salons" (New messages in my rooms).
 A line that mentions your name, in a room that is not on screen, is announced by a notification ("Bruno mentions you · France room"), in the menu and over VPX during a game, unless "Mentions pendant les parties" (Mentions during games) is turned off or "Masquer les notifications pendant les parties" (Hide notifications during games) is chosen.
 A click opens that room.
 The room door on the home screen and the Community medallion count unread mentions.
+They also count in the messages pill of the tables menu, one line per room on "Messages en attente" (Waiting messages).
 
 **Community settings.**
 System menu > Friends > Réglages de la communauté (Community settings): appear online to everyone, rooms on or off (off, they stay visible, greyed out with their reason: for the family), default room (your country or World), word filter, mentions during games, new messages in my rooms (notification or nothing), ready-made phrases, ignored players (to stop ignoring), room rules.
@@ -765,7 +832,7 @@ Everyone customises an avatar, visible to all, friends or not, wherever their na
 For now it is always a picture of one's own: a photo or a picture taken from the disk, or in the built-in browser, cropped with the cabinet buttons ([avatar.ts](../../packages/core/src/avatar.ts), screen `app/src/avatar-menu.ts`).
 
 - **Where it shows.**
-  "Mes amis" (My friends) (online, the badge's ring is green; offline, it dims), a friend's sheet (in front of their name), "Joueurs en ligne" (Players online), the rooms (their people present and their lines), the scoreboards, the public profiles, "Trouver un joueur" (Find a player) and the results, "Demandes d'amis" (Friend requests), "Depuis un ami" (From a friend), "Partage et réseau" (Sharing and network) (yours), the game history (each game's players as small badges, then each one in front of their rank), the lobby, the invitation and the results of a live game, the invitation card and the score band during the game, and notifications that are about a single player ("Bruno vient de se connecter", Bruno has just connected).
+  "Mes amis" (My friends) (online, the badge's ring is green; offline, it dims), a player's profile (in front of their name, and their invited players), "Joueurs en ligne" (Players online), the rooms (their people present and their lines), the scoreboards, "Trouver un joueur" (Find a player) and the results, "Demandes d'amis" (Friend requests), "Depuis un ami" (From a friend), "Partage et réseau" (Sharing and network) (yours), the game history (each game's players as small badges, then each one in front of their rank), the lobby, the invitation and the results of a live game, the invitation card and the score band during the game, and notifications that are about a single player ("Bruno vient de se connecter", Bruno has just connected).
   Without a picture: the initials ("AM" for "Alexis Martin") on a dark hue taken from the key, the same on every cabinet.
   The score insert at the bottom of the playfield, too small for readable initials, keeps the hue only.
 - **Choosing the picture.**

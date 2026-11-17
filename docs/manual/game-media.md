@@ -559,6 +559,8 @@ While you browse, Cyber Pinball draws the DMD display itself, like a machine in 
 The dots stay on screen at all times: the table's DMD media never replaces them, it shows around them (FullDMD frame, below).
 Setting "DMD du menu" (Menu DMD) in **System menu > "Borne" (Cabinet) > "DMD"** ( Start switches between the two, saved in `<data>\medias.json`, field `dmd`): **live** by default, or **classic** (the table's media alone, else the generated DMD that scrolls its title, as before).
 That media is the DMD screen's (`roleMedia`, `resolveMedia`): on a FullDMD screen, the table's (FullDMD) media, and its (DMD) only if it has no FullDMD; on a DMD-only screen, the (DMD) first, the (FullDMD) failing that.
+When the table has both, the DMD screen takes the one whose proportions best fill its zone (`bestDmdMedia`, `dmdScreenAspect`: the role's zone in the cabinet model, otherwise 4:1 or 16:9), whatever its label: a 21:9 "(DMD)" taken over from PinUP Popper comes before a 16:9 "(FullDMD)" on a 4:1 DMD, instead of leaving half the screen empty.
+On a tie, or if one of the two cannot be measured, the order above decides.
 It is never the DMD the ROM produces during a game: the table is not running in the menu.
 
 | Page | What it shows | Duration |
@@ -757,7 +759,7 @@ The doctor ([doctor.ts](../../packages/core/src/doctor.ts), details screen > "Di
 | Finding | When | Fix |
 | --- | --- | --- |
 | Format the menu does not read | `flv`, `f4v`, `avi`, `mov` (checked with `canPlayType` in Electron 44.5.1), `wmv`, `mpg`, `mpeg` (not among Chromium's formats); or a format not intended for the type (`(Wheel)` as a `jpg`, `(Loading)` as an image…) | trash if a readable version has the same name; otherwise, convert (HandBrake) |
-| Display stored under the wrong type | `(DMD)` in 16:9, or `(FullDMD)` in 4:1: the menu picks DMD or FullDMD from the type of the DMD screen ("Écran du DMD"; without an answer, its proportions, boundary at 8:3) | rename to the other type, if the name is free |
+| Display stored under the wrong type | `(DMD)` in 16:9, or `(FullDMD)` in 4:1 (boundary at 8:3), and the other type's name free; when both names are taken, nothing shows: the DMD screen already takes the one that fills it best (information, under "À savoir" (Good to know)) | rename to the other type, in one step |
 | Misnamed media | `(Type) nom` whose name is neither that of a `.vpx` in the folder nor that of the folder (pages included: `Nom 2`, `Nom_02`); file with neither `(Type)` nor a VPinFE name | rename to `(Type) <dossier>` (the next free page for the flyer and the rules), unless `medias\` already shows that type |
 | Media stored outside `medias\` | PinUP Popper layout (`POPMedia\…\Wheel\<jeu>.png`) or PinballX layout (`Media\Visual Pinball\Wheel Images\…`) in the table folder, or `(Type) nom` placed next to the table; the `pupvideos`, `pinmame` and `cache` folders and the script's DMD folder are ignored | store and rename as `medias\(Type) <dossier>.ext`; the emptied tree goes to the trash |
 | Proportions differ from the screen | a gap of more than 15% (`MEDIA_RATIO_TOLERANCE`, measured as a ratio) from the role's zone in the cabinet model: cropped playfield (only the aspect ratio matters, since the menu rotates the media; an almost square file does not tell where the flippers are), black bars or a portrait media item on a landscape screen for the backglass, DMD and topper, FullDMD shown shrunk for lack of a DMD | — (information) |
@@ -765,6 +767,9 @@ The doctor ([doctor.ts](../../packages/core/src/doctor.ts), details screen > "Di
 | Duplicate media | several files of the same type for the same game (`.png` and `.webp`, `.vpx` name and folder name, `(Wheel)` and VPinFE's `wheel.png`): only one is shown; a version in the folder that has its own media is not a duplicate | trash the never-shown files of the same kind; an image next to a video of the same type is only flagged |
 | Media the menu could not read | error recorded by the display in the error file, for a file unchanged since then | trash for a damaged or rejected file (decoding, format, image); only flagged for a disk error |
 
+**No backglass** (`backglassMissing`): a table without a `.directb2s` leaves the backglass screen to the front-end during the game; the finding says what it really shows there, the table's Backglass media (by name), otherwise its title or the backglass media shared by the cabinet.
+It stays silent when the cabinet has no backglass screen, or when one of the table's PuP-Packs fills the backglass (`pupShowsBackglass`); a VR table whose room has its own backglass (`tableHasVrRoom`) is not invited to receive a `.directb2s`.
+**Good to know**: information with nothing to set in Cyber Pinball (a media's proportions, missing backglass, a display whose two names are taken) carries `note`; the Diagnosis and the check of an added table show it apart, at the bottom, in an "À savoir" (Good to know) section, without "Ignorer" (Ignore), so the check of a taken-over table keeps at the top only what can be repaired.
 Every fix is safe: rename, move into `medias\`, or move to the trash (`trash\`); nothing is converted or deleted.
 "Tout réparer" (Repair all) chains the fixes without any two of them targeting the same file; anything that depends on a rename (the type of a misnamed display, for example) is checked at the next analysis.
 

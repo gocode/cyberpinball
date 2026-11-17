@@ -86,6 +86,7 @@ import { dofRomNumbers, tableDofIni, tableIniMasksGlobal, type DofSetup } from '
 import { playBlockers, playSeverity } from './playable';
 import { parseTableName, readInfo, type TableEntry } from './tables';
 import { findTableIni } from './vpx-settings';
+import { hasOwnCabinetView, importedViewFinding } from './tableview';
 import { EDGE_LABELS } from './layout';
 import { orientationFinding, type PlayfieldOrientation } from './sync';
 import { vpxPlayedFlipperEdge } from './vpx';
@@ -157,6 +158,7 @@ export const FINDING_CODES = [
   'pupPackDisabled',
   'pupPackDisabledScript',
   'manualView',
+  'importedView',
   'tableOrientation',
   'tableWindows',
   'fullDmdHidden',
@@ -710,7 +712,7 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
 
   // 7. Sens de la partie changé par le .ini de la table, sinon cadrage manuel qu'il impose (souvent livré avec elle).
   const orientation = ctx.orientation && tableOrientationFinding(entry.file, ctx.orientation);
-  const manual = orientation || manualViewFinding(entry.file);
+  const manual = orientation || manualViewFinding(entry.file) || importedViewFinding(entry.file, ctx.orientation);
   if (manual) findings.push(manual);
 
   // 7 bis. Écrans placés pour cette table seulement (menu de VPX, « Save as Table Override »),
@@ -748,8 +750,21 @@ function manualViewFinding(tableFile: string): Finding | undefined {
   const doc = IniDocument.parse(fs.readFileSync(ini.path, 'utf8'));
   const mode = doc.get('Player', 'CabinetAutofitMode')?.trim();
   if (mode !== '0' && !/^manual$/i.test(mode ?? '')) return undefined;
-  doc.remove('Player', 'CabinetAutofitMode');
   const name = path.basename(ini.path);
+  // Vue de borne enregistrée pour cette table (point de vue de VPX, ou reprise d'une autre installation : tableview.ts) :
+  // un choix fait pour elle, gardé. Le retour au cadrage automatique est écrit (1, Ajuster), pas la clé retirée : sans
+  // elle, la vue reprise serait remise en cadrage manuel à la partie suivante (importedView).
+  if (hasOwnCabinetView(doc)) {
+    doc.set('Player', 'CabinetAutofitMode', '1');
+    return {
+      code: 'manualView',
+      severity: 'info',
+      title: t('Cadrage réglé pour cette table'),
+      detail: t('{name} règle le cadrage de cette table à la main (cadrage manuel, avec sa propre vue) : VPX la joue telle qu’elle a été enregistrée pour elle. « Régler l’affichage en partie » dans la fiche permet de la retoucher.', { name }),
+      fix: { label: t('Passer cette table au cadrage automatique'), ops: [{ op: 'write', path: ini.path, content: doc.toString() }] },
+    };
+  }
+  doc.remove('Player', 'CabinetAutofitMode');
   return {
     code: 'manualView',
     severity: 'warning',
@@ -1267,7 +1282,7 @@ export function repairScriptAfterStop(entry: TableEntry, ctx: DoctorContext, ops
  * 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack), et une table que le core.vbs
  * arrête ne démarre pas (Back to the Future, 30 octobre 2026 : vpmInit appelé deux fois).
  */
-export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['backglassEmpty', 'scriptCoreCompat', 'dmdDesktopOption','pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupNoScreens', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['backglassEmpty', 'scriptCoreCompat', 'importedView', 'dmdDesktopOption','pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupNoScreens', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
 
 /**
  * Constats réparables de PUP_PLAY_REPAIRS pour cette table. Sans script connu (cache
@@ -1293,6 +1308,9 @@ export function pupPlayRepairs(entry: TableEntry, ctx: DoctorContext): Finding[]
   const desktopDmd = desktopDmdFinding(entry, { ...ctx, script });
   if (desktopDmd) found.push(desktopDmd);
   found.push(...checkPup(entry, { ...ctx, script, vpxLog: undefined }, override));
+  // Cadrage réglé pour la table dans son ancienne installation (tableview.ts) : seulement quand le sens de la partie se vérifie.
+  const view = ctx.orientation && !manualViewFinding(entry.file) ? importedViewFinding(entry.file, ctx.orientation) : undefined;
+  if (view) found.push(view);
   return found.filter((f) => f.fix && PUP_PLAY_REPAIRS.includes(f.code));
 }
 

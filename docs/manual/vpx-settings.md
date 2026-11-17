@@ -17,4 +17,6 @@ From the table menu, R key (or Exit then "Réglages de VPX" (VPX settings)); sta
   "Valeur par défaut" (Default value) leaves the key empty, which is the VPX convention.
 - Per table (`openSettings({ scope: 'table', table })`): the `<table>.ini` file next to the .vpx, found the way VPX does it (table name, otherwise folder name).
   Only values that differ from the global setting are kept in it, as VPX does; an empty file is deleted.
+  For a table that plays a ROM, the "Son" (Sound) group of "Essentiels" adds "Volume de la ROM" (ROM volume) after VPX's volumes: it is not in the `.ini` but in the ROM's memory, which Cyber Pinball writes outside a game (`RomVolumeControl`, see [ROM volume](sound.md#rom-volume)).
+  The screen opened on its own (`--reglages --table=…`) has it too.
   In a sandbox (`CYBERPINBALL_HOME`), it is written to `<bac à sable>\sandbox\tables\` and never next to the real .vpx.

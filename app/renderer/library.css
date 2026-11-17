@@ -1596,6 +1596,46 @@ body.mouse .media-card[data-act]:hover {
   overflow-wrap: anywhere;
 }
 
+/*
+ * Le badge d'une ligne (Mes badges, Badges les plus proches) : à gauche du nom et de son détail.
+ * Reçu : lumineux, un halo à la couleur de sa rareté (niveau.js, RAR) ; pas encore : gris et
+ * éteint, sans reflet. Le halo reste court : le haut de la première ligne ne le coupe pas.
+ */
+.lib-row-medal {
+  flex: none;
+  display: block;
+  width: 6.4cqmin;
+  height: 6.4cqmin;
+  --medal-rgb: 205 218 214;
+}
+
+.lib-row-medal svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.lib-row-medal.rarity-rare {
+  --medal-rgb: 95 180 207;
+}
+
+.lib-row-medal.rarity-epic {
+  --medal-rgb: 169 139 255;
+}
+
+.lib-row-medal.rarity-legendary {
+  --medal-rgb: 240 210 122;
+}
+
+.lib-row-medal.medal-earned {
+  filter: brightness(1.08) saturate(1.15) drop-shadow(0 0 0.6cqmin rgb(var(--medal-rgb) / 0.6));
+}
+
+.lib-row-medal.medal-locked {
+  filter: grayscale(1) brightness(0.55) contrast(0.9);
+  opacity: 0.7;
+}
+
 .lib-row-progress {
   height: 0.74cqmin;
   margin: 0.8cqmin 0 0.2cqmin;

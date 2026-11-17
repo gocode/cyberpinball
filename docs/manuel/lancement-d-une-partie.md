@@ -104,10 +104,39 @@ Pour `vpmInit` : à partir de deux appels dans le code (commentaires, chaînes, 
 La table n'est pas modifiée ; un `.vbs` venu d'ailleurs est corrigé lui-même.
 Constat du médecin « Script écrit pour un ancien core.vbs » (`scriptCoreCompat`), réparé dès l'installation et avant chaque partie (`PUP_PLAY_REPAIRS`) ; les lectures de script passent en version 8, si bien que les tables déjà installées sont relues.
 Quand le texte ne montre rien (un seul `vpmInit`, dans une Sub appelée deux fois), la partie arrêtée par ce message fait corriger le `.vbs` aussitôt (`repairScriptAfterStop`), et l'écran d'échec dit « Cyber Pinball a corrigé le script de la table (…) : relancez-la. ».
+**Pièce VR dessinée hors du casque** (`vrRoomOnScreens`) : une version VR de table allume sa pièce (meuble, salle, fronton en 3D) par un interrupteur du script ; une table hybride le garde pour le casque (« If RenderingMode = 2 or VRTest = 1 »), mais une version faite pour le casque seul l'allume d'office (« Const VR_Room = 1 »), et un interrupteur d'essai laissé à 1 (`VRTest`, `LiveViewVRSim`) l'allume même dans une table hybride.
+Sur les écrans, VPX dessine alors toute la pièce à chaque image alors qu'elle ne sert que dans le casque.
+La règle repère ces interrupteurs allumés hors de toute Sub (`VR_FLAG`), et le `.vbs` de Cyber Pinball multiplie leur valeur par `Abs(RenderingMode = 2)`, qui vaut 1 en VR et 0 sur les écrans, sur la même ligne (une `Const` devient une variable).
+Le médecin le dit dans la fiche de la table (« Pièce VR dessinée hors du casque », action « Réserver la pièce VR au casque ») et le répare avant chaque partie ; un script protégé ne se corrige pas : le constat conseille la version sans VR, ou l'interrupteur mis à 0 dans l'éditeur de VPX.
+Tests : `vr-hors-casque.test.ts`.
 Tests : `scriptcompat.test.ts` (repérage, lignes à leur place, exécution par `cscript` sur un faux core.vbs : un seul appel à `vpmInit`, médecin, PuP-Pack, table mise à jour, `.vbs` venu d'ailleurs, message d'arrêt) et la table piégée `scriptCoreCompat`.
 
 `node scripts/sonde-fenetres.mjs --exe … --ini … --table …` (après `npm run build`) relève toutes les fenêtres d'une partie, cachées comprises, avec ce qu'en ferait le lanceur ; `--commande Edit` ouvre la table dans l'éditeur pour vérifier la reconnaissance de l'éditeur et de l'audit sur de vraies fenêtres.
 Toujours sur des copies de la table et de VPinballX.ini.
+
+**DMD réglé pour le mode bureau.**
+Une table qui choisit son DMD par une option du menu de VPX réglée par défaut pour le mode bureau (*JP's Space Cadet* v7.0 : « DMD Type » sur « Desktop DMD ») laissait la fenêtre du DMD noire sur une borne.
+Sur une borne qui a un écran ou une zone de DMD, cette option passe sur FlexDMD dans le `.ini` de la table, dès l'installation et avant chaque partie (`PUP_PLAY_REPAIRS`), sans écraser un choix fait dans le menu de VPX : voir [DMD réglé pour le mode bureau](plugins-de-vpx-backglass-pup-et-dmd.md#dmd-réglé-pour-le-mode-bureau).
+
+**Volume de la ROM avant et après la partie.**
+Juste avant la partie, Cyber Pinball pose dans la mémoire de la ROM le volume voulu (le choix du joueur, ou le volume conseillé à la place d'un volume d'usine bas) ; après, un volume changé à la porte du monnayeur devient le choix du joueur.
+Jamais pendant la partie, ni dans le double d'une partie entre amis, ni pour « Régler l'affichage en partie » : voir [Volume de la ROM](son.md#volume-de-la-rom).
+
+**Cadence de chaque partie.**
+Une table qui rame ne laissait aucune trace : ni le journal de VPX ni les rapports ne disaient combien d'images par seconde la partie tenait (17/11/2026 : des tables reprises d'une autre installation ramaient sur une borne et pas sur une autre).
+Le plugin VPX « CyberPinballDmd », activé dans toutes les parties (voir [Position du DMD en partie](plugins-de-vpx-backglass-pup-et-dmd.md#position-du-dmd-en-partie)), compte désormais les images rendues (`VPXPI_EVT_ON_PREPARE_FRAME`, [cadence.h](../../packages/vpx-vision3d/src/cadence.h)) et range l'écart entre deux images dans un histogramme à la milliseconde ; les 5 premières secondes (préparation de la table, premières vidéos) ne comptent pas.
+
+- **Dans `vpinball.log`** : chaque à-coup (au moins 100 ms entre deux images) au moment où il arrive (« Cadence: stall of … ms at …s », les 30 premiers), puis un bilan toutes les minutes et à la fin de la partie : `Cadence end: frames=… duration=…s fps=… p50=…ms p95=…ms p99=…ms max=…ms late=…% stalls=… worst10s=…fps mem=…MB`.
+  Soit les images par seconde, la médiane et les 95e et 99e centiles de l'écart, le plus long écart, la part des images en retard (plus de 1,5 fois la médiane), les à-coups, la pire fenêtre de 10 s et la mémoire privée de VPX ; un bilan `Cadence running` est un bilan d'étape.
+- **Relu après la partie** (`noteGameCadence`, [app/src/game-cadence.ts](../../app/src/game-cadence.ts) ; lecture dans [vpxcadence.ts](../../packages/core/src/vpxcadence.ts)) : seulement ce que VPX a écrit pendant cette partie ; le bilan de fin, sinon le dernier d'étape (VPX arrêté avant la fin, plantage).
+  La cadence visée est lue au lancement (« Synchronization mode: … with maximum FPS: …, display FPS: … » : la plus petite des deux ; 60 si la ligne manque).
+- **Au journal de la borne**, une ligne en français : « Cadence de la partie (…) : tenue — … images/s pour … visées, médiane … ms, … », suivie du 99e centile, du pire écart, de la part des images en retard, des à-coups, de la pire fenêtre de 10 s, de la mémoire de VPX et de la durée mesurée.
+  Le verdict y est « tenue », « RAME », « À-COUPS », « RAME, avec des à-coups » ou « trop courte pour juger » ; sans bilan (plugin absent, partie trop courte), la ligne le dit.
+  Chaque rapport de la borne contient ce journal et celui de VPX de la dernière partie (voir [Fiche technique](fiche-technique.md#fiche-technique)).
+- **Verdict** (`cadenceVerdict`) : la partie rame si sa moyenne est sous 90 % de la cadence visée, sa pire fenêtre de 10 s sous 75 %, ou si au moins 10 % des images sont en retard ; elle saccade à partir de 3 à-coups et d'au moins un par minute ; sous 20 s de jeu mesuré, elle est trop courte pour juger.
+- **Relevé par table** (`recordGameCadence`) : chaque partie jugée va dans `<données>\logs\cadence-parties.json` (les 3 dernières par table, 400 tables au plus, celles jouées le plus récemment ; écriture atomique), une partie dans le casque marquée comme telle.
+  Le médecin le lit pour dire qu'une table rame sur cette borne (voir [Santé de la borne](sante-de-la-borne.md#santé-de-la-borne)).
+- **Banc et tests** : `scripts/banc-cadence.ps1` (le vrai VPX sur le bureau caché, la même table jouée avec des fenêtres du fronton et du DMD de plusieurs tailles), `packages/vpx-vision3d/test/banc-cadence.cpp` (le compteur seul), [cadence-partie.test.ts](../../packages/core/src/test/cadence-partie.test.ts) (bilan relu champ par champ, même forme écrite par le plugin et lue par Cyber Pinball, cadence visée, verdict, ligne du journal) et le piège `slowTable` de [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).
 
 ### Réalité virtuelle
 

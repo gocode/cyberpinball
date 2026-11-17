@@ -145,7 +145,7 @@ export function createLevelMenu(host: LevelMenuHost): LevelMenu {
     if (near.length)
       sections.push({
         title: t('Badges les plus proches'),
-        rows: near.map((n) => ({ icon: n.badge.icon, text: n.badge.label, detail: n.badge.detail, aside: `${fmt(n.value)} / ${fmt(n.badge.target)}`, progress: { value: n.progress, tone: 'info' as const }, badges: [rarityLabel(n.badge.rarity)] })),
+        rows: near.map((n) => ({ icon: n.badge.icon, medal: { icon: n.badge.icon, rarity: n.badge.rarity, earned: false }, text: n.badge.label, detail: n.badge.detail, aside: `${fmt(n.value)} / ${fmt(n.badge.target)}`, progress: { value: n.progress, tone: 'info' as const }, badges: [rarityLabel(n.badge.rarity)] })),
       });
     const actions: Action[] = [
       { label: t('Mes badges'), icon: 'medal', detail: t('{n} sur {total}', { n: s.badges.length, total: BADGES.length }), run: () => openBadges(here) },
@@ -179,10 +179,12 @@ export function createLevelMenu(host: LevelMenuHost): LevelMenu {
       rows: BADGES.filter((b) => b.family === family).map((b): Row => {
         const got = held.get(b.id);
         const rarity = rarityLabel(b.rarity);
-        if (got) return { icon: b.icon, text: b.label, detail: t('{detail} · reçu le {date}', { detail: b.detail, date: new Date(got.at).toLocaleDateString() }), badges: [rarity], aside: `+${RARITY_XP[b.rarity]} XP`, tone: 'ok' };
-        if (b.secret && !badgeEarned(b, facts)) return { icon: 'lock', text: t('Badge secret'), detail: b.hint ?? '', badges: [rarity], tone: 'quiet' };
+        // Le badge dessiné à gauche : brillant une fois reçu, gris et éteint avant ; un secret pas
+        // encore reçu ne montre que le cadenas, dans la forme de sa rareté.
+        if (got) return { icon: b.icon, medal: { icon: b.icon, rarity: b.rarity, earned: true }, text: b.label, detail: t('{detail} · reçu le {date}', { detail: b.detail, date: new Date(got.at).toLocaleDateString() }), badges: [rarity], aside: `+${RARITY_XP[b.rarity]} XP`, tone: 'ok' };
+        if (b.secret && !badgeEarned(b, facts)) return { icon: 'lock', medal: { icon: 'lock', rarity: b.rarity, earned: false }, text: t('Badge secret'), detail: b.hint ?? '', badges: [rarity], tone: 'quiet' };
         const value = Math.min(b.target, Math.floor(b.measure(facts)));
-        return { icon: b.icon, text: b.label, detail: b.detail, badges: [rarity], aside: `${value.toLocaleString()} / ${b.target.toLocaleString()}`, ...(value > 0 ? { progress: { value: value / b.target, tone: 'info' as const } } : { tone: 'quiet' as const }) };
+        return { icon: b.icon, medal: { icon: b.icon, rarity: b.rarity, earned: false }, text: b.label, detail: b.detail, badges: [rarity], aside: `${value.toLocaleString()} / ${b.target.toLocaleString()}`, ...(value > 0 ? { progress: { value: value / b.target, tone: 'info' as const } } : { tone: 'quiet' as const }) };
       }),
     }));
     return {

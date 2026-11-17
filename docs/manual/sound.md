@@ -86,7 +86,46 @@ The volume belongs to the machine itself: on a WPC, a Stern or a Data East, the 
 - **Path to the ROM**: VPX's `CoinDoor`, `Service2` and `Service3` actions reach the table script as `keyCoinDoor`, `keyDown` and `keyUp` (`scripts/VPMKeys.vbs`), which `vpmKeyDown` (`WPC.vbs`…) hands to the door switches.
   The door toggles on each press (`toggleKeyCoinDoor`).
 - **During a game**: door, then − or + as many times as needed (the ROM shows the volume on the DMD), then door to close it.
-  The setting stays for that table, in its NVRAM.
+  The setting stays for that table, in its NVRAM, and Cyber Pinball keeps it as the player's choice (see [ROM volume](#rom-volume)).
 - **Limits**: older machines (System 11, Gottlieb, early solid state) often have a potentiometer on the sound board and no volume in the ROM; the − and + buttons set nothing there.
   The service menu's Escape and Enter buttons (7 and 0, `Service1` and `Service4`) keep their VPX keys, with no button to map.
 - Tests: [buttons.test.ts](../../packages/core/src/test/buttons.test.ts) ("porte du monnayeur et ses boutons − et +").
+
+### ROM volume
+
+Williams WPC machines and some Stern SAM machines keep their main volume in the ROM's memory (NVRAM, `<pinmame>\nvram\<rom>.nv`), not in VPX.
+With no memory, the ROM sets its factory volume at start-up: 12 of 31 on WPC, quiet next to the table's sounds (Monster Bash almost silent, 11/17/2026), 40 of 63 on Stern SAM.
+Changing it took the coin-door gesture during a game (above), which nobody knows.
+Cyber Pinball reads this volume, shows it on the table's page, sets it outside a game in "Réglages de cette table" (Settings for this table), and raises a low factory volume to the recommended volume on its own just before the game.
+Code: [romvolume.ts](../../packages/core/src/romvolume.ts) (state, advice, player's choice), [romscores.ts](../../packages/core/src/romscores.ts) (reading and writing the memory), [app/src/rom-volume.ts](../../app/src/rom-volume.ts) (before and after the game), [app/src/settings.ts](../../app/src/settings.ts) (setting).
+
+- **Where the volume is** (`romMasterVolume`): the ROM's memory map (Pinball Memory Maps, the same as for balls per game and high scores, read from the `<données>\cache\cartes-memoire` cache, offline) locates `game_state.volume` ("Volume", "Master Volume").
+  It is only used if it can be read and written safely: one whole byte, a range, a single NVRAM area, described checksums.
+  Otherwise (Whitestar, Data East, System 11…), the machine does not keep its volume in a memory Cyber Pinball can read.
+- **Which memory** (`tablePinmameDir`, `romVolumeStatus`): `<table>\pinmame\nvram` when the table has its ROMs next to it, otherwise the shared PinMAME folder; the first ROM PinMAME loads (aliases included) whose map locates the volume.
+- **What the ROM will play** (`readRomVolume`): the stored value; with no memory (the ROM creates it during its first game), a blank block, a wrong checksum or an out-of-range value, its factory volume.
+  Factory volume: the map's (Stern SAM), otherwise 12 for a WPC (`WPC_FACTORY_VOLUME`, measured on the libpinmame bench with The Addams Family and Monster Bash).
+- **Low and recommended** (`romVolumeAdvice`), from the ROM's range, never from a cabinet: low below half the range, recommended at three quarters.
+  WPC: low below 16, recommended 23 of 31; Stern SAM: low below 32, recommended 47 of 63 (their factory volume, 40, is not low).
+- **Writing** (`writeRomVolume`, `setRomVolume`): always outside a game, on the memory read again just before (high scores may have been written since); the byte and its mirror copies set, each checksum covering them redone, the result read back, then written in one go (`writeFileAtomic`).
+  Refused, with its reason, when it is not safe: value out of range, byte no checksum covers, or a block mixing the volume with other settings whose checksum is already wrong (redoing it would validate bytes the ROM rejected).
+  A block holding only the volume (WPC, SAM) is always redone: blank, it becomes valid.
+- **Before the game** (`beforeGame`): the wanted volume is set, if it is not already; the player's choice, otherwise, when automatic, the recommended volume instead of a low factory volume.
+  With no memory, nothing is written: the ROM creates it during the first game, at the factory volume, and Cyber Pinball raises that low volume as soon as the game ends.
+  Never in the double of a game between friends (its volume is already the cabinet's, see [Friends: the cabinet network](friends-the-cabinet-network.md#friends-the-cabinet-network)), nor for "Régler l'affichage en partie" (Adjust the display during a game).
+  Log: "Volume de la ROM (…, taf_l7) : 12 → 23 sur 31 avant la partie (volume d'usine bas, conseillé)." ("usine → 23" for a blank block).
+- **After the game** (`afterGame`, `romVolumeChangedInGame`): a volume changed at the coin door during the game becomes the player's choice, kept afterwards (log: "… réglé à la porte pendant la partie, gardé."); a volume still at the factory value after a first game is not a choice.
+  The player's choices are in `<données>\volumes-rom.json`, per `.nv` file.
+- **Low volume set elsewhere**: a low volume that is neither the factory one nor chosen in Cyber Pinball (set in another front-end, or at the door before Cyber Pinball) is never changed on its own: it may be wanted.
+  The doctor flags it: finding "Volume de la ROM bas" (Low ROM volume) (`lowRomVolume`, `romVolumeFinding`), To check in the table's diagnosis and in the "Tables" line of [Cabinet health](cabinet-health.md#cabinet-health), with the fix "Monter le volume de la ROM à 23 sur 31" (Raise the ROM volume to 23 of 31) (`romVolume` operation of `applyOps`: the memory read again at write time, the old one to the recycle bin).
+- **Table's page** ("Volume de la ROM" (ROM volume) line of its files summary, `romVolumeLine`): "12 sur 31, d'usine, faible : monté à 23 avant la partie" (12 of 31, factory, low: raised to 23 before the game), "d'usine, 12 sur 31 (faible) : monté à 23 dès la fin de la première partie" (factory, 12 of 31 (low): raised to 23 as soon as the first game ends), "18 sur 31 (votre réglage)" (18 of 31 (your setting)), "… : remis à … (votre réglage) avant la partie" (…: set back to … (your setting) before the game), or "10 sur 31 : bas" (10 of 31: low), in orange, with "volume de la ROM bas" (ROM volume low) in the "À vérifier" (To check) line.
+  A table whose ROM does not keep its volume has no such line.
+- **"Réglages de cette table" (Settings for this table) > Son (Sound)**: a "Volume de la ROM" (ROM volume) line, after VPX's volumes, for every table that plays a ROM.
+  Start opens the list: "Automatique : 23 si le volume d'usine est bas" (Automatic: 23 if the factory volume is low) (recommended), then each value of the range ("12 sur 31"…), marked "d'usine" (factory), "conseillé" (recommended) or "bas" (low).
+  The choice is written to the memory at once; with no memory yet, it is remembered and set when the first game ends.
+  "Valeur par défaut" (Default value) (Del) goes back to automatic.
+  Badge: "Réglé pour cette table" (Set for this table), "Monté à 23 avant la partie" (Raised to 23 before the game: a low factory volume Cyber Pinball raises on its own), "Bas" (Low) or "Automatique" (Automatic).
+  The details give the value used, the table's setting, the range, the factory volume, the recommended one, the memory file ("créée à la première partie", created during the first game, if missing) and the door gesture with the cabinet's keys.
+- **Machine that does not keep its volume in memory** (or map not known yet, PinMAME folder not found): the line says "Réglé à la machine" (Set on the machine), read-only; Start says why Cyber Pinball cannot set it and recalls the gesture with the cabinet's keys ("pendant la partie, ouvrir la porte du monnayeur (Fin), puis − (8) ou + (9)", during the game, open the coin door (End), then − (8) or + (9), `romVolumeGesture`).
+  Without these buttons mapped, it recalls that VPX's volume ("Volume du backglass", Backglass volume) also raises the ROM's music and voices.
+- Tests: [volume-des-rom.test.ts](../../packages/core/src/test/volume-des-rom.test.ts), on real memories measured on the libpinmame bench (WPC, Stern SAM, Data East), and the `lowRomVolume` trap in [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).

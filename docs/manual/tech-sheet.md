@@ -32,6 +32,7 @@ Each line opens the tech sheet block that explains it (`sheet` target), whose "R
 
 **Send a report.**
 A `rapport-borne-YYYY-MM-DD.zip` ZIP (`buildReport`, [packages/core/src/techsheet.ts](../../packages/core/src/techsheet.ts)): `rapport.html` (the sheet and the health, a standalone page with no script or external resource, readable and printable anywhere), `probleme.txt` (what the player wrote through "Décrire le problème" (Describe the problem), with the phone or the keyboard, if they did), `resume.txt`, `sante.json`, `fiche.json`, the Cyber Pinball log for the last seven days (`journalSince`), the VPX log of the last game, `VPinballX.ini` and `configurations.json`.
+Every game is measured there: the Cyber Pinball log has the "Cadence de la partie" (Frame rate of the game) line of each (frames per second VPX held against the target, picture freezes, memory used by VPX, verdict), and VPX's log has each stall at its time and the plugin's summaries (see "Frame rate of every game" in [Launching a game](launching-a-game.md#launching-a-game)).
 Everything is **anonymised before writing** (`anonymizer`): profile folder and account name (`‹utilisateur›`), PC name (`‹PC›`), names of the player, the cabinet and friends (`‹ami 1›`…), IPv4 and IPv6 addresses, email addresses; screen fingerprints and serial numbers become "écran 1", "écran 2".
 Version and driver numbers and times stay readable.
 "Voir le contenu du rapport" (See what the report contains) lists each file, its size and what is replaced.

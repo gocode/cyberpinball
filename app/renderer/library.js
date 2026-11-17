@@ -183,9 +183,10 @@ function renderLibrary(v) {
         // Pastille d'un joueur (son avatar, sinon ses initiales) : à gauche de tout le bloc, à la place de l'icône.
         // Un pays : son drapeau devant le nom, à la place de l'icône ; un joueur sans pays a le drapeau
         // Cyber Pinball (playerFlag, 13/11/2026). Une ligne sans drapeau garde sa case, vide.
+        // Un badge (Mes badges) : son dessin à gauche de tout le bloc tient lieu d'icône.
         if (row.flag) line.append(flagNode(row.flag.code, row.flag.src, row.flag.name, 'lib-row-flag'));
         else if (flagged && !row.icon && !row.avatar) line.append(libEl('span', 'flag lib-row-flag none'));
-        else if (row.icon && !row.avatar) line.append(cyberIcon(row.icon, 'lib-row-icon'));
+        else if (row.icon && !row.avatar && !row.medal) line.append(cyberIcon(row.icon, 'lib-row-icon'));
         // Une réaction : son emoji en grand à la place de l'icône, son mot dessous (tuiles « Réagir »).
         else if (row.emoji) line.append(libEl('span', 'lib-row-emoji', row.emoji));
         line.append(libEl('span', 'lib-row-text', row.text));
@@ -200,7 +201,7 @@ function renderLibrary(v) {
         for (const badge of row.badges ?? []) line.append(libEl('span', 'badge', badge));
         // Case, vignette et valeur à droite (Juke-box) : la ligne en colonnes, le texte dans la sienne.
         // Libellé à gauche (Fiche technique : « Processeur », « Mémoire ») : sa propre colonne, commune à la section.
-        const parts = Boolean(row.check || row.thumb || row.aside || row.label);
+        const parts = Boolean(row.check || row.thumb || row.aside || row.label || row.medal);
         // Schéma à droite (« Écran du DMD ») ou pastille à gauche : le texte passe dans une colonne à part.
         const main = row.figure || row.avatar || parts || row.controls ? libEl('div', 'lib-row-main') : li;
         main.append(line);
@@ -225,6 +226,7 @@ function renderLibrary(v) {
           if (row.label) li.append(libEl('span', 'lib-row-label', row.label));
           if (row.check) li.append(rowCheck(row.check));
           if (row.thumb) li.append(rowThumb(row.thumb, row.thumbIcon));
+          if (row.medal) li.append(rowMedal(row.medal));
           li.append(main);
           if (row.aside) li.append(libEl('span', 'lib-row-aside', row.aside));
         }
@@ -1423,6 +1425,17 @@ function rowMedals(medals) {
     strip.append(cell);
   }
   return strip;
+}
+
+/**
+ * Le badge d'une ligne (Row.medal) : dessiné dans sa forme et sa rareté (niveau.js). Reçu, il
+ * brille (halo de sa rareté, reflet qui passe) ; pas encore, il est gris, éteint et immobile.
+ */
+function rowMedal(m) {
+  const art = libEl('span', `lib-row-medal rarity-${m.rarity} ${m.earned ? 'medal-earned' : 'medal-locked'}`);
+  if (window.CyberLevels) art.innerHTML = CyberLevels.badgeSvg(m.icon, m.rarity, !m.earned);
+  else art.append(cyberIcon(m.icon));
+  return art;
 }
 
 function rowProgress(p) {

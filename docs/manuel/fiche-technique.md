@@ -32,6 +32,7 @@ Chaque ligne ouvre le bloc de la fiche qui l'explique (cible `sheet`), dont le �
 
 **Envoyer un rapport.**
 Un ZIP `rapport-borne-AAAA-MM-JJ.zip` (`buildReport`, [packages/core/src/techsheet.ts](../../packages/core/src/techsheet.ts)) : `rapport.html` (la fiche et la santé, une page autonome, sans script ni ressource externe, lisible et imprimable partout), `probleme.txt` (ce que le joueur a écrit par « Décrire le problème », au téléphone ou au clavier, s'il l'a fait), `resume.txt`, `sante.json`, `fiche.json`, le journal de Cyber Pinball des sept derniers jours (`journalSince`), celui de VPX de la dernière partie, `VPinballX.ini` et `configurations.json`.
+Chaque partie y est mesurée : le journal de Cyber Pinball a la ligne « Cadence de la partie » de chacune (images par seconde tenues par VPX pour la cadence visée, arrêts de l'image, mémoire prise par VPX, verdict), et celui de VPX chaque à-coup à son heure et les bilans du plugin (voir « Cadence de chaque partie » dans [Lancement d'une partie](lancement-d-une-partie.md#lancement-dune-partie)).
 Tout est **anonymisé avant l'écriture** (`anonymizer`) : dossier du profil et nom du compte (`‹utilisateur›`), nom du PC (`‹PC›`), noms du joueur, de la borne et des amis (`‹ami 1›`…), adresses IPv4 et IPv6, adresses e-mail ; les empreintes et numéros de série des écrans deviennent « écran 1 », « écran 2 ».
 Les numéros de version, de pilote et les heures restent lisibles.
 « Voir le contenu du rapport » liste chaque fichier, sa taille et ce qui est remplacé.

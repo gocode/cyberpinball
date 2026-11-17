@@ -37,6 +37,13 @@ export const messages: Record<string, string> = {
     'When the table was brought in from {from}, that installation had no known ROM folder (no VPinMAME\\roms, no VPinMAME rompath in the registry, no Popper ROM folder).',
   'La table utilise PinMAME, mais le nom de sa ROM n’apparaît pas clairement dans son script.': 'The table uses PinMAME, but its script doesn’t clearly name its ROM.',
   'Rapport de plantage de VPX': 'VPX crash report',
+  'Cadrage réglé pour cette table': 'Framing set for this table',
+  '{file} garde le cadrage réglé pour cette table dans l’installation d’où elle vient, que VPX 10.8.1 n’applique qu’en cadrage manuel. Il est repris pour cette table seule ; « Régler l’affichage en partie » permet de le retoucher ou de passer au cadrage automatique.':
+    '{file} keeps the framing set for this table in the installation it came from, which VPX 10.8.1 only applies in manual framing. It is kept for this table alone; “Adjust display in game” lets you touch it up or switch to automatic framing.',
+  'Reprendre le cadrage réglé pour cette table': 'Keep the framing set for this table',
+  '{name} règle le cadrage de cette table à la main (cadrage manuel, avec sa propre vue) : VPX la joue telle qu’elle a été enregistrée pour elle. « Régler l’affichage en partie » dans la fiche permet de la retoucher.':
+    '{name} sets this table’s framing by hand (manual framing, with its own view): VPX plays it as it was saved for it. “Adjust display in game” on the sheet lets you touch it up.',
+  'Passer cette table au cadrage automatique': 'Switch this table to automatic framing',
   'Pièce VR dessinée hors du casque': 'VR room drawn without the headset',
   'Version VR de la table : son script allume sa pièce VR (meuble, salle, fronton en 3D) même sans casque ({flags}). Sur les écrans, VPX la dessine à chaque image alors qu’elle ne sert que dans le casque.':
     'VR version of the table: its script turns on its VR room (cabinet, room, 3D backglass) even without a headset ({flags}). On the screens, VPX draws it every frame although it is only of use in the headset.',

@@ -6,11 +6,17 @@ Le menu système (Exit, Tab ou ⚙ depuis l'écran des tables) ne montre que cin
 Chaque rubrique s'ouvre sur ses entrées ; Exit (ou « Retour ») remonte d'un cran, la sélection sur la rubrique qu'on quitte.
 Un écran ouvert depuis une entrée revient, par son « Retour », à la rubrique d'où l'on venait, la sélection sur cette entrée ; la roue dentée rouvre toujours les rubriques.
 
+**La roue dentée.**
+En haut à droite, à droite de la carte du joueur et des pastilles (badges, amis, téléchargements), elle est elle-même une pastille ronde du même gabarit : même hauteur, même haut, même fond, même filet et même survol (filet et anneau verts, jamais un fond carré), à l'écart habituel des autres.
+Sur un écran plein (Menu système et ses écrans, Mes badges, aide…), elle suit les pastilles de la ligne de la marque, au même centre que sur l'écran des tables : elle ne saute pas d'un écran à l'autre.
+Jusqu'à la 0.1.13, elle devenait carrée au survol et restait décalée par rapport aux pastilles.
+Test : [entete-homogene.test.ts](../../packages/core/src/test/entete-homogene.test.ts).
+
 | Rubrique | Entrées |
 | --- | --- |
 | Tables | Toutes les tables, Collections, Roue (voir [Roue : ses réglages](medias-des-jeux.md#roue--ses-réglages)), Ajouter une table, Téléchargements, Bibliothèque de ROM |
 | Médias | Trouver les médias manquants (sur VPinMediaDB) ; Médias, son et attente |
-| Amis | Mes amis, Historique des parties, Trouver un joueur, Demandes d’amis, Mes badges, Partage et réseau (voir [Amis : le réseau des bornes](amis-le-reseau-des-bornes.md#amis--le-réseau-des-bornes)) |
+| Amis | Joueurs en ligne, Messages, Mes amis, Mon avatar, Mon profil public, Historique des parties, Trouver un joueur, Demandes d’amis, Mes badges, Réglages de la communauté, Partage et réseau, Scores des amis pendant la partie, Masquer les notifications pendant les parties (voir [Amis : le réseau des bornes](amis-le-reseau-des-bornes.md#amis--le-réseau-des-bornes)) |
 | Borne | Santé de la borne, Fiche technique, Configuration de la borne, Réglages de VPX, Commandes de la borne, DMD (Écran du DMD, DMD du front-end, Couleur du DMD, DMD réel), Bureau Windows (Ouvrir l’Explorateur Windows en [borne dédiée](borne-dediee.md#borne-dédiée)), Borne dédiée, Relance par Start (voir [Relance par Start](relance-par-start.md#relance-par-start)), Mode invité |
 | Cyber Pinball | Langue / Language, Mise à jour de Cyber Pinball, Activité récente (voir [Activité récente](activite-recente.md#activité-récente)), Sauvegardes (voir [Sauvegardes](sauvegardes.md#sauvegardes)), Migration, Quitter Cyber Pinball, Redémarrer Cyber Pinball, Mettre en veille, Redémarrer la borne, Éteindre la borne |
 

@@ -4675,7 +4675,7 @@ export function createLibrary(host: LibraryHost) {
         const table = find(file);
         if (!table) continue;
         try {
-          repairPupForPlay(table, { tablesDir: layout()!.tables, script: cachedScript(file, host.dataDir), cabinet: borne }, { trashDir });
+          repairPupForPlay(table, { tablesDir: layout()!.tables, script: cachedScript(file, host.dataDir), cabinet: borne, orientation: host.playfieldOrientation?.() }, { trashDir });
         } catch (error) {
           console.log(`PuP-Pack (${table.id}) : réparation à l'installation impossible (${(error as Error).message}).`); // i18n-ignore : journal
         }

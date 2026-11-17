@@ -1,5 +1,6 @@
 // Niveaux et badges, côté plateau (décidés le 17/11/2026, maquette « Niveaux et badges ») :
-// - CyberLevels.badgeSvg(icon, rarity) : le badge dessiné. Communs : Liseré néon rond (anneau
+// - CyberLevels.badgeSvg(icon, rarity, still) : le badge dessiné ; still, sans le reflet qui passe
+//   (un badge pas encore reçu, dans Mes badges). Communs : Liseré néon rond (anneau
 //   chromé, tube néon, émail profond, pictogramme néon, 4 rivets lumineux) ; rares, épiques et
 //   légendaires : Liseré néon en hexagone arrondi (rivets 6 coins, coins et milieux, étoiles) ;
 // - CyberLevels.playerCard(p), badgesPill(b) : la carte du joueur et ses badges, au coin d'état ;
@@ -40,7 +41,7 @@
   const GLOSS = (id) => `<linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></linearGradient>`;
   const ENAMEL = (id, c) => `<radialGradient id="${id}e" cx="50%" cy="35%" r="75%"><stop offset="0" stop-color="${c.b}" stop-opacity=".9"/><stop offset=".55" stop-color="${c.c}"/><stop offset="1" stop-color="${c.d}"/></radialGradient>`;
   const GLINT = (id) => `<linearGradient id="${id}gl" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>`;
-  const glint = (id) => (quiet() ? '' : `<g clip-path="url(#${id}c)"><rect x="-80" y="-20" width="24" height="140" fill="url(#${id}gl)" transform="skewX(-22)"><animate attributeName="x" values="-80;150;150" keyTimes="0;.32;1" dur="5s" begin="${(Math.random() * 4).toFixed(2)}s" repeatCount="indefinite"/></rect></g>`);
+  const glint = (id, still) => (still || quiet() ? '' : `<g clip-path="url(#${id}c)"><rect x="-80" y="-20" width="24" height="140" fill="url(#${id}gl)" transform="skewX(-22)"><animate attributeName="x" values="-80;150;150" keyTimes="0;.32;1" dur="5s" begin="${(Math.random() * 4).toFixed(2)}s" repeatCount="indefinite"/></rect></g>`);
   const neonIcon = (name, c, id, scale = 1.5) => `<g filter="url(#${id}n)">${icon(name, scale, `stroke="${c.b}" stroke-width="2.1"`)}</g>${icon(name, scale, 'stroke="#fff" stroke-width=".85"')}`;
   const star = (x, y, c) => `<path d="M${x.toFixed(2)} ${(y - 2.3).toFixed(2)}l.72 1.5 1.65.22-1.2 1.15.3 1.63-1.47-.8-1.47.8.3-1.63-1.2-1.15 1.65-.22z" fill="${c.a}" stroke="${c.c}" stroke-width=".3"/>`;
   /** Rivets lumineux : lueur à la couleur de la rareté, cœur clair, point blanc. */
@@ -64,7 +65,7 @@
   /** Contour du faisceau, au ras du bord, depuis le haut, dans le sens des aiguilles d'une montre. */
   const outline = (rarity) => (rarity === 'common' ? circlePath(47.2) : roundHex(49.3));
 
-  function roundBadge(c, name, id) {
+  function roundBadge(c, name, id, still) {
     return `<svg viewBox="0 0 100 100" aria-hidden="true"><defs>${CHROME(id)}${NEON(id)}${GLOSS(id)}${ENAMEL(id, c)}${GLINT(id)}<clipPath id="${id}c"><circle cx="50" cy="50" r="46"/></clipPath></defs>
       <circle cx="50" cy="50" r="46" fill="url(#${id}m)"/>
       <circle cx="50" cy="50" r="40.5" fill="#030807"/>
@@ -75,10 +76,10 @@
       ${rivets(id, ring(4, 43.25, -Math.PI / 2 + Math.PI / 4), 2, c)}
       ${neonIcon(name, c, id)}
       <ellipse cx="44" cy="27" rx="27" ry="13" fill="url(#${id}s)"/>
-      ${glint(id)}</svg>`;
+      ${glint(id, still)}</svg>`;
   }
 
-  function hexBadge(c, name, id, rarity) {
+  function hexBadge(c, name, id, rarity, still) {
     const corners = ring(6, 42.6, -Math.PI / 2);
     const mids = ring(6, 38.9, -Math.PI / 2 + Math.PI / 6);
     const studs = rarity === 'legendary' ? `<g filter="url(#${id}n)">${corners.map(([x, y]) => star(x, y, c)).join('')}</g>` : rivets(id, rarity === 'epic' ? [...corners, ...mids] : corners, rarity === 'epic' ? 1.75 : 2, c);
@@ -92,13 +93,13 @@
       ${studs}
       ${neonIcon(name, c, id)}
       <g clip-path="url(#${id}in)"><ellipse cx="44" cy="26" rx="30" ry="15" fill="url(#${id}s)"/></g>
-      ${glint(id)}</svg>`;
+      ${glint(id, still)}</svg>`;
   }
 
-  function badgeSvg(name, rarity) {
+  function badgeSvg(name, rarity, still = false) {
     const c = RAR[rarity] ?? RAR.common;
     const id = `cpb${uid++}`;
-    return rarity === 'common' || !RAR[rarity] ? roundBadge(c, name, id) : hexBadge(c, name, id, rarity);
+    return rarity === 'common' || !RAR[rarity] ? roundBadge(c, name, id, still) : hexBadge(c, name, id, rarity, still);
   }
 
   // ---------- Coin d'état : la carte du joueur, ses badges ----------

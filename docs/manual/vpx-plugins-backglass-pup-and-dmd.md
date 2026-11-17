@@ -227,6 +227,24 @@ Code: [fulldmdframe.ts](../../packages/core/src/fulldmdframe.ts), [fulldmdtable.
   Nothing is changed in the tables.
 - **Tests**: [fulldmdframe.test.ts](../../packages/core/src/test/fulldmdframe.test.ts) (frame, video, placement on the screen, table `.ini`, invariant on simulated screens, doctor) and the `fullDmdHidden` trap in [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).
 
+### DMD set for desktop mode
+
+Some recent tables choose where to draw their DMD with a table option of the VPX menu (F12), whose default value puts it in the desktop-mode scenery.
+*JP's Space Cadet* v7.0 (JPSalas) is the example: its "DMD Type" option defaults to "Desktop DMD", a DMD made of flashers in the scenery, invisible in cabinet mode; FlexDMD is never created and VPX's DMD window stays black (11/17/2026, on a three-screen cabinet).
+Code: [tableoptions.ts](../../packages/core/src/tableoptions.ts), finding in [doctor.ts](../../packages/core/src/doctor.ts) (`desktopDmdFinding`).
+
+- **Reading the script** (`tableOptions`): the `Table1.Option(name, min, max, step, default, unit, Array(labels))` calls whose arguments are all written out literally, comments removed and lines continued with "_" joined back together; an option with a computed argument is ignored.
+- **DMD option spotted** (`cabinetDmdOptions`): a list of labels whose default value names a desktop DMD or none ("Desktop", "DT", "Internal", "Playfield", "Backdrop", "Flasher", "Text box", "Apron", "None", "Off"…), whose name or one label mentions a DMD, and which offers FlexDMD, or else UltraDMD (which VPX's FlexDMD plugin also provides).
+  Or a switch such as "Use FlexDMD" (Off/On, or 0/1 with no labels) off by default.
+- **Writing** (`cabinetDmdIni`): VPX 10.8.1 stores the player's choice in `[TableOption]` of the table's `.ini`, under the option's name with every character that is neither a letter nor a digit turned into "_" ("DMD Type" gives `DMD_Type`, `PinTable::Option`); a list of labels is stored as the minimum plus the label's rank, a switch as 0 or 1.
+  Cyber Pinball writes the FlexDMD value there only for a missing or empty key: a choice made in the VPX menu is never overwritten, and that menu shows and changes this setting like any other.
+  A new `.ini` gets Windows line endings, like the ones VPX writes.
+- **When**: only on a cabinet with a DMD screen or zone; at installation and before each game (`PUP_PLAY_REPAIRS`), without asking anything.
+  The table is not modified.
+- **Doctor**: finding "DMD réglé pour le mode bureau" (DMD set for desktop mode) (`dmdDesktopOption`), which names the option, its default value, the one chosen for the cabinet and the file, with the fix "Régler « DMD Type » sur « FlexDMD » dans …" (Set "DMD Type" to "FlexDMD" in …); it goes away once the key is written.
+  Script readings move to version 10 (`FACTS_VERSION`, `app/src/vbs.ts`): tables already installed are read again.
+- **Tests**: [tableoptions.test.ts](../../packages/core/src/test/tableoptions.test.ts) (reading the options, VPX keys, player's choice kept, doctor, new `.ini`, state of VPX's DMD window) and the `dmdDesktopOption` trap in [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).
+
 ### DMD position during a game
 
 Moving the DMD during a game was still complicated, VPX's menu mixing its many settings (the FullDMD's among them) without saying what they are for.
@@ -286,6 +304,10 @@ Code: [dmdplace.ts](../../packages/core/src/dmdplace.ts) (positions, table `.ini
   An `.ini` written before (`Output = 0`) is rewritten at the next game.
 - **The DMD frame** is drawn where the screen is in its window's page (`screenBox`), not in fractions of the window: if Windows places or sizes a screen's window differently from what was asked, it is put back in place once shown and the log says so (`keepOverlayOnScreen`), and the frame stays right (13 November 2026: on the DMD screen it did not reach the bottom, while the saved position touched it).
 - **No DMD window in the game** (DMD off or embedded in the playfield): the menu says so; the frame fills with a preview in DMD dots (`DmdMenuFrame.preview`); the chosen position is adjusted and saved, and shows in the next game.
+- **DMD window still empty** (`vpxDmdWindowState`): VPX 10.8.1 only shows an ancillary window once a plugin draws its first frame there (`Renderer.cpp`, "if (rendered) … Show()"); a DMD window placed on a screen but invisible therefore means the table sends no DMD (option set for desktop mode, see [DMD set for desktop mode](#dmd-set-for-desktop-mode), or a table without a DMD).
+  The menu took it for a hidden DMD: "Masqué" (Hidden) came back at every game, even after "Afficher" (Show) and "Enregistrer pour cette table" (Save for this table) (*JP's Space Cadet*, 11/17/2026).
+  Only a window moved off the screens now counts as hidden (`parked` state); an empty window (`empty`) lets the menu start from the saved position (the table's, otherwise the general position), shown, and the menu explains that VPX hasn't drawn anything in the DMD window yet, that the table sends it no DMD, and that the chosen position is saved and will be used as soon as the table sends one.
+  The log notes it ("Réglages en partie (…) : menu ouvert, DMD de VPX vide (VPX n'y a rien dessiné : la table n'envoie pas de DMD), fenêtre en …").
 - **On the wheel**: this setting changes nothing on the wheel, which has its own (the table's page > "Gérer la table…" > "DMD sur la roue", DMD on the wheel; see [Menu DMD](game-media.md#menu-dmd)).
 - **Limits**: a PuP-Pack drawing in the DMD window (screen 5 or 1, non-zero `Priority.PUP`) stays there, shrunk to the chosen position.
   The keyboard's letters and punctuation follow its layout (`windowsVk`); a cabinet's keys (Shift, Ctrl, digits, F1-F24) do not.

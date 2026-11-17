@@ -8,20 +8,20 @@ Le partage est **activé par défaut** ; « Partage et réseau » le coupe.
 | Entrée | Ce qu'elle montre |
 | --- | --- |
 | Messages | Les conversations avec vos amis, la plus récente d'abord, puis les amis à qui vous n'avez pas encore écrit. La pastille rouge et « non lus » marquent ce qui attend. Start ouvre le fil d'un ami (voir « Messagerie » plus bas). |
-| Mes amis | En ligne, puis hors ligne. Pour chacun : en partie et sur quelle table (en temps réel), dans le front-end, ou vu il y a combien de temps ; son dernier évènement (« Nouveau meilleur score sur … », « Badge reçu : … », « A joué à … »). Start ouvre sa fiche : derniers évènements, sa bibliothèque, « Inviter à une partie en direct » (grisée, « Hors ligne », quand il ne l'est pas), « Voir sa bibliothèque », « Retirer de mes amis », « Bloquer ». En tête, une invitation reçue ou la partie en direct en cours. |
+| Mes amis | En ligne, puis hors ligne. Pour chacun : en partie et sur quelle table (en temps réel), dans le front-end, ou vu il y a combien de temps ; son dernier évènement (« Nouveau meilleur score sur … », « Badge reçu : … », « A joué à … »). Start ouvre son profil, le seul écran d'un joueur (voir « Profil public et « J'aime » » plus bas) : sa présence, sa bibliothèque, son niveau, ses badges, une seule liste d'activité, « Inviter à une partie en direct » (grisée, « Hors ligne », quand il ne l'est pas), « Voir sa bibliothèque », « Écrire un message », « Retirer de mes amis », « Bloquer … ». En tête, une invitation reçue ou la partie en direct en cours. |
 | Mon avatar | La photo ou l'image que tous les joueurs voient à côté de votre nom : « Choisir une image sur ce PC… », « Chercher une image sur le web… », « Recadrer mon avatar », « Retirer mon avatar » (voir « Avatar des joueurs » plus bas). Sans avatar, vos initiales sur une teinte tirée de votre clé. |
-| Mon profil public | Ce que voient les joueurs qui ne sont pas vos amis (pays, badges, records, activité récente), et qui a aimé chacun de vos records et badges. Il se désactive ici (voir « Profil public et « J'aime » » plus bas). |
+| Mon profil public | Ce que voient les joueurs qui ne sont pas vos amis (niveau, badges, pays, amis, records, personnes invitées, groupes publics, activité récente), et qui a aimé chacun de vos records et badges. Pendant le premier mois, « Qui vous a fait découvrir Cyber Pinball ? » (voir « Personnes invitées » plus bas). Il se désactive ici (voir « Profil public et « J'aime » » plus bas). |
 | Historique des parties | Les parties entre amis finies sur cette borne, de la plus récente à la plus ancienne, par jour : la table, l'heure, et dessous les joueurs avec leur rang et leur score. Une partie s'ouvre pour revoir son détail (voir « Historique des parties » plus bas). |
-| Trouver un joueur | L'annuaire : « Chercher un nom… » (sans accents ni casse ; ou l'identifiant vu sur la fiche d'un joueur, entier ou ses quatre premiers caractères), les bornes « À proximité (réseau local) » et celles « Vus récemment ». Un joueur : « Envoyer une demande d'ami », ou « Annuler la demande », « Accepter », « Refuser », « Voir sa fiche », « Bloquer ». |
+| Trouver un joueur | L'annuaire : « Chercher un nom… » (sans accents ni casse ; ou l'identifiant vu sur le profil d'un joueur, entier ou ses quatre premiers caractères), les bornes « À proximité (réseau local) » et celles « Vus récemment ». Start sur un joueur ouvre son profil : « Envoyer une demande d'ami », ou « Annuler la demande », « Accepter », « Refuser », et « Bloquer … ». |
 | Demandes d'amis | Reçues (à valider, pastille rouge jusqu'à la roue dentée) et envoyées (« En attente : remise dès que sa borne sera en ligne »). |
-| Mes badges | Obtenus et à obtenir : Première partie, Dix tables, Cent parties, Une heure sur une table, Dix heures de jeu, Au tableau d'honneur, Grand Champion, Cinq fois champion. |
+| Mes badges | Les 56 badges, par famille, obtenus (avec leur date) ou à obtenir (avec leur progression) ; les badges secrets ne montrent que leur indice (voir [Niveaux et badges](niveaux-et-badges.md#niveaux-et-badges)). |
 | Partage et réseau | Partage activé ou non, « Votre nom : Alexis » (avec l'identifiant de la borne), réseau local, bibliothèque partagée ou non, débit des téléchargements, pare-feu de Windows, ce que voient les autres, joueurs bloqués. La sélection s'ouvre sur « Retour » : un Start par mégarde ne coupe pas le partage. |
 | Masquer les notifications pendant les parties | Désactivé par défaut : la connexion d'un ami, une demande de rejoindre une partie, les nouvelles de la partie entre amis s'affichent aussi pendant les parties, avec leur son (voir « Partout, même en partie » dans [Notifications de l'écran des tables](notifications-de-l-ecran-des-tables.md#notifications-de-lécran-des-tables)). Start bascule ; activé, rien ne s'affiche ni ne sonne pendant une partie, tout attend le front-end. |
 
 **Identité.**
 Chaque borne a une clé Ed25519, créée au premier démarrage et gardée dans `<données>\social.json` (avec les amis, les demandes, l'annuaire, les évènements et les badges ; jamais partagé).
 Le nom (2 à 24 lettres, chiffres, espaces, `'`, `.`, `_`, `-`) est signé par cette clé ; l'identifiant du joueur (« A1B2-C3D4-E5F6-7890 », `playerId`, tiré de la clé) distingue deux joueurs du même nom.
-Il ne s'affiche que sur la fiche d'un joueur (ligne « Identifiant : … ») et dans « Partage et réseau » ; partout ailleurs (listes, amis, scores, partie en direct, titres), le nom s'affiche seul, avec l'avatar.
+Il ne s'affiche que sur le profil d'un joueur (ligne « Identifiant : … ») et dans « Partage et réseau » ; partout ailleurs (listes, amis, scores, partie en direct, titres), le nom s'affiche seul, avec l'avatar.
 Une garde des tests (`noTag`, friends-menu.test.ts) refuse toute étiquette accolée à un nom.
 Un `social.json` illisible est mis de côté (`social.json.illisible-<date>`), jamais écrasé.
 
@@ -37,6 +37,7 @@ Juste après l'assistant d'écrans de l'installation, le front-end ouvre l'écra
 Le pseudo est obligatoire : tant qu'il n'est pas choisi, la ligne du pseudo affiche « à choisir », « Continuer » reste grisé, et « Continuer » comme Exit ne font que rappeler le pseudo, la sélection revenue sur « Choisir mon pseudo… ».
 Le nom d'office retapé tel quel (« Joueur A1B2 », « Player A1B2 ») est refusé.
 L'avatar reste facultatif.
+Tant que la question se pose (voir « Personnes invitées » plus bas), une entrée facultative se glisse avant « Continuer » : « Qui vous a fait découvrir Cyber Pinball ? », qui devient « Découvert grâce à … » une fois un joueur choisi.
 L'écran revient à chaque démarrage tant que le profil porte le nom d'office, même déjà vu et même avec un avatar ; un profil qui avait passé l'écran sans pseudo le retrouve donc au démarrage suivant.
 Jamais en mode invité ni pendant un essai sans opérateur (sauf `CYBERPINBALL_PROFIL=1`), et après l'ouverture quand le démarrage arrive sur la roue.
 La date de la première ouverture (`profileOffered` dans `social.json`) reste notée, pour mémoire.
@@ -46,7 +47,7 @@ Code : `app/src/profile-welcome.ts`, règle `profileWelcomeDue` de [packages/cor
 Toutes les bornes dont le partage est activé rejoignent un même sujet Hyperswarm (`cyberpinball/annuaire/1`, sur la DHT de Holepunch, nœuds d'amorçage `node1-3.hyperdht.org`).
 À chaque connexion, deux bornes échangent leur profil et jusqu'à 200 profils vus : l'annuaire passe de borne en borne.
 Un profil relayé n'entre que si sa signature est bonne ; le plus récent l'emporte ; un profil non revu depuis 60 jours sort.
-« Vu il y a… » (annuaire, fiche d'un joueur, classements) est la dernière fois que le joueur était en ligne : vu par cette borne (son bonjour, sa balise locale), ou par une borne qui le relaie, à la date qu'elle en donne (champ `seen` de chaque profil relayé, borné entre la date du profil signé et maintenant ; une borne plus ancienne qui ne l'envoie pas : la date du profil).
+« Vu il y a… » (annuaire, profil d'un joueur, classements) est la dernière fois que le joueur était en ligne : vu par cette borne (son bonjour, sa balise locale), ou par une borne qui le relaie, à la date qu'elle en donne (champ `seen` de chaque profil relayé, borné entre la date du profil signé et maintenant ; une borne plus ancienne qui ne l'envoie pas : la date du profil).
 Recevoir un profil relayé ne le rajeunit jamais : jusqu'à la 0.1.11-essai.27, chaque relais remettait tous les profils reçus à l'heure de réception, si bien que tous les joueurs semblaient « vus » au même moment et qu'aucun ne sortait jamais de l'annuaire.
 Les dates déjà faussées sont ramenées, une fois, à la dernière preuve sûre (date du profil, balise locale, dernière présence d'un ami, demande d'ami reçue ; `repairDirectorySeen`, marqueur `directorySeenChecked`).
 Deux joueurs seulement se trouvent aussi bien que mille : la DHT est celle de tous les usagers de Holepunch.
@@ -85,7 +86,7 @@ Un ami suivi sans liaison est redemandé à Hyperswarm toutes les 5 s pendant de
 Ces délais sont tirés au hasard autour de leur valeur (de moitié à une fois et demie) : deux bornes qui s'appellent au même instant se gênent, car Hyperswarm garde chez la plus grande clé son propre appel encore en cours et coupe celui de l'autre, même quand cet appel va échouer (entrant bloqué chez l'autre) ; à rythme fixe, elles retombaient ensemble à chaque relance.
 Un appel Internet coupé avant le bonjour, sans autre liaison, est relancé entre 0,3 et 1,5 s plus tard (six fois par minute au plus), sans attendre les 1 s, 5 s puis 15 s de Hyperswarm.
 La liste dit si elle est sûre ([friendpresence.ts](../../packages/core/src/friendpresence.ts)) : « Recherche des amis… » au démarrage (30 s, ou jusqu'à ce que tous les amis soient là) et après un changement de réseau, « Mise à jour en cours… » pendant une tolérance, puis « Liste à jour : 1 ami en ligne », avec une barre qui va et vient tant qu'elle n'est pas sûre ; un ami hors ligne pendant une recherche est « Vu il y a 3 h · recherche en cours ».
-Partout où la présence s'affiche : « Mes amis », le menu système (« 1 en ligne · recherche en cours »), « Jouer avec un ami », la fiche d'un ami (« Relié par Internet et le réseau local »), la pastille de l'écran des tables (montrée même à zéro pendant la recherche, point évidé).
+Partout où la présence s'affiche : « Mes amis », le menu système (« 1 en ligne · recherche en cours »), « Jouer avec un ami », le profil d'un ami (« Relié par Internet et le réseau local »), la pastille de l'écran des tables (montrée même à zéro pendant la recherche, point évidé).
 « Vient de se connecter » n'est pas annoncé pendant la recherche : c'est la borne qui arrive.
 Journal (`data\logs\journal.txt`), pour les amis et les demandes seulement : chaque liaison ouverte ou fermée, par où, sa raison (« Duplicate connection », « connection timed out », « fin normale »), sa durée et ce qui reste ; « X en ligne » avec, pendant la recherche, le délai depuis son début (« 2.4 s après le début de la recherche ») ; « X hors ligne (dernière liaison fermée il y a 15 s) » ; la balise locale reçue d'un ami et son adresse ; un appel local impossible (pare-feu) une fois par cinq minutes ; un ami qu'Hyperswarm avait abandonné.
 
@@ -125,7 +126,7 @@ Activée par défaut entre amis : deux joueurs devenus amis voient chacun la bib
 « Partage et réseau » > « Ne plus partager ma bibliothèque » la coupe, « Partager ma bibliothèque avec mes amis » la remet ; ce choix du joueur est gardé (`shareLibraryChosen`), et un `social.json` écrit avant ce défaut, qui portait « non » sans que personne l'ait choisi, est relu « partagée ».
 L'écran rappelle de ne partager que ce qu'on a le droit de partager (captures d'œuvres, ROM et PuP-Packs restent à leurs ayants droit).
 Les amis voient la liste des tables et, pour chacune, ses médias propres (ceux de `medias\` : logo, fronton, vidéos, règles, musique ; ni les médias communs de la borne ni l'image tirée du `.directb2s`).
-Fiche d'un ami > « Voir sa bibliothèque » : « Sur votre borne » (même jeu : identifiant VPS, ROM, ou titre et année ; « 2 manquants ») et « Absentes de votre borne ».
+Profil d'un ami > « Voir sa bibliothèque » : « Sur votre borne » (même jeu : identifiant VPS, ROM, ou titre et année ; « 2 manquants ») et « Absentes de votre borne ».
 Une de ses tables : ses médias, « Déjà équipé » (votre table a déjà ce type de média, pas forcément le même fichier) ou « Manquant », puis « Récupérer les n médias manquants », « Récupérer les n médias » ou « Inviter … à jouer ».
 La réception montre sa progression et s'annule (Exit) ; chaque fichier arrive dans `<données>\amis\recus\` et n'en sort que s'il a la taille et l'empreinte SHA-256 annoncées et des premiers octets qui disent un média de son type (les contrôles de l'import).
 Il entre alors dans le brouillon de « Médias du jeu » de la table, avec sa provenance (« la borne de Bruno #A1B2 »), le curseur sur le premier média reçu (« Afficheur large reçu de Bruno : vérifiez-le, puis enregistrez. ») : on le voit, puis « Enregistrer » montre le plan avant d'écrire.
@@ -147,7 +148,7 @@ Sous la liste, « Récupérer les n parties cochées » (le poids ; refusé s'il
 **Une réception ne part qu'une fois** : elle porte une clé, la table et l'ami (`dedupe`), et tant qu'elle tourne, attend son ami, est en pause, ou est reçue sans être installée, rien ne la relance.
 Elle se voit là où on l'a lancée : dans la bibliothèque de l'ami, la ligne de la table porte son état (« Réception en cours », « En attente de Bruno », « Reçue · à installer »), sa barre et « 42 % · 120 Mo sur 300 Mo · fichier 3 sur 14 · Start : voir la réception » ; Start y mène.
 Sur la fiche de la table, « Voir la réception de la table » (ou « Installer la table reçue ») remplace « Récupérer toute la table », le curseur dessus, avec la même barre en tête ; de même « Voir la réception des médias ».
-La fiche de l'ami ajoute « 1 réception en cours ».
+Le profil de l'ami l'ajoute à la ligne de sa bibliothèque (« 1 réception en cours »).
 L'écran de la réception dit « Lancée à 14:02 : rien d'autre à faire » : elle continue si on le quitte, et Start sur la table revient ici sans la relancer ; « Continuer en arrière-plan » ramène à la table, « Annuler la réception » efface ce qui est reçu.
 Reçue, l'écran dit « Reçue, pas encore installée » et propose d'abord **« Installer dans ma bibliothèque »** (le plan d'ajout de cette table) ; de même la fiche de la table et Téléchargements.
 Une table reçue dont le plan a été annulé reste « Reçue · à installer » tant que son dossier est là, et « Récupérer de nouveau » est un choix explicite de cet écran.
@@ -175,7 +176,7 @@ Code : [packages/core/src/ratelimit.ts](../../packages/core/src/ratelimit.ts), `
 
 **Partie en direct.**
 Deux entrées.
-Fiche d'un ami > « Inviter à une partie en direct » : choisir une table (celles qu'il a dans la même version d'abord, voir « Choisir la table d'une partie en direct » plus bas).
+Profil d'un ami > « Inviter à une partie en direct » : choisir une table (celles qu'il a dans la même version d'abord, voir « Choisir la table d'une partie en direct » plus bas).
 Fiche d'une table > « Jouer avec un ami », juste sous « Jouer » : choisir l'ami (en ligne en tête, ceux qui ont la table dans la même version d'abord, les amis hors ligne grisés dessous).
 Les deux restent visibles quand on ne peut pas inviter, grisées avec leur raison : « Hors ligne : invitez-le quand il sera connecté », « Aucun ami en ligne pour l'instant », « Pas encore d'ami : Menu système > Amis > Trouver un joueur » ; un ami en partie s'invite aussi (« En partie : il recevra une notification discrète sur sa table »).
 Un salon s'ouvre, l'invitation part ; jusqu'à quatre joueurs (« Inviter un autre ami »).
@@ -381,7 +382,7 @@ Les bornes reliées voient l'adresse IP, comme dans tout échange de pair à pai
 Jamais le vrai réseau pendant un essai : `socialNetMode` coupe le réseau dès qu'une variable d'essai est là (autopilote, captures, endurance, bac à sable `CYBERPINBALL_HOME`, écrans simulés), sauf `CYBERPINBALL_RESEAU=simule` : un réseau d'essai HyperDHT dans le processus et un réseau local en mémoire, sur 127.0.0.1 seulement, avec une règle de pare-feu simulée.
 `CYBERPINBALL_RESEAU=non` coupe aussi en usage normal.
 
-Code : les décisions dans [packages/core/src/social.ts](../../packages/core/src/social.ts) (profil, messages, annuaire, amitié, évènements), [friendlibrary.ts](../../packages/core/src/friendlibrary.ts) (bibliothèque partagée, messages des fichiers) et [livegame.ts](../../packages/core/src/livegame.ts) (invitation, salon, départ, résultats), le transport dans `app/src/social-net.ts` (seul module qui ouvre des sockets), les services dans `app/src/friend-content.ts` et `app/src/live-game.ts`, les écrans dans `app/src/friends-menu.ts`, `app/src/friend-library-menu.ts` et `app/src/live-game-menu.ts`.
+Code : les décisions dans [packages/core/src/social.ts](../../packages/core/src/social.ts) (profil, messages, annuaire, amitié, évènements), [friendlibrary.ts](../../packages/core/src/friendlibrary.ts) (bibliothèque partagée, messages des fichiers) et [livegame.ts](../../packages/core/src/livegame.ts) (invitation, salon, départ, résultats), le transport dans `app/src/social-net.ts` (seul module qui ouvre des sockets), les services dans `app/src/friend-content.ts` et `app/src/live-game.ts`, les écrans dans `app/src/friends-menu.ts`, `app/src/profile-menu.ts` (le profil d'un joueur), `app/src/friend-library-menu.ts` et `app/src/live-game-menu.ts`.
 Le nom d'un joueur suit toujours son profil signé le plus récent, d'où qu'il vienne (bonjour, annuaire relayé, balise), jamais un plus ancien (`learnProfiles`, `renamePeer`).
 Preuves : [social.test.ts](../../packages/core/src/test/social.test.ts) (noms, signatures, messages piégés, annuaire, règles d'amitié des deux côtés, badges, mode du réseau), [social-net.test.ts](../../packages/core/src/test/social-net.test.ts) (deux bornes sur un réseau d'essai : annuaire, demande, acceptation même borne éteinte, présence, record, retrait, réseau local sans Internet, blocage ; réseau local en panne au démarrage, Internet qui tourne quand même et le local réessayé ; balise qui ne lève pas sur une carte refusée ou absente ; aucune socket hors de 127.0.0.1 ; aucun autre module ne charge Hyperswarm, `net` ou `dgram`), [firewall.test.ts](../../packages/core/src/test/firewall.test.ts) (lecture de netsh dans toutes les langues, même règle dans l'installeur, jamais en mise à jour, en silence ni en bac à sable), [friend-services.test.ts](../../packages/core/src/test/friend-services.test.ts) (bibliothèque partagée par défaut et refusée une fois coupée, médias reçus identiques à l'octet, identifiant inconnu refusé, table entière partie par partie sans sauvegardes ni programme ni ROM pas prise, chemin piégé refusé, partie en direct de l'invitation aux résultats), [friends-menu.test.ts](../../packages/core/src/test/friends-menu.test.ts) (chaque écran, partage par défaut, chaque partie d'une table menant à sa propre action et la ROM décochée, curseur du compte à rebours, invitation grisée avec sa raison et « Jouer avec un ami »), [invitation-en-partie.test.ts](../../packages/core/src/test/invitation-en-partie.test.ts) (invitation reçue pendant une partie : gardée, jamais « occupé » ; carte puis pastille, coin du plateau dans les quatre sens, fenêtre sans focus ni capture, ouverte au retour au front-end).
 
@@ -413,12 +414,12 @@ La vérification à l'acceptation reste le filet de sécurité : une table chang
 
 ### Messagerie
 
-Menu système > Amis > « Messages », ou « Écrire » sur la fiche d'un ami.
+Menu système > Amis > « Messages », ou « Écrire un message » sur le profil d'un ami.
 On écrit **entre amis seulement**, sans serveur : les messages passent directement d'une borne à l'autre, sur la même connexion chiffrée que la présence, et restent sur les deux bornes.
 
 **Le fil d'un ami.**
 Ses messages à gauche, les vôtres à droite, et au centre les évènements de l'amitié dessinés par la borne (un record, un badge).
-Les flippers choisissent un message, Start ouvre « Répondre », MagnaSave passe à l'ami précédent ou suivant, Exit sort du fil vers ses actions : « Écrire un message… », « Réponse rapide… », « Options de la conversation », « Voir sa fiche ».
+Les flippers choisissent un message, Start ouvre « Répondre », MagnaSave passe à l'ami précédent ou suivant, Exit sort du fil vers ses actions : « Écrire un message… », « Réponse rapide… », « Options de la conversation », « Voir son profil ».
 
 **Répondre aux boutons.**
 « Répondre » propose sept réactions par emoji posées sur le message choisi (👍 J'aime, ❤️ J'adore, 🥰 Solidaire, 😆 Haha, 😮 Waouh, 😢 Triste, 😡 Grrr, les mêmes que dans les salons ; Start de nouveau sur la sienne la retire ; une réaction d'avant, Bravo ou TILT !, reste affichée), six phrases toutes prêtes, et « Écrire un message… » : le clavier à l'écran, ou le téléphone appairé, dont le texte s'écrit en direct dans le champ. 500 caractères au plus.
@@ -453,6 +454,7 @@ Un fil ouvert n'annonce rien de plus.
 
 **Options et réglages.**
 Les options d'une conversation coupent les notifications d'un ami, effacent la conversation (sur cette borne seulement) ou bloquent l'ami (le blocage du réseau des bornes, qui efface aussi la conversation).
+Une conversation non lue compte dans la pastille des messages de l'écran des tables, sauf en sourdine, et paraît sur l'écran « Messages en attente » (voir [Notifications de l'écran des tables](notifications-de-l-ecran-des-tables.md#notifications-de-lécran-des-tables)).
 « Réglages de la messagerie » active ou désactive la messagerie (désactivée, vos amis voient « N'accepte pas de messages » et ce qu'ils écrivent attend), coupe le son des messages, et règle leur durée de conservation : 30 jours, 1 an (par défaut) ou toujours.
 En mode invité, le menu système est fermé : pas de messagerie, et les notifications de message attendent le déverrouillage.
 Les réglages comptent aussi « Répondre depuis le téléphone pendant une partie » (activé par défaut).
@@ -466,7 +468,7 @@ Essais : [suppression-messages.test.ts](../../packages/core/src/test/suppression
 **En train d'écrire.**
 Tant qu'un ami a du texte dans son champ (clavier à l'écran, vrai clavier ou téléphone), son badge apparaît sous le dernier message : son avatar, son pseudo et trois points qui s'allument l'un après l'autre.
 De même dans un groupe (chaque membre qui écrit, sous la discussion) et dans un salon (sous le journal, trois badges au plus, puis « +2 » ; les joueurs ignorés n'y sont pas).
-Le téléphone le montre aussi, sous le fil, le salon ou la messagerie de la partie, et ses propres champs l'envoient.
+Le téléphone le montre aussi, sous le fil, le salon ou la messagerie de la partie (les pseudos, trois au plus puis « +2 », et les trois points), et ses propres champs l'envoient.
 Les points partent avec le message, quand le champ est vidé ou fermé, ou d'eux-mêmes 8 secondes après le dernier signal.
 C'est un signal éphémère, jamais gardé : `chat-typing` vers un ami, `grp-typing` vers les membres joignables d'un groupe, `room-typing` dans un salon (signé par son auteur, relayé comme la présence) ; un toutes les 3 secondes au plus pendant la frappe.
 Une borne d'avant cette version ne l'envoie pas et ne l'affiche pas.
@@ -478,18 +480,36 @@ Les messages sont gardés dans `<données>\amis\messagerie.json`.
 
 ### Profil public et « J'aime »
 
-Tout joueur a un **profil public**, lisible par ceux qui ne sont pas ses amis : son pseudo, son pays, son avatar, ses badges, le nombre de ses records publiés, et son **activité récente** (records et badges des 30 derniers jours).
-Table en cours, parties jouées, bibliothèque et messages restent entre amis, et le profil le dit ; « En ligne » ou « En partie » se voient dans « Joueurs en ligne » (voir plus bas).
-On l'ouvre par « Voir son profil public », sur la fiche d'un joueur de l'annuaire (« Trouver un joueur ») ou d'un ami.
+Tout joueur a un **profil public**, lisible par ceux qui ne sont pas ses amis : son pseudo, son avatar, son niveau, ses badges, son pays, son nombre d'amis (jamais leur liste), le nombre de ses records publiés, ses personnes invitées, ses groupes publics et son **activité récente** (records et badges des 30 derniers jours).
+Table en cours, parties jouées, bibliothèque et messages restent entre amis, et le profil le dit (« Table en cours, parties jouées, bibliothèque : réservées à ses amis ») ; « En ligne » ou « En partie » se voient dans « Joueurs en ligne » (voir plus bas).
+
+**Un seul écran par joueur.**
+Ami ou non, un joueur n'a qu'un écran, son profil (`app/src/profile-menu.ts`) ; jusqu'à la 0.1.13, la fiche d'un ami et son profil public faisaient doublon, avec deux listes d'activité différentes.
+Mes amis, « Joueurs en ligne », l'annuaire (« Trouver un joueur »), les demandes d'amis, la messagerie et les groupes (« Voir son profil »), les salons (les options d'une ligne) et l'Activité récente y mènent tous directement ; son « Retour » revient d'où l'on venait.
+Sous le pseudo, le palier et le niveau (« Flippeur · niveau 14 »), puis « Votre ami » ou « Profil public · pas votre ami ».
+De haut en bas :
+
+- ce que la relation ajoute (`playerPart` de `app/src/friends-menu.ts`) : pour un ami, sa présence (« En partie », « En ligne » ou « Hors ligne », depuis quand vous êtes amis, par où sa borne est reliée) et sa bibliothèque (avec « 1 réception en cours ») ; pour un autre joueur, où il a été vu (« Sur votre réseau local », « Vu il y a 3 j ») et la demande d'ami en cours, envoyée ou reçue ;
+- son pays, son nombre d'amis et ses records publiés, « Profil actualisé il y a … », puis son identifiant ;
+- son niveau et sa barre (« Flippeur · niveau 14 », « 350 / 750 XP ») ;
+- ses badges en médailles, les plus rares d'abord, douze au plus (« 23 badges sur 56 », « Les 12 plus rares ») ;
+- ses personnes invitées, s'il en a (voir « Personnes invitées » ci-dessous) ;
+- ses groupes publics, jamais un groupe privé (voir [Niveaux et badges](niveaux-et-badges.md#ce-que-voit-le-joueur)) ;
+- une seule liste d'activité, la plus récente en haut : ses records et badges des 30 derniers jours, à aimer, et, pour un ami, ses parties jouées sur les mêmes 30 jours (sans carte publique reçue, ses évènements d'ami seuls).
+
+La carte d'un joueur dont la borne n'a pas encore la version des niveaux n'a pas de niveau : la ligne dit « Niveau pas encore connu » (« Sa borne n'a pas encore la version qui donne le niveau »).
+Un niveau invraisemblable s'affiche « Niveau ? » (voir [Niveaux et badges](niveaux-et-badges.md#niveau-de-départ-et-vraisemblance)).
+Les actions : pour un ami, « Inviter à une partie en direct », « Voir sa bibliothèque », « Écrire un message » ; pour un autre joueur, « Envoyer une demande d'ami » (ou « Annuler la demande », « Accepter », « Refuser ») et « Écrire un message », grisé ; puis « Masquer son activité », « Retirer de mes amis » (un ami, avec confirmation), « Bloquer … » et « Retour ».
 
 **Aimer.**
 Sur le profil, les flippers choisissent un record ou un badge, Start l'aime, Start de nouveau ne l'aime plus.
 Chacun voit le nombre de « J'aime » ; seul l'auteur voit qui a aimé.
 On ne peut pas écrire à un joueur qui n'est pas un ami : « Écrire un message » reste visible, grisé, avec sa raison ; « Envoyer une demande d'ami » est à côté.
-« Masquer son activité » cache sur cette borne ses évènements et ses « J'aime » ; « Bloquer » coupe tout.
+« Masquer son activité » cache sur cette borne ses évènements et ses « J'aime », avec son niveau, ses badges et ses personnes invitées ; « Bloquer » coupe tout.
 
 **Mon profil public.**
-Menu système > Amis > « Mon profil public » montre ce que voient les autres et, pour chaque évènement, qui l'a aimé (Start).
+Menu système > Amis > « Mon profil public » montre ce que voient les autres (pays, amis et records, niveau et barre, badges en médailles, personnes invitées, groupes publics) et, pour chaque évènement de « Votre activité récente », qui l'a aimé (Start).
+Pendant le premier mois, il propose aussi « Qui vous a fait découvrir Cyber Pinball ? » (voir « Personnes invitées » ci-dessous).
 Un « J'aime » reçu s'annonce par une notification à l'écran des tables, regroupée (« Dora et Kiko aiment votre activité »).
 Le profil public est **activé par défaut** ; « Désactiver mon profil public », ici ou dans « Partage et réseau », ne laisse aux autres que le pseudo dans l'annuaire (et les scores, s'ils sont publiés).
 
@@ -498,7 +518,43 @@ La carte publique d'un joueur est signée par sa clé et passe de borne en borne
 Un « J'aime » est un petit message signé, remis directement à la borne de l'auteur quand elle est reliée, sinon relayé par une ou deux bornes, et réessayé à chaque liaison pendant 30 jours.
 Le nombre affiché est celui de la dernière carte reçue.
 Une même borne ne peut pas donner plus de 100 « J'aime » par jour à un joueur.
+Les cartes envoyées ensemble tiennent sous 180 Kio par message (`withinBytes`, [publicprofile.ts](../../packages/core/src/publicprofile.ts)) : une carte porte jusqu'à vingt attestations de personnes invitées, et un message trop gros serait refusé entier.
 Cartes et « J'aime » sont gardés dans `<données>\amis\profils.json`.
+
+### Personnes invitées
+
+Un joueur qui a fait découvrir Cyber Pinball à d'autres le voit sur son profil, avec le badge Ambassadeur dès la première personne ; le profil de la personne invitée, lui, ne dit jamais qui l'a invitée.
+Sans serveur ni compte, seule la personne invitée peut dire qui l'a invitée ([invitations.ts](../../packages/core/src/invitations.ts)).
+
+**La question.**
+« Qui vous a fait découvrir Cyber Pinball ? » se pose à l'écran « Votre profil de joueur » du premier lancement, avant « Continuer », puis dans Menu système > Amis > « Mon profil public », pendant les 30 jours qui suivent la première ouverture de cet écran (`DECLARE_DAYS`, `profileOffered`) ; elle est toujours facultative.
+L'écran (`app/src/invite-menu.ts`) propose d'abord les joueurs « Sur votre réseau local », puis « Vos amis » (huit au plus par liste), « Chercher un joueur… » (son pseudo, ou l'identifiant vu sur son profil, dans l'annuaire), « Personne : je l'ai trouvé seul » (la question ne revient plus) et « Plus tard ».
+Le joueur choisi porte « Choisi », l'écran dit « Vous avez choisi … » et l'entrée devient « Découvert grâce à … » ; tant que rien n'est confirmé, on peut en changer.
+
+**Quand ça compte.**
+L'invitation compte à la première partie menée au bout (voir [Niveaux et badges](niveaux-et-badges.md#gagner-des-xp)), ou tout de suite si une partie l'a déjà été.
+La borne signe alors une attestation (`invited` : l'inviteur, la personne invitée, son pseudo, l'empreinte de sa machine, l'heure) et la remet à la borne de l'inviteur si elle est reliée ; sinon, les bornes reliées la relaient, deux fois au plus (`INVITE_TTL`), et elle repart à chaque liaison tant que l'inviteur ne l'a pas reçue directement.
+L'écran dit ensuite « Bruno vous a fait découvrir Cyber Pinball » et « C'est compté : il le voit sur son profil » (ou « … dès que sa borne sera en ligne ») ; plus rien ne se change.
+
+**Une machine ne compte qu'une fois.**
+L'empreinte de la machine est tirée du `MachineGuid` de Windows sans qu'on puisse remonter jusqu'à lui (`machineTag`) ; le `MachineGuid` ne quitte jamais la borne.
+Illisible, l'invitation déclarée attend une partie suivante.
+L'inviteur garde une attestation par machine et par joueur, jamais la sienne ni une venue de sa propre machine, et joint les vingt plus récentes à sa carte publique (`INVITES_IN_CARD`), avec leur total.
+Toute borne qui montre son profil vérifie la signature de chaque attestation par la clé de la personne invitée (`invitedOf`) : un nombre gonflé ne passe pas ; au-delà des vingt jointes, le total annoncé est cru, 500 au plus.
+Un compte supprimé (avis d'oubli) retire son attestation.
+
+**Sur le profil de l'inviteur.**
+Une partie « Personnes invitées » : « A fait découvrir Cyber Pinball à 3 joueurs » (« Vous avez fait découvrir Cyber Pinball à 3 joueurs » dans Mon profil public), avec les avatars des huit plus récentes et « +N » au-delà.
+
+**XP, notification et badges.**
+Chaque personne invitée rapporte 100 XP à l'inviteur, puis 25 XP à chaque palier qu'elle passe (Flippeur, Habitué…, lu sur sa carte publique s'il est vraisemblable), hors plafond (voir [Niveaux et badges](niveaux-et-badges.md#gagner-des-xp)).
+La notification « Nova, que vous avez invité, vient de finir sa première partie » (« Elle compte parmi vos personnes invitées ») l'annonce avec son son, regroupée au besoin (« 2 personnes invitées ont fini leur première partie ») ; un clic ouvre Mon profil public.
+Les badges Ambassadeur, Rassembleur et Bâtisseur de communauté suivent leur nombre.
+
+**Fichiers et tests.**
+Le choix, « Personne », sa propre attestation et celles reçues sont gardés dans `<données>\amis\invitations.json` ; `app/src/invitations-service.ts` lit l'empreinte de la machine (`CYBERPINBALL_MACHINE` la remplace pour les bornes fictives des essais).
+Une borne d'avant cette version ignore les attestations (`invites`) et ne montre pas les personnes invitées.
+Tests : [invitations.test.ts](../../packages/core/src/test/invitations.test.ts).
 
 ### Communauté et joueurs en ligne
 
@@ -506,12 +562,22 @@ Cartes et « J'aime » sont gardés dans `<données>\amis\profils.json`.
 Dans la roue, juste après le Juke-box et avant le médaillon Collections et les tables de chaque collection, un médaillon sur l'anneau chromé commun ouvre la communauté : son nom en vert, le nombre de joueurs en ligne et d'amis en ligne dessous.
 Partout (médaillon, affiche, Menu système, onglets de « Joueurs en ligne », téléphone), le nombre de joueurs en ligne, et celui de votre pays, ne s'affiche qu'au-delà de cinq, comme les présents d'un salon : un réseau presque vide, chiffré, découragerait ; les joueurs restent nommés, et vos amis en ligne se comptent toujours.
 Start ouvre l'**accueil**, six portes : « Joueurs en ligne », « Parties instantanées » (voir ci-dessous), « Mes amis » (avec la pastille des demandes reçues), « Messages » (la messagerie entre amis), le salon de votre pays (voir « Salons par pays » ci-dessous) et « Classements », qui ouvre sur deux portes, « Joueurs » et « Tables ».
-« Joueurs » classe les joueurs par leurs XP, en onglets Amis, National et Mondial (MagnaSave passe de l'un à l'autre), de la semaine (les XP gagnés depuis lundi, à zéro chaque semaine) ou de tout temps (les flippers passent de l'une à l'autre) ; il compte les joueurs dont la borne a reçu la carte publique, et vous, toujours visible, à part au-delà des cinquante premiers.
-Un total invraisemblable pour l'ancienneté d'un joueur, ou une semaine au-delà de ce qu'une semaine permet, ne se classe pas : il est compté sous le tableau.
-« Tables » montre toutes vos tables, les cinq dernières jouées d'abord, puis toutes les autres de A à Z, en onglets Cette borne, Amis, National et Mondial, sur la période choisie (« Période » : Tout temps, Cette année, Cette semaine, Aujourd'hui).
-Une table classée dit le premier, son score, le nombre de joueurs et votre place ; une table sans classement reste dans la liste, grisée, avec sa raison (aucun score sur la période, empreinte en calcul, version illisible).
-« Rechercher une table », en tête de la liste, filtre par nom avec le clavier à l'écran ou celui du PC, sans accents ni majuscules ; « Effacer la recherche » ramène toutes les tables.
-Start sur une table ouvre son tableau des scores, dont le « Retour » revient à la liste des tables.
+« Joueurs » classe les joueurs par leurs XP, en onglets Amis, National et Mondial (MagnaSave passe de l'un à l'autre), de la semaine (les XP gagnés depuis lundi, à zéro chaque lundi) ou de tout temps (les flippers passent de l'une à l'autre).
+Il s'ouvre sur National · Cette semaine (Mondial sans pays choisi) : la semaine d'abord, où chacun a sa chance.
+Chaque ligne donne le rang, le drapeau, la pastille du joueur avec son niveau et sa présence, son pseudo et ses XP, l'autre période en petit (« 12 400 XP au total », « +850 cette semaine ») ; à égalité, le même rang.
+Il compte les joueurs dont la borne a reçu la carte publique, qui porte, signés, les XP de la semaine et son lundi (la carte d'une borne pas encore à jour ne se classe qu'en Tout temps), et vous, même profil public désactivé.
+Votre ligne, « (vous) », reste toujours visible, à part au-delà des cinquante premiers ; sous le tableau, votre place (« National · Cette semaine : votre place, 37 sur 120 joueurs »).
+Un total impossible pour quiconque (au-delà de tout ce qui a pu se gagner depuis l'arrivée des niveaux, compte tenu des XP que rapportent les personnes invitées), ou une semaine au-delà de ce qu'une semaine permet, ne se classe pas : il est compté sous le tableau (« 1 joueur écarté (XP impossibles) »).
+Un total seulement inattendu pour l'ancienneté du joueur sur cette borne se classe, son niveau montré « ? ».
+Partage désactivé, la porte est grisée avec sa raison ; sans pays, National dit « Pays non choisi : Amis > Partage et réseau » ; sans ami, Amis dit « Aucun ami pour l'instant ».
+Start ou Exit revient aux deux portes, dont la porte « Joueurs » résume votre place : « Vous : niveau 14 · 37ᵉ au monde cette semaine · 3ᵉ dans votre pays ».
+« Tables » montre toutes vos tables, les cinq dernières jouées d'abord (« Jouées récemment », avec « hier », « il y a 3 j »), puis toutes les autres de A à Z, en onglets Cette borne, Amis, National et Mondial, chacun comptant ses tables classées (« 3 sur 42 »), sur la période choisie (« Période » : Tout temps, Cette année, Cette semaine, Aujourd'hui ; Start passe à la suivante).
+Il s'ouvre sur Mondial · Tout temps (Cette borne quand le partage est désactivé), le curseur sur la recherche.
+Une table classée dit le premier, son score, le nombre de joueurs (de parties, pour Cette borne) et votre place, avec « Premier » en vert quand vous menez ; une table sans classement reste dans la liste, grisée, avec sa raison (aucun score sur la période, empreinte en calcul, version illisible).
+« Rechercher une table », en tête de la liste, filtre par nom avec le clavier à l'écran ou celui du PC, sans accents ni majuscules : chaque mot tapé commence un mot du nom ou se trouve dans le nom écrit sans espaces (« comete » trouve « Comète »).
+Pendant une recherche, les tables se suivent de A à Z ; « Effacer la recherche » les ramène toutes.
+Start sur une table ouvre son tableau des scores à la même portée et à la même période, dont le « Retour » revient à la liste des tables.
+Le classement des joueurs est calculé par `playerBoard` dans `packages/core/src/playerranking.ts`, l'écran dans `app/src/rankings-menu.ts` ; tests : `packages/core/src/test/classement-joueurs.test.ts` et `packages/core/src/test/classements-global.test.ts`.
 Exit revient à la roue.
 Le médaillon se masque dans Menu système > Tables > Roue (« Communauté dans la roue ») ; il n'apparaît jamais en mode invité.
 Choisi dans la roue, il montre son **affiche**, comme le Juke-box : derrière la roue (tout le plateau en borne, le cadre du plateau au bureau) et à la place du média du fronton.
@@ -525,7 +591,7 @@ Chaque ligne porte la pastille du joueur, son drapeau devant son nom (le drapeau
 La **table en cours** n'est montrée qu'entre amis.
 MagnaSave passe d'un **filtre** à l'autre, en onglets au-dessus de la liste : Tous, Mon pays, À proximité (le réseau local), Mêmes tables (les joueurs dont les scores classés portent sur des tables que vous avez, le plus de tables en commun d'abord).
 Un filtre qui ne peut rien montrer reste visible, grisé, sa raison à la place du nombre (« Réseau local coupé », « Pays non choisi »).
-Start sur un ami ouvre sa fiche ; sur un autre joueur, son profil public (demande d'ami, « J'aime », blocage).
+Start sur un joueur, ami ou non, ouvre son profil (présence et bibliothèque d'un ami ; demande d'ami, « J'aime », blocage).
 
 **Apparaître en ligne pour tous.**
 Activé par défaut.
@@ -669,7 +735,7 @@ Une action (« /me lance Star Courier ») s'écrit en italique ; une ligne qui v
 Les présents, avec pastille et drapeau, sont dans la colonne latérale (dessous en borne) ; leur nombre ne s'affiche (là, sur la porte du salon, l'affiche du médaillon, la liste des salons et le téléphone) qu'au-delà de cinq, pour qu'un salon presque vide ne décourage pas d'entrer.
 Un salon quitté vous garde présent encore une minute (`ROOM_LINGER_MS`) : qui passe voit que quelqu'un vient d'y être, et l'écran « Écrire » ne vous fait pas disparaître le temps d'une ligne.
 Sous chaque ligne, ses réactions en pastilles (« 👍 3 », la vôtre cerclée de bleu).
-Les flippers parcourent les lignes, Start ouvre les options de la ligne choisie : « Réagir », les sept réactions par emoji en tuiles (👍 J'aime, ❤️ J'adore, 🥰 Solidaire, 😆 Haha, 😮 Waouh, 😢 Triste, 😡 Grrr ; une par joueur et par ligne, une autre la remplace, Start sur la sienne la retire), répondre (votre ligne commence par `@pseudo`), voir sa fiche ou son profil public, envoyer une demande d'ami, ignorer ce joueur dans les salons (ses lignes disparaissent, il n'est pas prévenu), bloquer.
+Les flippers parcourent les lignes, Start ouvre les options de la ligne choisie : « Réagir », les sept réactions par emoji en tuiles (👍 J'aime, ❤️ J'adore, 🥰 Solidaire, 😆 Haha, 😮 Waouh, 😢 Triste, 😡 Grrr ; une par joueur et par ligne, une autre la remplace, Start sur la sienne la retire), répondre (votre ligne commence par `@pseudo`), voir son profil, envoyer une demande d'ami, ignorer ce joueur dans les salons (ses lignes disparaissent, il n'est pas prévenu), bloquer.
 « Signaler ce message » l'envoie aux modérateurs (voir « Modération des salons »).
 
 **Supprimer sa ligne.**
@@ -699,6 +765,7 @@ Réglage : « Nouveaux messages de mes salons ».
 Une ligne qui cite votre pseudo, dans un salon qui n'est pas à l'écran, s'annonce par une notification (« Bruno vous cite · Salon France »), dans le front-end et par-dessus VPX en partie, sauf si « Mentions pendant les parties » est coupé ou si « Masquer les notifications pendant les parties » est choisi.
 Un clic ouvre ce salon.
 La porte du salon dans l'accueil et le médaillon Communauté comptent les mentions non lues.
+Elles comptent aussi dans la pastille des messages de l'écran des tables, une ligne par salon sur « Messages en attente ».
 
 **Réglages de la communauté.**
 Menu système > Amis > Réglages de la communauté : apparaître en ligne pour tous, salons activés ou désactivés (désactivés, ils restent visibles, grisés avec leur raison : pour la famille), salon par défaut (votre pays ou Monde), filtre de mots, mentions pendant les parties, nouveaux messages de mes salons (notification ou rien), phrases préparées, joueurs ignorés (à ne plus ignorer), règles des salons.
@@ -763,7 +830,7 @@ Chacun personnalise un avatar, visible de tous, amis ou non, partout où son nom
 Pour l'instant, c'est toujours une image à soi : une photo ou une image prise sur le disque, ou dans le navigateur intégré, recadrée aux boutons de la borne ([avatar.ts](../../packages/core/src/avatar.ts), écran `app/src/avatar-menu.ts`).
 
 - **Où il se voit.**
-  « Mes amis » (en ligne, l'anneau de la pastille est vert ; hors ligne, elle s'éteint), la fiche d'un ami (devant son nom), « Joueurs en ligne », les salons (leurs présents et leurs lignes), les tableaux des scores, les profils publics, « Trouver un joueur » et les résultats, « Demandes d'amis », « Depuis un ami », « Partage et réseau » (le vôtre), l'historique des parties (les joueurs de chaque partie en petites pastilles, puis chacun devant son rang), le salon, l'invitation et les résultats d'une partie en direct, la carte d'invitation et la bande des scores pendant la partie, et les notifications qui ne parlent que d'un joueur (« Bruno vient de se connecter »).
+  « Mes amis » (en ligne, l'anneau de la pastille est vert ; hors ligne, elle s'éteint), le profil d'un joueur (devant son nom, et ses personnes invitées), « Joueurs en ligne », les salons (leurs présents et leurs lignes), les tableaux des scores, « Trouver un joueur » et les résultats, « Demandes d'amis », « Depuis un ami », « Partage et réseau » (le vôtre), l'historique des parties (les joueurs de chaque partie en petites pastilles, puis chacun devant son rang), le salon, l'invitation et les résultats d'une partie en direct, la carte d'invitation et la bande des scores pendant la partie, et les notifications qui ne parlent que d'un joueur (« Bruno vient de se connecter »).
   Sans image : les initiales (« AM » pour « Alexis Martin ») sur une teinte sombre tirée de la clé, la même sur toutes les bornes.
   L'encart des scores au bas du plateau, trop petit pour des initiales lisibles, ne garde que la teinte.
 - **Choisir l'image.**

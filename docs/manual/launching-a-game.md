@@ -105,10 +105,39 @@ For `vpmInit`: from two calls in the code on (comments, strings, `object.vpmInit
 The table is not modified; a `.vbs` from elsewhere is fixed itself.
 Doctor finding "Script écrit pour un ancien core.vbs" (Script written for an older core.vbs) (`scriptCoreCompat`), repaired at installation and before each game (`PUP_PLAY_REPAIRS`); script readings move to version 8, so tables already installed are read again.
 When the text shows nothing (a single `vpmInit`, in a Sub called twice), the game stopped by that message gets the `.vbs` fixed right away (`repairScriptAfterStop`), and the failure screen says "Cyber Pinball a corrigé le script de la table (…) : relancez-la." (Cyber Pinball fixed the table's script (…): start it again.).
+**VR room drawn without the headset** (`vrRoomOnScreens`): a VR version of a table turns on its room (cabinet, room, 3D backglass) through a switch in its script; a hybrid table keeps it for the headset ("If RenderingMode = 2 or VRTest = 1"), but a version made for the headset only turns it on outright ("Const VR_Room = 1"), and a test switch left at 1 (`VRTest`, `LiveViewVRSim`) turns it on even in a hybrid table.
+On the screens, VPX then draws the whole room every frame although it is only of use in the headset.
+The rule spots these switches turned on outside any Sub (`VR_FLAG`), and Cyber Pinball's `.vbs` multiplies their value by `Abs(RenderingMode = 2)`, which is 1 in VR and 0 on the screens, on the same line (a `Const` becomes a variable).
+The doctor says so on the table's page ("Pièce VR dessinée hors du casque" (VR room drawn without the headset), action "Réserver la pièce VR au casque" (Keep the VR room for the headset)) and repairs it before every game; a protected script cannot be fixed: the finding advises the non-VR version, or the switch set to 0 in the VPX editor.
+Tests: `vr-hors-casque.test.ts`.
 Tests: `scriptcompat.test.ts` (detection, lines in place, run by `cscript` on a fake core.vbs: a single call to `vpmInit`, doctor, PuP-Pack, updated table, `.vbs` from elsewhere, stop message) and the `scriptCoreCompat` trap table.
 
 `node scripts/sonde-fenetres.mjs --exe … --ini … --table …` (after `npm run build`) lists every window of a game, hidden ones included, along with what the launcher would do with them; `--commande Edit` opens the table in the editor to check that the editor and the audit are recognized on real windows.
 Always on copies of the table and of VPinballX.ini.
+
+**DMD set for desktop mode.**
+A table that picks its DMD with a VPX menu option set by default for desktop mode (*JP's Space Cadet* v7.0: "DMD Type" on "Desktop DMD") left the DMD window black on a cabinet.
+On a cabinet with a DMD screen or zone, that option is switched to FlexDMD in the table's `.ini`, at installation and before each game (`PUP_PLAY_REPAIRS`), without overwriting a choice made in the VPX menu: see [DMD set for desktop mode](vpx-plugins-backglass-pup-and-dmd.md#dmd-set-for-desktop-mode).
+
+**ROM volume before and after the game.**
+Just before the game, Cyber Pinball sets the wanted volume in the ROM's memory (the player's choice, or the recommended volume instead of a low factory volume); afterwards, a volume changed at the coin door becomes the player's choice.
+Never during the game, nor in the double of a game between friends (the table copy used for that game), nor for "Régler l'affichage en partie" (Adjust the display during a game): see [ROM volume](sound.md#rom-volume).
+
+**Frame rate of every game.**
+A sluggish table left no trace: neither VPX's log nor the reports said how many frames per second the game held (11/17/2026: tables brought over from another installation were sluggish on one cabinet and not on another).
+The "CyberPinballDmd" VPX plugin, enabled in every game (see [DMD position during a game](vpx-plugins-backglass-pup-and-dmd.md#dmd-position-during-a-game)), now counts the rendered frames (`VPXPI_EVT_ON_PREPARE_FRAME`, [cadence.h](../../packages/vpx-vision3d/src/cadence.h)) and puts the gap between two frames in a histogram to the millisecond; the first 5 seconds (table preparation, first videos) do not count.
+
+- **In `vpinball.log`**: each stall (at least 100 ms between two frames) when it happens ("Cadence: stall of … ms at …s", the first 30), then a summary every minute and at the end of the game: `Cadence end: frames=… duration=…s fps=… p50=…ms p95=…ms p99=…ms max=…ms late=…% stalls=… worst10s=…fps mem=…MB`.
+  That is the frames per second, the median and the 95th and 99th percentiles of the gap, the longest gap, the share of late frames (more than 1.5 times the median), the stalls, the worst 10 s window and VPX's private memory; a `Cadence running` summary is an interim one.
+- **Read back after the game** (`noteGameCadence`, [app/src/game-cadence.ts](../../app/src/game-cadence.ts); parsing in [vpxcadence.ts](../../packages/core/src/vpxcadence.ts)): only what VPX wrote during this game; the end summary, otherwise the last interim one (VPX stopped before the end, crash).
+  The target frame rate is read at launch ("Synchronization mode: … with maximum FPS: …, display FPS: …": the smaller of the two; 60 if the line is missing).
+- **In the cabinet log**, one line in French: "Cadence de la partie (…) : tenue — … images/s pour … visées, médiane … ms, …", followed by the 99th percentile, the longest gap, the share of late frames, the stalls, the worst 10 s window, VPX's memory and the measured duration.
+  The verdict there is "tenue" (kept up), "RAME" (sluggish), "À-COUPS" (stutters), "RAME, avec des à-coups" (sluggish, with stutters) or "trop courte pour juger" (too short to judge); with no summary (plugin missing, game too short), the line says so.
+  Every cabinet report contains this log and VPX's log of the last game (see [Tech sheet](tech-sheet.md#tech-sheet)).
+- **Verdict** (`cadenceVerdict`): the game is sluggish if its average is under 90 % of the target, its worst 10 s window under 75 %, or if at least 10 % of the frames are late; it stutters from 3 stalls and at least one per minute; under 20 s of measured play, it is too short to judge.
+- **Record per table** (`recordGameCadence`): each judged game goes into `<données>\logs\cadence-parties.json` (the last 3 per table, 400 tables at most, the most recently played; atomic write), a game in the headset marked as such.
+  The doctor reads it to say that a table is sluggish on this cabinet (see [Cabinet health](cabinet-health.md#cabinet-health)).
+- **Bench and tests**: `scripts/banc-cadence.ps1` (the real VPX on the hidden desktop, the same table played with backglass and DMD windows of several sizes), `packages/vpx-vision3d/test/banc-cadence.cpp` (the counter alone), [cadence-partie.test.ts](../../packages/core/src/test/cadence-partie.test.ts) (summary read field by field, same format written by the plugin and read by Cyber Pinball, target frame rate, verdict, log line) and the `slowTable` trap in [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).
 
 ### Virtual reality
 

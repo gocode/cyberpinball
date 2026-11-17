@@ -318,6 +318,11 @@ export interface Row {
   progress?: { value?: number; tone?: Tone; busy?: boolean };
   /** Badges d'un joueur (profil public) : chacun dessiné dans sa forme et sa rareté (niveau.js), son nom dessous. */
   medals?: { icon: IconName; rarity: string; label: string }[];
+  /**
+   * Le badge dessiné à gauche de la ligne, à la place de l'icône (Mes badges, Badges les plus
+   * proches) : dans sa forme et sa rareté (niveau.js) ; reçu, il brille ; pas encore, il est gris et éteint.
+   */
+  medal?: { icon: IconName; rarity: string; earned: boolean };
   /** Schéma de l'écran du DMD à droite de la ligne (« Écran du DMD ») : FullDMD ou DMD seul en bande. */
   figure?: 'fulldmd' | 'dmd';
   /** Schéma des manettes du casque à gauche (légende du menu du casque) : ces commandes en vert ; vide, une case vide. */

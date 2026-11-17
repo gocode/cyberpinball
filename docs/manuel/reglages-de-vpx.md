@@ -17,4 +17,6 @@
   « Valeur par défaut » laisse la clé vide, la convention de VPX.
 - Par table (`openSettings({ scope: 'table', table })`) : le fichier `<table>.ini` à côté du .vpx, trouvé comme VPX le fait (nom de la table, sinon nom du dossier).
   Seules les valeurs différentes du réglage général y sont gardées, comme VPX ; un fichier vide est supprimé.
+  Pour une table qui joue une ROM, le groupe « Son » des Essentiels ajoute « Volume de la ROM » après les volumes de VPX : il n'est pas dans le `.ini` mais dans la mémoire de la ROM, que Cyber Pinball écrit hors partie (`RomVolumeControl`, voir [Volume de la ROM](son.md#volume-de-la-rom)).
+  L'écran ouvert seul (`--reglages --table=…`) l'a aussi.
   En bac à sable (`CYBERPINBALL_HOME`), il est écrit dans `<bac à sable>\sandbox\tables\` et jamais à côté du vrai .vpx.

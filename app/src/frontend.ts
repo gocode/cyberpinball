@@ -1181,10 +1181,7 @@ const library = createLibrary({
     return install ? path.join(vpxPrefDir(install.version), 'vpinball.log') : undefined;
   },
   pupFolder: () => IniDocument.parse(readTextIfExists(activeVpxIni(loc)) ?? '').get('Plugin.PUP', 'PUPFolder'),
-  playfieldOrientation: () => {
-    const cabinet = loadCabinet(loc.dataDir);
-    return cabinet ? playfieldOrientation(cabinet, observedDisplays(), readTextIfExists(activeVpxIni(loc))) : undefined;
-  },
+  playfieldOrientation: () => currentPlayfieldOrientation(),
   quit: () => void quit(),
   keys: () => KEYS,
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
@@ -4314,13 +4311,19 @@ function handleKey(input: Input, fromPhone = false): boolean {
  * option qui laisse le fronton vide ou faite pour une autre borne, script qui coupe le pack.
  * Seuls le pack et le .vbs de Cyber Pinball changent ; l'ancien va à la corbeille.
  */
+/** Playfield de la borne tel que VPX le verra (sens des tables) ; undefined sans configuration ni playfield branché. */
+function currentPlayfieldOrientation(): ReturnType<typeof playfieldOrientation> {
+  const cabinet = loadCabinet(loc.dataDir);
+  return cabinet ? playfieldOrientation(cabinet, observedDisplays(), readTextIfExists(activeVpxIni(loc))) : undefined;
+}
+
 function preparePupPack(table: TableEntry): void {
   if (!loc.root) return;
   const layout = layoutOf(loc.root);
   try {
     const done = repairPupForPlay(
       table,
-      { tablesDir: layout.tables, script: cachedScript(table.file, loc.dataDir), cabinet: pupCabinet(loadCabinet(loc.dataDir)) },
+      { tablesDir: layout.tables, script: cachedScript(table.file, loc.dataDir), cabinet: pupCabinet(loadCabinet(loc.dataDir)), orientation: currentPlayfieldOrientation() },
       { trashDir: trashDirFor(layout.trash, `Avant la partie ${path.basename(table.folder)}`) }, // i18n-ignore : nom de dossier
     );
     for (const f of done) console.log(`PuP-Pack (${table.id}) : ${f.title} → ${f.fix!.label}`);

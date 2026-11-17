@@ -15,6 +15,8 @@ La messagerie y est la même qu'à la borne (Menu système > Amis > Messages) : 
   Les messages de l'ami à gauche, les miens à droite en vert, en pointillés tant qu'ils attendent sa connexion, en ambre s'ils n'ont pas été remis ; les jours et les évènements de l'ami (records, badges) au centre ; les réactions sous leur message.
   C'est le même fil qu'à la borne (`threadItems`, partagé par les deux).
   La ligne d'état dit ce qui arrivera à ce qu'on écrit (« Nova est en ligne », hors ligne, refus) ; au-dessus du champ, les réactions au dernier message reçu et les phrases toutes prêtes, d'un appui.
+  **En train d'écrire** : sous le dernier message, qui écrit en ce moment, l'ami ou les membres d'un groupe (les pseudos, trois au plus puis « +2 », et trois points qui s'allument l'un après l'autre) ; de même sous le salon et la messagerie de la partie (voir « En train d'écrire » dans [Amis : le réseau des bornes](amis-le-reseau-des-bornes.md#messagerie)).
+  Le champ du téléphone l'envoie à son tour (`typing`, une fois par seconde au plus tant qu'il reste du texte, la borne n'en relayant qu'un toutes les 3 s) et l'arrête quand il est vidé, le message envoyé ou le fil quitté ; la borne vérifie l'ami, le groupe ou le salon.
   Ouvert au téléphone, le fil est lu, comme à la borne.
 - **Écrire** : dans le front-end, et pendant une partie si « Messagerie au téléphone pendant la partie » le permet.
   Le champ, 500 caractères au plus, part par la borne, qui vérifie l'ami, le texte et la réaction (`chat-send`, `chat-react`).

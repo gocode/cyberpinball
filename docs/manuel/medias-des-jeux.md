@@ -559,6 +559,8 @@ Pendant la navigation, Cyber Pinball dessine lui-même l'afficheur du DMD, comme
 Les points restent affichés en permanence : le média DMD de la table ne les remplace jamais, il se voit autour d'eux (cadre du FullDMD, ci-dessous).
 Réglage « DMD du front-end » de **Menu système > « Borne » > « DMD »** ( Start passe de l'un à l'autre, enregistré dans `<données>\medias.json`, champ `dmd`) : **vivant** par défaut, ou **classique** (le média de la table seul, sinon le DMD généré qui fait défiler son titre, comme avant).
 Ce média est celui de l'écran du DMD (`roleMedia`, `resolveMedia`) : sur un écran FullDMD, le média (FullDMD) de la table, et son (DMD) seulement s'il n'a pas de FullDMD ; sur un DMD seul, le (DMD) d'abord, le (FullDMD) à défaut.
+Quand la table a les deux, l'écran du DMD prend celui dont les proportions remplissent le mieux sa zone (`bestDmdMedia`, `dmdScreenAspect` : la zone du rôle dans le modèle de la borne, sinon 4:1 ou 16:9), quel que soit son libellé : un « (DMD) » en 21:9 repris de PinUP Popper passe devant un « (FullDMD) » en 16:9 sur un DMD 4:1, au lieu de laisser la moitié de l'écran vide.
+À égalité, ou si l'un des deux ne se mesure pas, l'ordre ci-dessus décide.
 Ce n'est jamais le DMD que la ROM produit en partie : la table ne tourne pas dans le front-end.
 
 | Page | Ce qu'elle montre | Durée |
@@ -757,7 +759,7 @@ Le médecin ([doctor.ts](../../packages/core/src/doctor.ts), fiche > « Diagnost
 | Constat | Quand | Correction |
 | --- | --- | --- |
 | Format que le front-end ne lit pas | `flv`, `f4v`, `avi`, `mov` (vérifié avec `canPlayType` dans Electron 44.5.1), `wmv`, `mpg`, `mpeg` (absents des formats de Chromium) ; ou format non prévu pour le type (`(Wheel)` en `jpg`, `(Loading)` en image…) | corbeille si une version lisible porte le même nom ; sinon, convertir (HandBrake) |
-| Afficheur rangé sous le mauvais type | `(DMD)` en 16:9, ou `(FullDMD)` en 4:1 : le front-end choisit DMD ou FullDMD d'après le type de l'écran du DMD (« Écran du DMD » ; sans réponse, ses proportions, frontière 8:3) | renommer dans l'autre type, si le nom est libre |
+| Afficheur rangé sous le mauvais type | `(DMD)` en 16:9, ou `(FullDMD)` en 4:1 (frontière 8:3), et le nom de l'autre type libre ; quand les deux noms sont pris, rien ne paraît : l'écran du DMD prend déjà celui qui le remplit le mieux (information, dans « À savoir ») | renommer dans l'autre type, en un geste |
 | Média mal nommé | `(Type) nom` dont le nom n'est ni celui d'un `.vpx` du dossier ni celui du dossier (pages comprises : `Nom 2`, `Nom_02`) ; fichier sans `(Type)` ni nom de VPinFE | renommer `(Type) <dossier>` (la page suivante libre pour le prospectus et les règles), sauf si `medias\` montre déjà ce type |
 | Média rangé hors de `medias\` | rangement de PinUP Popper (`POPMedia\…\Wheel\<jeu>.png`) ou de PinballX (`Media\Visual Pinball\Wheel Images\…`) dans le dossier de la table, ou `(Type) nom` posé à côté de la table ; les dossiers `pupvideos`, `pinmame`, `cache` et celui du DMD du script sont ignorés | ranger et renommer `medias\(Type) <dossier>.ext` ; l'arborescence vidée part à la corbeille |
 | Proportions différentes de l'écran | écart de plus de 15 % (`MEDIA_RATIO_TOLERANCE`, mesuré en rapport) avec la zone du rôle dans le modèle de borne : plateau recadré (seul le rapport des côtés compte, le front-end tourne le média ; un fichier presque carré ne dit pas où sont les flippers), bandes noires ou média en portrait sur un écran en paysage pour le fronton, le DMD et le topper, FullDMD montré réduit faute de DMD | — (information) |
@@ -765,6 +767,9 @@ Le médecin ([doctor.ts](../../packages/core/src/doctor.ts), fiche > « Diagnost
 | Médias en double | plusieurs fichiers d'un même type pour un même jeu (`.png` et `.webp`, nom du `.vpx` et nom du dossier, `(Wheel)` et `wheel.png` de VPinFE) : un seul est montré ; une version du dossier qui a son propre média n'est pas un doublon | corbeille des fichiers jamais montrés de même nature ; une image à côté d'une vidéo du même type est seulement signalée |
 | Média que le front-end n'a pas pu lire | erreur enregistrée par l'affichage dans le fichier des erreurs, pour un fichier inchangé depuis | corbeille pour un fichier abîmé ou refusé (décodage, format, image) ; seulement signalé pour une erreur de disque |
 
+**Pas de backglass** (`backglassMissing`) : une table sans `.directb2s` laisse l'écran du fronton au front-end pendant la partie ; le constat dit ce qu'il y montre vraiment, le média Backglass de la table (son nom), sinon son titre ou le média de fronton commun à la borne.
+Il se tait quand la borne n'a pas d'écran de fronton, ou quand un PuP-Pack de la table occupe le fronton (`pupShowsBackglass`) ; une table VR dont la pièce a son propre fronton (`tableHasVrRoom`) n'est pas invitée à recevoir un `.directb2s`.
+**À savoir** : les informations sans rien à régler dans Cyber Pinball (proportions d'un média, fronton absent, afficheur dont les deux noms sont pris) portent `note` ; le Diagnostic et la vérification d'une table ajoutée les montrent à part, en bas, dans une section « À savoir », sans « Ignorer », si bien que la vérification d'une table reprise ne garde en tête que ce qui se répare.
 Chaque correction est sûre : renommer, déplacer dans `medias\`, ou mettre à la corbeille (`trash\`) ; rien n'est converti ni supprimé.
 « Tout réparer » enchaîne les corrections sans qu'elles visent deux fois le même fichier ; ce qui dépend d'un renommage (le type d'un afficheur mal nommé, par exemple) est vérifié à l'analyse suivante.
 

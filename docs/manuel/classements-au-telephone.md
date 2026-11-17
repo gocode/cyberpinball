@@ -4,6 +4,7 @@
 
 La vue **Scores** de la page du téléphone (onglet Communauté) montre le tableau des scores de chaque table, exactement comme à la borne (fiche de la table > « Tableau des scores ») : les portées **Cette borne**, **Amis**, **National** et **Mondial**, les quatre périodes (tout temps, cette année, cette semaine, aujourd'hui), le rang, le drapeau, la pastille du joueur avec sa marque de présence, le nom et le score.
 Lecture seule : « Masquer un score… » reste à la borne.
+C'est, au téléphone, la porte « Tables » des Classements de la borne (Communauté > Classements > Tables, puis une table) ; la porte « Joueurs », le classement des joueurs par leurs XP, ne se montre qu'à la borne (voir « Le médaillon Communauté » dans [Amis](amis-le-reseau-des-bornes.md#amis--le-réseau-des-bornes)).
 
 - **Quelle table** : celle que la borne a choisie sur la roue, ou lancée pendant une partie, s'ouvre par défaut, marquée « À la borne » ; la page la suit quand la roue tourne.
   Le bouton de la table, en tête, ouvre la liste de toutes les tables (un champ « Chercher une table » au-delà de huit) ; une autre table choisie reste, même quand la roue tourne, jusqu'à ce qu'on choisisse de nouveau celle de la borne.
