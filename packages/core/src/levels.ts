@@ -562,6 +562,19 @@ export function plausibleXp(days: number): number {
   return START_XP_MAX + BADGES_XP_ALL + d * (DAILY_PLAY_CAP + DAILY_SOCIAL_CAP) + Math.ceil(d / 7) * WEEK_RANKING_MAX;
 }
 
+/**
+ * XP au plus en une semaine (classement des joueurs de la semaine, playerranking.ts) : sept jours de
+ * jeu et de vie sociale au plafond, les classements de la semaine d'avant versés le mardi, et tous les
+ * badges d'un coup (la première semaine d'un joueur les reçoit avec son niveau de départ, hors départ).
+ */
+export const WEEK_XP_MAX = BADGES_XP_ALL + 7 * (DAILY_PLAY_CAP + DAILY_SOCIAL_CAP) + WEEK_RANKING_MAX;
+
+/** Les niveaux sont arrivés ce jour-là (0.1.14-essai.34) : personne n'a pu gagner d'XP avant. */
+export const LEVELS_SINCE = '2026-11-17T00:00:00Z';
+
+/** Le total qu'aucun joueur ne peut avoir dépassé à cette date, quelle que soit son ancienneté. */
+export const levelsXpCeiling = (now: Date): number => plausibleXp((now.getTime() - Date.parse(LEVELS_SINCE)) / 86_400_000);
+
 /** Le niveau à montrer d'un autre joueur : undefined (« ? ») s'il n'est pas vraisemblable. */
 export function shownLevel(xp: number | undefined, firstSeen: string | undefined, now: Date): number | undefined {
   if (xp === undefined) return undefined;

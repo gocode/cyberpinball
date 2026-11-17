@@ -60,6 +60,12 @@ export interface PublicCard {
   records: number;
   /** XP du joueur (levels.ts) : son niveau ; absents d'une carte faite avant les niveaux. */
   xp?: number;
+  /**
+   * XP gagnés pendant sa semaine (levels.ts, weekXp), et le lundi qui l'ouvre (weekKey) : le
+   * classement des joueurs de la semaine (playerranking.ts, 17/11/2026). Absents d'une carte d'avant ;
+   * une semaine passée ne compte plus.
+   */
+  week?: CardWeek;
   /** Nombre de ses amis (jamais la liste). */
   friends?: number;
   events: PublicEvent[];
@@ -67,6 +73,12 @@ export interface PublicCard {
   likes: Record<string, number>;
   at: string;
   sig: string;
+}
+
+/** Les XP d'une semaine : `of`, le lundi qui l'ouvre (AAAA-MM-JJ, à l'heure de la borne). */
+export interface CardWeek {
+  of: string;
+  xp: number;
 }
 
 export interface Like {
@@ -101,14 +113,15 @@ export const profilesFile = (dataDir: string) => path.join(dataDir, 'amis', 'pro
 const isIso = (v: unknown): v is string => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
 const isEventId = (v: unknown): v is string => typeof v === 'string' && v.length >= 1 && v.length <= 120 && !/[\x00-\x1f]/.test(v);
 const isCountry = (v: unknown): v is string => typeof v === 'string' && /^[A-Z]{2}$/.test(v);
+const isDayKey = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
 const DAY = 86_400_000;
 
 // ---------------------------------------------------------------------------
 // Carte : faire, signer, vérifier
 
 function cardText(c: Omit<PublicCard, 'sig'>): string {
-  // Niveau et amis n'entrent au texte que s'ils y sont : les cartes d'avant se vérifient toujours.
-  return JSON.stringify({ app: 'cyberpinball', kind: 'card', key: c.key, name: c.name, country: c.country ?? null, avatar: c.avatar ?? null, badges: c.badges, records: c.records, events: c.events, likes: c.likes, at: c.at, ...(c.xp !== undefined ? { xp: c.xp } : {}), ...(c.friends !== undefined ? { friends: c.friends } : {}) });
+  // Niveau, semaine et amis n'entrent au texte que s'ils y sont : les cartes d'avant se vérifient toujours.
+  return JSON.stringify({ app: 'cyberpinball', kind: 'card', key: c.key, name: c.name, country: c.country ?? null, avatar: c.avatar ?? null, badges: c.badges, records: c.records, events: c.events, likes: c.likes, at: c.at, ...(c.xp !== undefined ? { xp: c.xp } : {}), ...(c.friends !== undefined ? { friends: c.friends } : {}), ...(c.week ? { week: { of: c.week.of, xp: c.week.xp } } : {}) });
 }
 
 /** Mes évènements publics : records et badges des derniers jours, du plus récent au plus ancien. */
@@ -121,14 +134,14 @@ export function publicEvents(events: readonly SocialEvent[], now = new Date()): 
 }
 
 /** Ma carte, signée : les « J'aime » reçus sur ses évènements comptés à l'instant. */
-export function makeCard(state: Pick<SocialState, 'key' | 'name' | 'events' | 'badges'>, store: ProfileStore, extra: { country?: string; avatar?: string; records: number; xp?: number; friends?: number }, now = new Date()): PublicCard {
+export function makeCard(state: Pick<SocialState, 'key' | 'name' | 'events' | 'badges'>, store: ProfileStore, extra: { country?: string; avatar?: string; records: number; xp?: number; week?: CardWeek; friends?: number }, now = new Date()): PublicCard {
   const events = publicEvents(state.events, now);
   const likes: Record<string, number> = {};
   for (const e of events) {
     const n = store.received.filter((l) => l.event === e.id && l.on && !store.hidden.includes(l.from)).length;
     if (n) likes[e.id] = n;
   }
-  const base: Omit<PublicCard, 'sig'> = { key: state.key.publicKey, name: state.name, ...(extra.country ? { country: extra.country } : {}), ...(extra.avatar ? { avatar: extra.avatar } : {}), badges: state.badges.map((b) => b.id), records: extra.records, events, likes, at: now.toISOString(), ...(extra.xp !== undefined ? { xp: Math.max(0, Math.floor(extra.xp)) } : {}), ...(extra.friends !== undefined ? { friends: extra.friends } : {}) };
+  const base: Omit<PublicCard, 'sig'> = { key: state.key.publicKey, name: state.name, ...(extra.country ? { country: extra.country } : {}), ...(extra.avatar ? { avatar: extra.avatar } : {}), badges: state.badges.map((b) => b.id), records: extra.records, events, likes, at: now.toISOString(), ...(extra.xp !== undefined ? { xp: Math.max(0, Math.floor(extra.xp)) } : {}), ...(extra.friends !== undefined ? { friends: extra.friends } : {}), ...(extra.week && isDayKey(extra.week.of) ? { week: { of: extra.week.of, xp: Math.max(0, Math.min(Math.floor(extra.week.xp), extra.xp ?? Infinity)) } } : {}) };
   return { ...base, sig: signText(cardText(base), state.key) };
 }
 
@@ -177,7 +190,15 @@ export function verifyCard(raw: unknown, now = new Date()): PublicCard | undefin
   }
   const count = (v: unknown, max: number) => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= max ? v : undefined);
   if ((r.xp !== undefined && count(r.xp, 100_000_000) === undefined) || (r.friends !== undefined && count(r.friends, 100_000) === undefined)) return undefined;
-  const card: PublicCard = { key: r.key, name, ...(r.country ? { country: r.country as string } : {}), ...(r.avatar ? { avatar: r.avatar as string } : {}), badges: r.badges as string[], records: r.records, events: events as PublicEvent[], likes, at: r.at, ...(r.xp !== undefined ? { xp: r.xp as number } : {}), ...(r.friends !== undefined ? { friends: r.friends as number } : {}), sig: r.sig };
+  // La semaine : un lundi et des XP, jamais plus que le total de la carte.
+  let week: CardWeek | undefined;
+  if (r.week !== undefined) {
+    const w = r.week && typeof r.week === 'object' && !Array.isArray(r.week) ? (r.week as Record<string, unknown>) : undefined;
+    const wxp = count(w?.xp, 100_000_000);
+    if (!w || !isDayKey(w.of) || wxp === undefined || (r.xp !== undefined && wxp > (r.xp as number))) return undefined;
+    week = { of: w.of, xp: wxp };
+  }
+  const card: PublicCard = { key: r.key, name, ...(r.country ? { country: r.country as string } : {}), ...(r.avatar ? { avatar: r.avatar as string } : {}), badges: r.badges as string[], records: r.records, events: events as PublicEvent[], likes, at: r.at, ...(r.xp !== undefined ? { xp: r.xp as number } : {}), ...(r.friends !== undefined ? { friends: r.friends as number } : {}), ...(week ? { week } : {}), sig: r.sig };
   const { sig, ...base } = card;
   return verifyText(cardText(base), sig, card.key) ? card : undefined;
 }

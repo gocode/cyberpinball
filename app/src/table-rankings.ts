@@ -77,6 +77,20 @@ export interface TableRankings {
   view(table: TableEntry, scope: Exclude<RankingScope, 'cabinet'>, period: ScorePeriod): RankingView;
 }
 
+/**
+ * Statut d'un autre joueur : « En partie » ou « En ligne » quand sa borne est reliée à la mienne,
+ * « Hors ligne » pour un ami qui ne l'est pas, sinon sa dernière apparition sur le réseau. Partagé
+ * par les classements des tables et celui des joueurs (rankings-menu.ts).
+ */
+export function playerStatus(net: Pick<TableRankingsOptions['net'], 'online' | 'presenceOf'>, state: SocialState, key: string, now: Date): PlayerStatus | undefined {
+  const online = net.online?.(key) ?? false;
+  const friend = relationOf(state, key) === 'friend';
+  if (online) return friend && net.presenceOf?.(key)?.status === 'playing' ? { state: 'playing', label: t('En partie') } : { state: 'online', label: t('En ligne') };
+  if (friend) return { state: 'offline', label: t('Hors ligne') };
+  const seen = state.directory.find((d) => d.profile.key === key)?.seen;
+  return seen ? { state: 'seen', label: t('Vu {ago}', { ago: socialAgo(seen, now) }) } : undefined;
+}
+
 export function createTableRankings(opts: TableRankingsOptions): TableRankings {
   /** Version de chaque table, par fichier : calculée une fois par lancement (le .vpx peut changer, la borne redémarre). */
   const versions = new Map<string, Version>();
@@ -113,15 +127,7 @@ export function createTableRankings(opts: TableRankingsOptions): TableRankings {
     const face = { ...avatarView(line.key, line.name, file), ...(level ? { level } : {}) };
     const rank = { ...(level ? { level } : {}), ...(line.xp !== undefined && !level ? { levelUnsure: true as const } : {}) };
     if (line.mine) return { ...line, face, ...rank };
-    const online = net.online?.(line.key) ?? false;
-    const friend = relationOf(state, line.key) === 'friend';
-    let status: PlayerStatus | undefined;
-    if (online) status = friend && net.presenceOf?.(line.key)?.status === 'playing' ? { state: 'playing', label: t('En partie') } : { state: 'online', label: t('En ligne') };
-    else if (friend) status = { state: 'offline', label: t('Hors ligne') };
-    else {
-      const seen = state.directory.find((d) => d.profile.key === line.key)?.seen;
-      if (seen) status = { state: 'seen', label: t('Vu {ago}', { ago: socialAgo(seen, now) }) };
-    }
+    const status = playerStatus(net, state, line.key, now);
     return { ...line, face, ...rank, ...(status ? { status } : {}) };
   }
 

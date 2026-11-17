@@ -55,8 +55,9 @@ test('mode invité : chaque porte déclarée sert dans app/src (aucune porte mor
 
 test('mode invité : chaque action de la fiche déclare sa porte, et une action sans porte est cachée', () => {
   const library = read('library.ts');
+  const types = read('library-types.ts');
   // Le type oblige chaque action de la fiche (Jouer, pages, PuP-Pack…) à dire sa porte.
-  assert.match(library, /type SheetAction = Action & \{ door: GuestDoor \};/);
+  assert.match(types, /type SheetAction = Action & \{ door: GuestDoor \};/);
   const sheet = library.slice(library.indexOf('function buildSheet('), library.indexOf('function pagesAction('));
   assert.match(sheet, /const actions: SheetAction\[\] = \[/, 'buildSheet : actions typées SheetAction');
   assert.match(sheet, /const missing: SheetAction\[\]/);
@@ -66,7 +67,7 @@ test('mode invité : chaque action de la fiche déclare sa porte, et une action 
   // Le filtre : en mode invité, seules les actions à porte ouverte (une action sans porte ne passe pas).
   assert.match(library, /host\.guest\.active \? \{ \.\.\.built, actions: built\.actions\.filter\(\(a\) => host\.guest\.allows\(a\.door\)\) \}/);
   // Seuls la fiche, ses pages et son tableau des scores s'ouvrent ; tout autre écran passe par une porte fermée.
-  const screens = /const GUEST_SCREENS: [^=]+= \{([^}]*)\};/.exec(library)?.[1];
+  const screens = /const GUEST_SCREENS: [^=]+= \{([^}]*)\};/.exec(types)?.[1];
   assert.equal(screens?.trim(), "sheet: 'menu.sheet', pages: 'sheet.read', scores: 'sheet.scores'");
   assert.match(library, /if \(!host\.guest\.knock\(GUEST_SCREENS\[next\.kind\]\)\) return;/);
   assert.match(library, /!host\.guest\.knock\('files\.drop'\)/);

@@ -34,6 +34,7 @@ import {
   startLevels,
   startXp,
   weekKey,
+  weekXp,
   type BadgeFacts,
   type Celebration,
   type GameFacts,
@@ -102,6 +103,12 @@ export function createLevelTracker(host: LevelTrackerHost): LevelTracker {
   if (frozen) host.log('Niveau : fichier d’une version plus récente de Cyber Pinball, montré sans être complété.'); // i18n-ignore : journal
   let state: LevelState = frozen ? emptyLevels() : loaded.state;
   let gain: PlayerLevel['gain'];
+
+  /** Mes XP, et ceux de la semaine en cours, à ma carte publique (classement des joueurs, playerranking.ts). */
+  function publishLevel(): void {
+    const at = now();
+    host.net.setLevel(state.xp, { of: weekKey(at), xp: weekXp(state, at) });
+  }
   let timer: NodeJS.Timeout | undefined;
 
   function save(): void {
@@ -170,7 +177,7 @@ export function createLevelTracker(host: LevelTrackerHost): LevelTracker {
     const shown = granted.silent ? [] : badges;
     if (shown.length || levelOf(state.xp).level > levelOf(from).level) state = celebrate(state, from, shown, now());
     if (total) gain = { xp: total, from, at: Date.now() };
-    host.net.setLevel(state.xp);
+    publishLevel();
     save();
     host.log(`Niveau : +${total} XP (${why}${badges.length ? ` ; badges : ${badges.join(', ')}` : ''}) ; niveau ${levelOf(state.xp).level}, ${state.xp} XP.`); // i18n-ignore : journal
     host.changed();
@@ -223,6 +230,8 @@ export function createLevelTracker(host: LevelTrackerHost): LevelTracker {
       state = settled.state;
       save();
     }
+    // Un lundi passé sans partie : ma carte annonce la nouvelle semaine, à zéro (setLevel ne renvoie rien d'inchangé).
+    publishLevel();
   }
   const pick = (s: { world?: Place; country?: Place; friends?: Place }) => ({ ...(s.world ? { world: s.world } : {}), ...(s.country ? { country: s.country } : {}), ...(s.friends ? { friends: s.friends } : {}) });
 
@@ -244,11 +253,11 @@ export function createLevelTracker(host: LevelTrackerHost): LevelTracker {
       if (badges.length) state = badgeGains(state, badges.map((id) => ({ id, xp: badgeXp(id) })), at).state;
       // Le moment du départ : niveau atteint et badges déjà mérités, en cascade.
       state = { ...state, pending: { badges, from: 0, to: state.xp, at: at.toISOString(), start: true } };
-      host.net.setLevel(state.xp);
+      publishLevel();
       save();
       host.log(`Niveau : niveau de départ ${levelOf(state.xp).level} (${state.xp} XP, ${badges.length} badges).`); // i18n-ignore : journal
     } else {
-      host.net.setLevel(state.xp);
+      publishLevel();
       apply(state, [], 'démarrage'); // i18n-ignore : journal
     }
     noteRankings();

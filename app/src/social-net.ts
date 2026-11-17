@@ -169,6 +169,7 @@ import {
   verifyCard,
   verifyLike,
   type Like,
+  type CardWeek,
   type PublicCard,
   parseSocialMessage,
   peerProfile,
@@ -459,8 +460,8 @@ export interface SocialNet {
    * nouvelle série du catalogue).
    */
   checkBadges(facts: BadgeFacts): { events: SocialEvent[]; fresh: EarnedBadge[]; silent: boolean };
-  /** Mes XP (levels.ts) : ils partent avec ma carte publique et mes scores publiés. */
-  setLevel(xp: number): void;
+  /** Mes XP (levels.ts) : ils partent avec ma carte publique et mes scores publiés ; `week`, ceux de ma semaine (classement des joueurs). */
+  setLevel(xp: number, week?: CardWeek): void;
   /** « J'aime » que j'ai donnés (et pas retirés). */
   likesGiven(): number;
   /** « J'aime » reçus et réactions reçues sur mes lignes de salon, par identifiant (levels.ts, receivedGains). */
@@ -549,6 +550,8 @@ export interface SocialNet {
    * ligne ; la mienne pour ma clé (undefined si mon profil public est coupé).
    */
   publicCard(key: string): PublicCard | undefined;
+  /** Toutes les cartes reçues des autres joueurs (classement des joueurs), sans celles que je masque ni d'un joueur bloqué. */
+  publicCards(): PublicCard[];
   /** Quand sa carte a été reçue pour la dernière fois (ISO). */
   cardSeen(key: string): string | undefined;
   /** Première fois que cette borne a reçu la carte d'un joueur (vraisemblance de son niveau). */
@@ -1579,6 +1582,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   /** Mes XP (levels.ts), donnés par le suivi du niveau ; absents tant qu'il ne les a pas calculés. */
   let myXp: number | undefined;
+  /** Mes XP de la semaine, et son lundi (levels.ts, weekXp et weekKey). */
+  let myWeek: CardWeek | undefined;
 
   /** Ma carte publique, signée maintenant ; undefined si le partage ou le profil public est coupé. */
   function ownCard(): PublicCard | undefined {
@@ -1586,7 +1591,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     const country = myCountry();
     const avatar = ownAvatarHash();
     const records = rankings.scores.filter((s) => s.key === state.key.publicKey).length;
-    return makeCard(state, profiles, { ...(country ? { country } : {}), ...(avatar ? { avatar } : {}), records, ...(myXp !== undefined ? { xp: myXp } : {}), friends: state.friends.length }, now());
+    return makeCard(state, profiles, { ...(country ? { country } : {}), ...(avatar ? { avatar } : {}), records, ...(myXp !== undefined ? { xp: myXp } : {}), ...(myWeek ? { week: myWeek } : {}), friends: state.friends.length }, now());
   }
 
   const greetedLinks = (except?: string) => [...peers.values()].filter((p) => p.key !== except).map((p) => bestLink(p.key)).filter((l): l is Link => !!l?.greeted);
@@ -2136,9 +2141,10 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       if (granted.fresh.length) announceCard();
       return { events: granted.events, fresh: granted.fresh, silent: granted.silent };
     },
-    setLevel(xp) {
-      if (myXp === xp) return;
+    setLevel(xp, week) {
+      if (myXp === xp && myWeek?.of === week?.of && myWeek?.xp === week?.xp) return;
       myXp = xp;
+      myWeek = week;
       announceCard();
     },
     likesGiven: () => profiles.given.filter((l) => l.on).length,
@@ -2153,6 +2159,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     publicCard: (key) => (key === state.key.publicKey ? ownCard() : profiles.hidden.includes(key) ? undefined : cardOf(profiles, key)),
     cardSeen: (key) => profiles.seen[key],
     cardFirstSeen: (key) => profiles.first?.[key],
+    publicCards: () => profiles.cards.filter((c) => c.key !== state.key.publicKey && !profiles.hidden.includes(c.key) && !shunned(c.key)),
     like(key, event, on) {
       if (key === state.key.publicKey || shunned(key)) return;
       profiles = giveLike(profiles, signLike(state.key, state.name, key, event, on, now()));

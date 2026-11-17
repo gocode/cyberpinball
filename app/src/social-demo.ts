@@ -57,7 +57,7 @@
 import { generateKeyPairSync } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { acknowledge, addEvent, addToHistory, newChatState, presenceTable, readAvatarImage, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, PUP_FOLDER, readHostSettings, receiveLines, saveChat, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, toWire, verifyWire, writeLine, type LiveGame, type SocialState, type TableEntry, signCharter, type Charter, type Reaction } from '@cyberpinball/core';
+import { acknowledge, addEvent, addToHistory, newChatState, presenceTable, readAvatarImage, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, PUP_FOLDER, readHostSettings, receiveLines, saveChat, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, toWire, verifyWire, weekKey, writeLine, type LiveGame, type SocialState, type TableEntry, signCharter, type Charter, type Reaction } from '@cyberpinball/core';
 import { createChatService, type ChatService } from './chat-service';
 import { createGroupService, type GroupService } from './group-service';
 import { createFriendContent, type FriendContent } from './friend-content';
@@ -339,6 +339,17 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       if (playing) net.setPresence({ status: 'playing', table: DEMO_TABLES.brunoPlays, since: new Date(Date.now() - 8 * 60_000).toISOString() });
       strangers.push(net);
     }
+    // Classements > Joueurs : des XP de tout temps et de la semaine sur leurs cartes (inventés).
+    const week = weekKey(new Date());
+    const levels: [SocialNet, number, number][] = [
+      [bruno, 9_880, 2_015],
+      [dora, 4_400, 310],
+      [strangers[0]!, 12_210, 1_240],
+      [strangers[1]!, 7_760, 0],
+      [strangers[2]!, 10_105, 2_480],
+      [strangers[3]!, 5_300, 880],
+    ];
+    for (const [net, xp, gained] of levels) net.setLevel(xp, { of: week, xp: gained });
     // Salon France : ils y entrent (règles acceptées), écrivent quelques lignes, Bruno cite la borne.
     const room = 'pays-FR';
     const say = (net: SocialNet, text: string, ms: number, action = false) => timersLater.push(setTimeout(() => void net.roomSend(room, text, action), ms));

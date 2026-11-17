@@ -3110,8 +3110,9 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   --level-col: max-content;
 }
 
+/* Du texte : sur la ligne de base des autres colonnes (le rang, le nom, le score), pas centré comme le drapeau. */
 .lib-scoreboard .scoreboard-level {
-  align-self: center;
+  align-self: baseline;
   display: flex;
   justify-content: flex-start;
 }

@@ -176,6 +176,7 @@ export * from './chat';
 export * from './groups';
 export * from './reactions';
 export * from './publicprofile';
+export * from './playerranking';
 export * from './livepresence';
 export * from './rooms';
 export * from './typing';

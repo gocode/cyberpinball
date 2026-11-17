@@ -11,6 +11,9 @@ son interface).
 
 ## 0.1.14
 
+- Classements : l'écran s'ouvre sur deux portes, « Joueurs » et « Tables ».
+- Classements > Joueurs : les joueurs classés par leurs XP, entre amis, dans votre pays et dans le monde, de la semaine (à zéro chaque lundi) ou de tout temps ; votre place reste toujours visible.
+- Classements > Tables : toutes vos tables apparaissent, les dernières jouées d'abord, puis de A à Z ; une table sans classement reste dans la liste, grisée, avec sa raison, et une recherche par nom les filtre.
 - Un seul écran par joueur : la fiche d'un ami et son profil public ne font plus qu'un. Le profil d'un ami montre en plus sa présence, sa bibliothèque et ses parties jouées, dans la même liste d'activité que ses records et badges à aimer, avec l'invitation à une partie et « Retirer de mes amis ». Mes amis, l'annuaire, la messagerie, les salons, les groupes et l'Activité récente y mènent tous directement.
 - En-tête homogène : la roue dentée du Menu système est désormais une pastille ronde, de la même taille et à la même hauteur que les pastilles des badges et des amis, avec le même survol ; elle n'est plus décalée par rapport à elles.
 - La carte du joueur (avatar, niveau, barre d'XP) et la pastille des badges restent affichées en haut des écrans pleins (Menu système, Mes badges, aide…), et plus seulement sur l'écran des tables.

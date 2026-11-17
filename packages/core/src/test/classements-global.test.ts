@@ -1,13 +1,13 @@
-// Classements de toutes mes tables (app/src/rankings-menu.ts), la porte « Classements » de l'accueil
-// Communauté. Elle ouvrait le tableau des scores de la table restée choisie dans la roue (retour du
-// 13/11/2026 : « pourquoi 2001, l’Odyssée de l’espace ? »). Ces tests fixent la classe :
-// - l'écran parle de toutes les tables, jamais d'une seule ; une ligne par table qui a des scores,
-//   avec le premier, son score, le nombre de joueurs et ma place ; les tables sans score se comptent ;
+// Communauté > Classements (app/src/rankings-menu.ts). Deux retours d'essai fixent la classe :
+// - 13/11/2026 : la porte ouvrait le tableau des scores de la table restée choisie dans la roue ;
+// - 17/11/2026 : « ça me montre les classements d'un jeu, et pas des autres » : seules les tables
+//   déjà classées avaient une ligne. Désormais :
+// - l'accueil propose deux portes, « Joueurs » (par XP) et « Tables » ;
+// - « Tables » montre TOUTES les tables : les dernières jouées d'abord, puis de A à Z ; une table sans
+//   classement reste dans la liste, grisée, avec sa raison ; une recherche par nom les filtre ;
 // - les quatre portées en onglets (MagnaSave passe à la suivante), la période se choisit ;
-// - une portée sans réseau (partage désactivé) est grisée avec sa raison, et l'écran s'ouvre alors
-//   sur « Cette borne » ;
 // - Start sur une table ouvre son tableau des scores à la même portée et à la même période, dont le
-//   « Retour » revient aux classements.
+//   « Retour » revient à la liste des tables.
 
 import assert from 'node:assert/strict';
 import * as path from 'node:path';
@@ -18,29 +18,41 @@ import { setLanguage, type RankingScope, type ScorePeriod, type TableEntry } fro
 interface Built {
   heading: string;
   subheading?: string;
-  sections: { title?: string; rows: { text: string; detail?: string; tone?: string; action?: number }[] }[];
-  actions: { label: string; run: () => void }[];
+  sections: { title?: string; rows: { text: string; detail?: string; tone?: string; action?: number; aside?: string }[] }[];
+  actions: { label: string; detail?: string; tone?: string; run: () => void }[];
   tabs?: { label: string; count: string; current: boolean; disabled?: boolean; action: number }[];
   back: () => void;
   keys?: (input: { code: string }) => boolean;
 }
 
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { createRankingsMenu } = require(path.join(REPO_ROOT, 'app', 'dist', 'rankings-menu.js')) as {
+const { createRankingsMenu, matchesSearch } = require(path.join(REPO_ROOT, 'app', 'dist', 'rankings-menu.js')) as {
   createRankingsMenu(host: object): { open(back: () => void): void; detail(): string };
+  matchesSearch(title: string, query: string): boolean;
 };
 
-const table = (title: string, file: string): TableEntry => ({ id: file, emulator: 'vpx', file: path.join('D:', 'Borne', 'tables', file), folder: path.join('D:', 'Borne', 'tables'), title, manufacturer: 'Studio Exemple', year: 2025, infoFile: '', info: {} }) as TableEntry;
-const TABLES = [table('Atlas Rising', 'atlas.vpx'), table('Copper Comet', 'copper.vpx'), table('Lunar Diner', 'lunar.vpx')];
+const NOW = new Date('2026-11-17T18:00:00');
+const table = (title: string, file: string, lastRun?: string): TableEntry =>
+  ({ id: file, emulator: 'vpx', file: path.join('D:', 'Borne', 'tables', file), folder: path.join('D:', 'Borne', 'tables'), title, manufacturer: 'Studio Exemple', year: 2025, infoFile: '', info: lastRun ? { User: { LastRun: lastRun } } : {} }) as TableEntry;
+const TABLES = [table('Atlas Rising', 'atlas.vpx'), table('Copper Comet', 'copper.vpx'), table('Lunar Diner', 'lunar.vpx', '2026-11-16T21:00:00')];
+
+const rowsOf = (b: Built) => b.sections.flatMap((s) => s.rows);
+const go = (b: Built, label: string) => {
+  const a = b.actions.find((x) => x.label === label);
+  assert.ok(a, `action « ${label} »`);
+  a.run();
+};
 
 function harness(opts: { sharing?: boolean } = {}) {
   let screen: (() => Built) | undefined;
   const opened: { title: string; scope: RankingScope; period: ScorePeriod; back: () => void }[] = [];
+  const prompts: { value: string; done: (v: string | undefined) => void }[] = [];
   const line = (rank: number, name: string, score: number, mine = false) => ({ rank, key: name, name, country: 'FR', score, at: '2026-11-13T20:00:00Z', how: 'rom', id: `${name}-${score}`, ...(mine ? { mine: true } : {}), face: {} });
   const menu = createRankingsMenu({
     library: {
       openCustom: (build: () => Built) => (screen = build),
       openScores: (t: TableEntry, scope: RankingScope, period: ScorePeriod, back: () => void) => opened.push({ title: t.title, scope, period, back }),
+      openPrompt: (_h: string, _l: string, value: string, done: (v: string | undefined) => void) => prompts.push({ value, done }),
     },
     tables: () => TABLES,
     local: (t: TableEntry) => (t.title === 'Lunar Diner' ? { lines: [{ rank: 1, score: 4_200_000, initials: 'JUL', at: '2026-11-12T20:00:00Z' }], games: 3, tableBoard: true, everyGame: true, romWithoutMap: false } : { lines: [], games: 0, tableBoard: false, everyGame: false, romWithoutMap: false }),
@@ -52,49 +64,101 @@ function harness(opts: { sharing?: boolean } = {}) {
     },
     zoneKeys: () => ['ControlLeft', 'ControlRight'],
     openSharing: () => undefined,
+    now: () => NOW.getTime(),
   });
-  return { menu, opened, built: () => screen!() };
+  return { menu, opened, prompts, built: () => screen!() };
 }
 
-test('« Classements » : toutes les tables, une ligne par table classée, jamais une seule table', () => {
+test('« Classements » : l’accueil propose deux portes, Joueurs et Tables', () => {
   setLanguage('fr');
   const h = harness();
   let backed = false;
   h.menu.open(() => (backed = true));
   const b = h.built();
   assert.equal(b.heading, 'Classements');
-  assert.equal(b.subheading, 'Mondial · Tout temps');
-  assert.match(h.menu.detail(), /Toutes vos tables/);
-  const rows = b.sections.flatMap((s) => s.rows);
-  const atlas = rows.find((r) => r.text === 'Atlas Rising');
-  assert.ok(atlas, 'la table classée a sa ligne');
-  assert.match(atlas.detail ?? '', /^1\. Kiko · 12.345.678 · 14 joueurs · vous êtes 2ᵉ$/u);
-  assert.ok(!rows.some((r) => r.text === 'Copper Comet'), 'une table sans score n’a pas de ligne');
-  assert.ok(rows.some((r) => /1 autre table sans score/.test(r.text)), 'elle se compte');
-  assert.ok(rows.some((r) => /Empreinte de 1 table en calcul/.test(r.text)), 'une empreinte en calcul se dit');
-  // Les quatre portées en onglets, le mondial ouvert.
-  assert.deepEqual(b.tabs?.map((t) => t.label), ['Cette borne', 'Amis', 'National', 'Mondial']);
-  assert.equal(b.tabs?.find((t) => t.current)?.label, 'Mondial');
-  // Start sur la table : son tableau des scores à la même portée, période ; Retour revient ici.
-  b.actions[atlas.action!]!.run();
-  assert.equal(h.opened.length, 1);
-  assert.deepEqual({ title: h.opened[0]!.title, scope: h.opened[0]!.scope, period: h.opened[0]!.period }, { title: 'Atlas Rising', scope: 'world', period: 'all' });
-  h.opened[0]!.back();
-  assert.equal(h.built().heading, 'Classements');
-  // Retour de l'écran : vers l'accueil.
-  h.built().back();
+  assert.deepEqual(b.actions.map((a) => a.label), ['Joueurs', 'Tables', 'Retour : Communauté']);
+  assert.match(h.menu.detail(), /Joueurs par XP/);
+  // Sans réseau des bornes, la porte « Joueurs » est grisée et dit pourquoi.
+  assert.equal(b.actions[0]!.tone, 'quiet');
+  assert.match(b.actions[0]!.detail ?? '', /Indisponible/);
+  b.back();
   assert.ok(backed);
 });
 
-test('« Classements » : MagnaSave change de portée, « Période » de période ; Cette borne montre les scores relevés ici', () => {
+test('« Tables » : toutes les tables, jamais seulement celles qui ont des scores ; les sans-classement grisées avec leur raison', () => {
   setLanguage('fr');
   const h = harness();
   h.menu.open(() => undefined);
+  go(h.built(), 'Tables');
+  const b = h.built();
+  assert.equal(b.heading, 'Tables');
+  assert.equal(b.subheading, 'Mondial · Tout temps');
+  const rows = rowsOf(b);
+  for (const title of ['Atlas Rising', 'Copper Comet', 'Lunar Diner']) assert.ok(rows.some((r) => r.text === title), `${title} a sa ligne`);
+  const atlas = rows.find((r) => r.text === 'Atlas Rising')!;
+  assert.match(atlas.detail ?? '', /^1\. Kiko · 12.345.678 · 14 joueurs · vous êtes 2ᵉ$/u);
+  const copper = rows.find((r) => r.text === 'Copper Comet')!;
+  assert.equal(copper.tone, 'quiet');
+  assert.equal(copper.detail, 'Aucun score tout temps');
+  const lunar = rows.find((r) => r.text === 'Lunar Diner')!;
+  assert.equal(lunar.tone, 'quiet');
+  assert.equal(lunar.detail, 'Empreinte de la table en calcul…');
+  // La dernière jouée en tête, avec quand ; les autres de A à Z.
+  assert.deepEqual(b.sections.map((s) => s.title).filter(Boolean), ['Jouées récemment', 'Toutes les autres tables · A–Z']);
+  assert.equal(b.sections.find((s) => s.title === 'Jouées récemment')!.rows[0]!.text, 'Lunar Diner');
+  assert.equal(lunar.aside, 'hier');
+  // Les quatre portées en onglets, le mondial ouvert ; chaque onglet compte ses tables classées sur toutes.
+  assert.deepEqual(b.tabs?.map((t) => t.label), ['Cette borne', 'Amis', 'National', 'Mondial']);
+  assert.equal(b.tabs?.find((t) => t.current)?.label, 'Mondial');
+  assert.equal(b.tabs?.find((t) => t.label === 'Mondial')?.count, '1 sur 3');
+  // Start sur une table, même grisée : son tableau des scores à la même portée et période ; Retour revient ici.
+  b.actions[copper.action!]!.run();
+  b.actions[atlas.action!]!.run();
+  assert.deepEqual(h.opened.map((o) => o.title), ['Copper Comet', 'Atlas Rising']);
+  assert.deepEqual({ scope: h.opened[1]!.scope, period: h.opened[1]!.period }, { scope: 'world', period: 'all' });
+  h.opened[1]!.back();
+  assert.equal(h.built().heading, 'Tables');
+  // Retour de l'écran : vers l'accueil des classements.
+  h.built().back();
+  assert.equal(h.built().heading, 'Classements');
+});
+
+test('« Tables » : la recherche filtre par nom, sans accents ni casse, et s’efface', () => {
+  setLanguage('fr');
+  assert.ok(matchesSearch('Comète Rouge', 'comete'));
+  assert.ok(matchesSearch('Copper Comet', 'COM'));
+  assert.ok(matchesSearch('Atlas Rising', 'ris'));
+  assert.ok(matchesSearch('Spider-Man', 'spiderman'));
+  assert.ok(!matchesSearch('Atlas Rising', 'lunar'));
+  const h = harness();
+  h.menu.open(() => undefined);
+  go(h.built(), 'Tables');
+  const search = rowsOf(h.built()).find((r) => r.text === 'Rechercher une table');
+  assert.ok(search, 'la recherche en tête');
+  h.built().actions[search.action!]!.run();
+  assert.equal(h.prompts.length, 1);
+  h.prompts[0]!.done('lun');
+  let b = h.built();
+  assert.equal(b.heading, 'Tables');
+  const titles = rowsOf(b).map((r) => r.text);
+  assert.ok(titles.includes('Lunar Diner') && !titles.includes('Atlas Rising') && !titles.includes('Copper Comet'), titles.join(', '));
+  assert.ok(titles.includes('Recherche : « lun »'));
+  // Effacer : toutes les tables reviennent.
+  go(b, 'Effacer la recherche');
+  b = h.built();
+  assert.ok(['Atlas Rising', 'Copper Comet', 'Lunar Diner'].every((x) => rowsOf(b).some((r) => r.text === x)));
+});
+
+test('« Tables » : MagnaSave change de portée, « Période » de période ; Cette borne montre les scores relevés ici', () => {
+  setLanguage('fr');
+  const h = harness();
+  h.menu.open(() => undefined);
+  go(h.built(), 'Tables');
   // MagnaSave droite depuis Mondial : on revient sur Cette borne.
   assert.ok(h.built().keys?.({ code: 'ControlRight' }));
   const b = h.built();
   assert.equal(b.subheading, 'Cette borne · Tout temps');
-  const lunar = b.sections.flatMap((s) => s.rows).find((r) => r.text === 'Lunar Diner');
+  const lunar = rowsOf(b).find((r) => r.text === 'Lunar Diner');
   assert.match(lunar?.detail ?? '', /^1\. JUL · 4.200.000 · 3 parties$/u);
   const period = b.actions.find((a) => a.label.startsWith('Période'));
   assert.ok(period);
@@ -102,10 +166,11 @@ test('« Classements » : MagnaSave change de portée, « Période » de périod
   assert.equal(h.built().subheading, 'Cette borne · Cette année');
 });
 
-test('« Classements » : sans partage, les portées en réseau sont grisées avec leur raison et l’écran s’ouvre sur Cette borne', () => {
+test('« Tables » : sans partage, les portées en réseau sont grisées avec leur raison et l’écran s’ouvre sur Cette borne', () => {
   setLanguage('fr');
   const h = harness({ sharing: false });
   h.menu.open(() => undefined);
+  go(h.built(), 'Tables');
   const b = h.built();
   assert.equal(b.tabs?.find((t) => t.current)?.label, 'Cette borne');
   for (const label of ['Amis', 'National', 'Mondial']) {
@@ -119,7 +184,7 @@ test('« Classements » : sans partage, les portées en réseau sont grisées av
 // connues, arrivaient aussitôt après l'ouverture ; l'écran se reconstruisait, mais la limite de cadence
 // (deux secondes) rendait le classement de l'ouverture, et plus rien ne le redessinait. La classe : un
 // changement reçu pendant la limite de cadence est toujours relu, jamais oublié.
-test('« Classements » : une empreinte arrivée juste après l’ouverture se voit, un changement pendant la limite de cadence est relu à sa fin', () => {
+test('« Tables » : une empreinte arrivée juste après l’ouverture se voit, un changement pendant la limite de cadence est relu à sa fin', () => {
   setLanguage('fr');
   let clock = 1_000_000;
   let ready = false;
@@ -139,9 +204,10 @@ test('« Classements » : une empreinte arrivée juste après l’ouverture se v
     now: () => clock,
     later: (ms: number, run: () => void) => timers.push({ at: clock + ms, run }),
   });
-  const texts = () => screen!().sections.flatMap((s) => s.rows.map((r) => `${r.text} ${r.detail ?? ''}`));
+  const texts = () => rowsOf(screen!()).map((r) => `${r.text} ${r.detail ?? ''}`);
   menu.open(() => undefined);
-  assert.ok(texts().some((t) => /Empreintes de 2 tables en calcul/.test(t)));
+  go(screen!(), 'Tables');
+  assert.equal(texts().filter((t) => /en calcul/.test(t)).length, 2);
   // Les empreintes arrivent dix millisecondes plus tard : l'écran se reconstruit et les montre.
   ready = true;
   clock += 10;
@@ -175,10 +241,12 @@ test('« Classements » : en anglais', () => {
   try {
     const h = harness();
     h.menu.open(() => undefined);
+    assert.equal(h.built().heading, 'Leaderboards');
+    go(h.built(), 'Tables');
     const b = h.built();
-    assert.equal(b.heading, 'Leaderboards');
-    const atlas = b.sections.flatMap((s) => s.rows).find((r) => r.text === 'Atlas Rising');
+    const atlas = rowsOf(b).find((r) => r.text === 'Atlas Rising');
     assert.match(atlas?.detail ?? '', /14 players · you are #2$/);
+    assert.equal(b.tabs?.find((t) => t.label === 'World')?.count, '1 of 3');
   } finally {
     setLanguage('fr');
   }
