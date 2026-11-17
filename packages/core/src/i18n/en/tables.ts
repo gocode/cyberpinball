@@ -84,6 +84,15 @@ export const messages: Record<string, string> = {
   'Ni le script ni une ROM ne lancent de PuP-Pack, et rien ne dit lequel de ces dossiers lancer : {list}. La table se joue sans ses vidéos ; gardez un seul pack dans pupvideos.':
     'Neither the script nor a ROM starts a PuP-Pack, and nothing says which of these folders to start: {list}. The table plays without its videos; keep a single pack in pupvideos.',
   'PuP-Pack jamais lancé': 'PuP-Pack never started',
+  'PuP-Pack fait pour une autre version de la table': 'PuP-Pack made for another version of the table',
+  'E{from} à E{to}': 'E{from} to E{to}',
+  'Le pack « {pack} » n’affiche rien sans les événements que le script de sa table lui envoie ({wanted}).':
+    'The “{pack}” pack shows nothing without the events its table script sends it ({wanted}).',
+  'Le script de cette version n’en envoie aucun : seulement {sent}, pour les effets DOF de la borne.':
+    'This version’s script sends none of them: only {sent}, for the cabinet’s DOF effects.',
+  'Le script de cette version n’en envoie aucun.': 'This version’s script sends none of them.',
+  'Le fronton et l’écran du pack restent noirs. Installez la version du jeu qui demande ce pack (« incl. PuP » ou note de VPS dans le catalogue), ou retirez le pack.':
+    'The pack’s backglass and screen stay black. Install the version of the game that asks for this pack (“incl. PuP” or a VPS note in the catalog), or remove the pack.',
   'Le script de la table ne lance jamais de PuP-Pack, et la table ne joue pas de ROM : le plugin PUP de VPX 10.8.1 ne charge alors rien de lui-même, même avec pupvideos\\{pack} bien rangé. Ce pack est fait pour PinUP Player, que B2S Server lançait sans rien demander au script.':
     'The table’s script never starts a PuP-Pack, and the table plays no ROM: the VPX 10.8.1 PUP plugin then loads nothing by itself, even with pupvideos\\{pack} in place. This pack was made for PinUP Player, which B2S Server started without the script asking.',
   'La table n’est pas modifiée : VPX joue {file}, une copie de son script qui lance le pack au début de {init}.': 'The table isn’t modified: VPX plays {file}, a copy of its script that starts the pack at the beginning of {init}.',

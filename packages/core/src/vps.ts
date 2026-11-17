@@ -159,6 +159,14 @@ function indexGame(game: VpsGame): IndexedGame {
     add(main.replace(/^(the|a|an)\s+/i, ''), 0.96);
   }
   const vpxFiles = (game.tableFiles ?? []).filter((f) => f && (f.tableFormat ?? 'VPX').toUpperCase() === 'VPX');
+  // Éditions des versions (« Galaxy Edition » de JP's Space Cadet) : « Space Cadet Galaxy Edition »
+  // désigne le jeu aussi bien que son titre seul.
+  for (const edition of new Set(vpxFiles.map((f) => f.edition?.trim()).filter((e): e is string => Boolean(e)))) {
+    add(`${name} ${edition}`, 0.99);
+    add(`${noArticle} ${edition}`, 0.98);
+    const main = name.split(/\s+-\s+|:\s+/)[0]!.replace(/\s*\([^)]*\)\s*$/, '');
+    add(`${main} ${edition}`, 0.97);
+  }
   return {
     game,
     aliases: [...aliases].map(([key, weight]) => ({ key, weight })).sort((a, b) => b.key.length - a.key.length),
@@ -559,8 +567,15 @@ function pickTableFile(entry: IndexedGame, names: ParsedName[]): VpsTableFile | 
   const mod = words.has('mod') || names.some((n) => /mod\b/i.test(n.rest));
   const sameVersion = (file: VpsTableFile) => Boolean(file.version && versions.has(normVersion(file.version)));
   let best: { file: VpsTableFile; score: number } | undefined;
+  // Édition citée dans un nom (« JP's Space Cadet Galaxy Edition.vpx ») : la version qui la porte,
+  // si l'édition ne fait pas déjà partie du titre du jeu.
+  const gameKey = vpsKey(entry.game.name);
+  const editionOf = (file: VpsTableFile) => {
+    const key = vpsKey(file.edition ?? '').replace(/edition$/, '');
+    return key.length >= 4 && !gameKey.includes(key) && names.some((n) => n.whole.includes(key)) ? key : undefined;
+  };
   for (const file of entry.vpxFiles) {
-    let score = 0;
+    let score = editionOf(file) ? 3 : 0;
     for (const author of file.authors ?? []) {
       // « Bigus » pour « Bigus1 » : le chiffre final est souvent omis.
       const keys = new Set([vpsKey(author), vpsKey(author).replace(/\d+$/, '')].filter((k) => k.length >= 2));

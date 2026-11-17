@@ -94,6 +94,7 @@ export const messages: Record<string, string> = {
   'mise à jour le {date}': 'updated {date}',
   'fournit {items}': 'includes {items}',
   'Conseillée : {reasons}.': 'Recommended: {reasons}.',
+  'Note de VPS : « {comment} »': 'VPS note: “{comment}”',
   'Retour au catalogue': 'Back to the catalog',
   '{n} joueur': '{n} player',
   '{n} joueurs': '{n} players',

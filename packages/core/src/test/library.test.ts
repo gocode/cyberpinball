@@ -43,8 +43,9 @@ test('nom de ROM lu dans le script, commentaires ignorés', () => {
   // Choix entre deux ROM selon une option du script.
   const choice = 'LoadVPM "1", "S11.VBS", 1\nIf UseFree Then cRom = "fp_a" Else cRom = "fp_b"\n.GameName = cRom';
   assert.deepEqual(scriptFacts(choice).roms, ['fp_a', 'fp_b']);
-  // Table électromécanique : un cGameName pour les scores et B2S, mais pas de PinMAME.
-  assert.deepEqual(scriptFacts('Const cGameName = "bigshot"\nSet Controller = CreateObject("B2S.Server")'), { usesPinmame: false, roms: [], b2sName: 'bigshot' });
+  // Table électromécanique : un cGameName pour les scores et B2S, mais pas de PinMAME. Sans PuP
+  // ni ROM, les numéros qu'elle envoie au plugin PUP sont relevés (aucun ici) : pupNotDriven.
+  assert.deepEqual(scriptFacts('Const cGameName = "bigshot"\nSet Controller = CreateObject("B2S.Server")'), { usesPinmame: false, roms: [], b2sName: 'bigshot', b2sEvents: [] });
 });
 
 test('dossier du DMD lu dans le script (FlexDMD, UltraDMD)', () => {

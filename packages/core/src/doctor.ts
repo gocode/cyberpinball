@@ -50,6 +50,8 @@ import {
   packDrawsDmd,
   packScreens,
   captureTriggers,
+  packDrivers,
+  scriptB2sEvents,
   pupLoaderNeeded,
   pupScriptFacts,
   pupSwitchesToEnable,
@@ -142,6 +144,7 @@ export const FINDING_CODES = [
   'pupOptionMismatch',
   'pupNoScreens',
   'pupDisabledByScript',
+  'pupNotDriven',
   'pupHidesDmd',
   'pupDmdInBackglass',
   'pupDmdBackToBackglass',
@@ -236,6 +239,11 @@ export interface ScriptFacts {
    * valeur qui l'envoie à la fenêtre du DMD de la borne (tableoptions.ts, constat dmdDesktopOption).
    */
   dmdOptions?: CabinetDmdOption[];
+  /**
+   * Numéros que le script envoie au plugin PUP en déclencheurs « E » (DOF, B2SSetData : scriptB2sEvents) ;
+   * absent si l'un d'eux est calculé.
+   */
+  b2sEvents?: number[];
   /** La table a sa pièce VR (tableHasVrRoom) : en VR, son fronton est dans la pièce, sans .directb2s. */
   vrRoom?: boolean;
 }
@@ -477,6 +485,9 @@ export function scriptFacts(vbs: string): ScriptFacts {
   if (music.length) facts.music = music;
   const dmdOptions = cabinetDmdOptions(vbs);
   if (dmdOptions.length) facts.dmdOptions = dmdOptions;
+  // Seulement là où Cyber Pinball lance lui-même un pack (ni ROM ni PuP dans le script) : notDrivenFinding.
+  const b2sEvents = pupLoaderNeeded(facts) ? scriptB2sEvents(code) : undefined;
+  if (b2sEvents) facts.b2sEvents = b2sEvents;
   if (tableHasVrRoom(vbs)) facts.vrRoom = true;
   return facts;
 }
@@ -1047,6 +1058,31 @@ function pupShowsBackglass(entry: TableEntry, facts: ScriptFacts | undefined): b
     const screens = own.length ? own : parseScreens(defaultScreensPup(root) ?? '');
     return screens.length > 0 && pupWindows(screens).backglass;
   });
+}
+
+/**
+ * PuP-Pack que le script de la table ne peut pas faire jouer (packDrivers, scriptB2sEvents) : ses
+ * déclencheurs E attendent des numéros que ce script n'envoie jamais, et rien d'autre (image du
+ * DMD reconnue, écran qui montre quelque chose de lui-même) ne l'anime. Aucune correction : c'est
+ * le pack d'une autre version du jeu.
+ */
+function notDrivenFinding(dir: string, pack: string, facts: ScriptFacts): Finding | undefined {
+  const drivers = packDrivers(findPackRoot(dir) ?? dir);
+  const sent = facts.b2sEvents ?? [];
+  if (!drivers.events.length || drivers.events.some((e) => sent.includes(e)) || drivers.defaults || (drivers.capture && facts.drawsDmd)) return undefined;
+  const range = (n: number[]) => (n.length === 1 ? `E${n[0]}` : t('E{from} à E{to}', { from: String(n[0]), to: String(n.at(-1)) }));
+  return {
+    code: 'pupNotDriven',
+    severity: 'warning',
+    title: t('PuP-Pack fait pour une autre version de la table'),
+    detail: [
+      t('Le pack « {pack} » n’affiche rien sans les événements que le script de sa table lui envoie ({wanted}).', { pack, wanted: range(drivers.events) }),
+      sent.length
+        ? t('Le script de cette version n’en envoie aucun : seulement {sent}, pour les effets DOF de la borne.', { sent: range(sent) })
+        : t('Le script de cette version n’en envoie aucun.'),
+      t('Le fronton et l’écran du pack restent noirs. Installez la version du jeu qui demande ce pack (« incl. PuP » ou note de VPS dans le catalogue), ou retirez le pack.'),
+    ].join(' '),
+  };
 }
 
 /**
@@ -1760,6 +1796,14 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
   // Le .vbs de Cyber Pinball qui le lance déjà compte ; un .vbs à refaire est déjà signalé.
   if (loader && matching.length && override?.state.kind !== 'stale' && !(override && pupScriptFacts(scriptCode(override.text)))) {
     findings.push(pupLoaderFinding(entry, matching[0]!, override));
+  }
+
+  // Pack fait pour une autre version du jeu : le script ne connaît pas PuP (Cyber Pinball lance le
+  // pack), et le pack n'affiche rien que sur des déclencheurs E que ce script n'envoie jamais
+  // (JP's Space Cadet v7.0 de JPSalas et le pack de la Galaxy Edition, 17/11/2026 : fronton noir).
+  if (loader && matching.length && facts?.b2sEvents) {
+    const notDriven = notDrivenFinding(path.join(pupvideos, matching[0]!), matching[0]!, facts);
+    if (notDriven) findings.push(notDriven);
   }
 
   for (const pack of matching) {

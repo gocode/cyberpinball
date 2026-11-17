@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.15
 
+- Catalog: a version's edition (JP's Space Cadet's "Galaxy Edition", for example) is shown before its authors and can be searched. "Space Cadet Galaxy Edition" finds the game and puts that version first, and a file that names the edition is recognised as it. A version's VPS note ("Pup Pack installation is REQUIRED") is shown too.
+- Doctor: a PuP-Pack made for another version of the game is reported ("PuP-Pack made for another version of the table"). When the table script doesn't drive PuP, the pack shows nothing without events this script never sends, and the backglass stays black: the finding says so, with the expected numbers and the ones the script sends.
 - What's new: levels have their line there, with a badge moment as the preview; "Try it" opens "My level". A cabinet that had already seen everything gets the red dot again for this new item.
 - My badges shows each badge's artwork, in its shape and rarity: an earned badge shines, with a glow in its colour and a passing gleam; a badge not yet earned stays grey and dim. The closest badges, in My level, show the same artwork.
 - A table brought in from another installation keeps the framing that had been set for it there: Cyber Pinball switches it to manual framing for that table alone, as long as the game still faces the right way on your cabinet.

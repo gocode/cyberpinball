@@ -383,6 +383,57 @@ function resolveValue(code: string, token: string): string[] {
   return [...code.matchAll(new RegExp(`\\b${token}\\s*=\\s*"([^"\\r\\n]*)"`, 'gi'))].map((v) => v[1]!.trim());
 }
 
+/**
+ * Numéros que le script envoie au plugin PUP en déclencheurs « E » : chaque DOF n, DOFALT n,
+ * SoundFXDOF(…, n, …) et B2SSetData n passe par B2S Server (Sub DOF de controller.vbs ;
+ * B2SServer::B2SSetData envoie B2SPluginEvent { 'E', n }, B2SServer.cpp l. 441-460 au commit
+ * af26b2d93), que le plugin PUP compare aux déclencheurs E de triggers.pup. Un numéro relayé par
+ * le paramètre de la routine qui l'enveloppe (Sub DOF(DOFevent, State)) ne compte pas ; un numéro
+ * calculé ailleurs rend undefined : on ne sait pas ce que le script envoie. `code` : scriptCode.
+ */
+export function scriptB2sEvents(code: string): number[] | undefined {
+  const sent = new Set<number>();
+  let params = new Set<string>();
+  const CALL = /\b(?:DOF(?:ALT)?\b\s*\(?\s*|SoundFXDOF\s*\(\s*[^,\r\n]*,\s*|B2SSetData\s*\(?\s*)([^,\r\n)]+?)\s*,/gi;
+  for (const line of code.split('\n')) {
+    // En-tête de routine : ses paramètres comptent pour le reste de la ligne (« Sub X : DOF 1, 1 : End Sub »).
+    const head = /^\s*(?:(?:Public|Private)\s+)?(?:Sub|Function)\s+\w+\s*(?:\(([^)]*)\))?/i.exec(line);
+    if (head) params = new Set((head[1] ?? '').split(',').map((p) => p.replace(/\b(ByVal|ByRef)\b/gi, '').trim().toLowerCase()).filter(Boolean));
+    for (const m of (head ? line.slice(head[0].length) : line).matchAll(CALL)) {
+      const arg = m[1]!.trim();
+      if (/^\d+$/.test(arg)) sent.add(Number(arg));
+      else if (!params.has(arg.toLowerCase())) return undefined;
+    }
+    if (/\bEnd\s+(Sub|Function)\b/i.test(line)) params = new Set();
+  }
+  return [...sent].sort((a, b) => a - b);
+}
+
+/**
+ * Ce qui peut faire jouer un pack sur une table sans ROM : ses déclencheurs « E » actifs, ceux
+ * reconnus sur les images du DMD (« D » avec leur capture, pupcapture.ts), et ses écrans visibles
+ * qui montrent une image ou une vidéo d'eux-mêmes (playlist par défaut de screens.pup).
+ */
+export function packDrivers(root: string): { events: number[]; capture: number; defaults: number } {
+  const file = readDirents(root).find((d) => d.isFile() && d.name.toLowerCase() === 'triggers.pup');
+  const events = new Set<number>();
+  if (file) {
+    for (const line of readText(path.join(root, file.name)).split(/\r?\n/).slice(1)) {
+      const cols = parseCsvLine(line);
+      if (cols.length < 4 || cols[1]!.trim() !== '1') continue;
+      const e = /^E(\d+)$/i.exec(cols[3]!.trim());
+      if (e) events.add(Number(e[1]));
+    }
+  }
+  const folders = new Map(readDirents(root).filter((d) => d.isDirectory()).map((d) => [d.name.toLowerCase(), d.name]));
+  const defaults = packScreens(root).filter((s) => {
+    if (!isVisible(s) || !s.playlist) return false;
+    const dir = folders.get(s.playlist.toLowerCase());
+    return Boolean(dir && readDirents(path.join(root, dir)).some((d) => d.isFile() && !isJunkName(d.name)));
+  }).length;
+  return { events: [...events].sort((a, b) => a - b), capture: captureTriggers(root).capture, defaults };
+}
+
 /** Le script pilote un jeu par PinMAME (`code` : scriptCode). */
 export function usesPinmameCode(code: string): boolean {
   // LoadVPMALT : variante de LoadVPM de certaines tables (contrôleur au choix), une ROM tout de même.

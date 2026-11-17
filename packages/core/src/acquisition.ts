@@ -18,7 +18,7 @@ import { dmdMediaType } from './medias';
 import { requiredForPlay } from './playable';
 import { romContent } from './romzip';
 import type { TableInfoFile } from './tables';
-import { matchVps, searchVps, vpsKey, type VpsDb, type VpsGame, type VpsLink, type VpsTableFile } from './vps';
+import { matchVps, searchVps, vpsKey, vpsWords, type VpsDb, type VpsGame, type VpsLink, type VpsTableFile } from './vps';
 
 // ---------------------------------------------------------------------------
 // Hôtes des liens
@@ -452,10 +452,29 @@ export function formatDay(ms: number): string {
   return formatDate(ms, { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-/** « VPW, Sixtoe 1.25 » */
-export function versionLabel(file: { authors?: string[]; version?: string }): string {
+/**
+ * « VPW, Sixtoe 1.25 », précédé de l'édition que VPS lui donne : « Galaxy Edition · Funkatron101,
+ * JPSalas, Mesterial… 1.2 ». Sans elle, deux versions d'un même jeu ne se distinguaient que par
+ * leurs auteurs (JP's Space Cadet, 17/11/2026 : la Galaxy Edition restait introuvable).
+ */
+export function versionLabel(file: { authors?: string[]; version?: string; edition?: string }): string {
   const authors = (file.authors ?? []).slice(0, 3).join(', ') + ((file.authors?.length ?? 0) > 3 ? '…' : '');
-  return [authors, file.version].filter(Boolean).join(' ') || t('version sans auteur');
+  const who = [authors, file.version].filter(Boolean).join(' ');
+  const edition = file.edition?.trim();
+  return [edition, who].filter(Boolean).join(' · ') || t('version sans auteur');
+}
+
+/**
+ * Version d'un jeu que désigne un texte cherché par son édition (« Space Cadet Galaxy Edition ») :
+ * tous les mots de l'édition, hors ceux du titre du jeu, sont dans le texte. undefined sinon.
+ */
+export function versionForText(game: VpsGame, text: string): VpsTableFile | undefined {
+  const typed = new Set(vpsWords(text));
+  const title = new Set(vpsWords(game.name));
+  return vpxVersions(game).find((f) => {
+    const words = vpsWords(f.edition ?? '').filter((w) => !title.has(w) && w.length >= 3 && w !== 'edition');
+    return words.length > 0 && words.every((w) => typed.has(w));
+  });
 }
 
 // ---------------------------------------------------------------------------

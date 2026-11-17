@@ -179,6 +179,10 @@
       canvas.height = p.H;
       // L'unité : un centième de la colonne 9:16 du badge (tout l'écran en borne, son milieu au bureau).
       p.S = Math.min(p.W, (p.H * 9) / 16) / 100;
+      // La largeur de tout l'écran dans cette unité (100 en borne, davantage au bureau) : les positions se
+      // comptent depuis le bord gauche de l'écran, le milieu de la colonne est à span / 2. Une position
+      // tirée entre 0 et 100 se tasserait à gauche au bureau (retour du 17/11/2026).
+      p.span = p.W / p.S;
     };
     p.CX = () => p.W * 0.5;
     p.CY = () => p.H * 0.4;
@@ -199,7 +203,8 @@
     };
     return p;
   }
-  const motes = (n) => Array.from({ length: n }, () => ({ x: rnd() * 100, y: rnd() * 178, vy: 1.5 + rnd() * 3.5, ph: rnd() * TAU, s: 0.25 + rnd() * 0.6 }));
+  /** Les poussières qui montent : sur toute la largeur de l'écran, `n` par largeur de colonne (la même densité en borne et au bureau). */
+  const motes = (p, n) => Array.from({ length: Math.round((n * p.span) / 100) }, () => ({ x: rnd() * p.span, y: rnd() * 178, vy: 1.5 + rnd() * 3.5, ph: rnd() * TAU, s: 0.25 + rnd() * 0.6 }));
   function drawMotes(p, list, t, from, rise = true) {
     const k = clamp((t - from) / 1.2);
     if (k <= 0) return;
@@ -213,22 +218,22 @@
     shock: (p) => ({
       sparks: Array.from({ length: Math.round(36 * p.rich) }, () => ({ a: rnd() * TAU, v: 26 + rnd() * 62, len: 3 + rnd() * 7, life: 0.8 + rnd() * 0.9 })),
       inflow: Array.from({ length: 40 }, () => ({ a: rnd() * TAU, r0: 60 + rnd() * 70, d: rnd() * 0.3 })),
-      motes: motes(46),
+      motes: motes(p, 46),
     }),
-    rays: () => ({ motes: motes(60) }),
+    rays: (p) => ({ motes: motes(p, 60) }),
     swarm: (p) => ({
       list: Array.from({ length: Math.round(60 + 26 * p.rich) }, () => {
         const a = rnd() * TAU, sr = 115 + rnd() * 40, ta = rnd() * TAU, tr = 22 + Math.pow(rnd(), 0.75) * 58;
-        return { sx: 50 + Math.cos(a) * sr, sy: 71.1 + Math.sin(a) * sr, tx: 50 + Math.cos(ta) * tr, ty: 71.1 + Math.sin(ta) * tr * 1.35, d: rnd() * 0.25, ph: rnd() * TAU, sp: 1 + rnd() * 2.2, s: 0.35 + rnd() * 0.75 };
+        return { sx: p.span / 2 + Math.cos(a) * sr, sy: 71.1 + Math.sin(a) * sr, tx: p.span / 2 + Math.cos(ta) * tr, ty: 71.1 + Math.sin(ta) * tr * 1.35, d: rnd() * 0.25, ph: rnd() * TAU, sp: 1 + rnd() * 2.2, s: 0.35 + rnd() * 0.75 };
       }),
     }),
-    rise: () => ({
-      cols: Array.from({ length: 9 }, (_, i) => ({ x: 50 + (i - 4) * 10.5, h: i === 4 ? 0 : 0.2 + rnd() * 0.22, d: Math.abs(i - 4) * 0.04 + rnd() * 0.05 })),
+    rise: (p) => ({
+      cols: Array.from({ length: 9 }, (_, i) => ({ x: p.span / 2 + (i - 4) * 10.5, h: i === 4 ? 0 : 0.2 + rnd() * 0.22, d: Math.abs(i - 4) * 0.04 + rnd() * 0.05 })),
       sparks: Array.from({ length: 70 }, () => ({ c: Math.floor(rnd() * 9), y: rnd(), v: 0.12 + rnd() * 0.25, s: 0.25 + rnd() * 0.5, dx: (rnd() - 0.5) * 3 })),
-      motes: motes(30),
+      motes: motes(p, 30),
     }),
-    glitch: () => ({ motes: motes(24) }),
-    horizon: () => ({ stars: Array.from({ length: 80 }, () => ({ x: rnd() * 100, y: rnd() * 98, s: 0.25 + rnd() * 0.7, ph: rnd() * TAU, sp: 0.7 + rnd() * 2 })) }),
+    glitch: (p) => ({ motes: motes(p, 24) }),
+    horizon: (p) => ({ stars: Array.from({ length: Math.round((80 * p.span) / 100) }, () => ({ x: rnd() * p.span, y: rnd() * 98, s: 0.25 + rnd() * 0.7, ph: rnd() * TAU, sp: 0.7 + rnd() * 2 })) }),
   };
 
   const RENDER = {
@@ -701,5 +706,6 @@
     };
   }
 
-  window.CyberLevels = { badgeSvg, playerCard, badgesPill, moment, outline };
+  // `fonds` : les fonds du moment, pour les essais (moment-fond.test.ts : répartis sur tout l'écran, centrés sur la colonne).
+  window.CyberLevels = { badgeSvg, playerCard, badgesPill, moment, outline, fonds: { SETUP, RENDER, painter } };
 })();

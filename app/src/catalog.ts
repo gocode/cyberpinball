@@ -72,6 +72,7 @@ import {
   readVpxTableInfo,
   reassignFile,
   recommendVersion,
+  versionForText,
   removeGame,
   removeItem,
   requirements,
@@ -1048,9 +1049,12 @@ export function createCatalog(ctx: CatalogContext) {
 
   function buildGame(game: VpsGame, fast?: ReturnType<typeof quickNeeds>): Built {
     const advice = recommendVersion(game);
-    // La version conseillée d'abord, puis les autres, la plus récente d'abord.
+    // La version que désigne la recherche par son édition (« Space Cadet Galaxy Edition »), puis la
+    // conseillée, puis les autres, la plus récente d'abord.
+    const wanted = filter.text ? versionForText(game, filter.text) : undefined;
+    const rank = (v: { id: string }) => (v.id === wanted?.id ? 2 : 0) + (v.id === advice?.file.id ? 1 : 0);
     const versions = vpxVersions(game)
-      .sort((x, y) => Number(y.id === advice?.file.id) - Number(x.id === advice?.file.id))
+      .sort((x, y) => rank(y) - rank(x))
       .slice(0, 20);
     const mine = installedVersion(game);
     const count = vpxVersions(game).length;
@@ -1083,7 +1087,13 @@ export function createCatalog(ctx: CatalogContext) {
         mine.source === v.id ? { label: t('Installée'), tone: 'ok' } : advice?.file.id === v.id ? { label: t('Conseillée'), tone: 'ok' } : !liveLinks(v).length ? { label: t('Aucun lien'), tone: 'error' } : undefined,
       extra: (v) => {
         const included = (v.features ?? []).filter((f) => /^incl\./i.test(f)).map((f) => f.replace(/^incl\.\s*/i, ''));
-        return [advice?.file.id === v.id ? t('Conseillée : {reasons}.', { reasons: advice.reasons.join(', ') }) : undefined, included.length ? t('fournit {items}', { items: included.join(', ') }) : undefined].filter((x): x is string => Boolean(x));
+        // Commentaire de VPS (« This table uses PuPDMD. Pup Pack installation is REQUIRED. ») : ce que la version exige.
+        const comment = v.comment?.trim();
+        return [
+          advice?.file.id === v.id ? t('Conseillée : {reasons}.', { reasons: advice.reasons.join(', ') }) : undefined,
+          included.length ? t('fournit {items}', { items: included.join(', ') }) : undefined,
+          comment ? t('Note de VPS : « {comment} »', { comment: comment.length > 160 ? `${comment.slice(0, 159)}…` : comment }) : undefined,
+        ].filter((x): x is string => Boolean(x));
       },
       pick: (v) => openNeeds(game.id, v.id),
       back: () => openCatalog(),

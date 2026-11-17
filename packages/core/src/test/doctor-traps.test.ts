@@ -43,6 +43,8 @@ const VPMINIT_TWICE_SCRIPT = `${SCRIPT}Sub Table1_Init\r\n  vpmInit Me\r\n  vpmI
 const DESKTOP_DMD_SCRIPT = `${SCRIPT}Sub Table1_OptionEvent(ByVal e)\r\n  x = Table1.Option("DMD Type", 0, 1, 1, 0, 0, Array("Desktop DMD", "FlexDMD"))\r\nEnd Sub\r\n`;
 /** Même table refaite sans ROM, en FlexDMD, dont le script ne lance jamais PuP (Game of Thrones LE, VPW). */
 const NO_PUP_SCRIPT = 'Const cGameName="afm_113b"\r\nSub Table1_Init\r\n  LoadEM\r\n  Set FlexDMD = CreateObject("FlexDMD.FlexDMD")\r\nEnd Sub\r\n';
+/** Même table sans ROM, dont le script n'envoie au plugin PUP que l'effet DOF 105 (E105). */
+const NOT_DRIVEN_SCRIPT = `${NO_PUP_SCRIPT}Sub Kicker1_Hit\r\n  DOF 105, DOFPulse\r\nEnd Sub\r\n`;
 /** Borne à trois écrans : backglass, DMD 4:1, pas de topper ; playfield 16:9 couché, Windows en paysage. */
 const CABINET: PupCabinet = {
   backglass: true,
@@ -472,6 +474,18 @@ const TRAPS: Trap[] = [
       write(path.join(folder, `${TABLE}.vpx`), vpxWithScript(NO_PUP_SCRIPT));
     },
     script: scriptFacts(NO_PUP_SCRIPT),
+  },
+  // Pack d'une autre version du jeu : il n'attend que E7, le script n'envoie que E105 (pupnotdriven.test.ts).
+  {
+    code: 'pupNotDriven',
+    arm: (folder) => {
+      const pack = healthyPack(folder);
+      for (const dir of ['', path.join('PuP-Pack_Options', 'Option 1 - Backglass DMD Separate')]) {
+        write(path.join(pack, dir, 'triggers.pup'), 'ID,Active,Descript,Trigger,ScreenNum,PlayList,PlayFile\r\n357,1,Start Backglass,E7,2,Backglass,attract.mp4\r\n');
+      }
+      write(path.join(folder, `${TABLE}.vpx`), vpxWithScript(NOT_DRIVEN_SCRIPT));
+    },
+    script: scriptFacts(NOT_DRIVEN_SCRIPT),
   },
   {
     code: 'pupCaptureUnseen',
