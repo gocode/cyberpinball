@@ -6,8 +6,6 @@ export const messages: Record<string, string> = {
   'Votez pour les idées des joueurs, proposez les vôtres, signalez un problème': 'Vote for players’ ideas, suggest your own, report a problem',
   'Votez et proposez · {n} proposition': 'Vote and suggest · {n} idea',
   'Votez et proposez · {n} propositions': 'Vote and suggest · {n} ideas',
-  'Langue, mise à jour, avis et propositions, activité récente, sauvegardes, migration, conditions d’utilisation, la communauté, quitter ou redémarrer, veille et extinction':
-    'Language, update, feedback and ideas, recent activity, backups, migration, terms of use, the community, quit or restart, sleep and shutdown',
   // Natures et états
   'Problème': 'Problem',
   'Quelque chose ne marche pas comme prévu': 'Something does not work as expected',

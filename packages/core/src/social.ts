@@ -190,6 +190,8 @@ export interface SocialState {
   badges: EarnedBadge[];
   /** Badges déjà évalués une fois : ceux mérités ensuite deviennent des évènements (badges.ts). */
   badgesChecked: boolean;
+  /** Série du catalogue des badges déjà évaluée (badges.ts, BADGES_SERIES) : absente, la première. */
+  badgesSeries?: number;
   /**
    * Avatar de ce joueur : nom du fichier dans <données>\avatars (avatar.ts) ; absent : ses
    * initiales. Envoyé à ses amis et aux joueurs d'une demande en cours, jamais à l'annuaire ; son
@@ -329,6 +331,7 @@ export function parseSocialState(raw: unknown): SocialState | undefined {
     events: array(s.events, (e): e is SocialEvent => !!parseEvent(e)),
     badges: array(s.badges, (b): b is EarnedBadge => !!b && typeof b === 'object' && typeof (b as EarnedBadge).id === 'string' && isIso((b as EarnedBadge).at)),
     badgesChecked: s.badgesChecked === true,
+    ...(typeof s.badgesSeries === 'number' && Number.isInteger(s.badgesSeries) && s.badgesSeries > 0 ? { badgesSeries: s.badgesSeries } : {}),
     ...(isAvatarFileName(s.avatar) ? { avatar: s.avatar } : {}),
     ...(peerAvatarsOf(s.peerAvatars) ? { peerAvatars: peerAvatarsOf(s.peerAvatars)! } : {}),
   };

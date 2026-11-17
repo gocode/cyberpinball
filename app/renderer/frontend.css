@@ -30,7 +30,8 @@ body {
  */
 #root,
 #cinema,
-#stop {
+#stop,
+#level-moment {
   position: fixed;
   left: calc(var(--pf-x, 0) * 100vw);
   top: calc(var(--pf-y, 0) * 100vh);
@@ -72,7 +73,10 @@ html[data-rotation='180'] #cinema,
 html[data-rotation='270'] #cinema,
 html[data-rotation='90'] #stop,
 html[data-rotation='180'] #stop,
-html[data-rotation='270'] #stop {
+html[data-rotation='270'] #stop,
+html[data-rotation='90'] #level-moment,
+html[data-rotation='180'] #level-moment,
+html[data-rotation='270'] #level-moment {
   position: fixed;
   top: calc((var(--pf-y, 0) + var(--pf-h, 1) / 2) * 100vh);
   left: calc((var(--pf-x, 0) + var(--pf-w, 1) / 2) * 100vw);

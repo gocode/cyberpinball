@@ -69,6 +69,17 @@ export function withAlias(text: string, alias: string, rom: string, comment?: st
   return lines.join('\r\n') + '\r\n';
 }
 
+/** Commentaire écrit juste au-dessus de la ligne de cet alias (sans « # »), ou undefined. */
+export function aliasComment(text: string, alias: string): string | undefined {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  const at = lines.findIndex((l) => parseAliases(l)[0]?.alias.toLowerCase() === alias.toLowerCase());
+  const above = at > 0 ? lines[at - 1]!.trim() : '';
+  return above.startsWith('#') && above !== HEADER ? above.replace(/^#\s*/, '') : undefined;
+}
+
+/** Commentaire de l'alias repris du VPMAlias.txt d'une installation (tableimport.ts, doctor.ts). */
+export const IMPORTED_ALIAS_COMMENT = 'alias de VPinMAME repris de l’installation d’origine (VPMAlias.txt)'; // i18n-ignore : commentaire écrit dans alias.txt
+
 /** Contenu du fichier sans la ligne de cet alias (ni son commentaire) ; vide s'il ne reste aucun alias. */
 export function withoutAlias(text: string, alias: string): string {
   const lines = text.split(/\r?\n/);

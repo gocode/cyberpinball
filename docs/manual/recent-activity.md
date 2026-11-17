@@ -3,7 +3,7 @@
 ## Recent activity
 
 A notification stays only a few seconds, is shortened to fit its line, waits for the end of a game ("Masquer les notifications pendant les parties" (Hide notifications during games)) or melts into a summary ("4 nouveautés" (4 new notifications)): seen too late, it was lost.
-**Menu système (System menu) > Activité récente (Recent activity)**, at the top of the system menu root, keeps them all, in full.
+**Menu système (System menu) > Activité récente (Recent activity)**, at the system menu root (right after "Nouveautés" (What's new) when it is there), keeps them all, in full.
 It is also filed in the Cyber Pinball section, since it covers everything, not only friends.
 
 - **What goes in**: every notification event, as soon as it arrives, whether it showed or not (a friend coming online or starting a game, their record, their badge, a friend request received or accepted, an invitation and its end, a guest accepting, declining or leaving, a game with friends finished or cancelled, a download finished or blocked); a newer version of Cyber Pinball found in the background (once per version), the update done or failed at startup; the startup notices that name a screen (backup restored, cabinet configuration recognized, DMD screen to check, Windows firewall).

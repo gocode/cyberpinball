@@ -81,6 +81,8 @@ export interface GroupsMenu {
   open(back: () => void): void;
   /** Un groupe (notification d'un message), « Retour » vers `back`. */
   openGroup(g: string, back?: () => void): void;
+  /** Un groupe public de l'annuaire (profil public d'un de ses membres) : ses membres, sa table, « Rejoindre ». */
+  openPublic(g: string, back: () => void): void;
   /** Clic sur une notification : l'invitation la plus récente, sinon le groupe au dernier message non lu, sinon la liste. */
   openNews(back: () => void): void;
   /** Le groupe à l'écran (pas de notification pour ce qu'on lit déjà) ; undefined : aucun. */
@@ -857,6 +859,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
     door,
     open,
     openGroup,
+    openPublic,
     openNews(back) {
       listBack = back;
       const invites = groups.invitations();

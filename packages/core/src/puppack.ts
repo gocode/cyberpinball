@@ -385,7 +385,8 @@ function resolveValue(code: string, token: string): string[] {
 
 /** Le script pilote un jeu par PinMAME (`code` : scriptCode). */
 export function usesPinmameCode(code: string): boolean {
-  return /\bLoadVPM\b|VPinMAME\.Controller/i.test(code);
+  // LoadVPMALT : variante de LoadVPM de certaines tables (contrôleur au choix), une ROM tout de même.
+  return /\bLoadVPM(?:ALT)?\b|VPinMAME\.Controller/i.test(code);
 }
 
 /** Ce qu'il faut savoir du script pour dire comment le plugin trouve le pack. */

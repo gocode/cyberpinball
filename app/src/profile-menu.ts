@@ -13,7 +13,11 @@ import {
   badgeLabel,
   countryName,
   eventText,
+  levelOf,
   locale,
+  shownLevel,
+  tierLabel,
+  tierOf,
   socialAgo,
   t,
   tn,
@@ -35,6 +39,14 @@ export interface ProfileMenuHost {
   request(key: string, name: string): void;
   block(key: string): void;
   openThread?(key: string, back: () => void): void;
+  /**
+   * Groupes publics d'un joueur (group-service.ts, publicGroupsOf) : jamais un groupe privé. `open` : le
+   * groupe (j'en suis membre), sinon sa page de l'annuaire, avec « Rejoindre ».
+   */
+  groups?: {
+    of(key: string): { id: string; name: string; members: number; week?: string; mine: boolean }[];
+    open(id: string, mine: boolean, back: () => void): void;
+  };
   now?(): Date;
 }
 
@@ -59,9 +71,27 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
   const isFriend = (key: string) => net.state().friends.some((f) => f.key === key);
   const nameOf = (key: string, card?: PublicCard) => card?.name ?? net.state().friends.find((f) => f.key === key)?.name ?? net.state().directory.find((d) => d.profile.key === key)?.profile.name ?? key.slice(0, 8);
   /** Pastille : l'avatar d'un ami, sinon celui de sa carte (public, contrôlé par son empreinte), sinon ses initiales. */
-  const avatarOf = (key: string, name: string, card?: PublicCard) => avatarView(key, name, net.avatarFile(key) ?? (card?.avatar ? net.rankingAvatar(key, card.avatar) : undefined));
+  /** Son niveau, s'il est vraisemblable depuis le jour où cette borne a vu sa carte ; « ? » sinon. */
+  const levelOfCard = (key: string, card?: PublicCard) => (card?.xp === undefined ? undefined : shownLevel(card.xp, net.cardFirstSeen(key), now()) ?? ('?' as const));
+  const levelLine = (level: number | '?' | undefined) => (level === undefined ? undefined : level === '?' ? t('Niveau ?') : t('{tier} · niveau {level}', { tier: tierLabel(tierOf(level)), level }));
+  const avatarOf = (key: string, name: string, card?: PublicCard) => {
+    const level = levelOfCard(key, card);
+    return { ...avatarView(key, name, net.avatarFile(key) ?? (card?.avatar ? net.rankingAvatar(key, card.avatar) : undefined)), ...(typeof level === 'number' ? { level } : {}) };
+  };
 
   const eventIcon = (e: PublicEvent): IconName => (e.kind === 'badge' ? 'medal' : 'trophy');
+
+  /** Ses groupes publics : une ligne par groupe, Start l'ouvre. Rien quand il n'en a aucun de connu. */
+  function groupsSection(key: string, actions: Action[], here: (at: number) => void): Section[] {
+    const list = host.groups?.of(key) ?? [];
+    if (!list.length) return [];
+    const rows: Row[] = list.map((g) => {
+      const index = actions.push({ label: g.name, key: `group:${g.id}`, icon: 'group', run: () => host.groups!.open(g.id, g.mine, () => here(index)) }) - 1;
+      const detail = [tn(g.members, '{n} membre', '{n} membres'), g.week ? t('table de la semaine : {table}', { table: g.week }) : undefined, g.mine ? t('vous en êtes') : undefined].filter(Boolean).join(' · ');
+      return { text: g.name, detail, icon: 'group' as const, action: index, pick: true };
+    });
+    return [{ title: t('Groupes publics'), rows }];
+  }
 
   // ---------- Profil public d'un joueur ----------
 
@@ -79,6 +109,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     const seen = net.cardSeen(key);
     const facts: string[] = [];
     if (card?.country) facts.push(countryName(card.country, locale()));
+    if (card?.friends !== undefined) facts.push(tn(card.friends, '{n} ami', '{n} amis'));
     if (card) facts.push(tn(card.badges.length, '{n} badge', '{n} badges'), tn(card.records, '{n} record publié', '{n} records publiés'));
     if (net.activityHidden(key)) sections.push({ rows: [{ text: t('Activité masquée sur cette borne'), detail: t('Ses évènements et ses « J’aime » ne s’affichent plus ici'), tone: 'quiet', icon: 'eye' }] });
     else if (!card) sections.push({ rows: [{ text: t('Profil public pas encore reçu'), detail: t('Il arrive quand sa borne, ou une borne qui l’a vu, est reliée à la vôtre'), tone: 'info', icon: 'clock' }] });
@@ -91,6 +122,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       });
       sections.push({ title: t('Activité récente · {n} derniers jours', { n: 30 }), rows: rows.length ? rows : [{ text: t('Ni record ni badge ces derniers jours'), tone: 'quiet' }] });
     }
+    sections.push(...groupsSection(key, actions, here));
     if (!friend) sections.push({ rows: [{ text: t('Table en cours, parties jouées, bibliothèque : réservées à ses amis'), tone: 'quiet', icon: 'lock' }] });
     // Actions : devenir ami, écrire (grisé pour un non-ami, avec sa raison), masquer, bloquer.
     const relation = net.state().outgoing.some((r) => r.key === key) ? 'outgoing' : net.state().incoming.some((r) => r.key === key) ? 'incoming' : friend ? 'friend' : 'none';
@@ -106,7 +138,9 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       { label: t('Bloquer {name}', { name }), icon: 'lock', detail: t('Plus de demande, plus de connexion avec sa borne'), run: () => confirm(t('Bloquer {name} ?', { name }), t('Plus de demande, plus de connexion avec sa borne. « Partage et réseau » le débloque.'), t('Bloquer'), () => { host.block(key); flash = { text: t('{name} bloqué : « Partage et réseau » le débloque', { name }), tone: 'ok' }; back(); }, () => openProfile(key, back)) },
       { label: t('Retour'), icon: 'back', run: back },
     );
-    return { heading: name, icon: 'friend-list', avatar: avatarOf(key, name, card), subheading: friend ? t('Profil public · votre ami') : t('Profil public · pas votre ami'), sections, actions, back, listStart: t('j’aime · ne plus aimer') };
+    const level = levelLine(levelOfCard(key, card));
+    const relationText = friend ? t('Profil public · votre ami') : t('Profil public · pas votre ami');
+    return { heading: name, icon: 'friend-list', avatar: avatarOf(key, name, card), subheading: level ? `${level} · ${relationText}` : relationText, sections, actions, back, listStart: t('j’aime · ne plus aimer') };
   }
 
   function confirm(question: string, lead: string, yes: string, run: () => void, cancel: () => void): void {
@@ -130,7 +164,8 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     if (!s.enabled) sections.push({ rows: [{ text: t('Partage désactivé : personne ne vous voit, vous ne voyez personne'), detail: t('Partage et réseau : « Activer le partage »'), tone: 'warning', badges: [t('Désactivé')] }] });
     else if (!card) sections.push({ rows: [{ text: t('Profil public désactivé'), detail: t('Les autres joueurs ne voient que votre pseudo dans l’annuaire, et vos scores s’ils sont publiés'), tone: 'warning', badges: [t('Désactivé')] }] });
     else {
-      const facts = [card.country ? countryName(card.country, locale()) : undefined, tn(card.badges.length, '{n} badge', '{n} badges'), tn(card.records, '{n} record publié', '{n} records publiés')].filter(Boolean).join(' · ');
+      const mine = card.xp !== undefined ? levelOf(card.xp) : undefined;
+      const facts = [mine ? t('{tier} · niveau {level}', { tier: tierLabel(mine.tier), level: mine.level }) : undefined, card.country ? countryName(card.country, locale()) : undefined, card.friends !== undefined ? tn(card.friends, '{n} ami', '{n} amis') : undefined, tn(card.badges.length, '{n} badge', '{n} badges'), tn(card.records, '{n} record publié', '{n} records publiés')].filter(Boolean).join(' · ');
       sections.push({ rows: [{ text: t('Ce que voient les joueurs qui ne sont pas vos amis'), detail: facts, icon: 'eye' }] });
       const rows: Row[] = card.events.map((e) => {
         const n = card.likes[e.id] ?? 0;
@@ -139,6 +174,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       });
       sections.push({ title: t('Votre activité récente'), rows: rows.length ? rows : [{ text: t('Ni record ni badge ces derniers jours'), tone: 'quiet' }] });
     }
+    sections.push(...groupsSection(me(), actions, (at) => openMine(undefined, at)));
     actions.push(
       on
         ? { label: t('Désactiver mon profil public'), icon: 'eye', detail: t('Les autres ne verront plus que votre pseudo dans l’annuaire'), run: () => { net.setPublicProfile(false); flash = { text: t('Profil public désactivé'), tone: 'ok' }; openMine(undefined, Number.MAX_SAFE_INTEGER); } }

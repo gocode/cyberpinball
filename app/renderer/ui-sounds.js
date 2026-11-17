@@ -248,7 +248,140 @@
       for (const [at, freq, decay] of notes) for (const [ratio, peak] of partials) tone(ac, out, t + at, { from: freq * ratio, peak, attack: 0.004, decay: decay / Math.sqrt(ratio) });
       return 0.45;
     },
+    // Badge commun reçu, « Tintement » (niveaux, 17/11/2026) : calé sur l'animation du badge
+    // (app/renderer/niveau.js) ; un court souffle, puis un arpège de cloches à l'arrivée du badge
+    // (1,05 s) sur une nappe douce ; de petits tics pendant le défilement des XP ; 4 s, réverbéré.
+    badge(ac, out, t) {
+      const wet = room(ac, out);
+      swell(ac, wet, t + 0.75, 0.3, 0.05);
+      [84, 88, 91, 96].forEach((m, i) => bell(ac, wet, t + 1.05 + i * 0.1, m, 1.3, 0.16));
+      pad(ac, wet, t + 1.05, [60, 64, 67], 1.6, 0.03, 1600);
+      ticks(ac, out, t + 2.4, 10, 0.8);
+      bell(ac, wet, t + 3.25, 91, 0.9, 0.07);
+      return 4.2;
+    },
+    // Badge rare, épique ou légendaire, « Fanfare » : un souffle qui monte, un impact grave à
+    // l'arrivée du badge, un arpège, puis les accords fa – sol – do pendant le texte ; des tics
+    // pendant le défilement des XP. 5 s, réverbéré.
+    'badge-rare'(ac, out, t) {
+      const wet = room(ac, out);
+      swell(ac, wet, t + 0.15, 0.9, 0.12);
+      boom(ac, out, t + 1.03, 0.5);
+      [72, 76, 79, 84].forEach((m) => bell(ac, wet, t + 1.05, m, 1.6, 0.1));
+      for (let i = 0; i < 7; i++) bell(ac, wet, t + 1.1 + i * 0.05, [96, 98, 100, 103, 105, 108][i % 6], 0.5, 0.05);
+      [84, 88, 91, 96, 100].forEach((m, i) => bell(ac, wet, t + 1.6 + i * 0.075, m, 0.9, 0.09));
+      pad(ac, wet, t + 1.75, [65, 69, 72], 0.8, 0.045);
+      pad(ac, wet, t + 2.55, [67, 71, 74], 0.7, 0.045);
+      pad(ac, wet, t + 3.25, [60, 72, 76, 79, 84], 2.2, 0.055, 3200);
+      bell(ac, wet, t + 3.25, 96, 1.6, 0.1);
+      ticks(ac, out, t + 2.4, 14, 0.8);
+      return 5.6;
+    },
+    // Le niveau monte (animation du badge, ou seul) : deux notes de cloche qui montent d'une quarte. 1,6 s.
+    'level-up'(ac, out, t) {
+      const wet = room(ac, out);
+      bell(ac, wet, t, 91, 0.8, 0.1);
+      bell(ac, wet, t + 0.12, 96, 1.4, 0.12);
+      return 1.6;
+    },
   };
+
+  // ---------- Outils des musiques des badges ----------
+
+  const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  /** Sortie avec réverbération : le son direct, plus une réponse de bruit qui décroît en 2,2 s. */
+  function room(ac, out) {
+    const bus = ac.createGain();
+    bus.connect(out);
+    const verb = ac.createConvolver();
+    const len = Math.round(ac.sampleRate * 2.2);
+    const ir = ac.createBuffer(2, len, ac.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+    }
+    verb.buffer = ir;
+    const wet = ac.createGain();
+    wet.gain.value = 0.32;
+    bus.connect(verb).connect(wet).connect(out);
+    return bus;
+  }
+
+  /** Cloche en modulation de fréquence : un son clair qui s'éteint. */
+  function bell(ac, out, t, midi, dur, vol) {
+    const car = ac.createOscillator();
+    const mod = ac.createOscillator();
+    const depth = ac.createGain();
+    car.frequency.value = hz(midi);
+    mod.frequency.value = hz(midi) * 3.5;
+    depth.gain.setValueAtTime(hz(midi) * 2.2, t);
+    depth.gain.exponentialRampToValueAtTime(1, t + dur);
+    mod.connect(depth).connect(car.frequency);
+    car.connect(envelope(ac, t, vol, 0.008, dur)).connect(out);
+    car.start(t);
+    mod.start(t);
+    car.stop(t + dur + 0.05);
+    mod.stop(t + dur + 0.05);
+  }
+
+  /** Nappe de dents de scie désaccordées, filtre qui s'ouvre : la chaleur des accords. */
+  function pad(ac, out, t, midis, dur, vol, bright = 2200) {
+    const f = ac.createBiquadFilter();
+    f.type = 'lowpass';
+    f.Q.value = 2;
+    f.frequency.setValueAtTime(400, t);
+    f.frequency.linearRampToValueAtTime(bright, t + dur * 0.5);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + Math.min(0.25, dur * 0.3));
+    g.gain.setValueAtTime(vol, t + dur * 0.75);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    f.connect(g).connect(out);
+    for (const m of midis)
+      for (const det of [-7, 7]) {
+        const o = ac.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.value = hz(m);
+        o.detune.value = det;
+        o.connect(f);
+        o.start(t);
+        o.stop(t + dur + 0.05);
+      }
+  }
+
+  /** Souffle qui monte : un bruit dont le filtre s'ouvre. */
+  function swell(ac, out, t, dur, vol) {
+    const src = ac.createBufferSource();
+    src.buffer = noiseBuffer(ac);
+    src.loop = true;
+    const f = ac.createBiquadFilter();
+    f.type = 'bandpass';
+    f.Q.value = 3;
+    f.frequency.setValueAtTime(300, t);
+    f.frequency.exponentialRampToValueAtTime(7000, t + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.95);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.08);
+    src.connect(f).connect(g).connect(out);
+    src.start(t);
+    src.stop(t + dur + 0.1);
+  }
+
+  /** Impact grave : une sinusoïde qui chute, et un éclat aigu. */
+  function boom(ac, out, t, vol) {
+    tone(ac, out, t, { from: 120, to: 38, glide: 0.45, peak: vol, attack: 0.005, decay: 0.6 });
+    hiss(ac, out, t, { filter: 'highpass', freq: 2500, peak: vol * 0.35, attack: 0.002, decay: 0.28 });
+  }
+
+  /** Petits tics qui montent pendant le défilement des XP. */
+  function ticks(ac, out, t, n, span) {
+    for (let i = 0; i < n; i++) {
+      const at = t + span * (1 - Math.pow(1 - i / n, 2));
+      tone(ac, out, at, { type: 'square', from: hz(91 + (i % 5) * 2), peak: 0.035, attack: 0.002, decay: 0.05 });
+    }
+  }
 
   function forget(entry) {
     clearTimeout(entry.timer);

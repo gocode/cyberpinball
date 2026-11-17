@@ -58,6 +58,10 @@ export interface PublicCard {
   badges: string[];
   /** Records publiés aux classements. */
   records: number;
+  /** XP du joueur (levels.ts) : son niveau ; absents d'une carte faite avant les niveaux. */
+  xp?: number;
+  /** Nombre de ses amis (jamais la liste). */
+  friends?: number;
   events: PublicEvent[];
   /** « J'aime » reçus par évènement (id → nombre). */
   likes: Record<string, number>;
@@ -81,6 +85,8 @@ export interface ProfileStore {
   cards: PublicCard[];
   /** Dernière fois que la carte d'un joueur a été reçue (clé → ISO). */
   seen: Record<string, string>;
+  /** Première fois (clé → ISO) : la vraisemblance de son niveau (levels.ts, shownLevel). Absent : rien de noté. */
+  first?: Record<string, string>;
   /** Mes « J'aime » (le dernier par évènement) ; `sent` : remis directement à la borne de l'auteur. */
   given: (Like & { sent?: boolean })[];
   /** « J'aime » reçus sur mes évènements (le dernier de chaque joueur pour chaque évènement). */
@@ -101,7 +107,8 @@ const DAY = 86_400_000;
 // Carte : faire, signer, vérifier
 
 function cardText(c: Omit<PublicCard, 'sig'>): string {
-  return JSON.stringify({ app: 'cyberpinball', kind: 'card', key: c.key, name: c.name, country: c.country ?? null, avatar: c.avatar ?? null, badges: c.badges, records: c.records, events: c.events, likes: c.likes, at: c.at });
+  // Niveau et amis n'entrent au texte que s'ils y sont : les cartes d'avant se vérifient toujours.
+  return JSON.stringify({ app: 'cyberpinball', kind: 'card', key: c.key, name: c.name, country: c.country ?? null, avatar: c.avatar ?? null, badges: c.badges, records: c.records, events: c.events, likes: c.likes, at: c.at, ...(c.xp !== undefined ? { xp: c.xp } : {}), ...(c.friends !== undefined ? { friends: c.friends } : {}) });
 }
 
 /** Mes évènements publics : records et badges des derniers jours, du plus récent au plus ancien. */
@@ -114,14 +121,14 @@ export function publicEvents(events: readonly SocialEvent[], now = new Date()): 
 }
 
 /** Ma carte, signée : les « J'aime » reçus sur ses évènements comptés à l'instant. */
-export function makeCard(state: Pick<SocialState, 'key' | 'name' | 'events' | 'badges'>, store: ProfileStore, extra: { country?: string; avatar?: string; records: number }, now = new Date()): PublicCard {
+export function makeCard(state: Pick<SocialState, 'key' | 'name' | 'events' | 'badges'>, store: ProfileStore, extra: { country?: string; avatar?: string; records: number; xp?: number; friends?: number }, now = new Date()): PublicCard {
   const events = publicEvents(state.events, now);
   const likes: Record<string, number> = {};
   for (const e of events) {
     const n = store.received.filter((l) => l.event === e.id && l.on && !store.hidden.includes(l.from)).length;
     if (n) likes[e.id] = n;
   }
-  const base: Omit<PublicCard, 'sig'> = { key: state.key.publicKey, name: state.name, ...(extra.country ? { country: extra.country } : {}), ...(extra.avatar ? { avatar: extra.avatar } : {}), badges: state.badges.map((b) => b.id), records: extra.records, events, likes, at: now.toISOString() };
+  const base: Omit<PublicCard, 'sig'> = { key: state.key.publicKey, name: state.name, ...(extra.country ? { country: extra.country } : {}), ...(extra.avatar ? { avatar: extra.avatar } : {}), badges: state.badges.map((b) => b.id), records: extra.records, events, likes, at: now.toISOString(), ...(extra.xp !== undefined ? { xp: Math.max(0, Math.floor(extra.xp)) } : {}), ...(extra.friends !== undefined ? { friends: extra.friends } : {}) };
   return { ...base, sig: signText(cardText(base), state.key) };
 }
 
@@ -168,7 +175,9 @@ export function verifyCard(raw: unknown, now = new Date()): PublicCard | undefin
     if (!isEventId(id) || typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > 1_000_000) return undefined;
     likes[id] = n;
   }
-  const card: PublicCard = { key: r.key, name, ...(r.country ? { country: r.country as string } : {}), ...(r.avatar ? { avatar: r.avatar as string } : {}), badges: r.badges as string[], records: r.records, events: events as PublicEvent[], likes, at: r.at, sig: r.sig };
+  const count = (v: unknown, max: number) => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= max ? v : undefined);
+  if ((r.xp !== undefined && count(r.xp, 100_000_000) === undefined) || (r.friends !== undefined && count(r.friends, 100_000) === undefined)) return undefined;
+  const card: PublicCard = { key: r.key, name, ...(r.country ? { country: r.country as string } : {}), ...(r.avatar ? { avatar: r.avatar as string } : {}), badges: r.badges as string[], records: r.records, events: events as PublicEvent[], likes, at: r.at, ...(r.xp !== undefined ? { xp: r.xp as number } : {}), ...(r.friends !== undefined ? { friends: r.friends as number } : {}), sig: r.sig };
   const { sig, ...base } = card;
   return verifyText(cardText(base), sig, card.key) ? card : undefined;
 }
@@ -180,17 +189,19 @@ export function verifyCard(raw: unknown, now = new Date()): PublicCard | undefin
 export function mergeCards(store: ProfileStore, cards: readonly PublicCard[], me: string, now = new Date()): { store: ProfileStore; fresh: PublicCard[] } {
   const byKey = new Map(store.cards.map((c) => [c.key, c]));
   const seen = { ...store.seen };
+  const first = { ...store.first };
   const fresh: PublicCard[] = [];
   for (const c of cards) {
     if (c.key === me) continue;
     seen[c.key] = now.toISOString();
+    first[c.key] ??= now.toISOString();
     const had = byKey.get(c.key);
     if (had && Date.parse(had.at) >= Date.parse(c.at)) continue;
     byKey.set(c.key, c);
     fresh.push(c);
   }
-  if (!fresh.length && Object.keys(seen).length === Object.keys(store.seen).length) return { store: { ...store, seen }, fresh };
-  return { store: pruneCards({ ...store, cards: [...byKey.values()], seen }, now), fresh };
+  if (!fresh.length && Object.keys(seen).length === Object.keys(store.seen).length) return { store: { ...store, seen, first }, fresh };
+  return { store: pruneCards({ ...store, cards: [...byKey.values()], seen, first }, now), fresh };
 }
 
 /** Ménage : les cartes plus vues depuis CARD_KEEP_DAYS partent, et au-delà de CARDS_MAX les plus anciennes. */
@@ -200,9 +211,10 @@ export function pruneCards(store: ProfileStore, now = new Date()): ProfileStore 
   const cards = store.cards.filter((c) => seenAt(c) >= limit).sort((a, b) => seenAt(b) - seenAt(a)).slice(0, CARDS_MAX);
   const keys = new Set(cards.map((c) => c.key));
   const seen = Object.fromEntries(Object.entries(store.seen).filter(([k]) => keys.has(k)));
+  const first = Object.fromEntries(Object.entries(store.first ?? {}).filter(([k]) => keys.has(k)));
   const pendingLimit = now.getTime() - LIKE_PENDING_DAYS * DAY;
   const given = store.given.filter((l) => l.sent || Date.parse(l.at) >= pendingLimit || keys.has(l.to));
-  return { ...store, cards, seen, given };
+  return { ...store, cards, seen, first, given };
 }
 
 /** Ce qu'une borne envoie au bonjour : ma carte d'abord, puis les plus récemment vues. */
@@ -295,11 +307,12 @@ export function loadProfiles(dataDir: string, now = new Date()): ProfileStore {
   const s = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const cards = (Array.isArray(s.cards) ? s.cards : []).map((c) => verifyCard(c, now)).filter((c): c is PublicCard => !!c);
   const seen = s.seen && typeof s.seen === 'object' ? Object.fromEntries(Object.entries(s.seen as Record<string, unknown>).filter(([k, v]) => isPlayerPublicKey(k) && isIso(v))) as Record<string, string> : {};
+  const first = s.first && typeof s.first === 'object' ? Object.fromEntries(Object.entries(s.first as Record<string, unknown>).filter(([k, v]) => isPlayerPublicKey(k) && isIso(v))) as Record<string, string> : {};
   const likes = (v: unknown) => (Array.isArray(v) ? v : []).map((l) => ({ l: verifyLike(l, now), sent: (l as { sent?: unknown })?.sent === true })).filter((x) => !!x.l);
   const given = likes(s.given).map(({ l, sent }) => ({ ...l!, ...(sent ? { sent: true } : {}) }));
   const received = likes(s.received).map(({ l }) => l!);
   const hidden = (Array.isArray(s.hidden) ? s.hidden : []).filter(isPlayerPublicKey) as string[];
-  return pruneCards({ v: 1, cards, seen, given, received, hidden }, now);
+  return pruneCards({ v: 1, cards, seen, first, given, received, hidden }, now);
 }
 
 export function saveProfiles(dataDir: string, store: ProfileStore): void {

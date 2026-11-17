@@ -30,6 +30,15 @@ import {
   downloadReasonText,
   avatarsDir,
   avatarView,
+  BADGES,
+  badgeDefinition,
+  badgeShape,
+  FAMILY_BACKDROP,
+  RARITY_XP,
+  rarityLabel,
+  levelOf,
+  tierLabel,
+  type AvatarView,
   profileWelcomeDue,
   powerSimulated,
   powerTexts,
@@ -282,6 +291,8 @@ import {
   type NoticeView,
   type NoticeZone,
   type SystemItemId,
+  type NewsReach,
+  isSystemGroup,
   noticeZone,
   type ZoneScreen,
   type MenuMoment,
@@ -334,7 +345,6 @@ import {
   loadedRoms,
   readTableRecords,
   vpRegFile,
-  playStats,
   presenceTable,
   socialNetMode,
   type DmdAnimationName,
@@ -512,9 +522,12 @@ import { findComponent } from '@cyberpinball/installer';
 import { closeHeadsetViews, isHeadsetView, openHeadsetViews, sendToHeadsetViews, setHeadsetPainting, type HeadsetPage } from './casque-vues';
 import { createLiveScoresMenu } from './live-scores-menu';
 import { createLiveGames, type LiveProgress, type LiveStartGate } from './live-game';
+import { createLevelTracker } from './level-tracker';
+import { createLevelMenu } from './level-menu';
 import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
 import { createActivityMenu } from './activity-menu';
+import { createNewsMenu } from './news-menu';
 import { demoCharter, seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
 import { createDedicatedMenu } from './dedicated-menu';
 import { TableTints } from './table-tint';
@@ -2779,6 +2792,8 @@ function socialChanged(): void {
     // Une charte reçue a pu faire de cette borne un modérateur (ou le contraire).
     syncModerationItem();
     menuNotices.observe();
+    // Nouvel ami, « J'aime » ou réaction reçus : leurs XP (level-tracker.ts).
+    levelTracker.socialChanged();
     broadcast();
   }, 250);
 }
@@ -2787,6 +2802,8 @@ const socialCharter = socialDemo ? demoCharter(loc.dataDir) : undefined;
 const socialNet = createSocialNet({
   ...(socialCharter ? { charter: socialCharter } : {}),
   dataDir: loc.dataDir,
+  // Une ligne écrite au salon : la présence du jour compte pour le niveau.
+  onOwnLine: () => levelTracker.roomMessage(),
   mode: socialMode,
   log: (line) => console.log(line),
   onChange: socialChanged,
@@ -2839,6 +2856,7 @@ const groupService = createGroupService({
   net: socialNet,
   dataDir: loc.dataDir,
   onChange: () => socialChanged(),
+  onOwnLine: () => levelTracker.roomMessage(),
   onArrive: (view, lines) => {
     if (guest.active || groupsMenu.shown() === view.id) return;
     menuNotices.push(lines.map((l) => ({ kind: 'group-message' as const, key: l.id, at: Date.now(), who: l.name, player: l.by, subject: view.name, extra: (l.body.k === 'msg' ? l.body.text : '').replace(/\s*\n\s*/g, ' ') })));
@@ -2948,6 +2966,45 @@ const activityMenu = createActivityMenu({
   log: (line) => console.log(line),
 });
 library.provideSystemItem('activity', activityMenu.item);
+/**
+ * Nouveautés (Menu système > Nouveautés, news-menu.ts) : les grandes nouveautés, choisies à la main,
+ * en chronologie ; « Essayer » mène à chaque fonction, son « Retour » ramenant à la nouveauté.
+ */
+const newsMenu = createNewsMenu({
+  dataDir: loc.dataDir,
+  library: { openCustom: (build, at) => library.openCustom(build, at), openSystem: () => library.openSystem() },
+  reach: (target, back) => newsReach(target, back),
+  changed: () => {
+    if (!closing && state.phase !== 'playing' && state.phase !== 'loading') broadcast();
+  },
+  log: (line) => console.log(line),
+});
+library.provideSystemItem('news', newsMenu.item);
+
+/** Où « Essayer » mène depuis une nouveauté, ou pourquoi pas maintenant. */
+function newsReach(target: NewsReach, back: () => void): { run?: () => void; gone?: string } {
+  if (guest.active) return { gone: t('Indisponible en mode invité') };
+  switch (target.kind) {
+    case 'system':
+      if (isSystemGroup(target.id)) return { run: () => void library.openSystemEntry(target.id) };
+      if (!library.hasSystemItem(target.id)) return { gone: t('Indisponible sur cette borne') };
+      return { run: () => library.runSystemItem(target.id as SystemItemId, back) };
+    case 'community': {
+      if (!socialNet.state().enabled) return { gone: t('Indisponible : partage désactivé (Partage et réseau)') };
+      const open = { home: () => communityMenu.openHome(back), instant: () => instantMenu.open(back), groups: () => groupsMenu.open(back) }[target.door];
+      return { run: open };
+    }
+    case 'jukebox':
+      return { run: () => openJukebox() };
+    case 'sheet': {
+      const table = tables[state.index];
+      if (!table) return { gone: t('Choisissez d’abord une table sur la roue') };
+      if (target.part === 'credits') return { run: () => library.credits.open(table) };
+      if (target.part === 'scores') return { run: () => library.openScores(table, 'world', 'week', back) };
+      return { run: () => library.openSheet(table) };
+    }
+  }
+}
 const menuNotices = createMenuNotices({
   social: socialNet,
   jobs: () => library.downloads.manager.jobs(),
@@ -3077,6 +3134,21 @@ const liveGames = createLiveGames({
     // Le compte à rebours et l'annulation s'affichent d'eux-mêmes ; dans la gestion des tables aussi, une fois la partie acceptée.
     friendsMenu.live.follow(() => !closing && (state.phase === 'menu' || state.phase === 'library'), () => library.leave());
   },
+  // Une partie en ligne finie : ses XP au niveau du joueur.
+  onFinished: (entry) => levelTracker.liveFinished(entry),
+  log: (line) => console.log(line),
+});
+// Niveau du joueur (level-tracker.ts, décidé le 17/11/2026) : XP des parties, des parties en ligne,
+// du salon et des amis ; badges ; classements de la semaine ; le moment montré au retour d'une partie.
+// Rien ne compte en mode invité ni pendant un essai sans opérateur.
+const levelTracker = createLevelTracker({
+  dataDir: loc.dataDir,
+  net: socialNet,
+  tables: () => tables,
+  history: () => liveGames.history(),
+  groups: () => ({ count: groupService.groups().length, wins: 0 }),
+  active: () => !guest.active && !process.env.CYBERPINBALL_AUTOPILOT,
+  changed: () => socialChanged(),
   log: (line) => console.log(line),
 });
 // Volume −, Volume + et Muet : le son de Windows, au menu comme en partie (cabinet-volume.ts).
@@ -3231,6 +3303,11 @@ const profileMenu = createProfileMenu({
     chatService.clear(key);
   },
   openThread: (key, back) => chatMenu.openThread(key, back),
+  // Ses groupes publics (17/11/2026) : connus de cette borne par l'annuaire ; jamais un groupe privé.
+  groups: {
+    of: (key) => groupService.publicGroupsOf(key).map(({ view, mine }) => ({ id: view.id, name: view.name, members: view.members.length, ...(view.week ? { week: view.week.table.title } : {}), mine })),
+    open: (id, mine, back) => (mine ? groupsMenu.openGroup(id, back) : groupsMenu.openPublic(id, back)),
+  },
 });
 library.provideSystemItem('public-profile', profileMenu.item);
 // Salons par pays (rooms-menu.ts) : le journal, écrire, les options d'une ligne, les règles, les réglages de la communauté.
@@ -3307,7 +3384,19 @@ const instantMenu = createInstantMenu({
   openSharing: (back) => library.runSystemItem('sharing', back),
   redraw: () => broadcast(),
 });
+// Mon niveau et Mes badges (level-menu.ts) : le récap, en tête de l'accueil Communauté.
+const levelMenu = createLevelMenu({
+  library,
+  net: socialNet,
+  levels: levelTracker,
+  openProfile: (back) => profileMenu.openMine(back),
+});
 const communityMenu = createCommunityMenu({
+  level: {
+    detail: () => levelMenu.detail(),
+    avatar: () => ({ ...avatarView(socialNet.state().key.publicKey, socialNet.state().name, socialNet.avatarFile(socialNet.state().key.publicKey)), level: levelTracker.view().level }),
+    open: (back) => levelMenu.open(back),
+  },
   instant: { door: () => instantMenu.door(), open: (back) => instantMenu.open(back) },
   rooms: { door: () => roomsMenu.door(), glance: () => roomsMenu.glance(), open: (back) => roomsMenu.openDefault(back) },
   groups: { door: () => groupsMenu.door(), open: (back) => groupsMenu.open(back) },
@@ -3340,7 +3429,7 @@ library.provideSystemItem('friends', friendsMenu.items.friends);
 library.provideSystemItem('game-history', friendsMenu.items['game-history']);
 library.provideSystemItem('find-player', friendsMenu.items['find-player']);
 library.provideSystemItem('friend-requests', friendsMenu.items['friend-requests']);
-library.provideSystemItem('badges', friendsMenu.items.badges);
+library.provideSystemItem('badges', levelMenu.badgesItem);
 library.provideSystemItem('sharing', friendsMenu.items.sharing);
 // « Ajouter une table > Depuis un ami… » : la bibliothèque d'un ami, ses tables absentes d'abord.
 library.provideAddFromFriend(friendsMenu.addFromFriend);
@@ -5613,6 +5702,12 @@ export function startFrontend(): void {
     else if (action.type === 'friends' || action.type === 'friend-requests') {
       if (state.phase === 'menu' && guest.knock('menu.system')) friendsMenu.items[action.type].run();
     }
+    // Carte du joueur (coin d'état) : Mon niveau ; pastille des badges : Mes badges.
+    else if (action.type === 'level' || action.type === 'badges') {
+      if (state.phase === 'menu' && guest.knock('menu.system')) (action.type === 'level' ? levelMenu.open : levelMenu.openBadges)(() => library.leave());
+    }
+    // Le moment d'un badge ou d'un niveau, vu : il ne revient plus.
+    else if (action.type === 'level-seen') levelTracker.seen();
     // « J'aime » sur mon activité : Mon profil public, qui dit qui a aimé.
     else if (action.type === 'my-profile') {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) profileMenu.openMine(state.phase === 'menu' ? () => library.leave() : undefined);
@@ -5876,7 +5971,7 @@ export function startFrontend(): void {
   }, 60_000);
   // Réseau des bornes : présence aux amis, annuaire ; un échec s'affiche dans « Partage et réseau ».
   void socialNet.start().then(async () => {
-    socialNet.checkBadges(playStats(tables));
+    levelTracker.start();
     // Les règles du pare-feu, à chaque démarrage et après une mise à jour : lues, écrites au
     // journal, reposées d'elles-mêmes par la tâche de réparation si l'une manque (firewall-guard.ts).
     // Ce qui reste à reposer reste visible : « Partage et réseau », la présence des amis ; et juste
@@ -6259,6 +6354,12 @@ const keyboardChords = createModifierChords<Input>({ down: (input) => handleKey(
  */
 function handleKey(input: Input, fromPhone = false): boolean {
   if (!fromPhone) cabinetVolume?.windowInput(input);
+  // Le moment d'un badge ou d'un niveau : une touche le ferme (pas dans la première seconde et
+  // demie : un bouton encore tenu au retour de la partie ne l'efface pas avant qu'on l'ait vu).
+  if (levelMomentAt && state.phase === 'menu' && levelTracker.pending()) {
+    if (Date.now() - levelMomentAt > 1500) levelTracker.seen();
+    return true;
+  }
   const is = (group: string[]) => group.includes(input.code);
   // Un bouton de la combinaison appuyé pendant qu'un autre est tenu ne fait rien d'autre. Le
   // téléphone n'y entre pas : on ne déverrouille le mode invité qu'à la borne.
@@ -6667,12 +6768,19 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
       recordPlay(table, startedAt, result.seconds);
       try {
         if (result.seconds >= 60) socialNet.publish({ kind: 'played', table: presenceTable(table), seconds: Math.round(result.seconds) });
-        socialNet.checkBadges(playStats(tables));
       } catch (error) {
-        console.log(`Partie (${table.id}) : nouvelles pour les amis et badges pas mis à jour (${(error as Error).message}) ; la partie compte quand même.`); // i18n-ignore : journal
+        console.log(`Partie (${table.id}) : nouvelles pour les amis pas envoyées (${(error as Error).message}) ; la partie compte quand même.`); // i18n-ignore : journal
       }
     }
     tables = tables.map((t) => (t.id === table.id ? { ...t, info: readInfo(t.infoFile) } : t));
+    // Le niveau : la partie (Pinball FX ne donne pas ses scores), puis les badges qu'elle vaut.
+    if (!autoStopAfterMs) {
+      try {
+        levelTracker.gameEnded({ table: presenceTable(table), seconds: result.seconds, entered: [], newTable: (table.info.User?.StartCount ?? 0) === 0, at: new Date() });
+      } catch (error) {
+        console.log(`Partie (${table.id}) : niveau et badges pas mis à jour (${(error as Error).message}) ; la partie compte quand même.`); // i18n-ignore : journal
+      }
+    }
     state = { ...state, phase: 'menu' };
   } else {
     console.log(`Partie (${table.id}) : échec de Pinball FX (${result.failure ?? 'inconnu'}) : ${result.message ?? ''}`); // i18n-ignore : journal
@@ -7195,6 +7303,15 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (result.ok) {
     // Les parties du test automatique ne comptent pas dans les statistiques.
     if (!autoStopAfterMs) recordPlay(table, startedAt, result.seconds);
+    // Le niveau (level-tracker.ts) : la partie, ses scores s'ils sont relevés, ses records, son mode.
+    const levelFacts = { table: presenceTable(table), seconds: result.seconds, entered: double ? [] : entered.map((e) => e.rank), newTable: (table.info.User?.StartCount ?? 0) === 0, at: new Date(), ...(vrGame !== undefined ? { mode: 'vr' as const } : vision3d.mode === 'on' ? { mode: 'vision3d' as const } : {}) };
+    const levelAfterGame = (scores?: number[]) => {
+      try {
+        levelTracker.gameEnded({ ...levelFacts, ...(scores ? { scores } : {}) });
+      } catch (error) {
+        console.log(`Partie (${table.id}) : niveau et badges pas mis à jour (${(error as Error).message}) ; la partie compte quand même.`); // i18n-ignore : journal
+      }
+    };
     // Les scores de la partie, datés, au tableau des scores de la table ; sans retarder le retour au menu.
     if (!autoStopAfterMs && scoresBefore) {
       tableScores
@@ -7202,8 +7319,12 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
         .then(async (kept) => {
           if (kept.length) broadcast();
           await publishScores(table, kept, Boolean(double && live?.multi));
+          levelAfterGame(kept.filter((p) => !p.of).map((p) => p.score));
         })
-        .catch((error: Error) => console.log(`Tableau des scores (${table.id}) : partie non gardée (${error.message}).`)); // i18n-ignore : journal
+        .catch((error: Error) => {
+          console.log(`Tableau des scores (${table.id}) : partie non gardée (${error.message}).`); // i18n-ignore : journal
+          levelAfterGame();
+        });
     }
     tables = tables.map((t) => (t.id === table.id ? { ...t, info: readInfo(t.infoFile) } : t));
     // Pour les amis : les records entrés au tableau, la partie, puis les badges qu'ils valent.
@@ -7215,10 +7336,11 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
         // Pas pour une partie entre amis : son tableau est celui du groupe, posé dans le double, pas celui de la table.
         if (!double) for (const s of [...entered].sort((a, b) => a.rank - b.rank)) socialNet.publish({ kind: 'record', table: seen, score: s.score, rank: s.rank, ...(s.initials ? { initials: s.initials } : {}) });
         if (result.seconds >= 60) socialNet.publish({ kind: 'played', table: seen, seconds: Math.round(result.seconds) });
-        socialNet.checkBadges(playStats(tables));
       } catch (error) {
-        console.log(`Partie (${table.id}) : nouvelles pour les amis et badges pas mis à jour (${(error as Error).message}) ; la partie compte quand même.`); // i18n-ignore : journal
+        console.log(`Partie (${table.id}) : nouvelles pour les amis pas envoyées (${(error as Error).message}) ; la partie compte quand même.`); // i18n-ignore : journal
       }
+      // Sans relevé des scores, le niveau n'attend rien de plus.
+      if (!scoresBefore) levelAfterGame();
     }
     const unseen = simulated === undefined ? joystickMessage(install.version) : undefined;
     state = unseen ? { ...state, phase: 'message', message: unseen } : { ...state, phase: 'menu' };
@@ -8028,6 +8150,8 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     // Amis en ligne et notification du moment, à gauche de la pastille des téléchargements
     // (jamais en mode invité ; la file décide seule du reste : menu-notices.ts).
     ...(role === 'playfield' ? menuCorner() : {}),
+    // Badge reçu, niveau qui monte : le moment, au retour sur l'écran des tables (level-tracker.ts, niveau.js).
+    ...(role === 'playfield' ? { levelMoment: levelMomentView() } : {}),
     library: state.phase === 'library' ? library.view() : undefined,
     // Mode attente : la table montrée, son logo, et l'invite du playfield.
     // Ses crédits en une ligne discrète, au-dessus de l'invite (réglage « Crédits de la table » du mode attente).
@@ -8109,7 +8233,7 @@ function browserOnPlayfield(): boolean {
  * menu des tables ou sur la ligne de la roue dentée d'un écran plein (`zone`) ; par-dessus VPX
  * ou le navigateur intégré, une ligne posée sur eux (game-notice.ts).
  */
-function menuCorner(): { zone?: 'corner' | 'head'; friendsOnline?: { count: number; title: string; searching?: boolean }; notice?: NoticeView } {
+function menuCorner(): { zone?: 'corner' | 'head'; friendsOnline?: { count: number; title: string; searching?: boolean }; notice?: NoticeView; player?: PlayerCardView; badges?: { count: number; total: number; title: string } } {
   const zone = currentZone();
   // La file avance à chaque rendu : une notification ouverte part quand l'écran ne s'y prête plus.
   const corner = menuNotices.view();
@@ -8118,13 +8242,92 @@ function menuCorner(): { zone?: 'corner' | 'head'; friendsOnline?: { count: numb
   const browser = zoneScreen() === 'browser' ? browserScreenRect()?.bounds : undefined;
   gameNotices.line(over, browser ? { zone: browser, rotation: 0, corner: 'bottom-left' } : undefined);
   if (zone.place !== 'corner' && zone.place !== 'head') return {};
-  return { zone: zone.place, ...corner };
+  // La carte du joueur et ses badges : au coin de l'écran des tables seulement (discrets, 17/11/2026).
+  const player = zone.place === 'corner' && zoneScreen() === 'menu' ? playerCard() : undefined;
+  return { zone: zone.place, ...corner, ...(player ? { player, badges: { count: socialNet.state().badges.length, total: BADGES.length, title: t('Mes badges') } } : {}) };
 }
 
 /** Part d'une fenêtre dans le lancement en cinéma : le logo part du plateau, se pose sur le fronton (sa fenêtre ou sa zone). */
 function cinemaFor(role: RoleId): CinemaView | undefined {
   const roles = windowRoles.get(role) ?? [role];
   return cinema.view({ depart: role === 'playfield', arrivee: roles.includes('backglass') });
+}
+
+/** Depuis quand le moment d'un badge ou d'un niveau est à l'écran (handleKey) ; undefined : rien. */
+let levelMomentAt: number | undefined;
+let levelMomentKey: string | undefined;
+
+/**
+ * Le moment à montrer (niveau.js) : au menu des tables seulement, jamais pendant une partie ni un
+ * chargement ; chaque badge avec sa rareté, son fond (famille) et sa forme, le niveau avant et après,
+ * et les sons au volume du réglage des sons de l'interface (uiSoundCue).
+ */
+function levelMomentView() {
+  const pending = levelTracker.pending();
+  if (!pending || state.phase !== 'menu' || attract.active || guest.active) {
+    if (!pending) levelMomentAt = levelMomentKey = undefined;
+    return undefined;
+  }
+  if (levelMomentKey !== pending.at) {
+    levelMomentKey = pending.at;
+    levelMomentAt = Date.now();
+  }
+  const lv = (xp: number) => {
+    const v = levelOf(xp);
+    return { level: v.level, progress: v.progress, into: v.into, need: v.need, tier: v.tier, tierLabel: tierLabel(v.tier) };
+  };
+  const s = socialNet.state();
+  const cue = (id: UiSoundId) => uiSoundCue(id, mediaSettings, 'browse');
+  return {
+    key: pending.at,
+    ...(pending.start ? { start: true } : {}),
+    badges: pending.badges.map((id) => {
+      const b = badgeDefinition(id)!;
+      return { id, label: b.label, detail: b.detail, rarity: b.rarity, rarityLabel: rarityLabel(b.rarity), icon: b.icon, backdrop: FAMILY_BACKDROP[b.family], shape: badgeShape(b.rarity), xp: RARITY_XP[b.rarity], ...(b.secret ? { secret: true } : {}) };
+    }).filter((b) => b.label),
+    from: lv(pending.from),
+    to: lv(pending.to),
+    avatar: { ...avatarView(s.key.publicKey, s.name, socialNet.avatarFile(s.key.publicKey)), level: levelOf(pending.to).level },
+    sounds: { badge: cue('badge'), rare: cue('badge-rare'), level: cue('level-up') },
+    texts: {
+      unlocked: t('Badge débloqué'),
+      secret: t('Secret dévoilé'),
+      level: t('Niveau'),
+      start: t('Votre niveau de départ'),
+      startDetail: t('Calculé sur vos parties d’avant les niveaux'),
+      badgesSoFar: tn(pending.badges.length, '{n} badge déjà mérité', '{n} badges déjà mérités'),
+      continue: t('Un bouton pour continuer'),
+    },
+  };
+}
+
+/** La carte du joueur du coin d'état : avatar à l'anneau de son palier, pseudo, niveau, barre ; « Invité » en mode invité. */
+interface PlayerCardView {
+  name: string;
+  avatar: AvatarView;
+  level?: number;
+  label: string;
+  progress?: number;
+  /** XP de la dernière partie : la part gagnée de la barre brille, « +85 XP » apparaît puis s'efface. */
+  gain?: { text: string; from: number };
+  guest?: true;
+  title: string;
+}
+function playerCard(): PlayerCardView {
+  const s = socialNet.state();
+  if (guest.active) return { name: t('Invité'), avatar: { initials: '?', hue: 170 }, label: t('Parties sans XP'), guest: true, title: t('Mode invité : les parties ne comptent pas pour le niveau') };
+  const v = levelTracker.view();
+  const from = v.gain ? levelOf(v.gain.from) : undefined;
+  return {
+    name: s.name,
+    avatar: { ...avatarView(s.key.publicKey, s.name, socialNet.avatarFile(s.key.publicKey)), level: v.level },
+    level: v.level,
+    label: t('NIV. {n}', { n: v.level }),
+    progress: v.progress,
+    // Le niveau a changé pendant la partie : la part gagnée part du début de la barre.
+    ...(v.gain ? { gain: { text: t('+{n} XP', { n: v.gain.xp }), from: from && from.level === v.level ? from.progress : 0 } } : {}),
+    title: t('{tier} · niveau {level} · {into} / {need} XP', { tier: tierLabel(v.tier), level: v.level, into: v.into, need: v.need }),
+  };
 }
 
 /** Table voisine dans le menu des tables (boutons, roue cliquée) : le solénoïde claque à chaque table. */

@@ -42,6 +42,8 @@ import { classifyDir, classifyFile, nameKey, type FileKind } from './tablefiles'
 import { parseTableName, readInfo, type TableInfoFile } from './tables';
 import { mergeFavorite } from './collections';
 import { HISTORIC_ROM_ALIASES } from './vpmalias';
+import { IMPORTED_ALIAS_COMMENT, readTableAliases, tableAliasFile, withAlias, type AliasLine } from './romalias';
+import type { CompanionReport } from './installation';
 import { ipdbIdOf, matchVps, type VpsCandidate, type VpsDb } from './vps';
 import { buildScriptPatch, readScriptPatch } from './scriptpatch';
 import { compatFixesApplicable, compatFixesFound } from './scriptcompat';
@@ -117,6 +119,12 @@ export interface PlanOptions {
    * comprise, sauf ce qui va ailleurs par nature (une ROM entre dans la bibliothèque).
    */
   target?: string;
+  /**
+   * Ce que la reprise depuis une autre installation a trouvé pour chaque .vpx (installationCompanions) :
+   * l'alias de VPinMAME sous lequel sa ROM a été trouvée, écrit dans pinmame\alias.txt ; la recherche
+   * d'une ROM introuvable, gardée dans le .info pour que la fiche dise où elle a été cherchée.
+   */
+  companions?: CompanionReport[];
 }
 
 /** Une version d'une ROM : celle de la bibliothèque ou une ROM importée. */
@@ -263,6 +271,8 @@ export interface TablePlan {
   vps?: TableVps;
   /** .vbs de Cyber Pinball (PuP-Pack allumé) à écrire ou à retirer. */
   scripts: ScriptPatchPlan[];
+  /** Lignes d'alias à ajouter à pinmame\alias.txt : la ROM reprise sous le nom que VPinMAME lui donnait. */
+  romAliases?: AliasLine[];
 }
 
 /** .vbs de Cyber Pinball, à côté d'un .vpx installé : le script de la table, PuP-Pack allumé. */
@@ -993,11 +1003,26 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
     info.CyberPinball = setPupMemory(info, pack.name, memory).CyberPinball;
   }
 
+  // Reprise depuis une autre installation : ce qu'elle a dit de la ROM de ces .vpx.
+  const reports = (opts.companions ?? []).filter((r) => game.vpx.some((v) => samePath(v.path, r.vpx)));
   const romsPresent = [...steps.filter((s) => s.kind === 'rom').map((s) => path.basename(s.to, '.zip').toLowerCase()), ...linkedRoms];
   const romsInstalled = listSafe(path.join(game.folder, 'pinmame', 'roms')).map((f) => f.replace(/\.zip$/i, '').toLowerCase());
-  if (game.roms.length && !game.roms.some((r) => romsPresent.includes(r.toLowerCase()) || romsInstalled.includes(r.toLowerCase()))) {
-    warnings.push(t("La ROM « {rom} » n'est pas dans l'import : la table ne démarrera pas sans elle.", { rom: game.roms[0]! }));
+  const present = (n: string) => romsPresent.includes(n.toLowerCase()) || romsInstalled.includes(n.toLowerCase());
+  // Un alias ne s'écrit que si sa ROM arrive et que celle demandée n'est pas là : il passerait avant elle.
+  const romAliases: AliasLine[] = [];
+  for (const a of reports.flatMap((r) => r.romAliases ?? [])) {
+    if (present(a.rom) && !present(a.alias) && !romAliases.some((x) => x.alias.toLowerCase() === a.alias.toLowerCase())) romAliases.push(a);
   }
+  const has = (r: string) => present(r) || romAliases.some((a) => a.alias.toLowerCase() === r.toLowerCase());
+  const romOk = !game.roms.length || game.roms.some(has);
+  if (!romOk) warnings.push(t("La ROM « {rom} » n'est pas dans l'import : la table ne démarrera pas sans elle.", { rom: game.roms[0]! }));
+  // La fiche dira où la ROM a été cherchée à la reprise ; une ROM arrivée depuis efface la note.
+  const search = reports.find((r) => r.romSearch)?.romSearch;
+  const cp = { ...((info.CyberPinball as Record<string, unknown> | undefined) ?? {}) };
+  if (search && !romOk) cp.RomSearch = { Roms: search.roms, Dirs: search.dirs, From: search.from };
+  else delete cp.RomSearch;
+  if (Object.keys(cp).length) info.CyberPinball = cp;
+  else delete info.CyberPinball;
   if (!game.isNew && !game.vpx.length && !steps.length) warnings.push(t('Rien à ajouter à cette table.'));
   const scripts = planScriptPatches(game, steps, opts, warnings);
 
@@ -1016,6 +1041,7 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
     warnings,
     vps: game.vps,
     scripts,
+    ...(romAliases.length ? { romAliases } : {}),
   };
 }
 
@@ -1133,6 +1159,14 @@ export function applyImport(plan: TablePlan, ctx: ImportContext): void {
     (plan.scripts ?? []).map((s): FileOp => (s.content !== undefined ? { op: 'write', path: s.to, content: s.content, encoding: 'latin1' } : { op: 'trash', path: s.to })),
     ctx,
   );
+  // ROM reprise sous le nom que VPinMAME lui donnait (VPMAlias.txt, ancien nom) : le plugin PinMAME
+  // de VPX ne lit que pinmame\alias.txt de la table, à côté de pinmame\roms.
+  if (plan.romAliases?.length) {
+    let text = readTableAliases(plan.folder).text;
+    for (const a of plan.romAliases) text = withAlias(text, a.alias, a.rom, IMPORTED_ALIAS_COMMENT);
+    fs.mkdirSync(path.dirname(tableAliasFile(plan.folder)), { recursive: true });
+    writeFileAtomic(tableAliasFile(plan.folder), text);
+  }
   writeFileAtomic(plan.infoFile, JSON.stringify(plan.info, null, 2) + '\n');
   for (const src of plan.infoSources) {
     if (src.mode === 'move' && fs.existsSync(src.from) && !samePath(src.from, plan.infoFile)) moveToTrash(src.from, ctx);

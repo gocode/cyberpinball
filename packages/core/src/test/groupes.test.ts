@@ -34,6 +34,7 @@ import {
   verifyAnnounce,
   mergeAnnounces,
   publicGroups,
+  playerPublicGroups,
   type GroupLine,
   type GroupsState,
   type GroupView,
@@ -383,4 +384,34 @@ test('groupes publics sur le réseau : trouvé par une inconnue, rejoint, fermé
     await Promise.all(all.map((c) => c.net.stop()));
     await testnet.destroy();
   }
+});
+
+test('profil public : les groupes publics d’un joueur, jamais un groupe privé (17/11/2026)', () => {
+  const alice = player('Alice');
+  const bruno = player('Bruno');
+  const chloe = player('Chloé');
+  const G = 'abcdef0123456789';
+  const H = '0123456789abcdef';
+  const P = '9876543210fedcba';
+  // Un groupe public de l'annuaire, dont Bruno est membre et pas moi (Chloé).
+  const pub = [sign(alice, G, { k: 'create', name: 'Club ouvert', access: 'public' }, 0, G), sign(bruno, G, { k: 'join' }, 1)];
+  const announce = signAnnounce({ key: alice.key }, pub, at(2))!;
+  // Un groupe public dont nous sommes membres tous les deux, sur ma borne.
+  const both = [sign(chloe, H, { k: 'create', name: 'Tilt du samedi', access: 'public' }, 0, H), sign(bruno, H, { k: 'join' }, 1)];
+  // Un groupe privé dont il est membre : jamais sur son profil.
+  const priv = [sign(chloe, P, { k: 'create', name: 'Club fermé' }, 0, P), sign(chloe, P, { k: 'invite', who: bruno.key.publicKey, whoName: 'Bruno' }, 1), sign(bruno, P, { k: 'join' }, 2)];
+  assert.equal(isMember(groupView(priv, at(3))!, bruno.key.publicKey), true);
+  const s: GroupsState = { ...newGroupsState(), groups: { [H]: { lines: both, unread: 0 }, [P]: { lines: priv, unread: 0 } }, directory: { [G]: announce } };
+  const seen = playerPublicGroups(s, bruno.key.publicKey, chloe.key.publicKey, at(4));
+  assert.deepEqual(seen.map((g) => [g.view.name, g.mine]).sort(), [['Club ouvert', false], ['Tilt du samedi', true]]);
+  assert.deepEqual(playerPublicGroups(s, alice.key.publicKey, chloe.key.publicKey, at(4)).map((g) => g.view.name), ['Club ouvert']);
+  // Redevenu privé : il quitte le profil.
+  const closed = { ...s, groups: { ...s.groups, [H]: { lines: [...both, sign(chloe, H, { k: 'access', access: 'private' }, 3)], unread: 0 } } };
+  assert.deepEqual(playerPublicGroups(closed, bruno.key.publicKey, chloe.key.publicKey, at(4)).map((g) => g.view.name), ['Club ouvert']);
+  // Le profil branché : section « Groupes publics », Start ouvre le groupe ou sa page de l'annuaire.
+  const profile = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'profile-menu.ts'), 'utf8');
+  assert.match(profile, /title: t\('Groupes publics'\)/);
+  const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  assert.match(front, /groupService\.publicGroupsOf\(key\)/);
+  assert.match(front, /mine \? groupsMenu\.openGroup\(id, back\) : groupsMenu\.openPublic\(id, back\)/);
 });

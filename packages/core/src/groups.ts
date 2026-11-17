@@ -475,6 +475,23 @@ export function publicGroups(s: GroupsState, me: string, now = new Date()): { an
   return out.sort((x, y) => y.view.members.length - x.view.members.length || Date.parse(y.announce.at) - Date.parse(x.announce.at));
 }
 
+/**
+ * Les groupes publics d'un joueur que cette borne connaît (les miens, et l'annuaire), pour son profil
+ * public (décidé le 17/11/2026) : jamais un groupe privé, ni même leur nombre. Les plus fournis d'abord.
+ * `mine` : j'en suis aussi membre.
+ */
+export function playerPublicGroups(s: GroupsState, key: string, me: string, now = new Date()): { view: GroupView; mine: boolean }[] {
+  const out: { view: GroupView; mine: boolean }[] = [];
+  for (const g of new Set([...Object.keys(s.groups), ...Object.keys(s.directory)])) {
+    const entry = s.groups[g];
+    const lines = entry && !entry.gone ? entry.lines : s.directory[g]?.lines;
+    const view = lines ? groupView(lines, now) : undefined;
+    if (!view || view.access !== 'public' || !isMember(view, key)) continue;
+    out.push({ view, mine: isMember(view, me) });
+  }
+  return out.sort((a, b) => b.view.members.length - a.view.members.length || a.view.name.localeCompare(b.view.name));
+}
+
 /** Je rejoins un groupe public de l'annuaire : il entre sur ma borne avec ma ligne d'arrivée. */
 export function joinPublic(s: GroupsState, announce: GroupAnnounce, join: GroupLine): GroupsState {
   const had = s.groups[announce.g];

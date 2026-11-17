@@ -162,6 +162,18 @@ if (argv.includes('--prive')) {
   if (local) fail('--prive et --local ne vont pas ensemble.');
 }
 
+// Nouveautés du front-end (packages/core/src/news.ts, Menu système > Nouveautés) : choisies à la main,
+// jamais remplies d'office. À une version finale, un rappel : la date de la dernière ligne, et celles
+// de cette version, à dater du jour de sa sortie.
+if (!prerelease) {
+  const news = require(path.join(repo, 'packages', 'core', 'dist', 'news.js'));
+  const today = new Date().toISOString().slice(0, 10);
+  const own = news.NEWS.filter((n) => n.version === version);
+  for (const n of own) if (n.date !== today) console.log(`Nouveautés : « ${n.title} » (${version}) est datée du ${n.date} ; sa date est celle de la sortie (${today}), dans packages/core/src/news.ts.`);
+  const latest = news.NEWS[0];
+  console.log(`Nouveautés du front-end : dernière ligne le ${latest.date} (« ${latest.title} »)${own.length ? `, ${own.length} pour la ${version}` : ', aucune pour cette version'}. Une fonction de cette version mérite-t-elle une ligne ? Rien n'est ajouté d'office (packages/core/src/news.ts).`);
+}
+
 step('Contrôle de publication');
 const audit = auditRepository();
 if (audit.problems.length) fail(`le dépôt est public, à retirer d'abord :\n  ${audit.problems.join('\n  ')}`);

@@ -1177,6 +1177,11 @@ function cornerNodes(s) {
   const nodes = [];
   if (s.downloads) nodes.push(downloadsPill(s.downloads));
   if (s.friendsOnline) nodes.push(friendsPill(s.friendsOnline));
+  // Le joueur : ses badges, puis sa carte (avatar, pseudo, niveau, barre), à gauche des pastilles (niveau.js).
+  if (s.player && window.CyberLevels) {
+    if (s.badges) nodes.push(CyberLevels.badgesPill(s.badges));
+    nodes.push(CyberLevels.playerCard(s.player));
+  }
   if (s.notice) {
     const line = statusCorner?.line ?? el('div', 'notice-line');
     const toast = noticeToast(s.notice);
@@ -2035,6 +2040,8 @@ window.cyber.onState((s) => {
   if (role === 'playfield') {
     CyberMenuAudio.update(s.sound);
     background.setVolume(s.sound?.video ?? 0);
+    // Badge reçu, niveau qui monte : le moment, au retour sur l'écran des tables (niveau.js).
+    window.CyberLevels?.moment(s.levelMoment);
   }
   // Fond de partie dès que la fenêtre de jeu de VPX s'affiche ; avant, au chargement, chaque
   // écran garde les médias du jeu (le playfield, sa vidéo de chargement et les commandes).

@@ -4,26 +4,42 @@
 // Lecture seule, une fois par session ; rien n'est jamais écrit.
 
 import { spawnSync } from 'node:child_process';
-import type { InstallationHints } from '@cyberpinball/core';
+import { pinmameRegistryHints, registryDefaultValue, type InstallationHints } from '@cyberpinball/core';
 
 const PINMAME_KEY = 'HKCU\\Software\\Freeware\\Visual PinMame\\globals';
 
+/** Où chercher la classe VPinMAME.Controller : son CLSID, puis la DLL inscrite (64 puis 32 bits). */
+const CONTROLLER_KEYS = ['HKCR\\VPinMAME.Controller\\CLSID', 'HKLM\\SOFTWARE\\Classes\\VPinMAME.Controller\\CLSID', 'HKLM\\SOFTWARE\\WOW6432Node\\Classes\\VPinMAME.Controller\\CLSID'];
+const CLSID_ROOTS = ['HKCR\\CLSID', 'HKLM\\SOFTWARE\\Classes\\CLSID', 'HKLM\\SOFTWARE\\WOW6432Node\\Classes\\CLSID'];
+
 let cached: InstallationHints | undefined;
 
-/** rompath, nvram_directory et vpxpath de VPinMAME, s'ils sont dans le registre. */
+function reg(args: string[]): string | undefined {
+  const query = spawnSync('reg', ['query', ...args], { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+  return query.status === 0 && query.stdout ? query.stdout : undefined;
+}
+
+/** VPinMAME.dll inscrite pour VPinMAME.Controller : le VPinMAME que les tables chargent vraiment. */
+function controllerDll(): string | undefined {
+  for (const key of CONTROLLER_KEYS) {
+    const clsid = registryDefaultValue(reg([key, '/ve']) ?? '');
+    if (!clsid) continue;
+    for (const root of CLSID_ROOTS) {
+      const dll = registryDefaultValue(reg([`${root}\\${clsid}\\InprocServer32`, '/ve']) ?? '');
+      if (dll) return dll;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * rompath (tous ses dossiers), nvram_directory et vpxpath de VPinMAME, et le dossier où il est
+ * inscrit, s'ils sont dans le registre.
+ */
 export function installationHints(): InstallationHints {
   if (cached) return cached;
   cached = {};
   if (process.platform !== 'win32') return cached;
-  const query = spawnSync('reg', ['query', PINMAME_KEY], { encoding: 'utf8', windowsHide: true, timeout: 5000 });
-  if (query.status !== 0 || !query.stdout) return cached;
-  const value = (name: string) => new RegExp(`^\\s*${name}\\s+REG_(?:EXPAND_)?SZ\\s+(.+?)\\s*$`, 'im').exec(query.stdout)?.[1];
-  const roms = value('rompath');
-  const nvram = value('nvram_directory');
-  const vpx = value('vpxpath');
-  // rompath peut lister plusieurs dossiers (« a;b ») : le premier est celui où VPinMAME range.
-  if (roms) cached.roms = roms.split(';')[0]!.trim();
-  if (nvram) cached.nvram = nvram.split(';')[0]!.trim();
-  if (vpx) cached.vpx = vpx.trim();
+  cached = pinmameRegistryHints(reg([PINMAME_KEY]) ?? '', controllerDll());
   return cached;
 }

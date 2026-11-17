@@ -93,7 +93,8 @@ test('la carte part toujours : le service porte la fin de la vue, la carte se fe
   // Une fin de partie en erreur (EPERM sur social.json après la partie) ne perd plus le résultat.
   assert.match(live, /fin de partie en erreur .* mon retour part quand même/);
   const front = read('app', 'src', 'frontend.ts');
-  assert.match(front, /socialNet\.checkBadges\(playStats\(tables\)\);\r?\n\s+\} catch \(error\) \{/);
+  // Le niveau et les badges d'après la partie : une erreur (écriture refusée) ne perd jamais la partie.
+  assert.equal((front.match(/levelTracker\.gameEnded\([^\n]*\);\r?\n\s+\} catch \(error\) \{/g) ?? []).length, 2);
 });
 
 // ---------------------------------------------------------------------------

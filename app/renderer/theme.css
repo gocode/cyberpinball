@@ -117,6 +117,29 @@ body {
   letter-spacing: 0.02em;
 }
 
+/*
+ * Palier du joueur (niveaux, 17/11/2026) : l'anneau de la pastille prend sa couleur, un liseré sombre
+ * entre les deux. Novice acier, Flippeur sarcelle, Habitué bleu, Expert vert, Maître violet, Sorcier
+ * or ; Légende or vif, avec un halo.
+ */
+.avatar.tiered {
+  overflow: visible;
+  box-shadow: 0 0 0 max(1px, 0.07em) var(--void), 0 0 0 max(2px, 0.17em) var(--tier, var(--line-strong));
+}
+.avatar.tiered .avatar-image {
+  border-radius: 50%;
+}
+.avatar.tier-novice { --tier: #7f958f; }
+.avatar.tier-flippeur { --tier: #3fb8a8; }
+.avatar.tier-habitue { --tier: #5fb4cf; }
+.avatar.tier-expert { --tier: #8be23a; }
+.avatar.tier-maitre { --tier: #a98bff; }
+.avatar.tier-sorcier { --tier: #f0d27a; }
+.avatar.tier-legende {
+  --tier: #ffe08a;
+  box-shadow: 0 0 0 max(1px, 0.07em) var(--void), 0 0 0 max(2px, 0.17em) var(--tier), 0 0 max(4px, 0.4em) rgba(255, 224, 138, 0.55);
+}
+
 .avatar-image {
   position: absolute;
   inset: 0;

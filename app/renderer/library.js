@@ -73,6 +73,8 @@ function renderLibrary(v) {
     'div',
     v.pages
       ? `lib-body lib-pages${guide ? ' lib-guide-body' : ''}`
+      : v.newsPage
+        ? 'lib-body lib-news-page'
       : v.crop
         ? 'lib-body lib-crop-body'
       : v.media
@@ -92,6 +94,7 @@ function renderLibrary(v) {
   // Texte en lecture (reading.ts) : de même, les actions s'éteignent un peu.
   else if (v.reading?.active) body.classList.add('zone-list');
   if (v.pages) body.append(renderPages(v.pages));
+  else if (v.newsPage) body.append(renderNewsPage(v.newsPage));
   else if (v.crop) body.append(renderCrop(v.crop));
   else if (v.journey) body.append(renderJourney(v.journey));
   else if (v.health) body.append(zoneFrame(renderHealth(v.health, v.cursor), v.zone));
@@ -139,7 +142,7 @@ function renderLibrary(v) {
       // Liste d'options (Section.options) : pas une liste de contenu, le garde-fou ne lui demande pas de cadre.
       const box = libEl('section', `lib-section${section.kind ? ` kind-${section.kind}` : ''}${section.options ? ' options' : ''}`);
       if (section.title) box.append(libEl('h2', '', section.title));
-      const list = libEl('ul', 'lib-rows');
+      const list = libEl('ul', section.kind === 'news' ? 'lib-rows news-timeline' : 'lib-rows');
       // Dès qu'une ligne a un drapeau, les autres gardent sa case, vide : les textes partent tous du même bord.
       // Les icônes prennent alors la largeur du drapeau (library.css, .has-flags) : « Pays : France »
       // sous « Partage activé » (Partage et réseau) partait 0,8 cqmin plus loin.
@@ -156,6 +159,11 @@ function renderLibrary(v) {
         // Fil de la messagerie : une bulle, une carte de la borne ou un séparateur de jour.
         if (row.bubble) {
           list.append(chatBubble(row, v.cursor));
+          continue;
+        }
+        // Nouveautés : une ligne de la chronologie (date, fil, bloc).
+        if (row.news) {
+          list.append(newsLine(row, v.cursor, moved, Math.min(rank++, 12)));
           continue;
         }
         const li = libEl('li', `lib-row tone-${row.tone ?? 'none'}${row.current ? ' current' : ''}`);
@@ -787,7 +795,9 @@ function renderScoreboard(b) {
     // qu'une ligne a un drapeau ou une pastille, leur colonne existe pour toutes, vide au besoin.
     const flags = b.lines.some((l) => l.flag || l.country);
     const avatars = b.lines.some((l) => l.avatar);
-    const list = libEl('ol', `scoreboard-lines${flags ? ' with-flags' : ''}${avatars ? ' with-avatars' : ''}`);
+    // Le niveau des joueurs (17/11/2026) : sa colonne, entre le nom et le score, dès qu'un joueur en a un.
+    const levels = b.lines.some((l) => l.levelText);
+    const list = libEl('ol', `scoreboard-lines${flags ? ' with-flags' : ''}${avatars ? ' with-avatars' : ''}${levels ? ' with-levels' : ''}`);
     // Garde-fou de mise en page (layout-check.ts) : colonnes, lignes de base et images alignées.
     list.dataset.aligned = '';
     for (const l of b.lines) {
@@ -798,7 +808,18 @@ function renderScoreboard(b) {
       if (avatars) li.append(l.avatar ? scoreboardFace(l) : libEl('span', 'scoreboard-face none'));
       const name = libEl('span', `scoreboard-name${l.anonymous ? ' anonymous' : ''}`);
       name.append(libEl('span', 'scoreboard-name-text', l.name));
-      li.append(name, libEl('span', 'scoreboard-score', l.score), libEl('span', 'scoreboard-when', l.when));
+      li.append(name);
+      // Pastille du niveau à la couleur du palier ; « ? » en pointillés : invraisemblable pour son ancienneté.
+      if (levels) {
+        const cell = libEl('span', 'scoreboard-level');
+        if (l.levelText) {
+          const chip = libEl('span', `scoreboard-level-chip${l.level ? '' : ' unsure'}`, l.levelText);
+          if (l.level) chip.dataset.tier = avatarTier(l.level);
+          cell.append(chip);
+        }
+        li.append(cell);
+      }
+      li.append(libEl('span', 'scoreboard-score', l.score), libEl('span', 'scoreboard-when', l.when));
       list.append(li);
     }
     box.append(list);
@@ -830,6 +851,67 @@ function renderScoreboard(b) {
 }
 
 // ---------- Prospectus et règles, page par page ----------
+
+/**
+ * Une ligne des Nouveautés (news-menu.ts) : à gauche la date et la version, sur la première ligne de
+ * leur jour seulement ; au milieu le fil de la chronologie et son point (vert tant qu'elle est
+ * nouvelle) ; à droite le bloc, choisi comme une ligne de liste : le petit aperçu s'il y en a un, le
+ * titre et ses badges, le détail, et sous la ligne choisie ce que fait Start.
+ */
+function newsLine(row, cursor, moved, rank) {
+  const n = row.news;
+  const li = libEl('li', `lib-row news-item${n.first ? ' first' : ''}${n.last ? ' last' : ''}${n.unread ? ' unread' : ''}`);
+  li.style.setProperty('--i', String(rank));
+  const date = libEl('div', 'news-date');
+  if (n.first) date.append(libEl('b', '', n.date), libEl('span', '', n.version));
+  const rail = libEl('div', 'news-rail');
+  rail.append(libEl('i'));
+  const block = libEl('div', 'news-block');
+  // Le choix est porté par le bloc, pas par la ligne entière (la date reste neutre) : le garde-fou
+  // de mise en page compare ce bloc (layout-check.ts, « choix courant invisible »).
+  block.dataset.choice = '';
+  if (row.action !== undefined) {
+    li.classList.add('pick');
+    if (row.action === cursor) li.classList.add('selected');
+    if (row.action === cursor && moved) li.classList.add('moved');
+    actOn(li, { type: 'activate', index: row.action });
+  }
+  if (n.preview) {
+    const img = libEl('img', 'news-thumb');
+    img.src = n.preview;
+    img.alt = '';
+    img.draggable = false;
+    img.decoding = 'async';
+    block.append(img);
+  }
+  const text = libEl('div', 'news-text');
+  const head = libEl('div', 'news-head');
+  head.append(libEl('span', 'news-title', row.text));
+  for (const b of n.badges) head.append(libEl('span', `news-badge ${b.kind}`, b.text));
+  text.append(head);
+  if (row.detail) text.append(libEl('div', 'news-detail', row.detail));
+  if (row.action === cursor && n.start) text.append(libEl('div', 'news-start', t('Start : {action}', { action: n.start })));
+  block.append(text);
+  li.append(date, rail, block);
+  return li;
+}
+
+/** Une nouveauté agrandie : le grand aperçu, le texte entier, où la trouver. */
+function renderNewsPage(p) {
+  const card = libEl('div', `news-page${p.preview ? '' : ' no-preview'}`);
+  if (p.preview) {
+    const img = libEl('img', 'news-shot');
+    img.src = p.preview;
+    img.alt = '';
+    img.draggable = false;
+    card.append(img);
+  }
+  const copy = libEl('div', 'news-copy');
+  for (const line of p.lines) copy.append(libEl('p', 'news-line', line));
+  copy.append(libEl('p', 'news-where', p.where));
+  card.append(copy);
+  return card;
+}
 
 function renderPages(p) {
   const stage = libEl('div', 'pages-stage');

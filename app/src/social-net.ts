@@ -198,7 +198,8 @@ import {
   type ByteRate,
   type LibraryMessage,
   type LiveMessage,
-  type PlayStats,
+  type BadgeFacts,
+  type EarnedBadge,
   type Presence,
   type Profile,
   type RelayedProfile,
@@ -326,6 +327,8 @@ export interface LanBeacons {
 
 export interface SocialNetOptions {
   dataDir: string;
+  /** J'ai écrit une ligne dans un salon (niveau : présence au salon). */
+  onOwnLine?(): void;
   mode: SocialNetMode;
   /** Pour les essais : un réseau d'essai déjà créé (nœuds d'amorçage sur 127.0.0.1). */
   bootstrap?: { host: string; port: number }[];
@@ -440,8 +443,18 @@ export interface SocialNet {
   setPresence(presence: Presence): void;
   /** Évènement de ce joueur (record, partie) : gardé, envoyé aux amis reliés. */
   publish(event: Omit<SocialEvent, 'id' | 'at'>): void;
-  /** Badges mérités depuis la dernière fois : ajoutés, et envoyés aux amis s'il y a lieu. */
-  checkBadges(play: PlayStats): SocialEvent[];
+  /**
+   * Badges mérités depuis la dernière fois : ajoutés, et envoyés aux amis s'il y a lieu. `fresh` :
+   * les badges ajoutés (à compter dans le niveau) ; `silent` : donnés sans annonce (premier calcul,
+   * nouvelle série du catalogue).
+   */
+  checkBadges(facts: BadgeFacts): { events: SocialEvent[]; fresh: EarnedBadge[]; silent: boolean };
+  /** Mes XP (levels.ts) : ils partent avec ma carte publique et mes scores publiés. */
+  setLevel(xp: number): void;
+  /** « J'aime » que j'ai donnés (et pas retirés). */
+  likesGiven(): number;
+  /** « J'aime » reçus et réactions reçues sur mes lignes de salon, par identifiant (levels.ts, receivedGains). */
+  receivedIds(): { likes: string[]; reactions: string[] };
   request(profile: Pick<Profile, 'key' | 'name'>): void;
   cancel(key: string): void;
   accept(key: string): void;
@@ -528,6 +541,8 @@ export interface SocialNet {
   publicCard(key: string): PublicCard | undefined;
   /** Quand sa carte a été reçue pour la dernière fois (ISO). */
   cardSeen(key: string): string | undefined;
+  /** Première fois que cette borne a reçu la carte d'un joueur (vraisemblance de son niveau). */
+  cardFirstSeen(key: string): string | undefined;
   /** Aimer (ou ne plus aimer) un évènement public d'un joueur : remis à sa borne, ou relayé. */
   like(key: string, event: string, on: boolean): void;
   likedByMe(key: string, event: string): boolean;
@@ -1515,13 +1530,16 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   // ---------- Profils publics et « J'aime » ----------
 
+  /** Mes XP (levels.ts), donnés par le suivi du niveau ; absents tant qu'il ne les a pas calculés. */
+  let myXp: number | undefined;
+
   /** Ma carte publique, signée maintenant ; undefined si le partage ou le profil public est coupé. */
   function ownCard(): PublicCard | undefined {
     if (!state.enabled || state.publicProfile === false) return undefined;
     const country = myCountry();
     const avatar = ownAvatarHash();
     const records = rankings.scores.filter((s) => s.key === state.key.publicKey).length;
-    return makeCard(state, profiles, { ...(country ? { country } : {}), ...(avatar ? { avatar } : {}), records }, now());
+    return makeCard(state, profiles, { ...(country ? { country } : {}), ...(avatar ? { avatar } : {}), records, ...(myXp !== undefined ? { xp: myXp } : {}), friends: state.friends.length }, now());
   }
 
   const greetedLinks = (except?: string) => [...peers.values()].filter((p) => p.key !== except).map((p) => bestLink(p.key)).filter((l): l is Link => !!l?.greeted);
@@ -2061,17 +2079,30 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       // Un record ou un badge : ma carte publique change aussi.
       if (event.kind !== 'played') announceCard();
     },
-    checkBadges(play) {
-      const granted = grantBadges(state, play, now());
+    checkBadges(facts) {
+      const granted = grantBadges(state, facts, now());
       commit(granted.state);
-      if (granted.events.length) {
-        broadcastFriends({ t: 'events', events: granted.events });
-        announceCard();
-      }
-      return granted.events;
+      if (granted.events.length) broadcastFriends({ t: 'events', events: granted.events });
+      if (granted.fresh.length) announceCard();
+      return { events: granted.events, fresh: granted.fresh, silent: granted.silent };
+    },
+    setLevel(xp) {
+      if (myXp === xp) return;
+      myXp = xp;
+      announceCard();
+    },
+    likesGiven: () => profiles.given.filter((l) => l.on).length,
+    receivedIds() {
+      const me = state.key.publicKey;
+      const mine = new Set(rooms.lines.filter((l) => l.key === me).map((l) => l.id));
+      return {
+        likes: profiles.received.filter((l) => l.on && l.to === me && !profiles.hidden.includes(l.from)).map((l) => `${l.from}|${l.event}`),
+        reactions: (rooms.reactions ?? []).filter((r) => r.kind && r.key !== me && mine.has(r.id)).map((r) => `${r.key}|${r.id}`),
+      };
     },
     publicCard: (key) => (key === state.key.publicKey ? ownCard() : profiles.hidden.includes(key) ? undefined : cardOf(profiles, key)),
     cardSeen: (key) => profiles.seen[key],
+    cardFirstSeen: (key) => profiles.first?.[key],
     like(key, event, on) {
       if (key === state.key.publicKey || shunned(key)) return;
       profiles = giveLike(profiles, signLike(state.key, state.name, key, event, on, now()));
@@ -2135,6 +2166,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       saveRoomsSoon();
       for (const link of greetedLinks()) link.send({ t: 'room', lines: [line] });
       changed();
+      opts.onOwnLine?.();
       return { line };
     },
     roomRetract(id) {
@@ -2219,7 +2251,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       if (!state.enabled || state.shareScores === false) return undefined;
       const country = myCountry();
       const avatar = ownAvatarHash();
-      const signed = signScore(state.key, { ...score, name: state.name, ...(country ? { country } : {}), ...(avatar ? { avatar } : {}) });
+      const signed = signScore(state.key, { ...score, name: state.name, ...(country ? { country } : {}), ...(avatar ? { avatar } : {}), ...(myXp !== undefined ? { xp: myXp } : {}) });
       const kept = mergeRankings(rankings, [signed], state.key.publicKey, now());
       if (!kept.length) return undefined;
       saveRankingsSoon();

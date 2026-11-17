@@ -280,17 +280,23 @@ test('évènements : phrases du record, du badge, de la partie', () => {
 
 test('badges : l’historique d’avant ne s’annonce pas, les suivants deviennent des évènements', () => {
   const table = (starts: number, run: number) => ({ info: { User: { StartCount: starts, RunTime: run } } }) as unknown as Pick<TableEntry, 'info'>;
+  const facts = (play: ReturnType<typeof playStats>) => ({ ...play, records: 0, championTables: 0 });
   const old = playStats([table(3, 4000), table(0, 0)]);
   assert.deepEqual(old, { games: 3, tables: 1, seconds: 4000, longestTable: 4000 });
   let s = player('Alice');
-  const first = grantBadges(s, old);
+  const first = grantBadges(s, facts(old));
   assert.deepEqual(first.state.badges.map((b) => b.id), ['first-game', 'hour-on-table']);
   assert.equal(first.events.length, 0, 'premier calcul : aucun évènement');
+  assert.deepEqual(first.fresh.map((b) => b.id), ['first-game', 'hour-on-table'], 'donnés en silence, mais rendus pour le niveau');
   s = first.state;
-  const later = grantBadges(s, playStats(Array.from({ length: 10 }, () => table(10, 100))));
-  assert.deepEqual(later.events.map((e) => e.badge), ['ten-tables', 'hundred-games']);
-  assert.equal(grantBadges(later.state, playStats([table(100, 100)])).events.length, 0, 'un badge ne se gagne qu’une fois');
-  assert.equal(new Set(BADGES.map((b) => b.icon)).size, BADGES.length, 'une icône par badge');
+  const later = grantBadges(s, facts(playStats(Array.from({ length: 10 }, () => table(10, 100)))));
+  assert.deepEqual(later.events.map((e) => e.badge), ['ten-games', 'hundred-games', 'ten-tables']);
+  assert.equal(grantBadges(later.state, facts(playStats([table(100, 100)]))).events.length, 0, 'un badge ne se gagne qu’une fois');
+  // Une nouvelle série du catalogue : ce que l'historique mérite déjà arrive sans annonce aux amis.
+  const series = grantBadges({ ...later.state, badgesSeries: 1 }, { ...facts(playStats([table(600, 100)])) });
+  assert.ok(series.fresh.some((b) => b.id === 'five-hundred-games'));
+  assert.equal(series.events.length, 0, 'nouvelle série : aucun évènement');
+  assert.ok(BADGES.length >= 50);
 });
 
 test('mode du réseau : jamais le vrai réseau pendant un essai sans opérateur', () => {

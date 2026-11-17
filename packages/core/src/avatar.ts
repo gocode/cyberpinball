@@ -40,6 +40,8 @@ export interface AvatarView {
   initials: string;
   /** Teinte (0 à 359) du fond des initiales, tirée de la clé : la même sur toutes les bornes. */
   hue: number;
+  /** Niveau du joueur (levels.ts), s'il est connu et vraisemblable : l'anneau prend la couleur de son palier. */
+  level?: number;
 }
 
 // ---------------------------------------------------------------------------

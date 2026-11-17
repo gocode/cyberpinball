@@ -26,6 +26,10 @@ export const messages: Record<string, string> = {
   'Script illisible': 'Unreadable script',
   'La ROM n’a pas pu être vérifiée : {error}': 'Couldn’t check the ROM: {error}',
   'ROM non vérifiée': 'ROM not checked',
+  'Cyber Pinball l’a cherchée dans {dirs}.': 'Cyber Pinball looked for it in {dirs}.',
+  'À la reprise depuis {from}, {roms} a été cherchée dans {dirs} : elle n’y était pas.': 'When the table was brought in from {from}, {roms} was looked for in {dirs}: it was not there.',
+  'À la reprise depuis {from}, cette installation n’avait aucun dossier de ROM connu (ni VPinMAME\\roms, ni rompath de VPinMAME dans le registre, ni dossier des ROM de Popper).':
+    'When the table was brought in from {from}, that installation had no known ROM folder (no VPinMAME\\roms, no VPinMAME rompath in the registry, no Popper ROM folder).',
   'La table utilise PinMAME, mais le nom de sa ROM n’apparaît pas clairement dans son script.': 'The table uses PinMAME, but its script doesn’t clearly name its ROM.',
   'Rapport de plantage de VPX': 'VPX crash report',
   'VPX a planté sur cette table le {date} ({reason}). {files} : {size}.': 'VPX crashed on this table on {date} ({reason}). {files}: {size}.',
@@ -373,6 +377,7 @@ export const messages: Record<string, string> = {
   'Impossible de lancer VPX : {error}': 'Couldn’t start VPX: {error}',
   // app/src/vbs.ts
   'VPX n’a pas extrait le script de la table.': 'VPX didn’t extract the table script.',
+  'VPX n’est pas installé : le script n’a pas pu être lu.': 'VPX is not installed: the script could not be read.',
   'VPX ne s’est pas terminé après {n} s.': 'VPX didn’t exit after {n} s.',
   'VPX s’est terminé avec le code {code}.': 'VPX exited with code {code}.',
   'VPX ne répondait plus dans le casque : Cyber Pinball l’a fermé.': 'VPX stopped responding in the headset: Cyber Pinball closed it.',

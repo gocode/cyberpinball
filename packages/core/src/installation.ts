@@ -19,8 +19,9 @@ import type { DatabaseSync } from 'node:sqlite';
 import { expectedPackNames, findPackRoot, isJunkName, isPackRoot, type PupLoadFacts } from './puppack';
 import { isInside, samePath } from './fileops';
 import { PUP_FOLDER } from './pupdisabled';
-import { t } from './i18n';
+import { formatList, t } from './i18n';
 import { mediaGameNames, scanInstallation, type IncomingMedia } from './mediaimport';
+import { historicAlias, parseAliases, type AliasLine } from './romalias';
 import { isRomZip } from './romzip';
 import { nameKey } from './tablefiles';
 import type { ImportSource } from './tableimport';
@@ -54,6 +55,12 @@ export interface InstallationLayout {
   musicDir?: string;
   /** Ce que les menus de l'installation disent de ses tables : nom de leurs médias, leur ROM. */
   catalog: CatalogEntry[];
+  /**
+   * Alias de ROM de VPinMAME (VPMAlias.txt de ses dossiers) : « nom demandé par le script, jeu
+   * chargé ». VPinMAME les applique de lui-même ; la table y tourne sous un nom que l'installation
+   * n'a pas en zip. Les anciens noms qu'il connaissait d'office (vpmalias.ts) s'y ajoutent.
+   */
+  romAliases?: AliasLine[];
 }
 
 /** Une table vue par un menu (Popper, PinballX, PinballY). */
@@ -79,12 +86,56 @@ export interface CatalogEntry {
  * installés, même loin des tables. Facultatif, jamais une condition pour reconnaître une installation.
  */
 export interface InstallationHints {
-  /** rompath de VPinMAME. */
-  roms?: string;
+  /**
+   * rompath de VPinMAME : un dossier, ou tous ceux qu'il liste (« C:\roms;D:\roms »), que VPinMAME
+   * lit tous, dans l'ordre. N'en garder que le premier perdait les ROM rangées dans les suivants.
+   */
+  roms?: string | string[];
   /** nvram_directory de VPinMAME. */
   nvram?: string;
   /** vpxpath de VPinMAME : le dossier de VPinballX.exe. */
   vpx?: string;
+  /**
+   * Dossier de VPinMAME d'après son inscription dans Windows (VPinMAME.dll de VPinMAME.Controller) :
+   * là où il est vraiment installé, même loin des tables, avec ses roms, altcolor, altsound, nvram.
+   */
+  pinmame?: string;
+}
+
+/** Les dossiers du rompath, un par un. */
+function hintRomDirs(hints: InstallationHints): string[] {
+  const list = Array.isArray(hints.roms) ? hints.roms : hints.roms ? [hints.roms] : [];
+  return list.flatMap((r) => r.split(';')).map((r) => r.trim()).filter(Boolean);
+}
+
+/**
+ * Ce que le registre dit de VPinMAME, d'après la sortie de « reg query …\Visual PinMame\globals »
+ * et le chemin de VPinMAME.dll inscrit pour VPinMAME.Controller : tous les dossiers du rompath (un
+ * dossier relatif l'est au dossier de VPinMAME, comme VPinMAME le lit), %VARIABLES% développées.
+ */
+export function pinmameRegistryHints(globals: string, controllerDll?: string, env: Record<string, string | undefined> = process.env): InstallationHints {
+  const hints: InstallationHints = {};
+  const expand = (s: string) => s.replace(/%([^%]+)%/g, (all, name: string) => env[name] ?? env[Object.keys(env).find((k) => k.toLowerCase() === name.toLowerCase()) ?? ''] ?? all);
+  const value = (name: string) => {
+    const v = new RegExp(`^\\s*${name}\\s+REG_(?:EXPAND_)?SZ\\s+(.+?)\\s*$`, 'im').exec(globals)?.[1];
+    return v === undefined ? undefined : expand(v.trim().replace(/^"|"$/g, ''));
+  };
+  const dll = controllerDll?.trim().replace(/^"|"$/g, '');
+  const pinmame = dll && path.isAbsolute(expand(dll)) ? path.dirname(expand(dll)) : undefined;
+  if (pinmame) hints.pinmame = pinmame;
+  const absolute = (d: string) => (path.isAbsolute(d) ? path.resolve(d) : pinmame ? path.resolve(pinmame, d) : undefined);
+  const roms = (value('rompath') ?? '').split(';').map((d) => d.trim()).filter(Boolean).map(absolute).filter((d): d is string => Boolean(d));
+  if (roms.length) hints.roms = roms;
+  const nvram = (value('nvram_directory') ?? '').split(';').map((d) => d.trim()).filter(Boolean).map(absolute).find(Boolean);
+  if (nvram) hints.nvram = nvram;
+  const vpx = value('vpxpath');
+  if (vpx) hints.vpx = vpx;
+  return hints;
+}
+
+/** Valeur par défaut d'une clé dans la sortie de « reg query … /ve » (« (Default) », « (par défaut) »…). */
+export function registryDefaultValue(output: string): string | undefined {
+  return /^\s*\([^)]*\)\s+REG_(?:EXPAND_)?SZ\s+(.+?)\s*$/im.exec(output)?.[1]?.trim() || undefined;
 }
 
 /** Ce qu'il faut savoir du script d'une table pour retrouver ses parties (ScriptFacts, doctor.ts). */
@@ -94,6 +145,11 @@ export type CompanionFacts = PupLoadFacts & { dmdFolder?: string; music?: string
 export interface Companion {
   path: string;
   part: 'folder' | 'backglass' | 'pov' | 'tableIni' | 'script' | 'rom' | 'nvram' | 'altcolor' | 'altsound' | 'pup' | 'dmdFolder' | 'music' | 'media';
+  /**
+   * ROM retrouvée sous un autre nom que celui du script, par un alias de VPinMAME (VPMAlias.txt,
+   * ancien nom) : la ligne à écrire dans <table>\pinmame\alias.txt pour que le plugin la charge.
+   */
+  alias?: AliasLine;
 }
 
 /** Ce que la reprise a retrouvé (ou non) pour une table : montré dans le plan d'ajout. */
@@ -103,6 +159,20 @@ export interface CompanionReport {
   found: Companion[];
   /** Ce que le script attend et que l'installation n'a pas (« PuP-Pack « TheMatrix » »). */
   missing: string[];
+  /** ROM introuvable : les noms cherchés et les dossiers où on les a cherchés, gardés dans la fiche de la table. */
+  romSearch?: RomSearch;
+  /** ROM trouvée par un alias de VPinMAME : lignes à écrire dans <table>\pinmame\alias.txt (PlanOptions.companions). */
+  romAliases?: AliasLine[];
+}
+
+/** Recherche d'une ROM dans une installation reprise, quand elle n'a rien donné (.info : CyberPinball.RomSearch). */
+export interface RomSearch {
+  /** Noms cherchés : ceux du script (ou du menu), puis leurs alias. */
+  roms: string[];
+  /** Dossiers de ROM de l'installation, dans l'ordre où on les a lus. */
+  dirs: string[];
+  /** Racine de l'installation reprise. */
+  from: string;
 }
 
 /** Fichiers nommés comme le .vpx, à côté de lui : fronton, point de vue, réglages, script, résolution du fronton (B2S). */
@@ -155,15 +225,23 @@ function locate(dir: string, exclude: string[], hints: InstallationHints): Insta
     if (path.dirname(at) === at) break;
   }
   vpxDir ??= own(hints.vpx && hasVpxExe(hints.vpx) ? hints.vpx : undefined);
+  // VPinMAME tel que Windows l'a inscrit : celui que les tables chargent vraiment, où qu'il soit.
+  const registered = own(hints.pinmame && resolveDir(hints.pinmame));
   if (!pinmame && !pinup && !pinballx && !pinbally && !vpxDir) return undefined;
 
   const popper = pinup ? readPopper(path.join(pinup, 'PUPDatabase.db')) : undefined;
   const frontends = [pinballx, pinbally].filter((d): d is string => Boolean(d));
   const catalog = [...(popper?.games ?? []), ...frontends.flatMap(readHyperpinCatalogs)];
 
-  const romDirs = unique([pinmame && child(pinmame, 'roms'), ...(popper?.romDirs ?? []), hints.roms].map((d) => own(d && resolveDir(d))));
+  // Tous les dossiers que VPinMAME lit : le rompath du registre en entier (« a;b »), son roms, celui
+  // de l'installation, le DirRoms de Popper. Un dossier relatif du rompath l'est au dossier de VPinMAME.
+  const relative = (d: string) => (path.isAbsolute(d) ? d : [registered, pinmame].filter((p): p is string => Boolean(p)).map((p) => path.resolve(p, d)).find(isDir));
+  const romDirs = unique(
+    [...hintRomDirs(hints).map(relative), registered && child(registered, 'roms'), pinmame && child(pinmame, 'roms'), ...(popper?.romDirs ?? [])].map((d) => own(d && resolveDir(d))),
+  );
   // VPinMAME du registre ou de Popper : le dossier au-dessus de ses ROM, s'il a des couleurs ou des sons.
-  const pinmameDirs = unique([pinmame, ...romDirs.map((r) => path.dirname(r)).filter((d) => child(d, 'altsound') || child(d, 'altcolor') || child(d, 'nvram'))].map(own));
+  const pinmameDirs = unique([pinmame, registered, ...romDirs.map((r) => path.dirname(r)).filter((d) => child(d, 'altsound') || child(d, 'altcolor') || child(d, 'nvram') || fileIn(d, ALIAS_FILE))].map(own));
+  const romAliases = pinmameDirs.flatMap(readVpmAliases);
   const nvramDirs = unique([...pinmameDirs.map((d) => child(d, 'nvram')), hints.nvram].map((d) => own(d && resolveDir(d))));
   const pupVideos = own(pinup && child(pinup, PUP_FOLDER));
   const mediaRoots: string[] = [];
@@ -195,7 +273,29 @@ function locate(dir: string, exclude: string[], hints: InstallationHints): Insta
     mediaRoots,
     musicDir,
     catalog,
+    ...(romAliases.length ? { romAliases } : {}),
   };
+}
+
+/** Fichier d'alias de VPinMAME, dans son dossier. */
+const ALIAS_FILE = 'VPMAlias.txt';
+
+/** Lignes « alias,jeu » du VPMAlias.txt d'un dossier de VPinMAME (vide s'il n'en a pas). */
+function readVpmAliases(dir: string): AliasLine[] {
+  const file = fileIn(dir, ALIAS_FILE);
+  if (!file) return [];
+  try {
+    return parseAliases(fs.readFileSync(file, 'latin1'));
+  } catch {
+    return [];
+  }
+}
+
+/** Jeu que VPinMAME charge pour ce nom : son VPMAlias.txt, puis les anciens noms qu'il connaissait d'office. */
+function romAliasOf(layout: InstallationLayout, rom: string): string | undefined {
+  const line = layout.romAliases?.find((l) => l.alias.toLowerCase() === rom.toLowerCase());
+  const real = line?.rom ?? historicAlias(rom);
+  return real && real.toLowerCase() !== rom.toLowerCase() ? real : undefined;
 }
 
 /** Dossier commun le plus profond : « C:\vPinball » pour VisualPinball\Tables et PinUPSystem\PUPVideos. */
@@ -235,7 +335,13 @@ export function knownTableInstallations(drives: string[] = ['C:', 'D:', 'E:'], e
 
 function knownInstallations(drives: string[], exclude: string[], hints: InstallationHints): InstallationLayout[] {
   const found: InstallationLayout[] = [];
-  const dirs = [...drives.flatMap((drive) => USUAL_PLACES.map((p) => `${drive}\\${p}`)), hints.vpx, hints.roms && path.dirname(path.dirname(path.resolve(hints.roms)))];
+  const romDir = hintRomDirs(hints).find((d) => path.isAbsolute(d));
+  const dirs = [
+    ...drives.flatMap((drive) => USUAL_PLACES.map((p) => `${drive}\\${p}`)),
+    hints.vpx,
+    hints.pinmame && path.dirname(path.resolve(hints.pinmame)),
+    romDir && path.dirname(path.dirname(path.resolve(romDir))),
+  ];
   for (const dir of dirs) {
     if (!dir || !isDir(dir)) continue;
     const layout = findInstallation(dir, exclude, hints);
@@ -397,23 +503,35 @@ function sameGame(a: string, b: string): boolean {
 export function tableCompanions(vpx: string, layout: InstallationLayout, facts?: CompanionFacts, medias?: Map<string, IncomingMedia[]>): CompanionReport {
   const found: Companion[] = [];
   const missing: string[] = [];
-  const add = (p: string | undefined, part: Companion['part']) => {
-    if (p && !found.some((c) => samePath(c.path, p) || (c.part === 'folder' && isInside(p, c.path)))) found.push({ path: p, part });
+  const add = (p: string | undefined, part: Companion['part'], alias?: AliasLine) => {
+    if (p && !found.some((c) => samePath(c.path, p) || (c.part === 'folder' && isInside(p, c.path)))) found.push({ path: p, part, ...(alias ? { alias } : {}) });
   };
   const home = tableHome(vpx, layout);
   if (home) add(home.dir, 'folder');
   for (const [ext, part] of Object.entries(NAMED_LIKE_TABLE)) add(sibling(vpx, ext), part);
   if (!home) add(backglassOf(vpx), 'backglass');
 
-  const catalogRoms = catalogOf(vpx, layout).map((e) => e.rom);
-  const roms = unique([...(facts?.usesPinmame ? facts.roms : []), ...(facts ? [] : catalogRoms)]);
+  const roms = tableRoms(vpx, layout, facts);
+  // Le jeu que VPinMAME charge vraiment pour chaque nom : le même, ou son alias (VPMAlias.txt, ancien nom).
+  const searched: string[] = [];
   for (const rom of roms) {
-    add(findRom(layout.romDirs, rom), 'rom');
-    add(layout.nvramDirs.map((d) => fileIn(d, `${rom}.nv`)).find(Boolean), 'nvram');
-    add(layout.pinmameDirs.map((d) => child(d, 'altcolor', rom)).find(Boolean), 'altcolor');
-    add(layout.pinmameDirs.map((d) => child(d, 'altsound', rom)).find(Boolean), 'altsound');
+    const real = romAliasOf(layout, rom);
+    searched.push(rom, ...(real ? [real] : []));
+    const own = findRom(layout.romDirs, rom);
+    const aliased = !own && real ? findRom(layout.romDirs, real) : undefined;
+    const loaded = aliased ? real! : rom;
+    add(own ?? aliased, 'rom', aliased ? { alias: rom, rom: real! } : undefined);
+    // Sauvegarde, couleurs et sons sont rangés sous le nom du jeu chargé.
+    const names = unique([loaded, rom]);
+    add(names.flatMap((n) => layout.nvramDirs.map((d) => fileIn(d, `${n}.nv`))).find(Boolean), 'nvram');
+    add(names.flatMap((n) => layout.pinmameDirs.map((d) => child(d, 'altcolor', n))).find(Boolean), 'altcolor');
+    add(names.flatMap((n) => layout.pinmameDirs.map((d) => child(d, 'altsound', n))).find(Boolean), 'altsound');
   }
-  if (roms.length && !found.some((c) => c.part === 'rom') && !(home && hasRomIn(home.dir, roms))) missing.push(t('ROM « {rom} »', { rom: roms[0]! }));
+  let romSearch: RomSearch | undefined;
+  if (roms.length && !found.some((c) => c.part === 'rom') && !(home && hasRomIn(home.dir, unique(searched)))) {
+    romSearch = { roms: unique(searched), dirs: layout.romDirs, from: layout.root };
+    missing.push(romSearchText(romSearch));
+  }
 
   const pack = layout.pupVideos ? findPack(layout.pupVideos, [...expectedPackNames(facts), ...roms], packTitles(vpx, home?.dir, layout)) : undefined;
   add(pack, 'pup');
@@ -438,7 +556,29 @@ export function tableCompanions(vpx: string, layout: InstallationLayout, facts?:
   }
 
   for (const m of mediasOf(vpx, layout, medias ?? indexInstallationMedias(layout))) add(m.from, 'media');
-  return { vpx, root: layout.root, found, missing };
+  const romAliases = found.flatMap((c) => (c.alias ? [c.alias] : []));
+  return { vpx, root: layout.root, found, missing, ...(romSearch ? { romSearch } : {}), ...(romAliases.length ? { romAliases } : {}) };
+}
+
+/**
+ * ROM d'une table de l'installation : celles que demande son script ; s'il n'en nomme aucune
+ * clairement (nom calculé, script illisible ou pas lu), celle que lui donne le menu (colonne ROM
+ * de Popper, <rom> de PinballX et PinballY). Une table dont le script n'utilise pas PinMAME n'en a pas.
+ */
+function tableRoms(vpx: string, layout: InstallationLayout, facts: CompanionFacts | undefined): string[] {
+  const fromScript = facts?.usesPinmame ? facts.roms : [];
+  if (fromScript.length) return unique(fromScript);
+  if (facts && !facts.usesPinmame) return [];
+  return unique(catalogOf(vpx, layout).map((e) => e.rom));
+}
+
+/** « ROM « t2_l8 » (ou t2_l6), cherchée dans C:\…\roms et D:\roms » : ce qui manque, et où on l'a cherché. */
+export function romSearchText(search: Pick<RomSearch, 'roms' | 'dirs'>): string {
+  const [rom, ...others] = search.roms;
+  const name = others.length ? t('ROM « {rom} » (ou {others})', { rom: rom!, others: formatList(others, 'or') }) : t('ROM « {rom} »', { rom: rom! });
+  return search.dirs.length
+    ? t('{name}, cherchée dans {dirs}', { name, dirs: formatList(search.dirs) })
+    : t('{name} : l’installation n’a aucun dossier de ROM connu (ni VPinMAME\\roms, ni rompath de VPinMAME dans le registre, ni dossier des ROM de Popper)', { name });
 }
 
 /** Le dossier propre à la table contient-il déjà sa ROM (VPinMame\roms, pinmame\roms…) ? */
@@ -463,17 +603,32 @@ function findRom(dirs: string[], rom: string, depth = 1): string | undefined {
     for (const dir of dirs) {
       for (const d of level ? subDirs(dir, level) : [dir]) {
         const folder = child(d, rom);
-        if (folder && dirents(folder).some((e) => e.isFile())) return folder;
+        if (folder && isRomFolder(folder)) return folder;
       }
     }
   }
   return undefined;
 }
 
-/** Sous-dossiers à exactement `level` niveaux sous `dir`. */
+/**
+ * Dossiers de VPinMAME qui ne sont jamais des ROM : un sous-dossier « t2_l8 » d'altcolor (couleurs),
+ * d'altsound (sons) ou de nvram n'est pas la ROM t2_l8, même quand le dossier des ROM donné par
+ * Popper ou le rompath est celui de VPinMAME lui-même.
+ */
+const NOT_ROM_DIRS = new Set(['altcolor', 'altsound', 'nvram', 'cfg', 'ini', 'hi', 'snap', 'memcard', 'wave', 'sta', 'inp', 'diff', 'samples', 'sounds', 'music', 'serum', 'vni']);
+
+/** Fichiers des couleurs, des sons, des sauvegardes : jamais des puces de ROM. */
+const NOT_ROM_FILES = /\.(crz|cromc|pal|vni|pac|csv|ogg|wav|mp3|nv|cfg|txt|ini|png|jpg|mp4|db)$/i;
+
+/** Dossier de puces décompressées : au moins un fichier qui n'est ni couleur, ni son, ni sauvegarde. */
+function isRomFolder(dir: string): boolean {
+  return dirents(dir).some((e) => e.isFile() && !NOT_ROM_FILES.test(e.name));
+}
+
+/** Sous-dossiers à exactement `level` niveaux sous `dir`, sans ceux de VPinMAME qui ne contiennent pas de ROM. */
 function subDirs(dir: string, level: number): string[] {
   let at = [dir];
-  for (let i = 0; i < level; i++) at = at.flatMap((d) => dirents(d).filter((e) => e.isDirectory()).map((e) => path.join(d, e.name)));
+  for (let i = 0; i < level; i++) at = at.flatMap((d) => dirents(d).filter((e) => e.isDirectory() && !NOT_ROM_DIRS.has(e.name.toLowerCase())).map((e) => path.join(d, e.name)));
   return at;
 }
 
@@ -524,7 +679,10 @@ function companionsOf(sources: ImportSource[], facts: (vpx: string) => Companion
   const extra: ImportSource[] = [];
   const taken = (p: string) => [...result, ...extra].some((s) => isInside(p, s.path) && !s.exclude?.some((x) => isInside(p, x)));
   // Une partie que l'import apporte déjà (le PuP-Pack d'un téléchargement) n'est jamais doublée par celle de l'installation.
+  // Une ROM, par son nom : un dossier de table qui contient une autre ROM (ancienne révision, celle
+  // d'une autre version) n'empêche pas celle que la table charge de venir de VPinMAME.
   const brought = broughtParts(sources);
+  const broughtRoms = broughtRomNames(sources);
   const chosen = sources.filter((s) => !s.unpacked && s.mode === 'copy').flatMap((s) => vpxIn(s.path));
   for (const src of sources) {
     if (src.unpacked || src.mode !== 'copy') continue;
@@ -545,6 +703,8 @@ function companionsOf(sources: ImportSource[], facts: (vpx: string) => Companion
       const kept: Companion[] = [];
       // Ce que le dossier propre à la table apporte déjà (sa ROM, son PuP-Pack) : pas de doublon venu d'ailleurs.
       let ownBrought = new Set<Companion['part']>();
+      let ownRoms = new Set<string>();
+      const already = (c: Companion) => (c.part === 'rom' ? broughtRoms.has(romNameOf(c.path)) || ownRoms.has(romNameOf(c.path)) : brought.has(c.part) || ownBrought.has(c.part));
       for (const c of report.found) {
         if (c.part === 'folder') {
           // Le dossier de la table remplace son .vpx choisi seul ; les autres versions qu'il contient
@@ -559,10 +719,12 @@ function companionsOf(sources: ImportSource[], facts: (vpx: string) => Companion
           for (let i = result.length - 1; i >= 0; i--) if (isInside(result[i]!.path, c.path)) result.splice(i, 1);
           result.splice(at >= 0 ? at : result.length, 0, folder);
           ownBrought = broughtParts([folder]);
+          ownRoms = broughtRomNames([folder]);
           kept.push(c);
           continue;
         }
-        if (taken(c.path) || brought.has(c.part) || ownBrought.has(c.part)) continue;
+        // Déjà apportée (une autre table cochée joue la même ROM) : son alias reste dans le rapport (romAliases).
+        if (taken(c.path) || already(c)) continue;
         extra.push({ path: c.path, mode: 'copy', owner: vpx, label: label(c.path) });
         kept.push(c);
       }
@@ -605,6 +767,24 @@ function broughtParts(sources: ImportSource[]): Set<Companion['part']> {
     else byFile(s.path);
   }
   return parts;
+}
+
+/**
+ * Noms des ROM (en minuscules) que les sources choisies apportent déjà : leurs zips de ROM, à quatre
+ * niveaux (« Ghostbusters\VPinMame\roms\gb_10.zip »). Une ROM de l'installation n'est écartée que si
+ * la même est déjà là : jamais parce qu'une autre ROM l'est.
+ */
+function broughtRomNames(sources: ImportSource[]): Set<string> {
+  const names = new Set<string>();
+  for (const s of sources) {
+    for (const f of isDir(s.path) ? filesUnder(s.path, 4) : [s.path]) if (/\.zip$/i.test(f) && isRomZip(f)) names.add(romNameOf(f));
+  }
+  return names;
+}
+
+/** Nom de la ROM d'un zip ou d'un dossier de puces : « t2_l8 ». */
+function romNameOf(p: string): string {
+  return path.basename(p).replace(/\.zip$/i, '').toLowerCase();
 }
 
 /** « PinUPSystem › PUPVideos › TheMatrix » : le chemin sous la racine de l'installation. */

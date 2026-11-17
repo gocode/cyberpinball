@@ -507,6 +507,11 @@ export interface SystemItem {
   tone?: Tone;
   /** Raccourci clavier qui fait la même chose sans passer par le menu (ActionShortcut). */
   shortcut?: ActionShortcut;
+  /**
+   * Raccourci de la racine (SYSTEM_ROOT_SHORTCUTS) qui n'y est pas toujours : faux, l'entrée ne reste que
+   * dans sa rubrique (Nouveautés : à la racine tant qu'elles sont récentes ou pas vues, newsAtRoot).
+   */
+  atRoot?: boolean;
   run: () => void;
 }
 
@@ -551,6 +556,11 @@ export type UiAction =
   | { type: 'messages' }
   /** Notification d'un « J'aime » : Mon profil public (profile-menu.ts). */
   | { type: 'my-profile' }
+  /** Carte du joueur du coin d'état : Mon niveau (level-menu.ts) ; pastille des badges : Mes badges. */
+  | { type: 'level' }
+  | { type: 'badges' }
+  /** Le moment d'un badge ou d'un niveau a été vu (level-tracker.ts). */
+  | { type: 'level-seen' }
   /** Notification d'une mention dans un salon : ce salon (rooms-menu.ts). */
   | { type: 'rooms' }
   /** Notification d'un signalement (modérateur) : la file des signalements (rooms-menu.ts). */
@@ -631,6 +641,13 @@ export interface Row {
    * (« 👍 2 »), sous le texte ; `mine` : celle que j'ai posée, cerclée.
    */
   log?: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' | 'masked'; flag?: FlagView; reactions?: { text: string; mine: boolean }[] };
+  /**
+   * Ligne de la chronologie des Nouveautés (news-menu.ts) : la date et la version, dites sur la
+   * première ligne de leur jour seulement (`first`), un petit aperçu s'il y en a un (adresse relative
+   * à la page : nouveautes/<id>-<langue>.webp), ses badges (« Nouveau », « BÊTA »), et ce que fait Start
+   * quand elle est choisie.
+   */
+  news?: { date: string; version: string; first: boolean; last: boolean; preview?: string; unread?: boolean; badges: { text: string; kind: 'new' | 'beta' }[]; start?: string };
 }
 export interface Section {
   title?: string;
@@ -767,6 +784,11 @@ export interface Built {
    * d'ouvrir une ligne pour sa validation (DMD sur la roue, 12/11/2026).
    */
   keysUp?: boolean;
+  /**
+   * Une nouveauté agrandie (news-menu.ts), à la place des sections : son grand aperçu (adresse relative
+   * à la page, nouveautes/<id>-<langue>.webp), son texte entier et où la trouver.
+   */
+  newsPage?: { preview?: string; lines: string[]; where: string };
 }
 
 /** Ce que le rendu montre d'un recadrage (app/renderer/library.js, renderCrop). */
@@ -1239,7 +1261,7 @@ export function createLibrary(host: LibraryHost) {
 
   /** Entrées d'une rubrique (de la racine : ses raccourcis, Téléchargements, puis les rubriques) que l'application fournit. */
   function systemEntries(group: SystemGroupId | undefined): SystemEntryId[] {
-    return (group ? SYSTEM_GROUPS[group].entries : SYSTEM_ROOT_ENTRIES).filter((id) => isSystemGroup(id) || systemItems.has(id));
+    return (group ? SYSTEM_GROUPS[group].entries : SYSTEM_ROOT_ENTRIES).filter((id) => isSystemGroup(id) || (systemItems.has(id) && (group !== undefined || systemItems.get(id)!.atRoot !== false)));
   }
 
   /** Une entrée attend l'utilisateur (pastille rouge) ; une rubrique, dès que l'une des siennes. */
@@ -4592,17 +4614,17 @@ export function createLibrary(host: LibraryHost) {
     go(s);
     void task(t('Analyse des fichiers…'), async () => {
       s.prepared = await prepareImport(paths, mode, path.join(host.dataDir, 'staging'));
-      // Le script de chaque table dit quelle ROM lui revient.
+      // Le script de chaque table dit quelle ROM lui revient. Sans VPX installé, celui écrit dans
+      // le .vpx (ou le .vbs posé à côté) se lit quand même : sans lui, une table reprise d'une autre
+      // installation n'emportait que la ROM que son menu nommait, souvent aucune.
       const exe = host.vpxExe();
-      if (exe) {
-        for (const vpx of s.prepared.sources.flatMap((src) => listVpx(src.path))) {
-          busy = t('Lecture du script de {file}…', { file: path.basename(vpx) });
-          host.broadcast();
-          const facts = await readScript(exe, vpx, host.dataDir);
-          if (!('error' in facts)) s.scripts.set(vpx.toLowerCase(), facts);
-        }
-        host.windows().get('playfield')?.focus();
+      for (const vpx of s.prepared.sources.flatMap((src) => listVpx(src.path))) {
+        busy = t('Lecture du script de {file}…', { file: path.basename(vpx) });
+        host.broadcast();
+        const facts = await readScript(exe, vpx, host.dataDir);
+        if (!('error' in facts)) s.scripts.set(vpx.toLowerCase(), facts);
       }
+      if (exe) host.windows().get('playfield')?.focus();
       // Une table choisie dans une installation existante (Popper, PinballX…) : son PuP-Pack, sa ROM,
       // ses couleurs, ses sons, son dossier DMD et ses médias sont rangés ailleurs ; ils la suivent.
       busy = t('Recherche de ses parties dans l’installation d’origine…');
@@ -4731,6 +4753,7 @@ export function createLibrary(host: LibraryHost) {
       romChoices: s.romChoices,
       vpsGame: s.acquisition?.gameId,
       target: s.target,
+      companions: s.companions,
     });
   }
 
@@ -5754,6 +5777,7 @@ export function createLibrary(host: LibraryHost) {
       journey: built.journey,
       health: built.health,
       scoreboard: built.scoreboard,
+      newsPage: built.newsPage,
       tabs: built.tabs,
       // L'ordre des flippers (visualOrder) : le garde-fou de mise en page le compare à celui de l'affichage.
       order: visualOrder(built, built.actions.length, host.landscape?.() ?? false),

@@ -563,7 +563,10 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
   // Choix courant invisible (13/11/2026, tuiles du haut de la gestion du Juke-box : une règle plus
   // précise rendait leur fond et leur bordure, et seul l'éclat passait) : la ligne choisie doit se
   // distinguer de ses voisines de même forme, par son fond, sa bordure, sa couleur ou son contour.
-  const look = (el) => {
+  // Une ligne dont le choix est porté par une partie d'elle-même (la chronologie des Nouveautés : le
+  // bloc, pas la colonne des dates) la désigne par data-choice : c'est elle qu'on compare.
+  const look = (row) => {
+    const el = row.querySelector(':scope > [data-choice]') ?? row;
     const s = getComputedStyle(el);
     return [s.backgroundColor, s.backgroundImage, s.borderTopColor, s.borderLeftColor, s.borderLeftWidth, s.color, s.outlineStyle, s.outlineColor, s.boxShadow].join('|');
   };

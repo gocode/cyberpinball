@@ -10,7 +10,7 @@
 //
 // Sans electron à l'exécution : les tests du cœur le chargent avec un réseau d'essai.
 
-import { avatarView, boardKey, rankingBoard, relationOf, socialAgo, t, type AvatarView, type Presence, type RankingLine, type RankingPosition, type RankingScope, type RankingStore, type ScorePeriod, type SocialState, type TableEntry } from '@cyberpinball/core';
+import { avatarView, boardKey, levelOf, rankingBoard, relationOf, shownLevel, socialAgo, t, type AvatarView, type Presence, type RankingLine, type RankingPosition, type RankingScope, type RankingStore, type ScorePeriod, type SocialState, type TableEntry } from '@cyberpinball/core';
 
 export interface TableRankingsOptions {
   net: {
@@ -19,6 +19,8 @@ export interface TableRankingsOptions {
     country(): string | undefined;
     status(): { running: boolean };
     /** Borne du joueur reliée à la mienne en ce moment. */
+    /** Le jour où cette borne a vu la carte publique d'un joueur pour la première fois (vraisemblance de son niveau). */
+    cardFirstSeen?(key: string): string | undefined;
     online?(key: string): boolean;
     /** Présence d'un ami (en partie ou au menu). */
     presenceOf?(key: string): Presence | undefined;
@@ -44,8 +46,11 @@ export interface PlayerStatus {
 }
 
 export interface RankingViewLine extends RankingLine {
-  /** Sa pastille : son image, sinon ses initiales sur sa teinte. */
+  /** Sa pastille : son image, sinon ses initiales sur sa teinte ; l'anneau de son palier si son niveau est connu. */
   face: AvatarView;
+  /** Son niveau (levels.ts) ; `levelUnsure` : annoncé, mais invraisemblable pour son ancienneté (« ? »). */
+  level?: number;
+  levelUnsure?: true;
   /** Son statut ; absent : le mien, ou un joueur jamais vu sur le réseau. */
   status?: PlayerStatus;
 }
@@ -102,8 +107,12 @@ export function createTableRankings(opts: TableRankingsOptions): TableRankings {
   function dressed(line: RankingLine, state: SocialState, now: Date): RankingViewLine {
     const net = opts.net;
     const file = net.avatarFile?.(line.key) ?? (line.avatar ? net.rankingAvatar?.(line.key, line.avatar) : undefined);
-    const face = avatarView(line.key, line.name, file);
-    if (line.mine) return { ...line, face };
+    // Le niveau : le mien tel quel ; celui d'un autre, s'il est vraisemblable depuis qu'on le connaît.
+    const firstSeen = [line.since, net.cardFirstSeen?.(line.key)].filter((x): x is string => !!x).sort()[0];
+    const level = line.xp === undefined ? undefined : line.mine ? levelOf(line.xp).level : shownLevel(line.xp, firstSeen, now);
+    const face = { ...avatarView(line.key, line.name, file), ...(level ? { level } : {}) };
+    const rank = { ...(level ? { level } : {}), ...(line.xp !== undefined && !level ? { levelUnsure: true as const } : {}) };
+    if (line.mine) return { ...line, face, ...rank };
     const online = net.online?.(line.key) ?? false;
     const friend = relationOf(state, line.key) === 'friend';
     let status: PlayerStatus | undefined;
@@ -113,7 +122,7 @@ export function createTableRankings(opts: TableRankingsOptions): TableRankings {
       const seen = state.directory.find((d) => d.profile.key === line.key)?.seen;
       if (seen) status = { state: 'seen', label: t('Vu {ago}', { ago: socialAgo(seen, now) }) };
     }
-    return { ...line, face, ...(status ? { status } : {}) };
+    return { ...line, face, ...rank, ...(status ? { status } : {}) };
   }
 
   return {

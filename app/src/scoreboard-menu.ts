@@ -65,6 +65,9 @@ export interface ScoreboardLineView {
   status?: PlayerStatus;
   /** Le joueur de cette borne. */
   mine?: boolean;
+  /** Classements en réseau : son niveau (« 14 »), ou « ? » s'il est invraisemblable ; `level` pour la couleur du palier. */
+  levelText?: string;
+  level?: number;
 }
 
 const locale = () => (language() === 'en' ? 'en-GB' : 'fr-FR');
@@ -172,6 +175,7 @@ function rankingLineView(line: RankingViewLine, now: Date, apart: boolean): Scor
     ...(line.mine ? { mine: true } : {}),
     avatar: line.face,
     ...(line.status ? { status: line.status } : {}),
+    ...(line.level ? { levelText: String(line.level), level: line.level } : line.levelUnsure ? { levelText: '?' } : {}),
   };
 }
 

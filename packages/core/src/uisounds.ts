@@ -14,7 +14,7 @@ import type { MenuMediaSettings } from './mediaview';
 import type { MenuMoment } from './menumoments';
 import { playVolume } from './menumoments';
 
-export const UI_SOUND_IDS = ['solenoid', 'coin', 'knocker', 'coil', 'invite', 'news', 'friend', 'intro'] as const;
+export const UI_SOUND_IDS = ['solenoid', 'coin', 'knocker', 'coil', 'invite', 'news', 'friend', 'intro', 'badge', 'badge-rare', 'level-up'] as const;
 export type UiSoundId = (typeof UI_SOUND_IDS)[number];
 
 export interface UiSoundSpec {
@@ -42,6 +42,11 @@ export interface UiSoundSpec {
    * (essai réel du 04/11/2026).
    */
   readonly notice?: boolean;
+  /**
+   * Musique du moment d'un badge ou d'un niveau (app/renderer/niveau.js) : le processus principal en donne
+   * le réglage et le volume (uiSoundCue, dans la vue du moment), la fenêtre la joue à sa place dans l'animation.
+   */
+  readonly moment?: boolean;
 }
 
 const SYNTH_SOURCE = 'synthèse WebAudio, app/renderer/ui-sounds.js'; // i18n-ignore : provenance, citée telle quelle
@@ -131,6 +136,39 @@ export const UI_SOUNDS: Readonly<Record<UiSoundId, UiSoundSpec>> = {
     },
     source: SYNTH_SOURCE,
     license: OWN_LICENSE,
+  },
+  badge: {
+    get label() {
+      return t('Tintement d’un badge');
+    },
+    get when() {
+      return t('Badge commun reçu, au retour sur l’écran des tables');
+    },
+    source: SYNTH_SOURCE,
+    license: OWN_LICENSE,
+    moment: true,
+  },
+  'badge-rare': {
+    get label() {
+      return t('Fanfare d’un badge');
+    },
+    get when() {
+      return t('Badge rare, épique ou légendaire reçu, au retour sur l’écran des tables');
+    },
+    source: SYNTH_SOURCE,
+    license: OWN_LICENSE,
+    moment: true,
+  },
+  'level-up': {
+    get label() {
+      return t('Passage de niveau');
+    },
+    get when() {
+      return t('Le niveau monte, au retour sur l’écran des tables');
+    },
+    source: SYNTH_SOURCE,
+    license: OWN_LICENSE,
+    moment: true,
   },
 };
 

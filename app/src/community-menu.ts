@@ -13,6 +13,7 @@
 import {
   shownCrowd,
   avatarView,
+  type AvatarView,
   commonTables,
   countryName,
   flagView,
@@ -61,6 +62,8 @@ export interface CommunityMenuHost {
   rankings: { detail(): string; open(back: () => void): void };
   /** Avis et propositions (feedback-menu.ts), la même entrée que dans le Menu système : tout en bas de l'accueil. */
   feedback?: { detail(): string; open(back: () => void): void };
+  /** Mon niveau (level-menu.ts) : ce que dit l'entrée, et l'ouvrir. En tête de l'accueil, avec mon avatar. */
+  level?: { detail(): string; avatar(): AvatarView; open(back: () => void): void };
   /** Partage et réseau (activer le partage, le réseau local, la présence publique). */
   openSharing(back: () => void): void;
   now?(): Date;
@@ -366,6 +369,8 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     const here = () => lib.openCustom(buildHome);
     const c = myCountry();
     const actions: Action[] = [
+      // Mon niveau en tête : le récap, à un appui de la roue (17/11/2026).
+      ...(host.level ? [{ label: t('Mon niveau'), detail: host.level.detail(), icon: 'gauge' as const, run: () => host.level!.open(here) }] : []),
       {
         label: t('Joueurs en ligne'),
         detail: s.enabled ? countsLine(list) : t('Indisponible : partage désactivé (Partage et réseau)'),

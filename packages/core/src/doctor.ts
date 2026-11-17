@@ -73,7 +73,7 @@ import {
 import { addCaptureWatch, backgroundTriggers, captureBlock, captureSettings, captureWatchLines, readCaptures, sameCapture, type CaptureBlocker } from './pupcapture';
 import { buildScriptPatch, ownCapture, readScriptPatch, scriptPatchState, type ScriptPatchState } from './scriptpatch';
 import { applyCompatFixes, compatFixesApplicable, compatFixesApplied, compatFixesForStop, compatFixesFound, vpmInitCallCount, type CompatFix } from './scriptcompat';
-import { aliasFor, historicAlias, neighbourRom, neighbourWarning, readTableAliases, romFamilyOf, tableAliasFile, withAlias, withoutAlias } from './romalias';
+import { aliasComment, aliasFor, historicAlias, IMPORTED_ALIAS_COMMENT, neighbourRom, neighbourWarning, readTableAliases, romFamilyOf, tableAliasFile, withAlias, withoutAlias } from './romalias';
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
 import { isChipName, listRelative, readZipEntries, romContent, type RomZipMember } from './romzip';
 import { companion, nameKey } from './tablefiles';
@@ -2735,8 +2735,10 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
   if (alias) {
     const historic = historicAlias(alias.alias)?.toLowerCase() === alias.rom.toLowerCase();
     if (here(alias.rom)) {
-      // Un ancien nom de VPinMAME : rien à dire. Une révision voisine : on la rappelle.
-      if (!historic) {
+      // Un ancien nom de VPinMAME, ou l'alias que VPinMAME appliquait dans l'installation d'où vient
+      // la table (VPMAlias.txt) : rien à dire. Une révision voisine choisie ici : on la rappelle.
+      const imported = aliasComment(aliasText, alias.alias) === IMPORTED_ALIAS_COMMENT;
+      if (!historic && !imported) {
         findings.push({
           code: 'romAlias',
           severity: 'info',
@@ -2898,11 +2900,38 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
         { rom, others },
       ),
       dirExists && !files.length ? t('Le dossier pinmame\\roms de la table est vide : tant qu’il existe, PinMAME ne cherche pas ailleurs.') : '',
+      romSearchedText(folder, roms, library),
     ]
       .filter(Boolean)
       .join(' '),
   });
   return findings;
+}
+
+/**
+ * « Cherchée par Cyber Pinball dans : … » : le pinmame\roms de la table, la bibliothèque de ROM, et,
+ * pour une table reprise d'une autre installation, les dossiers de ROM de celle-ci (CyberPinball.RomSearch
+ * du .info, écrit par le plan d'ajout). Le joueur sait ainsi où elle n'est pas, et où la mettre.
+ */
+function romSearchedText(folder: string, roms: string[], library: string | undefined): string {
+  const places = [path.join(folder, 'pinmame', 'roms'), ...(library ? [library] : [])];
+  const text = t('Cyber Pinball l’a cherchée dans {dirs}.', { dirs: formatList(places) });
+  const wanted = new Set(roms.map((r) => r.toLowerCase()));
+  for (const file of listSafe(folder).filter((f) => f.toLowerCase().endsWith('.info'))) {
+    const search = (readInfo(path.join(folder, file)).CyberPinball as { RomSearch?: { Roms?: unknown; Dirs?: unknown; From?: unknown } } | undefined)?.RomSearch;
+    const names = Array.isArray(search?.Roms) ? search.Roms.filter((r): r is string => typeof r === 'string') : [];
+    const dirs = Array.isArray(search?.Dirs) ? search.Dirs.filter((d): d is string => typeof d === 'string') : [];
+    if (!names.some((n) => wanted.has(n.toLowerCase()))) continue;
+    const from = typeof search?.From === 'string' ? search.From : '';
+    const asked = formatList(names, 'or');
+    return [
+      text,
+      dirs.length
+        ? t('À la reprise depuis {from}, {roms} a été cherchée dans {dirs} : elle n’y était pas.', { from, roms: asked, dirs: formatList(dirs) })
+        : t('À la reprise depuis {from}, cette installation n’avait aucun dossier de ROM connu (ni VPinMAME\\roms, ni rompath de VPinMAME dans le registre, ni dossier des ROM de Popper).', { from }),
+    ].join(' ');
+  }
+  return text;
 }
 
 /** ROM de la table à côté de celle de la bibliothèque : copie à remplacer par un lien. */

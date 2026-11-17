@@ -3055,7 +3055,7 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
  */
 .lib-scoreboard .scoreboard-lines {
   display: grid;
-  grid-template-columns: minmax(5.4cqmin, max-content) var(--flag-col,) var(--avatar-col,) minmax(9cqmin, 1fr) max-content max-content;
+  grid-template-columns: minmax(5.4cqmin, max-content) var(--flag-col,) var(--avatar-col,) minmax(9cqmin, 1fr) var(--level-col,) max-content max-content;
   column-gap: 1.2cqmin;
   margin: 0;
   padding: 0;
@@ -3069,6 +3069,42 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 .lib-scoreboard .scoreboard-lines.with-avatars {
   --avatar-col: 2.8cqmin;
 }
+
+/* Niveau des joueurs : une pastille à la couleur du palier, dans sa colonne (17/11/2026). */
+.lib-scoreboard .scoreboard-lines.with-levels {
+  --level-col: max-content;
+}
+
+.lib-scoreboard .scoreboard-level {
+  align-self: center;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.lib-scoreboard .scoreboard-level-chip {
+  min-width: 3.2cqmin;
+  padding: 0.15cqmin 0.9cqmin;
+  border: 0.15cqmin solid var(--tier, var(--line-strong));
+  border-radius: 99px;
+  color: var(--tier, var(--ink-muted));
+  font-size: 1.9cqmin;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.lib-scoreboard .scoreboard-level-chip.unsure {
+  border-style: dashed;
+}
+
+.lib-scoreboard .scoreboard-level-chip[data-tier='novice'] { --tier: #7f958f; }
+.lib-scoreboard .scoreboard-level-chip[data-tier='flippeur'] { --tier: #3fb8a8; }
+.lib-scoreboard .scoreboard-level-chip[data-tier='habitue'] { --tier: #5fb4cf; }
+.lib-scoreboard .scoreboard-level-chip[data-tier='expert'] { --tier: #8be23a; }
+.lib-scoreboard .scoreboard-level-chip[data-tier='maitre'] { --tier: #a98bff; }
+.lib-scoreboard .scoreboard-level-chip[data-tier='sorcier'] { --tier: #f0d27a; }
+.lib-scoreboard .scoreboard-level-chip[data-tier='legende'] { --tier: #ffe08a; }
 
 /* Le texte sur une même ligne de base ; drapeau et pastille centrés sur la ligne. */
 .lib-scoreboard .scoreboard-line {
@@ -5120,3 +5156,259 @@ body.mouse .lib-chip.pick:not(.selected):hover {
 .lib-row.with-controls { display: flex; align-items: center; gap: 2.2cqmin; }
 .lib-row.with-controls > .lib-row-main { flex: 1; min-width: 0; }
 .schema-ligne { height: 10.2cqmin; aspect-ratio: 520 / 300; }
+
+/*
+ * Nouveautés (news-menu.ts, maquette validée le 17/11/2026) : une chronologie. À gauche la date et la
+ * version, sur la première ligne de leur jour seulement ; au milieu le fil et son point (vert tant que
+ * la nouveauté est nouvelle, sarcelle plein au premier jour d'un groupe) ; à droite le bloc, choisi en
+ * vert comme une ligne de liste : le petit aperçu s'il y en a un, le titre et ses badges, le détail.
+ * Dimensions pour un petit côté de 1080 px : aucun texte sous 20 px (1,86cqmin).
+ */
+.news-timeline {
+  display: flex;
+  flex-direction: column;
+  padding: 0.6cqmin 0;
+}
+
+.lib-row.news-item {
+  display: grid;
+  grid-template-columns: 11cqmin 2.6cqmin minmax(0, 1fr);
+  column-gap: 1.4cqmin;
+  align-items: stretch;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.lib-row.news-item.selected {
+  border: 0;
+  background: none;
+}
+
+.news-date {
+  padding-top: 2.2cqmin;
+  text-align: right;
+}
+
+.news-date b {
+  display: block;
+  font-size: 2.4cqmin;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.news-date span {
+  display: block;
+  margin-top: 0.4cqmin;
+  font-size: 1.95cqmin;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.news-rail {
+  position: relative;
+}
+
+.news-rail::before {
+  content: '';
+  position: absolute;
+  left: calc(50% - 0.1cqmin);
+  top: 0;
+  bottom: 0;
+  width: 0.2cqmin;
+  background: color-mix(in oklab, var(--halo) 45%, transparent);
+}
+
+.news-item.first:first-child .news-rail::before {
+  top: 3cqmin;
+}
+
+.news-item.last .news-rail::before {
+  bottom: calc(100% - 3cqmin);
+}
+
+.news-rail i {
+  position: absolute;
+  left: calc(50% - 0.7cqmin);
+  top: 2.3cqmin;
+  width: 1.4cqmin;
+  height: 1.4cqmin;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 0.2cqmin solid color-mix(in oklab, var(--halo) 80%, var(--ink));
+  background: var(--void);
+}
+
+.news-item.first .news-rail i {
+  background: var(--halo);
+}
+
+.news-item.unread .news-rail i {
+  border-color: var(--signal);
+  background: var(--signal);
+  box-shadow: 0 0 1cqmin var(--signal-haze);
+}
+
+.news-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.8cqmin;
+  min-width: 0;
+  margin: 0.8cqmin 0;
+  padding: 1.6cqmin 1.8cqmin;
+  border: 0.15cqmin solid transparent;
+  border-radius: 1.1cqmin;
+}
+
+/* Le choix courant : le cadre et l'aplat verts du choix, autour du bloc seulement. */
+.lib-row.news-item.selected .news-block {
+  border-color: var(--accent);
+  background: var(--signal-wash);
+  box-shadow: inset 0 0 0 0.15cqmin var(--accent), 0 0 2.2cqmin rgba(139, 226, 58, 0.16);
+}
+
+body.mouse .lib-row.news-item.pick:not(.selected):hover .news-block {
+  border-color: var(--halo);
+}
+
+.news-thumb {
+  flex: none;
+  width: 18.5cqmin;
+  height: 11.6cqmin;
+  object-fit: cover;
+  border-radius: 0.8cqmin;
+  border: 0.12cqmin solid color-mix(in oklab, var(--halo) 70%, transparent);
+  background: var(--surface-sunken);
+}
+
+.news-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6cqmin;
+}
+
+.news-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6cqmin 1cqmin;
+}
+
+.news-title {
+  font-size: 2.6cqmin;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.news-badge {
+  padding: 0.1cqmin 0.9cqmin;
+  border-radius: 0.5cqmin;
+  font-size: 1.95cqmin;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.news-badge.new {
+  background: var(--signal);
+  color: var(--on-signal);
+}
+
+.news-badge.beta {
+  background: var(--meta);
+  color: var(--void);
+}
+
+.news-detail {
+  font-size: 2.15cqmin;
+  line-height: 1.38;
+  color: var(--ink-muted);
+  word-break: break-word;
+}
+
+.news-start {
+  font-size: 1.95cqmin;
+  color: var(--accent);
+}
+
+/* Une nouveauté agrandie : le grand aperçu, puis le texte ; au bureau, le texte à droite de l'aperçu. */
+.lib-body.lib-news-page {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 2.5cqmin;
+}
+
+@container (orientation: portrait) {
+  .lib-body.lib-news-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+}
+
+.news-page {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 3.4cqmin;
+  align-items: center;
+  padding: 2cqmin;
+  border-radius: 1cqmin;
+  background: var(--surface-sunken);
+  outline: 0.15cqmin solid var(--line);
+  outline-offset: -0.15cqmin;
+}
+
+/* Sans aperçu : le cadre à la taille de son texte, jamais un grand vide noir. */
+.news-page.no-preview {
+  grid-template-columns: minmax(0, 1fr);
+  align-self: start;
+}
+
+@container (orientation: portrait) {
+  .news-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-items: stretch;
+  }
+
+  .news-page.no-preview {
+    grid-template-rows: auto;
+    align-content: start;
+  }
+}
+
+.news-shot {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+  object-position: center top;
+  border-radius: 0.9cqmin;
+}
+
+.news-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4cqmin;
+  min-width: 0;
+  padding: 0 0.8cqmin 0.4cqmin;
+}
+
+.news-line {
+  margin: 0;
+  font-size: 2.3cqmin;
+  line-height: 1.42;
+  color: var(--ink);
+}
+
+.news-where {
+  margin: 0.4cqmin 0 0;
+  font-size: 2.05cqmin;
+  font-weight: 600;
+  color: var(--halo);
+  filter: brightness(1.35);
+}

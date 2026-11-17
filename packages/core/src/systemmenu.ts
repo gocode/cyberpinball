@@ -62,6 +62,7 @@ export const SYSTEM_ITEM_IDS = [
   'guest-mode',
   'language',
   'updates',
+  'news',
   'feedback',
   'terms',
   'community',
@@ -111,11 +112,13 @@ export const SYSTEM_ROOT: readonly SystemGroupId[] = ['amis', 'tables', 'medias'
  * gestionnaire de téléchargements d'une console, et Télécommande du téléphone (06/11/2026 : rangée
  * seulement dans Borne, on ne la trouvait pas), et le Juke-box (09/11/2026 : ses playlists se gèrent
  * depuis « Menu système > Juke-box », chemin donné par le médaillon de la roue), et les Collections
- * (10/11/2026 : sur une borne dont les MagnaSave ne répondent pas, Exit puis Collections). Elles gardent leur
- * place dans leur rubrique (Cyber Pinball > Activité récente, Médias > Juke-box, Tables >
+ * (10/11/2026 : sur une borne dont les MagnaSave ne répondent pas, Exit puis Collections), et les
+ * Nouveautés en tête (17/11/2026 : la pastille rouge y mène dès la première installation ; elles ne
+ * restent à la racine que tant qu'elles sont récentes ou pas vues, newsAtRoot). Elles gardent leur
+ * place dans leur rubrique (Cyber Pinball > Activité récente et Nouveautés, Médias > Juke-box, Tables >
  * Téléchargements, Borne > Télécommande du téléphone).
  */
-export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['activity', 'collections', 'jukebox', 'downloads', 'phone-remote'];
+export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['news', 'activity', 'collections', 'jukebox', 'downloads', 'phone-remote'];
 
 /**
  * La racine du menu système telle qu'elle s'affiche : Activité récente en tête (elle couvre
@@ -123,7 +126,7 @@ export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['activity', 'coll
  * téléphone, Borne, Cyber Pinball (ordre choisi le 29/10/2026, Juke-box ajouté le 09/11/2026). systemmenu.test.ts vérifie qu'elle reprend
  * SYSTEM_ROOT dans son ordre et chaque raccourci une fois.
  */
-export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['activity', 'collections', 'amis', 'tables', 'medias', 'jukebox', 'downloads', 'phone-remote', 'borne', 'cyberpinball'];
+export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['news', 'activity', 'collections', 'amis', 'tables', 'medias', 'jukebox', 'downloads', 'phone-remote', 'borne', 'cyberpinball'];
 
 export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
   tables: {
@@ -180,9 +183,9 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'cyberpinball',
     icon: 'pinball-app',
     label: 'Cyber Pinball', // i18n-ignore : le nom de l'application
-    get detail() { return t('Langue, mise à jour, avis et propositions, activité récente, sauvegardes, migration, conditions d’utilisation, la communauté, quitter ou redémarrer, veille et extinction'); },
+    get detail() { return t('Langue, mise à jour, nouveautés, avis et propositions, activité récente, sauvegardes, migration, conditions d’utilisation, la communauté, quitter ou redémarrer, veille et extinction'); },
     // Les sorties à la fin, de la plus légère à la plus lourde : quitter ou relancer Cyber Pinball, veille, redémarrage, arrêt.
-    entries: ['language', 'updates', 'feedback', 'activity', 'backups', 'migration', 'terms', 'community', 'quit', 'relaunch', 'sleep', 'restart', 'shutdown'],
+    entries: ['language', 'updates', 'news', 'feedback', 'activity', 'backups', 'migration', 'terms', 'community', 'quit', 'relaunch', 'sleep', 'restart', 'shutdown'],
   },
   migration: {
     id: 'migration',
@@ -265,6 +268,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   // Nommée dans les deux langues, pour qu'on la retrouve quelle que soit la langue affichée.
   language: { icon: 'language', label: 'Langue / Language' }, // i18n-ignore
   updates: { icon: 'upgrade', get label() { return t('Mise à jour de Cyber Pinball'); } },
+  // Les grandes nouveautés, choisies à la main (news.ts, app/src/news-menu.ts) : une chronologie.
+  news: { icon: 'sparkle', get label() { return t('Nouveautés'); } },
   // Le tableau public des propositions et le formulaire des retours (app/src/feedback-menu.ts).
   feedback: { icon: 'inbox', get label() { return t('Avis et propositions'); } },
   terms: { icon: 'rules', get label() { return t('Conditions d’utilisation'); } },

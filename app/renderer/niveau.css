@@ -1,0 +1,593 @@
+/*
+ * Niveaux et badges, côté plateau (niveau.js) : la carte du joueur et la pastille des badges au coin
+ * d'état, puis le moment d'un badge ou d'un niveau, dans le calque #level-moment (placé et tourné
+ * comme le plateau, frontend.css). Tailles en cqmin : n px sur un plateau de 1 080 = n/10,8 cqmin.
+ * D'après la maquette « Niveaux et badges » validée le 17/11/2026.
+ */
+
+/* ---------- Carte du joueur : même repère de 64 px que les pastilles, même fond, même filet ---------- */
+.player-card {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 1.1cqmin;
+  min-height: 5.93cqmin;
+  padding: 0 1.7cqmin 0 0.6cqmin;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 0.1cqmin solid var(--line-strong);
+  border-radius: 2.96cqmin;
+  text-align: left;
+}
+body.mouse .player-card:not(.player-card-guest) {
+  cursor: pointer;
+}
+body.mouse .player-card:not(.player-card-guest):hover {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 0.18cqmin var(--signal);
+}
+.player-card-avatar {
+  width: 4.8cqmin;
+  height: 4.8cqmin;
+  font-size: 1.9cqmin;
+}
+.player-card-who {
+  display: grid;
+  gap: 0.35cqmin;
+  min-width: 0;
+}
+.player-card-name {
+  font-size: 2.1cqmin;
+  font-weight: 600;
+  line-height: 1.05;
+  white-space: nowrap;
+  max-width: 22cqmin;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player-card-level {
+  display: flex;
+  align-items: center;
+  gap: 0.9cqmin;
+  font-size: 1.86cqmin;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--ink-muted);
+  line-height: 1;
+}
+.player-card-level b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.player-card.player-card-guest .player-card-name,
+.player-card.player-card-guest .player-card-level {
+  color: var(--ink-muted);
+  letter-spacing: 0.02em;
+}
+.player-card-bar {
+  position: relative;
+  width: 13cqmin;
+  height: 0.56cqmin;
+  border-radius: 99px;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 0.1cqmin var(--line-strong);
+  overflow: hidden;
+}
+.player-card-bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p, 0%);
+  border-radius: inherit;
+  background: var(--signal);
+}
+/* Part gagnée à la dernière partie : elle s'éclaire quelques secondes. */
+.player-card-bar em {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--p0, 0%);
+  width: calc(var(--p, 0%) - var(--p0, 0%));
+  border-radius: 99px;
+  background: #fff;
+  animation: player-gain 2.6s ease-in-out infinite;
+}
+@keyframes player-gain {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+.player-card-gain {
+  position: absolute;
+  right: -0.6cqmin;
+  top: 6.3cqmin;
+  font-size: 1.9cqmin;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--on-signal, #071204);
+  background: var(--signal);
+  padding: 0.3cqmin 0.9cqmin;
+  border-radius: 99px;
+  box-shadow: 0 0 1.6cqmin rgba(139, 226, 58, 0.18);
+  white-space: nowrap;
+  animation: player-gain-pop 6s ease-out forwards;
+}
+@keyframes player-gain-pop {
+  0% {
+    transform: translateY(1cqmin);
+    opacity: 0;
+  }
+  8%,
+  80% {
+    transform: none;
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---------- Pastille des badges : comme celle des amis, médaille or ---------- */
+.badges-pill {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 0.9cqmin;
+  min-height: 5.93cqmin;
+  padding: 0 1.48cqmin;
+  font: inherit;
+  font-size: 2.22cqmin;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 0.1cqmin solid var(--line-strong);
+  border-radius: 2.96cqmin;
+}
+body.mouse .badges-pill {
+  cursor: pointer;
+}
+body.mouse .badges-pill:hover {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 0.18cqmin var(--signal);
+}
+.badges-pill-icon {
+  font-size: 2.4cqmin;
+  color: #f0d27a;
+}
+
+/* ---------- Le moment ---------- */
+#level-moment {
+  z-index: 400;
+  pointer-events: none;
+}
+#level-moment.lm-on {
+  pointer-events: auto;
+}
+.lm-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  --rar: #4fb0d6;
+}
+/* La colonne du badge : 9:16, centrée ; ses tailles en cqmin sont celles d'un plateau de borne. */
+.lm-column {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: min(100%, calc(100cqh * 9 / 16));
+  transform: translateX(-50%);
+  container-type: size;
+}
+#level-moment .lm-stage {
+  container-type: size;
+}
+.lm-veil {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 8, 7, 0.88);
+  opacity: 0;
+}
+.lm-fx {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+.lm-flash {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 60cqmin;
+  height: 60cqmin;
+  margin: -30cqmin 0 0 -30cqmin;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, color-mix(in srgb, var(--rar) 55%, transparent) 18%, transparent 60%);
+  opacity: 0;
+  transform: scale(0.1);
+}
+.lm-medal {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 34cqmin;
+  height: 34cqmin;
+  margin: -17cqmin 0 0 -17cqmin;
+  opacity: 0;
+  transform: scale(0.6);
+}
+.lm-art,
+.lm-ring {
+  position: absolute;
+  inset: 0;
+}
+.lm-art svg,
+.lm-ring {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.lm-trace {
+  fill: none;
+  stroke: var(--rar);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-dasharray: 100 100;
+  stroke-dashoffset: 100;
+  filter: drop-shadow(0 0 1.2px var(--rar));
+}
+.lm-spark {
+  opacity: 0;
+}
+.lm-queue {
+  position: absolute;
+  right: 4cqmin;
+  top: 4cqmin;
+  font-size: 2cqmin;
+  letter-spacing: 0.14em;
+  color: var(--ink-muted);
+  opacity: 0;
+}
+.lm-txt {
+  position: absolute;
+  z-index: 1;
+  left: 6cqmin;
+  right: 6cqmin;
+  top: 62%;
+  display: grid;
+  justify-items: center;
+  gap: 1.6cqmin;
+  text-align: center;
+}
+/* Un voile doux derrière le texte : lisible sur les fonds les plus riches. */
+.lm-txt::before {
+  content: '';
+  position: absolute;
+  inset: -5cqmin -8cqmin;
+  z-index: -1;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(3, 8, 7, 0.82) 0%, rgba(3, 8, 7, 0.55) 45%, rgba(3, 8, 7, 0) 72%);
+}
+.lm-kick {
+  font-size: 2.4cqmin;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--signal);
+  opacity: 0;
+}
+.lm-name {
+  font-size: 5.4cqmin;
+  font-weight: 600;
+  line-height: 1.1;
+  opacity: 0;
+}
+.lm-detail {
+  font-size: 2.5cqmin;
+  color: var(--ink-muted);
+  opacity: 0;
+}
+.lm-rarity {
+  display: flex;
+  gap: 1.6cqmin;
+  align-items: center;
+  opacity: 0;
+}
+.lm-chip {
+  font-size: 2cqmin;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--rar);
+  border: 0.15cqmin solid var(--rar);
+  border-radius: 99px;
+  padding: 0.4cqmin 1.6cqmin;
+}
+.lm-xp {
+  font-size: 3.4cqmin;
+  font-weight: 700;
+  color: var(--signal);
+}
+.lm-up {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 10%;
+  text-align: center;
+  font-size: 7cqmin;
+  font-weight: 300;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+  opacity: 0;
+}
+.lm-up b {
+  color: var(--tier);
+  font-weight: 600;
+}
+.lm-up small {
+  display: block;
+  font-size: 2.6cqmin;
+  letter-spacing: 0.3em;
+  color: var(--tier);
+  font-weight: 600;
+  margin-top: 1cqmin;
+}
+.lm-up.lm-show {
+  animation: lm-up 1.6s ease-out forwards;
+}
+.lm-level {
+  position: absolute;
+  z-index: 1;
+  left: 7cqmin;
+  right: 7cqmin;
+  bottom: 15cqmin;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2.4cqmin;
+  align-items: center;
+  opacity: 0;
+}
+.lm-level::before {
+  content: '';
+  position: absolute;
+  inset: -2.4cqmin -3cqmin;
+  z-index: -1;
+  border-radius: 2cqmin;
+  background: radial-gradient(ellipse at center, rgba(3, 8, 7, 0.8) 30%, rgba(3, 8, 7, 0) 75%);
+}
+.lm-avatar {
+  width: 9cqmin;
+  height: 9cqmin;
+  font-size: 3.2cqmin;
+}
+.lm-level-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2cqmin;
+}
+.lm-level-num {
+  font-size: 2.6cqmin;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.lm-level-tier {
+  font-size: 2.1cqmin;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tier);
+  font-weight: 600;
+}
+.lm-bar {
+  position: relative;
+  height: 1.2cqmin;
+  margin-top: 1.2cqmin;
+  border-radius: 99px;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 0.1cqmin var(--line-strong);
+  overflow: hidden;
+}
+.lm-bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: inherit;
+  background: var(--tier, var(--signal));
+  transition: width 0.8s cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+.lm-bar i.lm-instant {
+  transition: none;
+}
+.lm-xpline {
+  font-size: 1.9cqmin;
+  color: var(--ink-muted);
+  margin-top: 0.8cqmin;
+}
+.lm-continue {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 5cqmin;
+  text-align: center;
+  font-size: 2cqmin;
+  color: var(--ink-muted);
+  opacity: 0;
+}
+
+/* Déroulé : voile, fond, éclat, badge, faisceau, titre qui s'écarte, texte, niveau. */
+.lm-stage.lm-play .lm-veil {
+  animation: lm-fade 0.4s ease-out forwards;
+}
+.lm-stage.lm-play .lm-fx {
+  animation: lm-fade 0.25s 0.15s forwards;
+}
+.lm-stage.lm-play .lm-flash {
+  animation: lm-flash 0.7s 0.95s ease-out forwards;
+}
+.lm-stage.lm-play .lm-medal {
+  animation: lm-medal 0.55s 1.05s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+}
+.lm-stage.lm-play .lm-spark {
+  animation: lm-fade 0.05s 1.45s forwards;
+}
+.lm-stage.lm-play .lm-kick {
+  animation: lm-spread 0.7s 1.7s ease-out forwards;
+}
+.lm-stage.lm-play .lm-txt::before {
+  animation: lm-fade 0.5s 1.6s forwards;
+}
+.lm-stage.lm-play .lm-name {
+  animation: lm-rise 0.45s 2s ease-out forwards;
+}
+.lm-stage.lm-play .lm-detail {
+  animation: lm-rise 0.45s 2.15s ease-out forwards;
+}
+.lm-stage.lm-play .lm-rarity {
+  animation: lm-rise 0.45s 2.35s ease-out forwards;
+}
+.lm-stage.lm-play .lm-level {
+  animation: lm-rise 0.45s 2.7s ease-out forwards;
+}
+.lm-stage.lm-play .lm-queue {
+  animation: lm-fade 0.4s 1.2s forwards;
+}
+.lm-stage.lm-play .lm-continue {
+  animation: lm-fade 0.5s 4.9s forwards;
+}
+/* Secret dévoilé : le badge apparaît en sautant, comme un signal capté. */
+.lm-stage.lm-secret.play .lm-medal {
+  animation: lm-glitch 0.7s 1.05s steps(1) forwards;
+}
+/* Niveau de départ et niveau seul : pas de badge ; le texte et la barre seulement. */
+.lm-stage.lm-start .lm-medal,
+.lm-stage.lm-level-only .lm-medal,
+.lm-stage.lm-level-only .lm-txt {
+  display: none;
+}
+.lm-stage.lm-start .lm-txt {
+  top: 30%;
+}
+.lm-stage.lm-start .lm-name {
+  font-size: 9cqmin;
+  font-weight: 300;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.lm-stage.lm-start .lm-chip {
+  color: var(--rar, var(--signal));
+  border-color: var(--rar, var(--signal));
+}
+
+@keyframes lm-fade {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes lm-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.1);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(0.7);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+@keyframes lm-medal {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lm-spread {
+  0% {
+    opacity: 0;
+    letter-spacing: 0.1em;
+  }
+  100% {
+    opacity: 1;
+    letter-spacing: 0.5em;
+  }
+}
+@keyframes lm-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(1.4cqmin);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lm-up {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+    letter-spacing: 0.02em;
+  }
+  30% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 1;
+    letter-spacing: 0.1em;
+  }
+}
+@keyframes lm-glitch {
+  0% {
+    opacity: 0.9;
+    transform: translateX(-3cqmin) scale(1.04);
+    filter: hue-rotate(90deg);
+  }
+  14% {
+    opacity: 0.2;
+    transform: translateX(2.4cqmin) scale(0.96);
+  }
+  28% {
+    opacity: 1;
+    transform: translateX(-1cqmin);
+    filter: hue-rotate(-60deg);
+  }
+  42% {
+    opacity: 0.5;
+    transform: translateX(1.6cqmin) scaleY(0.9);
+  }
+  57% {
+    opacity: 1;
+    transform: translateX(-0.5cqmin);
+    filter: none;
+  }
+  71% {
+    opacity: 0.7;
+    transform: translateX(0.6cqmin);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lm-stage.lm-play *,
+  .lm-up.lm-show,
+  .player-card-bar em,
+  .player-card-gain {
+    animation-duration: 0.01s !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+  }
+}

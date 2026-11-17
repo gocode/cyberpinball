@@ -4,6 +4,10 @@
 export const messages: Record<string, string> = {
   // packages/core/src/installation.ts
   'ROM « {rom} »': 'ROM “{rom}”',
+  'ROM « {rom} » (ou {others})': 'ROM “{rom}” (or {others})',
+  '{name}, cherchée dans {dirs}': '{name}, looked for in {dirs}',
+  '{name} : l’installation n’a aucun dossier de ROM connu (ni VPinMAME\\roms, ni rompath de VPinMAME dans le registre, ni dossier des ROM de Popper)':
+    '{name}: the installation has no known ROM folder (no VPinMAME\\roms, no VPinMAME rompath in the registry, no Popper ROM folder)',
   'PuP-Pack « {name} »': 'PuP-Pack “{name}”',
   'dossier DMD « {name} »': 'DMD folder “{name}”',
   Script: 'Script',
@@ -39,6 +43,8 @@ export const messages: Record<string, string> = {
     'Only the ticked tables are brought in, each with its whole folder when it has one, and what the installation keeps elsewhere: its PuP-Pack (PUPVideos), its ROM, save, colours and sounds (VPinMAME), its music, its DMD folder, its backglass and its media (Popper, PinballX, PinballY), under every name the installation gives them. Everything is copied: the original installation does not change. Nothing is installed before you have approved the plan.',
   'VPinMAME : {dir}': 'VPinMAME: {dir}',
   'VPinMAME : absent': 'VPinMAME: missing',
+  'ROM : {dirs}': 'ROMs: {dirs}',
+  'ROM : aucun dossier connu': 'ROMs: no known folder',
   'PuP-Packs : {dir}': 'PuP-Packs: {dir}',
   'PuP-Packs : absents': 'PuP-Packs: missing',
   'Médias : {dirs}': 'Media: {dirs}',

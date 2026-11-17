@@ -134,7 +134,7 @@ function fakeAudio(log: FakeLog, audio: { outputLatency?: number; state?: string
     }
     createOscillator() {
       const ctx = this;
-      return node({ type: 'sine', frequency: param(), start: (t: number) => void (log.starts++, log.startAt.push(t - ctx.currentTime)), stop: (t: number) => void log.stops.push(t - ctx.currentTime) });
+      return node({ type: 'sine', frequency: param(), detune: param(), start: (t: number) => void (log.starts++, log.startAt.push(t - ctx.currentTime)), stop: (t: number) => void log.stops.push(t - ctx.currentTime) });
     }
     createBufferSource() {
       const ctx = this;
@@ -142,6 +142,9 @@ function fakeAudio(log: FakeLog, audio: { outputLatency?: number; state?: string
     }
     createBiquadFilter() {
       return node({ type: 'lowpass', frequency: param(), Q: param() });
+    }
+    createConvolver() {
+      return node({ buffer: undefined });
     }
     createBuffer(_channels: number, length: number) {
       const data = new Float32Array(length);
@@ -235,8 +238,10 @@ test('fenêtre : chaque recette tient dans sa durée et sort sur la sortie du me
     assert.equal(w.api.play(id, 1), true);
     assert.ok(w.log.starts > 0, `${id} : des sources`);
     // Les sources s'arrêtent au plus tard 0,2 s après le début du son plus sa durée (ui-sounds.js libère alors le son).
-    // Des bruits brefs, sous 0,8 s ; seul le souffle de l'ouverture tient plus longtemps (3,1 s, joué une fois au démarrage).
-    assert.ok(Math.max(...w.log.stops) < (id === 'intro' ? 3.3 : 0.8), `${id} : ${Math.max(...w.log.stops)} s`);
+    // Des bruits brefs, sous 0,8 s ; seuls le souffle de l'ouverture (3,1 s, joué une fois au démarrage) et les
+    // musiques du moment d'un badge (calées sur son animation, une fois au retour d'une partie) tiennent plus longtemps.
+    const longest: Partial<Record<string, number>> = { intro: 3.3, badge: 4.4, 'badge-rare': 5.8, 'level-up': 1.8 };
+    assert.ok(Math.max(...w.log.stops) < (longest[id] ?? 0.8), `${id} : ${Math.max(...w.log.stops)} s`);
     assert.deepEqual(w.log.sinks, ['fronton']);
     w.flush();
     assert.equal(w.api.status().enCours, 0, `${id} : libéré`);
@@ -301,7 +306,11 @@ test('branchements : le processus principal ne joue un son que par uiSoundCue, a
   assert.match(fn, /windows\.get\('playfield'\)/);
   // Chaque son du registre a son déclencheur : un appel explicite, ou, pour le son d'une
   // notification, la règle qui le porte (NoticeRule.sound), jouée par menu-notices.ts.
-  for (const id of UI_SOUND_IDS.filter((id) => !UI_SOUNDS[id].notice)) assert.match(main, new RegExp(`playUiSound\\('${id}'[,)]`), id);
+  for (const id of UI_SOUND_IDS.filter((id) => !UI_SOUNDS[id].notice && !UI_SOUNDS[id].moment)) assert.match(main, new RegExp(`playUiSound\\('${id}'[,)]`), id);
+  // Les musiques du moment d'un badge : leur réglage et leur volume par uiSoundCue, joués par niveau.js à leur place dans l'animation.
+  for (const id of UI_SOUND_IDS.filter((id) => UI_SOUNDS[id].moment)) assert.match(main, new RegExp(`cue\\('${id}'\\)`), id);
+  assert.match(main, /const cue = \(id: UiSoundId\) => uiSoundCue\(id, mediaSettings, 'browse'\);/);
+  assert.match(read('app', 'renderer', 'niveau.js'), /window\.CyberUiSounds\.play\(cue\.id, cue\.volume\)/);
   // Le souffle de l'ouverture est daté : son accord sur l'ignition, à l'horloge des animations.
   assert.match(main, /playUiSound\('intro', startedAt === undefined \? undefined : startedAt \+ INTRO_TIMELINE\.ignition\)/);
   assert.match(main, /sound: \(id\) => playUiSound\(id\)/, 'les sons des notifications, joués à leur entrée');

@@ -33,6 +33,7 @@ import {
   joinPublic,
   mergeAnnounces,
   publicGroups,
+  playerPublicGroups,
   signAnnounce,
   verifyAnnounce,
   GROUP_ANNOUNCE_BATCH,
@@ -85,6 +86,8 @@ export interface GroupServiceOptions {
   onArrive?: (view: GroupView, lines: GroupLine[]) => void;
   /** Une invitation reçue d'un ami. */
   onInvite?: (invitation: GroupInvitation, view: GroupView) => void;
+  /** J'ai écrit un message dans un groupe (niveau : présence au salon). */
+  onOwnLine?: () => void;
   /** Essais : le rythme des empreintes (GROUP_SYNC_MS). */
   syncMs?: number;
   log?: (line: string) => void;
@@ -106,6 +109,8 @@ export interface GroupService {
   setAccess(g: string, access: GroupAccess): boolean;
   /** Les groupes publics de l'annuaire dont je ne suis pas membre. */
   publicGroups(): { announce: GroupAnnounce; view: GroupView }[];
+  /** Les groupes publics d'un joueur que cette borne connaît (son profil public) ; `mine` : j'en suis aussi. */
+  publicGroupsOf(key: string): { view: GroupView; mine: boolean }[];
   /** Rejoindre un groupe public de l'annuaire ; false s'il n'y est plus, s'il est plein ou si j'en ai été retiré. */
   joinPublic(g: string): boolean;
   /** Demander leur annuaire aux bornes reliées (l'écran « Groupes » s'ouvre). */
@@ -455,7 +460,11 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
       tick(true);
       return lines.length;
     },
-    send: (g, text) => write(g, { k: 'msg', text }),
+    send: (g, text) => {
+      const r = write(g, { k: 'msg', text });
+      if ('line' in r) opts.onOwnLine?.();
+      return r;
+    },
     react: (g, target, kind) => 'line' in write(g, { k: 'react', target, kind }),
     remove(g, target) {
       const v = viewOf(g);
@@ -477,6 +486,7 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
       return ok;
     },
     publicGroups: () => publicGroups(state, myKey(), now()),
+    publicGroupsOf: (key) => playerPublicGroups(state, key, myKey(), now()),
     joinPublic(g) {
       const a = state.directory[g];
       if (!a || !opts.net.state().enabled) return false;

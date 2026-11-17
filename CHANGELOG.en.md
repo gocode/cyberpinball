@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- What's new (System menu > What's new): the big new things in Cyber Pinball, picked one by one, as a timeline; the date given once per day, a small preview, and Start to see one full size, read on and "Try it" straight away. A red dot invites you there, from the very first installation; the entry stays at the top of the system menu while they are recent, then in the Cyber Pinball section.
+- Bringing tables in from another installation (PinUP Popper, PinballX, PinballY): tables now arrive with their ROM even when VPinMAME keeps it in another folder of its "rompath", has it under another name (VPMAlias.txt, old name), or is installed far from the tables; the ROM is read from the script VPX actually plays (the .vbs next to the table), or else from the original front-end.
+- A ROM that cannot be found is reported with the folders it was looked for in, in the add plan and then on the table's sheet.
 - Game parts: the recognised game's action is now called "Game: …" and the "Which game is it?" screen no longer mentions "VPS".
 - Real DMD (beta): a PIN2DMD that was recognised but stayed dark during games now says why. Cyber Pinball opens it then releases it at once, as VPX will, at startup, after a game and on "Check again". Already opened by another program (dmdext, PinUP Popper…), a driver VPX cannot use, board not found: it is shown on the "Real DMD" page, in cabinet health and before the game, with what to do. When all is well, the row says "opened then released: VPX will be able to light it".
 - Real DMD (beta): a program that often holds the real DMD (dmdext, PinUP Popper, PinballX, PinballY, another VPX) is reported before each game, for the ZeDMD and the Pixelcade too.

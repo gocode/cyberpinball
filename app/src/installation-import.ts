@@ -217,6 +217,8 @@ export function createInstallationImport(host: InstallationImportHost) {
     return [
       t('Tables : {dir}', { dir: l.tables }),
       l.pinmame ? t('VPinMAME : {dir}', { dir: l.pinmame }) : t('VPinMAME : absent'),
+      // Tous les dossiers où les ROM seront cherchées (rompath entier, VPinMAME inscrit, Popper).
+      l.romDirs.length ? t('ROM : {dirs}', { dirs: l.romDirs.join(', ') }) : t('ROM : aucun dossier connu'),
       l.pupVideos ? t('PuP-Packs : {dir}', { dir: l.pupVideos }) : t('PuP-Packs : absents'),
       l.mediaRoots.length ? t('Médias : {dirs}', { dirs: l.mediaRoots.join(', ') }) : undefined,
     ]

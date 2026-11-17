@@ -67,6 +67,8 @@ export interface RankedScore {
    * demande à sa borne, ou à une borne qui l'a déjà : l'empreinte la contrôle (décidé le 10/11/2026).
    */
   avatar?: string;
+  /** XP du joueur ce jour-là (levels.ts) : son niveau dans les tableaux ; absents d'un score d'avant les niveaux. */
+  xp?: number;
   sig: string;
 }
 
@@ -91,7 +93,7 @@ const SOURCES: readonly PlayedSource[] = ['rom', 'record', 'live'];
 /** Ce que couvre la signature : tout le score, dans un ordre fixe. */
 function signedText(s: Omit<RankedScore, 'sig'>): string {
   // L'avatar n'entre au texte que s'il y en a un : les scores d'avant les avatars se vérifient toujours.
-  return JSON.stringify({ app: 'cyberpinball', kind: 'score', key: s.key, name: s.name, country: s.country ?? null, board: s.board, balls: s.balls ?? null, title: s.table.title, score: s.score, at: s.at, how: s.how, ...(s.avatar ? { avatar: s.avatar } : {}) });
+  return JSON.stringify({ app: 'cyberpinball', kind: 'score', key: s.key, name: s.name, country: s.country ?? null, board: s.board, balls: s.balls ?? null, title: s.table.title, score: s.score, at: s.at, how: s.how, ...(s.avatar ? { avatar: s.avatar } : {}), ...(s.xp !== undefined ? { xp: s.xp } : {}) });
 }
 
 /** Identité d'un score : un même score relayé dix fois n'entre qu'une fois. */
@@ -123,6 +125,7 @@ export function verifyScore(raw: unknown, now = new Date()): RankedScore | undef
   if (r.country !== undefined && !isCountry(r.country)) return undefined;
   if (r.balls !== undefined && !isBallCount(r.balls)) return undefined;
   if (r.avatar !== undefined && !isAvatarHash(r.avatar)) return undefined;
+  if (r.xp !== undefined && (typeof r.xp !== 'number' || !Number.isInteger(r.xp) || r.xp < 0 || r.xp > 100_000_000)) return undefined;
   // Pas de score venu du futur (horloge d'une borne déréglée) ; dix minutes de tolérance.
   if (Date.parse(r.at) > now.getTime() + 10 * 60_000) return undefined;
   const s: Omit<RankedScore, 'sig'> = {
@@ -136,6 +139,7 @@ export function verifyScore(raw: unknown, now = new Date()): RankedScore | undef
     at: r.at,
     how: r.how as PlayedSource,
     ...(r.avatar ? { avatar: r.avatar as string } : {}),
+    ...(r.xp !== undefined ? { xp: r.xp as number } : {}),
   };
   return verifyText(signedText(s), r.sig, r.key) ? { ...s, sig: r.sig } : undefined;
 }
@@ -216,6 +220,21 @@ export function rankingAvatars(store: Pick<RankingStore, 'scores'>): Map<string,
   return new Map([...latest].map(([key, s]) => [key, s.avatar]));
 }
 
+/**
+ * XP de chaque joueur classé (le plus grand vu : un niveau ne baisse jamais) et la date de son plus
+ * ancien score gardé, pour juger sa vraisemblance (levels.ts, shownLevel).
+ */
+export function rankingLevels(store: Pick<RankingStore, 'scores'>): Map<string, { xp?: number; since: string }> {
+  const out = new Map<string, { xp?: number; since: string }>();
+  for (const s of store.scores) {
+    const known = out.get(s.key);
+    const xp = Math.max(known?.xp ?? -1, s.xp ?? -1);
+    const since = known && Date.parse(known.since) <= Date.parse(s.at) ? known.since : s.at;
+    out.set(s.key, { ...(xp >= 0 ? { xp } : {}), since });
+  }
+  return out;
+}
+
 export const isHidden = (store: Pick<RankingStore, 'hidden'>, s: RankedScore) => store.hidden.includes(`s:${rankedId(s)}`) || store.hidden.includes(`k:${s.key}`);
 
 // ---------------------------------------------------------------------------
@@ -232,6 +251,9 @@ export interface RankingLine {
   id: string;
   /** Le joueur de cette borne. */
   mine?: true;
+  /** Ses XP (rankingLevels) et la date de son plus ancien score gardé. */
+  xp?: number;
+  since?: string;
   /** Sa place exacte n'est pas connue : au-delà de cette place (la borne ne garde que le haut du classement). */
   beyond?: number;
   /** Empreinte de son avatar (rankingAvatars) ; absente : ses initiales. */
@@ -265,9 +287,11 @@ export function rankingBoard(store: RankingStore, q: RankingQuery, now = new Dat
   const scoped = list.filter((s) => (q.scope === 'country' ? !!q.country && s.country === q.country : q.scope === 'friends' ? s.key === q.me || !!q.friends?.has(s.key) : true));
   const best = bestPerPlayer(scoped, q.period, now);
   const avatars = rankingAvatars(store);
+  const levels = rankingLevels(store);
   const avatarOf = (key: string) => {
     const hash = avatars.get(key);
-    return hash ? { avatar: hash } : {};
+    const level = levels.get(key);
+    return { ...(hash ? { avatar: hash } : {}), ...(level?.xp !== undefined ? { xp: level.xp, since: level.since } : {}) };
   };
   const limit = q.limit ?? RANKING_LINES;
   // Plus loin que les premières lignes : la dernière laisse la place à la mienne.

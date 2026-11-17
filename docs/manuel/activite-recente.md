@@ -3,7 +3,7 @@
 ## Activité récente
 
 Une notification ne reste que quelques secondes, se raccourcit pour tenir sur sa ligne, attend la fin d'une partie (« Masquer les notifications pendant les parties ») ou se fond dans un résumé (« 4 nouveautés ») : vue trop tard, elle était perdue.
-**Menu système > Activité récente**, en tête de la racine du menu système, les garde toutes, en entier.
+**Menu système > Activité récente**, à la racine du menu système (juste après « Nouveautés » quand elles y sont), les garde toutes, en entier.
 Elle est aussi rangée dans la rubrique Cyber Pinball, puisqu'elle parle de tout, pas que des amis.
 
 - **Ce qui y entre** : chaque évènement des notifications, dès son arrivée, qu'il se soit montré ou non (un ami qui se connecte ou lance une partie, son record, son badge, une demande d'ami reçue ou acceptée, une invitation et sa fin, un invité qui accepte, décline ou quitte, une partie entre amis finie ou annulée, un téléchargement fini ou bloqué) ; une version plus récente de Cyber Pinball trouvée en arrière-plan (une fois par version), la mise à jour faite ou manquée au démarrage ; les constats du démarrage qui nomment un écran (sauvegarde restaurée, configuration de la borne reconnue, écran du DMD à vérifier, pare-feu de Windows).

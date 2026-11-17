@@ -169,6 +169,8 @@ export interface LiveGamesOptions {
    */
   play(table: TableEntry, playing: () => void, settings?: HostSetting[], board?: GroupRecord[], progress?: (p: LiveProgress) => void, gate?: LiveStartGate): Promise<LivePlayResult | undefined>;
   onChange?(): void;
+  /** Une partie finie vient d'entrer à l'historique (niveau : partie en ligne). */
+  onFinished?(entry: HistoryGame): void;
   now?(): Date;
   log?(line: string): void;
   /** Version de Cyber Pinball de cette borne (app.getVersion()), annoncée aux autres. */
@@ -321,6 +323,14 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
         log(`Partie en direct : « ${game.title} » à l'historique des parties.`); // i18n-ignore : journal
       } catch (error) {
         log(`Partie en direct : historique des parties non enregistré (${(error as Error).message}).`); // i18n-ignore : journal
+      }
+      const entry = loadedHistory().games.find((g) => g.id === game!.id);
+      if (entry) {
+        try {
+          opts.onFinished?.(entry);
+        } catch (error) {
+          log(`Partie en direct : niveau pas mis à jour (${(error as Error).message}).`); // i18n-ignore : journal
+        }
       }
     }
   };

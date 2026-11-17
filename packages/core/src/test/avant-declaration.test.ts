@@ -41,6 +41,9 @@ const REVIEWED = new Set([
   // Parties instantanées : l'entrée de la fiche d'une table, construite à l'ouverture d'une fiche.
   'instantMenu',
   'jukeboxPlayer',
+  // Niveau du joueur : lu par les rappels du salon, des groupes et des parties en ligne (une ligne écrite,
+  // une partie finie) et par le relevé différé du réseau ; jamais pendant l'initialisation.
+  'levelTracker',
   // Réglages du Juke-box : ouverts depuis sa gestion, par l'utilisateur.
   'jukeboxSettings',
   // Rappel du service des retours : appelé au chargement du tableau, jamais pendant l'initialisation.
