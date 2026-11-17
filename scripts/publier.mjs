@@ -57,6 +57,7 @@ import { lockBuild, zipProblems } from './paquet-application.mjs';
 import { describeRepository } from './decrire-github.mjs';
 import { githubToken, missingTokenMessage } from './jeton-github.mjs';
 import { snapshotAndPush } from './envoyer-github.mjs';
+import { frozenProblem } from './publication-figee.mjs';
 import { DIRECT_DOWNLOADS, directDownloadProblems } from './telechargement-direct.mjs';
 import { toReview } from './manuels-a-reviser.mjs';
 import { bulletPoints, changelogNotes, changelogSections } from './traductions.mjs';
@@ -175,6 +176,9 @@ if (bump) {
   version = next;
 }
 if (!update.isVersion(version)) fail(`version illisible : ${version}`);
+// Le commit que cette publication porte (scripts/publication-figee.mjs) : le commit « Version … »,
+// sinon HEAD au départ. L'instantané envoyé sur GitHub est le sien, jamais HEAD au moment de l'envoi.
+const frozen = git(['rev-parse', 'HEAD']).trim();
 const prerelease = version.includes('-');
 // Les liens directs des README donnent la dernière version finale : elle doit porter ses installeurs.
 if (!prerelease && !local && (rapid || argv.includes('--leger'))) {
@@ -252,6 +256,9 @@ if (!argv.includes('--sans-fabrication')) {
   const args = [path.join(repo, 'scripts', 'fabriquer.mjs'), ...(rapid ? ['--application'] : ['--installeur', ...(argv.includes('--leger') ? ['--leger'] : [])])];
   const run = spawnSync(process.execPath, args, { cwd: repo, stdio: 'inherit', env: { ...process.env, CYBERPINBALL_FABRICATION_PARENT: String(process.pid) } });
   if (run.status !== 0) fail('la fabrication a échoué.');
+  // Une fusion d'une autre session pendant la fabrication : les installeurs peuvent mêler deux états.
+  const changed = frozenProblem(git, frozen);
+  if (changed) fail(changed);
 }
 // L'application telle que fabriquée (build\app), dont le paquet léger est l'image exacte.
 const appPkg = JSON.parse(fs.readFileSync(path.join(repo, 'build', 'app', 'package.json'), 'utf8'));
@@ -369,7 +376,7 @@ if (privateRepo) {
   commit = (await api('GET', '')).json.default_branch;
 } else {
   step('Code sur GitHub (instantané, sans l’historique)');
-  commit = option('--commit') ?? snapshotAndPush({ message: `Cyber Pinball ${version}` });
+  commit = option('--commit') ?? snapshotAndPush({ message: `Cyber Pinball ${version}`, source: frozen });
 }
 
 step(`Release v${version} sur github.com/${target}${privateRepo ? ' (essai privé)' : ''}`);
