@@ -9,6 +9,12 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.15
+
+- Mes badges montre le dessin de chaque badge, dans sa forme et sa rareté : un badge reçu brille, avec un halo à sa couleur et un reflet qui passe ; un badge pas encore reçu reste gris et éteint. Les badges les plus proches, dans Mon niveau, ont le même dessin.
+- Une table reprise d'une autre installation garde le cadrage qui y avait été réglé pour elle : Cyber Pinball la passe en cadrage manuel pour elle seule, si le sens de la partie reste le bon sur votre borne.
+- Un cadrage réglé pour une table, en partie ou repris, n'est plus présenté comme un problème dans sa fiche ; y revenir au cadrage automatique tient d'une partie à l'autre.
+
 ## 0.1.14
 
 - Écran du DMD : quand une table a deux afficheurs, « (DMD) » et « (FullDMD) », le front-end montre celui dont les proportions remplissent le mieux l'écran, quel que soit son nom. Un « (DMD) » en 21:9 venu de PinUP Popper passe ainsi devant un « (FullDMD) » en 16:9 sur un DMD 4:1, au lieu de laisser la moitié de l'écran vide.

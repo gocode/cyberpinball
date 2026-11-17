@@ -7,6 +7,12 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.1.15
+
+- My badges shows each badge's artwork, in its shape and rarity: an earned badge shines, with a glow in its colour and a passing gleam; a badge not yet earned stays grey and dim. The closest badges, in My level, show the same artwork.
+- A table brought in from another installation keeps the framing that had been set for it there: Cyber Pinball switches it to manual framing for that table alone, as long as the game still faces the right way on your cabinet.
+- A framing set for a table, in game or brought in, is no longer shown as a problem on its sheet; switching it back to automatic framing now lasts from one game to the next.
+
 ## 0.1.14
 
 - DMD screen: when a table has two DMD media files, "(DMD)" and "(FullDMD)", the front-end shows the one whose proportions best fill the screen, whatever its name. A 21:9 "(DMD)" from PinUP Popper now wins over a 16:9 "(FullDMD)" on a 4:1 DMD, instead of leaving half the screen empty.
