@@ -11,6 +11,12 @@ son interface).
 
 ## 0.1.14
 
+- **Niveaux** : vos parties, vos progrès, les classements de la semaine, vos badges et la vie entre joueurs rapportent des XP, qui font monter un niveau qui ne baisse jamais. Votre carte de joueur (avatar, pseudo, niveau et barre) reste en haut de l'écran des tables, à côté de vos badges et de vos amis en ligne.
+- **Mon niveau**, en tête de la Communauté : la barre, les derniers gains, les classements de la semaine avec les XP prévus, les badges les plus proches et le barème, « Comment gagner des XP ».
+- **50 badges** en 11 familles, de commun à légendaire, dont des badges secrets ; une nouvelle vitrine « Mes badges ».
+- **Le moment d'un badge** : au retour d'une partie, chaque badge reçu a son animation, avec un fond propre à sa famille, et sa musique ; le passage de niveau a ses rayons.
+- Le niveau s'affiche aussi sur le profil public, avec le nombre d'amis, et dans une colonne des tableaux de scores.
+- **Groupes publics sur le profil** : le profil public d'un joueur montre ses groupes publics, avec leur nombre de membres et leur table de la semaine ; Start ouvre le groupe pour le rejoindre. Jamais un groupe privé.
 - Nouveautés (Menu système > Nouveautés) : les grandes nouveautés de Cyber Pinball, choisies une à une, en chronologie ; la date une seule fois par jour, un petit aperçu, et Start pour voir une nouveauté en grand, lire la suite et l'« Essayer » directement. Une pastille rouge invite à y passer, dès la première installation ; l'entrée reste en tête du menu système tant que les nouveautés sont récentes, puis dans la rubrique Cyber Pinball.
 - Reprise depuis une autre installation (PinUP Popper, PinballX, PinballY) : les tables arrivent avec leur ROM même quand VPinMAME la range dans un autre dossier de son « rompath », l’a sous un autre nom (VPMAlias.txt, ancien nom), ou est installé loin des tables ; la ROM se lit dans le script que VPX joue vraiment (le .vbs posé à côté de la table), ou à défaut dans le front-end d’origine.
 - Une ROM introuvable est dite avec les dossiers où elle a été cherchée, dans le plan d’ajout puis sur la fiche de la table.

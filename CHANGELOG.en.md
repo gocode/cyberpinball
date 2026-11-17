@@ -9,6 +9,12 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- **Levels**: your games, your progress, the weekly rankings, your badges and life between players earn XP, which raises a level that never goes down. Your player card (avatar, name, level and bar) stays at the top of the tables screen, next to your badges and online friends.
+- **My level**, first in Community: the bar, latest gains, the weekly rankings with expected XP, the closest badges and the scale, "How to earn XP".
+- **50 badges** in 11 families, from common to legendary, including secret badges; a new "My badges" showcase.
+- **The badge moment**: back from a game, each badge earned gets its animation, with a background of its family, and its music; levelling up has its rays.
+- The level also shows on the public profile, with the number of friends, and in a column of the score tables.
+- **Public groups on the profile**: a player's public profile shows their public groups, with their number of members and table of the week; Start opens the group to join it. Never a private group.
 - What's new (System menu > What's new): the big new things in Cyber Pinball, picked one by one, as a timeline; the date given once per day, a small preview, and Start to see one full size, read on and "Try it" straight away. A red dot invites you there, from the very first installation; the entry stays at the top of the system menu while they are recent, then in the Cyber Pinball section.
 - Bringing tables in from another installation (PinUP Popper, PinballX, PinballY): tables now arrive with their ROM even when VPinMAME keeps it in another folder of its "rompath", has it under another name (VPMAlias.txt, old name), or is installed far from the tables; the ROM is read from the script VPX actually plays (the .vbs next to the table), or else from the original front-end.
 - A ROM that cannot be found is reported with the folders it was looked for in, in the add plan and then on the table's sheet.
