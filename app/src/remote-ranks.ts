@@ -70,8 +70,8 @@ export interface RanksLine {
 /** Le tableau d'une table pour une portée et une période, comme à la borne. */
 export interface RanksBoard {
   table: { title: string; detail?: string };
-  /** Les portées ; `reason` : le classement est indisponible (grisé), pourquoi. */
-  scopes: { scope: RankingScope; label: string; current: boolean; reason?: string }[];
+  /** Les portées ; `reason` : le classement est indisponible (grisé), pourquoi ; `pending` : il va venir (empreinte en calcul). */
+  scopes: { scope: RankingScope; label: string; current: boolean; reason?: string; pending?: true }[];
   tabs: { period: ScorePeriod; label: string; count: string; current: boolean }[];
   lines: RanksLine[];
   empty?: { title: string; detail: string };
@@ -147,8 +147,9 @@ export function createRemoteRanks(host: RemoteRanksHost): RemoteRanks {
       const board: RanksBoard = {
         table: { title: table.title, ...(tableDetail(table) ? { detail: tableDetail(table) } : {}) },
         scopes: (shown.scopes ?? []).map(({ scope: s, label, current }) => {
-          const reason = s === 'cabinet' ? undefined : view(s, period).unavailable;
-          return { scope: s, label, current, ...(reason ? { reason } : {}) };
+          const v = s === 'cabinet' ? undefined : view(s, period);
+          const reason = v?.unavailable;
+          return { scope: s, label, current, ...(reason ? { reason } : {}), ...(reason && v?.pending ? { pending: true as const } : {}) };
         }),
         tabs: shown.tabs.map(({ period: p, label, count, current }) => ({ period: p, label, count, current })),
         lines: shown.lines.map(line),

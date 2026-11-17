@@ -15,10 +15,41 @@
 
 const byId = (id) => document.getElementById(id);
 
+// Portée et période : comme à la borne (app/src/scores-choice.ts), le classement mondial de la semaine
+// par défaut, puis le dernier choix fait sur ce téléphone, gardé dans le stockage du navigateur.
+const RANKS_STORE = 'cyberpinball.scores';
+const RANKS_SCOPES = ['cabinet', 'friends', 'country', 'world'];
+const RANKS_PERIODS = ['all', 'year', 'week', 'today'];
+
+/** Le dernier choix gardé ; un champ absent ou inconnu : jamais choisi. */
+function ranksSaved() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(RANKS_STORE) ?? '{}');
+    return {
+      scope: RANKS_SCOPES.includes(raw?.scope) ? raw.scope : undefined,
+      period: RANKS_PERIODS.includes(raw?.period) ? raw.period : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function ranksKeep() {
+  try {
+    localStorage.setItem(RANKS_STORE, JSON.stringify({ scope: ranks.scope, period: ranks.period }));
+  } catch {
+    // Stockage refusé (navigation privée) : le choix vaut jusqu'à la fermeture de la page.
+  }
+}
+
+const ranksFirst = ranksSaved();
+
 /** Ce que montre la vue Scores ; `follow` : la table de la borne, sinon `pick` (rang et version de la liste). */
 const ranks = {
-  scope: 'cabinet',
-  period: 'all',
+  scope: ranksFirst.scope ?? 'world',
+  period: ranksFirst.period ?? 'week',
+  /** Portée jamais choisie : sans classement mondial (partage désactivé), la vue passe sur Cette borne. */
+  scopeDefault: !ranksFirst.scope,
   follow: true,
   pick: undefined,
   /** Liste des tables (« ranks-tables ») et tableau (« ranks ») reçus. */
@@ -67,6 +98,16 @@ function ranksMessage(m) {
   }
   // Une réponse pour une portée ou une période déjà quittée : la suivante est en route.
   if (m.scope !== ranks.scope || m.period !== ranks.period) return;
+  // Le défaut sans classement mondial : Cette borne, comme à la borne (une fois ; un choix gardé reste tel quel).
+  // Une empreinte encore en calcul (`pending`) n'est pas une absence : le classement mondial va venir.
+  const world = m.board?.scopes?.find((sc) => sc.scope === 'world');
+  if (ranks.scopeDefault && ranks.scope === 'world' && world?.reason && !world.pending) {
+    ranks.scopeDefault = false;
+    ranks.scope = 'cabinet';
+    ranksAsk();
+    return;
+  }
+  if (m.board && !world?.pending) ranks.scopeDefault = false;
   ranks.shown = { v: Number(m.v), i: Number.isInteger(m.i) ? m.i : -1, follow: m.follow === true, board: m.board, empty: m.empty };
   if (ranks.shown.follow) {
     ranks.follow = true;
@@ -112,6 +153,7 @@ function renderScopes(board) {
       b.addEventListener('click', () => {
         if (state !== 'paired' || sc.current) return;
         ranks.scope = sc.scope;
+        ranksKeep();
         ranksAsk();
       });
       return b;
@@ -140,6 +182,7 @@ function renderPeriods(board) {
       b.addEventListener('click', () => {
         if (state !== 'paired' || tab.current) return;
         ranks.period = tab.period;
+        ranksKeep();
         ranksAsk();
       });
       return b;

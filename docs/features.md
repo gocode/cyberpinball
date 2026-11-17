@@ -480,7 +480,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 ## A table's page
 
 - **Start on a table** opens its page (or launches the game, if "Start on the wheel" says so): play statistics, a summary of its files, and three choices at the top, "Play", "Play with a friend", "Flyer and rules". The rest waits under "Manage the table…": "Game media", "Game parts", "Table files", "PuP-Pack", "This table's settings", "Adjust display in game", "Play and record", "Diagnose and repair", "Edit info", "Delete the table"; whatever needs a look shows from the game page.
-- **"Scoreboard"**: the table's scores on this cabinet, at your friends', in your country and in the world (see [Leaderboards](#leaderboards)).
+- **"Scoreboard"**: the table's scores on this cabinet, at your friends', in your country and in the world (see [Leaderboards](#leaderboards)). It opens on this week's world ranking, then on the scope and period you chose last time.
 - **"Add to favourites"** and **"Add to a collection…"**: the table in your favourites or your collections (see [Collections and favourites](#collections-and-favourites)).
 - **"All tables"** (System menu > "Tables"): the full list, with manufacturer, year, version and number of games; Start opens the same page.
 - **"Game parts"**: one line per part (table, backglass, ROM, PuP-Pack, DMD colours, sounds, music, point of view, topper, media), "Present", "Received, to install", "Expected" or missing; each one can be added, replaced, reassigned or removed, and a missing part starts a search on every site.

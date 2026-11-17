@@ -480,7 +480,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 ## La fiche d'une table
 
 - **Start sur une table** ouvre sa fiche (ou lance la partie, si « Start sur la roue » le dit) : statistiques de jeu, résumé des fichiers, et trois choix en tête, « Jouer », « Jouer avec un ami », « Prospectus et règles ». Le reste attend sous « Gérer la table… » : « Médias du jeu », « Parties du jeu », « Fichiers de la table », « PuP-Pack », « Réglages de cette table », « Régler l'affichage en partie », « Jouer et enregistrer », « Diagnostiquer et réparer », « Modifier les informations », « Supprimer la table » ; ce qui demande un œil s'annonce dès la fiche.
-- **« Tableau des scores »** : les scores de la table sur cette borne, chez vos amis, dans votre pays et dans le monde (voir [Classements](#classements)).
+- **« Tableau des scores »** : les scores de la table sur cette borne, chez vos amis, dans votre pays et dans le monde (voir [Classements](#classements)). Il s’ouvre sur le classement mondial de la semaine, puis sur la portée et la période que vous avez choisies la dernière fois.
 - **« Ajouter aux favoris »** et **« Ajouter à une collection… »** : la table dans vos favoris ou vos collections (voir [Collections et favoris](#collections-et-favoris)).
 - **« Toutes les tables »** (Menu système > « Tables ») : la liste complète, avec fabricant, année, version et nombre de parties ; Start ouvre la même fiche.
 - **« Parties du jeu »** : une ligne par partie (table, fronton, ROM, PuP-Pack, couleurs du DMD, sons, musique, point de vue, topper, médias), « Présent », « Reçu, à installer », « Attendu » ou absent ; chacune s'ajoute, se remplace, se réaffecte ou se retire, et une partie absente lance la recherche sur tous les sites.

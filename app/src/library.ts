@@ -8,6 +8,7 @@
 import type { MenuEntries, MenuField, PhoneRemote, RemoteBar } from './phone-remote';
 import { createPhoneRemoteMenu, remoteBlock, type RemoteWording } from './phone-remote-menu';
 import { periodLabel, rankingScoreboardView, scopeLabel, scoreboardView, scoresSummary, type ScoreboardView } from './scoreboard-menu';
+import { openingScoresChoice, readScoresChoice, writeScoresChoice } from './scores-choice';
 import type { RankingView } from './table-rankings';
 import type { TableBoard } from './table-scores';
 import * as fs from 'node:fs';
@@ -2807,15 +2808,26 @@ export function createLibrary(host: LibraryHost) {
 
   // ---------- Tableau des scores ----------
 
-  /** « Tableau des scores » : le record de la table et les parties du jour, puis l'écran des quatre périodes. */
+  /**
+   * « Tableau des scores » : le record de la table et les parties du jour, puis l'écran des scores,
+   * ouvert sur le dernier choix du joueur, sinon sur le classement mondial de la semaine (scores-choice.ts).
+   */
   function scoresAction(table: TableEntry): SheetAction {
     return {
       label: t('Tableau des scores'),
       detail: scoresSummary(host.scores!(table, 'all'), host.scores!(table, 'today')),
       icon: 'trophy',
       door: 'sheet.scores',
-      run: () => go({ kind: 'scores', file: table.file, period: 'all', scope: 'cabinet' }, SCORES_BACK),
+      run: () => {
+        const choice = openingScoresChoice(readScoresChoice(host.dataDir), () => host.rankings?.(table, 'world', 'week'));
+        go({ kind: 'scores', file: table.file, ...choice }, SCORES_BACK);
+      },
     };
+  }
+
+  /** Un onglet changé au tableau des scores : gardé pour la prochaine ouverture, sur toutes les tables. */
+  function keepScoresChoice(s: Pick<ScoresScreen, 'scope' | 'period'>): void {
+    writeScoresChoice(host.dataDir, { scope: s.scope, period: s.period });
   }
 
   /**
@@ -2828,7 +2840,10 @@ export function createLibrary(host: LibraryHost) {
     const back = s.back ?? (() => (table ? openSheet(table) : leave()));
     if (!table || !host.scores) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au front-end'), door: 'sheet.back', run: leave }], back };
     // Un onglet cliqué : le curseur revient sur « Retour à la fiche », le seul choix en vert.
-    const show = (change: Partial<Pick<ScoresScreen, 'period' | 'scope'>>) => go({ kind: 'scores', file: s.file, period: s.period, scope: s.scope, ...(s.back ? { back: s.back } : {}), ...change }, SCORES_BACK);
+    const show = (change: Partial<Pick<ScoresScreen, 'period' | 'scope'>>) => {
+      keepScoresChoice({ scope: s.scope, period: s.period, ...change });
+      go({ kind: 'scores', file: s.file, period: s.period, scope: s.scope, ...(s.back ? { back: s.back } : {}), ...change }, SCORES_BACK);
+    };
     const scope = s.scope;
     const network = scope !== 'cabinet';
     const view = (period: ScorePeriod): RankingView =>
@@ -2867,12 +2882,14 @@ export function createLibrary(host: LibraryHost) {
           const at = RANKING_SCOPES.indexOf(s.scope);
           const dir = magna.length > 1 && magna.indexOf(input.code) === 0 ? -1 : 1;
           s.scope = RANKING_SCOPES[(at + dir + RANKING_SCOPES.length) % RANKING_SCOPES.length]!;
+          keepScoresChoice(s);
           return true;
         }
         const step = KEYS.previous.includes(input.code) ? -1 : KEYS.next.includes(input.code) ? 1 : 0;
         if (!step) return false;
         const at = SCORE_PERIODS.indexOf(s.period);
         s.period = SCORE_PERIODS[(at + step + SCORE_PERIODS.length) % SCORE_PERIODS.length]!;
+        keepScoresChoice(s);
         return true;
       },
     };

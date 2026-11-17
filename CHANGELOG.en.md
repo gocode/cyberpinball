@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- A table's scoreboard now opens on this week's World ranking. Change the scope or the period (click, flippers, MagnaSave): your choice is kept and reopened next time, on every table, even after a restart. Without sharing, it opens on This cabinet. The phone's Scores view does the same and keeps its own choice.
 - Private groups (Community): create a group with your friends, by invitation only. A chat, a table of the week chosen for everyone (Start launches it) and the group leaderboard on that table, filled by the published scores. Every member can invite their friends; an invitation never shows the messages before it is accepted. Everything goes between the members' cabinets, with no server: an absent member receives the messages when they come back.
 - Media proposals and game parts: VPForums entries (and those the VPS database lists under a game) now show their preview, the image the author posted on their page, instead of "No preview". Their download count shows too.
 - Game with friends: each cabinet keeps its own volume. The table's sound no longer drops (or rises) on the guest's cabinet: only the host's game settings travel (balls, ball save, tilt, extras), never their sound level.

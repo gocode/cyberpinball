@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.14
 
+- Tableau des scores d'une table : il s'ouvre désormais sur le classement Mondial de la semaine. Changez de portée ou de période (clic, flippers, MagnaSave) : votre choix est gardé et rouvert la fois suivante, sur toutes les tables, même après un redémarrage. Sans partage, il s'ouvre sur Cette borne. La vue Scores du téléphone fait de même et garde son propre choix.
 - Groupes privés (Communauté) : créez un groupe avec vos amis, sur invitation seulement. Une discussion, une table de la semaine choisie pour tous (Start la lance) et le classement du groupe sur cette table, rempli par les scores publiés. Chaque membre peut inviter ses amis ; une invitation ne montre jamais les messages avant d'être acceptée. Tout passe entre les bornes des membres, sans serveur : un membre absent reçoit les messages à son retour.
 - Propositions de médias et parties du jeu : les fiches de VPForums (et celles que la base VPS range sous un jeu) montrent enfin leur aperçu, l'image que l'auteur a déposée sur sa page, au lieu de « Pas d'aperçu ». Leur nombre de téléchargements s'affiche aussi.
 - Partie entre amis : chaque borne garde son propre volume. Le son de la table ne baisse plus (ni ne monte) chez l'invité : seuls les réglages de jeu de l'hôte voyagent (billes, sauvetage, tilt, extras), jamais son niveau sonore.
