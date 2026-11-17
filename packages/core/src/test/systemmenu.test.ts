@@ -122,8 +122,9 @@ function segments(rest: string): string[] {
       segment = (quoted[1] ?? quoted[2] ?? quoted[3])!;
       text = text.slice(quoted[0].length);
     } else {
-      // L'apostrophe droite ferme une chaîne de code (t('Menu système > Amis')) ; celle des noms est typographique.
-      const plain = /^([^.;:,()«»"“”*>`'·]+?)(?=\s*(?:>|[.;:,()`'·]|$))/.exec(text);
+      // L'apostrophe droite ferme une chaîne de code (t('Menu système > Amis')) ; suivie d'une lettre,
+      // elle est dans le nom (« System menu > What's new », CHANGELOG anglais de la 0.1.14-essai.33).
+      const plain = /^((?:[^.;:,()«»"“”*>`'·]|'(?=\p{L}))+?)(?=\s*(?:>|[.;:,()`·]|'(?!\p{L})|$))/u.exec(text);
       if (!plain) break;
       segment = plain[1]!;
       text = text.slice(plain[0].length);
@@ -195,6 +196,9 @@ test('lecture des chemins : guillemets, traduction entre parenthèses, texte nu'
   assert.deepEqual(segments('"Borne" (Cabinet) > "Configuration de la borne" (Cabinet setup) > "Tilt" (`npm run`)'), ['Borne', 'Configuration de la borne', 'Tilt']);
   assert.deepEqual(segments('Borne > Configuration de la borne > Écran du DMD.'), ['Borne', 'Configuration de la borne', 'Écran du DMD']);
   assert.deepEqual(segments("Amis > Demandes d’amis'),"), ['Amis', 'Demandes d’amis'], 'chemin dans une chaîne de code');
+  assert.deepEqual(segments("What's new): the big new things"), ["What's new"], 'apostrophe droite dans un nom anglais');
+  assert.deepEqual(segments("Friends > Friend's requests'),"), ['Friends', "Friend's requests"], 'apostrophe dans le nom, puis fin de la chaîne de code');
+  assert.equal(checkPath(segments("What's new): the big new things")), undefined, '« What’s new » est une rubrique');
   assert.deepEqual(segments('Amis · vous : place 2 sur 3 »'), ['Amis'], 'la suite d’une notification, après « · »');
   assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Nouveautés, Activité récente, Collections, Amis, Tables, Médias, Juke-box, Téléchargements, Télécommande du téléphone, Borne, Cyber Pinball)');
   assert.equal(checkPath(['Téléchargements']), undefined, 'Téléchargements, à la racine');

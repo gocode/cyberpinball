@@ -115,6 +115,61 @@ test('« Classements » : sans partage, les portées en réseau sont grisées av
   }
 });
 
+// Retour du 17/11/2026 : « Empreintes de 2 tables en calcul… » restait affiché. Les empreintes, déjà
+// connues, arrivaient aussitôt après l'ouverture ; l'écran se reconstruisait, mais la limite de cadence
+// (deux secondes) rendait le classement de l'ouverture, et plus rien ne le redessinait. La classe : un
+// changement reçu pendant la limite de cadence est toujours relu, jamais oublié.
+test('« Classements » : une empreinte arrivée juste après l’ouverture se voit, un changement pendant la limite de cadence est relu à sa fin', () => {
+  setLanguage('fr');
+  let clock = 1_000_000;
+  let ready = false;
+  let leader = 'Kiko';
+  let screen: (() => Built) | undefined;
+  const timers: { at: number; run: () => void }[] = [];
+  let redraws = 0;
+  const line = (name: string, score: number) => ({ rank: 1, key: name, name, country: 'FR', score, at: '2026-11-13T20:00:00Z', how: 'rom', id: `${name}-${score}`, face: {} });
+  const menu = createRankingsMenu({
+    library: { openCustom: (build: () => Built) => (screen = build), openScores: () => undefined },
+    tables: () => TABLES.slice(0, 2),
+    local: () => ({ lines: [], games: 0, tableBoard: false, everyGame: false, romWithoutMap: false }),
+    network: () => (ready ? { lines: [line(leader, 5_000_000)], players: 2 } : { lines: [], players: 0, unavailable: 'Empreinte de la table en calcul…', pending: true }),
+    zoneKeys: () => [],
+    openSharing: () => undefined,
+    redraw: () => redraws++,
+    now: () => clock,
+    later: (ms: number, run: () => void) => timers.push({ at: clock + ms, run }),
+  });
+  const texts = () => screen!().sections.flatMap((s) => s.rows.map((r) => `${r.text} ${r.detail ?? ''}`));
+  menu.open(() => undefined);
+  assert.ok(texts().some((t) => /Empreintes de 2 tables en calcul/.test(t)));
+  // Les empreintes arrivent dix millisecondes plus tard : l'écran se reconstruit et les montre.
+  ready = true;
+  clock += 10;
+  assert.ok(!texts().some((t) => /en calcul/.test(t)), 'plus d’empreinte en calcul');
+  assert.ok(texts().some((t) => /Atlas Rising 1\. Kiko/.test(t)), 'la table classée a sa ligne');
+  // Des classements reçus du réseau une seconde plus tard : la limite de cadence garde l'ancien, mais la relecture est prévue.
+  leader = 'Nova';
+  clock += 1000;
+  assert.ok(texts().some((t) => /Atlas Rising 1\. Kiko/.test(t)), 'pendant la limite de cadence, le classement gardé');
+  const planned = timers.length;
+  assert.ok(planned >= 1, 'une relecture prévue à la fin de la limite de cadence');
+  texts();
+  assert.equal(timers.length, planned, 'pas une de plus à chaque reconstruction');
+  // Chaque relecture prévue arrive à son heure, et l'écran se reconstruit comme après un changement.
+  let last: string[] = [];
+  for (let guard = 0; timers.length; guard++) {
+    assert.ok(guard < 5, 'les relectures s’arrêtent quand plus rien ne change');
+    timers.sort((a, b) => a.at - b.at);
+    const next = timers.shift()!;
+    clock = next.at;
+    next.run();
+    last = texts();
+  }
+  assert.ok(redraws >= 1, 'l’écran relit ce qu’il montre');
+  assert.ok(last.some((t) => /Atlas Rising 1\. Nova/.test(t)), 'le nouveau premier se voit');
+  assert.ok(clock - 1_000_000 <= 10 + 2000, 'au plus tard deux secondes après le classement gardé');
+});
+
 test('« Classements » : en anglais', () => {
   setLanguage('en');
   try {

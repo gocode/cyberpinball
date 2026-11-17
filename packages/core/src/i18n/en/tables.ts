@@ -134,6 +134,9 @@ export const messages: Record<string, string> = {
   'allemande': 'German',
   'italienne': 'Italian',
   'espagnole': 'Spanish',
+  'PuP-Pack sans screens.pup': 'PuP-Pack without screens.pup',
+  'pupvideos\\{pack} n’a pas de screens.pup : PinUP Player prenait ses écrans par défaut, le plugin PUP de VPX n’en crée aucun et le pack reste éteint. Ses écrans y sont déclarés comme PinUP les montrait.': 'pupvideos\\{pack} has no screens.pup: PinUP Player used its default screens, the VPX PUP plugin creates none and the pack stays dark. Its screens are declared there the way PinUP showed them.',
+  'Déclarer les écrans du pack': 'Declare the pack’s screens',
   'Journal de VPX : pack sans screens.pup': 'VPX log: pack without screens.pup',
   'À la dernière partie, VPX a chargé « {path} » mais n’y a pas trouvé de screens.pup : les écrans du pack sont restés éteints.': 'In the last game, VPX loaded “{path}” but found no screens.pup there: the pack’s screens stayed dark.',
   'Journal de VPX : pack non chargé': 'VPX log: pack not loaded',
@@ -277,6 +280,8 @@ export const messages: Record<string, string> = {
   // packages/core/src/tablefiles.ts
   'Table VPX': 'VPX table',
   'Sauvegarde PinMAME': 'PinMAME save',
+  'Réglages de la ROM': 'ROM settings',
+  'Valeurs enregistrées par la table': 'Values saved by the table',
   'Réglages PinMAME': 'PinMAME settings',
   'Vidéos PuP': 'PuP videos',
   'Couleurs DMD (Serum)': 'DMD colors (Serum)',

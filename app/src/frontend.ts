@@ -3372,6 +3372,8 @@ const rankingsMenu = createRankingsMenu({
   network: (table, scope, period) => tableRankings.view(table, scope, period),
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
   openSharing: (back) => library.runSystemItem('sharing', back),
+  // Un changement arrivé pendant la limite de cadence des classements : relu à sa fin.
+  redraw: () => (library.isActive() ? library.changed() : broadcast()),
 });
 // Communauté (community-menu.ts) : l'accueil du médaillon de la roue, et « Joueurs en ligne », amis ou non.
 // Parties instantanées (instant-menu.ts) : ouvertes à tous, dans la Communauté et sur la fiche d'une table.
@@ -7753,7 +7755,7 @@ function explain(result: LaunchResult, table: TableEntry, repaired?: string, liv
     lines.push(t('La ROM de cette table est introuvable : elle doit être dans le dossier pinmame\\roms de la table.'));
   }
   const dmdFolder = cachedScript(table.file, loc.dataDir)?.dmdFolder;
-  const scriptStopped = /type (mismatch|incompatible)/i.test([result.message ?? '', ...result.logTail].join('\n'));
+  const scriptStopped = /type (mismatch|incompatible)/i.test([result.message ?? '', ...result.logTail.slice(-15)].join('\n'));
   if (dmdFolder && scriptStopped && !fs.existsSync(path.join(table.folder, dmdFolder))) {
     lines.push(t('Le script s’est arrêté sur le DMD qu’il dessine : son dossier « {folder} » manque. Start : le récupérer (« Pour aller plus loin »).', { folder: dmdFolder }));
   }

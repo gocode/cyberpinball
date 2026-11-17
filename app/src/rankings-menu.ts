@@ -34,7 +34,11 @@ export interface RankingsMenuHost {
   /** Touches MagnaSave relevées (la gauche d'abord) : la portée suivante, ou la précédente. */
   zoneKeys(): readonly string[];
   openSharing(back: () => void): void;
+  /** L'écran affiché relit ce qu'il montre (library.changed). */
+  redraw?(): void;
   now?(): number;
+  /** Minuterie (essais) : setTimeout par défaut. */
+  later?(ms: number, run: () => void): void;
 }
 
 export interface RankingsMenu {
@@ -63,7 +67,12 @@ interface Board {
   unavailable?: string;
 }
 
-/** Un classement se recalcule au plus toutes les deux secondes : chaque table relit ses scores. */
+/**
+ * Un classement se recalcule au plus toutes les deux secondes : chaque table relit ses scores. C'est
+ * une limite de cadence, jamais un oubli : un changement arrivé pendant ces deux secondes (empreinte
+ * calculée, classements reçus du réseau) est relu à leur fin (retour du 17/11/2026 : « Empreintes de
+ * 2 tables en calcul… » restait affiché, les empreintes déjà connues arrivant aussitôt après l'ouverture).
+ */
 const BOARD_TTL_MS = 2000;
 
 export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
@@ -71,7 +80,16 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
   let scope: RankingScope = 'world';
   let period: ScorePeriod = 'all';
   let back: () => void = () => undefined;
+  /**
+   * Classements gardés, toutes portées et périodes ensemble : une seule fenêtre de deux secondes,
+   * ouverte au premier calcul, et tout se relit à sa fin. Une fenêtre par portée ferait se relancer
+   * les relectures l'une l'autre (« Cette borne » gardée depuis l'ouverture, « Mondial » depuis
+   * l'arrivée des empreintes), toutes les deux secondes, sans fin.
+   */
   const cache = new Map<string, { at: number; board: Board }>();
+  let windowAt = 0;
+  /** Heure de la relecture prévue (0 : aucune). */
+  let trailingAt = 0;
 
   const place = (rank: number, beyond?: number) => (beyond ? t('au-delà de la {n}ᵉ place', { n: beyond }) : rank === 1 ? t('vous êtes 1ᵉʳ') : t('vous êtes {n}ᵉ', { n: rank }));
 
@@ -136,11 +154,37 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
 
   function freshBoard(sc: RankingScope, p: ScorePeriod): Board {
     const key = `${sc}|${p}`;
+    if (now() - windowAt >= BOARD_TTL_MS) {
+      cache.clear();
+      windowAt = now();
+    }
     const known = cache.get(key);
-    if (known && now() - known.at < BOARD_TTL_MS) return known.board;
+    // Relu pendant la fenêtre : l'écran a reçu un changement (kept relit à l'ouverture et après un
+    // changement seulement). Le classement gardé sert encore, et la relecture vient à la fin.
+    if (known) {
+      // Calculé à l'instant (la même construction, l'onglet après la liste) : rien n'a pu changer depuis.
+      if (now() > known.at) redrawAfter(windowAt + BOARD_TTL_MS - now());
+      return known.board;
+    }
     const board = compute(sc, p);
-    cache.set(key, { at: now(), board });
+    // Une empreinte en calcul n'est jamais gardée : son arrivée doit se voir aussitôt.
+    if (board.pending) cache.delete(key);
+    else cache.set(key, { at: now(), board });
     return board;
+  }
+
+  /** Relit l'écran à la fin de la fenêtre : une seule relecture prévue à la fois. */
+  function redrawAfter(ms: number): void {
+    if (!host.redraw) return;
+    const at = now() + ms;
+    if (at <= trailingAt) return;
+    trailingAt = at;
+    const run = () => {
+      if (trailingAt === at) trailingAt = 0;
+      host.redraw?.();
+    };
+    if (host.later) host.later(ms, run);
+    else setTimeout(run, ms).unref?.();
   }
 
   function build(): Built {
@@ -212,6 +256,7 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
       back = to;
       period = 'all';
       cache.clear();
+      windowAt = 0;
       // Le classement mondial d'abord ; sans réseau (partage désactivé), celui de cette borne.
       scope = boardOf('world', period).unavailable ? 'cabinet' : 'world';
       // Le curseur sur la première table (juste après les onglets), ou sur « Période » sans table.

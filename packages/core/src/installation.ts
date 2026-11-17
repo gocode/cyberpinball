@@ -13,7 +13,9 @@
 // (ImportSource.owner), rien n'est copié avant « Installer ». On liste aussi les tables d'une
 // installation, pour en reprendre une seule.
 
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { expectedPackNames, findPackRoot, isJunkName, isPackRoot, type PupLoadFacts } from './puppack';
@@ -26,6 +28,8 @@ import { isRomZip } from './romzip';
 import { nameKey } from './tablefiles';
 import type { ImportSource } from './tableimport';
 import { parseTableName } from './tables';
+import { extractVpReg, readVpRegStorages, vpRegStorageNames } from './vpreg';
+import { readVpxScript } from './vpxinfo';
 
 /** Où une installation existante range chaque partie d'une table. */
 export interface InstallationLayout {
@@ -53,6 +57,11 @@ export interface InstallationLayout {
   mediaRoots: string[];
   /** Musique de VPX (<VPX>\Music), que les scripts jouent par PlayMusic. */
   musicDir?: string;
+  /**
+   * VPReg.stg de VPX 10.7 et 10.8.0 (<VPX>\User\VPReg.stg) : ce que les scripts des tables ont
+   * enregistré (options, tableau d'honneur), un stockage par table (vpreg.ts).
+   */
+  vpRegFiles?: string[];
   /** Ce que les menus de l'installation disent de ses tables : nom de leurs médias, leur ROM. */
   catalog: CatalogEntry[];
   /**
@@ -144,12 +153,14 @@ export type CompanionFacts = PupLoadFacts & { dmdFolder?: string; music?: string
 /** Partie d'une table retrouvée hors de son dossier. */
 export interface Companion {
   path: string;
-  part: 'folder' | 'backglass' | 'pov' | 'tableIni' | 'script' | 'rom' | 'nvram' | 'altcolor' | 'altsound' | 'pup' | 'dmdFolder' | 'music' | 'media';
+  part: 'folder' | 'backglass' | 'pov' | 'tableIni' | 'script' | 'rom' | 'nvram' | 'cfg' | 'vpreg' | 'altcolor' | 'altsound' | 'pup' | 'dmdFolder' | 'music' | 'media';
   /**
    * ROM retrouvée sous un autre nom que celui du script, par un alias de VPinMAME (VPMAlias.txt,
    * ancien nom) : la ligne à écrire dans <table>\pinmame\alias.txt pour que le plugin la charge.
    */
   alias?: AliasLine;
+  /** vpreg : les stockages de ce VPReg.stg que le script de la table emploie (vpreg.ts). */
+  storages?: string[];
 }
 
 /** Ce que la reprise a retrouvé (ou non) pour une table : montré dans le plan d'ajout. */
@@ -249,6 +260,7 @@ function locate(dir: string, exclude: string[], hints: InstallationHints): Insta
     if (m && !mediaRoots.some((r) => isInside(m, r))) mediaRoots.push(m);
   }
   const musicDir = own(vpxDir && child(vpxDir, 'Music'));
+  const vpRegFiles = unique([vpxDir, hints.vpx].map((d) => own(d && resolveDir(d))).map((d) => (d && child(d, 'User') ? fileIn(child(d, 'User')!, 'VPReg.stg') : undefined)));
 
   // Dossiers de tables : ceux que disent les menus, celui de VPX, un « Tables » au-dessus du choix.
   const known = unique(
@@ -272,6 +284,7 @@ function locate(dir: string, exclude: string[], hints: InstallationHints): Insta
     pupVideos,
     mediaRoots,
     musicDir,
+    vpRegFiles,
     catalog,
     ...(romAliases.length ? { romAliases } : {}),
   };
@@ -524,6 +537,8 @@ export function tableCompanions(vpx: string, layout: InstallationLayout, facts?:
     // Sauvegarde, couleurs et sons sont rangés sous le nom du jeu chargé.
     const names = unique([loaded, rom]);
     add(names.flatMap((n) => layout.nvramDirs.map((d) => fileIn(d, `${n}.nv`))).find(Boolean), 'nvram');
+    // Réglages de la ROM (interrupteurs DIP, mixage) : VPinMAMEcfg<rom>.cfg, rangé dans pinmamecfg de la table.
+    add(names.flatMap((n) => layout.pinmameDirs.map((d) => child(d, 'cfg')).map((d) => d && fileIn(d, `${n}.cfg`))).find(Boolean), 'cfg');
     add(names.flatMap((n) => layout.pinmameDirs.map((d) => child(d, 'altcolor', n))).find(Boolean), 'altcolor');
     add(names.flatMap((n) => layout.pinmameDirs.map((d) => child(d, 'altsound', n))).find(Boolean), 'altsound');
   }
@@ -555,6 +570,21 @@ export function tableCompanions(vpx: string, layout: InstallationLayout, facts?:
     }
   }
 
+  // Ce que le script a enregistré (SaveValue) : le VPReg.stg de VPX 10.7 et 10.8.0, ou le dossier
+  // user d'une table rangée à plat (VPX 10.8.1). Celui d'une table qui a son dossier vient avec lui.
+  if (!(home && fileIn(child(home.dir, 'user') ?? '', 'VPReg.stg'))) {
+    const files = unique([fileIn(child(path.dirname(vpx), 'user') ?? '', 'VPReg.stg'), ...(layout.vpRegFiles ?? [])]);
+    const script = files.length ? (readTextSafe(sibling(vpx, '.vbs')) ?? readVpxScript(vpx)) : undefined;
+    const names = script ? vpRegStorageNames(script) : [];
+    for (const file of files) {
+      const storages = (readVpRegStorages(file, names) ?? []).map((s) => s.name);
+      if (storages.length) {
+        found.push({ path: file, part: 'vpreg', storages });
+        break;
+      }
+    }
+  }
+
   for (const m of mediasOf(vpx, layout, medias ?? indexInstallationMedias(layout))) add(m.from, 'media');
   const romAliases = found.flatMap((c) => (c.alias ? [c.alias] : []));
   return { vpx, root: layout.root, found, missing, ...(romSearch ? { romSearch } : {}), ...(romAliases.length ? { romAliases } : {}) };
@@ -579,6 +609,35 @@ export function romSearchText(search: Pick<RomSearch, 'roms' | 'dirs'>): string 
   return search.dirs.length
     ? t('{name}, cherchée dans {dirs}', { name, dirs: formatList(search.dirs) })
     : t('{name} : l’installation n’a aucun dossier de ROM connu (ni VPinMAME\\roms, ni rompath de VPinMAME dans le registre, ni dossier des ROM de Popper)', { name });
+}
+
+function readTextSafe(file: string | undefined): string | undefined {
+  try {
+    return file ? fs.readFileSync(file, 'latin1') : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * VPReg.stg réduit aux stockages de la table, écrit dans un dossier temporaire « …\user » (que
+ * l'import range dans le dossier de la table) ; undefined s'il n'y a rien à reprendre. Le même
+ * fichier source donne toujours le même dossier : un plan refait ne les multiplie pas.
+ */
+function vpRegSource(c: Companion): string | undefined {
+  const data = extractVpReg([c.path], c.storages ?? []);
+  if (!data) return undefined;
+  let stamp = '';
+  try {
+    stamp = String(fs.statSync(c.path).mtimeMs);
+  } catch {
+    return undefined;
+  }
+  const id = createHash('sha1').update(`${c.path}|${stamp}|${(c.storages ?? []).join('|')}`).digest('hex').slice(0, 16);
+  const user = path.join(os.tmpdir(), `cyberpinball-vpreg-${id}`, 'user');
+  fs.mkdirSync(user, { recursive: true });
+  fs.writeFileSync(path.join(user, 'VPReg.stg'), data);
+  return user;
 }
 
 /** Le dossier propre à la table contient-il déjà sa ROM (VPinMame\roms, pinmame\roms…) ? */
@@ -725,6 +784,14 @@ function companionsOf(sources: ImportSource[], facts: (vpx: string) => Companion
         }
         // Déjà apportée (une autre table cochée joue la même ROM) : son alias reste dans le rapport (romAliases).
         if (taken(c.path) || already(c)) continue;
+        if (c.part === 'vpreg') {
+          // Le fichier de toute l'installation n'est jamais copié : seuls les stockages de la table, dans un VPReg.stg à elle.
+          const user = vpRegSource(c);
+          if (!user) continue;
+          extra.push({ path: user, mode: 'copy', owner: vpx, label: label(c.path) });
+          kept.push(c);
+          continue;
+        }
         extra.push({ path: c.path, mode: 'copy', owner: vpx, label: label(c.path) });
         kept.push(c);
       }
@@ -810,6 +877,10 @@ export function companionLabel(part: Companion['part']): string {
       return t('ROM');
     case 'nvram':
       return t('Sauvegarde PinMAME');
+    case 'cfg':
+      return t('Réglages de la ROM');
+    case 'vpreg':
+      return t('Valeurs enregistrées par la table');
     case 'altcolor':
       return t('Couleurs du DMD');
     case 'altsound':

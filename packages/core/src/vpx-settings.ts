@@ -71,6 +71,8 @@ export function vpxOwnedKeys(profile: VpxProfile, manual: string[] = [], audio =
   for (const s of [...VPX_PLAY_SETTINGS, ...VPX_STILL_TABLE]) keys.push([s.section, s.key]);
   if (audio) for (const key of VPX_AUDIO_OWNED_KEYS) keys.push(['Player', key]);
   for (const key of options.dmdKeys ?? []) keys.push(['Plugin.DMDUtil', key]);
+  // DMD réel : l'attente de la fermeture que la synchronisation écrit avec lui (dmd.ts, DMD_SHUTDOWN_WAIT).
+  if (options.dmdKeys?.length) keys.push(['Plugin.CyberPinballDmd', 'ShutdownWait']);
   if (options.dof) keys.push(['Plugin.DOF', 'Enable']);
   for (const key of options.inputKeys ?? []) keys.push(['Input', key]);
   if (options.tilt) for (const key of VPX_TILT_OWNED_KEYS) keys.push(['Player', key]);

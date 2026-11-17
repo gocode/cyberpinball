@@ -299,6 +299,7 @@ export const PUP_HEALTH_FINDINGS = [
   'pupOptionNotApplied',
   'pupOptionMismatch',
   'pupOptionUnsuited',
+  'pupNoScreens',
   'pupHidesDmd',
   'pupDmdInBackglass',
   'pupDmdBackToBackglass',

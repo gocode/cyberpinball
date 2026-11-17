@@ -29,7 +29,10 @@
 //             l'afficheur remplit, et un relevé des images. Jamais écrit par Cyber Pinball : sans lui, le plugin
 //             ne dessine rien ;
 //   Follow  : 1 par défaut ; 0, ni taille donnée à SDL ni diffusion ; 2, la taille donnée à SDL sans diffusion (le banc
-//             compare les trois).
+//             compare les trois) ;
+//   ShutdownWait : millisecondes laissées à DMDUtil, à la fermeture, pour finir la recherche du DMD réel qu'il relance
+//             quand les sources changent après la partie (onSourcesChanged) ; 0 par défaut, écrit par Cyber Pinball
+//             quand un DMD réel est allumé (dmd.ts). Banc : scripts/banc-fermeture.mjs.
 
 #define _CRT_SECURE_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
@@ -60,6 +63,7 @@ unsigned int getVpxApiId = 0, onGameStartId = 0, onGameEndId = 0, onPrepareFrame
 MSGPI_STRING_VAL_SETTING(fichierJournal, "LogFile", "Log file", "Where the plugin writes what it does, empty for none", true, "", 1024);
 MSGPI_INT_VAL_SETTING(sondeActive, "Probe", "Probe", "1: measures how much of the Score View window the DMD fills (test bench)", true, 0, 1, 0);
 MSGPI_INT_VAL_SETTING(suiviActif, "Follow", "Follow", "1: gives SDL the size set from outside and tells ScoreView (default); 0: neither; 2: SDL only (test bench, to compare)", true, 0, 2, 1);
+MSGPI_INT_VAL_SETTING(attenteFermeture, "ShutdownWait", "Shutdown wait", "Milliseconds left to DMDUtil to finish looking for the real DMD when the DMD sources changed after the game (0: no wait)", true, 0, 10000, 0);
 
 constexpr wchar_t TITRE[] = L"Visual Pinball Score View";
 
@@ -70,6 +74,9 @@ double maintenant()
 
 bool enPartie = false;
 double debut = 0.0;
+// Fermeture : la partie est finie, et l'heure du dernier changement des sources de DMD reçu depuis (0 : aucun).
+bool partieFinie = false;
+double sourcesApresPartie = 0.0;
 
 void ecrire(const char* ligne)
 {
@@ -411,6 +418,8 @@ void MSGPIAPI onGetAuxRenderer(const unsigned int, void*, void* data)
 void MSGPIAPI onGameStart(const unsigned int, void*, void*)
 {
    enPartie = true;
+   partieFinie = false;
+   sourcesApresPartie = 0.0;
    debut = maintenant();
    fenetre = Fenetre {};
    suivi.remiseAZero();
@@ -422,9 +431,26 @@ void MSGPIAPI onGameStart(const unsigned int, void*, void*)
    ecrire(ligne);
 }
 
+// Fermeture de VPX avec un DMD réel (relevé le 17/11/2026 sur une borne à ZeDMD WiFi, Daredevil, Deadpool, 24) :
+// quand une source de DMD survit à la partie (FlexDMD, Serum…), VPX diffuse un dernier changement des sources
+// pendant qu'il défait la table. DMDUtil, dont le DMD vient d'être détruit (fin de partie), en recrée un et relance
+// la recherche des afficheurs (FindDisplays : connexion au ZeDMD WiFi, ports série), dans un fil que le destructeur
+// du DMD n'attend pas ; DMDUtil est déchargé quelques millisecondes plus tard, et le fil se réveille dans du code
+// déchargé : VPX s'arrête sur 0xC0000005 en se fermant. Les plugins se déchargent dans l'ordre de leurs numéros, ce
+// plugin juste avant DMDUtil : il retient la fermeture le temps que la recherche finisse (ShutdownWait, compté depuis
+// le changement des sources), seulement dans ce cas-là, et seulement quand DMDUtil est chargé.
+void MSGPIAPI onSourcesChanged(const unsigned int, void*, void*)
+{
+   if (enPartie || !partieFinie)
+      return;
+   sourcesApresPartie = maintenant();
+   ecrire("sources du DMD changees apres la partie");
+}
+
 void MSGPIAPI onGameEnd(const unsigned int, void*, void*)
 {
    enPartie = false;
+   partieFinie = true;
    fenetre = Fenetre {};
    char ligne[64];
    std::snprintf(ligne, sizeof(ligne), "fin diffusions=%d tailles=%d", diffusions, tailles);
@@ -440,8 +466,10 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballDmdPluginLoad(const uint32_t sessionId, c
    msgApi->RegisterSetting(endpointId, &fichierJournal);
    msgApi->RegisterSetting(endpointId, &sondeActive);
    msgApi->RegisterSetting(endpointId, &suiviActif);
+   msgApi->RegisterSetting(endpointId, &attenteFermeture);
    msgApi->BroadcastMsg(endpointId, getVpxApiId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_MSG_GET_API), &vpxApi);
    displaysChangedId = msgApi->GetMsgID(CTLPI_NAMESPACE, CTLPI_DISPLAY_ON_SRC_CHG_MSG);
+   msgApi->SubscribeMsg(endpointId, displaysChangedId, onSourcesChanged, nullptr);
    msgApi->SubscribeMsg(endpointId, onGameStartId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_GAME_START), onGameStart, nullptr);
    msgApi->SubscribeMsg(endpointId, onGameEndId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_GAME_END), onGameEnd, nullptr);
    msgApi->SubscribeMsg(endpointId, onPrepareFrameId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_PREPARE_FRAME), onPrepareFrame, nullptr);
@@ -455,6 +483,17 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballDmdPluginLoad(const uint32_t sessionId, c
 MSGPI_EXPORT void MSGPIAPI CyberPinballDmdPluginUnload()
 {
    enPartie = false;
+   msgApi->UnsubscribeMsg(displaysChangedId, onSourcesChanged, nullptr);
+   // DMDUtil se décharge juste après : sa recherche relancée pendant la fermeture finit d'abord (onSourcesChanged).
+   if (sourcesApresPartie > 0.0 && attenteFermeture_Val > 0 && GetModuleHandleW(L"plugin-dmdutil64.dll"))
+   {
+      const double reste = sourcesApresPartie + attenteFermeture_Val / 1000.0 - maintenant();
+      char ligne[96];
+      std::snprintf(ligne, sizeof(ligne), "fermeture retenue %.0f ms pour DMDUtil", reste > 0.0 ? reste * 1000.0 : 0.0);
+      ecrire(ligne);
+      if (reste > 0.0)
+         Sleep(static_cast<DWORD>(reste * 1000.0));
+   }
    msgApi->UnsubscribeMsg(onGameStartId, onGameStart, nullptr);
    msgApi->UnsubscribeMsg(onGameEndId, onGameEnd, nullptr);
    msgApi->UnsubscribeMsg(onPrepareFrameId, onPrepareFrame, nullptr);

@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.14
 
+- Leaderboards: "Fingerprints of … tables being computed…" no longer stays on screen once the fingerprints are ready, and leaderboards received from the network right after opening show up without reopening the screen.
+- Tables taken over from another installation (PinUP Popper, PinballX, old-style VPX): they now come with their settings. Their ROM's DIP switches (`VPinMAME\cfg`) and what their script had saved in VPX (table menu options, high scores of original tables, credits) are carried over, only each table's own; no more setting everything up again.
+- PuP-Packs without `screens.pup`: PinUP Player used its default screens, VPX's PUP plugin creates none and the pack stayed dark. The screens the pack uses are now declared automatically before the game.
+- Real DMD (beta): on a cabinet with a ZeDMD, VPX often crashed while closing after a FlexDMD or Serum-colored table: the DMDUtil plugin started looking for the display again during shutdown and was unloaded before it finished. Cyber Pinball now lets that search finish before VPX closes. A VPX crash that happens after the game ended is now reported as such, without blaming the table.
 - **Levels**: your games, your progress, the weekly rankings, your badges and life between players earn XP, which raises a level that never goes down. Your player card (avatar, name, level and bar) stays at the top of the tables screen, next to your badges and online friends.
 - **My level**, first in Community: the bar, latest gains, the weekly rankings with expected XP, the closest badges and the scale, "How to earn XP".
 - **50 badges** in 11 families, from common to legendary, including secret badges; a new "My badges" showcase.

@@ -264,6 +264,24 @@ export interface VpxDmdPlan {
 
 const DMDUTIL = 'Plugin.DMDUtil';
 
+/**
+ * DMD réel ouvert par VPX lui-même : à la fermeture d'une table dont une source de DMD survit à la
+ * partie (FlexDMD, Serum…), DMDUtil relance la recherche du DMD réel juste avant d'être déchargé, et
+ * VPX plante en se fermant (0xC0000005, bornes à ZeDMD WiFi, 17/11/2026). Le plugin CyberPinballDmd,
+ * déchargé juste avant lui, retient alors la fermeture jusqu'à 3 s après ce dernier changement des
+ * sources (dmd-suivi.cpp, ShutdownWait) : une connexion au ZeDMD WiFi répond en quelques dizaines de
+ * millisecondes, l'essai des ports série en moins de 2 s. Sans ce cas, aucune attente. Écrit par la
+ * synchronisation (sync.ts) quand VPX ouvre lui-même un DMD réel (vpxDmdShutdownWait) ; prouvé au
+ * banc scripts/banc-fermeture.mjs (faux ZeDMD WiFi joignable mais lent).
+ */
+export const DMD_SHUTDOWN_WAIT: VpxSetting = { section: 'Plugin.CyberPinballDmd', key: 'ShutdownWait', value: '3000' };
+
+/** L'attente à la fermeture, quand ces réglages font ouvrir un DMD réel à VPX lui-même ; sinon rien. */
+export function vpxDmdShutdownWait(settings: VpxSetting[]): VpxSetting[] {
+  const direct = settings.some((s) => s.section === DMDUTIL && s.key === 'Enable' && s.value === '1') && !settings.some((s) => s.section === DMDUTIL && s.key === 'DMDServer' && s.value === '1');
+  return direct ? [DMD_SHUTDOWN_WAIT] : [];
+}
+
 /** Clés de [Plugin.DMDUtil] que Cyber Pinball peut écrire. */
 export const VPX_DMD_OWNED_KEYS = ['Enable', ...HARDWARE_DMD_MODELS, 'ZeDMDWiFiEnabled', 'ZeDMDWiFiAddr', 'DMDServer', 'DMDServerAddr', 'DMDServerPort'];
 

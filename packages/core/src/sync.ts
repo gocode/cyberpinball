@@ -2,7 +2,7 @@ import { vpxAudioSettings } from './audio';
 import { managedJoysticks, noAutoLayoutSettings, vpxAnalogSettings } from './plunger';
 import { tiltFindings, VPX_STILL_TABLE, vpxTiltSettings } from './tilt';
 import { buttonInfo, buttonProblems, DEFAULT_BUTTONS, inGameMenuSetting, isInputKey, keyLabel, codeOfScancode, vpxInputSettings, vpxVolumeSettings, type SilencedAction } from './buttons';
-import { VPX_DMD_OWNED_KEYS, vpxDmdSettings, vpxFolderDefaults, type DetectedDmd, type GlobalDmdFolders } from './dmd';
+import { VPX_DMD_OWNED_KEYS, vpxDmdSettings, vpxDmdShutdownWait, vpxFolderDefaults, type DetectedDmd, type GlobalDmdFolders } from './dmd';
 import { detectDofControllers, VPX_DOF_OWNED_KEYS, vpxDofSettings, type DetectedDofController, type DofSetup, type HidName } from './dof';
 import { t } from './i18n';
 import { IniDocument } from './ini';
@@ -290,6 +290,8 @@ export function planVpxSync(
     dmd = plan.detected;
     findings.push(...plan.findings);
     applyOwned(plan.settings);
+    // DMD réel ouvert par VPX : sa fermeture attend la recherche que DMDUtil relance (dmd.ts, DMD_SHUTDOWN_WAIT).
+    applyOwned(vpxDmdShutdownWait(plan.settings));
   }
   for (const key of VPX_DMD_OWNED_KEYS) {
     const id = ownedId('Plugin.DMDUtil', key);

@@ -294,6 +294,19 @@ const TRAPS: Trap[] = [
     script: scriptFacts(PUP_SCRIPT),
   },
   {
+    // Pack sans screens.pup ni option, comme PinUP Popper les garde (Daredevil, 24 : 17/11/2026) :
+    // ses playlists et déclencheurs visent les écrans 2 et 5, que rien ne déclare.
+    code: 'pupNoScreens',
+    arm: (folder) => {
+      const pack = path.join(folder, 'pupvideos', 'afm_113b');
+      write(path.join(pack, 'playlists.pup'), 'ScreenNum,Folder,Des,AlphaSort,RestSeconds,Volume,Priority\r\n2,Backglass,,0,0,100,1\r\n5,"FullDMD",,0,0,100,1\r\n');
+      write(path.join(pack, 'triggers.pup'), 'ID,Active,Descript,Trigger,ScreenNum,PlayList,PlayFile,Volume,Priority,Length,Counter,RestSeconds,Loop,Defaults\r\n1,1,Attract,D1,2,Backglass,attract.mp4,100,1,0,0,0,1,\r\n');
+      write(path.join(pack, 'Backglass', 'attract.mp4'), 'mp4');
+      write(path.join(pack, 'FullDMD', 'score.mp4'), 'mp4');
+    },
+    script: scriptFacts(PUP_SCRIPT),
+  },
+  {
     // Option appliquée faite pour une borne sans DMD (encart vide), alors que la borne en a un.
     code: 'pupOptionUnsuited',
     arm: (folder) => {
@@ -727,7 +740,7 @@ for (const trap of TRAPS) {
 }
 
 test('corrections des PuP-Packs : appliquées, le constat disparaît', () => {
-  for (const code of ['pupMissing', 'pupNested', 'pupOrphan', 'pupOptionNotApplied'] as const) {
+  for (const code of ['pupMissing', 'pupNested', 'pupOrphan', 'pupOptionNotApplied', 'pupNoScreens'] as const) {
     const trap = TRAPS.find((t) => t.code === code)!;
     const tablesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-traps-'));
     const folder = healthyTable(tablesDir);

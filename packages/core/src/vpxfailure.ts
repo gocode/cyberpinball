@@ -85,6 +85,27 @@ export function vpxExitName(code: number | null | undefined): string | undefined
   return name ? `0x${u.toString(16).toUpperCase().padStart(8, '0')}, ${name()}` : undefined;
 }
 
+/** Lignes de la fin du journal où se cherche l'erreur du script (le reste sert à la fermeture). */
+const SCRIPT_ERROR_LINES = 15;
+
+/**
+ * VPX planté en se fermant, après la partie : la partie s'est déroulée jusqu'au bout (« Closing
+ * player… », Player::~Player), puis VPX s'est arrêté sur un code de plantage en défaisant la table.
+ * Relevé le 17/11/2026 sur une borne à ZeDMD WiFi (Daredevil, Deadpool, 24) : pendant la fermeture,
+ * une source de DMD survit (FlexDMD, Serum…), DMDUtil recrée son DMD et relance la recherche du DMD
+ * réel (« Attempting to connect », « Searching for ZeDMD »), puis il est déchargé avant qu'elle
+ * finisse ; son fil se réveille dans du code déchargé. `dmdProbe` : ce cas-là, lu dans le journal.
+ */
+export function vpxShutdownCrash(lines: readonly string[], exitCode: number | null | undefined): { dmdProbe: boolean } | undefined {
+  if (exitCode === null || exitCode === undefined || vpxMissingLibrary(exitCode) || !EXIT_NAMES[exitCode >>> 0]) return undefined;
+  const closing = lines.findLastIndex((l) => /\bClosing player\b/.test(l));
+  if (closing < 0) return undefined;
+  const after = lines.slice(closing);
+  const destroyed = after.findIndex((l) => /DMDUtil.*\bDMD destructor finished\b/.test(l));
+  const dmdProbe = destroyed >= 0 && after.slice(destroyed + 1).some((l) => /DMDUtil.*\b(Attempting to connect|Searching for (ZeDMD|PIN2DMD|Pixelcade))\b/i.test(l));
+  return { dmdProbe };
+}
+
 /** Ce que dit l'écran d'échec, et la ligne du journal de Cyber Pinball, pour un arrêt reconnu. */
 export interface VpxFailureDiagnosis {
   /** Titre de l'écran : la vraie raison. */
@@ -101,9 +122,23 @@ export interface VpxFailureDiagnosis {
  * connu. undefined : rien de reconnu (l'écran garde son explication habituelle).
  */
 export function diagnoseVpxFailure(logTail: readonly string[], exitCode: number | null | undefined, file: string, script?: string): VpxFailureDiagnosis | undefined {
-  const error = vpxScriptError(logTail, script);
+  const error = vpxScriptError(logTail.slice(-SCRIPT_ERROR_LINES), script);
   const exit = vpxExitName(exitCode);
   if (!error && !exit) return undefined;
+  // Planté en se fermant : la partie s'est jouée, rien n'est à réparer dans la table.
+  const shutdown = !error ? vpxShutdownCrash(logTail, exitCode) : undefined;
+  if (shutdown && exit) {
+    return {
+      title: t('VPX a planté en se fermant'),
+      lines: [
+        t('La partie s’est jouée jusqu’au bout : VPX s’est arrêté ({exit}) après sa fin, en se fermant.', { exit }),
+        shutdown.dmdProbe
+          ? t('Pendant la fermeture, le plugin DMDUtil de VPX a relancé la recherche du DMD réel (ZeDMD), puis a été déchargé avant qu’elle finisse. C’est un défaut de VPX 10.8.1, pas de la table ; Cyber Pinball fait désormais attendre la fin de cette recherche.')
+          : t('Rien n’est à réparer dans la table : une autre partie peut se dérouler normalement.'),
+      ],
+      journal: `VPX arrêté en se fermant, après la partie (${file}) : ${exit}${shutdown.dmdProbe ? ' ; DMDUtil relançait la recherche du DMD réel pendant la fermeture' : ''}.`, // i18n-ignore : journal
+    };
+  }
   const lines: string[] = [];
   const journal: string[] = [];
   if (error) {

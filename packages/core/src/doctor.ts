@@ -34,6 +34,7 @@ import { dressRecord, isDressWindow, tableDmdWindow } from './fulldmdframe';
 import { dressHiddenFinding, type TableDressing } from './fulldmdtable';
 import {
   analysePack,
+  defaultScreensPup,
   appliedOption,
   cabinetFullDmd,
   chooseVariant,
@@ -131,6 +132,7 @@ export const FINDING_CODES = [
   'pupOptionNotApplied',
   'pupOptionUnsuited',
   'pupOptionMismatch',
+  'pupNoScreens',
   'pupDisabledByScript',
   'pupHidesDmd',
   'pupDmdInBackglass',
@@ -1137,7 +1139,7 @@ export function repairScriptAfterStop(entry: TableEntry, ctx: DoctorContext, ops
  * 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack), et une table que le core.vbs
  * arrête ne démarre pas (Back to the Future, 30 octobre 2026 : vpmInit appelé deux fois).
  */
-export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['backglassEmpty', 'scriptCoreCompat','pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['backglassEmpty', 'scriptCoreCompat','pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupNoScreens', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
 
 /**
  * Constats réparables de PUP_PLAY_REPAIRS pour cette table. Sans script connu (cache
@@ -1715,6 +1717,19 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
       });
     }
 
+    // Pack sans screens.pup ni option à appliquer : PinUP Player prenait ses écrans par défaut, le
+    // plugin PUP n'en crée aucun et le pack reste éteint. Les écrans que le pack vise sont déclarés.
+    const screensPup = !nested.has(pack) && !info.variants.length ? defaultScreensPup(info.root) : undefined;
+    if (screensPup) {
+      findings.push({
+        code: 'pupNoScreens',
+        severity: 'warning',
+        title: t('PuP-Pack sans screens.pup'),
+        detail: t('pupvideos\\{pack} n’a pas de screens.pup : PinUP Player prenait ses écrans par défaut, le plugin PUP de VPX n’en crée aucun et le pack reste éteint. Ses écrans y sont déclarés comme PinUP les montrait.', { pack }),
+        fix: { label: t('Déclarer les écrans du pack'), ops: [{ op: 'write', path: path.join(info.root, 'screens.pup'), content: screensPup }] },
+      });
+    }
+
     // Option retenue dans le .info qui n'est pas celle en place, ou en place à moitié.
     const kept = memory?.option ? info.variants.find((v) => v.label.toLowerCase() === memory.option!.toLowerCase()) : undefined;
     if (!nested.has(pack) && kept && current && (current.variant !== kept || !current.complete)) {
@@ -1860,7 +1875,7 @@ function checkPupLog(entry: TableEntry, log: string, expected: string[], found: 
   const pathIndex = session.findLastIndex((l) => /PUP path: /.test(l));
   const pupPath = pathIndex >= 0 ? /PUP path: (.+)$/.exec(session[pathIndex]!)![1]!.trim() : undefined;
   if (pupPath && session.slice(pathIndex).some((l) => /No screens\.pup file found/.test(l))) {
-    if (!found.some((f) => f.code === 'pupOptionNotApplied')) {
+    if (!found.some((f) => f.code === 'pupOptionNotApplied' || f.code === 'pupNoScreens')) {
       findings.push({
         code: 'pupLog',
         severity: 'warning',

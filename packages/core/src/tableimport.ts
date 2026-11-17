@@ -570,6 +570,8 @@ function collect(src: ImportSource, pkg: number, items: Item[], ignored: string[
   if (!isDir(src.path)) {
     const name = path.basename(src.path);
     const media = src.unpacked ? undefined : recognizeMedia(name, mediaFolder(above.at(-1) ?? '', above.slice(0, -1)));
+    // Réglages d'une ROM pris seuls dans VPinMAME\cfg (installation.ts) : rangés dans pinmame\cfg de la table, où PinMAME les lit.
+    if (!src.unpacked && /\.cfg$/i.test(name) && above.at(-1)?.toLowerCase() === 'cfg') return push(src.path, false, 'pinmame', ['pinmame', 'cfg'], label);
     push(src.path, false, media ? 'media' : classifyFile(name), [], label, media);
     return;
   }

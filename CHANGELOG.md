@@ -11,6 +11,10 @@ son interface).
 
 ## 0.1.14
 
+- Classements : « Empreintes de … tables en calcul… » ne reste plus affiché une fois les empreintes arrivées, et des classements reçus du réseau juste après l'ouverture s'affichent sans avoir à rouvrir l'écran.
+- Tables reprises d'une autre installation (PinUP Popper, PinballX, VPX rangé à l'ancienne) : elles arrivent avec leurs réglages. Les interrupteurs DIP de leur ROM (`VPinMAME\cfg`) et ce que leur script avait enregistré dans VPX (options du menu de la table, tableau d'honneur des tables originales, crédits) sont repris, seulement ceux de chaque table ; plus besoin de tout régler de nouveau.
+- PuP-Packs sans `screens.pup` : PinUP Player prenait ses écrans par défaut, le plugin PUP de VPX n'en crée aucun et le pack restait éteint. Les écrans que le pack utilise sont maintenant déclarés d'eux-mêmes avant la partie.
+- DMD réel (bêta) : sur une borne à ZeDMD, VPX plantait souvent en se fermant après une table à FlexDMD ou à couleurs Serum : le plugin DMDUtil relançait la recherche de l'afficheur pendant la fermeture et était déchargé avant qu'elle finisse. Cyber Pinball laisse maintenant cette recherche finir avant de laisser VPX se fermer. Un plantage de VPX survenu après la fin de la partie est dit tel quel, sans laisser croire que la table est en cause.
 - **Niveaux** : vos parties, vos progrès, les classements de la semaine, vos badges et la vie entre joueurs rapportent des XP, qui font monter un niveau qui ne baisse jamais. Votre carte de joueur (avatar, pseudo, niveau et barre) reste en haut de l'écran des tables, à côté de vos badges et de vos amis en ligne.
 - **Mon niveau**, en tête de la Communauté : la barre, les derniers gains, les classements de la semaine avec les XP prévus, les badges les plus proches et le barème, « Comment gagner des XP ».
 - **50 badges** en 11 familles, de commun à légendaire, dont des badges secrets ; une nouvelle vitrine « Mes badges ».

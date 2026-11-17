@@ -11,7 +11,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
-import { chooseDmdDisplay, diagnoseVpxFailure, GUEST_DOORS, inspectorDisplayReadable, liveFailedPlaying, livePlayerStateLabel, liveWaitView, vpxExitName, vpxScriptError, type InspectorDisplay, type LiveGame } from '../index';
+import { chooseDmdDisplay, diagnoseVpxFailure, GUEST_DOORS, inspectorDisplayReadable, liveFailedPlaying, livePlayerStateLabel, liveWaitView, vpxExitName, vpxScriptError, vpxShutdownCrash, type InspectorDisplay, type LiveGame } from '../index';
 import { historyStateLabel } from '../gamehistory';
 
 // La fin du journal de VPX, telle que l'écran du PinCab l'a montrée.
@@ -57,6 +57,43 @@ test('diagnostic : la vraie raison, une ligne de journal, rien de « manquant »
   assert.equal(exit.scriptError, undefined);
   // Rien de reconnu (un code ordinaire, une ROM absente…) : l'écran garde son explication et « ce qu'il manque ».
   assert.equal(diagnoseVpxFailure(['ERROR … can’t start game'], 1, 'x.vpx'), undefined);
+});
+
+// Fin de journal d'une borne à ZeDMD WiFi (rapport du 17/11/2026, Daredevil) : la partie s'est fermée
+// (« Closing player… »), DMDUtil a recréé son DMD et relancé la connexion au ZeDMD, puis a été déchargé.
+const FERMETURE = [
+  '2026-11-17 12:29:59.259 INFO  [Main] [Player::~Player@865] Closing player...',
+  '2026-11-17 12:29:59.259 INFO  [Main] [DMDUtil:DMDUtilPlugin::onDmdSrcChanged@209] DMD Source Changed: format=2, width=128, height=32',
+  '2026-11-17 12:29:59.276 INFO  [Main] [DMDUtil:DMDUtilPlugin::OnDMDUtilLog@91] DMD destructor start',
+  '2026-11-17 12:29:59.279 INFO  [Main] [DMDUtil:DMDUtilPlugin::OnDMDUtilLog@91] DMD destructor finished',
+  '2026-11-17 12:29:59.279 INFO  [Main] [PUP:PUP::PUPManager::Stop@115] PUP Manager stop',
+  '2026-11-17 12:30:00.256 INFO  [Main] [DMDUtil:DMDUtilPlugin::onDmdSrcChanged@209] DMD Source Changed: format=2, width=128, height=32',
+  '2026-11-17 12:30:00.270 INFO  [6600] [DMDUtil:DMDUtilPlugin::OnDMDUtilLog@91] Attempting to connect to IP address: ‹adresse IP›',
+  '2026-11-17 12:30:00.283 INFO  [Main] [MsgPI::MsgPlugin::Unload@550] Plugin vpx unloaded [id=1]',
+  ...Array.from({ length: 30 }, (_, i) => `2026-11-17 12:30:00.29${i % 10} INFO  [Main] [DMDUtil:DMDUtilPlugin::OnDMDUtilLog@91] ligne ${i}`),
+  '2026-11-17 12:30:00.295 INFO  [Main] [DMDUtil:DMDUtilPlugin::OnDMDUtilLog@91] DMD destructor finished',
+  '2026-11-17 12:30:00.295 INFO  [Main] [MsgPI::MsgPlugin::Unload@550] Plugin DMDUtil unloaded [id=7]',
+  "2026-11-17 12:30:04.450 INFO  [Main] [FileLocator::GetTablePath@306] Cache folder was created for table 'DAREDEVIL2.0.2.vpx'",
+];
+
+test('plantage à la fermeture : la partie s’est jouée, dit tel ; la recherche du DMD réel relancée par DMDUtil est nommée', () => {
+  const d = diagnoseVpxFailure(FERMETURE, 3221225477, 'DAREDEVIL2.0.2.vbs')!;
+  assert.equal(d.title, 'VPX a planté en se fermant');
+  assert.match(d.lines[0]!, /^La partie s’est jouée jusqu’au bout : VPX s’est arrêté \(0xC0000005, accès mémoire interdit\) après sa fin/);
+  assert.match(d.lines[1]!, /DMDUtil de VPX a relancé la recherche du DMD réel/);
+  assert.match(d.journal, /^VPX arrêté en se fermant, après la partie \(DAREDEVIL2\.0\.2\.vbs\) : 0xC0000005.* DMDUtil relançait/);
+  assert.deepEqual(vpxShutdownCrash(FERMETURE, 3221225477), { dmdProbe: true });
+  // Fermeture normale (World Cup Soccer, même borne) : DMD détruit, aucune recherche après ; un plantage y serait autre chose.
+  const propre = FERMETURE.filter((l) => !/Attempting to connect/.test(l));
+  assert.deepEqual(vpxShutdownCrash(propre, 3221225477), { dmdProbe: false });
+  assert.match(diagnoseVpxFailure(propre, 3221225477, 'x.vpx')!.lines[1]!, /^Rien n’est à réparer dans la table/);
+  // Sans « Closing player » : arrêté pendant la partie, comme avant ; code ordinaire : rien.
+  assert.equal(vpxShutdownCrash(FERMETURE.slice(1), 3221225477), undefined);
+  assert.equal(diagnoseVpxFailure(FERMETURE.slice(1), 3221225477, 'x.vpx')!.title, 'VPX s’est arrêté pendant la partie');
+  assert.equal(vpxShutdownCrash(FERMETURE, 1), undefined);
+  // Une erreur du script plus haut que les 15 dernières lignes ne fait plus le diagnostic.
+  const ancienne = ['Runtime error on line 3, col 1: Type incompatible', ...FERMETURE];
+  assert.equal(diagnoseVpxFailure(ancienne, 3221225477, 'x.vpx')!.scriptError, undefined);
 });
 
 const tree = (controller: string, name = 'Display 0 128x32') => ({ name: controller, type: 'controller', children: [{ type: 'category', name: 'Displays', children: [{ type: 'display', name, mapping: 7 }] }] });

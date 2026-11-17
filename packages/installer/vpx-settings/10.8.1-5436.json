@@ -4,7 +4,7 @@
   "platform": "windows-x64",
   "sourceCommit": "af26b2d93",
   "source": "https://github.com/vpinball/vpinball/blob/af26b2d93/src/core/Settings_properties.inl",
-  "count": 1247,
+  "count": 1248,
   "settings": [
     {"section":"Version","key":"VPinball","type":"string","label":"VPX Version","description":"VPX version that saved this file","default":"10815436"},
     {"section":"Editor","key":"EnableLog","type":"bool","label":"Enable Log","description":"Enable general logging to the vinball.log file","default":true},
@@ -1245,6 +1245,7 @@
     {"section":"Plugin.CyberPinballDmd","key":"LogFile","type":"string","label":"Log file","description":"Where the plugin writes what it does, empty for none","default":"","plugin":"CyberPinballDmd"},
     {"section":"Plugin.CyberPinballDmd","key":"Probe","type":"int","label":"Probe","description":"1: measures how much of the Score View window the DMD fills (test bench)","default":0,"plugin":"CyberPinballDmd","min":0,"max":1},
     {"section":"Plugin.CyberPinballDmd","key":"Follow","type":"int","label":"Follow","description":"1: gives SDL the size set from outside and tells ScoreView (default); 0: neither; 2: SDL only (test bench, to compare)","default":1,"plugin":"CyberPinballDmd","min":0,"max":2},
+    {"section":"Plugin.CyberPinballDmd","key":"ShutdownWait","type":"int","label":"Shutdown wait","description":"Milliseconds left to DMDUtil to finish looking for the real DMD when the DMD sources changed after the game (0: no wait)","default":0,"plugin":"CyberPinballDmd","min":0,"max":10000},
     {"section":"Backglass","key":"Priority.B2S","type":"int","label":"B2S Backglass & FullDMD","description":"A value that will be used to select if the 'B2S Backglass & FullDMD' renderer should be used on the Backglass display. Higher values are priorized other lower ones.","default":0,"min":0,"max":100,"plugin":"B2S"},
     {"section":"Backglass","key":"Priority.B2SLegacy","type":"int","label":"B2S Legacy Backglass","description":"A value that will be used to select if the 'B2S Legacy Backglass' renderer should be used on the Backglass display. Higher values are priorized other lower ones.","default":0,"min":0,"max":100,"plugin":"B2SLegacy"},
     {"section":"Backglass","key":"Priority.PUP","type":"int","label":"PinUp Player","description":"A value that will be used to select if the 'PinUp Player' renderer should be used on the Backglass display. Higher values are priorized other lower ones.","default":0,"min":0,"max":100,"plugin":"PUP"},

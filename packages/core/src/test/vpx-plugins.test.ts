@@ -13,6 +13,7 @@ import {
   nextHardwareDmdChoice,
   pin2dmdSize,
   vpxDmdSettings,
+  vpxDmdShutdownWait,
   withHardwareDmdChoice,
   zedmdWifiAddressProblem,
   ZEDMD_WIFI_DEFAULT_ADDR,
@@ -295,6 +296,10 @@ test('synchronisation : DMD branché puis débranché', () => {
   assert.equal(get(plugged.nextIni, 'Plugin.DMDUtil', 'ZeDMD'), '1');
   assert.equal(get(plugged.nextIni, 'Plugin.DMDUtil', 'PIN2DMD'), undefined);
   assert.equal(plugged.dmd[0]?.model, 'ZeDMD');
+  // DMD réel ouvert par VPX : la fermeture attend la recherche que DMDUtil relance (plantage du 17/11/2026, banc-fermeture).
+  assert.equal(get(plugged.nextIni, 'Plugin.CyberPinballDmd', 'ShutdownWait'), '3000');
+  assert.equal(get(none.nextIni, 'Plugin.CyberPinballDmd', 'ShutdownWait'), undefined);
+  assert.deepEqual(vpxDmdShutdownWait([{ section: 'Plugin.DMDUtil', key: 'Enable', value: '1' }, { section: 'Plugin.DMDUtil', key: 'DMDServer', value: '1' }]), [], 'dmdserver tient le DMD : rien à attendre');
   // Débranché : rien n'est réécrit, la mémoire garde la dernière valeur écrite.
   const unplugged = planVpxSync(cabinet(), devPcDisplays(), plugged.nextIni!, PROFILE, { usb: DEV_PC_USB, memory: plugged.memory });
   assert.equal(unplugged.nextIni, undefined);

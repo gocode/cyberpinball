@@ -334,7 +334,10 @@ export function vpxPrefDir(version: string): string {
   return path.join(process.env.APPDATA ?? os.homedir(), 'VPinballX', minor);
 }
 
-function readLogTail(prefDir: string, lines = 15): string[] {
+// 120 lignes : de quoi voir la fin de la partie (« Closing player… ») avant un plantage à la fermeture,
+// que les plugins remplissent de dizaines de lignes (vpxShutdownCrash) ; l'erreur du script reste
+// cherchée dans les 15 dernières, l'écran n'en montre que 5.
+function readLogTail(prefDir: string, lines = 120): string[] {
   try {
     const text = fs.readFileSync(path.join(prefDir, 'vpinball.log'), 'utf8');
     return text

@@ -641,6 +641,44 @@ export function packScreens(root: string): PupScreen[] {
   return screensFile ? parseScreens(readText(path.join(root, screensFile.name))) : [];
 }
 
+/** Noms que PinUP Player donne à ses écrans (PinUpPlayer.ini), pour les écrans que screens.pup ne déclare pas. */
+const DEFAULT_SCREEN_NAMES: Record<number, string> = { 0: 'Topper', 1: 'DMD', 2: 'Backglass', 3: 'Playfield', 4: 'Music', 5: 'FullDMD' };
+
+/**
+ * screens.pup à écrire dans un pack qui n'en a pas : ses playlists (playlists.pup) et ses
+ * déclencheurs (triggers.pup) visent des écrans que rien ne déclare. PinUP Player prenait alors
+ * ses écrans par défaut ; le plugin PUP de VPX 10.8.1 n'en crée aucun (PUPManager::LoadConfig,
+ * commit af26b2d93 : « No screens.pup file found », puis rien), et tout le pack reste éteint :
+ * déclencheurs et playlists s'attachent à des écrans qui n'existent pas. Relevé le 17/11/2026 sur
+ * quatre tables reprises de PinUP Popper (24, Black Knight, Daredevil, World Cup Soccer).
+ *
+ * Chaque écran visé est déclaré comme le plugin le ferait lui-même (PUPScreen::CreateDefault) :
+ * mode Show, sans fond, sans place à part, au volume par défaut (colonne vide). undefined : le
+ * pack a déjà son screens.pup, a des options à appliquer (pupOptionNotApplied), ou ne vise aucun
+ * écran (pack piloté par le script, qui crée ses écrans par PuPlayer.Init).
+ */
+export function defaultScreensPup(root: string): string | undefined {
+  const entries = readDirents(root);
+  const file = (name: string) => entries.find((d) => d.isFile() && d.name.toLowerCase() === name)?.name;
+  if (file('screens.pup')) return undefined;
+  const nums = new Set<number>();
+  const collect = (name: string, column: number) => {
+    const found = file(name);
+    if (!found) return;
+    for (const line of readText(path.join(root, found)).split(/\r?\n/).slice(1)) {
+      if (!line.trim()) continue;
+      const num = Number.parseInt(parseCsvLine(line)[column] ?? '', 10);
+      if (Number.isInteger(num) && num >= 0 && num < 100) nums.add(num);
+    }
+  };
+  collect('playlists.pup', 0);
+  collect('triggers.pup', 4);
+  if (!nums.size) return undefined;
+  const lines = ['ScreenNum,ScreenDes,PlayList,PlayFile,Loopit,Active,Priority,CustomPos'];
+  for (const num of [...nums].sort((a, b) => a - b)) lines.push(`${num},${DEFAULT_SCREEN_NAMES[num] ?? `Screen ${num}`},,,0,Show,,`);
+  return lines.join('\r\n') + '\r\n';
+}
+
 /**
  * PuP-DMD posé dans le fronton : l'écran du DMD (5, sinon 1) est placé dans le fronton (CustomPos
  * « 2,0,0,100,100 ») et rien n'occupe la fenêtre du DMD. L'auteur a composé un grand écran 16:9
