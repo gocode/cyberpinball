@@ -940,6 +940,14 @@ function newsLine(row, cursor, moved, rank) {
   const head = libEl('div', 'news-head');
   head.append(libEl('span', 'news-title', row.text));
   for (const b of n.badges) head.append(libEl('span', `news-badge ${b.kind}`, b.text));
+  // Les réactions des joueurs en bref, au bout du titre : les trois emojis les plus choisis et le total.
+  if (n.reactions) {
+    const r = libEl('span', `news-reacts${n.reactions.mine ? ' mine' : ''}`);
+    r.title = n.reactions.label;
+    r.setAttribute('aria-label', n.reactions.label);
+    r.append(libEl('span', 'news-reacts-faces', n.reactions.emojis.join('')), libEl('b', 'news-reacts-total', String(n.reactions.total)));
+    head.append(r);
+  }
   text.append(head);
   if (row.detail) text.append(libEl('div', 'news-detail', row.detail));
   if (row.action === cursor && n.start) text.append(libEl('div', 'news-start', t('Start : {action}', { action: n.start })));

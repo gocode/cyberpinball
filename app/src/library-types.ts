@@ -373,7 +373,18 @@ export interface Row {
    * à la page : nouveautes/<id>-<langue>.webp), ses badges (« Nouveau », « BÊTA »), et ce que fait Start
    * quand elle est choisie.
    */
-  news?: { date: string; version: string; first: boolean; last: boolean; preview?: string; unread?: boolean; badges: { text: string; kind: 'new' | 'beta' }[]; start?: string };
+  news?: {
+    date: string;
+    version: string;
+    first: boolean;
+    last: boolean;
+    preview?: string;
+    unread?: boolean;
+    badges: { text: string; kind: 'new' | 'beta' }[];
+    start?: string;
+    /** Le résumé des réactions des joueurs : les trois emojis les plus choisis, le total, et si j'ai réagi (`label` le dit en toutes lettres). */
+    reactions?: { emojis: string[]; total: number; mine: boolean; label: string };
+  };
 }
 export interface Section {
   title?: string;

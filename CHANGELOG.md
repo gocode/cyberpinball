@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.16
 
+- Nouveautés : chaque ligne de la liste montre les réactions des joueurs en bref, les trois plus choisies et leur total, repérées en bleu quand vous avez réagi.
 - Retours et propositions : chaque proposition affiche le pseudo de son auteur ("par Ressort"), et sa fiche liste ceux qui la soutiennent, avec leur drapeau, le plus récent d'abord. Votre pseudo s'y ajoute quand vous votez. Les votes donnés avant cette version restent comptés, sans nom.
 - Téléphone, Messages : « Créer un groupe » et « Groupes publics » en tête, puis les invitations de groupe reçues (Accepter, Refuser), avant les conversations. Créer un groupe s'ouvre à la borne, où le nom se tape au clavier du téléphone.
 - Téléphone : « Groupes publics » en plein écran : chercher un groupe par son nom, le rejoindre, voir son aperçu (sa table de la semaine, ses membres) ; vos propres groupes publics sont marqués « Déjà membre », un groupe plein est grisé avec sa raison.

@@ -5500,6 +5500,34 @@ body.mouse .lib-row.news-item.pick:not(.selected):hover .news-block {
   color: var(--void);
 }
 
+/* Les réactions en bref, au bout du titre ; bordées de bleu quand j'ai réagi (comme ma tuile). */
+.news-reacts {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7cqmin;
+  padding: 0.15cqmin 1cqmin;
+  border: 0.15cqmin solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  font-size: 1.95cqmin;
+  line-height: 1.2;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.news-reacts-faces {
+  letter-spacing: 0.15em;
+}
+
+.news-reacts.mine {
+  border-color: var(--meta);
+}
+
+.news-reacts.mine .news-reacts-total {
+  color: var(--meta);
+}
+
 .news-detail {
   font-size: 2.15cqmin;
   line-height: 1.38;

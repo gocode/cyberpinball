@@ -21,7 +21,7 @@ import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { setLanguage } from '../i18n';
-import { NEWS, parseNewsReaction, parseNewsReactions, withMyNewsReaction, type NewsReactions } from '../news';
+import { NEWS, newsReactionSummary, parseNewsReaction, parseNewsReactions, withMyNewsReaction, type NewsReactions } from '../news';
 import { REACTIONS, type Reaction } from '../reactions';
 import { REPO_ROOT } from './i18n-scan';
 
@@ -178,9 +178,20 @@ test('réactions aux nouveautés, borne : une réponse inattendue n’entre pas,
   assert.deepEqual(withMyNewsReaction(undefined, 'wow'), { counts: { wow: 1 }, mine: 'wow' });
 });
 
+test('réactions aux nouveautés, résumé d’une ligne : les trois plus choisies, à égalité dans l’ordre des sept', () => {
+  assert.equal(newsReactionSummary(undefined), undefined);
+  assert.equal(newsReactionSummary({ counts: {} }), undefined, 'personne n’a réagi : rien sur la ligne');
+  assert.deepEqual(newsReactionSummary({ counts: { sad: 1, wow: 3, like: 3, love: 9, haha: 2 } }), { top: ['love', 'like', 'wow'], total: 18, mine: false });
+  assert.deepEqual(newsReactionSummary({ counts: { angry: 1 }, mine: 'angry' }), { top: ['angry'], total: 1, mine: true });
+});
+
 /* eslint-disable @typescript-eslint/no-require-imports */
 interface Built {
-  sections: { kind?: string; options?: boolean; rows: { text: string; emoji?: string; badges?: string[]; current?: boolean; tone?: string; action?: number; pick?: boolean }[] }[];
+  sections: {
+    kind?: string;
+    options?: boolean;
+    rows: { text: string; emoji?: string; badges?: string[]; current?: boolean; tone?: string; action?: number; pick?: boolean; news?: { reactions?: { emojis: string[]; total: number; mine: boolean; label: string } } }[];
+  }[];
   actions: { label: string; tone?: string; detail?: string; run: () => void }[];
   newsPage?: { note?: string };
 }
@@ -216,8 +227,23 @@ function screen(world: { net?: 'ok' | 'offline'; closed?: string } = {}) {
   menu.open();
   // La première nouveauté, agrandie.
   opened.at(-1)!.build().actions[0]!.run();
-  return { page: () => opened.at(-1)!.build(), at: () => opened.at(-1)!.at, sent, changed: () => changed };
+  return { list: () => opened[0]!.build(), page: () => opened.at(-1)!.build(), at: () => opened.at(-1)!.at, sent, changed: () => changed };
 }
+
+test('réactions aux nouveautés, liste : chaque ligne montre ses réactions en bref, et la mienne dès qu’elle est posée', () => {
+  const s = screen();
+  const rows = () => s.list().sections[0]!.rows;
+  assert.deepEqual(rows()[0]!.news!.reactions, { emojis: ['👍', '❤️'], total: 6, mine: false, label: '6 réactions' });
+  assert.ok(rows().slice(1).every((r) => !r.news!.reactions), 'sans réaction, rien sur la ligne');
+  s.page().actions[4]!.run();
+  assert.deepEqual(rows()[0]!.news!.reactions, { emojis: ['👍', '❤️', '😮'], total: 7, mine: true, label: '7 réactions, dont la vôtre' });
+  setLanguage('en');
+  try {
+    assert.equal(rows()[0]!.news!.reactions!.label, '7 reactions, including yours');
+  } finally {
+    setLanguage('fr');
+  }
+});
 
 test('réactions aux nouveautés, écran : sept tuiles avant « Essayer », la mienne repérée, Start la pose ou la retire', () => {
   const s = screen();

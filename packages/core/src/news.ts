@@ -452,6 +452,19 @@ export function withMyNewsReaction(before: NewsReactions | undefined, kind: Reac
   return { counts, ...(kind ? { mine: kind } : {}) };
 }
 
+/**
+ * Le résumé d'une ligne de la liste : les trois réactions les plus choisies (à égalité, dans l'ordre
+ * des sept), le total des joueurs, et si j'ai réagi. Rien quand personne n'a réagi.
+ */
+export function newsReactionSummary(r: NewsReactions | undefined): { top: Reaction[]; total: number; mine: boolean } | undefined {
+  if (!r) return undefined;
+  const chosen = REACTIONS.filter((k) => (r.counts[k] ?? 0) > 0);
+  const total = chosen.reduce((s, k) => s + r.counts[k]!, 0);
+  if (!total) return undefined;
+  const top = [...chosen].sort((a, b) => r.counts[b]! - r.counts[a]! || REACTIONS.indexOf(a) - REACTIONS.indexOf(b)).slice(0, 3);
+  return { top, total, mine: r.mine !== undefined };
+}
+
 const locale = () => (language() === 'en' ? 'en-GB' : 'fr-FR');
 
 /** « 17 nov. » ; « 17 Nov » en anglais. */

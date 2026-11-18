@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- What's new: each line of the list shows the players' reactions at a glance, the three most chosen and their total, marked in blue once you have reacted.
 - Feedback and ideas: each idea shows its author's nickname ("by Ressort"), and its page lists its supporters, with their flags, most recent first. Your nickname joins them when you vote. Votes given before this version still count, without a name.
 - Phone, Messages: "Create a group" and "Public groups" at the top, then the group invitations you received (Accept, Decline), before the conversations. Creating a group opens on the cabinet, where the name is typed with the phone's keyboard.
 - Phone: "Public groups" full screen: search a group by name, join it, see its preview (its table of the week, its members); your own public groups are marked "Already a member", a full group is greyed out with its reason.

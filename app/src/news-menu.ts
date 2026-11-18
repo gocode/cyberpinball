@@ -23,6 +23,7 @@ import {
   markNewsSeen,
   newsAtRoot,
   newsLongDate,
+  newsReactionSummary,
   newsShortDate,
   REACTION_EMOJI,
   REACTIONS,
@@ -112,12 +113,21 @@ export function createNewsMenu(host: NewsMenuHost): NewsMenu {
 
   const listAt = (i: number) => () => host.library.openCustom(buildList, i);
 
+  /** Sur chaque ligne de la liste, les réactions des joueurs en bref : « 👍❤️😮 23 », repéré quand j'ai réagi. */
+  function listReactions(n: NewsItem): NonNullable<NonNullable<Row['news']>['reactions']> | undefined {
+    const s = newsReactionSummary(host.reactions?.of(n.id));
+    if (!s) return undefined;
+    const label = s.mine ? tn(s.total, '{n} réaction, dont la vôtre', '{n} réactions, dont la vôtre') : tn(s.total, '{n} réaction', '{n} réactions');
+    return { emojis: s.top.map((k) => REACTION_EMOJI[k]), total: s.total, mine: s.mine, label };
+  }
+
   function buildList(): Built {
     const was = screen?.unread ?? new Set<string>();
     const rows: Row[] = items.map((n, i) => {
       const first = i === 0 || items[i - 1]!.date !== n.date;
       const unread = was.has(n.id);
       const preview = newsPreview(n);
+      const reactions = listReactions(n);
       return {
         text: n.title,
         detail: n.detail,
@@ -132,6 +142,7 @@ export function createNewsMenu(host: NewsMenuHost): NewsMenu {
           ...(unread ? { unread: true } : {}),
           badges: [...(unread ? [{ text: t('Nouveau'), kind: 'new' as const }] : []), ...(n.beta ? [{ text: beta(), kind: 'beta' as const }] : [])],
           start: n.more.length > 1 ? t('voir en grand et lire la suite') : t('voir en grand'),
+          ...(reactions ? { reactions } : {}),
         },
       };
     });
