@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.1
 
+- Correctifs de script jamais appliqués sur une borne où les tables avaient déjà été lues (Daredevil et Hellboy s'arrêtaient encore à chaque clignotement) : Cyber Pinball gardait en mémoire ce que disait le script de chaque table, sans voir qu'une nouvelle version savait y repérer davantage. Un correctif de script ajouté fait maintenant relire les scripts, dans les tables elles-mêmes, sans lancer VPX.
 - Menu système > Communauté > Jouer en local : pour une borne qui ne joue qu'en local, un seul réglage retire toute la partie sociale d'un coup, niveaux compris : niveaux, XP et badges (carte du joueur, moments de badge et de niveau), amis, joueurs en ligne, messages, salons, groupes, parties instantanées, classements en ligne, médaillon Communauté, Communauté au téléphone. Le réseau des bornes s'arrête ; la mise à jour, les Nouveautés, les tables et leurs scores restent. Rien n'est effacé : « Remettre la communauté » ramène tout, XP compris.
 - Nouveautés : les réactions des joueurs passent toujours à la ligne, au début de chaque nouveauté, sous l'aperçu et le texte.
 - Tables qui s'arrêtent un instant quand une minuterie de leur script arrive à échéance (Guardians of the Galaxy, Game of Thrones, et les tables qui décrivent leurs minuteries `vpmTimer` par un texte) : VPX compilait ce texte à chaque fois, et Windows le faisait analyser par son antivirus pendant que la partie attendait. Cyber Pinball joue maintenant une copie du script où chaque texte revu n'est compilé qu'une fois ; la table n'est pas modifiée.

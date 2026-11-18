@@ -9,10 +9,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { scriptFacts, type ScriptFacts } from '../doctor';
+import { COMPAT_FIXES } from '../scriptcompat';
+import { vpxWithScript } from './fixtures';
 
 const APP_DIST = path.join(__dirname, '..', '..', '..', '..', 'app', 'dist');
 
 interface VbsApi {
+  readScript(exe: string | undefined, table: string, dataDir: string): Promise<ScriptFacts | { error: string }>;
   cachedScript(table: string, dataDir: string): ScriptFacts | undefined;
   rememberScript(table: string, facts: ScriptFacts, dataDir: string): void;
   forgetScriptCache(): void;
@@ -59,6 +62,50 @@ test('scripts.json : lu une seule fois pour cent tables, relu dès qu’il chang
     assert.equal(reads, 2);
   } finally {
     nodeFs.readFileSync = realRead;
+    vbs.forgetScriptCache();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// 18/11/2026 : le correctif executeGlobalOnce (clignotements analysés par l'antivirus) a été publié sans changer
+// FACTS_VERSION ; sur une borne, les lectures gardées en cache dataient de la veille, ne le réclamaient pas, et le
+// médecin, qui s'y fie sans relire le script, ne l'a jamais appliqué (Daredevil, Hellboy). Invariant : une lecture
+// faite par une version qui ne connaissait pas tous les correctifs de script d'aujourd'hui est refaite, dans le .vpx,
+// sans lancer VPX.
+test('scripts.json : une lecture d’avant un correctif de script est refaite, sans lancer VPX', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-scripts-cache-'));
+  try {
+    const dataDir = path.join(dir, 'data');
+    fs.mkdirSync(path.join(dataDir, 'cache'), { recursive: true });
+    const flash = [
+      'Sub FlashForMs(MyLight, TotalPeriod, BlinkPeriod, FinalState)',
+      '  ExecuteGlobal "Sub " & MyLight.Name & "_Timer:Me.Visible = 0:End Sub"',
+      'End Sub',
+      '',
+    ].join('\r\n');
+    const tables = ['Daredevil.vpx', 'Hellboy.vpx'].map((name) => path.join(dir, name));
+    for (const table of tables) fs.writeFileSync(table, vpxWithScript(flash));
+    const cacheFile = path.join(dataDir, 'cache', 'scripts.json');
+    const before = scriptFacts('');
+    const stale = (table: string, fixes?: string) => {
+      const stat = fs.statSync(table);
+      return { size: stat.size, mtimeMs: stat.mtimeMs, facts: before, v: 12, ...(fixes === undefined ? {} : { fixes }) };
+    };
+    // Une lecture sans la liste (versions d'avant ce test), une autre faite quand executeGlobalOnce n'existait pas.
+    const older = COMPAT_FIXES.filter((f) => f !== 'executeGlobalOnce').join(',');
+    fs.writeFileSync(cacheFile, JSON.stringify({ [tables[0]!.toLowerCase()]: stale(tables[0]!), [tables[1]!.toLowerCase()]: stale(tables[1]!, older) }));
+    vbs.forgetScriptCache();
+
+    assert.ok(vbs.cachedScript(tables[0]!, dataDir)?.coreCompat?.includes('executeGlobalOnce'), 'cachedScript : relue');
+    // readScript avec un VPX qui n'existe pas : la lecture refaite ne le lance pas.
+    const read = await vbs.readScript(path.join(dir, 'VPinballX64.exe'), tables[1]!, dataDir);
+    assert.ok(!('error' in read) && read.coreCompat?.includes('executeGlobalOnce'), 'readScript : relue sans VPX');
+    const saved = JSON.parse(fs.readFileSync(cacheFile, 'utf8')) as Record<string, { fixes?: string }>;
+    for (const table of tables) assert.equal(saved[table.toLowerCase()]?.fixes, COMPAT_FIXES.join(','));
+    // Ensuite, fraîche : reprise telle quelle.
+    vbs.forgetScriptCache();
+    assert.ok(vbs.cachedScript(tables[1]!, dataDir)?.coreCompat?.includes('executeGlobalOnce'));
+  } finally {
     vbs.forgetScriptCache();
     fs.rmSync(dir, { recursive: true, force: true });
   }

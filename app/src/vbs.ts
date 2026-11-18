@@ -13,7 +13,7 @@
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { readVpxScript, saveOrWarn, scriptFacts, t, writeFileAtomic, type ScriptFacts } from '@cyberpinball/core';
+import { COMPAT_FIXES, readVpxScript, saveOrWarn, scriptFacts, t, writeFileAtomic, type ScriptFacts } from '@cyberpinball/core';
 
 export type ScriptResult = ScriptFacts | { error: string };
 
@@ -23,12 +23,26 @@ interface CacheEntry {
   facts: ScriptFacts;
   /** Version de la lecture : une entrée plus ancienne est relue (2 : dossier DMD, 3 : appels PuP, 4 : interrupteur du PuP, 5 : DMD dessiné par la table, 6 : interrupteur relayé par une autre variable et PuP-DMD, 7 : nom du jeu pour B2S et déclencheurs D envoyés par le script, 8 : ce que le core.vbs actuel refuse, 9 : musique jouée par PlayMusic, 10 : options de table du DMD, 11 : pièce VR). */
   v?: number;
+  /** Correctifs de script que la lecture savait repérer (COMPAT_FIXES) : une lecture d'avant un correctif est refaite. */
+  fixes?: string;
 }
 
 const FACTS_VERSION = 12;
+/** Un correctif de script ajouté rend les lectures plus anciennes périmées, sans numéro à penser à changer. */
+const FACTS_FIXES = COMPAT_FIXES.join(',');
 
 function fresh(entry: CacheEntry | undefined, stat: fs.Stats): entry is CacheEntry {
-  return Boolean(entry && entry.v === FACTS_VERSION && entry.size === stat.size && entry.mtimeMs === stat.mtimeMs);
+  return Boolean(entry && entry.v === FACTS_VERSION && entry.fixes === FACTS_FIXES && entry.size === stat.size && entry.mtimeMs === stat.mtimeMs);
+}
+
+/** Une entrée pour ce fichier tel qu'il est, faite par cette version de la lecture. */
+function cacheEntry(stat: fs.Stats, facts: ScriptFacts): CacheEntry {
+  return { size: stat.size, mtimeMs: stat.mtimeMs, facts, v: FACTS_VERSION, fixes: FACTS_FIXES };
+}
+
+/** Lecture d'une version précédente pour la même table, sans changement du fichier. */
+function sameFile(entry: CacheEntry | undefined, stat: fs.Stats): CacheEntry | undefined {
+  return entry && entry.size === stat.size && entry.mtimeMs === stat.mtimeMs ? entry : undefined;
 }
 
 const TIMEOUT_MS = 60_000;
@@ -49,6 +63,14 @@ export async function readScript(exe: string | undefined, table: string, dataDir
   const key = table.toLowerCase();
   const cached = cache[key];
   if (fresh(cached, stat)) return withPlayedScript(table, cached.facts);
+  // Lecture d'une version précédente, table inchangée : relue dans le .vpx sans lancer VPX (même texte que
+  // -ExtractVBS). Sans cela, chaque nouvelle lecture relançait VPX une seconde par table.
+  const previous = sameFile(cache[key], stat);
+  if (previous) {
+    const text = readVpxScript(table);
+    if (text === undefined) return withPlayedScript(table, previous.facts);
+    return remember(scriptFacts(text));
+  }
   // Pas de VPX pour extraire le script (pas encore installé) : celui écrit dans le .vpx, lu sans lui.
   if (!exe) return fromTable(t('VPX n’est pas installé : le script n’a pas pu être lu.'));
 
@@ -74,7 +96,7 @@ export async function readScript(exe: string | undefined, table: string, dataDir
 
   /** Le cache garde ce que dit le .vpx ; le .vbs posé à côté s'y ajoute à chaque lecture (withPlayedScript). */
   function remember(facts: ScriptFacts): ScriptFacts {
-    cache[key] = { size: stat.size, mtimeMs: stat.mtimeMs, facts, v: FACTS_VERSION };
+    cache[key] = cacheEntry(stat, facts);
     saveCache(cacheFile, cache);
     return withPlayedScript(table, facts);
   }
@@ -210,7 +232,7 @@ export function rememberScript(table: string, facts: ScriptFacts, dataDir: strin
   const cacheFile = path.join(dataDir, 'cache', 'scripts.json');
   const cache = loadCache(cacheFile);
   const stat = fs.statSync(table);
-  cache[table.toLowerCase()] = { size: stat.size, mtimeMs: stat.mtimeMs, facts, v: FACTS_VERSION };
+  cache[table.toLowerCase()] = cacheEntry(stat, facts);
   saveCache(cacheFile, cache);
 }
 
@@ -225,7 +247,7 @@ export function cachedScript(table: string, dataDir: string): ScriptFacts | unde
   const entry: CacheEntry | undefined = cache[table.toLowerCase()];
   try {
     const stat = fs.statSync(table);
-    const old = entry !== undefined && entry.size === stat.size && entry.mtimeMs === stat.mtimeMs ? entry : undefined;
+    const old = sameFile(entry, stat);
     if (fresh(entry, stat)) return withPlayedScript(table, entry.facts);
     // Lecture d'une version précédente pour la même table : relue dans le .vpx, sans lancer
     // VPX (même texte que -ExtractVBS). Sans elle, la santé de la borne et la préparation des
@@ -235,7 +257,7 @@ export function cachedScript(table: string, dataDir: string): ScriptFacts | unde
       // Script protégé : l'ancienne lecture sert encore (la ROM y est).
       if (text === undefined) return withPlayedScript(table, old.facts);
       const facts = scriptFacts(text);
-      cache[table.toLowerCase()] = { size: stat.size, mtimeMs: stat.mtimeMs, facts, v: FACTS_VERSION };
+      cache[table.toLowerCase()] = cacheEntry(stat, facts);
       saveCache(cacheFile, cache);
       return withPlayedScript(table, facts);
     }

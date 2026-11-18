@@ -449,6 +449,13 @@ const timerTextOnce: CompatRule = {
 
 const RULES: readonly CompatRule[] = [vpmInitOnce, vrRoomOnScreens, executeGlobalOnce, timerTextOnce];
 
+/**
+ * Les correctifs que cette version sait repérer. Les lectures de script gardées en cache (app/src/vbs.ts) les notent :
+ * une lecture faite avant l'arrivée d'un correctif ne le réclame pas, et le médecin s'y fie sans relire le script
+ * (18/11/2026 : executeGlobalOnce publié, jamais appliqué sur une borne dont les lectures dataient de la veille).
+ */
+export const COMPAT_FIXES: readonly CompatFix[] = RULES.map((r) => r.id);
+
 /** Correctifs dont le script a besoin, d'après son seul texte (code sans commentaires). */
 export function compatFixesFound(code: string): CompatFix[] {
   return RULES.filter((r) => r.found(code)).map((r) => r.id);
