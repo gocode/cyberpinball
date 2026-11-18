@@ -1,6 +1,7 @@
 // « Retours et propositions » (Menu système > Cyber Pinball) : le seul formulaire des retours, où mènent
 // aussi l'écran d'un plantage de VPX, la fiche technique et l'appli du téléphone :
-// chaque porte peut y mener, sans y obliger.
+// chaque porte peut y mener, sans y obliger. Une partie échouée et le Diagnostic d'une table ont
+// en plus « Envoyer un rapport aux développeurs » : un appui, le problème déjà connu (openSendReport).
 //   - L'accueil : le tableau public des propositions, les plus demandées d'abord, par nature (onglets) ;
 //     Start sur une proposition : son détail, où l'on vote. Puis « Proposer une idée », « Signaler un
 //     problème » et le réglage des rapports de plantage automatiques.
@@ -13,6 +14,7 @@
 
 import {
   crashDue,
+  crashSignature,
   maskWords,
   noteCrashSent,
   PROPOSAL_KIND_VIEW,
@@ -48,6 +50,50 @@ export interface FeedbackContext {
   attach?: boolean;
   /** Description déjà écrite (« Décrire le problème » de la fiche technique). */
   text?: string;
+}
+
+/**
+ * Ce que sait l'écran « Envoyer un rapport aux développeurs » : un problème vu par Cyber Pinball
+ * (partie échouée, Diagnostic d'une table), envoyé en un appui, sans rien écrire.
+ */
+export interface DevReport {
+  /** Ligne du problème (« Glass Lagoon · VPX arrêté : accès mémoire (0xC0000005) »). */
+  about: string;
+  table?: string;
+  /** Regroupe les rapports d'un même problème (crashSignature). */
+  signature: string;
+  /** Constats joints (Diagnostic d'une table), une ligne chacun. */
+  findings?: string[];
+  /** Le rapport automatique de ce plantage est déjà parti : seule la description du joueur reste à envoyer. */
+  notified?: boolean;
+}
+
+/**
+ * Le rapport du Diagnostic d'une table : ses constats (titre et détail), ce qui vient d'être réparé, et
+ * une signature qui regroupe les mêmes constats sur la même table.
+ */
+export function doctorReport(table: { id: string; title: string }, findings: readonly { code: string; title: string; detail?: string }[], repaired: readonly string[] = []): DevReport {
+  const codes = [...new Set(findings.map((f) => f.code))].sort();
+  return {
+    about: [table.title, t('Diagnostic'), findings.length ? tn(findings.length, '{n} constat', '{n} constats') : t('Aucun problème détecté')].join(' · '),
+    table: table.title,
+    signature: crashSignature('diagnostic', codes.join('+') || 'aucun', table.id),
+    findings: [...findings.map((f) => (f.detail ? `${f.title} : ${f.detail}` : f.title)), ...repaired.map((fix) => t('Réparé : {fix}', { fix }))],
+  };
+}
+
+/** Ce qu'a fait un plantage (crashed) : question à poser, rapport parti, déjà parti aujourd'hui, ou envois refusés. */
+export type CrashOutcome = 'ask' | 'sent' | 'known' | 'off';
+
+/**
+ * Ce qu'un plantage change sur l'écran de la partie échouée : la question des rapports automatiques à
+ * poser en quittant, ou, le rapport parti, l'encart « L'équipe a été prévenue 👌 » sous l'erreur
+ * (frontend.js) et le flipper qui n'ajoute plus que des détails.
+ */
+export function noteCrashOutcome(message: { report?: { consent?: boolean; notified?: boolean } }, outcome: CrashOutcome): void {
+  if (!message.report) return;
+  if (outcome === 'ask') message.report.consent = true;
+  if (outcome === 'sent' || outcome === 'known') message.report.notified = true;
 }
 
 export interface FeedbackMenuContext {
@@ -367,16 +413,103 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
   }
 
   /**
-   * Un plantage : parti tout de suite avec l'accord (une fois par jour pour un même plantage) ;
-   * vrai quand la question n'a jamais été posée (l'appelant la pose, askConsent).
+   * Un plantage : parti tout de suite avec l'accord (une fois par jour pour un même plantage).
+   * 'ask' : la question n'a jamais été posée (l'appelant la pose, askConsent) ; 'sent' et 'known' :
+   * les développeurs ont le rapport (parti maintenant, ou déjà aujourd'hui) et l'écran le dit ;
+   * 'off' : envois refusés, l'écran propose de l'envoyer quand même.
    */
-  function crashed(signature: string, table: string | undefined, about: string): boolean {
-    if (state.crashes === 'ask') return true;
-    if (!crashDue(state, signature)) return false;
+  function crashed(signature: string, table: string | undefined, about: string): CrashOutcome {
+    if (state.crashes === 'ask') return 'ask';
+    if (state.crashes !== 'yes') return 'off';
+    if (!crashDue(state, signature)) return 'known';
     state = noteCrashSent(state, signature);
     save();
     void ctx.service.sendReport({ v: 1, kind: 'crash', signature, text: about, ...(table ? { table } : {}), version: ctx.version, lang: ctx.language(), borne: state.borne, at: Date.now() }, ctx.techReport(about));
-    return false;
+    return 'sent';
+  }
+
+  // ---------- Envoyer un rapport aux développeurs ----------
+
+  /**
+   * Un appui suffit : le problème est déjà connu (partie échouée, Diagnostic d'une table), le rapport
+   * technique part avec lui ; une description reste possible, jamais exigée. Un plantage dont le
+   * rapport automatique est déjà parti (`notified`) le dit, et n'envoie que la description.
+   */
+  function openSendReport(report: DevReport, back: () => void): void {
+    let text = '';
+    let sending = false;
+    let result: 'sent' | 'queued' | 'failed' | undefined;
+    const findings = report.findings ?? [];
+    const send = async () => {
+      sending = true;
+      changed();
+      const body = [report.about, ...findings.map((f) => `- ${f}`), ...(text ? ['', text] : [])].join('\n');
+      const envelope: ReportEnvelope = { v: 1, kind: 'report', signature: report.signature, text: body, ...(report.table ? { table: report.table } : {}), version: ctx.version, lang: ctx.language(), borne: state.borne, at: Date.now() };
+      // Déjà prévenus : le rapport technique est parti avec le rapport automatique, il ne repart pas.
+      result = await ctx.service.sendReport(envelope, report.notified ? undefined : ctx.techReport(body));
+      sending = false;
+      // Envoyé à la main : un « Oui » à la question des rapports automatiques ne le renvoie pas aujourd'hui.
+      if (result !== 'failed') {
+        state = noteCrashSent(state, report.signature);
+        save();
+      }
+      ctx.log(`Retours : rapport aux développeurs (${report.signature}) : ${result}.`); // i18n-ignore : journal
+      changed();
+    };
+    const build = (): Built => {
+      const head: Row[] = [{ icon: 'alert', text: report.about, tone: 'warning' }];
+      if (report.notified) head.push({ icon: 'check', text: t('Les développeurs ont été prévenus de ce plantage'), detail: t('Le rapport automatique est parti : ils vont l’examiner. Ce que vous faisiez à ce moment les aidera.'), tone: 'ok', badges: [t('✓ Prévenus')] });
+      const what: Row[] = report.notified
+        ? [{ icon: 'edit', text: t('Votre description, ce plantage rappelé'), detail: t('Le rapport technique est déjà parti : il ne repart pas') }]
+        : [
+            ...(findings.length ? [{ icon: 'list' as const, text: t('Le diagnostic de la table'), detail: findings.slice(0, 3).join(' · ') + (findings.length > 3 ? ' …' : '') }] : []),
+            { icon: 'report', text: t('La fiche technique, la santé de la borne et les journaux'), detail: t('Ce qu’envoie « Envoyer un rapport » de la fiche technique') },
+          ];
+      what.push({ icon: 'lock', text: t('Chiffré pour les développeurs, anonymisé'), detail: t('Ni votre nom, ni le nom du PC, ni adresse IP, ni noms d’amis'), tone: 'info' });
+      const sections: Built['sections'] = [{ rows: head }];
+      if (result === 'sent') sections.push({ rows: [{ icon: 'check', text: t('Rapport envoyé aux développeurs'), detail: t('Chiffré : seuls les développeurs peuvent le lire. Ils vont l’examiner.'), tone: 'ok', badges: [t('✓ Envoyé')] }] });
+      else if (result === 'queued') sections.push({ rows: [{ icon: 'clock', text: t('Envoi en attente'), detail: t('La borne n’est pas en ligne : il partira tout seul dès qu’elle le sera'), tone: 'info', badges: [t('En attente')] }] });
+      else if (result === 'failed') sections.push({ rows: [{ icon: 'alert', text: t('Rapport non envoyé'), detail: t('Écriture impossible dans les données de la borne'), tone: 'error' }] });
+      else sections.push({ title: t('Ce qui part'), rows: what });
+      const actions: Action[] = [];
+      if (result === 'sent' || result === 'queued') actions.push({ label: t('Retour'), icon: 'back', tone: 'ok', run: back });
+      else {
+        const ready = !sending && (!report.notified || Boolean(text));
+        actions.push({
+          label: report.notified ? t('Envoyer ma description') : t('Envoyer le rapport'),
+          detail: sending ? t('Envoi en cours…') : ready ? t('Aux développeurs · chiffré, anonymisé') : t('Indisponible : décrivez d’abord ce qui s’est passé'),
+          icon: 'upload',
+          tone: ready ? 'ok' : 'quiet',
+          key: 'devreport:send',
+          run: () => (ready ? void send() : show(build)),
+        });
+        actions.push({
+          label: t('Décrire ce qui s’est passé'),
+          detail: text ? `« ${text.length > 60 ? `${text.slice(0, 60)}…` : text} »` : t('Facultatif : ce que vous faisiez, depuis quand, ce que vous avez essayé'),
+          icon: 'edit',
+          key: 'devreport:text',
+          ...(report.notified && !text ? { attention: true } : {}),
+          run: () =>
+            ctx.prompt(t('Description'), t('Les détails'), text, (value) => {
+              if (value !== undefined) text = cleanProposalText(value.slice(0, 2000)) ?? '';
+              show(build);
+            }, t('Lue par les développeurs seuls. Ni nom, ni adresse, ni numéro de téléphone.')),
+        });
+        if (!report.notified && ctx.openReportContents) actions.push({ label: t('Voir le contenu du rapport'), icon: 'eye', key: 'devreport:contents', run: () => ctx.openReportContents!(() => show(build)) });
+        actions.push({ label: t('Retour'), icon: 'back', run: back });
+      }
+      return {
+        heading: report.notified ? t('Ajouter des détails pour les développeurs') : t('Envoyer un rapport aux développeurs'),
+        icon: 'report',
+        ...(report.table ? { subheading: report.table } : {}),
+        lead: report.notified ? undefined : t('Un rapport anonymisé aide les développeurs à corriger ce problème pour tout le monde.'),
+        hint: t('Flippers : choisir · Start : écrire, envoyer · Exit : revenir'),
+        sections,
+        actions,
+        back,
+      };
+    };
+    show(build);
   }
 
   /** La question du premier plantage. `then` : là où l'on va ensuite (le menu, la roue). */
@@ -417,6 +550,8 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     openForm: (context: FeedbackContext, back: () => void, kind: ProposalKind = 'bug') => openForm({ kind, title: '', text: context.text ?? '', attach: context.attach ?? kind === 'bug', context }, back),
     crashed,
     askConsent,
+    /** « Envoyer un rapport aux développeurs » : écran d'une partie échouée, Diagnostic d'une table. */
+    openSendReport,
     consent: () => state.crashes,
     detail: () => {
       const n = ctx.service.list().length;

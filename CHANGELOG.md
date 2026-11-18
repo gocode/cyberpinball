@@ -11,6 +11,9 @@ son interface).
 
 ## 0.1.16
 
+- Partie échouée : un flipper envoie un rapport aux développeurs d'un seul appui (le problème déjà rappelé, la fiche technique jointe, chiffré et anonymisé), une description restant facultative.
+- Plantage de VPX dont le rapport automatique est parti : un encart 👌 sous l'erreur dit que l'équipe a été prévenue et va l'examiner ; le flipper n'y ajoute plus que vos détails.
+- Diagnostic d'une table : « Envoyer un rapport aux développeurs » joint les constats, ce qui vient d'être réparé, la fiche technique et les journaux.
 - Autres versions de VPX : une table peut se jouer avec un VPX déjà installé sur le PC (10.8.0, 10.7…), comme dans PinUP Popper. Il s'ajoute dans Menu système > Borne > Autres versions de VPX, où ceux des autres installations (PinUP Popper, PinballX, dossier de VPX) sont proposés d'office ; il se choisit ensuite dans la fiche de la table (Gérer la table, « Jouée avec ») et dans le plan d'installation d'une table. Tant qu'aucun autre VPX n'est ajouté, rien de cela n'apparaît.
 - Une table reprise de PinUP Popper garde le VPX qui la jouait : Cyber Pinball lit l'émulateur et l'ALTEXE de chaque table dans la base de Popper, et le plan d'installation reprend ce VPX s'il est dans la liste.
 - Cyber Pinball lance cet autre VPX avec ses propres réglages (écrans, fronton, DMD, VPinMAME, B2S Server, PinUP Player), sans jamais écrire dans son dossier. La réalité virtuelle, le réglage de l'affichage en partie, les parties entre amis, la Vision 3D, les réglages de VPX de Cyber Pinball et la préparation des PuP-Packs restent réservés à son propre VPX ; la fiche le dit.

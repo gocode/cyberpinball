@@ -301,7 +301,7 @@ import { findComponent } from '@cyberpinball/installer';
 import { createHealth } from './health';
 import { collectTechFacts, loadTechFacts, recentErrors, saveTechFacts } from './tech-facts';
 import { createTechSheet } from './tech-sheet';
-import { createFeedbackMenu } from './feedback-menu';
+import { createFeedbackMenu, doctorReport } from './feedback-menu';
 import { launchAttachments } from './launch-evidence';
 import { isShown, primaryRect, refuseOffscreen } from './offscreen';
 import { installationHints } from './installation-hints';
@@ -3037,6 +3037,16 @@ export function createLibrary(host: LibraryHost) {
       const index = actions.push({ label: t('Ignorer « {title} »', { title: same[0]!.title }), detail: t('Ne plus le signaler pour cette table'), tone: 'quiet', run: () => setIgnored(s, code, true) }) - 1;
       // Un constat sans réparation mène à son « Ignorer ».
       for (const f of same) if (!f.fix) rows[findings.indexOf(f)]!.action = index;
+    }
+    // Un rapport aux développeurs, d'un appui : les constats de cette table, la fiche technique et les journaux.
+    if (feedback && s.findings) {
+      actions.push({
+        label: t('Envoyer un rapport aux développeurs'),
+        detail: findings.length ? tn(findings.length, 'Ce constat, la fiche technique et les journaux · chiffré', 'Ces {n} constats, la fiche technique et les journaux · chiffré') : t('Un souci que le diagnostic ne voit pas : la fiche technique et les journaux · chiffré'),
+        icon: 'report',
+        key: 'doctor:report',
+        run: () => feedback.openSendReport(doctorReport(table, findings, s.log), () => go(s)),
+      });
     }
     const ignoredRows: Row[] = [];
     for (const code of [...new Set((s.ignored ?? []).map((f) => f.code))]) {

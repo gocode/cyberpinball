@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Failed game: a flipper sends a report to the developers in one press (the problem already filled in, the technical sheet attached, encrypted and anonymised), a description remaining optional.
+- VPX crash whose automatic report has been sent: a 👌 box under the error says the team has been told and will look into it; the flipper then only adds your details.
+- Table Diagnosis: "Send a report to the developers" attaches the findings, what was just repaired, the technical sheet and the logs.
 - Other VPX versions: a table can be played with a VPX already installed on the PC (10.8.0, 10.7…), as in PinUP Popper. It is added in System menu > Cabinet > Other VPX versions, where those of other installations (PinUP Popper, PinballX, VPX folder) are offered right away; it is then chosen on the table's sheet (Manage table, "Played with") and in a table's installation plan. As long as no other VPX is added, none of this shows.
 - A table taken over from PinUP Popper keeps the VPX that played it: Cyber Pinball reads each table's emulator and ALTEXE in Popper's database, and the installation plan keeps that VPX if it is in the list.
 - Cyber Pinball launches that other VPX with its own settings (screens, backglass, DMD, VPinMAME, B2S Server, PinUP Player), without ever writing to its folder. Virtual reality, in-game display adjustment, games with friends, Vision 3D, Cyber Pinball's VPX settings and PuP-Pack preparation stay with its own VPX; the sheet says so.

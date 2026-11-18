@@ -307,6 +307,7 @@ import { detectPinballFx, detectPinballFx3 } from './pinballfx-install';
 import { watchGameLoad, type GameLoadWatch } from './game-load';
 import { createLibrary, type ActionShortcut, type SystemItem, type UiAction } from './library';
 import { createFeedbackService } from './feedback-service';
+import { noteCrashOutcome } from './feedback-menu';
 import { onAppCrash } from './uncaught';
 import { createMenuDmd } from './menu-dmd';
 import { cachedScript } from './vbs';
@@ -617,11 +618,12 @@ export interface Message {
   title: string;
   lines: string[];
   /**
-   * Partie échouée : un flipper ouvre le formulaire des retours, ce problème rappelé (Avis et
-   * propositions, feedback-menu.ts) ; `consent` : la question des rapports automatiques est à poser
-   * en quittant (premier plantage).
+   * Partie échouée : un flipper ouvre « Envoyer un rapport aux développeurs », ce problème rappelé
+   * (feedback-menu.ts) ; `consent` : la question des rapports automatiques est à poser en quittant
+   * (premier plantage) ; `notified` : le rapport automatique est parti, l'écran le dit et le flipper
+   * n'ajoute plus que des détails.
    */
-  report?: { about: string; table: string; signature: string; consent?: boolean };
+  report?: { about: string; table: string; signature: string; consent?: boolean; notified?: boolean };
   /** Ce que fait Start sur ce message. */
   action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'interface' | 'otherFrontend' | 'journey' | 'replay' | 'live' | 'power' | 'orientation';
   /**
@@ -1702,10 +1704,29 @@ function remoteEntries(media = false): MenuEntries {
   if (message.action && guest.allows(MESSAGE_DOORS[message.action])) items.push({ ...toRemoteEntry({ label: t('Valider (Start)'), detail: message.lines[0], icon: 'start' }), pick: () => remotePress('confirm') });
   if (message.report && library.feedback) {
     const r = message.report;
-    items.push({ ...toRemoteEntry({ label: t('Signaler ce problème'), detail: t('Retours et propositions, ce problème rappelé'), icon: 'alert' }), pick: () => library.feedback?.openForm({ about: r.about, table: r.table, signature: r.signature, attach: true }, () => library.leave()) });
+    items.push({
+      ...toRemoteEntry(
+        r.notified
+          ? { label: t('Ajouter des détails pour les développeurs'), detail: t('Ils ont été prévenus de ce plantage'), icon: 'edit' }
+          : { label: t('Envoyer un rapport aux développeurs'), detail: t('Chiffré, anonymisé, ce problème rappelé'), icon: 'report' },
+      ),
+      pick: () => openFailureReport(r),
+    });
   }
   items.push({ ...toRemoteEntry({ label: t('Fermer (Exit)'), icon: 'close', back: true }), pick: () => remotePress('exit') });
   return { kind: 'screen', title: message.title, items, current: -1 };
+}
+
+/**
+ * Partie échouée : « Envoyer un rapport aux développeurs », ou « Ajouter des détails » quand le rapport
+ * automatique est déjà parti. En revenant, la question des rapports automatiques si elle reste à poser
+ * (premier plantage), sinon la roue.
+ */
+function openFailureReport(r: NonNullable<Message['report']>): void {
+  const feedback = library.feedback;
+  if (!feedback) return;
+  const back = () => (r.consent && feedback.consent() === 'ask' ? feedback.askConsent(r.signature, r.table, r.about, () => library.leave()) : library.leave());
+  feedback.openSendReport({ about: r.about, table: r.table, signature: r.signature, ...(r.notified ? { notified: true } : {}) }, back);
 }
 
 /**
@@ -4208,10 +4229,9 @@ function handleKey(input: Input, fromPhone = false): boolean {
     case 'jukebox':
       return jukeboxPlayer.handleKey(input);
     case 'message':
-      // Partie échouée : un flipper ouvre le formulaire des retours, ce problème déjà rappelé.
+      // Partie échouée : un flipper ouvre « Envoyer un rapport aux développeurs », ce problème déjà rappelé.
       if (state.message?.report && library.feedback && (is(KEYS.next) || is(KEYS.previous))) {
-        const r = state.message.report;
-        library.feedback.openForm({ about: r.about, table: r.table, signature: r.signature, attach: true }, () => library.leave());
+        openFailureReport(state.message.report);
         return true;
       }
       if (!is(KEYS.confirm) && !is(KEYS.exit)) return false;
@@ -5196,7 +5216,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     const repaired = result.failure === 'dialog' && result.message ? repairScriptStop(table, result.message) : undefined;
     const message = explain(result, table, repaired, Boolean(double), changedFiles);
     // Plantage de VPX : le rapport automatique (avec l'accord), ou la question au premier plantage, en quittant l'écran.
-    if (result.failure === 'crash' && message.report && library.feedback?.crashed(message.report.signature, table.title, message.report.about)) message.report.consent = true;
+    if (result.failure === 'crash' && message.report && library.feedback) noteCrashOutcome(message, library.feedback.crashed(message.report.signature, table.title, message.report.about));
     state = { ...state, phase: 'message', message };
   }
   // Configuration de la borne changée juste avant la partie : VPX avait déjà les bons

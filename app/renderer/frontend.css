@@ -2472,6 +2472,52 @@ html.power-phase body,
   color: var(--quiet);
 }
 
+/*
+ * Plantage dont le rapport automatique est parti : l'encart « L'équipe a été prévenue », sous
+ * l'erreur, dans la colonne du message (mêmes bords que le texte). Vert signal sur un lavis, sans
+ * lueur (rien à couper au bord de l'écran qui défile).
+ */
+.team-notified {
+  display: flex;
+  align-items: center;
+  gap: 2.4cqmin;
+  margin-top: 2.6cqmin;
+  padding: 2cqmin 3.2cqmin 2cqmin 2.2cqmin;
+  border: 1px solid var(--signal-haze);
+  border-radius: 1.6cqmin;
+  background: var(--signal-wash);
+}
+
+.team-notified-mark {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 7cqmin;
+  height: 7cqmin;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--signal) 16%, transparent);
+  font-family: 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  font-size: 4cqmin;
+  line-height: 1;
+}
+
+.team-notified-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4cqmin;
+  min-width: 0;
+  font-size: 2.4cqmin;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.team-notified strong {
+  font-size: 2.9cqmin;
+  font-weight: 600;
+  color: var(--signal);
+}
+
 /* ---------- Écrans secondaires ---------- */
 
 /*

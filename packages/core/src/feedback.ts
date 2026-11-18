@@ -358,7 +358,7 @@ export function saveFeedbackState(dataDir: string, state: FeedbackState): void {
 }
 
 /** Signature d'un plantage, pour le regrouper : « vpx:0xC0000005:Glass Lagoon », « app:exception:<empreinte> ». */
-export function crashSignature(source: 'vpx' | 'app', code: string, detail = ''): string {
+export function crashSignature(source: 'vpx' | 'app' | 'diagnostic', code: string, detail = ''): string {
   return `${source}:${code}:${detail}`.slice(0, 200);
 }
 

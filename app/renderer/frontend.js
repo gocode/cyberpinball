@@ -73,6 +73,17 @@ function keysGrid(title, rows) {
   return box;
 }
 
+/** Encart d'un plantage dont le rapport automatique est parti : l'équipe est prévenue, rien à faire. */
+function teamNotified() {
+  const card = el('div', 'team-notified');
+  card.setAttribute('role', 'status');
+  card.append(el('span', 'team-notified-mark', '👌'));
+  const text = el('div', 'team-notified-text');
+  text.append(el('strong', '', t('L’équipe a été prévenue')), el('span', '', t('Le rapport de ce plantage est parti automatiquement aux développeurs : ils vont l’examiner.')));
+  card.append(text);
+  return card;
+}
+
 /** Pied de page : chaque commande est aussi cliquable (code de la touche équivalente). */
 /**
  * Bandeau d'aide : « Start : fiche » (« Start: game page » en anglais, sans espace avant
@@ -1328,9 +1339,13 @@ function drawPlayfield(s) {
     cover.append(el('h1', '', s.message.title));
     const box = el('div', 'message');
     for (const line of s.message.lines) box.append(el('p', /^\d{4}-\d\d-\d\d /.test(line) ? 'log' : '', line));
+    // Plantage dont le rapport automatique est parti : l'encart « L'équipe a été prévenue », sous l'erreur,
+    // dans sa colonne (mêmes bords que le texte).
+    if (s.message.report?.notified) box.append(teamNotified());
     cover.append(box);
-    // Une partie échouée : un flipper ouvre le formulaire des retours (Retours et propositions), ce problème rappelé.
-    const report = s.message.report ? [[t('Flipper : signaler ce problème'), s.nav.next]] : [];
+    // Une partie échouée : un flipper envoie un rapport aux développeurs, ce problème rappelé ; le rapport
+    // automatique déjà parti (l'encart le dit), il n'ajoute plus que des détails.
+    const report = s.message.report ? [[s.message.report.notified ? t('Flipper : ajouter des détails pour les développeurs') : t('Flipper : envoyer un rapport aux développeurs'), s.nav.next]] : [];
     if (s.message.action === 'addTable') cover.append(footer([[t('Ajouter une table'), s.nav.confirm], [t('Menu système'), s.nav.exit]]));
     // Partie échouée : Start mène au parcours « Ce qu'il manque pour jouer » (clic compris).
     else if (s.message.action === 'journey') cover.append(footer([[t('Start : voir ce qu’il manque pour jouer'), s.nav.confirm], [t('Exit : revenir au front-end'), s.nav.exit], ...report]));
