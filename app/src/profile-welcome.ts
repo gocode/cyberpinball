@@ -11,7 +11,7 @@
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec un réseau coupé.
 
-import { avatarView, hasDefaultName, NAME_MAX, NAME_MIN, t } from '@cyberpinball/core';
+import { avatarView, formatDate, hasDefaultName, NAME_MAX, NAME_MIN, t, tn, type AccountCopy } from '@cyberpinball/core';
 import type { AvatarMenu } from './avatar-menu';
 import { onGesture } from './gesture-flash';
 import type { Action, Built, Row } from './library';
@@ -33,6 +33,11 @@ export interface ProfileWelcomeHost {
    * se pose (invitations.ts, inviterAsked) ; `chosen`, le pseudo déjà choisi.
    */
   invite?: { asked(): boolean; chosen(): string | undefined; open(back: () => void): void };
+  /**
+   * Mon compte (account-menu.ts) : le compte d'une installation d'avant, trouvé dans la copie de secours
+   * de ce PC, proposé d'office ; « J'ai déjà un compte » (code, mot de passe, sauvegarde).
+   */
+  account?: { offer(): AccountCopy | undefined; openCopy(copy: AccountCopy, back: () => void): void; openRestore(back: () => void): void };
 }
 
 export interface ProfileWelcome {
@@ -47,7 +52,8 @@ const AVATAR_AT = 1;
 export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
   // « Qui vous a fait découvrir… » se glisse avant « Continuer » tant que la question se pose.
   const inviteShown = () => Boolean(host.invite && (host.invite.asked() || host.invite.chosen()));
-  const CONTINUE_AT_ = () => (inviteShown() ? 3 : 2);
+  const ALREADY_AT = 2;
+  const CONTINUE_AT_ = () => 2 + (host.account ? 1 : 0) + (inviteShown() ? 1 : 0);
   let done: () => void = () => undefined;
   let flash: Row | undefined;
   // Montré à chaque dessin jusqu'au geste suivant, jamais effacé par build() (gesture-flash.ts).
@@ -56,6 +62,9 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
   const me = () => host.net.state();
   const show = (at: number) => host.library.openCustom(build, at);
   const named = () => !hasDefaultName(me());
+  // « Créer un nouveau compte » : la copie trouvée n'est plus proposée jusqu'au prochain démarrage.
+  let declined = false;
+  const found = () => (declined || named() ? undefined : host.account?.offer());
 
   function askName(): void {
     const s = me();
@@ -83,7 +92,42 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
     show(NAME_AT);
   }
 
+  /** Une installation d'avant a laissé son compte sur ce PC : le reprendre, en prendre un autre, ou repartir de zéro. */
+  function buildFound(copy: AccountCopy): Built {
+    const c = copy.summary;
+    const view = avatarView(c.key, c.name, undefined);
+    return {
+      heading: t('Votre profil de joueur'),
+      icon: 'account',
+      avatar: view,
+      subheading: t('Un compte a été trouvé sur ce PC'),
+      lead: t('Bienvenue ! Cyber Pinball a déjà été installé sur ce PC : votre compte est prêt à être repris, avec son niveau, ses badges et ses amis.'),
+      sections: [
+        {
+          rows: [
+            {
+              text: t('{name} · niveau {level} · {badges}', { name: c.name, level: c.level, badges: tn(c.badges, '{n} badge', '{n} badges') }),
+              detail: t('Copie de secours du {date} · {friends}', { date: formatDate(new Date(c.at)), friends: tn(c.friends, '{n} ami', '{n} amis') }),
+              tone: 'ok',
+              badges: [t('Trouvé')],
+              avatar: view,
+            },
+          ],
+        },
+      ],
+      actions: [
+        { label: t('Reprendre le compte de {name}', { name: c.name }), detail: t('Pseudo, avatar, niveau, badges et amis'), icon: 'restore', tone: 'ok', run: () => host.account!.openCopy(copy, () => show(0)) },
+        { label: t('Reprendre un autre compte…'), detail: t('Code de récupération, mot de passe ou sauvegarde'), icon: 'account', run: () => host.account!.openRestore(() => show(1)) },
+        { label: t('Créer un nouveau compte'), detail: t('Un nouveau pseudo, sans niveau ni ami'), icon: 'plus', run: () => ((declined = true), show(NAME_AT)) },
+      ],
+      // Exit ne décide rien : l'écran reste, le choix est à faire.
+      back: () => show(0),
+    };
+  }
+
   function build(): Built {
+    const copy = found();
+    if (copy) return buildFound(copy);
     const s = me();
     const hasName = named();
     const pictured = Boolean(s.avatar);
@@ -109,6 +153,9 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
         // Revenu sans avatar : la sélection reste dessus, pas sur « Continuer ».
         run: () => host.avatarMenu.open(() => show(me().avatar ? CONTINUE_AT_() : AVATAR_AT)),
       },
+      ...(host.account
+        ? [{ label: t('J’ai déjà un compte…'), detail: t('Code de récupération, mot de passe ou sauvegarde'), icon: 'restore' as const, run: () => host.account!.openRestore(() => show(ALREADY_AT)) } satisfies Action]
+        : []),
       ...(inviteShown() && host.invite
         ? [
             {
@@ -120,7 +167,7 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
           ]
         : []),
       hasName
-        ? { label: t('Continuer'), detail: t('Tout se change plus tard : Menu système > Amis > Partage et réseau'), icon: 'check', ...(pictured ? { tone: 'ok' as const } : {}), run: leave }
+        ? { label: t('Continuer'), detail: t('Tout se change plus tard : Menu système > Mon compte'), icon: 'check', ...(pictured ? { tone: 'ok' as const } : {}), run: leave }
         : { label: t('Continuer'), detail: t('Choisissez d’abord votre pseudo'), icon: 'check', tone: 'quiet', run: leave },
     ];
     return {

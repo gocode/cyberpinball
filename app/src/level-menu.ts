@@ -55,7 +55,7 @@ export interface LevelMenu {
   open(back: () => void): void;
   /** « Mes badges », son « Retour » vers `back`. */
   openBadges(back: () => void): void;
-  /** Menu système > Amis > Mes badges. */
+  /** Menu système > Mon compte > Mes badges. */
   badgesItem: ProvidedSystemItem;
   /** Ce que dit l'entrée « Mon niveau » (accueil Communauté) : palier, niveau, XP restants. */
   detail(): string;
@@ -76,7 +76,7 @@ const GAIN_ICON: Record<XpGain['kind'], IconName> = {
   start: 'history',
   'room-day': 'message',
   friend: 'friend-add',
-  like: 'star',
+  like: 'thumb-up',
   reaction: 'sparkle',
   invited: 'friend-add',
   'invitee-tier': 'upgrade',
@@ -236,7 +236,7 @@ export function createLevelMenu(host: LevelMenuHost): LevelMenu {
             rows: [
               row('message', t('Premier message du jour au salon'), `${XP.roomDay}`),
               row('friend-add', t('Nouvel ami'), `${XP.friend}`),
-              row('star', t('« J’aime » reçu'), `${XP.like}`),
+              row('thumb-up', t('« J’aime » reçu'), `${XP.like}`),
               row('sparkle', t('Réaction reçue'), `${XP.reaction}`),
             ],
           },

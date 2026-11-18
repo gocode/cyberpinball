@@ -42,7 +42,7 @@ function host(over: Record<string, unknown> = {}) {
     scores: () => ({ lines: [{ rank: 1, score: 12_400_250, initials: 'CAM', at: NOW.toISOString() }], games: 1, tableBoard: false, everyGame: true, romWithoutMap: false }),
     rankings: (_t: TableEntry, scope: RankingScope) =>
       scope === 'country'
-        ? { lines: [], players: 0, unavailable: 'Pays non choisi : Amis > Partage et réseau' }
+        ? { lines: [], players: 0, unavailable: 'Pays non choisi : Mon compte > Mon pays' }
         : {
             lines: [{ rank: 1, key: KEY, id: SCORE_ID, name: 'Bruno', country: 'FR', score: 952_100_000, at: NOW.toISOString(), how: 'rom', face: avatarView(KEY, 'Bruno', AVATAR), status: { state: 'playing', label: 'En partie' } }],
             players: 1,
@@ -66,7 +66,7 @@ test('classements au téléphone : le tableau de la borne, rien d’autre (ni cl
   assert.equal(shown.file, ORBITE.file, 'sans table choisie : celle de la borne');
   const { board } = shown;
   assert.deepEqual(board.scopes.map((s) => s.scope), ['cabinet', 'friends', 'country', 'world']);
-  assert.equal(board.scopes.find((s) => s.scope === 'country')?.reason, 'Pays non choisi : Amis > Partage et réseau', 'une portée indisponible, avec sa raison');
+  assert.equal(board.scopes.find((s) => s.scope === 'country')?.reason, 'Pays non choisi : Mon compte > Mon pays', 'une portée indisponible, avec sa raison');
   assert.equal(board.scopes.find((s) => s.scope === 'world')?.reason, undefined);
   const line = board.lines[0]!;
   assert.equal(line.name, 'Bruno');

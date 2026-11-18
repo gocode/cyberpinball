@@ -155,6 +155,10 @@ const CYBER_ICONS = {
   upload: '<path d="M12 15V3M7 8l5-5 5 5M4 17v4h16v-4"/>', // Envoyer un fichier du téléphone vers la borne (le contraire de download).
   credits: '<path d="M11 20.5C6.5 19 4 15 4.5 8M13 20.5C17.5 19 20 15 19.5 8M4.6 9.5C3 8.5 2.6 6.8 3 5c1.6.8 2.2 2.6 1.6 4.5zM5.4 13.8C3.6 13.4 2.5 12 2.3 10.2c1.8.3 3 1.8 3.1 3.6zM7.8 17.6c-1.8.3-3.4-.4-4.4-1.9 1.8-.6 3.5 0 4.4 1.9zM19.4 9.5C21 8.5 21.4 6.8 21 5c-1.6.8-2.2 2.6-1.6 4.5zM18.6 13.8C20.4 13.4 21.5 12 21.7 10.2c-1.8.3-3 1.8-3.1 3.6zM16.2 17.6c1.8.3 3.4-.4 4.4-1.9-1.8-.6-3.5 0-4.4 1.9z"/>', // Laurier ouvert, deux branches de trois feuilles : crédits de la communauté, distinct de l’étoile des favoris et du trophée des scores.
   vr: '<path d="M4 8h16a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-4l-2-3h-4l-2 3H4a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2zM7 8V5h10v3"/>', // Casque de réalité virtuelle et sa sangle : jouer dans le casque.
+
+  // « J'aime » du profil public (profile-menu.ts) : un pouce levé, qu'on comprend sans légende.
+  'thumb-up': '<rect x="2.5" y="10" width="4" height="10.5" rx="1"/><path d="M6.5 11 10.6 3.2c1.6.1 2.7 1.5 2.4 3.1L12.4 9.5H19a2 2 0 0 1 2 2.4l-1.3 6.8a2.2 2.2 0 0 1-2.2 1.8H6.5z"/>', // Pouce levé et sa manchette : aimer un record ou un badge.
+  'thumb-up-filled': '<rect x="3" y="10.5" width="3.5" height="9.5" rx="1"/><path d="M6.5 11.3 10.4 4c1.4.1 2.4 1.4 2.1 2.8L12 10h6.6a1.8 1.8 0 0 1 1.8 2.2l-1.2 6.2a2 2 0 0 1-2 1.6H6.5z"/>', // Pouce compact, rempli par le CSS (theme.css) : vous aimez déjà.
 };
 
 /**

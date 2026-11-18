@@ -53,7 +53,7 @@ export interface GameNoticesOptions {
   place(): { zone: Rect; rotation: Rotation } | undefined;
   /** Partie entre amis : les écrans que la bande peut prendre (DMD, écrans libres, plateau). */
   boardScreens(): LiveBoardScreens | undefined;
-  /** Où le joueur veut voir les scores des amis (Menu système > Amis). */
+  /** Où le joueur veut voir les scores des amis (Menu système > Communauté). */
   scoresSettings?(): LiveScoresSettings;
   /** Ce que la règle voit du DMD, maintenant (dmd-watch.ts) : sans réponse, jamais de scores sur le DMD. */
   dmdVerdict?(): DmdScoreVerdict | undefined;

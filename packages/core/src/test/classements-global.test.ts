@@ -57,7 +57,7 @@ function harness(opts: { sharing?: boolean } = {}) {
     tables: () => TABLES,
     local: (t: TableEntry) => (t.title === 'Lunar Diner' ? { lines: [{ rank: 1, score: 4_200_000, initials: 'JUL', at: '2026-11-12T20:00:00Z' }], games: 3, tableBoard: true, everyGame: true, romWithoutMap: false } : { lines: [], games: 0, tableBoard: false, everyGame: false, romWithoutMap: false }),
     network: (t: TableEntry, scope: RankingScope) => {
-      if (opts.sharing === false) return { lines: [], players: 0, unavailable: 'Partage désactivé : Amis > Partage et réseau' };
+      if (opts.sharing === false) return { lines: [], players: 0, unavailable: 'Partage désactivé : Communauté > Partage et réseau' };
       if (t.title === 'Atlas Rising') return { lines: [line(1, 'Kiko', 12_345_678), line(2, 'Moi', 9_000_000, true)], players: scope === 'world' ? 14 : 3, me: { rank: 2 } };
       if (t.title === 'Copper Comet') return { lines: [], players: 0 };
       return { lines: [], players: 0, unavailable: 'Empreinte de la table en calcul…', pending: true };

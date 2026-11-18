@@ -161,7 +161,7 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   'group-invite': { priority: 10, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friend-request', tone: 'warning', act: { type: 'groups' }, sound: 'news' },
   // Un signalement reçu par un modérateur : au menu, regroupés.
   'room-report': { priority: 8, ttlMs: 60 * MIN, quietMs: MIN, icon: 'alert', tone: 'warning', act: { type: 'moderation' }, sound: 'news' },
-  'player-like': { priority: 18, ttlMs: 60 * MIN, quietMs: MIN, icon: 'star', tone: 'ok', act: { type: 'my-profile' } },
+  'player-like': { priority: 18, ttlMs: 60 * MIN, quietMs: MIN, icon: 'thumb-up', tone: 'ok', act: { type: 'my-profile' } },
   // Une personne que j'ai invitée a fini sa première partie (invitations.ts) : un vrai moment, avec son son.
   'player-invited': { priority: 12, ttlMs: 24 * 60 * MIN, quietMs: MIN, icon: 'friend-add', tone: 'ok', act: { type: 'my-profile' }, sound: 'news' },
   // Une de mes propositions est passée « fait » (feedback.ts, contributions).
@@ -321,7 +321,7 @@ function reasonShort(reason: LiveNoticeReason | undefined): string | undefined {
 }
 
 /** Où retrouver la partie entre amis au clavier ou aux boutons : son entrée, en tête de « Mes amis ». */
-const livePath = () => t('Menu système > Amis > Mes amis');
+const livePath = () => t('Menu système > Communauté > Mes amis');
 
 /**
  * Titre et précision d'un groupe d'évènements du même genre (le premier est le plus ancien).
@@ -380,7 +380,7 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
       const title = last.won ? t('Partie entre amis : vous gagnez !') : last.who ? t('Partie entre amis : {name} gagne', { name: who(last) }) : t('Partie entre amis terminée');
       // Le chemin des résultats d'abord : c'est lui qui reste quand la place manque (frontend.js, fitNotice).
       const place = !last.won && last.place ? t('vous : place {rank} sur {n}', { rank: last.place.rank, n: last.place.of }) : undefined;
-      return fit({ title, detail: [t('Résultats : {path}', { path: t('Menu système > Amis') }), place].filter(Boolean).join(' · ') });
+      return fit({ title, detail: [t('Menu système > Communauté'), place].filter(Boolean).join(' · ') });
     }
     case 'friend-message': {
       // Le dernier message en précision : c'est lui qu'on veut lire.
@@ -437,7 +437,7 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
     case 'friend-online':
       return fit(one ? { title: t('{name} vient de se connecter', { name: who(one) }) } : { title: tn(n, '{n} ami vient de se connecter', '{n} amis viennent de se connecter'), detail: names() });
     case 'friend-request':
-      return fit(one ? { title: t('Demande d’ami : {name}', { name: who(one) }), detail: t('Menu système > Amis > Demandes d’amis') } : { title: tn(n, '{n} demande d’ami', '{n} demandes d’ami'), detail: names() });
+      return fit(one ? { title: t('Demande d’ami : {name}', { name: who(one) }), detail: t('Menu système > Communauté > Demandes d’amis') } : { title: tn(n, '{n} demande d’ami', '{n} demandes d’ami'), detail: names() });
     case 'friend-accepted':
       return fit(one ? { title: t('{name} a accepté votre demande', { name: who(one) }), detail: t('Vous êtes maintenant amis') } : { title: tn(n, '{n} demande acceptée', '{n} demandes acceptées'), detail: names() });
     case 'friend-playing':

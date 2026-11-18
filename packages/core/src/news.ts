@@ -53,6 +53,22 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Demandé par un joueur (Retours et propositions, 18/11/2026) : réinstallé, il avait perdu son niveau.
+    id: 'mon-compte',
+    date: '2026-11-18',
+    version: '0.1.16',
+    get title() { return t('Mon compte'); },
+    get detail() { return t('Votre pseudo, votre niveau, vos badges et vos amis vous suivent sur un autre PC ou après une réinstallation.'); },
+    get more() {
+      return [
+        t('Cyber Pinball garde d’office une copie de secours de votre compte sur ce PC, hors de son dossier : une réinstallation la retrouve et vous propose de la reprendre.'),
+        t('Notez votre code de récupération, 24 mots ou leur QR à photographier, pour retrouver votre compte sur n’importe quel PC. Un mot de passe est possible aussi : votre pseudo devient votre identifiant, et le serveur ne garde qu’une copie chiffrée qu’il ne peut pas ouvrir.'),
+      ];
+    },
+    get where() { return t('Menu système › Mon compte'); },
+    reach: { kind: 'system', id: 'account' },
+  },
+  {
     id: 'autres-vpx',
     date: '2026-11-18',
     version: '0.1.16',

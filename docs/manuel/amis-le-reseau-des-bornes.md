@@ -2,7 +2,7 @@
 
 ## Amis : le réseau des bornes
 
-Menu système > « Amis » relie les bornes entre elles **sans serveur** : chacune trouve les autres et leur parle directement, par Internet ou sur le réseau local.
+Menu système > « Communauté » relie les bornes entre elles **sans serveur** : chacune trouve les autres et leur parle directement, par Internet ou sur le réseau local.
 Le partage est **activé par défaut** ; « Partage et réseau » le coupe.
 
 | Entrée | Ce qu'elle montre |
@@ -178,7 +178,7 @@ Code : [packages/core/src/ratelimit.ts](../../packages/core/src/ratelimit.ts), `
 Deux entrées.
 Profil d'un ami > « Inviter à une partie en direct » : choisir une table (celles qu'il a dans la même version d'abord, voir « Choisir la table d'une partie en direct » plus bas).
 Fiche d'une table > « Jouer avec un ami », juste sous « Jouer » : choisir l'ami (en ligne en tête, ceux qui ont la table dans la même version d'abord, les amis hors ligne grisés dessous).
-Les deux restent visibles quand on ne peut pas inviter, grisées avec leur raison : « Hors ligne : invitez-le quand il sera connecté », « Aucun ami en ligne pour l'instant », « Pas encore d'ami : Menu système > Amis > Trouver un joueur » ; un ami en partie s'invite aussi (« En partie : il recevra une notification discrète sur sa table »).
+Les deux restent visibles quand on ne peut pas inviter, grisées avec leur raison : « Hors ligne : invitez-le quand il sera connecté », « Aucun ami en ligne pour l'instant », « Pas encore d'ami : Menu système > Communauté > Trouver un joueur » ; un ami en partie s'invite aussi (« En partie : il recevra une notification discrète sur sa table »).
 Un salon s'ouvre, l'invitation part ; jusqu'à quatre joueurs (« Inviter un autre ami »).
 Chez l'ami, le carillon d'invitation sonne et « Invitation de … » s'ouvre d'elle-même sur l'écran des tables, dans le menu système et sur l'aide (par-dessus l'écran ouvert, que « Répondre plus tard » rend tel qu'il était), le curseur sur « Répondre plus tard » (avec le temps restant) : un bouton déjà appuyé n'accepte ni ne refuse ; sinon elle attend en tête de « Mes amis », deux minutes au plus.
 La borne y vérifie qu'elle a la même version que celui qui invite, obligatoirement (un score sur lequel se défier, et plus tard des tournois) : le même `.vpx` (empreinte SHA-256, gardée dans `<données>\amis\empreintes.json`) et le même script joué.
@@ -254,7 +254,7 @@ Garde-fou (`LiveDmdTally`) : réglage activé et DMD présent, sans passage apr�
 Un DMD matériel seul (ZeDMD, PIN2DMD) ne peut pas être recouvert.
 **Sur le fronton**, libre ou pris par la table (son B2S, son PuP-Pack ; le journal dit lequel, d'après `occupiedRoles`, relu toutes les 2 s), en permanence : « Partie entre amis » puis une carte par joueur, côte à côte, nom, score en grand, « Bille 2 sur 3 » ; en bas du fronton, comme les compteurs d'un électromécanique, discrète (au plus un cinquième de sa hauteur, sans descendre sous la taille lisible : un fronton peu haut la rejetait sinon vers le plateau) ; sans fronton, au centre du topper.
 Sans fronton ni topper, **un encart au bas du plateau**, dans le coin gauche pour le joueur, tourné avec le plateau : sur le tablier, sous la sortie des couloirs extérieurs, loin de l'écoulement et du couloir de lancement ; une ligne par joueur (nom, score, bille), au plus un dixième de la hauteur du plateau.
-**Au choix du joueur** : Menu système > Amis > « Scores des amis pendant la partie » ([app/src/live-scores-menu.ts](../../app/src/live-scores-menu.ts), gardé dans `<données>\amis\scores-en-partie.json`) : Automatique (ce qui précède), Sur le fronton (en bas, par-dessus son image, son B2S ou son PuP-Pack), Sur le topper (au centre, de même), En bas du plateau, Sur le côté du plateau (au milieu du bord gauche du joueur).
+**Au choix du joueur** : Menu système > Communauté > « Scores des amis pendant la partie » ([app/src/live-scores-menu.ts](../../app/src/live-scores-menu.ts), gardé dans `<données>\amis\scores-en-partie.json`) : Automatique (ce qui précède), Sur le fronton (en bas, par-dessus son image, son B2S ou son PuP-Pack), Sur le topper (au centre, de même), En bas du plateau, Sur le côté du plateau (au milieu du bord gauche du joueur).
 Chaque choix reste visible ; celui que la borne ne permet pas est grisé avec sa raison (pas d'écran de fronton, pas de topper).
 À part, « Scores sur le DMD : activés » (par défaut) ou « désactivés » (plus rien sur le DMD), Start pour basculer ; grisé avec sa raison sans écran du DMD, ou tant que le pare-feu de VPX n'est pas autorisé (le DMD ne se lit pas).
 Les réglages valent pour toutes les tables (le fichier prévoit un réglage par table, `tables`, pas encore proposé) ; une place qu'une table ne permet pas revient à l'automatique, et le journal dit pourquoi.
@@ -365,7 +365,7 @@ Le journal de Cyber Pinball en garde une ligne : « VPX arrêté (fichier) : err
 Un joueur dont VPX s'arrête avant 20 s de jeu apparaît « VPX s'est arrêté pendant sa partie », distinct d'une partie jamais démarrée.
 
 **Historique des parties.**
-Menu système > Amis > « Historique des parties » : chaque partie en direct finie sur cette borne, de la plus récente à la plus ancienne, rangées par jour (« Vendredi 30 octobre 2026 ») ; pour chacune, la table en titre, l'heure du départ, et dessous les joueurs avec leur rang et leur score (« 1. Bruno 2 841 350 120 · 2. Alexis (vous) 1 000 000 · Chloé 9 999, hors classement »).
+Menu système > Communauté > « Historique des parties » : chaque partie en direct finie sur cette borne, de la plus récente à la plus ancienne, rangées par jour (« Vendredi 30 octobre 2026 ») ; pour chacune, la table en titre, l'heure du départ, et dessous les joueurs avec leur rang et leur score (« 1. Bruno 2 841 350 120 · 2. Alexis (vous) 1 000 000 · Chloé 9 999, hors classement »).
 Une partie que vous avez gagnée porte une étoile.
 Choisir une partie ouvre son détail : la version de la table et son nombre de billes, l'hôte, puis chaque joueur, son rang et son score (« Meilleur score »), pourquoi il était hors classement (réglages de l'hôte non reçus, autre nombre de billes, plus d'un joueur dans sa table), la place prise au tableau d'honneur de la table et la durée jouée ; sans score, « Score non disponible » et ce qui lui est arrivé (« La partie n'a pas démarré de son côté », « A quitté la partie », « Résultat pas arrivé à temps », ou pour une borne en retard « Cyber Pinball 0.1.5-essai.10 sur sa borne : ni départ automatique ni score en direct, à mettre à jour » : la version de chaque borne est gardée).
 Retour ramène la liste, le curseur sur cette partie.
@@ -414,7 +414,7 @@ La vérification à l'acceptation reste le filet de sécurité : une table chang
 
 ### Messagerie
 
-Menu système > Amis > « Messages », ou « Écrire un message » sur le profil d'un ami.
+Menu système > Communauté > « Messages », ou « Écrire un message » sur le profil d'un ami.
 On écrit **entre amis seulement**, sans serveur : les messages passent directement d'une borne à l'autre, sur la même connexion chiffrée que la présence, et restent sur les deux bornes.
 
 **Le fil d'un ami.**
@@ -508,7 +508,7 @@ On ne peut pas écrire à un joueur qui n'est pas un ami : « Écrire un message
 « Masquer son activité » cache sur cette borne ses évènements et ses « J'aime », avec son niveau, ses badges et ses personnes invitées ; « Bloquer » coupe tout.
 
 **Mon profil public.**
-Menu système > Amis > « Mon profil public » montre ce que voient les autres (pays, amis et records, niveau et barre, badges en médailles, personnes invitées, groupes publics) et, pour chaque évènement de « Votre activité récente », qui l'a aimé (Start).
+Menu système > « Mon compte » > « Mon profil public » montre ce que voient les autres (pays, amis et records, niveau et barre, badges en médailles, personnes invitées, groupes publics) et, pour chaque évènement de « Votre activité récente », qui l'a aimé (Start).
 Pendant le premier mois, il propose aussi « Qui vous a fait découvrir Cyber Pinball ? » (voir « Personnes invitées » ci-dessous).
 Un « J'aime » reçu s'annonce par une notification à l'écran des tables, regroupée (« Dora et Kiko aiment votre activité »).
 Le profil public est **activé par défaut** ; « Désactiver mon profil public », ici ou dans « Partage et réseau », ne laisse aux autres que le pseudo dans l'annuaire (et les scores, s'ils sont publiés).
@@ -527,7 +527,7 @@ Un joueur qui a fait découvrir Cyber Pinball à d'autres le voit sur son profil
 Sans serveur ni compte, seule la personne invitée peut dire qui l'a invitée ([invitations.ts](../../packages/core/src/invitations.ts)).
 
 **La question.**
-« Qui vous a fait découvrir Cyber Pinball ? » se pose à l'écran « Votre profil de joueur » du premier lancement, avant « Continuer », puis dans Menu système > Amis > « Mon profil public », pendant les 30 jours qui suivent la première ouverture de cet écran (`DECLARE_DAYS`, `profileOffered`) ; elle est toujours facultative.
+« Qui vous a fait découvrir Cyber Pinball ? » se pose à l'écran « Votre profil de joueur » du premier lancement, avant « Continuer », puis dans Menu système > « Mon compte » > « Mon profil public », pendant les 30 jours qui suivent la première ouverture de cet écran (`DECLARE_DAYS`, `profileOffered`) ; elle est toujours facultative.
 L'écran (`app/src/invite-menu.ts`) propose d'abord les joueurs « Sur votre réseau local », puis « Vos amis » (huit au plus par liste), « Chercher un joueur… » (son pseudo, ou l'identifiant vu sur son profil, dans l'annuaire), « Personne : je l'ai trouvé seul » (la question ne revient plus) et « Plus tard ».
 Le joueur choisi porte « Choisi », l'écran dit « Vous avez choisi … » et l'entrée devient « Découvert grâce à … » ; tant que rien n'est confirmé, on peut en changer.
 
@@ -569,7 +569,7 @@ Il compte les joueurs dont la borne a reçu la carte publique, qui porte, signé
 Votre ligne, « (vous) », reste toujours visible, à part au-delà des cinquante premiers ; sous le tableau, votre place (« National · Cette semaine : votre place, 37 sur 120 joueurs »).
 Un total impossible pour quiconque (au-delà de tout ce qui a pu se gagner depuis l'arrivée des niveaux, compte tenu des XP que rapportent les personnes invitées), ou une semaine au-delà de ce qu'une semaine permet, ne se classe pas : il est compté sous le tableau (« 1 joueur écarté (XP impossibles) »).
 Un total seulement inattendu pour l'ancienneté du joueur sur cette borne se classe, son niveau montré « ? ».
-Partage désactivé, la porte est grisée avec sa raison ; sans pays, National dit « Pays non choisi : Amis > Partage et réseau » ; sans ami, Amis dit « Aucun ami pour l'instant ».
+Partage désactivé, la porte est grisée avec sa raison ; sans pays, National dit « Pays non choisi : Mon compte > Mon pays » ; sans ami, Amis dit « Aucun ami pour l'instant ».
 Start ou Exit revient aux deux portes, dont la porte « Joueurs » résume votre place : « Vous : niveau 14 · 37ᵉ au monde cette semaine · 3ᵉ dans votre pays ».
 « Tables » montre toutes vos tables, les cinq dernières jouées d'abord (« Jouées récemment », avec « hier », « il y a 3 j »), puis toutes les autres de A à Z, en onglets Cette borne, Amis, National et Mondial, chacun comptant ses tables classées (« 3 sur 42 »), sur la période choisie (« Période » : Tout temps, Cette année, Cette semaine, Aujourd'hui ; Start passe à la suivante).
 Il s'ouvre sur Mondial · Tout temps (Cette borne quand le partage est désactivé), le curseur sur la recherche.
@@ -584,7 +584,7 @@ Choisi dans la roue, il montre son **affiche**, comme le Juke-box : derrière la
 Elle donne les chiffres (joueurs en ligne, ceux de votre pays, vos amis), le salon de votre pays avec ses présents et sa dernière ligne, et les amis en ligne (sinon les messages non lus) ; partage désactivé, elle dit comment l'activer.
 
 **Joueurs en ligne.**
-Aussi en tête de Menu système > Amis.
+Aussi en tête de Menu système > Communauté.
 Tous les joueurs que votre borne a croisés, amis ou non (l'annuaire du réseau, vos amis, les joueurs des classements), **ceux en ligne d'abord** : vos **amis en ligne**, puis les joueurs de **votre pays**, puis les autres ; dans chaque groupe, ceux qui sont en partie d'abord, puis par nom.
 Viennent ensuite, dans « Hors ligne », tous les autres : vos amis d'abord, puis le plus récemment vu (« Vu il y a 3 j »).
 Chaque ligne porte la pastille du joueur, son drapeau devant son nom (le drapeau Cyber Pinball, une bille comète, pour un joueur qui n'a pas dit son pays ; de même dans les classements et les salons), un anneau vert autour de la pastille quand il est connecté, et dessous ce qu'il fait (« En partie », sur quelle table entre amis, « En ligne », « Vu il y a 3 j ») et ce qui vous rapproche (« 6 tables en commun », « Sur votre réseau local ») ; « Ami » (hors de la section des amis) ou « Demande envoyée » dans la même ligne.
@@ -768,7 +768,7 @@ La porte du salon dans l'accueil et le médaillon Communauté comptent les menti
 Elles comptent aussi dans la pastille des messages de l'écran des tables, une ligne par salon sur « Messages en attente ».
 
 **Réglages de la communauté.**
-Menu système > Amis > Réglages de la communauté : apparaître en ligne pour tous, salons activés ou désactivés (désactivés, ils restent visibles, grisés avec leur raison : pour la famille), salon par défaut (votre pays ou Monde), filtre de mots, mentions pendant les parties, nouveaux messages de mes salons (notification ou rien), phrases préparées, joueurs ignorés (à ne plus ignorer), règles des salons.
+Menu système > Communauté > Réglages de la communauté : apparaître en ligne pour tous, salons activés ou désactivés (désactivés, ils restent visibles, grisés avec leur raison : pour la famille), salon par défaut (votre pays ou Monde), filtre de mots, mentions pendant les parties, nouveaux messages de mes salons (notification ou rien), phrases préparées, joueurs ignorés (à ne plus ignorer), règles des salons.
 En mode invité, la communauté est fermée avec le menu système.
 
 **Phrases préparées.**
@@ -805,7 +805,7 @@ Le signalement, signé par vous, joint la ligne telle que son auteur l'a signée
 **Les modérateurs.**
 Leurs clés de joueur sont listées dans une charte numérotée, signée par la clé du projet (la même que celle des mises à jour) et livrée avec Cyber Pinball ; une charte plus récente passe de borne en borne et remplace l'ancienne.
 Personne d'autre ne peut se dire modérateur.
-Une borne de modérateur a l'entrée Menu système > Amis > Modération : la file des signalements, les messages les plus signalés d'abord.
+Une borne de modérateur a l'entrée Menu système > Communauté > Modération : la file des signalements, les messages les plus signalés d'abord.
 Ouvrir un signalement montre les lignes autour du message, qui l'a signalé et pourquoi, et les décisions : masquer le message, sourdine 1 h, 24 h ou 7 jours (le message masqué aussi), exclure des salons, lever une sanction en cours, ou classer sans suite.
 Les mêmes décisions sont dans les options d'une ligne, et « Sujet du salon… » pose la ligne affichée en tête du salon.
 Un nouveau signalement s'annonce par une notification.
@@ -834,7 +834,7 @@ Pour l'instant, c'est toujours une image à soi : une photo ou une image prise s
   Sans image : les initiales (« AM » pour « Alexis Martin ») sur une teinte sombre tirée de la clé, la même sur toutes les bornes.
   L'encart des scores au bas du plateau, trop petit pour des initiales lisibles, ne garde que la teinte.
 - **Choisir l'image.**
-  Menu système > Amis > « Mon avatar » (ou « Partage et réseau » > « Changer d'avatar… »).
+  Menu système > « Mon compte » > « Mon avatar » (ou « Partage et réseau » > « Changer d'avatar… »).
   « Choisir une image sur ce PC… » ouvre le sélecteur de fichiers de Cyber Pinball (.jpg, .jpeg, .png, .webp, .gif, .bmp, .avif, 40 Mo au plus).
   « Chercher une image sur le web… » ouvre le navigateur intégré sur une recherche d'images : un clic droit sur une image, « Télécharger cette image » (proposé sur toute recherche libre, médias compris, les moteurs d'images n'ayant pas de lien de téléchargement), et le navigateur se ferme sur le recadrage.
 - **Image de travail.**

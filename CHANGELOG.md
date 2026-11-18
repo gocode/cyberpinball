@@ -11,6 +11,14 @@ son interface).
 
 ## 0.1.16
 
+- Profil d'un joueur : le « J'aime » d'un record ou d'un badge s'affiche avec un pouce levé au lieu d'une étoile, pour qu'on comprenne qu'on peut l'aimer ; le pouce est rempli quand vous l'aimez déjà. Même pouce sur l'écran « Ont aimé », la notification d'un « J'aime » reçu, le détail des points d'expérience et les badges « Apprécié », « Populaire » et « Généreux ».
+- Nouvelle rubrique Menu système > Mon compte, en tête : protéger et transférer son compte, pseudo, avatar, pays, badges, profil public, ce que voient les autres, et la suppression du compte.
+- Copie de secours du compte, écrite d'office hors du dossier de Cyber Pinball : une réinstallation, même dans un autre dossier, retrouve le compte et propose de le reprendre au premier lancement.
+- Code de récupération : 24 mots à noter, ou leur QR à photographier, qui redonnent le compte sur n'importe quel PC ; deux mots sont redemandés pour vérifier qu'il est bien noté.
+- Mot de passe facultatif : le pseudo devient l'identifiant, et le compte est gardé chiffré sur le serveur de Cyber Pinball, qui ne peut pas l'ouvrir ; dix essais manqués par heure au plus.
+- "J'ai déjà un compte" au premier lancement : reprendre un compte par son code, son mot de passe, une sauvegarde ou la copie de secours du PC.
+- La rubrique Amis s'appelle désormais Communauté, comme le médaillon de la roue ; "Partage et réseau" n'y garde que le réseau.
+- Correction : l'image de l'avatar entre enfin dans les sauvegardes.
 - Tables dont le DMD passe par UltraDMD ou FlexDMD : leurs vidéos trop grandes, que VPX 10.8.1 décode en entier à chaque scène (la partie se figeait une à plusieurs secondes, flippers compris), sont ramenées à la taille du DMD avant la partie ; elles s'affichent pareil, l'original va à la corbeille de Cyber Pinball. La Santé et la fiche de la table le signalent.
 - PuP-Packs à options dont l'option en place n'a pas d'écrans déclarés (Hellboy, Daredevil, 24…) : leurs écrans sont maintenant déclarés avant la partie, comme pour les packs sans options ; le pack s'affiche de nouveau.
 - DMD réel (bêta), PIN2DMD resté noir en partie avec « Image du front-end : oui » : le serveur du DMD qui ne trouvait pas l'afficheur continuait de le chercher pendant la partie et gardait la carte, si bien que VPX ne pouvait plus l'ouvrir. Il s'arrête désormais au bout de 20 secondes sans réponse, et toujours avant une partie que VPX pilote lui-même.

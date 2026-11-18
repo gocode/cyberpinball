@@ -2,7 +2,7 @@
 // son entrée dans friends-menu.ts et frontend.ts, « Télécharger cette image » du navigateur
 // intégré). Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
-  // Menu système > Amis > Mon avatar
+  // Menu système > Mon compte > Mon avatar
   'Mon avatar': 'My avatar',
   'Votre image, vue par vos amis': 'Your picture, seen by your friends',
   'Pas encore d’avatar : une photo ou une image à vous': 'No avatar yet: a photo or a picture of your own',
@@ -60,10 +60,7 @@ export const messages: Record<string, string> = {
   'Ceux qui ne sont pas en ligne le recevront à leur prochaine connexion': 'Those who are not online will receive it when they next connect',
   'Avatar pas enregistré : {error}': 'Avatar not saved: {error}',
   // Partage et réseau (friends-menu.ts)
-  'Votre avatar : vos initiales': 'Your avatar: your initials',
-  'Vu par tous les joueurs, amis ou non ; « Changer d’avatar… » le montre': 'Seen by every player, friend or not; "Change avatar…" shows it',
   'Changer d’avatar…': 'Change avatar…',
-  'Une photo ou une image, recadrée aux boutons': 'A photo or a picture, cropped with the buttons',
   'Réseau : votre avatar': 'Network: your avatar',
   'Partout où vous apparaissez : Joueurs en ligne, salons, classements, profil public': 'Wherever you appear: Players online, rooms, leaderboards, public profile',
   // Navigateur intégré (frontend.ts, acquire-window.ts)
@@ -93,7 +90,7 @@ export const messages: Record<string, string> = {
   'Au clavier à l’écran, de {min} à {max} caractères': 'With the on-screen keyboard, {min} to {max} characters',
   'Mettre un avatar…': 'Add an avatar…',
   'Une image de ce PC ou du web, recadrée aux boutons': 'A picture from this PC or the web, cropped with the buttons',
-  'Tout se change plus tard : Menu système > Amis > Partage et réseau': 'Everything can be changed later: System menu > Friends > Sharing and network',
+  'Tout se change plus tard : Menu système > Mon compte': 'Everything can be changed later: System menu > My account',
   'Choisissez d’abord votre pseudo': 'Choose your nickname first',
   'Choisissez d’abord votre pseudo : il est obligatoire pour jouer': 'Choose your nickname first: it is mandatory to play',
   'C’est le nom donné d’office : choisissez le vôtre': 'That is the default name: choose your own',

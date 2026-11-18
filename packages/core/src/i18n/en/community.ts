@@ -52,10 +52,8 @@ export const messages: Record<string, string> = {
   '« En ligne » ou « En partie », jamais la table ; vos amis voient toujours votre présence': '"Online" or "Playing", never the table; your friends always see your status',
   'Les autres vous voient hors ligne ; vos amis voient toujours votre présence': 'Others see you offline; your friends always see your status',
   'Apparaître en ligne pour tous': 'Appear online to everyone',
-  '« En ligne » ou « En partie » dans « Joueurs en ligne », jamais la table': '"Online" or "Playing" in "Players online", never the table',
   'Vous apparaissez en ligne pour tous': 'You appear online to everyone',
   'Ne plus apparaître en ligne pour tous': 'Stop appearing online to everyone',
-  'Vos amis voient toujours votre présence ; les autres ne vous voient plus dans « Joueurs en ligne »': 'Your friends always see your status; others no longer see you in "Players online"',
   'Vous n’apparaissez plus en ligne pour les autres joueurs': 'You no longer appear online to other players',
 
   // Téléphone : la partie « Joueurs » de la Communauté
@@ -146,7 +144,7 @@ export const messages: Record<string, string> = {
   'Les joueurs que cette borne connaît : leurs cartes arrivent au fil des connexions': 'The players this cabinet knows: their cards arrive as cabinets connect',
   '{n} joueur écarté (XP impossibles)': '{n} player left out (impossible XP)',
   '{n} joueurs écartés (XP impossibles)': '{n} players left out (impossible XP)',
-  'Amis > Trouver un joueur': 'Friends > Find a player',
+  'Communauté > Trouver un joueur': 'Community > Find a player',
   'Aucun ami pour l’instant': 'No friend yet',
   'Personne n’a encore gagné d’XP cette semaine': 'Nobody has earned XP this week yet',
   'Chaque partie compte : le classement repart à zéro chaque lundi.': 'Every game counts: the ranking starts again from zero every Monday.',

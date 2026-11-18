@@ -23,6 +23,11 @@ export const SYSTEM_ITEM_IDS = [
   'menu-media',
   'jukebox',
   'jukebox-settings',
+  'account',
+  'player-name',
+  'country',
+  'account-privacy',
+  'account-delete',
   'online-players',
   'community-settings',
   'moderation',
@@ -79,7 +84,7 @@ export const SYSTEM_ITEM_IDS = [
 export type SystemItemId = (typeof SYSTEM_ITEM_IDS)[number];
 
 /** Rubriques (et sous-rubrique) : l'arbre les ouvre lui-même. */
-export const SYSTEM_GROUP_IDS = ['tables', 'medias', 'amis', 'borne', 'realite-virtuelle', 'dmd', 'cyberpinball', 'migration'] as const;
+export const SYSTEM_GROUP_IDS = ['compte', 'tables', 'medias', 'amis', 'borne', 'realite-virtuelle', 'dmd', 'cyberpinball', 'migration'] as const;
 export type SystemGroupId = (typeof SYSTEM_GROUP_IDS)[number];
 
 export type SystemEntryId = SystemItemId | SystemGroupId;
@@ -105,7 +110,7 @@ export interface SystemGroup extends SystemEntry {
 }
 
 /** Rubriques du menu système, dans l'ordre. */
-export const SYSTEM_ROOT: readonly SystemGroupId[] = ['amis', 'tables', 'medias', 'borne', 'cyberpinball'];
+export const SYSTEM_ROOT: readonly SystemGroupId[] = ['compte', 'amis', 'tables', 'medias', 'borne', 'cyberpinball'];
 
 /**
  * Entrées montrées aussi à la racine, parmi les rubriques : Activité récente, les notifications de
@@ -127,7 +132,7 @@ export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['news', 'activity
  * téléphone, Borne, Cyber Pinball (ordre choisi le 29/10/2026, Juke-box ajouté le 09/11/2026). systemmenu.test.ts vérifie qu'elle reprend
  * SYSTEM_ROOT dans son ordre et chaque raccourci une fois.
  */
-export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['news', 'activity', 'collections', 'amis', 'tables', 'medias', 'jukebox', 'downloads', 'phone-remote', 'borne', 'cyberpinball'];
+export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['news', 'activity', 'collections', 'compte', 'amis', 'tables', 'medias', 'jukebox', 'downloads', 'phone-remote', 'borne', 'cyberpinball'];
 
 export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
   tables: {
@@ -146,13 +151,23 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     // Les réglages du Juke-box à côté de sa gestion (13/11/2026 : sorties du son, visualiseur, médaillon).
     entries: ['missing-media', 'menu-media', 'jukebox', 'jukebox-settings'],
   },
-  // Réseau des bornes (social.ts) : les amis, l'annuaire des joueurs, les badges, le partage.
+  // Mon compte (18/11/2026, account-menu.ts) : tout ce qui est « moi », et de quoi retrouver son compte
+  // sur un autre PC (code de récupération, mot de passe, copie de secours). En tête des rubriques.
+  compte: {
+    id: 'compte',
+    icon: 'account',
+    get label() { return t('Mon compte'); },
+    get detail() { return t('Protéger et transférer mon compte, pseudo, avatar, pays, niveau et badges, profil public'); },
+    entries: ['account', 'player-name', 'avatar', 'country', 'badges', 'public-profile', 'account-privacy', 'account-delete'],
+  },
+  // Réseau des bornes (social.ts) : les joueurs, les amis, l'annuaire, les salons, le partage. Nommée
+  // « Amis » jusqu'au 18/11/2026 : « Communauté », comme le médaillon de la roue.
   amis: {
     id: 'amis',
     icon: 'friends',
-    get label() { return t('Amis'); },
-    get detail() { return t('Messages, mes amis, mon avatar, mon profil public, historique des parties, trouver un joueur, demandes, badges, partage'); },
-    entries: ['online-players', 'messages', 'friends', 'avatar', 'public-profile', 'game-history', 'find-player', 'friend-requests', 'badges', 'community-settings', 'moderation', 'sharing', 'live-scores', 'quiet-in-game'],
+    get label() { return t('Communauté'); },
+    get detail() { return t('Joueurs en ligne, messages, mes amis, historique des parties, trouver un joueur, demandes, salons, partage et réseau'); },
+    entries: ['online-players', 'messages', 'friends', 'game-history', 'find-player', 'friend-requests', 'community-settings', 'moderation', 'sharing', 'live-scores', 'quiet-in-game'],
   },
   borne: {
     id: 'borne',
@@ -208,6 +223,12 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   jukebox: { icon: 'jukebox', label: 'Juke-box' }, // i18n-ignore : le nom du Juke-box, le même en anglais
   // Réglages du Juke-box (app/src/jukebox-settings.ts) : sorties du son, visualiseur du DMD, médaillon dans la roue.
   'jukebox-settings': { icon: 'sliders', get label() { return t('Réglages du Juke-box'); } },
+  // Mon compte (account-menu.ts) : protéger et transférer, pseudo, pays, ce que voient les autres, suppression.
+  account: { icon: 'lock', get label() { return t('Protéger et transférer mon compte'); } },
+  'player-name': { icon: 'edit', get label() { return t('Mon pseudo'); } },
+  country: { icon: 'globe', get label() { return t('Mon pays'); } },
+  'account-privacy': { icon: 'pulse', get label() { return t('Ce que voient les autres'); } },
+  'account-delete': { icon: 'trash', get label() { return t('Supprimer mon compte'); } },
   // La messagerie entre amis (chat-menu.ts) : en tête de la rubrique, la pastille rouge quand un message attend.
   // Joueurs en ligne, amis ou non (community-menu.ts) : en tête de la rubrique Amis.
   'online-players': { icon: 'globe', get label() { return t('Joueurs en ligne'); } },

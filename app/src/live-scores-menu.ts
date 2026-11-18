@@ -1,4 +1,4 @@
-// Menu système > Amis > « Scores des amis pendant la partie » (essai réel du 31/10/2026 : « proposer
+// Menu système > Communauté > « Scores des amis pendant la partie » (essai réel du 31/10/2026 : « proposer
 // dans la configuration des joueurs où ils veulent voir les scores des autres joueurs ») : deux
 // réglages indépendants (essai du 04/11/2026). La place de la bande (LiveScoresPlace,
 // packages/core/src/gamenotice.ts) : Automatique (le fronton, même pris par la table ; sinon le

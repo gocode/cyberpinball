@@ -1,4 +1,4 @@
-// Menu système > Amis > Historique des parties (packages/core/src/gamehistory.ts) : les parties
+// Menu système > Communauté > Historique des parties (packages/core/src/gamehistory.ts) : les parties
 // entre amis finies sur cette borne, de la plus récente à la plus ancienne, rangées par jour ; la
 // table en titre, les joueurs dessous avec leur rang et leur score. On ouvre une partie pour revoir
 // son détail : la version de la table, l'hôte, et chaque joueur (rang, score, pourquoi hors

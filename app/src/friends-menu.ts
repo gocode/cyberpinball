@@ -1,4 +1,4 @@
-// Menu système > Amis : le réseau des bornes à l'écran (social.ts, social-net.ts). « Mes amis »
+// Menu système > Communauté : le réseau des bornes à l'écran (social.ts, social-net.ts). « Mes amis »
 // (en ligne, en partie et sur quelle table, dernier évènement), « Historique des parties » (les
 // parties entre amis finies sur cette borne : game-history-menu.ts), « Trouver un joueur » (l'annuaire :
 // chercher un nom, les bornes à proximité sur le réseau local), « Demandes d'amis » (reçues à
@@ -125,6 +125,8 @@ export interface FriendsMenu {
   openRequests(back?: () => void): void;
   /** « Trouver un joueur » (l'annuaire). */
   openFind(): void;
+  /** « Supprimer mon compte » (Menu système > Mon compte) : son « Annuler » vers `back`. */
+  openDeleteAccount(back: () => void): void;
   /** Historique des parties : le détail d'une partie, s'il la garde (son « Retour » vers `back`). */
   history: { has(id: string): boolean; openGame(id: string, back: () => void): void };
   items: {
@@ -302,7 +304,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   /** Amis qui partagent leur bibliothèque et qui ont des tables absentes de la borne : combien. */
   function addFromFriendDetail(): string {
     const friends = net.state().friends;
-    if (!friends.length) return t('Pas encore d’ami : Menu système > Amis > « Trouver un joueur »');
+    if (!friends.length) return t('Pas encore d’ami : Menu système > Communauté > « Trouver un joueur »');
     const online = friends.filter((f) => net.online(f.key)).length;
     return online
       ? tn(online, 'Les tables d’un ami, récupérées de sa borne · {n} ami en ligne', 'Les tables d’un ami, récupérées de sa borne · {n} amis en ligne')
@@ -656,16 +658,12 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const lanDown = lanProblem();
     const rows: Row[] = [
       s.enabled ? { text: t('Partage activé'), detail: status.mode === 'off' ? t('Réseau coupé pendant les essais sans opérateur') : status.running ? tn(status.peers, 'Relié à {n} borne', 'Relié à {n} bornes') : status.error ? t('Réseau indisponible : {error}', { error: status.error }) : t('Connexion au réseau…'), tone: 'ok', badges: [t('Activé')], icon: 'network' } : { text: t('Partage désactivé'), detail: t('Personne ne vous voit ; vos amis vous voient hors ligne'), tone: 'warning', badges: [t('Désactivé')], icon: 'network' },
-      { text: t('Votre nom : {name}', { name: s.name }), detail: t('Visible dans l’annuaire · votre identifiant : {id}', { id: playerId(s.key.publicKey) }), icon: 'friend-list' },
-      { text: s.avatar ? t('Votre avatar : une image à vous') : t('Votre avatar : vos initiales'), detail: t('Vu par tous les joueurs, amis ou non ; « Changer d’avatar… » le montre'), icon: 'avatar' },
       s.lan && lanDown
         ? { text: t('Réseau local : indisponible'), detail: t('{reason} · Internet continue sans lui ; nouvel essai tout seul', { reason: lanDown }), tone: 'warning', badges: [t('Indisponible')], icon: 'monitor' }
         : { text: s.lan ? t('Réseau local : activé') : t('Réseau local : désactivé'), detail: s.lan ? tn(near, '{n} borne à proximité', '{n} bornes à proximité') : t('Les bornes de votre réseau ne vous trouvent pas sans Internet'), tone: s.lan ? 'ok' : 'quiet', icon: 'monitor' },
       s.shareLibrary
         ? { text: t('Bibliothèque partagée avec vos amis'), detail: t('Ils voient vos tables et peuvent les récupérer, avec leurs médias'), tone: 'ok', badges: [t('Partagée')], icon: 'tables' }
         : { text: t('Bibliothèque pas partagée'), detail: t('Vos amis ne voient pas vos tables'), tone: 'quiet', icon: 'tables' },
-      scoresRow(s),
-      countryRow(),
       s.downloadRate
         ? { text: t('Débit des téléchargements : {rate}', { rate: rateLabel(s.downloadRate) }), detail: t('Tables et médias reçus de vos amis, tous envois confondus'), tone: 'ok', badges: [t('Limité')], icon: 'gauge' }
         : { text: t('Débit des téléchargements : sans limite'), detail: t('Tables et médias reçus de vos amis, aussi vite que vos connexions le permettent'), tone: 'quiet', icon: 'gauge' },
@@ -673,8 +671,8 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       vpxRow(),
       ...[repairRow()].filter((r): r is Row => !!r),
     ];
-    const actions: Action[] = [{ label: t('Changer de nom…'), detail: t('{min} à {max} caractères', { min: NAME_MIN, max: NAME_MAX }), icon: 'edit', run: () => askName() }];
-    if (host.avatarMenu) actions.push({ label: t('Changer d’avatar…'), detail: t('Une photo ou une image, recadrée aux boutons'), icon: 'avatar', run: () => host.avatarMenu!.open(() => host.library.openCustom(buildSharing, 1)) });
+    // Pseudo, avatar, pays, ce que voient les autres et la suppression du compte : Menu système > Mon compte (account-menu.ts).
+    const actions: Action[] = [];
     if (firewallToAllow()) actions.push(allowAction(() => host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER)));
     if (s.blocked.length) actions.push({ label: tn(s.blocked.length, '{n} joueur bloqué', '{n} joueurs bloqués'), icon: 'eye', run: () => openBlocked() });
     actions.push(
@@ -682,27 +680,8 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         ? { label: t('Ne plus partager ma bibliothèque'), detail: t('Vos amis ne voient plus vos tables ni vos médias'), icon: 'tables', run: () => { net.setShareLibrary(false); flash = { text: t('Bibliothèque plus partagée'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
         : { label: t('Partager ma bibliothèque avec mes amis'), detail: t('Vos tables, leurs parties et leurs médias, entre amis seulement'), icon: 'tables', run: () => { net.setShareLibrary(true); flash = { text: t('Bibliothèque partagée avec vos amis'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
     );
-    actions.push(
-      s.shareScores === false
-        ? { label: t('Publier mes scores'), detail: t('Classements des amis, de votre pays et du monde'), icon: 'trophy', run: () => { net.setShareScores(true); flash = { text: t('Vos scores sont publiés aux classements'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
-        : { label: t('Ne plus publier mes scores'), detail: t('Vous voyez toujours les classements ; vos parties n’y entrent plus'), icon: 'trophy', run: () => { net.setShareScores(false); flash = { text: t('Vos scores ne sont plus publiés'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
-    );
-    actions.push(
-      s.publicProfile === false
-        ? { label: t('Activer mon profil public'), detail: t('Pays, badges, records et activité récente, visibles de tous'), icon: 'account', run: () => { net.setPublicProfile(true); flash = { text: t('Profil public activé'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
-        : { label: t('Désactiver mon profil public'), detail: t('Les autres ne verront plus que votre pseudo dans l’annuaire'), icon: 'account', run: () => { net.setPublicProfile(false); flash = { text: t('Profil public désactivé'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
-    );
-    // Présence publique (livepresence.ts) : « En ligne » ou « En partie » dans « Joueurs en ligne », jamais la table.
-    actions.push(
-      s.publicPresence === false
-        ? { label: t('Apparaître en ligne pour tous'), detail: t('« En ligne » ou « En partie » dans « Joueurs en ligne », jamais la table'), icon: 'pulse', run: () => { net.setPublicPresence(true); flash = { text: t('Vous apparaissez en ligne pour tous'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
-        : { label: t('Ne plus apparaître en ligne pour tous'), detail: t('Vos amis voient toujours votre présence ; les autres ne vous voient plus dans « Joueurs en ligne »'), icon: 'pulse', run: () => { net.setPublicPresence(false); flash = { text: t('Vous n’apparaissez plus en ligne pour les autres joueurs'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
-    );
-    actions.push({ label: t('Choisir mon pays…'), detail: t('Pour le classement national'), icon: 'globe', run: () => openCountry() });
     actions.push({ label: t('Limiter le débit des téléchargements…'), detail: t('Actuellement : {rate}', { rate: rateLabel(s.downloadRate ?? 0) }), icon: 'gauge', run: () => openDownloadRate() });
     actions.push({ label: s.lan ? t('Désactiver le réseau local') : t('Activer le réseau local'), icon: 'monitor', run: async () => { await net.setLan(!s.lan); host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } });
-    // Supprimer mon compte (RGPD) : avant la coupure, jamais sélectionné d'office ; confirmé sur un écran à part.
-    if (host.account) actions.push({ label: t('Supprimer mon compte…'), detail: t('Votre nom, vos amis, vos messages, vos scores publiés : effacés ici et chez les autres'), icon: 'trash', tone: 'warning', run: () => openDeleteAccount() });
     // La coupure en dernier, juste avant « Retour » (sélection d'office).
     actions.push(
       s.enabled
@@ -742,10 +721,12 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
 
   // ---------- Supprimer mon compte (account-delete.ts, forget.ts) ----------
 
-  const toSharing = () => host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER);
+  /** Le « Annuler » de la suppression : Menu système > Mon compte, d'où elle s'ouvre (account-menu.ts). */
+  let toSharing = () => host.library.openSystem();
 
   /** Ce qui part et ce qui reste, puis la confirmation ; le curseur sur « Annuler ». */
-  function openDeleteAccount(): void {
+  function openDeleteAccount(back?: () => void): void {
+    if (back) toSharing = back;
     const s = net.state();
     host.library.openCustom(
       () => ({
@@ -846,49 +827,6 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     );
   }
 
-  /** Publication de mes scores aux classements national et mondial (rankings.ts). */
-  function scoresRow(s: ReturnType<typeof net.state>): Row {
-    return s.shareScores === false
-      ? { text: t('Scores pas publiés'), detail: t('Vos parties n’entrent pas aux classements ; vous les voyez quand même'), tone: 'quiet', icon: 'trophy' }
-      : { text: t('Scores publiés aux classements'), detail: t('Amis, national et mondial : chaque partie seul à une table, sur sa version exacte'), tone: 'ok', badges: [t('Publiés')], icon: 'trophy' };
-  }
-
-  /** Le pays du classement national : choisi, d'après Windows, ou inconnu. */
-  function countryRow(): Row {
-    const code = net.country();
-    const chosen = net.state().country;
-    if (!code) return { text: t('Pays : pas choisi'), detail: t('Vous n’apparaissez qu’au classement mondial ; « Choisir mon pays… »'), tone: 'warning', badges: [t('À choisir')], icon: 'globe' };
-    return { text: t('Pays : {country}', { country: countryName(code, locale()) }), detail: chosen ? t('Choisi par vous') : t('D’après la région de Windows'), tone: 'ok', icon: 'globe', flag: flagView(code, locale()) };
-  }
-
-  /** Choisir le pays : celui de Windows d'abord, puis tous, par ordre alphabétique. */
-  function openCountry(): void {
-    const done = () => host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER);
-    const codes = countryCodes(locale());
-    const current = net.country();
-    const choose = (code: string | undefined) => {
-      net.setCountry(code);
-      const shown = net.country();
-      flash = { text: shown ? t('Pays : {country}', { country: countryName(shown, locale()) }) : t('Pays : pas choisi'), tone: 'ok' };
-      done();
-    };
-    host.library.openCustom(
-      () => ({
-        heading: t('Mon pays'),
-        icon: 'globe',
-        lead: t('Il accompagne vos scores : il vous place au classement national, et se voit à côté de votre nom.'),
-        sections: [],
-        actions: [
-          { label: t('D’après la région de Windows'), detail: t('Le pays réglé dans Windows, s’il se lit'), icon: 'refresh', key: 'windows', run: () => choose(undefined) },
-          ...codes.map((code) => ({ label: countryName(code, locale()), flag: flagView(code, locale()), detail: code === current ? t('choix actuel') : undefined, tone: code === current ? ('ok' as const) : undefined, key: `country-${code}`, run: () => choose(code) })),
-          backAction(done),
-        ],
-        back: done,
-      }),
-      current ? codes.indexOf(current) + 1 : 0,
-    );
-  }
-
   /** Limite du débit des téléchargements depuis les amis (ratelimit.ts), choisie dans une liste. */
   function openDownloadRate(): void {
     const current = () => net.state().downloadRate ?? 0;
@@ -916,14 +854,6 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       }),
       Math.max(0, DOWNLOAD_RATE_CHOICES.indexOf(current())),
     );
-  }
-
-  function askName(): void {
-    host.library.openPrompt(t('Votre nom'), t('Nom du joueur'), net.state().name, (value) => {
-      if (value !== undefined && !net.rename(value)) flash = { text: t('Nom refusé : {min} à {max} lettres, chiffres, espaces, tirets ou points', { min: NAME_MIN, max: NAME_MAX }), tone: 'error' };
-      else if (value !== undefined) flash = { text: t('Nom changé : vos amis et l’annuaire le reçoivent'), tone: 'ok' };
-      host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER);
-    });
   }
 
   async function allowFirewall(after: () => void): Promise<void> {
@@ -980,6 +910,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     playerPart,
     openRequests,
     openFind: () => openFind(),
+    openDeleteAccount: (back) => openDeleteAccount(back),
     history: { has: (id) => host.games.history().some((g) => g.id === id), openGame: (id, back) => historyMenu.openGame(id, back) },
     items: {
       friends: {

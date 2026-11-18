@@ -50,3 +50,33 @@ CREATE TABLE IF NOT EXISTS signatures (
   PRIMARY KEY (pk, t)
 );
 CREATE INDEX IF NOT EXISTS signatures_t ON signatures (t);
+
+-- Coffres des comptes (packages/core/src/vault.ts) : une copie chiffrée du compte d'un joueur, que le
+-- service ne peut pas ouvrir, rangée sous sa clé publique. `t` : date signée du dernier envoi (un
+-- envoi plus ancien est refusé) ; `at` : date du service.
+CREATE TABLE IF NOT EXISTS coffres (
+  pk TEXT PRIMARY KEY,
+  data BLOB NOT NULL,
+  hash TEXT NOT NULL,
+  t INTEGER NOT NULL,
+  at INTEGER NOT NULL
+);
+
+-- Mot de passe facultatif d'un coffre : l'identifiant réservé (le pseudo, sans casse), le sel de
+-- scrypt, l'empreinte SHA-256 de la preuve du mot de passe et l'enveloppe de la clé des données.
+-- Ni le mot de passe ni la clé : le service ne peut pas ouvrir le coffre.
+CREATE TABLE IF NOT EXISTS coffres_mdp (
+  login TEXT PRIMARY KEY,
+  pk TEXT NOT NULL UNIQUE,
+  salt BLOB NOT NULL,
+  auth TEXT NOT NULL,
+  wrap BLOB NOT NULL,
+  at INTEGER NOT NULL
+);
+
+-- Essais manqués d'ouverture par identifiant, gardés une heure : au-delà de dix, l'identifiant attend.
+CREATE TABLE IF NOT EXISTS coffres_essais (
+  login TEXT NOT NULL,
+  at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS coffres_essais_login ON coffres_essais (login, at);

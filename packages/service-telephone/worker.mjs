@@ -175,6 +175,13 @@ const HEX64 = /^[0-9a-f]{64}$/;
 const CONTROL = /\p{Cc}/u;
 const CONTROL_BUT_NEWLINE = /[^\P{Cc}\n]/u;
 
+/** Base64 standard, par morceaux : un coffre de 900 ko ferait déborder la pile en un seul appel. */
+function toB64(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
 function fromB64(text, bytes) {
   if (typeof text !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(text) || text.length % 4 === 1) return undefined;
   let bin;
@@ -234,9 +241,9 @@ async function boundedText(request, max) {
  * Vérifie une requête signée d'une borne : { b, s }, `b` le JSON { v: 1, op, pk, t, … }, `s` la
  * signature Ed25519 (base64) de RETOURS_PREFIX + b par `pk`. Rend { body } ou { status, why }.
  */
-export async function verifySigned(payload, op, now) {
+export async function verifySigned(payload, op, now, max = SIGNED_MAX) {
   if (!payload || typeof payload.b !== 'string' || typeof payload.s !== 'string') return { status: 400, why: 'forme' };
-  if (encoder.encode(payload.b).length > SIGNED_MAX) return { status: 413, why: 'taille' };
+  if (encoder.encode(payload.b).length > max) return { status: 413, why: 'taille' };
   let body;
   try {
     body = JSON.parse(payload.b);
@@ -250,8 +257,9 @@ export async function verifySigned(payload, op, now) {
   return { body };
 }
 
-async function signedRequest(request, op, now) {
-  const text = await boundedText(request, SIGNED_MAX * 3);
+async function signedRequest(request, op, now, max = SIGNED_MAX) {
+  // `b` est une chaîne JSON dans le JSON : ses guillemets échappés peuvent presque doubler sa taille.
+  const text = await boundedText(request, max * 2 + SIGNED_MAX);
   if (text === undefined) return { status: 413, why: 'taille' };
   let payload;
   try {
@@ -259,7 +267,7 @@ async function signedRequest(request, op, now) {
   } catch {
     return { status: 400, why: 'forme' };
   }
-  return verifySigned(payload, op, now);
+  return verifySigned(payload, op, now, max);
 }
 
 // Rejeu : chaque (clé, date) acceptée est notée le temps où sa date reste admise (deux fois l'écart
@@ -391,6 +399,9 @@ async function forget(request, env, now) {
     db.prepare('DELETE FROM votes WHERE proposition IN (SELECT id FROM propositions WHERE author = ?1)').bind(pk),
     db.prepare('DELETE FROM propositions WHERE author = ?1').bind(pk),
     db.prepare('DELETE FROM votes WHERE voter = ?1').bind(pk),
+    // Le coffre du compte et son mot de passe (routes /api/coffre…) partent avec lui.
+    db.prepare('DELETE FROM coffres WHERE pk = ?1').bind(pk),
+    db.prepare('DELETE FROM coffres_mdp WHERE pk = ?1').bind(pk),
   ]);
   if (refused) return refused;
   return reply(200, { propositions: propositions ?? 0 });
@@ -535,6 +546,145 @@ async function admin(request, env, url, now) {
   return one ? reply(405, { erreur: 'méthode' }) : reply(404, { erreur: 'inconnue' });
 }
 
+// ─── Coffre du compte (packages/core/src/vault.ts) ──────────────────────────────────────────────
+//
+// Une copie chiffrée du compte d'un joueur, que le service ne peut pas ouvrir, rangée sous sa clé
+// publique. POST /api/coffre l'écrit (signée par la clé, op « coffre ») ; GET /api/coffre/<pk> la
+// rend à qui connaît la clé publique (elle ne s'ouvre qu'avec la graine du joueur, c'est-à-dire son
+// code de récupération). Un mot de passe facultatif (POST /api/coffre/mdp, op « coffre-mdp ») réserve
+// un identifiant (le pseudo, sans casse) et garde : le sel de scrypt, l'empreinte SHA-256 de la
+// preuve du mot de passe, l'enveloppe de la clé des données. POST /api/coffre/sel rend le sel d'un
+// identifiant ; POST /api/coffre/ouvrir rend l'enveloppe et le coffre à qui donne la bonne preuve,
+// au plus VAULT_TRIES essais manqués par identifiant et par heure.
+
+/** Taille d'un coffre chiffré, en octets. */
+export const VAULT_MAX = 900_000;
+export const VAULT_TRIES = 10;
+const HOUR_MS = 3_600_000;
+const LOGIN_MAX = 40;
+
+/** Identifiant d'un mot de passe : déjà normalisé par la borne (NFC, minuscules, espaces simples). */
+export function cleanLogin(value) {
+  if (typeof value !== 'string' || value.length < 2 || value.length > LOGIN_MAX || CONTROL.test(value)) return undefined;
+  const s = value.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
+  return s === value ? s : undefined;
+}
+
+async function bodyJson(request, max) {
+  const text = await boundedText(request, max);
+  if (text === undefined) return undefined;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+async function vaultPut(request, env, now) {
+  if (await limited(request, env)) return reply(429, { erreur: 'trop' });
+  const checked = await signedRequest(request, 'coffre', now, Math.ceil((VAULT_MAX * 4) / 3) + 1024);
+  if (!checked.body) return reply(checked.status, { erreur: checked.why });
+  const { pk, t, data, hash } = checked.body;
+  const bytes = fromB64(data);
+  if (!bytes || bytes.length < 32 || bytes.length > VAULT_MAX || typeof hash !== 'string' || !HEX64.test(hash)) return reply(400, { erreur: 'forme' });
+  const db = env.RETOURS;
+  if (await seen(db, pk, t)) return reply(409, { erreur: 'rejeu' });
+  // Un envoi plus ancien que le coffre gardé ne le remplace pas.
+  const kept = await db.prepare('SELECT t FROM coffres WHERE pk = ?1').bind(pk).first('t');
+  if (kept !== null && kept !== undefined && kept >= t) return reply(409, { erreur: 'ancien' });
+  const refused = await writeOnce(db, pk, t, [
+    ...markSeen(db, pk, t, now),
+    db.prepare('INSERT INTO coffres (pk, data, hash, t, at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (pk) DO UPDATE SET data = ?2, hash = ?3, t = ?4, at = ?5').bind(pk, bytes, hash, t, now),
+  ]);
+  return refused ?? reply(204);
+}
+
+async function vaultGet(env, pk) {
+  const row = await env.RETOURS.prepare('SELECT data, at FROM coffres WHERE pk = ?1').bind(pk).first();
+  if (!row) return reply(404, { erreur: 'inconnu' });
+  return reply(200, { data: toB64(new Uint8Array(row.data)), at: row.at });
+}
+
+async function vaultPassword(request, env, now) {
+  if (await limited(request, env)) return reply(429, { erreur: 'trop' });
+  const checked = await signedRequest(request, 'coffre-mdp', now);
+  if (!checked.body) return reply(checked.status, { erreur: checked.why });
+  const { pk, t } = checked.body;
+  const db = env.RETOURS;
+  if (await seen(db, pk, t)) return reply(409, { erreur: 'rejeu' });
+  if (checked.body.remove === true) {
+    const refused = await writeOnce(db, pk, t, [...markSeen(db, pk, t, now), db.prepare('DELETE FROM coffres_mdp WHERE pk = ?1').bind(pk)]);
+    return refused ?? reply(204);
+  }
+  const login = cleanLogin(checked.body.login);
+  const salt = fromB64(checked.body.salt, 16);
+  const wrap = fromB64(checked.body.wrap, 60);
+  const auth = checked.body.auth;
+  if (!login || !salt || !wrap || typeof auth !== 'string' || !HEX64.test(auth)) return reply(400, { erreur: 'forme' });
+  if ((await db.prepare('SELECT 1 AS x FROM coffres WHERE pk = ?1').bind(pk).first()) === null) return reply(409, { erreur: 'sans-coffre' });
+  const owner = await db.prepare('SELECT pk FROM coffres_mdp WHERE login = ?1').bind(login).first('pk');
+  if (owner && owner !== pk) return reply(409, { erreur: 'pris' });
+  const refused = await writeOnce(db, pk, t, [
+    ...markSeen(db, pk, t, now),
+    db.prepare('DELETE FROM coffres_mdp WHERE pk = ?1').bind(pk),
+    db.prepare('INSERT INTO coffres_mdp (login, pk, salt, auth, wrap, at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)').bind(login, pk, salt, auth, wrap, now),
+    db.prepare('DELETE FROM coffres_essais WHERE login = ?1').bind(login),
+  ]);
+  return refused ?? reply(204);
+}
+
+async function vaultSalt(request, env) {
+  if (await limited(request, env)) return reply(429, { erreur: 'trop' });
+  const body = await bodyJson(request, 512);
+  const login = cleanLogin(body?.login);
+  if (!login) return reply(400, { erreur: 'forme' });
+  const salt = await env.RETOURS.prepare('SELECT salt FROM coffres_mdp WHERE login = ?1').bind(login).first('salt');
+  return salt ? reply(200, { salt: toB64(new Uint8Array(salt)) }) : reply(404, { erreur: 'inconnu' });
+}
+
+async function vaultOpen(request, env, now) {
+  if (await limited(request, env)) return reply(429, { erreur: 'trop' });
+  const body = await bodyJson(request, 512);
+  const login = cleanLogin(body?.login);
+  const proof = fromB64(body?.auth, 32);
+  if (!login || !proof) return reply(400, { erreur: 'forme' });
+  const db = env.RETOURS;
+  await db.prepare('DELETE FROM coffres_essais WHERE at < ?1').bind(now - HOUR_MS).run();
+  const tries = await db.prepare('SELECT COUNT(*) AS n FROM coffres_essais WHERE login = ?1').bind(login).first('n');
+  if ((tries ?? 0) >= VAULT_TRIES) return reply(429, { erreur: 'essais' });
+  const row = await db.prepare('SELECT m.pk, m.auth, m.wrap, c.data, c.at FROM coffres_mdp m JOIN coffres c ON c.pk = m.pk WHERE m.login = ?1').bind(login).first();
+  if (!row || (await sha256hex(proof)) !== row.auth) {
+    await db.prepare('INSERT INTO coffres_essais (login, at) VALUES (?1, ?2)').bind(login, now).run();
+    return reply(403, { erreur: 'refuse' });
+  }
+  await db.prepare('DELETE FROM coffres_essais WHERE login = ?1').bind(login).run();
+  return reply(200, { pk: row.pk, wrap: toB64(new Uint8Array(row.wrap)), data: toB64(new Uint8Array(row.data)), at: row.at });
+}
+
+/** Les routes du coffre (/api/coffre…) ; undefined pour les autres. */
+async function coffre(request, env, url, now) {
+  const path = url.pathname;
+  if (path !== '/api/coffre' && !path.startsWith('/api/coffre/')) return undefined;
+  if (!env.RETOURS) return reply(503, { erreur: 'indisponible' });
+  try {
+    const get = /^\/api\/coffre\/([0-9a-f]{64})$/.exec(path);
+    if (get) {
+      if (request.method !== 'GET') return reply(405, { erreur: 'méthode' });
+      if (await limited(request, env)) return reply(429, { erreur: 'trop' });
+      return await vaultGet(env, get[1]);
+    }
+    if (request.method !== 'POST') return reply(405, { erreur: 'méthode' });
+    if (path === '/api/coffre') return await vaultPut(request, env, now);
+    if (path === '/api/coffre/mdp') return await vaultPassword(request, env, now);
+    if (path === '/api/coffre/sel') return await vaultSalt(request, env);
+    if (path === '/api/coffre/ouvrir') return await vaultOpen(request, env, now);
+    return reply(404, { erreur: 'inconnue' });
+  } catch {
+    // Rien n'est journalisé : ni la requête, ni l'erreur.
+    return reply(500, { erreur: 'service' });
+  }
+}
+
 /** Les routes des retours (/api/propositions, /api/votes, /api/rapports, /api/admin/…) ; undefined pour les autres. */
 async function retours(request, env, url, now) {
   const path = url.pathname;
@@ -561,7 +711,7 @@ export default {
     const url = new URL(request.url);
     const call = /^\/api\/b\/([^/]+)$/.exec(url.pathname);
     if (call) return ID.test(call[1]) ? api(request, env, call[1], now) : reply(404, { erreur: 'inconnue' });
-    const answered = await retours(request, env, url, now);
+    const answered = (await coffre(request, env, url, now)) ?? (await retours(request, env, url, now));
     if (answered) return answered;
     // La page du raccourci d'une borne : la même pour toutes (page.js lit l'identifiant dans l'adresse).
     if (/^\/b\/[A-Za-z0-9_-]{22}\/?$/.test(url.pathname)) {

@@ -6,7 +6,7 @@
 //   « Retirer de mes amis » (17/11/2026 : la fiche d'ami et le profil public faisaient doublon).
 //   Pour un autre joueur, ce qui est réservé aux amis est dit, grisé ; « Écrire un message » reste
 //   visible, grisé avec sa raison ;
-// - « Mon profil public » (Menu système > Amis) : ce que voient les autres, et qui a aimé chaque
+// - « Mon profil public » (Menu système > Mon compte) : ce que voient les autres, et qui a aimé chaque
 //   évènement (pour moi seul).
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module.
@@ -92,7 +92,7 @@ export interface ProfileMenuHost {
 export interface ProfileMenu {
   /** Le profil public d'un joueur, son « Retour » vers `back`. */
   openProfile(key: string, back: () => void): void;
-  /** « Mon profil public » (Menu système > Amis). */
+  /** « Mon profil public » (Menu système > Mon compte). */
   item: ProvidedSystemItem;
   /** Clic sur la notification d'un « J'aime » : « Mon profil public ». */
   openMine(back?: () => void): void;
@@ -250,8 +250,8 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     const rows: Row[] = items.map(({ event: e, likable }) => {
       if (!likable || !card) return { text: eventText(e, badgeLabel), detail: socialAgo(e.at, now()), icon: eventIcon(e), tone: e.kind === 'played' ? 'quiet' : 'ok' };
       const liked = net.likedByMe(key, e.id);
-      const index = actions.push({ label: eventText(e, badgeLabel), key: `like:${e.id}`, icon: liked ? 'star-filled' : 'star', run: () => { net.like(key, e.id, !liked); here(index); } }) - 1;
-      return { text: eventText(e, badgeLabel), detail: socialAgo(e.at, now()), icon: eventIcon(e), aside: `★ ${card.likes[e.id] ?? 0}`, ...(liked ? { badges: [t('Vous aimez')] } : {}), action: index, pick: true };
+      const index = actions.push({ label: eventText(e, badgeLabel), key: `like:${e.id}`, icon: liked ? 'thumb-up-filled' : 'thumb-up', run: () => { net.like(key, e.id, !liked); here(index); } }) - 1;
+      return { text: eventText(e, badgeLabel), detail: socialAgo(e.at, now()), icon: eventIcon(e), aside: `${card.likes[e.id] ?? 0}`, asideIcon: liked ? 'thumb-up-filled' : 'thumb-up', ...(liked ? { badges: [t('Vous aimez')] } : {}), action: index, pick: true };
     });
     const empty = friend ? t('Rien encore : ses records, badges et parties s’afficheront ici') : t('Ni record ni badge ces derniers jours');
     return { title: card ? t('Activité récente · {n} derniers jours', { n: 30 }) : t('Activité récente'), rows: rows.length ? rows : [{ text: empty, tone: 'quiet' }] };
@@ -285,7 +285,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       const rows: Row[] = card.events.map((e) => {
         const n = card.likes[e.id] ?? 0;
         const index = actions.push({ label: eventText(e, badgeLabel), key: `mine:${e.id}`, icon: eventIcon(e), ...(n ? {} : { tone: 'quiet' as const }), run: () => (n ? openLikers(e, () => openMine(undefined, index)) : undefined) }) - 1;
-        return { text: eventText(e, badgeLabel), detail: socialAgo(e.at, now()), icon: eventIcon(e), aside: `★ ${n}`, ...(n ? {} : { sub: t('Pas encore de « J’aime »') }), action: index, pick: true };
+        return { text: eventText(e, badgeLabel), detail: socialAgo(e.at, now()), icon: eventIcon(e), aside: `${n}`, asideIcon: n ? 'thumb-up-filled' : 'thumb-up', ...(n ? {} : { sub: t('Pas encore de « J’aime »') }), action: index, pick: true };
       });
       sections.push({ title: t('Votre activité récente'), rows: rows.length ? rows : [{ text: t('Ni record ni badge ces derniers jours'), tone: 'quiet' }] });
     }
@@ -313,7 +313,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       actions.push({ label: t('Retour'), icon: 'back', run: back });
       return {
         heading: t('Ont aimé'),
-        icon: 'star',
+        icon: 'thumb-up',
         subheading: eventText(e, badgeLabel),
         lead: t('Vous seul voyez qui a aimé ; les autres joueurs voient le nombre.'),
         sections: [{ rows: rows.length ? rows : [{ text: t('Personne pour l’instant'), tone: 'quiet' }] }],

@@ -1,4 +1,4 @@
-// Réglages du joueur pour les scores des amis pendant la partie (Menu système > Amis,
+// Réglages du joueur pour les scores des amis pendant la partie (Menu système > Communauté,
 // live-scores-menu.ts) : la place de la bande, et les scores sur le DMD, à part (LiveScoresSettings,
 // packages/core/src/gamenotice.ts). Gardés dans <données>\amis\scores-en-partie.json ; illisibles ou
 // absents : l'automatique, DMD activé. Le fichier peut porter un réglage par table (`tables`), pas

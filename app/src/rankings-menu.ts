@@ -409,8 +409,8 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
   function playersUnavailable(sc: PlayerScope): string | undefined {
     const s = host.players?.state();
     if (!s) return t('Réseau des bornes absent');
-    if (!s.enabled) return t('Partage désactivé : Amis > Partage et réseau');
-    if (sc === 'country' && !s.country) return t('Pays non choisi : Amis > Partage et réseau');
+    if (!s.enabled) return t('Partage désactivé : Communauté > Partage et réseau');
+    if (sc === 'country' && !s.country) return t('Pays non choisi : Mon compte > Mon pays');
     return undefined;
   }
 
@@ -473,7 +473,7 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
       const legend = (['playing', 'online', 'offline'] as Presence[]).filter((pr) => shownPresence.has(pr)).map((presence) => ({ presence, label: presence === 'playing' ? t('En partie') : presence === 'online' ? t('En ligne') : t('Hors ligne') }));
       const empty =
         playerScope === 'friends' && !host.players?.state().friends.size
-          ? { title: t('Aucun ami pour l’instant'), detail: t('Amis > Trouver un joueur') }
+          ? { title: t('Aucun ami pour l’instant'), detail: t('Communauté > Trouver un joueur') }
           : playerPeriod === 'week'
             ? { title: t('Personne n’a encore gagné d’XP cette semaine'), detail: t('Chaque partie compte : le classement repart à zéro chaque lundi.') }
             : { title: t('Aucun joueur classé pour l’instant'), detail: t('Les cartes des autres joueurs arrivent au fil des connexions.') };

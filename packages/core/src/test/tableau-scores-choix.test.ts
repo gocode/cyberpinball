@@ -29,7 +29,7 @@ const choice = require(path.join(REPO_ROOT, 'app', 'dist', 'scores-choice.js')) 
 };
 
 const AVAILABLE = () => ({});
-const MISSING = () => ({ unavailable: 'Partage désactivé : Amis > Partage et réseau' });
+const MISSING = () => ({ unavailable: 'Partage désactivé : Communauté > Partage et réseau' });
 
 test('tableau des scores : par défaut Mondial, Cette semaine ; sans classement mondial, Cette borne', () => {
   assert.deepEqual(choice.SCORES_CHOICE_DEFAULT, { scope: 'world', period: 'week' });

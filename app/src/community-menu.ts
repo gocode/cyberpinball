@@ -78,7 +78,7 @@ export interface CommunityMenu {
   openHome(back: () => void): void;
   /** « Joueurs en ligne », son « Retour » vers `back` ; sans lui, le menu système. */
   openPlayers(back?: () => void): void;
-  /** Menu système > Amis > Joueurs en ligne. */
+  /** Menu système > Communauté > Joueurs en ligne. */
   item: ProvidedSystemItem;
   /** Ce que dit le médaillon : joueurs en ligne, ceux de mon pays, mes amis ; quelque chose attend. */
   summary(): { online: number; country: number; friends: number; attention: boolean };

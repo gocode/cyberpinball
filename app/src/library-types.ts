@@ -342,6 +342,8 @@ export interface Row {
   thumbIcon?: string;
   /** Valeur courte à droite de la ligne (« 1080p », « 4:12 », « 21 / 24 retenus »), jamais coupée. */
   aside?: string;
+  /** Icône devant cette valeur (le pouce des « J'aime » devant leur nombre). */
+  asideIcon?: IconName;
   /** Seconde ligne de détail, plus discrète (dernière synchro, raison d'une indisponibilité). */
   sub?: string;
   /** Case devant la ligne : cochée, vide, ou barrée (sautée, refusée : on ne peut pas la cocher). */
@@ -415,7 +417,16 @@ export interface Action {
    * Page web de l'élément (une ligne des crédits) : tant qu'il est choisi, son QR code s'affiche
    * sous les actions, pour l'ouvrir aussi sur le téléphone.
    */
-  qr?: { url: string; title: string };
+  qr?: {
+    url: string;
+    title: string;
+    /**
+     * Un QR qui n'est pas une page (le code de récupération du compte : ses mots en texte) : `url` est
+     * le texte encodé, `caption` ce qui s'écrit sous le QR à sa place, `hint` à quoi il sert.
+     */
+    caption?: string;
+    hint?: string;
+  };
   run: () => void | Promise<void>;
 }
 
@@ -575,6 +586,8 @@ export interface PromptOptions {
    * Pour « en train d'écrire » (typing.ts). Le texte donné à l'ouverture ne compte pas.
    */
   onInput?: (active: boolean) => void;
+  /** Mot de passe (Mon compte) : le texte s'affiche en points, ni emoji ni préfixe. */
+  secret?: boolean;
 }
 
 /**
@@ -586,7 +599,7 @@ export type TextPrefix = { prefixes?: { label: string; text: string }[]; prefixA
 export type Editor =
   /** Sans `field` : saisie libre d'un écran « prompt ». */
   /** `at` : point d'insertion (textedit.ts, absent : à la fin) ; `emoji` : panneau des emojis ouvert. */
-  | ({ kind: 'text'; field?: Field; label: string; value: string; at?: number; emoji?: boolean; cursor: number; shift: boolean; typed: boolean } & TextPrefix)
+  | ({ kind: 'text'; field?: Field; label: string; value: string; at?: number; emoji?: boolean; cursor: number; shift: boolean; typed: boolean; secret?: boolean } & TextPrefix)
   | { kind: 'choice'; field: Field; label: string; choices: string[]; cursor: number }
   | { kind: 'number'; field: Field; label: string; value: number; typed: string; cursor: number };
 

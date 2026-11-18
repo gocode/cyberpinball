@@ -741,7 +741,7 @@ export function createLibrary(host: LibraryHost) {
   /** Saisie d'un nom avec le clavier à l'écran (ou un vrai clavier). */
   function openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string, options?: PromptOptions): void {
     const prefix = options?.prefixes?.length ? { prefixes: options.prefixes, prefixAt: Math.min(options.prefix ?? 0, options.prefixes.length - 1) } : {};
-    const next: Screen = { kind: 'prompt', heading, lead, editor: { kind: 'text', label, value, cursor: 0, shift: false, typed: false, ...prefix }, done, table: tableOf(screen), ...(options?.onInput ? { onInput: options.onInput } : {}) };
+    const next: Screen = { kind: 'prompt', heading, lead, editor: { kind: 'text', label, value, cursor: 0, shift: false, typed: false, ...prefix, ...(options?.secret ? { secret: true } : {}) }, done, table: tableOf(screen), ...(options?.onInput ? { onInput: options.onInput } : {}) };
     promptSeen.set(next, value);
     go(next);
   }
@@ -5342,7 +5342,7 @@ export function createLibrary(host: LibraryHost) {
   /** QR code de l'élément choisi : calculé pour lui seul, l'adresse montrée sans « https:// » ni « www. ». */
   function actionQrView(qr: Action['qr']) {
     if (!qr) return undefined;
-    return { qr: qrRows(qr.url), title: qr.title, url: qr.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '') };
+    return { qr: qrRows(qr.url), title: qr.title, url: qr.caption ?? qr.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''), ...(qr.hint ? { hint: qr.hint } : {}) };
   }
 
   function view() {
@@ -5578,9 +5578,10 @@ export function createLibrary(host: LibraryHost) {
       label: e.label,
       keys,
       cursor: e.cursor,
-      // Le texte de part et d'autre du point d'insertion.
-      value: beforeCaret(e),
-      after: afterCaret(e),
+      // Le texte de part et d'autre du point d'insertion ; un mot de passe, en points.
+      value: e.secret ? '●'.repeat([...beforeCaret(e)].length) : beforeCaret(e),
+      after: e.secret ? '●'.repeat([...afterCaret(e)].length) : afterCaret(e),
+      ...(e.secret ? { off: [{ index: KEYBOARD.indexOf('Emoji'), why: t('Pas d’emoji dans un mot de passe') }] } : {}),
       shift: e.shift,
       shiftKey: KEYBOARD.indexOf('Maj'),
       // Champ à préfixe (lien, identifiant) : la touche des emojis grisée, avec sa raison.

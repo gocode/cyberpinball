@@ -38,7 +38,7 @@ export const messages: Record<string, string> = {
   "Aucune clé branchée : elle apparaît ici dès qu’elle l’est": "No stick plugged in: it shows up here as soon as it is",
   "À un ami": "To a friend",
   "Le résumé, dans la messagerie · {online}": "The summary, in messages · {online}",
-  "Aucun ami pour l’instant : Menu système > Amis > Trouver un joueur": "No friends yet: System menu > Friends > Find a player",
+  "Aucun ami pour l’instant : Menu système > Communauté > Trouver un joueur": "No friends yet: System menu > Community > Find a player",
   "Réseau des amis coupé": "Friends network off",
   "Dans un dossier de la borne": "In a cabinet folder",
   "{dir} · à copier vous-même": "{dir} · to copy yourself",

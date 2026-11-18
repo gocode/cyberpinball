@@ -4,7 +4,7 @@
 
 The **Communauté** (Community) tab of the phone page gathers **Messages**, **Amis** (Friends) and **Scores** (previous section), as three buttons under the top bar.
 It keeps the last one opened.
-Messaging there is the same as at the cabinet (System menu > Friends > Messages): the cabinet chooses, formats and translates everything (`app/src/chat-menu.ts`, `remoteCommunity`); the page only draws (`app/renderer/telephone/telephone-community.js`).
+Messaging there is the same as at the cabinet (System menu > Community > Messages): the cabinet chooses, formats and translates everything (`app/src/chat-menu.ts`, `remoteCommunity`); the page only draws (`app/renderer/telephone/telephone-community.js`).
 
 - **Messages**: the conversations in the cabinet's order (most recent first, then friends without a message, then former friends whose conversation stays readable), with the friend's avatar and presence mark (green online, blue in a game, hollow offline), the last message ("Vous : …", You: …), its time, and the number of unread messages.
   A refusal or messages waiting are written under the conversation, in amber.

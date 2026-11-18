@@ -120,7 +120,7 @@ export const GAME_NOTICE_LINE = { width: 720, height: 76, gap: 14 } as const;
 //      pendant le jeu ») : le DMD que VPX ou PinMAME dessine ne s'écrit pas de l'extérieur, alors
 //      Cyber Pinball pose ses propres points par-dessus, à sa place, quelques secondes
 //      (liveBoardDots), comme un vrai flipper montre les scores des autres.
-// Le joueur peut aussi choisir la place de la bande (Menu système > Amis > « Scores des amis pendant
+// Le joueur peut aussi choisir la place de la bande (Menu système > Communauté > « Scores des amis pendant
 // la partie », LiveScoresSettings) : un choix que la borne ne permet pas revient à l'automatique, et
 // le journal le dit.
 
@@ -219,7 +219,7 @@ export interface LiveBoardScreens {
   zones?: { backglass?: Rect; topper?: Rect };
 }
 
-/** Où le joueur veut la bande des scores des amis (Menu système > Amis > « Scores des amis pendant la partie »). */
+/** Où le joueur veut la bande des scores des amis (Menu système > Communauté > « Scores des amis pendant la partie »). */
 export type LiveScoresPlace = 'auto' | 'backglass' | 'topper' | 'playfield-bottom' | 'playfield-side';
 
 export const LIVE_SCORES_PLACES: readonly LiveScoresPlace[] = ['auto', 'backglass', 'topper', 'playfield-bottom', 'playfield-side'];
@@ -392,7 +392,7 @@ export function liveScoresChoices(cabinet: LiveScoresCabinet): LiveScoresChoice[
 /** Le réglage « Scores sur le DMD » : grisé, pourquoi, quand la borne ne le permet pas (jamais caché). */
 export function liveScoresDmdUnavailable(cabinet: LiveScoresCabinet): string | undefined {
   if (!cabinet.dmd) return t('Pas d’écran du DMD sur cette borne : un DMD matériel ne peut pas être recouvert');
-  if (!cabinet.inspector) return t('Le DMD se lit par l’inspector de VPX : Amis > Partage et réseau > « Autoriser dans le pare-feu de Windows »');
+  if (!cabinet.inspector) return t('Le DMD se lit par l’inspector de VPX : Communauté > Partage et réseau > « Autoriser dans le pare-feu de Windows »');
   return undefined;
 }
 

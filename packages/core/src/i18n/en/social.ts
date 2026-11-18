@@ -4,7 +4,6 @@
 export const messages: Record<string, string> = {
   // packages/core/src/systemmenu.ts
   'Amis': 'Friends',
-  'Messages, mes amis, mon avatar, mon profil public, historique des parties, trouver un joueur, demandes, badges, partage': 'Messages, my friends, my avatar, my public profile, game history, find a player, requests, badges, sharing',
   'Mes amis': 'My friends',
   'Trouver un joueur': 'Find a player',
   'Demandes d’amis': 'Friend requests',
@@ -176,7 +175,7 @@ export const messages: Record<string, string> = {
   'Règles du pare-feu en place': 'Firewall rules in place',
   'Cyber Pinball ouvert aux autres bornes, VPX fermé au réseau': 'Cyber Pinball open to other cabinets, VPX closed to the network',
   'Vérifié après la mise à jour : une règle du pare-feu de Windows est à reposer. Windows demande son autorisation une seule fois ; ensuite, Cyber Pinball la repose de lui-même à chaque démarrage.': 'Checked after the update: a Windows Firewall rule must be set again. Windows asks for its permission once; after that, Cyber Pinball sets it again on its own at every startup.',
-  'Pare-feu de Windows : {reason}. Menu système > Amis > Partage et réseau.': 'Windows Firewall: {reason}. System menu > Friends > Sharing and network.',
+  'Pare-feu de Windows : {reason}. Menu système > Communauté > Partage et réseau.': 'Windows Firewall: {reason}. System menu > Community > Sharing and network.',
   'Indisponible : VPX n’est pas encore installé': 'Unavailable: VPX is not installed yet',
   'Partage activé': 'Sharing on',
   'Relié à {n} borne': 'Connected to {n} cabinet',
@@ -184,8 +183,6 @@ export const messages: Record<string, string> = {
   'Connexion au réseau…': 'Connecting to the network…',
   'Partage désactivé': 'Sharing off',
   'Personne ne vous voit ; vos amis vous voient hors ligne': 'Nobody sees you; your friends see you offline',
-  'Votre nom : {name}': 'Your name: {name}',
-  'Visible dans l’annuaire · votre identifiant : {id}': 'Shown in the directory · your ID: {id}',
   'Identifiant : {id}': 'ID: {id}',
   'Unique à sa borne : départage deux joueurs du même nom': 'Unique to their cabinet: tells apart two players with the same name',
   'Réseau local : activé': 'Local network: on',
@@ -203,8 +200,6 @@ export const messages: Record<string, string> = {
   'Plus de présence, plus d’annuaire ; vos amis restent dans la liste': 'No more presence, no more directory; your friends stay in the list',
   'Activer le partage': 'Turn sharing on',
   'Présence, annuaire et demandes d’amis': 'Presence, directory and friend requests',
-  'Changer de nom…': 'Change name…',
-  '{min} à {max} caractères': '{min} to {max} characters',
   'Désactiver le réseau local': 'Turn the local network off',
   'Activer le réseau local': 'Turn the local network on',
   'Autoriser dans le pare-feu de Windows': 'Allow in Windows Firewall',
@@ -213,9 +208,6 @@ export const messages: Record<string, string> = {
   '{n} joueurs bloqués': '{n} blocked players',
   'Sans serveur : les bornes se trouvent et se parlent directement, par Internet ou sur votre réseau local.': 'No server: cabinets find and talk to each other directly, over the Internet or on your local network.',
   'Ce que voient les autres': 'What others see',
-  'Votre nom': 'Your name',
-  'Nom refusé : {min} à {max} lettres, chiffres, espaces, tirets ou points': 'Name refused: {min} to {max} letters, digits, spaces, dashes or dots',
-  'Nom changé : vos amis et l’annuaire le reçoivent': 'Name changed: your friends and the directory receive it',
   'Pare-feu de Windows : {error}': 'Windows Firewall: {error}',
   'Autorisation refusée : rien n’a changé': 'Permission refused: nothing changed',
   'Débloquer {name}': 'Unblock {name}',
@@ -243,7 +235,6 @@ export const messages: Record<string, string> = {
   '{n} en attente': '{n} pending',
 
   // app/src/friends-menu.ts : supprimer mon compte (account-delete.ts)
-  'Supprimer mon compte…': 'Delete my account…',
   'Votre nom, vos amis, vos messages, vos scores publiés : effacés ici et chez les autres': 'Your name, friends, messages and published scores: erased here and on other cabinets',
   'Supprimer mon compte ?': 'Delete my account?',
   'Rien ne pourra le rétablir. Cyber Pinball redémarre ensuite avec un compte neuf, sans nom ni ami.': 'Nothing can bring it back. Cyber Pinball then restarts with a new account, with no name and no friends.',

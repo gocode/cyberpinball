@@ -4,7 +4,7 @@
 
 L'onglet **Communauté** de la page du téléphone rassemble **Messages**, **Amis** et **Scores** (section précédente), en trois boutons sous la barre du haut.
 Il garde le dernier ouvert.
-La messagerie y est la même qu'à la borne (Menu système > Amis > Messages) : la borne choisit, met en forme et traduit tout (`app/src/chat-menu.ts`, `remoteCommunity`) ; la page ne fait que dessiner (`app/renderer/telephone/telephone-community.js`).
+La messagerie y est la même qu'à la borne (Menu système > Communauté > Messages) : la borne choisit, met en forme et traduit tout (`app/src/chat-menu.ts`, `remoteCommunity`) ; la page ne fait que dessiner (`app/renderer/telephone/telephone-community.js`).
 
 - **Messages** : les conversations dans l'ordre de la borne (la plus récente d'abord, puis les amis sans message, puis les anciens amis dont le fil reste lisible), avec la pastille de l'ami et sa marque de présence (verte en ligne, bleue en partie, creuse hors ligne), le dernier message (« Vous : … »), son moment, et le nombre de non-lus.
   Un refus ou des messages en attente s'écrivent sous la conversation, en ambre.

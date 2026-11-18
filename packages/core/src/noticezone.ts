@@ -70,7 +70,7 @@ export interface NoticeZone {
 
 /** Ce qui, sur l'écran du moment, change la règle. */
 export interface ZoneFacts {
-  /** « Masquer les notifications pendant les parties » (Menu système > Amis). */
+  /** « Masquer les notifications pendant les parties » (Menu système > Communauté). */
   quietInGame?: boolean;
   /** Un constat bref est posé sous la marque du menu des tables, à la place de la notification. */
   banner?: boolean;

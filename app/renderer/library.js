@@ -9,6 +9,13 @@ function libEl(tag, className, text) {
   return node;
 }
 
+/** Valeur à droite d'une ligne, précédée de son icône s'il y en a une (le pouce des « J'aime »). */
+function rowAside(row) {
+  const aside = libEl('span', 'lib-row-aside', row.aside);
+  if (row.asideIcon) aside.prepend(cyberIcon(row.asideIcon, 'lib-row-aside-icon'), ' ');
+  return aside;
+}
+
 // Vue en cours de dessin : un clic part avec l'identité de l'action qu'il vise (focus.ts),
 // pour valider cet élément même si la liste a bougé entre-temps.
 let drawn;
@@ -219,7 +226,7 @@ function renderLibrary(v) {
           // restent, comme sur une ligne en colonnes ; sans elles, une case cochée ne se voyait pas.
           if (row.check) li.append(rowCheck(row.check));
           li.append(avatarNode(row.avatar, 'lib-row-avatar'), main);
-          if (row.aside) li.append(libEl('span', 'lib-row-aside', row.aside));
+          if (row.aside) li.append(rowAside(row));
         }
         if (parts && !row.figure && !row.avatar) {
           li.classList.add('with-parts');
@@ -228,7 +235,7 @@ function renderLibrary(v) {
           if (row.thumb) li.append(rowThumb(row.thumb, row.thumbIcon));
           if (row.medal) li.append(rowMedal(row.medal));
           li.append(main);
-          if (row.aside) li.append(libEl('span', 'lib-row-aside', row.aside));
+          if (row.aside) li.append(rowAside(row));
         }
         // Avec une pastille ou des colonnes, la barre et la note restent dans la colonne du texte.
         const tail = row.avatar || parts ? main : li;
@@ -325,8 +332,9 @@ function renderLibrary(v) {
     const li = libEl('li', 'lib-actions-qr');
     const qr = remoteQr(v.actionQr.qr);
     qr.className = 'lib-actions-qr-code';
-    qr.setAttribute('aria-label', t('QR code de la page'));
-    li.append(libEl('p', 'lib-actions-qr-title', v.actionQr.title), qr, libEl('p', 'lib-actions-qr-url', v.actionQr.url), libEl('p', 'lib-actions-qr-hint', t('Start l’ouvre ici. Visez ce code pour l’ouvrir sur votre téléphone.')));
+    qr.setAttribute('aria-label', v.actionQr.title || t('QR code de la page'));
+    // `hint` : un QR qui n'est pas une page (code de récupération du compte) dit lui-même à quoi il sert.
+    li.append(libEl('p', 'lib-actions-qr-title', v.actionQr.title), qr, libEl('p', 'lib-actions-qr-url', v.actionQr.url), libEl('p', 'lib-actions-qr-hint', v.actionQr.hint || t('Start l’ouvre ici. Visez ce code pour l’ouvrir sur votre téléphone.')));
     actions.append(li);
   }
   body.append(actions);

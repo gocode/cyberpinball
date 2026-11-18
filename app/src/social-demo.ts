@@ -33,7 +33,7 @@
 // la demande, et dès son premier morceau, pendant que le menu système est ouvert (l'écran de
 // réception), Émile (l'ami hors ligne) se connecte, Bruno gagne un badge et lance une autre
 // partie : trois nouveautés, un seul résumé au retour ; la table finit ensuite au menu des tables.
-// CYBERPINBALL_RESEAU_DEMO=messagerie (Menu système > Amis > Messages) : la conversation avec Émile
+// CYBERPINBALL_RESEAU_DEMO=messagerie (Menu système > Communauté > Messages) : la conversation avec Émile
 // (hors ligne) a déjà son historique et deux messages qui attendent sa connexion ; Bruno, devenu ami,
 // écrit deux messages, puis répond à ce que la borne lui écrit (une réaction, une phrase).
 // CYBERPINBALL_RESEAU_DEMO=communaute (médaillon Communauté, Joueurs en ligne) : en plus de Bruno

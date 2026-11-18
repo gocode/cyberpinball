@@ -32,7 +32,7 @@ export const messages: Record<string, string> = {
     'You alone are responsible for what you share and what you fetch: messages, images, media, tables. Do not share anything unlawful or offensive, or any content you have no right to pass on to other people.',
   'Une ROM ou un PuP-Pack ne se récupère chez un ami qu’après votre attestation d’en avoir le droit : cette attestation vous engage.':
     'A ROM or a PuP-Pack can only be fetched from a friend once you have declared that you have the right to it: that declaration is binding on you.',
-  'Pour tout couper : Menu système > Amis > Partage et réseau.': 'To turn it all off: System menu > Friends > Sharing and network.',
+  'Pour tout couper : Menu système > Communauté > Partage et réseau.': 'To turn it all off: System menu > Community > Sharing and network.',
 
   'Sites, services et logiciels tiers': 'Third-party sites, services and software',
   'Visual Pinball X, PinMAME, les sites de téléchargement, les bases de médias, YouTube et les autres services que Cyber Pinball utilise, ou vers lesquels il vous oriente, sont édités par des tiers indépendants. Cyber Pinball n’y est pas affilié et ne répond ni de leur contenu, ni de leur disponibilité.':

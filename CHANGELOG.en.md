@@ -9,6 +9,14 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Player profile: a record's or badge's "Like" now shows a thumbs-up instead of a star, so it is clear you can like it; the thumb is filled once you have liked it. The same thumb appears on the "Liked by" screen, the notification for a like you receive, the experience points breakdown and the "Appreciated", "Popular" and "Generous" badges.
+- New System menu > My account section, at the top: protect and transfer your account, nickname, avatar, country, badges, public profile, what others see, and account deletion.
+- Backup copy of the account, written automatically outside the Cyber Pinball folder: a reinstall, even in another folder, finds the account and offers to take it back on first launch.
+- Recovery code: 24 words to write down, or their QR code to photograph, which bring the account back on any PC; two words are asked again to check it is written down.
+- Optional password: the nickname becomes the ID, and the account is kept encrypted on the Cyber Pinball server, which cannot open it; at most ten failed tries per hour.
+- "I already have an account" on first launch: take back an account with its code, its password, a backup or the PC's backup copy.
+- The Friends section is now called Community, like the wheel medallion; "Sharing and network" only keeps the network there.
+- Fix: the avatar picture is now included in backups.
 - Tables whose DMD runs through UltraDMD or FlexDMD: their oversized videos, which VPX 10.8.1 decodes whole for every scene (the game froze for one to several seconds, flippers included), are brought down to the DMD size before the game; they look the same, and the original goes to Cyber Pinball's recycle bin. Health and the table's sheet point it out.
 - PuP-Packs with options whose current option declares no screens (Hellboy, Daredevil, 24…): their screens are now declared before the game, as for packs without options; the pack shows again.
 - Real DMD (beta), PIN2DMD staying dark during games with "Menu image: yes": the DMD server that could not find the display kept searching for it during the game and held on to the board, so VPX could no longer open it. It now stops after 20 seconds without an answer, and always before a game where VPX drives the DMD itself.

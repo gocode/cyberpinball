@@ -226,7 +226,7 @@ export const messages: Record<string, string> = {
   'Chargement de la messagerie…': 'Loading your messages…',
   'La borne envoie vos conversations.': 'The cabinet is sending your conversations.',
   'Messagerie indisponible': 'Messaging unavailable',
-  'À la borne : Amis > Trouver un joueur.': 'At the cabinet: Friends > Find a player.',
+  'À la borne : Communauté > Trouver un joueur.': 'At the cabinet: Community > Find a player.',
   'Ouverture du fil…': 'Opening the conversation…',
   'Retour aux conversations': 'Back to conversations',
   'Clavier : taper dans le champ ouvert à la borne': 'Keyboard: type in the field open at the cabinet',

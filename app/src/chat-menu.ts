@@ -1,4 +1,4 @@
-// Menu système > Amis > Messages : la messagerie entre amis à l'écran (chat-service.ts).
+// Menu système > Communauté > Messages : la messagerie entre amis à l'écran (chat-service.ts).
 //
 // - « Messages » : une ligne par ami, les conversations les plus récentes d'abord, puis les amis à
 //   qui l'on n'a pas encore écrit (en ligne d'abord) ; le non-lu porte la pastille rouge et son mot.

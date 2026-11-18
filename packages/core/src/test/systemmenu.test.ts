@@ -54,7 +54,7 @@ test('menu système : chaque entrée est rangée une fois, sous une seule rubriq
     if (SYSTEM_ROOT.includes(group)) assert.ok(!seen.has(group), `la rubrique « ${group} » est aussi rangée dans « ${seen.get(group)} »`);
     else assert.ok(systemPathOf(group), `« ${group} » n'est accessible depuis aucune rubrique`);
   }
-  assert.equal(SYSTEM_ROOT.length, 5, 'cinq rubriques');
+  assert.equal(SYSTEM_ROOT.length, 6, 'six rubriques (Mon compte en tête depuis le 18/11/2026)');
 });
 
 test('menu système : la racine reprend les rubriques dans leur ordre, et chaque raccourci une fois', () => {
@@ -64,8 +64,9 @@ test('menu système : la racine reprend les rubriques dans leur ordre, et chaque
   // Télécommande du téléphone avant Borne (06/11/2026 : rangée seulement dans Borne, on ne la trouvait pas),
   // Juke-box après Médias (09/11/2026 : « Menu système > Juke-box », chemin donné par le médaillon de la roue),
   // Collections après Activité récente (10/11/2026 : sur une borne dont les MagnaSave ne répondent pas, Exit puis Collections),
-  // Nouveautés tout en tête (17/11/2026 : la pastille rouge y mène ; à la racine tant qu'elles sont récentes ou pas vues).
-  assert.deepEqual(SYSTEM_ROOT_ENTRIES, ['news', 'activity', 'collections', 'amis', 'tables', 'medias', 'jukebox', 'downloads', 'phone-remote', 'borne', 'cyberpinball']);
+  // Nouveautés tout en tête (17/11/2026 : la pastille rouge y mène ; à la racine tant qu'elles sont récentes ou pas vues),
+  // Mon compte en tête des rubriques (18/11/2026), Amis devenue Communauté.
+  assert.deepEqual(SYSTEM_ROOT_ENTRIES, ['news', 'activity', 'collections', 'compte', 'amis', 'tables', 'medias', 'jukebox', 'downloads', 'phone-remote', 'borne', 'cyberpinball']);
 });
 
 test('menu système : dans une rubrique, chaque entrée a son icône, et la rubrique la sienne', () => {
@@ -201,7 +202,7 @@ test('lecture des chemins : guillemets, traduction entre parenthèses, texte nu'
   assert.deepEqual(segments("Friends > Friend's requests'),"), ['Friends', "Friend's requests"], 'apostrophe dans le nom, puis fin de la chaîne de code');
   assert.equal(checkPath(segments("What's new): the big new things")), undefined, '« What’s new » est une rubrique');
   assert.deepEqual(segments('Amis · vous : place 2 sur 3 »'), ['Amis'], 'la suite d’une notification, après « · »');
-  assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Nouveautés, Activité récente, Collections, Amis, Tables, Médias, Juke-box, Téléchargements, Télécommande du téléphone, Borne, Cyber Pinball)');
+  assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Nouveautés, Activité récente, Collections, Mon compte, Communauté, Tables, Médias, Juke-box, Téléchargements, Télécommande du téléphone, Borne, Cyber Pinball)');
   assert.equal(checkPath(['Téléchargements']), undefined, 'Téléchargements, à la racine');
   assert.equal(checkPath(['Tables', 'Téléchargements']), undefined, 'et toujours dans Tables');
   assert.equal(checkPath(['Cyber Pinball', 'Language / Langue']), undefined);

@@ -92,6 +92,11 @@ body {
   vertical-align: -0.14em;
 }
 
+/* Pouce des « J'aime » déjà donnés : rempli de la couleur du texte, partout où il paraît. */
+.icon[data-icon="thumb-up-filled"] {
+  fill: currentColor;
+}
+
 /*
  * Pastille d'un joueur (avatar.js, packages/core/src/avatar.ts) : son image, ou ses initiales sur
  * la teinte tirée de sa clé. La teinte reste sombre et peu saturée (fond noir sarcelle) : seul le

@@ -66,7 +66,7 @@ export function termsDocument(): TermsDocument {
           t('Le réseau des bornes est activé d’office : vos amis voient votre pseudo, votre avatar, votre pays, votre présence en ligne et vos scores publiés, et peuvent parcourir votre bibliothèque de tables et de médias.'),
           t('Vous êtes seul responsable de ce que vous partagez et de ce que vous récupérez : messages, images, médias, tables. Ne partagez rien d’illicite ou d’offensant, ni aucun contenu dont vous n’avez pas le droit de faire profiter d’autres personnes.'),
           t('Une ROM ou un PuP-Pack ne se récupère chez un ami qu’après votre attestation d’en avoir le droit : cette attestation vous engage.'),
-          t('Pour tout couper : Menu système > Amis > Partage et réseau.'),
+          t('Pour tout couper : Menu système > Communauté > Partage et réseau.'),
         ],
       },
       {

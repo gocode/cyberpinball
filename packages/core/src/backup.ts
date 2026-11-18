@@ -26,6 +26,7 @@ import * as path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
 import { renameWithRetryAsync, writeFileAtomic } from './atomicwrite';
+import { isAvatarFileName } from './avatar';
 import { chatFile } from './chat';
 import { movePath, safeName, samePath, trashDirFor } from './fileops';
 import { t } from './i18n';
@@ -128,6 +129,8 @@ export function partOf(rel: string): BackupPart | undefined {
       if (parts.length > 2) {
         // Amis : records, historique, réglages ; ce qu'un ami a envoyé (recus, tables) se redemande.
         if (sub === 'amis') return ['recus', 'tables'].includes(parts[2]?.toLowerCase() ?? '') ? undefined : 'friends';
+        // Avatars (avatar.ts) : le sien, que rien d'autre ne garde, et ceux des amis ; jamais le dossier de recadrage.
+        if (sub === 'avatars') return parts.length === 3 && isAvatarFileName(parts[2]) ? 'friends' : undefined;
         if (sub === 'enregistrements') return 'vpx';
         // cache, logs, backups (anciens VPinballX.ini), staging, sauvegardes, restauration, adblock (listes retéléchargées)…
         return undefined;

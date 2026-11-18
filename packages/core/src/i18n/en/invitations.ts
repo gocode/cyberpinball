@@ -53,7 +53,7 @@ export const messages: Record<string, string> = {
   'Son pseudo, ou l’identifiant vu sur sa fiche': 'Their nickname, or the ID shown on their card',
   'Personne : je l’ai trouvé seul': 'Nobody: I found it myself',
   'La question ne sera plus posée': 'You won’t be asked again',
-  'Menu système > Amis > Mon profil public, pendant un mois': 'System menu > Friends > My public profile, for a month',
+  'Menu système > Mon compte > Mon profil public, pendant un mois': 'System menu > My account > My public profile, for a month',
   'Personne sur votre réseau local pour l’instant': 'Nobody on your local network yet',
   'Cherchez son pseudo dans l’annuaire': 'Search for their nickname in the directory',
   'Un joueur vous a fait découvrir Cyber Pinball ? Dites-le : il le verra sur son profil, parmi les personnes qu’il a invitées. Votre profil, lui, n’en dit rien.': 'Did a player introduce you to Cyber Pinball? Say so: they will see it on their profile, among the players they invited. Your own profile says nothing about it.',

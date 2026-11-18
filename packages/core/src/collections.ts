@@ -107,7 +107,7 @@ export function buildCollections<T extends Shelved & { id?: string }>(tables: re
     friends.state === 'off'
       ? t('Le réseau des amis est coupé')
       : friends.state === 'none'
-        ? t('Pas encore d’ami : Menu système > Amis > Trouver un joueur')
+        ? t('Pas encore d’ami : Menu système > Communauté > Trouver un joueur')
         : friends.state === 'offline'
           ? t('Aucun ami en ligne pour l’instant')
           : friends.state === 'searching'

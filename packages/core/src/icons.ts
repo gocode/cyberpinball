@@ -149,6 +149,9 @@ export const ICON_NAMES = [
   'vr',
   // Crédits de la communauté (fiche d'une table, Menu système > Cyber Pinball > La communauté)
   'credits',
+  // « J'aime » du profil public : pouce levé, rempli quand on aime déjà
+  'thumb-up',
+  'thumb-up-filled',
 ] as const;
 
 

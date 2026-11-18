@@ -277,8 +277,8 @@ function defaultName(key: string): string {
   return t('Joueur {tag}', { tag: shortTag(key) });
 }
 
-export function newSocialState(now = new Date()): SocialState {
-  const key = createPlayerKey();
+/** État neuf ; `key` : une clé déjà connue (compte repris par son code de récupération, recovery.ts). */
+export function newSocialState(now = new Date(), key: PlayerKey = createPlayerKey()): SocialState {
   return { version: 1, enabled: true, lan: true, shareLibrary: true, name: defaultName(key.publicKey), nameAt: now.toISOString(), key, friends: [], incoming: [], outgoing: [], blocked: [], declined: [], directory: [], directorySeenChecked: true, events: [], badges: [], badgesChecked: false };
 }
 

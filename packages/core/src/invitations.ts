@@ -3,7 +3,7 @@
 // première. Jamais « parrain » ni « filleul » : on dit « personnes invitées », « a invité ».
 //
 // Sans serveur ni compte, seul le joueur invité peut dire qui l'a invité :
-// - au premier lancement (ou plus tard, Menu système > Amis), il répond à « Qui t'a fait découvrir
+// - au premier lancement (ou plus tard, Menu système > Communauté), il répond à « Qui t'a fait découvrir
 //   Cyber Pinball ? » : un joueur de l'annuaire, ou personne (declareInviter, declineInviter) ;
 // - l'invitation ne compte qu'à sa première partie menée au bout (confirmInvitation) : sa borne signe
 //   alors une attestation (Invitation) et la remet à la borne de l'inviteur, ou la fait relayer ;

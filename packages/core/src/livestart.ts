@@ -249,7 +249,7 @@ export function liveManualLabel(reason: LiveManualReason): { text: string; detai
       : reason === 'rom'
         ? t('la mémoire de sa ROM n’est pas décrite (carte absente ou incomplète)')
         : reason === 'inspector'
-          ? t('il faudrait l’inspector de VPX : Menu système > Amis > Partage et réseau, règle du pare-feu de VPX')
+          ? t('il faudrait l’inspector de VPX : Menu système > Communauté > Partage et réseau, règle du pare-feu de VPX')
           : t('le relevé ne s’ajoute pas à son script');
   return { text, detail: t('{why} ; chacun appuie sur Start à « Partez ! », et son score compte s’il entre au tableau d’honneur', { why }) };
 }

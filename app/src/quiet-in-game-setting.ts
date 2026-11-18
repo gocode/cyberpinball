@@ -1,4 +1,4 @@
-// Réglage du joueur « Masquer les notifications pendant les parties » (Menu système > Amis ;
+// Réglage du joueur « Masquer les notifications pendant les parties » (Menu système > Communauté ;
 // essai réel du 04/11/2026) : désactivé par défaut, les notifications qui se montrent partout
 // (connexion d'un ami, demande de rejoindre une partie, nouvelles de la partie entre amis :
 // notices.ts, NoticeRule.away) paraissent aussi pendant les parties, par-dessus VPX, avec leur son.

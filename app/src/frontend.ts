@@ -289,6 +289,10 @@ import {
   maskWords,
   jukeboxRoutes,
   type JukeboxAudioRoute,
+  accountCopiesDir,
+  RELAY_ORIGIN,
+  writeAccountBundle,
+  type AccountCopy,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, runningProcessNames, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays, simulatedDisplays } from './displays';
@@ -350,7 +354,9 @@ import { createGuestMenu } from './guest-menu';
 import { collectionsPoster, createCollectionsItem, createCollectionsMenu, tableCollectionsAction } from './collections-menu';
 import { createFriendsMenu } from './friends-menu';
 import { createChatService } from './chat-service';
-import { deleteAccount } from './account-delete';
+import { deleteAccount, eraseAccountFiles } from './account-delete';
+import { createAccountMenu } from './account-menu';
+import { createAccountService, httpTransport } from './account-service';
 import { createChatMenu } from './chat-menu';
 import { createGroupService } from './group-service';
 import { createGroupsMenu } from './groups-menu';
@@ -1097,7 +1103,7 @@ let downloadsShown: string | undefined;
 // Télécommande du téléphone (phone-remote.ts) : le navigateur intégré, puis tout le menu (setMenu,
 // plus bas) ; réseau local réel en usage normal, si la règle du pare-feu de Cyber Pinball est
 // posée ; 127.0.0.1 pendant un essai.
-// Réseau des bornes (Menu système > Amis) : partage activé par défaut, démarré avec le menu ;
+// Réseau des bornes (Menu système > Communauté) : partage activé par défaut, démarré avec le menu ;
 // jamais le vrai réseau pendant un essai sans opérateur (socialNetMode), ni le vrai pare-feu.
 const socialMode = socialNetMode(process.env);
 // La règle du pare-feu de Cyber Pinball (et celle qui ferme VPX au réseau, l'inspector des parties
@@ -2400,7 +2406,7 @@ const socialNet = createSocialNet({
 // restés en attente repartent peu après le démarrage, puis toutes les 30 minutes.
 onAppCrash((c) => library.feedback?.crashed(crashSignature('app', c.code, c.detail), undefined, c.about));
 feedbackService.watch();
-// Messagerie entre amis (Menu système > Amis > Messages) : un message pour un ami absent attend et
+// Messagerie entre amis (Menu système > Communauté > Messages) : un message pour un ami absent attend et
 // part à son retour ; l'arrivée d'un message passe par les notifications (menu-notices.ts).
 /** Le DMD annonce un message arrivé au menu pendant ce temps (« MESSAGE DE NOVA »), puis reprend son affichage. */
 const DMD_MESSAGE_MS = 4000;
@@ -2492,7 +2498,7 @@ library.downloads.friends({
 // chaque écran selon sa zone (noticezone.ts, currentZone) : partout dans Cyber Pinball, et en
 // partie ce qui compte, par-dessus VPX (essai réel du 04/11/2026).
 /**
- * « Masquer les notifications pendant les parties » (Menu système > Amis, quiet-in-game-setting.ts) :
+ * « Masquer les notifications pendant les parties » (Menu système > Communauté, quiet-in-game-setting.ts) :
  * désactivé par défaut ; activé, rien ne s'affiche ni ne sonne pendant une partie.
  */
 let quietInGame = readQuietInGame(loc.dataDir);
@@ -2819,7 +2825,28 @@ library.provideSystemItem('avatar', {
 // Démarrage du menu : pseudo obligatoire tant qu'il n'est pas choisi, avatar proposé (profile-welcome.ts).
 // « Qui vous a fait découvrir Cyber Pinball ? » (invitations-service.ts) : à l'accueil du profil et dans « Mon profil public ».
 const invitationsService = createInvitationsService({ library, net: socialNet, played: () => levelTracker.played() });
-const profileWelcome = createProfileWelcome({ library, net: socialNet, avatarMenu, invite: invitationsService.entry });
+// Mon compte (account-service.ts, account-menu.ts) : copie de secours hors de la racine, code de
+// récupération, coffre chiffré et mot de passe, reprise d'un compte. Jamais le vrai service pendant un
+// essai (hors écran, réseau simulé ou coupé) : le coffre y est indisponible, la copie de secours reste
+// dans le bac à sable (accountCopiesDir).
+const accountService = createAccountService({
+  dataDir: loc.dataDir,
+  copiesDir: accountCopiesDir(loc),
+  key: () => socialNet.state().key,
+  ...(OFFSCREEN || process.env.CYBERPINBALL_RESEAU === 'simule' || socialMode === 'off' ? {} : { transport: httpTransport(process.env.CYBERPINBALL_RELAIS ?? RELAY_ORIGIN) }),
+  changed: () => socialChanged(),
+  log: (line) => console.log(line),
+});
+/** Le menu « Mon compte », créé plus bas (il a besoin du menu Amis) : l'écran de bienvenue le lit ici. */
+let accountEntry: { openCopy(copy: AccountCopy, back: () => void): void; openRestore(back: () => void): void } | undefined;
+const profileWelcome = createProfileWelcome({
+  library,
+  net: socialNet,
+  avatarMenu,
+  invite: invitationsService.entry,
+  // Mon compte : le compte d'une installation d'avant (copie de secours de ce PC), et « J'ai déjà un compte ».
+  account: { offer: () => accountService.offer(), openCopy: (copy, back) => accountEntry?.openCopy(copy, back), openRestore: (back) => accountEntry?.openRestore(back) },
+});
 
 /**
  * Écrans du démarrage, dans l'ordre : les conditions d'utilisation à accepter, puis « Votre profil
@@ -3010,6 +3037,36 @@ const levelMenu = createLevelMenu({
   levels: levelTracker,
   openProfile: (back) => profileMenu.openMine(back),
 });
+
+const accountMenu = createAccountMenu({
+  library,
+  net: socialNet,
+  service: accountService,
+  level: () => {
+    const v = levelTracker.view();
+    return { level: v.level, xp: levelTracker.state().xp };
+  },
+  openDelete: (back) => friendsMenu.openDeleteAccount(back),
+  // Reprendre un compte : réseau et messagerie arrêtés (rien n'y réécrit le compte d'avant), ses
+  // fichiers effacés, le paquet posé, les écritures gelées comme après une restauration, puis le redémarrage.
+  apply: async (bundle) => {
+    accountService.stop();
+    await socialNet.stop();
+    chatService.stop();
+    eraseAccountFiles(loc.dataDir);
+    writeAccountBundle(loc.dataDir, bundle);
+    freezeWrites([loc.root ?? loc.dataDir, loc.dataDir], [path.join(loc.dataDir, 'logs')]);
+    console.log('Mon compte : compte repris, redémarrage'); // i18n-ignore : journal
+    relaunchMenu();
+  },
+});
+library.provideSystemItem('account', accountMenu.items.account);
+library.provideSystemItem('player-name', accountMenu.items['player-name']);
+library.provideSystemItem('country', accountMenu.items.country);
+library.provideSystemItem('account-privacy', accountMenu.items['account-privacy']);
+library.provideSystemItem('account-delete', accountMenu.items['account-delete']);
+accountEntry = accountMenu;
+accountService.start();
 const communityMenu = createCommunityMenu({
   level: {
     detail: () => levelMenu.detail(),
@@ -5906,7 +5963,7 @@ async function checkFirewallAtStart(): Promise<void> {
   const report = await guardFirewall(socialFirewall, { ...(update ? { update } : {}), log: (line) => console.log(line) });
   if (socialFirewall.simulated || !report.problems.length) return;
   if (update && state.phase === 'menu' && !guest.active && !closing) friendsMenu.openFirewall(() => library.leave());
-  else showBanner(tLater('Pare-feu de Windows : {reason}. Menu système > Amis > Partage et réseau.', { reason: report.problems[0]!.reason }), 'sharing');
+  else showBanner(tLater('Pare-feu de Windows : {reason}. Menu système > Communauté > Partage et réseau.', { reason: report.problems[0]!.reason }), 'sharing');
 }
 
 /**

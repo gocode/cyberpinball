@@ -1,4 +1,4 @@
-// Limite de débit des téléchargements depuis les amis (Menu système > Amis > « Partage et
+// Limite de débit des téléchargements depuis les amis (Menu système > Communauté > « Partage et
 // réseau » > « Débit des téléchargements »), choisie par le joueur dans social.json.
 //
 // Règles :

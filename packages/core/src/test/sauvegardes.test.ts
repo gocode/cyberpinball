@@ -105,6 +105,8 @@ test('chaque fichier va dans sa partie, et ce qui ne se sauvegarde jamais en est
   assert.equal(partOf('tables/T/user/VPReg.stg'), 'scores');
   assert.equal(partOf('data/social.json'), 'friends');
   assert.equal(partOf('data/amis/records.json'), 'friends');
+  assert.equal(partOf(`data/avatars/${'a'.repeat(64)}.png`), 'friends');
+  assert.equal(partOf('data/avatars/recadrage/x.png'), undefined);
   assert.equal(partOf('tables/T/T.vpx'), 'tables');
   assert.equal(partOf('tables/T/pinmame/roms/t.zip'), 'tables');
   assert.equal(partOf('media/x.png'), 'tables');
