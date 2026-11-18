@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.1
 
+- Nouveautés : les réactions des joueurs passent toujours à la ligne, au début de chaque nouveauté, sous l'aperçu et le texte.
 - Tables qui s'arrêtent un instant quand une minuterie de leur script arrive à échéance (Guardians of the Galaxy, Game of Thrones, et les tables qui décrivent leurs minuteries `vpmTimer` par un texte) : VPX compilait ce texte à chaque fois, et Windows le faisait analyser par son antivirus pendant que la partie attendait. Cyber Pinball joue maintenant une copie du script où chaque texte revu n'est compilé qu'une fois ; la table n'est pas modifiée.
 - Retours et propositions : « Joindre des fichiers… » ajoute des fichiers de ce PC à un rapport privé (formulaire et « Envoyer un rapport aux développeurs »). On les choisit dans le sélecteur de fichiers de Cyber Pinball, aux flippers, à la souris ou au clavier. Cinq fichiers et 1,2 Mo en tout au plus ; une capture d'écran trop lourde est réduite plutôt que refusée. Les fichiers partent chiffrés avec le rapport, lus par l'équipe seule, jamais publiés ; seul leur nom part, jamais leur emplacement sur le disque. Start sur un fichier de la liste le retire.
 - Téléphone : le bouton Retour (ou le geste retour) d'Android remonte les écrans de la télécommande au lieu de la fermer. Il ferme une feuille ouverte, revient d'un fil, d'un profil ou d'une page, remonte d'une rubrique dans Menus ou d'une playlist dans le Juke-box, ramène les autres onglets à l'Écran, et fait le retour de l'écran ouvert à la borne. À l'écran de départ, il quitte la page comme avant.

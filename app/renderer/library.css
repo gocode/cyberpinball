@@ -5430,8 +5430,9 @@ body.mouse .lib-chip.pick:not(.selected):hover {
 
 .news-block {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
-  gap: 1.8cqmin;
+  gap: 1cqmin;
   min-width: 0;
   margin: 0.8cqmin 0;
   padding: 1.6cqmin 1.8cqmin;
@@ -5448,6 +5449,14 @@ body.mouse .lib-chip.pick:not(.selected):hover {
 
 body.mouse .lib-row.news-item.pick:not(.selected):hover .news-block {
   border-color: var(--halo);
+}
+
+.news-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.8cqmin;
+  min-width: 0;
+  width: 100%;
 }
 
 .news-thumb {
@@ -5500,10 +5509,10 @@ body.mouse .lib-row.news-item.pick:not(.selected):hover .news-block {
   color: var(--void);
 }
 
-/* Les réactions en bref, sous le texte comme sous un message ; bordées de bleu quand j'ai réagi (comme ma tuile). */
+/* Les réactions en bref, à la ligne sous l'aperçu et le texte, au début du bloc comme sous un message ;
+   bordées de bleu quand j'ai réagi (comme ma tuile). */
 .news-reacts {
   align-self: flex-start;
-  margin-top: 0.2cqmin;
   display: inline-flex;
   align-items: center;
   gap: 0.7cqmin;

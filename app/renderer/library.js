@@ -928,13 +928,15 @@ function newsLine(row, cursor, moved, rank) {
     if (row.action === cursor && moved) li.classList.add('moved');
     actOn(li, { type: 'activate', index: row.action });
   }
+  // L'aperçu et le texte côte à côte ; les réactions passent dessous, au début du bloc.
+  const main = libEl('div', 'news-main');
   if (n.preview) {
     const img = libEl('img', 'news-thumb');
     img.src = n.preview;
     img.alt = '';
     img.draggable = false;
     img.decoding = 'async';
-    block.append(img);
+    main.append(img);
   }
   const text = libEl('div', 'news-text');
   const head = libEl('div', 'news-head');
@@ -942,16 +944,18 @@ function newsLine(row, cursor, moved, rank) {
   for (const b of n.badges) head.append(libEl('span', `news-badge ${b.kind}`, b.text));
   text.append(head);
   if (row.detail) text.append(libEl('div', 'news-detail', row.detail));
-  // Les réactions des joueurs en bref, sous le texte comme sous un message : les trois emojis les plus choisis et le total.
+  if (row.action === cursor && n.start) text.append(libEl('div', 'news-start', t('Start : {action}', { action: n.start })));
+  main.append(text);
+  block.append(main);
+  // Les réactions des joueurs en bref, sous la ligne comme sous un message : les trois emojis les plus
+  // choisis et le total, toujours à la ligne et au début du bloc, avec ou sans aperçu.
   if (n.reactions) {
     const r = libEl('span', `news-reacts${n.reactions.mine ? ' mine' : ''}`);
     r.title = n.reactions.label;
     r.setAttribute('aria-label', n.reactions.label);
     r.append(libEl('span', 'news-reacts-faces', n.reactions.emojis.join('')), libEl('b', 'news-reacts-total', String(n.reactions.total)));
-    text.append(r);
+    block.append(r);
   }
-  if (row.action === cursor && n.start) text.append(libEl('div', 'news-start', t('Start : {action}', { action: n.start })));
-  block.append(text);
   li.append(date, rail, block);
   return li;
 }

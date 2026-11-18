@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- What's new: the players' reactions now always sit on their own line, at the start of each item, under the preview and the text.
 - Tables that stop for a moment when one of their script's timers fires (Guardians of the Galaxy, Game of Thrones, and the tables that describe their `vpmTimer` timers as text): VPX compiled that text every time, and Windows had its antivirus scan it while the game waited. Cyber Pinball now plays a copy of the script where each repeated text is compiled only once; the table is not modified.
 - Feedback and ideas: "Attach files…" adds files from this PC to a private report (the form and "Send a report to the developers"). They are chosen in the Cyber Pinball file picker, with the flippers, the mouse or the keyboard. Five files and 1.2 MB in all at most; a screenshot that is too large is shrunk rather than refused. The files are sent encrypted with the report, read by the team only, never published; only their name is sent, never their location on the disk. Start on a file in the list removes it.
 - Phone: the Android Back button (or back gesture) now steps back through the remote's screens instead of closing it. It closes an open sheet, leaves a conversation, profile or page, goes up a section in Menus or out of a playlist in the Jukebox, brings the other tabs back to Screen, and goes back on the screen open on the cabinet. On the starting screen, it leaves the page as before.
