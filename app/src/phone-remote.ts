@@ -573,6 +573,7 @@ export const PHONE_FILES: Readonly<Record<string, string>> = {
   '/telephone-groupes.js': 'telephone/telephone-groupes.js',
   '/telephone-niveau.js': 'telephone/telephone-niveau.js',
   '/telephone-jukebox.js': 'telephone/telephone-jukebox.js',
+  '/telephone-retour.js': 'telephone/telephone-retour.js',
   // La pastille d'un joueur, dessinée comme à la borne (vue Scores).
   '/avatar.js': 'avatar.js',
   // Les badges officiels (CyberLevels.badgeSvg), dessinés au téléphone comme à la borne (profil d'un joueur).

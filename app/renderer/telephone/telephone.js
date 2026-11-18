@@ -2184,8 +2184,7 @@ document.addEventListener('fullscreenchange', () => {
   if (leavingOnPurpose || document.visibilityState === 'hidden') {
     leavingOnPurpose = false;
     return;
-  }
-  hiddenAfterExit = false;
+  }  hiddenAfterExit = false;
   exitTimer = setTimeout(() => {
     if (!hiddenAfterExit) setFullscreenOff(true);
   }, 700);
