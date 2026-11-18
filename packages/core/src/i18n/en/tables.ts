@@ -78,6 +78,13 @@ export const messages: Record<string, string> = {
   'Corrigé dans {file}, le script que VPX joue à la place de celui de la table : une procédure n’est redéfinie que si son texte change.': 'Fixed in {file}, the script VPX plays instead of the table’s: a procedure is only redefined when its text changes.',
   'La table n’est pas modifiée : VPX joue {file}, une copie de son script où une procédure n’est redéfinie que si son texte change.': 'The table is not modified: VPX plays {file}, a copy of its script where a procedure is only redefined when its text changes.',
   'Ne redéfinir une procédure que si elle change (dans {file})': 'Only redefine a procedure when it changes (in {file})',
+  'Script qui arrête la partie à chaque minuterie': 'Script that stops the game at every timer',
+  'Script qui arrête la partie à chaque clignotement et à chaque minuterie': 'Script that stops the game at every blink and every timer',
+  'Le script de la table décrit des minuteries par un texte (vpmTimer.AddTimer) : VPX compile ce texte à chaque échéance, Windows le fait analyser par son antivirus, et la partie s’arrête le temps de l’analyse.':
+    'The table’s script describes timers as text (vpmTimer.AddTimer): VPX compiles that text each time a timer fires, Windows has its antivirus scan it, and the game stops while it does.',
+  'Corrigé dans {file}, le script que VPX joue à la place de celui de la table : chaque texte n’est compilé qu’une fois.': 'Fixed in {file}, the script VPX plays instead of the table’s: each text is compiled only once.',
+  'La table n’est pas modifiée : VPX joue {file}, une copie de son script où chaque texte n’est compilé qu’une fois.': 'The table is not modified: VPX plays {file}, a copy of its script where each text is compiled only once.',
+  'Ne compiler chaque texte qu’une fois (dans {file})': 'Compile each text only once (in {file})',
   'La table rame sur cette borne': 'The table is sluggish on this cabinet',
   'La table saccade sur cette borne': 'The table stutters on this cabinet',
   'À la dernière partie ({date}), VPX a tenu {fps} images par seconde pour {target} visées.': 'In the last game ({date}), VPX held {fps} frames per second for a target of {target}.',

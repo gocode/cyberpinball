@@ -128,6 +128,7 @@ export function tableContents(tableFile: string, opts: TableContentsOptions): Ta
             ...(patch.compat?.includes('vpmInitOnce') ? [t('vpmInit exécuté une seule fois')] : []),
             ...(patch.compat?.includes('vrRoomOnScreens') ? [t('pièce VR réservée au casque')] : []),
             ...(patch.compat?.includes('executeGlobalOnce') ? [t('clignotements sans analyse de l’antivirus')] : []),
+            ...(patch.compat?.includes('timerTextOnce') ? [t('minuteries sans analyse de l’antivirus')] : []),
             ...(patch.prewarm ? [t('images du DMD chargées d’avance')] : []),
           ];
           fileEntry(name, 'scriptOverride', 'ok', t('script de la table adapté par Cyber Pinball : {what}', { what: what.join(', ') }));

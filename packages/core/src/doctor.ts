@@ -1218,21 +1218,30 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
     content = buildScriptPatch(source, own.switches, own.loader, own.capture, compat, own.prewarm) ?? buildScriptPatch(source, own.switches, own.loader, undefined, compat, own.prewarm);
   }
   // Procédures redéfinies pendant la partie (clignotements de FlashForMs, SetFlash) : seul correctif qui manque.
-  if (missing.every((f) => f === 'executeGlobalOnce')) {
+  // Minuteries de vpmTimer décrites par un texte : compilé par Execute à chaque échéance.
+  if (missing.every((f) => f === 'executeGlobalOnce' || f === 'timerTextOnce')) {
+    const blinks = missing.includes('executeGlobalOnce');
+    const timers = missing.includes('timerTextOnce');
     const detail = [
-      t('Le script de la table redéfinit des procédures pendant la partie (ExecuteGlobal, à chaque clignotement d’une lumière). Windows fait analyser chacune par son antivirus, et la partie s’arrête le temps de l’analyse : de quelques millisecondes à une seconde selon le PC.'),
+      ...(blinks ? [t('Le script de la table redéfinit des procédures pendant la partie (ExecuteGlobal, à chaque clignotement d’une lumière). Windows fait analyser chacune par son antivirus, et la partie s’arrête le temps de l’analyse : de quelques millisecondes à une seconde selon le PC.')] : []),
+      ...(timers ? [t('Le script de la table décrit des minuteries par un texte (vpmTimer.AddTimer) : VPX compile ce texte à chaque échéance, Windows le fait analyser par son antivirus, et la partie s’arrête le temps de l’analyse.')] : []),
       !content
         ? t('Le script de la table est protégé : Cyber Pinball ne peut pas le corriger.')
-        : foreign
-          ? t('Corrigé dans {file}, le script que VPX joue à la place de celui de la table : une procédure n’est redéfinie que si son texte change.', { file })
-          : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où une procédure n’est redéfinie que si son texte change.', { file }),
+        : !timers
+          ? foreign
+            ? t('Corrigé dans {file}, le script que VPX joue à la place de celui de la table : une procédure n’est redéfinie que si son texte change.', { file })
+            : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où une procédure n’est redéfinie que si son texte change.', { file })
+          : foreign
+            ? t('Corrigé dans {file}, le script que VPX joue à la place de celui de la table : chaque texte n’est compilé qu’une fois.', { file })
+            : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où chaque texte n’est compilé qu’une fois.', { file }),
     ];
+    const label = timers ? t('Ne compiler chaque texte qu’une fois (dans {file})', { file }) : t('Ne redéfinir une procédure que si elle change (dans {file})', { file });
     return {
       code: 'scriptCoreCompat',
       severity: 'warning',
-      title: t('Script qui arrête la partie à chaque clignotement'),
+      title: blinks && timers ? t('Script qui arrête la partie à chaque clignotement et à chaque minuterie') : blinks ? t('Script qui arrête la partie à chaque clignotement') : t('Script qui arrête la partie à chaque minuterie'),
       detail: detail.join(' '),
-      fix: content ? { label: t('Ne redéfinir une procédure que si elle change (dans {file})', { file }), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
+      fix: content ? { label, ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
     };
   }
   // Pièce VR allumée sur les écrans (version VR de la table, ou interrupteur d'essai laissé à 1) : seule, ou avec vpmInit.

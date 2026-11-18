@@ -16,7 +16,7 @@
 import { commentStart } from './vbscript';
 
 /** Correctifs connus, nommés dans la dernière ligne du .vbs de Cyber Pinball. */
-export type CompatFix = 'vpmInitOnce' | 'vrRoomOnScreens' | 'executeGlobalOnce';
+export type CompatFix = 'vpmInitOnce' | 'vrRoomOnScreens' | 'executeGlobalOnce' | 'timerTextOnce';
 
 interface CompatRule {
   id: CompatFix;
@@ -298,7 +298,156 @@ const executeGlobalOnce: CompatRule = {
   stop: /(?!)/,
 };
 
-const RULES: readonly CompatRule[] = [vpmInitOnce, vrRoomOnScreens, executeGlobalOnce];
+// ---------- Minuteries de vpmTimer décrites par un texte ----------
+//
+// « vpmTimer.AddTimer 3000, "PlaySoundVol ""x"", 1 '" » : le core.vbs garde le texte et, quand la minuterie arrive à
+// échéance, le fait compiler par Execute (cvpmTimer.Update) ; chaque échéance relance donc une analyse de l'antivirus
+// (voir plus haut). Relevé le 18/11/2026 dans les tables d'un poste de développement : Guardians of the Galaxy en a 12
+// (bonus de fin de bille), Game of Thrones une ; les scripts de système de VPX en ont pour les monnayeurs.
+//
+// Passer un objet GetRef à AddTimer éviterait Execute, mais le core.vbs de VPX 10.8.1-5436 (3.61, cvpmTimer.Update l. 254)
+// recopie la file sans Set quand une minuterie part : un objet placé derrière fait tomber la partie (erreur 450). Le .vbs
+// de Cyber Pinball corrige donc le core.vbs lui-même, au chargement : les textes que le script charge par GetTextFile
+// (core.vbs, et les scripts de système qui le chargent à leur tour) passent par CyberPinball_TextFile, qui fait précéder
+// cet Execute de CyberPinball_TimerCall. Un texte vu une deuxième fois devient une Sub compilée une fois pour toutes
+// (« <texte> <argument> », comme Execute le recevait), appelée ensuite sans analyse ; un texte vu une seule fois (valeurs
+// qui changent) ne coûte rien de plus qu'avant. Execute agit dans la portée de cvpmTimer.Update : un texte qui nomme une
+// de ses variables, un de ses membres, ou qui ouvre ou ferme une procédure, est laissé à Execute, comme avant.
+
+const TIMER_TEXT = 'CyberPinball_TextFile';
+const TIMER_CALL = 'CyberPinball_TimerCall';
+/** L'appel du texte dans cvpmTimer.Update (core.vbs 3.61 : « Execute mQue3(ii) & " " & mQue2(ii) & " " »). */
+export const CORE_TIMER_EXECUTE = 'Execute mQue3(ii) & " " & mQue2(ii)';
+/** Une minuterie de vpmTimer et la place (à partir de 0) de son rappel parmi ses arguments. */
+const TIMER_ADD = /(^|[^\w.])vpmTimer\s*\.\s*(AddTimer2?|PulseSwitch)\b/gi;
+const GET_TEXT_FILE = /(^|[^\w.])GetTextFile(?=\s*\()/gi;
+
+/** Arguments d'un appel, du début de `rest` à la fin de l'instruction (virgules hors chaînes et parenthèses). */
+function callArguments(rest: string): string[] {
+  const args: string[] = [];
+  let depth = 0;
+  let quoted = false;
+  let current = '';
+  for (const ch of rest) {
+    if (ch === '"') quoted = !quoted;
+    else if (!quoted && ch === '(') depth++;
+    else if (!quoted && ch === ')') {
+      if (depth === 0) break;
+      depth--;
+    } else if (!quoted && depth === 0 && (ch === ':' || ch === "'")) break;
+    else if (!quoted && depth === 0 && ch === ',') {
+      args.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  args.push(current.trim());
+  return args;
+}
+
+/** Le script donne à vpmTimer au moins une minuterie dont le rappel est un texte (pas un GetRef). */
+function queuesTimerText(code: string): boolean {
+  for (const line of code.split('\n')) {
+    for (const m of line.matchAll(TIMER_ADD)) {
+      const at = m.index! + m[0].length;
+      if ((line.slice(0, at).match(/"/g)?.length ?? 0) % 2) continue;
+      const rest = line.slice(at).replace(/^\s*\(/, '');
+      const callback = callArguments(rest)[/^PulseSwitch$/i.test(m[2]!) ? 2 : 1] ?? '';
+      if (callback.includes('"') && !/^\(?\s*GetRef\s*\(/i.test(callback)) return true;
+    }
+  }
+  return false;
+}
+
+/** Le script charge des scripts de VPX par GetTextFile (core.vbs, ou un script de système qui le charge). */
+function loadsTextFiles(code: string): boolean {
+  let found = false;
+  for (const line of code.split('\n')) {
+    editCode(line, (part) => {
+      if (GET_TEXT_FILE.test(part)) found = true;
+      GET_TEXT_FILE.lastIndex = 0;
+      return part;
+    });
+    if (found) return true;
+  }
+  return false;
+}
+
+const timerTextOnce: CompatRule = {
+  id: 'timerTextOnce',
+  found: (code) => queuesTimerText(code) && loadsTextFiles(code),
+  applicable: (code) => queuesTimerText(code) && loadsTextFiles(code),
+  applied: (text) => new RegExp(`^\\s*function\\s+${TIMER_TEXT}\\b`, 'im').test(text),
+  apply(text) {
+    const eol = /\r\n/.test(text) ? '\r\n' : '\n';
+    const parts = text.split(/(\r?\n)/);
+    let calls = 0;
+    for (let i = 0; i < parts.length; i += 2) {
+      parts[i] = editCode(parts[i]!, (code) =>
+        code.replace(GET_TEXT_FILE, (_, before: string) => {
+          calls++;
+          return `${before}${TIMER_TEXT}`;
+        }),
+      );
+    }
+    if (!calls) return undefined;
+    let out = parts.join('');
+    if (out && !/\r?\n$/.test(out)) out += eol;
+    const q = (s: string) => s.replace(/"/g, '""');
+    const lines = [
+      // Le texte d'un fichier de VPX, avec ses propres chargements et l'Execute des minuteries corrigés. Sans On Error :
+      // un fichier introuvable reste une erreur pour l'appelant, qui la traite comme avant (If Err Then MsgBox…).
+      `Function ${TIMER_TEXT}(aFile)`,
+      `  Dim text`,
+      `  text = GetTextFile(aFile)`,
+      `  text = Replace(text, "GetTextFile(", "${TIMER_TEXT}(", 1, -1, vbTextCompare)`,
+      `  text = Replace(text, "${q(CORE_TIMER_EXECUTE)}", "If ${TIMER_CALL}(mQue3(ii), mQue2(ii)) = False Then ${q(CORE_TIMER_EXECUTE)}", 1, -1, vbTextCompare)`,
+      `  ${TIMER_TEXT} = text`,
+      `End Function`,
+      `Dim ${TIMER_CALL}_Seen, ${TIMER_CALL}_Unsafe, ${TIMER_CALL}_Count`,
+      // True : le rappel a été fait par sa Sub compilée ; False : à Execute de le faire, comme avant.
+      `Function ${TIMER_CALL}(aCode, aArg)`,
+      `  Dim code, f, name`,
+      `  ${TIMER_CALL} = False`,
+      `  If VarType(aCode) <> vbString Then Exit Function`,
+      `  code = aCode`,
+      `  If IsEmpty(${TIMER_CALL}_Seen) Then`,
+      `    Set ${TIMER_CALL}_Seen = CreateObject("Scripting.Dictionary")`,
+      `    Set ${TIMER_CALL}_Unsafe = New RegExp`,
+      `    ${TIMER_CALL}_Unsafe.IgnoreCase = True`,
+      `    ${TIMER_CALL}_Unsafe.Pattern = "(^|[^\\w.])(ii|jj|sw|obj|mquecopy|me|mnow|mtimers|mque\\d|mslowupdates|mfastupdates|mresets|mfasttimer|update|fastupdate|reset|inittimer|enableupdate|addresetobj|pulsesw|pulseswitch|addtimer2?|sub|function|class|property|end|exit)(?!\\w)"`,
+      `  End If`,
+      `  If Not ${TIMER_CALL}_Seen.Exists(code) Then`,
+      `    If ${TIMER_CALL}_Seen.Count < 2000 Then ${TIMER_CALL}_Seen.Add code, 1`,
+      `    Exit Function`,
+      `  End If`,
+      `  If IsObject(${TIMER_CALL}_Seen.Item(code)) Then`,
+      `    Set f = ${TIMER_CALL}_Seen.Item(code)`,
+      `  Else`,
+      `    If ${TIMER_CALL}_Seen.Item(code) <> 1 Then Exit Function`,
+      `    ${TIMER_CALL}_Seen.Item(code) = 0`,
+      `    If ${TIMER_CALL}_Unsafe.Test(code) Then Exit Function`,
+      `    ${TIMER_CALL}_Count = ${TIMER_CALL}_Count + 1`,
+      `    name = "${TIMER_CALL}_" & ${TIMER_CALL}_Count`,
+      `    On Error Resume Next`,
+      `    ExecuteGlobal "Sub " & name & "(CyberPinball_Arg)" & vbNewLine & code & " CyberPinball_Arg " & vbNewLine & "End Sub"`,
+      `    If Err.Number = 0 Then Set f = GetRef(name)`,
+      `    If Err.Number <> 0 Then Err.Clear : Exit Function`,
+      `    On Error Goto 0`,
+      `    Set ${TIMER_CALL}_Seen.Item(code) = f`,
+      `  End If`,
+      `  ${TIMER_CALL} = True`,
+      `  Call f(aArg)`,
+      `End Function`,
+    ];
+    return out + lines.join(eol) + eol;
+  },
+  // Aucun message de VPX : la partie s'arrête un instant, sans erreur.
+  stop: /(?!)/,
+};
+
+const RULES: readonly CompatRule[] = [vpmInitOnce, vrRoomOnScreens, executeGlobalOnce, timerTextOnce];
 
 /** Correctifs dont le script a besoin, d'après son seul texte (code sans commentaires). */
 export function compatFixesFound(code: string): CompatFix[] {
