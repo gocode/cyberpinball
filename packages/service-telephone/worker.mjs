@@ -18,7 +18,9 @@
 //      rejouée. Le service garde la clé publique de l'auteur et des votants, pour compter une voix par
 //      borne et limiter les propositions par jour, mais ne la rend jamais dans une réponse. Le pseudo
 //      et le pays du joueur (champ signé `who`, 18/11/2026) accompagnent une proposition ou un vote :
-//      la liste nomme l'auteur, GET /api/soutiens?id=… nomme ceux qui la soutiennent ;
+//      la liste nomme l'auteur, GET /api/soutiens?id=… nomme ceux qui la soutiennent. POST /api/noms
+//      (une fois par jour) met à jour le pseudo d'une borne qui a déjà proposé ou voté : ses propositions
+//      d'avant le 18/11/2026 sont ainsi nommées sans nouveau vote ;
 //    - privé : les rapports chiffrés (POST /api/rapports), des boîtes scellées binaires « CPR1 » que
 //      le service ne peut pas lire (seul l'administrateur a la clé) ; il ne garde que la boîte et sa
 //      date, sans auteur, et seulement les plus récentes.
@@ -437,6 +439,25 @@ async function listSupporters(env, url) {
 }
 
 /**
+ * Le pseudo signé d'une borne qui a déjà proposé ou voté (op « name ») : retenu pour nommer ses
+ * propositions et ses votes passés. Une borne inconnue du tableau n'est pas inscrite (204, rien gardé).
+ */
+async function rename(request, env, now) {
+  if (await limited(request, env)) return reply(429, { erreur: 'trop' });
+  const checked = await signedRequest(request, 'name', now);
+  if (!checked.body) return reply(checked.status, { erreur: checked.why });
+  const { pk, t } = checked.body;
+  const who = cleanWho(checked.body.who);
+  if (!who) return reply(400, { erreur: 'forme' });
+  const db = env.RETOURS;
+  if (await seen(db, pk, t)) return reply(409, { erreur: 'rejeu' });
+  const known = await db.prepare('SELECT EXISTS (SELECT 1 FROM votes WHERE voter = ?1) OR EXISTS (SELECT 1 FROM propositions WHERE author = ?1) AS k').bind(pk).first('k');
+  if (!known) return new Response(null, { status: 204, headers: API_HEADERS });
+  const refused = await writeOnce(db, pk, t, [...markSeen(db, pk, t, now), noteWho(db, pk, who, t)]);
+  return refused ?? reply(200, { nom: who.name });
+}
+
+/**
  * Compte supprimé par son joueur (RGPD, droit à l'effacement) : ses propositions (et les votes qu'elles
  * avaient) et ses votes partent. Une proposition d'un autre fusionnée dans l'une des siennes redevient
  * visible seule. Signée par la clé effacée, comme un vote.
@@ -797,7 +818,7 @@ async function coffre(request, env, url, now) {
 /** Les routes des retours (/api/propositions, /api/soutiens, /api/votes, /api/rapports, /api/admin/…) ; undefined pour les autres. */
 async function retours(request, env, url, now) {
   const path = url.pathname;
-  const known = path === '/api/propositions' || path === '/api/soutiens' || path === '/api/votes' || path === '/api/oubli' || path === '/api/rapports' || path === '/api/nouveautes' || path.startsWith('/api/admin/');
+  const known = path === '/api/propositions' || path === '/api/soutiens' || path === '/api/noms' || path === '/api/votes' || path === '/api/oubli' || path === '/api/rapports' || path === '/api/nouveautes' || path.startsWith('/api/admin/');
   if (!known) return undefined;
   if (!env.RETOURS) return reply(503, { erreur: 'indisponible' });
   try {
@@ -813,6 +834,7 @@ async function retours(request, env, url, now) {
     }
     if (request.method !== 'POST') return reply(405, { erreur: 'méthode' });
     if (path === '/api/oubli') return await forget(request, env, now);
+    if (path === '/api/noms') return await rename(request, env, now);
     return path === '/api/votes' ? await vote(request, env, now) : await report(request, env, now);
   } catch {
     // Rien n'est journalisé : ni la requête, ni l'erreur (qui pourrait citer un contenu).

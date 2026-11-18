@@ -107,6 +107,7 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
         net = 'ok';
         loadedAt = Date.now();
         if (pk) noteContributions(noteProposals(contributions, list));
+        if (pk) void sendName();
       } catch (error) {
         net = 'offline';
         opts.log(`Retours : liste des propositions injoignable (${(error as Error).message}).`); // i18n-ignore : journal
@@ -141,7 +142,7 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
       // Jamais deux requêtes à la même milliseconde : le service refuse une date déjà vue (rejeu).
       lastT = Math.max(Date.now(), lastT + 1);
       const r = await call('POST', route, JSON.stringify(signFeedback(key, op, lastT)));
-      if (r.status === 200 || r.status === 201) return { ok: true, id: (r.json as { id?: string } | undefined)?.id, json: r.json };
+      if (r.status === 200 || r.status === 201 || r.status === 204) return { ok: true, id: (r.json as { id?: string } | undefined)?.id, json: r.json };
       opts.log(`Retours : ${route} refusé (HTTP ${r.status}).`); // i18n-ignore : journal
       return { ok: false, why: r.status === 429 ? 'quota' : 'refused' };
     } catch (error) {
@@ -154,6 +155,26 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
   function me(): { who?: FeedbackPerson } {
     const who = parseFeedbackPerson(opts.who?.());
     return who ? { who } : {};
+  }
+
+  // ---------- Mon pseudo sur le tableau ----------
+
+  /** Dernier pseudo envoyé (et quand) : une fois par jour, ou dès qu'il change. */
+  let nameSent: { key: string; at: number } | undefined;
+
+  /**
+   * Mon pseudo pour mes propositions et mes votes passés (ceux d'avant le 18/11/2026 n'en avaient pas) :
+   * envoyé seulement si j'ai proposé ou voté, une fois par jour ou quand il change. Le service ne
+   * l'inscrit pas pour une borne qui n'a rien sur le tableau.
+   */
+  async function sendName(): Promise<void> {
+    const { who } = me();
+    if (!who || !list.some((p) => p.mine || p.voted)) return;
+    const stamp = JSON.stringify(who);
+    if (nameSent?.key === stamp && Date.now() - nameSent.at < 86_400_000) return;
+    nameSent = { key: stamp, at: Date.now() };
+    const r = await signed('/api/noms', { op: 'name', who });
+    if (!r.ok) nameSent = undefined;
   }
 
   // ---------- Soutiens d'une proposition (sa fiche) ----------
@@ -469,6 +490,12 @@ function simulatedStore(seedFile: string, dataDir: string) {
         if (b.on) row.voters.add(b.pk);
         else row.voters.delete(b.pk);
         return { status: 200, json: { id: row.id, votes: row.voters.size, voted: b.on } };
+      }
+      if (method === 'POST' && route === '/api/noms' && typeof body === 'string') {
+        const b = JSON.parse((JSON.parse(body) as { b: string }).b) as { pk: string; who?: unknown };
+        if (!rows.some((r) => r.authorKey === b.pk || r.voters.has(b.pk))) return { status: 204 };
+        noteWho(b.pk, b.who);
+        return { status: 200, json: { nom: parseFeedbackPerson(b.who)?.name } };
       }
       if (method === 'POST' && route === '/api/oubli' && typeof body === 'string') {
         const b = JSON.parse((JSON.parse(body) as { b: string }).b) as { pk: string };

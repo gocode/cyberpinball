@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.16
 
+- Retours et propositions : les propositions faites avant l'arrivée des pseudos reçoivent celui de leur auteur dès que sa borne est à jour, sans qu'il ait à voter de nouveau.
 - Badges secrets : leur apparition "signal capté", en sautant, se joue enfin ; une erreur de règle la remplaçait par celle des autres badges.
 - Téléphone, Scores : « Mon niveau » en résumé en tête (le niveau, le palier, la barre, les XP de la semaine) ; un toucher ouvre Mon niveau en plein écran, tel qu'à la borne : la barre, la semaine, les classements de la semaine, les badges les plus proches dessinés comme à la borne, puis « Mes badges » et « Comment gagner des XP ».
 - Téléphone, Scores : une bascule « Une table / Toutes les tables ». Toutes les tables : une ligne par table, les dernières jouées d'abord, avec le premier de chacune et votre place, à la portée et à la période choisies ; une table sans classement reste grisée avec sa raison. Une ligne touchée ouvre le tableau des scores de cette table.

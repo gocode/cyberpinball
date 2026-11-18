@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Feedback and ideas: ideas posted before nicknames arrived get their author's nickname as soon as their cabinet is up to date, without voting again.
 - Secret badges: their glitchy "signal caught" entrance now actually plays; a rule mistake replaced it with the regular badge entrance.
 - Phone, Scores: a summary of "My level" at the top (the level, the tier, the bar, this week's XP); a tap opens My level full screen, as on the cabinet: the bar, the week, this week's rankings, the closest badges drawn as on the cabinet, then "My badges" and "How to earn XP".
 - Phone, Scores: a "One table / All tables" switch. All tables: one line per table, the most recently played first, with each table's leader and your place, at the chosen scope and period; a table without a ranking stays greyed out with its reason. Tapping a line opens that table's scoreboard.

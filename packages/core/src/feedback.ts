@@ -134,7 +134,9 @@ export type FeedbackOp =
   /** Ma réaction à une nouveauté du front-end (news.ts) ; null la retire. */
   | { op: 'news-react'; item: string; kind: Reaction | null }
   /** Compte supprimé (forget.ts, RGPD) : le service efface ses propositions, ses votes et ses réactions. */
-  | { op: 'forget' };
+  | { op: 'forget' }
+  /** Mon pseudo, pour nommer mes propositions et mes votes passés (une fois par jour, si j'en ai). */
+  | { op: 'name'; who: FeedbackPerson };
 
 /** Corps signé d'une requête de la borne (POST /api/propositions, /api/votes). */
 export function signFeedback(key: PlayerKey, op: FeedbackOp, now = Date.now()): SignedBody {

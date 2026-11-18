@@ -297,6 +297,18 @@ test('retours : l’auteur est nommé, ceux qui soutiennent aussi, sans aucune c
   const adm = await s.adminCall('GET', `/api/admin/propositions/${id}/soutiens`);
   assert.equal(adm.status, 200);
   assert.deepEqual(((await adm.json()) as { soutiens: unknown[] }).soutiens, [{ name: 'Kiko2' }]);
+  // Une proposition d'avant les pseudos : son auteur, à jour, envoie son pseudo (POST /api/noms) et elle est nommée.
+  const early = keys();
+  const before = (await s.propose(early, { title: 'Proposée avant les pseudos' })).json.id as string;
+  assert.equal((await s.list()).propositions.find((p) => p.id === before && 'author' in p), undefined);
+  const rename = async (k: Keys, who: unknown) => (await s.call('POST', '/api/noms', s.signed(k, { op: 'name', who }))).status;
+  assert.equal(await rename(early, { name: 'Ancien', country: 'FR' }), 200);
+  assert.deepEqual(((await s.list()).propositions.find((p) => p.id === before) as Proposition & { author?: unknown }).author, { name: 'Ancien', country: 'FR' });
+  assert.equal(await rename(early, { name: '' }), 400);
+  // Une borne qui n'a rien sur le tableau n'est pas inscrite.
+  const stranger = keys();
+  assert.equal(await rename(stranger, { name: 'Curieux' }), 204);
+  assert.equal((await s.d1.prepare('SELECT COUNT(*) AS n FROM noms_retours WHERE pk = ?1').bind(stranger.pk).first('n')) as number, 0);
   // Compte effacé : son nom part avec lui.
   assert.equal((await s.call('POST', '/api/oubli', s.signed(kiko, { op: 'forget' }))).status, 200);
   assert.equal((await s.d1.prepare('SELECT COUNT(*) AS n FROM noms_retours WHERE pk = ?1').bind(kiko.pk).first('n')) as number, 0);
