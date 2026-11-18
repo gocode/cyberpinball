@@ -14,6 +14,7 @@ export function fakeFeedbackService(over?: Partial<FeedbackService>): FeedbackSe
       canWrite: () => false,
       propose: async () => ({ ok: false, why: 'offline' }),
       vote: async () => ({ ok: false, why: 'offline' }),
+      supporters: () => ({ state: 'offline' }),
       forgetMe: async () => ({ ok: false, why: 'offline' }),
       news: {
         of: () => ({ counts: {} }),

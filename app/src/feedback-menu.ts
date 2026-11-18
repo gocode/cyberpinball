@@ -3,7 +3,8 @@
 // chaque porte peut y mener, sans y obliger. Une partie échouée et le Diagnostic d'une table ont
 // en plus « Envoyer un rapport aux développeurs » : un appui, le problème déjà connu (openSendReport).
 //   - L'accueil : le tableau public des propositions, les plus demandées d'abord, par nature (onglets) ;
-//     Start sur une proposition : son détail, où l'on vote. Puis « Proposer une idée », « Signaler un
+//     chaque ligne nomme son auteur (18/11/2026). Start sur une proposition : son détail, où l'on vote,
+//     qui l'a proposée et ceux qui la soutiennent. Puis « Proposer une idée », « Signaler un
 //     problème » et le réglage des rapports de plantage automatiques.
 //   - Le formulaire : la nature, le titre et la description (au clavier à l'écran ou au téléphone), le
 //     rapport technique joint ou non ; les propositions proches s'affichent dès le titre écrit
@@ -26,11 +27,14 @@ import {
   cleanProposalTitle,
   formatDateTime,
   loadFeedbackState,
+  locale,
+  playerFlag,
   saveFeedbackState,
   similarProposals,
   t,
   tn,
   type CrashConsent,
+  type FeedbackPerson,
   type FeedbackState,
   type Proposal,
   type ProposalKind,
@@ -220,7 +224,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       ...(action !== undefined ? { action, pick: true } : {}),
       icon: PROPOSAL_KIND_VIEW[p.kind].icon,
       text: maskWords(p.title),
-      detail: [PROPOSAL_KIND_VIEW[p.kind].label, p.merged ? tn(p.merged, '{n} doublon regroupé', '{n} doublons regroupés') : '', p.reply ? t('réponse de l’équipe') : ''].filter(Boolean).join(' · '),
+      detail: [PROPOSAL_KIND_VIEW[p.kind].label, p.author ? t('par {name}', { name: p.author.name }) : '', p.merged ? tn(p.merged, '{n} doublon regroupé', '{n} doublons regroupés') : '', p.reply ? t('réponse de l’équipe') : ''].filter(Boolean).join(' · '),
       aside: tn(p.votes, '{n} vote', '{n} votes'),
       // L'état et le vote se lisent dans les badges : la couleur de la ligne reste au choix courant.
       badges: [...(p.status !== 'new' ? [status.label] : []), ...(p.voted ? [t('✓ Voté')] : [])],
@@ -228,6 +232,30 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
   }
 
   // ---------- Une proposition ----------
+
+  /** Soutiens nommés montrés au plus sur la fiche ; les suivants se comptent avec les anonymes. */
+  const SUPPORTERS_SHOWN = 60;
+
+  /** Un joueur nommé : son drapeau devant son pseudo (sans pays : le drapeau Cyber Pinball). */
+  const personRow = (who: FeedbackPerson, detail?: string): Row => ({ text: who.name, flag: playerFlag(who.country, locale()), ...(detail ? { detail } : {}) });
+
+  /** La section « Ils la soutiennent » : les nommés, puis les autres comptés ; l'état du service sinon. */
+  function supportersSection(p: Proposal): { title: string; rows: Row[] } {
+    const { value, state } = ctx.service.supporters(p.id);
+    if (!value)
+      return {
+        title: t('Ils la soutiennent'),
+        rows: [{ icon: 'info', text: state === 'offline' ? t('Liste des soutiens injoignable') : t('Chargement des soutiens…'), detail: state === 'offline' ? t('Nouvel essai à la prochaine ouverture') : '', tone: 'quiet' }],
+      };
+    const total = value.people.length + value.others;
+    const title = total ? t('Ils la soutiennent ({n})', { n: total }) : t('Ils la soutiennent');
+    if (!total) return { title, rows: [{ icon: 'info', text: t('Personne d’autre pour l’instant'), detail: p.voted ? '' : t('Votez : votre pseudo s’affichera ici'), tone: 'quiet' }] };
+    const shown = value.people.slice(0, SUPPORTERS_SHOWN);
+    const rest = total - shown.length;
+    const rows: Row[] = shown.map((who) => personRow(who));
+    if (rest) rows.push({ icon: 'friends', text: shown.length ? tn(rest, 'et {n} autre joueur', 'et {n} autres joueurs') : tn(rest, '{n} joueur', '{n} joueurs'), detail: t('Votes donnés sans pseudo, avant novembre 2026'), tone: 'quiet' });
+    return { title, rows };
+  }
 
   function openProposal(id: string, back: () => void): void {
     const self = () => openProposal(id, back);
@@ -240,19 +268,26 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         p.voted
           ? { label: t('Retirer mon vote'), detail: tn(p.votes, '{n} vote, le vôtre compris', '{n} votes, le vôtre compris'), icon: 'close', key: 'feedback:unvote', run: () => void ctx.service.vote(p.id, false).then(self) }
           : canVote
-            ? { label: t('Voter pour cette proposition'), detail: t('Une voix par borne · l’équipe commence par les plus demandées'), icon: 'check', tone: 'ok', key: 'feedback:vote', run: () => void ctx.service.vote(p.id, true).then(self) }
+            ? { label: t('Voter pour cette proposition'), detail: t('Une voix par borne · votre pseudo s’affiche parmi ses soutiens'), icon: 'check', tone: 'ok', key: 'feedback:vote', run: () => void ctx.service.vote(p.id, true).then(self) }
             : { label: t('Voter pour cette proposition'), detail: t('Indisponible : la borne n’a pas encore sa clé de joueur'), icon: 'check', tone: 'quiet', key: 'feedback:vote', run: self },
       );
       actions.push({ label: t('Retour'), icon: 'back', run: back });
       const status = PROPOSAL_STATUS_VIEW[p.status];
       const rows: Row[] = [];
       if (p.text) rows.push({ icon: 'edit', text: maskWords(p.text) });
-      rows.push({ icon: 'info', text: t('État : {status}', { status: status.label }), detail: t('Proposée le {when}', { when: formatDateTime(p.at, { dateStyle: 'medium' }) }), ...(status.tone ? { tone: status.tone } : {}) });
+      const when = formatDateTime(p.at, { dateStyle: 'medium' });
+      // L'auteur, nommé s'il a signé son pseudo (propositions d'avant le 18/11/2026 : sans nom).
+      rows.push(
+        p.author
+          ? personRow(p.author, p.mine ? t('Proposée depuis cette borne le {when}', { when }) : t('A proposé le {when}', { when }))
+          : { icon: 'account', text: p.mine ? t('Proposée depuis cette borne') : t('Auteur non nommé'), detail: t('Proposée le {when}', { when }), tone: 'quiet' },
+      );
+      rows.push({ icon: 'info', text: t('État : {status}', { status: status.label }), ...(status.tone ? { tone: status.tone } : {}) });
       return {
         heading: maskWords(p.title),
         icon: PROPOSAL_KIND_VIEW[p.kind].icon,
-        subheading: [PROPOSAL_KIND_VIEW[p.kind].label, tn(p.votes, '{n} vote', '{n} votes'), p.mine ? t('proposée depuis cette borne') : ''].filter(Boolean).join(' · '),
-        sections: [{ rows }, ...(p.reply ? [{ title: t('Réponse de l’équipe'), rows: [{ icon: 'message' as const, text: maskWords(p.reply), tone: 'info' as const }] }] : [])],
+        subheading: [PROPOSAL_KIND_VIEW[p.kind].label, p.author ? t('par {name}', { name: p.author.name }) : '', tn(p.votes, '{n} vote', '{n} votes')].filter(Boolean).join(' · '),
+        sections: [{ rows }, ...(p.reply ? [{ title: t('Réponse de l’équipe'), rows: [{ icon: 'message' as const, text: maskWords(p.reply), tone: 'info' as const }] }] : []), supportersSection(p)],
         actions,
         back,
       };

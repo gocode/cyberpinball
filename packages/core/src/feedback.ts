@@ -2,7 +2,9 @@
 // Electron. Deux circuits vers le service du projet (packages/service-telephone/worker.mjs, base D1) :
 // - public : le tableau des propositions (bug, amélioration, nouvelle fonction), publié tout de suite,
 //   où chaque borne vote une fois par proposition ; les requêtes sont signées par la clé du joueur
-//   (sharing.ts, PlayerKey), qui ne sert qu'à compter une voix par borne et n'est jamais rendue ;
+//   (sharing.ts, PlayerKey), qui ne sert qu'à compter une voix par borne et n'est jamais rendue ; le
+//   pseudo et le pays du joueur les accompagnent (`who`, 18/11/2026) : l'auteur est nommé sur le
+//   tableau, et ceux qui soutiennent une proposition sur sa fiche ;
 // - privé : les rapports (plantage, problème décrit, fiche technique jointe), scellés ici pour la clé
 //   « retours » du projet (X25519 + AES-256-GCM) : le service garde des octets qu'il ne peut pas lire.
 //
@@ -19,6 +21,7 @@ import { t } from './i18n';
 import type { IconName } from './icons';
 import type { Reaction } from './reactions';
 import { signText, type PlayerKey } from './sharing';
+import { normalizeName } from './social';
 
 /** Texte signé d'une requête d'une borne : ce préfixe, puis le corps JSON. Le même que RETOURS_PREFIX (worker.mjs). */
 export const FEEDBACK_PREFIX = 'cyberpinball:retours:v1\n';
@@ -46,6 +49,18 @@ export const REPORT_SEALED_MAX = 1_900_000;
 /** En-tête d'un rapport scellé. */
 export const REPORT_MAGIC = 'CPR1';
 
+/** Un joueur nommé par le service : son pseudo et son pays (code ISO à deux lettres), jamais sa clé. */
+export interface FeedbackPerson {
+  name: string;
+  country?: string;
+}
+
+/** Ceux qui soutiennent une proposition, l'auteur à part : les nommés, et le nombre des autres (votes sans pseudo). */
+export interface ProposalSupporters {
+  people: FeedbackPerson[];
+  others: number;
+}
+
 /** Une proposition telle que le service la rend. */
 export interface Proposal {
   id: string;
@@ -61,6 +76,8 @@ export interface Proposal {
   reply?: string;
   /** Propositions fusionnées dans celle-ci (doublons). */
   merged: number;
+  /** Son auteur, s'il a signé son pseudo (propositions d'avant le 18/11/2026 : aucun). */
+  author?: FeedbackPerson;
   mine?: boolean;
   voted?: boolean;
 }
@@ -111,8 +128,9 @@ export interface SignedBody {
 }
 
 export type FeedbackOp =
-  | { op: 'propose'; kind: ProposalKind; title: string; text: string; lang: string }
-  | { op: 'vote'; id: string; on: boolean }
+  | { op: 'propose'; kind: ProposalKind; title: string; text: string; lang: string; who?: FeedbackPerson }
+  /** `who` : seulement quand on vote (on = true) ; le service l'ignore pour un vote retiré. */
+  | { op: 'vote'; id: string; on: boolean; who?: FeedbackPerson }
   /** Ma réaction à une nouveauté du front-end (news.ts) ; null la retire. */
   | { op: 'news-react'; item: string; kind: Reaction | null }
   /** Compte supprimé (forget.ts, RGPD) : le service efface ses propositions, ses votes et ses réactions. */
@@ -132,6 +150,25 @@ export function signFeedbackAdmin(privatePem: string, method: string, pathAndQue
   return { 'X-Retours-Date': String(now), 'X-Retours-Signature': sig };
 }
 
+/** Un joueur nommé par le service (ou à envoyer) : pseudo valide (normalizeName) et pays facultatif ; undefined sinon. */
+export function parseFeedbackPerson(raw: unknown): FeedbackPerson | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const name = normalizeName(r.name);
+  if (!name) return undefined;
+  return typeof r.country === 'string' && /^[A-Z]{2}$/.test(r.country) ? { name, country: r.country } : { name };
+}
+
+/** Réponse de GET /api/soutiens, vérifiée : les joueurs nommés (dans l'ordre du service) et le nombre des autres. */
+export function parseSupporters(raw: unknown): ProposalSupporters | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  if (!Array.isArray(r.soutiens)) return undefined;
+  const people = r.soutiens.map(parseFeedbackPerson).filter((p): p is FeedbackPerson => Boolean(p));
+  const others = typeof r.autres === 'number' && Number.isFinite(r.autres) && r.autres > 0 ? Math.floor(r.autres) : 0;
+  return { people, others: others + (r.soutiens.length - people.length) };
+}
+
 /** Une proposition du service, vérifiée champ par champ (rien d'inattendu n'entre dans les écrans). */
 export function parseProposal(raw: unknown): Proposal | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
@@ -142,6 +179,7 @@ export function parseProposal(raw: unknown): Proposal | undefined {
   if (!PROPOSAL_KINDS.includes(r.kind as ProposalKind) || !PROPOSAL_STATUSES.includes(r.status as ProposalStatus)) return undefined;
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0);
   const reply = typeof r.reply === 'string' && r.reply.trim() ? cleanProposalText(r.reply.slice(0, 1000)) : undefined;
+  const author = parseFeedbackPerson(r.author);
   return {
     id: r.id,
     kind: r.kind as ProposalKind,
@@ -154,6 +192,7 @@ export function parseProposal(raw: unknown): Proposal | undefined {
     updated: num(r.updated ?? r.at),
     ...(reply ? { reply } : {}),
     merged: num(r.merged),
+    ...(author ? { author } : {}),
     ...(r.mine === true ? { mine: true } : {}),
     ...(r.voted === true ? { voted: true } : {}),
   };

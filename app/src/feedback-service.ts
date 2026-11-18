@@ -18,8 +18,12 @@ import {
   noteReport,
   parseNewsReaction,
   parseNewsReactions,
+  parseFeedbackPerson,
   parseProposals,
+  parseSupporters,
   withMyNewsReaction,
+  type FeedbackPerson,
+  type ProposalSupporters,
   type NewsReactions,
   type Reaction,
   REPORT_SEALED_MAX,
@@ -42,6 +46,8 @@ export interface FeedbackServiceOptions {
   dataDir: string;
   /** La clé du joueur de cette borne (réseau des amis) ; undefined : on ne peut ni proposer ni voter. */
   key(): PlayerKey | undefined;
+  /** Son pseudo et son pays, signés avec ses propositions et ses votes : le tableau le nomme. */
+  who?(): FeedbackPerson | undefined;
   origin?: string;
   /** Service simulé (essais) : le fichier des propositions de départ, ou '' pour une liste vide ; rien ne sort sur le réseau. */
   simulated?: string;
@@ -144,8 +150,42 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
     }
   }
 
+  /** Mon pseudo et mon pays, vérifiés comme le service les vérifiera ; rien s'il n'est pas valide. */
+  function me(): { who?: FeedbackPerson } {
+    const who = parseFeedbackPerson(opts.who?.());
+    return who ? { who } : {};
+  }
+
+  // ---------- Soutiens d'une proposition (sa fiche) ----------
+
+  /** Soutiens relus au plus toutes les minutes ; `state` : où en est la dernière lecture. */
+  const backers = new Map<string, { at: number; value?: ProposalSupporters; state: 'loading' | 'ok' | 'offline' }>();
+  const BACKERS_TTL_MS = 60_000;
+
+  /** Ceux qui soutiennent cette proposition, tels que lus (et relus en fond s'ils datent) ; `changed()` à l'arrivée. */
+  function supporters(id: string): { value?: ProposalSupporters; state: 'loading' | 'ok' | 'offline' } {
+    const known = backers.get(id);
+    if (!known || (known.state !== 'loading' && Date.now() - known.at > BACKERS_TTL_MS)) void loadSupporters(id);
+    return backers.get(id)!;
+  }
+
+  async function loadSupporters(id: string): Promise<void> {
+    const before = backers.get(id);
+    backers.set(id, { at: Date.now(), ...(before?.value ? { value: before.value } : {}), state: 'loading' });
+    try {
+      const r = await call('GET', `/api/soutiens?id=${encodeURIComponent(id)}`);
+      const value = r.status === 200 ? parseSupporters(r.json) : undefined;
+      if (!value) throw new Error(`HTTP ${r.status}`);
+      backers.set(id, { at: Date.now(), value, state: 'ok' });
+    } catch (error) {
+      backers.set(id, { at: Date.now(), ...(before?.value ? { value: before.value } : {}), state: 'offline' });
+      opts.log(`Retours : soutiens injoignables (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+    opts.changed();
+  }
+
   async function propose(kind: ProposalKind, title: string, text: string, lang: string): Promise<Outcome> {
-    const r = await signed('/api/propositions', { op: 'propose', kind, title, text, lang });
+    const r = await signed('/api/propositions', { op: 'propose', kind, title, text, lang, ...me() });
     if (r.ok) {
       opts.log(`Retours : proposition publiée (${kind}).`); // i18n-ignore : journal
       await refresh();
@@ -158,11 +198,13 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
     const before = list;
     list = list.map((p) => (p.id === id && Boolean(p.voted) !== on ? { ...p, voted: on, votes: Math.max(0, p.votes + (on ? 1 : -1)) } : p));
     opts.changed();
-    const r = await signed('/api/votes', { op: 'vote', id, on });
+    const r = await signed('/api/votes', { op: 'vote', id, on, ...(on ? me() : {}) });
     if (!r.ok) list = before;
     else {
       const votes = (r.json as { votes?: number } | undefined)?.votes;
       if (typeof votes === 'number') list = list.map((p) => (p.id === id ? { ...p, votes } : p));
+      // Mon nom entre (ou sort) de ses soutiens : relus à la prochaine vue de sa fiche.
+      backers.delete(id);
     }
     opts.changed();
     return r;
@@ -314,6 +356,7 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
     canWrite: () => Boolean(opts.key()),
     propose,
     vote,
+    supporters,
     forgetMe,
     /** Réactions aux Nouveautés : les totaux d'une nouveauté, l'état du service, relire, réagir. */
     news: {
@@ -339,14 +382,29 @@ export type FeedbackService = ReturnType<typeof createFeedbackService>;
  * signature vérifiée. Les rapports reçus sont écrits dans <données>\retours\envoyes.
  */
 function simulatedStore(seedFile: string, dataDir: string) {
-  type Row = Proposal & { voters: Set<string>; author?: string };
+  // `authorKey` : la clé de l'auteur (v0 pour la graine) ; `voters` : les clés des votants, auteur compris.
+  type Row = Proposal & { voters: Set<string>; authorKey?: string };
   let rows: Row[] = [];
+  // Pseudo et pays de chaque clé, comme la table noms_retours du service.
+  const names = new Map<string, FeedbackPerson>();
   try {
-    const seed = JSON.parse(fs.readFileSync(seedFile, 'utf8')) as { propositions?: unknown[] };
-    rows = parseProposals(seed).map((p) => ({ ...p, voted: undefined, mine: undefined, voters: new Set(Array.from({ length: p.votes }, (_, i) => `v${i}`)) }));
+    // Graine : `author` (pseudo et pays de l'auteur) et `soutiens` (ceux qui la soutiennent, nommés,
+    // les plus récents d'abord) ; les autres voix restent sans nom, comme les votes d'avant le 18/11/2026.
+    const seed = JSON.parse(fs.readFileSync(seedFile, 'utf8')) as { propositions?: { id?: string; soutiens?: unknown[] }[] };
+    const named = new Map((seed.propositions ?? []).map((r) => [r.id, (r.soutiens ?? []).map(parseFeedbackPerson).filter((x): x is FeedbackPerson => Boolean(x))]));
+    rows = parseProposals(seed).map((p) => {
+      const voters = new Set(Array.from({ length: Math.max(1, p.votes) }, (_, i) => `${p.id}:v${i}`));
+      if (p.author) names.set(`${p.id}:v0`, p.author);
+      (named.get(p.id) ?? []).slice(0, p.votes - 1).forEach((who, i) => names.set(`${p.id}:v${i + 1}`, who));
+      return { ...p, voted: undefined, mine: undefined, voters, authorKey: `${p.id}:v0` };
+    });
   } catch {
     rows = [];
   }
+  const noteWho = (pk: string, raw: unknown) => {
+    const who = parseFeedbackPerson(raw);
+    if (who) names.set(pk, who);
+  };
   const sent = path.join(dataDir, 'retours', 'envoyes');
   // Réactions aux Nouveautés : quelques joueurs inventés en ont déjà posé (graine du fichier, champ
   // « nouveautes » : { <id>: { <réaction>: nombre } }), puis celles de cette borne.
@@ -379,29 +437,45 @@ function simulatedStore(seedFile: string, dataDir: string) {
         return { status: 200, json: { item: b.item, ...newsView(b.item, b.pk) } };
       }
       if (method === 'GET' && route.startsWith('/api/propositions')) {
-        const view = rows
-          .map(({ voters, author, ...p }) => ({ ...p, votes: voters.size, ...(pk ? { voted: voters.has(pk), mine: author === pk } : {}) }));
+        const view = rows.map(({ voters, authorKey, author: _seed, ...p }) => {
+          const author = authorKey ? names.get(authorKey) : undefined;
+          return { ...p, votes: voters.size, ...(author ? { author } : {}), ...(pk ? { voted: voters.has(pk), mine: authorKey === pk } : {}) };
+        });
         return { status: 200, json: { propositions: view } };
       }
+      if (method === 'GET' && route.startsWith('/api/soutiens')) {
+        const id = new URLSearchParams(route.split('?')[1] ?? '').get('id');
+        const row = rows.find((r) => r.id === id);
+        if (!row) return { status: 404 };
+        // Les plus récents d'abord : l'ordre d'arrivée, à l'envers.
+        const others = [...row.voters].filter((v) => v !== row.authorKey).reverse();
+        const soutiens = others.map((v) => names.get(v)).filter((x): x is FeedbackPerson => Boolean(x));
+        return { status: 200, json: { id: row.id, soutiens, autres: others.length - soutiens.length } };
+      }
       if (method === 'POST' && route === '/api/propositions' && typeof body === 'string') {
-        const b = JSON.parse((JSON.parse(body) as { b: string }).b) as { kind: ProposalKind; title: string; text: string; lang: string; pk: string; t: number };
+        const b = JSON.parse((JSON.parse(body) as { b: string }).b) as { kind: ProposalKind; title: string; text: string; lang: string; pk: string; t: number; who?: unknown };
         const id = crypto.randomBytes(8).toString('base64url').slice(0, 10);
-        rows.push({ id, kind: b.kind, title: b.title, text: b.text, lang: b.lang, votes: 1, status: 'new', at: b.t, updated: b.t, merged: 0, author: b.pk, voters: new Set([b.pk]) });
+        noteWho(b.pk, b.who);
+        rows.push({ id, kind: b.kind, title: b.title, text: b.text, lang: b.lang, votes: 1, status: 'new', at: b.t, updated: b.t, merged: 0, authorKey: b.pk, voters: new Set([b.pk]) });
         return { status: 201, json: { id } };
       }
       if (method === 'POST' && route === '/api/votes' && typeof body === 'string') {
-        const b = JSON.parse((JSON.parse(body) as { b: string }).b) as { id: string; on: boolean; pk: string };
+        const b = JSON.parse((JSON.parse(body) as { b: string }).b) as { id: string; on: boolean; pk: string; who?: unknown };
         const row = rows.find((r) => r.id === b.id);
         if (!row) return { status: 404 };
+        if (b.on) noteWho(b.pk, b.who);
+        // Un vote redonné passe en tête des soutiens, comme sa date dans le service.
+        if (b.on) row.voters.delete(b.pk);
         if (b.on) row.voters.add(b.pk);
         else row.voters.delete(b.pk);
         return { status: 200, json: { id: row.id, votes: row.voters.size, voted: b.on } };
       }
       if (method === 'POST' && route === '/api/oubli' && typeof body === 'string') {
         const b = JSON.parse((JSON.parse(body) as { b: string }).b) as { pk: string };
-        const mine = rows.filter((r) => r.author === b.pk);
-        rows = rows.filter((r) => r.author !== b.pk);
+        const mine = rows.filter((r) => r.authorKey === b.pk);
+        rows = rows.filter((r) => r.authorKey !== b.pk);
         for (const r of rows) r.voters.delete(b.pk);
+        names.delete(b.pk);
         for (const who of reactions.values()) who.delete(b.pk);
         return { status: 200, json: { propositions: mine.length } };
       }

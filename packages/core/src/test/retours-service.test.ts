@@ -255,6 +255,53 @@ test('retours : la liste est triée par voix puis date, sans aucune clé, sans l
   assert.equal(all.propositions.find((p) => p.id === hidden)?.hidden, true);
 });
 
+// Auteur et soutiens (18/11/2026) : le pseudo et le pays signés (`who`) nomment l'auteur dans la liste,
+// et ceux qui soutiennent une proposition dans /api/soutiens, l'auteur à part, le plus récent d'abord ;
+// jamais une clé. Un vote d'avant (sans `who`) se compte sans nom ; un pseudo invalide n'est pas gardé ;
+// un pseudo changé remplace l'ancien partout ; le compte effacé emporte son nom.
+test('retours : l’auteur est nommé, ceux qui soutiennent aussi, sans aucune clé', async () => {
+  const s = await service();
+  const [author, kiko, dora, old, odd] = [keys(), keys(), keys(), keys(), keys()];
+  const id = (await s.propose(author, { title: 'Tournois entre amis', who: { name: 'Bruno', country: 'FR' } })).json.id as string;
+  const voteAs = async (k: Keys, on: boolean, who?: unknown) => (await s.call('POST', '/api/votes', s.signed(k, { op: 'vote', id, on, ...(who === undefined ? {} : { who }) }))).status;
+  assert.equal(await voteAs(old, true), 200);
+  s.state.clock += 1000;
+  assert.equal(await voteAs(kiko, true, { name: 'Kiko', country: 'BE' }), 200);
+  s.state.clock += 1000;
+  assert.equal(await voteAs(dora, true, { name: 'Dora' }), 200);
+  s.state.clock += 1000;
+  assert.equal(await voteAs(odd, true, { name: '<b>', country: 'XX' }), 200, 'un pseudo invalide ne bloque pas le vote');
+  const backers = async (target = id) => {
+    const r = await s.call('GET', `/api/soutiens?id=${target}`);
+    return { status: r.status, text: r.status === 200 ? await r.text() : '' };
+  };
+  const listed = await s.list();
+  assert.deepEqual((listed.propositions[0] as Proposition & { author?: unknown }).author, { name: 'Bruno', country: 'FR' });
+  let r = await backers();
+  assert.equal(r.status, 200);
+  assert.deepEqual(JSON.parse(r.text), { id, soutiens: [{ name: 'Dora' }, { name: 'Kiko', country: 'BE' }], autres: 2 });
+  for (const k of [author, kiko, dora, old, odd]) {
+    assert.ok(!r.text.includes(k.pk), 'clé publique dans les soutiens');
+    assert.ok(!listed.text.includes(k.pk), 'clé publique dans la liste');
+  }
+  // Kiko change de pseudo en votant ailleurs : son nouveau nom partout ; un vote retiré ne nomme personne.
+  const other = (await s.propose(dora, { title: 'Mode nuit pour la roue' })).json.id as string;
+  assert.equal((await s.call('POST', '/api/votes', s.signed(kiko, { op: 'vote', id: other, on: true, who: { name: 'Kiko2' } }))).status, 200);
+  assert.equal(await voteAs(dora, false, { name: 'Usurpé' }), 200);
+  assert.deepEqual(JSON.parse((await backers()).text).soutiens, [{ name: 'Kiko2' }]);
+  // Une proposition masquée ou inconnue : rien en public ; l'administrateur voit ses soutiens.
+  assert.equal((await s.edit(id, { hidden: true })).status, 200);
+  assert.equal((await backers()).status, 404);
+  assert.equal((await backers('zzzzzzzzzz')).status, 404);
+  assert.equal((await s.call('GET', '/api/soutiens?id=../x')).status, 400);
+  const adm = await s.adminCall('GET', `/api/admin/propositions/${id}/soutiens`);
+  assert.equal(adm.status, 200);
+  assert.deepEqual(((await adm.json()) as { soutiens: unknown[] }).soutiens, [{ name: 'Kiko2' }]);
+  // Compte effacé : son nom part avec lui.
+  assert.equal((await s.call('POST', '/api/oubli', s.signed(kiko, { op: 'forget' }))).status, 200);
+  assert.equal((await s.d1.prepare('SELECT COUNT(*) AS n FROM noms_retours WHERE pk = ?1').bind(kiko.pk).first('n')) as number, 0);
+});
+
 test('retours : une voix par borne et par proposition, retirable, jamais rejouée', async () => {
   const s = await service();
   const [author, fan] = [keys(), keys()];

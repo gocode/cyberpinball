@@ -23,7 +23,9 @@ import {
   loadFeedbackState,
   noteCrashSent,
   openSealedReport,
+  parseFeedbackPerson,
   parseProposals,
+  parseSupporters,
   saveFeedbackState,
   sealReport,
   signFeedback,
@@ -86,11 +88,32 @@ const p = (id: string, title: string, votes: number, extra: Partial<Proposal> = 
 
 test('les propositions du service sont relues et triées par votes', () => {
   const list = parseProposals({
-    propositions: [p('aaaaaaaa', 'Classement par fabricant', 3), p('bbbbbbbb', 'Mode nuit pour la roue', 12, { voted: true, author: 'x' } as Partial<Proposal>), { id: '../etc', title: 'Mauvaise', kind: 'feature', status: 'new' }, p('cccccccc', 'Statut inconnu', 5, { status: 'zzz' as Proposal['status'] })],
+    propositions: [p('aaaaaaaa', 'Classement par fabricant', 3), p('bbbbbbbb', 'Mode nuit pour la roue', 12, { voted: true, author: 'x' } as unknown as Partial<Proposal>), { id: '../etc', title: 'Mauvaise', kind: 'feature', status: 'new' }, p('cccccccc', 'Statut inconnu', 5, { status: 'zzz' as Proposal['status'] })],
   });
   assert.deepEqual(list.map((x) => x.id), ['bbbbbbbb', 'aaaaaaaa']);
   assert.equal(list[0]!.voted, true);
   assert.ok(!('author' in list[0]!), 'rien d’inattendu n’entre');
+});
+
+// Auteur et soutiens (18/11/2026) : le service nomme les joueurs par leur pseudo signé ; un pseudo
+// invalide ou un pays mal formé n'entre pas dans les écrans, et un soutien sans nom se compte.
+test('auteur et soutiens : pseudo et pays vérifiés, les invalides se comptent sans nom', () => {
+  const [good, noCountry, bad] = parseProposals({
+    propositions: [
+      p('aaaaaaaa', 'Classement par fabricant', 3, { author: { name: '  Bruno ', country: 'FR' } }),
+      p('bbbbbbbb', 'Mode nuit pour la roue', 2, { author: { name: 'Dora', country: 'france' } } as unknown as Partial<Proposal>),
+      p('cccccccc', 'Écran du DMD trop sombre', 1, { author: { name: '<script>' } } as unknown as Partial<Proposal>),
+    ],
+  });
+  assert.deepEqual(good!.author, { name: 'Bruno', country: 'FR' });
+  assert.deepEqual(noCountry!.author, { name: 'Dora' });
+  assert.ok(!('author' in bad!));
+  assert.deepEqual(parseSupporters({ soutiens: [{ name: 'Kiko', country: 'BE' }, { name: '' }, 'x', { name: 'Vortex' }], autres: 3 }), {
+    people: [{ name: 'Kiko', country: 'BE' }, { name: 'Vortex' }],
+    others: 5,
+  });
+  assert.equal(parseSupporters({ autres: 2 }), undefined);
+  assert.deepEqual(parseFeedbackPerson({ name: 'Tiltman', country: 'CA' }), { name: 'Tiltman', country: 'CA' });
 });
 
 test('les doublons sont retrouvés malgré accents, majuscules et pluriels', () => {

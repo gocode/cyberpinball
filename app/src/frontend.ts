@@ -1133,6 +1133,11 @@ const phoneRemote = createPhoneRemote({
 const feedbackService = createFeedbackService({
   dataDir: loc.dataDir,
   key: () => socialNet.state().key,
+  // Mon pseudo et mon pays, signés avec mes propositions et mes votes : le tableau me nomme.
+  who: () => {
+    const country = socialNet.country();
+    return { name: socialNet.state().name, ...(country ? { country } : {}) };
+  },
   ...(process.env.CYBERPINBALL_RELAIS ? { origin: process.env.CYBERPINBALL_RELAIS } : {}),
   // Essais : un service en mémoire (rien ne sort sur le vrai réseau), avec les propositions de départ du fichier donné.
   ...(process.env.CYBERPINBALL_RETOURS_SIMULES !== undefined || process.env.CYBERPINBALL_RESEAU === 'simule' || OFFSCREEN ? { simulated: process.env.CYBERPINBALL_RETOURS_SIMULES ?? '' } : {}),

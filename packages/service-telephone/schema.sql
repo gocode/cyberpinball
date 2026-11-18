@@ -1,7 +1,7 @@
 -- Base D1 des retours des joueurs (liaison RETOURS de worker.mjs), nommée « cyberpinball-retours ».
 -- Rejouable : node scripts/service-telephone.mjs d1 (ou deployer) l'applique à chaque fois.
--- Aucune adresse IP ni aucun nom : une borne n'y figure que par sa clé publique Ed25519 (hexadécimal),
--- que le service ne rend jamais.
+-- Aucune adresse IP : une borne n'y figure que par sa clé publique Ed25519 (hexadécimal), que le
+-- service ne rend jamais, et par le pseudo que son joueur signe avec ses propositions et ses votes.
 
 -- Le tableau public des propositions. `author` : clé publique de la borne qui l'a publiée ; `t` : date
 -- signée par la borne ; `at`, `updated` : dates du service (millisecondes). `merged_into` : la
@@ -32,6 +32,16 @@ CREATE TABLE IF NOT EXISTS votes (
   voter TEXT NOT NULL,
   at INTEGER NOT NULL,
   PRIMARY KEY (proposition, voter)
+);
+
+-- Pseudo et pays signés d'une borne (champ `who` d'une proposition ou d'un vote, 18/11/2026) : la liste
+-- nomme l'auteur d'une proposition, /api/soutiens ceux qui la soutiennent. `t` : date signée de la
+-- dernière écriture (une plus ancienne ne remplace rien). Effacé avec le compte (/api/oubli).
+CREATE TABLE IF NOT EXISTS noms_retours (
+  pk TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  country TEXT,
+  t INTEGER NOT NULL
 );
 
 -- Réactions aux Nouveautés du front-end (packages/core/src/news.ts) : une par borne et par nouveauté,

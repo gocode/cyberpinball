@@ -16,7 +16,9 @@
 //      validation préalable) ; POST /api/votes donne ou retire une voix. Chaque écriture est signée par
 //      la clé Ed25519 de la borne (protocole v1, RETOURS_PREFIX), datée à dix minutes près, jamais
 //      rejouée. Le service garde la clé publique de l'auteur et des votants, pour compter une voix par
-//      borne et limiter les propositions par jour, mais ne la rend jamais dans une réponse ;
+//      borne et limiter les propositions par jour, mais ne la rend jamais dans une réponse. Le pseudo
+//      et le pays du joueur (champ signé `who`, 18/11/2026) accompagnent une proposition ou un vote :
+//      la liste nomme l'auteur, GET /api/soutiens?id=… nomme ceux qui la soutiennent ;
 //    - privé : les rapports chiffrés (POST /api/rapports), des boîtes scellées binaires « CPR1 » que
 //      le service ne peut pas lire (seul l'administrateur a la clé) ; il ne garde que la boîte et sa
 //      date, sans auteur, et seulement les plus récentes.
@@ -172,6 +174,13 @@ export const SIGNED_MAX = 8192;
 /** Propositions rendues par la liste publique. */
 export const LIST_MAX = 500;
 const ADMIN_BODY_MAX = 65_536;
+/** Soutiens nommés rendus au plus pour une proposition ; les autres se comptent. */
+export const SUPPORTERS_MAX = 200;
+/** Pseudo d'un joueur : la même règle que normalizeName (packages/core/src/social.ts). */
+const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} '._-]*$/u;
+const NAME_MIN = 2;
+const NAME_MAX = 24;
+const COUNTRY_RE = /^[A-Z]{2}$/;
 const DAY_MS = 86_400_000;
 const PID = /^[A-Za-z0-9_-]{10}$/;
 const HEX64 = /^[0-9a-f]{64}$/;
@@ -225,6 +234,20 @@ export function cleanTitle(value) {
   const s = value.normalize('NFC').replace(/\s+/g, ' ').trim();
   return CONTROL.test(s) || s.length < TITLE_MIN || s.length > TITLE_MAX ? undefined : s;
 }
+
+/** Le joueur d'une écriture signée (`who`) : pseudo valide et pays facultatif ; undefined sinon. */
+export function cleanWho(value) {
+  if (!value || typeof value !== 'object' || typeof value.name !== 'string') return undefined;
+  const name = value.name.normalize('NFC').replace(/\s+/g, ' ').trim();
+  if (name.length < NAME_MIN || name.length > NAME_MAX || !NAME_RE.test(name)) return undefined;
+  return { name, country: typeof value.country === 'string' && COUNTRY_RE.test(value.country) ? value.country : null };
+}
+
+/** Retient le pseudo et le pays signés d'une borne ; une écriture plus ancienne ne remplace pas la dernière. */
+const noteWho = (db, pk, who, t) =>
+  db
+    .prepare('INSERT INTO noms_retours (pk, name, country, t) VALUES (?1, ?2, ?3, ?4) ON CONFLICT (pk) DO UPDATE SET name = excluded.name, country = excluded.country, t = excluded.t WHERE excluded.t > noms_retours.t')
+    .bind(pk, who.name, who.country, t);
 
 /** Texte libre : retours à la ligne permis (\r\n ramené à \n), bords ôtés ; tout autre caractère de contrôle refusé. */
 export function cleanText(value, max = TEXT_MAX) {
@@ -298,15 +321,18 @@ async function limited(request, env) {
 const SELECT_PROPOSITIONS = `SELECT p.id, p.kind, p.title, p.text, p.lang, p.status, p.at, p.updated, p.reply, p.hidden, p.merged_into,
   (SELECT COUNT(*) FROM votes v WHERE v.proposition = p.id) AS n_votes,
   (SELECT COUNT(*) FROM propositions m WHERE m.merged_into = p.id) AS n_merged,
+  (SELECT n.name FROM noms_retours n WHERE n.pk = p.author) AS author_name,
+  (SELECT n.country FROM noms_retours n WHERE n.pk = p.author) AS author_country,
   p.author = ?1 AS is_mine,
   EXISTS (SELECT 1 FROM votes w WHERE w.proposition = p.id AND w.voter = ?1) AS has_voted
 FROM propositions p`;
 
-/** Une proposition telle que rendue : jamais la clé de l'auteur ni celles des votants. */
+/** Une proposition telle que rendue : le pseudo de l'auteur s'il est connu, jamais sa clé ni celles des votants. */
 function present(row, { admin = false, pk } = {}) {
   const out = { id: row.id, kind: row.kind, title: row.title, text: row.text, lang: row.lang, votes: row.n_votes, status: row.status, at: row.at, updated: row.updated };
   if (row.reply !== null && row.reply !== undefined) out.reply = row.reply;
   out.merged = row.n_merged;
+  if (row.author_name) out.author = row.author_country ? { name: row.author_name, country: row.author_country } : { name: row.author_name };
   if (pk) {
     out.mine = !!row.is_mine;
     out.voted = !!row.has_voted;
@@ -335,6 +361,7 @@ async function propose(request, env, now) {
   const title = cleanTitle(checked.body.title);
   const text = checked.body.text === undefined ? '' : cleanText(checked.body.text);
   if (!kind || !lang || title === undefined || text === undefined) return reply(400, { erreur: 'forme' });
+  const who = cleanWho(checked.body.who);
   const db = env.RETOURS;
   if (await seen(db, pk, t)) return reply(409, { erreur: 'rejeu' });
   const count = await db.prepare('SELECT COUNT(*) AS n FROM propositions WHERE author = ?1 AND at > ?2').bind(pk, now - DAY_MS).first('n');
@@ -345,6 +372,7 @@ async function propose(request, env, now) {
     ...markSeen(db, pk, t, now),
     db.prepare('INSERT INTO propositions (id, kind, title, text, lang, author, t, at, updated) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)').bind(id, kind, title, text, lang, pk, t, now),
     db.prepare('INSERT INTO votes (proposition, voter, at) VALUES (?1, ?2, ?3)').bind(id, pk, t),
+    ...(who ? [noteWho(db, pk, who, t)] : []),
   ]);
   return refused ?? reply(201, { id });
 }
@@ -366,6 +394,7 @@ async function vote(request, env, now) {
   if (!checked.body) return reply(checked.status, { erreur: checked.why });
   const { pk, t, id, on } = checked.body;
   if (typeof id !== 'string' || !PID.test(id) || typeof on !== 'boolean') return reply(400, { erreur: 'forme' });
+  const who = on ? cleanWho(checked.body.who) : undefined;
   const db = env.RETOURS;
   const target = await resolveVisible(db, id);
   if (!target) return reply(404, { erreur: 'inconnue' });
@@ -377,10 +406,34 @@ async function vote(request, env, now) {
     on
       ? db.prepare('INSERT INTO votes (proposition, voter, at) VALUES (?1, ?2, ?3) ON CONFLICT (proposition, voter) DO UPDATE SET at = excluded.at').bind(target, pk, t)
       : db.prepare('DELETE FROM votes WHERE proposition = ?1 AND voter = ?2').bind(target, pk),
+    ...(who ? [noteWho(db, pk, who, t)] : []),
   ]);
   if (refused) return refused;
   const votes = await db.prepare('SELECT COUNT(*) AS n FROM votes WHERE proposition = ?1').bind(target).first('n');
   return reply(200, { id: target, votes, voted: on });
+}
+
+/**
+ * Ceux qui soutiennent une proposition, l'auteur à part : les pseudos connus (vote le plus récent
+ * d'abord, SUPPORTERS_MAX au plus) et le nombre des autres (votes donnés sans pseudo, avant le
+ * 18/11/2026, ou au-delà de la limite). Jamais de clé. Public : seulement une proposition visible ;
+ * l'administrateur voit aussi les masquées et les fusionnées.
+ */
+async function supporters(db, id, { admin = false } = {}) {
+  const row = await db.prepare('SELECT id, author, hidden, merged_into FROM propositions WHERE id = ?1').bind(id).first();
+  if (!row || (!admin && (row.hidden || row.merged_into))) return reply(404, { erreur: 'inconnue' });
+  const total = await db.prepare('SELECT COUNT(*) AS n FROM votes WHERE proposition = ?1 AND voter != ?2').bind(id, row.author).first('n');
+  const { results } = await db
+    .prepare('SELECT n.name, n.country FROM votes v JOIN noms_retours n ON n.pk = v.voter WHERE v.proposition = ?1 AND v.voter != ?2 ORDER BY v.at DESC LIMIT ?3')
+    .bind(id, row.author, SUPPORTERS_MAX)
+    .all();
+  const people = results.map((r) => (r.country ? { name: r.name, country: r.country } : { name: r.name }));
+  return reply(200, { id, soutiens: people, autres: Math.max(0, (total ?? 0) - people.length) });
+}
+
+async function listSupporters(env, url) {
+  const id = url.searchParams.get('id') ?? '';
+  return PID.test(id) ? supporters(env.RETOURS, id) : reply(400, { erreur: 'forme' });
 }
 
 /**
@@ -403,6 +456,7 @@ async function forget(request, env, now) {
     db.prepare('DELETE FROM propositions WHERE author = ?1').bind(pk),
     db.prepare('DELETE FROM votes WHERE voter = ?1').bind(pk),
     db.prepare('DELETE FROM reactions_nouveautes WHERE voter = ?1').bind(pk),
+    db.prepare('DELETE FROM noms_retours WHERE pk = ?1').bind(pk),
     // Le coffre du compte et son mot de passe (routes /api/coffre…) partent avec lui.
     db.prepare('DELETE FROM coffres WHERE pk = ?1').bind(pk),
     db.prepare('DELETE FROM coffres_mdp WHERE pk = ?1').bind(pk),
@@ -578,6 +632,8 @@ async function admin(request, env, url, now) {
     const { results } = await db.prepare(`${SELECT_PROPOSITIONS} ORDER BY n_votes DESC, p.at DESC`).bind('').all();
     return reply(200, { propositions: results.map((r) => present(r, { admin: true })) });
   }
+  const backers = /^propositions\/([A-Za-z0-9_-]{10})\/soutiens$/.exec(route);
+  if (backers) return request.method === 'GET' ? supporters(db, backers[1], { admin: true }) : reply(405, { erreur: 'méthode' });
   const edit = /^propositions\/([A-Za-z0-9_-]{10})$/.exec(route);
   if (edit) return request.method === 'POST' ? adminEdit(env, edit[1], raw, date, now) : reply(405, { erreur: 'méthode' });
   if (route === 'rapports') {
@@ -738,10 +794,10 @@ async function coffre(request, env, url, now) {
   }
 }
 
-/** Les routes des retours (/api/propositions, /api/votes, /api/rapports, /api/admin/…) ; undefined pour les autres. */
+/** Les routes des retours (/api/propositions, /api/soutiens, /api/votes, /api/rapports, /api/admin/…) ; undefined pour les autres. */
 async function retours(request, env, url, now) {
   const path = url.pathname;
-  const known = path === '/api/propositions' || path === '/api/votes' || path === '/api/oubli' || path === '/api/rapports' || path === '/api/nouveautes' || path.startsWith('/api/admin/');
+  const known = path === '/api/propositions' || path === '/api/soutiens' || path === '/api/votes' || path === '/api/oubli' || path === '/api/rapports' || path === '/api/nouveautes' || path.startsWith('/api/admin/');
   if (!known) return undefined;
   if (!env.RETOURS) return reply(503, { erreur: 'indisponible' });
   try {
@@ -750,6 +806,7 @@ async function retours(request, env, url, now) {
       if (request.method === 'GET') return await listNewsReactions(env, url);
       return request.method === 'POST' ? await reactNews(request, env, now) : reply(405, { erreur: 'méthode' });
     }
+    if (path === '/api/soutiens') return request.method === 'GET' ? await listSupporters(env, url) : reply(405, { erreur: 'méthode' });
     if (path === '/api/propositions') {
       if (request.method === 'GET') return await listPropositions(env, url);
       return request.method === 'POST' ? await propose(request, env, now) : reply(405, { erreur: 'méthode' });
