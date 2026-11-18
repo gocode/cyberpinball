@@ -44,6 +44,38 @@ export interface RemoteEntry {
   group?: string;
   /** L'élément choisi de la liste, celui dont les actions sont dans la zone `actions`. */
   chosen?: boolean;
+  /**
+   * Comment le téléphone dessine l'entrée : `chips`, un badge parmi ceux de son groupe (phrases
+   * préparées, réactions), sur deux lignes qui défilent vers la droite ; absent, une ligne de liste.
+   * Tiré du rôle de sa section à la borne (remoteLayout).
+   */
+  layout?: RemoteLayout;
+}
+
+/** Dessin d'une entrée au téléphone autre qu'une ligne de liste. */
+export type RemoteLayout = 'chips';
+
+/**
+ * Le dessin au téléphone de chaque rôle de section (Section.kind) que la borne dessine ou range à part
+ * (app/renderer/library.js) : `chips` en badges, `rows` en lignes de liste. Un rôle nouveau dessiné à
+ * part à la borne doit être classé ici (test remote-menus) : sinon le téléphone en ferait des lignes
+ * sans que personne l'ait décidé (les phrases préparées en grandes cases, 18/11/2026).
+ */
+export const REMOTE_SECTION_LAYOUT: Readonly<Record<string, RemoteLayout | 'rows'>> = {
+  // Phrases préparées d'un salon : déjà des badges à la borne.
+  chips: 'chips',
+  // « Répondre » d'un fil (chat-menu.ts, groups-menu.ts) et options d'une ligne d'un salon : des lignes
+  // à la borne, des textes courts à choisir d'un appui au téléphone.
+  phrases: 'chips',
+  reactions: 'chips',
+  news: 'rows',
+  players: 'rows',
+};
+
+/** Le dessin au téléphone d'une entrée de cette section ; undefined : une ligne de liste. */
+export function remoteLayout(kind: string | undefined): RemoteLayout | undefined {
+  const layout = kind ? REMOTE_SECTION_LAYOUT[kind] : undefined;
+  return layout === 'rows' ? undefined : layout;
 }
 
 /** Les collections de la roue, pour le choix du téléphone : leur nom, leur nombre de tables, l'active ; imposée (mode invité) : pourquoi. */
@@ -147,7 +179,9 @@ export function remoteEntries(e: RemoteEntries): RemoteEntries {
     const wheel = art?.wheel && REMOTE_IMAGE.test(art.wheel) ? art.wheel : undefined;
     const media = art?.media && REMOTE_IMAGE.test(art.media) ? art.media : undefined;
     const thumb = art?.thumb && REMOTE_IMAGE.test(art.thumb) ? art.thumb : undefined;
-    const bounded = item.group ? { ...item, group: remoteText(item.group, GROUP_MAX) } : item;
+    const { layout, ...rest } = item;
+    const known = layout === 'chips' ? { layout } : {};
+    const bounded = rest.group ? { ...rest, ...known, group: remoteText(rest.group, GROUP_MAX) } : { ...rest, ...known };
     return wheel || media || thumb ? { ...bounded, art: { ...(wheel ? { wheel } : {}), ...(media ? { media } : {}), ...(thumb ? { thumb } : {}) } } : bounded;
   });
   return { ...e, title: remoteText(e.title, LABEL_MAX), ...(e.note ? { note: remoteText(e.note, 300) } : {}), items, current: e.current >= 0 && e.current < items.length ? e.current : -1 };

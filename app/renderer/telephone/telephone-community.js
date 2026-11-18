@@ -213,7 +213,7 @@ function renderRoom() {
     list.replaceChildren();
     status.hidden = false;
     status.textContent = community.data?.closed ?? t('Partage désactivé : Partage et réseau');
-    chips.replaceChildren();
+    setChips(chips, []);
     field.disabled = true;
     return;
   }
@@ -249,16 +249,8 @@ function renderRoom() {
   status.hidden = !r.blocked;
   status.textContent = r.blocked ?? '';
   field.disabled = Boolean(r.blocked);
-  const chip = (label, run) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'chip';
-    b.textContent = label;
-    b.disabled = Boolean(r.blocked);
-    b.addEventListener('click', run);
-    return b;
-  };
-  chips.replaceChildren(...r.phrases.map((p) => chip(p, () => send({ t: 'room-send', text: p }))));
+  // Les phrases préparées en badges, sur deux lignes qui défilent (chipStrip, telephone.js).
+  setChips(chips, [{ lines: 2, items: r.phrases.map((p) => ({ label: p, disabled: Boolean(r.blocked), run: () => send({ t: 'room-send', text: p }) })) }], r.name);
 }
 
 document.getElementById('room-form').addEventListener('submit', (e) => {
@@ -321,7 +313,7 @@ function renderThread() {
     lines.replaceChildren();
     status.textContent = community.data?.closed ?? t('Ouverture du fil…');
     status.className = 'thread-status';
-    chips.replaceChildren();
+    setChips(chips, []);
     field.disabled = true;
     form.classList.add('off');
     return;
@@ -371,23 +363,18 @@ function renderThread() {
   field.disabled = Boolean(th.blocked);
   form.classList.toggle('off', Boolean(th.blocked));
   field.placeholder = th.blocked ? t('Indisponible') : t('Écrire à {name}…', { name: th.name });
-  // Réactions au dernier message reçu, puis les phrases toutes prêtes ; rien quand on ne peut pas écrire.
+  // Les réactions au dernier message reçu sur une ligne, puis les phrases toutes prêtes sur deux
+  // (chipStrip, telephone.js) ; rien quand on ne peut pas écrire.
   const lastIn = [...th.items].reverse().find((it) => it.kind === 'line' && !it.out);
-  const chip = (label, run) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'thread-chip';
-    b.textContent = label;
-    b.addEventListener('click', run);
-    return b;
-  };
-  chips.replaceChildren(
-    ...(th.blocked
+  setChips(
+    chips,
+    th.blocked
       ? []
       : [
-          ...(lastIn ? th.reactions.map((r) => chip(r.label, () => send({ t: 'chat-react', key: th.key, target: lastIn.id, kind: r.id }))) : []),
-          ...th.phrases.map((p) => chip(p, () => send({ t: 'chat-send', key: th.key, text: p }))),
-        ]),
+          { lines: 1, className: 'reactions', items: lastIn ? th.reactions.map((r) => ({ label: r.label, run: () => send({ t: 'chat-react', key: th.key, target: lastIn.id, kind: r.id }) })) : [] },
+          { lines: 2, items: th.phrases.map((p) => ({ label: p, run: () => send({ t: 'chat-send', key: th.key, text: p }) })) },
+        ],
+    [th.key, lastIn?.id ?? ''],
   );
 }
 

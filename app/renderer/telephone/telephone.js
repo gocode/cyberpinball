@@ -416,6 +416,100 @@ function entryRow(item, opts) {
   return li;
 }
 
+// ---------- Badges à choisir d'un appui (phrases préparées, réactions) ----------
+
+/**
+ * Une bande de badges : les uns à côté des autres, sur `lines` lignes au plus (deux pour les phrases,
+ * une pour les réactions) ; s'il y en a davantage, la bande s'élargit juste assez pour tenir sur ces
+ * lignes et défile vers la droite. Un badge long garde son texte sur une ligne, coupé au bout au-delà
+ * de la largeur de l'écran (le texte entier pour le lecteur d'écran). Jamais une grande case par
+ * phrase (18/11/2026). items : { label, run(b), current?, disabled? }.
+ */
+function chipStrip(items, { lines = 2, className = '' } = {}) {
+  const strip = document.createElement('div');
+  strip.className = `chip-strip${className ? ` ${className}` : ''}`;
+  strip.dataset.lines = String(lines);
+  const rows = document.createElement('div');
+  rows.className = 'chip-rows';
+  for (const it of items) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `chip${it.current ? ' current' : ''}`;
+    // Le texte dans sa propre boîte, coupée au bout : le badge, lui, ne coupe rien, et sa zone de toucher
+    // (::after, 48 px de haut) déborde du dessin.
+    const text = document.createElement('span');
+    text.className = 'chip-text';
+    text.textContent = it.label;
+    b.append(text);
+    b.setAttribute('aria-label', it.label);
+    if (it.current) b.setAttribute('aria-current', 'true');
+    if (it.disabled) b.disabled = true;
+    b.addEventListener('click', () => {
+      if (state !== 'paired' || b.disabled) return;
+      if (navigator.vibrate) navigator.vibrate(12);
+      it.run(b);
+    });
+    rows.append(b);
+  }
+  strip.append(rows);
+  strip.addEventListener('scroll', () => chipsEdge(strip), { passive: true });
+  chipsWatch.observe(strip);
+  return strip;
+}
+
+/** Le fondu au bord droit tant que la bande a encore des badges à montrer de ce côté. */
+function chipsEdge(strip) {
+  strip.classList.toggle('more', strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 2);
+}
+
+/**
+ * Remplace les bandes de `box` (une par groupe : `{ items, lines, className }`), sauf si rien n'a
+ * changé (`sig`) : la borne renvoie le fil toutes les 1,5 s, et la bande ne doit pas revenir à gauche
+ * sous le doigt qui la fait défiler.
+ */
+function setChips(box, groups, sig) {
+  const shown = groups.filter((g) => g.items.length);
+  const key = JSON.stringify([sig, shown.map((g) => [g.className ?? '', g.items.map((i) => [i.label, Boolean(i.current), Boolean(i.disabled)])])]);
+  if (box.dataset.sig === key) return;
+  box.dataset.sig = key;
+  box.replaceChildren(...shown.map((g) => chipStrip(g.items, g)));
+}
+
+/** Ajuste la largeur d'une bande pour qu'elle tienne sur ses lignes (mesurée quand elle est montrée). */
+function fitChips(strip) {
+  if (!strip.isConnected) {
+    chipsWatch.unobserve(strip);
+    return;
+  }
+  const rows = strip.firstElementChild;
+  const max = Number(strip.dataset.lines) || 2;
+  if (rows && strip.clientWidth && max >= 2) {
+    rows.style.width = '';
+    const lineCount = () => new Set([...rows.children].map((c) => c.offsetTop)).size;
+    if (lineCount() > max) {
+      const gap = parseFloat(getComputedStyle(rows).columnGap) || 0;
+      const total = [...rows.children].reduce((sum, c) => sum + c.offsetWidth + gap, 0);
+      let width = Math.max(strip.clientWidth, Math.ceil(total / max));
+      rows.style.width = `${width}px`;
+      while (lineCount() > max && width < total) {
+        width += 24;
+        rows.style.width = `${width}px`;
+      }
+    }
+  }
+  chipsEdge(strip);
+}
+// Ajusté à l'image suivante, hors du rappel : changer la taille dans le rappel même relancerait
+// l'observation dans la même image (« ResizeObserver loop » à la console).
+const chipsPending = new Set();
+const chipsWatch = new ResizeObserver((seen) => {
+  for (const e of seen) chipsPending.add(e.target);
+  requestAnimationFrame(() => {
+    for (const strip of chipsPending) fitChips(strip);
+    chipsPending.clear();
+  });
+});
+
 /** Message d'une liste vide : chargement, opération en cours, rien à toucher, menus fermés. */
 function showEmpty(prefix, icon, title, text) {
   const box = $(`${prefix}-empty`);
@@ -455,11 +549,30 @@ function renderEntries() {
     list.classList.toggle('grid', grid);
     // Un titre avant chaque groupe, comme les sections de la borne : jamais une liste et ses options mêlées.
     let group;
+    let chips;
     const rows = [];
     e.items.forEach((item, i) => {
-      if (!grid && item.group && item.group !== group) rows.push(groupTitle(item.group));
+      const newGroup = item.group !== group;
+      if (!grid && item.group && newGroup) rows.push(groupTitle(item.group));
       group = item.group;
+      // Badges (phrases préparées, réactions : layout « chips ») : ceux d'un même groupe dans une bande.
+      if (!grid && item.layout === 'chips') {
+        if (!chips || newGroup) {
+          chips = [];
+          rows.push({ chips });
+        }
+        chips.push({ label: item.label, current: i === e.current, run: run(i) });
+        return;
+      }
+      chips = undefined;
       rows.push(grid ? tableCard(item, i === e.current, run(i)) : entryRow(item, { icons, medals, current: i === e.current, run: run(i) }));
+    });
+    rows.forEach((r, k) => {
+      if (!r.chips) return;
+      const li = document.createElement('li');
+      li.className = 'entry-chips';
+      li.append(chipStrip(r.chips, { lines: 2 }));
+      rows[k] = li;
     });
     list.replaceChildren(...rows);
     scrollToCurrent();
@@ -675,18 +788,15 @@ function renderChat() {
   const typing = typingItem(chat.typing, 'in-game');
   if (typing) list.append(typing);
   list.scrollTop = list.scrollHeight;
+  // Les réactions au dernier message reçu sur une ligne, puis les phrases sur deux (chipStrip).
   const lastIn = [...chat.lines].reverse().find((l) => !l.out);
-  const chip = (label, run) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'phone-chat-chip';
-    b.textContent = label;
-    b.addEventListener('click', run);
-    return b;
-  };
-  $('phone-chat-chips').replaceChildren(
-    ...(lastIn ? chat.reactions.map((r) => chip(r.label, () => send({ t: 'chat-react', key: chat.key, target: lastIn.id, kind: r.id }))) : []),
-    ...chat.phrases.map((p) => chip(p, () => send({ t: 'chat-send', key: chat.key, text: p }))),
+  setChips(
+    $('phone-chat-chips'),
+    [
+      { lines: 1, className: 'reactions', items: lastIn ? chat.reactions.map((r) => ({ label: r.label, run: () => send({ t: 'chat-react', key: chat.key, target: lastIn.id, kind: r.id }) })) : [] },
+      { lines: 2, items: chat.phrases.map((p) => ({ label: p, run: () => send({ t: 'chat-send', key: chat.key, text: p }) })) },
+    ],
+    [chat.key, lastIn?.id ?? ''],
   );
   $('phone-chat-field').placeholder = t('Écrire à {name}…', { name: chat.name });
   $('phone-chat-send').textContent = t('Envoyer');

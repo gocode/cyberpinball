@@ -1087,28 +1087,111 @@ body:not([data-mode='browser'])[data-view='thread'] .thread {
   color: var(--warning);
 }
 
+/* Au-dessus du champ d'un fil ou d'un salon : la bande des réactions puis celle des phrases. */
 .thread-chips {
   flex: none;
   display: flex;
+  flex-direction: column;
   gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  touch-action: pan-x;
 }
 
 .thread-chips:empty {
   display: none;
 }
 
-.thread-chip {
+/*
+ * Badges à choisir d'un appui (chipStrip, telephone.js) : phrases préparées, réactions. Les uns à côté
+ * des autres sur deux lignes au plus (une pour les réactions) ; au-delà, la bande défile vers la
+ * droite, sans barre. Un badge long reste sur une ligne, coupé au bout.
+ */
+.chip-strip {
   flex: none;
-  min-height: 48px;
+  /* La zone de toucher des badges (4 px au-dessus et au-dessous) reste dans la bande. */
+  padding: 4px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+}
+
+.chip-strip::-webkit-scrollbar {
+  display: none;
+}
+
+/* D'autres badges à droite : le bord s'estompe, pour inviter à faire défiler. */
+.chip-strip.more {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
+
+.chip-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 6px;
+  min-width: 100%;
+}
+
+.chip-strip[data-lines='1'] .chip-rows {
+  flex-wrap: nowrap;
+  width: max-content;
+}
+
+.chip {
+  position: relative;
+  flex: none;
+  max-width: min(80vw, 340px);
+  min-height: 40px;
   padding: 0 14px;
   border: 1px solid var(--line-strong);
-  border-radius: 24px;
+  border-radius: 20px;
   background: var(--surface);
+  color: var(--ink);
   font-size: 15px;
+  line-height: 38px;
+}
+
+/* 40 px dessinés, 48 px à toucher : la zone déborde de 4 px en haut et en bas (l'écart entre deux lignes). */
+.chip::after {
+  content: '';
+  position: absolute;
+  inset: -5px -3px;
+}
+
+.chip-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chip:active,
+.chip.sent {
+  border-color: var(--signal);
+  background: var(--surface-raised);
+}
+
+/* Celui que le curseur de la borne désigne (vue Écran). */
+.chip.current {
+  border-color: var(--signal);
+  color: var(--signal);
+}
+
+.chip:disabled {
+  color: var(--ink-faint);
+  border-color: var(--line-soft);
+}
+
+.chip-strip.reactions .chip {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 14px;
+  line-height: 34px;
+}
+
+/* Vue Écran : la bande d'un groupe de badges, au fil de la liste. */
+.entry-list li.entry-chips {
+  padding: 4px 6px 8px;
 }
 
 .thread-form {
@@ -2513,21 +2596,15 @@ body[data-short='true'] .top {
   color: var(--ink-muted);
 }
 
+/* Réactions puis phrases, en badges (chipStrip, telephone.js). */
 .phone-chat-chips {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.phone-chat-chip {
-  min-height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  background: var(--surface-raised);
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
+.phone-chat-chips:empty {
+  display: none;
 }
 
 .phone-chat-form {
@@ -2555,7 +2632,7 @@ body[data-short='true'] .top {
 }
 
 /* Le fil présent : la page part du haut, plus serrée, et tout tient à l'écran (le champ jamais
-   repoussé hors de la vue) ; les pastilles sur une rangée qui défile ; l'état de la dernière bulle
+   repoussé hors de la vue) ; les badges en bandes qui défilent ; l'état de la dernière bulle
    jamais sous la barre de défilement. */
 .game-note:has(.phone-chat:not([hidden])) {
   justify-content: flex-start;
@@ -2573,16 +2650,6 @@ body[data-short='true'] .top {
   padding-right: 10px;
 }
 
-.phone-chat-chips {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-
-.phone-chat-chip {
-  flex: none;
-  white-space: nowrap;
-}
 
 /* --- Juke-box : le lecteur de la borne (telephone-jukebox.js) --- */
 

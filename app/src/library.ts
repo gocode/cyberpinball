@@ -26,6 +26,7 @@ import {
   systemPathOf,
   remoteMenuTree,
   toRemoteEntry,
+  remoteLayout,
   type RemoteMenus,
   type SystemEntryId,
   type SystemGroupId,
@@ -5655,7 +5656,7 @@ export function createLibrary(host: LibraryHost) {
     // (actionsTitle). Le téléphone range de même : jamais une liste et ses options mêlées.
     const rowOf = new Map<number, { row: Row; section: Section }>();
     for (const sec of built.sections) for (const row of sec.rows) if (row.action !== undefined && !rowOf.has(row.action)) rowOf.set(row.action, { row, section: sec });
-    const placed = (index: number, back: boolean): { zone?: 'options' | 'list' | 'actions'; group?: string; art?: { thumb: string }; chosen?: true } => {
+    const placed = (index: number, back: boolean): { zone?: 'options' | 'list' | 'actions'; group?: string; art?: { thumb: string }; chosen?: true; layout?: 'chips' } => {
       const at = rowOf.get(index);
       if (!at) return !back && built.actionsTitle ? { zone: 'actions', group: built.actionsTitle } : {};
       const thumb = at.row.thumb?.startsWith('cyber-media:') ? at.row.thumb : undefined;
@@ -5663,6 +5664,8 @@ export function createLibrary(host: LibraryHost) {
         ...(at.section.options ? { zone: 'options' as const } : at.section.title ? { zone: 'list' as const, group: at.section.title } : {}),
         ...(thumb ? { art: { thumb } } : {}),
         ...(at.row.current ? { chosen: true as const } : {}),
+        // Badges au téléphone aussi (phrases préparées, réactions) : jamais une grande case par phrase.
+        ...(remoteLayout(at.section.kind) === 'chips' ? { layout: 'chips' as const } : {}),
       };
     };
     return {

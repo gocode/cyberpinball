@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Phone: canned phrases and reactions now show as chips, side by side on at most two lines, and the strip scrolls to the right when there are more; no more one big box per phrase in the Screen view ("Write in the room", "Reply"), and the same chips in the room, a friend's thread and the in-game messages, with reactions on their own line above the phrases.
 - Community medallion: the playfield poster shows your level (its tier and its bar), your place in the worldwide and national rankings, and your week in one line (XP earned, places this week). A place not known yet keeps its box, greyed out, with the reason. To keep it light, the country room now only shows on the backglass poster.
 - Failed game: a flipper sends a report to the developers in one press (the problem already filled in, the technical sheet attached, encrypted and anonymised), a description remaining optional.
 - VPX crash whose automatic report has been sent: a 👌 box under the error says the team has been told and will look into it; the flipper then only adds your details.

@@ -16,6 +16,8 @@ import {
   remoteEntries,
   remoteMenuTarget,
   remoteMenuTree,
+  remoteLayout,
+  REMOTE_SECTION_LAYOUT,
   SYSTEM_GROUP_IDS,
   SYSTEM_GROUPS,
   SYSTEM_ITEM_IDS,
@@ -100,6 +102,34 @@ test('accès direct : une entrée part bornée, sans caractère de contrôle, sa
   const many = remoteEntries({ kind: 'screen', title: 'T', items: Array.from({ length: REMOTE_ENTRIES_MAX + 10 }, (_, i) => ({ label: String(i) })), current: REMOTE_ENTRIES_MAX + 5 });
   assert.equal(many.items.length, REMOTE_ENTRIES_MAX);
   assert.equal(many.current, -1, 'un choix hors de la liste envoyée : aucun');
+});
+
+test('accès direct : chaque rôle de section que la borne dessine à part a son dessin décidé au téléphone (badges ou lignes)', () => {
+  // Les phrases préparées, en badges à la borne, arrivaient au téléphone en grandes cases l'une sous
+  // l'autre (18/11/2026) : la borne ne disait pas le rôle de la section. Tout rôle que library.js
+  // dessine ou range à part est désormais classé, et les badges y partent comme badges.
+  const borne = read('app', 'renderer', 'library.js');
+  const kinds = new Set([...borne.matchAll(/section\.kind === '([a-z-]+)'/g)].map((m) => m[1]!));
+  assert.ok(kinds.has('chips'), 'library.js dessine toujours les badges à part');
+  for (const kind of kinds) assert.ok(Object.hasOwn(REMOTE_SECTION_LAYOUT, kind), `rôle « ${kind} » dessiné à part à la borne : à classer dans REMOTE_SECTION_LAYOUT (badges ou lignes au téléphone)`);
+  assert.equal(remoteLayout('chips'), 'chips');
+  assert.equal(remoteLayout('phrases'), 'chips', '« Répondre » d’un fil : les phrases en badges au téléphone');
+  assert.equal(remoteLayout('reactions'), 'chips');
+  assert.equal(remoteLayout('players'), undefined);
+  assert.equal(remoteLayout(undefined), undefined);
+  // La borne joint le dessin à l'entrée, d'après la section qui la montre ; le téléphone le lit.
+  assert.match(read('app', 'src', 'library.ts'), /remoteLayout\(at\.section\.kind\)/);
+  const page = read('app', 'renderer', 'telephone', 'telephone.js');
+  assert.match(page, /item\.layout === 'chips'/);
+  // Un seul dessin de badges pour toute la page : Écran, fil, salon, messagerie de la partie.
+  const community = read('app', 'renderer', 'telephone', 'telephone-community.js');
+  assert.ok(!/thread-chip'|className = 'chip'|phone-chat-chip'/.test(page + community), 'plus de badges dessinés à la main hors de chipStrip');
+  assert.ok((community.match(/setChips\(/g) ?? []).length >= 4, 'le fil et le salon passent par setChips');
+  assert.match(page, /setChips\(\s*\$\('phone-chat-chips'\)/, 'la messagerie de la partie aussi');
+  // Un dessin inconnu ne part pas ; « chips » part tel quel.
+  const sent = remoteEntries({ kind: 'screen', title: 'T', items: [{ label: 'a', layout: 'chips' }, { label: 'b', layout: 'autre' as never }], current: 0 });
+  assert.equal(sent.items[0]!.layout, 'chips');
+  assert.ok(!('layout' in sent.items[1]!));
 });
 
 test('accès direct : mêmes portes que la borne, rien ne se déverrouille du téléphone, un rang d’un écran dépassé est ignoré', () => {
