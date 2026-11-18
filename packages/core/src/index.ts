@@ -176,6 +176,7 @@ export * from './friendpresence';
 export * from './badges';
 export * from './levels';
 export * from './account';
+export * from './localplay';
 export * from './recovery';
 export * from './vault';
 export * from './firewall';

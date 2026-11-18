@@ -156,6 +156,11 @@ export interface SocialState {
    * `false` le coupe ; mes amis voient toujours ma présence.
    */
   publicPresence?: boolean;
+  /**
+   * « Jouer en local » (localplay.ts) : toute la partie sociale retirée, niveaux compris ; le partage
+   * (`enabled`) est alors coupé. Absent : la communauté est là.
+   */
+  localPlay?: true;
   /** Pays déclaré (ISO 3166-1 alpha-2) ; absent : celui de la région de Windows, s'il se lit. */
   country?: string;
   /**
@@ -315,6 +320,7 @@ export function parseSocialState(raw: unknown): SocialState | undefined {
     ...(s.shareScores === false ? { shareScores: false } : {}),
     ...(s.publicProfile === false ? { publicProfile: false } : {}),
     ...(s.publicPresence === false ? { publicPresence: false } : {}),
+    ...(s.localPlay === true ? { localPlay: true as const } : {}),
     ...(typeof s.country === 'string' && /^[A-Z]{2}$/.test(s.country) ? { country: s.country } : {}),
     ...(isIso(s.profileOffered) ? { profileOffered: s.profileOffered } : {}),
     ...(parseRate(s.downloadRate) ? { downloadRate: s.downloadRate as ByteRate } : {}),

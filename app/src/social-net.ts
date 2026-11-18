@@ -469,6 +469,11 @@ export interface SocialNet {
    */
   forgetMe(): Promise<{ reached: number }>;
   setEnabled(on: boolean): Promise<void>;
+  /**
+   * « Jouer en local » (localplay.ts) : activé, le partage se coupe et le réseau s'arrête ; retiré, le
+   * partage revient et le réseau repart. Rien d'autre n'est effacé (amis, XP, badges restent).
+   */
+  setLocalPlay(on: boolean): Promise<void>;
   setLan(on: boolean): Promise<void>;
   rename(name: string): boolean;
   setPresence(presence: Presence): void;
@@ -2185,6 +2190,13 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       commit({ ...state, enabled: on });
       if (on) await start();
       else await stop();
+    },
+    async setLocalPlay(on) {
+      const { localPlay: _, ...rest } = state;
+      commit(on ? { ...rest, localPlay: true, enabled: false } : { ...rest, enabled: true });
+      if (on) await stop();
+      else await start();
+      changed();
     },
     async forgetMe() {
       // Les amis et les demandes d'une borne d'avant la suppression des comptes l'apprennent par « unfriend ».

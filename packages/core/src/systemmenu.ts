@@ -43,6 +43,7 @@ export const SYSTEM_ITEM_IDS = [
   'live-scores',
   'activity',
   'quiet-in-game',
+  'local-play',
   'health',
   'tech-sheet',
   'cabinet',
@@ -166,8 +167,9 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'amis',
     icon: 'friends',
     get label() { return t('Communauté'); },
-    get detail() { return t('Joueurs en ligne, messages, mes amis, historique des parties, trouver un joueur, demandes, salons, partage et réseau'); },
-    entries: ['online-players', 'messages', 'friends', 'game-history', 'find-player', 'friend-requests', 'community-settings', 'moderation', 'sharing', 'live-scores', 'quiet-in-game'],
+    get detail() { return t('Joueurs en ligne, messages, mes amis, historique des parties, trouver un joueur, demandes, salons, partage et réseau, jouer en local'); },
+    // « Jouer en local » en dernier (localplay.ts) : activé, la rubrique ne garde que lui.
+    entries: ['online-players', 'messages', 'friends', 'game-history', 'find-player', 'friend-requests', 'community-settings', 'moderation', 'sharing', 'live-scores', 'quiet-in-game', 'local-play'],
   },
   borne: {
     id: 'borne',
@@ -252,6 +254,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   activity: { icon: 'bell', get label() { return t('Activité récente'); } },
   // La lune du « ne pas déranger » : la cloche est à Activité récente, dans la même rubrique.
   'quiet-in-game': { icon: 'moon', get label() { return t('Masquer les notifications pendant les parties'); } },
+  // Tout le social retiré d'un coup, niveaux compris (localplay.ts) ; le libellé dit l'état.
+  'local-play': { icon: 'cabinet', get label() { return t('Jouer en local'); } },
   health: { icon: 'health', get label() { return t('Santé de la borne'); } },
   // Fiche technique (tech-sheet.ts) : PC, Windows, écrans, contrôleurs, logiciels, rapport à envoyer.
   'tech-sheet': { icon: 'report', get label() { return t('Fiche technique'); } },

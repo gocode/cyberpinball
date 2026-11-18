@@ -26,6 +26,7 @@ export function fakeSocialNet(over?: Partial<SocialNet>): SocialNet {
       stop: async () => undefined,
       forgetMe: async () => ({ reached: 0 }),
       setEnabled: async () => undefined,
+      setLocalPlay: async () => undefined,
       setLan: async () => undefined,
       rename: () => false,
       setPresence: noop,

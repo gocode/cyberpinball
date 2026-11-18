@@ -102,5 +102,6 @@ test('en-tête : la carte du joueur et ses badges, sur l’écran des tables com
   const main = frontendSource();
   const corner = main.slice(main.indexOf('function menuCorner('), main.indexOf('function cinemaFor('));
   assert.doesNotMatch(corner, /zone\.place === 'corner' && zoneScreen\(\) === 'menu' \? playerCard\(\)/, 'plus réservée à l’écran des tables');
-  assert.match(corner, /const player = screen !== 'attract' && screen !== 'jukebox' \? playerCard\(\) : undefined;/);
+  // Ni en jeu local, qui retire le système de niveaux (localplay.ts, jouer-en-local.test.ts).
+  assert.match(corner, /const player = screen !== 'attract' && screen !== 'jukebox' && !localPlay\(\) \? playerCard\(\) : undefined;/);
 });

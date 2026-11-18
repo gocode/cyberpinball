@@ -17,6 +17,7 @@ import {
   isFavorite,
   CONFIG_KEY,
   isSystemGroup,
+  hiddenInLocalPlay,
   SYSTEM_GROUP_IDS,
   SYSTEM_GROUPS,
   SYSTEM_ITEM_IDS,
@@ -667,7 +668,8 @@ export function createLibrary(host: LibraryHost) {
   /** Une entrée du menu système ouverte depuis un autre écran : son « Retour » ramène à `back`. */
   function runSystemItem(id: SystemItemId, back: () => void): void {
     const item = systemItems.get(id);
-    if (!item) return back();
+    // Retirée en jeu local : un raccourci venu d'ailleurs (pastille, téléphone) ne la rouvre pas.
+    if (!item || hiddenInLocalPlay(id, localPlay())) return back();
     section = SYSTEM_ITEMS[id].icon;
     systemReturn = back;
     item.run();
@@ -675,7 +677,13 @@ export function createLibrary(host: LibraryHost) {
 
   /** Entrées d'une rubrique (de la racine : ses raccourcis, Téléchargements, puis les rubriques) que l'application fournit. */
   function systemEntries(group: SystemGroupId | undefined): SystemEntryId[] {
-    return (group ? SYSTEM_GROUPS[group].entries : SYSTEM_ROOT_ENTRIES).filter((id) => isSystemGroup(id) || (systemItems.has(id) && (group !== undefined || systemItems.get(id)!.atRoot !== false)));
+    const local = localPlay();
+    return (group ? SYSTEM_GROUPS[group].entries : SYSTEM_ROOT_ENTRIES).filter((id) => isSystemGroup(id) || (systemItems.has(id) && !hiddenInLocalPlay(id, local) && (group !== undefined || systemItems.get(id)!.atRoot !== false)));
+  }
+
+  /** « Jouer en local » activé (localplay.ts). */
+  function localPlay(): boolean {
+    return host.localPlay?.() === true;
   }
 
   /** Une entrée attend l'utilisateur (pastille rouge) ; une rubrique, dès que l'une des siennes. */
@@ -2413,8 +2421,8 @@ export function createLibrary(host: LibraryHost) {
           host.play(table);
         },
       },
-      ...(host.playWithFriend ? [notFx({ ...host.playWithFriend(table, () => openSheet(table)), door: 'sheet.friends' as const }, t('Parties entre amis : tables VPX seulement'))] : []),
-      ...(host.instantGame ? [notFx({ ...host.instantGame(table, () => openSheet(table)), door: 'sheet.instant' as const }, t('Parties en direct : tables VPX seulement'))] : []),
+      ...(host.playWithFriend && !localPlay() ? [notFx({ ...host.playWithFriend(table, () => openSheet(table)), door: 'sheet.friends' as const }, t('Parties entre amis : tables VPX seulement'))] : []),
+      ...(host.instantGame && !localPlay() ? [notFx({ ...host.instantGame(table, () => openSheet(table)), door: 'sheet.instant' as const }, t('Parties en direct : tables VPX seulement'))] : []),
       ...(host.scores ? [notFx(scoresAction(table), t('{game} ne donne pas ses scores', { game: zenName }))] : []),
       pagesAction(table),
       { label: t('Crédits'), detail: kept('credits', () => credits.summary(table)), icon: 'credits', door: 'sheet.credits', run: () => credits.open(table) },
@@ -2501,7 +2509,8 @@ export function createLibrary(host: LibraryHost) {
       door: 'sheet.scores',
       run: () => {
         const choice = openingScoresChoice(readScoresChoice(host.dataDir), () => host.rankings?.(table, 'world', 'week'));
-        go({ kind: 'scores', file: table.file, ...choice }, SCORES_BACK);
+        // En jeu local, seulement les scores de cette borne.
+        go({ kind: 'scores', file: table.file, ...choice, ...(localPlay() ? { scope: 'cabinet' as const } : {}) }, SCORES_BACK);
       },
     };
   }
@@ -2525,7 +2534,9 @@ export function createLibrary(host: LibraryHost) {
       keepScoresChoice({ scope: s.scope, period: s.period, ...change });
       go({ kind: 'scores', file: s.file, period: s.period, scope: s.scope, ...(s.back ? { back: s.back } : {}), ...change }, SCORES_BACK);
     };
-    const scope = s.scope;
+    // En jeu local, les classements en ligne n'existent plus : la portée de la borne seule, sans onglets de portée.
+    const local = localPlay();
+    const scope = local ? 'cabinet' : s.scope;
     const network = scope !== 'cabinet';
     const view = (period: ScorePeriod): RankingView =>
       host.rankings ? host.rankings(table, scope as Exclude<RankingScope, 'cabinet'>, period) : { lines: [], players: 0, unavailable: t('Réseau des bornes absent') };
@@ -2540,7 +2551,7 @@ export function createLibrary(host: LibraryHost) {
       // Les onglets d'abord (rendus dans le tableau), dans l'ordre de lecture : les portées au-dessus,
       // puis les périodes ; puis le retour, seul dans la colonne des actions.
       actions: [
-        ...RANKING_SCOPES.map((sc) => ({ label: t('Onglet {period}', { period: scopeLabel(sc) }), key: `scope-${sc}`, door: 'sheet.scores' as const, run: () => show({ scope: sc }) })),
+        ...RANKING_SCOPES.filter(() => !local).map((sc) => ({ label: t('Onglet {period}', { period: scopeLabel(sc) }), key: `scope-${sc}`, door: 'sheet.scores' as const, run: () => show({ scope: sc }) })),
         ...SCORE_PERIODS.map((period) => ({ label: t('Onglet {period}', { period: periodLabel(period) }), key: `period-${period}`, door: 'sheet.scores' as const, run: () => show({ period }) })),
         { label: s.back ? t('Retour aux classements') : t('Retour à la fiche'), icon: 'back' as const, key: 'back', door: 'sheet.back' as const, run: back },
         // Masquer un score aberrant : sur cette borne seulement ; fermé à l'invité (porte de « Gérer la table »).
@@ -2549,7 +2560,9 @@ export function createLibrary(host: LibraryHost) {
           : []),
       ],
       back,
-      hint: s.back ? t('Flippers : période précédente ou suivante · Start ou MagnaSave : portée suivante · Exit : retour aux classements · souris') : t('Flippers : période précédente ou suivante · Start ou MagnaSave : portée suivante · Exit : retour à la fiche · souris'),
+      hint: local
+        ? t('Flippers : période précédente ou suivante · Exit : retour à la fiche · souris')
+        : s.back ? t('Flippers : période précédente ou suivante · Start ou MagnaSave : portée suivante · Exit : retour aux classements · souris') : t('Flippers : période précédente ou suivante · Start ou MagnaSave : portée suivante · Exit : retour à la fiche · souris'),
       keys: (input) => {
         const KEYS = host.keys();
         // Start ou MagnaSave : la portée suivante (la gauche, première touche relevée : la précédente) ;
@@ -2557,7 +2570,7 @@ export function createLibrary(host: LibraryHost) {
         // l'OS (étape « Boutons de l'interface ») n'avait aucun moyen de changer de portée (18/11/2026).
         const magna = host.zoneKeys?.() ?? [];
         const start = KEYS.confirm.includes(input.code);
-        if (start || magna.includes(input.code)) {
+        if (!local && (start || magna.includes(input.code))) {
           const at = RANKING_SCOPES.indexOf(s.scope);
           const dir = !start && magna.length > 1 && magna.indexOf(input.code) === 0 ? -1 : 1;
           s.scope = RANKING_SCOPES[(at + dir + RANKING_SCOPES.length) % RANKING_SCOPES.length]!;
@@ -5732,10 +5745,12 @@ export function createLibrary(host: LibraryHost) {
    */
   function remoteMenus(): RemoteMenus {
     if (!host.guest.allows('menu.system')) return { nodes: [], locked: t('Mode invité : seul l’écran des tables est ouvert. Le menu système se déverrouille à la borne.') };
+    const local = localPlay();
     return {
       nodes: remoteMenuTree((id) => {
         const item = systemItems.get(id);
-        if (!item) return undefined;
+        // Retirée en jeu local (localplay.ts) : comme une entrée absente.
+        if (!item || hiddenInLocalPlay(id, local)) return undefined;
         // Le détail d'une entrée se calcule (téléchargements, mises à jour…) : une entrée qui échoue part sans lui.
         const read = <T>(get: () => T): T | undefined => {
           try {
@@ -5786,7 +5801,7 @@ export function createLibrary(host: LibraryHost) {
       openSystemGroup(id);
       return true;
     }
-    if (!systemItems.has(id)) return false;
+    if (!systemItems.has(id) || hiddenInLocalPlay(id, localPlay())) return false;
     const trail = systemPathOf(id) ?? [];
     systemChosen = id;
     openSystemGroup(trail.at(-1), id);

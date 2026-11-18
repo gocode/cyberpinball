@@ -174,6 +174,11 @@ export interface LibraryHost {
   /** Mode invité : seules la fiche, ses pages et les actions à porte ouverte passent (guestmode.ts). */
   guest: Pick<GuestMode, 'active' | 'allows' | 'knock'>;
   /**
+   * « Jouer en local » (localplay.ts) : vrai, le Menu système perd la partie sociale (LOCAL_PLAY_HIDDEN),
+   * la fiche « Jouer avec un ami » et « Partie instantanée », le tableau des scores ses classements en ligne.
+   */
+  localPlay?(): boolean;
+  /**
    * Un téléchargement fini que son écran n'a pas repris : au menu des tables, la notification du
    * menu le dit (menu-notices.ts) ; sur un écran plein, un bandeau bref (`text`).
    */

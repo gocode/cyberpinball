@@ -174,6 +174,7 @@ import {
   type SystemItemId,
   type NewsReach,
   isSystemGroup,
+  hiddenInLocalPlay,
   noticeZone,
   type ZoneScreen,
   type MenuMoment,
@@ -406,6 +407,7 @@ import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
 import { createActivityMenu, type MessageKind } from './activity-menu';
 import { createInboxMenu, type InboxLink, type InboxThread } from './inbox-menu';
+import { createLocalPlayItem } from './local-play';
 import { createNewsMenu } from './news-menu';
 import { demoCharter, seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
 import { createDedicatedMenu } from './dedicated-menu';
@@ -1184,6 +1186,7 @@ const library = createLibrary({
   tableSettings: (table) => openVpxSettings(table),
   romVolume: (table) => romVolumes.view(table),
   playWithFriend: (table, back) => friendsMenu.live.sheetAction(table, back),
+  localPlay: () => localPlay(),
   ...(socialNetMode(process.env) === 'off' ? {} : { instantGame: (table: TableEntry, back: () => void) => instantMenu.sheetAction(table, back) }),
   scores: (table, period) => tableScores.board(table, period),
   rankings: (table, scope, period) => tableRankings.view(table, scope, period),
@@ -1355,9 +1358,22 @@ function onJukebox(): boolean {
   return jukeboxShown() && state.medallion === 'jukebox' && !attractTable();
 }
 
-/** Le médaillon Communauté est dans la roue (réglage « Communauté dans la roue ») ; jamais en mode invité, qui ferme la communauté. */
+/** Le médaillon Communauté est dans la roue (réglage « Communauté dans la roue ») ; jamais en mode invité, qui ferme la communauté, ni en jeu local. */
 function communityShown(): boolean {
-  return mediaSettings.community && !guest.active;
+  return mediaSettings.community && !guest.active && !localPlay();
+}
+
+/**
+ * « Jouer en local » (Menu système > Communauté, localplay.ts) : toute la partie sociale retirée,
+ * niveaux compris. Le réseau des bornes est arrêté (social-net.ts) ; ici, ce qui se montre.
+ */
+function localPlay(): boolean {
+  return socialNet.state().localPlay === true;
+}
+
+/** La Communauté est fermée : mode invité, ou jeu local. */
+function socialClosed(): boolean {
+  return guest.active || localPlay();
 }
 
 /** Le médaillon Communauté est choisi dans la roue. */
@@ -1829,6 +1845,7 @@ function remotePickJukebox(): void {
 /** La Communauté au téléphone : conversations, fil ouvert, Joueurs et profil ouvert ; jamais en mode invité. */
 function remoteCommunity(open: string | undefined, profile: string | undefined, room: string | undefined, page: RemotePage | undefined): RemoteCommunity {
   if (guest.active) return { closed: t('Fermée en mode invité.'), unread: 0, rows: [] };
+  if (localPlay()) return { closed: t('Retirée : la borne joue en local (Menu système › Communauté › Jouer en local).'), unread: 0, rows: [] };
   // Mes groupes en tête des conversations ; leur fil s'ouvre par « g:<id> ».
   const groups = groupsMenu.remote(open);
   const chat = chatMenu.remoteCommunity(open?.startsWith('g:') ? undefined : open);
@@ -2631,18 +2648,22 @@ library.provideSystemItem('news', newsMenu.item);
 /** Où « Essayer » mène depuis une nouveauté, ou pourquoi pas maintenant. */
 function newsReach(target: NewsReach, back: () => void): { run?: () => void; gone?: string } {
   if (guest.active) return { gone: t('Indisponible en mode invité') };
+  // En jeu local, ce qui touche aux autres joueurs et aux niveaux est retiré (localplay.ts).
+  const local = t('Indisponible : la borne joue en local (Communauté › Jouer en local)');
   switch (target.kind) {
     case 'system':
       if (isSystemGroup(target.id)) return { run: () => void library.openSystemEntry(target.id) };
       if (!library.hasSystemItem(target.id)) return { gone: t('Indisponible sur cette borne') };
+      if (hiddenInLocalPlay(target.id as SystemItemId, localPlay())) return { gone: local };
       return { run: () => library.runSystemItem(target.id as SystemItemId, back) };
     case 'community': {
+      if (localPlay()) return { gone: local };
       if (!socialNet.state().enabled) return { gone: t('Indisponible : partage désactivé (Partage et réseau)') };
       const open = { home: () => communityMenu.openHome(back), instant: () => instantMenu.open(back), groups: () => groupsMenu.open(back) }[target.door];
       return { run: open };
     }
     case 'level':
-      return { run: () => levelMenu.open(back) };
+      return localPlay() ? { gone: local } : { run: () => levelMenu.open(back) };
     case 'jukebox':
       return { run: () => openJukebox() };
     case 'sheet': {
@@ -3256,6 +3277,8 @@ library.provideSystemItem('find-player', friendsMenu.items['find-player']);
 library.provideSystemItem('friend-requests', friendsMenu.items['friend-requests']);
 library.provideSystemItem('badges', levelMenu.badgesItem);
 library.provideSystemItem('sharing', friendsMenu.items.sharing);
+// « Jouer en local » (localplay.ts), au bout de la rubrique Communauté : activé, elle ne garde que lui.
+library.provideSystemItem('local-play', createLocalPlayItem({ net: socialNet, library, redraw: () => broadcast() }));
 // « Ajouter une table > Depuis un ami… » : la bibliothèque d'un ami, ses tables absentes d'abord.
 library.provideAddFromFriend(friendsMenu.addFromFriend);
 // « Masquer les notifications pendant les parties » : Start bascule, le curseur reste sur l'entrée.
@@ -6040,7 +6063,8 @@ function resumeMenuPlace(resume: MenuResume | undefined, screensFirst: boolean):
 async function checkFirewallAtStart(): Promise<void> {
   const update = updates.justInstalled();
   const report = await guardFirewall(socialFirewall, { ...(update ? { update } : {}), log: (line) => console.log(line) });
-  if (socialFirewall.simulated || !report.problems.length) return;
+  // En jeu local, rien à demander : le réseau des bornes est arrêté et « Partage et réseau » retiré.
+  if (socialFirewall.simulated || !report.problems.length || localPlay()) return;
   if (update && state.phase === 'menu' && !guest.active && !closing) friendsMenu.openFirewall(() => library.leave());
   else showBanner(tLater('Pare-feu de Windows : {reason}. Menu système > Communauté > Partage et réseau.', { reason: report.problems[0]!.reason }), 'sharing');
 }
@@ -6214,7 +6238,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     // Le son du menu ne sort que d'une fenêtre : celle du playfield.
     sound: role === 'playfield' ? soundView() : undefined,
     // Messagerie : le fronton montre la carte de l'ami du fil ouvert ; le DMD, quelques secondes, l'arrivée d'un message au menu.
-    friendCard: state.phase === 'library' && !guest.active ? chatMenu.frontonCard() : undefined,
+    friendCard: state.phase === 'library' && !socialClosed() ? chatMenu.frontonCard() : undefined,
     dmdMessage: dmdMessage && dmdMessage.until > Date.now() && state.phase !== 'playing' && state.phase !== 'loading' ? dmdMessage.text : undefined,
     // Juke-box : l'affiche du médaillon choisi, ou le lecteur (liste, clip, cartel).
     jukebox: jukeboxPlayer.view(role, (state.phase === 'menu' && !state.help && onJukebox()) || jukeboxManaging()),
@@ -6283,9 +6307,10 @@ function menuCorner(): { zone?: 'corner' | 'head'; friendsOnline?: { count: numb
   // système, Mes badges, aide…), 17/11/2026 ; ni en mode attente (vitrine pour qui passe) ni au Juke-box
   // (sa ligne porte son repère, jukebox.css).
   const screen = zoneScreen();
-  const player = screen !== 'attract' && screen !== 'jukebox' ? playerCard() : undefined;
+  // En jeu local, ni carte du joueur ni badges : le système de niveaux est retiré (localplay.ts).
+  const player = screen !== 'attract' && screen !== 'jukebox' && !localPlay() ? playerCard() : undefined;
   // Les messages en attente : leur pastille, au coin comme sur la ligne de la roue dentée.
-  const inbox = guest.active ? undefined : inboxMenu.pill();
+  const inbox = socialClosed() ? undefined : inboxMenu.pill();
   return { zone: zone.place, ...corner, ...(inbox ? { inbox } : {}), ...(player ? { player, badges: { count: socialNet.state().badges.length, total: BADGES.length, title: t('Mes badges') } } : {}) };
 }
 
@@ -6306,7 +6331,10 @@ let levelMomentKey: string | undefined;
  */
 function levelMomentView() {
   const pending = levelTracker.pending();
-  if (!pending || state.phase !== 'menu' || attract.active || guest.active) {
+  // En jeu local, les XP se comptent en silence : le moment est tenu pour vu, il ne revient pas plus tard.
+  // Hors du rendu en cours : seen() redessine.
+  if (pending && localPlay()) setImmediate(() => localPlay() && levelTracker.seen());
+  if (!pending || localPlay() || state.phase !== 'menu' || attract.active || guest.active) {
     if (!pending) levelMomentAt = levelMomentKey = undefined;
     return undefined;
   }
