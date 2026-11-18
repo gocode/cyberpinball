@@ -71,6 +71,13 @@ export const messages: Record<string, string> = {
   'Corrigé dans {file}, le script que VPX joue à la place de celui de la table : la pièce ne s’allume plus que dans le casque.': 'Fixed in {file}, the script VPX plays instead of the table’s: the room now only turns on in the headset.',
   'La table n’est pas modifiée : VPX joue {file}, une copie de son script où la pièce ne s’allume que dans le casque.': 'The table is not modified: VPX plays {file}, a copy of its script where the room only turns on in the headset.',
   'Réserver la pièce VR au casque (dans {file})': 'Keep the VR room for the headset (in {file})',
+  'Script qui arrête la partie à chaque clignotement': 'Script that stops the game at every blink',
+  'Le script de la table redéfinit des procédures pendant la partie (ExecuteGlobal, à chaque clignotement d’une lumière). Windows fait analyser chacune par son antivirus, et la partie s’arrête le temps de l’analyse : de quelques millisecondes à une seconde selon le PC.':
+    'The table’s script redefines procedures during the game (ExecuteGlobal, at every blink of a light). Windows has its antivirus scan each one, and the game stops while it does: from a few milliseconds to a second depending on the PC.',
+  'Le script de la table est protégé : Cyber Pinball ne peut pas le corriger.': 'The table’s script is protected: Cyber Pinball cannot fix it.',
+  'Corrigé dans {file}, le script que VPX joue à la place de celui de la table : une procédure n’est redéfinie que si son texte change.': 'Fixed in {file}, the script VPX plays instead of the table’s: a procedure is only redefined when its text changes.',
+  'La table n’est pas modifiée : VPX joue {file}, une copie de son script où une procédure n’est redéfinie que si son texte change.': 'The table is not modified: VPX plays {file}, a copy of its script where a procedure is only redefined when its text changes.',
+  'Ne redéfinir une procédure que si elle change (dans {file})': 'Only redefine a procedure when it changes (in {file})',
   'La table rame sur cette borne': 'The table is sluggish on this cabinet',
   'La table saccade sur cette borne': 'The table stutters on this cabinet',
   'À la dernière partie ({date}), VPX a tenu {fps} images par seconde pour {target} visées.': 'In the last game ({date}), VPX held {fps} frames per second for a target of {target}.',

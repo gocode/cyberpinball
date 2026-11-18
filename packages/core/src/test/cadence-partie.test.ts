@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { cadenceJournal, cadenceVerdict, parseVpxCadence, readVpxCadence, readVpxTargetFps, vpxMemoryGrowth } from '../vpxcadence';
+import { cadenceJournal, cadenceVerdict, parseVpxCadence, readVpxCadence, readVpxTargetFps, stallPlace, stallPlaceJournal, vpxMemoryGrowth } from '../vpxcadence';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8');
@@ -103,6 +103,25 @@ test('à-coups : chacun dit où était le fil des images (relevé pendant l’at
   const calls = [...suspended.matchAll(/\b([A-Za-z_]\w*)\s*\(/g)].map((m) => m[1]);
   for (const call of calls) assert.ok(['SuspendThread', 'GetThreadContext', 'static_cast', 'reinterpret_cast', 'VirtualQuery', 'sizeof', 'min', 'memcpy', 'if', 'defined'].includes(call!), `appel pendant la suspension : ${call}`);
   assert.match(read('packages', 'vpx-vision3d', 'CMakeLists.txt'), /add_executable\(banc-arrets test\/banc-arrets\.cpp\)/);
+});
+
+test('à-coups : où attendait VPX, lu dans les lignes du relevé (rapport de Daredevil du 18/11/2026)', () => {
+  const lines = [
+    "2026-11-18 15:27:25.395 WARN  [Main] [CyberPinballDmd:`anonymous-namespace'::compterImage@309] Cadence: stall of 508 ms at 5.9s; main thread 104 samples: in ntdll.dll 104; under MPCLIENT.DLL 104; top MPCLIENT.DLL+0x2ee6f (99)",
+    "2026-11-18 15:27:25.510 WARN  [Main] [CyberPinballDmd:`anonymous-namespace'::compterImage@309] Cadence: stall of 115 ms at 6.0s; main thread 17 samples: in ntdll.dll 14, amsi.dll 2, msvcrt.dll 1; under MPCLIENT.DLL 13, VPinballX_BGFX64.exe 4; top MPCLIENT.DLL+0x17dc0 (12)",
+    "2026-11-18 15:27:53.588 WARN  [Main] [CyberPinballDmd:`anonymous-namespace'::compterImage@309] Cadence: stall of 143 ms at 34.1s; main thread 22 samples: in ntdll.dll 17, RPCRT4.dll 1, vbscript.dll 1, amsi.dll 1; under MPCLIENT.DLL 17, VPinballX_BGFX64.exe 5; top MPCLIENT.DLL+0x17dc0 (13) (no more stalls logged)",
+    'Cadence: stall of 250 ms at 31.2s',
+  ];
+  const place = stallPlace(lines)!;
+  assert.equal(place.module, 'MPCLIENT.DLL');
+  assert.equal(place.samples, 143);
+  assert.equal(Math.round(place.share * 100), 94);
+  assert.match(place.what!, /antivirus/);
+  assert.equal(stallPlaceJournal('DAREDEVIL_1.3', lines), "À-coups de la partie (DAREDEVIL_1.3) : le fil des images de VPX était surtout dans MPCLIENT.DLL (94 % de 143 relevés), l'antivirus de Windows, qui analyse du code compilé par le script (ExecuteGlobal, Execute, Eval).");
+  // Plugin d'avant le relevé, ou partie sans à-coup : rien à dire.
+  assert.equal(stallPlace(['Cadence: stall of 250 ms at 31.2s']), undefined);
+  assert.equal(stallPlace(['Cadence: stall of 300 ms at 2.0s; main thread 50 samples: in avcodec-61.dll 50; under plugin-flexdmd64.dll 50; top x (1)'])?.module, 'plugin-flexdmd64.dll');
+  assert.match(stallPlace(['Cadence: stall of 300 ms at 2.0s; main thread 50 samples: in x 50; under swscale-8.dll 50; top x (1)'])!.what!, /vidéo/);
 });
 
 test('à-coups : banc du relevé (comptes par module, vrai fil suspendu), s’il est construit', (t) => {

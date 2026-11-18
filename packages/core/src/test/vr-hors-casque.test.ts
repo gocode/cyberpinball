@@ -130,6 +130,7 @@ test('tables hybrides réelles du poste : rien à corriger (Addams Family, Gooni
   for (const file of tables) {
     const script = readVpxScript(file);
     if (script === undefined) continue;
-    assert.deepEqual(compatFixesFound(scriptCode(script)), [], path.basename(file));
+    // Elles recopient aussi FlashForMs (executeGlobalOnce, code-dynamique.test.ts) : seule la pièce VR compte ici.
+    assert.ok(!compatFixesFound(scriptCode(script)).includes('vrRoomOnScreens'), path.basename(file));
   }
 });

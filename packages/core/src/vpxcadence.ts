@@ -70,6 +70,46 @@ export function vpxMemoryGrowth(lines: readonly string[]): { fromMB: number; toM
   return { fromMB: first.memMB!, toMB: last.memMB!, minutes: Math.max(0, (last.durationS - first.durationS) / 60) };
 }
 
+/** Ce que fait un module quand le fil des images de VPX y attend (noms en minuscules). */
+const STALL_PLACES: readonly [RegExp, string][] = [
+  [/^(mpclient|mpoav|amsi)\.dll$/, "l'antivirus de Windows, qui analyse du code compilé par le script (ExecuteGlobal, Execute, Eval)"], // i18n-ignore : journal
+  [/^vbscript\.dll$/, 'le script de la table'], // i18n-ignore : journal
+  [/^(avcodec|avformat|avutil|swscale|swresample)[-\w]*\.dll$/, "le décodage d'une vidéo"], // i18n-ignore : journal
+  [/^(nvoglv|nvwgf2um|nvd3dum|igd|amdxx|atiu|aticfx|d3d1[01]|dxgi)[\w]*\.dll$/, 'le pilote de la carte graphique'], // i18n-ignore : journal
+];
+
+/**
+ * Où était le fil des images de VPX pendant les à-coups d'une partie, d'après les lignes « Cadence: stall … ; main thread
+ * N samples: … under A n, B m » du plugin du DMD (arrets.h) : le module le plus relevé sur la pile, sa part des relevés,
+ * et ce qu'il fait quand il est connu. undefined : pas de relevé (plugin d'avant le 18/11/2026, ou aucun à-coup).
+ */
+export function stallPlace(lines: readonly string[]): { module: string; share: number; samples: number; what?: string } | undefined {
+  const counts = new Map<string, number>();
+  let total = 0;
+  for (const line of lines) {
+    const under = /Cadence: stall of \d+ ms .*; main thread \d+ samples: .*?; under ([^;]+)/.exec(line)?.[1];
+    if (!under) continue;
+    for (const m of under.matchAll(/([^,]+?) (\d+)(?:,|$)/g)) {
+      const name = m[1]!.trim();
+      const n = Number(m[2]);
+      counts.set(name, (counts.get(name) ?? 0) + n);
+      total += n;
+    }
+  }
+  if (!total) return undefined;
+  const [module, samples] = [...counts].sort((a, b) => b[1] - a[1])[0]!;
+  const what = STALL_PLACES.find(([re]) => re.test(module.toLowerCase()))?.[1];
+  return { module, share: samples / total, samples: total, ...(what ? { what } : {}) };
+}
+
+/** Ligne du journal de la borne qui dit où VPX attendait pendant les à-coups ; undefined sans relevé. */
+export function stallPlaceJournal(table: string, lines: readonly string[]): string | undefined {
+  const place = stallPlace(lines);
+  if (!place) return undefined;
+  const pct = Math.round(place.share * 100);
+  return `À-coups de la partie (${table}) : le fil des images de VPX était surtout dans ${place.module} (${pct} % de ${place.samples} relevés)${place.what ? `, ${place.what}` : ''}.`; // i18n-ignore : journal
+}
+
 /** Le dernier bilan des lignes données (celles d'une partie) : celui de fin, sinon le dernier d'étape. */
 export function readVpxCadence(lines: readonly string[]): VpxCadence | undefined {
   let last: VpxCadence | undefined;

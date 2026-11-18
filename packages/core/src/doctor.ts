@@ -1217,6 +1217,24 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
     const compat = [...new Set([...own.compat, ...missing])];
     content = buildScriptPatch(source, own.switches, own.loader, own.capture, compat, own.prewarm) ?? buildScriptPatch(source, own.switches, own.loader, undefined, compat, own.prewarm);
   }
+  // Procédures redéfinies pendant la partie (clignotements de FlashForMs, SetFlash) : seul correctif qui manque.
+  if (missing.every((f) => f === 'executeGlobalOnce')) {
+    const detail = [
+      t('Le script de la table redéfinit des procédures pendant la partie (ExecuteGlobal, à chaque clignotement d’une lumière). Windows fait analyser chacune par son antivirus, et la partie s’arrête le temps de l’analyse : de quelques millisecondes à une seconde selon le PC.'),
+      !content
+        ? t('Le script de la table est protégé : Cyber Pinball ne peut pas le corriger.')
+        : foreign
+          ? t('Corrigé dans {file}, le script que VPX joue à la place de celui de la table : une procédure n’est redéfinie que si son texte change.', { file })
+          : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où une procédure n’est redéfinie que si son texte change.', { file }),
+    ];
+    return {
+      code: 'scriptCoreCompat',
+      severity: 'warning',
+      title: t('Script qui arrête la partie à chaque clignotement'),
+      detail: detail.join(' '),
+      fix: content ? { label: t('Ne redéfinir une procédure que si elle change (dans {file})', { file }), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
+    };
+  }
   // Pièce VR allumée sur les écrans (version VR de la table, ou interrupteur d'essai laissé à 1) : seule, ou avec vpmInit.
   if (!missing.includes('vpmInitOnce')) {
     const flags = code !== undefined ? vrRoomFlags(code) : [];

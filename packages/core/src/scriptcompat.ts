@@ -16,7 +16,7 @@
 import { commentStart } from './vbscript';
 
 /** Correctifs connus, nommés dans la dernière ligne du .vbs de Cyber Pinball. */
-export type CompatFix = 'vpmInitOnce' | 'vrRoomOnScreens';
+export type CompatFix = 'vpmInitOnce' | 'vrRoomOnScreens' | 'executeGlobalOnce';
 
 interface CompatRule {
   id: CompatFix;
@@ -188,7 +188,117 @@ export function vrRoomFlags(code: string): string[] {
   return vrFlagsForcingRoom(code).map((f) => f.name);
 }
 
-const RULES: readonly CompatRule[] = [vpmInitOnce, vrRoomOnScreens];
+// ---------- Procédure redéfinie par ExecuteGlobal pendant la partie ----------
+//
+// Windows fait lire à son antivirus (AMSI, Microsoft Defender par défaut) chaque texte que VBScript compile pendant la
+// partie : ExecuteGlobal, Execute, Eval. Le fil des images de VPX attend la fin de l'analyse. Le core.vbs de VPX le dit
+// lui-même (cvpmTimer.Update : « calling Execute is a direct cause of stutters since it triggers OS security »). Mesuré
+// le 18/11/2026 sur un poste de développement (Defender actif, cscript) : un appel direct 1,3 µs, ExecuteGlobal 22 ms,
+// Execute 2 à 29 ms, Eval 50 ms. Rapport d'une borne du même jour (Daredevil, plugin du DMD, arrets.h) : 155 arrêts
+// de 100 à 1 000 ms en trois minutes, le fil des images dans MPCLIENT.DLL (Defender) sous amsi.dll et vbscript.dll.
+//
+// La routine de clignotement que des centaines de tables recopient (FlashForMs de gtxjoe, SetFlash de JP) redéfinit à
+// chaque appel la Sub « <lumière>_Timer » par ExecuteGlobal, avec un texte qui ne dépend que du nom de la lumière :
+// chaque clignotement relance une analyse. Le .vbs de Cyber Pinball passe ces définitions par CyberPinball_ExecuteGlobal,
+// qui ne recompile une procédure que si son texte a changé depuis la dernière définition de ce nom : redéfinir une
+// procédure par le même texte ne change rien. Tout autre texte (instructions, plusieurs procédures) est exécuté
+// comme avant, à chaque fois. ExecuteGlobal agit dans la portée globale d'où qu'on l'appelle : le déplacer dans une Sub
+// ne change pas ce qu'il fait.
+
+const EXECUTE_GLOBAL_ONCE = 'CyberPinball_ExecuteGlobal';
+/** ExecuteGlobal dont le texte commence par une définition (« ExecuteGlobal "Sub " & … »), hors chaîne. */
+const DEFINING_EXECUTE_GLOBAL = /(^|[^\w.])ExecuteGlobal(?=\s*\(?\s*"\s*(?:(?:public|private)\s+)?(?:sub|function)\s)/gi;
+const PROCEDURE_START = /^\s*(?:(?:public|private)\s+)?(?:sub|function)\s/i;
+const PROCEDURE_END = /^\s*end\s+(?:sub|function)\b/i;
+
+/** Positions des ExecuteGlobal qui définissent une procédure dans une ligne de code (hors chaînes). */
+function definingExecuteGlobals(code: string): number[] {
+  const out: number[] = [];
+  for (const m of code.matchAll(DEFINING_EXECUTE_GLOBAL)) {
+    const at = m.index! + m[1]!.length;
+    if ((code.slice(0, at).match(/"/g)?.length ?? 0) % 2 === 0) out.push(at);
+  }
+  return out;
+}
+
+/** Le script redéfinit une procédure par ExecuteGlobal depuis une de ses Sub (donc pendant la partie). */
+function redefinesDuringPlay(code: string): boolean {
+  let depth = 0;
+  for (const line of code.split('\n')) {
+    if (PROCEDURE_START.test(line)) depth++;
+    if (depth && definingExecuteGlobals(line).length) return true;
+    if (PROCEDURE_END.test(line)) depth = Math.max(0, depth - 1);
+  }
+  return false;
+}
+
+const executeGlobalOnce: CompatRule = {
+  id: 'executeGlobalOnce',
+  found: (code) => redefinesDuringPlay(code),
+  applicable: (code) => redefinesDuringPlay(code),
+  applied: (text) => new RegExp(`^\\s*sub\\s+${EXECUTE_GLOBAL_ONCE}\\b`, 'im').test(text),
+  apply(text) {
+    const eol = /\r\n/.test(text) ? '\r\n' : '\n';
+    const parts = text.split(/(\r?\n)/);
+    let calls = 0;
+    for (let i = 0; i < parts.length; i += 2) {
+      const line = parts[i]!;
+      const at = commentStart(line);
+      const code = at < 0 ? line : line.slice(0, at);
+      const positions = definingExecuteGlobals(code);
+      if (!positions.length) continue;
+      let edited = code;
+      for (const p of positions.reverse()) edited = `${edited.slice(0, p)}${EXECUTE_GLOBAL_ONCE}${edited.slice(p + 'ExecuteGlobal'.length)}`;
+      parts[i] = edited + (at < 0 ? '' : line.slice(at));
+      calls += positions.length;
+    }
+    if (!calls) return undefined;
+    let out = parts.join('');
+    if (out && !/\r?\n$/.test(out)) out += eol;
+    // En fin de script (VBScript connaît Sub et variables globales dès le chargement). Le dictionnaire est créé au
+    // premier appel : du code de premier niveau placé avant ces lignes peut déjà appeler la routine. Les noms de
+    // VBScript ignorent la casse ; le texte, lui, est comparé tel quel. Une seule procédure : le motif refuse un second
+    // « End Sub ». Le nom est lu avec des fonctions de chaîne : RegExp.Execute coûte autant qu'ExecuteGlobal (5 ms
+    // mesurées le 18/11/2026, Defender actif), RegExp.Test 10 µs.
+    const g = EXECUTE_GLOBAL_ONCE;
+    const lines = [
+      `Dim ${g}_Defined, ${g}_Shape`,
+      `Sub ${g}(aCode)`,
+      `  Dim code, s, low, key, p`,
+      `  code = CStr(aCode)`,
+      `  If IsEmpty(${g}_Defined) Then`,
+      `    Set ${g}_Defined = CreateObject("Scripting.Dictionary")`,
+      `    Set ${g}_Shape = New RegExp`,
+      `    ${g}_Shape.IgnoreCase = True`,
+      `    ${g}_Shape.Pattern = "^\\s*(?:(?:public|private)\\s+)?(?:sub|function)\\s+[A-Za-z_]\\w*(?:(?!\\bend\\s+(?:sub|function)\\b)[\\s\\S])*\\bend\\s+(?:sub|function)\\s*:?\\s*$"`,
+      `  End If`,
+      `  key = ""`,
+      `  If ${g}_Shape.Test(code) Then`,
+      `    s = LTrim(Replace(Replace(Replace(code, vbTab, " "), vbCr, " "), vbLf, " "))`,
+      `    low = LCase(s)`,
+      `    If Left(low, 7) = "public " Or Left(low, 8) = "private " Then s = LTrim(Mid(s, InStr(s, " ") + 1)) : low = LCase(s)`,
+      `    s = LTrim(Mid(s, InStr(s, " ") + 1))`,
+      `    For p = 1 To Len(s)`,
+      `      If InStr("abcdefghijklmnopqrstuvwxyz0123456789_", LCase(Mid(s, p, 1))) = 0 Then Exit For`,
+      `    Next`,
+      `    key = LCase(Left(s, p - 1))`,
+      `  End If`,
+      `  If key <> "" Then`,
+      `    If ${g}_Defined.Exists(key) Then`,
+      `      If ${g}_Defined(key) = code Then Exit Sub`,
+      `    End If`,
+      `  End If`,
+      `  ExecuteGlobal code`,
+      `  If key <> "" Then ${g}_Defined(key) = code`,
+      `End Sub`,
+    ];
+    return out + lines.join(eol) + eol;
+  },
+  // Aucun message de VPX : la partie s'arrête un instant, sans erreur.
+  stop: /(?!)/,
+};
+
+const RULES: readonly CompatRule[] = [vpmInitOnce, vrRoomOnScreens, executeGlobalOnce];
 
 /** Correctifs dont le script a besoin, d'après son seul texte (code sans commentaires). */
 export function compatFixesFound(code: string): CompatFix[] {

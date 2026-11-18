@@ -234,5 +234,6 @@ export const messages: Record<string, string> = {
   'PuP-Pack allumé': 'PuP-Pack switched on',
   'vpmInit exécuté une seule fois': 'vpmInit run only once',
   'pièce VR réservée au casque': 'VR room kept for the headset',
+  'clignotements sans analyse de l’antivirus': 'blinking lights without antivirus scans',
   'images du DMD chargées d’avance': 'DMD images loaded in advance',
 };
