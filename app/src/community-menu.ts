@@ -40,6 +40,7 @@ import type { Action, Built, ProvidedSystemItem, Row, Section } from './library'
 import type { PlayerStanding, StandingPlace } from './rankings-menu';
 import type { RoomGlance } from './rooms-menu';
 import type { SocialNet } from './social-net';
+import type { RemotePeople } from './phone-remote';
 
 export interface CommunityMenuHost {
   library: {
@@ -84,6 +85,8 @@ export interface CommunityMenu {
   summary(): { online: number; country: number; friends: number; attention: boolean };
   /** Les joueurs en ligne, amis compris, dans l'ordre de la liste (téléphone). */
   players(): OnlinePlayer[];
+  /** « Joueurs » au téléphone : demandes reçues, filtres et groupes de la borne, `max` joueurs au plus par filtre. */
+  remotePeople(max: number): RemotePeople;
   /** L'affiche du médaillon choisi dans la roue (plateau, fronton), comme celle du Juke-box. */
   poster(): CommunityPosterView;
 }
@@ -266,12 +269,70 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
   }
 
   /** Ce qui rapproche : les tables en commun (nommées dans « Mêmes tables »), le réseau local. */
-  function closeness(p: OnlinePlayer, tables: ReadonlyMap<string, readonly string[]>): string | undefined {
+  function closeness(p: OnlinePlayer, tables: ReadonlyMap<string, readonly string[]>, shown: OnlineFilter = filter): string | undefined {
     const common = tables.get(p.key) ?? [];
-    if (filter === 'tables' && common.length) return tn(common.length, '{n} table : {list}', '{n} tables : {list}', { list: common.slice(0, 3).join(', ') + (common.length > 3 ? '…' : '') });
+    if (shown === 'tables' && common.length) return tn(common.length, '{n} table : {list}', '{n} tables : {list}', { list: common.slice(0, 3).join(', ') + (common.length > 3 ? '…' : '') });
     if (p.nearby) return t('Sur votre réseau local');
     if (common.length) return tn(common.length, '{n} table en commun', '{n} tables en commun');
     return undefined;
+  }
+
+  /**
+   * Ce que fait un joueur, sous son nom (13/11/2026 : le nom seul sur sa ligne, pas de badges les uns
+   * derrière les autres) : en partie (sur quelle table, entre amis), en ligne, ou depuis quand on ne
+   * l'a pas vu ; « Ami » seulement hors de la section des amis, la demande envoyée, ce qui rapproche.
+   * La même ligne à la borne et au téléphone.
+   */
+  function personDetail(p: OnlinePlayer, group: OnlineGroup['id'], tables: ReadonlyMap<string, readonly string[]>, shown: OnlineFilter): string {
+    const table = p.friend && p.status === 'playing' ? net.presenceOf(p.key)?.table?.title : undefined;
+    const doing =
+      p.status === 'playing' ? (table ? t('En partie sur {table}', { table }) : t('En partie')) : p.status === 'online' ? t('En ligne') : p.seen ? t('Vu {ago}', { ago: socialAgo(p.seen, now()) }) : t('Hors ligne');
+    const tie = p.friend ? (group === 'friends' ? undefined : t('Ami')) : net.state().outgoing.some((r) => r.key === p.key) ? t('Demande envoyée') : undefined;
+    return [doing, tie, closeness(p, tables, shown)].filter(Boolean).join(' · ');
+  }
+
+  /**
+   * « Joueurs » au téléphone : les demandes d'ami reçues, les filtres de la borne (avec leur nombre, ou
+   * pourquoi ils ne montrent rien) et, pour chacun, ses groupes titrés comme ici. Tous les joueurs
+   * connus, ceux en ligne d'abord ; au plus `max` par filtre.
+   */
+  function remotePeople(max: number): RemotePeople {
+    const s = net.state();
+    const status = net.status();
+    const list = everyone();
+    const counts = onlineCounts(list, myCountry());
+    const tables = commonTables(host.tables().map(presenceTable), net.rankings().scores);
+    const flagOf = (code: string | undefined) => playerFlag(code, locale()).src ?? '';
+    const card = (key: string) => net.publicCard(key)?.country;
+    const groups = Object.fromEntries(
+      ONLINE_FILTERS.map((f) => {
+        let left = max;
+        const shown = onlineGroups(list, myCountry(), f)
+          .map((g) => {
+            const rows = g.players.slice(0, Math.max(0, left));
+            left -= rows.length;
+            return {
+              title: groupTitle(g),
+              rows: rows.map((p) => ({ key: p.key, name: p.name, avatar: avatar(p.key, p.name), flag: flagOf(p.country), detail: personDetail(p, g.id, tables, f), state: p.status })),
+            };
+          })
+          .filter((g) => g.rows.length);
+        return [f, shown];
+      }),
+    );
+    const note = !s.enabled ? t('Partage désactivé : personne ne vous voit, vous ne voyez personne') : !status.running ? (status.error ? t('Réseau des bornes indisponible : nouvel essai tout seul') : t('Connexion au réseau des bornes…')) : undefined;
+    return {
+      requests: s.enabled
+        ? s.incoming.map((r) => ({ key: r.key, name: r.name, avatar: avatar(r.key, r.name), flag: flagOf(card(r.key)), detail: t('Demande reçue {ago}', { ago: socialAgo(r.at, now()) }) }))
+        : [],
+      filters: ONLINE_FILTERS.map((f) => {
+        const problem = filterProblem(f);
+        const count = shownCrowd(counts[f]);
+        return { id: f, label: filterLabel(f), ...(problem ? { count: problem, disabled: true } : count !== undefined ? { count: String(count) } : {}) };
+      }),
+      groups,
+      ...(note ? { note } : {}),
+    };
   }
 
   function buildPlayers(): Built {
@@ -309,19 +370,11 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
           const index = actions.push({ label: p.name, key: `player:${p.key}`, icon: p.friend ? 'friend-list' : 'account', run: () => host.openProfile(p.key, here) }) - 1;
           // Son drapeau devant le nom ; sans pays, le drapeau Cyber Pinball (13/11/2026).
           const flag = playerFlag(p.country, locale());
-          // Le nom seul sur sa ligne (13/11/2026 : pas de badges les uns derrière les autres). En ligne :
-          // l'anneau vert autour de la pastille (ton « ok », comme dans « Mes amis »). Dessous, ce qu'il
-          // fait : en partie (sur quelle table, entre amis), en ligne, ou depuis quand on ne l'a pas vu ;
-          // « Ami » seulement hors de la section des amis, et la demande envoyée.
-          const table = p.friend && p.status === 'playing' ? net.presenceOf(p.key)?.table?.title : undefined;
-          const doing =
-            p.status === 'playing' ? (table ? t('En partie sur {table}', { table }) : t('En partie')) : p.status === 'online' ? t('En ligne') : p.seen ? t('Vu {ago}', { ago: socialAgo(p.seen, now()) }) : t('Hors ligne');
-          const tie = p.friend ? (g.id === 'friends' ? undefined : t('Ami')) : s.outgoing.some((r) => r.key === p.key) ? t('Demande envoyée') : undefined;
           return {
             text: p.name,
             avatar: avatar(p.key, p.name),
             flag,
-            detail: [doing, tie, closeness(p, tables)].filter(Boolean).join(' · '),
+            detail: personDetail(p, g.id, tables, filter),
             ...(p.status === 'offline' ? {} : { tone: 'ok' as const }),
             action: index,
             pick: true,
@@ -541,5 +594,6 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     summary,
     poster,
     players: () => onlineGroups(players(), myCountry(), 'all').flatMap((g) => g.players),
+    remotePeople,
   };
 }

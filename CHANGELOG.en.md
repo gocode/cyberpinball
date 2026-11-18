@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Phone, Community: the "Players" tab now mirrors the cabinet's list, with received friend requests on top (Accept, Decline), filters as chips (All, My country, Nearby, Same tables) and players grouped as on the cabinet, each with their flag.
+- Phone: tapping a player opens their profile, the same as on the cabinet: level, official badges, activity with likes, public groups; send a friend request, write to a friend, invite them to a game or browse their library (on the cabinet), and under "More" hide their activity, remove them from your friends or block them, after a confirmation on the phone.
+- Phone: the Community tabs become Messages, Players, Rooms and Scores; the unread count moves to a capsule in the corner, so "Messages" is no longer cut off.
 - Tables whose DMD runs through FlexDMD with images stored in the table (JP tables such as Hellboy or Daredevil): these images are now loaded during the loading screen instead of when first shown, which stopped the game for a moment, flippers included. The table is not modified.
 - What's new: on an enlarged item, react with one of the seven message reactions (👍 ❤️ 🥰 😆 😮 😢 😡). Each tile shows how many players chose it, all over the world, and yours is marked; Start on it removes it. One reaction per cabinet and per item; deleting your account also erases your reactions.
 - Player profile: a record's or badge's "Like" now shows a thumbs-up instead of a star, so it is clear you can like it; the thumb is filled once you have liked it. The same thumb appears on the "Liked by" screen, the notification for a like you receive, the experience points breakdown and the "Appreciated", "Popular" and "Generous" badges.

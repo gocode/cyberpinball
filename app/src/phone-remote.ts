@@ -262,11 +262,60 @@ export interface RemoteCommunity {
   thread?: RemoteThread;
   /** Le salon par pays montré au téléphone (rooms-menu.ts) : ses dernières lignes, ses présents, les phrases. */
   room?: RemoteRoom;
-  /**
-   * Les autres joueurs en ligne, qui ne sont pas mes amis (community-menu.ts, présence publique) :
-   * montrés dans « Joueurs » après mes amis, sans fil (on n'écrit qu'à ses amis).
-   */
-  players?: RemoteCommunityRow[];
+  /** Joueurs (community-menu.ts, remotePeople) : les demandes d'ami reçues, les filtres de la borne et les joueurs. */
+  people?: RemotePeople;
+  /** Le profil d'un joueur ouvert au téléphone (profile-open), tel que la borne le montre (phone-community.ts). */
+  profile?: RemoteProfile;
+}
+
+/** Un joueur de la liste « Joueurs », comme à la borne (Joueurs en ligne) : son drapeau, ce qu'il fait. */
+export interface RemotePerson {
+  key: string;
+  name: string;
+  avatar: AvatarView;
+  /** L'image du drapeau (« drapeaux/fr.svg », ou celui de Cyber Pinball), servie par la borne. */
+  flag: string;
+  /** « En partie sur Neon Abyss · 2 tables en commun », « Vu il y a 3 h ». */
+  detail: string;
+  state: 'online' | 'playing' | 'offline';
+}
+
+/** La liste « Joueurs » : les demandes reçues, puis chaque filtre de la borne et ses groupes titrés. */
+export interface RemotePeople {
+  requests: { key: string; name: string; avatar: AvatarView; flag: string; detail: string }[];
+  /** Les filtres (Tous, Mon pays, À proximité, Mêmes tables) : le nombre, ou pourquoi il ne montre rien. */
+  filters: { id: string; label: string; count?: string; disabled?: boolean }[];
+  /** Pour chaque filtre, ses groupes : « Amis en ligne (2) », « Hors ligne (4) »… */
+  groups: Record<string, { title: string; rows: RemotePerson[] }[]>;
+  /** Pourquoi la liste est vide ou incomplète (partage coupé, connexion en cours). */
+  note?: string;
+}
+
+/**
+ * Le profil d'un joueur pour le téléphone : celui de la borne (profile-menu.ts, buildProfile), rangé
+ * pour la page. Chaque action porte son identité dans l'écran de la borne (`act`) ; `where` dit ce qui
+ * se passe au toucher : `here`, le profil change sur place ; `borne`, un écran s'ouvre à la borne
+ * (inviter, sa bibliothèque) ; `thread`, le fil s'ouvre au téléphone ; `confirm`, le téléphone demande
+ * d'abord (bloquer, retirer de mes amis).
+ */
+export interface RemoteProfile {
+  key: string;
+  name: string;
+  avatar: AvatarView;
+  flag?: string;
+  /** « Expert · niveau 14 · Votre ami ». */
+  subheading: string;
+  /** Le constat de la dernière action (« Demande envoyée à Kiko »). */
+  flash?: { text: string; detail?: string; tone?: string };
+  /** Présence, bibliothèque, faits de sa carte, demande envoyée ou reçue. */
+  rows: { text: string; detail?: string; tone?: string; icon?: string }[];
+  level?: { text: string; detail?: string; progress?: number };
+  badges?: { text: string; detail?: string; medals: { icon: string; rarity: string; label: string }[] };
+  activity?: { title: string; rows: { text: string; detail?: string; icon?: string; likes?: number; liked?: boolean; act?: string }[] };
+  groups?: { text: string; detail?: string; act: string }[];
+  /** Ce qui reste réservé (« Table en cours… réservées à ses amis »), une activité masquée. */
+  notes: string[];
+  actions: { act: string; label: string; detail?: string; icon?: string; quiet?: boolean; primary?: boolean; where: 'here' | 'borne' | 'thread' | 'confirm' }[];
 }
 
 /**
@@ -326,8 +375,12 @@ export interface MenuTarget {
    */
   typing?(key: string | undefined, on: boolean): void;
   chatReact?(key: string, target: string, kind: string): void;
-  /** Communauté : les conversations et le fil ouvert au téléphone (`open`) ; sans elle, l'onglet le dit. */
-  community?(open?: string): RemoteCommunity;
+  /** Communauté : les conversations, le fil ouvert (`open`) et le profil ouvert (`profile`) au téléphone ; sans elle, l'onglet le dit. */
+  community?(open?: string, profile?: string): RemoteCommunity;
+  /** Une action du profil montré au téléphone (son identité dans l'écran de la borne) ; la borne vérifie tout. */
+  profileAct?(key: string, act: string): void;
+  /** Accepter ou refuser une demande d'ami reçue. */
+  friendAnswer?(key: string, yes: boolean): void;
   /** Juke-box : le lecteur de la borne pour l'onglet du téléphone, et ses commandes (vérifiées par la borne). */
   jukebox?(): RemoteJukebox;
   jukeboxAct?(op: RemoteJukeboxOp, key?: string, fraction?: number): void;
@@ -423,6 +476,8 @@ export const PHONE_FILES: Readonly<Record<string, string>> = {
   '/telephone-jukebox.js': 'telephone/telephone-jukebox.js',
   // La pastille d'un joueur, dessinée comme à la borne (vue Scores).
   '/avatar.js': 'avatar.js',
+  // Les badges officiels (CyberLevels.badgeSvg), dessinés au téléphone comme à la borne (profil d'un joueur).
+  '/niveau.js': 'niveau.js',
   '/theme.css': 'theme.css',
   '/i18n.js': 'i18n.js',
   '/icons.js': 'icons.js',
@@ -608,6 +663,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   let communityTimer: NodeJS.Timeout | undefined;
   /** Le fil ouvert au téléphone (clé d'un ami), ou la liste. */
   let communityOpen: string | undefined;
+  /** Le profil ouvert au téléphone (clé d'un joueur), ou aucun. */
+  let profileOpen: string | undefined;
   let menusAt = 0;
   let menusTimer: NodeJS.Timeout | undefined;
   /**
@@ -966,6 +1023,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     // Une liaison neuve : la vue Scores redemande ce qu'elle montre (« ranks »).
     ranksWatch = undefined;
     communityOpen = undefined;
+    profileOpen = undefined;
     wantsMedia = false;
     pushState(true);
   }
@@ -1095,13 +1153,27 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     communityAt = now;
     let c: RemoteCommunity;
     try {
-      c = menu.community(communityOpen);
+      c = menu.community(communityOpen, profileOpen);
     } catch (error) {
       journalIncident('Télécommande : messagerie illisible pour le téléphone', error); // i18n-ignore : journal
       return;
     }
     const face = (a: AvatarView): AvatarView => remoteAvatar(images, a);
-    const shown: RemoteCommunity = { ...c, rows: c.rows.map((r) => ({ ...r, avatar: face(r.avatar) })), ...(c.players ? { players: c.players.map((r) => ({ ...r, avatar: face(r.avatar) })) } : {}), ...(c.thread ? { thread: { ...c.thread, avatar: face(c.thread.avatar) } } : {}) };
+    // Chaque pastille sous un jeton de la télécommande : jamais un chemin de la borne.
+    const people = c.people
+      ? {
+          ...c.people,
+          requests: c.people.requests.map((r) => ({ ...r, avatar: face(r.avatar) })),
+          groups: Object.fromEntries(Object.entries(c.people.groups).map(([id, groups]) => [id, groups.map((g) => ({ ...g, rows: g.rows.map((r) => ({ ...r, avatar: face(r.avatar) })) }))])),
+        }
+      : undefined;
+    const shown: RemoteCommunity = {
+      ...c,
+      rows: c.rows.map((r) => ({ ...r, avatar: face(r.avatar) })),
+      ...(people ? { people } : {}),
+      ...(c.thread ? { thread: { ...c.thread, avatar: face(c.thread.avatar) } } : {}),
+      ...(c.profile ? { profile: { ...c.profile, avatar: face(c.profile.avatar) } } : {}),
+    };
     const text = JSON.stringify(shown);
     if (!force && text === communitySent) return;
     communitySent = text;
@@ -1624,6 +1696,15 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         menu.roomSend?.(message.text);
         pushCommunity(true);
         return;
+      case 'profile-act':
+        // L'action est retrouvée par son identité dans le profil refait par la borne ; elle vérifie tout.
+        menu.profileAct?.(message.key, message.a);
+        pushCommunity(true);
+        return;
+      case 'friend-answer':
+        menu.friendAnswer?.(message.key, message.yes);
+        pushCommunity(true);
+        return;
       case 'typing':
         // Le menu vérifie tout (ami, membre, salon, réglages) ; un signal de trop n'envoie rien (au plus un toutes les 3 s).
         menu.typing?.(message.key, message.on);
@@ -1701,6 +1782,12 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     // Communauté : le fil ouvert au téléphone (aucun geste injecté) ; son contenu part aussitôt.
     if (message.t === 'chat-open') {
       communityOpen = message.key;
+      pushCommunity(true);
+      return;
+    }
+    // Le profil d'un joueur ouvert (ou refermé) au téléphone : la borne l'envoie tant qu'il l'est.
+    if (message.t === 'profile-open') {
+      profileOpen = message.key;
       pushCommunity(true);
       return;
     }
@@ -2138,6 +2225,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     clearTimeout(communityTimer);
     communityTimer = undefined;
     communityOpen = undefined;
+    profileOpen = undefined;
     // Les jetons des images ne valent plus rien : la prochaine liaison en reçoit d'autres.
     images.reset();
     resized.clear();

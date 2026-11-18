@@ -361,6 +361,7 @@ import { createChatMenu } from './chat-menu';
 import { createGroupService } from './group-service';
 import { createGroupsMenu } from './groups-menu';
 import { createProfileMenu } from './profile-menu';
+import { createPhoneCommunity } from './phone-community';
 import { createCommunityMenu } from './community-menu';
 import { createInstantMenu } from './instant-menu';
 import { createRoomsMenu } from './rooms-menu';
@@ -410,7 +411,7 @@ import { syncRelaunchWatcher, watchDesktopButton, watchStartHold } from './start
 import { createPowerMenu } from './power';
 import { readWakeDevices } from './arcade-hours';
 import { createPhoneRelay } from './phone-relay';
-import { createPhoneRemote, phoneRemoteMode, type MenuEntries, type MenuEntry, type RemoteJukebox } from './phone-remote';
+import { createPhoneRemote, phoneRemoteMode, type MenuEntries, type MenuEntry, type RemoteCommunity, type RemoteJukebox } from './phone-remote';
 
 /**
  * Touches du menu : celles des boutons de l'interface (étape « Boutons de l'interface »
@@ -1524,13 +1525,9 @@ phoneRemote.setMenu({
   jukebox: () => remoteJukebox(),
   jukeboxAct: (op, key, fraction) => remoteJukeboxAct(op, key, fraction),
   // Communauté au téléphone (messages, amis) : au menu, et pendant une partie si le réglage le permet ; jamais en mode invité.
-  community: (open) => {
-    if (guest.active) return { closed: t('Fermée en mode invité.'), unread: 0, rows: [] };
-    // Mes groupes en tête des conversations ; leur fil s'ouvre par « g:<id> ».
-    const groups = groupsMenu.remote(open);
-    const chat = chatMenu.remoteCommunity(open?.startsWith('g:') ? undefined : open);
-    return { ...chat, rows: [...groups.rows, ...chat.rows], unread: chat.unread + groups.unread, ...(groups.thread ? { thread: groups.thread } : {}), players: remoteOnlinePlayers(), ...remoteRoom() };
-  },
+  community: (open, profile) => remoteCommunity(open, profile),
+  profileAct: (key, act) => remoteProfileAct(key, act),
+  friendAnswer: (key, yes) => remoteFriendAnswer(key, yes),
   roomSend: (text) => remoteRoomSend(text),
   chatSend: (key, text) => {
     if (!phoneMayWrite()) return;
@@ -1813,19 +1810,25 @@ function remotePickJukebox(): void {
 }
 
 /** Les joueurs en ligne qui ne sont pas mes amis, pour « Joueurs » au téléphone : jamais la table, leur pays en clair. */
-function remoteOnlinePlayers() {
-  return communityMenu
-    .players()
-    .filter((p) => !p.friend)
-    .slice(0, REMOTE_ENTRIES_MAX)
-    .map((p) => ({
-      key: p.key,
-      name: p.name,
-      avatar: avatarView(p.key, p.name, socialNet.avatarFile(p.key)),
-      presence: [p.status === 'playing' ? t('En partie') : t('En ligne'), p.country ? countryName(p.country, locale()) : undefined].filter(Boolean).join(' · '),
-      state: p.status === 'playing' ? ('playing' as const) : ('online' as const),
-      last: '',
-    }));
+/** La Communauté au téléphone : conversations, fil ouvert, Joueurs et profil ouvert ; jamais en mode invité. */
+function remoteCommunity(open: string | undefined, profile: string | undefined): RemoteCommunity {
+  if (guest.active) return { closed: t('Fermée en mode invité.'), unread: 0, rows: [] };
+  // Mes groupes en tête des conversations ; leur fil s'ouvre par « g:<id> ».
+  const groups = groupsMenu.remote(open);
+  const chat = chatMenu.remoteCommunity(open?.startsWith('g:') ? undefined : open);
+  // Joueurs (demandes, filtres, groupes) et le profil ouvert : phone-community.ts.
+  const shown = profile ? phoneCommunity.profile(profile) : undefined;
+  return { ...chat, rows: [...groups.rows, ...chat.rows], unread: chat.unread + groups.unread, ...(groups.thread ? { thread: groups.thread } : {}), people: communityMenu.remotePeople(REMOTE_ENTRIES_MAX), ...(shown ? { profile: shown } : {}), ...remoteRoom() };
+}
+
+/** Une action du profil montré au téléphone (phone-community.ts) ; jamais en mode invité. */
+function remoteProfileAct(key: string, act: string): void {
+  if (!guest.active) phoneCommunity.act(key, act);
+}
+
+/** Accepter ou refuser une demande d'ami depuis Joueurs ; jamais en mode invité. */
+function remoteFriendAnswer(key: string, yes: boolean): void {
+  if (!guest.active) phoneCommunity.answer(key, yes);
 }
 
 /** Le salon par pays pour le téléphone (rooms-menu.ts) : celui ouvert à la borne, sinon le salon par défaut. */
@@ -2924,16 +2927,18 @@ const chatMenu = createChatMenu({
 });
 library.provideSystemItem('messages', chatMenu.item);
 // Profil public et « J'aime » (profile-menu.ts) : celui des autres joueurs, et le mien.
+/** Bloquer un joueur : plus de connexion avec sa borne, son fil effacé (profil de la borne et du téléphone). */
+function blockPlayer(key: string): void {
+  socialNet.block(key);
+  chatService.clear(key);
+}
 const profileMenu = createProfileMenu({
   library,
   net: socialNet,
   // Le seul écran d'un joueur (17/11/2026) : la relation y ajoute présence, bibliothèque et demandes d'ami.
   relation: (key, name, ctx) => friendsMenu.playerPart(key, name, ctx),
   writeDetail: (key) => chatMenu.writeDetail(key),
-  block: (key) => {
-    socialNet.block(key);
-    chatService.clear(key);
-  },
+  block: (key) => blockPlayer(key),
   openThread: (key, back) => chatMenu.openThread(key, back),
   // Ses groupes publics (17/11/2026) : connus de cette borne par l'annuaire ; jamais un groupe privé.
   groups: {
@@ -2943,6 +2948,13 @@ const profileMenu = createProfileMenu({
   invite: invitationsService.entry,
 });
 library.provideSystemItem('public-profile', profileMenu.item);
+// Le profil d'un joueur au téléphone (phone-community.ts) : celui de la borne, ses actions par leur identité.
+const phoneCommunity = createPhoneCommunity({
+  profiles: profileMenu,
+  net: socialNet,
+  block: (key) => blockPlayer(key),
+  refresh: () => phoneRemote?.menuChanged(),
+});
 // Salons par pays (rooms-menu.ts) : le journal, écrire, les options d'une ligne, les règles, les réglages de la communauté.
 const roomsMenu = createRoomsMenu({
   library,

@@ -97,7 +97,7 @@ const VIEWS = {
 };
 /** Vues de la Communauté (un même onglet) : les messages, les amis, les scores ; et le fil d'un ami, plein écran. */
 const COMMUNITY_VIEWS = ['messages', 'friends', 'room', 'ranks'];
-const tabOf = (v) => (COMMUNITY_VIEWS.includes(v) || v === 'thread' ? 'community' : v === 'player' ? 'jukebox' : v);
+const tabOf = (v) => (COMMUNITY_VIEWS.includes(v) || v === 'thread' || v === 'profile' ? 'community' : v === 'player' ? 'jukebox' : v);
 for (const [name, def] of Object.entries(VIEWS)) {
   const tab = $(`tab-${name}`);
   const text = document.createElement('span');
@@ -341,13 +341,15 @@ let menus;
 let menuPath = [];
 
 function setView(next) {
-  if (!(knownView(next) || next === 'thread' || next === 'player') || $(`tab-${tabOf(next)}`).disabled) return;
+  if (!(knownView(next) || next === 'thread' || next === 'profile' || next === 'player') || $(`tab-${tabOf(next)}`).disabled) return;
   const before = document.body.dataset.view;
   view = next;
-  if (next !== 'thread' && next !== 'player') store(VIEW_STORE, next);
+  if (next !== 'thread' && next !== 'profile' && next !== 'player') store(VIEW_STORE, next);
   if (COMMUNITY_VIEWS.includes(next)) communityView = next;
   // Un fil quitté : la borne cesse de l'envoyer (et de le marquer lu).
   if (before === 'thread' && next !== 'thread') communityLeaveThread();
+  // Un profil quitté : la borne cesse de l'envoyer.
+  if (before === 'profile' && next !== 'profile') communityLeaveProfile();
   // Un bouton tenu reste tenu à la borne tant que le doigt n'est pas levé : changer de vue le relâche.
   releaseButtons();
   syncLayout();
@@ -846,11 +848,11 @@ function renderTop() {
   const top = communityTop(shown) ?? jukeboxTop(shown);
   $('page-title').textContent = top ? top.title : screen.title;
   $('page-host').textContent = top ? top.detail : screen.item;
-  $('top-back').hidden = shown !== 'thread' && shown !== 'player';
-  $('top-back').setAttribute('aria-label', shown === 'player' ? t('Retour au Juke-box') : t('Retour aux conversations'));
+  $('top-back').hidden = shown !== 'thread' && shown !== 'profile' && shown !== 'player';
+  $('top-back').setAttribute('aria-label', shown === 'player' ? t('Retour au Juke-box') : shown === 'profile' ? t('Retour') : t('Retour aux conversations'));
   $('top-mark').replaceChildren(...(top?.face ? [top.face] : []));
   $('top-mark').classList.toggle('face', Boolean(top?.face));
-  $('top-keys').hidden = !(mode === 'menu' && fieldShown && shown !== 'thread');
+  $('top-keys').hidden = !(mode === 'menu' && fieldShown && shown !== 'thread' && shown !== 'profile');
   $('top-keys').setAttribute('aria-expanded', String(!$('keys').hidden));
 }
 
@@ -1147,6 +1149,7 @@ function handle(m) {
       if (document.body.dataset.view === 'ranks' && m.mode !== 'browser') ranksAsk();
       // Et un fil ouvert le redemande (la borne l'oublie à chaque liaison).
       if (document.body.dataset.view === 'thread' && community.open && m.mode !== 'browser') send({ t: 'chat-open', key: community.open });
+      if (document.body.dataset.view === 'profile' && community.profile && m.mode !== 'browser') send({ t: 'profile-open', key: community.profile });
       if (hintAfterMode && state === 'paired') {
         hintAfterMode = false;
         // Après l'essai du nom : passée par le nom, la page part ; restée sur l'adresse, le raccourci qui suit la borne.

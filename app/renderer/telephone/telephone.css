@@ -608,7 +608,8 @@ body[data-mode='game'] .views {
 }
 
 /* Le fil d'un ami prend tout l'écran (le clavier du téléphone y monte) ; son retour est en haut. */
-body[data-view='thread'] .views {
+body[data-view='thread'] .views,
+body[data-view='profile'] .views {
   display: none;
 }
 
@@ -710,7 +711,7 @@ body[data-view='thread'] .views {
 
 .seg {
   display: none;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   flex-shrink: 0;
   gap: 4px;
   padding: 4px;
@@ -727,6 +728,7 @@ body:not([data-mode='browser'])[data-view='ranks'] .seg {
 }
 
 .seg-tab {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -754,17 +756,20 @@ body:not([data-mode='browser'])[data-view='ranks'] .seg {
   text-overflow: ellipsis;
 }
 
+/* Le nombre en capsule au coin de l'onglet, au-dessus du libellé : le libellé garde toute sa largeur. */
 .seg-count {
-  flex: none;
+  position: absolute;
+  top: 3px;
+  right: 3px;
   display: grid;
   place-items: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: 11px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 11px;
   background: var(--signal);
   color: var(--on-signal);
-  font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -797,7 +802,8 @@ body:not([data-mode='browser'])[data-view='friends'] .community {
 
 body:not([data-state='paired']) .community,
 body:not([data-state='paired']) .seg,
-body:not([data-state='paired']) .thread {
+body:not([data-state='paired']) .thread,
+body:not([data-state='paired']) .profile {
   visibility: hidden;
 }
 
@@ -3558,4 +3564,407 @@ body:not([data-state='paired']) .room {
   border-radius: 6px;
   background: rgba(95, 180, 207, 0.12);
   box-shadow: inset 3px 0 0 var(--meta);
+}
+
+/* ---------- Joueurs : demandes d'ami, filtres, joueurs (telephone-community.js, renderPeople) ---------- */
+
+.person-flag {
+  flex: none;
+  width: 20px;
+  height: 15px;
+  margin-right: 6px;
+  border-radius: 2px;
+  object-fit: cover;
+  vertical-align: -2px;
+}
+
+.entry.person .entry-go {
+  flex: none;
+  color: var(--ink-muted);
+  font-size: 20px;
+}
+
+.entry-list li.people-filters {
+  padding: 2px 6px 4px;
+}
+
+/* Une demande d'ami reçue : une carte cerclée de vert, ses trois boutons. */
+.people-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 8px;
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface-raised);
+}
+
+.people-card.attention {
+  border-color: color-mix(in oklab, var(--signal) 55%, var(--line-strong));
+}
+
+.people-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.people-actions,
+.profile-actions {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 8px;
+}
+
+.people-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.people-btn .icon {
+  flex: none;
+  font-size: 20px;
+}
+
+.people-btn-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.people-btn.primary {
+  border-color: var(--signal);
+  background: var(--signal);
+  color: var(--on-signal);
+}
+
+.people-btn.off {
+  border-color: var(--line-soft);
+  color: var(--ink-faint);
+}
+
+.people-btn:active {
+  border-color: var(--signal);
+}
+
+/* ---------- Profil d'un joueur, plein écran (telephone-community.js, renderProfile) ---------- */
+
+.profile {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+body:not([data-mode='browser'])[data-view='profile'] .profile {
+  display: flex;
+}
+
+.profile-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 2px 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.profile-wait {
+  margin: 24px 0;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+.profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 4px;
+}
+
+.avatar.profile-avatar {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  font-size: 26px;
+}
+
+.profile-who {
+  min-width: 0;
+}
+
+.profile-name {
+  overflow-wrap: anywhere;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 28px;
+}
+
+.profile-name .person-flag {
+  vertical-align: 0;
+}
+
+.profile-sub {
+  font-size: 15px;
+  line-height: 21px;
+  color: var(--ink-muted);
+}
+
+/* Une ligne du profil : icône, texte, détail ; « ok » en vert (en ligne, demande envoyée). */
+.profile-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+
+.profile-line > .icon {
+  flex: none;
+  width: 24px;
+  color: var(--ink-muted);
+  font-size: 22px;
+}
+
+.profile-line-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  font-size: 15px;
+  line-height: 21px;
+  overflow-wrap: anywhere;
+}
+
+.profile-line-text small {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+
+.profile-line.tone-ok > .icon,
+.profile-line.tone-ok .profile-line-text > span {
+  color: var(--signal);
+}
+
+.profile-line.tone-info > .icon {
+  color: var(--meta);
+}
+
+.profile-line.tone-quiet .profile-line-text > span {
+  color: var(--ink-muted);
+}
+
+.profile-line.tone-warning > .icon,
+.profile-line.tone-warning .profile-line-text > span {
+  color: var(--warning);
+}
+
+.profile-flash {
+  border: 1px solid color-mix(in oklab, var(--signal) 45%, var(--line-strong));
+  border-radius: 12px;
+  background: var(--signal-wash);
+  padding: 6px 10px;
+}
+
+.profile-reason {
+  min-height: 0;
+  padding-top: 0;
+}
+
+.profile-reason .profile-line-text > span {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.profile-bar {
+  display: block;
+  height: 8px;
+  margin: 6px 0 2px;
+  border-radius: 4px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.profile-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--signal);
+}
+
+.profile-section {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.profile-section small {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-muted);
+}
+
+/* Les badges officiels sur une ligne qui défile, leur nom dessous. */
+.profile-medals {
+  display: flex;
+  gap: 10px;
+  padding: 4px 12px 4px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+}
+
+.profile-medal {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 70px;
+  font-size: 12px;
+  line-height: 15px;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+.profile-medal-art {
+  display: block;
+  width: 52px;
+  height: 52px;
+}
+
+.profile-medal-art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.profile-panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.profile-panel > .profile-line {
+  min-height: 56px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.profile-panel > .profile-line:last-child {
+  border-bottom: 0;
+}
+
+.profile-act > .icon {
+  color: var(--signal);
+}
+
+/* « J'aime » d'un évènement : l'étoile et le nombre ; aimé, en vert. */
+.profile-like {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 56px;
+  min-height: 48px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 24px;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.profile-like.on {
+  border-color: var(--signal);
+  color: var(--signal);
+}
+
+.profile-group .entry-go {
+  flex: none;
+  color: var(--ink-muted);
+  font-size: 20px;
+}
+
+.profile-note .profile-line-text > span {
+  font-size: 14px;
+}
+
+/* Le profil défile d'un bloc : aucun de ses éléments ne se tasse (les noms des badges restaient rognés). */
+.profile-body > * {
+  flex: none;
+}
+
+/* Les actions du profil sur deux colonnes, la principale sur toute la largeur : aucun libellé coupé. */
+.profile-actions {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.profile-actions > .people-btn.primary {
+  grid-column: 1 / -1;
+}
+
+/* Une demande d'ami : « Accepter » un peu plus large que les deux autres. */
+.people-card .people-actions {
+  grid-auto-flow: row;
+  grid-template-columns: 1.3fr 1fr 1fr;
+}
+
+.people-card .people-btn {
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.profile-medals {
+  padding-bottom: 8px;
+}
+
+/* Un libellé long (« Écrire un message ») passe sur deux lignes dans son bouton, jamais coupé. */
+.profile-actions .people-btn-text {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  line-height: 18px;
+  text-align: center;
 }

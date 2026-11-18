@@ -11,6 +11,9 @@ son interface).
 
 ## 0.1.16
 
+- Téléphone, Communauté : l'onglet « Joueurs » reprend la liste de la borne, avec les demandes d'ami reçues en tête (Accepter, Refuser), les filtres en badges (Tous, Mon pays, À proximité, Mêmes tables) et les joueurs groupés comme à la borne, chacun avec son drapeau.
+- Téléphone : un toucher sur un joueur ouvre son profil, le même qu'à la borne : son niveau, ses badges officiels, son activité avec les « J'aime », ses groupes publics ; envoyer une demande d'ami, écrire à un ami, l'inviter à une partie ou voir sa bibliothèque (à la borne), et sous « Plus » masquer son activité, le retirer de vos amis ou le bloquer, après une confirmation au téléphone.
+- Téléphone : les onglets de la Communauté deviennent Messages, Joueurs, Salons et Scores ; le nombre de non-lus passe en capsule au coin, « Messages » n'est plus coupé.
 - Tables dont le DMD passe par FlexDMD avec des images rangées dans la table (tables de JP comme Hellboy ou Daredevil) : ces images sont chargées pendant l'écran de chargement, et non plus à leur premier affichage, qui arrêtait la partie un instant, flippers compris. La table n'est pas modifiée.
 - Nouveautés : sur une nouveauté agrandie, réagissez avec l'une des sept réactions des messages (👍 ❤️ 🥰 😆 😮 😢 😡). Chaque tuile dit combien de joueurs l'ont choisie, partout dans le monde, et la vôtre est repérée ; Start sur elle la retire. Une réaction par borne et par nouveauté ; supprimer son compte efface aussi ses réactions.
 - Profil d'un joueur : le « J'aime » d'un record ou d'un badge s'affiche avec un pouce levé au lieu d'une étoile, pour qu'on comprenne qu'on peut l'aimer ; le pouce est rempli quand vous l'aimez déjà. Même pouce sur l'écran « Ont aimé », la notification d'un « J'aime » reçu, le détail des points d'expérience et les badges « Apprécié », « Populaire » et « Généreux ».

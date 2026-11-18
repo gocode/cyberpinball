@@ -465,6 +465,18 @@ export type PhoneMessage =
    */
   | { t: 'chat-open'; s: number; key?: string }
   /**
+   * Communauté, Joueurs : le profil d'un joueur ouvert au téléphone (sa clé publique), ou aucun. La
+   * borne l'envoie tant qu'il est ouvert, comme le fil d'un ami.
+   */
+  | { t: 'profile-open'; s: number; key?: string }
+  /**
+   * Une action du profil montré (`a` : son identité dans l'écran de la borne, « request », « like:… »).
+   * La borne refait le profil et ne lance que l'action qui y porte cette identité.
+   */
+  | { t: 'profile-act'; s: number; key: string; a: string }
+  /** Accepter (`yes`) ou refuser une demande d'ami reçue, depuis la liste des joueurs. */
+  | { t: 'friend-answer'; s: number; key: string; yes: boolean }
+  /**
    * Juke-box (onglet du téléphone) : une commande du lecteur de la borne (jukebox-player.ts), comme
    * un clic ou un bouton à la borne. `key` : une ligne reçue (playlist, morceau, ligne fixe) ;
    * `fraction` : l'endroit du morceau (0 à 1). La borne vérifie tout.
@@ -480,6 +492,10 @@ export type RemoteJukeboxOp = (typeof REMOTE_JUKEBOX_OPS)[number];
 const finite = (v: unknown, max: number): v is number => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= max;
 /** Un fil de la Communauté au téléphone : la clé d'un ami, ou « g: » et l'identifiant d'un groupe privé (groups.ts). */
 const isChatKey = (v: unknown): v is string => typeof v === 'string' && /^(?:[0-9a-f]{64}|g:[0-9a-f]{16})$/.test(v);
+/** La clé publique d'un joueur (64 caractères hexadécimaux), jamais autre chose. */
+const isPlayerKey = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
+/** L'identité d'une action d'un écran (sa clé, sinon son libellé) : courte, sans caractère de contrôle. */
+const isActionId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 200 && !/[\x00-\x1f\x7f]/.test(v);
 
 /** Lit un message ouvert du téléphone : undefined pour tout ce qui n'est pas attendu (type, bornes, longueur). */
 export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
@@ -565,6 +581,13 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
     case 'chat-open':
       if (m.key === undefined || m.key === null) return { t: 'chat-open', s };
       return isChatKey(m.key) ? { t: 'chat-open', s, key: m.key } : undefined;
+    case 'profile-open':
+      if (m.key === undefined || m.key === null) return { t: 'profile-open', s };
+      return isPlayerKey(m.key) ? { t: 'profile-open', s, key: m.key } : undefined;
+    case 'profile-act':
+      return isPlayerKey(m.key) && isActionId(m.a) ? { t: 'profile-act', s, key: m.key, a: m.a } : undefined;
+    case 'friend-answer':
+      return isPlayerKey(m.key) && typeof m.yes === 'boolean' ? { t: 'friend-answer', s, key: m.key, yes: m.yes } : undefined;
     case 'ping':
       return { t: 'ping', s };
     case 'bye':

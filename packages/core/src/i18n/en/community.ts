@@ -28,6 +28,7 @@ export const messages: Record<string, string> = {
   'En ligne ailleurs ({n})': 'Online elsewhere ({n})',
   'Sur votre réseau local ({n})': 'On your local network ({n})',
   'Le plus de tables en commun ({n})': 'Most tables in common ({n})',
+  'Demande reçue {ago}': 'Request received {ago}',
   '{n} table : {list}': '{n} table: {list}',
   '{n} tables : {list}': '{n} tables: {list}',
   '{n} table en commun': '{n} table in common',
@@ -39,7 +40,6 @@ export const messages: Record<string, string> = {
   'Le choisir : Partage et réseau › Choisir mon pays': 'Choose it: Sharing and network › Choose my country',
   'Personne pour ce filtre en ce moment': 'Nobody for this filter right now',
   'MagnaSave : filtre suivant': 'MagnaSave: next filter',
-  'Personne en ligne pour l’instant': 'Nobody online yet',
   'La liste se remplit à mesure que les bornes se signalent': 'The list fills up as cabinets announce themselves',
   'Tous les joueurs croisés par votre borne, ceux en ligne d’abord. La table en cours n’est montrée qu’entre amis.': 'Every player your cabinet has come across, those online first. The current table is shown to friends only.',
   'Aucun joueur connu pour l’instant': 'No known players yet',
@@ -58,8 +58,17 @@ export const messages: Record<string, string> = {
 
   // Téléphone : la partie « Joueurs » de la Communauté
   'Joueurs': 'Players',
-  'Autres joueurs en ligne ({n})': 'Other players online ({n})',
-  'Autres joueurs en ligne': 'Other players online',
+  'Demande d’ami': 'Friend request',
+  'Demandes d’ami': 'Friend requests',
+  'Joueurs indisponibles': 'Players unavailable',
+  'Mettez la borne à jour pour voir les joueurs ici.': 'Update the cabinet to see players here.',
+  'Personne ici pour l’instant': 'Nobody here yet',
+  'Les joueurs du réseau des bornes s’affichent ici dès qu’ils sont vus.': 'Players from the cabinet network show up here as soon as they are seen.',
+  'Essayez le filtre « Tous ».': 'Try the “All” filter.',
+  'Dans « Joueurs », ouvrez un profil pour envoyer une demande d’ami.': 'In “Players”, open a profile to send a friend request.',
+  // Le profil d'un joueur au téléphone
+  'Ouverture du profil…': 'Opening the profile…',
+  'Ne plus aimer': 'Unlike',
 
   // Garde-fou des essais sans opérateur (install-vpx.ts)
   'Essai sans opérateur : pas de téléchargement de VPX': 'Unattended test: no VPX download',

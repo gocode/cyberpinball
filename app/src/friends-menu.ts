@@ -385,12 +385,13 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         events: f.events,
         actions: [
           // Toujours là : grisée hors ligne ; en partie, l'ami la reçoit en notification sur sa table.
-          live.friendAction(key, () => ctx.here()),
-          { label: t('Voir sa bibliothèque'), detail: libraryMenu.detail(key), icon: 'tables', run: () => libraryMenu.open(key, () => ctx.here()) },
+          { ...live.friendAction(key, () => ctx.here()), key: 'invite' },
+          { label: t('Voir sa bibliothèque'), key: 'library', detail: libraryMenu.detail(key), icon: 'tables', run: () => libraryMenu.open(key, () => ctx.here()) },
         ],
         tail: [
           {
             label: t('Retirer de mes amis'),
+            key: 'unfriend',
             detail: t('Il ne verra plus votre présence, vous ne verrez plus la sienne'),
             icon: 'close',
             run: () => confirm(t('Retirer {name} de vos amis ?', { name: f.name }), t('Retirer'), () => { net.remove(key); ctx.flash({ text: t('{name} retiré de vos amis', { name: f.name }), tone: 'ok' }); ctx.here(); }, () => ctx.here()),
@@ -405,11 +406,11 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const entry = s.directory.find((d) => d.profile.key === key);
     const nearby = nearbyPlayers(s, now()).some((d) => d.profile.key === key);
     if (entry) rows.push({ text: nearby ? t('Sur votre réseau local') : t('Vu {ago}', { ago: socialAgo(entry.seen, now()) }), tone: nearby ? 'ok' : 'quiet', icon: nearby ? 'network' : 'clock' });
-    if (rel === 'none') actions.push({ label: t('Envoyer une demande d’ami'), detail: t('Il la verra dans « Demandes d’amis » et pourra l’accepter'), icon: 'friend-add', tone: 'ok', run: () => { net.request({ key, name: plain }); ctx.flash({ text: t('Demande envoyée à {name}', { name: plain }), detail: net.online(key) ? t('Remise à sa borne') : t('Remise dès que sa borne sera en ligne'), tone: 'ok' }); ctx.here(); } });
+    if (rel === 'none') actions.push({ label: t('Envoyer une demande d’ami'), key: 'request', detail: t('Il la verra dans « Demandes d’amis » et pourra l’accepter'), icon: 'friend-add', tone: 'ok', run: () => { net.request({ key, name: plain }); ctx.flash({ text: t('Demande envoyée à {name}', { name: plain }), detail: net.online(key) ? t('Remise à sa borne') : t('Remise dès que sa borne sera en ligne'), tone: 'ok' }); ctx.here(); } });
     const outgoing = s.outgoing.find((r) => r.key === key);
     if (rel === 'outgoing' && outgoing) {
       rows.push({ text: t('Demande envoyée le {date}', { date: new Date(outgoing.at).toLocaleDateString() }), detail: net.online(key) ? t('Remise à sa borne : il ne l’a pas encore acceptée') : t('Remise dès que sa borne sera en ligne'), tone: 'info', icon: 'friend-add' });
-      actions.push({ label: t('Annuler la demande'), icon: 'close', run: () => { net.cancel(key); ctx.flash({ text: t('Demande à {name} annulée', { name: plain }), tone: 'ok' }); ctx.here(); } });
+      actions.push({ label: t('Annuler la demande'), key: 'cancel-request', icon: 'close', run: () => { net.cancel(key); ctx.flash({ text: t('Demande à {name} annulée', { name: plain }), tone: 'ok' }); ctx.here(); } });
     }
     if (rel === 'incoming') {
       rows.push({ text: t('Demande d’amitié reçue'), tone: 'ok', icon: 'friend-request' });
@@ -420,8 +421,8 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
 
   function requestActions(key: string, plain: string, after: () => void, say: (row: Row) => void): Action[] {
     return [
-      { label: t('Accepter'), detail: t('Partager votre présence avec ce joueur'), icon: 'check', tone: 'ok', run: () => { net.accept(key); say({ text: t('{name} est maintenant votre ami', { name: plain }), tone: 'ok' }); after(); } },
-      { label: t('Refuser'), detail: t('Nouvelle demande impossible pendant 30 jours'), icon: 'close', run: () => { net.decline(key); say({ text: t('Demande de {name} refusée', { name: plain }), tone: 'ok' }); after(); } },
+      { label: t('Accepter'), key: 'accept', detail: t('Partager votre présence avec ce joueur'), icon: 'check', tone: 'ok', run: () => { net.accept(key); say({ text: t('{name} est maintenant votre ami', { name: plain }), tone: 'ok' }); after(); } },
+      { label: t('Refuser'), key: 'decline', detail: t('Nouvelle demande impossible pendant 30 jours'), icon: 'close', run: () => { net.decline(key); say({ text: t('Demande de {name} refusée', { name: plain }), tone: 'ok' }); after(); } },
     ];
   }
 
