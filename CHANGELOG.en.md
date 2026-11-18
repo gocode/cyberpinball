@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Secret badges: their glitchy "signal caught" entrance now actually plays; a rule mistake replaced it with the regular badge entrance.
 - Phone, Scores: a summary of "My level" at the top (the level, the tier, the bar, this week's XP); a tap opens My level full screen, as on the cabinet: the bar, the week, this week's rankings, the closest badges drawn as on the cabinet, then "My badges" and "How to earn XP".
 - Phone, Scores: a "One table / All tables" switch. All tables: one line per table, the most recently played first, with each table's leader and your place, at the chosen scope and period; a table without a ranking stays greyed out with its reason. Tapping a line opens that table's scoreboard.
 - Phone: a bell in the Community top bar, with the number of unread notifications. It opens the recent activity, day by day; each line leads to its screen: a friend's or a group's thread, a profile, Players or a room open on the phone, the rest on the cabinet. "Clear recent activity" after a confirmation.

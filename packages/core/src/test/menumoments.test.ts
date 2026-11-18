@@ -507,6 +507,25 @@ test('feuilles du menu : une classe n’est définie que dans une feuille (sauf 
   assert.deepEqual([...new Set(misused)], []);
 });
 
+test('niveau.css ne vise que des classes que le rendu pose : aucune règle morte', () => {
+  // `.lm-secret.play` au lieu de `.lm-secret.lm-play` : la règle ne s'appliquait jamais et
+  // l'apparition des badges secrets se jouait comme les autres (18/11/2026). Chaque classe de la
+  // feuille doit figurer dans une chaîne de niveau.js, frontend.js ou frontend.html.
+  const code = ['niveau.js', 'frontend.js', 'frontend.html'].map((f) => fs.readFileSync(path.join(APP, 'renderer', f), 'utf8')).join('\n');
+  const tokens = new Set<string>();
+  for (const [s] of code.matchAll(/'[^'\n]*'|"[^"\n]*"|`[^`]*`/g)) for (const t of s.slice(1, -1).split(/[^\w-]+/)) tokens.add(t);
+  const css = fs.readFileSync(path.join(APP, 'renderer', 'niveau.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const classes = new Set<string>();
+  for (const [, selector] of css.matchAll(/([^{}]+)\{/g)) {
+    if (selector!.trim().startsWith('@')) continue;
+    for (const [, c] of selector!.matchAll(/\.([A-Za-z_][\w-]*)/g)) classes.add(c!);
+  }
+  assert.ok(classes.has('lm-secret') && classes.has('lm-play'));
+  // États communs à toutes les feuilles (voir le test précédent), posés ailleurs.
+  const shared = new Set(['current', 'selected', 'mouse']);
+  assert.deepEqual([...classes].filter((c) => !tokens.has(c) && !shared.has(c)), []);
+});
+
 test('essais hors écran : toute fenêtre de l’application est muette', () => {
   const offscreen = fs.readFileSync(path.join(APP, 'src', 'offscreen.ts'), 'utf8');
   const create = offscreen.slice(offscreen.indexOf('export function createWindow'), offscreen.indexOf('function keepOffscreen'));

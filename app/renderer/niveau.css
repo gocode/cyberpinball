@@ -486,7 +486,7 @@ body.mouse .badges-pill:hover {
   animation: lm-fade 0.5s 4.9s forwards;
 }
 /* Secret dévoilé : le badge apparaît en sautant, comme un signal capté. */
-.lm-stage.lm-secret.play .lm-medal {
+.lm-stage.lm-secret.lm-play .lm-medal {
   animation: lm-glitch 0.7s 1.05s steps(1) forwards;
 }
 /* Niveau de départ et niveau seul : pas de badge ; le texte et la barre seulement. */
