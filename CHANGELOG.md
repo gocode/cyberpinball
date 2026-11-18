@@ -9,6 +9,10 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.2.1
+
+- Téléphone : le bouton Retour (ou le geste retour) d'Android remonte les écrans de la télécommande au lieu de la fermer. Il ferme une feuille ouverte, revient d'un fil, d'un profil ou d'une page, remonte d'une rubrique dans Menus ou d'une playlist dans le Juke-box, ramène les autres onglets à l'Écran, et fait le retour de l'écran ouvert à la borne. À l'écran de départ, il quitte la page comme avant.
+
 ## 0.2.0
 
 - Communauté : l'affiche de la Communauté et le filtre « Mon pays » de Joueurs indiquent le bon chemin (Menu système › Communauté › Partage et réseau, Mon compte › Mon pays) ; ils citaient encore l'ancienne rubrique Amis.

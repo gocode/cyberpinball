@@ -7,6 +7,10 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.2.1
+
+- Phone: the Android Back button (or back gesture) now steps back through the remote's screens instead of closing it. It closes an open sheet, leaves a conversation, profile or page, goes up a section in Menus or out of a playlist in the Jukebox, brings the other tabs back to Screen, and goes back on the screen open on the cabinet. On the starting screen, it leaves the page as before.
+
 ## 0.2.0
 
 - Community: the Community poster and the Players "My country" filter point to the right place (System menu › Community › Sharing and network, My account › My country); they still named the old Friends section.
