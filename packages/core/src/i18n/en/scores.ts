@@ -26,7 +26,7 @@ export const messages: Record<string, string> = {
   // app/src/library.ts
   'Tableau des scores': 'Scoreboard',
   'Onglet {period}': '{period} tab',
-  'Flippers : période précédente ou suivante · MagnaSave : portée · Start ou Exit : retour à la fiche · souris': 'Flippers: previous or next period · MagnaSave: scope · Start or Exit: back to game page · mouse',
+  'Flippers : période précédente ou suivante · Start ou MagnaSave : portée suivante · Exit : retour à la fiche · souris': 'Flippers: previous or next period · Start or MagnaSave: next scope · Exit: back to game page · mouse',
   'Réseau des bornes absent': 'Cabinet network unavailable',
   'Masquer un score…': 'Hide a score…',
   'Un score douteux, ou tous ceux d’un joueur, sur cette borne': 'A dubious score, or all of a player’s, on this cabinet',

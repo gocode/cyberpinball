@@ -467,16 +467,15 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
       scoreboard: view,
       actions,
       back: () => home(0),
-      hint: t('Flippers : Cette semaine ou Tout temps · MagnaSave : portée · Start ou Exit : retour aux classements · souris'),
+      hint: t('Flippers : Cette semaine ou Tout temps · Start ou MagnaSave : portée suivante · Exit : retour aux classements · souris'),
       keys: (input) => {
         const keys = host.keys?.();
-        if (keys?.confirm.includes(input.code)) {
-          home(0);
-          return true;
-        }
+        // Start : la portée suivante. Une borne dont les MagnaSave valident et reviennent dans l'OS (étape
+        // « Boutons de l'interface ») n'avait aucun moyen de changer de portée (retour du 18/11/2026).
         const magna = host.zoneKeys();
-        if (magna.includes(input.code)) {
-          const dir = magna.length > 1 && magna.indexOf(input.code) === 0 ? -1 : 1;
+        const start = keys?.confirm.includes(input.code) ?? false;
+        if (start || magna.includes(input.code)) {
+          const dir = !start && magna.length > 1 && magna.indexOf(input.code) === 0 ? -1 : 1;
           const at = PLAYER_SCOPES.indexOf(playerScope);
           playerScope = PLAYER_SCOPES[(at + dir + PLAYER_SCOPES.length) % PLAYER_SCOPES.length]!;
           here();

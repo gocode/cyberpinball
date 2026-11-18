@@ -52,6 +52,7 @@ Les badges que l'historique mérite déjà sont donnés en même temps, sans ann
 Les amis et les « J'aime » d'avant sont comptés sans XP.
 
 Le niveau voyage dans la carte publique signée et dans chaque score publié (champ `xp`, qui n'entre au texte signé que s'il est présent).
+Un tableau des scores montre le niveau d'aujourd'hui : celui de la dernière carte publique reçue du joueur (le mien, d'après mes XP), et seulement à défaut celui que porte son score ; un score publié avant les niveaux a donc lui aussi un niveau, dès que la carte du joueur est arrivée.
 Chaque borne note le jour où elle a reçu pour la première fois la carte d'un joueur ; un niveau qui dépasse ce que les plafonds permettent depuis ce jour s'affiche « ? » (`shownLevel`).
 Chaque personne invitée vérifiée sur sa carte ajoute à ce qui est permis ce qu'elle peut rapporter, 250 XP (100 + 6 paliers × 25, `INVITED_XP_MAX`).
 Le niveau ne change jamais une place dans un classement.

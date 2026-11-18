@@ -7,6 +7,11 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.1.16
+
+- Leaderboards: players' levels now also show on scores published before levels arrived, taken from their public card.
+- Leaderboards and Leaderboards > Players: Start moves to the next scope (Friends, National, World), Exit goes back; a cabinet whose MagnaSave buttons confirm and go back in the OS can finally change scope.
+
 ## 0.1.15
 
 - Profile: a badge name no longer breaks in the middle of a word ("Ambassado / r"), and each medal shows below it the XP it awards, in the colour of its rarity.

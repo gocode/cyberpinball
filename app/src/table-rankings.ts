@@ -21,8 +21,8 @@ export interface TableRankingsOptions {
     /** Borne du joueur reliée à la mienne en ce moment. */
     /** Le jour où cette borne a vu la carte publique d'un joueur pour la première fois (vraisemblance de son niveau). */
     cardFirstSeen?(key: string): string | undefined;
-    /** Sa carte publique : ses personnes invitées comptent dans la vraisemblance de son niveau. */
-    publicCard?(key: string): Pick<PublicCard, 'invited' | 'invitedTotal'> | undefined;
+    /** Sa dernière carte publique reçue : ses XP d'aujourd'hui (son niveau), et ses personnes invitées (sa vraisemblance). */
+    publicCard?(key: string): Pick<PublicCard, 'xp' | 'invited' | 'invitedTotal'> | undefined;
     online?(key: string): boolean;
     /** Présence d'un ami (en partie ou au menu). */
     presenceOf?(key: string): Presence | undefined;
@@ -31,6 +31,8 @@ export interface TableRankingsOptions {
     /** Avatar d'un joueur classé d'après l'empreinte de son score : le fichier, sinon demandé. */
     rankingAvatar?(key: string, hash: string): string | undefined;
   };
+  /** Mes XP d'aujourd'hui (level-tracker.ts) : le niveau de ma ligne. */
+  myXp?(): number | undefined;
   /** Version stricte d'une de mes tables (live-game.ts, versionOf). */
   versionOf(table: TableEntry): Promise<{ print?: string; script?: string }>;
   /** Billes par partie de ma table (ball-count.ts) ; undefined : inconnu. */
@@ -129,11 +131,16 @@ export function createTableRankings(opts: TableRankingsOptions): TableRankings {
   function dressed(line: RankingLine, state: SocialState, now: Date): RankingViewLine {
     const net = opts.net;
     const file = net.avatarFile?.(line.key) ?? (line.avatar ? net.rankingAvatar?.(line.key, line.avatar) : undefined);
-    // Le niveau : le mien tel quel ; celui d'un autre, s'il est vraisemblable depuis qu'on le connaît.
+    // Le niveau d'aujourd'hui, comme à l'écran « Joueurs » : mes XP, ou sa dernière carte publique ;
+    // à défaut, les XP portés par le score (ceux du jour de la partie). Un score publié avant les
+    // niveaux (17/11/2026), ou par une borne plus ancienne, n'en a pas : sans la carte, la ligne
+    // n'aurait jamais de niveau (retour du 17/11/2026).
+    const xp = (line.mine ? opts.myXp?.() : net.publicCard?.(line.key)?.xp) ?? line.xp;
+    // Le mien tel quel ; celui d'un autre, s'il est vraisemblable depuis qu'on le connaît.
     const firstSeen = [line.since, net.cardFirstSeen?.(line.key)].filter((x): x is string => !!x).sort()[0];
-    const level = line.xp === undefined ? undefined : line.mine ? levelOf(line.xp).level : shownLevel(line.xp, firstSeen, now, invitedCount(line.key));
+    const level = xp === undefined ? undefined : line.mine ? levelOf(xp).level : shownLevel(xp, firstSeen, now, invitedCount(line.key));
     const face = { ...avatarView(line.key, line.name, file), ...(level ? { level } : {}) };
-    const rank = { ...(level ? { level } : {}), ...(line.xp !== undefined && !level ? { levelUnsure: true as const } : {}) };
+    const rank = { ...(level ? { level } : {}), ...(xp !== undefined && !level ? { levelUnsure: true as const } : {}) };
     if (line.mine) return { ...line, face, ...rank };
     const status = playerStatus(net, state, line.key, now);
     return { ...line, face, ...rank, ...(status ? { status } : {}) };

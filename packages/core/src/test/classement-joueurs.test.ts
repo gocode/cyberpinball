@@ -137,11 +137,42 @@ test('écran « Joueurs » : trois portées, la semaine d’abord ; flippers pou
   assert.ok(b.keys?.({ code: 'ControlRight' }));
   assert.equal(screen!().subheading, 'Mondial · Tout temps');
   assert.equal(screen!().scoreboard?.lines.length, 4);
-  // Start : retour à l'accueil des classements.
+  // Start : la portée suivante (après Mondial, Amis) ; Exit : retour à l'accueil des classements.
   assert.ok(screen!().keys?.({ code: 'Enter' }));
+  assert.equal(screen!().subheading, 'Amis · Tout temps');
+  screen!().back();
   assert.equal(screen!().heading, 'Classements');
   // Sans partage : indisponible, avec sa raison.
   enabled = false;
   screen!().actions.find((a) => a.label === 'Joueurs')!.run();
   assert.match(screen!().scoreboard?.empty?.title ?? '', /indisponible/);
+});
+
+// Retour du 18/11/2026 sur un vrai PinCab : ses MagnaSave valident et reviennent dans l'OS (étape
+// « Boutons de l'interface »), donc aucune touche MagnaSave n'est libre (zoneKeys vide) ; la portée ne
+// changeait plus. Start suffit, sur toute borne.
+test('écran « Joueurs » : sans MagnaSave libre, Start change de portée', () => {
+  setLanguage('fr');
+  let screen: (() => Built) | undefined;
+  const menu = createRankingsMenu({
+    library: { openCustom: (build: () => Built) => (screen = build), openScores: () => undefined },
+    tables: () => [],
+    local: () => ({ lines: [], games: 0, tableBoard: false, everyGame: false, romWithoutMap: false }),
+    network: () => ({ lines: [], players: 0 }),
+    players: { state: () => ({ enabled: true, country: 'FR', friends: new Set<string>(), me: p('me', 'Moi', 9_420, 640) }), cards: () => [], firstSeen: () => LONG_AGO },
+    keys: () => ({ previous: ['Joy5'], next: ['Joy4'], confirm: ['Joy6'] }),
+    zoneKeys: () => [],
+    openSharing: () => undefined,
+    now: () => NOW.getTime(),
+  });
+  menu.open(() => undefined);
+  screen!().actions.find((a) => a.label === 'Joueurs')!.run();
+  assert.equal(screen!().subheading, 'National · Cette semaine');
+  const seen = [];
+  for (let i = 0; i < 3; i++) {
+    assert.ok(screen!().keys?.({ code: 'Joy6' }), 'Start est pris');
+    seen.push(screen!().subheading);
+  }
+  assert.deepEqual(seen, ['Mondial · Cette semaine', 'Amis · Cette semaine', 'National · Cette semaine']);
+  assert.match(String((screen!() as unknown as { hint: string }).hint), /Start ou MagnaSave : portée suivante · Exit : retour/);
 });

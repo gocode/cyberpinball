@@ -2630,6 +2630,8 @@ const tableRankings = createTableRankings({
   net: socialNet,
   versionOf: (table) => liveGames.versionOf(table),
   ballsOf: async (table) => (await ballCounts.of(table))?.balls,
+  // Le niveau de ma ligne : mes XP d'aujourd'hui (le suivi du niveau, créé plus bas, n'est lu qu'à l'affichage).
+  myXp: () => levelTracker.state().xp,
   changed: () => (library.isActive() ? library.changed() : broadcast()),
 });
 // Une partie entre amis se joue sur un double de la table : sa mémoire de ROM, ses records et ses

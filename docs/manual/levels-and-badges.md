@@ -52,6 +52,7 @@ Badges the history already deserves are granted at the same time, without tellin
 Friends and likes from before are counted without XP.
 
 The level travels in the signed public card and in every published score (`xp` field, which only enters the signed text when present).
+A leaderboard shows today's level: the one on the player's latest public card (mine, from my XP), and only failing that the one carried by their score; a score published before levels therefore has a level too, as soon as the player's card has arrived.
 Each cabinet notes the day it first received a player's card; a level beyond what the caps allow since that day shows as "?" (`shownLevel`).
 Each invited player checked on their card adds to what is allowed what they can earn, 250 XP (100 + 6 tiers × 25, `INVITED_XP_MAX`).
 The level never changes a place in a ranking.

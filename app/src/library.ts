@@ -2476,19 +2476,17 @@ export function createLibrary(host: LibraryHost) {
           : []),
       ],
       back,
-      hint: s.back ? t('Flippers : période précédente ou suivante · MagnaSave : portée · Start ou Exit : retour aux classements · souris') : t('Flippers : période précédente ou suivante · MagnaSave : portée · Start ou Exit : retour à la fiche · souris'),
+      hint: s.back ? t('Flippers : période précédente ou suivante · Start ou MagnaSave : portée suivante · Exit : retour aux classements · souris') : t('Flippers : période précédente ou suivante · Start ou MagnaSave : portée suivante · Exit : retour à la fiche · souris'),
       keys: (input) => {
         const KEYS = host.keys();
-        // Start revient à la fiche, même après un clic sur un onglet (qui y a posé le curseur).
-        if (KEYS.confirm.includes(input.code)) {
-          back();
-          return true;
-        }
-        // MagnaSave : la portée suivante ; la gauche (première touche relevée), la précédente.
+        // Start ou MagnaSave : la portée suivante (la gauche, première touche relevée : la précédente) ;
+        // Exit revient. Start seul suffit : une borne dont les MagnaSave valident et reviennent dans
+        // l'OS (étape « Boutons de l'interface ») n'avait aucun moyen de changer de portée (18/11/2026).
         const magna = host.zoneKeys?.() ?? [];
-        if (magna.includes(input.code)) {
+        const start = KEYS.confirm.includes(input.code);
+        if (start || magna.includes(input.code)) {
           const at = RANKING_SCOPES.indexOf(s.scope);
-          const dir = magna.length > 1 && magna.indexOf(input.code) === 0 ? -1 : 1;
+          const dir = !start && magna.length > 1 && magna.indexOf(input.code) === 0 ? -1 : 1;
           s.scope = RANKING_SCOPES[(at + dir + RANKING_SCOPES.length) % RANKING_SCOPES.length]!;
           keepScoresChoice(s);
           return true;

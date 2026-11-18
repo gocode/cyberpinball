@@ -309,8 +309,8 @@ test('deux bornes : l’avatar joint à mes scores se voit au classement d’un 
 });
 
 test('au classement : la pastille et le statut de chacun — en partie, en ligne, hors ligne, vu il y a…', async () => {
-  interface Face { src?: string; initials: string }
-  interface Line { name: string; face: Face; status?: { state: string; label: string } }
+  interface Face { src?: string; initials: string; level?: number }
+  interface Line { name: string; face: Face; status?: { state: string; label: string }; level?: number; levelUnsure?: true }
   interface Rankings { view(table: object, scope: string, period: string): { lines: Line[] } }
   const { createTableRankings } = require(path.join(REPO_ROOT, 'app', 'dist', 'table-rankings.js')) as { createTableRankings(o: object): Rankings };
   const { newSocialState } = require(path.join(REPO_ROOT, 'packages', 'core', 'dist', 'social.js')) as { newSocialState(now: Date): object };
@@ -339,7 +339,11 @@ test('au classement : la pastille et le statut de chacun — en partie, en ligne
       presenceOf: (k: string) => (k === playing!.key.publicKey ? { status: 'playing' } : undefined),
       avatarFile: (k: string) => (k === playing!.key.publicKey ? 'C:/avatars/bruno.png' : undefined),
       rankingAvatar: (_k: string, h: string) => (h === hash ? 'C:/avatars/kenji.png' : undefined),
+      // Des scores publiés sans XP (avant les niveaux) : le niveau vient de la carte publique de chacun.
+      publicCard: (k: string) => (k === playing!.key.publicKey ? { xp: 9_000 } : k === online!.key.publicKey ? { xp: 400_000 } : undefined),
+      cardFirstSeen: (k: string) => (k === online!.key.publicKey ? NOW.toISOString() : '2026-01-01T00:00:00Z'),
     },
+    myXp: () => 3_752,
     versionOf: async () => ({ print: 'a'.repeat(64) }),
     ballsOf: async () => 3,
     changed: () => changed++,
@@ -360,4 +364,11 @@ test('au classement : la pastille et le statut de chacun — en partie, en ligne
   assert.match(by('Kenji').face.src ?? '', /kenji\.png/, 'un inconnu : celui joint à son score');
   assert.equal(by('Olu').face.src, undefined);
   assert.equal(by('Olu').face.initials, 'O');
+  // Le niveau d'aujourd'hui, même sur un score d'avant les niveaux (retour du 17/11/2026) : ma ligne
+  // par mes XP, un autre par sa carte publique ; « ? » si sa carte est invraisemblable ; rien sans carte.
+  assert.ok(by('Julie').level, 'ma ligne a mon niveau');
+  assert.ok(by('Bruno').level, 'sa carte publique donne son niveau');
+  assert.equal(by('Bruno').face.level, by('Bruno').level, 'l’anneau de l’avatar aussi');
+  assert.equal(by('Lena').levelUnsure, true, 'une carte invraisemblable : « ? »');
+  assert.equal(by('Olu').level, undefined, 'ni XP au score, ni carte : pas de niveau inventé');
 });

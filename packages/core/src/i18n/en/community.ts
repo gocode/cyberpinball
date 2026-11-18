@@ -144,7 +144,7 @@ export const messages: Record<string, string> = {
   'Les cartes des autres joueurs arrivent au fil des connexions.': 'Other players’ cards arrive as cabinets connect.',
   'Les XP gagnés depuis lundi : le classement repart à zéro chaque semaine.': 'XP earned since Monday: the ranking starts again from zero every week.',
   'Les XP de toujours : le niveau de chaque joueur.': 'XP of all time: each player’s level.',
-  'Flippers : Cette semaine ou Tout temps · MagnaSave : portée · Start ou Exit : retour aux classements · souris': 'Flippers: This week or All time · MagnaSave: scope · Start or Exit: back to leaderboards · mouse',
+  'Flippers : Cette semaine ou Tout temps · Start ou MagnaSave : portée suivante · Exit : retour aux classements · souris': 'Flippers: This week or All time · Start or MagnaSave: next scope · Exit: back to leaderboards · mouse',
   'Retour aux classements': 'Back to leaderboards',
-  'Flippers : période précédente ou suivante · MagnaSave : portée · Start ou Exit : retour aux classements · souris': 'Flippers: previous or next period · MagnaSave: scope · Start or Exit: back to leaderboards · mouse',
+  'Flippers : période précédente ou suivante · Start ou MagnaSave : portée suivante · Exit : retour aux classements · souris': 'Flippers: previous or next period · Start or MagnaSave: next scope · Exit: back to leaderboards · mouse',
 };

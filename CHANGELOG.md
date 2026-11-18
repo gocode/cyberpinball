@@ -9,6 +9,11 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.16
+
+- Tableaux des scores : le niveau des joueurs s'affiche aussi sur leurs scores publiés avant l'arrivée des niveaux, d'après leur carte publique.
+- Tableaux des scores et Classements > Joueurs : Start passe à la portée suivante (Amis, National, Mondial), Exit revient ; une borne dont les MagnaSave valident et reviennent dans l'OS peut enfin changer de portée.
+
 ## 0.1.15
 
 - Profil : le nom d'un badge ne se coupe plus au milieu d'un mot (« Ambassadeu / r »), et chaque médaille rappelle dessous les XP qu'elle rapporte, à la couleur de sa rareté.
