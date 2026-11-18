@@ -9,6 +9,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { fakeTableScoresOptions } from './doublures';
 import {
   addPlayed,
   emptyScoreJournal,
@@ -217,7 +218,7 @@ interface View {
   note?: string;
 }
 const { createTableScores } = require(path.join(REPO_ROOT, 'app', 'dist', 'table-scores.js')) as {
-  createTableScores(opts: { dataDir: string; romsOf(t: TableEntry): string[]; pinmameDirs(): string[]; now?(): Date; fetch?: typeof fetch }): Scores;
+  createTableScores(opts: object): Scores;
 };
 const { scoreboardView, scoresSummary } = require(path.join(REPO_ROOT, 'app', 'dist', 'scoreboard-menu.js')) as {
   scoreboardView(boards: (p: ScorePeriod) => Board, period: ScorePeriod, now?: Date): View;
@@ -276,7 +277,7 @@ test('de la partie à la fiche : le score lu dans la ROM, daté, au tableau de c
   assert.deepEqual(await scores.finish(table, snap, { live: { score: 4_200_000 } }), [{ at: now.toISOString(), score: 4_200_000, how: 'live' }]);
 
   // Gardé dans <données>\scores.json, relu par une autre instance (redémarrage).
-  const again = createTableScores({ dataDir: path.join(dir, 'data'), romsOf: () => ['t2_l8'], pinmameDirs: () => [], now: () => now });
+  const again = createTableScores(fakeTableScoresOptions({ dataDir: path.join(dir, 'data'), romsOf: () => ['t2_l8'], now: () => now }));
   assert.deepEqual(again.board(table, 'today').lines.map((l) => l.score), [4_200_000, 3_000_000]);
 
   // L'écran : quatre onglets, celui ouvert, le compte des parties, et les lignes.
@@ -296,7 +297,7 @@ test('de la partie à la fiche : le score lu dans la ROM, daté, au tableau de c
 test('table originale : seuls les scores entrés au tableau d’honneur sont gardés, et l’écran le dit', async () => {
   setLanguage('fr');
   const { dir, table } = cabinet();
-  const scores = createTableScores({ dataDir: path.join(dir, 'data'), romsOf: () => [], pinmameDirs: () => [], now: () => NOW });
+  const scores = createTableScores(fakeTableScoresOptions({ dataDir: path.join(dir, 'data'), now: () => NOW }));
   const snap = scores.snapshot(table);
   const kept = await scores.finish(table, snap, {
     recordsBefore: { file: 'VPReg.stg', storage: 'GoT', scores: [{ rank: 1, score: 500, initials: 'AAA' }] },

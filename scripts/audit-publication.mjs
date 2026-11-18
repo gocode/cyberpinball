@@ -85,9 +85,10 @@ export function internalPlaces(tracked) {
 /**
  * Fichiers publiés autorisés à citer un emplacement interne : les tests qui relisent les
  * démonstrations et se mettent en attente sans elles, le lanceur qui charge leur complément
- * s'il est présent, et les contrôles du dépôt qui couvrent aussi les documents internes.
+ * s'il est présent, et les contrôles du dépôt qui couvrent aussi les documents internes (dont la
+ * boucle de test courte, qui lance les gardes des démonstrations quand l'une d'elles change).
  */
-const MAY_CITE_INTERNAL = /^packages\/core\/src\/test\/|^lanceur\.ps1$|^scripts\/(audit-publication|traductions)(\.test)?\.mjs$/;
+const MAY_CITE_INTERNAL = /^packages\/core\/src\/test\/|^lanceur\.ps1$|^scripts\/(audit-publication|traductions|verifier)(\.test)?\.mjs$/;
 
 /** Renvois d'un fichier publié vers un emplacement interne (lien Markdown ou chemin cité). */
 export function internalReferences(file, text, places) {

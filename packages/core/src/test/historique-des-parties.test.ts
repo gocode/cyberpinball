@@ -11,6 +11,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { fakeSocialNet } from './doublures';
 import {
   addToHistory,
   emptyHistory,
@@ -190,7 +191,7 @@ test('service : une partie finie entre à l’historique de l’invité, et y re
   let deliver: ((k: string, m: unknown) => void) | undefined;
   const make = () =>
     createLiveGames({
-      net: { state: () => ({ key: { publicKey: BRUNO }, name: 'Bruno', friends: [{ key: ALEXIS, name: 'Alexis' }] }), online: () => true, send: () => true, onMessage: (cb: typeof deliver) => ((deliver = cb), () => undefined) },
+      net: fakeSocialNet({ state: () => ({ key: { publicKey: BRUNO }, name: 'Bruno', friends: [{ key: ALEXIS, name: 'Alexis' }] }), online: () => true, send: () => true, onMessage: (cb: typeof deliver) => ((deliver = cb), () => undefined) }),
       dataDir: path.join(root, 'data'),
       tables: () => [table],
       play: async () => undefined,

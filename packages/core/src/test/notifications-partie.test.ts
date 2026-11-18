@@ -46,6 +46,7 @@ import { SYSTEM_GROUPS, SYSTEM_ITEMS } from '../systemmenu';
 import { UI_SOUNDS, uiSoundCue } from '../uisounds';
 import type { TableEntry } from '../tables';
 import { frontendSource } from './frontend-source';
+import { fakeSocialNet } from './doublures';
 
 const read = (...parts: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...parts), 'utf8');
 const len = (s: string | undefined) => [...(s ?? '')].length;
@@ -281,12 +282,12 @@ test('service et menu : les vraies réponses deviennent une notification regroup
   const entry = { file: vpx, folder: dir, title: 'Glass Lagoon', info: {} } as unknown as TableEntry;
   let deliver: ((key: string, m: unknown) => void) | undefined;
   const friends = [['bruno', 'Bruno'], ['lea', 'Léa'], ['david', 'David']].map(([key, name]) => ({ key, name, events: [] }));
-  const net = {
+  const net = fakeSocialNet({
     state: () => ({ key: { publicKey: ME }, name: 'Moi', friends, enabled: true, incoming: [], outgoing: [] }),
     online: () => true,
     send: () => true,
     onMessage: (cb: (key: string, m: unknown) => void) => ((deliver = cb), () => (deliver = undefined)),
-  };
+  });
   let changes = 0;
   const games = createLiveGames({ net, dataDir: dir, tables: () => [entry], play: async () => undefined, onChange: () => changes++ });
   let clock = 1_000_000;

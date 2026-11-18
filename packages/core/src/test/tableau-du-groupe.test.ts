@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { cfb } from './fixtures';
 import { REPO_ROOT } from './i18n-scan';
+import { fakeSocialNet } from './doublures';
 import {
   addGameToBoard,
   boardFor,
@@ -122,7 +123,7 @@ test('service : une partie finie entre au tableau du groupe de l’invité, gard
   let deliver: ((k: string, m: unknown) => void) | undefined;
   const make = () =>
     createLiveGames({
-      net: { state: () => ({ key: { publicKey: me }, name: 'Bruno', friends: [{ key: host, name: 'Alexis' }] }), online: () => true, send: () => true, onMessage: (cb: typeof deliver) => ((deliver = cb), () => undefined) },
+      net: fakeSocialNet({ state: () => ({ key: { publicKey: me }, name: 'Bruno', friends: [{ key: host, name: 'Alexis' }] }), online: () => true, send: () => true, onMessage: (cb: typeof deliver) => ((deliver = cb), () => undefined) }),
       dataDir: path.join(root, 'data'),
       tables: () => [table],
       play: async () => undefined,

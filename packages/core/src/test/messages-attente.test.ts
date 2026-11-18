@@ -22,6 +22,7 @@ import { ACTIVITY_MESSAGE_KINDS, activityAct, activityFacts, activityText, addAc
 import type { NoticeEvent, NoticeKind } from '../notices';
 import { REPO_ROOT } from './i18n-scan';
 import { frontendSource } from './frontend-source';
+import { fakeActivityFriends, fakeActivityLive, fakeMenuLibrary } from './doublures';
 
 const NOVA = 'b'.repeat(64);
 const LEA = 'c'.repeat(64);
@@ -130,10 +131,10 @@ test('messages en attente : la ligne ouvre sa conversation, dit ce qui y attend,
     let build: (() => Built) | undefined;
     const menu = createActivityMenu({
       dataDir,
-      library: { openCustom: (b: () => Built) => (build = b), openSystem() {}, cursor: () => 99, isShowing: () => true, runSystemItem() {}, hasSystemItem: () => true, openDownloads() {} },
+      library: fakeMenuLibrary({ openCustom: (b: () => Built) => (build = b), cursor: () => 99, isShowing: () => true, hasSystemItem: () => true }),
       hasDownload: () => false,
-      friends: { isFriend: () => true, online: () => false, playing: () => false, incoming: () => false, openFriend() {}, openRequests() {}, avatar: (key: string) => ({ initials: key.slice(0, 1) }) },
-      live: { hasInvite: () => false, inviteEnd: () => undefined, openInvite() {}, current: () => undefined, open() {}, inHistory: () => false, openHistory() {} },
+      friends: fakeActivityFriends({ isFriend: () => true, avatar: (key: string) => ({ initials: key.slice(0, 1) }) }),
+      live: fakeActivityLive({ }),
       threads: { pending: (kind: string, thread: string) => pending[`${kind}|${thread}`], open: (kind: string, thread: string) => did.push(`${kind} ${thread.slice(0, 4)}`) },
       now: () => T0 + 10 * MIN,
     });

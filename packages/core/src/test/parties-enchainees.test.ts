@@ -18,6 +18,7 @@ import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { LIVE_READY_SIGNAL_MS, LIVE_READY_WAIT_MS, liveGoDeadline, liveGoDue, liveReadyOverdue, liveStateHook, parseLiveState, type LiveGame, type TableEntry } from '../index';
 import { frontendSource } from './frontend-source';
+import { fakeSocialNet } from './doublures';
 
 // ---------------------------------------------------------------------------
 // Le relevé d'une table qui ne pose ses valeurs qu'au Start
@@ -164,7 +165,7 @@ test('service : trois parties à la suite (même table, puis une autre) ; chacun
   // Messages perdus en route (une liaison qui tombe) : l'expéditeur croit les avoir envoyés.
   const drops: { from: string; t: string; done?: boolean }[] = [];
   const lost: string[] = [];
-  const net = (me: string, name: string, other: string, otherName: string) => ({
+  const net = (me: string, name: string, other: string, otherName: string) => fakeSocialNet({
     state: () => ({ key: { publicKey: me }, name, friends: [{ key: other, name: otherName }] }),
     online: () => true,
     send: (to: string, m: { t: string }) => {

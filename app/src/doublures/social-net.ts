@@ -1,0 +1,103 @@
+// Doublure du réseau des bornes (social-net.ts) : arrêté, sans ami, rien n'est envoyé (voir neutre.ts).
+//
+// Elle sert aussi pour toutes les vues partielles du réseau qu'attendent les menus et les services
+// (Pick<SocialNet, …>, `net`, `social`) : un membre que l'un d'eux se met à lire existe déjà ici.
+
+import { emptyRankings, newModerationState, newRoomsState, newSocialState } from '@cyberpinball/core';
+import type { SocialNet } from '../social-net';
+import { noop, overlay } from './neutre';
+
+export function fakeSocialNet(over?: Partial<SocialNet>): SocialNet {
+  const state = newSocialState();
+  const rooms = newRoomsState();
+  const moderation = newModerationState();
+  const rankings = emptyRankings();
+  const off = () => noop;
+  return overlay<SocialNet>(
+    {
+      state: () => state,
+      simulatedBootstrap: () => undefined,
+      status: () => ({ mode: 'off', running: false, internet: false, lan: false, peers: 0 }),
+      online: () => false,
+      presenceOf: () => undefined,
+      listSync: () => 'off',
+      linksOf: () => [],
+      start: async () => undefined,
+      stop: async () => undefined,
+      forgetMe: async () => ({ reached: 0 }),
+      setEnabled: async () => undefined,
+      setLan: async () => undefined,
+      rename: () => false,
+      setPresence: noop,
+      publish: noop,
+      checkBadges: () => ({ events: [], fresh: [], silent: true }),
+      setLevel: noop,
+      likesGiven: () => 0,
+      invitations: () => ({ v: 1, received: [] }),
+      declareInviter: noop,
+      declineInviter: noop,
+      confirmInvitation: noop,
+      receivedIds: () => ({ likes: [], reactions: [] }),
+      request: noop,
+      cancel: noop,
+      accept: noop,
+      decline: noop,
+      remove: noop,
+      block: noop,
+      unblock: noop,
+      setShareLibrary: noop,
+      setDownloadRate: noop,
+      send: () => false,
+      setPartners: noop,
+      setGroupPeers: noop,
+      reachable: () => false,
+      sendGroupDirectory: () => 0,
+      announceInstant: noop,
+      instantGames: () => [],
+      sendChunk: async () => false,
+      setAvatar: noop,
+      avatarFile: () => undefined,
+      rankingAvatar: () => undefined,
+      publishScore: () => undefined,
+      rankings: () => rankings,
+      hideScore: noop,
+      hidePlayer: noop,
+      setShareScores: noop,
+      setCountry: noop,
+      markProfileOffered: noop,
+      country: () => undefined,
+      publicCard: () => undefined,
+      publicCards: () => [],
+      cardSeen: () => undefined,
+      cardFirstSeen: () => undefined,
+      like: noop,
+      likedByMe: () => false,
+      likers: () => [],
+      setPublicProfile: noop,
+      livePlayers: () => [],
+      setPublicPresence: noop,
+      rooms: () => rooms,
+      roomSend: () => ({ reason: 'disabled' }),
+      roomRetract: () => false,
+      roomReact: () => false,
+      roomOpen: noop,
+      roomPresent: () => [],
+      roomTyping: noop,
+      roomTypers: () => [],
+      roomMoves: () => [],
+      setRooms: noop,
+      onRoomLines: off,
+      moderation: () => moderation,
+      amModerator: () => false,
+      moderate: () => false,
+      report: noop,
+      handleReports: noop,
+      onReports: off,
+      hideActivity: noop,
+      activityHidden: () => false,
+      onMessage: off,
+      onChunk: off,
+    },
+    over,
+  );
+}

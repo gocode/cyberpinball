@@ -12,6 +12,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { fakeSocialNet } from './doublures';
 import {
   libraryMessages,
   liveChoiceDetail,
@@ -157,7 +158,7 @@ function pair() {
   const net = (i: number) => {
     const me = ends[i]!;
     const other = ends[1 - i]!;
-    return {
+    return fakeSocialNet({
       state: () => ({ key: { publicKey: me.key }, name: me.key, friends: [{ key: other.key, name: other.key }], shareLibrary: true }),
       online: () => true,
       send: (_key: string, m: LibraryMessage) => {
@@ -172,7 +173,7 @@ function pair() {
         return () => undefined;
       },
       onChunk: () => () => undefined,
-    };
+    });
   };
   return { ends, net };
 }

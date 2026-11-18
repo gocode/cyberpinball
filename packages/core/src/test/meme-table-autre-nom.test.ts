@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { matchLiveTable, parseLiveMessage, sameTable, type LiveInvite, type LiveMessage, type LiveTable, type TableIdentity } from '../index';
 import type { TableEntry } from '../tables';
+import { fakeSocialNet } from './doublures';
 
 const PRINT = 'a'.repeat(64);
 const LE: TableIdentity = { title: 'Game of Thrones LE', manufacturer: 'Stern', year: 2015 };
@@ -43,7 +44,7 @@ const { createLiveGames } = require(path.join(REPO_ROOT, 'app', 'dist', 'live-ga
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
-const net = { state: () => ({ key: { publicKey: 'moi' }, name: 'Moi', friends: [] }), online: () => true, send: () => true, onMessage: () => () => undefined };
+const net = fakeSocialNet({ state: () => ({ key: { publicKey: 'moi' }, name: 'Moi', friends: [] }), online: () => true, send: () => true, onMessage: () => () => undefined });
 
 test('service : la table reçue et renommée est reconnue à son .vpx, et le journal le dit', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-meme-table-'));

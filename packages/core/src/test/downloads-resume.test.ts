@@ -30,6 +30,7 @@ import { layoutOf } from '../locations';
 import { tableContents } from '../tablecontents';
 import type { TableFile } from '../friendlibrary';
 import type { SocialState } from '../social';
+import { fakeDownloadManager, fakeReturnWorld } from './doublures';
 
 const APP_DIST = path.join(REPO_ROOT, 'app', 'dist');
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -477,9 +478,9 @@ test('liste des téléchargements : du plus récent au plus ancien, dans chaque 
   /* eslint-enable @typescript-eslint/no-require-imports */
   let shown: { sections: { title?: string; rows: { text: string }[] }[] } | undefined;
   createDownloadCenter({
-    manager: { jobs: () => queue, get: (id: string) => queue.find((j) => j.id === id), progress: () => undefined, seen: () => {} },
+    manager: fakeDownloadManager({ jobs: () => queue, get: (id: string) => queue.find((j) => j.id === id) }),
     show: (build: () => typeof shown) => (shown = build()),
-    world: { hasTable: () => false, hasFriend: () => false, tableTitle: () => undefined, friendName: () => undefined },
+    world: fakeReturnWorld({ tableTitle: () => undefined, friendName: () => undefined }),
     deliver: () => {},
     files: { detail: () => '', open: () => {} },
     back: () => {},
@@ -508,16 +509,15 @@ test('pastille rouge des téléchargements : partie dès que la liste est vue, s
   ];
   const active = (j: DownloadJob) => j.state === 'running' || j.state === 'queued' || j.state === 'waiting' || j.state === 'paused';
   const opened: string[] = [];
-  const manager = {
+  const manager = fakeDownloadManager({
     jobs: () => queue,
     get: (id: string) => queue.find((j) => j.id === id),
-    progress: () => undefined,
     // Comme downloadmanager.ts : seul ce qui est fini ou bloqué devient vu.
     seen: (id: string) => {
       const j = queue.find((x) => x.id === id);
       if (j && !active(j)) j.seen = true;
     },
-  };
+  });
   assert.equal(downloadsAttention(summarize(queue)), true, 'des nouvelles : pastille rouge');
   assert.equal(summarize(queue).unseen, 4);
 
@@ -528,7 +528,7 @@ test('pastille rouge des téléchargements : partie dès que la liste est vue, s
   createDownloadCenter({
     manager,
     show: (b: () => unknown) => ((build = b), b()),
-    world: { hasTable: () => false, hasFriend: () => false, tableTitle: () => undefined, friendName: () => undefined },
+    world: fakeReturnWorld({ tableTitle: () => undefined, friendName: () => undefined }),
     deliver: (j: DownloadJob) => opened.push(j.id),
     files: { detail: () => '', open: () => {} },
     back: () => {},

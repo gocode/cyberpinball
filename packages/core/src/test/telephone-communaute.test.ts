@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { parsePhoneMessage } from '../remote';
 import { REPO_ROOT } from './i18n-scan';
+import { fakeSocialNet } from './doublures';
 
 const APP_DIST = path.join(REPO_ROOT, 'app', 'dist');
 const ME = 'a'.repeat(64);
@@ -106,14 +107,14 @@ function fixture(opts: { friend: boolean; flash?: boolean }) {
   };
   const phone = createPhoneCommunity({
     profiles: { remote: () => built() },
-    net: {
+    net: fakeSocialNet({
       publicCard: () => ({ country: 'FR', likes }),
       likedByMe: (_key: string, id: string) => id === 'e1',
       remove: (key: string) => void removed.push(key),
       accept: (key: string) => void answers.push(`oui:${key}`),
       decline: (key: string) => void answers.push(`non:${key}`),
       state: () => ({ key: { publicKey: ME }, friends: opts.friend ? [{ key: KIKO }] : [], incoming: [{ key: LENA }] }),
-    },
+    }),
     block: (key: string) => void blocked.push(key),
     refresh: () => void refreshes.push(1),
   });

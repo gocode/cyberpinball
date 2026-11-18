@@ -56,6 +56,16 @@ export function slowFiles(files, read, { follow = true } = {}) {
   return new Set(files.filter((file) => isSlow(file.replace(/\.(js|mjs|cjs)$/, ''), new Set())));
 }
 
+/**
+ * Gardes qui relisent tout un dossier sans en citer les fichiers : lancées quand un fichier qu'elles
+ * relisent change. Une démonstration ou un test qui écrit une doublure à la main, ou un hôte de
+ * l'application qui gagne un membre, se voient ainsi dès `--modifies`, pas seulement à avant-fusion.
+ */
+export const FOLDER_GUARDS = [
+  { when: /^(interne\/demos\/|app\/src\/)/, test: 'demonstrations' },
+  { when: /^(interne\/demos\/|packages\/core\/src\/test\/|app\/src\/doublures\/)/, test: 'doublures' },
+];
+
 /** Les fichiers de test qui importent ou citent un des fichiers changés (noms de base, sans extension). */
 export function testsForChanges(changed, tests, sourceOf) {
   const bases = new Set();
@@ -64,6 +74,7 @@ export function testsForChanges(changed, tests, sourceOf) {
     const base = path.basename(file).replace(/\.(test\.)?(ts|tsx|js|mjs|cjs)$/, '');
     if (/\.test\.(ts|mjs)$/.test(file)) direct.add(base);
     else bases.add(base);
+    for (const guard of FOLDER_GUARDS) if (guard.when.test(file.replace(/\\/g, '/'))) direct.add(guard.test);
   }
   return tests.filter((test) => {
     const base = test.replace(/\.test\.(js|mjs)$/, '');

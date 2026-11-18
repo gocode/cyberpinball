@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { frontendSource } from './frontend-source';
+import { fakeSocialNet } from './doublures';
 import {
   answerGame,
   guestGame,
@@ -169,7 +170,7 @@ test('service : l’invitation dit 3 billes, l’invité répond 5, le journal l
   };
   const hostTable = make('hote');
   const guestTable = make('invite');
-  const host = createLiveGames({ net: { state: () => ({ key: { publicKey: 'hote' }, name: 'Alice', friends: [] }), online: () => true, send: () => true, onMessage: () => () => undefined }, dataDir: path.join(root, 'h'), tables: () => [hostTable], ballsOf: async () => 3, play: async () => undefined });
+  const host = createLiveGames({ net: fakeSocialNet({ state: () => ({ key: { publicKey: 'hote' }, name: 'Alice', friends: [] }), online: () => true, send: () => true }), dataDir: path.join(root, 'h'), tables: () => [hostTable], ballsOf: async () => 3, play: async () => undefined });
   const sent = (await host.create(hostTable)).table;
   host.stop();
   assert.equal(sent.balls, 3);
@@ -177,7 +178,7 @@ test('service : l’invitation dit 3 billes, l’invité répond 5, le journal l
   const out: LiveMessage[] = [];
   const lines: string[] = [];
   const guest = createLiveGames({
-    net: { state: () => ({ key: { publicKey: 'bruno' }, name: 'Bruno', friends: [{ key: 'hote', name: 'Alice' }] }), online: () => true, send: (_k: string, m: LiveMessage) => (out.push(m), true), onMessage: (cb: typeof deliver) => ((deliver = cb), () => undefined) },
+    net: fakeSocialNet({ state: () => ({ key: { publicKey: 'bruno' }, name: 'Bruno', friends: [{ key: 'hote', name: 'Alice' }] }), online: () => true, send: (_k: string, m: LiveMessage) => (out.push(m), true), onMessage: (cb: typeof deliver) => ((deliver = cb), () => undefined) }),
     dataDir: path.join(root, 'g'),
     tables: () => [guestTable],
     ballsOf: async () => 5,

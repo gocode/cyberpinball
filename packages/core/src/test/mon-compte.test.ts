@@ -25,6 +25,7 @@ import { signFeedback } from '../feedback';
 import { openVault, signVault, passwordSetup, passwordKeys, sealVault, unwrapDataKey, vaultDataKey, vaultLogin } from '../vault';
 import { memoryD1, SERVICE_DIR } from './fausse-d1';
 import { REPO_ROOT } from './i18n-scan';
+import { fakeMenuLibrary, fakeSocialNet } from './doublures';
 
 const T0 = new Date('2026-11-18T20:00:00Z');
 const tmp = (prefix: string) => fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -309,13 +310,12 @@ test('écran : le code se vérifie par deux mots ; une copie se reprend après c
   const service = (await import(pathToFileURL(path.join(REPO_ROOT, 'app', 'dist', 'account-service.js')).href)) as Service;
   const svc = service.createAccountService({ dataDir: kiko.dir, copiesDir: tmp('cp-secours-'), key: () => kiko.s.key });
   const menu = createAccountMenu({
-    library: {
+    library: fakeMenuLibrary({
       openCustom: (build: () => MenuBuilt, at?: number) => (screen = { build, at }),
       openPrompt: (_h: string, label: string, _v: string, done: (v: string | undefined) => void) => prompts.push({ label, done }),
-      runSystemItem: () => undefined,
       openSystem: () => (screen = undefined),
-    },
-    net: { state: () => kiko.s, rename: () => true, avatarFile: () => undefined, country: () => 'FR', setCountry: () => undefined, setShareScores: () => undefined, setPublicProfile: () => undefined, setPublicPresence: () => undefined },
+    }),
+    net: fakeSocialNet({ state: () => kiko.s, rename: () => true, country: () => 'FR' }),
     service: svc,
     level: () => ({ level: 12, xp: 3450 }),
     openDelete: () => undefined,

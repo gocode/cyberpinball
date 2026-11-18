@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { frontendSource } from './frontend-source';
+import { fakeSocialNet } from './doublures';
 import {
   applyRoom,
   gameStatus,
@@ -445,7 +446,7 @@ test('service : l’hôte prêt attend son invité ; « partez » arrive aux deu
   fs.writeFileSync(vpx, 'table');
   const table = { file: vpx, folder: dir, title: 'The Matrix', info: {} } as unknown as TableEntry;
   const handlers: Record<string, (k: string, m: unknown) => void> = {};
-  const net = (me: string, name: string, other: string, otherName: string) => ({
+  const net = (me: string, name: string, other: string, otherName: string) => fakeSocialNet({
     state: () => ({ key: { publicKey: me }, name, friends: [{ key: other, name: otherName }] }),
     online: () => true,
     send: (to: string, m: unknown) => (setImmediate(() => handlers[to]?.(me, JSON.parse(JSON.stringify(m)))), true),

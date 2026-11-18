@@ -19,6 +19,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { frontendSource } from './frontend-source';
+import { fakeSocialNet } from './doublures';
 import {
   addGameToBoard,
   boardFor,
@@ -493,7 +494,7 @@ test('service : la progression de l’hôte entre dans la partie à chaque chang
   const table = { file: vpx, folder: dir, title: 'Game of Thrones LE', info: {} } as unknown as TableEntry;
   let deliver: ((k: string, m: unknown) => void) | undefined;
   const games = createLiveGames({
-    net: { state: () => ({ key: { publicKey: 'alexis' }, name: 'Alexis', friends: [{ key: 'bruno', name: 'Bruno' }] }), online: () => true, send: () => true, onMessage: (cb: typeof deliver) => ((deliver = cb), () => undefined) },
+    net: fakeSocialNet({ state: () => ({ key: { publicKey: 'alexis' }, name: 'Alexis', friends: [{ key: 'bruno', name: 'Bruno' }] }), online: () => true, send: () => true, onMessage: (cb: typeof deliver) => ((deliver = cb), () => undefined) }),
     dataDir: dir,
     tables: () => [table],
     play: async (_t: TableEntry, playingNow: () => void, _s: unknown, _b: unknown, progress: (p: object) => void) => {

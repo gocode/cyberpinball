@@ -17,6 +17,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { earlyReferences } from './avant-declaration';
 import { REPO_ROOT } from './i18n-scan';
+import { fakeMenuTarget } from './doublures';
 
 /**
  * Constantes de frontend.ts lues par des rappels écrits plus haut, relus le 11/11/2026 : des rappels
@@ -99,18 +100,11 @@ test('télécommande : réveil différé au démarrage, écoute en échec retent
     kept: { size: () => 1, keys: () => [], list: () => [], touch: () => undefined, keep: () => undefined, forget: () => false } as never,
     log: (line: string) => lines.push(line),
   });
-  remote.setMenu({
+  remote.setMenu(fakeMenuTarget({
     phase: () => 'menu',
     screen: () => ({ title: 'Menu' }),
-    field: () => undefined,
-    button: () => undefined,
-    setText: () => undefined,
-    enter: () => undefined,
     uploadDir: () => ({ refused: '' }),
-    uploading: () => undefined,
-    uploaded: () => undefined,
-    changed: () => undefined,
-  });
+  }));
   try {
     assert.equal(calls, 0, 'setMenu ne lit rien pendant l’initialisation de l’appelant : le réveil attend');
     await new Promise((r) => setTimeout(r, 300));

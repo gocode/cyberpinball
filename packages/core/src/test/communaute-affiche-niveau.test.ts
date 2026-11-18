@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { createPlayerKey, levelOf, newSocialState, setLanguage, tierLabel, weekKey } from '../index';
+import { fakeCommunityMessages, fakeSocialNet } from './doublures';
 
 interface Tile {
   label: string;
@@ -62,21 +63,16 @@ function poster(opts: { enabled?: boolean; country?: string; myXp?: number; myWe
   });
   const menu = createCommunityMenu({
     library: { openCustom: () => undefined, openSystem: () => undefined },
-    net: {
+    net: fakeSocialNet({
       state: () => ({ ...newSocialState(new Date(0)), enabled, key: createPlayerKey(), friends: [] }),
       country: () => country,
       rankings: () => ({ scores: [] }),
-      livePlayers: () => [],
-      online: () => false,
-      presenceOf: () => undefined,
-      publicCard: () => undefined,
-      avatarFile: () => undefined,
       status: () => ({ running: true }),
-    },
+    }),
     zoneKeys: () => [],
     tables: () => [],
     openProfile: () => {},
-    messages: { detail: () => '', attention: () => false, quiet: () => true, open: () => {} },
+    messages: fakeCommunityMessages({ }),
     rankings: { detail: () => '', open: () => {}, standing: () => rankings.standing() },
     level: { detail: () => '', avatar: () => ({ initials: 'MO', hue: 0 }), open: () => {}, view: () => ({ ...levelOf(myXp), week: opts.myWeek ?? 300 }) },
     openSharing: () => {},

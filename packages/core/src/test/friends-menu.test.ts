@@ -14,6 +14,7 @@ import { REPO_ROOT } from './i18n-scan';
 import { createDownloadManager } from '../downloadmanager';
 import { newSocialState } from '../social';
 import type { LiveGame, LiveInvite } from '../livegame';
+import { fakeFriendContent, fakeFriendDownloads, fakeMenuLibrary } from './doublures';
 
 const APP_DIST = path.join(REPO_ROOT, 'app', 'dist');
 
@@ -104,27 +105,16 @@ function setup(content?: object, presence?: 'menu' | 'playing', vpx?: () => stri
   });
   const menu = createFriendsMenu({
     profile: { open: (key: string, back: () => void) => profile.openProfile(key, back) },
-    library: {
+    library: fakeMenuLibrary({
       openCustom: (build: Build, at?: number) => opened.push({ build, at }),
-      openSystem: () => undefined,
-      openPrompt: () => undefined,
       task: async (_message: string, work: () => Promise<void> | void) => work(),
-      openMediasWith: () => undefined,
-      catalogFor: () => undefined,
-      installReceived: () => undefined,
-      isShowing: () => false,
-    },
+    }),
     net,
     firewall,
     // Gestionnaire de téléchargements sans source : les réceptions y entrent, rien ne part.
-    downloads: {
+    downloads: fakeFriendDownloads({
       manager,
-      finisher: () => undefined,
-      deliverer: () => undefined,
-      opener: () => undefined,
-      deliver: () => undefined,
-      openReturn: () => undefined,
-    },
+    }),
     content: content ?? createFriendContent({ net, dataDir: dir, tables: () => [], root: () => undefined, contents: () => undefined }),
     games,
     tables: () => extra.tables ?? [],
@@ -435,16 +425,14 @@ test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le
     { id: id(4), rel: 'pupvideos/bop_l7/screens.pup', bytes: 2_000, part: 'pup' },
   ];
   const library = { at: new Date().toISOString(), tables: [{ id: id(9), table: { title: 'Bride of Pin-bot', manufacturer: 'Williams', year: 1991 }, medias: [] }] };
-  const content = {
+  const content = fakeFriendContent({
     library: () => ({ state: 'ready', library }),
-    refresh: () => undefined,
     fetch: async () => ({ received: [], failed: [] }),
     tableFiles: async () => files,
     fetchTable: async () => ({ dir: '', received: [], failed: [] }),
     receivedDir: () => '',
     tableDir: (folder: string) => path.join(os.tmpdir(), 'cp-friends-menu-table', folder),
-    stop: () => undefined,
-  };
+  });
   const { menu, last, manager } = setup(content);
   menu.items.friends!.run();
   await last().build().actions.find((a) => a.label.startsWith('Bruno'))!.run();
@@ -524,9 +512,8 @@ test('choix de la table avec deux amis : la même version chez tous en tête, le
     [EMILE]: { tables: [theirs(4, 'Terminator 2'), theirs(5, 'Fish Tales'), theirs(6, 'Medieval Madness'), theirs(7, 'Twilight Zone')], prints: { [theirs(4, '').id]: P('a'), [theirs(5, '').id]: P('b'), [theirs(6, '').id]: P('c'), [theirs(7, '').id]: 'pending' } },
   };
   const asked: string[] = [];
-  const content = {
+  const content = fakeFriendContent({
     library: (key: string) => ({ state: 'ready', library: { at: new Date().toISOString(), versions: true, tables: libraries[key]!.tables } }),
-    refresh: () => undefined,
     tableVersions: (key: string, ids: readonly string[]) => {
       asked.push(...ids);
       return new Map(ids.map((id) => [id, libraries[key]!.prints[id] === 'pending' ? 'pending' : { id, print: libraries[key]!.prints[id] }]));
@@ -534,8 +521,7 @@ test('choix de la table avec deux amis : la même version chez tous en tête, le
     tableFiles: async () => 'offline',
     receivedDir: () => '',
     tableDir: () => '',
-    stop: () => undefined,
-  };
+  });
   const { menu, last, games } = setup(content, 'menu', undefined, { friends: [{ key: EMILE, name: 'Émile' }], tables });
   for (const [title, print] of [['Terminator 2', P('a')], ['Fish Tales', P('b')], ['Medieval Madness', P('c')], ['Twilight Zone', P('d')]] as const) games.prints.set(title, print);
   menu.live.inviteFriends([FRIEND, EMILE], () => undefined);
@@ -593,13 +579,11 @@ test('« Ajouter une table > Depuis un ami » : les amis qui ont des tables à p
     [FRIEND]: [theirs(1, 'Terminator 2')],
     [EMILE]: [theirs(2, 'Terminator 2'), theirs(3, 'Fish Tales'), theirs(4, 'Medieval Madness')],
   };
-  const content = {
+  const content = fakeFriendContent({
     library: (key: string) => ({ state: 'ready', library: { at: new Date().toISOString(), tables: libraries[key]! } }),
-    refresh: () => undefined,
     receivedDir: () => '',
     tableDir: () => '',
-    stop: () => undefined,
-  };
+  });
   const { menu, last } = setup(content, 'menu', undefined, { friends: [{ key: EMILE, name: 'Émile' }], tables: [table('Terminator 2')] });
   const add = (menu as unknown as { addFromFriend: { detail(): string; open(back: () => void): void } }).addFromFriend;
   assert.match(add.detail(), /2 amis en ligne/);

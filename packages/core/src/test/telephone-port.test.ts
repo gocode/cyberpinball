@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { createKeptPhones, createRemotePairing, keptFingerprint } from '../index';
 import { REPO_ROOT } from './i18n-scan';
+import { fakeMenuTarget } from './doublures';
 
 interface Remote {
   setMenu(menu: Record<string, unknown>): void;
@@ -27,7 +28,7 @@ interface Remote {
 const { createPhoneRemote } = require(path.join(REPO_ROOT, 'app', 'dist', 'phone-remote.js')) as { createPhoneRemote(opts: Record<string, unknown>): Remote };
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const MENU = { phase: () => 'menu', screen: () => ({ title: 'Menu' }), field: () => undefined, button: () => undefined, setText: () => undefined, enter: () => undefined, uploadDir: () => ({ refused: '' }), uploading: () => undefined, uploaded: () => undefined, changed: () => undefined };
+const MENU = fakeMenuTarget({ phase: () => 'menu', screen: () => ({ title: 'Menu' }), uploadDir: () => ({ refused: '' }) });
 // Un téléphone gardé : la télécommande écoute dès que le menu est là.
 const KEPT = { size: () => 1, keys: () => [], list: () => [], seen: () => undefined, add: () => 'x', forget: () => false };
 

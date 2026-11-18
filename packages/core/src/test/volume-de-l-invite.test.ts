@@ -17,6 +17,7 @@ import { test } from 'node:test';
 import { cfb } from './fixtures';
 import { REPO_ROOT } from './i18n-scan';
 import { applyHostSettings, folderChanges, folderPrint, mergeRomVolume, readHostSettings, readVpReg, romChecksums, scriptVolumeKeys, type HostSetting, type RomMemory, type TableEntry } from '../index';
+import { fakeTableDoublesOptions } from './doublures';
 
 /** WPC (réduite d'après taf_l7) : le volume sous sa propre somme, deux réglages dans le bloc des réglages. */
 const WPC: RomMemory = {
@@ -137,7 +138,7 @@ function cabinet(root: string, files: { nv?: Buffer; cfg?: Buffer; reg?: Buffer 
 function play(root: string, host: TableEntry, guest: TableEntry, maps: Record<string, RomMemory> = { taf_l7: WPC }) {
   const settings = readHostSettings({ folder: host.folder, roms: ['taf_l7'] })!;
   const log: string[] = [];
-  const doubles = createTableDoubles({ root: () => path.join(root, 'invite'), tablesDir: () => path.join(root, 'invite', 'tables'), romsOf: () => ['taf_l7'], memoryCacheDir: cacheMaps(path.join(root, 'cartes'), maps), log: (l: string) => log.push(l) });
+  const doubles = createTableDoubles(fakeTableDoublesOptions({ root: () => path.join(root, 'invite'), tablesDir: () => path.join(root, 'invite', 'tables'), romsOf: () => ['taf_l7'], memoryCacheDir: cacheMaps(path.join(root, 'cartes'), maps), log: (l: string) => log.push(l) }));
   const started = doubles.start(guest, 'partie', settings);
   assert.ok(started.ok, started.ok ? '' : started.reason);
   const dir = started.double.table.folder;

@@ -11,6 +11,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { fakeSocialNet, fakeTableRankingsOptions } from './doublures';
 import {
   countryCodes,
   countryOfLocale,
@@ -329,8 +330,8 @@ test('au classement : la pastille et le statut de chacun — en partie, en ligne
     directory: [{ profile: { key: seen!.key.publicKey, name: 'Kenji', at: NOW.toISOString(), sig: '' }, seen: new Date(NOW.getTime() - 3 * 3600_000).toISOString() }],
   };
   let changed = 0;
-  const rankings = createTableRankings({
-    net: {
+  const rankings = createTableRankings(fakeTableRankingsOptions({
+    net: fakeSocialNet({
       state: () => state,
       rankings: () => store,
       country: () => 'FR',
@@ -342,13 +343,13 @@ test('au classement : la pastille et le statut de chacun — en partie, en ligne
       // Des scores publiés sans XP (avant les niveaux) : le niveau vient de la carte publique de chacun.
       publicCard: (k: string) => (k === playing!.key.publicKey ? { xp: 9_000 } : k === online!.key.publicKey ? { xp: 400_000 } : undefined),
       cardFirstSeen: (k: string) => (k === online!.key.publicKey ? NOW.toISOString() : '2026-01-01T00:00:00Z'),
-    },
+    }),
     myXp: () => 3_752,
     versionOf: async () => ({ print: 'a'.repeat(64) }),
     ballsOf: async () => 3,
     changed: () => changed++,
     now: () => NOW,
-  });
+  }));
   const entry = { file: 't2.vpx', folder: 'C:\t2', title: 'Terminator 2' };
   rankings.view(entry, 'world', 'all');
   await until('empreinte de la table', () => changed > 0, 2000);

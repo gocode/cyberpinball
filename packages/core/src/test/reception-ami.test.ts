@@ -22,6 +22,7 @@ import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { createDownloadManager, downloadReasonText, encodePng, jobBytes, layoutOf, partLabel, pendingDownload, say, scanTables, screenZones, setLanguage, skippedFiles, tableContents, type DownloadJob, type DownloadTransport } from '../index';
 import type { TableEntry } from '../tables';
+import { fakeFriendContent, fakeFriendDownloads, fakeMenuLibrary, fakeReturnWorld, fakeSocialNet } from './doublures';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { createFriendLibraryMenu } = require(path.join(REPO_ROOT, 'app', 'dist', 'friend-library-menu.js')) as {
@@ -111,25 +112,18 @@ function setup() {
   let listings = 0;
   const steps = new Map<string, (job: DownloadJob) => unknown>();
   const menu = createFriendLibraryMenu({
-    library: {
+    library: fakeMenuLibrary({
       openCustom: (build: () => Built, at = 0) => (shown = { build, at }),
       isShowing: (build: () => Built) => shown?.build === build,
-      openSystem() {},
-      openMediasWith() {},
-      catalogFor() {},
-      installReceived() {},
-    },
+    }),
     net: { state: () => ({ friends: [{ key: 'ami', name: 'Ami' }] }), online: () => true },
-    content: {
+    content: fakeFriendContent({
       library: () => ({ state: 'ready', library: { at: new Date().toISOString(), tables: [{ id: 't1', table: { title: 'Comet Lounge', manufacturer: 'Halcyon', year: 1990 }, medias: [] }] } }),
-      refresh() {},
-      tableVersions: () => new Map(),
       tableFiles: async () => (listings++, files),
       tableDir: (folder: string) => path.join(dir, 'amis', 'tables', folder),
       receivedDir: () => path.join(dir, 'amis', 'recus'),
-      stop() {},
-    },
-    downloads: { manager, finisher() {}, deliverer() {}, opener() {}, deliver() {}, openReturn() {}, nextStep: (kind: string, fn: (job: DownloadJob) => unknown) => steps.set(kind, fn) },
+    }),
+    downloads: fakeFriendDownloads({ manager, nextStep: (kind: string, fn: (job: DownloadJob) => unknown) => steps.set(kind, fn) }),
     live: { inviteOn() {} },
     tables: () => [],
     root: () => dir,
@@ -324,7 +318,7 @@ test('annonce et service cohérents : un média que l’envoi refuserait n’est
   let handler: (key: string, message: object) => void = () => undefined;
   const lines: string[] = [];
   const content = createFriendContent({
-    net: { state: () => ({ shareLibrary: true }), online: () => true, send: (_k: string, m: never) => (sent.push(m), true), sendChunk: async () => true, onMessage: (fn: typeof handler) => ((handler = fn), () => undefined), onChunk: () => () => undefined },
+    net: fakeSocialNet({ state: () => ({ shareLibrary: true }), online: () => true, send: (_k: string, m: never) => (sent.push(m), true), sendChunk: async () => true, onMessage: (fn: typeof handler) => ((handler = fn), () => undefined), onChunk: () => () => undefined }),
     dataDir: path.join(base, 'donnees'),
     tables: () => scanTables(layoutOf(root).tables),
     root: () => root,
@@ -409,7 +403,7 @@ test('un travail fini propose d’abord sa suite : « Installer dans ma biblioth
     const center = createDownloadCenter({
       manager,
       show: (build: () => Shown) => (shown = build),
-      world: { hasTable: () => false, hasFriend: () => true, tableTitle: () => undefined, friendName: () => 'Ami' },
+      world: fakeReturnWorld({ hasFriend: () => true, tableTitle: () => undefined, friendName: () => 'Ami' }),
       nextStep: (j: DownloadJob) => step(j),
       deliver() {},
       files: { detail: () => '', open() {} },

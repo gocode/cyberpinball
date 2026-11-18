@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import { vpxWithScript } from './fixtures';
 import { REPO_ROOT } from './i18n-scan';
 import { answerGame, buildScriptPatch, LIVE_PROTOCOL, livePlayerStateLabel, matchLiveTable, newLiveGame, parseLiveMessage, type LiveInvite, type LiveMessage, type LiveTable, type TableEntry, type TableIdentity } from '../index';
+import { fakeSocialNet } from './doublures';
 
 const T2: TableIdentity = { title: 'Terminator 2', manufacturer: 'Williams', year: 1991 };
 const A = 'a'.repeat(64), B = 'b'.repeat(64), S = 'c'.repeat(64);
@@ -69,7 +70,7 @@ test('service : le .vbs de Cyber Pinball ne compte pas ; un .vbs venu d’ailleu
   const foreign = `${SCRIPT}' modifié à la main : 5 billes\r\n`;
   const invitation = async (hostVbs: string | undefined, guestVbs: string | undefined) => {
     const hostTable = table(hostVbs);
-    const net = (key: string, out: LiveMessage[], deliver?: (cb: (k: string, m: unknown) => void) => void) => ({
+    const net = (key: string, out: LiveMessage[], deliver?: (cb: (k: string, m: unknown) => void) => void) => fakeSocialNet({
       state: () => ({ key: { publicKey: key }, name: key, friends: [{ key: 'hote', name: 'Alice' }] }),
       online: () => true,
       send: (_k: string, m: LiveMessage) => (out.push(m), true),

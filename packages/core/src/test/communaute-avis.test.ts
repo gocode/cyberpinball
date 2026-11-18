@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT, interfaceSources } from './i18n-scan';
 import { SYSTEM_ITEMS, createPlayerKey, newSocialState, setLanguage } from '../index';
+import { fakeCommunityMessages, fakeSocialNet } from './doublures';
 
 interface Built {
   heading: string;
@@ -31,7 +32,7 @@ function harness(withFeedback: boolean) {
     tables: () => [],
     openProfile: () => {},
     openFriend: () => {},
-    messages: { detail: () => '', attention: () => false, quiet: () => true, open: () => {} },
+    messages: fakeCommunityMessages({ }),
     rankings: { detail: () => '', open: () => {} },
     openSharing: () => {},
     ...(withFeedback ? { feedback: { detail: () => '3 propositions · 1 de vous', open: (back: () => void) => feedbackOpened.push(back) } } : {}),
@@ -81,22 +82,19 @@ test('Communauté : le nombre de joueurs en ligne ne se dit qu’au-delà de cin
     let screen: (() => Built & { tabs?: { label: string; count: string }[]; subheading?: string }) | undefined;
     const menu = createCommunityMenu({
       library: { openCustom: (build: () => Built) => (screen = build), openSystem: () => undefined },
-      net: {
+      net: fakeSocialNet({
         state: () => ({ ...base, enabled: true, key: createPlayerKey(), friends: [friend] }),
         country: () => 'FR',
         rankings: () => ({ scores: [] }),
         livePlayers: () => beacons,
         online: (k: string) => k === friend.key,
-        presenceOf: () => undefined,
-        publicCard: () => undefined,
-        avatarFile: () => undefined,
         status: () => ({ running: true }),
-      },
+      }),
       zoneKeys: () => [],
       tables: () => [],
       openProfile: () => {},
       openFriend: () => {},
-      messages: { detail: () => '', attention: () => false, quiet: () => true, open: () => {} },
+      messages: fakeCommunityMessages({ }),
       rankings: { detail: () => '', open: () => {} },
       openSharing: () => {},
     }) as unknown as { poster(): { stats: string }; item: { detail: string }; openPlayers(back?: () => void): void };

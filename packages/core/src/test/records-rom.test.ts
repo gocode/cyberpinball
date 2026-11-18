@@ -13,6 +13,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { cachedRomMemory, folderChanges, folderPrint, newRecords, readRomRecords, romChecksums, writeRomRecords, type GroupRecord, type RomMemory, type TableEntry, type TableRecords } from '../index';
+import { fakeTableDoublesOptions } from './doublures';
 
 /** WPC (T2, t2_l8.map.json réduite) : GC puis quatre places, scores en BCD sur 5 octets, une somme 16 bits par bloc. */
 const WPC: RomMemory = {
@@ -154,7 +155,7 @@ test('double : records du groupe dans la mémoire de la ROM du double, score du 
   fs.writeFileSync(path.join(folder, 'pinmame', 'nvram', 't2_l8.nv'), wpcMemory());
   const table = { id: 't2', file: path.join(folder, 'Terminator 2.vpx'), folder, title: 'Terminator 2', info: {} } as unknown as TableEntry;
   const before = folderPrint(folder, { full: true });
-  const doubles = createTableDoubles({ root: () => root, tablesDir: () => path.join(root, 'tables'), romsOf: () => ['t2_l8'], memoryCacheDir });
+  const doubles = createTableDoubles(fakeTableDoublesOptions({ root: () => root, tablesDir: () => path.join(root, 'tables'), romsOf: () => ['t2_l8'], memoryCacheDir }));
   const board: GroupRecord[] = [{ player: 'b', name: 'Bruno', score: 2_841_350_120, initials: 'BRU', at: '', game: 'g' }];
   const started = doubles.start(table, 'partie', undefined, board);
   assert.ok(started.ok);

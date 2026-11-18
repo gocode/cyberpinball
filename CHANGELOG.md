@@ -11,6 +11,8 @@ son interface).
 
 ## 0.1.16
 
+- Développement : les doublures des services et des hôtes de l'application (réseau des bornes, écran des tables, parties en direct, contenus des amis, téléchargements, retours, navigateur intégré, téléphone, tableaux des scores) ont chacune leur fabrique, typée sur la vraie interface, qui complète par des valeurs neutres ce que donne un test ou une démonstration. Un membre ajouté à une interface se règle une fois, dans sa fabrique et dans la branche qui l'ajoute : les 111 doublures écrites à la main dans les tests et les démonstrations y passent désormais, et un test refuse toute nouvelle copie écrite à la main ainsi que toute surcharge qui n'est pas un membre du contrat.
+- Développement : `npm run verifier -- --modifies` lance aussi ces gardes quand une démonstration, un test ou un module de l'application change, au lieu d'attendre la suite complète d'avant la fusion.
 - Moment des badges : le voile reste posé d'un badge à l'autre, l'écran des tables ne se rallume plus un instant sous le badge suivant.
 - Téléphone, Salons : le salon se choisit en tête (le vôtre, Monde, ceux où l'on parle, « Autres pays… »), indépendamment de celui ouvert à la borne ; écrire et les phrases préparées partent dans le salon choisi.
 - Téléphone, Salons : une ligne touchée ouvre ses options, comme à la borne : réagir (sept réactions), répondre (le champ commence par @pseudo), voir son profil, envoyer une demande d'ami, l'ignorer, signaler le message avec sa raison, le bloquer ; sur votre ligne, la supprimer. Bloquer et supprimer se confirment au téléphone. Les réactions s'affichent sous chaque ligne.

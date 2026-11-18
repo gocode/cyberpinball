@@ -11,6 +11,7 @@ import { REPO_ROOT } from './i18n-scan';
 import { DEFAULT_MENU_MEDIA_SETTINGS, normalizeMenuMediaSettings } from '../mediaview';
 import { medallionWheel, medallionWheelMove, type Medallion } from '../jukebox-screens';
 import { frontendSource } from './frontend-source';
+import { fakeMenuLibrary } from './doublures';
 
 const LEADS: Medallion[] = ['jukebox', 'community', 'collections'];
 
@@ -73,12 +74,11 @@ function harness() {
   const events: string[] = [];
   const item = createCollectionsItem({
     collections: c.menu,
-    library: {
+    library: fakeMenuLibrary({
       openCustom: (build: () => Built, at?: number) => screens.push({ build, at }),
       openSystem: () => events.push('menu système'),
       leave: () => events.push('roue'),
-      openPrompt() {},
-    },
+    }),
     keysLabel: () => 'MagnaSave gauche / droit',
     captureKeys() {},
   });

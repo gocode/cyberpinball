@@ -31,6 +31,7 @@ import { instantComplete, joinGame, newLiveGame, parseLiveMessage, type LiveGame
 import { liveNotices, liveSnapshot } from '../livenotices';
 import { newSocialState, setName, type SocialState } from '../social';
 import type { TableEntry } from '../tables';
+import { fakeSocialNet } from './doublures';
 
 const T0 = new Date('2026-11-16T20:00:00Z');
 const at = (ms: number) => new Date(T0.getTime() + ms);
@@ -155,7 +156,7 @@ test('trois bornes qui ne sont pas amies : chacun rejoint, complète elle part p
   const played: string[] = [];
   const make = (me: string) =>
     createLiveGames({
-      net: {
+      net: fakeSocialNet({
         // Personne n'est ami de personne.
         state: () => ({ key: { publicKey: me }, name: me[0]!.toUpperCase() + me.slice(1), friends: [] }),
         online: () => true,
@@ -163,8 +164,7 @@ test('trois bornes qui ne sont pas amies : chacun rejoint, complète elle part p
         onMessage: (cb: (k: string, m: unknown) => void) => ((handlers[me] = cb), () => undefined),
         setPartners: (keys: string[]) => (partners[me] = [...keys]),
         announceInstant: (g: unknown) => (announced[me] ??= []).push(g),
-        instantGames: () => [],
-      },
+      }),
       dataDir: path.join(dir, me),
       tables: () => [table],
       play: async () => {
@@ -216,14 +216,13 @@ test('un joueur qui quitte le salon libère sa place, l’annonce le dit', { tim
   const announced: unknown[] = [];
   const make = (me: string) =>
     createLiveGames({
-      net: {
+      net: fakeSocialNet({
         state: () => ({ key: { publicKey: me }, name: me, friends: [] }),
         online: () => true,
         send: (to: string, m: unknown) => (setImmediate(() => handlers[to]?.(me, JSON.parse(JSON.stringify(m)))), true),
         onMessage: (cb: (k: string, m: unknown) => void) => ((handlers[me] = cb), () => undefined),
-        setPartners: () => undefined,
         announceInstant: (g: unknown) => announced.push(g),
-      },
+      }),
       dataDir: path.join(dir, me),
       tables: () => [table],
       play: async () => undefined,

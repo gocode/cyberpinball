@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { loadFeedbackState, saveFeedbackState, type ReportEnvelope } from '../feedback';
+import { fakeFeedbackService } from './doublures';
 
 const APP_DIST = path.join(REPO_ROOT, 'app', 'dist');
 
@@ -56,14 +57,11 @@ function setup(consent?: 'yes' | 'no') {
   let typed: string | undefined;
   const menu = createFeedbackMenu({
     dataDir,
-    service: {
-      refreshIfOld: async () => undefined,
-      list: () => [],
+    service: fakeFeedbackService({
       net: () => 'ok',
       canWrite: () => true,
-      queuedCount: () => 0,
       sendReport: async (envelope: ReportEnvelope, file?: Uint8Array) => (sent.push({ envelope, ...(file ? { file } : {}) }), 'sent'),
-    },
+    }),
     version: '9.9.9',
     language: () => 'fr',
     openCustom: (build: Build) => (shown = build),

@@ -36,6 +36,7 @@ import {
 } from '../firewall';
 import { newSocialState } from '../social';
 import { frontendSource } from './frontend-source';
+import { fakeFriendDownloads, fakeLiveGames, fakeMenuLibrary } from './doublures';
 
 const APP_DIST = path.join(REPO_ROOT, 'app', 'dist');
 
@@ -240,12 +241,12 @@ function friendsOn(firewall: Rule) {
   const off = createSocialNet({ dataDir: dir, mode: 'off' });
   const net = { ...off, status: () => ({ ...(off.status() as object), mode: 'public' }) };
   const opened: { build: Build; at?: number }[] = [];
-  const games = { current: () => undefined, board: () => [], history: () => [], table: () => undefined, waitView: () => undefined, invites: () => [], stop: () => undefined };
+  const games = fakeLiveGames({ });
   const menu = createFriendsMenu({
-    library: { openCustom: (build: Build, at?: number) => opened.push({ build, at }), openSystem: () => undefined, openPrompt: () => undefined, task: async (_m: string, work: () => unknown) => work(), openMediasWith: () => undefined, catalogFor: () => undefined, installReceived: () => undefined, isShowing: () => false },
+    library: fakeMenuLibrary({ openCustom: (build: Build, at?: number) => opened.push({ build, at }), task: async (_m: string, work: () => unknown) => work() }),
     net,
     firewall,
-    downloads: { manager: createDownloadManager({ dataDir: dir, transports: {} }), finisher: () => undefined, deliverer: () => undefined, opener: () => undefined, deliver: () => undefined, openReturn: () => undefined },
+    downloads: fakeFriendDownloads({ manager: createDownloadManager({ dataDir: dir, transports: {} }) }),
     content: createFriendContent({ net, dataDir: dir, tables: () => [], root: () => undefined, contents: () => undefined }),
     games,
     tables: () => [],

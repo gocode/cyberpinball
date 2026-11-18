@@ -16,6 +16,7 @@ import { DOWNLOAD_RATE_CHOICES, RATE_BURST_MS, RATE_MIN, RatePacer, parseRate, r
 import { newSocialState, parseSocialState } from '../social';
 import { tableContents } from '../tablecontents';
 import { scanTables, type TableEntry } from '../tables';
+import { fakeSocialNet } from './doublures';
 
 const KIO = 1024;
 
@@ -127,7 +128,7 @@ function pair() {
   const sent: Record<string, unknown>[] = [];
   const state = { alice: { shareLibrary: true } as { shareLibrary: boolean; downloadRate?: number }, bruno: { shareLibrary: true } };
   // Remise au tour suivant, dans l'ordre : comme un flux.
-  const net = (me: 'alice' | 'bruno', other: 'alice' | 'bruno') => ({
+  const net = (me: 'alice' | 'bruno', other: 'alice' | 'bruno') => fakeSocialNet({
     state: () => state[me],
     online: () => true,
     send: (_key: string, message: Record<string, unknown>) => {

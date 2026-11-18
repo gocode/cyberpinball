@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { frontendSource } from './frontend-source';
+import { fakeSocialNet, fakeTableDoublesOptions } from './doublures';
 import {
   applyHostSettings,
   createSettingsReceiver,
@@ -159,7 +160,7 @@ test('double de l’invité : les réglages de l’hôte à la place des siens, 
   write(path.join(cache, 'index.json'), JSON.stringify({ t2_l8: 'maps/bally/t2_l8.map.json' }));
   write(path.join(cache, 'maps_bally_t2_l8.map.json'), JSON.stringify({ _metadata: { platform: 'bally-35-8K' } }));
   write(path.join(cache, 'platform_bally-35-8K.json'), JSON.stringify({ memory_layout: [{ type: 'nvram', address: 0, size: 256 }] }));
-  const doubles = createTableDoubles({ root: () => root, tablesDir: () => path.join(root, 'tables'), romsOf: () => ['t2_l8'], memoryCacheDir: cache });
+  const doubles = createTableDoubles(fakeTableDoublesOptions({ root: () => root, tablesDir: () => path.join(root, 'tables'), romsOf: () => ['t2_l8'], memoryCacheDir: cache }));
   const settings: HostSetting[] = [{ rel: 'pinmame/nvram/t2_l8.nv', data: Buffer.from('mémoire de l’hôte : 3 billes') }, { rel: 'pinmame/cfg/t2_l8.cfg' }, { rel: 'user/VPReg.stg', data: Buffer.from('records de l’hôte') }];
   const started = doubles.start(table, 'partie', settings);
   assert.ok(started.ok);
@@ -179,7 +180,7 @@ test('deux bornes : l’invité accepte, reçoit les réglages de l’hôte, le 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-reglages-bornes-'));
   const handlers = new Map<string, (from: string, m: unknown) => void>();
   // Un réseau d'essai : chaque message passe par le JSON et la vérification du réseau, après un tour de boucle.
-  const net = (me: string, name: string, friend: { key: string; name: string }) => ({
+  const net = (me: string, name: string, friend: { key: string; name: string }) => fakeSocialNet({
     state: () => ({ key: { publicKey: me }, name, friends: [friend] }),
     online: () => true,
     send: (to: string, m: LiveMessage) => {

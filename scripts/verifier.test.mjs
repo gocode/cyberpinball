@@ -46,6 +46,15 @@ test('verifier : les tests d’un fichier changé sont ceux qui l’importent, l
   assert.deepEqual(testsForChanges(['docs/manuel.md'], tests, of), []);
 });
 
+test('verifier : une démonstration, un test ou un hôte changés lancent les gardes des doublures', () => {
+  const tests = ['demonstrations.test.js', 'doublures.test.js', 'vbs.test.js'];
+  const of = () => '';
+  assert.deepEqual(testsForChanges(['interne/demos/demo-sante.cjs'], tests, of), ['demonstrations.test.js', 'doublures.test.js']);
+  assert.deepEqual(testsForChanges(['packages/core/src/test/vbs.test.ts'], tests, of), ['doublures.test.js', 'vbs.test.js']);
+  assert.deepEqual(testsForChanges(['app/src/feedback-service.ts'], tests, of), ['demonstrations.test.js']);
+  assert.deepEqual(testsForChanges(['app/src/doublures/feedback.ts'], tests, of), ['demonstrations.test.js', 'doublures.test.js']);
+});
+
 test('verifier : la suite rapide et test:electron se partagent tous les tests, les fichiers Electron du dépôt sont lents', () => {
   const dist = path.join(repo, 'packages', 'core', 'dist', 'test');
   if (!fs.existsSync(dist)) return;

@@ -18,6 +18,7 @@ import { LIVE_INVITE_MS, type LiveInvite, type LiveMessage } from '../livegame';
 import type { Rect, Rotation } from '../model';
 import type { TableEntry } from '../tables';
 import { frontendSource } from './frontend-source';
+import { fakeSocialNet } from './doublures';
 
 const read = (...parts: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...parts), 'utf8');
 
@@ -93,12 +94,12 @@ function fakeNet() {
   return {
     sent,
     receive: (key: string, m: LiveMessage) => deliver!(key, m),
-    net: {
+    net: fakeSocialNet({
       state: () => ({ key: { publicKey: 'moi' }, name: 'Moi', friends: [{ key: 'bruno', name: 'Bruno' }] }),
       online: () => true,
       send: (key: string, message: LiveMessage) => (sent.push({ key, message }), true),
       onMessage: (cb: (key: string, m: unknown) => void) => ((deliver = cb), () => (deliver = undefined)),
-    },
+    }),
   };
 }
 

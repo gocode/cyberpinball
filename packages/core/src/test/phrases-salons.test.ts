@@ -17,6 +17,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { setLanguage } from '../i18n';
+import { fakeMenuLibrary, fakeSocialNet } from './doublures';
 import {
   cleanPhrases,
   DEFAULT_PHRASES,
@@ -118,7 +119,7 @@ function harness(opts: { table?: string } = {}) {
   // L'écran montré, son rang de curseur, et les ouvertures (pour suivre le curseur après chaque geste).
   let screen: { build: () => Built; at: number } | undefined;
   let prompt: { heading: string; value: string; done: (v: string | undefined) => void } | undefined;
-  const library = {
+  const library = fakeMenuLibrary({
     openCustom(build: () => Built, at?: number) {
       // Comme library.ts : le même écran redessiné garde son curseur ; un rang donné est obéi.
       if (screen && screen.build === build && at === undefined) return;
@@ -133,25 +134,18 @@ function harness(opts: { table?: string } = {}) {
       prompt = { heading, value, done };
       screen = undefined;
     },
-  };
+  });
   const me = { enabled: true, name: 'Moi', key: { publicKey: 'a'.repeat(64) }, blocked: [] as string[], friends: [], requests: [] };
-  const net = {
+  const net = fakeSocialNet({
     state: () => me,
     country: () => 'FR',
     rooms: () => rooms,
     setRooms: (change: Partial<RoomsState>) => (rooms = { ...rooms, ...change }),
     status: () => ({ running: true }),
     moderation: () => ({ acts: [], reports: [] }),
-    amModerator: () => false,
     onRoomLines: () => () => undefined,
-    roomOpen: () => undefined,
-    roomPresent: () => [],
-    roomTyping: () => undefined,
-    roomTypers: () => [],
-    roomMoves: () => [],
-    avatarFile: () => undefined,
     roomSend: () => ({ reason: 'text' }),
-  };
+  });
   const menu = createRoomsMenu({
     library,
     net,

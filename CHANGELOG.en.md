@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Development: the test doubles of the app's services and hosts (cabinet network, table screen, live games, friends' content, downloads, feedback, built-in browser, phone, score boards) each have a factory, typed on the real interface, that fills in neutral values around what a test or a demo provides. A member added to an interface is handled once, in its factory and in the branch that adds it: the 111 hand-written doubles in tests and demos now go through them, and a test rejects any new hand-written copy as well as any override that is not a member of the contract.
+- Development: `npm run verifier -- --modifies` also runs these guards when a demo, a test or an app module changes, instead of waiting for the full pre-merge suite.
 - Badge moment: the veil stays in place from one badge to the next, the table screen no longer flashes back under the next badge.
 - Phone, Rooms: the room is picked at the top (yours, World, the active ones, "Other countries…"), independently of the one open on the cabinet; writing and canned phrases go to the picked room.
 - Phone, Rooms: tapping a line opens its options, as on the cabinet: react (seven reactions), reply (the field starts with @nickname), see their profile, send a friend request, ignore them, report the message with a reason, block them; on your own line, delete it. Blocking and deleting are confirmed on the phone. Reactions show under each line.

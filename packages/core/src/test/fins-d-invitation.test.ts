@@ -19,6 +19,7 @@ import { LIVE_INVITE_MS, lateAnswerEnd, livePlayerStateLabel, parseLiveMessage, 
 import { inviteNotices } from '../livenotices';
 import { NOTICE_DETAIL_MAX, NOTICE_RULES, NOTICE_TITLE_MAX, noticeText } from '../notices';
 import type { TableEntry } from '../tables';
+import { fakeSocialNet } from './doublures';
 
 type Ended = { why: LiveInviteEnd | 'answered'; name: string; title: string; next?: string };
 type Games = {
@@ -42,7 +43,7 @@ function testNet() {
   const handlers: Record<string, (k: string, m: unknown) => void> = {};
   const rules: { from: string; when: (m: Record<string, unknown>) => boolean; done?: boolean }[] = [];
   const state = { offline: new Set<string>(), sent: [] as string[], lost: [] as string[] };
-  const make = (me: string, name: string, other: string, otherName: string) => ({
+  const make = (me: string, name: string, other: string, otherName: string) => fakeSocialNet({
     state: () => ({ key: { publicKey: me }, name, friends: [{ key: other, name: otherName }] }),
     online: (key: string) => !state.offline.has(key) && !state.offline.has(me),
     send: (to: string, m: Record<string, unknown>) => {

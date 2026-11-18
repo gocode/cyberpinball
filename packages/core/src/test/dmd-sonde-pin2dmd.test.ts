@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { detectHardwareDmds, dmdHolders, hardwareDmdDriverProblem, hardwareDmdFacts, hardwareDmdName, PIN2DMD_PRODUCTS, pin2dmdProbeProblem, vpxDmdSettings } from '../dmd';
 import type { LibusbProbe, ObservedUsbDevice } from '../model';
+import { fakeMenuLibrary } from './doublures';
 
 const REPO = path.join(__dirname, '..', '..', '..', '..');
 const ID = 'USB\\VID_0314&PID_E457\\5&1&0&2';
@@ -106,7 +107,7 @@ test('écran « DMD réel » : la ligne du PIN2DMD dit si la sonde l’a ouvert,
   };
   const page = (device: ObservedUsbDevice) =>
     createHardwareDmdMenu({
-      library: { openCustom: () => undefined, openSystem: () => undefined, openPrompt: () => undefined, openNotice: () => undefined },
+      library: fakeMenuLibrary({ }),
       usb: () => [device],
       cabinet: () => undefined,
       save: () => undefined,

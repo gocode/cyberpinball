@@ -14,6 +14,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { frontendSource } from './frontend-source';
+import { fakeSocialNet } from './doublures';
 import {
   applyRoom,
   gameStatus,
@@ -214,7 +215,7 @@ function testNet() {
   const handlers: Record<string, (k: string, m: unknown) => void> = {};
   const rules: { from: string; when: (m: Record<string, unknown>) => boolean; done?: boolean }[] = [];
   const state = { cut: false, offline: new Set<string>(), sent: [] as string[], lost: [] as string[] };
-  const make = (me: string, name: string, other: string, otherName: string) => ({
+  const make = (me: string, name: string, other: string, otherName: string) => fakeSocialNet({
     state: () => ({ key: { publicKey: me }, name, friends: [{ key: other, name: otherName }] }),
     online: (key: string) => !state.cut && !state.offline.has(key) && !state.offline.has(me),
     send: (to: string, m: Record<string, unknown>) => {

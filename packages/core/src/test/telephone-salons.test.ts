@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import { parsePhoneMessage } from '../remote';
 import { newRoomsState, type RoomLine, type RoomReaction, type RoomsState } from '../rooms';
 import { REPO_ROOT } from './i18n-scan';
+import { fakeMenuLibrary, fakeSocialNet } from './doublures';
 
 const ME = 'a'.repeat(64);
 const KIKO = 'b'.repeat(64);
@@ -66,29 +67,22 @@ function harness() {
   };
   const calls: string[] = [];
   const me = { enabled: true, name: 'Moi', key: { publicKey: ME }, blocked: [] as string[], friends: [{ key: NOVA, name: 'Nova' }], incoming: [], outgoing: [], declined: [] };
-  const net = {
+  const net = fakeSocialNet({
     state: () => me,
     country: () => 'FR',
     rooms: () => rooms,
     setRooms: (change: Partial<RoomsState>) => (rooms = { ...rooms, ...change }),
     status: () => ({ running: true }),
     moderation: () => ({ acts: [{ id: 'h1', by: 'm', kind: 'hide', target: '2222222222222222', at: at(5), sig: 'x' }], reports: [] }),
-    amModerator: () => false,
     onRoomLines: () => () => undefined,
-    roomOpen: () => undefined,
-    roomPresent: () => [],
-    roomTyping: () => undefined,
-    roomTypers: () => [],
-    roomMoves: () => [],
-    avatarFile: () => undefined,
     roomReact: (id: string, kind: string | null) => (calls.push(`react:${id.slice(0, 1)}:${kind}`), true),
     roomRetract: (id: string) => (calls.push(`retract:${id.slice(0, 1)}`), true),
     request: (p: { key: string }) => void calls.push(`request:${p.key.slice(0, 1)}`),
     report: (l: RoomLine, reason: string) => void calls.push(`report:${l.id.slice(0, 1)}:${reason}`),
     block: (key: string) => void calls.push(`block:${key.slice(0, 1)}`),
-  };
+  });
   const menu = createRoomsMenu({
-    library: { openCustom: () => undefined, openSystem: () => undefined, isShowing: () => false, openPrompt: () => undefined },
+    library: fakeMenuLibrary(),
     net,
     openProfile: () => undefined,
     openFriend: () => undefined,

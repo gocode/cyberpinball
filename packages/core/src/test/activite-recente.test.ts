@@ -40,6 +40,7 @@ import { ZONE_SCREENS, noticeZone, type NoticeZone } from '../noticezone';
 import { SYSTEM_GROUPS, SYSTEM_ROOT_SHORTCUTS } from '../systemmenu';
 import { newSocialState } from '../social';
 import { REPO_ROOT } from './i18n-scan';
+import { fakeActivityFriends, fakeActivityLive, fakeMenuLibrary } from './doublures';
 
 const KINDS = Object.keys(NOTICE_RULES) as NoticeKind[];
 const BRUNO = 'b'.repeat(64);
@@ -248,7 +249,7 @@ function activityScreen(dataDir: string, world: { friends?: string[]; online?: s
   const did: string[] = [];
   const menu = createActivityMenu({
     dataDir,
-    library: {
+    library: fakeMenuLibrary({
       openCustom: (build: () => Built, at?: number) => {
         opened.push({ build, at });
         cursor = at ?? 0;
@@ -259,25 +260,22 @@ function activityScreen(dataDir: string, world: { friends?: string[]; online?: s
       runSystemItem: (id: string) => did.push(`entrée ${id}`),
       hasSystemItem: () => true,
       openDownloads: (focus: string) => did.push(`téléchargements ${focus}`),
-    },
+    }),
     hasDownload: (id: string) => (world.jobs ?? []).includes(id),
-    friends: {
+    friends: fakeActivityFriends({
       isFriend: (k: string) => (world.friends ?? []).includes(k),
       online: (k: string) => (world.online ?? []).includes(k),
-      playing: () => false,
-      incoming: () => false,
       openFriend: (k: string) => did.push(`fiche ${k.slice(0, 1)}`),
       openRequests: () => did.push('demandes'),
-    },
-    live: {
+    }),
+    live: fakeActivityLive({
       hasInvite: (id: string) => (world.invites ?? []).includes(id),
       inviteEnd: (id: string) => (id === 'eeeeeeeeeeeeeeee' ? { why: 'expired', name: 'Bruno', title: 'Twilight Zone' } : undefined),
       openInvite: (id: string) => did.push(`invitation ${id}`),
-      current: () => undefined,
       open: () => did.push('partie'),
       inHistory: (id: string) => (world.history ?? []).includes(id),
       openHistory: (id: string) => did.push(`historique ${id}`),
-    },
+    }),
     now: () => T0 + 3600_000,
   });
   return { menu, did, last: () => opened.at(-1)!.build(), move: (to: number) => (cursor = to) };
