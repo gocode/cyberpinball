@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- LED and feedback (DOF): a cabinet coming from PinUP Popper, PinballX or PinballY gets its configtool configuration back. Cyber Pinball looks for the old DOF on the drives (C:\DirectOutput, C:\vPinball\DirectOutput, Program Files…); when the VPX DOF plugin has no file, the screen and the Cabinet health show the folder found, and "Reuse the old DOF configuration" copies its directoutputconfig.ini and tablemappings files there, backing up what was there. The old DOF's GlobalConfig is never reused; its Cabinet.xml (Teensy, addressable LEDs) is shown next and reused only if it is consistent and no other one is already in place.
 - Feedback and ideas: ideas posted before nicknames arrived get their author's nickname as soon as their cabinet is up to date, without voting again.
 - Secret badges: their glitchy "signal caught" entrance now actually plays; a rule mistake replaced it with the regular badge entrance.
 - Phone, Scores: a summary of "My level" at the top (the level, the tier, the bar, this week's XP); a tap opens My level full screen, as on the cabinet: the bar, the week, this week's rankings, the closest badges drawn as on the cabinet, then "My badges" and "How to earn XP".

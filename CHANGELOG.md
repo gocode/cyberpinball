@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.16
 
+- LED et retours (DOF) : une borne qui vient de PinUP Popper, PinballX ou PinballY retrouve sa configuration du configtool. Cyber Pinball cherche l'ancien DOF sur les disques (C:\DirectOutput, C:\vPinball\DirectOutput, Program Files…) ; quand le plugin DOF de VPX n'a aucun fichier, l'écran et la Santé de la borne montrent le dossier trouvé, et « Reprendre la configuration de l'ancien DOF » y copie ses directoutputconfig.ini et tablemappings, en sauvegardant l'existant. Le GlobalConfig de l'ancien DOF n'est jamais repris ; son Cabinet.xml (Teensy, LED adressables) est montré ensuite et repris seulement s'il est cohérent et qu'aucun autre n'est déjà en place.
 - Retours et propositions : les propositions faites avant l'arrivée des pseudos reçoivent celui de leur auteur dès que sa borne est à jour, sans qu'il ait à voter de nouveau.
 - Badges secrets : leur apparition "signal capté", en sautant, se joue enfin ; une erreur de règle la remplaçait par celle des autres badges.
 - Téléphone, Scores : « Mon niveau » en résumé en tête (le niveau, le palier, la barre, les XP de la semaine) ; un toucher ouvre Mon niveau en plein écran, tel qu'à la borne : la barre, la semaine, les classements de la semaine, les badges les plus proches dessinés comme à la borne, puis « Mes badges » et « Comment gagner des XP ».

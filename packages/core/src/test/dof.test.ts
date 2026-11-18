@@ -16,7 +16,12 @@ import {
   cabinetXml,
   detectDofControllers,
   dofFindings,
+  dofHealthFacts,
   dofIniNumber,
+  findLegacyDofConfigs,
+  legacyDofInstalls,
+  planLegacyCabinet,
+  planLegacyDofImport,
   dofIniRoms,
   dofRomNumbers,
   DOF_CONTROLLER_TYPES,
@@ -40,6 +45,7 @@ import {
   type CabinetLeds,
 } from '../dof';
 import { toPhysicalScreen } from '../fingerprint';
+import { dofLines } from '../health';
 import type { ObservedUsbDevice } from '../model';
 import { planVpxSync } from '../sync';
 import { devPcDisplays, emptyCabinet } from './fixtures';
@@ -510,4 +516,127 @@ test('DOF : alignement avec WLED en Art-Net « Multi RGB » (170 LED par univers
     ],
   );
   assert.deepEqual(wledSegments({ ...leds, controller: 'TeensyStripController', port: 'COM5' }), []);
+});
+
+// Cas réel (18/11/2026) : un joueur venu de PinUP Popper, KL25Z unité 1, aucune LED : sa
+// configuration du configtool était restée dans C:\DirectOutput\Config, que le plugin DOF de VPX ne
+// lit pas. Toute borne qui vient d'un autre front-end est dans ce cas.
+function legacyDof(root: string, sub: string, files: Record<string, string>, when?: Date): string {
+  const config = path.join(root, sub, 'DirectOutput', 'Config');
+  fs.mkdirSync(config, { recursive: true });
+  for (const [name, content] of Object.entries(files)) {
+    fs.writeFileSync(path.join(config, name), content);
+    if (when) fs.utimesSync(path.join(config, name), when, when);
+  }
+  return config;
+}
+
+const OLD_GLOBAL = '<?xml version="1.0"?>\r\n<GlobalConfig>\r\n  <IniFilesPath>{InstallDir}\\Config</IniFilesPath>\r\n  <CabinetConfigFilePattern>{InstallDir}\\Config\\Cabinet.xml</CabinetConfigFilePattern>\r\n</GlobalConfig>\r\n';
+const TEENSY_CABINET = [
+  '<?xml version="1.0"?>',
+  '<Cabinet>',
+  '  <OutputControllers><TeensyStripController><Name>Teensy</Name><NumberOfLedsStrip1>120</NumberOfLedsStrip1><ComPortName>COM5</ComPortName></TeensyStripController></OutputControllers>',
+  '  <Toys><LedStrip><Name>Côté gauche</Name><Width>1</Width><Height>120</Height><FirstLedNumber>1</FirstLedNumber><OutputControllerName>Teensy</OutputControllerName></LedStrip>',
+  '  <LedWizEquivalent><Name>LedWizEquivalent 30</Name><Outputs><LedWizEquivalentOutput><OutputName>Côté gauche</OutputName><LedWizEquivalentOutputNumber>1</LedWizEquivalentOutputNumber></LedWizEquivalentOutput></Outputs><LedWizNumber>30</LedWizNumber></LedWizEquivalent></Toys>',
+  '</Cabinet>',
+].join('\r\n');
+
+test('DOF : configuration d’un ancien DOF (Popper, PinballX, PinballY) trouvée, signalée et reprise sans son GlobalConfig', () => {
+  const c = tmp();
+  const d = tmp();
+  // C:\DirectOutput (installateur de DOF), avec son GlobalConfig ({InstallDir}\Config) et ses tablemappings.
+  const oldConfig = legacyDof(c, '', { 'directoutputconfig51.ini': INI, 'tablemappings.xml': '<TableMappings/>', 'GlobalConfig_B2SServer.xml': OLD_GLOBAL }, new Date('2026-03-01T12:00:00Z'));
+  // D:\vPinball\DirectOutput (Baller Installer), plus récent ; un dossier système n'est jamais parcouru.
+  legacyDof(d, 'vPinball', { 'directoutputconfig30.ini': INI }, new Date('2026-06-01T12:00:00Z'));
+  legacyDof(d, 'Windows', { 'directoutputconfig1.ini': INI });
+  const installs = legacyDofInstalls([c, d]);
+  assert.deepEqual(installs, [path.join(c, 'DirectOutput'), path.join(d, 'vPinball', 'DirectOutput')]);
+  const legacy = findLegacyDofConfigs(installs);
+  assert.deepEqual(
+    legacy.map((l) => [l.dir, l.ini.map((f) => f.number)]),
+    [
+      [path.join(d, 'vPinball', 'DirectOutput', 'Config'), [30]],
+      [path.resolve(oldConfig), [51]],
+    ],
+    'la plus récente d’abord, ini lus là où l’ancien GlobalConfig les désignait',
+  );
+  assert.deepEqual(legacy[1]!.tablemappings, [path.join(path.resolve(oldConfig), 'tablemappings.xml')]);
+  assert.deepEqual(legacy[1]!.ini[0]!.roms, ['afm_113b', 'mm_109c', 'tz']);
+
+  // Le dossier que lit le plugin DOF de VPX est vide : le constat montre l'ancien dossier, pas « aucun ini ».
+  const vpxDir = tmp();
+  const kl25z = [usb(0x1209, 0xeaea)];
+  const setup = readDofSetup(vpxDir, undefined, [path.join(c, 'DirectOutput')]);
+  assert.equal(setup.legacy?.length, 1);
+  const findings = dofFindings(setup, detectDofControllers(kl25z), kl25z);
+  assert.deepEqual(
+    findings.map((f) => f.code),
+    ['legacyIni'],
+  );
+  assert.ok(findings[0]!.message.includes(path.resolve(oldConfig)), findings[0]!.message);
+  assert.ok(findings[0]!.message.includes('directoutputconfig51.ini'), findings[0]!.message);
+  // Sans contrôleur reconnu (périphériques illisibles), l'ancienne configuration est signalée quand même.
+  assert.deepEqual(
+    dofFindings(setup, [], []).map((f) => f.code),
+    ['legacyIni'],
+  );
+  // Même constat dans la Santé de la borne.
+  const lines = dofLines(dofHealthFacts(setup, detectDofControllers(kl25z), kl25z));
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0]!.state, 'check');
+  assert.ok(lines[0]!.title.includes(path.resolve(oldConfig)), lines[0]!.title);
+
+  // Reprise : ini et tablemappings seulement, jamais le GlobalConfig ({InstallDir} désignerait ici le dossier de VPX).
+  const plan = planLegacyDofImport(setup.legacy![0]!, vpxDir);
+  assert.deepEqual(plan.copies.map((x) => path.basename(x.to)).sort(), ['directoutputconfig51.ini', 'tablemappings.xml']);
+  assert.deepEqual(plan.numbers, [51]);
+  for (const x of plan.copies) fs.copyFileSync(x.from, x.to);
+  const after = readDofSetup(vpxDir, undefined, [path.join(c, 'DirectOutput')]);
+  assert.deepEqual(after.ini.map((f) => f.number), [51]);
+  assert.equal(after.legacy, undefined, 'la borne a ses ini : l’ancien DOF n’est plus cherché');
+  assert.equal(after.globalConfig, undefined);
+  assert.equal(after.iniFilesPathMissing, undefined, 'aucun avertissement IniFilesPath');
+  assert.deepEqual(dofFindings(after, detectDofControllers(kl25z), kl25z), [], 'KL25Z unité 1 et directoutputconfig51.ini : rien à redire');
+  assert.ok(fs.existsSync(path.join(oldConfig, 'directoutputconfig51.ini')), 'l’ancien dossier ne change pas');
+
+  // Le dossier de VPX lui-même n'est jamais pris pour un ancien DOF.
+  assert.deepEqual(findLegacyDofConfigs([path.join(c, 'DirectOutput')], [oldConfig]), []);
+});
+
+test('DOF : le Cabinet.xml d’un ancien DOF n’est repris que s’il est cohérent, jamais à la place d’un fichier présent', () => {
+  const root = tmp();
+  const config = legacyDof(root, '', { 'directoutputconfig30.ini': INI, 'Cabinet.xml': TEENSY_CABINET, 'GlobalConfig_B2SServer.xml': OLD_GLOBAL });
+  const legacy = findLegacyDofConfigs(legacyDofInstalls([root]));
+  assert.equal(legacy[0]!.cabinet, path.join(path.resolve(config), 'Cabinet.xml'));
+  assert.deepEqual(planLegacyDofImport(legacy[0]!, tmp()).skipped.map((s) => path.basename(s.file)), ['Cabinet.xml'], 'examiné à part, pas copié avec les ini');
+
+  // Cohérent : repris tel quel, avec un GlobalConfig de Cyber Pinball qui le désigne.
+  const vpxDir = tmp();
+  const plan = planLegacyCabinet(legacy[0]!.cabinet!, vpxDir);
+  assert.deepEqual(plan.problems, []);
+  assert.deepEqual(plan.files.map((f) => path.basename(f.file)), ['GlobalConfig_B2SServer.xml', 'Cabinet.xml']);
+  for (const f of plan.files) fs.writeFileSync(f.file, f.content);
+  for (const x of planLegacyDofImport(legacy[0]!, vpxDir).copies) fs.copyFileSync(x.from, x.to);
+  const setup = readDofSetup(vpxDir);
+  assert.equal(setup.iniFilesPathMissing, undefined);
+  assert.equal(setup.cabinet?.owned, false, 'il reste un fichier écrit à la main');
+  assert.deepEqual(setup.cabinet?.strips.map((s) => s.name), ['Côté gauche']);
+  const teensy = [usb(0x16c0, 0x0483, { port: 'COM5' })];
+  assert.deepEqual(dofFindings(setup, detectDofControllers(teensy), teensy), []);
+  // Un Cabinet.xml est déjà là : gardé tel quel.
+  assert.ok(planLegacyCabinet(legacy[0]!.cabinet!, vpxDir).problems.some((p) => p.includes('Cabinet.xml')));
+
+  // Incohérent : contrôleur que libdof ne gère pas, bande sans contrôleur déclaré.
+  const odd = path.join(tmp(), 'Cabinet.xml');
+  fs.writeFileSync(
+    odd,
+    '<Cabinet><OutputControllers><DirectStripController><Name>Strip</Name></DirectStripController></OutputControllers><Toys><LedStrip><Name>A</Name><OutputControllerName>Absent</OutputControllerName></LedStrip></Toys></Cabinet>',
+  );
+  const refused = planLegacyCabinet(odd, tmp());
+  assert.equal(refused.files.length, 0);
+  assert.ok(refused.problems.some((p) => p.includes('DirectStripController')), refused.problems.join(' | '));
+  assert.ok(refused.problems.some((p) => p.includes('Absent')), refused.problems.join(' | '));
+  // Illisible.
+  fs.writeFileSync(odd, '<Cabinet><Toys></Cabinet>');
+  assert.equal(planLegacyCabinet(odd, tmp()).problems.length, 1);
 });

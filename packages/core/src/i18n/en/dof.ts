@@ -271,4 +271,33 @@ export const messages: Record<string, string> = {
   'Trous compris : les LED entre deux bandes n’existent pas, WLED les ignore.': 'Gaps included: the LEDs between two strips do not exist, WLED ignores them.',
   '« {name} » {start}': '“{name}” {start}',
   'Dans WLED, LED Preferences, le « Start » de chaque bande : {list} ({n} LED en tout).': 'In WLED, LED Preferences, the “Start” of each strip: {list} ({n} LEDs in total).',
+  // Configuration d'un ancien DOF (PinUP Popper, PinballX, PinballY)
+  '{list} et {n} autre': '{list} and {n} other',
+  '{list} et {n} autres': '{list} and {n} others',
+  'Configuration DOF de votre ancien front-end trouvée dans {dir} ({files}, {date}), mais le plugin DOF de VPX ne la lit pas : « Reprendre la configuration de l’ancien DOF » la met en place.':
+    'DOF configuration from your previous front-end found in {dir} ({files}, {date}), but the VPX DOF plugin does not read it: “Reuse the old DOF configuration” puts it in place.',
+  'examiné à part': 'reviewed separately',
+  '« {type} » ({name}) n’est pas géré par le plugin DOF de VPX (libdof).': '“{type}” ({name}) is not supported by the VPX DOF plugin (libdof).',
+  'Reprendre la configuration de l’ancien DOF': 'Reuse the old DOF configuration',
+  '{files} · {dir} · {date} : seuls les fichiers du configtool sont copiés': '{files} · {dir} · {date}: only the configtool files are copied',
+  'Reprise de la configuration de l’ancien DOF…': 'Reusing the old DOF configuration…',
+  '{n} fichier repris : directoutputconfig{list}.ini.': '{n} file reused: directoutputconfig{list}.ini.',
+  '{n} fichiers repris : directoutputconfig{list}.ini.': '{n} files reused: directoutputconfig{list}.ini.',
+  'Copiés depuis {dir}, qui ne change pas. Le GlobalConfig de l’ancien DOF n’est pas repris : le plugin DOF de VPX n’en a pas besoin.':
+    'Copied from {dir}, which stays unchanged. The old DOF’s GlobalConfig is not reused: the VPX DOF plugin does not need it.',
+  'Configuration de l’ancien DOF reprise': 'Old DOF configuration reused',
+  'Reprise impossible': 'Could not reuse it',
+  '{n} bande de LED': '{n} LED strip',
+  '{n} bandes de LED': '{n} LED strips',
+  'Ce qu’il déclare': 'What it declares',
+  'Pourquoi il n’est pas repris': 'Why it is not reused',
+  'Décrire les bandes dans Cyber Pinball…': 'Describe the strips in Cyber Pinball…',
+  'Cabinet.xml écrit pour vous, d’après vos bandes': 'Cabinet.xml written for you, from your strips',
+  'Ne pas le reprendre': 'Do not reuse it',
+  'Reprendre ce Cabinet.xml': 'Reuse this Cabinet.xml',
+  'Copié tel quel, avec un GlobalConfig de Cyber Pinball qui le désigne': 'Copied as is, with a Cyber Pinball GlobalConfig pointing to it',
+  'Cabinet.xml de l’ancien DOF': 'Old DOF’s Cabinet.xml',
+  'L’ancien DOF avait aussi un Cabinet.xml ({file}) : contrôleurs à déclarer (Teensy, LED adressables…). Le plugin DOF de VPX le lit seulement si un GlobalConfig le désigne.':
+    'The old DOF also had a Cabinet.xml ({file}): controllers to declare (Teensy, addressable LEDs…). The VPX DOF plugin reads it only if a GlobalConfig points to it.',
+  'Cabinet.xml de l’ancien DOF repris': 'Old DOF’s Cabinet.xml reused',
 };

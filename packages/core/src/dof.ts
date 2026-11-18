@@ -20,7 +20,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { t } from './i18n';
+import { formatDate, t, tn } from './i18n';
 import type { ObservedUsbDevice } from './model';
 import type { DofFacts } from './health';
 import type { Severity, SyncFinding } from './sync';
@@ -362,6 +362,11 @@ export interface DofSetup {
   iniFilesPathMissing?: string;
   /** Fichiers illisibles, avec la raison. */
   errors: { file: string; message: string }[];
+  /**
+   * Configurations d'un ancien DOF (celui de PinUP Popper, PinballX, PinballY) que le plugin DOF
+   * de VPX ne lit pas, la plus récente d'abord ; cherchées seulement quand la borne n'a aucun ini.
+   */
+  legacy?: LegacyDofConfig[];
 }
 
 const INI_NAMES = ['directoutputconfig', 'ledcontrol'] as const;
@@ -425,9 +430,14 @@ function exists(p: string): boolean {
   }
 }
 
-/** Variables de chemin de libdof que l'on sait remplacer hors partie (GlobalConfig.cpp, GetReplaceValuesDictionary). */
-function resolvePattern(pattern: string, globalDir: string): string {
-  const replaced = pattern.replace(/\{(GlobalConfigDirectory|GlobalConfigDir)\}/gi, globalDir);
+/**
+ * Variables de chemin de libdof que l'on sait remplacer hors partie (GlobalConfig.cpp,
+ * GetReplaceValuesDictionary). {InstallDir} n'a de sens que pour un DOF classique, dont on connaît
+ * le dossier d'installation ; ailleurs il reste tel quel.
+ */
+function resolvePattern(pattern: string, globalDir: string, installDir?: string): string {
+  let replaced = pattern.replace(/\{(GlobalConfigDirectory|GlobalConfigDir)\}/gi, globalDir);
+  if (installDir) replaced = replaced.replace(/\{InstallDir\}/gi, installDir);
   return path.isAbsolute(replaced) ? replaced : path.resolve(globalDir, replaced);
 }
 
@@ -501,8 +511,10 @@ export function readCabinetXml(file: string, text = fs.readFileSync(file, 'utf8'
 /**
  * Ce que libdof lira hors du dossier d'une table. `dir` est <prefPath>directoutputconfig ;
  * `workDir`, le dossier de travail de VPX (dossier de son exécutable), dernier recours de libdof.
+ * `legacyInstalls` : dossiers d'installation d'un DOF classique (legacyDofInstalls), examinés
+ * seulement si libdof ne trouve aucun ini.
  */
-export function readDofSetup(dir: string, workDir?: string): DofSetup {
+export function readDofSetup(dir: string, workDir?: string, legacyInstalls: string[] = []): DofSetup {
   const setup: DofSetup = { dir, ini: [], errors: [] };
   let globalFile = path.join(dir, 'GlobalConfig_B2SServer.xml');
   if (!exists(globalFile) && workDir && exists(path.join(workDir, 'directoutputconfig', 'GlobalConfig_B2SServer.xml'))) {
@@ -553,7 +565,158 @@ export function readDofSetup(dir: string, workDir?: string): DofSetup {
     const stray = ['Cabinet.xml', 'cabinet.xml'].map((n) => path.join(dir, n)).find(exists);
     if (stray) setup.ignoredCabinet = stray;
   }
+  if (!setup.ini.length && legacyInstalls.length) {
+    const legacy = findLegacyDofConfigs(legacyInstalls, [dir, ...(workDir ? [workDir] : [])]);
+    if (legacy.length) setup.legacy = legacy;
+  }
   return setup;
+}
+
+// ---------------------------------------------------------------------------
+// Configuration d'un ancien DOF (PinUP Popper, PinballX, PinballY)
+// ---------------------------------------------------------------------------
+
+/**
+ * Le DOF classique (DirectOutput.dll, chargé par le B2S Server) range sa configuration dans le
+ * dossier Config de son installation : C:\DirectOutput\Config (installateur de DOF R3++),
+ * C:\vPinball\DirectOutput\Config (Baller Installer, PinUP Popper), C:\Program Files
+ * (x86)\DirectOutput\Config… Le plugin DOF de VPX 10.8 ne lit que <prefPath>directoutputconfig :
+ * une borne qui vient d'un autre front-end garde là une configuration complète du configtool
+ * que libdof ignore (cas réel du 18/11/2026 : « No cabinet config file loaded », aucune LED).
+ */
+export interface LegacyDofConfig {
+  /** Dossier d'installation du DOF classique (…\DirectOutput). */
+  installDir: string;
+  /** Dossier de ses ini (…\DirectOutput\Config, ou l'IniFilesPath de son GlobalConfig). */
+  dir: string;
+  ini: DofIniFile[];
+  /** tablemappings.xml du configtool, à côté des ini. */
+  tablemappings: string[];
+  /** Cabinet.xml de l'ancien DOF (Teensy, LED adressables…) : repris seulement après examen. */
+  cabinet?: string;
+  /** Dernière modification de ses ini (ms depuis 1970). */
+  modified: number;
+}
+
+/** Dossiers de la racine d'un disque où un DOF classique n'est jamais installé. */
+const NOT_A_DOF_PARENT = /^(\$recycle\.bin|\$windows\.~\w+|system volume information|windows|recovery|perflogs|config\.msi|msocache|users|programdata|documents and settings)$/i;
+
+function isDir(p: string): boolean {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Dossiers d'installation d'un DOF classique sur ces racines de disque (C:\, D:\…) : <racine>\DirectOutput
+ * et <racine>\<dossier>\DirectOutput (C:\vPinball, C:\Program Files (x86), D:\Pinball…). Un seul
+ * niveau de dossiers est lu par disque : c'est rapide, et c'est là que les installateurs le mettent.
+ */
+export function legacyDofInstalls(roots: string[]): string[] {
+  const out: string[] = [];
+  const add = (p: string) => {
+    if (isDir(p) && !out.some((o) => path.resolve(o).toLowerCase() === path.resolve(p).toLowerCase())) out.push(p);
+  };
+  for (const root of roots) {
+    add(path.join(root, 'DirectOutput'));
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(root, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries) {
+      if (e.isDirectory() && !NOT_A_DOF_PARENT.test(e.name) && e.name.toLowerCase() !== 'directoutput') add(path.join(root, e.name, 'DirectOutput'));
+    }
+  }
+  return out;
+}
+
+function sameDir(a: string, b: string): boolean {
+  return path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+}
+
+function mtime(file: string): number {
+  try {
+    return fs.statSync(file).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
+/** La configuration du configtool d'un DOF classique, lue comme DOF la lisait ; undefined sans ini. */
+function readLegacyDof(installDir: string): LegacyDofConfig | undefined {
+  const configDir = path.join(installDir, 'Config');
+  const globalFile = path.join(configDir, 'GlobalConfig_B2SServer.xml');
+  let global: DofGlobalConfig | undefined;
+  if (exists(globalFile)) {
+    try {
+      global = readGlobalConfig(globalFile);
+    } catch {
+      /* GlobalConfig illisible : les ini du dossier Config restent bons à prendre */
+    }
+  }
+  // {InstallDir}\config désigne en général le dossier Config lui-même : on garde alors son nom tel qu'il est écrit.
+  const iniFilesPath = global?.iniFilesPath ? resolvePattern(global.iniFilesPath, configDir, installDir) : undefined;
+  const lookup = [...(iniFilesPath && !sameDir(iniFilesPath, configDir) ? [iniFilesPath] : []), configDir, installDir];
+  let dir: string | undefined;
+  let files: string[] = [];
+  for (const d of lookup) {
+    files = listIni(d, 'directoutputconfig');
+    if (files.length) {
+      dir = d;
+      break;
+    }
+  }
+  if (!dir) return undefined;
+  const ini: DofIniFile[] = [];
+  for (const file of files) {
+    try {
+      ini.push({ number: dofIniNumber(file)!, file, roms: dofIniRoms(fs.readFileSync(file, 'latin1')) });
+    } catch {
+      /* ini illisible : laissé de côté */
+    }
+  }
+  if (!ini.length) return undefined;
+  ini.sort((a, b) => a.number - b.number);
+  let names: string[] = [];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    /* déjà lu par listIni */
+  }
+  const tablemappings = names.filter((n) => n.toLowerCase().startsWith('tablemappings.')).map((n) => path.join(dir, n));
+  const cabinetFile = global?.cabinetPattern ? resolvePattern(global.cabinetPattern, configDir, installDir) : path.join(configDir, 'Cabinet.xml');
+  return {
+    installDir,
+    dir,
+    ini,
+    tablemappings,
+    ...(exists(cabinetFile) ? { cabinet: cabinetFile } : {}),
+    modified: Math.max(...ini.map((f) => mtime(f.file))),
+  };
+}
+
+/**
+ * Configurations d'un ancien DOF trouvées dans ces dossiers d'installation (legacyDofInstalls), la
+ * plus récente d'abord. `exclude` : dossiers que libdof lit déjà (celui de VPX, son dossier de travail).
+ */
+export function findLegacyDofConfigs(installDirs: string[], exclude: string[] = []): LegacyDofConfig[] {
+  const out: LegacyDofConfig[] = [];
+  for (const installDir of installDirs) {
+    const legacy = readLegacyDof(installDir);
+    if (!legacy || exclude.some((e) => sameDir(e, legacy.dir)) || out.some((o) => sameDir(o.dir, legacy.dir))) continue;
+    out.push(legacy);
+  }
+  return out.sort((a, b) => b.modified - a.modified);
+}
+
+/** « directoutputconfig51.ini », « directoutputconfig30.ini, directoutputconfig51.ini et 2 autres ». */
+export function legacyDofFiles(legacy: LegacyDofConfig): string {
+  const names = legacy.ini.map((f) => path.basename(f.file));
+  return names.length <= 3 ? names.join(', ') : tn(names.length - 2, '{list} et {n} autre', '{list} et {n} autres', { list: names.slice(0, 2).join(', ') });
 }
 
 // ---------------------------------------------------------------------------
@@ -603,6 +766,7 @@ export function tableIniMasksGlobal(setup: DofSetup, folder: string): boolean {
 export const DOF_FINDING_CODES = [
   'noController',
   'noIni',
+  'legacyIni',
   'missingIni',
   'orphanIni',
   'addressableUndeclared',
@@ -644,11 +808,25 @@ export function dofFindings(setup: DofSetup, detected: DetectedDofController[], 
     push('iniFilesPathMissing', 'warning', t('GlobalConfig : IniFilesPath désigne « {path} », qui n’existe pas. DOF cherche alors ses ini ailleurs.', { path: setup.iniFilesPathMissing }));
   }
 
+  // Configuration du configtool laissée dans le dossier d'un DOF classique : le plugin DOF de VPX ne
+  // la lit pas, même sans contrôleur reconnu (périphériques illisibles, carte débranchée).
+  const legacy = setup.ini.length ? undefined : setup.legacy?.[0];
+  if (legacy) {
+    push(
+      'legacyIni',
+      'warning',
+      t('Configuration DOF de votre ancien front-end trouvée dans {dir} ({files}, {date}), mais le plugin DOF de VPX ne la lit pas : « Reprendre la configuration de l’ancien DOF » la met en place.', {
+        dir: legacy.dir,
+        files: legacyDofFiles(legacy),
+        date: formatDate(legacy.modified),
+      }),
+    );
+  }
   if (!detected.length && !declared.length && !setup.ini.length) {
-    push('noController', 'info', t('Aucun contrôleur DOF reconnu et aucune configuration : DOF reste éteint.'));
+    if (!legacy) push('noController', 'info', t('Aucun contrôleur DOF reconnu et aucune configuration : DOF reste éteint.'));
     return out;
   }
-  if (!setup.ini.length) {
+  if (!setup.ini.length && !legacy) {
     push('noIni', 'warning', t('Aucun fichier directoutputconfig.ini : DOF ne sait pas quoi allumer. Importez la configuration de votre borne faite sur configtool.vpuniverse.com.'));
   }
   for (const d of detected) {
@@ -1226,12 +1404,94 @@ export function planDofImport(unpacked: string, dir: string): DofImportPlan {
       else plan.copies.push({ from: f, to });
     } else plan.skipped.push({ file: f, reason: t('inutile à DOF') });
   }
-  if (exists(dir)) {
-    for (const name of fs.readdirSync(dir)) {
-      const lower = name.toLowerCase();
-      if (dofIniNumber(name) !== undefined || lower.startsWith('tablemappings.')) plan.replaced.push(path.join(dir, name));
+  plan.replaced = configtoolFiles(dir);
+  plan.numbers.sort((a, b) => a - b);
+  return plan;
+}
+
+/** ini et tablemappings du configtool présents dans le dossier de DOF : remplacés d'un bloc par un import. */
+function configtoolFiles(dir: string): string[] {
+  if (!exists(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((name) => dofIniNumber(name) !== undefined || name.toLowerCase().startsWith('tablemappings.'))
+    .map((name) => path.join(dir, name));
+}
+
+/**
+ * Reprise de la configuration d'un ancien DOF : ses directoutputconfig*.ini et tablemappings
+ * seulement, comme un import du configtool. Jamais son GlobalConfig_B2SServer.xml : son IniFilesPath
+ * ({InstallDir}\config) désignerait ici le dossier de VPX, qui n'a pas d'ini. Son Cabinet.xml
+ * s'examine à part (planLegacyCabinet).
+ */
+export function planLegacyDofImport(legacy: LegacyDofConfig, dir: string): DofImportPlan {
+  const plan: DofImportPlan = { copies: [], replaced: configtoolFiles(dir), skipped: [], numbers: [] };
+  for (const f of legacy.ini) {
+    plan.copies.push({ from: f.file, to: path.join(dir, path.basename(f.file)) });
+    plan.numbers.push(f.number);
+  }
+  for (const f of legacy.tablemappings) plan.copies.push({ from: f, to: path.join(dir, path.basename(f)) });
+  if (legacy.cabinet) plan.skipped.push({ file: legacy.cabinet, reason: t('examiné à part') });
+  plan.numbers.sort((a, b) => a - b);
+  return plan;
+}
+
+export interface LegacyCabinetPlan {
+  /** Le Cabinet.xml de l'ancien DOF, lu ; absent s'il est illisible. */
+  cabinet?: DofCabinetFile;
+  /** Raisons de ne pas le reprendre ; liste vide : il peut l'être tel quel. */
+  problems: string[];
+  /** Ce qui serait écrit : le Cabinet.xml repris, et le GlobalConfig de Cyber Pinball qui le désigne. */
+  files: { file: string; content: string }[];
+}
+
+/**
+ * Le Cabinet.xml d'un ancien DOF peut-il servir au plugin DOF de VPX ? Seulement s'il est lisible,
+ * que libdof gère tous ses contrôleurs et que chaque bande a son contrôleur ; et jamais à la place
+ * d'un Cabinet.xml déjà là, ni d'un GlobalConfig écrit à la main (même règle que planLedWrite).
+ * Repris tel quel, sans la marque de Cyber Pinball : il reste un fichier écrit à la main.
+ */
+export function planLegacyCabinet(file: string, dir: string, now = new Date()): LegacyCabinetPlan {
+  const plan: LegacyCabinetPlan = { problems: [], files: [] };
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+    plan.cabinet = readCabinetXml(file, text);
+  } catch (e) {
+    plan.problems.push(t('{file} illisible : {message}', { file: path.basename(file), message: (e as Error).message }));
+    return plan;
+  }
+  const cabinet = plan.cabinet;
+  for (const c of cabinet.controllers) {
+    if (c.type !== 'NullOutputController' && !isDofControllerType(c.type)) {
+      plan.problems.push(t('« {type} » ({name}) n’est pas géré par le plugin DOF de VPX (libdof).', { type: c.type, name: c.name }));
     }
   }
-  plan.numbers.sort((a, b) => a - b);
+  for (const s of cabinet.strips) {
+    if (s.controller && !cabinet.controllers.some((c) => c.name === s.controller)) {
+      plan.problems.push(t('Bande « {name} » : son contrôleur « {controller} » n’est pas déclaré.', { name: s.name, controller: s.controller }));
+    }
+  }
+  const globalFile = path.join(dir, 'GlobalConfig_B2SServer.xml');
+  let target = path.join(dir, 'Cabinet.xml');
+  let writeGlobal = true;
+  if (exists(globalFile) && !OWNED_COMMENT.test(fs.readFileSync(globalFile, 'utf8'))) {
+    let global: DofGlobalConfig | undefined;
+    try {
+      global = readGlobalConfig(globalFile);
+    } catch {
+      /* illisible : traité comme écrit à la main */
+    }
+    if (!global?.cabinetPattern) {
+      plan.problems.push(t('GlobalConfig écrit à la main, sans CabinetConfigFilePattern : ajoutez <CabinetConfigFilePattern>{GlobalConfigDir}\\Cabinet.xml</CabinetConfigFilePattern>.'));
+    } else {
+      target = resolvePattern(global.cabinetPattern, dir);
+      writeGlobal = false;
+    }
+  }
+  if (exists(target)) plan.problems.push(t('{file} existe déjà dans le dossier de DOF : gardé tel quel', { file: target }));
+  if (plan.problems.length) return plan;
+  if (writeGlobal) plan.files.push({ file: globalFile, content: globalConfigXml(now) });
+  plan.files.push({ file: target, content: text });
   return plan;
 }

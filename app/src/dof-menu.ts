@@ -4,7 +4,9 @@
 // - ouvrir configtool.vpuniverse.com dans « Récupérer » : le ZIP téléchargé revient ici et s'importe ;
 // - importer un ZIP déjà téléchargé ;
 // - décrire les bandes de LED adressables (Teensy, Wemos D1) : Cabinet.xml et GlobalConfig écrits
-//   par Cyber Pinball, jamais à la place de fichiers écrits à la main.
+//   par Cyber Pinball, jamais à la place de fichiers écrits à la main ;
+// - reprendre la configuration d'un ancien DOF (celui de PinUP Popper, PinballX, PinballY) quand la
+//   borne n'en a aucune : ses ini et tablemappings seulement, puis son Cabinet.xml après examen.
 // Rien n'est envoyé aux contrôleurs hors partie : c'est VPX qui les pilote, par son plugin DOF.
 
 import * as fs from 'node:fs';
@@ -16,7 +18,14 @@ import {
   DOF_CONTROLLERS,
   dofControllerLabels,
   dofFindings,
+  formatDate,
   isDofControllerType,
+  legacyDofFiles,
+  planLegacyCabinet,
+  planLegacyDofImport,
+  type DofImportPlan,
+  type LegacyCabinetPlan,
+  type LegacyDofConfig,
   LED_ARRANGEMENTS,
   LED_COLOR_ORDERS,
   LED_CONTROLLER_TYPES,
@@ -72,6 +81,10 @@ export interface DofMenuHost {
   dir(): string | undefined;
   /** Dossier de travail de VPX, dernier recours de libdof. */
   workDir(): string | undefined;
+  /** Dossiers d'installation d'un DOF classique déjà relevés sur les disques (dof-files.ts). */
+  legacyInstalls(): string[];
+  /** Relève de nouveau les DOF classiques (« Vérifier de nouveau »). */
+  rescanLegacy?(): Promise<unknown>;
   /** Périphériques USB présents ; undefined : illisibles. */
   usb(): ObservedUsbDevice[] | undefined;
   /** Noms HID connus (joysticks relevés) : départagent Pinscape et LedWiz. */
@@ -119,8 +132,18 @@ export function createDofMenu(host: DofMenuHost) {
   function read(fresh = false) {
     if (!fresh && cache && Date.now() - cache.at < CACHE_MS) return cache;
     const dir = host.dir();
-    cache = { at: Date.now(), setup: dir ? readDofSetup(dir, host.workDir()) : undefined, devices: host.usb() ?? [] };
+    cache = { at: Date.now(), setup: dir ? readDofSetup(dir, host.workDir(), host.legacyInstalls()) : undefined, devices: host.usb() ?? [] };
     return cache;
+  }
+
+  /** Anciennes configurations à reprendre (trois au plus) : seulement quand la borne n'a aucun ini. */
+  function legacyOf(s: DofSetup | undefined): LegacyDofConfig[] {
+    return s && !s.ini.length ? (s.legacy ?? []).slice(0, 3) : [];
+  }
+
+  /** Les actions de reprise passent en tête : les autres descendent d'autant. */
+  function shift(): number {
+    return legacyOf(setup()).length;
   }
 
   function setup(): DofSetup | undefined {
@@ -207,6 +230,16 @@ export function createDofMenu(host: DofMenuHost) {
     else if (s && (detected.length || s.ini.length)) sections.push({ rows: [{ icon: 'check', text: t('Rien n’empêche DOF d’allumer la borne'), tone: 'ok' }] });
 
     const actions: Action[] = [
+      ...legacyOf(s).map(
+        (l, i): Action => ({
+          key: `legacy-${i}`,
+          label: t('Reprendre la configuration de l’ancien DOF'),
+          detail: t('{files} · {dir} · {date} : seuls les fichiers du configtool sont copiés', { files: legacyDofFiles(l), dir: l.dir, date: formatDate(l.modified) }),
+          icon: 'import',
+          tone: 'ok',
+          run: () => void takeLegacy(l),
+        }),
+      ),
       host.browse && s
         ? {
             label: t('Ouvrir configtool.vpuniverse.com'),
@@ -246,9 +279,116 @@ export function createDofMenu(host: DofMenuHost) {
 
   function refresh(): void {
     flash = undefined;
+    // Un DOF classique installé depuis le relevé : vu à la lecture suivante.
+    void host.rescanLegacy?.().then(() => (cache = undefined));
     read(true);
     host.changed();
-    open(3);
+    open(3 + shift());
+  }
+
+  /** Met de côté les ini et tablemappings actuels, puis copie ceux du plan ; rend le dossier de sauvegarde s'il a servi. */
+  function applyImport(plan: DofImportPlan, dir: string): string | undefined {
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+    const saved = path.join(host.backupDir(), 'dof', stamp);
+    fs.mkdirSync(dir, { recursive: true });
+    if (plan.replaced.length) {
+      fs.mkdirSync(saved, { recursive: true });
+      for (const f of plan.replaced) renameWithRetry(f, path.join(saved, path.basename(f)));
+    }
+    for (const c of plan.copies) fs.copyFileSync(c.from, c.to);
+    return plan.replaced.length ? saved : undefined;
+  }
+
+  // ---------- Ancien DOF ----------
+
+  /**
+   * Copie les ini et tablemappings d'un ancien DOF dans le dossier que lit le plugin de VPX ; jamais
+   * son GlobalConfig. Son Cabinet.xml, s'il en a un, est montré ensuite et repris seulement sur demande.
+   */
+  async function takeLegacy(legacy: LegacyDofConfig): Promise<void> {
+    const dir = host.dir();
+    if (!dir) return;
+    let message: string[] = [];
+    let ok = false;
+    await library.task(t('Reprise de la configuration de l’ancien DOF…'), () => {
+      try {
+        const plan = planLegacyDofImport(legacy, dir);
+        const saved = applyImport(plan, dir);
+        ok = true;
+        message = [
+          tn(plan.numbers.length, '{n} fichier repris : directoutputconfig{list}.ini.', '{n} fichiers repris : directoutputconfig{list}.ini.', { list: plan.numbers.join(', ') }),
+          t('Copiés depuis {dir}, qui ne change pas. Le GlobalConfig de l’ancien DOF n’est pas repris : le plugin DOF de VPX n’en a pas besoin.', { dir: legacy.dir }),
+          ...(saved ? [t('L’ancienne configuration est sauvegardée dans {dir}.', { dir: saved })] : []),
+        ];
+      } catch (error) {
+        message = [(error as Error).message];
+      }
+    });
+    cache = undefined;
+    if (ok) host.changed();
+    flash = { text: message[0] ?? '', tone: ok ? 'ok' : 'error' };
+    const cabinet = ok ? legacy.cabinet : undefined;
+    library.openNotice(ok ? t('Configuration de l’ancien DOF reprise') : t('Reprise impossible'), message, () => (cabinet ? openLegacyCabinet(cabinet) : open()));
+  }
+
+  /** Le Cabinet.xml de l'ancien DOF : ce qu'il déclare, et sa reprise s'il est cohérent. */
+  function openLegacyCabinet(file: string): void {
+    const dir = host.dir();
+    if (!dir) return open();
+    const plan = planLegacyCabinet(file, dir);
+    const c = plan.cabinet;
+    const declared: Row[] = c
+      ? [
+          ...c.controllers.map((x): Row => ({ icon: 'chip', text: isDofControllerType(x.type) ? DOF_CONTROLLERS[x.type].label : x.type, detail: [x.name, x.comPort].filter(Boolean).join(' · ') })),
+          ...(c.strips.length ? [{ icon: 'bulb' as const, text: tn(c.strips.length, '{n} bande de LED', '{n} bandes de LED'), detail: c.strips.map((s) => s.name).join(', ') }] : []),
+        ]
+      : [];
+    const sections: Built['sections'] = [];
+    if (declared.length) sections.push({ title: t('Ce qu’il déclare'), rows: declared });
+    if (plan.problems.length) sections.push({ title: t('Pourquoi il n’est pas repris'), rows: plan.problems.map((p) => ({ icon: 'alert' as const, text: p, tone: 'warning' as const })) });
+    const actions: Action[] = plan.problems.length
+      ? [
+          { label: t('Décrire les bandes dans Cyber Pinball…'), detail: t('Cabinet.xml écrit pour vous, d’après vos bandes'), icon: 'bulb', run: () => openEditor() },
+          { label: t('Ne pas le reprendre'), icon: 'back', run: () => open() },
+        ]
+      : [
+          { label: t('Reprendre ce Cabinet.xml'), detail: t('Copié tel quel, avec un GlobalConfig de Cyber Pinball qui le désigne'), icon: 'import', tone: 'ok', run: () => takeLegacyCabinet(plan) },
+          { label: t('Ne pas le reprendre'), icon: 'back', run: () => open() },
+        ];
+    library.openCustom(() => ({
+      heading: t('Cabinet.xml de l’ancien DOF'),
+      icon: 'bulb',
+      lead: t('L’ancien DOF avait aussi un Cabinet.xml ({file}) : contrôleurs à déclarer (Teensy, LED adressables…). Le plugin DOF de VPX le lit seulement si un GlobalConfig le désigne.', { file }),
+      sections,
+      actions,
+      back: () => open(),
+    }));
+  }
+
+  function takeLegacyCabinet(plan: LegacyCabinetPlan): void {
+    const lines: string[] = [];
+    let ok = true;
+    try {
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+      for (const f of plan.files) {
+        if (fs.existsSync(f.file)) {
+          // Seul un GlobalConfig de Cyber Pinball peut être là (planLegacyCabinet) : gardé de côté quand même.
+          const saved = path.join(host.backupDir(), 'dof', stamp);
+          fs.mkdirSync(saved, { recursive: true });
+          fs.copyFileSync(f.file, path.join(saved, path.basename(f.file)));
+        }
+        fs.mkdirSync(path.dirname(f.file), { recursive: true });
+        writeFileAtomic(f.file, f.content);
+        lines.push(t('Écrit : {file}', { file: f.file }));
+      }
+    } catch (error) {
+      ok = false;
+      lines.push((error as Error).message);
+    }
+    flash = { text: ok ? t('Cabinet.xml de l’ancien DOF repris') : lines[lines.length - 1]!, tone: ok ? 'ok' : 'error' };
+    cache = undefined;
+    host.changed();
+    library.openNotice(t('Cabinet.xml de l’ancien DOF'), lines, () => open());
   }
 
   // ---------- Configtool ----------
@@ -267,7 +407,7 @@ export function createDofMenu(host: DofMenuHost) {
       start: 'windows',
     });
     if (paths?.[0]) await importZip(paths[0]);
-    else open(1);
+    else open(1 + shift());
   }
 
   async function importZip(file: string): Promise<void> {
@@ -281,18 +421,11 @@ export function createDofMenu(host: DofMenuHost) {
         fs.mkdirSync(staging, { recursive: true });
         if (!(await host.unpack(file, staging))) throw new Error(t('Archive illisible : {file}', { file: path.basename(file) }));
         const plan = planDofImport(staging, dir);
-        const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
-        const saved = path.join(host.backupDir(), 'dof', stamp);
-        fs.mkdirSync(dir, { recursive: true });
-        if (plan.replaced.length) {
-          fs.mkdirSync(saved, { recursive: true });
-          for (const f of plan.replaced) renameWithRetry(f, path.join(saved, path.basename(f)));
-        }
-        for (const c of plan.copies) fs.copyFileSync(c.from, c.to);
+        const saved = applyImport(plan, dir);
         ok = true;
         message = [
           tn(plan.numbers.length, '{n} fichier importé : directoutputconfig{list}.ini.', '{n} fichiers importés : directoutputconfig{list}.ini.', { list: plan.numbers.join(', ') }),
-          ...(plan.replaced.length ? [t('L’ancienne configuration est sauvegardée dans {dir}.', { dir: saved })] : []),
+          ...(saved ? [t('L’ancienne configuration est sauvegardée dans {dir}.', { dir: saved })] : []),
           ...plan.skipped.filter((s) => s.reason !== t('inutile à DOF')).map((s) => t('{file} : {reason}', { file: path.basename(s.file), reason: s.reason })),
         ];
       } catch (error) {
@@ -328,7 +461,7 @@ export function createDofMenu(host: DofMenuHost) {
 
   function leaveEditor(): void {
     draft = undefined;
-    open(2);
+    open(2 + shift());
   }
 
   /** Lignes de l'éditeur avant les bandes : contrôleur, puis port (série) ou adresse et univers (Art-Net). */
@@ -796,7 +929,7 @@ export function createDofMenu(host: DofMenuHost) {
     );
     flash = { text: plan.refused.length ? t('Cabinet.xml non écrit : voir le détail') : t('Bandes enregistrées dans Cabinet.xml'), tone: plan.refused.length ? 'warning' : 'ok' };
     // L'avis d'abord : l'éditeur n'est plus à l'écran quand la santé relève et redessine.
-    library.openNotice(t('LED adressables'), lines, () => open(2));
+    library.openNotice(t('LED adressables'), lines, () => open(2 + shift()));
     draft = undefined;
     cache = undefined;
     host.changed();

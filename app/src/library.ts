@@ -265,7 +265,7 @@ import { buildVpxChoice, createOtherVpxMenu, createPlanVpx, otherVpxLimitsText, 
 import { createHardwareDmdMenu } from './hardware-dmd-menu';
 import { applyMenuDmdServer, dmdServerProblem, dmdServerReady, onDmdServerState } from './dmd-server';
 import { onPin2dmdProbe } from './pin2dmd-probe';
-import { dofDir, readDof, vpxWorkDir } from './dof-files';
+import { dofDir, knownLegacyDof, readDof, scanLegacyDof, vpxWorkDir } from './dof-files';
 import { backupDir, locations } from './paths';
 import { activeVpxIni, usbDevices } from './vpx-ini';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
@@ -1432,6 +1432,8 @@ export function createLibrary(host: LibraryHost) {
     },
     dir: () => dofDirOf(),
     workDir: () => vpxWorkDir(locations()),
+    legacyInstalls: () => knownLegacyDof(),
+    rescanLegacy: () => scanLegacyDof(true),
     usb: () => usbDevices(),
     hidNames: () => cabinetJoystickHids(loadCabinet(host.dataDir)),
     backupDir: () => backupDir(host.dataDir),
