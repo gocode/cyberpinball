@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- The file picker now opens sorted by name, like Windows File Explorer; "Sort by date" is still one gesture away.
 - Script fixes never applied on a cabinet where the tables had already been read (Daredevil and Hellboy still stopped at every blink): Cyber Pinball kept what each table's script said, without noticing that a newer version could find more in it. A new script fix now makes it read the scripts again, from the tables themselves, without starting VPX.
 - System menu > Community > Local play: for a cabinet that only plays locally, a single setting removes the whole social side at once, levels included: levels, XP and badges (player card, badge and level moments), friends, players online, messages, rooms, groups, instant games, online rankings, the Community medallion, the Community on the phone. The cabinet network stops; updates, What's new, tables and their scores stay. Nothing is deleted: "Bring the community back" restores everything, XP included.
 - What's new: the players' reactions now always sit on their own line, at the start of each item, under the preview and the text.

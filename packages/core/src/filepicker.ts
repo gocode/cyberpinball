@@ -141,6 +141,18 @@ export interface PickerEntry {
 
 export type PickerSort = 'name' | 'date';
 
+/**
+ * Tri d'un explorateur de fichiers à son ouverture : par nom, comme l'Explorateur de Windows.
+ * « Trier par date » reste un geste ; jamais de tri par date imposé d'office.
+ */
+export const DEFAULT_PICKER_SORT: PickerSort = 'name';
+
+// Un seul comparateur : localeCompare avec options en recrée un à chaque appel (183 ms pour
+// trier 460 téléchargements à chaque reconstruction de l'écran).
+const NAMES = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+/** Ordre d'un explorateur par nom : sans casse ni accents, « 9 » avant « 10 ». */
+export const compareNames = (a: string, b: string): number => NAMES.compare(a, b);
+
 /** Noms qu'un explorateur cache : fichiers système, corbeille, dossiers techniques. */
 export function hiddenName(name: string): boolean {
   return /^(\$recycle\.bin|system volume information|desktop\.ini|thumbs\.db|ntuser\.dat.*|\$windows\.~.*|recovery|config\.msi|pagefile\.sys|hiberfil\.sys|swapfile\.sys|dumpstack\.log(\.tmp)?)$/i.test(name) || name.startsWith('.') || name.startsWith('~$');
@@ -187,7 +199,7 @@ export function listFolder(dir: string, opts: { filter?: PickFilter; showAll?: b
     }
     entries.push({ name: d.name, path: full, dir: isDir, size: isDir ? 0 : stat.size, mtimeMs: stat.mtimeMs, matches, kind: isDir ? 'other' : downloadKind(d.name) });
   }
-  const byName = (a: PickerEntry, b: PickerEntry) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
+  const byName = (a: PickerEntry, b: PickerEntry) => compareNames(a.name, b.name);
   const sort = opts.sort === 'date' ? (a: PickerEntry, b: PickerEntry) => b.mtimeMs - a.mtimeMs || byName(a, b) : byName;
   entries.sort((a, b) => Number(b.dir) - Number(a.dir) || sort(a, b));
   return { entries, hidden };

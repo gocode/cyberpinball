@@ -21,6 +21,7 @@ import {
   trashDownloads,
 } from '../downloads';
 import {
+  DEFAULT_PICKER_SORT,
   driveLabel,
   filterExtensions,
   hiddenName,
@@ -256,6 +257,30 @@ test('sélecteur : contenu d’un dossier, filtré, dossiers d’abord, fichiers
   assert.equal(parentWithin(williams, williams), undefined);
   assert.equal(parentWithin(path.join(williams, 'Medieval Madness'), williams), williams);
   assert.equal(parentWithin(williams, undefined), path.join(usb, 'Flippers'));
+});
+
+test('explorateurs de fichiers : tri par nom à l’ouverture, la date seulement par le geste', () => {
+  // Décision du 18/11/2026 : comme l'Explorateur de Windows, un explorateur s'ouvre trié par
+  // nom. Un tri par date imposé d'office (le sélecteur l'a été) ne doit pas revenir.
+  assert.equal(DEFAULT_PICKER_SORT, 'name');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-tri-'));
+  put(path.join(root, 'b.vpx'), 'vpx', 0);
+  put(path.join(root, 'A.vpx'), 'vpx', 10);
+  put(path.join(root, 'c10.vpx'), 'vpx', 5);
+  put(path.join(root, 'c9.vpx'), 'vpx', 1);
+  put(path.join(root, 'Z', 'x.vpx'), 'vpx');
+  assert.deepEqual(listFolder(root).entries.map((e) => e.name), ['Z', 'A.vpx', 'b.vpx', 'c9.vpx', 'c10.vpx'], 'sans tri précisé : par nom');
+  assert.deepEqual(listFolder(root, { sort: DEFAULT_PICKER_SORT }).entries.map((e) => e.name), ['Z', 'A.vpx', 'b.vpx', 'c9.vpx', 'c10.vpx']);
+
+  // Partout dans l'application : l'état d'un explorateur part de DEFAULT_PICKER_SORT, jamais d'un tri écrit en dur.
+  const dir = path.join(__dirname, '..', '..', '..', '..', 'app', 'src');
+  const offenders: string[] = [];
+  for (const f of fs.readdirSync(dir).filter((n) => n.endsWith('.ts'))) {
+    const src = fs.readFileSync(path.join(dir, f), 'utf8');
+    if (/\bsort:\s*'date'/.test(src)) offenders.push(f);
+  }
+  assert.deepEqual(offenders, [], 'tri par date d’office : partir de DEFAULT_PICKER_SORT');
+  assert.match(fs.readFileSync(path.join(dir, 'file-picker.ts'), 'utf8'), /sort: DEFAULT_PICKER_SORT/);
 });
 
 test('sélecteur : lecteurs, emplacements, sélection, chemin raccourci', () => {

@@ -14,6 +14,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app } from 'electron';
 import {
+  compareNames,
+  DEFAULT_PICKER_SORT,
   DOWNLOAD_KIND_LABELS,
   downloadLine,
   filterExtensions,
@@ -39,6 +41,7 @@ import {
   type Layout,
   type PickFilter,
   type PickerPlace,
+  type PickerSort,
 } from '@cyberpinball/core';
 import type { Action, Built, Row, Section, Tone } from './library';
 
@@ -120,7 +123,7 @@ interface PickerState {
   dir?: string;
   selected: string[];
   showAll: boolean;
-  sort: 'name' | 'date';
+  sort: PickerSort;
   flash?: { text: string; tone: Tone };
 }
 
@@ -137,7 +140,7 @@ export function createFilePicker(ctx: FilePickerContext) {
     if (s.request.mode === 'folder') return { shown: [], hidden: 0 };
     const all = ctx.inventory();
     const shown = s.showAll ? all : all.filter((e) => matchesFilter(e.name, s.request.filter));
-    const sorted = s.sort === 'name' ? [...shown].sort((a, b) => (a.label ?? a.name).localeCompare(b.label ?? b.name, undefined, { sensitivity: 'base', numeric: true })) : shown;
+    const sorted = s.sort === 'name' ? [...shown].sort((a, b) => compareNames(a.label ?? a.name, b.label ?? b.name)) : shown;
     return { shown: sorted, hidden: all.length - shown.length };
   }
 
@@ -146,7 +149,7 @@ export function createFilePicker(ctx: FilePickerContext) {
     const drives = await listDrives();
     const count = l ? ctx.inventory().length : 0;
     const places = pickerPlaces({ cpDownloads: l ? { count } : undefined, windowsDownloads: windowsDir(), importDir: l?.import, desktop: desktopDir(), drives });
-    const s: PickerState = { request, places, place: places[0]!, selected: [], showAll: false, sort: 'date' };
+    const s: PickerState = { request, places, place: places[0]!, selected: [], showAll: false, sort: DEFAULT_PICKER_SORT };
     // Les téléchargements de Cyber Pinball d'abord, s'ils ont ce qu'on cherche ; sinon Téléchargements de Windows.
     const wanted = request.start ? places.find((p) => p.kind === ({ cp: 'cp-downloads', windows: 'windows-downloads', import: 'import', desktop: 'desktop' } as const)[request.start!]) : undefined;
     const cp = places.find((p) => p.kind === 'cp-downloads');
