@@ -441,8 +441,12 @@ body.mouse .badges-pill:hover {
   opacity: 0;
 }
 
-/* Déroulé : voile, fond, éclat, badge, faisceau, titre qui s'écarte, texte, niveau. */
-.lm-stage.lm-play .lm-veil {
+/*
+ * Déroulé : voile, fond, éclat, badge, faisceau, titre qui s'écarte, texte, niveau. Le voile se pose
+ * une fois, à l'ouverture du moment, et reste d'un badge à l'autre : lié au déroulé (classe ôtée puis
+ * remise à chaque badge), il repartait de zéro et la roue se rallumait sous le texte (18/11/2026).
+ */
+#level-moment.lm-on .lm-veil {
   animation: lm-fade 0.4s ease-out forwards;
 }
 .lm-stage.lm-play .lm-fx {

@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.16
 
+- Moment des badges : le voile reste posé d'un badge à l'autre, l'écran des tables ne se rallume plus un instant sous le badge suivant.
 - Téléphone, Salons : le salon se choisit en tête (le vôtre, Monde, ceux où l'on parle, « Autres pays… »), indépendamment de celui ouvert à la borne ; écrire et les phrases préparées partent dans le salon choisi.
 - Téléphone, Salons : une ligne touchée ouvre ses options, comme à la borne : réagir (sept réactions), répondre (le champ commence par @pseudo), voir son profil, envoyer une demande d'ami, l'ignorer, signaler le message avec sa raison, le bloquer ; sur votre ligne, la supprimer. Bloquer et supprimer se confirment au téléphone. Les réactions s'affichent sous chaque ligne.
 - Téléphone : une ligne masquée par la modération l'est désormais aussi au téléphone, où elle s'affichait en clair.

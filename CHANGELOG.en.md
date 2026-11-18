@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Badge moment: the veil stays in place from one badge to the next, the table screen no longer flashes back under the next badge.
 - Phone, Rooms: the room is picked at the top (yours, World, the active ones, "Other countries…"), independently of the one open on the cabinet; writing and canned phrases go to the picked room.
 - Phone, Rooms: tapping a line opens its options, as on the cabinet: react (seven reactions), reply (the field starts with @nickname), see their profile, send a friend request, ignore them, report the message with a reason, block them; on your own line, delete it. Blocking and deleting are confirmed on the phone. Reactions show under each line.
 - Phone: a line hidden by moderation is now hidden on the phone too, where it was shown in full.

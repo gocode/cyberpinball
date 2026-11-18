@@ -142,6 +142,30 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
     }
     return undefined;
   };
+  // Un calque posé avant « top » dans un même conteneur, sans contenir « bottom » : le voile d'un moment
+  // de badge (niveau.css), frère de la colonne qui porte le texte, s'y dessine dessous et passe sur la
+  // roue. Il ne cache que tant qu'il est opaque à l'œil : fond et opacités des ancêtres compris (le
+  // voile qui repart de zéro laissait voir la roue sous le texte du badge suivant, 18/11/2026).
+  const seenOpacity = (e) => {
+    let o = 1;
+    for (let n = e; n; n = n.parentElement) o *= Number(getComputedStyle(n).opacity);
+    return o;
+  };
+  const layerOver = (top, bottom, x, y) => {
+    for (let e = top; e && !e.contains(bottom); e = e.parentElement) {
+      for (let s = e.previousElementSibling; s; s = s.previousElementSibling) {
+        if (s.contains(bottom)) continue;
+        const st = getComputedStyle(s);
+        if (st.position === 'static' || st.visibility === 'hidden') continue;
+        const c = st.backgroundColor.match(/[\d.]+/g);
+        const alpha = !c ? 0 : c.length < 4 ? 1 : Number(c[3]);
+        if (alpha * seenOpacity(s) < 0.8) continue;
+        const r = s.getBoundingClientRect();
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return s;
+      }
+    }
+    return undefined;
+  };
   // Le temps d'un relevé au point, ces éléments reçoivent la souris (pointer-events), puis reprennent leur réglage.
   const touchable = (els, run) => {
     const saved = els.map((e) => [e.style.getPropertyValue('pointer-events'), e.style.getPropertyPriority('pointer-events')]);
@@ -191,11 +215,11 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
       // Le logo du lancement en cinéma ne fait que passer sur l'écran : sur le titre du repli du
       // chargement, ce n'est ni un chevauchement ni une coupure.
       if (top.closest('.cinema')) continue;
-      // Le moment d'un badge ou d'un niveau passe sur la roue sous son voile (88 %, niveau.css) : ce
-      // qui est dessous est éteint, pas chevauché. Ses éléments entre eux restent contrôlés.
-      if (top.closest('#level-moment') && !bottom.closest('#level-moment')) continue;
       const at = (v) => '[' + [v.left, v.top, v.right, v.bottom].map(Math.round).join(', ') + ']';
-      const cover = masked(top, bottom, x, y);
+      // Le moment d'un badge ou d'un niveau passe sur la roue sous son voile (88 %) : ce qui est
+      // dessous est éteint, pas chevauché, tant que le voile est là. Une exception pour tout le moment
+      // l'aurait laissé passer le texte sur une roue mal voilée.
+      const cover = masked(top, bottom, x, y) ?? layerOver(top, bottom, x, y);
       if (cover) {
         // Caché en entier : voulu (un menu par-dessus un autre). En partie : coupé.
         const c = cover.getBoundingClientRect(), hidden = onA ? vb : va;
