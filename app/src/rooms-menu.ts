@@ -28,6 +28,7 @@ import {
   PHRASES_MAX,
   relationOf,
   roomCountry,
+  isRoomId,
   roomLines,
   roomOfCountry,
   roomPhrases,
@@ -59,6 +60,7 @@ import {
 } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
 import type { SocialNet } from './social-net';
+import type { RemoteRoom } from './phone-remote';
 
 export interface RoomsMenuHost {
   library: {
@@ -112,10 +114,14 @@ export interface RoomsMenu {
   moderationItem: ProvidedSystemItem;
   /** Clic sur la notification d'un signalement : la file, son « Retour » vers `back`. */
   openModeration(back: () => void): void;
-  /** Le salon pour le téléphone : celui à l'écran, sinon celui par défaut ; ses 60 dernières lignes. */
-  /** `present` : le nombre de présents, au-delà de cinq seulement (shownCrowd). */
-  /** `typing` : les pseudos de qui écrit en ce moment (typing.ts). */
-  remote(): { room: RoomId; name: string; present?: number; lines: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' }[]; phrases: string[]; blocked?: string; typing?: string[] };
+  /**
+   * Le salon pour le téléphone : celui qu'il a choisi (`room`), sinon celui à l'écran, sinon celui par
+   * défaut ; ses 60 dernières lignes (chacune avec son identifiant, son auteur, ses réactions), les
+   * salons à choisir, les phrases ; `present` au-delà de cinq seulement (shownCrowd), `typing` : qui écrit.
+   */
+  remote(room?: string): RemoteRoom & { room: RoomId; phrases: string[]; blocked?: string; typing?: string[] };
+  /** Un geste fait au téléphone sur une ligne de ce salon (réagir, demande d'ami, ignorer, signaler, bloquer, retirer la mienne). */
+  remoteAct(room: string, line: string, act: string, reason?: string): void;
 }
 
 /** Le salon par défaut d'un coup d'œil : la dernière ligne visible (filtre de mots appliqué), ou la raison d'un salon fermé. */
@@ -138,6 +144,8 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
   const now = () => host.now?.() ?? new Date();
   let current: { room: RoomId; back: () => void } | undefined;
   let notice: { text: string; tone: 'ok' | 'warning' | 'error' } | undefined;
+  /** Le constat du dernier geste fait au téléphone, montré là-bas quelques secondes. */
+  let phoneNotice: { text: string; tone: 'ok' | 'warning'; at: number } | undefined;
   let lastMentionRoom: RoomId | undefined;
 
   const me = () => net.state();
@@ -1079,15 +1087,44 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       run: () => openModeration(() => lib.openSystem()),
     },
     openModeration,
-    remote() {
-      const room = current && lib.isShowing(buildRoom) ? current.room : defaultRoom();
+    remote(asked) {
+      const room = isRoomId(asked) ? asked : current && lib.isShowing(buildRoom) ? current.room : defaultRoom();
       const self = me().key.publicKey;
+      const acts = net.moderation().acts;
+      const reacts = reactionsByLine(net.rooms());
       const lines = roomLines(net.rooms(), room)
         .filter(visible)
         .slice(-60)
-        .map((l) => ({ time: time(l.at), nick: l.name, hue: hueOf(l.key, l.name), text: shownText(l.text), kind: (l.key === self ? 'own' : l.me ? 'me' : mentions(l.text, me().name) ? 'mention' : 'line') as 'own' | 'me' | 'mention' | 'line' }));
+        .map((l) => {
+          // Masquée par la modération : ni son texte ni ses réactions, comme à la borne.
+          const hidden = lineHidden(acts, l.id, now());
+          const kind = hidden ? 'masked' : l.key === self ? 'own' : l.me ? 'me' : mentions(l.text, me().name) ? 'mention' : 'line';
+          const counts = hidden ? [] : countReactions((reacts.get(l.id) ?? []).filter((r) => !ignored(r.key)), self);
+          const mine = counts.find((c) => c.mine)?.kind;
+          return {
+            id: l.id,
+            key: l.key,
+            time: time(l.at),
+            nick: l.name,
+            hue: hueOf(l.key, l.name),
+            text: hidden ? t('message masqué par la modération') : shownText(l.text),
+            kind: kind as 'own' | 'me' | 'mention' | 'line' | 'masked',
+            ...(counts.length ? { reacts: counts.map(reactionChip).join(' · ') } : {}),
+            ...(mine ? { mine } : {}),
+            ...(relationOf(me(), l.key) === 'friend' ? { friend: true } : {}),
+          };
+        });
       const problem = writeProblem(room) ?? (net.rooms().rulesAt ? undefined : t('Acceptez d’abord les règles des salons, à la borne : Écrire dans le salon'));
       const typing = net.roomTypers(room).filter((x) => !ignored(x.key)).map((x) => x.name);
+      // Les salons en tête, comme « Salons » à la borne : le mien, Monde, ceux où l'on parle, et celui montré.
+      const mineRoom = myCountry() ? roomOfCountry(myCountry()!) : undefined;
+      const choices = [...(mineRoom ? [mineRoom] : []), WORLD_ROOM, ...activeRooms(net.rooms()).map((r) => r.room)];
+      if (!choices.includes(room)) choices.push(room);
+      const rooms = [...new Set(choices)].map((r) => {
+        const n = shownCrowd(net.roomPresent(r).length);
+        return { room: r, name: roomName(r), ...(n ? { present: n } : {}) };
+      });
+      const said = phoneNotice && now().getTime() - phoneNotice.at < 8000 ? { text: phoneNotice.text, tone: phoneNotice.tone } : undefined;
       return {
         room,
         name: roomName(room),
@@ -1097,7 +1134,47 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         // Les mêmes phrases qu'à la borne (Réglages de la communauté > Phrases préparées).
         phrases: readyPhrases(),
         ...(problem ? { blocked: problem } : {}),
+        rooms,
+        countries: countryCodes(locale()),
+        reactions: REACTIONS.map((r) => ({ id: r, label: reactionText(r) })),
+        reasons: MOD_REASONS.map((r) => ({ id: r, label: reasonLabel(r) })),
+        ...(said ? { notice: said } : {}),
       };
+    },
+    remoteAct(room, lineId, act, reason) {
+      const l = net.rooms().lines.find((x) => x.id === lineId && x.room === room);
+      if (!l || !visible(l)) return;
+      const say = (text: string, tone: 'ok' | 'warning' = 'ok') => void (phoneNotice = { text, tone, at: now().getTime() });
+      const self = l.key === me().key.publicKey;
+      if (act === 'retract') {
+        if (self && net.roomRetract(l.id)) say(t('Ligne supprimée'));
+        return;
+      }
+      if (act === 'unreact' || act.startsWith('react:')) {
+        if (lineHidden(net.moderation().acts, l.id, now())) return;
+        const kind = act === 'unreact' ? null : act.slice(6);
+        if (kind !== null && !(REACTIONS as readonly string[]).includes(kind)) return;
+        const problem = writeProblem(room);
+        if (problem) return say(problem, 'warning');
+        if (!net.rooms().rulesAt) return say(t('Acceptez d’abord les règles des salons, à la borne : Écrire dans le salon'), 'warning');
+        if (!net.roomReact(l.id, kind as (typeof REACTIONS)[number] | null)) say(t('Réaction impossible pour l’instant'), 'warning');
+        return;
+      }
+      // Les gestes sur la ligne d'un autre joueur.
+      if (self) return;
+      if (act === 'request' && relationOf(me(), l.key) === 'none') {
+        net.request({ key: l.key, name: l.name });
+        say(t('Demande envoyée à {name}', { name: l.name }));
+      } else if (act === 'ignore') {
+        setIgnored(l.key, true);
+        say(t('{name} est ignoré dans les salons', { name: l.name }));
+      } else if (act === 'report' && (MOD_REASONS as readonly string[]).includes(reason ?? '')) {
+        net.report(l, reason as (typeof MOD_REASONS)[number]);
+        say(t('Signalement envoyé aux modérateurs'));
+      } else if (act === 'block') {
+        net.block(l.key);
+        say(t('{name} est bloqué', { name: l.name }));
+      }
     },
     write: (room, text) => {
       const why = write(room, text);

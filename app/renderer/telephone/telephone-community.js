@@ -27,6 +27,8 @@ const community = {
   profileFrom: 'friends',
   /** Le filtre de « Joueurs » (Tous, Mon pays, À proximité, Mêmes tables), gardé par ce téléphone. */
   filter: 'all',
+  /** Le salon choisi au téléphone (« monde », « pays-FR »), ou celui de la borne. */
+  room: undefined,
   /** Le fil montré a déjà défilé jusqu'en bas (un message arrivé ne fait pas sauter la lecture). */
   shownKey: undefined,
 };
@@ -545,10 +547,82 @@ function communityLeaveProfile() {
   send({ t: 'profile-open' });
 }
 
+/** Le nom d'un pays dans la langue de la page (Intl), sinon son code. */
+function countryLabel(code) {
+  try {
+    return new Intl.DisplayNames([window.cyberI18n?.locale ?? 'fr'], { type: 'region' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** Choisir le salon montré au téléphone (la borne l'envoie aussitôt) ; sans salon : celui de la borne. */
+function communityPickRoom(room) {
+  community.room = room;
+  community.roomShown = undefined;
+  send({ t: 'room-open', ...(room ? { room } : {}) });
+}
+
+/** « Autres pays… » : tous les pays, par leur nom ; un toucher ouvre son salon. */
+function openCountries(r) {
+  const list = (r.countries ?? []).map((code) => ({ code, name: countryLabel(code) })).sort((a, b) => a.name.localeCompare(b.name));
+  openSheet(t('Salons des pays'), list.map((c) => ({ label: c.name, run: () => communityPickRoom(`pays-${c.code}`) })));
+}
+
 /**
- * Le salon par pays (la borne choisit : celui ouvert à la borne, sinon celui par défaut) : ses dernières
- * lignes à l'ancienne (l'heure, <pseudo> à la teinte de sa clé, le texte), des phrases d'un appui et un
- * champ. Écrire passe par la borne (« room-send »), qui vérifie les règles, les limites et le texte.
+ * Les options d'une ligne, au toucher : réagir (la mienne choisie, la retoucher la retire), répondre
+ * (le champ commence par @pseudo), voir son profil, demande d'ami, ignorer, signaler (avec la raison),
+ * bloquer ; sur ma ligne, la supprimer. Bloquer et supprimer se confirment ; la borne vérifie tout.
+ */
+function openLineOptions(r, l) {
+  if (state !== 'paired' || !l.id || l.kind === 'masked') return;
+  const own = l.kind === 'own';
+  const act = (a, extra) => send({ t: 'room-act', room: r.room, line: l.id, a, ...(extra ?? {}) });
+  const confirm = (title, text, label, a) => openSheet(title, [{ label, danger: true, run: () => act(a) }], { text });
+  const reactions = r.blocked
+    ? []
+    : [
+        chipStrip(
+          (r.reactions ?? []).map((x) => ({
+            label: x.label,
+            current: x.id === l.mine,
+            run: () => {
+              closeSheet();
+              act(x.id === l.mine ? 'unreact' : `react:${x.id}`);
+            },
+          })),
+          { lines: 1, className: 'reactions' },
+        ),
+      ];
+  const items = own
+    ? [{ label: t('Supprimer ma ligne…'), danger: true, run: () => confirm(t('Supprimer votre ligne ?'), l.text, t('Supprimer'), 'retract') }]
+    : [
+        ...(r.blocked
+          ? []
+          : [
+              {
+                label: t('Répondre à @{name}', { name: l.nick }),
+                run: () => {
+                  const field = document.getElementById('room-field');
+                  field.value = `@${l.nick} `;
+                  field.focus();
+                },
+              },
+            ]),
+        { label: t('Voir son profil'), run: () => communityOpenProfile(l.key) },
+        ...(l.friend ? [] : [{ label: t('Envoyer une demande d’ami'), run: () => act('request') }]),
+        { label: t('Ignorer {name} dans les salons', { name: l.nick }), run: () => act('ignore') },
+        { label: t('Signaler ce message'), run: () => openSheet(t('Signaler ce message'), (r.reasons ?? []).map((x) => ({ label: x.label, run: () => act('report', { reason: x.id }) })), { text: l.text }) },
+        { label: t('Bloquer {name}', { name: l.nick }), danger: true, run: () => confirm(t('Bloquer {name} ?', { name: l.nick }), t('Plus de demande d’ami, plus de connexion avec sa borne, ses lignes disparaissent de vos salons. Débloquer : Partage et réseau.'), t('Bloquer'), 'block') },
+      ];
+  openSheet(t('Ligne de {name} à {time}', { name: l.nick, time: l.time }), items, { text: l.text, top: reactions });
+}
+
+/**
+ * Le salon (rooms-menu.ts, remote) : le salon à choisir en tête (le mien, Monde, ceux où l'on parle,
+ * « Autres pays… »), ses dernières lignes à l'ancienne (l'heure, <pseudo> à la teinte de sa clé, le
+ * texte, ses réactions dessous), des phrases d'un appui et un champ. Une ligne touchée ouvre ses
+ * options. Écrire passe par la borne (« room-send »), qui vérifie les règles, les limites et le texte.
  */
 function renderRoom() {
   const r = community.data?.room;
@@ -556,21 +630,36 @@ function renderRoom() {
   const status = document.getElementById('room-status');
   const chips = document.getElementById('room-chips');
   const field = document.getElementById('room-field');
+  const picker = document.getElementById('room-picker');
   document.getElementById('room-send').textContent = t('Envoyer');
-  document.getElementById('room-head').textContent = r ? r.name : t('Salon indisponible');
   if (!r) {
     list.replaceChildren();
+    picker.replaceChildren();
     status.hidden = false;
     status.textContent = community.data?.closed ?? t('Partage désactivé : Partage et réseau');
     setChips(chips, []);
     field.disabled = true;
     return;
   }
+  // Les salons à choisir, en badges sur une ligne ; « Autres pays… » en dernier.
+  setChips(
+    picker,
+    [
+      {
+        lines: 1,
+        items: [
+          ...(r.rooms ?? []).map((x) => ({ label: x.present ? `${x.name} · ${x.present}` : x.name, current: x.room === r.room, run: () => communityPickRoom(x.room) })),
+          ...(r.countries?.length ? [{ label: t('Autres pays…'), run: () => openCountries(r) }] : []),
+        ],
+      },
+    ],
+    r.room,
+  );
   const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
   list.replaceChildren(
     ...r.lines.map((l) => {
       const li = document.createElement('li');
-      li.className = `room-line kind-${l.kind}`;
+      li.className = `room-line kind-${l.kind}${l.id && l.kind !== 'masked' ? ' pick' : ''}`;
       const time = document.createElement('time');
       time.textContent = l.time;
       const text = document.createElement('span');
@@ -586,20 +675,39 @@ function renderRoom() {
       say.className = l.kind === 'me' ? 'room-act' : '';
       say.textContent = l.text;
       text.append(say);
+      if (l.reacts) {
+        const reacts = document.createElement('span');
+        reacts.className = 'room-reacts';
+        reacts.textContent = l.reacts;
+        text.append(reacts);
+      }
       li.append(time, text);
+      if (l.id && l.kind !== 'masked') {
+        li.tabIndex = 0;
+        li.setAttribute('role', 'button');
+        li.addEventListener('click', () => {
+          // Un texte sélectionné (copier une ligne) n'ouvre rien.
+          if (String(window.getSelection?.() ?? '').trim()) return;
+          if (navigator.vibrate) navigator.vibrate(12);
+          openLineOptions(community.data?.room ?? r, l);
+        });
+      }
       return li;
     }),
   );
   // Qui écrit dans le salon, sous la dernière ligne.
   const typing = typingItem(r.typing, 'room');
   if (typing) list.append(typing);
-  if (atBottom || community.roomShown !== r.name) list.scrollTop = list.scrollHeight;
-  community.roomShown = r.name;
-  status.hidden = !r.blocked;
-  status.textContent = r.blocked ?? '';
+  if (atBottom || community.roomShown !== r.room) list.scrollTop = list.scrollHeight;
+  community.roomShown = r.room;
+  // Le constat du dernier geste (signalement envoyé…), sinon pourquoi on ne peut pas écrire, sinon l'aide.
+  const line = r.notice ?? (r.blocked ? { text: r.blocked, tone: 'warning' } : { text: t('Touchez une ligne : réagir, répondre, voir le profil, signaler.'), tone: 'info' });
+  status.hidden = false;
+  status.textContent = line.text;
+  status.className = `thread-status ${line.tone}`;
   field.disabled = Boolean(r.blocked);
   // Les phrases préparées en badges, sur deux lignes qui défilent (chipStrip, telephone.js).
-  setChips(chips, [{ lines: 2, items: r.phrases.map((p) => ({ label: p, disabled: Boolean(r.blocked), run: () => send({ t: 'room-send', text: p }) })) }], r.name);
+  setChips(chips, [{ lines: 2, items: r.phrases.map((p) => ({ label: p, disabled: Boolean(r.blocked), run: () => send({ t: 'room-send', text: p }) })) }], r.room);
 }
 
 document.getElementById('room-form').addEventListener('submit', (e) => {

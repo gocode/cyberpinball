@@ -1525,21 +1525,22 @@ phoneRemote.setMenu({
   jukebox: () => remoteJukebox(),
   jukeboxAct: (op, key, fraction) => remoteJukeboxAct(op, key, fraction),
   // Communauté au téléphone (messages, amis) : au menu, et pendant une partie si le réglage le permet ; jamais en mode invité.
-  community: (open, profile) => remoteCommunity(open, profile),
+  community: (open, profile, room) => remoteCommunity(open, profile, room),
   profileAct: (key, act) => remoteProfileAct(key, act),
   friendAnswer: (key, yes) => remoteFriendAnswer(key, yes),
-  roomSend: (text) => remoteRoomSend(text),
+  roomSend: (text, room) => remoteRoomSend(text, room),
+  roomAct: (room, line, act, reason) => remoteRoomAct(room, line, act, reason),
   chatSend: (key, text) => {
     if (!phoneMayWrite()) return;
     if (key.startsWith('g:')) groupService.send(key.slice(2), text);
     else chatService.send(key, text);
   },
   // « En train d'écrire » depuis un champ du téléphone (typing.ts) : chaque service vérifie l'ami, le groupe, le salon.
-  typing: (key, on) => {
+  typing: (key, on, room) => {
     if (on && !phoneMayWrite()) return;
     if (key === undefined) {
       if (guest.active || !socialNet.state().enabled) return;
-      const r = roomsMenu.remote();
+      const r = roomsMenu.remote(room);
       socialNet.roomTyping(r.room, on && !r.blocked);
     } else if (key.startsWith('g:')) groupService.typing(key.slice(2), on);
     else chatService.typing(key, on);
@@ -1811,14 +1812,14 @@ function remotePickJukebox(): void {
 
 /** Les joueurs en ligne qui ne sont pas mes amis, pour « Joueurs » au téléphone : jamais la table, leur pays en clair. */
 /** La Communauté au téléphone : conversations, fil ouvert, Joueurs et profil ouvert ; jamais en mode invité. */
-function remoteCommunity(open: string | undefined, profile: string | undefined): RemoteCommunity {
+function remoteCommunity(open: string | undefined, profile: string | undefined, room: string | undefined): RemoteCommunity {
   if (guest.active) return { closed: t('Fermée en mode invité.'), unread: 0, rows: [] };
   // Mes groupes en tête des conversations ; leur fil s'ouvre par « g:<id> ».
   const groups = groupsMenu.remote(open);
   const chat = chatMenu.remoteCommunity(open?.startsWith('g:') ? undefined : open);
   // Joueurs (demandes, filtres, groupes) et le profil ouvert : phone-community.ts.
   const shown = profile ? phoneCommunity.profile(profile) : undefined;
-  return { ...chat, rows: [...groups.rows, ...chat.rows], unread: chat.unread + groups.unread, ...(groups.thread ? { thread: groups.thread } : {}), people: communityMenu.remotePeople(REMOTE_ENTRIES_MAX), ...(shown ? { profile: shown } : {}), ...remoteRoom() };
+  return { ...chat, rows: [...groups.rows, ...chat.rows], unread: chat.unread + groups.unread, ...(groups.thread ? { thread: groups.thread } : {}), people: communityMenu.remotePeople(REMOTE_ENTRIES_MAX), ...(shown ? { profile: shown } : {}), ...remoteRoom(room) };
 }
 
 /** Une action du profil montré au téléphone (phone-community.ts) ; jamais en mode invité. */
@@ -1832,15 +1833,21 @@ function remoteFriendAnswer(key: string, yes: boolean): void {
 }
 
 /** Le salon par pays pour le téléphone (rooms-menu.ts) : celui ouvert à la borne, sinon le salon par défaut. */
-function remoteRoom() {
-  return socialNet.state().enabled ? { room: roomsMenu.remote() } : {};
+function remoteRoom(room: string | undefined) {
+  return socialNet.state().enabled ? { room: roomsMenu.remote(room) } : {};
 }
 
 /** Une ligne écrite au téléphone dans ce salon ; jamais en mode invité. */
-function remoteRoomSend(text: string): void {
+function remoteRoomSend(text: string, room: string | undefined): void {
   if (guest.active || !socialNet.state().enabled) return;
-  const r = roomsMenu.remote();
+  const r = roomsMenu.remote(room);
   if (!r.blocked) roomsMenu.write(r.room, text);
+}
+
+/** Un geste fait au téléphone sur une ligne d'un salon (rooms-menu.ts, remoteAct) ; jamais en mode invité. */
+function remoteRoomAct(room: string, line: string, act: string, reason: string | undefined): void {
+  if (guest.active || !socialNet.state().enabled) return;
+  roomsMenu.remoteAct(room, line, act, reason);
 }
 
 /** Le médaillon Communauté touché au téléphone : choisi, ou, déjà choisi, ouvert. */

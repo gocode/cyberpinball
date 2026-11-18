@@ -117,7 +117,7 @@ export const messages: Record<string, string> = {
   'Derniers messages': 'Latest messages',
   'Flippers : choisir une phrase · Start : l’envoyer · Exit : sortir des phrases': 'Flippers: choose a phrase · Start: send it · Exit: leave the phrases',
   'Salon': 'Room',
-  'Salon indisponible': 'Room unavailable',
+  'Touchez une ligne : réagir, répondre, voir le profil, signaler.': 'Tap a line to react, reply, see the profile or report.',
   'Acceptez d’abord les règles des salons, à la borne : Écrire dans le salon': 'Accept the room rules first, at the cabinet: Write in the room',
 
   // Phrases préparées : Écrire dans le salon, Réglages de la communauté > Phrases préparées

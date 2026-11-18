@@ -191,6 +191,9 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
       // Le logo du lancement en cinéma ne fait que passer sur l'écran : sur le titre du repli du
       // chargement, ce n'est ni un chevauchement ni une coupure.
       if (top.closest('.cinema')) continue;
+      // Le moment d'un badge ou d'un niveau passe sur la roue sous son voile (88 %, niveau.css) : ce
+      // qui est dessous est éteint, pas chevauché. Ses éléments entre eux restent contrôlés.
+      if (top.closest('#level-moment') && !bottom.closest('#level-moment')) continue;
       const at = (v) => '[' + [v.left, v.top, v.right, v.bottom].map(Math.round).join(', ') + ']';
       const cover = masked(top, bottom, x, y);
       if (cover) {

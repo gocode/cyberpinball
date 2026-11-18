@@ -224,10 +224,24 @@ export interface RemoteCommunityRow {
 
 /** Le salon montré au téléphone : à l'ancienne, une ligne par message ; pourquoi on ne peut pas écrire. */
 export interface RemoteRoom {
+  /** Son identifiant (« monde », « pays-FR »), pour les gestes sur ses lignes. */
+  room: string;
   name: string;
   /** Au-delà de cinq présents seulement (shownCrowd) : un salon presque vide ne se chiffre pas. */
   present?: number;
-  lines: { time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' }[];
+  /**
+   * Chaque ligne : son identifiant et la clé de son auteur (son profil, les gestes), ses réactions en
+   * pastilles (« 👍 2 · 😆 1 ») et la mienne ; masquée par la modération : `masked`, sans son texte.
+   */
+  lines: { id?: string; key?: string; time: string; nick?: string; hue?: number; text: string; kind: 'line' | 'me' | 'mention' | 'own' | 'sys' | 'masked'; reacts?: string; mine?: string; friend?: boolean }[];
+  /** Les salons à choisir en tête (le mien, Monde, ceux où l'on parle), et les pays pour « Autres pays… ». */
+  rooms?: { room: string; name: string; present?: number }[];
+  countries?: string[];
+  /** Les réactions et les raisons d'un signalement, dans la langue de la borne. */
+  reactions?: { id: string; label: string }[];
+  reasons?: { id: string; label: string }[];
+  /** Le constat du dernier geste fait au téléphone (« Signalement envoyé aux modérateurs »). */
+  notice?: { text: string; tone: 'ok' | 'warning' };
   phrases: string[];
   /** On ne peut pas écrire (règles à accepter à la borne, salons désactivés…) : pourquoi. */
   blocked?: string;
@@ -367,16 +381,18 @@ export interface MenuTarget {
   chat?(): RemoteChat | undefined;
   /** Écrire à un ami, ou réagir à un de ses messages, depuis le téléphone ; la messagerie vérifie tout. */
   chatSend?(key: string, text: string): void;
-  /** Une ligne écrite au téléphone dans le salon qu'il montre. */
-  roomSend?(text: string): void;
+  /** Une ligne écrite au téléphone dans le salon qu'il montre (`room` : celui choisi au téléphone, sinon celui de la borne). */
+  roomSend?(text: string, room?: string): void;
+  /** Un geste sur une ligne d'un salon (réagir, signaler…) ; la borne vérifie tout. */
+  roomAct?(room: string, line: string, act: string, reason?: string): void;
   /**
    * « En train d'écrire » depuis un champ du téléphone (typing.ts) : à un ami (`key`), dans un groupe
    * (`key` « g: » et son identifiant) ou dans le salon qu'il montre (sans `key`) ; `on`, il reste du texte.
    */
-  typing?(key: string | undefined, on: boolean): void;
+  typing?(key: string | undefined, on: boolean, room?: string): void;
   chatReact?(key: string, target: string, kind: string): void;
   /** Communauté : les conversations, le fil ouvert (`open`) et le profil ouvert (`profile`) au téléphone ; sans elle, l'onglet le dit. */
-  community?(open?: string, profile?: string): RemoteCommunity;
+  community?(open?: string, profile?: string, room?: string): RemoteCommunity;
   /** Une action du profil montré au téléphone (son identité dans l'écran de la borne) ; la borne vérifie tout. */
   profileAct?(key: string, act: string): void;
   /** Accepter ou refuser une demande d'ami reçue. */
@@ -665,6 +681,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   let communityOpen: string | undefined;
   /** Le profil ouvert au téléphone (clé d'un joueur), ou aucun. */
   let profileOpen: string | undefined;
+  /** Le salon choisi au téléphone, ou celui de la borne. */
+  let roomOpen: string | undefined;
   let menusAt = 0;
   let menusTimer: NodeJS.Timeout | undefined;
   /**
@@ -1024,6 +1042,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     ranksWatch = undefined;
     communityOpen = undefined;
     profileOpen = undefined;
+    roomOpen = undefined;
     wantsMedia = false;
     pushState(true);
   }
@@ -1153,7 +1172,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     communityAt = now;
     let c: RemoteCommunity;
     try {
-      c = menu.community(communityOpen, profileOpen);
+      c = menu.community(communityOpen, profileOpen, roomOpen);
     } catch (error) {
       journalIncident('Télécommande : messagerie illisible pour le téléphone', error); // i18n-ignore : journal
       return;
@@ -1693,7 +1712,12 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         pushCommunity(true);
         return;
       case 'room-send':
-        menu.roomSend?.(message.text);
+        menu.roomSend?.(message.text, roomOpen);
+        pushCommunity(true);
+        return;
+      case 'room-act':
+        // La borne retrouve la ligne dans ce salon et vérifie le geste (rooms-menu.ts, remoteAct).
+        menu.roomAct?.(message.room, message.line, message.a, message.reason);
         pushCommunity(true);
         return;
       case 'profile-act':
@@ -1707,7 +1731,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         return;
       case 'typing':
         // Le menu vérifie tout (ami, membre, salon, réglages) ; un signal de trop n'envoie rien (au plus un toutes les 3 s).
-        menu.typing?.(message.key, message.on);
+        menu.typing?.(message.key, message.on, roomOpen);
         return;
       case 'set':
         // Le clavier à l'écran n'a qu'une ligne : un saut de ligne (permis pour une zone de texte d'une page) y devient une espace.
@@ -1782,6 +1806,12 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     // Communauté : le fil ouvert au téléphone (aucun geste injecté) ; son contenu part aussitôt.
     if (message.t === 'chat-open') {
       communityOpen = message.key;
+      pushCommunity(true);
+      return;
+    }
+    // Le salon choisi au téléphone (ou celui de la borne) : son journal part aussitôt.
+    if (message.t === 'room-open') {
+      roomOpen = message.room;
       pushCommunity(true);
       return;
     }
@@ -2226,6 +2256,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     communityTimer = undefined;
     communityOpen = undefined;
     profileOpen = undefined;
+    roomOpen = undefined;
     // Les jetons des images ne valent plus rien : la prochaine liaison en reçoit d'autres.
     images.reset();
     resized.clear();

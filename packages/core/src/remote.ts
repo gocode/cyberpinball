@@ -43,6 +43,7 @@ import { aeadOpen, aeadSeal } from './chacha';
 import { RANKING_SCOPES, type RankingScope } from './rankings';
 import { SCORE_PERIODS, type ScorePeriod } from './scoreboard';
 import { REMOTE_PHONE_NAME_RESULTS, type RemotePhoneNameResult } from './remote-name';
+import { isRoomId } from './rooms';
 
 /** Durée de validité d'un QR code (sa clé d'appairage), puis il se renouvelle. */
 export const REMOTE_PAIRING_MS = 3 * 60_000;
@@ -476,6 +477,13 @@ export type PhoneMessage =
   | { t: 'profile-act'; s: number; key: string; a: string }
   /** Accepter (`yes`) ou refuser une demande d'ami reçue, depuis la liste des joueurs. */
   | { t: 'friend-answer'; s: number; key: string; yes: boolean }
+  /** Salons : le salon montré au téléphone (« monde », « pays-FR »), ou celui de la borne (`room` absent). */
+  | { t: 'room-open'; s: number; room?: string }
+  /**
+   * Un geste sur une ligne d'un salon (son identifiant) : réagir (« react:like », « unreact »), demande
+   * d'ami, ignorer, signaler (avec sa raison), bloquer, retirer sa propre ligne. La borne vérifie tout.
+   */
+  | { t: 'room-act'; s: number; room: string; line: string; a: RemoteRoomAct; reason?: string }
   /**
    * Juke-box (onglet du téléphone) : une commande du lecteur de la borne (jukebox-player.ts), comme
    * un clic ou un bouton à la borne. `key` : une ligne reçue (playlist, morceau, ligne fixe) ;
@@ -484,6 +492,10 @@ export type PhoneMessage =
   | { t: 'jb'; s: number; op: RemoteJukeboxOp; key?: string; fraction?: number }
   | { t: 'ping'; s: number }
   | { t: 'bye'; s: number };
+
+/** Gestes sur une ligne d'un salon, au téléphone (« react:<réaction> » en plus). */
+export const REMOTE_ROOM_ACTS = ['unreact', 'request', 'ignore', 'report', 'block', 'retract'] as const;
+export type RemoteRoomAct = (typeof REMOTE_ROOM_ACTS)[number] | `react:${string}`;
 
 /** Commandes du Juke-box au téléphone. */
 export const REMOTE_JUKEBOX_OPS = ['open', 'row', 'play', 'up', 'pause', 'shuffle', 'repeat', 'seek', 'next', 'prev', 'manage', 'exit'] as const;
@@ -588,6 +600,16 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       return isPlayerKey(m.key) && isActionId(m.a) ? { t: 'profile-act', s, key: m.key, a: m.a } : undefined;
     case 'friend-answer':
       return isPlayerKey(m.key) && typeof m.yes === 'boolean' ? { t: 'friend-answer', s, key: m.key, yes: m.yes } : undefined;
+    case 'room-open':
+      if (m.room === undefined || m.room === null) return { t: 'room-open', s };
+      return isRoomId(m.room) ? { t: 'room-open', s, room: m.room } : undefined;
+    case 'room-act': {
+      const a = m.a;
+      const known = (REMOTE_ROOM_ACTS as readonly unknown[]).includes(a) || (typeof a === 'string' && /^react:[a-z]{1,20}$/.test(a));
+      if (!isRoomId(m.room) || typeof m.line !== 'string' || !/^[0-9a-f]{16}$/.test(m.line) || !known) return undefined;
+      if (m.reason !== undefined && (typeof m.reason !== 'string' || !/^[a-z]{1,20}$/.test(m.reason))) return undefined;
+      return { t: 'room-act', s, room: m.room, line: m.line, a: a as RemoteRoomAct, ...(typeof m.reason === 'string' ? { reason: m.reason } : {}) };
+    }
     case 'ping':
       return { t: 'ping', s };
     case 'bye':

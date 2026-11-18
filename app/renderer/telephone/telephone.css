@@ -3489,15 +3489,6 @@ body:not([data-state='paired']) .room {
   visibility: hidden;
 }
 
-.room-head {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--signal);
-}
-
 .room-lines {
   flex: 1;
   min-height: 0;
@@ -3967,4 +3958,40 @@ body:not([data-mode='browser'])[data-view='profile'] .profile {
   text-overflow: clip;
   line-height: 18px;
   text-align: center;
+}
+
+/* ---------- Salons : le salon à choisir, les réactions d'une ligne, une ligne qui s'ouvre au toucher ---------- */
+
+.room-picker:empty {
+  display: none;
+}
+
+.room-line.pick {
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.room-line.pick:active {
+  background: var(--signal-wash);
+}
+
+.room-line.kind-masked .room-text > span:last-child {
+  font-style: italic;
+  color: var(--ink-faint);
+}
+
+.room-reacts {
+  display: block;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+
+.thread-status.ok {
+  color: var(--signal);
+}
+
+/* Les réactions d'une ligne, en tête de sa feuille d'options. */
+.sheet-actions > .chip-strip {
+  margin-bottom: 4px;
 }

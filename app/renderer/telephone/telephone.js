@@ -1150,6 +1150,8 @@ function handle(m) {
       // Et un fil ouvert le redemande (la borne l'oublie à chaque liaison).
       if (document.body.dataset.view === 'thread' && community.open && m.mode !== 'browser') send({ t: 'chat-open', key: community.open });
       if (document.body.dataset.view === 'profile' && community.profile && m.mode !== 'browser') send({ t: 'profile-open', key: community.profile });
+      // Le salon choisi au téléphone : la borne l'oublie à chaque liaison.
+      if (community.room && m.mode !== 'browser') send({ t: 'room-open', room: community.room });
       if (hintAfterMode && state === 'paired') {
         hintAfterMode = false;
         // Après l'essai du nom : passée par le nom, la page part ; restée sur l'adresse, le raccourci qui suit la borne.
@@ -1862,6 +1864,8 @@ function openSheet(title, items, opts = {}) {
   const list = [...items];
   if (opts.search) list.push({ id: 'bye', label: t('Déconnecter ce téléphone') });
   box.replaceChildren(
+    // En tête des actions, ce que la feuille montre d'autre (les réactions d'une ligne d'un salon).
+    ...(opts.top ?? []),
     ...list.map((item) => {
       const b = document.createElement('button');
       b.type = 'button';

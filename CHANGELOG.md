@@ -11,6 +11,9 @@ son interface).
 
 ## 0.1.16
 
+- Téléphone, Salons : le salon se choisit en tête (le vôtre, Monde, ceux où l'on parle, « Autres pays… »), indépendamment de celui ouvert à la borne ; écrire et les phrases préparées partent dans le salon choisi.
+- Téléphone, Salons : une ligne touchée ouvre ses options, comme à la borne : réagir (sept réactions), répondre (le champ commence par @pseudo), voir son profil, envoyer une demande d'ami, l'ignorer, signaler le message avec sa raison, le bloquer ; sur votre ligne, la supprimer. Bloquer et supprimer se confirment au téléphone. Les réactions s'affichent sous chaque ligne.
+- Téléphone : une ligne masquée par la modération l'est désormais aussi au téléphone, où elle s'affichait en clair.
 - Téléphone, Communauté : l'onglet « Joueurs » reprend la liste de la borne, avec les demandes d'ami reçues en tête (Accepter, Refuser), les filtres en badges (Tous, Mon pays, À proximité, Mêmes tables) et les joueurs groupés comme à la borne, chacun avec son drapeau.
 - Téléphone : un toucher sur un joueur ouvre son profil, le même qu'à la borne : son niveau, ses badges officiels, son activité avec les « J'aime », ses groupes publics ; envoyer une demande d'ami, écrire à un ami, l'inviter à une partie ou voir sa bibliothèque (à la borne), et sous « Plus » masquer son activité, le retirer de vos amis ou le bloquer, après une confirmation au téléphone.
 - Téléphone : les onglets de la Communauté deviennent Messages, Joueurs, Salons et Scores ; le nombre de non-lus passe en capsule au coin, « Messages » n'est plus coupé.
