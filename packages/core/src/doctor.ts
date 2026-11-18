@@ -10,6 +10,7 @@ import { findMangledDirs } from './copytree';
 import { formatDate, formatDateTime, formatList, t, tn } from './i18n';
 import { IniDocument } from './ini';
 import { slowTableFinding } from './slowtable';
+import { flexPrewarmFor, type FlexPrewarm } from './flexprewarm';
 import { heavyDmdVideosFinding } from './dmdvideos';
 import { isCurrentMediaError, mediaErrorsFile, readMediaErrors, type MediaErrorEntry, type MediaErrorKind } from './mediaerrors';
 import {
@@ -95,7 +96,7 @@ import { orientationFinding, type PlayfieldOrientation } from './sync';
 import { vpxPlayedFlipperEdge } from './vpx';
 import { scriptCode } from './vbscript';
 import { cabinetDmdIni, cabinetDmdOptions, type CabinetDmdOption } from './tableoptions';
-import { readVpxScript, readVpxTableName } from './vpxinfo';
+import { readVpxImageNames, readVpxScript, readVpxTableName } from './vpxinfo';
 import { describeRenames, emptyPlayedPlaylists, missingPackFiles, packFileFixes, type PackFileFixes } from './pupfiles';
 import { activePacks, disabledPacks, isPupFolderName, packsOfTable, PUP_DISABLED_FOLDER, PUP_FOLDER, pupVideosDir } from './pupdisabled';
 import { ratioLabel } from './zones';
@@ -117,6 +118,7 @@ export const FINDING_CODES = [
   'scriptOverride',
   'scriptPatchStale',
   'scriptCoreCompat',
+  'flexImagesLate',
   'dmdDesktopOption',
   'backglassMissing',
   'backglassMisnamed',
@@ -613,6 +615,9 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   if (ownFolder) {
     const compat = coreCompatFinding(entry, ctx, override);
     if (compat) findings.push(compat);
+    // Images du DMD que FlexDMD tire de la table, chargées en pleine partie (flexprewarm.ts) : chargées d'avance.
+    const prewarm = compat ? undefined : flexPrewarmFinding(entry, ctx, override);
+    if (prewarm) findings.push(prewarm);
   }
   const desktopDmd = desktopDmdFinding(entry, ctx);
   if (desktopDmd) findings.push(desktopDmd);
@@ -1210,7 +1215,7 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
   if (foreign) content = applyCompatFixes(foreign.text, missing);
   else if (source !== undefined) {
     const compat = [...new Set([...own.compat, ...missing])];
-    content = buildScriptPatch(source, own.switches, own.loader, own.capture, compat) ?? buildScriptPatch(source, own.switches, own.loader, undefined, compat);
+    content = buildScriptPatch(source, own.switches, own.loader, own.capture, compat, own.prewarm) ?? buildScriptPatch(source, own.switches, own.loader, undefined, compat, own.prewarm);
   }
   // Pièce VR allumée sur les écrans (version VR de la table, ou interrupteur d'essai laissé à 1) : seule, ou avec vpmInit.
   if (!missing.includes('vpmInitOnce')) {
@@ -1251,6 +1256,42 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
   };
 }
 
+
+/**
+ * Images du DMD que FlexDMD tire de la table (« VPX.nom ») : décodées à leur premier affichage, sur le fil de VPX, elles
+ * arrêtent la partie (flexprewarm.ts). VPX joue le .vbs de Cyber Pinball, qui les demande pendant le chargement de la
+ * table ; la table n'est pas modifiée. Un .vbs venu d'ailleurs ou d'une ancienne version de la table n'est pas touché ici.
+ */
+function flexPrewarmFinding(entry: TableEntry, ctx: DoctorContext, override: Override | undefined): Finding | undefined {
+  if (override && override.state.kind !== 'ours') return undefined;
+  const facts = ctx.script && !('error' in ctx.script) ? ctx.script : undefined;
+  if (facts && !facts.drawsDmd) return undefined;
+  const source = readVpxScript(entry.file);
+  const names = source !== undefined ? readVpxImageNames(entry.file) : undefined;
+  const prewarm = source !== undefined && names ? flexPrewarmFor(source, names) : undefined;
+  if (!source || !prewarm) return undefined;
+  const own = ownParts(override);
+  const same = own.prewarm && own.prewarm.variable === prewarm.variable && own.prewarm.images.join('\n') === prewarm.images.join('\n');
+  if (same) return undefined;
+  const content = buildScriptPatch(source, own.switches, own.loader, own.capture, own.compat, prewarm) ?? buildScriptPatch(source, own.switches, own.loader, undefined, own.compat, prewarm);
+  if (!content) return undefined;
+  const base = path.basename(entry.file).replace(/\.vpx$/i, '');
+  const target = override?.file ?? path.join(entry.folder, `${base}.vbs`);
+  const file = path.basename(target);
+  // Images distinctes : une variante (« &dmd=2 ») est la même image.
+  const shown = prewarm.images.filter((id) => !id.includes('&')).length;
+  return {
+    code: 'flexImagesLate',
+    severity: 'warning',
+    title: t('Images du DMD chargées en pleine partie'),
+    detail: [
+      tn(shown, 'Le DMD de cette table montre {n} image rangée dans la table, par FlexDMD.', 'Le DMD de cette table montre {n} images rangées dans la table, par FlexDMD.', { n: shown }),
+      t('VPX 10.8.1 lit et décode chacune à son premier affichage, pendant la partie : la partie s’arrête un instant, flippers compris.'),
+      t('La table n’est pas modifiée : VPX joue {file}, une copie de son script qui charge ces images pendant le chargement de la table.', { file }),
+    ].join(' '),
+    fix: { label: t('Charger les images du DMD d’avance (dans {file})', { file }), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] },
+  };
+}
 
 /** Règles DOF d'une table (dof.ts) : ini local qui masque celui de la borne, table sans PinMAME, ROM sans effets. */
 function dofFindingsFor(folder: string, script: ScriptFacts, dof: DofSetup): Finding[] {
@@ -1323,7 +1364,7 @@ export function repairScriptAfterStop(entry: TableEntry, ctx: DoctorContext, ops
  * 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack), et une table que le core.vbs
  * arrête ne démarre pas (Back to the Future, 30 octobre 2026 : vpmInit appelé deux fois).
  */
-export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['backglassEmpty', 'scriptCoreCompat', 'importedView', 'dmdDesktopOption','pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupNoScreens', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['backglassEmpty', 'scriptCoreCompat', 'flexImagesLate', 'importedView', 'dmdDesktopOption','pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupNoScreens', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
 
 /**
  * Constats réparables de PUP_PLAY_REPAIRS pour cette table. Sans script connu (cache
@@ -1344,6 +1385,8 @@ export function pupPlayRepairs(entry: TableEntry, ctx: DoctorContext): Finding[]
   if (override?.state.kind === 'stale' && !pupOff) found.push(staleFinding(override));
   const compat = coreCompatFinding(entry, { ...ctx, script }, override);
   if (compat) found.push(compat);
+  const prewarm = compat ? undefined : flexPrewarmFinding(entry, { ...ctx, script }, override);
+  if (prewarm) found.push(prewarm);
   const emptyB2s = emptyBackglassFinding(companion(entry.folder, base, true, '.directb2s'));
   if (emptyB2s) found.push(emptyB2s);
   const desktopDmd = desktopDmdFinding(entry, { ...ctx, script });
@@ -1449,7 +1492,7 @@ function pupSwitchFinding(entry: TableEntry, pack: string, offs: PupSwitch[], ov
     const embedded = readVpxScript(entry.file);
     const switches = embedded !== undefined ? pupSwitchesToEnable(scriptCode(embedded), drawsDmd) : [];
     const own = ownParts(override);
-    if (embedded !== undefined && switches.length) content = buildScriptPatch(embedded, switches, own.loader, own.capture, own.compat) ?? buildScriptPatch(embedded, switches, undefined, undefined, own.compat);
+    if (embedded !== undefined && switches.length) content = buildScriptPatch(embedded, switches, own.loader, own.capture, own.compat, own.prewarm) ?? buildScriptPatch(embedded, switches, undefined, undefined, own.compat, own.prewarm);
   }
   const main = offs.find((s) => s.kind !== 'dmd');
   const dmd = offs.find((s) => s.kind === 'dmd');
@@ -1500,7 +1543,7 @@ function pupLoaderFinding(entry: TableEntry, pack: string, override: Override | 
     // Notre .vbs est refait (la ligne qui le marque resterait sinon avant le lancement ajouté).
     const embedded = readVpxScript(entry.file);
     const own = ownParts(override);
-    if (embedded !== undefined) content = buildScriptPatch(embedded, own.switches, loader, own.capture, own.compat) ?? buildScriptPatch(embedded, own.switches, loader, undefined, own.compat);
+    if (embedded !== undefined) content = buildScriptPatch(embedded, own.switches, loader, own.capture, own.compat, own.prewarm) ?? buildScriptPatch(embedded, own.switches, loader, undefined, own.compat, own.prewarm);
   }
   const params = { pack, file, init: table ? `${table}_Init` : '' };
   return {
@@ -1524,10 +1567,10 @@ function pupLoaderFinding(entry: TableEntry, pack: string, override: Override | 
 }
 
 /** Ce qu'un .vbs de Cyber Pinball garde quand il est refait : interrupteurs, lancement du pack, reconnaissance. */
-function ownParts(override: Override | undefined): { switches: PupSwitch[]; loader?: PupLoader; capture?: ReturnType<typeof ownCapture>; compat: CompatFix[] } {
+function ownParts(override: Override | undefined): { switches: PupSwitch[]; loader?: PupLoader; capture?: ReturnType<typeof ownCapture>; compat: CompatFix[]; prewarm?: FlexPrewarm } {
   if (override?.state.kind !== 'ours') return { switches: [], compat: [] };
   const { patch } = override.state;
-  return { switches: patch.switches, loader: patch.loader, capture: ownCapture(override.text, patch), compat: patch.compat ?? [] };
+  return { switches: patch.switches, loader: patch.loader, capture: ownCapture(override.text, patch), compat: patch.compat ?? [], prewarm: patch.prewarm };
 }
 
 /** Pourquoi Cyber Pinball ne peut pas reconnaître les images du DMD de cette table. */
@@ -1595,7 +1638,7 @@ function pupCaptureFinding(entry: TableEntry, pack: string, root: string, overri
   else {
     const table = readVpxTableName(entry.file);
     const loader = own.loader ?? (loaderNeeded ? (table ? { pack, table } : { pack }) : undefined);
-    content = buildScriptPatch(source, own.switches, loader, block, own.compat);
+    content = buildScriptPatch(source, own.switches, loader, block, own.compat, own.prewarm);
   }
   if (!content) return unseen('timer');
   return {
@@ -1665,7 +1708,8 @@ function pupOffScriptFinding(entry: TableEntry, override: Override | undefined):
   if (!pupParts && override.state.kind === 'ours') return undefined;
   const embedded = readVpxScript(entry.file);
   const compat = embedded !== undefined ? compatFixesApplicable(patch.compat ?? [], scriptCode(embedded)) : [];
-  const content = embedded !== undefined && compat.length ? buildScriptPatch(embedded, [], undefined, undefined, compat) : undefined;
+  const prewarm = override.state.kind === 'ours' ? override.state.patch.prewarm : undefined;
+  const content = embedded !== undefined && (compat.length || prewarm) ? buildScriptPatch(embedded, [], undefined, undefined, compat, prewarm) : undefined;
   if (content !== undefined && content === override.text) return undefined;
   const file = path.basename(override.file);
   return {

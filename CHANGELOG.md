@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.16
 
+- Tables dont le DMD passe par FlexDMD avec des images rangées dans la table (tables de JP comme Hellboy ou Daredevil) : ces images sont chargées pendant l'écran de chargement, et non plus à leur premier affichage, qui arrêtait la partie un instant, flippers compris. La table n'est pas modifiée.
 - Nouveautés : sur une nouveauté agrandie, réagissez avec l'une des sept réactions des messages (👍 ❤️ 🥰 😆 😮 😢 😡). Chaque tuile dit combien de joueurs l'ont choisie, partout dans le monde, et la vôtre est repérée ; Start sur elle la retire. Une réaction par borne et par nouveauté ; supprimer son compte efface aussi ses réactions.
 - Profil d'un joueur : le « J'aime » d'un record ou d'un badge s'affiche avec un pouce levé au lieu d'une étoile, pour qu'on comprenne qu'on peut l'aimer ; le pouce est rempli quand vous l'aimez déjà. Même pouce sur l'écran « Ont aimé », la notification d'un « J'aime » reçu, le détail des points d'expérience et les badges « Apprécié », « Populaire » et « Généreux ».
 - Nouvelle rubrique Menu système > Mon compte, en tête : protéger et transférer son compte, pseudo, avatar, pays, badges, profil public, ce que voient les autres, et la suppression du compte.

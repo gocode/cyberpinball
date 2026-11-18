@@ -37,6 +37,14 @@ export const messages: Record<string, string> = {
     'When the table was brought in from {from}, that installation had no known ROM folder (no VPinMAME\\roms, no VPinMAME rompath in the registry, no Popper ROM folder).',
   'La table utilise PinMAME, mais le nom de sa ROM n’apparaît pas clairement dans son script.': 'The table uses PinMAME, but its script doesn’t clearly name its ROM.',
   'Rapport de plantage de VPX': 'VPX crash report',
+  'Images du DMD chargées en pleine partie': 'DMD images loaded mid-game',
+  'Le DMD de cette table montre {n} image rangée dans la table, par FlexDMD.': 'This table’s DMD shows {n} image stored in the table, through FlexDMD.',
+  'Le DMD de cette table montre {n} images rangées dans la table, par FlexDMD.': 'This table’s DMD shows {n} images stored in the table, through FlexDMD.',
+  'VPX 10.8.1 lit et décode chacune à son premier affichage, pendant la partie : la partie s’arrête un instant, flippers compris.':
+    'VPX 10.8.1 reads and decodes each one the first time it is shown, during the game: the game stops for a moment, flippers included.',
+  'La table n’est pas modifiée : VPX joue {file}, une copie de son script qui charge ces images pendant le chargement de la table.':
+    'The table is not modified: VPX plays {file}, a copy of its script that loads these images while the table is loading.',
+  'Charger les images du DMD d’avance (dans {file})': 'Load the DMD images in advance (in {file})',
   'Vidéos du DMD trop grandes : la partie se fige': 'DMD videos too large: the game freezes',
   'vidéo que Cyber Pinball ne sait pas réduire (seul le H.264 en MP4 l’est)': 'a video Cyber Pinball cannot shrink (only H.264 in MP4 can be)',
   '{file}, {width} × {height}': '{file}, {width} × {height}',

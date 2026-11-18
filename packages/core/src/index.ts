@@ -112,6 +112,7 @@ export * from './vpxcadence';
 export * from './dmdvideos';
 export * from './webmfile';
 export * from './mp4track';
+export * from './flexprewarm';
 export * from './highscores';
 export * from './scoreboard';
 export * from './rankings';

@@ -366,6 +366,17 @@ export function vpxWithScript(script: string, protectedScript = false): Buffer {
   return cfb({ TableName: 'Table' }, { GameData: gameData });
 }
 
+/** Une table avec son script et des images rangées en elle (GameStg/ImageN : nom et dimensions, sans pixels). */
+export function vpxWithScriptAndImages(script: string, images: { name: string; width: number; height: number }[]): Buffer {
+  const text = Buffer.from(script, 'latin1');
+  const gameData = Buffer.concat([biff('NAME', biffStr('Table1')), biff('CODE'), u32(text.length), text, biff('ENDB')]);
+  const streams: Record<string, Buffer> = { GameData: gameData };
+  images.forEach((img, i) => {
+    streams[`Image${i}`] = Buffer.concat([biff('NAME', biffStr(img.name)), biff('WDTH', u32(img.width)), biff('HGHT', u32(img.height)), biff('ENDB')]);
+  });
+  return cfb({ TableName: 'Table' }, streams);
+}
+
 /** Générateur pseudo-aléatoire stable : les images de test ne changent pas d'un essai à l'autre. */
 export function seeded(seed: number): () => number {
   let s = seed >>> 0;

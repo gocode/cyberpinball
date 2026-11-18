@@ -233,4 +233,6 @@ export const messages: Record<string, string> = {
   'script de la table adapté par Cyber Pinball : {what}': 'table script adapted by Cyber Pinball: {what}',
   'PuP-Pack allumé': 'PuP-Pack switched on',
   'vpmInit exécuté une seule fois': 'vpmInit run only once',
+  'pièce VR réservée au casque': 'VR room kept for the headset',
+  'images du DMD chargées d’avance': 'DMD images loaded in advance',
 };

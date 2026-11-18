@@ -20,6 +20,7 @@ import { addCaptureWatch, captureBlock, type PupCapture } from './pupcapture';
 import { applyCompatFixes, compatFixesApplicable, type CompatFix } from './scriptcompat';
 import { addPupLoader, enablePupSwitch, pupLoaderNeeded, pupScriptFacts, pupSwitchesToEnable, usesPinmameCode, type PupLoader, type PupSwitch } from './puppack';
 import { scriptCode } from './vbscript';
+import { addFlexPrewarm, flexDmdVariable, type FlexPrewarm } from './flexprewarm';
 
 /** Début de la dernière ligne d'un script adapté par Cyber Pinball. */
 export const SCRIPT_PATCH_MARK = "' CyberPinball-script ";
@@ -35,6 +36,8 @@ export interface ScriptPatch {
   capture?: PupCapture;
   /** Correctifs pour le core.vbs actuel (scriptcompat.ts). */
   compat?: CompatFix[];
+  /** Images du DMD que FlexDMD charge pendant le chargement de la table (flexprewarm.ts). */
+  prewarm?: FlexPrewarm;
 }
 
 /** Reconnaissance à poser : ses réglages et ses lignes (captureWatchLines, ou celles d'un .vbs déjà écrit). */
@@ -55,7 +58,7 @@ export function scriptHash(script: string): string {
  * sa place, si le minuteur où brancher la reconnaissance n'est plus dans le script, ou si un
  * correctif ne trouve plus sa place.
  */
-export function buildScriptPatch(original: string, switches: PupSwitch[], loader?: PupLoader, capture?: CaptureBlock, compat: CompatFix[] = []): string | undefined {
+export function buildScriptPatch(original: string, switches: PupSwitch[], loader?: PupLoader, capture?: CaptureBlock, compat: CompatFix[] = [], prewarm?: FlexPrewarm): string | undefined {
   let text: string | undefined = original;
   for (const sw of switches) {
     text = text === undefined ? undefined : enablePupSwitch(text, sw);
@@ -64,6 +67,7 @@ export function buildScriptPatch(original: string, switches: PupSwitch[], loader
   if (loader) text = addPupLoader(text, loader);
   if (capture) text = addCaptureWatch(text, capture.settings.timer, capture.lines);
   if (text !== undefined && compat.length) text = applyCompatFixes(text, compat);
+  if (text !== undefined && prewarm) text = addFlexPrewarm(text, prewarm);
   if (text === undefined) return undefined;
   const eol = /\r\n/.test(original) ? '\r\n' : '\n';
   const patch: ScriptPatch = {
@@ -72,6 +76,7 @@ export function buildScriptPatch(original: string, switches: PupSwitch[], loader
     ...(loader ? { loader } : {}),
     ...(capture ? { capture: capture.settings } : {}),
     ...(compat.length ? { compat } : {}),
+    ...(prewarm ? { prewarm } : {}),
   };
   return `${text}${/\r?\n$/.test(text) ? '' : eol}${SCRIPT_PATCH_MARK}${JSON.stringify(patch)}${eol}`;
 }
@@ -120,11 +125,13 @@ export function scriptPatchState(vbs: string, embedded: string | undefined): Scr
     // Les correctifs pour le core.vbs, tant que le nouveau script s'y prête ; s'il en réclame un
     // autre, le médecin l'ajoute (scriptCoreCompat).
     const compat = compatFixesApplicable(patch.compat ?? [], code);
-    const kept = capture ? buildScriptPatch(embedded, switches, loader, capture, compat) : undefined;
-    const content = kept ?? (switches.length || loader || compat.length ? buildScriptPatch(embedded, switches, loader, undefined, compat) : undefined);
+    // Le chargement d'avance, tant que le nouveau script lance encore le même FlexDMD ; sinon le médecin le refait.
+    const prewarm = patch.prewarm && flexDmdVariable(code) === patch.prewarm.variable ? patch.prewarm : undefined;
+    const kept = capture ? buildScriptPatch(embedded, switches, loader, capture, compat, prewarm) : undefined;
+    const content = kept ?? (switches.length || loader || compat.length || prewarm ? buildScriptPatch(embedded, switches, loader, undefined, compat, prewarm) : undefined);
     return content ? { kind: 'stale', patch, content } : { kind: 'stale', patch };
   }
-  return buildScriptPatch(embedded, patch.switches, patch.loader, ownCapture(vbs, patch), patch.compat) === vbs ? { kind: 'ours', patch } : { kind: 'foreign' };
+  return buildScriptPatch(embedded, patch.switches, patch.loader, ownCapture(vbs, patch), patch.compat, patch.prewarm) === vbs ? { kind: 'ours', patch } : { kind: 'foreign' };
 }
 
 /** Le bloc de reconnaissance d'un .vbs de Cyber Pinball, tel quel, quand sa dernière ligne en annonce un. */

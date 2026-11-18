@@ -16,7 +16,7 @@ import { blocksPlay, playBlockers } from '../playable';
 import { readInfo, scanTables, type TableEntry } from '../tables';
 import { buildZip } from '../romzip';
 import { readDofSetup, type DofSetup } from '../dof';
-import { devPcDisplays, framedFullDmd, starTrekPack, vpxWithScript } from './fixtures';
+import { devPcDisplays, framedFullDmd, starTrekPack, vpxWithScript, vpxWithScriptAndImages } from './fixtures';
 import { pngFrame } from '../fulldmdframe';
 import { dressScreen, tableDressing } from '../fulldmdtable';
 import type { Cabinet, PhysicalScreen } from '../model';
@@ -45,6 +45,8 @@ const DESKTOP_DMD_SCRIPT = `${SCRIPT}Sub Table1_OptionEvent(ByVal e)\r\n  x = Ta
 const NO_PUP_SCRIPT = 'Const cGameName="afm_113b"\r\nSub Table1_Init\r\n  LoadEM\r\n  Set FlexDMD = CreateObject("FlexDMD.FlexDMD")\r\nEnd Sub\r\n';
 /** Même table sans ROM, dont le script n'envoie au plugin PUP que l'effet DOF 105 (E105). */
 const NOT_DRIVEN_SCRIPT = `${NO_PUP_SCRIPT}Sub Kicker1_Hit\r\n  DOF 105, DOFPulse\r\nEnd Sub\r\n`;
+/** Table de JP : FlexDMD lancé, noms d'images assemblés par « "VPX." & … » (flexprewarm.ts). */
+const FLEX_JP_SCRIPT = `Set FlexDMD = CreateObject("FlexDMD.FlexDMD")\r\nFlexDMD.Run = True\r\nChars(65) = "d_a"\r\nSub Show(c) : FlexDMD.NewImage "", "VPX." & Chars(c) & "&dmd=2" : End Sub\r\n`;
 /** Borne à trois écrans : backglass, DMD 4:1, pas de topper ; playfield 16:9 couché, Windows en paysage. */
 const CABINET: PupCabinet = {
   backglass: true,
@@ -595,6 +597,12 @@ const TRAPS: Trap[] = [
       write(path.join(folder, 'Addams.UltraDMD', 'petite.mp4'), mp4(128, 32));
     },
     script: scriptFacts(`${SCRIPT}Set UltraDMD = CreateObject("UltraDMD.DMDObject")\r\nUltraDMD.SetProjectFolder curDir & "\\Addams.UltraDMD"\r\n`),
+  },
+  // Images du DMD (flexprewarm.ts) : une table de JP dont FlexDMD tirerait ses images de la table en pleine partie.
+  {
+    code: 'flexImagesLate',
+    arm: (folder) => write(path.join(folder, `${TABLE}.vpx`), vpxWithScriptAndImages(FLEX_JP_SCRIPT, [{ name: 'd_a', width: 128, height: 32 }])),
+    script: scriptFacts(FLEX_JP_SCRIPT),
   },
   // Cadence (slowtable.ts) : la dernière partie de la table, mesurée par le plugin du DMD, a ramé (17/11/2026).
   {

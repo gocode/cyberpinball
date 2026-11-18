@@ -125,7 +125,9 @@ export function tableContents(tableFile: string, opts: TableContentsOptions): Ta
         if (patch) {
           const what = [
             ...(patch.switches.length || patch.loader || patch.capture ? [t('PuP-Pack allumé')] : []),
-            ...(patch.compat?.length ? [t('vpmInit exécuté une seule fois')] : []),
+            ...(patch.compat?.includes('vpmInitOnce') ? [t('vpmInit exécuté une seule fois')] : []),
+            ...(patch.compat?.includes('vrRoomOnScreens') ? [t('pièce VR réservée au casque')] : []),
+            ...(patch.prewarm ? [t('images du DMD chargées d’avance')] : []),
           ];
           fileEntry(name, 'scriptOverride', 'ok', t('script de la table adapté par Cyber Pinball : {what}', { what: what.join(', ') }));
         } else if (sameBase(name)) fileEntry(name, 'scriptOverride', 'warning', t('remplace le script écrit dans la table'));

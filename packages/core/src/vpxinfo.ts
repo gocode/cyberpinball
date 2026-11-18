@@ -323,6 +323,38 @@ export interface VpxImages {
   logos: VpxImage[];
 }
 
+/**
+ * Noms des images rangées dans la table (GameStg/ImageN), sans lire leurs octets : seul le début de chaque image est lu.
+ * Pour les images du DMD que FlexDMD tire de la table (flexprewarm.ts). undefined si le fichier n'est pas un .vpx lisible.
+ */
+export function readVpxImageNames(file: string): { name: string; width: number; height: number }[] | undefined {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(file, 'r');
+    const cfb = new CompoundFile(fd);
+    const game = cfb.children(cfb.entries[0]!).find((e) => e.type === 1 && e.name === 'GameStg');
+    if (!game) return [];
+    const names: { name: string; width: number; height: number }[] = [];
+    for (const entry of cfb.children(game).filter((e) => e.type === 2 && /^Image\d+$/.test(e.name))) {
+      let name = '';
+      let width = 0;
+      let height = 0;
+      for (const { tag, body } of biffRecords(cfb.stream(entry, 4096))) {
+        if (tag === 'NAME' && !name) name = biffString(body);
+        else if (tag === 'WDTH' && body.length >= 4) width = body.readUInt32LE(0);
+        else if (tag === 'HGHT' && body.length >= 4) height = body.readUInt32LE(0);
+        else if (tag === 'JPEG' || tag === 'BITS' || tag === 'DATA') break;
+      }
+      if (name) names.push({ name, width, height });
+    }
+    return names;
+  } catch {
+    return undefined;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
 /** Au-delà, une image n'est pas lue (une texture de 4K en PNG fait déjà 20 Mo). */
 const MAX_IMAGE_BYTES = 60 * 1024 * 1024;
 /** Images de chaque sorte gardées, au plus. */
