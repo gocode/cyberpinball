@@ -51,3 +51,38 @@ test('pack qui a son screens.pup, ou qui ne vise aucun écran : rien à écrire'
   assert.equal(defaultScreensPup(scripted), undefined);
   for (const dir of [complete, scripted]) fs.rmSync(dir, { recursive: true });
 });
+
+test('pack à options dont l’option en place n’a pas de screens.pup : écrans déclarés avant la partie, une seule fois (Hellboy, 18/11/2026)', () => {
+  const { diagnose, repairPupForPlay, scriptFacts } = require('../doctor') as typeof import('../doctor');
+  const { scanTables } = require('../tables') as typeof import('../tables');
+  const { vpxWithScript } = require('./fixtures') as typeof import('./fixtures');
+  const tablesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-pup-options-'));
+  const folder = path.join(tablesDir, 'Hellboy (Original 2021)');
+  const script = 'Set PuPlayer = CreateObject("PinUpPlayer.PinDisplay")\r\nPuPlayer.B2SInit "", "HELLBOY"\r\n';
+  fs.mkdirSync(folder, { recursive: true });
+  fs.writeFileSync(path.join(folder, 'Hellboy (Original 2021).vpx'), vpxWithScript(script));
+  const root = path.join(folder, 'pupvideos', 'HELLBOY');
+  // Deux options faites seulement de déclencheurs et de playlists, sans screens.pup ; la première est en place.
+  for (const option of ['Option 1', 'Option 2']) {
+    fs.mkdirSync(path.join(root, 'PuP-Pack_Options', option), { recursive: true });
+    fs.writeFileSync(path.join(root, 'PuP-Pack_Options', option, 'playlists.pup'), PLAYLISTS);
+    fs.writeFileSync(path.join(root, 'PuP-Pack_Options', option, 'triggers.pup'), option === 'Option 1' ? TRIGGERS : TRIGGERS.replace('a.mp4', 'b.mp4'));
+    fs.writeFileSync(path.join(root, `${option}.bat`), `copy /y "PuP-Pack_Options\\${option}\\*.pup" .\r\n`);
+  }
+  fs.writeFileSync(path.join(root, 'playlists.pup'), PLAYLISTS);
+  fs.writeFileSync(path.join(root, 'triggers.pup'), TRIGGERS);
+  for (const name of ['Backglass', 'FullDMD', 'Topper', 'Music']) fs.mkdirSync(path.join(root, name));
+  const ctx = { tablesDir, script: scriptFacts(script) };
+  const codes = () => diagnose(scanTables(tablesDir)[0]!, ctx).map((f) => f.code);
+  assert.ok(codes().includes('pupNoScreens'), codes().join(', '));
+  const trashDir = `${tablesDir}-corbeille`;
+  const first = repairPupForPlay(scanTables(tablesDir)[0]!, ctx, { trashDir });
+  assert.ok(first.some((f) => f.code === 'pupNoScreens'));
+  assert.ok(fs.existsSync(path.join(root, 'screens.pup')));
+  // Partie suivante : rien à refaire, et l'option n'est pas réappliquée par-dessus (pas de va-et-vient).
+  assert.deepEqual(repairPupForPlay(scanTables(tablesDir)[0]!, ctx, { trashDir }).map((f) => f.code), []);
+  assert.ok(fs.existsSync(path.join(root, 'screens.pup')));
+  assert.ok(!codes().includes('pupNoScreens'));
+  fs.rmSync(tablesDir, { recursive: true, force: true });
+  fs.rmSync(trashDir, { recursive: true, force: true });
+});

@@ -11,6 +11,8 @@ son interface).
 
 ## 0.1.16
 
+- Tables dont le DMD passe par UltraDMD ou FlexDMD : leurs vidéos trop grandes, que VPX 10.8.1 décode en entier à chaque scène (la partie se figeait une à plusieurs secondes, flippers compris), sont ramenées à la taille du DMD avant la partie ; elles s'affichent pareil, l'original va à la corbeille de Cyber Pinball. La Santé et la fiche de la table le signalent.
+- PuP-Packs à options dont l'option en place n'a pas d'écrans déclarés (Hellboy, Daredevil, 24…) : leurs écrans sont maintenant déclarés avant la partie, comme pour les packs sans options ; le pack s'affiche de nouveau.
 - DMD réel (bêta), PIN2DMD resté noir en partie avec « Image du front-end : oui » : le serveur du DMD qui ne trouvait pas l'afficheur continuait de le chercher pendant la partie et gardait la carte, si bien que VPX ne pouvait plus l'ouvrir. Il s'arrête désormais au bout de 20 secondes sans réponse, et toujours avant une partie que VPX pilote lui-même.
 - DMD réel : la vérification du PIN2DMD fait maintenant tout ce que fait VPX, jusqu'à lire le nom de la carte. Une carte qui ne donne pas son nom, ou un nom que le module DMD de VPX ne connaît pas (il n'accepte que PIN2DMD, PIN2DMD XL et PIN2DMD HD), est signalée avec le nom lu, à l'écran « DMD réel » et dans la Santé de la borne.
 - DMD réel : quand le serveur du DMD ne trouve pas l'afficheur, l'écran « DMD réel » et la Santé le disent, avec la cause trouvée par la vérification du PIN2DMD, et VPX reprend le DMD lui-même pendant les parties.

@@ -383,6 +383,7 @@ import { DMD_PLUGIN, installVpxPlugin } from './vpx-plugins';
 import { askElevation } from './uac-confirm';
 import { createVision3dMenu } from './vision3d-menu';
 import { noteGameCadence, vpxLogSize } from './game-cadence';
+import { shrinkDmdVideos } from './dmd-video-shrink';
 import { createVrFrontend } from './vr-frontend';
 import { closeHeadsetViews, isHeadsetView, openHeadsetViews, sendToHeadsetViews, setHeadsetPainting, type HeadsetPage } from './casque-vues';
 import { createLiveScoresMenu } from './live-scores-menu';
@@ -4363,6 +4364,24 @@ function currentPlayfieldOrientation(): ReturnType<typeof playfieldOrientation> 
   return cabinet ? playfieldOrientation(cabinet, observedDisplays(), readTextIfExists(activeVpxIni(loc))) : undefined;
 }
 
+/** Vidéos du DMD de la table ramenées à la taille du DMD avant la partie ; rien si le script n'a pas de dossier de DMD. */
+async function shrinkTableDmdVideos(table: TableEntry): Promise<void> {
+  const facts = cachedScript(table.file, loc.dataDir);
+  if (!loc.root || !facts?.dmdFolder) return;
+  const layout = layoutOf(loc.root);
+  try {
+    await shrinkDmdVideos({
+      tableFolder: table.folder,
+      dmdFolder: facts.dmdFolder,
+      converter: (converter ??= createConverter()),
+      trashDir: trashDirFor(layout.trash, `Avant la partie ${path.basename(table.folder)}`), // i18n-ignore : nom de dossier
+      log: (line) => console.log(line),
+    });
+  } catch (error) {
+    console.log(`Vidéos du DMD (${table.id}) : réduction impossible (${(error as Error).message}).`); // i18n-ignore : journal
+  }
+}
+
 function preparePupPack(table: TableEntry): void {
   if (!loc.root) return;
   const layout = layoutOf(loc.root);
@@ -4761,6 +4780,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // PuP-Pack : ce qui l'empêcherait de s'afficher est réglé avant la partie, sans rien demander.
   // Avec un autre VPX, c'est PinUP Player qui lit le pack, tel que l'installation du joueur l'a réglé.
   if (!otherVpx) preparePupPack(table);
+  // Vidéos du DMD trop grandes (dmd-video-shrink.ts) : ramenées à la taille du DMD, sinon la partie se fige à chaque scène.
+  if (!otherVpx) await shrinkTableDmdVideos(table);
   // Volume de la ROM : le volume voulu posé avant la partie, relu au retour (rom-volume.ts). Jamais
   // dans le double d'une partie entre amis : son volume est celui de cette borne, déjà dans la mémoire.
   // Ni avec un autre VPX : VPinMAME y garde ses propres réglages.

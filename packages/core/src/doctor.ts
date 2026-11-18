@@ -10,6 +10,7 @@ import { findMangledDirs } from './copytree';
 import { formatDate, formatDateTime, formatList, t, tn } from './i18n';
 import { IniDocument } from './ini';
 import { slowTableFinding } from './slowtable';
+import { heavyDmdVideosFinding } from './dmdvideos';
 import { isCurrentMediaError, mediaErrorsFile, readMediaErrors, type MediaErrorEntry, type MediaErrorKind } from './mediaerrors';
 import {
   bestDmdMedia,
@@ -132,6 +133,7 @@ export const FINDING_CODES = [
   'romAliasHistoric',
   'romAliasObsolete',
   'dmdFolderMissing',
+  'dmdVideosHeavy',
   'scriptUnreadable',
   'crashReport',
   'infoMissing',
@@ -663,6 +665,9 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     if (!('error' in ctx.script) && ctx.script.dmdFolder) {
       const finding = checkDmdFolder(folder, ctx.script.dmdFolder, ctx.script.usesPinmame);
       if (finding) findings.push(finding);
+      // Vidéos du DMD décodées en entier à chaque scène par le plugin FlexDMD (dmdvideos.ts) : la partie se fige.
+      const videos = finding ? undefined : heavyDmdVideosFinding(folder, ctx.script.dmdFolder);
+      if (videos) findings.push(videos);
     }
   }
 
@@ -1911,7 +1916,11 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
 
     // Pack sans screens.pup ni option à appliquer : PinUP Player prenait ses écrans par défaut, le
     // plugin PUP n'en crée aucun et le pack reste éteint. Les écrans que le pack vise sont déclarés.
-    const screensPup = !nested.has(pack) && !info.variants.length ? defaultScreensPup(info.root) : undefined;
+    // Un pack à options dont l'option en place n'apporte pas de screens.pup est dans le même cas
+    // (Hellboy, Daredevil, 24 : rapport d'une borne en 0.1.16-essai.4, 18/11/2026) ; seule une option
+    // qui reste à appliquer (pupOptionNotApplied) passe avant : elle peut apporter le sien.
+    const optionPending = findings.some((f) => f.code === 'pupOptionNotApplied' && f.detail.includes(`pupvideos\\${pack}`));
+    const screensPup = !nested.has(pack) && !optionPending ? defaultScreensPup(info.root) : undefined;
     if (screensPup) {
       findings.push({
         code: 'pupNoScreens',

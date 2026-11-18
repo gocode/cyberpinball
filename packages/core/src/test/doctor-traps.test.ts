@@ -587,6 +587,15 @@ const TRAPS: Trap[] = [
   { code: 'dofNoPinmame', arm: () => {}, script: scriptFacts(NO_PUP_SCRIPT), ctx: (folder) => ({ dof: dofSetupWith(folder, ['afm']) }) },
   // DOF : un directoutputconfig51.ini resté dans le dossier de la table masque celui de la borne.
   { code: 'dofLocalIni', arm: (folder) => write(path.join(folder, 'directoutputconfig51.ini'), '[Config DOF]\r\nafm,0\r\n'), ctx: (folder) => ({ dof: dofSetupWith(folder, ['afm']) }) },
+  // Vidéos du DMD (dmdvideos.ts) : une vidéo UltraDMD de 1920 × 480, décodée en entier à chaque scène, fige la partie.
+  {
+    code: 'dmdVideosHeavy',
+    arm: (folder) => {
+      write(path.join(folder, 'Addams.UltraDMD', 'intro.mp4'), mp4(1920, 480));
+      write(path.join(folder, 'Addams.UltraDMD', 'petite.mp4'), mp4(128, 32));
+    },
+    script: scriptFacts(`${SCRIPT}Set UltraDMD = CreateObject("UltraDMD.DMDObject")\r\nUltraDMD.SetProjectFolder curDir & "\\Addams.UltraDMD"\r\n`),
+  },
   // Cadence (slowtable.ts) : la dernière partie de la table, mesurée par le plugin du DMD, a ramé (17/11/2026).
   {
     code: 'slowTable',

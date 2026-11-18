@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Tables whose DMD runs through UltraDMD or FlexDMD: their oversized videos, which VPX 10.8.1 decodes whole for every scene (the game froze for one to several seconds, flippers included), are brought down to the DMD size before the game; they look the same, and the original goes to Cyber Pinball's recycle bin. Health and the table's sheet point it out.
+- PuP-Packs with options whose current option declares no screens (Hellboy, Daredevil, 24…): their screens are now declared before the game, as for packs without options; the pack shows again.
 - Real DMD (beta), PIN2DMD staying dark during games with "Menu image: yes": the DMD server that could not find the display kept searching for it during the game and held on to the board, so VPX could no longer open it. It now stops after 20 seconds without an answer, and always before a game where VPX drives the DMD itself.
 - Real DMD: the PIN2DMD check now does everything VPX does, up to reading the board's name. A board that does not give its name, or gives a name VPX's DMD module does not know (it only accepts PIN2DMD, PIN2DMD XL and PIN2DMD HD), is reported with the name it gave, on the "Real DMD" screen and in the cabinet Health.
 - Real DMD: when the DMD server cannot find the display, the "Real DMD" screen and the Health say so, with the cause found by the PIN2DMD check, and VPX takes the DMD back itself during games.

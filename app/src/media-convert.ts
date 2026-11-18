@@ -22,7 +22,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Readable } from 'node:stream';
 import { session, WebContentsView } from 'electron';
-import { mediaKind, oggOpusFile, t, wavFile, writeFileAtomic, type AudioTrim, type RgbaImage } from '@cyberpinball/core';
+import { mediaKind, mp4VideoTrack, oggOpusFile, t, wavFile, webmFile, writeFileAtomic, type AudioTrim, type EncodedFrame, type RgbaImage } from '@cyberpinball/core';
 
 const PARTITION = 'cyberpinball-conversion';
 const ORIGIN = 'https://conversion.cyberpinball.invalid';
@@ -46,6 +46,9 @@ export interface AudioProbe {
 // fréquence du contexte) ; les paquets reviennent bout à bout, chacun précédé de sa longueur sur
 // 4 octets, avec le délai de l'encodeur (en-tête OpusHead qu'il rend, sinon 312, celui de libopus) ;
 // le conteneur Ogg est écrit par le processus principal (oggOpusFile).
+// shrinkVideo : images décodées une à une par WebCodecs (VideoDecoder), depuis les positions que Cyber Pinball a lues
+// dans le MP4 (mp4track.ts), redessinées à la taille du DMD et encodées en VP8 ; une page cachée ne lit pas les vidéos,
+// et un saut par image redécode depuis l'image clé précédente (78 s pour 8 s de vidéo, 18/11/2026).
 const PAGE = `<!doctype html><meta charset="utf-8"><title>conversion</title><script>
 let cache = { id: '', buffer: null };
 async function decode(id) {
@@ -167,6 +170,69 @@ window.cropJpeg = async (id, out, x, y, side, size, quality) => {
   await fetch('/out/' + out, { method: 'POST', body: jpeg });
   return { width: size, height: size };
 };
+window.shrinkVideo = async (id, out, width, height, fps, track) => {
+  const bytes = new Uint8Array(await (await fetch('/in/' + id)).arrayBuffer());
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  const chunks = [];
+  let failure = null;
+  const encoder = new VideoEncoder({
+    output: (chunk) => { const b = new Uint8Array(chunk.byteLength); chunk.copyTo(b); chunks.push({ bytes: b, key: chunk.type === 'key', ts: chunk.timestamp }); },
+    error: (e) => (failure = e),
+  });
+  encoder.configure({ codec: 'vp8', width, height, bitrate: 400000, framerate: fps });
+  const count = Math.max(1, Math.round((track.durationUs / 1e6) * fps));
+  const startUs = Math.min(...track.samples.map((s) => s.ctsUs));
+  let emitted = 0;
+  let drawn = false;
+  const emitUntil = (seconds) => {
+    while (drawn && emitted < count && emitted / fps <= seconds + 1e-6) {
+      const frame = new VideoFrame(canvas, { timestamp: Math.round((emitted * 1e6) / fps), duration: Math.round(1e6 / fps) });
+      encoder.encode(frame, { keyFrame: emitted % fps === 0 });
+      frame.close();
+      emitted++;
+    }
+  };
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(frame, 0, 0, width, height);
+      drawn = true;
+      emitUntil((frame.timestamp - startUs) / 1e6);
+      frame.close();
+    },
+    error: (e) => (failure = e),
+  });
+  const description = Uint8Array.from(atob(track.description), (c) => c.charCodeAt(0));
+  decoder.configure({ codec: track.codec, description, codedWidth: track.width, codedHeight: track.height });
+  for (const s of track.samples) {
+    if (failure) break;
+    decoder.decode(new EncodedVideoChunk({ type: s.key ? 'key' : 'delta', timestamp: s.ctsUs, duration: s.durationUs, data: bytes.subarray(s.offset, s.offset + s.size) }));
+    while (decoder.decodeQueueSize > 16) await new Promise((r) => setTimeout(r, 1));
+  }
+  await decoder.flush();
+  decoder.close();
+  emitUntil(track.durationUs / 1e6);
+  await encoder.flush();
+  encoder.close();
+  if (failure) throw failure;
+  let size = 0;
+  for (const c of chunks) size += 13 + c.bytes.length;
+  const all = new Uint8Array(size);
+  const view = new DataView(all.buffer);
+  let at = 0;
+  for (const c of chunks) {
+    view.setUint32(at, c.bytes.length, true);
+    all[at + 4] = c.key ? 1 : 0;
+    view.setFloat64(at + 5, c.ts, true);
+    all.set(c.bytes, at + 13);
+    at += 13 + c.bytes.length;
+  }
+  await fetch('/out/' + out + '?duration=' + Math.round(track.durationUs / 1000), { method: 'POST', body: all.buffer });
+  return { frames: chunks.length };
+};
 window.framesOf = async (id, video, times, maxWidth, out) => {
   const blob = await (await fetch('/in/' + id)).blob();
   const grab = async (source, width, height, key) => {
@@ -246,7 +312,7 @@ export function createConverter() {
     loading ??= (async () => {
       const s = session.fromPartition(PARTITION);
       if (!s.protocol.isProtocolHandled('https')) s.protocol.handle('https', handle);
-      const v = new WebContentsView({ webPreferences: { session: s, offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false } });
+      const v = new WebContentsView({ webPreferences: { session: s, offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
       // Aucune fenêtre ne la porte : gardée ici, sinon le ramasse-miettes la détruirait (acquire-window.ts, hiddenViews).
       hiddenViews.add(v);
       v.webContents.once('destroyed', () => hiddenViews.delete(v));
@@ -411,7 +477,39 @@ export function createConverter() {
     return got.data;
   }
 
-  return { probeAudio, audioToWav, audioToOggOpus, imageToPng, mediaFrames, fitJpeg, cropJpeg };
+  /**
+   * Vidéo ramenée à `width` × `height` (la taille du DMD), en VP8 dans un WebM écrit à `out` (dmdvideos.ts) : le plugin
+   * FlexDMD de VPX la décode en entier à chaque scène, une vidéo de la taille du DMD ne fige plus la partie.
+   */
+  async function shrinkVideo(file: string, out: string, width = 128, height = 32, fps = 30): Promise<{ frames: number; bytes: number }> {
+    // Positions et instants des images, lus ici (mp4track.ts) : la page les décode une à une.
+    const track = mp4VideoTrack(fs.readFileSync(file));
+    if (!track) throw new Error(t('vidéo que Cyber Pinball ne sait pas réduire (seul le H.264 en MP4 l’est)'));
+    const id = inputId(file);
+    const key = `v${next++}`;
+    const shown = { ...track, description: track.description.toString('base64') };
+    try {
+      await run(`shrinkVideo(${JSON.stringify(id)}, ${JSON.stringify(key)}, ${width}, ${height}, ${fps}, ${JSON.stringify(shown)})`);
+    } catch (error) {
+      throw failure(error, 'image');
+    }
+    const got = outputs.get(key);
+    outputs.delete(key);
+    if (!got) throw new Error(t('conversion sans résultat'));
+    const frames: EncodedFrame[] = [];
+    for (let at = 0; at + 13 <= got.data.length; ) {
+      const length = got.data.readUInt32LE(at);
+      frames.push({ data: got.data.subarray(at + 13, at + 13 + length), key: got.data[at + 4] === 1, timestampUs: got.data.readDoubleLE(at + 5) });
+      at += 13 + length;
+    }
+    if (!frames.length || !frames[0]!.key) throw new Error(t('conversion sans résultat'));
+    const webm = webmFile({ width, height, frames, durationMs: Number(got.query.get('duration')) || (frames.length * 1000) / fps });
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    writeFileAtomic(out, webm);
+    return { frames: frames.length, bytes: webm.length };
+  }
+
+  return { probeAudio, audioToWav, audioToOggOpus, imageToPng, mediaFrames, fitJpeg, cropJpeg, shrinkVideo };
 
 }
 

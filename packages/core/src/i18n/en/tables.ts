@@ -37,6 +37,18 @@ export const messages: Record<string, string> = {
     'When the table was brought in from {from}, that installation had no known ROM folder (no VPinMAME\\roms, no VPinMAME rompath in the registry, no Popper ROM folder).',
   'La table utilise PinMAME, mais le nom de sa ROM n’apparaît pas clairement dans son script.': 'The table uses PinMAME, but its script doesn’t clearly name its ROM.',
   'Rapport de plantage de VPX': 'VPX crash report',
+  'Vidéos du DMD trop grandes : la partie se fige': 'DMD videos too large: the game freezes',
+  'vidéo que Cyber Pinball ne sait pas réduire (seul le H.264 en MP4 l’est)': 'a video Cyber Pinball cannot shrink (only H.264 in MP4 can be)',
+  '{file}, {width} × {height}': '{file}, {width} × {height}',
+  '{file}, {size}': '{file}, {size}',
+  '{n} vidéo de {folder} dépasse de loin la taille du DMD ({example}).': '{n} video in {folder} is far larger than the DMD ({example}).',
+  '{n} vidéos de {folder} dépassent de loin la taille du DMD ({example} ; {names}…).': '{n} videos in {folder} are far larger than the DMD ({example}; {names}…).',
+  'Le plugin FlexDMD de VPX 10.8.1 décode chaque vidéo en entier, d’un coup, à chaque scène qui la montre : la partie se fige une à plusieurs secondes, flippers compris, et VPX prend de la mémoire à chaque fois.':
+    'The FlexDMD plugin of VPX 10.8.1 decodes each video whole, in one go, every time a scene shows it: the game freezes for one to several seconds, flippers included, and VPX takes more memory each time.',
+  'Le DMD n’a que 128 × 32 points : Cyber Pinball les ramène à cette taille avant la prochaine partie, où elles s’afficheront pareil, sans arrêt ; les originaux vont à sa corbeille.':
+    'The DMD only has 128 × 32 dots: Cyber Pinball brings them down to that size before the next game, where they will look the same, without freezing; the originals go to its recycle bin.',
+  'Le DMD n’a que 128 × 32 points : Cyber Pinball ramène à cette taille, avant la prochaine partie, celles qu’il sait lire (mp4, mov, webm) ; les autres (wmv, avi) restent telles quelles : remplacez-les par des mp4 à la taille du DMD.':
+    'The DMD only has 128 × 32 dots: before the next game, Cyber Pinball brings down to that size the ones it can read (mp4, mov, webm); the others (wmv, avi) stay as they are: replace them with mp4 files at the DMD size.',
   'Cadrage réglé pour cette table': 'Framing set for this table',
   '{file} garde le cadrage réglé pour cette table dans l’installation d’où elle vient, que VPX 10.8.1 n’applique qu’en cadrage manuel. Il est repris pour cette table seule ; « Régler l’affichage en partie » permet de le retoucher ou de passer au cadrage automatique.':
     '{file} keeps the framing set for this table in the installation it came from, which VPX 10.8.1 only applies in manual framing. It is kept for this table alone; “Adjust display in game” lets you touch it up or switch to automatic framing.',
