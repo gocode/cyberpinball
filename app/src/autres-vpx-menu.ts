@@ -200,7 +200,7 @@ export function createOtherVpxMenu(host: OtherVpxMenuHost): { item: ProvidedSyst
       icon: 'layers',
       lead: [
         t('Un VPX déjà installé sur ce PC, pour les tables qui tournent mieux avec lui : il se choisit dans la fiche de chaque table (Gérer la table, « Jouée avec ») et quand une table s’installe.'),
-        t('Cyber Pinball le lance avec ses propres réglages (écrans, fronton, DMD), comme PinUP Popper. {limits}', { limits: otherVpxLimitsText() }),
+        t('Cyber Pinball le lance avec ses propres réglages (écrans, fronton, DMD). {limits}', { limits: otherVpxLimitsText() }),
       ].join(' '),
       sections: [],
       actions,

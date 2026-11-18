@@ -1,6 +1,6 @@
-// Autres versions de VPX : un VPX déjà installé sur le PC (10.8.0, 10.7…), choisi table par table, comme
-// PinUP Popper le permet. Cyber Pinball ne l'installe jamais : VPinMAME et B2S Server, dont ces versions ont
-// besoin, s'inscrivent dans le registre de Windows ; c'est l'installation du joueur, avec ses propres réglages.
+// Autres versions de VPX : un VPX déjà installé sur le PC (10.8.0, 10.7…), choisi table par table.
+// Cyber Pinball ne l'installe jamais : VPinMAME et B2S Server, dont ces versions ont besoin,
+// s'inscrivent dans le registre de Windows ; c'est l'installation du joueur, avec ses propres réglages.
 //
 // Pour une table jouée ainsi, Cyber Pinball n'est qu'un lanceur : l'exécutable avec la table (-Play), son
 // VPinballX.ini à lui (écrans, fronton, DMD réglés pour lui), puis le retour à la roue. Rien de ce que

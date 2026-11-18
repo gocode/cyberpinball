@@ -34,7 +34,7 @@ export const messages: Record<string, string> = {
   'Choisir son exécutable (VPinballX64.exe…) sur ce PC': 'Choose its executable (VPinballX64.exe…) on this PC',
   'Un VPX déjà installé sur ce PC, pour les tables qui tournent mieux avec lui : il se choisit dans la fiche de chaque table (Gérer la table, « Jouée avec ») et quand une table s’installe.':
     'A VPX already installed on this PC, for the tables that run better with it: it is chosen on each table’s sheet (Manage table, “Played with”) and when a table is installed.',
-  'Cyber Pinball le lance avec ses propres réglages (écrans, fronton, DMD), comme PinUP Popper. {limits}': 'Cyber Pinball launches it with its own settings (screens, backglass, DMD), like PinUP Popper. {limits}',
+  'Cyber Pinball le lance avec ses propres réglages (écrans, fronton, DMD). {limits}': 'Cyber Pinball launches it with its own settings (screens, backglass, DMD). {limits}',
   'Retirer {vpx} ?': 'Remove {vpx}?',
   'La table qui l’a choisi sera jouée avec le VPX de Cyber Pinball ; elle le retrouvera s’il est ajouté de nouveau. Rien n’est effacé de ce PC.':
     'The table that chose it will be played with Cyber Pinball’s VPX; it will get it back if it is added again. Nothing is deleted from this PC.',
@@ -64,9 +64,9 @@ export const messages: Record<string, string> = {
   'Changer le VPX': 'Change the VPX',
   // Nouveautés du front-end (news.ts)
   'Les tables qui tournent mieux avec VPX 10.8.0 se jouent avec lui, table par table.': 'Tables that run better with VPX 10.8.0 are played with it, table by table.',
-  'Ajoutez un VPX déjà installé sur ce PC (celui de PinUP Popper est proposé d’office), puis choisissez-le dans la fiche d’une table ou quand elle s’installe. Une table reprise de PinUP Popper garde le VPX qui la jouait.':
-    'Add a VPX already installed on this PC (PinUP Popper’s is offered right away), then choose it on a table’s sheet or when it is installed. A table taken over from PinUP Popper keeps the VPX that played it.',
-  'Cyber Pinball le lance avec ses propres réglages, comme PinUP Popper ; la réalité virtuelle, le réglage de l’affichage et les parties entre amis restent avec le VPX de Cyber Pinball.':
-    'Cyber Pinball launches it with its own settings, like PinUP Popper; virtual reality, display adjustment and games with friends stay with Cyber Pinball’s VPX.',
+  'Ajoutez un VPX déjà installé sur ce PC (ceux des autres installations sont proposés d’office), puis choisissez-le dans la fiche d’une table ou quand elle s’installe. Une table reprise d’une autre installation garde le VPX qui la jouait.':
+    'Add a VPX already installed on this PC (those of other installations are offered right away), then choose it on a table’s sheet or when it is installed. A table taken over from another installation keeps the VPX that played it.',
+  'Cyber Pinball le lance avec ses propres réglages ; la réalité virtuelle, le réglage de l’affichage et les parties entre amis restent avec le VPX de Cyber Pinball.':
+    'Cyber Pinball launches it with its own settings; virtual reality, display adjustment and games with friends stay with Cyber Pinball’s VPX.',
   'Menu système › Borne › Autres versions de VPX': 'System menu › Cabinet › Other VPX versions',
 };

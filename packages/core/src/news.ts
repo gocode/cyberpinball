@@ -60,8 +60,8 @@ export const NEWS: readonly NewsItem[] = [
     get detail() { return t('Les tables qui tournent mieux avec VPX 10.8.0 se jouent avec lui, table par table.'); },
     get more() {
       return [
-        t('Ajoutez un VPX déjà installé sur ce PC (celui de PinUP Popper est proposé d’office), puis choisissez-le dans la fiche d’une table ou quand elle s’installe. Une table reprise de PinUP Popper garde le VPX qui la jouait.'),
-        t('Cyber Pinball le lance avec ses propres réglages, comme PinUP Popper ; la réalité virtuelle, le réglage de l’affichage et les parties entre amis restent avec le VPX de Cyber Pinball.'),
+        t('Ajoutez un VPX déjà installé sur ce PC (ceux des autres installations sont proposés d’office), puis choisissez-le dans la fiche d’une table ou quand elle s’installe. Une table reprise d’une autre installation garde le VPX qui la jouait.'),
+        t('Cyber Pinball le lance avec ses propres réglages ; la réalité virtuelle, le réglage de l’affichage et les parties entre amis restent avec le VPX de Cyber Pinball.'),
       ];
     },
     get where() { return t('Menu système › Borne › Autres versions de VPX'); },

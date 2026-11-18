@@ -1,5 +1,5 @@
-// Autres versions de VPX (autres-vpx.ts) : un VPX déjà installé sur le PC (10.8.0…), choisi table par table,
-// comme PinUP Popper le permet. Invariants : la liste n'accepte qu'un exécutable de VPX 10 d'une autre version
+// Autres versions de VPX (autres-vpx.ts) : un VPX déjà installé sur le PC (10.8.0…), choisi table par table.
+// Invariants : la liste n'accepte qu'un exécutable de VPX 10 d'une autre version
 // que celle de Cyber Pinball ; le choix d'une table vit dans son .info sans toucher au reste ; un choix dont le
 // VPX a été retiré ne compte plus ; la base de Popper dit avec quel exécutable chaque table était jouée (dossier
 // de l'émulateur, ALTEXE), sans rien deviner d'un ALTEXE propre au script de lancement ; une partie avec un autre
@@ -28,9 +28,12 @@ import {
   type OtherVpx,
 } from '../autres-vpx';
 import { programsDuringGame } from '../coexistence';
+import { setLanguage } from '../i18n';
 import { findInstallation, listInstallationTables } from '../installation';
+import { NEWS } from '../news';
 import { peFileVersion } from '../vc-runtime';
 import { frontendSource } from './frontend-source';
+import { REPO_ROOT } from './i18n-scan';
 
 /** Le plus petit exécutable Windows (PE32+) qui porte une version de fichier, comme celle de VPinballX64.exe. */
 function fakeExe(version: string): Buffer {
@@ -207,4 +210,51 @@ test('une partie avec un autre VPX ne prépare rien du VPX de Cyber Pinball et n
   }
   // Pas de partie dont on ne saurait pas dire pourquoi elle ne se lance pas.
   assert.match(body, /const otherRefused = otherVpx && otherVpxRefusal\(/);
+});
+
+// Décision du 18/11/2026 : la fonction dit ce qu'elle fait, sans nommer PinUP Popper ni s'y comparer.
+// Popper ne se nomme que dans la reprise d'une autre installation et des médias (installation-import.ts, media-import.ts).
+test('les textes visibles des autres versions de VPX ne citent pas PinUP Popper, en français ni en anglais', () => {
+  const popper = /popper/i;
+  const read = (rel: string) => fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8');
+
+  // La ligne des Nouveautés : titre, détail, suite et chemin, dans les deux langues.
+  try {
+    for (const lang of ['fr', 'en'] as const) {
+      setLanguage(lang);
+      const item = NEWS.find((n) => n.id === 'autres-vpx');
+      assert.ok(item, 'la ligne autres-vpx des Nouveautés');
+      for (const text of [item.title, item.detail, ...item.more, item.where]) assert.doesNotMatch(text, popper, `Nouveautés (${lang}) : ${text}`);
+    }
+  } finally {
+    setLanguage('fr');
+  }
+
+  // Les textes de l'écran, de la fiche et du plan d'installation (français), puis leur dictionnaire anglais, qui
+  // ne sert qu'à cette fonction (clés françaises et traductions).
+  for (const rel of ['app/src/autres-vpx-menu.ts', 'packages/core/src/autres-vpx.ts']) {
+    for (const [, text] of read(rel).matchAll(/\b(?:t|tn|tLater)\(\s*'((?:[^'\\]|\\.)*)'/g)) {
+      assert.doesNotMatch(text!, popper, `${rel} : ${text}`);
+    }
+  }
+  for (const line of read('packages/core/src/i18n/en/autresvpx.ts').split(/\r?\n/)) {
+    if (!line.trim().startsWith('//')) assert.doesNotMatch(line, popper, `i18n/en/autresvpx.ts : ${line.trim()}`);
+  }
+
+  // Les notes de version de la fonction : en attente dans changements/, puis rassemblées dans les CHANGELOG.
+  const feature = /Autres versions de VPX|cet autre VPX|VPX qui la jouait|Other VPX versions|that other VPX|VPX that played it/;
+  const notes = [
+    'CHANGELOG.md',
+    'CHANGELOG.en.md',
+    ...fs.readdirSync(path.join(REPO_ROOT, 'changements')).filter((f) => f.endsWith('.md') && f !== 'LISEZMOI.md').map((f) => `changements/${f}`),
+  ];
+  let seen = 0;
+  for (const rel of notes) {
+    for (const line of read(rel).split(/\r?\n/)) {
+      if (!line.startsWith('- ') || !feature.test(line)) continue;
+      seen++;
+      assert.doesNotMatch(line, popper, `${rel} : ${line}`);
+    }
+  }
+  assert.ok(seen >= 6, `notes de version de la fonction retrouvées (${seen})`);
 });
