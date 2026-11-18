@@ -7,7 +7,8 @@ export const messages: Record<string, string> = {
     'Language, update, what’s new, feedback and ideas, recent activity, backups, migration, terms of use, the community, quit or restart, sleep and shutdown',
 
   // packages/core/src/news.ts : les nouveautés
-  'Votre pseudo, votre niveau, vos badges et vos amis vous suivent sur un autre PC ou après une réinstallation.': 'Your nickname, level, badges and friends follow you to another PC or after reinstalling.',
+  'Votre compte vous suit': 'Your account follows you',
+  'Pseudo, niveau, badges et amis : vous retrouvez tout sur un autre PC ou après une réinstallation.': 'Nickname, level, badges and friends: you get it all back on another PC or after reinstalling.',
   'Cyber Pinball garde d’office une copie de secours de votre compte sur ce PC, hors de son dossier : une réinstallation la retrouve et vous propose de la reprendre.':
     'Cyber Pinball automatically keeps a backup copy of your account on this PC, outside its folder: a reinstall finds it and offers to take it back.',
   'Notez votre code de récupération, 24 mots ou leur QR à photographier, pour retrouver votre compte sur n’importe quel PC. Un mot de passe est possible aussi : votre pseudo devient votre identifiant, et le serveur ne garde qu’une copie chiffrée qu’il ne peut pas ouvrir.':

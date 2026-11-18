@@ -68,14 +68,15 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Menu système › Télécommande du téléphone'); },
     reach: { kind: 'system', id: 'phone-remote' },
+    preview: true,
   },
   {
     // Demandé par un joueur (Retours et propositions, 18/11/2026) : réinstallé, il avait perdu son niveau.
     id: 'mon-compte',
     date: '2026-11-18',
     version: '0.1.16',
-    get title() { return t('Mon compte'); },
-    get detail() { return t('Votre pseudo, votre niveau, vos badges et vos amis vous suivent sur un autre PC ou après une réinstallation.'); },
+    get title() { return t('Votre compte vous suit'); },
+    get detail() { return t('Pseudo, niveau, badges et amis : vous retrouvez tout sur un autre PC ou après une réinstallation.'); },
     get more() {
       return [
         t('Cyber Pinball garde d’office une copie de secours de votre compte sur ce PC, hors de son dossier : une réinstallation la retrouve et vous propose de la reprendre.'),
@@ -84,6 +85,7 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Menu système › Mon compte'); },
     reach: { kind: 'system', id: 'account' },
+    preview: true,
   },
   {
     id: 'autres-vpx',
@@ -259,6 +261,7 @@ export const NEWS: readonly NewsItem[] = [
     get where() { return t('Menu système › Borne › Réalité virtuelle'); },
     reach: { kind: 'system', id: 'realite-virtuelle' },
     beta: true,
+    preview: true,
   },
   {
     id: 'vision-3d',
@@ -353,6 +356,7 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Menu système › Cyber Pinball › Sauvegardes'); },
     reach: { kind: 'system', id: 'backups' },
+    preview: true,
   },
   {
     id: 'amis',

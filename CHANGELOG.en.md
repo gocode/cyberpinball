@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- What's new: the players' reactions now sit under the text of each line, as under a message, and four more items have their preview (your account, the Community on the phone, virtual reality, backups).
 - Tables that stop for a moment at every blink of a light (Daredevil, Hellboy, and the many tables that copy the FlashForMs or SetFlash routine): their script redefined a procedure at every blink, and Windows had its antivirus scan each one while the game waited. Cyber Pinball now plays a copy of the script where a procedure is only redefined when it changes; the table is not modified.
 - After a game with stutters, the cabinet log says what VPX was waiting on (Windows antivirus, script, video decoding, graphics driver).
 - LED and feedback (DOF): a cabinet coming from PinUP Popper, PinballX or PinballY gets its configtool configuration back. Cyber Pinball looks for the old DOF on the drives (C:\DirectOutput, C:\vPinball\DirectOutput, Program Files…); when the VPX DOF plugin has no file, the screen and the Cabinet health show the folder found, and "Reuse the old DOF configuration" copies its directoutputconfig.ini and tablemappings files there, backing up what was there. The old DOF's GlobalConfig is never reused; its Cabinet.xml (Teensy, addressable LEDs) is shown next and reused only if it is consistent and no other one is already in place.

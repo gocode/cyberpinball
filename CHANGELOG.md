@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.16
 
+- Nouveautés : les réactions des joueurs passent sous le texte de chaque ligne, comme sous un message, et quatre nouveautés de plus ont leur aperçu (votre compte, la Communauté au téléphone, la réalité virtuelle, les sauvegardes).
 - Tables qui s'arrêtent un instant à chaque clignotement de lumière (Daredevil, Hellboy, et les nombreuses tables qui recopient la routine FlashForMs ou SetFlash) : leur script redéfinissait une procédure à chaque clignotement, et Windows faisait analyser chacune par son antivirus pendant que la partie attendait. Cyber Pinball joue maintenant une copie du script où une procédure n'est redéfinie que si elle change ; la table n'est pas modifiée.
 - Après une partie qui a eu des à-coups, le journal de la borne dit où VPX attendait (antivirus de Windows, script, décodage d'une vidéo, pilote de la carte graphique).
 - LED et retours (DOF) : une borne qui vient de PinUP Popper, PinballX ou PinballY retrouve sa configuration du configtool. Cyber Pinball cherche l'ancien DOF sur les disques (C:\DirectOutput, C:\vPinball\DirectOutput, Program Files…) ; quand le plugin DOF de VPX n'a aucun fichier, l'écran et la Santé de la borne montrent le dossier trouvé, et « Reprendre la configuration de l'ancien DOF » y copie ses directoutputconfig.ini et tablemappings, en sauvegardant l'existant. Le GlobalConfig de l'ancien DOF n'est jamais repris ; son Cabinet.xml (Teensy, LED adressables) est montré ensuite et repris seulement s'il est cohérent et qu'aucun autre n'est déjà en place.

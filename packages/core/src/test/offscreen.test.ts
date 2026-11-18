@@ -244,7 +244,10 @@ test('scripts : aucun paramètre réaffecté dans le corps du script, ni pris co
   const scripts = [path.join(REPO, 'lanceur.ps1'), ...['scripts', 'interne/demos'].flatMap((dir) => internalFiles(path.join(REPO, dir), /\.ps1$/).map((f) => path.join(REPO, dir, f)))];
   const found = scripts.flatMap((file) => {
     const text = fs.readFileSync(file, 'utf8');
-    const block = /^param\(([\s\S]*?)^\)/m.exec(text) ?? /^param\((.*)\)$/m.exec(text);
+    // Le bloc sur plusieurs lignes (« param( » seul sur sa ligne), sinon sur une seule : sans cette
+    // distinction, un param(...) d'une ligne avalait le script jusqu'à la prochaine ligne « ) »
+    // (demo-mon-compte.ps1, faux « $ErrorActionPreference réaffecté »).
+    const block = /^param\(\s*\r?\n([\s\S]*?)^\)/m.exec(text) ?? /^param\((.*)\)\s*$/m.exec(text);
     if (!block) return [];
     const names = [...block[1]!.matchAll(/\$(\w+)/g)].map((m) => m[1]!.toLowerCase());
     const body = text.slice(block.index + block[0].length).split('\n');
