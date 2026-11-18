@@ -193,4 +193,6 @@ export const messages: Record<string, string> = {
   "{name} vous invite dans son groupe public": "{name} invites you to their public group",
   "{name} vous invite dans un groupe public": "{name} invites you to a public group",
   "Communauté › Groupes": "Community › Groups",
+  // Au téléphone (groups-menu.ts, remoteGroups ; 18/11/2026)
+  "{name} vous invite": "{name} invites you",
 };

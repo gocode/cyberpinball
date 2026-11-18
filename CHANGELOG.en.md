@@ -9,6 +9,12 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Phone, Messages: "Create a group" and "Public groups" at the top, then the group invitations you received (Accept, Decline), before the conversations. Creating a group opens on the cabinet, where the name is typed with the phone's keyboard.
+- Phone: "Public groups" full screen: search a group by name, join it, see its preview (its table of the week, its members); your own public groups are marked "Already a member", a full group is greyed out with its reason.
+- Phone, a group: its table of the week ("Play" launches it on the cabinet) and its ranking at the top of the thread, the author's nickname above each message; the ⋮ menu gives the members (and their profile), invite friends, mute or unmute the group's notifications, leave it after a confirmation.
+- Phone, Players: the open instant games at the top (Join; a game on another version of the table stays greyed out with its reason), then "Open an instant game": the table picked on the cabinet by default, "Change" for another one, 2 to 4 players.
+- Phone: "Your game" full screen: the taken and free seats, the start, the time it closes if it is not full, invite online friends, cancel it (or leave it) after a confirmation.
+- What the phone cannot do during a game (create a group, play the table of the week, join or open an instant game) stays visible, greyed out, with its reason.
 - Tables whose DMD runs through FlexDMD (JP tables such as Hellboy or Daredevil): loading their images ahead now also covers the ones whose name the script builds (Hellboy's DMD letters) and every image of large tables (Daredevil was cut short). Parameters that are not image options are no longer sent to FlexDMD.
 - When a game stops for a moment, the VPX log now says what VPX was doing during the stop (script, video decoding, plugin, graphics driver): one report is enough to find why a table lags.
 - Development: the test doubles of the app's services and hosts (cabinet network, table screen, live games, friends' content, downloads, feedback, built-in browser, phone, score boards) each have a factory, typed on the real interface, that fills in neutral values around what a test or a demo provides. A member added to an interface is handled once, in its factory and in the branch that adds it: the 111 hand-written doubles in tests and demos now go through them, and a test rejects any new hand-written copy as well as any override that is not a member of the contract.

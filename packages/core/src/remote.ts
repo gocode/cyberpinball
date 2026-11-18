@@ -485,6 +485,20 @@ export type PhoneMessage =
    */
   | { t: 'room-act'; s: number; room: string; line: string; a: RemoteRoomAct; reason?: string }
   /**
+   * Groupes (groups-menu.ts, remoteAct) : un geste sur un groupe (`g`, son identifiant) : accepter ou
+   * refuser son invitation, rejoindre un groupe public, jouer sa table de la semaine, inviter un ami
+   * (`key`), couper ou rétablir ses notifications, le quitter ; sans groupe : créer un groupe (à la
+   * borne), demander l'annuaire des groupes publics. La borne vérifie tout.
+   */
+  | { t: 'group-act'; s: number; a: RemoteGroupAct; g?: string; key?: string }
+  /**
+   * Parties instantanées (instant-menu.ts, remoteAct) : rejoindre une partie annoncée (`id`), en
+   * ouvrir une (`table` : la référence d'une table reçue, sinon celle choisie à la borne ; `count` :
+   * 2 à 4 joueurs), inviter un ami dans la mienne (`key`), l'annuler ou la quitter, demander la liste
+   * des tables (« Changer »). La borne vérifie tout.
+   */
+  | { t: 'instant-act'; s: number; a: RemoteInstantAct; id?: string; table?: string; count?: number; key?: string }
+  /**
    * Juke-box (onglet du téléphone) : une commande du lecteur de la borne (jukebox-player.ts), comme
    * un clic ou un bouton à la borne. `key` : une ligne reçue (playlist, morceau, ligne fixe) ;
    * `fraction` : l'endroit du morceau (0 à 1). La borne vérifie tout.
@@ -497,6 +511,14 @@ export type PhoneMessage =
 export const REMOTE_ROOM_ACTS = ['unreact', 'request', 'ignore', 'report', 'block', 'retract'] as const;
 export type RemoteRoomAct = (typeof REMOTE_ROOM_ACTS)[number] | `react:${string}`;
 
+/** Gestes sur un groupe, au téléphone ; « create » et « directory » sans groupe, « invite » avec un ami. */
+export const REMOTE_GROUP_ACTS = ['accept', 'decline', 'join', 'play', 'invite', 'mute', 'unmute', 'leave', 'create', 'directory'] as const;
+export type RemoteGroupAct = (typeof REMOTE_GROUP_ACTS)[number];
+
+/** Gestes sur les parties instantanées, au téléphone. */
+export const REMOTE_INSTANT_ACTS = ['join', 'open', 'invite', 'cancel', 'tables'] as const;
+export type RemoteInstantAct = (typeof REMOTE_INSTANT_ACTS)[number];
+
 /** Commandes du Juke-box au téléphone. */
 export const REMOTE_JUKEBOX_OPS = ['open', 'row', 'play', 'up', 'pause', 'shuffle', 'repeat', 'seek', 'next', 'prev', 'manage', 'exit'] as const;
 export type RemoteJukeboxOp = (typeof REMOTE_JUKEBOX_OPS)[number];
@@ -506,6 +528,8 @@ const finite = (v: unknown, max: number): v is number => typeof v === 'number' &
 const isChatKey = (v: unknown): v is string => typeof v === 'string' && /^(?:[0-9a-f]{64}|g:[0-9a-f]{16})$/.test(v);
 /** La clé publique d'un joueur (64 caractères hexadécimaux), jamais autre chose. */
 const isPlayerKey = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
+/** Un identifiant de groupe, de partie instantanée, ou la référence d'une table : 16 chiffres hexadécimaux. */
+const isHexId = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{16}$/.test(v);
 /** L'identité d'une action d'un écran (sa clé, sinon son libellé) : courte, sans caractère de contrôle. */
 const isActionId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 200 && !/[\x00-\x1f\x7f]/.test(v);
 
@@ -609,6 +633,28 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       if (!isRoomId(m.room) || typeof m.line !== 'string' || !/^[0-9a-f]{16}$/.test(m.line) || !known) return undefined;
       if (m.reason !== undefined && (typeof m.reason !== 'string' || !/^[a-z]{1,20}$/.test(m.reason))) return undefined;
       return { t: 'room-act', s, room: m.room, line: m.line, a: a as RemoteRoomAct, ...(typeof m.reason === 'string' ? { reason: m.reason } : {}) };
+    }
+    case 'group-act': {
+      if (!(REMOTE_GROUP_ACTS as readonly unknown[]).includes(m.a)) return undefined;
+      const a = m.a as RemoteGroupAct;
+      const alone = a === 'create' || a === 'directory';
+      // Un groupe, sauf pour créer et l'annuaire ; un ami pour inviter, et seulement là.
+      if (alone ? m.g !== undefined : !isHexId(m.g)) return undefined;
+      if (a === 'invite' ? !isPlayerKey(m.key) : m.key !== undefined) return undefined;
+      return { t: 'group-act', s, a, ...(alone ? {} : { g: m.g as string }), ...(a === 'invite' ? { key: m.key as string } : {}) };
+    }
+    case 'instant-act': {
+      if (!(REMOTE_INSTANT_ACTS as readonly unknown[]).includes(m.a)) return undefined;
+      const a = m.a as RemoteInstantAct;
+      if (a === 'join') return isHexId(m.id) && m.table === undefined && m.count === undefined && m.key === undefined ? { t: 'instant-act', s, a, id: m.id } : undefined;
+      if (a === 'invite') return isPlayerKey(m.key) && m.id === undefined && m.table === undefined && m.count === undefined ? { t: 'instant-act', s, a, key: m.key } : undefined;
+      if (a === 'open') {
+        const count = m.count;
+        if (typeof count !== 'number' || !Number.isInteger(count) || count < 2 || count > 4 || m.id !== undefined || m.key !== undefined) return undefined;
+        if (m.table !== undefined && !isHexId(m.table)) return undefined;
+        return { t: 'instant-act', s, a, count, ...(m.table !== undefined ? { table: m.table as string } : {}) };
+      }
+      return m.id === undefined && m.table === undefined && m.count === undefined && m.key === undefined ? { t: 'instant-act', s, a } : undefined;
     }
     case 'ping':
       return { t: 'ping', s };

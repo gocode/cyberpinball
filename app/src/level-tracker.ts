@@ -103,6 +103,19 @@ export interface LevelTracker {
 /** Combien de temps « +85 XP » reste sur la carte du joueur. */
 export const GAIN_SHOWN_MS = 6000;
 
+/**
+ * Le moment du niveau de départ d'une borne neuve s'affiche-t-il ? Il prend la première touche
+ * (handleKey) : une démonstration sans opérateur, partie d'une borne neuve, perdait ainsi son
+ * premier appui sur la roue et tout son parcours se décalait (18/11/2026, 60 démonstrations
+ * exposées). Comme l'ouverture : pas pendant un essai sans opérateur, sauf demandé
+ * (CYBERPINBALL_MOMENT_DEPART=1, les démonstrations qui le montrent) ; 0 le retire partout.
+ */
+export function startMomentShown(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.CYBERPINBALL_MOMENT_DEPART === '1') return true;
+  if (env.CYBERPINBALL_MOMENT_DEPART === '0') return false;
+  return !env.CYBERPINBALL_AUTOPILOT && !env.CYBERPINBALL_STRESS;
+}
+
 export function createLevelTracker(host: LevelTrackerHost): LevelTracker {
   const now = () => host.now?.() ?? new Date();
   const dir = path.join(host.dataDir, 'amis');
@@ -279,8 +292,9 @@ export function createLevelTracker(host: LevelTrackerHost): LevelTracker {
       const granted = host.net.checkBadges(facts());
       const badges = granted.fresh.map((b) => b.id).filter((id) => badgeDefinition(id));
       if (badges.length) state = badgeGains(state, badges.map((id) => ({ id, xp: badgeXp(id) })), at).state;
-      // Le moment du départ : niveau atteint et badges déjà mérités, en cascade.
-      state = { ...state, pending: { badges, from: 0, to: state.xp, at: at.toISOString(), start: true } };
+      // Le moment du départ : niveau atteint et badges déjà mérités, en cascade (pas pendant un essai
+      // sans opérateur, sauf demandé : startMomentShown). Le niveau et les badges comptent de même.
+      if (startMomentShown()) state = { ...state, pending: { badges, from: 0, to: state.xp, at: at.toISOString(), start: true } };
       publishLevel();
       save();
       host.log(`Niveau : niveau de départ ${levelOf(state.xp).level} (${state.xp} XP, ${badges.length} badges).`); // i18n-ignore : journal

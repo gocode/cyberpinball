@@ -78,4 +78,12 @@ export const messages: Record<string, string> = {
   '{n} joueurs ont rejoint votre partie': '{n} players joined your game',
   '{n} joueur arrivé': '{n} player joined',
   '{n} joueurs arrivés': '{n} players joined',
+  // Au téléphone (instant-menu.ts, remote ; 18/11/2026)
+  "Seul celui qui a ouvert la partie invite": "Only the player who opened the game can invite",
+  "Vous êtes dans cette partie": "You are in this game",
+  "Départ à {n} joueurs": "Starts with {n} players",
+  "Ouverte {ago} · fermée à {time} si elle n’est pas complète": "Opened {ago} · closes at {time} if not full",
+  "Le départ, la partie et les résultats se passent à la borne ; le téléphone reste la télécommande et la messagerie.": "The start, the game and the results happen on the cabinet; the phone stays the remote and the messenger.",
+  "Elle s’affiche chez tous les joueurs en ligne et part d’elle-même dès qu’elle est complète ; sinon, elle se ferme au bout de {n} minutes. Vous jouez à la borne.": "It shows for every online player and starts by itself as soon as it is full; otherwise it closes after {n} minutes. You play on the cabinet.",
+  "Pendant une partie : à la fin de celle-ci": "During a game: once it is over",
 };

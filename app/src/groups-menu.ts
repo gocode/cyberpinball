@@ -46,12 +46,13 @@ import {
   type ModReason,
   type PresenceTable,
   type Reaction,
+  type RemoteGroupAct,
   type TableEntry,
 } from '@cyberpinball/core';
 import type { GroupService } from './group-service';
 import { onGesture } from './gesture-flash';
 import type { Action, Built, Row, Section } from './library';
-import type { RemoteCommunityRow, RemoteThread } from './phone-remote';
+import type { RemoteCommunityRow, RemoteGroupHead, RemoteGroups, RemoteMember, RemoteThread } from './phone-remote';
 import type { SocialNet } from './social-net';
 
 export interface GroupsMenuHost {
@@ -71,6 +72,8 @@ export interface GroupsMenuHost {
   openProfile?(key: string, back: () => void): void;
   /** Partage et réseau : là où se réactive le partage. */
   openSharing?(back: () => void): void;
+  /** Pourquoi la borne n'ouvre pas d'écran pour le téléphone (une partie en cours) ; undefined : elle peut. */
+  busy?(): string | undefined;
   now?(): Date;
 }
 
@@ -92,6 +95,14 @@ export interface GroupsMenu {
    * fil du groupe ouvert au téléphone (`open`), lu puisqu'il est sous les yeux.
    */
   remote(open?: string): { rows: RemoteCommunityRow[]; unread: number; thread?: RemoteThread };
+  /** Pour « Messages » au téléphone : créer un groupe, les invitations reçues, les groupes publics. */
+  remoteGroups(): RemoteGroups;
+  /**
+   * Un geste fait au téléphone : la borne retrouve le groupe (invitation, annuaire, l'un des miens),
+   * l'ami à inviter, et ne fait que ce que son propre écran permettrait. « create » ouvre « Créer un
+   * groupe » à la borne (le nom s'y tape, au clavier du téléphone), son « Retour » vers `back`.
+   */
+  remoteAct(act: RemoteGroupAct, g: string | undefined, key: string | undefined, back: () => void): void;
 }
 
 /** Messages du fil montrés au plus (les plus anciens restent sur la borne). */
@@ -278,6 +289,23 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
 
   // ---------- Un groupe public de l'annuaire ----------
 
+  /** Pourquoi on ne peut pas rejoindre ce groupe public (partage coupé, complet, retiré par son créateur) ; undefined : on peut. */
+  function joinReason(view: GroupView): string | undefined {
+    const problem = blocked();
+    const full = view.members.length + view.invited.length >= GROUP_MEMBERS_MAX;
+    const removed = view.former.get(myKey())?.how === 'removed';
+    return problem ?? (full ? t('{n} membres au plus', { n: GROUP_MEMBERS_MAX }) : removed ? t('le créateur vous a retiré : il faut une invitation') : undefined);
+  }
+
+  /** Les amis à inviter dans ce groupe (ni membres ni déjà invités), et pourquoi personne (complet, tous là, partage coupé). */
+  function inviteState(v: GroupView): { candidates: { key: string; name: string }[]; reason?: string } {
+    const problem = blocked();
+    const room = GROUP_MEMBERS_MAX - v.members.length - v.invited.length;
+    const candidates = friendsSorted().filter((f) => !isMember(v, f.key) && !v.invited.some((i) => i.key === f.key));
+    const reason = problem ?? (room <= 0 ? t('{n} membres au plus', { n: GROUP_MEMBERS_MAX }) : candidates.length ? undefined : t('tous vos amis sont membres ou invités'));
+    return { candidates: reason ? [] : candidates, ...(reason ? { reason } : {}) };
+  }
+
   function openPublic(g: string, back: () => void): void {
     lib.openCustom(() => {
       const found = groups.publicGroups().find((x) => x.view.id === g);
@@ -294,10 +322,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
         const made = view.week.table.manufacturer && view.week.table.year ? `${view.week.table.manufacturer} ${view.week.table.year} · ` : '';
         sections.push({ title: t('Table de la semaine'), rows: [{ text: view.week.table.title, detail: made + (local ? t('déjà dans votre borne') : t('pas dans votre borne')), ...(thumb ? { thumb } : { icon: 'play' as const }), aside: local ? t('Prête') : t('Absente'), ...(local ? {} : { tone: 'quiet' as const }) }] });
       }
-      const problem = blocked();
-      const full = view.members.length + view.invited.length >= GROUP_MEMBERS_MAX;
-      const removed = view.former.get(myKey())?.how === 'removed';
-      const reason = problem ?? (full ? t('{n} membres au plus', { n: GROUP_MEMBERS_MAX }) : removed ? t('le créateur vous a retiré : il faut une invitation') : undefined);
+      const reason = joinReason(view);
       const actions: Action[] = [
         reason
           ? { label: t('Rejoindre'), icon: 'check', tone: 'quiet', detail: t('Indisponible : {reason}', { reason }), run: () => undefined }
@@ -469,7 +494,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       const week = v.week;
       const local = localTable(week.table);
       const index = actions.push({ label: t('Jouer : {table}', { table: week.table.title }), key: 'week', icon: 'play', ...(local ? {} : { tone: 'quiet' as const }), run: () => (local ? host.play(local) : undefined) }) - 1;
-      const meta = [week.table.manufacturer && week.table.year ? `${week.table.manufacturer} ${week.table.year}` : undefined, untilText(week.until), t('choisie par {name}', { name: week.by === myKey() ? t('vous') : week.byName })].filter(Boolean).join(' · ');
+      const meta = weekMeta(week);
       const thumb = local ? host.wheel?.(local) : undefined;
       sections.push({ title: t('Table de la semaine'), rows: [{ text: week.table.title, detail: local ? meta : `${meta} · ${t('pas dans votre borne')}`, ...(thumb ? { thumb } : { icon: 'play' as const }), aside: local ? t('Jouer') : t('Absente'), ...(local ? {} : { tone: 'quiet' as const }), action: index, pick: true }] });
     } else {
@@ -515,21 +540,16 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
     }
 
     const others = v.members.filter((m) => m.key !== myKey());
-    const notMembers = net.state().friends.filter((f) => !isMember(v, f.key) && !v.invited.some((i) => i.key === f.key));
-    const room = GROUP_MEMBERS_MAX - v.members.length - v.invited.length;
+    const invite = inviteState(v);
     const unavailable = (label: string, icon: Action['icon'], reason: string): Action => ({ label, icon, tone: 'quiet', detail: t('Indisponible : {reason}', { reason }), run: () => undefined });
     actions.push(
       problem ? unavailable(t('Écrire au groupe'), 'message', problem) : { label: t('Écrire au groupe'), icon: 'message', detail: t('Phrases prêtes ou clavier à l’écran'), run: () => openReply(g) },
       problem ? unavailable(t('Choisir la table de la semaine'), 'play', problem) : { label: t('Choisir la table de la semaine'), icon: 'play', detail: v.week ? t('Remplace {table} pour tous', { table: v.week.table.title }) : t('Jusqu’à dimanche 23:59, pour tous les membres'), run: () => openChooseTable(g) },
-      problem
-        ? unavailable(t('Inviter des amis'), 'friend-add', problem)
-        : room <= 0
-          ? unavailable(t('Inviter des amis'), 'friend-add', t('{n} membres au plus', { n: GROUP_MEMBERS_MAX }))
-          : notMembers.length
-            ? { label: t('Inviter des amis'), icon: 'friend-add', detail: listNames(notMembers.map((f) => f.name), (names) => t('{names} ne sont pas encore membres', { names }), (name) => t('{name} n’est pas encore membre', { name })), run: () => openInvite(g) }
-            : unavailable(t('Inviter des amis'), 'friend-add', t('tous vos amis sont membres ou invités')),
+      invite.reason
+        ? unavailable(t('Inviter des amis'), 'friend-add', invite.reason)
+        : { label: t('Inviter des amis'), icon: 'friend-add', detail: listNames(invite.candidates.map((f) => f.name), (names) => t('{names} ne sont pas encore membres', { names }), (name) => t('{name} n’est pas encore membre', { name })), run: () => openInvite(g) },
       { label: t('Membres'), icon: 'friends', detail: others.length ? t('{names} et vous', { names: others.map((m) => m.name).join(', ') }) : v.invited.length ? tn(v.invited.length, '{n} invitation en attente', '{n} invitations en attente') : t('Vous seul pour l’instant'), run: () => openMembers(g) },
-      { label: t('Quitter le groupe'), icon: 'exit', detail: v.creator === myKey() && others.length ? t('Vous l’avez créé : personne ne pourra plus retirer de membre') : t('Vous ne verrez plus ses messages'), run: () => confirmLeave(g) },
+      { label: t('Quitter le groupe'), icon: 'exit', detail: leaveDetail(v), run: () => confirmLeave(g) },
       { label: t('Retour'), icon: 'back', run: up },
     );
     const on = onlineCount(v);
@@ -541,6 +561,16 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       actions,
       back: up,
     };
+  }
+
+  /** Ce que dit la table de la semaine : son fabricant et son année, jusqu'à quand, qui l'a choisie. */
+  function weekMeta(week: NonNullable<GroupView['week']>): string {
+    return [week.table.manufacturer && week.table.year ? `${week.table.manufacturer} ${week.table.year}` : undefined, untilText(week.until), t('choisie par {name}', { name: week.by === myKey() ? t('vous') : week.byName })].filter(Boolean).join(' · ');
+  }
+
+  /** Ce que coûte de quitter ce groupe. */
+  function leaveDetail(v: GroupView): string {
+    return v.creator === myKey() && v.members.some((m) => m.key !== myKey()) ? t('Vous l’avez créé : personne ne pourra plus retirer de membre') : t('Vous ne verrez plus ses messages');
   }
 
   /** « Lucas et Camille », « Lucas, Camille et 2 autres » : la phrase qui convient au nombre. */
@@ -866,6 +896,134 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
     }, 0);
   }
 
+  // ---------- Au téléphone (lot 4 de la Communauté au téléphone, 18/11/2026) ----------
+
+  /** Le constat du dernier geste fait au téléphone ; effacé au geste suivant à la borne. */
+  let phoneNotice: RemoteGroups['notice'];
+  onGesture(() => (phoneNotice = undefined));
+  const flagSrc = (country: string | undefined) => flag(country).src;
+  const member = (key: string, name: string, country: string | undefined, detail: string): RemoteMember => {
+    const src = flagSrc(country);
+    return { key, name, ...(src ? { flag: src } : {}), detail, ...(key === myKey() ? { me: true as const } : {}) };
+  };
+
+  /** Un groupe ouvert au téléphone : la table de la semaine et son classement, ses membres, les amis à inviter. */
+  function groupHead(v: GroupView): RemoteGroupHead {
+    const local = v.week ? localTable(v.week.table) : undefined;
+    const ranks = v.week ? ranking(v) : [];
+    const invite = inviteState(v);
+    return {
+      g: v.id,
+      ...(v.week
+        ? { week: { title: v.week.table.title, detail: weekMeta(v.week), ...(local ? (host.busy?.() ? { reason: host.busy()! } : {}) : { reason: t('pas dans votre borne') }) } }
+        : { noWeek: t('« Choisir la table de la semaine » : un membre la choisit pour tous, jusqu’à dimanche') }),
+      ranking: ranks.map((r, i) => {
+        const src = flagSrc(r.country);
+        return { rank: i + 1, name: r.key === myKey() ? t('Vous') : r.name, ...(src ? { flag: src } : {}), score: formatNumber(r.score), ...(r.key === myKey() ? { me: true as const } : {}) };
+      }),
+      ...(v.week && !ranks.length ? { rankingEmpty: t('Pas encore de score depuis le choix de la table') } : {}),
+      members: [
+        ...v.members.map((m) => member(m.key, m.name, m.country, [m.key === v.creator ? t('Créateur') : undefined, presence(m.key).text].filter(Boolean).join(' · '))),
+        ...v.invited.map((i) => member(i.key, i.name, undefined, t('Invité par {name} · en attente de sa réponse', { name: i.by === myKey() ? t('vous') : (v.members.find((m) => m.key === i.by)?.name ?? '?') }))),
+      ],
+      invitable: invite.candidates.map((f) => member(f.key, f.name, undefined, presence(f.key).text)),
+      ...(invite.reason ? { inviteReason: invite.reason } : {}),
+      muted: Boolean(groups.entry(v.id)?.muted),
+      leave: leaveDetail(v),
+    };
+  }
+
+  /** « Messages » au téléphone : créer un groupe, les invitations reçues, les groupes publics (et les miens). */
+  function remoteGroups(): RemoteGroups {
+    const problem = blocked();
+    const face = (key: string, name: string) => avatar(key, name);
+    const facts = (view: GroupView) => {
+      const creator = view.members.find((m) => m.key === view.creator)?.name;
+      return [tn(view.members.length, '{n} membre', '{n} membres'), ...(creator ? [t('créé par {name}', { name: creator })] : []), ...(view.week ? [t('Table de la semaine : {table}', { table: view.week.table.title })] : [])].join(' · ');
+    };
+    const preview = (view: GroupView) => [
+      ...(view.week ? [t('Table de la semaine : {table}', { table: view.week.table.title }) + ` · ${localTable(view.week.table) ? t('déjà dans votre borne') : t('pas dans votre borne')}`] : []),
+      ...view.members.slice(0, 12).map((m) => [m.name, m.key === view.creator ? t('Créateur') : undefined, presence(m.key).text].filter(Boolean).join(' · ')),
+    ];
+    const invitations = problem
+      ? []
+      : groups.invitations().map(({ invitation, view }) => {
+          const from = inviterName(invitation.from, view);
+          return {
+            g: view.id,
+            name: view.name,
+            avatar: face(invitation.from, from),
+            detail: [t('{name} vous invite', { name: from }), tn(view.members.length, '{n} membre', '{n} membres'), ...(view.week ? [t('Table de la semaine : {table}', { table: view.week.table.title })] : [])].join(' · '),
+          };
+        });
+    const directory = problem ? [] : groups.publicGroups();
+    const mine = problem ? [] : groups.groups().filter((g) => g.view.access === 'public');
+    return {
+      ...(problem ? { blocked: problem } : {}),
+      create: { detail: t('Public ou privé, un nom, des amis à inviter'), ...((problem ?? host.busy?.()) ? { reason: (problem ?? host.busy?.())! } : {}) },
+      invitations,
+      publics: [
+        ...directory.map(({ view }) => {
+          const reason = joinReason(view);
+          return { g: view.id, name: shownName(view.name), detail: facts(view), avatars: view.members.slice(0, 3).map((m) => face(m.key, m.name)), ...(reason ? { reason } : {}), preview: preview(view) };
+        }),
+        ...mine.map(({ view }) => ({ g: view.id, name: view.name, detail: facts(view), avatars: view.members.slice(0, 3).map((m) => face(m.key, m.name)), member: true as const, preview: preview(view) })),
+      ],
+      ...(phoneNotice ? { notice: phoneNotice } : {}),
+    };
+  }
+
+  function remoteAct(act: RemoteGroupAct, g: string | undefined, key: string | undefined, back: () => void): void {
+    const say = (text: string, tone: 'ok' | 'warning' = 'ok') => (phoneNotice = { text, tone });
+    if (act === 'directory') return groups.askDirectory();
+    if (act === 'create') {
+      // À la borne : le nom s'y tape (clavier du téléphone), les amis s'y cochent ; la liste d'abord, pour son « Retour ».
+      if (blocked() || host.busy?.()) return;
+      listBack = back;
+      lib.openCustom(buildList, 0);
+      openCreate(() => lib.openCustom(buildList, 0));
+      return;
+    }
+    if (!g || blocked()) return;
+    // Une invitation reçue, et elle seule.
+    if (act === 'accept' || act === 'decline') {
+      const found = groups.invitations().find((x) => x.invitation.g === g);
+      if (!found) return;
+      if (act === 'accept' ? groups.accept(g) : groups.decline(g)) say(act === 'accept' ? t('Bienvenue dans « {group} »', { group: found.view.name }) : t('Invitation refusée'));
+      return;
+    }
+    // Un groupe public de l'annuaire, qu'on peut rejoindre.
+    if (act === 'join') {
+      const found = groups.publicGroups().find((x) => x.view.id === g);
+      if (!found || joinReason(found.view)) return;
+      if (groups.joinPublic(g)) say(t('Bienvenue dans « {group} »', { group: found.view.name }));
+      else say(t('Ce groupe n’a pas pu être rejoint'), 'warning');
+      return;
+    }
+    // L'un de mes groupes.
+    const v = groups.view(g);
+    if (!v || !isMember(v, myKey())) return;
+    switch (act) {
+      case 'play': {
+        const local = v.week ? localTable(v.week.table) : undefined;
+        if (local && !host.busy?.()) host.play(local);
+        return;
+      }
+      case 'invite': {
+        const friend = inviteState(v).candidates.find((f) => f.key === key);
+        if (friend && groups.invite(g, [friend])) say(tn(1, '{n} invitation envoyée', '{n} invitations envoyées'));
+        return;
+      }
+      case 'mute':
+      case 'unmute':
+        groups.setMuted(g, act === 'mute');
+        return;
+      case 'leave':
+        if (groups.leave(g)) say(t('Vous avez quitté « {group} »', { group: v.name }));
+        return;
+    }
+  }
+
   return {
     door,
     open,
@@ -916,7 +1074,8 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
         }
         const out = line.by === myKey();
         const c = chips(v, line);
-        items.push({ kind: 'line', id: line.id, text: shownText(line.body.text), out, meta: `${out ? t('Vous') : line.name} · ${time(line.at)}`, bubble: out ? 'out' : 'in', ...(c.length ? { chips: c } : {}) });
+        // Plusieurs auteurs dans un groupe : le pseudo de chacun au-dessus de sa bulle ; l'heure dessous.
+        items.push({ kind: 'line', id: line.id, text: shownText(line.body.text), out, meta: time(line.at), bubble: out ? 'out' : 'in', ...(out ? {} : { author: line.name }), ...(c.length ? { chips: c } : {}) });
       }
       const on = onlineCount(v);
       return {
@@ -933,8 +1092,11 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
           items,
           reactions: REACTIONS.map((r) => ({ id: r, label: reactionLabel(r) })),
           phrases: chatPhrases(),
+          group: groupHead(v),
         },
       };
     },
+    remoteGroups,
+    remoteAct,
   };
 }

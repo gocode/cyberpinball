@@ -304,7 +304,10 @@ function renderPeople(list, c) {
   if (!filters.some((f) => f.id === community.filter && !f.disabled)) community.filter = 'all';
   const rows = [];
   if (p.requests.length) rows.push(sectionTitle(tn(p.requests.length, 'Demande d’ami', 'Demandes d’ami')), ...p.requests.map(requestCard));
+  // Les parties instantanées ouvertes, la mienne ou de quoi en ouvrir une (telephone-groupes.js).
+  rows.push(...instantHead(c));
   if (p.note) rows.push(sectionTitle(p.note));
+  else if (c.instant) rows.push(sectionTitle(t('Joueurs')));
   const strip = document.createElement('li');
   strip.className = 'entry-chips people-filters';
   strip.append(
@@ -743,8 +746,10 @@ function renderCommunity() {
   }
   // Joueurs : les demandes, les filtres et les groupes de la borne.
   if (shown === 'friends') return renderPeople(list, c);
-  list.replaceChildren(...c.rows.map((r) => communityRow(r, r.last)));
-  if (!c.rows.length) showEmpty('conv', 'friend-add', t('Pas encore d’ami à qui écrire'), t('Dans « Joueurs », ouvrez un profil pour envoyer une demande d’ami.'));
+  // En tête : créer un groupe, les groupes publics, les invitations reçues (telephone-groupes.js).
+  const head = groupsHead(c);
+  list.replaceChildren(...head, ...c.rows.map((r) => communityRow(r, r.last)));
+  if (!c.rows.length && !c.groups?.invitations.length) showEmpty('conv', 'friend-add', t('Pas encore d’ami à qui écrire'), t('Dans « Joueurs », ouvrez un profil pour envoyer une demande d’ami.'));
   else showEmpty('conv');
 }
 
@@ -767,6 +772,7 @@ function renderThread() {
   }
   const atBottom = lines.scrollHeight - lines.scrollTop - lines.clientHeight < 40;
   lines.replaceChildren(
+    ...(th.group ? [groupWeekItem(th.group)] : []),
     ...(th.items.length ? th.items : [{ kind: 'day', text: t('Pas encore de message : écrivez le premier') }]).map((it) => {
       const li = document.createElement('li');
       if (it.kind === 'day') {
@@ -783,6 +789,12 @@ function renderThread() {
         return li;
       }
       li.className = `th-line ${it.out ? 'out' : 'in'} ${it.bubble}`;
+      if (it.author) {
+        const author = document.createElement('div');
+        author.className = 'th-author';
+        author.textContent = it.author;
+        li.append(author);
+      }
       const bubble = document.createElement('div');
       bubble.className = 'th-bubble';
       bubble.textContent = it.text;
@@ -836,11 +848,17 @@ function communityMessage(m) {
     people: m.people && typeof m.people === 'object' && Array.isArray(m.people.requests) && Array.isArray(m.people.filters) && m.people.groups && typeof m.people.groups === 'object' ? m.people : undefined,
     profile: m.profile && typeof m.profile === 'object' && typeof m.profile.key === 'string' && Array.isArray(m.profile.actions) ? m.profile : undefined,
     room: m.room && typeof m.room === 'object' && typeof m.room.name === 'string' && Array.isArray(m.room.lines) ? m.room : undefined,
+    // Groupes (créer, invitations, groupes publics) et parties instantanées : gardés, sinon ces parties restent absentes.
+    groups: m.groups && typeof m.groups === 'object' && m.groups.create && Array.isArray(m.groups.invitations) && Array.isArray(m.groups.publics) ? m.groups : undefined,
+    instant: m.instant && typeof m.instant === 'object' && Array.isArray(m.instant.games) ? m.instant : undefined,
   };
   renderCommunity();
   if (document.body.dataset.view === 'thread') renderThread();
   if (document.body.dataset.view === 'room') renderRoom();
   if (document.body.dataset.view === 'profile') renderProfile();
+  if (document.body.dataset.view === 'page') renderPage();
+  // « Changer » : la liste des tables arrive.
+  if (pages.picking && community.data.instant?.open?.tables) showTablePicker();
   renderTop();
 }
 
@@ -873,6 +891,7 @@ function communityTop(shown) {
     const pr = community.data?.profile;
     return pr && pr.key === community.profile ? { title: pr.name, detail: pr.subheading, face: communityFace({ ...pr, state: 'gone' }, 'top-face') } : { title: t('Profil'), detail: '' };
   }
+  if (shown === 'page') return pageTop();
   if (shown === 'room' && community.data?.room) return { title: community.data.room.name, detail: community.data.room.present ? tn(community.data.room.present, '{n} présent', '{n} présents') : '' };
   if (!['messages', 'friends', 'room', 'ranks'].includes(shown)) return undefined;
   const unread = community.data?.unread ?? 0;
@@ -884,6 +903,7 @@ document.getElementById('top-back').addEventListener('click', () => {
   const shown = document.body.dataset.view;
   if (shown === 'player') return setView('jukebox');
   if (shown === 'profile' && community.profileFrom === 'thread' && community.open) return setView('thread');
+  if (shown === 'page') return setView(pages.from);
   setView(shown === 'profile' ? community.profileFrom : communityView);
 });
 document.getElementById('thread-form').addEventListener('submit', (e) => {

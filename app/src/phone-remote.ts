@@ -107,6 +107,8 @@ import {
   type FirewallState,
   type JukeboxPlayerView,
   type RemoteJukeboxOp,
+  type RemoteGroupAct,
+  type RemoteInstantAct,
   mediaPathFromUrl,
   type KeptPhone,
   type KeptPhones,
@@ -262,9 +264,66 @@ export interface RemoteThread {
   blocked?: string;
   /** « En train d'écrire » (typing.ts) : les pseudos de qui écrit en ce moment. */
   typing?: string[];
-  items: ({ kind: 'day'; text: string } | { kind: 'event'; text: string; time: string } | { kind: 'line'; id: string; text: string; out: boolean; meta: string; bubble: 'in' | 'out' | 'pending' | 'expired'; chips?: string[] })[];
+  /** Chaque ligne ; dans un groupe, `author` : le pseudo de l'auteur d'un message reçu, au-dessus de sa bulle. */
+  items: ({ kind: 'day'; text: string } | { kind: 'event'; text: string; time: string } | { kind: 'line'; id: string; text: string; out: boolean; meta: string; bubble: 'in' | 'out' | 'pending' | 'expired'; chips?: string[]; author?: string })[];
   reactions: { id: string; label: string }[];
   phrases: string[];
+  /** Un groupe : sa table de la semaine et son classement en tête du fil, et son menu ⋮ (groups-menu.ts). */
+  group?: RemoteGroupHead;
+}
+
+/** Ce qu'une ligne du téléphone dit d'un joueur : sa clé (son profil), son pseudo, son drapeau et un détail. */
+export interface RemoteMember {
+  key: string;
+  name: string;
+  flag?: string;
+  detail: string;
+  /** C'est moi. */
+  me?: true;
+}
+
+/** Un groupe ouvert au téléphone, en plus de son fil (groups-menu.ts, remote). */
+export interface RemoteGroupHead {
+  g: string;
+  /** La table de la semaine : « Jouer » la lance à la borne ; absente de la borne, grisé avec sa raison. */
+  week?: { title: string; detail: string; reason?: string };
+  /** Pas de table de la semaine : ce qu'il faut pour en avoir une. */
+  noWeek?: string;
+  /** Le classement du groupe sur la table de la semaine. */
+  ranking: { rank: number; name: string; flag?: string; score: string; me?: true }[];
+  /** Personne n'a encore de score : pourquoi. */
+  rankingEmpty?: string;
+  /** Menu ⋮ : les membres (leur profil), les amis à inviter (ou pourquoi personne), les notifications, quitter. */
+  members: RemoteMember[];
+  invitable: RemoteMember[];
+  inviteReason?: string;
+  muted: boolean;
+  leave: string;
+}
+
+/** Les groupes au téléphone (groups-menu.ts, remoteGroups) : créer, les invitations reçues, les groupes publics. */
+export interface RemoteGroups {
+  /** Rien n'est possible (partage coupé) : pourquoi. */
+  blocked?: string;
+  /** « Créer un groupe » s'ouvre à la borne ; grisé avec sa raison. */
+  create: { detail: string; reason?: string };
+  invitations: { g: string; name: string; avatar: AvatarView; detail: string; reason?: string }[];
+  /** L'annuaire, et mes groupes publics (« Déjà membre ») ; `preview` : ce que dit l'aperçu. */
+  publics: { g: string; name: string; detail: string; avatars: AvatarView[]; member?: true; reason?: string; preview: string[] }[];
+  /** Le constat du dernier geste fait au téléphone (« Bienvenue dans … », « 1 invitation envoyée »). */
+  notice?: { text: string; tone: 'ok' | 'warning' };
+}
+
+/** Les parties instantanées au téléphone (instant-menu.ts, remote), en tête de « Joueurs ». */
+export interface RemoteInstant {
+  /** Rien n'est possible (partage coupé, réseau en connexion) : pourquoi. */
+  blocked?: string;
+  /** Les parties ouvertes par d'autres : « Rejoindre », ou grisé avec sa raison (autre version de la table). */
+  games: { id: string; title: string; detail: string; avatars: AvatarView[]; free: string; join?: true; reason?: string }[];
+  /** Ouvrir une partie : la table choisie à la borne par défaut, les autres pour « Changer » (sur demande) ; grisé avec sa raison. */
+  open?: { reason?: string; table?: { ref: string; title: string }; tables?: { ref: string; title: string }[]; min: number; max: number; text: string };
+  /** Ma partie ouverte, en attente : les places, l'heure de fermeture, inviter des amis, l'annuler (ou la quitter). */
+  mine?: { title: string; detail: string; seats: { name: string; avatar: AvatarView; me?: true }[]; max: number; status: string; closes: string; host: boolean; invitable: RemoteMember[]; inviteReason?: string; cancel: string; note: string };
 }
 
 /** La rubrique Communauté du téléphone : les conversations, le fil ouvert, ou pourquoi la messagerie est fermée. */
@@ -280,6 +339,10 @@ export interface RemoteCommunity {
   people?: RemotePeople;
   /** Le profil d'un joueur ouvert au téléphone (profile-open), tel que la borne le montre (phone-community.ts). */
   profile?: RemoteProfile;
+  /** Groupes (groups-menu.ts) : créer, les invitations reçues, les groupes publics. */
+  groups?: RemoteGroups;
+  /** Parties instantanées (instant-menu.ts) : celles des autres, en ouvrir une, la mienne. */
+  instant?: RemoteInstant;
 }
 
 /** Un joueur de la liste « Joueurs », comme à la borne (Joueurs en ligne) : son drapeau, ce qu'il fait. */
@@ -397,6 +460,10 @@ export interface MenuTarget {
   profileAct?(key: string, act: string): void;
   /** Accepter ou refuser une demande d'ami reçue. */
   friendAnswer?(key: string, yes: boolean): void;
+  /** Un geste sur un groupe (groups-menu.ts, remoteAct) ; la borne vérifie tout. */
+  groupAct?(act: RemoteGroupAct, g?: string, key?: string): void;
+  /** Un geste sur les parties instantanées (instant-menu.ts, remoteAct) ; la borne vérifie tout. */
+  instantAct?(act: RemoteInstantAct, opts: { id?: string; table?: string; count?: number; key?: string }): void;
   /** Juke-box : le lecteur de la borne pour l'onglet du téléphone, et ses commandes (vérifiées par la borne). */
   jukebox?(): RemoteJukebox;
   jukeboxAct?(op: RemoteJukeboxOp, key?: string, fraction?: number): void;
@@ -489,6 +556,7 @@ export const PHONE_FILES: Readonly<Record<string, string>> = {
   '/telephone-core.js': 'telephone/telephone-core.js',
   '/telephone-ranks.js': 'telephone/telephone-ranks.js',
   '/telephone-community.js': 'telephone/telephone-community.js',
+  '/telephone-groupes.js': 'telephone/telephone-groupes.js',
   '/telephone-jukebox.js': 'telephone/telephone-jukebox.js',
   // La pastille d'un joueur, dessinée comme à la borne (vue Scores).
   '/avatar.js': 'avatar.js',
@@ -1186,10 +1254,26 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
           groups: Object.fromEntries(Object.entries(c.people.groups).map(([id, groups]) => [id, groups.map((g) => ({ ...g, rows: g.rows.map((r) => ({ ...r, avatar: face(r.avatar) })) }))])),
         }
       : undefined;
+    const groups = c.groups
+      ? {
+          ...c.groups,
+          invitations: c.groups.invitations.map((i) => ({ ...i, avatar: face(i.avatar) })),
+          publics: c.groups.publics.map((p) => ({ ...p, avatars: p.avatars.map(face) })),
+        }
+      : undefined;
+    const instant = c.instant
+      ? {
+          ...c.instant,
+          games: c.instant.games.map((g) => ({ ...g, avatars: g.avatars.map(face) })),
+          ...(c.instant.mine ? { mine: { ...c.instant.mine, seats: c.instant.mine.seats.map((s) => ({ ...s, avatar: face(s.avatar) })) } } : {}),
+        }
+      : undefined;
     const shown: RemoteCommunity = {
       ...c,
       rows: c.rows.map((r) => ({ ...r, avatar: face(r.avatar) })),
       ...(people ? { people } : {}),
+      ...(groups ? { groups } : {}),
+      ...(instant ? { instant } : {}),
       ...(c.thread ? { thread: { ...c.thread, avatar: face(c.thread.avatar) } } : {}),
       ...(c.profile ? { profile: { ...c.profile, avatar: face(c.profile.avatar) } } : {}),
     };
@@ -1727,6 +1811,16 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         return;
       case 'friend-answer':
         menu.friendAnswer?.(message.key, message.yes);
+        pushCommunity(true);
+        return;
+      case 'group-act':
+        // La borne retrouve le groupe et vérifie le geste (groups-menu.ts, remoteAct).
+        menu.groupAct?.(message.a, message.g, message.key);
+        pushCommunity(true);
+        return;
+      case 'instant-act':
+        // La borne retrouve la partie, la table ou l'ami, et vérifie le geste (instant-menu.ts, remoteAct).
+        menu.instantAct?.(message.a, { ...(message.id ? { id: message.id } : {}), ...(message.table ? { table: message.table } : {}), ...(message.count ? { count: message.count } : {}), ...(message.key ? { key: message.key } : {}) });
         pushCommunity(true);
         return;
       case 'typing':

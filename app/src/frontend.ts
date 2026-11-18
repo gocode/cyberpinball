@@ -24,6 +24,8 @@ import {
   CHAT_REACTIONS,
   type ChatReaction,
   type Reaction,
+  type RemoteGroupAct,
+  type RemoteInstantAct,
   downloadReasonLater,
   downloadReasonText,
   avatarsDir,
@@ -1528,6 +1530,8 @@ phoneRemote.setMenu({
   community: (open, profile, room) => remoteCommunity(open, profile, room),
   profileAct: (key, act) => remoteProfileAct(key, act),
   friendAnswer: (key, yes) => remoteFriendAnswer(key, yes),
+  groupAct: (act, g, key) => remoteGroupAct(act, g, key),
+  instantAct: (act, opts) => remoteInstantAct(act, opts),
   roomSend: (text, room) => remoteRoomSend(text, room),
   roomAct: (room, line, act, reason) => remoteRoomAct(room, line, act, reason),
   chatSend: (key, text) => {
@@ -1819,7 +1823,22 @@ function remoteCommunity(open: string | undefined, profile: string | undefined, 
   const chat = chatMenu.remoteCommunity(open?.startsWith('g:') ? undefined : open);
   // Joueurs (demandes, filtres, groupes) et le profil ouvert : phone-community.ts.
   const shown = profile ? phoneCommunity.profile(profile) : undefined;
-  return { ...chat, rows: [...groups.rows, ...chat.rows], unread: chat.unread + groups.unread, ...(groups.thread ? { thread: groups.thread } : {}), people: communityMenu.remotePeople(REMOTE_ENTRIES_MAX), ...(shown ? { profile: shown } : {}), ...remoteRoom(room) };
+  return { ...chat, rows: [...groups.rows, ...chat.rows], unread: chat.unread + groups.unread, ...(groups.thread ? { thread: groups.thread } : {}), people: communityMenu.remotePeople(REMOTE_ENTRIES_MAX), ...(shown ? { profile: shown } : {}), ...remoteRoom(room), groups: groupsMenu.remoteGroups(), instant: instantMenu.remote() };
+}
+
+/** Un geste fait au téléphone sur un groupe (groups-menu.ts, remoteAct) ; jamais en mode invité. */
+function remoteGroupAct(act: RemoteGroupAct, g: string | undefined, key: string | undefined): void {
+  if (!guest.active) groupsMenu.remoteAct(act, g, key, () => library.leave());
+}
+
+/** Un geste fait au téléphone sur les parties instantanées (instant-menu.ts, remoteAct) ; jamais en mode invité. */
+function remoteInstantAct(act: RemoteInstantAct, opts: { id?: string; table?: string; count?: number; key?: string }): void {
+  if (!guest.active) instantMenu.remoteAct(act, opts, () => library.leave());
+}
+
+/** Pourquoi la borne n'ouvre pas d'écran pour le téléphone en ce moment (une partie) ; undefined : elle peut. */
+function remoteBusy(): string | undefined {
+  return state.phase === 'playing' || state.phase === 'loading' ? t('Pendant une partie : à la fin de celle-ci') : undefined;
 }
 
 /** Une action du profil montré au téléphone (phone-community.ts) ; jamais en mode invité. */
@@ -1842,7 +1861,7 @@ function remoteRoomSend(text: string, room: string | undefined): void {
   if (guest.active || !socialNet.state().enabled) return;
   const r = roomsMenu.remote(room);
   if (!r.blocked) roomsMenu.write(r.room, text);
-}
+}
 
 /** Un geste fait au téléphone sur une ligne d'un salon (rooms-menu.ts, remoteAct) ; jamais en mode invité. */
 function remoteRoomAct(room: string, line: string, act: string, reason: string | undefined): void {
@@ -2983,6 +3002,7 @@ const groupsMenu = createGroupsMenu({
   },
   openProfile: (key, back) => profileMenu.openProfile(key, back),
   openSharing: (back) => library.runSystemItem('sharing', back),
+  busy: () => remoteBusy(),
 });
 // Modération : l'entrée n'existe que pour un modérateur de la charte (elle peut changer : relue à chaque changement du réseau).
 let moderationShown = false;
@@ -3054,6 +3074,8 @@ const instantMenu = createInstantMenu({
   games: liveGames,
   live: friendsMenu.live,
   tables: () => tables,
+  selected: () => tables[state.index],
+  busy: () => remoteBusy(),
   openSharing: (back) => library.runSystemItem('sharing', back),
   redraw: () => broadcast(),
 });

@@ -9,12 +9,15 @@
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec des services d'essai.
 
+import { createHash } from 'node:crypto';
 import {
   avatarView,
   INSTANT_MAX_PLAYERS,
   INSTANT_MIN_PLAYERS,
+  INSTANT_OPEN_MS,
   instantFree,
   instantInvite,
+  instantMax,
   locale,
   playerFlag,
   socialAgo,
@@ -22,9 +25,11 @@ import {
   tn,
   type InstantGame,
   type LiveTableMatch,
+  type RemoteInstantAct,
   type TableEntry,
 } from '@cyberpinball/core';
 import type { Action, Built, Row, Section } from './library';
+import type { RemoteInstant } from './phone-remote';
 import type { LiveGames } from './live-game';
 import type { LiveMenu } from './live-game-menu';
 import type { SocialNet } from './social-net';
@@ -35,8 +40,12 @@ export interface InstantMenuHost {
     openCustom(build: () => Built, at?: number): void;
     task(message: string, work: () => Promise<void> | void): Promise<void>;
   };
-  net: Pick<SocialNet, 'state' | 'status' | 'avatarFile'>;
+  net: Pick<SocialNet, 'state' | 'status' | 'avatarFile'> & Partial<Pick<SocialNet, 'online'>>;
   games: LiveGames;
+  /** La table choisie sur la roue de la borne : celle qu'« Ouvrir une partie » propose au téléphone. */
+  selected?(): TableEntry | undefined;
+  /** Pourquoi la borne ne peut pas ouvrir d'écran en ce moment (une partie en cours) ; undefined : elle peut. */
+  busy?(): string | undefined;
   /** Le salon, le départ et les résultats de la partie en cours. */
   live: Pick<LiveMenu, 'open'>;
   tables(): readonly TableEntry[];
@@ -55,7 +64,20 @@ export interface InstantMenu {
   sheetAction(table: TableEntry, back: () => void): Action;
   /** Parties ouvertes par d'autres en ce moment. */
   count(): number;
+  /** Pour « Joueurs » au téléphone : les parties ouvertes, en ouvrir une, la mienne (instant-menu.ts reste la source). */
+  remote(): RemoteInstant;
+  /**
+   * Un geste fait au téléphone : la borne retrouve la partie, la table (sa référence) ou l'ami, et ne
+   * fait que ce que son propre écran permettrait ; rejoindre et ouvrir se passent à la borne.
+   */
+  remoteAct(act: RemoteInstantAct, opts: { id?: string; table?: string; count?: number; key?: string }, to: () => void): void;
 }
+
+/** La référence d'une table au téléphone : jamais son chemin. */
+export const instantTableRef = (table: TableEntry): string => createHash('sha256').update(table.file).digest('hex').slice(0, 16);
+/** Tables envoyées au plus pour « Changer », et combien de temps après la demande. */
+const PHONE_TABLES_MAX = 400;
+const PHONE_TABLES_MS = 2 * 60_000;
 
 export function createInstantMenu(host: InstantMenuHost): InstantMenu {
   const now = () => host.now?.() ?? new Date();
@@ -255,7 +277,117 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
     }).then(() => host.live.open(() => lib.openCustom(build)));
   }
 
+  // ---------- Au téléphone (lot 4 de la Communauté au téléphone, 18/11/2026) ----------
+
+  /** « Changer » demandé au téléphone (ms) : la liste des tables part pendant PHONE_TABLES_MS. */
+  let tablesAt = 0;
+  const time = (iso: string) => new Date(iso).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
+  const face = (key: string, name: string) => avatarView(key, name, host.net.avatarFile(key));
+
+  /** Mes amis en ligne qui ne sont pas dans ma partie, si j'en suis l'hôte et qu'il reste une place ; sinon pourquoi personne. */
+  function inviteState(game: NonNullable<ReturnType<typeof myInstant>>): { candidates: { key: string; name: string }[]; reason?: string } {
+    if (game.host !== myKey()) return { candidates: [], reason: t('Seul celui qui a ouvert la partie invite') };
+    const taken = game.players.filter((p) => p.host || p.state === 'accepted' || p.state === 'invited').length;
+    if (taken >= game.instant!.max) return { candidates: [], reason: t('Complète : départ pour tout le monde') };
+    const candidates = host.net
+      .state()
+      .friends.filter((f) => host.net.online?.(f.key) && !game.players.some((p) => p.key === f.key))
+      .map((f) => ({ key: f.key, name: f.name }));
+    return candidates.length ? { candidates } : { candidates, reason: t('Aucun ami en ligne pour l’instant') };
+  }
+
+  function remote(): RemoteInstant {
+    const problem = unavailable();
+    if (problem) return { blocked: problem, games: [] };
+    const mine = myInstant();
+    const busy = host.busy?.();
+    const list = games.instantGames().map((g) => {
+      const found = matchOf(g);
+      const others = g.seats.map((s) => face(s.key, s.name));
+      const reason = busy ?? (!found.match ? t('Vérification de la table sur votre borne…') : found.match !== 'same' ? fitText(found.match, found.scriptDiffers) : mine?.id === g.id ? t('Vous êtes dans cette partie') : undefined);
+      return {
+        id: g.id,
+        title: g.title,
+        detail: [t('Ouverte par {name} {ago}', { name: g.name, ago: socialAgo(g.opened, now()) }), seatsText(g)].join(' · '),
+        avatars: others.slice(0, INSTANT_MAX_PLAYERS),
+        free: tn(instantFree(g), '{n} place', '{n} places'),
+        ...(reason ? { reason } : { join: true as const }),
+      };
+    });
+    const out: RemoteInstant = { games: list };
+    if (mine) {
+      const seated = mine.players.filter((p) => p.host || p.state === 'accepted');
+      const invite = inviteState(mine);
+      const max = mine.instant!.max;
+      const hosting = mine.host === myKey();
+      const closes = new Date(Date.parse(mine.instant!.opened) + INSTANT_OPEN_MS).toISOString();
+      out.mine = {
+        title: mine.title,
+        detail: t('{n} sur {max} joueurs', { n: seated.length, max }),
+        seats: seated.map((p) => ({ name: p.key === myKey() ? t('Vous') : p.name, avatar: face(p.key, p.name), ...(p.key === myKey() ? { me: true as const } : {}) })),
+        max,
+        status: seated.length >= max ? t('Complète : départ pour tout le monde') : t('Départ à {n} joueurs', { n: max }),
+        closes: t('Ouverte {ago} · fermée à {time} si elle n’est pas complète', { ago: socialAgo(mine.instant!.opened, now()), time: time(closes) }),
+        host: hosting,
+        invitable: invite.candidates.map((f) => ({ key: f.key, name: f.name, detail: t('En ligne') })),
+        ...(invite.reason ? { inviteReason: invite.reason } : {}),
+        cancel: hosting ? t('Elle disparaît de la liste ; ceux qui l’ont rejointe en sont prévenus') : t('Votre place se libère pour un autre joueur'),
+        note: t('Le départ, la partie et les résultats se passent à la borne ; le téléphone reste la télécommande et la messagerie.'),
+      };
+    } else {
+      const chosen = host.selected?.();
+      const table = chosen && chosen.emulator === 'vpx' ? { ref: instantTableRef(chosen), title: fullTitle(chosen) } : undefined;
+      const wanted = Date.now() - tablesAt < PHONE_TABLES_MS;
+      out.open = {
+        ...(busy ? { reason: busy } : !playable().length ? { reason: t('Aucune table VPX sur cette borne') } : {}),
+        ...(table ? { table } : {}),
+        ...(wanted ? { tables: [...playable()].sort((a, b) => a.title.localeCompare(b.title)).slice(0, PHONE_TABLES_MAX).map((e) => ({ ref: instantTableRef(e), title: fullTitle(e) })) } : {}),
+        min: INSTANT_MIN_PLAYERS,
+        max: INSTANT_MAX_PLAYERS,
+        text: t('Elle s’affiche chez tous les joueurs en ligne et part d’elle-même dès qu’elle est complète ; sinon, elle se ferme au bout de {n} minutes. Vous jouez à la borne.', { n: Math.round(INSTANT_OPEN_MS / 60_000) }),
+      };
+    }
+    return out;
+  }
+
+  function remoteAct(act: RemoteInstantAct, opts: { id?: string; table?: string; count?: number; key?: string }, to: () => void): void {
+    if (unavailable()) return;
+    if (act === 'tables') {
+      tablesAt = Date.now();
+      return;
+    }
+    const mine = myInstant();
+    if (act === 'cancel') {
+      if (mine) games.leave();
+      return;
+    }
+    if (act === 'invite') {
+      const friend = mine ? inviteState(mine).candidates.find((f) => f.key === opts.key) : undefined;
+      if (friend) games.invite(friend.key, friend.name);
+      return;
+    }
+    // Rejoindre et ouvrir se passent à la borne : pas pendant une partie.
+    if (host.busy?.()) return;
+    if (act === 'join') {
+      const g = games.instantGames().find((x) => x.id === opts.id);
+      if (g && matchOf(g).match === 'same' && mine?.id !== g.id) {
+        back = to;
+        joinGame(g);
+      }
+      return;
+    }
+    if (act === 'open') {
+      if (mine) return;
+      const table = opts.table ? playable().find((e) => instantTableRef(e) === opts.table) : host.selected?.();
+      if (!table || table.emulator !== 'vpx') return;
+      back = to;
+      openGame(table, instantMax(opts.count ?? INSTANT_MIN_PLAYERS));
+    }
+  }
+
   return {
+    remote,
+    remoteAct,
     door,
     open(to) {
       back = to;
