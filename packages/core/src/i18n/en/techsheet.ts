@@ -299,6 +299,7 @@ export const messages: Record<string, string> = {
   "la fiche et la santé, à lire d’abord": "the sheet and the health, read this first",
   "ce que décrit le joueur": "what the player describes",
   "le résumé en texte": "the summary as text",
+  "joint par le joueur": "attached by the player",
   "le relevé complet de la santé": "the full health reading",
   "le relevé de la fiche technique": "the tech sheet reading",
   "Numéro de la borne": "Cabinet number",

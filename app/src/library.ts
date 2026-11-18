@@ -12,7 +12,7 @@ import { openingScoresChoice, readScoresChoice, writeScoresChoice } from './scor
 import type { RankingView } from './table-rankings';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, BrowserWindow, clipboard, dialog, net, screen as electronScreen, type Input, type WebContents } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, nativeImage, net, screen as electronScreen, type Input, type WebContents } from 'electron';
 import {
   isFavorite,
   CONFIG_KEY,
@@ -1367,7 +1367,13 @@ export function createLibrary(host: LibraryHost) {
         openSystem: () => openSystem(),
         prompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
         showing: (build) => screen?.kind === 'custom' && screen.build === build,
-        techReport: (text) => techSheet.reportZip(text),
+        techReport: (text, files) => techSheet.reportZip(text, files),
+        pick: (request) => pickPaths(request),
+        shrinkImage: (file) => {
+          const image = nativeImage.createFromPath(file);
+          if (image.isEmpty()) return undefined;
+          return (image.getSize().width > 1920 ? image.resize({ width: 1920, quality: 'good' }) : image).toJPEG(82);
+        },
         openReportContents: (back) => techSheet.openContents(back),
         log: (line) => console.log(line),
       })

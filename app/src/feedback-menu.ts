@@ -31,7 +31,9 @@ import {
   playerFlag,
   saveFeedbackState,
   similarProposals,
+  formatSize,
   t,
+  tLater,
   tn,
   type CrashConsent,
   type FeedbackPerson,
@@ -41,7 +43,9 @@ import {
   type ReportEnvelope,
 } from '@cyberpinball/core';
 import type { FeedbackService } from './feedback-service';
+import type { PickRequest } from './file-picker';
 import type { Action, Built, Row } from './library';
+import { addAttachments, ATTACHMENTS_BYTES_MAX, ATTACHMENTS_COUNT_MAX, attachmentsSize, isImageName, refusalText, reportFile, type Attachment, type ShrinkImage } from './report-attachments';
 
 /** Ce que le formulaire sait déjà en venant d'un plantage ou de la fiche technique. */
 export interface FeedbackContext {
@@ -111,8 +115,12 @@ export interface FeedbackMenuContext {
   openSystem(): void;
   prompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void;
   showing(build: () => Built): boolean;
-  /** Le rapport technique de la fiche (ZIP anonymisé), avec ce texte en description. */
-  techReport(text: string): Buffer | undefined;
+  /** Le rapport technique de la fiche (ZIP anonymisé), avec ce texte en description et ces fichiers joints. */
+  techReport(text: string, files?: { name: string; data: Buffer }[]): Buffer | undefined;
+  /** Le sélecteur de fichiers de Cyber Pinball (library.ts) : les pièces jointes d'un rapport privé. */
+  pick?(request: Omit<PickRequest, 'done' | 'cancel'>): Promise<string[] | undefined>;
+  /** Réduit une capture d'écran trop lourde (Electron nativeImage). */
+  shrinkImage?: ShrinkImage;
   /** Le contenu du rapport, page de la fiche technique, avec son retour. */
   openReportContents?(back: () => void): void;
   log(line: string): void;
@@ -127,6 +135,15 @@ interface Draft {
   attach: boolean;
   context: FeedbackContext;
   sending?: boolean;
+  files: Attachment[];
+  /** Ce qui n'a pas pu être joint, dit sous la liste jusqu'au prochain choix. */
+  notice?: Row;
+}
+
+/** Les pièces jointes d'un écran (formulaire, rapport aux développeurs). */
+interface AttachBox {
+  files: Attachment[];
+  notice?: Row;
 }
 
 export function createFeedbackMenu(ctx: FeedbackMenuContext) {
@@ -173,8 +190,8 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         actions.push({ label: tabLabel(id), key: `feedback-tab:${id}`, run: () => ((tab = id), self()) });
         return { label: tabLabel(id), count: String(n), current: tab === id, action: actions.length - 1 };
       });
-      actions.push({ label: t('Proposer une idée'), detail: t('Amélioration ou nouvelle fonction · publique, les autres joueurs votent'), icon: 'plus', tone: 'ok', key: 'feedback:idea', run: () => openForm({ kind: 'feature', title: '', text: '', attach: false, context: {} }, self) });
-      actions.push({ label: t('Signaler un problème'), detail: t('Ce qui ne marche pas · rapport technique joint, lu par l’équipe seule'), icon: 'alert', key: 'feedback:bug', run: () => openForm({ kind: 'bug', title: '', text: '', attach: true, context: {} }, self) });
+      actions.push({ label: t('Proposer une idée'), detail: t('Amélioration ou nouvelle fonction · publique, les autres joueurs votent'), icon: 'plus', tone: 'ok', key: 'feedback:idea', run: () => openForm({ kind: 'feature', title: '', text: '', attach: false, context: {}, files: [] }, self) });
+      actions.push({ label: t('Signaler un problème'), detail: t('Ce qui ne marche pas · rapport technique joint, lu par l’équipe seule'), icon: 'alert', key: 'feedback:bug', run: () => openForm({ kind: 'bug', title: '', text: '', attach: true, context: {}, files: [] }, self) });
       actions.push({
         label: t('Rapports de plantage automatiques'),
         detail: consentLabel(state.crashes),
@@ -294,6 +311,63 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     });
   }
 
+  // ---------- Les pièces jointes (rapport privé seulement) ----------
+
+  /**
+   * « Joindre des fichiers… » (le sélecteur de fichiers de Cyber Pinball, aux flippers) et la liste
+   * des fichiers joints, chacun retiré par Start. Ajoute ses actions à `actions` ; rend la section.
+   */
+  function attachmentsUi(box: AttachBox, reopen: () => void, actions: Action[]): Built['sections'][number] | undefined {
+    if (ctx.pick) {
+      const full = box.files.length >= ATTACHMENTS_COUNT_MAX;
+      const size = attachmentsSize(box.files);
+      actions.push({
+        label: t('Joindre des fichiers…'),
+        detail: full
+          ? t('Indisponible : {n} fichiers au plus ; retirez-en un d’abord', { n: ATTACHMENTS_COUNT_MAX })
+          : box.files.length
+            ? t('{size} sur {max} · privé, lu par l’équipe seule', { size: formatSize(size), max: formatSize(ATTACHMENTS_BYTES_MAX) })
+            : t('Captures d’écran, journaux, réglages · privé, lu par l’équipe seule'),
+        icon: 'import',
+        key: 'attach:pick',
+        ...(full ? { tone: 'quiet' as const } : {}),
+        run: () => (full ? reopen() : void pickAttachments(box, reopen)),
+      });
+    }
+    if (!box.files.length && !box.notice) return undefined;
+    // Ce qui n'a pas été joint d'abord : sous les fichiers, une liste qui défile le cacherait.
+    const rows: Row[] = box.notice ? [box.notice] : [];
+    for (const f of box.files) {
+      actions.push({ label: t('Retirer {file}', { file: f.name }), key: `attach:remove:${f.name}`, run: () => ((box.files = box.files.filter((x) => x !== f)), (box.notice = undefined), reopen()) });
+      rows.push({
+        action: actions.length - 1,
+        pick: true,
+        icon: isImageName(f.name) ? 'image' : 'report',
+        text: f.name,
+        detail: [formatSize(f.data.length), ...(f.shrunk ? [t('image réduite pour tenir')] : []), t('Start : retirer')].join(' · '),
+      });
+    }
+    return { title: t('Fichiers joints · privés'), rows };
+  }
+
+  async function pickAttachments(box: AttachBox, reopen: () => void): Promise<void> {
+    const paths = await ctx.pick!({
+      title: t('Joindre des fichiers au rapport'),
+      icon: 'import',
+      purpose: tLater('Pièce jointe d’un rapport'),
+      mode: 'files',
+      start: 'desktop',
+    });
+    if (paths?.length) {
+      const r = addAttachments(box.files, paths, ctx.shrinkImage);
+      box.files = r.list;
+      const refused = refusalText(r.refused);
+      box.notice = refused ? { icon: 'alert', text: refused.text, detail: refused.detail, tone: 'warning' } : undefined;
+      ctx.log(`Retours : ${r.list.length} pièce(s) jointe(s), ${r.refused.length} refusée(s).`); // i18n-ignore : journal
+    }
+    reopen();
+  }
+
   // ---------- Le formulaire ----------
 
   /** Le formulaire, d'où que l'on vienne (menu, plantage, fiche technique, téléphone). */
@@ -344,12 +418,13 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         run: () => ((draft.attach = !draft.attach), self()),
       });
       if (draft.attach && ctx.openReportContents) actions.push({ label: t('Voir le contenu du rapport'), icon: 'eye', key: 'feedback:contents', run: () => ctx.openReportContents!(self) });
+      const filesSection = attachmentsUi(draft, self, actions);
       const ready = Boolean(title) && !draft.sending;
       const why = draft.sending ? t('Envoi en cours…') : !title ? t('Indisponible : écrivez d’abord un titre ({min} caractères au moins)', { min: PROPOSAL_TITLE_MIN }) : !ctx.service.canWrite() ? t('Indisponible : la borne n’a pas encore sa clé de joueur') : undefined;
       // Le privé d'abord : un problème signalé reste entre le joueur et l'équipe ; publier est un choix
       // de plus, nommé comme tel (« en public »). Le bouton mis en avant : privé pour un problème,
       // publié pour une idée (les autres joueurs votent).
-      const privateReady = Boolean(draft.title || draft.text) && !draft.sending;
+      const privateReady = Boolean(draft.title || draft.text || draft.files.length) && !draft.sending;
       const publicReady = ready && ctx.service.canWrite();
       actions.push({
         label: t('Envoyer à l’équipe seulement'),
@@ -372,11 +447,12 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       if (draft.context.about) sections.push({ rows: [{ icon: 'alert', text: draft.context.about, detail: t('Rappelé dans le rapport'), tone: 'warning' }] });
       sections.push({ title: t('Nature'), options: true, rows: kindRows });
       if (nearRows.length) sections.push({ title: t('Déjà proposé ? Votez plutôt'), rows: nearRows });
+      if (filesSection) sections.push(filesSection);
       return {
         heading: draft.kind === 'bug' ? t('Signaler un problème') : t('Proposer une idée'),
         icon: draft.kind === 'bug' ? 'alert' : 'plus',
         subheading: t('Retours et propositions'),
-        lead: t('Envoyé à l’équipe seulement, tout reste privé. Publié en public, le titre et la description sont visibles de tous ; le rapport technique reste privé.'),
+        lead: t('Envoyé à l’équipe seulement, tout reste privé. Publié en public, le titre et la description sont visibles de tous ; le rapport technique et les fichiers joints restent privés.'),
         hint: t('Flippers : choisir · Start : écrire, changer, envoyer · Exit : revenir'),
         sections,
         actions,
@@ -411,11 +487,14 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       published = r.ok ? 'ok' : r.why;
       id = r.ok ? r.id : undefined;
     }
-    // Le rapport privé : demandé (joint), ou seul quand rien n'est publié.
+    // Le rapport privé : demandé (joint), avec des fichiers joints, ou seul quand rien n'est publié.
     let report: 'sent' | 'queued' | 'failed' | undefined;
-    if (draft.attach || !publish || published !== 'ok') {
-      const zip = draft.attach ? ctx.techReport([draft.title, draft.text].filter(Boolean).join('\n\n')) : undefined;
-      report = await ctx.service.sendReport(envelope(draft, id), zip);
+    if (draft.attach || draft.files.length || !publish || published !== 'ok') {
+      const body = [draft.title, draft.text].filter(Boolean).join('\n\n');
+      const { file, dropped } = reportFile((files) => ctx.techReport(body, files), draft.attach, draft.files);
+      const env = envelope(draft, id);
+      if (dropped) env.text = `${env.text ?? ''}\n[rapport technique trop lourd avec les pièces jointes, retiré]`.trim(); // i18n-ignore : lu par l'équipe
+      report = await ctx.service.sendReport(env, file);
     }
     draft.sending = false;
     openSent(draft, published, report, id, back);
@@ -426,7 +505,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     if (published === 'ok') rows.push({ icon: 'check', text: t('Proposition publiée'), detail: t('« {title} » · votre vote compte déjà', { title: draft.title }), tone: 'ok', badges: [t('✓ Publiée')] });
     else if (published === 'quota') rows.push({ icon: 'alert', text: t('Pas publiée : cinq propositions par jour au plus'), detail: t('Elle est partie à l’équipe en privé ; republiez-la demain si vous voulez que les autres votent.'), tone: 'warning' });
     else if (published) rows.push({ icon: 'alert', text: t('Pas publiée : le service ne répond pas'), detail: t('Elle part à l’équipe en privé dès que la borne est en ligne.'), tone: 'warning' });
-    if (report === 'sent') rows.push({ icon: 'lock', text: draft.attach ? t('Rapport technique envoyé à l’équipe') : t('Message envoyé à l’équipe'), detail: t('Chiffré : seule l’équipe peut le lire'), tone: 'ok', badges: [t('✓ Envoyé')] });
+    if (report === 'sent') rows.push({ icon: 'lock', text: draft.attach ? t('Rapport technique envoyé à l’équipe') : t('Message envoyé à l’équipe'), detail: draft.files.length ? tn(draft.files.length, 'Chiffré, avec {n} fichier joint : seule l’équipe peut le lire', 'Chiffré, avec {n} fichiers joints : seule l’équipe peut le lire') : t('Chiffré : seule l’équipe peut le lire'), tone: 'ok', badges: [t('✓ Envoyé')] });
     else if (report === 'queued') rows.push({ icon: 'clock', text: t('Envoi en attente'), detail: t('La borne n’est pas en ligne : il partira tout seul dès qu’elle le sera'), tone: 'info', badges: [t('En attente')] });
     else if (report === 'failed') rows.push({ icon: 'alert', text: t('Rapport non envoyé'), detail: t('Écriture impossible dans les données de la borne'), tone: 'error' });
     const home = () => open(back);
@@ -479,14 +558,17 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     let text = '';
     let sending = false;
     let result: 'sent' | 'queued' | 'failed' | undefined;
+    const box: AttachBox = { files: [] };
     const findings = report.findings ?? [];
     const send = async () => {
       sending = true;
       changed();
       const body = [report.about, ...findings.map((f) => `- ${f}`), ...(text ? ['', text] : [])].join('\n');
-      const envelope: ReportEnvelope = { v: 1, kind: 'report', signature: report.signature, text: body, ...(report.table ? { table: report.table } : {}), version: ctx.version, lang: ctx.language(), borne: state.borne, at: Date.now() };
-      // Déjà prévenus : le rapport technique est parti avec le rapport automatique, il ne repart pas.
-      result = await ctx.service.sendReport(envelope, report.notified ? undefined : ctx.techReport(body));
+      // Déjà prévenus : le rapport technique est parti avec le rapport automatique, il ne repart pas ;
+      // les fichiers joints, si.
+      const { file, dropped } = reportFile((files) => ctx.techReport(body, files), !report.notified, box.files);
+      const envelope: ReportEnvelope = { v: 1, kind: 'report', signature: report.signature, text: dropped ? `${body}\n[rapport technique trop lourd avec les pièces jointes, retiré]` : body, ...(report.table ? { table: report.table } : {}), version: ctx.version, lang: ctx.language(), borne: state.borne, at: Date.now() }; // i18n-ignore : lu par l'équipe
+      result = await ctx.service.sendReport(envelope, file);
       sending = false;
       // Envoyé à la main : un « Oui » à la question des rapports automatiques ne le renvoie pas aujourd'hui.
       if (result !== 'failed') {
@@ -507,17 +589,17 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
           ];
       what.push({ icon: 'lock', text: t('Chiffré pour les développeurs, anonymisé'), detail: t('Ni votre nom, ni le nom du PC, ni adresse IP, ni noms d’amis'), tone: 'info' });
       const sections: Built['sections'] = [{ rows: head }];
-      if (result === 'sent') sections.push({ rows: [{ icon: 'check', text: t('Rapport envoyé aux développeurs'), detail: t('Chiffré : seuls les développeurs peuvent le lire. Ils vont l’examiner.'), tone: 'ok', badges: [t('✓ Envoyé')] }] });
+      if (result === 'sent') sections.push({ rows: [{ icon: 'check', text: t('Rapport envoyé aux développeurs'), detail: box.files.length ? tn(box.files.length, 'Chiffré, avec {n} fichier joint : seuls les développeurs peuvent le lire. Ils vont l’examiner.', 'Chiffré, avec {n} fichiers joints : seuls les développeurs peuvent le lire. Ils vont l’examiner.') : t('Chiffré : seuls les développeurs peuvent le lire. Ils vont l’examiner.'), tone: 'ok', badges: [t('✓ Envoyé')] }] });
       else if (result === 'queued') sections.push({ rows: [{ icon: 'clock', text: t('Envoi en attente'), detail: t('La borne n’est pas en ligne : il partira tout seul dès qu’elle le sera'), tone: 'info', badges: [t('En attente')] }] });
       else if (result === 'failed') sections.push({ rows: [{ icon: 'alert', text: t('Rapport non envoyé'), detail: t('Écriture impossible dans les données de la borne'), tone: 'error' }] });
       else sections.push({ title: t('Ce qui part'), rows: what });
       const actions: Action[] = [];
       if (result === 'sent' || result === 'queued') actions.push({ label: t('Retour'), icon: 'back', tone: 'ok', run: back });
       else {
-        const ready = !sending && (!report.notified || Boolean(text));
+        const ready = !sending && (!report.notified || Boolean(text) || box.files.length > 0);
         actions.push({
-          label: report.notified ? t('Envoyer ma description') : t('Envoyer le rapport'),
-          detail: sending ? t('Envoi en cours…') : ready ? t('Aux développeurs · chiffré, anonymisé') : t('Indisponible : décrivez d’abord ce qui s’est passé'),
+          label: !report.notified ? t('Envoyer le rapport') : text || !box.files.length ? t('Envoyer ma description') : t('Envoyer mes fichiers'),
+          detail: sending ? t('Envoi en cours…') : ready ? t('Aux développeurs · chiffré, anonymisé') : t('Indisponible : décrivez d’abord ce qui s’est passé, ou joignez un fichier'),
           icon: 'upload',
           tone: ready ? 'ok' : 'quiet',
           key: 'devreport:send',
@@ -535,6 +617,8 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
               show(build);
             }, t('Lue par les développeurs seuls. Ni nom, ni adresse, ni numéro de téléphone.')),
         });
+        const filesSection = attachmentsUi(box, () => show(build), actions);
+        if (filesSection) sections.push(filesSection);
         if (!report.notified && ctx.openReportContents) actions.push({ label: t('Voir le contenu du rapport'), icon: 'eye', key: 'devreport:contents', run: () => ctx.openReportContents!(() => show(build)) });
         actions.push({ label: t('Retour'), icon: 'back', run: back });
       }
@@ -577,7 +661,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         { label: t('Oui, à chaque plantage'), icon: 'check', tone: 'ok', key: 'consent:yes', run: () => answer('yes') },
         { label: t('Non'), icon: 'close', key: 'consent:no', run: () => answer('no') },
         // Le retour du formulaire ramène à la question, encore sans réponse.
-        { label: t('Décrire ce qui s’est passé'), detail: t('Le formulaire, avec ce plantage déjà rappelé'), icon: 'edit', key: 'consent:describe', run: () => openForm({ kind: 'bug', title: '', text: '', attach: true, context: { about, table, signature, attach: true } }, () => askConsent(signature, table, about, then)) },
+        { label: t('Décrire ce qui s’est passé'), detail: t('Le formulaire, avec ce plantage déjà rappelé'), icon: 'edit', key: 'consent:describe', run: () => openForm({ kind: 'bug', title: '', text: '', attach: true, context: { about, table, signature, attach: true }, files: [] }, () => askConsent(signature, table, about, then)) },
         ...(ctx.openReportContents ? [{ label: t('Voir le contenu du rapport'), icon: 'eye' as const, key: 'consent:contents', run: () => ctx.openReportContents!(() => askConsent(signature, table, about, then)) }] : []),
       ],
       back: then,
@@ -587,7 +671,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
   return {
     open,
     /** Le formulaire directement (plantage, fiche technique, téléphone) ; `kind` : la nature proposée. */
-    openForm: (context: FeedbackContext, back: () => void, kind: ProposalKind = 'bug') => openForm({ kind, title: '', text: context.text ?? '', attach: context.attach ?? kind === 'bug', context }, back),
+    openForm: (context: FeedbackContext, back: () => void, kind: ProposalKind = 'bug') => openForm({ kind, title: '', text: context.text ?? '', attach: context.attach ?? kind === 'bug', context, files: [] }, back),
     crashed,
     askConsent,
     /** « Envoyer un rapport aux développeurs » : écran d'une partie échouée, Diagnostic d'une table. */

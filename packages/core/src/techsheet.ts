@@ -698,6 +698,8 @@ export interface ReportInput {
   description?: string;
   /** Fichiers joints, déjà lus : leur nom dans le ZIP et leur texte (anonymisé ici). */
   attachments: { name: string; text: string; about: string }[];
+  /** Fichiers choisis par le joueur (rapport aux développeurs), tels quels : leur chemin dans le ZIP, jamais anonymisés. */
+  playerFiles?: { name: string; data: Buffer }[];
   /** Le relevé de la santé, tel qu'il est gardé (sante.json). */
   healthJson?: unknown;
   secrets: ReportSecrets;
@@ -775,7 +777,7 @@ export function reportMailto(summary: string, file: string): string {
 const html = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** rapport.html : la page à lire d'abord, autonome (aucune ressource externe), imprimable. */
-export function reportHtml(input: Omit<ReportInput, 'attachments' | 'secrets'> & { files: { name: string; about: string }[] }): string {
+export function reportHtml(input: Omit<ReportInput, 'attachments' | 'secrets' | 'playerFiles'> & { files: { name: string; about: string }[] }): string {
   const { facts, health } = input;
   const blocks = techBlocks(facts);
   const count = (s: HealthState) => health.filter((l) => l.state === s).length;
@@ -846,6 +848,7 @@ export function buildReport(input: ReportInput): Report {
     ...(input.healthJson !== undefined ? [{ name: 'sante.json', about: t('le relevé complet de la santé') }] : []), // i18n-ignore : nom de fichier
     { name: 'fiche.json', about: t('le relevé de la fiche technique') }, // i18n-ignore : nom de fichier
     ...input.attachments.map((a) => ({ name: a.name, about: a.about })),
+    ...(input.playerFiles ?? []).map((f) => ({ name: f.name, about: t('joint par le joueur') })),
   ];
   add('rapport.html', hide(reportHtml({ facts: input.facts, health: input.health, description: input.description, files: listed.slice(1) })), listed[0]!.about); // i18n-ignore : nom de fichier
   if (input.description?.trim()) add('probleme.txt', hide(input.description.trim()), t('ce que décrit le joueur')); // i18n-ignore : nom de fichier
@@ -853,6 +856,7 @@ export function buildReport(input: ReportInput): Report {
   if (input.healthJson !== undefined) add('sante.json', hide(JSON.stringify(input.healthJson, null, 1)), t('le relevé complet de la santé')); // i18n-ignore : nom de fichier
   add('fiche.json', hide(JSON.stringify(input.facts, null, 1)), t('le relevé de la fiche technique')); // i18n-ignore : nom de fichier
   for (const a of input.attachments) add(a.name, hide(a.text), a.about);
+  for (const f of input.playerFiles ?? []) members.push({ name: f.name, data: f.data, about: t('joint par le joueur') });
   const zip = zipBuffers(members, now);
   return { name: reportName(now), zip, summary, short, files: members.map((m) => ({ name: m.name, size: m.data.length, about: m.about })) };
 }

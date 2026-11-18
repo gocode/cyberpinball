@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Feedback and ideas: "Attach files…" adds files from this PC to a private report (the form and "Send a report to the developers"). They are chosen in the Cyber Pinball file picker, with the flippers, the mouse or the keyboard. Five files and 1.2 MB in all at most; a screenshot that is too large is shrunk rather than refused. The files are sent encrypted with the report, read by the team only, never published; only their name is sent, never their location on the disk. Start on a file in the list removes it.
 - Phone: the Android Back button (or back gesture) now steps back through the remote's screens instead of closing it. It closes an open sheet, leaves a conversation, profile or page, goes up a section in Menus or out of a playlist in the Jukebox, brings the other tabs back to Screen, and goes back on the screen open on the cabinet. On the starting screen, it leaves the page as before.
 
 ## 0.2.0

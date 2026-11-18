@@ -167,6 +167,20 @@ test('fiche : anonymisation du rapport', () => {
   assert.equal(hide('VPX 10.8.1.5436, pilote 32.0.15.6636 à 14:32:05'), 'VPX 10.8.1.5436, pilote 32.0.15.6636 à 14:32:05');
 });
 
+test('fiche : les fichiers joints par le joueur entrent tels quels, listés dans rapport.html', () => {
+  const report = buildReport({
+    facts: facts(),
+    health: [],
+    attachments: [],
+    playerFiles: [{ name: 'pieces-jointes/Glass Lagoon.ini', data: Buffer.from('[Player]\r\nUser=bruno') }],
+    secrets: { user: 'bruno', profile: 'D:\\Profils\\bruno', computer: 'SALON-PC', names: [] },
+  });
+  assert.equal(report.files.at(-1)!.name, 'pieces-jointes/Glass Lagoon.ini');
+  assert.ok(report.zip.includes('pieces-jointes/Glass Lagoon.ini'));
+  // Tels quels : le joueur les a choisis et vus ; seul le rapport généré est anonymisé.
+  assert.equal(report.files.at(-1)!.size, Buffer.byteLength('[Player]\r\nUser=bruno'));
+});
+
 test('fiche : le rapport, un ZIP anonymisé et ses résumés', () => {
   const f = facts();
   const lines = pcLines(pcHealthFacts(f), Date.parse('2026-11-11'));

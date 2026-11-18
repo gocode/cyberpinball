@@ -206,7 +206,7 @@ export function createTechSheet(ctx: TechSheetContext) {
   }
 
   /** Le rapport avec cette description (formulaire des retours, plantage). */
-  function make(text: string): Report | undefined {
+  function make(text: string, files?: { name: string; data: Buffer }[]): Report | undefined {
     if (!facts) return undefined;
     const health = ctx.health();
     const lines = health ? healthLines(health) : [];
@@ -219,6 +219,7 @@ export function createTechSheet(ctx: TechSheetContext) {
       health: lines,
       description: text,
       attachments,
+      ...(files?.length ? { playerFiles: files } : {}),
       healthJson: health,
       secrets: { user: os.userInfo().username, profile: os.homedir(), computer: os.hostname(), names: ctx.names() },
     });
@@ -436,8 +437,8 @@ export function createTechSheet(ctx: TechSheetContext) {
     summary,
     facts: () => facts,
     running: () => Boolean(running),
-    /** Le ZIP du rapport avec cette description, pour le service des retours ; undefined avant le premier relevé. */
-    reportZip: (text: string) => make(text)?.zip,
+    /** Le ZIP du rapport avec cette description (et les fichiers joints par le joueur), pour le service des retours ; undefined avant le premier relevé. */
+    reportZip: (text: string, files?: { name: string; data: Buffer }[]) => make(text, files)?.zip,
     openContents,
   };
 }
