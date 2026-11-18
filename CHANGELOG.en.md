@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- LED and feedback (DOF): a configtool configuration with addressable LEDs (directoutputconfig30.ini…) but no Cabinet.xml saying where they are connected is now reported, on the screen and in the Cabinet health, with the likely serial port of their controller (Teensy, or the CH340/CP210x bridge of a Wemos D1 or an ESP32). Until now the screen said "Nothing prevents DOF from lighting the cabinet" while the strips stayed dark; "Addressable LED strips…" now starts from that port.
+- Real DMD: a common USB-serial bridge (CH340, CP210x) is no longer turned on as a ZeDMD by default when it did not answer like a ZeDMD in the last game, when the DOF Cabinet.xml points to it, or when addressable LEDs are still waiting for their controller. The Real DMD screen shows it for what it is ("COM3: USB-serial bridge, not a ZeDMD"); "ZeDMD: yes" overrides it.
+- LED and feedback (DOF): reusing the old DOF configuration also reuses its Cabinet.xml when it has addressable LEDs, if it is consistent and its ports are connected.
+- LED and feedback (DOF): strips described for a Wemos D1 now get the baud rate (2,000,000), compression and per-strip length its firmware expects; without them, the VPX DOF plugin talked to it at 9600 baud and nothing lit up. A Cabinet.xml reread in the editor keeps all its controller settings.
 - What's new: the players' reactions now sit under the text of each line, as under a message, and four more items have their preview (your account, the Community on the phone, virtual reality, backups).
 - Tables that stop for a moment at every blink of a light (Daredevil, Hellboy, and the many tables that copy the FlashForMs or SetFlash routine): their script redefined a procedure at every blink, and Windows had its antivirus scan each one while the game waited. Cyber Pinball now plays a copy of the script where a procedure is only redefined when it changes; the table is not modified.
 - After a game with stutters, the cabinet log says what VPX was waiting on (Windows antivirus, script, video decoding, graphics driver).

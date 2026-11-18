@@ -18,8 +18,11 @@ import {
   DOF_CONTROLLERS,
   dofControllerLabels,
   dofFindings,
+  addressablePortGuess,
   formatDate,
+  isAddressableNumber,
   isDofControllerType,
+  isSerialBridge,
   legacyDofFiles,
   planLegacyCabinet,
   planLegacyDofImport,
@@ -259,9 +262,13 @@ export function createDofMenu(host: DofMenuHost) {
         : { label: t('Importer la configuration du configtool…'), detail: t('Indisponible sans VPX installé'), icon: 'import', tone: 'quiet', run: () => library.openNotice(t('Import indisponible'), [t('Installez d’abord VPX : DOF fait partie de VPX.')], () => open()) },
       {
         label: t('Bandes de LED adressables…'),
-        detail: s?.cabinet?.strips.length ? tn(s.cabinet.strips.length, '{n} bande décrite', '{n} bandes décrites') : t('Décrire vos bandes WS2812 : Cabinet.xml écrit pour vous'),
+        detail: findings.some((f) => f.code === 'addressableIniUndeclared')
+          ? t('Vos fichiers du configtool attendent des LED adressables : dites ici où elles sont branchées')
+          : s?.cabinet?.strips.length
+            ? tn(s.cabinet.strips.length, '{n} bande décrite', '{n} bandes décrites')
+            : t('Décrire vos bandes WS2812 : Cabinet.xml écrit pour vous'),
         icon: 'bulb',
-        ...(s ? {} : { tone: 'quiet' as const }),
+        ...(s ? (findings.some((f) => f.code === 'addressableIniUndeclared') ? { tone: 'warning' as const } : {}) : { tone: 'quiet' as const }),
         run: () => (s ? openEditor() : library.openNotice(t('LED adressables indisponibles'), [t('Installez d’abord VPX : DOF fait partie de VPX.')], () => open())),
       },
       { label: t('Vérifier de nouveau'), detail: t('Relit les périphériques USB et le dossier de DOF'), icon: 'refresh', run: () => refresh() },
@@ -310,6 +317,8 @@ export function createDofMenu(host: DofMenuHost) {
     if (!dir) return;
     let message: string[] = [];
     let ok = false;
+    /** Cabinet.xml de l'ancien DOF encore à examiner après la reprise. */
+    let cabinetLeft = legacy.cabinet;
     await library.task(t('Reprise de la configuration de l’ancien DOF…'), () => {
       try {
         const plan = planLegacyDofImport(legacy, dir);
@@ -320,6 +329,16 @@ export function createDofMenu(host: DofMenuHost) {
           t('Copiés depuis {dir}, qui ne change pas. Le GlobalConfig de l’ancien DOF n’est pas repris : le plugin DOF de VPX n’en a pas besoin.', { dir: legacy.dir }),
           ...(saved ? [t('L’ancienne configuration est sauvegardée dans {dir}.', { dir: saved })] : []),
         ];
+        // Des ini de LED adressables (30 à 39) ne servent à rien sans le Cabinet.xml qui dit où elles
+        // sont branchées : repris dans le même geste quand il est cohérent et que ses ports sont là.
+        if (legacy.cabinet && plan.numbers.some(isAddressableNumber)) {
+          const cabinetPlan = planLegacyCabinet(legacy.cabinet, dir, { devices: host.usb() });
+          if (!cabinetPlan.problems.length) {
+            const written = writeCabinetPlan(cabinetPlan);
+            message.push(t('Son Cabinet.xml (LED adressables) est repris aussi, avec un GlobalConfig de Cyber Pinball qui le désigne.'), ...written.lines);
+            if (written.ok) cabinetLeft = undefined;
+          }
+        }
       } catch (error) {
         message = [(error as Error).message];
       }
@@ -327,15 +346,38 @@ export function createDofMenu(host: DofMenuHost) {
     cache = undefined;
     if (ok) host.changed();
     flash = { text: message[0] ?? '', tone: ok ? 'ok' : 'error' };
-    const cabinet = ok ? legacy.cabinet : undefined;
+    const cabinet = ok ? cabinetLeft : undefined;
     library.openNotice(ok ? t('Configuration de l’ancien DOF reprise') : t('Reprise impossible'), message, () => (cabinet ? openLegacyCabinet(cabinet) : open()));
+  }
+
+  /** Écrit le GlobalConfig et le Cabinet.xml d'une reprise ; un fichier remplacé est d'abord sauvegardé. */
+  function writeCabinetPlan(plan: LegacyCabinetPlan): { ok: boolean; lines: string[] } {
+    const lines: string[] = [];
+    try {
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+      for (const f of plan.files) {
+        if (fs.existsSync(f.file)) {
+          // Seul un GlobalConfig de Cyber Pinball peut être là (planLegacyCabinet) : gardé de côté quand même.
+          const saved = path.join(host.backupDir(), 'dof', stamp);
+          fs.mkdirSync(saved, { recursive: true });
+          fs.copyFileSync(f.file, path.join(saved, path.basename(f.file)));
+        }
+        fs.mkdirSync(path.dirname(f.file), { recursive: true });
+        writeFileAtomic(f.file, f.content);
+        lines.push(t('Écrit : {file}', { file: f.file }));
+      }
+      return { ok: true, lines };
+    } catch (error) {
+      lines.push((error as Error).message);
+      return { ok: false, lines };
+    }
   }
 
   /** Le Cabinet.xml de l'ancien DOF : ce qu'il déclare, et sa reprise s'il est cohérent. */
   function openLegacyCabinet(file: string): void {
     const dir = host.dir();
     if (!dir) return open();
-    const plan = planLegacyCabinet(file, dir);
+    const plan = planLegacyCabinet(file, dir, { devices: host.usb() });
     const c = plan.cabinet;
     const declared: Row[] = c
       ? [
@@ -366,25 +408,7 @@ export function createDofMenu(host: DofMenuHost) {
   }
 
   function takeLegacyCabinet(plan: LegacyCabinetPlan): void {
-    const lines: string[] = [];
-    let ok = true;
-    try {
-      const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
-      for (const f of plan.files) {
-        if (fs.existsSync(f.file)) {
-          // Seul un GlobalConfig de Cyber Pinball peut être là (planLegacyCabinet) : gardé de côté quand même.
-          const saved = path.join(host.backupDir(), 'dof', stamp);
-          fs.mkdirSync(saved, { recursive: true });
-          fs.copyFileSync(f.file, path.join(saved, path.basename(f.file)));
-        }
-        fs.mkdirSync(path.dirname(f.file), { recursive: true });
-        writeFileAtomic(f.file, f.content);
-        lines.push(t('Écrit : {file}', { file: f.file }));
-      }
-    } catch (error) {
-      ok = false;
-      lines.push((error as Error).message);
-    }
+    const { ok, lines } = writeCabinetPlan(plan);
     flash = { text: ok ? t('Cabinet.xml de l’ancien DOF repris') : lines[lines.length - 1]!, tone: ok ? 'ok' : 'error' };
     cache = undefined;
     host.changed();
@@ -451,7 +475,11 @@ export function createDofMenu(host: DofMenuHost) {
     const teensy = detected.find((d) => d.type === 'TeensyStripController');
     // Une carte qui porte elle-même ses bandes (DudesCab, Pinscape Pico), sans Teensy : on part d'elle.
     const onBoard = !teensy ? detected.find((d) => d.type === 'DudesCab' || d.type === 'PinscapePico') : undefined;
-    return { controller: (onBoard?.type as LedControllerType | undefined) ?? 'TeensyStripController', port: teensy?.device.port ?? serialPortCandidates(devices)[0]?.port ?? '', strips: [] };
+    if (onBoard) return { controller: onBoard.type as LedControllerType, port: '', strips: [] };
+    // Sans Teensy, un pont USB-série (CH340, CP210x) est sans doute une Wemos D1 ou un ESP32.
+    const guess = addressablePortGuess(devices, detected);
+    const bridge = !teensy && guess !== undefined && devices.some((d) => d.port === guess && isSerialBridge(d));
+    return { controller: bridge ? 'WemosD1MPStripController' : 'TeensyStripController', port: guess ?? serialPortCandidates(devices)[0]?.port ?? '', strips: [] };
   }
 
   function openEditor(at = 0): void {

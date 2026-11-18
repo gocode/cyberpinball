@@ -18,10 +18,12 @@ import {
   t,
   tn,
   withHardwareDmdChoice,
+  zedmdDoubt,
   zedmdWifiAddressProblem,
   ZEDMD_WIFI_DEFAULT_ADDR,
   type CabinetConfiguration,
   type DetectedDmd,
+  type DmdPortHints,
   type HardwareDmdChoice,
   type HardwareDmdModel,
   type HardwareDmdSetup,
@@ -41,6 +43,8 @@ export interface HardwareDmdMenuHost {
   };
   /** Périphériques USB présents ; undefined : illisibles. */
   usb(): ObservedUsbDevice[] | undefined;
+  /** Ce que DOF et le dernier vpinball.log disent des ports série (dmd-hints.ts) ; absent : rien. */
+  hints?(): DmdPortHints;
   /** Configuration active de la borne ; undefined avant l'assistant d'écrans. */
   cabinet(): CabinetConfiguration | undefined;
   save(cabinet: CabinetConfiguration): void;
@@ -75,12 +79,27 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
   let flash: { text: string; tone: 'ok' | 'warning' | 'error' } | undefined;
 
   /** Lecture des périphériques gardée quelques secondes : le détail de l'entrée se redessine souvent. */
-  let cache: { at: number; devices: ObservedUsbDevice[] } | undefined;
+  let cache: { at: number; devices: ObservedUsbDevice[]; hints: DmdPortHints | undefined } | undefined;
   const CACHE_MS = 5000;
+  function read(fresh = false) {
+    if (!fresh && cache && Date.now() - cache.at < CACHE_MS) return cache;
+    cache = { at: Date.now(), devices: host.usb() ?? [], hints: host.hints?.() };
+    return cache;
+  }
   function devices(fresh = false): ObservedUsbDevice[] {
-    if (!fresh && cache && Date.now() - cache.at < CACHE_MS) return cache.devices;
-    cache = { at: Date.now(), devices: host.usb() ?? [] };
-    return cache.devices;
+    return read(fresh).devices;
+  }
+
+  /** DMD reconnus, sans les ponts USB-série qui ne sont sans doute pas des ZeDMD (zedmdDoubt). */
+  function detectedDmds(): { detected: DetectedDmd[]; doubted: { d: DetectedDmd; message: string; failed: boolean }[] } {
+    const { devices: list, hints } = read();
+    const s = setup();
+    const all = detectHardwareDmds(list);
+    const doubted = all.flatMap((d) => {
+      const doubt = zedmdDoubt(d, hints, s);
+      return doubt ? [{ d, message: doubt.message, failed: doubt.reason === 'failed' }] : [];
+    });
+    return { detected: all.filter((d) => !doubted.some((x) => x.d === d)), doubted };
   }
 
   function setup(): HardwareDmdSetup | undefined {
@@ -109,7 +128,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
     const back = () => library.openSystem();
     const s = setup();
     const cabinet = host.cabinet();
-    const detected = detectHardwareDmds(devices());
+    const { detected, doubted } = detectedDmds();
     const sections: Built['sections'] = [];
     if (flash) sections.push({ rows: [{ text: flash.text, tone: flash.tone }] });
 
@@ -136,6 +155,15 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
         .join(' · ');
       return { icon: 'usb' as const, text: hardwareDmdName(d), detail, ...(off ? { tone: 'quiet' as const } : problem ? { tone: 'warning' as const } : {}) };
     });
+    // Un pont USB-série qui n'est sans doute pas un ZeDMD : montré pour ce qu'il est, pas comme un ZeDMD.
+    for (const x of doubted) {
+      found.push({
+        icon: 'usb',
+        text: t('{port} : pont USB-série, pas un ZeDMD', { port: x.d.device.port ?? x.d.usb }),
+        detail: t('USB {usb} · ZeDMD pas allumé d’office', { usb: x.d.usb }),
+        tone: x.failed ? 'warning' : 'quiet',
+      });
+    }
     if (s?.zedmdWifi?.enabled) found.push({ icon: 'network', text: t('ZeDMD en wifi'), detail: t('{address} · VPX s’y connecte au début de chaque partie', { address: s.zedmdWifi.address }) });
     // dmdserver, quand l'image du menu est demandée : il tient le DMD, ou il attend qu'on le branche.
     if (s?.menu && (detected.some((d) => hardwareDmdChoice(s, d.model) !== 'off') || s.zedmdWifi?.enabled)) {
@@ -152,7 +180,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
     sections.push({ title: t('Reconnus'), rows: found });
 
     // À vérifier : les pilotes d'abord (ils laissent le DMD noir), puis les puces USB-série courantes.
-    const checks: Row[] = [];
+    const checks: Row[] = doubted.map((x) => ({ icon: x.failed ? ('alert' as const) : ('info' as const), text: x.message, tone: x.failed ? ('warning' as const) : ('info' as const) }));
     for (const d of detected) {
       if (hardwareDmdChoice(s, d.model) === 'off') continue;
       const problem = hardwareDmdDriverProblem(d);
@@ -281,7 +309,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
     badge: 'beta',
     get detail() {
       const s = setup();
-      const on = detectHardwareDmds(devices()).filter((d) => hardwareDmdChoice(s, d.model) !== 'off');
+      const on = detectedDmds().detected.filter((d) => hardwareDmdChoice(s, d.model) !== 'off');
       const names = on.map((d) => hardwareDmdName(d));
       if (s?.zedmdWifi?.enabled) names.push(t('ZeDMD en wifi'));
       if (!names.length) return t('ZeDMD, PIN2DMD, Pixelcade : aucun reconnu');

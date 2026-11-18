@@ -3,7 +3,7 @@ import { managedJoysticks, noAutoLayoutSettings, vpxAnalogSettings } from './plu
 import { tiltFindings, VPX_STILL_TABLE, vpxTiltSettings } from './tilt';
 import { buttonInfo, buttonProblems, DEFAULT_BUTTONS, inGameMenuSetting, isInputKey, keyLabel, codeOfScancode, vpxInputSettings, vpxVolumeSettings, type SilencedAction } from './buttons';
 import { VPX_DMD_OWNED_KEYS, vpxDmdSettings, vpxDmdShutdownWait, vpxFolderDefaults, type DetectedDmd, type GlobalDmdFolders } from './dmd';
-import { detectDofControllers, VPX_DOF_OWNED_KEYS, vpxDofSettings, type DetectedDofController, type DofSetup, type HidName } from './dof';
+import { detectDofControllers, dmdPortHints, VPX_DOF_OWNED_KEYS, vpxDofSettings, type DetectedDofController, type DofSetup, type HidName } from './dof';
 import { t } from './i18n';
 import { IniDocument } from './ini';
 import { loadOwnedMemory, readTextIfExists, saveOwnedMemory, writeWithBackup, type WriteReport } from './store';
@@ -70,6 +70,11 @@ export interface SyncOptions {
   dmdServer?: boolean;
   /** Programmes ouverts qui gardent souvent un DMD réel (dmdHolders, dmd.ts) : signalés avant la partie. */
   dmdHolders?: string[];
+  /**
+   * Dernier vpinball.log : un pont USB-série qui n'a pas répondu comme un ZeDMD n'est plus allumé
+   * d'office (zedmdDoubt, dmd.ts ; avec dof, le port d'un contrôleur de LED non plus).
+   */
+  vpxLog?: string;
   /** Dossiers communs de ROM et de colorisation (findGlobalDmdFolders), proposés aux plugins. */
   folders?: GlobalDmdFolders;
   /**
@@ -286,7 +291,8 @@ export function planVpxSync(
   // dernière valeur écrite reste en mémoire.
   let dmd: DetectedDmd[] = [];
   if (options.usb) {
-    const plan = vpxDmdSettings(options.usb, cabinet.hardwareDmd, options.dmdServer, options.dmdHolders);
+    const hints = options.dof || options.vpxLog !== undefined ? dmdPortHints(options.dof, options.vpxLog) : undefined;
+    const plan = vpxDmdSettings(options.usb, cabinet.hardwareDmd, options.dmdServer, options.dmdHolders, hints);
     dmd = plan.detected;
     findings.push(...plan.findings);
     applyOwned(plan.settings);

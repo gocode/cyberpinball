@@ -266,6 +266,7 @@ import { createHardwareDmdMenu } from './hardware-dmd-menu';
 import { applyMenuDmdServer, dmdServerProblem, dmdServerReady, onDmdServerState } from './dmd-server';
 import { onPin2dmdProbe } from './pin2dmd-probe';
 import { dofDir, knownLegacyDof, readDof, scanLegacyDof, vpxWorkDir } from './dof-files';
+import { dmdHints } from './dmd-hints';
 import { backupDir, locations } from './paths';
 import { activeVpxIni, usbDevices } from './vpx-ini';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
@@ -1266,7 +1267,7 @@ export function createLibrary(host: LibraryHost) {
     },
     hardwareDmd: () => {
       const devices = usbDevices();
-      return devices ? hardwareDmdFacts(devices, loadCabinet(host.dataDir)?.hardwareDmd, dmdServerProblem()) : undefined;
+      return devices ? hardwareDmdFacts(devices, loadCabinet(host.dataDir)?.hardwareDmd, dmdServerProblem(), dmdHints(locations())) : undefined;
     },
     vr: () => host.vrNetwork?.(),
     remote: () => host.phoneRemote?.nameFacts(),
@@ -1485,6 +1486,7 @@ export function createLibrary(host: LibraryHost) {
       showing: (build) => screen?.kind === 'custom' && screen.build === build,
     },
     usb: () => usbDevices(),
+    hints: () => dmdHints(locations()),
     cabinet: () => loadCabinet(host.dataDir),
     save: (cabinet) => saveCabinet(host.dataDir, cabinet),
     changed: () => {

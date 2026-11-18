@@ -16,6 +16,7 @@ import {
   cabinetXml,
   detectDofControllers,
   dofFindings,
+  dmdPortHints,
   dofHealthFacts,
   dofIniNumber,
   findLegacyDofConfigs,
@@ -46,6 +47,7 @@ import {
 } from '../dof';
 import { toPhysicalScreen } from '../fingerprint';
 import { dofLines } from '../health';
+import { hardwareDmdFacts, vpxDmdSettings, zedmdLogPorts } from '../dmd';
 import type { ObservedUsbDevice } from '../model';
 import { planVpxSync } from '../sync';
 import { devPcDisplays, emptyCabinet } from './fixtures';
@@ -639,4 +641,188 @@ test('DOF : le Cabinet.xml d’un ancien DOF n’est repris que s’il est cohé
   // Illisible.
   fs.writeFileSync(odd, '<Cabinet><Toys></Cabinet>');
   assert.equal(planLegacyCabinet(odd, tmp()).problems.length, 1);
+  // Le port qu'il désigne n'est pas branché : pas repris tel quel.
+  const away = planLegacyCabinet(legacy[0]!.cabinet!, tmp(), { devices: [usb(0x10c4, 0xea60, { port: 'COM3' })] });
+  assert.ok(away.problems.some((p) => p.includes('COM5')), away.problems.join(' | '));
+  assert.deepEqual(planLegacyCabinet(legacy[0]!.cabinet!, tmp(), { devices: [usb(0x16c0, 0x0483, { port: 'COM5' })] }).problems, []);
+});
+
+// Cas réel (18/11/2026, second rapport) : directoutputconfig30.ini (LED adressables) et 51 (KL25Z)
+// importés, ni Cabinet.xml ni GlobalConfig : libdof ne crée jamais le contrôleur 30, les bandes restent
+// éteintes, et l'écran disait « Rien n'empêche DOF d'allumer la borne ». Le contrôleur des bandes, un
+// pont CP210x sur COM3, était pris pour un ZeDMD : DMDUtil lui envoyait sa poignée de main à chaque partie.
+const CP210X_COM3 = usb(0x10c4, 0xea60, { port: 'COM3', name: 'Silicon Labs CP210x USB to UART Bridge (COM3)' });
+const ZEDMD_FAILED_LOG = [
+  '2026-11-18 14:34:21.319 INFO  [13352] [DMDUtil:DMDUtilPlugin::OnDMDUtilLog@91] Searching for ZeDMD...',
+  '2026-11-18 14:34:21.351 INFO  [13352] [DMDUtil:DMDUtilPlugin::OnDMDUtilLog@91] ZeDMD candidate: device=COM3, vid=0x10C4, pid=0xEA60',
+  '2026-11-18 14:34:22.338 INFO  [13352] [DMDUtil:DMDUtilPlugin::OnDMDUtilLog@91] ZeDMD handshake response error, first 8 bytes of response: ý ý ý ý ý ý ý ý',
+  '2026-11-18 14:34:23.244 INFO  [13352] [DMDUtil:DMDUtilPlugin::OnDMDUtilLog@91] ZeDMD handshake response error, first 8 bytes of response: ý ý ý ý ý ý ý ý',
+  '2026-11-18 14:34:23.265 INFO  [13352] [DMDUtil:DMDUtilPlugin::OnDMDUtilLog@91] ZeDMD candidate: device=COM1',
+  '2026-11-18 14:34:23.266 INFO  [13352] [DMDUtil:DMDUtilPlugin::OnDMDUtilLog@91] Unable to set baudrate on device COM1, error code 0',
+  '2026-11-18 14:34:23.266 INFO  [13352] [DMDUtil:DMDUtilPlugin::OnDMDUtilLog@91] Unable to find ZeDMD',
+].join('\r\n');
+
+// Cabinet.xml d'une borne réelle qui marchait sous PinUP Popper (18/11/2026), noms changés : une Wemos D1
+// sur COM3, des bandes sur les sorties 1, 2, 3 et 6 (4 et 5 vides), et les réglages de port et de
+// protocole que son micrologiciel attend (libdof prend sinon ceux du Teensy : 9600 bauds, sans compression).
+const WEMOS_CABINET = `<?xml version="1.0"?>
+<Cabinet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Name>Borne d'essai</Name>
+  <OutputControllers>
+    <WemosD1MPStripController>
+      <Name>Bandes</Name>
+      <NumberOfLedsStrip1>256</NumberOfLedsStrip1>
+      <NumberOfLedsStrip2>103</NumberOfLedsStrip2>
+      <NumberOfLedsStrip3>103</NumberOfLedsStrip3>
+      <NumberOfLedsStrip6>78</NumberOfLedsStrip6>
+      <ComPortName>COM3</ComPortName>
+      <ComPortTimeOutMs>300</ComPortTimeOutMs>
+      <ComPortBaudRate>2000000</ComPortBaudRate>
+      <ComPortOpenWaitMs>300</ComPortOpenWaitMs>
+      <ComPortHandshakeStartWaitMs>100</ComPortHandshakeStartWaitMs>
+      <ComPortHandshakeEndWaitMs>100</ComPortHandshakeEndWaitMs>
+      <SendPerLedstripLength>true</SendPerLedstripLength>
+      <UseCompression>true</UseCompression>
+      <TestOnConnect>true</TestOnConnect>
+    </WemosD1MPStripController>
+  </OutputControllers>
+  <Toys>
+    <LedStrip><Name>backboard</Name><Width>32</Width><Height>8</Height><LedStripArrangement>BottomUpAlternateRightLeft</LedStripArrangement><ColorOrder>RGB</ColorOrder><FirstLedNumber>1</FirstLedNumber><FadingCurveName>SwissLizardsLedCurve</FadingCurveName><Brightness>50</Brightness><OutputControllerName>Bandes</OutputControllerName></LedStrip>
+    <LedStrip><Name>side gauche</Name><Width>103</Width><Height>1</Height><LedStripArrangement>LeftRightTopDown</LedStripArrangement><ColorOrder>RGB</ColorOrder><FirstLedNumber>257</FirstLedNumber><FadingCurveName>SwissLizardsLedCurve</FadingCurveName><Brightness>50</Brightness><OutputControllerName>Bandes</OutputControllerName></LedStrip>
+    <LedStrip><Name>side droit</Name><Width>103</Width><Height>1</Height><LedStripArrangement>LeftRightTopDown</LedStripArrangement><ColorOrder>RGB</ColorOrder><FirstLedNumber>360</FirstLedNumber><FadingCurveName>SwissLizardsLedCurve</FadingCurveName><Brightness>50</Brightness><OutputControllerName>Bandes</OutputControllerName></LedStrip>
+    <LedStrip><Name>HP</Name><Width>1</Width><Height>78</Height><LedStripArrangement>LeftRightTopDown</LedStripArrangement><ColorOrder>RGB</ColorOrder><FirstLedNumber>463</FirstLedNumber><FadingCurveName>SwissLizardsLedCurve</FadingCurveName><Brightness>50</Brightness><OutputControllerName>Bandes</OutputControllerName></LedStrip>
+    <LedWizEquivalent>
+      <Name>LedWizEquivalent 30</Name>
+      <Outputs>
+        <LedWizEquivalentOutput><OutputName>backboard</OutputName><LedWizEquivalentOutputNumber>1</LedWizEquivalentOutputNumber></LedWizEquivalentOutput>
+        <LedWizEquivalentOutput><OutputName>side gauche</OutputName><LedWizEquivalentOutputNumber>4</LedWizEquivalentOutputNumber></LedWizEquivalentOutput>
+        <LedWizEquivalentOutput><OutputName>side droit</OutputName><LedWizEquivalentOutputNumber>7</LedWizEquivalentOutputNumber></LedWizEquivalentOutput>
+        <LedWizEquivalentOutput><OutputName>HP</OutputName><LedWizEquivalentOutputNumber>10</LedWizEquivalentOutputNumber></LedWizEquivalentOutput>
+      </Outputs>
+      <LedWizNumber>30</LedWizNumber>
+    </LedWizEquivalent>
+  </Toys>
+</Cabinet>`;
+
+test('DOF : un Cabinet.xml de Wemos D1 relu puis réécrit garde ses réglages de port et de protocole', () => {
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'Cabinet.xml'), WEMOS_CABINET);
+  fs.writeFileSync(path.join(dir, 'GlobalConfig_B2SServer.xml'), '<GlobalConfig><CabinetConfigFilePattern>{GlobalConfigDir}\\Cabinet.xml</CabinetConfigFilePattern></GlobalConfig>');
+  fs.writeFileSync(path.join(dir, 'directoutputconfig30.ini'), INI);
+  const cab = readDofSetup(dir).cabinet!;
+  const keys = ['ComPortTimeOutMs', 'ComPortBaudRate', 'ComPortOpenWaitMs', 'ComPortHandshakeStartWaitMs', 'ComPortHandshakeEndWaitMs', 'SendPerLedstripLength', 'UseCompression', 'TestOnConnect'];
+  assert.deepEqual(Object.keys(cab.controllers[0]!.settings ?? {}).sort(), [...keys].sort());
+  const leds = ledsFromCabinet(cab)!;
+  assert.deepEqual(
+    leds.strips.map((s) => [s.name, s.output, s.dofOutput]),
+    [
+      ['backboard', 1, 1],
+      ['side gauche', 2, 4],
+      ['side droit', 3, 7],
+      ['HP', 6, 10],
+    ],
+    'sorties 4 et 5 vides : la bande « HP » reste sur la sortie 6',
+  );
+  const again = readCabinetXml(path.join(dir, 'réécrit.xml'), cabinetXml(leds));
+  assert.deepEqual(again.controllers[0]!.settings, cab.controllers[0]!.settings, 'aucun réglage perdu');
+  assert.deepEqual(again.controllers[0]!.ledsPerOutput, [256, 103, 103, 0, 0, 78]);
+  assert.deepEqual(
+    again.strips.map((s) => s.firstLed),
+    cab.strips.map((s) => s.firstLed),
+  );
+  // Décrites dans Cyber Pinball, les bandes d'une Wemos D1 ont d'office le débit et le protocole de son micrologiciel.
+  const fresh = readCabinetXml('neuf.xml', cabinetXml({ controller: 'WemosD1MPStripController', port: 'COM3', strips: leds.strips }));
+  assert.equal(fresh.controllers[0]!.settings?.ComPortBaudRate, '2000000');
+  assert.equal(fresh.controllers[0]!.settings?.UseCompression, 'true');
+  assert.equal(fresh.controllers[0]!.settings?.SendPerLedstripLength, 'true');
+  // Le Teensy (USB natif) garde les valeurs de libdof.
+  assert.equal(readCabinetXml('teensy.xml', cabinetXml({ controller: 'TeensyStripController', port: 'COM5', strips: leds.strips })).controllers[0]!.settings, undefined);
+  // Repris d'un ancien DOF : copié tel quel.
+  const legacy = planLegacyCabinet(path.join(dir, 'Cabinet.xml'), tmp(), { devices: [usb(0x10c4, 0xea60, { port: 'COM3' })] });
+  assert.deepEqual(legacy.problems, []);
+  assert.equal(legacy.files.find((f) => f.file.endsWith('Cabinet.xml'))!.content, WEMOS_CABINET);
+});
+
+test('DOF : ini des LED adressables sans Cabinet.xml signalé, avec le port série probable', () => {
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'directoutputconfig30.ini'), INI);
+  fs.writeFileSync(path.join(dir, 'directoutputconfig51.ini'), INI);
+  const devices = [usb(0x1209, 0xeaea), CP210X_COM3];
+  const setup = readDofSetup(dir);
+  const findings = dofFindings(setup, detectDofControllers(devices), devices);
+  const undeclared = findings.find((f) => f.code === 'addressableIniUndeclared');
+  assert.ok(undeclared, findings.map((f) => f.code).join(', '));
+  assert.equal(undeclared.severity, 'warning', 'plus de « Rien n’empêche DOF d’allumer la borne »');
+  assert.match(undeclared.message, /contrôleur 30/);
+  assert.match(undeclared.message, /COM3/);
+  // Même constat dans la Santé.
+  assert.ok(dofLines(dofHealthFacts(setup, detectDofControllers(devices), devices)).some((l) => l.state === 'check' && l.title.includes('COM3')));
+  // Sans port série : le constat reste, sans port proposé.
+  const alone = dofFindings(setup, detectDofControllers([usb(0x1209, 0xeaea)]), [usb(0x1209, 0xeaea)]).find((f) => f.code === 'addressableIniUndeclared');
+  assert.ok(alone && !alone.message.includes('COM'), alone?.message);
+  // DudesCab : il porte lui-même ses bandes, rien à dire.
+  const dudes = [usb(0x1209, 0xeaea), usb(0x2e8a, 0x106f)];
+  assert.ok(!dofFindings(setup, detectDofControllers(dudes), dudes).some((f) => f.code === 'addressableIniUndeclared'));
+  // Les bandes décrites (Cabinet.xml du contrôleur 30 sur COM3) : plus rien à redire.
+  const leds: CabinetLeds = {
+    controller: 'WemosD1MPStripController',
+    port: 'COM3',
+    strips: [{ name: 'Côté gauche', output: 1, width: 1, height: 120, arrangement: 'TopDownLeftRight', colorOrder: 'GRB', brightness: 100, dofOutput: 1 }],
+  };
+  for (const f of planLedWrite(dir, leds).files) fs.writeFileSync(f.file, f.content);
+  assert.deepEqual(dofFindings(readDofSetup(dir), detectDofControllers(devices), devices), []);
+});
+
+test('DMD réel : un pont USB-série qui ne répond pas comme un ZeDMD n’est plus allumé d’office', () => {
+  assert.deepEqual(zedmdLogPorts(ZEDMD_FAILED_LOG), { failed: ['COM3'], confirmed: [] });
+  const ok = ZEDMD_FAILED_LOG + '\r\n2026-11-18 15:00:00.000 INFO  [1] [DMDUtil:DMDUtilPlugin::OnDMDUtilLog@91] ZeDMD candidate: device=COM3, vid=0x10C4, pid=0xEA60\r\n2026-11-18 15:00:01.000 INFO  [1] [DMDUtil:DMDUtilPlugin::OnDMDUtilLog@91] ZeDMD found: device=COM3, width=128, height=32';
+  assert.deepEqual(zedmdLogPorts(ok), { failed: [], confirmed: ['COM3'] }, 'le dernier essai de chaque port l’emporte');
+
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'directoutputconfig30.ini'), INI);
+  fs.writeFileSync(path.join(dir, 'directoutputconfig51.ini'), INI);
+  const devices = [usb(0x1209, 0xeaea), CP210X_COM3];
+  const zedmd = (plan: ReturnType<typeof vpxDmdSettings>) => plan.settings.find((s) => s.key === 'ZeDMD')?.value;
+
+  // Poignée de main échouée au dernier journal : ZeDMD pas allumé, dit à l'écran et dans la Santé.
+  const failed = dmdPortHints(readDofSetup(dir), ZEDMD_FAILED_LOG);
+  const plan = vpxDmdSettings(devices, undefined, false, [], failed);
+  assert.equal(zedmd(plan), undefined, 'ZeDMD = 1 n’est plus écrit');
+  assert.ok(plan.findings.some((f) => f.severity === 'warning' && /COM3 ne répond pas comme un ZeDMD/.test(f.message)), plan.findings.map((f) => f.message).join(' | '));
+  const facts = hardwareDmdFacts(devices, undefined, undefined, failed);
+  assert.deepEqual(facts.devices, [], 'jamais montré comme « ZeDMD (COM3) »');
+  assert.ok(facts.problems.some((p) => p.includes('COM3')));
+  // Des LED adressables sans Cabinet.xml, sans journal : pas allumé non plus, sans alarme côté DMD (DOF le dit).
+  const addressable = dmdPortHints(readDofSetup(dir), undefined);
+  assert.equal(zedmd(vpxDmdSettings(devices, undefined, false, [], addressable)), undefined);
+  assert.deepEqual(hardwareDmdFacts(devices, undefined, undefined, addressable).problems, []);
+  // « ZeDMD : oui » passe outre ; un ZeDMD qui a répondu reste allumé ; sans indice, rien ne change.
+  assert.equal(zedmd(vpxDmdSettings(devices, { models: { ZeDMD: 'on' } }, false, [], failed)), '1');
+  assert.equal(zedmd(vpxDmdSettings(devices, undefined, false, [], dmdPortHints(readDofSetup(dir), ok))), '1');
+  assert.equal(zedmd(vpxDmdSettings(devices)), '1');
+
+  // Bandes déclarées sur COM3 : c'est le port de DOF, plus jamais celui d'un ZeDMD, même sans journal.
+  const leds: CabinetLeds = {
+    controller: 'WemosD1MPStripController',
+    port: 'COM3',
+    strips: [{ name: 'Côté gauche', output: 1, width: 1, height: 120, arrangement: 'TopDownLeftRight', colorOrder: 'GRB', brightness: 100, dofOutput: 1 }],
+  };
+  for (const f of planLedWrite(dir, leds).files) fs.writeFileSync(f.file, f.content);
+  const declared = dmdPortHints(readDofSetup(dir), undefined);
+  assert.deepEqual(declared.dof, ['COM3']);
+  assert.equal(declared.addressable, false);
+  assert.equal(zedmd(vpxDmdSettings(devices, undefined, false, [], declared)), undefined);
+  // Un vrai ZeDMD sur un autre pont (CH340, COM4) reste allumé.
+  const both = [...devices, usb(0x1a86, 0x7523, { port: 'COM4' })];
+  assert.equal(zedmd(vpxDmdSettings(both, undefined, false, [], declared)), '1');
+
+  // Synchronisation de VPinballX.ini : avec le journal, ZeDMD n'est pas écrit à 1.
+  const displays = devPcDisplays();
+  const cabinet = emptyCabinet();
+  cabinet.screens = displays.map(toPhysicalScreen);
+  cabinet.roles = { playfield: cabinet.screens[3]!.fingerprint };
+  const before = tmp();
+  fs.writeFileSync(path.join(before, 'directoutputconfig30.ini'), INI);
+  const synced = planVpxSync(cabinet, displays, '', undefined, { usb: devices, dof: readDofSetup(before), vpxLog: ZEDMD_FAILED_LOG });
+  assert.ok(!/ZeDMD = 1/.test(synced.nextIni ?? ''), synced.nextIni);
 });

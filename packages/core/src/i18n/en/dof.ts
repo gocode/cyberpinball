@@ -300,4 +300,10 @@ export const messages: Record<string, string> = {
   'L’ancien DOF avait aussi un Cabinet.xml ({file}) : contrôleurs à déclarer (Teensy, LED adressables…). Le plugin DOF de VPX le lit seulement si un GlobalConfig le désigne.':
     'The old DOF also had a Cabinet.xml ({file}): controllers to declare (Teensy, addressable LEDs…). The VPX DOF plugin reads it only if a GlobalConfig points to it.',
   'Cabinet.xml de l’ancien DOF repris': 'Old DOF’s Cabinet.xml reused',
+  // LED adressables configurées dans le configtool, sans Cabinet.xml
+  'Votre configuration du configtool a des LED adressables (contrôleur {n}) mais rien ne dit à DOF où elles sont branchées : décrivez vos bandes dans « Bandes de LED adressables… »{port}.':
+    'Your configtool configuration has addressable LEDs (controller {n}) but nothing tells DOF where they are connected: describe your strips in “Addressable LED strips…”{port}.',
+  ' (port série {port} branché : sans doute leur contrôleur)': ' (serial port {port} connected: probably their controller)',
+  'Vos fichiers du configtool attendent des LED adressables : dites ici où elles sont branchées': 'Your configtool files expect addressable LEDs: say here where they are connected',
+  'Son Cabinet.xml (LED adressables) est repris aussi, avec un GlobalConfig de Cyber Pinball qui le désigne.': 'Its Cabinet.xml (addressable LEDs) is reused too, with a Cyber Pinball GlobalConfig pointing to it.',
 };

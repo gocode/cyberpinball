@@ -123,4 +123,13 @@ export const messages: Record<string, string> = {
   'Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s)': 'The DMD server cannot find the display (no answer within {seconds} s)',
   'Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s), sans cause trouvée : envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions)':
     'The DMD server cannot find the display (no answer within {seconds} s), and no cause was found: send a report (System menu > Cyber Pinball > Feedback and ideas)',
+  // Pont USB-série qui n'est sans doute pas un ZeDMD (contrôleur de LED…)
+  '« ZeDMD : oui » si c’en est bien un': '“ZeDMD: yes” if it really is one',
+  '{port} est le port d’un contrôleur de DOF (Cabinet.xml) : ZeDMD n’y est pas allumé d’office ({yes}).': '{port} is the port of a DOF controller (Cabinet.xml): ZeDMD is not turned on there by default ({yes}).',
+  '{port} ne répond pas comme un ZeDMD (dernière partie : « handshake response error ») : c’est peut-être votre contrôleur de LED. ZeDMD n’y est plus allumé d’office ({yes}).':
+    '{port} does not answer like a ZeDMD (last game: “handshake response error”): it may be your LED controller. ZeDMD is no longer turned on there by default ({yes}).',
+  '{port} : pont USB-série courant, et votre configuration DOF a des LED adressables : c’est peut-être leur contrôleur. ZeDMD n’y est pas allumé d’office ({yes}).':
+    '{port}: common USB-serial bridge, and your DOF configuration has addressable LEDs: it may be their controller. ZeDMD is not turned on there by default ({yes}).',
+  '{port} : pont USB-série, pas un ZeDMD': '{port}: USB-serial bridge, not a ZeDMD',
+  'USB {usb} · ZeDMD pas allumé d’office': 'USB {usb} · ZeDMD not turned on by default',
 };

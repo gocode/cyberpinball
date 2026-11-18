@@ -20,6 +20,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { zedmdLogPorts, type DmdPortHints } from './dmd';
 import { formatDate, t, tn } from './i18n';
 import type { ObservedUsbDevice } from './model';
 import type { DofFacts } from './health';
@@ -85,6 +86,11 @@ export function isDofControllerType(type: string): type is DofControllerType {
 
 /** Numéro de l'ini du configtool pour les LED adressables (LedWizEquivalent du Cabinet.xml). */
 export const DOF_ADDRESSABLE_NUMBER = 30;
+
+/** Les contrôleurs de LED adressables du configtool portent les numéros 30 à 39. */
+export function isAddressableNumber(n: number): boolean {
+  return n >= 30 && n <= 39;
+}
 
 // ---------------------------------------------------------------------------
 // Détection passive
@@ -215,6 +221,29 @@ export function serialPortCandidates(devices: ObservedUsbDevice[]): { port: stri
   return out.sort((a, b) => comNumber(a.port) - comNumber(b.port));
 }
 
+/** Ponts USB-série des cartes Wemos D1 et ESP32 (CH340, CH343, CP210x, USB natif de l'ESP32-S3). */
+const SERIAL_BRIDGES: readonly { vid: number; pid: number }[] = [
+  { vid: 0x1a86, pid: 0x7523 },
+  { vid: 0x1a86, pid: 0x55d3 },
+  { vid: 0x10c4, pid: 0xea60 },
+  { vid: 0x303a, pid: 0x1001 },
+];
+
+/** Le périphérique est-il un pont USB-série de Wemos D1 ou d'ESP32 ? */
+export function isSerialBridge(d: Pick<ObservedUsbDevice, 'vid' | 'pid'>): boolean {
+  return SERIAL_BRIDGES.some((b) => b.vid === d.vid && b.pid === d.pid);
+}
+
+/**
+ * Port série probable du contrôleur des LED adressables, sans rien ouvrir : celui d'un Teensy
+ * reconnu, sinon celui d'un pont USB-série de Wemos D1 ou d'ESP32 ; undefined sans candidat.
+ */
+export function addressablePortGuess(devices: ObservedUsbDevice[], detected: DetectedDofController[]): string | undefined {
+  const teensy = detected.find((d) => d.type === 'TeensyStripController' && d.device.port);
+  if (teensy) return teensy.device.port;
+  return serialPortCandidates(devices.filter(isSerialBridge))[0]?.port;
+}
+
 function comNumber(port: string): number {
   const m = /COM(\d+)/i.exec(port);
   return m ? Number(m[1]) : 9999;
@@ -315,6 +344,8 @@ export interface DofCabinetController {
   address?: string;
   /** NumberOfLedsStrip1..10 des contrôleurs de LED adressables. */
   ledsPerOutput?: number[];
+  /** Ses autres réglages, tels qu'écrits (ComPortBaudRate, UseCompression…) : gardés à la réécriture. */
+  settings?: Record<string, string>;
 }
 
 export interface DofCabinetStrip {
@@ -464,6 +495,12 @@ export function readCabinetXml(file: string, text = fs.readFileSync(file, 'utf8'
     const comPort = childText(c, 'ComPortName');
     const universe = childText(c, 'Universe');
     const address = childText(c, 'BroadcastAddress');
+    const settings: Record<string, string> = {};
+    for (const s of c.children) {
+      if (/^(Name|ComPortName|Universe|BroadcastAddress|NumberOfLedsStrip\d+)$/.test(s.name) || s.children.length) continue;
+      const v = s.text.trim();
+      if (v) settings[s.name] = v;
+    }
     controllers.push({
       type: c.name,
       name: childText(c, 'Name') ?? c.attrs.Name ?? c.name,
@@ -471,6 +508,7 @@ export function readCabinetXml(file: string, text = fs.readFileSync(file, 'utf8'
       ...(universe !== undefined ? { universe: Number(universe) } : {}),
       ...(address ? { address } : {}),
       ...(leds.length ? { ledsPerOutput: Array.from(leds, (v) => v ?? 0) } : {}),
+      ...(Object.keys(settings).length ? { settings } : {}),
     });
   }
   const strips: DofCabinetStrip[] = [];
@@ -770,6 +808,7 @@ export const DOF_FINDING_CODES = [
   'missingIni',
   'orphanIni',
   'addressableUndeclared',
+  'addressableIniUndeclared',
   'cabinetIgnored',
   'cabinetMissing',
   'cabinetPortMissing',
@@ -858,6 +897,24 @@ export function dofFindings(setup: DofSetup, detected: DetectedDofController[], 
       'warning',
       t('Teensy branché ({port}) mais aucun Cabinet.xml ne le déclare : libdof ne le trouve pas seul. Décrivez vos bandes de LED dans « LED et retours (DOF) ».', {
         port: teensy.map((d) => d.device.port ?? d.usb).join(', '),
+      }),
+    );
+  }
+  // Un ini des LED adressables (30 à 39 dans le configtool) sans LedWizEquivalent de ce numéro dans un
+  // Cabinet.xml lu par libdof : libdof ne crée jamais ce contrôleur, les bandes restent éteintes
+  // (cas réel du 18/11/2026 : directoutputconfig30.ini importé, aucun Cabinet.xml). DudesCab et
+  // Pinscape Pico portent eux-mêmes leurs bandes ; un Teensy branché a déjà son constat.
+  const onBoard = detected.some((d) => d.type === 'DudesCab' || d.type === 'PinscapePico');
+  const equivalents = new Set(setup.cabinet?.equivalents.map((e) => e.number) ?? []);
+  const orphanAddressable = setup.ini.filter((f) => isAddressableNumber(f.number) && !equivalents.has(f.number)).map((f) => f.number);
+  if (orphanAddressable.length && !onBoard && !(teensy.length && !declared.some((c) => c.type === 'TeensyStripController'))) {
+    const port = addressablePortGuess(devices, detected);
+    push(
+      'addressableIniUndeclared',
+      'warning',
+      t('Votre configuration du configtool a des LED adressables (contrôleur {n}) mais rien ne dit à DOF où elles sont branchées : décrivez vos bandes dans « Bandes de LED adressables… »{port}.', {
+        n: orphanAddressable.join(', '),
+        port: port ? t(' (port série {port} branché : sans doute leur contrôleur)', { port }) : '',
       }),
     );
   }
@@ -1010,6 +1067,33 @@ export interface CabinetLeds {
   address?: string;
   /** Art-Net : numéro du premier univers (0 par défaut, celui de WLED). */
   universe?: number;
+  /**
+   * Autres réglages du contrôleur (ComPortBaudRate, UseCompression…), repris d'un Cabinet.xml relu et
+   * réécrits tels quels ; ils passent avant les valeurs que Cyber Pinball écrit pour un Wemos D1.
+   */
+  settings?: Record<string, string>;
+}
+
+/**
+ * Réglages d'un WemosD1MPStripController que Cyber Pinball écrit d'office. libdof (WemosD1StripController.cpp,
+ * qui hérite de TeensyStripController.cpp) prend sinon ceux du Teensy : 9600 bauds, délais de 200, 50,
+ * 20 et 50 ms, sans longueur par bande ni compression. Le Teensy parle par l'USB natif, où le débit
+ * n'a pas d'effet ; une Wemos D1 passe par un vrai port série (CH340, CP210x), et son micrologiciel
+ * attend 2 000 000 bauds. Valeurs d'un Cabinet.xml qui marchait sur une borne réelle (18/11/2026).
+ */
+export const WEMOS_SETTINGS: Readonly<Record<string, string>> = {
+  ComPortBaudRate: '2000000',
+  ComPortTimeOutMs: '300',
+  ComPortOpenWaitMs: '300',
+  ComPortHandshakeStartWaitMs: '100',
+  ComPortHandshakeEndWaitMs: '100',
+  SendPerLedstripLength: 'true',
+  UseCompression: 'true',
+};
+
+/** Réglages écrits pour ce contrôleur : ceux du Wemos D1 par défaut, puis ceux repris du fichier. */
+export function controllerSettings(leds: Pick<CabinetLeds, 'controller' | 'settings'>): Record<string, string> {
+  return { ...(leds.controller === 'WemosD1MPStripController' ? WEMOS_SETTINGS : {}), ...leds.settings };
 }
 
 /** Sorties qu'offre un contrôleur : sorties du Teensy ou du Wemos, univers Art-Net. */
@@ -1157,6 +1241,7 @@ export function cabinetXml(leds: CabinetLeds, now = new Date()): string {
       el('Name', controllerOf(1), '      '),
       ...counts.map((n, i) => el(`NumberOfLedsStrip${i + 1}`, n, '      ')),
       el('ComPortName', leds.port.trim().toUpperCase(), '      '),
+      ...Object.entries(controllerSettings(leds)).map(([k, v]) => el(k, v, '      ')),
       `    </${leds.controller}>`,
     );
   }
@@ -1296,6 +1381,7 @@ export function ledsFromCabinet(cabinet: DofCabinetFile): CabinetLeds | undefine
     controller: c.type as LedControllerType,
     port: c.comPort ?? '',
     strips: cabinet.strips.filter((s) => !s.controller || s.controller === c.name).map((s) => spec(s, outputOf(s.firstLed))),
+    ...(c.settings ? { settings: { ...c.settings } } : {}),
   };
 }
 
@@ -1319,6 +1405,23 @@ export function dofControllerLabels(setup: DofSetup, detected: DetectedDofContro
     labels.push(c.comPort ? `${info} (${c.comPort}) · Cabinet.xml` : `${info} · Cabinet.xml`);
   }
   return labels;
+}
+
+/**
+ * Ce que DOF et le dernier journal de VPX disent des ports série, pour le DMD réel (dmd.ts,
+ * zedmdDoubt) : ports des contrôleurs du Cabinet.xml que libdof lit, LED adressables configurées,
+ * ports où la poignée de main du ZeDMD a échoué ou réussi.
+ */
+export function dmdPortHints(dof: DofSetup | undefined, vpxLog: string | undefined): DmdPortHints {
+  const log = vpxLog ? zedmdLogPorts(vpxLog) : { failed: [], confirmed: [] };
+  return {
+    failed: log.failed,
+    confirmed: log.confirmed,
+    dof: (dof?.cabinet?.controllers ?? []).map((c) => c.comPort?.toUpperCase()).filter((p): p is string => Boolean(p)),
+    // Seulement des LED adressables dont on ne sait pas encore où elles sont branchées : une fois le
+    // Cabinet.xml en place (sur un autre port), un pont USB-série restant peut de nouveau être un ZeDMD.
+    addressable: Boolean(dof?.ini.some((f) => isAddressableNumber(f.number) && !dof.cabinet?.equivalents.some((e) => e.number === f.number))),
+  };
 }
 
 /** Ce que la santé de la borne garde de DOF (health.ts, dofLines). */
@@ -1450,8 +1553,9 @@ export interface LegacyCabinetPlan {
  * que libdof gère tous ses contrôleurs et que chaque bande a son contrôleur ; et jamais à la place
  * d'un Cabinet.xml déjà là, ni d'un GlobalConfig écrit à la main (même règle que planLedWrite).
  * Repris tel quel, sans la marque de Cyber Pinball : il reste un fichier écrit à la main.
+ * `devices` (périphériques présents) : chaque port série qu'il désigne doit être branché.
  */
-export function planLegacyCabinet(file: string, dir: string, now = new Date()): LegacyCabinetPlan {
+export function planLegacyCabinet(file: string, dir: string, options: { devices?: ObservedUsbDevice[] | undefined; now?: Date } = {}): LegacyCabinetPlan {
   const plan: LegacyCabinetPlan = { problems: [], files: [] };
   let text: string;
   try {
@@ -1470,6 +1574,14 @@ export function planLegacyCabinet(file: string, dir: string, now = new Date()): 
   for (const s of cabinet.strips) {
     if (s.controller && !cabinet.controllers.some((c) => c.name === s.controller)) {
       plan.problems.push(t('Bande « {name} » : son contrôleur « {controller} » n’est pas déclaré.', { name: s.name, controller: s.controller }));
+    }
+  }
+  if (options.devices) {
+    const ports = presentPorts(options.devices);
+    for (const c of cabinet.controllers) {
+      if (c.comPort && !ports.has(c.comPort.toUpperCase())) {
+        plan.problems.push(t('Cabinet.xml : {name} sur {port}, mais aucun périphérique branché n’a ce port.', { name: c.name, port: c.comPort }));
+      }
     }
   }
   const globalFile = path.join(dir, 'GlobalConfig_B2SServer.xml');
@@ -1491,7 +1603,7 @@ export function planLegacyCabinet(file: string, dir: string, now = new Date()): 
   }
   if (exists(target)) plan.problems.push(t('{file} existe déjà dans le dossier de DOF : gardé tel quel', { file: target }));
   if (plan.problems.length) return plan;
-  if (writeGlobal) plan.files.push({ file: globalFile, content: globalConfigXml(now) });
+  if (writeGlobal) plan.files.push({ file: globalFile, content: globalConfigXml(options.now) });
   plan.files.push({ file: target, content: text });
   return plan;
 }

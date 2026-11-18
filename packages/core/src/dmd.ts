@@ -89,6 +89,83 @@ export function detectHardwareDmds(devices: ObservedUsbDevice[]): DetectedDmd[] 
 }
 
 // ---------------------------------------------------------------------------
+// ZeDMD reconnu à un pont USB-série courant (CH340, CP210x) : en est-ce bien un ?
+//
+// Cas réel (18/11/2026) : un contrôleur de LED adressables sur COM3 (CP210x) pris pour un ZeDMD ;
+// [Plugin.DMDUtil] ZeDMD = 1 faisait envoyer à chaque partie la poignée de main du ZeDMD au
+// contrôleur de LED (« ZeDMD handshake response error », « Unable to find ZeDMD »), et DMDUtil l'aurait
+// pris à DOF une fois Cabinet.xml en place.
+
+/** Ce que la borne sait de ses ports série, pour ne pas prendre un contrôleur de LED pour un ZeDMD. */
+export interface DmdPortHints {
+  /** Ports où la dernière recherche de DMDUtil (vpinball.log) n'a pas reçu de réponse de ZeDMD. */
+  failed?: string[];
+  /** Ports où un ZeDMD a répondu. */
+  confirmed?: string[];
+  /** Ports désignés par le Cabinet.xml que libdof lit (contrôleurs de LED de DOF). */
+  dof?: string[];
+  /** La configuration DOF a des LED adressables (directoutputconfig30 à 39.ini) qu'aucun Cabinet.xml ne situe. */
+  addressable?: boolean;
+}
+
+/**
+ * Ports essayés par DMDUtil d'après vpinball.log, le dernier essai de chaque port l'emportant :
+ * « ZeDMD candidate: device=COM3… » puis « ZeDMD handshake response error » (échec) ou une ligne
+ * « … found … » (réponse). Journal de libzedmd relayé par DMDUtilPlugin::OnDMDUtilLog.
+ */
+export function zedmdLogPorts(log: string): { failed: string[]; confirmed: string[] } {
+  const result = new Map<string, 'failed' | 'confirmed'>();
+  let current: string | undefined;
+  for (const line of log.split(/\r?\n/)) {
+    if (!line.includes('ZeDMD')) continue;
+    const port = /device=(COM\d+)/i.exec(line)?.[1]?.toUpperCase();
+    if (/ZeDMD candidate:/i.test(line)) {
+      current = port;
+      continue;
+    }
+    if (/handshake response error/i.test(line) && current) result.set(current, 'failed');
+    else if (/\bfound\b/i.test(line) && !/unable/i.test(line) && (port ?? current)) result.set((port ?? current)!, 'confirmed');
+  }
+  const pick = (v: 'failed' | 'confirmed') => [...result].filter(([, r]) => r === v).map(([p]) => p);
+  return { failed: pick('failed'), confirmed: pick('confirmed') };
+}
+
+export interface ZedmdDoubt {
+  /** failed : il n'a pas répondu ; dof : Cabinet.xml le donne à DOF ; addressable : des LED adressables sans contrôleur déclaré. */
+  reason: 'failed' | 'dof' | 'addressable';
+  message: string;
+}
+
+/**
+ * Pourquoi ce ZeDMD reconnu à un pont USB-série courant n'en est sans doute pas un ; undefined : rien
+ * ne s'y oppose. Ne vaut qu'en automatique (« ZeDMD : oui » passe outre).
+ */
+export function zedmdDoubt(d: DetectedDmd, hints: DmdPortHints | undefined, setup?: HardwareDmdSetup): ZedmdDoubt | undefined {
+  if (d.model !== 'ZeDMD' || !d.generic || !hints || hardwareDmdChoice(setup, d.model) !== 'auto') return undefined;
+  const port = d.device.port?.toUpperCase();
+  if (!port) return undefined;
+  const has = (list: string[] | undefined) => Boolean(list?.some((p) => p.toUpperCase() === port));
+  if (has(hints.confirmed)) return undefined;
+  const yes = t('« ZeDMD : oui » si c’en est bien un');
+  if (has(hints.dof)) {
+    return { reason: 'dof', message: t('{port} est le port d’un contrôleur de DOF (Cabinet.xml) : ZeDMD n’y est pas allumé d’office ({yes}).', { port, yes }) };
+  }
+  if (has(hints.failed)) {
+    return {
+      reason: 'failed',
+      message: t('{port} ne répond pas comme un ZeDMD (dernière partie : « handshake response error ») : c’est peut-être votre contrôleur de LED. ZeDMD n’y est plus allumé d’office ({yes}).', { port, yes }),
+    };
+  }
+  if (hints.addressable) {
+    return {
+      reason: 'addressable',
+      message: t('{port} : pont USB-série courant, et votre configuration DOF a des LED adressables : c’est peut-être leur contrôleur. ZeDMD n’y est pas allumé d’office ({yes}).', { port, yes }),
+    };
+  }
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
 // Choix de l'utilisateur (Menu système > Borne > DMD > DMD réel)
 
 /**
@@ -317,9 +394,15 @@ export const VPX_DMD_OWNED_KEYS = ['Enable', ...HARDWARE_DMD_MODELS, 'ZeDMDWiFiE
  * server : dmdserver tient le DMD et répond (image du menu) ; VPX lui envoie alors ses images au lieu
  * d'ouvrir le matériel. Sinon, VPX ouvre le DMD lui-même, comme sans l'image du menu.
  */
-export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmdSetup, server = false, holders: string[] = []): VpxDmdPlan {
-  const detected = detectHardwareDmds(devices);
+export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmdSetup, server = false, holders: string[] = [], hints?: DmdPortHints): VpxDmdPlan {
+  const all = detectHardwareDmds(devices);
   const findings: SyncFinding[] = [];
+  // Un pont USB-série qui n'est sans doute pas un ZeDMD (contrôleur de LED…) : pas allumé d'office.
+  for (const d of all) {
+    const doubt = zedmdDoubt(d, hints, setup);
+    if (doubt) findings.push({ severity: doubt.reason === 'failed' ? 'warning' : 'info', message: doubt.message });
+  }
+  const detected = all.filter((d) => !zedmdDoubt(d, hints, setup));
   // Un programme ouvert qui garde souvent le DMD réel (dmdext, PinUP Popper…) : DMDUtil ne pourra pas
   // l'ouvrir, et libdmdutil n'en dit rien. Dit avant la partie, pour tous les modèles.
   const lit = detected.some((d) => hardwareDmdChoice(setup, d.model) !== 'off') || Boolean(setup?.zedmdWifi?.enabled);
@@ -396,11 +479,15 @@ export interface HardwareDmdFacts {
 }
 
 /** serverProblem : pourquoi le serveur du DMD ne peut pas tourner (app/src/dmd-server.ts), lu si « Image du menu » est demandée. */
-export function hardwareDmdFacts(devices: ObservedUsbDevice[], setup?: HardwareDmdSetup, serverProblem?: string): HardwareDmdFacts {
-  const on = detectHardwareDmds(devices).filter((d) => hardwareDmdChoice(setup, d.model) !== 'off');
+export function hardwareDmdFacts(devices: ObservedUsbDevice[], setup?: HardwareDmdSetup, serverProblem?: string, hints?: DmdPortHints): HardwareDmdFacts {
+  const found = detectHardwareDmds(devices).filter((d) => hardwareDmdChoice(setup, d.model) !== 'off');
+  // Un pont USB-série qui n'a pas répondu comme un ZeDMD : jamais montré comme un ZeDMD, et à vérifier
+  // tant que rien d'autre ne l'explique (Cabinet.xml de DOF, LED adressables : dit par DOF).
+  const doubts = found.map((d) => zedmdDoubt(d, hints, setup));
+  const on = found.filter((_, i) => !doubts[i]);
   const names = on.map((d) => hardwareDmdName(d));
   if (setup?.zedmdWifi?.enabled) names.push(t('ZeDMD en wifi ({address})', { address: setup.zedmdWifi.address }));
-  const problems = on.map((d) => hardwareDmdDriverProblem(d)).filter((p): p is string => Boolean(p));
+  const problems = [...doubts.filter((x) => x?.reason === 'failed').map((x) => x!.message), ...on.map((d) => hardwareDmdDriverProblem(d)).filter((p): p is string => Boolean(p))];
   if (setup?.menu && names.length && serverProblem) problems.push(t('Image du front-end sur le DMD réel : {problem}', { problem: serverProblem }));
   const probe = on.find((d) => d.model === 'PIN2DMD' && d.device.libusbProbe)?.device.libusbProbe;
   return { devices: names, problems, ...(setup?.menu ? { menu: true } : {}), ...(probe ? { pin2dmdProbe: probe } : {}) };
