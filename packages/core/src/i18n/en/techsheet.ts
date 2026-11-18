@@ -301,6 +301,8 @@ export const messages: Record<string, string> = {
   "le résumé en texte": "the summary as text",
   "le relevé complet de la santé": "the full health reading",
   "le relevé de la fiche technique": "the tech sheet reading",
+  "Numéro de la borne": "Cabinet number",
+  "À donner à l’équipe de Cyber Pinball pour qu’elle retrouve vos rapports": "Give it to the Cyber Pinball team so they can find your reports",
   "le rapport de plantage de VPX (pile d’appels)": "the VPX crash report (call stack)",
   "le journal de VPX d’une partie précédente : VPX s’est arrêté avant d’écrire le sien": "the VPX log of an earlier game: VPX stopped before writing its own",
   "Fichiers de VPX": "VPX files",

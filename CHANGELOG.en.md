@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Tech sheet: the cabinet number ("7KQ2-M9XD"), on the last line of the Cyber Pinball block, to give to the team so they can find this cabinet's reports.
 - VPX files replaced outside Cyber Pinball (another VPX copied over it): Cabinet health and the tech sheet name them, with their version, and "Put the original files back" takes them from the verified VPX archive, leaving the rest of the folder alone.
 - VPX stopping before writing its log: the failure screen says "VPX stopped while starting", a VPX fault rather than the table's, and Start puts its original files back when they changed.
 - Cyber Pinball always launches its own VPX executable, even when another VPX was put in the same folder.

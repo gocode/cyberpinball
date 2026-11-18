@@ -110,6 +110,8 @@ export interface TechFacts {
     /** Erreurs du journal depuis 24 heures. */
     errors: number;
     language: string;
+    /** Numéro de la borne pour l'équipe (borneCode) : il retrouve ses rapports, sans rien dire du joueur. */
+    borne?: string;
   };
 }
 
@@ -561,6 +563,8 @@ function appBlock(f: TechFacts): TechBlock {
     if (a.phones !== undefined) rows.push({ label: t('Télécommande'), value: a.phones ? tn(a.phones, '{n} téléphone jumelé', '{n} téléphones jumelés') : t('Aucun téléphone jumelé') });
     rows.push({ label: t('Journal'), value: a.errors ? tn(a.errors, '{n} erreur depuis hier', '{n} erreurs depuis hier') : t('Aucune erreur depuis hier'), detail: a.errors ? t('Elles sont dans le rapport') : undefined });
     rows.push({ label: t('Langue'), value: a.language });
+    // En dernier et en retrait : le joueur ne s'en sert que si l'équipe le lui demande.
+    if (a.borne) rows.push({ label: t('Numéro de la borne'), value: a.borne, detail: t('À donner à l’équipe de Cyber Pinball pour qu’elle retrouve vos rapports'), state: 'quiet' });
   } else rows.push({ label: t('Cyber Pinball'), value: NOT_READ(), state: 'quiet' });
   const notes: TechBlock['notes'] = a?.firewall === false && a.friends !== 'off' ? [{ state: 'check', title: t('Règle du pare-feu absente'), detail: t('Sans elle, ni le réseau des amis ni la télécommande ne reçoivent rien.') }] : [];
   const essentials = a ? [t('Version {version}', { version: a.version }), tn(a.tables, '{n} table', '{n} tables'), a.friends === 'connected' ? t('réseau des amis connecté') : ''].filter(Boolean) : [];

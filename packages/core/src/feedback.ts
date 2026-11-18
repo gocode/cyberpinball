@@ -308,18 +308,49 @@ export function newFeedbackState(): FeedbackState {
   return { crashes: 'ask', borne: crypto.randomBytes(9).toString('base64url'), sent: {} };
 }
 
+/**
+ * L'état des retours. Un numéro de borne tiré à cette lecture (fichier absent, ou numéro illisible) est
+ * enregistré tout de suite : la fiche technique le montre au joueur (borneCode), il ne doit plus changer
+ * d'un démarrage à l'autre, ni différer de celui des rapports qui partiront.
+ */
 export function loadFeedbackState(dataDir: string): FeedbackState {
+  let raw: Partial<FeedbackState> = {};
   try {
-    const raw = JSON.parse(fs.readFileSync(path.join(dataDir, FEEDBACK_FILE), 'utf8')) as Partial<FeedbackState>;
-    const base = newFeedbackState();
-    return {
-      crashes: raw.crashes === 'yes' || raw.crashes === 'no' ? raw.crashes : 'ask',
-      borne: typeof raw.borne === 'string' && /^[A-Za-z0-9_-]{8,32}$/.test(raw.borne) ? raw.borne : base.borne,
-      sent: raw.sent && typeof raw.sent === 'object' ? Object.fromEntries(Object.entries(raw.sent).filter(([, v]) => typeof v === 'number')) : {},
-    };
+    raw = JSON.parse(fs.readFileSync(path.join(dataDir, FEEDBACK_FILE), 'utf8')) as Partial<FeedbackState>;
   } catch {
-    return newFeedbackState();
+    raw = {};
   }
+  const kept = typeof raw.borne === 'string' && /^[A-Za-z0-9_-]{8,32}$/.test(raw.borne) ? raw.borne : undefined;
+  const state: FeedbackState = {
+    crashes: raw.crashes === 'yes' || raw.crashes === 'no' ? raw.crashes : 'ask',
+    borne: kept ?? newFeedbackState().borne,
+    sent: raw.sent && typeof raw.sent === 'object' ? Object.fromEntries(Object.entries(raw.sent).filter(([, v]) => typeof v === 'number')) : {},
+  };
+  if (!kept) {
+    try {
+      saveFeedbackState(dataDir, state);
+    } catch {
+      // Données en lecture seule : le numéro reste celui de cette session.
+    }
+  }
+  return state;
+}
+
+/** Alphabet de Crockford : ni I, L, O ni U, que l'on confond avec 1, 0 ou V au téléphone. */
+const BORNE_CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+/**
+ * Le numéro de la borne, lisible et facile à dicter : « 7KQ2-M9XD ». Tiré de ReportEnvelope.borne (une
+ * empreinte, sans retour possible au numéro), il se calcule aussi pour les rapports déjà reçus : la
+ * gestion des retours le retrouve. Montré au joueur dans la fiche technique, pour qu'il le donne à l'équipe.
+ */
+export function borneCode(borne: string): string {
+  const hash = crypto.createHash('sha256').update(`cyberpinball-borne:${borne}`).digest();
+  let bits = 0n;
+  for (const byte of hash.subarray(0, 5)) bits = (bits << 8n) | BigInt(byte);
+  let code = '';
+  for (let i = 0; i < 8; i++) code = BORNE_CODE_ALPHABET[Number((bits >> BigInt(i * 5)) & 31n)]! + code;
+  return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
 
 export function saveFeedbackState(dataDir: string, state: FeedbackState): void {

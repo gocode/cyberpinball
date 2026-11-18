@@ -5022,12 +5022,12 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (watchLive) clearInterval(watchLive);
   gameNotices.close();
   inGameMenu.disarm();
-  // Une partie réussie efface les pièces d'un échec précédent, qui ne partent plus dans un rapport (launch-evidence.ts).
-  if (result.ok) rememberLaunch(result, table.title);
   const load = gameLoad?.stop(playedVr ? 'casque' : 'ecrans');
   if (load) console.log(load);
   stopWaitExit?.();
   vrFront.vrGameStop = undefined;
+  // Une partie réussie efface les pièces d'un échec précédent, qui ne partent plus dans un rapport (launch-evidence.ts).
+  if (result.ok) rememberLaunch(result, table.title);
   const room = vrFront.endGameRoom({ ...result, stopAsked: gameStopAsked });
   // Ce que VPX a changé dans la copie de l'INI de la table pendant la partie, reporté dans l'INI de la table.
   if (vrGame?.tableIni) {

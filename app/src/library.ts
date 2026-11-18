@@ -250,6 +250,8 @@ import {
   partSourcesOf,
   type MediaCredit,
   type TableCreditsInput,
+  borneCode,
+  loadFeedbackState,
 } from '@cyberpinball/core';
 import { createCreditsMenu, type CreditsDepth } from './credits-menu';
 import { prepareImport, unpackArchive } from './archives';
@@ -1318,6 +1320,7 @@ export function createLibrary(host: LibraryHost) {
             data: host.dataDir,
             errors: recentErrors(host.dataDir),
             language: language() === 'fr' ? t('Français') : t('Anglais'),
+            borne: borneCode(loadFeedbackState(host.dataDir).borne),
             ...host.techApp?.(),
           };
         },

@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.16
 
+- Fiche technique : le numéro de la borne (« 7KQ2-M9XD »), en dernière ligne du bloc Cyber Pinball, à donner à l'équipe pour qu'elle retrouve les rapports de cette borne.
 - Fichiers de VPX remplacés hors de Cyber Pinball (un autre VPX copié par-dessus) : la Santé de la borne et la fiche technique les nomment, avec leur version, et « Remettre les fichiers d'origine » les reprend dans l'archive vérifiée de VPX, sans toucher au reste du dossier.
 - VPX arrêté avant d'écrire son journal : l'écran d'échec dit « VPX s'est arrêté en démarrant », la panne de VPX et non de la table, et Start remet ses fichiers d'origine quand ils ont changé.
 - Cyber Pinball lance toujours son propre exécutable de VPX, même quand un autre VPX a été posé dans le même dossier.
