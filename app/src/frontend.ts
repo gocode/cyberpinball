@@ -313,7 +313,7 @@ import { createMenuDmd } from './menu-dmd';
 import { cachedScript } from './vbs';
 import { mediaFrame, prepareDressing } from './fulldmd';
 import { LiveDmd, type LiveDmdAnimationHandle } from './live-dmd';
-import { applyMenuDmdServer, menuDmdServer } from './dmd-server';
+import { applyMenuDmdServer, handDmdToVpx, menuDmdServer } from './dmd-server';
 import { DmdWheels } from './dmd-wheel';
 import { createConverter } from './media-convert';
 import { RomMusic } from './rom-music';
@@ -4835,8 +4835,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // chargement jusqu'à ce que sa fenêtre de jeu s'affiche, puis le fond de partie de chaque
   // écran (viewFor). Celui que VPX n'occupe pas (topper, backglass sans .directb2s) reste couvert.
   playing = table;
-  // Le DMD réel passe à VPX : le menu lâche dmdserver avant que VPX ne s'y connecte.
-  menuDmdServer().pause();
+  // Le DMD réel passe à VPX : le menu lâche dmdserver avant que VPX ne s'y connecte ; si VPX ouvre le DMD
+  // lui-même (serveur muet à la synchronisation), le serveur s'arrête avant, pour ne pas tenir la carte.
+  await handDmdToVpx();
   realign = simulated === undefined ? realignPlan(assignments) : undefined;
   hideTaskbars();
   settleScreens('game');

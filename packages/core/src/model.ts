@@ -381,14 +381,17 @@ export interface CabinetAudio {
  * Windows (identifiants et registre seulement : aucun port n'est ouvert).
  */
 /**
- * Sonde d'un PIN2DMD par la libusb de VPX : `stage` est l'étape où elle s'est arrêtée (`list` : libusb
- * ne le voit pas ; `open` : libusb_open ; `claim` : libusb_claim_interface ; `ok` : ouvert et relâché),
- * `code` le code d'erreur de libusb (0 si tout va bien). `holders` : programmes ouverts à ce moment-là
- * qui gardent souvent un DMD réel (dmdext, PinUP Popper…).
+ * Sonde d'un PIN2DMD par la libusb de VPX, étape par étape comme PIN2DMDInit de libdmdutil : `stage` est
+ * l'étape où elle s'est arrêtée (`list` : libusb ne le voit pas ; `open` : libusb_open ; `claim` :
+ * libusb_claim_interface ; `name` : le nom de produit illisible, ou pas l'un des trois que libdmdutil
+ * accepte ; `ok` : ouvert, nommé et relâché), `code` le code d'erreur de libusb (0 si tout va bien, ou
+ * pour un nom lu mais refusé). `product` : le nom que la carte a donné (iProduct), quand il a été lu.
+ * `holders` : programmes ouverts à ce moment-là qui gardent souvent un DMD réel (dmdext, PinUP Popper…).
  */
 export interface LibusbProbe {
-  stage: 'list' | 'open' | 'claim' | 'ok';
+  stage: 'list' | 'open' | 'claim' | 'name' | 'ok';
   code: number;
+  product?: string;
   holders?: string[];
 }
 

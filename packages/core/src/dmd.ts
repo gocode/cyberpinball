@@ -214,13 +214,33 @@ export function dmdHolders(processNames: string[]): string[] {
 }
 
 /**
+ * Les seuls noms de produit (iProduct) sous lesquels libdmdutil pilote un PIN2DMD : comparaison exacte
+ * (strcmp) dans PIN2DMDInit (PIN2DMD.cpp, 3485e2e ; inchangé sur master au 18/11/2026, src/devices).
+ */
+export const PIN2DMD_PRODUCTS: readonly string[] = ['PIN2DMD', 'PIN2DMD XL', 'PIN2DMD HD'];
+
+/**
  * Ce que la sonde du PIN2DMD dit de ce que verra VPX ; undefined : il s'ouvre (ou pas encore sondé).
  * libdmdutil (PIN2DMD.cpp, PIN2DMDInit) abandonne en silence quand libusb_open ou libusb_claim_interface
- * échoue : sans la sonde, le journal de VPX ne dit rien et le DMD reste noir.
+ * échoue, ou quand le nom de la carte n'est pas l'un des trois qu'il connaît : sans la sonde, le journal
+ * de VPX ne dit rien et le DMD reste noir.
  */
 export function pin2dmdProbeProblem(probe: LibusbProbe | undefined, service?: string): string | undefined {
   if (!probe || probe.stage === 'ok') return undefined;
   if (probe.stage === 'list') return t('PIN2DMD : Windows le voit, mais la libusb de VPX ne le trouve pas. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau ».');
+  if (probe.stage === 'name') {
+    // Lu, mais refusé : rien ne se règle sur la borne, libdmdutil compare le nom à sa liste.
+    if (probe.code >= 0 && probe.product) {
+      return t(
+        'PIN2DMD : la carte se présente sous le nom « {product} », que le module DMD de VPX (libdmdutil) ne connaît pas : il n’accepte que {known}. VPX ne la pilotera pas et le DMD restera noir. Cyber Pinball ne peut pas le contourner : envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions) pour que ce nom soit signalé aux auteurs de VPX.',
+        { product: probe.product, known: formatList(PIN2DMD_PRODUCTS.map((p) => `« ${p} »`)) },
+      );
+    }
+    return t(
+      'PIN2DMD : la carte s’ouvre, mais ne donne pas son nom à la libusb de VPX ({why}). Le module DMD de VPX (libdmdutil) ne la pilote qu’après l’avoir lu : le DMD restera noir. Débranchez-la, rebranchez-la, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions).',
+      { why: probe.code < 0 ? t('erreur {code}', { code: probe.code }) : t('nom vide') },
+    );
+  }
   if (probe.code === LIBUSB_ERROR_ACCESS || probe.code === LIBUSB_ERROR_BUSY) {
     const holders = probe.holders ?? [];
     return holders.length
@@ -236,6 +256,11 @@ export function pin2dmdProbeProblem(probe: LibusbProbe | undefined, service?: st
     code: probe.code,
     stage: probe.stage,
   });
+}
+
+/** Le nom du PIN2DMD : celui que la sonde a lu par libusb, sinon celui que Windows a retenu. */
+export function pin2dmdProduct(device: ObservedUsbDevice): string | undefined {
+  return device.libusbProbe?.product ?? device.product;
 }
 
 /** Taille du PIN2DMD d'après le nom que la carte donne à l'USB (libdmdutil, PIN2DMD.cpp). */
@@ -366,6 +391,8 @@ export interface HardwareDmdFacts {
   problems: string[];
   /** « Image du front-end : oui » : le DMD réel montre aussi le front-end entre les parties. */
   menu?: boolean;
+  /** Dernière sonde du PIN2DMD allumé (étape, code, nom lu) : le rapport d'une borne la montre telle quelle. */
+  pin2dmdProbe?: LibusbProbe;
 }
 
 /** serverProblem : pourquoi le serveur du DMD ne peut pas tourner (app/src/dmd-server.ts), lu si « Image du menu » est demandée. */
@@ -375,12 +402,13 @@ export function hardwareDmdFacts(devices: ObservedUsbDevice[], setup?: HardwareD
   if (setup?.zedmdWifi?.enabled) names.push(t('ZeDMD en wifi ({address})', { address: setup.zedmdWifi.address }));
   const problems = on.map((d) => hardwareDmdDriverProblem(d)).filter((p): p is string => Boolean(p));
   if (setup?.menu && names.length && serverProblem) problems.push(t('Image du front-end sur le DMD réel : {problem}', { problem: serverProblem }));
-  return { devices: names, problems, ...(setup?.menu ? { menu: true } : {}) };
+  const probe = on.find((d) => d.model === 'PIN2DMD' && d.device.libusbProbe)?.device.libusbProbe;
+  return { devices: names, problems, ...(setup?.menu ? { menu: true } : {}), ...(probe ? { pin2dmdProbe: probe } : {}) };
 }
 
 /** « ZeDMD (COM3) », « PIN2DMD HD » */
 export function hardwareDmdName(d: DetectedDmd): string {
-  const name = d.model === 'PIN2DMD' ? (pin2dmdSize(d.device.product)?.label ?? d.model) : d.model;
+  const name = d.model === 'PIN2DMD' ? (pin2dmdSize(pin2dmdProduct(d.device))?.label ?? d.model) : d.model;
   return d.device.port ? `${name} (${d.device.port})` : name;
 }
 

@@ -113,4 +113,14 @@ export const messages: Record<string, string> = {
   'DMD réel : dmdserver tient l’afficheur (image du front-end, bêta) ; VPX lui envoie ses images pendant les parties.': 'Real DMD: dmdserver holds the display (menu image, beta); VPX sends it its frames during games.',
   'Image du front-end sur le DMD réel : {problem}': 'Menu image on the real DMD: {problem}',
   'Écrit par Cyber Pinball (Menu système > Borne > DMD > DMD réel) : réécrit à chaque lancement du serveur.': 'Written by Cyber Pinball (System menu > Cabinet > DMD > Real DMD): rewritten each time the server starts.',
+  // Sonde du PIN2DMD : le nom de la carte (dmd.ts), serveur du DMD sans afficheur (dmdserver.ts)
+  'PIN2DMD : la carte se présente sous le nom « {product} », que le module DMD de VPX (libdmdutil) ne connaît pas : il n’accepte que {known}. VPX ne la pilotera pas et le DMD restera noir. Cyber Pinball ne peut pas le contourner : envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions) pour que ce nom soit signalé aux auteurs de VPX.':
+    'PIN2DMD: the board calls itself “{product}”, a name VPX’s DMD module (libdmdutil) does not know: it only accepts {known}. VPX will not drive it and the DMD will stay dark. Cyber Pinball cannot work around this: send a report (System menu > Cyber Pinball > Feedback and ideas) so that this name is reported to the VPX authors.',
+  'PIN2DMD : la carte s’ouvre, mais ne donne pas son nom à la libusb de VPX ({why}). Le module DMD de VPX (libdmdutil) ne la pilote qu’après l’avoir lu : le DMD restera noir. Débranchez-la, rebranchez-la, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions).':
+    'PIN2DMD: the board opens, but does not give its name to VPX’s libusb ({why}). VPX’s DMD module (libdmdutil) only drives it after reading that name: the DMD will stay dark. Unplug it, plug it back in, then “Check again”; if nothing changes, send a report (System menu > Cyber Pinball > Feedback and ideas).',
+  'erreur {code}': 'error {code}',
+  'nom vide': 'empty name',
+  'Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s)': 'The DMD server cannot find the display (no answer within {seconds} s)',
+  'Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s), sans cause trouvée : envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions)':
+    'The DMD server cannot find the display (no answer within {seconds} s), and no cause was found: send a report (System menu > Cyber Pinball > Feedback and ideas)',
 };

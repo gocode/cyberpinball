@@ -11,7 +11,7 @@
 
 import { DMD_HEIGHT, DMD_WIDTH, type DmdColors, type DmdDots } from './livedmd';
 import { t } from './i18n';
-import { detectHardwareDmds, hardwareDmdChoice, type HardwareDmdSetup } from './dmd';
+import { detectHardwareDmds, hardwareDmdChoice, hardwareDmdDriverProblem, type HardwareDmdSetup } from './dmd';
 import type { ObservedUsbDevice } from './model';
 import type { VpxSetting } from './vpx';
 
@@ -99,6 +99,19 @@ export function dmdServerWanted(devices: ObservedUsbDevice[], setup: HardwareDmd
     const choice = hardwareDmdChoice(setup, m);
     return choice === 'on' || (choice === 'auto' && detected.some((d) => d.model === m));
   });
+}
+
+/**
+ * Le serveur n'a trouvé aucun afficheur dans le délai (app/src/dmd-server.ts, FIND_TIMEOUT_MS) : il est
+ * arrêté, VPX ouvre le DMD lui-même. Dit à l'écran « DMD réel » (« … ; VPX ouvre le DMD lui-même pendant
+ * les parties ») et dans la Santé. La cause, quand elle est connue (pilote, sonde du PIN2DMD : nom refusé,
+ * carte prise…), est déjà dite à part, juste à côté ; sinon, demander un rapport.
+ */
+export function dmdServerNotFoundProblem(devices: ObservedUsbDevice[], setup: HardwareDmdSetup | undefined, seconds: number): string {
+  const known = detectHardwareDmds(devices).some((d) => hardwareDmdChoice(setup, d.model) !== 'off' && hardwareDmdDriverProblem(d));
+  return known
+    ? t('Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s)', { seconds })
+    : t('Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s), sans cause trouvée : envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions)', { seconds });
 }
 
 /**

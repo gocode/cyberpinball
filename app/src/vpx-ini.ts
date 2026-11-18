@@ -26,7 +26,7 @@ import {
 } from '@cyberpinball/core';
 import { probeAudioOutputs, probeUsbDevices } from '@cyberpinball/win-displays';
 import { readDof } from './dof-files';
-import { dmdServerReady } from './dmd-server';
+import { dmdServerForVpx } from './dmd-server';
 import { dmdHolderNames, withPin2dmdProbe } from './pin2dmd-probe';
 import { backupDir, locations, vpxInstall } from './paths';
 
@@ -54,7 +54,7 @@ export function syncVpxIni(
     cabinet,
     displays,
     profile,
-    { overwriteManual, audio, usb: usbDevices(), dmdServer: dmdServerReady(), dmdHolders: dmdHolderNames(), folders, dof: readDof(loc), hidNames: cabinetJoystickHids(cabinet), only },
+    { overwriteManual, audio, usb: usbDevices(), dmdServer: dmdServerForVpx(), dmdHolders: dmdHolderNames(), folders, dof: readDof(loc), hidNames: cabinetJoystickHids(cabinet), only },
     backupDir(dataDir),
   );
 }

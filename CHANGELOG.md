@@ -11,6 +11,9 @@ son interface).
 
 ## 0.1.16
 
+- DMD réel (bêta), PIN2DMD resté noir en partie avec « Image du front-end : oui » : le serveur du DMD qui ne trouvait pas l'afficheur continuait de le chercher pendant la partie et gardait la carte, si bien que VPX ne pouvait plus l'ouvrir. Il s'arrête désormais au bout de 20 secondes sans réponse, et toujours avant une partie que VPX pilote lui-même.
+- DMD réel : la vérification du PIN2DMD fait maintenant tout ce que fait VPX, jusqu'à lire le nom de la carte. Une carte qui ne donne pas son nom, ou un nom que le module DMD de VPX ne connaît pas (il n'accepte que PIN2DMD, PIN2DMD XL et PIN2DMD HD), est signalée avec le nom lu, à l'écran « DMD réel » et dans la Santé de la borne.
+- DMD réel : quand le serveur du DMD ne trouve pas l'afficheur, l'écran « DMD réel » et la Santé le disent, avec la cause trouvée par la vérification du PIN2DMD, et VPX reprend le DMD lui-même pendant les parties.
 - Retours et propositions, formulaire : « Envoyer à l'équipe seulement » vient d'abord, puis « Publier en public », pour qu'on ne publie plus par mégarde ce qui devait rester privé ; pour un problème signalé, c'est l'envoi privé qui est mis en avant.
 - Téléphone : les phrases préparées et les réactions s'affichent en badges, les uns à côté des autres sur deux lignes au plus, et la bande défile vers la droite quand il y en a davantage ; plus de grande case par phrase dans la vue Écran (« Écrire dans le salon », « Répondre »), et les mêmes badges dans le salon, le fil d'un ami et la messagerie pendant la partie, les réactions sur une ligne à part au-dessus des phrases.
 - Médaillon Communauté : l'affiche du plateau montre votre niveau (son palier et sa barre), votre place au classement mondial et dans votre pays, et votre semaine en une ligne (XP gagnés, places de la semaine). Une place encore inconnue garde sa case, grisée, avec sa raison. Pour alléger, le salon du pays ne paraît plus que sur l’affiche du fronton.

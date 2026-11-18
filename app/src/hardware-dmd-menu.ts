@@ -13,6 +13,7 @@ import {
   HARDWARE_DMD_MODELS,
   nextHardwareDmdChoice,
   pin2dmdProbeProblem,
+  pin2dmdProduct,
   pin2dmdSize,
   t,
   tn,
@@ -116,7 +117,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
     const found: Row[] = detected.map((d) => {
       const off = hardwareDmdChoice(s, d.model) === 'off';
       const problem = !off && hardwareDmdDriverProblem(d);
-      const size = d.model === 'PIN2DMD' ? pin2dmdSize(d.device.product) : undefined;
+      const size = d.model === 'PIN2DMD' ? pin2dmdSize(pin2dmdProduct(d.device)) : undefined;
       const detail = [
         size ? t('{width} × {height} points', { width: size.width, height: size.height }) : undefined,
         t('USB {usb}', { usb: d.usb }),

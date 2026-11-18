@@ -263,7 +263,7 @@ import { prepareImport, unpackArchive } from './archives';
 import { createDofMenu } from './dof-menu';
 import { buildVpxChoice, createOtherVpxMenu, createPlanVpx, otherVpxLimitsText, playedWithText, vpxChoiceCursor } from './autres-vpx-menu';
 import { createHardwareDmdMenu } from './hardware-dmd-menu';
-import { applyMenuDmdServer, dmdServerProblem, dmdServerReady } from './dmd-server';
+import { applyMenuDmdServer, dmdServerProblem, dmdServerReady, onDmdServerState } from './dmd-server';
 import { onPin2dmdProbe } from './pin2dmd-probe';
 import { dofDir, readDof, vpxWorkDir } from './dof-files';
 import { backupDir, locations } from './paths';
@@ -1498,6 +1498,11 @@ export function createLibrary(host: LibraryHost) {
   // La sonde du PIN2DMD a répondu (démarrage, retour de partie, « Vérifier de nouveau ») : la Santé et
   // l'écran « DMD réel » disent ce que VPX verra en ouvrant la carte.
   onPin2dmdProbe(() => {
+    hardwareDmdMenu.probed();
+    void health.refresh();
+  });
+  // Le serveur du DMD tient l'afficheur, ou vient d'être abandonné faute d'afficheur : dit tout de suite.
+  onDmdServerState(() => {
     hardwareDmdMenu.probed();
     void health.refresh();
   });

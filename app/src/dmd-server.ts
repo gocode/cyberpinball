@@ -3,12 +3,19 @@
 // protocole). Pendant une partie, le menu se déconnecte et VPX s'y connecte à son tour
 // ([Plugin.DMDUtil] DMDServer = 1, écrit seulement quand le serveur répond : sinon VPX ouvre le DMD
 // lui-même, comme sans l'image du menu). Rien ne s'affiche à l'écran : ni console, ni fenêtre.
+//
+// Un serveur qui ne répond pas ne doit jamais tenir la carte : avec -w, il relance FindDisplays chaque
+// seconde, et PIN2DMDInit de libdmdutil (PIN2DMD.cpp) garde le PIN2DMD ouvert et réservé quand il le
+// refuse ensuite (nom inconnu, nom illisible) ; VPX, qui ouvre alors le DMD lui-même, le trouvait pris et
+// le DMD restait noir (borne d'un joueur, 18/11/2026). D'où : sans réponse en FIND_TIMEOUT_MS, le serveur
+// est arrêté et la sonde du PIN2DMD dit pourquoi (pin2dmd-probe.ts) ; et avant une partie que VPX ne lui
+// confie pas, il est arrêté et attendu (handDmdToVpx).
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
-import { DMDSERVER_ADDR, DMDSERVER_PORT, dmdServerFrame, dmdServerIni, dmdServerWanted, loadCabinet, t, type DmdColors, type DmdDots } from '@cyberpinball/core';
+import { DMDSERVER_ADDR, DMDSERVER_PORT, dmdServerFrame, dmdServerIni, dmdServerNotFoundProblem, dmdServerWanted, loadCabinet, t, type DmdColors, type DmdDots } from '@cyberpinball/core';
 import { locations, vpxInstall } from './paths';
 import { clearPin2dmdProbe, refreshPin2dmdProbe } from './pin2dmd-probe';
 import { usbDevices } from './vpx-ini';
@@ -32,7 +39,24 @@ export interface DmdServerOptions {
   retryMs?: number;
   /** Délai avant de relancer un serveur arrêté (DMD débranché, plantage), en ms. */
   restartMs?: number;
+  /** Au-delà, un serveur qui n'a trouvé aucun afficheur est arrêté (FIND_TIMEOUT_MS). */
+  findTimeoutMs?: number;
+  /** Le serveur abandonné faute d'afficheur vient de se terminer : la carte est libre. */
+  onGiveUp?(): void;
+  /** Le front-end tient l'afficheur. */
+  onReady?(): void;
+  /** Arguments du programme (essais : un faux serveur) ; dmdServerArgs par défaut. */
+  args?(program: DmdServerProgram, iniPath: string): string[];
 }
+
+/**
+ * Délai pour trouver l'afficheur. Un DMD branché répond en moins d'une seconde (ZeDMD : quelques
+ * secondes de poignée de main au plus, ZeDMD en wifi : le temps d'une connexion).
+ */
+export const FIND_TIMEOUT_MS = 20_000;
+
+/** Attente de la fin du serveur arrêté avant une partie : le système rend la carte à sa sortie. */
+const HALT_WAIT_MS = 3000;
 
 /** Arguments du serveur : la DLL de VPX, l'ini, attendre le DMD, journal sur la sortie d'erreur. */
 export function dmdServerArgs(program: DmdServerProgram, iniPath: string): string[] {
@@ -70,6 +94,10 @@ export class DmdServerHost {
   private failure: string | undefined;
   /** Les choix (dmdserver.ini) avec lesquels il s'est arrêté pour de bon. */
   private failedIni = '';
+  /** Échéance de la recherche de l'afficheur (FIND_TIMEOUT_MS), jusqu'à la première connexion. */
+  private giveUp: NodeJS.Timeout | undefined;
+  /** Abandonné faute d'afficheur : au bout de combien de secondes. Réessayé au prochain applyMenuDmdServer. */
+  private searchFailed: number | undefined;
 
   constructor(private readonly options: DmdServerOptions) {}
 
@@ -81,6 +109,11 @@ export class DmdServerHost {
   /** Le serveur s'est arrêté pour de bon (DLL de VPX absente ou d'une autre version) : pourquoi. */
   problem(): string | undefined {
     return this.failure;
+  }
+
+  /** Abandonné faute d'afficheur (FIND_TIMEOUT_MS) : au bout de combien de secondes ; undefined sinon. */
+  notFound(): number | undefined {
+    return this.searchFailed;
   }
 
   /** Le serveur doit-il tourner ? Démarré, il suit les choix de « DMD réel » (dmdserver.ini). */
@@ -102,6 +135,7 @@ export class DmdServerHost {
     this.ini = ini;
     this.running = true;
     this.failure = undefined;
+    this.searchFailed = undefined;
     fs.mkdirSync(path.dirname(this.options.iniPath), { recursive: true });
     fs.writeFileSync(this.options.iniPath, ini);
     void this.launch(program);
@@ -111,7 +145,10 @@ export class DmdServerHost {
   stop(): void {
     this.running = false;
     this.external = false;
+    this.searchFailed = undefined;
     clearTimeout(this.restart);
+    clearTimeout(this.giveUp);
+    this.giveUp = undefined;
     this.disconnect();
     if (this.child && this.child.exitCode === null) this.child.kill();
     this.child = undefined;
@@ -122,6 +159,49 @@ export class DmdServerHost {
   pause(): void {
     this.paused = true;
     this.disconnect();
+  }
+
+  /**
+   * Avant une partie. throughServer : VPX passera par le serveur ([Plugin.DMDUtil] DMDServer = 1, écrit
+   * par la synchronisation) ; le menu lâche seulement l'afficheur. Sinon VPX ouvrira le DMD lui-même : le
+   * serveur lancé par Cyber Pinball (qui cherche encore l'afficheur, ou ne répondait pas à la
+   * synchronisation) est arrêté, et sa fin attendue : il pourrait tenir la carte. Relancé au retour
+   * (applyMenuDmdServer).
+   */
+  async handOver(throughServer: boolean): Promise<void> {
+    this.pause();
+    const child = this.child;
+    if (throughServer || this.external || !child) return;
+    this.options.log('dmdserver : arrêté avant la partie (il ne tenait pas l’afficheur) : VPX ouvre le DMD lui-même.'); // i18n-ignore : journal
+    this.stop();
+    if (child.exitCode !== null) return;
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, HALT_WAIT_MS);
+      child.once('exit', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  }
+
+  /** Aucun afficheur trouvé dans le délai : le serveur s'arrête et ne se relance pas de lui-même. */
+  private giveUpSearch(timeoutMs: number): void {
+    this.giveUp = undefined;
+    if (!this.running || this.connected || this.external) return;
+    const seconds = Math.round(timeoutMs / 1000);
+    this.options.log(`dmdserver : aucun afficheur trouvé en ${seconds} s, arrêté ; VPX ouvre le DMD lui-même pendant les parties.`); // i18n-ignore : journal
+    const child = this.child;
+    this.running = false;
+    this.searchFailed = seconds;
+    clearTimeout(this.restart);
+    this.disconnect();
+    this.child = undefined;
+    // La sonde attend que le serveur soit sorti : c'est alors que le système rend la carte.
+    const done = () => this.options.onGiveUp?.();
+    if (child && child.exitCode === null) {
+      child.once('exit', done);
+      child.kill();
+    } else done();
   }
 
   /** Après une partie : le menu reprend l'afficheur et renvoie sa dernière image. */
@@ -151,8 +231,14 @@ export class DmdServerHost {
     }
     if (!this.running) return;
     // Dossier de travail : celui de la DLL de VPX (ses propres DLL à côté d'elle).
-    const child = spawn(program.exe, dmdServerArgs(program, this.options.iniPath), { cwd: program.dmdutilDir, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const args = (this.options.args ?? dmdServerArgs)(program, this.options.iniPath);
+    const child = spawn(program.exe, args, { cwd: program.dmdutilDir, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     this.child = child;
+    // Une seule échéance depuis le premier lancement : un serveur qui plante et repart ne la repousse pas.
+    if (!this.giveUp) {
+      const timeoutMs = this.options.findTimeoutMs ?? FIND_TIMEOUT_MS;
+      this.giveUp = setTimeout(() => this.giveUpSearch(timeoutMs), timeoutMs);
+    }
     const relay = (data: Buffer) => {
       for (const line of data.toString('utf8').split(/\r?\n/)) if (line.trim()) this.options.log(`dmdserver : ${line.trim()}`);
     };
@@ -203,8 +289,11 @@ export class DmdServerHost {
     this.socket = socket;
     socket.once('connect', () => {
       this.connected = true;
+      clearTimeout(this.giveUp);
+      this.giveUp = undefined;
       this.options.log('dmdserver : le front-end tient l’afficheur.'); // i18n-ignore : journal
       if (this.last) this.write(this.last);
+      this.options.onReady?.();
     });
     socket.on('error', () => undefined);
     socket.once('close', () => {
@@ -254,6 +343,13 @@ export function dmdServerProgram(): DmdServerProgram | { problem: string } {
   return { exe, dmdutilDir };
 }
 
+const stateListeners: (() => void)[] = [];
+
+/** Le serveur tient l'afficheur, ou vient d'être abandonné faute d'afficheur : la Santé et « DMD réel » se redessinent. */
+export function onDmdServerState(listener: () => void): void {
+  stateListeners.push(listener);
+}
+
 export function menuDmdServer(): DmdServerHost {
   shared ??= new DmdServerHost({
     program: () => {
@@ -262,19 +358,57 @@ export function menuDmdServer(): DmdServerHost {
     },
     iniPath: path.join(locations().dataDir, 'dmdserver.ini'),
     log: (line) => console.log(line),
+    // La carte est libre : la sonde dit ce que VPX verra en l'ouvrant (nom refusé, carte prise…).
+    onGiveUp: () => {
+      refreshPin2dmdProbe(usbDevices() ?? []);
+      for (const l of stateListeners) l();
+    },
+    // La carte est au serveur : une sonde la trouverait prise (par lui), la dernière ne vaut plus.
+    onReady: () => {
+      clearPin2dmdProbe();
+      for (const l of stateListeners) l();
+    },
   });
   return shared;
 }
 
-/** VPX peut-il passer par dmdserver ? Lu par la synchronisation avant chaque partie. */
+/** VPX peut-il passer par dmdserver ? (écran « DMD réel ») */
 export function dmdServerReady(): boolean {
   return shared?.ready() ?? false;
 }
 
-/** Pourquoi l'image du menu ne marche pas (programme absent, VPX d'une autre version…) ; undefined sinon. */
+/** Ce que la dernière synchronisation a écrit pour VPX : true, il passe par le serveur (DMDServer = 1). */
+let vpxThroughServer = false;
+
+/**
+ * Lu par la synchronisation de VPinballX.ini (vpx-ini.ts) : VPX passe par le serveur seulement s'il
+ * répond. La réponse est retenue pour handDmdToVpx, juste avant la partie.
+ */
+export function dmdServerForVpx(): boolean {
+  vpxThroughServer = dmdServerReady();
+  return vpxThroughServer;
+}
+
+/**
+ * Juste avant de lancer VPX : le menu lâche l'afficheur ; si la synchronisation a fait ouvrir le DMD à
+ * VPX lui-même, le serveur est arrêté, et sa fin attendue, avant que VPX ne parte (handOver).
+ */
+export function handDmdToVpx(): Promise<void> {
+  return menuDmdServer().handOver(vpxThroughServer);
+}
+
+/**
+ * Pourquoi l'image du menu ne marche pas (programme absent, VPX d'une autre version, aucun afficheur
+ * trouvé) ; undefined sinon.
+ */
 export function dmdServerProblem(): string | undefined {
   const p = dmdServerProgram();
-  return 'problem' in p ? p.problem : shared?.problem();
+  if ('problem' in p) return p.problem;
+  const failure = shared?.problem();
+  if (failure) return failure;
+  const seconds = shared?.notFound();
+  if (seconds === undefined) return undefined;
+  return dmdServerNotFoundProblem(usbDevices() ?? [], loadCabinet(locations().dataDir)?.hardwareDmd, seconds);
 }
 
 /**
@@ -287,8 +421,10 @@ export function applyMenuDmdServer(): void {
   const server = menuDmdServer();
   if (dmdServerWanted(devices, setup)) server.start(dmdServerIni(devices, setup));
   else server.stop();
-  // Le serveur tient la carte : une sonde la trouverait occupée (par lui). Sinon, le PIN2DMD est sondé
-  // comme VPX l'ouvrira à la prochaine partie (pin2dmd-probe.ts).
-  if (server.active()) clearPin2dmdProbe();
-  else refreshPin2dmdProbe(devices);
+  // Serveur arrêté (jamais lancé, ou abandonné faute d'afficheur) : le PIN2DMD est sondé comme VPX
+  // l'ouvrira à la prochaine partie (pin2dmd-probe.ts). Serveur lancé : pas de sonde, elle trouverait la
+  // carte prise par lui ; la dernière reste dite tant qu'il ne tient pas l'afficheur (onReady l'efface),
+  // puis la sonde repart s'il abandonne (onGiveUp).
+  if (!server.active()) refreshPin2dmdProbe(devices);
+  else if (server.ready()) clearPin2dmdProbe();
 }

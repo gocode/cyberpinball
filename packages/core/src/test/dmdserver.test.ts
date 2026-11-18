@@ -10,7 +10,7 @@ import * as net from 'node:net';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { hardwareDmdFacts, vpxDmdSettings } from '../dmd';
-import { DMDSTREAM_HEADER_SIZE, dmdRgb24, dmdServerFrame, dmdServerIni, dmdServerWanted, dmdStreamHeader, parseDmdStreamHeader } from '../dmdserver';
+import { DMDSTREAM_HEADER_SIZE, dmdRgb24, dmdServerFrame, dmdServerIni, dmdServerNotFoundProblem, dmdServerWanted, dmdStreamHeader, parseDmdStreamHeader } from '../dmdserver';
 import { setLanguage } from '../i18n';
 import { DMD_HEIGHT, DMD_WIDTH } from '../livedmd';
 import type { ObservedUsbDevice } from '../model';
@@ -238,4 +238,169 @@ test('santé : « Image du menu » demandée mais serveur impossible, dit avec s
   assert.deepEqual(hardwareDmdFacts([PIN2DMD], undefined, problem).problems, [], 'image du menu non demandée : rien à dire');
   assert.deepEqual(hardwareDmdFacts([], { menu: true }, problem).problems, [], 'aucun DMD : rien à dire');
   assert.deepEqual(hardwareDmdFacts([PIN2DMD], { menu: true }).problems, [], 'serveur prêt');
+});
+
+// Borne d'un joueur (18/11/2026, PIN2DMD noir en partie comme dans le front-end) : le serveur, lancé avec -w,
+// relançait FindDisplays chaque seconde sans rien trouver ; PIN2DMDInit de libdmdutil garde la carte ouverte
+// et réservée quand il la refuse, et le serveur restait lancé pendant la partie, où VPX ouvrait le DMD
+// lui-même. Invariants : un serveur muet s'arrête de lui-même, et jamais il ne tourne quand VPX ouvre le DMD.
+type Host = {
+  start(ini: string): void;
+  stop(): void;
+  handOver(throughServer: boolean): Promise<void>;
+  ready(): boolean;
+  active(): boolean;
+  notFound(): number | undefined;
+};
+type HostOptions = {
+  program(): { exe: string; dmdutilDir: string } | undefined;
+  iniPath: string;
+  log(l: string): void;
+  port?: number;
+  retryMs?: number;
+  restartMs?: number;
+  findTimeoutMs?: number;
+  onGiveUp?(): void;
+  args?(): string[];
+};
+
+/** Un port où rien n'écoute. */
+function freePort(): Promise<number> {
+  return new Promise((resolve) => {
+    const s = net.createServer();
+    s.listen(0, '127.0.0.1', () => {
+      const { port } = s.address() as net.AddressInfo;
+      s.close(() => resolve(port));
+    });
+  });
+}
+
+/** Un faux serveur qui ne trouve jamais d'afficheur : il tourne sans jamais écouter (comme dmdserver -w). */
+function mute(port: number, extra: Partial<HostOptions> = {}): { host: Host; log: string[]; pid(): number | undefined } {
+  const { DmdServerHost } = require(path.join(REPO_ROOT, 'app', 'dist', 'dmd-server.js')) as { DmdServerHost: new (o: HostOptions) => Host };
+  const log: string[] = [];
+  const dir = path.join(REPO_ROOT, 'tmp');
+  fs.mkdirSync(dir, { recursive: true });
+  const host = new DmdServerHost({
+    program: () => ({ exe: process.execPath, dmdutilDir: dir }),
+    iniPath: path.join(dir, 'essai-dmdserver-muet.ini'),
+    log: (l) => log.push(l),
+    port,
+    retryMs: 50,
+    restartMs: 50,
+    args: () => ['-e', 'setInterval(() => {}, 1000)'],
+    ...extra,
+  });
+  return { host, log, pid: () => (host as unknown as { child?: { pid?: number } }).child?.pid };
+}
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+test('serveur du DMD sans afficheur : arrêté au bout du délai, la carte rendue avant la sonde, pas de relance seule', async () => {
+  setLanguage('fr');
+  let started: number | undefined;
+  let aliveAtGiveUp: boolean | undefined;
+  const { host, log, pid } = mute(await freePort(), {
+    findTimeoutMs: 400,
+    onGiveUp: () => {
+      aliveAtGiveUp = alive(started!);
+    },
+  });
+  try {
+    host.start('[DMDServer]\r\n');
+    await until(() => (started = pid()) !== undefined);
+    await until(() => aliveAtGiveUp !== undefined);
+    // onGiveUp vient après la fin du processus : c'est alors que le système rend la carte à la sonde.
+    assert.equal(aliveAtGiveUp, false, 'le serveur est terminé quand la sonde part');
+    assert.equal(host.active(), false);
+    assert.equal(host.ready(), false);
+    assert.equal(host.notFound(), 0, 'abandonné, au bout du délai (en secondes, arrondi)');
+    assert.ok(log.some((l) => /aucun afficheur trouvé en 0 s, arrêté/.test(l)));
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(pid(), undefined, 'pas de relance de lui-même');
+    // Au prochain appel (retour de partie, « Vérifier de nouveau ») : nouvel essai, mêmes choix.
+    host.start('[DMDServer]\r\n');
+    assert.equal(host.notFound(), undefined);
+    assert.equal(host.active(), true);
+  } finally {
+    host.stop();
+  }
+});
+
+test('avant une partie que VPX ne confie pas au serveur : le serveur muet est arrêté, et sa fin attendue', async () => {
+  const { host, log, pid } = mute(await freePort(), { findTimeoutMs: 60_000 });
+  try {
+    host.start('[DMDServer]\r\n');
+    let child: number | undefined;
+    await until(() => (child = pid()) !== undefined);
+    // La synchronisation a écrit DMDServer = 0 (serveur muet) : VPX ouvrira la carte lui-même.
+    await host.handOver(false);
+    assert.equal(alive(child!), false, 'terminé avant que VPX ne parte');
+    assert.equal(host.active(), false);
+    assert.ok(log.some((l) => /arrêté avant la partie/.test(l)));
+    // Au retour, applyMenuDmdServer le relance.
+    host.start('[DMDServer]\r\n');
+    assert.equal(host.active(), true);
+  } finally {
+    host.stop();
+  }
+});
+
+test('avant une partie que VPX confie au serveur : il reste lancé, le menu lâche seulement l’afficheur', async () => {
+  const fake = await fakeServer();
+  const { DmdServerHost } = require(path.join(REPO_ROOT, 'app', 'dist', 'dmd-server.js')) as { DmdServerHost: new (o: HostOptions) => Host };
+  const host = new DmdServerHost({ program: () => ({ exe: 'cyberpinball-dmdserver.exe', dmdutilDir: 'plugins' }), iniPath: path.join(REPO_ROOT, 'tmp', 'essai-dmdserver.ini'), log: () => undefined, port: fake.port, retryMs: 50 });
+  try {
+    host.start('[DMDServer]\r\n');
+    await until(() => host.ready());
+    await host.handOver(true);
+    await until(() => fake.clients() === 0);
+    assert.equal(host.active(), true, 'le serveur tourne : VPX s’y connecte');
+  } finally {
+    host.stop();
+    await fake.close().catch(() => undefined);
+  }
+});
+
+test('lancement d’une partie : la synchronisation retient sa réponse, le serveur est rendu d’après elle juste avant VPX', () => {
+  const read = (f: string) => fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', f), 'utf8');
+  assert.match(read('vpx-ini.ts'), /dmdServer: dmdServerForVpx\(\)/, 'la réponse écrite dans VPinballX.ini est celle que handDmdToVpx reprend');
+  const frontend = read('frontend.ts');
+  const handed = frontend.indexOf('await handDmdToVpx();');
+  assert.ok(handed > 0, 'frontend.ts : await handDmdToVpx() avant la partie');
+  assert.ok(handed < frontend.indexOf('launchVpx({'), 'avant le lancement de VPX');
+  assert.doesNotMatch(frontend, /menuDmdServer\(\)\.pause\(\)/, 'jamais seulement lâché : un serveur muet tiendrait la carte');
+});
+
+test('santé et « DMD réel » : le serveur qui ne trouve pas l’afficheur le dit, avec la cause ou un rapport à envoyer', () => {
+  setLanguage('fr');
+  const refused: ObservedUsbDevice = { ...PIN2DMD, libusbProbe: { stage: 'name', code: 0, product: 'PIN2DMD EVO' } };
+  // Cause trouvée (la sonde, dite à part) : la phrase du serveur ne la répète pas.
+  const known = dmdServerNotFoundProblem([refused], { menu: true }, 20);
+  assert.equal(known, 'Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en 20 s)');
+  const facts = hardwareDmdFacts([refused], { menu: true }, known);
+  assert.equal(facts.problems.length, 2);
+  assert.match(facts.problems[0]!, /« PIN2DMD EVO »/);
+  assert.equal(facts.problems[1], `Image du front-end sur le DMD réel : ${known}`);
+  // Sans cause trouvée : un rapport.
+  assert.match(dmdServerNotFoundProblem([{ ...PIN2DMD, libusbProbe: { stage: 'ok', code: 0, product: 'PIN2DMD' } }], { menu: true }, 20), /sans cause trouvée : envoyez un rapport/);
+  // La cause d'un modèle éteint ne compte pas.
+  assert.match(dmdServerNotFoundProblem([refused, ZEDMD], { menu: true, models: { PIN2DMD: 'off' } }, 20), /sans cause trouvée/);
+});
+
+test('dmdserver.ini : un modèle ni reconnu ni forcé n’est jamais cherché (Pixelcade chez un joueur à PIN2DMD seul)', () => {
+  const ini = dmdServerIni([PIN2DMD], { menu: true });
+  assert.match(ini, /\[PIN2DMD\]\r\nEnabled = 1/);
+  assert.match(ini, /\[Pixelcade\]\r\nEnabled = 0/);
+  assert.match(ini, /\[ZeDMD\]\r\nEnabled = 0/);
+  assert.match(ini, /\[ZeDMD-WiFi\]\r\nEnabled = 0/);
+  // « Pixelcade : oui » (le Start passe par « oui » entre « automatique » et « non ») : cherché, comme demandé.
+  assert.match(dmdServerIni([PIN2DMD], { menu: true, models: { Pixelcade: 'on' } }), /\[Pixelcade\]\r\nEnabled = 1/);
 });

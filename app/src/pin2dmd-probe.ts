@@ -1,12 +1,13 @@
 // Sonde du PIN2DMD (bêta du DMD réel) : un PIN2DMD reconnu à son identifiant USB, au bon pilote, peut
 // quand même rester noir en partie, parce que libdmdutil abandonne en silence quand libusb_open ou
 // libusb_claim_interface échoue (pilote que la libusb de VPX ne sait pas utiliser, carte déjà tenue
-// par dmdext ou un autre front-end). La sonde (sonde-pin2dmd.ts, processus à part) fait les mêmes
-// étapes que VPX, avec sa libusb, puis relâche tout.
+// par dmdext ou un autre front-end), ou quand la carte ne donne pas l'un des trois noms qu'il connaît.
+// La sonde (sonde-pin2dmd.ts, processus à part) fait les mêmes étapes que VPX, avec sa libusb, puis
+// relâche tout.
 //
 // Quand : au démarrage du front-end, au retour d'une partie et après un choix de « DMD réel »
-// (applyMenuDmdServer), jamais pendant une partie, ni quand le serveur du DMD tient l'afficheur
-// (l'image du front-end : la carte est alors à lui). Son résultat est joint au PIN2DMD de la liste
+// (applyMenuDmdServer), et quand le serveur du DMD abandonne faute d'afficheur (dmd-server.ts) ; jamais
+// pendant une partie, ni tant que le serveur du DMD tourne (il tient la carte, ou essaie de la prendre). Son résultat est joint au PIN2DMD de la liste
 // des périphériques (libusbProbe) : l'écran « DMD réel », la Santé de la borne et les points à
 // vérifier avant chaque partie le disent sans rien sonder eux-mêmes.
 
@@ -76,7 +77,8 @@ export function runPin2dmdProbe(dll: string, script = path.join(__dirname, 'sond
       try {
         const line = out.trim().split(/\r?\n/).pop() ?? '';
         const parsed = JSON.parse(line) as LibusbProbe;
-        resolve(['list', 'open', 'claim', 'ok'].includes(parsed.stage) && typeof parsed.code === 'number' ? { stage: parsed.stage, code: parsed.code } : undefined);
+        const known = ['list', 'open', 'claim', 'name', 'ok'].includes(parsed.stage) && typeof parsed.code === 'number';
+        resolve(known ? { stage: parsed.stage, code: parsed.code, ...(typeof parsed.product === 'string' ? { product: parsed.product } : {}) } : undefined);
       } catch {
         resolve(undefined);
       }
@@ -96,7 +98,7 @@ export function withPin2dmdProbe(devices: ObservedUsbDevice[]): ObservedUsbDevic
   return devices.map((d) => (ids.includes(d.instanceId) ? { ...d, libusbProbe: probe } : d));
 }
 
-/** Le serveur du DMD tient la carte (image du front-end) : la dernière sonde ne vaut plus. */
+/** Le serveur du DMD tient l'afficheur (image du front-end) : la dernière sonde ne vaut plus. */
 export function clearPin2dmdProbe(): void {
   if (!result) return;
   result = undefined;
@@ -130,7 +132,8 @@ export function refreshPin2dmdProbe(devices: ObservedUsbDevice[]): void {
       const busy = probe.stage === 'open' || probe.stage === 'claim';
       const holders = busy ? dmdHolderNames() : [];
       result = { ids, probe: holders.length ? { ...probe, holders } : probe };
-      console.log(`DMD réel, sonde du PIN2DMD : étape ${probe.stage}, code ${probe.code}${holders.length ? ` ; ouverts : ${holders.join(', ')}` : ''}.`); // i18n-ignore : journal
+      const named = probe.product === undefined ? '' : `, nom « ${probe.product} »`; // i18n-ignore : journal
+      console.log(`DMD réel, sonde du PIN2DMD : étape ${probe.stage}, code ${probe.code}${named}${holders.length ? ` ; ouverts : ${holders.join(', ')}` : ''}.`); // i18n-ignore : journal
       for (const l of listeners) l();
     } else {
       console.log('DMD réel, sonde du PIN2DMD : pas de réponse (8 s), rien de conclu.'); // i18n-ignore : journal

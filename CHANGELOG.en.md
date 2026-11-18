@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Real DMD (beta), PIN2DMD staying dark during games with "Menu image: yes": the DMD server that could not find the display kept searching for it during the game and held on to the board, so VPX could no longer open it. It now stops after 20 seconds without an answer, and always before a game where VPX drives the DMD itself.
+- Real DMD: the PIN2DMD check now does everything VPX does, up to reading the board's name. A board that does not give its name, or gives a name VPX's DMD module does not know (it only accepts PIN2DMD, PIN2DMD XL and PIN2DMD HD), is reported with the name it gave, on the "Real DMD" screen and in the cabinet Health.
+- Real DMD: when the DMD server cannot find the display, the "Real DMD" screen and the Health say so, with the cause found by the PIN2DMD check, and VPX takes the DMD back itself during games.
 - Feedback and ideas, form: "Send to the team only" now comes first, then "Publish publicly", so what should stay private is no longer published by mistake; for a reported problem, the private option is the highlighted one.
 - Phone: canned phrases and reactions now show as chips, side by side on at most two lines, and the strip scrolls to the right when there are more; no more one big box per phrase in the Screen view ("Write in the room", "Reply"), and the same chips in the room, a friend's thread and the in-game messages, with reactions on their own line above the phrases.
 - Community medallion: the playfield poster shows your level (its tier and its bar), your place in the worldwide and national rankings, and your week in one line (XP earned, places this week). A place not known yet keeps its box, greyed out, with the reason. To keep it light, the country room now only shows on the backglass poster.
