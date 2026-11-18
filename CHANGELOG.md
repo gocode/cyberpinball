@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.16
 
+- Retours et propositions, formulaire : « Envoyer à l'équipe seulement » vient d'abord, puis « Publier en public », pour qu'on ne publie plus par mégarde ce qui devait rester privé ; pour un problème signalé, c'est l'envoi privé qui est mis en avant.
 - Téléphone : les phrases préparées et les réactions s'affichent en badges, les uns à côté des autres sur deux lignes au plus, et la bande défile vers la droite quand il y en a davantage ; plus de grande case par phrase dans la vue Écran (« Écrire dans le salon », « Répondre »), et les mêmes badges dans le salon, le fil d'un ami et la messagerie pendant la partie, les réactions sur une ligne à part au-dessus des phrases.
 - Médaillon Communauté : l'affiche du plateau montre votre niveau (son palier et sa barre), votre place au classement mondial et dans votre pays, et votre semaine en une ligne (XP gagnés, places de la semaine). Une place encore inconnue garde sa case, grisée, avec sa raison. Pour alléger, le salon du pays ne paraît plus que sur l’affiche du fronton.
 - Partie échouée : un flipper envoie un rapport aux développeurs d'un seul appui (le problème déjà rappelé, la fiche technique jointe, chiffré et anonymisé), une description restant facultative.

@@ -38,7 +38,11 @@ type Outcome = 'ask' | 'sent' | 'known' | 'off';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { createFeedbackMenu, doctorReport, noteCrashOutcome } = require(path.join(APP_DIST, 'feedback-menu.js')) as {
-  createFeedbackMenu(ctx: object): { crashed(signature: string, table: string | undefined, about: string): Outcome; openSendReport(report: DevReport, back: () => void): void };
+  createFeedbackMenu(ctx: object): {
+    crashed(signature: string, table: string | undefined, about: string): Outcome;
+    openSendReport(report: DevReport, back: () => void): void;
+    openForm(context: { text?: string }, back: () => void, kind?: string): void;
+  };
   doctorReport(table: { id: string; title: string }, findings: { code: string; title: string; detail?: string }[], repaired?: string[]): DevReport;
   noteCrashOutcome(message: { report?: { consent?: boolean; notified?: boolean } }, outcome: Outcome): void;
 };
@@ -182,4 +186,19 @@ test('rapport aux développeurs : le flipper de la partie échouée le propose, 
   assert.match(library, /feedback\.openSendReport\(doctorReport\(/);
   const frontend = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
   assert.match(frontend, /noteCrashOutcome\(message, library\.feedback\.crashed\(/);
+});
+
+test('formulaire des retours : « Envoyer à l’équipe seulement » avant « Publier en public », le privé mis en avant pour un problème', () => {
+  for (const kind of ['bug', 'feature']) {
+    const s = setup();
+    s.type('Le DMD reste noir sur Glass Lagoon');
+    s.menu.openForm({ text: 'Depuis la dernière mise à jour.' }, () => undefined, kind);
+    s.action('feedback:title').run();
+    const keys = s.screen().actions.map((a) => a.key);
+    assert.ok(keys.indexOf('feedback:private') >= 0 && keys.indexOf('feedback:private') + 1 === keys.indexOf('feedback:publish'), `${kind} : le privé juste avant le public (${keys.join(', ')})`);
+    assert.equal(s.action('feedback:publish').label, 'Publier en public');
+    assert.equal(s.action('feedback:private').tone, kind === 'bug' ? 'ok' : undefined);
+    assert.equal(s.action('feedback:publish').tone, kind === 'bug' ? undefined : 'ok');
+    s.done();
+  }
 });

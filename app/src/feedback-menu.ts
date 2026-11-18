@@ -299,7 +299,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
           ctx.prompt(t('Description'), t('Les détails'), draft.text, (value) => {
             if (value !== undefined) draft.text = cleanProposalText(value.slice(0, 2000)) ?? '';
             self();
-          }, t('Visible de tous avec le titre. Ni nom, ni adresse, ni numéro de téléphone.')),
+          }, t('Visible de tous avec le titre si vous publiez en public. Ni nom, ni adresse, ni numéro de téléphone.')),
       });
       actions.push({
         label: t('Joindre le rapport technique'),
@@ -311,21 +311,26 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       if (draft.attach && ctx.openReportContents) actions.push({ label: t('Voir le contenu du rapport'), icon: 'eye', key: 'feedback:contents', run: () => ctx.openReportContents!(self) });
       const ready = Boolean(title) && !draft.sending;
       const why = draft.sending ? t('Envoi en cours…') : !title ? t('Indisponible : écrivez d’abord un titre ({min} caractères au moins)', { min: PROPOSAL_TITLE_MIN }) : !ctx.service.canWrite() ? t('Indisponible : la borne n’a pas encore sa clé de joueur') : undefined;
-      actions.push({
-        label: t('Publier'),
-        detail: why ?? (near.length ? t('Visible de tous tout de suite · si l’une des propositions proches est la même, votez plutôt pour elle') : t('Visible de tous tout de suite · les autres joueurs pourront voter')),
-        icon: 'upload',
-        tone: ready && ctx.service.canWrite() ? 'ok' : 'quiet',
-        key: 'feedback:publish',
-        run: () => (ready && ctx.service.canWrite() ? void send(draft, true, back) : self()),
-      });
+      // Le privé d'abord : un problème signalé reste entre le joueur et l'équipe ; publier est un choix
+      // de plus, nommé comme tel (« en public »). Le bouton mis en avant : privé pour un problème,
+      // publié pour une idée (les autres joueurs votent).
+      const privateReady = Boolean(draft.title || draft.text) && !draft.sending;
+      const publicReady = ready && ctx.service.canWrite();
       actions.push({
         label: t('Envoyer à l’équipe seulement'),
-        detail: draft.sending ? t('Envoi en cours…') : draft.title || draft.text ? t('Privé : rien n’est publié') : t('Indisponible : écrivez d’abord un titre ou une description'),
+        detail: draft.sending ? t('Envoi en cours…') : privateReady ? t('Privé : rien n’est publié') : t('Indisponible : écrivez d’abord un titre ou une description'),
         icon: 'lock',
-        tone: (draft.title || draft.text) && !draft.sending ? undefined : 'quiet',
+        ...(privateReady ? (draft.kind === 'bug' ? { tone: 'ok' as const } : {}) : { tone: 'quiet' as const }),
         key: 'feedback:private',
-        run: () => ((draft.title || draft.text) && !draft.sending ? void send(draft, false, back) : self()),
+        run: () => (privateReady ? void send(draft, false, back) : self()),
+      });
+      actions.push({
+        label: t('Publier en public'),
+        detail: why ?? (near.length ? t('Visible de tous tout de suite · si l’une des propositions proches est la même, votez plutôt pour elle') : t('Visible de tous tout de suite · les autres joueurs pourront voter')),
+        icon: 'upload',
+        ...(publicReady ? (draft.kind === 'bug' ? {} : { tone: 'ok' as const }) : { tone: 'quiet' as const }),
+        key: 'feedback:publish',
+        run: () => (publicReady ? void send(draft, true, back) : self()),
       });
       actions.push({ label: t('Retour'), icon: 'back', run: back });
       const sections: Built['sections'] = [];
@@ -336,7 +341,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         heading: draft.kind === 'bug' ? t('Signaler un problème') : t('Proposer une idée'),
         icon: draft.kind === 'bug' ? 'alert' : 'plus',
         subheading: t('Retours et propositions'),
-        lead: t('Le titre et la description sont publics ; le rapport technique reste privé.'),
+        lead: t('Envoyé à l’équipe seulement, tout reste privé. Publié en public, le titre et la description sont visibles de tous ; le rapport technique reste privé.'),
         hint: t('Flippers : choisir · Start : écrire, changer, envoyer · Exit : revenir'),
         sections,
         actions,
