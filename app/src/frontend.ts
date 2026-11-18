@@ -296,6 +296,8 @@ import { installVpx, vpxArchivePresent } from './install-vpx';
 import { describeVcRuntime, ensureVcRuntime, vcRuntimeReady } from './vc-runtime';
 import { armRecording, type RecordingOutcome, type RecordingRun, type RecordingScreen } from './game-recording';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
+import { rememberLaunch } from './launch-evidence';
+import { restoreVpxFiles, vpxChangedFiles, vpxFilesStatus } from './vpx-integrity';
 import { launchPinballFx, runningPinballFx, ZEN_LAUNCH_GAMES } from './pinballfx-launcher';
 import { detectPinballFx, detectPinballFx3 } from './pinballfx-install';
 import { watchGameLoad, type GameLoadWatch } from './game-load';
@@ -5020,6 +5022,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (watchLive) clearInterval(watchLive);
   gameNotices.close();
   inGameMenu.disarm();
+  // Une partie réussie efface les pièces d'un échec précédent, qui ne partent plus dans un rapport (launch-evidence.ts).
+  if (result.ok) rememberLaunch(result, table.title);
   const load = gameLoad?.stop(playedVr ? 'casque' : 'ecrans');
   if (load) console.log(load);
   stopWaitExit?.();
@@ -5168,8 +5172,11 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     // Toute partie échouée laisse sa trace au journal : le 12/11/2026, trois lancements d'Addams
     // Family arrêtés sur sa fenêtre d'options n'y avaient rien laissé.
     console.log(`Partie (${table.id}) : échec (${result.failure ?? 'inconnu'}) : ${result.message ?? ''}`); // i18n-ignore : journal
+    // VPX arrêté avant d'écrire son journal : ses fichiers sont-ils encore ceux de son archive (vpx-integrity.ts) ?
+    const changedFiles = result.failure === 'crash' && result.logWritten === false ? vpxChangedFiles(loc) : [];
+    rememberLaunch(result, table.title, changedFiles);
     const repaired = result.failure === 'dialog' && result.message ? repairScriptStop(table, result.message) : undefined;
-    const message = explain(result, table, repaired, Boolean(double));
+    const message = explain(result, table, repaired, Boolean(double), changedFiles);
     // Plantage de VPX : le rapport automatique (avec l'accord), ou la question au premier plantage, en quittant l'écran.
     if (result.failure === 'crash' && message.report && library.feedback?.crashed(message.report.signature, table.title, message.report.about)) message.report.consent = true;
     state = { ...state, phase: 'message', message };
@@ -5553,17 +5560,22 @@ function tableScriptText(table: TableEntry): string | undefined {
  * tel, le dossier restant proposé (« Pour aller plus loin »), pas exigé. `repaired` : le script
  * vient d'être corrigé pour le core.vbs actuel (repairScriptStop), la partie suivante démarre.
  */
-function explain(result: LaunchResult, table: TableEntry, repaired?: string, live = false): Message {
+function explain(result: LaunchResult, table: TableEntry, repaired?: string, live = false, changedFiles: readonly string[] = []): Message {
   // Arrêt reconnu dans le journal de VPX (vpxfailure.ts) : la vraie raison, et Start relance la
   // table, ou ouvre la partie entre amis ; jamais « ce qu'il manque pour jouer », rien ne manque.
-  const known = repaired ? undefined : diagnoseVpxFailure(result.logTail, result.exitCode, path.basename(tableScriptFile(table) ?? table.file), tableScriptText(table));
+  const known = repaired ? undefined : diagnoseVpxFailure(result.logTail, result.exitCode, path.basename(tableScriptFile(table) ?? table.file), tableScriptText(table), {
+    ...(result.logWritten !== undefined && { logWritten: result.logWritten }),
+    changedFiles,
+  });
   if (known) {
     console.log(known.journal);
     const lines = [...known.lines];
     if (live) lines.push(t('Partie entre amis : les autres continuent ; votre score compte jusqu’à l’arrêt.'));
     lines.push(...result.notices);
     if (result.logTail.length) lines.push(t('Fin du journal de VPX :'), ...result.logTail.slice(-5));
-    return { title: known.title, lines, action: live ? 'live' : 'replay', table: table.file, report: failureReport(result, table, known.title) };
+    // VPX arrêté en démarrant, ses fichiers modifiés : Start les remet (startVpxInstall).
+    const action: Message['action'] = known.startup && changedFiles.length ? 'install-vpx' : live ? 'live' : 'replay';
+    return { title: known.title, lines, action, table: table.file, report: failureReport(result, table, known.title, known.startup) };
   }
   const lines = [result.message ?? t('Erreur inconnue.')];
   if (repaired) lines.push(t('Cyber Pinball a corrigé le script de la table ({fix}) : relancez-la.', { fix: repaired }));
@@ -5581,12 +5593,13 @@ function explain(result: LaunchResult, table: TableEntry, repaired?: string, liv
 }
 
 /** Ce qu'une partie échouée confie au formulaire des retours : la table, la raison, et de quoi regrouper ce plantage. */
-function failureReport(result: LaunchResult, table: TableEntry, reason: string): Message['report'] {
+function failureReport(result: LaunchResult, table: TableEntry, reason: string, startup = false): Message['report'] {
   const code = vpxExitName(result.exitCode);
   return {
     about: [table.title, code ? t('VPX arrêté : {code}', { code }) : reason].join(' · '),
     table: table.title,
-    signature: crashSignature('vpx', code?.split(',')[0] ?? result.failure ?? 'inconnu', table.id),
+    // Arrêté en démarrant : la panne est celle de VPX, pas de la table ; ses plantages se regroupent, toutes tables.
+    signature: crashSignature('vpx', code?.split(',')[0] ?? result.failure ?? 'inconnu', startup ? 'demarrage' : table.id),
   };
 }
 
@@ -5667,6 +5680,14 @@ function startVpxInstall(): boolean {
   // VPX déjà là sans son runtime (Windows neuf, message du démarrage, Santé de la borne) : le runtime seul.
   if (vpxInstall(loc) && !vcRuntimeReady().ok) {
     askVcRuntime();
+    return true;
+  }
+  // VPX là, mais des fichiers remplacés hors de Cyber Pinball (un autre VPX copié par-dessus) : leurs originaux, tirés de l'archive.
+  if (vpxInstall(loc) && vpxFilesStatus(loc)?.changed.length) {
+    show([t('Préparation…')]);
+    restoreVpxFiles(loc, (received, total) => show([t('Téléchargement : {percent} % ({received} / {total} Mo)', { percent: Math.floor((received / total) * 100), received: Math.round(received / 1e6), total: Math.round(total / 1e6) }), t('Ne débranchez pas la borne.')]), library.downloads.manager)
+      .then((n) => vpxReady(tn(n, 'Le fichier d’origine de VPX est remis.', 'Les {n} fichiers d’origine de VPX sont remis.')))
+      .catch((error: Error) => show([t('Les fichiers de VPX n’ont pas été remis : {error}', { error: error.message }), t('Start : réessayer · Exit : plus tard')], 'install-vpx'));
     return true;
   }
   show([t('Préparation…')]);

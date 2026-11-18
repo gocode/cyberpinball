@@ -21,11 +21,12 @@ export const EXTRACT_TIMEOUT_MS = 10 * 60_000;
  * Extrait une archive zip avec le tar de Windows (bsdtar, présent depuis Windows 10 1803).
  * On appelle celui de System32 explicitement : celui de Git pour Windows ne lit pas les zip.
  */
-export function extractZip(archive: string, destination: string): void {
+export function extractZip(archive: string, destination: string, members: readonly string[] = []): void {
   fs.mkdirSync(destination, { recursive: true });
   const tar = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
   // Jamais sans fin : une archive illisible ou un disque bloqué arrête l'installation avec une erreur.
-  execFileSync(tar, ['-xf', archive, '-C', destination], { stdio: 'ignore', windowsHide: true, timeout: EXTRACT_TIMEOUT_MS });
+  // `members` : seulement ces chemins de l'archive (remise de fichiers d'origine, component-files.ts).
+  execFileSync(tar, ['-xf', archive, '-C', destination, ...members], { stdio: 'ignore', windowsHide: true, timeout: EXTRACT_TIMEOUT_MS });
 }
 
 /** Si l'archive contient un seul dossier de premier niveau, on remonte son contenu. */
@@ -37,10 +38,17 @@ export function flattenSingleFolder(dir: string): void {
   fs.rmdirSync(inner);
 }
 
-export function findExecutable(dir: string, pattern: string): string | undefined {
+/**
+ * L'exécutable du composant dans `dir` : `preferred` (Component.executable) quand il est là, sinon le
+ * premier nom qui répond à `pattern`. Sans cette préférence, un VPX64.exe d'une autre version posé à
+ * côté de VPinballX_BGFX64.exe passait devant lui dans l'ordre alphabétique (« 6 » avant « _ »), et
+ * Cyber Pinball lançait cet autre VPX.
+ */
+export function findExecutable(dir: string, pattern: string, preferred?: string): string | undefined {
   if (!fs.existsSync(dir)) return undefined;
   const re = new RegExp(pattern, 'i');
-  const name = fs.readdirSync(dir).find((f) => re.test(f));
+  const names = fs.readdirSync(dir);
+  const name = (preferred && names.find((f) => f.toLowerCase() === preferred.toLowerCase())) || names.find((f) => re.test(f));
   return name ? path.join(dir, name) : undefined;
 }
 

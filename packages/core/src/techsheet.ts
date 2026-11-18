@@ -88,7 +88,8 @@ export interface TechFacts {
     dof: string[];
   };
   software?: {
-    vpx?: { version?: string; known?: string };
+    /** changedFiles : fichiers modifiés hors de Cyber Pinball (« SDL364.dll 3.2.18.0 »), absents s'ils sont d'origine. */
+    vpx?: { version?: string; known?: string; changedFiles?: string[] };
     /** Plugins de VPX trouvés et leur état dans VPinballX.ini. */
     plugins: { id: string; name: string; enabled: boolean }[];
     pupPacks?: number;
@@ -521,6 +522,12 @@ function softwareBlock(f: TechFacts): TechBlock {
   if (vpx?.version) {
     const newer = vpx.known && vpx.known !== vpx.version;
     play.push({ label: t('Visual Pinball X'), value: vpx.version, detail: newer ? t('{version} disponible, facultative', { version: vpx.known! }) : undefined, state: newer ? 'info' : 'ok' });
+    // Le numéro vient du marqueur d'installation : des fichiers remplacés depuis (un autre VPX par-dessus) le démentent.
+    if (vpx.changedFiles?.length) {
+      const files = vpx.changedFiles.slice(0, 3).join(', ') + (vpx.changedFiles.length > 3 ? '…' : '');
+      play.push({ label: t('Fichiers de VPX'), value: tn(vpx.changedFiles.length, '{n} modifié', '{n} modifiés'), detail: files, state: 'check' });
+      notes.push({ state: 'check', title: t('Fichiers de VPX modifiés hors de Cyber Pinball'), detail: t('{files} : VPX peut s’arrêter dès son démarrage. « Santé de la borne » remet les fichiers d’origine.', { files }) });
+    }
   } else {
     play.push({ label: t('Visual Pinball X'), value: t('Absent'), detail: t('Sans VPX, aucune table ne démarre'), state: 'blocking' });
     notes.push({ state: 'blocking', title: t('VPX n’est pas installé'), detail: t('« Santé de la borne » propose de l’installer.') });

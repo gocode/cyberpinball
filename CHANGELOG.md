@@ -11,6 +11,10 @@ son interface).
 
 ## 0.1.16
 
+- Fichiers de VPX remplacés hors de Cyber Pinball (un autre VPX copié par-dessus) : la Santé de la borne et la fiche technique les nomment, avec leur version, et « Remettre les fichiers d'origine » les reprend dans l'archive vérifiée de VPX, sans toucher au reste du dossier.
+- VPX arrêté avant d'écrire son journal : l'écran d'échec dit « VPX s'est arrêté en démarrant », la panne de VPX et non de la table, et Start remet ses fichiers d'origine quand ils ont changé.
+- Cyber Pinball lance toujours son propre exécutable de VPX, même quand un autre VPX a été posé dans le même dossier.
+- Rapport de plantage : le rapport de VPX (crash.txt, pile d'appels) est joint, et un journal de VPX plus ancien que le lancement est joint sous le nom « partie précédente » au lieu de passer pour celui du plantage.
 - Tableaux des scores : le niveau des joueurs s'affiche aussi sur leurs scores publiés avant l'arrivée des niveaux, d'après leur carte publique.
 - Tableaux des scores et Classements > Joueurs : Start passe à la portée suivante (Amis, National, Mondial), Exit revient ; une borne dont les MagnaSave valident et reviennent dans l'OS peut enfin changer de portée.
 

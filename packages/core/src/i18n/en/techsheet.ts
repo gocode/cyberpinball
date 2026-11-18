@@ -301,4 +301,9 @@ export const messages: Record<string, string> = {
   "le résumé en texte": "the summary as text",
   "le relevé complet de la santé": "the full health reading",
   "le relevé de la fiche technique": "the tech sheet reading",
+  "le rapport de plantage de VPX (pile d’appels)": "the VPX crash report (call stack)",
+  "le journal de VPX d’une partie précédente : VPX s’est arrêté avant d’écrire le sien": "the VPX log of an earlier game: VPX stopped before writing its own",
+  "Fichiers de VPX": "VPX files",
+  "Fichiers de VPX modifiés hors de Cyber Pinball": "VPX files changed outside Cyber Pinball",
+  "{files} : VPX peut s’arrêter dès son démarrage. « Santé de la borne » remet les fichiers d’origine.": "{files}: VPX may stop as soon as it starts. “Cabinet health” puts the original files back.",
 };

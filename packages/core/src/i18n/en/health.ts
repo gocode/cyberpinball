@@ -130,4 +130,8 @@ export const messages: Record<string, string> = {
   'Runtime de Microsoft : {detail}': 'Microsoft runtime: {detail}',
   'Runtime de Microsoft absent de Windows': 'Microsoft runtime missing from Windows',
   'Installer le runtime Visual C++': 'Install the Visual C++ runtime',
+  'VPX {version} : un fichier modifié hors de Cyber Pinball': 'VPX {version}: one file changed outside Cyber Pinball',
+  'VPX {version} : {n} fichiers modifiés hors de Cyber Pinball': 'VPX {version}: {n} files changed outside Cyber Pinball',
+  '{files} : VPX peut s’arrêter dès son démarrage, sur toutes les tables': '{files}: VPX may stop as soon as it starts, on every table',
+  'Remettre les fichiers d’origine': 'Put the original files back',
 };

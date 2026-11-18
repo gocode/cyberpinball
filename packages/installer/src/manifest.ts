@@ -43,6 +43,12 @@ export interface Component {
    */
   executable?: string;
   /**
+   * Taille de chaque exécutable et bibliothèque de l'archive (chemin relatif séparé par des « / ») :
+   * ce qui permet de voir un dossier installé modifié hors de Cyber Pinball (component-files.ts) et
+   * d'en remettre les fichiers d'origine. Rempli par `node scripts/composant-fichiers.mjs <archive>`.
+   */
+  files?: Record<string, number>;
+  /**
    * Ce que l'adaptateur du même id doit savoir de cette version précise
    * (pour VPX : format des noms d'écran, plugins à activer). Lu par l'adaptateur, opaque ici.
    */

@@ -122,8 +122,10 @@ test('application : l’inspector n’est pas posé pour le DMD d’une table sa
 test('écran d’échec : arrêt reconnu = vraie raison, Start rejoue (ou ouvre la partie entre amis), jamais « ce qu’il manque »', () => {
   const front = frontendSource();
   assert.match(front, /const known = repaired \? undefined : diagnoseVpxFailure\(result\.logTail, result\.exitCode,/);
-  assert.match(front, /return \{ title: known\.title, lines, action: live \? 'live' : 'replay', table: table\.file, report: failureReport\(result, table, known\.title\) \};/);
-  assert.match(front, /explain\(result, table, repaired, Boolean\(double\)\)/);
+  // Arrêté en démarrant, fichiers de VPX modifiés : Start les remet (vpx-fichiers-modifies.test.ts) ; sinon rejouer.
+  assert.match(front, /const action: Message\['action'\] = known\.startup && changedFiles\.length \? 'install-vpx' : live \? 'live' : 'replay';/);
+  assert.match(front, /return \{ title: known\.title, lines, action, table: table\.file, report: failureReport\(result, table, known\.title, known\.startup\) \};/);
+  assert.match(front, /explain\(result, table, repaired, Boolean\(double\), changedFiles\)/);
   assert.match(front, /state\.message\?\.action === 'replay' && is\(KEYS\.confirm\)/);
   assert.match(front, /state\.message\?\.action === 'live' && is\(KEYS\.confirm\)/);
   const renderer = fs.readFileSync(path.join(REPO_ROOT, 'app', 'renderer', 'frontend.js'), 'utf8');

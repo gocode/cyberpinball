@@ -295,6 +295,7 @@ import { createHealth } from './health';
 import { collectTechFacts, loadTechFacts, recentErrors, saveTechFacts } from './tech-facts';
 import { createTechSheet } from './tech-sheet';
 import { createFeedbackMenu } from './feedback-menu';
+import { launchAttachments } from './launch-evidence';
 import { isShown, primaryRect, refuseOffscreen } from './offscreen';
 import { installationHints } from './installation-hints';
 import { countDiskReads, describeDiskReads, diskWatchEnabled, type DiskReads } from './build-guard';
@@ -1294,6 +1295,7 @@ export function createLibrary(host: LibraryHost) {
         },
         vpxIniText: () => readTextIfExists(activeVpxIni(locations())),
         vpxVersion: () => host.vpxVersion?.(),
+        vpxChangedFiles: () => health.facts()?.vpx.changedFiles ?? [],
         vpxKnown: () => {
           try {
             return findComponent('vpx').version;
@@ -1378,7 +1380,9 @@ export function createLibrary(host: LibraryHost) {
     const out: { name: string; text: string; about: string }[] = [];
     const log = host.vpxLogFile?.();
     const logText = log ? readTextIfExists(log) : '';
-    if (logText) out.push({ name: 'vpinball.log', text: logText.slice(-1_500_000), about: t('le journal de VPX, dernière partie') }); // i18n-ignore : nom de fichier
+    // Le crash.txt du dernier plantage, et le journal de VPX nommé selon qu'il est celui de ce lancement (launch-evidence.ts).
+    const abouts = { crash: t('le rapport de plantage de VPX (pile d’appels)'), log: t('le journal de VPX, dernière partie'), 'previous-log': t('le journal de VPX d’une partie précédente : VPX s’est arrêté avant d’écrire le sien') };
+    for (const a of launchAttachments(logText.slice(-1_500_000))) out.push({ name: a.name, text: a.text, about: abouts[a.kind] });
     const ini = readTextIfExists(activeVpxIni(locations()));
     if (ini) out.push({ name: 'VPinballX.ini', text: ini, about: t('les réglages de VPX') }); // i18n-ignore : nom de fichier
     const set = loadCabinetSet(host.dataDir);

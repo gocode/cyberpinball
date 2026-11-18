@@ -49,6 +49,7 @@ import {
 import { findComponent } from '@cyberpinball/installer';
 import type { Action, Built, LibraryHost } from './library';
 import { locations, vpxProfile } from './paths';
+import { vpxChangedFiles } from './vpx-integrity';
 import { taskbarFacts } from './screen-guard';
 import { describeVcRuntime, vcRuntimeReady } from './vc-runtime';
 
@@ -151,7 +152,9 @@ export function createHealth(ctx: HealthContext) {
     const layout = ctx.layout();
     const disks = diskFacts({ tables: layout?.tables, downloads: layout?.downloads, data: host.dataDir }, host.diskSpace ?? diskSpace);
     const installed = host.vpxVersion?.();
-    const vpx = { installed, known: knownVpx(), ...(installed && { runtime: runtimeFacts() }) };
+    // Fichiers de VPX remplacés hors de Cyber Pinball (vpx-integrity.ts) : un simple stat de chacun.
+    const changedFiles = installed ? vpxChangedFiles(locations()) : [];
+    const vpx = { installed, known: knownVpx(), ...(installed && { runtime: runtimeFacts() }), ...(changedFiles.length && { changedFiles }) };
     // Barres des tâches que le gardien des écrans a remises derrière le menu depuis le démarrage.
     const screens = host.displays ? { ...screensFacts(loadCabinetSet(host.dataDir), host.displays(), vpxProfile(locations()).profile.displayIdFormat), taskbars: taskbarFacts() } : undefined;
     let tables: HealthFacts['tables'];

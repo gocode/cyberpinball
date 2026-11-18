@@ -21,6 +21,7 @@ export * from './manifest';
 export { downloadComponent } from './download';
 export * from './vpx-settings-schema';
 export * from './vpx-own-plugins';
+export * from './component-files';
 
 const MARKER = '.cyberpinball-component.json';
 const MIN_FREE_BYTES = 2 * 1024 ** 3;
@@ -99,7 +100,7 @@ export function activeComponent(root: string, id: string): { version: string; en
 /** État d'un composant dans la racine, sans rien modifier. */
 export function componentStatus(root: string, component: Component) {
   const paths = componentPaths(root, component.installDir, component.version);
-  const executable = findExecutable(paths.version, component.executablePattern);
+  const executable = findExecutable(paths.version, component.executablePattern, component.executable);
   const currentTarget = isLink(paths.current) ? fs.realpathSync(paths.current) : undefined;
   return {
     paths,
@@ -132,7 +133,7 @@ export async function installComponent(root: string, component: Component, onPro
     fs.rmSync(staging, { recursive: true, force: true });
     extractZip(archive, staging);
     flattenSingleFolder(staging);
-    if (!findExecutable(staging, component.executablePattern)) {
+    if (!findExecutable(staging, component.executablePattern, component.executable)) {
       fs.rmSync(staging, { recursive: true, force: true });
       throw new Error(t("Aucun exécutable correspondant à {pattern} dans l'archive de {name}.", { pattern: component.executablePattern, name: component.name }));
     }
@@ -146,6 +147,6 @@ export async function installComponent(root: string, component: Component, onPro
   }
 
   pointJunction(paths.current, paths.version);
-  const executable = findExecutable(paths.current, component.executablePattern)!;
+  const executable = findExecutable(paths.current, component.executablePattern, component.executable)!;
   return { component, dir: paths.version, current: paths.current, executable, alreadyInstalled: status.installed };
 }

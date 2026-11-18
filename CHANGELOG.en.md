@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- VPX files replaced outside Cyber Pinball (another VPX copied over it): Cabinet health and the tech sheet name them, with their version, and "Put the original files back" takes them from the verified VPX archive, leaving the rest of the folder alone.
+- VPX stopping before writing its log: the failure screen says "VPX stopped while starting", a VPX fault rather than the table's, and Start puts its original files back when they changed.
+- Cyber Pinball always launches its own VPX executable, even when another VPX was put in the same folder.
+- Crash report: the VPX crash report (crash.txt, call stack) is attached, and a VPX log older than the launch is attached as "earlier game" instead of passing for the crash's log.
 - Leaderboards: players' levels now also show on scores published before levels arrived, taken from their public card.
 - Leaderboards and Leaderboards > Players: Start moves to the next scope (Friends, National, World), Exit goes back; a cabinet whose MagnaSave buttons confirm and go back in the OS can finally change scope.
 

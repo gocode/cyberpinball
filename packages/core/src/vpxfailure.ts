@@ -106,6 +106,36 @@ export function vpxShutdownCrash(lines: readonly string[], exitCode: number | nu
   return { dmdProbe };
 }
 
+/** Ce que le lanceur sait du lancement, en plus du journal et du code de sortie. */
+export interface VpxLaunchFacts {
+  /** VPX a écrit son journal pendant ce lancement (launcher.ts) ; faux : arrêté avant. Absent : inconnu. */
+  logWritten?: boolean;
+  /** Fichiers de VPX qui ne sont plus ceux de son archive (component-files.ts), décrits pour le joueur. */
+  changedFiles?: readonly string[];
+}
+
+/**
+ * VPX planté au démarrage, avant d'écrire une ligne de son journal : la table n'a pas encore été lue,
+ * la panne est celle de VPX lui-même (rapports du 17/11/2026 : Demolition Man et Diablo arrêtés en
+ * 0,2 s, le dossier de VPX modifié hors de Cyber Pinball). Jamais un arrêt faute de bibliothèque
+ * (vpxMissingLibrary, son propre écran), ni un code inconnu.
+ */
+export function vpxStartupCrash(exitCode: number | null | undefined, launch: VpxLaunchFacts): ((exit: string, file: string) => VpxFailureDiagnosis) | undefined {
+  if (launch.logWritten !== false || exitCode === null || exitCode === undefined || !EXIT_NAMES[exitCode >>> 0]) return undefined;
+  const changed = launch.changedFiles ?? [];
+  return (exit, file) => ({
+    title: t('VPX s’est arrêté en démarrant'),
+    lines: [
+      t('VPX s’est arrêté ({exit}) avant d’écrire la moindre ligne de son journal : il n’avait pas encore ouvert la table. La panne vient de VPX, pas de cette table.', { exit }),
+      changed.length
+        ? t('Des fichiers de VPX ont été remplacés hors de Cyber Pinball : {files}. Start : remettre ses fichiers d’origine.', { files: changed.slice(0, 3).join(', ') + (changed.length > 3 ? '…' : '') })
+        : t('Menu système > Borne > « Santé de la borne » vérifie VPX et ses fichiers.'),
+    ],
+    journal: `VPX arrêté au démarrage, avant son journal (${file}) : ${exit}${changed.length ? ` ; fichiers de VPX modifiés : ${changed.join(', ')}` : ''}.`, // i18n-ignore : journal
+    startup: true,
+  });
+}
+
 /** Ce que dit l'écran d'échec, et la ligne du journal de Cyber Pinball, pour un arrêt reconnu. */
 export interface VpxFailureDiagnosis {
   /** Titre de l'écran : la vraie raison. */
@@ -115,16 +145,26 @@ export interface VpxFailureDiagnosis {
   /** Ligne du journal de Cyber Pinball (en français, pour le diagnostic à distance). */
   journal: string;
   scriptError?: VpxScriptError;
+  /** Arrêté au démarrage, avant son journal (vpxStartupCrash) : la panne est celle de VPX, toutes tables. */
+  startup?: true;
 }
 
 /**
  * La règle : une erreur du script de la table dans la fin du journal de VPX, ou un code de sortie
  * connu. undefined : rien de reconnu (l'écran garde son explication habituelle).
  */
-export function diagnoseVpxFailure(logTail: readonly string[], exitCode: number | null | undefined, file: string, script?: string): VpxFailureDiagnosis | undefined {
+export function diagnoseVpxFailure(
+  logTail: readonly string[],
+  exitCode: number | null | undefined,
+  file: string,
+  script?: string,
+  launch: VpxLaunchFacts = {},
+): VpxFailureDiagnosis | undefined {
   const error = vpxScriptError(logTail.slice(-SCRIPT_ERROR_LINES), script);
   const exit = vpxExitName(exitCode);
   if (!error && !exit) return undefined;
+  const early = !error && !vpxMissingLibrary(exitCode) ? vpxStartupCrash(exitCode, launch) : undefined;
+  if (early && exit) return early(exit, file);
   // Planté en se fermant : la partie s'est jouée, rien n'est à réparer dans la table.
   const shutdown = !error ? vpxShutdownCrash(logTail, exitCode) : undefined;
   if (shutdown && exit) {

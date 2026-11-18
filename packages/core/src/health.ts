@@ -149,6 +149,11 @@ export interface VpxFacts {
   known?: string;
   /** Runtime Visual C++ de Windows (vc-runtime.ts) : absent ou trop ancien, VPX ne démarre pas. */
   runtime?: { ok: boolean; detail?: string };
+  /**
+   * Fichiers de VPX qui ne sont plus ceux de son archive (un autre VPX copié par-dessus), décrits :
+   * « SDL364.dll 3.2.18.0 ». VPX peut alors s'arrêter dès son démarrage, sur toutes les tables.
+   */
+  changedFiles?: string[];
 }
 
 /**
@@ -748,6 +753,19 @@ export function vpxLines(facts: VpxFacts): HealthLine[] {
         title: t('Il manque le runtime Visual C++ : VPX ne démarre pas'),
         detail: facts.runtime.detail ? t('Runtime de Microsoft : {detail}', { detail: facts.runtime.detail }) : t('Runtime de Microsoft absent de Windows'),
         go: t('Installer le runtime Visual C++'),
+        target: { kind: 'install-vpx' },
+      },
+    ];
+  }
+  if (facts.changedFiles?.length) {
+    const files = facts.changedFiles.slice(0, 3).join(', ') + (facts.changedFiles.length > 3 ? '…' : '');
+    return [
+      {
+        check: 'vpx',
+        state: 'check',
+        title: tn(facts.changedFiles.length, 'VPX {version} : un fichier modifié hors de Cyber Pinball', 'VPX {version} : {n} fichiers modifiés hors de Cyber Pinball', { version: facts.installed }),
+        detail: t('{files} : VPX peut s’arrêter dès son démarrage, sur toutes les tables', { files }),
+        go: t('Remettre les fichiers d’origine'),
         target: { kind: 'install-vpx' },
       },
     ];

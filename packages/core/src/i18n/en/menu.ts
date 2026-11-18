@@ -549,4 +549,11 @@ export const messages: Record<string, string> = {
   'Le runtime Visual C++ de Microsoft est installé : VPX peut démarrer.': 'Microsoft’s Visual C++ runtime is installed: VPX can start.',
   'Le runtime Visual C++ n’est pas installé : {reason}.': 'The Visual C++ runtime is not installed: {reason}.',
   '{name} s’installe par l’installateur de son éditeur, pas par extraction.': '{name} is installed by its publisher’s installer, not by extraction.',
+  'VPX s’est arrêté en démarrant': 'VPX stopped while starting',
+  'VPX s’est arrêté ({exit}) avant d’écrire la moindre ligne de son journal : il n’avait pas encore ouvert la table. La panne vient de VPX, pas de cette table.': 'VPX stopped ({exit}) before writing a single line of its log: it had not opened the table yet. The fault is in VPX, not in this table.',
+  'Des fichiers de VPX ont été remplacés hors de Cyber Pinball : {files}. Start : remettre ses fichiers d’origine.': 'Some VPX files were replaced outside Cyber Pinball: {files}. Start: put its original files back.',
+  'Menu système > Borne > « Santé de la borne » vérifie VPX et ses fichiers.': 'System menu > Cabinet > “Cabinet health” checks VPX and its files.',
+  'Le fichier d’origine de VPX est remis.': 'The original VPX file is back.',
+  'Les {n} fichiers d’origine de VPX sont remis.': 'The {n} original VPX files are back.',
+  'Les fichiers de VPX n’ont pas été remis : {error}': 'The VPX files were not put back: {error}',
 };

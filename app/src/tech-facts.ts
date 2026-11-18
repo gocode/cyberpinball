@@ -234,6 +234,8 @@ export interface TechCollectContext {
   vpxIniText(): string;
   vpxVersion(): string | undefined;
   vpxKnown(): string | undefined;
+  /** Fichiers de VPX modifiés hors de Cyber Pinball (vpx-integrity.ts), décrits ; vide : d'origine. */
+  vpxChangedFiles?(): string[];
   vcRuntime(): { ok: boolean; detail?: string } | undefined;
   /** Périphériques USB branchés (Pinscape, contrôleurs DOF). */
   usbPinscape(): boolean;
@@ -271,7 +273,7 @@ export async function collectTechFacts(ctx: TechCollectContext): Promise<TechFac
   };
   const iniText = ctx.vpxIniText();
   const software: TechFacts['software'] = {
-    vpx: { version: ctx.vpxVersion(), known: ctx.vpxKnown() },
+    vpx: { version: ctx.vpxVersion(), known: ctx.vpxKnown(), ...(ctx.vpxChangedFiles?.().length && { changedFiles: ctx.vpxChangedFiles!() }) },
     plugins: vpxPlugins(ctx.vpxDir(), iniText),
     ...(ctx.pupPacks() !== undefined && { pupPacks: ctx.pupPacks() }),
   };

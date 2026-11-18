@@ -57,8 +57,19 @@ export interface LaunchResult {
   vr?: boolean;
   /** Fenêtres de VPX autres que celles du jeu : masquées, fermées ou laissées, une phrase chacune. */
   notices: string[];
+  /** Fin du journal de VPX, seulement s'il l'a écrit pendant ce lancement (jamais celui d'une partie précédente). */
   logTail: string[];
+  /**
+   * VPX a-t-il écrit son journal pendant ce lancement ? Faux : il s'est arrêté avant d'en écrire une
+   * ligne (rapports du 17/11/2026, dossier de VPX modifié). Absent : partie simulée, rien à dire.
+   */
+  logWritten?: boolean;
+  /** Le crash.txt que VPX a écrit à côté de la table en plantant (pile d'appels, modules), pour le rapport. */
+  crashReport?: string;
 }
+
+/** Taille gardée du crash.txt de VPX : sa pile et ses modules tiennent en quelques dizaines de Ko. */
+const CRASH_REPORT_MAX = 200_000;
 
 export interface LaunchOptions {
   exe: string;
@@ -235,6 +246,13 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
       clearInterval(poll);
       if (killTimer) clearTimeout(killTimer);
       const crash = newCrashReport(opts.table, t0);
+      const logWritten = logWrittenSince(opts.vpxPrefDir, t0);
+      let crashReport: string | undefined;
+      try {
+        crashReport = crash ? fs.readFileSync(crash, 'utf8').slice(0, CRASH_REPORT_MAX) : undefined;
+      } catch {
+        crashReport = undefined;
+      }
       if (!failure && crash) {
         failure = 'crash';
         message = t("VPX s'est arrêté brutalement (rapport : {file}).", { file: crash });
@@ -254,7 +272,9 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
         loadSeconds: playingSince ? (playingSince - t0) / 1000 : undefined,
         ...(player?.title === VR_PREVIEW_TITLE && { vr: true }),
         notices,
-        logTail: failure ? readLogTail(opts.vpxPrefDir) : [],
+        logTail: failure && logWritten ? readLogTail(opts.vpxPrefDir) : [],
+        logWritten,
+        ...(crashReport && { crashReport }),
       });
     };
     child.on('exit', (code) => finish(code));
@@ -325,6 +345,20 @@ function newCrashReport(table: string, since: number): string | undefined {
     return fs.statSync(file).mtimeMs >= since ? file : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * VPX a-t-il écrit son journal depuis `since` (le lancement) ? Il l'ouvre dès son démarrage ; un
+ * journal plus ancien est celui d'une partie précédente, qui ne dit rien de cet arrêt (rapports du
+ * 17/11/2026 : le journal joint datait de la partie d'avant et égarait la lecture).
+ */
+export function logWrittenSince(prefDir: string, since: number): boolean {
+  try {
+    // Une seconde de marge : la date d'un fichier n'est pas à la milliseconde sur tous les disques.
+    return fs.statSync(path.join(prefDir, 'vpinball.log')).mtimeMs >= since - 1000;
+  } catch {
+    return false;
   }
 }
 
