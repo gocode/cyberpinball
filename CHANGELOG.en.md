@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Phone, What's new: the cabinet's timeline on the phone too. The date and version head each day; each line has its thread and dot (green while it is new), its description, its "New" and "BETA" badges, its reactions at a glance and its small preview.
+- Phone, an opened news item: its date, version, preview, full text and where to find it. The seven reactions are chips side by side, with each one's player count and yours highlighted; they used to be stacked one under the other, with no count.
 - LED and feedback (DOF): a configtool configuration with addressable LEDs (directoutputconfig30.ini…) but no Cabinet.xml saying where they are connected is now reported, on the screen and in the Cabinet health, with the likely serial port of their controller (Teensy, or the CH340/CP210x bridge of a Wemos D1 or an ESP32). Until now the screen said "Nothing prevents DOF from lighting the cabinet" while the strips stayed dark; "Addressable LED strips…" now starts from that port.
 - Real DMD: a common USB-serial bridge (CH340, CP210x) is no longer turned on as a ZeDMD by default when it did not answer like a ZeDMD in the last game, when the DOF Cabinet.xml points to it, or when addressable LEDs are still waiting for their controller. The Real DMD screen shows it for what it is ("COM3: USB-serial bridge, not a ZeDMD"); "ZeDMD: yes" overrides it.
 - LED and feedback (DOF): reusing the old DOF configuration also reuses its Cabinet.xml when it has addressable LEDs, if it is consistent and its ports are connected.

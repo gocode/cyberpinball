@@ -27,6 +27,7 @@ import {
   remoteMenuTree,
   toRemoteEntry,
   remoteLayout,
+  type RemoteEntry,
   type RemoteMenus,
   type SystemEntryId,
   type SystemGroupId,
@@ -5666,22 +5667,43 @@ export function createLibrary(host: LibraryHost) {
     // (actionsTitle). Le téléphone range de même : jamais une liste et ses options mêlées.
     const rowOf = new Map<number, { row: Row; section: Section }>();
     for (const sec of built.sections) for (const row of sec.rows) if (row.action !== undefined && !rowOf.has(row.action)) rowOf.set(row.action, { row, section: sec });
-    const placed = (index: number, back: boolean): { zone?: 'options' | 'list' | 'actions'; group?: string; art?: { thumb: string }; chosen?: true; layout?: 'chips' } => {
+    const placed = (index: number, back: boolean): Partial<Pick<RemoteEntry, 'zone' | 'group' | 'chosen' | 'layout' | 'count' | 'emoji' | 'timeline'>> & { art?: { thumb: string } } => {
       const at = rowOf.get(index);
       if (!at) return !back && built.actionsTitle ? { zone: 'actions', group: built.actionsTitle } : {};
       const thumb = at.row.thumb?.startsWith('cyber-media:') ? at.row.thumb : undefined;
+      const chips = remoteLayout(at.section.kind) === 'chips';
+      const n = at.row.news;
       return {
         ...(at.section.options ? { zone: 'options' as const } : at.section.title ? { zone: 'list' as const, group: at.section.title } : {}),
         ...(thumb ? { art: { thumb } } : {}),
         ...(at.row.current ? { chosen: true as const } : {}),
         // Badges au téléphone aussi (phrases préparées, réactions) : jamais une grande case par phrase.
-        ...(remoteLayout(at.section.kind) === 'chips' ? { layout: 'chips' as const } : {}),
+        // Le nombre de la tuile (les joueurs d'une réaction) part avec le badge.
+        ...(chips ? { layout: 'chips' as const, ...(at.row.badges?.[0] ? { count: at.row.badges[0] } : {}), ...(at.row.emoji ? { emoji: at.row.emoji } : {}) } : {}),
+        // Une ligne des Nouveautés : la chronologie de la borne, date, version, repères et réactions.
+        ...(n
+          ? {
+              timeline: {
+                date: n.date,
+                version: n.version,
+                first: n.first,
+                last: n.last,
+                ...(n.unread ? { unread: true } : {}),
+                badges: n.badges,
+                ...(n.reactions ? { reacts: { faces: n.reactions.emojis.join(''), total: n.reactions.total, mine: n.reactions.mine, label: n.reactions.label } } : {}),
+                ...(n.preview ? { image: n.preview } : {}),
+              },
+            }
+          : {}),
       };
     };
+    const page = built.newsPage;
     return {
       kind: 'screen',
       title: built.heading,
       ...(icon ? { icon } : {}),
+      ...(built.subheading ? { lead: built.subheading } : {}),
+      ...(page ? { page: { ...(page.preview ? { image: page.preview } : {}), lines: page.lines, where: page.where, ...(page.note ? { note: page.note } : {}) } } : {}),
       ...(built.variant?.split(' ').includes('jukebox') ? { area: 'jukebox' as const } : {}),
       items: built.actions.map((a, index) => {
         const back = a.run === built.back;

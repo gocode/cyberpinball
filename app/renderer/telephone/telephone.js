@@ -438,14 +438,24 @@ function chipStrip(items, { lines = 2, className = '' } = {}) {
   for (const it of items) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = `chip${it.current ? ' current' : ''}`;
+    b.className = `chip${it.current ? ' current' : ''}${it.mine ? ' mine' : ''}${it.emoji ? ' emoji' : ''}`;
+    if (it.i !== undefined) b.dataset.i = String(it.i);
     // Le texte dans sa propre boîte, coupée au bout : le badge, lui, ne coupe rien, et sa zone de toucher
-    // (::after, 48 px de haut) déborde du dessin.
+    // (::after, 48 px de haut) déborde du dessin. Un badge à emoji (une réaction) montre l'emoji seul ;
+    // son nom reste dans aria-label et au toucher long (title).
     const text = document.createElement('span');
     text.className = 'chip-text';
-    text.textContent = it.label;
+    text.textContent = it.emoji || it.label;
+    if (it.emoji) b.title = it.label;
     b.append(text);
-    b.setAttribute('aria-label', it.label);
+    // Son nombre (les joueurs d'une réaction), à côté du libellé.
+    if (it.count) {
+      const count = document.createElement('b');
+      count.className = 'chip-count';
+      count.textContent = it.count;
+      b.append(count);
+    }
+    b.setAttribute('aria-label', it.count ? `${it.label} ${it.count}` : it.label);
     if (it.current) b.setAttribute('aria-current', 'true');
     if (it.disabled) b.disabled = true;
     b.addEventListener('click', () => {
@@ -555,6 +565,9 @@ function renderEntries() {
     let group;
     let chips;
     const rows = [];
+    // Le sous-titre de l'écran (la date et la version d'une nouveauté), puis une page de texte : avant les entrées.
+    if (!grid && e.lead) rows.push(leadRow(e.lead));
+    if (!grid && e.page) rows.push(pageCard(e.page));
     e.items.forEach((item, i) => {
       const newGroup = item.group !== group;
       if (!grid && item.group && newGroup) rows.push(groupTitle(item.group));
@@ -565,11 +578,21 @@ function renderEntries() {
           chips = [];
           rows.push({ chips });
         }
-        chips.push({ label: item.label, current: i === e.current, run: run(i) });
+        chips.push({ label: item.label, emoji: item.emoji, count: item.count, mine: item.chosen, current: i === e.current, run: run(i), i });
         return;
       }
       chips = undefined;
-      rows.push(grid ? tableCard(item, i === e.current, run(i)) : entryRow(item, { icons, medals, current: i === e.current, run: run(i) }));
+      // Une ligne des Nouveautés : la chronologie, comme à la borne.
+      if (!grid && item.timeline) {
+        const row = timelineRow(item, i, i === e.current, run(i));
+        // Le fil part du premier point de la chronologie.
+        if (!rows.some((r) => r.classList?.contains('tl-item'))) row.classList.add('tl-start');
+        rows.push(row);
+        return;
+      }
+      const row = grid ? tableCard(item, i === e.current, run(i)) : entryRow(item, { icons, medals, current: i === e.current, run: run(i) });
+      row.firstElementChild.dataset.i = String(i);
+      rows.push(row);
     });
     rows.forEach((r, k) => {
       if (!r.chips) return;
@@ -583,6 +606,136 @@ function renderEntries() {
   }
   renderTools();
   syncLayout();
+}
+
+/** Le sous-titre de l'écran de la borne (« 17 novembre 2026 · version 0.1.16 »). */
+function leadRow(text) {
+  const li = document.createElement('li');
+  li.className = 'entry-lead';
+  li.textContent = text;
+  return li;
+}
+
+/** Une page de texte ouverte à la borne (une nouveauté agrandie) : son aperçu, son texte entier, où la trouver. */
+function pageCard(p) {
+  const li = document.createElement('li');
+  li.className = 'entry-page';
+  if (p.image) {
+    const img = document.createElement('img');
+    img.className = 'page-shot';
+    img.alt = '';
+    img.draggable = false;
+    img.decoding = 'async';
+    img.addEventListener('error', () => img.remove());
+    img.src = `/${p.image}`;
+    li.append(img);
+  }
+  for (const line of p.lines) {
+    const para = document.createElement('p');
+    para.className = 'page-line';
+    para.textContent = line;
+    li.append(para);
+  }
+  if (p.where) {
+    const where = document.createElement('p');
+    where.className = 'page-where';
+    where.textContent = p.where;
+    li.append(where);
+  }
+  if (p.note) {
+    const note = document.createElement('p');
+    note.className = 'page-note';
+    note.textContent = p.note;
+    li.append(note);
+  }
+  return li;
+}
+
+/**
+ * Une ligne de la chronologie des Nouveautés : la date et la version en tête de leur jour, le fil et
+ * son point (vert tant qu'elle est nouvelle), puis le bloc à toucher : titre, « Nouveau », « BÊTA »,
+ * réactions en bref, description, petit aperçu. Comme la chronologie de la borne, resserrée en largeur.
+ */
+function timelineRow(item, i, current, run) {
+  const n = item.timeline;
+  const li = document.createElement('li');
+  li.className = `tl-item${n.first ? ' first' : ''}${n.last ? ' last' : ''}${n.unread ? ' unread' : ''}`;
+  if (n.first) {
+    const day = document.createElement('div');
+    day.className = 'tl-day';
+    const date = document.createElement('b');
+    date.textContent = n.date;
+    day.append(date);
+    if (n.version) {
+      const version = document.createElement('span');
+      version.textContent = n.version;
+      day.append(version);
+    }
+    li.append(day);
+  }
+  const rail = document.createElement('span');
+  rail.className = 'tl-rail';
+  rail.setAttribute('aria-hidden', 'true');
+  rail.append(document.createElement('i'));
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = `entry tl-block${current ? ' current' : ''}`;
+  b.dataset.i = String(i);
+  if (current) b.setAttribute('aria-current', 'true');
+  const text = document.createElement('span');
+  text.className = 'entry-text';
+  const head = document.createElement('span');
+  head.className = 'tl-head';
+  const title = document.createElement('span');
+  title.className = 'entry-label';
+  title.textContent = item.label;
+  head.append(title);
+  for (const badge of n.badges ?? []) {
+    const mark = document.createElement('span');
+    mark.className = `tl-badge ${badge.kind}`;
+    mark.textContent = badge.text;
+    head.append(mark);
+  }
+  text.append(head);
+  if (item.detail) {
+    const detail = document.createElement('span');
+    detail.className = 'tl-detail';
+    detail.textContent = item.detail;
+    text.append(detail);
+  }
+  if (n.reacts) {
+    const r = document.createElement('span');
+    r.className = `tl-reacts${n.reacts.mine ? ' mine' : ''}`;
+    r.setAttribute('aria-label', n.reacts.label);
+    const faces = document.createElement('span');
+    faces.className = 'tl-faces';
+    faces.textContent = n.reacts.faces;
+    const total = document.createElement('b');
+    total.textContent = String(n.reacts.total);
+    r.append(faces, total);
+    text.append(r);
+  }
+  b.append(text);
+  if (n.image) {
+    const img = document.createElement('img');
+    img.className = 'tl-thumb';
+    img.alt = '';
+    img.draggable = false;
+    img.decoding = 'async';
+    img.addEventListener('error', () => img.remove());
+    img.src = `/${n.image}`;
+    b.append(img);
+  }
+  b.addEventListener('click', () => {
+    if (state !== 'paired') return;
+    if (navigator.vibrate) navigator.vibrate(12);
+    run(b);
+  });
+  const line = document.createElement('div');
+  line.className = 'tl-line';
+  line.append(rail, b);
+  li.append(line);
+  return li;
 }
 
 /** Le titre d'un groupe d'entrées (« Playlists », « Néon nocturne · YouTube »). */
@@ -689,9 +842,9 @@ $('grid-toggle').addEventListener('click', () => {
 
 /** L'entrée choisie à la borne a changé (flipper) : seulement son repère, la liste ne se redessine pas. */
 function markCurrent() {
-  const rows = $('entries-list').querySelectorAll('li:not(.entry-group) > .entry');
-  rows.forEach((b, i) => {
-    const on = i === entries?.current;
+  // Chaque entrée porte son rang (data-i) : une bande de badges ou une page de texte ne décale rien.
+  $('entries-list').querySelectorAll('[data-i]').forEach((b) => {
+    const on = Number(b.dataset.i) === entries?.current;
     b.classList.toggle('current', on);
     if (on) b.setAttribute('aria-current', 'true');
     else b.removeAttribute('aria-current');
@@ -701,7 +854,7 @@ function markCurrent() {
 
 function scrollToCurrent() {
   if (view !== 'list') return;
-  $('entries-list').querySelector('.entry.current')?.scrollIntoView({ block: 'nearest' });
+  $('entries-list').querySelector('[data-i].current')?.scrollIntoView({ block: 'nearest' });
 }
 
 /** La rubrique montrée dans la vue Menus (les rubriques ouvertes qui n'existent plus sont refermées). */
@@ -1173,6 +1326,9 @@ function handle(m) {
         items: Array.isArray(m.items) ? m.items : [],
         current: Number.isInteger(m.current) ? m.current : -1,
         note: typeof m.note === 'string' ? m.note : '',
+        // Le sous-titre de l'écran et une page de texte (une nouveauté ouverte) : montrés avant les entrées.
+        lead: typeof m.lead === 'string' ? m.lead : '',
+        page: m.page && Array.isArray(m.page.lines) ? m.page : undefined,
         inGame: m.inGame === true || typeof m.inGame === 'string' ? m.inGame : undefined,
         collections: m.collections && Array.isArray(m.collections.items) ? m.collections : undefined,
         area: m.area === 'jukebox' ? 'jukebox' : undefined,

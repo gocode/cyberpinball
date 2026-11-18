@@ -50,10 +50,71 @@ export interface RemoteEntry {
    * Tiré du rôle de sa section à la borne (remoteLayout).
    */
   layout?: RemoteLayout;
+  /** Un badge (`layout` « chips ») : son nombre, dessiné à côté du libellé (les joueurs d'une réaction). */
+  count?: string;
+  /**
+   * Un badge dessiné par son emoji (une tuile de réaction à la borne) : le téléphone le montre à la
+   * place du libellé, qui reste pour le lecteur d'écran. Les sept tiennent ainsi sans défiler.
+   */
+  emoji?: string;
+  /** Une ligne de chronologie (les Nouveautés) : le téléphone la dessine comme la borne, date, fil et bloc. */
+  timeline?: RemoteTimeline;
 }
 
 /** Dessin d'une entrée au téléphone autre qu'une ligne de liste. */
 export type RemoteLayout = 'chips';
+
+/**
+ * Une ligne de la chronologie des Nouveautés au téléphone (Row.news à la borne) : la date et la
+ * version, montrées sur la première ligne de leur jour ; « Nouveau » et « BÊTA » ; les réactions en
+ * bref ; l'aperçu (`image`, un fichier des Nouveautés livré avec l'application, jamais un autre chemin).
+ */
+export interface RemoteTimeline {
+  date: string;
+  version?: string;
+  first?: boolean;
+  last?: boolean;
+  unread?: boolean;
+  badges?: { text: string; kind: 'new' | 'beta' }[];
+  reacts?: { faces: string; total: number; mine?: boolean; label: string };
+  image?: string;
+}
+
+/** Une page de texte ouverte à la borne (une nouveauté agrandie) : son aperçu, son texte, où la trouver, l'état des réactions. */
+export interface RemoteTextPage {
+  image?: string;
+  lines: string[];
+  where?: string;
+  note?: string;
+}
+
+/** Un aperçu des Nouveautés (app/renderer/nouveautes), servi au téléphone sous le même nom ; rien d'autre. */
+export const REMOTE_NEWS_IMAGE = /^nouveautes\/[a-z0-9-]{1,60}-(?:fr|en)\.webp$/;
+const newsImage = (src: unknown): string | undefined => (typeof src === 'string' && REMOTE_NEWS_IMAGE.test(src) ? src : undefined);
+
+function remoteTimeline(n: RemoteTimeline): RemoteTimeline {
+  const image = newsImage(n.image);
+  return {
+    date: remoteText(n.date, 40),
+    ...(n.version ? { version: remoteText(n.version, 40) } : {}),
+    ...(n.first ? { first: true } : {}),
+    ...(n.last ? { last: true } : {}),
+    ...(n.unread ? { unread: true } : {}),
+    ...(n.badges?.length ? { badges: n.badges.slice(0, 4).map((b) => ({ text: remoteText(b.text, 24), kind: b.kind === 'beta' ? ('beta' as const) : ('new' as const) })) } : {}),
+    ...(n.reacts ? { reacts: { faces: remoteText(n.reacts.faces, 24), total: Math.max(0, Math.floor(Number(n.reacts.total) || 0)), ...(n.reacts.mine ? { mine: true } : {}), label: remoteText(n.reacts.label, 80) } } : {}),
+    ...(image ? { image } : {}),
+  };
+}
+
+function remoteTextPage(p: RemoteTextPage): RemoteTextPage {
+  const image = newsImage(p.image);
+  return {
+    ...(image ? { image } : {}),
+    lines: p.lines.slice(0, 20).map((l) => remoteText(l, 600)),
+    ...(p.where ? { where: remoteText(p.where, 200) } : {}),
+    ...(p.note ? { note: remoteText(p.note, 200) } : {}),
+  };
+}
 
 /**
  * Le dessin au téléphone de chaque rôle de section (Section.kind) que la borne dessine ou range à part
@@ -68,6 +129,10 @@ export const REMOTE_SECTION_LAYOUT: Readonly<Record<string, RemoteLayout | 'rows
   // à la borne, des textes courts à choisir d'un appui au téléphone.
   phrases: 'chips',
   reactions: 'chips',
+  // Les réactions d'une nouveauté : des tuiles côte à côte à la borne, des badges au téléphone (elles y
+  // tombaient l'une sous l'autre, 18/11/2026).
+  'news-reactions': 'chips',
+  // La chronologie : des lignes, dessinées en chronologie au téléphone aussi (RemoteEntry.timeline).
   news: 'rows',
   players: 'rows',
 };
@@ -105,6 +170,10 @@ export interface RemoteEntries {
   current: number;
   /** Une phrase sous le titre : ce qui se passe (opération en cours), ou quoi faire (« Touchez une table, puis encore pour… »). */
   note?: string;
+  /** Le sous-titre de l'écran à la borne (Built.subheading) : « 17 novembre 2026 · version 0.1.16 ». */
+  lead?: string;
+  /** Une page de texte (une nouveauté agrandie) : montrée avant les entrées. */
+  page?: RemoteTextPage;
   /**
    * Pendant une partie, les boutons du téléphone pilotent le menu ouvert (réglages en partie) ;
    * sans cela, ils ne font rien (VPX a les boutons).
@@ -179,12 +248,22 @@ export function remoteEntries(e: RemoteEntries): RemoteEntries {
     const wheel = art?.wheel && REMOTE_IMAGE.test(art.wheel) ? art.wheel : undefined;
     const media = art?.media && REMOTE_IMAGE.test(art.media) ? art.media : undefined;
     const thumb = art?.thumb && REMOTE_IMAGE.test(art.thumb) ? art.thumb : undefined;
-    const { layout, ...rest } = item;
-    const known = layout === 'chips' ? { layout } : {};
-    const bounded = rest.group ? { ...rest, ...known, group: remoteText(rest.group, GROUP_MAX) } : { ...rest, ...known };
+    const { layout, count, emoji, timeline, ...rest } = item;
+    const known = layout === 'chips' ? { layout, ...(count ? { count: remoteText(count, 12) } : {}), ...(emoji ? { emoji: remoteText(emoji, 16) } : {}) } : {};
+    const line = timeline ? { timeline: remoteTimeline(timeline) } : {};
+    const bounded = rest.group ? { ...rest, ...known, ...line, group: remoteText(rest.group, GROUP_MAX) } : { ...rest, ...known, ...line };
     return wheel || media || thumb ? { ...bounded, art: { ...(wheel ? { wheel } : {}), ...(media ? { media } : {}), ...(thumb ? { thumb } : {}) } } : bounded;
   });
-  return { ...e, title: remoteText(e.title, LABEL_MAX), ...(e.note ? { note: remoteText(e.note, 300) } : {}), items, current: e.current >= 0 && e.current < items.length ? e.current : -1 };
+  const { lead, page, ...rest } = e;
+  return {
+    ...rest,
+    title: remoteText(e.title, LABEL_MAX),
+    ...(e.note ? { note: remoteText(e.note, 300) } : {}),
+    ...(lead ? { lead: remoteText(lead, 200) } : {}),
+    ...(page ? { page: remoteTextPage(page) } : {}),
+    items,
+    current: e.current >= 0 && e.current < items.length ? e.current : -1,
+  };
 }
 
 /**

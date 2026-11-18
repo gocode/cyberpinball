@@ -110,6 +110,7 @@ import {
   type RemoteGroupAct,
   type RemoteInstantAct,
   type RemotePage,
+  REMOTE_NEWS_IMAGE,
   mediaPathFromUrl,
   type KeptPhone,
   type KeptPhones,
@@ -951,7 +952,9 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     // Un drapeau (deux lettres, ou Cyber Pinball), ou une image sous son jeton (pastille, pochette, miniature) ; rien d'autre du disque.
     const flag = FLAG_PATH.exec(url);
     const token = IMAGE_PATH.exec(url)?.[1];
-    const image: RemoteImage | undefined = flag ? { file: path.join(rendererDir, 'drapeaux', `${flag[1]}.svg`) } : token ? images.get(token) : undefined;
+    // L'aperçu d'une nouveauté (app/renderer/nouveautes), sous son propre nom : livré avec l'application.
+    const news = REMOTE_NEWS_IMAGE.test(url.slice(1)) ? url.slice(1) : undefined;
+    const image: RemoteImage | undefined = flag ? { file: path.join(rendererDir, 'drapeaux', `${flag[1]}.svg`) } : news ? { file: path.join(rendererDir, news) } : token ? images.get(token) : undefined;
     if (image) {
       readImage(image, token, (body, type) => {
         if (!body) return void res.writeHead(404, { ...headers, 'Content-Type': 'text/plain; charset=utf-8' }).end();

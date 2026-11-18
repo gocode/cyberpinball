@@ -11,6 +11,8 @@ son interface).
 
 ## 0.1.16
 
+- Téléphone, Nouveautés : la chronologie de la borne au téléphone aussi. La date et la version sont en tête de chaque jour ; chaque ligne a son fil et son point (vert tant qu'elle est nouvelle), sa description, ses badges « Nouveau » et « BÊTA », ses réactions en bref et son petit aperçu.
+- Téléphone, une nouveauté ouverte : sa date, sa version, son aperçu, son texte entier et où la trouver. Les sept réactions sont des badges côte à côte, avec le nombre de joueurs de chacune et la vôtre repérée ; elles tombaient l'une sous l'autre, sans nombre.
 - LED et retours (DOF) : une configuration du configtool qui a des LED adressables (directoutputconfig30.ini…) sans Cabinet.xml pour dire où elles sont branchées est signalée, à l'écran et dans la Santé de la borne, avec le port série probable de leur contrôleur (Teensy, ou pont CH340/CP210x d'une Wemos D1 ou d'un ESP32). Jusqu'ici l'écran disait « Rien n'empêche DOF d'allumer la borne » alors que les bandes restaient éteintes ; « Bandes de LED adressables… » part maintenant de ce port.
 - DMD réel : un pont USB-série courant (CH340, CP210x) n'est plus allumé d'office comme ZeDMD quand il n'a pas répondu comme un ZeDMD à la dernière partie, quand le Cabinet.xml de DOF le désigne, ou quand des LED adressables attendent encore leur contrôleur. L'écran DMD réel le montre pour ce qu'il est (« COM3 : pont USB-série, pas un ZeDMD ») ; « ZeDMD : oui » passe outre.
 - LED et retours (DOF) : la reprise de la configuration de l'ancien DOF reprend aussi son Cabinet.xml quand elle a des LED adressables, s'il est cohérent et que ses ports sont branchés.

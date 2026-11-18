@@ -109,8 +109,13 @@ test('accès direct : chaque rôle de section que la borne dessine à part a son
   // l'autre (18/11/2026) : la borne ne disait pas le rôle de la section. Tout rôle que library.js
   // dessine ou range à part est désormais classé, et les badges y partent comme badges.
   const borne = read('app', 'renderer', 'library.js');
-  const kinds = new Set([...borne.matchAll(/section\.kind === '([a-z-]+)'/g)].map((m) => m[1]!));
+  // Toute façon de lire le rôle d'une section : `section.kind === …` dans la boucle, ou retrouvée à part
+  // (`v.sections.find((s) => s.kind === 'news-reactions')`) : les réactions d'une nouveauté, ainsi
+  // trouvées, avaient échappé au classement et tombaient l'une sous l'autre au téléphone (18/11/2026).
+  const kinds = new Set([...borne.matchAll(/\b(?:section|sec|s)\.kind === '([a-z-]+)'/g)].map((m) => m[1]!));
   assert.ok(kinds.has('chips'), 'library.js dessine toujours les badges à part');
+  assert.ok(kinds.has('news-reactions'), 'une section retrouvée par sections.find est vue aussi');
+  assert.equal(remoteLayout('news-reactions'), 'chips', 'les réactions d’une nouveauté : des badges au téléphone');
   for (const kind of kinds) assert.ok(Object.hasOwn(REMOTE_SECTION_LAYOUT, kind), `rôle « ${kind} » dessiné à part à la borne : à classer dans REMOTE_SECTION_LAYOUT (badges ou lignes au téléphone)`);
   assert.equal(remoteLayout('chips'), 'chips');
   assert.equal(remoteLayout('phrases'), 'chips', '« Répondre » d’un fil : les phrases en badges au téléphone');
@@ -130,6 +135,36 @@ test('accès direct : chaque rôle de section que la borne dessine à part a son
   const sent = remoteEntries({ kind: 'screen', title: 'T', items: [{ label: 'a', layout: 'chips' }, { label: 'b', layout: 'autre' as never }], current: 0 });
   assert.equal(sent.items[0]!.layout, 'chips');
   assert.ok(!('layout' in sent.items[1]!));
+});
+
+test('accès direct : les Nouveautés au téléphone, chronologie, sous-titre et page de texte, bornés', () => {
+  // Au téléphone, la liste des Nouveautés n'avait ni date ni version, et la nouveauté ouverte ni son
+  // texte, ni sa date, ni sa version (18/11/2026) : la borne envoie désormais ce qu'elle montre.
+  const sent = remoteEntries({
+    kind: 'screen',
+    title: 'Nouveautés',
+    lead: `17 novembre 2026 · version 0.1.16\u0007`,
+    page: { image: 'nouveautes/amis-fr.webp', lines: ['Première ligne', 'x'.repeat(900)], where: 'Communauté › Amis', note: 'Soyez le premier à réagir' },
+    items: [
+      { label: 'Amis', detail: 'Ajoutez des amis', timeline: { date: '17 nov.', version: '0.1.16', first: true, unread: true, badges: [{ text: 'Nouveau', kind: 'new' }], reacts: { faces: '👍❤️', total: 3, mine: true, label: '3 réactions, dont la vôtre' }, image: 'nouveautes/amis-fr.webp' } },
+      { label: 'Ailleurs', timeline: { date: '16 nov.', image: '../../secret.webp' } },
+      { label: '👍 J’aime', layout: 'chips', count: '12' },
+      { label: 'Sans badge', count: '4' },
+    ],
+    current: 0,
+  });
+  assert.equal(sent.lead, '17 novembre 2026 · version 0.1.16 ', 'le sous-titre, sans caractère de contrôle');
+  assert.equal(sent.page?.lines[0], 'Première ligne');
+  assert.equal(sent.page?.lines[1]?.length, 600, 'chaque ligne bornée');
+  assert.equal(sent.page?.image, 'nouveautes/amis-fr.webp');
+  const [line, other, chip, plain] = sent.items;
+  assert.deepEqual(line?.timeline?.badges, [{ text: 'Nouveau', kind: 'new' }]);
+  assert.equal(line?.timeline?.reacts?.total, 3);
+  assert.equal(line?.timeline?.image, 'nouveautes/amis-fr.webp');
+  assert.equal(other?.timeline?.image, undefined, 'un aperçu hors des Nouveautés ne part pas');
+  assert.equal(chip?.count, '12', 'le nombre d’un badge');
+  assert.ok(!('count' in plain!), 'un nombre seulement sur un badge');
+  assert.equal(remoteEntries({ kind: 'screen', title: 'T', page: { image: 'C:/x.webp', lines: [] }, items: [], current: -1 }).page?.image, undefined);
 });
 
 test('accès direct : mêmes portes que la borne, rien ne se déverrouille du téléphone, un rang d’un écran dépassé est ignoré', () => {
