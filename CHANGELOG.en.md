@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Tables whose DMD runs through FlexDMD (JP tables such as Hellboy or Daredevil): loading their images ahead now also covers the ones whose name the script builds (Hellboy's DMD letters) and every image of large tables (Daredevil was cut short). Parameters that are not image options are no longer sent to FlexDMD.
+- When a game stops for a moment, the VPX log now says what VPX was doing during the stop (script, video decoding, plugin, graphics driver): one report is enough to find why a table lags.
 - Development: the test doubles of the app's services and hosts (cabinet network, table screen, live games, friends' content, downloads, feedback, built-in browser, phone, score boards) each have a factory, typed on the real interface, that fills in neutral values around what a test or a demo provides. A member added to an interface is handled once, in its factory and in the branch that adds it: the 111 hand-written doubles in tests and demos now go through them, and a test rejects any new hand-written copy as well as any override that is not a member of the contract.
 - Development: `npm run verifier -- --modifies` also runs these guards when a demo, a test or an app module changes, instead of waiting for the full pre-merge suite.
 - Badge moment: the veil stays in place from one badge to the next, the table screen no longer flashes back under the next badge.

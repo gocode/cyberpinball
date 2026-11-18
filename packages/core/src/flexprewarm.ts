@@ -22,8 +22,11 @@ export interface FlexPrewarm {
   images: string[];
 }
 
-/** Au plus tant d'images chargées d'avance (une table de JP en a une centaine). */
-export const FLEX_PREWARM_MAX = 400;
+/**
+ * Au plus tant de demandes (images et variantes). Une table de JP en fait plusieurs centaines : Daredevil, 178 images
+ * en trois variantes, était coupé à la 135e avec 400 (rapport du 18/11/2026). Une image se charge en 1 à 2 ms.
+ */
+export const FLEX_PREWARM_MAX = 3000;
 const SUB = 'CyberPinball_FlexPrewarm';
 
 /** La variable à laquelle le script donne son objet FlexDMD (« Set FlexDMD = CreateObject("FlexDMD.FlexDMD") »). */
@@ -33,6 +36,34 @@ export function flexDmdVariable(code: string): string | undefined {
 
 function literals(code: string): string[] {
   return [...code.matchAll(/"((?:[^"\n]|"")*)"/g)].map((m) => m[1]!.replace(/""/g, '"'));
+}
+
+/**
+ * Les options d'image que FlexDMD reconnaît (AssetManager.cpp, ResolveSrc : « dmd= », « dmd2= », « add », « region= »,
+ * « pad= »), écrites en entier. Une autre chaîne commençant par « & » (paramètres d'une adresse web dans le script de
+ * Hellboy, « &session_time= ») n'en est pas une ; et « region= » ou « pad= » incomplets font lire à FlexDMD des
+ * nombres absents (il ne vérifie leur compte que dans une version de débogage) : jamais demandés.
+ */
+export function isFlexImageOptions(suffix: string): boolean {
+  if (!suffix.startsWith('&') || suffix.length < 2) return false;
+  return suffix
+    .slice(1)
+    .split('&')
+    .every((token) => /^(?:dmd2?=\d+|add|region=\d+,\d+,\d+,\d+|pad=\d+,\d+,\d+,\d+)$/i.test(token));
+}
+
+/**
+ * Débuts de noms que le script complète (« "d_" & lettre », « "VPX.d_" & n ») : les images de la table qui commencent
+ * ainsi sont celles qu'il montrera. Chez Hellboy, les lettres du DMD (d_a… d_z, d_1a…) ne sont écrites nulle part en
+ * entier : elles se chargeaient en partie malgré le chargement d'avance (rapport du 18/11/2026).
+ */
+function builtPrefixes(code: string): string[] {
+  const out = new Set<string>();
+  for (const m of code.matchAll(/"((?:[^"\n]|"")*)"\s*&/g)) {
+    const s = m[1]!.replace(/^VPX\./i, '');
+    if (s.length >= 2 && /^[\w.-]+$/.test(s)) out.add(s.toLowerCase());
+  }
+  return [...out];
 }
 
 /** Au-delà, une image de la table n'est pas une image de DMD (une texture du plateau) : jamais chargée d'avance sans être nommée. */
@@ -53,10 +84,19 @@ export function flexPrewarmFor(script: string, images: readonly { name: string; 
   const builds = /"VPX\."\s*&/i.test(code);
   const strings = literals(code);
   // Suffixes d'options écrits à part (« & "&dmd=2&add" ») : les variantes que le script demandera.
-  const suffixes = [...new Set(strings.filter((s) => /^&[a-z]/i.test(s)))];
+  const suffixes = [...new Set(strings.filter(isFlexImageOptions))];
   const ids: string[] = [];
+  const seen = new Set<string>();
   const add = (id: string) => {
-    if (ids.length < FLEX_PREWARM_MAX && !ids.some((x) => x.toLowerCase() === id.toLowerCase())) ids.push(id);
+    if (ids.length < FLEX_PREWARM_MAX && !seen.has(id.toLowerCase())) {
+      seen.add(id.toLowerCase());
+      ids.push(id);
+    }
+  };
+  const dmdSized = (image: { width: number; height: number }) => image.width <= FLEX_DMD_IMAGE_MAX.width && image.height <= FLEX_DMD_IMAGE_MAX.height;
+  const addBuilt = (name: string) => {
+    add(`VPX.${name}`);
+    for (const suffix of suffixes) add(`VPX.${name}${suffix}`);
   };
   for (const s of strings) {
     const full = /^VPX\.([^&]+)(&.*)?$/i.exec(s);
@@ -64,14 +104,20 @@ export function flexPrewarmFor(script: string, images: readonly { name: string; 
       const image = byLower.get(full[1]!.toLowerCase());
       if (image) {
         add(`VPX.${image.name}`);
-        if (full[2]) add(`VPX.${image.name}${full[2]}`);
+        if (full[2] && isFlexImageOptions(full[2])) add(`VPX.${image.name}${full[2]}`);
       }
       continue;
     }
     const image = builds ? byLower.get(s.toLowerCase()) : undefined;
-    if (!image || image.width > FLEX_DMD_IMAGE_MAX.width || image.height > FLEX_DMD_IMAGE_MAX.height) continue;
-    add(`VPX.${image.name}`);
-    for (const suffix of suffixes) add(`VPX.${image.name}${suffix}`);
+    if (image && dmdSized(image)) addBuilt(image.name);
+  }
+  // Noms complétés par le script : les images de DMD de la table qui commencent comme eux.
+  if (builds) {
+    const prefixes = builtPrefixes(code);
+    for (const image of images) {
+      const lower = image.name.toLowerCase();
+      if (dmdSized(image) && prefixes.some((p) => lower.startsWith(p) && lower.length > p.length)) addBuilt(image.name);
+    }
   }
   return ids.length ? { variable, images: ids } : undefined;
 }

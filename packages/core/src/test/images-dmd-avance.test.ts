@@ -11,7 +11,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { diagnose, pupPlayRepairs, repairPupForPlay, scriptFacts } from '../doctor';
-import { addFlexPrewarm, flexPrewarmFor, hasFlexPrewarm } from '../flexprewarm';
+import { addFlexPrewarm, flexPrewarmFor, hasFlexPrewarm, isFlexImageOptions } from '../flexprewarm';
 import { buildScriptPatch, readScriptPatch, scriptPatchState } from '../scriptpatch';
 import { scanTables } from '../tables';
 import { vpxWithScript } from './fixtures';
@@ -53,6 +53,45 @@ test('images relevées : chaînes du script qui sont des images de DMD de la tab
   // Pas de FlexDMD, ou pas de « Run = True » où brancher le chargement : rien.
   assert.equal(flexPrewarmFor(JP.replace('CreateObject("FlexDMD.FlexDMD")', 'CreateObject("UltraDMD.DMDObject")'), IMAGES), undefined);
   assert.equal(flexPrewarmFor(JP.replace('FlexDMD.Run = True', 'FlexDMD.Run = False'), IMAGES), undefined);
+});
+
+test('noms fabriqués par le script (« "d_" & lettre ») : les images de DMD qui commencent ainsi, jamais les grandes', () => {
+  // Hellboy (rapport du 18/11/2026) : d_h, d_5, d_1a… se chargeaient encore en partie, jamais écrits en entier.
+  const built = [
+    'Set FlexDMD = CreateObject("FlexDMD.FlexDMD")',
+    'FlexDMD.Run = True',
+    'Sub ShowChar(c, i)',
+    '  DMDScene.GetImage("Dig" & i).Bitmap = FlexDMD.NewImage("", "VPX." & "d_" & LCase(c) & "&dmd=2&add").Bitmap',
+    'End Sub',
+    '',
+  ].join('\r\n');
+  const imgs = [
+    { name: 'd_h', width: 128, height: 32 },
+    { name: 'd_5', width: 16, height: 32 },
+    { name: 'd_border10', width: 256, height: 64 },
+    { name: 'd_big', width: 2048, height: 1024 },
+    { name: 'playfield_x', width: 128, height: 32 },
+  ];
+  const p = flexPrewarmFor(built, imgs)!;
+  assert.deepEqual(p.images, ['VPX.d_h', 'VPX.d_h&dmd=2&add', 'VPX.d_5', 'VPX.d_5&dmd=2&add', 'VPX.d_border10', 'VPX.d_border10&dmd=2&add']);
+  // Sans « "VPX." & », rien n'est complété : les débuts de noms ne comptent pas.
+  assert.equal(flexPrewarmFor(built.replace('"VPX." & "d_" & LCase(c) & "&dmd=2&add"', '"VPX.d_h"'), imgs)!.images.join(','), 'VPX.d_h');
+});
+
+test('options d’image : seules celles que FlexDMD reconnaît, écrites en entier', () => {
+  for (const ok of ['&dmd=2', '&dmd2=3', '&add', '&dmd=2&add', '&region=0,0,128,32', '&pad=1,1,1,1&add']) assert.ok(isFlexImageOptions(ok), ok);
+  // Paramètres d'une adresse web (Hellboy) ; « region= » incomplet : FlexDMD lirait des nombres absents.
+  for (const no of ['&session_time=', '&H', '&installed=true', '&region=', '&region=0,0', '&pad=1', '&', 'dmd=2', '&dmd=x']) assert.ok(!isFlexImageOptions(no), no);
+  const script = [
+    'Set FlexDMD = CreateObject("FlexDMD.FlexDMD")',
+    'FlexDMD.Run = True',
+    'u = "https://example.com/?a=1" & "&session_time=" & t & "&H"',
+    'Chars(65) = "d_a"',
+    'FlexDMD.NewImage "", "VPX." & Chars(65) & "&dmd=2"',
+    'FlexDMD.NewImage "", "VPX.d_b&region="',
+    '',
+  ].join('\r\n');
+  assert.deepEqual(flexPrewarmFor(script, IMAGES)!.images, ['VPX.d_a', 'VPX.d_a&dmd=2', 'VPX.d_b']);
 });
 
 test('script adapté : appel au bout de la ligne qui lance FlexDMD (commentaire gardé), Sub en fin, lignes à leur place', () => {

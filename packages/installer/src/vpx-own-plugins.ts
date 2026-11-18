@@ -26,7 +26,7 @@ export interface OwnPlugin {
  */
 export const OWN_PLUGINS: OwnPlugin[] = [
   { dir: 'vpx-vision3d', cfg: 'plugin.cfg', sources: ['src/vision3d.cpp', 'src/vue.h'] },
-  { dir: 'vpx-vision3d', cfg: 'cyberpinball-dmd.cfg', sources: ['src/dmd-suivi.cpp', 'src/suivi-dmd.h', 'src/cadence.h'] },
+  { dir: 'vpx-vision3d', cfg: 'cyberpinball-dmd.cfg', sources: ['src/dmd-suivi.cpp', 'src/suivi-dmd.h', 'src/cadence.h', 'src/arrets.h'] },
 ];
 
 /** Enable et réglages déclarés de chaque plugin de Cyber Pinball. `packagesDir` : le dossier packages/ du dépôt. */

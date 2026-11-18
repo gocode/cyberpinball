@@ -37,6 +37,8 @@
 // Cadence des images (cadence.h) : le plugin compte les images de la partie et en écrit le bilan dans vpinball.log
 // (toutes les minutes, puis à la fin), avec chaque à-coup au moment où il arrive, pour qu'on le rapproche de ce que
 // VPX ou un plugin faisait alors (vidéo de PuP lancée, DMD…). Cyber Pinball le relit après la partie (vpxcadence.ts).
+// Chaque à-coup dit aussi où était le fil des images pendant l'attente (arrets.h : un fil de veille, le temps de la
+// partie, qui ne relève rien tant que les images arrivent à l'heure).
 
 #define _CRT_SECURE_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
@@ -59,6 +61,7 @@
 #include "LoggingPlugin.h"
 #include "suivi-dmd.h"
 #include "cadence.h"
+#include "arrets.h"
 
 using namespace cyberpinball;
 
@@ -284,13 +287,26 @@ void direBilan(const char* quand)
    LPI_LOGI("%s", ligne);
 }
 
+// Où était le fil des images pendant chaque à-coup (arrets.h) : démarré à la première image de la partie, depuis ce
+// fil-là, arrêté à la fin de la partie.
+ReleveArrets releve;
+bool releveDemarre = false;
+
 void compterImage(double t)
 {
-   if (cadence.image(t) && aCoupsDits < A_COUPS_DITS_MAX)
+   const bool aCoup = cadence.image(t);
+   char ou[448];
+   if (releveDemarre)
+      releve.image(aCoup && aCoupsDits < A_COUPS_DITS_MAX, ou, sizeof(ou));
+   else
+      ou[0] = '\0';
+   if (aCoup && aCoupsDits < A_COUPS_DITS_MAX)
    {
       // Au moment même : l'heure de la ligne le rapproche de ce que VPX et les plugins écrivaient alors.
       aCoupsDits++;
-      LPI_LOGW("Cadence: stall of %d ms at %.1fs%s", static_cast<int>(cadence.dernierEcart() * 1000.0 + 0.5), cadence.tempsDePartie(t), aCoupsDits == A_COUPS_DITS_MAX ? " (no more stalls logged)" : "");
+      char quoi[480];
+      std::snprintf(quoi, sizeof(quoi), "%s%s%s", ou[0] ? "; main thread " : "", ou, aCoupsDits == A_COUPS_DITS_MAX ? " (no more stalls logged)" : "");
+      LPI_LOGW("Cadence: stall of %d ms at %.1fs%s", static_cast<int>(cadence.dernierEcart() * 1000.0 + 0.5), cadence.tempsDePartie(t), quoi);
    }
    if (cadence.ecarts() && t - cadenceDiteA >= CADENCE_PERIODE_S)
    {
@@ -303,6 +319,8 @@ void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
 {
    if (!enPartie)
       return;
+   if (!releveDemarre)
+      releveDemarre = releve.demarrer();
    const double t = maintenant();
    compterImage(t);
    // Banc : les images comptées, dites toutes les 2 s (VPX qui ne rend plus se voit).
@@ -510,6 +528,8 @@ void MSGPIAPI onGameEnd(const unsigned int, void*, void*)
 {
    if (enPartie && cadence.ecarts())
       direBilan("end");
+   releve.arreter();
+   releveDemarre = false;
    enPartie = false;
    partieFinie = true;
    fenetre = Fenetre {};
@@ -545,6 +565,8 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballDmdPluginLoad(const uint32_t sessionId, c
 MSGPI_EXPORT void MSGPIAPI CyberPinballDmdPluginUnload()
 {
    enPartie = false;
+   releve.arreter();
+   releveDemarre = false;
    msgApi->UnsubscribeMsg(displaysChangedId, onSourcesChanged, nullptr);
    // DMDUtil se décharge juste après : sa recherche relancée pendant la fermeture finit d'abord (onSourcesChanged).
    if (sourcesApresPartie > 0.0 && attenteFermeture_Val > 0 && GetModuleHandleW(L"plugin-dmdutil64.dll"))

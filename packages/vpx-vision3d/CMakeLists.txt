@@ -42,6 +42,10 @@ target_include_directories(banc-suivi-dmd PRIVATE src)
 add_executable(banc-cadence test/banc-cadence.cpp)
 target_include_directories(banc-cadence PRIVATE src)
 
+# Banc du relevé des arrêts (où était le fil des images pendant un à-coup), sans VPX.
+add_executable(banc-arrets test/banc-arrets.cpp)
+target_include_directories(banc-arrets PRIVATE src)
+
 # Banc de la pause (logique, sans VPX ni casque).
 add_executable(banc-pause test/banc-pause.cpp)
 target_include_directories(banc-pause PRIVATE src)

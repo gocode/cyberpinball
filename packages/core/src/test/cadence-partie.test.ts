@@ -90,6 +90,29 @@ test('plugin du DMD : la cadence écrite dans vpinball.log (API de journal de VP
   assert.match(read('packages', 'vpx-vision3d', 'vendor', 'vpx', 'PROVENANCE.txt'), /LoggingPlugin\.h/);
 });
 
+test('à-coups : chacun dit où était le fil des images (relevé pendant l’attente, sans verrou pendant la suspension)', () => {
+  const cpp = read('packages', 'vpx-vision3d', 'src', 'dmd-suivi.cpp');
+  assert.match(cpp, /#include "arrets\.h"/);
+  assert.match(cpp, /releveDemarre = releve\.demarrer\(\);/, 'démarré depuis le fil des images');
+  assert.match(cpp, /"; main thread "/);
+  assert.match(cpp, /releve\.arreter\(\);[\s\S]*CyberPinballDmdPluginUnload|CyberPinballDmdPluginUnload[\s\S]*releve\.arreter\(\);/);
+  // Pendant la suspension : registres, VirtualQuery et une copie, rien d'autre (ni allocation, ni chargeur, ni journal).
+  const h = read('packages', 'vpx-vision3d', 'src', 'arrets.h');
+  const suspended = h.slice(h.indexOf('SuspendThread(m_fil)'), h.indexOf('ResumeThread(m_fil)'));
+  assert.ok(suspended.length > 0);
+  const calls = [...suspended.matchAll(/\b([A-Za-z_]\w*)\s*\(/g)].map((m) => m[1]);
+  for (const call of calls) assert.ok(['SuspendThread', 'GetThreadContext', 'static_cast', 'reinterpret_cast', 'VirtualQuery', 'sizeof', 'min', 'memcpy', 'if', 'defined'].includes(call!), `appel pendant la suspension : ${call}`);
+  assert.match(read('packages', 'vpx-vision3d', 'CMakeLists.txt'), /add_executable\(banc-arrets test\/banc-arrets\.cpp\)/);
+});
+
+test('à-coups : banc du relevé (comptes par module, vrai fil suspendu), s’il est construit', (t) => {
+  const banc = path.join(repo, 'build', 'vision3d', 'Release', 'banc-arrets.exe');
+  if (!fs.existsSync(banc)) return t.skip('banc pas construit (node scripts/vision3d.mjs)');
+  const run = spawnSync(banc, [], { encoding: 'utf8', windowsHide: true });
+  assert.equal(run.status, 0, run.stdout);
+  assert.match(run.stdout, /tout va bien/);
+});
+
 test('cadence : banc de la logique (histogramme, centiles, à-coups, pire fenêtre), s’il est construit', (t) => {
   const banc = path.join(repo, 'build', 'vision3d', 'Release', 'banc-cadence.exe');
   if (!fs.existsSync(banc)) return t.skip('banc pas construit (node scripts/vision3d.mjs)');

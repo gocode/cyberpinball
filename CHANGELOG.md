@@ -11,6 +11,8 @@ son interface).
 
 ## 0.1.16
 
+- Tables dont le DMD passe par FlexDMD (tables de JP comme Hellboy ou Daredevil) : le chargement d'avance de leurs images couvre aussi celles dont le script fabrique le nom (lettres du DMD de Hellboy) et toutes les images des grandes tables (Daredevil était coupé en route). Les paramètres qui ne sont pas des options d'image ne sont plus demandés à FlexDMD.
+- Quand une partie s'arrête un instant, le journal de VPX dit maintenant où VPX en était pendant l'arrêt (script, décodage d'une vidéo, plugin, pilote de la carte graphique) : un rapport suffit à trouver la cause d'une table qui rame.
 - Développement : les doublures des services et des hôtes de l'application (réseau des bornes, écran des tables, parties en direct, contenus des amis, téléchargements, retours, navigateur intégré, téléphone, tableaux des scores) ont chacune leur fabrique, typée sur la vraie interface, qui complète par des valeurs neutres ce que donne un test ou une démonstration. Un membre ajouté à une interface se règle une fois, dans sa fabrique et dans la branche qui l'ajoute : les 111 doublures écrites à la main dans les tests et les démonstrations y passent désormais, et un test refuse toute nouvelle copie écrite à la main ainsi que toute surcharge qui n'est pas un membre du contrat.
 - Développement : `npm run verifier -- --modifies` lance aussi ces gardes quand une démonstration, un test ou un module de l'application change, au lieu d'attendre la suite complète d'avant la fusion.
 - Moment des badges : le voile reste posé d'un badge à l'autre, l'écran des tables ne se rallume plus un instant sous le badge suivant.
