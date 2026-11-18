@@ -91,7 +91,28 @@ export interface RankingsMenu {
   open(back: () => void): void;
   /** Ce que dit la porte de l'accueil. */
   detail(): string;
+  /** Ma place chez les joueurs (affiche du médaillon Communauté) ; absente sans réseau ou partage coupé. */
+  standing(): PlayerStanding | undefined;
 }
+
+/** Ma place dans un classement des joueurs, de tout temps et de la semaine. */
+export interface StandingPlace {
+  /** Ma place de tout temps ; absente : pas encore d'XP. */
+  rank?: number;
+  /** Joueurs classés de tout temps. */
+  players: number;
+  /** Ma place cette semaine ; absente : aucun XP depuis lundi. */
+  week?: number;
+}
+
+/** Ma place au monde et dans mon pays (absent : pays non choisi). */
+export interface PlayerStanding {
+  world: StandingPlace;
+  country?: StandingPlace & { code: string };
+}
+
+/** La place de l'affiche se recalcule au plus toutes les deux secondes : l'affiche se redessine à chaque état. */
+const STANDING_TTL_MS = 2000;
 
 /** Ce qu'une table montre à une portée et une période. */
 type TableState =
@@ -504,6 +525,25 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
 
   // ---------- Accueil ----------
 
+  let standingKept: { at: number; value: PlayerStanding | undefined } | undefined;
+
+  function standing(): PlayerStanding | undefined {
+    const at = now();
+    if (standingKept && at - standingKept.at >= 0 && at - standingKept.at < STANDING_TTL_MS) return standingKept.value;
+    let value: PlayerStanding | undefined;
+    if (host.players && !playersUnavailable('world')) {
+      const placeIn = (sc: PlayerScope): StandingPlace => {
+        const all = playersOf(sc, 'all');
+        const week = playersOf(sc, 'week');
+        return { ...(all.me ? { rank: all.me.rank } : {}), players: all.players, ...(week.me ? { week: week.me.rank } : {}) };
+      };
+      const country = host.players.state().country;
+      value = { world: placeIn('world'), ...(country ? { country: { code: country, ...placeIn('country') } } : {}) };
+    }
+    standingKept = { at, value };
+    return value;
+  }
+
   /** Ma place chez les joueurs : « Vous : niveau 14 · 37ᵉ en France · 412ᵉ au monde ». */
   function playersDetail(): string {
     if (!host.players) return t('Indisponible : réseau des bornes absent');
@@ -554,5 +594,6 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
       home(0);
     },
     detail: () => t('Joueurs par XP, et les scores de chaque table'),
+    standing,
   };
 }

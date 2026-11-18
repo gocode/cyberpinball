@@ -4,6 +4,7 @@
 // Juke-box (ses classes jb-poster…) : la marque, le grand titre, les chiffres (joueurs en ligne, de
 // mon pays, amis), le salon de mon pays et sa dernière ligne, les amis en ligne, le médaillon vivant
 // « Montée » (medaillons-vivants.js) ; en pied du fronton, « Start · Ouvrir la Communauté ».
+// Sur le plateau seulement (18/11/2026) : mon niveau, ma place mondiale et nationale (jukebox.css, classes cm-*).
 // Le processus principal choisit et traduit tout (frontend.ts, communityPoster) ; ici, on dessine.
 // Le médaillon Collections (13/11/2026) a la même affiche, son médaillon « Carrousel » à la place
 // (s.collectionsMedallion.poster, collections-menu.ts : collectionsPoster) : window.CyberCollections.
@@ -24,8 +25,8 @@
   }
 
   /** Les nombres de la ligne des chiffres en gras, comme sur l'affiche du Juke-box. */
-  function statsLine(text) {
-    const node = el('p', 'jb-poster-stats');
+  function statsLine(text, className = 'jb-poster-stats') {
+    const node = el('p', className);
     let at = 0;
     for (const m of String(text).matchAll(/\d+/g)) {
       if (m.index > at) node.append(document.createTextNode(text.slice(at, m.index)));
@@ -34,6 +35,34 @@
     }
     if (at < text.length) node.append(document.createTextNode(text.slice(at)));
     return node;
+  }
+
+  /**
+   * Mon niveau et mes places (18/11/2026) : trois cases en grille commune (intitulé, valeur, détail
+   * alignés d'une case à l'autre), la barre du niveau sous sa valeur, la semaine en une ligne dessous.
+   * Montrées sur le plateau seulement (jukebox.css : .cm-standing).
+   */
+  function standingNode(st) {
+    const box = el('div', 'cm-standing');
+    const grid = el('div', 'cm-standing-tiles');
+    grid.style.setProperty('--tiles', String(st.tiles.length));
+    for (const tile of st.tiles) {
+      const cell = el('div', `cm-tile${tile.quiet ? ' cm-quiet' : ''}`);
+      const label = el('p', 'cm-tile-label');
+      if (tile.flag && typeof flagNode === 'function') label.append(flagNode(tile.flag.code, tile.flag.src, tile.flag.name, 'cm-tile-flag'));
+      label.append(el('span', '', tile.label));
+      const bar = el('div', 'cm-tile-bar');
+      if (tile.progress !== undefined) {
+        const fill = el('span');
+        fill.style.width = `${Math.round(Math.min(1, Math.max(0, tile.progress)) * 100)}%`;
+        bar.append(fill);
+      } else bar.classList.add('cm-none');
+      cell.append(label, el('p', 'cm-tile-value', tile.value), bar, el('p', 'cm-tile-detail', tile.detail));
+      grid.append(cell);
+    }
+    box.append(grid);
+    if (st.week) box.append(statsLine(st.week, 'cm-standing-week'));
+    return box;
   }
 
   /** L'affiche d'un médaillon : `kind`, son dessin (medaillons-vivants.js) ; `of(s)`, sa vue dans l'état. */
@@ -76,6 +105,10 @@
         const detail = el('p', 'jb-muted jb-poster-detail jb-ellipsis', p.detail);
         detail.title = p.detail;
         copy.append(detail);
+      }
+      if (p.standing?.tiles?.length) {
+        box.classList.add('cm-has-standing');
+        copy.append(standingNode(p.standing));
       }
       stage.append(head, copy, emblem());
       if (hint) {

@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Community medallion: the playfield poster shows your level (its tier and its bar), your place in the worldwide and national rankings, and your week in one line (XP earned, places this week). A place not known yet keeps its box, greyed out, with the reason. To keep it light, the country room now only shows on the backglass poster.
 - Failed game: a flipper sends a report to the developers in one press (the problem already filled in, the technical sheet attached, encrypted and anonymised), a description remaining optional.
 - VPX crash whose automatic report has been sent: a 👌 box under the error says the team has been told and will look into it; the flipper then only adds your details.
 - Table Diagnosis: "Send a report to the developers" attaches the findings, what was just repaired, the technical sheet and the logs.

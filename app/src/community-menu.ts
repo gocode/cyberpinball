@@ -17,6 +17,7 @@ import {
   commonTables,
   countryName,
   flagView,
+  formatNumber,
   playerFlag,
   locale,
   nearbyPlayers,
@@ -26,13 +27,17 @@ import {
   onlineGroups,
   presenceTable,
   t,
+  tierLabel,
   tn,
+  type FlagView,
+  type LevelView,
   type OnlineFilter,
   type OnlineGroup,
   type OnlinePlayer,
   type TableEntry,
 } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
+import type { PlayerStanding, StandingPlace } from './rankings-menu';
 import type { RoomGlance } from './rooms-menu';
 import type { SocialNet } from './social-net';
 
@@ -58,11 +63,11 @@ export interface CommunityMenuHost {
   /** Les parties instantanées, ouvertes à tous (instant-menu.ts) : ce que dit la porte, et les ouvrir. */
   instant?: { door(): { label: string; detail: string; quiet: boolean }; open(back: () => void): void };
   /** Les classements de toutes mes tables (rankings-menu.ts) : ce que dit la porte, et les ouvrir. */
-  rankings: { detail(): string; open(back: () => void): void };
+  rankings: { detail(): string; open(back: () => void): void; standing?(): PlayerStanding | undefined };
   /** Retours et propositions (feedback-menu.ts), la même entrée que dans le Menu système : tout en bas de l'accueil. */
   feedback?: { detail(): string; open(back: () => void): void };
   /** Mon niveau (level-menu.ts) : ce que dit l'entrée, et l'ouvrir. En tête de l'accueil, avec mon avatar. */
-  level?: { detail(): string; avatar(): AvatarView; open(back: () => void): void };
+  level?: { detail(): string; avatar(): AvatarView; open(back: () => void): void; view?(): LevelView & { week: number } };
   /** Partage et réseau (activer le partage, le réseau local, la présence publique). */
   openSharing(back: () => void): void;
   now?(): Date;
@@ -96,9 +101,29 @@ export interface CommunityPosterView {
   eyebrow: string;
   heading: string;
   detail?: string;
+  /** Mon niveau et ma place, mondiale et nationale : sur le plateau seulement (18/11/2026). */
+  standing?: PosterStanding;
   tagline: string;
   start: string;
   open: string;
+}
+
+/** Une case de l'affiche : « Niveau 14 », « Mondial 412ᵉ », « France 37ᵉ ». */
+export interface PosterTile {
+  label: string;
+  value: string;
+  detail: string;
+  /** Avancée dans le niveau, de 0 à 1. */
+  progress?: number;
+  flag?: FlagView;
+  /** Rien à classer (pays non choisi, pas encore d'XP) : la case reste, grisée. */
+  quiet?: boolean;
+}
+
+export interface PosterStanding {
+  tiles: PosterTile[];
+  /** La semaine en une ligne : XP gagnés depuis lundi et places de la semaine. */
+  week?: string;
 }
 
 export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
@@ -458,7 +483,40 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
         : t('Joueurs en ligne, messages, salon, classements');
     const eyebrow = room ? (room.problem || !room.present ? room.name : `${room.name} · ${tn(room.present, '{n} présent', '{n} présents')}`) : t('Joueurs en ligne');
     const heading = room?.problem ?? (room?.last ? `<${room.last.name}> ${room.last.text}` : room ? t('Rien de neuf pour l’instant') : t('Start pour ouvrir la Communauté'));
-    return { ...frame, stats: countsLine(list), empty: false, eyebrow, heading, detail };
+    const standing = standingView();
+    return { ...frame, stats: countsLine(list), empty: false, eyebrow, heading, detail, ...(standing ? { standing } : {}) };
+  }
+
+  /** Une place : « 1ᵉʳ », « 412ᵉ ». */
+  const ordinal = (n: number) => (n === 1 ? t('1ᵉʳ') : t('{n}ᵉ', { n: formatNumber(n) }));
+
+  /**
+   * Mon niveau, ma place au monde et dans mon pays, de tout temps ; la semaine en une ligne dessous
+   * (demande du 18/11/2026 : « un petit peu plus de data » sur le plateau). Une place qui manque
+   * (pays non choisi, pas encore d'XP) garde sa case, grisée, avec sa raison.
+   */
+  function standingView(): PosterStanding | undefined {
+    const lv = host.level?.view?.();
+    const st = host.rankings.standing?.();
+    if (!lv && !st) return undefined;
+    const tiles: PosterTile[] = [];
+    if (lv) tiles.push({ label: t('Niveau'), value: formatNumber(lv.level), detail: tierLabel(lv.tier), progress: lv.progress });
+    if (st) {
+      const place = (label: string, p: StandingPlace | undefined, why: string, flag?: FlagView): PosterTile =>
+        p?.rank
+          ? { label, value: ordinal(p.rank), detail: tn(p.players, 'sur {n} joueur', 'sur {n} joueurs'), ...(flag ? { flag } : {}) }
+          : { label, value: '—', detail: why, quiet: true, ...(flag ? { flag } : {}) };
+      tiles.push(place(t('Mondial'), st.world, t('Pas encore classé')));
+      const c = st.country;
+      tiles.push(c ? place(countryLabel(c.code)!, c, t('Pas encore classé'), flagView(c.code, locale())) : place(t('National'), undefined, t('Pays non choisi')));
+    }
+    const parts: string[] = [];
+    if (lv) parts.push(lv.week > 0 ? t('Cette semaine : +{n} XP', { n: formatNumber(lv.week) }) : t('Pas encore d’XP cette semaine'));
+    if (st?.world.week) parts.push(st.world.week === 1 ? t('1ᵉʳ au monde') : t('{n}ᵉ au monde', { n: formatNumber(st.world.week) }));
+    if (st?.country?.week) parts.push(st.country.week === 1 ? t('1ᵉʳ dans votre pays') : t('{n}ᵉ dans votre pays', { n: formatNumber(st.country.week) }));
+    // Chaque segment insécable : la ligne ne passe à la ligne qu'entre deux segments (« 5ᵉ / au monde » sur l'affiche du bureau).
+    const nbsp = String.fromCharCode(160);
+    return { tiles, ...(parts.length ? { week: parts.map((p) => p.replace(/ /g, nbsp)).join(' · ') } : {}) };
   }
 
   function openHome(back: () => void): void {

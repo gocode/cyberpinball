@@ -3014,6 +3014,8 @@ const communityMenu = createCommunityMenu({
     detail: () => levelMenu.detail(),
     avatar: () => ({ ...avatarView(socialNet.state().key.publicKey, socialNet.state().name, socialNet.avatarFile(socialNet.state().key.publicKey)), level: levelTracker.view().level }),
     open: (back) => levelMenu.open(back),
+    // L'affiche du plateau : mon niveau et mes XP de la semaine.
+    view: () => ({ ...levelOf(levelTracker.state().xp), week: weekXp(levelTracker.state(), new Date()) }),
   },
   instant: { door: () => instantMenu.door(), open: (back) => instantMenu.open(back) },
   rooms: { door: () => roomsMenu.door(), glance: () => roomsMenu.glance(), open: (back) => roomsMenu.openDefault(back) },
@@ -3034,7 +3036,7 @@ const communityMenu = createCommunityMenu({
     quiet: () => chatMenu.item.tone === 'quiet',
     open: (back) => library.runSystemItem('messages', back),
   },
-  rankings: { detail: () => rankingsMenu.detail(), open: (back) => rankingsMenu.open(back) },
+  rankings: { detail: () => rankingsMenu.detail(), open: (back) => rankingsMenu.open(back), standing: () => rankingsMenu.standing() },
   openSharing: (back) => library.runSystemItem('sharing', back),
   // La même entrée que Menu système > Cyber Pinball, tout en bas de l'accueil : son « Retour » ramène à la Communauté.
   ...(library.hasSystemItem('feedback')

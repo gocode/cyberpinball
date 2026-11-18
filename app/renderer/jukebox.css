@@ -1509,6 +1509,153 @@
   margin: calc(10 * var(--pp)) 0 calc(12 * var(--pp)) !important;
 }
 
+/*
+ * Affiche du médaillon Communauté (community.js), ses classes cm-* : mon niveau et mes places,
+ * mondiale et nationale, sur le plateau seulement (demande du 18/11/2026).
+ */
+.cm-standing {
+  display: none;
+}
+
+.jb-wheel-poster .cm-standing {
+  --tile-label: var(--small);
+  --tile-value: 64;
+  --tile-detail: var(--small);
+  display: block;
+  width: 100%;
+  margin-top: calc(40 * var(--pp));
+}
+
+.jb-wheel-poster.desk .cm-standing {
+  --tile-value: 40;
+  margin-top: calc(26 * var(--pp));
+}
+
+/*
+ * Grille commune : intitulé, valeur, barre et détail sur les mêmes lignes d'une case à l'autre
+ * (sous-grille), même quand un détail passe sur deux lignes.
+ */
+.cm-standing-tiles {
+  display: grid;
+  grid-template-columns: repeat(var(--tiles, 3), minmax(0, 1fr));
+  grid-template-rows: repeat(4, auto);
+  text-align: center;
+}
+
+.cm-tile {
+  grid-row: span 4;
+  display: grid;
+  grid-template-rows: subgrid;
+  justify-items: center;
+  align-items: start;
+  row-gap: calc(10 * var(--pp));
+  padding: 0 calc(6 * var(--pp));
+  min-width: 0;
+}
+
+.cm-tile + .cm-tile {
+  border-left: 1px solid var(--line-strong);
+}
+
+.cm-tile-label {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(10 * var(--pp));
+  font-size: max(calc(var(--tile-label) * var(--pp)), var(--jb-floor));
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.cm-tile-label > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cm-tile-flag {
+  width: calc(30 * var(--pp));
+  height: calc(22.5 * var(--pp));
+  min-width: 20px;
+  min-height: 15px;
+  border-radius: calc(3 * var(--pp));
+}
+
+.cm-tile-value {
+  font-size: max(calc(var(--tile-value) * var(--pp)), var(--jb-floor));
+  font-weight: 780;
+  font-stretch: 90%;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* La barre du niveau, en fil vert ; une case sans barre garde sa ligne (alignement). */
+.cm-tile-bar {
+  width: 70%;
+  height: calc(4 * var(--pp));
+  min-height: 3px;
+  border-radius: 999px;
+  background: rgba(230, 240, 236, 0.16);
+}
+
+.cm-tile-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #8be23a;
+  box-shadow: 0 0 calc(8 * var(--pp)) rgba(139, 226, 58, 0.55);
+}
+
+.cm-tile-bar.cm-none {
+  visibility: hidden;
+}
+
+.cm-tile-detail {
+  font-size: max(calc(var(--tile-detail) * var(--pp)), var(--jb-floor));
+  line-height: 1.25;
+  color: var(--ink-muted);
+  text-wrap: balance;
+}
+
+.cm-quiet .cm-tile-value {
+  color: var(--ink-muted);
+}
+
+.cm-standing-week {
+  margin-top: calc(26 * var(--pp)) !important;
+  font-size: max(calc(var(--small) * var(--pp)), var(--jb-floor));
+  letter-spacing: 0.025em;
+  color: var(--ink-muted);
+  text-wrap: balance;
+}
+
+.cm-standing-week strong {
+  color: var(--ink);
+  font-weight: 550;
+}
+
+/*
+ * Sur le plateau, les cases prennent la place du salon de mon pays (retour du 18/11/2026 : « beaucoup
+ * trop d'informations, c'est lourd ») ; le fronton le garde. En borne, l'affiche tient dans les 1370
+ * premiers pixels, la roue dessous : le médaillon se resserre un peu.
+ */
+.jb-wheel-poster.cm-has-standing .jb-eyebrow,
+.jb-wheel-poster.cm-has-standing .jb-poster-heading {
+  display: none;
+}
+
+.jb-wheel-poster.cm-has-standing {
+  --emblem: 420;
+}
+
+.jb-wheel-poster.desk.cm-has-standing {
+  --emblem: 260;
+}
+
 /* Cadre du fronton du menu au bureau (1140 × 641) : la composition en largeur, resserrée. */
 .jb-wheel-fronton {
   --pw: 1140;
