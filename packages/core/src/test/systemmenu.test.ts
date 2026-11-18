@@ -156,13 +156,18 @@ function checkPath(parts: string[]): string | undefined {
 function textFiles(): string[] {
   const docs = [MANUEL, MANUAL, TESTS_MANUELS, MANUAL_TESTS_EN].flatMap(splitFiles).map((f) => path.join(REPO, f));
   const readmes = ['README.md', 'README.fr.md', 'CHANGELOG.md', 'CHANGELOG.en.md'].map((f) => path.join(REPO, f));
+  // Les notes des branches (changements/) deviennent le CHANGELOG à la publication : relues dès la
+  // branche, sinon un chemin faux n'apparaît qu'une fois publié (« System menu > My account section »,
+  // 0.1.16-essai.12).
+  const changes = path.join(REPO, 'changements');
+  const notes = fs.existsSync(changes) ? fs.readdirSync(changes).filter((f) => f.endsWith('.md')).map((f) => path.join(changes, f)) : [];
   const code = [APP, path.join(REPO, 'packages', 'core', 'src'), path.join(REPO, 'packages', 'core', 'src', 'i18n', 'en')].flatMap((dir) =>
     fs
       .readdirSync(dir)
       .filter((f) => f.endsWith('.ts'))
       .map((f) => path.join(dir, f)),
   );
-  return [...docs, ...readmes, ...code].filter((f) => fs.existsSync(f));
+  return [...docs, ...readmes, ...notes, ...code].filter((f) => fs.existsSync(f));
 }
 
 /**

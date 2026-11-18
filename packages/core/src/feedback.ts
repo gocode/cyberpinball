@@ -17,6 +17,7 @@ import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import { t } from './i18n';
 import type { IconName } from './icons';
+import type { Reaction } from './reactions';
 import { signText, type PlayerKey } from './sharing';
 
 /** Texte signé d'une requête d'une borne : ce préfixe, puis le corps JSON. Le même que RETOURS_PREFIX (worker.mjs). */
@@ -112,7 +113,9 @@ export interface SignedBody {
 export type FeedbackOp =
   | { op: 'propose'; kind: ProposalKind; title: string; text: string; lang: string }
   | { op: 'vote'; id: string; on: boolean }
-  /** Compte supprimé (forget.ts, RGPD) : le service efface ses propositions et ses votes. */
+  /** Ma réaction à une nouveauté du front-end (news.ts) ; null la retire. */
+  | { op: 'news-react'; item: string; kind: Reaction | null }
+  /** Compte supprimé (forget.ts, RGPD) : le service efface ses propositions, ses votes et ses réactions. */
   | { op: 'forget' };
 
 /** Corps signé d'une requête de la borne (POST /api/propositions, /api/votes). */

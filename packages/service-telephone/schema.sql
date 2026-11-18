@@ -34,6 +34,16 @@ CREATE TABLE IF NOT EXISTS votes (
   PRIMARY KEY (proposition, voter)
 );
 
+-- Réactions aux Nouveautés du front-end (packages/core/src/news.ts) : une par borne et par nouveauté,
+-- l'une des sept réactions des messages. `at` : date signée de la dernière (une date plus ancienne est un rejeu).
+CREATE TABLE IF NOT EXISTS reactions_nouveautes (
+  item TEXT NOT NULL,
+  voter TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (item, voter)
+);
+
 -- Rapports chiffrés (boîtes scellées « CPR1 ») : le service ne peut pas les lire. Ni auteur ni adresse.
 CREATE TABLE IF NOT EXISTS rapports (
   id TEXT PRIMARY KEY,

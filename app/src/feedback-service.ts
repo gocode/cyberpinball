@@ -16,7 +16,12 @@ import {
   loadContributions,
   noteProposals,
   noteReport,
+  parseNewsReaction,
+  parseNewsReactions,
   parseProposals,
+  withMyNewsReaction,
+  type NewsReactions,
+  type Reaction,
   REPORT_SEALED_MAX,
   saveContributions,
   type Contributions,
@@ -164,15 +169,59 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
   }
 
   /**
-   * Compte supprimé : le service efface les propositions de cette clé et ses votes. À appeler
-   * avant d'effacer la clé (elle signe la demande). Hors ligne : `offline`, rien n'est effacé là-bas.
+   * Compte supprimé : le service efface les propositions de cette clé, ses votes et ses réactions. À
+   * appeler avant d'effacer la clé (elle signe la demande). Hors ligne : `offline`, rien n'est effacé là-bas.
    */
   async function forgetMe(): Promise<Outcome> {
     const r = await signed('/api/oubli', { op: 'forget' });
     if (r.ok) {
       list = list.filter((p) => !p.mine).map((p) => (p.voted ? { ...p, voted: false, votes: Math.max(0, p.votes - 1) } : p));
+      news = Object.fromEntries(Object.entries(news).map(([item, n]) => [item, n.mine ? withMyNewsReaction(n, null) : n]));
       opts.changed();
     }
+    return r;
+  }
+
+  // ---------- Réactions aux Nouveautés (news.ts) ----------
+
+  /** Les totaux de chaque nouveauté et ma réaction, relus à l'ouverture des Nouveautés. */
+  let news: Record<string, NewsReactions> = {};
+  let newsNet: FeedbackNet = 'idle';
+  let newsLoading: Promise<void> | undefined;
+  let newsAt = 0;
+
+  function refreshNews(): Promise<void> {
+    newsLoading ??= (async () => {
+      if (newsNet !== 'ok') newsNet = 'loading';
+      opts.changed();
+      try {
+        const pk = opts.key()?.publicKey;
+        const r = await call('GET', `/api/nouveautes${pk ? `?pk=${pk}` : ''}`);
+        if (r.status !== 200) throw new Error(`HTTP ${r.status}`);
+        news = parseNewsReactions(r.json);
+        newsNet = 'ok';
+        newsAt = Date.now();
+      } catch (error) {
+        newsNet = 'offline';
+        opts.log(`Nouveautés : réactions injoignables (${(error as Error).message}).`); // i18n-ignore : journal
+      } finally {
+        newsLoading = undefined;
+        opts.changed();
+      }
+    })();
+    return newsLoading;
+  }
+
+  /** Pose, change ou retire (null) ma réaction : tout de suite à l'écran, la réponse du service fait foi. */
+  async function reactNews(item: string, kind: Reaction | null): Promise<Outcome> {
+    const before = news[item];
+    news = { ...news, [item]: withMyNewsReaction(before, kind) };
+    opts.changed();
+    const r = await signed('/api/nouveautes', { op: 'news-react', item, kind });
+    const after = r.ok ? parseNewsReaction(r.json) : undefined;
+    news = { ...news, [item]: after ?? before ?? { counts: {} } };
+    if (r.ok) opts.log(`Nouveautés : réaction ${kind ?? 'retirée'} sur ${item}.`); // i18n-ignore : journal
+    opts.changed();
     return r;
   }
 
@@ -266,6 +315,14 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
     propose,
     vote,
     forgetMe,
+    /** Réactions aux Nouveautés : les totaux d'une nouveauté, l'état du service, relire, réagir. */
+    news: {
+      of: (item: string): NewsReactions => news[item] ?? { counts: {} },
+      net: () => newsNet,
+      refresh: refreshNews,
+      refreshIfOld: () => (Date.now() - newsAt > 120_000 ? refreshNews() : Promise.resolve()),
+      react: reactNews,
+    },
     sendReport,
     queuedCount: () => queued().length,
     flush,
@@ -291,9 +348,36 @@ function simulatedStore(seedFile: string, dataDir: string) {
     rows = [];
   }
   const sent = path.join(dataDir, 'retours', 'envoyes');
+  // Réactions aux Nouveautés : quelques joueurs inventés en ont déjà posé (graine du fichier, champ
+  // « nouveautes » : { <id>: { <réaction>: nombre } }), puis celles de cette borne.
+  const reactions = new Map<string, Map<string, string>>();
+  try {
+    const seed = JSON.parse(fs.readFileSync(seedFile, 'utf8')) as { nouveautes?: Record<string, Record<string, number>> };
+    for (const [item, counts] of Object.entries(seed.nouveautes ?? {}))
+      for (const [kind, n] of Object.entries(counts)) for (let i = 0; i < n; i++) (reactions.get(item) ?? reactions.set(item, new Map()).get(item)!).set(`${kind}${i}`, kind);
+  } catch {
+    // Pas de graine : aucune réaction.
+  }
+  const newsView = (item: string, pk: string | undefined) => {
+    const who = reactions.get(item) ?? new Map<string, string>();
+    const counts: Record<string, number> = {};
+    for (const kind of who.values()) counts[kind] = (counts[kind] ?? 0) + 1;
+    const mine = pk ? who.get(pk) : undefined;
+    return { counts, ...(mine ? { mine } : {}) };
+  };
   return {
     async call(method: string, route: string, body: string | Uint8Array | undefined, pk: string | undefined): Promise<{ status: number; json?: unknown }> {
       await new Promise((r) => setTimeout(r, 120));
+      if (method === 'GET' && route.startsWith('/api/nouveautes')) {
+        return { status: 200, json: { reactions: Object.fromEntries([...reactions.keys()].map((item) => [item, newsView(item, pk)])) } };
+      }
+      if (method === 'POST' && route === '/api/nouveautes' && typeof body === 'string') {
+        const b = JSON.parse((JSON.parse(body) as { b: string }).b) as { item: string; kind: string | null; pk: string };
+        const who = reactions.get(b.item) ?? reactions.set(b.item, new Map()).get(b.item)!;
+        if (b.kind) who.set(b.pk, b.kind);
+        else who.delete(b.pk);
+        return { status: 200, json: { item: b.item, ...newsView(b.item, b.pk) } };
+      }
       if (method === 'GET' && route.startsWith('/api/propositions')) {
         const view = rows
           .map(({ voters, author, ...p }) => ({ ...p, votes: voters.size, ...(pk ? { voted: voters.has(pk), mine: author === pk } : {}) }));
@@ -318,6 +402,7 @@ function simulatedStore(seedFile: string, dataDir: string) {
         const mine = rows.filter((r) => r.author === b.pk);
         rows = rows.filter((r) => r.author !== b.pk);
         for (const r of rows) r.voters.delete(b.pk);
+        for (const who of reactions.values()) who.delete(b.pk);
         return { status: 200, json: { propositions: mine.length } };
       }
       if (method === 'POST' && route === '/api/rapports' && body instanceof Uint8Array) {

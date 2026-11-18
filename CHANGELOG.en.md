@@ -9,8 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- What's new: on an enlarged item, react with one of the seven message reactions (👍 ❤️ 🥰 😆 😮 😢 😡). Each tile shows how many players chose it, all over the world, and yours is marked; Start on it removes it. One reaction per cabinet and per item; deleting your account also erases your reactions.
 - Player profile: a record's or badge's "Like" now shows a thumbs-up instead of a star, so it is clear you can like it; the thumb is filled once you have liked it. The same thumb appears on the "Liked by" screen, the notification for a like you receive, the experience points breakdown and the "Appreciated", "Popular" and "Generous" badges.
-- New System menu > My account section, at the top: protect and transfer your account, nickname, avatar, country, badges, public profile, what others see, and account deletion.
+- New section System menu > My account, at the top: protect and transfer your account, nickname, avatar, country, badges, public profile, what others see, and account deletion.
 - Backup copy of the account, written automatically outside the Cyber Pinball folder: a reinstall, even in another folder, finds the account and offers to take it back on first launch.
 - Recovery code: 24 words to write down, or their QR code to photograph, which bring the account back on any PC; two words are asked again to check it is written down.
 - Optional password: the nickname becomes the ID, and the account is kept encrypted on the Cyber Pinball server, which cannot open it; at most ten failed tries per hour.

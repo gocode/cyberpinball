@@ -101,7 +101,7 @@ function renderLibrary(v) {
   // Texte en lecture (reading.ts) : de même, les actions s'éteignent un peu.
   else if (v.reading?.active) body.classList.add('zone-list');
   if (v.pages) body.append(renderPages(v.pages));
-  else if (v.newsPage) body.append(renderNewsPage(v.newsPage));
+  else if (v.newsPage) body.append(renderNewsPage(v.newsPage, v));
   else if (v.crop) body.append(renderCrop(v.crop));
   else if (v.journey) body.append(renderJourney(v.journey));
   else if (v.health) body.append(zoneFrame(renderHealth(v.health, v.cursor), v.zone));
@@ -949,7 +949,7 @@ function newsLine(row, cursor, moved, rank) {
 }
 
 /** Une nouveauté agrandie : le grand aperçu, le texte entier, où la trouver. */
-function renderNewsPage(p) {
+function renderNewsPage(p, v) {
   const card = libEl('div', `news-page${p.preview ? '' : ' no-preview'}`);
   if (p.preview) {
     const img = libEl('img', 'news-shot');
@@ -962,7 +962,38 @@ function renderNewsPage(p) {
   for (const line of p.lines) copy.append(libEl('p', 'news-line', line));
   copy.append(libEl('p', 'news-where', p.where));
   card.append(copy);
+  // « Réagir » (Section.kind « news-reactions ») : les sept réactions en tuiles, sur toute la
+  // largeur de la carte, sous l'aperçu et le texte (au bureau, la colonne du texte n'a pas la place).
+  const tiles = v.sections.find((s) => s.kind === 'news-reactions');
+  if (tiles) card.append(newsReactions(tiles, p.note, v.cursor));
   return card;
+}
+
+/**
+ * Les réactions d'une nouveauté : une tuile par réaction, l'emoji et le nombre de joueurs dessous ;
+ * la mienne cerclée de bleu méta (le vert reste au choix du curseur) ; grisées quand réagir est
+ * impossible, la raison dans la ligne d'état.
+ */
+function newsReactions(section, note, cursor) {
+  // Une liste d'options (Section.options), pas une liste de contenu : pas de cadre ni de repère
+  // (layout-check.ts) ; Exit revient à la liste des nouveautés.
+  const box = libEl('section', `lib-section${section.options ? ' options' : ''} news-react`);
+  box.append(libEl('h3', 'news-react-title', section.title));
+  const list = libEl('ul', 'lib-rows news-react-tiles');
+  for (const row of section.rows) {
+    const li = libEl('li', `lib-row news-react-tile tone-${row.tone ?? 'none'}${row.current ? ' mine' : ''}`);
+    li.title = row.text;
+    if (row.action !== undefined) {
+      li.classList.add('pick');
+      if (row.action === cursor) li.classList.add('selected');
+      actOn(li, { type: 'activate', index: row.action });
+    }
+    li.append(libEl('span', 'news-react-emoji', row.emoji), libEl('span', 'news-react-count', row.badges?.[0] ?? ''));
+    list.append(li);
+  }
+  box.append(list);
+  if (note) box.append(libEl('p', 'news-react-note', note));
+  return box;
 }
 
 function renderPages(p) {

@@ -521,9 +521,10 @@ export interface Built {
   keysUp?: boolean;
   /**
    * Une nouveauté agrandie (news-menu.ts), à la place des sections : son grand aperçu (adresse relative
-   * à la page, nouveautes/<id>-<langue>.webp), son texte entier et où la trouver.
+   * à la page, nouveautes/<id>-<langue>.webp), son texte entier et où la trouver ; `note` : la ligne
+   * d'état sous ses réactions (Section.kind « news-reactions », rendue dans la carte).
    */
-  newsPage?: { preview?: string; lines: string[]; where: string };
+  newsPage?: { preview?: string; lines: string[]; where: string; note?: string };
 }
 
 /** Ce que le rendu montre d'un recadrage (app/renderer/library.js, renderCrop). */

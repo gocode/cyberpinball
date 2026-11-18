@@ -40,6 +40,13 @@ test('nouveautés : une sélection datée, la plus récente en haut, jamais une 
     assert.match(n.version, /^\d+\.\d+\.\d+$/, `${n.id} : la version finale qui l'a apportée`);
     assert.ok(n.more.length >= 1 && n.more.length <= 3, `${n.id} : une à trois phrases de détail`);
     assert.ok(n.detail.length <= 110, `${n.id} : la ligne tient en une phrase (${n.detail.length} signes)`);
+    // Le texte agrandi tient dans sa case sans défiler (une borne n'a pas de souris) : 460 signes au plus, dans les deux langues.
+    for (const lang of ['fr', 'en'] as const) {
+      setLanguage(lang);
+      const size = n.more.join(' ').length;
+      assert.ok(size <= 460, `${n.id} (${lang}) : texte agrandi de ${size} signes, au-delà de 460 il ne tient plus au bureau`);
+    }
+    setLanguage('fr');
   }
   for (let i = 1; i < NEWS.length; i++) assert.ok(NEWS[i - 1]!.date >= NEWS[i]!.date, `${NEWS[i]!.id} : la plus récente en haut`);
   const perDay = new Map<string, number>();

@@ -2554,6 +2554,14 @@ const newsMenu = createNewsMenu({
   dataDir: loc.dataDir,
   library: { openCustom: (build, at) => library.openCustom(build, at), openSystem: () => library.openSystem() },
   reach: (target, back) => newsReach(target, back),
+  // Les sept réactions sur chaque nouveauté, comptées par le service des retours (une par borne).
+  reactions: {
+    of: (item) => feedbackService.news.of(item),
+    net: () => feedbackService.news.net(),
+    refresh: () => feedbackService.news.refreshIfOld(),
+    react: (item, kind) => feedbackService.news.react(item, kind),
+    closed: () => (guest.active ? t('Réagir est fermé en mode invité') : undefined),
+  },
   changed: () => {
     if (!closing && state.phase !== 'playing' && state.phase !== 'loading') broadcast();
   },

@@ -5526,11 +5526,14 @@ body.mouse .lib-row.news-item.pick:not(.selected):hover .news-block {
   }
 }
 
+/* L'aperçu et le texte côte à côte au bureau, l'un sous l'autre en borne ; les réactions sur toute la largeur, dessous. */
 .news-page {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-  gap: 3.4cqmin;
+  /* Au bureau, le texte a la plus grande part : une colonne étroite le faisait déborder au-dessus de la carte. */
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.5fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 2.4cqmin 3.4cqmin;
   align-items: center;
   padding: 2cqmin;
   border-radius: 1cqmin;
@@ -5539,21 +5542,103 @@ body.mouse .lib-row.news-item.pick:not(.selected):hover .news-block {
   outline-offset: -0.15cqmin;
 }
 
+/*
+ * Réagir à une nouveauté : sept tuiles de front sous le texte, l'emoji et le nombre de joueurs ; la
+ * mienne cerclée de bleu méta, le choix du curseur en vert comme toute ligne choisie.
+ */
+.news-react {
+  grid-column: 1 / -1;
+  align-self: end;
+  padding-top: 1.6cqmin;
+  border-top: 0.15cqmin solid var(--line);
+}
+
+.news-react-title {
+  margin: 0 0 1cqmin;
+  font-size: 2cqmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.news-react-tiles {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.9cqmin;
+}
+
+.lib-row.news-react-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3cqmin;
+  padding: 0.9cqmin 0.4cqmin 0.7cqmin;
+  border: 0.15cqmin solid var(--line-strong);
+  border-radius: 0.8cqmin;
+  background: var(--surface-raised);
+  font-size: 2cqmin;
+}
+
+.news-react-emoji {
+  font-size: 3.6cqmin;
+  line-height: 1;
+}
+
+.news-react-count {
+  min-height: 2.4cqmin;
+  font-size: 1.95cqmin;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+}
+
+.lib-row.news-react-tile.mine {
+  border-color: var(--meta);
+  box-shadow: inset 0 0 0 0.15cqmin var(--meta);
+}
+
+.lib-row.news-react-tile.mine .news-react-count {
+  color: var(--meta);
+}
+
+.lib-row.news-react-tile.selected {
+  border-color: var(--accent);
+  background: var(--signal-wash);
+  box-shadow: inset 0 0 0 0.15cqmin var(--accent), 0 0 2cqmin var(--signal-haze);
+}
+
+.lib-row.news-react-tile.tone-quiet {
+  opacity: 0.55;
+}
+
+body.mouse .lib-row.news-react-tile.pick:not(.selected):hover {
+  border-color: var(--halo);
+}
+
+.news-react-note {
+  margin: 1cqmin 0 0;
+  font-size: 1.95cqmin;
+  color: var(--ink-muted);
+}
+
 /* Sans aperçu : le cadre à la taille de son texte, jamais un grand vide noir. */
 .news-page.no-preview {
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
   align-self: start;
 }
 
 @container (orientation: portrait) {
   .news-page {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr) auto auto;
     align-items: stretch;
   }
 
   .news-page.no-preview {
-    grid-template-rows: auto;
+    grid-template-rows: auto auto;
     align-content: start;
   }
 }
@@ -5562,17 +5647,33 @@ body.mouse .lib-row.news-item.pick:not(.selected):hover .news-block {
   width: 100%;
   height: 100%;
   min-height: 0;
+  max-height: 100%;
   object-fit: contain;
   object-position: center top;
   border-radius: 0.9cqmin;
 }
 
+/*
+ * Le texte tient dans sa case, calé en haut : jamais de défilement (une borne n'a pas de souris pour
+ * le faire), d'où un texte court (news.test.ts) et, en paysage, une colonne large et une police plus fine.
+ */
 .news-copy {
   display: flex;
   flex-direction: column;
   gap: 1.4cqmin;
   min-width: 0;
+  align-self: start;
   padding: 0 0.8cqmin 0.4cqmin;
+}
+
+@container (orientation: landscape) {
+  .news-copy .news-line {
+    font-size: 2.1cqmin;
+  }
+
+  .news-copy .news-where {
+    font-size: 1.95cqmin;
+  }
 }
 
 .news-line {

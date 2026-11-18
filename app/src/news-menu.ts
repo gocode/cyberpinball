@@ -24,6 +24,10 @@ import {
   newsAtRoot,
   newsLongDate,
   newsShortDate,
+  REACTION_EMOJI,
+  REACTIONS,
+  reactionName,
+  reactionText,
   saveNewsState,
   saveOrWarn,
   t,
@@ -31,6 +35,8 @@ import {
   unreadNews,
   type NewsItem,
   type NewsReach,
+  type NewsReactions,
+  type Reaction,
 } from '@cyberpinball/core';
 // Types seulement : library.js charge electron, que les tests du cœur n'ont pas.
 import type { Action, Built, ProvidedSystemItem, Row } from './library';
@@ -55,6 +61,19 @@ export interface NewsMenuHost {
   log?(line: string): void;
   /** Les nouveautés (essais) ; sans elles, NEWS. */
   items?: readonly NewsItem[];
+  /**
+   * Les réactions des joueurs (les sept des messages), comptées par le service des retours
+   * (feedback-service.ts) ; sans elles, la nouveauté agrandie n'a pas de « Réagir ».
+   */
+  reactions?: {
+    of(item: string): NewsReactions;
+    net(): 'idle' | 'loading' | 'ok' | 'offline';
+    /** Relues à l'ouverture des Nouveautés. */
+    refresh(): Promise<void> | void;
+    react(item: string, kind: Reaction | null): Promise<{ ok: boolean }>;
+    /** Pourquoi réagir est impossible maintenant (mode invité, pas de clé de joueur), sinon undefined. */
+    closed(): string | undefined;
+  };
 }
 
 export interface NewsMenu {
@@ -141,7 +160,51 @@ export function createNewsMenu(host: NewsMenuHost): NewsMenu {
 
   function openPage(i: number, fresh = true): void {
     pageAt = i;
-    host.library.openCustom(pageBuild, fresh ? 0 : undefined);
+    // Ouverte, le choix sur « Essayer » : après les sept réactions, quand il y en a.
+    host.library.openCustom(pageBuild, fresh ? (host.reactions ? REACTIONS.length : 0) : undefined);
+  }
+
+  /**
+   * « Réagir » : les sept réactions en tuiles sous le texte, chacune avec son nombre de joueurs, la
+   * mienne repérée ; Start pose une réaction, ou retire la mienne. Les tuiles sont des lignes à
+   * choisir (leurs actions ne se répètent pas dans la colonne), avant « Essayer » dans l'ordre des
+   * flippers, comme à l'écran. Grisées avec leur raison quand réagir est impossible.
+   */
+  function reactionTiles(n: NewsItem, actions: Action[]): { section?: Built['sections'][number]; note?: string } {
+    const r = host.reactions;
+    if (!r) return {};
+    const mine = r.of(n.id);
+    const net = r.net();
+    const closed = r.closed() ?? (net === 'offline' ? t('Réactions hors ligne : elles reviennent dès que le service répond') : undefined);
+    const rows: Row[] = REACTIONS.map((kind) => {
+      const on = mine.mine === kind;
+      const count = mine.counts[kind] ?? 0;
+      const index =
+        actions.push({
+          label: reactionText(kind),
+          key: `news:react:${kind}`,
+          ...(closed ? { tone: 'quiet' as const, detail: closed } : {}),
+          run: () => {
+            if (closed) return;
+            // Tout de suite à l'écran, puis la réponse du service.
+            const sent = r.react(n.id, on ? null : kind);
+            host.changed?.();
+            void sent.finally(() => host.changed?.());
+          },
+        }) - 1;
+      return {
+        text: reactionName(kind),
+        emoji: REACTION_EMOJI[kind],
+        badges: count ? [String(count)] : [],
+        ...(on ? { current: true } : {}),
+        ...(closed ? { tone: 'quiet' as const } : {}),
+        action: index,
+        pick: true,
+      };
+    });
+    const total = REACTIONS.reduce((s, k) => s + (mine.counts[k] ?? 0), 0);
+    const note = closed ?? (net === 'loading' && !total ? t('Lecture des réactions…') : mine.mine ? t('Votre réaction : {reaction} · Start sur elle la retire', { reaction: reactionText(mine.mine) }) : total ? tn(total, '{n} joueur a réagi', '{n} joueurs ont réagi') : t('Soyez le premier à réagir'));
+    return { section: { title: t('Réagir'), kind: 'news-reactions', options: true, rows }, note };
   }
 
   function buildPage(i: number): Built {
@@ -150,7 +213,9 @@ export function createNewsMenu(host: NewsMenuHost): NewsMenu {
     const here = () => openPage(i);
     const reach = host.reach(n.reach, here);
     const preview = newsPreview(n);
-    const actions: Action[] = [
+    const actions: Action[] = [];
+    const tiles = reactionTiles(n, actions);
+    actions.push(
       {
         label: t('Essayer : {where}', { where: lastStep(n.where) }),
         icon: 'play',
@@ -161,16 +226,16 @@ export function createNewsMenu(host: NewsMenuHost): NewsMenu {
       ...(i > 0 ? [{ label: t('‹ Précédente'), icon: 'chevron-left' as const, key: 'news:previous', run: () => openPage(i - 1, false) }] : []),
       ...(i < items.length - 1 ? [{ label: t('Suivante ›'), icon: 'chevron-right' as const, key: 'news:next', run: () => openPage(i + 1, false) }] : []),
       { label: t('Retour à la liste'), icon: 'back', key: 'news:list', run: back },
-    ];
+    );
     return {
       heading: n.title,
       icon: 'sparkle',
       subheading: [t('{date} · version {version}', { date: newsLongDate(n.date), version: n.version }), ...(n.beta ? [beta()] : [])].join(' · '),
-      sections: [],
-      newsPage: { ...(preview ? { preview } : {}), lines: [...n.more], where: t('Où : {where}', { where: n.where }) },
+      sections: tiles.section ? [tiles.section] : [],
+      newsPage: { ...(preview ? { preview } : {}), lines: [...n.more], where: t('Où : {where}', { where: n.where }), ...(tiles.note ? { note: tiles.note } : {}) },
       actions,
       back,
-      hint: t('Flippers : choisir · Start : essayer · Exit : retour à la liste'),
+      hint: t('Flippers : choisir · Start : valider · Exit : retour à la liste'),
     };
   }
 
@@ -186,6 +251,7 @@ export function createNewsMenu(host: NewsMenuHost): NewsMenu {
     host.log?.(`Nouveautés : ouvertes, ${items.length} lignes, ${unread.length} à voir.`); // i18n-ignore : journal
     // Ouvrir l'écran, c'est les avoir vues : la pastille part, le repère « Nouveau » reste jusqu'à la sortie.
     if (markNewsSeen(state, unread.map((n) => n.id))) save();
+    if (host.reactions) void Promise.resolve(host.reactions.refresh()).then(() => host.changed?.());
     host.library.openCustom(buildList, 0);
   }
 

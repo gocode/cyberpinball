@@ -18,6 +18,7 @@
 import * as fs from 'node:fs';
 import { writeFileAtomic } from './atomicwrite';
 import { language, t } from './i18n';
+import { REACTIONS, isReaction, type Reaction } from './reactions';
 import type { SystemEntryId } from './systemmenu';
 
 export const NEWS_FILE = 'nouveautes.json';
@@ -402,6 +403,53 @@ export function newsAtRoot(state: NewsState, now: number, items: readonly NewsIt
   if (unreadNews(state, items).length) return true;
   const newest = newestNewsDate(items);
   return newest !== undefined && now - Date.parse(`${newest}T12:00:00`) < NEWS_ROOT_DAYS * 86_400_000;
+}
+
+// ---------------------------------------------------------------------------
+// Réactions des joueurs (les sept des messages), comptées par le service des retours
+// (packages/service-telephone/worker.mjs, GET et POST /api/nouveautes) : une par borne et par nouveauté.
+
+/** Les réactions d'une nouveauté : combien de joueurs pour chacune, et la mienne. */
+export interface NewsReactions {
+  counts: Partial<Record<Reaction, number>>;
+  mine?: Reaction;
+}
+
+/** Une réponse du service, vérifiée champ par champ : rien d'inattendu n'entre dans les écrans. */
+export function parseNewsReactions(raw: unknown): Record<string, NewsReactions> {
+  const all = raw && typeof raw === 'object' ? (raw as { reactions?: unknown }).reactions : undefined;
+  const out: Record<string, NewsReactions> = {};
+  if (!all || typeof all !== 'object') return out;
+  for (const [item, value] of Object.entries(all as Record<string, unknown>)) {
+    if (!/^[a-z0-9-]{2,40}$/.test(item)) continue;
+    const one = parseNewsReaction(value);
+    if (one) out[item] = one;
+  }
+  return out;
+}
+
+/** Les réactions d'une nouveauté (réponse d'un POST, ou une entrée de la liste). */
+export function parseNewsReaction(raw: unknown): NewsReactions | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as { counts?: unknown; mine?: unknown };
+  const counts: Partial<Record<Reaction, number>> = {};
+  if (r.counts && typeof r.counts === 'object') {
+    for (const kind of REACTIONS) {
+      const n = (r.counts as Record<string, unknown>)[kind];
+      if (typeof n === 'number' && Number.isSafeInteger(n) && n > 0) counts[kind] = n;
+    }
+  }
+  return { counts, ...(isReaction(r.mine) ? { mine: r.mine } : {}) };
+}
+
+/** Ma réaction changée, tout de suite à l'écran (la réponse du service fait foi ensuite). */
+export function withMyNewsReaction(before: NewsReactions | undefined, kind: Reaction | null): NewsReactions {
+  const counts = { ...(before?.counts ?? {}) };
+  const old = before?.mine;
+  if (old) counts[old] = Math.max(0, (counts[old] ?? 0) - 1) || undefined;
+  if (kind) counts[kind] = (counts[kind] ?? 0) + 1;
+  for (const k of REACTIONS) if (!counts[k]) delete counts[k];
+  return { counts, ...(kind ? { mine: kind } : {}) };
 }
 
 const locale = () => (language() === 'en' ? 'en-GB' : 'fr-FR');

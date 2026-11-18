@@ -22,6 +22,9 @@
 //      date, sans auteur, et seulement les plus récentes.
 //    L'administrateur (requêtes /api/admin/…, signées par ADMIN_PUBLIC_KEY) masque, change le statut,
 //    répond, fusionne les doublons, et relève les rapports.
+//    Les réactions aux Nouveautés du front-end : GET /api/nouveautes rend les totaux de chaque
+//    nouveauté (et la mienne si `pk` est donné) ; POST /api/nouveautes pose, change ou retire ma
+//    réaction, signée comme un vote, une par borne et par nouveauté.
 //
 // Il ne journalise ni adresse IP ni contenu : l'adresse IP ne sert que de clé à la limite d'écritures.
 //
@@ -399,12 +402,62 @@ async function forget(request, env, now) {
     db.prepare('DELETE FROM votes WHERE proposition IN (SELECT id FROM propositions WHERE author = ?1)').bind(pk),
     db.prepare('DELETE FROM propositions WHERE author = ?1').bind(pk),
     db.prepare('DELETE FROM votes WHERE voter = ?1').bind(pk),
+    db.prepare('DELETE FROM reactions_nouveautes WHERE voter = ?1').bind(pk),
     // Le coffre du compte et son mot de passe (routes /api/coffre…) partent avec lui.
     db.prepare('DELETE FROM coffres WHERE pk = ?1').bind(pk),
     db.prepare('DELETE FROM coffres_mdp WHERE pk = ?1').bind(pk),
   ]);
   if (refused) return refused;
   return reply(200, { propositions: propositions ?? 0 });
+}
+
+// ─── Réactions aux Nouveautés ───────────────────────────────────────────────────────────────────
+
+/** Les sept réactions, dans l'ordre (le même que REACTIONS, packages/core/src/reactions.ts). */
+export const NEWS_REACTIONS = ['like', 'love', 'care', 'haha', 'wow', 'sad', 'angry'];
+/** Identifiant d'une nouveauté (news.ts) : minuscules, chiffres, tirets. */
+export const NEWS_ITEM = /^[a-z0-9-]{2,40}$/;
+/** Nouveautés rendues au plus (les plus récentes ont les identifiants que la borne connaît). */
+export const NEWS_ITEMS_MAX = 100;
+
+/** Les totaux de chaque nouveauté, et ma réaction si `pk` est donné : jamais une clé. */
+async function listNewsReactions(env, url) {
+  const asked = url.searchParams.get('pk');
+  const pk = asked && HEX64.test(asked) ? asked : '';
+  const { results } = await env.RETOURS.prepare('SELECT item, kind, COUNT(*) AS n, SUM(voter = ?1) AS mine FROM reactions_nouveautes GROUP BY item, kind ORDER BY item LIMIT ?2').bind(pk, NEWS_ITEMS_MAX * NEWS_REACTIONS.length).all();
+  const reactions = {};
+  for (const r of results) {
+    const one = (reactions[r.item] ??= { counts: {} });
+    one.counts[r.kind] = r.n;
+    if (pk && r.mine) one.mine = r.kind;
+  }
+  return reply(200, { reactions });
+}
+
+async function totalsOf(db, item) {
+  const { results } = await db.prepare('SELECT kind, COUNT(*) AS n FROM reactions_nouveautes WHERE item = ?1 GROUP BY kind').bind(item).all();
+  return Object.fromEntries(results.map((r) => [r.kind, r.n]));
+}
+
+/** Pose, change ou retire (kind: null) ma réaction à une nouveauté : signée, une par borne, jamais rejouée. */
+async function reactNews(request, env, now) {
+  if (await limited(request, env)) return reply(429, { erreur: 'trop' });
+  const checked = await signedRequest(request, 'news-react', now);
+  if (!checked.body) return reply(checked.status, { erreur: checked.why });
+  const { pk, t, item, kind } = checked.body;
+  if (typeof item !== 'string' || !NEWS_ITEM.test(item) || (kind !== null && !NEWS_REACTIONS.includes(kind))) return reply(400, { erreur: 'forme' });
+  const db = env.RETOURS;
+  if (await seen(db, pk, t)) return reply(409, { erreur: 'rejeu' });
+  const last = await db.prepare('SELECT at FROM reactions_nouveautes WHERE item = ?1 AND voter = ?2').bind(item, pk).first('at');
+  if (last !== null && last !== undefined && t <= last) return reply(409, { erreur: 'rejeu' });
+  const refused = await writeOnce(db, pk, t, [
+    ...markSeen(db, pk, t, now),
+    kind
+      ? db.prepare('INSERT INTO reactions_nouveautes (item, voter, kind, at) VALUES (?1, ?2, ?3, ?4) ON CONFLICT (item, voter) DO UPDATE SET kind = excluded.kind, at = excluded.at').bind(item, pk, kind, t)
+      : db.prepare('DELETE FROM reactions_nouveautes WHERE item = ?1 AND voter = ?2').bind(item, pk),
+  ]);
+  if (refused) return refused;
+  return reply(200, { item, counts: await totalsOf(db, item), ...(kind ? { mine: kind } : {}) });
 }
 
 async function report(request, env, now) {
@@ -688,11 +741,15 @@ async function coffre(request, env, url, now) {
 /** Les routes des retours (/api/propositions, /api/votes, /api/rapports, /api/admin/…) ; undefined pour les autres. */
 async function retours(request, env, url, now) {
   const path = url.pathname;
-  const known = path === '/api/propositions' || path === '/api/votes' || path === '/api/oubli' || path === '/api/rapports' || path.startsWith('/api/admin/');
+  const known = path === '/api/propositions' || path === '/api/votes' || path === '/api/oubli' || path === '/api/rapports' || path === '/api/nouveautes' || path.startsWith('/api/admin/');
   if (!known) return undefined;
   if (!env.RETOURS) return reply(503, { erreur: 'indisponible' });
   try {
     if (path.startsWith('/api/admin/')) return await admin(request, env, url, now);
+    if (path === '/api/nouveautes') {
+      if (request.method === 'GET') return await listNewsReactions(env, url);
+      return request.method === 'POST' ? await reactNews(request, env, now) : reply(405, { erreur: 'méthode' });
+    }
     if (path === '/api/propositions') {
       if (request.method === 'GET') return await listPropositions(env, url);
       return request.method === 'POST' ? await propose(request, env, now) : reply(405, { erreur: 'méthode' });
