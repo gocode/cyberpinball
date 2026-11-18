@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.1
 
+- Tables UltraDMD et FlexDMD : quand le médecin range une table en vrac dans son propre dossier, il emporte aussi le dossier de son DMD (« Table.UltraDMD »), qui restait derrière et laissait le DMD vide.
+- Le médecin retrouve un dossier du DMD resté à la racine du dossier des tables, ou dans le dossier d'une autre version de la table, et propose de le ranger avec la table.
+- Une table dont le script cherche son dossier du DMD dans TablesDirectory (le dossier Tables de VPX, pas celui de la table) le trouve désormais dans son propre dossier : VPX joue une copie corrigée de son script, la table n'est pas modifiée.
 - Le sélecteur de fichiers s'ouvre trié par nom, comme l'Explorateur de Windows ; « Trier par date » reste à portée de geste.
 - Correctifs de script jamais appliqués sur une borne où les tables avaient déjà été lues (Daredevil et Hellboy s'arrêtaient encore à chaque clignotement) : Cyber Pinball gardait en mémoire ce que disait le script de chaque table, sans voir qu'une nouvelle version savait y repérer davantage. Un correctif de script ajouté fait maintenant relire les scripts, dans les tables elles-mêmes, sans lancer VPX.
 - Menu système > Communauté > Jouer en local : pour une borne qui ne joue qu'en local, un seul réglage retire toute la partie sociale d'un coup, niveaux compris : niveaux, XP et badges (carte du joueur, moments de badge et de niveau), amis, joueurs en ligne, messages, salons, groupes, parties instantanées, classements en ligne, médaillon Communauté, Communauté au téléphone. Le réseau des bornes s'arrête ; la mise à jour, les Nouveautés, les tables et leurs scores restent. Rien n'est effacé : « Remettre la communauté » ramène tout, XP compris.

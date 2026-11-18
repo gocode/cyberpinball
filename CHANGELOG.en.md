@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- UltraDMD and FlexDMD tables: when the doctor moves a loose table into its own folder, it now also moves its DMD folder ("Table.UltraDMD"), which used to stay behind and leave the DMD empty.
+- The doctor finds a DMD folder left at the top of the tables folder, or in another version's folder, and offers to put it with the table.
+- A table whose script looks for its DMD folder in TablesDirectory (VPX's Tables folder, not the table's) now finds it in its own folder: VPX plays a fixed copy of its script, the table itself is unchanged.
 - The file picker now opens sorted by name, like Windows File Explorer; "Sort by date" is still one gesture away.
 - Script fixes never applied on a cabinet where the tables had already been read (Daredevil and Hellboy still stopped at every blink): Cyber Pinball kept what each table's script said, without noticing that a newer version could find more in it. A new script fix now makes it read the scripts again, from the tables themselves, without starting VPX.
 - System menu > Community > Local play: for a cabinet that only plays locally, a single setting removes the whole social side at once, levels included: levels, XP and badges (player card, badge and level moments), friends, players online, messages, rooms, groups, instant games, online rankings, the Community medallion, the Community on the phone. The cabinet network stops; updates, What's new, tables and their scores stay. Nothing is deleted: "Bring the community back" restores everything, XP included.

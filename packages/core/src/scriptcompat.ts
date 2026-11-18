@@ -13,10 +13,10 @@
 // appelée deux fois). Le médecin l'applique avant chaque partie (PUP_PLAY_REPAIRS) et dès
 // l'installation ; la table n'est jamais modifiée.
 
-import { commentStart } from './vbscript';
+import { commentStart, scriptCode } from './vbscript';
 
 /** Correctifs connus, nommés dans la dernière ligne du .vbs de Cyber Pinball. */
-export type CompatFix = 'vpmInitOnce' | 'vrRoomOnScreens' | 'executeGlobalOnce' | 'timerTextOnce';
+export type CompatFix = 'vpmInitOnce' | 'vrRoomOnScreens' | 'executeGlobalOnce' | 'timerTextOnce' | 'tablesDirectoryDmd';
 
 interface CompatRule {
   id: CompatFix;
@@ -447,7 +447,86 @@ const timerTextOnce: CompatRule = {
   stop: /(?!)/,
 };
 
-const RULES: readonly CompatRule[] = [vpmInitOnce, vrRoomOnScreens, executeGlobalOnce, timerTextOnce];
+// ---------- Dossier du DMD cherché dans TablesDirectory ----------
+//
+// UltraDMD et FlexDMD chargent leurs images d'un dossier livré avec la table (« Foo.UltraDMD »). La plupart des
+// scripts le cherchent dans le dossier courant (« curDir = fso.GetAbsolutePathName(".") ») : VPX 10.8 en fait le
+// dossier de la table juste avant de compiler le script (PinTable::Play, « make sure the load directory is the
+// active directory »). D'autres passent par TablesDirectory : VPX 10.8 y met le dossier « Tables » à côté de
+// VPinballX.exe s'il existe, sinon « tables » dans le dossier de la table (ScriptGlobalTable::get_TablesDirectory),
+// jamais le dossier de la table lui-même. Avec une table par dossier, le DMD y reste vide. Signalé le 18/11/2026
+// par un utilisateur. Le .vbs de Cyber Pinball remplace TablesDirectory, sur les seules lignes qui mènent au dossier
+// du DMD, par le dossier courant relevé au chargement du script, comme le font les scripts en curDir.
+
+const TABLE_DIR = 'CyberPinball_TableDir';
+const TABLES_DIRECTORY = /(^|[^\w.])TablesDirectory(?!\w)/gi;
+const PROJECT_FOLDER = /\.(?:ProjectFolder\s*=|SetProjectFolder\b)/i;
+const VB_WORDS = new Set(['and', 'or', 'not', 'call', 'set', 'with', 'end', 'me', 'true', 'false', 'nothing', 'empty', 'null']);
+
+/** Code d'une ligne sans ses chaînes (pour y chercher des noms). */
+function codeOnly(line: string): string {
+  let out = '';
+  editCode(line, (part) => {
+    out += ` ${part}`;
+    return part;
+  });
+  return out;
+}
+
+/** Lignes (à partir de 0) qui mènent le dossier du DMD à TablesDirectory : l'appel lui-même, ou la variable qu'il reçoit. */
+function tablesDirectoryDmdLines(code: string): number[] {
+  const lines = code.split('\n');
+  const uses = (i: number) => new RegExp(TABLES_DIRECTORY.source, 'i').test(codeOnly(lines[i]!));
+  const found = new Set<number>();
+  lines.forEach((line, i) => {
+    const at = line.search(PROJECT_FOLDER);
+    if (at < 0) return;
+    if (uses(i)) found.add(i);
+    // Variables du chemin (« .SetProjectFolder dmdDir ») : leur affectation à partir de TablesDirectory.
+    const names = [...codeOnly(line.slice(at)).matchAll(/(?:^|[^\w.])([A-Za-z_]\w*)(?![\w.(])/g)].map((m) => m[1]!).filter((n) => !VB_WORDS.has(n.toLowerCase()) && !/^(SetProjectFolder|ProjectFolder|TablesDirectory)$/i.test(n));
+    for (const name of names) {
+      const assign = new RegExp(`(?:^|[\\s:])${name}\\s*=`, 'i');
+      lines.forEach((other, j) => {
+        if (j !== i && assign.test(codeOnly(other)) && uses(j)) found.add(j);
+      });
+    }
+  });
+  return [...found].sort((a, b) => a - b);
+}
+
+const tablesDirectoryDmd: CompatRule = {
+  id: 'tablesDirectoryDmd',
+  found: (code) => tablesDirectoryDmdLines(code).length > 0,
+  applicable: (code) => tablesDirectoryDmdLines(code).length > 0,
+  applied: (text) => new RegExp(`^\\s*function\\s+${TABLE_DIR}\\b`, 'im').test(text) && tablesDirectoryDmdLines(scriptCode(text)).length === 0,
+  apply(text) {
+    const targets = tablesDirectoryDmdLines(scriptCode(text));
+    if (!targets.length) return undefined;
+    const eol = /\r\n/.test(text) ? '\r\n' : '\n';
+    const parts = text.split(/(\r?\n)/);
+    for (const line of targets) {
+      const i = line * 2;
+      if (parts[i] === undefined) return undefined;
+      parts[i] = editCode(parts[i]!, (code) => code.replace(TABLES_DIRECTORY, (_, before: string) => `${before}${TABLE_DIR}()`));
+    }
+    let out = parts.join('');
+    if (out && !/\r?\n$/.test(out)) out += eol;
+    // Relevé au chargement du script (dernière ligne exécutée avant <table>_Init), ou au premier appel s'il vient plus tôt.
+    const lines = [
+      `Dim ${TABLE_DIR}_Value`,
+      `Function ${TABLE_DIR}()`,
+      `  If IsEmpty(${TABLE_DIR}_Value) Then ${TABLE_DIR}_Value = CreateObject("Scripting.FileSystemObject").GetAbsolutePathName(".") & "\\"`,
+      `  ${TABLE_DIR} = ${TABLE_DIR}_Value`,
+      `End Function`,
+      `Call ${TABLE_DIR}()`,
+    ];
+    return out + lines.join(eol) + eol;
+  },
+  // Aucun message de VPX : le DMD reste vide, ou le script s'arrête plus loin (« Type incompatible »).
+  stop: /(?!)/,
+};
+
+const RULES: readonly CompatRule[] = [vpmInitOnce, vrRoomOnScreens, executeGlobalOnce, timerTextOnce, tablesDirectoryDmd];
 
 /**
  * Les correctifs que cette version sait repérer. Les lectures de script gardées en cache (app/src/vbs.ts) les notent :

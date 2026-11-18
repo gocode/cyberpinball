@@ -40,6 +40,20 @@ export const messages: Record<string, string> = {
   'Images du DMD chargées en pleine partie': 'DMD images loaded mid-game',
   'Le DMD de cette table montre {n} image rangée dans la table, par FlexDMD.': 'This table’s DMD shows {n} image stored in the table, through FlexDMD.',
   'Le DMD de cette table montre {n} images rangées dans la table, par FlexDMD.': 'This table’s DMD shows {n} images stored in the table, through FlexDMD.',
+  'Dossier « {folder} » rangé ailleurs': 'Folder “{folder}” stored elsewhere',
+  'dans le dossier de « {table} »': 'in the “{table}” folder',
+  'à la racine du dossier des tables': 'at the top of the tables folder',
+  'Il est {where} : VPX le cherche dans le dossier de la table.': 'It is {where}: VPX looks for it in the table’s folder.',
+  'Copier « {folder} » dans le dossier de la table': 'Copy “{folder}” to the table’s folder',
+  'Ranger « {folder} » dans le dossier de la table': 'Move “{folder}” to the table’s folder',
+  'DMD cherché hors du dossier de la table': 'DMD looked for outside the table’s folder',
+  'Le script cherche le dossier « {folder} » dans TablesDirectory : VPX y met son propre dossier Tables, pas celui de la table. Ce DMD resterait vide.':
+    'The script looks for the “{folder}” folder in TablesDirectory: VPX puts its own Tables folder there, not the table’s. This DMD would stay empty.',
+  'Corrigé dans {file}, le script que VPX joue à la place de celui de la table : il cherche ce dossier dans celui de la table.':
+    'Fixed in {file}, the script VPX plays instead of the table’s: it looks for this folder in the table’s folder.',
+  'La table n’est pas modifiée : VPX joue {file}, une copie de son script qui cherche ce dossier dans celui de la table.':
+    'The table isn’t changed: VPX plays {file}, a copy of its script that looks for this folder in the table’s folder.',
+  'Chercher le DMD dans le dossier de la table (dans {file})': 'Look for the DMD in the table’s folder (in {file})',
   'VPX 10.8.1 lit et décode chacune à son premier affichage, pendant la partie : la partie s’arrête un instant, flippers compris.':
     'VPX 10.8.1 reads and decodes each one the first time it is shown, during the game: the game stops for a moment, flippers included.',
   'La table n’est pas modifiée : VPX joue {file}, une copie de son script qui charge ces images pendant le chargement de la table.':

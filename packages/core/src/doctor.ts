@@ -526,7 +526,8 @@ function dmdProjectFolder(code: string): string | undefined {
       const variable = /^[A-Za-z_]\w*$/.test(part) ? new RegExp(`\\b${part}\\s*=\\s*"([^"]*)"`, 'i').exec(code) : null;
       if (literal) value += literal[1];
       else if (variable) value += variable[1];
-      // Variable de tête non résolue (curDir, TablesDirectory) : le dossier de la table.
+      // Variable de tête non résolue (curDir) : le dossier de la table. TablesDirectory n'en est
+      // pas un, le .vbs de Cyber Pinball le remplace (scriptcompat.ts, tablesDirectoryDmd).
       else if (i === 0 && /^[A-Za-z_]\w*$/.test(part)) continue;
       else {
         value = '';
@@ -577,7 +578,14 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   // 1. Table rangée en vrac dans le dossier des tables.
   if (!ownFolder) {
     const target = path.join(ctx.tablesDir, tableFolderName(entry.title, entry.manufacturer, entry.year));
-    const moved = files.filter((f) => f.toLowerCase().startsWith(`${base.toLowerCase()}.`) && !fs.statSync(path.join(folder, f)).isDirectory());
+    // Ses fichiers, et le dossier du DMD que charge son script (« Foo.UltraDMD », « GooniesDMD ») :
+    // VPX le cherche dans le dossier de la table (dossier courant à la partie), laissé derrière il manquerait.
+    const dmd = ctx.script && !('error' in ctx.script) ? ctx.script.dmdFolder?.toLowerCase() : undefined;
+    const moved = files.filter((f) => {
+      const lower = f.toLowerCase();
+      if (!fs.statSync(path.join(folder, f)).isDirectory()) return lower.startsWith(`${base.toLowerCase()}.`);
+      return lower === dmd || (DMD_FOLDER_NAME.test(f) && lower.startsWith(`${base.toLowerCase()}.`));
+    });
     findings.push({
       code: 'outsideFolder',
       severity: 'warning',
@@ -668,7 +676,7 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
       findings.push(...checkRom(folder, ctx.script.roms, ctx.romLibrary));
     }
     if (!('error' in ctx.script) && ctx.script.dmdFolder) {
-      const finding = checkDmdFolder(folder, ctx.script.dmdFolder, ctx.script.usesPinmame);
+      const finding = checkDmdFolder(folder, ctx.script.dmdFolder, ctx.script.usesPinmame, ctx.tablesDir);
       if (finding) findings.push(finding);
       // Vidéos du DMD décodées en entier à chaque scène par le plugin FlexDMD (dmdvideos.ts) : la partie se fige.
       const videos = finding ? undefined : heavyDmdVideosFinding(folder, ctx.script.dmdFolder);
@@ -1217,9 +1225,27 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
     const compat = [...new Set([...own.compat, ...missing])];
     content = buildScriptPatch(source, own.switches, own.loader, own.capture, compat, own.prewarm) ?? buildScriptPatch(source, own.switches, own.loader, undefined, compat, own.prewarm);
   }
+  // Dossier du DMD cherché dans TablesDirectory, qui n'est pas le dossier de la table (scriptcompat.ts).
+  if (missing.every((f) => f === 'tablesDirectoryDmd')) {
+    const folder = facts?.dmdFolder ?? 'UltraDMD';
+    return {
+      code: 'scriptCoreCompat',
+      severity: 'warning',
+      title: t('DMD cherché hors du dossier de la table'),
+      detail: [
+        t('Le script cherche le dossier « {folder} » dans TablesDirectory : VPX y met son propre dossier Tables, pas celui de la table. Ce DMD resterait vide.', { folder }),
+        !content
+          ? t('Le script de la table est protégé : Cyber Pinball ne peut pas le corriger.')
+          : foreign
+            ? t('Corrigé dans {file}, le script que VPX joue à la place de celui de la table : il cherche ce dossier dans celui de la table.', { file })
+            : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script qui cherche ce dossier dans celui de la table.', { file }),
+      ].join(' '),
+      fix: content ? { label: t('Chercher le DMD dans le dossier de la table (dans {file})', { file }), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
+    };
+  }
   // Procédures redéfinies pendant la partie (clignotements de FlashForMs, SetFlash) : seul correctif qui manque.
   // Minuteries de vpmTimer décrites par un texte : compilé par Execute à chaque échéance.
-  if (missing.every((f) => f === 'executeGlobalOnce' || f === 'timerTextOnce')) {
+  if (missing.filter((f) => f !== 'tablesDirectoryDmd').every((f) => f === 'executeGlobalOnce' || f === 'timerTextOnce')) {
     const blinks = missing.includes('executeGlobalOnce');
     const timers = missing.includes('timerTextOnce');
     const detail = [
@@ -3263,7 +3289,7 @@ function checkRomCopy(file: string, library: string): Finding[] {
  * plugins/flexdmd/actors/Image.cpp) : ce DMD-là reste vide, et un script qui ne s'y attend
  * pas s'arrête sur « Type incompatible » (Goonies de VPW).
  */
-function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean): Finding | undefined {
+function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean, tablesDir: string): Finding | undefined {
   const dirs = readDirents(folder).filter((d) => d.isDirectory()).map((d) => d.name);
   if (dirs.some((d) => d.toLowerCase() === dmdFolder.toLowerCase())) return undefined;
   const intro = [
@@ -3292,6 +3318,22 @@ function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean)
       },
     };
   }
+  // Resté à la racine du dossier des tables (table rangée sans lui, ou installation à plat) : il
+  // revient à la table. Dans le dossier d'une autre version de la table : copié, elle en a besoin aussi.
+  const elsewhere = findDmdFolderElsewhere(folder, dmdFolder, tablesDir);
+  if (elsewhere) {
+    const where = elsewhere.shared ? t('dans le dossier de « {table} »', { table: path.basename(path.dirname(elsewhere.path)) }) : t('à la racine du dossier des tables');
+    return {
+      code: 'dmdFolderMissing',
+      severity: 'warning',
+      title: t('Dossier « {folder} » rangé ailleurs', { folder: dmdFolder }),
+      detail: `${intro} ${t('Il est {where} : VPX le cherche dans le dossier de la table.', { where })}`,
+      fix: {
+        label: elsewhere.shared ? t('Copier « {folder} » dans le dossier de la table', { folder: dmdFolder }) : t('Ranger « {folder} » dans le dossier de la table', { folder: dmdFolder }),
+        ops: [{ op: elsewhere.shared ? 'copy' : 'move', from: elsewhere.path, to: path.join(folder, dmdFolder) }],
+      },
+    };
+  }
   return {
     code: 'dmdFolderMissing',
     severity: 'warning',
@@ -3299,6 +3341,29 @@ function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean)
     detail: `${intro} ${t('Ce dossier est fourni avec la table d’origine ; mettez-le dans le dossier d’import puis « Ajouter une table ».')}`,
   };
 }
+
+/**
+ * Le dossier du DMD hors de celui de la table : à la racine du dossier des tables (shared: false),
+ * sinon dans le dossier d'une autre table (shared: true, une autre version qui le charge aussi).
+ */
+function findDmdFolderElsewhere(folder: string, dmdFolder: string, tablesDir: string): { path: string; shared: boolean } | undefined {
+  const root = path.resolve(tablesDir);
+  if (path.resolve(folder).toLowerCase() === root.toLowerCase()) return undefined;
+  const wanted = dmdFolder.toLowerCase();
+  const dirs = readDirents(root).filter((d) => d.isDirectory());
+  const loose = dirs.find((d) => d.name.toLowerCase() === wanted);
+  if (loose) return { path: path.join(root, loose.name), shared: false };
+  for (const d of dirs) {
+    const other = path.join(root, d.name);
+    if (other.toLowerCase() === path.resolve(folder).toLowerCase()) continue;
+    const found = readDirents(other).find((e) => e.isDirectory() && e.name.toLowerCase() === wanted);
+    if (found) return { path: path.join(other, found.name), shared: true };
+  }
+  return undefined;
+}
+
+/** Dossier de contenu FlexDMD ou UltraDMD, d'après son nom. */
+const DMD_FOLDER_NAME = /\.(ultradmd|flexdmd)$/i;
 
 /** Fichiers que FlexDMD et UltraDMD chargent depuis leur dossier. */
 const DMD_ASSET_EXT = new Set(['.fnt', '.png', '.gif', '.apng', '.bmp', '.jpg', '.jpeg']);
