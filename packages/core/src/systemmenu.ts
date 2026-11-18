@@ -42,6 +42,7 @@ export const SYSTEM_ITEM_IDS = [
   'tech-sheet',
   'cabinet',
   'vpx-settings',
+  'other-vpx',
   'vision3d',
   'vr',
   'vr-calibrate',
@@ -158,7 +159,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     icon: 'cabinet',
     get label() { return t('Borne'); },
     get detail() { return t('Santé, fiche technique, boutons, écrans, son, réglages de VPX, réalité virtuelle, vision 3D, télécommande du téléphone, DMD, bureau Windows, mode invité'); },
-    entries: ['health', 'tech-sheet', 'cabinet', 'vpx-settings', 'vision3d', 'realite-virtuelle', 'controls', 'phone-remote', 'dmd', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'start-relaunch', 'guest-mode'],
+    entries: ['health', 'tech-sheet', 'cabinet', 'vpx-settings', 'other-vpx', 'vision3d', 'realite-virtuelle', 'controls', 'phone-remote', 'dmd', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'start-relaunch', 'guest-mode'],
   },
   // Tous les réglages du casque ensemble, l'activation en tête (12/11/2026 : « les options VR doivent être
   // dans VR », règle générale : un réglage est dans la rubrique de la fonction qu'il règle).
@@ -235,6 +236,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   'tech-sheet': { icon: 'report', get label() { return t('Fiche technique'); } },
   cabinet: { icon: 'toolbox', get label() { return t('Configuration de la borne'); } },
   'vpx-settings': { icon: 'sliders', get label() { return t('Réglages de VPX'); } },
+  // Un VPX déjà installé sur le PC (10.8.0…), pour les tables qui le choisissent (autres-vpx.ts).
+  'other-vpx': { icon: 'layers', get label() { return t('Autres versions de VPX'); } },
   // Jouer dans un casque (vr.ts) : désactivée, ou dans le casque quand il est prêt.
   // L'activation, en tête de la rubrique Réalité virtuelle (qui porte l'icône du casque).
   vr: { icon: 'power', get label() { return t('Réalité virtuelle'); } },

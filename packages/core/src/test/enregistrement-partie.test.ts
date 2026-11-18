@@ -372,7 +372,8 @@ test('balancier simulé de VPX éteint pour une partie enregistrée : son cercle
   assert.deepEqual(recordingIniCarryBack(text, ''), []);
   // Le lancement d'une partie enregistrée passe bien cet INI à VPX (frontend.ts).
   const front = frontendSource();
-  assert.ok(front.includes('ini: vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)'));
+  // (Une table jouée avec un autre VPX garde les réglages de celui-ci : autres-vpx.test.ts.)
+  assert.ok(front.includes('ini: otherVpx ? undefined : (vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc))'));
   assert.ok(front.includes('if (recordIni) finishRecordingIni(recordIni, table);'));
 });
 

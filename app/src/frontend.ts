@@ -2,6 +2,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, BrowserWindow, globalShortcut, ipcMain, session, webContents, type Input, type Rectangle, type WebContents } from 'electron';
 import {
+  otherVpxFor,
+  otherVpxLabel,
+  otherVpxRefusal,
+  readOtherVpx,
   joystickStartCode,
   relaunchEnabled,
   saveRelaunchEnabled,
@@ -4611,7 +4615,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Une partie est celle d'une table, d'où qu'elle parte (roue, fiche, Bibliothèque, groupe, partie
   // entre amis) : la roue passe dessus et quitte le médaillon, pour le chargement comme pour le retour.
   pointAtTable(table);
-  const install = vpxInstall(loc);
+  // Table jouée avec un autre VPX du PC (autres-vpx.ts) : Cyber Pinball n'en est que le lanceur. Rien de ce
+  // qu'il fait pour son VPX 10.8.1 (INI, plugins, VR, PuP, DMD) ; jamais une écriture dans le dossier de ce VPX.
+  const otherVpx = table.emulator === 'vpx' ? otherVpxFor(table.info, readOtherVpx(loc.dataDir)) : undefined;
+  const install = otherVpx ? { exe: otherVpx.exe, version: otherVpx.version } : vpxInstall(loc);
   if (!install && table.emulator === 'vpx') return undefined;
   // Une sauvegarde automatique cède la place (elle reprendra au prochain moment libre) ; une sauvegarde
   // à la main ou une restauration en cours : la partie écrirait ses scores pendant la copie.
@@ -4669,6 +4676,14 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Table de Pinball FX : sa propre partie, sans rien de ce qui est propre à VPX (pinballfx.ts).
   if (isZenEmulator(table.emulator)) return playPinballFx(table, autoStopAfterMs, mode, simulated);
   if (!install) return undefined;
+  const otherRefused = otherVpx && otherVpxRefusal(otherVpx, { exists: simulated !== undefined || fs.existsSync(otherVpx.exe), display: mode === 'display', friends: Boolean(hooks.double) });
+  if (otherRefused) {
+    console.log(`Partie (${table.id}) avec ${otherVpxLabel(otherVpx)} : ${otherRefused.title}.`); // i18n-ignore : journal
+    state = { ...state, phase: 'message', help: false, message: otherRefused };
+    broadcast();
+    return undefined;
+  }
+  if (otherVpx) console.log(`Partie (${table.id}) avec un autre VPX : ${otherVpxLabel(otherVpx)}, ${otherVpx.exe}, ses propres réglages.`); // i18n-ignore : journal
 
   // Dès le chargement : son écran rappelle les boutons du menu de VPX, pas ceux du jeu.
   displayMode = mode === 'display';
@@ -4722,14 +4737,16 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   }
 
   // PuP-Pack : ce qui l'empêcherait de s'afficher est réglé avant la partie, sans rien demander.
-  preparePupPack(table);
+  // Avec un autre VPX, c'est PinUP Player qui lit le pack, tel que l'installation du joueur l'a réglé.
+  if (!otherVpx) preparePupPack(table);
   // Volume de la ROM : le volume voulu posé avant la partie, relu au retour (rom-volume.ts). Jamais
   // dans le double d'une partie entre amis : son volume est celui de cette borne, déjà dans la mémoire.
-  const romVolumeWatched = !hooks.double && !displayMode;
+  // Ni avec un autre VPX : VPinMAME y garde ses propres réglages.
+  const romVolumeWatched = !hooks.double && !displayMode && !otherVpx;
   if (romVolumeWatched) romVolumes.beforeGame(table);
   closeTopmostWindows();
   // Habillage FullDMD : le DMD de VPX posé dans le cadre du média FullDMD, que le fond de partie montre autour.
-  dressing = loc.root
+  dressing = loc.root && !otherVpx
     ? await prepareDressing(table, {
         root: loc.root,
         dataDir: loc.dataDir,
@@ -4740,7 +4757,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
       })
     : undefined;
   // Position du DMD réglée en partie pour cette table et cette configuration (in-game-menu.ts) : par-dessus l'habillage.
-  const configuration = loadCabinet(loc.dataDir);
+  // Avec un autre VPX, ni position du DMD, ni réglages en partie, ni Vision 3D : ils écrivent les réglages du VPX de Cyber Pinball.
+  const configuration = otherVpx ? undefined : loadCabinet(loc.dataDir);
   if (configuration) {
     try {
       const placed = prepareDmdPlace(table, { cabinet: configuration, displays: observedDisplays(), dataDir: loc.dataDir, format: profile.displayIdFormat });
@@ -4858,7 +4876,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const onWindows = () => launchStep('windows');
   // Réalité virtuelle (vr.ts) : activée et un runtime OpenXR présent, VPX reçoit un INI à part, la VR
   // en « Autodetect » (dans le casque s'il est prêt, sinon sur les écrans). Jamais pour régler l'affichage.
-  const vrGame = simulated === undefined && !displayMode ? vrFront.prepareVr(played.file, double?.ini) : undefined;
+  const vrGame = simulated === undefined && !displayMode && !otherVpx ? vrFront.prepareVr(played.file, double?.ini) : undefined;
   vrFront.headsetExitHint = vrGame && vrFront.headset?.inUse ? vrFront.exitHintText() : undefined;
   // Casque pas sur la tête (le compagnon le dit, ou il ne tourne pas) : la borne dit de le mettre.
   vrFront.vrWearHint =
@@ -4881,12 +4899,12 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (vrGame) vrFront.refreshVrNetwork();
   // Le DMD qui remplit sa fenêtre redimensionnée en partie : le plugin « CyberPinballDmd », activé dans toutes les
   // parties (components.json), remis dans VPX avant chaque partie s'il a changé (vpx-plugins.ts).
-  if (simulated === undefined) {
+  if (simulated === undefined && !otherVpx) {
     const dmdPlugin = installVpxPlugin(DMD_PLUGIN, path.dirname(install.exe), path.join(__dirname, '..'));
     if (dmdPlugin !== 'up-to-date') console.log(`Plugin du DMD : ${dmdPlugin === 'installed' ? 'copié dans VPX' : dmdPlugin === 'busy' ? 'VPX ouvert, copie à la partie suivante' : 'absent de cette version'}.`); // i18n-ignore : journal
   }
   // Vision 3D (vision3d.ts) : le capteur, allumé dès le Start, suit la tête pour VPX quand la table est à l'écran.
-  const vision3dSource = simulated === undefined && !displayMode ? prepareVision3d(install.exe, Boolean(vrGame)) : undefined;
+  const vision3dSource = simulated === undefined && !displayMode && !otherVpx ? prepareVision3d(install.exe, Boolean(vrGame)) : undefined;
   // Allumé au Start, mais pas de Vision 3D pour cette partie (dans le casque) : éteint tout de suite.
   if (!vision3dSource && headTracker.running && !vision3dMenu.testing()) headTracker.stop();
   // Bilan de la Vision 3D : ce que VPX écrira de son module dans vpinball.log, à partir d'ici.
@@ -4913,7 +4931,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const cadenceLogFrom = simulated === undefined ? vpxLogSize(vpxLog) : undefined;
   // Autres programmes de borne ouverts pendant la partie (PinUP Popper, dmdext…), même acceptés au démarrage : dits
   // par-dessus VPX (une fois par jour et par programme), et écrits avec la cadence de la partie (coexistence.ts).
-  const openDuringGame = simulated === undefined ? programsDuringGame(runningProcessNames()) : [];
+  const openDuringGame = simulated === undefined ? programsDuringGame(runningProcessNames(), Boolean(otherVpx)) : [];
   if (openDuringGame.length) {
     console.log(`Partie (${table.id}) : ouverts pendant la partie : ${openDuringGame.join(', ')}.`); // i18n-ignore : journal
     menuNotices.push([{ kind: 'program-open' as const, key: `program|${openDuringGame.join('|')}`, at: Date.now(), subject: formatList(openDuringGame) }]);
@@ -4931,14 +4949,14 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Hors écran, un chargement simulé qui tarde (CYBERPINBALL_PARTIE_SIMULEE_CHARGEMENT_MS) montre le cartouche.
   const simulatedLoadMs = Number(process.env.CYBERPINBALL_PARTIE_SIMULEE_CHARGEMENT_MS) || undefined;
   // Jouer et enregistrer : le balancier simulé de VPX dessinerait son cercle dans la vidéo ; la partie reçoit un INI à part, balancier éteint (recordingini.ts).
-  const recordIni = recording && simulated === undefined && !vrGame && !double ? prepareRecordingIni(table) : undefined;
+  const recordIni = recording && simulated === undefined && !vrGame && !double && !otherVpx ? prepareRecordingIni(table) : undefined;
   // Partie dans le casque : la couche du repère de la pièce garde la table à sa place si le Quest remet l'origine.
   const roomEnv = vrGame && simulated === undefined ? vrFront.startGameRoom() : undefined;
   const vpxEnv = { ...(roomEnv ? { env: roomEnv } : {}), ...(vrGame?.tableIni ? { tableIni: vrGame.tableIni.file } : {}) };
   const game =
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}), ...(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE ? { crashCode: Number(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE) } : {}) })
-      : launchVpx({ exe: install.exe, ini: vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), ...vpxEnv, onVr, onPlaying, onForeground, onWindows });
+      : launchVpx({ exe: install.exe, ini: otherVpx ? undefined : (vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), ...vpxEnv, onVr, onPlaying, onForeground, onWindows });
   // Arrêt demandé par Cyber Pinball (Exit, casque perdu, partie entre amis…) : une fin voulue, pas un plantage.
   let gameStopAsked = false;
   const stopGame = game.stop;

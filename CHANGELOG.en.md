@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Other VPX versions: a table can be played with a VPX already installed on the PC (10.8.0, 10.7…), as in PinUP Popper. It is added in System menu > Cabinet > Other VPX versions, where those of other installations (PinUP Popper, PinballX, VPX folder) are offered right away; it is then chosen on the table's sheet (Manage table, "Played with") and in a table's installation plan. As long as no other VPX is added, none of this shows.
+- A table taken over from PinUP Popper keeps the VPX that played it: Cyber Pinball reads each table's emulator and ALTEXE in Popper's database, and the installation plan keeps that VPX if it is in the list.
+- Cyber Pinball launches that other VPX with its own settings (screens, backglass, DMD, VPinMAME, B2S Server, PinUP Player), without ever writing to its folder. Virtual reality, in-game display adjustment, games with friends, Vision 3D, Cyber Pinball's VPX settings and PuP-Pack preparation stay with its own VPX; the sheet says so.
 - Tech sheet: the cabinet number ("7KQ2-M9XD"), on the last line of the Cyber Pinball block, to give to the team so they can find this cabinet's reports.
 - VPX files replaced outside Cyber Pinball (another VPX copied over it): Cabinet health and the tech sheet name them, with their version, and "Put the original files back" takes them from the verified VPX archive, leaving the rest of the folder alone.
 - VPX stopping before writing its log: the failure screen says "VPX stopped while starting", a VPX fault rather than the table's, and Start puts its original files back when they changed.

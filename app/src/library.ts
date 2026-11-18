@@ -52,6 +52,10 @@ import {
   applyRomImport,
   addZenTable,
   isZenEmulator,
+  knownTableInstallations,
+  otherVpxFor,
+  otherVpxLabel,
+  withVpxChoice,
   PINBALLFX_TABLES,
   PINBALLFX3_CABINET_HELP_URL,
   pinballFx3InstalledTables,
@@ -256,6 +260,7 @@ import {
 import { createCreditsMenu, type CreditsDepth } from './credits-menu';
 import { prepareImport, unpackArchive } from './archives';
 import { createDofMenu } from './dof-menu';
+import { buildVpxChoice, createOtherVpxMenu, createPlanVpx, otherVpxLimitsText, playedWithText, vpxChoiceCursor } from './autres-vpx-menu';
 import { createHardwareDmdMenu } from './hardware-dmd-menu';
 import { applyMenuDmdServer, dmdServerProblem, dmdServerReady } from './dmd-server';
 import { onPin2dmdProbe } from './pin2dmd-probe';
@@ -526,7 +531,7 @@ export function createLibrary(host: LibraryHost) {
     openCustom: (build, at) => openCustom(build, at),
     cursor: () => cursor,
     task: (message, work) => task(message, work),
-    install: (paths, back) => startImport(paths, 'copy', undefined, undefined, true, undefined, back),
+    install: (paths, back, vpxHints) => startImport(paths, 'copy', undefined, undefined, true, undefined, back, vpxHints),
     web: (after) => catalogUi.webAction('add.installation', { query: partWebQuery('table', 'table'), received: (file) => startImport([file], 'copy', undefined, undefined, true) }, after),
     back: () => openAdd(),
   });
@@ -1450,6 +1455,23 @@ export function createLibrary(host: LibraryHost) {
   });
   provideSystemItem('dof', dofMenu.item);
 
+  // Autres versions de VPX (autres-vpx.ts) : un VPX déjà installé sur le PC, choisi table par table.
+  const otherVpxMenu = createOtherVpxMenu({
+    library: {
+      openCustom: (build, at) => openCustom(build, at),
+      openSystem: () => openSystem(),
+      openNotice: (heading, lines, then) => openNotice(heading, lines, then),
+      pick: (request) => pickPaths(request),
+      task: (message, work) => task(message, work),
+    },
+    dataDir: () => host.dataDir,
+    ownVersion: () => host.vpxVersion?.(),
+    tables: () => host.tables(),
+    found: () => knownTableInstallations(['C:', 'D:', 'E:', 'F:'], host.root ? [host.root] : [], installationHints()).flatMap((l) => l.vpxExes ?? []),
+    changed: () => host.broadcast(),
+  });
+  provideSystemItem('other-vpx', otherVpxMenu.item);
+
   // DMD réel (bêta) : ZeDMD, PIN2DMD, Pixelcade reconnus, leurs pilotes, un choix par modèle, le ZeDMD en wifi.
   const hardwareDmdMenu = createHardwareDmdMenu({
     library: {
@@ -2327,7 +2349,8 @@ export function createLibrary(host: LibraryHost) {
       ...(host.tableSettings
         ? [notFx({ label: t('Réglages de cette table'), detail: t('Son, jeu… pour cette table seulement'), icon: 'sliders' as const, door: 'sheet.table-settings' as const, run: () => host.tableSettings!(table) }, t('Ils se règlent dans {game}', { game: zenName }))]
         : []),
-      ...(host.adjustDisplay && (fx || kept('vpx', () => host.vpxExe()))
+      ...(fx ? [] : tableVpxAction(table)),
+      ...(host.adjustDisplay && (fx || kept('vpx', () => host.vpxExe())) && !otherVpxFor(table.info, otherVpxMenu.list())
         ? [notFx({ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, door: 'sheet.display' as const, run: () => adjustDisplay(table) }, t('Écrans et cadrage : dans le mode borne de {game}', { game: zenName }))]
         : []),
       ...(host.menuDmd
@@ -2403,6 +2426,32 @@ export function createLibrary(host: LibraryHost) {
       actions,
       back: exit,
     };
+  }
+
+  /**
+   * « Jouée avec … » de Gérer la table (autres-vpx-menu.ts) : seulement quand un autre VPX est dans Menu système >
+   * Borne > Autres versions de VPX. Sans lui, la question ne se pose pas : rien n'est montré.
+   */
+  function tableVpxAction(table: TableEntry): SheetAction[] {
+    const others = otherVpxMenu.list();
+    if (!others.length) return [];
+    const chosen = otherVpxFor(table.info, others);
+    const detail = chosen ? t('{limits} (Start : choisir)', { limits: otherVpxLimitsText() }) : t('Avec toutes les fonctions de Cyber Pinball (Start : choisir)');
+    return [{ label: playedWithText(chosen, host.vpxVersion?.()), detail, icon: 'layers', door: 'sheet.vpx', run: () => openTableVpx(table) }];
+  }
+
+  function openTableVpx(table: TableEntry): void {
+    const others = otherVpxMenu.list();
+    const current = otherVpxFor(table.info, others)?.id;
+    const choose = (id: string | undefined) => {
+      const infoFile = infoFileFor(table, tablesDir());
+      writeFileAtomic(infoFile, JSON.stringify(withVpxChoice(readInfo(infoFile), id), null, 2) + '\n');
+      console.log(`Table ${path.basename(table.file)} : jouée avec ${id ? otherVpxLabel(others.find((v) => v.id === id)!) : 'le VPX de Cyber Pinball'}.`); // i18n-ignore : journal
+      reloadTables(table.file);
+      openSheet(find(table.file) ?? table);
+    };
+    const back = () => openSheet(table);
+    openCustom(() => buildVpxChoice({ subheading: table.title, planned: false, others, current, ownVersion: host.vpxVersion?.(), choose, back }), vpxChoiceCursor(others, current));
   }
 
   /** « Ajouter aux favoris » : la table entre dans la collection Favoris (MagnaSave, sur la roue) ; le choix reste sur l'entrée. */
@@ -4130,9 +4179,9 @@ export function createLibrary(host: LibraryHost) {
    * fichiers reçus du catalogue. `journey` : ajout fait depuis le parcours d'une table, on y
    * revient après l'installation ; `fromHub` : « Annuler » revient à l'entonnoir.
    */
-  function startImport(paths: string[], mode: 'move' | 'copy', acquisition?: AddPlan['acquisition'], journey?: string, fromHub = false, target?: string, back?: () => void): void {
+  function startImport(paths: string[], mode: 'move' | 'copy', acquisition?: AddPlan['acquisition'], journey?: string, fromHub = false, target?: string, back?: () => void, vpxHints?: Map<string, string>): void {
     if (!layout()) return openAdd();
-    const s: AddPlan = { kind: 'addPlan', mode, scripts: new Map(), existing: [], vpsChoices: new Map(), pupChoices: new Map(), romChoices: new Map(), cabinet: pupCabinet(loadCabinet(host.dataDir)), acquisition, journey, fromHub, target, back };
+    const s: AddPlan = { kind: 'addPlan', mode, scripts: new Map(), existing: [], vpsChoices: new Map(), pupChoices: new Map(), romChoices: new Map(), cabinet: pupCabinet(loadCabinet(host.dataDir)), acquisition, journey, fromHub, target, back, vpxChoices: new Map(), ...(vpxHints?.size ? { vpxHints } : {}) };
     go(s);
     void task(t('Analyse des fichiers…'), async () => {
       s.prepared = await prepareImport(paths, mode, path.join(host.dataDir, 'staging'));
@@ -4454,6 +4503,20 @@ export function createLibrary(host: LibraryHost) {
     return { title: t('Repris de l’installation d’origine · {root}', { root: reports[0]!.root }), rows };
   }
 
+  // Le VPX des tables du plan d'installation (autres-vpx-menu.ts).
+  const planVpx = createPlanVpx();
+
+  function openPlanVpx(s: AddPlan, tp: TablePlan): void {
+    const others = otherVpxMenu.list();
+    const current = planVpx.choiceFor(s, tp, others);
+    const back = () => go(s);
+    const choose = (id: string | undefined) => {
+      (s.vpxChoices ??= new Map()).set(tp.folder.toLowerCase(), id ?? null);
+      back();
+    };
+    openCustom(() => buildVpxChoice({ subheading: path.basename(tp.folder), planned: true, others, current, ownVersion: host.vpxVersion?.(), choose, back }), vpxChoiceCursor(others, current));
+  }
+
   function buildAddPlan(s: AddPlan): Built {
     const cancel = () => {
       if (s.prepared) fs.rmSync(s.prepared.staging, { recursive: true, force: true });
@@ -4464,6 +4527,7 @@ export function createLibrary(host: LibraryHost) {
     };
     const sections: Section[] = [];
     const plan = s.plan;
+    const others = otherVpxMenu.list();
     // Après « Installer » et « Annuler » : changer le jeu VPS d'une table.
     const choiceActions: Action[] = [];
     for (const error of s.prepared?.errors ?? []) sections.push({ rows: [{ text: error, tone: 'error' }] });
@@ -4486,6 +4550,18 @@ export function createLibrary(host: LibraryHost) {
             run: () => go({ kind: 'addChoice', plan: s, key }, chosen >= 0 ? chosen : tp.vps!.decided ? tp.vps!.candidates.length : 0),
           });
         }
+      }
+      // Le VPX de la table, seulement quand un autre VPX est dans Menu système > Borne > Autres versions de VPX.
+      if (others.length && tp.steps.some((st) => st.kind === 'table')) {
+        const choice = planVpx.choiceFor(s, tp, others);
+        const chosen = others.find((v) => v.id === choice);
+        rows.push({
+          text: playedWithText(chosen, host.vpxVersion?.()),
+          detail: chosen ? otherVpxLimitsText() : undefined,
+          badges: ['VPX'],
+          action: 2 + choiceActions.length,
+        });
+        choiceActions.push({ label: t('Changer le VPX'), detail: path.basename(tp.folder), run: () => openPlanVpx(s, tp) });
       }
       for (const step of tp.steps) {
         // Média reconnu : son libellé (Logo, Fronton…) plutôt que « Médias du frontend ».
@@ -4649,7 +4725,10 @@ export function createLibrary(host: LibraryHost) {
       const trashDir = trashDirFor(layout()!.trash, 'Remplacé à l’import'); // i18n-ignore : nom de dossier
       const cleanupRoots = [layout()!.import, prepared.staging];
       const checked: string[] = [];
+      const others = otherVpxMenu.list();
       for (const t of plan.tables) {
+        // Le VPX de la table (autres-vpx.ts), écrit dans son .info avec le reste.
+        if (others.length && t.steps.some((st) => st.kind === 'table')) t.info = withVpxChoice(t.info, planVpx.choiceFor(s, t, others));
         applyImport(t, { trashDir, cleanupRoots });
         for (const step of t.steps.filter((st) => st.kind === 'table')) {
           const facts = s.scripts.get(step.from.toLowerCase());

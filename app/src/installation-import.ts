@@ -32,7 +32,8 @@ export interface InstallationImportHost {
   cursor(): number;
   task(message: string, work: () => Promise<void> | void): Promise<void>;
   /** Plan d'ajout de ces .vpx (copiés) ; « Annuler » y revient par `back`. */
-  install(paths: string[], back: () => void): void;
+  /** `vpxHints` : l'exécutable de VPX qui jouait chaque .vpx dans l'installation (chemin en minuscules). */
+  install(paths: string[], back: () => void, vpxHints?: Map<string, string>): void;
   /** « Chercher sur le web… » de l'écran (ADD_SCREENS), `after` : le redessine. */
   web(after: () => void): Action;
   /** Retour à « Ajouter une table ». */
@@ -157,6 +158,9 @@ export function createInstallationImport(host: InstallationImportHost) {
         host.install(
           chosen.map((c) => c.vpx),
           () => openTables(l.layout),
+          // Le VPX qui jouait chaque table (Popper : son émulateur et son ALTEXE) : le plan d'installation le reprend
+          // s'il est dans Autres versions de VPX (autres-vpx.ts).
+          new Map(chosen.flatMap((c) => (c.vpxExe ? [[c.vpx.toLowerCase(), c.vpxExe] as const] : []))),
         );
       },
     });

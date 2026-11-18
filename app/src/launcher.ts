@@ -73,7 +73,8 @@ const CRASH_REPORT_MAX = 200_000;
 
 export interface LaunchOptions {
   exe: string;
-  ini: string;
+  /** Le VPinballX.ini à passer par -Ini ; absent : celui de ce VPX (un autre VPX du PC et ses propres réglages). */
+  ini?: string;
   table: string;
   /**
    * Réglage de l'affichage : -PovEdit au lieu de -Play (VPX 10.8.1, AppCommands.cpp) : la
@@ -116,7 +117,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
   const t0 = Date.now();
   // VPX doit pouvoir prendre le premier plan même si Windows hésite.
   allowAnyForeground();
-  const args = ['-Ini', opts.ini, ...(opts.tableIni ? ['-TableIni', opts.tableIni] : []), opts.display ? '-PovEdit' : '-Play', opts.table];
+  const args = [...(opts.ini ? ['-Ini', opts.ini] : []), ...(opts.tableIni ? ['-TableIni', opts.tableIni] : []), opts.display ? '-PovEdit' : '-Play', opts.table];
   const child = spawn(opts.exe, args, {
     cwd: path.dirname(opts.exe),
     windowsHide: false,

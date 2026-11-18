@@ -73,6 +73,7 @@ export const GUEST_DOORS = {
   'sheet.menu-dmd': false, // DMD sur la roue (affiché ou masqué, sa place)
   'sheet.record': false, // Jouer et enregistrer (vidéo de présentation de la table sur la roue)
   'sheet.table-settings': false, // Réglages de cette table
+  'sheet.vpx': false, // VPX de la table (celui de Cyber Pinball ou une autre version installée sur le PC)
   'sheet.doctor': false, // Diagnostiquer et réparer
   'sheet.remove': false, // Supprimer la table
   'sheet.manage': false, // Gérer la table… (médias, parties du jeu, fichiers, réglages, diagnostic, modifier, supprimer)

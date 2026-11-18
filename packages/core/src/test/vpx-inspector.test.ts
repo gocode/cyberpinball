@@ -197,5 +197,5 @@ test('le double : carte réduite sous les deux noms du jeu, VPinballX.ini copié
   assert.ok(!/writeFileSync\(iniSource/.test(doubles), 'le VPinballX.ini de la borne n’est jamais écrit');
   const front = frontendSource();
   // Le double passe avant l'INI d'une partie enregistrée (jamais ensemble : « Jouer et enregistrer » joue seul).
-  assert.match(front, /ini: vrGame\?\.ini \?\? double\?\.ini \?\? recordIni\?\.ini \?\? activeVpxIni\(loc\)/);
+  assert.match(front, /ini: otherVpx \? undefined : \(vrGame\?\.ini \?\? double\?\.ini \?\? recordIni\?\.ini \?\? activeVpxIni\(loc\)\)/);
 });

@@ -53,6 +53,21 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    id: 'autres-vpx',
+    date: '2026-11-18',
+    version: '0.1.16',
+    get title() { return t('Autres versions de VPX'); },
+    get detail() { return t('Les tables qui tournent mieux avec VPX 10.8.0 se jouent avec lui, table par table.'); },
+    get more() {
+      return [
+        t('Ajoutez un VPX déjà installé sur ce PC (celui de PinUP Popper est proposé d’office), puis choisissez-le dans la fiche d’une table ou quand elle s’installe. Une table reprise de PinUP Popper garde le VPX qui la jouait.'),
+        t('Cyber Pinball le lance avec ses propres réglages, comme PinUP Popper ; la réalité virtuelle, le réglage de l’affichage et les parties entre amis restent avec le VPX de Cyber Pinball.'),
+      ];
+    },
+    get where() { return t('Menu système › Borne › Autres versions de VPX'); },
+    reach: { kind: 'system', id: 'other-vpx' },
+  },
+  {
     // Ajoutée après coup (17/11/2026) : les niveaux étaient sortis en préversion sans leur ligne.
     id: 'niveaux',
     date: '2026-11-17',

@@ -44,10 +44,19 @@ export const GAME_INTRUDERS: { name: string; processes: string[] }[] = [
   { name: 'B2S Server', processes: ['B2SBackglassServerEXE.exe'] },
 ];
 
-/** Les programmes de GAME_INTRUDERS ouverts, d'après les noms des processus en cours (noms affichés, sans doublon). */
-export function programsDuringGame(processNames: string[]): string[] {
+/**
+ * Ce qu'une table jouée avec un autre VPX du PC (autres-vpx.ts) lance elle-même : le lecteur des PuP-Packs, dmdext,
+ * le serveur B2S. Ils font sa partie, ce ne sont pas des intrus ; un menu de borne en reste un.
+ */
+const CLASSIC_GAME_PROGRAMS = ['PinUP Player', 'dmdext', 'B2S Server'];
+
+/**
+ * Les programmes de GAME_INTRUDERS ouverts, d'après les noms des processus en cours (noms affichés, sans doublon).
+ * `classic` : la partie se joue avec un autre VPX, qui lance lui-même ceux de CLASSIC_GAME_PROGRAMS.
+ */
+export function programsDuringGame(processNames: string[], classic = false): string[] {
   const open = new Set(processNames.map((n) => n.toLowerCase()));
-  return GAME_INTRUDERS.filter((p) => p.processes.some((x) => open.has(x.toLowerCase()))).map((p) => p.name);
+  return GAME_INTRUDERS.filter((p) => !(classic && CLASSIC_GAME_PROGRAMS.includes(p.name)) && p.processes.some((x) => open.has(x.toLowerCase()))).map((p) => p.name);
 }
 
 /** Menus ouverts, d'après les noms des processus en cours. */

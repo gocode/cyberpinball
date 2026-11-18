@@ -19,6 +19,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { expectedPackNames, findPackRoot, isJunkName, isPackRoot, type PupLoadFacts } from './puppack';
+import { popperGameExe, vpxExesIn } from './autres-vpx';
 import { isInside, samePath } from './fileops';
 import { PUP_FOLDER } from './pupdisabled';
 import { formatList, t } from './i18n';
@@ -65,6 +66,12 @@ export interface InstallationLayout {
   /** Ce que les menus de l'installation disent de ses tables : nom de leurs médias, leur ROM. */
   catalog: CatalogEntry[];
   /**
+   * Exécutables de VPX de l'installation : ceux de son dossier de VPX, puis ceux des émulateurs de Popper
+   * (un par version : « Visual Pinball X », « VPX 10.7 »…). Le premier est celui des tables dont le menu ne
+   * dit rien. Ce qu'on propose d'ajouter dans Menu système > Borne > Autres versions de VPX.
+   */
+  vpxExes?: string[];
+  /**
    * Alias de ROM de VPinMAME (VPMAlias.txt de ses dossiers) : « nom demandé par le script, jeu
    * chargé ». VPinMAME les applique de lui-même ; la table y tourne sous un nom que l'installation
    * n'a pas en zip. Les anciens noms qu'il connaissait d'office (vpmalias.ts) s'y ajoutent.
@@ -88,6 +95,11 @@ export interface CatalogEntry {
    * activée dans la base de PinballX et de PinballY. Absent : le menu n'en dit rien.
    */
   active?: boolean;
+  /**
+   * L'exécutable de VPX avec lequel le menu lance la table (Popper : le dossier de son émulateur et
+   * son ALTEXE, autres-vpx.ts) ; absent : le menu n'en dit rien.
+   */
+  vpxExe?: string;
 }
 
 /**
@@ -268,6 +280,7 @@ function locate(dir: string, exclude: string[], hints: InstallationHints): Insta
       own(d && resolveDir(d)),
     ),
   );
+  const vpxExes = unique([vpxDir ? vpxExesIn(vpxDir)[0] : undefined, ...(popper?.vpxExes ?? [])].filter((e) => e && !exclude.some((x) => isInside(e, x)) && isFile(e)));
   const roots = [pinmame, pinup, pinballx, pinbally, vpxDir].filter((d): d is string => Boolean(d));
   const found = tablesDirOf(start, known, commonDir([start, ...roots]));
   if (!found) return undefined;
@@ -286,6 +299,7 @@ function locate(dir: string, exclude: string[], hints: InstallationHints): Insta
     musicDir,
     vpRegFiles,
     catalog,
+    ...(vpxExes.length ? { vpxExes } : {}),
     ...(romAliases.length ? { romAliases } : {}),
   };
 }
@@ -383,6 +397,12 @@ export interface InstallationTable {
    * PinballY) ; false : présente sur le disque seulement ; absent : l'installation n'en dit rien.
    */
   active?: boolean;
+  /**
+   * L'exécutable de VPX qui jouait la table dans cette installation : celui que dit son menu (Popper), sinon
+   * celui de l'installation. Absent : aucun VPX connu. À l'installation, il choisit l'autre VPX de la table
+   * quand il est dans Menu système > Borne > Autres versions de VPX.
+   */
+  vpxExe?: string;
 }
 
 /**
@@ -407,6 +427,8 @@ function tablesOf(layout: InstallationLayout, medias: Map<string, IncomingMedia[
       const named = parseTableName(path.basename(vpx, path.extname(vpx)));
       const entries = catalogOf(vpx, layout);
       const playlists = unique(entries.flatMap((e) => e.playlists ?? []));
+      // Le menu connaît la table sans dire son VPX (un ALTEXE propre à son script de lancement) : rien n'est deviné.
+      const vpxExe = entries.length ? entries.find((e) => e.vpxExe)?.vpxExe : layout.vpxExes?.[0];
       return {
         vpx,
         title: named.title,
@@ -416,6 +438,7 @@ function tablesOf(layout: InstallationLayout, medias: Map<string, IncomingMedia[
         medias: mediasOf(vpx, layout, medias).length,
         playlists,
         ...(knowsActivity ? { active: entries.some((e) => e.active) } : {}),
+        ...(vpxExe ? { vpxExe } : {}),
       };
     })
     .sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }) || a.vpx.localeCompare(b.vpx));
@@ -912,6 +935,8 @@ interface PopperFacts {
   mediaDirs: string[];
   romDirs: string[];
   games: CatalogEntry[];
+  /** L'exécutable habituel du dossier de chaque émulateur Visual Pinball (DirEmulator). */
+  vpxExes: string[];
 }
 
 /** Lecture seule de la base de Popper ; undefined si elle manque ou ne se lit pas (Popper ouvert, base abîmée). */
@@ -927,31 +952,38 @@ export function readPopper(file: string): PopperFacts | undefined {
     const gameCols = columns('Games');
     const col = (cols: Set<string>, name: string) => (cols.has(name.toLowerCase()) ? name : 'NULL');
     const emus = db
-      .prepare(`select EMUID as id, EmuName as name, ${col(emuCols, 'DirGames')} as games, ${col(emuCols, 'DirMedia')} as media, ${col(emuCols, 'DirRoms')} as roms, ${col(emuCols, 'GamesExt')} as ext from Emulators`)
-      .all() as { id: number; name: string | null; games: string | null; media: string | null; roms: string | null; ext: string | null }[];
+      .prepare(
+        `select EMUID as id, EmuName as name, ${col(emuCols, 'DirGames')} as games, ${col(emuCols, 'DirMedia')} as media, ${col(emuCols, 'DirRoms')} as roms, ${col(emuCols, 'GamesExt')} as ext, ${col(emuCols, 'DirEmulator')} as emulator from Emulators`,
+      )
+      .all() as { id: number; name: string | null; games: string | null; media: string | null; roms: string | null; ext: string | null; emulator: string | null }[];
     const vp = emus.filter((e) => /vpx/i.test(e.ext ?? '') || /visual\s*pinball|vpinball/i.test(e.name ?? ''));
-    if (!vp.length) return { tableDirs: [], mediaDirs: [], romDirs: [], games: [] };
+    if (!vp.length) return { tableDirs: [], mediaDirs: [], romDirs: [], games: [], vpxExes: [] };
     const ids = vp.map((e) => e.id);
     const rows = db
-      .prepare(`select GameID as id, EMUID as emu, GameName as name, GameFileName as file, ${col(gameCols, 'ROM')} as rom from Games where EMUID in (${ids.map(() => '?').join(',')})`)
-      .all(...ids) as { id: number; emu: number; name: string | null; file: string | null; rom: string | null }[];
+      .prepare(`select GameID as id, EMUID as emu, GameName as name, GameFileName as file, ${col(gameCols, 'ROM')} as rom, ${col(gameCols, 'ALTEXE')} as alt from Games where EMUID in (${ids.map(() => '?').join(',')})`)
+      .all(...ids) as { id: number; emu: number; name: string | null; file: string | null; rom: string | null; alt: string | null }[];
     const lists = popperPlaylists(db);
     const games: CatalogEntry[] = [];
     for (const r of rows) {
       if (!r.file?.trim()) continue;
-      const dir = vp.find((e) => e.id === r.emu)?.games ?? '';
+      const emu = vp.find((e) => e.id === r.emu);
+      const dir = emu?.games ?? '';
       const file = path.isAbsolute(r.file) ? r.file : dir ? path.join(dir, r.file) : undefined;
       const playlists = lists ? lists.filter((l) => l.games.has(r.id)).map((l) => l.name) : undefined;
+      const vpxExe = popperGameExe(emu?.emulator, r.alt);
       games.push({
         ...(file ? { file } : {}),
         stem: path.basename(r.file, path.extname(r.file)),
         names: r.name?.trim() ? [r.name.trim()] : [],
         ...(r.rom?.trim() ? { rom: r.rom.trim() } : {}),
         ...(playlists ? { playlists, active: playlists.length > 0 } : {}),
+        ...(vpxExe ? { vpxExe } : {}),
       });
     }
     const dirs = (key: 'games' | 'media' | 'roms') => unique(vp.map((e) => e[key]?.trim()).filter((d): d is string => Boolean(d) && path.isAbsolute(d!)));
-    return { tableDirs: dirs('games'), mediaDirs: dirs('media'), romDirs: dirs('roms'), games };
+    // Les exécutables nommés par un ALTEXE comptent aussi : une table jouée en 10.8.0 sous l'émulateur habituel.
+    const vpxExes = unique([...vp.map((e) => popperGameExe(e.emulator, undefined)), ...games.map((g) => g.vpxExe)]);
+    return { tableDirs: dirs('games'), mediaDirs: dirs('media'), romDirs: dirs('roms'), games, vpxExes };
   } catch {
     return undefined;
   } finally {

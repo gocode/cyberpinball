@@ -625,6 +625,13 @@ export type Screen =
       cabinet?: PupCabinet;
       /** Version gardée par ROM (RomImport.key) : empreinte du contenu choisi. */
       romChoices: Map<string, string>;
+      /**
+       * VPX choisi par table du plan (dossier de la table, en minuscules) : un autre VPX du PC (autres-vpx.ts),
+       * ou null pour celui de Cyber Pinball. Absent : celui que disent `vpxHints`, sinon celui de la table installée.
+       */
+      vpxChoices?: Map<string, string | null>;
+      /** L'exécutable de VPX qui jouait chaque .vpx dans l'installation d'où il vient (chemin en minuscules). */
+      vpxHints?: Map<string, string>;
       /** Fichiers récupérés depuis le catalogue : le jeu VPS est déjà choisi, la provenance notée après l'installation ; `quick` : installation rapide. */
       acquisition?: { gameId: string; items: WaitItem[]; quick?: boolean };
       /** Ajout fait depuis le parcours de cette table (« Ce qu'il manque pour jouer ») : on y revient ensuite. */
