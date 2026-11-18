@@ -7,10 +7,16 @@ It is not the list of fixes: that one stays in each version's notes ("Mise à jo
 
 - **A timeline**: the most recent at the top, the date and version given only once for the new things of the same day.
   Each line has its title, a sentence saying what it brings and, if it has one, a small preview; "Nouveau" (New) marks those not seen yet, "BÊTA" (BETA) those still being tested.
+  Under each line's text, as under a message, the players' reactions in brief: the three most chosen and their total ("👍❤️😮 23"), marked in blue when you have reacted.
 - **One new thing full size**: Start on a line enlarges it, with its large preview, its full text and where to find it ("Où : Communauté › Parties instantanées" (Where: Community › Instant games)).
   "Essayer" (Try it) leads straight to the feature; its "Retour" (Back) brings you back to the new thing.
   When it cannot be used right now, "Essayer" stays visible, greyed out, with its reason (guest mode, sharing turned off, no table chosen on the wheel).
   "‹ Précédente" (Previous) and "Suivante ›" (Next) go from one new thing to the next without going back to the list.
+- **Reacting**: under the text of an enlarged new thing, the seven message reactions (👍 ❤️ 🥰 😆 😮 😢 😡) as tiles, each with the number of players who chose it, all over the world, yours marked.
+  Start sets a reaction, or changes it; Start on yours removes it ("Votre réaction : … · Start sur elle la retire", Your reaction: … · Start on it removes it).
+  One reaction per cabinet and per new thing, tied to the player key and counted by the feedback service; deleting your account also erases your reactions.
+  Offline, the tiles stay visible, greyed out with their reason ("Réactions hors ligne : elles reviennent dès que le service répond", Reactions offline: they come back as soon as the service answers).
+- **The previews**: most lines have their own, including your account, Community on the phone, virtual reality and backups.
 - **The red dot**: on the gear wheel and on the entry, as long as a new thing has not been seen, from the very first installation.
   Opening the screen marks them all seen; the "Nouveau" marker stays until you leave it.
   A new cabinet, or one updated from a version that did not have this screen, sees only those of the latest date as new.

@@ -57,7 +57,7 @@ export const NEWS: readonly NewsItem[] = [
     // Lots 2 à 5 de la Communauté au téléphone (18/11/2026), la ligne ajoutée avec le dernier.
     id: 'communaute-telephone',
     date: '2026-11-18',
-    version: '0.1.16',
+    version: '0.2.0',
     get title() { return t('La Communauté dans votre téléphone'); },
     get detail() { return t('Joueurs, profils, groupes, parties instantanées, salons, classements et niveau, comme à la borne.'); },
     get more() {
@@ -74,7 +74,7 @@ export const NEWS: readonly NewsItem[] = [
     // Demandé par un joueur (Retours et propositions, 18/11/2026) : réinstallé, il avait perdu son niveau.
     id: 'mon-compte',
     date: '2026-11-18',
-    version: '0.1.16',
+    version: '0.2.0',
     get title() { return t('Votre compte vous suit'); },
     get detail() { return t('Pseudo, niveau, badges et amis : vous retrouvez tout sur un autre PC ou après une réinstallation.'); },
     get more() {
@@ -90,7 +90,7 @@ export const NEWS: readonly NewsItem[] = [
   {
     id: 'autres-vpx',
     date: '2026-11-18',
-    version: '0.1.16',
+    version: '0.2.0',
     get title() { return t('Autres versions de VPX'); },
     get detail() { return t('Les tables qui tournent mieux avec VPX 10.8.0 se jouent avec lui, table par table.'); },
     get more() {
@@ -101,6 +101,22 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Menu système › Borne › Autres versions de VPX'); },
     reach: { kind: 'system', id: 'other-vpx' },
+  },
+  {
+    // Ajoutée avant la 0.2.0 (18/11/2026) : la reprise de l'ancien DOF n'avait pas sa ligne.
+    id: 'dof-repris',
+    date: '2026-11-18',
+    version: '0.2.0',
+    get title() { return t('Votre configuration DOF reprise'); },
+    get detail() { return t('Une borne venue d’un autre front-end retrouve ses LED et ses toys, sans rien refaire dans le configtool.'); },
+    get more() {
+      return [
+        t('Cyber Pinball cherche l’ancien DOF sur les disques et montre ce qu’il a trouvé. « Reprendre la configuration de l’ancien DOF » copie ses fichiers du configtool et, s’il est cohérent, son Cabinet.xml, en sauvegardant ce qui était en place.'),
+        t('Des LED adressables sans Cabinet.xml sont signalées avec le port probable de leur contrôleur, et des bandes pilotées par une Wemos D1 reçoivent d’office les réglages qu’attend son micrologiciel.'),
+      ];
+    },
+    get where() { return t('Menu système › Borne › LED et retours (DOF)'); },
+    reach: { kind: 'system', id: 'dof' },
   },
   {
     // Ajoutée après coup (17/11/2026) : les niveaux étaient sortis en préversion sans leur ligne.

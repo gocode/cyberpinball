@@ -56,6 +56,9 @@ Support stays in beta until equipped cabinets have confirmed it: the "BÊTA" (BE
 
 - **One choice per model**, Start to go from one to the next: "automatique" (automatic: on when recognized, keys kept once unplugged), "oui" (yes: always on, DMDUtil looks for it at the start of each game), "non" (no: never, an Arduino board on a CH340 no longer gets DMDUtil's handshake).
   In automatic, a ZeDMD recognized on a CH340 or a CP210x is turned on, with the advice to switch to "non" (no) if it is not one.
+  Except when this common USB-serial bridge is probably something else, the Wemos D1 or ESP32 of addressable LEDs for instance (`zedmdDoubt`): it did not answer like a ZeDMD in the last game ("handshake response error" in `vpinball.log`), the DOF Cabinet.xml gives it to a controller, or configtool addressable LEDs are still waiting for their controller (see [LED and feedback (DOF)](led-and-feedback-dof.md#led-and-feedback-dof)).
+  It is then not turned on by default: the screen shows it for what it is ("COM3 : pont USB-série, pas un ZeDMD", COM3: USB-serial bridge, not a ZeDMD; "ZeDMD pas allumé d'office", ZeDMD not turned on by default) and says why in the points to check.
+  A port that answered like a ZeDMD in the last game stays on, and "ZeDMD : oui" (ZeDMD: yes) overrides it.
 - **ZeDMD over Wi-Fi**: invisible to USB.
   Start asks for its name or IP address (`zedmd-wifi.local` without any setting, libzedmd's name); empty, Wi-Fi is turned off and the address kept. libdmdutil opens it even without `ZeDMD = 1` (`DMD::FindDisplays`).
 - **Drivers**, read without opening anything: the driver service (registry `Service`) and the Device Manager code (`CM_Get_DevNode_Status`).
@@ -64,7 +67,9 @@ Support stays in beta until equipped cabinets have confirmed it: the "BÊTA" (BE
   A ZeDMD or a Pixelcade without a COM port lacks its chip's driver (WCH CH340/CH343, Silicon Labs CP210x).
 - **PIN2DMD probe**: libdmdutil gives up silently when `libusb_open` or `libusb_claim_interface` fails (`PIN2DMD.cpp`, `PIN2DMDInit`); the VPX log says nothing and the DMD stays dark.
   The probe (`app/src/sonde-pin2dmd.ts`, the executable in Node mode, with no window) takes the same steps with VPX's `libusb64-1.0.dll`, then releases everything.
-  It runs when the front-end starts, after a game and after a "Real DMD" choice (`applyMenuDmdServer`), never during a game nor while the DMD server holds the board.
+  It goes all the way through `PIN2DMDInit`, as VPX does: it reads the board's name (`iProduct`), which VPX's DMD module compares with three names only, "PIN2DMD", "PIN2DMD XL" and "PIN2DMD HD".
+  A board that does not give its name, or gives another name, is never driven by VPX and the DMD stays dark: the "DMD réel" (Real DMD) screen and the Health say so with the name read ("PIN2DMD : la carte se présente sous le nom « … »", PIN2DMD: the board calls itself "…"), and suggest sending a report, since Cyber Pinball cannot work around it.
+  It runs when the front-end starts, after a game, after a "Real DMD" choice (`applyMenuDmdServer`) and after a DMD server that cannot find the display is stopped, never during a game nor while the DMD server holds the board.
   Its verdict is attached to the PIN2DMD (`libusbProbe`): board already opened by another program (codes `-3` and `-6`, with the open programs recognised), driver libusb cannot use (`-12`), board not found, other error.
   The page, cabinet health and the points to check before the game say it; opened then released, the row says "VPX will be able to light it".
 - **Programs that hold a real DMD** (`DMD_HOLDER_PROGRAMS`, `dmd.ts`): dmdext, PinUP Popper, PinballX, PinballY, another VPX, Future Pinball.
@@ -73,7 +78,7 @@ Support stays in beta until equipped cabinets have confirmed it: the "BÊTA" (BE
   The ZeDMD gives its size only when connected.
 
 The choices are kept with the cabinet configuration (`cabinet.json`, `hardwareDmd`) and picked up by the synchronization that precedes each game.
-Cabinet health has a "DMD réel" (Real DMD) check: ready, or a driver to install.
+Cabinet health has a "DMD réel" (Real DMD) check: ready, or a point to check (driver to install, PIN2DMD that VPX will not open, DMD server that cannot find the display, USB-serial bridge that did not answer like a ZeDMD).
 Ready without "Menu image", it says that this choice makes the real DMD show the menu too.
 
 **Menu image (beta).**
@@ -91,7 +96,10 @@ The menu and VPX send it their frames in turn (`app/src/dmd-server.ts`, protocol
   `--verifier` runs these checks alone and gives the fingerprint (`node scripts/dmdserver.mjs --verifier --vpx <VPX folder>`).
 - **Start**: when the menu starts, after a "DMD réel" choice and when returning from a game, if at least one DMD is on (recognized, set to "oui" (yes), or ZeDMD over Wi-Fi).
   `dmdserver.ini` (data folder) takes the per-model choices: Serum and PuP stay off (`AltColor = 0`, `PUPCapture = 0`), because VPX sends frames that are already coloured.
-  `-w`: the server waits for the DMD instead of stopping.
+  `-w`: the server waits for the DMD instead of stopping, but 20 seconds at most (`FIND_TIMEOUT_MS`).
+  With no display found within that time, it is stopped and does not restart on its own: libdmdutil keeps open a PIN2DMD whose name it refuses, and VPX, which then opens the DMD itself, would find it taken.
+  The "DMD réel" (Real DMD) screen and the Health say so ("Le serveur du DMD ne trouve pas l'afficheur (aucune réponse en 20 s)", The DMD server cannot find the display (no answer within 20 s)), with the cause found by the PIN2DMD probe, otherwise the advice to send a report; VPX takes the DMD back itself during games.
+  Before a game that VPX drives itself (`DMDServer = 0`), the server is always stopped and its exit awaited (`handDmdToVpx`): the system releases the board when it exits.
   If it stops (DMD unplugged, crash), it is restarted 2 s later.
   After code 3 or 4 it is not: the reason is shown in "DMD réel" and in cabinet health.
 - **Frames**: the menu DMD, live or classic, in RGB24 128 × 32, in the chosen colour (an off dot is black on the real DMD).
@@ -244,6 +252,24 @@ Code: [tableoptions.ts](../../packages/core/src/tableoptions.ts), finding in [do
 - **Doctor**: finding "DMD réglé pour le mode bureau" (DMD set for desktop mode) (`dmdDesktopOption`), which names the option, its default value, the one chosen for the cabinet and the file, with the fix "Régler « DMD Type » sur « FlexDMD » dans …" (Set "DMD Type" to "FlexDMD" in …); it goes away once the key is written.
   Script readings move to version 10 (`FACTS_VERSION`, `app/src/vbs.ts`): tables already installed are read again.
 - **Tests**: [tableoptions.test.ts](../../packages/core/src/test/tableoptions.test.ts) (reading the options, VPX keys, player's choice kept, doctor, new `.ini`, state of VPX's DMD window) and the `dmdDesktopOption` trap in [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).
+
+### FlexDMD and UltraDMD DMDs without stalls in game
+
+VPX 10.8.1's FlexDMD plugin, which also serves UltraDMD, does some work on VPX's thread, when the script asks for it: the game stops while it is done, flippers included.
+Two cases are handled before the game, without modifying the table.
+
+- **Images stored in the table** (JP's tables such as *Hellboy* or *Daredevil*): FlexDMD reads and decodes each "VPX.name" image of the `.vpx` the first time it is shown (`AssetManager.cpp`), then keeps it.
+  Cyber Pinball's `.vbs` asks for all of them right after `FlexDMD.Run = True`, during the loading screen ([flexprewarm.ts](../../packages/core/src/flexprewarm.ts)): in the game, they are already there.
+  The images kept are the table's images whose name the script writes out in full ("VPX.name&…"), gives as a string (`"VPX." & name`, in JP's tables) or builds from a beginning (`"d_" & letter`: the letters of *Hellboy*'s DMD); only strings that are the name of one of the table's images count.
+  Image options written in the script are kept when FlexDMD recognises them in full (`dmd=`, `dmd2=`, `add`, `region=`, `pad=`); any other string starting with "&" (web address parameters) is never asked of FlexDMD.
+  Up to 3,000 requests (`FLEX_PREWARM_MAX`): all the images of large tables, *Daredevil* included (178 images in three variants).
+  Doctor finding "Images du DMD chargées en pleine partie" (DMD images loaded mid-game) (`flexImagesLate`), repaired on its own before each game (`PUP_PLAY_REPAIRS`); a `.vbs` from elsewhere is not touched.
+- **Videos too large** (UltraDMD or FlexDMD tables): the plugin decodes each video of the DMD folder whole, in one go, at every scene that shows it (`Video.cpp`); a 1920 × 480 video froze the game for one to several seconds at every scene.
+  A video larger than four times the largest DMD (256 × 64 dots), or over 3 MB when its size cannot be read, is reported ([dmdvideos.ts](../../packages/core/src/dmdvideos.ts)): finding "Vidéos du DMD trop grandes : la partie se fige" (DMD videos too large: the game freezes) (`dmdVideosHeavy`), in the table's diagnosis and in the "Tables" line of Cabinet health.
+  Before the game, those Chromium can read (mp4, m4v, mov, webm) are brought down to 128 × 32 (`app/src/dmd-video-shrink.ts`): re-encoded as VP8 in a WebM, under the same name, which VPX recognises by its content; the original goes to Cyber Pinball's recycle bin.
+  They look the same on the DMD, and a video already shrunk is not redone.
+  The others (wmv, avi) stay as they are, and the finding advises replacing them with mp4 files at the DMD size.
+- **Tests**: `images-dmd-avance.test.ts`, `dmd-videos.test.ts`, `reduction-videos-dmd.test.ts`, `webm-dmd.test.ts` and the `flexImagesLate` and `dmdVideosHeavy` traps in [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).
 
 ### DMD position during a game
 

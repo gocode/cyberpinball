@@ -7,8 +7,9 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
-## 0.1.16
+## 0.2.0
 
+- Community: the Community poster and the Players "My country" filter point to the right place (System menu › Community › Sharing and network, My account › My country); they still named the old Friends section.
 - Phone, What's new: the cabinet's timeline on the phone too. The date and version head each day; each line has its thread and dot (green while it is new), its description, its "New" and "BETA" badges, its reactions at a glance and its small preview.
 - Phone, an opened news item: its date, version, preview, full text and where to find it. The seven reactions are chips side by side, with each one's player count and yours highlighted; they used to be stacked one under the other, with no count.
 - LED and feedback (DOF): a configtool configuration with addressable LEDs (directoutputconfig30.ini…) but no Cabinet.xml saying where they are connected is now reported, on the screen and in the Cabinet health, with the likely serial port of their controller (Teensy, or the CH340/CP210x bridge of a Wemos D1 or an ESP32). Until now the screen said "Nothing prevents DOF from lighting the cabinet" while the strips stayed dark; "Addressable LED strips…" now starts from that port.

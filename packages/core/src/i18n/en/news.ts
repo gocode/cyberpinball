@@ -14,6 +14,14 @@ export const messages: Record<string, string> = {
   'Notez votre code de récupération, 24 mots ou leur QR à photographier, pour retrouver votre compte sur n’importe quel PC. Un mot de passe est possible aussi : votre pseudo devient votre identifiant, et le serveur ne garde qu’une copie chiffrée qu’il ne peut pas ouvrir.':
     'Write down your recovery code, 24 words or their QR code to photograph, to get your account back on any PC. A password works too: your nickname becomes your ID, and the server only keeps an encrypted copy it cannot open.',
   'Menu système › Mon compte': 'System menu › My account',
+  'Votre configuration DOF reprise': 'Your DOF setup carried over',
+  'Une borne venue d’un autre front-end retrouve ses LED et ses toys, sans rien refaire dans le configtool.':
+    'A cabinet coming from another front-end gets its LEDs and toys back, without redoing anything in the configtool.',
+  'Cyber Pinball cherche l’ancien DOF sur les disques et montre ce qu’il a trouvé. « Reprendre la configuration de l’ancien DOF » copie ses fichiers du configtool et, s’il est cohérent, son Cabinet.xml, en sauvegardant ce qui était en place.':
+    'Cyber Pinball looks for the old DOF on the drives and shows what it found. “Reuse the old DOF configuration” copies its configtool files and, if it is consistent, its Cabinet.xml, backing up whatever was in place.',
+  'Des LED adressables sans Cabinet.xml sont signalées avec le port probable de leur contrôleur, et des bandes pilotées par une Wemos D1 reçoivent d’office les réglages qu’attend son micrologiciel.':
+    'Addressable LEDs without a Cabinet.xml are flagged with the likely port of their controller, and strips driven by a Wemos D1 automatically get the settings its firmware expects.',
+  'Menu système › Borne › LED et retours (DOF)': 'System menu › Cabinet › LED and feedback (DOF)',
   'Niveaux': 'Levels',
   'Vos parties, vos progrès, vos badges et la vie entre joueurs vous font monter de niveau.': 'Your games, your progress, your badges and life among players raise your level.',
   'Chaque partie, chaque record battu, chaque classement de la semaine, chaque badge reçu et la vie entre joueurs rapportent des XP. Votre niveau monte et ne baisse jamais ; votre carte de joueur, en haut de l’écran des tables, le montre avec sa barre.':

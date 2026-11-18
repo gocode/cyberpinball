@@ -30,7 +30,7 @@ The [README](../README.md) introduces Cyber Pinball in a few pictures. This page
 
 ## Play with friends
 
-Cabinets link directly to each other, over the Internet or the local network, with no server and no account. Everything is in System menu > "Friends".
+Cabinets link directly to each other, over the Internet or the local network, with no server and no account. Everything is in System menu > "Community".
 
 <p align="center"><img src="images/en/live-game.webp?v=1db3208de7" width="760" alt="A live game between cabinets: Bruno's invitation for Atlas Rising opens by itself, then the shared start, a countdown with both players ready."></p>
 
@@ -91,7 +91,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 
 ### Messaging
 
-- **Between friends, with no server**: System menu > Friends > "Messages", or "Write" on a friend's page. Messages go straight from one cabinet to the other, encrypted, and stay on both cabinets.
+- **Between friends, with no server**: System menu > Community > "Messages", or "Write" on a friend's page. Messages go straight from one cabinet to the other, encrypted, and stay on both cabinets.
 - **A thread like on a phone**: the friend's messages on the left, yours on the right, and in between the friendship's events (a high score, a badge). MagnaSave goes to the previous or next friend; the backglass shows the friend's card while their thread is open.
 - **Reply from the buttons**: seven emoji reactions placed on a message (👍 Like, ❤️ Love, 🥰 Care, 😆 Haha, 😮 Wow, 😢 Sad, 😡 Angry), the same as in the rooms, six ready-made phrases, or "Write a message…" with the on-screen keyboard or the phone, whose text appears as you type. At a desk, the real keyboard.
 - **A friend offline**: the message waits, "Waiting", and leaves by itself as soon as both cabinets are on at the same time, then turns to "Received".
@@ -382,7 +382,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 ## Everything from the buttons
 
 - **Flippers, Start and Exit** are enough everywhere: choose, confirm, go back. The gear ⚙ and Tab open the system menu with the mouse or the keyboard.
-- **A system menu in five sections**: Friends, Tables, Media, Cabinet and Cyber Pinball, with Recent activity, Collections, Jukebox, Downloads and Phone remote as shortcuts. A red dot climbs up to the gear when an entry is waiting for you, and the menu opens on it.
+- **A system menu in six sections**: My account, Community, Tables, Media, Cabinet and Cyber Pinball, with What's new, Recent activity, Collections, Jukebox, Downloads and Phone remote as shortcuts. A red dot climbs up to the gear when an entry is waiting for you, and the menu opens on it.
 - **An action's message stays** ("Name changed", "Avatar saved"…) until the next action, instead of vanishing at once.
 - **The flippers follow the screen's order**, from top to bottom, on every management screen; they only wrap around at the two ends.
 - **Always a way out**: Exit closes "Get" even when Windows has taken the foreground, and held for two seconds it forces it closed. Before every Windows permission prompt, a screen warns that you will have to answer with the keyboard or the mouse.

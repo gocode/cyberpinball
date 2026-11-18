@@ -4,12 +4,13 @@
 
 Menu système > « Cyber Pinball » > « Sauvegardes » fait une copie de la borne sur une clé USB, un disque externe ou un lecteur réseau, et la restaure, sur cette borne (après une panne, une erreur de réglage) ou sur un autre PC.
 L'entrée dit la date et le niveau de la dernière sauvegarde.
+Chaque sauvegarde contient aussi votre compte (pseudo, avatar, niveau, badges, amis) ; Menu système > « Mon compte » > « Protéger et transférer mon compte », puis « Reprendre un compte sur cette borne… » > « Depuis une sauvegarde… », mène aussi ici (voir [Mon compte](mon-compte.md#mon-compte)).
 
 **Trois niveaux, chacun contient le précédent** (`LEVEL_PARTS`, [packages/core/src/backup.ts](../../packages/core/src/backup.ts)) :
 
 | Niveau | Parties | Ce qu'on y trouve |
 | --- | --- | --- |
-| Réglages et scores (quelques Mo) | `cabinet`, `settings`, `scores`, `friends` | `data\cabinet.json` et ses configurations, `vpx-owned.json`, `config\VPinballX*.ini` ; les autres fichiers JSON de `data` (médias du front-end, langue, positions du DMD, mode invité…), le `.ini` de chaque table et `pinmame\cfg` ; `pinmame\nvram`, `pinmame\memcard` et `user\VPReg.stg` de chaque table ; `data\social.json` (dont la clé privée de l'identité de la borne) et `data\amis` |
+| Réglages et scores (quelques Mo) | `cabinet`, `settings`, `scores`, `friends` | `data\cabinet.json` et ses configurations, `vpx-owned.json`, `config\VPinballX*.ini` ; les autres fichiers JSON de `data` (médias du front-end, langue, positions du DMD, mode invité…), le `.ini` de chaque table et `pinmame\cfg` ; `pinmame\nvram`, `pinmame\memcard` et `user\VPReg.stg` de chaque table ; `data\social.json` (dont la clé privée de l'identité de la borne), `data\avatars` (l'image de votre avatar et celles de vos amis, jamais le dossier de recadrage) et `data\amis` |
 | Avec les tables | en plus `tables` | Les dossiers des tables (sans leur `cache`), `pinmame\roms`, `media` |
 | Toute l'installation | en plus `vpx` | `emulators` (jamais la jonction `current`), `downloads`, `tools`, `data\enregistrements` |
 
@@ -77,4 +78,5 @@ Code : le moteur dans [packages/core/src/backup.ts](../../packages/core/src/back
 
 **Limites.**
 Le premier lancement après une réinstallation ouvre l'assistant : la restauration se fait ensuite, depuis Sauvegardes (les écrans et les boutons de la sauvegarde remplacent ceux que l'assistant vient de relever).
+Le compte, lui, peut revenir dès le premier lancement, par la copie de secours de ce PC, le code de récupération ou le mot de passe (voir [Mon compte](mon-compte.md#mon-compte)).
 Un dossier hors d'une lettre de lecteur (`\\NAS\borne`) ne se choisit pas encore à l'écran : un lecteur réseau monté sur une lettre convient.

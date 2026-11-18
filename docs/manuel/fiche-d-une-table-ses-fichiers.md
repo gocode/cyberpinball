@@ -4,7 +4,7 @@
 
 **Ses actions** : la fiche tient en quelques choix.
 En tête, « Jouer », « Jouer avec un ami » et « Prospectus et règles » : un seul livret, le prospectus (ou la fiche générée) puis les règles (cartes, textes et vidéo trouvés seuls, et toujours les commandes de la partie en dernier) ; les flippers passent d'une page à l'autre, de l'un à l'autre, Start tourne la page puis revient à la fiche après la dernière, et la souris saute à l'autre partie.
-Tout le reste est rangé sous **« Gérer la table… »** : « Pour aller plus loin », « Médias du jeu », « Parties du jeu », « Fichiers de la table », « PuP-Pack », « Réglages de cette table », « Régler l'affichage en partie », « Jouer et enregistrer », « Diagnostiquer et réparer », « Modifier les informations », « Supprimer la table ».
+Tout le reste est rangé sous **« Gérer la table… »** : « Pour aller plus loin », « Médias du jeu », « Parties du jeu », « Fichiers de la table », « PuP-Pack », « Réglages de cette table », « Jouée avec … » (seulement quand un autre VPX est ajouté, voir [Autres versions de VPX](autres-versions-de-vpx.md#autres-versions-de-vpx)), « Régler l'affichage en partie », « Jouer et enregistrer », « Diagnostiquer et réparer », « Modifier les informations », « Supprimer la table ».
 Son détail dit, dès la fiche, ce qui demande un œil (« À vérifier : Fichiers de la table, PuP-Pack »), en orange.
 Les écrans ouverts de là y reviennent (`sheetManage`, `app/src/library.ts`) ; Exit sur « Gérer la table » ramène à la fiche.
 « Ce qu'il manque pour jouer » reste en tête de la fiche, avant « Jouer ».
@@ -14,6 +14,7 @@ Les démonstrations nomment une action rangée sous « Gérer la table… » par
 La fiche d'une table (Start sur une table du front-end) montre ses statistiques sur une ligne et un **résumé borné** de ses fichiers : une ligne par sorte présente (table, backglass, ROM, contenu du DMD, vidéos PuP, couleurs du DMD, sons alternatifs, musique, réglages propres, médias), trois noms au plus par ligne (« t2_l3, t2_l4 et 4 autres »), une ligne « Absents » pour les sortes manquantes et une ligne « À vérifier » (backglass mal nommé, script remplacé par un `.vbs`, rapport de plantage, volume de la ROM bas).
 Après la ROM, une ligne « Volume de la ROM » dit, pour une machine qui garde son volume dans sa mémoire, celui que la ROM jouera et ce que Cyber Pinball en fait (« 12 sur 31, d'usine, faible : monté à 23 avant la partie », « 18 sur 31 (votre réglage) »…, voir [Volume de la ROM](son.md#volume-de-la-rom)).
 Une table qui rame ou saccade sur la borne le dit dans « Diagnostiquer et réparer », avec les chiffres de sa dernière partie (voir [Santé de la borne](sante-de-la-borne.md#santé-de-la-borne)).
+« Diagnostiquer et réparer » propose aussi « Envoyer un rapport aux développeurs » : d'un appui, les constats de la table, ce qui vient d'être réparé, la fiche technique et les journaux, chiffrés et anonymisés ; une description reste facultative, et sans constat le détail dit « Un souci que le diagnostic ne voit pas ».
 En hauteur (borne, playfield tourné, ou écran portrait), les informations gardent leur place et les actions passent sur deux colonnes ; la liste des actions défile si elle dépasse.
 Sur une borne, la liste des actions mangeait toute la hauteur : avec beaucoup de fichiers, seule la première ligne des statistiques restait visible.
 

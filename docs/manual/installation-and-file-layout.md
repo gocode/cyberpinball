@@ -2,8 +2,7 @@
 
 ## Installation and file layout
 
-All of Cyber Pinball lives in a **root chosen at installation** (the launcher's "Installer" (Install) action), e.g.
-`D:\CyberPinball`.
+All of Cyber Pinball lives in a **root chosen at installation** (the launcher's "Installer" (Install) action), for example `D:\CyberPinball`.
 The layout is fixed: an update moves nothing.
 
 ```
@@ -32,6 +31,12 @@ D:\CyberPinball\
   The full installer drops it into `downloads\` next to the VPX archive, for a cabinet without Internet.
   A VPX that stops for lack of a DLL (0xC0000135, 0xC0000139, 0xC000007B) is named on the failure screen, which points to "Santé de la borne" (`vpxMissingLibrary`, [packages/core/src/vpxfailure.ts](../../packages/core/src/vpxfailure.ts)).
   For a new VPX version: when it is installed, Cyber Pinball reads the DLLs its files import (`vpxRuntimeNeeds`, [packages/core/src/vc-runtime.ts](../../packages/core/src/vc-runtime.ts)) and logs a runtime newer than `vcRuntime`, or any other redistributable library missing from a fresh Windows (legacy DirectX, OpenAL…); `vc-runtime.test.ts` checks the same on the machine's installed VPX (or `CYBERPINBALL_VPX_DIR`), and that the manifest's Microsoft installer is recent enough.
+- **Checked VPX files.**
+  The manifest gives the size of every executable and library in the VPX archive (`files`, read by `scripts/composant-fichiers.mjs`); at each cabinet health and tech sheet reading, and after VPX stopped while starting, Cyber Pinball compares the installed folder with that list (`checkComponentFiles`, [packages/installer/src/component-files.ts](../../packages/installer/src/component-files.ts); `app/src/vpx-integrity.ts`), with a simple `stat`.
+  A changed or missing file, most often because another VPX was copied over it, is named with its version in "Santé de la borne" (Cabinet health) ("VPX 10.8.1-5436 : 1 fichier modifié hors de Cyber Pinball" (1 file changed outside Cyber Pinball), "SDL364.dll 3.2.18.0 : VPX peut s'arrêter dès son démarrage, sur toutes les tables" (VPX may stop as soon as it starts, on every table)) and in the tech sheet ("Logiciels" (Software) block).
+  "Remettre les fichiers d'origine" (Put the original files back) takes them from the verified VPX archive (downloaded if it is no longer in `downloads\`, SHA-256 checked), extracts only those files and puts them back one by one, leaving the rest of the folder alone (settings, Cyber Pinball's plugins, `VPReg.stg`).
+  Another VPX executable put next to Cyber Pinball's is neither removed nor launched: the launcher always takes the executable named by the manifest (`findExecutable`, `Component.executable`), and the log reports it.
+  Tests: `vpx-fichiers-modifies.test.ts`.
 - The root is refused in Program Files, in Windows and on a network share.
   The choice is stored in `%APPDATA%\CyberPinball\root.json`.
 - Before a root is chosen, everything is written to a sandbox (`%APPDATA%\CyberPinball\sandbox\`).

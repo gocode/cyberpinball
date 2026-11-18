@@ -23,5 +23,6 @@ While Cyber Pinball is open (`<data>\relance-start\application.pid`, pid checked
 - **Updates**: the watcher keeps `CyberPinball.exe` open.
   It is stopped (`<data>\relance-start\veilleur.pid`) before the installer or the light update, by the installer itself (run by hand), by the uninstaller and by `npm run deployer`; Cyber Pinball, once restarted, starts it again.
 - **Setting**: system menu > “Borne” (Cabinet) > “Relance par Start” (Relaunch with Start), which says “oui” (yes) or “non” (no) (`<data>\relance-start\reglage.json`, yes by default).
-  Greyed out, with the reason, when Start is not a joystick button and on a [dedicated cabinet](dedicated-cabinet.md#dedicated-cabinet), where Cyber Pinball relaunches by itself. “Non” (No) removes the shortcut and stops the watcher.
+  Greyed out, with the reason, when Start is not a joystick button and on a [dedicated cabinet](dedicated-cabinet.md#dedicated-cabinet), where Cyber Pinball relaunches by itself.
+  “Non” (No) removes the shortcut and stops the watcher.
 - **Log**: the watcher writes to the same `journal.txt` (“Relance par Start : …”): button followed, press recognised, launch or reason for doing nothing.

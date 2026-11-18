@@ -112,7 +112,7 @@ Code : [romvolume.ts](../../packages/core/src/romvolume.ts) (état, conseil, cho
   Un bloc qui ne tient que le volume (WPC, SAM) se refait toujours : vierge, il devient juste.
 - **Avant la partie** (`beforeGame`) : le volume voulu est posé, s'il ne l'est pas déjà ; le choix du joueur, sinon, en automatique, le volume conseillé à la place d'un volume d'usine bas.
   Sans mémoire, rien n'est écrit : la ROM la crée pendant la première partie, au volume d'usine, et Cyber Pinball monte ce volume bas dès la fin de cette partie.
-  Jamais dans le double d'une partie entre amis (son volume est déjà celui de la borne, voir [Amis : le réseau des bornes](amis-le-reseau-des-bornes.md#amis--le-réseau-des-bornes)), ni pour « Régler l'affichage en partie ».
+  Jamais dans le double d'une partie entre amis (son volume est déjà celui de la borne, voir [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#communauté--le-réseau-des-bornes)), ni pour « Régler l'affichage en partie ».
   Journal : « Volume de la ROM (…, taf_l7) : 12 → 23 sur 31 avant la partie (volume d'usine bas, conseillé). » (« usine → 23 » pour un bloc vierge).
 - **Après la partie** (`afterGame`, `romVolumeChangedInGame`) : un volume changé à la porte du monnayeur pendant la partie devient le choix du joueur, gardé ensuite (journal : « … réglé à la porte pendant la partie, gardé. ») ; un volume resté celui d'usine après une première partie n'est pas un choix.
   Les choix du joueur sont dans `<données>\volumes-rom.json`, par fichier `.nv`.

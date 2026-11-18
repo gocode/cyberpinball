@@ -31,11 +31,16 @@ Elle est aussi rangée dans la rubrique Cyber Pinball, puisqu'elle parle de tout
   Une ligne est vue quand le curseur s'y pose (pas tout d'un coup à l'ouverture) ; son repère, la pastille rouge et le mot « Non lu », reste jusqu'à ce qu'on quitte l'écran, et le sous-titre compte les lignes non lues à l'ouverture.
   Notifications du front-end « compteur seul » ou « coupées » : ce qui ne se montre plus est consigné déjà lu, sauf la partie entre amis et les erreurs.
 - **Jamais de pastille rouge** : le non-lu se marque dans l'écran seulement, et l'entrée dit « <n> non lues · … ».
-  Ce qui attend une réponse a déjà sa pastille là où l'on y répond : demandes d'ami et invitation dans Amis, téléchargement fini ou bloqué dans Téléchargements, version disponible ou mise à jour qui n'a pas abouti dans « Mise à jour de Cyber Pinball ».
+  Ce qui attend une réponse a déjà sa pastille là où l'on y répond : demandes d'ami et invitation dans Communauté, téléchargement fini ou bloqué dans Téléchargements, version disponible ou mise à jour qui n'a pas abouti dans « Mise à jour de Cyber Pinball ».
   La redoubler ici faisait deux pastilles pour une chose, ou une pastille pour rien (une mise à jour installée, une connexion d'ami), et, l'entrée étant alors rangée sous Amis, une pastille de mise à jour qui remontait par la rubrique Amis.
 - **Depuis l'écran des tables** : le résumé « 4 nouveautés » ouvre Activité récente, qui dit chacune en entier ; « Retour » ramène à l'écran des tables.
   Une notification seule garde son action directe (Mes amis, Demandes d'amis, Téléchargements, la partie entre amis).
   « Messages en attente » y mène aussi, parmi ses accès rapides ; « Retour » y ramène alors.
 - **Mode invité** : l'écran est fermé, comme tout le menu système ; le résumé n'y mène pas.
+- **Au téléphone** : la cloche de la barre du haut de la Communauté porte le nombre de lignes non lues et ouvre le même journal, jour par jour, dans une feuille (voir [Communauté au téléphone](communaute-au-telephone.md#communauté-au-téléphone)).
+  Chaque ligne a son heure, l'état de l'ami et son texte entier ; une ligne qui ne vaut plus reste grisée avec sa raison.
+  Touchée, elle est lue et mène à son écran : le fil d'un ami ou d'un groupe, un profil, Joueurs ou un salon s'ouvrent au téléphone, le reste à la borne.
+  « Effacer l'activité récente » le vide après une confirmation au téléphone.
+  Le téléphone ne reçoit de chaque ligne qu'une référence (`activity-act`), jamais la clé d'un joueur.
 - **Code** : le journal dans `packages/core/src/activity.ts` (`addActivity`, `trimActivity`, `markActivityShown`, `markActivityRead`, `activityText`, `activityAct`, `markThreadRead`, `loadActivity`) ; l'écran et ce que fait chaque ligne dans `app/src/activity-menu.ts` ; chaque évènement consigné par `app/src/menu-notices.ts` (`activity`), la notification qui le dit en entier le donnant pour lu (`NoticeTick.entered`).
 - **Tests** : `packages/core/src/test/activite-recente.test.ts` (texte entier, regroupement dans la journée et redites, limite des 50 lignes, fichier gardé et mis de côté, non lu et résumé, chaque genre en français et en anglais, la vraie file sur chaque écran, l'écran avec ses lignes grisées et ses actions, la ligne vue sous le curseur) ; `packages/core/src/test/messages-attente.test.ts` (une ligne par conversation, la conversation lue qui lit ses lignes, la ligne qui ouvre sa conversation ou se grise).

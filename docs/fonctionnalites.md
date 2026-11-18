@@ -30,7 +30,7 @@ Le [README](../README.fr.md) présente Cyber Pinball en quelques images. Cette p
 
 ## Jouer entre amis
 
-Les bornes se relient directement entre elles, par Internet ou par le réseau local, sans serveur ni compte. Tout se trouve dans Menu système > « Amis ».
+Les bornes se relient directement entre elles, par Internet ou par le réseau local, sans serveur ni compte. Tout se trouve dans Menu système > « Communauté ».
 
 <p align="center"><img src="images/fr/live-game.webp?v=57b0ba496a" width="760" alt="Une partie en direct entre bornes : l'invitation de Bruno pour Atlas Rising s'ouvre d'elle-même, puis le départ commun, un compte à rebours avec les deux joueurs prêts."></p>
 
@@ -91,7 +91,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 
 ### Messagerie
 
-- **Entre amis, sans serveur** : Menu système > Amis > « Messages », ou « Écrire » sur la fiche d'un ami. Les messages passent directement d'une borne à l'autre, chiffrés, et restent sur les deux bornes.
+- **Entre amis, sans serveur** : Menu système > Communauté > « Messages », ou « Écrire » sur la fiche d'un ami. Les messages passent directement d'une borne à l'autre, chiffrés, et restent sur les deux bornes.
 - **Un fil comme sur un téléphone** : les messages de l'ami à gauche, les vôtres à droite, et au milieu les évènements de l'amitié (un record, un badge). MagnaSave passe à l'ami précédent ou suivant ; le fronton montre la carte de l'ami pendant que son fil est ouvert.
 - **Répondre aux boutons** : sept réactions par emoji posées sur un message (👍 J'aime, ❤️ J'adore, 🥰 Solidaire, 😆 Haha, 😮 Waouh, 😢 Triste, 😡 Grrr), les mêmes que dans les salons, six phrases toutes prêtes, ou « Écrire un message… » au clavier à l'écran ou au téléphone, dont le texte s'écrit en direct. Au bureau, le vrai clavier.
 - **Un ami hors ligne** : le message attend, « En attente », et part tout seul dès que les deux bornes sont allumées en même temps, puis passe à « Reçu ».
@@ -382,7 +382,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 ## Tout se fait aux boutons
 
 - **Flippers, Start et Exit** suffisent partout : choisir, valider, revenir. La roue dentée ⚙ et Tab ouvrent le menu système à la souris ou au clavier.
-- **Menu système en cinq rubriques** : Amis, Tables, Médias, Borne et Cyber Pinball, avec en raccourci Activité récente, Collections, Juke-box, Téléchargements et Télécommande du téléphone. Une pastille rouge remonte jusqu'à la roue dentée quand une entrée vous attend, et le menu s'ouvre sur elle.
+- **Menu système en six rubriques** : Mon compte, Communauté, Tables, Médias, Borne et Cyber Pinball, avec en raccourci Nouveautés, Activité récente, Collections, Juke-box, Téléchargements et Télécommande du téléphone. Une pastille rouge remonte jusqu'à la roue dentée quand une entrée vous attend, et le menu s'ouvre sur elle.
 - **Le message d'un geste reste** (« Nom changé », « Avatar enregistré »…) jusqu'au geste suivant, au lieu de s'effacer aussitôt.
 - **Les flippers suivent l'ordre de l'écran**, de haut en bas, sur tous les écrans de gestion ; le tour ne se fait qu'aux deux bouts.
 - **Toujours une sortie** : Exit ferme « Récupérer » même quand Windows a pris le premier plan, et tenu deux secondes il le ferme de force. Avant chaque demande d'autorisation de Windows, un écran prévient qu'il faudra répondre au clavier ou à la souris.

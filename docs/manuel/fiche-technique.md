@@ -11,8 +11,8 @@ La page montre six blocs, chacun avec son état écrit (« ✓ OK », « ! À v�
 | Windows | Édition et build, redémarrage en attente, mode d'alimentation et délais d'écran et de veille, mode Jeu, planification GPU, notifications, Visual C++, antivirus, langue et clavier | Redémarrer la borne (s'il y a une mise à jour en attente), Borne dédiée |
 | Écrans | Chaque écran branché, par son rôle dans la configuration retenue : modèle, diagonale, définition, fréquence, connexion (HDMI, DisplayPort…), fréquence la plus haute annoncée quand il en a une, échelle de Windows, rotation ; puis la configuration retenue et ses écrans trouvés | Configuration de la borne |
 | Contrôleurs | Boutons (Pinscape, clavier ou encodeur, nombre de boutons configurés), lanceur, accéléromètre, contrôleurs DOF | Commandes de la borne, LED et retours (DOF) |
-| Logiciels | VPX et la version que Cyber Pinball connaît (« facultative » : une information, pas une panne), les plugins de VPX trouvés dans son dossier `plugins` et leur état dans `VPinballX.ini` (PinMAME, B2S, DOF, FlexDMD, PUP, Serum, AltSound, DMDUtil d'abord), les tables avec un PuP-Pack | Installer la version connue de VPX, Réglages de VPX |
-| Cyber Pinball | Version et préversions, mode (borne ou bureau), borne dédiée, dossier des données, tables et tables prêtes, réseau des amis, téléphones jumelés, erreurs du journal depuis hier, langue | Mise à jour de Cyber Pinball, Activité récente |
+| Logiciels | VPX et la version que Cyber Pinball connaît (« facultative » : une information, pas une panne), les plugins de VPX trouvés dans son dossier `plugins` et leur état dans `VPinballX.ini` (PinMAME, B2S, DOF, FlexDMD, PUP, Serum, AltSound, DMDUtil d'abord), les tables avec un PuP-Pack ; les fichiers de VPX remplacés hors de Cyber Pinball, nommés avec leur version (« Fichiers de VPX : 1 modifié », « SDL364.dll 3.2.18.0 ») | Installer la version connue de VPX, Réglages de VPX, Santé de la borne (« Remettre les fichiers d'origine ») |
+| Cyber Pinball | Version et préversions, mode (borne ou bureau), borne dédiée, dossier des données, tables et tables prêtes, réseau des amis, téléphones jumelés, erreurs du journal depuis hier, langue ; en dernière ligne, le numéro de la borne | Mise à jour de Cyber Pinball, Activité récente |
 
 **Relevé.**
 Un script PowerShell sans fenêtre ni autorisation (`TECH_PROBE_SCRIPT`, [app/src/tech-facts.ts](../../app/src/tech-facts.ts)) lit le PC et Windows (CIM, registre, `powercfg`, `Get-Disk`, `Get-NetAdapter`) ; il dure quelques secondes à vingt secondes et tourne à part, sans bloquer le front-end.
@@ -26,6 +26,12 @@ Les essais remplacent le relevé par un fichier (`CYBERPINBALL_FICHE`).
 Un écran sous sa fréquence est « À vérifier », sans affirmer une cause qui n'est pas établie (`refreshGap`, `refreshNote`) : si Windows propose plus à cette définition, la ligne le dit (« Playfield à 60 Hz, Windows propose 144 Hz ») et renvoie aux paramètres d'affichage ; si seul l'écran annonce plus, elle demande de vérifier le port et le câble, et rappelle, en HDMI seulement, que certains câbles et cartes plafonnent la 4K à 60 Hz.
 Un écart d'un hertz (59,94 Hz) ne compte pas.
 
+**Numéro de la borne.**
+La dernière ligne du bloc Cyber Pinball, en retrait, donne le numéro de la borne (« 7KQ2-M9XD »), à donner à l'équipe de Cyber Pinball pour qu'elle retrouve les rapports de cette borne.
+Il est tiré de l'identifiant de borne que portent les rapports (une empreinte, sans retour possible à l'identifiant, `borneCode` de [packages/core/src/feedback.ts](../../packages/core/src/feedback.ts)), en huit caractères de l'alphabet de Crockford (ni I, L, O ni U, qu'on confond au téléphone) ; il ne dit rien du joueur.
+Il est enregistré dès sa première lecture, et ne change plus d'un démarrage à l'autre.
+Test : `numero-borne.test.ts`.
+
 **Dans la santé de la borne.**
 Chaque relevé met à jour le groupe « PC et Windows » de [Santé de la borne](sante-de-la-borne.md#santé-de-la-borne) (`HealthFacts.pc`, `pcLines`), sans refaire le reste : écrans sous leur fréquence, redémarrage de Windows en attente, mode d'alimentation (« Économie d'énergie » à vérifier), pilote graphique de plus de deux ans, moins de 8 Go de mémoire.
 Chaque ligne ouvre le bloc de la fiche qui l'explique (cible `sheet`), dont le « Retour » ramène à la santé.
@@ -33,6 +39,7 @@ Chaque ligne ouvre le bloc de la fiche qui l'explique (cible `sheet`), dont le �
 **Envoyer un rapport.**
 Un ZIP `rapport-borne-AAAA-MM-JJ.zip` (`buildReport`, [packages/core/src/techsheet.ts](../../packages/core/src/techsheet.ts)) : `rapport.html` (la fiche et la santé, une page autonome, sans script ni ressource externe, lisible et imprimable partout), `probleme.txt` (ce que le joueur a écrit par « Décrire le problème », au téléphone ou au clavier, s'il l'a fait), `resume.txt`, `sante.json`, `fiche.json`, le journal de Cyber Pinball des sept derniers jours (`journalSince`), celui de VPX de la dernière partie, `VPinballX.ini` et `configurations.json`.
 Chaque partie y est mesurée : le journal de Cyber Pinball a la ligne « Cadence de la partie » de chacune (images par seconde tenues par VPX pour la cadence visée, arrêts de l'image, mémoire prise par VPX, verdict), et celui de VPX chaque à-coup à son heure et les bilans du plugin (voir « Cadence de chaque partie » dans [Lancement d'une partie](lancement-d-une-partie.md#lancement-dune-partie)).
+Après un lancement échoué, le ZIP joint aussi le `crash.txt` de VPX (sa pile d'appels) ; un journal de VPX plus ancien que ce lancement, VPX s'étant arrêté avant d'écrire le sien, y est nommé `vpinball-partie-precedente.log` au lieu de `vpinball.log`.
 Tout est **anonymisé avant l'écriture** (`anonymizer`) : dossier du profil et nom du compte (`‹utilisateur›`), nom du PC (`‹PC›`), noms du joueur, de la borne et des amis (`‹ami 1›`…), adresses IPv4 et IPv6, adresses e-mail ; les empreintes et numéros de série des écrans deviennent « écran 1 », « écran 2 ».
 Les numéros de version, de pilote et les heures restent lisibles.
 « Voir le contenu du rapport » liste chaque fichier, sa taille et ce qui est remplacé.

@@ -12,6 +12,8 @@ Code: [packages/core/src/coexistence.ts](../../packages/core/src/coexistence.ts)
   Only the log `%APPDATA%\VPinballX\10.8\vpinball.log` is shared if the other frontend also uses VPX 10.8: each game rewrites it.
 - VPX plugin mode: no component is registered in Windows (VPinMAME, B2S and PinUP Player stay the other frontend's); `B2STableSettings.xml`, `DmdDevice.ini` and `PUPDatabase.db` are not touched.
   The DOF folder (`%APPDATA%\VPinballX\10.8\directoutputconfig`) is shared by every VPX 10.8 on the PC: Cyber Pinball only writes there on request (configtool import, previous configuration backed up; addressable LEDs described), and never in place of a hand-written `Cabinet.xml` or GlobalConfig (see [LED and feedback (DOF)](led-and-feedback-dof.md#led-and-feedback-dof)).
+  The other frontend's classic DOF (`C:\DirectOutput`, `C:\vPinball\DirectOutput`…) keeps its configtool configuration in its own folder, which the VPX DOF plugin does not read.
+  When VPX's DOF folder is empty, the "LED et retours (DOF)" (LED and feedback) screen and the Cabinet health show that old configuration, and "Reprendre la configuration de l'ancien DOF" (Reuse the old DOF configuration) copies its ini and tablemappings files without touching the original folder; its GlobalConfig is never reused, its Cabinet.xml only if it is consistent and its ports are plugged in.
 - The other frontend's files are never moved: "Reprendre les médias de PinUP Popper / PinballX" (Import media from PinUP Popper / PinballX) copies them, and a table picked outside `import\` is copied.
 - ROMs and NVRAM are stored separately: high scores and game settings are not shared.
 

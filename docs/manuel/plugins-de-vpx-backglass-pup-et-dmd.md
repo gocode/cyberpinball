@@ -56,6 +56,9 @@ La prise en charge reste en bêta tant que des bornes équipées ne l'ont pas co
 
 - **Un choix par modèle**, Start pour passer de l'un à l'autre : « automatique » (allumé quand il est reconnu, clés gardées une fois débranché), « oui » (toujours allumé : DMDUtil le cherche au début de chaque partie), « non » (jamais : une carte Arduino au CH340 ne reçoit plus la poignée de main de DMDUtil).
   En automatique, un ZeDMD reconnu sur un CH340 ou un CP210x est allumé, avec le conseil de passer à « non » si ce n'en est pas un.
+  Sauf quand ce pont USB-série courant est sans doute autre chose, une Wemos D1 ou un ESP32 de LED adressables par exemple (`zedmdDoubt`) : il n'a pas répondu comme un ZeDMD à la dernière partie (« handshake response error » dans `vpinball.log`), le Cabinet.xml de DOF le donne à un contrôleur, ou des LED adressables du configtool attendent encore leur contrôleur (voir [LED et retours (DOF)](led-et-retours-dof.md#led-et-retours-dof)).
+  Il n'est alors pas allumé d'office : l'écran le montre pour ce qu'il est (« COM3 : pont USB-série, pas un ZeDMD », « ZeDMD pas allumé d'office ») et dit pourquoi dans les points à vérifier.
+  Un port qui a répondu comme un ZeDMD à la dernière partie reste allumé, et « ZeDMD : oui » passe outre.
 - **ZeDMD en wifi** : invisible pour l'USB.
   Start demande son nom ou son adresse IP (`zedmd-wifi.local` sans réglage, nom de libzedmd) ; vide, le wifi est coupé et l'adresse gardée. libdmdutil l'ouvre même sans `ZeDMD = 1` (`DMD::FindDisplays`).
 - **Pilotes**, lus sans rien ouvrir : le service du pilote (`Service` du registre) et le code du Gestionnaire de périphériques (`CM_Get_DevNode_Status`).
@@ -64,7 +67,9 @@ La prise en charge reste en bêta tant que des bornes équipées ne l'ont pas co
   Un ZeDMD ou un Pixelcade sans port COM manque du pilote de sa puce (CH340/CH343 de WCH, CP210x de Silicon Labs).
 - **Sonde du PIN2DMD** : libdmdutil abandonne en silence quand `libusb_open` ou `libusb_claim_interface` échoue (`PIN2DMD.cpp`, `PIN2DMDInit`) ; le journal de VPX ne dit rien et le DMD reste noir.
   La sonde (`app/src/sonde-pin2dmd.ts`, l'exécutable en mode Node, sans fenêtre) fait les mêmes étapes avec la `libusb64-1.0.dll` de VPX, puis relâche tout.
-  Elle tourne au démarrage du front-end, au retour d'une partie et après un choix de « DMD réel » (`applyMenuDmdServer`), jamais pendant une partie ni quand le serveur du DMD tient la carte.
+  Elle va jusqu'au bout de `PIN2DMDInit`, comme VPX : elle lit le nom de la carte (`iProduct`), que le module DMD de VPX compare à trois noms seulement, « PIN2DMD », « PIN2DMD XL » et « PIN2DMD HD ».
+  Une carte qui ne donne pas son nom, ou un autre nom, n'est jamais pilotée par VPX et le DMD reste noir : l'écran « DMD réel » et la Santé le disent avec le nom lu (« PIN2DMD : la carte se présente sous le nom « … » »), et proposent d'envoyer un rapport, car Cyber Pinball ne peut pas le contourner.
+  Elle tourne au démarrage du front-end, au retour d'une partie, après un choix de « DMD réel » (`applyMenuDmdServer`) et après l'arrêt d'un serveur du DMD qui ne trouve pas l'afficheur, jamais pendant une partie ni quand le serveur du DMD tient la carte.
   Son verdict est joint au PIN2DMD (`libusbProbe`) : carte déjà ouverte par un autre programme (codes `-3` et `-6`, avec les programmes ouverts reconnus), pilote que libusb ne sait pas utiliser (`-12`), carte introuvable, autre erreur.
   L'écran, la Santé et les points à vérifier avant la partie le disent ; ouverte puis relâchée, la ligne dit « VPX pourra l'allumer ».
 - **Programmes qui gardent un DMD réel** (`DMD_HOLDER_PROGRAMS`, `dmd.ts`) : dmdext, PinUP Popper, PinballX, PinballY, un autre VPX, Future Pinball.
@@ -73,7 +78,7 @@ La prise en charge reste en bêta tant que des bornes équipées ne l'ont pas co
   Le ZeDMD donne sa taille à la connexion seulement.
 
 Les choix sont gardés avec la configuration de la borne (`cabinet.json`, `hardwareDmd`) et repris par la synchronisation qui précède chaque partie.
-La santé de la borne a un contrôle « DMD réel » : prêt, ou un pilote à installer.
+La santé de la borne a un contrôle « DMD réel » : prêt, ou un point à vérifier (pilote à installer, PIN2DMD que VPX n'ouvrira pas, serveur du DMD qui ne trouve pas l'afficheur, pont USB-série qui n'a pas répondu comme un ZeDMD).
 Prêt sans « Image du front-end », il dit que ce choix fait aussi montrer le front-end au DMD réel.
 
 **Image du front-end (bêta).**
@@ -91,7 +96,10 @@ Le front-end et VPX lui envoient leurs images tour à tour (`app/src/dmd-server.
   `--verifier` fait ces contrôles seuls et donne l'empreinte (`node scripts/dmdserver.mjs --verifier --vpx <dossier de VPX>`).
 - **Lancement** : au démarrage du front-end, après un choix de « DMD réel » et au retour d'une partie, s'il y a au moins un DMD allumé (reconnu, réglé sur « oui », ou ZeDMD en wifi).
   `dmdserver.ini` (dossier des données) reprend les choix par modèle : Serum et PuP restent éteints (`AltColor = 0`, `PUPCapture = 0`), car VPX envoie ses images déjà colorées.
-  `-w` : le serveur attend le DMD plutôt que de s'arrêter.
+  `-w` : le serveur attend le DMD plutôt que de s'arrêter, mais 20 secondes au plus (`FIND_TIMEOUT_MS`).
+  Sans afficheur trouvé dans ce délai, il est arrêté et ne se relance pas de lui-même : libdmdutil garde ouvert un PIN2DMD dont il refuse le nom, et VPX, qui ouvre alors le DMD lui-même, le trouverait pris.
+  L'écran « DMD réel » et la Santé le disent (« Le serveur du DMD ne trouve pas l'afficheur (aucune réponse en 20 s) »), avec la cause trouvée par la sonde du PIN2DMD, sinon le conseil d'envoyer un rapport ; VPX reprend le DMD lui-même pendant les parties.
+  Avant une partie que VPX pilote lui-même (`DMDServer = 0`), le serveur est toujours arrêté et sa fin attendue (`handDmdToVpx`) : le système rend la carte à sa sortie.
   S'il s'arrête (DMD débranché, plantage), il est relancé 2 s plus tard.
   Après un code 3 ou 4, il ne l'est plus : la raison est affichée dans « DMD réel » et dans la santé de la borne.
 - **Images** : le DMD du front-end, vivant ou classique, en RGB24 128 × 32, dans la couleur réglée (un point éteint est noir sur le DMD réel).
@@ -244,6 +252,24 @@ Code : [tableoptions.ts](../../packages/core/src/tableoptions.ts), constat dans 
 - **Médecin** : constat « DMD réglé pour le mode bureau » (`dmdDesktopOption`), qui nomme l'option, sa valeur par défaut, celle choisie pour la borne et le fichier, avec la correction « Régler « DMD Type » sur « FlexDMD » dans … » ; il disparaît une fois la clé écrite.
   Les lectures de script passent en version 10 (`FACTS_VERSION`, `app/src/vbs.ts`) : les tables déjà installées sont relues.
 - **Tests** : [tableoptions.test.ts](../../packages/core/src/test/tableoptions.test.ts) (lecture des options, clés de VPX, choix du joueur gardé, médecin, `.ini` neuf, état de la fenêtre du DMD de VPX) et le piège `dmdDesktopOption` de [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).
+
+### DMD de FlexDMD et d'UltraDMD sans arrêt en partie
+
+Le plugin FlexDMD de VPX 10.8.1, qui sert aussi UltraDMD, fait certains travaux sur le fil de VPX, au moment où le script les demande : la partie s'arrête le temps de les faire, flippers compris.
+Deux cas sont réglés avant la partie, sans modifier la table.
+
+- **Images rangées dans la table** (tables de JP comme *Hellboy* ou *Daredevil*) : FlexDMD lit et décode chaque image « VPX.nom » du `.vpx` à son premier affichage (`AssetManager.cpp`), puis la garde.
+  Le `.vbs` de Cyber Pinball les demande toutes juste après `FlexDMD.Run = True`, pendant l'écran de chargement ([flexprewarm.ts](../../packages/core/src/flexprewarm.ts)) : en partie, elles sont déjà là.
+  Les images retenues sont celles de la table dont le script écrit le nom en entier (« VPX.nom&… »), le donne en chaîne (« "VPX." & nom », chez JP) ou le fabrique à partir d'un début (« "d_" & lettre » : les lettres du DMD de *Hellboy*) ; seules comptent les chaînes qui sont le nom d'une image de la table.
+  Les options d'image écrites dans le script sont reprises quand FlexDMD les reconnaît en entier (`dmd=`, `dmd2=`, `add`, `region=`, `pad=`) ; une autre chaîne qui commence par « & » (paramètres d'une adresse web) n'est jamais demandée à FlexDMD.
+  Jusqu'à 3 000 demandes (`FLEX_PREWARM_MAX`) : toutes les images des grandes tables, *Daredevil* compris (178 images en trois variantes).
+  Constat du médecin « Images du DMD chargées en pleine partie » (`flexImagesLate`), réparé seul avant chaque partie (`PUP_PLAY_REPAIRS`) ; un `.vbs` venu d'ailleurs n'est pas touché.
+- **Vidéos trop grandes** (tables UltraDMD ou FlexDMD) : le plugin décode chaque vidéo du dossier du DMD en entier, d'un coup, à chaque scène qui la montre (`Video.cpp`) ; une vidéo de 1920 × 480 figeait la partie une à plusieurs secondes à chaque scène.
+  Une vidéo de plus de quatre fois le plus grand DMD (256 × 64 points), ou de plus de 3 Mo quand sa taille ne se lit pas, est signalée ([dmdvideos.ts](../../packages/core/src/dmdvideos.ts)) : constat « Vidéos du DMD trop grandes : la partie se fige » (`dmdVideosHeavy`), dans le diagnostic de la table et dans la ligne « Tables » de la Santé de la borne.
+  Avant la partie, celles que Chromium sait lire (mp4, m4v, mov, webm) sont ramenées à 128 × 32 (`app/src/dmd-video-shrink.ts`) : réencodées en VP8 dans un WebM, sous le même nom, que VPX reconnaît à son contenu ; l'original va à la corbeille de Cyber Pinball.
+  Elles s'affichent pareil sur le DMD, et une vidéo déjà réduite n'est pas refaite.
+  Les autres (wmv, avi) restent telles quelles, et le constat conseille de les remplacer par des mp4 à la taille du DMD.
+- **Tests** : `images-dmd-avance.test.ts`, `dmd-videos.test.ts`, `reduction-videos-dmd.test.ts`, `webm-dmd.test.ts` et les pièges `flexImagesLate` et `dmdVideosHeavy` de [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).
 
 ### Position du DMD en partie
 

@@ -91,13 +91,13 @@ Rivets and stars glow in the rarity colour.
   In guest mode, the card says "Guest · Games without XP".
   The card and the badges pill also stay at the top of full-screen pages (System menu and its screens, My badges, help…), on the brand line, at the height of the other pills (`--pill-height`, [app/renderer/niveau.css](../../app/renderer/niveau.css)); never in attract mode nor in the Juke-box.
   There, "+85 XP" does not show (it would fall on the screen's title), and on a cabinet the card gives way while a notification is shown.
-  The System menu gear, on their right, is a round pill of the same size (see [System menu](system-menu-five-sections.md#system-menu-five-sections)).
+  The System menu gear, on their right, is a round pill of the same size (see [System menu](system-menu-five-sections.md#system-menu-six-sections)).
 - **My level**, first in the Community home: the bar and XP to go, this week's XP, the four latest gains, the current week's rankings with the expected XP, the two closest badges; then "My badges", "How to earn XP" and "My public profile".
 - **My badges**: each row carries the badge's drawing, in its shape and rarity ([app/src/level-menu.ts](../../app/src/level-menu.ts), `Row.medal`).
   An earned badge shines, with a halo in its rarity colour and a passing gleam; a badge not earned yet stays grey and unlit, without a gleam; a secret not earned yet shows only its padlock.
   The two closest badges, in "My level", have the same drawing.
   A badge not earned yet says what it is worth ("Play 100 different tables · +1,000 XP to earn"), secret badges included, after their hint.
-- **Public profile** (see [Friends: the cabinet network](friends-the-cabinet-network.md#public-profile-and-likes)): the tier and level under the name; then, after the country, the number of friends (never the list) and the high scores, the level line with its bar ("Flippeur · niveau 14", "350 / 750 XP") and their badges as medals, the rarest first (twelve at most, "23 badges sur 56", 23 badges out of 56).
+- **Public profile** (see [Community: the cabinet network](friends-the-cabinet-network.md#public-profile-and-likes)): the tier and level under the name; then, after the country, the number of friends (never the list) and the high scores, the level line with its bar ("Flippeur · niveau 14", "350 / 750 XP") and their badges as medals, the rarest first (twelve at most, "23 badges sur 56", 23 badges out of 56).
   Under each medal, its full name, on two lines if needed, never cut in the middle of a word ("Ambassado / r"), then the XP it is worth ("+150 XP"), in its rarity colour.
   The card of a cabinet that does not have this version yet has no level: "Niveau pas encore connu" (Level not known yet).
   Their invited players come next ("A fait découvrir Cyber Pinball à 3 joueurs", Introduced 3 players to Cyber Pinball, with their avatars).
@@ -113,7 +113,9 @@ Back on the tables screen, never during a game or a loading, each badge earned g
 The background depends on the badge family: Horizon (Journey, Play time, Explorer, Discoveries), Shock wave (Honor roll, Rankings), Rise (Progress), Swarm (Online, Chat rooms, Between players, Community), Reveal (Secrets, with "Secret revealed").
 When the level goes up during the moment, rays in the tier colour join in and "Level 15" appears; a legendary badge gets golden rays from the start.
 The badge arrives, a beam follows its exact edge (circle or hexagon) with a spark at its head, then come the name, the condition, the rarity, the XP counting up and the level bar.
+A secret badge, though, appears in jumps, in jolts, like a signal being picked up.
 Several badges play one after another ("1 / 3"); any button closes the moment, except during the first second and a half, and it closes by itself eight seconds after the end.
+The veil is laid once, when the moment opens, and stays from one badge to the next: the tables screen does not light up again under the next badge.
 On a desktop, the badge and text sit in a 9:16 column in the middle of the screen; the background covers the whole screen.
 Its stars and dust spread over the whole width, on both sides of the badge, and the swarm centres on the column (test: [moment-fond.test.ts](../../packages/core/src/test/moment-fond.test.ts), for each background).
 

@@ -387,7 +387,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
       sections.push({
         rows: [
           problem
-            ? { text: t('{filter} : {reason}', { filter: filterLabel(filter), reason: problem }), detail: filter === 'nearby' ? t('Le réactiver : Partage et réseau') : t('Le choisir : Partage et réseau › Choisir mon pays'), icon: 'info', tone: 'quiet' }
+            ? { text: t('{filter} : {reason}', { filter: filterLabel(filter), reason: problem }), detail: filter === 'nearby' ? t('Le réactiver : Partage et réseau') : t('Le choisir : Mon compte › Mon pays'), icon: 'info', tone: 'quiet' }
             : list.length
               ? { text: t('Personne pour ce filtre en ce moment'), detail: t('MagnaSave : filtre suivant'), icon: 'info', tone: 'quiet' }
               : { text: t('Aucun joueur connu pour l’instant'), detail: t('La liste se remplit à mesure que les bornes se signalent'), icon: 'info', tone: 'quiet' },
@@ -523,7 +523,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
   function poster(): CommunityPosterView {
     const frame = { edition: t('Le flipper se joue à plusieurs'), label: t('Votre borne. Vos joueurs.'), title: t('COMMUNAUTÉ'), tagline: t('Joueurs, salons, classements.'), start: t('Start'), open: t('Ouvrir la Communauté') };
     if (!net.state().enabled)
-      return { ...frame, stats: t('Le réseau des bornes vous attend.'), empty: true, eyebrow: t('Pour commencer'), heading: t('Activez le partage'), detail: t('Menu système › Amis › Partage et réseau') };
+      return { ...frame, stats: t('Le réseau des bornes vous attend.'), empty: true, eyebrow: t('Pour commencer'), heading: t('Activez le partage'), detail: t('Menu système › Communauté › Partage et réseau') };
     const list = players();
     const room = host.rooms?.glance?.();
     const friends = list.filter((p) => p.friend);

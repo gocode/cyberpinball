@@ -20,3 +20,4 @@ From the table menu, R key (or Exit then "Réglages de VPX" (VPX settings)); sta
   For a table that plays a ROM, the "Son" (Sound) group of "Essentiels" adds "Volume de la ROM" (ROM volume) after VPX's volumes: it is not in the `.ini` but in the ROM's memory, which Cyber Pinball writes outside a game (`RomVolumeControl`, see [ROM volume](sound.md#rom-volume)).
   The screen opened on its own (`--reglages --table=…`) has it too.
   In a sandbox (`CYBERPINBALL_HOME`), it is written to `<bac à sable>\sandbox\tables\` and never next to the real .vpx.
+- These settings are those of Cyber Pinball's VPX: a table played with another VPX of the PC starts with that other VPX's settings, which Cyber Pinball never touches (see [Other VPX versions](other-vpx-versions.md#other-vpx-versions)).

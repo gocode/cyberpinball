@@ -112,7 +112,7 @@ Code: [romvolume.ts](../../packages/core/src/romvolume.ts) (state, advice, playe
   A block holding only the volume (WPC, SAM) is always redone: blank, it becomes valid.
 - **Before the game** (`beforeGame`): the wanted volume is set, if it is not already; the player's choice, otherwise, when automatic, the recommended volume instead of a low factory volume.
   With no memory, nothing is written: the ROM creates it during the first game, at the factory volume, and Cyber Pinball raises that low volume as soon as the game ends.
-  Never in the double of a game between friends (its volume is already the cabinet's, see [Friends: the cabinet network](friends-the-cabinet-network.md#friends-the-cabinet-network)), nor for "Régler l'affichage en partie" (Adjust the display during a game).
+  Never in the double of a game between friends (its volume is already the cabinet's, see [Community: the cabinet network](friends-the-cabinet-network.md#community-the-cabinet-network)), nor for "Régler l'affichage en partie" (Adjust the display during a game).
   Log: "Volume de la ROM (…, taf_l7) : 12 → 23 sur 31 avant la partie (volume d'usine bas, conseillé)." ("usine → 23" for a blank block).
 - **After the game** (`afterGame`, `romVolumeChangedInGame`): a volume changed at the coin door during the game becomes the player's choice, kept afterwards (log: "… réglé à la porte pendant la partie, gardé."); a volume still at the factory value after a first game is not a choice.
   The player's choices are in `<données>\volumes-rom.json`, per `.nv` file.

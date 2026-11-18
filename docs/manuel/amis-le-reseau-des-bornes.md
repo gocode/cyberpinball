@@ -1,33 +1,31 @@
 [English](../manual/friends-the-cabinet-network.md) · Français · [Sommaire du manuel](../manuel.md)
 
-## Amis : le réseau des bornes
+## Communauté : le réseau des bornes
 
 Menu système > « Communauté » relie les bornes entre elles **sans serveur** : chacune trouve les autres et leur parle directement, par Internet ou sur le réseau local.
 Le partage est **activé par défaut** ; « Partage et réseau » le coupe.
+Ce qui est à vous (pseudo, avatar, pays, badges, profil public, ce que voient les autres, suppression du compte) est dans Menu système > « Mon compte » (voir [Mon compte](mon-compte.md#mon-compte)).
 
 | Entrée | Ce qu'elle montre |
 | --- | --- |
 | Messages | Les conversations avec vos amis, la plus récente d'abord, puis les amis à qui vous n'avez pas encore écrit. La pastille rouge et « non lus » marquent ce qui attend. Start ouvre le fil d'un ami (voir « Messagerie » plus bas). |
 | Mes amis | En ligne, puis hors ligne. Pour chacun : en partie et sur quelle table (en temps réel), dans le front-end, ou vu il y a combien de temps ; son dernier évènement (« Nouveau meilleur score sur … », « Badge reçu : … », « A joué à … »). Start ouvre son profil, le seul écran d'un joueur (voir « Profil public et « J'aime » » plus bas) : sa présence, sa bibliothèque, son niveau, ses badges, une seule liste d'activité, « Inviter à une partie en direct » (grisée, « Hors ligne », quand il ne l'est pas), « Voir sa bibliothèque », « Écrire un message », « Retirer de mes amis », « Bloquer … ». En tête, une invitation reçue ou la partie en direct en cours. |
-| Mon avatar | La photo ou l'image que tous les joueurs voient à côté de votre nom : « Choisir une image sur ce PC… », « Chercher une image sur le web… », « Recadrer mon avatar », « Retirer mon avatar » (voir « Avatar des joueurs » plus bas). Sans avatar, vos initiales sur une teinte tirée de votre clé. |
-| Mon profil public | Ce que voient les joueurs qui ne sont pas vos amis (niveau, badges, pays, amis, records, personnes invitées, groupes publics, activité récente), et qui a aimé chacun de vos records et badges. Pendant le premier mois, « Qui vous a fait découvrir Cyber Pinball ? » (voir « Personnes invitées » plus bas). Il se désactive ici (voir « Profil public et « J'aime » » plus bas). |
 | Historique des parties | Les parties entre amis finies sur cette borne, de la plus récente à la plus ancienne, par jour : la table, l'heure, et dessous les joueurs avec leur rang et leur score. Une partie s'ouvre pour revoir son détail (voir « Historique des parties » plus bas). |
 | Trouver un joueur | L'annuaire : « Chercher un nom… » (sans accents ni casse ; ou l'identifiant vu sur le profil d'un joueur, entier ou ses quatre premiers caractères), les bornes « À proximité (réseau local) » et celles « Vus récemment ». Start sur un joueur ouvre son profil : « Envoyer une demande d'ami », ou « Annuler la demande », « Accepter », « Refuser », et « Bloquer … ». |
 | Demandes d'amis | Reçues (à valider, pastille rouge jusqu'à la roue dentée) et envoyées (« En attente : remise dès que sa borne sera en ligne »). |
-| Mes badges | Les 56 badges, par famille, obtenus (avec leur date) ou à obtenir (avec leur progression) ; les badges secrets ne montrent que leur indice (voir [Niveaux et badges](niveaux-et-badges.md#niveaux-et-badges)). |
-| Partage et réseau | Partage activé ou non, « Votre nom : Alexis » (avec l'identifiant de la borne), réseau local, bibliothèque partagée ou non, débit des téléchargements, pare-feu de Windows, ce que voient les autres, joueurs bloqués. La sélection s'ouvre sur « Retour » : un Start par mégarde ne coupe pas le partage. |
+| Partage et réseau | Le réseau seul : partage activé ou non, réseau local, bibliothèque partagée ou non, débit des téléchargements, pare-feu de Windows, état en direct des tables Stern SAM, le rappel de ce que voient les autres, joueurs bloqués. Le pseudo, l'avatar, le pays, les réglages de ce que voient les autres et la suppression du compte sont dans Mon compte. La sélection s'ouvre sur « Retour » : un Start par mégarde ne coupe pas le partage. |
 | Masquer les notifications pendant les parties | Désactivé par défaut : la connexion d'un ami, une demande de rejoindre une partie, les nouvelles de la partie entre amis s'affichent aussi pendant les parties, avec leur son (voir « Partout, même en partie » dans [Notifications de l'écran des tables](notifications-de-l-ecran-des-tables.md#notifications-de-lécran-des-tables)). Start bascule ; activé, rien ne s'affiche ni ne sonne pendant une partie, tout attend le front-end. |
 
 **Identité.**
 Chaque borne a une clé Ed25519, créée au premier démarrage et gardée dans `<données>\social.json` (avec les amis, les demandes, l'annuaire, les évènements et les badges ; jamais partagé).
 Le nom (2 à 24 lettres, chiffres, espaces, `'`, `.`, `_`, `-`) est signé par cette clé ; l'identifiant du joueur (« A1B2-C3D4-E5F6-7890 », `playerId`, tiré de la clé) distingue deux joueurs du même nom.
-Il ne s'affiche que sur le profil d'un joueur (ligne « Identifiant : … ») et dans « Partage et réseau » ; partout ailleurs (listes, amis, scores, partie en direct, titres), le nom s'affiche seul, avec l'avatar.
+Il ne s'affiche que sur le profil d'un joueur (ligne « Identifiant : … ») et dans Mon compte (« Mon pseudo », la reprise d'un compte, sa suppression) ; partout ailleurs (listes, amis, scores, partie en direct, titres), le nom s'affiche seul, avec l'avatar.
 Une garde des tests (`noTag`, friends-menu.test.ts) refuse toute étiquette accolée à un nom.
 Un `social.json` illisible est mis de côté (`social.json.illisible-<date>`), jamais écrasé.
 
 **Supprimer son compte (RGPD).**
-« Partage et réseau » > « Supprimer mon compte… » montre ce qui part (le compte et son identifiant, les amis, les demandes, les conversations, les salons, l'avatar, les scores publiés, le profil public, les propositions et votes du tableau des retours) et ce qui reste (les tables, leurs scores, les réglages, les sauvegardes déjà faites, qui contiennent le compte, à effacer dans Menu système > Cyber Pinball > Sauvegardes), le curseur sur « Annuler ».
-« Supprimer définitivement mon compte » : le service des retours efface d'abord les propositions et les votes de la clé (`POST /api/oubli`, signé par elle ; injoignable, le joueur réessaie ou continue sans lui) ; un **avis d'oubli** signé par la clé (`forget` : la clé, l'heure) part vers les bornes reliées, avec « unfriend » vers les amis et les demandes, et le réseau s'arrête ; les fichiers du compte sont effacés (`social.json`, `avatars\`, `amis\messagerie.json`, `amis\salons.json`, `amis\profils.json`, `amis\records.json`, `amis\parties.json`, les classements reçus) ; Cyber Pinball redémarre avec une clé neuve.
+Menu système > « Mon compte » > « Supprimer mon compte » montre ce qui part (le compte et son identifiant, les amis, les demandes, les conversations, les salons, l'avatar, les scores publiés, le profil public, les propositions et votes du tableau des retours, les réactions aux Nouveautés) et ce qui reste (les tables, leurs scores, les réglages, les sauvegardes déjà faites, qui contiennent le compte, à effacer dans Menu système > Cyber Pinball > Sauvegardes), le curseur sur « Annuler ».
+« Supprimer définitivement mon compte » : le service des retours efface d'abord les propositions, les votes et les réactions de la clé, avec la copie chiffrée du compte et son mot de passe (`POST /api/oubli`, signé par elle ; injoignable, le joueur réessaie ou continue sans lui) ; un **avis d'oubli** signé par la clé (`forget` : la clé, l'heure) part vers les bornes reliées, avec « unfriend » vers les amis et les demandes, et le réseau s'arrête ; les fichiers du compte sont effacés (`social.json`, `avatars\`, `amis\messagerie.json`, `amis\salons.json`, `amis\profils.json`, `amis\records.json`, `amis\parties.json`, les classements reçus) ; Cyber Pinball redémarre avec une clé neuve.
 Chaque borne qui reçoit l'avis vérifie sa signature, efface tout ce qui vient de cette clé (annuaire, amis, demandes, classements, carte publique, « J'aime », lignes de salon, conversation), refuse ce qui en reviendrait par un relais, garde l'avis dans `<données>\amis\oublis.json` (la clé seule, sans nom) et le relaie ; il est joint au bonjour de chaque liaison, pour les bornes qui étaient éteintes.
 Modules : [forget.ts](../../packages/core/src/forget.ts), `app/src/account-delete.ts`.
 Essais : [suppression-compte.test.ts](../../packages/core/src/test/suppression-compte.test.ts) (signature, effacement de chaque donnée, et entre deux bornes en 127.0.0.1 : l'avis efface le joueur et ses lignes) et `retours-service.test.ts` (propositions, votes, rejeu).
@@ -37,6 +35,7 @@ Juste après l'assistant d'écrans de l'installation, le front-end ouvre l'écra
 Le pseudo est obligatoire : tant qu'il n'est pas choisi, la ligne du pseudo affiche « à choisir », « Continuer » reste grisé, et « Continuer » comme Exit ne font que rappeler le pseudo, la sélection revenue sur « Choisir mon pseudo… ».
 Le nom d'office retapé tel quel (« Joueur A1B2 », « Player A1B2 ») est refusé.
 L'avatar reste facultatif.
+« J'ai déjà un compte… », avant « Continuer », reprend un compte existant, et un compte trouvé dans la copie de secours de ce PC est proposé d'office (voir [Mon compte](mon-compte.md#mon-compte)).
 Tant que la question se pose (voir « Personnes invitées » plus bas), une entrée facultative se glisse avant « Continuer » : « Qui vous a fait découvrir Cyber Pinball ? », qui devient « Découvert grâce à … » une fois un joueur choisi.
 L'écran revient à chaque démarrage tant que le profil porte le nom d'office, même déjà vu et même avec un avatar ; un profil qui avait passé l'écran sans pseudo le retrouve donc au démarrage suivant.
 Jamais en mode invité ni pendant un essai sans opérateur (sauf `CYBERPINBALL_PROFIL=1`), et après l'ouverture quand le démarrage arrive sur la roue.
@@ -504,6 +503,7 @@ Les actions : pour un ami, « Inviter à une partie en direct », « Voir sa bib
 **Aimer.**
 Sur le profil, les flippers choisissent un record ou un badge, Start l'aime, Start de nouveau ne l'aime plus.
 Chacun voit le nombre de « J'aime » ; seul l'auteur voit qui a aimé.
+Le « J'aime » se montre par un pouce levé, rempli quand vous l'aimez déjà ; le même pouce marque l'écran « Ont aimé », la notification d'un « J'aime » reçu, le détail des points d'expérience et les badges « Apprécié », « Populaire » et « Généreux ».
 On ne peut pas écrire à un joueur qui n'est pas un ami : « Écrire un message » reste visible, grisé, avec sa raison ; « Envoyer une demande d'ami » est à côté.
 « Masquer son activité » cache sur cette borne ses évènements et ses « J'aime », avec son niveau, ses badges et ses personnes invitées ; « Bloquer » coupe tout.
 
@@ -511,7 +511,7 @@ On ne peut pas écrire à un joueur qui n'est pas un ami : « Écrire un message
 Menu système > « Mon compte » > « Mon profil public » montre ce que voient les autres (pays, amis et records, niveau et barre, badges en médailles, personnes invitées, groupes publics) et, pour chaque évènement de « Votre activité récente », qui l'a aimé (Start).
 Pendant le premier mois, il propose aussi « Qui vous a fait découvrir Cyber Pinball ? » (voir « Personnes invitées » ci-dessous).
 Un « J'aime » reçu s'annonce par une notification à l'écran des tables, regroupée (« Dora et Kiko aiment votre activité »).
-Le profil public est **activé par défaut** ; « Désactiver mon profil public », ici ou dans « Partage et réseau », ne laisse aux autres que le pseudo dans l'annuaire (et les scores, s'ils sont publiés).
+Le profil public est **activé par défaut** ; « Désactiver mon profil public », ici ou dans « Ce que voient les autres », ne laisse aux autres que le pseudo dans l'annuaire (et les scores, s'ils sont publiés).
 
 **Sans serveur.**
 La carte publique d'un joueur est signée par sa clé et passe de borne en borne comme les scores des classements : chaque borne la garde 60 jours, si bien qu'un profil se lit même quand son joueur est hors ligne, dans l'état de la dernière carte reçue (« Profil actualisé il y a … »).
@@ -562,7 +562,7 @@ Tests : [invitations.test.ts](../../packages/core/src/test/invitations.test.ts).
 Dans la roue, juste après le Juke-box et avant le médaillon Collections et les tables de chaque collection, un médaillon sur l'anneau chromé commun ouvre la communauté : son nom en vert, le nombre de joueurs en ligne et d'amis en ligne dessous.
 Partout (médaillon, affiche, Menu système, onglets de « Joueurs en ligne », téléphone), le nombre de joueurs en ligne, et celui de votre pays, ne s'affiche qu'au-delà de cinq, comme les présents d'un salon : un réseau presque vide, chiffré, découragerait ; les joueurs restent nommés, et vos amis en ligne se comptent toujours.
 Start ouvre l'**accueil**, six portes : « Joueurs en ligne », « Parties instantanées » (voir ci-dessous), « Mes amis » (avec la pastille des demandes reçues), « Messages » (la messagerie entre amis), le salon de votre pays (voir « Salons par pays » ci-dessous) et « Classements », qui ouvre sur deux portes, « Joueurs » et « Tables ».
-« Joueurs » classe les joueurs par leurs XP, en onglets Amis, National et Mondial (MagnaSave passe de l'un à l'autre), de la semaine (les XP gagnés depuis lundi, à zéro chaque lundi) ou de tout temps (les flippers passent de l'une à l'autre).
+« Joueurs » classe les joueurs par leurs XP, en onglets Amis, National et Mondial (Start ou MagnaSave passe de l'un à l'autre), de la semaine (les XP gagnés depuis lundi, à zéro chaque lundi) ou de tout temps (les flippers passent de l'une à l'autre).
 Il s'ouvre sur National · Cette semaine (Mondial sans pays choisi) : la semaine d'abord, où chacun a sa chance.
 Chaque ligne donne le rang, le drapeau, la pastille du joueur avec son niveau et sa présence, son pseudo et ses XP, l'autre période en petit (« 12 400 XP au total », « +850 cette semaine ») ; à égalité, le même rang.
 Il compte les joueurs dont la borne a reçu la carte publique, qui porte, signés, les XP de la semaine et son lundi (la carte d'une borne pas encore à jour ne se classe qu'en Tout temps), et vous, même profil public désactivé.
@@ -570,18 +570,21 @@ Votre ligne, « (vous) », reste toujours visible, à part au-delà des cinquant
 Un total impossible pour quiconque (au-delà de tout ce qui a pu se gagner depuis l'arrivée des niveaux, compte tenu des XP que rapportent les personnes invitées), ou une semaine au-delà de ce qu'une semaine permet, ne se classe pas : il est compté sous le tableau (« 1 joueur écarté (XP impossibles) »).
 Un total seulement inattendu pour l'ancienneté du joueur sur cette borne se classe, son niveau montré « ? ».
 Partage désactivé, la porte est grisée avec sa raison ; sans pays, National dit « Pays non choisi : Mon compte > Mon pays » ; sans ami, Amis dit « Aucun ami pour l'instant ».
-Start ou Exit revient aux deux portes, dont la porte « Joueurs » résume votre place : « Vous : niveau 14 · 37ᵉ au monde cette semaine · 3ᵉ dans votre pays ».
+Exit revient aux deux portes, dont la porte « Joueurs » résume votre place : « Vous : niveau 14 · 37ᵉ au monde cette semaine · 3ᵉ dans votre pays ».
 « Tables » montre toutes vos tables, les cinq dernières jouées d'abord (« Jouées récemment », avec « hier », « il y a 3 j »), puis toutes les autres de A à Z, en onglets Cette borne, Amis, National et Mondial, chacun comptant ses tables classées (« 3 sur 42 »), sur la période choisie (« Période » : Tout temps, Cette année, Cette semaine, Aujourd'hui ; Start passe à la suivante).
 Il s'ouvre sur Mondial · Tout temps (Cette borne quand le partage est désactivé), le curseur sur la recherche.
 Une table classée dit le premier, son score, le nombre de joueurs (de parties, pour Cette borne) et votre place, avec « Premier » en vert quand vous menez ; une table sans classement reste dans la liste, grisée, avec sa raison (aucun score sur la période, empreinte en calcul, version illisible).
 « Rechercher une table », en tête de la liste, filtre par nom avec le clavier à l'écran ou celui du PC, sans accents ni majuscules : chaque mot tapé commence un mot du nom ou se trouve dans le nom écrit sans espaces (« comete » trouve « Comète »).
 Pendant une recherche, les tables se suivent de A à Z ; « Effacer la recherche » les ramène toutes.
 Start sur une table ouvre son tableau des scores à la même portée et à la même période, dont le « Retour » revient à la liste des tables.
+Dans un tableau des scores, comme dans « Joueurs », Start ou MagnaSave passe à la portée suivante, les flippers changent de période et Exit revient : une borne dont les MagnaSave valident et reviennent dans l'OS change ainsi de portée.
 Le classement des joueurs est calculé par `playerBoard` dans `packages/core/src/playerranking.ts`, l'écran dans `app/src/rankings-menu.ts` ; tests : `packages/core/src/test/classement-joueurs.test.ts` et `packages/core/src/test/classements-global.test.ts`.
 Exit revient à la roue.
 Le médaillon se masque dans Menu système > Tables > Roue (« Communauté dans la roue ») ; il n'apparaît jamais en mode invité.
 Choisi dans la roue, il montre son **affiche**, comme le Juke-box : derrière la roue (tout le plateau en borne, le cadre du plateau au bureau) et à la place du média du fronton.
-Elle donne les chiffres (joueurs en ligne, ceux de votre pays, vos amis), le salon de votre pays avec ses présents et sa dernière ligne, et les amis en ligne (sinon les messages non lus) ; partage désactivé, elle dit comment l'activer.
+Les deux affiches donnent les chiffres (joueurs en ligne, ceux de votre pays, vos amis) et les amis en ligne (sinon les messages non lus) ; partage désactivé, elles disent comment l'activer.
+Celle du plateau montre en plus votre niveau (son palier et sa barre), votre place au classement mondial et dans votre pays, et votre semaine en une ligne (« Cette semaine : +850 XP · 37ᵉ au monde · 3ᵉ dans votre pays ») ; une place encore inconnue garde sa case, grisée, avec sa raison (« Pas encore classé », « Pays non choisi »).
+Le salon de votre pays, avec ses présents et sa dernière ligne, ne paraît que sur l'affiche du fronton.
 
 **Joueurs en ligne.**
 Aussi en tête de Menu système > Communauté.
@@ -595,8 +598,8 @@ Start sur un joueur, ami ou non, ouvre son profil (présence et bibliothèque d'
 
 **Apparaître en ligne pour tous.**
 Activé par défaut.
-Coupé (en bas de « Joueurs en ligne », ou dans « Partage et réseau »), vous n'apparaissez plus chez les joueurs qui ne sont pas vos amis ; vos amis voient toujours votre présence, et vous voyez toujours la liste.
-Au téléphone, l'onglet Communauté a une partie « Joueurs » : vos amis, puis les autres joueurs en ligne, qu'on voit sans pouvoir leur écrire.
+Coupé (en bas de « Joueurs en ligne », ou dans Mon compte > « Ce que voient les autres »), vous n'apparaissez plus chez les joueurs qui ne sont pas vos amis ; vos amis voient toujours votre présence, et vous voyez toujours la liste.
+Au téléphone, l'onglet Communauté a un onglet « Joueurs » : la même liste, avec les demandes reçues, les filtres en badges et le profil de chaque joueur (voir [Communauté au téléphone](communaute-au-telephone.md#communauté-au-téléphone)).
 
 **Sans serveur.**
 Chaque borne signe toutes les deux minutes un petit signal (`live` : sa clé, son pseudo, son pays, « en ligne » ou « en partie », l'heure ; jamais la table), envoyé aux bornes reliées, et tout de suite quand elle entre en partie ou en sort.
@@ -613,7 +616,7 @@ Le module est [livepresence.ts](../../packages/core/src/livepresence.ts), l'écr
 
 Une partie en direct ouverte à tous, amis ou non.
 Un joueur l'ouvre, choisit le nombre de joueurs, et elle s'affiche dans la Communauté de chaque borne en ligne ; n'importe qui la rejoint, et **dès qu'elle est complète, elle part d'elle-même pour tout le monde**.
-La partie elle-même est celle des amis (voir « Amis : le réseau des bornes ») : chacun joue sur sa borne, la même version de la table, avec les réglages de l'hôte, un départ commun et les résultats de chacun.
+La partie elle-même est celle des amis (voir « Communauté : le réseau des bornes ») : chacun joue sur sa borne, la même version de la table, avec les réglages de l'hôte, un départ commun et les résultats de chacun.
 
 **Ouvrir une partie.**
 Communauté > Parties instantanées > « Ouvrir une partie instantanée » : la table (vos tables VPX), puis le nombre de joueurs, vous compris (2, 3 ou 4).
@@ -623,6 +626,7 @@ Le salon d'attente s'ouvre : « En attente de 2 joueurs », les joueurs déjà l
 « Annuler la partie » la retire de toutes les listes, et ceux qui l'avaient rejointe en sont prévenus.
 Une partie qui n'est pas complète en trente minutes se ferme d'elle-même.
 Une seule partie à la fois : en ouvrir une autre ferme la précédente.
+Au téléphone, Communauté > Joueurs montre les parties ouvertes et « Ouvrir une partie instantanée » (voir Communauté au téléphone).
 
 **Rejoindre.**
 Communauté > Parties instantanées : les parties ouvertes par les autres, la plus récente d'abord.
@@ -698,7 +702,7 @@ L'écran montre qui invite, si le groupe est public ou privé, les membres et la
 « Accepter » fait entrer dans le groupe ; « Refuser » ne dit rien de plus que « refusée » à qui a invité.
 
 **Au téléphone.**
-Dans l'onglet Communauté, « Messages » montre vos groupes en tête des conversations (leur pastille porte les initiales du groupe) ; un toucher ouvre le fil du groupe, avec l'auteur de chaque message, les réactions et les phrases d'un appui, et un champ pour écrire.
+Dans l'onglet Communauté, « Messages » propose « Créer un groupe » (ouvert à la borne) et « Groupes publics », puis les invitations reçues, et montre vos groupes en tête des conversations ; le fil d'un groupe a sa table de la semaine, son classement, l'auteur de chaque message et son menu ⋮ (voir Communauté au téléphone).
 Comme pour la messagerie, la borne vérifie tout ce qui part, dans le front-end comme pendant une partie.
 
 **Signaler.**
@@ -781,7 +785,7 @@ Le téléphone reçoit la même liste.
 Les phrases d'origine (six, dont « Merci ! ») suivent la langue de la borne tant qu'on ne les modifie pas ; les phrases sont gardées dans `<données>\amis\salons.json` (`phrases`, absent : celles d'origine).
 
 **Au téléphone.**
-L'onglet Communauté a une partie « Salon » : les 60 dernières lignes du salon ouvert à la borne (sinon du salon par défaut), des phrases d'un appui et un champ ; on y écrit dans le front-end comme pendant une partie.
+L'onglet Salons de la Communauté : le salon se choisit au téléphone, indépendamment de la borne ; ses 60 dernières lignes, les options d'une ligne au toucher (réagir, répondre, profil, signaler, bloquer, supprimer la sienne), des phrases d'un appui et un champ ; on y écrit dans le front-end comme pendant une partie.
 Les règles s'acceptent à la borne.
 
 **Sans serveur.**
@@ -830,11 +834,11 @@ Chacun personnalise un avatar, visible de tous, amis ou non, partout où son nom
 Pour l'instant, c'est toujours une image à soi : une photo ou une image prise sur le disque, ou dans le navigateur intégré, recadrée aux boutons de la borne ([avatar.ts](../../packages/core/src/avatar.ts), écran `app/src/avatar-menu.ts`).
 
 - **Où il se voit.**
-  « Mes amis » (en ligne, l'anneau de la pastille est vert ; hors ligne, elle s'éteint), le profil d'un joueur (devant son nom, et ses personnes invitées), « Joueurs en ligne », les salons (leurs présents et leurs lignes), les tableaux des scores, « Trouver un joueur » et les résultats, « Demandes d'amis », « Depuis un ami », « Partage et réseau » (le vôtre), l'historique des parties (les joueurs de chaque partie en petites pastilles, puis chacun devant son rang), le salon, l'invitation et les résultats d'une partie en direct, la carte d'invitation et la bande des scores pendant la partie, et les notifications qui ne parlent que d'un joueur (« Bruno vient de se connecter »).
+  « Mes amis » (en ligne, l'anneau de la pastille est vert ; hors ligne, elle s'éteint), le profil d'un joueur (devant son nom, et ses personnes invitées), « Joueurs en ligne », les salons (leurs présents et leurs lignes), les tableaux des scores, « Trouver un joueur » et les résultats, « Demandes d'amis », « Depuis un ami », « Protéger et transférer mon compte » (le vôtre), l'historique des parties (les joueurs de chaque partie en petites pastilles, puis chacun devant son rang), le salon, l'invitation et les résultats d'une partie en direct, la carte d'invitation et la bande des scores pendant la partie, et les notifications qui ne parlent que d'un joueur (« Bruno vient de se connecter »).
   Sans image : les initiales (« AM » pour « Alexis Martin ») sur une teinte sombre tirée de la clé, la même sur toutes les bornes.
   L'encart des scores au bas du plateau, trop petit pour des initiales lisibles, ne garde que la teinte.
 - **Choisir l'image.**
-  Menu système > « Mon compte » > « Mon avatar » (ou « Partage et réseau » > « Changer d'avatar… »).
+  Menu système > « Mon compte » > « Mon avatar » (ou « Mettre un avatar… » à l'écran « Votre profil de joueur » du premier lancement).
   « Choisir une image sur ce PC… » ouvre le sélecteur de fichiers de Cyber Pinball (.jpg, .jpeg, .png, .webp, .gif, .bmp, .avif, 40 Mo au plus).
   « Chercher une image sur le web… » ouvre le navigateur intégré sur une recherche d'images : un clic droit sur une image, « Télécharger cette image » (proposé sur toute recherche libre, médias compris, les moteurs d'images n'ayant pas de lien de téléchargement), et le navigateur se ferme sur le recadrage.
 - **Image de travail.**
@@ -850,6 +854,7 @@ Pour l'instant, c'est toujours une image à soi : une photo ou une image prise s
   « Valider ce cadrage » découpe le carré en JPEG de 256 pixels (`cropJpeg`, qualité 0,86, refait à 0,72 puis 0,55 s'il dépasse 96 Ko), rangé sous son empreinte : `<données>\avatars\<sha256>.jpg`.
   Le nom change avec le contenu : rien à invalider dans le cache du rendu, et deux joueurs qui ont la même image ne la gardent qu'une fois.
   `social.json` garde le nom du fichier (`avatar`), et ceux des amis (`peerAvatars`, par clé).
+  Le fichier entre dans les sauvegardes (« Réglages et scores ») et dans la copie de secours du compte (voir [Mon compte](mon-compte.md#mon-compte)) : une restauration ou une reprise ramène l'image avec son nom.
   Les fenêtres le lisent par le protocole `cyber-media://`, dont le dossier `avatars` fait partie (les fenêtres posées pendant la partie l'autorisent dans leur politique de sécurité).
 - **Échange entre bornes.**
   L'empreinte de l'avatar voyage avec tout ce que le joueur signe ou annonce : le bonjour de chaque liaison (absente : pas d'avatar ; une borne d'avant les avatars n'en envoie pas, elle compte comme sans avatar), le signal de présence publique, le signal de présence dans un salon, la carte du profil public et les scores des classements.

@@ -31,6 +31,12 @@ D:\CyberPinball\
   L'installeur complet le dépose dans `downloads\` avec l'archive de VPX, pour une borne sans Internet.
   Un VPX qui s'arrête faute d'une DLL (0xC0000135, 0xC0000139, 0xC000007B) est nommé sur l'écran d'échec, qui renvoie à « Santé de la borne » (`vpxMissingLibrary`, [packages/core/src/vpxfailure.ts](../../packages/core/src/vpxfailure.ts)).
   Pour une nouvelle version de VPX : à son installation, Cyber Pinball relit les DLL que ses fichiers importent (`vpxRuntimeNeeds`, [packages/core/src/vc-runtime.ts](../../packages/core/src/vc-runtime.ts)) et écrit au journal un runtime plus récent que `vcRuntime`, ou toute autre bibliothèque de redistribuable absente d'un Windows neuf (DirectX d'origine, OpenAL…) ; `vc-runtime.test.ts` vérifie la même chose sur le VPX installé du poste (`CYBERPINBALL_VPX_DIR` sinon), et que l'installateur de Microsoft du manifeste est assez récent.
+- **Fichiers de VPX contrôlés.**
+  Le manifeste donne la taille de chaque exécutable et bibliothèque de l'archive de VPX (`files`, relevé par `scripts/composant-fichiers.mjs`) ; à chaque relevé de la santé et de la fiche technique, et après un VPX arrêté en démarrant, Cyber Pinball compare le dossier installé à cette liste (`checkComponentFiles`, [packages/installer/src/component-files.ts](../../packages/installer/src/component-files.ts) ; `app/src/vpx-integrity.ts`), par un simple `stat`.
+  Un fichier changé ou absent, le plus souvent parce qu'un autre VPX a été copié par-dessus, est nommé avec sa version dans « Santé de la borne » (« VPX 10.8.1-5436 : 1 fichier modifié hors de Cyber Pinball », « SDL364.dll 3.2.18.0 : VPX peut s'arrêter dès son démarrage, sur toutes les tables ») et dans la fiche technique (bloc « Logiciels »).
+  « Remettre les fichiers d'origine » les reprend dans l'archive vérifiée de VPX (téléchargée si elle n'est plus dans `downloads\`, SHA-256 contrôlé), en extrait ces seuls fichiers et les remet un à un, sans toucher au reste du dossier (réglages, plugins de Cyber Pinball, `VPReg.stg`).
+  Un autre exécutable de VPX posé à côté de celui de Cyber Pinball n'est ni retiré ni lancé : le lanceur prend toujours l'exécutable que nomme le manifeste (`findExecutable`, `Component.executable`), et le journal le signale.
+  Tests : `vpx-fichiers-modifies.test.ts`.
 - La racine est refusée dans Program Files, dans Windows et sur un partage réseau.
   Le choix est mémorisé dans `%APPDATA%\CyberPinball\root.json`.
 - Avant le choix d'une racine, tout s'écrit dans un bac à sable (`%APPDATA%\CyberPinball\sandbox\`).

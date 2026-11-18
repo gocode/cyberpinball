@@ -9,6 +9,8 @@
   Un écran rebranché ou réveillé pendant que le front-end tourne (moniteurs mis en veille par le verrouillage de Windows, renumérotés au réveil) reçoit de nouveau son voile noir, mais les fenêtres du front-end ne suivent pas encore ce changement : le gardien signale l'écran découvert ou mal couvert dans la console, et un redémarrage de Cyber Pinball remet tout en place.
 - Clés de VPX 10.8.1 (fenêtres `Player`, `Backglass`, `ScoreView`, `Topper`, `[Plugin.<id>] Enable`, priorités et réglages des plugins B2S, PUP et DMDUtil).
   Le format des noms d'écran et les plugins à activer changent selon la version de VPX : ils sont décrits par version dans le manifeste (`adapterSettings`).
+- Autres versions de VPX (voir [Autres versions de VPX](autres-versions-de-vpx.md#autres-versions-de-vpx)) : Cyber Pinball n'en est que le lanceur, avec les réglages de ce VPX.
+  Pas de réalité virtuelle, de réglage de l'affichage en partie, de partie entre amis, de Vision 3D, de réglages de VPX de Cyber Pinball ni de préparation des PuP-Packs pour les tables jouées ainsi.
 - Image du front-end sur le DMD réel : le serveur du DMD n'accepte que le `dmdutil64.dll` de VPX 10.8.1, reconnu à son empreinte.
   Avec toute autre version de VPX, plus récente ou plus ancienne, « Image du front-end » est grisé avec sa raison et VPX garde le DMD en partie.
   Passer à une autre version demande de recopier les en-têtes, de refaire `packages/dmdserver/dmdutil64.def` et d'ajouter l'empreinte (`vendor/PROVENANCE.txt`) ; un test l'exige pour la version de VPX installée.

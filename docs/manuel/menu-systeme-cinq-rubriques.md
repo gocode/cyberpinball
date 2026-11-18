@@ -1,8 +1,8 @@
 [English](../manual/system-menu-five-sections.md) · Français · [Sommaire du manuel](../manuel.md)
 
-## Menu système : cinq rubriques
+## Menu système : six rubriques
 
-Le menu système (Exit, Tab ou ⚙ depuis l'écran des tables) ne montre que cinq rubriques, puis « Retour aux tables ».
+Le menu système (Exit, Tab ou ⚙ depuis l'écran des tables) montre six rubriques, Mon compte, Communauté, Tables, Médias, Borne et Cyber Pinball, avec quelques raccourcis parmi elles (Nouveautés tant qu'elles sont récentes, Activité récente, Collections, Juke-box, Téléchargements, Télécommande du téléphone), puis « Retour aux tables ».
 Chaque rubrique s'ouvre sur ses entrées ; Exit (ou « Retour ») remonte d'un cran, la sélection sur la rubrique qu'on quitte.
 Un écran ouvert depuis une entrée revient, par son « Retour », à la rubrique d'où l'on venait, la sélection sur cette entrée ; la roue dentée rouvre toujours les rubriques.
 
@@ -14,11 +14,12 @@ Test : [entete-homogene.test.ts](../../packages/core/src/test/entete-homogene.te
 
 | Rubrique | Entrées |
 | --- | --- |
+| Mon compte | Protéger et transférer mon compte, Mon pseudo, Mon avatar, Mon pays, Mes badges, Mon profil public, Ce que voient les autres, Supprimer mon compte (voir [Mon compte](mon-compte.md#mon-compte)) |
+| Communauté | Joueurs en ligne, Messages, Mes amis, Historique des parties, Trouver un joueur, Demandes d’amis, Réglages de la communauté, Modération (bornes des modérateurs seulement), Partage et réseau, Scores des amis pendant la partie, Masquer les notifications pendant les parties (voir [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#communauté--le-réseau-des-bornes)) |
 | Tables | Toutes les tables, Collections, Roue (voir [Roue : ses réglages](medias-des-jeux.md#roue--ses-réglages)), Ajouter une table, Téléchargements, Bibliothèque de ROM |
-| Médias | Trouver les médias manquants (sur VPinMediaDB) ; Médias, son et attente |
-| Amis | Joueurs en ligne, Messages, Mes amis, Mon avatar, Mon profil public, Historique des parties, Trouver un joueur, Demandes d’amis, Mes badges, Réglages de la communauté, Partage et réseau, Scores des amis pendant la partie, Masquer les notifications pendant les parties (voir [Amis : le réseau des bornes](amis-le-reseau-des-bornes.md#amis--le-réseau-des-bornes)) |
-| Borne | Santé de la borne, Fiche technique, Configuration de la borne, Réglages de VPX, Commandes de la borne, DMD (Écran du DMD, DMD du front-end, Couleur du DMD, DMD réel), Bureau Windows (Ouvrir l’Explorateur Windows en [borne dédiée](borne-dediee.md#borne-dédiée)), Borne dédiée, Relance par Start (voir [Relance par Start](relance-par-start.md#relance-par-start)), Mode invité |
-| Cyber Pinball | Langue / Language, Mise à jour de Cyber Pinball, Activité récente (voir [Activité récente](activite-recente.md#activité-récente)), Sauvegardes (voir [Sauvegardes](sauvegardes.md#sauvegardes)), Migration, Quitter Cyber Pinball, Redémarrer Cyber Pinball, Mettre en veille, Redémarrer la borne, Éteindre la borne |
+| Médias | Trouver les médias manquants (sur VPinMediaDB) ; Médias, son et attente ; Juke-box ; Réglages du Juke-box |
+| Borne | Santé de la borne, Fiche technique, Configuration de la borne, Réglages de VPX, Autres versions de VPX, Vision 3D, Réalité virtuelle (Réalité virtuelle, Caler la borne, Manettes du casque, Recopie sur le playfield), Commandes de la borne, Télécommande du téléphone, DMD (Écran du DMD, DMD du front-end, Couleur du DMD, DMD réel), LED et retours (DOF), Bureau Windows (Ouvrir l’Explorateur Windows en [borne dédiée](borne-dediee.md#borne-dédiée)), Borne dédiée, Lancement au démarrage, Relance par Start (voir [Relance par Start](relance-par-start.md#relance-par-start)), Mode invité |
+| Cyber Pinball | Langue / Language, Mise à jour de Cyber Pinball, Nouveautés (voir [Nouveautés](nouveautes.md#nouveautés)), Retours et propositions (voir [Retours et propositions](retours-et-propositions.md#retours-et-propositions)), Activité récente (voir [Activité récente](activite-recente.md#activité-récente)), Sauvegardes (voir [Sauvegardes](sauvegardes.md#sauvegardes)), Migration, Conditions d’utilisation, La communauté (voir [Crédits de la communauté](credits-de-la-communaute.md#crédits-de-la-communauté)), Quitter Cyber Pinball, Redémarrer Cyber Pinball, Mettre en veille, Redémarrer la borne, Éteindre la borne |
 
 « Migration » (dans Cyber Pinball) regroupe ce qui ne sert qu'une fois, en venant d'un autre frontend : « Reprendre les médias » (de PinUP Popper ou PinballX) et « Regrouper les ROM » dans la bibliothèque.
 
@@ -28,7 +29,7 @@ Start sur une table ouvre **sa fiche, la même que depuis la roue** (Jouer, Joue
 Une table supprimée depuis la liste y ramène.
 Code : `openAllTables` et `sheetReturn` dans `app/src/library.ts`.
 
-La pastille rouge d'une entrée (fichiers reçus à installer, mise à jour disponible, écran du DMD à vérifier…) remonte à sa rubrique, puis à la roue dentée ; à l'ouverture, la sélection va sur la première qui en porte une.
+La pastille rouge d'une entrée (fichiers reçus à installer, mise à jour disponible, écran du DMD à vérifier, code de récupération à noter…) remonte à sa rubrique, puis à la roue dentée ; à l'ouverture, la sélection va sur la première qui en porte une.
 
 L'arbre (rubriques, ordre, nom et icône de chaque entrée) est dans [packages/core/src/systemmenu.ts](../../packages/core/src/systemmenu.ts) (`SYSTEM_ROOT`, `SYSTEM_GROUPS`, `SYSTEM_ITEMS`).
 L'application fournit ce que fait chaque entrée par son identifiant (`library.provideSystemItem`, `app/src/library.ts` et `frontend.ts`) ; une nouvelle entrée se range en ajoutant son identifiant à une rubrique, sans toucher aux autres.

@@ -9,6 +9,8 @@
   A screen that is plugged back in or wakes up while the menu is running (monitors put to sleep by the Windows lock screen, renumbered on wake-up) gets its black cover again, but the menu windows do not follow this change yet: the screen guard reports the uncovered or badly covered screen in the console, and restarting Cyber Pinball puts everything back in place.
 - VPX 10.8.1 keys (`Player`, `Backglass`, `ScoreView`, `Topper` windows, `[Plugin.<id>] Enable`, priorities and settings of the B2S, PUP and DMDUtil plugins).
   The format of screen names and the plugins to enable change with the VPX version: they are described per version in the manifest (`adapterSettings`).
+- Other VPX versions (see [Other VPX versions](other-vpx-versions.md#other-vpx-versions)): Cyber Pinball is only their launcher, with that VPX's settings.
+  No virtual reality, in-game display adjustment, games with friends, 3D vision, Cyber Pinball's VPX settings or PuP-Pack preparation for the tables played that way.
 - Menu image on the real DMD: the DMD server only accepts the `dmdutil64.dll` of VPX 10.8.1, recognised by its fingerprint.
   With any other VPX version, newer or older, "Image du menu" (Menu image) is greyed out with its reason and VPX keeps the DMD during games.
   Moving to another version requires copying the headers again, redoing `packages/dmdserver/dmdutil64.def` and adding the fingerprint (`vendor/PROVENANCE.txt`); a test requires it for the installed VPX version.

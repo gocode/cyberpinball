@@ -3,6 +3,8 @@
 ## Lancement d'une partie
 
 `app/src/launcher.ts` lance la table comme un frontend : `VPinballX_BGFX64.exe -Ini <VPinballX.ini> -Play <table.vpx>`, puis surveille les fenêtres du processus toutes les 250 ms jusqu'à sa fin.
+L'exécutable est toujours celui que nomme le manifeste de VPX (`findExecutable`, `Component.executable`) : un autre VPX posé dans le même dossier (`VPinballX64.exe`…) n'est jamais lancé à sa place.
+Une table jouée avec un autre VPX du PC est lancée sans `-Ini`, avec les réglages de ce VPX : voir [Autres versions de VPX](autres-versions-de-vpx.md#autres-versions-de-vpx).
 La partie commence quand la fenêtre « Visual Pinball Player » apparaît (elle reprend le premier plan si besoin, `onPlaying`) ; VPX a pris la main quand Windows dit que cette fenêtre tient le premier plan (`onForeground`, relu à chaque tour : le coup de bobine du lancement en cinéma).
 Fermer cette fenêtre termine VPX proprement (code 0).
 Ctrl+Maj+K arrête une partie bloquée (fermeture polie, puis forcée après 5 s).
@@ -96,6 +98,20 @@ Chaque autre fenêtre visible de VPX est classée (`classifyVpxWindow`, `package
 
 Le formulaire d'options et les deux derniers cas laissent un constat d'une phrase (`LaunchResult.notices`) : écrit dans la console à la fin de la partie, ajouté au message d'une partie échouée et au bilan du test d'endurance (« autres fenêtres de VPX »).
 
+**VPX arrêté en démarrant.**
+Un `vpinball.log` que ce lancement n'a pas écrit (plus ancien que lui, `logWrittenSince`) n'est jamais lu comme le sien : sa fin ne paraît pas à l'écran d'échec.
+VPX planté avant d'écrire la moindre ligne de son journal n'avait pas encore ouvert la table : l'écran d'échec dit « VPX s'est arrêté en démarrant », la panne de VPX et non de la table, avec une même signature pour toutes les tables (`vpxStartupCrash`, [vpxfailure.ts](../../packages/core/src/vpxfailure.ts)).
+Cyber Pinball compare alors les fichiers de son VPX à ceux de l'archive (voir « Fichiers de VPX contrôlés » dans [Installation et organisation des fichiers](installation-et-organisation-des-fichiers.md#installation-et-organisation-des-fichiers)) : remplacés hors de Cyber Pinball, ils sont nommés à l'écran et Start remet leurs originaux ; sinon l'écran renvoie à « Santé de la borne ».
+Cas réel : un autre VPX copié par-dessus celui de Cyber Pinball (SDL 3.2.18 à la place de 3.4.14) arrêtait VPX 0,2 s après chaque lancement, sur toutes les tables.
+
+**Rapport d'une partie échouée.**
+L'écran d'échec propose « Flipper : envoyer un rapport aux développeurs » (au téléphone, « Envoyer un rapport aux développeurs ») : le problème déjà rappelé, la fiche technique, la santé de la borne et les journaux joints, chiffrés et anonymisés comme le rapport de la [fiche technique](fiche-technique.md#fiche-technique).
+« Envoyer le rapport » part d'un appui ; « Décrire ce qui s'est passé » reste facultatif, et « Voir le contenu du rapport » liste ce qui part.
+Un plantage de VPX dont le rapport automatique est parti (accord donné, voir [Retours et propositions](retours-et-propositions.md#retours-et-propositions)) a sous l'erreur un encart 👌 « L'équipe a été prévenue » : les développeurs vont l'examiner.
+Le flipper devient alors « Flipper : ajouter des détails pour les développeurs » et n'envoie plus que la description, le rapport technique étant déjà parti.
+Le rapport d'un lancement échoué joint le `crash.txt` de VPX (sa pile d'appels, qui nomme le module fautif) ; un journal de VPX plus ancien que le lancement y est joint sous le nom `vpinball-partie-precedente.log` au lieu de passer pour celui du plantage (`launchAttachments`, [app/src/launch-evidence.ts](../../app/src/launch-evidence.ts)).
+Une partie réussie efface ces pièces.
+
 **Script écrit pour un ancien core.vbs.**
 *Back to the Future (Data East 1990)* s'arrêtait à chaque lancement sur « Table script bug: cvpmFlips2.Init is called twice. Maybe 'vpmInit Me' is duplicated in the code ? » : son script appelle `vpmInit Me` deux fois dans `bttf_Init`.
 Les anciens core.vbs le laissaient faire (un second `vpmInit` ne refait rien : événements déjà créés, mêmes réglages de PinMAME) ; celui de VPX 10.8.1-5436 (`cvpmFlips2.Init`) affiche ce message et quitte la partie (`QuitPlayer 2`).
@@ -104,12 +120,19 @@ Pour `vpmInit` : à partir de deux appels dans le code (commentaires, chaînes, 
 La table n'est pas modifiée ; un `.vbs` venu d'ailleurs est corrigé lui-même.
 Constat du médecin « Script écrit pour un ancien core.vbs » (`scriptCoreCompat`), réparé dès l'installation et avant chaque partie (`PUP_PLAY_REPAIRS`) ; les lectures de script passent en version 8, si bien que les tables déjà installées sont relues.
 Quand le texte ne montre rien (un seul `vpmInit`, dans une Sub appelée deux fois), la partie arrêtée par ce message fait corriger le `.vbs` aussitôt (`repairScriptAfterStop`), et l'écran d'échec dit « Cyber Pinball a corrigé le script de la table (…) : relancez-la. ».
+**Procédure redéfinie à chaque clignotement** (`executeGlobalOnce`) : des tables s'arrêtaient un instant à chaque clignotement d'une lumière (*Daredevil*, *Hellboy*, et les nombreuses tables qui recopient la routine `FlashForMs` ou `SetFlash`).
+Leur script redéfinit la Sub `<lumière>_Timer` par `ExecuteGlobal` à chaque appel, et Windows fait analyser par son antivirus (AMSI, Microsoft Defender par défaut) chaque texte que VBScript compile pendant la partie, le fil des images de VPX attendant la fin de l'analyse : sur une borne, *Daredevil* faisait 155 arrêts de 100 à 1 000 ms en trois minutes.
+La règle repère un `ExecuteGlobal` qui définit une procédure depuis une Sub (donc pendant la partie), et le `.vbs` de Cyber Pinball le remplace par `CyberPinball_ExecuteGlobal`, défini après la dernière ligne, qui ne recompile une procédure que si son texte a changé depuis la dernière définition de ce nom ; tout autre texte est exécuté comme avant, à chaque fois.
+La table n'est pas modifiée ; un `.vbs` venu d'ailleurs est corrigé lui-même.
+Le médecin le dit dans la fiche de la table (« Script qui arrête la partie à chaque clignotement », action « Ne redéfinir une procédure que si elle change ») et le répare avant chaque partie ; un script protégé ne se corrige pas.
+Tests : `code-dynamique.test.ts` (repérage, lignes à leur place, exécution par `cscript`, médecin).
 **Pièce VR dessinée hors du casque** (`vrRoomOnScreens`) : une version VR de table allume sa pièce (meuble, salle, fronton en 3D) par un interrupteur du script ; une table hybride le garde pour le casque (« If RenderingMode = 2 or VRTest = 1 »), mais une version faite pour le casque seul l'allume d'office (« Const VR_Room = 1 »), et un interrupteur d'essai laissé à 1 (`VRTest`, `LiveViewVRSim`) l'allume même dans une table hybride.
 Sur les écrans, VPX dessine alors toute la pièce à chaque image alors qu'elle ne sert que dans le casque.
 La règle repère ces interrupteurs allumés hors de toute Sub (`VR_FLAG`), et le `.vbs` de Cyber Pinball multiplie leur valeur par `Abs(RenderingMode = 2)`, qui vaut 1 en VR et 0 sur les écrans, sur la même ligne (une `Const` devient une variable).
 Le médecin le dit dans la fiche de la table (« Pièce VR dessinée hors du casque », action « Réserver la pièce VR au casque ») et le répare avant chaque partie ; un script protégé ne se corrige pas : le constat conseille la version sans VR, ou l'interrupteur mis à 0 dans l'éditeur de VPX.
 Tests : `vr-hors-casque.test.ts`.
 Tests : `scriptcompat.test.ts` (repérage, lignes à leur place, exécution par `cscript` sur un faux core.vbs : un seul appel à `vpmInit`, médecin, PuP-Pack, table mise à jour, `.vbs` venu d'ailleurs, message d'arrêt) et la table piégée `scriptCoreCompat`.
+Avant la partie, les images du DMD que FlexDMD tire de la table sont chargées pendant l'écran de chargement, et les vidéos du DMD trop grandes sont ramenées à la taille du DMD : voir [DMD de FlexDMD et d'UltraDMD sans arrêt en partie](plugins-de-vpx-backglass-pup-et-dmd.md#dmd-de-flexdmd-et-dultradmd-sans-arrêt-en-partie).
 
 `node scripts/sonde-fenetres.mjs --exe … --ini … --table …` (après `npm run build`) relève toutes les fenêtres d'une partie, cachées comprises, avec ce qu'en ferait le lanceur ; `--commande Edit` ouvre la table dans l'éditeur pour vérifier la reconnaissance de l'éditeur et de l'audit sur de vraies fenêtres.
 Toujours sur des copies de la table et de VPinballX.ini.
@@ -128,10 +151,12 @@ Le plugin VPX « CyberPinballDmd », activé dans toutes les parties (voir [Posi
 
 - **Dans `vpinball.log`** : chaque à-coup (au moins 100 ms entre deux images) au moment où il arrive (« Cadence: stall of … ms at …s », les 30 premiers), puis un bilan toutes les minutes et à la fin de la partie : `Cadence end: frames=… duration=…s fps=… p50=…ms p95=…ms p99=…ms max=…ms late=…% stalls=… worst10s=…fps mem=…MB`.
   Soit les images par seconde, la médiane et les 95e et 99e centiles de l'écart, le plus long écart, la part des images en retard (plus de 1,5 fois la médiane), les à-coups, la pire fenêtre de 10 s et la mémoire privée de VPX ; un bilan `Cadence running` est un bilan d'étape.
+  Pendant qu'une image tarde, un fil de veille du plugin suspend un instant le fil des images, copie sa pile et compte les relevés par module ([arrets.h](../../packages/vpx-vision3d/src/arrets.h)) : chaque ligne « Cadence: stall » dit où VPX en était pendant l'arrêt (« … samples: in vbscript.dll …, ntdll.dll … ; under … »), script, décodage d'une vidéo, plugin ou pilote de la carte graphique.
 - **Relu après la partie** (`noteGameCadence`, [app/src/game-cadence.ts](../../app/src/game-cadence.ts) ; lecture dans [vpxcadence.ts](../../packages/core/src/vpxcadence.ts)) : seulement ce que VPX a écrit pendant cette partie ; le bilan de fin, sinon le dernier d'étape (VPX arrêté avant la fin, plantage).
   La cadence visée est lue au lancement (« Synchronization mode: … with maximum FPS: …, display FPS: … » : la plus petite des deux ; 60 si la ligne manque).
 - **Au journal de la borne**, une ligne en français : « Cadence de la partie (…) : tenue — … images/s pour … visées, médiane … ms, … », suivie du 99e centile, du pire écart, de la part des images en retard, des à-coups, de la pire fenêtre de 10 s, de la mémoire de VPX et de la durée mesurée.
   Le verdict y est « tenue », « RAME », « À-COUPS », « RAME, avec des à-coups » ou « trop courte pour juger » ; sans bilan (plugin absent, partie trop courte), la ligne le dit.
+  Après une partie qui a eu des à-coups, une seconde ligne dit où VPX attendait, d'après ces relevés (`stallPlaceJournal`) : « À-coups de la partie (…) : le fil des images de VPX était surtout dans mpclient.dll (… % de … relevés), l'antivirus de Windows… » ; un module connu est nommé par ce qu'il fait : antivirus de Windows, script de la table, décodage d'une vidéo, pilote de la carte graphique.
   Chaque rapport de la borne contient ce journal et celui de VPX de la dernière partie (voir [Fiche technique](fiche-technique.md#fiche-technique)).
 - **Verdict** (`cadenceVerdict`) : la partie rame si sa moyenne est sous 90 % de la cadence visée, sa pire fenêtre de 10 s sous 75 %, ou si au moins 10 % des images sont en retard ; elle saccade à partir de 3 à-coups et d'au moins un par minute ; sous 20 s de jeu mesuré, elle est trop courte pour juger.
 - **Relevé par table** (`recordGameCadence`) : chaque partie jugée va dans `<données>\logs\cadence-parties.json` (les 3 dernières par table, 400 tables au plus, celles jouées le plus récemment ; écriture atomique), une partie dans le casque marquée comme telle.

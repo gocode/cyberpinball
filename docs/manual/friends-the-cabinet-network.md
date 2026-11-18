@@ -1,33 +1,31 @@
 [Français](../manuel/amis-le-reseau-des-bornes.md) · English · [Manual contents](../manual.md)
 
-## Friends: the cabinet network
+## Community: the cabinet network
 
 System menu > "Communauté" (Community) links cabinets together **with no server**: each finds the others and talks to them directly, over the Internet or on the local network.
 Sharing is **on by default**; "Partage et réseau" (Sharing and network) turns it off.
+What is yours (nickname, avatar, country, badges, public profile, what others see, deleting the account) is in System menu > "Mon compte" (My account) (see [My account](my-account.md#my-account)).
 
 | Entry | What it shows |
 | --- | --- |
 | Messages | Conversations with your friends, the most recent first, then the friends you have not written to yet. The red dot and "non lus" (unread) mark what is waiting. Start opens a friend's conversation (see "Messaging" below). |
 | Mes amis (My friends) | Online, then offline. For each: playing and which table (in real time), in the menu, or seen how long ago; their latest event ("Nouveau meilleur score sur …", New high score on; "Badge reçu : …", Badge earned; "A joué à …", Played). Start opens their profile, the one screen of a player (see "Public profile and likes" below): their presence, their library, their level, their badges, a single activity list, "Inviter à une partie en direct" (Invite to a live game; greyed out, "Hors ligne", Offline, when they are not), "Voir sa bibliothèque" (See their library), "Écrire un message" (Write a message), "Retirer de mes amis" (Remove from my friends), "Bloquer …" (Block …). At the top, an invitation received or the live game in progress. |
-| Mon avatar (My avatar) | The photo or picture every player sees next to your name: "Choisir une image sur ce PC…" (Choose a picture on this PC…), "Chercher une image sur le web…" (Search the web for a picture…), "Recadrer mon avatar" (Crop my avatar), "Retirer mon avatar" (Remove my avatar) (see "Player avatars" below). Without an avatar, your initials on a hue taken from your key. |
-| Mon profil public (My public profile) | What players who are not your friends see (level, badges, country, friends, high scores, invited players, public groups, recent activity), and who liked each of your high scores and badges. During the first month, "Qui vous a fait découvrir Cyber Pinball ?" (Who introduced you to Cyber Pinball?, see "Invited players" below). It can be turned off here (see "Public profile and likes" below). |
 | Historique des parties (Game history) | The games with friends finished on this cabinet, newest first, by day: the table, the time, and below it the players with their rank and score. A game opens to review its details (see "Game history" below). |
 | Trouver un joueur (Find a player) | The directory: "Chercher un nom…" (Search for a name, ignoring accents and case; or the ID shown on a player's profile, whole or its first four characters), cabinets "À proximité (réseau local)" (Nearby, local network) and "Vus récemment" (Seen recently). Start on a player opens their profile: "Envoyer une demande d'ami" (Send a friend request), or cancel, accept, decline, and "Bloquer …" (Block …). |
 | Demandes d'amis (Friend requests) | Received (to answer, red dot up to the gear) and sent ("En attente : remise dès que sa borne sera en ligne", Waiting: delivered as soon as their cabinet is online). |
-| Mes badges (My badges) | The 56 badges, by family, earned (with their date) or still to earn (with their progress); secret badges only show their hint (see [Levels and badges](levels-and-badges.md#levels-and-badges)). |
-| Partage et réseau (Sharing and network) | Sharing on or off, "Votre nom : Alexis" (Your name, with the cabinet's ID), local network, library shared or not, download speed, Windows Firewall, what others see, blocked players. The selection opens on "Retour" (Back): a stray Start does not turn sharing off. |
+| Partage et réseau (Sharing and network) | The network only: sharing on or off, local network, library shared or not, download speed, Windows Firewall, live state of Stern SAM tables, the reminder of what others see, blocked players. The nickname, the avatar, the country, the settings of what others see and deleting the account are in My account. The selection opens on "Retour" (Back): a stray Start does not turn sharing off. |
 | Masquer les notifications pendant les parties (Hide notifications during games) | Off by default: a friend coming online, a request to join a game, the news of a game with friends also show during games, with their sound (see "Everywhere, even in a game" in [Tables menu notifications](tables-menu-notifications.md#tables-menu-notifications)). Start toggles; on, nothing shows or rings during a game, everything waits for the menu. |
 
 **Identity.**
 Each cabinet has an Ed25519 key, created on first start and kept in `<data>\social.json` (with friends, requests, directory, events and badges; never shared).
 The name (2 to 24 letters, digits, spaces, `'`, `.`, `_`, `-`) is signed by this key; the player's ID ("A1B2-C3D4-E5F6-7890", `playerId`, taken from the key) tells two players with the same name apart.
-It only shows on a player's profile ("Identifiant : …" (ID) line) and in "Partage et réseau"; everywhere else (lists, friends, scores, live game, headings), the name shows alone, with the avatar.
+It only shows on a player's profile ("Identifiant : …" (ID) line) and in My account ("Mon pseudo" (My nickname), taking back an account, deleting it); everywhere else (lists, friends, scores, live game, headings), the name shows alone, with the avatar.
 A test guard (`noTag`, friends-menu.test.ts) rejects any tag attached to a name.
 An unreadable `social.json` is set aside (`social.json.illisible-<date>`), never overwritten.
 
 **Deleting your account (GDPR).**
-"Partage et réseau" > "Supprimer mon compte…" (Delete my account…) shows what goes (the account and its ID, friends, requests, conversations, rooms, avatar, published scores, public profile, suggestions and votes on the feedback board) and what stays (tables, their scores, settings, and backups already made, which contain the account, to delete in System menu > Cyber Pinball > Backups), with the cursor on "Annuler" (Cancel).
-"Supprimer définitivement mon compte" (Permanently delete my account): the feedback service first erases the key's suggestions and votes (`POST /api/oubli`, signed by it; if unreachable, the player retries or goes on without it); an **erasure notice** signed by the key (`forget`: the key, the time) goes to connected cabinets, with "unfriend" to friends and requests, and the network stops; the account files are erased (`social.json`, `avatars\`, `amis\messagerie.json`, `amis\salons.json`, `amis\profils.json`, `amis\records.json`, `amis\parties.json`, the received rankings); Cyber Pinball restarts with a new key.
+System menu > "Mon compte" (My account) > "Supprimer mon compte" (Delete my account) shows what goes (the account and its ID, friends, requests, conversations, rooms, avatar, published scores, public profile, suggestions and votes on the feedback board, reactions to What's new) and what stays (tables, their scores, settings, and backups already made, which contain the account, to delete in System menu > Cyber Pinball > Backups), with the cursor on "Annuler" (Cancel).
+"Supprimer définitivement mon compte" (Permanently delete my account): the feedback service first erases the key's suggestions, votes and reactions, along with the account's encrypted copy and its password (`POST /api/oubli`, signed by it; if unreachable, the player retries or goes on without it); an **erasure notice** signed by the key (`forget`: the key, the time) goes to connected cabinets, with "unfriend" to friends and requests, and the network stops; the account files are erased (`social.json`, `avatars\`, `amis\messagerie.json`, `amis\salons.json`, `amis\profils.json`, `amis\records.json`, `amis\parties.json`, the received rankings); Cyber Pinball restarts with a new key.
 Every cabinet that receives the notice checks its signature, erases everything that comes from that key (directory, friends, requests, rankings, public card, likes, room lines, conversation), refuses whatever a relay would bring back, keeps the notice in `<data>\amis\oublis.json` (the key only, no name) and relays it; it is attached to every link's hello, for cabinets that were off.
 Modules: [forget.ts](../../packages/core/src/forget.ts), `app/src/account-delete.ts`.
 Tests: [suppression-compte.test.ts](../../packages/core/src/test/suppression-compte.test.ts) (signature, erasure of each piece of data, and between two cabinets on 127.0.0.1: the notice erases the player and their lines) and `retours-service.test.ts` (suggestions, votes, replay).
@@ -37,6 +35,7 @@ Right after the installation's screen wizard, the front-end opens the "Votre pro
 The nickname is mandatory: as long as it is not chosen, the nickname line reads "to be chosen", "Continuer" stays greyed out, and both "Continuer" and Exit only remind the player of the nickname, with the selection back on "Choisir mon pseudo…".
 The default name typed again as is ("Joueur A1B2", "Player A1B2") is refused.
 The avatar stays optional.
+"J'ai déjà un compte…" (I already have an account…), before "Continuer", takes back an existing account, and an account found in this PC's backup copy is offered automatically (see [My account](my-account.md#my-account)).
 As long as the question is asked (see "Invited players" below), an optional entry slips in before "Continuer": "Qui vous a fait découvrir Cyber Pinball ?" (Who introduced you to Cyber Pinball?), which becomes "Découvert grâce à …" (Discovered thanks to …) once a player is chosen.
 The screen comes back at every start as long as the profile has the default name, even if already seen and even with an avatar; a profile that had skipped the screen without a nickname therefore gets it again at the next start.
 Never in guest mode nor during an unattended test (unless `CYBERPINBALL_PROFIL=1`), and after the opening when the start lands on the wheel.
@@ -136,8 +135,7 @@ The parts screen asks the friend's cabinet for the list of its files, sorted by 
 The screen opens in the list of parts, the cursor on the first one: each line says in plain words "Cochée" (Ticked) or "Non cochée" (Unticked) (the title counts "3 cochées sur 4", 3 ticked of 4), and Start on a part ticks or unticks it; for a table you already have, ticked, theirs replaces yours, unticked, you keep yours.
 The flippers go down from the last part to "Récupérer les n parties cochées" (Get the n ticked parts), then to "Retour" (Back); the help strip says so in the list ("Start ou Entrée : cocher ou décocher la partie", Start or Enter: tick or untick the part; `listStart`: any screen whose list is ticked declares it), and MagnaSave goes from the list to the actions and back.
 By default: all their parts you do not have, except those under rights, unticked with their note: the ROM ("l'œuvre du fabricant : à ne prendre que si vous en avez le droit", the manufacturer's work: only take it if you have the right to) and the PuP-Pack ("vidéos et musiques souvent tirées du jeu : à ne prendre que si vous en avez le droit", videos and music often taken from the game: only take it if you have the right to).
-One rule for every unticked part: its line says it is there and how to tick it, "+ Disponible : Start pour la cocher" (Available: Start to tick it; "… pour prendre la sienne à la place de la vôtre", to take theirs instead of yours, when you have it), and for the ROM and the PuP-Pack "!
-Disponible, à cocher vous-même : Start, puis l'attestation de vos droits" (Available, tick it yourself: Start, then the declaration of your rights).
+One rule for every unticked part: its line says it is there and how to tick it, "+ Disponible : Start pour la cocher" (Available: Start to tick it; "… pour prendre la sienne à la place de la vôtre", to take theirs instead of yours, when you have it), and for the ROM and the PuP-Pack, with a "!" sign, "Disponible, à cocher vous-même : Start, puis l'attestation de vos droits" (Available, tick it yourself: Start, then the declaration of your rights).
 Start on one of them opens its legal notice ("La ROM : vos droits", The ROM: your rights; "Le PuP-Pack : vos droits", The PuP-Pack: your rights): what it is and who owns it, where it comes from ("Ce contenu vient directement de la borne de … : Cyber Pinball ne le fournit pas et ne vérifie pas vos droits. Vous en êtes seul responsable.", This content comes straight from …'s cabinet: Cyber Pinball does not provide it and does not check your rights. You alone are responsible for it.), then the pledge to tick, "J'atteste avoir le droit de détenir ce contenu (par exemple la machine d'origine ou une licence) et je m'engage à respecter le droit d'auteur et les conditions d'utilisation de ses ayants droit." (I certify that I have the right to hold this content, for example the original machine or a licence, and I agree to respect the copyright and the terms of use of its rights holders; "J'atteste et je m'engage", I certify and agree, "À cocher", To tick, then "Cochée", Ticked).
 "Prendre la ROM" (Take the ROM) or "Prendre le PuP-Pack" (Take the PuP-Pack) does nothing until it is ticked; once ticked, the cursor moves onto it, then the parts screen comes back on the ROM's line, "Cochée", "✓ Droits attestés" (Rights attested).
 A part asked for by an invitation is ticked by default only if it is not under rights.
@@ -217,8 +215,7 @@ In the room: "Prêt, réglages de l'hôte reçus" (Ready, host's settings receiv
 To play with 5 balls, the host sets their own table to 5 before inviting.
 Settings specific to each cabinet do not travel: PinMAME's `default.cfg`, the table's display and sound options (`.ini`) ([reglages-de-l-hote.test.ts](../../packages/core/src/test/reglages-de-l-hote.test.ts)).
 **Nor does the volume** (decision of 16/11/2026): each cabinet keeps its own sound level, suited to where it stands, whether the host plays louder or quieter.
-Yet it lives in those same files; in the guest's copy, each one is the host's with the guest's volume ([volume-de-l-invite.test.ts](../../packages/core/src/test/volume-de-l-invite.test.ts)): in the ROM's memory, the volumes its Pinball Memory Maps map locates (WPC "Volume", Stern SAM "Master Volume", knocker volume…), their checksums rebuilt (without them, the ROM resets the volume at boot: measured on the libpinmame bench with The Addams Family); at the end of the `.cfg`, PinMAME's 25 mixing levels; in `VPReg.stg`, the keys whose name says volume and those the VPW service menu titles "…
-VOLUME" (`scriptVolumeKeys`).
+Yet it lives in those same files; in the guest's copy, each one is the host's with the guest's volume ([volume-de-l-invite.test.ts](../../packages/core/src/test/volume-de-l-invite.test.ts)): in the ROM's memory, the volumes its Pinball Memory Maps map locates (WPC "Volume", Stern SAM "Master Volume", knocker volume…), their checksums rebuilt (without them, the ROM resets the volume at boot: measured on the libpinmame bench with The Addams Family); at the end of the `.cfg`, PinMAME's 25 mixing levels; in `VPReg.stg`, the keys whose name says volume and those the VPW service menu titles with "VOLUME" at the end (`scriptVolumeKeys`).
 A guest who never played the table keeps the factory volume, as at home.
 When the volume cannot be put back safely, the guest's own file stays, with its own game settings: map not in the cache, map that does not locate the volume (Whitestar, Data East, System 11…), wrong checksum, volume key the host does not have, file absent on the host while the guest has set their volume.
 Only machines whose sound is set by a potentiometer on the sound board (Bally, Williams System 4 to 9, Gottlieb System 1 and 80, Atari, Stern M-100 and M-200, Zaccaria, Taito…) receive the host's whole memory.
@@ -506,6 +503,7 @@ The actions: for a friend, "Inviter à une partie en direct" (Invite to a live g
 **Liking.**
 On the profile, the flippers choose a high score or a badge, Start likes it, Start again unlikes it.
 Everyone sees the number of likes; only the author sees who liked it.
+A like shows as a raised thumb, filled when you already like it; the same thumb marks the "Ont aimé" (Liked by) screen, the notification of a like received, the experience points detail and the "Apprécié" (Appreciated), "Populaire" (Popular) and "Généreux" (Generous) badges.
 You cannot write to a player who is not a friend: "Écrire un message" (Write a message) stays visible, greyed out, with its reason; "Envoyer une demande d'ami" (Send a friend request) is next to it.
 "Masquer son activité" (Hide their activity) hides their events and likes on this cabinet, along with their level, badges and invited players; "Bloquer" (Block) cuts everything.
 
@@ -513,7 +511,7 @@ You cannot write to a player who is not a friend: "Écrire un message" (Write a 
 System menu > "Mon compte" (My account) > "Mon profil public" (My public profile) shows what others see (country, friends and high scores, level and bar, badges as medals, invited players, public groups) and, for each event of "Votre activité récente" (Your recent activity), who liked it (Start).
 During the first month, it also offers "Qui vous a fait découvrir Cyber Pinball ?" (Who introduced you to Cyber Pinball?, see "Invited players" below).
 A like received is announced by a notification in the table menu, grouped ("Dora and Kiko like your activity").
-The public profile is **on by default**; "Désactiver mon profil public" (Turn off my public profile), here or in "Partage et réseau" (Sharing and network), leaves others only the nickname in the directory (and the scores, if they are published).
+The public profile is **on by default**; "Désactiver mon profil public" (Turn off my public profile), here or in "Ce que voient les autres" (What others see), leaves others only the nickname in the directory (and the scores, if they are published).
 
 **Without a server.**
 A player's public card is signed by their key and travels from cabinet to cabinet like the ranking scores: each cabinet keeps it 60 days, so a profile can be read even when its player is offline, as of the last card received ("Profil actualisé il y a …", Profile updated … ago).
@@ -564,7 +562,7 @@ Tests: [invitations.test.ts](../../packages/core/src/test/invitations.test.ts).
 On the wheel, right after the Juke-box and before the Collections medallion and the tables of each collection, a medallion on the shared chrome ring opens the community: its name in green, the number of players online and friends online below.
 Everywhere (medallion, poster, System menu, "Joueurs en ligne" (Players online) tabs, phone), the number of players online, and that of your country, only shows above five, like the people present in a room: a nearly empty network, in figures, would put people off; players stay named, and your online friends are always counted.
 Start opens the **home screen**, six doors: "Joueurs en ligne" (Players online), "Parties instantanées" (Instant games, see below), "Mes amis" (My friends, with the badge of received requests), "Messages" (messaging between friends), your country's room (see "Rooms by country" below) and "Classements" (Leaderboards), which opens on two doors, "Joueurs" (Players) and "Tables".
-"Joueurs" (Players) ranks players by their XP, in Friends, National and Worldwide tabs (MagnaSave goes from one to the next), for the week (XP earned since Monday, back to zero every Monday) or of all time (the flippers switch between them).
+"Joueurs" (Players) ranks players by their XP, in Friends, National and Worldwide tabs (Start or MagnaSave goes from one to the next), for the week (XP earned since Monday, back to zero every Monday) or of all time (the flippers switch between them).
 It opens on National · This week (Worldwide without a chosen country): the week first, where everyone has a chance.
 Each line gives the rank, the flag, the player's avatar with their level and presence, their nickname and their XP, the other period in small print ("12 400 XP au total" (12,400 XP in total), "+850 cette semaine" (+850 this week)); tied players share the same rank.
 It counts the players whose public card the cabinet has received, which carries, signed, the week's XP and its Monday (the card of a cabinet not yet up to date is only ranked in All time), and you, even with your public profile turned off.
@@ -572,18 +570,21 @@ Your line, "(vous)" (you), always stays visible, set apart beyond the first fift
 A total impossible for anyone (beyond everything that could be earned since levels arrived, allowing for the XP brought by invited people), or a week beyond what a week allows, is not ranked: it is counted under the board ("1 joueur écarté (XP impossibles)" (1 player set aside, impossible XP)).
 A total that is only unexpected for how long the player has been known to this cabinet is ranked, their level shown as "?".
 With sharing off, the door is greyed with its reason; without a country, National says "Pays non choisi : Mon compte > Mon pays" (Country not chosen); without friends, Friends says "Aucun ami pour l'instant" (No friend yet).
-Start or Exit returns to the two doors, where the "Joueurs" (Players) door sums up your place: "Vous : niveau 14 · 37ᵉ au monde cette semaine · 3ᵉ dans votre pays" (You: level 14 · 37th worldwide this week · 3rd in your country).
+Exit returns to the two doors, where the "Joueurs" (Players) door sums up your place: "Vous : niveau 14 · 37ᵉ au monde cette semaine · 3ᵉ dans votre pays" (You: level 14 · 37th worldwide this week · 3rd in your country).
 "Tables" shows all your tables, the five most recently played first ("Jouées récemment" (Played recently), with "hier" (yesterday), "il y a 3 j" (3 d ago)), then all the others from A to Z, in This cabinet, Friends, National and Worldwide tabs, each counting its ranked tables ("3 sur 42", 3 of 42), over the chosen period ("Période": All time, This year, This week, Today; Start goes to the next).
 It opens on Worldwide · All time (This cabinet when sharing is off), the cursor on the search.
 A ranked table tells the leader, their score, the number of players (of games, for This cabinet) and your place, with "Premier" (First) in green when you lead; a table without a ranking stays in the list, greyed, with its reason (no score over the period, fingerprint being computed, unreadable version).
 "Rechercher une table" (Search for a table), at the top of the list, filters by name with the on-screen keyboard or the PC's, without accents or capitals: each word typed starts a word of the name or is found in the name written without spaces ("comete" finds "Comète").
 During a search, the tables follow from A to Z; "Effacer la recherche" (Clear the search) brings them all back.
 Start on a table opens its leaderboard at the same scope and period, whose "Back" returns to the list of tables.
+In a scoreboard, as in "Joueurs" (Players), Start or MagnaSave goes to the next scope, the flippers change the period and Exit goes back: a cabinet whose MagnaSave buttons confirm and go back in the OS can thus change scope.
 The player ranking is computed by `playerBoard` in `packages/core/src/playerranking.ts`, the screen in `app/src/rankings-menu.ts`; tests: `packages/core/src/test/classement-joueurs.test.ts` and `packages/core/src/test/classements-global.test.ts`.
 Exit goes back to the wheel.
 The medallion can be hidden in System menu > Tables > Wheel ("Communauté dans la roue", Community on the wheel); it never shows in guest mode.
 Chosen on the wheel, it shows its **poster**, like the Juke-box: behind the wheel (the whole playfield on a cabinet, the playfield frame on a desktop) and in place of the backglass media.
-It gives the figures (players online, those from your country, your friends), your country's room with those present and its last line, and the friends online (otherwise unread messages); with sharing turned off, it says how to turn it on.
+Both posters give the figures (players online, those from your country, your friends) and the friends online (otherwise unread messages); with sharing turned off, they say how to turn it on.
+The playfield one also shows your level (its tier and bar), your place in the worldwide ranking and in your country, and your week in one line ("Cette semaine : +850 XP · 37ᵉ au monde · 3ᵉ dans votre pays", This week: +850 XP · 37th worldwide · 3rd in your country); a place not known yet keeps its box, greyed out, with its reason ("Pas encore classé", Not ranked yet; "Pays non choisi", Country not chosen).
+Your country's room, with those present and its last line, only appears on the backglass poster.
 
 **Players online.**
 Also at the top of System menu > Community.
@@ -597,8 +598,8 @@ Start on a player, friend or not, opens their profile (a friend's presence and l
 
 **Appear online to everyone.**
 On by default.
-Turned off (at the bottom of "Joueurs en ligne", or in "Partage et réseau", Sharing and network), you no longer appear to players who are not your friends; your friends still see your status, and you still see the list.
-On the phone, the Community tab has a "Joueurs" (Players) part: your friends, then the other players online, whom you see without being able to write to them.
+Turned off (at the bottom of "Joueurs en ligne", or in My account > "Ce que voient les autres", What others see), you no longer appear to players who are not your friends; your friends still see your status, and you still see the list.
+On the phone, the Community tab has a "Joueurs" (Players) tab: the same list, with the requests received, the filters as chips and each player's profile (see [Community on the phone](community-on-the-phone.md#community-on-the-phone)).
 
 **Without a server.**
 Every two minutes each cabinet signs a small signal (`live`: its key, nickname, country, "online" or "playing", the time; never the table), sent to the linked cabinets, and at once when it starts or ends a game.
@@ -615,7 +616,7 @@ The module is [livepresence.ts](../../packages/core/src/livepresence.ts), the sc
 
 A live game open to everyone, friends or not.
 A player opens it, chooses the number of players, and it shows up in the Community of every cabinet online; anyone can join it, and **as soon as it is full, it starts by itself for everyone**.
-The game itself is the one played between friends (see "Friends: the cabinet network"): each player plays on their own cabinet, the same version of the table, with the host's settings, a common start and everyone's results.
+The game itself is the one played between friends (see "Community: the cabinet network"): each player plays on their own cabinet, the same version of the table, with the host's settings, a common start and everyone's results.
 
 **Opening a game.**
 Community > Parties instantanées (Instant games) > "Ouvrir une partie instantanée" (Open an instant game): the table (your VPX tables), then the number of players, yourself included (2, 3 or 4).
@@ -625,6 +626,7 @@ Each arrival brings a notification ("Tiltman joined your game") and a line at th
 "Annuler la partie" (Cancel the game) removes it from every list, and players who had joined are told.
 A game that is not full within thirty minutes closes by itself.
 One game at a time: opening another one closes the previous one.
+On the phone, Community > Players shows the open games and "Ouvrir une partie instantanée" (Open an instant game) (see Community on the phone).
 
 **Joining.**
 Community > Parties instantanées: the games opened by others, most recent first.
@@ -700,7 +702,7 @@ The screen shows who invites, whether the group is public or private, the member
 "Accepter" (Accept) joins the group; "Refuser" (Decline) tells the inviter nothing more than "declined".
 
 **On the phone.**
-In the Community tab, "Messages" shows your groups at the top of the conversations (their badge carries the group's initials); a tap opens the group's thread, with each message's author, one-tap reactions and phrases, and a field to write.
+In the Community tab, "Messages" offers "Créer un groupe" (Create a group, opened on the cabinet) and "Groupes publics" (Public groups), then the invitations received, and shows your groups at the top of the conversations; a group's thread has its table of the week, its ranking, each message's author and its ⋮ menu (see Community on the phone).
 As with messaging, the cabinet checks everything that goes out, in the front end as during a game.
 
 **Report.**
@@ -783,7 +785,7 @@ The phone gets the same list.
 The original phrases (six, "Thanks!" included) follow the cabinet language as long as they are not edited; the phrases are kept in `<data>\amis\salons.json` (`phrases`, absent: the original ones).
 
 **On the phone.**
-The Community tab has a "Salon" (Room) part: the last 60 lines of the room open at the cabinet (otherwise the default room), one-tap phrases and a field; you can write there in the menu as well as during a game.
+The Rooms tab of Community: the room is picked on the phone, independently of the cabinet; its last 60 lines, a line's options on a tap (react, reply, profile, report, block, delete your own), phrases in one tap and a field; you write there in the front-end as during a game.
 The rules are accepted at the cabinet.
 
 **Without a server.**
@@ -832,11 +834,11 @@ Everyone customises an avatar, visible to all, friends or not, wherever their na
 For now it is always a picture of one's own: a photo or a picture taken from the disk, or in the built-in browser, cropped with the cabinet buttons ([avatar.ts](../../packages/core/src/avatar.ts), screen `app/src/avatar-menu.ts`).
 
 - **Where it shows.**
-  "Mes amis" (My friends) (online, the badge's ring is green; offline, it dims), a player's profile (in front of their name, and their invited players), "Joueurs en ligne" (Players online), the rooms (their people present and their lines), the scoreboards, "Trouver un joueur" (Find a player) and the results, "Demandes d'amis" (Friend requests), "Depuis un ami" (From a friend), "Partage et réseau" (Sharing and network) (yours), the game history (each game's players as small badges, then each one in front of their rank), the lobby, the invitation and the results of a live game, the invitation card and the score band during the game, and notifications that are about a single player ("Bruno vient de se connecter", Bruno has just connected).
+  "Mes amis" (My friends) (online, the badge's ring is green; offline, it dims), a player's profile (in front of their name, and their invited players), "Joueurs en ligne" (Players online), the rooms (their people present and their lines), the scoreboards, "Trouver un joueur" (Find a player) and the results, "Demandes d'amis" (Friend requests), "Depuis un ami" (From a friend), "Protéger et transférer mon compte" (Protect and transfer my account) (yours), the game history (each game's players as small badges, then each one in front of their rank), the lobby, the invitation and the results of a live game, the invitation card and the score band during the game, and notifications that are about a single player ("Bruno vient de se connecter", Bruno has just connected).
   Without a picture: the initials ("AM" for "Alexis Martin") on a dark hue taken from the key, the same on every cabinet.
   The score insert at the bottom of the playfield, too small for readable initials, keeps the hue only.
 - **Choosing the picture.**
-  System menu > "Mon compte" (My account) > "Mon avatar" (My avatar) (or "Partage et réseau" > "Changer d'avatar…", Change avatar…).
+  System menu > "Mon compte" (My account) > "Mon avatar" (My avatar) (or "Mettre un avatar…", Add an avatar…, on the first launch's "Votre profil de joueur" screen).
   "Choisir une image sur ce PC…" (Choose a picture on this PC…) opens Cyber Pinball's file picker (.jpg, .jpeg, .png, .webp, .gif, .bmp, .avif, 40 MB at most).
   "Chercher une image sur le web…" (Search the web for a picture…) opens the built-in browser on an image search: right-click a picture, "Télécharger cette image" (Download this image) (offered on every free search, media included, since image search engines have no download link), and the browser closes onto the cropping screen.
 - **Working picture.**
@@ -852,6 +854,7 @@ For now it is always a picture of one's own: a photo or a picture taken from the
   "Valider ce cadrage" cuts the square into a 256-pixel JPEG (`cropJpeg`, quality 0.86, redone at 0.72 then 0.55 if it exceeds 96 KB), stored under its digest: `<data>\avatars\<sha256>.jpg`.
   The name changes with the content: nothing to invalidate in the renderer's cache, and two players with the same picture keep it only once.
   `social.json` keeps the file name (`avatar`), and the friends' ones (`peerAvatars`, by key).
+  The file goes into backups ("Réglages et scores", Settings and scores) and into the account's backup copy (see [My account](my-account.md#my-account)): a restore or a takeover brings the picture back with its name.
   Windows read it through the `cyber-media://` protocol, whose folders include `avatars` (the windows laid over the game allow it in their security policy).
 - **Exchange between cabinets.**
   The avatar's digest travels with everything the player signs or announces: the hello of each link (absent: no avatar; a cabinet from before avatars sends none and counts as having no avatar), the public presence signal, the presence signal in a room, the public profile card and the leaderboard scores.

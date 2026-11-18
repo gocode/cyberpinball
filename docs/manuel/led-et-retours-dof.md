@@ -54,12 +54,28 @@ Le dossier est **commun à tout VPX 10.8 du PC** (un autre front-end de borne co
 
 - **Contrôleurs** : ceux reconnus à l'USB (avec le numéro d'ini qu'ils lisent) et ceux seulement déclarés dans Cabinet.xml ;
 - **Configuration** : les ini trouvés et leur dossier, le nombre de ROM configurées, Cabinet.xml (écrit par Cyber Pinball ou à la main, nombre de bandes) ;
-- **À vérifier** (`dofFindings`) : aucun ini ; contrôleur sans son ini ; Teensy branché mais non déclaré ; Cabinet.xml présent mais qu'aucun GlobalConfig ne désigne ; port COM de Cabinet.xml absent ; type de contrôleur que libdof ne gère pas (SSF, Hue) ; bande qu'aucune sortie ne vise ; `LedWizEquivalent` sans son ini ; `IniFilesPath` introuvable ; fichier illisible ;
+- **À vérifier** (`dofFindings`) : aucun ini ; contrôleur sans son ini ; Teensy branché mais non déclaré ; Cabinet.xml présent mais qu'aucun GlobalConfig ne désigne ; port COM de Cabinet.xml absent ; type de contrôleur que libdof ne gère pas (SSF, Hue) ; bande qu'aucune sortie ne vise ; `LedWizEquivalent` sans son ini ; `IniFilesPath` introuvable ; fichier illisible ; LED adressables sans Cabinet.xml ; configuration d'un ancien DOF que le plugin ne lit pas.
+  **LED adressables sans Cabinet.xml** (`addressableIniUndeclared`) : un `directoutputconfig30.ini` à `39.ini` (les contrôleurs de LED adressables du configtool) sans `LedWizEquivalent` de ce numéro dans un Cabinet.xml lu par libdof, qui ne crée alors jamais le contrôleur : les bandes restent éteintes.
+  Le constat donne le port série probable de leur contrôleur, sans rien ouvrir (`addressablePortGuess`) : celui d'un Teensy reconnu, sinon celui d'un pont USB-série CH340 ou CP210x (Wemos D1, ESP32).
+  « Bandes de LED adressables… » passe alors en ambre (« Vos fichiers du configtool attendent des LED adressables : dites ici où elles sont branchées ») et l'éditeur part de ce port.
+  Rien n'est signalé avec un DudesCab ou une Pinscape Pico, qui portent eux-mêmes leurs bandes ;
+- **Configuration d'un ancien DOF** (`legacyIni`) : une borne qui vient de PinUP Popper, PinballX ou PinballY garde sa configuration du configtool dans le dossier de son DOF classique (`…\DirectOutput\Config`), que le plugin DOF de VPX ne lit pas.
+  Quand le dossier lu par le plugin n'a aucun ini, Cyber Pinball cherche un DOF classique sur les disques fixes, sans rien ouvrir : `<disque>\DirectOutput` et `<disque>\<dossier>\DirectOutput` (C:\DirectOutput, C:\vPinball\DirectOutput, Program Files…), relevés une fois (`legacyDofInstalls`, `app/src/dof-files.ts`) ; ses ini sont lus là où son GlobalConfig les désignait.
+  L'écran et la Santé de la borne montrent le dossier trouvé, ses fichiers et leur date.
+  **« Reprendre la configuration de l'ancien DOF »**, en tête des actions (trois anciens DOF au plus), y copie ses `directoutputconfig*.ini` et `tablemappings.*` (`planLegacyDofImport`), en mettant de côté ceux d'avant dans `<données>\sauvegardes\dof\<date>\` ; le dossier de l'ancien DOF ne change pas.
+  Son GlobalConfig n'est jamais repris : le plugin DOF de VPX n'en a pas besoin.
+  Son Cabinet.xml (Teensy, LED adressables), s'il en a un, est examiné à part (`planLegacyCabinet`) : repris seulement s'il est lisible, que libdof gère tous ses contrôleurs, que chaque bande a son contrôleur déclaré, que les ports COM qu'il nomme sont branchés et qu'aucun Cabinet.xml n'est déjà dans le dossier de DOF.
+  Quand les ini repris ont des LED adressables (30 à 39), un Cabinet.xml cohérent est repris dans le même geste, avec un GlobalConfig de Cyber Pinball qui le désigne.
+  Sinon un écran « Cabinet.xml de l'ancien DOF » dit ce qu'il déclare et, s'il y a lieu, « Pourquoi il n'est pas repris », avec « Reprendre ce Cabinet.xml » ou « Décrire les bandes dans Cyber Pinball… », et « Ne pas le reprendre » ;
 - **« Ouvrir configtool.vpuniverse.com »** : la page s'ouvre dans « Récupérer », avec son compte VPUniverse ; le ZIP de « Generate Config » revient à l'écran et s'importe.
   Le site est derrière un défi Cloudflare : aucun téléchargement automatique, c'est l'utilisateur qui clique ;
 - **« Importer la configuration du configtool… »** : un ZIP déjà téléchargé (`planDofImport`) ; un ZIP sans `directoutputconfig*.ini` est refusé ; un Cabinet.xml ou un GlobalConfig du ZIP n'écrase jamais un fichier présent ;
 - **« Bandes de LED adressables… »** : la carte d'abord, en trois familles (libdof : `LedStrip` exige un contrôleur qui reçoit des valeurs, `ISupportsSetValues`) :
-  - **Teensy (TeensyStripController) et Wemos D1** : port série (choisi parmi les ports branchés, ou saisi), sorties de la carte ;
+  - **Teensy (TeensyStripController) et Wemos D1** : port série (choisi parmi les ports branchés, ou saisi), sorties de la carte.
+    Sans Teensy reconnu, l'éditeur part d'une Wemos D1 sur le pont USB-série trouvé (CH340, CP210x).
+    Une Wemos D1 reçoit d'office, dans Cabinet.xml, les réglages qu'attend son micrologiciel (`WEMOS_SETTINGS`) : `ComPortBaudRate` 2 000 000 bauds, `UseCompression` et `SendPerLedstripLength` (longueur par bande), avec les délais du port série d'un Cabinet.xml éprouvé.
+    Sans eux, libdof lui applique ceux du Teensy : 9600 bauds, et rien ne s'allume.
+    Un Cabinet.xml relu dans l'éditeur garde tous les réglages de son contrôleur, réécrits tels quels à l'enregistrement ;
   - **Art-Net** (WLED sur un ESP32, ou tout autre nœud Art-Net) : adresse IP du nœud (vide : diffusion sur tout le réseau) et premier univers (0 pour WLED) ; un contrôleur `ArtNet` par univers, chacun de 512 canaux, soit 170 LED au plus (`ArtNet.h`, `DMX_CHANNELS`), la numérotation repartant de 1 à chaque univers ; une bande plus longue se coupe en deux bandes sur deux univers.
     **Alignement avec WLED** (`wledSegments`) : en « Multi RGB », WLED range 170 LED par univers à la suite (LED k : univers de départ + k ÷ 170, canaux 3 × (k mod 170) + 1 à 3).
     Une bande de DOF ne débordant jamais d'un univers, elle commence dans WLED à 170 × (son univers − le premier) + sa `FirstLedNumber` − 1 : pour une bande par univers, « Start » 0, 170, 340, 510 dans LED Preferences, avec des trous dans la numérotation.
@@ -85,7 +101,11 @@ L'essai se fait en partie, sur une table à ROM PinMAME.
 **Médecin d'une table** (`dofFindingsFor`, seulement sur une borne qui a des ini) : `dofLocalIni` (un `directoutputconfig*.ini` dans le dossier de la table masque celui de la borne quand `IniFilesPath` n'est pas réglé ; correction : le mettre à la corbeille), `dofNoPinmame` (table sans ROM : pas de retours en mode plugins), `dofNoConfig` (la configuration n'a rien pour sa ROM, selon les trois règles de libdof : égalité sans casse, puis `<rom>_…`, puis préfixe).
 Jamais bloquant.
 
-**Santé de la borne** : un contrôle « LED et retours (DOF) » (`dofLines`), absent sur une borne sans contrôleur ni configuration ; une ligne par point à vérifier, sinon « DOF prêt », chacune vers l'écran.
+**Santé de la borne** : un contrôle « LED et retours (DOF) » (`dofLines`), absent sur une borne sans contrôleur ni configuration ; une ligne par point à vérifier (LED adressables sans Cabinet.xml et configuration d'un ancien DOF comprises), sinon « DOF prêt », chacune vers l'écran.
+
+**DOF et DMD réel.**
+Une Wemos D1 ou un ESP32 passe par le même pont USB-série courant (CH340, CP210x) qu'un ZeDMD générique.
+Le port d'un contrôleur déclaré dans Cabinet.xml, ou un tel pont quand des LED adressables attendent encore leur contrôleur, n'est donc pas allumé d'office comme ZeDMD (voir [DMD réel](plugins-de-vpx-backglass-pup-et-dmd.md#plugins-de-vpx--backglass-pup-et-dmd)).
 
 **Réglages de VPX** : l'onglet « Essentiels » a un groupe « Retours de la borne (DOF) » : `[Plugin.DOF] Enable` (gérée), et `[Controller] DOFContactors`, `DOFKnocker`, `DOFChimes`, `DOFBell`, `DOFGear`, `DOFShaker`, `DOFFlippers`, `DOFTargets`, `DOFDropTargets` : son de la table, DOF, ou les deux (défaut de VPX).
 Seuls les scripts qui utilisent `controller.vbs` les lisent.

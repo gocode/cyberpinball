@@ -1,8 +1,8 @@
 [Français](../manuel/menu-systeme-cinq-rubriques.md) · English · [Manual contents](../manual.md)
 
-## System menu: five sections
+## System menu: six sections
 
-The system menu (Exit, Tab or ⚙ from the table menu) shows only five sections, then "Retour aux tables" (Back to tables).
+The system menu (Exit, Tab or ⚙ from the table menu) shows six sections, Mon compte (My account), Communauté (Community), Tables, Médias (Media), Borne (Cabinet) and Cyber Pinball, with a few shortcuts among them (What's new while it is recent, Recent activity, Collections, Juke-box, Downloads, Phone remote), then "Retour aux tables" (Back to tables).
 Each section opens on its entries; Exit (or "Retour", Back) goes up one level, with the selection on the section being left.
 A screen opened from an entry returns, through its "Retour", to the section it came from, with the selection on that entry; the gear always reopens the sections.
 
@@ -14,11 +14,12 @@ Test: [entete-homogene.test.ts](../../packages/core/src/test/entete-homogene.tes
 
 | Section | Entries |
 | --- | --- |
+| Mon compte (My account) | Protect and transfer my account, My nickname, My avatar, My country, My badges, My public profile, What others see, Delete my account (see [My account](my-account.md#my-account)) |
+| Communauté (Community) | Players online, Messages, My friends, Game history, Find a player, Friend requests, Community settings, Moderation (moderators' cabinets only), Sharing and network, Friends' scores during the game, Hide notifications during games (see [Community: the cabinet network](friends-the-cabinet-network.md#community-the-cabinet-network)) |
 | Tables | All tables, Collections, Roue (Wheel, see [Wheel: its settings](game-media.md#wheel-its-settings)), Add a table, Downloads, ROM library |
-| Médias (Media) | Find missing media (on VPinMediaDB); Media, sound and attract mode |
-| Amis (Friends) | Players online, Messages, My friends, My avatar, My public profile, Game history, Find a player, Friend requests, My badges, Community settings, Sharing and network, Friends' scores during the game, Hide notifications during games (see [Friends: the cabinet network](friends-the-cabinet-network.md#friends-the-cabinet-network)) |
-| Borne (Cabinet) | Cabinet health, Tech sheet, Cabinet setup, VPX settings, Cabinet controls, DMD (DMD screen, Menu DMD, DMD colour, Real DMD), Windows desktop (Open Windows Explorer on a [dedicated cabinet](dedicated-cabinet.md#dedicated-cabinet)), Dedicated cabinet, Relaunch with Start (see [Relaunch with Start](relaunch-with-start.md#relaunch-with-start)), Guest mode |
-| Cyber Pinball | Langue / Language, Cyber Pinball update, Recent activity (see [Recent activity](recent-activity.md#recent-activity)), Backups (see [Backups](backups.md#backups)), Migration, Quit Cyber Pinball, Restart Cyber Pinball, Sleep, Restart the cabinet, Shut down the cabinet |
+| Médias (Media) | Find missing media (on VPinMediaDB); Media, sound and attract mode; Juke-box; Juke-box settings |
+| Borne (Cabinet) | Cabinet health, Tech sheet, Cabinet setup, VPX settings, Other VPX versions, 3D vision, Virtual reality (Virtual reality, Align the cabinet, Headset controllers, Mirror on the playfield), Cabinet controls, Phone remote, DMD (DMD screen, Menu DMD, DMD colour, Real DMD), LED and feedback (DOF), Windows desktop (Open Windows Explorer on a [dedicated cabinet](dedicated-cabinet.md#dedicated-cabinet)), Dedicated cabinet, Launch at startup, Relaunch with Start (see [Relaunch with Start](relaunch-with-start.md#relaunch-with-start)), Guest mode |
+| Cyber Pinball | Langue / Language, Cyber Pinball update, What's new (see [What's new](whats-new.md#whats-new)), Feedback and ideas (see [Feedback and ideas](feedback-and-ideas.md#feedback-and-ideas)), Recent activity (see [Recent activity](recent-activity.md#recent-activity)), Backups (see [Backups](backups.md#backups)), Migration, Terms of use, The community (see [Community credits](community-credits.md#community-credits)), Quit Cyber Pinball, Restart Cyber Pinball, Sleep, Restart the cabinet, Shut down the cabinet |
 
 "Migration" (in Cyber Pinball) gathers what is only used once, when coming from another frontend: "Reprendre les médias" (Import media, from PinUP Popper or PinballX) and "Regrouper les ROM" (Gather ROMs) in the library.
 
@@ -28,7 +29,7 @@ Start on a table opens **its page, the same as from the wheel** (Play, Play with
 A table removed from the list goes back to it.
 Code: `openAllTables` and `sheetReturn` in `app/src/library.ts`.
 
-An entry's red dot (received files to install, update available, DMD screen to check…) goes up to its section, then to the gear; on opening, the selection goes to the first one that carries one.
+An entry's red dot (received files to install, update available, DMD screen to check, recovery code to write down…) goes up to its section, then to the gear; on opening, the selection goes to the first one that carries one.
 
 The tree (sections, order, name and icon of each entry) is in [packages/core/src/systemmenu.ts](../../packages/core/src/systemmenu.ts) (`SYSTEM_ROOT`, `SYSTEM_GROUPS`, `SYSTEM_ITEMS`).
 The application provides what each entry does through its identifier (`library.provideSystemItem`, `app/src/library.ts` and `frontend.ts`); a new entry is placed by adding its identifier to a section, without touching the others.

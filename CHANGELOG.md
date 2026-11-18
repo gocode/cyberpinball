@@ -9,8 +9,9 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
-## 0.1.16
+## 0.2.0
 
+- Communauté : l'affiche de la Communauté et le filtre « Mon pays » de Joueurs indiquent le bon chemin (Menu système › Communauté › Partage et réseau, Mon compte › Mon pays) ; ils citaient encore l'ancienne rubrique Amis.
 - Téléphone, Nouveautés : la chronologie de la borne au téléphone aussi. La date et la version sont en tête de chaque jour ; chaque ligne a son fil et son point (vert tant qu'elle est nouvelle), sa description, ses badges « Nouveau » et « BÊTA », ses réactions en bref et son petit aperçu.
 - Téléphone, une nouveauté ouverte : sa date, sa version, son aperçu, son texte entier et où la trouver. Les sept réactions sont des badges côte à côte, avec le nombre de joueurs de chacune et la vôtre repérée ; elles tombaient l'une sous l'autre, sans nombre.
 - LED et retours (DOF) : une configuration du configtool qui a des LED adressables (directoutputconfig30.ini…) sans Cabinet.xml pour dire où elles sont branchées est signalée, à l'écran et dans la Santé de la borne, avec le port série probable de leur contrôleur (Teensy, ou pont CH340/CP210x d'une Wemos D1 ou d'un ESP32). Jusqu'ici l'écran disait « Rien n'empêche DOF d'allumer la borne » alors que les bandes restaient éteintes ; « Bandes de LED adressables… » part maintenant de ce port.
