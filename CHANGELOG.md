@@ -11,6 +11,10 @@ son interface).
 
 ## 0.1.16
 
+- Téléphone, Scores : « Mon niveau » en résumé en tête (le niveau, le palier, la barre, les XP de la semaine) ; un toucher ouvre Mon niveau en plein écran, tel qu'à la borne : la barre, la semaine, les classements de la semaine, les badges les plus proches dessinés comme à la borne, puis « Mes badges » et « Comment gagner des XP ».
+- Téléphone, Scores : une bascule « Une table / Toutes les tables ». Toutes les tables : une ligne par table, les dernières jouées d'abord, avec le premier de chacune et votre place, à la portée et à la période choisies ; une table sans classement reste grisée avec sa raison. Une ligne touchée ouvre le tableau des scores de cette table.
+- Téléphone : une cloche dans la barre du haut de la Communauté, avec le nombre de notifications non lues. Elle ouvre l'Activité récente, jour par jour ; chaque ligne mène à son écran : le fil d'un ami ou d'un groupe, un profil, Joueurs ou un salon s'ouvrent au téléphone, le reste à la borne. « Effacer l'activité récente » après une confirmation.
+- Nouveautés : la Communauté dans votre téléphone.
 - Nouveautés : chaque ligne de la liste montre les réactions des joueurs en bref, les trois plus choisies et leur total, repérées en bleu quand vous avez réagi.
 - Retours et propositions : chaque proposition affiche le pseudo de son auteur ("par Ressort"), et sa fiche liste ceux qui la soutiennent, avec leur drapeau, le plus récent d'abord. Votre pseudo s'y ajoute quand vous votez. Les votes donnés avant cette version restent comptés, sans nom.
 - Téléphone, Messages : « Créer un groupe » et « Groupes publics » en tête, puis les invitations de groupe reçues (Accepter, Refuser), avant les conversations. Créer un groupe s'ouvre à la borne, où le nom se tape au clavier du téléphone.

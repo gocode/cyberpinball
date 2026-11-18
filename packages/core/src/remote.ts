@@ -442,9 +442,10 @@ export type PhoneMessage =
    * Classements (vue Scores) : le tableau d'une table pour une portée et une période. La table est
    * un rang de la liste envoyée sous la version `v` (« ranks-tables ») ; sans rang, celle que la
    * borne a choisie ou lancée. Des nombres et deux mots connus, jamais un chemin : la borne lit ses
-   * propres données, en lecture seule.
+   * propres données, en lecture seule. `all` : toutes les tables, une ligne par table (le premier, ma
+   * place), sans table choisie.
    */
-  | { t: 'ranks'; s: number; scope: RankingScope; period: ScorePeriod; table?: { v: number; i: number } }
+  | { t: 'ranks'; s: number; scope: RankingScope; period: ScorePeriod; table?: { v: number; i: number }; all?: true }
   /** La vue Scores est quittée : la borne ne recalcule plus les classements pour le téléphone. */
   | { t: 'ranks-off'; s: number }
   /**
@@ -499,6 +500,16 @@ export type PhoneMessage =
    */
   | { t: 'instant-act'; s: number; a: RemoteInstantAct; id?: string; table?: string; count?: number; key?: string }
   /**
+   * Une page plein écran de la Communauté ouverte au téléphone, dont la borne envoie le détail tant
+   * qu'elle l'est (Mon niveau, Mes badges, Comment gagner des XP, l'Activité récente) ; absente : aucune.
+   */
+  | { t: 'page-open'; s: number; page?: RemotePage }
+  /**
+   * Activité récente : une ligne touchée (`ref` : sa référence reçue, jamais sa clé), lue et menée à son
+   * écran ; ou « clear » : tout effacer, déjà confirmé au téléphone. La borne vérifie tout.
+   */
+  | { t: 'activity-act'; s: number; a: 'open' | 'clear'; ref?: string }
+  /**
    * Juke-box (onglet du téléphone) : une commande du lecteur de la borne (jukebox-player.ts), comme
    * un clic ou un bouton à la borne. `key` : une ligne reçue (playlist, morceau, ligne fixe) ;
    * `fraction` : l'endroit du morceau (0 à 1). La borne vérifie tout.
@@ -514,6 +525,10 @@ export type RemoteRoomAct = (typeof REMOTE_ROOM_ACTS)[number] | `react:${string}
 /** Gestes sur un groupe, au téléphone ; « create » et « directory » sans groupe, « invite » avec un ami. */
 export const REMOTE_GROUP_ACTS = ['accept', 'decline', 'join', 'play', 'invite', 'mute', 'unmute', 'leave', 'create', 'directory'] as const;
 export type RemoteGroupAct = (typeof REMOTE_GROUP_ACTS)[number];
+
+/** Pages plein écran dont la borne envoie le détail au téléphone tant qu'elles sont ouvertes. */
+export const REMOTE_PAGES = ['level', 'badges', 'rules', 'activity'] as const;
+export type RemotePage = (typeof REMOTE_PAGES)[number];
 
 /** Gestes sur les parties instantanées, au téléphone. */
 export const REMOTE_INSTANT_ACTS = ['join', 'open', 'invite', 'cancel', 'tables'] as const;
@@ -591,6 +606,7 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
     case 'ranks': {
       if (!RANKING_SCOPES.includes(m.scope as RankingScope) || !SCORE_PERIODS.includes(m.period as ScorePeriod)) return undefined;
       const base = { t: 'ranks' as const, s, scope: m.scope as RankingScope, period: m.period as ScorePeriod };
+      if (m.all !== undefined) return m.all === true && m.v === undefined && m.i === undefined ? { ...base, all: true } : undefined;
       if (m.v === undefined && m.i === undefined) return base;
       const index = (v: unknown, max: number) => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 && v < max;
       return index(m.v, Number.MAX_SAFE_INTEGER) && index(m.i, REMOTE_ENTRIES_MAX) ? { ...base, table: { v: m.v as number, i: m.i as number } } : undefined;
@@ -656,6 +672,12 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       }
       return m.id === undefined && m.table === undefined && m.count === undefined && m.key === undefined ? { t: 'instant-act', s, a } : undefined;
     }
+    case 'page-open':
+      if (m.page === undefined || m.page === null) return { t: 'page-open', s };
+      return (REMOTE_PAGES as readonly unknown[]).includes(m.page) ? { t: 'page-open', s, page: m.page as RemotePage } : undefined;
+    case 'activity-act':
+      if (m.a === 'clear') return m.ref === undefined ? { t: 'activity-act', s, a: 'clear' } : undefined;
+      return m.a === 'open' && isHexId(m.ref) ? { t: 'activity-act', s, a: 'open', ref: m.ref } : undefined;
     case 'ping':
       return { t: 'ping', s };
     case 'bye':

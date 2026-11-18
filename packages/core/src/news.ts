@@ -54,6 +54,22 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Lots 2 à 5 de la Communauté au téléphone (18/11/2026), la ligne ajoutée avec le dernier.
+    id: 'communaute-telephone',
+    date: '2026-11-18',
+    version: '0.1.16',
+    get title() { return t('La Communauté dans votre téléphone'); },
+    get detail() { return t('Joueurs, profils, groupes, parties instantanées, salons, classements et niveau, comme à la borne.'); },
+    get more() {
+      return [
+        t('L’onglet Communauté du téléphone reprend celle de la borne : ouvrez le profil d’un joueur, répondez à une demande d’ami, rejoignez un groupe public, ouvrez une partie instantanée, choisissez votre salon.'),
+        t('Dans Scores : votre niveau et vos badges, les classements de toutes vos tables, et la cloche de l’Activité récente en haut.'),
+      ];
+    },
+    get where() { return t('Menu système › Télécommande du téléphone'); },
+    reach: { kind: 'system', id: 'phone-remote' },
+  },
+  {
     // Demandé par un joueur (Retours et propositions, 18/11/2026) : réinstallé, il avait perdu son niveau.
     id: 'mon-compte',
     date: '2026-11-18',

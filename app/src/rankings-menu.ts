@@ -93,6 +93,19 @@ export interface RankingsMenu {
   detail(): string;
   /** Ma place chez les joueurs (affiche du médaillon Communauté) ; absente sans réseau ou partage coupé. */
   standing(): PlayerStanding | undefined;
+  /**
+   * « Toutes les tables » au téléphone (lot 5) : le même calcul que l'écran « Tables », à cette portée
+   * et cette période ; les portées (et pourquoi l'une est grisée), puis les tables, récentes d'abord.
+   */
+  remoteTables(scope: RankingScope, period: ScorePeriod): RemoteAllTables;
+}
+
+/** Une ligne par table pour le téléphone : son fichier (que la borne garde), le premier, ma place, ou pourquoi rien. */
+export interface RemoteAllTables {
+  scopes: { scope: RankingScope; label: string; count: string; current: boolean; reason?: string }[];
+  periods: { period: ScorePeriod; label: string; current: boolean }[];
+  unavailable?: string;
+  sections: { title: string; rows: { file: string; title: string; lead?: string; flag?: string; count?: string; mine?: string; first?: true; reason?: string; aside?: string }[] }[];
 }
 
 /** Ma place dans un classement des joueurs, de tout temps et de la semaine. */
@@ -309,6 +322,37 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
       // Le curseur revient sur la recherche, juste après les onglets.
       host.library.openCustom(buildTables, RANKING_SCOPES.length);
     }, t('Quelques lettres suffisent : sans accents ni majuscules, dans n’importe quel mot du nom.'));
+  }
+
+  function remoteTables(sc: RankingScope, p: ScorePeriod): RemoteAllTables {
+    const tables = host.tables();
+    const board = freshBoard(sc, p);
+    const scopes = RANKING_SCOPES.map((x) => {
+      const b = freshBoard(x, p);
+      return { scope: x, label: scopeLabel(x), count: b.unavailable ? '' : t('{n} sur {total}', { n: b.ranked, total: tables.length }), current: x === sc, ...(b.unavailable ? { reason: b.unavailable } : {}) };
+    });
+    const periods = SCORE_PERIODS.map((x) => ({ period: x, label: periodLabel(x), current: x === p }));
+    if (board.unavailable) return { scopes, periods, unavailable: board.unavailable, sections: [] };
+    const recent = tables
+      .filter((x) => lastRunOf(x) > 0)
+      .sort((a, b) => lastRunOf(b) - lastRunOf(a))
+      .slice(0, RECENT_TABLES);
+    const rest = tables.filter((x) => !recent.includes(x)).sort((a, b) => a.title.localeCompare(b.title, locale()));
+    const rowOf = (x: TableEntry, isRecent: boolean) => {
+      const state = board.states.get(x.file);
+      const ago = isRecent ? lastRunOf(x) : 0;
+      const base = { file: x.file, title: x.title, ...(ago ? { aside: agoLabel(ago) } : {}) };
+      if (state?.kind === 'ranked') {
+        const flag = playerFlag(state.leader.country, locale()).src;
+        return { ...base, lead: t('1. {name} · {score}', { name: state.leader.name, score: formatNumber(state.leader.score) }), ...(flag && sc !== 'cabinet' ? { flag } : {}), count: state.count, ...(state.mine ? { mine: state.mine } : {}), ...(state.first ? { first: true as const } : {}) };
+      }
+      return { ...base, reason: state?.kind === 'pending' ? t('Empreinte de la table en calcul…') : (state?.reason ?? t('Aucun score {period}', { period: periodLabel(p).toLowerCase() })) };
+    };
+    const sections = [
+      ...(recent.length ? [{ title: t('Jouées récemment'), rows: recent.map((x) => rowOf(x, true)) }] : []),
+      ...(rest.length ? [{ title: recent.length ? t('Toutes les autres tables · A–Z') : t('Toutes les tables · A–Z'), rows: rest.map((x) => rowOf(x, false)) }] : []),
+    ];
+    return { scopes, periods, sections };
   }
 
   function buildTables(): Built {
@@ -585,6 +629,7 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
   }
 
   return {
+    remoteTables,
     open(to) {
       back = to;
       period = 'all';

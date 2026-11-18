@@ -26,6 +26,9 @@ import {
   type Reaction,
   type RemoteGroupAct,
   type RemoteInstantAct,
+  type RankingScope,
+  type RemotePage,
+  type ScorePeriod,
   downloadReasonLater,
   downloadReasonText,
   avatarsDir,
@@ -367,7 +370,7 @@ import { createPhoneCommunity } from './phone-community';
 import { createCommunityMenu } from './community-menu';
 import { createInstantMenu } from './instant-menu';
 import { createRoomsMenu } from './rooms-menu';
-import { createRankingsMenu } from './rankings-menu';
+import { createRankingsMenu, type RemoteAllTables } from './rankings-menu';
 import { createFirewallRule } from './firewall-rule';
 import { guardFirewall } from './firewall-guard';
 import { createMdnsResponder } from './mdns-responder';
@@ -1525,6 +1528,8 @@ phoneRemote.setMenu({
     rankings: (table, scope, period) => tableRankings.view(table, scope, period),
     closed: () => (guest.allows('sheet.scores') ? undefined : t('Fermés en mode invité.')),
     images: phoneRemote.images,
+    // « Toutes les tables » : le calcul de l'écran « Tables » de la borne (rankings-menu.ts).
+    all: (scope, period) => remoteAllTables(scope, period),
   }),
   // Messagerie pendant une partie : lire et répondre au téléphone, sans toucher aux boutons de VPX ; jamais en mode invité.
   chat: () => (guest.active ? undefined : chatMenu.remoteChat()),
@@ -1532,7 +1537,8 @@ phoneRemote.setMenu({
   jukebox: () => remoteJukebox(),
   jukeboxAct: (op, key, fraction) => remoteJukeboxAct(op, key, fraction),
   // Communauté au téléphone (messages, amis) : au menu, et pendant une partie si le réglage le permet ; jamais en mode invité.
-  community: (open, profile, room) => remoteCommunity(open, profile, room),
+  community: (open, profile, room, page) => remoteCommunity(open, profile, room, page),
+  activityAct: (act, ref) => remoteActivityAct(act, ref),
   profileAct: (key, act) => remoteProfileAct(key, act),
   friendAnswer: (key, yes) => remoteFriendAnswer(key, yes),
   groupAct: (act, g, key) => remoteGroupAct(act, g, key),
@@ -1821,14 +1827,33 @@ function remotePickJukebox(): void {
 
 /** Les joueurs en ligne qui ne sont pas mes amis, pour « Joueurs » au téléphone : jamais la table, leur pays en clair. */
 /** La Communauté au téléphone : conversations, fil ouvert, Joueurs et profil ouvert ; jamais en mode invité. */
-function remoteCommunity(open: string | undefined, profile: string | undefined, room: string | undefined): RemoteCommunity {
+function remoteCommunity(open: string | undefined, profile: string | undefined, room: string | undefined, page: RemotePage | undefined): RemoteCommunity {
   if (guest.active) return { closed: t('Fermée en mode invité.'), unread: 0, rows: [] };
   // Mes groupes en tête des conversations ; leur fil s'ouvre par « g:<id> ».
   const groups = groupsMenu.remote(open);
   const chat = chatMenu.remoteCommunity(open?.startsWith('g:') ? undefined : open);
   // Joueurs (demandes, filtres, groupes) et le profil ouvert : phone-community.ts.
   const shown = profile ? phoneCommunity.profile(profile) : undefined;
-  return { ...chat, rows: [...groups.rows, ...chat.rows], unread: chat.unread + groups.unread, ...(groups.thread ? { thread: groups.thread } : {}), people: communityMenu.remotePeople(REMOTE_ENTRIES_MAX), ...(shown ? { profile: shown } : {}), ...remoteRoom(room), groups: groupsMenu.remoteGroups(), instant: instantMenu.remote() };
+  return { ...chat, rows: [...groups.rows, ...chat.rows], unread: chat.unread + groups.unread, ...(groups.thread ? { thread: groups.thread } : {}), people: communityMenu.remotePeople(REMOTE_ENTRIES_MAX), ...(shown ? { profile: shown } : {}), ...remoteRoom(room), groups: groupsMenu.remoteGroups(), instant: instantMenu.remote(), ...remoteLevel(page) };
+}
+
+/** Mon niveau en résumé, la page de niveau ouverte au téléphone, et la cloche de l'Activité récente (son journal quand sa feuille est ouverte). */
+function remoteLevel(page: RemotePage | undefined) {
+  const shown = page === 'level' || page === 'badges' || page === 'rules' ? { page: { kind: page, view: levelMenu.remotePage(page) } } : {};
+  return { level: levelMenu.remoteSummary(), activity: activityMenu.remote(page === 'activity'), ...shown };
+}
+
+/** Une ligne de l'Activité récente touchée au téléphone (activity-menu.ts), ou tout effacer ; jamais en mode invité. */
+function remoteActivityAct(act: 'open' | 'clear', ref: string | undefined): void {
+  if (guest.active) return;
+  if (act === 'clear') return activityMenu.remoteClear();
+  // Un écran à la borne : pas pendant une partie.
+  if (ref && !remoteBusy()) activityMenu.remoteOpen(ref, () => library.leave());
+}
+
+/** « Toutes les tables » au téléphone : le calcul de l'écran « Tables » de la borne (rankings-menu.ts). */
+function remoteAllTables(scope: RankingScope, period: ScorePeriod): RemoteAllTables {
+  return rankingsMenu.remoteTables(scope, period);
 }
 
 /** Un geste fait au téléphone sur un groupe (groups-menu.ts, remoteAct) ; jamais en mode invité. */

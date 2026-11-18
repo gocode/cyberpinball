@@ -35,6 +35,7 @@ import {
   type XpGain,
 } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
+import { remotePage, type RemotePageView } from './phone-pages';
 import type { LevelTracker } from './level-tracker';
 import type { SocialNet } from './social-net';
 
@@ -59,6 +60,22 @@ export interface LevelMenu {
   badgesItem: ProvidedSystemItem;
   /** Ce que dit l'entrée « Mon niveau » (accueil Communauté) : palier, niveau, XP restants. */
   detail(): string;
+  /** Mon niveau en résumé, en tête des Scores du téléphone. */
+  remoteSummary(): RemoteLevel;
+  /** Une page du téléphone : Mon niveau, Mes badges ou le barème, tels que la borne les montre (phone-pages.ts). */
+  remotePage(page: 'level' | 'badges' | 'rules'): RemotePageView;
+}
+
+/** Mon niveau en résumé, pour le téléphone : le niveau, le palier, la barre, les XP de la semaine. */
+export interface RemoteLevel {
+  level: number;
+  title: string;
+  xp: string;
+  progress: number;
+  week: string;
+  /** Le gain de la semaine, court (« +120 XP »), en pastille à côté du titre. */
+  gain: string;
+  detail: string;
 }
 
 const GAIN_ICON: Record<XpGain['kind'], IconName> = {
@@ -202,7 +219,11 @@ export function createLevelMenu(host: LevelMenuHost): LevelMenu {
   // ---------- Comment gagner des XP ----------
 
   function openRules(back: () => void): void {
-    lib.openCustom(() => {
+    lib.openCustom(() => buildRules(back));
+  }
+
+  function buildRules(back: () => void): Built {
+    {
       const row = (icon: IconName, text: string, xp: string, detail?: string): Row => ({ icon, text, aside: xp, ...(detail ? { detail } : {}) });
       const places = (scope: 'world' | 'country' | 'friends') => RANKING_XP[scope].map(([upTo, xp]) => `${upTo === 1 ? t('1er') : t('top {n}', { n: upTo })} : ${xp}`).join(' · ');
       return {
@@ -248,13 +269,30 @@ export function createLevelMenu(host: LevelMenuHost): LevelMenu {
         actions: [{ label: t('Retour'), icon: 'back', run: back }],
         back,
       };
-    });
+    }
   }
 
   return {
     open: (back) => open(back),
     openBadges,
     detail,
+    remoteSummary() {
+      const state = host.levels.state();
+      const v = levelOf(state.xp);
+      return {
+        level: v.level,
+        title: t('Mon niveau · {tier}', { tier: tierLabel(v.tier) }),
+        xp: t('{into} / {need} XP', { into: fmt(v.into), need: fmt(v.need) }),
+        progress: v.progress,
+        week: t('+{n} XP cette semaine', { n: fmt(weekXp(state, now())) }),
+        gain: `+${fmt(weekXp(state, now()))} XP`,
+        detail: detail(),
+      };
+    },
+    remotePage(page) {
+      const none = () => undefined;
+      return remotePage(page === 'badges' ? buildBadges(none) : page === 'rules' ? buildRules(none) : build(none));
+    },
     badgesItem: {
       get detail() {
         return t('{n} sur {total}', { n: host.net.state().badges.length, total: BADGES.length });

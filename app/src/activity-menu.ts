@@ -13,6 +13,7 @@
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec des amis et des
 // téléchargements d'essai.
 
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import {
   ACTIVITY_FILE,
@@ -119,7 +120,28 @@ export interface ActivityMenu {
   unread(): number;
   /** Le journal (essais, démonstrations). */
   entries(): readonly ActivityEntry[];
+  /**
+   * Pour la cloche du téléphone : les non-lus, et (`full`) le journal par jour, chaque ligne avec sa
+   * référence (jamais sa clé), son texte, où elle mène, ou pourquoi plus rien.
+   */
+  remote(full: boolean): RemoteActivity;
+  /** Une ligne touchée au téléphone (sa référence) : lue, et son écran ouvert à la borne s'il n'est pas au téléphone. */
+  remoteOpen(ref: string, back: () => void): void;
+  /** Tout effacer (déjà confirmé au téléphone). */
+  remoteClear(): void;
 }
+
+/** Où mène une ligne de l'Activité récente touchée au téléphone. */
+export type RemoteActivityGo = { where: 'thread'; key: string } | { where: 'profile'; key: string } | { where: 'friends' } | { where: 'room'; room: string } | { where: 'borne' };
+
+/** L'Activité récente au téléphone : la cloche (non-lus), et le journal par jour quand la feuille est ouverte. */
+export interface RemoteActivity {
+  unread: number;
+  days?: { title: string; rows: { ref: string; icon: string; title: string; detail?: string; time: string; status?: string; gone?: string; label?: string; go?: RemoteActivityGo; unread?: true }[] }[];
+}
+
+/** La référence d'une ligne au téléphone : jamais sa clé (un joueur, un téléchargement). */
+const activityRef = (id: string) => createHash('sha256').update(id).digest('hex').slice(0, 16);
 
 const locale = () => (language() === 'en' ? 'en-GB' : 'fr-FR');
 const time = (at: number) => new Date(at).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
@@ -362,6 +384,76 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
     );
   }
 
+  // ---------- Au téléphone (lot 5 de la Communauté au téléphone, 18/11/2026) ----------
+
+  /** Ce que la ligne ouvre au téléphone lui-même (un fil, un profil, Joueurs, un salon), sinon à la borne. */
+  function phoneGo(e: ActivityEntry, r: Reach): RemoteActivityGo | undefined {
+    if (r.gone || !r.run) return undefined;
+    const act = activityAct(e);
+    switch (act?.type) {
+      case 'chat':
+        return { where: 'thread', key: act.key };
+      case 'group':
+        return { where: 'thread', key: `g:${act.id}` };
+      case 'room':
+        return { where: 'room', room: act.id };
+      case 'friend':
+        return { where: 'profile', key: act.key };
+      case 'friend-request':
+        return host.friends.incoming(act.key) ? { where: 'friends' } : { where: 'profile', key: act.key };
+      default:
+        return { where: 'borne' };
+    }
+  }
+
+  function remote(full: boolean): RemoteActivity {
+    const unread = activityUnread(log);
+    if (!full) return { unread };
+    const t0 = now();
+    const days: NonNullable<RemoteActivity['days']> = [];
+    log.entries.forEach((e, i) => {
+      const look = activityLook(e);
+      const text = activityText(e);
+      const r = reach(e, i);
+      const go = phoneGo(e, r);
+      const row = {
+        ref: activityRef(e.id),
+        icon: look.icon,
+        title: text.title,
+        ...(text.detail ? { detail: text.detail } : {}),
+        time: time(e.at),
+        ...(r.status ? { status: r.status } : {}),
+        ...(r.gone ? { gone: r.gone } : r.label ? { label: r.label } : {}),
+        ...(go ? { go } : {}),
+        ...(e.read ? {} : { unread: true as const }),
+      };
+      const title = dayTitle(e.at, t0);
+      const last = days.at(-1);
+      if (last?.title === title) last.rows.push(row);
+      else days.push({ title, rows: [row] });
+    });
+    return { unread, days };
+  }
+
+  function remoteOpen(ref: string, back: () => void): void {
+    const i = log.entries.findIndex((e) => activityRef(e.id) === ref);
+    const e = log.entries[i];
+    if (!e) return;
+    if (markActivityRead(log, [e.id])) save();
+    const r = reach(e, i);
+    // Un fil, un profil, Joueurs, un salon s'ouvrent au téléphone lui-même ; le reste, à la borne.
+    if (phoneGo(e, r)?.where !== 'borne') return;
+    screen = { back, unread: new Set() };
+    r.run?.();
+  }
+
+  function remoteClear(): void {
+    if (!log.entries.length) return;
+    log.entries = [];
+    save();
+    host.log?.('Activité récente : effacée depuis le téléphone.'); // i18n-ignore : journal
+  }
+
   function show(at: number): void {
     host.library.openCustom(build, at);
   }
@@ -381,6 +473,9 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
     open,
     unread: () => activityUnread(log),
     entries: () => log.entries,
+    remote,
+    remoteOpen,
+    remoteClear,
     item: {
       // Jamais de pastille rouge : ce qui attend a la sienne là où on y répond (activity.ts, en-tête).
       get detail() {

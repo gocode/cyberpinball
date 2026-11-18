@@ -170,4 +170,9 @@ export const messages: Record<string, string> = {
   'Choisissez d’abord une table sur la roue': 'Choose a table on the wheel first',
   'Indisponible en mode invité': 'Not available in guest mode',
   'Indisponible sur cette borne': 'Not available on this cabinet',
+  // La Communauté dans votre téléphone (18/11/2026)
+  "La Communauté dans votre téléphone": "The Community on your phone",
+  "Joueurs, profils, groupes, parties instantanées, salons, classements et niveau, comme à la borne.": "Players, profiles, groups, instant games, rooms, rankings and level, as on the cabinet.",
+  "L’onglet Communauté du téléphone reprend celle de la borne : ouvrez le profil d’un joueur, répondez à une demande d’ami, rejoignez un groupe public, ouvrez une partie instantanée, choisissez votre salon.": "The phone’s Community tab mirrors the cabinet’s: open a player’s profile, answer a friend request, join a public group, open an instant game, pick your room.",
+  "Dans Scores : votre niveau et vos badges, les classements de toutes vos tables, et la cloche de l’Activité récente en haut.": "In Scores: your level and badges, the rankings of all your tables, and the recent activity bell at the top.",
 };

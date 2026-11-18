@@ -79,7 +79,8 @@ function ranksLeave() {
 
 /** La demande à la borne : la portée, la période, et la table choisie si ce n'est pas celle de la borne. */
 function ranksAsk() {
-  const table = !ranks.follow && ranks.pick ? { v: ranks.pick.v, i: ranks.pick.i } : {};
+  // Toutes les tables (telephone-niveau.js) : sans table choisie.
+  const table = ranksAllMode() ? { all: true } : !ranks.follow && ranks.pick ? { v: ranks.pick.v, i: ranks.pick.i } : {};
   ranks.live = send({ t: 'ranks', scope: ranks.scope, period: ranks.period, ...table }) || ranks.live;
 }
 
@@ -96,6 +97,9 @@ function ranksMessage(m) {
     else renderRanks();
     return;
   }
+  // Toutes les tables : une ligne par table (telephone-niveau.js).
+  if (m.every) return allTablesMessage(m);
+  if (ranksAllMode()) return;
   // Une réponse pour une portée ou une période déjà quittée : la suivante est en route.
   if (m.scope !== ranks.scope || m.period !== ranks.period) return;
   // Le défaut sans classement mondial : Cette borne, comme à la borne (une fois ; un choix gardé reste tel quel).
@@ -357,6 +361,11 @@ function renderFoot(board) {
 
 /** Toute la vue : la table, puis le tableau, ou la liste des tables quand on en choisit une. */
 function renderRanks() {
+  // En tête : Mon niveau, la bascule Une table / Toutes les tables (telephone-niveau.js).
+  renderLevelCard();
+  renderRanksMode();
+  ranksModeLayout();
+  if (ranksAllMode()) return renderAllTables();
   renderRanksTable();
   byId('ranks-picker').hidden = !ranks.picking;
   byId('ranks-scroll').hidden = ranks.picking;

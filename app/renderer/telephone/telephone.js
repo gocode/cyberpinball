@@ -350,6 +350,8 @@ function setView(next) {
   if (before === 'thread' && next !== 'thread') communityLeaveThread();
   // Un profil quitté : la borne cesse de l'envoyer.
   if (before === 'profile' && next !== 'profile') communityLeaveProfile();
+  // Une page plein écran quittée (Mon niveau, Mes badges…) : la borne cesse d'en envoyer le détail.
+  if (before === 'page' && next !== 'page') communityLeavePage();
   // Un bouton tenu reste tenu à la borne tant que le doigt n'est pas levé : changer de vue le relâche.
   releaseButtons();
   syncLayout();
@@ -854,6 +856,7 @@ function renderTop() {
   $('top-mark').classList.toggle('face', Boolean(top?.face));
   $('top-keys').hidden = !(mode === 'menu' && fieldShown && shown !== 'thread' && shown !== 'profile' && shown !== 'page');
   $('top-keys').setAttribute('aria-expanded', String(!$('keys').hidden));
+  renderBell();
 }
 
 // --- Liaison ---------------------------------------------------------------
@@ -1858,6 +1861,8 @@ $('nav-close').addEventListener('click', () =>
 );
 
 let sheetOpener;
+/** Ce que fait la feuille ouverte quand elle se ferme (telephone-niveau.js : l'Activité récente). */
+let sheetOnClose;
 /** Feuille d'actions : `opts.search` ajoute la recherche (recherche libre) et « Déconnecter ce téléphone ». */
 function openSheet(title, items, opts = {}) {
   $('sheet-title').textContent = title;
@@ -1894,6 +1899,7 @@ function openSheet(title, items, opts = {}) {
   if (opts.search && search) $('search-query').value = search.query ?? '';
   showEngines(opts.search && search && mode === 'browser');
   sheetOpener = opts.opener;
+  sheetOnClose = opts.onClose;
   sheetOpener?.setAttribute('aria-expanded', 'true');
   releaseButtons();
   // Derrière la feuille, rien ne réagit ni ne prend le focus.
@@ -1909,6 +1915,9 @@ function closeSheet() {
   sheetOpener?.setAttribute('aria-expanded', 'false');
   sheetOpener?.focus({ preventScroll: true });
   sheetOpener = undefined;
+  const closed = sheetOnClose;
+  sheetOnClose = undefined;
+  closed?.();
   // Un mot sur le nom de la borne attendait cette feuille (l'astuce de l'écran d'accueil).
   if (nameNote) setTimeout(showNameNote, 300);
 }

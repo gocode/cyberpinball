@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.16
 
+- Phone, Scores: a summary of "My level" at the top (the level, the tier, the bar, this week's XP); a tap opens My level full screen, as on the cabinet: the bar, the week, this week's rankings, the closest badges drawn as on the cabinet, then "My badges" and "How to earn XP".
+- Phone, Scores: a "One table / All tables" switch. All tables: one line per table, the most recently played first, with each table's leader and your place, at the chosen scope and period; a table without a ranking stays greyed out with its reason. Tapping a line opens that table's scoreboard.
+- Phone: a bell in the Community top bar, with the number of unread notifications. It opens the recent activity, day by day; each line leads to its screen: a friend's or a group's thread, a profile, Players or a room open on the phone, the rest on the cabinet. "Clear recent activity" after a confirmation.
+- What's new: the Community on your phone.
 - What's new: each line of the list shows the players' reactions at a glance, the three most chosen and their total, marked in blue once you have reacted.
 - Feedback and ideas: each idea shows its author's nickname ("by Ressort"), and its page lists its supporters, with their flags, most recent first. Your nickname joins them when you vote. Votes given before this version still count, without a name.
 - Phone, Messages: "Create a group" and "Public groups" at the top, then the group invitations you received (Accept, Decline), before the conversations. Creating a group opens on the cabinet, where the name is typed with the phone's keyboard.

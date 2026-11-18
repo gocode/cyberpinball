@@ -463,13 +463,19 @@ function renderInstantPage(box) {
 // ---------- La page plein écran ----------
 
 /** Ouvre une page plein écran (Groupes publics, Votre partie) ; son retour ramène à la vue d'où elle vient. */
-function communityOpenPage(kind) {
+function communityOpenPage(kind, opts = {}) {
   const from = document.body.dataset.view;
-  if (from !== 'page') pages.from = COMMUNITY_VIEWS.includes(from) ? from : 'messages';
+  if (from !== 'page') {
+    pages.from = COMMUNITY_VIEWS.includes(from) ? from : 'messages';
+    pages.parent = undefined;
+  } else if (!opts.back) pages.parent = pages.kind;
+  else pages.parent = undefined;
   pages.kind = kind;
   pages.query = '';
   // L'annuaire des groupes publics se demande aux bornes reliées : la page se redessine à l'arrivée.
   if (kind === 'publics') send({ t: 'group-act', a: 'directory' });
+  // Mon niveau, Mes badges, le barème : la borne en envoie le détail tant que la page est ouverte.
+  send({ t: 'page-open', ...(LEVEL_PAGES.includes(kind) ? { page: kind } : {}) });
   setView('page');
   renderPage();
 }
@@ -478,6 +484,7 @@ function renderPage() {
   const box = document.getElementById('full-page-body');
   if (pages.kind === 'publics') renderPublics(box);
   else if (pages.kind === 'instant') renderInstantPage(box);
+  else if (LEVEL_PAGES.includes(pages.kind)) renderLevelPage(box, pages.kind);
   else box.replaceChildren();
 }
 
@@ -491,5 +498,16 @@ function pageTop() {
     const mine = community.data?.instant?.mine;
     return { title: t('Votre partie'), detail: mine ? `${mine.title} · ${mine.detail}` : '' };
   }
+  if (LEVEL_PAGES.includes(pages.kind)) {
+    const page = community.data?.page;
+    return page?.kind === pages.kind ? { title: page.view.heading, detail: page.view.subheading ?? '' } : { title: t('Mon niveau'), detail: '' };
+  }
   return { title: t('Communauté'), detail: '' };
+}
+
+/** La page plein écran est quittée : la borne cesse d'en envoyer le détail (Mon niveau…). */
+function communityLeavePage() {
+  if (LEVEL_PAGES.includes(pages.kind)) send({ t: 'page-open' });
+  pages.kind = undefined;
+  pages.parent = undefined;
 }

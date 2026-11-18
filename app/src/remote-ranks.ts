@@ -16,6 +16,7 @@ import * as path from 'node:path';
 import { isAvatarFileName, mediaPathFromUrl, REMOTE_ENTRIES_MAX, RANKING_SCOPES, t, type AvatarView, type RankingScope, type ScorePeriod, type TableEntry } from '@cyberpinball/core';
 import { rankingScoreboardView, scoreboardView, type ScoreboardLineView, type ScoreboardView } from './scoreboard-menu';
 import type { RemoteImages } from './remote-images';
+import type { RemoteAllTables } from './rankings-menu';
 import type { PlayerStatus, RankingView } from './table-rankings';
 import type { TableBoard } from './table-scores';
 
@@ -33,7 +34,17 @@ export interface RemoteRanksHost {
    * `images`), le seul qui les sert. Un magasin à part donnerait des jetons que la borne ne sert pas.
    */
   images: RemoteImages;
+  /** « Toutes les tables » (rankings-menu.ts, remoteTables) : une ligne par table ; absent, le téléphone ne la propose pas. */
+  all?(scope: RankingScope, period: ScorePeriod): RemoteAllTables;
   now?(): Date;
+}
+
+/** « Toutes les tables » au téléphone : chaque table par son rang dans la liste envoyée (« ranks-tables »), jamais son fichier. */
+export interface RanksAll {
+  scopes: RemoteAllTables['scopes'];
+  periods: RemoteAllTables['periods'];
+  unavailable?: string;
+  sections: { title: string; rows: (Omit<RemoteAllTables['sections'][number]['rows'][number], 'file'> & { i: number })[] }[];
 }
 
 /** Une table de la liste du téléphone. */
@@ -85,6 +96,8 @@ export interface RemoteRanks {
   tables(): RanksTables & { files: string[] };
   /** Le tableau d'une table (son fichier ; absent : celle de la borne), ou pourquoi il n'y en a pas. */
   board(file: string | undefined, scope: RankingScope, period: ScorePeriod): { file: string; board: RanksBoard } | { file?: undefined; empty: { title: string; detail: string } };
+  /** Toutes les tables à cette portée et cette période, ou pourquoi rien (fermés, absent de la borne). */
+  all(scope: RankingScope, period: ScorePeriod): { all: RanksAll } | { empty: { title: string; detail: string } };
   /** Le fichier d'une pastille d'après son jeton ; undefined pour un jeton inconnu. */
   avatar(token: string): string | undefined;
   /** La télécommande s'endort : les jetons ne valent plus rien. */
@@ -161,6 +174,24 @@ export function createRemoteRanks(host: RemoteRanksHost): RemoteRanks {
       // Les quatre portées, toujours dans l'ordre de la borne.
       if (board.scopes.length !== RANKING_SCOPES.length) throw new Error('portées du tableau des scores incomplètes'); // i18n-ignore : erreur interne
       return { file: table.file, board };
+    },
+    all(scope, period) {
+      const locked = host.closed?.();
+      if (locked) return { empty: { title: t('Classements fermés'), detail: locked } };
+      if (!host.all) return { empty: { title: t('Classements indisponibles'), detail: t('Cette borne ne tient pas de tableau des scores.') } };
+      const files = listed().map((x) => x.file);
+      const all = host.all(scope, period);
+      return {
+        all: {
+          scopes: all.scopes,
+          periods: all.periods,
+          ...(all.unavailable ? { unavailable: all.unavailable } : {}),
+          // Une table hors de la liste envoyée (au-delà de REMOTE_ENTRIES_MAX) ne s'ouvrirait pas : elle n'est pas montrée.
+          sections: all.sections
+            .map((sec) => ({ title: sec.title, rows: sec.rows.flatMap(({ file, ...row }) => (files.includes(file) ? [{ ...row, i: files.indexOf(file) }] : [])) }))
+            .filter((sec) => sec.rows.length),
+        },
+      };
     },
     avatar: (token) => images.get(token)?.file,
     reset: () => images.reset(),

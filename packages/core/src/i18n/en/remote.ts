@@ -315,4 +315,12 @@ export const messages: Record<string, string> = {
   "Aucune partie ouverte : elle a commencé, ou elle est fermée.": "No open game: it has started, or it is closed.",
   "Libre": "Free",
   "Votre partie": "Your game",
+  // Scores, Mon niveau et Activité récente au téléphone (telephone-niveau.js, 18/11/2026)
+  "Une table": "One table",
+  "La borne envoie le classement de chaque table.": "The cabinet is sending the ranking of each table.",
+  "La borne envoie la page…": "The cabinet is sending the page…",
+  "Activité récente : {n} non lue": "Recent activity: {n} unread",
+  "Activité récente : {n} non lues": "Recent activity: {n} unread",
+  "La borne envoie l’activité récente…": "The cabinet is sending the recent activity…",
+  "Ouvrir": "Open",
 };

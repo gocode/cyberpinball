@@ -109,6 +109,7 @@ import {
   type RemoteJukeboxOp,
   type RemoteGroupAct,
   type RemoteInstantAct,
+  type RemotePage,
   mediaPathFromUrl,
   type KeptPhone,
   type KeptPhones,
@@ -134,6 +135,9 @@ import type { MdnsResponder } from './mdns-responder';
 import type { PhoneRelay } from './phone-relay';
 import { createRemoteImages, REMOTE_IMAGE_PATH, type RemoteImage } from './remote-images';
 import { remoteAvatar, type RemoteRanks } from './remote-ranks';
+import type { RemoteLevel } from './level-menu';
+import type { RemoteActivity } from './activity-menu';
+import type { RemotePageView } from './phone-pages';
 import { journalIncident } from './uncaught';
 
 /** Où écouter : le réseau local réel, 127.0.0.1 seulement (essais), ou nulle part (réseau coupé). */
@@ -343,6 +347,12 @@ export interface RemoteCommunity {
   groups?: RemoteGroups;
   /** Parties instantanées (instant-menu.ts) : celles des autres, en ouvrir une, la mienne. */
   instant?: RemoteInstant;
+  /** Mon niveau en résumé, en tête des Scores (level-menu.ts). */
+  level?: RemoteLevel;
+  /** La page plein écran ouverte au téléphone (page-open) : Mon niveau, Mes badges, le barème. */
+  page?: { kind: 'level' | 'badges' | 'rules'; view: RemotePageView };
+  /** La cloche : les non-lus de l'Activité récente, et son journal quand la feuille est ouverte (activity-menu.ts). */
+  activity?: RemoteActivity;
 }
 
 /** Un joueur de la liste « Joueurs », comme à la borne (Joueurs en ligne) : son drapeau, ce qu'il fait. */
@@ -455,7 +465,10 @@ export interface MenuTarget {
   typing?(key: string | undefined, on: boolean, room?: string): void;
   chatReact?(key: string, target: string, kind: string): void;
   /** Communauté : les conversations, le fil ouvert (`open`) et le profil ouvert (`profile`) au téléphone ; sans elle, l'onglet le dit. */
-  community?(open?: string, profile?: string, room?: string): RemoteCommunity;
+  /** `page` : la page plein écran ouverte au téléphone (Mon niveau, Mes badges, le barème, l'Activité récente). */
+  community?(open?: string, profile?: string, room?: string, page?: RemotePage): RemoteCommunity;
+  /** Activité récente : une ligne touchée (sa référence), ou tout effacer ; la borne vérifie tout. */
+  activityAct?(act: 'open' | 'clear', ref?: string): void;
   /** Une action du profil montré au téléphone (son identité dans l'écran de la borne) ; la borne vérifie tout. */
   profileAct?(key: string, act: string): void;
   /** Accepter ou refuser une demande d'ami reçue. */
@@ -557,6 +570,7 @@ export const PHONE_FILES: Readonly<Record<string, string>> = {
   '/telephone-ranks.js': 'telephone/telephone-ranks.js',
   '/telephone-community.js': 'telephone/telephone-community.js',
   '/telephone-groupes.js': 'telephone/telephone-groupes.js',
+  '/telephone-niveau.js': 'telephone/telephone-niveau.js',
   '/telephone-jukebox.js': 'telephone/telephone-jukebox.js',
   // La pastille d'un joueur, dessinée comme à la borne (vue Scores).
   '/avatar.js': 'avatar.js',
@@ -749,6 +763,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   let communityOpen: string | undefined;
   /** Le profil ouvert au téléphone (clé d'un joueur), ou aucun. */
   let profileOpen: string | undefined;
+  /** La page plein écran de la Communauté ouverte au téléphone, ou aucune. */
+  let pageOpen: RemotePage | undefined;
   /** Le salon choisi au téléphone, ou celui de la borne. */
   let roomOpen: string | undefined;
   let menusAt = 0;
@@ -757,7 +773,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
    * Vue Scores ouverte au téléphone : la portée, la période, et la table qu'il a choisie (son
    * fichier, gardé à la borne) ; sans table choisie, il suit celle de la borne.
    */
-  let ranksWatch: { scope: RankingScope; period: ScorePeriod; file?: string } | undefined;
+  let ranksWatch: { scope: RankingScope; period: ScorePeriod; file?: string; all?: true } | undefined;
   /** Liste des tables envoyée : sa version (change avec ses lignes), ses fichiers dans l'ordre, ce qui est parti. */
   let ranksVersion = 0;
   let ranksItems = '';
@@ -1110,6 +1126,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     ranksWatch = undefined;
     communityOpen = undefined;
     profileOpen = undefined;
+    pageOpen = undefined;
     roomOpen = undefined;
     wantsMedia = false;
     pushState(true);
@@ -1240,7 +1257,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     communityAt = now;
     let c: RemoteCommunity;
     try {
-      c = menu.community(communityOpen, profileOpen, roomOpen);
+      c = menu.community(communityOpen, profileOpen, roomOpen, pageOpen);
     } catch (error) {
       journalIncident('Télécommande : messagerie illisible pour le téléphone', error); // i18n-ignore : journal
       return;
@@ -1313,11 +1330,13 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     }
     let tables: ReturnType<RemoteRanks['tables']>;
     let shown: ReturnType<RemoteRanks['board']>;
+    let allShown: ReturnType<RemoteRanks['all']> | undefined;
     try {
       tables = ranks.tables();
       // La table choisie au téléphone a disparu (supprimée à la borne) : il suit de nouveau celle de la borne.
       if (ranksWatch.file && !tables.files.includes(ranksWatch.file)) ranksWatch = { scope: ranksWatch.scope, period: ranksWatch.period };
-      shown = ranks.board(ranksWatch.file, ranksWatch.scope, ranksWatch.period);
+      shown = ranksWatch.all ? { empty: { title: '', detail: '' } } : ranks.board(ranksWatch.file, ranksWatch.scope, ranksWatch.period);
+      if (ranksWatch.all) allShown = ranks.all(ranksWatch.scope, ranksWatch.period);
     } catch (error) {
       journalIncident('Télécommande : classements illisibles pour le téléphone', error); // i18n-ignore : journal
       return;
@@ -1334,6 +1353,15 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       ranksTablesSent = listText;
       sendTo(active, { t: 'ranks-tables', v: ranksVersion, ...list });
     }
+    // Toutes les tables : une ligne par table, chacune par son rang dans la liste envoyée.
+    if (allShown) {
+      const all = 'all' in allShown ? { all: allShown.all } : { empty: allShown.empty };
+      const allText = JSON.stringify({ v: ranksVersion, scope: ranksWatch.scope, period: ranksWatch.period, ...all });
+      if (!force && allText === ranksSent) return;
+      ranksSent = allText;
+      sendTo(active, { t: 'ranks', v: ranksVersion, i: -1, follow: false, every: true, scope: ranksWatch.scope, period: ranksWatch.period, ...all });
+      return;
+    }
     const i = shown.file ? ranksFiles.indexOf(shown.file) : -1;
     const content = 'board' in shown ? { board: shown.board } : { empty: shown.empty };
     const text = JSON.stringify({ v: ranksVersion, i, follow: !ranksWatch.file, scope: ranksWatch.scope, period: ranksWatch.period, ...content });
@@ -1349,7 +1377,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     const picked = m.table && m.table.v === ranksVersion ? ranksFiles[m.table.i] : undefined;
     const keep = m.table && m.table.v !== ranksVersion ? ranksWatch?.file : undefined;
     const file = picked ?? keep;
-    ranksWatch = { scope: m.scope, period: m.period, ...(file ? { file } : {}) };
+    // « Toutes les tables » garde la table choisie pour le retour à « Une table ».
+    ranksWatch = { scope: m.scope, period: m.period, ...(file ? { file } : m.all ? (ranksWatch?.file ? { file: ranksWatch.file } : {}) : {}), ...(m.all ? { all: true as const } : {}) };
     pushRanks(true);
   }
 
@@ -1818,6 +1847,11 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         menu.groupAct?.(message.a, message.g, message.key);
         pushCommunity(true);
         return;
+      case 'activity-act':
+        // La borne retrouve la ligne par sa référence (activity-menu.ts, remoteOpen) ; effacer, déjà confirmé au téléphone.
+        menu.activityAct?.(message.a, message.ref);
+        pushCommunity(true);
+        return;
       case 'instant-act':
         // La borne retrouve la partie, la table ou l'ami, et vérifie le geste (instant-menu.ts, remoteAct).
         menu.instantAct?.(message.a, { ...(message.id ? { id: message.id } : {}), ...(message.table ? { table: message.table } : {}), ...(message.count ? { count: message.count } : {}), ...(message.key ? { key: message.key } : {}) });
@@ -1906,6 +1940,12 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     // Le salon choisi au téléphone (ou celui de la borne) : son journal part aussitôt.
     if (message.t === 'room-open') {
       roomOpen = message.room;
+      pushCommunity(true);
+      return;
+    }
+    // Une page plein écran ouverte (ou refermée) au téléphone : la borne en envoie le détail tant qu'elle l'est.
+    if (message.t === 'page-open') {
+      pageOpen = message.page;
       pushCommunity(true);
       return;
     }
@@ -2350,6 +2390,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     communityTimer = undefined;
     communityOpen = undefined;
     profileOpen = undefined;
+    pageOpen = undefined;
     roomOpen = undefined;
     // Les jetons des images ne valent plus rien : la prochaine liaison en reçoit d'autres.
     images.reset();

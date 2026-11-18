@@ -36,6 +36,8 @@
       </section>
       <div class="link" id="link" role="status"><span class="dot" aria-hidden="true"></span><span class="link-text" id="link-text" data-i18n>Connexion…</span></div>
       <button type="button" class="top-keys" id="top-keys" aria-controls="keys" hidden></button>
+      <!-- La cloche : l'Activité récente, dans les vues de la Communauté (telephone-niveau.js). -->
+      <button type="button" class="top-bell" id="top-bell" hidden></button>
       <button type="button" class="top-more" id="top-more" aria-controls="sheet" aria-haspopup="dialog"></button>
     </header>
 
@@ -162,6 +164,9 @@
       <!-- Scores : la table (choisie ou lancée à la borne, ou une autre de la liste), ses portées et ses
            périodes, puis le tableau en grille commune, comme à la borne. -->
       <section class="ranks" id="ranks" role="tabpanel" aria-labelledby="tab-ranks">
+        <!-- Mon niveau en résumé, et « Une table / Toutes les tables » (telephone-niveau.js). -->
+        <button type="button" class="ranks-level" id="ranks-level" hidden></button>
+        <div class="phone-toggle ranks-mode" id="ranks-mode" role="tablist"></div>
         <button type="button" class="ranks-table" id="ranks-table" aria-expanded="false" aria-controls="ranks-picker">
           <span class="ranks-table-mark" id="ranks-table-mark" aria-hidden="true"></span>
           <span class="ranks-table-text">
@@ -174,6 +179,7 @@
           <div class="ranks-scopes" id="ranks-scopes" role="tablist"></div>
           <div class="ranks-periods" id="ranks-periods" role="tablist"></div>
           <ol class="ranks-lines" id="ranks-lines" data-aligned></ol>
+          <div class="ranks-all" id="ranks-all" hidden></div>
           <div class="empty" id="ranks-empty" hidden>
             <span class="empty-mark" id="ranks-empty-mark" aria-hidden="true"></span>
             <p class="empty-title" id="ranks-empty-title"></p>
@@ -313,6 +319,7 @@
     <script src="telephone-ranks.js"></script>
     <script src="telephone-community.js"></script>
     <script src="telephone-groupes.js"></script>
+    <script src="telephone-niveau.js"></script>
     <script src="telephone-jukebox.js"></script>
     <script src="telephone.js"></script>
   </body>

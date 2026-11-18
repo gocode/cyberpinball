@@ -851,12 +851,17 @@ function communityMessage(m) {
     // Groupes (créer, invitations, groupes publics) et parties instantanées : gardés, sinon ces parties restent absentes.
     groups: m.groups && typeof m.groups === 'object' && m.groups.create && Array.isArray(m.groups.invitations) && Array.isArray(m.groups.publics) ? m.groups : undefined,
     instant: m.instant && typeof m.instant === 'object' && Array.isArray(m.instant.games) ? m.instant : undefined,
+    // Mon niveau, la page de niveau ouverte et la cloche de l'Activité récente (telephone-niveau.js).
+    level: m.level && typeof m.level === 'object' && Number.isInteger(m.level.level) ? m.level : undefined,
+    page: m.page && typeof m.page === 'object' && typeof m.page.kind === 'string' && m.page.view && Array.isArray(m.page.view.sections) ? m.page : undefined,
+    activity: m.activity && typeof m.activity === 'object' && Number.isInteger(m.activity.unread) ? m.activity : undefined,
   };
   renderCommunity();
   if (document.body.dataset.view === 'thread') renderThread();
   if (document.body.dataset.view === 'room') renderRoom();
   if (document.body.dataset.view === 'profile') renderProfile();
   if (document.body.dataset.view === 'page') renderPage();
+  levelsMessage();
   // « Changer » : la liste des tables arrive.
   if (pages.picking && community.data.instant?.open?.tables) showTablePicker();
   renderTop();
@@ -903,6 +908,8 @@ document.getElementById('top-back').addEventListener('click', () => {
   const shown = document.body.dataset.view;
   if (shown === 'player') return setView('jukebox');
   if (shown === 'profile' && community.profileFrom === 'thread' && community.open) return setView('thread');
+  // Une page ouverte depuis une autre (Mes badges depuis Mon niveau) : retour à celle-là.
+  if (shown === 'page' && pages.parent) return communityOpenPage(pages.parent, { back: true });
   if (shown === 'page') return setView(pages.from);
   setView(shown === 'profile' ? community.profileFrom : communityView);
 });

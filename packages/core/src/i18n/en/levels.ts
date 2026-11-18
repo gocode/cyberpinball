@@ -209,4 +209,7 @@ export const messages: Record<string, string> = {
   '{n} badges sur {total}': '{n} badges out of {total}',
   'Les {n} plus rares': 'The {n} rarest',
   'Aucun badge pour l’instant': 'No badges yet',
+  // Au téléphone (level-menu.ts, remoteSummary ; 18/11/2026)
+  "Mon niveau · {tier}": "My level · {tier}",
+  "+{n} XP cette semaine": "+{n} XP this week",
 };

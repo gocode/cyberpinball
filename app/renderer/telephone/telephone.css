@@ -4369,3 +4369,393 @@ body:not([data-mode='browser'])[data-view='page'] .full-page {
 .groups-actions > .people-btn {
   width: 100%;
 }
+
+/* ---------- Scores, Mon niveau, Activité récente (telephone-niveau.js, lot 5) ---------- */
+
+/* Mon niveau en résumé, en tête des Scores : le niveau dans son rond, le palier, la barre, les XP. */
+.ranks-level {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+
+.ranks-level[hidden] {
+  display: none;
+}
+
+.ranks-level .entry-go {
+  flex: none;
+  color: var(--ink-muted);
+  font-size: 20px;
+}
+
+.level-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 2px solid var(--signal);
+  border-radius: 50%;
+  color: var(--signal);
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.level-card-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.level-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.level-card-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.level-card-gain {
+  flex: none;
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: var(--signal-wash);
+  color: var(--signal);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.level-card-detail {
+  overflow: hidden;
+  font-size: 14px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Une table / Toutes les tables : la vue choisie en vert lavé (le vert plein reste à l'action). */
+.ranks-mode {
+  flex: none;
+  margin: 10px 10px 0;
+}
+
+.ranks-mode button.on {
+  background: var(--signal-wash);
+  color: var(--signal);
+  box-shadow: inset 0 0 0 1px var(--signal);
+}
+
+.ranks-all[hidden] {
+  display: none;
+}
+
+.ranks-all {
+  display: flex;
+  flex-direction: column;
+}
+
+.all-section {
+  padding: 14px 4px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+/* Une table : son initiale, son nom, le premier ; ma place à droite, dans sa colonne. */
+.all-row {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 8px 4px;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+
+.all-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.all-name {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.all-lead {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 19px;
+  color: var(--ink-muted);
+}
+
+.all-place {
+  max-width: 112px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+  color: var(--ink);
+}
+
+.all-row.first .all-place {
+  color: var(--signal);
+}
+
+.all-row.quiet .all-name,
+.all-row.quiet .all-place {
+  color: var(--ink-faint);
+}
+
+/* Mon niveau, Mes badges, le barème : l'écran de la borne, ligne par ligne. */
+.level-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 4px;
+}
+
+.level-hero .level-num {
+  width: 64px;
+  height: 64px;
+  font-size: 26px;
+}
+
+.level-panel > .level-row + .level-row {
+  border-top: 1px solid var(--line-soft);
+}
+
+.level-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 12px;
+}
+
+.level-row > .icon {
+  justify-self: center;
+  color: var(--meta);
+  font-size: 22px;
+}
+
+.level-medal {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+}
+
+.level-medal svg {
+  width: 40px;
+  height: 40px;
+}
+
+.level-row-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.level-row-main {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.level-row-text small,
+.level-tags {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+
+.level-aside {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.level-row.tone-ok .level-aside {
+  color: var(--signal);
+}
+
+.level-row.tone-quiet .level-row-main,
+.level-row.tone-quiet .level-aside {
+  color: var(--ink-faint);
+}
+
+.level-link {
+  width: 100%;
+}
+
+/* La cloche de la barre du haut : le nombre de non-lus en capsule au coin, comme les onglets. */
+.top-bell {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--ink);
+  font-size: 23px;
+}
+
+.top-bell[hidden] {
+  display: none;
+}
+
+.top-bell b {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.top-bell b[hidden] {
+  display: none;
+}
+
+/* L'Activité récente, dans sa feuille : par jour, chaque ligne avec son heure et ce qu'elle ouvre. */
+.activity-list {
+  display: flex;
+  max-height: 58vh;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.activity-day {
+  padding: 12px 4px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.activity-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 8px 4px;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+
+.activity-row > .icon {
+  justify-self: center;
+  color: var(--meta);
+  font-size: 20px;
+}
+
+.activity-row.unread .level-row-main::after {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--signal);
+  vertical-align: 2px;
+}
+
+.activity-row.quiet .level-row-main,
+.activity-row.quiet > .icon {
+  color: var(--ink-faint);
+}
+
+.activity-go {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--signal);
+}
+
+/* Toutes les tables : le choix d’une table et son tableau se cachent (leur display écrase hidden). */
+.ranks-table[hidden],
+.ranks-lines[hidden] {
+  display: none;
+}
+
+/* Le détail d’un lien passe à la ligne plutôt que d’être coupé. */
+.level-link .profile-line-text small {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+/* Écran bas (petit Android) : le résumé de niveau sur une ligne de moins, sans sa barre (elle est sur la page Mon niveau). */
+@media (max-height: 640px) {
+  .ranks-level {
+    min-height: 56px;
+    padding: 6px 12px;
+  }
+
+  .ranks-level .level-num {
+    width: 40px;
+    height: 40px;
+    font-size: 17px;
+  }
+
+  .ranks-level .profile-bar {
+    display: none;
+  }
+}
