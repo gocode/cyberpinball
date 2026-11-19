@@ -10,9 +10,11 @@ import {
   pinballFxLocalSettingsFiles,
   pinballFxRotationValue,
   pinballFxSettingsWithRotation,
+  PINBALLFX3_EXTRA_KEYS,
   windowsVk,
   ZEN_GAME_KEYS,
   ZenKeyPresser,
+  zenGameKeys,
   zenJoystickKeys,
   type CabinetButtons,
 } from '..';
@@ -110,6 +112,18 @@ test('boutons de joystick : les commandes de Pinball FX (écran Contrôles > Cla
   assert.equal(keys.has(JOY(11)), false, 'Volume + : reste à Cyber Pinball');
 });
 
+test('Pinball FX3 : les flippers envoient aussi la flèche de leur côté (menus aux flèches, Maj sans effet)', () => {
+  const keys = zenJoystickKeys(PINSCAPE, 'pinballfx3');
+  assert.deepEqual(keys.get(JOY(5)), ['ShiftLeft', 'ArrowLeft'], 'flipper gauche : Maj en partie, flèche dans les menus');
+  assert.deepEqual(keys.get(JOY(4)), ['ShiftRight', 'ArrowRight'], 'flipper droit');
+  assert.deepEqual(keys.get(JOY(12)), ['Enter'], 'Start : valider, comme Pinball FX');
+  assert.deepEqual(keys.get(JOY(7)), ['ArrowUp'], 'MagnaSave gauche inchangé');
+  // Pinball FX et jeu non précisé : pas de flèches aux flippers.
+  assert.deepEqual(zenJoystickKeys(PINSCAPE, 'pinballfx').get(JOY(5)), ['ShiftLeft']);
+  assert.deepEqual(zenGameKeys().leftFlipper, ['ShiftLeft']);
+  for (const key of Object.values(PINBALLFX3_EXTRA_KEYS)) assert.notEqual(windowsVk(key!), undefined, key);
+});
+
 test('tremblements : Alt gauche, Alt droite, Espace, comme dans le jeu', () => {
   const keys = zenJoystickKeys({ buttons: { ...PINSCAPE.buttons, nudgeLeft: JOY(14), nudgeRight: JOY(15), nudgeCenter: JOY(16) }, navigation: undefined });
   assert.deepEqual([keys.get(JOY(14)), keys.get(JOY(15)), keys.get(JOY(16))], [['AltLeft'], ['AltRight'], ['Space']]);
@@ -140,8 +154,31 @@ interface ZenKeysModule {
     buttons: unknown,
     gamePid: () => number | undefined,
     system: { foregroundPid(): number | undefined; key(vk: number, down: boolean): void; watch(l: (code: string, down: boolean) => void): () => void },
+    game?: string,
   ): () => void;
 }
+
+test('pont, Pinball FX3 : flipper gauche = Maj gauche puis flèche gauche ; appuis comptés au journal', (t) => {
+  const zen = require(path.join(REPO_ROOT, 'app', 'dist', 'zen-keys.js')) as ZenKeysModule;
+  const logs: string[] = [];
+  t.mock.method(console, 'log', (msg: string) => logs.push(msg));
+  let listener: ((code: string, down: boolean) => void) | undefined;
+  let front = 42;
+  const sent: [number, boolean][] = [];
+  const stop = zen.bridgeZenKeys(
+    { buttons: { leftFlipper: JOY(1), rightFlipper: JOY(2), start: 'Digit1', exit: 'Escape', credit: 'Digit5', plunger: 'Enter' } },
+    () => 42,
+    { foregroundPid: () => front, key: (vk, down) => sent.push([vk, down]), watch: (l) => ((listener = l), () => undefined) },
+    'pinballfx3',
+  );
+  listener!(JOY(1), true);
+  listener!(JOY(1), false);
+  assert.deepEqual(sent, [[0xa0, true], [0x25, true], [0xa0, false], [0x25, false]]);
+  front = 7;
+  listener!(JOY(2), true);
+  stop();
+  assert.ok(logs.some((l) => /1 appui\(s\) de bouton envoyé\(s\) au jeu, 1 gardé\(s\)/.test(l)), logs.join('\n'));
+});
 
 test('pont : touches seulement quand le jeu a le premier plan, relâchées à la fin', () => {
   const zen = require(path.join(REPO_ROOT, 'app', 'dist', 'zen-keys.js')) as ZenKeysModule;

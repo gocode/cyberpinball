@@ -4847,7 +4847,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
       ? simulateVpx({ onPlaying, onForeground })
       : launchPinballFx({ command, game: launchGame, exitHeld: vrFront.exitHeldNow, onPlaying, onForeground, ...(onWindow ? { onWindow } : {}) });
   // Pinscape et encodeurs en mode manette : leurs boutons rendus au jeu de Zen comme des touches (zen-keys.ts).
-  const stopZenKeys = simulated === undefined && command && zenKey ? bridgeZenKeys({ buttons, navigation }, () => game.pid) : () => undefined;
+  const stopZenKeys = simulated === undefined && command && zenKey ? bridgeZenKeys({ buttons, navigation }, () => game.pid, undefined, zenKey) : () => undefined;
   if (launch) {
     launch.stop = () => game.stop();
     launchStep('launched');

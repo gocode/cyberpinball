@@ -19,12 +19,18 @@
 // du haut), aux flèches haut et bas (fenêtres qu'elle ouvre : les MagnaSave de la borne), Entrée pour
 // valider, Échap pour revenir. Les boutons de volume restent à Cyber Pinball (son de Windows). Les
 // touches du clavier d'une borne arrivent déjà au jeu : rien n'est rejoué pour elles.
+//
+// Pinball FX3 (« Pinball FX Classic ») reçoit les mêmes touches (essai sur un PinCab le 19/11/2026 :
+// en partie, flippers, Start et MagnaSave répondent), mais ses menus se parcourent aux flèches gauche
+// et droite, sur lesquelles Maj ne fait rien. Sans elles, impossible d'atteindre l'icône de borne pour
+// activer son mode borne. Ses flippers envoient donc aussi la flèche de leur côté (PINBALLFX3_EXTRA_KEYS).
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import { buttonKeys, type ButtonsSource } from './buttons';
 import type { ButtonId, Rotation } from './model';
+import type { ZenGameKey } from './zen';
 
 /** Valeur de forcedDisplayRotation pour une rotation horaire de l'image ; undefined : image droite, rien à forcer. */
 export function pinballFxRotationValue(rotation: Rotation): string | undefined {
@@ -116,22 +122,42 @@ export const ZEN_GAME_KEYS: Readonly<Partial<Record<ButtonId, string>>> = {
   nudgeCenter: 'Space',
 };
 
+/**
+ * Touches de plus pour Pinball FX3 : les flèches gauche et droite parcourent ses menus, où Maj ne
+ * fait rien ; en partie, Maj lève toujours les flippers.
+ */
+export const PINBALLFX3_EXTRA_KEYS: Readonly<Partial<Record<ButtonId, string>>> = {
+  leftFlipper: 'ArrowLeft',
+  rightFlipper: 'ArrowRight',
+};
+
+/** Touches d'un rôle dans le jeu de Zen `game` (sans jeu précisé : celles de Pinball FX). */
+export function zenGameKeys(game?: ZenGameKey): Partial<Record<ButtonId, string[]>> {
+  const out: Partial<Record<ButtonId, string[]>> = {};
+  const add = (keys: Readonly<Partial<Record<ButtonId, string>>>) => {
+    for (const [id, key] of Object.entries(keys) as [ButtonId, string][]) out[id] = [...(out[id] ?? []), key];
+  };
+  add(ZEN_GAME_KEYS);
+  if (game === 'pinballfx3') add(PINBALLFX3_EXTRA_KEYS);
+  return out;
+}
+
 /** Bouton de joystick (jeton de VPX « SDLJoy_… »), pas une touche du clavier. */
 function isJoystickCode(code: string | undefined): code is string {
   return typeof code === 'string' && code.startsWith('SDLJoy_');
 }
 
 /**
- * Pour chaque bouton de joystick de la borne, les touches à appuyer dans un jeu de Zen : celle de son
- * rôle en jeu (relevé de l'étape « Boutons », qui ne donne jamais un bouton à deux rôles ; relevé
+ * Pour chaque bouton de joystick de la borne, les touches à appuyer dans le jeu de Zen `zenGame` : celles
+ * de son rôle en jeu (zenGameKeys ; relevé de l'étape « Boutons », qui ne donne jamais un bouton à deux rôles ; relevé
  * incohérent : touches par défaut, rien à rejouer). Un bouton du clavier n'y est pas (il arrive déjà au jeu).
  */
-export function zenJoystickKeys(source: ButtonsSource): Map<string, string[]> {
+export function zenJoystickKeys(source: ButtonsSource, zenGame?: ZenGameKey): Map<string, string[]> {
   const map = new Map<string, string[]>();
   const game = buttonKeys(source?.buttons);
-  for (const [id, key] of Object.entries(ZEN_GAME_KEYS) as [ButtonId, string][]) {
+  for (const [id, keys] of Object.entries(zenGameKeys(zenGame)) as [ButtonId, string[]][]) {
     const code = game[id];
-    if (isJoystickCode(code)) map.set(code, [...new Set([...(map.get(code) ?? []), key])]);
+    if (isJoystickCode(code)) map.set(code, [...new Set([...(map.get(code) ?? []), ...keys])]);
   }
   return map;
 }

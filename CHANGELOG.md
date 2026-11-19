@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.1
 
+- Pinball FX3 sur une borne dont les boutons sont ceux d'un joystick (Pinscape, encodeur en mode manette) : les flippers parcourent maintenant les menus du jeu. Ces menus se déplacent aux flèches gauche et droite, que les flippers n'envoyaient pas ; chaque flipper envoie désormais aussi la flèche de son côté. On peut ainsi atteindre l'icône de borne et activer le mode borne sans clavier. En partie, les flippers lèvent toujours les batteurs.
+- Jeux de Zen : à la fin de chaque partie, le journal compte les appuis de bouton envoyés au jeu et ceux gardés parce que le jeu n'était pas au premier plan.
 - Assistant de configuration, boutons : un MagnaSave (ou tout autre bouton) choisi pour l'aide-mémoire, les réglages de VPX, le bureau Windows ou « Quitter sans enregistrer » garde sa touche dans le jeu. Sur une carte en mode clavier comme la CSD PinOne, le MagnaSave mis sur un de ces boutons du menu se retrouvait sans touche aux boutons du jeu, sa ligne vide, et ne faisait plus rien en partie.
 - Relevé des boutons : un bouton qui perd sa touche parce qu'un autre l'a prise le dit sur sa propre ligne, en orange (« reprise par Extra Ball »), jusqu'à ce qu'il soit relevé de nouveau ; plus aucune ligne n'est vide.
 - Relevé des boutons : un bouton envoyé par AltGr (Alt droit sur un clavier européen) n'est plus relevé deux fois ; Windows le fait précéder d'un Ctrl gauche que l'assistant prenait pour un bouton de plus.

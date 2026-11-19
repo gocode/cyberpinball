@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Pinball FX3 on a cabinet whose buttons are joystick buttons (Pinscape, encoder in gamepad mode): the flippers now move through the game's menus. Those menus use the left and right arrow keys, which the flippers didn't send; each flipper now also sends the arrow on its side. You can reach the cabinet icon and turn on cabinet mode without a keyboard. In a game, the flippers still flip.
+- Zen games: at the end of each game, the log counts the button presses sent to the game and those held back because the game wasn't in front.
 - Setup wizard, buttons: a MagnaSave (or any other button) chosen for the quick reference, the VPX settings, the Windows desktop or "Quit without saving" keeps its key in the game. On a board in keyboard mode such as the CSD PinOne, a MagnaSave set on one of these menu buttons ended up with no key in the game buttons, its line empty, and did nothing during a game.
 - Button mapping: a button that loses its key because another one took it now says so on its own line, in orange ("now on Extra Ball"), until it is mapped again; no line is ever empty.
 - Button mapping: a button sent as AltGr (right Alt on a European keyboard) is no longer mapped twice; Windows sends a left Ctrl just before it, which the wizard took for one more button.
