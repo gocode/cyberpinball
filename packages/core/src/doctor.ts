@@ -519,25 +519,50 @@ function playedMusic(code: string): string[] {
  */
 function dmdProjectFolder(code: string): string | undefined {
   for (const m of code.matchAll(/\.(?:ProjectFolder\s*=|SetProjectFolder\b)\s*\(?([^\n:]*)/gi)) {
-    const parts = m[1]!.replace(/\)\s*$/, '').split('&').map((p) => p.trim());
-    let value = '';
-    for (const [i, part] of parts.entries()) {
-      const literal = /^"([^"]*)"$/.exec(part);
-      const variable = /^[A-Za-z_]\w*$/.test(part) ? new RegExp(`\\b${part}\\s*=\\s*"([^"]*)"`, 'i').exec(code) : null;
-      if (literal) value += literal[1];
-      else if (variable) value += variable[1];
-      // Variable de tête non résolue (curDir) : le dossier de la table. TablesDirectory n'en est
-      // pas un, le .vbs de Cyber Pinball le remplace (scriptcompat.ts, tablesDirectoryDmd).
-      else if (i === 0 && /^[A-Za-z_]\w*$/.test(part)) continue;
-      else {
-        value = '';
-        break;
-      }
-    }
-    value = value.trim();
+    const value = (pathExpression(code, m[1]!.replace(/\)\s*$/, ''), 0) ?? '').trim();
     if (!value || /^[a-z]:|^\\\\/i.test(value)) continue;
     const name = value.split(/[\\/]/).filter((part) => part && part !== '.').at(-1);
     if (name && name !== '..') return name;
+  }
+  return undefined;
+}
+
+/**
+ * Valeur d'un chemin écrit dans le script (« curDir & "\" & TableName & ".UltraDMD" ») : textes, et variables dont la
+ * valeur est un texte ou un tel chemin. Le chargement d'UltraDMD le plus recopié passe par une variable
+ * (« DirName = curDir & "\" & TableName & ".UltraDMD" » puis « .SetProjectFolder DirName ») : sans la suivre, le dossier
+ * restait inconnu, ni copié à la reprise d'une installation ni signalé absent (Goldorak, 19/11/2026). Une variable de
+ * tête non résolue (curDir) est le dossier de la table ; TablesDirectory n'en est pas un, le .vbs de Cyber Pinball le
+ * remplace (scriptcompat.ts, tablesDirectoryDmd). undefined : le chemin n'est pas lisible sans exécuter le script.
+ */
+function pathExpression(code: string, expression: string, depth: number): string | undefined {
+  const parts = expression.split('&').map((p) => p.trim());
+  let value = '';
+  for (const [i, part] of parts.entries()) {
+    const literal = /^"([^"]*)"$/.exec(part);
+    if (literal) {
+      value += literal[1];
+      continue;
+    }
+    if (/^[A-Za-z_]\w*$/.test(part)) {
+      const resolved = depth < 3 ? variableValue(code, part, depth) : undefined;
+      if (resolved !== undefined) {
+        value += resolved;
+        continue;
+      }
+      if (i === 0) continue;
+    }
+    return undefined;
+  }
+  return value;
+}
+
+/** Valeur de la première affectation lisible d'une variable (« Const TableName = "Goldorak" », « DirName = … »). */
+function variableValue(code: string, name: string, depth: number): string | undefined {
+  const assign = new RegExp(`(?:^|:)\\s*(?:(?:const|dim|private|public)\\s+)?${name}\\s*=\\s*([^:\\n]+)`, 'gim');
+  for (const m of code.matchAll(assign)) {
+    const value = pathExpression(code, m[1]!.trim(), depth + 1);
+    if (value !== undefined && value !== '') return value;
   }
   return undefined;
 }

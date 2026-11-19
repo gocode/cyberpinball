@@ -3,7 +3,7 @@
 // qu'une table rame sur cette borne. Le plugin « CyberPinballDmd » écrit le bilan (cadence.h), dans toutes les parties.
 
 import * as fs from 'node:fs';
-import { cadenceJournal, readVpxCadence, readVpxTargetFps, recordGameCadence, stallPlaceJournal } from '@cyberpinball/core';
+import { cadenceJournal, readVpxCadence, readVpxTargetFps, recordGameCadence, scriptErrorsJournal, stallPlaceJournal } from '@cyberpinball/core';
 
 /** Taille du journal de VPX avant la partie : ce qu'il écrira de cette partie commence là. */
 export function vpxLogSize(file: string): number {
@@ -35,6 +35,9 @@ function linesSince(file: string, from: number): string[] {
 /** Après la partie : la cadence au journal, et dans le relevé de la table. */
 export function noteGameCadence(opts: { logsDir: string; tableFile: string; tableId: string; vpxLog: string; from: number; vr: boolean; others?: string[] }): void {
   const lines = linesSince(opts.vpxLog, opts.from);
+  // Erreurs du script pendant la partie, regroupées : une erreur répétée à chaque tour d'une minuterie tient en une ligne.
+  const errors = scriptErrorsJournal(opts.tableId, lines);
+  if (errors) console.log(errors);
   const cadence = readVpxCadence(lines);
   if (!cadence) {
     console.log(`Cadence de la partie (${opts.tableId}) : aucun bilan dans vpinball.log (plugin du DMD absent ou partie trop courte).`); // i18n-ignore : journal

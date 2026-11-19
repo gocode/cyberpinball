@@ -7,8 +7,9 @@
 // crée pas son éditeur, donc ni audit de la table, ni éditeur de script, ni
 // fenêtre de progression. La reconnaissance des fenêtres de l'éditeur sert de
 // filet pour une autre version de VPX qui en ouvrirait une malgré tout.
-// Le script de la table peut ouvrir ses propres boîtes : une erreur (MsgBox) arrête
-// la partie, un formulaire d'options (core.vbs, VPinMAME.WSHDlg) est validé tel quel.
+// Le script de la table peut ouvrir ses propres boîtes : une question (Oui/Non, Annuler) arrête
+// la partie, un formulaire d'options (core.vbs, VPinMAME.WSHDlg) est validé tel quel, un simple
+// message à un seul bouton OK aussi (noté au journal).
 
 import { t, tn } from './i18n';
 import { ROLES, type ObservedDisplay, type Rect, type RoleId } from './model';
@@ -53,6 +54,11 @@ export type VpxWindowVerdict =
    * tel quel par son bouton `okId`, la partie continue avec les choix qu'il propose.
    */
   | { kind: 'options'; okId: number; notice: string }
+  /**
+   * Message du script de la table (MsgBox) qui n'a qu'un bouton OK : rien à décider, le script attend seulement
+   * qu'on le lise. Validé par `okId`, la partie continue ; `message` est noté au journal (`notice`).
+   */
+  | { kind: 'information'; okId: number; message: string; notice: string }
   /** Boîte bloquante (question, erreur) : la partie est arrêtée avec ce message. */
   | { kind: 'dialog'; message: string }
   /** Autre fenêtre : laissée telle quelle, signalée. */
@@ -103,6 +109,19 @@ function optionsOkButton(controls: readonly ObservedControl[]): ObservedControl 
   if (!controls.some((c) => isButton(c) && CHOICE_BUTTONS.has(c.style & BS_TYPEMASK))) return undefined;
   const pushes = controls.filter((c) => isButton(c) && [BS_PUSHBUTTON, BS_DEFPUSHBUTTON].includes(c.style & BS_TYPEMASK));
   return pushes.find((c) => OK_TEXT.test(c.text.trim())) ?? (pushes.length === 1 ? pushes[0] : undefined);
+}
+
+/**
+ * Bouton OK d'un message du script (MsgBox à un seul bouton, vbOKOnly) : un seul bouton à presser, nommé OK, ni
+ * case, ni bouton radio, ni champ de saisie. Les boîtes de VPX lui-même (« Visual Pinball », « Visual Pinball Error » :
+ * jeu impossible à lancer, casque absent) n'en sont pas : elles disent pourquoi la partie ne peut pas se jouer.
+ * Une MsgBox de VBScript porte le titre « VBScript », ou celui que lui donne le script.
+ */
+function scriptMessageOk(title: string, controls: readonly ObservedControl[]): ObservedControl | undefined {
+  if (/^Visual Pinball\b/i.test(title)) return undefined;
+  if (controls.some((c) => (isButton(c) && CHOICE_BUTTONS.has(c.style & BS_TYPEMASK)) || /^(edit|combobox|listbox)$/i.test(c.className.trim()))) return undefined;
+  const pushes = controls.filter((c) => isButton(c) && [BS_PUSHBUTTON, BS_DEFPUSHBUTTON].includes(c.style & BS_TYPEMASK));
+  return pushes.length === 1 && /^&?ok$/i.test(pushes[0]!.text.trim()) ? pushes[0] : undefined;
 }
 
 function setting(key: string): string {
@@ -178,6 +197,19 @@ export function classifyVpxWindow(w: ObservedVpxWindow): VpxWindowVerdict {
         "VPX cherche un casque de réalité virtuelle : la VR est forcée ([PlayerVR] AskToTurnOn = 0). Remettez {setting} dans VPinballX.ini, et dans le .ini de la table s'il la surcharge.",
         { setting: setting('AskToTurnOn') },
       ),
+    };
+  }
+  // Message du script à un seul bouton OK (19/11/2026, Goldorak : « UltraDMD userfiles directory '…' does not exist.
+  // No graphic images will be displayed on the DMD ») : l'arrêter comme une erreur empêchait la table de se jouer,
+  // alors que le script continue dès qu'on presse OK. Validé, la partie continue ; le message reste au journal.
+  const info = scriptMessageOk(title, w.controls ?? []);
+  if (info) {
+    const message = texts.join(' ') || title;
+    return {
+      kind: 'information',
+      okId: info.id,
+      message,
+      notice: t('Message du script de la table validé par OK, la partie continue : « {message} »', { message }),
     };
   }
   return { kind: 'dialog', message: text };

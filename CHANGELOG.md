@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.1
 
+- Tables dont le script affiche un simple message avec un seul bouton OK (Goldorak : « UltraDMD userfiles directory … does not exist ») : la partie s'arrêtait comme pour une erreur. Le message est maintenant validé par OK, la partie continue et le message reste dans le journal. Les questions (Oui/Non, Annuler) et les erreurs de VPX arrêtent toujours la partie.
+- Tables UltraDMD dont le script nomme son dossier par une variable (« DirName = curDir & … & ".UltraDMD" », la forme la plus recopiée) : ce dossier est maintenant reconnu. Il suit la table quand on reprend une autre installation, et le médecin signale son absence. Un dossier nommé comme la table (« Table.UltraDMD », « Table.FlexDMD ») suit aussi la table.
+- Erreurs du script répétées pendant la partie (« Objet requis: 'UltraDMD' » à chaque tour) : le journal de la borne les résume en une ligne, avec la ligne du script et le nombre de fois.
 - Tables UltraDMD et FlexDMD : quand le médecin range une table en vrac dans son propre dossier, il emporte aussi le dossier de son DMD (« Table.UltraDMD »), qui restait derrière et laissait le DMD vide.
 - Le médecin retrouve un dossier du DMD resté à la racine du dossier des tables, ou dans le dossier d'une autre version de la table, et propose de le ranger avec la table.
 - Une table dont le script cherche son dossier du DMD dans TablesDirectory (le dossier Tables de VPX, pas celui de la table) le trouve désormais dans son propre dossier : VPX joue une copie corrigée de son script, la table n'est pas modifiée.

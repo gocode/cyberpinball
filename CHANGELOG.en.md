@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Tables whose script shows a plain message with a single OK button (Goldorak: "UltraDMD userfiles directory … does not exist"): the game used to stop as if it were an error. The message is now accepted with OK, the game goes on and the message stays in the log. Questions (Yes/No, Cancel) and VPX errors still stop the game.
+- UltraDMD tables whose script names its folder through a variable ("DirName = curDir & … & ".UltraDMD"", the most copied form): that folder is now recognised. It follows the table when another installation is imported, and the doctor reports it when it is missing. A folder named like the table ("Table.UltraDMD", "Table.FlexDMD") follows the table too.
+- Script errors repeated during the game ("Object required: 'UltraDMD'" at every tick): the cabinet log sums them up in one line, with the script line and how many times.
 - UltraDMD and FlexDMD tables: when the doctor moves a loose table into its own folder, it now also moves its DMD folder ("Table.UltraDMD"), which used to stay behind and leave the DMD empty.
 - The doctor finds a DMD folder left at the top of the tables folder, or in another version's folder, and offers to put it with the table.
 - A table whose script looks for its DMD folder in TablesDirectory (VPX's Tables folder, not the table's) now finds it in its own folder: VPX plays a fixed copy of its script, the table itself is unchanged.

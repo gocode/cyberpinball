@@ -50,6 +50,57 @@ export function vpxScriptError(lines: readonly string[], script?: string): VpxSc
   return undefined;
 }
 
+/** Une erreur du script et le nombre de fois que VPX l'a écrite pendant la partie. */
+export interface RepeatedScriptError extends VpxScriptError {
+  count: number;
+}
+
+/**
+ * Les erreurs du script écrites par VPX pendant une partie, regroupées (même ligne, même message), la plus
+ * fréquente d'abord. Une erreur dans une Sub appelée à chaque tour d'une minuterie revient à chaque tour :
+ * VPX l'écrit au journal et la montre sur le plateau autant de fois (19/11/2026, une table Champions League :
+ * « Objet requis: 'UltraDMD' » sur tout le plateau, la variable UltraDMD restée vide).
+ */
+export function scriptErrorsDuringGame(lines: readonly string[], script?: string): RepeatedScriptError[] {
+  const re = /\b(runtime|compil(?:e|ation))\s+error\s+(?:on|at)\s+line\s+(\d+)(?:\s*,\s*col(?:umn)?\s+(\d+))?\s*:\s*(.*?)\s*$/i;
+  const groups = new Map<string, RepeatedScriptError>();
+  const source = script?.split(/\r?\n/);
+  for (const text of lines) {
+    const m = re.exec(text);
+    if (!m) continue;
+    const kind = /^run/i.test(m[1]!) ? 'runtime' : 'compile';
+    const key = `${kind}|${m[2]}|${m[4]}`;
+    const known = groups.get(key);
+    if (known) {
+      known.count++;
+      continue;
+    }
+    const line = Number(m[2]);
+    const error: RepeatedScriptError = { kind, line, ...(m[3] ? { column: Number(m[3]) } : {}), message: m[4]!, count: 1 };
+    const code = source?.[line - 1]?.trim();
+    if (code) error.code = code.length > 120 ? `${code.slice(0, 117)}…` : code;
+    groups.set(key, error);
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Une ligne du journal de la borne qui résume les erreurs du script pendant la partie (une par erreur, avec le
+ * nombre de fois), au lieu de les laisser se perdre parmi des centaines de lignes identiques. undefined sans erreur.
+ */
+export function scriptErrorsJournal(table: string, lines: readonly string[], script?: string): string | undefined {
+  const errors = scriptErrorsDuringGame(lines, script);
+  if (!errors.length) return undefined;
+  const loop = errors.some((e) => e.count >= 3);
+  const parts = errors.slice(0, 5).map((e) => {
+    const where = `ligne ${e.line}${e.code ? ` (${e.code})` : ''}`; // i18n-ignore : journal
+    return `${where} : « ${e.message} »${e.count > 1 ? `, ${e.count} fois` : ''}`; // i18n-ignore : journal
+  });
+  const more = errors.length > 5 ? ` ; et ${errors.length - 5} autres` : ''; // i18n-ignore : journal
+  const head = loop ? 'Erreur du script répétée en boucle pendant la partie' : 'Erreur du script pendant la partie'; // i18n-ignore : journal
+  return `${head} (${table}) : ${parts.join(' ; ')}${more}.`;
+}
+
 /**
  * Codes de sortie de Windows qui disent comment VPX s'est arrêté (NTSTATUS, rendus en entier non
  * signé par Node : 3221226356 = 0xC0000374).

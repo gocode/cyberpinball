@@ -581,6 +581,10 @@ export function tableCompanions(vpx: string, layout: InstallationLayout, facts?:
     if (dmd) add(dmd, 'dmdFolder');
     else missing.push(t('dossier DMD « {name} »', { name: facts.dmdFolder }));
   }
+  // Dossier du DMD nommé comme la table (« Foo.UltraDMD », « Foo.FlexDMD ») : repris même quand le script ne dit pas
+  // lisiblement lequel il charge (chemin calculé à l'exécution).
+  const base = path.basename(vpx).replace(/\.vpx$/i, '');
+  for (const ext of ['UltraDMD', 'FlexDMD']) add(child(path.dirname(vpx), `${base}.${ext}`), 'dmdFolder');
 
   // Musique que le script joue (PlayMusic "Akira\track.mp3") : rangée par VPX dans son dossier Music.
   if (layout.musicDir) {

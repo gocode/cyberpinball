@@ -161,10 +161,10 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
           controls,
         });
         if (verdict.kind === 'game') continue;
-        if (verdict.kind === 'options') {
-          // Options de la table au démarrage : validées telles quelles (OK), la partie continue.
-          // Sans réponse, VPX attendrait toujours ; arrêtée, la table reposerait la question à
-          // chaque lancement. Encore là OPTIONS_CLOSE_MS après le clic : arrêtée comme une erreur.
+        if (verdict.kind === 'options' || verdict.kind === 'information') {
+          // Options de la table au démarrage, ou simple message du script : validés tels quels (OK), la
+          // partie continue. Sans réponse, VPX attendrait toujours ; arrêtée, la table reposerait la question
+          // à chaque lancement. Encore là OPTIONS_CLOSE_MS après le clic : arrêtée comme une erreur.
           const pressed = optionsPressed.get(w.handle);
           if (pressed === undefined) {
             const ok = controls?.find((c) => c.id === verdict.okId);
@@ -175,11 +175,11 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
             }
           } else if (Date.now() - pressed < OPTIONS_CLOSE_MS) continue;
         }
-        if (verdict.kind === 'dialog' || verdict.kind === 'options') {
+        if (verdict.kind === 'dialog' || verdict.kind === 'options' || verdict.kind === 'information') {
           // Une boîte de dialogue de VPX (question, erreur, ROM introuvable…) bloquerait
           // la borne : on rapporte son texte et on arrête la partie.
           failure = 'dialog';
-          message = verdict.kind === 'dialog' ? verdict.message : [w.title.trim(), ...(controls ?? []).map((c) => c.text).filter(Boolean)].join(' : ');
+          message = verdict.kind === 'dialog' || verdict.kind === 'information' ? verdict.message : [w.title.trim(), ...(controls ?? []).map((c) => c.text).filter(Boolean)].join(' : ');
           child.kill();
           return;
         }

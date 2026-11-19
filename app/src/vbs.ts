@@ -21,13 +21,13 @@ interface CacheEntry {
   size: number;
   mtimeMs: number;
   facts: ScriptFacts;
-  /** Version de la lecture : une entrée plus ancienne est relue (2 : dossier DMD, 3 : appels PuP, 4 : interrupteur du PuP, 5 : DMD dessiné par la table, 6 : interrupteur relayé par une autre variable et PuP-DMD, 7 : nom du jeu pour B2S et déclencheurs D envoyés par le script, 8 : ce que le core.vbs actuel refuse, 9 : musique jouée par PlayMusic, 10 : options de table du DMD, 11 : pièce VR). */
+  /** Version de la lecture : une entrée plus ancienne est relue (2 : dossier DMD, 3 : appels PuP, 4 : interrupteur du PuP, 5 : DMD dessiné par la table, 6 : interrupteur relayé par une autre variable et PuP-DMD, 7 : nom du jeu pour B2S et déclencheurs D envoyés par le script, 8 : ce que le core.vbs actuel refuse, 9 : musique jouée par PlayMusic, 10 : options de table du DMD, 11 : pièce VR, 13 : dossier du DMD nommé par une variable, « DirName = curDir & … »). */
   v?: number;
   /** Correctifs de script que la lecture savait repérer (COMPAT_FIXES) : une lecture d'avant un correctif est refaite. */
   fixes?: string;
 }
 
-const FACTS_VERSION = 12;
+const FACTS_VERSION = 13;
 /** Un correctif de script ajouté rend les lectures plus anciennes périmées, sans numéro à penser à changer. */
 const FACTS_FIXES = COMPAT_FIXES.join(',');
 
