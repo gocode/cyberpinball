@@ -10,15 +10,22 @@
 //
 // Boutons : Pinball FX ne lit que le clavier et les manettes XInput, pas un joystick DirectInput
 // (Pinscape, encodeur en mode manette). Pendant la partie, chaque bouton de joystick relevé par
-// l'étape « Boutons » est rendu au jeu sous la forme des touches de son clavier par défaut :
-// flippers sur Maj gauche et droite, lancer et valider sur Entrée, retour sur Échap, et les flèches
-// pour les menus du jeu (le flipper pousse aussi la flèche de son côté, les MagnaSave montent et
-// descendent). Les touches du clavier d'une borne arrivent déjà au jeu : rien n'est rejoué pour elles.
+// l'assistant est rendu au jeu sous la forme des touches de son clavier par défaut, avec les deux
+// rôles qu'il a dans Cyber Pinball : bouton du jeu (flippers sur Maj gauche et droite, lanceur et
+// Start sur Entrée, Exit sur Échap) et bouton de l'interface (Précédent et Suivant sur les flèches
+// gauche et droite, Valider sur Entrée, Retour sur Échap), pour parcourir les menus du jeu comme
+// la roue. Le jeu ne dit pas s'il est dans un menu ou en partie : un bouton aux deux rôles envoie
+// les deux touches. Pas de touche de MagnaSave : Pinball FX n'a pas de commande à lui. Ses commandes
+// réassignables (KeyMap_* de son exécutable, relevées le 19/11/2026) sont LeftFlipper, RightFlipper,
+// BallLaunch, NudgeLeft, NudgeRight, NudgeForward, ChangeCamera, BackglassView, ToggleVisualMode et
+// UsePowerup ; le MagnaSave de Black Knight 2000 se déclenche au lanceur. Les touches du clavier
+// d'une borne arrivent déjà au jeu : rien n'est rejoué pour elles.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
-import type { ButtonId, CabinetButtons, Rotation } from './model';
+import { buttonKeys, navigationButtons, type ButtonsSource } from './buttons';
+import type { ButtonId, NavigationId, Rotation } from './model';
 
 /** Valeur de forcedDisplayRotation pour une rotation horaire de l'image ; undefined : image droite, rien à forcer. */
 export function pinballFxRotationValue(rotation: Rotation): string | undefined {
@@ -89,22 +96,24 @@ export function applyPinballFxRotation(localAppData: string, rotation: Rotation)
   return changed;
 }
 
-/**
- * Touches du clavier (KeyboardEvent.code) que les jeux de Zen reçoivent pour chaque bouton de la
- * borne. Le flipper pousse aussi la flèche de son côté, et les MagnaSave haut et bas : les menus du
- * jeu se parcourent aux flèches.
- */
+/** Touches du clavier (KeyboardEvent.code) des boutons du jeu dans les jeux de Zen. Pas de MagnaSave : voir plus haut. */
 export const ZEN_GAME_KEYS: Readonly<Partial<Record<ButtonId, readonly string[]>>> = {
-  leftFlipper: ['ShiftLeft', 'ArrowLeft'],
-  rightFlipper: ['ShiftRight', 'ArrowRight'],
+  leftFlipper: ['ShiftLeft'],
+  rightFlipper: ['ShiftRight'],
   start: ['Enter'],
   plunger: ['Enter'],
   exit: ['Escape'],
-  leftMagna: ['ArrowUp'],
-  rightMagna: ['ArrowDown'],
   nudgeLeft: ['AltLeft'],
   nudgeRight: ['AltRight'],
   nudgeCenter: ['Space'],
+};
+
+/** Touches des boutons de l'interface dans les menus des jeux de Zen : les mêmes rôles que dans la roue. */
+export const ZEN_NAVIGATION_KEYS: Readonly<Partial<Record<NavigationId, readonly string[]>>> = {
+  previous: ['ArrowLeft'],
+  next: ['ArrowRight'],
+  confirm: ['Enter'],
+  back: ['Escape'],
 };
 
 /** Bouton de joystick (jeton de VPX « SDLJoy_… »), pas une touche du clavier. */
@@ -113,17 +122,20 @@ function isJoystickCode(code: string | undefined): code is string {
 }
 
 /**
- * Pour chaque bouton de joystick de la borne, les touches à appuyer dans un jeu de Zen. Deux
- * boutons peuvent donner la même touche (Start et lanceur : Entrée) ; un bouton du clavier n'y est
- * pas (il arrive déjà au jeu).
+ * Pour chaque bouton de joystick de la borne, les touches à appuyer dans un jeu de Zen : celles de
+ * son rôle dans le jeu et de son rôle dans l'interface (boutons de l'interface relevés, sinon
+ * flippers, Start et Exit). Deux boutons peuvent donner la même touche (Start et lanceur : Entrée) ;
+ * un bouton du clavier n'y est pas (il arrive déjà au jeu).
  */
-export function zenJoystickKeys(buttons: Partial<CabinetButtons>): Map<string, string[]> {
+export function zenJoystickKeys(source: ButtonsSource): Map<string, string[]> {
   const map = new Map<string, string[]>();
-  for (const [id, keys] of Object.entries(ZEN_GAME_KEYS) as [ButtonId, readonly string[]][]) {
-    const code = buttons[id];
-    if (!isJoystickCode(code)) continue;
-    map.set(code, [...new Set([...(map.get(code) ?? []), ...keys])]);
-  }
+  const add = (code: string | undefined, keys: readonly string[]) => {
+    if (isJoystickCode(code)) map.set(code, [...new Set([...(map.get(code) ?? []), ...keys])]);
+  };
+  const game = buttonKeys(source?.buttons);
+  for (const [id, keys] of Object.entries(ZEN_GAME_KEYS) as [ButtonId, readonly string[]][]) add(game[id], keys);
+  const nav = navigationButtons(source);
+  for (const [id, keys] of Object.entries(ZEN_NAVIGATION_KEYS) as [NavigationId, readonly string[]][]) add(nav[id], keys);
   return map;
 }
 

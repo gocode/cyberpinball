@@ -12,6 +12,7 @@ import {
   pinballFxSettingsWithRotation,
   windowsVk,
   ZEN_GAME_KEYS,
+  ZEN_NAVIGATION_KEYS,
   ZenKeyPresser,
   zenJoystickKeys,
   type CabinetButtons,
@@ -89,19 +90,39 @@ test('applyPinballFxRotation : chaque boutique, jeu jamais ouvert sans effet', (
 
 const JOY = (n: number) => `SDLJoy_03000000091200006ae8000000000000_1;${n}`;
 
-test('boutons de joystick : touches du clavier des jeux de Zen, boutons du clavier laissés', () => {
-  const buttons = { leftFlipper: JOY(1), rightFlipper: JOY(2), start: JOY(3), plunger: JOY(3), exit: 'Escape', leftMagna: JOY(5) } as unknown as CabinetButtons;
-  const keys = zenJoystickKeys(buttons);
-  assert.deepEqual(keys.get(JOY(1)), ['ShiftLeft', 'ArrowLeft']);
-  assert.deepEqual(keys.get(JOY(2)), ['ShiftRight', 'ArrowRight']);
-  assert.deepEqual(keys.get(JOY(3)), ['Enter'], 'Start et lanceur sur le même bouton : Entrée une fois');
-  assert.deepEqual(keys.get(JOY(5)), ['ArrowUp']);
-  assert.equal(keys.has('Escape'), false, 'Exit est une touche du clavier : elle arrive déjà au jeu');
-  assert.equal(keys.size, 4);
+// Borne relevée le 19/11/2026 : MagnaSave droit pour Valider, gauche pour Retour dans l'interface.
+const PINSCAPE = {
+  buttons: { leftFlipper: JOY(5), rightFlipper: JOY(4), start: JOY(12), exit: JOY(8), credit: JOY(1), plunger: JOY(9), rightMagna: JOY(6), leftMagna: JOY(7), pause: JOY(13) },
+  navigation: { previous: JOY(5), next: JOY(4), confirm: JOY(6), back: JOY(7) },
+} as unknown as { buttons: CabinetButtons; navigation: Record<string, string> };
+
+test('boutons de joystick : rôle dans le jeu et rôle dans l’interface, comme dans la roue', () => {
+  const keys = zenJoystickKeys(PINSCAPE);
+  assert.deepEqual(keys.get(JOY(5)), ['ShiftLeft', 'ArrowLeft'], 'flipper gauche, Précédent');
+  assert.deepEqual(keys.get(JOY(4)), ['ShiftRight', 'ArrowRight'], 'flipper droit, Suivant');
+  assert.deepEqual(keys.get(JOY(6)), ['Enter'], 'MagnaSave droit : Valider');
+  assert.deepEqual(keys.get(JOY(7)), ['Escape'], 'MagnaSave gauche : Retour');
+  assert.deepEqual(keys.get(JOY(12)), ['Enter'], 'Start');
+  assert.deepEqual(keys.get(JOY(9)), ['Enter'], 'lanceur');
+  assert.deepEqual(keys.get(JOY(8)), ['Escape'], 'Exit');
+  assert.equal(keys.has(JOY(1)), false, 'Crédit : rien dans le jeu');
+  assert.equal(keys.has(JOY(13)), false, 'Pause : rien dans le jeu');
+});
+
+test('sans boutons de l’interface relevés : flippers, Start et Exit les remplacent', () => {
+  const keys = zenJoystickKeys({ buttons: PINSCAPE.buttons, navigation: undefined });
+  assert.deepEqual(keys.get(JOY(5)), ['ShiftLeft', 'ArrowLeft']);
+  assert.deepEqual(keys.get(JOY(12)), ['Enter']);
+  assert.deepEqual(keys.get(JOY(8)), ['Escape']);
+  assert.equal(keys.has(JOY(6)), false, 'MagnaSave sans rôle : Pinball FX n’a pas de commande MagnaSave');
+});
+
+test('borne au clavier : rien n’est rejoué, ses touches arrivent déjà au jeu', () => {
+  assert.equal(zenJoystickKeys(undefined).size, 0);
 });
 
 test('chaque touche des jeux de Zen a son code de touche virtuelle', () => {
-  for (const list of Object.values(ZEN_GAME_KEYS)) for (const key of list ?? []) assert.notEqual(windowsVk(key), undefined, key);
+  for (const list of [...Object.values(ZEN_GAME_KEYS), ...Object.values(ZEN_NAVIGATION_KEYS)]) for (const key of list ?? []) assert.notEqual(windowsVk(key), undefined, key);
 });
 
 test('touche partagée : relâchée au dernier bouton lâché', () => {
@@ -128,7 +149,7 @@ test('pont : touches seulement quand le jeu a le premier plan, relâchées à la
   let watching = false;
   let front = 42;
   const sent: [number, boolean][] = [];
-  const stop = zen.bridgeZenKeys({ leftFlipper: JOY(1), rightFlipper: JOY(2), start: 'Digit1', exit: 'Escape', credit: 'Digit5', plunger: 'Enter' }, () => 42, {
+  const stop = zen.bridgeZenKeys({ buttons: { leftFlipper: JOY(1), rightFlipper: JOY(2), start: 'Digit1', exit: 'Escape', credit: 'Digit5', plunger: 'Enter' } }, () => 42, {
     foregroundPid: () => front,
     key: (vk, down) => sent.push([vk, down]),
     watch: (l) => {

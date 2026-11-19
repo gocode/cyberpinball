@@ -6,7 +6,7 @@
 // Les touches ne partent que quand le jeu a le premier plan : un bouton appuyé pendant que le
 // front-end est devant va au front-end (joystick-input.ts), jamais en double.
 
-import { buttonKeys, windowsVk, ZenKeyPresser, zenJoystickKeys, type CabinetButtons } from '@cyberpinball/core';
+import { windowsVk, ZenKeyPresser, zenJoystickKeys, type ButtonsSource } from '@cyberpinball/core';
 import { foregroundWindow, setKeyDown } from '@cyberpinball/win-displays';
 
 export interface ZenKeysSystem {
@@ -27,12 +27,12 @@ const realSystem: ZenKeysSystem = {
 };
 
 /**
- * Rend au jeu `gamePid()` les boutons de joystick de la borne sous forme de touches, jusqu'à l'arrêt
- * (la fonction rendue), qui relâche aussi les touches encore tenues. Rien à faire sur une borne dont
- * aucun bouton n'est un bouton de joystick.
+ * Rend au jeu `gamePid()` les boutons de joystick de la borne (boutons du jeu et de l'interface)
+ * sous forme de touches, jusqu'à l'arrêt (la fonction rendue), qui relâche aussi les touches encore
+ * tenues. Rien à faire sur une borne dont aucun bouton n'est un bouton de joystick.
  */
-export function bridgeZenKeys(buttons: CabinetButtons | undefined, gamePid: () => number | undefined, system: ZenKeysSystem = realSystem): () => void {
-  const keys = zenJoystickKeys(buttonKeys(buttons));
+export function bridgeZenKeys(source: ButtonsSource, gamePid: () => number | undefined, system: ZenKeysSystem = realSystem): () => void {
+  const keys = zenJoystickKeys(source);
   if (keys.size === 0) return () => undefined;
   const presser = new ZenKeyPresser(keys);
   const send = (key: string, down: boolean) => {
