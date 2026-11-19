@@ -31,7 +31,7 @@ function inSandbox(name: string, run: (home: string) => void): void {
   try {
     run(path.join(dir, 'home'));
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
   }
 }
 

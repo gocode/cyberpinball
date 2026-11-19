@@ -19,7 +19,9 @@ import {
   BUTTONS,
   PREVIOUS_KEY,
   buttonKeys,
+  altGrPhantomControl,
   gameFromNavigation,
+  gameKeysTakenByNavigation,
   defaultNavigation,
   GAME_KEYS,
   INTERFACE_KEYS,
@@ -151,7 +153,7 @@ import { orientation } from './display-orientation';
 import { observedDisplays, orientationSimulated } from './displays';
 import { createWindow, isShown, OFFSCREEN, readyToShow, whenReadyToShow, windowRect } from './offscreen';
 import { keyboardFollows, keyboardIncident } from './foreground';
-import { onKeyInput, sendableKey } from './key-input';
+import { onKeyInput, sendableKey, sendableModifiers } from './key-input';
 import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton, pressVirtualHat, pressVirtualPinscapeButton, retryJoysticks } from './joystick-input';
 import { installVpx, vpxArchivePresent } from './install-vpx';
 import { vcRuntimeReady } from './vc-runtime';
@@ -280,6 +282,11 @@ interface ButtonCapture {
   refused?: string;
   /** Bouton qui vient de perdre sa touche au profit d'un autre (takenNotice, core) : dit jusqu'au relevé suivant. */
   taken?: string;
+  /**
+   * Boutons restés sans touche parce qu'un autre l'a reprise -> nom de cet autre : dit sur leur ligne
+   * jusqu'à ce qu'ils soient relevés ou passés (19/11/2026 : une ligne vidée sans un mot).
+   */
+  lost?: Record<string, string>;
   /** Dernière touche relevée et quand : un contact qui rebondit (balancier, interrupteur) ne compte qu'une fois (BOUNCE_MS). */
   bounce?: { code: string; at: number };
   /** Touches qui n'ont pas à être essayées (keysToTry) : celles en vigueur à l'arrivée, ou celles par défaut choisies. */
@@ -361,6 +368,8 @@ let continueAfterVpx = false;
  * avoir été relevée.
  */
 const pressed = new Set<string>();
+/** Dernier appui du relevé et quand : un Ctrl gauche suivi aussitôt d'Alt droit est AltGr (altGrPhantomControl). */
+let lastDown: { code: string; at: number } | undefined;
 /** Touche maintenue qui ouvrira la question (ou y répondra oui) au bout de `ms`. */
 let held: { code: string; at: number; ms: number; timer: NodeJS.Timeout; answering: boolean } | undefined;
 /** Maintien affiché à partir de ce délai : en dessous, c'est un appui ordinaire. */
@@ -521,7 +530,7 @@ async function pressRealKey(code: string): Promise<boolean> {
   win.webContents.on('before-input-event', watch);
   replaying = code;
   try {
-    win.webContents.sendInputEvent({ type: 'keyDown', keyCode });
+    win.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers: sendableModifiers(code) });
     await delay(50);
     win.webContents.sendInputEvent({ type: 'keyUp', keyCode });
     await delay(50);
@@ -684,6 +693,10 @@ function handleKey(input: Input): boolean {
   if (CAPTURE_PHASES.includes(wizard.phase)) {
     if (!input.isAutoRepeat) {
       touched(wizard.capture!);
+      // AltGr : Windows envoie d'abord un Ctrl gauche fantôme, qui serait relevé comme un bouton de plus.
+      const now = Date.now();
+      if (altGrPhantomControl(lastDown, input.code, now) && pressed.delete('ControlLeft')) console.log('Assistant : Ctrl gauche envoyé avec AltGr, ignoré'); // i18n-ignore : journal
+      lastDown = { code: input.code, at: now };
       pressed.add(input.code);
     }
     broadcast();
@@ -1139,7 +1152,9 @@ const FROM_INTERFACE_LAST = 'interface';
 function reviewSet(set: KeySet, keys: SetKeys = inForceKeys(set), last?: string): void {
   stopButtonsCountdown();
   wizard.phase = summaryPhase(set);
-  wizard.capture = { set, index: 0, keys, answered: new Set(set.items.map((b) => b.id)), reference: { ...keys }, action: 0, tried: new Set(), ...(last && { last }) };
+  // Proposés sur l'interface : les boutons du jeu dont un flipper, Start ou Exit a repris la touche le disent.
+  const lost = last === FROM_INTERFACE_LAST ? gameKeysTakenByNavigation(wizard.navigation) : {};
+  wizard.capture = { set, index: 0, keys, answered: new Set(set.items.map((b) => b.id)), reference: { ...keys }, action: 0, tried: new Set(), ...(last && { last }), lost: lost as Record<string, string> };
 }
 
 /**
@@ -1262,18 +1277,23 @@ function handleButtonKey(input: Input): void {
   const record = recordKey(capture.set, capture.keys, button.id, code);
   capture.refused = record.refused;
   if (!record.refused) capture.taken = record.taken && takenNotice(record.taken, code);
-  // Sans opérateur, la trace de chaque relevé (essais de bout en bout, clavier-reel.test.ts).
-  if (process.env.CYBERPINBALL_AUTOPILOT) console.log(`Assistant : relevé ${capture.set.kind}, ${button.id} sur ${code} : ${record.refused ? `refusé (${record.refused})` : record.skipped ? 'passé' : record.taken ? `gardé, ${record.taken.id} vidé` : 'gardé'}`); // i18n-ignore : console de l'autopilote
+  // Chaque relevé au journal (19/11/2026 : un joueur dont le MagnaSave n'était « pas trouvé » n'avait
+  // rien à nous envoyer) ; les essais de bout en bout suivent la même ligne (clavier-reel.test.ts).
+  console.log(`Assistant : relevé ${capture.set.kind}, ${button.id} sur ${code} : ${record.refused ? `refusé (${record.refused})` : record.skipped ? 'passé' : record.taken ? `gardé, ${record.taken.id} vidé` : 'gardé'}`); // i18n-ignore : journal
   if (record.refused) return;
   // Une autre touche : l'essai de ce bouton est à refaire.
   if (capture.keys[button.id] !== record.keys[button.id]) capture.tried.delete(button.id);
   capture.keys = record.keys;
   capture.last = record.skipped ? t('{button} : pas de bouton', { button: button.label }) : t('{button} : {key}', { button: button.label, key: keyLabel(code) });
   capture.answered.add(button.id);
-  // Le bouton qui a perdu sa touche : à essayer de nouveau, et redemandé s'il est obligatoire (nextButton).
+  // Le bouton qui a perdu sa touche : à essayer de nouveau, redemandé s'il est obligatoire (nextButton),
+  // et sa ligne dit qui l'a reprise jusqu'à ce qu'il ait de nouveau la sienne.
+  capture.lost = { ...capture.lost };
+  delete capture.lost[button.id];
   if (record.taken) {
     capture.tried.delete(record.taken.id);
     if (record.taken.required) capture.answered.delete(record.taken.id);
+    capture.lost[record.taken.id] = button.label;
   }
   // Pas après Exit qui passe un bouton : on le presse plusieurs fois de suite, vite.
   capture.bounce = record.skipped ? undefined : { code, at: Date.now() };
@@ -1448,10 +1468,11 @@ function skipButton(capture: ButtonCapture): void {
     capture.notice = t('{button} est obligatoire : appuyez dessus sur la borne.', { button: button.label });
     return;
   }
-  if (process.env.CYBERPINBALL_AUTOPILOT) console.log(`Assistant : relevé ${capture.set.kind}, ${button.id} : passé à la souris`); // i18n-ignore : console de l'autopilote
+  console.log(`Assistant : relevé ${capture.set.kind}, ${button.id} : passé à la souris`); // i18n-ignore : journal
   const keys = { ...capture.keys };
   delete keys[button.id];
   capture.keys = keys;
+  if (capture.lost) delete capture.lost[button.id];
   capture.tried.delete(button.id);
   capture.answered.add(button.id);
   capture.last = t('{button} : pas de bouton', { button: button.label });
@@ -1485,7 +1506,7 @@ function finishCapture(capture: ButtonCapture): void {
     } else delete keys[b.id];
     capture.answered.add(b.id);
   }
-  if (process.env.CYBERPINBALL_AUTOPILOT) console.log(`Assistant : relevé ${set.kind} terminé à la souris`); // i18n-ignore : console de l'autopilote
+  console.log(`Assistant : relevé ${set.kind} terminé à la souris`); // i18n-ignore : journal
   capture.keys = keys;
   capture.last = t('boutons restants avec leur touche actuelle');
   enterButtonsSummary(capture);
@@ -1513,6 +1534,8 @@ function buttonsTimeout(): void {
  */
 function acceptButtons(): void {
   const capture = wizard.capture!;
+  // Au journal, ce qui a été validé : de quoi lire ce qu'un joueur a obtenu, bouton par bouton.
+  console.log(`Assistant : touches validées (${capture.set.kind}) : ${capture.set.items.map((b) => `${b.id}=${capture.keys[b.id] ?? '-'}`).join(' ')}`); // i18n-ignore : journal
   if (capture.set === GAME_KEYS) wizard.buttons = { ...capture.keys } as CabinetButtons;
   else wizard.navigation = { ...capture.keys } as NavigationButtons;
   KEYS = wizardKeys(inForce());
@@ -1770,22 +1793,24 @@ function buttonsView(index: number, base: Record<string, unknown>) {
   const list = set.items.map((b, i) => {
     const code = capture.keys[b.id];
     const answered = capture.answered.has(b.id);
+    // Sans touche parce qu'un autre bouton l'a reprise (relevé, ou touche en vigueur pas encore
+    // relevée) : la ligne dit lequel, en orange, jamais une ligne vide.
+    const lostTo = code ? undefined : (capture.lost?.[b.id] ?? (answered ? undefined : holderOf(b.id)?.label));
+    const state = !summary && i === capture.index ? 'current' : answered ? 'done' : 'todo';
     return {
       label: b.label,
       key: code
         ? keyLabel(code)
-        : answered
-          ? t('aucun')
-          : holderOf(b.id)
-            ? b.required
-              ? t('à relever')
-              : t('facultatif')
+        : lostTo
+          ? t('reprise par {button}', { button: lostTo })
+          : answered
+            ? t('aucun')
             : inForceSet[b.id]
               ? keyLabel(inForceSet[b.id])
               : b.required
-                ? ''
+                ? t('à relever')
                 : t('facultatif'),
-      state: !summary && i === capture.index ? 'current' : answered ? 'done' : 'todo',
+      state: lostTo ? `${state} lost` : state,
       selected: summary && capture.action === SUMMARY_ACTIONS.length + i,
       tried: summary && capture.tried.has(b.id),
     };
@@ -1904,7 +1929,10 @@ function buttonsView(index: number, base: Record<string, unknown>) {
         : wizard.buttons
           ? t('Sans réponse dans {n} s : touches actuelles gardées.', { n: seconds })
           : t('Sans réponse dans {n} s : touches par défaut des encodeurs gardées (Maj, 1, Échap…).', { n: seconds })),
-    step: capture.last
+    // Une touche reprise : le message le dit déjà, la ligne du relevé laisse sa place.
+    step: capture.taken
+      ? ''
+      : capture.last
       ? t('Relevé : {last}', { last: lastLabel(set, capture.last) })
       : game
         ? t('Chaque bouton une seule fois : ce que VPX recevra pendant une partie.')

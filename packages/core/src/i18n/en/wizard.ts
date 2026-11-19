@@ -26,6 +26,7 @@ export const messages: Record<string, string> = {
   'Touches par défaut': 'Default keys',
   'Tout modifier': 'Change all',
   facultatif: 'optional',
+  'reprise par {button}': 'now on {button}',
   Enregistrer: 'Save',
   'Essayez les boutons': 'Try the buttons',
   'Perdent leur touche dans VPX : {actions}': 'Lose their key in VPX: {actions}',
@@ -684,8 +685,8 @@ export const messages: Record<string, string> = {
   'Exit ({key}) maintenu {n} s': 'Exit ({key}) held {n} s',
   'Échap maintenue {n} s': 'Esc held {n} s',
   'ou {key}': 'or {key}',
-  '{key} était le bouton {button} : il passe au nouveau, et {button} est à relever de nouveau.': '{key} was the {button} button: it moves to the new one, and {button} must be recorded again.',
-  '{key} était le bouton {button} : il passe au nouveau, et {button} restera sans bouton à l’enregistrement.': '{key} was the {button} button: it moves to the new one, and {button} will have no button once saved.',
+  '{key} était le bouton {button} : {button} est à relever de nouveau.': '{key} was the {button} button: {button} must be mapped again.',
+  '{key} était le bouton {button} : {button} n’a plus de touche.': '{key} was the {button} button: {button} has no key now.',
   'à relever': 'to record',
   '{key} est maintenant le bouton {button}': '{key} is now the {button} button',
 };

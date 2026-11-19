@@ -27,6 +27,9 @@ import {
   refusedNavigationKey,
   defaultNavigation,
   gameFromNavigation,
+  gameKeysTakenByNavigation,
+  altGrPhantomControl,
+  ALTGR_PHANTOM_MS,
   interfaceKeys,
   collectionKeys,
   zoneSwitchKeys,
@@ -650,7 +653,7 @@ test('chaque bouton, du jeu et de l’interface, se relève sur une touche du cl
   }
   // Un bouton obligatoire vidé est annoncé « à relever de nouveau » ; un facultatif, « sans bouton ».
   assert.match(takenNotice({ label: 'Start', required: true }, 'Digit1'), /Start est à relever de nouveau/);
-  assert.match(takenNotice({ label: 'Pause', required: false }, 'KeyP'), /Pause restera sans bouton à l’enregistrement/);
+  assert.match(takenNotice({ label: 'Pause', required: false }, 'KeyP'), /Pause n’a plus de touche/);
   // Le bouton qui passe (Exit, Retour), une fois relevé, passe un bouton facultatif ; un obligatoire le prend.
   const exit = 'Escape';
   assert.equal(recordKey(GAME_KEYS, { exit }, 'extraBall', exit).skipped, true);
@@ -703,11 +706,41 @@ test('assistant complet : les boutons du jeu proposés sur ceux de l’interface
   assert.equal(game.rightFlipper, 'KeyL');
   assert.equal(game.start, 'Enter');
   assert.equal(game.exit, 'KeyU');
-  // Les autres gardent la touche des encodeurs, sauf celle que l'interface a prise : sans touche, à donner.
+  // Les autres gardent la touche des encodeurs, sauf celle qu'un autre bouton du jeu a reprise : sans touche, à donner.
   assert.equal(game.credit, DEFAULT_BUTTONS.credit);
-  assert.equal(game.plunger, undefined, 'Entrée est valider');
-  assert.equal(game.extraBall, undefined, 'B est l’aide-mémoire');
+  assert.equal(game.plunger, undefined, 'Entrée est Start');
+  assert.deepEqual(gameKeysTakenByNavigation(navigation), { plunger: 'Start' });
+  // Un bouton de l'interface sans bouton du jeu (aide-mémoire…) ne retire rien : le même bouton sert aux deux.
+  assert.equal(game.extraBall, 'KeyB', 'B, aide-mémoire au menu, reste Extra Ball en partie');
   assert.deepEqual(gameFromNavigation(undefined), DEFAULT_BUTTONS);
+});
+
+test('AltGr : le Ctrl gauche fantôme que Windows envoie juste avant Alt droit n’est pas un bouton', () => {
+  assert.equal(altGrPhantomControl({ code: 'ControlLeft', at: 1000 }, 'AltRight', 1000), true);
+  assert.equal(altGrPhantomControl({ code: 'ControlLeft', at: 1000 }, 'AltRight', 1000 + ALTGR_PHANTOM_MS), true);
+  // Ctrl gauche appuyé exprès, puis Alt droit plus tard : deux boutons.
+  assert.equal(altGrPhantomControl({ code: 'ControlLeft', at: 1000 }, 'AltRight', 1000 + ALTGR_PHANTOM_MS + 1), false);
+  assert.equal(altGrPhantomControl({ code: 'ControlRight', at: 1000 }, 'AltRight', 1000), false);
+  assert.equal(altGrPhantomControl({ code: 'ControlLeft', at: 1000 }, 'ShiftRight', 1000), false);
+  assert.equal(altGrPhantomControl(undefined, 'AltRight', 1000), false);
+  // Les touches modificatrices d'un encodeur sont toutes des boutons valables pour VPX (la touche Windows exceptée).
+  for (const code of ['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight']) assert.equal(refusedKey(code), undefined, code);
+});
+
+test('PinOne en mode clavier : un MagnaSave mis sur l’aide-mémoire ou les réglages garde Ctrl en partie', () => {
+  // 19/11/2026 : MagnaSave gauche « introuvable », sa ligne vide aux boutons du jeu.
+  const navigation = { previous: 'ShiftLeft', next: 'ShiftRight', confirm: 'Digit1', back: 'Escape', help: 'ControlLeft', settings: 'ControlRight' };
+  const game = gameFromNavigation(navigation);
+  assert.equal(game.leftMagna, 'ControlLeft');
+  assert.equal(game.rightMagna, 'ControlRight');
+  assert.deepEqual(gameKeysTakenByNavigation(navigation), {});
+  assert.deepEqual(buttonProblems(game), []);
+  // Un MagnaSave pris comme Précédent de l'interface devient le flipper gauche du jeu : l'ancien
+  // MagnaSave n'a plus de touche, et sa ligne le dit (repris par le flipper gauche).
+  const magnaAsPrevious = { ...navigation, previous: 'ControlLeft', help: undefined };
+  assert.equal(gameFromNavigation(magnaAsPrevious).leftMagna, undefined);
+  assert.deepEqual(gameKeysTakenByNavigation(magnaAsPrevious), { leftMagna: 'Flipper gauche' });
+  assert.equal(gameFromNavigation(magnaAsPrevious).leftFlipper, 'ControlLeft');
 });
 
 test('interface : ses boutons sont indépendants de ceux du jeu', () => {

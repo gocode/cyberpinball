@@ -188,6 +188,15 @@ body {
   color: var(--accent);
 }
 
+/* Touche reprise par un autre bouton : la ligne le dit elle-même, jusqu'à ce qu'il soit relevé de nouveau. */
+.buttons-list li.lost {
+  border-color: var(--warning);
+}
+
+.buttons-list li.lost b {
+  color: var(--warning);
+}
+
 .buttons-list li.tried b::after {
   content: ' ✓';
   color: var(--signal);

@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Setup wizard, buttons: a MagnaSave (or any other button) chosen for the quick reference, the VPX settings, the Windows desktop or "Quit without saving" keeps its key in the game. On a board in keyboard mode such as the CSD PinOne, a MagnaSave set on one of these menu buttons ended up with no key in the game buttons, its line empty, and did nothing during a game.
+- Button mapping: a button that loses its key because another one took it now says so on its own line, in orange ("now on Extra Ball"), until it is mapped again; no line is ever empty.
+- Button mapping: a button sent as AltGr (right Alt on a European keyboard) is no longer mapped twice; Windows sends a left Ctrl just before it, which the wizard took for one more button.
+- Log: every button mapped, skipped or refused, and the keys accepted at the end of each mapping, are written to it; a report to the developers is enough to see what happened.
 - A game that changes a screen's resolution during play (Pinball FX3 in 1080p full screen on a 4K playfield, for example) no longer shifts the front-end's screens: each window follows its role's screen, instead of showing the rotated playfield on the DMD screen and the DMD card on the backglass. A window found on another role's screen is logged and put back.
 - Pinball FX, Pinball FX3 and Future Pinball: the front-end detects the screens the game draws on itself (cabinet mode, extra windows), from the game's own windows only; it leaves them to the game and no longer hides them. The other screens show their media according to "Media during play".
 - Pinball FX3: when the game has never been opened on the PC, Cyber Pinball says so before starting the table: its cabinet mode isn't turned on there and the game would open on its home screen, in landscape. The message explains what to do in the game (cabinet icon next to the profile, "Activate", rotation, backglass and DMD); Start opens the game anyway to set it up, Exit goes back to the menu. The game encrypts these settings: Cyber Pinball can't write them for you, as it does for Pinball FX.

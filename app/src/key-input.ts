@@ -45,6 +45,10 @@ export function onKeyInput(win: BrowserWindow, down: (input: Input) => boolean, 
  * Touche du clavier (KeyboardEvent.code) au format de webContents.sendInputEvent (keyCode
  * d'Electron), pour la rejouer par le même chemin qu'une vraie touche : essais sans opérateur.
  * Undefined pour une touche que sendInputEvent ne sait pas produire.
+ *
+ * Touches modificatrices (19/11/2026 : flippers et MagnaSave de la plupart des encodeurs, jamais
+ * essayés par ce chemin) : sendInputEvent ne produit que celles de gauche (« Control » arrive en
+ * ControlLeft, « Shift » en ShiftLeft, « Alt » en AltLeft) ; celles de droite n'ont pas de nom.
  */
 export function sendableKey(code: string): string | undefined {
   const letter = /^Key([A-Z])$/.exec(code);
@@ -68,6 +72,20 @@ export function sendableKey(code: string): string | undefined {
     Semicolon: ';',
     Comma: ',',
     Period: '.',
+    ControlLeft: 'Control',
+    ShiftLeft: 'Shift',
+    AltLeft: 'Alt',
   };
   return named[code];
+}
+
+/**
+ * Indicateur de modificateur que porte l'appui d'une touche modificatrice d'un vrai clavier
+ * (Ctrl enfoncé : `control` vrai dès son propre appui) ; le relâchement n'en porte aucun.
+ */
+export function sendableModifiers(code: string): ('control' | 'shift' | 'alt')[] {
+  if (code.startsWith('Control')) return ['control'];
+  if (code.startsWith('Shift')) return ['shift'];
+  if (code.startsWith('Alt')) return ['alt'];
+  return [];
 }

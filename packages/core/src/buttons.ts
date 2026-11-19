@@ -235,8 +235,8 @@ export function recordKey(set: KeySet, keys: SetKeys, id: string, code: string):
 /** Ce que le relevé dit d'un bouton vidé parce qu'un autre a pris sa touche (recordKey, `taken`). */
 export function takenNotice(taken: { label: string; required: boolean }, code: string): string {
   return taken.required
-    ? t('{key} était le bouton {button} : il passe au nouveau, et {button} est à relever de nouveau.', { key: keyLabel(code), button: taken.label })
-    : t('{key} était le bouton {button} : il passe au nouveau, et {button} restera sans bouton à l’enregistrement.', { key: keyLabel(code), button: taken.label });
+    ? t('{key} était le bouton {button} : {button} est à relever de nouveau.', { key: keyLabel(code), button: taken.label })
+    : t('{key} était le bouton {button} : {button} n’a plus de touche.', { key: keyLabel(code), button: taken.label });
 }
 
 /** Ce qui rend un relevé de ce jeu inutilisable (buttonProblems, navigationProblems). Vide : valable. */
@@ -479,6 +479,20 @@ export function refusedKey(code: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Délai sous lequel un Ctrl gauche suivi d'Alt droit est l'AltGr d'un seul bouton : Windows, avec
+ * une disposition de clavier européenne, envoie un Ctrl gauche fantôme juste avant Alt droit.
+ */
+export const ALTGR_PHANTOM_MS = 50;
+
+/**
+ * Vrai quand l'appui `code` à l'instant `at` montre que le Ctrl gauche appuyé juste avant
+ * (`previous`) était le fantôme d'AltGr : le relevé ne doit voir qu'Alt droit, pas deux boutons.
+ */
+export function altGrPhantomControl(previous: { code: string; at: number } | undefined, code: string, at: number): boolean {
+  return code === 'AltRight' && previous?.code === 'ControlLeft' && at - previous.at <= ALTGR_PHANTOM_MS;
+}
+
 // ---------------------------------------------------------------------------
 // Boutons de joystick
 
@@ -690,18 +704,37 @@ export function defaultNavigation(buttons: CabinetButtons | undefined): Navigati
 /**
  * Boutons du jeu proposés sur ceux de l'interface, relevés en premier dans l'assistant complet
  * (16/11/2026) : flippers sur précédent et suivant, Start sur valider, Exit sur retour ; les autres
- * gardent la touche par défaut des encodeurs, sauf celle qu'un bouton de l'interface a prise (le
- * bouton reste alors sans touche, et le récapitulatif le dit).
+ * gardent la touche par défaut des encodeurs, sauf celle que l'un de ces quatre vient de prendre
+ * (deux boutons du jeu sur la même touche : le bouton reste alors sans touche, et sa ligne dit lequel
+ * l'a reprise, gameKeysTakenByNavigation).
+ *
+ * Les boutons de l'interface sans bouton du jeu (aide-mémoire, réglages, bureau, quitter) ne retirent
+ * rien : les deux jeux sont indépendants, un même bouton physique sert dans les deux. 19/11/2026 : un
+ * joueur d'une PinOne (MagnaSave sur Ctrl) qui avait mis un MagnaSave sur l'aide-mémoire le voyait
+ * vide aux boutons du jeu, et sans effet en partie.
  */
 export function gameFromNavigation(navigation: NavigationButtons | undefined): CabinetButtons {
   const keys: CabinetButtons = { ...DEFAULT_BUTTONS };
-  const taken = new Set(Object.values(navigation ?? {}).filter((code): code is string => Boolean(code)));
-  for (const id of Object.keys(keys) as ButtonId[]) if (keys[id] && taken.has(keys[id]!)) delete keys[id];
+  for (const id of Object.keys(gameKeysTakenByNavigation(navigation)) as ButtonId[]) delete keys[id];
   for (const n of NAVIGATION) {
     const code = navigation?.[n.id];
     if (n.game && code) keys[n.game] = code;
   }
   return keys;
+}
+
+/**
+ * Boutons du jeu que gameFromNavigation laisse sans touche, et le bouton du jeu qui a repris leur
+ * touche par défaut (un flipper, Start ou Exit posé dessus par l'interface) : identifiant -> nom.
+ */
+export function gameKeysTakenByNavigation(navigation: NavigationButtons | undefined): Partial<Record<ButtonId, string>> {
+  const taken: Partial<Record<ButtonId, string>> = {};
+  for (const n of NAVIGATION) {
+    const code = navigation?.[n.id];
+    if (!n.game || !code) continue;
+    for (const b of BUTTONS) if (b.id !== n.game && b.default === code && !NAVIGATION.some((m) => m.game === b.id && navigation?.[m.id])) taken[b.id] = buttonInfo(n.game).label;
+  }
+  return taken;
 }
 
 /** Ce qui rend un relevé des boutons de l'interface inutilisable. Vide : relevé valable. */
