@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Pinball FX and Pinball FX3 on a cabinet with joystick buttons (Pinscape, encoder in gamepad mode): each button sends the game the key a keyboard encoder sends for its in-game role, the same as in VPX (flippers on Shift, MagnaSave on Ctrl, Start on 1, plunger on Enter, Exit on Esc, credit on 5…). The cabinet works like a keyboard-encoder cabinet, in play and in the game's menus: flippers in the top bar, MagnaSave in the windows it opens. Volume buttons stay with Cyber Pinball.
 - When a signing certificate is configured, the build also signs the binaries Cyber Pinball ships itself (VPX plugins, OpenXR layer, headset companion, DMD server), not only the executable and installers: a single unsigned binary is enough for some antivirus products to block the application.
 - Pinball FX and Pinball FX3 on a cabinet with joystick buttons: in the game's menus, the cabinet's interface buttons do the same as on the wheel (Previous and Next on Left and Right arrows, Confirm on Enter, Back on Esc), on top of their role in play. A MagnaSave button used for Confirm or Back in Cyber Pinball also confirms or goes back in Pinball FX, which has no MagnaSave command; MagnaSave buttons no longer send the Up and Down arrows.
 - Groups, rooms and private messages open on the latest messages, at the bottom, on the cabinet and on the phone: a group opened on its table of the week, and on the phone a thread reopened from another tab went back to the oldest message.

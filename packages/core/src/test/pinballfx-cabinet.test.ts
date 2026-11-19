@@ -12,7 +12,6 @@ import {
   pinballFxSettingsWithRotation,
   windowsVk,
   ZEN_GAME_KEYS,
-  ZEN_NAVIGATION_KEYS,
   ZenKeyPresser,
   zenJoystickKeys,
   type CabinetButtons,
@@ -92,37 +91,32 @@ const JOY = (n: number) => `SDLJoy_03000000091200006ae8000000000000_1;${n}`;
 
 // Borne relevée le 19/11/2026 : MagnaSave droit pour Valider, gauche pour Retour dans l'interface.
 const PINSCAPE = {
-  buttons: { leftFlipper: JOY(5), rightFlipper: JOY(4), start: JOY(12), exit: JOY(8), credit: JOY(1), plunger: JOY(9), rightMagna: JOY(6), leftMagna: JOY(7), pause: JOY(13) },
+  buttons: { leftFlipper: JOY(5), rightFlipper: JOY(4), start: JOY(12), exit: JOY(8), credit: JOY(1), plunger: JOY(9), rightMagna: JOY(6), leftMagna: JOY(7), pause: JOY(13), volumeUp: JOY(11) },
   navigation: { previous: JOY(5), next: JOY(4), confirm: JOY(6), back: JOY(7) },
 } as unknown as { buttons: CabinetButtons; navigation: Record<string, string> };
 
-test('boutons de joystick : rôle dans le jeu et rôle dans l’interface, comme dans la roue', () => {
+test('boutons de joystick : la touche des encodeurs de leur rôle en jeu, comme une borne au clavier', () => {
   const keys = zenJoystickKeys(PINSCAPE);
-  assert.deepEqual(keys.get(JOY(5)), ['ShiftLeft', 'ArrowLeft'], 'flipper gauche, Précédent');
-  assert.deepEqual(keys.get(JOY(4)), ['ShiftRight', 'ArrowRight'], 'flipper droit, Suivant');
-  assert.deepEqual(keys.get(JOY(6)), ['Enter'], 'MagnaSave droit : Valider');
-  assert.deepEqual(keys.get(JOY(7)), ['Escape'], 'MagnaSave gauche : Retour');
-  assert.deepEqual(keys.get(JOY(12)), ['Enter'], 'Start');
+  assert.deepEqual(keys.get(JOY(5)), ['ShiftLeft'], 'flipper gauche');
+  assert.deepEqual(keys.get(JOY(4)), ['ShiftRight'], 'flipper droit');
+  assert.deepEqual(keys.get(JOY(7)), ['ControlLeft'], 'MagnaSave gauche : Ctrl gauche, pas Retour de la roue');
+  assert.deepEqual(keys.get(JOY(6)), ['ControlRight'], 'MagnaSave droit : Ctrl droit, pas Valider de la roue');
+  assert.deepEqual(keys.get(JOY(12)), ['Digit1'], 'Start');
   assert.deepEqual(keys.get(JOY(9)), ['Enter'], 'lanceur');
   assert.deepEqual(keys.get(JOY(8)), ['Escape'], 'Exit');
-  assert.equal(keys.has(JOY(1)), false, 'Crédit : rien dans le jeu');
-  assert.equal(keys.has(JOY(13)), false, 'Pause : rien dans le jeu');
-});
-
-test('sans boutons de l’interface relevés : flippers, Start et Exit les remplacent', () => {
-  const keys = zenJoystickKeys({ buttons: PINSCAPE.buttons, navigation: undefined });
-  assert.deepEqual(keys.get(JOY(5)), ['ShiftLeft', 'ArrowLeft']);
-  assert.deepEqual(keys.get(JOY(12)), ['Enter']);
-  assert.deepEqual(keys.get(JOY(8)), ['Escape']);
-  assert.equal(keys.has(JOY(6)), false, 'MagnaSave sans rôle : Pinball FX n’a pas de commande MagnaSave');
+  assert.deepEqual(keys.get(JOY(1)), ['Digit5'], 'Crédit');
+  assert.deepEqual(keys.get(JOY(13)), ['KeyP'], 'Pause');
+  assert.equal(keys.has(JOY(11)), false, 'Volume + : reste à Cyber Pinball');
 });
 
 test('borne au clavier : rien n’est rejoué, ses touches arrivent déjà au jeu', () => {
   assert.equal(zenJoystickKeys(undefined).size, 0);
 });
 
-test('chaque touche des jeux de Zen a son code de touche virtuelle', () => {
-  for (const list of [...Object.values(ZEN_GAME_KEYS), ...Object.values(ZEN_NAVIGATION_KEYS)]) for (const key of list ?? []) assert.notEqual(windowsVk(key), undefined, key);
+test('chaque touche des jeux de Zen a son code de touche virtuelle, sans les boutons de volume', () => {
+  for (const key of Object.values(ZEN_GAME_KEYS)) assert.notEqual(windowsVk(key!), undefined, key);
+  assert.equal(ZEN_GAME_KEYS.volumeUp, undefined);
+  assert.equal(ZEN_GAME_KEYS.volumeDown, undefined);
 });
 
 test('touche partagée : relâchée au dernier bouton lâché', () => {
@@ -160,9 +154,9 @@ test('pont : touches seulement quand le jeu a le premier plan, relâchées à la
   });
   assert.ok(listener && watching);
   listener(JOY(1), true);
-  assert.deepEqual(sent, [[0xa0, true], [0x25, true]], 'Maj gauche et flèche gauche');
+  assert.deepEqual(sent, [[0xa0, true]], 'Maj gauche');
   listener(JOY(1), false);
-  assert.deepEqual(sent.slice(2), [[0xa0, false], [0x25, false]]);
+  assert.deepEqual(sent.slice(1), [[0xa0, false]]);
   sent.length = 0;
   front = 7; // le front-end est devant : le bouton lui revient, rien n'est joué au jeu
   listener(JOY(2), true);
@@ -174,7 +168,7 @@ test('pont : touches seulement quand le jeu a le premier plan, relâchées à la
   listener(JOY(9), true); // bouton sans rôle
   stop();
   assert.equal(watching, false);
-  assert.deepEqual(sent, [[0xa1, true], [0x27, true], [0xa1, false], [0x27, false]], 'touches tenues relâchées à l’arrêt');
+  assert.deepEqual(sent, [[0xa1, true], [0xa1, false]], 'touche tenue relâchée à l’arrêt');
 });
 
 test('pont : borne au clavier seulement, rien n’est écouté', () => {
