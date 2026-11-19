@@ -58,6 +58,7 @@ import {
   type RoomLine,
   type TableEntry,
 } from '@cyberpinball/core';
+import { lastLineAt } from './chat-cursor';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
 import type { SocialNet } from './social-net';
 import type { RemoteRoom } from './phone-remote';
@@ -325,12 +326,8 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
 
   // ---------- Le salon ----------
 
-  /** Le curseur sur la dernière ligne du journal (la plus récente), s'il y en a une. */
-  function lastLineAt(): number | undefined {
-    const keys = buildRoom().actions.map((a) => a.key ?? '');
-    for (let i = keys.length - 1; i >= 0; i--) if (keys[i]!.startsWith('line:')) return i;
-    return undefined;
-  }
+  /** Le curseur sur la dernière ligne du journal (la plus récente), s'il y en a une (chat-cursor.ts). */
+  const lastRoomLineAt = (): number | undefined => lastLineAt(buildRoom());
 
   function openRoom(room: RoomId, back: () => void): void {
     current = { room, back };
@@ -339,7 +336,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
     announced = room;
     awaySince = undefined;
     net.roomOpen(room);
-    lib.openCustom(buildRoom, lastLineAt());
+    lib.openCustom(buildRoom, lastRoomLineAt());
   }
 
   function buildRoom(): Built {
@@ -1178,7 +1175,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
     },
     write: (room, text) => {
       const why = write(room, text);
-      if (lib.isShowing(buildRoom)) lib.openCustom(buildRoom, lastLineAt());
+      if (lib.isShowing(buildRoom)) lib.openCustom(buildRoom, lastRoomLineAt());
       return why;
     },
   };

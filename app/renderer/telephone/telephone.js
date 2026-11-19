@@ -944,7 +944,8 @@ function renderChat() {
   // L'ami écrit : les trois points sous son dernier message (telephone-community.js, typingItem).
   const typing = typingItem(chat.typing, 'in-game');
   if (typing) list.append(typing);
-  list.scrollTop = list.scrollHeight;
+  // En bas sur le dernier message, même dessiné caché ; remonté lire, il n'est plus ramené (telephone-bas.js).
+  CyberBottom.settle(list, chat.key);
   // Les réactions au dernier message reçu sur une ligne, puis les phrases sur deux (chipStrip).
   const lastIn = [...chat.lines].reverse().find((l) => !l.out);
   setChips(

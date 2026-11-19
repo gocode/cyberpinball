@@ -568,6 +568,7 @@ export const PHONE_FILES: Readonly<Record<string, string>> = {
   '/telephone.css': 'telephone/telephone.css',
   '/telephone.js': 'telephone/telephone.js',
   '/telephone-core.js': 'telephone/telephone-core.js',
+  '/telephone-bas.js': 'telephone/telephone-bas.js',
   '/telephone-ranks.js': 'telephone/telephone-ranks.js',
   '/telephone-community.js': 'telephone/telephone-community.js',
   '/telephone-groupes.js': 'telephone/telephone-groupes.js',

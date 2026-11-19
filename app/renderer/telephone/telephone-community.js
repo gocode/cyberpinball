@@ -29,8 +29,6 @@ const community = {
   filter: 'all',
   /** Le salon choisi au téléphone (« monde », « pays-FR »), ou celui de la borne. */
   room: undefined,
-  /** Le fil montré a déjà défilé jusqu'en bas (un message arrivé ne fait pas sauter la lecture). */
-  shownKey: undefined,
 };
 
 for (const [id, label] of [
@@ -562,7 +560,7 @@ function countryLabel(code) {
 /** Choisir le salon montré au téléphone (la borne l'envoie aussitôt) ; sans salon : celui de la borne. */
 function communityPickRoom(room) {
   community.room = room;
-  community.roomShown = undefined;
+  CyberBottom.reset(document.getElementById('room-lines'));
   send({ t: 'room-open', ...(room ? { room } : {}) });
 }
 
@@ -658,7 +656,6 @@ function renderRoom() {
     ],
     r.room,
   );
-  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
   list.replaceChildren(
     ...r.lines.map((l) => {
       const li = document.createElement('li');
@@ -701,8 +698,8 @@ function renderRoom() {
   // Qui écrit dans le salon, sous la dernière ligne.
   const typing = typingItem(r.typing, 'room');
   if (typing) list.append(typing);
-  if (atBottom || community.roomShown !== r.room) list.scrollTop = list.scrollHeight;
-  community.roomShown = r.room;
+  // En bas sur les dernières lignes, à l'arrivée comme au retour sur l'onglet (telephone-bas.js).
+  CyberBottom.settle(list, r.room);
   // Le constat du dernier geste (signalement envoyé…), sinon pourquoi on ne peut pas écrire, sinon l'aide.
   const line = r.notice ?? (r.blocked ? { text: r.blocked, tone: 'warning' } : { text: t('Touchez une ligne : réagir, répondre, voir le profil, signaler.'), tone: 'info' });
   status.hidden = false;
@@ -770,7 +767,6 @@ function renderThread() {
     form.classList.add('off');
     return;
   }
-  const atBottom = lines.scrollHeight - lines.scrollTop - lines.clientHeight < 40;
   lines.replaceChildren(
     ...(th.group ? [groupWeekItem(th.group)] : []),
     ...(th.items.length ? th.items : [{ kind: 'day', text: t('Pas encore de message : écrivez le premier') }]).map((it) => {
@@ -814,9 +810,8 @@ function renderThread() {
   // Qui écrit (l'ami, des membres du groupe), sous le dernier message.
   const typing = typingItem(th.typing, 'thread');
   if (typing) lines.append(typing);
-  // Ouvert : en bas, sur le dernier message ; ensuite, seulement si on y était déjà.
-  if (community.shownKey !== th.key || atBottom) lines.scrollTop = lines.scrollHeight;
-  community.shownKey = th.key;
+  // Ouvert ou montré de nouveau : en bas, sur le dernier message ; ensuite, seulement si on y était (telephone-bas.js).
+  CyberBottom.settle(lines, th.key);
   status.textContent = th.blocked ?? [th.status.text, th.status.detail].filter(Boolean).join(' · ');
   status.className = `thread-status ${th.blocked ? 'warning' : th.status.tone}`;
   field.disabled = Boolean(th.blocked);
@@ -870,7 +865,7 @@ function communityMessage(m) {
 /** Ouvre le fil d'un ami : la borne l'envoie (et le marque lu) tant qu'il est ouvert. */
 function communityOpenThread(key) {
   community.open = key;
-  community.shownKey = undefined;
+  CyberBottom.reset(document.getElementById('thread-lines'));
   send({ t: 'chat-open', key });
   setView('thread');
   renderThread();

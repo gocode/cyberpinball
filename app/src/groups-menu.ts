@@ -49,6 +49,7 @@ import {
   type RemoteGroupAct,
   type TableEntry,
 } from '@cyberpinball/core';
+import { lastLineAt } from './chat-cursor';
 import type { GroupService } from './group-service';
 import { onGesture } from './gesture-flash';
 import type { Action, Built, Row, Section } from './library';
@@ -458,7 +459,8 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
   function openGroup(g: string, back?: () => void): void {
     current = { g, back: back ?? current?.back ?? (() => lib.openCustom(buildList, 0)) };
     groups.markRead(g);
-    lib.openCustom(groupBuild(g), 0);
+    // Ouvert sur le dernier message, en bas (chat-cursor.ts) ; sans message, sur la table de la semaine.
+    lib.openCustom(groupBuild(g), lastLineAt(groupBuild(g)()) ?? 0);
   }
 
   const dayOf = (iso: string) => new Date(iso).toDateString();

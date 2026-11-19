@@ -41,6 +41,7 @@ import {
   type IconName,
   type AvatarView,
 } from '@cyberpinball/core';
+import { lastLineAt } from './chat-cursor';
 import type { ChatService } from './chat-service';
 import type { RemoteChat, RemoteCommunity, RemoteThread } from './phone-remote';
 import { onGesture } from './gesture-flash';
@@ -269,10 +270,8 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
   function openThread(key: string, back?: () => void): void {
     thread = { key, back: back ?? thread?.back ?? (() => openList()) };
     chat.markRead(key);
-    // Ouvert sur le dernier message (les messages sont les premières actions du fil) : les plus récents, en bas, sous les yeux.
-    const c = convOf(key);
-    const messages = c ? Math.min(threadLines(c).length, THREAD_SHOWN) : 0;
-    lib.openCustom(threadBuild(key), Math.max(0, messages - 1));
+    // Ouvert sur le dernier message : les plus récents, en bas, sous les yeux (chat-cursor.ts).
+    lib.openCustom(threadBuild(key), lastLineAt(threadBuild(key)()) ?? 0);
   }
 
   /** Les conversations dans l'ordre de la liste : MagnaSave passe à la voisine. */

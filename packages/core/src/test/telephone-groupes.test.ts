@@ -50,6 +50,7 @@ const { createGroupsMenu } = require(path.join(REPO_ROOT, 'app', 'dist', 'groups
     remote(open?: string): Remote;
     remoteGroups(): { blocked?: string; create: { reason?: string }; invitations: { g: string; name: string; detail: string }[]; publics: { g: string; name: string; member?: true; reason?: string; preview: string[] }[]; notice?: { text: string } };
     remoteAct(act: string, g: string | undefined, key: string | undefined, back: () => void): void;
+    openGroup(g: string, back?: () => void): void;
   };
 };
 const { createInstantMenu, instantTableRef } = require(path.join(REPO_ROOT, 'app', 'dist', 'instant-menu.js')) as {
@@ -127,9 +128,11 @@ function groupsHarness() {
     report: () => undefined,
   });
   const opened: string[] = [];
+  /** Le dernier écran ouvert à la borne et le rang du curseur à l'ouverture. */
+  let shown: { build: () => { heading: string; actions: { key?: string }[] }; at?: number } | undefined;
   let busy: string | undefined;
   const menu = createGroupsMenu({
-    library: { openCustom: (build: () => { heading: string }) => opened.push(build().heading), isShowing: () => false, openPrompt: () => undefined },
+    library: { openCustom: (build: () => { heading: string; actions: { key?: string }[] }, at?: number) => ((shown = { build, at }), opened.push(build().heading)), isShowing: () => false, openPrompt: () => undefined },
     net,
     groups,
     tables: () => [{ title: 'Star Courier', file: 'C:\\Tables\\Star Courier.vpx', emulator: 'vpx', info: {} }],
@@ -137,8 +140,16 @@ function groupsHarness() {
     busy: () => busy,
     now: () => at(10),
   });
-  return { menu, calls, opened, ids: { MINE, PUB, INV, FULL }, keys: { kiko: kiko.key.publicKey, bruno: bruno.key.publicKey }, off: () => (enabled = false), setBusy: (b: string | undefined) => (busy = b), mute: () => (mine.get(MINE)!.entry.muted = true) };
+  return { menu, calls, opened, shown: () => shown, lastMessage: mineLines.at(-1)!.id, ids: { MINE, PUB, INV, FULL }, keys: { kiko: kiko.key.publicKey, bruno: bruno.key.publicKey }, off: () => (enabled = false), setBusy: (b: string | undefined) => (busy = b), mute: () => (mine.get(MINE)!.entry.muted = true) };
 }
+
+test('groupe ouvert à la borne : sur le dernier message, en bas, pas sur la table de la semaine (19/11/2026)', () => {
+  const h = groupsHarness();
+  h.menu.openGroup(h.ids.MINE, () => undefined);
+  const s = h.shown()!;
+  assert.equal(s.build().heading, 'Nuits néon');
+  assert.equal(s.build().actions[s.at!]?.key, `line:${h.lastMessage}`, 'le curseur sur le message le plus récent');
+});
 
 test('groupes au téléphone : créer, les invitations reçues, les groupes publics (les miens « Déjà membre »)', () => {
   const h = groupsHarness();
