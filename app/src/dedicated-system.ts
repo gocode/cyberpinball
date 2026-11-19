@@ -30,7 +30,7 @@ import {
 } from '@cyberpinball/core';
 import { listWindows } from '@cyberpinball/win-displays';
 import { OFFSCREEN } from './offscreen';
-import { ELEVATION_WAIT_MS, elevationNoAnswer } from '@cyberpinball/core';
+import { ELEVATION_WAIT_MS, elevationNoAnswer, POWERSHELL_POLICY } from '@cyberpinball/core';
 
 /** Ce que l'écran lit de Windows, sans élévation. */
 export interface DedicatedProbe {
@@ -102,7 +102,7 @@ $out | ConvertTo-Json -Compress
 /** `timeoutMs` : une demande de Windows (UAC) sans réponse n'est plus attendue au-delà (front-policy.ts). */
 function powershell(args: string[], timeoutMs?: number): Promise<{ status: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const child = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', ...args], { windowsHide: true });
+    const child = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', POWERSHELL_POLICY, ...args], { windowsHide: true });
     let stdout = '';
     let stderr = '';
     const timer = timeoutMs
@@ -125,7 +125,7 @@ function powershell(args: string[], timeoutMs?: number): Promise<{ status: numbe
 function runScriptFile(script: string, elevate: boolean): Promise<{ status: number | null; stdout: string; stderr: string }> {
   if (!elevate) return powershell(['-File', script]);
   const quoted = script.replace(/'/g, "''");
-  const elevated = `try { $p = Start-Process -FilePath '${POWERSHELL}' -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '"${quoted}"'); exit $p.ExitCode } catch { [Console]::Error.WriteLine($_.Exception.Message); if ($_.Exception.Message -match 'cancel|annul') { exit ${CANCELLED} } else { exit 1 } }`;
+  const elevated = `try { $p = Start-Process -FilePath '${POWERSHELL}' -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList @('-NoProfile', '-ExecutionPolicy', '${POWERSHELL_POLICY}', '-File', '"${quoted}"'); exit $p.ExitCode } catch { [Console]::Error.WriteLine($_.Exception.Message); if ($_.Exception.Message -match 'cancel|annul') { exit ${CANCELLED} } else { exit 1 } }`;
   return powershell(['-Command', elevated], ELEVATION_WAIT_MS);
 }
 

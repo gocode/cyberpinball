@@ -11,7 +11,9 @@
 // 01/11/2026, cette autorisation enregistre aussi la tâche de réparation (plus bas) : les règles
 // sont ensuite vérifiées à chaque démarrage et reposées d'elles-mêmes, sans rien à valider.
 
+import * as path from 'node:path';
 import { t } from './i18n';
+import { POWERSHELL_POLICY } from './powershell';
 
 /** Nom de la règle, le même partout : l'installeur, l'application et la désinstallation. */
 export const FIREWALL_RULE = 'Cyber Pinball';
@@ -124,7 +126,7 @@ export function readVpxFirewallShow(output: string, status: number | null, progr
  * La commande unique, passée à cmd.exe sous une seule autorisation de Windows : la règle de Cyber
  * Pinball (s'il y a son exécutable), puis celle de VPX (s'il y a ses programmes), chacune retirée
  * puis reposée. Celle de l'installeur (relue par vpx-inspector.test.ts) ; l'application passe par
- * PowerShell (firewallSetupScript, plus bas), qui pose en plus la tâche de réparation.
+ * PowerShell (firewallSetupScript, plus bas), qui pose en plus la tâche de réparation et son script.
  */
 export function firewallCommandLine(rules: { app?: string; vpx?: readonly string[] }): string {
   const parts: string[] = [];
@@ -153,11 +155,27 @@ export function firewallCommandLine(rules: { app?: string; vpx?: readonly string
 // Windows, donnée une fois, enregistre une tâche planifiée qui refait la même pose, avec les droits
 // d'administrateur, sans invite : l'application la lance au démarrage dès qu'une règle manque ou
 // ne correspond plus (mise à jour, nouvelle version de VPX, invite de Windows restée sans réponse).
-// La tâche ne lance que PowerShell de Windows, sur un script figé à son enregistrement (encodé dans
-// ses arguments, jamais un fichier modifiable), qui ne fait que poser ces deux règles.
+// La tâche ne lance que PowerShell de Windows, sur un script figé à son enregistrement, qui ne fait
+// que poser ces deux règles. Jusqu'au 19/11/2026, ce script était encodé dans ses arguments
+// (-EncodedCommand, -ExecutionPolicy Bypass, -WindowStyle Hidden) : une tâche aux droits
+// d'administrateur sur ce modèle est un signe de logiciel malveillant, et un antivirus a mis Cyber
+// Pinball en quarantaine (powershell.ts). Depuis, c'est un fichier lisible dans ProgramData, dans un
+// dossier dont seuls les administrateurs et le système peuvent modifier le contenu (l'utilisateur ne
+// peut pas changer ce que la tâche exécute avec ses droits élevés). Une tâche de l'ancien modèle n'a
+// pas ce fichier : elle compte comme absente, et la prochaine autorisation la remplace.
 
 /** Nom de la tâche planifiée qui repose les règles sans invite. */
 export const FIREWALL_REPAIR_TASK = 'Cyber Pinball pare-feu';
+
+/** Dossier du script de la tâche, sous ProgramData : protégé à la pose (administrateurs et système seuls). */
+export const FIREWALL_REPAIR_DIR = 'CyberPinball';
+/** Le script de la tâche de réparation, dans FIREWALL_REPAIR_DIR. */
+export const FIREWALL_REPAIR_FILE = 'reparer-pare-feu.ps1';
+
+/** Chemin du script de la tâche de réparation (sa présence dit que la tâche est du modèle actuel). */
+export function firewallRepairScriptPath(programData = process.env.ProgramData ?? 'C:\\ProgramData'): string {
+  return path.win32.join(programData, FIREWALL_REPAIR_DIR, FIREWALL_REPAIR_FILE);
+}
 
 /** Une règle du pare-feu qui vise un programme, lue par PowerShell. */
 export interface FirewallRuleInfo {
@@ -291,23 +309,36 @@ export function firewallRepairScript(o: { exe: string; vpxDir?: string }): strin
   ].join('\n');
 }
 
-/** Arguments de PowerShell pour un script passé encodé (UTF-16, base 64) : aucun guillemet à échapper. */
-export function powershellEncodedArgs(script: string): string[] {
-  return ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')];
-}
-
 /**
  * Le script lancé sous l'autorisation de Windows : la pose, puis l'enregistrement de la tâche de
- * réparation (elle refait la même pose, encodée dans ses arguments). La tâche n'a aucun déclencheur :
- * seule l'application la lance. S4U : elle tourne hors de la session, sans fenêtre, avec les droits
- * d'administrateur de l'utilisateur qui l'a autorisée.
+ * réparation. Son script (la même pose) est écrit dans ProgramData\CyberPinball, dossier d'abord
+ * protégé : propriétaire Administrateurs, héritage coupé, contrôle total au système et aux
+ * administrateurs, lecture seule aux utilisateurs ; un fichier déjà là est retiré avant l'écriture
+ * (il garderait sinon son propriétaire). Une étape qui échoue arrête tout, avant l'enregistrement de
+ * la tâche. La tâche n'a aucun déclencheur : seule l'application la lance. S4U : elle tourne hors de
+ * la session, sans fenêtre, avec les droits d'administrateur de l'utilisateur qui l'a autorisée.
  */
 export function firewallSetupScript(o: { exe: string; vpxDir?: string }): string {
   const repair = firewallRepairScript(o);
+  const rule = (sid: string, rights: string) =>
+    `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier '${sid}'), '${rights}', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))`; // i18n-ignore : script PowerShell
   return [
     repair,
+    "$ErrorActionPreference = 'Stop'",
+    `$dir = Join-Path $env:ProgramData ${psQuote(FIREWALL_REPAIR_DIR)}`,
+    'New-Item -ItemType Directory -Force -Path $dir | Out-Null',
+    '$acl = New-Object Security.AccessControl.DirectorySecurity',
+    "$acl.SetOwner((New-Object Security.Principal.SecurityIdentifier 'S-1-5-32-544'))", // i18n-ignore : script PowerShell
+    '$acl.SetAccessRuleProtection($true, $false)',
+    rule('S-1-5-18', 'FullControl'),
+    rule('S-1-5-32-544', 'FullControl'),
+    rule('S-1-5-32-545', 'ReadAndExecute'),
+    'Set-Acl -LiteralPath $dir -AclObject $acl',
+    `$f = Join-Path $dir ${psQuote(FIREWALL_REPAIR_FILE)}`,
+    'Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue',
+    `[IO.File]::WriteAllText($f, ${psQuote(repair.replace(/\r?\n/g, '\r\n'))}, (New-Object Text.UTF8Encoding $true))`,
     "$ps = Join-Path $env:SystemRoot 'System32\\WindowsPowerShell\\v1.0\\powershell.exe'",
-    `$a = New-ScheduledTaskAction -Execute $ps -Argument ${psQuote(powershellEncodedArgs(repair).join(' '))}`,
+    `$a = New-ScheduledTaskAction -Execute $ps -Argument ('-NoProfile -NonInteractive -ExecutionPolicy ${POWERSHELL_POLICY} -File "' + $f + '"')`,
     '$p = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType S4U -RunLevel Highest', // i18n-ignore : script PowerShell
     '$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 5) -MultipleInstances IgnoreNew',
     `Register-ScheduledTask -TaskName ${psQuote(FIREWALL_REPAIR_TASK)} -Description ${psQuote('Cyber Pinball : repose ses règles du pare-feu de Windows (réseau des bornes, VPX fermé au réseau) quand l’application en trouve une qui manque.')} -Action $a -Principal $p -Settings $s -Force | Out-Null`, // i18n-ignore : script PowerShell, description de la tâche

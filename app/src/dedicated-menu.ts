@@ -355,7 +355,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
                   rows: [
                     {
                       text: t('Gestionnaire des tâches > Fichier > Exécuter une nouvelle tâche'),
-                      detail: t('powershell -ExecutionPolicy Bypass -File "{file}" (cochez « Créer cette tâche avec des privilèges d’administration » si le bureau est remplacé)', { file: settingsRescueFile(host.dataDir) }),
+                      detail: t('powershell -ExecutionPolicy RemoteSigned -File "{file}" (cochez « Créer cette tâche avec des privilèges d’administration » si le bureau est remplacé)', { file: settingsRescueFile(host.dataDir) }),
                     },
                   ],
                 },
@@ -364,7 +364,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
           {
             title: t('Depuis un compte administrateur'),
             rows: [
-              { text: t('Rétablir le bureau sans Cyber Pinball'), detail: t('PowerShell en administrateur : powershell -ExecutionPolicy Bypass -File "{file}"', { file }) },
+              { text: t('Rétablir le bureau sans Cyber Pinball'), detail: t('PowerShell en administrateur : powershell -ExecutionPolicy RemoteSigned -File "{file}"', { file }) },
               { text: t('Cyber Pinball redémarre en boucle'), detail: t('Le même script, puis redémarrer ; la cause est notée dans {file}', { file: path.join(host.dataDir, 'logs', 'erreurs.txt') }) },
             ],
           },
@@ -495,7 +495,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
     const lines = [
       '#Requires -RunAsAdministrator',
       '# Secours de la borne dédiée de Cyber Pinball : remet Windows dans l’état d’avant l’activation.', // i18n-ignore : script pour l'administrateur
-      `# PowerShell en administrateur : powershell -ExecutionPolicy Bypass -File "${file}"`, // i18n-ignore : script pour l'administrateur
+      `# PowerShell en administrateur : powershell -ExecutionPolicy RemoteSigned -File "${file}"`, // i18n-ignore : script pour l'administrateur
       elevatedScript({ kind: 'deactivate', sid: record.sid, reference: record.reference }, result),
       'Get-Content -LiteralPath $ResultFile',
       '',
@@ -640,7 +640,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
     const lines = [
       ...(elevate ? ['#Requires -RunAsAdministrator'] : []),
       '# Secours de Cyber Pinball : remet les réglages de Windows sauvegardés avant l’activation.', // i18n-ignore : script de secours
-      `# ${elevate ? 'PowerShell en administrateur' : 'PowerShell'} : powershell -ExecutionPolicy Bypass -File "${file}"`, // i18n-ignore : script de secours
+      `# ${elevate ? 'PowerShell en administrateur' : 'PowerShell'} : powershell -ExecutionPolicy RemoteSigned -File "${file}"`, // i18n-ignore : script de secours
       settingsScript({ sid: record.sid, startupDir: record.startupDir, want: record.reference }, settingsRescueResultFile(host.dataDir)),
       'Get-Content -LiteralPath $ResultFile',
       '',

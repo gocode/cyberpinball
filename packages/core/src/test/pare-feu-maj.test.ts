@@ -21,6 +21,8 @@ import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { createDownloadManager } from '../downloadmanager';
 import {
+  FIREWALL_REPAIR_DIR,
+  FIREWALL_REPAIR_FILE,
   FIREWALL_REPAIR_TASK,
   FIREWALL_RULE,
   VPX_FIREWALL_RULE,
@@ -29,6 +31,7 @@ import {
   firewallProblems,
   firewallReadScript,
   firewallRepairScript,
+  firewallRepairScriptPath,
   firewallSetupScript,
   readFirewallRules,
   vpxFirewallState,
@@ -122,10 +125,10 @@ test('lecture par programme : une règle bloquante de l’invite de Windows n’
   assert.match(firewallProblems('blocked', undefined)[0]!.reason, /invite « Autoriser l’accès » est restée sans réponse/);
 });
 
-/** Décode le script d'un `-EncodedCommand`. */
-const decoded = (args: readonly string[]) => Buffer.from(args[args.indexOf('-EncodedCommand') + 1]!, 'base64').toString('utf16le');
+/** Le script d'un `-File` (lu pendant que la commande tourne : retiré ensuite). */
+const scriptOf = (args: readonly string[]) => fs.readFileSync(args[args.indexOf('-File') + 1]!, 'utf8');
 
-test('la pose retire toute règle d’entrée sur l’exécutable, et la tâche de réparation ne lance qu’un script figé', () => {
+test('la pose retire toute règle d’entrée sur l’exécutable, et la tâche de réparation ne lance qu’un script figé et protégé', () => {
   const repair = firewallRepairScript({ exe: EXE, vpxDir: 'D:\\CyberPinball\\emulators\\vpx' });
   assert.match(repair, /Where-Object \{ \$_\.Program -ieq \$exe \} \| Get-NetFirewallRule \| Where-Object \{ \$_\.Direction -eq 'Inbound' \} \| Remove-NetFirewallRule/, 'les règles de l’invite de Windows, quel que soit leur nom');
   assert.ok(repair.indexOf('Remove-NetFirewallRule') < repair.indexOf('New-NetFirewallRule'), 'retirées avant la pose');
@@ -138,10 +141,26 @@ test('la pose retire toute règle d’entrée sur l’exécutable, et la tâche 
   assert.match(setup, new RegExp(`Register-ScheduledTask -TaskName '${FIREWALL_REPAIR_TASK}'`));
   assert.match(setup, /-LogonType S4U -RunLevel Highest/, 'hors de la session, sans fenêtre, droits d’administrateur');
   assert.doesNotMatch(setup, /New-ScheduledTaskTrigger/, 'aucun déclencheur : seule l’application la lance');
-  // La tâche lance PowerShell de Windows sur le script encodé dans ses arguments : la même pose, aucun fichier.
-  const args = /-Argument '([^']+)'/.exec(setup)![1]!.split(' ');
-  assert.equal(decoded(args), repair);
-  assert.doesNotMatch(args.join(' '), /-File|\.ps1/);
+  // La tâche lance PowerShell de Windows sur un fichier lisible de ProgramData (19/11/2026 : un script
+  // encodé dans ses arguments, sans fenêtre, politique contournée, l'a fait prendre pour un cheval de Troie).
+  assert.match(setup, /\$a = New-ScheduledTaskAction -Execute \$ps -Argument \('-NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "' \+ \$f \+ '"'\)/);
+  assert.doesNotMatch(setup, /EncodedCommand|Bypass|WindowStyle/);
+  assert.match(setup, new RegExp(`\\$dir = Join-Path \\$env:ProgramData '${FIREWALL_REPAIR_DIR}'`));
+  assert.match(setup, new RegExp(`\\$f = Join-Path \\$dir '${FIREWALL_REPAIR_FILE.replace('.', '\\.')}'`));
+  assert.equal(firewallRepairScriptPath('C:\\ProgramData'), `C:\\ProgramData\\${FIREWALL_REPAIR_DIR}\\${FIREWALL_REPAIR_FILE}`);
+  // Le script figé est la pose elle-même, mot pour mot (apostrophes doublées dans la chaîne PowerShell).
+  const written = /\[IO\.File\]::WriteAllText\(\$f, '((?:[^']|'')*)', \(New-Object Text\.UTF8Encoding \$true\)\)/.exec(setup)![1]!.replace(/''/g, "'");
+  assert.equal(written, repair.replace(/\r?\n/g, '\r\n'));
+  // Le dossier protégé AVANT l'écriture : seuls le système et les administrateurs y écrivent, sinon
+  // l'utilisateur changerait ce que la tâche lance avec les droits d'administrateur.
+  const protect = setup.indexOf('Set-Acl -LiteralPath $dir -AclObject $acl');
+  assert.ok(protect > 0 && protect < setup.indexOf('WriteAllText') && setup.indexOf('WriteAllText') < setup.indexOf('Register-ScheduledTask'));
+  assert.match(setup, /\$acl\.SetOwner\(\(New-Object Security\.Principal\.SecurityIdentifier 'S-1-5-32-544'\)\)/, 'propriétaire : Administrateurs');
+  assert.match(setup, /\$acl\.SetAccessRuleProtection\(\$true, \$false\)/, 'héritage coupé');
+  assert.match(setup, /SecurityIdentifier 'S-1-5-32-545'\), 'ReadAndExecute'/, 'les utilisateurs en lecture seule');
+  assert.doesNotMatch(setup, /S-1-5-32-545'\), '(FullControl|Modify|Write)/);
+  assert.ok(setup.indexOf("$ErrorActionPreference = 'Stop'") < setup.indexOf('New-Item'), 'une étape en échec arrête tout, tâche comprise');
+  assert.ok(setup.indexOf('Remove-Item -LiteralPath $f') < setup.indexOf('WriteAllText'), 'un fichier déjà là est retiré (il garderait son propriétaire)');
   // La lecture : par programme, sans élévation, aucun changement.
   const read = firewallReadScript([EXE, VPX_REAL]);
   assert.match(read, /Get-NetFirewallApplicationFilter -PolicyStore ActiveStore/);
@@ -162,17 +181,24 @@ test('les scripts PowerShell sont syntaxiquement valides (analysés, jamais exé
  * Aucune commande ne part vers le vrai système ; toute commande qui modifierait le pare-feu sans
  * élévation fait échouer le test.
  */
-function fakeMachine(start: { rules: FirewallRuleInfo[]; task: boolean; cancel?: boolean }) {
-  const machine = { rules: [...start.rules], task: start.task, commands: [] as string[], elevations: 0 };
+function fakeMachine(start: { rules: FirewallRuleInfo[]; task: boolean; cancel?: boolean; oldTask?: boolean }) {
+  const machine = { rules: [...start.rules], task: start.task || Boolean(start.oldTask), commands: [] as string[], elevations: 0 };
+  // Le script de la tâche dans ProgramData (ici un dossier d'essai) : là pour une tâche du modèle
+  // actuel, absent pour une tâche d'avant le 19/11/2026 (script encodé dans ses arguments).
+  const repairScript = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cp-pare-feu-programdata-')), FIREWALL_REPAIR_FILE);
+  if (start.task) fs.writeFileSync(repairScript, 'pose');
   const good = () => {
     machine.rules = [rule({ program: EXE }), ...[VPX_REAL, VPX_CURRENT].map((program) => rule({ program, name: VPX_FIREWALL_RULE, allow: false, block: true }))];
   };
   const run = async (file: string, args: string[]): Promise<RunResult> => {
     const base = path.basename(file).toLowerCase();
     machine.commands.push(`${base} ${args.filter((a) => a.length < 200).join(' ')}`);
-    if (base === 'powershell.exe' && args.includes('-EncodedCommand')) {
-      const script = decoded(args);
-      assert.match(script, /^\$t = @\(/, 'seule la lecture passe sans élévation');
+    assert.doesNotMatch(args.join(' '), /EncodedCommand|Bypass|WindowStyle', 'Hidden/, 'jamais les signes d’un logiciel malveillant');
+    if (base === 'powershell.exe' && args.includes('-File')) {
+      assert.deepEqual(args.slice(0, 5), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'RemoteSigned', '-File']);
+      const script = scriptOf(args);
+      assert.equal(script.charCodeAt(0), 0xfeff, 'UTF-8 avec BOM, lu par PowerShell 5');
+      assert.match(script.slice(1), /^\$t = @\(/, 'seule la lecture passe sans élévation');
       const wanted = [...script.matchAll(/'([^']+\.exe)'/gi)].map((m) => m[1]!.toLowerCase());
       const rules = machine.rules.filter((r) => wanted.includes(r.program.toLowerCase()));
       return { status: 0, stdout: JSON.stringify({ rules: rules.map((r) => ({ p: r.program, n: r.name, d: r.inbound ? 1 : 2, a: r.block ? 4 : 2, e: r.enabled ? 1 : 2, f: r.profiles === 7 ? 0 : r.profiles })), vpx: machine.rules.filter((r) => r.name === VPX_FIREWALL_RULE).length }), stderr: '' };
@@ -181,6 +207,7 @@ function fakeMachine(start: { rules: FirewallRuleInfo[]; task: boolean; cancel?:
       // L'élévation : Start-Process -Verb RunAs sur le script de pose écrit à côté.
       const command = args[args.indexOf('-Command') + 1]!;
       assert.match(command, /Start-Process -FilePath '[^']+powershell\.exe' -Verb RunAs/);
+      assert.match(command, /'-ExecutionPolicy', 'RemoteSigned', '-File'/);
       const file = /'-File', '"([^"]+)"'/.exec(command)![1]!.replace(/''/g, "'");
       const script = fs.readFileSync(file, 'utf8');
       assert.ok(script.startsWith('\ufeff'), 'UTF-8 avec BOM, lu par PowerShell 5');
@@ -189,6 +216,7 @@ function fakeMachine(start: { rules: FirewallRuleInfo[]; task: boolean; cancel?:
       if (start.cancel) return { status: 1223, stdout: '', stderr: 'L’opération a été annulée par l’utilisateur.' };
       good();
       machine.task = true;
+      fs.writeFileSync(repairScript, 'pose');
       return { status: 0, stdout: '', stderr: '' };
     }
     if (base === 'schtasks.exe') {
@@ -206,16 +234,16 @@ function fakeMachine(start: { rules: FirewallRuleInfo[]; task: boolean; cancel?:
     }
     throw new Error(`commande inattendue : ${file}`);
   };
-  return { machine, run };
+  return { machine, run, repairScript };
 }
 
-const firewallOn = (run: (file: string, args: string[]) => Promise<RunResult>) =>
-  createFirewallRule({ exe: EXE, simulated: false, vpx: () => [VPX_REAL, VPX_CURRENT], run, wait: async () => undefined });
+const firewallOn = ({ run, repairScript }: { run: (file: string, args: string[]) => Promise<RunResult>; repairScript: string }) =>
+  createFirewallRule({ exe: EXE, simulated: false, vpx: () => [VPX_REAL, VPX_CURRENT], run, wait: async () => undefined, repairScript });
 
 test('après une mise à jour : chaque règle au journal, reposée d’elle-même par la tâche de réparation, sans invite', async () => {
   // Le poste du 01/11/2026 : les règles bloquantes de l'invite de Windows, rien pour VPX ; la tâche posée.
-  const { machine, run } = fakeMachine({ rules: [...queryUser(4, true), ...queryUser(2, false)], task: true });
-  const firewall = firewallOn(run);
+  const { machine, run, repairScript } = fakeMachine({ rules: [...queryUser(4, true), ...queryUser(2, false)], task: true });
+  const firewall = firewallOn({ run, repairScript });
   const log: string[] = [];
   const report = await guardFirewall(firewall, { update: { from: '0.1.5', to: '0.1.6' }, log: (l) => log.push(l) });
   assert.equal(log[0], 'Pare-feu (après la mise à jour 0.1.5 → 0.1.6) : Cyber Pinball blocked, VPX missing, réparation automatique prête.');
@@ -259,8 +287,8 @@ function friendsOn(firewall: Rule) {
 }
 
 test('sans tâche de réparation : la raison reste visible, la présence dit « bloqué par le pare-feu », l’autorisation pose tout', async () => {
-  const { machine, run } = fakeMachine({ rules: queryUser(4, true), task: false });
-  const firewall = firewallOn(run);
+  const { machine, run, repairScript } = fakeMachine({ rules: queryUser(4, true), task: false });
+  const firewall = firewallOn({ run, repairScript });
   const log: string[] = [];
   const report = await guardFirewall(firewall, { update: { from: '0.1.5', to: '0.1.6' }, log: (l) => log.push(l) });
   assert.deepEqual(report.problems.map((p) => p.rule), ['app', 'vpx']);
@@ -307,13 +335,27 @@ test('sans tâche de réparation : la raison reste visible, la présence dit « 
 });
 
 test('autorisation refusée : rien de posé, l’état reste à reposer', async () => {
-  const { machine, run } = fakeMachine({ rules: [], task: false, cancel: true });
-  const firewall = firewallOn(run);
+  const { machine, run, repairScript } = fakeMachine({ rules: [], task: false, cancel: true });
+  const firewall = firewallOn({ run, repairScript });
   await firewall.check();
   assert.deepEqual(await firewall.allow(), { cancelled: true });
   assert.deepEqual([firewall.state(), firewall.taskState(), machine.elevations], ['missing', false, 1]);
-  // Le script de pose écrit pour l'élévation est retiré, accepté ou non.
-  assert.deepEqual(fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith(`cyberpinball-pare-feu-${process.pid}-`)), []);
+  // Le script de pose écrit pour l'élévation est retiré, accepté ou non ; ceux de la lecture aussi.
+  assert.deepEqual(fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith(`cyberpinball-pare-feu-${process.pid}-`) || f.startsWith(`cyberpinball-pare-feu-lecture-${process.pid}-`)), []);
+});
+
+test('une tâche de réparation d’avant le 19/11/2026 (script encodé, sans fichier dans ProgramData) n’est jamais lancée', async () => {
+  const { machine, run, repairScript } = fakeMachine({ rules: queryUser(4, true), task: false, oldTask: true });
+  const firewall = firewallOn({ run, repairScript });
+  await firewall.check();
+  assert.equal(firewall.taskState(), false, 'comptée comme absente : la prochaine autorisation la remplace');
+  assert.equal(await firewall.repair(), false);
+  assert.ok(!machine.commands.some((c) => c.startsWith('schtasks.exe /run')), 'jamais lancée');
+  // L'autorisation pose la tâche du modèle actuel, avec son script : la réparation marche ensuite.
+  await firewall.allow();
+  assert.equal(firewall.taskState(), true);
+  machine.rules = queryUser(4, true);
+  assert.equal(await firewall.repair(), true);
 });
 
 test('l’application vérifie les règles à chaque démarrage et juste après une mise à jour, jamais au milieu d’une partie', () => {
@@ -330,5 +372,5 @@ test('l’application vérifie les règles à chaque démarrage et juste après 
   const nsi = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'installeur', 'cyberpinball.nsi'), 'utf8');
   assert.match(nsi, /netsh advfirewall firewall delete rule name="all" dir=in program="\$Racine\\app\\\$\{EXE\}" >nul 2>&1 & netsh advfirewall firewall add rule name="Cyber Pinball"/);
   const uninstall = nsi.slice(nsi.indexOf('Section "Uninstall"'), nsi.indexOf('SectionEnd', nsi.indexOf('Section "Uninstall"')));
-  assert.match(uninstall, new RegExp(`schtasks /delete /tn "${FIREWALL_REPAIR_TASK}" /f`));
+  assert.match(uninstall, new RegExp(`schtasks /delete /tn "${FIREWALL_REPAIR_TASK}" /f & rmdir /s /q "%ProgramData%\\\\${FIREWALL_REPAIR_DIR}"`), 'la tâche et son script');
 });

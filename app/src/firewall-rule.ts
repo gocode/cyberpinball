@@ -24,9 +24,13 @@ import * as path from 'node:path';
 import {
   appFirewallState,
   firewallReadScript,
+  firewallRepairScriptPath,
   firewallSetupScript,
   firewallShowArgs,
-  powershellEncodedArgs,
+  powershellExe,
+  powershellFileArgs,
+  powershellFileText,
+  POWERSHELL_POLICY,
   psQuote,
   readFirewallRules,
   readFirewallShow,
@@ -43,7 +47,7 @@ import { ELEVATION_WAIT_MS } from '@cyberpinball/core';
 const SYSTEM32 = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32');
 const NETSH = path.join(SYSTEM32, 'netsh.exe');
 const SCHTASKS = path.join(SYSTEM32, 'schtasks.exe');
-const POWERSHELL = path.join(SYSTEM32, 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+const POWERSHELL = powershellExe();
 /** Code de Start-Process quand l'utilisateur refuse l'élévation (ERROR_CANCELLED). */
 const CANCELLED = 1223;
 
@@ -128,7 +132,7 @@ function vpxDirOf(programs: readonly string[] | undefined): string | undefined {
  * `vpx` : les programmes que la règle de VPX doit viser maintenant (vpxFirewallPrograms), undefined
  * sans VPX. `run` : les commandes (tests) ; `wait` : la pause entre deux relectures après la réparation.
  */
-export function createFirewallRule(opts: { exe: string; simulated: boolean; vpx?: () => string[] | undefined; log?: (line: string) => void; run?: Run; wait?: (ms: number) => Promise<void> }): FirewallRule {
+export function createFirewallRule(opts: { exe: string; simulated: boolean; vpx?: () => string[] | undefined; log?: (line: string) => void; run?: Run; wait?: (ms: number) => Promise<void>; repairScript?: string }): FirewallRule {
   let last: FirewallState | undefined;
   let lastVpx: VpxFirewallState | undefined;
   let lastTask: boolean | undefined;
@@ -175,7 +179,21 @@ export function createFirewallRule(opts: { exe: string; simulated: boolean; vpx?
   }
   const run = opts.run ?? spawnRun;
   const wait = opts.wait ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
-  const checkTask = async () => (lastTask = (await run(SCHTASKS, repairTaskQueryArgs())).status === 0);
+  // Une tâche de l'ancien modèle (script encodé dans ses arguments, avant le 19/11/2026) n'a pas son
+  // fichier dans ProgramData : absente, jamais lancée ; la prochaine autorisation la remplace.
+  const scriptPath = opts.repairScript ?? firewallRepairScriptPath();
+  const checkTask = async () => (lastTask = (await run(SCHTASKS, repairTaskQueryArgs())).status === 0 && fs.existsSync(scriptPath));
+  let reads = 0;
+  /** Un script en fichier lisible (powershell.ts), retiré après usage. */
+  const runScript = async (name: string, script: string, ms?: number) => {
+    const file = path.join(os.tmpdir(), `cyberpinball-${name}-${process.pid}-${++reads}.ps1`);
+    fs.writeFileSync(file, powershellFileText(script), 'utf8');
+    try {
+      return await run(POWERSHELL, powershellFileArgs(file), ms);
+    } finally {
+      fs.rmSync(file, { force: true });
+    }
+  };
   const good = () => last === 'allowed' && (lastVpx === undefined || lastVpx === 'closed');
   return {
     simulated: false,
@@ -184,7 +202,7 @@ export function createFirewallRule(opts: { exe: string; simulated: boolean; vpx?
     taskState: () => lastTask,
     async check() {
       const vpx = opts.vpx?.();
-      const ps = await run(POWERSHELL, powershellEncodedArgs(firewallReadScript([opts.exe, ...(vpx ?? [])])));
+      const ps = await runScript('pare-feu-lecture', firewallReadScript([opts.exe, ...(vpx ?? [])]));
       const read = readFirewallRules(ps.stdout, ps.status);
       await checkTask();
       if (read) {
@@ -209,11 +227,11 @@ export function createFirewallRule(opts: { exe: string; simulated: boolean; vpx?
       const vpx = opts.vpx?.();
       const vpxDir = vpxDirOf(vpx);
       const script = path.join(os.tmpdir(), `cyberpinball-pare-feu-${process.pid}-${Date.now()}.ps1`);
-      fs.writeFileSync(script, `\ufeff${firewallSetupScript({ exe: opts.exe, ...(vpxDir ? { vpxDir } : {}) })}\r\n`, 'utf8');
-      const elevate = `try { $p = Start-Process -FilePath ${psQuote(POWERSHELL)} -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ${psQuote(`"${script}"`)}); exit $p.ExitCode } catch { [Console]::Error.WriteLine($_.Exception.Message); if ($_.Exception.Message -match 'cancel|annul') { exit ${CANCELLED} } else { exit 1 } }`;
+      fs.writeFileSync(script, powershellFileText(firewallSetupScript({ exe: opts.exe, ...(vpxDir ? { vpxDir } : {}) })), 'utf8');
+      const elevate = `try { $p = Start-Process -FilePath ${psQuote(POWERSHELL)} -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', '${POWERSHELL_POLICY}', '-File', ${psQuote(`"${script}"`)}); exit $p.ExitCode } catch { [Console]::Error.WriteLine($_.Exception.Message); if ($_.Exception.Message -match 'cancel|annul') { exit ${CANCELLED} } else { exit 1 } }`;
       opts.log?.(`Pare-feu : règles et réparation automatique demandées à Windows (UAC) pour ${opts.exe}${vpx?.length ? ` et pour VPX (${vpxDir})` : ''}.`); // i18n-ignore : journal
       try {
-        const r = await run(POWERSHELL, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', elevate], FIREWALL_ELEVATION_MS);
+        const r = await run(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', elevate], FIREWALL_ELEVATION_MS);
         await this.check();
         if (good()) return { ok: true };
         if (r.status === CANCELLED) return { cancelled: true };

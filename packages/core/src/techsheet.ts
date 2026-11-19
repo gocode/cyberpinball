@@ -69,7 +69,6 @@ export interface TechFacts {
     gameMode?: boolean;
     gpuScheduling?: boolean;
     notifications?: boolean;
-    antivirus?: string[];
     locale?: string;
     keyboard?: string;
     /** Runtime Visual C++ de Windows (vc-runtime.ts). */
@@ -225,8 +224,8 @@ export function parseTechProbe(raw: unknown): { pc: NonNullable<TechFacts['pc']>
   if (r.gameMode !== undefined) windows.gameMode = num(r.gameMode) !== 0;
   if (num(r.hags) !== undefined) windows.gpuScheduling = num(r.hags) === 2;
   if (r.toast !== undefined) windows.notifications = num(r.toast) !== 0;
-  const av = list(r.av).map(str).filter((a): a is string => Boolean(a));
-  if (av.length) windows.antivirus = [...new Set(av)];
+  // Les antivirus du poste ne sont plus relevés (19/11/2026) : un programme qui les liste se fait
+  // prendre pour un logiciel malveillant (powershell.ts).
   if (str(r.culture)) windows.locale = str(r.culture);
   const klid = (str(r.keyboard) ?? '').split(':').pop()?.toLowerCase();
   if (klid) windows.keyboard = keyboardName(klid);
@@ -444,7 +443,6 @@ function windowsBlock(f: TechFacts): TechBlock {
   if (w.gpuScheduling !== undefined) rows.push({ label: t('Accélération GPU'), value: w.gpuScheduling ? t('Planification matérielle activée') : t('Planification matérielle désactivée') });
   if (w.notifications !== undefined) rows.push({ label: t('Notifications'), value: w.notifications ? t('Activées') : t('Désactivées') });
   if (w.vcRuntime) rows.push(w.vcRuntime.ok ? { label: t('Visual C++'), value: t('Présent') } : { label: t('Visual C++'), value: t('À installer'), detail: w.vcRuntime.detail, state: 'blocking' });
-  if (w.antivirus?.length) rows.push({ label: t('Antivirus'), value: w.antivirus.join(', ') });
   if (w.locale || w.keyboard) rows.push({ label: t('Langue'), value: w.locale ?? NOT_READ(), detail: w.keyboard ? t('Clavier {layout}', { layout: w.keyboard }) : undefined });
   return block('windows', t('Windows'), 'desktop', [{ rows }], notes, [joined([w.name, w.release])].filter(Boolean));
 }

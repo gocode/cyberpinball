@@ -47,7 +47,7 @@ import {
   type Vision3dSourceKind,
   type WebcamEyes,
 } from '@cyberpinball/core';
-import { ELEVATION_WAIT_MS } from '@cyberpinball/core';
+import { ELEVATION_WAIT_MS, POWERSHELL_POLICY } from '@cyberpinball/core';
 import { CANCELLED, POWERSHELL, powershell, quote, signerOf } from './elevation';
 import { downloadComponent, findComponent } from '@cyberpinball/installer';
 import { deviceStatus, hklmValue, memoryIntegrityEnabled } from '@cyberpinball/win-displays';
@@ -753,7 +753,7 @@ export async function installKinectDriver(file: string): Promise<DriverInstall> 
   const script = path.join(work, 'installer.ps1');
   fs.writeFileSync(script, ['$ok = @(0, 3010, 1641, 1638)', ...steps, 'exit 0', ''].join('\r\n'), 'utf8');
   const elevated = await powershell(
-    `try { $p = Start-Process -FilePath ${quote(POWERSHELL)} -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '"${script.replace(/'/g, "''")}"'); exit $p.ExitCode } catch { if ($_.Exception.Message -match 'cancel|annul') { exit ${CANCELLED} } else { [Console]::Error.WriteLine($_.Exception.Message); exit 1 } }`,
+    `try { $p = Start-Process -FilePath ${quote(POWERSHELL)} -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList @('-NoProfile', '-ExecutionPolicy', '${POWERSHELL_POLICY}', '-File', '"${script.replace(/'/g, "''")}"'); exit $p.ExitCode } catch { if ($_.Exception.Message -match 'cancel|annul') { exit ${CANCELLED} } else { [Console]::Error.WriteLine($_.Exception.Message); exit 1 } }`,
     ELEVATION_WAIT_MS,
   );
   if (elevated.status === CANCELLED) return { ok: false, cancelled: true, reason: 'installation refusée' }; // i18n-ignore : journal

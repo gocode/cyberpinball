@@ -80,7 +80,8 @@ test('fiche : la sortie de PowerShell est lue sans rien supposer', () => {
   assert.equal(windows.gameMode, true);
   assert.equal(windows.gpuScheduling, true);
   assert.equal(windows.notifications, false);
-  assert.deepEqual(windows.antivirus, ['Windows Defender']);
+  // Les antivirus ne sont plus relevés (19/11/2026, powershell.ts) : un ancien relevé qui les cite n'en dit rien.
+  assert.ok(!('antivirus' in windows));
   assert.equal(windows.keyboard, 'AZERTY (France)');
   // Un relevé vide ou illisible ne casse rien et n'affirme rien.
   assert.deepEqual(parseTechProbe(undefined), { pc: {}, windows: {} });

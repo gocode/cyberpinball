@@ -88,7 +88,7 @@ test('commandes du pare-feu : entrée fermée, fin du processus, délai qui tue 
   assert.doesNotMatch(src, /child\.on\('close'/);
   assert.match(src, /taskkill\.exe', \['\/T', '\/F', '\/PID'/);
   assert.match(src, /process\.once\('exit', \(\) => running\.forEach\(killTree\)\)/);
-  assert.match(src, /run\(POWERSHELL, \['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', elevate\], FIREWALL_ELEVATION_MS\)/, 'l’autorisation de Windows a son propre délai');
+  assert.match(src, /run\(POWERSHELL, \['-NoProfile', '-NonInteractive', '-Command', elevate\], FIREWALL_ELEVATION_MS\)/, 'l’autorisation de Windows a son propre délai');
   // Toute commande passe par `run` (spawnRun ou celle d'un test) : aucun autre lancement direct.
   assert.equal(src.match(/\bspawn\(/g)?.length, 1);
 });

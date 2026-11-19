@@ -144,7 +144,7 @@ async function runScript(start: SimulatedSettings, settingsRun: SettingsRun): Pr
   assert.doesNotMatch(script, SYSTEM_CALLS);
   fs.writeFileSync(scriptFile, '\ufeff' + script, 'utf8');
   const ps = await new Promise<{ status: number | null; output: string }>((resolve) => {
-    const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptFile], { windowsHide: true });
+    const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'RemoteSigned', '-File', scriptFile], { windowsHide: true });
     let output = '';
     child.stdout.on('data', (d) => (output += d));
     child.stderr.on('data', (d) => (output += d));

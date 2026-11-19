@@ -187,6 +187,7 @@ export * from './localplay';
 export * from './recovery';
 export * from './vault';
 export * from './firewall';
+export * from './powershell';
 export * from './friendlibrary';
 export * from './livegame';
 export * from './instantgames';

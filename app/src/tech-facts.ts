@@ -1,12 +1,14 @@
 // Relevé de la fiche technique (packages/core/src/techsheet.ts) : un script PowerShell sans fenêtre, en lecture seule,
 // pour le PC et Windows (processeur, mémoire, carte graphique et son pilote, disques, réseau,
-// redémarrage en attente, mode d'alimentation, mode Jeu, notifications, antivirus, langue),
+// redémarrage en attente, mode d'alimentation, mode Jeu, notifications, langue),
 // DisplayConfig pour la connexion et les fréquences des écrans (probeDisplayLinks), la
 // configuration de la borne pour les rôles, les boutons et le lanceur, VPinballX.ini et le dossier
 // des plugins de VPX pour les logiciels, l'hôte pour Cyber Pinball lui-même.
 //
 // Le relevé ne lance rien de visible, ne demande aucune autorisation (UAC) et ne bloque pas le
 // menu : le script tourne à part, jusqu'à TECH_PROBE_MS. Une partie qui échoue reste absente.
+// Le script passe par un fichier .ps1 lisible, jamais encodé, et ne liste pas les antivirus du
+// poste : les deux ensemble ont fait prendre Cyber Pinball pour un cheval de Troie (powershell.ts).
 // Hors Windows ou dans les essais (CYBERPINBALL_FICHE : un fichier JSON de TechFacts), rien n'est lu
 // du système.
 
@@ -19,9 +21,12 @@ import {
   language,
   matchScreens,
   parseTechProbe,
+  powershellExe,
+  powershellFileArgs,
   readJsonFile,
   readTextIfExists,
   writeFileAtomic,
+  writeTempPowershellScript,
   type Cabinet,
   type ObservedDisplay,
   type RoleId,
@@ -88,7 +93,6 @@ try {
 $r.gameMode = (Get-ItemProperty 'HKCU:\Software\Microsoft\GameBar').AutoGameModeEnabled
 $r.hags = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers').HwSchMode
 $r.toast = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\PushNotifications').ToastEnabled
-try { $r.av = @(Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct | ForEach-Object { $_.displayName }) } catch {}
 try { $r.culture = (Get-Culture).Name } catch {}
 try { $r.keyboard = @((Get-WinUserLanguageList)[0].InputMethodTips)[0] } catch {}
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -98,13 +102,19 @@ $r | ConvertTo-Json -Depth 5 -Compress
 /** Lance le script ; sa sortie JSON brute, ou undefined (PowerShell absent, délai dépassé, sortie illisible). */
 export function runTechProbe(): Promise<unknown> {
   if (process.platform !== 'win32') return Promise.resolve(undefined);
-  const encoded = Buffer.from(TECH_PROBE_SCRIPT, 'utf16le').toString('base64');
+  let file: string;
+  try {
+    file = writeTempPowershellScript(`releve-${process.pid}`, TECH_PROBE_SCRIPT);
+  } catch {
+    return Promise.resolve(undefined);
+  }
   return new Promise((resolve) => {
     execFile(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded],
+      powershellExe(),
+      powershellFileArgs(file),
       { windowsHide: true, timeout: TECH_PROBE_MS, maxBuffer: 4 * 1024 * 1024, encoding: 'utf8' },
       (error, stdout) => {
+        fs.rmSync(file, { force: true });
         try {
           const text = stdout.trim().replace(/^﻿/, '');
           resolve(text ? JSON.parse(text.slice(text.indexOf('{'))) : undefined);

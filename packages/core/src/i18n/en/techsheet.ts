@@ -199,7 +199,6 @@ export const messages: Record<string, string> = {
   "Activées": "On",
   "Désactivées": "Off",
   "Visual C++": "Visual C++",
-  "Antivirus": "Antivirus",
   "Langue": "Language",
   "Clavier {layout}": "{layout} keyboard",
   "Windows": "Windows",

@@ -404,7 +404,8 @@ Section "Uninstall"
       ${If} $4 != ""
         StrCpy $4 "$4 & "
       ${EndIf}
-      StrCpy $4 '$4schtasks /delete /tn "Cyber Pinball pare-feu" /f' ; i18n-ignore : nom de la tâche
+      ; Et son script, dans ProgramData (firewall.ts, FIREWALL_REPAIR_DIR).
+      StrCpy $4 '$4schtasks /delete /tn "Cyber Pinball pare-feu" /f & rmdir /s /q "%ProgramData%\CyberPinball"' ; i18n-ignore : nom de la tâche
     ${EndIf}
     ${If} $4 != ""
       DetailPrint "$(L_DESINST_PAREFEU)"

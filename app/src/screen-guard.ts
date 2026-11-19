@@ -58,6 +58,9 @@ import {
   taskbarMarkerText,
   taskbarRescueScript,
   taskbarsToRestore,
+  powershellExe,
+  powershellFileArgs,
+  writeTempPowershellScript,
   type GuardScreen,
   type HiddenTaskbar,
   type TaskbarFacts,
@@ -327,10 +330,9 @@ function startTaskbarRescue(): void {
   if (rescueStarted || OFFSCREEN) return;
   rescueStarted = true;
   try {
-    const script = taskbarRescueScript({ pid: process.pid, exe: process.execPath, marker: taskbarMarker() });
-    const encoded = Buffer.from(script, 'utf16le').toString('base64');
-    const powershell = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-    spawn(powershell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-EncodedCommand', encoded], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    // Un fichier .ps1 lisible au nom fixe, remplacé à chaque lancement : jamais un script encodé (powershell.ts).
+    const script = writeTempPowershellScript('secours-barres', taskbarRescueScript({ pid: process.pid, exe: process.execPath, marker: taskbarMarker() }));
+    spawn(powershellExe(), powershellFileArgs(script), { detached: true, stdio: 'ignore', windowsHide: true }).unref();
   } catch (error) {
     console.warn(`Secours des barres des tâches non lancé : ${(error as Error).message}`); // i18n-ignore : console
   }

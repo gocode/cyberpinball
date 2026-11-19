@@ -5,17 +5,18 @@
 
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
-import { ELEVATION_WAIT_MS, elevationNoAnswer } from '@cyberpinball/core';
+import { ELEVATION_WAIT_MS, elevationNoAnswer, powershellExe } from '@cyberpinball/core';
 
 export const SYSTEM32 = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32');
-export const POWERSHELL = path.join(SYSTEM32, 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+export const POWERSHELL = powershellExe();
 /** Code de Start-Process quand l'utilisateur refuse l'élévation (ERROR_CANCELLED). */
 export const CANCELLED = 1223;
 
 /** `timeoutMs` : une demande de Windows (UAC) sans réponse n'est plus attendue au-delà (front-policy.ts). */
 export function powershell(command: string, timeoutMs?: number): Promise<{ status: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const child = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command], { windowsHide: true });
+    // Une commande d'une ligne (-Command) : la politique d'exécution ne la concerne pas (powershell.ts).
+    const child = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', command], { windowsHide: true });
     let stdout = '';
     let stderr = '';
     const timer = timeoutMs
