@@ -70,7 +70,7 @@ import {
 import { loadManifest, loadVpxSettingsSchema } from '@cyberpinball/installer';
 import { backupDir, locations, vpxInstall, vpxProfile } from './paths';
 import { activeVpxIni } from './vpx-ini';
-import { describeReset, resetButtons } from './buttons-reset';
+import { describeReset, resetButtons, resetCheck, resetConsequences } from './buttons-reset';
 import { coverDisplay } from './cover-display';
 import { onJoystickInput } from './joystick-input';
 import { createWindow, primaryRect, readyToShow, whenReadyToShow } from './offscreen';
@@ -449,7 +449,7 @@ function openRow(row: Row): void {
           [`[${row.section}] ${row.key} = ${row.value === '' ? t('(vide : touche par défaut de VPX)') : row.value}`, mapping.why],
           [
             { label: t('Affecter les boutons de la borne'), run: () => relaunchWizard(true) },
-            { label: t('Remettre les touches par défaut des encodeurs'), run: () => resetButtonsHere() },
+            { label: t('Remettre les touches par défaut des encodeurs'), run: () => askResetButtons() },
           ],
         )
       : info(`[${row.section}] ${row.key}`, [
@@ -695,10 +695,24 @@ function romVolumeDetail() {
   return { title: t('Volume de la ROM'), help, facts };
 }
 
-/** Touches par défaut des encodeurs (cabinet.json et [Input]) ; l'écran suit aussitôt ces touches. */
+/**
+ * Avant la remise : ce qu'elle fait, « Retour » présélectionné ; sur une borne aux boutons de joystick,
+ * la raison du refus et l'étape « Boutons » à la place (buttons-reset.ts).
+ */
+function askResetButtons(): void {
+  const s = session!;
+  const check = resetCheck();
+  if (check.state === 'none') return;
+  s.panel =
+    check.state === 'refused'
+      ? info(t('Touches par défaut des encodeurs'), [check.reason], [{ label: t('Affecter les boutons de la borne'), run: () => relaunchWizard(true) }])
+      : info(t('Remplacer les boutons par les touches par défaut ?'), [resetConsequences()], [{ label: t('Remplacer'), run: () => resetButtonsHere() }]);
+}
+
+/** Touches par défaut des encodeurs (cabinet.json et [Input]), confirmées ; l'écran suit aussitôt ces touches. */
 function resetButtonsHere(): void {
   const s = session!;
-  const reset = resetButtons();
+  const reset = resetButtons('réglages de VPX'); // i18n-ignore : journal
   if (!reset) return;
   KEYS = settingsKeys(reset.cabinet);
   s.owned = ownedKeys();

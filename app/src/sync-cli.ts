@@ -25,7 +25,7 @@ if (!cabinet) {
 
 // --boutons-par-defaut : touches par défaut des encodeurs, quand un mauvais relevé empêche de piloter la borne.
 if (process.argv.includes('--boutons-par-defaut')) {
-  const reset = resetButtons()!;
+  const reset = resetButtons('commande sync --boutons-par-defaut')!; // i18n-ignore : journal
   console.log('Touches par défaut des encodeurs remises dans cabinet.json.');
   for (const line of describeReset(reset)) console.log(line);
   process.exit(reset.sync.plan.findings.some((f) => f.severity === 'blocking') ? 1 : 0);

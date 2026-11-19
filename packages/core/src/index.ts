@@ -24,6 +24,7 @@ export * from './tables';
 export * from './pinballfx';
 export * from './pinballfx3';
 export * from './pinballfx-cabinet';
+export * from './buttons-backup';
 export * from './zen';
 export * from './tableorder';
 export * from './backtrail';

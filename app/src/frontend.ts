@@ -304,6 +304,7 @@ import {
   writeAccountBundle,
   type AccountCopy,
   applyPinballFxRotation,
+  formatDateTime,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
 import { detectFuturePinball, futurePinballPlan, placeFuturePinballWindow } from './futurepinball-play';
@@ -346,7 +347,7 @@ import { DesktopMode } from './desktop-mode';
 import { answerLegacy, legacyDesktopTurned, orientationForDesktop, orientationFromDesktop, takeOrientationProblems } from './display-orientation';
 import { acceptFrontends, otherFrontendsOnThisPc, unacceptedFrontends } from './frontend-gate';
 import { hideTaskbars, isVeil, nameScreen, onScreensSettled, recoverScreens, relaunchCovered, restoreTaskbars, setDesktopMode, setScreensBusy, settleScreens, takeCoverIncidents } from './screen-guard';
-import { describeReset, resetButtons } from './buttons-reset';
+import { buttonsBackup, describeReset, describeRestore, resetButtons, resetCheck, resetConsequences, restoreButtons } from './buttons-reset';
 import { forcedRotation, menuRotation, openSettings, romVolumeControl } from './settings';
 import { allowJukebox, allowPreview, serveMedias } from './media-protocol';
 import { startJukeboxMedia, stopJukeboxMedia, streamUrl } from './jukebox-media-server';
@@ -2054,11 +2055,23 @@ function cabinetSetupItems(): SystemItem[] {
   // « Écran du DMD » après la disposition des écrans, quand la borne a un DMD (aussi dans Borne > DMD).
   const dmd = dmdScreenItem();
   if (dmd) steps.splice(WIZARD_STEPS.findIndex((s) => s.id === 'disposition') + 1, 0, dmd);
+  // Remise aux touches par défaut : en dernier, refusée sur une borne à joystick, confirmée ailleurs (buttons-reset.ts).
+  const check = resetCheck();
+  const backup = buttonsBackup();
   return [
     ...steps,
     { label: t('Assistant complet'), detail: t('Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son'), icon: 'wizard', run: () => relaunchWizard() },
-    { label: t('Touches par défaut des encodeurs'), detail: t('Si les boutons ne répondent plus comme prévu (aussi à la souris)'), icon: 'keyboard', run: () => resetButtonsFromMenu() },
     configurations.systemItem,
+    ...(backup
+      ? [{ label: t('Rétablir les boutons d’avant'), detail: t('Relevé remplacé le {date} par les touches par défaut des encodeurs', { date: formatDateTime(backup.at) }), icon: 'restore' as const, run: () => restoreButtonsFromMenu() }]
+      : []),
+    {
+      label: t('Touches par défaut des encodeurs'),
+      detail: check.state === 'refused' ? t('Indisponible : les boutons de cette borne sont des boutons de joystick') : t('Pour une borne aux boutons de clavier ; demande confirmation'),
+      icon: 'keyboard',
+      ...(check.state === 'refused' ? { tone: 'quiet' as const } : {}),
+      run: () => openButtonsReset(),
+    },
   ];
 }
 
@@ -2164,7 +2177,7 @@ function openCabinetSetup(): void {
     icon: SYSTEM_ITEMS.cabinet.icon,
     lead: t('Chaque étape se refait seule, puis revient à l’écran des tables. Exit maintenu 2 s (ou le bouton « Quitter sans enregistrer » des boutons de l’interface) en sort sans rien changer, à toute étape.'),
     sections: [],
-    actions: [...cabinetSetupItems().map((i) => ({ label: i.label, detail: i.detail, icon: i.icon, attention: i.attention, run: i.run })), { label: t('Retour'), icon: 'back', run: () => library.openSystem() }],
+    actions: [...cabinetSetupItems().map((i) => ({ label: i.label, detail: i.detail, icon: i.icon, attention: i.attention, ...(i.tone ? { tone: i.tone } : {}), run: i.run })), { label: t('Retour'), icon: 'back', run: () => library.openSystem() }],
     back: () => library.openSystem(),
     // La sélection va d'office sur l'entrée qui attend l'utilisateur (pastille rouge).
   }), Math.max(0, cabinetSetupItems().findIndex((i) => i.attention)));
@@ -3612,16 +3625,66 @@ function restoreFromDesktop(): void {
   broadcast();
 }
 
-/** Menu système > « Borne » > « Configuration de la borne » > « Touches par défaut des encodeurs » : le menu suit aussitôt ces touches. */
+/**
+ * Menu système > « Borne » > « Configuration de la borne » > « Touches par défaut des encodeurs » : ce
+ * qu'elle fait, puis Annuler (présélectionné) ou Remplacer. Sur une borne aux boutons de joystick, la
+ * raison du refus et l'étape « Boutons » à la place : ses boutons ne répondraient plus.
+ */
+function openButtonsReset(): void {
+  const check = resetCheck();
+  if (check.state === 'none') return;
+  library.openCustom(() =>
+    check.state === 'refused'
+      ? {
+          heading: t('Touches par défaut des encodeurs'),
+          icon: 'keyboard',
+          lead: check.reason,
+          sections: [],
+          actions: [
+            { label: t('Retour'), icon: 'back', run: () => openCabinetSetup() },
+            { label: WIZARD_STEPS.find((s) => s.flag === '--boutons')!.label, icon: 'wizard', run: () => void relaunchWizard('--boutons') },
+          ],
+          back: () => openCabinetSetup(),
+        }
+      : {
+          heading: t('Remplacer les boutons par les touches par défaut ?'),
+          icon: 'keyboard',
+          lead: resetConsequences(),
+          sections: [],
+          actions: [
+            { label: t('Annuler'), icon: 'close', run: () => openCabinetSetup() },
+            { label: t('Remplacer'), tone: 'warning', icon: 'keyboard', run: () => resetButtonsFromMenu() },
+          ],
+          back: () => openCabinetSetup(),
+        },
+  );
+}
+
+/** Remise confirmée : le menu suit aussitôt ces touches. */
 function resetButtonsFromMenu(): void {
-  const reset = resetButtons();
+  const reset = resetButtons('Menu système'); // i18n-ignore : journal
   if (!reset) return;
-  buttons = reset.cabinet.buttons;
-  navigation = reset.cabinet.navigation;
-  KEYS = menuKeysFor(reset.cabinet);
-  library.leave();
+  followButtons(reset.cabinet);
   state = { ...state, phase: 'message', message: { title: t('Touches par défaut des encodeurs remises'), lines: describeReset(reset) } };
   broadcast();
+}
+
+/** Menu système > « Borne » > « Configuration de la borne » > « Rétablir les boutons d’avant » : le relevé gardé par la dernière remise. */
+function restoreButtonsFromMenu(): void {
+  const reset = restoreButtons();
+  if (!reset) return;
+  followButtons(reset.cabinet);
+  state = { ...state, phase: 'message', message: { title: t('Boutons d’avant rétablis'), lines: describeRestore(reset) } };
+  broadcast();
+}
+
+function followButtons(cabinet: Cabinet): void {
+  buttons = cabinet.buttons;
+  navigation = cabinet.navigation;
+  KEYS = menuKeysFor(cabinet);
+  library.leave();
+  // La relance par Start suit le Start de ce relevé (bouton de joystick ou non).
+  applyRelaunchWatcher();
 }
 
 export function startFrontend(): void {

@@ -79,7 +79,18 @@ export const messages: Record<string, string> = {
   'Assistant complet': 'Full wizard',
   'Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son': 'Every step in a row: buttons, screens, playfield, layout, sound',
   'Touches par défaut des encodeurs': 'Encoder default keys',
-  'Si les boutons ne répondent plus comme prévu (aussi à la souris)': 'If the buttons no longer respond as expected (mouse works too)',
+  'Pour une borne aux boutons de clavier ; demande confirmation': 'For a cabinet with keyboard buttons; asks for confirmation',
+  'Indisponible : les boutons de cette borne sont des boutons de joystick': 'Unavailable: this cabinet’s buttons are joystick buttons',
+  'Rétablir les boutons d’avant': 'Restore the previous buttons',
+  'Relevé remplacé le {date} par les touches par défaut des encodeurs': 'Mapping replaced on {date} by the encoder default keys',
+  'Remplacer les boutons par les touches par défaut ?': 'Replace the buttons with the default keys?',
+  Remplacer: 'Replace',
+  'Boutons d’avant rétablis': 'Previous buttons restored',
+  'Les boutons relevés avant la remise aux touches par défaut répondent de nouveau.': 'The buttons mapped before the reset to default keys respond again.',
+  'Chaque bouton de la borne, du jeu comme de l’interface, reprend la touche que les encodeurs envoient d’office : Maj pour les flippers, 1 pour Start, Échap pour Exit, 5 pour le crédit, Entrée pour le lanceur. À choisir seulement si vos boutons envoient ces touches de clavier. Le relevé actuel est gardé : « Rétablir les boutons d’avant » le remet.':
+    'Every cabinet button, game and interface alike, goes back to the key encoders send by default: Shift for the flippers, 1 for Start, Esc for Exit, 5 for credit, Enter for the plunger. Only choose this if your buttons send these keyboard keys. The current mapping is kept: “Restore the previous buttons” puts it back.',
+  'Les boutons de cette borne sont des boutons de joystick ({n}, Pinscape ou encodeur en mode manette) : des touches de clavier ne peuvent pas les remplacer, et plus aucun bouton ne répondrait. Pour changer un bouton, refaites l’étape « Boutons ».':
+    'This cabinet’s buttons are joystick buttons ({n}, Pinscape or encoder in gamepad mode): keyboard keys can’t replace them, and no button would respond anymore. To change a button, redo the “Buttons” step.',
   'Chaque étape se refait seule, puis revient à l’écran des tables. Exit maintenu 2 s (ou le bouton « Quitter sans enregistrer » des boutons de l’interface) en sort sans rien changer, à toute étape.':
     'Each step can be redone on its own, then returns to the table menu. Holding Exit for 2 s (or the “Quit without saving” interface button) leaves without changing anything, at any step.',
   'Bureau Windows': 'Windows desktop',
