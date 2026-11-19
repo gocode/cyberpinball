@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Feedback and ideas: each status of an idea has its own badge (icon and colour), outlined until the team commits to it and filled once it does. "New", "Under review", "Planned", "In development", "Done" and "Not planned" are told apart at a glance, and an idea's page says what its status means.
 - Tables without sound: after each game, the cabinet log says which sound outputs VPX opened, which ones it did not find, and the music it did not find. The diagnosis reports music not found during the last game, and sound muted by the table's own setting (volume at 0 in its .ini), with a way to bring it back.
 - PuP-Pack whose music playlist is empty (Goldorak): the diagnosis reports it as a warning, and says the table will be silent until the pack is complete.
 - Music named through a variable, or played by a script procedure ("PlaySong "theme.mp3""): it is now recognised, brought along with the table from another installation, and reported when it is missing.

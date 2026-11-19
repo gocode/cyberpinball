@@ -337,6 +337,89 @@ body.mouse .lib-back:hover {
   word-break: break-word;
 }
 
+/*
+ * Pastille d'état (Retours et propositions, Row.status) : en tête de la ligne du détail, au même bord
+ * gauche que le titre d'une ligne à l'autre. Chaque état se reconnaît sans lire : son icône, sa
+ * couleur (blanc, bleu méta, ambre, vert signal, gris), un contour tant que rien n'est engagé, un
+ * fond plein dès que l'équipe s'y engage, des pointillés éteints pour « Pas retenue ». Texte de
+ * 20 px à 1080 ; le fond plein reste lisible sur la ligne choisie (dégradé vert translucide).
+ */
+.lib-row-detail.with-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6cqmin 1.2cqmin;
+  margin-top: 0.7cqmin;
+}
+
+.lib-status {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.6cqmin;
+  box-sizing: border-box;
+  padding: 0.2cqmin 1cqmin 0.2cqmin 0.8cqmin;
+  border: 0.19cqmin solid currentColor;
+  border-radius: 0.4cqmin;
+  font-family: var(--font-ui);
+  font-size: 1.86cqmin;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lib-status-icon {
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+  stroke-width: 2.2;
+}
+
+.lib-status.tone-neutral {
+  color: var(--ink);
+}
+
+.lib-status.tone-info {
+  color: var(--meta);
+}
+
+.lib-status.tone-warning {
+  color: var(--warning);
+}
+
+.lib-status.tone-ok {
+  color: var(--signal);
+}
+
+.lib-status.tone-quiet {
+  color: var(--ink-muted);
+}
+
+.lib-status.fill-solid {
+  border-color: transparent;
+}
+
+.lib-status.fill-solid.tone-info {
+  background: var(--meta);
+  color: var(--void);
+}
+
+.lib-status.fill-solid.tone-warning {
+  background: var(--warning);
+  color: var(--on-warning);
+}
+
+.lib-status.fill-solid.tone-ok {
+  background: var(--signal);
+  color: var(--on-signal);
+}
+
+.lib-status.fill-dashed {
+  border-style: dashed;
+}
+
 .lib-row.more {
   color: var(--quiet);
   font-style: italic;

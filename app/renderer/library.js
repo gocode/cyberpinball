@@ -16,6 +16,16 @@ function rowAside(row) {
   return aside;
 }
 
+/**
+ * Pastille d'état d'une ligne (Retours et propositions) : son icône et son mot, jamais la couleur
+ * seule ; ton et remplissage (contour, plein, pointillés) en classes, library.css.
+ */
+function rowStatus(status) {
+  const chip = libEl('span', `lib-status tone-${status.tone} fill-${status.fill}`);
+  chip.append(cyberIcon(status.icon, 'lib-status-icon'), libEl('span', 'lib-status-text', status.text));
+  return chip;
+}
+
 // Vue en cours de dessin : un clic part avec l'identité de l'action qu'il vise (focus.ts),
 // pour valider cet élément même si la liste a bougé entre-temps.
 let drawn;
@@ -212,7 +222,13 @@ function renderLibrary(v) {
         // Schéma à droite (« Écran du DMD ») ou pastille à gauche : le texte passe dans une colonne à part.
         const main = row.figure || row.avatar || parts || row.controls ? libEl('div', 'lib-row-main') : li;
         main.append(line);
-        if (row.detail) main.append(libEl('div', 'lib-row-detail', row.detail));
+        // Pastille d'état (Retours et propositions) : en tête de la ligne du détail, au bord gauche du texte.
+        if (row.status) {
+          const detail = libEl('div', 'lib-row-detail with-status');
+          detail.append(rowStatus(row.status));
+          if (row.detail) detail.append(libEl('span', 'lib-row-detail-text', row.detail));
+          main.append(detail);
+        } else if (row.detail) main.append(libEl('div', 'lib-row-detail', row.detail));
         if (row.sub) main.append(libEl('div', 'lib-row-sub', row.sub));
         if (row.figure) li.append(main, dmdFigure(row.figure));
         // Légende du menu du casque : le schéma des manettes à gauche, la commande en vert ; sans dessin, une case vide.

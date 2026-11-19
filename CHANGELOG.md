@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.1
 
+- Retours et propositions : chaque état d'une proposition a sa propre pastille (icône et couleur), avec un contour tant que l'équipe ne s'est pas engagée et un fond plein dès qu'elle l'est. « Nouvelle », « À l'étude », « Prévue », « En développement », « Faite » et « Pas retenue » se distinguent d'un coup d'œil, et la fiche d'une proposition dit ce que son état veut dire.
 - Tables sans son : après chaque partie, le journal de la borne dit quelles sorties du son VPX a ouvertes, celles qu'il n'a pas trouvées, et la musique qu'il n'a pas trouvée. Le diagnostic signale une musique introuvable à la dernière partie, et un son coupé par le réglage propre à la table (volume à 0 dans son .ini), avec de quoi le rendre.
 - PuP-Pack dont la playlist de musique est vide (Goldorak) : le diagnostic le signale comme un avertissement, et dit que la table sera muette tant que le pack n'est pas complet.
 - Musique nommée par une variable, ou jouée par une procédure du script (« PlaySong "theme.mp3" ») : elle est maintenant reconnue, reprise avec la table depuis une autre installation, et signalée quand elle n'y est pas.

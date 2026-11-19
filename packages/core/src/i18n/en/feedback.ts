@@ -19,6 +19,13 @@ export const messages: Record<string, string> = {
   'En développement': 'In development',
   'Faite': 'Done',
   'Pas retenue': 'Not planned',
+  'Pas encore examinée par l’équipe': 'Not reviewed by the team yet',
+  'L’équipe l’examine': 'The team is looking into it',
+  'Retenue : elle arrivera dans une prochaine version': 'Accepted: it will come in a future version',
+  'L’équipe y travaille en ce moment': 'The team is working on it now',
+  'Disponible dans Cyber Pinball': 'Available in Cyber Pinball',
+  'L’équipe ne prévoit pas de la faire': 'The team does not plan to do it',
+  'Avancement': 'Progress',
   // L'accueil
   'Demander au prochain plantage': 'Ask at the next crash',
   'Proposer une idée': 'Suggest an idea',
@@ -58,7 +65,6 @@ export const messages: Record<string, string> = {
   'Voter pour cette proposition': 'Vote for this idea',
   'Une voix par borne · votre pseudo s’affiche parmi ses soutiens': 'One vote per cabinet · your nickname shows among its supporters',
   'Indisponible : la borne n’a pas encore sa clé de joueur': 'Unavailable: the cabinet does not have its player key yet',
-  'État : {status}': 'Status: {status}',
   'Proposée le {when}': 'Suggested on {when}',
   // Auteur et soutiens (18/11/2026)
   'Proposée depuis cette borne': 'Suggested from this cabinet',

@@ -235,16 +235,23 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     return PROPOSAL_KIND_VIEW[id].label;
   }
 
+  /** La pastille d'état d'une proposition : chaque état a son icône, sa couleur et son remplissage. */
+  function statusChip(p: Proposal): NonNullable<Row['status']> {
+    const view = PROPOSAL_STATUS_VIEW[p.status];
+    return { text: view.label, icon: view.icon, tone: view.tone, fill: view.fill };
+  }
+
   function proposalRow(p: Proposal, action?: number): Row {
-    const status = PROPOSAL_STATUS_VIEW[p.status];
     return {
       ...(action !== undefined ? { action, pick: true } : {}),
       icon: PROPOSAL_KIND_VIEW[p.kind].icon,
       text: maskWords(p.title),
       detail: [PROPOSAL_KIND_VIEW[p.kind].label, p.author ? t('par {name}', { name: p.author.name }) : '', p.merged ? tn(p.merged, '{n} doublon regroupé', '{n} doublons regroupés') : '', p.reply ? t('réponse de l’équipe') : ''].filter(Boolean).join(' · '),
       aside: tn(p.votes, '{n} vote', '{n} votes'),
-      // L'état et le vote se lisent dans les badges : la couleur de la ligne reste au choix courant.
-      badges: [...(p.status !== 'new' ? [status.label] : []), ...(p.voted ? [t('✓ Voté')] : [])],
+      // L'état dans sa pastille, en tête du détail (« Nouvelle » comprise) ; le vote dans un badge.
+      // La couleur de la ligne reste au choix courant.
+      status: statusChip(p),
+      ...(p.voted ? { badges: [t('✓ Voté')] } : {}),
     };
   }
 
@@ -289,7 +296,6 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
             : { label: t('Voter pour cette proposition'), detail: t('Indisponible : la borne n’a pas encore sa clé de joueur'), icon: 'check', tone: 'quiet', key: 'feedback:vote', run: self },
       );
       actions.push({ label: t('Retour'), icon: 'back', run: back });
-      const status = PROPOSAL_STATUS_VIEW[p.status];
       const rows: Row[] = [];
       if (p.text) rows.push({ icon: 'edit', text: maskWords(p.text) });
       const when = formatDateTime(p.at, { dateStyle: 'medium' });
@@ -299,7 +305,8 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
           ? personRow(p.author, p.mine ? t('Proposée depuis cette borne le {when}', { when }) : t('A proposé le {when}', { when }))
           : { icon: 'account', text: p.mine ? t('Proposée depuis cette borne') : t('Auteur non nommé'), detail: t('Proposée le {when}', { when }), tone: 'quiet' },
       );
-      rows.push({ icon: 'info', text: t('État : {status}', { status: status.label }), ...(status.tone ? { tone: status.tone } : {}) });
+      // L'état : la même pastille que dans la liste, et ce qu'il veut dire.
+      rows.push({ icon: 'info', text: t('Avancement'), status: statusChip(p), detail: PROPOSAL_STATUS_VIEW[p.status].meaning });
       return {
         heading: maskWords(p.title),
         icon: PROPOSAL_KIND_VIEW[p.kind].icon,

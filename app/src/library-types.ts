@@ -306,6 +306,12 @@ export interface Row {
   detail?: string;
   tone?: Tone;
   badges?: string[];
+  /**
+   * Pastille d'état en tête de la ligne du détail (Retours et propositions : PROPOSAL_STATUS_VIEW) :
+   * icône et mot, à la couleur de son ton ; contour, fond plein ou pointillés selon `fill`. Sous le
+   * texte, toutes au même bord gauche d'une ligne à l'autre.
+   */
+  status?: { text: string; icon: IconName; tone: 'neutral' | 'info' | 'warning' | 'ok' | 'quiet'; fill: 'outline' | 'solid' | 'dashed' };
   /** Ligne rattachée à une action : surlignée quand l'action est choisie. */
   action?: number;
   /** Ligne à choisir (un fichier, un élément de la liste d'attente) : son action n'est pas répétée dans la liste des actions. */

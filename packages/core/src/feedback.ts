@@ -88,13 +88,28 @@ export const PROPOSAL_KIND_VIEW: Record<ProposalKind, { icon: IconName; readonly
   feature: { icon: 'star', get label() { return t('Nouvelle fonction'); }, get lead() { return t('Quelque chose que Cyber Pinball ne fait pas encore'); } },
 };
 
-export const PROPOSAL_STATUS_VIEW: Record<ProposalStatus, { readonly label: string; tone?: 'ok' | 'info' | 'quiet' | 'warning' }> = {
-  new: { get label() { return t('Nouvelle'); } },
-  review: { get label() { return t('À l’étude'); }, tone: 'info' },
-  planned: { get label() { return t('Prévue'); }, tone: 'info' },
-  progress: { get label() { return t('En développement'); }, tone: 'warning' },
-  done: { get label() { return t('Faite'); }, tone: 'ok' },
-  declined: { get label() { return t('Pas retenue'); }, tone: 'quiet' },
+/**
+ * L'aspect d'un état, pour que chacun se reconnaisse d'un coup d'œil (19/11/2026 : tous écrits pareil,
+ * on ne les distinguait pas) : sa propre icône, sa couleur, et un contour tant que l'équipe ne s'est pas
+ * engagée, un fond plein dès qu'elle l'est (prévue, en développement, faite) ; « Pas retenue » en
+ * pointillés éteints. Deux états n'ont jamais le même aspect (feedback-etats.test.ts).
+ */
+export interface ProposalStatusView {
+  readonly label: string;
+  /** Ce que l'état veut dire pour le joueur, sur la fiche de la proposition. */
+  readonly meaning: string;
+  icon: IconName;
+  tone: 'neutral' | 'info' | 'warning' | 'ok' | 'quiet';
+  fill: 'outline' | 'solid' | 'dashed';
+}
+
+export const PROPOSAL_STATUS_VIEW: Record<ProposalStatus, ProposalStatusView> = {
+  new: { get label() { return t('Nouvelle'); }, get meaning() { return t('Pas encore examinée par l’équipe'); }, icon: 'sparkle', tone: 'neutral', fill: 'outline' },
+  review: { get label() { return t('À l’étude'); }, get meaning() { return t('L’équipe l’examine'); }, icon: 'eye', tone: 'info', fill: 'outline' },
+  planned: { get label() { return t('Prévue'); }, get meaning() { return t('Retenue : elle arrivera dans une prochaine version'); }, icon: 'calendar', tone: 'info', fill: 'solid' },
+  progress: { get label() { return t('En développement'); }, get meaning() { return t('L’équipe y travaille en ce moment'); }, icon: 'gear', tone: 'warning', fill: 'solid' },
+  done: { get label() { return t('Faite'); }, get meaning() { return t('Disponible dans Cyber Pinball'); }, icon: 'check', tone: 'ok', fill: 'solid' },
+  declined: { get label() { return t('Pas retenue'); }, get meaning() { return t('L’équipe ne prévoit pas de la faire'); }, icon: 'close', tone: 'quiet', fill: 'dashed' },
 };
 
 // ---------------------------------------------------------------------------
