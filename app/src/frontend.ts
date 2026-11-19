@@ -6,6 +6,9 @@ import {
   otherVpxLabel,
   otherVpxRefusal,
   readOtherVpx,
+  readVpxFileVersion,
+  tableTooNew,
+  tooNewRefusal,
   joystickStartCode,
   relaunchEnabled,
   saveRelaunchEnabled,
@@ -4905,6 +4908,14 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (otherRefused) {
     console.log(`Partie (${table.id}) avec ${otherVpxLabel(otherVpx)} : ${otherRefused.title}.`); // i18n-ignore : journal
     state = { ...state, phase: 'message', help: false, message: otherRefused };
+    broadcast();
+    return undefined;
+  }
+  // Table enregistrée par un VPX plus récent (vpx-format.ts) : celui-ci afficherait une erreur et la chargerait mal.
+  const tooNew = table.emulator === 'vpx' && simulated === undefined ? tableTooNew(readVpxFileVersion(table.file), table.info, vpxInstall(loc)?.version, readOtherVpx(loc.dataDir)) : undefined;
+  if (tooNew) {
+    console.log(`Partie (${table.id}) refusée : enregistrée par VPX ${tooNew.table}, plus récent que ${tooNew.player}.`); // i18n-ignore : journal
+    state = { ...state, phase: 'message', help: false, message: tooNewRefusal(tooNew) };
     broadcast();
     return undefined;
   }

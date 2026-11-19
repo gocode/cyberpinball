@@ -62,6 +62,16 @@ export const messages: Record<string, string> = {
   'Avec toutes les fonctions de Cyber Pinball · choix actuel': 'With all of Cyber Pinball’s features · current choice',
   '{exe} · choix actuel': '{exe} · current choice',
   'Changer le VPX': 'Change the VPX',
+  // Table enregistrée par un VPX plus récent (vpx-format.ts) : médecin, Santé de la borne, installation, partie refusée
+  'Table enregistrée par VPX {table}': 'Table saved with VPX {table}',
+  '{vpx} ne sait pas ouvrir une table enregistrée par VPX {table} : la partie échouerait.': '{vpx} cannot open a table saved with VPX {table}: the game would fail.',
+  '{vpx} sait la jouer : Gérer la table, puis « Jouée avec », pour le choisir.': '{vpx} can play it: Manage table, then “Played with”, to choose it.',
+  'Ajoutez un VPX {table} ou plus récent (Menu système > Borne > Autres versions de VPX), puis choisissez-le dans Gérer la table, « Jouée avec ».':
+    'Add a VPX {table} or newer (System menu > Cabinet > Other VPX versions), then choose it in Manage table, “Played with”.',
+  '{vpx} ne peut pas ouvrir cette table': '{vpx} cannot open this table',
+  'Elle a été enregistrée par VPX {table}, plus récent.': 'It was saved with VPX {table}, a newer version.',
+  'La jouer avec {vpx}': 'Play it with {vpx}',
+  'Table enregistrée par VPX {table}, que ce VPX ne sait pas ouvrir : le script n’a pas pu être lu.': 'Table saved with VPX {table}, which this VPX cannot open: the script could not be read.',
   // Nouveautés du front-end (news.ts)
   'Les tables qui tournent mieux avec VPX 10.8.0 se jouent avec lui, table par table.': 'Tables that run better with VPX 10.8.0 are played with it, table by table.',
   'Ajoutez un VPX déjà installé sur ce PC (ceux des autres installations sont proposés d’office), puis choisissez-le dans la fiche d’une table ou quand elle s’installe. Une table reprise d’une autre installation garde le VPX qui la jouait.':

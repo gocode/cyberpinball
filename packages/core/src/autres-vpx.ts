@@ -18,6 +18,7 @@ import { readWholeFile } from './boundedread';
 import { samePath } from './fileops';
 import { t, tLater, type LaterText } from './i18n';
 import { peFileVersion } from './vc-runtime';
+import { vpxFormatName, vpxReadableFormat, vpxVersionName } from './vpx-format';
 
 /** Un autre VPX, déjà installé sur le PC. */
 export interface OtherVpx {
@@ -47,9 +48,17 @@ export function otherVpxShortVersion(version: string): string {
   return version.split('.').slice(0, 3).join('.');
 }
 
-/** « VPX 10.8.0 » : ce que montrent la fiche, l'installation d'une table et le menu système. */
+/**
+ * « VPX 10.8.0 » : ce que montrent la fiche, l'installation d'une table et le menu système. Une préversion qui lit
+ * un format plus récent que son numéro garde sa révision (« VPX 10.8.1.6012 », vpxVersionName).
+ */
 export function otherVpxLabel(v: Pick<OtherVpx, 'version'>): string {
-  return `VPX ${otherVpxShortVersion(v.version)}`; // i18n-ignore : nom de logiciel et numéro de version
+  return `VPX ${vpxVersionName(v.version)}`; // i18n-ignore : nom de logiciel et numéro de version
+}
+
+/** Le VPX de Cyber Pinball, tel que la fiche et l'installation d'une table le nomment (`version` : « 10.8.1-5436 »). */
+export function ownVpxLabel(version: string | undefined): string {
+  return version ? t('VPX {version} de Cyber Pinball', { version: otherVpxShortVersion(version.replace(/-/g, '.')) }) : t('VPX de Cyber Pinball');
 }
 
 export function readOtherVpx(dataDir: string): OtherVpx[] {
@@ -175,6 +184,64 @@ export function otherVpxRefusal(v: OtherVpx, game: { exists: boolean; display?: 
     };
   }
   return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Table enregistrée par un VPX plus récent (vpx-format.ts)
+
+/** Une table que le VPX qui la joue ne sait pas ouvrir : elle a été enregistrée par un VPX plus récent. */
+export interface TooNewTable {
+  /** « 10.9 » : le VPX qui l'a enregistrée (vpxFormatName). */
+  table: string;
+  /** Le VPX qui la joue, nommé (« VPX 10.8.1 de Cyber Pinball », « VPX 10.8.0 »). */
+  player: string;
+  /**
+   * Ceux qui savent l'ouvrir : le VPX de Cyber Pinball d'abord (id undefined, toutes ses fonctions), puis les
+   * autres VPX de la liste, le plus récent d'abord.
+   */
+  able: { id: string | undefined; label: string }[];
+}
+
+/**
+ * La table (son format, readVpxFileVersion ; son .info pour le VPX choisi) est-elle plus récente que le VPX qui la
+ * joue ? `own` : version du VPX de Cyber Pinball (« 10.8.1-5436 ») ; `others` : autres-vpx.json. undefined : il
+ * sait l'ouvrir, ou rien ne permet de le dire (format ou version inconnus, VPX de Cyber Pinball absent).
+ */
+export function tableTooNew(format: number | undefined, info: { [key: string]: unknown }, own: string | undefined, others: OtherVpx[]): TooNewTable | undefined {
+  if (format === undefined) return undefined;
+  const reads = (version: string | undefined) => {
+    const readable = version === undefined ? undefined : vpxReadableFormat(version);
+    return readable !== undefined && format <= readable;
+  };
+  const chosen = otherVpxFor(info, others);
+  const version = chosen ? chosen.version : own;
+  const readable = version === undefined ? undefined : vpxReadableFormat(version);
+  if (readable === undefined || format <= readable) return undefined;
+  const able: TooNewTable['able'] = [];
+  if (chosen && reads(own)) able.push({ id: undefined, label: ownVpxLabel(own) });
+  const newest = others.filter((v) => v !== chosen && reads(v.version)).sort((a, b) => (vpxReadableFormat(b.version) ?? 0) - (vpxReadableFormat(a.version) ?? 0));
+  for (const v of newest) able.push({ id: v.id, label: otherVpxLabel(v) });
+  return { table: vpxFormatName(format), player: chosen ? otherVpxLabel(chosen) : ownVpxLabel(own), able };
+}
+
+/** Pourquoi la partie échouerait : « VPX 10.8.1 de Cyber Pinball ne sait pas ouvrir une table enregistrée par VPX 10.9… ». */
+export function tooNewReason(c: TooNewTable): string {
+  return t('{vpx} ne sait pas ouvrir une table enregistrée par VPX {table} : la partie échouerait.', { vpx: c.player, table: c.table });
+}
+
+/** Ce qu'il faut faire : choisir le VPX qui sait l'ouvrir dans la fiche, ou en ajouter un. */
+export function tooNewAdvice(c: TooNewTable): string {
+  const first = c.able[0];
+  if (first) return t('{vpx} sait la jouer : Gérer la table, puis « Jouée avec », pour le choisir.', { vpx: first.label });
+  return t('Ajoutez un VPX {table} ou plus récent (Menu système > Borne > Autres versions de VPX), puis choisissez-le dans Gérer la table, « Jouée avec ».', { table: c.table });
+}
+
+/** Message qui remplace la partie, avant de lancer VPX (même forme qu'otherVpxRefusal). */
+export function tooNewRefusal(c: TooNewTable): { title: string; lines: string[] } {
+  return {
+    title: t('{vpx} ne peut pas ouvrir cette table', { vpx: c.player }),
+    lines: [t('Elle a été enregistrée par VPX {table}, plus récent.', { table: c.table }), tooNewAdvice(c), t('Start ou Exit : revenir au front-end.')],
+  };
 }
 
 // ---------------------------------------------------------------------------

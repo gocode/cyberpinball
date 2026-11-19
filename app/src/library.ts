@@ -63,6 +63,8 @@ import {
   knownTableInstallations,
   otherVpxFor,
   otherVpxLabel,
+  tooNewAdvice,
+  tooNewReason,
   withVpxChoice,
   PINBALLFX_TABLES,
   PINBALLFX3_CABINET_HELP_URL,
@@ -1916,6 +1918,7 @@ export function createLibrary(host: LibraryHost) {
       dmdPlaced: Boolean(cabinet && dmdPlaceOf(readDmdPlaces(host.dataDir), cabinet.id, table.id)),
       dof: readDofQuiet(),
       romVolume: host.romVolume?.(table),
+      vpx: { own: host.vpxVersion?.(), others: otherVpxMenu.list() },
     });
     // Constats ignorés par le joueur pour cette table : hors du compte, gardés pour le Diagnostic.
     const { shown, ignored } = splitIgnoredFindings(findings, table.info);
@@ -1946,6 +1949,7 @@ export function createLibrary(host: LibraryHost) {
     const vpxLog = readLog(host.vpxLogFile?.());
     const orientation = host.playfieldOrientation?.();
     const dof = readDofQuiet();
+    const vpx = { own: host.vpxVersion?.(), others: otherVpxMenu.list() };
     return (table) => {
       const script = cachedScript(table.file, host.dataDir);
       if (!script) return undefined;
@@ -1960,6 +1964,7 @@ export function createLibrary(host: LibraryHost) {
         orientation,
         dof,
         romVolume: host.romVolume?.(table),
+        vpx,
       });
       return splitIgnoredFindings(findings, table.info).shown;
     };
@@ -4640,7 +4645,7 @@ export function createLibrary(host: LibraryHost) {
 
   function openPlanVpx(s: AddPlan, tp: TablePlan): void {
     const others = otherVpxMenu.list();
-    const current = planVpx.choiceFor(s, tp, others);
+    const current = planVpx.choiceFor(s, tp, others, host.vpxVersion?.());
     const back = () => go(s);
     const choose = (id: string | undefined) => {
       (s.vpxChoices ??= new Map()).set(tp.folder.toLowerCase(), id ?? null);
@@ -4687,7 +4692,7 @@ export function createLibrary(host: LibraryHost) {
       }
       // Le VPX de la table, seulement quand un autre VPX est dans Menu système > Borne > Autres versions de VPX.
       if (others.length && tp.steps.some((st) => st.kind === 'table')) {
-        const choice = planVpx.choiceFor(s, tp, others);
+        const choice = planVpx.choiceFor(s, tp, others, host.vpxVersion?.());
         const chosen = others.find((v) => v.id === choice);
         rows.push({
           text: playedWithText(chosen, host.vpxVersion?.()),
@@ -4696,6 +4701,11 @@ export function createLibrary(host: LibraryHost) {
           action: 2 + choiceActions.length,
         });
         choiceActions.push({ label: t('Changer le VPX'), detail: path.basename(tp.folder), run: () => openPlanVpx(s, tp) });
+      }
+      // Table enregistrée par un VPX plus récent que celui qui la jouerait (vpx-format.ts) : dit avant d'installer.
+      if (tp.steps.some((st) => st.kind === 'table')) {
+        const tooNew = planVpx.tooNew(tp, others.length ? planVpx.choiceFor(s, tp, others, host.vpxVersion?.()) : undefined, others, host.vpxVersion?.());
+        if (tooNew) rows.push({ text: tooNewReason(tooNew), detail: tooNewAdvice(tooNew), tone: 'warning' });
       }
       for (const step of tp.steps) {
         // Média reconnu : son libellé (Logo, Fronton…) plutôt que « Médias du frontend ».
@@ -4866,7 +4876,7 @@ export function createLibrary(host: LibraryHost) {
       const others = otherVpxMenu.list();
       for (const t of plan.tables) {
         // Le VPX de la table (autres-vpx.ts), écrit dans son .info avec le reste.
-        if (others.length && t.steps.some((st) => st.kind === 'table')) t.info = withVpxChoice(t.info, planVpx.choiceFor(s, t, others));
+        if (others.length && t.steps.some((st) => st.kind === 'table')) t.info = withVpxChoice(t.info, planVpx.choiceFor(s, t, others, host.vpxVersion?.()));
         applyImport(t, { trashDir, cleanupRoots });
         for (const step of t.steps.filter((st) => st.kind === 'table')) {
           const facts = s.scripts.get(step.from.toLowerCase());

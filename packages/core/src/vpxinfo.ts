@@ -507,6 +507,29 @@ export function readVpxTableName(file: string): string | undefined {
   }
 }
 
+/**
+ * Version du format de la table : l'entier de 4 octets (petit-boutiste) du flux GameStg/Version, écrit par
+ * PinTable::SaveToStorage avec le CURRENT_FILE_FORMAT_VERSION du VPX qui l'a enregistrée (1080 : VPX 10.8.0,
+ * 1081 : 10.8.1, 1090 : préversions 10.9). VPX lit le même flux au chargement (PinTable::LoadGameFromStorage) et
+ * prévient quand il dépasse le sien (vpx-format.ts). undefined : fichier illisible, ou pas une table de VPX 10.
+ */
+export function readVpxFileVersion(file: string): number | undefined {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(file, 'r');
+    const cfb = new CompoundFile(fd);
+    const game = cfb.children(cfb.entries[0]!).find((e) => e.type === 1 && e.name === 'GameStg');
+    const version = game && cfb.children(game).find((e) => e.type === 2 && e.name === 'Version');
+    if (!version) return undefined;
+    const data = cfb.stream(version, 4);
+    return data.length >= 4 ? data.readInt32LE(0) : undefined;
+  } catch {
+    return undefined;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
 /** Plateau et vitre d'une table, en unités de VPX (PinTable : LEFT, RGHT, TOPX, BOTM, GLAS, GLAB de GameData). */
 export interface VpxGlass {
   /** Version du format (flux GameStg/Version) : 1080 pour VPX 10.8. */

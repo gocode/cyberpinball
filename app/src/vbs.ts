@@ -13,7 +13,7 @@
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { COMPAT_FIXES, readVpxScript, saveOrWarn, scriptFacts, t, writeFileAtomic, type ScriptFacts } from '@cyberpinball/core';
+import { checkOtherVpx, COMPAT_FIXES, readVpxFileVersion, readVpxScript, saveOrWarn, scriptFacts, t, vpxFormatName, vpxReadsFormat, writeFileAtomic, type ScriptFacts } from '@cyberpinball/core';
 
 export type ScriptResult = ScriptFacts | { error: string };
 
@@ -73,6 +73,12 @@ export async function readScript(exe: string | undefined, table: string, dataDir
   }
   // Pas de VPX pour extraire le script (pas encore installé) : celui écrit dans le .vpx, lu sans lui.
   if (!exe) return fromTable(t('VPX n’est pas installé : le script n’a pas pu être lu.'));
+  // Table enregistrée par un VPX plus récent que celui-ci (vpx-format.ts) : il ouvrirait une fenêtre d'erreur et
+  // attendrait qu'on la ferme. Le script est lu dans le .vpx, sans lui.
+  const format = readVpxFileVersion(table);
+  if (format !== undefined && !vpxReadsFormat(exeVersion(exe), format)) {
+    return fromTable(t('Table enregistrée par VPX {table}, que ce VPX ne sait pas ouvrir : le script n’a pas pu être lu.', { table: vpxFormatName(format) }));
+  }
 
   fs.mkdirSync(path.join(dataDir, 'cache'), { recursive: true });
   const work = fs.mkdtempSync(path.join(dataDir, 'cache', 'script-'));
@@ -153,6 +159,18 @@ export function withPlayedScript(table: string, facts: ScriptFacts): ScriptFacts
 
 function sameNames(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((n, i) => n.toLowerCase() === b[i]!.toLowerCase());
+}
+
+/** Version de chaque exécutable de VPX, lue une fois par session (fichier de plusieurs dizaines de Mo). */
+const exeVersions = new Map<string, string | undefined>();
+
+function exeVersion(exe: string): string | undefined {
+  const key = exe.toLowerCase();
+  if (!exeVersions.has(key)) {
+    const checked = checkOtherVpx(exe, undefined);
+    exeVersions.set(key, checked.ok ? checked.version : undefined);
+  }
+  return exeVersions.get(key);
 }
 
 function run(exe: string, args: string[]): Promise<void> {

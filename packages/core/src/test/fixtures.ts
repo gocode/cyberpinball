@@ -366,6 +366,16 @@ export function vpxWithScript(script: string, protectedScript = false): Buffer {
   return cfb({ TableName: 'Table' }, { GameData: gameData });
 }
 
+/**
+ * .vpx minimal enregistré par un VPX dont le format est `version` (flux GameStg/Version, entier de 4 octets
+ * petit-boutiste, comme sur les vraies tables : 1080, 1081, 1090), avec ce script.
+ */
+export function vpxSavedWith(version: number, script = 'Option Explicit\r\n'): Buffer {
+  const text = Buffer.from(script, 'latin1');
+  const gameData = Buffer.concat([biff('NAME', biffStr('Table1')), biff('CODE'), u32(text.length), text, biff('ENDB')]);
+  return cfb({ TableName: 'Table' }, { GameData: gameData, Version: u32(version) });
+}
+
 /** Une table avec son script et des images rangées en elle (GameStg/ImageN : nom et dimensions, sans pixels). */
 export function vpxWithScriptAndImages(script: string, images: { name: string; width: number; height: number }[]): Buffer {
   const text = Buffer.from(script, 'latin1');

@@ -16,7 +16,7 @@ import { blocksPlay, playBlockers } from '../playable';
 import { readInfo, scanTables, type TableEntry } from '../tables';
 import { buildZip } from '../romzip';
 import { readDofSetup, type DofSetup } from '../dof';
-import { devPcDisplays, framedFullDmd, starTrekPack, vpxWithScript, vpxWithScriptAndImages } from './fixtures';
+import { devPcDisplays, framedFullDmd, starTrekPack, vpxSavedWith, vpxWithScript, vpxWithScriptAndImages } from './fixtures';
 import { pngFrame } from '../fulldmdframe';
 import { dressScreen, tableDressing } from '../fulldmdtable';
 import type { Cabinet, PhysicalScreen } from '../model';
@@ -643,6 +643,12 @@ const TRAPS: Trap[] = [
     code: 'lowRomVolume',
     arm: (folder) => write(path.join(folder, 'pinmame', 'nvram', 'mb_106b.nv'), (writeRomVolume(realMemory('mb_106'), realNv('mb_106b-usine'), 6) as { data: Buffer }).data),
     ctx: (folder) => ({ romVolume: { status: romVolumeStatus({ roms: ['mb_106b'], pinmameDir: path.join(folder, 'pinmame'), memory: () => realMemory('mb_106') }) } }),
+  },
+  // Format (vpx-format.ts) : table enregistrée par une préversion 10.9 (format 1090), jouée avec le VPX 10.8.1 de Cyber Pinball.
+  {
+    code: 'tableTooNew',
+    arm: (folder) => write(path.join(folder, `${TABLE}.vpx`), vpxSavedWith(1090)),
+    ctx: () => ({ vpx: { own: '10.8.1-5436', others: [] } }),
   },
 ];
 

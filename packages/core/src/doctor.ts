@@ -97,7 +97,8 @@ import { orientationFinding, type PlayfieldOrientation } from './sync';
 import { vpxPlayedFlipperEdge } from './vpx';
 import { scriptCode } from './vbscript';
 import { cabinetDmdIni, cabinetDmdOptions, type CabinetDmdOption } from './tableoptions';
-import { readVpxImageNames, readVpxScript, readVpxTableName } from './vpxinfo';
+import { readVpxFileVersion, readVpxImageNames, readVpxScript, readVpxTableName } from './vpxinfo';
+import { tableTooNew, tooNewAdvice, tooNewReason, withVpxChoice, type OtherVpx } from './autres-vpx';
 import { describeRenames, emptyPlayedPlaylists, missingPackFiles, packFileFixes, type PackFileFixes } from './pupfiles';
 import { activePacks, disabledPacks, isPupFolderName, packsOfTable, PUP_DISABLED_FOLDER, PUP_FOLDER, pupVideosDir } from './pupdisabled';
 import { ratioLabel } from './zones';
@@ -186,6 +187,7 @@ export const FINDING_CODES = [
   'tableAudioMuted',
   'musicMissing',
   'dmdImagesMissing',
+  'tableTooNew',
 ] as const;
 
 export interface Finding {
@@ -301,6 +303,11 @@ export interface DoctorContext {
    * absent, la règle se tait.
    */
   romVolume?: { status: RomVolumeStatus; choice?: number };
+  /**
+   * Version du VPX de Cyber Pinball (« 10.8.1-5436 ») et autres VPX du PC (autres-vpx.json) : une table enregistrée
+   * par un VPX plus récent que celui qui la joue est signalée (tableTooNew, vpx-format.ts). Absent, la règle se tait.
+   */
+  vpx?: { own?: string; others: OtherVpx[] };
 }
 
 /** Mémoire de Cyber Pinball dans le .info : option et nom d'origine de chaque pack installé. */
@@ -686,6 +693,10 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
       },
     });
   }
+
+  // 1 bis. Table enregistrée par un VPX plus récent que celui qui la joue (vpx-format.ts) : la partie échouerait.
+  const tooNew = tooNewFinding(entry, ctx);
+  if (tooNew) findings.push(tooNew);
 
   // 2. Un .vbs nommé comme la table remplace son script ; celui de Cyber Pinball (PuP-Pack
   // allumé, script corrigé pour le core.vbs, scriptpatch.ts) est le bienvenu tant qu'il est
@@ -3641,6 +3652,27 @@ function readDirents(dir: string): fs.Dirent[] {
 }
 
 /** Constat « Volume de la ROM bas » : bas, ni d'usine (monté avant la partie) ni choisi par le joueur. */
+/**
+ * Table enregistrée par un VPX plus récent que celui qui la joue (une préversion 10.9 et le VPX 10.8.1 de Cyber
+ * Pinball) : la correction la fait jouer par le premier VPX qui sait l'ouvrir, comme « Jouée avec » de la fiche.
+ */
+export function tooNewFinding(entry: TableEntry, ctx: DoctorContext): Finding | undefined {
+  if (!ctx.vpx || entry.emulator !== 'vpx') return undefined;
+  const tooNew = tableTooNew(readVpxFileVersion(entry.file), entry.info, ctx.vpx.own, ctx.vpx.others);
+  if (!tooNew) return undefined;
+  const first = tooNew.able[0];
+  return {
+    code: 'tableTooNew',
+    severity: 'warning',
+    title: t('Table enregistrée par VPX {table}', { table: tooNew.table }),
+    detail: `${tooNewReason(tooNew)} ${tooNewAdvice(tooNew)}`,
+    fix:
+      first && fs.existsSync(entry.infoFile)
+        ? { label: t('La jouer avec {vpx}', { vpx: first.label }), ops: [{ op: 'write', path: entry.infoFile, content: JSON.stringify(withVpxChoice(entry.info, first.id), null, 2) + '\n' }] }
+        : undefined,
+  };
+}
+
 export function romVolumeFinding(v: DoctorContext['romVolume']): Finding | undefined {
   const s = v?.status;
   if (!s || s.kind !== 'set' || v.choice !== undefined || !isLowRomVolume(s) || isFactoryRomVolume(s)) return undefined;

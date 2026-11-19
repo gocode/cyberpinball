@@ -11,14 +11,17 @@ import {
   matchOtherVpx,
   otherVpxFor,
   otherVpxLabel,
-  otherVpxShortVersion,
+  ownVpxLabel,
   readOtherVpx,
+  readVpxFileVersion,
+  tableTooNew,
   removeOtherVpx,
   say,
   t,
   tLater,
   tn,
   vpxChoiceOf,
+  withVpxChoice,
   writeOtherVpx,
   type IconName,
   type LaterText,
@@ -48,11 +51,6 @@ export interface OtherVpxMenuHost {
 /** Ce que Cyber Pinball ne fait pas pour une table jouée avec un autre VPX, en une phrase. */
 export function otherVpxLimitsText(): string {
   return t('Pas de {limits} pour ces tables.', { limits: formatList(OTHER_VPX_LIMITS.map((l) => say(l))) });
-}
-
-/** Le VPX de Cyber Pinball, tel que la fiche et l'installation d'une table le nomment (`version` : « 10.8.1-5436 »). */
-export function ownVpxLabel(version: string | undefined): string {
-  return version ? t('VPX {version} de Cyber Pinball', { version: otherVpxShortVersion(version.replace(/-/g, '.')) }) : t('VPX de Cyber Pinball');
 }
 
 /** « Jouée avec VPX 10.8.0 » : la ligne de la fiche (Gérer la table) et du plan d'installation. */
@@ -113,7 +111,8 @@ export function vpxChoiceCursor(others: OtherVpx[], current: string | undefined)
 /**
  * Le VPX des tables d'un plan d'installation. `choiceFor` : le choix fait dans le plan, sinon celui avec lequel
  * l'installation d'origine jouait la table (PinUP Popper : son émulateur et son ALTEXE) s'il est dans la liste,
- * sinon celui de la table déjà installée ; undefined : le VPX de Cyber Pinball.
+ * sinon celui de la table déjà installée ; undefined : le VPX de Cyber Pinball. Une table enregistrée par un VPX
+ * plus récent que celui-là (vpx-format.ts) prend, faute de choix fait dans le plan, le premier qui sait l'ouvrir.
  */
 export function createPlanVpx() {
   /** Version de l'exécutable d'une autre installation, lue une fois par fichier. */
@@ -126,18 +125,41 @@ export function createPlanVpx() {
     }
     return versions.get(key);
   };
+  /** Format de la table à installer (readVpxFileVersion), lu une fois par fichier. */
+  const formats = new Map<string, number | undefined>();
+  const formatOf = (table: { steps: { kind: string; from: string }[] }) => {
+    const from = table.steps.find((st) => st.kind === 'table')?.from;
+    if (!from || !/\.vpx$/i.test(from)) return undefined;
+    const key = from.toLowerCase();
+    if (!formats.has(key)) formats.set(key, readVpxFileVersion(from));
+    return formats.get(key);
+  };
+  function baseChoice(
+    plan: { vpxHints?: Map<string, string> },
+    table: { steps: { kind: string; from: string }[]; info: { [key: string]: unknown } },
+    others: OtherVpx[],
+  ): string | undefined {
+    const from = table.steps.find((st) => st.kind === 'table')?.from;
+    const exe = from && plan.vpxHints?.get(from.toLowerCase());
+    if (exe) return matchOtherVpx(others, exe, versionOf(exe))?.id;
+    return otherVpxFor(table.info, others)?.id;
+  }
   return {
     choiceFor(
       plan: { vpxChoices?: Map<string, string | null>; vpxHints?: Map<string, string> },
       table: { folder: string; steps: { kind: string; from: string }[]; info: { [key: string]: unknown } },
       others: OtherVpx[],
+      ownVersion?: string,
     ): string | undefined {
       const key = table.folder.toLowerCase();
       if (plan.vpxChoices?.has(key)) return plan.vpxChoices.get(key) ?? undefined;
-      const from = table.steps.find((st) => st.kind === 'table')?.from;
-      const exe = from && plan.vpxHints?.get(from.toLowerCase());
-      if (exe) return matchOtherVpx(others, exe, versionOf(exe))?.id;
-      return otherVpxFor(table.info, others)?.id;
+      const base = baseChoice(plan, table, others);
+      const tooNew = tableTooNew(formatOf(table), withVpxChoice(table.info, base), ownVersion, others);
+      return tooNew?.able.length ? tooNew.able[0]!.id : base;
+    },
+    /** La table, avec le VPX choisi dans le plan, est-elle plus récente que lui ? (ligne d'avertissement du plan) */
+    tooNew(table: { steps: { kind: string; from: string }[]; info: { [key: string]: unknown } }, choice: string | undefined, others: OtherVpx[], ownVersion: string | undefined) {
+      return tableTooNew(formatOf(table), withVpxChoice(table.info, choice), ownVersion, others);
     },
   };
 }
