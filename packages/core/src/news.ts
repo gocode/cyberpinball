@@ -71,20 +71,22 @@ export const NEWS: readonly NewsItem[] = [
     beta: true,
   },
   {
-    // Traduction automatique des propositions par le service (19/11/2026).
-    id: 'propositions-traduites',
+    // Reprise d'une autre installation par liens physiques NTFS (0.2.1-essai.15), retenue pour la
+    // 0.2.1 en bêta (19/11/2026), à la place de la traduction des propositions.
+    id: 'reprise-sans-duplication',
     date: '2026-11-19',
     version: '0.2.1',
-    get title() { return t('Les idées de tous les joueurs, dans votre langue'); },
-    get detail() { return t('Les propositions écrites dans une autre langue se lisent traduites, et vous pouvez voter pour elles.'); },
+    get title() { return t('Reprendre vos tables sans les dupliquer'); },
+    get detail() { return t('Les tables de PinUP Popper, PinballX ou PinballY rejoignent la roue sans être dupliquées sur le disque.'); },
     get more() {
       return [
-        t('Retours et propositions traduit d’office chaque proposition, et la réponse de l’équipe, dans toutes les langues de Cyber Pinball : rien à régler.'),
-        t('Une mention discrète signale un texte traduit ; sur la fiche d’une proposition, « Voir l’original » montre ce que l’auteur a écrit. En écrivant une idée, celles déjà proposées dans une autre langue vous sont aussi suggérées.'),
+        t('Sur le même disque, tables, frontons, vidéos, PuP-Packs et ROM sont liés au lieu d’être copiés : aucune place en plus, et l’installation d’origine reste telle quelle.'),
+        t('Chaque table arrive avec son PuP-Pack, sa ROM et ses médias. Avant d’installer, le plan d’ajout dit ce qui sera lié, ce qui sera copié et la place qu’il faut.'),
       ];
     },
-    get where() { return t('Menu système › Cyber Pinball › Retours et propositions'); },
-    reach: { kind: 'system', id: 'feedback' },
+    get where() { return t('Menu système › Tables › Ajouter une table › Depuis une autre installation'); },
+    reach: { kind: 'system', id: 'add-table' },
+    beta: true,
   },
   {
     // Lots 2 à 5 de la Communauté au téléphone (18/11/2026), la ligne ajoutée avec le dernier.

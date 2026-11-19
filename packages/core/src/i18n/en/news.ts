@@ -14,12 +14,13 @@ export const messages: Record<string, string> = {
   'La partie se lance dans Future Pinball et revient à la roue quand vous quittez la table ; un appui long sur Exit le ferme. BAM et les scores du jeu viendront ensuite.':
     'The game runs in Future Pinball and comes back to the wheel when you leave the table; holding Exit closes it. BAM and the game’s scores will come later.',
   'Menu système › Tables › Ajouter une table › Tables de Future Pinball': 'System menu › Tables › Add a table › Future Pinball tables',
-  'Les idées de tous les joueurs, dans votre langue': 'Every player’s ideas, in your language',
-  'Les propositions écrites dans une autre langue se lisent traduites, et vous pouvez voter pour elles.': 'Ideas written in another language are shown translated, and you can vote for them.',
-  'Retours et propositions traduit d’office chaque proposition, et la réponse de l’équipe, dans toutes les langues de Cyber Pinball : rien à régler.':
-    'Feedback and ideas translates every idea, and the team’s reply, into all of Cyber Pinball’s languages: nothing to set up.',
-  'Une mention discrète signale un texte traduit ; sur la fiche d’une proposition, « Voir l’original » montre ce que l’auteur a écrit. En écrivant une idée, celles déjà proposées dans une autre langue vous sont aussi suggérées.':
-    'A small note marks translated text; on an idea’s page, “See the original” shows what the author wrote. While you write an idea, those already suggested in another language are offered too.',
+  'Reprendre vos tables sans les dupliquer': 'Bring your tables over without duplicating them',
+  'Les tables de PinUP Popper, PinballX ou PinballY rejoignent la roue sans être dupliquées sur le disque.':
+    'Tables from PinUP Popper, PinballX or PinballY join the wheel without being duplicated on disk.',
+  'Sur le même disque, tables, frontons, vidéos, PuP-Packs et ROM sont liés au lieu d’être copiés : aucune place en plus, et l’installation d’origine reste telle quelle.':
+    'On the same drive, tables, backglasses, videos, PuP-Packs and ROMs are linked instead of copied: no extra space, and the original installation stays as it is.',
+  'Chaque table arrive avec son PuP-Pack, sa ROM et ses médias. Avant d’installer, le plan d’ajout dit ce qui sera lié, ce qui sera copié et la place qu’il faut.':
+    'Each table comes with its PuP-Pack, ROM and media. Before installing, the add plan shows what will be linked, what will be copied and the space needed.',
   'Votre compte vous suit': 'Your account follows you',
   'Pseudo, niveau, badges et amis : vous retrouvez tout sur un autre PC ou après une réinstallation.': 'Nickname, level, badges and friends: you get it all back on another PC or after reinstalling.',
   'Cyber Pinball garde d’office une copie de secours de votre compte sur ce PC, hors de son dossier : une réinstallation la retrouve et vous propose de la reprendre.':
