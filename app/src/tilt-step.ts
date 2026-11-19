@@ -7,6 +7,11 @@
 //   les boutons de tremblement ; l'angle du contact se règle aux flippers ;
 // - pas de tilt (aucun balancier relevé).
 //
+// L'accéléromètre se choisit ici, sans lien avec le lanceur (lanceur à bouton, ou sur une autre
+// carte que le KL25Z) : celui du lanceur s'il a été réglé, sinon le premier Pinscape lu, proposé
+// d'office tant qu'il n'a pas été éteint à la main ; la ligne « Accéléromètre » passe d'une carte
+// à l'autre, puis à « Aucun ».
+//
 // Avec un accéléromètre, la force des secousses (échelle de ses axes, NUDGE_GAIN) se règle aussi
 // ici : VPX ignore une secousse trop faible, et un Pinscape à l'échelle 1 n'en donne presque
 // jamais assez (plunger.ts). L'essai dit la secousse lue et le seuil sous lequel VPX l'ignore.
@@ -25,10 +30,13 @@ import {
   hasBob,
   keyLabel,
   NUDGE_GAIN,
+  nudgeCandidates,
   nudgeFloor,
+  nudgeOn,
   nudgeScale,
   plumbOptionsFromIni,
   plumbView,
+  proposedNudge,
   proposedTilt,
   setPlumbShape,
   setPlumbThreshold,
@@ -49,7 +57,7 @@ import {
 } from '@cyberpinball/core';
 
 /** Lignes du réglage. */
-export type TiltRow = 'mode' | 'threshold' | 'gain';
+export type TiltRow = 'mode' | 'threshold' | 'sensor' | 'gain';
 export type TiltAction = 'save';
 
 /** Durée pendant laquelle un contact (simulé ou réel) reste allumé à l'écran. */
@@ -65,8 +73,12 @@ export interface TiltStep {
   vpx?: CabinetTilt;
   /** Balancier de la borne : sa touche ou son bouton de joystick. */
   bob?: string;
-  /** Accéléromètre de l'étape « Lanceur ». */
+  /** Accéléromètre : celui enregistré, celui choisi sur la ligne « Accéléromètre », ou le Pinscape proposé. */
   nudge?: CabinetAnalog['nudge'];
+  /** Accéléromètre d'arrivée : il garde ses axes, sa force et ses sens s'il est choisi de nouveau. */
+  initialNudge?: CabinetAnalog['nudge'];
+  /** Accéléromètre éteint à la main : le Pinscape n'est plus proposé. */
+  nudgeOff: boolean;
   /** Force des secousses proposée (accéléromètre seulement), enregistrée avec le tilt. */
   gain?: number;
   /** [Input] Mapping.Nudge0.Strength : le seuil de VPX en dépend aussi. */
@@ -101,7 +113,8 @@ export function startTiltStep(saved: CabinetTilt | undefined, ini: string, butto
     modes,
     ...(!saved && { vpx: tiltFromIni(ini, buttons) }),
     ...(hasBob(buttons) && { bob: buttons!.tilt }),
-    ...(nudge && { nudge: structuredClone(nudge) }),
+    ...(nudge && { nudge: structuredClone(nudge), initialNudge: structuredClone(nudge) }),
+    nudgeOff: !nudge && Boolean(analog?.nudgeOff),
     // Force jamais réglée (échelle 1, celle de VPX) : celle d'un Pinscape en « 1G » est proposée.
     ...(nudge && { gain: clampNudgeGain(nudge.gain ?? NUDGE_GAIN.pinscape) }),
     strength: options.strength ?? 1,
@@ -116,10 +129,17 @@ export function startTiltStep(saved: CabinetTilt | undefined, ini: string, butto
   return step;
 }
 
-/** Le réglage de l'accéléromètre avec la force choisie ; inchangé sans accéléromètre. */
+/**
+ * Les capteurs de la borne avec l'accéléromètre de l'étape et sa force ; inchangés si l'étape
+ * n'a ni accéléromètre ni accéléromètre éteint (rien à écrire dans VPX).
+ */
 export function analogWithGain(step: TiltStep, analog: CabinetAnalog | undefined): CabinetAnalog | undefined {
-  if (!analog?.nudge || step.gain === undefined) return analog;
-  return { ...analog, nudge: { ...analog.nudge, gain: step.gain } };
+  if (!step.nudge && !step.nudgeOff) return analog;
+  const rest: CabinetAnalog = { ...analog };
+  delete rest.nudge;
+  delete rest.nudgeOff;
+  if (!step.nudge) return { ...rest, nudgeOff: true };
+  return { ...rest, nudge: { ...step.nudge, ...(step.gain !== undefined && { gain: step.gain }) } };
 }
 
 /** La simulation lit les axes à la force choisie, comme VPX les lira. */
@@ -130,8 +150,41 @@ function applyGain(step: TiltStep): void {
   setPlumbShape(step.sim, shape('x'), shape('y'));
 }
 
+/** Nouvel accéléromètre (ou aucun) : sa force, et la simulation qui le lit. */
+function setSensor(step: TiltStep, nudge: CabinetAnalog['nudge']): void {
+  step.nudge = nudge && structuredClone(nudge);
+  step.gain = nudge ? clampNudgeGain(nudge.gain ?? NUDGE_GAIN.pinscape) : undefined;
+  if (nudge) applyGain(step);
+  else setPlumbShape(step.sim, undefined, undefined);
+  if (step.editing === 'gain' && !nudge) step.editing = undefined;
+}
+
+/** Cartes que la ligne « Accéléromètre » propose : celles qui ont deux axes, plus celle déjà réglée si elle est débranchée. */
+function sensorChoices(step: TiltStep): { device: string; name?: string }[] {
+  const seen = nudgeCandidates(step.readings).map((r) => ({ device: r.device, name: r.name }));
+  const current = step.nudge;
+  return current && !seen.some((c) => c.device === current.device) ? [{ device: current.device, name: current.name }, ...seen] : seen;
+}
+
+/** Ligne « Accéléromètre » : la carte suivante, puis « Aucun ». */
+function nextSensor(step: TiltStep): void {
+  const list = sensorChoices(step);
+  const at = step.nudge ? list.findIndex((c) => c.device === step.nudge!.device) : -1;
+  const next = list[at + 1];
+  step.nudgeOff = !next;
+  if (!next) return setSensor(step, undefined);
+  // La carte d'arrivée garde ses axes, sa force et ses sens ; une autre prend X et Y.
+  setSensor(step, step.initialNudge?.device === next.device ? step.initialNudge : nudgeOn(next));
+}
+
 export function rows(step: TiltStep): TiltRow[] {
-  return [...(['mode'] as const), ...(step.tilt.mode === 'simulated' ? (['threshold'] as const) : []), ...(step.gain !== undefined ? (['gain'] as const) : [])];
+  const sensor = step.nudge || sensorChoices(step).length > 0;
+  return [
+    ...(['mode'] as const),
+    ...(step.tilt.mode === 'simulated' ? (['threshold'] as const) : []),
+    ...(sensor ? (['sensor'] as const) : []),
+    ...(step.gain !== undefined ? (['gain'] as const) : []),
+  ];
 }
 
 function choices(step: TiltStep): (TiltRow | TiltAction)[] {
@@ -195,6 +248,9 @@ function choose(step: TiltStep, choice: TiltRow | TiltAction): TiltOutcome {
     case 'gain':
       step.editing = choice;
       return 'stay';
+    case 'sensor':
+      nextSensor(step);
+      return 'stay';
   }
 }
 
@@ -223,6 +279,11 @@ export function tiltTick(step: TiltStep, readings: AxisReading[], now: number): 
   const shown = () => JSON.stringify([plumb(step, now), Math.round(rawPeak(step) * 100)]);
   const before = shown();
   step.readings = readings;
+  // Pas d'accéléromètre réglé, ni éteint à la main : celui du premier Pinscape lu, même sans lanceur analogique.
+  if (!step.nudge && !step.nudgeOff) {
+    const proposed = proposedNudge(readings);
+    if (proposed) setSensor(step, proposed);
+  }
   // Accéléromètre repris de VPX : il n'a que l'identifiant du joystick ; son nom vient de SDL.
   const sensor = step.nudge;
   if (sensor && !sensor.name) {
@@ -268,6 +329,7 @@ function plumb(step: TiltStep, now: number): PlumbDrawing {
 const ROW_LABELS: Record<TiltRow, () => string> = {
   mode: () => 'Tilt',
   threshold: () => t('Contact du balancier simulé'),
+  sensor: () => t('Accéléromètre'),
   gain: () => t('Force des secousses'),
 };
 
@@ -282,6 +344,12 @@ function rowValue(step: TiltStep, row: TiltRow): string {
     case 'gain': {
       const gain = gainLabel(step.gain!);
       return step.editing === 'gain' ? `◀ ${gain} ▶` : gain;
+    }
+    case 'sensor': {
+      const n = step.nudge;
+      if (!n) return t('Aucun');
+      const device = n.name || step.readings.find((r) => r.device === n.device)?.name || n.device;
+      return t('Axes {x} et {y} · {device}', { x: axisLabel(n.x), y: axisLabel(n.y), device });
     }
   }
 }
@@ -301,6 +369,8 @@ function rowHelp(step: TiltStep, choice: TiltRow | TiltAction | undefined): stri
       return step.editing === 'threshold'
         ? t('Plus petit : tilt plus facile. VPX va de {min} à {max}, {def} par défaut.', { min: thresholdLabel(0.15), max: thresholdLabel(4), def: thresholdLabel(1) })
         : t('Angle auquel le balancier simulé touche son anneau : plus petit, tilt plus facile.');
+    case 'sensor':
+      return t('Carte dont l’accéléromètre fait trembler la table quand on bouscule la borne (un Pinscape : axes X et Y), quelle que soit la carte du lanceur. Valider : la carte suivante, puis « Aucun ».');
     case 'gain':
       return t('Plus grand : la bille et le balancier réagissent à des secousses plus douces. À {pinscape}, 1 g mesuré par un Pinscape (réglé en « 1G ») vaut 1 g dans VPX.', { pinscape: gainLabel(NUDGE_GAIN.pinscape) });
     default:
@@ -350,7 +420,7 @@ export function tiltView(step: TiltStep, saveLabel: string, keys: TiltViewKeys, 
     measure: undefined,
     name: step.vpx ? t('Réglage actuel de VPX : {what}', { what: vpxLine(step.vpx) }) : t('Essayez : le balancier suit ce que VPX calculera'),
     details: rowHelp(step, selected),
-    notice: simulated && !step.nudge ? t('Pas d’accéléromètre réglé (étape « Lanceur ») : seuls les boutons de tremblement feront bouger le balancier simulé, et cet essai ne le montre pas.') : simulated && drawing.missing ? t('Accéléromètre introuvable : est-il branché ?') : undefined,
+    notice: simulated && !step.nudge ? t('Pas d’accéléromètre : seuls les boutons de tremblement feront bouger le balancier simulé, et cet essai ne le montre pas.') : simulated && drawing.missing ? t('Accéléromètre introuvable : est-il branché ?') : undefined,
     plumb: { ...drawing, caption: accelerometer ?? '' },
     step: line,
     buttons: rows(step).map((row) => ({ label: ROW_LABELS[row](), key: rowValue(step, row), state: 'done', selected: selected === row })),

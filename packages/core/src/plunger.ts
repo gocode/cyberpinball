@@ -84,6 +84,27 @@ export function isPinscape(name: string | undefined): boolean {
   return Boolean(name?.startsWith('mjrnet Pinscape Controller'));
 }
 
+/**
+ * Joysticks qui peuvent porter l'accéléromètre (deux axes au moins), les Pinscape d'abord.
+ * L'accéléromètre ne dépend jamais du lanceur : une borne peut avoir un lanceur à bouton, ou son
+ * lanceur sur une autre carte (encodeur de boutons), et l'accéléromètre sur un KL25Z.
+ */
+export function nudgeCandidates(readings: AxisReading[]): AxisReading[] {
+  const usable = readings.filter((r) => r.values.length > PINSCAPE_AXES.nudgeY);
+  return [...usable.filter((r) => isPinscape(r.name)), ...usable.filter((r) => !isPinscape(r.name))];
+}
+
+/** Accéléromètre sur les axes X et Y de ce joystick, à la force d'un Pinscape en « 1G ». */
+export function nudgeOn(reading: { device: string; name?: string }): NudgeSensor {
+  return { device: reading.device, ...(reading.name && { name: reading.name }), x: PINSCAPE_AXES.nudgeX, y: PINSCAPE_AXES.nudgeY, gain: NUDGE_GAIN.pinscape };
+}
+
+/** Accéléromètre proposé d'office : celui du premier Pinscape lu, quel que soit le lanceur ; aucun sinon. */
+export function proposedNudge(readings: AxisReading[]): NudgeSensor | undefined {
+  const pinscape = nudgeCandidates(readings).find((r) => isPinscape(r.name));
+  return pinscape && nudgeOn(pinscape);
+}
+
 /** Force des secousses pour l'écran : « ×2,00 ». */
 export function gainLabel(gain: number): string {
   return `×${formatNumber(gain, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

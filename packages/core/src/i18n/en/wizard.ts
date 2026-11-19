@@ -663,8 +663,13 @@ export const messages: Record<string, string> = {
   'La borne ne tiltera pas.': 'The cabinet will not tilt.',
   'Réglage actuel de VPX : {what}': 'Current VPX setting: {what}',
   'Essayez : le balancier suit ce que VPX calculera': 'Try it: the tilt bob follows what VPX will compute',
-  'Pas d’accéléromètre réglé (étape « Lanceur ») : seuls les boutons de tremblement feront bouger le balancier simulé, et cet essai ne le montre pas.':
-    'No accelerometer set (“Plunger” step): only the nudge buttons will move the simulated tilt bob, and this test does not show it.',
+  'Pas d’accéléromètre : seuls les boutons de tremblement feront bouger le balancier simulé, et cet essai ne le montre pas.':
+    'No accelerometer: only the nudge buttons will move the simulated tilt bob, and this test does not show it.',
+  // Accéléromètre choisi à l'étape « Tilt », sans lien avec le lanceur
+  Accéléromètre: 'Accelerometer',
+  'Axes {x} et {y} · {device}': 'Axes {x} and {y} · {device}',
+  'Carte dont l’accéléromètre fait trembler la table quand on bouscule la borne (un Pinscape : axes X et Y), quelle que soit la carte du lanceur. Valider : la carte suivante, puis « Aucun ».':
+    'Board whose accelerometer shakes the table when the cabinet is nudged (a Pinscape: axes X and Y), whichever board the plunger is on. Confirm: the next board, then “None”.',
   'Accéléromètre introuvable : est-il branché ?': 'Accelerometer not found: is it plugged in?',
   // Force des secousses (plunger.ts NUDGE_GAIN, tilt-step.ts)
   'Force des secousses': 'Nudge strength',

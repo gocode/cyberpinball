@@ -79,6 +79,7 @@ import {
   type CabinetTilt,
   analogLines,
   hasBob,
+  proposedNudge,
   tiltLines,
   audioScreen,
   channelsLabel,
@@ -154,7 +155,7 @@ import { onKeyInput, sendableKey } from './key-input';
 import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton, pressVirtualHat, pressVirtualPinscapeButton, retryJoysticks } from './joystick-input';
 import { installVpx, vpxArchivePresent } from './install-vpx';
 import { vcRuntimeReady } from './vc-runtime';
-import { plungerClick, plungerKey, plungerTick, plungerView, startPlungerStep, type PlungerAction, type PlungerOutcome, type PlungerStep } from './plunger-step';
+import { plungerClick, plungerKey, plungerTick, plungerView, startPlungerStep, withoutPlunger, type PlungerAction, type PlungerOutcome, type PlungerStep } from './plunger-step';
 import { analogWithGain, startTiltStep, tiltClick, tiltKey, tiltTick, tiltView, type TiltAction, type TiltOutcome, type TiltStep } from './tilt-step';
 import { locations, vpxInstall, vpxProfile } from './paths';
 import { activeVpxIni, audioOutputs, syncVpxIni } from './vpx-ini';
@@ -1555,10 +1556,13 @@ function stopPlungerTimer(): void {
   plungerTimer = undefined;
 }
 
-/** Enregistrer (le réglage de l'étape) ou « Pas de lanceur analogique » (aucun capteur). */
+/**
+ * Enregistrer (le réglage de l'étape) ou « Pas de lanceur analogique » : plus de lanceur, mais
+ * l'accéléromètre reste (lanceur à bouton et accéléromètre sur un KL25Z).
+ */
 function afterPlunger(outcome: PlungerOutcome): void {
   if (outcome !== 'save' && outcome !== 'none') return;
-  wizard.analog = outcome === 'save' ? structuredClone(wizard.plunger!.analog) : {};
+  wizard.analog = outcome === 'save' ? structuredClone(wizard.plunger!.analog) : withoutPlunger(wizard.plunger!.analog);
   wizard.plunger = undefined;
   stopPlungerTimer();
   if (only) saveStep();
@@ -1592,7 +1596,7 @@ const TILT_BROADCAST_MS = 33;
  * relevé ni tilt enregistré n'a rien à régler : on passe aux écrans, VPX garde son balancier simulé.
  */
 function startTilt(): void {
-  if (!only && !wizard.tilt && !wizard.analog?.nudge && !hasBob(wizard.buttons)) {
+  if (!only && !wizard.tilt && !wizard.analog?.nudge && !hasBob(wizard.buttons) && !(proposedNudge(joystickAxes()) && !wizard.analog?.nudgeOff)) {
     wizard.phase = 'assign';
     return;
   }

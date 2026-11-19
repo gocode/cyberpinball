@@ -24,6 +24,7 @@ import {
   PINSCAPE_AXES,
   plungerPosition,
   proposedAnalog,
+  proposedNudge,
   restProblem,
   startDetection,
   t,
@@ -96,14 +97,32 @@ function plungerDevice(step: PlungerStep): AxisReading | undefined {
   return step.readings.find((r) => r.device === device);
 }
 
-/** Lignes du réglage : la vitesse pour un joystick à six axes, l'accéléromètre s'il reste deux axes libres. */
+/** Sans lanceur analogique : l'accéléromètre seul reste (il ne dépend pas du lanceur). */
+export function withoutPlunger(analog: CabinetAnalog): CabinetAnalog {
+  return { ...(analog.nudge && { nudge: structuredClone(analog.nudge) }), ...(analog.nudgeOff && { nudgeOff: true }) };
+}
+
+/**
+ * Accéléromètre que la ligne « Accéléromètre » allume : celui d'un Pinscape lu, quelle que soit
+ * la carte du lanceur ; sinon X et Y du joystick du lanceur, si le lanceur n'y est pas.
+ */
+function nudgeToOffer(step: PlungerStep): CabinetAnalog['nudge'] {
+  const pinscape = proposedNudge(step.readings);
+  if (pinscape) return pinscape;
+  const p = step.analog.plunger;
+  const axes = plungerDevice(step)?.values.length ?? 0;
+  if (!p || axes <= PINSCAPE_AXES.nudgeY || p.axis <= PINSCAPE_AXES.nudgeY) return undefined;
+  return { device: p.device, ...(p.name && { name: p.name }), x: PINSCAPE_AXES.nudgeX, y: PINSCAPE_AXES.nudgeY, gain: NUDGE_GAIN.pinscape };
+}
+
+/** Lignes du réglage : la vitesse pour un joystick à six axes, l'accéléromètre s'il y en a un à proposer. */
 export function rows(step: PlungerStep): PlungerRow[] {
   if (step.mode === 'detect' || !step.analog.plunger) return [];
   const p = step.analog.plunger;
   const axes = plungerDevice(step)?.values.length ?? 0;
   const list: PlungerRow[] = ['sensor', 'direction', 'deadZone'];
   if (p.speedAxis !== undefined || (axes > PINSCAPE_AXES.plungerSpeed && p.axis !== PINSCAPE_AXES.plungerSpeed)) list.push('speed');
-  if (step.analog.nudge || (axes > PINSCAPE_AXES.nudgeY && p.axis > PINSCAPE_AXES.nudgeY)) list.push('nudge');
+  if (step.analog.nudge || nudgeToOffer(step)) list.push('nudge');
   return list;
 }
 
@@ -183,11 +202,20 @@ function choose(step: PlungerStep, choice: PlungerRow | PlungerAction): PlungerO
         else delete p.speedAxis;
       }
       return 'stay';
-    case 'nudge':
-      if (step.analog.nudge) delete step.analog.nudge;
-      // Force déjà réglée (étape « Tilt ») sur ce joystick : gardée ; sinon celle d'un Pinscape en « 1G ».
-      else if (p) step.analog.nudge = { device: p.device, ...(p.name && { name: p.name }), x: PINSCAPE_AXES.nudgeX, y: PINSCAPE_AXES.nudgeY, gain: keptGain(step, p.device) };
+    case 'nudge': {
+      if (step.analog.nudge) {
+        delete step.analog.nudge;
+        step.analog.nudgeOff = true;
+        return 'stay';
+      }
+      const offer = nudgeToOffer(step);
+      if (offer) {
+        // Force déjà réglée (étape « Tilt ») sur ce joystick : gardée ; sinon celle d'un Pinscape en « 1G ».
+        step.analog.nudge = { ...offer, gain: keptGain(step, offer.device) };
+        delete step.analog.nudgeOff;
+      }
       return 'stay';
+    }
   }
 }
 
@@ -224,10 +252,14 @@ export function plungerTick(step: PlungerStep, readings: AxisReading[], now: num
     step.detection = feedDetection(step.detection, readings);
     const axis = detectedAxis(step.detection);
     if (axis?.released) {
-      // La détection décide du capteur et de son sens ; le reste vient de proposedAnalog, sauf la
-      // force des secousses déjà réglée sur ce joystick (étape « Tilt »).
-      step.analog = proposedAnalog(axis);
-      if (step.analog.nudge) step.analog.nudge.gain = keptGain(step, step.analog.nudge.device);
+      // La détection décide du capteur et de son sens ; le reste vient de proposedAnalog. Un
+      // accéléromètre déjà réglé (ou éteint) reste tel quel : il ne dépend pas du lanceur, et peut
+      // être sur une autre carte. Sinon, celui d'un Pinscape lu, avec la force déjà réglée.
+      const proposed = proposedAnalog(axis);
+      const before = step.analog;
+      const nudge = before.nudge ?? (before.nudgeOff ? undefined : (proposed.nudge ?? proposedNudge(readings)));
+      step.analog = { plunger: proposed.plunger, ...(nudge && { nudge }), ...(!nudge && before.nudgeOff && { nudgeOff: true }) };
+      if (nudge && !before.nudge) nudge.gain = keptGain(step, nudge.device);
       step.rest = axis.rest;
       step.mode = 'settings';
       step.shot = { recent: [] };
@@ -296,8 +328,13 @@ function rowValue(step: PlungerStep, row: PlungerRow): string {
       return step.editing ? `◀ ${Math.round(p.deadZone * 100)} % ▶` : `${Math.round(p.deadZone * 100)} %`;
     case 'speed':
       return p.speedAxis === undefined ? t('Non, calculée par VPX') : t('Oui, axe {axis}', { axis: axisLabel(p.speedAxis) });
-    case 'nudge':
-      return step.analog.nudge ? t('Oui, axes {x} et {y}', { x: axisLabel(step.analog.nudge.x), y: axisLabel(step.analog.nudge.y) }) : t('Non');
+    case 'nudge': {
+      const n = step.analog.nudge;
+      if (!n) return t('Non');
+      const axes = { x: axisLabel(n.x), y: axisLabel(n.y) };
+      // Sur une autre carte que le lanceur : laquelle.
+      return n.device === p.device ? t('Oui, axes {x} et {y}', axes) : t('Axes {x} et {y} · {device}', { ...axes, device: deviceName(step, n.device, n.name) });
+    }
   }
 }
 

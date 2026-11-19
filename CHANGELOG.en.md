@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Accelerometer without an analog plunger: with a button plunger, or a plunger wired to another board than the KL25Z, the Pinscape nudging is now offered automatically at the "Tilt" step of the cabinet setup. A new "Accelerometer" line there picks the board, or "None".
+- "No analog plunger" no longer turns the accelerometer off: this choice used to cut nudging in VPX too, and the tilt bob test stayed still.
 - "Encoder default keys" (System menu > Cabinet > Cabinet setup, and VPX settings) no longer replaces the buttons with a single press. On a cabinet with joystick buttons (Pinscape, encoder in gamepad mode), it stays visible but greyed out: keyboard keys can't replace these buttons, and none would respond anymore. The screen it opens says why and offers to redo the "Buttons" step. On a keyboard cabinet, it first says what will change, with "Cancel" preselected, and "Replace" has to be chosen on purpose. The replaced mapping is always kept: "Restore the previous buttons" puts it back. Every reset and every restore is written to the log.
 - Cyber Pinball is no longer mistaken for a Trojan by antivirus products that watch program behaviour (Kaspersky had quarantined it at startup). Its PowerShell scripts now run from readable files, never encoded, without bypassing Windows' execution policy, and the technical sheet no longer collects the list of installed antivirus products.
 - The automatic firewall repair now runs a readable script, stored in a ProgramData folder that only administrators can modify. On a PC where it was already allowed, Windows will ask for permission once more, the next time a firewall rule needs to be restored.

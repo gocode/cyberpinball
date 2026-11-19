@@ -265,6 +265,8 @@ export type NavigationButtons = Partial<Record<NavigationId, string>>;
 export interface CabinetAnalog {
   plunger?: PlungerSensor;
   nudge?: NudgeSensor;
+  /** Accelerometer turned off by hand: a Pinscape plugged in is no longer proposed for it. */
+  nudgeOff?: boolean;
 }
 
 /** Analog plunger: a joystick axis, as VPX reads it ([Input] Mapping.Plunger0.*). */
