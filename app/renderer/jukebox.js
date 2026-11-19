@@ -838,6 +838,7 @@
     const m = clip?.media;
     if (!m) return;
     clearInterval(m.levelsTimer);
+    for (const stop of m.unwatch ?? []) stop();
     m.context?.close().catch(() => {});
     m.graph?.close();
     for (const media of [m.audio, m.video]) {
@@ -928,6 +929,12 @@
         { once: true },
       );
       media.addEventListener('error', () => send({ type: 'error', id: order.id, message: media.error?.message || String(media.error?.code ?? '') }));
+      stalls(media);
+    };
+    // Coupures de la lecture (jukebox-stalls.js) : au journal, avec leur cause.
+    const stalls = (media) => {
+      const stop = window.CyberJukeboxStalls?.watch(media, (c) => send({ type: 'stall', id: order.id, ...c }));
+      if (stop) (m.unwatch ??= []).push(stop);
     };
     if (order.kind === 'local') {
       // Le son mène : la vidéo muette le suit, recalée quand elle s'en écarte.
@@ -947,6 +954,7 @@
         video.src = order.video;
         clip.stage.replaceChildren(video);
         m.video = video;
+        stalls(video);
         const follow = () => {
           if (Math.abs(video.currentTime - audio.currentTime) > 0.25 && Number.isFinite(audio.currentTime)) video.currentTime = audio.currentTime;
         };

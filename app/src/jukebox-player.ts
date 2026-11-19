@@ -104,6 +104,11 @@ export interface JukeboxPlayerHost {
   routes?(): JukeboxAudioRoute[];
   /** Rend un fichier lisible par le protocole des médias (media-protocol.ts). */
   allow(file: string): void;
+  /**
+   * Adresse d'un son ou d'une vidéo hors du processus principal (jukebox-media-server.ts) ; absent ou
+   * sans réponse : le protocole des médias.
+   */
+  streamUrl?(file: string): string | undefined;
   /** Exit : retour à la roue (la musique est déjà arrêtée). */
   leave(): void;
   redraw(): void;
@@ -195,9 +200,21 @@ export type JukeboxMessage =
   /** Contrôle de débordement de la page (une fois par ouverture) : ce qui dépasse de la fenêtre. */
   | { type: 'overflow'; text: string }
   /** Sortie sur laquelle le morceau joue vraiment (une fois par morceau) : le journal la note. */
-  | { type: 'sink'; id: number; label?: string; problem?: string; routed: boolean };
+  | { type: 'sink'; id: number; label?: string; problem?: string; routed: boolean }
+  /**
+   * Lecture locale arrêtée faute de données ou d'images (jukebox-stalls.js) : le journal note la coupure,
+   * avec ce qui était chargé d'avance, pour dire d'où elle vient.
+   */
+  | { type: 'stall'; id: number; ms: number; at: number; cause: string; ahead?: number };
 
 const isAbsolute = (p: string | undefined): p is string => Boolean(p && path.isAbsolute(p));
+
+/** Causes des coupures (renderer/jukebox-stalls.js), en clair pour le journal. */
+const STALL_CAUSES: Record<string, string> = {
+  data: 'attente de données', // i18n-ignore : journal
+  frame: 'image figée', // i18n-ignore : journal
+  sound: 'son figé', // i18n-ignore : journal
+};
 
 /** Défilement du niveau des playlists (tops : sinon, celui de chaque playlist). */
 const PLAYLISTS_TOP = '@playlists';
@@ -285,9 +302,10 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     return mediaUrl(file);
   }
 
+  /** Son ou vidéo d'un morceau : par le serveur local (jukebox-media-server.ts), sinon par le protocole des médias. */
   function fileUrl(file: string): string {
     host.allow(file);
-    return mediaUrl(file);
+    return host.streamUrl?.(file) ?? mediaUrl(file);
   }
 
   // ---------- Données ----------
@@ -404,6 +422,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
   }
 
   function stopPlayback(): void {
+    mainLag.stop();
     order = undefined;
     time = undefined;
     levels = undefined;
@@ -690,8 +709,50 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     }
     host.log(`Juke-box : lecture de ${key} (${pb.kind}) dans ${playlistId}.`); // i18n-ignore : journal
     if (pb.kind === 'online') openOnline(pb, id);
+    else mainLag.start();
     sendTime();
   }
+
+  /** Coupures notées pour ce morceau : les premières au journal, puis un bilan toutes les dix. */
+  let stalls = { key: '', count: 0 };
+  function noteStall(key: string, msg: Extract<JukeboxMessage, { type: 'stall' }>): void {
+    if (stalls.key !== key) stalls = { key, count: 0 };
+    stalls.count++;
+    if (stalls.count > 5 && stalls.count % 10) return;
+    const ms = Math.max(0, Math.round(Number(msg.ms) || 0));
+    const at = Math.max(0, Math.round(Number(msg.at) || 0));
+    const ahead = Number.isFinite(msg.ahead) ? `, ${Number(msg.ahead).toFixed(1)} s chargées d'avance` : ''; // i18n-ignore : journal
+    const lag = mainLag.take();
+    const cause = STALL_CAUSES[String(msg.cause)] ?? String(msg.cause).slice(0, 40);
+    host.log(`Juke-box : [avertissement] ${key} s'est arrêté ${(ms / 1000).toFixed(1)} s à ${at} s (${cause}${ahead} ; processus principal en retard de ${lag} ms au plus sur les 10 dernières secondes) ; coupure n° ${stalls.count}.`); // i18n-ignore : journal
+  }
+
+  /** Retard de la boucle du processus principal (il sert les fichiers du Juke-box) : le pire des 10 dernières secondes. */
+  const mainLag = (() => {
+    const STEP = 100;
+    const window: number[] = [];
+    let last = Date.now();
+    let timer: NodeJS.Timeout | undefined;
+    return {
+      start() {
+        if (timer) return;
+        last = Date.now();
+        timer = setInterval(() => {
+          const now = Date.now();
+          window.push(Math.max(0, now - last - STEP));
+          if (window.length > 100) window.shift();
+          last = now;
+        }, STEP);
+        timer.unref?.();
+      },
+      stop() {
+        clearInterval(timer);
+        timer = undefined;
+        window.length = 0;
+      },
+      take: () => (window.length ? Math.max(...window) : 0),
+    };
+  })();
 
   /** Message d'une fenêtre (lecture locale) ou relevé du lecteur YouTube. */
   function message(msg: JukeboxMessage): void {
@@ -719,6 +780,8 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       failures = 0;
       time = { key: order.key, position: msg.position, ...(msg.duration ? { duration: msg.duration } : time?.duration !== undefined ? { duration: time.duration } : {}), paused: msg.paused ?? order.paused };
       sendTime();
+    } else if (msg.type === 'stall') {
+      noteStall(order.key, msg);
     } else if (msg.type === 'levels') {
       levels = { at: Date.now(), values: msg.levels.slice(0, JUKEBOX_SPECTRUM_BANDS).map((v) => (Number.isFinite(v) ? v : 0)) };
       sendPulse(levels.values);

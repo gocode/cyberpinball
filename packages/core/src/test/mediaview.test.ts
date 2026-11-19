@@ -331,8 +331,12 @@ test('rendu : CSP ouverte au seul protocole des médias, composant chargé, erre
   const html = fs.readFileSync(path.join(APP, 'renderer', 'frontend.html'), 'utf8');
   const csp = /Content-Security-Policy" content="([^"]+)"/.exec(html)?.[1] ?? '';
   assert.match(csp, /img-src 'self' cyber-media:/);
-  assert.match(csp, /media-src cyber-media:(;|$)/);
-  assert.doesNotMatch(csp, /file:|\*/, 'aucun accès direct au disque');
+  // Sons et vidéos : le protocole des médias, et le serveur des morceaux du Juke-box sur cette machine
+  // seulement (jukebox-media-server.ts : 127.0.0.1, port choisi au démarrage, jeton dans l'adresse).
+  assert.match(csp, /media-src cyber-media: http:\/\/127\.0\.0\.1:\*(;|$)/);
+  assert.doesNotMatch(csp, /file:/, 'aucun accès direct au disque');
+  const sources = csp.split(';').flatMap((d) => d.trim().split(/\s+/).slice(1));
+  assert.deepEqual(sources.filter((s) => /^(\*|https?:|https?:\/\/\*|\*\.)/.test(s) && s !== 'http://127.0.0.1:*'), [], 'aucune source ouverte à tout le web');
   assert.ok(html.indexOf('media.js') > 0 && html.indexOf('media.js') < html.indexOf('frontend.js'), 'media.js avant frontend.js');
   // Affichages par défaut (T3) : sans eux, un écran sans média n'affiche que le titre.
   assert.ok(html.indexOf('fallback.js') > 0 && html.indexOf('fallback.js') < html.indexOf('frontend.js'), 'fallback.js avant frontend.js');

@@ -6,8 +6,9 @@
 // origine, QR déjà servi, Exit, touche interdite, trame rejouée, clé inconnue) et Fermer, qui
 // coupe l'écoute. Le scénario est interne/demos/demo-telecommande.cjs, ici sans captures. Tout sur
 // 127.0.0.1 ; aucune fenêtre n'apparaît (rendu hors écran).
-// Et l'invariant du réseau : seuls social-net.ts et phone-remote.ts écoutent, la télécommande sur
-// 127.0.0.1 hors du réseau local réel, jamais pendant un essai.
+// Et l'invariant du réseau : seuls social-net.ts, phone-remote.ts et le serveur des morceaux du
+// Juke-box (jukebox-media-worker.ts, 127.0.0.1 seulement) écoutent, la télécommande sur 127.0.0.1
+// hors du réseau local réel, jamais pendant un essai.
 
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -217,13 +218,16 @@ test('classements au téléphone : la table de la borne, les portées et les pé
   }
 });
 
-test('réseau : seuls social-net.ts et phone-remote.ts écoutent ; la télécommande, seulement sur le réseau local réel', () => {
+test('réseau : seuls social-net.ts, phone-remote.ts et le serveur du Juke-box écoutent ; la télécommande, seulement sur le réseau local réel', () => {
   const src = path.join(REPO_ROOT, 'app', 'src');
   const listeners = fs
     .readdirSync(src)
     .filter((f) => f.endsWith('.ts') && /createServer\(|\.listen\(/.test(fs.readFileSync(path.join(src, f), 'utf8')))
     .sort();
-  assert.deepEqual(listeners, ['phone-remote.ts', 'social-net.ts']);
+  assert.deepEqual(listeners, ['jukebox-media-worker.ts', 'phone-remote.ts', 'social-net.ts']);
+  // Serveur des morceaux du Juke-box : cette machine seulement, port libre choisi par le système.
+  const jukebox = fs.readFileSync(path.join(src, 'jukebox-media-worker.ts'), 'utf8');
+  assert.deepEqual([...jukebox.matchAll(/\.listen\(([^,]+), ([^,]+),/g)].map((m) => [m[1], m[2]]), [['0', "'127.0.0.1'"]]);
   const remote = fs.readFileSync(path.join(src, 'phone-remote.ts'), 'utf8');
   // Une seule écoute, à l'hôte de remoteListenHost ; toute connexion hors du réseau local coupée avant lecture.
   assert.deepEqual([...remote.matchAll(/\.listen\(([^,]+), ([^,]+),/g)].map((m) => [m[1], m[2]]), [['port', 'remoteListenHost(mode)']]);

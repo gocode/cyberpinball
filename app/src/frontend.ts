@@ -342,6 +342,7 @@ import { hideTaskbars, isVeil, nameScreen, onScreensSettled, recoverScreens, rel
 import { describeReset, resetButtons } from './buttons-reset';
 import { forcedRotation, menuRotation, openSettings, romVolumeControl } from './settings';
 import { allowJukebox, allowPreview, serveMedias } from './media-protocol';
+import { startJukeboxMedia, stopJukeboxMedia, streamUrl } from './jukebox-media-server';
 import { createJukeboxPlayer, type JukeboxMessage } from './jukebox-player';
 import { createAvatarMenu } from './avatar-menu';
 import { createProfileWelcome } from './profile-welcome';
@@ -1306,6 +1307,7 @@ const jukeboxPlayer = createJukeboxPlayer({
   output: () => menuOutput(),
   routes: () => jukeboxAudioRoutes(),
   allow: (file) => allowJukebox(file),
+  streamUrl: (file) => streamUrl(file),
   leave: () => {
     state = { ...state, phase: tables.length ? 'menu' : 'message', medallion: 'jukebox', ...(tables.length ? {} : { message: noTables() }) };
   },
@@ -3783,6 +3785,9 @@ export function startFrontend(): void {
   });
   // Les avatars des joueurs (avatar.ts) se lisent aussi par le protocole des médias.
   serveMedias(() => [...medias!.allowedDirs(tables), avatarsDir(loc.dataDir)]);
+  // Morceaux du Juke-box lus hors du processus principal (jukebox-media-server.ts).
+  startJukeboxMedia({ log: (line) => console.log(line) });
+  app.on('will-quit', () => stopJukeboxMedia());
 
   // Média ajouté, remplacé ou supprimé, table ajoutée, renommée ou supprimée, par
   // n'importe quel chemin (Cyber Pinball ou à la main) : relu et renvoyé aux fenêtres.

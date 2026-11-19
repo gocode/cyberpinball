@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Jukebox: videos and sounds played from disk no longer stop every few seconds. A heavy video (4K, with sound and picture stored far apart in the file) could freeze, sound included, whenever the front-end was busy; its files are now read by a separate process.
+- Jukebox: every interruption while playing a local track is written to the log, with its cause (waiting for data, frozen picture, frozen sound) and how much was loaded ahead.
 - Putting a table in the trash while one of its files is open elsewhere: the screen now says which file is held and, when Windows knows, by which program, instead of silently failing at every press. Any front-end action that fails is caught and explained the same way.
 - Tables whose script sends the B2S backglass plain text where VPX expects a number: the fixed copy of the script is played from the very first game, without waiting for VPX to log its refusal.
 - DMD folder put by mistake in the folder of another table, which does not load it: the diagnosis gives it back to its table (instead of copying it), and says so.
