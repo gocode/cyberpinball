@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- When a signing certificate is configured, the build also signs the binaries Cyber Pinball ships itself (VPX plugins, OpenXR layer, headset companion, DMD server), not only the executable and installers: a single unsigned binary is enough for some antivirus products to block the application.
 - Pinball FX and Pinball FX3 on a cabinet with joystick buttons: in the game's menus, the cabinet's interface buttons do the same as on the wheel (Previous and Next on Left and Right arrows, Confirm on Enter, Back on Esc), on top of their role in play. A MagnaSave button used for Confirm or Back in Cyber Pinball also confirms or goes back in Pinball FX, which has no MagnaSave command; MagnaSave buttons no longer send the Up and Down arrows.
 - Groups, rooms and private messages open on the latest messages, at the bottom, on the cabinet and on the phone: a group opened on its table of the week, and on the phone a thread reopened from another tab went back to the oldest message.
 - Pinball FX on a cabinet: before each game, Cyber Pinball sets the game's forced display rotation in the same direction as its own playfield screens (the game's Options > Video, `LocalSettings.cfg` file). The table faces the player instead of staying in landscape. A PC with an upright screen keeps its setting.

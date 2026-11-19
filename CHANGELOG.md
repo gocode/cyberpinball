@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.1
 
+- Quand un certificat de signature est configuré, la fabrication signe aussi les binaires que Cyber Pinball livre lui-même (plugins de VPX, couche OpenXR, compagnon du casque, serveur du DMD), et plus seulement l'exécutable et les installeurs : un binaire non signé suffit à faire bloquer l'application par certains antivirus.
 - Pinball FX et Pinball FX3 sur une borne aux boutons de joystick : dans les menus du jeu, les boutons de l'interface de la borne font la même chose que dans la roue (Précédent et Suivant sur les flèches gauche et droite, Valider sur Entrée, Retour sur Échap), en plus de leur rôle en partie. Un MagnaSave qui sert à Valider ou Retour dans Cyber Pinball sert aussi à Valider ou Retour dans Pinball FX, qui n'a pas de commande MagnaSave ; les MagnaSave n'envoient plus les flèches haut et bas.
 - Les groupes, les salons et les messages privés s'ouvrent sur les derniers messages, en bas, à la borne comme au téléphone : un groupe s'ouvrait sur sa table de la semaine, et au téléphone un fil repris après un autre onglet revenait au plus ancien.
 - Pinball FX sur une borne : avant chaque partie, Cyber Pinball règle la rotation forcée de l'image du jeu dans le même sens que ses propres écrans du playfield (Options > Vidéo du jeu, fichier `LocalSettings.cfg`). La table est face au joueur au lieu de rester en paysage. Un PC dont l'écran est droit garde son réglage.

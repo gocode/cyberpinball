@@ -13,7 +13,8 @@
 // l'exécutable) est noté dans le package.json de l'application (cyberpinball.socle) : tout ce
 // qui, hors de resources\app, demanderait l'installeur pour changer.
 //
-// Signature : facultative, par variables d'environnement (voir scripts/signature.mjs).
+// Signature : facultative, par variables d'environnement (voir scripts/signature.mjs). Quand elle
+// est configurée, tous les binaires livrés de Cyber Pinball sont signés : exécutable, natif\, installeurs.
 //
 // L'application est d'abord regroupée par esbuild en deux fichiers (processus
 // principal, preload) : les paquets du monorepo y sont inclus. Seuls koffi, sodium-native et
@@ -27,7 +28,7 @@ import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { builtApart, lockBuild, stageProblems } from './paquet-application.mjs';
-import { sign, signatureConfigured } from './signature.mjs';
+import { sign, signAll, signatureConfigured } from './signature.mjs';
 
 const require = createRequire(import.meta.url);
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -254,6 +255,13 @@ function packageApplication() {
   const run = spawnSync(windowsTar(), ['-a', '-c', '-f', zip, '-C', stage, ...fs.readdirSync(stage)], { encoding: 'utf8' });
   if (run.status !== 0) throw new Error(`Paquet de l'application impossible : ${run.stderr || run.error?.message}`);
   console.log(`\nPaquet de l'application : ${zip} (${(fs.statSync(zip).size / 1024 ** 2).toFixed(1)} Mio, socle ${socle})`);
+}
+
+// Nos binaires natifs (compagnon du casque, plugins de VPX, couche OpenXR, serveur du DMD) : signés
+// comme l'exécutable, et avant le paquet de mise à jour qui les embarque.
+if (signatureConfigured()) {
+  step('Signature des binaires natifs');
+  await signAll(path.join(stage, 'natif'));
 }
 
 if (process.argv.includes('--application')) {

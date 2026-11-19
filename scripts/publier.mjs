@@ -62,6 +62,7 @@ import { frozenProblem } from './publication-figee.mjs';
 import { DIRECT_DOWNLOADS, directDownloadProblems } from './telechargement-direct.mjs';
 import { toReview } from './manuels-a-reviser.mjs';
 import { releaseBody } from './page-release.mjs';
+import { signatureConfigured } from './signature.mjs';
 import { bulletPoints, changelogNotes, changelogSections, fragmentNotes } from './traductions.mjs';
 import { FRAGMENTS_DIR, applyVersion, foldFragments, nextVersion, notesVersion } from './version-suivante.mjs';
 
@@ -190,6 +191,11 @@ if (argv.includes('--prive')) {
   if (!privateRepo || !/^[\w.-]+\/[\w.-]+$/.test(privateRepo)) fail(`--prive : dépôt du canal d'essai inconnu. Passez --depot <proprietaire/nom>, ou écrivez-le dans ${update.privateChannelFile()} ({ "depot": "proprietaire/nom", "jeton": "…" }).`);
   if (!prerelease) fail(`${version} est une version finale : un essai privé est une préversion (--essai).`);
   if (local) fail('--prive et --local ne vont pas ensemble.');
+}
+// Exécutables non signés : des antivirus les prennent pour des chevaux de Troie (Kaspersky, 19/11/2026).
+// Rappel à chaque publication tant qu'aucun certificat n'est configuré (scripts/signature.mjs).
+if (!signatureConfigured()) {
+  console.log(`Signature : aucun certificat configuré, les exécutables de la ${version} partent non signés et des antivirus peuvent les bloquer (scripts/signature.mjs).`);
 }
 
 // Nouveautés du front-end (packages/core/src/news.ts, Menu système > Nouveautés) : choisies à la main,

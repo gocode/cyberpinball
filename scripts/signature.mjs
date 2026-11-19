@@ -82,3 +82,31 @@ export async function sign(file, description = 'Cyber Pinball') {
   console.log(`Signé : ${file}`);
   return true;
 }
+
+/** Extensions des binaires Windows (PE) que Windows ou un autre programme charge. */
+export const BINARY_EXTENSIONS = ['.exe', '.dll', '.node'];
+
+/** Binaires Windows d'un dossier et de ses sous-dossiers, dans un ordre stable. */
+export function binariesIn(dir) {
+  if (!fs.existsSync(dir)) return [];
+  const found = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) found.push(...binariesIn(full));
+    else if (BINARY_EXTENSIONS.includes(path.extname(entry.name).toLowerCase())) found.push(full);
+  }
+  return found.sort((a, b) => a.localeCompare(b, 'en'));
+}
+
+/**
+ * Signe tous les binaires d'un dossier si un certificat est configuré ; renvoie ceux qui l'ont été.
+ * Un binaire non signé livré avec l'application (plugin chargé par VPX, couche OpenXR, compagnon
+ * du casque) suffit à faire classer Cyber Pinball parmi les chevaux de Troie par un antivirus :
+ * Kaspersky a mis l'exécutable en quarantaine le 19/11/2026.
+ */
+export async function signAll(dir, description = 'Cyber Pinball') {
+  if (!signatureConfigured()) return [];
+  const signed = [];
+  for (const file of binariesIn(dir)) if (await sign(file, description)) signed.push(file);
+  return signed;
+}
