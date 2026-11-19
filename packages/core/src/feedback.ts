@@ -17,7 +17,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
-import { t } from './i18n';
+import { isLanguage, LANGUAGES, t, type Language } from './i18n';
 import type { IconName } from './icons';
 import type { Reaction } from './reactions';
 import { signText, type PlayerKey } from './sharing';
@@ -61,6 +61,16 @@ export interface ProposalSupporters {
   others: number;
 }
 
+/**
+ * Une version traduite par le service (Workers AI) : le titre et la description pour une langue autre
+ * que celle de l'auteur, la réponse pour une langue autre que celle de l'équipe.
+ */
+export interface ProposalTranslation {
+  title?: string;
+  text?: string;
+  reply?: string;
+}
+
 /** Une proposition telle que le service la rend. */
 export interface Proposal {
   id: string;
@@ -74,6 +84,10 @@ export interface Proposal {
   updated: number;
   /** Réponse publique de l'équipe. */
   reply?: string;
+  /** Langue de la réponse, quand ce n'est pas celle de la proposition. */
+  replyLang?: Language;
+  /** Versions traduites par le service, par langue de l'interface (absentes tant qu'il ne les a pas faites). */
+  translations?: Partial<Record<Language, ProposalTranslation>>;
   /** Propositions fusionnées dans celle-ci (doublons). */
   merged: number;
   /** Son auteur, s'il a signé son pseudo (propositions d'avant le 18/11/2026 : aucun). */
@@ -197,23 +211,87 @@ export function parseProposal(raw: unknown): Proposal | undefined {
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0);
   const reply = typeof r.reply === 'string' && r.reply.trim() ? cleanProposalText(r.reply.slice(0, 1000)) : undefined;
   const author = parseFeedbackPerson(r.author);
+  const lang = isLanguage(r.lang) ? r.lang : 'fr';
+  const replyLang = reply && isLanguage(r.reply_lang) && r.reply_lang !== lang ? r.reply_lang : undefined;
+  const translations = parseTranslations(r.translations);
   return {
     id: r.id,
     kind: r.kind as ProposalKind,
     title,
     text,
-    lang: r.lang === 'en' ? 'en' : 'fr',
+    lang,
     votes: num(r.votes),
     status: r.status as ProposalStatus,
     at: num(r.at),
     updated: num(r.updated ?? r.at),
     ...(reply ? { reply } : {}),
+    ...(replyLang ? { replyLang } : {}),
+    ...(translations ? { translations } : {}),
     merged: num(r.merged),
     ...(author ? { author } : {}),
     ...(r.mine === true ? { mine: true } : {}),
     ...(r.voted === true ? { voted: true } : {}),
   };
 }
+
+/** Les versions traduites d'une proposition, vérifiées comme l'originale (langues de l'interface seulement). */
+function parseTranslations(raw: unknown): Proposal['translations'] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const out: Partial<Record<Language, ProposalTranslation>> = {};
+  for (const lang of LANGUAGES) {
+    const v = (raw as Record<string, unknown>)[lang];
+    if (!v || typeof v !== 'object') continue;
+    const r = v as Record<string, unknown>;
+    const title = cleanProposalTitle(r.title);
+    const text = typeof r.text === 'string' ? cleanProposalText(r.text) : undefined;
+    const reply = typeof r.reply === 'string' && r.reply.trim() ? cleanProposalText(r.reply.slice(0, 1000)) : undefined;
+    // Un titre traduit illisible : la version entière est écartée, sauf la réponse.
+    const one: ProposalTranslation = { ...(title ? { title, ...(text !== undefined ? { text } : {}) } : {}), ...(reply ? { reply } : {}) };
+    if (Object.keys(one).length) out[lang] = one;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Une proposition telle qu'un joueur la lit : dans sa langue si le service l'a traduite, l'originale gardée à côté. */
+export interface ProposalView extends Proposal {
+  /** Le titre et la description sont traduits de cette langue. */
+  translatedFrom?: Language;
+  /** La réponse de l'équipe est traduite de cette langue. */
+  replyTranslatedFrom?: Language;
+  /** L'original, tel que l'auteur (et l'équipe) l'ont écrit. */
+  original: { lang: Language; title: string; text: string; reply?: string; replyLang?: Language };
+}
+
+/**
+ * La proposition dans la langue `lang` : titre, description et réponse traduits quand le service en a
+ * une version, l'original sinon. `original` : la proposition telle qu'écrite (« Voir l'original »).
+ */
+export function proposalIn(p: Proposal, lang: Language): ProposalView {
+  const own = isLanguage(p.lang) ? p.lang : 'fr';
+  const replyLang = p.replyLang ?? own;
+  const original = { lang: own, title: p.title, text: p.text, ...(p.reply ? { reply: p.reply, replyLang } : {}) };
+  const version = p.translations?.[lang];
+  const main = lang !== own && version?.title ? version : undefined;
+  const reply = p.reply && lang !== replyLang && version?.reply ? version.reply : undefined;
+  return {
+    ...p,
+    ...(main ? { title: main.title!, text: p.text ? (main.text ?? p.text) : '', translatedFrom: own } : {}),
+    ...(reply ? { reply, replyTranslatedFrom: replyLang } : {}),
+    original,
+  };
+}
+
+/** La proposition telle qu'écrite, sans traduction : « Voir l'original ». */
+export function proposalOriginal(p: ProposalView): ProposalView {
+  const { translatedFrom: _a, replyTranslatedFrom: _b, ...rest } = p;
+  return { ...rest, title: p.original.title, text: p.original.text, ...(p.original.reply ? { reply: p.original.reply } : {}) };
+}
+
+/** « Traduit du français » : la mention discrète d'un texte traduit, selon sa langue d'origine. */
+export const TRANSLATED_FROM: Record<Language, () => string> = {
+  fr: () => t('Traduit du français'),
+  en: () => t('Traduit de l’anglais'),
+};
 
 /** Les propositions de la réponse du service, triées par votes puis par date (la plus récente d'abord). */
 export function parseProposals(raw: unknown): Proposal[] {
@@ -249,7 +327,7 @@ export function proposalWords(text: string): Set<string> {
  * Propositions proches d'un texte (titre et description) : part des mots porteurs en commun, le
  * titre compte double, deux mots en commun au moins. Les plus proches d'abord, `max` au plus, au-dessus d'un seuil.
  */
-export function similarProposals(text: string, list: readonly Proposal[], max = 3, threshold = 0.3): Proposal[] {
+export function similarProposals<P extends Proposal>(text: string, list: readonly P[], max = 3, threshold = 0.3): P[] {
   const mine = proposalWords(text);
   if (!mine.size) return [];
   const scored = list.map((p) => {

@@ -33,5 +33,15 @@ name = "LIMITE"
 namespace_id = "4782"
 simple = { limit = 20, period = 60 }
 
+# Workers AI : traduction des propositions dans toutes les langues de l'interface (modèle m2m100).
+# Compris dans l'offre gratuite de Cloudflare (allocation quotidienne) ; au-delà, les traductions
+# attendent le lendemain, les propositions restent publiées dans la langue de leur auteur.
+[ai]
+binding = "AI"
+
+# Chaque heure : traductions manquantes (propositions d'avant, langue ajoutée) ou échouées.
+[triggers]
+crons = ["17 * * * *"]
+
 [observability]
 enabled = false

@@ -7,6 +7,12 @@ export const messages: Record<string, string> = {
     'Language, update, what’s new, feedback and ideas, recent activity, backups, migration, terms of use, the community, quit or restart, sleep and shutdown',
 
   // packages/core/src/news.ts : les nouveautés
+  'Les idées de tous les joueurs, dans votre langue': 'Every player’s ideas, in your language',
+  'Les propositions écrites dans une autre langue se lisent traduites, et vous pouvez voter pour elles.': 'Ideas written in another language are shown translated, and you can vote for them.',
+  'Retours et propositions traduit d’office chaque proposition, et la réponse de l’équipe, dans toutes les langues de Cyber Pinball : rien à régler.':
+    'Feedback and ideas translates every idea, and the team’s reply, into all of Cyber Pinball’s languages: nothing to set up.',
+  'Une mention discrète signale un texte traduit ; sur la fiche d’une proposition, « Voir l’original » montre ce que l’auteur a écrit. En écrivant une idée, celles déjà proposées dans une autre langue vous sont aussi suggérées.':
+    'A small note marks translated text; on an idea’s page, “See the original” shows what the author wrote. While you write an idea, those already suggested in another language are offered too.',
   'Votre compte vous suit': 'Your account follows you',
   'Pseudo, niveau, badges et amis : vous retrouvez tout sur un autre PC ou après une réinstallation.': 'Nickname, level, badges and friends: you get it all back on another PC or after reinstalling.',
   'Cyber Pinball garde d’office une copie de secours de votre compte sur ce PC, hors de son dossier : une réinstallation la retrouve et vous propose de la reprendre.':

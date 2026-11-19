@@ -26,6 +26,23 @@ CREATE INDEX IF NOT EXISTS propositions_author ON propositions (author, at);
 -- Doublons fusionnés dans une proposition.
 CREATE INDEX IF NOT EXISTS propositions_merged ON propositions (merged_into);
 
+-- Traductions automatiques des propositions (Workers AI, 19/11/2026) : une ligne par proposition et
+-- par langue de l'interface autre que l'originale (ou autre que celle de la réponse de l'équipe).
+-- `source` : empreinte de l'original traduit (titre, description, réponse) ; une proposition modifiée
+-- a une autre empreinte, sa traduction est refaite. `ok` = 0 : traduction en cours ou échouée à la
+-- date `at`, retentée plus tard ; les champs restent alors vides.
+CREATE TABLE IF NOT EXISTS traductions (
+  proposition TEXT NOT NULL,
+  lang TEXT NOT NULL,
+  source TEXT NOT NULL,
+  title TEXT,
+  text TEXT,
+  reply TEXT,
+  ok INTEGER NOT NULL DEFAULT 0,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (proposition, lang)
+);
+
 -- Une voix par borne et par proposition. `at` : date signée du dernier vote (une date plus ancienne est un rejeu).
 CREATE TABLE IF NOT EXISTS votes (
   proposition TEXT NOT NULL,

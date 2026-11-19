@@ -197,4 +197,11 @@ export const messages: Record<string, string> = {
   'À l’équipe de Cyber Pinball': 'To the Cyber Pinball team',
   'Par Internet, chiffré : seule l’équipe le lit · Retours et propositions': 'Over the Internet, encrypted: only the team reads it · Feedback and ideas',
   'À l’équipe, au téléphone, sur une clé USB ou à un ami · anonymisé': 'To the team, the phone, a USB stick or a friend · anonymised',
+  // Propositions traduites par le service (19/11/2026)
+  'Traduit du français': 'Translated from French',
+  'Traduit de l’anglais': 'Translated from English',
+  'Voir l’original': 'See the original',
+  'Voir la traduction': 'See the translation',
+  'Traduction automatique · « Voir l’original » pour le texte de l’auteur': 'Automatic translation · “See the original” for the author’s text',
+  'Texte original, tel que l’auteur l’a écrit': 'Original text, as the author wrote it',
 };

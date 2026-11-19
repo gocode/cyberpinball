@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.1
 
+- Retours et propositions : chaque proposition se lit dans votre langue. Le service traduit d'office le titre, la description et la réponse de l'équipe dans toutes les langues de Cyber Pinball, dès la publication, y compris les propositions déjà publiées ; une mention discrète signale un texte traduit, et « Voir l'original » sur la fiche montre ce que l'auteur a écrit.
+- Retours et propositions : « Déjà proposé ? Votez plutôt » retrouve aussi les idées écrites dans une autre langue, et le filtre de mots s'applique aux textes traduits.
 - Juke-box : les vidéos et les sons lus depuis le disque ne s'arrêtent plus toutes les quelques secondes. Une vidéo lourde (4K, son et image rangés loin l'un de l'autre dans le fichier) pouvait se figer, son compris, dès que le front-end était occupé ; ses fichiers sont maintenant lus par un processus à part.
 - Juke-box : chaque coupure de la lecture d'un morceau local est notée au journal, avec sa cause (attente de données, image figée, son figé) et ce qui était chargé d'avance.
 - Mettre une table à la corbeille pendant qu'un de ses fichiers est ouvert ailleurs : l'écran dit maintenant quel fichier est tenu et, quand Windows le sait, par quel programme, au lieu d'échouer sans rien dire à chaque appui. Toute action du front-end qui échoue est rattrapée et expliquée de la même façon.

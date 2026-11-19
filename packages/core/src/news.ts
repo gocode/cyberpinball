@@ -54,6 +54,22 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Traduction automatique des propositions par le service (19/11/2026).
+    id: 'propositions-traduites',
+    date: '2026-11-19',
+    version: '0.2.1',
+    get title() { return t('Les idées de tous les joueurs, dans votre langue'); },
+    get detail() { return t('Les propositions écrites dans une autre langue se lisent traduites, et vous pouvez voter pour elles.'); },
+    get more() {
+      return [
+        t('Retours et propositions traduit d’office chaque proposition, et la réponse de l’équipe, dans toutes les langues de Cyber Pinball : rien à régler.'),
+        t('Une mention discrète signale un texte traduit ; sur la fiche d’une proposition, « Voir l’original » montre ce que l’auteur a écrit. En écrivant une idée, celles déjà proposées dans une autre langue vous sont aussi suggérées.'),
+      ];
+    },
+    get where() { return t('Menu système › Cyber Pinball › Retours et propositions'); },
+    reach: { kind: 'system', id: 'feedback' },
+  },
+  {
     // Lots 2 à 5 de la Communauté au téléphone (18/11/2026), la ligne ajoutée avec le dernier.
     id: 'communaute-telephone',
     date: '2026-11-18',

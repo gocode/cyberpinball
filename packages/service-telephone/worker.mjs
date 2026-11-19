@@ -32,8 +32,12 @@
 //
 // Il ne journalise ni adresse IP ni contenu : l'adresse IP ne sert que de clé à la limite d'écritures.
 //
+//    Chaque proposition se lit dans toutes les langues de l'interface : traduite par Workers AI à la
+//    publication, puis comblée à la demande et chaque heure (voir « Traduction des propositions »).
+//
 // Liaisons (wrangler.toml) : ADRESSES (KV), ASSETS (public/), RETOURS (D1 ; sans elle, les routes
-// des retours répondent 503), LIMITE (limite d'écritures par adresse IP, facultative).
+// des retours répondent 503), LIMITE (limite d'écritures par adresse IP, facultative), AI (Workers AI,
+// facultative : sans elle, les propositions restent dans la langue de leur auteur).
 // ADMIN_PUBLIC_KEY (variable, facultative) : clé publique d'administration en hexadécimal, qui
 // remplace la constante du même nom. Elle ne se règle que par le déploiement (wrangler.toml ou
 // tableau de bord Cloudflare) : les essais s'en servent pour signer avec une clé de test.
@@ -329,10 +333,191 @@ const SELECT_PROPOSITIONS = `SELECT p.id, p.kind, p.title, p.text, p.lang, p.sta
   EXISTS (SELECT 1 FROM votes w WHERE w.proposition = p.id AND w.voter = ?1) AS has_voted
 FROM propositions p`;
 
+// ─── Traduction des propositions (Workers AI, liaison AI) ───────────────────────────────────────
+//
+// Chaque proposition se lit dans toutes les langues de l'interface (LANGS, la même liste que
+// LANGUAGES de packages/core/src/i18n.ts, fixé par un essai). Le titre et la description sont
+// traduits vers chaque langue autre que celle de l'auteur, la réponse de l'équipe vers chaque langue
+// autre que la sienne (devinée, sinon celle de la proposition). Une fois, sur le service : à la
+// publication, puis à la demande (la liste lue, une version manque ou n'est plus à jour) et chaque
+// heure (cron) : les propositions d'avant cette fonction et les langues ajoutées plus tard se
+// comblent d'elles-mêmes. Une traduction en échec (quota du jour, service indisponible) laisse la
+// proposition publiée dans sa langue ; elle est retentée après TRANSLATE_RETRY_MS.
+
+export const TRANSLATE_MODEL = '@cf/meta/m2m100-1.2b';
+/** Une traduction en cours ou échouée n'est retentée qu'après ce délai. */
+export const TRANSLATE_RETRY_MS = 30 * 60_000;
+/** Appels au modèle au plus par passage : à la demande (en tâche de fond d'une requête) et par le cron. */
+export const TRANSLATE_CALLS_ON_DEMAND = 24;
+export const TRANSLATE_CALLS_CRON = 120;
+/** Au-delà de ce nombre de lignes, une description est traduite d'un bloc. */
+const TRANSLATE_LINES_MAX = 30;
+
+/** Mots outils propres à chaque langue : de quoi deviner la langue d'une réponse de l'équipe. */
+const LANG_WORDS = {
+  fr: new Set('le la les des une est et pour pas dans que qui sur avec nous vous merci cette sera bien aussi mais plus ce du au aux'.split(' ')),
+  en: new Set('the is and for not in that which with we you thanks thank this will be also but more it of to are has have'.split(' ')),
+};
+
+/** Langue d'un texte parmi LANGS, d'après ses mots outils ; undefined si rien ne tranche. */
+export function guessLang(text) {
+  const words = String(text ?? '').toLowerCase().split(/[^\p{L}']+/u).filter(Boolean);
+  let best;
+  let bestScore = 0;
+  let tie = false;
+  for (const lang of LANGS) {
+    const set = LANG_WORDS[lang];
+    if (!set) continue;
+    const score = words.reduce((n, w) => n + (set.has(w) ? 1 : 0), 0);
+    if (score > bestScore) [best, bestScore, tie] = [lang, score, false];
+    else if (score === bestScore && score > 0) tie = true;
+  }
+  return bestScore >= 2 && !tie ? best : undefined;
+}
+
+/** Langue de la réponse de l'équipe : devinée, sinon celle de la proposition. */
+const replyLangOf = (row) => (row.reply ? (guessLang(row.reply) ?? row.lang) : row.lang);
+
+/** Ce qu'une langue doit recevoir d'une proposition : titre et description, réponse ; rien pour l'originale. */
+function neededFor(row, lang) {
+  const main = lang !== row.lang;
+  const answer = Boolean(row.reply) && lang !== replyLangOf(row);
+  return main || answer ? { main, answer } : undefined;
+}
+
+/** Empreinte de l'original traduit : change dès que le titre, la description ou la réponse change. */
+async function sourceOf(row) {
+  return (await sha256hex(encoder.encode(`${row.title}\0${row.text}\0${row.reply ?? ''}`))).slice(0, 32);
+}
+
+/** Traductions à jour d'une liste de propositions : Map id → { lang → { title?, text?, reply? } }, et les manquantes. */
+async function translationsOf(db, rows, now) {
+  const ids = rows.map((r) => r.id);
+  const stored = new Map();
+  // Par paquets : une requête D1 admet un nombre borné de paramètres.
+  for (let i = 0; i < ids.length; i += 90) {
+    const part = ids.slice(i, i + 90);
+    const { results } = await db.prepare(`SELECT proposition, lang, source, title, text, reply, ok, at FROM traductions WHERE proposition IN (${part.map((_, j) => `?${j + 1}`).join(', ')})`).bind(...part).all();
+    for (const t of results) stored.set(`${t.proposition}\n${t.lang}`, t);
+  }
+  const ready = new Map();
+  const missing = [];
+  for (const row of rows) {
+    const source = await sourceOf(row);
+    for (const lang of LANGS) {
+      const need = neededFor(row, lang);
+      if (!need) continue;
+      const t = stored.get(`${row.id}\n${lang}`);
+      if (t && t.source === source && t.ok) {
+        const out = {};
+        if (need.main) {
+          out.title = t.title;
+          if (row.text) out.text = t.text ?? '';
+        }
+        if (need.answer && t.reply) out.reply = t.reply;
+        if (Object.keys(out).length) (ready.get(row.id) ?? ready.set(row.id, {}).get(row.id))[lang] = out;
+      } else if (!t || t.source !== source || now - t.at >= TRANSLATE_RETRY_MS) missing.push({ row, lang, source, need });
+    }
+  }
+  return { ready, missing };
+}
+
+/** Un texte traduit par le modèle ; lève une erreur si le service ne rend rien d'utilisable. */
+async function translateText(env, text, from, to) {
+  const out = await env.AI.run(TRANSLATE_MODEL, { text, source_lang: from, target_lang: to });
+  const result = typeof out?.translated_text === 'string' ? out.translated_text.trim() : '';
+  if (!result) throw new Error('traduction vide');
+  return result;
+}
+
+/** Une description, ligne par ligne (les retours à la ligne restent), d'un bloc si elle en a trop. */
+async function translateLines(env, text, from, to, spend) {
+  const lines = text.split('\n');
+  if (lines.length > TRANSLATE_LINES_MAX) {
+    spend(1);
+    return translateText(env, text, from, to);
+  }
+  const out = [];
+  for (const line of lines) {
+    if (!line.trim()) out.push('');
+    else {
+      spend(1);
+      out.push(await translateText(env, line, from, to));
+    }
+  }
+  return out.join('\n');
+}
+
+/** Ramène un texte traduit aux règles d'une proposition (longueur, caractères de contrôle). */
+function fitTitle(text) {
+  const s = text.normalize('NFC').replace(/\p{Cc}/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, TITLE_MAX).trim();
+  return s.length >= TITLE_MIN ? s : undefined;
+}
+const fitText = (text, max) => text.normalize('NFC').replace(/\r\n?/g, '\n').replace(/[^\P{Cc}\n]/gu, ' ').trim().slice(0, max);
+
+/**
+ * Comble les traductions manquantes, au plus `calls` appels au modèle. Chaque version est d'abord
+ * réservée (ok = 0, datée) : une autre requête ne la refait pas pendant TRANSLATE_RETRY_MS, et un
+ * échec attend autant avant d'être retenté. Au premier échec (quota du jour, panne), le passage
+ * s'arrête : les suivantes attendront le prochain.
+ */
+export async function fillTranslations(env, now, { ids, calls = TRANSLATE_CALLS_ON_DEMAND } = {}) {
+  const db = env.RETOURS;
+  if (!db || !env.AI?.run) return { done: 0, failed: 0 };
+  const where = ids?.length ? `p.id IN (${ids.map((_, i) => `?${i + 1}`).join(', ')})` : 'p.hidden = 0 AND p.merged_into IS NULL';
+  const { results } = await db.prepare(`SELECT p.id, p.title, p.text, p.lang, p.reply FROM propositions p WHERE ${where} ORDER BY p.at DESC LIMIT ${LIST_MAX}`).bind(...(ids ?? [])).all();
+  const { missing } = await translationsOf(db, results, now);
+  let budget = calls;
+  let done = 0;
+  for (const job of missing) {
+    // Appels de cette version : le titre, chaque ligne non vide de la description, de la réponse.
+    const linesOf = (s) => (s ? Math.min(s.split('\n').filter((l) => l.trim()).length, TRANSLATE_LINES_MAX + 1) : 0);
+    const cost = (job.need.main ? 1 + linesOf(job.row.text) : 0) + (job.need.answer ? linesOf(job.row.reply) : 0);
+    if (cost > budget) break;
+    const claim = 'INSERT INTO traductions (proposition, lang, source, ok, at) VALUES (?1, ?2, ?3, 0, ?4) ON CONFLICT (proposition, lang) DO UPDATE SET source = excluded.source, title = NULL, text = NULL, reply = NULL, ok = 0, at = excluded.at';
+    await db.prepare(claim).bind(job.row.id, job.lang, job.source, now).run();
+    try {
+      const spend = (n) => (budget -= n);
+      let title = null;
+      let text = null;
+      let answer = null;
+      if (job.need.main) {
+        spend(1);
+        title = fitTitle(await translateText(env, job.row.title, job.row.lang, job.lang));
+        if (!title) throw new Error('titre traduit trop court');
+        text = job.row.text ? fitText(await translateLines(env, job.row.text, job.row.lang, job.lang, spend), TEXT_MAX) : '';
+      }
+      if (job.need.answer) answer = fitText(await translateLines(env, job.row.reply, replyLangOf(job.row), job.lang, spend), REPLY_MAX) || null;
+      // Seulement si l'original n'a pas changé pendant la traduction.
+      await db
+        .prepare('UPDATE traductions SET title = ?4, text = ?5, reply = ?6, ok = 1, at = ?7 WHERE proposition = ?1 AND lang = ?2 AND source = ?3')
+        .bind(job.row.id, job.lang, job.source, title, text, answer, now)
+        .run();
+      done++;
+    } catch {
+      // Rien n'est journalisé (le message pourrait citer le texte) : la réservation datée vaut échec.
+      return { done, failed: 1 };
+    }
+  }
+  return { done, failed: 0 };
+}
+
+/** Lance une tâche après la réponse (ctx.waitUntil) ; sans contexte d'exécution (essais), l'attend. */
+async function inBackground(ctx, task) {
+  const safe = task.catch(() => undefined);
+  if (typeof ctx?.waitUntil === 'function') ctx.waitUntil(safe);
+  else await safe;
+}
+
 /** Une proposition telle que rendue : le pseudo de l'auteur s'il est connu, jamais sa clé ni celles des votants. */
-function present(row, { admin = false, pk } = {}) {
+function present(row, { admin = false, pk, translations } = {}) {
   const out = { id: row.id, kind: row.kind, title: row.title, text: row.text, lang: row.lang, votes: row.n_votes, status: row.status, at: row.at, updated: row.updated };
-  if (row.reply !== null && row.reply !== undefined) out.reply = row.reply;
+  if (row.reply !== null && row.reply !== undefined) {
+    out.reply = row.reply;
+    const replyLang = replyLangOf(row);
+    if (replyLang !== row.lang) out.reply_lang = replyLang;
+  }
+  if (translations && Object.keys(translations).length) out.translations = translations;
   out.merged = row.n_merged;
   if (row.author_name) out.author = row.author_country ? { name: row.author_name, country: row.author_country } : { name: row.author_name };
   if (pk) {
@@ -346,14 +531,18 @@ function present(row, { admin = false, pk } = {}) {
   return out;
 }
 
-async function listPropositions(env, url) {
+async function listPropositions(env, url, now, ctx) {
   const asked = url.searchParams.get('pk');
   const pk = asked && HEX64.test(asked) ? asked : undefined;
   const { results } = await env.RETOURS.prepare(`${SELECT_PROPOSITIONS} WHERE p.hidden = 0 AND p.merged_into IS NULL ORDER BY n_votes DESC, p.at DESC LIMIT ?2`).bind(pk ?? '', LIST_MAX).all();
-  return reply(200, { propositions: results.map((r) => present(r, { pk })) });
+  const { ready, missing } = await translationsOf(env.RETOURS, results, now);
+  const answer = reply(200, { propositions: results.map((r) => present(r, { pk, translations: ready.get(r.id) })) });
+  // Une version manque ou n'est plus à jour : comblée après la réponse, lue à la prochaine liste.
+  if (missing.length && env.AI) await inBackground(ctx, fillTranslations(env, now));
+  return answer;
 }
 
-async function propose(request, env, now) {
+async function propose(request, env, now, ctx) {
   if (await limited(request, env)) return reply(429, { erreur: 'trop' });
   const checked = await signedRequest(request, 'propose', now);
   if (!checked.body) return reply(checked.status, { erreur: checked.why });
@@ -376,7 +565,10 @@ async function propose(request, env, now) {
     db.prepare('INSERT INTO votes (proposition, voter, at) VALUES (?1, ?2, ?3)').bind(id, pk, t),
     ...(who ? [noteWho(db, pk, who, t)] : []),
   ]);
-  return refused ?? reply(201, { id });
+  if (refused) return refused;
+  // Traduite tout de suite vers les autres langues, après la réponse : la publication n'attend pas.
+  if (env.AI) await inBackground(ctx, fillTranslations(env, now, { ids: [id] }));
+  return reply(201, { id });
 }
 
 /** La proposition visible qui reçoit les voix de `id` : elle-même, ou celle où elle a été fusionnée. */
@@ -474,6 +666,7 @@ async function forget(request, env, now) {
     ...markSeen(db, pk, t, now),
     db.prepare('UPDATE propositions SET merged_into = NULL WHERE merged_into IN (SELECT id FROM propositions WHERE author = ?1)').bind(pk),
     db.prepare('DELETE FROM votes WHERE proposition IN (SELECT id FROM propositions WHERE author = ?1)').bind(pk),
+    db.prepare('DELETE FROM traductions WHERE proposition IN (SELECT id FROM propositions WHERE author = ?1)').bind(pk),
     db.prepare('DELETE FROM propositions WHERE author = ?1').bind(pk),
     db.prepare('DELETE FROM votes WHERE voter = ?1').bind(pk),
     db.prepare('DELETE FROM reactions_nouveautes WHERE voter = ?1').bind(pk),
@@ -570,7 +763,7 @@ export async function verifyAdmin(request, env, raw, now) {
   return undefined;
 }
 
-async function adminEdit(env, id, raw, date, now) {
+async function adminEdit(env, id, raw, date, now, ctx) {
   const db = env.RETOURS;
   const row = await db.prepare('SELECT id, merged_into FROM propositions WHERE id = ?1').bind(id).first();
   if (!row) return reply(404, { erreur: 'inconnue' });
@@ -633,11 +826,14 @@ async function adminEdit(env, id, raw, date, now) {
   statements.push(db.prepare(`UPDATE propositions SET ${sets.join(', ')} WHERE id = ?1`).bind(id, ...values));
   const refused = await writeOnce(db, 'admin', date, [...markSeen(db, 'admin', date, now), ...statements]);
   if (refused) return refused;
+  // Titre, description ou réponse changés : leurs traductions sont refaites après la réponse.
+  if (env.AI && (body.title !== undefined || body.text !== undefined || body.reply !== undefined)) await inBackground(ctx, fillTranslations(env, now, { ids: [id] }));
   const after = await db.prepare(`${SELECT_PROPOSITIONS} WHERE p.id = ?2`).bind('', id).first();
-  return reply(200, present(after, { admin: true }));
+  const { ready } = await translationsOf(db, [after], now);
+  return reply(200, present(after, { admin: true, translations: ready.get(id) }));
 }
 
-async function admin(request, env, url, now) {
+async function admin(request, env, url, now, ctx) {
   if (Number(request.headers.get('Content-Length') ?? 0) > ADMIN_BODY_MAX) return reply(413, { erreur: 'taille' });
   const raw = await request.arrayBuffer();
   if (raw.byteLength > ADMIN_BODY_MAX) return reply(413, { erreur: 'taille' });
@@ -651,12 +847,13 @@ async function admin(request, env, url, now) {
   if (route === 'propositions') {
     if (request.method !== 'GET') return reply(405, { erreur: 'méthode' });
     const { results } = await db.prepare(`${SELECT_PROPOSITIONS} ORDER BY n_votes DESC, p.at DESC`).bind('').all();
-    return reply(200, { propositions: results.map((r) => present(r, { admin: true })) });
+    const { ready } = await translationsOf(db, results, now);
+    return reply(200, { propositions: results.map((r) => present(r, { admin: true, translations: ready.get(r.id) })) });
   }
   const backers = /^propositions\/([A-Za-z0-9_-]{10})\/soutiens$/.exec(route);
   if (backers) return request.method === 'GET' ? supporters(db, backers[1], { admin: true }) : reply(405, { erreur: 'méthode' });
   const edit = /^propositions\/([A-Za-z0-9_-]{10})$/.exec(route);
-  if (edit) return request.method === 'POST' ? adminEdit(env, edit[1], raw, date, now) : reply(405, { erreur: 'méthode' });
+  if (edit) return request.method === 'POST' ? adminEdit(env, edit[1], raw, date, now, ctx) : reply(405, { erreur: 'méthode' });
   if (route === 'rapports') {
     if (request.method !== 'GET') return reply(405, { erreur: 'méthode' });
     const { results } = await db.prepare('SELECT id, at, size FROM rapports ORDER BY at DESC, rowid DESC').all();
@@ -816,21 +1013,21 @@ async function coffre(request, env, url, now) {
 }
 
 /** Les routes des retours (/api/propositions, /api/soutiens, /api/votes, /api/rapports, /api/admin/…) ; undefined pour les autres. */
-async function retours(request, env, url, now) {
+async function retours(request, env, url, now, ctx) {
   const path = url.pathname;
   const known = path === '/api/propositions' || path === '/api/soutiens' || path === '/api/noms' || path === '/api/votes' || path === '/api/oubli' || path === '/api/rapports' || path === '/api/nouveautes' || path.startsWith('/api/admin/');
   if (!known) return undefined;
   if (!env.RETOURS) return reply(503, { erreur: 'indisponible' });
   try {
-    if (path.startsWith('/api/admin/')) return await admin(request, env, url, now);
+    if (path.startsWith('/api/admin/')) return await admin(request, env, url, now, ctx);
     if (path === '/api/nouveautes') {
       if (request.method === 'GET') return await listNewsReactions(env, url);
       return request.method === 'POST' ? await reactNews(request, env, now) : reply(405, { erreur: 'méthode' });
     }
     if (path === '/api/soutiens') return request.method === 'GET' ? await listSupporters(env, url) : reply(405, { erreur: 'méthode' });
     if (path === '/api/propositions') {
-      if (request.method === 'GET') return await listPropositions(env, url);
-      return request.method === 'POST' ? await propose(request, env, now) : reply(405, { erreur: 'méthode' });
+      if (request.method === 'GET') return await listPropositions(env, url, now, ctx);
+      return request.method === 'POST' ? await propose(request, env, now, ctx) : reply(405, { erreur: 'méthode' });
     }
     if (request.method !== 'POST') return reply(405, { erreur: 'méthode' });
     if (path === '/api/oubli') return await forget(request, env, now);
@@ -843,11 +1040,11 @@ async function retours(request, env, url, now) {
 }
 
 export default {
-  async fetch(request, env, _ctx, now = Date.now()) {
+  async fetch(request, env, ctx, now = Date.now()) {
     const url = new URL(request.url);
     const call = /^\/api\/b\/([^/]+)$/.exec(url.pathname);
     if (call) return ID.test(call[1]) ? api(request, env, call[1], now) : reply(404, { erreur: 'inconnue' });
-    const answered = (await coffre(request, env, url, now)) ?? (await retours(request, env, url, now));
+    const answered = (await coffre(request, env, url, now)) ?? (await retours(request, env, url, now, ctx));
     if (answered) return answered;
     // La page du raccourci d'une borne : la même pour toutes (page.js lit l'identifiant dans l'adresse).
     if (/^\/b\/[A-Za-z0-9_-]{22}\/?$/.test(url.pathname)) {
@@ -857,5 +1054,10 @@ export default {
       return new Response(page.body, { status: page.status, headers });
     }
     return env.ASSETS.fetch(request);
+  },
+
+  /** Chaque heure (wrangler.toml, [triggers]) : les traductions manquantes ou échouées, sans attendre qu'une borne lise la liste. */
+  async scheduled(_event, env, ctx, now = Date.now()) {
+    await inBackground(ctx, fillTranslations(env, now, { calls: TRANSLATE_CALLS_CRON }));
   },
 };

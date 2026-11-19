@@ -8,7 +8,7 @@
 //   node scripts/service-telephone.mjs d1         crée la base D1 « cyberpinball-retours », inscrit son identifiant dans
 //                                                 wrangler.toml, puis lui applique schema.sql (rejouable)
 //   node scripts/service-telephone.mjs deployer   prépare, applique schema.sql à la base D1, puis met le service en ligne
-//                                                 (wrangler deploy)
+//                                                 (wrangler deploy), puis lance le rattrapage des traductions
 //
 // Les fichiers copiés ne sont pas suivis par git (packages/service-telephone/.gitignore) : la page
 // du service et celle de la borne partagent ainsi le même chiffrement, sans double à tenir.
@@ -76,7 +76,35 @@ function deploy() {
   if (text.includes(D1_PLACEHOLDER)) throw new Error('base D1 des retours pas encore créée : node scripts/service-telephone.mjs d1');
   prepare();
   applySchema();
-  process.stdout.write(wrangler(['deploy']));
+  let out;
+  try {
+    out = wrangler(['deploy']);
+  } catch (e) {
+    // wrangler peut finir sur un code non nul après un déploiement réussi (19/11/2026, Windows) : sa
+    // sortie fait foi, sinon le rattrapage des traductions serait sauté à tort.
+    if (!deployedOk(e.stdout)) throw e;
+    out = e.stdout;
+    console.warn(`wrangler a fini sur le code ${e.status} après un déploiement réussi.`);
+  }
+  process.stdout.write(out);
+}
+
+/** La sortie de `wrangler deploy` confirme la mise en ligne : le Worker envoyé, puis ses déclencheurs. */
+export function deployedOk(stdout) {
+  return typeof stdout === 'string' && /Uploaded \S+/.test(stdout) && /Deployed \S+ triggers/.test(stdout);
+}
+
+/**
+ * Rattrapage des traductions au déploiement : lire la liste suffit, le service comble alors en tâche
+ * de fond les versions manquantes (propositions d'avant, langue ajoutée) ; le cron horaire fait le reste.
+ */
+async function kickTranslations() {
+  try {
+    const r = await fetch('https://t.cyberpinball.com/api/propositions', { signal: AbortSignal.timeout(30_000) });
+    console.log(`Rattrapage des traductions lancé (HTTP ${r.status}).`);
+  } catch (e) {
+    console.log(`Rattrapage des traductions : liste injoignable (${e.message}), le cron horaire s'en chargera.`);
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -84,7 +112,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (what === 'preparer') prepare();
   else if (what === 'kv') createKv();
   else if (what === 'd1') createD1();
-  else if (what === 'deployer') deploy();
+  else if (what === 'deployer') {
+    deploy();
+    await kickTranslations();
+  }
   else {
     console.error('Usage : node scripts/service-telephone.mjs preparer | kv | d1 | deployer');
     process.exit(2);

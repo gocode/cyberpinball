@@ -26,20 +26,26 @@ import {
   cleanProposalText,
   cleanProposalTitle,
   formatDateTime,
+  isLanguage,
+  LANGUAGE_NAMES,
   loadFeedbackState,
   locale,
   playerFlag,
+  proposalIn,
+  proposalOriginal,
   saveFeedbackState,
   similarProposals,
   formatSize,
   t,
   tLater,
   tn,
+  TRANSLATED_FROM,
   type CrashConsent,
   type FeedbackPerson,
   type FeedbackState,
   type Proposal,
   type ProposalKind,
+  type ProposalView,
   type ReportEnvelope,
 } from '@cyberpinball/core';
 import type { FeedbackService } from './feedback-service';
@@ -169,6 +175,28 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     ctx.openCustom(build, at);
   }
 
+  // ---------- Langue : chaque proposition se lit dans celle du joueur ----------
+
+  /** Propositions dont le joueur a demandé l'original (« Voir l'original »), le temps de la session. */
+  const originals = new Set<string>();
+  const myLanguage = () => {
+    const lang = ctx.language();
+    return isLanguage(lang) ? lang : 'fr';
+  };
+  /** La proposition dans la langue du joueur (traduite par le service), ou telle qu'écrite s'il l'a demandé. */
+  const view = (p: Proposal): ProposalView => {
+    const v = proposalIn(p, myLanguage());
+    return originals.has(p.id) ? proposalOriginal(v) : v;
+  };
+  /** Les propositions telles que le joueur les lit : la liste, et les doublons comparés dans sa langue. */
+  const viewed = () => ctx.service.list().map(view);
+  /** « traduit du français », en fin de ligne de la liste. */
+  const translatedNote = (p: ProposalView) => {
+    if (!p.translatedFrom) return '';
+    const s = TRANSLATED_FROM[p.translatedFrom]();
+    return s.charAt(0).toLocaleLowerCase(locale()) + s.slice(1);
+  };
+
   const consentLabel = (c: CrashConsent) => (c === 'yes' ? t('Oui') : c === 'no' ? t('Non') : t('Demander au prochain plantage'));
 
   // ---------- L'accueil : le tableau des propositions ----------
@@ -177,7 +205,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     void ctx.service.refreshIfOld();
     const self = () => open(back);
     const build = (): Built => {
-      const all = ctx.service.list();
+      const all = viewed();
       const net = ctx.service.net();
       const shown = all.filter((p) => (tab === 'all' ? true : tab === 'mine' ? p.mine || p.voted : p.kind === tab));
       const actions: Action[] = [];
@@ -237,16 +265,16 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
 
   /** La pastille d'état d'une proposition : chaque état a son icône, sa couleur et son remplissage. */
   function statusChip(p: Proposal): NonNullable<Row['status']> {
-    const view = PROPOSAL_STATUS_VIEW[p.status];
-    return { text: view.label, icon: view.icon, tone: view.tone, fill: view.fill };
+    const look = PROPOSAL_STATUS_VIEW[p.status];
+    return { text: look.label, icon: look.icon, tone: look.tone, fill: look.fill };
   }
 
-  function proposalRow(p: Proposal, action?: number): Row {
+  function proposalRow(p: ProposalView, action?: number): Row {
     return {
       ...(action !== undefined ? { action, pick: true } : {}),
       icon: PROPOSAL_KIND_VIEW[p.kind].icon,
       text: maskWords(p.title),
-      detail: [PROPOSAL_KIND_VIEW[p.kind].label, p.author ? t('par {name}', { name: p.author.name }) : '', p.merged ? tn(p.merged, '{n} doublon regroupé', '{n} doublons regroupés') : '', p.reply ? t('réponse de l’équipe') : ''].filter(Boolean).join(' · '),
+      detail: [PROPOSAL_KIND_VIEW[p.kind].label, p.author ? t('par {name}', { name: p.author.name }) : '', p.merged ? tn(p.merged, '{n} doublon regroupé', '{n} doublons regroupés') : '', p.reply ? t('réponse de l’équipe') : '', translatedNote(p)].filter(Boolean).join(' · '),
       aside: tn(p.votes, '{n} vote', '{n} votes'),
       // L'état dans sa pastille, en tête du détail (« Nouvelle » comprise) ; le vote dans un badge.
       // La couleur de la ligne reste au choix courant.
@@ -284,7 +312,8 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
   function openProposal(id: string, back: () => void): void {
     const self = () => openProposal(id, back);
     show(() => {
-      const p = ctx.service.list().find((x) => x.id === id);
+      const found = ctx.service.list().find((x) => x.id === id);
+      const p = found && view(found);
       if (!p) return { heading: t('Proposition introuvable'), icon: 'alert', sections: [{ rows: [{ icon: 'info', text: t('Elle a été retirée ou regroupée avec une autre.'), tone: 'quiet' }] }], actions: [{ label: t('Retour'), icon: 'back', run: back }], back };
       const actions: Action[] = [];
       const canVote = ctx.service.canWrite();
@@ -295,9 +324,26 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
             ? { label: t('Voter pour cette proposition'), detail: t('Une voix par borne · votre pseudo s’affiche parmi ses soutiens'), icon: 'check', tone: 'ok', key: 'feedback:vote', run: () => void ctx.service.vote(p.id, true).then(self) }
             : { label: t('Voter pour cette proposition'), detail: t('Indisponible : la borne n’a pas encore sa clé de joueur'), icon: 'check', tone: 'quiet', key: 'feedback:vote', run: self },
       );
+      // Traduite par le service : l'original à un appui (et retour à la traduction).
+      const asWritten = originals.has(p.id);
+      const translated = proposalIn(found!, myLanguage());
+      if (translated.translatedFrom || translated.replyTranslatedFrom)
+        actions.push({
+          label: asWritten ? t('Voir la traduction') : t('Voir l’original'),
+          detail: asWritten ? LANGUAGE_NAMES[myLanguage()] : LANGUAGE_NAMES[translated.translatedFrom ?? translated.replyTranslatedFrom!],
+          icon: 'language',
+          key: 'feedback:original',
+          run: () => {
+            if (asWritten) originals.delete(p.id);
+            else originals.add(p.id);
+            self();
+          },
+        });
       actions.push({ label: t('Retour'), icon: 'back', run: back });
       const rows: Row[] = [];
       if (p.text) rows.push({ icon: 'edit', text: maskWords(p.text) });
+      if (p.translatedFrom) rows.push({ icon: 'language', text: TRANSLATED_FROM[p.translatedFrom](), detail: t('Traduction automatique · « Voir l’original » pour le texte de l’auteur'), tone: 'quiet' });
+      else if (asWritten && translated.translatedFrom) rows.push({ icon: 'language', text: t('Texte original, tel que l’auteur l’a écrit'), tone: 'quiet' });
       const when = formatDateTime(p.at, { dateStyle: 'medium' });
       // L'auteur, nommé s'il a signé son pseudo (propositions d'avant le 18/11/2026 : sans nom).
       rows.push(
@@ -311,7 +357,13 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         heading: maskWords(p.title),
         icon: PROPOSAL_KIND_VIEW[p.kind].icon,
         subheading: [PROPOSAL_KIND_VIEW[p.kind].label, p.author ? t('par {name}', { name: p.author.name }) : '', tn(p.votes, '{n} vote', '{n} votes')].filter(Boolean).join(' · '),
-        sections: [{ rows }, ...(p.reply ? [{ title: t('Réponse de l’équipe'), rows: [{ icon: 'message' as const, text: maskWords(p.reply), tone: 'info' as const }] }] : []), supportersSection(p)],
+        sections: [
+          { rows },
+          ...(p.reply
+            ? [{ title: t('Réponse de l’équipe'), rows: [{ icon: 'message' as const, text: maskWords(p.reply), tone: 'info' as const }, ...(p.replyTranslatedFrom ? [{ icon: 'language' as const, text: TRANSLATED_FROM[p.replyTranslatedFrom](), tone: 'quiet' as const }] : [])] }]
+            : []),
+          supportersSection(p),
+        ],
         actions,
         back,
       };
@@ -389,7 +441,8 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         kindRows.push({ action: actions.length - 1, pick: true, icon: PROPOSAL_KIND_VIEW[k].icon, text: PROPOSAL_KIND_VIEW[k].label, detail: PROPOSAL_KIND_VIEW[k].lead, check: draft.kind === k ? 'on' : 'off', ...(draft.kind === k ? { current: true } : {}) });
       }
       const title = cleanProposalTitle(draft.title);
-      const near = draft.title.trim() ? similarProposals(`${draft.title} ${draft.text}`, ctx.service.list()) : [];
+      // Comparées dans la langue du joueur : une idée déjà proposée dans une autre langue est retrouvée.
+      const near = draft.title.trim() ? similarProposals(`${draft.title} ${draft.text}`, viewed()) : [];
       const nearRows: Row[] = near.map((p) => {
         actions.push({ label: p.title, key: `feedback-near:${p.id}`, run: () => openProposal(p.id, self) });
         return proposalRow(p, actions.length - 1);
