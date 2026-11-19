@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.1
 
+- Mettre à la corbeille la table affichée sur la roue ne bute plus sur « opération refusée » : Cyber Pinball ne garde plus ses vidéos ouvertes pendant qu'elles tournent, et Windows laisse déplacer son dossier.
 - Assistant de configuration, relevé des boutons : chaque écran dit en clair comment passer un bouton que la borne n'a pas, revenir en arrière, finir l'étape et corriger une erreur. Deux nouvelles actions à la souris : « Passer ce bouton » (boutons facultatifs) et « Terminer le relevé » (dès les boutons obligatoires relevés, les autres gardent leur touche actuelle). « Touches par défaut » s'appelle maintenant « Touches par défaut des encodeurs » pour les boutons du jeu.
 - Assistant de configuration : une frise des étapes en haut de chaque écran, une pastille numérotée par étape ; celle en cours porte son nom et où l'on en est (« Boutons de l'interface · Bouton 1 sur 4 », « Écrans · Rôle 2 sur 4 », « Son · Sortie 1 sur 3 »), à la place de la ligne qui le disait au milieu de l'écran.
 - Assistant de configuration au clavier et à la souris : chaque étape (lanceur, tilt, écrans et rôles, orientation, diagonale, son, haut-parleurs, récapitulatif, fin) a ses boutons à l'écran, cliquables, avec sous chacun les touches qui font la même chose (flèches, Entrée, Échap, Retour arrière, ou les boutons de la borne). Toute la première configuration se fait depuis un PC, en bureau à distance compris ; seul le relevé des boutons demande d'appuyer sur les vrais boutons de la borne.

@@ -7,8 +7,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { Readable } from 'node:stream';
 import { protocol } from 'electron';
+import { mediaResponse } from './media-response';
 import { JUKEBOX_AUDIO_EXTENSIONS, JUKEBOX_VIDEO_EXTENSIONS, MEDIA_SCHEME, isServedMedia, mediaContentType, mediaPathFromUrl } from '@cyberpinball/core';
 
 // À faire avant que l'application soit prête : un schéma « standard » et « stream »
@@ -62,30 +62,9 @@ export function serveMedias(allowedDirs: () => string[]): void {
   });
 }
 
-/** Réponse entière, ou la plage demandée (206) : Chromium lit les vidéos par morceaux. */
+/** Jamais de fichier gardé ouvert entre deux morceaux : la table affichée reste déplaçable (media-response.ts). */
 function respond(file: string, size: number, range: string | null): Response {
-  const type = mediaContentType(file);
-  // Lisible par les pages du menu en « crossOrigin » (niveaux du son du Juke-box) : les fichiers servis sont déjà ceux autorisés.
-  const headers: Record<string, string> = { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' };
-  const m = range ? /^bytes=(\d*)-(\d*)$/.exec(range.trim()) : null;
-  if (m && (m[1] || m[2])) {
-    let start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
-    let end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
-    if (start >= size || start > end) {
-      return new Response(null, { status: 416, headers: { ...headers, 'Content-Range': `bytes */${size}` } });
-    }
-    start = Math.max(0, start);
-    end = Math.max(start, end);
-    return new Response(stream(file, start, end), {
-      status: 206,
-      headers: { ...headers, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': String(end - start + 1) },
-    });
-  }
-  return new Response(size ? stream(file, 0, size - 1) : null, { status: 200, headers: { ...headers, 'Content-Length': String(size) } });
-}
-
-function stream(file: string, start: number, end: number): ReadableStream {
-  return Readable.toWeb(fs.createReadStream(file, { start, end })) as ReadableStream;
+  return mediaResponse(file, size, range, mediaContentType(file));
 }
 
 function refuse(what: string, status: number): Response {
