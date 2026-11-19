@@ -27,6 +27,7 @@ function fileVersion(file: string): string | undefined {
     const stamp = `${st.size}:${st.mtimeMs}`;
     const kept = versionCache.get(file);
     if (kept?.stamp === stamp) return kept.version;
+    // lecture entière : exécutable de VPX, quelques dizaines de Mo
     const version = peFileVersion(fs.readFileSync(file));
     versionCache.set(file, { stamp, version });
     return version;

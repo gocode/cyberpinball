@@ -11,6 +11,7 @@
 import { createHash, createPrivateKey, createPublicKey, sign, verify } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileDigest } from './boundedread';
 import { UPDATE_PUBLIC_KEY } from './update-key';
 
 export const PLUGINS_DIR = 'plugins';
@@ -47,7 +48,7 @@ export function ensurePluginsDir(dataDir: string): void {
 }
 
 function sha256(file: string): string {
-  return createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  return fileDigest(file, 'sha256');
 }
 
 /** Chemin relatif sûr (ni absolu, ni « .. »), toujours avec des « / ». */

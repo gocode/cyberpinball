@@ -848,6 +848,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
   function fontBase64(): string {
     if (fontData !== undefined) return fontData;
     try {
+      // lecture entière : police livrée avec Cyber Pinball
       fontData = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'polices', 'saira', 'Saira-wdth-wght.ttf')).toString('base64');
     } catch {
       fontData = '';

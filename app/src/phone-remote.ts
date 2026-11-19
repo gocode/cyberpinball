@@ -969,6 +969,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       res.writeHead(404, { ...headers, 'Content-Type': 'text/plain; charset=utf-8' }).end();
       return;
     }
+    // lecture entière : page du téléphone livrée avec Cyber Pinball
     fs.readFile(path.join(rendererDir, file), (error, body) => {
       if (error) return void res.writeHead(500, headers).end();
       res.writeHead(200, { ...headers, 'Content-Type': TYPES[path.extname(file)] ?? 'application/octet-stream' }).end(req.method === 'HEAD' ? undefined : body);
@@ -987,6 +988,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     const type = TYPES[path.extname(image.file).toLowerCase()] ?? 'application/octet-stream';
     const kept = token ? resized.get(token) : undefined;
     if (kept) return done(kept.body, kept.type);
+    // lecture entière : image de média (roue, fronton), quelques Mo
     fs.readFile(image.file, (error, body) => {
       if (error) return done(undefined, type);
       if (!image.max || type === TYPES['.svg']) return done(body, type);

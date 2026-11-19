@@ -22,6 +22,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import type { B2sElement, B2sImages, B2sLitImages } from './b2simage';
+import { fileDigest } from './boundedread';
 import { t, tn } from './i18n';
 import { mediaDbOfferLabel, mediaDbOffers, type MediaDbCandidate, type MediaDbOffer, type MediaDbQuality } from './mediadb';
 import { isAcceptedFormat, mediaKind, MEDIA_TYPES, type MediaKind, type MediaType } from './medias';
@@ -315,7 +316,7 @@ function distinctB2s(list: B2sSource[]): B2sSource[] {
     const image = src.images.backglass ?? src.images.dmd;
     let key: string | undefined;
     try {
-      key = image ? crypto.createHash('md5').update(fs.readFileSync(image.file)).digest('hex') : undefined;
+      key = image ? fileDigest(image.file, 'md5') : undefined;
     } catch {
       key = undefined;
     }

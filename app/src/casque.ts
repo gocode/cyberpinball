@@ -57,6 +57,7 @@ export function writeDecor(appDir: string, dir: string, panels: readonly Headset
     if (fs.existsSync(file) && fs.existsSync(stamp) && fs.readFileSync(stamp, 'utf8') === key) return file;
     const decor = buildDecor(panels, { lockbarWidth });
     if (!decor) return undefined;
+    // lecture entière : textures du décor livrées avec Cyber Pinball
     const bytes = new Map<DecorTexture, Uint8Array>(DECOR_TEXTURES.map((n) => [n, new Uint8Array(fs.readFileSync(path.join(textures, n)))]));
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(file, writeGlb(decor, bytes));

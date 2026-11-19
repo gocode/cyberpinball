@@ -9,11 +9,11 @@
 // de deux contenus différents, le plus récent (ou celui choisi) est gardé, l'autre
 // part à la corbeille.
 
-import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileDigest } from './boundedread';
 import { sameVolume, type FileOp } from './fileops';
-import { zipContentHash } from './romzip';
+import { zipFileContentHash } from './romzip';
 
 /** Un fichier de ROM sur le disque. */
 export interface RomFile {
@@ -97,8 +97,9 @@ export function romHash(file: RomFile): string {
   const key = `${file.dev}:${file.ino}`;
   const known = hashes.get(key);
   if (known && known.size === file.size && known.mtimeMs === file.mtimeMs) return known.hash;
-  const data = fs.readFileSync(file.path);
-  const hash = zipContentHash(data) ?? createHash('sha1').update(data).digest('hex');
+  // Rien n'est lu d'un bloc : un .zip de plusieurs Go (l'archive d'une table, rangée avec ses ROM)
+  // arrêtait l'import d'une installation entière sur « File size (…) is greater than 2 GiB ».
+  const hash = zipFileContentHash(file.path) ?? fileDigest(file.path, 'sha1');
   hashes.set(key, { size: file.size, mtimeMs: file.mtimeMs, hash });
   return hash;
 }

@@ -165,6 +165,7 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           const { nv, memory } = romBoard(rom);
           if (!memory || !fs.existsSync(nv)) continue;
           try {
+            // lecture entière : mémoire d'une ROM (.nv), quelques ko
             const before = fs.readFileSync(nv);
             const places = readRomRecords(memory, before)?.length ?? 0;
             const out = places > 1 ? writeRomRecords(memory, before, board.slice(0, places - 1).map((r) => ({ score: r.score, initials: groupInitials(r) }))) : undefined;
@@ -258,6 +259,7 @@ export function createTableDoubles(opts: TableDoublesOptions) {
         for (const rom of roms) {
           const { nv, memory } = romBoard(rom);
           try {
+            // lecture entière : mémoire d'une ROM (.nv), quelques ko
             const scores = memory && fs.existsSync(nv) ? readRomRecords(memory, fs.readFileSync(nv)) : undefined;
             if (scores) return { file: nv, storage: rom, scores };
           } catch {

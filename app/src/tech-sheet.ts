@@ -353,6 +353,7 @@ export function createTechSheet(ctx: TechSheetContext) {
     const file = path.join(dir, r.name);
     try {
       writeFileAtomic(file, r.zip);
+      // lecture entière : fiche technique écrite juste avant, quelques Mo
       const back = await fs.promises.readFile(file);
       if (!back.equals(r.zip)) throw new Error(t('le fichier relu ne correspond pas'));
     } catch (error) {

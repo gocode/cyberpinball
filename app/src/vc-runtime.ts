@@ -18,6 +18,7 @@ export function systemVcRuntime(dir = SYSTEM32): Record<string, string | undefin
   const versions: Record<string, string | undefined> = {};
   for (const dll of VC_RUNTIME_DLLS) {
     try {
+      // lecture entière : DLL du runtime Visual C++, quelques Mo
       versions[dll] = peFileVersion(fs.readFileSync(path.join(dir, dll)));
     } catch {
       versions[dll] = undefined;

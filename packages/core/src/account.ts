@@ -124,6 +124,7 @@ export function readAccountBundle(dataDir: string, opts: { lean?: boolean; now?:
   if (protection !== undefined) bundle.protection = parseProtection(protection);
   if (state.avatar && isAvatarFileName(state.avatar)) {
     try {
+      // lecture entière : avatar de Cyber Pinball, réduit à l'enregistrement
       bundle.avatar = { name: state.avatar, data: fs.readFileSync(avatarPath(dataDir, state.avatar)).toString('base64') };
     } catch {
       // image absente : le pseudo reste, les initiales en attendant

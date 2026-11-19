@@ -53,6 +53,8 @@ import {
   applyImport,
   applyOps,
   applyRomImport,
+  importSpace,
+  importSpaceProblems,
   addZenTable,
   isZenEmulator,
   knownTableInstallations,
@@ -262,6 +264,7 @@ import {
 } from '@cyberpinball/core';
 import { createCreditsMenu, type CreditsDepth } from './credits-menu';
 import { prepareImport, unpackArchive } from './archives';
+import { importSpaceSection, importSpaceShort } from './import-space-menu';
 import { createDofMenu } from './dof-menu';
 import { buildVpxChoice, createOtherVpxMenu, createPlanVpx, otherVpxLimitsText, playedWithText, vpxChoiceCursor } from './autres-vpx-menu';
 import { createHardwareDmdMenu } from './hardware-dmd-menu';
@@ -4366,6 +4369,7 @@ export function createLibrary(host: LibraryHost) {
       target: s.target,
       companions: s.companions,
     });
+    s.space = importSpace(s.plan, { sizes: (s.sizes ??= new Map()) });
   }
 
   type Pending = { kind: 'vps' | 'pup'; key: string };
@@ -4571,6 +4575,8 @@ export function createLibrary(host: LibraryHost) {
     // Après « Installer » et « Annuler » : changer le jeu VPS d'une table.
     const choiceActions: Action[] = [];
     for (const error of s.prepared?.errors ?? []) sections.push({ rows: [{ text: error, tone: 'error' }] });
+    const space = plan && importSpaceSection(s.space);
+    if (space) sections.push(space);
     if (s.companions?.length) sections.push(companionSection(s.companions));
     if (plan && !s.vps && plan.tables.some((t) => t.steps.some((st) => st.kind === 'table'))) {
       sections.push({ rows: [{ text: t('Base VPS indisponible : noms déduits des fichiers'), detail: vpsProblem ? t('Téléchargement impossible ({problem}). Elle sera téléchargée au prochain ajout.', { problem: vpsProblem }) : undefined, tone: 'quiet' }] });
@@ -4642,13 +4648,14 @@ export function createLibrary(host: LibraryHost) {
     ]
       .filter(Boolean)
       .join(' · ');
-    const actions: Action[] = count
-      ? [
-          { label: t('Installer'), detail: what || undefined, tone: 'ok', run: () => install(s) },
-          { label: t('Annuler'), run: cancel },
-          ...choiceActions,
-        ]
-      : [{ label: t('Retour'), run: cancel }];
+    // Disque trop plein : « Revérifier la place » (après en avoir libéré) remplace « Installer ».
+    const first: Action = importSpaceShort(s.space)
+      ? { label: t('Revérifier la place'), detail: t('Après avoir libéré de la place sur le disque'), run: () => {
+          replan(s);
+          host.broadcast();
+        } }
+      : { label: t('Installer'), detail: what || undefined, tone: 'ok', run: () => install(s) };
+    const actions: Action[] = count ? [first, { label: t('Annuler'), run: cancel }, ...choiceActions] : [{ label: t('Retour'), run: cancel }];
     return {
       heading: count ? t('Plan d’installation') : t('Rien à installer'),
       subheading: s.acquisition?.quick && count ? t('Installation rapide : vérifiez, puis « Installer »') : undefined,
@@ -4762,6 +4769,9 @@ export function createLibrary(host: LibraryHost) {
     const plan = s.plan!;
     const prepared = s.prepared!;
     void task(t('Installation…'), async () => {
+      // La place a pu changer depuis le plan : revérifiée avant de copier quoi que ce soit.
+      const short = importSpaceProblems(importSpace(plan, { sizes: s.sizes }));
+      if (short.length) throw new Error(short.join(' '));
       const trashDir = trashDirFor(layout()!.trash, 'Remplacé à l’import'); // i18n-ignore : nom de dossier
       const cleanupRoots = [layout()!.import, prepared.staging];
       const checked: string[] = [];

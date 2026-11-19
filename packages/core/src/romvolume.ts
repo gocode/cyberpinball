@@ -121,6 +121,7 @@ export function romVolumeStatus(input: { roms: readonly string[]; pinmameDir: st
     const base = { rom, file, memory, spot, ...(factory !== undefined ? { factory } : {}), ...romVolumeAdvice(spot) };
     let nv: Buffer | undefined;
     try {
+      // lecture entière : mémoire d'une ROM (.nv), quelques ko
       nv = fs.readFileSync(file);
     } catch {
       return { kind: 'absent', ...base };
@@ -141,6 +142,7 @@ export function setRomVolume(s: RomVolumeStatus, value: number): { ok: true } | 
   if (s.kind === 'none') return { ok: false, reason: s.reason };
   let nv: Buffer;
   try {
+    // lecture entière : mémoire d'une ROM (.nv), quelques ko
     nv = fs.readFileSync(s.file);
   } catch {
     return { ok: false, reason: t('pas encore de mémoire : la ROM la crée à sa première partie') };

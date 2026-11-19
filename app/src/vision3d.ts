@@ -482,7 +482,9 @@ function startWebcam(fovDeg: number, onHead: (p: Vec3) => void, onFailure: (reas
   const assets = {
     bundle: fs.readFileSync(mediapipeFile(vendor, 'vision_bundle.js'), 'utf8'),
     loader: fs.readFileSync(mediapipeFile(vendor, 'vision_wasm_internal.js'), 'utf8'),
+    // lecture entière : moteur de MediaPipe livré avec Vision 3D
     wasm: fs.readFileSync(mediapipeFile(vendor, 'vision_wasm_internal.wasm')),
+    // lecture entière : modèle livré avec Vision 3D
     model: fs.readFileSync(model),
   };
   const onAssets = (event: Electron.IpcMainInvokeEvent) => (event.sender === win.webContents ? assets : undefined);
@@ -721,6 +723,7 @@ export async function installKinectDriver(file: string): Promise<DriverInstall> 
   const work = path.join(path.dirname(file), component.id);
   fs.rmSync(work, { recursive: true, force: true });
   fs.mkdirSync(work, { recursive: true });
+  // lecture entière : installateur téléchargé par Cyber Pinball, taille connue
   const exe = fs.readFileSync(file);
   const cab = attachedCabinet(exe);
   if (!cab) return { ok: false, reason: 'archive des paquets introuvable dans l’installateur' }; // i18n-ignore : journal

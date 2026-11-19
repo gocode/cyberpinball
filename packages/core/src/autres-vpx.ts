@@ -14,6 +14,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
+import { readWholeFile } from './boundedread';
 import { samePath } from './fileops';
 import { t, tLater, type LaterText } from './i18n';
 import { peFileVersion } from './vc-runtime';
@@ -75,7 +76,7 @@ export type OtherVpxCheck = { ok: true; version: string } | { ok: false; reason:
  * celle de Cyber Pinball (`ownVersion`, « 10.8.1-5436 ») : la même version n'apporterait rien et ferait perdre
  * à la table tout ce que Cyber Pinball fait pour elle. `read` : le contenu du fichier (les essais le simulent).
  */
-export function checkOtherVpx(exe: string, ownVersion: string | undefined, read: (file: string) => Buffer = (f) => fs.readFileSync(f)): OtherVpxCheck {
+export function checkOtherVpx(exe: string, ownVersion: string | undefined, read: (file: string) => Buffer = (f) => readWholeFile(f, 512 * 1024 ** 2)): OtherVpxCheck {
   if (!/^vpinballx.*\.exe$/i.test(path.basename(exe))) return { ok: false, reason: t('Ce n’est pas l’exécutable de VPX (VPinballX64.exe, VPinballX.exe…).') };
   let version: string | undefined;
   try {

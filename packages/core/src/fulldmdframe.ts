@@ -18,6 +18,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { saveOrWarn, writeFileAtomic } from './atomicwrite';
+import { readWholeFile } from './boundedread';
 import { t } from './i18n';
 import { IniDocument } from './ini';
 import type { MediaSource, MediaType } from './medias';
@@ -303,7 +304,7 @@ export function pngFrame(file: string): FrameRecord | undefined {
   if (!/\.png$/i.test(file)) return undefined;
   let img: RgbaImage | undefined;
   try {
-    img = decodePng(fs.readFileSync(file));
+    img = decodePng(readWholeFile(file, 256 * 1024 ** 2));
   } catch {
     return undefined;
   }

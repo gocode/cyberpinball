@@ -710,6 +710,7 @@ export async function b2sLitImages(file: string, cacheDir: string): Promise<B2sL
       const parent = kind === 'backglass' ? 'backglass' : 'dmd';
       const mine = bulbs.filter((b) => b.parent.toLowerCase() === parent && b.visible && b.image && !b.text);
       if (!ground || !mine.length) continue;
+      // lecture entière : image extraite du fronton par Cyber Pinball, dans son cache
       const canvas = ground.format === 'png' ? decodePng(await fs.promises.readFile(ground.file)) : undefined;
       if (!canvas) {
         problems.push(`${ground.element} de ${path.basename(file)} n'est pas un PNG lisible : ampoules non composées.`); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché

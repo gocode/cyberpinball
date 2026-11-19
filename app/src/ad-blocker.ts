@@ -87,6 +87,7 @@ export function createAdBlocker(opts: AdBlockerOptions) {
     if (!file) return;
     diskRead = true;
     try {
+      // lecture entière : cache des listes de blocage, écrit par Cyber Pinball
       const data = fs.readFileSync(file);
       engine = FiltersEngine.deserialize(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
       savedAt = fs.statSync(file).mtimeMs;

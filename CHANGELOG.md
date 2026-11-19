@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.1
 
+- Reprise d'une grosse installation existante : l'analyse ne s'arrête plus sur « File size (…) is greater than 2 GiB ». Une archive de plusieurs Go rangée avec les tables (l'archive téléchargée d'une table et de son PuP-Pack) était prise pour une ROM et lue d'un bloc ; elle est maintenant reconnue comme une archive et laissée où elle est.
+- Les archives .zip se lisent par leur seule table des matières, quelle que soit leur taille (format Zip64 compris), et les empreintes des ROM, des médias et des PuP-Packs se calculent par morceaux : aucun fichier posé par l'utilisateur n'est plus lu d'un bloc.
+- Le plan d'installation dit la place qu'il prendra sur chaque disque et la place libre. S'il en manque, il le dit avant de copier (« Pas assez de place sur D:\ : il faut 182 Go, 40 Go libres ») et propose « Revérifier la place » au lieu d'« Installer ».
 - Page de téléchargement sur GitHub : les nouveautés s'affichent d'abord en anglais, puis en français, et les explications sur la mise à jour, les installeurs et la licence de VPX sont données dans les deux langues.
 - Tables dont le script affiche un simple message avec un seul bouton OK (Goldorak : « UltraDMD userfiles directory … does not exist ») : la partie s'arrêtait comme pour une erreur. Le message est maintenant validé par OK, la partie continue et le message reste dans le journal. Les questions (Oui/Non, Annuler) et les erreurs de VPX arrêtent toujours la partie.
 - Tables UltraDMD dont le script nomme son dossier par une variable (« DirName = curDir & … & ".UltraDMD" », la forme la plus recopiée) : ce dossier est maintenant reconnu. Il suit la table quand on reprend une autre installation, et le médecin signale son absence. Un dossier nommé comme la table (« Table.UltraDMD », « Table.FlexDMD ») suit aussi la table.

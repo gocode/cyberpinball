@@ -14,6 +14,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { readWholeFile, updateHash } from './boundedread';
 import { DMD_HEIGHT, DMD_WIDTH } from './livedmd';
 import { parseCsvLine } from './puppack';
 import { commentStart } from './vbscript';
@@ -108,7 +109,8 @@ export function readCaptures(root: string, depth: DmdDepth): CaptureImage[] {
     if (!entry.isFile() || !m) continue;
     let file: Buffer;
     try {
-      file = fs.readFileSync(path.join(root, dir.name, entry.name));
+      // Une capture 128 × 32 pèse quelques ko : un fichier plus gros n'en est pas une.
+      file = readWholeFile(path.join(root, dir.name, entry.name), 16 * 1024 * 1024);
     } catch {
       continue;
     }
@@ -462,7 +464,7 @@ export function captureSignature(root: string): string {
     for (const name of files) {
       hash.update(`${name}\n`);
       try {
-        hash.update(fs.readFileSync(path.join(root, dir.name, name)));
+        updateHash(hash, path.join(root, dir.name, name));
       } catch {
         hash.update('?');
       }
@@ -472,7 +474,7 @@ export function captureSignature(root: string): string {
   const triggers = readDirents(root).find((e) => e.isFile() && e.name.toLowerCase() === 'triggers.pup');
   if (triggers) {
     try {
-      hash.update(fs.readFileSync(path.join(root, triggers.name)));
+      updateHash(hash, path.join(root, triggers.name));
     } catch {
       hash.update('?');
     }

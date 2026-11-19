@@ -67,6 +67,7 @@ export function readHostSettings(table: { folder: string; roms: readonly string[
     try {
       if (slot.file && fs.statSync(slot.file).isFile()) {
         if (fs.statSync(slot.file).size > SETTINGS_MAX_BYTES) return undefined;
+        // lecture entière : taille vérifiée juste au-dessus (SETTINGS_MAX_BYTES)
         data = fs.readFileSync(slot.file);
       }
     } catch {
@@ -192,6 +193,7 @@ function mergeVpRegVolume(file: string, host: Buffer | undefined, guest: Buffer 
 
 function readIfFile(file: string): Buffer | undefined {
   try {
+    // lecture entière : fichier de réglages de VPX ou de Cyber Pinball, quelques ko
     return fs.statSync(file).isFile() ? fs.readFileSync(file) : undefined;
   } catch {
     return undefined;

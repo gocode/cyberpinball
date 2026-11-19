@@ -31,6 +31,7 @@ export function createBallCounts(opts: BallCountsOptions): { of(table: TableEntr
           nv: (rom) => {
             for (const dir of dirs) {
               try {
+                // lecture entière : mémoire d'une ROM (.nv), quelques ko
                 return fs.readFileSync(path.join(dir, 'nvram', `${rom.toLowerCase()}.nv`));
               } catch {
                 // Pas ici : le dossier suivant.

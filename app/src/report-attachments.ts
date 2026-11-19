@@ -112,6 +112,7 @@ export function addAttachments(list: readonly Attachment[], files: readonly stri
         continue;
       }
       try {
+        // lecture entière : taille vérifiée juste au-dessus (room)
         data = fs.readFileSync(file);
       } catch {
         refused.push({ file: base, why: 'read' });

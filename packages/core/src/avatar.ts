@@ -143,6 +143,7 @@ export function readAvatarFile(dataDir: string, fileName: string): AvatarImage |
   if (!isAvatarFileName(fileName)) return undefined;
   let bytes: Buffer;
   try {
+    // lecture entière : avatar de Cyber Pinball, réduit à l'enregistrement
     bytes = fs.readFileSync(avatarPath(dataDir, fileName));
   } catch {
     return undefined;

@@ -348,6 +348,7 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
       trimQueue();
       for (const f of queued()) {
         const file = path.join(queueDir, f);
+        // lecture entière : retour mis en attente par Cyber Pinball, borné à l'envoi
         if (!(await post(fs.readFileSync(file)))) break;
         fs.rmSync(file, { force: true });
       }

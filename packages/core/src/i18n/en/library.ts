@@ -474,4 +474,19 @@ export const messages: Record<string, string> = {
   // app/src/library.ts : clavier à l'écran, panneau des emojis
   'Pas d’emoji dans un lien': 'No emoji in a link',
   'Lettres': 'Letters',
+
+  // Plan d'installation : place sur le disque (app/src/import-space-menu.ts, packages/core/src/importspace.ts)
+  'Pas assez de place sur {disk} : il faut {need}, {free} libres.': 'Not enough space on {disk}: {need} needed, {free} free.',
+  'Pas assez de place sur {disk} : il faut {need}, {free} libres': 'Not enough space on {disk}: {need} needed, {free} free',
+  '{copied} à copier, et {margin} gardé libre pour Windows. Libérez de la place sur ce disque, ou choisissez moins de tables.':
+    '{copied} to copy, and {margin} kept free for Windows. Free up space on this drive, or choose fewer tables.',
+  '{need} à copier sur {disk}': '{need} to copy to {disk}',
+  '{free} libres': '{free} free',
+  'Place libre inconnue': 'Free space unknown',
+  'Place sur le disque': 'Drive space',
+  'Revérifier la place': 'Check space again',
+  'Après avoir libéré de la place sur le disque': 'After freeing up space on the drive',
+
+  // Lecture d'un fichier trop gros (packages/core/src/boundedread.ts)
+  '{file} pèse {size} : trop gros pour être lu en entier (au plus {max}).': '{file} is {size}: too large to be read whole (at most {max}).',
 };

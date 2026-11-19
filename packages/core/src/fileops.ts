@@ -91,6 +91,7 @@ export function applyOps(ops: FileOp[], ctx: OpContext): void {
         break;
       }
       case 'romVolume': {
+        // lecture entière : mémoire d'une ROM (.nv), quelques ko
         const out = writeRomVolume(op.memory, fs.readFileSync(op.path), op.value);
         if (!out.ok) throw new Error(t('Volume de la ROM non écrit : {reason}', { reason: out.reason }));
         writeReplacing(op.path, out.data.toString('latin1'), 'latin1', ctx);

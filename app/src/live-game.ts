@@ -1116,6 +1116,7 @@ function scriptPrint(vpx: string): string | undefined {
   }
   if (!name) return undefined;
   try {
+    // lecture entière : script .vbs d'une table, quelques centaines de ko
     const bytes = fs.readFileSync(path.join(dir, name));
     if (scriptPatchState(bytes.toString('latin1'), readVpxScript(vpx)).kind === 'ours') return undefined;
     return createHash('sha256').update(bytes).digest('hex');

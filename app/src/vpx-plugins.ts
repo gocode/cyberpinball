@@ -38,6 +38,7 @@ export function vpxPluginFiles(spec: VpxPluginSpec, appDir: string): { dll: stri
 
 const sameFile = (a: string, b: string) => {
   try {
+    // lecture entière : fichiers d'un greffon de VPX, quelques Mo
     return fs.readFileSync(a).equals(fs.readFileSync(b));
   } catch {
     return false;

@@ -1570,6 +1570,7 @@ function sameFile(a: string, b: string): boolean {
     const key = `${a}\0${statA.mtimeMs}\0${b}\0${statB.mtimeMs}\0${size}`;
     const known = comparisons.get(key);
     if (known !== undefined) return known;
+    // lecture entière : taille vérifiée sur la même ligne (FULL_COMPARE)
     const same = size <= FULL_COMPARE ? fs.readFileSync(a).equals(fs.readFileSync(b)) : sameSamples(a, b, size);
     if (comparisons.size >= COMPARISONS_KEPT) comparisons.clear();
     comparisons.set(key, same);

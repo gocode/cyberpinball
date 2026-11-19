@@ -22,7 +22,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Readable } from 'node:stream';
 import { session, WebContentsView } from 'electron';
-import { mediaKind, mp4VideoTrack, oggOpusFile, t, wavFile, webmFile, writeFileAtomic, type AudioTrim, type EncodedFrame, type RgbaImage } from '@cyberpinball/core';
+import { mediaKind, mp4VideoTrack, oggOpusFile, readWholeFile, t, wavFile, webmFile, writeFileAtomic, type AudioTrim, type EncodedFrame, type RgbaImage } from '@cyberpinball/core';
 
 const PARTITION = 'cyberpinball-conversion';
 const ORIGIN = 'https://conversion.cyberpinball.invalid';
@@ -483,7 +483,8 @@ export function createConverter() {
    */
   async function shrinkVideo(file: string, out: string, width = 128, height = 32, fps = 30): Promise<{ frames: number; bytes: number }> {
     // Positions et instants des images, lus ici (mp4track.ts) : la page les décode une à une.
-    const track = mp4VideoTrack(fs.readFileSync(file));
+    // La vidéo entière est lue pour trouver ses images : au-delà de 1 Go, refusée avec un message clair.
+    const track = mp4VideoTrack(readWholeFile(file, 1024 ** 3));
     if (!track) throw new Error(t('vidéo que Cyber Pinball ne sait pas réduire (seul le H.264 en MP4 l’est)'));
     const id = inputId(file);
     const key = `v${next++}`;

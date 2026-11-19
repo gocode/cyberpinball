@@ -132,6 +132,7 @@ export function createTableScores(opts: TableScoresOptions): TableScores {
   const readBytes = (nv: string | undefined) => {
     if (!nv) return undefined;
     try {
+      // lecture entière : mémoire d'une ROM (.nv), quelques ko
       return fs.readFileSync(nv);
     } catch {
       return undefined;
@@ -169,6 +170,7 @@ export function createTableScores(opts: TableScoresOptions): TableScores {
       }
       everyGame ||= Boolean((memory.map as { game_state?: { scores?: unknown } }).game_state?.scores);
       const nv = nvFile(table, rom);
+      // lecture entière : mémoire d'une ROM (.nv), quelques ko
       if (nv) sources.push({ stamp: `${stampOf(nv)}:${rom}`, read: () => readRomRecords(memory, fs.readFileSync(nv)) });
     }
     const stamp = sources.map((s) => s.stamp).join('|');

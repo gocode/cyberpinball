@@ -19,9 +19,9 @@
 // Le double se supprime sans jamais suivre un lien vers un dossier (leçon de l'incident des
 // jonctions du 29/10/2026) ; supprimer un lien physique ne touche pas l'original.
 
-import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileDigest } from './boundedread';
 import { t } from './i18n';
 
 /** Ce que rien n'écrit pendant une partie : lié plutôt que copié. */
@@ -213,7 +213,7 @@ export function folderPrint(folder: string, opts: { full?: boolean; contents?: b
       else if (entry.isDirectory()) walk(file);
       else if (entry.isFile()) {
         const stat = fs.statSync(file);
-        const content = opts.full || (opts.contents !== false && stat.size <= HASHED_MAX) ? ` ${createHash('sha256').update(fs.readFileSync(file)).digest('hex')}` : '';
+        const content = opts.full || (opts.contents !== false && stat.size <= HASHED_MAX) ? ` ${fileDigest(file, 'sha256')}` : '';
         out.set(rel, `${stat.size} ${Math.round(stat.mtimeMs)}${content}`);
       }
     }

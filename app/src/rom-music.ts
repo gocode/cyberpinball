@@ -268,6 +268,7 @@ export class RomMusic {
         this.note(rom, { result: 'failed', switches, detail });
         return;
       }
+      // lecture entière : son enregistré par Cyber Pinball, durée bornée
       const pcm = fs.readFileSync(recordJob.pcm);
       const samples = new Int16Array(pcm.buffer, pcm.byteOffset, Math.floor(pcm.length / 2));
       const clip = clipRomAudio(samples, result.channels, result.rate);

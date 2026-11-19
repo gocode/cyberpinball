@@ -217,6 +217,7 @@ export function createVision3dMenu(ctx: Vision3dMenuContext) {
   function noteVision3dGame(logFile: string, from: number): void {
     let text = '';
     try {
+      // lecture entière : journal de VPX, recommencé à chaque lancement
       const all = fs.readFileSync(logFile);
       // VPX recommence son journal à chaque lancement : plus court qu'avant, il est tout neuf.
       text = all.subarray(all.length >= from ? from : 0).toString('utf8');

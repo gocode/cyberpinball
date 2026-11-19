@@ -132,6 +132,7 @@ export function prepareScoreViewLayouts(vpxLayoutsDir: string, dataDir: string):
   } catch {
     return undefined;
   }
+  // lecture entière : dispositions du tableau des scores livrées avec VPX, quelques ko
   const files = names.map((name) => ({ name, data: fs.readFileSync(path.join(vpxLayoutsDir, name)) }));
   const originals = files.filter((f) => /\.scv$/i.test(f.name));
   if (!originals.length) return undefined;

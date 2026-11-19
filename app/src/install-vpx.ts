@@ -30,6 +30,7 @@ function peNames(dir: string): string[] {
 
 /** Ces fichiers, lus un à un au fil de l'analyse (jamais tous en mémoire). */
 function* peFiles(dir: string, names: readonly string[]): Generator<PeFile> {
+  // lecture entière : exécutables et DLL de VPX, quelques dizaines de Mo au plus
   for (const name of names) yield { path: name, buf: fs.readFileSync(path.join(dir, name)) };
 }
 

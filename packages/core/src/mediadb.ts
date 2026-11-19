@@ -25,6 +25,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { renameWithRetry, writeFileAtomic } from './atomicwrite';
+import { fileDigest } from './boundedread';
 import { applyOps, samePath, type FileOp } from './fileops';
 import { formatDate, formatNumber, t } from './i18n';
 import { fetchResumable, partSize, ResumableError } from './resumable';
@@ -635,7 +636,7 @@ export class MediaDbDownloadError extends Error {
 }
 
 function md5OfFile(file: string): string {
-  return crypto.createHash('md5').update(fs.readFileSync(file)).digest('hex');
+  return fileDigest(file, 'md5');
 }
 
 /**

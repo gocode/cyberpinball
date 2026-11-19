@@ -16,6 +16,7 @@ import {
   type WaitItem,
   type DownloadJob,
   type CompanionReport,
+  type ImportSpace,
   type DriveInfo,
   type TechFacts,
   t,
@@ -683,6 +684,10 @@ export type Screen =
        * retrouvé ailleurs dans l'installation et ajouté au plan, et ce qui y manque.
        */
       companions?: CompanionReport[];
+      /** Place que le plan demandera sur chaque disque (importspace.ts), refaite avec lui. */
+      space?: ImportSpace;
+      /** Tailles déjà mesurées des fichiers et dossiers du plan, pour ne pas les remesurer à chaque choix. */
+      sizes?: Map<string, number>;
     }
   | { kind: 'addChoice'; plan: AddPlan; key: string }
   | { kind: 'addPupChoice'; plan: AddPlan; key: string }
