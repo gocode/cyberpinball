@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Level up: the wheel table's music goes quiet during the badge or level animation, then resumes where it left off; levelling up now has a real fanfare (4 s) instead of two barely audible bell notes.
 - Pinball FX and Pinball FX3 on a cabinet with joystick buttons: each button now sends the key the game expects, from its Controls > Keyboard screen, instead of the VPX encoder key. Flippers on Left and Right Shift, plunger and Start on Enter (launch, confirm), Exit and Pause on Esc (back, pause), MagnaSave on the Up and Down arrows (menu windows), nudges on Left Alt, Right Alt and Space. In the game's menus: flippers for the top bar, MagnaSave for the windows it opens.
 - Accelerometer without an analog plunger: with a button plunger, or a plunger wired to another board than the KL25Z, the Pinscape nudging is now offered automatically at the "Tilt" step of the cabinet setup. A new "Accelerometer" line there picks the board, or "None".
 - "No analog plunger" no longer turns the accelerometer off: this choice used to cut nudging in VPX too, and the tilt bob test stayed still.

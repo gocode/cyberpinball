@@ -214,6 +214,16 @@ export function menuSound(
 }
 
 /**
+ * Son du menu pendant le moment d'un badge ou d'un niveau (niveau.js) : la musique du jeu se tait
+ * en fondu sans perdre sa place (même piste à volume nul : elle revient où elle en était), le son
+ * de la vidéo du plateau aussi ; la musique du moment (sons de l'interface) a seule la parole.
+ * Retour du 19/11/2026 sur la borne : le passage de niveau se perdait sous la musique de la table.
+ */
+export function hushForMoment(plan: MenuSoundPlan): MenuSoundPlan {
+  return { ...(plan.music ? { music: { ...plan.music, volume: 0 } } : {}), video: 0 };
+}
+
+/**
  * Son de l'ouverture au démarrage (intro.ts) : la musique de fond choisie par l'utilisateur, en
  * boucle, au volume de la musique, jusqu'au premier bouton (la roue reprend alors la musique du
  * jeu, en fondu) ; sans elle, le son de la vidéo d'ouverture du plateau, s'il y en a une, au

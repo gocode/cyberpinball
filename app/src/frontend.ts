@@ -151,6 +151,7 @@ import {
   effectiveDmdColor,
   menuAudioOutput,
   menuSound,
+  hushForMoment,
   AttractMode,
   attractMemory,
   momentScreen,
@@ -6436,6 +6437,11 @@ function cinemaFor(role: RoleId): CinemaView | undefined {
 let levelMomentAt: number | undefined;
 let levelMomentKey: string | undefined;
 
+/** Le moment d'un badge ou d'un niveau est à l'écran (levelMomentView), sans effet de bord : soundView le lit aussi. */
+function levelMomentShowing(): boolean {
+  return !!levelTracker.pending() && !localPlay() && state.phase === 'menu' && !attract.active && !guest.active;
+}
+
 /**
  * Le moment à montrer (niveau.js) : au menu des tables seulement, jamais pendant une partie ni un
  * chargement ; chaque badge avec sa rareté, son fond (famille) et sa forme, le niveau avant et après,
@@ -6446,7 +6452,7 @@ function levelMomentView() {
   // En jeu local, les XP se comptent en silence : le moment est tenu pour vu, il ne revient pas plus tard.
   // Hors du rendu en cours : seen() redessine.
   if (pending && localPlay()) setImmediate(() => localPlay() && levelTracker.seen());
-  if (!pending || localPlay() || state.phase !== 'menu' || attract.active || guest.active) {
+  if (!pending || !levelMomentShowing()) {
     if (!pending) levelMomentAt = levelMomentKey = undefined;
     return undefined;
   }
@@ -6574,7 +6580,9 @@ function soundView() {
     table && medias
       ? menuSound(now, now === 'attract' && hours.night() ? { ...mediaSettings, attractSound: 'muted' } : mediaSettings, { music: medias.sound(table, 'Audio'), launch: now === 'loading' ? medias.sound(table, 'AudioLaunch') : undefined }, tableMediaVolume(table))
       : { video: 0 };
-  return { ...plan, launchId: plan.launch ? launchCount : undefined, output: menuOutput() };
+  // Le moment d'un badge ou d'un niveau : la musique de la table se tait le temps de la fête (niveau.js).
+  const heard = levelMomentShowing() ? hushForMoment(plan) : plan;
+  return { ...heard, launchId: heard.launch ? launchCount : undefined, output: menuOutput() };
 }
 
 // ---------------------------------------------------------------------------

@@ -79,7 +79,8 @@ test('jouer en local : chaque surface sociale du front-end le lit', () => {
   assert.match(front, /const inbox = socialClosed\(\) \? undefined/);
   assert.match(front, /friendCard: [^,]*!socialClosed\(\)/);
   // Moments de badge et de niveau ; Communauté au téléphone ; pare-feu ; « Essayer » des Nouveautés.
-  assert.match(front, /if \(!pending \|\| localPlay\(\)/);
+  assert.match(front, /function levelMomentShowing\(\): boolean \{\s*return !!levelTracker\.pending\(\) && !localPlay\(\)/);
+  assert.match(front, /if \(!pending \|\| !levelMomentShowing\(\)\)/);
   assert.match(front, /function remoteCommunity\([^)]*\): RemoteCommunity \{\s*if \(guest\.active\) return \{[^\n]*\n\s*if \(localPlay\(\)\) return \{ closed:/);
   assert.match(front, /!report\.problems\.length \|\| localPlay\(\)\) return;/);
   assert.match(front, /case 'level':\s*return localPlay\(\) \? \{ gone: local \}/);

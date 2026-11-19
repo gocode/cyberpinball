@@ -277,12 +277,25 @@
       ticks(ac, out, t + 2.4, 14, 0.8);
       return 5.6;
     },
-    // Le niveau monte (animation du badge, ou seul) : deux notes de cloche qui montent d'une quarte. 1,6 s.
+    // Le niveau monte (« Niveau N » s'affiche, seul ou après le dernier badge), « Fanfare du niveau »
+    // (19/11/2026 : deux cloches de 1,6 s se perdaient sous la musique de la table, qui se tait
+    // désormais pendant le moment) : un impact grave et l'accord de do avec un arpège qui monte, un
+    // accord de sol en appel, puis le grand accord de do tenu, sa basse et ses cloches. 4 s, réverbéré.
     'level-up'(ac, out, t) {
       const wet = room(ac, out);
-      bell(ac, wet, t, 91, 0.8, 0.1);
-      bell(ac, wet, t + 0.12, 96, 1.4, 0.12);
-      return 1.6;
+      boom(ac, out, t, 0.55);
+      pad(ac, wet, t, [60, 64, 67, 72], 0.5, 0.06, 3000);
+      [72, 76, 79, 84, 88, 91].forEach((m, i) => bell(ac, wet, t + i * 0.07, m, 0.7, 0.13));
+      pad(ac, wet, t + 0.55, [62, 67, 71, 74], 0.45, 0.06, 3000);
+      [86, 91].forEach((m, i) => bell(ac, wet, t + 0.55 + i * 0.08, m, 0.6, 0.12));
+      const at = t + 1.05;
+      boom(ac, out, at, 0.45);
+      pad(ac, wet, at, [48, 60, 64, 67, 72, 76], 2.6, 0.065, 3600);
+      tone(ac, out, at, { from: 65.4, peak: 0.3, attack: 0.02, decay: 1.8 });
+      [84, 88, 91, 96].forEach((m, i) => bell(ac, wet, at + i * 0.09, m, 1.8, 0.16));
+      for (let i = 0; i < 8; i++) bell(ac, wet, at + 0.5 + i * 0.12, [96, 100, 103, 108][i % 4], 0.5, 0.05);
+      swell(ac, wet, at + 0.05, 0.6, 0.05);
+      return 4;
     },
   };
 

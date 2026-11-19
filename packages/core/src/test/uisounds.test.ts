@@ -241,7 +241,7 @@ test('fenêtre : chaque recette tient dans sa durée et sort sur la sortie du me
     // Les sources s'arrêtent au plus tard 0,2 s après le début du son plus sa durée (ui-sounds.js libère alors le son).
     // Des bruits brefs, sous 0,8 s ; seuls le souffle de l'ouverture (3,1 s, joué une fois au démarrage) et les
     // musiques du moment d'un badge (calées sur son animation, une fois au retour d'une partie) tiennent plus longtemps.
-    const longest: Partial<Record<string, number>> = { intro: 3.3, badge: 4.4, 'badge-rare': 5.8, 'level-up': 1.8 };
+    const longest: Partial<Record<string, number>> = { intro: 3.3, badge: 4.4, 'badge-rare': 5.8, 'level-up': 4.2 };
     assert.ok(Math.max(...w.log.stops) < (longest[id] ?? 0.8), `${id} : ${Math.max(...w.log.stops)} s`);
     assert.deepEqual(w.log.sinks, ['fronton']);
     w.flush();

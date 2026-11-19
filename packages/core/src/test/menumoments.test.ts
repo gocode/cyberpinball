@@ -15,6 +15,7 @@ import {
   attractDelayLabel,
   attractMemory,
   durationLabel,
+  hushForMoment,
   VOLUME_CHOICES,
   menuAudioOutput,
   menuSound,
@@ -544,4 +545,16 @@ test('essais hors écran : toute fenêtre de l’application est muette', () => 
       assert.doesNotMatch(source, /setAudioMuted\(false\)/, name);
     }
   }
+});
+
+// Retour du 19/11/2026 sur la borne : le passage de niveau se perdait sous la musique de la table.
+test('moment d’un badge ou d’un niveau : la musique de la table se tait sans perdre sa place, la vidéo aussi', () => {
+  const music = { url: 'file:///Audio/table.mp3', volume: 0.8 };
+  // Même piste à volume nul : le rendu baisse en fondu et reprend où elle en était (menu-audio.js).
+  assert.deepEqual(hushForMoment({ music, video: 0 }), { music: { url: music.url, volume: 0 }, video: 0 });
+  assert.deepEqual(hushForMoment({ video: 0.4 }), { video: 0 });
+  assert.equal(music.volume, 0.8, 'le plan d’origine reste intact');
+  // Branché dans l'état du plateau : soundView passe par le moment.
+  const src = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
+  assert.match(src, /levelMomentShowing\(\) \? hushForMoment\(plan\) : plan/);
 });

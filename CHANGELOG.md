@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.1
 
+- Passage de niveau : la musique de la table sur la roue se tait pendant l'animation du badge ou du niveau, puis reprend où elle en était ; le passage de niveau a maintenant sa vraie fanfare (4 s) au lieu de deux notes de cloche presque inaudibles.
 - Pinball FX et Pinball FX3 sur une borne aux boutons de joystick : chaque bouton envoie maintenant la touche que le jeu attend, d'après son écran Contrôles > Clavier, et non plus celle des encodeurs de VPX. Flippers sur Maj gauche et droite, lanceur et Start sur Entrée (lancer, valider), Exit et Pause sur Échap (retour, pause), MagnaSave sur les flèches haut et bas (fenêtres des menus), tremblements sur Alt gauche, Alt droite et Espace. Dans les menus du jeu : flippers pour la barre du haut, MagnaSave pour les fenêtres qu'elle ouvre.
 - Accéléromètre sans lanceur analogique : avec un lanceur à bouton, ou un lanceur branché sur une autre carte que le KL25Z, les secousses du Pinscape sont maintenant proposées d'office à l'étape « Tilt » de la configuration de la borne. Une nouvelle ligne « Accéléromètre » y choisit la carte, ou « Aucun ».
 - « Pas de lanceur analogique » n'éteint plus l'accéléromètre : avant, ce choix coupait aussi les secousses dans VPX, et le balancier de l'essai restait immobile.
