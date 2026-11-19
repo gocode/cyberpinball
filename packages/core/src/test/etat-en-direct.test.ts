@@ -531,7 +531,8 @@ test('application : le relevé lu pendant la partie, la fin ferme VPX, une parti
   assert.match(front, /const onPlaying = \(\) => \{\r?\n[^\n]*\r?\n\s+playingSince = Date\.now\(\);\r?\n\s+state = \{ \.\.\.state, phase: 'playing' \};/);
   assert.match(front, /broadcast\(\);\r?\n\s+setTimeout\(showLiveBoard, LIVE_BOARD_SETTLE_MS\);/);
   assert.match(front, /gameNotices\.board\(!wait && playing && state\.phase === 'playing' && settled && current \? liveBoardView\(current, socialNet\.state\(\)\.key\.publicKey\) : undefined\);/);
-  assert.match(front, /console\.log\(`Partie : écrans occupés par VPX[^\n]*\r?\n\s+broadcast\(\);\r?\n[^\n]*\r?\n\s+showLiveBoard\(\);/);
+  // Le journal nomme le jeu qui occupe les écrans (VPX, ou Pinball FX, FX3, Future Pinball : game-screens.ts).
+  assert.match(front, /console\.log\(`Partie : écrans occupés par \$\{other\?\.name \?\? 'VPX'\}[^\n]*\r?\n\s+broadcast\(\);\r?\n[^\n]*\r?\n\s+showLiveBoard\(\);/);
   const doubles = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'table-double.ts'), 'utf8');
   assert.match(doubles, /liveStateHook\(script, readVpxElements\(plan\.file\), stateFile, rom\?\.memory, offered, goFile\)/);
   assert.match(doubles, /const rom = roms\.map\(\(name\) => \(\{ name, memory: romBoard\(name\)\.memory \}\)\)\.find\(\(r\) => r\.memory\);/);

@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- A game that changes a screen's resolution during play (Pinball FX3 in 1080p full screen on a 4K playfield, for example) no longer shifts the front-end's screens: each window follows its role's screen, instead of showing the rotated playfield on the DMD screen and the DMD card on the backglass. A window found on another role's screen is logged and put back.
+- Pinball FX, Pinball FX3 and Future Pinball: the front-end detects the screens the game draws on itself (cabinet mode, extra windows), from the game's own windows only; it leaves them to the game and no longer hides them. The other screens show their media according to "Media during play".
 - Pinball FX3: when the game has never been opened on the PC, Cyber Pinball says so before starting the table: its cabinet mode isn't turned on there and the game would open on its home screen, in landscape. The message explains what to do in the game (cabinet icon next to the profile, "Activate", rotation, backglass and DMD); Start opens the game anyway to set it up, Exit goes back to the menu. The game encrypts these settings: Cyber Pinball can't write them for you, as it does for Pinball FX.
 - Pinball FX3: only Fish Tales and Sorcerer's Lair are free; for any other table, the messages remind you it must be bought on the Steam account. For those two tables, the message after a very short game no longer suspects a missing purchase.
 - Level up: the wheel table's music goes quiet during the badge or level animation, then resumes where it left off; levelling up now has a real fanfare (4 s) instead of two barely audible bell notes.

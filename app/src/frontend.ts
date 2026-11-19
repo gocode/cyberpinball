@@ -161,6 +161,7 @@ import {
   screensTable,
   tableContents,
   occupiedRoles,
+  surfaceRoleRects,
   confusableRoles,
   vpxWindowMoves,
   VPX_ANCILLARY_WINDOWS,
@@ -349,6 +350,7 @@ import { DesktopMode } from './desktop-mode';
 import { answerLegacy, legacyDesktopTurned, orientationForDesktop, orientationFromDesktop, takeOrientationProblems } from './display-orientation';
 import { acceptFrontends, otherFrontendsOnThisPc, unacceptedFrontends } from './frontend-gate';
 import { hideTaskbars, isVeil, nameScreen, onScreensSettled, recoverScreens, relaunchCovered, restoreTaskbars, setDesktopMode, setScreensBusy, settleScreens, takeCoverIncidents } from './screen-guard';
+import { followScreens, watchGameWindows } from './game-screens';
 import { buttonsBackup, describeReset, describeRestore, resetButtons, resetCheck, resetConsequences, restoreButtons } from './buttons-reset';
 import { forcedRotation, menuRotation, openSettings, romVolumeControl } from './settings';
 import { allowJukebox, allowPreview, serveMedias } from './media-protocol';
@@ -3907,7 +3909,12 @@ export function startFrontend(): void {
   openWindows(assignments, cabinet && !choose ? cabinetZones(cabinet) : {});
   // Écran débranché puis rebranché hors partie : chaque fenêtre du menu reprend le sien. Pendant
   // un lancement ou une partie, rien ne bouge (le premier plan va à VPX) : la reprise se fait au retour.
-  onScreensSettled(() => playing || launch || recoverScreens('displays'));
+  // Écran qui change de place ou de définition (un jeu en plein écran exclusif, partie comprise) :
+  // chaque fenêtre suit d'abord l'écran de son rôle (game-screens.ts).
+  onScreensSettled(() => {
+    followMenuScreens();
+    return playing || launch || recoverScreens('displays');
+  });
   // Pendant une partie ou un lancement, VPX couvre les écrans : le voile seul y est normal.
   setScreensBusy(() => Boolean(playing || launch));
   vrFront.headset = new HeadsetMenu({
@@ -4255,15 +4262,7 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
   const surfaces = screenSurfaces(assignments, zones);
   const cabinet = loadCabinet(loc.dataDir);
   const labelOf = (role: RoleInfo) => ({ ...role, label: cabinetRoleLabel(cabinet, role.id, role.label) });
-  roleRects = surfaces.flatMap((s) => {
-    const d = s.display.bounds;
-    const own = s.role === 'playfield' ? [{ role: s.role, rect: { ...d } }] : [];
-    const parts = s.parts.map((p) => {
-      const r = zoneRect(p.zone, d);
-      return { role: p.role, rect: { x: d.x + r.x, y: d.y + r.y, width: r.width, height: r.height } };
-    });
-    return [...own, ...parts];
-  });
+  roleRects = surfaceRoleRects(surfaces);
   headsetPages = surfaces.map((s) => ({ role: s.role, bounds: { ...s.display.bounds }, parts: s.parts, ...(s.playfield ? { playfield: s.playfield } : {}) }));
   // Sans playfield retrouvé, le menu s'affiche quand même sur l'écran principal.
   const pages = [
@@ -4818,6 +4817,8 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     endLaunch();
     settleScreens('vpx');
     socialNet.setPresence({ status: 'playing', table: presenceTable(table), since: new Date().toISOString() });
+    // Écrans où le jeu dessine (mode borne, fenêtres annexes de Future Pinball) : laissés au jeu (game-screens.ts).
+    watchOccupied(simulated?.split(',').filter((r): r is RoleId => ROLES.some((x) => x.id === r)), simulated === undefined ? { name: zenName, pids: () => (game.pid === undefined ? [] : [game.pid]) } : undefined);
     broadcast();
     if (autoStopAfterMs) setTimeout(() => game.stop(), autoStopAfterMs);
   };
@@ -5732,13 +5733,13 @@ let pendingPlay: { frontends: OtherFrontend[]; play: () => Promise<PlayReport | 
  * et son fond de partie reste figé. Partie simulée : les rôles donnés. Rien n'est montré
  * ni mis au premier plan : seul l'état des fenêtres change.
  */
-function watchOccupied(simulated: RoleId[] | undefined): void {
+function watchOccupied(simulated: RoleId[] | undefined, other?: { name: string; pids: () => number[] }): void {
   const update = (roles: RoleId[]) => {
     const next = new Set(roles);
     if (next.size === occupied.size && [...next].every((r) => occupied.has(r))) return;
     occupied = next;
     for (const role of next) occupiedThisGame.add(role);
-    console.log(`Partie : écrans occupés par VPX : ${[...occupied].join(', ') || 'aucun'}.`);
+    console.log(`Partie : écrans occupés par ${other?.name ?? 'VPX'} : ${[...occupied].join(', ') || 'aucun'}.`);
     broadcast();
     // Un écran que VPX prend ou rend : la bande de la partie entre amis change de place.
     showLiveBoard();
@@ -5747,9 +5748,12 @@ function watchOccupied(simulated: RoleId[] | undefined): void {
   minimizedSeen = new Set();
   if (simulated) return update(simulated);
   dressCoveredSeen = false;
+  // Jeu autre que VPX (Pinball FX, Pinball FX3, Future Pinball) : ses seules fenêtres comptent (game-screens.ts).
+  const seen = new Set<bigint>();
   const check = () => {
     try {
       let stack = listWindows((w) => w.visible);
+      if (other) return update(watchGameWindows({ zones: roleRects, stack, ownPid: process.pid, gamePids: other.pids(), game: other.name, seen, label: roleLabel, log: (line) => console.log(line) }));
       if (realignVpxWindows(stack)) stack = listWindows((w) => w.visible);
       minimizedVpxWindows(stack);
       update(occupiedRoles(roleRects, stack, process.pid));
@@ -5788,6 +5792,25 @@ function minimizedVpxWindows(stack: ReturnType<typeof listWindows>): void {
     minimizedSeen.add(w.title);
     const role = VPX_ANCILLARY_WINDOWS[w.title as keyof typeof VPX_ANCILLARY_WINDOWS];
     console.log(`[avertissement] Partie : « ${w.title} » est réduite par Windows : l'écran du rôle ${role} ne montre pas ce que VPX y dessine (fronton, DMD ou PuP-Pack). Deux fenêtres plein écran de VPX sur un même écran ?`);
+  }
+}
+
+/** Nom d'un rôle dans le journal : celui que lui donne la borne (« Backglass », « FullDMD »…). */
+function roleLabel(role: RoleId): string {
+  return cabinetRoleLabel(loadCabinet(loc.dataDir), role, ROLES.find((r) => r.id === role)!.label);
+}
+
+/** Écrans qui ont fini de changer : chaque fenêtre reprend l'écran de son rôle, là où il est désormais (game-screens.ts). */
+function followMenuScreens(): void {
+  if (desktop.active) return;
+  try {
+    const cabinet = loadCabinet(loc.dataDir);
+    const followed = followScreens({ assignments: menuAssignments, zones: cabinet ? cabinetZones(cabinet) : {}, windows, observed: observedDisplays(), label: roleLabel, log: (line) => console.log(line) });
+    if (!followed) return;
+    menuAssignments = followed.assignments;
+    roleRects = followed.roleRects;
+  } catch (error) {
+    console.log(`Écrans : fenêtres pas reposées (${(error as Error).message}).`); // i18n-ignore : journal
   }
 }
 

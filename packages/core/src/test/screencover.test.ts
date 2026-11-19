@@ -102,8 +102,9 @@ test('écran rebranché : voile neuf sous les fenêtres du menu, fenêtres repri
   assert.match(guard, /recoverCovered\(present, \(win\) => !veilSet\.has\(win\)\)/);
   assert.match(guard, /veiledScreens\(screens, listWindows/);
   const frontend = frontendSource();
-  // Hors lancement et hors partie seulement : le premier plan va à VPX.
-  assert.match(frontend, /onScreensSettled\(\(\) => playing \|\| launch \|\| recoverScreens\('displays'\)\)/);
+  // Hors lancement et hors partie seulement : le premier plan va à VPX. Avant, chaque fenêtre suit
+  // l'écran de son rôle, partie comprise (game-screens.ts, gamescreens.test.ts).
+  assert.match(frontend, /onScreensSettled\(\(\) => \{\s*followMenuScreens\(\);\s*return playing \|\| launch \|\| recoverScreens\('displays'\);\s*\}\)/);
   // Au retour d'une partie, aussitôt puis une fois les écrans posés.
   assert.match(frontend, /settleScreens\('return'\);[\s\S]{0,300}recoverScreens\('return'\);\s*setTimeout\(\(\) => playing \|\| recoverScreens\('return'\), SCREENS_SETTLE_MS\);/);
   // Chaque fenêtre suivie par coverDisplay peut être reprise.

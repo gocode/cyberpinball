@@ -248,7 +248,8 @@ export const WINDOWS_CHANGES: WindowsChange[] = [
   // Borne lancée au démarrage de Windows (06/11/2026) : les barres des tâches restent masquées toute la session, rendues au bureau Windows (menu ou Ctrl+Maj+D) et à la fermeture (restoresTaskbarsAt). Si Cyber Pinball s’arrête sans les rendre, un PowerShell caché les réaffiche d’après le témoin (taskbarRescueScript) ; rien d’enregistré.
   { call: 'taskbarRescueScript', files: ['app/src/screen-guard.ts'] },
   // Barre des tâches passée devant une fenêtre du menu : rangée juste sous elle, comme l’Explorateur le fait devant une fenêtre plein écran active (taskbarguard.ts). Seulement l’ordre des fenêtres, jamais quand un autre programme a le premier plan ; l’Explorateur la remet devant à la bascule suivante, rien n’est enregistré.
-  { call: 'placeWindowBelow', files: ['app/src/screen-guard.ts'] },
+  // Partie d’un jeu autre que VPX (game-screens.ts) : une fenêtre du front-end qui cache celle du jeu (fronton ou DMD de son mode borne) passe juste sous elle, sans activation ; seulement l’ordre des fenêtres, rien n’est enregistré.
+  { call: 'placeWindowBelow', files: ['app/src/screen-guard.ts', 'app/src/game-screens.ts'] },
   // Raccourcis globaux (SHORTCUTS) : Ctrl+Maj+K pendant une partie, Ctrl+Maj+D en mode bureau ; chacun rendu à la fin.
   { call: 'globalShortcut.register', files: ['app/src/frontend.ts'] },
   // Entrée de « Programmes et fonctionnalités » (HKCU), retirée à la désinstallation.

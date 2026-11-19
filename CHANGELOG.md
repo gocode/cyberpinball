@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.1
 
+- Un jeu qui change la définition d'un écran pendant la partie (Pinball FX3 en plein écran 1080p sur un playfield 4K, par exemple) ne déplace plus les écrans du front-end : chaque fenêtre suit l'écran de son rôle, au lieu de montrer le plateau tourné sur l'écran du DMD et la carte du DMD sur le fronton. Une fenêtre trouvée sur l'écran d'un autre rôle est notée dans le journal et reposée.
+- Pinball FX, Pinball FX3 et Future Pinball : le front-end relève les écrans où le jeu dessine lui-même (mode borne, fenêtres annexes), d'après les seules fenêtres du jeu ; il leur laisse la place et ne les cache plus. Les autres écrans montrent leur média selon « Médias pendant la partie ».
 - Pinball FX3 : quand le jeu n'a encore jamais été ouvert sur le PC, Cyber Pinball le dit avant de lancer la table : son mode borne n'y est pas activé et le jeu s'ouvrirait sur son écran d'accueil, en paysage. Le message explique quoi faire dans le jeu (icône de borne à côté du profil, « Activer », rotation, fronton et DMD) ; Start ouvre le jeu quand même pour le régler, Exit revient au front-end. Ces réglages sont chiffrés par le jeu : Cyber Pinball ne peut pas les écrire à sa place, comme il le fait pour Pinball FX.
 - Pinball FX3 : seules Fish Tales et Sorcerer's Lair sont gratuites ; pour une autre table, les messages rappellent qu'elle doit être achetée sur le compte Steam. Pour ces deux tables, le message d'une partie trop courte ne soupçonne plus un achat manquant.
 - Passage de niveau : la musique de la table sur la roue se tait pendant l'animation du badge ou du niveau, puis reprend où elle en était ; le passage de niveau a maintenant sa vraie fanfare (4 s) au lieu de deux notes de cloche presque inaudibles.

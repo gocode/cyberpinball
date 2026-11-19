@@ -101,6 +101,7 @@ export * from './listzones';
 export * from './reading';
 export * from './offscreen';
 export * from './menumoments';
+export * from './gamescreens';
 export * from './audiosink';
 export * from './mediadb';
 export * from './vpxinfo';
