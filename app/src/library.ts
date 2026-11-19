@@ -175,6 +175,7 @@ import {
   formatNumber,
   companionLabel,
   installationCompanions,
+  importLinks,
   type CompanionReport,
   language,
   activeConfiguration,
@@ -264,6 +265,7 @@ import {
 } from '@cyberpinball/core';
 import { createCreditsMenu, type CreditsDepth } from './credits-menu';
 import { prepareImport, unpackArchive } from './archives';
+import { importLinksRows } from './import-links-menu';
 import { importSpaceSection, importSpaceShort } from './import-space-menu';
 import { createDofMenu } from './dof-menu';
 import { buildVpxChoice, createOtherVpxMenu, createPlanVpx, otherVpxLimitsText, playedWithText, vpxChoiceCursor } from './autres-vpx-menu';
@@ -4369,7 +4371,8 @@ export function createLibrary(host: LibraryHost) {
       target: s.target,
       companions: s.companions,
     });
-    s.space = importSpace(s.plan, { sizes: (s.sizes ??= new Map()) });
+    s.links = importLinks(s.plan, (s.linkScan ??= new Map()));
+    s.space = importSpace(s.plan, { sizes: (s.sizes ??= new Map()), scan: s.linkScan });
   }
 
   type Pending = { kind: 'vps' | 'pup'; key: string };
@@ -4575,7 +4578,7 @@ export function createLibrary(host: LibraryHost) {
     // Après « Installer » et « Annuler » : changer le jeu VPS d'une table.
     const choiceActions: Action[] = [];
     for (const error of s.prepared?.errors ?? []) sections.push({ rows: [{ text: error, tone: 'error' }] });
-    const space = plan && importSpaceSection(s.space);
+    const space = plan && importSpaceSection(s.space, importLinksRows(s.links));
     if (space) sections.push(space);
     if (s.companions?.length) sections.push(companionSection(s.companions));
     if (plan && !s.vps && plan.tables.some((t) => t.steps.some((st) => st.kind === 'table'))) {
@@ -4770,7 +4773,7 @@ export function createLibrary(host: LibraryHost) {
     const prepared = s.prepared!;
     void task(t('Installation…'), async () => {
       // La place a pu changer depuis le plan : revérifiée avant de copier quoi que ce soit.
-      const short = importSpaceProblems(importSpace(plan, { sizes: s.sizes }));
+      const short = importSpaceProblems(importSpace(plan, { sizes: s.sizes, scan: s.linkScan }));
       if (short.length) throw new Error(short.join(' '));
       const trashDir = trashDirFor(layout()!.trash, 'Remplacé à l’import'); // i18n-ignore : nom de dossier
       const cleanupRoots = [layout()!.import, prepared.staging];

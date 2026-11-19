@@ -16,6 +16,8 @@ import {
   type WaitItem,
   type DownloadJob,
   type CompanionReport,
+  type ImportLinks,
+  type SourceFiles,
   type ImportSpace,
   type DriveInfo,
   type TechFacts,
@@ -690,6 +692,9 @@ export type Screen =
        * retrouvé ailleurs dans l'installation et ajouté au plan, et ce qui y manque.
        */
       companions?: CompanionReport[];
+      /** Installation reprise : ce qui sera lié (sans place en plus) et copié ; parcours des sources gardés d'un plan à l'autre. */
+      links?: ImportLinks;
+      linkScan?: Map<string, SourceFiles>;
       /** Place que le plan demandera sur chaque disque (importspace.ts), refaite avec lui. */
       space?: ImportSpace;
       /** Tailles déjà mesurées des fichiers et dossiers du plan, pour ne pas les remesurer à chaque choix. */

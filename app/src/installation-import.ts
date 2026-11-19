@@ -3,7 +3,8 @@
 // celles qu'on veut, et seules celles-là passent par le plan d'ajout, avec tout ce qui les
 // accompagne ailleurs dans l'installation (PuP-Pack, ROM, couleurs, sons, dossier DMD, médias :
 // installationCompanions, appelé par le plan d'ajout). Rien n'est copié avant « Installer » ;
-// l'installation d'origine n'est jamais modifiée. Cœur : packages/core/src/installation.ts.
+// l'installation d'origine n'est jamais modifiée. Sur le même disque que Cyber Pinball, les gros
+// fichiers sont liés plutôt que copiés (liens physiques, hardlink.ts) : aucune place en plus. Cœur : packages/core/src/installation.ts.
 
 import * as path from 'node:path';
 import {
@@ -13,6 +14,7 @@ import {
   indexInstallationMedias,
   knownTableInstallations,
   listInstallationTables,
+  sameVolume,
   t,
   tn,
   type InstallationLayout,
@@ -200,7 +202,7 @@ export function createInstallationImport(host: InstallationImportHost) {
       lead: lead(),
       sections: [
         ...noticeSection(),
-        { title: t('Où sont ses parties'), rows: [{ text: placeDetail(l.layout), tone: 'quiet' }] },
+        { title: t('Où sont ses parties'), rows: [{ text: placeDetail(l.layout), tone: 'quiet' }, ...otherDiskRows(l.layout)] },
         { title: shown === played && shown !== l.tables ? t('Ses tables jouées (listes de lecture)') : t('Ses tables'), rows: rows.length ? rows : [{ text: t('Aucune table dans {dir}', { dir: l.layout.tables }), tone: 'quiet' }] },
       ],
       actions,
@@ -210,7 +212,21 @@ export function createInstallationImport(host: InstallationImportHost) {
   }
 
   const lead = () =>
-    t('Seules les tables cochées sont reprises, chacune avec tout son dossier quand elle en a un, et ce que l’installation range ailleurs : son PuP-Pack (PUPVideos), sa ROM, sa sauvegarde, ses couleurs et ses sons (VPinMAME), sa musique, son dossier DMD, son fronton et ses médias (Popper, PinballX, PinballY), sous tous les noms que l’installation leur donne. Tout est copié : l’installation d’origine ne change pas. Rien n’est installé avant que vous ayez validé le plan.');
+    t('Seules les tables cochées sont reprises, chacune avec tout son dossier quand elle en a un, et ce que l’installation range ailleurs : son PuP-Pack (PUPVideos), sa ROM, sa sauvegarde, ses couleurs et ses sons (VPinMAME), sa musique, son dossier DMD, son fronton et ses médias (Popper, PinballX, PinballY), sous tous les noms que l’installation leur donne. Sur le même disque que Cyber Pinball, les gros fichiers (tables, frontons, vidéos, images, sons, ROM) sont liés sans place en plus, et le reste est copié ; l’installation d’origine ne change pas. Rien n’est installé avant que vous ayez validé le plan.');
+
+  /** Installation sur un autre disque que Cyber Pinball : rien ne peut s'y lier, tout sera copié. */
+  function otherDiskRows(layout: InstallationLayout): Row[] {
+    const root = host.root();
+    if (!root || sameVolume(layout.tables, root)) return [];
+    const disk = (p: string) => path.parse(path.resolve(p)).root.toUpperCase();
+    return [
+      {
+        text: t('Autre disque que Cyber Pinball ({from}, {to}) : tout sera copié', { from: disk(layout.tables), to: disk(root) }),
+        detail: t('Le plan d’ajout dit la place que prendra la copie. Cyber Pinball installé sur le même disque que l’installation reprendrait ses tables sans rien dupliquer.'),
+        tone: 'warning',
+      },
+    ];
+  }
 
   function noticeSection() {
     return notice ? [{ rows: [{ text: notice, tone: 'warning' as const }] }] : [];

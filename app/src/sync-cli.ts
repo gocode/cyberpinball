@@ -6,6 +6,8 @@
 
 // En premier : refuse toute écriture hors du bac à sable pendant un essai sans opérateur.
 import './sandbox-guard';
+// Puis la garde des liens physiques : aucune écriture sur place dans un fichier partagé avec une autre installation.
+import './hardlink-guard';
 import { describeDisplays, explainScore, formatChanges, loadCabinet, loadCabinetSet, rememberChoice, resolveLanguage, setLanguage, updateCabinetSet } from '@cyberpinball/core';
 import { observedDisplays } from './displays';
 import { locations, vpxProfile } from './paths';

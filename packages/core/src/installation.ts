@@ -776,6 +776,8 @@ function companionsOf(sources: ImportSource[], facts: (vpx: string) => Companion
   const brought = broughtParts(sources);
   const broughtRoms = broughtRomNames(sources);
   const chosen = sources.filter((s) => !s.unpacked && s.mode === 'copy').flatMap((s) => vpxIn(s.path));
+  // Sources prises dans une installation : leurs gros fichiers sont liés, pas copiés (hardlink.ts).
+  const fromInstallation = new Set<ImportSource>();
   for (const src of sources) {
     if (src.unpacked || src.mode !== 'copy') continue;
     for (const vpx of vpxIn(src.path)) {
@@ -789,6 +791,7 @@ function companionsOf(sources: ImportSource[], facts: (vpx: string) => Companion
       }
       const entry = layouts.get(dir.toLowerCase());
       if (!entry) continue;
+      fromInstallation.add(src);
       entry.medias ??= indexInstallationMedias(entry.layout);
       const report = tableCompanions(vpx, entry.layout, facts(vpx), entry.medias);
       const label = (p: string) => shownPath(p, entry.layout.root);
@@ -805,7 +808,7 @@ function companionsOf(sources: ImportSource[], facts: (vpx: string) => Companion
           if (result.some((s) => isInside(c.path, s.path))) continue;
           const others = tableHome(vpx, entry.layout)!.others.filter((o) => !chosen.some((v) => samePath(v, o)));
           // Son nom seul (« Ghostbusters ») : c'est l'un des noms candidats de la table (describeGame).
-          const folder: ImportSource = { path: c.path, mode: 'copy', label: path.basename(c.path), ...(others.length ? { exclude: others.flatMap(withSiblings) } : {}) };
+          const folder: ImportSource = { path: c.path, mode: 'copy', link: true, label: path.basename(c.path), ...(others.length ? { exclude: others.flatMap(withSiblings) } : {}) };
           // Les .vpx cochés de ce dossier y sont : leur source seule laisse la place au dossier.
           const at = result.findIndex((s) => isInside(s.path, c.path));
           for (let i = result.length - 1; i >= 0; i--) if (isInside(result[i]!.path, c.path)) result.splice(i, 1);
@@ -825,14 +828,14 @@ function companionsOf(sources: ImportSource[], facts: (vpx: string) => Companion
           kept.push(c);
           continue;
         }
-        extra.push({ path: c.path, mode: 'copy', owner: vpx, label: label(c.path) });
+        extra.push({ path: c.path, mode: 'copy', link: true, owner: vpx, label: label(c.path) });
         kept.push(c);
       }
       report.found = kept;
       if (report.found.length || report.missing.length) reports.push(report);
     }
   }
-  return { sources: [...result, ...extra], reports };
+  return { sources: [...result.map((s) => (fromInstallation.has(s) ? { ...s, link: true } : s)), ...extra], reports };
 }
 
 /** Un .vpx et les fichiers nommés comme lui à côté de lui (son fronton, ses réglages…). */

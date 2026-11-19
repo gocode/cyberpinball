@@ -7,6 +7,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { atomicTempPath, renameWithRetry } from './atomicwrite';
 import { copyTree } from './copytree';
+import { isLinkable, LINK_FALLBACK_CODES } from './hardlink';
 import { formatNumber, t } from './i18n';
 import type { RomMemory } from './ballcount';
 import { writeRomVolume } from './romscores';
@@ -14,7 +15,11 @@ import { buildZip, writeZipData, type RomZipMember } from './romzip';
 
 export type FileOp =
   | { op: 'move'; from: string; to: string }
-  | { op: 'copy'; from: string; to: string }
+  /**
+   * Copie ; link : les gros fichiers qui ne bougent pas (hardlink.ts) deviennent des liens physiques
+   * sur le même volume (aucune place en plus, l'original intact), copiés ailleurs.
+   */
+  | { op: 'copy'; from: string; to: string; link?: boolean }
   | { op: 'trash'; path: string }
   | { op: 'delete'; path: string }
   /**
@@ -66,10 +71,10 @@ export function applyOps(ops: FileOp[], ctx: OpContext): void {
     switch (op.op) {
       case 'move':
         if (samePath(op.from, op.to) && op.from === op.to) break;
-        transfer(op.from, op.to, ctx, true);
+        transfer(op.from, op.to, ctx, true, false);
         break;
       case 'copy':
-        transfer(op.from, op.to, ctx, false);
+        transfer(op.from, op.to, ctx, false, op.link ?? false);
         break;
       case 'trash':
         moveToTrash(op.path, ctx);
@@ -133,11 +138,11 @@ function copyToTrash(target: string, ctx: OpContext): string {
  * Déplace ou copie. Un dossier qui arrive sur un dossier existant est fusionné
  * fichier par fichier ; un fichier déjà présent à destination part à la corbeille.
  */
-function transfer(from: string, to: string, ctx: OpContext, move: boolean): void {
+function transfer(from: string, to: string, ctx: OpContext, move: boolean, link: boolean): void {
   const fromIsDir = fs.statSync(from).isDirectory();
   if (fs.existsSync(to) && !samePath(from, to)) {
     if (fromIsDir && fs.statSync(to).isDirectory()) {
-      for (const name of fs.readdirSync(from)) transfer(path.join(from, name), path.join(to, name), ctx, move);
+      for (const name of fs.readdirSync(from)) transfer(path.join(from, name), path.join(to, name), ctx, move, link);
       if (move) fs.rmdirSync(from);
       return;
     }
@@ -145,7 +150,7 @@ function transfer(from: string, to: string, ctx: OpContext, move: boolean): void
   }
   if (move) movePath(from, to);
   else {
-    copyTree(from, to, { overwrite: false });
+    copyTree(from, to, { overwrite: false, ...(link ? { link: isLinkable } : {}) });
   }
 }
 
@@ -169,7 +174,7 @@ export function linkFile(from: string, to: string, ctx: OpContext): 'linked' | '
     return 'linked';
   } catch (error) {
     // Autre volume, ou système de fichiers sans liens physiques (clé USB en FAT32, exFAT).
-    if (!['EXDEV', 'EPERM', 'ENOTSUP', 'EINVAL', 'EMLINK'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
+    if (!LINK_FALLBACK_CODES.has((error as NodeJS.ErrnoException).code ?? '')) throw error;
     fs.copyFileSync(from, to);
     return 'copied';
   }
@@ -274,12 +279,22 @@ export function isInside(child: string, parent: string): boolean {
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 }
 
-/** Taille d'un fichier ou d'un dossier, en octets. */
-export function sizeOf(target: string): number {
+/**
+ * Taille d'un fichier ou d'un dossier, en octets. Un fichier présent sous plusieurs noms dans le
+ * dossier (liens physiques, hardlink.ts) ne compte qu'une fois : ses données n'y sont qu'une fois.
+ */
+export function sizeOf(target: string, seen = new Set<string>()): number {
   try {
-    const stat = fs.statSync(target);
-    if (!stat.isDirectory()) return stat.size;
-    return fs.readdirSync(target).reduce((sum, name) => sum + sizeOf(path.join(target, name)), 0);
+    const stat = fs.statSync(target, { bigint: true });
+    if (!stat.isDirectory()) {
+      if (stat.nlink > 1n) {
+        const id = `${stat.dev}:${stat.ino}`;
+        if (seen.has(id)) return 0;
+        seen.add(id);
+      }
+      return Number(stat.size);
+    }
+    return fs.readdirSync(target).reduce((sum, name) => sum + sizeOf(path.join(target, name), seen), 0);
   } catch {
     return 0;
   }

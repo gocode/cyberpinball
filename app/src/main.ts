@@ -6,6 +6,8 @@
 import './sandbox-guard';
 // Puis, en bac à sable, un profil de Chromium à lui : deux essais en même temps ne se gênent plus.
 import './sandbox-profile';
+// Puis la garde des liens physiques : aucune écriture sur place dans un fichier partagé avec une autre installation.
+import './hardlink-guard';
 // Puis, avant le démarrage d'Electron : le mode hors écran des essais sans opérateur.
 import { OFFSCREEN, relaunchOnHiddenDesktop } from './offscreen';
 // Puis une restauration préparée (Sauvegardes) : ses fichiers posés avant que quoi que ce soit ne les lise.

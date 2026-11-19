@@ -5,10 +5,13 @@
 import { formatSize, IMPORT_SPACE_MARGIN, t, type ImportSpace } from '@cyberpinball/core';
 import type { Row, Section } from './library-types';
 
-/** Section « Place sur le disque » du plan ; rien quand l'import ne copie rien. */
-export function importSpaceSection(space: ImportSpace | undefined): Section | undefined {
-  if (!space?.disks.length) return undefined;
-  const rows: Row[] = space.disks.map((d) =>
+/**
+ * Section « Place sur le disque » du plan ; rien quand l'import ne copie rien. `before` : lignes
+ * d'abord (ce qui sera lié et copié d'une installation reprise, import-links-menu.ts).
+ */
+export function importSpaceSection(space: ImportSpace | undefined, before: Row[] = []): Section | undefined {
+  if (!space?.disks.length && !before.length) return undefined;
+  const rows: Row[] = [...before, ...(space?.disks ?? []).map((d): Row =>
     d.short
       ? {
           text: t('Pas assez de place sur {disk} : il faut {need}, {free} libres', { disk: d.root, need: formatSize(d.need + IMPORT_SPACE_MARGIN), free: formatSize(d.free ?? 0) }),
@@ -20,7 +23,7 @@ export function importSpaceSection(space: ImportSpace | undefined): Section | un
           detail: d.free !== undefined ? t('{free} libres', { free: formatSize(d.free) }) : t('Place libre inconnue'),
           tone: 'quiet',
         },
-  );
+  )];
   return { title: t('Place sur le disque'), rows };
 }
 

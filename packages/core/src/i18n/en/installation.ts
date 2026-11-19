@@ -40,8 +40,11 @@ export const messages: Record<string, string> = {
   'Ses tables': 'Its tables',
   'Aucune table dans {dir}': 'No table in {dir}',
   'cocher ou décocher la table': 'tick or untick the table',
-  'Seules les tables cochées sont reprises, chacune avec tout son dossier quand elle en a un, et ce que l’installation range ailleurs : son PuP-Pack (PUPVideos), sa ROM, sa sauvegarde, ses couleurs et ses sons (VPinMAME), sa musique, son dossier DMD, son fronton et ses médias (Popper, PinballX, PinballY), sous tous les noms que l’installation leur donne. Tout est copié : l’installation d’origine ne change pas. Rien n’est installé avant que vous ayez validé le plan.':
-    'Only the ticked tables are brought in, each with its whole folder when it has one, and what the installation keeps elsewhere: its PuP-Pack (PUPVideos), its ROM, save, colours and sounds (VPinMAME), its music, its DMD folder, its backglass and its media (Popper, PinballX, PinballY), under every name the installation gives them. Everything is copied: the original installation does not change. Nothing is installed before you have approved the plan.',
+  'Seules les tables cochées sont reprises, chacune avec tout son dossier quand elle en a un, et ce que l’installation range ailleurs : son PuP-Pack (PUPVideos), sa ROM, sa sauvegarde, ses couleurs et ses sons (VPinMAME), sa musique, son dossier DMD, son fronton et ses médias (Popper, PinballX, PinballY), sous tous les noms que l’installation leur donne. Sur le même disque que Cyber Pinball, les gros fichiers (tables, frontons, vidéos, images, sons, ROM) sont liés sans place en plus, et le reste est copié ; l’installation d’origine ne change pas. Rien n’est installé avant que vous ayez validé le plan.':
+    'Only the ticked tables are brought in, each with its whole folder when it has one, and what the installation keeps elsewhere: its PuP-Pack (PUPVideos), its ROM, save, colours and sounds (VPinMAME), its music, its DMD folder, its backglass and its media (Popper, PinballX, PinballY), under every name the installation gives them. On the same drive as Cyber Pinball, the big files (tables, backglasses, videos, images, sounds, ROMs) are linked without using more space, and the rest is copied; the original installation does not change. Nothing is installed before you have approved the plan.',
+  'Autre disque que Cyber Pinball ({from}, {to}) : tout sera copié': 'Not the same drive as Cyber Pinball ({from}, {to}): everything will be copied',
+  'Le plan d’ajout dit la place que prendra la copie. Cyber Pinball installé sur le même disque que l’installation reprendrait ses tables sans rien dupliquer.':
+    'The add plan shows how much space the copy will take. With Cyber Pinball installed on the same drive as the installation, its tables would be brought in without duplicating anything.',
   'VPinMAME : {dir}': 'VPinMAME: {dir}',
   'VPinMAME : absent': 'VPinMAME: missing',
   'ROM : {dirs}': 'ROMs: {dirs}',
@@ -68,6 +71,18 @@ export const messages: Record<string, string> = {
   'Rien d’autre retrouvé': 'Nothing else found',
   'absent de l’installation : {parts}': 'missing from the installation: {parts}',
   'Repris de l’installation d’origine · {root}': 'Brought in from the original installation · {root}',
+  // app/src/import-links-menu.ts
+  '{n} gros fichier lié, sans place en plus': '{n} big file linked, no extra space',
+  '{n} gros fichiers liés, sans place en plus': '{n} big files linked, no extra space',
+  '{size} : tables, frontons, vidéos, images, sons et ROM. Liens physiques NTFS : les mêmes données sous un second nom, l’installation d’origine reste telle quelle.':
+    '{size}: tables, backglasses, videos, images, sounds and ROMs. NTFS hard links: the same data under a second name, the original installation stays as it is.',
+  '{n} fichier copié': '{n} file copied',
+  '{n} fichiers copiés': '{n} files copied',
+  '{size} : les petits fichiers que VPX, PinMAME ou le PuP-Pack peuvent réécrire (.pup, .ini, .cfg, scripts…)':
+    '{size}: the small files VPX, PinMAME or the PuP-Pack may rewrite (.pup, .ini, .cfg, scripts…)',
+  'Installation d’origine sur {from}, Cyber Pinball sur {to} : tout est copié': 'Original installation on {from}, Cyber Pinball on {to}: everything is copied',
+  'La copie prend {size} sur {to}. Un lien ne se fait que sur le même disque : Cyber Pinball installé sur {from} (dossier choisi à l’installation, ou /D= pour une installation silencieuse) reprendrait ces tables sans dupliquer {linkable}. « Installer » copie quand même.':
+    'The copy takes {size} on {to}. A link only works on the same drive: with Cyber Pinball installed on {from} (folder chosen when installing, or /D= for a silent install), these tables would be brought in without duplicating {linkable}. “Install” copies anyway.',
   // app/src/game-parts.ts
   'Chercher un fichier ou un dossier…': 'Look for a file or a folder…',
   'Un fichier, ou tout un dossier (« Prendre ce dossier entier ») : Téléchargements, clé USB, disques, une autre installation': 'A file, or a whole folder (“Take this whole folder”): Downloads, USB stick, drives, another installation',

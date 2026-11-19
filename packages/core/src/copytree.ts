@@ -15,6 +15,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { detachHardLink, linkOrCopy } from './hardlink';
 
 export interface CopyOptions {
   /**
@@ -27,6 +28,11 @@ export interface CopyOptions {
    * Appelé aussi pour la source elle-même.
    */
   filter?: (src: string, dest: string) => boolean;
+  /**
+   * Vrai pour un fichier à lier plutôt qu'à copier (hardlink.ts) : lien physique sur le même
+   * volume, copie sinon. Jamais un dossier : les dossiers sont toujours créés.
+   */
+  link?: (src: string) => boolean;
 }
 
 /**
@@ -54,7 +60,15 @@ function copyEntry(src: string, dest: string, opts: CopyOptions): void {
     for (const name of fs.readdirSync(src)) copyEntry(path.join(src, name), path.join(dest, name), opts);
   } else {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.copyFileSync(src, dest, opts.overwrite === false ? fs.constants.COPYFILE_EXCL : 0);
+    const linking = opts.link?.(src) ?? false;
+    if (opts.overwrite !== false) {
+      // Copier par-dessus un fichier lié écrirait dans l'original (CopyFile réécrit le fichier en
+      // place) : son nom est retiré d'abord, l'autre nom garde ses octets.
+      detachHardLink(dest, false);
+      if (linking) fs.rmSync(dest, { force: true });
+    }
+    if (linking) linkOrCopy(src, dest);
+    else fs.copyFileSync(src, dest, opts.overwrite === false ? fs.constants.COPYFILE_EXCL : 0);
   }
 }
 

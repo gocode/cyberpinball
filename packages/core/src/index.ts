@@ -32,6 +32,8 @@ export * from './atomicwrite';
 export * from './backup';
 export * from './fileops';
 export * from './copytree';
+export * from './hardlink';
+export * from './importlinks';
 export * from './boundedread';
 export * from './importspace';
 export * from './transfer';

@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { fileDigest, readWholeFile, FileTooBigError } from '../boundedread';
 import { installationCompanions } from '../installation';
+import { importLinks } from '../importlinks';
 import { importSpace, importSpaceProblems, IMPORT_SPACE_MARGIN } from '../importspace';
 import { romFile, romHash } from '../romlibrary';
 import { buildZip, isRomZip, readZipEntries, zipContentHash, ROM_ZIP_MAX } from '../romzip';
@@ -205,8 +206,10 @@ bigTest('reprise d’une installation avec des archives de plusieurs Go : le pla
     assert.ok(plan.tables.length > 0);
     assert.deepEqual(plan.roms, [], 'ni l’archive de la table ni celle des ROM ne sont des ROM');
     assert.ok(ROM_ZIP_MAX < 2.3 * GIB);
-    // La place du plan se mesure sans rien lire : le PuP-Pack de 3 Go y compte.
-    assert.ok(importSpace(plan, { free: () => 1e15 }).bytes >= 3 * GIB);
+    // La place du plan se mesure sans rien lire. Même disque : le PuP-Pack de 3 Go est lié (hardlink.ts),
+    // il ne prend aucune place ; le plan le dit lié.
+    assert.ok(importLinks(plan)!.linked >= 3 * GIB);
+    assert.ok(importSpace(plan, { free: () => 1e15 }).bytes < GIB);
   } finally {
     fs.rmSync(base, { recursive: true, force: true });
   }

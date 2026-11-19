@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { formatSize, sameVolume, sizeOf } from './fileops';
 import { diskSpace } from './health';
 import { t } from './i18n';
+import { sourceFiles, type SourceFiles } from './importlinks';
 import type { RomZipMember } from './romzip';
 import type { ImportPlan } from './tableimport';
 
@@ -36,12 +37,15 @@ export interface ImportSpaceOptions {
   sizes?: Map<string, number>;
   /** Place libre du disque d'un dossier (essais). */
   free?: (dir: string) => number | undefined;
+  /** Parcours des sources liées (importlinks.ts), partagés avec importLinks. */
+  scan?: Map<string, SourceFiles>;
 }
 
 /**
  * Ce que l'import écrira, disque par disque : chaque copie, chaque déplacement d'un disque à
  * l'autre, chaque ROM refaite à plat ou copiée dans une table d'un autre disque. Un déplacement
- * sur le même disque n'est qu'un renommage : il ne compte pas.
+ * sur le même disque n'est qu'un renommage, un lien physique un second nom (installation reprise,
+ * hardlink.ts) : ni l'un ni l'autre ne compte.
  */
 export function importSpace(plan: ImportPlan, opts: ImportSpaceOptions = {}): ImportSpace {
   const sizes = opts.sizes ?? new Map<string, number>();
@@ -51,6 +55,15 @@ export function importSpace(plan: ImportPlan, opts: ImportSpaceOptions = {}): Im
     if (n === undefined) sizes.set(key, (n = sizeOf(p)));
     return n;
   };
+  // Copie liée sur le même disque (installation reprise) : seuls les fichiers qui ne se lient pas prennent de la place.
+  const scan = opts.scan ?? new Map<string, SourceFiles>();
+  const unlinked = (p: string) => {
+    const key = p.toLowerCase();
+    let f = scan.get(key);
+    if (!f) scan.set(key, (f = sourceFiles(p)));
+    return f.other;
+  };
+  const linkedHere = (link: boolean | undefined, mode: string | undefined, from: string, to: string) => Boolean(link) && mode === 'copy' && sameVolume(from, to);
   const zipSize = (files: RomZipMember[]) => [...new Set(files.map((f) => f.from))].reduce((n, f) => n + size(f), 0);
   const needs = new Map<string, number>();
   const add = (to: string, bytes: number) => {
@@ -61,6 +74,7 @@ export function importSpace(plan: ImportPlan, opts: ImportSpaceOptions = {}): Im
   for (const table of plan.tables) {
     for (const s of table.steps) {
       if (s.zip) add(s.to, zipSize(s.zip.files));
+      else if (linkedHere(s.link, s.mode, s.from, s.to)) add(s.to, unlinked(s.from));
       else if (s.mode === 'copy' || !sameVolume(s.from, s.to)) add(s.to, size(s.from));
     }
   }
@@ -69,6 +83,7 @@ export function importSpace(plan: ImportPlan, opts: ImportSpaceOptions = {}): Im
     if (!kept) continue;
     if (!kept.inLibrary) {
       if (kept.build) add(r.to, zipSize(kept.build));
+      else if (kept.from && linkedHere(kept.link, kept.mode, kept.from, r.to)) add(r.to, unlinked(kept.from));
       else if (kept.from && (kept.mode === 'copy' || !sameVolume(kept.from, r.to))) add(r.to, kept.size);
     }
     // Une table d'un autre disque que la bibliothèque reçoit une copie, pas un lien.

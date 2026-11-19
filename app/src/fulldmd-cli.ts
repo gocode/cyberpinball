@@ -9,6 +9,8 @@
 
 // En premier : refuse toute écriture hors du bac à sable pendant un essai sans opérateur.
 import './sandbox-guard';
+// Puis la garde des liens physiques : aucune écriture sur place dans un fichier partagé avec une autre installation.
+import './hardlink-guard';
 import * as path from 'node:path';
 import { dmdKindOf, dressCoverage, DRESS_COVERED, fullDmdReasonLabel, gameDmdWindow, layoutOf, loadCabinet, resolveLanguage, scanTables, setLanguage, t, type TableDressing } from '@cyberpinball/core';
 import { analyseDressing } from './fulldmd';

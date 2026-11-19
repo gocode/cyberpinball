@@ -58,6 +58,12 @@ export interface ImportSource {
   label?: string;
   /** move : on vide le dossier d'import ; copy : on ne touche pas aux fichiers de l'utilisateur. */
   mode: 'move' | 'copy';
+  /**
+   * Avec mode copy : les gros fichiers qui ne bougent pas (.vpx, fronton, vidéos, images, sons, ROM)
+   * deviennent des liens physiques sur le même volume, sans place en plus (hardlink.ts) ; le reste
+   * est copié. Une installation reprise (installation.ts) : rien n'y change.
+   */
+  link?: boolean;
   /** Dossier déballé d'une archive : c'est un paquet, même s'il ne contient qu'un fichier. */
   unpacked?: boolean;
   /**
@@ -138,6 +144,8 @@ export interface RomImportVersion {
   /** Fichier importé qui porte ce contenu (zip, ou dossier de puces). */
   from?: string;
   mode?: 'move' | 'copy';
+  /** Copie liée (ImportSource.link). */
+  link?: boolean;
   /** Puces à refaire en un zip à plat : elles étaient dans un sous-dossier, ou déballées. */
   build?: RomZipMember[];
   /** Dossier où étaient les puces (« t2_l8 »), si la ROM est refaite à plat. */
@@ -236,6 +244,8 @@ export interface ImportStep {
   /** Destination relative au dossier de la table, pour l'affichage. */
   target: string;
   mode: 'move' | 'copy';
+  /** Copie liée (ImportSource.link) : les fichiers liables deviennent des liens physiques sur le même volume. */
+  link?: boolean;
   isDir: boolean;
   renamed: boolean;
   /** Un fichier existant sera remplacé (et mis à la corbeille), ou un dossier complété. */
@@ -299,6 +309,7 @@ interface Item {
   pkg: number;
   source: string;
   mode: 'move' | 'copy';
+  link?: boolean;
   /** Nom d'origine d'un dossier déballé (archive qui ne contient que le pack). */
   name?: string;
   /** Média de présentation reconnu d'après son nom et son dossier. */
@@ -438,7 +449,7 @@ function planRoms(romItems: { item: Item; owner?: Game }[], games: Game[], plann
     if (!kept.inLibrary && kept.build) {
       ops.push({ op: 'zip', to, files: kept.build, mtimeMs: kept.mtimeMs });
       if (kept.mode === 'move' && !kept.unpacked) ops.push({ op: 'trash', path: kept.from! });
-    } else if (!kept.inLibrary) ops.push({ op: kept.mode!, from: kept.from!, to });
+    } else if (!kept.inLibrary) ops.push(transferOp(kept.mode!, kept.from!, to, kept.link));
     const unused = incoming
       .filter(({ item }) => item.path !== kept.from)
       .map(({ item }) => ({ from: item.path, source: item.source, mode: item.mode }));
@@ -469,7 +480,7 @@ function planRoms(romItems: { item: Item; owner?: Game }[], games: Game[], plann
 /** Version d'une ROM importée : le zip tel quel, ou le zip à plat qu'on refera (son empreinte d'avance). */
 function importedVersion(item: Item): RomImportVersion | undefined {
   const rom = item.rom;
-  const base = { label: item.source, inLibrary: false, from: item.path, mode: item.mode, unpacked: item.unpacked };
+  const base = { label: item.source, inLibrary: false, from: item.path, mode: item.mode, unpacked: item.unpacked, ...(item.link ? { link: true } : {}) };
   const original = path.basename(item.path).replace(/\.zip$/i, '');
   const renamedFrom = rom && !item.isDir && original.toLowerCase() !== rom.name.toLowerCase() ? original : undefined;
   if (rom?.build) {
@@ -549,7 +560,7 @@ export function applyRomImport(rom: RomImport, ctx: ImportContext): void {
 function collect(src: ImportSource, pkg: number, items: Item[], ignored: string[], dmdFolders: string[], hints: RomHints): void {
   const label = src.label ?? path.basename(src.path);
   const unpacked = Boolean(src.unpacked);
-  const owner = src.owner ? { owner: src.owner } : {};
+  const owner = { ...(src.owner ? { owner: src.owner } : {}), ...(src.link && src.mode === 'copy' ? { link: true } : {}) };
   const excluded = (p: string) => src.exclude?.some((x) => samePath(x, p) || isInside(p, x)) ?? false;
   const push = (p: string, dir: boolean, kind: FileKind, parents: string[], source: string, media?: RecognizedMedia) => {
     if (excluded(p)) return;
@@ -846,6 +857,7 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
       to,
       target,
       mode: item.mode,
+      ...(item.link ? { link: true } : {}),
       isDir: item.isDir,
       renamed: path.basename(target) !== base,
       replaces: fs.existsSync(to),
@@ -1153,7 +1165,7 @@ export function applyImport(plan: TablePlan, ctx: ImportContext): void {
       if (s.zip.trashSource) ops.push({ op: 'trash', path: s.from });
       continue;
     }
-    ops.push({ op: s.mode, from: s.from, to: s.to });
+    ops.push(transferOp(s.mode, s.from, s.to, s.link));
     if (s.pack) ops.push(...packOps(s.to, s.pack));
   }
   applyOps(ops, ctx);
@@ -1178,6 +1190,11 @@ export function applyImport(plan: TablePlan, ctx: ImportContext): void {
     const root = ctx.cleanupRoots.find((r) => isInside(step.from, r));
     if (root) pruneEmptyDirs(path.dirname(step.from), root);
   }
+}
+
+/** Copie (liée ou non) ou déplacement d'un élément de l'import. */
+function transferOp(mode: 'move' | 'copy', from: string, to: string, link?: boolean): FileOp {
+  return mode === 'copy' && link ? { op: 'copy', from, to, link: true } : { op: mode, from, to };
 }
 
 /** Une fois le pack en place : retrait des fichiers inutiles, puis l'option retenue, recopiée comme le ferait son .bat. */

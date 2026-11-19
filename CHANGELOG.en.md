@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Bringing in tables from another installation (PinUP Popper, PinballX, PinballY, plain VPX) no longer duplicates their big files when it sits on the same drive as Cyber Pinball: tables, backglasses, PuP-Pack videos, images and sounds, ROMs and music become NTFS hard links, taking no extra space, and the original installation stays as it is. Only the small files VPX, PinMAME or the PuP-Pack may rewrite (.pup, .ini, .cfg, scripts...) are copied. The add plan shows what will be linked and what will be copied, with the space needed.
+- Original installation on another drive than Cyber Pinball: the import screen and the add plan say so, with the space the copy will take, and explain that installing Cyber Pinball on the same drive avoids any duplication. Copying is still possible.
+- No write by Cyber Pinball can change a file shared with another installation: before writing to a linked file (a PuP-Pack option, the backglass image taken from the .directb2s, a replacement...), its link is broken, and the original keeps its bytes and its date.
 - Feedback and ideas: each status of an idea has its own badge (icon and colour), outlined until the team commits to it and filled once it does. "New", "Under review", "Planned", "In development", "Done" and "Not planned" are told apart at a glance, and an idea's page says what its status means.
 - Tables without sound: after each game, the cabinet log says which sound outputs VPX opened, which ones it did not find, and the music it did not find. The diagnosis reports music not found during the last game, and sound muted by the table's own setting (volume at 0 in its .ini), with a way to bring it back.
 - PuP-Pack whose music playlist is empty (Goldorak): the diagnosis reports it as a warning, and says the table will be silent until the pack is complete.
