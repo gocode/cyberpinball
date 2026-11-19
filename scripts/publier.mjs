@@ -10,8 +10,9 @@
 //   npm run publier                       -> release GitHub v<version> de package.json
 //   npm run publier -- --brouillon        -> release laissée en brouillon (invisible des bornes)
 //   npm run publier -- --sans-fabrication -> reprend release\ tel qu'il est
-//   npm run publier -- --notes <fichier>  -> nouveautés (sinon : section « ## <version> » de CHANGELOG.md,
-//                                            et de CHANGELOG.en.md pour la release GitHub)
+//   npm run publier -- --notes <fichier>  -> nouveautés, « ## Français » puis « ## English » (sinon :
+//                                            section « ## <version> » de CHANGELOG.md et de CHANGELOG.en.md) ;
+//                                            la page de release commence par l'anglais (scripts/page-release.mjs)
 //   npm run publier -- --rapide           -> sans refaire les installeurs (une à deux minutes) : le
 //                                            paquet léger seul, le flux désignant les installeurs
 //                                            de la dernière publication complète
@@ -60,7 +61,8 @@ import { snapshotAndPush } from './envoyer-github.mjs';
 import { frozenProblem } from './publication-figee.mjs';
 import { DIRECT_DOWNLOADS, directDownloadProblems } from './telechargement-direct.mjs';
 import { toReview } from './manuels-a-reviser.mjs';
-import { bulletPoints, changelogNotes, changelogSections } from './traductions.mjs';
+import { releaseBody } from './page-release.mjs';
+import { bulletPoints, changelogNotes, changelogSections, fragmentNotes } from './traductions.mjs';
 import { FRAGMENTS_DIR, applyVersion, foldFragments, nextVersion, notesVersion } from './version-suivante.mjs';
 
 const require = createRequire(import.meta.url);
@@ -306,9 +308,12 @@ const changelog = (file) => {
   const own = changelogNotes(file, version);
   return own.length || !prerelease ? own : changelogNotes(file, base);
 };
-let notes = notesFile ? bulletPoints(fs.readFileSync(notesFile, 'utf8')) : changelog(path.join(repo, 'CHANGELOG.md'));
-// Version anglaise : dans la release GitHub, et dans le flux pour les bornes réglées en anglais.
-let notesEn = notesFile ? [] : changelog(path.join(repo, 'CHANGELOG.en.md'));
+// --notes : même forme que changements/<branche>.md (« ## Français » puis « ## English »).
+const notesText = notesFile ? fs.readFileSync(notesFile, 'utf8') : undefined;
+const fromFile = notesText && (/^## English\s*$/m.test(notesText) ? fragmentNotes(notesText) : { fr: bulletPoints(notesText), en: [] });
+let notes = fromFile ? fromFile.fr : changelog(path.join(repo, 'CHANGELOG.md'));
+// Version anglaise : en tête de la release GitHub, et dans le flux pour les bornes réglées en anglais.
+let notesEn = fromFile ? fromFile.en : changelog(path.join(repo, 'CHANGELOG.en.md'));
 if (!notes.length && prerelease) {
   notes = [`Préversion d'essai de la ${base}.`];
   notesEn = [`Test pre-release of ${base}.`];
@@ -316,7 +321,14 @@ if (!notes.length && prerelease) {
 if (!notes.length && !local) fail(`aucune nouveauté pour ${version} : ajoutez une section « ## ${version} » à CHANGELOG.md (une ligne « - » par point), ou --notes <fichier>.`);
 for (const n of notes) console.log(`  - ${n}`);
 for (const n of notesEn) console.log(`  - (en) ${n}`);
-if (!notesFile && !notesEn.length) console.log(`  (pas de section « ## ${version} » dans CHANGELOG.en.md : release sans les nouveautés en anglais)`);
+// Le public de la page de release est d'abord anglophone : elle commence par l'anglais.
+if (!local && notesEn.length !== notes.length) {
+  fail(
+    notesFile
+      ? `${notesFile} : il faut « ## Français » puis « ## English », autant de points « - » dans chacune (${notes.length} en français, ${notesEn.length} en anglais).`
+      : `${notes.length} nouveauté(s) en français, ${notesEn.length} en anglais (section « ## ${version} » de CHANGELOG.en.md) : la page de release commence par l'anglais.`,
+  );
+}
 // Nouveautés des versions précédentes (les 20 dernières) : une borne qui en a sauté les voit toutes.
 const readText = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '');
 const sectionsFr = changelogSections(readText(path.join(repo, 'CHANGELOG.md')));
@@ -380,28 +392,21 @@ if (privateRepo) {
 }
 
 step(`Release v${version} sur github.com/${target}${privateRepo ? ' (essai privé)' : ''}`);
-const installs = manifest.installer.version ?? version;
-const installersText = reference
-  ? [
-      `**Installeurs** : ceux de la [${installs}](${manifest.installer.url.replace(/\/download\/(v[^/]+)\/.*$/, '/tag/$1')}) ; une borne installée avec eux reçoit ensuite la mise à jour légère vers ${version}.`,
-      '',
-    ]
-  : [
-      `**${update.UPDATE_INSTALLER_NAME}** : installeur léger (Visual Pinball X téléchargé au premier lancement).`,
-      '',
-      '**CyberPinball-Setup-complet.exe** : avec l’archive officielle de Visual Pinball X, pour une borne sans Internet. Redistribution gratuite seulement : ni vendue, ni livrée avec une borne vendue ou exploitée commercialement (licence de VPX).',
-      '',
-    ];
-const body = [
-  ...notes.map((n) => `- ${n}`),
-  '',
-  ...(notesEn.length ? ['**English**', '', ...notesEn.map((n) => `- ${n}`), ''] : []),
-  `Les bornes déjà installées se mettent à jour depuis le menu système, « Mise à jour de Cyber Pinball » : mise à jour légère (**${update.UPDATE_APP_NAME}**, l'application seule) si elles ont déjà le même socle (${socle}), sinon par l'installeur.`,
-  '',
-  ...installersText,
-  `SHA-256 de ${update.UPDATE_INSTALLER_NAME} : \`${manifest.installer.sha256}\``,
-  `SHA-256 de ${update.UPDATE_APP_NAME} : \`${manifest.app.sha256}\``,
-].join('\n');
+// Anglais d'abord, puis français ; pied bilingue (scripts/page-release.mjs).
+const body = releaseBody({
+  version,
+  notes,
+  notesEn,
+  socle,
+  installerName: update.UPDATE_INSTALLER_NAME,
+  appName: update.UPDATE_APP_NAME,
+  installerSha256: manifest.installer.sha256,
+  appSha256: manifest.app.sha256,
+  reference: reference && {
+    version: manifest.installer.version ?? version,
+    url: manifest.installer.url.replace(/\/download\/(v[^/]+)\/.*$/, '/tag/$1'),
+  },
+});
 // Un brouillon de la même version, laissé par une publication interrompue (envoi refusé par
 // GitHub, 04/11/2026 : HTTP 500 sur le paquet), est retiré : sinon il resterait orphelin à côté
 // du nouveau. Un brouillon n'a pas encore d'étiquette, d'où la liste plutôt que /releases/tags.

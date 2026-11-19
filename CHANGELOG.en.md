@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- GitHub download page: release notes now come first in English, then in French, and the explanations about updating, the installers and the VPX license are given in both languages.
 - Tables whose script shows a plain message with a single OK button (Goldorak: "UltraDMD userfiles directory … does not exist"): the game used to stop as if it were an error. The message is now accepted with OK, the game goes on and the message stays in the log. Questions (Yes/No, Cancel) and VPX errors still stop the game.
 - UltraDMD tables whose script names its folder through a variable ("DirName = curDir & … & ".UltraDMD"", the most copied form): that folder is now recognised. It follows the table when another installation is imported, and the doctor reports it when it is missing. A folder named like the table ("Table.UltraDMD", "Table.FlexDMD") follows the table too.
 - Script errors repeated during the game ("Object required: 'UltraDMD'" at every tick): the cabinet log sums them up in one line, with the script line and how many times.

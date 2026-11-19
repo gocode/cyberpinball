@@ -12,13 +12,15 @@
 // Documents découpés (SPLITS, scripts/decoupage.mjs) : le sommaire et chaque rubrique sont
 // comparés à leur traduction (la n-ième rubrique du sommaire français avec la n-ième du sommaire
 // anglais) ; une rubrique absente du sommaire, ou écrite avec plusieurs phrases sur une ligne, est
-// refusée. Nouveautés en attente (changements/*.md) : autant de points en français qu'en anglais.
+// refusée. Nouveautés en attente (changements/*.md) : autant de points en français qu'en anglais,
+// et pas de français dans les points anglais hors des libellés cités entre guillemets.
 
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isPrivate } from './audit-publication.mjs';
+import { frenchOutsideQuotes } from './page-release.mjs';
 import { reflow } from './phrases.mjs';
 import { readmeDownloadProblems } from './telechargement-direct.mjs';
 
@@ -289,6 +291,9 @@ export function fragmentProblems(root = repo) {
     const { fr, en } = fragmentNotes(text);
     if (!fr.length) problems.push(`${file} : aucun point « - » sous « ## Français »`);
     if (fr.length !== en.length) problems.push(`${file} : ${fr.length} point(s) en français, ${en.length} en anglais`);
+    // La page de release commence par ces points anglais : du français y serait lu tel quel (ou
+    // traduit de travers par le navigateur) par le public anglophone.
+    for (const n of en.filter(frenchOutsideQuotes)) problems.push(`${file} : point anglais avec du français hors guillemets ; citer un libellé français entre "…" suivi de sa traduction (« ${n.slice(0, 60)} »)`);
     for (const n of fr.filter((n) => published.has(n))) problems.push(`${file} : point déjà publié dans CHANGELOG.md, à retirer (« ${n.slice(0, 60)} »)`);
   }
   return problems;

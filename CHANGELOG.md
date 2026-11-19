@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.1
 
+- Page de téléchargement sur GitHub : les nouveautés s'affichent d'abord en anglais, puis en français, et les explications sur la mise à jour, les installeurs et la licence de VPX sont données dans les deux langues.
 - Tables dont le script affiche un simple message avec un seul bouton OK (Goldorak : « UltraDMD userfiles directory … does not exist ») : la partie s'arrêtait comme pour une erreur. Le message est maintenant validé par OK, la partie continue et le message reste dans le journal. Les questions (Oui/Non, Annuler) et les erreurs de VPX arrêtent toujours la partie.
 - Tables UltraDMD dont le script nomme son dossier par une variable (« DirName = curDir & … & ".UltraDMD" », la forme la plus recopiée) : ce dossier est maintenant reconnu. Il suit la table quand on reprend une autre installation, et le médecin signale son absence. Un dossier nommé comme la table (« Table.UltraDMD », « Table.FlexDMD ») suit aussi la table.
 - Erreurs du script répétées pendant la partie (« Objet requis: 'UltraDMD' » à chaque tour) : le journal de la borne les résume en une ligne, avec la ligne du script et le nombre de fois.
