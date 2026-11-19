@@ -16,7 +16,7 @@
 import { commentStart, scriptCode } from './vbscript';
 
 /** Correctifs connus, nommés dans la dernière ligne du .vbs de Cyber Pinball. */
-export type CompatFix = 'vpmInitOnce' | 'vrRoomOnScreens' | 'executeGlobalOnce' | 'timerTextOnce' | 'tablesDirectoryDmd';
+export type CompatFix = 'vpmInitOnce' | 'vrRoomOnScreens' | 'executeGlobalOnce' | 'timerTextOnce' | 'tablesDirectoryDmd' | 'b2sArgs';
 
 interface CompatRule {
   id: CompatFix;
@@ -526,7 +526,178 @@ const tablesDirectoryDmd: CompatRule = {
   stop: /(?!)/,
 };
 
-const RULES: readonly CompatRule[] = [vpmInitOnce, vrRoomOnScreens, executeGlobalOnce, timerTextOnce, tablesDirectoryDmd];
+// ---------- Appels au fronton B2S que le plugin de VPX refuse ----------
+//
+// VPX 10.8.1 fournit B2S.Server par son plugin B2S (plugins/b2s/B2SPlugin.cpp), aux paramètres typés : B2SSetData
+// (int, int) ou (string, int), B2SSetScore (int, int)… Un texte à une place « int » est converti par VariantChangeType
+// (src/core/DynamicScript.cpp, COMToScriptVariant) : un nombre écrit en texte passe, tout autre texte échoue (« Failed to
+// convert from COM variant type 8 », « Failed to convert a parameter in call to B2S_Server.B2SSetData »), et l'erreur
+// de type arrête la procédure du script qui appelait. Le B2S Server d'origine l'acceptait sans arrêter la table.
+// Relevé le 19/11/2026 (Champions League 2023, ligne 5165 de son script) : l'erreur venait pendant l'initialisation,
+// qui s'arrêtait avant de créer UltraDMD, puis « Objet requis: 'UltraDMD' » 540 fois sur le plateau.
+// Le .vbs de Cyber Pinball passe ces appels par une procédure qui convertit en nombre un texte numérique, aux seules
+// places « int » du plugin, et qui, si le fronton refuse encore, laisse le script continuer : un élément du fronton
+// non allumé plutôt qu'une table arrêtée. Appliqué seulement aux tables dont VPX a écrit ce refus (doctor.ts,
+// compatFixesFromLog) : rien ne change pour les autres.
+
+const B2S_CALL = 'CyberPinball_B2S';
+/** Pour chaque méthode du plugin et son nombre d'arguments : les places qui n'acceptent qu'un entier. */
+const B2S_INT_ONLY: Record<string, Record<number, number[]>> = (() => {
+  const both = (one: number[], two: number[]) => ({ 1: one, 2: two });
+  const map: Record<string, Record<number, number[]>> = {
+    b2ssetdata: { 2: [1] },
+    b2ssetpos: { 3: [1, 2] },
+    b2ssetillumination: { 2: [1] },
+    b2ssetled: { 2: [0] },
+    b2ssetleddisplay: { 2: [0] },
+    b2ssetreel: { 2: [0, 1] },
+    b2ssetscore: { 2: [0, 1] },
+    b2ssetscoreplayer: { 2: [0, 1] },
+    b2ssetscoredigit: { 2: [0, 1] },
+    b2ssetscorerollover: { 2: [0, 1] },
+  };
+  for (let i = 1; i <= 6; i++) map[`b2ssetscoreplayer${i}`] = { 1: [0] };
+  for (let i = 1; i <= 4; i++) map[`b2ssetscorerolloverplayer${i}`] = { 1: [0] };
+  for (const m of ['credits', 'playerup', 'canplay', 'ballinplay', 'tilt', 'match', 'gameover', 'shootagain']) map[`b2sset${m}`] = both([0], [0, 1]);
+  return map;
+})();
+
+/** Un appel à une méthode B2S en début d'instruction : objet, méthode, et la place de ses arguments dans la ligne. */
+interface B2sCall {
+  start: number;
+  end: number;
+  call: boolean;
+  object: string;
+  method: string;
+  args: string[];
+  parens: boolean;
+}
+
+/** Fin des arguments d'une instruction (« : », « ' », Else, fin de ligne ; parenthèse fermante en mode parenthésé). */
+function argumentsEnd(line: string, from: number, parens: boolean): number {
+  let depth = 0;
+  let quoted = false;
+  for (let i = from; i < line.length; i++) {
+    const ch = line[i]!;
+    if (ch === '"') quoted = !quoted;
+    if (quoted) continue;
+    if (ch === '(') depth++;
+    else if (ch === ')') {
+      if (depth === 0) return parens ? i : -1;
+      depth--;
+    } else if (!parens && depth === 0 && (ch === ':' || ch === "'")) return i;
+    else if (!parens && depth === 0 && /^\belse\b/i.test(line.slice(i)) && /[\s]/.test(line[i - 1] ?? ' ')) return i;
+  }
+  return parens ? -1 : line.length;
+}
+
+/** Arguments séparés par les virgules hors chaînes et parenthèses. */
+function splitArguments(text: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let quoted = false;
+  let current = '';
+  for (const ch of text) {
+    if (ch === '"') quoted = !quoted;
+    if (!quoted && ch === '(') depth++;
+    if (!quoted && ch === ')') depth--;
+    if (!quoted && depth === 0 && ch === ',') {
+      out.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) out.push(current.trim());
+  return out;
+}
+
+/** Les appels B2S d'une ligne dont une place « int » du plugin reçoit un argument (à convertir). */
+function b2sCalls(line: string): B2sCall[] {
+  const calls: B2sCall[] = [];
+  const at = commentStart(line);
+  const code = at < 0 ? line : line.slice(0, at);
+  const re = /(^|:|\bthen\b|\belse\b)(\s*)(call\s+)?([A-Za-z_][\w]*(?:\.[A-Za-z_]\w*)*)\.(B2S\w+)\b/gi;
+  for (const m of code.matchAll(re)) {
+    const start = m.index! + m[1]!.length + m[2]!.length;
+    if ((code.slice(0, start).match(/"/g)?.length ?? 0) % 2) continue;
+    const afterName = m.index! + m[0].length;
+    const rest = code.slice(afterName);
+    const open = /^\s*\(/.exec(rest);
+    const call = Boolean(m[3]);
+    // Sans Call, « x.B2SSetData(1, 2) » n'est pas valide en VBScript avec deux arguments ; avec un seul, les
+    // parenthèses font partie de l'argument : on lit comme une instruction.
+    const parens = call && Boolean(open);
+    const from = parens ? afterName + open![0].length : afterName;
+    const end = argumentsEnd(code, from, parens);
+    if (end < 0) continue;
+    const args = splitArguments(code.slice(from, end));
+    const ints = B2S_INT_ONLY[m[5]!.toLowerCase()]?.[args.length];
+    if (!ints?.length) continue;
+    calls.push({ start, end: parens ? end + 1 : end, call, object: m[4]!, method: m[5]!, args, parens });
+  }
+  return calls;
+}
+
+const b2sArgs: CompatRule = {
+  id: 'b2sArgs',
+  // Jamais d'après le seul texte : un argument texte ne se voit qu'à l'exécution. Réclamé par le journal de VPX.
+  found: () => false,
+  applicable: (code) => code.split('\n').some((l) => b2sCalls(l).length > 0),
+  applied: (text) => new RegExp(`^\\s*function\\s+${B2S_CALL}_Int\\b`, 'im').test(text),
+  apply(text) {
+    const eol = /\r\n/.test(text) ? '\r\n' : '\n';
+    const parts = text.split(/(\r?\n)/);
+    const used = new Map<string, { method: string; n: number }>();
+    for (let i = 0; i < parts.length; i += 2) {
+      const line = parts[i]!;
+      const calls = b2sCalls(line);
+      if (!calls.length) continue;
+      let edited = line;
+      for (const c of [...calls].reverse()) {
+        const name = `${B2S_CALL}_${c.method}_${c.args.length}`;
+        used.set(name.toLowerCase(), { method: c.method, n: c.args.length });
+        const args = [c.object, ...c.args].join(', ');
+        const replacement = c.call ? `Call ${name}(${args})` : `${name} ${args} `;
+        edited = edited.slice(0, c.start) + replacement + edited.slice(c.end).replace(/^\s+/, (s) => (c.call ? s : ''));
+      }
+      parts[i] = edited;
+    }
+    if (!used.size) return undefined;
+    let out = parts.join('');
+    if (out && !/\r?\n$/.test(out)) out += eol;
+    const lines = [
+      // Un nombre écrit en texte devient un nombre ; tout le reste passe tel quel.
+      `Function ${B2S_CALL}_Int(aValue)`,
+      `  If VarType(aValue) = vbString Then`,
+      `    If IsNumeric(aValue) Then ${B2S_CALL}_Int = CLng(aValue) : Exit Function`,
+      `  End If`,
+      `  If IsObject(aValue) Then Set ${B2S_CALL}_Int = aValue Else ${B2S_CALL}_Int = aValue`,
+      `End Function`,
+    ];
+    for (const { method, n } of used.values()) {
+      const ints = B2S_INT_ONLY[method.toLowerCase()]![n]!;
+      const params = Array.from({ length: n }, (_, k) => `a${k}`);
+      const values = params.map((p, k) => (ints.includes(k) ? `${B2S_CALL}_Int(${p})` : p));
+      lines.push(
+        `Sub ${B2S_CALL}_${method}_${n}(aServer, ${params.join(', ')})`,
+        // Le fronton refuse encore (texte qui n'est pas un nombre) : le script continue, comme avec le B2S Server d'origine.
+        `  On Error Resume Next`,
+        `  aServer.${method} ${values.join(', ')}`,
+        `End Sub`,
+      );
+    }
+    return out + lines.join(eol) + eol;
+  },
+  stop: /Failed to convert a parameter in call to B2S_Server\.|Type incompatible: '[\w.]*\.B2S\w+'|Type mismatch: '[\w.]*\.B2S\w+'/i,
+};
+
+const RULES: readonly CompatRule[] = [vpmInitOnce, vrRoomOnScreens, executeGlobalOnce, timerTextOnce, tablesDirectoryDmd, b2sArgs];
+
+/** Correctifs que réclament les lignes du journal de VPX d'une partie de la table (erreurs du script, refus d'un plugin). */
+export function compatFixesFromLog(lines: readonly string[], code?: string): CompatFix[] {
+  return RULES.filter((r) => r.stop.source !== '(?!)' && lines.some((l) => r.stop.test(l)) && (code === undefined || r.applicable(code))).map((r) => r.id);
+}
 
 /**
  * Les correctifs que cette version sait repérer. Les lectures de script gardées en cache (app/src/vbs.ts) les notent :

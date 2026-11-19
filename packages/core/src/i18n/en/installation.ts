@@ -10,6 +10,7 @@ export const messages: Record<string, string> = {
     '{name}: the installation has no known ROM folder (no VPinMAME\\roms, no VPinMAME rompath in the registry, no Popper ROM folder)',
   'PuP-Pack « {name} »': 'PuP-Pack “{name}”',
   'dossier DMD « {name} »': 'DMD folder “{name}”',
+  'musique « {name} »': 'music “{name}”',
   Script: 'Script',
   ROM: 'ROM',
   'Couleurs du DMD': 'DMD colours',

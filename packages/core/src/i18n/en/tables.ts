@@ -2,6 +2,29 @@
 export const messages: Record<string, string> = {
   // packages/core/src/doctor.ts
   'Table hors de son propre dossier': 'Table outside its own folder',
+  'Son coupé pour cette table': 'Sound muted for this table',
+  'Image du DMD absente': 'DMD image missing',
+  'Images du DMD absentes': 'DMD images missing',
+  'À la dernière partie, le DMD n’a pas trouvé {list} dans « {folder} » : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprenez-le en entier, puis « Ajouter une table ».':
+    'During the last game, the DMD did not find {list} in “{folder}”: it only shows its texts. This folder comes with the original table; take it again in full, then “Add a table”.',
+  'À la dernière partie, le DMD n’a pas trouvé {n} images dans « {folder} » ({list}) : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprenez-le en entier, puis « Ajouter une table ».':
+    'During the last game, the DMD did not find {n} images in “{folder}” ({list}): it only shows its texts. This folder comes with the original table; take it again in full, then “Add a table”.',
+  'La musique de la table passe par ce pack ({list}) : sans elle, la table est muette. Ses vidéos et sa musique sont souvent un téléchargement à part du pack ; reprenez-le en entier.':
+    'The table’s music comes from this pack ({list}): without it, the table is silent. Its videos and music are often a separate download from the pack; take it again in full.',
+  'Script arrêté par le fronton B2S de VPX': 'Script stopped by VPX’s B2S backglass',
+  'À la dernière partie, le fronton B2S de VPX a refusé un appel du script (un texte là où il attend un nombre) : la procédure qui l’appelait s’est arrêtée, et la suite de la table avec elle.':
+    'During the last game, VPX’s B2S backglass refused a call from the script (text where it expects a number): the procedure that made it stopped, and the rest of the table with it.',
+  'Corrigé dans {file}, le script que VPX joue à la place de celui de la table : un nombre écrit en texte est converti, et un appel encore refusé n’arrête plus le script.':
+    'Fixed in {file}, the script VPX plays instead of the table’s: a number written as text is converted, and a call still refused no longer stops the script.',
+  'La table n’est pas modifiée : VPX joue {file}, une copie de son script où un nombre écrit en texte est converti, et où un appel encore refusé n’arrête plus le script.':
+    'The table is not modified: VPX plays {file}, a copy of its script where a number written as text is converted, and where a call still refused no longer stops the script.',
+  'Adapter les appels au fronton B2S (dans {file})': 'Adapt the calls to the B2S backglass (in {file})',
+  '{file} règle {keys} à 0 pour cette table seulement : elle se joue sans ce son.': '{file} sets {keys} to 0 for this table only: it plays without that sound.',
+  'Rendre le son à cette table': 'Give this table its sound back',
+  'Musique introuvable': 'Music not found',
+  'Musiques introuvables': 'Music files not found',
+  'À la dernière partie, VPX n’a pas trouvé {names} : il cherche la musique de la table dans « {where} ». Elle est fournie avec la table d’origine ; mettez-la dans le dossier d’import puis « Ajouter une table ».':
+    'During the last game, VPX did not find {names}: it looks for the table’s music in “{where}”. It comes with the original table; put it in the import folder, then “Add a table”.',
   'VPX range chaque table dans son dossier, avec sa ROM, son backglass et ses vidéos. Celle-ci est en vrac dans {dir}.': 'VPX keeps each table in its own folder, with its ROM, backglass and videos. This one sits loose in {dir}.',
   'Déplacer ses {n} fichiers dans « {folder} »': 'Move its {n} files to “{folder}”',
   'Déplacer la table dans « {folder} »': 'Move the table to “{folder}”',

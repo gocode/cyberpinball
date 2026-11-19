@@ -542,6 +542,30 @@ const TRAPS: Trap[] = [
     code: 'tableWindows',
     arm: (folder) => write(path.join(folder, `${TABLE}.ini`), '[ScoreView]\r\nScoreViewWndX = 760\r\nScoreViewWndY = 860\r\nScoreViewWidth = 400\r\nScoreViewHeight = 100\r\n\r\n[Player]\r\nCabinetAutofitPos = 0.1\r\n'),
   },
+  // Son coupé par le .ini de la table (vpxgamelog.ts) : repris d'une autre installation.
+  { code: 'tableAudioMuted', arm: (folder) => write(path.join(folder, `${TABLE}.ini`), '[Player]\r\nMusicVolume = 0\r\n') },
+  // Musique que VPX n'a pas trouvée à la dernière partie (« Failed to stream music »).
+  {
+    code: 'musicMissing',
+    arm: () => {},
+    ctx: (folder) => ({
+      vpxLog: [
+        `2026-11-19 10:16:00.000 INFO  [Main] [PinTable::LoadGameFromFilename@1419] LoadGameFromFilename ${path.join(folder, `${TABLE}.vpx`)}`,
+        '2026-11-19 10:16:03.000 ERROR [Main] [ScriptGlobalTable::PlayMusic@133] Failed to stream music: theme.mp3',
+      ].join('\r\n'),
+    }),
+  },
+  // Images du DMD que VPX n'a pas trouvées à la dernière partie (« Asset not loaded »).
+  {
+    code: 'dmdImagesMissing',
+    arm: () => {},
+    ctx: (folder) => ({
+      vpxLog: [
+        `2026-11-19 11:02:15.636 INFO  [Main] [PinTable::LoadGameFromFilename@1419] LoadGameFromFilename ${path.join(folder, `${TABLE}.vpx`)}`,
+        `2026-11-19 11:02:17.356 ERROR [Main] [FlexDMD:Flex::AssetManager::Open@300] Asset not loaded: ${path.join(folder, 'Foo.UltraDMD', 'black.jpg')}`,
+      ].join('\r\n'),
+    }),
+  },
   // Habillage FullDMD (fulldmdtable.ts) : le .ini de la table met le DMD sur tout l'écran, par-dessus l'habillage.
   {
     code: 'fullDmdHidden',

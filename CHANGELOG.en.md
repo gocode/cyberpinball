@@ -9,6 +9,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Tables without sound: after each game, the cabinet log says which sound outputs VPX opened, which ones it did not find, and the music it did not find. The diagnosis reports music not found during the last game, and sound muted by the table's own setting (volume at 0 in its .ini), with a way to bring it back.
+- PuP-Pack whose music playlist is empty (Goldorak): the diagnosis reports it as a warning, and says the table will be silent until the pack is complete.
+- Music named through a variable, or played by a script procedure ("PlaySong "theme.mp3""): it is now recognised, brought along with the table from another installation, and reported when it is missing.
+- UltraDMD and FlexDMD tables: after each game, the cabinet log says which image folder the DMD used, how many images it loaded, and which ones are missing or in an unsupported format. The diagnosis reports images not found during the last game (a DMD that only shows its texts, in orange).
+- Tables whose script sends text to the B2S backglass where VPX expects a number (Champions League 2023): VPX's backglass refused the call, and the table's initialisation stopped there ("Object required: 'UltraDMD'" all over the playfield). After a game where VPX logged that refusal, Cyber Pinball plays a copy of the script where a number written as text is converted, and where a call still refused no longer stops the script; the table itself is unchanged.
 - The "table doctor" is now called the diagnosis everywhere, like the screen opened by "Diagnose and fix": "Open the table's diagnosis" in cabinet health, and the same word in the manuals and the project pages.
 - Taking over a large existing installation: the scan no longer stops on "File size (…) is greater than 2 GiB". A multi-GB archive stored with the tables (a table's downloaded archive with its PuP-Pack) was taken for a ROM and read in one go; it is now recognized as an archive and left where it is.
 - .zip archives are read through their table of contents only, whatever their size (Zip64 included), and fingerprints of ROMs, media and PuP-Packs are computed piece by piece: no file placed by the user is read in one go any more.

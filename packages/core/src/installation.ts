@@ -593,8 +593,14 @@ export function tableCompanions(vpx: string, layout: InstallationLayout, facts?:
       if (!parts.length) continue;
       // « Akira\track.mp3 » ou « Akira\ » (suite calculée) : le dossier ; « track.mp3 » : le fichier seul.
       const folder = parts.length > 1 || /[\\/]$/.test(ref);
-      add(folder ? child(layout.musicDir, parts[0]!) : fileIn(layout.musicDir, parts[0]!), 'music');
+      const music = folder ? child(layout.musicDir, parts[0]!) : fileIn(layout.musicDir, parts[0]!);
+      add(music, 'music');
+      // Ni dans le dossier Music de l'installation, ni dans le dossier de la table : à dire, la table serait muette.
+      const own = home && (folder ? child(home.dir, 'music', parts[0]!) : fileIn(child(home.dir, 'music') ?? '', parts[0]!));
+      if (!music && !own) missing.push(t('musique « {name} »', { name: ref }));
     }
+  } else if (facts?.music?.length && !(home && child(home.dir, 'music'))) {
+    missing.push(t('musique « {name} »', { name: facts.music[0]! }));
   }
 
   // Ce que le script a enregistré (SaveValue) : le VPReg.stg de VPX 10.7 et 10.8.0, ou le dossier

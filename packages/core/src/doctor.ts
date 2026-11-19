@@ -9,6 +9,7 @@ import { applyOps, formatSize, isInside, safeName, sameVolume, sizeOf, type File
 import { findMangledDirs } from './copytree';
 import { formatDate, formatDateTime, formatList, t, tn } from './i18n';
 import { IniDocument } from './ini';
+import { flexAssets, musicNotFound, mutedAudioSettings } from './vpxgamelog';
 import { slowTableFinding } from './slowtable';
 import { flexPrewarmFor, type FlexPrewarm } from './flexprewarm';
 import { heavyDmdVideosFinding } from './dmdvideos';
@@ -80,7 +81,7 @@ import {
 } from './puppack';
 import { addCaptureWatch, backgroundTriggers, captureBlock, captureSettings, captureWatchLines, readCaptures, sameCapture, type CaptureBlocker } from './pupcapture';
 import { buildScriptPatch, ownCapture, readScriptPatch, scriptPatchState, type ScriptPatchState } from './scriptpatch';
-import { applyCompatFixes, compatFixesApplicable, compatFixesApplied, compatFixesForStop, compatFixesFound, vpmInitCallCount, vrRoomFlags, type CompatFix } from './scriptcompat';
+import { applyCompatFixes, compatFixesApplicable, compatFixesApplied, compatFixesForStop, compatFixesFound, compatFixesFromLog, vpmInitCallCount, vrRoomFlags, type CompatFix } from './scriptcompat';
 import { aliasComment, aliasFor, historicAlias, IMPORTED_ALIAS_COMMENT, neighbourRom, neighbourWarning, readTableAliases, romFamilyOf, tableAliasFile, withAlias, withoutAlias } from './romalias';
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
 import { isChipName, listRelative, readZipEntries, romContent, type RomZipMember } from './romzip';
@@ -182,6 +183,9 @@ export const FINDING_CODES = [
   'dofLocalIni',
   'slowTable',
   'lowRomVolume',
+  'tableAudioMuted',
+  'musicMissing',
+  'dmdImagesMissing',
 ] as const;
 
 export interface Finding {
@@ -502,11 +506,64 @@ export function scriptFacts(vbs: string): ScriptFacts {
  */
 function playedMusic(code: string): string[] {
   const out: string[] = [];
-  for (const m of code.matchAll(/\bPlayMusic\b\s*\(?\s*"([^"\r\n]+)"/gi)) {
-    const name = m[1]!.trim().replace(/\//g, '\\');
-    if (!name || /^[a-z]:|^\\\\/i.test(name)) continue;
-    if (!name.includes('\\') && !/\.(mp3|ogg|wav|flac)$/i.test(name)) continue;
+  const keep = (raw: string | undefined) => {
+    const name = raw?.trim().replace(/\//g, '\\');
+    if (!name || /^[a-z]:|^\\\\/i.test(name)) return;
+    if (!name.includes('\\') && !/\.(mp3|ogg|wav|flac)$/i.test(name)) return;
     if (!out.some((o) => o.toLowerCase() === name.toLowerCase())) out.push(name);
+  };
+  for (const m of code.matchAll(/\bPlayMusic\b\s*\(?\s*"([^"\r\n]+)"/gi)) keep(m[1]);
+  // Nom tenu par une variable (« PlayMusic MusicDir & "theme.mp3" », MusicDir = "Goldorak\") : suivie comme le dossier du DMD.
+  const wrappers = musicWrappers(code);
+  const params = new Set(wrappers.map((w) => w.paramName.toLowerCase()));
+  for (const m of code.matchAll(/\bPlayMusic\b\s*\(?\s*([A-Za-z_][^,:'\r\n)]*)/gi)) {
+    const parts = m[1]!.split('&').map((p) => p.trim());
+    if (parts.some((p) => params.has(p.toLowerCase()))) continue;
+    keep(musicPath(code, parts));
+  }
+  // Procédure qui joue ce qu'on lui donne (« Sub PlaySong(s) : PlayMusic s : End Sub », puis « PlaySong "Goldorak\1.mp3" ») :
+  // le nom est dans ses appels.
+  for (const w of wrappers) {
+    const call = new RegExp(`(?:^|[^\\w.])(?:call\\s+)?${w.name}\\b[ \\t]*\\(?([^:'\\r\\n]*)`, 'gim');
+    for (const m of code.matchAll(call)) {
+      const at = m.index! + m[0].search(new RegExp(`${w.name}\\b`, 'i'));
+      const before = code.slice(code.lastIndexOf('\n', at) + 1, at);
+      if (/^\s*(?:(?:public|private)\s+)?(?:sub|function)\s+$/i.test(before)) continue;
+      const arg = m[1]!.replace(/\)\s*$/, '').split(',').map((a) => a.trim())[w.param];
+      const value = arg === undefined ? undefined : musicPath(code, arg.split('&').map((p) => p.trim()));
+      if (value === undefined) continue;
+      keep(musicPath(code, w.expression, { [w.paramName.toLowerCase()]: value }));
+    }
+  }
+  return out;
+}
+
+/** Nom d'un morceau fait de textes et de variables, toutes lisibles (sinon undefined : rien d'inventé). */
+function musicPath(code: string, parts: readonly string[], known: Record<string, string> = {}): string | undefined {
+  let value = '';
+  for (const part of parts) {
+    const literal = /^"([^"]*)"$/.exec(part);
+    if (literal) value += literal[1];
+    else if (Object.hasOwn(known, part.toLowerCase())) value += known[part.toLowerCase()];
+    else if (/^[A-Za-z_]\w*$/.test(part)) {
+      const v = variableValue(code, part, 0);
+      if (v === undefined) return undefined;
+      value += v;
+    } else return undefined;
+  }
+  return value;
+}
+
+/** Procédures du script qui passent un de leurs paramètres à PlayMusic : nom, place du paramètre, expression jouée. */
+function musicWrappers(code: string): { name: string; param: number; paramName: string; expression: string[] }[] {
+  const out: { name: string; param: number; paramName: string; expression: string[] }[] = [];
+  for (const m of code.matchAll(/^\s*(?:(?:public|private)\s+)?(?:sub|function)\s+([A-Za-z_]\w*)\s*\(([^)]*)\)([\s\S]*?)\bend\s+(?:sub|function)\b/gim)) {
+    const params = m[2]!.split(',').map((p) => p.trim().replace(/^(byval|byref)\s+/i, ''));
+    const play = /\bPlayMusic\b\s*\(?\s*([^,:'\r\n)]+)/i.exec(m[3]!);
+    if (!play) continue;
+    const expression = play[1]!.split('&').map((p) => p.trim());
+    const param = params.findIndex((p) => expression.some((part) => part.toLowerCase() === p.toLowerCase()));
+    if (param >= 0) out.push({ name: m[1]!, param, paramName: params[param]!, expression });
   }
   return out;
 }
@@ -646,7 +703,9 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   }
   // Script que le core.vbs actuel arrête (vpmInit appelé deux fois) : corrigé dans le .vbs.
   if (ownFolder) {
-    const compat = coreCompatFinding(entry, ctx, override);
+    // Correctifs que réclame le journal de la dernière partie de la table (appel refusé par le fronton B2S de VPX…).
+    const session = ctx.vpxLog ? tableLogSession(entry, ctx.vpxLog) : undefined;
+    const compat = coreCompatFinding(entry, ctx, override, session ? compatFixesFromLog(session) : []);
     if (compat) findings.push(compat);
     // Images du DMD que FlexDMD tire de la table, chargées en pleine partie (flexprewarm.ts) : chargées d'avance.
     const prewarm = compat ? undefined : flexPrewarmFinding(entry, ctx, override);
@@ -776,6 +835,15 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   const windows = tableWindowsFinding(entry.file, dressRecord(entry.info), Boolean(hidden) || Boolean(ctx.dmdPlaced));
   if (windows) findings.push(windows);
   if (hidden) findings.push(hidden);
+  // Son coupé par le .ini de la table, ou musique que VPX n'a pas trouvée à la dernière partie (vpxgamelog.ts).
+  const muted = tableAudioMutedFinding(entry.file);
+  if (muted) findings.push(muted);
+  if (ctx.vpxLog) {
+    const music = musicNotFoundFinding(entry, ctx.vpxLog);
+    if (music) findings.push(music);
+    const images = dmdImagesMissingFinding(entry, ctx.vpxLog);
+    if (images) findings.push(images);
+  }
 
   // 8. PuP-Pack (mode plugins de VPX 10.8.1).
   if (ownFolder) findings.push(...checkPup(entry, ctx, override));
@@ -897,6 +965,85 @@ const WINDOW_KEY = /^(Output|Display|FullScreen|WndX|WndY|Width|Height)$/i;
  * cadre que dessine un PuP-Pack) ; le constat le montre et permet d'y revenir, par
  * exemple après un changement d'écran. La réparation retire ces clés et rien d'autre.
  */
+/**
+ * Son coupé pour cette table seulement : son .ini met le volume du fronton (musique) ou du plateau à 0 dans [Player],
+ * souvent repris d'une autre installation. La réparation retire ces clés : la table suit le réglage général.
+ */
+function tableAudioMutedFinding(tableFile: string): Finding | undefined {
+  const ini = findTableIni(tableFile);
+  if (!ini.exists) return undefined;
+  const doc = IniDocument.parse(fs.readFileSync(ini.path, 'utf8'));
+  const muted = mutedAudioSettings(doc);
+  if (!muted.length) return undefined;
+  for (const e of muted) doc.remove(e.section, e.key);
+  const name = path.basename(ini.path);
+  return {
+    code: 'tableAudioMuted',
+    severity: 'warning',
+    title: t('Son coupé pour cette table'),
+    detail: t('{file} règle {keys} à 0 pour cette table seulement : elle se joue sans ce son.', { file: name, keys: muted.map((e) => e.key).join(', ') }),
+    fix: {
+      label: t('Rendre le son à cette table'),
+      ops: doc.entries().length ? [{ op: 'write', path: ini.path, content: doc.toString() }] : [{ op: 'trash', path: ini.path }],
+    },
+  };
+}
+
+/** Lignes du journal de VPX de la dernière partie de cette table (de son chargement au chargement suivant). */
+function tableLogSession(entry: TableEntry, log: string): string[] | undefined {
+  const lines = log.split(/\r?\n/);
+  const loads = lines.map((l, i) => ({ i, file: /LoadGameFromFilename (.+)$/.exec(l)?.[1]?.trim() })).filter((x) => x.file);
+  const start = loads.filter((x) => samePathCI(x.file!, entry.file)).at(-1);
+  if (!start) return undefined;
+  const end = loads.find((x) => x.i > start.i)?.i ?? lines.length;
+  return lines.slice(start.i, end);
+}
+
+/**
+ * Musique que VPX n'a pas trouvée à la dernière partie (« Failed to stream music: <nom> ») : il la cherche dans le
+ * dossier « music » de la table, puis dans celui de VPX. La table se joue sans elle.
+ */
+function musicNotFoundFinding(entry: TableEntry, log: string): Finding | undefined {
+  const session = tableLogSession(entry, log);
+  const names = session ? musicNotFound(session) : [];
+  if (!names.length) return undefined;
+  const where = path.join(path.dirname(entry.file), 'music');
+  return {
+    code: 'musicMissing',
+    severity: 'warning',
+    title: tn(names.length, 'Musique introuvable', 'Musiques introuvables'),
+    detail: t('À la dernière partie, VPX n’a pas trouvé {names} : il cherche la musique de la table dans « {where} ». Elle est fournie avec la table d’origine ; mettez-la dans le dossier d’import puis « Ajouter une table ».', {
+      names: names.map((n) => `« ${n} »`).join(', '),
+      where,
+    }),
+  };
+}
+
+/**
+ * Images du DMD (UltraDMD, FlexDMD) que VPX n'a pas pu charger à la dernière partie : le dossier est là, mais pas ces
+ * images (« Asset not loaded », « Failed to resolve asset »). Le DMD n'en montre que les textes, dans sa couleur.
+ * Relevé le 19/11/2026 : Goldorak, « Goldorak.UltraDMD\black.jpg » absent, DMD orange.
+ */
+function dmdImagesMissingFinding(entry: TableEntry, log: string): Finding | undefined {
+  const session = tableLogSession(entry, log);
+  if (!session) return undefined;
+  const assets = flexAssets(session);
+  const missing = [...assets.notLoaded, ...assets.missing].filter((f) => !/^FlexDMD\.Resources\.|^VPX\./i.test(f));
+  if (!missing.length) return undefined;
+  const names = [...new Set(missing.map((f) => path.basename(f)))];
+  const folder = path.basename(path.dirname(missing[0]!));
+  return {
+    code: 'dmdImagesMissing',
+    severity: 'warning',
+    title: tn(names.length, 'Image du DMD absente', 'Images du DMD absentes'),
+    detail: tn(names.length, 'À la dernière partie, le DMD n’a pas trouvé {list} dans « {folder} » : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprenez-le en entier, puis « Ajouter une table ».', 'À la dernière partie, le DMD n’a pas trouvé {n} images dans « {folder} » ({list}) : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprenez-le en entier, puis « Ajouter une table ».', {
+      n: names.length,
+      folder,
+      list: names.slice(0, 3).map((n) => `« ${n} »`).join(', ') + (names.length > 3 ? '…' : ''),
+    }),
+  };
+}
+
 function tableWindowsFinding(tableFile: string, dress: Rect | undefined, dmdElsewhere = false): Finding | undefined {
   const ini = findTableIni(tableFile);
   if (!ini.exists) return undefined;
@@ -1237,8 +1384,10 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
   if (!foreign && facts && [...(facts.coreCompat ?? []), ...forced].every((f) => own.compat.includes(f))) return undefined;
   const source = foreign ? foreign.text : readVpxScript(entry.file);
   const code = source !== undefined ? scriptCode(source) : undefined;
-  const wanted = [...new Set([...(code !== undefined ? compatFixesFound(code) : (facts?.coreCompat ?? [])), ...forced])];
+  const asked = code !== undefined ? compatFixesApplicable(forced, code) : forced;
+  const wanted = [...new Set([...(code !== undefined ? compatFixesFound(code) : (facts?.coreCompat ?? [])), ...asked])];
   const done = foreign ? compatFixesApplied(foreign.text) : own.compat;
+  // Un correctif réclamé par le journal reste, même si le texte seul ne le réclame pas (b2sArgs).
   const missing = wanted.filter((f) => !done.includes(f));
   if (!missing.length) return undefined;
   const base = path.basename(entry.file).replace(/\.vpx$/i, '');
@@ -1249,6 +1398,23 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
   else if (source !== undefined) {
     const compat = [...new Set([...own.compat, ...missing])];
     content = buildScriptPatch(source, own.switches, own.loader, own.capture, compat, own.prewarm) ?? buildScriptPatch(source, own.switches, own.loader, undefined, compat, own.prewarm);
+  }
+  // Appel au fronton B2S que le plugin de VPX refuse (texte à la place d'un nombre) : le script s'arrêtait là.
+  if (missing.every((f) => f === 'b2sArgs')) {
+    return {
+      code: 'scriptCoreCompat',
+      severity: 'warning',
+      title: t('Script arrêté par le fronton B2S de VPX'),
+      detail: [
+        t('À la dernière partie, le fronton B2S de VPX a refusé un appel du script (un texte là où il attend un nombre) : la procédure qui l’appelait s’est arrêtée, et la suite de la table avec elle.'),
+        !content
+          ? t('Le script de la table est protégé : Cyber Pinball ne peut pas le corriger.')
+          : foreign
+            ? t('Corrigé dans {file}, le script que VPX joue à la place de celui de la table : un nombre écrit en texte est converti, et un appel encore refusé n’arrête plus le script.', { file })
+            : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où un nombre écrit en texte est converti, et où un appel encore refusé n’arrête plus le script.', { file }),
+      ].join(' '),
+      fix: content ? { label: t('Adapter les appels au fronton B2S (dans {file})', { file }), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
+    };
   }
   // Dossier du DMD cherché dans TablesDirectory, qui n'est pas le dossier de la table (scriptcompat.ts).
   if (missing.every((f) => f === 'tablesDirectoryDmd')) {
@@ -1461,7 +1627,9 @@ export function pupPlayRepairs(entry: TableEntry, ctx: DoctorContext): Finding[]
   const found: Finding[] = [];
   const pupOff = tableDisabledPacks(entry, script && !('error' in script) ? script : undefined).length > 0;
   if (override?.state.kind === 'stale' && !pupOff) found.push(staleFinding(override));
-  const compat = coreCompatFinding(entry, { ...ctx, script }, override);
+  // Correctifs réclamés par le journal de la partie précédente (appel refusé par le fronton B2S de VPX…).
+  const session = ctx.vpxLog ? tableLogSession(entry, ctx.vpxLog) : undefined;
+  const compat = coreCompatFinding(entry, { ...ctx, script }, override, session ? compatFixesFromLog(session) : []);
   if (compat) found.push(compat);
   const prewarm = compat ? undefined : flexPrewarmFinding(entry, { ...ctx, script }, override);
   if (prewarm) found.push(prewarm);
@@ -1968,15 +2136,20 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
       // ni ne s'y entend. Une playlist vide que rien ne vise ne compte pas (pupfiles.ts).
       const empty = emptyPlayedPlaylists(info.root, facts?.pup ? played : undefined);
       if (empty.length) {
+        // La musique de la table passe par le pack (playlist « Music ») : vide, la table est muette (Goldorak, 19/11/2026).
+        const music = empty.filter((p) => /music|musique|audio|sound|song/i.test(p));
         findings.push({
           code: 'pupPlaylistsEmpty',
-          severity: 'info',
+          severity: music.length ? 'warning' : 'info',
           title: tn(empty.length, 'Playlist du PuP-Pack vide', 'Playlists du PuP-Pack vides'),
-          detail: tn(empty.length, 'pupvideos\\{pack} joue la playlist {list}, vide ou absente : rien ne s’y verra ni ne s’y entendra.', 'pupvideos\\{pack} joue {n} playlists vides ou absentes ({list}) : rien ne s’y verra ni ne s’y entendra.', {
-            pack,
-            n: empty.length,
-            list: empty.slice(0, 3).map(quote).join(', ') + (empty.length > 3 ? '…' : ''),
-          }),
+          detail: [
+            tn(empty.length, 'pupvideos\\{pack} joue la playlist {list}, vide ou absente : rien ne s’y verra ni ne s’y entendra.', 'pupvideos\\{pack} joue {n} playlists vides ou absentes ({list}) : rien ne s’y verra ni ne s’y entendra.', {
+              pack,
+              n: empty.length,
+              list: empty.slice(0, 3).map(quote).join(', ') + (empty.length > 3 ? '…' : ''),
+            }),
+            ...(music.length ? [t('La musique de la table passe par ce pack ({list}) : sans elle, la table est muette. Ses vidéos et sa musique sont souvent un téléchargement à part du pack ; reprenez-le en entier.', { list: music.map(quote).join(', ') })] : []),
+          ].join(' '),
         });
       }
     }

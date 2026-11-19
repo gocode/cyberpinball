@@ -321,6 +321,7 @@ import { noteCrashOutcome } from './feedback-menu';
 import { onAppCrash } from './uncaught';
 import { createMenuDmd } from './menu-dmd';
 import { cachedScript } from './vbs';
+import { readVpxLogTail, vpxLogPath } from './dmd-hints';
 import { mediaFrame, prepareDressing } from './fulldmd';
 import { LiveDmd, type LiveDmdAnimationHandle } from './live-dmd';
 import { applyMenuDmdServer, handDmdToVpx, menuDmdServer } from './dmd-server';
@@ -4547,7 +4548,8 @@ function preparePupPack(table: TableEntry): void {
   try {
     const done = repairPupForPlay(
       table,
-      { tablesDir: layout.tables, script: cachedScript(table.file, loc.dataDir), cabinet: pupCabinet(loadCabinet(loc.dataDir)), orientation: currentPlayfieldOrientation() },
+      // Le journal de la partie précédente : un appel refusé par un plugin (fronton B2S) y réclame un correctif du script.
+      { tablesDir: layout.tables, script: cachedScript(table.file, loc.dataDir), cabinet: pupCabinet(loadCabinet(loc.dataDir)), orientation: currentPlayfieldOrientation(), vpxLog: readVpxLogTail(vpxLogPath(loc)) },
       { trashDir: trashDirFor(layout.trash, `Avant la partie ${path.basename(table.folder)}`) }, // i18n-ignore : nom de dossier
     );
     for (const f of done) console.log(`PuP-Pack (${table.id}) : ${f.title} → ${f.fix!.label}`);
