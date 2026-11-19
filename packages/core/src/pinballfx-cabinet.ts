@@ -9,20 +9,21 @@
 // celle de ses propres fenêtres du playfield, horaire, en degrés.
 //
 // Boutons : Pinball FX ne lit que le clavier et les manettes XInput, pas un joystick DirectInput
-// (Pinscape, encodeur en mode manette). Il est pensé pour les bornes à encodeur clavier : ses menus
-// se parcourent avec les touches qu'un encodeur envoie (flippers sur Maj pour la barre du haut,
-// MagnaSave sur Ctrl dans les fenêtres qu'elle ouvre ; essai sur un PinCab, 19/11/2026). Pendant la
-// partie, chaque bouton de joystick relevé par l'assistant envoie donc la touche par défaut des
-// encodeurs pour son rôle en jeu, celle que VPX lit aussi (BUTTONS de buttons.ts) : la borne se
-// comporte comme une borne à encodeur clavier, en partie comme dans les menus du jeu. Les boutons
-// de l'interface de Cyber Pinball n'y jouent aucun rôle : leurs touches de la roue (flèches, Entrée)
-// ne pilotent pas ces menus. Les boutons de volume restent à Cyber Pinball (son de Windows). Les
+// (Pinscape, encodeur en mode manette). Pendant la partie, chaque bouton de joystick relevé par
+// l'assistant envoie la touche que le jeu attend pour son rôle (ZEN_GAME_KEYS). Ses touches ne sont
+// pas celles des encodeurs de VPX : son écran Options > Contrôles > Clavier, relevé sur un PinCab le
+// 19/11/2026, donne Flipper gauche Maj gauche, Flipper droit Maj droite, Lance-billes Entrée,
+// Ut. pouvoir S, Décaler à gauche Alt gauche, Décaler à droite Alt droite, Décaler vers l'avant
+// Espace, Modifier caméra C, Activer mode visuel G, Vue fronton Haut, Tir gauche et Tir droit
+// (Judge Dredd) Ctrl gauche et Bas ; pas de MagnaSave. Ses menus se parcourent aux flippers (barre
+// du haut), aux flèches haut et bas (fenêtres qu'elle ouvre : les MagnaSave de la borne), Entrée pour
+// valider, Échap pour revenir. Les boutons de volume restent à Cyber Pinball (son de Windows). Les
 // touches du clavier d'une borne arrivent déjà au jeu : rien n'est rejoué pour elles.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
-import { BUTTONS, buttonKeys, type ButtonsSource } from './buttons';
+import { buttonKeys, type ButtonsSource } from './buttons';
 import type { ButtonId, Rotation } from './model';
 
 /** Valeur de forcedDisplayRotation pour une rotation horaire de l'image ; undefined : image droite, rien à forcer. */
@@ -94,17 +95,26 @@ export function applyPinballFxRotation(localAppData: string, rotation: Rotation)
   return changed;
 }
 
-/** Boutons qui restent à Cyber Pinball pendant la partie : le son de toute la borne (cabinetvolume.ts). */
-const KEPT_BY_CYBER_PINBALL: ReadonlySet<ButtonId> = new Set<ButtonId>(['volumeDown', 'volumeUp', 'volumeMute']);
-
 /**
- * Touche (KeyboardEvent.code) que les jeux de Zen reçoivent pour chaque bouton du jeu : celle des
- * encodeurs de borne (Maj pour les flippers, Ctrl pour les MagnaSave, 1 pour Start, Entrée pour le
- * lanceur, Échap pour Exit…), la même que VPX.
+ * Touche (KeyboardEvent.code) que les jeux de Zen reçoivent pour chaque bouton de la borne, d'après
+ * leurs commandes par défaut (voir plus haut). Start et lanceur valident (Entrée), Exit et Pause
+ * reviennent ou ouvrent la pause (Échap), les MagnaSave montent et descendent dans les fenêtres du
+ * jeu (en partie : Vue fronton et Tir droit de Judge Dredd). Crédit, porte du monnayeur, tilt : le jeu
+ * n'a pas de commande pour eux. Volume : reste à Cyber Pinball.
  */
-export const ZEN_GAME_KEYS: Readonly<Partial<Record<ButtonId, string>>> = Object.fromEntries(
-  BUTTONS.filter((b) => b.default && !KEPT_BY_CYBER_PINBALL.has(b.id)).map((b) => [b.id, b.default!]),
-);
+export const ZEN_GAME_KEYS: Readonly<Partial<Record<ButtonId, string>>> = {
+  leftFlipper: 'ShiftLeft',
+  rightFlipper: 'ShiftRight',
+  plunger: 'Enter',
+  start: 'Enter',
+  exit: 'Escape',
+  pause: 'Escape',
+  leftMagna: 'ArrowUp',
+  rightMagna: 'ArrowDown',
+  nudgeLeft: 'AltLeft',
+  nudgeRight: 'AltRight',
+  nudgeCenter: 'Space',
+};
 
 /** Bouton de joystick (jeton de VPX « SDLJoy_… »), pas une touche du clavier. */
 function isJoystickCode(code: string | undefined): code is string {

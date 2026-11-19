@@ -91,22 +91,28 @@ const JOY = (n: number) => `SDLJoy_03000000091200006ae8000000000000_1;${n}`;
 
 // Borne relevée le 19/11/2026 : MagnaSave droit pour Valider, gauche pour Retour dans l'interface.
 const PINSCAPE = {
-  buttons: { leftFlipper: JOY(5), rightFlipper: JOY(4), start: JOY(12), exit: JOY(8), credit: JOY(1), plunger: JOY(9), rightMagna: JOY(6), leftMagna: JOY(7), pause: JOY(13), volumeUp: JOY(11) },
+  buttons: { leftFlipper: JOY(5), rightFlipper: JOY(4), start: JOY(12), exit: JOY(8), credit: JOY(1), plunger: JOY(9), rightMagna: JOY(6), leftMagna: JOY(7), pause: JOY(13), coinDoor: JOY(10), volumeUp: JOY(11) },
   navigation: { previous: JOY(5), next: JOY(4), confirm: JOY(6), back: JOY(7) },
 } as unknown as { buttons: CabinetButtons; navigation: Record<string, string> };
 
-test('boutons de joystick : la touche des encodeurs de leur rôle en jeu, comme une borne au clavier', () => {
+test('boutons de joystick : les commandes de Pinball FX (écran Contrôles > Clavier du jeu)', () => {
   const keys = zenJoystickKeys(PINSCAPE);
-  assert.deepEqual(keys.get(JOY(5)), ['ShiftLeft'], 'flipper gauche');
+  assert.deepEqual(keys.get(JOY(5)), ['ShiftLeft'], 'flipper gauche : Flipper gauche, et la barre du haut des menus');
   assert.deepEqual(keys.get(JOY(4)), ['ShiftRight'], 'flipper droit');
-  assert.deepEqual(keys.get(JOY(7)), ['ControlLeft'], 'MagnaSave gauche : Ctrl gauche, pas Retour de la roue');
-  assert.deepEqual(keys.get(JOY(6)), ['ControlRight'], 'MagnaSave droit : Ctrl droit, pas Valider de la roue');
-  assert.deepEqual(keys.get(JOY(12)), ['Digit1'], 'Start');
-  assert.deepEqual(keys.get(JOY(9)), ['Enter'], 'lanceur');
-  assert.deepEqual(keys.get(JOY(8)), ['Escape'], 'Exit');
-  assert.deepEqual(keys.get(JOY(1)), ['Digit5'], 'Crédit');
-  assert.deepEqual(keys.get(JOY(13)), ['KeyP'], 'Pause');
+  assert.deepEqual(keys.get(JOY(9)), ['Enter'], 'lanceur : Lance-billes, et valider');
+  assert.deepEqual(keys.get(JOY(12)), ['Enter'], 'Start : valider');
+  assert.deepEqual(keys.get(JOY(8)), ['Escape'], 'Exit : retour, pause');
+  assert.deepEqual(keys.get(JOY(13)), ['Escape'], 'Pause');
+  assert.deepEqual(keys.get(JOY(7)), ['ArrowUp'], 'MagnaSave gauche : monter dans les fenêtres du jeu');
+  assert.deepEqual(keys.get(JOY(6)), ['ArrowDown'], 'MagnaSave droit : descendre');
+  assert.equal(keys.has(JOY(1)), false, 'Crédit : pas de commande dans le jeu');
+  assert.equal(keys.has(JOY(10)), false, 'Porte du monnayeur : pas de commande dans le jeu');
   assert.equal(keys.has(JOY(11)), false, 'Volume + : reste à Cyber Pinball');
+});
+
+test('tremblements : Alt gauche, Alt droite, Espace, comme dans le jeu', () => {
+  const keys = zenJoystickKeys({ buttons: { ...PINSCAPE.buttons, nudgeLeft: JOY(14), nudgeRight: JOY(15), nudgeCenter: JOY(16) }, navigation: undefined });
+  assert.deepEqual([keys.get(JOY(14)), keys.get(JOY(15)), keys.get(JOY(16))], [['AltLeft'], ['AltRight'], ['Space']]);
 });
 
 test('borne au clavier : rien n’est rejoué, ses touches arrivent déjà au jeu', () => {
