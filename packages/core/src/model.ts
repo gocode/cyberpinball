@@ -1,5 +1,5 @@
-// Modèle de borne : la seule source de vérité. Tous les fichiers des outils
-// tiers (VPinballX.ini, plus tard ScreenRes.txt, PinUP, dmddevice.ini) en sont dérivés.
+// Cabinet model: the single source of truth. Every file of the third-party tools
+// (VPinballX.ini, later ScreenRes.txt, PinUP, dmddevice.ini) is derived from it.
 
 import type { HardwareDmdSetup } from './dmd';
 import { t } from './i18n';
@@ -12,7 +12,7 @@ export interface RoleInfo {
   required: boolean;
 }
 
-/** Ordre de l'assistant : du plus important au plus optionnel. */
+/** Order of the setup wizard: from the most important to the most optional. */
 export const ROLES: readonly RoleInfo[] = [
   { id: 'playfield', label: 'Playfield', required: true },
   { id: 'backglass', label: 'Backglass', required: false },
@@ -29,28 +29,28 @@ export interface Rect {
 
 export type Rotation = 0 | 90 | 180 | 270;
 
-/** Rôles affichés dans une fenêtre annexe de VPX (Backglass, ScoreView, Topper). */
+/** Roles shown in an ancillary window of VPX (Backglass, ScoreView, Topper). */
 export type AncillaryRoleId = Exclude<RoleId, 'playfield'>;
 
 /**
- * Ce que montre l'écran du rôle dmd (fenêtre ScoreView de VPX) :
- * - `fulldmd` : un écran large (16:9) qui montre les médias FullDMD et l'écran 5 des
- *   PuP-Packs, avec le DMD de la ROM ou de FlexDMD incrusté par-dessus ;
- * - `dmd` : le DMD seul, en bande 4:1 (vrai écran DMD, bande sous le fronton ou derrière
- *   la découpe du panneau des haut-parleurs, incrustation dans le playfield).
+ * What the screen of the dmd role shows (VPX's ScoreView window):
+ * - `fulldmd`: a wide screen (16:9) that shows the FullDMD media and screen 5 of the
+ *   PuP-Packs, with the DMD of the ROM or of FlexDMD overlaid on top;
+ * - `dmd`: the DMD alone, as a 4:1 strip (real DMD screen, strip below the backglass or behind
+ *   the cut-out of the speaker panel, overlay in the playfield).
  */
 export type DmdKind = 'fulldmd' | 'dmd';
 
 /**
- * Partie de l'image d'un écran, en fractions de sa largeur et de sa hauteur
- * (0 à 1, origine en haut à gauche de l'image Windows). Une fraction survit à un
- * changement de définition de l'écran, pas des pixels.
+ * Part of a screen's image, in fractions of its width and height
+ * (0 to 1, origin at the top left of the Windows image). A fraction survives a
+ * change of the screen's resolution; pixels do not.
  *
- * La zone du rôle DMD est celle de la fenêtre ScoreView de VPX, qui superpose
- * deux couches : le FullDMD en fond (image du .directb2s, écran 5 d'un PuP-Pack)
- * et, par-dessus, le DMD de la ROM, que les plugins placent eux-mêmes dans la
- * fenêtre (B2S : ScoreViewDMDOverlay et ScoreViewDMDAutoPos ; PuP : écran 1 posé
- * sur l'écran 5 par CustomPos).
+ * The zone of the DMD role is that of VPX's ScoreView window, which stacks
+ * two layers: the FullDMD as background (image of the .directb2s, screen 5 of a PuP-Pack)
+ * and, on top, the DMD of the ROM, which the plugins place themselves in the
+ * window (B2S: ScoreViewDMDOverlay and ScoreViewDMDAutoPos; PuP: screen 1 placed
+ * on screen 5 by CustomPos).
  */
 export interface ScreenZone {
   x: number;
@@ -58,62 +58,62 @@ export interface ScreenZone {
   width: number;
   height: number;
   /**
-   * Format conservé quand on redimensionne la zone (largeur sur hauteur, en pixels :
-   * 16/9…). Absent : format libre.
+   * Aspect ratio kept when the zone is resized (width over height, in pixels:
+   * 16/9...). Absent: free aspect ratio.
    */
   aspect?: number;
 }
 
-/** Ce que contient l'EDID d'un écran (lu dans le registre Windows). */
+/** What a screen's EDID contains (read from the Windows registry). */
 export interface EdidInfo {
-  /** Code fabricant PNP sur trois lettres, par exemple « SAM ». */
+  /** Three-letter PNP manufacturer code, for example "SAM". */
   manufacturer: string;
   productCode: number;
-  /** Numéro de série binaire ; 0 quand le fabricant ne le renseigne pas. */
+  /** Binary serial number; 0 when the manufacturer does not fill it in. */
   serialNumber: number;
-  /** Numéro de série texte (descripteur 0xFF), souvent plus fiable que le binaire. */
+  /** Text serial number (descriptor 0xFF), often more reliable than the binary one. */
   serialText?: string;
-  /** Nom du modèle (descripteur 0xFC). */
+  /** Model name (descriptor 0xFC). */
   monitorName?: string;
   widthCm: number;
   heightCm: number;
-  /** Taille de l'image au millimètre, lue dans le premier timing détaillé ; plus précise que les cm. */
+  /** Image size to the millimetre, read from the first detailed timing; more precise than the cm. */
   imageMm?: { width: number; height: number };
 }
 
 /**
- * Un écran tel qu'il est vu au moment de la détection. Le nom GDI et la position
- * changent d'un démarrage à l'autre : ce sont des observations, jamais des clés.
+ * A screen as seen at detection time. The GDI name and the position
+ * change from one start to the next: they are observations, never keys.
  */
 export interface ObservedDisplay {
-  /** Nom GDI Windows, par exemple « \\.\DISPLAY13 ». Instable. */
+  /** Windows GDI name, for example "\\.\DISPLAY13". Unstable. */
   gdiName: string;
-  /** Nom convivial renvoyé par DisplayConfig ; c'est aussi celui que VPX (via SDL) affiche. */
+  /** Friendly name returned by DisplayConfig; it is also the one VPX (through SDL) shows. */
   friendlyName: string;
   /**
-   * Description du moniteur (EnumDisplayDevicesW, DeviceString), souvent « Moniteur
-   * PnP générique ». SDL s'en sert quand le nom convivial est vide.
+   * Monitor description (EnumDisplayDevicesW, DeviceString), often "Moniteur
+   * PnP générique" (Generic PnP Monitor). SDL uses it when the friendly name is empty.
    */
   monitorDescription?: string;
-  /** Chemin d'interface du moniteur, par exemple « \\?\DISPLAY#SAM0C8D#8&1f2e3d4c&0&UID257#{...} ». */
+  /** Interface path of the monitor, for example "\\?\DISPLAY#SAM0C8D#8&1f2e3d4c&0&UID257#{...}". */
   devicePath: string;
-  /** Position et taille sur le bureau, en pixels physiques. */
+  /** Position and size on the desktop, in physical pixels. */
   bounds: Rect;
   rotation: Rotation;
   primary: boolean;
-  /** Facteur d'échelle Windows (1 = 100 %). Absent quand on n'a pas pu le lire. */
+  /** Windows scale factor (1 = 100%). Absent when it could not be read. */
   scale?: number;
   edid?: EdidInfo;
   /**
-   * ContainerId du moniteur PnP (HKLM\SYSTEM\CurrentControlSet\Enum\DISPLAY\…).
-   * Les haut-parleurs HDMI de l'écran portent le même : c'est ce qui les rattache à lui.
+   * ContainerId of the PnP monitor (HKLM\SYSTEM\CurrentControlSet\Enum\DISPLAY\...).
+   * The screen's HDMI speakers carry the same one: that is what ties them to it.
    */
   containerId?: string;
 }
 
 export type FingerprintStrength = 'strong' | 'weak';
 
-/** Un écran physique enregistré dans le modèle de borne. */
+/** A physical screen recorded in the cabinet model. */
 export interface PhysicalScreen {
   fingerprint: string;
   strength: FingerprintStrength;
@@ -122,18 +122,18 @@ export interface PhysicalScreen {
   heightPx: number;
   widthCm: number;
   heightCm: number;
-  /** Dernière observation, conservée pour le diagnostic. */
+  /** Last observation, kept for diagnosis. */
   lastSeen?: ObservedDisplay;
 }
 
 /**
- * Bord de l'image Windows du playfield le plus proche du joueur, là où sont les
- * flippers. Sur une borne, l'écran est souvent couché et tourné alors que Windows
- * reste en paysage : le joueur se tient alors au bord gauche ou droit de l'image.
+ * Edge of the playfield's Windows image closest to the player, where the
+ * flippers are. On a cabinet, the screen often lies flat and rotated while Windows
+ * stays in landscape: the player then stands at the left or right edge of the image.
  */
 export type FlipperEdge = 'bottom' | 'left' | 'top' | 'right';
 
-/** Rotation horaire (degrés) à appliquer à un affichage pour qu'il soit droit vu du joueur. */
+/** Clockwise rotation (degrees) to apply to a display so that it is upright as seen by the player. */
 export function edgeRotation(edge: FlipperEdge): Rotation {
   return ({ bottom: 0, left: 90, top: 180, right: 270 } as const)[edge];
 }
@@ -141,15 +141,15 @@ export function edgeRotation(edge: FlipperEdge): Rotation {
 export interface PlayfieldLayout {
   flipperEdge: FlipperEdge;
   /**
-   * Taille de la zone d'affichage saisie dans l'assistant (diagonale), quand l'EDID
-   * est absent ou incohérent (téléviseurs, projecteurs). Prime sur l'EDID.
+   * Size of the display area entered in the setup wizard (diagonal), when the EDID
+   * is missing or inconsistent (TVs, projectors). Takes precedence over the EDID.
    */
   manualSizeCm?: { width: number; height: number };
   /**
-   * Orientation de Windows dans laquelle le playfield a été configuré, quand l'assistant a dû
-   * tourner l'écran pour VPX (vpxOrientationFix). Cyber Pinball la donne à l'écran pour la
-   * session seulement et rend la sienne à Windows en sortant (sessionorientation.ts). Absent :
-   * l'écran garde l'orientation de Windows.
+   * Windows orientation in which the playfield was set up, when the setup wizard had to
+   * rotate the screen for VPX (vpxOrientationFix). Cyber Pinball gives it to the screen for the
+   * session only and gives Windows its own back on exit (sessionorientation.ts). Absent:
+   * the screen keeps the Windows orientation.
    */
   windowsRotation?: Rotation;
 }
@@ -158,65 +158,65 @@ export interface Cabinet {
   version: 1;
   screens: PhysicalScreen[];
   /**
-   * Rôle -> empreinte de l'écran physique qui l'affiche. Plusieurs rôles annexes
-   * peuvent partager un écran, chacun dans sa zone (`zones`) ; sur l'écran du
-   * playfield, ils sont incrustés dans son image.
+   * Role -> fingerprint of the physical screen that shows it. Several ancillary roles
+   * can share a screen, each in its zone (`zones`); on the playfield's
+   * screen, they are overlaid in its image.
    */
   roles: Partial<Record<RoleId, string>>;
   /**
-   * Partie de son écran occupée par chaque rôle. Absent : l'écran entier, comme
-   * dans les modèles enregistrés avant les zones. Le playfield peut lui aussi
-   * n'occuper qu'une partie de son écran (poste de bureau).
+   * Part of its screen taken by each role. Absent: the whole screen, as
+   * in the models saved before zones. The playfield too may
+   * take only part of its screen (desk PC).
    */
   zones?: Partial<Record<RoleId, ScreenZone>>;
   /**
-   * FullDMD ou DMD seul, dit par l'utilisateur (assistant, « Écran du DMD »). Absent dans les
-   * modèles d'avant ce choix : déduit des proportions de la zone du DMD (dmdscreen.ts).
+   * FullDMD or DMD alone, as stated by the user (setup wizard, "Écran du DMD" (DMD screen)). Absent in the
+   * models from before this choice: deduced from the proportions of the DMD's zone (dmdscreen.ts).
    */
   dmdKind?: DmdKind;
-  /** Absent dans les modèles enregistrés avant l'assistant d'orientation : flippers en bas. */
+  /** Absent in the models saved before the orientation wizard: flippers at the bottom. */
   playfield?: PlayfieldLayout;
   /**
-   * Clés gérées de VPinballX.ini (« Section.Clé ») que l'utilisateur a choisi de
-   * garder après les avoir changées à la main : Cyber Pinball ne les écrit plus.
+   * Managed keys of VPinballX.ini ("Section.Key") that the user chose to
+   * keep after changing them by hand: Cyber Pinball no longer writes them.
    */
   vpxManual?: string[];
-  /** Absent tant que l'étape « Son » de l'assistant n'a pas été faite : aucune clé audio n'est écrite. */
+  /** Absent until the "Son" (Sound) step of the setup wizard has been done: no audio key is written. */
   audio?: CabinetAudio;
   /**
-   * Touche de chaque bouton, relevée à l'étape « Boutons » de l'assistant. Absent tant
-   * qu'elle n'a pas été faite : l'interface suit les touches par défaut des encodeurs
-   * et aucune clé [Input] n'est écrite.
+   * Key of each button, captured at the "Boutons" (Buttons) step of the setup wizard. Absent until
+   * that step has been done: the interface follows the default keys of the encoders
+   * and no [Input] key is written.
    */
   buttons?: CabinetButtons;
   /**
-   * Boutons qui pilotent l'interface de Cyber Pinball (précédent, suivant, valider,
-   * retour, aide, réglages), relevés à l'étape « Boutons de l'interface », indépendants de
-   * ceux du jeu. Absent (borne d'avant cette étape) : l'interface suit les boutons du jeu,
-   * flippers, Start et Exit (defaultNavigation). VPX ne les lit pas.
+   * Buttons that drive the Cyber Pinball interface (previous, next, confirm,
+   * back, help, settings), captured at the "Boutons de l'interface" (Interface buttons) step, independent of
+   * those of the game. Absent (cabinet from before this step): the interface follows the game's buttons,
+   * flippers, Start and Exit (defaultNavigation). VPX does not read them.
    */
   navigation?: NavigationButtons;
   /**
-   * Lanceur analogique et accéléromètre, relevés à l'étape « Lanceur » (plunger.ts). Absent
-   * tant qu'elle n'a pas été faite : aucun capteur n'est écrit dans [Input] ; vide : la borne
-   * n'en a pas, VPX n'en lit aucun.
+   * Analog plunger and accelerometer, captured at the "Lanceur" (Plunger) step (plunger.ts). Absent
+   * until that step has been done: no sensor is written to [Input]; empty: the cabinet
+   * has none, VPX reads none.
    */
   analog?: CabinetAnalog;
   /**
-   * Tilt de la borne, décidé à l'étape « Tilt » (tilt.ts) : balancier de la borne (le bouton
-   * « Balancier de tilt » de l'étape « Boutons »), balancier simulé par VPX, ou aucun. Absent
-   * tant qu'elle n'a pas été faite : [Player] SimulatedPlumb et PlumbThresholdAngle restent tels quels.
+   * Cabinet tilt, decided at the "Tilt" step (tilt.ts): the cabinet's plumb bob (the
+   * "Balancier de tilt" (Tilt bob) button of the "Boutons" step), plumb simulated by VPX, or none. Absent
+   * until that step has been done: [Player] SimulatedPlumb and PlumbThresholdAngle stay as they are.
    */
   tilt?: CabinetTilt;
   /**
-   * Écran du navigateur intégré (fenêtre « Récupérer ») : celui de ce rôle, retrouvé par
-   * son empreinte quel que soit son numéro dans Windows (browser-screen.ts). Absent :
-   * automatique, le playfield s'il est droit, sinon le plus grand des autres écrans.
+   * Screen of the built-in browser ("Récupérer" (Fetch) window): the one of this role, found by
+   * its fingerprint whatever its number in Windows (browser-screen.ts). Absent:
+   * automatic, the playfield if it is upright, else the largest of the other screens.
    */
   browserScreen?: RoleId;
   /**
-   * DMD réels (Menu système > Borne > DMD > DMD réel, dmd.ts) : chaque modèle automatique, forcé ou
-   * éteint, et le ZeDMD en wifi. Absent : tout automatique, d'après les identifiants USB.
+   * Real DMDs (system menu > Borne > DMD > DMD réel, dmd.ts): each model automatic, forced or
+   * off, and the ZeDMD over wifi. Absent: all automatic, from the USB identifiers.
    */
   hardwareDmd?: HardwareDmdSetup;
   vpx: {
@@ -225,7 +225,7 @@ export interface Cabinet {
   updatedAt: string;
 }
 
-/** Boutons de la borne que l'assistant fait affecter (liste et ordre dans buttons.ts). */
+/** Cabinet buttons the setup wizard has assigned (list and order in buttons.ts). */
 export type ButtonId =
   | 'leftFlipper'
   | 'rightFlipper'
@@ -250,97 +250,97 @@ export type ButtonId =
   | 'volumeMute';
 
 /**
- * Bouton -> touche qu'il envoie (KeyboardEvent.code : « ShiftLeft », « Digit1 »…).
- * Un bouton facultatif absent de la borne n'y figure pas.
+ * Button -> key it sends (KeyboardEvent.code: "ShiftLeft", "Digit1"...).
+ * An optional button the cabinet lacks is not listed.
  */
 export type CabinetButtons = Partial<Record<ButtonId, string>>;
 
-/** Boutons de l'interface (liste et ordre dans buttons.ts, NAVIGATION). */
+/** Interface buttons (list and order in buttons.ts, NAVIGATION). */
 export type NavigationId = 'previous' | 'next' | 'confirm' | 'back' | 'help' | 'settings' | 'desktop' | 'quit';
 
-/** Bouton de l'interface -> touche ou bouton de joystick, comme CabinetButtons. */
+/** Interface button -> key or joystick button, like CabinetButtons. */
 export type NavigationButtons = Partial<Record<NavigationId, string>>;
 
-/** Capteurs analogiques de la borne : un lanceur, un accéléromètre (étape « Lanceur »). */
+/** Analog sensors of the cabinet: a plunger, an accelerometer ("Lanceur" (Plunger) step). */
 export interface CabinetAnalog {
   plunger?: PlungerSensor;
   nudge?: NudgeSensor;
 }
 
-/** Lanceur analogique : un axe de joystick, tel que VPX le lit ([Input] Mapping.Plunger0.*). */
+/** Analog plunger: a joystick axis, as VPX reads it ([Input] Mapping.Plunger0.*). */
 export interface PlungerSensor {
-  /** Joystick, par son identifiant de VPX : « SDLJoy_<GUID>_<rang> ». */
+  /** Joystick, by its VPX identifier: "SDLJoy_<GUID>_<rank>". */
   device: string;
-  /** Nom donné par SDL (« mjrnet Pinscape Controller »), pour l'écran. */
+  /** Name given by SDL ("mjrnet Pinscape Controller"), for display. */
   name?: string;
-  /** Numéro SDL de l'axe de la position, à partir de 0 (Z d'un Pinscape : 2). */
+  /** SDL number of the position axis, from 0 (Z of a Pinscape: 2). */
   axis: number;
-  /** Tirer le lanceur fait baisser la valeur de l'axe. */
+  /** Pulling the plunger lowers the axis value. */
   reversed: boolean;
-  /** Part de la course ignorée autour du repos, de 0 à 0,3. */
+  /** Share of the travel ignored around rest, from 0 to 0.3. */
   deadZone: number;
-  /** Axe de la vitesse mesurée par la carte (RZ d'un Pinscape en « X/Y/Z + RX/RY/RZ » : 5). */
+  /** Axis of the speed measured by the board (RZ of a Pinscape in "X/Y/Z + RX/RY/RZ": 5). */
   speedAxis?: number;
 }
 
 /**
- * Ce qui fait tilter la borne : son balancier mécanique (un bouton relevé, VPX n'en simule pas),
- * le balancier que VPX simule à partir des secousses, ou rien.
+ * What makes the cabinet tilt: its mechanical plumb bob (a captured button, VPX does not simulate one),
+ * the plumb that VPX simulates from nudges, or nothing.
  */
 export type TiltMode = 'bob' | 'simulated' | 'none';
 
 export interface CabinetTilt {
   mode: TiltMode;
-  /** Angle du balancier simulé qui touche l'anneau, en degrés ([Player] PlumbThresholdAngle, 0,15 à 4). Gardé quand le mode change. */
+  /** Angle at which the simulated plumb touches the ring, in degrees ([Player] PlumbThresholdAngle, 0.15 to 4). Kept when the mode changes. */
   threshold: number;
 }
 
-/** Accéléromètre de la borne pour les tremblements ([Input] Mapping.Nudge0.*, manette). */
+/** Cabinet accelerometer for nudges ([Input] Mapping.Nudge0.*, controller). */
 export interface NudgeSensor {
   device: string;
   name?: string;
-  /** Axes SDL de l'accélération latérale et longitudinale (X et Y d'un Pinscape : 0 et 1). */
+  /** SDL axes of lateral and longitudinal acceleration (X and Y of a Pinscape: 0 and 1). */
   x: number;
   y: number;
   /**
-   * Force des secousses : échelle de VPX des deux axes (plunger.ts, NUDGE_GAIN). Absente : 1,
-   * la valeur lue telle quelle, comme la disposition par défaut de VPX pour un Pinscape.
+   * Strength of the nudges: VPX scale of both axes (plunger.ts, NUDGE_GAIN). Absent: 1,
+   * the value read as is, like VPX's default layout for a Pinscape.
    */
   gain?: number;
-  /** Axe inversé dans le menu de VPX (échelle négative), gardé tel quel. */
+  /** Axis inverted in VPX's menu (negative scale), kept as is. */
   invertX?: boolean;
   invertY?: boolean;
 }
 
 /**
- * Sortie audio telle que Windows la voit au moment de la détection (registre
- * MMDevices, lecture seule). Comme pour les écrans, le nom est une observation :
- * localisé, renommable, parfois partagé par deux cartes identiques.
+ * Audio output as Windows sees it at detection time (MMDevices
+ * registry, read only). As for screens, the name is an observation:
+ * localised, renamable, sometimes shared by two identical cards.
  */
 export interface ObservedAudioOutput {
-  /** Identifiant MMDevice « {0.0.0.00000000}.{guid} » : stable tant que le pilote n'est pas réinstallé. */
+  /** MMDevice identifier "{0.0.0.00000000}.{guid}": stable as long as the driver is not reinstalled. */
   endpointId: string;
-  /** Nom que VPX attend, au caractère près : « DeviceDesc (interface) », par exemple « Haut-parleurs (USB Audio Device) ». */
+  /** Name VPX expects, to the character: "DeviceDesc (interface)", for example "Haut-parleurs (USB Audio Device)". */
   friendlyName: string;
-  /** Partie avant les parenthèses, renommable dans le panneau Son. */
+  /** Part before the parentheses, renamable in the Sound panel. */
   deviceDesc: string;
-  /** Partie entre parenthèses, par exemple « 2- USB Audio Device ». */
+  /** Part between the parentheses, for example "2- USB Audio Device". */
   interfaceName: string;
-  /** Bus du périphérique : HDAUDIO, USB, BTHENUM, ROOT (virtuel)… */
+  /** Bus of the device: HDAUDIO, USB, BTHENUM, ROOT (virtual)... */
   bus: string;
-  /** Facteur de forme Windows (EndpointFormFactor) : 1 haut-parleurs, 3 casque, 9 sortie numérique (HDMI, S/PDIF)… */
+  /** Windows form factor (EndpointFormFactor): 1 speakers, 3 headphones, 9 digital output (HDMI, S/PDIF)... */
   formFactor: number;
-  /** Canaux réglés dans Windows (2, 6, 8) ; 0 quand le format est illisible. */
+  /** Channels set in Windows (2, 6, 8); 0 when the format cannot be read. */
   channels: number;
-  /** Masque des haut-parleurs (WAVEFORMATEXTENSIBLE.dwChannelMask). */
+  /** Speaker mask (WAVEFORMATEXTENSIBLE.dwChannelMask). */
   channelMask: number;
-  /** ContainerId du périphérique, partagé avec l'écran pour une sortie HDMI. */
+  /** ContainerId of the device, shared with the screen for an HDMI output. */
   containerId?: string;
-  /** Sortie par défaut de Windows (rôle Console), quand le registre permet de le savoir. */
+  /** Default output of Windows (Console role), when the registry tells. */
   isDefault?: boolean;
 }
 
-/** Les deux sorties de VPX : SoundDeviceBG (fronton : ROM, AltSound, PuP, musique) et SoundDevice (plateau). */
+/** The two outputs of VPX: SoundDeviceBG (backglass: ROM, AltSound, PuP, music) and SoundDevice (playfield). */
 export type AudioRole = 'backglass' | 'playfield';
 
 export const AUDIO_ROLES: readonly { id: AudioRole; label: string }[] = [
@@ -349,44 +349,44 @@ export const AUDIO_ROLES: readonly { id: AudioRole; label: string }[] = [
 ];
 
 /**
- * Mixage des sons de la table sur la sortie du plateau, traduit en [Player] Sound3D :
- * stéréo, surround (deux paires sur le plateau) ou SSF (avant au fronton, arrière et côtés sur le plateau).
+ * Mix of the table's sounds on the playfield output, translated into [Player] Sound3D:
+ * stereo, surround (two pairs on the playfield) or SSF (front at the backglass, rear and sides on the playfield).
  */
 export type PlayfieldAudioMode = 'stereo' | 'surround' | 'ssf';
 
-/** Une sortie audio enregistrée dans le modèle de borne. */
+/** An audio output recorded in the cabinet model. */
 export interface AudioOutput {
-  /** Empreinte principale. */
+  /** Main fingerprint. */
   endpointId: string;
-  /** Repli : retrouve une sortie HDMI recréée par le pilote, par son écran. */
+  /** Fallback: finds an HDMI output recreated by the driver, through its screen. */
   containerId?: string;
-  /** Empreinte de l'écran (PhysicalScreen) dont c'est le haut-parleur. */
+  /** Fingerprint of the screen (PhysicalScreen) whose speaker this is. */
   screen?: string;
   label: string;
-  /** Dernière observation, conservée pour le diagnostic. */
+  /** Last observation, kept for diagnosis. */
   lastSeen?: ObservedAudioOutput;
 }
 
 export interface CabinetAudio {
   outputs: AudioOutput[];
-  /** Rôle -> endpointId de la sortie enregistrée. Les deux rôles peuvent partager une sortie (SSF à une carte). */
+  /** Role -> endpointId of the recorded output. Both roles can share an output (SSF on one card). */
   roles: Partial<Record<AudioRole, string>>;
   playfieldMode: PlayfieldAudioMode;
-  /** En surround : paire de canaux branchée côté lockbar (avant : Sound3D 3, arrière : 2). */
+  /** In surround: pair of channels wired on the lockbar side (front: Sound3D 3, rear: 2). */
   lockbarPair?: 'front' | 'rear';
 }
 
 /**
- * Périphérique USB présent, vu passivement par le gestionnaire de configuration de
- * Windows (identifiants et registre seulement : aucun port n'est ouvert).
+ * USB device present, seen passively by the Windows configuration manager
+ * (identifiers and registry only: no port is opened).
  */
 /**
- * Sonde d'un PIN2DMD par la libusb de VPX, étape par étape comme PIN2DMDInit de libdmdutil : `stage` est
- * l'étape où elle s'est arrêtée (`list` : libusb ne le voit pas ; `open` : libusb_open ; `claim` :
- * libusb_claim_interface ; `name` : le nom de produit illisible, ou pas l'un des trois que libdmdutil
- * accepte ; `ok` : ouvert, nommé et relâché), `code` le code d'erreur de libusb (0 si tout va bien, ou
- * pour un nom lu mais refusé). `product` : le nom que la carte a donné (iProduct), quand il a été lu.
- * `holders` : programmes ouverts à ce moment-là qui gardent souvent un DMD réel (dmdext, PinUP Popper…).
+ * Probe of a PIN2DMD by VPX's libusb, step by step like PIN2DMDInit of libdmdutil: `stage` is
+ * the step where it stopped (`list`: libusb does not see it; `open`: libusb_open; `claim`:
+ * libusb_claim_interface; `name`: the product name unreadable, or not one of the three that libdmdutil
+ * accepts; `ok`: opened, named and released), `code` the libusb error code (0 if all is well, or
+ * for a name read but refused). `product`: the name the board gave (iProduct), when it was read.
+ * `holders`: programs open at that moment that often hold a real DMD (dmdext, PinUP Popper...).
  */
 export interface LibusbProbe {
   stage: 'list' | 'open' | 'claim' | 'name' | 'ok';
@@ -396,30 +396,30 @@ export interface LibusbProbe {
 }
 
 export interface ObservedUsbDevice {
-  /** Identifiant d'instance PnP, par exemple « USB\VID_1A86&PID_7523\5&2C1E9F&0&3 » (…&MI_00\… pour une interface). */
+  /** PnP instance identifier, for example "USB\VID_1A86&PID_7523\5&2C1E9F&0&3" (...&MI_00\... for an interface). */
   instanceId: string;
   vid: number;
   pid: number;
-  /** Nom du Gestionnaire de périphériques (FriendlyName, sinon DeviceDesc). */
+  /** Device Manager name (FriendlyName, else DeviceDesc). */
   name?: string;
-  /** Port série attribué par Windows (COM3), quand il y en a un. */
+  /** Serial port assigned by Windows (COM3), when there is one. */
   port?: string;
-  /** Classe de pilote de Windows (« Camera », « Image », « HIDClass »…) ; absente sans pilote installé. */
+  /** Windows driver class ("Camera", "Image", "HIDClass"...); absent when no driver is installed. */
   deviceClass?: string;
-  /** Service du pilote (« usbser », « WinUSB », « libusbK »…) ; absent sans pilote installé. */
+  /** Driver service ("usbser", "WinUSB", "libusbK"...); absent when no driver is installed. */
   service?: string;
   /**
-   * Pilote libusb0 ou libusbK seulement : libusbK.dll est-elle dans System32 ? libusb (le PIN2DMD de
-   * VPX) n'ouvre ces deux pilotes que par elle (libusb, windows_winusb.c, winusbx_init). Absent : non relevé.
+   * libusb0 or libusbK driver only: is libusbK.dll in System32? libusb (VPX's PIN2DMD) only
+   * opens these two drivers through it (libusb, windows_winusb.c, winusbx_init). Absent: not checked.
    */
   libusbKDll?: boolean;
   /**
-   * PIN2DMD seulement : ce que la libusb de VPX a dit en l'ouvrant puis en le relâchant, comme le fait
-   * DMDUtil au début d'une partie (app/src/sonde-pin2dmd.ts). Absent : pas encore sondé.
+   * PIN2DMD only: what VPX's libusb said when opening then releasing it, as
+   * DMDUtil does at the start of a game (app/src/sonde-pin2dmd.ts). Absent: not probed yet.
    */
   libusbProbe?: LibusbProbe;
-  /** Code du Gestionnaire de périphériques quand le pilote ne tourne pas (28 : aucun pilote) ; absent : rien à signaler. */
+  /** Device Manager code when the driver is not running (28: no driver); absent: nothing to report. */
   problem?: number;
-  /** Nom que le périphérique donne lui-même à l'USB (« PIN2DMD HD »), quand Windows le connaît. */
+  /** Name the device gives itself over USB ("PIN2DMD HD"), when Windows knows it. */
   product?: string;
 }

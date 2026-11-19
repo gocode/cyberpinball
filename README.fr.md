@@ -15,6 +15,8 @@
 
 Windows 10 ou 11, 64 bits. Ces liens téléchargent toujours la dernière version, directement. Déjà installé ? La borne se met à jour depuis son menu système. Versions précédentes et nouveautés : [toutes les versions](https://github.com/gocode/cyberpinball/releases).
 
+**Vous avez déjà PinUP Popper, PinballX ou PinballY ?** Cyber Pinball s'installe à côté sans rien changer à leur installation, et peut reprendre leurs tables sans les dupliquer : sur le même disque, les gros fichiers (tables, frontons, médias des PuP-Packs, ROM) deviennent des liens physiques NTFS, qui ne prennent aucune place en plus. Voir [Cohabitation avec un autre front-end de borne](docs/manuel/cohabitation-avec-un-autre-front-end-de-borne.md).
+
 <p align="center"><a href="https://www.youtube.com/watch?v=nXr4ikaEhh4"><img src="docs/images/fr/trailer.webp?v=fdbef74fd3" width="760" alt="Le trailer de Cyber Pinball sur YouTube : TON PINCAB CONNECTÉ, à côté d'une partie entre amis en direct et de son départ commun. Bouton Regarder le trailer."></a></p>
 
 <p align="center"><sub><a href="https://www.youtube.com/watch?v=nXr4ikaEhh4">▶ Le trailer de Cyber Pinball, sur YouTube</a></sub></p>
@@ -256,6 +258,10 @@ Le [manuel technique](docs/manuel.md) détaille chaque partie : fichiers écrits
 Chacune des étapes ci-dessous est une action de `lanceur.cmd` (rubrique « Fabrication et publication sur GitHub ») : voir l'[aide-mémoire](docs/manuel/installation-et-organisation-des-fichiers.md#aide-mémoire--publier-une-version) du manuel technique.
 
 `npm run publier` vérifie que rien de personnel ni de secret ne risque de partir, fabrique les deux installeurs, signe le flux de mise à jour et envoie un instantané du code sur `main`. Il crée ensuite la release GitHub `v<version>` avec les installeurs et le flux. Les nouveautés proviennent de [CHANGELOG.md](CHANGELOG.md), affiché sur la borne, et de sa traduction [CHANGELOG.en.md](CHANGELOG.en.md), jointe à la release GitHub. Il faut un jeton GitHub à accès restreint (fine-grained), enregistré une fois pour toutes dans `%USERPROFILE%\.cyberpinball\jeton-github.txt` (ou dans la variable `CYBERPINBALL_GITHUB_TOKEN`), ainsi que la clé de publication. Ni l'un ni l'autre ne se trouve jamais dans le dépôt : le `.gitignore` et le contrôle de publication écartent tous deux les fichiers de secrets. La description et les sujets du dépôt sont tirés du `package.json` et appliqués à chaque release, ou par `npm run decrire` (le jeton doit alors avoir la permission « Administration »). Voir [Mise à jour depuis la borne](docs/manuel/installation-et-organisation-des-fichiers.md#mise-à-jour-depuis-la-borne) dans le manuel technique.
+
+## Contribuer
+
+Signalements de bogues, correctifs et traductions sont les bienvenus. Le guide [CONTRIBUTING.md](CONTRIBUTING.md), en anglais, explique l'organisation du dépôt, la compilation et les tests, les conventions du code et la façon de proposer un changement.
 
 ## Composants tiers et licences
 

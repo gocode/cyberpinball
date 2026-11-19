@@ -84,8 +84,11 @@ export function splitText(summary, root = repo) {
     .join('\n');
 }
 
-/** Documents publiés sans traduction : générés depuis des sources en français, ou notice de tiers. */
-const UNTRANSLATED = [/^docs\/design-system\/components\/[^/]+\/README\.md$/, /^app\/renderer\/polices\/LISEZMOI\.md$/];
+/**
+ * Documents publiés sans traduction : générés depuis des sources en français, notice de tiers, ou
+ * guide des contributeurs (en anglais seulement : il s'adresse à ceux qui ne lisent pas le français).
+ */
+const UNTRANSLATED = [/^docs\/design-system\/components\/[^/]+\/README\.md$/, /^app\/renderer\/polices\/LISEZMOI\.md$/, /^CONTRIBUTING\.md$/];
 
 /** Points « - » d'un texte de nouveautés. */
 export function bulletPoints(text) {

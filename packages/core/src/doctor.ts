@@ -1,7 +1,7 @@
-// Médecin des tables : repère ce qui empêche une table de bien fonctionner et
-// propose une correction précise, que l'utilisateur déclenche lui-même.
-// Le script de la table (nom de la ROM) est lu par l'application avec
-// VPinballX -ExtractVBS ; ici on ne fait qu'interpréter son texte.
+// Table diagnosis: spots what prevents a table from working properly and
+// proposes a precise fix, which the user triggers themselves.
+// The table script (ROM name) is read by the application with
+// VPinballX -ExtractVBS; here we only interpret its text.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -108,12 +108,12 @@ import { isFactoryRomVolume, isLowRomVolume, romVolumeText, type RomVolumeStatus
 export type FindingSeverity = 'error' | 'warning' | 'info';
 
 export interface Fix {
-  /** Ce que fait la correction, dit à l'utilisateur avant qu'il la déclenche. */
+  /** What the fix does, told to the user before they trigger it. */
   label: string;
   ops: FileOp[];
 }
 
-/** Toutes les règles du médecin ; chacune a sa table piégée (doctor-traps.test.ts). */
+/** All the rules of the table diagnosis; each has its trap table (doctor-traps.test.ts). */
 export const FINDING_CODES = [
   'outsideFolder',
   'folderMangled',
@@ -197,133 +197,136 @@ export interface Finding {
   detail: string;
   fix?: Fix;
   /**
-   * Information discrète : rien à faire dans Cyber Pinball (proportions d'un média, fronton absent).
-   * Le Diagnostic et la vérification d'une table ajoutée la montrent à part, en bas (« À savoir »),
-   * sans « Ignorer » : elle n'encombre pas les constats à régler.
+   * Low-key information: nothing to do in Cyber Pinball (proportions of a media, no backglass).
+   * The Diagnostic view and the check of an added table show it apart, at the bottom ("À savoir"
+   * (Good to know)), without "Ignorer" (Ignore): it does not clutter the findings to fix.
    */
   note?: boolean;
   /**
-   * Constats de ROM : la ROM qui manque ou qu'il faut lier (`rom`), et la révision voisine
-   * présente sur la borne (`neighbour`), pour le parcours « Ce qu'il manque pour jouer » (journey.ts).
+   * ROM findings: the ROM that is missing or must be linked (`rom`), and the neighbouring revision
+   * present on the cabinet (`neighbour`), for the "Ce qu'il manque pour jouer" (What is missing to
+   * play) journey (journey.ts).
    */
   rom?: string;
   neighbour?: string;
 }
 
-/** Ce qu'on a appris du script de la table. */
+/** What we learnt from the table script. */
 export interface ScriptFacts {
-  /** La table pilote un vrai jeu par PinMAME : il lui faut une ROM. */
+  /** The table drives a real game through PinMAME: it needs a ROM. */
   usesPinmame: boolean;
-  /** Noms de ROM possibles (certaines tables laissent choisir entre plusieurs). */
+  /** Possible ROM names (some tables let you choose between several). */
   roms: string[];
   /**
-   * Dossier, à côté de la table, d'où FlexDMD ou UltraDMD charge les images,
-   * vidéos et polices du DMD (ProjectFolder). Facultatif pour jouer (playable.ts) :
-   * sans lui, ce DMD-là reste vide et certains scripts s'arrêtent (« Type incompatible »).
+   * Folder, next to the table, from which FlexDMD or UltraDMD loads the DMD images,
+   * videos and fonts (ProjectFolder). Optional to play (playable.ts):
+   * without it, that DMD stays empty and some scripts stop ("Type incompatible" (Type mismatch)).
    */
   dmdFolder?: string;
   /**
-   * La table dessine son propre DMD (ROM de PinMAME, FlexDMD, UltraDMD) : un PuP-Pack qui
-   * occupe la fenêtre du DMD le cache, le plugin PUP ne dessinant jamais le DMD de la table.
+   * The table draws its own DMD (PinMAME ROM, FlexDMD, UltraDMD): a PuP-Pack that
+   * occupies the DMD window hides it, since the PUP plugin never draws the table's DMD.
    */
   drawsDmd?: boolean;
-  /** Absent si la table n'utilise pas PuP. */
+  /** Absent if the table does not use PuP. */
   pup?: PupScriptFacts;
   /**
-   * Nom du jeu donné à B2S Server (cGameName), pour une table sans ROM : celui sous lequel
-   * PinUP Player cherchait le pack quand le script ne le lance pas (pupLoaderNeeded).
+   * Game name given to B2S Server (cGameName), for a table without a ROM: the one under which
+   * PinUP Player looked for the pack when the script does not launch it (pupLoaderNeeded).
    */
   b2sName?: string;
   /**
-   * Ce que le core.vbs actuel refuse dans le script et que les anciens laissaient passer
-   * (scriptcompat.ts) : corrigé dans le .vbs de Cyber Pinball (scriptCoreCompat).
+   * What the current core.vbs refuses in the script and the old ones let through
+   * (scriptcompat.ts): fixed in Cyber Pinball's .vbs (scriptCoreCompat).
    */
   coreCompat?: CompatFix[];
   /**
-   * Morceaux que le script joue par PlayMusic, tels qu'il les nomme (« Akira\track.mp3 », ou le seul
-   * dossier « Akira\ » quand la suite est calculée) : VPX les cherche dans son dossier Music.
+   * Tracks the script plays through PlayMusic, as it names them ("Akira\track.mp3", or only the
+   * folder "Akira\" when the rest is computed): VPX looks for them in its Music folder.
    */
   music?: string[];
   /**
-   * Options de table (menu F12 de VPX) qui laissent le DMD dans le décor du mode bureau, avec la
-   * valeur qui l'envoie à la fenêtre du DMD de la borne (tableoptions.ts, constat dmdDesktopOption).
+   * Table options (VPX F12 menu) that leave the DMD in the desktop mode scenery, with the
+   * value that sends it to the cabinet's DMD window (tableoptions.ts, finding dmdDesktopOption).
    */
   dmdOptions?: CabinetDmdOption[];
   /**
-   * Numéros que le script envoie au plugin PUP en déclencheurs « E » (DOF, B2SSetData : scriptB2sEvents) ;
-   * absent si l'un d'eux est calculé.
+   * Numbers the script sends to the PUP plugin as "E" triggers (DOF, B2SSetData: scriptB2sEvents);
+   * absent if one of them is computed.
    */
   b2sEvents?: number[];
-  /** La table a sa pièce VR (tableHasVrRoom) : en VR, son fronton est dans la pièce, sans .directb2s. */
+  /** The table has its VR room (tableHasVrRoom): in VR, its backglass is in the room, without a .directb2s. */
   vrRoom?: boolean;
 }
 
 export interface DoctorContext {
   tablesDir: string;
-  /** Résultat de la lecture du script, ou l'erreur rencontrée ; absent si VPX n'est pas installé. */
+  /** Result of reading the script, or the error met; absent if VPX is not installed. */
   script?: ScriptFacts | { error: string };
-  /** Dossier des journaux, où l'on garde une copie du crash.txt avant de le retirer. */
+  /** Logs folder, where a copy of crash.txt is kept before removing it. */
   logsDir?: string;
-  /** Écrans de la borne, pour les PuP-Packs (option, écrans absents) ; absent sans modèle de borne. */
+  /** Cabinet screens, for PuP-Packs (option, missing screens); absent without a cabinet model. */
   cabinet?: PupCabinet;
-  /** Contenu de vpinball.log, s'il est lisible : ce que VPX a dit du pack à la dernière partie. */
+  /** Content of vpinball.log, if readable: what VPX said about the pack during the last game. */
   vpxLog?: string;
   /**
-   * Noms de pack attendus par les autres versions du dossier, qui partagent
-   * pupvideos ; undefined si le script de l'une d'elles n'est pas connu.
+   * Pack names expected by the other versions in the folder, which share
+   * pupvideos; undefined if the script of one of them is not known.
    */
   otherPackNames?: string[];
-  /** Bibliothèque de ROM (<racine>\pinmame\roms) ; absente, les liens ne sont pas vérifiés. */
+  /** ROM library (<root folder>\pinmame\roms); absent, the links are not checked. */
   romLibrary?: string;
   /**
-   * Erreurs de lecture des médias enregistrées par l'affichage ; absentes, elles
-   * sont lues dans <logsDir>\medias-erreurs.json (mediaerrors.ts).
+   * Media playback errors recorded by the display; absent, they
+   * are read from <logsDir>\medias-erreurs.json (mediaerrors.ts).
    */
   mediaErrors?: MediaErrorEntry[];
-  /** Playfield de la borne (playfieldOrientation) : le .ini de la table peut changer le sens de la partie. */
+  /** Cabinet playfield (playfieldOrientation): the table's .ini can change the direction of the game. */
   orientation?: PlayfieldOrientation;
   /**
-   * Habillage FullDMD de la table (tableDressing, fulldmdtable.ts) : cadre trouvé dans son média
-   * FullDMD et place du DMD dans son .ini ; absent, l'habillage n'est pas vérifié.
+   * FullDMD dressing of the table (tableDressing, fulldmdtable.ts): frame found in its FullDMD
+   * media and DMD position in its .ini; absent, the dressing is not checked.
    */
   dressing?: TableDressing;
   /**
-   * Le DMD de la table a une place réglée en partie pour la configuration branchée (dmdplace.ts,
-   * « Position du DMD ») : Cyber Pinball la réécrit dans [ScoreView] du .ini avant chaque partie.
-   * Ni « Écrans placés pour cette table » pour le DMD, ni « Le DMD cacherait l'habillage FullDMD ».
+   * The table's DMD has an in-game position set for the connected configuration (dmdplace.ts,
+   * "Position du DMD" (DMD position)): Cyber Pinball rewrites it in [ScoreView] of the .ini before
+   * each game. Neither "Écrans placés pour cette table" (Screens placed for this table) for the
+   * DMD, nor "Le DMD cacherait l'habillage FullDMD" (The DMD would hide the FullDMD dressing).
    */
   dmdPlaced?: boolean;
   /**
-   * Configuration de DOF de la borne (readDofSetup, dof.ts) : la ROM de la table y a-t-elle ses
-   * effets ? Absente, ou sans aucun ini (borne sans DOF), les règles DOF se taisent.
+   * DOF configuration of the cabinet (readDofSetup, dof.ts): does the table's ROM have its
+   * effects in it? Absent, or without any ini (cabinet without DOF), the DOF rules stay silent.
    */
   dof?: DofSetup;
   /**
-   * Volume de la ROM de la table (romvolume.ts, romVolumeStatus) et celui que le joueur a choisi ;
-   * absent, la règle se tait.
+   * Volume of the table's ROM (romvolume.ts, romVolumeStatus) and the one the player chose;
+   * absent, the rule stays silent.
    */
   romVolume?: { status: RomVolumeStatus; choice?: number };
   /**
-   * Version du VPX de Cyber Pinball (« 10.8.1-5436 ») et autres VPX du PC (autres-vpx.json) : une table enregistrée
-   * par un VPX plus récent que celui qui la joue est signalée (tableTooNew, vpx-format.ts). Absent, la règle se tait.
+   * Version of Cyber Pinball's VPX ("10.8.1-5436") and other VPX installs on the PC (autres-vpx.json): a table saved
+   * by a more recent VPX than the one that plays it is reported (tableTooNew, vpx-format.ts). Absent, the rule stays silent.
    */
   vpx?: { own?: string; others: OtherVpx[] };
 }
 
-/** Mémoire de Cyber Pinball dans le .info : option et nom d'origine de chaque pack installé. */
+/** Cyber Pinball's memory in the .info: option and original name of each installed pack. */
 export interface PupMemory {
   option?: string;
   origin?: string;
-  /** L'option a été choisie dans la fiche (« PuP-Pack ») : le médecin ne propose plus d'en changer. */
+  /** The option was chosen in the game page ("PuP-Pack"): the table diagnosis no longer offers to change it. */
   chosen?: 'user';
   /**
-   * PuP-DMD ramené du fronton dans la fenêtre du DMD (pupDmdInBackglass) : l'écran et son
-   * CustomPos d'origine, remis si la borne n'a plus d'écran DMD (pupDmdBackToBackglass).
+   * PuP-DMD brought back from the backglass into the DMD window (pupDmdInBackglass): the screen
+   * and its original CustomPos, restored if the cabinet no longer has a DMD screen
+   * (pupDmdBackToBackglass).
    */
   dmd?: {
     screen: number;
     customPos: string;
-    /** CustomPos que Cyber Pinball a posé : tant qu'il est en place, la retouche est la sienne. */
+    /** CustomPos that Cyber Pinball set: as long as it is in place, the adjustment is its own. */
     applied?: string;
   };
 }
@@ -334,7 +337,7 @@ export function pupMemory(info: { [key: string]: unknown }, pack: string): PupMe
   return found?.[1];
 }
 
-/** Le .info avec la mémoire de ce pack remplacée, les autres champs conservés. */
+/** The .info with this pack's memory replaced, the other fields kept. */
 export function setPupMemory<T extends { [key: string]: unknown }>(info: T, pack: string, memory: PupMemory): T {
   const own = { ...(info.CyberPinball as { pup?: Record<string, PupMemory> } | undefined) };
   const pup = Object.fromEntries(Object.entries(own.pup ?? {}).filter(([name]) => name.toLowerCase() !== pack.toLowerCase()));
@@ -343,10 +346,11 @@ export function setPupMemory<T extends { [key: string]: unknown }>(info: T, pack
 }
 
 /**
- * Constats que le joueur a choisi d'ignorer pour cette table (Diagnostic > « Ignorer… ») : leurs
- * codes, dans le .info (CyberPinball.doctor.ignored). Un constat ignoré ne compte plus nulle part
- * (santé de la borne, « Ce qu'il manque pour jouer », pastilles) ; le Diagnostic le garde dans
- * « Ignorés », d'où il se rétablit. Par code : la même sorte de problème sur cette table.
+ * Findings the player chose to ignore for this table (Diagnostic > "Ignorer…" (Ignore...)): their
+ * codes, in the .info (CyberPinball.doctor.ignored). An ignored finding no longer counts anywhere
+ * (cabinet health, "Ce qu'il manque pour jouer" (What is missing to play), badges); the Diagnostic
+ * view keeps it in "Ignorés" (Ignored), from which it can be restored. By code: the same kind of
+ * problem on this table.
  */
 export function ignoredFindingCodes(info: { [key: string]: unknown }): Finding['code'][] {
   const own = info.CyberPinball as { doctor?: { ignored?: unknown } } | undefined;
@@ -355,7 +359,7 @@ export function ignoredFindingCodes(info: { [key: string]: unknown }): Finding['
   return list.filter((c): c is Finding['code'] => typeof c === 'string' && (FINDING_CODES as readonly string[]).includes(c));
 }
 
-/** Le .info avec ce constat ignoré (ou rétabli), les autres champs conservés. */
+/** The .info with this finding ignored (or restored), the other fields kept. */
 export function setFindingIgnored<T extends { [key: string]: unknown }>(info: T, code: Finding['code'], ignored: boolean): T {
   const own = { ...(info.CyberPinball as { doctor?: { ignored?: string[] } } | undefined) };
   const rest = ignoredFindingCodes(info).filter((c) => c !== code);
@@ -369,13 +373,13 @@ export function setFindingIgnored<T extends { [key: string]: unknown }>(info: T,
   return { ...info, CyberPinball: next };
 }
 
-/** Les constats montrés et ceux que le joueur a ignorés pour cette table. */
+/** The findings shown and those the player ignored for this table. */
 export function splitIgnoredFindings(findings: Finding[], info: { [key: string]: unknown }): { shown: Finding[]; ignored: Finding[] } {
   const codes = new Set<string>(ignoredFindingCodes(info));
   return { shown: findings.filter((f) => !codes.has(f.code)), ignored: findings.filter((f) => codes.has(f.code)) };
 }
 
-/** Le .info où ce qu'on retient du pack `from` passe sous son nouveau nom `to`. */
+/** The .info where what we remember of pack `from` moves under its new name `to`. */
 export function renamePupMemory<T extends { [key: string]: unknown }>(info: T, from: string, to: string): T {
   const memory = pupMemory(info, from);
   if (!memory) return info;
@@ -389,10 +393,10 @@ function withPupMemory(info: { [key: string]: unknown }, pack: string, memory: P
 }
 
 /**
- * Opérations qui appliquent une option d'un pack installé : ses fichiers recopiés à la
- * racine (les .pup remplacés partent à la corbeille avec la copie), ceux que son .bat
- * supprime à la corbeille, et l'option retenue dans le .info pour les mises à jour.
- * Rien n'est exécuté : le .bat n'a été que lu (analysePack).
+ * Operations that apply an option of an installed pack: its files copied to the
+ * root of the pack (the replaced .pup files go to the recycle bin with the copy), those its .bat
+ * deletes go to the recycle bin, and the option recorded in the .info for updates.
+ * Nothing is executed: the .bat has only been read (analysePack).
  */
 export function pupOptionOps(entry: TableEntry, root: string, pack: string, variant: PupVariant, memory: PupMemory): FileOp[] {
   return [
@@ -403,28 +407,28 @@ export function pupOptionOps(entry: TableEntry, root: string, pack: string, vari
 }
 
 export interface TablePupPack {
-  /** Nom du dossier dans pupvideos. */
+  /** Folder name in pupvideos. */
   pack: string;
-  /** Racine du pack (screens.pup). */
+  /** Root of the pack (screens.pup). */
   root: string;
   variants: PupVariant[];
-  /** Option dont les fichiers sont à la racine (appliedOption). */
+  /** Option whose files are at the root (appliedOption). */
   applied?: PupVariant;
-  /** Seuls les .pup de l'option appliquée sont en place : ce qui manque. */
+  /** Only the .pup files of the applied option are in place: what is missing. */
   incomplete?: string[];
-  /** Options que les fichiers en place ne distinguent pas de l'appliquée. */
+  /** Options that the files in place do not distinguish from the applied one. */
   twins: PupVariant[];
-  /** Option la plus proche de la borne, si le choix est net. */
+  /** Option closest to the cabinet, if the choice is clear. */
   recommended?: PupVariant;
-  /** Choix pas net : les deux options en tête pour la borne. */
+  /** Choice not clear: the two leading options for the cabinet. */
   candidates?: [PupVariant, PupVariant];
   memory?: PupMemory;
 }
 
 /**
- * PuP-Packs d'une table qui ont des options (variantes lues dans leurs .bat ou leurs
- * dossiers d'options), avec celle appliquée et celle qui convient à la borne : la fiche
- * les propose (« PuP-Pack »), le médecin compare les deux.
+ * PuP-Packs of a table that have options (variants read in their .bat files or their
+ * option folders), with the applied one and the one that suits the cabinet: the game page
+ * offers them ("PuP-Pack"), the table diagnosis compares the two.
  */
 export function tablePupPacks(entry: TableEntry, borne?: PupCabinet): TablePupPack[] {
   const cabinet = withTableBackglass(entry, borne);
@@ -454,8 +458,8 @@ export function tablePupPacks(entry: TableEntry, borne?: PupCabinet): TablePupPa
 }
 
 /**
- * La borne, et si cette table a son fronton (.directb2s) : une option de PuP-Pack qui
- * laisse le fronton au B2S n'y montre sinon qu'une image fixe (pupWindows).
+ * The cabinet, and whether this table has its backglass (.directb2s): a PuP-Pack option that
+ * leaves the backglass to B2S otherwise shows only a still image there (pupWindows).
  */
 function withTableBackglass(entry: TableEntry, cabinet: PupCabinet | undefined): PupCabinet | undefined {
   if (!cabinet) return undefined;
@@ -463,13 +467,13 @@ function withTableBackglass(entry: TableEntry, cabinet: PupCabinet | undefined):
   return { ...cabinet, tableBackglass: Boolean(companion(entry.folder, base, true, '.directb2s')) };
 }
 
-/** Nom du dossier d'une table : « Terminator 2 (Williams 1991) ». */
+/** Name of a table's folder: "Terminator 2 (Williams 1991)". */
 export function tableFolderName(title: string, manufacturer?: string, year?: number): string {
   const suffix = [manufacturer, year].filter(Boolean).join(' ');
   return safeName(suffix ? `${title} (${suffix})` : title) || 'Table';
 }
 
-/** Nom(s) de ROM d'après le script VBScript de la table. */
+/** ROM name(s) according to the table's VBScript script. */
 export function scriptFacts(vbs: string): ScriptFacts {
   const code = scriptCode(vbs);
   const usesPinmame = usesPinmameCode(code);
@@ -500,7 +504,7 @@ export function scriptFacts(vbs: string): ScriptFacts {
   if (music.length) facts.music = music;
   const dmdOptions = cabinetDmdOptions(vbs);
   if (dmdOptions.length) facts.dmdOptions = dmdOptions;
-  // Seulement là où Cyber Pinball lance lui-même un pack (ni ROM ni PuP dans le script) : notDrivenFinding.
+  // Only where Cyber Pinball launches a pack itself (neither ROM nor PuP in the script): notDrivenFinding.
   const b2sEvents = pupLoaderNeeded(facts) ? scriptB2sEvents(code) : undefined;
   if (b2sEvents) facts.b2sEvents = b2sEvents;
   if (tableHasVrRoom(vbs)) facts.vrRoom = true;
@@ -508,8 +512,8 @@ export function scriptFacts(vbs: string): ScriptFacts {
 }
 
 /**
- * Morceaux joués par PlayMusic : la partie écrite en toutes lettres du nom (« "Akira\" & n & ".mp3" »
- * donne « Akira\ »). Un nom sans dossier ni extension (variable seule) n'en dit rien.
+ * Tracks played through PlayMusic: the part of the name written out in full (`"Akira\" & n & ".mp3"`
+ * gives `Akira\`). A name without folder or extension (a variable alone) tells nothing.
  */
 function playedMusic(code: string): string[] {
   const out: string[] = [];
@@ -520,7 +524,7 @@ function playedMusic(code: string): string[] {
     if (!out.some((o) => o.toLowerCase() === name.toLowerCase())) out.push(name);
   };
   for (const m of code.matchAll(/\bPlayMusic\b\s*\(?\s*"([^"\r\n]+)"/gi)) keep(m[1]);
-  // Nom tenu par une variable (« PlayMusic MusicDir & "theme.mp3" », MusicDir = "Goldorak\") : suivie comme le dossier du DMD.
+  // Name held by a variable (`PlayMusic MusicDir & "theme.mp3"`, `MusicDir = "Goldorak\"`): followed like the DMD folder.
   const wrappers = musicWrappers(code);
   const params = new Set(wrappers.map((w) => w.paramName.toLowerCase()));
   for (const m of code.matchAll(/\bPlayMusic\b\s*\(?\s*([A-Za-z_][^,:'\r\n)]*)/gi)) {
@@ -528,8 +532,8 @@ function playedMusic(code: string): string[] {
     if (parts.some((p) => params.has(p.toLowerCase()))) continue;
     keep(musicPath(code, parts));
   }
-  // Procédure qui joue ce qu'on lui donne (« Sub PlaySong(s) : PlayMusic s : End Sub », puis « PlaySong "Goldorak\1.mp3" ») :
-  // le nom est dans ses appels.
+  // Procedure that plays what it is given (`Sub PlaySong(s) : PlayMusic s : End Sub`, then `PlaySong "Goldorak\1.mp3"`):
+  // the name is in its calls.
   for (const w of wrappers) {
     const call = new RegExp(`(?:^|[^\\w.])(?:call\\s+)?${w.name}\\b[ \\t]*\\(?([^:'\\r\\n]*)`, 'gim');
     for (const m of code.matchAll(call)) {
@@ -545,7 +549,7 @@ function playedMusic(code: string): string[] {
   return out;
 }
 
-/** Nom d'un morceau fait de textes et de variables, toutes lisibles (sinon undefined : rien d'inventé). */
+/** Name of a track made of texts and variables, all readable (otherwise undefined: nothing made up). */
 function musicPath(code: string, parts: readonly string[], known: Record<string, string> = {}): string | undefined {
   let value = '';
   for (const part of parts) {
@@ -561,7 +565,7 @@ function musicPath(code: string, parts: readonly string[], known: Record<string,
   return value;
 }
 
-/** Procédures du script qui passent un de leurs paramètres à PlayMusic : nom, place du paramètre, expression jouée. */
+/** Script procedures that pass one of their parameters to PlayMusic: name, parameter position, expression played. */
 function musicWrappers(code: string): { name: string; param: number; paramName: string; expression: string[] }[] {
   const out: { name: string; param: number; paramName: string; expression: string[] }[] = [];
   for (const m of code.matchAll(/^\s*(?:(?:public|private)\s+)?(?:sub|function)\s+([A-Za-z_]\w*)\s*\(([^)]*)\)([\s\S]*?)\bend\s+(?:sub|function)\b/gim)) {
@@ -576,10 +580,10 @@ function musicWrappers(code: string): { name: string; param: number; paramName: 
 }
 
 /**
- * Dossier du DMD d'après « .ProjectFolder = "./TheGooniesDMD/" » ou
- * « .ProjectFolder = ".\"&myGameName&".FlexDMD\" » (FlexDMD), ou
- * « .SetProjectFolder curDir & "\Foo.UltraDMD" » (UltraDMD). Le chemin part du
- * dossier de la table ; un chemin absolu ne concerne pas ce dossier.
+ * DMD folder according to `.ProjectFolder = "./TheGooniesDMD/"` or
+ * `.ProjectFolder = ".\"&myGameName&".FlexDMD\"` (FlexDMD), or
+ * `.SetProjectFolder curDir & "\Foo.UltraDMD"` (UltraDMD). The path starts from the
+ * table's folder; an absolute path does not concern this folder.
  */
 function dmdProjectFolder(code: string): string | undefined {
   for (const m of code.matchAll(/\.(?:ProjectFolder\s*=|SetProjectFolder\b)\s*\(?([^\n:]*)/gi)) {
@@ -592,12 +596,12 @@ function dmdProjectFolder(code: string): string | undefined {
 }
 
 /**
- * Valeur d'un chemin écrit dans le script (« curDir & "\" & TableName & ".UltraDMD" ») : textes, et variables dont la
- * valeur est un texte ou un tel chemin. Le chargement d'UltraDMD le plus recopié passe par une variable
- * (« DirName = curDir & "\" & TableName & ".UltraDMD" » puis « .SetProjectFolder DirName ») : sans la suivre, le dossier
- * restait inconnu, ni copié à la reprise d'une installation ni signalé absent (Goldorak, 19/11/2026). Une variable de
- * tête non résolue (curDir) est le dossier de la table ; TablesDirectory n'en est pas un, le .vbs de Cyber Pinball le
- * remplace (scriptcompat.ts, tablesDirectoryDmd). undefined : le chemin n'est pas lisible sans exécuter le script.
+ * Value of a path written in the script (`curDir & "\" & TableName & ".UltraDMD"`): texts, and variables whose
+ * value is a text or such a path. The most copied UltraDMD loading goes through a variable
+ * (`DirName = curDir & "\" & TableName & ".UltraDMD"` then `.SetProjectFolder DirName`): without following it, the folder
+ * stayed unknown, neither copied when taking over an installation nor reported missing (Goldorak, 19/11/2026). An
+ * unresolved leading variable (curDir) is the table's folder; TablesDirectory is not, Cyber Pinball's .vbs
+ * replaces it (scriptcompat.ts, tablesDirectoryDmd). undefined: the path cannot be read without running the script.
  */
 function pathExpression(code: string, expression: string, depth: number): string | undefined {
   const parts = expression.split('&').map((p) => p.trim());
@@ -621,7 +625,7 @@ function pathExpression(code: string, expression: string, depth: number): string
   return value;
 }
 
-/** Valeur de la première affectation lisible d'une variable (« Const TableName = "Goldorak" », « DirName = … »). */
+/** Value of the first readable assignment of a variable (`Const TableName = "Goldorak"`, `DirName = ...`). */
 function variableValue(code: string, name: string, depth: number): string | undefined {
   const assign = new RegExp(`(?:^|:)\\s*(?:(?:const|dim|private|public)\\s+)?${name}\\s*=\\s*([^:\\n]+)`, 'gim');
   for (const m of code.matchAll(assign)) {
@@ -632,9 +636,9 @@ function variableValue(code: string, name: string, depth: number): string | unde
 }
 
 export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
-  // Le médecin lit des tables VPX (script, ROM, PuP-Pack, fronton, réglages de VPX). Une table d'un autre
-  // logiciel (Pinball FX, Future Pinball…) n'a rien de tout cela : aucun constat, jamais une fausse
-  // alerte (« ROM absente » sur un .fpt).
+  // The table diagnosis reads VPX tables (script, ROM, PuP-Pack, backglass, VPX settings). A table from another
+  // program (Pinball FX, Future Pinball...) has none of that: no finding, never a false
+  // alarm ("ROM absente" (Missing ROM) on a .fpt).
   if (!isVpxTable(entry)) return [];
   const findings: Finding[] = [];
   const folder = entry.folder;
@@ -643,8 +647,8 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   const files = fs.readdirSync(folder);
   const has = (name: string) => files.find((f) => f.toLowerCase() === name.toLowerCase());
 
-  // 0. Dossier écrit par l'ancien fs.cpSync de Node 22 : « Été » devenu « Ã‰tÃ© » (copytree.ts).
-  // Le dossier de la table lui-même (copie d'une table à l'import) ou l'un de ses sous-dossiers.
+  // 0. Folder written by the old fs.cpSync of Node 22: "Été" turned into "Ã‰tÃ©" (copytree.ts).
+  // The table's own folder (copy of a table on import) or one of its subfolders.
   if (ownFolder) {
     const mangled = findMangledDirs(folder, 3);
     if (mangled.length) {
@@ -668,11 +672,11 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     }
   }
 
-  // 1. Table rangée en vrac dans le dossier des tables.
+  // 1. Table stored loose in the tables folder.
   if (!ownFolder) {
     const target = path.join(ctx.tablesDir, tableFolderName(entry.title, entry.manufacturer, entry.year));
-    // Ses fichiers, et le dossier du DMD que charge son script (« Foo.UltraDMD », « GooniesDMD ») :
-    // VPX le cherche dans le dossier de la table (dossier courant à la partie), laissé derrière il manquerait.
+    // Its files, and the DMD folder its script loads ("Foo.UltraDMD", "GooniesDMD"):
+    // VPX looks for it in the table's folder (current folder during the game); left behind, it would be missing.
     const dmd = ctx.script && !('error' in ctx.script) ? ctx.script.dmdFolder?.toLowerCase() : undefined;
     const moved = files.filter((f) => {
       const lower = f.toLowerCase();
@@ -694,16 +698,16 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     });
   }
 
-  // 1 bis. Table enregistrée par un VPX plus récent que celui qui la joue (vpx-format.ts) : la partie échouerait.
+  // 1 bis. Table saved by a more recent VPX than the one that plays it (vpx-format.ts): the game would fail.
   const tooNew = tooNewFinding(entry, ctx);
   if (tooNew) findings.push(tooNew);
 
-  // 2. Un .vbs nommé comme la table remplace son script ; celui de Cyber Pinball (PuP-Pack
-  // allumé, script corrigé pour le core.vbs, scriptpatch.ts) est le bienvenu tant qu'il est
-  // tiré du script actuel de la table.
+  // 2. A .vbs named like the table replaces its script; Cyber Pinball's own (PuP-Pack
+  // switched on, script fixed for the core.vbs, scriptpatch.ts) is welcome as long as it is
+  // derived from the table's current script.
   const vbs = has(`${base}.vbs`);
   const override = vbs ? readOverride(entry, path.join(folder, vbs)) : undefined;
-  // Pack désactivé : le .vbs périmé est refait sans PuP (pupPackDisabledScript, dans checkPup).
+  // Disabled pack: the outdated .vbs is rebuilt without PuP (pupPackDisabledScript, in checkPup).
   const pupOff = ownFolder && tableDisabledPacks(entry, ctx.script && !('error' in ctx.script) ? ctx.script : undefined).length > 0;
   if (override?.state.kind === 'stale') {
     if (!pupOff) findings.push(staleFinding(override));
@@ -716,13 +720,13 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
       fix: { label: t('Mettre {file} à la corbeille', { file: vbs }), ops: [{ op: 'trash', path: path.join(folder, vbs) }] },
     });
   }
-  // Script que le core.vbs actuel arrête (vpmInit appelé deux fois) : corrigé dans le .vbs.
+  // Script that the current core.vbs stops (vpmInit called twice): fixed in the .vbs.
   if (ownFolder) {
-    // Correctifs que réclame le journal de la dernière partie de la table (appel refusé par le fronton B2S de VPX…).
+    // Fixes requested by the log of the table's last game (call refused by VPX's B2S backglass...).
     const session = ctx.vpxLog ? tableLogSession(entry, ctx.vpxLog) : undefined;
     const compat = coreCompatFinding(entry, ctx, override, session ? compatFixesFromLog(session) : []);
     if (compat) findings.push(compat);
-    // Images du DMD que FlexDMD tire de la table, chargées en pleine partie (flexprewarm.ts) : chargées d'avance.
+    // DMD images that FlexDMD takes from the table, loaded in the middle of the game (flexprewarm.ts): loaded in advance.
     const prewarm = compat ? undefined : flexPrewarmFinding(entry, ctx, override);
     if (prewarm) findings.push(prewarm);
   }
@@ -765,7 +769,7 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     });
   }
 
-  // 4. ROM attendue par le script.
+  // 4. ROM expected by the script.
   if (ownFolder && ctx.script) {
     if ('error' in ctx.script) {
       findings.push({ code: 'scriptUnreadable', severity: 'warning', title: t('Script illisible'), detail: t('La ROM n’a pas pu être vérifiée : {error}', { error: ctx.script.error }) });
@@ -777,24 +781,24 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     if (!('error' in ctx.script) && ctx.script.dmdFolder) {
       const finding = checkDmdFolder(folder, ctx.script.dmdFolder, ctx.script.usesPinmame, ctx.tablesDir);
       if (finding) findings.push(finding);
-      // Vidéos du DMD décodées en entier à chaque scène par le plugin FlexDMD (dmdvideos.ts) : la partie se fige.
+      // DMD videos decoded in full at each scene by the FlexDMD plugin (dmdvideos.ts): the game freezes.
       const videos = finding ? undefined : heavyDmdVideosFinding(folder, ctx.script.dmdFolder);
       if (videos) findings.push(videos);
     }
   }
 
-  // 4 bis. DOF : les LED et retours de la borne réagiront-ils à cette table ? Seulement sur une
-  // borne qui a une configuration DOF, et jamais bloquant : la table se joue sans.
+  // 4 bis. DOF: will the cabinet's LEDs and feedback react to this table? Only on a
+  // cabinet that has a DOF configuration, and never blocking: the table plays without it.
   if (ownFolder && ctx.dof?.ini.length && ctx.script && !('error' in ctx.script)) {
     findings.push(...dofFindingsFor(folder, ctx.script, ctx.dof));
   }
 
-  // 4 ter. Volume de la ROM bas, réglé hors de Cyber Pinball (un volume d'usine bas est monté de
-  // lui-même avant la partie, un volume choisi par le joueur est gardé) : signalé, réparable.
+  // 4 ter. Low ROM volume, set outside Cyber Pinball (a low factory volume is raised
+  // automatically before the game, a volume chosen by the player is kept): reported, repairable.
   const volume = romVolumeFinding(ctx.romVolume);
   if (volume) findings.push(volume);
 
-  // 5. Rapports de plantage laissés par VPX.
+  // 5. Crash reports left by VPX.
   const crashes = ['crash.txt', 'crash.dmp'].map(has).filter((f): f is string => Boolean(f));
   if (crashes.length) {
     const size = crashes.reduce((sum, f) => sum + sizeOf(path.join(folder, f)), 0);
@@ -825,7 +829,7 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     });
   }
 
-  // 6. Fichier .info partagé entre frontends.
+  // 6. .info file shared between frontends.
   if (!fs.existsSync(entry.infoFile) && !(ownFolder && has(`${path.basename(folder)}.info`))) {
     const infoFile = ownFolder ? path.join(folder, `${path.basename(folder)}.info`) : entry.infoFile;
     const info = { Info: { Title: entry.title, Manufacturer: entry.manufacturer, Year: entry.year } };
@@ -838,19 +842,19 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     });
   }
 
-  // 7. Sens de la partie changé par le .ini de la table, sinon cadrage manuel qu'il impose (souvent livré avec elle).
+  // 7. Direction of the game changed by the table's .ini, otherwise the manual framing it imposes (often shipped with it).
   const orientation = ctx.orientation && tableOrientationFinding(entry.file, ctx.orientation);
   const manual = orientation || manualViewFinding(entry.file) || importedViewFinding(entry.file, ctx.orientation);
   if (manual) findings.push(manual);
 
-  // 7 bis. Écrans placés pour cette table seulement (menu de VPX, « Save as Table Override »),
-  // dont le DMD qui recouvrirait l'habillage FullDMD : ce constat-là garde la fenêtre du DMD. Le DMD
-  // placé en partie (« Position du DMD ») est voulu et géré par Cyber Pinball : ni l'un ni l'autre.
+  // 7 bis. Screens placed for this table only (VPX menu, "Save as Table Override"),
+  // including the DMD that would cover the FullDMD dressing: that finding keeps the DMD window. The DMD
+  // placed in game ("Position du DMD" (DMD position)) is intended and managed by Cyber Pinball: neither one.
   const hidden = !ctx.dmdPlaced && ctx.dressing && dressHiddenFinding(entry, ctx.dressing);
   const windows = tableWindowsFinding(entry.file, dressRecord(entry.info), Boolean(hidden) || Boolean(ctx.dmdPlaced));
   if (windows) findings.push(windows);
   if (hidden) findings.push(hidden);
-  // Son coupé par le .ini de la table, ou musique que VPX n'a pas trouvée à la dernière partie (vpxgamelog.ts).
+  // Sound muted by the table's .ini, or music that VPX did not find during the last game (vpxgamelog.ts).
   const muted = tableAudioMutedFinding(entry.file);
   if (muted) findings.push(muted);
   if (ctx.vpxLog) {
@@ -860,26 +864,26 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     if (images) findings.push(images);
   }
 
-  // 8. PuP-Pack (mode plugins de VPX 10.8.1).
+  // 8. PuP-Pack (VPX 10.8.1 plugin mode).
   if (ownFolder) findings.push(...checkPup(entry, ctx, override));
 
-  // 9. Médias de présentation (medias\ de la table).
+  // 9. Presentation media (the table's medias\).
   if (ownFolder) findings.push(...checkMedias(entry, ctx));
 
-  // 10. Cadence des dernières parties sur cette borne (slowtable.ts) : la table rame ou saccade.
+  // 10. Frame rate of the last games on this cabinet (slowtable.ts): the table lags or stutters.
   const slow = slowTableFinding(ctx.logsDir, entry.file);
   if (slow) findings.push(slow);
 
-  // Seule la ROM bloque « Jouer » (playable.ts) : tout autre constat est au plus un avertissement.
+  // Only the ROM blocks "Jouer" (Play) (playable.ts): any other finding is at most a warning.
   const order: Record<FindingSeverity, number> = { error: 0, warning: 1, info: 2 };
   return findings.map(playSeverity).sort((a, b) => order[a.severity] - order[b.severity]);
 }
 
 /**
- * `[Player] CabinetAutofitMode = 0` dans le .ini de la table : VPX ne cadre plus la
- * table et reprend la vue réglée à la main, souvent pour l'écran de l'auteur, d'où
- * un bas de table tronqué ou une table qui déborde. La réparation retire la clé (le
- * réglage général reprend la main), l'ancien fichier part à la corbeille.
+ * `[Player] CabinetAutofitMode = 0` in the table's .ini: VPX no longer frames the
+ * table and takes back the view set by hand, often for the author's screen, hence
+ * a truncated bottom of the table or a table that overflows. The repair removes the key (the
+ * general setting takes over), the old file goes to the recycle bin.
  */
 function manualViewFinding(tableFile: string): Finding | undefined {
   const ini = findTableIni(tableFile);
@@ -888,9 +892,9 @@ function manualViewFinding(tableFile: string): Finding | undefined {
   const mode = doc.get('Player', 'CabinetAutofitMode')?.trim();
   if (mode !== '0' && !/^manual$/i.test(mode ?? '')) return undefined;
   const name = path.basename(ini.path);
-  // Vue de borne enregistrée pour cette table (point de vue de VPX, ou reprise d'une autre installation : tableview.ts) :
-  // un choix fait pour elle, gardé. Le retour au cadrage automatique est écrit (1, Ajuster), pas la clé retirée : sans
-  // elle, la vue reprise serait remise en cadrage manuel à la partie suivante (importedView).
+  // Cabinet view saved for this table (VPX point of view, or taken over from another installation: tableview.ts):
+  // a choice made for it, kept. The return to automatic framing is written (1, Ajuster (Fit)), the key is not
+  // removed: without it, the taken-over view would be put back to manual framing at the next game (importedView).
   if (hasOwnCabinetView(doc)) {
     doc.set('Player', 'CabinetAutofitMode', '1');
     return {
@@ -917,15 +921,15 @@ function manualViewFinding(tableFile: string): Finding | undefined {
   };
 }
 
-/** Clés du .ini d'une table qui décident du sens de la partie (vpxPlayedFlipperEdge). */
+/** Keys of a table's .ini that decide the direction of the game (vpxPlayedFlipperEdge). */
 const ORIENTATION_KEYS = ['BGSet', 'CabinetAutofitMode'];
 
 /**
- * Le .ini de la table change le sens de la partie sur cette borne : sans lui, VPX
- * dessinerait les flippers du côté du joueur ; avec lui (vue bureau, ou cadrage manuel
- * qui reprend la rotation réglée par l'auteur), plus. La réparation retire ces clés ;
- * l'ancien fichier part à la corbeille. Si VPinballX.ini est lui-même en cause, c'est
- * la synchronisation qui le dit.
+ * The table's .ini changes the direction of the game on this cabinet: without it, VPX
+ * would draw the flippers on the player's side; with it (desktop view, or manual framing
+ * that takes back the rotation set by the author), no longer. The repair removes these keys;
+ * the old file goes to the recycle bin. If VPinballX.ini itself is at fault, it is
+ * the synchronisation that says so.
  */
 function tableOrientationFinding(tableFile: string, orientation: PlayfieldOrientation): Finding | undefined {
   const ini = findTableIni(tableFile);
@@ -965,7 +969,7 @@ function tableOrientationFinding(tableFile: string, orientation: PlayfieldOrient
   };
 }
 
-/** Fenêtres annexes de VPX que le .ini d'une table peut placer pour elle seule. */
+/** Secondary VPX windows that a table's .ini can place for that table alone. */
 const TABLE_WINDOWS = [
   { section: 'Backglass', prefix: 'Backglass', get label() { return t('Fronton'); } },
   { section: 'ScoreView', prefix: 'ScoreView', label: 'DMD' },
@@ -974,15 +978,15 @@ const TABLE_WINDOWS = [
 const WINDOW_KEY = /^(Output|Display|FullScreen|WndX|WndY|Width|Height)$/i;
 
 /**
- * Fronton, DMD ou topper placés pour cette table seulement : le menu de VPX (« Display
- * Settings », enregistré par « Save as Table Override ») écrit leur fenêtre dans le .ini
- * de la table, par-dessus la disposition de la borne. C'est voulu (le DMD posé dans le
- * cadre que dessine un PuP-Pack) ; le constat le montre et permet d'y revenir, par
- * exemple après un changement d'écran. La réparation retire ces clés et rien d'autre.
+ * Backglass, DMD or topper placed for this table only: the VPX menu ("Display
+ * Settings", saved by "Save as Table Override") writes their window in the table's .ini,
+ * over the cabinet layout. It is intended (the DMD set in the
+ * frame drawn by a PuP-Pack); the finding shows it and allows going back to it, for
+ * example after a screen change. The repair removes these keys and nothing else.
  */
 /**
- * Son coupé pour cette table seulement : son .ini met le volume du fronton (musique) ou du plateau à 0 dans [Player],
- * souvent repris d'une autre installation. La réparation retire ces clés : la table suit le réglage général.
+ * Sound muted for this table only: its .ini sets the backglass (music) or playfield volume to 0 in [Player],
+ * often taken over from another installation. The repair removes these keys: the table follows the general setting.
  */
 function tableAudioMutedFinding(tableFile: string): Finding | undefined {
   const ini = findTableIni(tableFile);
@@ -1004,7 +1008,7 @@ function tableAudioMutedFinding(tableFile: string): Finding | undefined {
   };
 }
 
-/** Lignes du journal de VPX de la dernière partie de cette table (de son chargement au chargement suivant). */
+/** Lines of the VPX log for the last game of this table (from its loading to the next loading). */
 function tableLogSession(entry: TableEntry, log: string): string[] | undefined {
   const lines = log.split(/\r?\n/);
   const loads = lines.map((l, i) => ({ i, file: /LoadGameFromFilename (.+)$/.exec(l)?.[1]?.trim() })).filter((x) => x.file);
@@ -1015,8 +1019,8 @@ function tableLogSession(entry: TableEntry, log: string): string[] | undefined {
 }
 
 /**
- * Musique que VPX n'a pas trouvée à la dernière partie (« Failed to stream music: <nom> ») : il la cherche dans le
- * dossier « music » de la table, puis dans celui de VPX. La table se joue sans elle.
+ * Music that VPX did not find during the last game ("Failed to stream music: <name>"): it looks for it in the
+ * table's "music" folder, then in VPX's. The table plays without it.
  */
 function musicNotFoundFinding(entry: TableEntry, log: string): Finding | undefined {
   const session = tableLogSession(entry, log);
@@ -1035,9 +1039,9 @@ function musicNotFoundFinding(entry: TableEntry, log: string): Finding | undefin
 }
 
 /**
- * Images du DMD (UltraDMD, FlexDMD) que VPX n'a pas pu charger à la dernière partie : le dossier est là, mais pas ces
- * images (« Asset not loaded », « Failed to resolve asset »). Le DMD n'en montre que les textes, dans sa couleur.
- * Relevé le 19/11/2026 : Goldorak, « Goldorak.UltraDMD\black.jpg » absent, DMD orange.
+ * DMD images (UltraDMD, FlexDMD) that VPX could not load during the last game: the folder is there, but not these
+ * images ("Asset not loaded", "Failed to resolve asset"). The DMD shows only their texts, in its colour.
+ * Noted on 19/11/2026: Goldorak, "Goldorak.UltraDMD\black.jpg" missing, orange DMD.
  */
 function dmdImagesMissingFinding(entry: TableEntry, log: string): Finding | undefined {
   const session = tableLogSession(entry, log);
@@ -1045,8 +1049,8 @@ function dmdImagesMissingFinding(entry: TableEntry, log: string): Finding | unde
   const assets = flexAssets(session);
   const failed = [...assets.notLoaded, ...assets.missing].filter((f) => !/^FlexDMD\.Resources\.|^VPX\./i.test(f));
   if (!failed.length) return undefined;
-  // « Asset not loaded » vaut pour un fichier absent comme pour un fichier que le plugin n'a pas su lire (IMG_Load,
-  // AssetManager::Open) : un fichier présent est dit illisible, pas absent.
+  // "Asset not loaded" applies to a missing file as well as to a file the plugin could not read (IMG_Load,
+  // AssetManager::Open): a file that is present is reported as unreadable, not missing.
   const present = (f: string) => readDirents(path.dirname(f)).some((d) => d.isFile() && d.name.toLowerCase() === path.basename(f).toLowerCase());
   const unreadable = [...new Set(failed.filter(present).map((f) => path.basename(f)))];
   const missing = failed.filter((f) => !present(f));
@@ -1079,8 +1083,8 @@ function tableWindowsFinding(tableFile: string, dress: Rect | undefined, dmdElse
   const ini = findTableIni(tableFile);
   if (!ini.exists) return undefined;
   const doc = IniDocument.parse(fs.readFileSync(ini.path, 'utf8'));
-  // Le DMD posé par Cyber Pinball dans le cadre de l'habillage FullDMD (fulldmdtable.ts) est géré, pas un réglage
-  // à défaire ; une place réglée qui recouvre l'habillage relève de « Le DMD cacherait l'habillage FullDMD » (dmdElsewhere).
+  // The DMD set by Cyber Pinball in the frame of the FullDMD dressing (fulldmdtable.ts) is managed, not a setting
+  // to undo; a set position that covers the dressing falls under "Le DMD cacherait l'habillage FullDMD" (dmdElsewhere).
   const dressed = dmdElsewhere || isDressWindow(tableDmdWindow(doc), dress);
   const placed: string[] = [];
   for (const w of TABLE_WINDOWS) {
@@ -1119,14 +1123,14 @@ function tableWindowsFinding(tableFile: string, dress: Rect | undefined, dmdElse
 }
 
 /**
- * Le plugin PUP ne dessine jamais le DMD de la table : il n'en lit les images que pour
- * reconnaître des scènes (PuPCapture, PUPManager::ProcessDmdFrame). Dans la fenêtre du DMD,
- * VPX garde le premier moteur qui dessine, par priorité (player.cpp, OnAuxRendererChanged) :
- * avec Priority.PUP = 100, un pack qui a un écran 5 ou 1 cache le score de la ROM, de FlexDMD
- * ou d'UltraDMD (2001 - A Space Odyssey, option « DMD on Fulldmd »). La priorité se lit dans
- * les réglages de la table : « [ScoreView] Priority.PUP = 0 » dans son .ini rend la fenêtre
- * au DMD pour elle seule ; le pack garde le fronton et le topper. Une valeur déjà écrite
- * pour la table (menu de VPX en partie) est respectée.
+ * The PUP plugin never draws the table's DMD: it reads its images only to
+ * recognise scenes (PuPCapture, PUPManager::ProcessDmdFrame). In the DMD window,
+ * VPX keeps the first engine that draws, by priority (player.cpp, OnAuxRendererChanged):
+ * with Priority.PUP = 100, a pack that has a screen 5 or 1 hides the score of the ROM, of FlexDMD
+ * or of UltraDMD (2001 - A Space Odyssey, option "DMD on Fulldmd"). The priority is read from
+ * the table's settings: "[ScoreView] Priority.PUP = 0" in its .ini gives the window back
+ * to the DMD for that table alone; the pack keeps the backglass and the topper. A value already written
+ * for the table (VPX menu in game) is respected.
  */
 function pupHidesDmdFinding(tableFile: string, pack: string): Finding | undefined {
   const ini = findTableIni(tableFile);
@@ -1144,13 +1148,13 @@ function pupHidesDmdFinding(tableFile: string, pack: string): Finding | undefine
 }
 
 /**
- * Le score d'un PuP-DMD posé dans le fronton (dmdInBackglass) passe dans la fenêtre du DMD de la
- * borne : son écran reçoit un CustomPos qui y pose la bande du fronton où l'auteur l'a mis, aux
- * proportions de cette fenêtre (aspects.dmd : 4:1 sur une borne, 16:9 sur un FullDMD). Il faut
- * que le script écrive le score sur le pack (LabelNew), qu'aucune option du pack ne le mette déjà
- * sur le DMD (le choix d'option s'en charge), et que la borne ait un écran DMD. La place est
- * recalculée quand la fenêtre du DMD change de forme (autre configuration de la borne), et le
- * CustomPos d'origine, retenu dans le .info, est remis quand la borne n'a plus d'écran DMD.
+ * The score of a PuP-DMD set in the backglass (dmdInBackglass) moves into the cabinet's DMD
+ * window: its screen gets a CustomPos that places there the strip of the backglass where the author
+ * put it, in the proportions of that window (aspects.dmd: 4:1 on a cabinet, 16:9 on a FullDMD). The
+ * script must write the score on the pack (LabelNew), no option of the pack must already put it
+ * on the DMD (the option choice takes care of that), and the cabinet must have a DMD screen. The position is
+ * recomputed when the DMD window changes shape (another cabinet configuration), and the
+ * original CustomPos, recorded in the .info, is restored when the cabinet no longer has a DMD screen.
  */
 function pupDmdPlaceFinding(
   entry: TableEntry,
@@ -1169,8 +1173,8 @@ function pupDmdPlaceFinding(
   } catch {
     return undefined;
   }
-  // Retouche de Cyber Pinball en place : le CustomPos qu'il a posé (une retouche plus ancienne
-  // ne le retenait pas : un écran qui se désigne lui-même).
+  // Cyber Pinball's adjustment in place: the CustomPos it set (an older adjustment
+  // did not record it: a screen that points to itself).
   const kept = memory?.dmd;
   const current = kept ? screenCustomPos(text, kept.screen) : undefined;
   const keptScreen = kept && parseScreens(text).filter((s) => s.num === kept.screen).pop();
@@ -1195,7 +1199,7 @@ function pupDmdPlaceFinding(
   if (!cabinet.dmd || !facts?.pup?.labels) return undefined;
   if (info.variants.some((v) => v.traits.windows?.dmd)) return undefined;
   const aspect = cabinet.aspects?.dmd ?? cabinet.dmdRatio;
-  // Le pack tel que livré : celui en place, ou celui d'avant la retouche.
+  // The pack as shipped: the one in place, or the one from before the adjustment.
   const shipped = ours ? relocateScreen(text, kept!.screen, kept!.customPos) : text;
   const found = dmdInBackglass(parseScreens(shipped), aspect);
   const original = found && screenCustomPos(shipped, found.screen);
@@ -1220,9 +1224,9 @@ function pupDmdPlaceFinding(
 }
 
 /**
- * Fronton sans aucune image (b2sWithoutBackglass) : le plugin B2S de VPX planterait à la
- * première image de la partie. Mis à la corbeille avant chaque partie et dès l'installation
- * (PUP_PLAY_REPAIRS) : la table se joue alors sans fronton B2S, comme si elle n'en avait pas.
+ * Backglass without any image (b2sWithoutBackglass): VPX's B2S plugin would crash at the
+ * first frame of the game. Moved to the recycle bin before each game and as soon as it is installed
+ * (PUP_PLAY_REPAIRS): the table is then played without a B2S backglass, as if it had none.
  */
 function emptyBackglassFinding(file: string | undefined): Finding | undefined {
   if (!file || !b2sWithoutBackglass(file)) return undefined;
@@ -1240,12 +1244,12 @@ function emptyBackglassFinding(file: string | undefined): Finding | undefined {
 }
 
 /**
- * Table sans .directb2s : ce que montre vraiment l'écran du fronton pendant la partie. VPX ne
- * l'occupe pas ; le front-end y laisse le média Backglass de la table (première image, figée, par
- * défaut : renderGame d'app/renderer/frontend.js), sinon le titre de la table ou le média commun
- * de la borne. Rien à dire quand la borne n'a pas d'écran de fronton, ni quand un PuP-Pack de la
- * table occupe le fronton (ses vidéos le remplissent). Une table VR dont la pièce a son propre
- * fronton (tableHasVrRoom) n'est pas invitée à recevoir un .directb2s. Information discrète.
+ * Table without a .directb2s: what the backglass screen really shows during the game. VPX does not
+ * occupy it; the frontend leaves the table's Backglass media there (first frame, frozen, by
+ * default: renderGame of app/renderer/frontend.js), otherwise the table title or the cabinet's common
+ * media. Nothing to say when the cabinet has no backglass screen, nor when a PuP-Pack of the
+ * table occupies the backglass (its videos fill it). A VR table whose room has its own
+ * backglass (tableHasVrRoom) is not invited to receive a .directb2s. Low-key information.
  */
 function backglassMissingFinding(entry: TableEntry, ctx: DoctorContext, ownFolder: boolean): Finding | undefined {
   if (ctx.cabinet && !ctx.cabinet.backglass) return undefined;
@@ -1266,7 +1270,7 @@ function backglassMissingFinding(entry: TableEntry, ctx: DoctorContext, ownFolde
   };
 }
 
-/** Un PuP-Pack de la table (celui que son script ou sa ROM charge) occupe l'écran du fronton. */
+/** A PuP-Pack of the table (the one its script or its ROM loads) occupies the backglass screen. */
 function pupShowsBackglass(entry: TableEntry, facts: ScriptFacts | undefined): boolean {
   const dir = pupVideosDir(entry.folder);
   if (!dir) return false;
@@ -1274,7 +1278,7 @@ function pupShowsBackglass(entry: TableEntry, facts: ScriptFacts | undefined): b
   const packs = packsOfTable(activePacks(entry.folder), facts ? expectedPackNames(facts) : undefined, alone);
   return packs.some((pack) => {
     const root = findPackRoot(path.join(dir, pack)) ?? path.join(dir, pack);
-    // Sans screens.pup, celui que Cyber Pinball écrit avant la partie (pupNoScreens).
+    // Without screens.pup, the one Cyber Pinball writes before the game (pupNoScreens).
     const own = packScreens(root);
     const screens = own.length ? own : parseScreens(defaultScreensPup(root) ?? '');
     return screens.length > 0 && pupWindows(screens).backglass;
@@ -1282,10 +1286,10 @@ function pupShowsBackglass(entry: TableEntry, facts: ScriptFacts | undefined): b
 }
 
 /**
- * PuP-Pack que le script de la table ne peut pas faire jouer (packDrivers, scriptB2sEvents) : ses
- * déclencheurs E attendent des numéros que ce script n'envoie jamais, et rien d'autre (image du
- * DMD reconnue, écran qui montre quelque chose de lui-même) ne l'anime. Aucune correction : c'est
- * le pack d'une autre version du jeu.
+ * PuP-Pack that the table script cannot drive (packDrivers, scriptB2sEvents): its
+ * E triggers wait for numbers this script never sends, and nothing else (recognised DMD
+ * image, screen that shows something on its own) animates it. No fix: it is
+ * the pack of another version of the game.
  */
 function notDrivenFinding(dir: string, pack: string, facts: ScriptFacts): Finding | undefined {
   const drivers = packDrivers(findPackRoot(dir) ?? dir);
@@ -1307,9 +1311,9 @@ function notDrivenFinding(dir: string, pack: string, facts: ScriptFacts): Findin
 }
 
 /**
- * DMD de la table réglé pour le mode bureau (tableoptions.ts) : sur une borne qui a un écran ou une
- * zone de DMD, l'option de table passe sur FlexDMD dans le .ini de la table, tant que le joueur n'y a
- * pas fait son propre choix. Réglé avant chaque partie et dès l'installation (PUP_PLAY_REPAIRS).
+ * Table DMD set for desktop mode (tableoptions.ts): on a cabinet that has a DMD screen or
+ * area, the table option switches to FlexDMD in the table's .ini, as long as the player has not
+ * made their own choice there. Set before each game and as soon as it is installed (PUP_PLAY_REPAIRS).
  */
 function desktopDmdFinding(entry: TableEntry, ctx: DoctorContext): Finding | undefined {
   const script = ctx.script;
@@ -1336,7 +1340,7 @@ function desktopDmdFinding(entry: TableEntry, ctx: DoctorContext): Finding | und
   };
 }
 
-/** Fichiers d'un pack renommés pour que le plugin PUP commence ses playlists comme PinUP Player (playlistRenames). */
+/** Files of a pack renamed so that the PUP plugin starts its playlists like PinUP Player (playlistRenames). */
 function playlistOrderFinding(pack: string, root: string, renames: PlaylistRename[]): Finding {
   const first = renames[0]!;
   const params = {
@@ -1365,8 +1369,8 @@ function playlistOrderFinding(pack: string, root: string, renames: PlaylistRenam
 }
 
 /**
- * Fichiers du pack que le plugin PUP lit autrement que PinUP Player (pupfiles.ts) : renommés, et
- * chaque .pup qui les nomme réécrit (options comprises), les anciens .pup à la corbeille.
+ * Pack files that the PUP plugin reads differently from PinUP Player (pupfiles.ts): renamed, and
+ * each .pup that names them rewritten (options included), the old .pup files to the recycle bin.
  */
 function packFileNamesFinding(pack: string, root: string, media: PackFileFixes): Finding {
   return {
@@ -1384,7 +1388,7 @@ function packFileNamesFinding(pack: string, root: string, media: PackFileFixes):
   };
 }
 
-/** Le .vbs de Cyber Pinball tiré du script d'une version précédente de la table. */
+/** Cyber Pinball's .vbs derived from the script of a previous version of the table. */
 function staleFinding(override: Override): Finding {
   const file = path.basename(override.file);
   const content = override.state.kind === 'stale' ? override.state.content : undefined;
@@ -1400,25 +1404,25 @@ function staleFinding(override: Override): Finding {
 }
 
 /**
- * Script que le core.vbs actuel arrête et que les anciens laissaient passer (scriptcompat.ts) :
- * VPX joue le .vbs de Cyber Pinball, corrigé ligne pour ligne ; un .vbs venu d'ailleurs est
- * corrigé lui-même. `forced` : correctifs réclamés par le message d'une partie arrêtée, que le
- * texte seul ne montrait pas (repairScriptAfterStop). undefined quand rien n'est à corriger.
+ * Script that the current core.vbs stops and the old ones let through (scriptcompat.ts):
+ * VPX plays Cyber Pinball's .vbs, fixed line for line; a .vbs from elsewhere is
+ * fixed itself. `forced`: fixes requested by the message of a stopped game, which the
+ * text alone did not show (repairScriptAfterStop). undefined when nothing needs fixing.
  */
 function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Override | undefined, forced: CompatFix[] = []): Finding | undefined {
-  // Un .vbs tiré d'une ancienne version de la table est d'abord refait (scriptPatchStale).
+  // A .vbs derived from an old version of the table is rebuilt first (scriptPatchStale).
   if (override?.state.kind === 'stale') return undefined;
   const foreign = override?.state.kind === 'foreign' ? override : undefined;
   const own = ownParts(override);
   const facts = ctx.script && !('error' in ctx.script) ? ctx.script : undefined;
-  // Le script de la table n'est relu que s'il le faut : la lecture en cache dit déjà ce qu'il réclame.
+  // The table script is read again only if needed: the cached reading already says what it requests.
   if (!foreign && facts && [...(facts.coreCompat ?? []), ...forced].every((f) => own.compat.includes(f))) return undefined;
   const source = foreign ? foreign.text : readVpxScript(entry.file);
   const code = source !== undefined ? scriptCode(source) : undefined;
   const asked = code !== undefined ? compatFixesApplicable(forced, code) : forced;
   const wanted = [...new Set([...(code !== undefined ? compatFixesFound(code) : (facts?.coreCompat ?? [])), ...asked])];
   const done = foreign ? compatFixesApplied(foreign.text) : own.compat;
-  // Un correctif réclamé par le journal reste, même si le texte seul ne le réclame pas (b2sArgs).
+  // A fix requested by the log stays, even if the text alone does not request it (b2sArgs).
   const missing = wanted.filter((f) => !done.includes(f));
   if (!missing.length) return undefined;
   const base = path.basename(entry.file).replace(/\.vpx$/i, '');
@@ -1430,7 +1434,7 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
     const compat = [...new Set([...own.compat, ...missing])];
     content = buildScriptPatch(source, own.switches, own.loader, own.capture, compat, own.prewarm) ?? buildScriptPatch(source, own.switches, own.loader, undefined, compat, own.prewarm);
   }
-  // Appel au fronton B2S que le plugin de VPX refuse (texte à la place d'un nombre) : le script s'arrêtait là.
+  // Call to the B2S backglass that VPX's plugin refuses (text instead of a number): the script stopped there.
   if (missing.every((f) => f === 'b2sArgs')) {
     return {
       code: 'scriptCoreCompat',
@@ -1447,7 +1451,7 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
       fix: content ? { label: t('Adapter les appels au fronton B2S (dans {file})', { file }), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
     };
   }
-  // Dossier du DMD cherché dans TablesDirectory, qui n'est pas le dossier de la table (scriptcompat.ts).
+  // DMD folder looked for in TablesDirectory, which is not the table's folder (scriptcompat.ts).
   if (missing.every((f) => f === 'tablesDirectoryDmd')) {
     const folder = facts?.dmdFolder ?? 'UltraDMD';
     return {
@@ -1465,8 +1469,8 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
       fix: content ? { label: t('Chercher le DMD dans le dossier de la table (dans {file})', { file }), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
     };
   }
-  // Procédures redéfinies pendant la partie (clignotements de FlashForMs, SetFlash) : seul correctif qui manque.
-  // Minuteries de vpmTimer décrites par un texte : compilé par Execute à chaque échéance.
+  // Procedures redefined during the game (FlashForMs and SetFlash blinking): the only fix missing.
+  // vpmTimer timers described by a text: compiled by Execute at each deadline.
   if (missing.filter((f) => f !== 'tablesDirectoryDmd').every((f) => f === 'executeGlobalOnce' || f === 'timerTextOnce')) {
     const blinks = missing.includes('executeGlobalOnce');
     const timers = missing.includes('timerTextOnce');
@@ -1492,7 +1496,7 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
       fix: content ? { label, ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
     };
   }
-  // Pièce VR allumée sur les écrans (version VR de la table, ou interrupteur d'essai laissé à 1) : seule, ou avec vpmInit.
+  // VR room switched on on the screens (VR version of the table, or test switch left at 1): alone, or with vpmInit.
   if (!missing.includes('vpmInitOnce')) {
     const flags = code !== undefined ? vrRoomFlags(code) : [];
     const detail = [
@@ -1533,9 +1537,9 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
 
 
 /**
- * Images du DMD que FlexDMD tire de la table (« VPX.nom ») : décodées à leur premier affichage, sur le fil de VPX, elles
- * arrêtent la partie (flexprewarm.ts). VPX joue le .vbs de Cyber Pinball, qui les demande pendant le chargement de la
- * table ; la table n'est pas modifiée. Un .vbs venu d'ailleurs ou d'une ancienne version de la table n'est pas touché ici.
+ * DMD images that FlexDMD takes from the table ("VPX.name"): decoded on their first display, on the VPX thread, they
+ * stop the game (flexprewarm.ts). VPX plays Cyber Pinball's .vbs, which requests them while the table is
+ * loading; the table is not modified. A .vbs from elsewhere or from an old version of the table is not touched here.
  */
 function flexPrewarmFinding(entry: TableEntry, ctx: DoctorContext, override: Override | undefined): Finding | undefined {
   if (override && override.state.kind !== 'ours') return undefined;
@@ -1553,7 +1557,7 @@ function flexPrewarmFinding(entry: TableEntry, ctx: DoctorContext, override: Ove
   const base = path.basename(entry.file).replace(/\.vpx$/i, '');
   const target = override?.file ?? path.join(entry.folder, `${base}.vbs`);
   const file = path.basename(target);
-  // Images distinctes : une variante (« &dmd=2 ») est la même image.
+  // Distinct images: a variant ("&dmd=2") is the same image.
   const shown = prewarm.images.filter((id) => !id.includes('&')).length;
   return {
     code: 'flexImagesLate',
@@ -1568,7 +1572,7 @@ function flexPrewarmFinding(entry: TableEntry, ctx: DoctorContext, override: Ove
   };
 }
 
-/** Règles DOF d'une table (dof.ts) : ini local qui masque celui de la borne, table sans PinMAME, ROM sans effets. */
+/** DOF rules of a table (dof.ts): local ini that hides the cabinet's one, table without PinMAME, ROM without effects. */
 function dofFindingsFor(folder: string, script: ScriptFacts, dof: DofSetup): Finding[] {
   if (tableIniMasksGlobal(dof, folder)) {
     const local = tableDofIni(folder);
@@ -1610,10 +1614,10 @@ function dofFindingsFor(folder: string, script: ScriptFacts, dof: DofSetup): Fin
 }
 
 /**
- * Partie arrêtée par une boîte de dialogue de VPX : si son message est celui d'un script que le
- * core.vbs actuel refuse (scriptcompat.ts), le .vbs de Cyber Pinball est corrigé aussitôt, pour la
- * partie suivante. Couvre ce que le texte du script ne montre pas (un seul vpmInit, dans une Sub
- * appelée deux fois). Renvoie le constat réglé, ou undefined.
+ * Game stopped by a VPX dialog box: if its message is the one of a script that the
+ * current core.vbs refuses (scriptcompat.ts), Cyber Pinball's .vbs is fixed at once, for the
+ * next game. Covers what the script text does not show (a single vpmInit, in a Sub
+ * called twice). Returns the settled finding, or undefined.
  */
 export function repairScriptAfterStop(entry: TableEntry, ctx: DoctorContext, ops: OpContext, message: string): Finding | undefined {
   if (path.resolve(entry.folder).toLowerCase() === path.resolve(ctx.tablesDir).toLowerCase()) return undefined;
@@ -1631,19 +1635,19 @@ export function repairScriptAfterStop(entry: TableEntry, ctx: DoctorContext, ops
 }
 
 /**
- * Réparations que le menu fait seul avant chaque partie, et dès l'installation : script que
- * le core.vbs actuel arrête (scriptCoreCompat), et PuP-Packs. Elles ne touchent qu'au pack
- * (renommé, remonté, option recopiée, les anciens fichiers à la corbeille) et au .vbs de
- * Cyber Pinball, jamais à la table ; une option choisie dans la fiche est gardée. Sans elles,
- * un pack installé reste éteint tant qu'on n'ouvre pas le médecin (2001 - A Space Odyssey,
- * 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack), et une table que le core.vbs
- * arrête ne démarre pas (Back to the Future, 30 octobre 2026 : vpmInit appelé deux fois).
+ * Repairs that the menu makes on its own before each game, and as soon as it is installed: script that
+ * the current core.vbs stops (scriptCoreCompat), and PuP-Packs. They only touch the pack
+ * (renamed, moved up, option copied, the old files to the recycle bin) and Cyber Pinball's
+ * .vbs, never the table; an option chosen in the game page is kept. Without them,
+ * an installed pack stays off as long as the table diagnosis is not opened (2001 - A Space Odyssey,
+ * 25 October 2026: game played without the .vbs that switches the pack on), and a table that the core.vbs
+ * stops does not start (Back to the Future, 30 October 2026: vpmInit called twice).
  */
 export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['backglassEmpty', 'scriptCoreCompat', 'flexImagesLate', 'importedView', 'dmdDesktopOption','pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupNoScreens', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
 
 /**
- * Constats réparables de PUP_PLAY_REPAIRS pour cette table. Sans script connu (cache
- * périmé), le script est lu dans le .vpx (readVpxScript), sans lancer VPX.
+ * Repairable findings of PUP_PLAY_REPAIRS for this table. Without a known script (outdated
+ * cache), the script is read in the .vpx (readVpxScript), without launching VPX.
  */
 export function pupPlayRepairs(entry: TableEntry, ctx: DoctorContext): Finding[] {
   if (path.resolve(entry.folder).toLowerCase() === path.resolve(ctx.tablesDir).toLowerCase()) return [];
@@ -1658,7 +1662,7 @@ export function pupPlayRepairs(entry: TableEntry, ctx: DoctorContext): Finding[]
   const found: Finding[] = [];
   const pupOff = tableDisabledPacks(entry, script && !('error' in script) ? script : undefined).length > 0;
   if (override?.state.kind === 'stale' && !pupOff) found.push(staleFinding(override));
-  // Correctifs réclamés par le journal de la partie précédente (appel refusé par le fronton B2S de VPX…).
+  // Fixes requested by the log of the previous game (call refused by VPX's B2S backglass...).
   const session = ctx.vpxLog ? tableLogSession(entry, ctx.vpxLog) : undefined;
   const compat = coreCompatFinding(entry, { ...ctx, script }, override, session ? compatFixesFromLog(session) : []);
   if (compat) found.push(compat);
@@ -1669,16 +1673,16 @@ export function pupPlayRepairs(entry: TableEntry, ctx: DoctorContext): Finding[]
   const desktopDmd = desktopDmdFinding(entry, { ...ctx, script });
   if (desktopDmd) found.push(desktopDmd);
   found.push(...checkPup(entry, { ...ctx, script, vpxLog: undefined }, override));
-  // Cadrage réglé pour la table dans son ancienne installation (tableview.ts) : seulement quand le sens de la partie se vérifie.
+  // Framing set for the table in its old installation (tableview.ts): only when the direction of the game is checked.
   const view = ctx.orientation && !manualViewFinding(entry.file) ? importedViewFinding(entry.file, ctx.orientation) : undefined;
   if (view) found.push(view);
   return found.filter((f) => f.fix && PUP_PLAY_REPAIRS.includes(f.code));
 }
 
 /**
- * Applique les réparations de pupPlayRepairs une à une (l'une peut en appeler une autre :
- * pack remonté, puis son option), six au plus ; les fichiers remplacés vont à la corbeille.
- * Renvoie les constats réglés, pour le journal.
+ * Applies the repairs of pupPlayRepairs one by one (one may lead to another:
+ * pack moved up, then its option), six at most; the replaced files go to the recycle bin.
+ * Returns the settled findings, for the log.
  */
 export function repairPupForPlay(entry: TableEntry, ctx: DoctorContext, ops: OpContext): Finding[] {
   const done: Finding[] = [];
@@ -1687,17 +1691,17 @@ export function repairPupForPlay(entry: TableEntry, ctx: DoctorContext, ops: OpC
     if (!next) break;
     applyOps(next.fix!.ops, ops);
     done.push(next);
-    // Une réparation réécrit le .info (option retenue) : la suivante part de celui-là, sinon
-    // l'option qu'elle vient de retenir passerait pour différente de celle en place.
+    // A repair rewrites the .info (recorded option): the next one starts from that one, otherwise
+    // the option it has just recorded would look different from the one in place.
     if (fs.existsSync(entry.infoFile)) entry = { ...entry, info: readInfo(entry.infoFile) };
   }
   return done;
 }
 
-/** Le .vbs qui remplace le script de la table, et s'il vient de Cyber Pinball. */
+/** The .vbs that replaces the table script, and whether it comes from Cyber Pinball. */
 interface Override {
   file: string;
-  /** Contenu, lu en latin1 (un caractère par octet). */
+  /** Content, read as latin1 (one character per byte). */
   text: string;
   state: ScriptPatchState;
 }
@@ -1709,21 +1713,21 @@ function readOverride(entry: TableEntry, file: string): Override | undefined {
   } catch {
     return undefined;
   }
-  // Le script de la table n'est lu que pour un .vbs marqué par Cyber Pinball.
+  // The table script is read only for a .vbs marked by Cyber Pinball.
   const state: ScriptPatchState = readScriptPatch(text) ? scriptPatchState(text, readVpxScript(entry.file)) : { kind: 'foreign' };
   return { file, text, state };
 }
 
 /**
- * PuP-Pack coupé par le script : la correction allume l'interrupteur dans un .vbs à côté
- * de la table (scriptpatch.ts), sans toucher à la table ; dans le .vbs déjà là s'il vient
- * d'ailleurs. Sans le texte du script (table protégée), le constat dit quoi changer.
+ * PuP-Pack switched off by the script: the fix switches on the switch in a .vbs next to
+ * the table (scriptpatch.ts), without touching the table; in the .vbs already there if it comes
+ * from elsewhere. Without the script text (protected table), the finding says what to change.
  */
 /**
- * L'option retenue dans le .info n'est pas celle dont les fichiers sont en place (un .bat
- * lancé à la main, une copie interrompue, l'ancienne reconnaissance par les seuls .pup), ou
- * n'y est qu'en partie. Choisie dans la fiche ou en partie en place : elle est réappliquée.
- * Retenue d'office à l'installation : c'est la mémoire qui suit les fichiers.
+ * The option recorded in the .info is not the one whose files are in place (a .bat
+ * run by hand, an interrupted copy, the old recognition by the .pup files alone), or
+ * is only partly there. Chosen in the game page or partly in place: it is reapplied.
+ * Recorded automatically at installation: it is the memory that follows the files.
  */
 function pupMismatchFinding(entry: TableEntry, root: string, pack: string, kept: PupVariant, current: AppliedOption, memory: PupMemory): Finding {
   const partial = current.variant === kept;
@@ -1750,8 +1754,8 @@ function pupMismatchFinding(entry: TableEntry, root: string, pack: string, kept:
 }
 
 /**
- * Interrupteurs éteints dans le script que VPX jouera (`offs`, pupSwitchesToEnable) : le
- * lancement du pack, et la PuP-DMD quand l'option du pack occupe la fenêtre du DMD.
+ * Switches turned off in the script that VPX will play (`offs`, pupSwitchesToEnable): the
+ * launch of the pack, and the PuP-DMD when the pack option occupies the DMD window.
  */
 function pupSwitchFinding(entry: TableEntry, pack: string, offs: PupSwitch[], override: Override | undefined, drawsDmd: boolean): Finding {
   const base = path.basename(entry.file).replace(/\.vpx$/i, '');
@@ -1759,13 +1763,13 @@ function pupSwitchFinding(entry: TableEntry, pack: string, offs: PupSwitch[], ov
   const file = path.basename(target);
   let content: string | undefined;
   if (override && override.state.kind !== 'ours') {
-    // .vbs venu d'ailleurs : allumé dans ce fichier même, chaque valeur sur sa ligne.
+    // .vbs from elsewhere: switched on in this very file, each value on its line.
     let text: string | undefined = override.text;
     for (const sw of offs) text = text === undefined ? undefined : enablePupSwitch(text, sw);
     content = text;
   } else {
-    // Notre .vbs, ou pas de .vbs : refait d'après le texte de la table, recopié ligne pour ligne,
-    // avec le lancement du pack et la reconnaissance des images qu'il avait déjà.
+    // Our .vbs, or no .vbs: rebuilt from the table's text, copied line for line,
+    // with the launch of the pack and the image recognition it already had.
     const embedded = readVpxScript(entry.file);
     const switches = embedded !== undefined ? pupSwitchesToEnable(scriptCode(embedded), drawsDmd) : [];
     const own = ownParts(override);
@@ -1804,9 +1808,9 @@ function pupSwitchFinding(entry: TableEntry, pack: string, offs: PupSwitch[], ov
 }
 
 /**
- * Le pack que ni le script ni la ROM ne lancent, lancé par le .vbs de Cyber Pinball : le script
- * de la table recopié, plus le lancement au début de <table>_Init (addPupLoader). Un .vbs venu
- * d'ailleurs reçoit le lancement dans ce fichier même.
+ * The pack that neither the script nor the ROM launch, launched by Cyber Pinball's .vbs: the table
+ * script copied, plus the launch at the start of <table>_Init (addPupLoader). A .vbs from
+ * elsewhere gets the launch in this very file.
  */
 function pupLoaderFinding(entry: TableEntry, pack: string, override: Override | undefined): Finding {
   const base = path.basename(entry.file).replace(/\.vpx$/i, '');
@@ -1817,7 +1821,7 @@ function pupLoaderFinding(entry: TableEntry, pack: string, override: Override | 
   let content: string | undefined;
   if (override && override.state.kind !== 'ours') content = addPupLoader(override.text, loader);
   else {
-    // Notre .vbs est refait (la ligne qui le marque resterait sinon avant le lancement ajouté).
+    // Our .vbs is rebuilt (the line that marks it would otherwise stay before the added launch).
     const embedded = readVpxScript(entry.file);
     const own = ownParts(override);
     if (embedded !== undefined) content = buildScriptPatch(embedded, own.switches, loader, own.capture, own.compat, own.prewarm) ?? buildScriptPatch(embedded, own.switches, loader, undefined, own.compat, own.prewarm);
@@ -1843,14 +1847,14 @@ function pupLoaderFinding(entry: TableEntry, pack: string, override: Override | 
   };
 }
 
-/** Ce qu'un .vbs de Cyber Pinball garde quand il est refait : interrupteurs, lancement du pack, reconnaissance. */
+/** What a Cyber Pinball .vbs keeps when it is rebuilt: switches, launch of the pack, recognition. */
 function ownParts(override: Override | undefined): { switches: PupSwitch[]; loader?: PupLoader; capture?: ReturnType<typeof ownCapture>; compat: CompatFix[]; prewarm?: FlexPrewarm } {
   if (override?.state.kind !== 'ours') return { switches: [], compat: [] };
   const { patch } = override.state;
   return { switches: patch.switches, loader: patch.loader, capture: ownCapture(override.text, patch), compat: patch.compat ?? [], prewarm: patch.prewarm };
 }
 
-/** Pourquoi Cyber Pinball ne peut pas reconnaître les images du DMD de cette table. */
+/** Why Cyber Pinball cannot recognise the DMD images of this table. */
 function captureBlockerText(blocker: CaptureBlocker | 'protected' | 'size'): string {
   switch (blocker) {
     case 'protected':
@@ -1869,12 +1873,12 @@ function captureBlockerText(blocker: CaptureBlocker | 'protected' | 'size'): str
 }
 
 /**
- * Déclencheurs « D » d'un pack à PupCapture sur une table sans ROM : le plugin PUP ne reçoit pas
- * les images de FlexDMD (FlexDMDPlugin.cpp l. 556, au commit af26b2d93). Le .vbs de Cyber Pinball
- * les reconnaît lui-même sur FlexDMD.DmdPixels et envoie les déclencheurs au pack (pupcapture.ts) :
- * dans notre .vbs, refait avec ce qu'il avait déjà, ou dans un .vbs venu d'ailleurs. undefined
- * quand le .vbs joué a déjà la reconnaissance à jour (mêmes captures, mêmes réglages).
- * `loaderNeeded` : le pack est lancé par le .vbs de Cyber Pinball (pupLoaderNeeded).
+ * "D" triggers of a pack using PupCapture on a table without a ROM: the PUP plugin does not receive
+ * the FlexDMD images (FlexDMDPlugin.cpp l. 556, at commit af26b2d93). Cyber Pinball's .vbs
+ * recognises them itself on FlexDMD.DmdPixels and sends the triggers to the pack (pupcapture.ts):
+ * in our .vbs, rebuilt with what it already had, or in a .vbs from elsewhere. undefined
+ * when the played .vbs already has up-to-date recognition (same captures, same settings).
+ * `loaderNeeded`: the pack is launched by Cyber Pinball's .vbs (pupLoaderNeeded).
  */
 function pupCaptureFinding(entry: TableEntry, pack: string, root: string, override: Override | undefined, loaderNeeded: boolean): Finding | undefined {
   const { capture, total } = captureTriggers(root);
@@ -1899,8 +1903,8 @@ function pupCaptureFinding(entry: TableEntry, pack: string, root: string, overri
   const source = foreign ? foreign.text : readVpxScript(entry.file);
   if (source === undefined) return unseen('protected');
   const code = scriptCode(source);
-  // Les déclencheurs vont à l'objet qui a lancé le pack : celui du .vbs de Cyber Pinball (déjà là,
-  // ou posé avec la reconnaissance), sinon celui que crée le script.
+  // The triggers go to the object that launched the pack: the one of Cyber Pinball's .vbs (already there,
+  // or set with the recognition), otherwise the one the script creates.
   const ours = loaderNeeded || own.loader !== undefined || /\bsub\s+CyberPinball_PuPStart\b/i.test(code);
   const settings = captureSettings(code, pack, root, ours ? 'CyberPinball_PuP' : undefined);
   if ('blocker' in settings) return unseen(settings.blocker);
@@ -1936,10 +1940,10 @@ function pupCaptureFinding(entry: TableEntry, pack: string, root: string, overri
 }
 
 /**
- * PuP-Packs de la table désactivés (pupdisabled.ts), quand elle n'en charge plus aucun d'actif :
- * pour la partie, c'est une table sans pack. [] sinon (aucun pack désactivé, ou un pack actif
- * qu'elle charge l'emporte). Le médecin, la santé, le parcours et la préparation de chaque partie
- * passent par là : un pack désactivé n'est ni réclamé, ni rallumé, ni relancé.
+ * Disabled PuP-Packs of the table (pupdisabled.ts), when it no longer loads any active one:
+ * for the game, it is a table without a pack. [] otherwise (no disabled pack, or an active pack
+ * it loads prevails). The table diagnosis, the health, the journey and the preparation of each game
+ * go through here: a disabled pack is neither requested, nor switched on again, nor relaunched.
  */
 export function tableDisabledPacks(entry: TableEntry, facts: PupLoadFacts | undefined): string[] {
   const off = disabledPacks(entry.folder);
@@ -1953,7 +1957,7 @@ export function tableDisabledPacks(entry: TableEntry, facts: PupLoadFacts | unde
   return loadsActive ? [] : mine;
 }
 
-/** Constats d'une table au pack désactivé : l'état, et le .vbs de Cyber Pinball à remettre sans PuP. */
+/** Findings of a table with a disabled pack: the state, and Cyber Pinball's .vbs to restore without PuP. */
 function pupOffFindings(entry: TableEntry, packs: string[], override: Override | undefined): Finding[] {
   const findings: Finding[] = [
     {
@@ -1971,12 +1975,12 @@ function pupOffFindings(entry: TableEntry, packs: string[], override: Override |
 }
 
 /**
- * Le .vbs de Cyber Pinball encore adapté pour le pack désactivé (interrupteurs allumés, lancement
- * ajouté, reconnaissance des images du DMD), ou tiré d'une ancienne version de la table : refait
- * d'après le script de la table sans rien de PuP (seuls les correctifs du core.vbs restent), ou mis
- * à la corbeille s'il n'avait que ça. Sans pack, une PuP-DMD allumée laisserait le DMD sans score, et
- * un script qui ne joue sa musique que sans PuP (2001 : « if usepup = false then PlaySound ») se
- * tairait. Un .vbs venu d'ailleurs n'est pas touché. Réparé avant chaque partie (PUP_PLAY_REPAIRS).
+ * Cyber Pinball's .vbs still adapted for the disabled pack (switches on, launch
+ * added, DMD image recognition), or derived from an old version of the table: rebuilt
+ * from the table script without anything of PuP (only the core.vbs fixes remain), or moved
+ * to the recycle bin if it had only that. Without a pack, a PuP-DMD switched on would leave the DMD without a score, and
+ * a script that plays its music only without PuP (2001: "if usepup = false then PlaySound") would go
+ * silent. A .vbs from elsewhere is not touched. Repaired before each game (PUP_PLAY_REPAIRS).
  */
 function pupOffScriptFinding(entry: TableEntry, override: Override | undefined): Finding | undefined {
   if (!override || override.state.kind === 'foreign') return undefined;
@@ -1992,7 +1996,7 @@ function pupOffScriptFinding(entry: TableEntry, override: Override | undefined):
   return {
     code: 'pupPackDisabledScript',
     severity: 'warning',
-    // Sans rien de PuP, seulement périmé (table mise à jour) : refait, mais sans rallumer le pack.
+    // Without anything of PuP, only outdated (table updated): rebuilt, but without switching the pack on again.
     title: pupParts ? t('Script encore adapté pour le PuP-Pack désactivé') : t('Script adapté pour une ancienne version de la table'),
     detail: [
       pupParts
@@ -2007,12 +2011,12 @@ function pupOffScriptFinding(entry: TableEntry, override: Override | undefined):
   };
 }
 
-/** Règles du § 4.4 de la recherche sur les PuP-Packs, sans lancer VPX. */
+/** Rules of § 4.4 of the research on PuP-Packs, without launching VPX. */
 function checkPup(entry: TableEntry, context: DoctorContext, override?: Override): Finding[] {
   const ctx = { ...context, cabinet: withTableBackglass(entry, context.cabinet) };
   const folder = entry.folder;
   const facts = ctx.script && !('error' in ctx.script) ? ctx.script : undefined;
-  // Pack désactivé (pupdisabled.ts) : la table se joue comme sans pack ; rien n'est réclamé.
+  // Disabled pack (pupdisabled.ts): the table plays as without a pack; nothing is requested.
   const disabled = tableDisabledPacks(entry, facts);
   if (disabled.length) return pupOffFindings(entry, disabled, override);
   const pupDir = pupVideosDir(folder);
@@ -2020,18 +2024,18 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
   if (!facts?.pup && !packs.length) return [];
   const findings: Finding[] = [];
   const othersKnown = ctx.otherPackNames !== undefined || listSafe(folder).filter((f) => f.toLowerCase().endsWith('.vpx')).length <= 1;
-  // Ni le script ni la ROM ne lancent le pack : Cyber Pinball le lancera (pupNotLoaded), sous le
-  // nom du jeu pour B2S, ou à défaut sous celui du seul dossier du pack.
+  // Neither the script nor the ROM launch the pack: Cyber Pinball will launch it (pupNotLoaded), under the
+  // game name for B2S, or failing that under the name of the pack's only folder.
   const loader = facts ? pupLoaderNeeded(facts) : false;
   const expected = expectedPackNames(facts);
   if (loader && !expected.length && othersKnown && packs.length === 1) expected.push(packs[0]!);
   const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
   const matching = packs.filter((p) => expected.some((e) => same(e, p)));
-  // Un pack attendu par une autre version du dossier n'est ni orphelin ni à renommer.
+  // A pack expected by another version in the folder is neither orphaned nor to be renamed.
   const others = packs.filter((p) => !matching.includes(p) && !(ctx.otherPackNames ?? []).some((n) => same(n, p)));
   const pupvideos = pupDir ?? path.join(folder, PUP_FOLDER);
 
-  // Dossier en double : pupvideos\X\X\screens.pup, ou dossier d'archive en trop.
+  // Duplicate folder: pupvideos\X\X\screens.pup, or extra archive folder.
   const nested = new Set<string>();
   for (const pack of packs) {
     const dir = path.join(pupvideos, pack);
@@ -2055,11 +2059,11 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
     });
   }
 
-  // Pack introuvable : rien ne porte le nom que le plugin cherche.
+  // Pack not found: nothing bears the name the plugin looks for.
   if (facts && expected.length && !matching.length) {
     const wanted = expected[0]!;
     const candidate = othersKnown && others.length === 1 ? others[0] : undefined;
-    // L'option retenue pour le pack le suit sous son nouveau nom.
+    // The option recorded for the pack follows it under its new name.
     const memory = candidate ? pupMemory(entry.info, candidate) : undefined;
     const keep: FileOp[] = candidate && memory && fs.existsSync(entry.infoFile) ? [{ op: 'write', path: entry.infoFile, content: JSON.stringify(renamePupMemory(entry.info, candidate, wanted), null, 2) + '\n' }] : [];
     findings.push({
@@ -2080,8 +2084,8 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
       fix: candidate ? { label: t('Renommer « {from} » en « {to} »', { from: candidate, to: wanted }), ops: [{ op: 'move', from: path.join(pupvideos, candidate), to: path.join(pupvideos, wanted) }, ...keep] } : undefined,
     });
   } else if (loader && !expected.length && othersKnown && others.length) {
-    // Garde-fou : un pack présent que personne ne nommera jamais au plugin ne passe pas en silence
-    // (Game of Thrones LE, 28 octobre 2026 : aucun constat, aucune vidéo).
+    // Safeguard: a pack present that nobody will ever name to the plugin does not go by silently
+    // (Game of Thrones LE, 28 October 2026: no finding, no video).
     findings.push({
       code: 'pupMissing',
       severity: 'warning',
@@ -2107,26 +2111,26 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
     });
   }
 
-  // Script qui ne lance jamais le pack (« usePUP = False ») : bien rangé, il ne s'affichera pas.
-  // C'est le script que VPX joue qui compte : le .vbs posé à côté s'il y en a un, sinon celui de
-  // la table, relu dans le .vpx (une lecture gardée en cache peut dater d'avant qu'on sache voir
-  // un interrupteur, comme « HasPup = enablePupPack » des Goonies). La PuP-DMD compte aussi
-  // quand l'option en place occupe la fenêtre du DMD d'une borne qui en a une.
+  // Script that never launches the pack ("usePUP = False"): properly stored, it will not be displayed.
+  // What counts is the script VPX plays: the .vbs set next to the table if there is one, otherwise the
+  // table's, read again in the .vpx (a cached reading may date from before we knew how to see
+  // a switch, like "HasPup = enablePupPack" in the Goonies). The PuP-DMD also counts
+  // when the option in place occupies the DMD window of a cabinet that has one.
   const drawsDmd = matching.length > 0 && ctx.cabinet?.dmd !== false && packDrawsDmd(path.join(pupvideos, matching[0]!));
   const played = override ? override.text : matching.length && facts?.pup ? readVpxScript(entry.file) : undefined;
   const offs = played !== undefined ? pupSwitchesToEnable(scriptCode(played), drawsDmd) : facts?.pup?.disabledBy ? [facts.pup.disabledBy] : [];
   const off = offs.find((s) => s.kind !== 'dmd');
   if (offs.length && matching.length) findings.push(pupSwitchFinding(entry, matching[0]!, offs, override, drawsDmd));
 
-  // Script qui ne lance jamais de pack, table sans ROM : le plugin ne le charge pas de lui-même.
-  // Le .vbs de Cyber Pinball qui le lance déjà compte ; un .vbs à refaire est déjà signalé.
+  // Script that never launches a pack, table without a ROM: the plugin does not load it on its own.
+  // Cyber Pinball's .vbs that already launches it counts; a .vbs to rebuild is already reported.
   if (loader && matching.length && override?.state.kind !== 'stale' && !(override && pupScriptFacts(scriptCode(override.text)))) {
     findings.push(pupLoaderFinding(entry, matching[0]!, override));
   }
 
-  // Pack fait pour une autre version du jeu : le script ne connaît pas PuP (Cyber Pinball lance le
-  // pack), et le pack n'affiche rien que sur des déclencheurs E que ce script n'envoie jamais
-  // (JP's Space Cadet v7.0 de JPSalas et le pack de la Galaxy Edition, 17/11/2026 : fronton noir).
+  // Pack made for another version of the game: the script does not know PuP (Cyber Pinball launches the
+  // pack), and the pack displays nothing except on E triggers that this script never sends
+  // (JP's Space Cadet v7.0 by JPSalas and the Galaxy Edition pack, 17/11/2026: black backglass).
   if (loader && matching.length && facts?.b2sEvents) {
     const notDriven = notDrivenFinding(path.join(pupvideos, matching[0]!), matching[0]!, facts);
     if (notDriven) findings.push(notDriven);
@@ -2137,14 +2141,14 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
     const info = analysePack(findPackRoot(dir) ?? dir);
     const memory = pupMemory(entry.info, pack);
 
-    // Playlist que le plugin commence par un autre fichier que PinUP Player (tri sensible à la casse).
+    // Playlist that the plugin starts with a different file from PinUP Player (case-sensitive sort).
     if (!nested.has(pack)) {
       const renames = playlistRenames(info.root);
       if (renames.length) findings.push(playlistOrderFinding(pack, info.root, renames));
     }
 
-    // Fichiers que le plugin lit autrement que PinUP Player (image nommée comme une vidéo, nom
-    // accentué), puis fichiers nommés par le pack et absents : sans eux, des écrans restent noirs.
+    // Files that the plugin reads differently from PinUP Player (image named like a video, name
+    // with accents), then files named by the pack and missing: without them, screens stay black.
     if (!nested.has(pack)) {
       const media = packFileFixes(info.root, facts?.pup ? played : undefined);
       if (media.renames.length) findings.push(packFileNamesFinding(pack, info.root, media));
@@ -2163,11 +2167,11 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
           });
         }
       }
-      // Playlists vides que le pack joue vraiment (déclencheur actif, écran, script) : rien ne s'y montre
-      // ni ne s'y entend. Une playlist vide que rien ne vise ne compte pas (pupfiles.ts).
+      // Empty playlists that the pack really plays (active trigger, screen, script): nothing is shown
+      // or heard there. An empty playlist that nothing targets does not count (pupfiles.ts).
       const empty = emptyPlayedPlaylists(info.root, facts?.pup ? played : undefined);
       if (empty.length) {
-        // La musique de la table passe par le pack (playlist « Music ») : vide, la table est muette (Goldorak, 19/11/2026).
+        // The table's music goes through the pack ("Music" playlist): empty, the table is silent (Goldorak, 19/11/2026).
         const music = empty.filter((p) => /music|musique|audio|sound|song/i.test(p));
         findings.push({
           code: 'pupPlaylistsEmpty',
@@ -2185,21 +2189,21 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
       }
     }
 
-    // Pack dans la fenêtre du DMD d'une table qui dessine son propre DMD : le score disparaîtrait.
+    // Pack in the DMD window of a table that draws its own DMD: the score would disappear.
     if (!nested.has(pack) && !off && facts?.drawsDmd && !facts.pup?.labels && ctx.cabinet?.dmd && info.screens.length && pupWindows(info.screens).dmd) {
       const finding = pupHidesDmdFinding(entry.file, pack);
       if (finding) findings.push(finding);
     }
 
-    // PuP-DMD posé dans le fronton (pack fait pour un seul écran 16:9) : sur une borne qui a un
-    // écran DMD, le score passe dans la fenêtre du DMD ; remis dans le fronton si elle n'en a plus.
+    // PuP-DMD set in the backglass (pack made for a single 16:9 screen): on a cabinet that has a
+    // DMD screen, the score moves into the DMD window; put back in the backglass if it no longer has one.
     if (!nested.has(pack) && !off) {
       const finding = pupDmdPlaceFinding(entry, pack, info, memory, ctx.cabinet, facts);
       if (finding) findings.push(finding);
     }
 
-    // Option non appliquée : des variantes, et une racine sans .pup ou avec des .pup d'aucune variante.
-    // Un pack imbriqué est d'abord remonté : la correction viserait sinon l'ancien emplacement.
+    // Option not applied: variants, and a root without .pup files or with .pup files of no variant.
+    // A nested pack is moved up first: otherwise the fix would target the old location.
     const current = appliedOption(info, memory?.option);
     if (!nested.has(pack) && info.variants.length && (!info.pupFiles.length || !current)) {
       const choice = chooseVariant(info.variants, ctx.cabinet, memory?.option);
@@ -2233,18 +2237,18 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
         fix: {
           label: t('Appliquer « {option} » ({why})', { option: v.label, why }),
           ops: [
-            // L'option est retenue pour la prochaine mise à jour du pack.
+            // The option is recorded for the next update of the pack.
             ...pupOptionOps(entry, info.root, pack, v, memory ?? {}),
           ],
         },
       });
     }
 
-    // Pack sans screens.pup ni option à appliquer : PinUP Player prenait ses écrans par défaut, le
-    // plugin PUP n'en crée aucun et le pack reste éteint. Les écrans que le pack vise sont déclarés.
-    // Un pack à options dont l'option en place n'apporte pas de screens.pup est dans le même cas
-    // (Hellboy, Daredevil, 24 : rapport d'une borne en 0.1.16-essai.4, 18/11/2026) ; seule une option
-    // qui reste à appliquer (pupOptionNotApplied) passe avant : elle peut apporter le sien.
+    // Pack without screens.pup or option to apply: PinUP Player took its default screens, the
+    // PUP plugin creates none and the pack stays off. The screens the pack targets are declared.
+    // A pack with options whose option in place does not bring a screens.pup is in the same case
+    // (Hellboy, Daredevil, 24: report from a cabinet on 0.1.16-essai.4, 18/11/2026); only an option
+    // still to apply (pupOptionNotApplied) comes first: it may bring its own.
     const optionPending = findings.some((f) => f.code === 'pupOptionNotApplied' && f.detail.includes(`pupvideos\\${pack}`));
     const screensPup = !nested.has(pack) && !optionPending ? defaultScreensPup(info.root) : undefined;
     if (screensPup) {
@@ -2257,15 +2261,15 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
       });
     }
 
-    // Option retenue dans le .info qui n'est pas celle en place, ou en place à moitié.
+    // Option recorded in the .info that is not the one in place, or only half in place.
     const kept = memory?.option ? info.variants.find((v) => v.label.toLowerCase() === memory.option!.toLowerCase()) : undefined;
     if (!nested.has(pack) && kept && current && (current.variant !== kept || !current.complete)) {
       findings.push(pupMismatchFinding(entry, info.root, pack, kept, current, memory!));
     }
 
-    // Option appliquée moins adaptée à la borne qu'une autre (borne changée depuis
-    // l'installation, ou choix d'office d'une autre époque) : sauf si elle a été choisie
-    // dans la fiche, la meilleure est proposée, nettement meilleure seulement.
+    // Applied option less suited to the cabinet than another (cabinet changed since
+    // installation, or automatic choice from another era): unless it was chosen
+    // in the game page, the best one is proposed, only if clearly better.
     const applied = current?.variant;
     if (ctx.cabinet && applied && memory?.chosen !== 'user' && info.variants.length > 1) {
       const best = chooseVariant(info.variants, ctx.cabinet);
@@ -2287,13 +2291,13 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
       }
     }
 
-    // Écrans demandés que la borne n'a pas, et écran Playfield que le plugin ne rend pas.
+    // Requested screens that the cabinet does not have, and Playfield screen that the plugin does not render.
     if (ctx.cabinet) {
       const has = { topper: ctx.cabinet.topper, backglass: ctx.cabinet.backglass, dmd: ctx.cabinet.dmd };
       const labels = { topper: t('le topper'), backglass: t('le backglass'), dmd: t('le DMD') };
       const lost = new Set<'topper' | 'backglass' | 'dmd'>();
       for (const s of info.screens.filter(isVisible)) {
-        // Un écran placé dans un autre (CustomPos) s'affiche là où est son parent.
+        // A screen placed in another one (CustomPos) is displayed where its parent is.
         const role = screenRole(s.parent !== undefined && s.parent !== s.num ? s.parent : s.num);
         if (role && role !== 'playfield' && !has[role]) lost.add(role);
       }
@@ -2318,7 +2322,7 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
       });
     }
 
-    // Pack ancien : le script déclare tout, le pack n'a que des dossiers de vidéos.
+    // Old pack: the script declares everything, the pack only has video folders.
     if (facts?.pup?.playlistAdd && !info.pupFiles.length && !info.variants.length) {
       findings.push({
         code: 'pupScriptDriven',
@@ -2331,17 +2335,17 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
       });
     }
 
-    // PuPCapture sans PinMAME : le plugin ne reçoit les images du DMD que des ROM de PinMAME
-    // (B2SPluginEventStream, GetIdentifyFrame) ; FlexDMD ne les lui donne pas (FlexDMDPlugin.cpp,
-    // « TODO … pup events », au commit af26b2d93). Le .vbs de Cyber Pinball les reconnaît sur
-    // FlexDMD.DmdPixels et envoie les déclencheurs (pupCaptureFinding), sauf si le script les
-    // envoie lui-même (B2SData "D…"). Un .vbs à refaire est déjà signalé (scriptPatchStale).
+    // PuPCapture without PinMAME: the plugin receives DMD images only from PinMAME ROMs
+    // (B2SPluginEventStream, GetIdentifyFrame); FlexDMD does not give them to it (FlexDMDPlugin.cpp,
+    // "TODO … pup events", at commit af26b2d93). Cyber Pinball's .vbs recognises them on
+    // FlexDMD.DmdPixels and sends the triggers (pupCaptureFinding), unless the script sends
+    // them itself (B2SData "D…"). A .vbs to rebuild is already reported (scriptPatchStale).
     if (!nested.has(pack) && info.hasPupCapture && facts && !facts.usesPinmame && !facts.pup?.dmdTriggers && override?.state.kind !== 'stale') {
       const finding = pupCaptureFinding(entry, pack, info.root, override, loader);
       if (finding) findings.push(finding);
     }
 
-    // PuPCapture : les images reconnues dépendent de la ROM exacte.
+    // PuPCapture: the recognised images depend on the exact ROM.
     const rom = facts?.usesPinmame ? facts.roms[0] : undefined;
     if (info.hasPupCapture && rom) {
       const origin = memory?.origin;
@@ -2371,7 +2375,7 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
   return findings;
 }
 
-/** Langue d'une ROM d'après son suffixe (« acd_170hf ») ; supposé, à confirmer sur la borne. */
+/** Language of a ROM according to its suffix ("acd_170hf"); assumed, to be confirmed on the cabinet. */
 export function romLanguage(rom: string): string | undefined {
   const m = /_\d{2,3}[a-z]([fgis])$/i.exec(rom);
   if (!m) return undefined;
@@ -2387,7 +2391,7 @@ export function romLanguage(rom: string): string | undefined {
   }
 }
 
-/** Ce que vpinball.log dit du pack à la dernière partie de cette table. */
+/** What vpinball.log says about the pack during the last game of this table. */
 function checkPupLog(entry: TableEntry, log: string, expected: string[], found: Finding[]): Finding[] {
   const lines = log.split(/\r?\n/);
   const loads = lines.map((l, i) => ({ i, file: /LoadGameFromFilename (.+)$/.exec(l)?.[1]?.trim() })).filter((x) => x.file);
@@ -2395,8 +2399,8 @@ function checkPupLog(entry: TableEntry, log: string, expected: string[], found: 
   if (!start) return [];
   const end = loads.find((x) => x.i > start.i)?.i ?? lines.length;
   const session = lines.slice(start.i, end);
-  // Une vraie partie : VPX 10.8.1 écrit « Starting script » puis « Startup done » (Player::Player) ;
-  // « Starting Play mode » vient du lancement depuis l'éditeur.
+  // A real game: VPX 10.8.1 writes "Starting script" then "Startup done" (Player::Player);
+  // "Starting Play mode" comes from launching from the editor.
   if (!session.some((l) => /Plugin PUP loaded/.test(l)) || !session.some((l) => /Starting Play mode|Starting script|Startup done/.test(l))) return [];
   const findings: Finding[] = [];
   const pathIndex = session.findLastIndex((l) => /PUP path: /.test(l));
@@ -2438,19 +2442,19 @@ function checkPupLog(entry: TableEntry, log: string, expected: string[], found: 
   return findings;
 }
 
-// ---------- Médias de présentation ----------
+// ---------- Presentation media ----------
 
 /**
- * Écart de proportions toléré entre un média et l'écran de son rôle, mesuré en
- * rapport (16:10 sur 16:9 passe, 4:3 sur 16:9 non) : au-delà, le menu recadre
- * le plateau ou laisse des bandes noires sur les autres écrans.
+ * Proportion gap tolerated between a media and the screen of its role, measured as a
+ * ratio (16:10 on 16:9 passes, 4:3 on 16:9 does not): beyond that, the menu crops
+ * the playfield or leaves black bars on the other screens.
  */
 export const MEDIA_RATIO_TOLERANCE = 0.15;
 
 /**
- * Seuils du constat « média très lourd », par nature de fichier. Une vidéo
- * 1080p d'une minute pèse 20 à 60 Mo, une 4K jusqu'à 150 Mo ; une image 4K en
- * PNG 10 à 20 Mo ; une musique de 5 minutes 5 à 12 Mo en mp3, 50 Mo en wav.
+ * Thresholds of the "very heavy media" finding, by file kind. A one-minute 1080p
+ * video weighs 20 to 60 MB, a 4K one up to 150 MB; a 4K image in
+ * PNG 10 to 20 MB; a 5-minute music track 5 to 12 MB in mp3, 50 MB in wav.
  */
 export const MEDIA_SIZE_LIMITS: Record<MediaKind, number> = {
   image: 25 * 1024 ** 2,
@@ -2458,20 +2462,20 @@ export const MEDIA_SIZE_LIMITS: Record<MediaKind, number> = {
   audio: 50 * 1024 ** 2,
 };
 
-/** Une image de plus de pixels que l'écran 8K (7680 × 4320) occupe plus de 130 Mo une fois décodée. */
+/** An image with more pixels than the 8K screen (7680 × 4320) takes more than 130 MB once decoded. */
 export const MEDIA_MAX_PIXELS = 7680 * 4320;
 
-/** Un fichier de medias\ et ce que son nom dit de lui. */
+/** A file of medias\ and what its name says about it. */
 interface MediaItem {
   file: string;
   name: string;
   ext: string;
-  /** Absent : ni « (Type) », ni nom de VPinFE. */
+  /** Absent: neither "(Type)" nor a VPinFE name. */
   type?: MediaType;
-  /** Nom après « (Type) » ; absent pour un nom de VPinFE. */
+  /** Name after "(Type)"; absent for a VPinFE name. */
   stem?: string;
   vpinfe?: boolean;
-  /** Format lu par le menu pour ce type. */
+  /** Format read by the menu for this type. */
   accepted: boolean;
 }
 
@@ -2491,9 +2495,9 @@ function mediaItems(dir: string): MediaItem[] {
 }
 
 /**
- * Fichiers que le menu montre pour un type et une liste de noms (le .vpx, puis le
- * dossier), comme resolveMedia aux étapes 1 à 3 : la première page dans le format
- * préféré, ou toutes les pages ; sinon le nom de VPinFE.
+ * Files that the menu shows for a type and a list of names (the .vpx, then the
+ * folder), like resolveMedia at steps 1 to 3: the first page in the preferred
+ * format, or all the pages; otherwise the VPinFE name.
  */
 function shownMedia(items: MediaItem[], type: MediaType, names: string[]): MediaItem[] {
   const info = mediaTypeInfo(type);
@@ -2515,14 +2519,14 @@ function shownMedia(items: MediaItem[], type: MediaType, names: string[]): Media
   return [];
 }
 
-/** « « a », « b » et 3 autres ». */
+/** "a", "b" and 3 others. */
 function quoteList(names: string[], max = 4): string {
   const shown = names.slice(0, max).map(quote);
   const rest = names.length - shown.length;
   return formatList(rest > 0 ? [...shown, tn(rest, '{n} autre', '{n} autres')] : shown);
 }
 
-/** « nom » (guillemets de la langue). */
+/** "name" (quotation marks of the language). */
 function quote(name: string): string {
   return t('« {name} »', { name });
 }
@@ -2560,21 +2564,21 @@ const MEDIA_ERROR_LABELS: Record<MediaErrorKind, string> = {
   },
 };
 
-/** Erreurs dues au fichier lui-même : il ne sera pas mieux lu la fois suivante. */
+/** Errors due to the file itself: it will not be read any better the next time. */
 const FILE_ERRORS: readonly MediaErrorKind[] = ['decode', 'unsupported', 'image'];
 
-/** Dossiers d'un PuP-Pack, d'une ROM ou d'un DMD dessiné par le script : jamais des médias du menu. */
+/** Folders of a PuP-Pack, a ROM or a DMD drawn by the script: never menu media. */
 function notMediaFolder(name: string, dmdFolder: string | undefined): boolean {
   const n = name.toLowerCase();
   return ['medias', 'pinmame', 'cache'].includes(n) || isPupFolderName(n) || n === dmdFolder?.toLowerCase() || /\.ultradmd$|flexdmd/i.test(n);
 }
 
-/** Fichiers d'un dossier, sous-dossiers compris. */
+/** Files of a folder, subfolders included. */
 function filesUnder(dir: string): string[] {
   return readDirents(dir).flatMap((d) => (d.isDirectory() ? filesUnder(path.join(dir, d.name)) : [path.join(dir, d.name)]));
 }
 
-/** Média trouvé hors de medias\ : rangé à la Popper ou à la PinballX, ou « (Type) nom » au mauvais endroit. */
+/** Media found outside medias\: stored the Popper or PinballX way, or "(Type) name" in the wrong place. */
 interface StrayMedia {
   from: string;
   type: MediaType;
@@ -2611,7 +2615,7 @@ function findStrayMedias(folder: string, likeTable: (stem: string) => number | u
   return out;
 }
 
-/** Règles du médecin sur les médias de la table : constats clairs, et corrections sûres (renommer, ranger, corbeille). */
+/** Rules of the table diagnosis on the table's media: clear findings, and safe fixes (rename, store, recycle bin). */
 function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
   const findings: Finding[] = [];
   const folder = entry.folder;
@@ -2622,7 +2626,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
   const vpxBases = readDirents(folder)
     .filter((d) => d.isFile() && /\.vpx$/i.test(d.name))
     .map((d) => d.name.slice(0, -4));
-  // Chaque version du dossier cherche son .vpx, puis le dossier.
+  // Each version in the folder looks for its .vpx, then the folder.
   const versionNames = (vpxBases.length ? vpxBases : [own[0]!]).map((b) => (b.toLowerCase() === folderName.toLowerCase() ? [b] : [b, folderName]));
   const allNames = [...new Set(versionNames.flat())];
   const facts = ctx.script && !('error' in ctx.script) ? ctx.script : undefined;
@@ -2634,13 +2638,13 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
   const taken = new Set(items.map((i) => i.name.toLowerCase()));
   const label = (type: MediaType) => mediaTypeInfo(type).label;
   const move = (from: string, to: string): FileOp => ({ op: 'move', from, to });
-  // Fichiers déjà renommés ou mis à la corbeille par une correction plus haut :
-  // « Tout réparer » applique les corrections l'une après l'autre.
+  // Files already renamed or moved to the recycle bin by a fix further up:
+  // "Tout réparer" (Repair all) applies the fixes one after the other.
   const claimed = new Set<string>();
   const claim = (file: string) => claimed.add(file.toLowerCase());
   const free = (file: string) => !claimed.has(file.toLowerCase());
 
-  // Format illisible par le menu, ou non prévu pour ce type.
+  // Format unreadable by the menu, or not intended for this type.
   const unreadable = items.filter((i) => i.type && !i.accepted);
   if (unreadable.length) {
     const redundant = unreadable.filter((i) =>
@@ -2680,13 +2684,13 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     });
   }
 
-  // DMD 4:1 rangé en FullDMD 16:9, ou l'inverse. L'écran du DMD prend déjà, parmi les afficheurs
-  // de la table, celui qui le remplit le mieux, quel que soit son libellé (resolveRoleMedia) : le
-  // libellé ne change rien à ce qui est montré. Le constat ne paraît que si le fichier peut être
-  // renommé selon ses proportions (il retrouve sa place dans les médias de la table) ; quand
-  // l'autre libellé est déjà pris, il n'y a rien à faire : chaque écran prend celui qui lui va
-  // (« (DMD) » en 21:9 et « (FullDMD) » en 16:9 d'une table reprise de PinUP Popper, 17/11/2026).
-  // Un média mal nommé est d'abord renommé ; son type est vérifié à l'analyse suivante.
+  // 4:1 DMD stored as 16:9 FullDMD, or the reverse. The DMD screen already takes, among the table's
+  // displays, the one that fills it best, whatever its label (resolveRoleMedia): the
+  // label changes nothing in what is shown. The finding only appears if the file can be
+  // renamed according to its proportions (it gets its place back in the table's media); when
+  // the other label is already taken, there is nothing to do: each screen takes the one that suits it
+  // ("(DMD)" in 21:9 and "(FullDMD)" in 16:9 of a table taken over from PinUP Popper, 17/11/2026).
+  // A misnamed media is renamed first; its type is checked at the next analysis.
   const named = (i: MediaItem) => i.stem !== undefined && allNames.some((n) => pageOf(i.stem!, n) !== undefined);
   const swapped: { item: MediaItem; actual: MediaType; ratio: number; to: string }[] = [];
   for (const item of items.filter((i) => (i.type === 'DMD' || i.type === 'FullDMD') && named(i) && i.accepted)) {
@@ -2724,10 +2728,10 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
       },
     });
   }
-  // Renommés plus haut : ils ne comptent pas parmi les doublons de leur ancien type.
+  // Renamed further up: they do not count among the duplicates of their old type.
   const swappedFiles = new Set(swapped.map((s) => s.item.file));
 
-  // Nom qui ne correspond ni à un .vpx du dossier ni au dossier.
+  // Name that matches neither a .vpx in the folder nor the folder.
   const misnamed = items.filter((i) => i.type && i.stem !== undefined && !named(i));
   const typeless = items.filter((i) => !i.type && mediaKind(i.name));
   if (misnamed.length || typeless.length) {
@@ -2799,7 +2803,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     });
   }
 
-  // Médias rangés à la Popper ou à la PinballX dans le dossier de la table, hors de medias\.
+  // Media stored the Popper or PinballX way in the table's folder, outside medias\.
   const keys = [entry.title, ...vpxBases, folderName].map((r) => nameKey(parseTableName(r).title)).filter(Boolean);
   const likeTable = (stem: string): number | undefined => {
     for (const name of allNames) {
@@ -2815,7 +2819,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
   if (strays.length) {
     const ops: FileOp[] = [];
     const moved: string[] = [];
-    // Laissés en place : medias\ montre déjà ce type (shown), ou le nom attendu est pris.
+    // Left in place: medias\ already shows this type (shown), or the expected name is taken.
     const left: { s: StrayMedia; shown?: string }[] = [];
     for (const s of strays) {
       const info = mediaTypeInfo(s.type);
@@ -2836,7 +2840,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
       ops.push(move(s.from, path.join(dir, target)));
       moved.push(s.from);
     }
-    // Arborescence vidée (POPMedia\…) : ses dossiers vides partent à la corbeille.
+    // Emptied tree (POPMedia\…): its empty folders go to the recycle bin.
     const tops = [...new Set(moved.map((f) => path.relative(folder, f).split(path.sep)).filter((parts) => parts.length > 1).map((parts) => parts[0]!))];
     for (const top of tops) {
       const all = filesUnder(path.join(folder, top));
@@ -2845,7 +2849,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     const rel = (s: StrayMedia) => path.relative(folder, s.from);
     findings.push({
       code: 'mediaStray',
-      // Rien à ranger : la table a déjà ses médias, ce ne sont que des restes.
+      // Nothing to store: the table already has its media, these are only leftovers.
       severity: moved.length ? 'warning' : 'info',
       title: tn(strays.length, 'Média rangé hors de medias\\', 'Médias rangés hors de medias\\'),
       detail: [
@@ -2875,7 +2879,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     });
   }
 
-  // Proportions qui ne collent pas à l'écran du rôle (zone comprise).
+  // Proportions that do not match the screen of the role (area included).
   const aspects = ctx.cabinet?.aspects;
   if (aspects) {
     const lines: string[] = [];
@@ -2887,7 +2891,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
       if (!d) return true;
       const size = `${d.width}×${d.height}`;
       if (mediaTypeInfo(type).orientable) {
-        // Le menu tourne le média du plateau d'après le bord des flippers : seul le rapport des côtés compte.
+        // The menu rotates the playfield media according to the flipper edge: only the aspect ratio counts.
         const rm = Math.max(d.width, d.height) / Math.min(d.width, d.height);
         const rs = Math.max(screen, 1 / screen);
         if (Math.abs(Math.log(rm / rs)) <= tolerance) return true;
@@ -2944,11 +2948,11 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     check('Backglass', 'backglass');
     check('Topper', 'topper');
     if (aspects.dmd) {
-      // Le type de l'écran du DMD (FullDMD ou DMD seul), sinon les proportions de sa fenêtre.
+      // The type of the DMD screen (FullDMD or DMD alone), otherwise the proportions of its window.
       const full = ctx.cabinet && cabinetFullDmd(ctx.cabinet);
       const wanted: MediaType = full === undefined ? dmdTypeForRatio(Math.max(aspects.dmd, 1 / aspects.dmd)) : full ? 'FullDMD' : 'DMD';
       const partner: MediaType = wanted === 'DMD' ? 'FullDMD' : 'DMD';
-      // Le média que l'écran du DMD montre vraiment : des deux afficheurs, celui qui le remplit le mieux (resolveRoleMedia).
+      // The media the DMD screen really shows: of the two displays, the one that fills it best (resolveRoleMedia).
       const mine = shownMedia(items, wanted, own)[0];
       const theirs = shownMedia(items, partner, own)[0];
       const shown = mine && theirs ? bestDmdMedia([mine, theirs], aspects.dmd, (i) => dimsOf(i.file)) : (mine ?? theirs);
@@ -2957,7 +2961,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
       else check(partner, 'dmd', t(', faute de média « {type} » ({code})', { type: label(wanted), code: wanted }), theirs);
     }
     if (lines.length) {
-      // Information discrète : rien à réparer dans Cyber Pinball, seul un autre fichier y changerait quelque chose.
+      // Low-key information: nothing to repair in Cyber Pinball, only another file would change anything.
       findings.push({
         code: 'mediaRatio',
         severity: 'info',
@@ -2968,7 +2972,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     }
   }
 
-  // Fichiers très lourds.
+  // Very heavy files.
   const heavy: string[] = [];
   for (const item of items) {
     const kind = mediaKind(item.name);
@@ -2996,7 +3000,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     });
   }
 
-  // Doublons d'un même type : un seul est montré.
+  // Duplicates of the same type: only one is shown.
   const duplicateLines: string[] = [];
   const duplicateOps: FileOp[] = [];
   for (const info of MEDIA_TYPES.filter((t) => !t.pages)) {
@@ -3042,7 +3046,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     });
   }
 
-  // Erreurs de lecture enregistrées par l'affichage.
+  // Reading errors recorded by the display.
   const errors = (ctx.mediaErrors ?? (ctx.logsDir ? readMediaErrors(mediaErrorsFile(ctx.logsDir)) : [])).filter(
     (e) => isInside(e.file, folder) && isCurrentMediaError(e),
   );
@@ -3085,21 +3089,21 @@ function listDirs(dir: string): string[] {
 }
 
 /**
- * ROM demandée par le script. Le plugin PinMAME de VPX 10.8.1 cherche dans
- * <table>\pinmame\roms si ce dossier existe, et seulement là ; sinon dans son dossier
- * commun (PinMAMEPath, la bibliothèque de ROM). Il lit aussi <table>\pinmame\alias.txt
- * avant tout : révision voisine, ou ancien nom de VPinMAME (romalias.ts).
+ * ROM requested by the script. The PinMAME plugin of VPX 10.8.1 looks in
+ * <table>\pinmame\roms if this folder exists, and only there; otherwise in its common
+ * folder (PinMAMEPath, the ROM library). It also reads <table>\pinmame\alias.txt
+ * before anything else: neighbouring revision, or old VPinMAME name (romalias.ts).
  */
 /**
- * ROM attendue par le script. D'abord ses puces éparpillées dans la table (un ancien
- * import déballait une ROM rangée dans un sous-dossier de son zip) : si la ROM n'est
- * nulle part ailleurs, elles sont refaites en un zip à plat, rangé dans la bibliothèque
- * et lié ; sinon elles ne servent à rien et partent à la corbeille.
+ * ROM expected by the script. First its chips scattered in the table (an old
+ * import unpacked a ROM stored in a subfolder of its zip): if the ROM is
+ * nowhere else, they are rebuilt into a flat zip, stored in the library
+ * and linked; otherwise they are of no use and go to the recycle bin.
  */
 /**
- * Ce qui empêche la ROM demandée par le script d'être lue (playable.ts), sans relire la
- * table : vide quand elle est là, liée, trouvée par le dossier commun de PinMAME ou
- * fournie par un alias. Pour la fiche, qui n'appelle pas tout le médecin.
+ * What prevents the ROM requested by the script from being read (playable.ts), without reading the
+ * table again: empty when it is there, linked, found by PinMAME's common folder or
+ * provided by an alias. For the game page, which does not call the whole table diagnosis.
  */
 export function romBlockers(folder: string, roms: string[], library?: string): Finding[] {
   return roms.length ? playBlockers(checkRom(folder, roms, library)) : [];
@@ -3128,18 +3132,18 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
   ];
 }
 
-/** Puces d'une ROM hors de son zip, dans le dossier de la table. */
+/** Chips of a ROM outside its zip, in the table's folder. */
 interface ScatteredRom {
   rom: string;
   files: string[];
-  /** Dossier nommé comme la ROM qui les contient (sinon, la racine de la table). */
+  /** Folder named like the ROM that contains them (otherwise, the table's root folder). */
   dir?: string;
 }
 
 /**
- * Puces de la ROM demandée laissées à la racine de la table (« t2_l8.rom »,
- * « t2_u14.l3 » : même nom ou même famille que la ROM), ou dans un dossier nommé
- * comme elle qui ne contient qu'elles.
+ * Chips of the requested ROM left at the root of the table ("t2_l8.rom",
+ * "t2_u14.l3": same name or same family as the ROM), or in a folder named
+ * like it that contains only them.
  */
 function scatteredRom(folder: string, roms: string[]): ScatteredRom | undefined {
   let best: ScatteredRom | undefined;
@@ -3164,15 +3168,15 @@ function scatteredRom(folder: string, roms: string[]): ScatteredRom | undefined 
   return best;
 }
 
-/** Les puces éparpillées à la corbeille (le dossier de la ROM d'un bloc). */
+/** The scattered chips to the recycle bin (the ROM's folder in one piece). */
 function scatteredTrash(s: ScatteredRom): FileOp[] {
   const loose = s.files.filter((f) => !s.dir || !isInside(f, s.dir));
   return [...loose.map((f) => ({ op: 'trash' as const, path: f })), ...(s.dir ? [{ op: 'trash' as const, path: s.dir }] : [])];
 }
 
 /**
- * Remet une ROM en place : son .zip à plat, rangé dans la bibliothèque et lié dans
- * pinmame\roms (copié d'un disque à l'autre), ou dans pinmame\roms sans bibliothèque.
+ * Puts a ROM back in place: its flat .zip, stored in the library and linked in
+ * pinmame\roms (copied from one drive to another), or in pinmame\roms without a library.
  */
 function rebuildRomOps(name: string, members: RomZipMember[], folder: string, library: string | undefined, mtimeMs: number): FileOp[] {
   const inTable = path.join(folder, 'pinmame', 'roms', name);
@@ -3180,7 +3184,7 @@ function rebuildRomOps(name: string, members: RomZipMember[], folder: string, li
   return [{ op: 'zip', to: target, files: members, mtimeMs }, ...(library ? [{ op: 'link' as const, from: target, to: inTable }] : [])];
 }
 
-/** Puces d'un zip rangées dans un sous-dossier : le zip à refaire à plat, sinon undefined. */
+/** Chips of a zip stored in a subfolder: the zip to rebuild flat, otherwise undefined. */
 function nestedRom(file: string): { folder: string; members: RomZipMember[] } | undefined {
   const entries = readZipEntries(file);
   const content = entries && romContent(entries.map((e) => e.name));
@@ -3188,14 +3192,14 @@ function nestedRom(file: string): { folder: string; members: RomZipMember[] } | 
   return { folder: content.dir, members: content.chips.map((c) => ({ from: file, entry: c, name: path.basename(c) })) };
 }
 
-/** Une ROM de pinmame\roms dont les puces sont dans un sous-dossier : PinMAME ne la lit pas. */
+/** A ROM of pinmame\roms whose chips are in a subfolder: PinMAME does not read it. */
 function checkRomNested(folder: string, file: string, library?: string): Finding | undefined {
   const nested = nestedRom(file);
   if (!nested) return undefined;
   const name = path.basename(file);
   const rom = name.replace(/\.zip$/i, '');
   const stored = library ? storedRom(library, name) : undefined;
-  // La ROM de la bibliothèque est refaite à plat si c'est celle de la table, ou si la bibliothèque n'en a pas.
+  // The library's ROM is rebuilt flat if it is the table's one, or if the library does not have it.
   const intoLibrary = library && (!stored || sameRomFile(stored, romFile(file)!));
   return {
     code: 'romNested',
@@ -3220,7 +3224,7 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
   const aliasFile = tableAliasFile(folder);
   const here = (name: string) => files.find((f) => f.toLowerCase() === `${name.toLowerCase()}.zip`);
   const inLibrary = (name: string) => (library ? storedRom(library, name) : undefined);
-  /** Lier (ou copier, d'un disque à l'autre) une ROM de la bibliothèque dans pinmame\roms. */
+  /** Link (or copy, from one drive to another) a ROM of the library into pinmame\roms. */
   const linkOp = (name: string): FileOp[] => {
     const stored = inLibrary(name);
     return stored && !here(name) ? [{ op: 'link', from: stored.path, to: path.join(romsDir, path.basename(stored.path)) }] : [];
@@ -3228,7 +3232,7 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
   const writeAliases = (content: string): FileOp => (content ? { op: 'write', path: aliasFile, content } : { op: 'trash', path: aliasFile });
   const findings: Finding[] = [];
 
-  // Alias devenu inutile : la ROM demandée est là, mais l'alias passe avant elle.
+  // Alias that has become useless: the requested ROM is there, but the alias comes before it.
   for (const r of roms) {
     const line = aliasFor(aliases, r);
     if (!line || !here(r) || line.rom.toLowerCase() === r.toLowerCase()) continue;
@@ -3252,7 +3256,7 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
   }
   const rom = roms[0]!;
 
-  // Puces éparpillées dans la table, et la ROM nulle part ailleurs : on refait son zip.
+  // Chips scattered in the table, and the ROM nowhere else: we rebuild its zip.
   if (scattered && !roms.some((r) => aliasFor(aliases, r) || inLibrary(r))) {
     const name = `${scattered.rom}.zip`;
     const where = scattered.dir ? t('dans le dossier « {folder} » de la table', { folder: path.basename(scattered.dir) }) : t('à la racine du dossier de la table');
@@ -3277,13 +3281,13 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
     return findings;
   }
 
-  // Un alias est déjà en place : c'est sa ROM qu'il faut.
+  // An alias is already in place: it is its ROM that is needed.
   const alias = roms.map((r) => aliasFor(aliases, r)).find(Boolean);
   if (alias) {
     const historic = historicAlias(alias.alias)?.toLowerCase() === alias.rom.toLowerCase();
     if (here(alias.rom)) {
-      // Un ancien nom de VPinMAME, ou l'alias que VPinMAME appliquait dans l'installation d'où vient
-      // la table (VPMAlias.txt) : rien à dire. Une révision voisine choisie ici : on la rappelle.
+      // An old VPinMAME name, or the alias that VPinMAME applied in the installation the table
+      // comes from (VPMAlias.txt): nothing to say. A neighbouring revision chosen here: we remind it.
       const imported = aliasComment(aliasText, alias.alias) === IMPORTED_ALIAS_COMMENT;
       if (!historic && !imported) {
         findings.push({
@@ -3327,7 +3331,7 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
     return findings;
   }
 
-  // Ancien nom de VPinMAME : le plugin ne le connaît plus, il faut la ligne d'alias.
+  // Old VPinMAME name: the plugin no longer knows it, the alias line is needed.
   const historic = roms.map((r) => [r, historicAlias(r)] as const).find(([, real]) => real);
   if (historic) {
     const [asked, real] = historic as readonly [string, string];
@@ -3349,21 +3353,21 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
       fix: available
         ? {
             label: t('Écrire l’alias « {line} » dans pinmame\\alias.txt', { line: `${asked},${real}` }),
-            ops: [...linkOp(real), { op: 'write', path: aliasFile, content: withAlias(aliasText, asked, real, `ancien nom de VPinMAME (release/VPMAlias.txt)`) }], // i18n-ignore : commentaire écrit dans alias.txt
+            ops: [...linkOp(real), { op: 'write', path: aliasFile, content: withAlias(aliasText, asked, real, `ancien nom de VPinMAME (release/VPMAlias.txt)`) }], // i18n-ignore: comment written in alias.txt
           }
         : undefined,
     });
     return findings;
   }
 
-  // La ROM est dans la bibliothèque : il ne manque que le lien.
+  // The ROM is in the library: only the link is missing.
   const stored = roms.map(inLibrary).find(Boolean);
   if (stored) {
     const name = path.basename(stored.path);
     const copy = !sameVolume(stored.path, folder);
     findings.push({
       code: 'romNotLinked',
-      // Sans pinmame\roms, PinMAME la trouve dans son dossier commun ; avec, il ne regarde que là.
+      // Without pinmame\roms, PinMAME finds it in its common folder; with it, it only looks there.
       severity: dirExists ? 'error' : 'info',
       rom: name.replace(/\.zip$/i, ''),
       title: dirExists
@@ -3387,7 +3391,7 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
     });
     return findings;
   }
-  // La ROM est peut-être dans le dossier, mais pas au bon endroit.
+  // The ROM may be in the folder, but not in the right place.
   const stray = findFile(folder, roms.map((r) => `${r.toLowerCase()}.zip`), romsDir);
   if (stray) {
     const nested = nestedRom(stray);
@@ -3411,7 +3415,7 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
     });
     return findings;
   }
-  // Une révision voisine est sur la borne : sur demande, un alias la fait charger.
+  // A neighbouring revision is on the cabinet: on request, an alias makes it load.
   const libraryNames = library ? [...listRoms(library).keys()] : [];
   const neighbour = neighbourRom(rom, [...files, ...libraryNames]);
   if (neighbour) {
@@ -3430,7 +3434,7 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
       }),
       fix: {
         label: t('Jouer avec {neighbour} (alias « {line} » dans pinmame\\alias.txt)', { neighbour, line: `${rom},${neighbour}` }),
-        ops: [...linkOp(neighbour), { op: 'write', path: aliasFile, content: withAlias(aliasText, rom, neighbour, `révision voisine choisie le ${new Date().toLocaleDateString('fr-FR')}`) }], // i18n-ignore : commentaire écrit dans alias.txt
+        ops: [...linkOp(neighbour), { op: 'write', path: aliasFile, content: withAlias(aliasText, rom, neighbour, `révision voisine choisie le ${new Date().toLocaleDateString('fr-FR')}`) }], // i18n-ignore: comment written in alias.txt
       },
     });
     return findings;
@@ -3456,9 +3460,10 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
 }
 
 /**
- * « Cherchée par Cyber Pinball dans : … » : le pinmame\roms de la table, la bibliothèque de ROM, et,
- * pour une table reprise d'une autre installation, les dossiers de ROM de celle-ci (CyberPinball.RomSearch
- * du .info, écrit par le plan d'ajout). Le joueur sait ainsi où elle n'est pas, et où la mettre.
+ * "Cherchée par Cyber Pinball dans : …" (Searched by Cyber Pinball in: ...): the table's pinmame\roms,
+ * the ROM library, and, for a table taken over from another installation, that installation's ROM
+ * folders (CyberPinball.RomSearch of the .info, written by the add plan). The player thus knows where
+ * it is not, and where to put it.
  */
 function romSearchedText(folder: string, roms: string[], library: string | undefined): string {
   const places = [path.join(folder, 'pinmame', 'roms'), ...(library ? [library] : [])];
@@ -3481,14 +3486,14 @@ function romSearchedText(folder: string, roms: string[], library: string | undef
   return text;
 }
 
-/** ROM de la table à côté de celle de la bibliothèque : copie à remplacer par un lien. */
+/** Table ROM next to the library's one: a copy to replace with a link. */
 function checkRomCopy(file: string, library: string): Finding[] {
   const own = romFile(file);
   const stored = storedRom(library, path.basename(file));
   if (!own || !stored || sameRomFile(own, stored)) return [];
   const name = path.basename(file);
   const identical = sameRomContent(own, stored);
-  // D'un disque à l'autre, une copie identique est la seule possibilité.
+  // From one drive to another, an identical copy is the only possibility.
   if (identical && !sameVolume(stored.path, file)) return [];
   return [
     identical
@@ -3513,10 +3518,10 @@ function checkRomCopy(file: string, library: string): Finding[] {
 }
 
 /**
- * Dossier FlexDMD / UltraDMD que charge le script, absent. Facultatif (playable.ts) : la
- * table se lance sans lui. Sans ses images, FlexDMD renvoie Nothing au script (NewImage,
- * plugins/flexdmd/actors/Image.cpp) : ce DMD-là reste vide, et un script qui ne s'y attend
- * pas s'arrête sur « Type incompatible » (Goonies de VPW).
+ * FlexDMD / UltraDMD folder loaded by the script, missing. Optional (playable.ts): the
+ * table starts without it. Without its images, FlexDMD returns Nothing to the script (NewImage,
+ * plugins/flexdmd/actors/Image.cpp): that DMD stays empty, and a script that does not expect
+ * it stops on "Type incompatible" (Type mismatch) (VPW's Goonies).
  */
 function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean, tablesDir: string): Finding | undefined {
   const dirs = readDirents(folder).filter((d) => d.isDirectory()).map((d) => d.name);
@@ -3527,7 +3532,7 @@ function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean,
       ? t('Le DMD de la ROM s’affiche à l’emplacement du DMD ; si le script s’arrête sur « Type incompatible », c’est ce dossier qui manque.')
       : t('Sans lui, ce DMD reste vide ; si le script s’arrête sur « Type incompatible », c’est ce dossier qui manque.'),
   ].join(' ');
-  // Contenu vidé à la racine par un import qui aplatissait les sous-dossiers : on le range.
+  // Content emptied at the root by an import that flattened the subfolders: we store it.
   const own = [path.basename(folder), ...readDirents(folder).filter((d) => d.isFile() && /\.vpx$/i.test(d.name)).map((d) => d.name.slice(0, -4))].map((n) =>
     n.toLowerCase(),
   );
@@ -3547,8 +3552,8 @@ function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean,
       },
     };
   }
-  // Resté à la racine du dossier des tables (table rangée sans lui, ou installation à plat) : il
-  // revient à la table. Dans le dossier d'une autre version de la table : copié, elle en a besoin aussi.
+  // Left at the root of the tables folder (table stored without it, or flat installation): it
+  // goes back to the table. In the folder of another version of the table: copied, it needs it too.
   const elsewhere = findDmdFolderElsewhere(folder, dmdFolder, tablesDir);
   if (elsewhere) {
     const where = elsewhere.shared ? t('dans le dossier de « {table} »', { table: path.basename(path.dirname(elsewhere.path)) }) : t('à la racine du dossier des tables');
@@ -3574,8 +3579,8 @@ function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean,
 }
 
 /**
- * Le dossier du DMD hors de celui de la table : à la racine du dossier des tables (shared: false),
- * sinon dans le dossier d'une autre table (shared: true, une autre version qui le charge aussi).
+ * The DMD folder outside the table's one: at the root of the tables folder (shared: false),
+ * otherwise in the folder of another table (shared: true, another version that also loads it).
  */
 function findDmdFolderElsewhere(folder: string, dmdFolder: string, tablesDir: string): { path: string; shared: boolean; host?: string } | undefined {
   const root = path.resolve(tablesDir);
@@ -3589,10 +3594,10 @@ function findDmdFolderElsewhere(folder: string, dmdFolder: string, tablesDir: st
     if (other.toLowerCase() === path.resolve(folder).toLowerCase()) continue;
     const found = readDirents(other).find((e) => e.isDirectory() && e.name.toLowerCase() === wanted);
     if (!found) continue;
-    // Une autre version de la table le charge aussi : copié, elle en a besoin. Une table qui ne le charge pas (son
-    // script nomme un autre dossier, ou aucun) l'hébergeait par erreur : déplacé (19/11/2026, Goldorak.UltraDMD
-    // collé dans le dossier de Champions League).
-    // Script illisible (protégé, ou table abîmée) : on ne sait pas, le dossier est copié comme avant.
+    // Another version of the table also loads it: copied, it needs it. A table that does not load it (its
+    // script names another folder, or none) was hosting it by mistake: moved (19/11/2026, Goldorak.UltraDMD
+    // pasted into the folder of Champions League).
+    // Unreadable script (protected, or damaged table): we cannot tell, the folder is copied as before.
     const scripts = readDirents(other)
       .filter((e) => e.isFile() && /\.vpx$/i.test(e.name))
       .map((e) => readVpxScript(path.join(other, e.name)))
@@ -3603,13 +3608,13 @@ function findDmdFolderElsewhere(folder: string, dmdFolder: string, tablesDir: st
   return undefined;
 }
 
-/** Dossier de contenu FlexDMD ou UltraDMD, d'après son nom. */
+/** FlexDMD or UltraDMD content folder, according to its name. */
 const DMD_FOLDER_NAME = /\.(ultradmd|flexdmd)$/i;
 
-/** Fichiers que FlexDMD et UltraDMD chargent depuis leur dossier. */
+/** Files that FlexDMD and UltraDMD load from their folder. */
 const DMD_ASSET_EXT = new Set(['.fnt', '.png', '.gif', '.apng', '.bmp', '.jpg', '.jpeg']);
 
-/** Cherche un fichier par nom dans le dossier de la table (3 niveaux), hors du dossier exclu. */
+/** Looks for a file by name in the table's folder (3 levels), outside the excluded folder. */
 function findFile(dir: string, names: string[], exclude: string, depth = 3): string | undefined {
   for (const dirent of readDirents(dir)) {
     const p = path.join(dir, dirent.name);
@@ -3625,7 +3630,7 @@ function findFile(dir: string, names: string[], exclude: string, depth = 3): str
   return undefined;
 }
 
-/** Le nom le plus proche des références (titre, nom de fichier, dossier). */
+/** The name closest to the references (title, file name, folder). */
 export function bestMatch(names: string[], references: string[]): string {
   const keys = references.map((r) => nameKey(parseTableName(r).title)).filter(Boolean);
   const score = (name: string) => {
@@ -3651,10 +3656,9 @@ function readDirents(dir: string): fs.Dirent[] {
   }
 }
 
-/** Constat « Volume de la ROM bas » : bas, ni d'usine (monté avant la partie) ni choisi par le joueur. */
 /**
- * Table enregistrée par un VPX plus récent que celui qui la joue (une préversion 10.9 et le VPX 10.8.1 de Cyber
- * Pinball) : la correction la fait jouer par le premier VPX qui sait l'ouvrir, comme « Jouée avec » de la fiche.
+ * Table saved by a more recent VPX than the one that plays it (a 10.9 pre-release and Cyber Pinball's
+ * VPX 10.8.1): the fix makes it play with the first VPX that can open it, like "Jouée avec" (Played with) on the game page.
  */
 export function tooNewFinding(entry: TableEntry, ctx: DoctorContext): Finding | undefined {
   if (!ctx.vpx || entry.emulator !== 'vpx') return undefined;
@@ -3673,6 +3677,7 @@ export function tooNewFinding(entry: TableEntry, ctx: DoctorContext): Finding | 
   };
 }
 
+/** "Volume de la ROM bas" (Low ROM volume) finding: low, neither factory (raised before the game) nor chosen by the player. */
 export function romVolumeFinding(v: DoctorContext['romVolume']): Finding | undefined {
   const s = v?.status;
   if (!s || s.kind !== 'set' || v.choice !== undefined || !isLowRomVolume(s) || isFactoryRomVolume(s)) return undefined;

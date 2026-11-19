@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.1
 
+- Page du projet sur GitHub : elle dit dès le début que Cyber Pinball s'installe à côté de PinUP Popper, PinballX ou PinballY sans toucher à leur installation, et qu'il reprend leurs tables sans les dupliquer quand elles sont sur le même disque.
+- Pour les développeurs : un guide en anglais (CONTRIBUTING.md) explique l'organisation du code, la compilation, les tests et la façon de proposer un changement ; les commentaires des principaux modules du cœur sont désormais en anglais.
 - Une table enregistrée par un VPX plus récent que celui qui la joue (une préversion 10.9 et le VPX 10.8.1 de Cyber Pinball) est repérée : le Diagnostic et la Santé de la borne la signalent, l'installation le dit, et la partie est refusée avec une explication au lieu d'échouer. Si un autre VPX assez récent est déjà dans Menu système > Borne > Autres versions de VPX, le Diagnostic propose « La jouer avec » lui, et l'installation le choisit d'office ; sinon, Cyber Pinball dit où l'ajouter.
 - Le script d'une telle table est lu directement dans le fichier, sans lancer un VPX qui ne sait pas l'ouvrir et resterait bloqué sur sa fenêtre d'erreur.
 - Une préversion 10.9 ajoutée aux autres versions de VPX est nommée avec sa révision (« VPX 10.8.1.6012 »), pour ne plus la confondre avec la 10.8.1.

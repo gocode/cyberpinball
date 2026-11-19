@@ -1,7 +1,7 @@
-// PuP-Packs en mode plugins de VPX 10.8.1 :
-// nom de dossier attendu d'après le script, vraie racine d'un pack (imbrications),
-// fichiers inutiles, options des .bat lues sans jamais être exécutées, et choix
-// de l'option d'après le modèle de borne.
+// PuP-Packs in VPX 10.8.1 plugin mode:
+// folder name expected from the script, true root of a pack (nesting),
+// useless files, options of the .bat files read without ever being run, and choice
+// of the option from the cabinet model.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -13,56 +13,56 @@ import { roleZone, zoneRatio } from './zones';
 
 export const PUP_FILES = ['screens.pup', 'playlists.pup', 'triggers.pup'] as const;
 
-/** Ce que le script d'une table dit de son PuP-Pack. */
+/** What a table's script says about its PuP-Pack. */
 export interface PupScriptFacts {
   /**
-   * Noms passés à B2SInit (chargement explicite du pack), puis à Init. Avec
-   * B2SInit, le nom du script l'emporte sur la ROM (PUPPlugin.cpp l. 211-241 :
-   * le chargement automatique par la ROM est sauté si le script a déjà lancé PuP).
+   * Names passed to B2SInit (explicit loading of the pack), then to Init. With
+   * B2SInit, the script's name wins over the ROM (PUPPlugin.cpp l. 211-241:
+   * automatic loading by the ROM is skipped if the script has already started PuP).
    */
   packNames: string[];
-  /** Le script déclare lui-même ses playlists (packs anciens, sans .pup). */
+  /** The script declares its playlists itself (old packs, without .pup). */
   playlistAdd: boolean;
   /**
-   * Le script écrit lui-même le score sur un écran du pack (PuP-DMD : LabelNew, LabelInit) :
-   * le pack dessine alors le DMD de la table, il peut occuper la fenêtre du DMD.
+   * The script writes the score itself on a screen of the pack (PuP-DMD: LabelNew, LabelInit):
+   * the pack then draws the table's DMD, it may occupy the DMD window.
    */
   labels?: boolean;
   /**
-   * Le script ne lance jamais le pack : son lancement dépend d'une variable que le
-   * script règle autrement au départ (« usePUP = False »). Absent si rien ne l'en empêche.
+   * The script never starts the pack: starting it depends on a variable that the
+   * script sets otherwise at the start ("usePUP = False"). Absent if nothing prevents it.
    */
   disabledBy?: PupSwitch;
   /**
-   * La PuP-DMD (le score que le script écrit sur l'écran DMD du pack, LabelInit) dépend d'une
-   * autre variable éteinte au départ (« enablePupDMD = False ») : un pack dont l'option occupe
-   * la fenêtre du DMD n'y montrerait que son cadre vide, par-dessus le DMD de la table.
+   * The PuP-DMD (the score that the script writes on the pack's DMD screen, LabelInit) depends on
+   * another variable switched off at the start ("enablePupDMD = False"): a pack whose option
+   * occupies the DMD window would only show its empty frame there, over the table's DMD.
    */
   dmdDisabledBy?: PupSwitch;
   /**
-   * Le script envoie lui-même des déclencheurs « D » au pack (PuPlayer.B2SData "D…") : ceux que
-   * le pack attend d'une image du DMD (PuPCapture) peuvent venir de là.
+   * The script itself sends "D" triggers to the pack (PuPlayer.B2SData "D..."): those that the
+   * pack expects from a DMD image (PuPCapture) may come from there.
    */
   dmdTriggers?: boolean;
 }
 
-/** Interrupteur du script qui décide si le PuP-Pack est lancé. */
+/** Script switch that decides whether the PuP-Pack is started. */
 export interface PupSwitch {
-  /** Variable (« usePUP »). */
+  /** Variable ("usePUP"). */
   variable: string;
-  /** Valeur que le script lui donne, telle qu'écrite (« False »). */
+  /** Value that the script gives it, as written ("False"). */
   value: string;
-  /** Valeur qui lance le pack (« True ») ; absente si on ne sait pas la déduire. */
+  /** Value that starts the pack ("True"); absent if it cannot be deduced. */
   enable?: string;
-  /** Ligne de l'affectation dans le script (à partir de 0). */
+  /** Line of the assignment in the script (from 0). */
   line: number;
-  /** Ce qu'il allume : le pack (absent), ou la PuP-DMD. */
+  /** What it switches on: the pack (absent), or the PuP-DMD. */
   kind?: 'dmd';
 }
 
 /**
- * Appels PuP d'un script dont les commentaires sont déjà retirés ; undefined si
- * la table n'utilise pas PuP.
+ * PuP calls of a script whose comments are already removed; undefined if
+ * the table does not use PuP.
  */
 export function pupScriptFacts(code: string): PupScriptFacts | undefined {
   const objects = new Set(['puplayer']);
@@ -89,10 +89,10 @@ export function pupScriptFacts(code: string): PupScriptFacts | undefined {
 }
 
 /**
- * Interrupteurs à allumer pour que le pack se voie : celui de son lancement, et celui de la
- * PuP-DMD quand l'option en place dessine dans la fenêtre du DMD (`packDrawsDmd`, pupWindows) :
- * sans elle, le pack y pose son cadre vide (« PuPFrames\default.png ») par-dessus le DMD de la
- * table. The Goonies (VPW 2021) livre les deux éteints (octobre 2026). `code` : scriptCode.
+ * Switches to turn on for the pack to be seen: the one that starts it, and the one of the
+ * PuP-DMD when the option in place draws in the DMD window (`packDrawsDmd`, pupWindows):
+ * without it, the pack puts its empty frame ("PuPFrames\default.png") over the table's
+ * DMD. The Goonies (VPW 2021) ships both switched off (October 2026). `code`: scriptCode.
  */
 export function pupSwitchesToEnable(code: string, packDrawsDmd: boolean): PupSwitch[] {
   const found: PupSwitch[] = [];
@@ -103,12 +103,12 @@ export function pupSwitchesToEnable(code: string, packDrawsDmd: boolean): PupSwi
   return found;
 }
 
-/** Les interrupteurs d'une liste, pour un message : « enablePupPack = True, enablePupDMD = True ». */
+/** The switches of a list, for a message: "enablePupPack = True, enablePupDMD = True". */
 export function describeSwitches(switches: PupSwitch[], state: 'value' | 'enable'): string {
   return switches.map((s) => `${s.variable} = ${state === 'value' ? s.value : (s.enable ?? '?')}`).join(', ');
 }
 
-// ---------- Interrupteur du script ----------
+// ---------- Script switch ----------
 
 const ROUTINE_START = /^\s*(?:(?:public|private)\s+)?(?:sub|function)\s+(\w+)/i;
 const ROUTINE_END = /^\s*end\s+(?:sub|function)\b/i;
@@ -124,31 +124,31 @@ function literalValue(text: string): Value {
   return Number(text);
 }
 
-/** Valeur numérique de VBScript (True vaut -1), ou la chaîne. */
+/** Numeric value in VBScript (True is -1), or the string. */
 const numeric = (v: Value) => (v === true ? -1 : v === false ? 0 : v);
 
 interface Assignment {
-  /** Nom de la variable tel qu'écrit. */
+  /** Name of the variable as written. */
   name: string;
   value: string;
   line: number;
-  /** Dans une Sub ou une Function (exécutée plus tard, ou jamais). */
+  /** In a Sub or a Function (run later, or never). */
   inRoutine: boolean;
-  /** Valeur littérale (sinon calculée : option de la table, fichier, autre variable). */
+  /** Literal value (otherwise computed: table option, file, other variable). */
   literal: boolean;
 }
 
 /**
- * Le lancement du pack (CreateObject("PinUpPlayer.PinDisplay"), puis B2SInit ou
- * Init) n'est atteint que si une variable a une certaine valeur, et le script lui en
- * donne une autre au départ : 2001 : A Space Odyssey (Original 2025) livre
- * « usePUP = False », et le plugin PUP ne charge jamais son pack, même bien rangé.
- * Les conditions qui entourent la ligne sont suivies dans sa Sub, puis là où cette
- * Sub est appelée (trois niveaux). Une variable qui ne fait que recopier une autre
- * (« HasPup = enablePupPack », The Goonies) renvoie à celle-ci : c'est elle qu'il faut
- * allumer. undefined si rien ne l'empêche, ou si on ne peut pas le dire : valeur calculée
- * (option de la table, fichier lu), changée dans une Sub, Else, Select Case.
- * `code` : le script sans commentaires, une ligne pour une ligne (scriptCode).
+ * Starting the pack (CreateObject("PinUpPlayer.PinDisplay"), then B2SInit or
+ * Init) is only reached if a variable has a certain value, and the script gives it
+ * another one at the start: 2001 : A Space Odyssey (Original 2025) ships
+ * "usePUP = False", and the PUP plugin never loads its pack, even when properly placed.
+ * The conditions around the line are followed in its Sub, then where that
+ * Sub is called (three levels). A variable that only copies another one
+ * ("HasPup = enablePupPack", The Goonies) refers to that one: it is the one to
+ * switch on. undefined if nothing prevents it, or if it cannot be told: computed value
+ * (table option, file read), changed in a Sub, Else, Select Case.
+ * `code`: the script without comments, one line for one line (scriptCode).
  */
 export function pupScriptSwitch(code: string): PupSwitch | undefined {
   return switchFinder(code)(PUP_CREATE);
@@ -157,10 +157,10 @@ export function pupScriptSwitch(code: string): PupSwitch | undefined {
 const PUP_CREATE = /CreateObject\s*\(\s*"PinUpPlayer\.PinDisplay"\s*\)/i;
 
 /**
- * Interrupteur de la PuP-DMD : la variable qui empêche d'atteindre LabelInit (mise en place
- * des textes de la PuP-DMD), si ce n'est pas déjà celle qui coupe le pack. The Goonies :
- * « Const enablePupDMD = False », et PuPInit fait alors cacher l'écran DMD du pack par
- * PinUP Player (SendMSG FN 12), que le plugin PUP ne gère pas.
+ * Switch of the PuP-DMD: the variable that prevents reaching LabelInit (setting up
+ * the PuP-DMD texts), if it is not already the one that cuts the pack. The Goonies:
+ * "Const enablePupDMD = False", and PuPInit then makes PinUP Player hide the pack's DMD
+ * screen (SendMSG FN 12), which the PUP plugin does not handle.
  */
 export function pupDmdSwitch(code: string): PupSwitch | undefined {
   const find = switchFinder(code);
@@ -171,7 +171,7 @@ export function pupDmdSwitch(code: string): PupSwitch | undefined {
   return { ...dmd, kind: 'dmd' };
 }
 
-/** Pour une ligne du script (needle), la variable éteinte au départ qui l'empêche d'être atteinte. */
+/** For a script line (needle), the variable switched off at the start that keeps it from being reached. */
 function switchFinder(code: string): (needle: RegExp) => PupSwitch | undefined {
   const lines = code.split(/\r?\n/);
   const routineOf: (string | undefined)[] = [];
@@ -186,7 +186,7 @@ function switchFinder(code: string): (needle: RegExp) => PupSwitch | undefined {
   lines.forEach((line, i) => {
     const inRoutine = routineOf[i] !== undefined && !ROUTINE_START.test(line);
     for (const statement of statements(line)) {
-      // « If x Then usePUP = True » : une affectation qui peut avoir lieu, comme dans une Sub.
+      // "If x Then usePUP = True": an assignment that may happen, as in a Sub.
       const single = /^if\s+.+?\s+then\s+(.+)$/i.exec(statement);
       const tails = single ? single[1]!.split(/\s+else\s+/i) : [statement];
       for (const s of tails) {
@@ -202,9 +202,9 @@ function switchFinder(code: string): (needle: RegExp) => PupSwitch | undefined {
   });
 
   /**
-   * Valeur de départ d'une variable, si elle est sûre : littérale hors de toute Sub, jamais
-   * rallumée ailleurs. Recopiée d'une autre variable (« HasPup = enablePupPack »), et jamais
-   * changée dans une Sub : la valeur de départ de cette autre variable, deux relais au plus.
+   * Starting value of a variable, if it is certain: literal outside any Sub, never
+   * switched on again elsewhere. Copied from another variable ("HasPup = enablePupPack"), and never
+   * changed in a Sub: the starting value of that other variable, two relays at most.
    */
   const startValue = (name: string, off: (v: Value) => boolean, depth = 0): Assignment | undefined => {
     const list = assignments.get(name.toLowerCase()) ?? [];
@@ -224,12 +224,12 @@ function switchFinder(code: string): (needle: RegExp) => PupSwitch | undefined {
     if (!top.length || top.some((a) => !a.literal)) return undefined;
     const last = top.at(-1)!;
     if (top.some((a) => numeric(literalValue(a.value)) !== numeric(literalValue(last.value)))) return undefined;
-    // Une Sub qui la rallume (option de la table, réglage lu) : on ne peut rien dire.
+    // A Sub that switches it on again (table option, setting read): nothing can be said.
     if (list.some((a) => a.inRoutine && (!a.literal || !off(literalValue(a.value))))) return undefined;
     return last;
   };
 
-  /** Condition d'un If : fausse au départ ? Alors la variable et la valeur qui la rendrait vraie. */
+  /** Condition of an If: false at the start? Then the variable and the value that would make it true. */
   const blocking = (cond: string): PupSwitch | undefined => {
     const c = cond.trim().replace(/^\((.*)\)$/, '$1').trim();
     const ors = c.split(/\s+or\s+/i);
@@ -280,7 +280,7 @@ function switchFinder(code: string): (needle: RegExp) => PupSwitch | undefined {
     return sw;
   };
 
-  /** Conditions des If qui entourent la ligne `i`, jusqu'au début de sa Sub ; null : branche Else, on ne sait pas. */
+  /** Conditions of the Ifs around line `i`, up to the start of its Sub; null: Else branch, unknown. */
   const guards = (i: number, needle: RegExp): { conds: string[]; routine?: string } | null => {
     const conds: string[] = [];
     const single = /^\s*if\s+(.+?)\s+then\s+(.+)$/i.exec(lines[i]!);
@@ -300,7 +300,7 @@ function switchFinder(code: string): (needle: RegExp) => PupSwitch | undefined {
     return { conds };
   };
 
-  /** La ligne est-elle bloquée ? Le blocage, null si elle est atteinte (ou si on ne sait pas). */
+  /** Is the line blocked? The blocking, null if it is reached (or if it is unknown). */
   const blockedAt = (i: number, needle: RegExp, level: number): PupSwitch | null => {
     const g = guards(i, needle);
     if (!g) return null;
@@ -311,7 +311,7 @@ function switchFinder(code: string): (needle: RegExp) => PupSwitch | undefined {
     if (!g.routine || level >= 3) return null;
     const call = new RegExp(`\\b${g.routine}\\b`, 'i');
     const sites = lines.map((l, k) => k).filter((k) => call.test(lines[k]!) && !ROUTINE_START.test(lines[k]!) && routineOf[k] !== g.routine);
-    // Sub jamais appelée par le script : un événement de VPX (Table1_Init…), atteinte.
+    // Sub never called by the script: a VPX event (Table1_Init...), reached.
     if (!sites.length) return null;
     let first: PupSwitch | null = null;
     for (const k of sites) {
@@ -358,9 +358,9 @@ function compare(a: number | string, op: string, b: number | string): boolean {
 }
 
 /**
- * Le script avec l'interrupteur allumé : seule la valeur de l'affectation change, sur
- * sa ligne ; le reste (fins de ligne, commentaires, accents) est rendu tel quel.
- * undefined si la ligne n'est plus celle qu'on attend.
+ * The script with the switch turned on: only the value of the assignment changes, on
+ * its line; the rest (line endings, comments, accents) is returned as is.
+ * undefined if the line is no longer the expected one.
  */
 export function enablePupSwitch(script: string, sw: PupSwitch): string | undefined {
   if (sw.enable === undefined) return undefined;
@@ -377,26 +377,26 @@ export function enablePupSwitch(script: string, sw: PupSwitch): string | undefin
   return parts.join('');
 }
 
-/** Littéral, ou valeurs données à la variable (Const cPuPPack = "…", pGameName = "…"). */
+/** Literal, or values given to the variable (Const cPuPPack = "...", pGameName = "..."). */
 function resolveValue(code: string, token: string): string[] {
   if (token.startsWith('"')) return [token.slice(1, -1).trim()];
   return [...code.matchAll(new RegExp(`\\b${token}\\s*=\\s*"([^"\\r\\n]*)"`, 'gi'))].map((v) => v[1]!.trim());
 }
 
 /**
- * Numéros que le script envoie au plugin PUP en déclencheurs « E » : chaque DOF n, DOFALT n,
- * SoundFXDOF(…, n, …) et B2SSetData n passe par B2S Server (Sub DOF de controller.vbs ;
- * B2SServer::B2SSetData envoie B2SPluginEvent { 'E', n }, B2SServer.cpp l. 441-460 au commit
- * af26b2d93), que le plugin PUP compare aux déclencheurs E de triggers.pup. Un numéro relayé par
- * le paramètre de la routine qui l'enveloppe (Sub DOF(DOFevent, State)) ne compte pas ; un numéro
- * calculé ailleurs rend undefined : on ne sait pas ce que le script envoie. `code` : scriptCode.
+ * Numbers that the script sends to the PUP plugin as "E" triggers: each DOF n, DOFALT n,
+ * SoundFXDOF(..., n, ...) and B2SSetData n goes through B2S Server (Sub DOF of controller.vbs;
+ * B2SServer::B2SSetData sends B2SPluginEvent { 'E', n }, B2SServer.cpp l. 441-460 at commit
+ * af26b2d93), which the PUP plugin compares with the E triggers of triggers.pup. A number relayed
+ * by the parameter of the routine that wraps it (Sub DOF(DOFevent, State)) does not count; a
+ * number computed elsewhere returns undefined: what the script sends is unknown. `code`: scriptCode.
  */
 export function scriptB2sEvents(code: string): number[] | undefined {
   const sent = new Set<number>();
   let params = new Set<string>();
   const CALL = /\b(?:DOF(?:ALT)?\b\s*\(?\s*|SoundFXDOF\s*\(\s*[^,\r\n]*,\s*|B2SSetData\s*\(?\s*)([^,\r\n)]+?)\s*,/gi;
   for (const line of code.split('\n')) {
-    // En-tête de routine : ses paramètres comptent pour le reste de la ligne (« Sub X : DOF 1, 1 : End Sub »).
+    // Routine header: its parameters count for the rest of the line ("Sub X : DOF 1, 1 : End Sub").
     const head = /^\s*(?:(?:Public|Private)\s+)?(?:Sub|Function)\s+\w+\s*(?:\(([^)]*)\))?/i.exec(line);
     if (head) params = new Set((head[1] ?? '').split(',').map((p) => p.replace(/\b(ByVal|ByRef)\b/gi, '').trim().toLowerCase()).filter(Boolean));
     for (const m of (head ? line.slice(head[0].length) : line).matchAll(CALL)) {
@@ -410,9 +410,9 @@ export function scriptB2sEvents(code: string): number[] | undefined {
 }
 
 /**
- * Ce qui peut faire jouer un pack sur une table sans ROM : ses déclencheurs « E » actifs, ceux
- * reconnus sur les images du DMD (« D » avec leur capture, pupcapture.ts), et ses écrans visibles
- * qui montrent une image ou une vidéo d'eux-mêmes (playlist par défaut de screens.pup).
+ * What can make a pack play on a table without a ROM: its active "E" triggers, those
+ * recognised on DMD images ("D" with their capture, pupcapture.ts), and its visible screens
+ * that show an image or a video of their own (default playlist of screens.pup).
  */
 export function packDrivers(root: string): { events: number[]; capture: number; defaults: number } {
   const file = readDirents(root).find((d) => d.isFile() && d.name.toLowerCase() === 'triggers.pup');
@@ -434,39 +434,39 @@ export function packDrivers(root: string): { events: number[]; capture: number; 
   return { events: [...events].sort((a, b) => a - b), capture: captureTriggers(root).capture, defaults };
 }
 
-/** Le script pilote un jeu par PinMAME (`code` : scriptCode). */
+/** The script drives a game through PinMAME (`code`: scriptCode). */
 export function usesPinmameCode(code: string): boolean {
-  // LoadVPMALT : variante de LoadVPM de certaines tables (contrôleur au choix), une ROM tout de même.
+  // LoadVPMALT: variant of LoadVPM in some tables (controller of choice), a ROM all the same.
   return /\bLoadVPM(?:ALT)?\b|VPinMAME\.Controller/i.test(code);
 }
 
-/** Ce qu'il faut savoir du script pour dire comment le plugin trouve le pack. */
+/** What must be known from the script to tell how the plugin finds the pack. */
 export interface PupLoadFacts {
   usesPinmame: boolean;
   roms: string[];
   pup?: PupScriptFacts;
-  /** Nom du jeu donné à B2S Server (cGameName), pour une table sans ROM. */
+  /** Game name given to B2S Server (cGameName), for a table without a ROM. */
   b2sName?: string;
 }
 
 /**
- * Personne ne chargera le pack : le script ne lance jamais PuP, et la table ne joue pas de ROM.
- * Le plugin PUP de VPX 10.8.1 ne charge un pack de lui-même que pour un jeu PinMAME
- * (PUPPlugin.cpp, OnControllersChanged, au commit af26b2d93 : un jeu publié par B2S, « b2s::… »,
- * est ignoré). Ces packs sont faits pour PinUP Player branché sur B2S Server, qui les cherchait
- * sous le nom du jeu donné à B2S. *Game of Thrones LE (VPW, Stern 2015)*, 28 octobre 2026 :
- * script en FlexDMD, « Dim PuPlayer ' Not currently used », pack de mikeleonheart à côté ;
- * vpinball.log disait « Plugin PUP loaded », jamais « PUP path ».
+ * Nobody will load the pack: the script never starts PuP, and the table does not play a ROM.
+ * The PUP plugin of VPX 10.8.1 only loads a pack by itself for a PinMAME game
+ * (PUPPlugin.cpp, OnControllersChanged, at commit af26b2d93: a game published by B2S, "b2s::...",
+ * is ignored). These packs are made for PinUP Player connected to B2S Server, which looked for
+ * them under the game name given to B2S. *Game of Thrones LE (VPW, Stern 2015)*, 28 October 2026:
+ * FlexDMD script, "Dim PuPlayer ' Not currently used", mikeleonheart's pack next to it;
+ * vpinball.log said "Plugin PUP loaded", never "PUP path".
  */
 export function pupLoaderNeeded(facts: PupLoadFacts): boolean {
   return !facts.usesPinmame && !facts.pup;
 }
 
-/** Noms de dossier possibles du pack, dans l'ordre où le plugin les essaie. */
+/** Possible folder names of the pack, in the order the plugin tries them. */
 export function expectedPackNames(facts: PupLoadFacts | undefined): string[] {
   if (!facts) return [];
   const names: string[] = [];
-  // Sans chargement par le script ni par la ROM, le nom que lui donnait PinUP Player : celui du jeu pour B2S.
+  // Without loading by the script or by the ROM, the name PinUP Player gave it: the game's name for B2S.
   const own = pupLoaderNeeded(facts) && facts.b2sName ? [facts.b2sName] : [];
   for (const name of [...(facts.pup?.packNames ?? []), ...(facts.usesPinmame ? facts.roms : []), ...own]) {
     if (name && !names.some((n) => n.toLowerCase() === name.toLowerCase())) names.push(name);
@@ -474,26 +474,26 @@ export function expectedPackNames(facts: PupLoadFacts | undefined): string[] {
   return names;
 }
 
-// ---------- Lancement du pack par Cyber Pinball ----------
+// ---------- Starting the pack by Cyber Pinball ----------
 
-/** Lancement du pack ajouté au script par Cyber Pinball, quand le script ne le fait pas. */
+/** Starting of the pack added to the script by Cyber Pinball, when the script does not do it. */
 export interface PupLoader {
-  /** Dossier du pack dans pupvideos. */
+  /** Folder of the pack in pupvideos. */
   pack: string;
-  /** Objet table (« Table1 ») : le pack est lancé au début de sa Sub <table>_Init ; absent, à la fin du script. */
+  /** Table object ("Table1"): the pack is started at the beginning of its Sub <table>_Init; absent, at the end of the script. */
   table?: string;
 }
 
 const LOADER_SUB = 'CyberPinball_PuPStart';
 
 /**
- * Le script qui lance le pack comme le ferait la table : un objet PinUpPlayer.PinDisplay, puis
- * B2SInit avec le nom du dossier (PUPPinDisplay::B2SInit charge le pack et démarre ses écrans).
- * Le plugin demande de le faire pendant l'initialisation de la table : l'appel est ajouté au
- * début de <table>_Init, sur la ligne de la Sub (« Sub Table1_Init : CyberPinball_PuPStart ») ;
- * la Sub elle-même, après la dernière ligne. Les numéros de ligne du script ne bougent pas.
- * Sans plugin PUP, l'erreur est ignorée (On Error Resume Next, dans la Sub seulement) puis
- * effacée : un « If Err Then MsgBox » plus loin dans <table>_Init ne la verrait pas.
+ * The script that starts the pack as the table would: a PinUpPlayer.PinDisplay object, then
+ * B2SInit with the folder name (PUPPinDisplay::B2SInit loads the pack and starts its screens).
+ * The plugin asks for this to be done during the table's initialisation: the call is added at
+ * the beginning of <table>_Init, on the line of the Sub ("Sub Table1_Init : CyberPinball_PuPStart");
+ * the Sub itself, after the last line. The script's line numbers do not move.
+ * Without the PUP plugin, the error is ignored (On Error Resume Next, in the Sub only) then
+ * cleared: an "If Err Then MsgBox" further down in <table>_Init would not see it.
  */
 export function addPupLoader(script: string, loader: PupLoader): string {
   const eol = /\r\n/.test(script) ? '\r\n' : '\n';
@@ -522,11 +522,11 @@ export function addPupLoader(script: string, loader: PupLoader): string {
   return text + lines.join(eol) + eol;
 }
 
-// ---------- Déclencheurs par images du DMD ----------
+// ---------- Triggers from DMD images ----------
 
 /**
- * Déclencheurs actifs du pack (triggers.pup à sa racine) : ceux qui attendent une image du DMD
- * (« D<n> » avec PupCapture\<n>.bmp), et tous.
+ * Active triggers of the pack (triggers.pup at its root): those that wait for a DMD image
+ * ("D<n>" with PupCapture\<n>.bmp), and all of them.
  */
 export function captureTriggers(root: string): { capture: number; total: number } {
   const file = readDirents(root).find((d) => d.isFile() && d.name.toLowerCase() === 'triggers.pup');
@@ -549,7 +549,7 @@ export function captureTriggers(root: string): { capture: number; total: number 
 
 // ---------- screens.pup ----------
 
-/** Ligne CSV telle que la lit le plugin (guillemets, "" pour un guillemet). */
+/** CSV line as the plugin reads it (quotes, "" for a quote). */
 export function parseCsvLine(line: string): string[] {
   const parts: string[] = [];
   let current = '';
@@ -577,16 +577,16 @@ export interface PupScreen {
   description: string;
   /** Show, ForceON, ForcePoP, ForceBack, ForcePopBack, MusicOnly, Off. */
   mode: string;
-  /** Écran parent d'un CustomPos (« 2,0,0,100,100 ») : l'écran s'affiche dedans. */
+  /** Parent screen of a CustomPos ("2,0,0,100,100"): the screen is shown inside it. */
   parent?: number;
-  /** Place du CustomPos, en % de la fenêtre du parent (PUPCustomPos::ScaledRect). */
+  /** Place of the CustomPos, in % of the parent's window (PUPCustomPos::ScaledRect). */
   rect?: { x: number; y: number; w: number; h: number };
-  /** Image ou vidéo montrée par défaut sur cet écran : dossier (playlist) et fichier, s'ils sont donnés. */
+  /** Image or video shown by default on this screen: folder (playlist) and file, if given. */
   playlist?: string;
   playFile?: string;
 }
 
-/** Écrans de screens.pup : la première ligne est sautée, une ligne valide a 8 colonnes (PUPScreen.cpp l. 65-105). */
+/** Screens of screens.pup: the first line is skipped, a valid line has 8 columns (PUPScreen.cpp l. 65-105). */
 export function parseScreens(text: string): PupScreen[] {
   const screens: PupScreen[] = [];
   for (const line of text.split(/\r?\n/).slice(1)) {
@@ -611,12 +611,12 @@ export function parseScreens(text: string): PupScreen[] {
   return screens;
 }
 
-/** L'écran montre des images (Off et MusicOnly n'affichent rien). */
+/** The screen shows images (Off and MusicOnly display nothing). */
 export function isVisible(screen: PupScreen): boolean {
   return !/^(off|musiconly)$/i.test(screen.mode);
 }
 
-/** Fenêtres de VPX où le plugin PUP dessine quelque chose avec ce screens.pup. */
+/** VPX windows where the PUP plugin draws something with this screens.pup. */
 export interface PupWindows {
   topper: boolean;
   backglass: boolean;
@@ -624,14 +624,14 @@ export interface PupWindows {
 }
 
 /**
- * Ce que le plugin PUP dessine dans chaque fenêtre, comme PUPManager::Render (commit
- * af26b2d93) : une fenêtre a une racine (Topper : écran 0 ; Backglass : 2, sinon 6 ;
- * ScoreView : 5, sinon 1), utilisable si elle n'est pas un écran posé dans un autre sans
- * enfant, et si un écran visible descend d'elle. Les écrans s'ajoutent dans l'ordre du
- * fichier ; un parent de CustomPos absent est créé d'office (ForceBack), un écran repris
- * plus bas remplace le premier et garde ses enfants (PUPManager::AddScreen).
- * Exemple : 2001 - A Space Odyssey, option « B2S Users … Pup on Fulldmd » : l'écran 2 est
- * posé dans le 5 (« 5,12.7,13.5,74.8,74.6 ») : rien sur le fronton, tout sur le FullDMD.
+ * What the PUP plugin draws in each window, like PUPManager::Render (commit
+ * af26b2d93): a window has a root (Topper: screen 0; Backglass: 2, otherwise 6;
+ * ScoreView: 5, otherwise 1), usable if it is not a screen placed inside another without a
+ * child, and if a visible screen descends from it. Screens are added in the order of the
+ * file; a missing CustomPos parent is created automatically (ForceBack), a screen repeated
+ * further down replaces the first one and keeps its children (PUPManager::AddScreen).
+ * Example: 2001 - A Space Odyssey, option "B2S Users ... Pup on Fulldmd": screen 2 is
+ * placed inside 5 ("5,12.7,13.5,74.8,74.6"): nothing on the backglass, everything on the FullDMD.
  */
 export function pupWindows(screens: PupScreen[]): PupWindows {
   const usable = pupRoots(screens);
@@ -639,15 +639,15 @@ export function pupWindows(screens: PupScreen[]): PupWindows {
 }
 
 /**
- * Écran PuP que le plugin prend comme racine de la fenêtre du DMD : 5 (FullDMD, 16:9) ou, à
- * défaut, 1 (DMD) ; undefined quand le pack n'y dessine rien (PUPManager::Render).
+ * PuP screen that the plugin takes as root of the DMD window: 5 (FullDMD, 16:9) or, failing
+ * that, 1 (DMD); undefined when the pack draws nothing there (PUPManager::Render).
  */
 export function pupDmdRoot(screens: PupScreen[]): 1 | 5 | undefined {
   const usable = pupRoots(screens);
   return usable(5) ? 5 : usable(1) ? 1 : undefined;
 }
 
-/** Racines utilisables d'après screens.pup, comme PUPManager::Render (voir pupWindows). */
+/** Usable roots according to screens.pup, like PUPManager::Render (see pupWindows). */
 function pupRoots(screens: PupScreen[]): (root: number) => boolean {
   const byNum = new Map<number, PupScreen>();
   const parentOf = new Map<number, number>();
@@ -674,39 +674,39 @@ function pupRoots(screens: PupScreen[]): (root: number) => boolean {
   };
 }
 
-/** Le pack rangé dans `dir` (racine retrouvée sous les imbrications) occupe la fenêtre du DMD avec l'option en place. */
+/** The pack placed in `dir` (root found under the nesting) occupies the DMD window with the option in place. */
 export function packDrawsDmd(dir: string): boolean {
   const screens = packScreens(findPackRoot(dir) ?? dir);
   return screens.length > 0 && pupWindows(screens).dmd;
 }
 
 /**
- * Écrans de la racine d'un pack (screens.pup appliqué), sans le reste de l'analyse : ni les .bat,
- * ni les dossiers d'options, ni le parcours de tout le pack à la recherche des fichiers inutiles.
- * Les questions « le pack occupe-t-il la fenêtre du DMD ? » ne lisaient que `.screens` d'un
- * analysePack complet, refait pour chaque pack à chaque diagnostic (17/11/2026). Même résultat
- * que analysePack(root).screens.
+ * Screens of a pack's root (screens.pup applied), without the rest of the analysis: neither the
+ * .bat files, nor the option folders, nor the walk through the whole pack looking for useless
+ * files. The questions "does the pack occupy the DMD window?" only read `.screens` of a full
+ * analysePack, redone for each pack at each diagnosis (17/11/2026). Same result
+ * as analysePack(root).screens.
  */
 export function packScreens(root: string): PupScreen[] {
   const screensFile = readDirents(root).find((d) => d.isFile() && d.name.toLowerCase() === 'screens.pup');
   return screensFile ? parseScreens(readText(path.join(root, screensFile.name))) : [];
 }
 
-/** Noms que PinUP Player donne à ses écrans (PinUpPlayer.ini), pour les écrans que screens.pup ne déclare pas. */
+/** Names that PinUP Player gives its screens (PinUpPlayer.ini), for the screens that screens.pup does not declare. */
 const DEFAULT_SCREEN_NAMES: Record<number, string> = { 0: 'Topper', 1: 'DMD', 2: 'Backglass', 3: 'Playfield', 4: 'Music', 5: 'FullDMD' };
 
 /**
- * screens.pup à écrire dans un pack qui n'en a pas : ses playlists (playlists.pup) et ses
- * déclencheurs (triggers.pup) visent des écrans que rien ne déclare. PinUP Player prenait alors
- * ses écrans par défaut ; le plugin PUP de VPX 10.8.1 n'en crée aucun (PUPManager::LoadConfig,
- * commit af26b2d93 : « No screens.pup file found », puis rien), et tout le pack reste éteint :
- * déclencheurs et playlists s'attachent à des écrans qui n'existent pas. Relevé le 17/11/2026 sur
- * quatre tables reprises de PinUP Popper (24, Black Knight, Daredevil, World Cup Soccer).
+ * screens.pup to write in a pack that has none: its playlists (playlists.pup) and its
+ * triggers (triggers.pup) target screens that nothing declares. PinUP Player then took
+ * its default screens; the PUP plugin of VPX 10.8.1 creates none (PUPManager::LoadConfig,
+ * commit af26b2d93: "No screens.pup file found", then nothing), and the whole pack stays off:
+ * triggers and playlists attach to screens that do not exist. Found on 17/11/2026 on
+ * four tables imported from PinUP Popper (24, Black Knight, Daredevil, World Cup Soccer).
  *
- * Chaque écran visé est déclaré comme le plugin le ferait lui-même (PUPScreen::CreateDefault) :
- * mode Show, sans fond, sans place à part, au volume par défaut (colonne vide). undefined : le
- * pack a déjà son screens.pup, a des options à appliquer (pupOptionNotApplied), ou ne vise aucun
- * écran (pack piloté par le script, qui crée ses écrans par PuPlayer.Init).
+ * Each targeted screen is declared as the plugin itself would (PUPScreen::CreateDefault):
+ * Show mode, no background, no separate place, at the default volume (empty column). undefined:
+ * the pack already has its screens.pup, has options to apply (pupOptionNotApplied), or targets
+ * no screen (pack driven by the script, which creates its screens through PuPlayer.Init).
  */
 export function defaultScreensPup(root: string): string | undefined {
   const entries = readDirents(root);
@@ -731,50 +731,51 @@ export function defaultScreensPup(root: string): string | undefined {
 }
 
 /**
- * PuP-DMD posé dans le fronton : l'écran du DMD (5, sinon 1) est placé dans le fronton (CustomPos
- * « 2,0,0,100,100 ») et rien n'occupe la fenêtre du DMD. L'auteur a composé un grand écran 16:9
- * unique, score en bas du fronton ; sur une borne qui a un écran DMD, celui-ci reste vide.
- * Exemple : City Hunter (Original 2025, Tombg), le 6 novembre 2026 : six vidéos en haut du
- * fronton, le score (étiquettes de l'écran 1) dans la bande du bas.
+ * PuP-DMD placed in the backglass: the DMD screen (5, otherwise 1) is placed in the backglass
+ * (CustomPos "2,0,0,100,100") and nothing occupies the DMD window. The author composed a single
+ * large 16:9 screen, score at the bottom of the backglass; on a cabinet that has a DMD screen,
+ * that one stays empty.
+ * Example: City Hunter (Original 2025, Tombg), on 6 November 2026: six videos at the top of the
+ * backglass, the score (labels of screen 1) in the bottom band.
  *
- * `band` : la bande du fronton, en % de sa hauteur, que les autres écrans posés dans le fronton
- * laissent libre (la plus haute des deux, en haut ou en bas) : c'est là que l'auteur a mis le
- * score. Sans bande nette (moins de 15 %), tout l'écran du DMD.
+ * `band`: the band of the backglass, in % of its height, that the other screens placed in the
+ * backglass leave free (the taller of the two, at the top or at the bottom): that is where the
+ * author put the score. Without a clear band (under 15 %), the whole DMD screen.
  *
- * La bande garde les proportions que l'auteur a composées : le plugin PUP place et dimensionne
- * les étiquettes en % de la largeur et de la hauteur de leur écran (PUPLabel::Render), une
- * place étirée en hauteur grossit le texte sans écarter les étiquettes, qui se chevauchent
- * (City Hunter sur le FullDMD 16:9 d'un poste, 6 novembre 2026, avec une bande calculée pour
- * un DMD 4:1). Elle est donc posée dans la fenêtre du DMD (`windowAspect`, largeur sur
- * hauteur) au plus grand sans déformation, centrée (dmdBandPlacement).
+ * The band keeps the proportions that the author composed: the PUP plugin places and sizes
+ * labels in % of the width and height of their screen (PUPLabel::Render), a place stretched
+ * in height enlarges the text without spreading the labels apart, which then overlap
+ * (City Hunter on the 16:9 FullDMD of a PC, 6 November 2026, with a band computed for
+ * a 4:1 DMD). So it is placed in the DMD window (`windowAspect`, width over
+ * height) as large as possible without distortion, centred (dmdBandPlacement).
  */
 export interface DmdInBackglass {
-  /** Écran du DMD (1 ou 5). */
+  /** DMD screen (1 or 5). */
   screen: number;
-  /** Écran du fronton où il est posé (2 ou 6). */
+  /** Backglass screen where it is placed (2 or 6). */
   parent: number;
-  /** Bande de l'écran du DMD à montrer dans la fenêtre du DMD, en % de sa hauteur. */
+  /** Band of the DMD screen to show in the DMD window, in % of its height. */
   band: { top: number; bottom: number };
-  /** CustomPos qui pose cette bande dans la fenêtre du DMD (relocateScreen). */
+  /** CustomPos that places this band in the DMD window (relocateScreen). */
   customPos: string;
 }
 
 const BACKGLASS_SCREENS = [2, 6];
 
-/** Proportions (largeur sur hauteur) de l'écran du fronton pour lequel le pack est composé : 2 « Backglass 16x9 », 6 « Backglass 4x3-5x4 » (PUPManager::AddScreen). */
+/** Proportions (width over height) of the backglass screen the pack is composed for: 2 "Backglass 16x9", 6 "Backglass 4x3-5x4" (PUPManager::AddScreen). */
 const BACKGLASS_ASPECT: Record<number, number> = { 2: 16 / 9, 6: 4 / 3 };
 
-/** DMD réel, quand la borne ne dit pas la forme de la fenêtre du DMD. */
+/** Real DMD, when the cabinet does not tell the shape of the DMD window. */
 const DEFAULT_DMD_ASPECT = 4;
 
 export function dmdInBackglass(screens: PupScreen[], windowAspect = DEFAULT_DMD_ASPECT): DmdInBackglass | undefined {
   if (!screens.length || pupWindows(screens).dmd) return undefined;
-  // Dernière définition de chaque écran : celle que le plugin garde (PUPManager::AddScreen).
+  // Last definition of each screen: the one the plugin keeps (PUPManager::AddScreen).
   const byNum = new Map(screens.map((s) => [s.num, s]));
   const dmd = [5, 1].map((n) => byNum.get(n)).find((s) => s && isVisible(s) && s.parent !== undefined && BACKGLASS_SCREENS.includes(s.parent));
   if (!dmd?.rect || !dmd.parent) return undefined;
   const parent = dmd.parent;
-  // Autres écrans visibles posés dans le même fronton, hors fonds pleine taille.
+  // Other visible screens placed in the same backglass, except full-size backgrounds.
   const others = [...byNum.values()].filter(
     (s) => s !== dmd && isVisible(s) && s.parent === parent && s.rect && !(s.rect.w >= 90 && s.rect.h >= 90) && s.rect.h > 0,
   );
@@ -785,27 +786,27 @@ export function dmdInBackglass(screens: PupScreen[], windowAspect = DEFAULT_DMD_
     const below = 100 - bottom;
     if (Math.max(top, below) >= 15) band = below >= top ? { top: bottom, bottom: 100 } : { top: 0, bottom: top };
   }
-  // Bande du fronton, ramenée dans l'écran du DMD (sa place dans le fronton : dmd.rect).
+  // Band of the backglass, brought back into the DMD screen (its place in the backglass: dmd.rect).
   const r = dmd.rect;
   const from = r.h > 0 ? Math.max(0, (band.top - r.y) / r.h) : 0;
   const to = r.h > 0 ? Math.min(1, (band.bottom - r.y) / r.h) : 1;
   const inside = to - from >= 0.15 ? { top: from * 100, bottom: to * 100 } : { top: 0, bottom: 100 };
-  // Proportions de l'écran du DMD tel que l'auteur l'a composé : sa place dans le fronton.
+  // Proportions of the DMD screen as the author composed it: its place in the backglass.
   const canvasAspect = (BACKGLASS_ASPECT[parent] ?? 16 / 9) * (r.w > 0 && r.h > 0 ? r.w / r.h : 1);
   const place = dmdBandPlacement(inside, canvasAspect, windowAspect > 0 ? windowAspect : DEFAULT_DMD_ASPECT);
   return { screen: dmd.num, parent, band: inside, customPos: customPosOf(dmd.num, place) };
 }
 
 /**
- * Place de l'écran (en % de la fenêtre, comme un CustomPos) qui montre la bande `band` (en % de
- * sa hauteur) au plus grand dans une fenêtre de proportions `windowAspect`, sans la déformer
- * (`canvasAspect` : largeur sur hauteur de l'écran composé par l'auteur), centrée. L'écran
- * déborde de la fenêtre là où la bande ne le couvre pas : ce qui en sort ne se voit pas
- * (PUPScreen::SetBounds ne limite pas la place à la fenêtre).
+ * Place of the screen (in % of the window, like a CustomPos) that shows the band `band` (in % of
+ * its height) as large as possible in a window of proportions `windowAspect`, without distorting
+ * it (`canvasAspect`: width over height of the screen composed by the author), centred. The screen
+ * overflows the window where the band does not cover it: what goes beyond is not seen
+ * (PUPScreen::SetBounds does not limit the place to the window).
  */
 export function dmdBandPlacement(band: { top: number; bottom: number }, canvasAspect: number, windowAspect: number): { x: number; y: number; w: number; h: number } {
   const share = (band.bottom - band.top) / 100;
-  // Toute la largeur de la fenêtre ; si la bande dépasse alors en hauteur, toute la hauteur.
+  // The whole width of the window; if the band then overflows in height, the whole height.
   let w = 100;
   let h = (100 * windowAspect) / canvasAspect;
   if (h * share > 100) {
@@ -823,17 +824,17 @@ function customPosOf(screen: number, place: { x: number; y: number; w: number; h
 }
 
 /**
- * CustomPos où l'écran se désigne lui-même : il reste une racine (PUPManager::AddScreen : pas
- * de parent quand la source est l'écran lui-même). C'est la forme que Cyber Pinball pose
- * (dmdBandPlacement) ; le .info retient laquelle (PupMemory.dmd).
+ * CustomPos where the screen designates itself: it stays a root (PUPManager::AddScreen: no
+ * parent when the source is the screen itself). This is the form that Cyber Pinball sets
+ * (dmdBandPlacement); the .info remembers which one (PupMemory.dmd).
  */
 export function isBandCustomPos(screen: PupScreen): boolean {
   return Boolean(screen.rect && screen.parent === screen.num);
 }
 
 /**
- * screens.pup où la dernière ligne de l'écran `num` reçoit le CustomPos `customPos` ; les autres
- * lignes et colonnes, les fins de ligne et les octets (lus en latin1) restent tels quels.
+ * screens.pup where the last line of screen `num` gets the CustomPos `customPos`; the other
+ * lines and columns, the line endings and the bytes (read as latin1) stay as they are.
  */
 export function relocateScreen(text: string, num: number, customPos: string): string {
   const lines = text.split(/(?<=\n)/);
@@ -847,7 +848,7 @@ export function relocateScreen(text: string, num: number, customPos: string): st
   const line = lines[index]!;
   const eol = /\r?\n$/.exec(line)?.[0] ?? '';
   const body = line.slice(0, line.length - eol.length);
-  // Début de la 8e colonne : après la 7e virgule hors guillemets.
+  // Start of the 8th column: after the 7th comma outside quotes.
   let commas = 0;
   let quoted = false;
   let start = -1;
@@ -864,7 +865,7 @@ export function relocateScreen(text: string, num: number, customPos: string): st
   return lines.join('');
 }
 
-/** CustomPos (8e colonne) de la dernière ligne de l'écran `num`, tel qu'écrit ; undefined sans ligne. */
+/** CustomPos (8th column) of the last line of screen `num`, as written; undefined without a line. */
 export function screenCustomPos(text: string, num: number): string | undefined {
   let found: string | undefined;
   for (const line of text.split(/\r?\n/).slice(1)) {
@@ -875,8 +876,8 @@ export function screenCustomPos(text: string, num: number): string | undefined {
 }
 
 /**
- * Deux screens.pup identiques, à un écran près dont Cyber Pinball a changé la place
- * (isBandCustomPos dans `actual`) : l'option du pack reste reconnue après la retouche.
+ * Two identical screens.pup files, except for one screen whose place Cyber Pinball changed
+ * (isBandCustomPos in `actual`): the pack's option stays recognised after the touch-up.
  */
 export function sameScreensIgnoringBand(actual: string, expected: string): boolean {
   const a = actual.split(/\r?\n/).filter((l) => l.trim());
@@ -892,7 +893,7 @@ export function sameScreensIgnoringBand(actual: string, expected: string): boole
   });
 }
 
-/** Rôle de la borne où le plugin dessine un écran PuP ; null : jamais affiché (Playfield). */
+/** Cabinet role where the plugin draws a PuP screen; null: never displayed (Playfield). */
 export function screenRole(num: number): RoleId | null | undefined {
   if (num === 0) return 'topper';
   if (num === 2 || num === 6) return 'backglass';
@@ -901,9 +902,9 @@ export function screenRole(num: number): RoleId | null | undefined {
   return undefined;
 }
 
-// ---------- Racine d'un pack ----------
+// ---------- Root of a pack ----------
 
-/** Fichiers sans valeur laissés par macOS, et vidéos vides. */
+/** Worthless files left by macOS, and empty videos. */
 export function isJunkName(name: string): boolean {
   const lower = name.toLowerCase();
   return lower.startsWith('._') || lower === '.ds_store' || lower === '__macosx';
@@ -911,7 +912,7 @@ export function isJunkName(name: string): boolean {
 
 const OPTIONS_DIR = /option/i;
 
-/** Dossier qui contient screens.pup, playlists.pup ou triggers.pup, ou des options qui en contiennent. */
+/** Folder that contains screens.pup, playlists.pup or triggers.pup, or options that contain them. */
 export function isPackRoot(dir: string): boolean {
   const entries = readDirents(dir);
   if (entries.some((d) => d.isFile() && (PUP_FILES as readonly string[]).includes(d.name.toLowerCase()))) return true;
@@ -919,15 +920,15 @@ export function isPackRoot(dir: string): boolean {
 }
 
 /**
- * Vraie racine du pack sous `dir` : `dir` lui-même, ou en descendant les
- * imbrications (« rom\rom », dossier d'archive en trop qui ne contient que le pack).
+ * True root of the pack under `dir`: `dir` itself, or by going down the
+ * nesting ("rom\rom", extra archive folder that contains only the pack).
  */
 export function findPackRoot(dir: string, depth = 3): string | undefined {
   if (isPackRoot(dir)) return dir;
   if (depth === 0) return undefined;
   const entries = readDirents(dir).filter((d) => !isJunkName(d.name));
   const dirs = entries.filter((d) => d.isDirectory());
-  // Un lisez-moi ou une image à côté du dossier du pack n'empêchent pas de descendre.
+  // A readme or an image next to the pack's folder does not prevent going down.
   const files = entries.filter((d) => d.isFile() && !/\.(txt|pdf|md|rtf|url|html?|jpe?g|png|gif)$/i.test(d.name));
   const same = dirs.find((d) => d.name.toLowerCase() === path.basename(dir).toLowerCase());
   const next = same ?? (dirs.length === 1 && files.length === 0 ? dirs[0] : undefined);
@@ -935,15 +936,15 @@ export function findPackRoot(dir: string, depth = 3): string | undefined {
 }
 
 /**
- * Copie de sauvegarde d'un dossier (« PuP-Pack_Options - Copy », « _backup », « Topper.orig ») :
- * ni une option, ni l'état en place. Gardians of the Galaxy (gotg_2020) livre un
- * « PuP-Pack_Options - Copy » à côté du vrai dossier d'options.
+ * Backup copy of a folder ("PuP-Pack_Options - Copy", "_backup", "Topper.orig"):
+ * neither an option, nor the state in place. Gardians of the Galaxy (gotg_2020) ships a
+ * "PuP-Pack_Options - Copy" next to the real options folder.
  */
 export function isBackupName(name: string): boolean {
   return /(^|[^a-z])(copy|copie|backup|sauvegarde|old)([^a-z]|$)|\.(orig|bak|old)$/i.test(name);
 }
 
-/** Sous-dossiers d'options (« PuP-Pack_Options\Option 1 - … ») qui contiennent des .pup. */
+/** Option subfolders ("PuP-Pack_Options\Option 1 - ...") that contain .pup files. */
 function optionFolders(root: string): string[] {
   const found: string[] = [];
   for (const d of readDirents(root)) {
@@ -959,40 +960,40 @@ function hasPupFile(dir: string): boolean {
   return readDirents(dir).some((d) => d.isFile() && d.name.toLowerCase().endsWith('.pup'));
 }
 
-// ---------- Ordre des playlists ----------
+// ---------- Order of playlists ----------
 
-/** Fichier d'une playlist à renommer, chemins relatifs à la racine du pack. */
+/** File of a playlist to rename, paths relative to the pack's root. */
 export interface PlaylistRename {
   playlist: string;
-  /** Premier fichier pour le plugin PUP, aujourd'hui. */
+  /** First file for the PUP plugin, today. */
   wrong: string;
   from: string;
   to: string;
 }
 
-/** Ordre de Windows et de PinUP Player : sans tenir compte de la casse (noms en majuscules, comme NTFS). */
+/** Order of Windows and PinUP Player: case-insensitive (names in upper case, like NTFS). */
 function folderOrder(a: string, b: string): number {
   const x = a.toUpperCase();
   const y = b.toUpperCase();
   return x < y ? -1 : x > y ? 1 : 0;
 }
 
-/** Ordre du plugin PUP : std::ranges::sort sur les chemins, caractère par caractère, casse comprise. */
+/** Order of the PUP plugin: std::ranges::sort on the paths, character by character, case included. */
 function pluginOrder(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
 /**
- * Fichiers à renommer pour que le plugin PUP commence chaque playlist par le même fichier
- * que PinUP Player. Le plugin trie les fichiers d'une playlist en tenant compte de la casse
- * (PUPPlaylist.cpp, commit af26b2d93), PinUP Player non ; un écran dont screens.pup donne
- * la playlist sans fichier joue le premier. *2001 - A Space Odyssey* : l'écran 14
- * « Callouts » joue PupAlphas, dont l'auteur a nommé « aaclear.png » (transparent) pour
- * qu'il passe devant les cadres « Overlay1… » ; le plugin prenait « Overlay1 by Dr Nobody
- * TY.png », un cadre entier écrasé au milieu du fronton (26 octobre 2026). Le fichier voulu
- * prend son nom en majuscules (extension gardée) : il passe alors premier dans les deux
- * ordres. Le plugin retrouve un fichier nommé par un déclencheur sans tenir compte de la
- * casse : rien d'autre ne change.
+ * Files to rename so that the PUP plugin starts each playlist with the same file
+ * as PinUP Player. The plugin sorts the files of a playlist case-sensitively
+ * (PUPPlaylist.cpp, commit af26b2d93), PinUP Player does not; a screen for which screens.pup gives
+ * the playlist without a file plays the first one. *2001 - A Space Odyssey*: screen 14
+ * "Callouts" plays PupAlphas, in which the author named "aaclear.png" (transparent) so
+ * that it comes before the "Overlay1..." frames; the plugin took "Overlay1 by Dr Nobody
+ * TY.png", a whole frame squashed in the middle of the backglass (26 October 2026). The wanted
+ * file takes its name in upper case (extension kept): it then comes first in both
+ * orders. The plugin finds a file named by a trigger case-insensitively:
+ * nothing else changes.
  */
 export function playlistRenames(root: string): PlaylistRename[] {
   const renames: PlaylistRename[] = [];
@@ -1017,31 +1018,31 @@ export function playlistRenames(root: string): PlaylistRename[] {
 // ---------- Options ----------
 
 export interface VariantTraits {
-  /** Variante pour un seul écran (bureau). */
+  /** Variant for a single screen (desktop). */
   desktop: boolean;
-  /** Variante que le plugin ne sait pas rendre (borne tout-en-un, PuP Stream). */
+  /** Variant that the plugin cannot render (all-in-one cabinet, PuP Stream). */
   unsupported: boolean;
   topper?: boolean;
-  /** Où va le DMD : sur son propre écran, dans le backglass, nulle part. */
+  /** Where the DMD goes: on its own screen, in the backglass, nowhere. */
   dmd?: 'separate' | 'backglass' | 'none';
-  /** FullDMD (écran 16:9) plutôt que DMD réel (4:1). */
+  /** FullDMD (16:9 screen) rather than real DMD (4:1). */
   fullDmd?: boolean;
-  /** Proportions du backglass visées (16/9, 4/3…). */
+  /** Targeted backglass proportions (16/9, 4/3...). */
   ratios: number[];
-  /** Fenêtres que le plugin PUP remplit avec le screens.pup de la variante (pupWindows). */
+  /** Windows that the PUP plugin fills with the variant's screens.pup (pupWindows). */
   windows?: PupWindows;
 }
 
 export interface PupVariant {
-  /** Nom montré : le .bat sans extension, ou le dossier de la variante. */
+  /** Name shown: the .bat without extension, or the variant's folder. */
   label: string;
-  /** .bat d'où vient la variante. */
+  /** .bat the variant comes from. */
   bat?: string;
-  /** Dossier d'où viennent les fichiers, relatif à la racine du pack. */
+  /** Folder the files come from, relative to the pack's root. */
   folder?: string;
-  /** Fichiers à recopier, relatifs à la racine du pack. */
+  /** Files to copy, relative to the pack's root. */
   copies: { from: string; to: string }[];
-  /** Fichiers que le .bat supprime (outils du mode classique), relatifs à la racine. */
+  /** Files that the .bat deletes (tools of the classic mode), relative to the root. */
   deletes: string[];
   traits: VariantTraits;
 }
@@ -1049,21 +1050,21 @@ export interface PupVariant {
 export interface BatReport {
   bat: string;
   ok: boolean;
-  /** Ce qui empêche de lire le .bat sans l'exécuter. */
+  /** What prevents reading the .bat without running it. */
   reason?: string;
 }
 
 export interface PupPackInfo {
   root: string;
-  /** .pup présents à la racine (noms réels). */
+  /** .pup files present at the root (real names). */
   pupFiles: string[];
   variants: PupVariant[];
-  /** .bat d'options analysés, réussis ou non. */
+  /** Option .bat files analysed, successfully or not. */
   bats: BatReport[];
-  /** Fichiers inutiles (._*, .DS_Store, MP4 vides), relatifs à la racine. */
+  /** Useless files (._*, .DS_Store, empty MP4s), relative to the root. */
   junk: string[];
   hasPupCapture: boolean;
-  /** Écrans de la racine (screens.pup appliqué). */
+  /** Screens of the root (screens.pup applied). */
   screens: PupScreen[];
 }
 
@@ -1079,10 +1080,10 @@ export function analysePack(root: string): PupPackInfo {
     bats.push({ bat, ok: Boolean(result.variant), reason: result.reason });
     if (result.variant) variants.push({ ...result.variant, traits: traitsOf(root, result.variant) });
   }
-  // Variantes rangées dans un dossier d'options : celles qu'aucun .bat lisible ne couvre (un
-  // .bat qui en recopie un fichier le couvre), jamais deux fois le même nom. GOTG (gotg_2020) :
-  // chaque option apparaissait deux fois, par son .bat et par son dossier, et l'égalité de
-  // score entre les deux jumelles cachait la recommandation (« pas de choix net »).
+  // Variants placed in an options folder: those that no readable .bat covers (a
+  // .bat that copies a file from one covers it), never the same name twice. GOTG (gotg_2020):
+  // each option appeared twice, through its .bat and through its folder, and the tied
+  // score between the two twins hid the recommendation ("pas de choix net" (no clear choice)).
   const inside = (file: string, folder: string) => file.toLowerCase().startsWith(folder.toLowerCase() + path.sep);
   for (const folder of optionFolders(root)) {
     if (variants.some((v) => (v.folder && v.folder.toLowerCase() === folder.toLowerCase()) || v.copies.some((c) => inside(c.from, folder)))) continue;
@@ -1105,11 +1106,11 @@ export function analysePack(root: string): PupPackInfo {
 const IGNORED_COMMANDS = new Set(['rem', 'echo', 'echo.', 'pause', 'cls', 'exit', 'title', 'color', 'timeout', 'setlocal', 'endlocal', 'chcp', 'popd', 'goto :eof']);
 
 /**
- * Lit un .bat d'option sans l'exécuter. Reconnu : copy et xcopy d'un dossier
- * du pack vers la racine (ou un de ses dossiers), del de fichiers du pack, et
- * les commandes sans effet (echo, rem, pause, cd vers le dossier du .bat…).
- * Tout le reste (chemins absolus, variables, start, move, if…) fait échouer
- * l'analyse : on ne devine jamais ce que ferait un .bat.
+ * Reads an option .bat without running it. Recognised: copy and xcopy from a folder
+ * of the pack to the root (or one of its folders), del of files of the pack, and
+ * commands without effect (echo, rem, pause, cd to the .bat's folder...).
+ * Anything else (absolute paths, variables, start, move, if...) makes the
+ * analysis fail: what a .bat would do is never guessed.
  */
 export function parseOptionBat(root: string, bat: string): { option: boolean; variant?: Omit<PupVariant, 'traits'>; reason?: string } {
   const text = readText(path.join(root, bat));
@@ -1118,8 +1119,8 @@ export function parseOptionBat(root: string, bat: string): { option: boolean; va
   const mentionsCopy = /^\s*@?\s*(x?copy)\b/im.test(text);
   const option = looksLikeOption || mentionsCopy;
   const copies: { from: string; to: string }[] = [];
-  // Chaque del avec le nombre de copies faites avant lui : un fichier supprimé puis recopié
-  // (« del Option*.jpg », puis « xcopy Option 2.JPG ») reste en place.
+  // Each del with the number of copies made before it: a file deleted then copied again
+  // ("del Option*.jpg", then "xcopy Option 2.JPG") stays in place.
   const deleted: { name: string; at: number }[] = [];
   const fail = (reason: string) => ({ option, reason });
   for (const raw of text.split(/\r?\n/)) {
@@ -1166,8 +1167,8 @@ export function parseOptionBat(root: string, bat: string): { option: boolean; va
   if (!copies.length) return { option: looksLikeOption, reason: option ? t('aucune copie de fichiers trouvée') : undefined };
   const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
   const deletes = [...new Set(deleted.filter((d) => !copies.slice(d.at).some((c) => same(c.to, d.name))).map((d) => d.name))];
-  // Dossier de la variante : celui d'où viennent ses .pup (l'aperçu « Option 2.JPG » est
-  // souvent pris un cran plus haut), sinon le dossier commun des fichiers copiés.
+  // Folder of the variant: the one its .pup files come from (the preview "Option 2.JPG" is
+  // often taken one level higher), otherwise the common folder of the copied files.
   const pups = copies.filter((c) => c.from.toLowerCase().endsWith('.pup'));
   const sources = (pups.length ? pups : copies).map((c) => path.dirname(c.from));
   const dirs = [...new Set(sources.map((d) => d.split(path.sep)[0]!))];
@@ -1175,19 +1176,19 @@ export function parseOptionBat(root: string, bat: string): { option: boolean; va
   return { option: true, variant: { label, bat, folder: folder && folder !== '.' ? folder : undefined, copies, deletes } };
 }
 
-/** Découpe une ligne de commande en arguments, guillemets compris. */
+/** Splits a command line into arguments, quotes included. */
 function tokenize(line: string): string[] {
   const tokens: string[] = [];
   for (const m of line.matchAll(/"([^"]*)"|(\S+)/g)) {
     const token = m[1] ?? m[2]!;
-    // « /y/s » : plusieurs options collées.
+    // "/y/s": several options stuck together.
     if (m[2] && token.startsWith('/')) tokens.push(...token.split(/(?=\/)/));
     else tokens.push(token);
   }
   return tokens;
 }
 
-/** Chemin relatif au dossier du .bat, ou undefined s'il en sort (absolu, variable, ..). */
+/** Path relative to the .bat's folder, or undefined if it goes outside it (absolute, variable, ..). */
 function relativeArg(arg: string): string | undefined {
   let p = arg.replace(/^%~dp0\\?/i, '').replace(/^%cd%\\?/i, '').replace(/\//g, '\\');
   if (/%|^[a-z]:|^\\/i.test(p)) return undefined;
@@ -1198,7 +1199,7 @@ function relativeArg(arg: string): string | undefined {
   return parts.join(path.sep);
 }
 
-/** Fichiers désignés par la source d'une copie : un dossier, un motif (« dossier\*.pup ») ou un fichier. */
+/** Files designated by the source of a copy: a folder, a pattern ("dossier\*.pup") or a file. */
 function expandSource(root: string, src: string, recursive: boolean): { dir: string; files: string[] } | undefined {
   const parts = src.split(path.sep).filter(Boolean);
   const last = parts.at(-1) ?? '';
@@ -1216,7 +1217,7 @@ function expandSource(root: string, src: string, recursive: boolean): { dir: str
   return files.length ? { dir, files } : undefined;
 }
 
-/** Chemin relatif réel (casse du disque), ou undefined s'il n'existe pas. */
+/** Real relative path (case on disk), or undefined if it does not exist. */
 function resolveInside(root: string, rel: string): string | undefined {
   let current = '';
   for (const part of rel.split(path.sep).filter(Boolean)) {
@@ -1227,7 +1228,7 @@ function resolveInside(root: string, rel: string): string | undefined {
   return current;
 }
 
-/** Noms qui correspondent à un motif de cmd.exe (* et ?), sans tenir compte de la casse. */
+/** Names that match a cmd.exe pattern (* and ?), case-insensitively. */
 function matchNames(names: string[], pattern: string): string[] {
   const expr = pattern === '*.*' ? '*' : pattern;
   const re = new RegExp(`^${expr.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`, 'i');
@@ -1246,7 +1247,7 @@ function commonDir(dirs: string[]): string {
   return first.slice(0, n).join(path.sep);
 }
 
-/** Ce que vise une variante, d'après son nom puis son screens.pup. */
+/** What a variant targets, from its name then its screens.pup. */
 export function traitsOf(root: string, variant: Omit<PupVariant, 'traits'>): VariantTraits {
   const name = variant.label
     .normalize('NFD')
@@ -1273,7 +1274,7 @@ export function traitsOf(root: string, variant: Omit<PupVariant, 'traits'>): Var
   ] as const) {
     if (re.test(name)) traits.ratios.push(ratio);
   }
-  // Le screens.pup de la variante complète ce que le nom ne dit pas.
+  // The variant's screens.pup completes what the name does not say.
   const screensCopy = variant.copies.find((c) => c.to.toLowerCase() === 'screens.pup');
   if (screensCopy) {
     const screens = parseScreens(readText(path.join(root, screensCopy.from)));
@@ -1284,12 +1285,12 @@ export function traitsOf(root: string, variant: Omit<PupVariant, 'traits'>): Var
       if (screens.some((s) => s.num === 1 || s.num === 5)) {
         traits.dmd = !dmd ? 'none' : dmd.parent !== undefined && dmd.parent !== dmd.num && screenRole(dmd.parent) === 'backglass' ? 'backglass' : 'separate';
       } else {
-        // Pas d'écran DMD (1) ni FullDMD (5) : le pack n'occupe pas la fenêtre du DMD, ce
-        // qui ne dit pas que la borne n'en a pas. Un écran « DMD » posé sur le backglass dit
-        // où va le DMD : allumé, le pack y met ses propres animations (le vrai DMD reste sur
-        // son écran) ; éteint, le cadre reste vide pour y poser le DMD. Sinon, rien à en
-        // déduire (Star Trek LE, octobre 2026 : l'option faite pour une borne à DMD notée
-        // « sans DMD », derrière celle qui laisse le cadre vide).
+        // No DMD screen (1) nor FullDMD (5): the pack does not occupy the DMD window, which
+        // does not say that the cabinet has none. A "DMD" screen placed on the backglass tells
+        // where the DMD goes: switched on, the pack puts its own animations there (the real DMD
+        // stays on its screen); switched off, the frame stays empty to put the DMD there.
+        // Otherwise, nothing to deduce (Star Trek LE, October 2026: the option made for a cabinet
+        // with a DMD noted "sans DMD" (without DMD), behind the one that leaves the frame empty).
         const frame = screens.find((s) => s.parent !== undefined && s.parent !== s.num && screenRole(s.parent) === 'backglass' && /dmd/i.test(`${s.description} ${s.playlist ?? ''}`));
         if (frame) traits.dmd = isVisible(frame) ? 'separate' : 'backglass';
       }
@@ -1297,49 +1298,49 @@ export function traitsOf(root: string, variant: Omit<PupVariant, 'traits'>): Var
     if (!traits.desktop && shown(3) && !shown(2) && !shown(6)) traits.desktop = true;
     if (screens.length) {
       traits.windows = pupWindows(screens);
-      // Sans indice dans le nom : l'écran que le plugin met dans la fenêtre du DMD, le 5 (FullDMD
-      // 16:9) ou le 1 (DMD) ; un FullDMD dans une bande 4:1 y serait réduit.
+      // Without a hint in the name: the screen that the plugin puts in the DMD window, 5 (FullDMD
+      // 16:9) or 1 (DMD); a FullDMD in a 4:1 band would be shrunk there.
       const root = pupDmdRoot(screens);
       if (traits.fullDmd === undefined && root) traits.fullDmd = root === 5;
-      // La fenêtre du topper, remplie ou non, l'emporte sur le nom : « Default Locale Topper
-      // Off » (2001) range le topper dans l'écran principal, la fenêtre du topper reste vide.
+      // The topper window, filled or not, wins over the name: "Default Locale Topper
+      // Off" (2001) puts the topper in the main screen, the topper window stays empty.
       if (screens.some((s) => s.num === 0 || s.parent === 0)) traits.topper = traits.windows.topper;
     }
   }
   return traits;
 }
 
-// ---------- Choix d'après la borne ----------
+// ---------- Choice from the cabinet ----------
 
-/** Ce que l'option d'un pack doit savoir de la borne. */
+/** What a pack's option needs to know about the cabinet. */
 export interface PupCabinet {
   backglass: boolean;
   dmd: boolean;
   topper: boolean;
-  /** Grand côté sur petit côté : 4 pour un DMD réel, 1,78 pour un écran 16:9. */
+  /** Long side over short side: 4 for a real DMD, 1.78 for a 16:9 screen. */
   dmdRatio?: number;
   /**
-   * L'écran du DMD est un FullDMD (dmdKindOf : choix de l'utilisateur, sinon forme de sa zone).
-   * Absent : d'après dmdRatio.
+   * The DMD screen is a FullDMD (dmdKindOf: the user's choice, otherwise the shape of its area).
+   * Absent: from dmdRatio.
    */
   fullDmd?: boolean;
   /**
-   * La table a son fronton (.directb2s) : une option qui laisse la fenêtre du backglass au
-   * B2S (« B2S Users ») a alors quelque chose à y montrer. Absent : on ne sait pas.
+   * The table has its backglass (.directb2s): an option that leaves the backglass window to
+   * B2S ("B2S Users") then has something to show there. Absent: unknown.
    */
   tableBackglass?: boolean;
   backglassRatio?: number;
   /**
-   * Largeur sur hauteur de chaque rôle, en pixels de Windows (zone comprise) : le
-   * médecin y compare les proportions des médias. Le playfield occupe son écran entier.
+   * Width over height of each role, in Windows pixels (area included): the
+   * table diagnosis compares the media proportions with them. The playfield occupies its whole screen.
    */
   aspects?: Partial<Record<RoleId, number>>;
 }
 
 export function pupCabinet(cabinet: Cabinet | undefined): PupCabinet | undefined {
   if (!cabinet) return undefined;
-  // Proportions de la fenêtre que VPX ouvrira pour le rôle : sa zone, pas tout l'écran
-  // (backglass et DMD partagent souvent le moniteur du fronton).
+  // Proportions of the window that VPX will open for the role: its area, not the whole screen
+  // (backglass and DMD often share the backglass monitor).
   const ratio = (role: AncillaryRoleId) => {
     const screen = cabinet.screens.find((s) => s.fingerprint === cabinet.roles[role]);
     if (!screen || !screen.widthPx || !screen.heightPx) return undefined;
@@ -1363,7 +1364,7 @@ export function pupCabinet(cabinet: Cabinet | undefined): PupCabinet | undefined
   };
 }
 
-/** « topper · DMD séparé · 16:9 » : ce que vise une option de PuP-Pack. */
+/** "topper · DMD séparé · 16:9" (topper · separate DMD · 16:9): what a PuP-Pack option targets. */
 export function variantTraitsLabel(v: PupVariant): string {
   const traits = v.traits;
   const parts: string[] = [];
@@ -1378,7 +1379,7 @@ export function variantTraitsLabel(v: PupVariant): string {
   return parts.join(' · ') || t('disposition non décrite');
 }
 
-/** Description courte de la borne, pour dire pourquoi une option est retenue. */
+/** Short description of the cabinet, to say why an option is chosen. */
 export function describePupCabinet(c: PupCabinet): string {
   const parts = [c.backglass ? 'backglass' : t('sans backglass')];
   if (c.dmd) parts.push(cabinetFullDmd(c) === false ? 'DMD 4:1' : 'FullDMD');
@@ -1388,7 +1389,7 @@ export function describePupCabinet(c: PupCabinet): string {
   return parts.join(', ');
 }
 
-/** FullDMD ou DMD seul : le type de l'écran, sinon les proportions de la fenêtre du DMD. */
+/** FullDMD or DMD alone: the type of the screen, otherwise the proportions of the DMD window. */
 export function cabinetFullDmd(c: PupCabinet): boolean | undefined {
   if (!c.dmd) return undefined;
   if (c.fullDmd !== undefined) return c.fullDmd;
@@ -1407,23 +1408,23 @@ export function scoreVariant(t: VariantTraits, c: PupCabinet): number {
   const full = cabinetFullDmd(c);
   if (t.fullDmd !== undefined && c.dmd && full !== undefined) s += t.fullDmd === full ? 4 : -6;
   if (t.ratios.length && c.backglassRatio) s += t.ratios.some((r) => Math.abs(r - c.backglassRatio!) / r < 0.08) ? 5 : -5;
-  // Fronton laissé vide par le pack : il faut que le .directb2s de la table y soit, sinon
-  // l'écran reste sur une image fixe (2001 - A Space Odyssey, octobre 2026).
+  // Backglass left empty by the pack: the table's .directb2s must be there, otherwise
+  // the screen stays on a still image (2001 - A Space Odyssey, October 2026).
   if (c.backglass && t.windows && !t.windows.backglass) s += c.tableBackglass === false ? -30 : c.tableBackglass ? -2 : -6;
   return s;
 }
 
 export interface VariantChoice {
   chosen?: PupVariant;
-  /** Choix évident : retenu sans demander. */
+  /** Obvious choice: chosen without asking. */
   confident: boolean;
-  /** Choix d'après la borne pas net : l'option qui talonne la retenue. */
+  /** Choice from the cabinet not clear-cut: the option close behind the chosen one. */
   runnerUp?: PupVariant;
-  /** remembered : option de l'installation précédente ; cabinet : d'après la borne. */
+  /** remembered: option of the previous installation; cabinet: from the cabinet. */
   reason: 'remembered' | 'only' | 'cabinet' | 'default' | 'none';
 }
 
-/** Option retenue d'office : celle de l'installation précédente, sinon la plus proche de la borne. */
+/** Option chosen automatically: the one of the previous installation, otherwise the closest to the cabinet. */
 export function chooseVariant(variants: PupVariant[], cabinet: PupCabinet | undefined, remembered?: string): VariantChoice {
   if (!variants.length) return { confident: true, reason: 'none' };
   const previous = remembered ? variants.find((v) => v.label.toLowerCase() === remembered.toLowerCase()) : undefined;
@@ -1439,25 +1440,25 @@ export function chooseVariant(variants: PupVariant[], cabinet: PupCabinet | unde
   return { chosen: best!.v, confident, reason: 'cabinet', ...(!confident && { runnerUp: second!.v }) };
 }
 
-/** Option en place à la racine du pack, telle que appliedOption la reconnaît. */
+/** Option in place at the pack's root, as appliedOption recognises it. */
 export interface AppliedOption {
   variant: PupVariant;
-  /** Tout ce que l'option recopie et supprime est en place ; sinon, seuls ses .pup le sont. */
+  /** Everything the option copies and deletes is in place; otherwise, only its .pup files are. */
   complete: boolean;
-  /** Ce qui manque à une option incomplète (differences). */
+  /** What an incomplete option lacks (differences). */
   differences: string[];
-  /** Autres options que les fichiers en place ne distinguent pas de celle-ci. */
+  /** Other options that the files in place do not distinguish from this one. */
   twins: PupVariant[];
 }
 
 /**
- * Option dont les fichiers sont à la racine. Toute l'option compte, pas ses seuls .pup :
- * GOTG (gotg_2020) a les mêmes screens.pup, playlists.pup et triggers.pup dans l'option 0
- * (bureau, PuPDesktopPunch.exe recopié) et l'option 2 (FullDMD, PuPDesktopPunch.exe
- * supprimé, « Option Selected.txt » à 2) ; la première qui ressemblait l'emportait, et
- * l'option 2 appliquée s'affichait toujours « Option 0 » (26 octobre 2026). Une option
- * complète l'emporte sur une option dont seuls les .pup sont là ; entre jumelles, celle
- * retenue dans le .info (remembered), puis celle qui recopie le plus de fichiers.
+ * Option whose files are at the root. The whole option counts, not only its .pup files:
+ * GOTG (gotg_2020) has the same screens.pup, playlists.pup and triggers.pup in option 0
+ * (desktop, PuPDesktopPunch.exe copied) and option 2 (FullDMD, PuPDesktopPunch.exe
+ * deleted, "Option Selected.txt" at 2); the first one that looked alike won, and
+ * option 2 once applied was always shown as "Option 0" (26 October 2026). A complete option
+ * wins over an option of which only the .pup files are there; between twins, the one
+ * remembered in the .info (remembered), then the one that copies the most files.
  */
 export function appliedOption(info: PupPackInfo, remembered?: string): AppliedOption | undefined {
   const withPups = info.variants.filter((v) => v.copies.some((c) => c.to.toLowerCase().endsWith('.pup')));
@@ -1472,8 +1473,8 @@ export function appliedOption(info: PupPackInfo, remembered?: string): AppliedOp
 }
 
 /**
- * Après « Appliquer » : le pack relu, l'option est-elle en place ? Sinon, pourquoi (ce qui
- * manque, ou l'option dont les fichiers sont là). La réussite ne s'annonce jamais sans ça.
+ * After "Appliquer" (Apply): the pack read again, is the option in place? Otherwise, why (what is
+ * missing, or the option whose files are there). Success is never announced without this.
  */
 export function checkAppliedOption(root: string, label: string): { ok: true } | { ok: false; reasons: string[] } {
   const info = analysePack(root);
@@ -1485,33 +1486,33 @@ export function checkAppliedOption(root: string, label: string): { ok: true } | 
   return { ok: false, reasons };
 }
 
-/** Fichiers de l'option introuvables dans le pack : l'appliquer s'arrêterait en chemin. */
+/** Files of the option not found in the pack: applying it would stop halfway. */
 export function missingSources(root: string, variant: Pick<PupVariant, 'copies'>): string[] {
   return variant.copies.filter((c) => !fs.existsSync(path.join(root, c.from))).map((c) => c.from);
 }
 
-/** Variante en place à la racine (appliedOption), ou undefined. */
+/** Variant in place at the root (appliedOption), or undefined. */
 export function appliedVariant(info: PupPackInfo, remembered?: string): PupVariant | undefined {
   return appliedOption(info, remembered)?.variant;
 }
 
-/** Tous les fichiers de l'option sont en place, et ceux qu'elle supprime absents. */
+/** All the files of the option are in place, and those it deletes are absent. */
 export function isApplied(root: string, variant: PupVariant): boolean {
   return variant.copies.some((c) => c.to.toLowerCase().endsWith('.pup')) && !variantDifferences(root, variant).length;
 }
 
-/** Image d'aperçu posée à la racine (« Option 2.JPG ») : PinUP Popper la montre, le plugin PUP l'ignore. */
+/** Preview image placed at the root ("Option 2.JPG"): PinUP Popper shows it, the PUP plugin ignores it. */
 function isPreviewImage(rel: string): boolean {
   return !rel.includes(path.sep) && /\.(jpe?g|png|gif|bmp)$/i.test(rel);
 }
 
-/** Au-delà, deux fichiers de même taille sont tenus pour identiques (vidéos d'une option). */
+/** Beyond this, two files of the same size are taken as identical (videos of an option). */
 const COMPARE_LIMIT = 8 * 1024 * 1024;
 
 /**
- * Écarts entre la racine et une option : fichier recopié absent ou différent, fichier
- * supprimé par son .bat encore là. Les aperçus de la racine ne comptent pas. `pup` : l'écart
- * porte sur un .pup (l'option n'est pas du tout en place).
+ * Differences between the root and an option: copied file absent or different, file
+ * deleted by its .bat still there. The root's previews do not count. `pup`: the difference
+ * concerns a .pup (the option is not in place at all).
  */
 export function variantDifferences(root: string, variant: Pick<PupVariant, 'copies' | 'deletes'>, limit = 4): { text: string; pup: boolean }[] {
   const found: { text: string; pup: boolean }[] = [];
@@ -1532,7 +1533,7 @@ export function variantDifferences(root: string, variant: Pick<PupVariant, 'copi
   return found;
 }
 
-/** screens.pup en place identique à celui de l'option, à la place du PuP-DMD près (sameScreensIgnoringBand). */
+/** screens.pup in place identical to the option's one, except for the place of the PuP-DMD (sameScreensIgnoringBand). */
 function sameScreensFile(actual: string, expected: string): boolean {
   if (path.basename(actual).toLowerCase() !== 'screens.pup') return false;
   try {
@@ -1542,23 +1543,23 @@ function sameScreensFile(actual: string, expected: string): boolean {
   }
 }
 
-/** Jusqu'à cette taille, deux fichiers sont comparés en entier (.pup, .txt, petites images). */
+/** Up to this size, two files are compared in full (.pup, .txt, small images). */
 const FULL_COMPARE = 256 * 1024;
-/** Au-delà : trois extraits de cette taille, au début, au milieu et à la fin. */
+/** Beyond it: three samples of this size, at the start, in the middle and at the end. */
 const SAMPLE = 64 * 1024;
 
 /**
- * Comparaisons déjà faites, par chemins, tailles et dates : le médecin, la fiche et « Appliquer »
- * comparent les mêmes options plusieurs fois de suite. Vidée au-delà de COMPARISONS_KEPT.
+ * Comparisons already made, by paths, sizes and dates: the table diagnosis, the game page and
+ * "Appliquer" (Apply) compare the same options several times in a row. Cleared beyond COMPARISONS_KEPT.
  */
 const comparisons = new Map<string, boolean>();
 const COMPARISONS_KEPT = 20_000;
 
 /**
- * Même contenu ? Comparer chaque fichier d'une option en entier lisait tout le pack (des centaines
- * de vidéos de quelques Mo, des deux côtés) à chaque diagnostic (17/11/2026). Les fichiers d'une
- * option sont des copies (copy, xcopy) : même taille et mêmes extraits suffisent au-delà de
- * FULL_COMPARE ; au-delà de COMPARE_LIMIT, la taille seule.
+ * Same content? Comparing each file of an option in full read the whole pack (hundreds
+ * of videos of a few MB, on both sides) at each diagnosis (17/11/2026). The files of an
+ * option are copies (copy, xcopy): same size and same samples are enough beyond
+ * FULL_COMPARE; beyond COMPARE_LIMIT, the size alone.
  */
 function sameFile(a: string, b: string): boolean {
   try {
@@ -1570,7 +1571,7 @@ function sameFile(a: string, b: string): boolean {
     const key = `${a}\0${statA.mtimeMs}\0${b}\0${statB.mtimeMs}\0${size}`;
     const known = comparisons.get(key);
     if (known !== undefined) return known;
-    // lecture entière : taille vérifiée sur la même ligne (FULL_COMPARE)
+    // lecture entière : size checked on the same line (FULL_COMPARE)
     const same = size <= FULL_COMPARE ? fs.readFileSync(a).equals(fs.readFileSync(b)) : sameSamples(a, b, size);
     if (comparisons.size >= COMPARISONS_KEPT) comparisons.clear();
     comparisons.set(key, same);
@@ -1580,7 +1581,7 @@ function sameFile(a: string, b: string): boolean {
   }
 }
 
-/** Début, milieu et fin identiques (fichiers de même taille, plus grands que SAMPLE). */
+/** Same start, middle and end (files of the same size, larger than SAMPLE). */
 function sameSamples(a: string, b: string, size: number): boolean {
   const fa = fs.openSync(a, 'r');
   try {
@@ -1602,12 +1603,12 @@ function sameSamples(a: string, b: string, size: number): boolean {
   }
 }
 
-/** Oublie les comparaisons gardées (essais). */
+/** Forgets the kept comparisons (tests). */
 export function forgetFileComparisons(): void {
   comparisons.clear();
 }
 
-// ---------- Utilitaires ----------
+// ---------- Utilities ----------
 
 function listJunk(root: string): string[] {
   const junk: string[] = [];
@@ -1623,7 +1624,7 @@ function listJunk(root: string): string[] {
   return junk;
 }
 
-/** Fichiers d'un dossier, relatifs à lui, sans les fichiers inutiles. */
+/** Files of a folder, relative to it, without the useless files. */
 function listFiles(dir: string): string[] {
   const files: string[] = [];
   const walk = (rel: string) => {

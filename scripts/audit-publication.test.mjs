@@ -20,6 +20,8 @@ test('un fichier hors des emplacements publics et des dossiers internes est refu
     'docs/demo-oubli.ps1', 'outils/rendu.mjs', 'docs/notes.md', 'notes.txt', 'app/brief-ecran.md', 'docs/design-system/critique-codex.md'];
   assert.deepEqual(unplacedFiles(tracked), ['video/x.txt', 'hors-depot/forum/a.md', 'docs/demo-oubli.ps1', 'outils/rendu.mjs', 'docs/notes.md', 'notes.txt', 'app/brief-ecran.md', 'docs/design-system/critique-codex.md']);
   assert.equal(isPublic('docs/fonctionnalites.md'), true);
+  // Guide des contributeurs, à la racine.
+  assert.equal(isPublic('CONTRIBUTING.md'), true);
   assert.equal(isPublic('docs/ecrans/pc-dev.json'), false);
   // Manuel découpé (une rubrique par fichier) et nouveautés en attente : publics, sans sous-dossier.
   for (const f of ['docs/manuel/son.md', 'docs/manual/sound.md', 'changements/ma-branche.md']) assert.equal(isPublic(f), true, f);

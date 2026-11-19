@@ -1,34 +1,34 @@
-// Mise à jour de Cyber Pinball depuis l'application : jamais d'office, toujours à la
-// demande de l'utilisateur (menu système > « Cyber Pinball » > « Mise à jour de Cyber Pinball »).
+// Updating Cyber Pinball from the application: never automatically, always at the user's
+// request (system menu > "Cyber Pinball" > "Mise à jour de Cyber Pinball" (Cyber Pinball update)).
 //
-// Chaque version est publiée en release GitHub (scripts/publier.mjs) avec trois fichiers :
-// les deux installeurs et le flux cyberpinball-maj.json. Le flux décrit la version,
-// ses nouveautés et l'installeur léger (adresse, taille, SHA-256) ; il est signé
-// (Ed25519) par la clé de publication, dont la moitié publique est dans update-key.ts.
-// Un flux mal signé n'est jamais lu : un compte GitHub compromis ne suffit pas à faire
-// installer un programme sur les bornes. L'installeur téléchargé est vérifié (taille,
-// SHA-256 du flux signé) avant d'être lancé.
+// Each version is published as a GitHub release (scripts/publier.mjs) with three files:
+// the two installers and the cyberpinball-maj.json feed. The feed describes the version,
+// its new features and the light installer (address, size, SHA-256); it is signed
+// (Ed25519) by the publishing key, whose public half is in update-key.ts.
+// A badly signed feed is never read: a compromised GitHub account is not enough to get a
+// program installed on the cabinets. The downloaded installer is checked (size, SHA-256 from
+// the signed feed) before it is launched.
 //
-// L'installation passe par l'installeur habituel, en mode /MAJ (scripts/installeur/
-// cyberpinball.nsi) : il attend que Cyber Pinball soit fermé, remplace app\ en gardant
-// l'ancien dossier jusqu'au bout (remis en place en cas d'échec), garde les raccourcis
-// choisis à l'installation, puis relance Cyber Pinball. Le fichier data\mise-a-jour.json
-// dit au démarrage suivant si la nouvelle version est bien là.
+// Installation goes through the usual installer, in /MAJ mode (scripts/installeur/
+// cyberpinball.nsi): it waits for Cyber Pinball to be closed, replaces app\ while keeping
+// the old folder until the end (put back on failure), keeps the shortcuts chosen at
+// installation, then relaunches Cyber Pinball. The data\mise-a-jour.json file tells the
+// next startup whether the new version is really there.
 //
-// Mise à jour légère : chaque release joint aussi le paquet de l'application seule
-// (CyberPinball-application.zip, le contenu de app\resources\app : quelques Mo). Une borne dont
-// le socle (Electron et l'exécutable qui l'entoure, voir scripts/fabriquer.mjs) est celui du
-// paquet le prend à la place de l'installeur : téléchargé et vérifié comme lui, déplié à côté,
-// puis mis en place par app/src/maj-legere.ts une fois Cyber Pinball fermé (l'ancien
-// resources\app gardé jusqu'au bout), et Cyber Pinball relancé. Une publication rapide
-// (scripts/publier.mjs --rapide) ne refait pas les installeurs : son flux désigne ceux de la
-// dernière publication complète (installer.version), qu'une borne d'un autre socle installe
-// d'abord avant de recevoir la mise à jour légère.
+// Light update: each release also attaches the package of the application alone
+// (CyberPinball-application.zip, the content of app\resources\app: a few MB). A cabinet whose
+// base (Electron and the executable around it, see scripts/fabriquer.mjs) is the package's one
+// takes it instead of the installer: downloaded and checked like it, unpacked next to it,
+// then put in place by app/src/maj-legere.ts once Cyber Pinball is closed (the old
+// resources\app kept until the end), and Cyber Pinball relaunched. A quick publication
+// (scripts/publier.mjs --rapide) does not rebuild the installers: its feed points to those of the
+// last full publication (installer.version), which a cabinet with another base installs
+// first before receiving the light update.
 //
-// Préversions (0.2.0-essai.1) : une borne qui les accepte (réglage gardé dans
-// <données>\preversions.json) cherche le flux de la release la plus récente, préversions
-// comprises, par l'API GitHub ; les autres ne lisent que celui de la dernière version finale.
-// Canal d'essai privé : voir « Source des mises à jour » plus bas.
+// Pre-releases (0.2.0-essai.1): a cabinet that accepts them (setting kept in
+// <data>\preversions.json) looks for the feed of the most recent release, pre-releases
+// included, through the GitHub API; the others only read the one of the latest release.
+// Private test channel: see "Update source" below.
 
 import { spawnSync } from 'node:child_process';
 import { createHash, createPublicKey, createPrivateKey, sign, verify } from 'node:crypto';
@@ -42,20 +42,20 @@ import { formatNumber, language, t, type Language } from './i18n';
 import { UPDATE_PUBLIC_KEY } from './update-key';
 import { fetchResumable, ResumableError } from './resumable';
 
-/** Dépôt GitHub des releases ; le même que « repository » du package.json racine (vérifié par les tests). */
+/** GitHub repository of the releases; the same as "repository" in the root package.json (checked by the tests). */
 export const UPDATE_REPOSITORY = 'gocode/cyberpinball';
-/** Nom du flux joint à chaque release. */
+/** Name of the feed attached to each release. */
 export const UPDATE_FEED_NAME = 'cyberpinball-maj.json';
-/** Installeur joint à chaque release et téléchargé par la mise à jour (sans VPX : il est déjà installé). */
+/** Installer attached to each release and downloaded by the update (without VPX: it is already installed). */
 export const UPDATE_INSTALLER_NAME = 'CyberPinball-Setup.exe';
-/** Paquet léger joint à chaque release : l'application seule (app\resources\app). */
+/** Light package attached to each release: the application alone (app\resources\app). */
 export const UPDATE_APP_NAME = 'CyberPinball-application.zip';
-/** Suivi d'une mise à jour lancée, dans le dossier de données. */
+/** Tracking of a launched update, in the data folder. */
 export const UPDATE_PENDING_FILE = 'mise-a-jour.json';
-/** Source des mises à jour (préversions, canal d'essai), dans le dossier de données. */
+/** Update source (pre-releases, test channel), in the data folder. */
 export const UPDATE_PRERELEASES_FILE = 'preversions.json';
 
-/** Fichier joint à une release : adresse, taille et empreinte, vérifiées au téléchargement. */
+/** File attached to a release: address, size and hash, checked on download. */
 export interface UpdateAsset {
   name: string;
   url: string;
@@ -63,30 +63,30 @@ export interface UpdateAsset {
   sha256: string;
 }
 
-/** Ce que décrit le flux : la dernière version publiée. */
+/** What the feed describes: the latest published version. */
 export interface UpdateManifest {
   version: string;
-  /** Date de publication (ISO 8601). */
+  /** Publication date (ISO 8601). */
   date: string;
-  /** Nouveautés, une ligne par point (en français : la borne les affiche si sa langue n'a pas les siennes). */
+  /** New features, one line per item (in French: the cabinet shows them if its language has none of its own). */
   notes: string[];
-  /** Nouveautés dans une autre langue (CHANGELOG.en.md), affichées par une borne réglée dans cette langue. */
+  /** New features in another language (CHANGELOG.en.md), shown by a cabinet set to that language. */
   notesByLanguage?: Partial<Record<Language, string[]>>;
   installer: UpdateAsset & {
     /**
-     * Version qu'il installe, quand ce n'est pas celle du flux : publication rapide, qui reprend
-     * l'installeur de la dernière publication complète. Absent : la version du flux.
+     * Version it installs, when it is not the feed's one: quick publication, which reuses the
+     * installer of the last full publication. Absent: the feed's version.
      */
     version?: string;
   };
   /**
-   * Paquet léger : remplace app\resources\app d'une borne au même socle, sans installeur.
-   * Absent des flux d'avant la mise à jour légère.
+   * Light package: replaces app\resources\app of a cabinet with the same base, without installer.
+   * Absent from feeds older than the light update.
    */
   app?: UpdateAsset & { socle: string };
   /**
-   * Nouveautés des versions précédentes (CHANGELOG), la plus récente d'abord : une borne qui a
-   * sauté des versions voit tout ce qui a changé depuis la sienne. Absent des flux plus anciens.
+   * New features of the previous versions (CHANGELOG), most recent first: a cabinet that has
+   * skipped versions sees everything that changed since its own. Absent from older feeds.
    */
   history?: UpdateHistoryEntry[];
 }
@@ -97,17 +97,17 @@ export interface UpdateHistoryEntry {
   notesByLanguage?: Partial<Record<Language, string[]>>;
 }
 
-/** Nouveautés d'une version, telles qu'à afficher. */
+/** New features of a version, as to be shown. */
 export interface ReleaseNotes {
   version: string;
   notes: string[];
 }
 
-/** Flux tel que publié : le manifeste exact, en texte, et sa signature. */
+/** Feed as published: the exact manifest, as text, and its signature. */
 export interface UpdateEnvelope {
   format: 1;
   manifest: string;
-  /** Signature Ed25519 du texte de `manifest` (UTF-8), en base64. */
+  /** Ed25519 signature of the `manifest` text (UTF-8), in base64. */
   signature: string;
 }
 
@@ -116,22 +116,22 @@ export type UpdateCheck =
   | { status: 'available'; current: string; latest: UpdateManifest };
 
 /**
- * Adresse du flux : celle de la dernière release du dépôt (GitHub redirige vers le
- * fichier, sans la limite de débit de son API). CYBERPINBALL_MAJ_URL la remplace pour les essais.
+ * Address of the feed: the one of the repository's latest release (GitHub redirects to the
+ * file, without the rate limit of its API). CYBERPINBALL_MAJ_URL replaces it for tests.
  */
 export function updateFeedUrl(env: NodeJS.ProcessEnv = process.env): string {
   return env.CYBERPINBALL_MAJ_URL || `https://github.com/${UPDATE_REPOSITORY}/releases/latest/download/${UPDATE_FEED_NAME}`;
 }
 
-/** Adresse d'un fichier d'une release précise (celle du flux, pas « latest » : une release plus récente ne s'y substitue pas). */
+/** Address of a file of a specific release (the feed's one, not "latest": a more recent release does not take its place). */
 export function releaseAssetUrl(version: string, name: string, repository = UPDATE_REPOSITORY): string {
   return `https://github.com/${repository}/releases/download/v${version}/${encodeURIComponent(name)}`;
 }
 
 /**
- * Clé publique de confiance. CYBERPINBALL_MAJ_CLE (fichier PEM) la remplace pour les
- * essais, et seulement dans un bac à sable (CYBERPINBALL_HOME) : une borne réelle ne
- * fait confiance qu'à la clé livrée avec l'application.
+ * Trusted public key. CYBERPINBALL_MAJ_CLE (PEM file) replaces it for
+ * tests, and only in a sandbox (CYBERPINBALL_HOME): a real cabinet only
+ * trusts the key shipped with the application.
  */
 export function updatePublicKey(env: NodeJS.ProcessEnv = process.env): string {
   if (env.CYBERPINBALL_MAJ_CLE && env.CYBERPINBALL_HOME) return fs.readFileSync(env.CYBERPINBALL_MAJ_CLE, 'utf8');
@@ -140,14 +140,14 @@ export function updatePublicKey(env: NodeJS.ProcessEnv = process.env): string {
 
 // ---------- Versions ----------
 
-/** a.b.c, avec une préversion facultative (0.2.0-beta.1). */
+/** a.b.c, with an optional pre-release (0.2.0-beta.1). */
 const VERSION = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/;
 
 export function isVersion(value: string): boolean {
   return VERSION.test(value);
 }
 
-/** Versions de Cyber Pinball (strictes, pas celles des tables : acquisition.ts) : négatif si a < b, 0 si égales, positif si a > b (règles de semver : 0.2.0-beta < 0.2.0). */
+/** Versions of Cyber Pinball (strict, not those of the tables: acquisition.ts): negative if a < b, 0 if equal, positive if a > b (semver rules: 0.2.0-beta < 0.2.0). */
 export function compareAppVersions(a: string, b: string): number {
   const pa = VERSION.exec(a);
   const pb = VERSION.exec(b);
@@ -177,9 +177,9 @@ export function compareAppVersions(a: string, b: string): number {
   return 0;
 }
 
-// ---------- Flux signé ----------
+// ---------- Signed feed ----------
 
-/** Signe un manifeste (scripts/publier.mjs). */
+/** Signs a manifest (scripts/publier.mjs). */
 export function signManifest(manifest: UpdateManifest, privateKeyPem: string): UpdateEnvelope {
   checkManifest(manifest);
   const text = JSON.stringify(manifest, null, 2);
@@ -187,7 +187,7 @@ export function signManifest(manifest: UpdateManifest, privateKeyPem: string): U
   return { format: 1, manifest: text, signature };
 }
 
-/** Lit un flux : la signature d'abord, puis la forme du manifeste. Refuse tout le reste. */
+/** Reads a feed: the signature first, then the shape of the manifest. Refuses everything else. */
 export function openEnvelope(raw: string, publicKeyPem: string): UpdateManifest {
   let envelope: Partial<UpdateEnvelope>;
   try {
@@ -243,15 +243,15 @@ function checkManifest(m: UpdateManifest): void {
   }
 }
 
-/** Nouveautés dans la langue de l'interface, sinon en français (flux d'avant les traductions). */
+/** New features in the interface language, otherwise in French (feeds from before the translations). */
 export function updateNotes(manifest: UpdateManifest | UpdateHistoryEntry, lang: Language = language()): string[] {
   const translated = manifest.notesByLanguage?.[lang];
   return translated?.length ? translated : manifest.notes;
 }
 
 /**
- * Nouveautés de chaque version plus récente que celle qui tourne, la plus récente d'abord :
- * la dernière publiée, puis celles de l'historique du flux qu'elle a sautées.
+ * New features of each version more recent than the running one, most recent first:
+ * the latest published, then those of the feed's history that it skipped.
  */
 export function missedReleases(manifest: UpdateManifest, current: string, lang: Language = language()): ReleaseNotes[] {
   const seen = new Set([manifest.version]);
@@ -262,39 +262,39 @@ export function missedReleases(manifest: UpdateManifest, current: string, lang: 
   return [{ version: manifest.version, notes: updateNotes(manifest, lang) }, ...older.map((e) => ({ version: e.version, notes: updateNotes(e, lang) }))];
 }
 
-// ---------- Source des mises à jour et canal d'essai privé ----------
+// ---------- Update source and private test channel ----------
 //
-// Trois sources, de la plus sûre à la plus fraîche, chacune comprenant la précédente :
-// - « finales » : la dernière version finale du dépôt public (réglage par défaut) ;
-// - « preversions » : la release la plus récente du dépôt public, préversions comprises ;
-// - « essais » : en plus, les releases d'un dépôt GitHub privé, lues avec un jeton en lecture
-//   seule. Pour qui maintient Cyber Pinball et veut essayer ses versions sur ses propres bornes
-//   avant de les publier. Le dépôt et le jeton sont dans un fichier hors des données de la borne
-//   (canal-essai.json dans %USERPROFILE%\.cyberpinball : ni sauvegardé, ni partagé, ni dans un
-//   rapport). Sans ce fichier, la source « essais » n'est pas proposée.
-// Quelle que soit la source, le flux est vérifié par la même signature : un jeton volé ne permet
-// pas de faire installer autre chose que ce que l'éditeur a signé.
+// Three sources, from the safest to the freshest, each including the previous one:
+// - "finales": the latest release of the public repository (default setting);
+// - "preversions": the most recent release of the public repository, pre-releases included;
+// - "essais": in addition, the releases of a private GitHub repository, read with a read-only
+//   token. For whoever maintains Cyber Pinball and wants to try their versions on their own
+//   cabinets before publishing them. The repository and the token are in a file outside the
+//   cabinet's data (canal-essai.json in %USERPROFILE%\.cyberpinball: neither backed up, nor
+//   shared, nor in a report). Without this file, the "essais" source is not offered.
+// Whatever the source, the feed is checked by the same signature: a stolen token does not make
+// it possible to install anything other than what the publisher signed.
 
-/** Source des mises à jour d'une borne. */
+/** Update source of a cabinet. */
 export type UpdateSource = 'finales' | 'preversions' | 'essais';
 export const UPDATE_SOURCES: readonly UpdateSource[] = ['finales', 'preversions', 'essais'];
 
-/** Canal d'essai privé : dépôt GitHub et jeton qui le lit. */
+/** Private test channel: GitHub repository and the token that reads it. */
 export interface PrivateChannel {
   repository: string;
   token: string;
-  /** Adresse de l'API GitHub (essais : un serveur local). */
+  /** Address of the GitHub API (tests: a local server). */
   api?: string;
 }
 
-/** Fichier du canal d'essai privé : CYBERPINBALL_CANAL_ESSAI le remplace (essais). */
+/** File of the private test channel: CYBERPINBALL_CANAL_ESSAI replaces it (tests). */
 export function privateChannelFile(env: NodeJS.ProcessEnv = process.env): string {
   return env.CYBERPINBALL_CANAL_ESSAI || path.join(os.homedir(), '.cyberpinball', 'canal-essai.json');
 }
 
 /**
- * Le canal d'essai privé de ce poste, ou undefined : fichier absent ou incomplet. Le fichier :
- * { "depot": "proprietaire/nom", "jeton": "github_pat_…" } (ou "repository" et "token").
+ * The private test channel of this computer, or undefined: file missing or incomplete. The file:
+ * { "depot": "proprietaire/nom", "jeton": "github_pat_…" } (or "repository" and "token").
  */
 export function loadPrivateChannel(file = privateChannelFile()): PrivateChannel | undefined {
   try {
@@ -309,7 +309,7 @@ export function loadPrivateChannel(file = privateChannelFile()): PrivateChannel 
   }
 }
 
-/** Source réglée sur la borne : « finales » tant que rien n'est réglé. */
+/** Source set on the cabinet: "finales" as long as nothing is set. */
 export function loadUpdateSource(dataDir: string): UpdateSource {
   try {
     const raw = JSON.parse(fs.readFileSync(path.join(dataDir, UPDATE_PRERELEASES_FILE), 'utf8').replace(/^﻿/, '')) as { preversions?: unknown; source?: unknown };
@@ -320,13 +320,13 @@ export function loadUpdateSource(dataDir: string): UpdateSource {
   }
 }
 
-/** Garde la source ; « preversions » reste écrit pour les versions qui ne connaissent pas « source ». */
+/** Saves the source; "preversions" stays written for the versions that do not know "source". */
 export function saveUpdateSource(dataDir: string, source: UpdateSource): void {
   fs.mkdirSync(dataDir, { recursive: true });
   writeFileAtomic(path.join(dataDir, UPDATE_PRERELEASES_FILE), `${JSON.stringify({ preversions: source !== 'finales', source }, null, 2)}\n`);
 }
 
-/** La borne accepte-t-elle les préversions ? Non tant que rien n'est réglé. */
+/** Does the cabinet accept pre-releases? No as long as nothing is set. */
 export function loadPrereleaseSetting(dataDir: string): boolean {
   return loadUpdateSource(dataDir) !== 'finales';
 }
@@ -336,8 +336,8 @@ export function savePrereleaseSetting(dataDir: string, on: boolean): void {
 }
 
 /**
- * Source effectivement suivie : « essais » sans canal d'essai sur ce poste (fichier retiré)
- * revient aux préversions publiques.
+ * Source actually followed: "essais" without a test channel on this computer (file removed)
+ * falls back to the public pre-releases.
  */
 export function effectiveUpdateSource(source: UpdateSource, channel: PrivateChannel | undefined): UpdateSource {
   return source === 'essais' && !channel ? 'preversions' : source;
@@ -345,16 +345,16 @@ export function effectiveUpdateSource(source: UpdateSource, channel: PrivateChan
 
 const GITHUB_API = 'https://api.github.com';
 
-/** Liste des releases du dépôt, préversions comprises (API GitHub, sans jeton : 60 requêtes par heure). */
+/** List of the repository's releases, pre-releases included (GitHub API, without token: 60 requests per hour). */
 export function releasesApiUrl(repository = UPDATE_REPOSITORY, api = GITHUB_API): string {
   return `${api}/repos/${repository}/releases?per_page=30`;
 }
 
 /**
- * fetch qui lit le dépôt du canal d'essai : le jeton est joint aux seules adresses de l'API de ce
- * dépôt, et un fichier joint est demandé en binaire. GitHub redirige alors vers un stockage
- * externe, suivi ici sans le jeton (il ne doit pas sortir de l'API ; le stockage le refuserait).
- * Toute autre adresse passe telle quelle.
+ * fetch that reads the test channel's repository: the token is attached only to the addresses of
+ * this repository's API, and an attached file is requested as binary. GitHub then redirects to an
+ * external storage, followed here without the token (it must not leave the API; the storage would
+ * refuse it). Any other address goes through as is.
  */
 export function channelFetch(channel: PrivateChannel | undefined, base: typeof fetch = fetch): typeof fetch {
   if (!channel) return base;
@@ -378,12 +378,12 @@ export function channelFetch(channel: PrivateChannel | undefined, base: typeof f
   }) as typeof fetch;
 }
 
-/** Release la plus récente d'une liste de l'API GitHub, et l'adresse API de chaque fichier joint de la liste. */
+/** Most recent release of a GitHub API list, and the API address of each attached file of the list. */
 interface NewestRelease {
   version: string;
-  /** Adresse du flux : de téléchargement (dépôt public), ou de l'API (dépôt privé). */
+  /** Address of the feed: for download (public repository), or of the API (private repository). */
   feed: string;
-  /** Adresse de téléchargement d'un fichier joint → son adresse dans l'API (pour un dépôt privé). */
+  /** Download address of an attached file → its address in the API (for a private repository). */
   apiUrls: Map<string, string>;
 }
 
@@ -410,9 +410,9 @@ async function newestRelease(listUrl: string, get: typeof fetch, signal: AbortSi
 }
 
 /**
- * Adresse du flux le plus récent, préversions comprises : celui de la release de plus haute
- * version qui en a un (les brouillons ne sont pas listés sans jeton). Le flux reste vérifié
- * par sa signature : la liste ne fait que dire où le chercher.
+ * Address of the most recent feed, pre-releases included: the one of the highest-version release
+ * that has one (drafts are not listed without a token). The feed is still checked by its
+ * signature: the list only says where to look for it.
  */
 export async function prereleaseFeedUrl(opts: { releasesUrl?: string; fetch?: typeof fetch; signal?: AbortSignal } = {}): Promise<string> {
   const best = await newestRelease(opts.releasesUrl ?? releasesApiUrl(), opts.fetch ?? fetch, opts.signal, false);
@@ -420,15 +420,15 @@ export async function prereleaseFeedUrl(opts: { releasesUrl?: string; fetch?: ty
   return best.feed;
 }
 
-/** Cherche la dernière version publiée et la compare à celle qui tourne. */
+/** Looks for the latest published version and compares it with the running one. */
 export async function checkForUpdate(opts: {
   current: string;
   feedUrl?: string;
-  /** Préversions comprises : le flux de la release la plus récente (CYBERPINBALL_MAJ_URL les remplace aussi). */
+  /** Pre-releases included: the feed of the most recent release (CYBERPINBALL_MAJ_URL replaces them too). */
   prereleases?: boolean;
   /**
-   * Canal d'essai privé : ses releases s'ajoutent aux préversions publiques, la plus récente
-   * l'emporte. Un canal illisible (jeton refusé…) est une erreur : jamais un repli silencieux.
+   * Private test channel: its releases are added to the public pre-releases, the most recent one
+   * wins. An unreadable channel (token refused...) is an error: never a silent fallback.
    */
   channel?: PrivateChannel;
   releasesUrl?: string;
@@ -442,7 +442,7 @@ export async function checkForUpdate(opts: {
   let privateRelease: NewestRelease | undefined;
   const listed = !opts.feedUrl && !process.env.CYBERPINBALL_MAJ_URL;
   if ((opts.prereleases || opts.channel) && listed) {
-    // Liste illisible (limite de l'API atteinte…) : le flux des versions finales, toujours lisible.
+    // Unreadable list (API limit reached...): the feed of the releases, always readable.
     const pub = await newestRelease(opts.releasesUrl ?? releasesApiUrl(), plain, opts.signal, false).catch(() => undefined);
     if (pub) url = pub.feed;
     if (opts.channel) {
@@ -468,8 +468,8 @@ export async function checkForUpdate(opts: {
   if (response.status === 404) throw new Error(t('Aucune version publiée pour l’instant sur le site des mises à jour.'));
   if (!response.ok) throw new Error(t('Le site des mises à jour répond HTTP {status}.', { status: response.status }));
   const latest = openEnvelope(await response.text(), opts.publicKey ?? updatePublicKey());
-  // Dépôt privé : ses fichiers ne se téléchargent que par l'API, avec le jeton (channelFetch).
-  // L'adresse seule change : taille et empreinte restent celles du flux signé.
+  // Private repository: its files can only be downloaded through the API, with the token (channelFetch).
+  // Only the address changes: size and hash stay those of the signed feed.
   if (privateRelease) {
     const viaApi = <A extends UpdateAsset>(asset: A): A => ({ ...asset, url: privateRelease.apiUrls.get(asset.url) ?? asset.url });
     latest.installer = viaApi(latest.installer);
@@ -478,12 +478,12 @@ export async function checkForUpdate(opts: {
   return { status: compareAppVersions(latest.version, opts.current) > 0 ? 'available' : 'up-to-date', current: opts.current, latest };
 }
 
-// ---------- Mise à jour légère ou installeur ----------
+// ---------- Light update or installer ----------
 
 /**
- * Socle d'une application installée : champ cyberpinball.socle de app\resources\app\package.json
- * (scripts/fabriquer.mjs). Undefined pour une version d'avant la mise à jour légère, ou lancée
- * depuis les sources.
+ * Base of an installed application: cyberpinball.socle field of app\resources\app\package.json
+ * (scripts/fabriquer.mjs). Undefined for a version from before the light update, or run
+ * from the sources.
  */
 export function installedSocle(appDir: string): string | undefined {
   try {
@@ -495,14 +495,14 @@ export function installedSocle(appDir: string): string | undefined {
 }
 
 export type UpdatePlan =
-  /** Paquet léger : même socle, seule l'application change. */
+  /** Light package: same base, only the application changes. */
   | { kind: 'light'; asset: UpdateAsset }
-  /** Installeur : socle différent (ou flux sans paquet léger). thenLight : il installe une version plus ancienne que le flux, la mise à jour légère suit. */
+  /** Installer: different base (or feed without a light package). thenLight: it installs a version older than the feed, the light update follows. */
   | { kind: 'installer'; asset: UpdateAsset; installs: string; thenLight: boolean }
-  /** Ni l'un ni l'autre : l'installeur publié n'apporte rien de plus récent que la version installée. */
+  /** Neither: the published installer brings nothing more recent than the installed version. */
   | { kind: 'none'; installs: string };
 
-/** Comment passer de la version installée (et de son socle) à celle du flux. */
+/** How to go from the installed version (and its base) to the feed's one. */
 export function updatePlan(manifest: UpdateManifest, current: string, socle: string | undefined): UpdatePlan {
   if (manifest.app && socle && manifest.app.socle === socle) return { kind: 'light', asset: manifest.app };
   const installs = manifest.installer.version ?? manifest.version;
@@ -510,19 +510,19 @@ export function updatePlan(manifest: UpdateManifest, current: string, socle: str
   return { kind: 'installer', asset: manifest.installer, installs, thenLight: installs !== manifest.version };
 }
 
-// ---------- Téléchargement ----------
+// ---------- Download ----------
 
-/** Dossier des installeurs téléchargés, dans downloads\ de la racine. */
+/** Folder of the downloaded installers, in downloads\ of the root folder. */
 export function updateDownloadsDir(downloadsDir: string): string {
   return path.join(downloadsDir, 'cyberpinball');
 }
 
-/** Nom local de l'installeur : la version qu'il installe y figure, pour ne jamais confondre deux téléchargements. */
+/** Local name of the installer: the version it installs is in it, so that two downloads are never confused. */
 export function updateInstallerFile(dir: string, manifest: UpdateManifest): string {
   return path.join(dir, `CyberPinball-Setup-${manifest.installer.version ?? manifest.version}.exe`);
 }
 
-/** Nom local du paquet léger. */
+/** Local name of the light package. */
 export function updateAppFile(dir: string, manifest: UpdateManifest): string {
   return path.join(dir, `CyberPinball-application-${manifest.version}.zip`);
 }
@@ -534,15 +534,15 @@ export async function sha256File(file: string): Promise<string> {
 }
 
 /**
- * Télécharge l'installeur décrit par le manifeste, ou reprend celui déjà téléchargé
- * s'il est intact. Un fichier de la mauvaise taille ou empreinte est supprimé, jamais lancé.
- * Les anciens installeurs du dossier sont supprimés : seul le dernier sert.
+ * Downloads the installer described by the manifest, or reuses the one already downloaded
+ * if it is intact. A file with the wrong size or hash is deleted, never launched.
+ * The old installers of the folder are deleted: only the latest one is used.
  */
 export async function downloadUpdate(manifest: UpdateManifest, dir: string, opts: DownloadOptions = {}): Promise<string> {
   return downloadAsset(manifest.installer, updateInstallerFile(dir, manifest), opts);
 }
 
-/** Télécharge le paquet léger, comme l'installeur : vérifié, repris s'il est déjà là, les anciens supprimés. */
+/** Downloads the light package, like the installer: checked, reused if already there, the old ones deleted. */
 export async function downloadAppPackage(manifest: UpdateManifest, dir: string, opts: DownloadOptions = {}): Promise<string> {
   if (!manifest.app) throw new Error(t('Flux de mise à jour incomplet : {what}.', { what: t('paquet de l’application illisible') }));
   return downloadAsset(manifest.app, updateAppFile(dir, manifest), opts);
@@ -554,7 +554,7 @@ export interface DownloadOptions {
   fetch?: typeof fetch;
 }
 
-/** Fichiers téléchargés par les mises à jour, et leurs restes : un seul de chaque sorte est gardé. */
+/** Files downloaded by the updates, and their leftovers: only one of each kind is kept. */
 const DOWNLOADED = [/^CyberPinball-Setup-.+\.exe(\.part)?$/i, /^CyberPinball-application-.+\.zip(\.part)?$/i];
 
 async function downloadAsset(asset: UpdateAsset, file: string, opts: DownloadOptions): Promise<string> {
@@ -569,7 +569,7 @@ async function downloadAsset(asset: UpdateAsset, file: string, opts: DownloadOpt
     return file;
   }
 
-  // Reçu sous « .part », repris là où il s'était arrêté après une coupure (resumable.ts).
+  // Received as ".part", resumed where it stopped after an interruption (resumable.ts).
   const part = `${file}.part`;
   const total = asset.size;
   let got: Awaited<ReturnType<typeof fetchResumable>>;
@@ -593,7 +593,7 @@ async function downloadAsset(asset: UpdateAsset, file: string, opts: DownloadOpt
       fs.rmSync(part, { force: true });
       throw new Error(t('Téléchargement impossible (HTTP {status}) : {url}', { status: e.status ?? 0, url: asset.url }));
     }
-    // Coupure : le partiel reste, le prochain essai reprendra là.
+    // Interruption: the partial file stays, the next attempt will resume there.
     if (e && !e.kept) fs.rmSync(part, { force: true });
     throw new Error(t('Téléchargement interrompu : {message}', { message: (error as Error).message }));
   }
@@ -611,29 +611,29 @@ async function downloadAsset(asset: UpdateAsset, file: string, opts: DownloadOpt
   return file;
 }
 
-// ---------- Mise en place du paquet léger ----------
+// ---------- Putting the light package in place ----------
 
-/** Dossier où le paquet léger est déplié, à côté de son téléchargement. */
+/** Folder where the light package is unpacked, next to its download. */
 export function stagedAppDir(dir: string, manifest: UpdateManifest): string {
   return path.join(dir, `application-${manifest.version}`);
 }
 
-/** tar.exe de Windows (bsdtar) : il lit et écrit les zip. Celui de Git (GNU tar) ne les lit pas. */
+/** Windows tar.exe (bsdtar): it reads and writes zips. Git's one (GNU tar) does not read them. */
 export function windowsTar(): string {
   return path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
 }
 
-/** Délai pour déplier le paquet léger (une vingtaine de Mo, quelques secondes d'ordinaire). */
+/** Time allowed to unpack the light package (about twenty MB, a few seconds usually). */
 export const UNPACK_TIMEOUT_MS = 2 * 60_000;
 
 /**
- * Déplie le paquet léger dans `target` (vidé d'abord), puis vérifie qu'il contient bien la
- * version du flux, au socle annoncé : un paquet qui ne correspond pas est effacé, jamais mis en place.
+ * Unpacks the light package into `target` (emptied first), then checks that it really contains the
+ * feed's version, with the announced base: a package that does not match is erased, never put in place.
  */
 export function unpackAppPackage(zip: string, target: string, manifest: UpdateManifest): void {
   fs.rmSync(target, { recursive: true, force: true });
   fs.mkdirSync(target, { recursive: true });
-  // Jamais sans fin (17/11/2026) : un tar suspendu gelait l'application sans rien dire.
+  // Never endless (17/11/2026): a hung tar froze the application without saying anything.
   const run = spawnSync(windowsTar(), ['-x', '-f', zip, '-C', target], { encoding: 'utf8', windowsHide: true, timeout: UNPACK_TIMEOUT_MS });
   let problem: string | undefined;
   if (run.status !== 0) problem = (run.error?.message ?? run.stderr) || `tar ${run.status}`;
@@ -642,12 +642,12 @@ export function unpackAppPackage(zip: string, target: string, manifest: UpdateMa
     try {
       pkg = JSON.parse(fs.readFileSync(path.join(target, 'package.json'), 'utf8'));
     } catch {
-      // Pas de package.json : signalé ci-dessous.
+      // No package.json: reported below.
     }
     if (pkg.version !== manifest.version || pkg.cyberpinball?.socle !== manifest.app?.socle) {
       problem = t('il contient la version {version}, pas {expected}', { version: String(pkg.version), expected: manifest.version });
     } else if (!fs.existsSync(path.join(target, 'dist', 'main.js')) || !fs.existsSync(path.join(target, 'renderer', 'frontend.html'))) {
-      // Le bon numéro, mais pas le code (0.1.13-essai.1, publiée incomplète) : le dire tel quel.
+      // The right number, but not the code (0.1.13-essai.1, published incomplete): say it as is.
       problem = t('le code de l’application manque dans le paquet');
     }
   }
@@ -657,26 +657,26 @@ export function unpackAppPackage(zip: string, target: string, manifest: UpdateMa
   }
 }
 
-/** Ce que fait app/src/maj-legere.ts une fois Cyber Pinball fermé (écrit en JSON à côté du paquet). */
+/** What app/src/maj-legere.ts does once Cyber Pinball is closed (written as JSON next to the package). */
 export interface LightUpdateJob {
-  /** Processus de Cyber Pinball à attendre. */
+  /** Cyber Pinball process to wait for. */
   pid: number;
-  /** app\resources\app, à remplacer. */
+  /** app\resources\app, to be replaced. */
   appDir: string;
-  /** Paquet déplié (stagedAppDir). */
+  /** Unpacked package (stagedAppDir). */
   staged: string;
   version: string;
-  /** Relance : CyberPinball.exe, ses arguments d'avant, son dossier de travail. */
+  /** Relaunch: CyberPinball.exe, its previous arguments, its working folder. */
   exe: string;
   args: string[];
   cwd: string;
-  /** Écrire la version dans « Programmes et fonctionnalités » (pas dans un bac à sable). */
+  /** Write the version in "Programs and Features" (not in a sandbox). */
   registry: boolean;
-  /** Journal de l'opération. */
+  /** Log of the operation. */
   log: string;
 }
 
-/** Attend la fin d'un processus (jusqu'à timeoutMs). Vrai s'il s'est terminé. */
+/** Waits for a process to end (up to timeoutMs). True if it ended. */
 export async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
   const end = Date.now() + timeoutMs;
   for (;;) {
@@ -691,12 +691,12 @@ export async function waitForExit(pid: number, timeoutMs: number): Promise<boole
 }
 
 /**
- * Remplace `appDir` par `staged` : l'ancien devient <appDir>.precedente le temps de
- * l'opération (essais pendant `retryMs`, tant qu'un fichier reste tenu), remis en place si la
- * nouvelle ne peut s'y mettre, supprimé sinon. En cas d'erreur, `appDir` est intact.
- * Faux si l'ancienne n'a pas pu être supprimée tout de suite (un fichier encore tenu par un
- * processus de Chromium qui finit de se fermer) : la mise à jour est faite quand même, et
- * removePreviousApp la retire au démarrage suivant.
+ * Replaces `appDir` with `staged`: the old one becomes <appDir>.precedente for the duration of
+ * the operation (attempts during `retryMs`, as long as a file stays held), put back if the
+ * new one cannot take its place, deleted otherwise. On error, `appDir` is intact.
+ * False if the old one could not be deleted right away (a file still held by a
+ * Chromium process that is finishing closing): the update is done anyway, and
+ * removePreviousApp removes it at the next startup.
  */
 export async function swapAppDir(appDir: string, staged: string, opts: { retryMs?: number } = {}): Promise<boolean> {
   if (!fs.existsSync(path.join(staged, 'package.json'))) throw new Error(t('Paquet de l’application introuvable : {dir}', { dir: staged }));
@@ -716,7 +716,7 @@ export async function swapAppDir(appDir: string, staged: string, opts: { retryMs
     try {
       renameWithRetry(staged, appDir);
     } catch {
-      // Autre disque (EXDEV) : copie, puis effacement du paquet déplié.
+      // Other drive (EXDEV): copy, then erase the unpacked package.
       copyTree(staged, appDir);
       fs.rmSync(staged, { recursive: true, force: true });
     }
@@ -729,15 +729,15 @@ export async function swapAppDir(appDir: string, staged: string, opts: { retryMs
 }
 
 /**
- * Retire <appDir>.precedente, reste d'une mise à jour légère (nouveaux essais pendant 5 s si
- * un fichier est encore tenu). Vrai s'il n'en reste rien ; jamais d'erreur.
+ * Removes <appDir>.precedente, a leftover of a light update (new attempts for 5 s if
+ * a file is still held). True if nothing is left of it; never an error.
  */
 export function removePreviousApp(appDir: string): boolean {
   const previous = `${appDir}.precedente`;
   try {
     fs.rmSync(previous, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   } catch {
-    // Retiré au prochain démarrage, ou à la prochaine mise à jour.
+    // Removed at the next startup, or at the next update.
   }
   return !fs.existsSync(previous);
 }
@@ -745,26 +745,26 @@ export function removePreviousApp(appDir: string): boolean {
 // ---------- Installation ----------
 
 /**
- * Arguments de l'installeur pour une mise à jour : /MAJ (attend la fermeture de Cyber
- * Pinball, garde les raccourcis, relance l'application), /D= la racine en dernier.
- * Hors écran (essais), il est aussi silencieux : aucune fenêtre ne s'ouvre.
+ * Arguments of the installer for an update: /MAJ (waits for Cyber Pinball to close, keeps the
+ * shortcuts, relaunches the application), /D= the root folder last.
+ * Off-screen (tests), it is also silent: no window opens.
  */
 export function updateInstallerArguments(root: string, opts: { silent?: boolean } = {}): string[] {
   return ['/MAJ', ...(opts.silent ? ['/S'] : []), `/D=${root}`];
 }
 
-/** Ligne de commande de la relance (CYBERPINBALL_MAJ_ARGS) : les arguments de l'application, entre guillemets si besoin. */
+/** Command line of the relaunch (CYBERPINBALL_MAJ_ARGS): the application's arguments, in quotes if needed. */
 export function relaunchArguments(args: string[]): string {
   return args.map((a) => (/[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a)).join(' ');
 }
 
 export interface PendingUpdate {
   from: string;
-  /** Version attendue au redémarrage (celle que pose l'installeur ou le paquet léger). */
+  /** Version expected at restart (the one set by the installer or the light package). */
   to: string;
-  /** Date du lancement de l'installeur ou de la mise en place (ISO 8601). */
+  /** Date the installer was launched or the package put in place (ISO 8601). */
   started: string;
-  /** Installeur lancé, ou paquet léger mis en place. */
+  /** Installer launched, or light package put in place. */
   installer: string;
 }
 
@@ -775,15 +775,15 @@ export function recordPendingUpdate(dataDir: string, pending: PendingUpdate): vo
 
 export type UpdateOutcome =
   | { kind: 'installed'; from: string; to: string }
-  /** L'installeur n'a pas abouti : l'ancienne version est toujours là. */
+  /** The installer did not succeed: the old version is still there. */
   | { kind: 'failed'; from: string; to: string; current: string };
 
 /**
- * Au démarrage : une mise à jour avait été lancée ? Lit et efface le suivi, et dit si
- * la version attendue tourne. Une version plus récente que celle d'avant compte aussi comme
- * installée : une version d'avant la mise à jour légère notait la version du flux, alors que
- * l'installeur d'une publication rapide pose celle de la dernière publication complète.
- * Un suivi illisible est effacé sans rien dire.
+ * At startup: had an update been launched? Reads and erases the tracking, and says whether
+ * the expected version is running. A version more recent than the previous one also counts as
+ * installed: a version from before the light update recorded the feed's version, whereas
+ * the installer of a quick publication sets the one of the last full publication.
+ * Unreadable tracking is erased silently.
  */
 export function takeUpdateOutcome(dataDir: string, current: string): UpdateOutcome | undefined {
   const file = path.join(dataDir, UPDATE_PENDING_FILE);

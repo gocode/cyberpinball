@@ -1,14 +1,14 @@
-// Informations que l'auteur a écrites dans la table elle-même (Fichier > Informations
-// de la table dans l'éditeur de VPX) : nom, auteur, version, date, description.
-// Elles survivent aux renommages du fichier : « GOTG_2.1.1.vpx » s'y appelle encore
-// « Guardians of the Galaxy ». La recherche approfondie des médias s'en sert.
+// Information that the author wrote in the table itself (File > Table Info in the VPX
+// editor): name, author, version, date, description.
+// It survives renamings of the file: "GOTG_2.1.1.vpx" is still called
+// "Guardians of the Galaxy" there. The in-depth media search uses it.
 //
-// Un .vpx est un fichier composé OLE (Compound File Binary, [MS-CFB]). VPX y range
-// ces informations dans le stockage « TableInfo », un flux par champ, en UTF-16LE
-// sans longueur ni zéro final (PinTable::SaveInfo, WriteInfoValue). Les flux sont
-// petits : ils vivent dans le mini-flux. On ne lit que l'en-tête, la table
-// d'allocation, le répertoire et ces quelques secteurs, jamais les centaines de Mo
-// d'images et de sons.
+// A .vpx is an OLE compound file (Compound File Binary, [MS-CFB]). VPX stores
+// this information in the "TableInfo" storage, one stream per field, in UTF-16LE
+// without length or final zero (PinTable::SaveInfo, WriteInfoValue). The streams are
+// small: they live in the mini stream. Only the header, the allocation
+// table, the directory and those few sectors are read, never the hundreds of MB
+// of images and sounds.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -24,7 +24,7 @@ export interface VpxTableInfo {
   rules?: string;
 }
 
-/** Flux du stockage TableInfo, et le champ où on les range. */
+/** Streams of the TableInfo storage, and the field where they are stored. */
 const FIELDS: Record<string, keyof VpxTableInfo> = {
   TableName: 'name',
   AuthorName: 'author',
@@ -39,7 +39,7 @@ const FIELDS: Record<string, keyof VpxTableInfo> = {
 const SIGNATURE = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
 const END_OF_CHAIN = 0xfffffffe;
 const MAX_SECTOR = 0xfffffffa;
-/** Au-delà, un champ est tronqué : la règle du jeu peut être longue, on n'en a pas besoin entière. */
+/** Beyond this, a field is truncated: the game rules may be long, they are not needed in full. */
 const MAX_FIELD_BYTES = 64 * 1024;
 
 export interface DirEntry {
@@ -53,9 +53,9 @@ export interface DirEntry {
 }
 
 /**
- * Lecteur minimal de fichier composé : en-tête, FAT (avec la DIFAT des gros
- * fichiers), répertoire et mini-flux. Lève une erreur si le fichier n'en est pas un.
- * Sert aussi pour VPReg.stg, où VPX range ce que les tables enregistrent (highscores.ts).
+ * Minimal compound file reader: header, FAT (with the DIFAT of large
+ * files), directory and mini stream. Throws an error if the file is not one.
+ * Also used for VPReg.stg, where VPX stores what the tables save (highscores.ts).
  */
 export class CompoundFile {
   private readonly sectorSize: number;
@@ -71,14 +71,14 @@ export class CompoundFile {
   constructor(private readonly fd: number) {
     this.fileSize = fs.fstatSync(fd).size;
     const header = this.read(0, 512);
-    if (!header.subarray(0, 8).equals(SIGNATURE)) throw new Error('ce n’est pas un fichier composé OLE'); // i18n-ignore : erreur interne, toujours rattrapée
+    if (!header.subarray(0, 8).equals(SIGNATURE)) throw new Error('ce n’est pas un fichier composé OLE'); // i18n-ignore: internal error, always caught
     this.sectorSize = 1 << header.readUInt16LE(0x1e);
     this.miniSectorSize = 1 << header.readUInt16LE(0x20);
-    if (this.sectorSize !== 512 && this.sectorSize !== 4096) throw new Error('taille de secteur inattendue'); // i18n-ignore : erreur interne, toujours rattrapée
+    if (this.sectorSize !== 512 && this.sectorSize !== 4096) throw new Error('taille de secteur inattendue'); // i18n-ignore: internal error, always caught
     const fatCount = header.readUInt32LE(0x2c);
     this.miniCutoff = header.readUInt32LE(0x38);
 
-    // Secteurs de la FAT : 109 dans l'en-tête, la suite dans la chaîne DIFAT.
+    // Sectors of the FAT: 109 in the header, the rest in the DIFAT chain.
     const fatSectors: number[] = [];
     for (let i = 0; i < 109 && fatSectors.length < fatCount; i++) fatSectors.push(header.readUInt32LE(0x4c + i * 4));
     let difat = header.readUInt32LE(0x44);
@@ -103,11 +103,11 @@ export class CompoundFile {
         right: dir.readUInt32LE(off + 0x48),
         child: dir.readUInt32LE(off + 0x4c),
         start: dir.readUInt32LE(off + 0x74),
-        // Version 3 : seuls les 32 bits de poids faible comptent.
+        // Version 3: only the 32 low-order bits count.
         size: dir.readUInt32LE(off + 0x78),
       });
     }
-    if (this.entries[0]?.type !== 5) throw new Error('répertoire du fichier composé illisible'); // i18n-ignore : erreur interne, toujours rattrapée
+    if (this.entries[0]?.type !== 5) throw new Error('répertoire du fichier composé illisible'); // i18n-ignore: internal error, always caught
     const miniFatStart = header.readUInt32LE(0x3c);
     if (miniFatStart <= MAX_SECTOR) {
       const miniFat = this.chain(miniFatStart);
@@ -123,14 +123,14 @@ export class CompoundFile {
 
   private sector(n: number): Buffer {
     const offset = (n + 1) * this.sectorSize;
-    if (n > MAX_SECTOR || offset >= this.fileSize) throw new Error(`secteur ${n} hors du fichier`); // i18n-ignore : erreur interne, toujours rattrapée
+    if (n > MAX_SECTOR || offset >= this.fileSize) throw new Error(`secteur ${n} hors du fichier`); // i18n-ignore: internal error, always caught
     return this.read(offset, this.sectorSize);
   }
 
   /**
-   * Ces secteurs, dans l'ordre, mis bout à bout. Les secteurs qui se suivent dans le fichier sont
-   * lus d'un seul appel : la table d'allocation d'un .vpx de 200 Mo (1,6 Mo) se lisait en 3 200
-   * lectures de 512 octets, à chaque ouverture (17/11/2026). Même résultat que sector() un à un.
+   * These sectors, in order, put end to end. Sectors that follow each other in the file are
+   * read in a single call: the allocation table of a 200 MB .vpx (1.6 MB) was read in 3,200
+   * reads of 512 bytes, at each opening (17/11/2026). Same result as sector() one by one.
    */
   private readSectors(list: number[]): Buffer {
     const parts: Buffer[] = [];
@@ -140,7 +140,7 @@ export class CompoundFile {
       const first = list[i]!;
       const last = list[j]!;
       for (const n of [first, last]) {
-        if (n > MAX_SECTOR || (n + 1) * this.sectorSize >= this.fileSize) throw new Error(`secteur ${n} hors du fichier`); // i18n-ignore : erreur interne, toujours rattrapée
+        if (n > MAX_SECTOR || (n + 1) * this.sectorSize >= this.fileSize) throw new Error(`secteur ${n} hors du fichier`); // i18n-ignore: internal error, always caught
       }
       parts.push(this.read((first + 1) * this.sectorSize, (j - i + 1) * this.sectorSize));
       i = j + 1;
@@ -148,29 +148,29 @@ export class CompoundFile {
     return Buffer.concat(parts);
   }
 
-  /** Chaîne de secteurs depuis `start`, jusqu'à `limit` octets. */
+  /** Chain of sectors from `start`, up to `limit` bytes. */
   private chain(start: number, limit = Infinity): Buffer {
     const list: number[] = [];
     const seen = new Set<number>();
     for (let s = start; s <= MAX_SECTOR && list.length * this.sectorSize < limit; s = this.fat[s] ?? END_OF_CHAIN) {
-      if (seen.has(s)) throw new Error('chaîne de secteurs en boucle'); // i18n-ignore : erreur interne, toujours rattrapée
+      if (seen.has(s)) throw new Error('chaîne de secteurs en boucle'); // i18n-ignore: internal error, always caught
       seen.add(s);
       list.push(s);
     }
     return this.readSectors(list);
   }
 
-  /** Contenu d'un flux, au plus `limit` octets. */
+  /** Content of a stream, at most `limit` bytes. */
   stream(entry: DirEntry, limit = Infinity): Buffer {
     const size = Math.min(entry.size, limit);
     if (entry.size >= this.miniCutoff) return this.chain(entry.start, size).subarray(0, size);
-    // Petit flux : secteurs de 64 octets dans le mini-flux, porté par l'entrée racine.
+    // Small stream: 64-byte sectors in the mini stream, carried by the root entry.
     this.miniStream ??= this.chain(this.entries[0]!.start, this.entries[0]!.size).subarray(0, this.entries[0]!.size);
     const parts: Buffer[] = [];
     let total = 0;
     const seen = new Set<number>();
     for (let s = entry.start; s <= MAX_SECTOR && total < size; s = this.miniFat?.[s] ?? END_OF_CHAIN) {
-      if (seen.has(s)) throw new Error('chaîne de mini-secteurs en boucle'); // i18n-ignore : erreur interne, toujours rattrapée
+      if (seen.has(s)) throw new Error('chaîne de mini-secteurs en boucle'); // i18n-ignore: internal error, always caught
       seen.add(s);
       const part = this.miniStream.subarray(s * this.miniSectorSize, (s + 1) * this.miniSectorSize);
       parts.push(part);
@@ -179,12 +179,12 @@ export class CompoundFile {
     return Buffer.concat(parts).subarray(0, size);
   }
 
-  /** Les secteurs d'une chaîne, dans l'ordre. */
+  /** The sectors of a chain, in order. */
   private sectors(start: number): number[] {
     const out: number[] = [];
     const seen = new Set<number>();
     for (let s = start; s <= MAX_SECTOR; s = this.fat[s] ?? END_OF_CHAIN) {
-      if (seen.has(s)) throw new Error('chaîne de secteurs en boucle'); // i18n-ignore : erreur interne, toujours rattrapée
+      if (seen.has(s)) throw new Error('chaîne de secteurs en boucle'); // i18n-ignore: internal error, always caught
       seen.add(s);
       out.push(s);
     }
@@ -192,9 +192,9 @@ export class CompoundFile {
   }
 
   /**
-   * Où vivent les octets d'un flux dans le fichier : chaque secteur (ou mini-secteur de 64 octets,
-   * pour un petit flux) de sa chaîne, avec sa place. Sert à réécrire une valeur sur place
-   * (highscores.ts, patchVpRegValues), sans toucher à la structure du fichier.
+   * Where the bytes of a stream live in the file: each sector (or 64-byte mini sector,
+   * for a small stream) of its chain, with its place. Used to rewrite a value in place
+   * (highscores.ts, patchVpRegValues), without touching the structure of the file.
    */
   spans(entry: DirEntry): { offset: number; length: number }[] {
     if (entry.size >= this.miniCutoff) return this.sectors(entry.start).map((s) => ({ offset: (s + 1) * this.sectorSize, length: this.sectorSize }));
@@ -202,26 +202,26 @@ export class CompoundFile {
     const out: { offset: number; length: number }[] = [];
     const seen = new Set<number>();
     for (let s = entry.start; s <= MAX_SECTOR; s = this.miniFat?.[s] ?? END_OF_CHAIN) {
-      if (seen.has(s)) throw new Error('chaîne de mini-secteurs en boucle'); // i18n-ignore : erreur interne, toujours rattrapée
+      if (seen.has(s)) throw new Error('chaîne de mini-secteurs en boucle'); // i18n-ignore: internal error, always caught
       seen.add(s);
       const at = s * this.miniSectorSize;
       const sector = root[Math.floor(at / this.sectorSize)];
-      if (sector === undefined) throw new Error('mini-secteur hors du mini-flux'); // i18n-ignore : erreur interne, toujours rattrapée
+      if (sector === undefined) throw new Error('mini-secteur hors du mini-flux'); // i18n-ignore: internal error, always caught
       out.push({ offset: (sector + 1) * this.sectorSize + (at % this.sectorSize), length: this.miniSectorSize });
     }
     return out;
   }
 
-  /** Position dans le fichier de l'entrée de répertoire `entry` (128 octets ; sa taille à +0x78). */
+  /** Position in the file of the directory entry `entry` (128 bytes; its size at +0x78). */
   entryOffset(entry: DirEntry): number {
     const index = this.entries.indexOf(entry);
-    if (index < 0) throw new Error('entrée inconnue'); // i18n-ignore : erreur interne, toujours rattrapée
+    if (index < 0) throw new Error('entrée inconnue'); // i18n-ignore: internal error, always caught
     const sector = this.sectors(this.dirStart)[Math.floor((index * 128) / this.sectorSize)];
-    if (sector === undefined) throw new Error('entrée hors du répertoire'); // i18n-ignore : erreur interne, toujours rattrapée
+    if (sector === undefined) throw new Error('entrée hors du répertoire'); // i18n-ignore: internal error, always caught
     return (sector + 1) * this.sectorSize + ((index * 128) % this.sectorSize);
   }
 
-  /** Enfants d'un stockage : l'arbre rouge-noir de ses entrées, parcouru en entier. */
+  /** Children of a storage: the red-black tree of its entries, walked in full. */
   children(entry: DirEntry): DirEntry[] {
     const out: DirEntry[] = [];
     const seen = new Set<number>();
@@ -238,13 +238,13 @@ export class CompoundFile {
   }
 }
 
-/** Texte d'un flux de TableInfo : UTF-16LE, sans les zéros ni les espaces aux bouts. */
+/** Text of a TableInfo stream: UTF-16LE, without the zeros or spaces at the ends. */
 function decode(buf: Buffer): string {
   const even = buf.length - (buf.length % 2);
   return buf.toString('utf16le', 0, even).replace(/\0+$/g, '').replace(/\r\n/g, '\n').trim();
 }
 
-/** Au-delà, la capture n'est pas lue : ce ne serait plus une simple image. */
+/** Beyond this, the screenshot is not read: it would no longer be a simple image. */
 const MAX_SCREENSHOT_BYTES = 40 * 1024 * 1024;
 
 const IMAGE_MAGIC: [string, number[]][] = [
@@ -254,9 +254,9 @@ const IMAGE_MAGIC: [string, number[]][] = [
 ];
 
 /**
- * Capture de la table choisie par son auteur (flux TableInfo/Screenshot) : les octets
- * du fichier image d'origine, souvent le plateau vu en entier. Rare ; undefined si la
- * table n'en a pas, ou si ce n'est pas une image que le menu sait lire.
+ * Screenshot of the table chosen by its author (TableInfo/Screenshot stream): the bytes
+ * of the original image file, often the playfield seen in full. Rare; undefined if the
+ * table has none, or if it is not an image that the menu can read.
  */
 export function readVpxScreenshot(file: string): { data: Buffer; ext: string } | undefined {
   let fd: number | undefined;
@@ -276,15 +276,15 @@ export function readVpxScreenshot(file: string): { data: Buffer; ext: string } |
   }
 }
 
-/** Format d'une image d'après sa signature ; undefined si le menu ne sait pas la lire. */
+/** Format of an image from its signature; undefined if the menu cannot read it. */
 function imageExt(data: Buffer): string | undefined {
   if (data.subarray(0, 4).toString('latin1') === 'RIFF' && data.subarray(8, 12).toString('latin1') === 'WEBP') return 'webp';
   return IMAGE_MAGIC.find(([, magic]) => magic.every((b, i) => data[i] === b))?.[0];
 }
 
 /**
- * Enregistrements BIFF de VPX : [longueur sur 4 octets][étiquette de 4 lettres][données
- * de longueur - 4]. Les enregistrements imbriqués (JPEG d'une image) suivent à plat.
+ * VPX BIFF records: [length on 4 bytes][tag of 4 letters][data
+ * of length - 4]. Nested records (JPEG of an image) follow flat.
  */
 function* biffRecords(data: Buffer): Generator<{ tag: string; body: Buffer }> {
   let pos = 0;
@@ -297,13 +297,13 @@ function* biffRecords(data: Buffer): Generator<{ tag: string; body: Buffer }> {
   }
 }
 
-/** Chaîne BIFF : [longueur sur 4 octets][octets]. */
+/** BIFF string: [length on 4 bytes][bytes]. */
 function biffString(body: Buffer): string {
   if (body.length < 4) return '';
   return body.toString('utf8', 4, 4 + Math.min(body.readUInt32LE(0), body.length - 4));
 }
 
-/** Une image rangée dans la table (GameStg/ImageN) : son nom, ses dimensions, son fichier d'origine. */
+/** An image stored in the table (GameStg/ImageN): its name, its dimensions, its original file. */
 export interface VpxImage {
   name: string;
   width: number;
@@ -313,19 +313,19 @@ export interface VpxImage {
 }
 
 export interface VpxImages {
-  /** Image du plateau (champ IMAG de GameData), si c'est une vraie vue de dessus. */
+  /** Image of the playfield (IMAG field of GameData), if it is a real top view. */
   playfield?: VpxImage;
-  /** Carte de règles : l'image que désigne le Markdown des règles, ou au nom parlant. */
+  /** Rules card: the image that the rules Markdown designates, or with a telling name. */
   rules?: VpxImage;
-  /** Frontons de la pièce VR (« Pincab_BackglassImage », « backglassimage »…). */
+  /** Backglasses of the VR room ("Pincab_BackglassImage", "backglassimage"...). */
   backglass: VpxImage[];
-  /** Logos (« VR_Logo », « PinCab_Logo »…). */
+  /** Logos ("VR_Logo", "PinCab_Logo"...). */
   logos: VpxImage[];
 }
 
 /**
- * Noms des images rangées dans la table (GameStg/ImageN), sans lire leurs octets : seul le début de chaque image est lu.
- * Pour les images du DMD que FlexDMD tire de la table (flexprewarm.ts). undefined si le fichier n'est pas un .vpx lisible.
+ * Names of the images stored in the table (GameStg/ImageN), without reading their bytes: only the start of each image is read.
+ * For the DMD images that FlexDMD takes from the table (flexprewarm.ts). undefined if the file is not a readable .vpx.
  */
 export function readVpxImageNames(file: string): { name: string; width: number; height: number }[] | undefined {
   let fd: number | undefined;
@@ -355,20 +355,20 @@ export function readVpxImageNames(file: string): { name: string; width: number; 
   }
 }
 
-/** Au-delà, une image n'est pas lue (une texture de 4K en PNG fait déjà 20 Mo). */
+/** Beyond this, an image is not read (a 4K texture as PNG is already 20 MB). */
 const MAX_IMAGE_BYTES = 60 * 1024 * 1024;
-/** Images de chaque sorte gardées, au plus. */
+/** Images of each kind kept, at most. */
 const MAX_PER_KIND = 3;
 
 /**
- * Images utiles au menu, rangées dans la table par son auteur :
- * - l'image du plateau désignée par IMAG, vue de dessus à plat, sauf les atlas du
- *   Visual Light Mapper (« VLM. », « Nestmap », image carrée) ;
- * - la carte de règles désignée par `![…](nom)` dans TableRules, sinon une image au nom
- *   de règles ou de carte d'instructions, plus large que haute ;
- * - les frontons et logos de la pièce VR, reconnus à leur nom.
- * Seul le début de chaque image est lu pour son nom ; ses octets seulement si elle sert.
- * undefined si le fichier n'est pas lisible comme un .vpx.
+ * Images useful to the menu, stored in the table by its author:
+ * - the playfield image designated by IMAG, top view flat, except the atlases of the
+ *   Visual Light Mapper ("VLM.", "Nestmap", square image);
+ * - the rules card designated by `![…](nom)` in TableRules, otherwise an image with a name
+ *   of rules or of instruction card, wider than tall;
+ * - the backglasses and logos of the VR room, recognised by their name.
+ * Only the start of each image is read for its name; its bytes only if it is used.
+ * undefined if the file is not readable as a .vpx.
  */
 export function readVpxImages(file: string, rules?: string): VpxImages | undefined {
   let fd: number | undefined;
@@ -379,7 +379,7 @@ export function readVpxImages(file: string, rules?: string): VpxImages | undefin
     const out: VpxImages = { backglass: [], logos: [] };
     if (!game) return out;
     const streams = cfb.children(game).filter((e) => e.type === 2);
-    // Nom de l'image du plateau, dans GameData (lu jusqu'à IMAG, qui vient tôt, avant le script).
+    // Name of the playfield image, in GameData (read up to IMAG, which comes early, before the script).
     const gameData = streams.find((e) => e.name === 'GameData');
     let playfieldName: string | undefined;
     if (gameData) {
@@ -413,7 +413,7 @@ export function readVpxImages(file: string, rules?: string): VpxImages | undefin
       const lower = meta.name.toLowerCase();
       if (!lower) continue;
       if (playfieldName && lower === playfieldName.toLowerCase()) {
-        // Atlas du Visual Light Mapper : une mosaïque de textures, pas une vue du plateau.
+        // Atlas of the Visual Light Mapper: a mosaic of textures, not a view of the playfield.
         if (!/vlm\.|nestmap/i.test(meta.name) && meta.width !== meta.height) out.playfield = load(entry, meta) ?? out.playfield;
         continue;
       }
@@ -440,8 +440,8 @@ export function readVpxImages(file: string, rules?: string): VpxImages | undefin
 }
 
 /**
- * Informations écrites dans la table par son auteur ; objet vide si la table n'en a
- * pas, undefined si le fichier n'est pas lisible comme un .vpx.
+ * Information written in the table by its author; empty object if the table has
+ * none, undefined if the file is not readable as a .vpx.
  */
 export function readVpxTableInfo(file: string): VpxTableInfo | undefined {
   let fd: number | undefined;
@@ -466,9 +466,9 @@ export function readVpxTableInfo(file: string): VpxTableInfo | undefined {
 }
 
 /**
- * Nom de l'objet table (« Table1 ») : ses événements s'appellent <nom>_Init, <nom>_KeyDown…
- * Enregistrement NAME de GameStg/GameData (longueur en octets, puis le texte, en UTF-16 dans
- * les tables enregistrées par VPX). undefined si la table n'est pas lisible.
+ * Name of the table object ("Table1"): its events are called <name>_Init, <name>_KeyDown...
+ * NAME record of GameStg/GameData (length in bytes, then the text, in UTF-16 in
+ * tables saved by VPX). undefined if the table is not readable.
  */
 export function readVpxTableName(file: string): string | undefined {
   let fd: number | undefined;
@@ -490,7 +490,7 @@ export function readVpxTableName(file: string): string | undefined {
         const name = (wide ? bytes.toString('utf16le') : bytes.toString('latin1')).trim();
         return /^\w+$/.test(name) ? name : undefined;
       }
-      // Le texte du script suit l'enregistrement CODE, hors de sa longueur.
+      // The text of the script follows the CODE record, outside its length.
       if (tag === 'CODE') {
         if (pos + 12 > data.length) return undefined;
         pos += 12 + data.readUInt32LE(pos + 8);
@@ -508,10 +508,10 @@ export function readVpxTableName(file: string): string | undefined {
 }
 
 /**
- * Version du format de la table : l'entier de 4 octets (petit-boutiste) du flux GameStg/Version, écrit par
- * PinTable::SaveToStorage avec le CURRENT_FILE_FORMAT_VERSION du VPX qui l'a enregistrée (1080 : VPX 10.8.0,
- * 1081 : 10.8.1, 1090 : préversions 10.9). VPX lit le même flux au chargement (PinTable::LoadGameFromStorage) et
- * prévient quand il dépasse le sien (vpx-format.ts). undefined : fichier illisible, ou pas une table de VPX 10.
+ * Version of the table's format: the 4-byte integer (little-endian) of the GameStg/Version stream, written by
+ * PinTable::SaveToStorage with the CURRENT_FILE_FORMAT_VERSION of the VPX that saved it (1080: VPX 10.8.0,
+ * 1081: 10.8.1, 1090: 10.9 pre-releases). VPX reads the same stream when loading (PinTable::LoadGameFromStorage) and
+ * warns when it is higher than its own (vpx-format.ts). undefined: unreadable file, or not a VPX 10 table.
  */
 export function readVpxFileVersion(file: string): number | undefined {
   let fd: number | undefined;
@@ -530,24 +530,24 @@ export function readVpxFileVersion(file: string): number | undefined {
   }
 }
 
-/** Plateau et vitre d'une table, en unités de VPX (PinTable : LEFT, RGHT, TOPX, BOTM, GLAS, GLAB de GameData). */
+/** Playfield and glass of a table, in VPX units (PinTable: LEFT, RGHT, TOPX, BOTM, GLAS, GLAB of GameData). */
 export interface VpxGlass {
-  /** Version du format (flux GameStg/Version) : 1080 pour VPX 10.8. */
+  /** Version of the format (GameStg/Version stream): 1080 for VPX 10.8. */
   fileVersion: number;
   left: number;
   right: number;
   top: number;
   bottom: number;
-  /** Hauteur de la vitre au-dessus du haut et du bas du plateau. */
+  /** Height of the glass above the top and the bottom of the playfield. */
   glassTop: number;
   glassBottom: number;
 }
 
 /**
- * Plateau et vitre d'une table, comme VPX les charge : avant le format 1080, la vitre était
- * horizontale et VPX prend sa hauteur du haut pour le bas (PinTable::LoadGameFromFilename). En VR,
- * le plateau est posé à « barre avant − hauteur de la vitre du bas × échelle » (VRDevice). undefined
- * si la table n'est pas lisible.
+ * Playfield and glass of a table, as VPX loads them: before format 1080, the glass was
+ * horizontal and VPX takes its top height for the bottom (PinTable::LoadGameFromFilename). In VR,
+ * the playfield is placed at "front rail − bottom glass height × scale" (VRDevice). undefined
+ * if the table is not readable.
  */
 export function readVpxGlass(file: string): VpxGlass | undefined {
   let fd: number | undefined;
@@ -575,16 +575,16 @@ export function readVpxGlass(file: string): VpxGlass | undefined {
   }
 }
 
-/** Protection du script (SECB, pintable.h) : script chiffré, illisible sans VPX. */
+/** Script protection (SECB, pintable.h): encrypted script, unreadable without VPX. */
 const DISABLE_SCRIPT_EDITING = 0x00000002;
 const DISABLE_EVERYTHING = 0x80000000;
 
 /**
- * Script écrit dans la table, octet pour octet (lu en latin1 : chaque caractère est un
- * octet, le texte réécrit tel quel redonne le même fichier). VPX le range dans
- * GameStg/GameData : l'enregistrement CODE (longueur 4) est suivi de la longueur du
- * texte et du texte (BiffReader::AsScript, au commit af26b2d93). undefined si la table
- * n'est pas lisible, n'a pas de script, ou si son script est protégé (chiffré).
+ * Script written in the table, byte for byte (read as latin1: each character is one
+ * byte, the text written back as is gives the same file again). VPX stores it in
+ * GameStg/GameData: the CODE record (length 4) is followed by the length of the
+ * text and the text (BiffReader::AsScript, at commit af26b2d93). undefined if the table
+ * is not readable, has no script, or if its script is protected (encrypted).
  */
 export function readVpxScript(file: string): string | undefined {
   let stat: fs.Stats;
@@ -593,8 +593,8 @@ export function readVpxScript(file: string): string | undefined {
   } catch {
     return undefined;
   }
-  // Un même diagnostic relit le script de la table jusqu'à six fois (médecin, PuP, DMD, VR) :
-  // gardé tant que la table ne change pas (taille et date), pour les dernières tables lues.
+  // One diagnosis reads the table's script up to six times (table diagnosis, PuP, DMD, VR):
+  // kept as long as the table does not change (size and date), for the last tables read.
   const key = `${path.resolve(file).toLowerCase()}\0${stat.size}\0${stat.mtimeMs}`;
   if (scriptsRead.has(key)) {
     const text = scriptsRead.get(key);
@@ -608,11 +608,11 @@ export function readVpxScript(file: string): string | undefined {
   return text;
 }
 
-/** Scripts déjà lus, du plus ancien au plus récent (clé : chemin, taille, date). */
+/** Scripts already read, from oldest to newest (key: path, size, date). */
 const scriptsRead = new Map<string, string | undefined>();
 const SCRIPTS_KEPT = 16;
 
-/** Oublie les scripts déjà lus (essais). */
+/** Forgets the scripts already read (tests). */
 export function forgetVpxScripts(): void {
   scriptsRead.clear();
 }
@@ -652,21 +652,21 @@ function readVpxScriptFromFile(file: string): string | undefined {
   }
 }
 
-/** Sortes d'éléments placés que lit readVpxPlayfield (ItemTypeEnum de VPX). */
+/** Kinds of placed elements that readVpxPlayfield reads (VPX ItemTypeEnum). */
 const LAYOUT_TYPES: Record<number, VpxPlacedType> = { 0: 'wall', 1: 'flipper', 3: 'plunger', 5: 'bumper', 6: 'trigger', 8: 'kicker', 10: 'gate', 11: 'spinner', 12: 'ramp', 22: 'target' };
 export type VpxPlacedType = 'wall' | 'flipper' | 'plunger' | 'bumper' | 'trigger' | 'kicker' | 'gate' | 'spinner' | 'ramp' | 'target';
 
-/** Plateau d'une table vu de dessus : ses bords (unités de VPX, y vers les flippers) et ses éléments placés. */
+/** Playfield of a table seen from above: its edges (VPX units, y towards the flippers) and its placed elements. */
 export interface VpxPlayfield {
   left: number;
   top: number;
   right: number;
   bottom: number;
-  /** Chaque élément : son centre (VCEN), ou les points de son tracé (murs, rampes). */
+  /** Each element: its centre (VCEN), or the points of its outline (walls, ramps). */
   items: { type: VpxPlacedType; name: string; pts: [number, number][] }[];
 }
 
-/** Comme biffRecords, mais CODE (le script, dans GameData) se saute par sa propre longueur au lieu d'arrêter la lecture. */
+/** Like biffRecords, but CODE (the script, in GameData) is skipped by its own length instead of stopping the reading. */
 function layoutRecords(buf: Buffer): { tag: string; body: Buffer }[] {
   const out: { tag: string; body: Buffer }[] = [];
   for (let pos = 0; pos + 8 <= buf.length; ) {
@@ -684,9 +684,9 @@ function layoutRecords(buf: Buffer): { tag: string; body: Buffer }[] {
 }
 
 /**
- * Plateau de la table pour le guide du jeu (tableguide.ts) : bords (LEFT, TOPX, RGHT, BOTM de
- * GameData) et éléments placés, avec leur nom et leurs points (VCEN, VPOS des points de tracé).
- * Ni lampes ni primitives : seulement ce qu'un coup peut désigner. undefined si illisible.
+ * Playfield of the table for the game guide (tableguide.ts): edges (LEFT, TOPX, RGHT, BOTM of
+ * GameData) and placed elements, with their name and their points (VCEN, VPOS of outline points).
+ * Neither lamps nor primitives: only what a shot can designate. undefined if unreadable.
  */
 export function readVpxPlayfield(file: string): VpxPlayfield | undefined {
   let fd: number | undefined;
@@ -709,7 +709,7 @@ export function readVpxPlayfield(file: string): VpxPlayfield | undefined {
       const head = cfb.stream(item, 4);
       const type = head.length >= 4 ? LAYOUT_TYPES[head.readUInt32LE(0)] : undefined;
       if (!type) continue;
-      // Murs et rampes : tout leur tracé ; les autres tiennent dans le début du flux.
+      // Walls and ramps: their whole outline; the others fit in the start of the stream.
       const buf = cfb.stream(item, type === 'wall' || type === 'ramp' ? 512 * 1024 : 16 * 1024);
       let name = '';
       const pts: [number, number][] = [];
@@ -731,16 +731,16 @@ export function readVpxPlayfield(file: string): VpxPlayfield | undefined {
   }
 }
 
-/** Un élément de la table : son type (ItemTypeEnum de VPX : 0 mur, 2 minuteur, 7 lampe…) et son nom. */
+/** An element of the table: its type (VPX ItemTypeEnum: 0 wall, 2 timer, 7 light...) and its name. */
 export interface VpxElement {
   type: number;
   name: string;
 }
 
 /**
- * Les éléments de la table, d'après GameStg/GameItemN : le type en tête du flux, puis
- * l'enregistrement NAME (longueur en octets, texte UTF-16LE). Lit le début de chaque flux
- * seulement, jamais les maillages. [] si la table est illisible.
+ * The elements of the table, from GameStg/GameItemN: the type at the head of the stream, then
+ * the NAME record (length in bytes, UTF-16LE text). Reads only the start of each stream,
+ * never the meshes. [] if the table is unreadable.
  */
 export function readVpxElements(file: string): VpxElement[] {
   let fd: number | undefined;
@@ -776,16 +776,16 @@ export function readVpxElements(file: string): VpxElement[] {
   }
 }
 
-/** Type d'élément « flasher » dans un GameItem (VPX : ItemTypeEnum, eItemFlasher). */
+/** "flasher" element type in a GameItem (VPX: ItemTypeEnum, eItemFlasher). */
 const ITEM_FLASHER = 20;
-/** Flasher en rendu externe (FlasherData::EXT_RENDER) de la fenêtre Backglass (VPXWINDOW_Backglass). */
+/** Flasher with external rendering (FlasherData::EXT_RENDER) of the Backglass window (VPXWINDOW_Backglass). */
 const FLASHER_EXT_RENDER = 4;
 const WINDOW_BACKGLASS = 1;
 
 /**
- * Flashers de la table qui montrent le fronton (rendu externe de la fenêtre Backglass : B2S, PuP…)
- * dans la scène VR ; undefined si la table est illisible. Sans aucun, une table qui a sa pièce VR
- * laisse son fronton vide en VR, sauf si VPX ajoute le sien ([PlayerVR] AddBackglass).
+ * Flashers of the table that show the backglass (external rendering of the Backglass window: B2S,
+ * PuP...) in the VR scene; undefined if the table is unreadable. Without any, a table that has its
+ * VR room leaves its backglass empty in VR, unless VPX adds its own ([PlayerVR] AddBackglass).
  */
 export function readVpxBackglassDisplays(file: string): number | undefined {
   let fd: number | undefined;

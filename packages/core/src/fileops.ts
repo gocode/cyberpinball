@@ -1,7 +1,7 @@
-// Opérations sur les fichiers des tables. Rien n'est jamais supprimé en silence :
-// ce qu'on remplace ou retire part dans la corbeille de la racine
-// (<racine>\trash\<date> <libellé>\…), d'où l'on peut le récupérer.
-// Seule exception : les rapports de plantage, qui n'ont aucune valeur une fois lus.
+// Operations on table files. Nothing is ever deleted silently:
+// what is replaced or removed goes to the root folder's trash
+// (<root>\trash\<date> <label>\...), from where it can be recovered.
+// Only exception: crash reports, which have no value once read.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -16,48 +16,48 @@ import { buildZip, writeZipData, type RomZipMember } from './romzip';
 export type FileOp =
   | { op: 'move'; from: string; to: string }
   /**
-   * Copie ; link : les gros fichiers qui ne bougent pas (hardlink.ts) deviennent des liens physiques
-   * sur le même volume (aucune place en plus, l'original intact), copiés ailleurs.
+   * Copy; link: large files that do not change (hardlink.ts) become hard links
+   * on the same volume (no extra space, the original intact), copied elsewhere.
    */
   | { op: 'copy'; from: string; to: string; link?: boolean }
   | { op: 'trash'; path: string }
   | { op: 'delete'; path: string }
   /**
-   * Écrit un petit fichier texte (.info) ; l'ancien part à la corbeille. latin1 : un
-   * caractère par octet (script de table rendu octet pour octet).
+   * Writes a small text file (.info); the old one goes to the trash. latin1: one
+   * character per byte (table script written back byte for byte).
    */
   | { op: 'write'; path: string; content: string; encoding?: 'utf8' | 'latin1' }
   /**
-   * Lien physique : to devient le même fichier que from, sans place en plus (voir linkFile).
-   * Copie quand les deux ne sont pas sur le même volume.
+   * Hard link: to becomes the same file as from, without extra space (see linkFile).
+   * Copy when the two are not on the same volume.
    */
   | { op: 'link'; from: string; to: string }
   /**
-   * ROM refaite à plat : un .zip dont les puces sont à la racine (romzip.ts), à partir
-   * de fichiers libres ou des fichiers d'un autre zip. Un fichier déjà là part à la corbeille.
+   * ROM rebuilt flat: a .zip whose chips are at the root (romzip.ts), from
+   * loose files or the files of another zip. A file already there goes to the trash.
    */
   | { op: 'zip'; to: string; files: RomZipMember[]; mtimeMs?: number }
   /**
-   * Volume de la ROM (romvolume.ts) : la mémoire relue au moment d'écrire (des records ont pu s'y
-   * écrire depuis le constat), le volume posé, sommes de contrôle refaites (writeRomVolume) ; la
-   * mémoire d'avant à la corbeille. Une écriture refusée lève l'erreur, avec sa raison.
+   * Volume of the ROM (romvolume.ts): the memory read again at write time (high scores may have
+   * been written to it since the check), the volume set, checksums redone (writeRomVolume); the
+   * previous memory to the trash. A refused write throws the error, with its reason.
    */
   | { op: 'romVolume'; path: string; memory: RomMemory; value: number };
 
 export interface OpContext {
-  /** Dossier de la corbeille de cette opération (créé à la première utilisation). */
+  /** Trash folder of this operation (created on first use). */
   trashDir: string;
 }
 
-/** Corbeille d'une opération : <racine>\trash\2026-10-20 14-05-12 <libellé>. */
+/** Trash of an operation: <root>\trash\2026-10-20 14-05-12 <label>. */
 export function trashDirFor(trashRoot: string, label: string, now = new Date()): string {
-  // Heure locale : c'est celle que l'utilisateur cherchera dans la corbeille.
+  // Local time: it is the one the user will look for in the trash.
   const pad = (n: number) => String(n).padStart(2, '0');
   const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
   return path.join(trashRoot, `${stamp} ${safeName(label)}`.trim());
 }
 
-/** Nom de fichier valide sous Windows. */
+/** Valid file name on Windows. */
 export function safeName(name: string): string {
   return name
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
@@ -89,14 +89,14 @@ export function applyOps(ops: FileOp[], ctx: OpContext): void {
         linkFile(op.from, op.to, ctx);
         break;
       case 'zip': {
-        // Contenu lu avant de mettre l'ancien fichier à la corbeille : la ROM peut se refaire d'elle-même.
+        // Content read before putting the old file in the trash: the ROM may be rebuilt from itself.
         const data = buildZip(op.files);
         if (fs.existsSync(op.to)) moveToTrash(op.to, ctx);
         writeZipData(op.to, data, op.mtimeMs);
         break;
       }
       case 'romVolume': {
-        // lecture entière : mémoire d'une ROM (.nv), quelques ko
+        // lecture entière : memory of a ROM (.nv), a few kB
         const out = writeRomVolume(op.memory, fs.readFileSync(op.path), op.value);
         if (!out.ok) throw new Error(t('Volume de la ROM non écrit : {reason}', { reason: out.reason }));
         writeReplacing(op.path, out.data.toString('latin1'), 'latin1', ctx);
@@ -107,11 +107,11 @@ export function applyOps(ops: FileOp[], ctx: OpContext): void {
 }
 
 /**
- * Écrit un fichier de table (.info, .vbs, .ini, screens.pup…) sans jamais le laisser tronqué ni
- * absent : le nouveau contenu entier dans un temporaire, une copie de l'ancien à la corbeille, puis
- * le temporaire renommé à sa place. Avant le 17/11/2026, l'ancien partait d'abord à la corbeille et
- * le nouveau s'écrivait directement : une coupure de courant entre les deux (une borne s'éteint à
- * l'interrupteur) laissait la table sans son fichier, ou avec un fichier à moitié écrit.
+ * Writes a table file (.info, .vbs, .ini, screens.pup...) without ever leaving it truncated or
+ * missing: the whole new content in a temporary file, a copy of the old one to the trash, then
+ * the temporary file renamed in its place. Before 17/11/2026, the old one first went to the trash
+ * and the new one was written directly: a power cut between the two (a cabinet is switched off at
+ * the switch) left the table without its file, or with a half-written file.
  */
 function writeReplacing(file: string, content: string, encoding: BufferEncoding, ctx: OpContext): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -126,7 +126,7 @@ function writeReplacing(file: string, content: string, encoding: BufferEncoding,
   }
 }
 
-/** Copie à la corbeille (l'original reste en place) ; rend la copie. */
+/** Copy to the trash (the original stays in place); returns the copy. */
 function copyToTrash(target: string, ctx: OpContext): string {
   fs.mkdirSync(ctx.trashDir, { recursive: true });
   const dest = path.join(ctx.trashDir, uniqueTrashName(ctx.trashDir, target));
@@ -135,8 +135,8 @@ function copyToTrash(target: string, ctx: OpContext): string {
 }
 
 /**
- * Déplace ou copie. Un dossier qui arrive sur un dossier existant est fusionné
- * fichier par fichier ; un fichier déjà présent à destination part à la corbeille.
+ * Moves or copies. A folder that arrives on an existing folder is merged
+ * file by file; a file already present at the destination goes to the trash.
  */
 function transfer(from: string, to: string, ctx: OpContext, move: boolean, link: boolean): void {
   const fromIsDir = fs.statSync(from).isDirectory();
@@ -155,10 +155,10 @@ function transfer(from: string, to: string, ctx: OpContext, move: boolean, link:
 }
 
 /**
- * Fait de to un lien physique vers from. Un fichier déjà là est remplacé : supprimé
- * s'il est identique octet pour octet (from garde le même contenu, rien n'est perdu),
- * mis à la corbeille sinon. D'un volume à l'autre, un lien est impossible : copie, et
- * une copie identique déjà en place reste telle quelle.
+ * Makes to a hard link to from. A file already there is replaced: deleted
+ * if it is identical byte for byte (from keeps the same content, nothing is lost),
+ * put in the trash otherwise. From one volume to another, a link is impossible: copy, and
+ * an identical copy already in place stays as it is.
  */
 export function linkFile(from: string, to: string, ctx: OpContext): 'linked' | 'copied' | 'unchanged' {
   if (fs.existsSync(to)) {
@@ -173,14 +173,14 @@ export function linkFile(from: string, to: string, ctx: OpContext): 'linked' | '
     fs.linkSync(from, to);
     return 'linked';
   } catch (error) {
-    // Autre volume, ou système de fichiers sans liens physiques (clé USB en FAT32, exFAT).
+    // Other volume, or file system without hard links (USB stick in FAT32, exFAT).
     if (!LINK_FALLBACK_CODES.has((error as NodeJS.ErrnoException).code ?? '')) throw error;
     fs.copyFileSync(from, to);
     return 'copied';
   }
 }
 
-/** Deux chemins désignent-ils le même fichier sur le disque (lien physique) ? */
+/** Do two paths designate the same file on disk (hard link)? */
 export function sameFile(a: string, b: string): boolean {
   try {
     const sa = fs.statSync(a, { bigint: true });
@@ -191,7 +191,7 @@ export function sameFile(a: string, b: string): boolean {
   }
 }
 
-/** Même contenu, octet pour octet. */
+/** Same content, byte for byte. */
 export function sameBytes(a: string, b: string): boolean {
   if (sameFile(a, b)) return true;
   if (fs.statSync(a).size !== fs.statSync(b).size) return false;
@@ -214,8 +214,8 @@ export function sameBytes(a: string, b: string): boolean {
 }
 
 /**
- * Les deux chemins sont-ils sur le même volume (condition d'un lien physique) ?
- * Un chemin qui n'existe pas encore compte pour son premier dossier existant.
+ * Are the two paths on the same volume (condition for a hard link)?
+ * A path that does not exist yet counts as its first existing folder.
  */
 export function sameVolume(a: string, b: string): boolean {
   const dev = (p: string) => {
@@ -248,12 +248,12 @@ function uniqueTrashName(trashDir: string, target: string): string {
 }
 
 /**
- * Déplace un fichier ou un dossier vers une destination libre. Sur le même disque
- * c'est un simple renommage ; d'un disque à l'autre (clé USB), copie puis suppression de l'original.
+ * Moves a file or a folder to a free destination. On the same drive
+ * it is a simple rename; from one drive to another (USB stick), copy then deletion of the original.
  */
 export function movePath(from: string, to: string): void {
   fs.mkdirSync(path.dirname(to), { recursive: true });
-  // Changement de casse seule (« t2.vpx » -> « T2.vpx ») : Windows le voit comme le même fichier.
+  // Change of case only ("t2.vpx" -> "T2.vpx"): Windows sees it as the same file.
   if (samePath(from, to) && from !== to) {
     const tmp = `${to}.renommage-${process.pid}`;
     renameWithRetry(from, tmp);
@@ -273,15 +273,15 @@ export function samePath(a: string, b: string): boolean {
   return path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
 }
 
-/** true si child est dans parent (ou est parent), sans tenir compte de la casse. */
+/** true if child is inside parent (or is parent), case-insensitively. */
 export function isInside(child: string, parent: string): boolean {
   const rel = path.relative(parent.toLowerCase(), child.toLowerCase());
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 }
 
 /**
- * Taille d'un fichier ou d'un dossier, en octets. Un fichier présent sous plusieurs noms dans le
- * dossier (liens physiques, hardlink.ts) ne compte qu'une fois : ses données n'y sont qu'une fois.
+ * Size of a file or a folder, in bytes. A file present under several names in the
+ * folder (hard links, hardlink.ts) counts only once: its data is there only once.
  */
 export function sizeOf(target: string, seen = new Set<string>()): number {
   try {
@@ -301,8 +301,8 @@ export function sizeOf(target: string, seen = new Set<string>()): number {
 }
 
 /**
- * « 1,0 Go », « 64 Mo », « 4,8 ko ». `fine` : une décimale fixe jusqu'à 100 (« 48,2 Mo »,
- * « 48,0 Mo »), pour un volume qui avance sous les yeux sans changer de largeur.
+ * "1,0 Go", "64 Mo", "4,8 ko". `fine`: one fixed decimal up to 100 ("48,2 Mo",
+ * "48,0 Mo"), for a volume that moves before the eyes without changing width.
  */
 export function formatSize(bytes: number, fine = false): string {
   const units: [number, string][] = [
@@ -311,7 +311,7 @@ export function formatSize(bytes: number, fine = false): string {
     [1024, t('ko')],
   ];
   for (const [size, unit] of units) {
-    // Dès 1000 de l'unité d'en dessous : « 1,0 Mo » plutôt que « 1 021 ko ».
+    // From 1000 of the unit below: "1,0 Mo" rather than "1 021 ko".
     if (bytes >= (size * 1000) / 1024) {
       const value = bytes / size;
       const digits = value < (fine ? 100 : 10) ? 1 : 0;
@@ -324,9 +324,9 @@ export function formatSize(bytes: number, fine = false): string {
 const SIZE_UNITS: Record<string, number> = { o: 1, b: 1, octets: 1, bytes: 1, ko: 1024, kb: 1024, kio: 1024, kib: 1024, mo: 1024 ** 2, mb: 1024 ** 2, mio: 1024 ** 2, mib: 1024 ** 2, go: 1024 ** 3, gb: 1024 ** 3, gio: 1024 ** 3, gib: 1024 ** 3, to: 1024 ** 4, tb: 1024 ** 4 };
 
 /**
- * Octets d'une taille écrite par un site (« 4.67 MB », « 6.5MB », « 1,234.5 KB », « 381,1 Mo ») ;
- * undefined si le texte n'en est pas une. Les sites comptent en 1024, comme formatSize : une taille
- * venue d'ailleurs ne s'affiche jamais telle quelle, elle repasse par formatSize (langue de la borne).
+ * Bytes of a size written by a site ("4.67 MB", "6.5MB", "1,234.5 KB", "381,1 Mo");
+ * undefined if the text is not one. Sites count in 1024, like formatSize: a size
+ * coming from elsewhere is never displayed as is, it goes back through formatSize (cabinet language).
  */
 export function parseSizeText(text: string | undefined): number | undefined {
   const m = text && /^\s*(\d[\d\s.,  ]*)\s*([a-z]+)\s*$/i.exec(text);
@@ -335,13 +335,13 @@ export function parseSizeText(text: string | undefined): number | undefined {
   if (!unit) return undefined;
   let digits = m[1]!.replace(/[\s  ]/g, '');
   if (digits.includes('.') && digits.includes(',')) digits = digits.replace(/,/g, '');
-  // Virgule seule : décimale (« 381,1 »), sauf suivie de trois chiffres exactement (« 1,234 »).
+  // Comma alone: decimal ("381,1"), unless followed by exactly three digits ("1,234").
   else if (digits.includes(',')) digits = /,\d{3}$/.test(digits) ? digits.replace(/,/g, '') : digits.replace(',', '.');
   const value = Number(digits);
   return Number.isFinite(value) ? Math.round(value * unit) : undefined;
 }
 
-/** Supprime les dossiers vides restés derrière un déplacement, jusqu'à stop exclu. */
+/** Deletes the empty folders left behind by a move, up to stop excluded. */
 export function pruneEmptyDirs(dir: string, stop: string): void {
   let current = dir;
   while (isInside(current, stop) && !samePath(current, stop) && fs.existsSync(current)) {

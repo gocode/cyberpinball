@@ -15,6 +15,8 @@
 
 Windows 10 or 11, 64-bit. These links always fetch the latest version, straight away. Already installed? The cabinet updates itself from its system menu. Earlier versions and release notes: [all releases](https://github.com/gocode/cyberpinball/releases).
 
+**Already running PinUP Popper, PinballX or PinballY?** Cyber Pinball installs next to it without changing anything in its installation, and can take over its tables without duplicating them: on the same drive, the big files (tables, backglasses, PuP-Pack media, ROMs) become NTFS hard links that take no extra space. See [Coexisting with another cabinet frontend](docs/manual/coexisting-with-another-cabinet-frontend.md).
+
 <p align="center"><a href="https://www.youtube.com/watch?v=wXy39LGCA80"><img src="docs/images/en/trailer.webp?v=45671d6bc5" width="760" alt="The Cyber Pinball trailer on YouTube: YOUR PINCAB CONNECTED, next to a live game with friends and its shared start. Watch the trailer button."></a></p>
 
 <p align="center"><sub><a href="https://www.youtube.com/watch?v=wXy39LGCA80">▶ The Cyber Pinball trailer, on YouTube</a></sub></p>
@@ -256,6 +258,10 @@ The [technical manual](docs/manual.md) describes every part in detail: the files
 Every step below is an action of `lanceur.cmd` (section "Fabrication et publication sur GitHub"): see the [cheat sheet](docs/manual/installation-and-file-layout.md#cheat-sheet-publishing-a-release) in the technical manual.
 
 `npm run publier` checks that nothing personal or secret is about to be published, builds both installers, signs the update feed and pushes a snapshot of the code to `main`. It then creates the GitHub release `v<version>` with the installers and the feed. Release notes come from [CHANGELOG.md](CHANGELOG.md) (French, shown on the cabinet) and [CHANGELOG.en.md](CHANGELOG.en.md) (English, added to the GitHub release). It needs a fine-grained GitHub token, saved once in `%USERPROFILE%\.cyberpinball\jeton-github.txt` (or the `CYBERPINBALL_GITHUB_TOKEN` variable), and the publication key: neither ever lives in the repository, and `.gitignore` plus the publication check keep secret files out of it. The repository description and topics come from `package.json` and are set at each release, or with `npm run decrire` (the token then also needs the "Administration" permission). See [Updating from the cabinet](docs/manual/installation-and-file-layout.md#updating-from-the-cabinet) in the technical manual.
+
+## Contributing
+
+Bug reports, fixes and translations are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains how the repository is organised, how to build and test it, the conventions the code follows and how to propose a change.
 
 ## Third-party components and licences
 

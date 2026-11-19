@@ -1,7 +1,7 @@
-// Générateur VPinballX.ini pour les fenêtres gérées par VPX 10.8.1 (Player,
-// Backglass, ScoreView, Topper) et les plugins qui les dessinent. Noms de clés
-// relevés dans le code source de VPX : src/core/Settings_properties.inl,
-// src/renderer/Window.cpp, src/core/player.cpp et plugins/.
+// VPinballX.ini generator for the windows managed by VPX 10.8.1 (Player,
+// Backglass, ScoreView, Topper) and the plugins that draw them. Key names
+// taken from the VPX source code: src/core/Settings_properties.inl,
+// src/renderer/Window.cpp, src/core/player.cpp and plugins/.
 
 import { t } from './i18n';
 import { IniDocument } from './ini';
@@ -12,7 +12,7 @@ import { vpxRect, zonePlacement } from './zones';
 interface VpxWindow {
   section: string;
   prefix: string;
-  /** Playfield n'a pas de réglage « Output » : il est toujours affiché. */
+  /** Playfield has no "Output" setting: it is always shown. */
   hasOutput: boolean;
 }
 
@@ -23,7 +23,7 @@ export const VPX_WINDOWS: Record<RoleId, VpxWindow> = {
   topper: { section: 'Topper', prefix: 'Topper', hasOutput: true },
 };
 
-// Valeurs des énumérations VPX.
+// Values of the VPX enumerations.
 const OUTPUT_DISABLED = '0';
 const OUTPUT_FLOATING = '1';
 const OUTPUT_EMBEDDED = '2';
@@ -41,44 +41,44 @@ export interface VpxChange extends VpxSetting {
 }
 
 /**
- * Façon dont une version de VPX désigne un écran dans VPinballX.ini :
- * - `name` : le nom SDL seul (10.8.1-5436, vérifié dans son journal) ;
- * - `name-position` : `<nom SDL> [x, y]` (branche principale depuis, Window::GetDisplays).
+ * How a version of VPX names a screen in VPinballX.ini:
+ * - `name`: the SDL name alone (10.8.1-5436, checked in its log);
+ * - `name-position`: `<SDL name> [x, y]` (main branch since then, Window::GetDisplays).
  */
 export type VpxDisplayIdFormat = 'name' | 'name-position';
 
-/** Ce qui change d'une version de VPX à l'autre ; décrit par version dans le manifeste des composants. */
+/** What changes from one version of VPX to another; described per version in the component manifest. */
 export interface VpxProfile {
   displayIdFormat: VpxDisplayIdFormat;
-  /** Plugins activés par Cyber Pinball ([Plugin.<id>] Enable = 1) ; VPX les désactive tous par défaut. */
+  /** Plugins enabled by Cyber Pinball ([Plugin.<id>] Enable = 1); VPX disables them all by default. */
   enabledPlugins: string[];
 }
 
 export const DEFAULT_VPX_PROFILE: VpxProfile = { displayIdFormat: 'name-position', enabledPlugins: [] };
 
 /**
- * Plugins à éteindre tant qu'un autre est activé. B2S et B2SLegacy réclament tous
- * deux l'objet B2S.Server des tables (B2SPlugin.cpp, B2SLegacyPlugin.cpp) : le
- * dernier chargé l'emporte. B2SLegacy est éteint par défaut sous Windows, mais une
- * valeur laissée dans VPinballX.ini suffit à le rallumer.
+ * Plugins to turn off as long as another one is enabled. B2S and B2SLegacy both
+ * claim the tables' B2S.Server object (B2SPlugin.cpp, B2SLegacyPlugin.cpp): the
+ * last one loaded wins. B2SLegacy is off by default on Windows, but a
+ * value left in VPinballX.ini is enough to turn it back on.
  */
 export const VPX_PLUGIN_CONFLICTS: Record<string, string[]> = { B2S: ['B2SLegacy'] };
 
-/** Fenêtres annexes : celles où plusieurs plugins se disputent l'affichage. */
+/** Ancillary windows: those where several plugins compete for the display. */
 export type VpxAncillarySection = 'Backglass' | 'ScoreView' | 'Topper';
 
 /**
- * [fenêtre] Priority.<moteur de rendu> (0 à 100, 0 par défaut). Pour chaque image,
- * VPX essaie les moteurs dans l'ordre décroissant de priorité et garde le premier
- * qui dessine (Player::OnAuxRendererChanged, Renderer.cpp). Sans ces clés, tous
- * valent 0 et l'ordre dépend du chargement des plugins.
- * - PUP d'abord : un pack PuP ne dessine que quand il a une vidéo à montrer, le
- *   backglass du .directb2s reste affiché le reste du temps ;
- * - B2S ensuite : backglass et FullDMD du .directb2s ;
- * - ScoreView en dernier : affichage générique du DMD et des scores.
- * Le moteur porte le nom de son plugin (PUPManager.cpp, B2SServer.cpp, ScoreViewPlugin.cpp).
- * Écran DMD seul (bande 4:1) : B2S y passe à 0 (DMD_ONLY_PRIORITIES), son image FullDMD
- * n'a rien à faire dans la bande ; le DMD de la ROM y est dessiné par ScoreView.
+ * [window] Priority.<renderer> (0 to 100, 0 by default). For each frame,
+ * VPX tries the renderers in decreasing order of priority and keeps the first one
+ * that draws (Player::OnAuxRendererChanged, Renderer.cpp). Without these keys, all
+ * are 0 and the order depends on the loading of the plugins.
+ * - PUP first: a PuP pack only draws when it has a video to show, the
+ *   backglass of the .directb2s stays shown the rest of the time;
+ * - B2S next: backglass and FullDMD of the .directb2s;
+ * - ScoreView last: generic display of the DMD and the scores.
+ * The renderer bears the name of its plugin (PUPManager.cpp, B2SServer.cpp, ScoreViewPlugin.cpp).
+ * DMD-only screen (4:1 strip): B2S goes to 0 there (DMD_ONLY_PRIORITIES), its FullDMD image
+ * has no business in the strip; the DMD of the ROM is drawn there by ScoreView.
  */
 export const VPX_RENDERER_PRIORITIES: Record<VpxAncillarySection, Record<string, number>> = {
   Backglass: { PUP: 100, B2S: 50 },
@@ -86,13 +86,13 @@ export const VPX_RENDERER_PRIORITIES: Record<VpxAncillarySection, Record<string,
   Topper: { PUP: 100 },
 };
 
-/** Priorités de la fenêtre du DMD quand l'écran est un DMD seul : le FullDMD du .directb2s après le DMD. */
+/** Priorities of the DMD window when the screen is a DMD alone: the FullDMD of the .directb2s after the DMD. */
 export const DMD_ONLY_PRIORITIES: Record<string, number> = { ...VPX_RENDERER_PRIORITIES.ScoreView, B2S: 0 };
 
 /**
- * Identifiant d'écran attendu par VPX. VPX compare cette chaîne au caractère
- * près ; si elle ne correspond à aucun écran, il se rabat sur l'écran principal.
- * C'est la panne « la table se lance sur le mauvais écran ».
+ * Screen identifier expected by VPX. VPX compares this string character for
+ * character; if it matches no screen, it falls back to the main screen.
+ * That is the "the table starts on the wrong screen" failure.
  */
 export function vpxDisplayId(display: ObservedDisplay, format: VpxDisplayIdFormat = 'name-position'): string {
   const name = vpxDisplayName(display);
@@ -100,27 +100,27 @@ export function vpxDisplayId(display: ObservedDisplay, format: VpxDisplayIdForma
 }
 
 /**
- * Nom que SDL donne à l'écran (SDL_windowsmodes.c, WIN_AddDisplay) : le nom
- * convivial DisplayConfig, ou à défaut la description EnumDisplayDevicesW.
+ * Name SDL gives the screen (SDL_windowsmodes.c, WIN_AddDisplay): the DisplayConfig
+ * friendly name, or failing that the EnumDisplayDevicesW description.
  */
 export function vpxDisplayName(display: ObservedDisplay): string {
   return display.friendlyName || display.monitorDescription || display.gdiName;
 }
 
 /**
- * Clés possédées par Cyber Pinball pour une affectation donnée des rôles. Un rôle
- * sur tout un écran a une fenêtre plein écran sans bordure ; sur une zone d'un
- * écran, une fenêtre « Windowed » posée sur la zone (WndX et WndY relatifs à
- * l'écran) ; dans la zone du playfield, une incrustation dans son image (WndX et
- * WndY relatifs à cette image).
+ * Keys owned by Cyber Pinball for a given assignment of the roles. A role
+ * on a whole screen has a borderless fullscreen window; on a zone of a
+ * screen, a "Windowed" window placed on the zone (WndX and WndY relative to the
+ * screen); in the playfield's zone, an overlay in its image (WndX and
+ * WndY relative to that image).
  *
- * `confused` : rôles que VPX peut ouvrir sur l'écran d'un autre (confusableRoles : écrans du
- * même nom). Leur fenêtre annexe n'est jamais en plein écran mais fenêtrée à la taille de
- * l'écran : SDL ne garde qu'une fenêtre plein écran par écran et réduit la précédente quand une
- * autre y passe (SDL_video.c, SDL_UpdateFullscreenMode : SDL_MinimizeWindow). Deux fenêtres
- * plein écran ouvertes sur le même PL2294H, le fronton était réduit pour toute la partie, et
- * Cyber Pinball ne pouvait pas le ramener sur son écran (Poste à 3 écrans, The Matrix le
- * 30 octobre 2026, City Hunter le 6 novembre : PuP-Pack invisible sur le fronton).
+ * `confused`: roles that VPX may open on another role's screen (confusableRoles: screens with the
+ * same name). Their ancillary window is never fullscreen but windowed at the size of the
+ * screen: SDL keeps only one fullscreen window per screen and minimises the previous one when another
+ * goes fullscreen there (SDL_video.c, SDL_UpdateFullscreenMode: SDL_MinimizeWindow). With two
+ * fullscreen windows open on the same PL2294H, the backglass was minimised for the whole game, and
+ * Cyber Pinball could not bring it back to its screen (3-screen PC, The Matrix on
+ * 30 October 2026, City Hunter on 6 November: PuP-Pack invisible on the backglass).
  */
 export function vpxSettingsFor(
   assignments: Partial<Record<RoleId, ObservedDisplay>>,
@@ -141,14 +141,14 @@ export function vpxSettingsFor(
       settings.push({ section: win.section, key: `${win.prefix}${suffix}`, value: String(value) });
 
     if (!display) {
-      // Rôle non affecté : on désactive la fenêtre sans toucher à ses autres réglages.
+      // Unassigned role: the window is disabled without touching its other settings.
       if (win.hasOutput) put('Output', OUTPUT_DISABLED);
       continue;
     }
     const placement = zonePlacement(role, assignments, zones);
     const rect = vpxRect(role, assignments, zones)!;
     if (placement === 'embedded') {
-      // Incrustée : la fenêtre n'existe pas, seul compte son rectangle dans l'image du playfield.
+      // Overlaid: the window does not exist, only its rectangle in the playfield's image counts.
       put('Output', OUTPUT_EMBEDDED);
     } else {
       if (win.hasOutput) put('Output', OUTPUT_FLOATING);
@@ -167,56 +167,56 @@ export function vpxSettingsFor(
 }
 
 /**
- * Réglages qui évitent toute boîte de dialogue de VPX pendant une partie lancée en
- * -Play. En -Play, VPX 10.8.1 ne crée pas son éditeur (PlayTableCommand,
- * AppCommands.cpp) : ni audit de la table, ni éditeur de script, ni fenêtre de
- * progression. Il lui reste deux questions posées par un réglage, qui bloquent la
- * borne en plein chargement :
- * - [Player] SecurityLevel : à partir de 1, VPX demande la permission pour chaque
- *   objet ActiveX que le script crée (ScriptInterpreter::QueryCustomPolicy), même
- *   Scripting.Dictionary ; à 4, il les refuse tous et le script s'arrête. 0 (valeur
- *   par défaut) : tous autorisés, sans question.
- * - [PlayerVR] AskToTurnOn : à 0 (« Enabled »), sans casque branché, « Connection
- *   to VR headset failed / Retry connection ? » ou « VR mode activated but OpenXR
- *   initialization failed. » (Player::Player, la version Windows a ENABLE_XR).
- *   2 (« Disabled », valeur par défaut) : jamais de VR sur une borne.
- * Écrites explicitement pour qu'une valeur changée à la main soit repérée (manualEdits).
+ * Settings that avoid any VPX dialog box during a game started with
+ * -Play. With -Play, VPX 10.8.1 does not create its editor (PlayTableCommand,
+ * AppCommands.cpp): no table audit, no script editor, no progress
+ * window. Two questions asked because of a setting remain, and they block the
+ * cabinet in the middle of loading:
+ * - [Player] SecurityLevel: from 1 up, VPX asks permission for each
+ *   ActiveX object the script creates (ScriptInterpreter::QueryCustomPolicy), even
+ *   Scripting.Dictionary; at 4, it refuses them all and the script stops. 0 (default
+ *   value): all allowed, no question.
+ * - [PlayerVR] AskToTurnOn: at 0 ("Enabled"), with no headset plugged in, "Connection
+ *   to VR headset failed / Retry connection ?" or "VR mode activated but OpenXR
+ *   initialization failed." (Player::Player, the Windows build has ENABLE_XR).
+ *   2 ("Disabled", default value): never VR on a cabinet.
+ * Written explicitly so that a value changed by hand is noticed (manualEdits).
  */
 export const VPX_PLAY_SETTINGS: readonly VpxSetting[] = [
   { section: 'Player', key: 'SecurityLevel', value: '0' },
   { section: 'PlayerVR', key: 'AskToTurnOn', value: '2' },
 ];
 
-/** Démarrage rapide des ROM WPC : le test de mémoire sauté (vpxPluginDefaults). */
+/** Fast start of WPC ROMs: the memory test skipped (vpxPluginDefaults). */
 export const PINMAME_FAST_BOOT: VpxSetting = { section: 'Plugin.PinMAME', key: 'Cheat', value: '1' };
 
-/** Plugins que Cyber Pinball éteint parce qu'un plugin activé fait le même travail (VPX_PLUGIN_CONFLICTS). */
+/** Plugins that Cyber Pinball turns off because an enabled plugin does the same job (VPX_PLUGIN_CONFLICTS). */
 export function disabledPlugins(profile: VpxProfile): string[] {
   const off = profile.enabledPlugins.flatMap((p) => VPX_PLUGIN_CONFLICTS[p] ?? []);
   return [...new Set(off)].filter((p) => !profile.enabledPlugins.includes(p));
 }
 
-/** Priorités écrites pour une fenêtre : seulement celles des plugins activés. */
+/** Priorities written for a window: only those of the enabled plugins. */
 export function rendererPriorities(section: string, profile: VpxProfile, dmdKind?: DmdKind): [string, number][] {
   const table = section === 'ScoreView' && dmdKind === 'dmd' ? DMD_ONLY_PRIORITIES : (VPX_RENDERER_PRIORITIES[section as VpxAncillarySection] ?? {});
   return Object.entries(table).filter(([renderer]) => profile.enabledPlugins.includes(renderer));
 }
 
 /**
- * Valeurs proposées aux plugins de la fenêtre DMD, écrites seulement quand la clé
- * est vide. Le plugin B2S affiche dans ScoreView l'image DMD (FullDMD) d'un
- * .directb2s qui en a une, et passe devant ScoreView (VPX_RENDERER_PRIORITIES) ;
- * sans incrustation (ScoreViewDMDOverlay = 0 par défaut), le DMD de la ROM n'y
- * apparaît pas : on ne verrait que le cadre. ScoreViewDMDAutoPos cherche dans
- * l'image le plus grand rectangle sombre aux proportions du DMD (B2SDMDOverlay.cpp).
- * Rien pour un écran DMD seul : B2S n'y dessine pas (DMD_ONLY_PRIORITIES).
+ * Values offered to the plugins of the DMD window, written only when the key
+ * is empty. The B2S plugin shows in ScoreView the DMD image (FullDMD) of a
+ * .directb2s that has one, and goes ahead of ScoreView (VPX_RENDERER_PRIORITIES);
+ * without overlay (ScoreViewDMDOverlay = 0 by default), the DMD of the ROM does not
+ * appear there: only the frame would be seen. ScoreViewDMDAutoPos looks in
+ * the image for the largest dark rectangle with the DMD's proportions (B2SDMDOverlay.cpp).
+ * Nothing for a DMD-only screen: B2S does not draw there (DMD_ONLY_PRIORITIES).
  *
- * [Plugin.PinMAME] Cheat (PINMAME_FAST_BOOT) : sans lui, une ROM WPC (Williams et Bally,
- * 1990-1999) refait à chaque partie le test de sa mémoire, plusieurs secondes de « TESTING… »
- * avant de jouer. Activé, PinMAME saute ce contrôle (wpc.c, MACHINE_INIT : « speed up startup
- * by disable checksum »). Le greffon le met à non par défaut, alors que VPinMAME l'avait
- * d'office sur la plupart des bornes : une table qui démarrait vite se mettait à tester.
- * Ni les règles ni les scores n'en dépendent.
+ * [Plugin.PinMAME] Cheat (PINMAME_FAST_BOOT): without it, a WPC ROM (Williams and Bally,
+ * 1990-1999) redoes its memory test at every game, several seconds of "TESTING..."
+ * before playing. Enabled, PinMAME skips this check (wpc.c, MACHINE_INIT: "speed up startup
+ * by disable checksum"). The plugin sets it to off by default, whereas VPinMAME had it
+ * on out of the box on most cabinets: a table that used to start fast began testing.
+ * Neither the rules nor the scores depend on it.
  */
 export function vpxPluginDefaults(assignments: Partial<Record<RoleId, ObservedDisplay>>, profile: VpxProfile, dmdKind?: DmdKind): VpxSetting[] {
   const defaults: VpxSetting[] = [];
@@ -228,7 +228,7 @@ export function vpxPluginDefaults(assignments: Partial<Record<RoleId, ObservedDi
   return defaults;
 }
 
-/** Valeur booléenne lue comme VPX (LayeredINIPropertyStore) : un entier non nul, true, on ou enable. */
+/** Boolean value read as VPX does (LayeredINIPropertyStore): a non-zero integer, true, on or enable. */
 export function iniBool(raw: string | undefined): boolean | undefined {
   const text = raw?.trim();
   if (!text) return undefined;
@@ -238,19 +238,19 @@ export function iniBool(raw: string | undefined): boolean | undefined {
   return undefined;
 }
 
-// Vue de la table (Player.BGSet) et cadrage automatique (CabinetAutofitMode).
+// Table view (Player.BGSet) and automatic framing (CabinetAutofitMode).
 const VIEW_DESKTOP = '0';
 const VIEW_CABINET = '1';
 const AUTOFIT_FIT_TABLE = '1';
 
-/** Clés de cadrage possédées par Cyber Pinball : elles découlent du playfield. */
+/** Framing keys owned by Cyber Pinball: they follow from the playfield. */
 export const VPX_LAYOUT_KEYS = ['BGSet', 'ScreenWidth', 'ScreenHeight'];
 
-/** Libellés des énumérations BGSet et CabinetAutofitMode (Settings_properties.inl, l. 165-167). */
+/** Labels of the BGSet and CabinetAutofitMode enumerations (Settings_properties.inl, l. 165-167). */
 const BGSET_LABELS = ['Desktop / Full Single Screen', 'Cabinet', 'Full Single Screen'];
 const AUTOFIT_LABELS = ['Manual', 'Fit Table', 'Fit Screen'];
 
-/** Énumération lue comme EnumPropertyDef::ParseEnum : un libellé, ou un nombre dans les bornes ; sinon la valeur par défaut. */
+/** Enumeration read as EnumPropertyDef::ParseEnum does: a label, or a number within bounds; else the default value. */
 function vpxEnum(raw: string | undefined, labels: string[], fallback: number): number {
   const text = raw?.trim() ?? '';
   const index = labels.indexOf(text);
@@ -259,30 +259,30 @@ function vpxEnum(raw: string | undefined, labels: string[], fallback: number): n
   return n >= 0 && n < labels.length ? n : fallback;
 }
 
-/** CabinetAutofitMode qui fait cadrer la table par VPX : « Fit Table » (1) ou « Fit Screen » (2), pas « Manual » (0, défaut de VPX). */
+/** CabinetAutofitMode that makes VPX frame the table: "Fit Table" (1) or "Fit Screen" (2), not "Manual" (0, VPX default). */
 export function isVpxAutofit(raw: string | undefined): boolean {
   return vpxEnum(raw, AUTOFIT_LABELS, 0) !== 0;
 }
 
 export interface VpxLayout {
-  /** Réglages possédés, réécrits à chaque synchronisation. */
+  /** Owned settings, rewritten at each synchronisation. */
   settings: VpxSetting[];
   /**
-   * Vue borne : cadrage automatique exigé. Le mode choisi par l'utilisateur (1 ou 2) est
-   * gardé ; toute autre valeur, absente ou « Manual », est remplacée par celle-ci.
+   * Cabinet view: automatic framing required. The mode chosen by the user (1 or 2) is
+   * kept; any other value, missing or "Manual", is replaced by this one.
    */
   autofit?: VpxSetting;
 }
 
 /**
- * Cadrage des tables (relevé dans ViewSetup.cpp et player.cpp de VPX 10.8.1) :
- * - ScreenWidth / ScreenHeight : taille réelle de l'image en cm, le grand côté en
- *   largeur quelle que soit l'orientation ; VPX ne les échange jamais ;
- * - BGSet = 1 (vue borne) quand l'image est plus haute que large pour le joueur ;
- * - CabinetAutofitMode 1 (« Fit Table ») ou 2 (« Fit Screen ») : VPX recalcule toute
- *   la vue borne de la table, y compris sa rotation, déduite de la forme de la
- *   fenêtre. C'est la seule façon de connaître le sens des tables en vue borne
- *   (vpxPlayedFlipperEdge) : le mode est donc exigé, pas seulement proposé.
+ * Framing of the tables (taken from ViewSetup.cpp and player.cpp of VPX 10.8.1):
+ * - ScreenWidth / ScreenHeight: actual size of the image in cm, the long side as
+ *   width whatever the orientation; VPX never swaps them;
+ * - BGSet = 1 (cabinet view) when the image is taller than wide for the player;
+ * - CabinetAutofitMode 1 ("Fit Table") or 2 ("Fit Screen"): VPX recomputes the whole
+ *   cabinet view of the table, including its rotation, deduced from the shape of the
+ *   window. It is the only way to know which way the tables face in cabinet view
+ *   (vpxPlayedFlipperEdge): so the mode is required, not just offered.
  */
 export function vpxLayoutSettings(display: ObservedDisplay, edge: FlipperEdge, size: SizeCm | undefined): VpxLayout {
   const cabinet = isCabinetView(display, edge);
@@ -295,28 +295,28 @@ export function vpxLayoutSettings(display: ObservedDisplay, edge: FlipperEdge, s
 }
 
 export interface VpxPlayedEdge {
-  /** Bord de la fenêtre du playfield où VPX dessinera les flippers ; undefined : celui que prévoit chaque table. */
+  /** Edge of the playfield window where VPX will draw the flippers; undefined: the one each table plans. */
   edge?: FlipperEdge;
-  /** desktop : vue bureau ; autofit : vue borne cadrée par VPX ; manual : vue borne réglée dans la table. */
+  /** desktop: desktop view; autofit: cabinet view framed by VPX; manual: cabinet view set in the table. */
   view: 'desktop' | 'autofit' | 'manual';
 }
 
 /**
- * Bord où VPX 10.8.1 dessinera les flippers dans la fenêtre du playfield, d'après les
- * valeurs qu'il lira (`read` : le .ini de la table par-dessus VPinballX.ini). VPX dessine
- * dans les coordonnées de Windows : seule compte la forme de la fenêtre, pas l'orientation
- * de l'écran. Une rotation de vue de r degrés met les flippers au bord dont edgeRotation
- * vaut r (0 en bas, 270 à droite : ViewSetup::ComputeMVP).
- * - Vue borne (BGSet = 1) et cadrage automatique (CabinetAutofitMode 1 ou 2) : à chaque
- *   partie, SetWindowAutofit remet la rotation de la table à 0 (après ses surcharges :
- *   ViewCabRotation n'y fait rien), et GetRotation y ajoute 270° pour une fenêtre
- *   paysage, 0° pour une fenêtre portrait (`viewportWidth < viewportHeight ? 0 : 3`).
- *   ScreenWidth / ScreenHeight absents, VPX prend ses valeurs par défaut et cadre quand même.
- * - Vue borne en cadrage manuel : la vue borne réglée dans la table, avec sa rotation
- *   (souvent 270°, pour un Windows en paysage) : rien ne garantit le sens, sauf si le .ini
- *   donne la vue et sa rotation (manualCabRotation : correction faite dans le menu de VPX).
- * - Vue bureau (BGSet 0 ou 2, PinTable::UpdateCurrentBGSet) : la vue bureau ou FSS de
- *   la table, dessinée flippers en bas.
+ * Edge where VPX 10.8.1 will draw the flippers in the playfield window, from the
+ * values it will read (`read`: the table's .ini over VPinballX.ini). VPX draws
+ * in Windows coordinates: only the shape of the window counts, not the orientation
+ * of the screen. A view rotation of r degrees puts the flippers at the edge whose edgeRotation
+ * is r (0 at the bottom, 270 on the right: ViewSetup::ComputeMVP).
+ * - Cabinet view (BGSet = 1) and automatic framing (CabinetAutofitMode 1 or 2): at each
+ *   game, SetWindowAutofit resets the table's rotation to 0 (after its overrides:
+ *   ViewCabRotation has no effect), and GetRotation adds 270° for a landscape
+ *   window, 0° for a portrait window (`viewportWidth < viewportHeight ? 0 : 3`).
+ *   ScreenWidth / ScreenHeight missing, VPX takes its default values and frames anyway.
+ * - Cabinet view with manual framing: the cabinet view set in the table, with its rotation
+ *   (often 270°, for a Windows in landscape): nothing guarantees the direction, unless the .ini
+ *   gives the view and its rotation (manualCabRotation: correction made in VPX's menu).
+ * - Desktop view (BGSet 0 or 2, PinTable::UpdateCurrentBGSet): the desktop or FSS view of
+ *   the table, drawn with the flippers at the bottom.
  */
 export function vpxPlayedFlipperEdge(read: (section: string, key: string) => string | undefined, window: ObservedDisplay): VpxPlayedEdge {
   if (vpxEnum(read('Player', 'BGSet'), BGSET_LABELS, 0) !== 1) return { edge: 'bottom', view: 'desktop' };
@@ -332,11 +332,11 @@ const VLM_WINDOW = 2;
 const ROTATION_EDGES: Record<Rotation, FlipperEdge> = { 0: 'bottom', 90: 'left', 180: 'top', 270: 'right' };
 
 /**
- * Vue borne en cadrage manuel : rotation de la vue quand le .ini la donne en entier, par
- * exemple après « Save as Table Override » dans le menu de VPX (ViewSetup::GetRotation) :
- * en mode « Window », ViewCabRotation s'ajoute à 270° pour une fenêtre paysage, 0° pour
- * une fenêtre portrait ; en « Legacy » ou « Camera », elle vaut seule. Sans ViewCabMode
- * ni ViewCabRotation, ce sont les valeurs du .vpx : undefined. Hors quart de tour aussi.
+ * Cabinet view with manual framing: rotation of the view when the .ini gives it in full, for
+ * example after "Save as Table Override" in VPX's menu (ViewSetup::GetRotation):
+ * in "Window" mode, ViewCabRotation is added to 270° for a landscape window, 0° for
+ * a portrait window; in "Legacy" or "Camera", it stands alone. Without ViewCabMode
+ * or ViewCabRotation, these are the values of the .vpx: undefined. Also outside quarter turns.
  */
 function manualCabRotation(read: (section: string, key: string) => string | undefined, window: ObservedDisplay): Rotation | undefined {
   const rawMode = read('TableOverride', 'ViewCabMode')?.trim();
@@ -350,9 +350,9 @@ function manualCabRotation(read: (section: string, key: string) => string | unde
 }
 
 /**
- * Bord où VPX affichera les flippers avec le cadrage écrit par Cyber Pinball
- * (vpxLayoutSettings, cadrage automatique en vue borne) : à droite d'une fenêtre
- * paysage, en bas d'une fenêtre portrait, sans réglage possible ; en bas en vue bureau.
+ * Edge where VPX will show the flippers with the framing written by Cyber Pinball
+ * (vpxLayoutSettings, automatic framing in cabinet view): on the right of a landscape
+ * window, at the bottom of a portrait window, with no setting possible; at the bottom in desktop view.
  */
 export function vpxFlipperEdge(display: ObservedDisplay, edge: FlipperEdge): FlipperEdge {
   const layout = vpxLayoutSettings(display, edge, undefined);
@@ -361,19 +361,19 @@ export function vpxFlipperEdge(display: ObservedDisplay, edge: FlipperEdge): Fli
 }
 
 export interface OrientationFix {
-  /** Quart(s) de tour à ajouter à l'orientation Windows actuelle. */
+  /** Quarter turn(s) to add to the current Windows orientation. */
   delta: Rotation;
-  /** Orientation Windows à demander (0 = paysage, 180 = paysage retourné…). */
+  /** Windows orientation to request (0 = landscape, 180 = landscape flipped...). */
   rotation: Rotation;
-  /** Bord du joueur dans la nouvelle image. */
+  /** Edge of the player in the new image. */
   edge: FlipperEdge;
 }
 
 /**
- * Orientation Windows qui met les flippers de VPX du côté du joueur, quand VPX ne
- * sait pas le faire seul ; undefined si rien à changer. Le retournement (180°) est
- * préféré : il garde la définition de l'image, donc la disposition des autres
- * écrans. Le quart de tour ne sert qu'à un Windows en portrait vu de côté.
+ * Windows orientation that puts VPX's flippers on the player's side, when VPX cannot
+ * do it on its own; undefined if there is nothing to change. Flipping (180°) is
+ * preferred: it keeps the image's resolution, hence the layout of the other
+ * screens. The quarter turn only serves a Windows in portrait seen from the side.
  */
 export function vpxOrientationFix(display: ObservedDisplay, edge: FlipperEdge): OrientationFix | undefined {
   if (vpxFlipperEdge(display, edge) === edge) return undefined;
@@ -390,7 +390,7 @@ function formatCm(value: number): string {
   return String(Math.round(value * 10) / 10);
 }
 
-/** Écrit chaque valeur proposée là où la clé est absente ou vide ; renvoie ce qui a changé. */
+/** Writes each offered value where the key is missing or empty; returns what changed. */
 export function applyVpxDefaults(doc: IniDocument, defaults: VpxSetting[]): VpxChange[] {
   return applyVpxSettings(
     doc,
@@ -398,7 +398,7 @@ export function applyVpxDefaults(doc: IniDocument, defaults: VpxSetting[]): VpxC
   );
 }
 
-/** Applique les réglages au document et renvoie uniquement ce qui a réellement changé. */
+/** Applies the settings to the document and returns only what actually changed. */
 export function applyVpxSettings(doc: IniDocument, settings: VpxSetting[]): VpxChange[] {
   const changes: VpxChange[] = [];
   for (const s of settings) {
@@ -410,7 +410,7 @@ export function applyVpxSettings(doc: IniDocument, settings: VpxSetting[]): VpxC
   return changes;
 }
 
-/** Diff lisible, une ligne par clé modifiée. */
+/** Readable diff, one line per changed key. */
 export function formatChanges(changes: VpxChange[]): string[] {
   return changes.map((c) => t('[{section}] {key} : {before} → {value}', { section: c.section, key: c.key, before: c.before ?? t('(absent)'), value: c.value }));
 }
