@@ -303,6 +303,7 @@ import {
   RELAY_ORIGIN,
   writeAccountBundle,
   type AccountCopy,
+  applyPinballFxRotation,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
 import { detectFuturePinball, futurePinballPlan, placeFuturePinballWindow } from './futurepinball-play';
@@ -319,6 +320,7 @@ import { rememberLaunch } from './launch-evidence';
 import { restoreVpxFiles, vpxChangedFiles, vpxFilesStatus } from './vpx-integrity';
 import { launchPinballFx, runningPinballFx, ZEN_LAUNCH_GAMES } from './pinballfx-launcher';
 import { detectPinballFx, detectPinballFx3 } from './pinballfx-install';
+import { bridgeZenKeys } from './zen-keys';
 import { watchGameLoad, type GameLoadWatch } from './game-load';
 import { createLibrary, type ActionShortcut, type SystemItem, type UiAction } from './library';
 import { createFeedbackService } from './feedback-service';
@@ -4718,6 +4720,14 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     }
     await delay(1500);
   }
+  // Borne : le playfield tourné, Pinball FX tourne son image comme les fenêtres du front-end (pinballfx-cabinet.ts).
+  if (simulated === undefined && zenKey === 'pinballfx' && process.env.LOCALAPPDATA) {
+    try {
+      for (const c of applyPinballFxRotation(process.env.LOCALAPPDATA, rotation)) console.log(`${zenName} (${table.id}) : rotation forcée ${c.value} écrite dans ${c.file}.`); // i18n-ignore : journal
+    } catch (error) {
+      console.log(`${zenName} (${table.id}) : rotation pas écrite (${(error as Error).message}) ; la partie se lance quand même.`); // i18n-ignore : journal
+    }
+  }
 
   closeTopmostWindows();
   playing = table;
@@ -4758,6 +4768,8 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     simulated !== undefined || !command
       ? simulateVpx({ onPlaying, onForeground })
       : launchPinballFx({ command, game: launchGame, exitHeld: vrFront.exitHeldNow, onPlaying, onForeground, ...(onWindow ? { onWindow } : {}) });
+  // Pinscape et encodeurs en mode manette : leurs boutons rendus au jeu de Zen comme des touches (zen-keys.ts).
+  const stopZenKeys = simulated === undefined && command && zenKey ? bridgeZenKeys(buttons, () => game.pid) : () => undefined;
   if (launch) {
     launch.stop = () => game.stop();
     launchStep('launched');
@@ -4765,6 +4777,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   }
   if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
   const result = await game.done;
+  stopZenKeys();
   stopJoystick();
   const stoppedLoading = launch?.stopped === true;
   endLaunch();

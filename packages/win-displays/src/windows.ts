@@ -63,6 +63,7 @@ interface Api {
   IsHungAppWindow: NativeFn;
   SendInput: NativeFn;
   SetWindowPosAfter: NativeFn;
+  MapVirtualKeyW: NativeFn;
 }
 
 let api: Api | undefined;
@@ -102,6 +103,7 @@ function loadApi(): Api {
     IsHungAppWindow: user32.func('bool __stdcall IsHungAppWindow(void *hwnd)'),
     SendInput: user32.func('uint32_t __stdcall SendInput(uint32_t count, void *inputs, int size)'),
     SetWindowPosAfter: user32.func('bool __stdcall SetWindowPos(void *hwnd, intptr_t after, int x, int y, int cx, int cy, uint32_t flags)'),
+    MapVirtualKeyW: user32.func('uint32_t __stdcall MapVirtualKeyW(uint32_t code, uint32_t mapType)'),
   };
   return api;
 }
@@ -387,6 +389,30 @@ export function pressKey(vk: number, mods: KeyModifiers = {}): boolean {
   const all = Buffer.concat([...held.map((b) => b.subarray(0, INPUT_SIZE)), keyInputs({ vk }), ...held.reverse().map((b) => b.subarray(INPUT_SIZE))]);
   const count = all.length / INPUT_SIZE;
   return (loadApi().SendInput(count, all, INPUT_SIZE) as number) === count;
+}
+
+const KEYEVENTF_EXTENDEDKEY = 0x0001;
+const MAPVK_VK_TO_VSC = 0;
+/**
+ * Touches du bloc étendu du clavier : sans le drapeau, Windows les prendrait pour celles du pavé
+ * numérique (flèches) ou pour leur jumelle de gauche (Ctrl et Alt droits).
+ */
+const EXTENDED_VKS = new Set([0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2d, 0x2e, 0x5b, 0x5c, 0x5d, 0x6f, 0xa3, 0xa5]);
+
+/**
+ * Appuie (`down`) ou relâche une touche pour la fenêtre au premier plan, comme un vrai clavier
+ * (SendInput, code de touche virtuelle et code de balayage) : un jeu qui distingue Maj gauche et
+ * Maj droite, ou les flèches du pavé numérique, les lit comme celles d'un clavier. La touche reste
+ * enfoncée jusqu'au relâchement : un flipper tenu reste levé.
+ */
+export function setKeyDown(vk: number, down: boolean): boolean {
+  const w = loadApi();
+  const buf = Buffer.alloc(INPUT_SIZE);
+  buf.writeUInt32LE(INPUT_KEYBOARD, 0);
+  buf.writeUInt16LE(vk, 8);
+  buf.writeUInt16LE((w.MapVirtualKeyW(vk, MAPVK_VK_TO_VSC) as number) & 0xffff, 10);
+  buf.writeUInt32LE((EXTENDED_VKS.has(vk) ? KEYEVENTF_EXTENDEDKEY : 0) | (down ? 0 : KEYEVENTF_KEYUP), 12);
+  return (w.SendInput(1, buf, INPUT_SIZE) as number) === 1;
 }
 
 const INPUT_MOUSE = 0;

@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.1
 
+- Pinball FX sur une borne : avant chaque partie, Cyber Pinball règle la rotation forcée de l'image du jeu dans le même sens que ses propres écrans du playfield (Options > Vidéo du jeu, fichier `LocalSettings.cfg`). La table est face au joueur au lieu de rester en paysage. Un PC dont l'écran est droit garde son réglage.
+- Pinball FX et Pinball FX3 sur une borne dont les boutons sont des boutons de joystick (Pinscape, encodeur en mode manette) : ces jeux ne lisent pas un joystick, seulement le clavier et les manettes Xbox. Pendant la partie, Cyber Pinball leur rend les boutons sous forme de touches du clavier : flippers sur Maj gauche et droite (et flèches gauche et droite pour les menus), Start et lanceur sur Entrée, Exit sur Échap, MagnaSave sur les flèches haut et bas, tremblements sur Alt gauche, Alt droit et Espace. Rien à installer (x360ce, JoyToKey).
 - DMD réel : un PIN2DMD s'allume enfin, en partie comme dans le front-end. Le module DMD de VPX 10.8.1 ne sait pas le piloter (sa prise en charge n'y a pas été compilée) ; le serveur du DMD de Cyber Pinball le pilote donc lui-même, au format d'images qu'emploient les autres front-ends (ordre des couleurs lu dans la carte), et VPX lui envoie ses images pendant les parties.
 - DMD réel : le serveur du DMD reçoit enfin les images, pour tous les modèles (ZeDMD compris). Celui du module DMD de VPX coupait chaque connexion sous Windows et tournait à vide en remplissant le journal ; Cyber Pinball a désormais le sien.
 - DMD réel : pour un PIN2DMD, le serveur du DMD tourne même avec « Image du front-end : non » ; le PIN2DMD reste alors noir entre les parties.

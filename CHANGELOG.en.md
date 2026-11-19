@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Pinball FX on a cabinet: before each game, Cyber Pinball sets the game's forced display rotation in the same direction as its own playfield screens (the game's Options > Video, `LocalSettings.cfg` file). The table faces the player instead of staying in landscape. A PC with an upright screen keeps its setting.
+- Pinball FX and Pinball FX3 on a cabinet whose buttons are joystick buttons (Pinscape, encoder in gamepad mode): these games don't read a joystick, only the keyboard and Xbox controllers. During the game, Cyber Pinball hands them the buttons as keyboard keys: flippers on Left and Right Shift (plus Left and Right arrows for the menus), Start and plunger on Enter, Exit on Esc, MagnaSave on Up and Down arrows, nudges on Left Alt, Right Alt and Space. Nothing to install (x360ce, JoyToKey).
 - Real DMD: a PIN2DMD finally lights up, both in games and in the frontend. VPX 10.8.1's DMD module cannot drive it (its support was not compiled in), so Cyber Pinball's DMD server now drives it itself, in the frame format other frontends use (with the colour order read from the board), and VPX sends it its frames during games.
 - Real DMD: the DMD server finally receives frames, for every model (ZeDMD included). The one in VPX's DMD module dropped every connection on Windows and spun idle while flooding the log; Cyber Pinball now has its own.
 - Real DMD: for a PIN2DMD, the DMD server runs even with "Menu image: no"; the PIN2DMD then stays dark between games.
