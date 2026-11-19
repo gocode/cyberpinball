@@ -50,15 +50,62 @@ function renderButtons(state) {
     button.textContent = a.label;
     // Indisponible (« Valider » tant qu'un bouton reste à essayer) : grisé, sa raison dessous, toujours visible.
     button.className = [a.selected && 'selected', a.disabled && 'disabled'].filter(Boolean).join(' ');
+    // Commande d'une étape (wizard-controls.ts) : les touches qui font la même chose, dessous.
+    if (a.keys) {
+      const keys = document.createElement('small');
+      keys.className = 'action-keys';
+      keys.textContent = a.keys;
+      button.append(keys);
+    }
     if (a.reason) {
       const reason = document.createElement('small');
       reason.className = 'action-reason';
       reason.textContent = a.reason;
       button.append(reason);
     }
-    button.dataset.act = JSON.stringify({ type: 'buttons', action: a.id });
+    button.dataset.act = JSON.stringify(a.act ?? { type: 'buttons', action: a.id });
     actions.append(button);
   }
+}
+
+// Frise des étapes, en haut : une pastille numérotée par étape, celle en cours avec son nom.
+function renderProgress(state) {
+  const box = $('progress');
+  box.hidden = !state.progress;
+  box.replaceChildren(
+    ...(state.progress ?? []).map((step) => {
+      const li = document.createElement('li');
+      li.className = step.state;
+      if (step.number !== undefined) {
+        const number = document.createElement('b');
+        number.textContent = String(step.number);
+        li.append(number);
+      }
+      if (step.label) {
+        const label = document.createElement('span');
+        label.textContent = step.label;
+        li.append(label);
+      }
+      return li;
+    }),
+  );
+}
+
+// Consignes du relevé des boutons : une par geste (passer, revenir, finir, corriger), son nom en tête.
+function renderHint(state) {
+  const hint = $('hint');
+  hint.classList.toggle('guide', Boolean(state.guide));
+  if (!state.guide) return text('hint', state.hint);
+  hint.replaceChildren(
+    ...state.guide.map((part) => {
+      const line = document.createElement('span');
+      line.className = 'guide-part';
+      const label = document.createElement('b');
+      label.textContent = part.label;
+      line.append(label, ` ${part.text}`);
+      return line;
+    }),
+  );
 }
 
 // Compte à rebours : une barre qui se vide, sous le texte qui dit ce qui se passera à la fin.
@@ -372,6 +419,7 @@ function renderQuit(state) {
 function render(state) {
   const root = $('screen');
   renderQuit(state);
+  renderProgress(state);
   renderZones(state);
   renderArrange(state);
   root.classList.toggle('arrange-step', state.phase === 'arrange');
@@ -397,7 +445,7 @@ function render(state) {
   text('number', state.number);
   text('name', state.name);
   text('details', state.details);
-  text('hint', state.hint);
+  renderHint(state);
   $('notice').hidden = !state.notice;
   text('notice', state.notice);
 

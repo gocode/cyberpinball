@@ -437,6 +437,26 @@ body {
   color: var(--warning);
 }
 
+/* Commande d'une étape : les touches qui font la même chose, sous son nom (wizard-controls.ts). */
+.action-keys {
+  display: block;
+  margin-top: 0.4vmin;
+  font-size: 1.9vmin;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ink-muted);
+}
+
+.actions button.selected .action-keys {
+  color: var(--on-signal);
+}
+
+/* Récapitulatif et résultat : les commandes sous le panneau, qu'on lit avant de valider. */
+#screen.report .actions {
+  order: 1;
+}
+
 /* Écran de choix (« Vos boutons sont-ils déjà les bons ? ») : deux grands choix. */
 #screen.choice .actions button {
   font-size: 3vmin;
@@ -504,6 +524,86 @@ body.pointer [data-act] {
 
 .brand .pin {
   color: var(--signal);
+}
+
+/*
+ * Frise des étapes (wizard-progress.ts), entre la marque et « Quitter sans enregistrer » : une
+ * pastille numérotée par étape, celle en cours pleine, avec son nom et où l'on en est. Sur un écran
+ * trop étroit pour tenir sur la ligne (portrait, 4:3), elle passe sur sa propre ligne, dessous.
+ */
+.top {
+  /* Trois colonnes, les deux bords de même largeur : la frise au centre exact de l'écran. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  row-gap: 1.2vmin;
+}
+
+.top .brand {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.top .quit {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.progress {
+  grid-column: 2;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1vmin;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.progress li {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1vmin;
+  min-width: 3.8vmin;
+  height: 3.8vmin;
+  padding: 0 1.2vmin;
+  border: 0.2vmin solid var(--line-strong);
+  border-radius: 1.9vmin;
+  font-size: 1.9vmin;
+  color: var(--ink-faint);
+}
+
+.progress li b {
+  font-weight: 600;
+}
+
+.progress li.done {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.progress li.current {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-signal);
+  font-weight: 600;
+  box-shadow: 0 0 1.6vmin var(--signal-haze);
+}
+
+@container (max-aspect-ratio: 16 / 10) {
+  .top {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .top .quit {
+    grid-column: 2;
+  }
+
+  .progress {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
 }
 
 /* Toujours là, à chaque étape : sortir sans rien écrire. */
@@ -740,6 +840,23 @@ footer {
 .hint {
   font-size: 2.2vmin;
   color: var(--quiet);
+}
+
+/* Relevé des boutons : une consigne par geste, son nom en tête (passer, revenir, finir, corriger). */
+.hint.guide {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6vmin 3.5vmin;
+}
+
+.guide-part b {
+  margin-right: 0.8vmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 /* ---------- Parts d'écran (rôles qui partagent cet écran) ---------- */

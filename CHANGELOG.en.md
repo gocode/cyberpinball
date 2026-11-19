@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Setup wizard, button mapping: every screen now says plainly how to skip a button the cabinet doesn't have, go back, finish the step and fix a mistake. Two new mouse actions: "Skip this button" (optional buttons) and "Finish mapping" (once the required buttons are mapped, the others keep their current key). "Default keys" is now called "Encoder default keys" for the game buttons.
+- Setup wizard: a step bar at the top of every screen, one numbered dot per step; the current one shows its name and progress ("Interface buttons · Button 1 of 4", "Screens · Role 2 of 4", "Sound · Output 1 of 3"), replacing the line that said so in the middle of the screen.
+- Setup wizard with keyboard and mouse: every step (plunger, tilt, screens and roles, orientation, diagonal, sound, speakers, summary, end) has clickable on-screen buttons, each showing the keys that do the same thing (arrows, Enter, Esc, Backspace, or the cabinet buttons). The whole first setup can be done from a PC, remote desktop included; only button mapping needs the real cabinet buttons to be pressed.
 - Jukebox: the fix for local tracks stopping every few seconds now works in the installed application. The separate reader was not shipped with it, so the Jukebox fell back to the old playback.
 - Project page on GitHub: it now says right away that Cyber Pinball installs next to PinUP Popper, PinballX or PinballY without touching their installation, and takes over their tables without duplicating them when they are on the same drive.
 - For developers: an English guide (CONTRIBUTING.md) explains how the code is organised, how to build and test it and how to propose a change; the comments of the main core modules are now in English.

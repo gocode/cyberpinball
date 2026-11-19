@@ -164,6 +164,8 @@ import { arrangeAction, arrangeKey, arrangePanel, arrangeZones, startArrange, ty
 import { relaunchCovered } from './screen-guard';
 import { quitWithWindow } from './app-lifetime';
 import { otherFrontendsOnThisPc } from './frontend-gate';
+import { controlActions, controlCode, isControlRole, pressedIn, type ControlAction, type ControlSpec } from './wizard-controls';
+import { progressView } from './wizard-progress';
 
 const COLORS = ['#ff3d7f', '#22d3ee', '#facc15', '#a3e635', '#c084fc', '#fb923c'];
 
@@ -559,8 +561,16 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
     const wait = /^Attendre(\d+)$/.exec(code);
     if (wait) await delay(Number(wait[1]) * 1000);
     else if (code === 'SansBoutons') buttonsTimeout();
-    // « click:<sélecteur> » : clic de souris dans la fenêtre du premier écran.
-    else if (code.startsWith('click:')) await windows[0]!.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(code.slice(6))})?.click()`);
+    // « click:<sélecteur> » : clic de souris sur le premier écran qui montre cet élément (les
+    // commandes d'une étape sont sur l'écran que le joueur regarde, souvent celui du playfield).
+    else if (code.startsWith('click:')) {
+      let clicked = false;
+      for (const win of windows) {
+        if (clicked || win.isDestroyed()) continue;
+        clicked = Boolean(await win.webContents.executeJavaScript(`(() => { const el = document.querySelector(${JSON.stringify(code.slice(6))}); el?.click(); return Boolean(el); })()`));
+      }
+      if (!clicked) console.error(`Autopilote : ${code} n’est pas arrivée jusqu’à l’assistant, aucun élément à cliquer`); // i18n-ignore : console de l'autopilote
+    }
     // « drag:<écran>:<rôle>:<poignée>:<dx>:<dy> » : la zone (poignée « move ») ou l'un de ses
     // coins tiré à la souris sur cet écran (numéro à partir de 1), par de vrais événements de pointeur.
     else if (code.startsWith('drag:')) {
@@ -617,6 +627,8 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
       handleKey({ type: 'keyUp', code, control: false } as Input);
     }
     await delay(400);
+    // L'étape où chaque geste a mené : les essais suivent le parcours, clic après clic.
+    console.log(`Autopilote : ${code} → ${wizard.phase}${wizard.quit ? ' (question de sortie)' : ''}`); // i18n-ignore : console de l'autopilote
     for (const [i, win] of windows.entries()) {
       const name = `${String(step).padStart(2, '0')}-${code.replace(/[^\w-]+/g, '_').slice(0, 40)}-ecran${i + 1}`;
       await layout.check(win.webContents, name);
@@ -629,7 +641,8 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
 
 function handleKey(input: Input): boolean {
   if (input.type === 'keyUp') return handleKeyUp(input);
-  const is = (group: string[]) => group.includes(input.code);
+  // Une touche du groupe, ou le clic sur la commande de ce groupe (wizard-controls.ts).
+  const is = (group: string[]) => pressedIn(input.code, group, KEYS);
   // Quitter sans enregistrer : avant toute étape, pour qu'aucune ne puisse retenir le joueur.
   // Ctrl+Q, ou le bouton « Quitter sans enregistrer » de la borne (sauf là où ce bouton a déjà un rôle).
   if (isQuitShortcut(input) || quitButtonActs(wizard.phase, input.code, KEYS.quit, stepKeys())) {
@@ -1031,9 +1044,15 @@ function quitView() {
 
 /** Actions du récapitulatif, choisies aux boutons ou à la souris. */
 const SUMMARY_ACTIONS = ['save', 'previous', 'defaults', 'restart'] as const;
+/**
+ * Actions du relevé, à la souris : le bouton d'avant, passer celui-ci (facultatif seulement),
+ * terminer le relevé (les boutons restants gardent la touche affichée), les touches par défaut.
+ * Au relevé, chaque appui est relevé : rien ne s'y choisit aux boutons.
+ */
+const CAPTURE_ACTIONS = ['previous', 'skip', 'finish', 'defaults', 'restart'] as const;
 /** Premier écran d'une borne sans boutons enregistrés : garder les touches actuelles, ou les modifier. */
 const CHOICE_ACTIONS = ['keep', 'modify'] as const;
-type ButtonsAction = (typeof SUMMARY_ACTIONS)[number] | (typeof CHOICE_ACTIONS)[number];
+type ButtonsAction = (typeof SUMMARY_ACTIONS)[number] | (typeof CAPTURE_ACTIONS)[number] | (typeof CHOICE_ACTIONS)[number];
 
 /** Marque de « Relevé : … » après « Touches par défaut » (le texte affiché est lastLabel). */
 const DEFAULTS_LAST = 'defaults';
@@ -1062,7 +1081,25 @@ function inForceKeys(set: KeySet): SetKeys {
 }
 
 /** Ce que la souris envoie depuis screen.js. */
-type WizardAction = { type: 'button'; index: number } | { type: 'buttons'; action: ButtonsAction | PlungerAction | TiltAction } | { type: 'quit'; op: 'ask' | 'yes' | 'no' } | ArrangeAction;
+type WizardAction = { type: 'button'; index: number } | { type: 'buttons'; action: ButtonsAction | PlungerAction | TiltAction } | { type: 'quit'; op: 'ask' | 'yes' | 'no' } | ArrangeAction | ControlAction;
+
+/**
+ * Étapes dont les commandes se cliquent comme on presse leur bouton (wizard-controls.ts). Pas le
+ * relevé des boutons ni son premier écran, où un appui est relevé ou choisit à son relâchement, ni
+ * la disposition, qui a son propre panneau cliquable.
+ */
+const CONTROL_PHASES: readonly Phase[] = ['plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'sound', 'channels', 'summary', 'done'];
+
+/** Clic sur une commande de l'étape : l'appui puis le relâchement du bouton de ce rôle. */
+function pressControl(role: unknown): void {
+  if (!isControlRole(role) || !CONTROL_PHASES.includes(wizard.phase)) return;
+  const code = controlCode(role);
+  handleKey({ type: 'keyDown', code, control: false, isAutoRepeat: false } as Input);
+  handleKey({ type: 'keyUp', code, control: false, isAutoRepeat: false } as Input);
+}
+
+/** Les boutons d'une étape, avec les touches de l'assistant. */
+const controls = (specs: (ControlSpec | false | undefined)[]) => controlActions(specs.filter((s): s is ControlSpec => Boolean(s)), KEYS);
 
 /**
  * Arrivée sur les boutons. Étape seule « Boutons du jeu », ou borne neuve : les boutons du jeu
@@ -1327,6 +1364,10 @@ function handleWizardAction(action: WizardAction): void {
     return;
   }
   if (wizard.quit || wizard.leaving) return;
+  if (action.type === 'control') {
+    pressControl(action.role);
+    return;
+  }
   if (action.type === 'arrange') {
     if (wizard.phase !== 'arrange') return;
     afterArrange(arrangeAction(arrangeHost(), wizard.arrange!, action));
@@ -1368,6 +1409,12 @@ function runButtonsAction(action: ButtonsAction): void {
       return startCapture(INTERFACE_KEYS);
     case 'previous':
       return previousButton();
+    case 'skip':
+      if (wizard.phase !== capturePhase(set)) return;
+      return skipButton(capture);
+    case 'finish':
+      if (wizard.phase !== capturePhase(set)) return;
+      return finishCapture(capture);
     case 'restart':
       return startCapture(set);
     case 'defaults':
@@ -1389,6 +1436,59 @@ function runButtonsAction(action: ButtonsAction): void {
 }
 
 const itemLabel = (set: KeySet, id: string) => set.items.find((b) => b.id === id)!.label;
+
+/**
+ * « Passer ce bouton », à la souris : comme Exit au relevé d'un bouton facultatif, il reste sans
+ * touche. Un bouton obligatoire ne se passe pas : l'écran dit de l'appuyer sur la borne.
+ */
+function skipButton(capture: ButtonCapture): void {
+  const button = capture.set.items[capture.index]!;
+  if (button.required) {
+    capture.notice = t('{button} est obligatoire : appuyez dessus sur la borne.', { button: button.label });
+    return;
+  }
+  if (process.env.CYBERPINBALL_AUTOPILOT) console.log(`Assistant : relevé ${capture.set.kind}, ${button.id} : passé à la souris`); // i18n-ignore : console de l'autopilote
+  const keys = { ...capture.keys };
+  delete keys[button.id];
+  capture.keys = keys;
+  capture.tried.delete(button.id);
+  capture.answered.add(button.id);
+  capture.last = t('{button} : pas de bouton', { button: button.label });
+  capture.bounce = undefined;
+  nextButton(capture);
+}
+
+/**
+ * « Terminer le relevé », à la souris, une fois les boutons obligatoires relevés : chaque bouton
+ * restant garde la touche affichée en retrait dans la liste (celle en vigueur), sauf si un bouton
+ * relevé l'a prise ; puis le récapitulatif, où l'on valide. En refaisant un seul bouton : retour
+ * au récapitulatif, sans rien changer.
+ */
+function finishCapture(capture: ButtonCapture): void {
+  if (redoingOne(capture)) return enterButtonsSummary(capture);
+  const set = capture.set;
+  const missing = set.items.filter((b) => b.required && !capture.answered.has(b.id));
+  if (missing.length) {
+    capture.notice = t('Encore à relever sur la borne : {buttons}.', { buttons: missing.map((b) => b.label).join(', ') });
+    return;
+  }
+  const inForceSet = inForceKeys(set);
+  const keys = { ...capture.keys };
+  const used = new Set(Object.values(keys).filter(Boolean));
+  for (const b of set.items) {
+    if (capture.answered.has(b.id)) continue;
+    const code = inForceSet[b.id];
+    if (code && !used.has(code) && !set.refused(b.id, code)) {
+      keys[b.id] = code;
+      used.add(code);
+    } else delete keys[b.id];
+    capture.answered.add(b.id);
+  }
+  if (process.env.CYBERPINBALL_AUTOPILOT) console.log(`Assistant : relevé ${set.kind} terminé à la souris`); // i18n-ignore : console de l'autopilote
+  capture.keys = keys;
+  capture.last = t('boutons restants avec leur touche actuelle');
+  enterButtonsSummary(capture);
+}
 
 /** Personne n'a touché à rien : les touches actuelles restent (celles des encodeurs sur une nouvelle borne). */
 function buttonsTimeout(): void {
@@ -1468,11 +1568,14 @@ function afterPlunger(outcome: PlungerOutcome): void {
 /** Étape « Lanceur » : même écran partout, comme les boutons ; droit sur l'ancien playfield. */
 function plungerViewFor(index: number, base: Record<string, unknown>) {
   const label = (codes: string[]) => keyLabel(codes[0]);
+  const view = plungerView(wizard.plunger!, only ? t('Enregistrer') : t('Continuer'), { previous: label(KEYS.previous), next: label(KEYS.next), confirm: label(KEYS.confirm), exit: label(KEYS.exit) });
   return {
     ...base,
     rotation: index === previousPlayfieldIndex() ? edgeRotation(previousEdge() ?? 'bottom') : 0,
     highlight: true,
-    ...plungerView(wizard.plunger!, only ? t('Enregistrer') : t('Continuer'), { previous: label(KEYS.previous), next: label(KEYS.next), confirm: label(KEYS.confirm), exit: label(KEYS.exit) }),
+    ...view,
+    // Revenir aux boutons du jeu, comme Retour arrière (assistant complet seulement).
+    actions: [...controls([!only && { role: 'back', label: t('Revenir') }]), ...view.actions],
   };
 }
 
@@ -1533,11 +1636,14 @@ function afterTilt(outcome: TiltOutcome): void {
 /** Étape « Tilt » : même écran partout, comme le lanceur ; droit sur l'ancien playfield. */
 function tiltViewFor(index: number, base: Record<string, unknown>) {
   const label = (codes: string[]) => keyLabel(codes[0]);
+  const view = tiltView(wizard.tiltStep!, only ? t('Enregistrer') : t('Continuer'), { previous: label(KEYS.previous), next: label(KEYS.next), confirm: label(KEYS.confirm) });
   return {
     ...base,
     rotation: index === previousPlayfieldIndex() ? edgeRotation(previousEdge() ?? 'bottom') : 0,
     highlight: true,
-    ...tiltView(wizard.tiltStep!, only ? t('Enregistrer') : t('Continuer'), { previous: label(KEYS.previous), next: label(KEYS.next), confirm: label(KEYS.confirm) }),
+    ...view,
+    // Revenir au lanceur, comme Retour arrière (assistant complet seulement).
+    actions: [...controls([!only && { role: 'back', label: t('Revenir') }]), ...(view.actions ?? [])],
   };
 }
 
@@ -1635,6 +1741,8 @@ function previousPlayfieldIndex(): number {
 const ACTION_LABELS: Record<ButtonsAction, string> = {
   get save() { return t('Valider'); },
   get previous() { return t('◀ Précédent'); },
+  get skip() { return t('Passer ce bouton'); },
+  get finish() { return t('Terminer le relevé'); },
   get defaults() { return t('Touches par défaut'); },
   get restart() { return t('Tout modifier'); },
   get keep() { return t('Garder ces touches'); },
@@ -1690,13 +1798,19 @@ function buttonsView(index: number, base: Record<string, unknown>) {
   const hasPrevious = (!summary && (capture.index > 0 || redoingOne(capture))) || previousStepOf(set) !== undefined;
   // Le nom de l'étape, sur chacun de ses écrans : relevé comme récapitulatif (16/11/2026).
   const stepTitle = game ? t('Boutons du jeu') : t('Boutons de l’interface');
-  const actions = (summary ? SUMMARY_ACTIONS : (['previous', 'defaults', 'restart'] as const)).map((id, i) => ({
+  const asked = summary ? undefined : set.items[capture.index];
+  // « Terminer le relevé » : une fois les boutons obligatoires relevés (toujours en refaisant un seul bouton).
+  const finishReason = !summary && set.items.some((b) => b.required && !capture.answered.has(b.id)) ? t('Après les boutons obligatoires') : undefined;
+  const actions = (summary ? SUMMARY_ACTIONS : CAPTURE_ACTIONS).map((id, i) => ({
     id,
-    label: id === 'save' && only ? t('Enregistrer') : ACTION_LABELS[id],
+    label: id === 'save' && only ? t('Enregistrer') : id === 'defaults' && game ? t('Touches par défaut des encodeurs') : ACTION_LABELS[id],
     selected: summary && i === capture.action,
     ...(id === 'save' && saveReason && { disabled: true, reason: saveReason }),
     // « ◀ Précédent » sans étape avant (première étape, étape seule) : grisé, avec sa raison.
     ...(id === 'previous' && !hasPrevious && { disabled: true, reason: t('Première étape') }),
+    // Indisponibles : grisés, avec leur raison, jamais cachés.
+    ...(id === 'skip' && asked?.required && { disabled: true, reason: t('Bouton obligatoire') }),
+    ...(id === 'finish' && finishReason && { disabled: true, reason: finishReason }),
   }));
   // Compte à rebours toujours visible : une barre, et la phrase qui dit ce qui se passera à la fin.
   const countdown = capture.deadline === undefined ? undefined : Math.max(0, capture.deadline - Date.now()) / BUTTONS_TIMEOUT_MS;
@@ -1713,8 +1827,8 @@ function buttonsView(index: number, base: Record<string, unknown>) {
     const choose = { left: keyOf('previous'), right: keyOf('next'), start: keyOf('confirm'), exit: keyOf('exit') };
     return {
       ...common,
+      // Le nom de l'étape est dans la frise du haut.
       prompt: toTry.length ? t('Essayez les boutons') : stepTitle,
-      name: toTry.length ? stepTitle : '',
       details: !game
         ? t('Touches de secours du clavier toujours actives : Tab, flèches, Entrée, Échap.')
         : silenced.length
@@ -1736,9 +1850,23 @@ function buttonsView(index: number, base: Record<string, unknown>) {
                   ? t('Relevé : {last}', { last: lastLabel(set, capture.last) })
                   : t('Touches actuelles'),
           }),
-      hint: game
-        ? t('Flippers ({left} / {right}) : choisir · Start ({start}) : lancer · Clic ou Start sur un bouton : le refaire', choose)
-        : t('Précédent / Suivant ({left} / {right}) : choisir · Valider ({start}) : lancer · Clic ou Valider sur un bouton : le refaire', choose),
+      hint: '',
+      guide: [
+        {
+          label: t('Choisir'),
+          text: game
+            ? t('Flippers ({left} / {right}) ou flèches, puis Start ({start}) ou Entrée ; ou un clic', choose)
+            : t('Précédent / Suivant ({left} / {right}) ou flèches, puis Valider ({start}) ou Entrée ; ou un clic', choose),
+        },
+        { label: t('Revenir'), text: previousStepOf(set) ? t('Retour arrière ou « ◀ Précédent » : étape précédente') : t('rien avant cette étape') },
+        {
+          label: t('Finir'),
+          text: untried.length
+            ? t('pressez sur la borne les boutons marqués ○, puis « {save} »', { save: only ? t('Enregistrer') : t('Valider') })
+            : t('« {save} »', { save: only ? t('Enregistrer') : t('Valider') }),
+        },
+        { label: t('Corriger'), text: t('un bouton de la liste pour le refaire, ou « Tout modifier »') },
+      ],
     };
   }
 
@@ -1752,11 +1880,8 @@ function buttonsView(index: number, base: Record<string, unknown>) {
     ...common,
     prompt: ('prompt' in button && button.prompt) || t('Appuyez sur le bouton'),
     measure: button.label,
-    name: `${stepTitle} · ${
-      button.required
-        ? t('Bouton {n} sur {total}', { n: capture.index + 1, total: required })
-        : t('Bouton facultatif {n} sur {total}', { n: capture.index + 1 - required, total: set.items.length - required })
-    }`,
+    // Le nom de l'étape et « Bouton 1 sur 4 » : dans la frise du haut (progressCount).
+    name: '',
     details: [
       ...('how' in button && button.how ? [button.how] : []),
       holderOf(button.id)
@@ -1767,6 +1892,7 @@ function buttonsView(index: number, base: Record<string, unknown>) {
       joystickLine(),
     ].join(' · '),
     notice:
+      capture.notice ??
       capture.refused ??
       capture.taken ??
       (seconds === undefined
@@ -1779,12 +1905,40 @@ function buttonsView(index: number, base: Record<string, unknown>) {
       : game
         ? t('Chaque bouton une seule fois : ce que VPX recevra pendant une partie.')
         : t('Chaque bouton une seule fois : ce qui pilotera le front-end et la suite de l’assistant.'),
-    hint: button.required
-      ? t('Clic sur un bouton : le refaire · Retour arrière : {back}', { back })
-      : game
-        ? t('Exit ({exit}) : la borne n’a pas ce bouton · Clic sur un bouton : le refaire · Retour arrière : {back}', { exit: keyOf('exit'), back })
-        : t('Retour ({exit}) : pas de bouton pour ce rôle · Clic sur un bouton : le refaire · Retour arrière : {back}', { exit: keyOf('exit'), back }),
+    // À chaque bouton, en clair (19/11/2026, un joueur ne savait pas quel bouton le faisait
+    // avancer) : comment passer un bouton qu'on n'a pas, revenir, finir l'étape, corriger.
+    hint: '',
+    guide: captureGuide(capture, button, keyOf('exit'), back),
   };
+}
+
+/**
+ * Consignes du relevé d'un bouton, une par geste : passer ce bouton, revenir, finir l'étape,
+ * corriger une erreur. Chacune dit le bouton de la borne et le bouton de l'écran qui la font.
+ */
+function captureGuide(capture: ButtonCapture, button: KeySet['items'][number], exit: string, back: string): { label: string; text: string }[] {
+  const game = capture.set === GAME_KEYS;
+  const requiredLeft = capture.set.items.some((b) => b.required && !capture.answered.has(b.id));
+  return [
+    {
+      label: t('Passer'),
+      text: button.required
+        ? t('impossible, bouton obligatoire : appuyez dessus sur la borne')
+        : game
+          ? t('pas ce bouton sur la borne : Exit ({exit}) ou « Passer ce bouton »', { exit })
+          : t('pas de bouton pour ce rôle : Retour ({exit}) ou « Passer ce bouton »', { exit }),
+    },
+    { label: t('Revenir'), text: t('Retour arrière ou « ◀ Précédent » : {back}', { back }) },
+    {
+      label: t('Finir'),
+      text: redoingOne(capture)
+        ? t('« Terminer le relevé » : retour au récapitulatif')
+        : requiredLeft
+          ? t('« Terminer le relevé » dès les boutons obligatoires relevés, puis « Valider »')
+          : t('« Terminer le relevé » : les autres boutons gardent leur touche, puis « Valider »'),
+    },
+    { label: t('Corriger'), text: t('clic sur un bouton de la liste') },
+  ];
 }
 
 /**
@@ -1799,7 +1953,8 @@ function choiceView(common: Record<string, unknown>, inForceSet: SetKeys) {
   return {
     ...common,
     prompt: t('Vos boutons sont-ils déjà les bons ?'),
-    name: t('Boutons de l’interface'),
+    // Le nom de l'étape est dans la frise du haut (wizard-progress.ts).
+    name: '',
     details: t('Ceux qui font circuler dans le front-end et dans l’assistant. Touches par défaut des encodeurs : la plupart des bornes les envoient déjà.'),
     buttons: capture.set.items.map((b) => ({ label: b.label, key: inForceSet[b.id] ? keyLabel(inForceSet[b.id]) : b.required ? t('aucune') : t('facultatif'), state: 'done' })),
     actions: CHOICE_ACTIONS.map((id, i) => ({ id, label: ACTION_LABELS[id], selected: i === capture.action })),
@@ -2915,6 +3070,10 @@ function viewFor(index: number) {
           hint: flip
             ? t('Start : retourner l’écran quand même · Exit : garder l’orientation de Windows (tables à l’envers dans Cyber Pinball)')
             : t('Start : tourner l’écran quand même · Exit : garder l’orientation de Windows (tables à l’envers dans Cyber Pinball)'),
+          actions: controls([
+            { role: 'confirm', label: flip ? t('Retourner quand même') : t('Tourner quand même') },
+            { role: 'exit', label: t('Garder l’orientation de Windows') },
+          ]),
         };
       }
       return {
@@ -2934,6 +3093,13 @@ function viewFor(index: number) {
         hint: t('Flippers : tourner jusqu’à lire ce texte à l’endroit, la bande de votre côté · Start : {confirm} · Exit : revenir', {
           confirm: fix ? t('retourner l’écran pour VPX') : t('valider'),
         }),
+        // Orientation seule : rien avant, Exit propose de quitter (bouton du haut).
+        actions: controls([
+          !isOnly('playfield') && { role: 'back', label: t('Revenir') },
+          { role: 'previous', label: t('◀ Tourner') },
+          { role: 'next', label: t('Tourner ▶') },
+          { role: 'confirm', label: fix ? t('Retourner l’écran pour VPX') : t('Valider'), primary: true },
+        ]),
       };
     }
     if (wizard.phase === 'flip') {
@@ -2947,6 +3113,10 @@ function viewFor(index: number) {
         step: t('Les tables auront leurs flippers de votre côté. Ce texte est-il toujours à l’endroit ?'),
         notice: base.notice ?? t('Sans réponse, retour à l’orientation d’origine dans {n} s.', { n: seconds }),
         hint: t('Start : garder cette orientation · Exit : revenir à l’orientation d’origine'),
+        actions: controls([
+          { role: 'confirm', label: t('Garder cette orientation'), primary: true },
+          { role: 'exit', label: t('Revenir à l’orientation d’origine') },
+        ]),
       };
     }
     const fromEdid = edidDiagonal(d);
@@ -2962,6 +3132,12 @@ function viewFor(index: number) {
             ? t('{cm} cm, taille annoncée par l’écran. Vérifiez-la : certains téléviseurs se trompent.', { cm: Math.round(wizard.diagonal * 2.54) })
             : t('{cm} cm. L’écran annonce {inches}″.', { cm: Math.round(wizard.diagonal * 2.54), inches: fromEdid }),
       hint: t('Flippers : moins / plus · Start : valider · Exit : revenir'),
+      actions: controls([
+        { role: 'back', label: t('Revenir') },
+        { role: 'previous', label: t('− Moins') },
+        { role: 'next', label: t('Plus +') },
+        { role: 'confirm', label: t('Valider'), primary: true },
+      ]),
     };
   }
 
@@ -3000,15 +3176,16 @@ function viewFor(index: number) {
         : option?.label
           ? t('{role} {option} ?', { role: named, option: option.label })
           : t('{role} ?', { role: named }),
+      // « Rôle 1 sur 4 » : dans la frise du haut (progressCount).
       step: option?.free
-        ? t('Étape {n} sur {total} : l’éditeur de disposition, pour placer le {role} où vous voulez, puis retour ici.', { n: wizard.roleIndex + 1, total: ROLES.length, role: role.label })
+        ? t('L’éditeur de disposition, pour placer le {role} où vous voulez, puis retour ici.', { role: role.label })
         : option?.dmdKind === 'fulldmd'
-          ? t('Étape {n} sur {total} : un FullDMD montre l’image du jeu sur tout l’écran, son DMD incrusté.', { n: wizard.roleIndex + 1, total: ROLES.length })
+          ? t('Un FullDMD montre l’image du jeu sur tout l’écran, son DMD incrusté.')
           : option?.dmdKind === 'dmd'
-            ? t('Étape {n} sur {total} : un DMD seul montre le DMD du jeu, du noir autour.', { n: wizard.roleIndex + 1, total: ROLES.length })
+            ? t('Un DMD seul montre le DMD du jeu, du noir autour.')
             : role.id === 'dmd'
-              ? t('Étape {n} sur {total} : quel écran affiche le DMD ou le FullDMD ?', { n: wizard.roleIndex + 1, total: ROLES.length })
-              : t('Étape {n} sur {total} : quel écran affiche le {role} ?', { n: wizard.roleIndex + 1, total: ROLES.length, role: role.label }),
+              ? t('Quel écran affiche le DMD ou le FullDMD ?')
+              : t('Quel écran affiche le {role} ?', { role: role.label }),
       hint: t('{flippers} · Start : {confirm} · Exit : {exit}', {
         flippers: placed
           ? role.required
@@ -3020,6 +3197,18 @@ function viewFor(index: number) {
         confirm: option?.free ? t('ouvrir l’éditeur') : t('valider'),
         exit: role.required ? t('quitter sans enregistrer ?') : t('aucun écran pour ce rôle'),
       }),
+      // Sur l'écran proposé, celui que le joueur regarde. Le playfield, obligatoire, n'a pas
+      // « Aucun écran » : son Exit est la sortie sans enregistrer, déjà en haut de chaque écran.
+      actions:
+        option?.display === index
+          ? controls([
+              wizard.roleIndex > 0 && { role: 'back', label: t('Revenir') },
+              { role: 'previous', label: t('◀ Écran précédent') },
+              { role: 'next', label: t('Écran suivant ▶') },
+              { role: 'confirm', label: option?.free ? t('Ouvrir l’éditeur') : t('Valider'), primary: true },
+              !role.required && { role: 'exit', label: t('Aucun écran') },
+            ])
+          : undefined,
     };
   }
 
@@ -3063,16 +3252,26 @@ function viewFor(index: number) {
       hint: only
         ? t('Start : enregistrer ({step} seulement) · Exit : recommencer l’étape · Retour arrière : revenir', { step: only.label.toLowerCase() })
         : t('Start : enregistrer et écrire VPinballX.ini · Exit : recommencer'),
+      // Sous le panneau, sur l'écran du playfield (screen.js) : celui que le joueur regarde.
+      actions: base.assignedRole === 'playfield'
+        ? controls([
+            { role: 'back', label: t('Revenir') },
+            { role: 'confirm', label: t('Enregistrer'), primary: true },
+            { role: 'exit', label: only ? t('Recommencer l’étape') : t('Recommencer') },
+          ])
+        : undefined,
     };
   }
 
   if (only) {
     // Boutons seuls : l'écran que le joueur regarde n'est pas connu, le résultat s'affiche partout.
     const previousLayout = buttonsOnly || interfaceOnly || arrangeOnly || isOnly('lanceur') || isOnly('tilt');
+    const report = buttonsOnly || interfaceOnly || isOnly('lanceur') || isOnly('tilt') || index === (wizard.assignments.playfield ?? 0);
     return {
       ...base,
       ...(previousLayout && { rotation: index === previousPlayfieldIndex() ? edgeRotation(previousEdge() ?? 'bottom') : 0 }),
-      report: buttonsOnly || interfaceOnly || isOnly('lanceur') || isOnly('tilt') || index === (wizard.assignments.playfield ?? 0),
+      report,
+      actions: report ? controls([{ role: 'confirm', label: t('Revenir au front-end'), primary: true }]) : undefined,
       name: '',
       details: '',
       title: only.saved,
@@ -3094,6 +3293,7 @@ function viewFor(index: number) {
     target: wizard.result?.iniPath,
     backup: wizard.result?.backup,
     hint: t("N'importe quel bouton : continuer vers les tables"),
+    actions: base.assignedRole === 'playfield' ? controls([{ role: 'confirm', label: t('Continuer vers les tables'), primary: true }]) : undefined,
   };
 }
 
@@ -3147,8 +3347,9 @@ function soundView(index: number, base: { notice?: string } & Record<string, unk
       ...base,
       highlight: true,
       measure: '♪'.repeat(Math.min(beeps, 6)) + (beeps > 6 ? ` ${beeps}` : ''),
-      prompt: t('Sortie {n} sur {total}', { n: beeps, total: sound.outputs.length }),
-      name: output.friendlyName,
+      // « Sortie 1 sur 3 » : dans la frise du haut (progressCount).
+      prompt: output.friendlyName,
+      name: '',
       details,
       notice,
       step: tn(beeps, '{n} bip : où l’entendez-vous ? Actuellement : {role}{reason}.', '{n} bips : où l’entendez-vous ? Actuellement : {role}{reason}.', {
@@ -3156,6 +3357,14 @@ function soundView(index: number, base: { notice?: string } & Record<string, unk
         reason: reason ? t(' (proposé : {reason})', { reason }) : '',
       }),
       hint: t('Flipper gauche : fronton · Flipper droit : plateau · Start : les deux · Exit : aucun, sortie suivante'),
+      // Son seul, première sortie : rien avant, Retour arrière propose de quitter (bouton du haut).
+      actions: controls([
+        !(isOnly('son') && sound.index === 0) && { role: 'back', label: t('Revenir') },
+        { role: 'previous', label: t('Dans le fronton') },
+        { role: 'next', label: t('Sur le plateau') },
+        { role: 'confirm', label: t('Les deux') },
+        { role: 'exit', label: t('Aucun') },
+      ]),
     };
   }
 
@@ -3169,18 +3378,51 @@ function soundView(index: number, base: { notice?: string } & Record<string, unk
     ...base,
     highlight: true,
     measure: pair.label,
-    prompt: t('Haut-parleurs {n} sur {total}', { n: sound.pairIndex + 1, total: pairs.length }),
-    name: describeAudioOutput(output),
+    // « Haut-parleurs 1 sur 3 » : dans la frise du haut (progressCount).
+    prompt: describeAudioOutput(output),
+    name: '',
     details,
     notice,
     step: t('Un bip à gauche, puis un plus aigu à droite : où sont ces haut-parleurs ?{answered}', { answered: answered ? ` (${answered})` : '' }),
     hint: t('Flipper gauche : plateau, près de vous · Flipper droit : plateau, côté fronton · Start : dans le fronton · Exit : rien entendu'),
+    actions: controls([
+      { role: 'back', label: t('Revenir') },
+      { role: 'previous', label: t('Plateau, près de vous') },
+      { role: 'next', label: t('Plateau, côté fronton') },
+      { role: 'confirm', label: t('Dans le fronton') },
+      { role: 'exit', label: t('Rien entendu') },
+    ]),
   };
 }
 
 function broadcast(): void {
   updateSound();
   windows.forEach((win, i) => {
-    if (!win.isDestroyed()) win.webContents.send('state', { ...viewFor(i), quit: quitView() });
+    if (win.isDestroyed()) return;
+    // Frise des étapes en haut de chaque écran, la même partout.
+    const progress = wizard.leaving ? undefined : progressView(wizard.phase, only?.label, progressCount());
+    win.webContents.send('state', { ...viewFor(i), progress, quit: quitView() });
   });
+}
+
+/**
+ * Où l'on en est dans l'étape, dit dans la frise à côté de son nom (demande du 19/11/2026 : ces
+ * mentions en haut, pour suivre les étapes) : bouton relevé, rôle, sortie audio, haut-parleurs.
+ */
+function progressCount(): string | undefined {
+  const capture = wizard.capture;
+  if (capture && wizard.phase === capturePhase(capture.set)) {
+    const items = capture.set.items;
+    const button = items[capture.index]!;
+    const required = items.filter((b) => b.required).length;
+    return button.required
+      ? t('Bouton {n} sur {total}', { n: capture.index + 1, total: required })
+      : t('Bouton facultatif {n} sur {total}', { n: capture.index + 1 - required, total: items.length - required });
+  }
+  if (wizard.phase === 'assign' && ROLES[wizard.roleIndex]) return t('Rôle {n} sur {total}', { n: wizard.roleIndex + 1, total: ROLES.length });
+  const sound = wizard.sound;
+  if (wizard.phase === 'sound' && sound) return t('Sortie {n} sur {total}', { n: sound.index + 1, total: sound.outputs.length });
+  const output = wizard.phase === 'channels' && sound ? playfieldAudio() : undefined;
+  if (output) return t('Haut-parleurs {n} sur {total}', { n: sound!.pairIndex + 1, total: speakerPairsOf(output).length });
+  return undefined;
 }
