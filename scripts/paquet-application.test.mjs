@@ -8,7 +8,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { lockBuild, stageProblems, VITAL_FILES, windowsTar, zipProblems } from './paquet-application.mjs';
+import { builtApart, lockBuild, stageProblems, VITAL_FILES, windowsTar, zipProblems } from './paquet-application.mjs';
 
 const windows = process.platform === 'win32' && fs.existsSync(windowsTar());
 
@@ -130,4 +130,20 @@ test('publication : avec le verrou tenu par une autre, elle s’arrête avant to
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+// Le 19/11/2026, le serveur des morceaux du Juke-box (jukebox-media-worker.js, chargé par son nom)
+// n'était pas fabriqué à part : main.js est un seul fichier regroupé, le script manquait à côté, le
+// processus utilitaire plantait dans l'application installée. Tout script que app/src charge par son
+// nom à côté de lui doit être fabriqué à part.
+test('fabrication : chaque script chargé par son nom (path.join(__dirname, …)) est fabriqué à part', () => {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const src = path.join(here, '..', 'app', 'src');
+  const named = new Set();
+  for (const file of fs.readdirSync(src).filter((f) => f.endsWith('.ts'))) {
+    for (const m of fs.readFileSync(path.join(src, file), 'utf8').matchAll(/path\.join\(__dirname, '([^'/\\]+\.js)'\)/g)) named.add(m[1]);
+  }
+  assert.ok(named.has('jukebox-media-worker.js') && named.has('veilleur.js'), 'la recherche trouve bien les scripts chargés par leur nom');
+  // adblock-preload.js est copié tel quel depuis le paquet de Ghostery (fabriquer.mjs).
+  assert.deepEqual([...named].filter((name) => !builtApart(name)).sort(), []);
 });

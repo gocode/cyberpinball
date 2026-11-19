@@ -88,7 +88,8 @@ test('sonde du PIN2DMD : processus à part, embarqué, jamais pendant une partie
   // Les noms acceptés : la même liste que le cœur (le module regroupé de la sonde ne l'importe pas).
   const products = /const PRODUCTS = \[([^\]]*)\]/.exec(sonde)![1]!.split(',').map((p) => p.trim().replace(/^'|'$/g, ''));
   assert.deepEqual(products, [...PIN2DMD_PRODUCTS]);
-  assert.match(fs.readFileSync(path.join(REPO, 'scripts', 'fabriquer.mjs'), 'utf8'), /f === 'sonde-pin2dmd\.js'/);
+  // Fabriqué à part (liste SEPARATE_SCRIPTS de la fabrication).
+  assert.match(fs.readFileSync(path.join(REPO, 'scripts', 'paquet-application.mjs'), 'utf8'), /SEPARATE_SCRIPTS = \[[^\]]*'sonde-pin2dmd\.js'/);
   const server = fs.readFileSync(path.join(REPO, 'app', 'src', 'dmd-server.ts'), 'utf8');
   // Sondé quand le serveur ne tourne pas (jamais lancé, ou abandonné faute d'afficheur : onGiveUp) ;
   // la dernière sonde n'est effacée que quand il tient l'afficheur.

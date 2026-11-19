@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.1
 
+- Juke-box : le correctif des morceaux locaux qui s'arrêtaient toutes les quelques secondes marche maintenant dans l'application installée. Le lecteur à part n'était pas livré avec elle, et le Juke-box retombait sur l'ancienne lecture.
 - Page du projet sur GitHub : elle dit dès le début que Cyber Pinball s'installe à côté de PinUP Popper, PinballX ou PinballY sans toucher à leur installation, et qu'il reprend leurs tables sans les dupliquer quand elles sont sur le même disque.
 - Pour les développeurs : un guide en anglais (CONTRIBUTING.md) explique l'organisation du code, la compilation, les tests et la façon de proposer un changement ; les commentaires des principaux modules du cœur sont désormais en anglais.
 - Une table enregistrée par un VPX plus récent que celui qui la joue (une préversion 10.9 et le VPX 10.8.1 de Cyber Pinball) est repérée : le Diagnostic et la Santé de la borne la signalent, l'installation le dit, et la partie est refusée avec une explication au lieu d'échouer. Si un autre VPX assez récent est déjà dans Menu système > Borne > Autres versions de VPX, le Diagnostic propose « La jouer avec » lui, et l'installation le choisit d'office ; sinon, Cyber Pinball dit où l'ajouter.

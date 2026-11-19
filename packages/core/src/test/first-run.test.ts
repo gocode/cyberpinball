@@ -105,7 +105,7 @@ test('l’installeur pose le runtime Visual C++ avant le premier lancement, jama
   // Le mode Node n'est jamais hérité par « Lancer Cyber Pinball ».
   assert.ok(section.indexOf('"ELECTRON_RUN_AS_NODE", t "1"') < section.indexOf('"ELECTRON_RUN_AS_NODE", p 0'));
   // Le script est regroupé dans l'application et passe par la même installation vérifiée que le menu.
-  assert.match(read('scripts', 'fabriquer.mjs'), /'runtime-vc\.js'/);
+  assert.match(read('scripts', 'paquet-application.mjs'), /SEPARATE_SCRIPTS = \[[^\]]*'runtime-vc\.js'/);
   assert.match(read('app', 'src', 'runtime-vc.ts'), /ensureVcRuntime\(/);
 });
 

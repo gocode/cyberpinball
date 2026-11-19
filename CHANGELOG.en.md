@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Jukebox: the fix for local tracks stopping every few seconds now works in the installed application. The separate reader was not shipped with it, so the Jukebox fell back to the old playback.
 - Project page on GitHub: it now says right away that Cyber Pinball installs next to PinUP Popper, PinballX or PinballY without touching their installation, and takes over their tables without duplicating them when they are on the same drive.
 - For developers: an English guide (CONTRIBUTING.md) explains how the code is organised, how to build and test it and how to propose a change; the comments of the main core modules are now in English.
 - A table saved by a newer VPX than the one that plays it (a 10.9 prerelease and Cyber Pinball's VPX 10.8.1) is detected: the Diagnosis and the Cabinet health report it, installation says so, and the game is refused with an explanation instead of failing. If a recent enough VPX is already in System menu > Cabinet > Other VPX versions, the Diagnosis offers to play it with that VPX and installation picks it by default; otherwise, Cyber Pinball says where to add one.

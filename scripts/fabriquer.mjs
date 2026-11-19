@@ -26,7 +26,7 @@ import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { lockBuild, stageProblems } from './paquet-application.mjs';
+import { builtApart, lockBuild, stageProblems } from './paquet-application.mjs';
 import { sign, signatureConfigured } from './signature.mjs';
 
 const require = createRequire(import.meta.url);
@@ -66,12 +66,11 @@ const NATIVE_NET = ['sodium-native', 'udx-native'];
 // Le script préchargé du bloqueur de publicités est copié à part (plus bas) : laissé hors du regroupement.
 const common = { bundle: true, platform: 'node', format: 'cjs', target: 'node22', external: ['electron', 'koffi', '@ghostery/adblocker-electron-preload', ...NATIVE_NET], logLevel: 'warning' };
 await esbuild.build({ ...common, entryPoints: [path.join(repo, 'app', 'dist', 'main.js')], outfile: path.join(stage, 'dist', 'main.js') });
-// Un preload par type de fenêtre (preload.js, settings-preload.js…) : on les prend tous. Et la
-// mise en place de la mise à jour légère, le veilleur de la relance par Start, l'installation du
-// runtime Visual C++ par l'installeur (runtime-vc.ts) et l'enregistreur de la
-// musique des ROM (rom-music.ts) et la sonde du PIN2DMD (pin2dmd-probe.ts), lancés à part par
-// l'exécutable en mode Node.
-for (const name of fs.readdirSync(path.join(repo, 'app', 'dist')).filter((f) => /preload\.js$/.test(f) || f === 'maj-legere.js' || f === 'veilleur.js' || f === 'enregistreur-rom.js' || f === 'runtime-vc.js' || f === 'sonde-pin2dmd.js')) {
+// Un preload par type de fenêtre (preload.js, settings-preload.js…) : on les prend tous. Et les
+// scripts lancés à part par leur nom (builtApart, paquet-application.mjs : mise à jour légère,
+// veilleur, enregistreur de la musique des ROM, runtime Visual C++, sonde du PIN2DMD, serveur des
+// morceaux du Juke-box).
+for (const name of fs.readdirSync(path.join(repo, 'app', 'dist')).filter(builtApart)) {
   await esbuild.build({ ...common, entryPoints: [path.join(repo, 'app', 'dist', name)], outfile: path.join(stage, 'dist', name) });
 }
 // Script préchargé du bloqueur de publicités (app/src/ad-blocker.ts), injecté par la session

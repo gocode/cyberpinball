@@ -310,7 +310,7 @@ test('musique de la ROM : le service ne donne à PinMAME que le dossier de trava
   assert.match(frontend, /phase: 'loading', help: false \};\r?\n\s*\/\/[^\n]*\r?\n\s*romMusic\?\.pause\(\);/, 'pause dès le lancement');
   assert.match(frontend, /busy: \(\) => state\.phase === 'loading' \|\| state\.phase === 'playing'/);
   // Regroupé à part par la fabrication, comme le veilleur.
-  assert.match(fs.readFileSync(path.join(REPO, 'scripts', 'fabriquer.mjs'), 'utf8'), /f === 'enregistreur-rom\.js'/);
+  assert.match(fs.readFileSync(path.join(REPO, 'scripts', 'paquet-application.mjs'), 'utf8'), /SEPARATE_SCRIPTS = \[[^\]]*'enregistreur-rom\.js'/);
 });
 
 // ---------------------------------------------------------------------------
