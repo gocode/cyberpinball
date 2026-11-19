@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Real DMD: a PIN2DMD finally lights up, both in games and in the frontend. VPX 10.8.1's DMD module cannot drive it (its support was not compiled in), so Cyber Pinball's DMD server now drives it itself, in the frame format other frontends use (with the colour order read from the board), and VPX sends it its frames during games.
+- Real DMD: the DMD server finally receives frames, for every model (ZeDMD included). The one in VPX's DMD module dropped every connection on Windows and spun idle while flooding the log; Cyber Pinball now has its own.
+- Real DMD: for a PIN2DMD, the DMD server runs even with "Menu image: no"; the PIN2DMD then stays dark between games.
+- Real DMD: the log says why a PIN2DMD does not open (no card, open refused, interface taken, unknown name), with the libusb code.
 - Moving the table shown on the wheel to the bin no longer fails with "operation not permitted": Cyber Pinball no longer keeps its videos open while they play, so Windows lets its folder move.
 - Setup wizard, button mapping: every screen now says plainly how to skip a button the cabinet doesn't have, go back, finish the step and fix a mistake. Two new mouse actions: "Skip this button" (optional buttons) and "Finish mapping" (once the required buttons are mapped, the others keep their current key). "Default keys" is now called "Encoder default keys" for the game buttons.
 - Setup wizard: a step bar at the top of every screen, one numbered dot per step; the current one shows its name and progress ("Interface buttons · Button 1 of 4", "Screens · Role 2 of 4", "Sound · Output 1 of 3"), replacing the line that said so in the middle of the screen.

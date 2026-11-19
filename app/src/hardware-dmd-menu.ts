@@ -7,6 +7,7 @@
 
 import {
   detectHardwareDmds,
+  dmdServerDrivesPin2dmd,
   hardwareDmdChoice,
   hardwareDmdDriverProblem,
   hardwareDmdName,
@@ -148,7 +149,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
               ? t('ne s’ouvre pas : voir « À vérifier »')
               : t('pilote à installer')
             : d.device.libusbProbe?.stage === 'ok'
-              ? t('ouvert puis relâché : VPX pourra l’allumer')
+              ? t('ouvert puis relâché : le serveur du DMD pourra l’allumer')
               : t('pilote prêt'),
       ]
         .filter(Boolean)
@@ -165,15 +166,36 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
       });
     }
     if (s?.zedmdWifi?.enabled) found.push({ icon: 'network', text: t('ZeDMD en wifi'), detail: t('{address} · VPX s’y connecte au début de chaque partie', { address: s.zedmdWifi.address }) });
-    // dmdserver, quand l'image du menu est demandée : il tient le DMD, ou il attend qu'on le branche.
-    if (s?.menu && (detected.some((d) => hardwareDmdChoice(s, d.model) !== 'off') || s.zedmdWifi?.enabled)) {
+    // dmdserver, quand l'image du menu est demandée ou qu'un PIN2DMD est allumé (VPX ne sait pas le piloter
+    // seul : PIN2DMD_ONLY_THROUGH_SERVER) : il tient le DMD, ou il attend qu'on le branche.
+    const pin2dmdServer = dmdServerDrivesPin2dmd(
+      detected.map((d) => d.device),
+      s,
+    );
+    if (pin2dmdServer || (s?.menu && (detected.some((d) => hardwareDmdChoice(s, d.model) !== 'off') || s.zedmdWifi?.enabled))) {
       const problem = host.menuServer.problem();
       found.push(
         problem
-          ? { icon: 'monitor', text: t('Serveur du DMD'), detail: t('{problem} ; VPX ouvre le DMD lui-même pendant les parties', { problem }), tone: 'warning' }
+          ? {
+              icon: 'monitor',
+              text: t('Serveur du DMD'),
+              detail: pin2dmdServer
+                ? t('{problem} ; le PIN2DMD restera noir : le module DMD de VPX ne sait pas le piloter seul', { problem })
+                : t('{problem} ; VPX ouvre le DMD lui-même pendant les parties', { problem }),
+              tone: 'warning',
+            }
           : host.menuServer.ready()
-            ? { icon: 'monitor', text: t('Serveur du DMD'), detail: t('Le front-end tient le DMD réel ; VPX le reprend pendant les parties'), tone: 'ok' }
-            : { icon: 'monitor', text: t('Serveur du DMD'), detail: t('Démarre, ou attend que le DMD réponde ; en attendant, VPX ouvre le DMD lui-même') },
+            ? {
+                icon: 'monitor',
+                text: t('Serveur du DMD'),
+                detail: s?.menu ? t('Le front-end tient le DMD réel ; VPX le reprend pendant les parties') : t('Pilote le PIN2DMD ; VPX lui envoie ses images pendant les parties'),
+                tone: 'ok',
+              }
+            : {
+                icon: 'monitor',
+                text: t('Serveur du DMD'),
+                detail: pin2dmdServer ? t('Démarre, ou attend que le PIN2DMD réponde') : t('Démarre, ou attend que le DMD réponde ; en attendant, VPX ouvre le DMD lui-même'),
+              },
       );
     }
     if (!found.length) found.push({ icon: 'info', text: t('Aucun DMD réel branché en USB'), detail: t('ZeDMD, PIN2DMD, Pixelcade : branchez-le, puis « Vérifier de nouveau ».'), tone: 'quiet' });

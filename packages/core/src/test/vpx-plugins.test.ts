@@ -362,7 +362,7 @@ test('chaque clé écrite pour VPX 10.8.1-5436 existe dans son schéma', () => {
   const action = (e: { section: string; key: string }) => (e.section === 'Input' ? /^Mapping\.(\w+)$/.exec(e.key)?.[1] : undefined);
   for (const e of written) assert.ok(known.has(`${e.section}/${e.key}`.toLowerCase()) || (action(e) ?? '') in VPX_INPUT_DEFAULTS, `[${e.section}] ${e.key}`);
   // Et l'écran des réglages les montre toutes comme gérées, sauf les valeurs proposées.
-  const owned = vpxOwnedKeys(PROFILE, [], false, { roles: ['playfield', 'backglass', 'dmd', 'topper'], dmdKeys: ['Enable', 'ZeDMD', 'PIN2DMD', 'Pixelcade'], inputKeys: Object.keys(plan.memory).filter((id) => id.startsWith('Input.')).map((id) => id.slice('Input.'.length)) });
+  const owned = vpxOwnedKeys(PROFILE, [], false, { roles: ['playfield', 'backglass', 'dmd', 'topper'], dmdKeys: ['Enable', 'ZeDMD', 'PIN2DMD', 'Pixelcade', 'DMDServer'], inputKeys: Object.keys(plan.memory).filter((id) => id.startsWith('Input.')).map((id) => id.slice('Input.'.length)) });
   const proposed = ['CabinetAutofitMode', 'ScoreViewDMDOverlay', 'ScoreViewDMDAutoPos', 'PinMAMEPath', 'VniPath', 'Cheat'];
   for (const e of written) if (!proposed.includes(e.key)) assert.ok(isOwned(owned, e.section, e.key), `[${e.section}] ${e.key}`);
 });
@@ -383,6 +383,8 @@ test('DMD réel : « non » écrit 0 même branché, « oui » écrit 1 même ab
   assert.deepEqual(on.settings, [
     { section: 'Plugin.DMDUtil', key: 'Enable', value: '1' },
     { section: 'Plugin.DMDUtil', key: 'PIN2DMD', value: '1' },
+    // Seul le serveur du DMD pilote un PIN2DMD (PIN2DMD_ONLY_THROUGH_SERVER) : serveur absent, jamais un DMDServer = 1 resté d'avant.
+    { section: 'Plugin.DMDUtil', key: 'DMDServer', value: '0' },
   ]);
   // Automatique, puce courante : allumé, avec le conseil de passer à « non » dans le menu (plus dans l'ini).
   const auto = vpxDmdSettings([CH340]);

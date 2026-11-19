@@ -11,6 +11,9 @@
 //   - puis ses fonctions sont toutes liées : une DLL absente ou à qui il en manque arrête le serveur avec
 //     un code dit (3, 4), sans fenêtre d'erreur de Windows ;
 //   - --verifier : contrôle seul de cette DLL, sans chercher de DMD ;
+//   - PIN2DMD piloté par le serveur lui-même quand la DLL de VPX ne sait pas le faire (src/pin2dmd.h) ;
+//   - serveur réseau à nous (src/serveur-tcp.h) : DMDUtil::DMDServer de la DLL de VPX déconnecte chaque
+//     client sous Windows et tourne à vide ;
 //   - options lues sans cargs (même syntaxe que le dmdserver d'origine).
 
 #define WIN32_LEAN_AND_MEAN
@@ -29,9 +32,11 @@
 #include <vector>
 
 #include "DMDUtil/Config.h"
-#include "DMDUtil/DMDServer.h"
+#include "DMDUtil/DMD.h"
 #include "DMDUtil/Logger.h"
 #include "empreintes.h"
+#include "pin2dmd.h"
+#include "serveur-tcp.h"
 
 namespace
 {
@@ -101,6 +106,8 @@ void Usage()
       "  -l, --logging              journal sur la sortie d'erreur\n"
       "  -v, --verbose-logging\n"
       "      --verifier             controle seul de dmdutil64.dll et de son empreinte (code 0, 3, 4 ou 6)\n"
+      "      --pin2dmd-essai FICHIER  essai sans carte : un PIN2DMD 128x32 simule, chaque paquet USB ecrit dans FICHIER\n"
+      "      --client-essai         essai : envoie des images au serveur de -a/-p par le client de la DLL de VPX\n"
       "  -h, --help\n");
 }
 
@@ -155,11 +162,11 @@ std::string Sha256(const std::wstring& file)
   return hex;
 }
 
-/** La version de VPX de cette empreinte, ou nullptr si elle n'est pas dans src/empreintes.h. */
-const char* KnownVpx(const std::string& sha256)
+/** La ligne de src/empreintes.h de cette empreinte, ou nullptr si elle n'y est pas. */
+const KnownDmdUtil* KnownVpx(const std::string& sha256)
 {
   for (const KnownDmdUtil& known : kKnownDmdUtil)
-    if (sha256 == known.sha256) return known.vpx;
+    if (sha256 == known.sha256) return &known;
   return nullptr;
 }
 
@@ -167,7 +174,7 @@ const char* KnownVpx(const std::string& sha256)
  * Charge dmdutil64.dll depuis ce dossier (ses propres DLL, zedmd64, libusb…, cherchées à côté d'elle),
  * puis lie toutes les fonctions dont ce programme a besoin.
  */
-int LoadDmdUtil(const std::wstring& dir, const char** vpx)
+int LoadDmdUtil(const std::wstring& dir, const KnownDmdUtil** vpx)
 {
   SetDllDirectoryW(dir.c_str());
   std::wstring dll = dir + L"\\dmdutil64.dll";
@@ -221,8 +228,9 @@ int main(int argc, char* argv[])
   const char* altColorPath = nullptr;
   const char* pupVideosPath = nullptr;
   const char* addr = nullptr;
+  const char* pin2dmdTest = nullptr;
   int port = 0;
-  bool wait = false, logging = false, verbose = false, verifyOnly = false;
+  bool wait = false, logging = false, verbose = false, verifyOnly = false, clientTest = false;
 
   for (int i = 1; i < argc; i++)
   {
@@ -243,10 +251,12 @@ int main(int argc, char* argv[])
     else if (const char* v = value("-u", "--pup-videos-path")) pupVideosPath = v;
     else if (const char* v = value("-a", "--addr")) addr = v;
     else if (const char* v = value("-p", "--port")) port = std::atoi(v);
+    else if (const char* v = value("--pin2dmd-essai", "--pin2dmd-essai")) pin2dmdTest = v;
     else if (a == "-w" || a == "--wait-for-displays") wait = true;
     else if (a == "-l" || a == "--logging") logging = true;
     else if (a == "-v" || a == "--verbose-logging") verbose = logging = true;
     else if (a == "--verifier") verifyOnly = true;
+    else if (a == "--client-essai") clientTest = true;
     else if (a == "-h" || a == "--help")
     {
       Usage();
@@ -260,11 +270,11 @@ int main(int argc, char* argv[])
     }
   }
 
-  const char* vpx = nullptr;
+  const KnownDmdUtil* vpx = nullptr;
   if (int loaded = LoadDmdUtil(dmdutilDir, &vpx); loaded != kOk) return loaded;
   if (verifyOnly)
   {
-    printf("dmdutil64.dll : compatible (%s).\n", vpx);
+    printf("dmdutil64.dll : compatible (%s ; PIN2DMD %s).\n", vpx->vpx, vpx->pin2dmd ? "par libdmdutil" : "par le serveur");
     return kOk;
   }
 
@@ -279,12 +289,69 @@ int main(int argc, char* argv[])
   if (logging) pConfig->SetLogCallback(LogCallback);
   if (verbose && config) DMDUtil::Log(DMDUtil_LogLevel_INFO, "Loaded config file");
 
+  if (clientTest)
+  {
+    // Essai (packages/core/src/test/dmdserver.test.ts) : le client réseau de la DLL de VPX, celui qu'emploie
+    // le plugin DMDUtil en partie (DMDServer = 1), envoie quelques images RGB24 au serveur de -a/-p.
+    pConfig->SetDMDServer(true);
+    pConfig->SetLocalDisplaysActive(false);
+    DMDUtil::DMD* pClient = new DMDUtil::DMD();
+    pClient->FindDisplays();
+    std::vector<uint8_t> frame(128 * 32 * 3, 0);
+    frame[0] = 255;
+    frame[1] = 128;
+    for (int i = 0; i < 30 && running; i++)
+    {
+      pClient->UpdateRGB24Data(frame.data(), 128, 32);
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    delete pClient;
+    return kOk;
+  }
+
   DMDUtil::DMD* pDmd = new DMDUtil::DMD();
+
+  // PIN2DMD que la DLL de VPX ne pilote pas (src/pin2dmd.h) : le serveur l'ouvre lui-même, avec la libusb de VPX.
+  const bool ownPin2dmd = !vpx->pin2dmd && pConfig->IsPIN2DMD();
+  pin2dmd::Libusb usb;
+  const bool usbReady = ownPin2dmd && !pin2dmdTest && usb.Load(dmdutilDir);
+  pin2dmd::Output* pPin2dmd = nullptr;
+  std::string lastWhy;
 
   while (running)
   {
     pDmd->FindDisplays();
     while (DMDUtil::DMD::IsFinding()) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    if (ownPin2dmd && pin2dmdTest && !pPin2dmd)
+    {
+      // Essai (packages/core/src/test/dmdserver.test.ts) : tout le chemin des images sauf l'USB.
+      pin2dmd::Card card;
+      card.product = "PIN2DMD";
+      pin2dmd::SizeOf(card.product, card.width, card.height);
+      pPin2dmd = new pin2dmd::Output(usb, card, pin2dmdTest);
+      pDmd->AddRGB24DMD(pPin2dmd);
+      fprintf(stderr, "PIN2DMD : carte simulee (essai), paquets dans %s.\n", pin2dmdTest);
+      fflush(stderr);
+    }
+    if (usbReady && !pPin2dmd)
+    {
+      pin2dmd::Card card;
+      std::string why;
+      if (pin2dmd::OpenCard(usb, card, why))
+      {
+        pPin2dmd = new pin2dmd::Output(usb, card);
+        pDmd->AddRGB24DMD(pPin2dmd);
+      }
+      else if (why != lastWhy)
+      {
+        // Une ligne par cause, pas une par seconde.
+        fprintf(stderr, "%s\n", why.c_str());
+        fflush(stderr);
+        lastWhy = why;
+      }
+    }
 
     if (pDmd->HasDisplay() || !wait) break;
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -297,25 +364,29 @@ int main(int argc, char* argv[])
     return running ? kNoDisplay : kOk;
   }
 
-  std::string fixedAltColorPath = pConfig->GetAltColorPath();
-  std::string fixedPupVideosPath = pConfig->GetPUPVideosPath();
-
   {
-    DMDUtil::DMDServer server(pDmd, !fixedAltColorPath.empty(), !fixedPupVideosPath.empty());
+    // Notre serveur réseau, pas DMDUtil::DMDServer de la DLL de VPX : inutilisable sous Windows (src/serveur-tcp.h).
+    serveur::TcpServer server(pDmd);
 
-    if (!server.Start(pConfig->GetDMDServerAddr(), static_cast<in_port_t>(pConfig->GetDMDServerPort())))
+    if (!server.Start(pConfig->GetDMDServerAddr(), pConfig->GetDMDServerPort()))
     {
       delete pDmd;
+      delete pPin2dmd;
       return kStartFailed;
     }
+    fprintf(stderr, "Serveur du DMD : a l'ecoute.\n");
+    fflush(stderr);
 
-    while (running && server.IsRunning() && pDmd->HasDisplay())
+    // PIN2DMD débranché : arrêt (code 0), Cyber Pinball relance le serveur, qui attend la carte (-w).
+    while (running && server.IsRunning() && pDmd->HasDisplay() && !(pPin2dmd && pPin2dmd->Lost()))
     {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
     server.Stop();
   }
+  // Le fil RGB24DMD de libdmdutil (qui appelle Output::Update) s'arrête avec le DMD : la sortie après lui.
   delete pDmd;
+  delete pPin2dmd;
   return kOk;
 }

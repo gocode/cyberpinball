@@ -88,17 +88,35 @@ export function dmdServerFrame(dots: DmdDots, color: string, colors?: DmdColors)
 }
 
 /**
- * Le DMD réel passe-t-il par dmdserver ? Il faut le choix « Image du menu : oui » et au moins un
- * DMD allumé : reconnu en USB (automatique ou oui), forcé, ou en wifi.
+ * Le module DMD de la version de VPX que Cyber Pinball installe (dmdutil64.dll de VPX 10.8.1-5436,
+ * libdmdutil 3485e2e) ne pilote aucun PIN2DMD : son code PIN2DMD est sous DMDUTIL_ENABLE_PIN2DMD, que
+ * son CMakeLists.txt ne définit jamais, et la DLL n'appelle jamais libusb (relevé dans le binaire). Seul
+ * cyberpinball-dmdserver pilote donc la carte (packages/dmdserver/src/pin2dmd.h), dans le front-end comme
+ * en partie (VPX lui envoie ses images, DMDServer = 1). Même fait que la colonne pin2dmd de
+ * packages/dmdserver/src/empreintes.h pour cette version de VPX (vérifié par dmdserver.test.ts).
+ */
+export const PIN2DMD_ONLY_THROUGH_SERVER = true;
+
+function modelOn(devices: ObservedUsbDevice[], setup: HardwareDmdSetup | undefined, model: 'ZeDMD' | 'PIN2DMD' | 'Pixelcade'): boolean {
+  const choice = hardwareDmdChoice(setup, model);
+  return choice === 'on' || (choice === 'auto' && detectHardwareDmds(devices).some((d) => d.model === model));
+}
+
+/** Un PIN2DMD est allumé (reconnu en USB, ou forcé) et seul le serveur du DMD sait le piloter. */
+export function dmdServerDrivesPin2dmd(devices: ObservedUsbDevice[], setup: HardwareDmdSetup | undefined): boolean {
+  return PIN2DMD_ONLY_THROUGH_SERVER && modelOn(devices, setup, 'PIN2DMD');
+}
+
+/**
+ * Le serveur du DMD doit-il tourner ? Avec « Image du front-end : oui » et au moins un DMD allumé
+ * (reconnu en USB, automatique ou oui, forcé, ou en wifi) ; et toujours pour un PIN2DMD allumé, que
+ * VPX ne sait pas piloter lui-même (PIN2DMD_ONLY_THROUGH_SERVER), même sans l'image du front-end.
  */
 export function dmdServerWanted(devices: ObservedUsbDevice[], setup: HardwareDmdSetup | undefined): boolean {
+  if (dmdServerDrivesPin2dmd(devices, setup)) return true;
   if (!setup?.menu) return false;
   if (setup.zedmdWifi?.enabled) return true;
-  const detected = detectHardwareDmds(devices);
-  return (['ZeDMD', 'PIN2DMD', 'Pixelcade'] as const).some((m) => {
-    const choice = hardwareDmdChoice(setup, m);
-    return choice === 'on' || (choice === 'auto' && detected.some((d) => d.model === m));
-  });
+  return (['ZeDMD', 'PIN2DMD', 'Pixelcade'] as const).some((m) => modelOn(devices, setup, m));
 }
 
 /**
@@ -120,12 +138,10 @@ export function dmdServerNotFoundProblem(devices: ObservedUsbDevice[], setup: Ha
  * couleur), et le serveur ne cherche pas de vidéos PuP.
  */
 export function dmdServerIni(devices: ObservedUsbDevice[], setup: HardwareDmdSetup | undefined): string {
-  const detected = detectHardwareDmds(devices);
-  const on = (m: 'ZeDMD' | 'PIN2DMD' | 'Pixelcade') => {
-    const choice = hardwareDmdChoice(setup, m);
-    return choice === 'on' || (choice === 'auto' && detected.some((d) => d.model === m)) ? 1 : 0;
-  };
-  const wifi = setup?.zedmdWifi?.enabled ? setup.zedmdWifi.address.trim() : '';
+  // Sans « Image du front-end », le serveur ne tourne que pour le PIN2DMD : il n'ouvre que lui.
+  const onlyPin2dmd = !setup?.menu;
+  const on = (m: 'ZeDMD' | 'PIN2DMD' | 'Pixelcade') => ((!onlyPin2dmd || m === 'PIN2DMD') && modelOn(devices, setup, m) ? 1 : 0);
+  const wifi = !onlyPin2dmd && setup?.zedmdWifi?.enabled ? setup.zedmdWifi.address.trim() : '';
   return [
     `; ${t('Écrit par Cyber Pinball (Menu système > Borne > DMD > DMD réel) : réécrit à chaque lancement du serveur.')}`,
     '[DMDServer]',

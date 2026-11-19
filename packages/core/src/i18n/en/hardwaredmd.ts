@@ -8,16 +8,16 @@ export const messages: Record<string, string> = {
   'Adresse IP impossible : chaque nombre va de 0 à 255.': 'Impossible IP address: each number goes from 0 to 255.',
   'code {code} du Gestionnaire de périphériques': 'Device Manager code {code}',
   ' (pilote actuel : {service})': ' (current driver: {service})',
-  'PIN2DMD : Windows ne lui a pas donné de pilote USB générique (WinUSB ou libusbK){why}. VPX ne pourra pas l’ouvrir et le DMD restera noir. Installez ce pilote avec l’outil fourni avec le PIN2DMD ou avec Zadig, puis « Vérifier de nouveau ».':
-    'PIN2DMD: Windows has not given it a generic USB driver (WinUSB or libusbK){why}. VPX will not be able to open it and the DMD will stay dark. Install that driver with the tool that comes with the PIN2DMD or with Zadig, then “Check again”.',
-  'PIN2DMD : son pilote {service} ne s’ouvre que par libusbK.dll, absente de Windows. VPX ne pourra pas l’ouvrir et le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».':
-    'PIN2DMD: its {service} driver can only be opened through libusbK.dll, which Windows does not have. VPX will not be able to open it and the DMD will stay dark. Replace that driver with WinUSB using Zadig (Options > List All Devices, pick the PIN2DMD, WinUSB, Replace Driver), then “Check again”.',
+  'PIN2DMD : Windows ne lui a pas donné de pilote USB générique (WinUSB ou libusbK){why}. Cyber Pinball ne pourra pas l’ouvrir et le DMD restera noir. Installez ce pilote avec l’outil fourni avec le PIN2DMD ou avec Zadig, puis « Vérifier de nouveau ».':
+    'PIN2DMD: Windows has not given it a generic USB driver (WinUSB or libusbK){why}. Cyber Pinball will not be able to open it and the DMD will stay dark. Install that driver with the tool that comes with the PIN2DMD or with Zadig, then “Check again”.',
+  'PIN2DMD : son pilote {service} ne s’ouvre que par libusbK.dll, absente de Windows. Cyber Pinball ne pourra pas l’ouvrir et le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».':
+    'PIN2DMD: its {service} driver can only be opened through libusbK.dll, which Windows does not have. Cyber Pinball will not be able to open it and the DMD will stay dark. Replace that driver with WinUSB using Zadig (Options > List All Devices, pick the PIN2DMD, WinUSB, Replace Driver), then “Check again”.',
   'PIN2DMD : Windows le voit, mais la libusb de VPX ne le trouve pas. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau ».':
     'PIN2DMD: Windows sees it, but VPX’s libusb cannot find it. Unplug it, plug it back in, then “Check again”.',
-  'PIN2DMD : déjà ouvert par un autre programme ({programs}). VPX ne pourra pas l’allumer et le DMD restera noir. Fermez-le, ou retirez-le du démarrage de Windows, puis « Vérifier de nouveau ».':
-    'PIN2DMD: already opened by another program ({programs}). VPX will not be able to light it and the DMD will stay dark. Close it, or remove it from Windows startup, then “Check again”.',
-  'PIN2DMD : déjà ouvert par un autre programme (dmdext, un autre front-end, l’éditeur du PIN2DMD…). VPX ne pourra pas l’allumer et le DMD restera noir. Fermez-le, ou retirez-le du démarrage de Windows, puis « Vérifier de nouveau ».':
-    'PIN2DMD: already opened by another program (dmdext, another frontend, the PIN2DMD editor…). VPX will not be able to light it and the DMD will stay dark. Close it, or remove it from Windows startup, then “Check again”.',
+  'PIN2DMD : déjà ouvert par un autre programme ({programs}). Cyber Pinball ne pourra pas l’allumer et le DMD restera noir. Fermez-le, ou retirez-le du démarrage de Windows, puis « Vérifier de nouveau ».':
+    'PIN2DMD: already opened by another program ({programs}). Cyber Pinball will not be able to light it and the DMD will stay dark. Close it, or remove it from Windows startup, then “Check again”.',
+  'PIN2DMD : déjà ouvert par un autre programme (dmdext, un autre front-end, l’éditeur du PIN2DMD…). Cyber Pinball ne pourra pas l’allumer et le DMD restera noir. Fermez-le, ou retirez-le du démarrage de Windows, puis « Vérifier de nouveau ».':
+    'PIN2DMD: already opened by another program (dmdext, another frontend, the PIN2DMD editor…). Cyber Pinball will not be able to light it and the DMD will stay dark. Close it, or remove it from Windows startup, then “Check again”.',
   'PIN2DMD : la libusb de VPX ne sait pas l’ouvrir avec son pilote actuel ({service}). Le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».':
     'PIN2DMD: VPX’s libusb cannot open it with its current driver ({service}). The DMD will stay dark. Replace that driver with WinUSB using Zadig (Options > List All Devices, pick the PIN2DMD, WinUSB, Replace Driver), then “Check again”.',
   'inconnu': 'unknown',
@@ -27,7 +27,7 @@ export const messages: Record<string, string> = {
     'Real DMD: {programs} is open and may be holding the real DMD; VPX could not light it. Close it before playing.',
   'DMD réel : {programs} sont ouverts et gardent peut-être le DMD réel ; VPX ne pourrait pas l’allumer. Fermez-les avant de jouer.':
     'Real DMD: {programs} are open and may be holding the real DMD; VPX could not light it. Close them before playing.',
-  'ouvert puis relâché : VPX pourra l’allumer': 'opened then released: VPX will be able to light it',
+  'ouvert puis relâché : le serveur du DMD pourra l’allumer': 'opened then released: the DMD server will be able to light it',
   'pilote CH340/CH343 de WCH': 'WCH CH340/CH343 driver',
   'pilote CP210x de Silicon Labs': 'Silicon Labs CP210x driver',
   'pilote du port série USB': 'USB serial port driver',
@@ -96,6 +96,10 @@ export const messages: Record<string, string> = {
   'VPX sans son module DMD (plugins\\dmdutil) : réinstallez VPX depuis Cyber Pinball': 'VPX without its DMD module (plugins\\dmdutil): reinstall VPX from Cyber Pinball',
   'Serveur du DMD': 'DMD server',
   '{problem} ; VPX ouvre le DMD lui-même pendant les parties': '{problem}; VPX opens the DMD itself during games',
+  '{problem} ; le PIN2DMD restera noir : le module DMD de VPX ne sait pas le piloter seul': '{problem}; the PIN2DMD will stay dark: VPX’s DMD module cannot drive it on its own',
+  'Pilote le PIN2DMD ; VPX lui envoie ses images pendant les parties': 'Drives the PIN2DMD; VPX sends it its frames during games',
+  'Démarre, ou attend que le PIN2DMD réponde': 'Starting, or waiting for the PIN2DMD to answer',
+  'PIN2DMD : {problem}': 'PIN2DMD: {problem}',
   'Le front-end tient le DMD réel ; VPX le reprend pendant les parties': 'The menu holds the real DMD; VPX takes it back during games',
   'Démarre, ou attend que le DMD réponde ; en attendant, VPX ouvre le DMD lui-même': 'Starting, or waiting for the DMD to answer; meanwhile, VPX opens the DMD itself',
   'Image du front-end : oui': 'Menu image: yes',

@@ -6512,7 +6512,7 @@ function soundView() {
 // DMD « classique » (une LED ne joue pas de vidéo) ; la fenêtre de l'écran du DMD, seulement en vivant.
 const liveDmd = new LiveDmd({
   send: (shot) => {
-    if (menuDmdServer().active()) menuDmdServer().send(shot.dots, menuDmdColor(), shot.rgb);
+    if (menuDmdServer().showsMenu()) menuDmdServer().send(shot.dots, menuDmdColor(), shot.rgb);
     if (!liveDmdOn()) return;
     const win = dmdWindow();
     if (win && !win.isDestroyed()) win.webContents.send('dmd', shot);
@@ -6643,7 +6643,7 @@ function liveDmdView(role: RoleId): { area: ReturnType<typeof liveDmdArea>; fram
 /** Programme du DMD vivant d'après l'état du menu : la table montrée, le chargement, la partie. */
 function syncLiveDmd(): void {
   // Le DMD réel montre le menu hors partie, même sans fenêtre de DMD vivant (DMD classique, pas d'écran de DMD).
-  const hardware = menuDmdServer().active() && state.phase !== 'playing' && !desktop.active;
+  const hardware = menuDmdServer().showsMenu() && state.phase !== 'playing' && !desktop.active;
   if (!liveDmdOn() && !hardware) {
     loadingDmd?.stop();
     loadingDmd = undefined;

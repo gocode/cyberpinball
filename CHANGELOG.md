@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.1
 
+- DMD réel : un PIN2DMD s'allume enfin, en partie comme dans le front-end. Le module DMD de VPX 10.8.1 ne sait pas le piloter (sa prise en charge n'y a pas été compilée) ; le serveur du DMD de Cyber Pinball le pilote donc lui-même, au format d'images qu'emploient les autres front-ends (ordre des couleurs lu dans la carte), et VPX lui envoie ses images pendant les parties.
+- DMD réel : le serveur du DMD reçoit enfin les images, pour tous les modèles (ZeDMD compris). Celui du module DMD de VPX coupait chaque connexion sous Windows et tournait à vide en remplissant le journal ; Cyber Pinball a désormais le sien.
+- DMD réel : pour un PIN2DMD, le serveur du DMD tourne même avec « Image du front-end : non » ; le PIN2DMD reste alors noir entre les parties.
+- DMD réel : le journal dit pourquoi un PIN2DMD ne s'ouvre pas (carte absente, ouverture refusée, interface prise, nom inconnu), avec le code de libusb.
 - Mettre à la corbeille la table affichée sur la roue ne bute plus sur « opération refusée » : Cyber Pinball ne garde plus ses vidéos ouvertes pendant qu'elles tournent, et Windows laisse déplacer son dossier.
 - Assistant de configuration, relevé des boutons : chaque écran dit en clair comment passer un bouton que la borne n'a pas, revenir en arrière, finir l'étape et corriger une erreur. Deux nouvelles actions à la souris : « Passer ce bouton » (boutons facultatifs) et « Terminer le relevé » (dès les boutons obligatoires relevés, les autres gardent leur touche actuelle). « Touches par défaut » s'appelle maintenant « Touches par défaut des encodeurs » pour les boutons du jeu.
 - Assistant de configuration : une frise des étapes en haut de chaque écran, une pastille numérotée par étape ; celle en cours porte son nom et où l'on en est (« Boutons de l'interface · Bouton 1 sur 4 », « Écrans · Rôle 2 sur 4 », « Son · Sortie 1 sur 3 »), à la place de la ligne qui le disait au milieu de l'écran.

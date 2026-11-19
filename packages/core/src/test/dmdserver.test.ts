@@ -4,13 +4,24 @@
 // images exactement comme DMDServer::ClientThread : 25 octets d'en-tête, puis length octets.
 
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { hardwareDmdFacts, vpxDmdSettings } from '../dmd';
-import { DMDSTREAM_HEADER_SIZE, dmdRgb24, dmdServerFrame, dmdServerIni, dmdServerNotFoundProblem, dmdServerWanted, dmdStreamHeader, parseDmdStreamHeader } from '../dmdserver';
+import {
+  DMDSTREAM_HEADER_SIZE,
+  dmdRgb24,
+  dmdServerDrivesPin2dmd,
+  dmdServerFrame,
+  dmdServerIni,
+  dmdServerNotFoundProblem,
+  dmdServerWanted,
+  dmdStreamHeader,
+  parseDmdStreamHeader,
+  PIN2DMD_ONLY_THROUGH_SERVER,
+} from '../dmdserver';
 import { setLanguage } from '../i18n';
 import { DMD_HEIGHT, DMD_WIDTH } from '../livedmd';
 import type { ObservedUsbDevice } from '../model';
@@ -57,7 +68,7 @@ test('dmdserver : les nuances du DMD du menu en RGB, point éteint noir', () => 
 
 test('dmdserver : lancé seulement avec « Image du menu » et un DMD allumé ; son ini suit les choix', () => {
   setLanguage('fr');
-  assert.equal(dmdServerWanted([PIN2DMD], undefined), false, 'sans le choix, VPX garde le DMD en direct');
+  assert.equal(dmdServerWanted([ZEDMD], undefined), false, 'sans le choix, VPX garde le ZeDMD en direct');
   assert.equal(dmdServerWanted([PIN2DMD], { menu: true }), true);
   assert.equal(dmdServerWanted([], { menu: true }), false, 'rien de branché : pas de serveur');
   assert.equal(dmdServerWanted([PIN2DMD], { menu: true, models: { PIN2DMD: 'off' } }), false);
@@ -69,6 +80,34 @@ test('dmdserver : lancé seulement avec « Image du menu » et un DMD allumé ; 
   assert.match(ini, /\[Pixelcade\]\r\nEnabled = 0/);
   assert.match(ini, /AltColor = 0/, 'VPX envoie ses images déjà en couleur');
   assert.match(dmdServerIni([], { menu: true, zedmdWifi: { enabled: true, address: '192.168.1.50' } }), /\[ZeDMD-WiFi\]\r\nEnabled = 1\r\nWiFiAddr = 192\.168\.1\.50/);
+});
+
+// Borne d'un joueur (19/11/2026, rapport OLHIA6EE-L) : PIN2DMD noir alors que la sonde l'ouvrait, le
+// nommait « PIN2DMD » et le relâchait sans erreur. Le dmdutil64.dll de VPX 10.8.1-5436 n'a pas de code
+// PIN2DMD (DMDUTIL_ENABLE_PIN2DMD jamais défini par libdmdutil 3485e2e, aucun appel à libusb dans le
+// binaire). Invariant : un PIN2DMD allumé passe toujours par le serveur, qui le pilote lui-même, même sans
+// l'image du front-end ; et VPX ne garde jamais un DMDServer = 1 d'une partie précédente quand le serveur
+// ne répond pas.
+test('PIN2DMD : toujours par le serveur du DMD, que le module DMD de VPX ne sait pas le piloter', () => {
+  setLanguage('fr');
+  assert.equal(PIN2DMD_ONLY_THROUGH_SERVER, true);
+  assert.equal(dmdServerDrivesPin2dmd([PIN2DMD], undefined), true, 'reconnu en USB, choix automatique');
+  assert.equal(dmdServerDrivesPin2dmd([], { models: { PIN2DMD: 'on' } }), true, 'forcé');
+  assert.equal(dmdServerDrivesPin2dmd([PIN2DMD], { models: { PIN2DMD: 'off' } }), false, 'éteint');
+  assert.equal(dmdServerDrivesPin2dmd([ZEDMD], undefined), false);
+  assert.equal(dmdServerWanted([PIN2DMD], undefined), true, 'sans « Image du front-end » : le serveur tourne pour le PIN2DMD');
+  assert.equal(dmdServerWanted([PIN2DMD], { menu: false }), true);
+  // Sans l'image du front-end, le serveur n'ouvre que le PIN2DMD : un ZeDMD reste à VPX.
+  const ini = dmdServerIni([PIN2DMD, ZEDMD], { menu: false });
+  assert.match(ini, /\[PIN2DMD\]\r\nEnabled = 1/);
+  assert.match(ini, /\[ZeDMD\]\r\nEnabled = 0/);
+  assert.match(ini, /\[ZeDMD-WiFi\]\r\nEnabled = 0/);
+  // Serveur prêt : VPX lui envoie ses images et n'ouvre rien lui-même.
+  const through = vpxDmdSettings([PIN2DMD], undefined, true).settings;
+  assert.equal(through.find((s) => s.key === 'DMDServer')?.value, '1');
+  assert.equal(through.find((s) => s.key === 'PIN2DMD')?.value, '0');
+  // Serveur absent : DMDServer = 0 écrit, même sans réglage de l'image du front-end.
+  assert.equal(vpxDmdSettings([PIN2DMD]).settings.find((s) => s.key === 'DMDServer')?.value, '0');
 });
 
 test('[Plugin.DMDUtil] : en mode serveur, VPX passe par dmdserver et n’ouvre plus le matériel', () => {
@@ -83,8 +122,8 @@ test('[Plugin.DMDUtil] : en mode serveur, VPX passe par dmdserver et n’ouvre p
   const direct = vpxDmdSettings([PIN2DMD], { menu: true }, false).settings;
   assert.equal(direct.find((s) => s.key === 'DMDServer')?.value, '0');
   assert.equal(direct.find((s) => s.key === 'PIN2DMD')?.value, '1');
-  // Jamais réglé : DMDServer reste tel quel.
-  assert.equal(vpxDmdSettings([PIN2DMD]).settings.find((s) => s.key === 'DMDServer'), undefined);
+  // Jamais réglé, et aucun PIN2DMD (que seul le serveur pilote) : DMDServer reste tel quel.
+  assert.equal(vpxDmdSettings([ZEDMD]).settings.find((s) => s.key === 'DMDServer'), undefined);
 });
 
 /** Faux dmdserver : lit les images comme DMDServer::ClientThread (en-tête, puis length octets). */
@@ -201,9 +240,119 @@ test('serveur du DMD : arguments, et codes de sortie qui ne se règlent pas en r
 // packages/dmdserver/src/empreintes.h. Sans elle, « Image du menu » serait indisponible pour tous.
 test('serveur du DMD : empreinte connue pour la version de VPX installée', () => {
   const known = fs.readFileSync(path.join(REPO_ROOT, 'packages', 'dmdserver', 'src', 'empreintes.h'), 'utf8');
-  const rows = [...known.matchAll(/\{"([0-9a-f]{64})", "VPX ([^"]+)"\}/g)].map((m) => m[2]);
-  assert.ok(rows.includes(vpxComponent().version), `empreintes.h : aucune ligne pour VPX ${vpxComponent().version} (${rows.join(', ') || 'aucune'}) ; voir packages/dmdserver/vendor/PROVENANCE.txt`);
+  const rows = [...known.matchAll(/\{"([0-9a-f]{64})", "VPX ([^"]+)", (true|false)\}/g)].map((m) => ({ vpx: m[2]!, pin2dmd: m[3] === 'true' }));
+  const row = rows.find((r) => r.vpx === vpxComponent().version);
+  assert.ok(row, `empreintes.h : aucune ligne pour VPX ${vpxComponent().version} (${rows.map((r) => r.vpx).join(', ') || 'aucune'}) ; voir packages/dmdserver/vendor/PROVENANCE.txt`);
+  // Le cœur et le serveur disent la même chose du PIN2DMD de cette version de VPX.
+  assert.equal(PIN2DMD_ONLY_THROUGH_SERVER, !row.pin2dmd, 'PIN2DMD_ONLY_THROUGH_SERVER (dmdserver.ts) et la colonne pin2dmd de empreintes.h divergent');
 });
+
+// Le vrai serveur sur le vrai dmdutil64.dll de VPX, avec une carte simulée (--pin2dmd-essai) : une image
+// du front-end, puis une de VPX (son client réseau, --client-essai), reçues par notre serveur réseau,
+// rendues par le fil RGB24DMD de libdmdutil, arrivent dans le paquet PIN2DMD au format du firmware, celui
+// qu'emploient les autres front-ends (décrit en tête de packages/dmdserver/src/pin2dmd.h) : en-tête 81 C3 E9 00, puis
+// six plans de 2048 octets. Demande la DLL de VPX : CYBERPINBALL_VPX_DMDUTIL, ou tmp/vpx-dmdutil (le
+// dossier plugins\dmdutil de VPX 10.8.1-5436). Borne d'un joueur (19/11/2026) : le DMDServer de cette DLL
+// coupait chaque client sous Windows et noyait le journal ; aucune image ne passait.
+const vpxDmdutil = process.env.CYBERPINBALL_VPX_DMDUTIL || path.join(REPO_ROOT, 'tmp', 'vpx-dmdutil');
+const serverExe = path.join(REPO_ROOT, 'build', 'dmdserver', 'Release', 'cyberpinball-dmdserver.exe');
+test(
+  'cyberpinball-dmdserver : une image du front-end arrive au PIN2DMD (carte simulée, DLL de VPX)',
+  { skip: (!fs.existsSync(serverExe) && 'non construit') || (!fs.existsSync(path.join(vpxDmdutil, 'dmdutil64.dll')) && 'DLL de VPX absente'), timeout: 30_000 },
+  async () => {
+    const dir = path.join(REPO_ROOT, 'tmp', 'essai-pin2dmd');
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(dir, { recursive: true });
+    const ini = path.join(dir, 'dmdserver.ini');
+    fs.writeFileSync(ini, dmdServerIni([PIN2DMD], undefined));
+    const packet = path.join(dir, 'paquet.bin');
+    const port = await freePort();
+    const child = spawn(serverExe, ['-d', vpxDmdutil, '-c', ini, '-p', String(port), '-w', '-l', '--pin2dmd-essai', packet], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+    let log = '';
+    child.stderr.on('data', (d: Buffer) => (log += d.toString('utf8')));
+    // Calculé à la main d'après le format (ordre des couleurs 0 : rouge au bit 0, vert au bit 1, bleu au bit 2 ;
+    // 6 bits par couleur, arrondi de 63 × (v / 255)^2,5) : (255, 128, 0) → rouge 63 (111111), vert 11 (001011),
+    // bleu 0. Le point 0 (moitié haute) a son rouge au bit 0 et son vert au bit 1 de l'octet 0 de chaque plan ;
+    // le dernier point (moitié basse, octet 2047) au bit 3 et au bit 4.
+    const planes = (lastPixel: boolean) => {
+      const expected = Buffer.alloc(2048 * 6);
+      for (let k = 0; k < 6; k++) {
+        const r = (63 >> k) & 1;
+        const b = (11 >> k) & 1;
+        expected[k * 2048] = r | (b << 1);
+        if (lastPixel) expected[2047 + k * 2048] = (r << 3) | (b << 4);
+      }
+      return expected;
+    };
+    const SIZE = 4 + 2048 * 6;
+    /** Les paquets complets écrits jusqu'ici (le serveur ajoute chaque envoi au fichier). */
+    const packets = (): Buffer[] => {
+      if (!fs.existsSync(packet)) return [];
+      const all = fs.readFileSync(packet);
+      return Array.from({ length: Math.floor(all.length / SIZE) }, (_, i) => all.subarray(i * SIZE, (i + 1) * SIZE));
+    };
+    const waitPacket = async (send: () => void): Promise<Buffer | undefined> => {
+      const deadline = Date.now() + 10_000;
+      while (Date.now() < deadline) {
+        send();
+        await new Promise((r) => setTimeout(r, 200));
+        const got = packets();
+        if (got.length) return got[0];
+      }
+      return undefined;
+    };
+    try {
+      // 1. Le front-end : une connexion gardée, des images RGB24 (dmdServerFrame).
+      const socket = await connectWithin(port, 15_000);
+      const dots = new Uint8Array(DMD_WIDTH * DMD_HEIGHT);
+      dots[0] = 15;
+      dots[DMD_WIDTH * DMD_HEIGHT - 1] = 15;
+      let closed = false;
+      socket.once('close', () => (closed = true));
+      const menu = await waitPacket(() => socket.write(dmdServerFrame(dots, '#ff8000')));
+      assert.ok(menu, `aucun paquet PIN2DMD écrit ; journal du serveur :\n${log.slice(0, 2000)}`);
+      assert.equal(closed, false, 'le serveur garde la connexion du front-end (DMDServer de libdmdutil la coupait)');
+      assert.deepEqual([...menu.subarray(0, 4)], [0x81, 0xc3, 0xe9, 0x00], 'en-tête des images RGB du firmware');
+      assert.deepEqual(menu.subarray(4), planes(true), 'six plans de bits, moitiés haute et basse');
+      socket.destroy();
+      await new Promise((r) => setTimeout(r, 300));
+
+      // 2. VPX en partie : le client réseau de la DLL de VPX elle-même (mode Data, Paths + Update).
+      const before = packets().length;
+      const client = spawnSync(serverExe, ['-d', vpxDmdutil, '-a', '127.0.0.1', '-p', String(port), '--client-essai'], { encoding: 'utf8', windowsHide: true, timeout: 15_000 });
+      assert.equal(client.status, 0, client.stderr);
+      await new Promise((r) => setTimeout(r, 300));
+      const expectedGame = planes(false);
+      const game = packets()
+        .slice(before)
+        .some((p) => p.subarray(4).equals(expectedGame));
+      assert.ok(game, `aucune image de VPX arrivée au PIN2DMD ; journal du serveur :\n${log.slice(-2000)}`);
+
+      assert.match(log, /carte simulee/);
+      // Ni boucle à vide ni journal noyé (DMDServer de libdmdutil : « Error accepting connection » sans fin).
+      assert.doesNotMatch(log, /Error accepting connection/);
+      assert.ok(log.split('\n').length < 200, `journal du serveur trop long : ${log.split('\n').length} lignes`);
+    } finally {
+      child.kill();
+    }
+  },
+);
+
+/** Connexion au serveur dès qu'il écoute. */
+async function connectWithin(port: number, ms: number): Promise<net.Socket> {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    try {
+      return await new Promise<net.Socket>((resolve, reject) => {
+        const s = net.connect({ host: '127.0.0.1', port }, () => resolve(s));
+        s.once('error', reject);
+      });
+    } catch (error) {
+      if (Date.now() > deadline) throw error;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+}
 
 function vpxComponent(): { version: string } {
   const list = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'packages', 'installer', 'components.json'), 'utf8')) as { components: { id: string; version: string }[] };
@@ -235,7 +384,8 @@ test('santé : « Image du menu » demandée mais serveur impossible, dit avec s
   setLanguage('fr');
   const problem = 'Version de VPX non prise en charge par le serveur du DMD (VPX 10.8.1 attendu)';
   assert.deepEqual(hardwareDmdFacts([PIN2DMD], { menu: true }, problem).problems, [`Image du front-end sur le DMD réel : ${problem}`]);
-  assert.deepEqual(hardwareDmdFacts([PIN2DMD], undefined, problem).problems, [], 'image du menu non demandée : rien à dire');
+  assert.deepEqual(hardwareDmdFacts([ZEDMD], undefined, problem).problems, [], 'image du menu non demandée : rien à dire pour un ZeDMD, que VPX pilote seul');
+  assert.deepEqual(hardwareDmdFacts([PIN2DMD], undefined, problem).problems, [`PIN2DMD : ${problem}`], 'un PIN2DMD ne s’allume que par le serveur');
   assert.deepEqual(hardwareDmdFacts([], { menu: true }, problem).problems, [], 'aucun DMD : rien à dire');
   assert.deepEqual(hardwareDmdFacts([PIN2DMD], { menu: true }).problems, [], 'serveur prêt');
 });

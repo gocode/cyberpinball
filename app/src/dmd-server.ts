@@ -4,6 +4,10 @@
 // ([Plugin.DMDUtil] DMDServer = 1, écrit seulement quand le serveur répond : sinon VPX ouvre le DMD
 // lui-même, comme sans l'image du menu). Rien ne s'affiche à l'écran : ni console, ni fenêtre.
 //
+// PIN2DMD : le module DMD de VPX 10.8.1 ne sait pas le piloter (PIN2DMD_ONLY_THROUGH_SERVER, core
+// dmdserver.ts) ; le serveur le pilote lui-même et tourne pour lui même sans l'image du front-end
+// (setMenuImage : le front-end ne lui envoie alors rien), et VPX lui envoie ses images en partie.
+//
 // Un serveur qui ne répond pas ne doit jamais tenir la carte : avec -w, il relance FindDisplays chaque
 // seconde, et PIN2DMDInit de libdmdutil (PIN2DMD.cpp) garde le PIN2DMD ouvert et réservé quand il le
 // refuse ensuite (nom inconnu, nom illisible) ; VPX, qui ouvre alors le DMD lui-même, le trouvait pris et
@@ -121,6 +125,18 @@ export class DmdServerHost {
     return this.running;
   }
 
+  /** « Image du front-end » : non, le serveur ne tourne que pour le PIN2DMD en partie ; le front-end ne lui envoie rien. */
+  private menuImage = true;
+
+  setMenuImage(on: boolean): void {
+    this.menuImage = on;
+  }
+
+  /** Le DMD réel montre le front-end : le serveur tourne et l'image du front-end est demandée. */
+  showsMenu(): boolean {
+    return this.running && this.menuImage;
+  }
+
   /**
    * Démarre (ou redémarre si les choix ont changé) le serveur avec ce dmdserver.ini. Sans le
    * programme, rien ne démarre : VPX garde le DMD en direct.
@@ -189,7 +205,7 @@ export class DmdServerHost {
     this.giveUp = undefined;
     if (!this.running || this.connected || this.external) return;
     const seconds = Math.round(timeoutMs / 1000);
-    this.options.log(`dmdserver : aucun afficheur trouvé en ${seconds} s, arrêté ; VPX ouvre le DMD lui-même pendant les parties.`); // i18n-ignore : journal
+    this.options.log(`dmdserver : aucun afficheur trouvé en ${seconds} s, arrêté.`); // i18n-ignore : journal
     const child = this.child;
     this.running = false;
     this.searchFailed = seconds;
@@ -419,6 +435,8 @@ export function applyMenuDmdServer(): void {
   const setup = loadCabinet(locations().dataDir)?.hardwareDmd;
   const devices = usbDevices() ?? [];
   const server = menuDmdServer();
+  // Sans « Image du front-end », le serveur peut tourner pour le seul PIN2DMD (dmdServerWanted) : rien du front-end.
+  server.setMenuImage(Boolean(setup?.menu));
   if (dmdServerWanted(devices, setup)) server.start(dmdServerIni(devices, setup));
   else server.stop();
   // Serveur arrêté (jamais lancé, ou abandonné faute d'afficheur) : le PIN2DMD est sondé comme VPX

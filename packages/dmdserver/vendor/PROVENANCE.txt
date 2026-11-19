@@ -2,7 +2,7 @@ En-têtes copiés sans modification, pour construire cyberpinball-dmdserver sur 
 Visual Pinball X 10.8.1-5436 installe dans plugins\dmdutil (même version de libdmdutil, même disposition
 des classes) :
 
-- libdmdutil/DMDUtil/ : Config.h, DMD.h, DMDServer.h, Logger.h, depuis
+- libdmdutil/DMDUtil/ : Config.h, DMD.h, DMDServer.h, Logger.h, RGB24DMD.h, depuis
   https://github.com/vpinball/libdmdutil, commit 3485e2e (celui de VPX 10.8.1-5436), dossier
   include/DMDUtil/. Licence : GPLv3+ (libdmdutil/LICENSE).
 - sockpp/sockpp/ : les en-têtes de sockpp qu'inclut tcp_acceptor.h (membre de DMDServer), depuis https://github.com/fpagliughi/sockpp, commit
@@ -21,3 +21,15 @@ de libdmdutil qu'il épingle, de refaire dmdutil64.def, d'ajouter à src/emprein
 « node scripts/dmdserver.mjs --verifier --vpx <VPX> » (code 6 tant qu'elle manque), puis de relancer cette
 même commande. packages/core/src/test/dmdserver.test.ts échoue tant que la version de VPX de
 packages/installer/components.json n'a pas sa ligne dans src/empreintes.h.
+
+src/pin2dmd.h : la sortie PIN2DMD du serveur, écrite pour Cyber Pinball : la DLL de VPX 10.8.1-5436 n'en
+contient pas le code (DMDUTIL_ENABLE_PIN2DMD jamais défini à ce commit ; corrigé en amont par libdmdutil
+f924569). L'ouverture de la carte suit les étapes de PIN2DMDInit (src/PIN2DMD.cpp de libdmdutil, même
+commit). Le format des images envoyées est l'interface du firmware PIN2DMD, décrite en tête du fichier ;
+le code et la courbe qui ramène les couleurs à 6 bits sont propres à Cyber Pinball. Une nouvelle version
+de VPX demande aussi de relever dans son dmdutil64.dll s'il pilote le PIN2DMD (colonne pin2dmd de
+src/empreintes.h).
+
+src/serveur-tcp.h : le serveur réseau, écrit pour Cyber Pinball d'après src/DMDServer.cpp de libdmdutil (même
+commit, même protocole) : celui de la DLL compare l'erreur de Winsock à EWOULDBLOCK et, sous Windows, coupe
+chaque client et tourne à vide.

@@ -13,7 +13,7 @@ import { formatList, t, tn } from './i18n';
 import type { LibusbProbe, ObservedUsbDevice } from './model';
 import type { SyncFinding } from './sync';
 import type { VpxSetting } from './vpx';
-import { vpxDmdServerSettings } from './dmdserver';
+import { dmdServerDrivesPin2dmd, vpxDmdServerSettings } from './dmdserver';
 
 export type HardwareDmdModel = 'ZeDMD' | 'PIN2DMD' | 'Pixelcade';
 
@@ -236,7 +236,7 @@ export function hardwareDmdDriverProblem(d: DetectedDmd): string | undefined {
     const service = device.service?.toLowerCase();
     if (problem || !service || !LIBUSB_SERVICES.includes(service)) {
       return t(
-        'PIN2DMD : Windows ne lui a pas donné de pilote USB générique (WinUSB ou libusbK){why}. VPX ne pourra pas l’ouvrir et le DMD restera noir. Installez ce pilote avec l’outil fourni avec le PIN2DMD ou avec Zadig, puis « Vérifier de nouveau ».',
+        'PIN2DMD : Windows ne lui a pas donné de pilote USB générique (WinUSB ou libusbK){why}. Cyber Pinball ne pourra pas l’ouvrir et le DMD restera noir. Installez ce pilote avec l’outil fourni avec le PIN2DMD ou avec Zadig, puis « Vérifier de nouveau ».',
         { why: code ? ` (${code})` : service ? t(' (pilote actuel : {service})', { service: device.service! }) : '' },
       );
     }
@@ -244,7 +244,7 @@ export function hardwareDmdDriverProblem(d: DetectedDmd): string | undefined {
     // libusbK.dll ; sans elle, seul WinUSB marche (libusb, windows_winusb.c, winusbx_init).
     if (service !== 'winusb' && device.libusbKDll === false) {
       return t(
-        'PIN2DMD : son pilote {service} ne s’ouvre que par libusbK.dll, absente de Windows. VPX ne pourra pas l’ouvrir et le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».',
+        'PIN2DMD : son pilote {service} ne s’ouvre que par libusbK.dll, absente de Windows. Cyber Pinball ne pourra pas l’ouvrir et le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».',
         { service: device.service! },
       );
     }
@@ -321,8 +321,8 @@ export function pin2dmdProbeProblem(probe: LibusbProbe | undefined, service?: st
   if (probe.code === LIBUSB_ERROR_ACCESS || probe.code === LIBUSB_ERROR_BUSY) {
     const holders = probe.holders ?? [];
     return holders.length
-      ? t('PIN2DMD : déjà ouvert par un autre programme ({programs}). VPX ne pourra pas l’allumer et le DMD restera noir. Fermez-le, ou retirez-le du démarrage de Windows, puis « Vérifier de nouveau ».', { programs: formatList(holders) })
-      : t('PIN2DMD : déjà ouvert par un autre programme (dmdext, un autre front-end, l’éditeur du PIN2DMD…). VPX ne pourra pas l’allumer et le DMD restera noir. Fermez-le, ou retirez-le du démarrage de Windows, puis « Vérifier de nouveau ».');
+      ? t('PIN2DMD : déjà ouvert par un autre programme ({programs}). Cyber Pinball ne pourra pas l’allumer et le DMD restera noir. Fermez-le, ou retirez-le du démarrage de Windows, puis « Vérifier de nouveau ».', { programs: formatList(holders) })
+      : t('PIN2DMD : déjà ouvert par un autre programme (dmdext, un autre front-end, l’éditeur du PIN2DMD…). Cyber Pinball ne pourra pas l’allumer et le DMD restera noir. Fermez-le, ou retirez-le du démarrage de Windows, puis « Vérifier de nouveau ».');
   }
   if (probe.code === LIBUSB_ERROR_NOT_SUPPORTED) {
     return t('PIN2DMD : la libusb de VPX ne sait pas l’ouvrir avec son pilote actuel ({service}). Le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».', {
@@ -434,8 +434,9 @@ export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmd
     values.push({ section: DMDUTIL, key: 'ZeDMDWiFiEnabled', value: wifi.enabled ? '1' : '0' });
     if (wifi.enabled) values.push({ section: DMDUTIL, key: 'ZeDMDWiFiAddr', value: wifi.address.trim() });
   }
-  // Image du menu réglée (oui ou non) mais serveur absent : VPX ouvre lui-même le DMD.
-  if (setup?.menu !== undefined) values.push({ section: DMDUTIL, key: 'DMDServer', value: '0' });
+  // Image du menu réglée (oui ou non), ou PIN2DMD que seul le serveur pilote, mais serveur absent : VPX
+  // ouvre lui-même le DMD (un DMDServer = 1 d'une partie précédente le laisserait attendre un serveur arrêté).
+  if (setup?.menu !== undefined || dmdServerDrivesPin2dmd(devices, setup)) values.push({ section: DMDUTIL, key: 'DMDServer', value: '0' });
   const anyOn = values.some((s) => s.value === '1') || Boolean(wifi?.enabled);
   const settings: VpxSetting[] = anyOn ? [{ section: DMDUTIL, key: 'Enable', value: '1' }, ...values] : values;
 
@@ -489,6 +490,8 @@ export function hardwareDmdFacts(devices: ObservedUsbDevice[], setup?: HardwareD
   if (setup?.zedmdWifi?.enabled) names.push(t('ZeDMD en wifi ({address})', { address: setup.zedmdWifi.address }));
   const problems = [...doubts.filter((x) => x?.reason === 'failed').map((x) => x!.message), ...on.map((d) => hardwareDmdDriverProblem(d)).filter((p): p is string => Boolean(p))];
   if (setup?.menu && names.length && serverProblem) problems.push(t('Image du front-end sur le DMD réel : {problem}', { problem: serverProblem }));
+  // PIN2DMD : seul le serveur le pilote, même sans l'image du front-end ; sans lui, la carte reste noire.
+  else if (serverProblem && dmdServerDrivesPin2dmd(devices, setup)) problems.push(t('PIN2DMD : {problem}', { problem: serverProblem }));
   const probe = on.find((d) => d.model === 'PIN2DMD' && d.device.libusbProbe)?.device.libusbProbe;
   return { devices: names, problems, ...(setup?.menu ? { menu: true } : {}), ...(probe ? { pin2dmdProbe: probe } : {}) };
 }

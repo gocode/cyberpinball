@@ -116,7 +116,7 @@ test('écran « DMD réel » : la ligne du PIN2DMD dit si la sonde l’a ouvert,
       menuServer: { problem: () => undefined, ready: () => false },
     }).build();
   const row = (device: ObservedUsbDevice) => page(device).sections.find((s) => s.rows.some((r) => /PIN2DMD/.test(r.text)))!.rows[0]!;
-  assert.match(row(pin2dmd({ stage: 'ok', code: 0 })).detail!, /ouvert puis relâché : VPX pourra l’allumer/);
+  assert.match(row(pin2dmd({ stage: 'ok', code: 0 })).detail!, /ouvert puis relâché : le serveur du DMD pourra l’allumer/);
   assert.match(row(pin2dmd({ stage: 'open', code: -3 })).detail!, /ne s’ouvre pas : voir « À vérifier »/);
   assert.match(row(pin2dmd()).detail!, /pilote prêt/);
   const checks = page(pin2dmd({ stage: 'open', code: -3, holders: ['dmdext'] })).sections.find((s) => s.title === 'À vérifier')!;
