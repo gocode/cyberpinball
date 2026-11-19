@@ -231,7 +231,7 @@ export const messages: Record<string, string> = {
   'Le pack propose plusieurs dispositions des écrans. Cyber Pinball recopie les fichiers de l’option choisie, comme le ferait son .bat, sans jamais l’exécuter ; l’option est retenue pour les mises à jour du pack. Rien n’est installé avant « Installer ».': 'The pack offers several screen layouts. Cyber Pinball copies the chosen option’s files, as its .bat would, without ever running it; the option is remembered for pack updates. Nothing is installed before “Install”.',
   Pack: 'Pack',
   'Nom du pack non vérifié : {folder}': 'Pack name not checked: {folder}',
-  'Le script de la table n’a pas pu être lu : le pack garde le nom de son dossier. Le médecin le vérifiera.': 'The table’s script could not be read: the pack keeps its folder name. The doctor will check it.',
+  'Le script de la table n’a pas pu être lu : le pack garde le nom de son dossier. Le diagnostic le vérifiera.': 'The table’s script could not be read: the pack keeps its folder name. The diagnosis will check it.',
   'PuP-Pack renommé « {name} »': 'PuP-Pack renamed “{name}”',
   'C’est le nom que charge la table ; « {origin} » n’aurait jamais été trouvé.': 'That’s the name the table loads; “{origin}” would never have been found.',
   'Dossier en trop retiré': 'Extra folder removed',

@@ -153,7 +153,7 @@ Le catalogue en ligne (**« Trouver une table en ligne »**) montre chaque jeu d
   Ce qui a été choisi à la main (rattaché quand même, gardé de côté exprès) n'est pas touché.
   Un fichier disparu passe « À corriger ».
   Aucun besoin d'éditer `acquisition.json` à la main.
-- **Installation** : « Installer : <jeu> » ouvre le plan d'ajout habituel avec les fichiers reçus, le jeu VPS déjà choisi ; rien ne bouge avant « Installer », puis le médecin vérifie la table.
+- **Installation** : « Installer : <jeu> » ouvre le plan d'ajout habituel avec les fichiers reçus, le jeu VPS déjà choisi ; rien ne bouge avant « Installer », puis le diagnostic vérifie la table.
   Un fichier **à corriger ne bloque jamais** le reste : le plan le laisse de côté (« PuP-Pack à corriger à part »), et seul un jeu dont tout est à corriger ouvre l'élément.
   Ce qui est récupéré pour une table installée (parcours « Ce qu'il manque pour jouer », « Parties du jeu ») lui revient en entier : le plan est ciblé sur son dossier (`PlanOptions.target`).
   La provenance va dans le `.info` (`CyberPinball.source` : jeu et fichier VPS, version, auteurs, page, date) ; les copies de `downloads\acquisition` sont effacées, les fichiers de Téléchargements restent.

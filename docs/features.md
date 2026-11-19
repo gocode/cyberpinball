@@ -267,7 +267,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **Controllers recognised without sending them anything** (Pinscape, LedWiz, Teensy, DudesCab, PacLed…), the VPX DOF plugin turned on, and what keeps an LED from lighting stated plainly (missing configuration, controller without its file, undeclared Teensy).
 - **The configtool configuration** is fetched in "Get" and imports itself; the old one is backed up.
 - **Addressable LEDs (WS2812)**: describe your strips (Teensy, Wemos D1, or Art-Net to WLED on an ESP32) and Cyber Pinball writes the DOF `Cabinet.xml`, never replacing a hand-written file.
-- **A table's doctor** points out a ROM with no DOF effects; the VPX settings choose, for the knocker or the shaker, the table's sound, the cabinet or both.
+- **A table's diagnosis** points out a ROM with no DOF effects; the VPX settings choose, for the knocker or the shaker, the table's sound, the cabinet or both.
 
 ### Several configurations
 
@@ -488,7 +488,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **"Game parts"**: one line per part (table, backglass, ROM, PuP-Pack, DMD colours, sounds, music, point of view, topper, media), "Present", "Received, to install", "Expected" or missing; each one can be added, replaced, reassigned or removed, and a missing part starts a search on every site.
 - **"Table files"**: the whole folder grouped by kind, with what VPX will do with each file ("loaded by VPX with this table", "wrongly named: VPX won't load it").
 - **"Flyer and rules"**: a single booklet, page by page, turned for the player. The rules are found automatically: the card and text stored in the table, a public rulesheet (The Pinball Primer, Pinball Rule Sheets), a tutorial video to watch on the phone; the game controls always come last. For about ten tables, a game guide opens the booklet: the goal, then one objective per page, with the shots numbered on the playfield and the shots from the flippers.
-- **"Diagnose and fix"**: the table doctor (see [A cabinet that looks after itself](#a-cabinet-that-looks-after-itself)).
+- **"Diagnose and fix"**: the table diagnosis (see [A cabinet that looks after itself](#a-cabinet-that-looks-after-itself)).
 
 <p align="center"><img src="images/en/game-page.webp?v=5a9f437c7d" width="360" alt="The game page of Neon Abyss: its play statistics and files, then Play, Play with a friend, Scoreboard, Flyer and rules, Add to favourites, Add to a collection and Manage the table."></p>
 
@@ -597,9 +597,9 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **A discreet indicator**, left out of the video: "Recording in 7 s", "REC 0:12 / 0:30".
 - **Back in the menu**: "Use for the wheel", "Keep aside", "Play and record again" or "Discard the recording".
 
-### Media doctor and import from another frontend
+### Media diagnosis and import from another frontend
 
-- **The media doctor** flags an unreadable format, a wrongly named or misplaced item, proportions that don't fit the screen, a very heavy file, duplicates. Its fixes are always safe (rename, move, bin); "Fix all" runs them in a row.
+- **The media diagnosis** flags an unreadable format, a wrongly named or misplaced item, proportions that don't fit the screen, a very heavy file, duplicates. Its fixes are always safe (rename, move, bin); "Fix all" runs them in a row.
 - **"Import media"** from another installed frontend (System menu > "Cyber Pinball" > "Migration"): a plan table by table, the original install is not modified.
 
 ## During a game
@@ -655,7 +655,7 @@ Two features in beta ("BETA" badge in System menu > Cabinet): without the hardwa
 
 <p align="center"><img src="images/en/tech-sheet.webp?v=be70aa361a" width="360" alt="The cabinet's tech sheet: the PC, Windows, the screens, the controllers, the software and Cyber Pinball, each block with its status (OK or To check), then Send a report and Cabinet health."></p>
 
-### The table doctor
+### The table diagnosis
 
 - **"Diagnose and fix"** explains in plain words why a table doesn't work, and fixes what it can: a ROM misplaced or scattered, a PuP-Pack switched off by its script or badly set up, a wrongly named backglass, a table drawn the wrong way round, framing imposed by the table.
 - **Nothing is deleted**: replaced files go to Cyber Pinball's bin.

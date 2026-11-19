@@ -3088,7 +3088,7 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
           rom: alias.alias,
           neighbour: alias.rom,
           title: t('Révision voisine : {rom} au lieu de {asked}', { rom: alias.rom, asked: alias.alias }),
-          detail: t('pinmame\\alias.txt fait charger {rom}, la table demande {asked}. {warning} Quand {asked}.zip arrivera, le médecin proposera de retirer l’alias.', {
+          detail: t('pinmame\\alias.txt fait charger {rom}, la table demande {asked}. {warning} Quand {asked}.zip arrivera, le diagnostic proposera de retirer l’alias.', {
             rom: alias.rom,
             asked: alias.alias,
             warning: neighbourWarning(),

@@ -2,15 +2,15 @@
 
 ## What's missing to play: guided path
 
-A table that will not start almost always has a cause Cyber Pinball already knows (missing ROM, VPX not installed…), but the doctor often stopped at the finding ("ROM « t2_l8 » absente: put the file in the import folder") without saying where to find the file.
+A table that will not start almost always has a cause Cyber Pinball already knows (missing ROM, VPX not installed…), but the diagnosis often stopped at the finding ("ROM « t2_l8 » absente: put the file in the import folder") without saying where to find the file.
 The **"Ce qu'il manque pour jouer" (What's missing to play)** screen leads all the way to the game: each step says where it stands and offers the next move, one press of Start away (or one click).
 
 - **What it takes to play**: the `.vpx` file and, if its script asks for one, the ROM, when it is missing or unreadable for PinMAME (not linked, misplaced, scattered, old name without an alias).
   A ROM found through PinMAME's shared folder, or provided by an alias to a neighbouring revision, is enough.
   Nothing else holds "Jouer" (Play) back: DMD content, `.directb2s` backglass, PuP-Pack, media, DMD colours, alternative sounds, tidying the table are offered, never required.
   A single rule, in the core: [packages/core/src/playable.ts](../../packages/core/src/playable.ts) (`blocksPlay`, `playBlockers`, `requiredForPlay`).
-  The doctor follows it (only ROM findings have the "error" severity; `playSeverity`, applied by `diagnose`, brings any other finding down to "warning"), and so do the path, the catalog's "Ce qu'il faut" ("indispensable", essential: the table and the ROM), the quick install, the details screen and the "Fichiers de la table" (Table files) inventory (`romBlockers`, which no longer say "ROM missing" when PinMAME finds it through its shared folder).
-  Tests: `playable.test.ts` (every doctor rule, even marked "error") and the invariant checked on every trapped table (`doctor-traps.test.ts`).
+  The diagnosis follows it (only ROM findings have the "error" severity; `playSeverity`, applied by `diagnose`, brings any other finding down to "warning"), and so do the path, the catalog's "Ce qu'il faut" ("indispensable", essential: the table and the ROM), the quick install, the details screen and the "Fichiers de la table" (Table files) inventory (`romBlockers`, which no longer say "ROM missing" when PinMAME finds it through its shared folder).
+  Tests: `playable.test.ts` (every diagnosis rule, even marked "error") and the invariant checked on every trapped table (`doctor-traps.test.ts`).
 - **Where to find it**: at the top of the details screen when the ROM is missing, or when a path is under way ("Reprendre : Étape 3 sur 4", Resume: Step 3 of 4); after a game that failed ("Start : voir ce qu'il manque pour jouer", Start: see what's missing to play); in the diagnosis, as soon as a finding keeps the table from playing; in the waiting list ("Reprendre : ce qu'il manque pour jouer <table>", Resume: what's missing to play <table>).
   Missing DMD content is offered on the details screen after "Jouer" ("Pour aller plus loin", Going further), never at the top.
 - **Steps**: first the path up to "Jouer" (Play), numbered: "Borne et VPX" (Cabinet and VPX), "Table" (the .vpx file, and the ROM its script asks for), "ROM <name>" (if the script uses PinMAME), then "Jouer".
@@ -30,15 +30,15 @@ The **"Ce qu'il manque pour jouer" (What's missing to play)** screen leads all t
   The received file ("Récupérer" window, watched Downloads folder) turns the step into "À installer" (To install): "Installer le fichier reçu" (Install the received file) shows the add plan (ROM library, link in the table), then comes back to the path, which reads the table again.
   A neighbouring revision already on the cabinet is offered second ("Jouer avec t2_l6, révision voisine", Play with t2_l6, neighbouring revision, with the warning from § "ROM library"), or first if the VPS database gives no link; a neighbouring revision given by the database comes last.
   Without a link: "Chercher t2_l8 dans le catalogue" (Search the catalog for t2_l8); always: "J'ai déjà le fichier" (I already have the file: drop it on the screen, or pick it on this PC), which also goes through the plan and comes back to the path.
-- **Resuming later**: the state is read again at every opening (doctor's findings, waiting list, VPS database).
+- **Resuming later**: the state is read again at every opening (diagnosis findings, waiting list, VPS database).
   The steps already shown are remembered in `<données>\parcours.json`, with the last position (step number and total, translated when shown, so the sheet follows a language changed since): a step settled since stays in the list, ticked, and "Step n of N" keeps its meaning.
   The path is forgotten when the game is started from it.
-- **Code**: plan in [packages/core/src/journey.ts](../../packages/core/src/journey.ts) (`planJourney`, `romSources`, `journeyChoices`, remembered paths), tests in `packages/core/src/test/journey.test.ts` (trapped tables analysed by the doctor, from a missing ROM up to "Jouer"); screen in `app/src/journey.ts`, rendering `renderJourney` (`app/renderer/library.js`); catalog entry points (`fetchFor`, `reopen`, `scanDownloads`, `openSearch`) in `app/src/catalog.ts`.
+- **Code**: plan in [packages/core/src/journey.ts](../../packages/core/src/journey.ts) (`planJourney`, `romSources`, `journeyChoices`, remembered paths), tests in `packages/core/src/test/journey.test.ts` (trapped tables analysed by the diagnosis, from a missing ROM up to "Jouer"); screen in `app/src/journey.ts`, rendering `renderJourney` (`app/renderer/library.js`); catalog entry points (`fetchFor`, `reopen`, `scanDownloads`, `openSearch`) in `app/src/catalog.ts`.
   Mockups: `EcranParcours` and `EcranParcoursBureau` in the design system.
 
-**What keeps a game from working**, what the doctor said about it, and what the path does:
+**What keeps a game from working**, what the diagnosis said about it, and what the path does:
 
-| Cause | Doctor's finding | Before the path | Step and move in the path |
+| Cause | Diagnosis finding | Before the path | Step and move in the path |
 | --- | --- | --- | --- |
 | VPX not installed | none: the script is not read, the ROM not checked | "Aucune table" (No table) message, VPX installation | "Borne et VPX": "Installer Visual Pinball X" (Install Visual Pinball X); the ROM waits ("En attente", Pending) |
 | Cabinet not set up | none | wizard on first start | "Borne et VPX": "Configurer la borne" (Set up the cabinet) |

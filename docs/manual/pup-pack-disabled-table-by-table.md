@@ -19,7 +19,7 @@ On re-enabling, the `.vbs` is redone identically.
 A `.vbs` from elsewhere is not touched.
 
 **Nothing switches it back on.**
-The doctor says "PuP-Pack disabled" (information) and asks for nothing; the repairs made before every game put the script back without PuP, never the pack; cabinet health and "What's missing to play" count it as done; "Game parts" neither searches nor offers a pack to download for it; sharing with friends does not send it; a pack update installed through the add plan is stored in `pupvideos (off)` and stays disabled.
+The diagnosis says "PuP-Pack disabled" (information) and asks for nothing; the repairs made before every game put the script back without PuP, never the pack; cabinet health and "What's missing to play" count it as done; "Game parts" neither searches nor offers a pack to download for it; sharing with friends does not send it; a pack update installed through the add plan is stored in `pupvideos (off)` and stays disabled.
 
 **Shared pack.**
 `pupvideos` is shared by the tables of one folder: the other versions that load the same pack (same ROM, same name) also play without it.

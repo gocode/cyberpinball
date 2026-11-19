@@ -4,16 +4,16 @@
 
 Une ROM sert souvent à plusieurs tables (versions, mods d'une même machine).
 Chaque ROM est stockée **une seule fois**, dans `<racine>\pinmame\roms`, et chaque table qui la joue en a, dans son propre `pinmame\roms` (là où VPX 10.8.1 la cherche d'abord), un **lien physique** : le même fichier sur le disque, sans place en plus.
-Le dossier n'a pas été inventé : `<racine>\pinmame` est déjà le dossier commun de PinMAME que la synchronisation propose pour `[Plugin.PinMAME] PinMAMEPath` dès qu'il contient `roms` ; une table sans lien y trouve donc encore sa ROM, en secours, **à condition de ne pas avoir de dossier `pinmame\roms`** : dès que ce dossier existe, le plugin PinMAME n'y cherche que là (`PinMAMEPlugin.cpp`, l. 436-477, commit af26b2d93), et le médecin le signale comme bloquant quand la ROM n'y est pas.
+Le dossier n'a pas été inventé : `<racine>\pinmame` est déjà le dossier commun de PinMAME que la synchronisation propose pour `[Plugin.PinMAME] PinMAMEPath` dès qu'il contient `roms` ; une table sans lien y trouve donc encore sa ROM, en secours, **à condition de ne pas avoir de dossier `pinmame\roms`** : dès que ce dossier existe, le plugin PinMAME n'y cherche que là (`PinMAMEPlugin.cpp`, l. 436-477, commit af26b2d93), et le diagnostic le signale comme bloquant quand la ROM n'y est pas.
 Code : [packages/core/src/romlibrary.ts](../../packages/core/src/romlibrary.ts).
 
 **Alias de ROM par table** ([packages/core/src/romalias.ts](../../packages/core/src/romalias.ts)) : le plugin lit aussi `alias.txt` dans le dossier PinMAME de la table (`<table>\pinmame`), une ligne « nom demandé par le script,jeu chargé », avant même la ROM.
-Le médecin s'en sert de trois façons :
+Le diagnostic s'en sert de trois façons :
 
 - **Révision voisine** : la ROM demandée manque, mais une autre révision du même jeu (`t2_l6` pour `t2_l8`) est dans la table ou la bibliothèque ; sur demande, il la lie et écrit l'alias.
   L'avertissement le dit : lampes, bobines ou contacts peuvent différer, les réglages et records (NVRAM) ne sont pas repris, les sons remasterisés et couleurs du DMD rangés sous l'autre nom ne sont plus trouvés.
   Tant que l'alias sert, un rappel reste dans le diagnostic.
-- **Anciens noms de VPinMAME** (« goldfinger » pour « bond », 119 noms tirés de `release/VPMAlias.txt` de PinMAME, dans [packages/core/src/vpmalias.ts](../../packages/core/src/vpmalias.ts)) : VPinMAME les traduisait de lui-même, le plugin de VPX 10.8.1 ne les connaît plus ; le médecin écrit la ligne, et dit s'il manque aussi la ROM réelle.
+- **Anciens noms de VPinMAME** (« goldfinger » pour « bond », 119 noms tirés de `release/VPMAlias.txt` de PinMAME, dans [packages/core/src/vpmalias.ts](../../packages/core/src/vpmalias.ts)) : VPinMAME les traduisait de lui-même, le plugin de VPX 10.8.1 ne les connaît plus ; le diagnostic écrit la ligne, et dit s'il manque aussi la ROM réelle.
 - **Alias devenu inutile** : la ROM demandée est arrivée, mais l'alias passe avant elle ; « Revenir à la ROM demandée » retire la ligne (et le fichier, s'il n'en reste aucune).
 
 - **Même volume obligatoire** : un lien physique ne relie que deux dossiers d'un même disque (NTFS).
@@ -37,7 +37,7 @@ Le médecin s'en sert de trois façons :
 - **Vue globale** (menu système : « Bibliothèque de ROM »), aux boutons : chaque ROM, les tables qui l'utilisent et sa taille ; les ROM à ranger ; les ROM **inutilisées** (aucune table ne l'a ni ne l'attend), avec la corbeille proposée une par une ou toutes ; les ROM **attendues mais absentes**, avec « Ajouter ».
   La place sur le disque compte chaque fichier physique une fois et dit ce que les liens économisent.
   Seules les ROM des dossiers `pinmame\roms` sont concernées : les `.zip` rangés ailleurs (polices FlexDMD, par exemple) ne sont pas des ROM.
-- **Médecin** : « ROM pas liée dans la table » (elle est dans la bibliothèque, pas dans `pinmame\roms` : la lier) et « Copie de ROM au lieu d'un lien » (la remplacer par un lien ; pour une autre version, utiliser celle de la bibliothèque, l'autre va à la corbeille).
+- **Diagnostic** : « ROM pas liée dans la table » (elle est dans la bibliothèque, pas dans `pinmame\roms` : la lier) et « Copie de ROM au lieu d'un lien » (la remplacer par un lien ; pour une autre version, utiliser celle de la bibliothèque, l'autre va à la corbeille).
   La fiche de la table marque « (bibliothèque) » une ROM liée.
 - **ROM éparpillée, ROM à sous-dossier** (réparation de ce qu'ont laissé les versions jusqu'à 0.1.3-essai.1, qui déballaient un zip de ROM à sous-dossier et rangeaient ses puces à la racine de la table) : « ROM « t2_l8 » en fichiers éparpillés dans la table » repère les puces de la ROM demandée restées à la racine de la table (même nom qu'elle ou même famille : `t2_l8.rom`, `t2_u14.l3`… ; ni `.vgm`, ni `.ini`, ni `.log`) ou dans un dossier nommé comme elle ; « Refaire t2_l8.zip dans la bibliothèque et le lier » refait le zip à plat, le range dans la bibliothèque, le lie dans `pinmame\roms` et met les puces à la corbeille.
   Si la ROM est déjà là (bibliothèque, lien, alias), il ne reste qu'à mettre ces fichiers à la corbeille.

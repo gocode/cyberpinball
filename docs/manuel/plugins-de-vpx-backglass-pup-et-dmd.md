@@ -201,7 +201,7 @@ Code : [packages/core/src/dmdscreen.ts](../../packages/core/src/dmdscreen.ts).
   Un type contraire à la forme de la zone (FullDMD dans une bande, DMD seul sur tout l'écran) est signalé pour information.
 - **Fond des écrans sans playfield** : fronton, DMD et topper montrent leurs zones sur du noir pur, jamais le fond d'ambiance ni le cadre 9:16 du plateau du front-end au bureau (`#media-bg`, propre au playfield ; `layout-check.ts` le refuse sur un autre écran).
 - **Limite de VPX 10.8.1** : dans la fenêtre du DMD, VPX garde le premier moteur qui dessine.
-  Le plugin PUP ne dessine jamais le DMD de la table : pour une table qui dessine le sien, le médecin rend la fenêtre au DMD (`[ScoreView] Priority.PUP = 0`, règle `pupHidesDmd`), et l'écran 5 du pack ne s'y montre pas pendant la partie.
+  Le plugin PUP ne dessine jamais le DMD de la table : pour une table qui dessine le sien, le diagnostic rend la fenêtre au DMD (`[ScoreView] Priority.PUP = 0`, règle `pupHidesDmd`), et l'écran 5 du pack ne s'y montre pas pendant la partie.
 - **Tests** : [dmdscreen.test.ts](../../packages/core/src/test/dmdscreen.test.ts).
 
 ### Habillage FullDMD en partie
@@ -228,12 +228,12 @@ Code : [fulldmdframe.ts](../../packages/core/src/fulldmdframe.ts), [fulldmdtable
   Le DMD du jeu s'inscrit dans le cadre, la fenêtre de VPX par-dessus.
 - **Réglage fin** : en partie, les deux MagnaSave > « Position du DMD » (ci-dessous), ou menu de VPX > « Display Settings » > « ScoreView Display » : position et taille au pixel près, puis « Save as Table Override ».
   Une place qui n'est plus celle que Cyber Pinball a écrite est celle de l'utilisateur : elle n'est plus jamais touchée.
-  Le médecin la montre (« Écrans placés pour cette table ») ; « Revenir à la disposition générale » la retire, et le cadre trouvé revient à la partie suivante.
-- **Détection** : le médecin signale « Le DMD cacherait l'habillage FullDMD » (`fullDmdHidden`, avertissement) quand la place du DMD réglée pour la table recouvre au moins la moitié de l'habillage (`dressCoverage` ; `ScoreViewFullScreen = 1`, par exemple) ; la correction pose le DMD dans le cadre.
+  Le diagnostic la montre (« Écrans placés pour cette table ») ; « Revenir à la disposition générale » la retire, et le cadre trouvé revient à la partie suivante.
+- **Détection** : le diagnostic signale « Le DMD cacherait l'habillage FullDMD » (`fullDmdHidden`, avertissement) quand la place du DMD réglée pour la table recouvre au moins la moitié de l'habillage (`dressCoverage` ; `ScoreViewFullScreen = 1`, par exemple) ; la correction pose le DMD dans le cadre.
   Pendant la partie, le front-end relit la pile des fenêtres de Windows : une fenêtre de VPX qui recouvre l'habillage est notée au journal (« Partie : le DMD de VPX recouvre … % de l'habillage FullDMD », `liveDressCoverage`).
 - **Diagnostic de toutes les tables** : `npm run habillage` (`scripts\diagnostic-habillage.ps1` : Electron sur un bureau Windows caché, rien n'apparaît à l'écran) liste chaque table, le cadre trouvé, la place du DMD en partie, et marque « [À CORRIGER] » celles dont le DMD recouvrirait l'habillage.
   Rien n'est changé aux tables.
-- **Tests** : [fulldmdframe.test.ts](../../packages/core/src/test/fulldmdframe.test.ts) (cadre, vidéo, place dans l'écran, `.ini` de la table, invariant sur des écrans simulés, médecin) et le piège `fullDmdHidden` de [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).
+- **Tests** : [fulldmdframe.test.ts](../../packages/core/src/test/fulldmdframe.test.ts) (cadre, vidéo, place dans l'écran, `.ini` de la table, invariant sur des écrans simulés, diagnostic) et le piège `fullDmdHidden` de [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).
 
 ### DMD réglé pour le mode bureau
 
@@ -249,9 +249,9 @@ Code : [tableoptions.ts](../../packages/core/src/tableoptions.ts), constat dans 
   Un `.ini` neuf prend les fins de ligne de Windows, comme ceux que VPX écrit.
 - **Quand** : seulement sur une borne qui a un écran ou une zone de DMD ; dès l'installation et avant chaque partie (`PUP_PLAY_REPAIRS`), sans rien demander.
   La table n'est pas modifiée.
-- **Médecin** : constat « DMD réglé pour le mode bureau » (`dmdDesktopOption`), qui nomme l'option, sa valeur par défaut, celle choisie pour la borne et le fichier, avec la correction « Régler « DMD Type » sur « FlexDMD » dans … » ; il disparaît une fois la clé écrite.
+- **Diagnostic** : constat « DMD réglé pour le mode bureau » (`dmdDesktopOption`), qui nomme l'option, sa valeur par défaut, celle choisie pour la borne et le fichier, avec la correction « Régler « DMD Type » sur « FlexDMD » dans … » ; il disparaît une fois la clé écrite.
   Les lectures de script passent en version 10 (`FACTS_VERSION`, `app/src/vbs.ts`) : les tables déjà installées sont relues.
-- **Tests** : [tableoptions.test.ts](../../packages/core/src/test/tableoptions.test.ts) (lecture des options, clés de VPX, choix du joueur gardé, médecin, `.ini` neuf, état de la fenêtre du DMD de VPX) et le piège `dmdDesktopOption` de [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).
+- **Tests** : [tableoptions.test.ts](../../packages/core/src/test/tableoptions.test.ts) (lecture des options, clés de VPX, choix du joueur gardé, diagnostic, `.ini` neuf, état de la fenêtre du DMD de VPX) et le piège `dmdDesktopOption` de [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).
 
 ### DMD de FlexDMD et d'UltraDMD sans arrêt en partie
 
@@ -263,7 +263,7 @@ Deux cas sont réglés avant la partie, sans modifier la table.
   Les images retenues sont celles de la table dont le script écrit le nom en entier (« VPX.nom&… »), le donne en chaîne (« "VPX." & nom », chez JP) ou le fabrique à partir d'un début (« "d_" & lettre » : les lettres du DMD de *Hellboy*) ; seules comptent les chaînes qui sont le nom d'une image de la table.
   Les options d'image écrites dans le script sont reprises quand FlexDMD les reconnaît en entier (`dmd=`, `dmd2=`, `add`, `region=`, `pad=`) ; une autre chaîne qui commence par « & » (paramètres d'une adresse web) n'est jamais demandée à FlexDMD.
   Jusqu'à 3 000 demandes (`FLEX_PREWARM_MAX`) : toutes les images des grandes tables, *Daredevil* compris (178 images en trois variantes).
-  Constat du médecin « Images du DMD chargées en pleine partie » (`flexImagesLate`), réparé seul avant chaque partie (`PUP_PLAY_REPAIRS`) ; un `.vbs` venu d'ailleurs n'est pas touché.
+  Constat du diagnostic « Images du DMD chargées en pleine partie » (`flexImagesLate`), réparé seul avant chaque partie (`PUP_PLAY_REPAIRS`) ; un `.vbs` venu d'ailleurs n'est pas touché.
 - **Vidéos trop grandes** (tables UltraDMD ou FlexDMD) : le plugin décode chaque vidéo du dossier du DMD en entier, d'un coup, à chaque scène qui la montre (`Video.cpp`) ; une vidéo de 1920 × 480 figeait la partie une à plusieurs secondes à chaque scène.
   Une vidéo de plus de quatre fois le plus grand DMD (256 × 64 points), ou de plus de 3 Mo quand sa taille ne se lit pas, est signalée ([dmdvideos.ts](../../packages/core/src/dmdvideos.ts)) : constat « Vidéos du DMD trop grandes : la partie se fige » (`dmdVideosHeavy`), dans le diagnostic de la table et dans la ligne « Tables » de la Santé de la borne.
   Avant la partie, celles que Chromium sait lire (mp4, m4v, mov, webm) sont ramenées à 128 × 32 (`app/src/dmd-video-shrink.ts`) : réencodées en VP8 dans un WebM, sous le même nom, que VPX reconnaît à son contenu ; l'original va à la corbeille de Cyber Pinball.
@@ -323,7 +323,7 @@ Code : [dmdplace.ts](../../packages/core/src/dmdplace.ts) (places, `.ini` de la 
   Les clés écrites sont retenues (`written`) ; une table qui n'a plus de place (ou dont l'écran est absent) les perd, sauf celles changées depuis dans le menu de VPX.
 - **Sur un FullDMD** : l'image FullDMD reste autour, seuls les points du DMD sont posés à la place choisie.
   `Priority.B2S = 0` : le plugin B2S ne dessine plus l'image FullDMD du `.directb2s` dans la petite fenêtre ; le fond de partie de Cyber Pinball montre le média FullDMD derrière.
-  Une place réglée ainsi passe avant l'habillage FullDMD (`dressUpdate` la garde, « place réglée en partie ») ; le médecin ne la signale ni comme « Écrans placés pour cette table » ni comme « Le DMD cacherait l'habillage FullDMD » (`DoctorContext.dmdPlaced`).
+  Une place réglée ainsi passe avant l'habillage FullDMD (`dressUpdate` la garde, « place réglée en partie ») ; le diagnostic ne la signale ni comme « Écrans placés pour cette table » ni comme « Le DMD cacherait l'habillage FullDMD » (`DoctorContext.dmdPlaced`).
 - **DMD masqué** : jamais `ScoreViewOutput = 0`, qui empêche VPX d'ouvrir la fenêtre : « DMD : affiché » ne montrait alors rien jusqu'au redémarrage de la table (13 novembre 2026).
   La fenêtre est écrite à sa place, et Cyber Pinball, qui la guette dès le lancement de VPX, la range hors de tout écran à sa taille avant son premier affichage (`watchHiddenDmd`, `dmdParkedRect`) : à sa taille, car le plugin ScoreView choisit sa mise en page sur la fenêtre à son premier rendu (le plugin « CyberPinballDmd » la lui fait rechoisir à chaque changement de taille, pas à un simple déplacement) ; dans le menu, masquer la range de même, à sa taille, et l'afficher la ramène aussitôt à sa place.
   Jamais `ShowWindow(SW_HIDE)` : VPX 10.8.1 remontre à chaque image une fenêtre annexe cachée (`Renderer::RenderAncillaryWindow`, « if (!IsVisible()) Show() »).
@@ -370,13 +370,13 @@ L'aide-mémoire le dit, « Enregistrer grisé : rien n'a changé ; Lancer le ral
 | seul sur son écran (plein écran) | non | passer en fenêtré dans ce menu écrit `FullScreen` tout de suite dans les réglages généraux, appliqué au lancement suivant |
 | incrusté dans le playfield | position et taille | encadré en vert tant que la page est ouverte |
 
-- **Après la partie** : une place enregistrée pour la table donne au médecin le constat « Écrans placés pour cette table » (information, avec les tailles et positions), et sa correction « Revenir à la disposition générale » retire ces clés seulement (`tableWindowsFinding`, `packages/core/src/doctor.ts`).
+- **Après la partie** : une place enregistrée pour la table donne au diagnostic le constat « Écrans placés pour cette table » (information, avec les tailles et positions), et sa correction « Revenir à la disposition générale » retire ces clés seulement (`tableWindowsFinding`, `packages/core/src/doctor.ts`).
   Une place enregistrée pour toutes les tables est une clé gérée changée à la main : le front-end demande au démarrage s'il faut la garder (voir « Plusieurs rôles sur un écran : zones »).
 - **Hors partie** : dans « Réglages de cette table », les réglages visuels (cadrage et caméra, fenêtres, profils des afficheurs `[DMD]` et `[Alpha]`, place du DMD dans l'image B2S, marges des écrans PuP) portent le badge « En partie » et ne se modifient plus ; seule la valeur propre à la table peut être retirée.
   Les mesures du meuble (largeur de l'écran, lockbar) restent réglables.
 - **Qui dessine dans la fenêtre du DMD** : le plugin PUP ne dessine jamais le DMD de la table ; il n'en lit les images que pour reconnaître des scènes (PuPCapture, `PUPManager::ProcessDmdFrame`).
   S'il prend la fenêtre ScoreView (pack avec un écran 5, ou un écran 1 qui n'est pas posé sur le fronton), le score de la ROM, de FlexDMD ou d'UltraDMD n'y paraît pas.
-  VPX lit la priorité dans les réglages de la table : pour une table qui dessine son DMD (ROM de PinMAME, `CreateObject("FlexDMD.FlexDMD")` ou `UltraDMD.DMDObject`, dossier du DMD) et dont le script n'écrit pas lui-même le score sur le pack (`LabelNew`, `LabelInit`), le médecin écrit `[ScoreView] Priority.PUP = 0` dans le `.ini` de la table (« Le PuP-Pack cacherait le DMD de la table », `pupHidesDmd`), et le front-end le fait seul avant la partie.
+  VPX lit la priorité dans les réglages de la table : pour une table qui dessine son DMD (ROM de PinMAME, `CreateObject("FlexDMD.FlexDMD")` ou `UltraDMD.DMDObject`, dossier du DMD) et dont le script n'écrit pas lui-même le score sur le pack (`LabelNew`, `LabelInit`), le diagnostic écrit `[ScoreView] Priority.PUP = 0` dans le `.ini` de la table (« Le PuP-Pack cacherait le DMD de la table », `pupHidesDmd`), et le front-end le fait seul avant la partie.
   Le pack garde le fronton et le topper ; une valeur déjà réglée pour la table dans le menu de VPX est respectée.
   Cas trouvé sur *2001* (score UltraDMD, option « DMD on Fulldmd »).
 - **Limites** : sans MagnaSave, on ne change pas de ligne dans le menu de VPX (`UIUp`, `UIDown`) ; l'ordre d'empilement de deux fenêtres de VPX qui se chevauchent (DMD sur le fronton) est laissé à Windows.

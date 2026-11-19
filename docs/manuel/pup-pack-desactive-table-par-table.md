@@ -19,7 +19,7 @@ Sans pack, un interrupteur laissé allumé gênerait la partie : une PuP-DMD all
 Un `.vbs` venu d'ailleurs n'est pas touché.
 
 **Rien ne le rallume.**
-Le médecin dit « PuP-Pack désactivé » (information) et ne réclame rien ; les réparations faites avant chaque partie remettent le script sans PuP, jamais le pack ; la santé de la borne et « Ce qu'il manque pour jouer » le comptent comme fait ; « Parties du jeu » ne cherche ni ne propose de pack à télécharger pour lui ; le partage entre amis ne l'envoie pas ; une mise à jour du pack installée par le plan d'ajout se range dans `pupvideos (off)` et reste désactivée.
+Le diagnostic dit « PuP-Pack désactivé » (information) et ne réclame rien ; les réparations faites avant chaque partie remettent le script sans PuP, jamais le pack ; la santé de la borne et « Ce qu'il manque pour jouer » le comptent comme fait ; « Parties du jeu » ne cherche ni ne propose de pack à télécharger pour lui ; le partage entre amis ne l'envoie pas ; une mise à jour du pack installée par le plan d'ajout se range dans `pupvideos (off)` et reste désactivée.
 
 **Pack partagé.**
 `pupvideos` est commun aux tables d'un même dossier : les autres versions qui chargent le même pack (même ROM, même nom) se jouent aussi sans lui.

@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.1
 
+- Le "médecin des tables" s'appelle désormais partout le diagnostic, comme l'écran ouvert par "Diagnostiquer et réparer" : "Ouvrir le diagnostic de la table" dans la santé de la borne, et le même mot dans les manuels et les pages du projet.
 - Reprise d'une grosse installation existante : l'analyse ne s'arrête plus sur « File size (…) is greater than 2 GiB ». Une archive de plusieurs Go rangée avec les tables (l'archive téléchargée d'une table et de son PuP-Pack) était prise pour une ROM et lue d'un bloc ; elle est maintenant reconnue comme une archive et laissée où elle est.
 - Les archives .zip se lisent par leur seule table des matières, quelle que soit leur taille (format Zip64 compris), et les empreintes des ROM, des médias et des PuP-Packs se calculent par morceaux : aucun fichier posé par l'utilisateur n'est plus lu d'un bloc.
 - Le plan d'installation dit la place qu'il prendra sur chaque disque et la place libre. S'il en manque, il le dit avant de copier (« Pas assez de place sur D:\ : il faut 182 Go, 40 Go libres ») et propose « Revérifier la place » au lieu d'« Installer ».

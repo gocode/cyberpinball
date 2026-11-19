@@ -15,7 +15,7 @@ export const messages: Record<string, string> = {
   '{space} : moins de {limit}': '{space}: less than {limit}',
   // tables
   'Rien à jouer pour l’instant': 'Nothing to play yet',
-  'Ouvrir le médecin de la table': 'Open the table doctor',
+  'Ouvrir le diagnostic de la table': 'Open the table’s diagnosis',
   '… et {n} autre table': '… and {n} more table',
   '… et {n} autres tables': '… and {n} more tables',
   'Voir toutes les tables à revoir': 'See every table to review',
@@ -73,8 +73,8 @@ export const messages: Record<string, string> = {
   'Vérifié le {day}': 'Checked on {day}',
   // app/src/health.ts
   'Tables à revoir': 'Tables to review',
-  '{n} table à revoir : le médecin de chacune dit quoi faire.': '{n} table to review: its doctor says what to do.',
-  '{n} tables à revoir : le médecin de chacune dit quoi faire.': '{n} tables to review: each one’s doctor says what to do.',
+  '{n} table à revoir : son diagnostic dit quoi faire.': '{n} table to review: its diagnosis says what to do.',
+  '{n} tables à revoir : le diagnostic de chacune dit quoi faire.': '{n} tables to review: each one’s diagnosis says what to do.',
   'Vérifier maintenant': 'Check now',
   'Premier relevé en cours : espace disque, tables, PuP-Packs, médias, écrans et VPX.': 'First check under way: disk space, tables, PuP-Packs, media, screens and VPX.',
   'Flippers : choisir · Start : ouvrir · Exit : revenir': 'Flippers: choose · Start: open · Exit: go back',

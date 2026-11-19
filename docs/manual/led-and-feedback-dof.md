@@ -98,7 +98,7 @@ The folder is **shared by every VPX 10.8 on the PC** (another cabinet frontend i
 Nothing is sent to the controllers outside a game: no port is opened, no LED is lit for a test.
 Testing happens in a game, on a table with a PinMAME ROM.
 
-**Table doctor** (`dofFindingsFor`, only on a cabinet that has ini files): `dofLocalIni` (a `directoutputconfig*.ini` in the table folder hides the cabinet's when `IniFilesPath` is not set; fix: move it to the recycle bin), `dofNoPinmame` (table without a ROM: no feedback in plugin mode), `dofNoConfig` (the configuration has nothing for its ROM, by libdof's three rules: case-insensitive match, then `<rom>_…`, then prefix).
+**Table diagnosis** (`dofFindingsFor`, only on a cabinet that has ini files): `dofLocalIni` (a `directoutputconfig*.ini` in the table folder hides the cabinet's when `IniFilesPath` is not set; fix: move it to the recycle bin), `dofNoPinmame` (table without a ROM: no feedback in plugin mode), `dofNoConfig` (the configuration has nothing for its ROM, by libdof's three rules: case-insensitive match, then `<rom>_…`, then prefix).
 Never blocking.
 
 **Cabinet health**: a “LED et retours (DOF)” check (`dofLines`), absent on a cabinet with no controller and no configuration; one line per point to check (addressable LEDs without a Cabinet.xml and an old DOF configuration included), otherwise “DOF prêt” (DOF ready), each leading to the screen.

@@ -9,7 +9,7 @@ The icons were drawn for Cyber Pinball, with no icon font and no online resource
   Every window loads it before its scripts; the design system reads it too (`docs/design-system/src/icones.mjs`, "Icônes" sheet).
   The names known to the code are in [packages/core/src/icons.ts](../../packages/core/src/icons.ts) (`ICON_NAMES`, `IconName` type).
 - **Declarative**: an entry picks its icon with an `icon` field — required on `SystemItem` (system menu), optional on `Action`, `Row` and `Built` (screen title) in `app/src/library.ts`; `WizardStep.icon` for the steps of "Configuration de la borne" (Cabinet setup), `EssentialGroup.icon` for the groups of the VPX settings.
-  A screen opened from the system menu that declares no icon takes its entry's (catalogue, adding a table, ROMs, media), except a table's screens (game page, doctor…), titled with the game's name.
+  A screen opened from the system menu that declares no icon takes its entry's (catalogue, adding a table, ROMs, media), except a table's screens (game page, diagnosis…), titled with the game's name.
 - **Drawing and sizes**: a 2-unit stroke for the whole family (`theme.css`, `.icon`), in the text color.
   For a 1,080 px short side: 30 px before a menu entry, 24 px from the label and aligned on its first line; 60 px before a title; 38 px for the gear (72 px click area); 22 to 26 px in the tabs and groups of the settings; never under 20 px.
 - **States**: the icon follows its label (dark on the green bar, red at rest for a destructive action, dark on the red bar once selected); the "waiting for the user" dot sits at the top right of the icon, as on the gear.

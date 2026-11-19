@@ -51,7 +51,7 @@ D:\CyberPinball\
   The application itself runs in Electron 44 (Node 24), which does not have this defect; the tests, `fabriquer.mjs` and the command-line tools run under Node 22.
   `copyTree` only uses `mkdirSync` and `copyFileSync`, which are sound everywhere.
   `copie-sure.test.ts` refuses any `fs.cpSync` in the sources and copies from and to accented folders.
-  What the old defect left behind, the table doctor recognises by its name (`folderMangled`, `unmangledName`) and offers to move under its real name; a file already present under the real name goes to the trash, replaced by the newer copy.
+  What the old defect left behind, the table diagnosis recognises by its name (`folderMangled`, `unmangledName`) and offers to move under its real name; a file already present under the real name goes to the trash, replaced by the newer copy.
 - Variables for testing: `CYBERPINBALL_ROOT` (another root), `CYBERPINBALL_HOME` (isolated sandbox), `CYBERPINBALL_VPX_INI` (another file).
 
 On the command line: `node packages/installer/dist/cli.js setup <racine>`, `install [id]`, `status`.

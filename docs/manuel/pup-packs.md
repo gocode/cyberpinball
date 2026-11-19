@@ -48,7 +48,7 @@ L'écran montre l'option appliquée, celle qui convient à la borne, et chaque o
 Start applique l'option choisie : ses fichiers sont recopiés, ceux qu'ils remplacent et ceux que son `.bat` supprime partent à la corbeille (`trash\<date> PuP-Pack <dossier>` : l'état d'avant, pour y revenir), aucun `.bat` n'est exécuté (`pupOptionOps`).
 Si un fichier de l'option manque dans le pack, rien n'est touché et le message dit lequel (`missingSources`).
 Après la copie, le pack est relu : « appliquée » ne s'affiche que si l'option est reconnue en place, sinon le message dit ce qui manque (`checkAppliedOption`).
-Le choix est retenu dans le `.info` (`option`, et `chosen: "user"` : le médecin ne le remet plus en cause) et sert dès la partie suivante ; « Jouer » est proposé sur le même écran pour le voir.
+Le choix est retenu dans le `.info` (`option`, et `chosen: "user"` : le diagnostic ne le remet plus en cause) et sert dès la partie suivante ; « Jouer » est proposé sur le même écran pour le voir.
 Sur la fiche, la ligne « PuP-Pack » passe en orange quand une autre option convient mieux à la borne.
 « Pour cette borne » nomme l'option conseillée et la borne telle qu'elle est configurée (fronton, FullDMD ou DMD 4:1, topper) ; quand deux options se valent, il nomme les deux, à essayer.
 Une liste plus haute que l'écran montre un filet sur le bord derrière lequel il reste des entrées, en haut comme en bas, et l'entrée choisie est amenée entière dans la vue quand le choix change (`markOverflow`, `app/renderer/library.js`, toutes les listes des écrans de gestion).
@@ -78,8 +78,8 @@ Pour allumer le pack sans modifier la table, Cyber Pinball écrit `<table>.vbs` 
 C'est le script lu dans le `.vpx` (`readVpxScript`, [vpxinfo.ts](../../packages/core/src/vpxinfo.ts), sans VPX), octet pour octet, où seule la valeur change, plus une dernière ligne `' CyberPinball-script {…}` qui garde l'empreinte du script d'origine ([scriptpatch.ts](../../packages/core/src/scriptpatch.ts)) ; les numéros de ligne des erreurs de script ne bougent pas.
 Ce `.vbs`-là n'est pas un « script remplacé » : la fiche dit « Script adapté ».
 À l'ajout d'une table avec son pack, ou d'un pack pour une table déjà installée, le plan l'écrit d'office ; à la mise à jour de la table, il le refait d'après le nouveau script, ou le met à la corbeille si la nouvelle version lance le pack d'elle-même.
-Un `.vbs` venu d'ailleurs n'est jamais remplacé : le médecin propose d'y allumer le pack.
-Un script protégé (chiffré) ne se lit pas sans VPX : le médecin dit alors quelle valeur changer.
+Un `.vbs` venu d'ailleurs n'est jamais remplacé : le diagnostic propose d'y allumer le pack.
+Un script protégé (chiffré) ne se lit pas sans VPX : le diagnostic dit alors quelle valeur changer.
 
 **Interrupteur relayé, et PuP-DMD.**
 *The Goonies Never Say Die Pinball (VPW 2021)* livre `Const enablePupPack = False`, puis `Dim HasPuP : HasPup = enablePupPack`, et ne lance le pack que `If HasPup Then`.
@@ -90,14 +90,14 @@ La PuP-DMD (le score que le script écrit sur l'écran DMD du pack, `LabelInit`)
 Éteint, le pack pose son cadre vide (`PuPFrames\default.png`) dans la fenêtre du DMD, par-dessus le DMD de la table, et le script demande à PinUP Player de cacher cet écran (`SendMSG` FN 12), ce que le plugin PUP ne fait pas.
 `pupSwitchesToEnable` allume donc les deux quand l'option en place occupe la fenêtre du DMD (`packDrawsDmd`) d'une borne qui en a une, sinon le pack seul.
 Le `.vbs` les garde tous dans sa dernière ligne (`kind: 'dmd'` pour la PuP-DMD).
-Le médecin relit le script dans le `.vpx` au lieu de se fier à la lecture gardée en cache, qui pouvait dater d'avant (lectures en version 6 : une ancienne lecture de la même table est refaite sans VPX, `cachedScript`).
+Le diagnostic relit le script dans le `.vpx` au lieu de se fier à la lecture gardée en cache, qui pouvait dater d'avant (lectures en version 6 : une ancienne lecture de la même table est refaite sans VPX, `cachedScript`).
 L'ajout d'une table ou d'un pack fait de même.
 
 **Pack que personne ne lance.**
 *Game of Thrones LE (VPW, Stern 2015)* est une table originale en FlexDMD, sans ROM.
 Son script ne crée jamais `PinUpPlayer.PinDisplay` (« `Dim PuPlayer ' Not currently used` ») ; le pack de mikeleonheart est fait pour PinUP Player branché sur B2S Server, qui le cherchait sous le nom du jeu donné à B2S (`cGameName = "gameofthrones"`).
 Le plugin PUP de VPX 10.8.1 ne charge un pack de lui-même que pour un jeu PinMAME (`OnControllersChanged` ne retient qu'un jeu `pinmame::…`, jamais `b2s::…`) : le journal disait « Plugin PUP loaded », jamais « PUP path ».
-Le médecin, lui, ne disait rien : sans appel PuP ni ROM, il n'attendait aucun nom, et aucune de ses règles ne s'appliquait.
+Le diagnostic, lui, ne disait rien : sans appel PuP ni ROM, il n'attendait aucun nom, et aucune de ses règles ne s'appliquait.
 C'était le troisième pack de suite installé sans vidéo sur le fronton.
 Désormais, `pupLoaderNeeded` ([puppack.ts](../../packages/core/src/puppack.ts)) reconnaît ce cas ; le nom attendu est celui du jeu pour B2S (`b2sName`, lu dans `.B2SName = "…"` ou `cGameName`), à défaut celui du seul dossier du pack, et le pack y est renommé (l'option retenue dans le `.info` suit, `renamePupMemory`).
 Le `.vbs` de Cyber Pinball lance alors le pack comme le ferait la table (`addPupLoader`) : `Sub Table1_Init() : CyberPinball_PuPStart` sur la ligne de la Sub (le nom de l'objet table est lu dans le `.vpx`, `readVpxTableName`), et, après la dernière ligne, une Sub qui crée `PinUpPlayer.PinDisplay` et appelle `B2SInit "", "<pack>"`, sous `On Error Resume Next` puis `Err.Clear`.
@@ -112,7 +112,7 @@ Le plugin PUP ne reçoit ces images que des ROM de PinMAME (`GetIdentifyFrame`) 
 Le script, lui, lit l'image de FlexDMD : `FlexDMD.DmdPixels` rend 128 × 32 octets aux 16 niveaux exacts des captures (0, 17 … 255 en `GRAY_4`), en tableau que le VBScript lit point par point.
 Le `.vbs` de Cyber Pinball refait donc la reconnaissance du plugin ([pupcapture.ts](../../packages/core/src/pupcapture.ts)) : `Sub FrameTimer_Timer() : CyberPinball_PuPCapture` sur la ligne de la Sub du minuteur d'images de la table (celui dont le script met `Interval = -1`), et, après la dernière ligne, un bloc qui lit l'image au plus toutes les 20 ms de `GameTime`, compare 16 points témoins puis l'empreinte de la zone des seules captures candidates, et envoie `B2SData "D<n>", 1` puis `0` à l'objet qui a lancé le pack (`CyberPinball_PuP`, ou celui du script), comme libpupdmd : la première capture par numéro croissant, jamais deux fois de suite la même.
 La première ligne du bloc porte ses réglages (pack, objets, minuteur, profondeur, empreinte des fichiers de `PupCapture`), la dernière ligne du `.vbs` aussi (`"capture": {…}`) : captures ou script changés, le bloc est refait à sa place ; table mise à jour, il suit le `.vbs` refait.
-Le médecin le propose (« Vidéos du PuP-Pack déclenchées par le DMD : sans effet », correction « Reconnaître les images du DMD ») et le front-end le fait seul avant la partie (`PUP_PLAY_REPAIRS`).
+Le diagnostic le propose (« Vidéos du PuP-Pack déclenchées par le DMD : sans effet », correction « Reconnaître les images du DMD ») et le front-end le fait seul avant la partie (`PUP_PLAY_REPAIRS`).
 Impossible sans objet `FlexDMD.FlexDMD`, avec un DMD en couleurs, sans minuteur d'images, sans objet du pack dans une variable, ou avec un script protégé : le constat le dit, sans correction.
 Rien n'est fait quand le script envoie lui-même des `D` (`PuPlayer.B2SData "D…"`, `dmdTriggers`).
 Sur *Game of Thrones*, 120 des 183 captures actives sont, point pour point, une image d'une ressource FlexDMD ; les autres mêlent une ressource et le texte du script, à vérifier sur la borne.
@@ -152,8 +152,8 @@ Le plugin ne dessine alors rien dans la fenêtre du fronton : une fenêtre n'est
 Ces options « B2S Users » comptent sur le `.directb2s` de la table ; sans lui, le fronton reste sur une image fixe.
 Le choix d'office lit donc, dans le `screens.pup` de chaque option, les fenêtres qu'elle remplit : un fronton laissé vide coûte beaucoup si la table n'a pas de `.directb2s`, un peu si on ne sait pas, presque rien sinon (le pack sur le fronton reste préféré).
 La fenêtre du topper, remplie ou non, l'emporte sur le nom (« Default Locale Topper Off » range le topper dans l'écran principal).
-Le médecin propose alors l'option qui met le pack sur le fronton (« Option du PuP-Pack inadaptée à la borne », avec « fronton laissé au .directb2s » et « table sans .directb2s »).
-Avant chaque partie, le front-end fait seul les réparations du pack que le médecin proposerait (`PUP_PLAY_REPAIRS`, `repairPupForPlay` : pack renommé ou remonté, option recopiée ou changée, script qui coupe le pack, `.vbs` de Cyber Pinball périmé) : sans elles, un pack restait éteint tant qu'on n'ouvrait pas le médecin.
+Le diagnostic propose alors l'option qui met le pack sur le fronton (« Option du PuP-Pack inadaptée à la borne », avec « fronton laissé au .directb2s » et « table sans .directb2s »).
+Avant chaque partie, le front-end fait seul les réparations du pack que le diagnostic proposerait (`PUP_PLAY_REPAIRS`, `repairPupForPlay` : pack renommé ou remonté, option recopiée ou changée, script qui coupe le pack, `.vbs` de Cyber Pinball périmé) : sans elles, un pack restait éteint tant qu'on n'ouvrait pas le diagnostic.
 Une option choisie dans la fiche est gardée, la table n'est jamais modifiée, les fichiers remplacés vont à la corbeille (`trash\… Avant la partie <dossier>`), et le journal du front-end note chaque réparation (« PuP-Pack (…) : … »).
 
 **Ordre des playlists.**
@@ -163,9 +163,9 @@ Les auteurs nomment souvent une image transparente pour qu'elle passe en premier
 Sur *2001*, l'écran 14 « Callouts » affichait ainsi un cadre entier écrasé au milieu du fronton ; *Guardians of the Galaxy* avait six dossiers dans ce cas.
 `playlistRenames` ([puppack.ts](../../packages/core/src/puppack.ts)) repère, dossier par dossier, le fichier que PinUP Player jouerait en premier et le renomme en majuscules, extension gardée : il passe alors premier dans les deux ordres.
 Le plugin retrouve sans tenir compte de la casse un fichier nommé par un déclencheur ou par `screens.pup` : rien d'autre ne change.
-C'est fait à l'import, par le médecin (« Playlist du PuP-Pack lue dans le mauvais ordre ») et avant chaque partie.
+C'est fait à l'import, par le diagnostic (« Playlist du PuP-Pack lue dans le mauvais ordre ») et avant chaque partie.
 
-**Le médecin** ([doctor.ts](../../packages/core/src/doctor.ts)) vérifie, sans lancer VPX :
+**Le diagnostic** ([doctor.ts](../../packages/core/src/doctor.ts)) vérifie, sans lancer VPX :
 
 | Constat | Quand | Correction |
 | --- | --- | --- |
@@ -196,7 +196,7 @@ C'est fait à l'import, par le médecin (« Playlist du PuP-Pack lue dans le mau
 | PuP-Pack désactivé | le pack de la table est dans `pupvideos (off)` (« Parties du jeu » > PuP-Pack > « Désactiver le PuP-Pack ») et aucun pack qu'elle charge n'est dans `pupvideos` | — (information) : rien n'est réclamé, ni « introuvable », ni journal « aucun pack chargé », ni option, ni script à allumer |
 | Script encore adapté pour le PuP-Pack désactivé | le `.vbs` de Cyber Pinball allume ou lance le pack désactivé (interrupteur, lancement, reconnaissance des images du DMD), ou date d'une ancienne version de la table | refaire le `.vbs` d'après le script de la table sans rien de PuP (les correctifs du `core.vbs` restent), ou le mettre à la corbeille ; fait aussi avant chaque partie |
 
-**Cas non reconnus** (le plan propose alors les options aux boutons, ou le médecin le signale) : `.bat` qui demandent un choix (`choice`, `set /p`) ou testent des fichiers (`if exist`), `.bat` qui lancent un exécutable (`PuPDesktopPunch.exe`, installeurs), options rangées hors d'un dossier dont le nom contient « option » et sans `.bat` lisible, packs sans aucun `.pup` hors d'un dossier `pupvideos` (packs anciens pilotés par le script : reconnus seulement s'ils arrivent déjà dans `pupvideos\`), `PinUpPlayer.ini` propre au pack (ignoré par le plugin), modifications faites dans le PuP-Pack Editor (activer les vidéos du topper, par exemple) qui ne correspondent plus à aucune option : signalées en information, jamais écrasées sans le bouton.
+**Cas non reconnus** (le plan propose alors les options aux boutons, ou le diagnostic le signale) : `.bat` qui demandent un choix (`choice`, `set /p`) ou testent des fichiers (`if exist`), `.bat` qui lancent un exécutable (`PuPDesktopPunch.exe`, installeurs), options rangées hors d'un dossier dont le nom contient « option » et sans `.bat` lisible, packs sans aucun `.pup` hors d'un dossier `pupvideos` (packs anciens pilotés par le script : reconnus seulement s'ils arrivent déjà dans `pupvideos\`), `PinUpPlayer.ini` propre au pack (ignoré par le plugin), modifications faites dans le PuP-Pack Editor (activer les vidéos du topper, par exemple) qui ne correspondent plus à aucune option : signalées en information, jamais écrasées sans le bouton.
 Les DLL FFmpeg de VPX et les clés `Priority.PUP` de `VPinballX.ini` (qui font passer le pack devant le directb2s) relèvent de la synchronisation de VPX, pas de ce module.
 
 Sources de la règle des options : l'exemple de `.bat` du [wiki vpinball de dekay](https://github-wiki-see.page/m/dekay/vpinball-wiki/wiki/PUP-Packs), [pup-research](https://github.com/francisdb/pup-research) (« copier les .pup de `PuP-Pack_Options/<option>` à la racine »), le [wiki Batocera](https://wiki.batocera.org/systems:vpinball) (Batman 66 : `Option 3 - Desktop`), les noms d'options des packs VPUniverse et vpinball.com, d'après les résumés des moteurs de recherche (Tron Legacy, Transformers, Aliens, Pirates of the Caribbean, packs PinEvent : « Option 1 - Backglass and Topper », « 2 Screen - 4x3 or 5x4 », « Full DMD on Backglass », « Backbox AIO », « PUP Stream »).

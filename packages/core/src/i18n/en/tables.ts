@@ -314,7 +314,7 @@ export const messages: Record<string, string> = {
   'pinmame\\alias.txt fait charger {loaded} quand le script demande {rom} ; PinMAME lit l’alias avant la ROM, si bien que {rom}.zip, maintenant dans pinmame\\roms, ne sert pas.': 'pinmame\\alias.txt loads {loaded} when the script asks for {rom}; PinMAME reads the alias before the ROM, so {rom}.zip, now in pinmame\\roms, goes unused.',
   'Revenir à la ROM demandée (retirer la ligne « {line} »)': 'Go back to the requested ROM (remove the line “{line}”)',
   'Révision voisine : {rom} au lieu de {asked}': 'Sibling revision: {rom} instead of {asked}',
-  'pinmame\\alias.txt fait charger {rom}, la table demande {asked}. {warning} Quand {asked}.zip arrivera, le médecin proposera de retirer l’alias.': 'pinmame\\alias.txt loads {rom}, the table asks for {asked}. {warning} When {asked}.zip arrives, the doctor will offer to remove the alias.',
+  'pinmame\\alias.txt fait charger {rom}, la table demande {asked}. {warning} Quand {asked}.zip arrivera, le diagnostic proposera de retirer l’alias.': 'pinmame\\alias.txt loads {rom}, the table asks for {asked}. {warning} When {asked}.zip arrives, the diagnosis will offer to remove the alias.',
   'ROM « {rom} » pas liée dans la table': 'ROM “{rom}” not linked in the table',
   'pinmame\\alias.txt fait charger {rom} pour {asked} ; elle est dans la bibliothèque, mais pas dans pinmame\\roms.': 'pinmame\\alias.txt loads {rom} for {asked}; it’s in the library, but not in pinmame\\roms.',
   'Lier la ROM de la bibliothèque dans pinmame\\roms': 'Link the library ROM into pinmame\\roms',

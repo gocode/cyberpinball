@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- The "table doctor" is now called the diagnosis everywhere, like the screen opened by "Diagnose and fix": "Open the table's diagnosis" in cabinet health, and the same word in the manuals and the project pages.
 - Taking over a large existing installation: the scan no longer stops on "File size (…) is greater than 2 GiB". A multi-GB archive stored with the tables (a table's downloaded archive with its PuP-Pack) was taken for a ROM and read in one go; it is now recognized as an archive and left where it is.
 - .zip archives are read through their table of contents only, whatever their size (Zip64 included), and fingerprints of ROMs, media and PuP-Packs are computed piece by piece: no file placed by the user is read in one go any more.
 - The installation plan shows how much space it will take on each drive and how much is free. If space is short, it says so before copying ("Not enough space on D:\: 182 GB needed, 40 GB free") and offers "Check space again" instead of "Install".

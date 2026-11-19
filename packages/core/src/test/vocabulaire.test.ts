@@ -50,13 +50,47 @@ test('vocabulaire : aucun texte de l’interface ne dit « repli » (ni « fallb
   assert.deepEqual(fautifs, [], `Dire « affichage par défaut », « À la place : … » ou « média commun de la borne » :\n${fautifs.join('\n')}`);
 });
 
+/** Manuels, README, pages des fonctions et nouveautés en attente : ce que le public lit. */
+const pagesPubliees = () => [
+  ...splitDocs(MANUEL),
+  ...splitDocs(MANUAL),
+  ...['README.md', 'README.fr.md', 'docs/fonctionnalites.md', 'docs/features.md'].map((file) => ({ file, text: fs.readFileSync(path.join(REPO, file), 'utf8') })),
+  ...fs.readdirSync(path.join(REPO, 'changements')).filter((f) => f.endsWith('.md')).map((f) => ({ file: `changements/${f}`, text: fs.readFileSync(path.join(REPO, 'changements', f), 'utf8') })),
+];
+
+// « Médecin des tables » (« table doctor ») déroutait, en français comme en anglais : un joueur
+// anglophone s'est demandé pourquoi la page de téléchargement parlait tant d'un « doctor »
+// (19/11/2026). L'écran s'appelle « Diagnostic » (« Diagnosis »), ouvert par « Diagnostiquer et
+// réparer » (« Diagnose and fix ») : on dit « le diagnostic » (« the diagnosis »). Le mot reste
+// dans le code (doctor.ts), les commentaires et l'avertissement sur l'épilepsie (un vrai médecin).
+const MEDECIN = /médecins?|\bdoctors?\b/i;
+const VRAI_MEDECIN = /avis d[’']un médecin|ask a doctor/;
+
+test('vocabulaire : aucun texte de l’interface ne parle du « médecin » (« doctor ») d’une table', () => {
+  const fautifs = Object.entries(EN_MESSAGES)
+    .filter(([source, en]) => !VRAI_MEDECIN.test(source) && (MEDECIN.test(source) || MEDECIN.test(en)))
+    .map(([source, en]) => `${source}  →  ${en}`);
+  assert.deepEqual(fautifs, [], `Dire « le diagnostic » (« the diagnosis ») :\n${fautifs.join('\n')}`);
+});
+
+test('vocabulaire : manuels et pages publiées disent « diagnostic », plus « médecin » ni « doctor »', () => {
+  const fautifs = pagesPubliees().flatMap(({ file, text }) =>
+    text.split(/\r?\n/).flatMap((ligne, i) => {
+      let reste = ligne
+        .replace(/`[^`]*`/g, '') // code : doctor.ts, CyberPinball.doctor.ignored
+        .replace(/\]\([^)]*\)|src="[^"]*"/g, '') // cibles des liens et images
+        .replace(/[\w-]*doctor[\w-]*\.\w+/g, '') // noms de fichiers
+        .replace(/"Dr\." for "Doctor"|« Dr\. » pour « Doctor »/g, ''); // abréviation d'un titre de jeu
+      // Une nouveauté peut citer l'ancien nom entre guillemets pour dire qu'il a changé.
+      if (file.startsWith('changements/')) reste = reste.replace(/«[^»]*»|"[^"]*"/g, '');
+      return !VRAI_MEDECIN.test(ligne) && MEDECIN.test(reste) ? [`${file}:${i + 1} : ${reste.match(MEDECIN)![0]}`] : [];
+    }),
+  );
+  assert.deepEqual(fautifs, [], `Dire « le diagnostic » (« the diagnosis ») :\n${fautifs.join('\n')}`);
+});
+
 test('vocabulaire : manuels et pages publiées ne citent plus « repli intégré » ni l’état « Repli : … »', () => {
-  const docs = [
-    ...splitDocs(MANUEL),
-    ...splitDocs(MANUAL),
-    ...['README.md', 'README.fr.md', 'docs/fonctionnalites.md', 'docs/features.md'].map((file) => ({ file, text: fs.readFileSync(path.join(REPO, file), 'utf8') })),
-    ...fs.readdirSync(path.join(REPO, 'changements')).filter((f) => f.endsWith('.md')).map((f) => ({ file: `changements/${f}`, text: fs.readFileSync(path.join(REPO, 'changements', f), 'utf8') })),
-  ];
+  const docs = pagesPubliees();
   const ancien = /replis? intégrés?|built-in fallbacks?|« Repli : |"Repli : |"Fallback: |\bdéfauts? de la borne\b|\bcabinet(?:['’]s)? defaults?\b/i;
   const fautifs = docs.flatMap(({ file, text }) =>
     text.split(/\r?\n/).flatMap((ligne, i) => (ancien.test(ligne) ? [`${file}:${i + 1} : ${ligne.match(ancien)![0]}`] : [])),

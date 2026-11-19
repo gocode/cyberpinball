@@ -2,15 +2,15 @@
 
 ## Ce qu'il manque pour jouer : parcours guidé
 
-Une table qui ne se lance pas a presque toujours une cause que Cyber Pinball connaît déjà (ROM absente, VPX pas installé…), mais le médecin s'arrêtait souvent au constat (« ROM « t2_l8 » absente : mettez le fichier dans le dossier d'import »), sans dire où trouver le fichier.
+Une table qui ne se lance pas a presque toujours une cause que Cyber Pinball connaît déjà (ROM absente, VPX pas installé…), mais le diagnostic s'arrêtait souvent au constat (« ROM « t2_l8 » absente : mettez le fichier dans le dossier d'import »), sans dire où trouver le fichier.
 L'écran **« Ce qu'il manque pour jouer »** accompagne jusqu'à la partie : chaque étape dit où elle en est et propose le geste suivant, en un appui sur Start (ou un clic).
 
 - **Ce qui est obligatoire pour jouer** : le fichier `.vpx` et, si son script en demande une, la ROM, absente ou illisible pour PinMAME (pas liée, mal rangée, éparpillée, ancien nom sans alias).
   Une ROM trouvée par le dossier commun de PinMAME, ou fournie par un alias vers une révision voisine, suffit.
   Rien d'autre ne retient « Jouer » : contenu du DMD, fronton `.directb2s`, PuP-Pack, médias, couleurs du DMD, sons alternatifs, rangement de la table sont proposés, jamais exigés.
   Une seule règle, dans le cœur : [packages/core/src/playable.ts](../../packages/core/src/playable.ts) (`blocksPlay`, `playBlockers`, `requiredForPlay`).
-  Le médecin s'y tient (seuls les constats de ROM sont de gravité « erreur » ; `playSeverity`, appliqué par `diagnose`, fait redescendre tout autre constat à « avertissement »), comme le parcours, « Ce qu'il faut » du catalogue (« indispensable » : la table et la ROM), l'installation rapide, la fiche et l'inventaire « Fichiers de la table » (`romBlockers`, qui ne disent plus « ROM absente » quand PinMAME la trouve par son dossier commun).
-  Tests : `playable.test.ts` (chaque règle du médecin, même marquée « erreur ») et l'invariant vérifié sur chaque table piégée (`doctor-traps.test.ts`).
+  Le diagnostic s'y tient (seuls les constats de ROM sont de gravité « erreur » ; `playSeverity`, appliqué par `diagnose`, fait redescendre tout autre constat à « avertissement »), comme le parcours, « Ce qu'il faut » du catalogue (« indispensable » : la table et la ROM), l'installation rapide, la fiche et l'inventaire « Fichiers de la table » (`romBlockers`, qui ne disent plus « ROM absente » quand PinMAME la trouve par son dossier commun).
+  Tests : `playable.test.ts` (chaque règle du diagnostic, même marquée « erreur ») et l'invariant vérifié sur chaque table piégée (`doctor-traps.test.ts`).
 - **Où on le trouve** : en tête de la fiche quand la ROM manque, ou qu'un parcours est en cours (« Reprendre : Étape 3 sur 4 ») ; après une partie qui a échoué (« Start : voir ce qu'il manque pour jouer ») ; dans le diagnostic, dès qu'un constat empêche de jouer ; dans la liste d'attente (« Reprendre : ce qu'il manque pour jouer <table> »).
   Un contenu du DMD absent est proposé dans la fiche après « Jouer » (« Pour aller plus loin »), jamais en tête.
 - **Étapes** : d'abord le chemin jusqu'à « Jouer », numéroté : « Borne et VPX », « Table » (le fichier .vpx, et la ROM que demande son script), « ROM <nom> » (si le script utilise PinMAME), puis « Jouer ».
@@ -30,15 +30,15 @@ L'écran **« Ce qu'il manque pour jouer »** accompagne jusqu'à la partie : ch
   Le fichier reçu (fenêtre « Récupérer », surveillance de Téléchargements) fait passer l'étape à « À installer » : « Installer le fichier reçu » montre le plan d'ajout (bibliothèque de ROM, lien dans la table), puis revient au parcours, qui relit la table.
   Une révision voisine déjà sur la borne est proposée en second (« Jouer avec t2_l6, révision voisine », avec l'avertissement du § « Bibliothèque de ROM »), ou en premier si la base VPS ne donne aucun lien ; une révision voisine donnée par la base, en dernier recours.
   Sans lien : « Chercher t2_l8 dans le catalogue » ; toujours : « J'ai déjà le fichier » (le glisser sur l'écran, ou le choisir sur ce PC), qui passe aussi par le plan et revient au parcours.
-- **Reprendre plus tard** : l'état se relit à chaque ouverture (constats du médecin, liste d'attente, base VPS).
+- **Reprendre plus tard** : l'état se relit à chaque ouverture (constats du diagnostic, liste d'attente, base VPS).
   Les étapes déjà montrées sont retenues dans `<données>\parcours.json`, avec la dernière position (numéro d'étape et total, traduits à l'affichage : la fiche suit la langue choisie depuis) : une étape réglée depuis reste dans la liste, cochée, et « Étape n sur N » ne change pas de sens.
   Le parcours est oublié quand on lance la partie depuis lui.
-- **Code** : plan dans [packages/core/src/journey.ts](../../packages/core/src/journey.ts) (`planJourney`, `romSources`, `journeyChoices`, mémoire des parcours), tests dans `packages/core/src/test/journey.test.ts` (tables piégées analysées par le médecin, d'une ROM absente jusqu'à « Jouer ») ; écran dans `app/src/journey.ts`, rendu `renderJourney` (`app/renderer/library.js`) ; points d'entrée du catalogue (`fetchFor`, `reopen`, `scanDownloads`, `openSearch`) dans `app/src/catalog.ts`.
+- **Code** : plan dans [packages/core/src/journey.ts](../../packages/core/src/journey.ts) (`planJourney`, `romSources`, `journeyChoices`, mémoire des parcours), tests dans `packages/core/src/test/journey.test.ts` (tables piégées analysées par le diagnostic, d'une ROM absente jusqu'à « Jouer ») ; écran dans `app/src/journey.ts`, rendu `renderJourney` (`app/renderer/library.js`) ; points d'entrée du catalogue (`fetchFor`, `reopen`, `scanDownloads`, `openSearch`) dans `app/src/catalog.ts`.
   Maquettes : `EcranParcours` et `EcranParcoursBureau` du design system.
 
-**Ce qui empêche un jeu de fonctionner**, ce que le médecin en disait, et ce que fait le parcours :
+**Ce qui empêche un jeu de fonctionner**, ce que le diagnostic en disait, et ce que fait le parcours :
 
-| Cause | Constat du médecin | Avant le parcours | Étape et geste du parcours |
+| Cause | Constat du diagnostic | Avant le parcours | Étape et geste du parcours |
 | --- | --- | --- | --- |
 | VPX pas installé | aucun : le script n'est pas lu, la ROM pas vérifiée | message « Aucune table », installation de VPX | « Borne et VPX » : « Installer Visual Pinball X » ; la ROM attend (« En attente ») |
 | Borne pas configurée | aucun | assistant au premier lancement | « Borne et VPX » : « Configurer la borne » |

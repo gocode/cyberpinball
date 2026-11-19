@@ -66,7 +66,7 @@ Les touches affichées sont lues là où le raccourci est défini : les touches 
 Un bouton de joystick ne s'affiche pas (son nom ne tient pas dans une touche).
 Modèle de la DA : `LigneMenu`, `.cp-shortcut`.
 
-**Retour en tête d'écran** : chaque écran du front-end (menu système, fiche, médecin, ajout, catalogue, médias, configurations…) porte au-dessus de son titre un bouton qui fait ce que fait Exit ; à la souris, inutile de descendre au bas de la liste chercher « Retour ».
+**Retour en tête d'écran** : chaque écran du front-end (menu système, fiche, diagnostic, ajout, catalogue, médias, configurations…) porte au-dessus de son titre un bouton qui fait ce que fait Exit ; à la souris, inutile de descendre au bas de la liste chercher « Retour ».
 Il **nomme l'écran où il mène** : « ‹ Neon Abyss » (la fiche), « ‹ Gérer la table », « ‹ Téléchargements », « ‹ Écran des tables » (la roue, ou la liste des titres).
 La destination se lit du parcours des écrans traversés (`BackTrail`, [packages/core/src/backtrail.ts](../../packages/core/src/backtrail.ts)) : chaque écran affiché s'y ajoute, et revenir sur l'un d'eux, par son retour ou par une action qui le rouvre (enregistrer, annuler), coupe la suite.
 Un retour qui arrive ailleurs que là où son bouton l'annonçait est appris pour la fois suivante et dit au journal (« Retour de « … » : le bouton annonçait « … », arrivé sur « … » »), pour que l'écran déclare sa destination ; Exit, un clic sur le bouton, Start ou un clic sur l'action de retour le vérifient.

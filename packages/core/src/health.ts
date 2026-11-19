@@ -444,7 +444,7 @@ export function tableLines(facts: TablesFacts): HealthLine[] {
     state: f.blocking ? 'blocking' : 'check',
     title: f.title,
     detail: f.reason,
-    go: t('Ouvrir le médecin de la table'),
+    go: t('Ouvrir le diagnostic de la table'),
     target: { kind: 'doctor', file: f.file },
   }));
   const more = facts.flagged.slice(HEALTH_TABLE_LINES);
@@ -487,7 +487,7 @@ export function tableLines(facts: TablesFacts): HealthLine[] {
  */
 export function pupLines(facts: PupFacts): HealthLine[] {
   if (!facts.packs) return [];
-  const go = t('Ouvrir le médecin de la table');
+  const go = t('Ouvrir le diagnostic de la table');
   const lines: HealthLine[] = facts.flagged.map((f) => ({
     check: 'pup',
     state: 'check',

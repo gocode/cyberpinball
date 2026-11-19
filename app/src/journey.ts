@@ -207,7 +207,7 @@ export function createJourney(ctx: JourneyContext) {
       // Toujours une issue vers le web : ce qui y est téléchargé revient à cette table, dans sa partie.
       ctx.catalog.webAction('journey', { query: partWebQuery(table.title), target: { gameId: knownVpsId(table.info), gameLabel: table.title, table: table.file } }, () => show(table.file, ctx.catalog.currentNotice())),
       { label: t('Revérifier'), detail: t('Relit la table et ce qui est arrivé'), run: () => show(table.file) },
-      { label: t('Diagnostic complet'), detail: t('Tous les constats du médecin, médias compris'), run: () => ((open = undefined), ctx.catalog.setRefresh(undefined), ctx.doctor(table)) },
+      { label: t('Diagnostic complet'), detail: t('Tous les constats, médias compris'), run: () => ((open = undefined), ctx.catalog.setRefresh(undefined), ctx.doctor(table)) },
     );
     const notice = open?.notice;
     const view = (s: JourneyStep, n: number | undefined, current: boolean) => {

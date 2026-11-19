@@ -270,7 +270,7 @@ export function createHealth(ctx: HealthContext) {
       return {
         heading: t('Tables à revoir'),
         icon: 'tables',
-        lead: tn(flagged.length, '{n} table à revoir : le médecin de chacune dit quoi faire.', '{n} tables à revoir : le médecin de chacune dit quoi faire.'),
+        lead: tn(flagged.length, '{n} table à revoir : son diagnostic dit quoi faire.', '{n} tables à revoir : le diagnostic de chacune dit quoi faire.'),
         sections: [],
         actions: [...actions, { label: t('Retour'), icon: 'back', run: back }],
         back,

@@ -1939,7 +1939,7 @@ export function createLibrary(host: LibraryHost) {
   /** Applique les corrections du médecin ; renvoie le fichier de la table, qui a pu changer de place. */
   function applyFixes(table: TableEntry, findings: Finding[]): string {
     let file = table.file;
-    const trashDir = trashDirFor(layout()!.trash, `Médecin ${path.basename(table.folder)}`); // i18n-ignore : nom de dossier
+    const trashDir = trashDirFor(layout()!.trash, `Diagnostic ${path.basename(table.folder)}`); // i18n-ignore : nom de dossier
     for (const f of findings) {
       applyOps(f.fix!.ops, { trashDir });
       for (const op of f.fix!.ops) {
@@ -4498,7 +4498,7 @@ export function createLibrary(host: LibraryHost) {
   function packRows(s: AddPlan, pack: PackPlan, actionIndex: number, choiceActions: Action[]): Row[] {
     const rows: Row[] = [];
     if (pack.nameFrom === 'folder') {
-      rows.push({ text: t('Nom du pack non vérifié : {folder}', { folder: `pupvideos\\${pack.name}` }), detail: t('Le script de la table n’a pas pu être lu : le pack garde le nom de son dossier. Le médecin le vérifiera.'), tone: 'warning' });
+      rows.push({ text: t('Nom du pack non vérifié : {folder}', { folder: `pupvideos\\${pack.name}` }), detail: t('Le script de la table n’a pas pu être lu : le pack garde le nom de son dossier. Le diagnostic le vérifiera.'), tone: 'warning' });
     } else if (pack.origin.toLowerCase() !== pack.name.toLowerCase()) {
       rows.push({ text: t('PuP-Pack renommé « {name} »', { name: pack.name }), detail: t('C’est le nom que charge la table ; « {origin} » n’aurait jamais été trouvé.', { origin: pack.origin }), tone: 'quiet' });
     }

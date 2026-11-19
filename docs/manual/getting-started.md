@@ -66,7 +66,7 @@ The keys shown are read where the shortcut is defined: this cabinet's interface 
 A joystick button is not shown (its name does not fit in a key).
 Art direction model: `LigneMenu`, `.cp-shortcut`.
 
-**Back at the top of the screen**: every menu screen (system menu, game page, doctor, adding, catalog, media, configurations…) has, above its title, a button that does what Exit does; with the mouse, no need to go down to the bottom of the list to find "Retour" (Back).
+**Back at the top of the screen**: every menu screen (system menu, game page, diagnosis, adding, catalog, media, configurations…) has, above its title, a button that does what Exit does; with the mouse, no need to go down to the bottom of the list to find "Retour" (Back).
 It **names the screen it leads to**: "‹ Neon Abyss" (the game page), "‹ Gérer la table" (Manage the table), "‹ Téléchargements" (Downloads), "‹ Menu des tables" (Table menu: the wheel, or the list of titles).
 The destination is read from the trail of screens gone through (`BackTrail`, [packages/core/src/backtrail.ts](../../packages/core/src/backtrail.ts)): each screen shown is added to it, and coming back to one of them, through its back button or through an action that reopens it (save, cancel), cuts what follows.
 A back that lands somewhere other than where its button said is learnt for the next time and written to the log ("Retour de « … » : le bouton annonçait « … », arrivé sur « … »"), so that the screen declares its destination; Exit, a click on the button, Start or a click on the back action all check it.

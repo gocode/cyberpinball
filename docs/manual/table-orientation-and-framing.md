@@ -38,7 +38,7 @@ On a playfield in portrait in Windows, flippers at the bottom, the menu was upri
 - **Sync** (`requireAutofit`, `orientationFinding`, `packages/core/src/sync.ts`): a value other than 1 and 2 is replaced by 1, with the finding "cadrage automatique de VPX rétabli" (VPX automatic framing restored) when it was written; a cabinet already set up is corrected at the next start, without redoing the wizard.
   After writing, the direction is computed again from the file: if VPX will not draw the flippers on the player's side (Windows orientation to change, `BGSet` changed by hand, `CabinetAutofitMode` kept by the user in `vpxManual`), a warning says so, with the values at fault.
 - **Settings**: the "Manuel" (Manual) choice, and the VPX default that is one, are no longer offered for `CabinetAutofitMode` in the general setting.
-- **Doctor**: "Table de travers sur cette borne" (Table sideways on this cabinet, `tableOrientation`) when a table's `.ini`, through `BGSet` or `CabinetAutofitMode`, stops VPX drawing the flippers on the player's side; it then replaces "Cadrage manuel imposé par la table" (Manual view forced by the table).
+- **Diagnosis**: "Table de travers sur cette borne" (Table sideways on this cabinet, `tableOrientation`) when a table's `.ini`, through `BGSet` or `CabinetAutofitMode`, stops VPX drawing the flippers on the player's side; it then replaces "Cadrage manuel imposé par la table" (Manual view forced by the table).
   The repair removes these keys only; the file goes to the recycle bin if it holds nothing else.
   If `VPinballX.ini` itself is at fault, the sync says so.
 - **Test**: `packages/core/src/test/orientation.test.ts` goes through the four Windows orientations, of a landscape screen and of a native portrait screen, the four flipper edges and seven starting `VPinballX.ini` files: the game goes the player's and the menu's way, without a warning, and a second sync changes nothing more; screen rotated outside the wizard or flip refused: right direction, or a warning.
@@ -97,8 +97,8 @@ The session now gives the game orientation back at startup, on wake and on recon
 - **Log**: the sync's warnings also go to the console ("Synchronisation : …"), including "Tables will show upside down".
 - **Fix made in VPX's menu**: to turn a table the right way, one had to switch to manual framing and rotate the view, which VPX saves in the table's `.ini` (`CabinetAutofitMode = 0`, `ViewCabMode`, `ViewCabRotation`).
   Cyber Pinball does not overwrite it.
-  When the `.ini` gives the view and its rotation, its direction is known (`manualCabRotation`, `packages/core/src/vpx.ts`, after `ViewSetup::GetRotation`: in "Window" mode the rotation is added to 270° for a landscape window, to 0° for a portrait window; in "Legacy" or "Camera" it stands alone): the doctor does not report "Table de travers" (Table sideways) for a table the right way for the player, and says where VPX will draw the others.
-  A fix made while Windows had lost the game orientation turns the table upside down once the orientation is taken back: the doctor reports it, and its repair removes `BGSet` and `CabinetAutofitMode` from the table's `.ini` (the remaining rotation is ignored by automatic framing).
+  When the `.ini` gives the view and its rotation, its direction is known (`manualCabRotation`, `packages/core/src/vpx.ts`, after `ViewSetup::GetRotation`: in "Window" mode the rotation is added to 270° for a landscape window, to 0° for a portrait window; in "Legacy" or "Camera" it stands alone): the diagnosis does not report "Table de travers" (Table sideways) for a table the right way for the player, and says where VPX will draw the others.
+  A fix made while Windows had lost the game orientation turns the table upside down once the orientation is taken back: the diagnosis reports it, and its repair removes `BGSet` and `CabinetAutofitMode` from the table's `.ini` (the remaining rotation is ignored by automatic framing).
 - **Test**: `packages/core/src/test/gameorientation.test.ts` pins the invariant on a landscape screen and a native portrait screen, for the four Windows orientations and the four player edges: wizard, exit, simulated restart (Windows gives its setting back), session start, then reconnection (`check`); each time, VPX draws the game on the player's side, the menu too, with no warning, and nothing is written to the Windows setting.
   A cabinet configured by an older version and back at 0° gets its direction back (`legacyOrientation`).
 
@@ -115,12 +115,12 @@ The "Point Of View" page therefore only offers what the framing reads again (acc
 | --- | --- | --- |
 | "Fit Table" (1) | the mode and `CabinetAutofitPos` (0 to 20 %) | position of the bottom flippers on the screen; higher up, the apron rises into the screen, at the expense of the top of the table |
 | "Fit Screen" (2) | the mode only | the full length of the table, stretched or squeezed |
-| manual (0) | offsets, scales, glass, rotation, then `ScreenPlayerX/Y/Z` | a hand-set view, which the doctor reports when a table forces it |
+| manual (0) | offsets, scales, glass, rotation, then `ScreenPlayerX/Y/Z` | a hand-set view, which the diagnosis reports when a table forces it |
 
 - **Save** (Start) > "Save as Table Override": in the table's `.ini`.
   Back on the details screen, it says "Affichage enregistré pour cette table" (Display saved for this table) if that file changed.
 - **Outside a game**, these keys can no longer be changed for a table: in "Réglages de cette table" (This table's settings), they carry the "En partie" (In game) badge and only the table's own value can be removed (`isLiveVisual`, `packages/core/src/vpx-settings.ts`); the table's essentials no longer list them.
-- **Doctor**: "Cadrage manuel imposé par la table" (Manual framing forced by the table) when the table's `.ini` (often shipped with it, set up for its author's screen) contains `CabinetAutofitMode = 0`; the repair removes the key, and the old file goes to the trash.
+- **Diagnosis**: "Cadrage manuel imposé par la table" (Manual framing forced by the table) when the table's `.ini` (often shipped with it, set up for its author's screen) contains `CabinetAutofitMode = 0`; the repair removes the key, and the old file goes to the trash.
   When that `.ini` also has its own cabinet view (`[TableOverride] ViewCabHOfs`, `ViewCabVOfs`, `ViewCabScale…`, `hasOwnCabinetView`), set in game or brought in, it is no longer a problem but information, "Framing set for this table" (`manualView`): VPX plays it as it was saved for it.
   Its fix, "Switch this table to automatic framing", writes `CabinetAutofitMode = 1` instead of removing the key: going back to automatic lasts from one game to the next.
 

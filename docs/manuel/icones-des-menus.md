@@ -9,7 +9,7 @@ Les icônes ont été dessinées pour Cyber Pinball, sans police d'icônes ni re
   Chaque fenêtre le charge avant ses scripts ; le design system le lit aussi (`docs/design-system/src/icones.mjs`, planche « Icônes »).
   Les noms connus du code sont dans [packages/core/src/icons.ts](../../packages/core/src/icons.ts) (`ICON_NAMES`, type `IconName`).
 - **Déclaratif** : une entrée choisit son icône par un champ `icon` — obligatoire sur `SystemItem` (menu système), facultatif sur `Action`, `Row` et `Built` (titre de l'écran) dans `app/src/library.ts` ; `WizardStep.icon` pour les étapes de « Configuration de la borne », `EssentialGroup.icon` pour les groupes des réglages de VPX.
-  Un écran ouvert depuis le menu système qui ne déclare pas d'icône reprend celle de son entrée (catalogue, ajout de table, ROM, médias), sauf les écrans d'une table (fiche, médecin…), titrés du nom du jeu.
+  Un écran ouvert depuis le menu système qui ne déclare pas d'icône reprend celle de son entrée (catalogue, ajout de table, ROM, médias), sauf les écrans d'une table (fiche, diagnostic…), titrés du nom du jeu.
 - **Dessin et tailles** : trait de 2 unités pour toute la famille (`theme.css`, `.icon`), couleur du texte.
   Pour un petit côté de 1 080 px : 30 px devant une entrée de menu, à 24 px du libellé et alignée sur sa première ligne ; 60 px devant un titre ; 38 px pour la roue dentée (zone cliquable de 72 px) ; 22 à 26 px dans les onglets et groupes des réglages ; jamais moins de 20 px.
 - **États** : l'icône suit son libellé (sombre sur l'aplat vert, rouge au repos pour une action destructrice, sombre sur l'aplat rouge une fois choisie) ; la pastille « attend l'utilisateur » se pose en haut à droite de l'icône, comme sur la roue dentée.

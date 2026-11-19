@@ -98,7 +98,7 @@ Le dossier est **commun à tout VPX 10.8 du PC** (un autre front-end de borne co
 Rien n'est envoyé aux contrôleurs hors partie : aucun port n'est ouvert, aucune LED n'est allumée pour essai.
 L'essai se fait en partie, sur une table à ROM PinMAME.
 
-**Médecin d'une table** (`dofFindingsFor`, seulement sur une borne qui a des ini) : `dofLocalIni` (un `directoutputconfig*.ini` dans le dossier de la table masque celui de la borne quand `IniFilesPath` n'est pas réglé ; correction : le mettre à la corbeille), `dofNoPinmame` (table sans ROM : pas de retours en mode plugins), `dofNoConfig` (la configuration n'a rien pour sa ROM, selon les trois règles de libdof : égalité sans casse, puis `<rom>_…`, puis préfixe).
+**Diagnostic d'une table** (`dofFindingsFor`, seulement sur une borne qui a des ini) : `dofLocalIni` (un `directoutputconfig*.ini` dans le dossier de la table masque celui de la borne quand `IniFilesPath` n'est pas réglé ; correction : le mettre à la corbeille), `dofNoPinmame` (table sans ROM : pas de retours en mode plugins), `dofNoConfig` (la configuration n'a rien pour sa ROM, selon les trois règles de libdof : égalité sans casse, puis `<rom>_…`, puis préfixe).
 Jamais bloquant.
 
 **Santé de la borne** : un contrôle « LED et retours (DOF) » (`dofLines`), absent sur une borne sans contrôleur ni configuration ; une ligne par point à vérifier (LED adressables sans Cabinet.xml et configuration d'un ancien DOF comprises), sinon « DOF prêt », chacune vers l'écran.

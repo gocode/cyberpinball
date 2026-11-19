@@ -38,7 +38,7 @@ Sur un playfield en portrait dans Windows, flippers en bas, le front-end était 
 - **Synchronisation** (`requireAutofit`, `orientationFinding`, `packages/core/src/sync.ts`) : une valeur hors de 1 et 2 est remplacée par 1, avec le constat « cadrage automatique de VPX rétabli » quand elle était écrite ; une borne déjà configurée est corrigée au prochain démarrage, sans refaire l'assistant.
   Après écriture, le sens est recalculé sur le fichier : si VPX ne dessinera pas les flippers du côté du joueur (orientation de Windows à changer, `BGSet` changé à la main, `CabinetAutofitMode` gardé par l'utilisateur dans `vpxManual`), un avertissement le dit, avec les valeurs en cause.
 - **Réglages** : le choix « Manuel », et la valeur par défaut de VPX qui en est un, ne sont plus proposés pour `CabinetAutofitMode` dans le réglage général.
-- **Médecin** : « Table de travers sur cette borne » (`tableOrientation`) quand le `.ini` d'une table, par `BGSet` ou `CabinetAutofitMode`, empêche VPX de dessiner les flippers du côté du joueur ; il remplace alors « Cadrage manuel imposé par la table ».
+- **Diagnostic** : « Table de travers sur cette borne » (`tableOrientation`) quand le `.ini` d'une table, par `BGSet` ou `CabinetAutofitMode`, empêche VPX de dessiner les flippers du côté du joueur ; il remplace alors « Cadrage manuel imposé par la table ».
   La réparation retire ces clés seulement ; le fichier part à la corbeille s'il ne contient rien d'autre.
   Si `VPinballX.ini` est lui-même en cause, c'est la synchronisation qui le dit.
 - **Test** : `packages/core/src/test/orientation.test.ts` parcourt les quatre orientations de Windows, d'un écran paysage et d'un écran natif portrait, les quatre bords des flippers et sept `VPinballX.ini` de départ : la partie est dans le sens du joueur et du front-end, sans avertissement, et une seconde synchronisation ne change plus rien ; écran tourné hors de l'assistant ou retournement refusé : sens juste, ou avertissement.
@@ -97,8 +97,8 @@ La session redonne désormais l'orientation de jeu au démarrage, au réveil et 
 - **Journal** : les avertissements de la synchronisation vont aussi dans la console (« Synchronisation : … »), dont « Les tables s'afficheront à l'envers ».
 - **Correction faite dans le menu de VPX** : pour remettre une table dans son sens, il fallait passer en cadrage manuel et tourner la vue, ce que VPX enregistre dans le `.ini` de la table (`CabinetAutofitMode = 0`, `ViewCabMode`, `ViewCabRotation`).
   Cyber Pinball ne l'écrase pas.
-  Quand le `.ini` donne la vue et sa rotation, son sens est connu (`manualCabRotation`, `packages/core/src/vpx.ts`, d'après `ViewSetup::GetRotation` : en mode « Window », la rotation s'ajoute à 270° pour une fenêtre paysage, à 0° pour une fenêtre portrait ; en « Legacy » ou « Camera », elle vaut seule) : le médecin ne signale pas « Table de travers » une table dans le sens du joueur, et dit où VPX dessinera les autres.
-  Une correction faite pendant que Windows avait perdu l'orientation de jeu met la table à l'envers une fois l'orientation reprise : le médecin la signale, et sa réparation retire `BGSet` et `CabinetAutofitMode` du `.ini` de la table (la rotation qui reste est ignorée par le cadrage automatique).
+  Quand le `.ini` donne la vue et sa rotation, son sens est connu (`manualCabRotation`, `packages/core/src/vpx.ts`, d'après `ViewSetup::GetRotation` : en mode « Window », la rotation s'ajoute à 270° pour une fenêtre paysage, à 0° pour une fenêtre portrait ; en « Legacy » ou « Camera », elle vaut seule) : le diagnostic ne signale pas « Table de travers » une table dans le sens du joueur, et dit où VPX dessinera les autres.
+  Une correction faite pendant que Windows avait perdu l'orientation de jeu met la table à l'envers une fois l'orientation reprise : le diagnostic la signale, et sa réparation retire `BGSet` et `CabinetAutofitMode` du `.ini` de la table (la rotation qui reste est ignorée par le cadrage automatique).
 - **Test** : `packages/core/src/test/gameorientation.test.ts` fixe l'invariant sur un écran paysage et un écran natif portrait, pour les quatre orientations de Windows et les quatre bords du joueur : assistant, sortie, redémarrage simulé (Windows rend son réglage), démarrage de la session, puis reconnexion (`check`) ; à chaque fois, VPX dessine la partie du côté du joueur, le front-end aussi, sans avertissement, et rien n'est écrit dans le réglage de Windows.
   Une borne configurée par une version plus ancienne et revenue à 0° retrouve son sens (`legacyOrientation`).
 
@@ -115,12 +115,12 @@ La page « Point Of View » ne propose donc que ce que le cadrage relit (d'aprè
 | --- | --- | --- |
 | « Fit Table » (1) | le mode et `CabinetAutofitPos` (0 à 20 %) | position des flippers du bas sur l'écran ; plus haut, le tablier remonte dans l'écran, au prix du haut de la table |
 | « Fit Screen » (2) | le mode seul | toute la longueur de la table, étirée ou tassée |
-| manuel (0) | décalages, échelles, vitre, rotation, puis `ScreenPlayerX/Y/Z` | vue réglée à la main, que le médecin signale quand une table l'impose |
+| manuel (0) | décalages, échelles, vitre, rotation, puis `ScreenPlayerX/Y/Z` | vue réglée à la main, que le diagnostic signale quand une table l'impose |
 
 - **Enregistrer** (Start) > « Save as Table Override » : dans le `.ini` de la table.
   Au retour, la fiche dit « Affichage enregistré pour cette table » si ce fichier a changé.
 - **Hors partie**, ces clés ne se modifient plus pour une table : dans « Réglages de cette table », elles ont le badge « En partie » et seule leur valeur propre à la table peut être retirée (`isLiveVisual`, `packages/core/src/vpx-settings.ts`) ; les essentiels de la table ne les montrent plus.
-- **Médecin** : « Cadrage manuel imposé par la table » quand le `.ini` de la table (souvent livré avec elle, réglé pour l'écran de son auteur) contient `CabinetAutofitMode = 0` ; la réparation retire la clé, l'ancien fichier part à la corbeille.
+- **Diagnostic** : « Cadrage manuel imposé par la table » quand le `.ini` de la table (souvent livré avec elle, réglé pour l'écran de son auteur) contient `CabinetAutofitMode = 0` ; la réparation retire la clé, l'ancien fichier part à la corbeille.
   Quand ce `.ini` a aussi sa propre vue de borne (`[TableOverride] ViewCabHOfs`, `ViewCabVOfs`, `ViewCabScale…`, `hasOwnCabinetView`), réglée en partie ou reprise, ce n'est plus un problème mais une information, « Cadrage réglé pour cette table » (`manualView`) : VPX la joue telle qu'elle a été enregistrée pour elle.
   Sa correction, « Passer cette table au cadrage automatique », écrit `CabinetAutofitMode = 1` au lieu de retirer la clé : le retour à l'automatique tient d'une partie à l'autre.
 

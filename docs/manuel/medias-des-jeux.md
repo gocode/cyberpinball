@@ -26,7 +26,7 @@ Aucun réglage par écran : l'écran de chaque média, ses proportions et sa rot
 | `(GameHelp)` | Règles | Une ou plusieurs cartes de règles. | Playfield, sur demande : fiche > « Règles », page par page | comme le prospectus | les règles trouvées seules (carte et texte du `.vpx`, feuille de règles, vidéo), puis les commandes de la partie |
 
 `(Other)`, `(RealDMD)` et `(RealColorDMD)` (Popper, PinballX) n'ont pas d'écran chez Cyber Pinball : ils sont lus, gardés et ignorés.
-Les anciens formats de Popper (`flv`, `f4v`, `avi`, `mov`, `wmv`, `mpg`, `mpeg`) ne se lisent pas : le médecin les signale, l'import les laisse de côté.
+Les anciens formats de Popper (`flv`, `f4v`, `avi`, `mov`, `wmv`, `mpg`, `mpeg`) ne se lisent pas : le diagnostic les signale, l'import les laisse de côté.
 
 Pour chaque écran, le front-end prend le premier média trouvé : `(Type) <nom du .vpx>`, `(Type) <nom du dossier>`, les noms fixes de VPinFE (`bg.png`, `wheel.png`, `table.mp4`…), l'image du `.directb2s` (fronton seulement), le **média commun de la borne** `<racine>\media\(Type).ext`, et enfin l'affichage par défaut.
 
@@ -43,7 +43,7 @@ Pour chaque écran, le front-end prend le premier média trouvé : `(Type) <nom 
   Tout est copié, l'installation d'origine n'est pas modifiée.
 - **À la main** : copier le fichier dans `medias\` sous son nom `(Type) <nom du dossier>.ext`.
   Le front-end le montre aussitôt sur chaque écran, sans redémarrer (voir « Changements en direct »).
-  Le médecin (fiche > « Diagnostiquer et réparer ») signale un nom qui ne correspond pas au jeu, un fichier rangé hors de `medias\`, un format illisible, des proportions qui ne collent pas à l'écran, et propose le renommage.
+  Le diagnostic (fiche > « Diagnostiquer et réparer ») signale un nom qui ne correspond pas au jeu, un fichier rangé hors de `medias\`, un format illisible, des proportions qui ne collent pas à l'écran, et propose le renommage.
 - **Médias communs de la borne** : un fichier `<racine>\media\(Type).ext`, sans nom de jeu, sert à tous les jeux qui n'ont pas ce média : un topper aux couleurs de la salle, une musique d'ambiance, une vidéo de fond.
   Il passe avant l'affichage par défaut.
 
@@ -121,8 +121,8 @@ La recherche suit cet ordre (`resolveMedia`, [packages/core/src/medias.ts](../..
   L'adresse des fichiers changeant avec leur date et leur taille, aucun écran ne garde l'ancienne image : le cache des images du `.directb2s` est daté de la même façon et celui des dimensions vérifie la date et la taille, il n'y a donc rien à réparer au démarrage.
   Un dossier absent au démarrage (`<racine>\media`) est guetté dès qu'il existe (à la relecture des tables) ; sans guet possible (lecteur réseau), les médias résolus expirent au bout de 10 s.
 - **Image du `.directb2s`** : extraite en tâche de fond, une table à la fois, au premier passage sur la table ; le repli s'affiche en attendant, puis l'image le remplace en fondu.
-- **Erreurs de lecture** (vidéo indécodable, image abîmée) : remontées par la fenêtre au processus principal avec le code de l'erreur, écrites dans la console et dans le journal unique `<données>\logs\medias-erreurs.json` (format décrit dans « Le médecin des médias »), une entrée par fichier ; une entrée disparaît quand le fichier change.
-  Le médecin les signale.
+- **Erreurs de lecture** (vidéo indécodable, image abîmée) : remontées par la fenêtre au processus principal avec le code de l'erreur, écrites dans la console et dans le journal unique `<données>\logs\medias-erreurs.json` (format décrit dans « Le diagnostic des médias »), une entrée par fichier ; une entrée disparaît quand le fichier change.
+  Le diagnostic les signale.
 - **Tests** : [mediaview.test.ts](../../packages/core/src/test/mediaview.test.ts) (adresses, dossiers autorisés, rotation pour chaque bord des flippers, DMD ou FullDMD, `.directb2s`, réglage, journal des erreurs, CSP et branchements du rendu), [mediawatch.ts](../../packages/core/src/test/mediawatch.test.ts) (guet des dossiers, nouveau fichier après un changement de chaque type, `.directb2s` relu sans repli, roue du vrai rendu qui affiche un logo ajouté à une table déjà à l'écran, sans bouger).
 
 ### L'écran des tables au bureau, de 5:4 à 16:9 et plus
@@ -162,7 +162,7 @@ Hors de l'écran des tables, rien de la dernière table de la roue ne reste à l
   Aucun fichier de table n'est lu, aucune vidéo ne tourne ; l'afficheur suit son écran (DMD seul ou FullDMD).
   Fond sombre dès la première image : jamais de blanc à la bascule.
 - **Règle** (`screensTable`, [packages/core/src/menumoments.ts](../../packages/core/src/menumoments.ts)) : chaque phase du front-end dit de quelle table elle parle, dans un tableau exhaustif (une nouvelle phase ne compile pas sans y être déclarée).
-  Le menu système ne garde une table que pour un écran qui la déclare : les écrans d'une table (fiche, prospectus, modification, médecin, suppression) la portent, un écran décrit la donne à son ouverture (`openCustom(build, at, table)` dans `app/src/library.ts`), une saisie ou un message garde celle de l'écran d'où il s'ouvre.
+  Le menu système ne garde une table que pour un écran qui la déclare : les écrans d'une table (fiche, prospectus, modification, diagnostic, suppression) la portent, un écran décrit la donne à son ouverture (`openCustom(build, at, table)` dans `app/src/library.ts`), une saisie ou un message garde celle de l'écran d'où il s'ouvre.
   Tout nouvel écran qui ne dit rien prend l'affichage par défaut.
 - **Essais** : le relevé des couches (`cyberEtat()`) dit « marque » pour l'affichage par défaut sans table, « repli » (valeur interne) pour celui d'une table sans ce média.
 - **Tests** : [ecrans-par-defaut.test.ts](../../packages/core/src/test/ecrans-par-defaut.test.ts) (chaque phase, chaque écran, composant du rendu pour chacun, branchements de `frontend.ts`).
@@ -752,9 +752,9 @@ Les PuP-Packs (`PUPVideos`) et les médias par défaut de Popper (`System`, `Def
 
 **Cas non reconnus** : le champ `MediaSearch` de Popper (un média partagé par plusieurs tables, avec joker) et `MediaWildCard` (plusieurs fichiers tirés au hasard : un seul est gardé) ; les médias nommés autrement que le jeu dans la base de Popper ou de PinballX, quand ce nom ne ressemble ni au `.vpx`, ni au dossier, ni au titre, ni à un jeu VPS (ils sont listés « Sans table ») ; `Table Images Desktop` et `Table Videos Desktop` de PinballX (vues de bureau) ; `Wheelbar` et les thèmes de Popper ; les sous-dossiers d'un dossier de type autres que les prospectus de PinballX.
 
-### Le médecin des médias
+### Le diagnostic des médias
 
-Le médecin ([doctor.ts](../../packages/core/src/doctor.ts), fiche > « Diagnostiquer et réparer ») vérifie, sans rien lancer :
+Le diagnostic ([doctor.ts](../../packages/core/src/doctor.ts), fiche > « Diagnostiquer et réparer ») vérifie, sans rien lancer :
 
 | Constat | Quand | Correction |
 | --- | --- | --- |

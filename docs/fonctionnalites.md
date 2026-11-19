@@ -267,7 +267,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Les contrôleurs reconnus sans rien leur envoyer** (Pinscape, LedWiz, Teensy, DudesCab, PacLed…), le plugin DOF de VPX allumé, et ce qui empêche une LED de s'allumer dit clairement (configuration absente, contrôleur sans son fichier, Teensy non déclaré).
 - **La configuration du configtool** se récupère dans « Récupérer » et s'importe d'elle-même ; l'ancienne est sauvegardée.
 - **LED adressables (WS2812)** : décrivez vos bandes (Teensy, Wemos D1, ou Art-Net vers WLED sur un ESP32) et Cyber Pinball écrit le `Cabinet.xml` de DOF, sans jamais remplacer un fichier écrit à la main.
-- **Le médecin d'une table** signale une ROM sans effets DOF ; les réglages de VPX choisissent, pour le knocker ou le vibreur, le son de la table, la borne ou les deux.
+- **Le diagnostic d'une table** signale une ROM sans effets DOF ; les réglages de VPX choisissent, pour le knocker ou le vibreur, le son de la table, la borne ou les deux.
 
 ### Plusieurs configurations
 
@@ -488,7 +488,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **« Parties du jeu »** : une ligne par partie (table, fronton, ROM, PuP-Pack, couleurs du DMD, sons, musique, point de vue, topper, médias), « Présent », « Reçu, à installer », « Attendu » ou absent ; chacune s'ajoute, se remplace, se réaffecte ou se retire, et une partie absente lance la recherche sur tous les sites.
 - **« Fichiers de la table »** : tout le dossier groupé par sorte, avec ce que VPX en fera (« chargé par VPX avec cette table », « mal nommé : VPX ne le chargera pas »).
 - **« Prospectus et règles »** : un seul livret, page par page, tourné pour le joueur. Les règles se trouvent seules : la carte et le texte rangés dans la table, une feuille de règles publique (The Pinball Primer, Pinball Rule Sheets), une vidéo d'explication à regarder sur le téléphone ; les commandes de la partie viennent toujours en dernier. Pour une dizaine de tables, un guide du jeu ouvre le livret : le but, puis un objectif par page, avec les coups numérotés sur le plateau et les tirs depuis les flippers.
-- **« Diagnostiquer et réparer »** : le médecin de la table (voir [Une borne qui s'entretient](#une-borne-qui-sentretient)).
+- **« Diagnostiquer et réparer »** : le diagnostic de la table (voir [Une borne qui s'entretient](#une-borne-qui-sentretient)).
 
 <p align="center"><img src="images/fr/game-page.webp?v=5bd3333057" width="360" alt="La fiche du jeu Neon Abyss : ses statistiques de jeu et ses fichiers, puis Jouer, Jouer avec un ami, Tableau des scores, Prospectus et règles, Ajouter aux favoris, Ajouter à une collection et Gérer la table."></p>
 
@@ -597,9 +597,9 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Un témoin discret**, exclu de la vidéo : « Enregistrement dans 7 s », « REC 0:12 / 0:30 ».
 - **Au retour** : « Utiliser pour la roue », « Garder de côté », « Rejouer et enregistrer » ou « Jeter l'enregistrement ».
 
-### Médecin des médias et reprise d'un autre frontend
+### Diagnostic des médias et reprise d'un autre frontend
 
-- **Le médecin des médias** signale un format illisible, un média mal nommé ou mal rangé, des proportions qui ne collent pas à l'écran, un fichier très lourd, des doublons. Ses corrections sont toujours sûres (renommer, déplacer, corbeille) ; « Tout réparer » les enchaîne.
+- **Le diagnostic des médias** signale un format illisible, un média mal nommé ou mal rangé, des proportions qui ne collent pas à l'écran, un fichier très lourd, des doublons. Ses corrections sont toujours sûres (renommer, déplacer, corbeille) ; « Tout réparer » les enchaîne.
 - **« Reprendre les médias »** d'un autre frontend installé (Menu système > « Cyber Pinball » > « Migration ») : plan table par table, l'installation d'origine n'est pas modifiée.
 
 ## Pendant une partie
@@ -655,7 +655,7 @@ Deux fonctions en bêta (badge « BÊTA » dans Menu système > Borne) : sans le
 
 <p align="center"><img src="images/fr/tech-sheet.webp?v=7cf1534a18" width="360" alt="La fiche technique de la borne : le PC, Windows, les écrans, les contrôleurs, les logiciels et Cyber Pinball, chaque bloc avec son état (OK ou À vérifier), puis Envoyer un rapport et Santé de la borne."></p>
 
-### Le médecin des tables
+### Le diagnostic des tables
 
 - **« Diagnostiquer et réparer »** explique en mots simples pourquoi une table ne marche pas, et répare ce qu'il peut : une ROM mal rangée ou éparpillée, un PuP-Pack coupé par son script ou mal configuré, un fronton mal nommé, une table de travers, un cadrage imposé par la table.
 - **Rien n'est supprimé** : les fichiers remplacés vont à la corbeille de Cyber Pinball.

@@ -51,7 +51,7 @@ D:\CyberPinball\
   L'application elle-même tourne dans Electron 44 (Node 24), qui n'a pas ce défaut ; les essais, `fabriquer.mjs` et les outils en ligne de commande tournent sous Node 22.
   `copyTree` n'emploie que `mkdirSync` et `copyFileSync`, sains partout.
   `copie-sure.test.ts` refuse tout `fs.cpSync` dans les sources et copie depuis et vers des dossiers accentués.
-  Ce que l'ancien défaut a laissé, le médecin le reconnaît à son nom (`folderMangled`, `unmangledName`) et propose de le ranger sous son vrai nom ; un fichier déjà présent sous le vrai nom part à la corbeille, remplacé par la copie, plus récente.
+  Ce que l'ancien défaut a laissé, le diagnostic le reconnaît à son nom (`folderMangled`, `unmangledName`) et propose de le ranger sous son vrai nom ; un fichier déjà présent sous le vrai nom part à la corbeille, remplacé par la copie, plus récente.
 - Variables pour les tests : `CYBERPINBALL_ROOT` (autre racine), `CYBERPINBALL_HOME` (bac à sable isolé), `CYBERPINBALL_VPX_INI` (autre fichier).
 
 En ligne de commande : `node packages/installer/dist/cli.js setup <racine>`, `install [id]`, `status`.

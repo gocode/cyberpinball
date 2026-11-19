@@ -2,7 +2,7 @@
 
 ## Interface language
 
-Everything Cyber Pinball displays exists in French and in English: table menu and game pages, system menu, setup wizard, VPX settings, the "Get" window, and the messages and findings of the core (doctor, synchronisation, import, update).
+Everything Cyber Pinball displays exists in French and in English: table menu and game pages, system menu, setup wizard, VPX settings, the "Get" window, and the messages and findings of the core (diagnosis, synchronisation, import, update).
 Dates and numbers follow the language (`fr-FR` or `en-GB`).
 Console logs, test reports and files written for other tools stay in French.
 

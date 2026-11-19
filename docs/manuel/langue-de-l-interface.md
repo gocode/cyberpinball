@@ -2,7 +2,7 @@
 
 ## Langue de l'interface
 
-Tout ce qu'affiche Cyber Pinball existe en français et en anglais : écran des tables et fiches, menu système, assistant, réglages de VPX, fenêtre « Récupérer », messages et constats du cœur (médecin, synchronisation, import, mise à jour).
+Tout ce qu'affiche Cyber Pinball existe en français et en anglais : écran des tables et fiches, menu système, assistant, réglages de VPX, fenêtre « Récupérer », messages et constats du cœur (diagnostic, synchronisation, import, mise à jour).
 Les dates et les nombres suivent la langue (`fr-FR` ou `en-GB`).
 Les journaux de la console, les rapports des essais et les fichiers écrits pour d'autres outils restent en français.
 

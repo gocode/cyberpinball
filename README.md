@@ -36,7 +36,7 @@ Cyber Pinball turns a PC full of Visual Pinball X tables into a real arcade cabi
 - **[Your phone as the cabinet's remote](#your-phone-as-the-cabinets-remote)**: every menu, the jukebox, messages and scores in your hand, with nothing to install.
 - **[Set up from the cabinet itself](#set-up-from-the-cabinet-itself)**: a wizard driven by the flipper buttons, screens recognised by their hardware fingerprint, so nothing breaks when Windows renumbers them.
 - **[Virtual reality and 3D vision](#virtual-reality-and-3d-vision-beta)**: tables in a headset, or a perspective that follows your head with a plain webcam (in beta).
-- **[From "I want this table" to "Play"](#from-i-want-this-table-to-play)**: the VPS catalogue, a guided "What's missing to play" path, a table doctor, every downloaded file sent where it belongs.
+- **[From "I want this table" to "Play"](#from-i-want-this-table-to-play)**: the VPS catalogue, a guided "What's missing to play" path, a table diagnosis, every downloaded file sent where it belongs.
 - **[Media from every source, chosen by you](#media-from-every-source-chosen-by-you)**: galleries of what each site offers, a built-in browser, and your own games recorded as wheel videos.
 - **[A cabinet that looks after itself](#a-cabinet-that-looks-after-itself)**: a health check, a tech sheet, backups, signed updates, a night schedule, guest mode for parties.
 
@@ -141,7 +141,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 - **"What's missing to play".** A step-by-step path, from a missing ROM or backglass to the right download page, then the install of what you fetched, ending on "Play". Only the table and its ROM are required; the rest is offered as extras.
 - **Every file goes where it belongs.** A file you download is recognised by its content (table, backglass, ROM, PuP-Pack, DMD colours, sounds, music…) and filed into that part of the game, even when something else was expected. A table's "Game parts" lets you add, replace, reassign or remove each part.
 - **Rules found on their own.** The flyer and the rules make one booklet you leaf through with the flippers: the card and text the author stored in the table, a public rule sheet for more than 800 machines, an explanation video to open on your phone.
-- **A table doctor.** "Diagnose and fix" explains in plain words why a table fails, and repairs what it can: a ROM in the wrong folder, a PuP-Pack its script keeps switched off or that is missing files, a backglass on the wrong screen.
+- **Table diagnosis.** "Diagnose and fix" explains in plain words why a table fails, and repairs what it can: a ROM in the wrong folder, a PuP-Pack its script keeps switched off or that is missing files, a backglass on the wrong screen.
 - **A shared ROM library.** Each ROM stored once, hard-linked into every table that uses it.
 - **PuP-Packs that just work.** The pack option is chosen from your screens, the pack is checked before each game, and known pack problems (images under a video name, accented file names, videos triggered by the DMD) are fixed for every pack.
 - **Downloads that resume** the next day if the connection drops, and bring you back in one move to the screen you started from. Cyber Pinball never downloads tables or ROMs on your behalf: you choose, from their authors' sites.
@@ -162,7 +162,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 ## A cabinet that looks after itself
 
 <p align="center">
-  <img src="docs/images/en/health.webp?v=794ac8eb14" width="360" alt="Cabinet health: 1 blocking, 2 to check, 3 OK. Disk space is fine, Midnight Circuit won't start because its ROM is missing (selected, with Open the table doctor), VPinMediaDB has media for 2 tables, the living-room cabinet is recognised with all 4 screens, tables are the right way round with the flippers at the bottom, and a newer VPX is available to install.">
+  <img src="docs/images/en/health.webp?v=794ac8eb14" width="360" alt="Cabinet health: 1 blocking, 2 to check, 3 OK. Disk space is fine, Midnight Circuit won't start because its ROM is missing (selected, with Open the table's diagnosis), VPinMediaDB has media for 2 tables, the living-room cabinet is recognised with all 4 screens, tables are the right way round with the flippers at the bottom, and a newer VPX is available to install.">
   <img src="docs/images/en/tech-sheet.webp?v=be70aa361a" width="360" alt="The cabinet's tech sheet: the PC, Windows, the screens, the controllers, the software and Cyber Pinball, each block with its status (OK or To check), then Send a report and Cabinet health.">
 </p>
 

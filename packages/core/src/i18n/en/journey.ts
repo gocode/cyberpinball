@@ -89,7 +89,7 @@ export const messages: Record<string, string> = {
   Revérifier: 'Check again',
   'Relit la table et ce qui est arrivé': 'Reads the table and what has arrived again',
   'Diagnostic complet': 'Full diagnosis',
-  'Tous les constats du médecin, médias compris': 'Every finding of the doctor, media included',
+  'Tous les constats, médias compris': 'Every finding, media included',
 
   // app/src/library.ts, app/src/catalog.ts, app/renderer/frontend.js
   'ROM {rom} absente : où la trouver, étape par étape': 'ROM {rom} missing: where to find it, step by step',

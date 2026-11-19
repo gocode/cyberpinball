@@ -153,7 +153,7 @@ The online catalog (**"Trouver une table en ligne" (Find a table online)**) show
   What was chosen by hand (assigned anyway, deliberately kept aside) is left alone.
   A file that is gone becomes "À corriger" (To fix).
   No need to edit `acquisition.json` by hand.
-- **Installation**: "Installer : <jeu>" (Install: <game>) opens the usual add plan with the received files, the VPS game already chosen; nothing moves until "Installer" (Install), then the doctor checks the table.
+- **Installation**: "Installer : <jeu>" (Install: <game>) opens the usual add plan with the received files, the VPS game already chosen; nothing moves until "Installer" (Install), then the diagnosis checks the table.
   A file **to fix never blocks** the rest: the plan leaves it aside ("PuP-Pack à corriger à part", PuP-Pack to fix separately), and only a game where everything is to fix opens the item.
   What is fetched for an installed table ("Ce qu'il manque pour jouer", What's missing to play, "Parties du jeu", Game parts) all goes to it: the plan targets its folder (`PlanOptions.target`).
   The origin is recorded in the `.info` (`CyberPinball.source`: VPS game and file, version, authors, page, date); the copies in `downloads\acquisition` are deleted, the files in Downloads stay.

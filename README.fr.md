@@ -36,7 +36,7 @@ Cyber Pinball transforme un PC rempli de tables Visual Pinball X en véritable b
 - **[Votre téléphone, télécommande de la borne](#votre-téléphone-télécommande-de-la-borne)** : tous les menus, le Juke-box, les messages et les scores dans la main, sans rien installer.
 - **[Tout se règle depuis la borne](#tout-se-règle-depuis-la-borne)** : un assistant qui se suit aux boutons des flippers. Les écrans sont reconnus à leur empreinte matérielle, si bien que rien ne casse quand Windows les renumérote.
 - **[Réalité virtuelle et Vision 3D](#réalité-virtuelle-et-vision-3d-bêta)** : les tables dans un casque, ou une perspective qui suit votre tête avec une simple webcam (en bêta).
-- **[De la table repérée à la première partie](#de-la-table-repérée-à-la-première-partie)** : le catalogue VPS, un parcours guidé « Ce qu'il manque pour jouer », un médecin des tables, et chaque fichier téléchargé rangé au bon endroit.
+- **[De la table repérée à la première partie](#de-la-table-repérée-à-la-première-partie)** : le catalogue VPS, un parcours guidé « Ce qu'il manque pour jouer », un diagnostic des tables, et chaque fichier téléchargé rangé au bon endroit.
 - **[Les médias de votre choix, d'où qu'ils viennent](#les-médias-de-votre-choix-doù-quils-viennent)** : pour chaque média, tout ce que proposent les sites, un navigateur intégré, et vos propres parties filmées pour présenter les tables sur la roue.
 - **[Une borne qui s'entretient toute seule](#une-borne-qui-sentretient-toute-seule)** : un bilan de santé, une fiche technique, des sauvegardes, des mises à jour signées, des horaires pour la nuit, un mode invité pour les soirées.
 
@@ -141,7 +141,7 @@ Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bor
 - **« Ce qu'il manque pour jouer ».** Un parcours pas à pas : d'une ROM ou d'un fronton manquant jusqu'à la bonne page de téléchargement, puis l'installation de ce que vous avez récupéré, et enfin « Jouer ». Seules la table et sa ROM sont indispensables ; le reste est proposé en bonus.
 - **Chaque fichier trouve sa place.** Cyber Pinball reconnaît un fichier téléchargé à son contenu (table, fronton, ROM, PuP-Pack, couleurs du DMD, sons, musique…) et le range dans la bonne partie du jeu, même si vous attendiez autre chose. Depuis les « Parties du jeu » d'une table, vous pouvez ajouter, remplacer, réaffecter ou retirer chacune d'elles.
 - **Les règles trouvées toutes seules.** Le prospectus et les règles forment un livret qu'on feuillette aux flippers : la carte et le texte rangés dans la table par son auteur, une feuille de règles publique pour plus de 800 machines, une vidéo d'explication à ouvrir sur le téléphone.
-- **Un médecin des tables.** « Diagnostiquer et réparer » explique simplement pourquoi une table ne fonctionne pas et répare ce qui peut l'être : une ROM dans le mauvais dossier, un PuP-Pack que le script de la table laisse éteint ou auquel il manque des fichiers, un fronton sur le mauvais écran.
+- **Un diagnostic des tables.** « Diagnostiquer et réparer » explique simplement pourquoi une table ne fonctionne pas et répare ce qui peut l'être : une ROM dans le mauvais dossier, un PuP-Pack que le script de la table laisse éteint ou auquel il manque des fichiers, un fronton sur le mauvais écran.
 - **Une seule bibliothèque de ROM.** Chaque ROM n'est stockée qu'une fois, puis liée physiquement dans chaque table qui en a besoin.
 - **Des PuP-Packs qui fonctionnent.** L'option du pack est choisie en fonction de vos écrans, le pack est vérifié avant chaque partie, et ses défauts connus (images enregistrées sous un nom de vidéo, noms de fichiers accentués, vidéos déclenchées par le DMD) sont corrigés, quel que soit le pack.
 - **Des téléchargements qui reprennent** le lendemain si la connexion coupe, et qui vous ramènent d'un geste à l'écran d'où vous étiez parti. Cyber Pinball ne télécharge jamais de tables ni de ROM de lui-même : c'est vous qui choisissez, sur les sites de leurs auteurs.
@@ -162,7 +162,7 @@ Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bor
 ## Une borne qui s'entretient toute seule
 
 <p align="center">
-  <img src="docs/images/fr/health.webp?v=c6ceeb14be" width="360" alt="Santé de la borne : 1 point bloquant, 2 à vérifier, 3 OK. L'espace disque suffit ; Midnight Circuit ne démarre pas faute de ROM (ligne sélectionnée, avec Ouvrir le médecin de la table) ; VPinMediaDB a des médias pour 2 tables ; la borne du salon est reconnue avec ses 4 écrans ; les tables sont dans votre sens, flippers en bas ; une version plus récente de VPX peut être installée.">
+  <img src="docs/images/fr/health.webp?v=c6ceeb14be" width="360" alt="Santé de la borne : 1 point bloquant, 2 à vérifier, 3 OK. L'espace disque suffit ; Midnight Circuit ne démarre pas faute de ROM (ligne sélectionnée, avec Ouvrir le diagnostic de la table) ; VPinMediaDB a des médias pour 2 tables ; la borne du salon est reconnue avec ses 4 écrans ; les tables sont dans votre sens, flippers en bas ; une version plus récente de VPX peut être installée.">
   <img src="docs/images/fr/tech-sheet.webp?v=7cf1534a18" width="360" alt="La fiche technique de la borne : le PC, Windows, les écrans, les contrôleurs, les logiciels et Cyber Pinball, chaque bloc avec son état (OK ou À vérifier), puis Envoyer un rapport et Santé de la borne.">
 </p>
 
