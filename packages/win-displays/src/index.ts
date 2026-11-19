@@ -314,5 +314,6 @@ export * from './power';
 export * from './system-volume';
 export * from './openxr';
 export * from './handles';
+export * from './file-holders';
 export * from './device-guard';
 export { hkcuValue, hklmValue } from './registry';

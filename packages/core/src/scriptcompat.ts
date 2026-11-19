@@ -639,10 +639,29 @@ function b2sCalls(line: string): B2sCall[] {
   return calls;
 }
 
+/**
+ * Un appel B2S dont une place « int » reçoit à coup sûr un texte que le plugin ne convertit pas : un texte écrit en clair
+ * qui n'est pas un nombre (« "on" », « "" »), ou un texte assemblé (« & », CStr) qui peut ne pas en être un. Un nombre
+ * écrit en texte (« "1" ») passe tel quel dans le plugin : rien à corriger.
+ */
+function refusedB2sArgument(code: string): boolean {
+  return code.split('\n').some((line) =>
+    b2sCalls(line).some((c) =>
+      (B2S_INT_ONLY[c.method.toLowerCase()]?.[c.args.length] ?? []).some((k) => {
+        const arg = c.args[k]!.replace(/^\((.*)\)$/, '$1').trim();
+        const literal = /^"((?:[^"]|"")*)"$/.exec(arg);
+        if (literal) return !/^\s*[+-]?\d+(?:[.,]\d+)?\s*$/.test(literal[1]!);
+        return /"[^"]*"\s*&|&\s*"|\bCStr\s*\(/i.test(arg);
+      }),
+    ),
+  );
+}
+
 const b2sArgs: CompatRule = {
   id: 'b2sArgs',
-  // Jamais d'après le seul texte : un argument texte ne se voit qu'à l'exécution. Réclamé par le journal de VPX.
-  found: () => false,
+  // Repéré dans le texte quand un appel passe à coup sûr un texte à une place « int » (refusedB2sArgument) ; sinon,
+  // réclamé par le journal de VPX après une partie (compatFixesFromLog) : un texte venu d'une variable ne se voit qu'à l'exécution.
+  found: (code) => refusedB2sArgument(code),
   applicable: (code) => code.split('\n').some((l) => b2sCalls(l).length > 0),
   applied: (text) => new RegExp(`^\\s*function\\s+${B2S_CALL}_Int\\b`, 'im').test(text),
   apply(text) {

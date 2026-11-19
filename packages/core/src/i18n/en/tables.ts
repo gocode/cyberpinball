@@ -3,7 +3,12 @@ export const messages: Record<string, string> = {
   // packages/core/src/doctor.ts
   'Table hors de son propre dossier': 'Table outside its own folder',
   'Son coupé pour cette table': 'Sound muted for this table',
+  '« {folder} » était dans le dossier de « {table} », qui ne le charge pas : il revient à cette table.': '“{folder}” was in the folder of “{table}”, which does not load it: it goes back to this table.',
   'Image du DMD absente': 'DMD image missing',
+  'Image du DMD illisible': 'DMD image unreadable',
+  'Images du DMD illisibles': 'DMD images unreadable',
+  'À la dernière partie, le DMD n’a pas su lire {list} dans « {folder} » : le fichier est là, mais son format ne passe pas (image abîmée, ou enregistrée sous un autre format que son extension).':
+    'During the last game, the DMD could not read {list} in “{folder}”: the file is there, but its format does not work (damaged image, or saved in another format than its extension).',
   'Images du DMD absentes': 'DMD images missing',
   'À la dernière partie, le DMD n’a pas trouvé {list} dans « {folder} » : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprenez-le en entier, puis « Ajouter une table ».':
     'During the last game, the DMD did not find {list} in “{folder}”: it only shows its texts. This folder comes with the original table; take it again in full, then “Add a table”.',
@@ -12,8 +17,8 @@ export const messages: Record<string, string> = {
   'La musique de la table passe par ce pack ({list}) : sans elle, la table est muette. Ses vidéos et sa musique sont souvent un téléchargement à part du pack ; reprenez-le en entier.':
     'The table’s music comes from this pack ({list}): without it, the table is silent. Its videos and music are often a separate download from the pack; take it again in full.',
   'Script arrêté par le fronton B2S de VPX': 'Script stopped by VPX’s B2S backglass',
-  'À la dernière partie, le fronton B2S de VPX a refusé un appel du script (un texte là où il attend un nombre) : la procédure qui l’appelait s’est arrêtée, et la suite de la table avec elle.':
-    'During the last game, VPX’s B2S backglass refused a call from the script (text where it expects a number): the procedure that made it stopped, and the rest of the table with it.',
+  'Le script envoie au fronton B2S de VPX un texte là où il attend un nombre : le fronton refuse l’appel, et la procédure qui l’appelait s’arrête, avec la suite de la table.':
+    'The script sends VPX’s B2S backglass text where it expects a number: the backglass refuses the call, and the procedure that made it stops, along with the rest of the table.',
   'Corrigé dans {file}, le script que VPX joue à la place de celui de la table : un nombre écrit en texte est converti, et un appel encore refusé n’arrête plus le script.':
     'Fixed in {file}, the script VPX plays instead of the table’s: a number written as text is converted, and a call still refused no longer stops the script.',
   'La table n’est pas modifiée : VPX joue {file}, une copie de son script où un nombre écrit en texte est converti, et où un appel encore refusé n’arrête plus le script.':

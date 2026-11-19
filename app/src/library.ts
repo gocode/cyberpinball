@@ -262,6 +262,8 @@ import {
   type TableCreditsInput,
   borneCode,
   loadFeedbackState,
+  fileErrorText,
+  isFileLocked,
 } from '@cyberpinball/core';
 import { createCreditsMenu, type CreditsDepth } from './credits-menu';
 import { prepareImport, unpackArchive } from './archives';
@@ -677,7 +679,7 @@ export function createLibrary(host: LibraryHost) {
     if (!item || hiddenInLocalPlay(id, localPlay())) return back();
     section = SYSTEM_ITEMS[id].icon;
     systemReturn = back;
-    item.run();
+    runAction(item.run, back);
   }
 
   /** Entrées d'une rubrique (de la racine : ses raccourcis, Téléchargements, puis les rubriques) que l'application fournit. */
@@ -715,7 +717,7 @@ export function createLibrary(host: LibraryHost) {
     systemChosen = id;
     if (isSystemGroup(id)) return openSystemGroup(id);
     section = SYSTEM_ITEMS[id].icon;
-    systemItems.get(id)!.run();
+    runAction(systemItems.get(id)!.run, () => openSystemGroup(undefined));
   }
 
   /** Remonte d'un cran : la rubrique parente (ou la racine), la sélection sur celle qu'on quitte. */
@@ -2165,6 +2167,40 @@ export function createLibrary(host: LibraryHost) {
     } finally {
       buildDepth--;
     }
+  }
+
+  /**
+   * Fait une action de l'écran sans jamais laisser passer son erreur : une opération sur les fichiers refusée
+   * (fichier tenu par un autre programme, disque plein) est dite à l'écran, une fois, avec le programme qui tient le
+   * fichier quand Windows le sait ; l'écran d'avant revient par `back`. Le 19/11/2026, mettre une table à la corbeille
+   * pendant qu'un de ses fichiers était ouvert laissait une « exception non rattrapée » à chaque appui, et rien à l'écran.
+   */
+  function runAction(run: (() => unknown) | undefined, back: () => void): unknown {
+    if (!run) return undefined;
+    try {
+      const result = run();
+      return result instanceof Promise ? result.catch((error: unknown) => actionFailed(error, back)) : result;
+    } catch (error) {
+      actionFailed(error, back);
+      return undefined;
+    }
+  }
+
+  function actionFailed(error: unknown, back: () => void): void {
+    const target = (error as { path?: string } | undefined)?.path;
+    let holders: string[] = [];
+    if (target && isFileLocked(error)) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const w = require('@cyberpinball/win-displays') as typeof import('@cyberpinball/win-displays');
+        holders = [...new Set(w.fileHolders(target).map((h) => h.name))];
+      } catch {
+        // Hors Windows, ou Windows ne sait pas le dire : le message général suffit.
+      }
+    }
+    const text = fileErrorText(error, holders);
+    console.warn(`Action du front-end refusée : ${(error as Error)?.message ?? String(error)}${holders.length ? ` (tenu par ${holders.join(', ')})` : ''}`); // i18n-ignore : journal
+    go({ kind: 'notice', heading: t('Opération impossible'), lines: [text], then: back });
   }
 
   /**
@@ -4946,7 +4982,7 @@ export function createLibrary(host: LibraryHost) {
         userGesture();
         if (built.actions[cursor]?.run === built.back) expectBack();
         const before = screen;
-        afterRun(built.actions[cursor]?.run(), before);
+        afterRun(runAction(built.actions[cursor]?.run, built.back), before);
       }
     }
     // Exit dans le texte ou dans la liste de contenu : retour aux actions de l'écran ; Exit dans les actions : l'écran se ferme.
@@ -4966,7 +5002,7 @@ export function createLibrary(host: LibraryHost) {
       reading.active = false;
       userGesture();
       const before = screen;
-      afterRun(hit.run(), before);
+      afterRun(runAction(hit.run, built.back), before);
     }
     host.broadcast();
     return true;
@@ -5370,7 +5406,7 @@ export function createLibrary(host: LibraryHost) {
       host.broadcast();
       if (built.actions[index]!.run === built.back) expectBack();
       const before = screen;
-      afterRun(built.actions[index]!.run(), before);
+      afterRun(runAction(built.actions[index]!.run, built.back), before);
     }
   }
 
@@ -6084,7 +6120,7 @@ export function createLibrary(host: LibraryHost) {
     systemPlace,
     reopenSystem,
     /** Essais : ouvrir l'écran de la télécommande. */
-    openPhoneRemote: () => remoteMenu?.item.run(),
+    openPhoneRemote: () => runAction(remoteMenu?.item.run, leave),
     /** Sélecteur de fichiers de Cyber Pinball ; undefined à l'abandon, l'écran d'où l'on vient revient tel quel. */
     pick: pickPaths,
     openNotice,

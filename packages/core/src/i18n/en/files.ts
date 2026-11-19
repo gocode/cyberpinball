@@ -1,6 +1,14 @@
 // Catalogue anglais : files (écran « Téléchargements », sélecteur de fichiers de Cyber
 // Pinball, et les entrées qui les ouvrent). Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
+  // packages/core/src/fileerror.ts, app/src/library.ts (runAction)
+  'Opération impossible': 'Could not do that',
+  '« {name} » est ouvert dans {programs} : fermez-le, puis réessayez.': '“{name}” is open in {programs}: close it, then try again.',
+  '« {name} » est ouvert par un autre programme (VPX, un lecteur vidéo, l’Explorateur de fichiers…) : fermez-le, puis réessayez.':
+    '“{name}” is open in another program (VPX, a video player, File Explorer…): close it, then try again.',
+  'Le disque est plein : libérez de la place, puis réessayez.': 'The disk is full: free some space, then try again.',
+  '« {name} » n’existe plus : la liste va se mettre à jour.': '“{name}” no longer exists: the list will update.',
+  'L’opération n’a pas pu se faire : {message}': 'That could not be done: {message}',
   // packages/core/src/downloads.ts
   Image: 'Image',
   Vidéo: 'Video',

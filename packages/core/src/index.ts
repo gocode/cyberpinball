@@ -113,6 +113,7 @@ export * from './livestate';
 export * from './vpxinspector';
 export * from './vpxfailure';
 export * from './vpxgamelog';
+export * from './fileerror';
 export * from './vpxcadence';
 export * from './dmdvideos';
 export * from './webmfile';

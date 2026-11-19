@@ -39,10 +39,20 @@ const SCRIPT = [
   '',
 ].join('\r\n');
 
-test('repérage : seulement par le journal de VPX, jamais d’après le texte seul', () => {
-  assert.deepEqual(compatFixesFound(scriptCode(SCRIPT)), []);
-  assert.deepEqual(compatFixesFromLog(REFUSED, scriptCode(SCRIPT)), ['b2sArgs']);
-  assert.deepEqual(compatFixesFromLog(['INFO rien'], scriptCode(SCRIPT)), []);
+/** Un texte venu d'une variable : invisible dans le texte, seul le journal le révèle. */
+const SCRIPT_VAR = 'Dim state : state = "on"\r\nSub Table1_Init\r\n  Controller.B2SSetData 5, state\r\nEnd Sub\r\n';
+
+test('repérage : texte en clair dans le script, sinon par le journal de VPX', () => {
+  // « "on" » à la place d'un nombre : repéré avant la première partie.
+  assert.deepEqual(compatFixesFound(scriptCode(SCRIPT)), ['b2sArgs']);
+  assert.deepEqual(compatFixesFound(scriptCode('Sub A : Controller.B2SSetData 5, "" : End Sub\r\n')), ['b2sArgs']);
+  assert.deepEqual(compatFixesFound(scriptCode('Sub A : Controller.B2SSetScore 1, "Score " & n : End Sub\r\n')), ['b2sArgs']);
+  // Un nombre écrit en texte passe dans le plugin ; un nom d'élément à la place « string » aussi : rien.
+  assert.deepEqual(compatFixesFound(scriptCode('Sub A : Controller.B2SSetData 5, "1" : Controller.B2SSetData "Ball", 1 : End Sub\r\n')), []);
+  // Variable : seul le journal le dit.
+  assert.deepEqual(compatFixesFound(scriptCode(SCRIPT_VAR)), []);
+  assert.deepEqual(compatFixesFromLog(REFUSED, scriptCode(SCRIPT_VAR)), ['b2sArgs']);
+  assert.deepEqual(compatFixesFromLog(['INFO rien'], scriptCode(SCRIPT_VAR)), []);
   // Aucun appel B2S à une place « int » : rien à corriger.
   assert.deepEqual(compatFixesFromLog(REFUSED, scriptCode('Sub A : Controller.B2SStartAnimation "x" : End Sub\r\n')), []);
 });
@@ -98,10 +108,11 @@ test('médecin : réclamé par le journal de la dernière partie, réparé avant
     const folder = path.join(tablesDir, name);
     fs.mkdirSync(folder, { recursive: true });
     const vpx = path.join(folder, 'Champions League 2023.vpx');
-    const table = vpxWithScript(SCRIPT);
+    // Texte venu d'une variable : rien à voir dans le script, le journal de la partie le réclame.
+    const table = vpxWithScript(SCRIPT_VAR);
     fs.writeFileSync(vpx, table);
     const log = [`2026-11-18 20:31:42.460 INFO  [Main] [PinTable::LoadGameFromFilename@1419] LoadGameFromFilename ${vpx}`, ...REFUSED].join('\r\n');
-    const ctx = { tablesDir, script: scriptFacts(SCRIPT), vpxLog: log };
+    const ctx = { tablesDir, script: scriptFacts(SCRIPT_VAR), vpxLog: log };
     const finding = diagnose(scanTables(tablesDir)[0]!, ctx).find((f) => f.code === 'scriptCoreCompat');
     assert.equal(finding?.title, 'Script arrêté par le fronton B2S de VPX');
     // Sans ce journal : rien.
@@ -109,11 +120,18 @@ test('médecin : réclamé par le journal de la dernière partie, réparé avant
     repairPupForPlay(scanTables(tablesDir)[0]!, ctx, { trashDir: `${tablesDir}-corbeille` });
     const vbs = fs.readFileSync(path.join(folder, 'Champions League 2023.vbs'), 'latin1');
     assert.deepEqual(readScriptPatch(vbs)?.compat, ['b2sArgs']);
-    assert.match(vbs, /^ {2}CyberPinball_B2S_B2SSetData_2 Controller, 5, "1" $/m);
+    assert.match(vbs, /^ {2}CyberPinball_B2S_B2SSetData_2 Controller, 5, state $/m);
     assert.ok(fs.readFileSync(vpx).equals(table));
     // Une fois corrigé, le même journal ne réclame plus rien, et la partie suivante sans erreur ne le retire pas.
     assert.equal(diagnose(scanTables(tablesDir)[0]!, ctx).find((f) => f.code === 'scriptCoreCompat'), undefined);
     assert.equal(diagnose(scanTables(tablesDir)[0]!, { ...ctx, vpxLog: undefined }).find((f) => f.code === 'scriptCoreCompat'), undefined);
+    // Texte en clair dans le script : réparé dès la première partie, sans journal.
+    fs.rmSync(path.join(folder, 'Champions League 2023.vbs'));
+    fs.writeFileSync(vpx, vpxWithScript(SCRIPT));
+    const first = { tablesDir, script: scriptFacts(SCRIPT) };
+    assert.equal(diagnose(scanTables(tablesDir)[0]!, first).find((f) => f.code === 'scriptCoreCompat')?.title, 'Script arrêté par le fronton B2S de VPX');
+    repairPupForPlay(scanTables(tablesDir)[0]!, first, { trashDir: `${tablesDir}-corbeille` });
+    assert.match(fs.readFileSync(path.join(folder, 'Champions League 2023.vbs'), 'latin1'), /^ {2}CyberPinball_B2S_B2SSetData_2 Controller, 5, "1" $/m);
   } finally {
     fs.rmSync(tablesDir, { recursive: true, force: true });
     fs.rmSync(`${tablesDir}-corbeille`, { recursive: true, force: true });

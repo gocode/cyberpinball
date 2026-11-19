@@ -1028,8 +1028,24 @@ function dmdImagesMissingFinding(entry: TableEntry, log: string): Finding | unde
   const session = tableLogSession(entry, log);
   if (!session) return undefined;
   const assets = flexAssets(session);
-  const missing = [...assets.notLoaded, ...assets.missing].filter((f) => !/^FlexDMD\.Resources\.|^VPX\./i.test(f));
-  if (!missing.length) return undefined;
+  const failed = [...assets.notLoaded, ...assets.missing].filter((f) => !/^FlexDMD\.Resources\.|^VPX\./i.test(f));
+  if (!failed.length) return undefined;
+  // « Asset not loaded » vaut pour un fichier absent comme pour un fichier que le plugin n'a pas su lire (IMG_Load,
+  // AssetManager::Open) : un fichier présent est dit illisible, pas absent.
+  const present = (f: string) => readDirents(path.dirname(f)).some((d) => d.isFile() && d.name.toLowerCase() === path.basename(f).toLowerCase());
+  const unreadable = [...new Set(failed.filter(present).map((f) => path.basename(f)))];
+  const missing = failed.filter((f) => !present(f));
+  if (!missing.length) {
+    return {
+      code: 'dmdImagesMissing',
+      severity: 'warning',
+      title: tn(unreadable.length, 'Image du DMD illisible', 'Images du DMD illisibles'),
+      detail: t('À la dernière partie, le DMD n’a pas su lire {list} dans « {folder} » : le fichier est là, mais son format ne passe pas (image abîmée, ou enregistrée sous un autre format que son extension).', {
+        list: unreadable.slice(0, 3).map((n) => `« ${n} »`).join(', ') + (unreadable.length > 3 ? '…' : ''),
+        folder: path.basename(path.dirname(failed[0]!)),
+      }),
+    };
+  }
   const names = [...new Set(missing.map((f) => path.basename(f)))];
   const folder = path.basename(path.dirname(missing[0]!));
   return {
@@ -1406,7 +1422,7 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
       severity: 'warning',
       title: t('Script arrêté par le fronton B2S de VPX'),
       detail: [
-        t('À la dernière partie, le fronton B2S de VPX a refusé un appel du script (un texte là où il attend un nombre) : la procédure qui l’appelait s’est arrêtée, et la suite de la table avec elle.'),
+        t('Le script envoie au fronton B2S de VPX un texte là où il attend un nombre : le fronton refuse l’appel, et la procédure qui l’appelait s’arrête, avec la suite de la table.'),
         !content
           ? t('Le script de la table est protégé : Cyber Pinball ne peut pas le corriger.')
           : foreign
@@ -3525,7 +3541,9 @@ function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean,
       code: 'dmdFolderMissing',
       severity: 'warning',
       title: t('Dossier « {folder} » rangé ailleurs', { folder: dmdFolder }),
-      detail: `${intro} ${t('Il est {where} : VPX le cherche dans le dossier de la table.', { where })}`,
+      detail: elsewhere.host
+        ? `${intro} ${t('« {folder} » était dans le dossier de « {table} », qui ne le charge pas : il revient à cette table.', { folder: dmdFolder, table: elsewhere.host })}`
+        : `${intro} ${t('Il est {where} : VPX le cherche dans le dossier de la table.', { where })}`,
       fix: {
         label: elsewhere.shared ? t('Copier « {folder} » dans le dossier de la table', { folder: dmdFolder }) : t('Ranger « {folder} » dans le dossier de la table', { folder: dmdFolder }),
         ops: [{ op: elsewhere.shared ? 'copy' : 'move', from: elsewhere.path, to: path.join(folder, dmdFolder) }],
@@ -3544,7 +3562,7 @@ function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean,
  * Le dossier du DMD hors de celui de la table : à la racine du dossier des tables (shared: false),
  * sinon dans le dossier d'une autre table (shared: true, une autre version qui le charge aussi).
  */
-function findDmdFolderElsewhere(folder: string, dmdFolder: string, tablesDir: string): { path: string; shared: boolean } | undefined {
+function findDmdFolderElsewhere(folder: string, dmdFolder: string, tablesDir: string): { path: string; shared: boolean; host?: string } | undefined {
   const root = path.resolve(tablesDir);
   if (path.resolve(folder).toLowerCase() === root.toLowerCase()) return undefined;
   const wanted = dmdFolder.toLowerCase();
@@ -3555,7 +3573,17 @@ function findDmdFolderElsewhere(folder: string, dmdFolder: string, tablesDir: st
     const other = path.join(root, d.name);
     if (other.toLowerCase() === path.resolve(folder).toLowerCase()) continue;
     const found = readDirents(other).find((e) => e.isDirectory() && e.name.toLowerCase() === wanted);
-    if (found) return { path: path.join(other, found.name), shared: true };
+    if (!found) continue;
+    // Une autre version de la table le charge aussi : copié, elle en a besoin. Une table qui ne le charge pas (son
+    // script nomme un autre dossier, ou aucun) l'hébergeait par erreur : déplacé (19/11/2026, Goldorak.UltraDMD
+    // collé dans le dossier de Champions League).
+    // Script illisible (protégé, ou table abîmée) : on ne sait pas, le dossier est copié comme avant.
+    const scripts = readDirents(other)
+      .filter((e) => e.isFile() && /\.vpx$/i.test(e.name))
+      .map((e) => readVpxScript(path.join(other, e.name)))
+      .filter((s): s is string => s !== undefined);
+    const loads = !scripts.length || scripts.some((s) => dmdProjectFolder(scriptCode(s))?.toLowerCase() === wanted);
+    return { path: path.join(other, found.name), shared: loads, ...(loads ? {} : { host: d.name }) };
   }
   return undefined;
 }

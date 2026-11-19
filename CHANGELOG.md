@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.1
 
+- Mettre une table à la corbeille pendant qu'un de ses fichiers est ouvert ailleurs : l'écran dit maintenant quel fichier est tenu et, quand Windows le sait, par quel programme, au lieu d'échouer sans rien dire à chaque appui. Toute action du front-end qui échoue est rattrapée et expliquée de la même façon.
+- Tables dont le script envoie au fronton B2S un texte en clair là où VPX attend un nombre : la copie corrigée du script est jouée dès la première partie, sans attendre que VPX ait écrit son refus.
+- Dossier du DMD rangé par erreur dans le dossier d'une autre table, qui ne le charge pas : le diagnostic le remet à sa table (au lieu d'en faire une copie), et le dit.
+- Images du DMD qui ne se chargent pas : le diagnostic distingue une image absente d'une image présente mais illisible.
 - Reprendre les tables d'une autre installation (PinUP Popper, PinballX, PinballY, VPX seul) ne duplique plus leurs gros fichiers quand elle est sur le même disque que Cyber Pinball : tables, frontons, vidéos, images et sons des PuP-Packs, ROM et musique deviennent des liens physiques NTFS, sans aucune place en plus, et l'installation d'origine reste telle quelle. Seuls les petits fichiers que VPX, PinMAME ou le PuP-Pack peuvent réécrire (.pup, .ini, .cfg, scripts...) sont copiés. Le plan d'ajout dit ce qui sera lié et ce qui sera copié, avec la place nécessaire.
 - Installation d'origine sur un autre disque que Cyber Pinball : l'écran de reprise et le plan d'ajout le disent, avec la place que prendra la copie, et expliquent qu'installer Cyber Pinball sur le même disque évite toute duplication. La copie reste possible.
 - Aucune écriture de Cyber Pinball ne peut modifier un fichier partagé avec une autre installation : avant d'écrire dans un fichier lié (option d'un PuP-Pack, fronton tiré du .directb2s, remplacement...), son lien est coupé, et l'original garde ses octets et sa date.

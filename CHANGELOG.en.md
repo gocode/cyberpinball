@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Putting a table in the trash while one of its files is open elsewhere: the screen now says which file is held and, when Windows knows, by which program, instead of silently failing at every press. Any front-end action that fails is caught and explained the same way.
+- Tables whose script sends the B2S backglass plain text where VPX expects a number: the fixed copy of the script is played from the very first game, without waiting for VPX to log its refusal.
+- DMD folder put by mistake in the folder of another table, which does not load it: the diagnosis gives it back to its table (instead of copying it), and says so.
+- DMD images that do not load: the diagnosis tells a missing image from an image that is there but unreadable.
 - Bringing in tables from another installation (PinUP Popper, PinballX, PinballY, plain VPX) no longer duplicates their big files when it sits on the same drive as Cyber Pinball: tables, backglasses, PuP-Pack videos, images and sounds, ROMs and music become NTFS hard links, taking no extra space, and the original installation stays as it is. Only the small files VPX, PinMAME or the PuP-Pack may rewrite (.pup, .ini, .cfg, scripts...) are copied. The add plan shows what will be linked and what will be copied, with the space needed.
 - Original installation on another drive than Cyber Pinball: the import screen and the add plan say so, with the space the copy will take, and explain that installing Cyber Pinball on the same drive avoids any duplication. Copying is still possible.
 - No write by Cyber Pinball can change a file shared with another installation: before writing to a linked file (a PuP-Pack option, the backglass image taken from the .directb2s, a replacement...), its link is broken, and the original keeps its bytes and its date.
