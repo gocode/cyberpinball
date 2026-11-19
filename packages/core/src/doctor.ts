@@ -89,7 +89,7 @@ import { companion, nameKey } from './tablefiles';
 import { b2sWithoutBackglass } from './b2simage';
 import { dofRomNumbers, tableDofIni, tableIniMasksGlobal, type DofSetup } from './dof';
 import { playBlockers, playSeverity } from './playable';
-import { parseTableName, readInfo, type TableEntry } from './tables';
+import { isVpxTable, parseTableName, readInfo, type TableEntry } from './tables';
 import { findTableIni } from './vpx-settings';
 import { hasOwnCabinetView, importedViewFinding } from './tableview';
 import { EDGE_LABELS } from './layout';
@@ -625,6 +625,10 @@ function variableValue(code: string, name: string, depth: number): string | unde
 }
 
 export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
+  // Le médecin lit des tables VPX (script, ROM, PuP-Pack, fronton, réglages de VPX). Une table d'un autre
+  // logiciel (Pinball FX, Future Pinball…) n'a rien de tout cela : aucun constat, jamais une fausse
+  // alerte (« ROM absente » sur un .fpt).
+  if (!isVpxTable(entry)) return [];
   const findings: Finding[] = [];
   const folder = entry.folder;
   const base = path.basename(entry.file).replace(/\.vpx$/i, '');

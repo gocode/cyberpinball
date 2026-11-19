@@ -57,6 +57,9 @@ import {
   importSpaceProblems,
   addZenTable,
   isZenEmulator,
+  isFuturePinballTable,
+  FUTURE_PINBALL_NAME,
+  TABLE_ENGINES,
   knownTableInstallations,
   otherVpxFor,
   otherVpxLabel,
@@ -301,6 +304,8 @@ import { analyseDressing } from './fulldmd';
 import { createMediaSites, jobKey } from './media-sites';
 import { createMediaImport } from './media-import';
 import { createInstallationImport } from './installation-import';
+import { createFuturePinballUi } from './futurepinball-ui';
+import { detectFuturePinball } from './futurepinball-play';
 import { userGesture } from './gesture-flash';
 import { createMedias, markAnimated, playsSoundPreview, type MediaCard, type MediaThumb } from './library-medias';
 import { createTableFiles } from './table-files';
@@ -544,6 +549,25 @@ export function createLibrary(host: LibraryHost) {
     task: (message, work) => task(message, work),
     install: (paths, back, vpxHints) => startImport(paths, 'copy', undefined, undefined, true, undefined, back, vpxHints),
     web: (after) => catalogUi.webAction('add.installation', { query: partWebQuery('table', 'table'), received: (file) => startImport([file], 'copy', undefined, undefined, true) }, after),
+    back: () => openAdd(),
+  });
+  // « Tables de Future Pinball » (19/11/2026) : écran à part (futurepinball-ui.ts), branché ici.
+  const futurePinballUi = createFuturePinballUi({
+    dataDir: () => host.dataDir,
+    tablesDir: () => tablesDir(),
+    tables: () => host.tables(),
+    pickFolder: async () => (await pickPaths({ title: t('Dossier de {game}', { game: FUTURE_PINBALL_NAME }), icon: 'folder', purpose: tLater('Dossier de Future Pinball'), mode: 'folder', start: 'desktop' }))?.[0],
+    pickTables: () => pickPaths({ title: t('Tables de {game}', { game: FUTURE_PINBALL_NAME }), icon: 'import', purpose: tLater('Ajout d’une table de Future Pinball'), mode: 'files', filter: { label: t('Tables de {game}', { game: FUTURE_PINBALL_NAME }), extensions: ['fpt'] }, start: 'desktop' }),
+    openCustom: (build, at) => openCustom(build, at),
+    cursor: () => cursor,
+    task: (message, work) => task(message, work),
+    vps: () => vpsForImport(),
+    added: (file) => reloadTables(file),
+    fetchMedias: (file) => void mediaDownload.fillMissing([file], { quiet: true }).catch((error: Error) => console.log(`${FUTURE_PINBALL_NAME} : médias de ${file} pas reçus (${error.message}).`)), // i18n-ignore : journal
+    openSheet: (entry, back) => {
+      sheetReturn = back;
+      openSheet(entry);
+    },
     back: () => openAdd(),
   });
   const mediaImport = createMediaImport({
@@ -1839,6 +1863,7 @@ export function createLibrary(host: LibraryHost) {
     void refreshVps();
     // Jeux de Zen installés ou non : relus ici, une fois, pas à chaque dessin de l'entonnoir.
     for (const game of Object.keys(zenUi) as ZenGameKey[]) zenUi[game].now = zenSetup(game);
+    futurePinballUi.refresh();
     go({ kind: 'addSource' });
   }
 
@@ -2296,9 +2321,11 @@ export function createLibrary(host: LibraryHost) {
     const stats: Row[] = [{ text: user.StartCount ? tn(user.StartCount, 'Jouée {n} fois', 'Jouée {n} fois') : t('Jamais jouée'), detail: played || undefined }];
     // Table d'un jeu de Zen (Pinball FX, Pinball FX3) : ni script, ni ROM, ni fichiers de VPX. Ce qui ne
     // s'y applique pas reste à sa place, grisé, avec la raison (jamais caché).
-    const fx = isZenEmulator(table.emulator);
-    const zenName = isZenEmulator(table.emulator) ? ZEN_GAMES[table.emulator].name : '';
-    const notFx = (action: SheetAction, reason: string): SheetAction => (fx ? { ...action, detail: reason, tone: 'quiet', attention: undefined, run: () => undefined } : action);
+    // Table de Future Pinball (19/11/2026) : pareil, un .fpt n'a rien de VPX ; ses raisons à elle (fpWhy).
+    const fp = table.emulator === 'futurepinball';
+    const fx = isZenEmulator(table.emulator) || fp;
+    const zenName = fx ? TABLE_ENGINES[table.emulator].short : '';
+    const notFx = (action: SheetAction, reason: string, fpReason?: string): SheetAction => (fx ? { ...action, detail: fp && fpReason ? fpReason : reason, tone: 'quiet', attention: undefined, run: () => undefined } : action);
 
     const script = kept('script', () => cachedScript(table.file, host.dataDir));
     // Seule la ROM peut empêcher de jouer (playable.ts) : la règle du médecin, sans relire la table.
@@ -2361,9 +2388,19 @@ export function createLibrary(host: LibraryHost) {
     if (check.length) files.push({ text: t('À vérifier'), detail: check.join(', '), tone: 'warning' });
     // Lu à l'ouverture de la fiche (openSheet), pas à chaque dessin.
     const fxInstall = isZenEmulator(table.emulator) ? zenNow(table.emulator).install : undefined;
-    const zenKey = fx ? zenEntryKey(table) : undefined;
-    const zen = fx ? zenTableOfEntry(table) : undefined;
-    const fxFiles: Row[] = [
+    const zenKey = isZenEmulator(table.emulator) ? zenEntryKey(table) : undefined;
+    const zen = isZenEmulator(table.emulator) ? zenTableOfEntry(table) : undefined;
+    // Lu à l'ouverture de la fiche (openSheet), pas à chaque dessin.
+    const fpInstall = fp ? kept('future-pinball', () => detectFuturePinball(host.dataDir)) : undefined;
+    const fpFiles: Row[] = [
+      { text: t('Table'), detail: path.basename(table.file), tone: 'ok' },
+      fpInstall
+        ? { text: zenName, detail: fpInstall.gameDir, tone: 'ok', badges: [menuBadgeLabel('beta')] }
+        : { text: zenName, detail: t('Introuvable sur ce PC : Ajouter une table > « Tables de {game} » pour choisir son dossier', { game: zenName }), tone: 'error', badges: [menuBadgeLabel('beta')] },
+      { text: t('BAM'), detail: t('Pas encore : la table se joue sans suivi de la tête ni réglages de BAM'), tone: 'quiet' },
+      mediaRow(table),
+    ];
+    const fxFiles: Row[] = fp ? fpFiles : [
       zenKey !== undefined && isZenEmulator(table.emulator)
         ? { text: t('Table'), detail: zenTableFacts({ game: table.emulator, key: zenKey }), tone: 'ok' }
         : { text: t('Table'), detail: table.emulator === 'pinballfx3' ? t('Fiche illisible : nom de table absent') : t('Fiche illisible : numéro de table absent'), tone: 'error' },
@@ -2409,15 +2446,15 @@ export function createLibrary(host: LibraryHost) {
     const manage: SheetAction[] = [
       ...further,
       { label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le front-end montre'), icon: 'image', door: 'sheet.medias', run: () => medias.open(table) },
-      notFx({ label: t('Parties du jeu'), detail: t('Table, PuP-Pack, fronton, ROM… : ajouter, remplacer, retirer'), icon: 'table-add', door: 'sheet.parts', run: () => gameParts.open(table) }, t('{game} fournit toute la table : rien à ajouter', { game: zenName })),
-      notFx({ label: t('Fichiers de la table'), detail: tableFiles.summary(contents), tone: contents.problems ? 'warning' : undefined, icon: 'folder', door: 'sheet.files', run: () => tableFiles.open(table, 0, contents) }, t('Une table de {game} n’a pas de fichiers à elle', { game: zenName })),
+      notFx({ label: t('Parties du jeu'), detail: t('Table, PuP-Pack, fronton, ROM… : ajouter, remplacer, retirer'), icon: 'table-add', door: 'sheet.parts', run: () => gameParts.open(table) }, t('{game} fournit toute la table : rien à ajouter', { game: zenName }), t('Une table de {game} tient dans son fichier .fpt : rien à ajouter', { game: zenName })),
+      notFx({ label: t('Fichiers de la table'), detail: tableFiles.summary(contents), tone: contents.problems ? 'warning' : undefined, icon: 'folder', door: 'sheet.files', run: () => tableFiles.open(table, 0, contents) }, t('Une table de {game} n’a pas de fichiers à elle', { game: zenName }), t('Une table de {game} est un seul fichier .fpt', { game: zenName })),
       ...(fx ? [] : pupAction(table, s)),
       ...(host.tableSettings
         ? [notFx({ label: t('Réglages de cette table'), detail: t('Son, jeu… pour cette table seulement'), icon: 'sliders' as const, door: 'sheet.table-settings' as const, run: () => host.tableSettings!(table) }, t('Ils se règlent dans {game}', { game: zenName }))]
         : []),
       ...(fx ? [] : tableVpxAction(table)),
       ...(host.adjustDisplay && (fx || kept('vpx', () => host.vpxExe())) && !otherVpxFor(table.info, otherVpxMenu.list())
-        ? [notFx({ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, door: 'sheet.display' as const, run: () => adjustDisplay(table) }, t('Écrans et cadrage : dans le mode borne de {game}', { game: zenName }))]
+        ? [notFx({ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, door: 'sheet.display' as const, run: () => adjustDisplay(table) }, t('Écrans et cadrage : dans le mode borne de {game}', { game: zenName }), t('Écrans et cadrage : dans les préférences de {game} (Vidéo)', { game: zenName }))]
         : []),
       ...(host.menuDmd
         ? [notFx({ label: t('DMD sur la roue'), detail: host.menuDmd.detail(table), icon: 'dmd' as const, door: 'sheet.menu-dmd' as const, run: () => host.menuDmd!.open(table, () => openSheet(table)) }, t('Tables VPX seulement : {game} ne donne pas son DMD', { game: zenName }))]
@@ -2425,9 +2462,9 @@ export function createLibrary(host: LibraryHost) {
       ...(host.playAndRecord && (fx || kept('vpx', () => host.vpxExe()))
         ? [notFx({ label: t('Jouer et enregistrer'), detail: t('Filmer la partie pour la présentation de la table sur la roue'), icon: 'record' as const, door: 'sheet.record' as const, run: () => recording.setup(table) }, t('Tables VPX seulement pour l’instant'))]
         : []),
-      notFx({ label: t('Diagnostiquer et réparer'), icon: 'pulse', door: 'sheet.doctor', run: () => openDoctor(table.file) }, t('Rien à diagnostiquer : {game} gère la table', { game: zenName })),
+      notFx({ label: t('Diagnostiquer et réparer'), icon: 'pulse', door: 'sheet.doctor', run: () => openDoctor(table.file) }, t('Rien à diagnostiquer : {game} gère la table', { game: zenName }), t('Le diagnostic lit les tables VPX : une table de {game} n’a ni ROM, ni PuP-Pack, ni script à vérifier', { game: zenName })),
       { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), icon: 'edit', door: 'sheet.edit', run: () => openEdit(table) },
-      { label: t('Supprimer la table'), detail: fx ? t('Retirée du front-end ; elle reste dans {game}', { game: zenName }) : t('Mise à la corbeille'), tone: 'error', icon: 'trash', door: 'sheet.remove', run: () => go({ kind: 'remove', file: table.file }) },
+      { label: t('Supprimer la table'), detail: fp ? t('Mise à la corbeille ; l’original n’est pas touché') : fx ? t('Retirée du front-end ; elle reste dans {game}', { game: zenName }) : t('Mise à la corbeille'), tone: 'error', icon: 'trash', door: 'sheet.remove', run: () => go({ kind: 'remove', file: table.file }) },
     ];
     if (s.manage) {
       // Exit et « Retour » : la fiche, sans plus y revenir depuis les écrans ouverts ensuite.
@@ -2464,7 +2501,7 @@ export function createLibrary(host: LibraryHost) {
       },
       ...(host.playWithFriend && !localPlay() ? [notFx({ ...host.playWithFriend(table, () => openSheet(table)), door: 'sheet.friends' as const }, t('Parties entre amis : tables VPX seulement'))] : []),
       ...(host.instantGame && !localPlay() ? [notFx({ ...host.instantGame(table, () => openSheet(table)), door: 'sheet.instant' as const }, t('Parties en direct : tables VPX seulement'))] : []),
-      ...(host.scores ? [notFx(scoresAction(table), t('{game} ne donne pas ses scores', { game: zenName }))] : []),
+      ...(host.scores ? [notFx(scoresAction(table), t('{game} ne donne pas ses scores', { game: zenName }), t('Scores de {game} : pas encore lus par Cyber Pinball', { game: zenName }))] : []),
       pagesAction(table),
       { label: t('Crédits'), detail: kept('credits', () => credits.summary(table)), icon: 'credits', door: 'sheet.credits', run: () => credits.open(table) },
       ...(host.favorite ? [favoriteAction(table)] : []),
@@ -3515,6 +3552,7 @@ export function createLibrary(host: LibraryHost) {
       { label: t('Choisir un dossier…'), detail: t('Tout le dossier d’une table, depuis une clé USB ou un disque'), icon: 'folder', run: () => void pick('folder') },
       zenAction('pinballfx'),
       zenAction('pinballfx3'),
+      futurePinballUi.action(),
       { label: t('Depuis une autre installation…'), detail: t('PinUP Popper, PinballX : les tables une à une, avec leur PuP-Pack, leur ROM et leurs médias'), icon: 'layers', run: () => installationImport.open() },
       ...(addFromFriend ? [{ label: t('Depuis un ami…'), detail: addFromFriend.detail(), icon: 'friend-list' as const, run: () => addFromFriend!.open(() => openAdd()) }] : []),
       { label: t('Récupérés et attendus'), detail: kept('attendus', () => catalogUi.summary()), icon: 'inbox', run: () => catalogUi.openWaitList(() => openAdd()) },
@@ -3573,7 +3611,10 @@ export function createLibrary(host: LibraryHost) {
     const install = setup.install;
     const inMenu = host.tables().filter((x) => x.emulator === game).length;
     // En phase de test (16/11/2026) : pastille « BÊTA » dans tous ses états, comme la VR.
-    const base = { label: t('Tables de {game}', { game: name }), icon: 'table-add' as const, badge: 'beta' as const };
+    // Une icône par jeu, quel que soit son état (19/11/2026) : deux jeux installés, ou deux à installer,
+    // montraient la même dans l'entonnoir (Future Pinball a la sienne, futurepinball-ui.ts).
+    const icon = game === 'pinballfx' ? ('table-add' as const) : ('flipper' as const);
+    const base = { label: t('Tables de {game}', { game: name }), icon, badge: 'beta' as const };
     if (!install) {
       if (setup.downloading) return { ...base, detail: t('Téléchargement en cours dans Steam : la liste des tables s’ouvre une fois le jeu installé'), tone: 'quiet', run: () => undefined };
       const getter = setup.getter;
@@ -3587,7 +3628,7 @@ export function createLibrary(host: LibraryHost) {
       const store = getter.store === 'steam' ? 'Steam' : 'Epic';
       return {
         label: t('Installer {game}', { game: name }),
-        icon: 'pinball-app',
+        icon,
         badge: 'beta',
         detail: ui.storeOpened
           ? t('Ouvert dans {store} : installez-le là-bas, ses tables apparaissent ici ensuite', { store })
@@ -4262,6 +4303,14 @@ export function createLibrary(host: LibraryHost) {
    */
   function startImport(paths: string[], mode: 'move' | 'copy', acquisition?: AddPlan['acquisition'], journey?: string, fromHub = false, target?: string, back?: () => void, vpxHints?: Map<string, string>): void {
     if (!layout()) return openAdd();
+    // Tables de Future Pinball (.fpt) choisies ou glissées : leur propre ajout (futurepinball-ui.ts), le
+    // plan d'ajout ne range que des tables VPX. Seules : l'écran de Future Pinball dit ce qui est fait.
+    const fpt = paths.filter((p) => isFuturePinballTable(p) && fs.statSync(p, { throwIfNoEntry: false })?.isFile());
+    if (fpt.length) {
+      paths = paths.filter((p) => !fpt.includes(p));
+      void futurePinballUi.add(fpt, { show: !paths.length });
+      if (!paths.length) return;
+    }
     const s: AddPlan = { kind: 'addPlan', mode, scripts: new Map(), existing: [], vpsChoices: new Map(), pupChoices: new Map(), romChoices: new Map(), cabinet: pupCabinet(loadCabinet(host.dataDir)), acquisition, journey, fromHub, target, back, vpxChoices: new Map(), ...(vpxHints?.size ? { vpxHints } : {}) };
     go(s);
     void task(t('Analyse des fichiers…'), async () => {

@@ -334,6 +334,11 @@ export interface VpsMatchInput {
   names: string[];
   /** Noms de ROM lus dans le script de la table. */
   roms?: string[];
+  /**
+   * Format de la table dans la base VPS (« FP » : Future Pinball) : un jeu qui n'existe pas dans ce
+   * format passe après. Absent : « VPX ».
+   */
+  format?: string;
 }
 
 export interface VpsCandidate {
@@ -425,7 +430,10 @@ export function matchVps(db: VpsDb, input: VpsMatchInput, opts: VpsMatchOptions 
       score += gap === 0 ? 0.05 : gap === 1 ? 0 : -0.2;
     }
     // On installe des tables VPX : un jeu qui n'existe qu'en Future Pinball ou chez Zen passe après.
-    if ((entry.game.tableFiles?.length ?? 0) > 0 && !entry.vpxFiles.length) score -= 0.1;
+    // Une table de Future Pinball (format « FP ») : c'est l'inverse.
+    const format = (input.format ?? 'VPX').toUpperCase();
+    const inFormat = format === 'VPX' ? entry.vpxFiles.length > 0 : (entry.game.tableFiles ?? []).some((f) => f && (f.tableFormat ?? 'VPX').toUpperCase() === format);
+    if ((entry.game.tableFiles?.length ?? 0) > 0 && !inFormat) score -= 0.1;
     // Auteur de la table cité dans le nom (« VPW », « g5k ») : c'est bien ce jeu.
     const table = pickTableFile(entry, names);
     if (table && title) score += 0.05;

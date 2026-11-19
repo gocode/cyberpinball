@@ -7,6 +7,13 @@ export const messages: Record<string, string> = {
     'Language, update, what’s new, feedback and ideas, recent activity, backups, migration, terms of use, the community, quit or restart, sleep and shutdown',
 
   // packages/core/src/news.ts : les nouveautés
+  'Future Pinball sur la roue': 'Future Pinball on the wheel',
+  'Vos tables Future Pinball (.fpt) à côté de vos tables VPX, lancées en un appui.': 'Your Future Pinball tables (.fpt) next to your VPX tables, started with one press.',
+  'Cyber Pinball trouve Future Pinball sur ce PC (ou dans le dossier que vous lui montrez) et liste les tables de son dossier Tables ; Start en ajoute une, avec son nom et ses médias. Un fichier .fpt choisi ailleurs marche aussi.':
+    'Cyber Pinball finds Future Pinball on this PC (or in the folder you show it) and lists the tables in its Tables folder; Start adds one, with its name and media. A .fpt file chosen elsewhere works too.',
+  'La partie se lance dans Future Pinball et revient à la roue quand vous quittez la table ; un appui long sur Exit le ferme. BAM et les scores du jeu viendront ensuite.':
+    'The game runs in Future Pinball and comes back to the wheel when you leave the table; holding Exit closes it. BAM and the game’s scores will come later.',
+  'Menu système › Tables › Ajouter une table › Tables de Future Pinball': 'System menu › Tables › Add a table › Future Pinball tables',
   'Les idées de tous les joueurs, dans votre langue': 'Every player’s ideas, in your language',
   'Les propositions écrites dans une autre langue se lisent traduites, et vous pouvez voter pour elles.': 'Ideas written in another language are shown translated, and you can vote for them.',
   'Retours et propositions traduit d’office chaque proposition, et la réponse de l’équipe, dans toutes les langues de Cyber Pinball : rien à régler.':

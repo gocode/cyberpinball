@@ -239,3 +239,4 @@ export * from './feedback';
 export * from './textedit';
 export * from './forget';
 export * from './autres-vpx';
+export * from './futurepinball';

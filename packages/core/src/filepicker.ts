@@ -20,7 +20,7 @@ export interface PickFilter {
 }
 
 /** Fichiers d'une table : ceux que l'ajout sait ranger. */
-export const TABLE_EXTENSIONS = ['vpx', 'directb2s', 'zip', '7z', 'rar', 'vbs', 'ini', 'pov', 'info', 'crz', 'cromc', 'vni', 'pal', 'pac', 'mp3', 'ogg', 'wav'];
+export const TABLE_EXTENSIONS = ['vpx', 'fpt', 'directb2s', 'zip', '7z', 'rar', 'vbs', 'ini', 'pov', 'info', 'crz', 'cromc', 'vni', 'pal', 'pac', 'mp3', 'ogg', 'wav'];
 /** Médias que l'ajout range aussi (logos, vidéos, images). */
 export const MEDIA_EXTENSIONS = ['png', 'apng', 'webp', 'jpg', 'jpeg', 'gif', 'mp4', 'webm', 'm4v', 'mp3', 'ogg', 'm4a', 'flac', 'wav'];
 

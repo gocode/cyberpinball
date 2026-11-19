@@ -62,7 +62,8 @@ test('collections : un type de jeu par logiciel, seulement sur une borne qui en 
   assert.ok(mixed.findIndex((c) => c.group === 'engine') > mixed.findIndex((c) => c.id === 'friends'));
   // Choisie puis gardée d'un démarrage à l'autre ; partie (plus qu'un logiciel) : Toutes.
   assert.equal(parseCollectionsSettings({ active: 'engine:pinballfx', mine: [] }).active, 'engine:pinballfx');
-  assert.equal(parseCollectionsSettings({ active: 'engine:futurepinball', mine: [] }).active, 'all');
+  assert.equal(parseCollectionsSettings({ active: 'engine:futurepinball', mine: [] }).active, 'engine:futurepinball');
+  assert.equal(parseCollectionsSettings({ active: 'engine:pinballfx2', mine: [] }).active, 'all');
   assert.equal(findCollection(buildCollections(ALL), 'engine:pinballfx').id, 'all');
   assert.equal(shelfView(engines[1]!).label, 'Pinball FX');
 });

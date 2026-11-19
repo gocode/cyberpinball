@@ -6,9 +6,12 @@
 // Quitter la table dans le jeu ramène à son propre menu, pas à Cyber Pinball : un
 // appui long sur Exit (bouton de la borne) ferme le jeu et rend la main au menu. Le
 // geste est écrit au chargement de la partie.
+//
+// Sert aussi à Future Pinball (19/11/2026, FUTURE_PINBALL_LAUNCH_GAME) : lancé directement, sans
+// boutique, le processus lancé est le jeu ; sa fenêtre est la première fenêtre visible de ce processus.
 
 import { spawn } from 'node:child_process';
-import { HoldDetector, isPinballFx3WindowTitle, PINBALLFX_WINDOW_TITLE, t, ZEN_GAMES, type ZenGameKey } from '@cyberpinball/core';
+import { FUTURE_PINBALL_NAME, HoldDetector, isPinballFx3WindowTitle, PINBALLFX_WINDOW_TITLE, t, ZEN_GAMES, type ZenGameKey } from '@cyberpinball/core';
 import { allowAnyForeground, bringToFront, closeWindow, foregroundWindow, listWindows, type WindowInfo } from '@cyberpinball/win-displays';
 import type { LaunchResult, RunningGame } from './launcher';
 
@@ -22,7 +25,7 @@ const KILL_AFTER_MS = 5000;
 
 /** Ce que le lanceur demande au système : remplacé dans les essais. */
 export interface PinballFxSystem {
-  launch(file: string, args: string[]): { pid?: number; on(event: 'error', cb: (error: Error) => void): void };
+  launch(file: string, args: string[], cwd?: string): { pid?: number; on(event: 'error', cb: (error: Error) => void): void };
   windows(): WindowInfo[];
   alive(pid: number): boolean;
   kill(pid: number): void;
@@ -36,10 +39,17 @@ export interface PinballFxSystem {
 export interface ZenLaunchGame {
   name: string;
   isWindow(w: Pick<WindowInfo, 'title' | 'className' | 'visible'>): boolean;
+  /**
+   * Le processus lancé est le jeu (Future Pinball) : sa première fenêtre visible est la fenêtre de jeu,
+   * et s'il s'arrête avant d'en ouvrir une, le lancement a échoué. Sinon (Steam), le jeu est reconnu à sa fenêtre.
+   */
+  ownProcess?: boolean;
 }
 
 export interface PinballFxLaunchOptions {
-  command: { file: string; args: string[] };
+  command: { file: string; args: string[]; cwd?: string };
+  /** La fenêtre de jeu vient de paraître (placement sur le playfield). */
+  onWindow?: (w: WindowInfo) => void;
   /** Pinball FX par défaut. */
   game?: ZenLaunchGame;
   /** Le bouton Exit de la borne est tenu, maintenant (clavier ou joystick). */
@@ -70,6 +80,12 @@ export const ZEN_LAUNCH_GAMES: Readonly<Record<ZenGameKey, ZenLaunchGame>> = {
   pinballfx3: { name: ZEN_GAMES.pinballfx3.name, isWindow: isPinballFx3Window },
 };
 
+/**
+ * Future Pinball : la fenêtre de son propre processus (ownProcess), quel que soit son titre. Le titre
+ * seul ne suffirait pas : une page web « Future Pinball - … » le porterait aussi.
+ */
+export const FUTURE_PINBALL_LAUNCH_GAME: ZenLaunchGame = { name: FUTURE_PINBALL_NAME, isWindow: () => false, ownProcess: true };
+
 function pidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -82,7 +98,7 @@ function pidAlive(pid: number): boolean {
 
 export const realPinballFxSystem: PinballFxSystem = {
   // Steam (ou le jeu) ouvre ses fenêtres : c'est la partie.
-  launch: (file, args) => spawn(file, args, { detached: true, stdio: 'ignore', windowsHide: false }), // fenêtre voulue
+  launch: (file, args, cwd) => spawn(file, args, { detached: true, stdio: 'ignore', windowsHide: false, ...(cwd ? { cwd } : {}) }), // fenêtre voulue
   windows: () => listWindows(),
   alive: pidAlive,
   kill: (pid) => {
@@ -164,7 +180,7 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
 
   let child: ReturnType<PinballFxSystem['launch']>;
   try {
-    child = sys.launch(opts.command.file, opts.command.args);
+    child = opts.command.cwd ? sys.launch(opts.command.file, opts.command.args, opts.command.cwd) : sys.launch(opts.command.file, opts.command.args);
   } catch (error) {
     failure = 'spawn';
     message = t('Impossible de lancer {game} : {error}', { game: zen.name, error: (error as Error).message });
@@ -180,7 +196,8 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
   poll = setInterval(() => {
     if (finished) return;
     if (gamePid === undefined) {
-      const w = sys.windows().find(zen.isWindow);
+      const own = zen.ownProcess ? child.pid : undefined;
+      const w = sys.windows().find((x) => zen.isWindow(x) || (own !== undefined && x.pid === own && x.visible));
       if (w) {
         gamePid = w.pid;
         gameWindow = w;
@@ -189,8 +206,14 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
           return;
         }
         playingSince = sys.now();
+        opts.onWindow?.(w);
         if (sys.foregroundPid() !== w.pid) sys.front(w);
         opts.onPlaying?.();
+      } else if (own !== undefined && !sys.alive(own)) {
+        // Le jeu s'est fermé sans ouvrir de fenêtre : table illisible, ou refusée par le jeu.
+        failure = 'crash';
+        message = t('{game} s’est fermé sans ouvrir la table.', { game: zen.name });
+        end();
       } else if (sys.now() - t0 > timeoutMs) {
         failure = 'timeout';
         message = t('{game} n’a pas ouvert sa fenêtre de jeu après {n} s.', { game: zen.name, n: Math.round(timeoutMs / 1000) });

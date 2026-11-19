@@ -1,7 +1,8 @@
 // Inventaire des tables. Une table = un fichier .vpx, en principe dans son
 // propre dossier (organisation officielle de VPX 10.8.1, docs/FileLayout.md),
 // ou une fiche .pinballfx / .pinballfx3 : table de Pinball FX ou de Pinball FX3 (contenu de Steam ou d'Epic, sans
-// fichier à elle), rangée de la même façon pour garder son .info et ses médias.
+// fichier à elle), rangée de la même façon pour garder son .info et ses médias, ou un fichier .fpt
+// (table de Future Pinball, futurepinball.ts).
 // Les métadonnées et statistiques vivent dans le fichier .info partagé entre
 // frontends, nommé comme la table ou comme son dossier.
 
@@ -35,7 +36,7 @@ export interface TableInfoFile {
   [key: string]: unknown;
 }
 
-export type TableEmulator = 'vpx' | 'pinballfx' | 'pinballfx3';
+export type TableEmulator = 'vpx' | 'pinballfx' | 'pinballfx3' | 'futurepinball';
 
 /**
  * Le logiciel qui joue la table, tel que la roue et les collections le nomment (17/11/2026) :
@@ -46,6 +47,7 @@ export const TABLE_ENGINES: Record<TableEmulator, { short: string; long: string;
   vpx: { short: 'VPX', long: 'Visual Pinball X', icon: 'playfield' },
   pinballfx: { short: 'Pinball FX', long: 'Pinball FX', icon: 'pinball-app' },
   pinballfx3: { short: 'Pinball FX3', long: 'Pinball FX3 (Pinball FX Classic)', icon: 'pinball-app' },
+  futurepinball: { short: 'Future Pinball', long: 'Future Pinball', icon: 'pinball-app' },
 };
 
 /** Extension d'une fiche de table de Pinball FX (JSON : { "PinballFX": { "Table": 156 } }). */
@@ -53,9 +55,12 @@ export const PINBALLFX_EXT = ZEN_GAMES.pinballfx.ext;
 /** Extension d'une fiche de table de Pinball FX3 (JSON : { "PinballFX3": { "Table": "WMS_Fish_Tales" } }). */
 export const PINBALLFX3_EXT = ZEN_GAMES.pinballfx3.ext;
 
-const TABLE_FILE = /\.(vpx|pinballfx3?)$/i;
+const TABLE_FILE = /\.(vpx|pinballfx3?|fpt)$/i;
 
-/** Nom d'un fichier de table sans son extension (.vpx, .pinballfx ou .pinballfx3). */
+/** Extension d'un fichier de table -> le logiciel qui la joue (.fpt : Future Pinball, 19/11/2026). */
+const EMULATOR_OF_EXTENSION: Readonly<Record<string, TableEmulator>> = { vpx: 'vpx', pinballfx: 'pinballfx', pinballfx3: 'pinballfx3', fpt: 'futurepinball' };
+
+/** Nom d'un fichier de table sans son extension (.vpx, .pinballfx, .pinballfx3 ou .fpt). */
 export function tableBaseName(file: string): string {
   return path.basename(file).replace(TABLE_FILE, '');
 }
@@ -63,7 +68,12 @@ export function tableBaseName(file: string): string {
 /** Fichier de table reconnu par l'inventaire, et son émulateur. */
 export function tableFileEmulator(name: string): TableEmulator | undefined {
   const m = TABLE_FILE.exec(name);
-  return m ? (m[1]!.toLowerCase() as TableEmulator) : undefined;
+  return m ? EMULATOR_OF_EXTENSION[m[1]!.toLowerCase()] : undefined;
+}
+
+/** Table jouée par VPX : la seule qui ait un script, une ROM, un PuP-Pack, un diagnostic. */
+export function isVpxTable(entry: Pick<TableEntry, 'emulator'>): boolean {
+  return (entry.emulator ?? 'vpx') === 'vpx';
 }
 
 export interface TableEntry {
@@ -157,6 +167,11 @@ function describeTable(tablesDir: string, folder: string, fileName: string): Tab
     infoFile,
     info,
   };
+}
+
+/** Une table de l'inventaire d'après son fichier (dans son dossier, ou à la racine du dossier des tables). */
+export function describeTableFile(tablesDir: string, file: string): TableEntry {
+  return describeTable(tablesDir, path.dirname(file), path.basename(file));
 }
 
 export function readInfo(file: string): TableInfoFile {

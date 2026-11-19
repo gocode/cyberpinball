@@ -54,6 +54,23 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Demandé par un joueur sur Facebook (19/11/2026) : premier niveau, sans BAM.
+    id: 'future-pinball',
+    date: '2026-11-19',
+    version: '0.2.1',
+    get title() { return t('Future Pinball sur la roue'); },
+    get detail() { return t('Vos tables Future Pinball (.fpt) à côté de vos tables VPX, lancées en un appui.'); },
+    get more() {
+      return [
+        t('Cyber Pinball trouve Future Pinball sur ce PC (ou dans le dossier que vous lui montrez) et liste les tables de son dossier Tables ; Start en ajoute une, avec son nom et ses médias. Un fichier .fpt choisi ailleurs marche aussi.'),
+        t('La partie se lance dans Future Pinball et revient à la roue quand vous quittez la table ; un appui long sur Exit le ferme. BAM et les scores du jeu viendront ensuite.'),
+      ];
+    },
+    get where() { return t('Menu système › Tables › Ajouter une table › Tables de Future Pinball'); },
+    reach: { kind: 'system', id: 'add-table' },
+    beta: true,
+  },
+  {
     // Traduction automatique des propositions par le service (19/11/2026).
     id: 'propositions-traduites',
     date: '2026-11-19',

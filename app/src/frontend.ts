@@ -103,6 +103,7 @@ import {
   pinballFx3Command,
   pinballFx3ShortGameMessage,
   isZenEmulator,
+  futurePinballCommandLine,
   ZEN_GAMES,
   type ZenGameKey,
   readInfo,
@@ -300,7 +301,8 @@ import {
   writeAccountBundle,
   type AccountCopy,
 } from '@cyberpinball/core';
-import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, runningProcessNames, visibleWindowsOf } from '@cyberpinball/win-displays';
+import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
+import { detectFuturePinball, futurePinballPlan, placeFuturePinballWindow } from './futurepinball-play';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
 import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, whenReadyToShow, windowRect } from './offscreen';
@@ -4656,13 +4658,17 @@ const SIMULATED_MANUAL = OFFSCREEN && !!process.env.CYBERPINBALL_PARTIE_SIMULEE_
  */
 async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefined, mode: 'display' | undefined, simulated: string | undefined): Promise<PlayReport | undefined> {
   // Pinball FX ou Pinball FX3 (17/11/2026) : même partie, chacun sa détection et sa commande.
-  const zenKey = table.emulator as ZenGameKey;
-  const zenName = ZEN_GAMES[zenKey].name;
+  // Future Pinball (19/11/2026) aussi : sa détection, sa commande et ses messages dans futurepinball-play.ts.
+  const fp = table.emulator === 'futurepinball' ? futurePinballPlan(table, { simulated, mode, install: simulated === undefined ? detectFuturePinball(loc.dataDir) : undefined }) : undefined;
+  const zenKey = (fp ? undefined : table.emulator) as ZenGameKey | undefined;
+  const zenName = fp ? fp.name : ZEN_GAMES[zenKey!].name;
+  const launchGame = fp ? fp.launchGame : ZEN_LAUNCH_GAMES[zenKey!];
   const fx = simulated === undefined && zenKey === 'pinballfx' ? detectPinballFx() : undefined;
   const fx3 = simulated === undefined && zenKey === 'pinballfx3' ? detectPinballFx3() : undefined;
   const tableKey = zenKey === 'pinballfx' ? table.pinballFxTable : table.pinballFx3Table;
-  const why =
-    mode === 'display'
+  const why = fp
+    ? fp.why
+    : mode === 'display'
       ? t('Le cadrage d’une table de {game} se règle dans le jeu (mode borne).', { game: zenName })
       : tableKey === undefined
         ? t('La fiche de cette table ne dit pas quelle table de {game} ouvrir.', { game: zenName })
@@ -4698,7 +4704,8 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
 
   // Un jeu resté ouvert (partie précédente quittée dans son menu) ouvrirait sa table à lui : fermé
   // d'abord. Pinball FX3 déjà ouvert ignorerait même la table demandée (Steam ne fait que le montrer).
-  const left = simulated === undefined ? runningPinballFx(undefined, ZEN_LAUNCH_GAMES[zenKey]) : undefined;
+  // Future Pinball est reconnu à son propre processus, une fois lancé : rien à chercher avant.
+  const left = simulated === undefined && zenKey ? runningPinballFx(undefined, launchGame) : undefined;
   if (left !== undefined) {
     console.log(`${zenName} (${table.id}) : jeu déjà ouvert (processus ${left}), fermé avant la partie.`); // i18n-ignore : journal
     try {
@@ -4729,17 +4736,25 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   };
   // Exit tenu se lit quel que soit le premier plan : le sondage des joysticks tourne pendant la partie.
   const stopJoystick = watchJoystickButtons(() => undefined);
-  const command =
-    fx && table.pinballFxTable !== undefined
+  const command: { file: string; args: string[]; cwd?: string } | undefined = fp
+    ? fp.command
+    : fx && table.pinballFxTable !== undefined
       ? pinballFxCommand(fx, table.pinballFxTable)
       : fx3 && table.pinballFx3Table !== undefined
         ? pinballFx3Command(fx3, table.pinballFx3Table)
         : undefined;
-  console.log(`Lancement : ${zenName} (${table.id}) lancé ${Date.now() - pressedAt} ms après le Start${command ? ` : ${command.file} ${command.args.join(' ')}` : ' (partie simulée)'}.`); // i18n-ignore : journal
+  console.log(`Lancement : ${zenName} (${table.id}) lancé ${Date.now() - pressedAt} ms après le Start${command ? ` : ${futurePinballCommandLine(command)}` : ' (partie simulée)'}.`); // i18n-ignore : journal
+  // Future Pinball ouvert en fenêtre ailleurs : posé sur le playfield (le plein écran reste où le jeu l'a mis).
+  const onWindow = fp
+    ? (w: WindowInfo) => {
+        const placed = placeFuturePinballWindow(w, menuAssignments.playfield?.bounds, observedDisplays().map((d) => d.bounds), setWindowBounds);
+        if (placed) console.log(`${zenName} (${table.id}) : fenêtre posée sur le playfield (${placed.x}, ${placed.y}, ${placed.width} × ${placed.height}).`); // i18n-ignore : journal
+      }
+    : undefined;
   const game =
     simulated !== undefined || !command
       ? simulateVpx({ onPlaying, onForeground })
-      : launchPinballFx({ command, game: ZEN_LAUNCH_GAMES[zenKey], exitHeld: vrFront.exitHeldNow, onPlaying, onForeground });
+      : launchPinballFx({ command, game: launchGame, exitHeld: vrFront.exitHeldNow, onPlaying, onForeground, ...(onWindow ? { onWindow } : {}) });
   if (launch) {
     launch.stop = () => game.stop();
     launchStep('launched');
@@ -4801,7 +4816,9 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
         title: t('{game} n’a pas ouvert la table', { game: zenName }),
         lines: [
           ...(result.message ? [result.message] : []),
-          zenKey === 'pinballfx3'
+          fp
+            ? fp.failureHint
+            : zenKey === 'pinballfx3'
             ? t('Vérifiez que Steam est connecté, que la table est sur ce compte Steam et que le mode borne est activé dans {game}.', { game: zenName })
             : t('Vérifiez que la table est achetée dans Pinball FX et que Steam (ou Epic) est connecté.'),
           t('Start ou Exit : revenir au front-end.'),
@@ -4881,7 +4898,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   }
 
   // Table de Pinball FX : sa propre partie, sans rien de ce qui est propre à VPX (pinballfx.ts).
-  if (isZenEmulator(table.emulator)) return playPinballFx(table, autoStopAfterMs, mode, simulated);
+  // Table de Future Pinball : la même partie, sa commande à lui (futurepinball-play.ts).
+  if (isZenEmulator(table.emulator) || table.emulator === 'futurepinball') return playPinballFx(table, autoStopAfterMs, mode, simulated);
   if (!install) return undefined;
   const otherRefused = otherVpx && otherVpxRefusal(otherVpx, { exists: simulated !== undefined || fs.existsSync(otherVpx.exe), display: mode === 'display', friends: Boolean(hooks.double) });
   if (otherRefused) {
@@ -6202,7 +6220,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
       state.phase === 'loading' && role === 'playfield' && launch?.slow
         ? launch.stopped
           ? { step: t('Arrêt demandé : VPX se ferme'), since: launch.since }
-          : { step: loadingStepLabel(launch.step), since: launch.since, stop: isZenEmulator(playing?.emulator) ? t('{keys} ou Exit : arrêter · en partie, appui long sur Exit : quitter {game}', { keys: shortcutLabel(SHORTCUTS.forceStop), game: ZEN_GAMES[playing!.emulator as ZenGameKey].name }) : t('{keys} ou Exit : arrêter', { keys: shortcutLabel(SHORTCUTS.forceStop) }) }
+          : { step: loadingStepLabel(launch.step), since: launch.since, stop: isZenEmulator(playing?.emulator) || playing?.emulator === 'futurepinball' ? t('{keys} ou Exit : arrêter · en partie, appui long sur Exit : quitter {game}', { keys: shortcutLabel(SHORTCUTS.forceStop), game: TABLE_ENGINES[playing!.emulator].short }) : t('{keys} ou Exit : arrêter', { keys: shortcutLabel(SHORTCUTS.forceStop) }) }
         : undefined,
     // Fronton du jeu choisi (image Backglass), en fond du menu au bureau, à côté du plateau.
     backglass: role === 'playfield' && m && table && !shown && !onMedallion() ? m.typeMedia(table, 'backglass', 'Backglass') : undefined,
