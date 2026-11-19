@@ -33,6 +33,7 @@ test('mode invité : les portes ouvertes sont exactement celles-ci, chacune pour
     'menu.collections': 'changer de collection (Toutes, Favoris, un fabricant…) : la roue montre d’autres tables, rien n’est modifié ; fermée quand le mode invité impose une collection (menu.collection-locked)',
     'game.force-stop': 'arrêter une partie bloquée : la partie seulement, rien n’est enregistré',
     'message.other-frontend': 'jouer quand même, un autre menu ouvert : rien n’est modifié',
+    'message.zen-first-run': 'ouvrir quand même Pinball FX3, jamais ouvert sur ce PC : la même partie que « Jouer », rien n’est écrit',
     'message.power': 'extinction déjà en cours : l’écran reste noir, aucun choix n’y est offert',
     'message.replay': 'rejouer la table après un arrêt de VPX : la même partie que « Jouer », rien de modifié',
     'sheet.play': 'jouer',

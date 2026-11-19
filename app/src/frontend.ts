@@ -104,6 +104,7 @@ import {
   playfieldOrientation,
   pinballFxCommand,
   pinballFx3Command,
+  pinballFx3FirstRunMessage,
   pinballFx3ShortGameMessage,
   isZenEmulator,
   futurePinballCommandLine,
@@ -651,7 +652,7 @@ export interface Message {
    */
   report?: { about: string; table: string; signature: string; consent?: boolean; notified?: boolean };
   /** Ce que fait Start sur ce message. */
-  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'interface' | 'otherFrontend' | 'journey' | 'replay' | 'live' | 'power' | 'orientation';
+  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'interface' | 'otherFrontend' | 'zenFirstRun' | 'journey' | 'replay' | 'live' | 'power' | 'orientation';
   /**
    * Table d'une partie échouée : Start ouvre « Ce qu'il manque pour jouer » (action 'journey'), ou la
    * relance quand rien ne manque (action 'replay' : le script de la table ou VPX s'est arrêté).
@@ -692,6 +693,7 @@ const MESSAGE_DOORS: Record<NonNullable<Message['action']>, GuestDoor> = {
   buttons: 'message.buttons',
   interface: 'message.interface',
   otherFrontend: 'message.other-frontend',
+  zenFirstRun: 'message.zen-first-run',
   journey: 'message.journey',
   replay: 'message.replay',
   live: 'message.live',
@@ -4496,7 +4498,8 @@ function handleKey(input: Input, fromPhone = false): boolean {
         state = { ...state, phase: tables.length ? 'menu' : 'message', message: tables.length ? undefined : noTables() };
         break;
       }
-      if (state.message?.action === 'otherFrontend') {
+      // Autre menu de borne ouvert, ou Pinball FX3 jamais ouvert sur ce PC : Start joue quand même.
+      if (state.message?.action === 'otherFrontend' || state.message?.action === 'zenFirstRun') {
         const run = pendingPlay;
         pendingPlay = undefined;
         state = { ...state, phase: 'menu', message: undefined };
@@ -4725,7 +4728,7 @@ const SIMULATED_MANUAL = OFFSCREEN && !!process.env.CYBERPINBALL_PARTIE_SIMULEE_
  * scores lus dans la ROM) : le jeu règle lui-même ses écrans et son DMD dans son mode borne. La partie compte dans les
  * statistiques de la table ; son score n'est pas lisible, ni tableau ni classement.
  */
-async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefined, mode: 'display' | undefined, simulated: string | undefined): Promise<PlayReport | undefined> {
+async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefined, mode: 'display' | undefined, simulated: string | undefined, firstRunSeen = false): Promise<PlayReport | undefined> {
   // Pinball FX ou Pinball FX3 (17/11/2026) : même partie, chacun sa détection et sa commande.
   // Future Pinball (19/11/2026) aussi : sa détection, sa commande et ses messages dans futurepinball-play.ts.
   const fp = table.emulator === 'futurepinball' ? futurePinballPlan(table, { simulated, mode, install: simulated === undefined ? detectFuturePinball(loc.dataDir) : undefined }) : undefined;
@@ -4746,6 +4749,16 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
           : undefined;
   if (why) {
     state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible'), lines: [why, t('Start ou Exit : revenir au front-end.')] } };
+    broadcast();
+    return undefined;
+  }
+  // Pinball FX3 jamais ouvert sur ce PC : son mode borne n'y est pas activé, il s'ouvrirait sur son
+  // écran d'accueil. Dit avant de lancer (ses réglages sont chiffrés : rien à écrire, pinballfx3-cabinet.ts).
+  const firstRun = fx3 && table.pinballFx3Table !== undefined && !firstRunSeen && !autoStopAfterMs ? pinballFx3FirstRunMessage(fx3.gameDir, table.pinballFx3Table) : undefined;
+  if (firstRun) {
+    console.log(`${zenName} (${table.id}) : jamais ouvert sur ce PC (${fx3!.gameDir} sans réglages), mode borne à activer dans le jeu ; Start l'ouvre quand même.`); // i18n-ignore : journal
+    pendingPlay = { frontends: [], play: () => playPinballFx(table, autoStopAfterMs, mode, simulated, true) };
+    state = { ...state, phase: 'message', help: false, message: { ...firstRun, action: 'zenFirstRun' } };
     broadcast();
     return undefined;
   }

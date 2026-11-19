@@ -40,6 +40,7 @@ export const GUEST_DOORS = {
   'game.settings': false, // Réglages en partie (position du DMD, menu de VPX) : les deux MagnaSave, pendant la partie
   // Messages du menu (frontend.ts, Message.action) : Start fait leur action ; Exit les ferme toujours, sans rien faire d'autre.
   'message.other-frontend': true, // Jouer quand même, un autre menu de borne ouvert
+  'message.zen-first-run': true, // Ouvrir quand même Pinball FX3, jamais ouvert sur ce PC (mode borne à activer dans le jeu)
   'message.power': true, // Extinction, veille ou redémarrage en cours (une action programmée peut arriver en mode invité) : l'écran noir reste, Start et Exit n'y font rien
   'message.wizard': false, // Relancer l’assistant des écrans
   'message.install-vpx': false, // Installer VPX

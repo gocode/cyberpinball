@@ -161,7 +161,8 @@ test('inventaire : même machine dans Pinball FX, FX3 et VPX, chacune son dossie
 test('partie trop courte : causes possibles d’un jeu resté sur son écran d’accueil, sans code borne à demander', () => {
   assert.equal(pinballFx3ShortGameMessage(PINBALLFX3_SHORT_GAME_S, 'WMS_Fish_Tales'), undefined);
   assert.equal(pinballFx3ShortGameMessage(600, 'WMS_Fish_Tales'), undefined);
-  const short = pinballFx3ShortGameMessage(12, 'WMS_Fish_Tales');
+  // Table payante : l'achat manquant est une cause possible (Fish Tales, gratuite : pinballfx3-cabinet.test.ts).
+  const short = pinballFx3ShortGameMessage(12, 'WMS_Medieval_Madness');
   assert.ok(short);
   assert.match(short.lines.join('\n'), /12 s/);
   assert.match(short.lines.join('\n'), /compte Steam/);

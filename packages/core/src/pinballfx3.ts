@@ -23,6 +23,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { t } from './i18n';
 import { pinballFxTable } from './pinballfx';
+import { isFreePinballFx3Table } from './pinballfx3-cabinet';
 import { findSteamGame, steamGameDownloading, steamInstallUrl } from './steam';
 
 export const PINBALLFX3_STEAM_APPID = '442120';
@@ -272,7 +273,8 @@ export function pinballFx3ShortGameMessage(seconds: number, name: string): { tit
     title: t('{game} est resté sur son écran d’accueil ?', { game }),
     lines: [
       t('La partie a duré {n} s. Si {game} s’est ouvert sur son écran d’accueil au lieu de la table :', { n: Math.round(seconds), game }),
-      t('la table n’est peut-être pas sur ce compte Steam : seules les tables achetées s’ouvrent directement, les autres restent en essai dans le jeu ;'),
+      // Fish Tales et Sorcerer's Lair sont gratuites : sur tout compte, ce n'est jamais un achat qui manque.
+      ...(isFreePinballFx3Table(name) ? [] : [t('la table n’est peut-être pas sur ce compte Steam : seules les tables achetées s’ouvrent directement, les autres restent en essai dans le jeu ;')]),
       t('ou le mode borne n’est pas activé : dans {game}, icône de borne à côté du profil, puis « Activer ». Aucun code à demander à Zen depuis novembre 2024.', { game }),
       ...(name.toLowerCase() === 'mars' ? [t('« Mars » : un défaut connu de {game} ouvre « Attack from Mars » à sa place quand le compte a les deux tables.', { game })] : []),
       t('Start ou Exit : revenir au front-end.'),

@@ -108,4 +108,13 @@ export const messages: Record<string, string> = {
   'la table n’est peut-être pas sur ce compte Steam : seules les tables achetées s’ouvrent directement, les autres restent en essai dans le jeu ;': 'the table may not be on this Steam account: only bought tables open directly, the others stay as trials in the game;',
   'ou le mode borne n’est pas activé : dans {game}, icône de borne à côté du profil, puis « Activer ». Aucun code à demander à Zen depuis novembre 2024.': 'or cabinet mode isn’t turned on: in {game}, cabinet icon next to the profile, then "Activate". No code to ask Zen for since November 2024.',
   '« Mars » : un défaut connu de {game} ouvre « Attack from Mars » à sa place quand le compte a les deux tables.': '“Mars”: a known {game} bug opens “Attack from Mars” instead when the account has both tables.',
+  // Pinball FX3 jamais ouvert sur ce PC (packages/core/src/pinballfx3-cabinet.ts, 19/11/2026)
+  'Première ouverture de {game} sur ce PC': 'First time {game} opens on this PC',
+  '{game} n’a encore jamais été ouvert ici : son mode borne n’y est pas activé. Sans lui, le jeu s’ouvre sur son écran d’accueil, en paysage, et pas sur la table.':
+    '{game} has never been opened here: its cabinet mode isn’t turned on. Without it, the game opens on its home screen, in landscape, and not on the table.',
+  'Dans le jeu : icône de borne à côté du profil, « Activer », puis la rotation du plateau et les écrans du fronton et du DMD. Cyber Pinball ne peut pas le faire à sa place : ces réglages sont chiffrés. Fermez ensuite le jeu (Exit tenu) et relancez la table.':
+    'In the game: cabinet icon next to the profile, "Activate", then the playfield rotation and the backglass and DMD screens. Cyber Pinball can’t do it for you: these settings are encrypted. Then close the game (hold Exit) and start the table again.',
+  'Seules Fish Tales et Sorcerer’s Lair sont gratuites : les autres tables ne s’ouvrent que si elles sont achetées sur ce compte Steam, sinon le jeu reste sur son écran d’accueil.':
+    'Only Fish Tales and Sorcerer’s Lair are free: the other tables only open if they are bought on this Steam account, otherwise the game stays on its home screen.',
+  'Start : ouvrir {game} · Exit : revenir au front-end': 'Start: open {game} · Exit: back to the menu',
 };
