@@ -92,6 +92,9 @@ import {
   needsChannelTest,
   stereoSurroundCandidate,
   silentPairNotices,
+  proposeAudioSetups,
+  describeDetected,
+  type AudioSetup,
   PLAYFIELD_MODE_LABELS,
   playfieldModeFromTest,
   SPEAKER_PLACE_LABELS,
@@ -172,6 +175,8 @@ import { otherFrontendsOnThisPc } from './frontend-gate';
 import { controlActions, controlCode, isControlRole, pressedIn, type ControlAction, type ControlSpec } from './wizard-controls';
 import { progressView } from './wizard-progress';
 import { openSoundPanel } from './sound-panel';
+import { quickCheckCabinet, quickCheckTexts, setupsView } from './sound-setups';
+import { probeAudioJacks } from '@cyberpinball/win-displays';
 
 const COLORS = ['#ff3d7f', '#22d3ee', '#facc15', '#a3e635', '#c084fc', '#fb923c'];
 
@@ -324,6 +329,12 @@ interface SoundStep {
   stereoCard?: { endpointId: string; state: 'ask' | 'windows'; notice?: string };
   /** Réponse « non » à cette question : elle n'est plus reposée dans cet assistant. */
   stereoDeclined?: boolean;
+  /** Configurations proposées avant toute question (audio-setups.ts) ; la dernière place est « pas à pas ». */
+  setups?: { list: AudioSetup[]; index: number; detected: string };
+  /** Configuration essayée : la vérification rapide attend chaque paire à sa place. */
+  chosen?: AudioSetup;
+  /** Vérification rapide, paire entendue « ailleurs » : la question de toujours (où l'entendez-vous ?). */
+  detail?: boolean;
 }
 
 /** Compte rendu de la fenêtre qui joue les sons (renderer/sound.js). */
@@ -755,8 +766,9 @@ function handleKey(input: Input): boolean {
     return true;
   }
 
-  if (wizard.phase === 'sound' || wizard.phase === 'channels') {
-    if (!(wizard.phase === 'sound' ? handleSoundKey(is) : handleChannelKey(is))) return false;
+  if (wizard.phase === 'setups' || wizard.phase === 'sound' || wizard.phase === 'channels') {
+    const handled = wizard.phase === 'setups' ? handleSetupsKey(is) : wizard.phase === 'sound' ? handleSoundKey(is) : handleChannelKey(is);
+    if (!handled) return false;
     broadcast();
     return true;
   }
@@ -1116,7 +1128,7 @@ type WizardAction = { type: 'button'; index: number } | { type: 'buttons'; actio
  * relevé des boutons ni son premier écran, où un appui est relevé ou choisit à son relâchement, ni
  * la disposition, qui a son propre panneau cliquable.
  */
-const CONTROL_PHASES: readonly Phase[] = ['plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'sound', 'channels', 'summary', 'done'];
+const CONTROL_PHASES: readonly Phase[] = ['plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'setups', 'sound', 'channels', 'summary', 'done'];
 
 /** Clic sur une commande de l'étape : l'appui puis le relâchement du bouton de ce rôle. */
 function pressControl(role: unknown): void {
@@ -2294,7 +2306,10 @@ function nextRole(): void {
 function loadAudioOutputs(): ObservedAudioOutput[] {
   const fixture = process.env.CYBERPINBALL_AUDIO_OUTPUTS;
   if (fixture) return readJsonFile(fixture) as ObservedAudioOutput[];
-  return audioOutputs() ?? [];
+  const outputs = audioOutputs() ?? [];
+  // Prises décrites par le pilote : de quoi proposer le SSF avant toute question (sound-setups.ts).
+  const jacks = probeAudioJacks(outputs.map((o) => o.endpointId));
+  return outputs.map((o) => (jacks.has(o.endpointId) ? { ...o, jacks: jacks.get(o.endpointId) } : o));
 }
 
 /**
@@ -2319,7 +2334,87 @@ function startSound(): void {
   const rank = (o: ObservedAudioOutput) => (o.endpointId === roles.backglass ? 0 : o.endpointId === roles.playfield ? 1 : 2);
   outputs.sort((a, b) => rank(a) - rank(b));
   wizard.sound = { outputs, index: 0, roles, reasons, pairIndex: 0, places: {} };
-  wizard.phase = 'sound';
+  // D'abord les configurations proposées d'après ce qui est détecté ; « pas à pas » reste le dernier choix.
+  const input = {
+    outputs,
+    displays,
+    backglassDisplay: wizard.assignments.backglass,
+    playfieldDisplay: wizard.assignments.playfield,
+    ...(previous?.audio && Object.keys(before).length && { previous: { audio: previous.audio, roles: before } }),
+  };
+  const list = proposeAudioSetups(input);
+  wizard.sound.setups = { list, index: 0, detected: describeDetected(input) };
+  wizard.phase = list.length ? 'setups' : 'sound';
+}
+
+/** Dernière place de la liste : « Aucune ne correspond : régler pas à pas ». */
+const isStepByStep = (s: NonNullable<SoundStep['setups']>) => s.index >= s.list.length;
+
+/**
+ * Propositions : flippers pour choisir, Start pour essayer (ou régler pas à pas, en dernière place),
+ * Exit pour régler pas à pas, Retour arrière comme sur la première sortie.
+ */
+function handleSetupsKey(is: (group: string[]) => boolean): boolean {
+  const sound = wizard.sound!;
+  const setups = sound.setups!;
+  const count = setups.list.length + 1;
+  if (is(KEYS.back)) {
+    if (isOnly('son')) askQuit();
+    else {
+      wizard.sound = undefined;
+      startArrangeStep();
+    }
+    return true;
+  }
+  if (is(KEYS.previous)) setups.index = (setups.index + count - 1) % count;
+  else if (is(KEYS.next)) setups.index = (setups.index + 1) % count;
+  else if (is(KEYS.exit) || (is(KEYS.confirm) && isStepByStep(setups))) {
+    sound.chosen = undefined;
+    sound.index = 0;
+    wizard.phase = 'sound';
+  } else if (is(KEYS.confirm)) trySetup(setups.list[setups.index]!);
+  else return false;
+  return true;
+}
+
+/**
+ * Essai d'une configuration : ses rôles ; en stéréo (ou réglages gardés), le récapitulatif ; en SSF,
+ * la vérification rapide, après le passage en 5.1 ou 7.1 dans Windows s'il le faut.
+ */
+function trySetup(setup: AudioSetup): void {
+  const sound = wizard.sound!;
+  sound.chosen = setup;
+  sound.roles = { ...setup.roles };
+  sound.detail = false;
+  sound.test = undefined;
+  sound.pairIndex = 0;
+  sound.places = {};
+  if (setup.playfieldMode === 'stereo' || setup.id === 'keep') {
+    wizard.phase = 'summary';
+    return;
+  }
+  const output = audioById(setup.roles.playfield)!;
+  wizard.phase = 'channels';
+  if (needsChannelTest(output) && !(setup.needsChannels && output.channels < setup.needsChannels)) return startQuickCheck();
+  sound.stereoCard = { endpointId: output.endpointId, state: 'windows' };
+  sound.stereoCard.notice = openSoundPanel();
+  if (!checkStereoCard()) startStereoWatch();
+}
+
+/** Paires que la vérification rapide fait sonner : celles qu'on attend quelque part. */
+function testPairs(output: ObservedAudioOutput) {
+  const expected = wizard.sound?.chosen?.expected;
+  const pairs = speakerPairsOf(output);
+  return expected ? pairs.filter((p) => expected[p.pair] && expected[p.pair] !== 'none') : pairs;
+}
+
+/** Début de la vérification rapide : les paires qu'on n'attend nulle part sont déjà « rien entendu ». */
+function startQuickCheck(): void {
+  const sound = wizard.sound!;
+  sound.pairIndex = 0;
+  sound.detail = false;
+  sound.places = {};
+  for (const [pair, place] of Object.entries(sound.chosen?.expected ?? {})) if (place === 'none') sound.places[pair as SpeakerPair] = 'none';
 }
 
 /** Rôles du modèle enregistré, ramenés aux sorties actives d'aujourd'hui. */
@@ -2445,6 +2540,8 @@ function checkStereoCard(): boolean {
   sound.places = {};
   sound.test = undefined;
   stopStereoWatch();
+  // Configuration proposée : sa vérification rapide (sinon, le test des paires de toujours).
+  if (sound.chosen) startQuickCheck();
   return true;
 }
 
@@ -2458,7 +2555,12 @@ function handleStereoCardKey(is: (group: string[]) => boolean): boolean {
   const card = sound.stereoCard!;
   if (is(KEYS.back)) {
     stopStereoWatch();
-    if (card.state === 'windows') {
+    if (sound.chosen && sound.setups) {
+      // Venu d'une configuration proposée : retour à la liste.
+      sound.stereoCard = undefined;
+      sound.chosen = undefined;
+      wizard.phase = 'setups';
+    } else if (card.state === 'windows') {
       card.state = 'ask';
       card.notice = undefined;
     } else {
@@ -2491,21 +2593,40 @@ function handleChannelKey(is: (group: string[]) => boolean): boolean {
   const sound = wizard.sound!;
   if (sound.stereoCard) return handleStereoCardKey(is);
   const output = playfieldAudio()!;
-  const pairs = speakerPairsOf(output);
+  const pairs = testPairs(output);
+  const pair = pairs[sound.pairIndex]!;
+  const quick = sound.chosen?.expected && !sound.detail;
   if (is(KEYS.back)) {
-    if (sound.pairIndex > 0) sound.pairIndex--;
-    else wizard.phase = 'sound';
+    if (sound.detail) sound.detail = false;
+    else if (sound.pairIndex > 0) sound.pairIndex--;
+    else if (sound.chosen && sound.setups) {
+      sound.chosen = undefined;
+      wizard.phase = 'setups';
+    } else wizard.phase = 'sound';
     return true;
   }
-  const answers: [string[], SpeakerPlace][] = [
-    [KEYS.previous, 'lockbar'],
-    [KEYS.next, 'top'],
-    [KEYS.confirm, 'backglass'],
-    [KEYS.exit, 'none'],
-  ];
-  const place = answers.find(([keys]) => is(keys))?.[1];
-  if (!place) return false;
-  sound.places[pairs[sound.pairIndex]!.pair] = place;
+  let place: SpeakerPlace | undefined;
+  if (quick) {
+    // Vérification rapide : Start, oui (là où on l'attend) ; Exit, aucun son ; un flipper, entendu
+    // ailleurs : la question de toujours pour cette paire.
+    if (is(KEYS.confirm)) place = sound.chosen!.expected![pair.pair];
+    else if (is(KEYS.exit)) place = 'none';
+    else if (is(KEYS.previous) || is(KEYS.next)) {
+      sound.detail = true;
+      return true;
+    } else return false;
+  } else {
+    const answers: [string[], SpeakerPlace][] = [
+      [KEYS.previous, 'lockbar'],
+      [KEYS.next, 'top'],
+      [KEYS.confirm, 'backglass'],
+      [KEYS.exit, 'none'],
+    ];
+    place = answers.find(([keys]) => is(keys))?.[1];
+    if (!place) return false;
+  }
+  sound.detail = false;
+  sound.places[pair.pair] = place!;
   if (sound.pairIndex + 1 < pairs.length) sound.pairIndex++;
   else {
     sound.test = { endpointId: output.endpointId, result: playfieldModeFromTest(sound.places) };
@@ -2526,10 +2647,17 @@ function backFromSummary(): void {
   }
   const sound = wizard.sound;
   if (!sound) return isOnly('son') ? askQuit() : startArrangeStep();
+  // Configuration proposée en stéréo (ou réglages gardés) : retour à la liste.
+  if (sound.chosen && sound.setups && (sound.chosen.playfieldMode === 'stereo' || sound.chosen.id === 'keep')) {
+    sound.chosen = undefined;
+    wizard.phase = 'setups';
+    return;
+  }
   const output = playfieldAudio();
   const card = output && needsChannelTest(output) ? undefined : stereoSurroundCandidate(sound.outputs, sound.roles, displays);
   if (output && needsChannelTest(output)) {
-    sound.pairIndex = speakerPairsOf(output).length - 1;
+    sound.pairIndex = testPairs(output).length - 1;
+    sound.detail = false;
     wizard.phase = 'channels';
   } else if (card) {
     // « Non, stéréo » répondu : Retour arrière ramène à la question.
@@ -2570,11 +2698,14 @@ function buildAudio(): CabinetAudio | undefined {
   if (!sound) return previous?.audio;
   const ids = new Set(Object.values(sound.roles));
   const test = channelTest();
+  // Réglages gardés tels quels : leur mixage, sans nouveau test.
+  const kept = !test && sound.chosen?.id === 'keep' ? previous?.audio : undefined;
+  const lockbarPair = test?.lockbarPair ?? kept?.lockbarPair;
   return {
     outputs: audio.filter((o) => ids.has(o.endpointId)).map((o) => toAudioOutput(o, displays)),
     roles: { ...sound.roles },
-    playfieldMode: test?.playfieldMode ?? 'stereo',
-    ...(test?.lockbarPair && { lockbarPair: test.lockbarPair }),
+    playfieldMode: test?.playfieldMode ?? kept?.playfieldMode ?? 'stereo',
+    ...(lockbarPair && { lockbarPair }),
   };
 }
 
@@ -2589,7 +2720,7 @@ function wantedSound(): { kind: string; key: string; [field: string]: unknown } 
   }
   const output = playfieldAudio();
   if (wizard.phase === 'channels' && sound && output && !sound.stereoCard) {
-    const pair = speakerPairsOf(output)[sound.pairIndex]!;
+    const pair = testPairs(output)[sound.pairIndex]!;
     return {
       kind: 'channel',
       key: `canaux:${output.endpointId}:${pair.pair}`,
@@ -3302,6 +3433,10 @@ function viewFor(index: number) {
     };
   }
 
+  if (wizard.phase === 'setups' && wizard.sound?.setups) {
+    return setupsScreen(base, assignedRole);
+  }
+
   if ((wizard.phase === 'sound' || wizard.phase === 'channels') && wizard.sound) {
     return soundView(index, base, assignedRole);
   }
@@ -3466,6 +3601,31 @@ function stepSummary(rolesLines: string[], playfieldLines: string[]): string[] {
   }
 }
 
+/** Configurations proposées : sur le playfield, que le joueur regarde ; ailleurs, « réglage du son en cours ». */
+function setupsScreen(base: Record<string, unknown>, assignedRole: RoleId | undefined) {
+  const sound = wizard.sound!;
+  const setups = sound.setups!;
+  if (assignedRole !== 'playfield') return { ...base, highlight: false, prompt: '', step: t('Réglage du son en cours') };
+  return {
+    ...base,
+    highlight: true,
+    prompt: t('Branchement du son'),
+    name: '',
+    details: '',
+    step: setups.detected,
+    hint: t('Flippers : choisir · Start : essayer cette configuration · Exit : régler pas à pas'),
+    setups: setupsView(setups.list, setups.index),
+    // Un seul focus : la proposition choisie ; les commandes ne s'allument pas.
+    actions: controls([
+      { role: 'back', label: t('Revenir') },
+      { role: 'previous', label: t('◀ Précédente') },
+      { role: 'next', label: t('Suivante ▶') },
+      { role: 'confirm', label: isStepByStep(setups) ? t('Régler pas à pas') : t('Essayer') },
+      { role: 'exit', label: t('Pas à pas') },
+    ]),
+  };
+}
+
 /**
  * Étapes « Son » et « Canaux » : la question s'affiche sur le playfield, que le
  * joueur regarde ; l'écran dont la sortie est le haut-parleur s'allume aussi.
@@ -3523,7 +3683,9 @@ function soundView(index: number, base: { notice?: string } & Record<string, unk
       notice: card.notice ?? notice,
       step: asking
         ? t('Exciters ou haut-parleurs sur le plateau (SSF, surround) ? Cette carte est réglée en {channels} dans Windows : pour les piloter, elle doit passer en 7.1.', { channels: channelsLabel(output.channels) })
-        : t('Dans le panneau Son de Windows : « {name} », Configurer, 7.1 Surround, puis Suivant jusqu’au bout. Le test des haut-parleurs démarre dès que Windows annonce le 5.1 ou le 7.1. Le 5.1 suffit pour deux exciters, quatre demandent le 7.1. Ni l’un ni l’autre : cette sortie reste en stéréo, il faut une carte son 7.1.', { name: output.friendlyName }),
+        : sound.chosen?.needsChannels === 6
+          ? t('Dans le panneau Son de Windows : « {name} », Configurer, 5.1 Surround, puis Suivant jusqu’au bout. La vérification démarre dès que Windows annonce le 5.1.', { name: output.friendlyName })
+          : t('Dans le panneau Son de Windows : « {name} », Configurer, 7.1 Surround, puis Suivant jusqu’au bout. Le test des haut-parleurs démarre dès que Windows annonce le 5.1 ou le 7.1. Le 5.1 suffit pour deux exciters, quatre demandent le 7.1. Ni l’un ni l’autre : cette sortie reste en stéréo, il faut une carte son 7.1.', { name: output.friendlyName }),
       hint: asking
         ? t('Start : oui, passer cette carte en 7.1 · Exit : non, rester en stéréo · Retour arrière : revenir')
         : t('Start : rouvrir le panneau Son · Exit : rester en stéréo · Retour arrière : revenir'),
@@ -3535,8 +3697,33 @@ function soundView(index: number, base: { notice?: string } & Record<string, unk
     };
   }
 
-  const pairs = speakerPairsOf(output);
+  const pairs = testPairs(output);
   const pair = pairs[sound.pairIndex]!;
+  const chosen = sound.chosen;
+  if (chosen?.expected && !sound.detail) {
+    // Vérification rapide : la paire sonne-t-elle là où la configuration l'attend ?
+    const texts = quickCheckTexts(chosen.expected[pair.pair] ?? 'none');
+    return {
+      ...base,
+      highlight: true,
+      // Pas de grand titre : le schéma allumé et la question disent où la paire doit sonner, et la place
+      // reste à un avertissement (sortie introuvable…) sans pousser les commandes sur la consigne.
+      // « Vérification 1 sur 3 » : dans la frise du haut (progressCount).
+      prompt: '',
+      name: '',
+      details: '',
+      notice,
+      step: texts.step,
+      hint: t('Start : oui · Flippers : entendu ailleurs · Exit : aucun son · Retour arrière : revenir'),
+      cabinet: quickCheckCabinet(chosen, pairs.map((p) => p.pair), sound.pairIndex),
+      actions: controls([
+        { role: 'back', label: t('Revenir') },
+        { role: 'confirm', label: texts.yes, primary: true },
+        { role: 'previous', label: t('Ailleurs') },
+        { role: 'exit', label: t('Aucun son') },
+      ]),
+    };
+  }
   const answered = pairs
     .slice(0, sound.pairIndex)
     .map((p) => t('{pair} : {place}', { pair: p.label, place: SPEAKER_PLACE_LABELS[sound.places[p.pair] ?? 'none'] }))
@@ -3590,6 +3777,6 @@ function progressCount(): string | undefined {
   const sound = wizard.sound;
   if (wizard.phase === 'sound' && sound) return t('Sortie {n} sur {total}', { n: sound.index + 1, total: sound.outputs.length });
   const output = wizard.phase === 'channels' && sound && !sound.stereoCard ? playfieldAudio() : undefined;
-  if (output) return t('Haut-parleurs {n} sur {total}', { n: sound!.pairIndex + 1, total: speakerPairsOf(output).length });
+  if (output) return sound!.chosen ? t('Vérification {n} sur {total}', { n: sound!.pairIndex + 1, total: testPairs(output).length }) : t('Haut-parleurs {n} sur {total}', { n: sound!.pairIndex + 1, total: testPairs(output).length });
   return undefined;
 }

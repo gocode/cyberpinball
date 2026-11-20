@@ -340,6 +340,28 @@ export interface ObservedAudioOutput {
   containerId?: string;
   /** Default output of Windows (Console role), when the registry tells. */
   isDefault?: boolean;
+  /**
+   * Jacks of the output, as its driver describes them (IKsJackDescription); absent when the driver
+   * describes none (many USB cards, HDMI). Read even when Windows sets the card to stereo.
+   */
+  jacks?: ObservedAudioJack[];
+}
+
+/**
+ * One jack of a sound card (KSJACK_DESCRIPTION). The role comes from the channels it carries
+ * (front, rear, side, centre/LFE): reliable. The colour declared by the maker is often 0
+ * (unspecified); the standard colours (green front, black rear, grey side, orange centre/LFE)
+ * are named from the role, and only for a motherboard card (HDAUDIO).
+ */
+export interface ObservedAudioJack {
+  /** Speaker mask carried by the jack (KSAUDIO_SPEAKER bits): 0x3 front, 0x30 rear, 0x600 side, 0xc centre/LFE. */
+  channelMapping: number;
+  /** Colour declared by the driver, 0xRRGGBB; 0 when unspecified. */
+  color: number;
+  /** EPcxGeoLocation: 1 rear, 2 front, 11 HDMI... */
+  geoLocation: number;
+  /** Something plugged in (jack sensing); a jack without sensing reports true. */
+  connected: boolean;
 }
 
 /** The two outputs of VPX: SoundDeviceBG (backglass: ROM, AltSound, PuP, music) and SoundDevice (playfield). */

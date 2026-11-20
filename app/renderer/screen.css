@@ -111,7 +111,8 @@ body {
   font-size: 22vmin;
 }
 
-#screen.measuring .number {
+#screen.measuring .number,
+#screen.sound .number {
   display: none;
 }
 
@@ -1157,3 +1158,38 @@ body.arranging .zone.editable {
 .arrange.dock-bottom {
   bottom: 4vmin;
 }
+
+
+/* Étape « Son » : configurations proposées et schéma de la borne (sound-setups.js). Un seul focus,
+   la proposition choisie ; le schéma garde ses textes au-dessus de 20 px à 1080 px de haut. */
+#details:has(.setups-view) { width: min(94%, 170vmin); }
+#screen:has(.setups-view) .prompt { font-size: 5.4vmin; }
+#screen:has(.setup-figure.check) .measure { font-size: 6vmin; }
+.setups-view { display: grid; grid-template-columns: 1fr 35vmin; gap: 4vmin; align-items: center; text-align: left; margin: 1vmin auto 0; }
+.setups { list-style: none; margin: 0; padding: 0; display: grid; gap: 1vmin; counter-reset: setup; }
+.setups li {
+  counter-increment: setup;
+  display: grid; grid-template-columns: 4.6vmin 1fr; column-gap: 1.6vmin; row-gap: 0.5vmin; align-items: baseline;
+  padding: 1.1vmin 2vmin; border-radius: 0.8vmin;
+  background: var(--surface-raised); border: 0.2vmin solid var(--line-strong);
+}
+.setups li::before {
+  content: counter(setup); grid-row: 1 / span 4; align-self: center;
+  display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; width: 4.6vmin; height: 4.6vmin; border-radius: 50%;
+  font-size: 2.4vmin; font-weight: 600; color: var(--ink-muted); border: 0.2vmin solid var(--line-strong);
+}
+.setups li.selected { border-color: var(--signal); background: color-mix(in oklab, var(--signal) 9%, var(--surface-raised)); box-shadow: 0 0 2.4vmin var(--signal-haze); }
+.setups li.selected::before { background: var(--signal); color: var(--on-signal); border-color: var(--signal); }
+.setups li.quiet .setup-title { color: var(--ink-muted); }
+.setup-title { grid-column: 2; font-size: 2.7vmin; font-weight: 600; font-stretch: 108%; color: var(--ink); }
+.setup-detail { grid-column: 2; font-size: 2.2vmin; color: var(--ink-muted); line-height: 1.35; }
+.setup-badge { grid-column: 2; justify-self: start; margin-top: 0.4vmin; padding: 0.3vmin 1.1vmin; border-radius: 0.5vmin; font-size: 1.95vmin; font-weight: 600; letter-spacing: 0.02em; }
+.setup-badge.ok { color: var(--signal); background: var(--signal-wash); }
+.setup-badge.warn { color: var(--warning); background: color-mix(in oklab, var(--warning) 12%, transparent); }
+.setup-badge.info { color: var(--meta); background: color-mix(in oklab, var(--meta) 12%, transparent); }
+.setup-figure { margin: 0; }
+.setup-figure .cab { width: 100%; height: auto; display: block; font-family: var(--font-ui); }
+/* Vérification : le schéma prend la hauteur qui reste (un avertissement peut s'ajouter), jamais plus de la moitié de l'écran. */
+#details:has(.setup-figure.check) { flex: 1 1 0; min-height: 0; display: flex; justify-content: center; }
+.setup-figure.check { height: 100%; margin: 0 auto; }
+.setup-figure.check .cab { height: 100%; max-height: 50vh; width: auto; margin: 0 auto; }

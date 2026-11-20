@@ -4,7 +4,7 @@
 const $ = (id) => document.getElementById(id);
 
 // Étapes où un seul écran porte la question, les autres restent en retrait.
-const STEP_PHASES = ['buttonsChoice', 'buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'gate'];
+const STEP_PHASES = ['buttonsChoice', 'buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'arrange', 'setups', 'sound', 'channels', 'gate'];
 
 function text(id, value) {
   $(id).textContent = value ?? '';
@@ -439,13 +439,15 @@ function render(state) {
   renderGauge(state);
   renderPlumb(state);
   root.classList.toggle('orient', ['orient', 'flip'].includes(state.phase) && state.highlight);
-  root.classList.toggle('sound', ['sound', 'channels'].includes(state.phase) && state.highlight);
+  root.classList.toggle('sound', ['setups', 'sound', 'channels'].includes(state.phase) && state.highlight);
   for (const angle of [90, 180, 270]) root.classList.toggle(`rot-${angle}`, state.rotation === angle);
 
   text('number', state.number);
   text('name', state.name);
   text('details', state.details);
   renderHint(state);
+  // Étape « Son » : configurations proposées, ou schéma de la vérification rapide (sound-setups.js).
+  window.renderSoundSetups(state);
   $('notice').hidden = !state.notice;
   text('notice', state.notice);
 

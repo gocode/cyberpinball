@@ -18,7 +18,7 @@ const STEPS: readonly ProgressStep[] = [
   { label: () => 'Tilt', phases: ['tilt'] },
   { label: () => t('Écrans'), phases: ['assign', 'orient', 'flip', 'size'] },
   { label: () => t('Disposition'), phases: ['arrange'] },
-  { label: () => t('Son'), phases: ['sound', 'channels'] },
+  { label: () => t('Son'), phases: ['setups', 'sound', 'channels'] },
   { label: () => t('Récapitulatif'), phases: ['summary'] },
 ];
 

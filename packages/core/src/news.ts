@@ -54,6 +54,22 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Rapport du 20/11/2026 (SSF introuvable) : la borne propose sa configuration du son.
+    id: 'son-propose',
+    date: '2026-11-20',
+    version: '0.2.2',
+    get title() { return t('Le son de la borne se règle presque seul'); },
+    get detail() { return t('Cyber Pinball regarde ce qui est branché, propose la configuration du son et la vérifie avec vous.'); },
+    get more() {
+      return [
+        t('L’étape « Son de la borne » lit les prises de la carte son et les haut-parleurs de vos écrans, puis propose quelques configurations, la plus probable en tête, avec un schéma de la borne.'),
+        t('Essayer une configuration la vérifie paire par paire. Carte en stéréo dans Windows : le panneau Son s’ouvre et l’assistant attend le 5.1 ou le 7.1. Sinon, « Régler pas à pas » reste là.'),
+      ];
+    },
+    get where() { return t('Menu système › Borne › Configuration de la borne › Son de la borne'); },
+    reach: { kind: 'system', id: 'cabinet' },
+  },
+  {
     // Demandé par un joueur sur Facebook (19/11/2026) : premier niveau, sans BAM.
     id: 'future-pinball',
     date: '2026-11-20',

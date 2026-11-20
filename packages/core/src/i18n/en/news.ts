@@ -7,6 +7,14 @@ export const messages: Record<string, string> = {
     'Language, update, what’s new, feedback and ideas, recent activity, backups, migration, terms of use, the community, quit or restart, sleep and shutdown',
 
   // packages/core/src/news.ts : les nouveautés
+  'Le son de la borne se règle presque seul': 'Cabinet sound almost sets itself up',
+  'Cyber Pinball regarde ce qui est branché, propose la configuration du son et la vérifie avec vous.':
+    'Cyber Pinball looks at what is plugged in, suggests the sound setup and checks it with you.',
+  'L’étape « Son de la borne » lit les prises de la carte son et les haut-parleurs de vos écrans, puis propose quelques configurations, la plus probable en tête, avec un schéma de la borne.':
+    'The “Cabinet sound” step reads the sound card’s jacks and your screens’ speakers, then suggests a few setups, the most likely first, with a drawing of the cabinet.',
+  'Essayer une configuration la vérifie paire par paire. Carte en stéréo dans Windows : le panneau Son s’ouvre et l’assistant attend le 5.1 ou le 7.1. Sinon, « Régler pas à pas » reste là.':
+    'Trying a setup checks it pair by pair. Card in stereo in Windows: the Sound panel opens and the wizard waits for 5.1 or 7.1. Otherwise, “Step by step” is still there.',
+  'Menu système › Borne › Configuration de la borne › Son de la borne': 'System menu › Cabinet › Cabinet setup › Cabinet sound',
   'Future Pinball sur la roue': 'Future Pinball on the wheel',
   'Vos tables Future Pinball (.fpt) à côté de vos tables VPX, lancées en un appui.': 'Your Future Pinball tables (.fpt) next to your VPX tables, started with one press.',
   'Cyber Pinball trouve Future Pinball sur ce PC (ou dans le dossier que vous lui montrez) et liste les tables de son dossier Tables ; Start en ajoute une, avec son nom et ses médias. Un fichier .fpt choisi ailleurs marche aussi.':

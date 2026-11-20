@@ -312,6 +312,7 @@ export * from './processes';
 export * from './joystick';
 export * from './power';
 export * from './system-volume';
+export * from './audio-jacks';
 export * from './openxr';
 export * from './handles';
 export * from './file-holders';

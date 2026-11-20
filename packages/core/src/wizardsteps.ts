@@ -26,7 +26,7 @@ import { VPX_LAYOUT_KEYS } from './vpx';
  * « buttonsChoice » : premier écran d'une borne sans boutons enregistrés, « Vos boutons sont-ils
  * déjà les bons ? » ; ses appuis choisissent, aucun n'est relevé.
  */
-export const WIZARD_PHASES = ['buttonsChoice', 'buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'summary', 'done'] as const;
+export const WIZARD_PHASES = ['buttonsChoice', 'buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'arrange', 'setups', 'sound', 'channels', 'summary', 'done'] as const;
 export type WizardPhase = (typeof WIZARD_PHASES)[number];
 
 /**
@@ -160,7 +160,7 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
     get label() { return t('Son de la borne'); },
     get detail() { return t('Fronton, plateau, SSF et exciters : sorties audio et test des haut-parleurs'); },
     get saved() { return t('Son enregistré'); },
-    phases: ['sound', 'channels', 'summary'],
+    phases: ['setups', 'sound', 'channels', 'summary'],
     fields: ['audio'],
     owns: isAudioKey,
   },

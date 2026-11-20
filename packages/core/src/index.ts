@@ -54,6 +54,7 @@ export * from './layout';
 export * from './browser-screen';
 export * from './vps';
 export * from './audio';
+export * from './audio-setups';
 export * from './buttons';
 export * from './cabinetvolume';
 export * from './plunger';
