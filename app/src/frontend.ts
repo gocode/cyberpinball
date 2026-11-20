@@ -113,6 +113,7 @@ import {
   pinballFx3ShortGameMessage,
   isZenEmulator,
   futurePinballCommandLine,
+  PINUP_DISPLAY_EXE,
   ZEN_GAMES,
   type ZenGameKey,
   readInfo,
@@ -320,8 +321,8 @@ import {
   mediaKind,
   formatDateTime,
 } from '@cyberpinball/core';
-import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
-import { detectFuturePinball, futurePinballButtonKeys, futurePinballNudgeKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, placeVirtualDmd, startDmdMirror } from './futurepinball-play';
+import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, processIdsByName, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
+import { detectFuturePinball, futurePinballButtonKeys, futurePinballNudgeKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, placePupWindows, placeVirtualDmd, startDmdMirror } from './futurepinball-play';
 import { bridgeNudgeKeys } from './nudge-keys';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
@@ -4961,7 +4962,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     socialNet.setPresence({ status: 'playing', table: presenceTable(table), since: new Date().toISOString() });
     // Écrans où le jeu dessine (mode borne, fenêtres annexes de Future Pinball) : laissés au jeu (game-screens.ts).
     // Le DMD recopié par dmdext (Future Pinball) compte comme une fenêtre du jeu : l'écran DMD lui est laissé.
-    watchOccupied(simulated?.split(',').filter((r): r is RoleId => ROLES.some((x) => x.id === r)), simulated === undefined ? { name: zenName, pids: () => [game.pid, dmdMirror?.pid()].filter((p): p is number => p !== undefined) } : undefined);
+    watchOccupied(simulated?.split(',').filter((r): r is RoleId => ROLES.some((x) => x.id === r)), simulated === undefined ? { name: zenName, pids: () => [game.pid, dmdMirror?.pid(), ...pupPids()].filter((p): p is number => p !== undefined) } : undefined);
     broadcast();
     if (autoStopAfterMs) setTimeout(() => game.stop(), autoStopAfterMs);
   };
@@ -4990,12 +4991,20 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   const dmdMirror = simulated === undefined && command && fp?.dmdMirror ? startDmdMirror(fp.dmdMirror, (line) => console.log(line)) : undefined;
   // Son DMD posé sur l'écran DMD tel qu'il est : le plein écran du jeu fait déplacer des écrans par Windows,
   // la place écrite dans DmdDevice.ini tombait alors hors de tout écran (PinCab, 20/11/2026).
-  const dmdMirrorWatch = dmdMirror
-    ? setInterval(() => {
-        const placed = placeDmdMirror(dmdMirror.pid(), roleRects.find((r) => r.role === 'dmd')?.rect, () => listWindows((w) => w.visible), setWindowBounds);
-        if (placed) console.log(`${zenName} (${table.id}) : DMD recopié posé sur l'écran DMD (${placed.x}, ${placed.y}, ${placed.width} × ${placed.height}).`); // i18n-ignore : journal
-      }, 1000)
-    : undefined;
+  // Les fenêtres de PinUP Player (PuP-Pack joué par une table « PinEvent ») aussi, chacune sur l'écran de son
+  // rôle : son PinUpPlayer.ini les place d'après une autre disposition des écrans (PinCab, 20/11/2026).
+  const pupPids = (): number[] => (fp && simulated === undefined ? processIdsByName(PINUP_DISPLAY_EXE) : []);
+  const dmdMirrorWatch =
+    simulated === undefined && command && fp
+      ? setInterval(() => {
+          const stack = () => listWindows((w) => w.visible);
+          const placed = dmdMirror ? placeDmdMirror(dmdMirror.pid(), roleRects.find((r) => r.role === 'dmd')?.rect, stack, setWindowBounds) : undefined;
+          if (placed) console.log(`${zenName} (${table.id}) : DMD recopié posé sur l'écran DMD (${placed.x}, ${placed.y}, ${placed.width} × ${placed.height}).`); // i18n-ignore : journal
+          for (const p of placePupWindows(pupPids(), (role) => roleRects.find((r) => r.role === role)?.rect, stack, setWindowBounds)) {
+            console.log(`${zenName} (${table.id}) : fenêtre ${p.title} de PinUP Player posée sur son écran (${p.to.x}, ${p.to.y}, ${p.to.width} × ${p.to.height}).`); // i18n-ignore : journal
+          }
+        }, 1000)
+      : undefined;
   // Pinball FX : son DMD envoyé à dmdext (ExternalDevice, DmdDevice64.dll de VPinMAME : colorisation, PuP-Packs)
   // s'ouvre là où DmdDevice.ini le place, sur le fronton chez un joueur (PinCab, 20/11/2026) : posé sur
   // l'écran DMD, comme le DMD recopié de Future Pinball. Une place déjà sur l'écran DMD est gardée.

@@ -147,7 +147,8 @@ test('branchement : les écrans changés reposent les fenêtres, et les jeux aut
   // Partie de Zen ou de Future Pinball : relevé des écrans par les fenêtres du processus du jeu, et de
   // dmdext qui recopie le DMD de Future Pinball sur l'écran DMD (20/11/2026).
   const zen = frontend.slice(frontend.indexOf('async function playPinballFx('), frontend.indexOf('async function play(table'));
-  assert.match(zen, /watchOccupied\([^;]*\{ name: zenName, pids: \(\) => \[game\.pid, dmdMirror\?\.pid\(\)\]\.filter\(/);
+  // … et de PinUP Player, qui joue le PuP-Pack d'une table « PinEvent » de Future Pinball (20/11/2026).
+  assert.match(zen, /watchOccupied\([^;]*\{ name: zenName, pids: \(\) => \[game\.pid, dmdMirror\?\.pid\(\), \.\.\.pupPids\(\)\]\.filter\(/);
   assert.match(zen, /stopWatchOccupied\(\)/);
   // VPX : le relevé de toujours (toute fenêtre d'un autre processus), sans jeu désigné.
   assert.match(frontend, /watchOccupied\(simulated\?\.split\(','\)\.filter\(\(r\): r is RoleId => ROLES\.some\(\(x\) => x\.id === r\)\)\);/);

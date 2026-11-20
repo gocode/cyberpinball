@@ -6,7 +6,7 @@
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
-import { dmdMirrorPlacement, findFuturePinball, FUTURE_PINBALL_NAME, FUTURE_PINBALL_PLAYER_KEY, futurePinballCommand, futurePinballDmdMirror, futurePinballGameKeys, futurePinballJoystickKeys, type NudgeSide, futurePinballPlacement, t, type ButtonsSource, type FuturePinballCommand, type FuturePinballInstall, type Rect, type TableEntry } from '@cyberpinball/core';
+import { dmdMirrorPlacement, pupScreenRole, pupWindowPlacement, findFuturePinball, FUTURE_PINBALL_NAME, FUTURE_PINBALL_PLAYER_KEY, futurePinballCommand, futurePinballDmdMirror, futurePinballGameKeys, futurePinballJoystickKeys, type NudgeSide, futurePinballPlacement, t, type ButtonsSource, type FuturePinballCommand, type FuturePinballInstall, type Rect, type TableEntry } from '@cyberpinball/core';
 import { hkcuValue, type WindowInfo } from '@cyberpinball/win-displays';
 import { FUTURE_PINBALL_BAM_LAUNCH_GAME, FUTURE_PINBALL_LAUNCH_GAME, type ZenLaunchGame } from './pinballfx-launcher';
 
@@ -158,6 +158,24 @@ export function placeVirtualDmd(dmdScreen: Rect | undefined, windows: () => Wind
   const to = dmdMirrorPlacement(dmd.rect, dmdScreen);
   if (!to) return undefined;
   return setBounds(dmd, to) ? to : undefined;
+}
+
+/**
+ * Fenêtres de PinUP Player (processus `pids`) posées chacune sur l'écran de son rôle, tel qu'il est maintenant
+ * (pupScreenRole, pupWindowPlacement) : appelé régulièrement pendant une partie de Future Pinball dont la table
+ * joue un PuP-Pack. Rend les places données (journal).
+ */
+export function placePupWindows(pids: readonly number[], roleRect: (role: 'topper' | 'backglass' | 'dmd') => Rect | undefined, windows: () => WindowInfo[], setBounds: (w: WindowInfo, r: Rect) => boolean): { title: string; to: Rect }[] {
+  if (!pids.length) return [];
+  const placed: { title: string; to: Rect }[] = [];
+  for (const w of windows()) {
+    if (!pids.includes(w.pid) || !w.visible) continue;
+    const role = pupScreenRole(w.title);
+    if (!role) continue;
+    const to = pupWindowPlacement(w.rect, roleRect(role));
+    if (to && setBounds(w, to)) placed.push({ title: w.title, to });
+  }
+  return placed;
 }
 
 /**

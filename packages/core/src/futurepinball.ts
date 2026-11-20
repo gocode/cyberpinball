@@ -209,6 +209,33 @@ export function dmdMirrorPlacement(window: Rect, dmdScreen: Rect | undefined): R
   return { x: dmdScreen.x, y: dmdScreen.y + Math.round((dmdScreen.height - height) / 2), width, height };
 }
 
+/** Exécutable de PinUP Player, le lecteur de PuP-Packs de PinUP Popper (lancé par une table « PinEvent »). */
+export const PINUP_DISPLAY_EXE = 'PinUpDisplay.exe';
+
+/**
+ * Rôle de la borne d'une fenêtre de PinUP Player, d'après son titre (« PUPSCREEN2 », « PUPOVERLAY5 ») et la
+ * numérotation des écrans de PinUP : 0 topper, 2 fronton, 5 FullDMD. undefined : autre écran (1, le petit DMD
+ * de 128 × 32 ; 3, le plateau ; 4, la musique…), laissé où il est.
+ */
+export function pupScreenRole(title: string): 'topper' | 'backglass' | 'dmd' | undefined {
+  const m = /^PUP(?:SCREEN|OVERLAY)(\d+)$/i.exec(title.trim());
+  if (!m) return undefined;
+  return ({ 0: 'topper', 2: 'backglass', 5: 'dmd' } as Record<number, 'topper' | 'backglass' | 'dmd'>)[Number(m[1])];
+}
+
+/**
+ * Place d'une fenêtre de PinUP Player pendant une partie de Future Pinball : tout l'écran de son rôle, tel
+ * qu'il est à cet instant. PinUP place ses fenêtres d'après son PinUpPlayer.ini, écrit pour une autre
+ * disposition des écrans (PinCab, 20/11/2026 : le fronton du PuP-Pack de Retroflair en (3840, 0) sur un
+ * écran de fronton en (3840, 101), au premier plan permanent : 90 % du fronton du jeu recouvert, décalé ;
+ * son DMD en (5760, 0), hors de tout écran). undefined : déjà à sa place, ou pas d'écran pour ce rôle.
+ */
+export function pupWindowPlacement(window: Rect, screen: Rect | undefined): Rect | undefined {
+  if (!screen || window.width <= 0 || window.height <= 0) return undefined;
+  const same = window.x === screen.x && window.y === screen.y && window.width === screen.width && window.height === screen.height;
+  return same ? undefined : { ...screen };
+}
+
 /** La ligne de commande telle que Windows la reçoit (journal, essais). */
 export function futurePinballCommandLine(command: Pick<FuturePinballCommand, 'file' | 'args'>): string {
   const quote = (a: string) => (/[\s"]/.test(a) ? `"${a}"` : a);

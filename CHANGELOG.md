@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.2
 
+- Future Pinball : le PuP-Pack d'une table (tables « PinEvent », comme Retroflair BAM Edition) s'affiche enfin à sa place. PinUP Player plaçait ses fenêtres d'après son propre réglage, écrit pour une autre disposition des écrans : son fronton recouvrait 90 % de celui du jeu, décalé, et son DMD tombait hors de tout écran. Pendant la partie, Cyber Pinball pose chaque fenêtre du PuP-Pack sur l'écran de son rôle (fronton, FullDMD, topper) et passe derrière elle ; le réglage de PinUP n'est pas modifié.
 - Fronton : sur l'écran des tables, l'image du fronton remplit tout son écran, comme pendant la partie (B2S de Visual Pinball, Pinball FX3). Une image plus étroite que l'écran (4:3 sur un écran 16:9) n'est plus entourée de bandes noires.
 - Pinball FX : Cyber Pinball ne dépose plus d'image de fronton dans le dossier du mode borne du jeu (Table_<numéro>.png, PFX.png) : le fronton de la borne reste celui de Cyber Pinball, le média de la table.
 - Ajout d'une table de Pinball FX ou de Pinball FX3 : l'image du catalogue de frontons de FX3 (archive.org) fait partie des choix du fronton, sans être prise d'office.

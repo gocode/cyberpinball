@@ -17,6 +17,8 @@ import {
   futurePinballCommandLine,
   futurePinballDmdMirror,
   dmdMirrorPlacement,
+  pupScreenRole,
+  pupWindowPlacement,
   futurePinballInstalledTables,
   futurePinballName,
   futurePinballPlacement,
@@ -139,6 +141,20 @@ test('DMD recopié : posé sur l’écran DMD tel qu’il est en partie ; déjà
   assert.equal(dmdMirrorPlacement({ x: 3900, y: -700, width: 1600, height: 400 }, dmdScreen), undefined);
   // Pas d'écran DMD sur cette borne : rien.
   assert.equal(dmdMirrorPlacement({ x: 5889, y: 286, width: 1661, height: 415 }, undefined), undefined);
+});
+
+test('PinUP Player : chaque fenêtre de PuP-Pack sur l’écran de son rôle tel qu’il est en partie', () => {
+  assert.equal(pupScreenRole('PUPSCREEN2'), 'backglass');
+  assert.equal(pupScreenRole('PUPOVERLAY5'), 'dmd');
+  assert.equal(pupScreenRole('PUPSCREEN0'), 'topper');
+  assert.equal(pupScreenRole('PUPSCREEN1'), undefined, 'le petit DMD de 128 × 32 reste où il est');
+  assert.equal(pupScreenRole('PUPSCREEN3'), undefined, 'le plateau aussi');
+  assert.equal(pupScreenRole('Virtual DMD'), undefined);
+  // PinCab, 20/11/2026 : fronton du PuP-Pack en (3840, 0), écran de fronton en (3840, 101) pendant la partie.
+  const backglass = { x: 3840, y: 101, width: 1920, height: 1080 };
+  assert.deepEqual(pupWindowPlacement({ x: 3840, y: 0, width: 1920, height: 1080 }, backglass), backglass);
+  assert.equal(pupWindowPlacement(backglass, backglass), undefined, 'déjà à sa place');
+  assert.equal(pupWindowPlacement({ x: 3840, y: 0, width: 1920, height: 1080 }, undefined), undefined, 'pas d’écran pour ce rôle');
 });
 
 test('BAM installé : la partie passe par BAM\\FPLoader.exe, avec la ligne des autres front-ends, depuis le dossier BAM', () => {
