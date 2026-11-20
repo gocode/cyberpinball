@@ -23,7 +23,7 @@ Windows 10 ou 11, 64 bits. Ces liens téléchargent toujours la dernière versio
 
 <p align="center"><sub>Nous suivre : <a href="https://www.facebook.com/cyberpinball.fr">les nouveautés et vos questions sur Facebook</a> · <a href="https://www.youtube.com/@cyberpinball">les tutoriels vidéo sur YouTube</a></sub></p>
 
-<p align="center"><img src="docs/images/fr/cabinet.webp?v=7cf14b1872" width="900" alt="L'écran des tables sur une borne à quatre écrans. Sur le playfield, montré à la verticale : le plateau de la table sélectionnée, la roue de médaillons ronds et les commandes. À côté, le topper et le fronton du même jeu, Neon Abyss, et le DMD animé du menu."></p>
+<p align="center"><img src="docs/images/fr/cabinet.webp?v=06110cf93f" width="900" alt="L'écran des tables sur une borne à quatre écrans. Sur le playfield, montré à la verticale : le plateau de la table sélectionnée, la roue de médaillons ronds et les commandes. À côté, le topper et le fronton du même jeu, Neon Abyss, et le DMD animé du menu."></p>
 
 <p align="center"><sub>Les tables présentées sont fictives.</sub></p>
 
@@ -120,7 +120,7 @@ Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bor
 
 ## Tout se règle depuis la borne
 
-<p align="center"><img src="docs/images/fr/wizard.webp?v=86d475eb65" width="900" alt="L'assistant de configuration, à l'étape des écrans et de leurs rôles : chacun des quatre écrans affiche son numéro, et celui du playfield demande « Playfield ? », avec les consignes pour les flippers et Start."></p>
+<p align="center"><img src="docs/images/fr/wizard.webp?v=90f21274f2" width="900" alt="L'assistant de configuration, à l'étape des écrans et de leurs rôles : chacun des quatre écrans affiche son numéro, et celui du playfield demande « Playfield ? », avec les consignes pour les flippers et Start."></p>
 
 - **Un assistant qui se suit debout, aux flippers.** Boutons (encodeur clavier, manette ou Pinscape KL25Z), lanceur analogique, accéléromètre et plomb de tilt, écrans, orientation et diagonale du playfield, sorties audio : à chaque étape, on répond avec les boutons de la borne.
 - **Des écrans reconnus, pas simplement numérotés.** Chaque écran est identifié par son empreinte EDID, et `VPinballX.ini` est réécrit à chaque démarrage. Vous pouvez remplacer un écran, les allumer dans un autre ordre ou laisser Windows tout renuméroter : le playfield reste le playfield. Un écran qui se débranche puis revient, même en pleine partie, retrouve son rôle.
@@ -129,7 +129,7 @@ Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bor
 - **Les LED et les retours de la borne (DOF).** Les contrôleurs (Pinscape, LedWiz, Teensy…) sont reconnus, la configuration du configtool s'importe d'elle-même, et vos bandes de LED adressables se décrivent à l'écran : Cyber Pinball écrit le `Cabinet.xml`, et dit ce qui empêche une LED de s'allumer.
 - **Les réglages de VPX sans toucher au `.ini`.** Tous les réglages de VPX, repris de son code source, se modifient pour l'ensemble des tables ou table par table. Le cadrage et l'emplacement du fronton, du DMD et du topper se règlent pendant la partie, depuis le menu de VPX.
 
-<p align="center"><img src="docs/images/fr/vpx-settings.webp?v=b26434761e" width="760" alt="L'écran des réglages de VPX : l'onglet Essentiels, avec la vue de la table et le son, les valeurs gérées par Cyber Pinball et l'explication du réglage sélectionné."></p>
+<p align="center"><img src="docs/images/fr/vpx-settings.webp?v=39a5059c42" width="760" alt="L'écran des réglages de VPX : l'onglet Essentiels, avec la vue de la table et le son, les valeurs gérées par Cyber Pinball et l'explication du réglage sélectionné."></p>
 
 ## Réalité virtuelle et Vision 3D (bêta)
 
@@ -153,7 +153,7 @@ Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bor
 ## Les médias de votre choix, d'où qu'ils viennent
 
 <p align="center">
-  <img src="docs/images/fr/game-page.webp?v=5bd3333057" width="360" alt="La fiche du jeu Neon Abyss : ses statistiques de jeu et ses fichiers, puis Jouer, Jouer avec un ami, Tableau des scores, Prospectus et règles, Ajouter aux favoris, Ajouter à une collection et Gérer la table.">
+  <img src="docs/images/fr/game-page.webp?v=bea681104c" width="360" alt="La fiche du jeu Neon Abyss : ses statistiques de jeu et ses fichiers, puis Jouer, Jouer avec un ami, Tableau des scores, Prospectus et règles, Ajouter aux favoris, Ajouter à une collection et Gérer la table.">
   <img src="docs/images/fr/game-media.webp?v=587ec90bc4" width="360" alt="L'écran Médias du jeu de Neon Abyss : chaque média avec son aperçu, l'endroit où le front-end l'affiche et son rôle (logo de la roue, plateau, fronton, DMD…), puis le volume de ce jeu et les actions Chercher les médias et Chercher sur le web.">
 </p>
 
@@ -180,7 +180,7 @@ Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bor
 - **Le bureau rendu tel que vous l'avez laissé.** L'écran du playfield n'est pivoté que le temps où Cyber Pinball fonctionne. À chaque fermeture, même après un plantage, il retrouve son orientation.
 - **En français ou en anglais**, au choix dans le menu système (« Language / Langue »), dates et nombres compris.
 
-<p align="center"><img src="docs/images/fr/system-menu.webp?v=5646ca729d" width="360" alt="Le menu système : Activité récente, Collections, Amis, Tables, Médias, Juke-box, Téléchargements, Télécommande du téléphone, Borne et Cyber Pinball, chacune avec un résumé de son contenu."></p>
+<p align="center"><img src="docs/images/fr/system-menu.webp?v=b036487e6b" width="360" alt="Le Menu système : Tables, Ma borne, Téléchargements, Activité récente, Communauté, Juke-box, Aide et infos, Quitter ou éteindre, chacune avec un résumé de son contenu."></p>
 
 ## Prérequis
 

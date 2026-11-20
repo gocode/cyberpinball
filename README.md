@@ -23,7 +23,7 @@ Windows 10 or 11, 64-bit. These links always fetch the latest version, straight 
 
 <p align="center"><sub>Follow us: <a href="https://www.facebook.com/cyberpinball">news and your questions on Facebook</a> · <a href="https://www.youtube.com/@cyberpinball">step-by-step video tutorials on YouTube</a></sub></p>
 
-<p align="center"><img src="docs/images/en/cabinet.webp?v=509ed89f07" width="900" alt="The table menu on a four-screen cabinet: the playfield screen, shown upright, with the selected table's playfield, the wheel of round table medallions and the button hints; next to it the topper and the backglass of the same game, Neon Abyss, and the menu's animated DMD."></p>
+<p align="center"><img src="docs/images/en/cabinet.webp?v=9bb563a1c9" width="900" alt="The table menu on a four-screen cabinet: the playfield screen, shown upright, with the selected table's playfield, the wheel of round table medallions and the button hints; next to it the topper and the backglass of the same game, Neon Abyss, and the menu's animated DMD."></p>
 
 <p align="center"><sub>Tables shown are fictional.</sub></p>
 
@@ -120,7 +120,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 
 ## Set up from the cabinet itself
 
-<p align="center"><img src="docs/images/en/wizard.webp?v=61a3eb8d13" width="900" alt="The setup wizard, screens and roles step: each of the four screens shows its number, and the playfield screen asks “Playfield?” with the flipper and Start hints."></p>
+<p align="center"><img src="docs/images/en/wizard.webp?v=6fd765b106" width="900" alt="The setup wizard, screens and roles step: each of the four screens shows its number, and the playfield screen asks “Playfield?” with the flipper and Start hints."></p>
 
 - **A wizard you follow standing at the flippers.** Buttons (keyboard encoder, gamepad or Pinscape KL25Z), analog plunger, accelerometer and tilt bob, screens, playfield orientation and diagonal, sound outputs: each step is answered with the cabinet's own buttons.
 - **Screens recognised, not numbered.** Each monitor is identified by its EDID fingerprint, and `VPinballX.ini` is rewritten at every start. Swap a monitor, wake the screens in a different order, let Windows renumber everything: the playfield stays the playfield. A screen that drops out and comes back, even mid-game, gets its role back.
@@ -129,7 +129,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 - **Cabinet LEDs and feedback (DOF).** Controllers (Pinscape, LedWiz, Teensy…) are recognised, the configtool configuration imports itself, and your addressable LED strips are described on screen: Cyber Pinball writes the `Cabinet.xml` and tells you what keeps an LED from lighting.
 - **VPX settings without the `.ini`.** Every VPX setting, read from VPX's own source code, is editable globally or table by table. Framing and the position of the backglass, DMD and topper are adjusted on the running table, from VPX's menu.
 
-<p align="center"><img src="docs/images/en/vpx-settings.webp?v=03be4e0581" width="760" alt="The VPX settings screen: the Essentials tab with table view and sound settings, the values managed by Cyber Pinball, and the description of the selected setting."></p>
+<p align="center"><img src="docs/images/en/vpx-settings.webp?v=facacf2474" width="760" alt="The VPX settings screen: the Essentials tab with table view and sound settings, the values managed by Cyber Pinball, and the description of the selected setting."></p>
 
 ## Virtual reality and 3D vision (beta)
 
@@ -153,7 +153,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 ## Media from every source, chosen by you
 
 <p align="center">
-  <img src="docs/images/en/game-page.webp?v=5a9f437c7d" width="360" alt="The game page of Neon Abyss: its play statistics and files, then Play, Play with a friend, Scoreboard, Flyer and rules, Add to favourites, Add to a collection and Manage the table.">
+  <img src="docs/images/en/game-page.webp?v=18c87f4ff4" width="360" alt="The game page of Neon Abyss: its play statistics and files, then Play, Play with a friend, Scoreboard, Flyer and rules, Add to favourites, Add to a collection and Manage the table.">
   <img src="docs/images/en/game-media.webp?v=2c9b874489" width="360" alt="The Game media screen of Neon Abyss: each media item with its preview, where the menu shows it and its role (wheel logo, playfield, backglass, DMD…), then this game's volume and the actions Find media and Search the web.">
 </p>
 
@@ -180,7 +180,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 - **The desktop put back as it was.** The playfield screen is rotated only while Cyber Pinball runs; every exit, even after a crash, restores its orientation.
 - **English or French**, chosen in the system menu ("Language / Langue"), with dates and numbers to match.
 
-<p align="center"><img src="docs/images/en/system-menu.webp?v=4606414e88" width="360" alt="The system menu: Recent activity, Collections, Friends, Tables, Media, Juke-box, Downloads, Phone remote, Cabinet and Cyber Pinball, each with what it holds."></p>
+<p align="center"><img src="docs/images/en/system-menu.webp?v=ab053aa4a7" width="360" alt="The system menu: Tables, My cabinet, Downloads, Recent activity, Community, Juke-box, Help and info, Quit or shut down, each with what it holds."></p>
 
 ## Requirements
 

@@ -4,7 +4,7 @@
 
 Le [README](../README.fr.md) présente Cyber Pinball en quelques images. Cette page détaille tout ce qu'il sait faire, rubrique par rubrique, tel que vous le trouvez sur la borne. Pour le fonctionnement interne (fichiers écrits, commandes, essais), voyez le [manuel technique](manuel.md).
 
-<p align="center"><img src="images/fr/cabinet.webp?v=7cf14b1872" width="900" alt="L'écran des tables sur une borne à quatre écrans. Sur le playfield, montré à la verticale : le plateau de la table sélectionnée, la roue de médaillons ronds et les commandes. À côté, le topper et le fronton du même jeu, Neon Abyss, et le DMD animé du front-end."></p>
+<p align="center"><img src="images/fr/cabinet.webp?v=06110cf93f" width="900" alt="L'écran des tables sur une borne à quatre écrans. Sur le playfield, montré à la verticale : le plateau de la table sélectionnée, la roue de médaillons ronds et les commandes. À côté, le topper et le fronton du même jeu, Neon Abyss, et le DMD animé du front-end."></p>
 
 <p align="center"><sub>Les tables présentées sont fictives.</sub></p>
 
@@ -50,7 +50,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 <p align="center"><img src="images/fr/friends.webp?v=8306cc0c9e" width="760" alt="Mes amis : Bruno en ligne, en partie sur Star Courier avec son nouveau record, et Émile hors ligne ; à côté, la fiche de Bruno avec ses derniers événements et « Voir sa bibliothèque »."></p>
 
 <p align="center">
-  <img src="images/fr/features/friends-section.webp?v=e38b02af5d" width="300" alt="La rubrique Amis : Messages, Mes amis, Mon avatar, Mon profil public, Historique des parties, Trouver un joueur, Demandes d'amis, Mes badges, Partage et réseau, Scores des amis pendant la partie, Masquer les notifications pendant les parties.">
+  <img src="images/fr/features/friends-section.webp?v=dbd12fdd53" width="300" alt="La rubrique Communauté : Mon profil, Joueurs en ligne, Parties instantanées, Mes amis, Messages, Groupes et salons, Classements, Réglages de la communauté.">
   <img src="images/fr/features/badges.webp?v=3c2118215f" width="300" alt="Mes badges, 4 sur 8 : Première partie, Cent parties, Une heure sur une table et Dix heures de jeu obtenus ; Dix tables, Au tableau d'honneur, Grand Champion et Cinq fois champion à obtenir.">
 </p>
 
@@ -178,13 +178,13 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 - **Versions reçues** : versions finales (par défaut) ou préversions aussi ; pour qui maintient Cyber Pinball, les essais d'un canal privé, que seules ses bornes voient.
 - **« Nous suivre »** (Menu système > Aide et infos) : la page Facebook, en français ou en anglais selon la langue de la borne, les tutoriels vidéo sur YouTube, et GitHub. Le QR code de la ligne choisie l'ouvre sur le téléphone, Start dans le navigateur intégré.
 
-<p align="center"><img src="images/fr/update.webp?v=678c1b367b" width="360" alt="Une mise à jour disponible : Cyber Pinball 0.2.0, sa date, ses nouveautés, la taille de l'installeur signé, et les boutons Mettre à jour maintenant et Plus tard."></p>
+<p align="center"><img src="images/fr/update.webp?v=8f09b7c09d" width="360" alt="Une mise à jour disponible : Cyber Pinball 0.3.0, sa date, ses nouveautés, la taille de l'installeur signé, et les boutons Mettre à jour maintenant et Plus tard."></p>
 
 ## Configurer la borne
 
 Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu système > « Ma borne » > « Configuration de la borne » refait chacune à part : elle ne change que ses propres réglages.
 
-<p align="center"><img src="images/fr/wizard.webp?v=86d475eb65" width="900" alt="L'assistant, étape Écrans et rôles : chaque écran affiche son numéro, et le playfield demande « Playfield ? » avec les commandes des flippers et de Start."></p>
+<p align="center"><img src="images/fr/wizard.webp?v=90f21274f2" width="900" alt="L'assistant, étape Écrans et rôles : chaque écran affiche son numéro, et le playfield demande « Playfield ? » avec les commandes des flippers et de Start."></p>
 
 <p align="center">
   <img src="images/fr/features/cabinet-setup.webp?v=94f106b884" width="300" alt="Configuration de la borne : chaque étape se refait seule, des boutons du jeu au son de la borne, avec l'assistant complet et les touches par défaut des encodeurs.">
@@ -397,7 +397,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Une icône par menu**, dessinée pour Cyber Pinball.
 - **Sélecteur de fichiers intégré**, à la place de celui de Windows : téléchargements, dossier d'import, Bureau, clés USB et disques, aux boutons, à la souris ou au clavier.
 
-<p align="center"><img src="images/fr/system-menu.webp?v=5646ca729d" width="360" alt="Le menu système : Activité récente, Collections, Amis, Tables, Médias, Juke-box, Téléchargements, Télécommande du téléphone, Borne et Cyber Pinball, chacune avec un résumé de son contenu."></p>
+<p align="center"><img src="images/fr/system-menu.webp?v=b036487e6b" width="360" alt="Le Menu système : Tables, Ma borne, Téléchargements, Activité récente, Communauté, Juke-box, Aide et infos, Quitter ou éteindre, chacune avec un résumé de son contenu."></p>
 
 <p align="center"><img src="images/fr/features/controls.webp?v=b76db12917" width="360" alt="L'aide-mémoire des commandes : dans le front-end (choisir une table, fiche, réglages de VPX, bureau Windows, partie bloquée) et pendant une partie (flippers, lanceur, crédit, MagnaSave, pause, tilt, volume)."></p>
 
@@ -493,7 +493,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **« Prospectus et règles »** : un seul livret, page par page, tourné pour le joueur. Les règles se trouvent seules : la carte et le texte rangés dans la table, une feuille de règles publique (The Pinball Primer, Pinball Rule Sheets), une vidéo d'explication à regarder sur le téléphone ; les commandes de la partie viennent toujours en dernier. Pour une dizaine de tables, un guide du jeu ouvre le livret : le but, puis un objectif par page, avec les coups numérotés sur le plateau et les tirs depuis les flippers.
 - **« Diagnostiquer et réparer »** : le diagnostic de la table (voir [Une borne qui s'entretient](#une-borne-qui-sentretient)).
 
-<p align="center"><img src="images/fr/game-page.webp?v=5bd3333057" width="360" alt="La fiche du jeu Neon Abyss : ses statistiques de jeu et ses fichiers, puis Jouer, Jouer avec un ami, Tableau des scores, Prospectus et règles, Ajouter aux favoris, Ajouter à une collection et Gérer la table."></p>
+<p align="center"><img src="images/fr/game-page.webp?v=bea681104c" width="360" alt="La fiche du jeu Neon Abyss : ses statistiques de jeu et ses fichiers, puis Jouer, Jouer avec un ami, Tableau des scores, Prospectus et règles, Ajouter aux favoris, Ajouter à une collection et Gérer la table."></p>
 
 <p align="center">
   <img src="images/fr/features/all-tables.webp?v=4edcfce892" width="300" alt="Toutes les tables : les sept tables avec leur fabricant, leur année et leur nombre de parties.">
@@ -541,7 +541,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **« Régler l'affichage en partie »** sur la fiche : la table démarre sur le cadrage (point de vue, fronton, DMD, topper), et cette partie ne compte pas dans les statistiques.
 - **Les questions de VPX évitées** (ActiveX, casque VR) ; une boîte de dialogue de VPX arrête la partie et son texte devient le message à l'écran.
 
-<p align="center"><img src="images/fr/vpx-settings.webp?v=b26434761e" width="760" alt="Les réglages de VPX : l'onglet Essentiels avec les réglages de la vue et du son, les valeurs gérées par Cyber Pinball, et le détail du réglage choisi."></p>
+<p align="center"><img src="images/fr/vpx-settings.webp?v=39a5059c42" width="760" alt="Les réglages de VPX : l'onglet Essentiels avec les réglages de la vue et du son, les valeurs gérées par Cyber Pinball, et le détail du réglage choisi."></p>
 
 ## Médias des jeux
 

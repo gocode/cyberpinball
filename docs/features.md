@@ -4,7 +4,7 @@ English · [Français](fonctionnalites.md)
 
 The [README](../README.md) introduces Cyber Pinball in a few pictures. This page lists everything it does, section by section, as you find it on the cabinet. For the inner workings (files written, commands, tests), see the [technical manual](manual.md).
 
-<p align="center"><img src="images/en/cabinet.webp?v=509ed89f07" width="900" alt="The table menu on a four-screen cabinet: the playfield screen, shown upright, with the selected table's playfield, the wheel of round table medallions and the button hints; next to it the topper and the backglass of the same game, Neon Abyss, and the menu's animated DMD."></p>
+<p align="center"><img src="images/en/cabinet.webp?v=9bb563a1c9" width="900" alt="The table menu on a four-screen cabinet: the playfield screen, shown upright, with the selected table's playfield, the wheel of round table medallions and the button hints; next to it the topper and the backglass of the same game, Neon Abyss, and the menu's animated DMD."></p>
 
 <p align="center"><sub>Tables shown are fictional.</sub></p>
 
@@ -50,7 +50,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 <p align="center"><img src="images/en/friends.webp?v=9353564220" width="760" alt="My friends: Bruno online, playing Star Courier with his new high score, and Émile offline; next to it, Bruno's page with his latest events and See their library."></p>
 
 <p align="center">
-  <img src="images/en/features/friends-section.webp?v=e5c1ff7c24" width="300" alt="The Friends section: Messages, My friends, My avatar, My public profile, Game history, Find a player, Friend requests, My badges, Sharing and network, Friends' scores during the game, Hide notifications during games.">
+  <img src="images/en/features/friends-section.webp?v=461559af82" width="300" alt="The Community section: My profile, Players online, Instant games, My friends, Messages, Groups and rooms, Leaderboards, Community settings.">
   <img src="images/en/features/badges.webp?v=b6caa8b6b3" width="300" alt="My badges, 4 of 8: First game, A hundred games, An hour on one table and Ten hours of play earned; Ten tables, On the high-score board, Grand Champion and Five-time champion still to earn.">
 </p>
 
@@ -178,13 +178,13 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 - **Versions received**: final versions (the default) or pre-releases too; for whoever maintains Cyber Pinball, tests from a private channel that only their own cabinets see.
 - **"Follow us"** (System menu > Help and info): the Facebook page, in French or English depending on the cabinet's language, the video tutorials on YouTube, and GitHub. The QR code of the chosen line opens it on the phone, Start in the built-in browser.
 
-<p align="center"><img src="images/en/update.webp?v=fa0c1e19dd" width="360" alt="An update is available: Cyber Pinball 0.2.0, its release date, what's new, the size of the signed installer, and the Update now and Later buttons."></p>
+<p align="center"><img src="images/en/update.webp?v=260d468578" width="360" alt="An update is available: Cyber Pinball 0.3.0, its release date, what's new, the size of the signed installer, and the Update now and Later buttons."></p>
 
 ## Set up the cabinet
 
 On first start, the wizard runs through every step. Afterwards, System menu > "My cabinet" > "Cabinet setup" runs each one on its own: it only changes its own settings.
 
-<p align="center"><img src="images/en/wizard.webp?v=61a3eb8d13" width="900" alt="The setup wizard, Screens and roles step: each screen shows its number, and the playfield asks “Playfield?” with the flipper and Start hints."></p>
+<p align="center"><img src="images/en/wizard.webp?v=6fd765b106" width="900" alt="The setup wizard, Screens and roles step: each screen shows its number, and the playfield asks “Playfield?” with the flipper and Start hints."></p>
 
 <p align="center">
   <img src="images/en/features/cabinet-setup.webp?v=c62c848439" width="300" alt="Cabinet setup: each step can be run on its own, from the game buttons to the cabinet sound, with the full wizard and the encoders' default keys.">
@@ -397,7 +397,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "M
 - **An icon for every menu**, drawn for Cyber Pinball.
 - **A built-in file picker**, in place of Windows': downloads, the import folder, the Desktop, USB sticks and drives, from the buttons, the mouse or the keyboard.
 
-<p align="center"><img src="images/en/system-menu.webp?v=4606414e88" width="360" alt="The system menu: Recent activity, Collections, Friends, Tables, Media, Juke-box, Downloads, Phone remote, Cabinet and Cyber Pinball, each with what it holds."></p>
+<p align="center"><img src="images/en/system-menu.webp?v=ab053aa4a7" width="360" alt="The system menu: Tables, My cabinet, Downloads, Recent activity, Community, Juke-box, Help and info, Quit or shut down, each with what it holds."></p>
 
 <p align="center"><img src="images/en/features/controls.webp?v=6415a94deb" width="360" alt="The controls cheat sheet: in the menu (choose a table, game page, VPX settings, Windows desktop, stuck game) and during a game (flippers, plunger, coin, MagnaSave, pause, tilt, volume)."></p>
 
@@ -493,7 +493,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "M
 - **"Flyer and rules"**: a single booklet, page by page, turned for the player. The rules are found automatically: the card and text stored in the table, a public rulesheet (The Pinball Primer, Pinball Rule Sheets), a tutorial video to watch on the phone; the game controls always come last. For about ten tables, a game guide opens the booklet: the goal, then one objective per page, with the shots numbered on the playfield and the shots from the flippers.
 - **"Diagnose and fix"**: the table diagnosis (see [A cabinet that looks after itself](#a-cabinet-that-looks-after-itself)).
 
-<p align="center"><img src="images/en/game-page.webp?v=5a9f437c7d" width="360" alt="The game page of Neon Abyss: its play statistics and files, then Play, Play with a friend, Scoreboard, Flyer and rules, Add to favourites, Add to a collection and Manage the table."></p>
+<p align="center"><img src="images/en/game-page.webp?v=18c87f4ff4" width="360" alt="The game page of Neon Abyss: its play statistics and files, then Play, Play with a friend, Scoreboard, Flyer and rules, Add to favourites, Add to a collection and Manage the table."></p>
 
 <p align="center">
   <img src="images/en/features/all-tables.webp?v=14d154367e" width="300" alt="All tables: the seven tables with their manufacturer, year and number of games played.">
@@ -541,7 +541,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "M
 - **"Adjust display in game"** on a table's page: the table starts on its framing (point of view, backglass, DMD, topper), and that game doesn't count in the statistics.
 - **VPX's questions avoided** (ActiveX, VR headset); a VPX dialog box stops the game and its text becomes the on-screen message.
 
-<p align="center"><img src="images/en/vpx-settings.webp?v=03be4e0581" width="760" alt="The VPX settings screen: the Essentials tab with table view and sound settings, the values managed by Cyber Pinball, and the description of the selected setting."></p>
+<p align="center"><img src="images/en/vpx-settings.webp?v=facacf2474" width="760" alt="The VPX settings screen: the Essentials tab with table view and sound settings, the values managed by Cyber Pinball, and the description of the selected setting."></p>
 
 ## Game media
 

@@ -7,6 +7,8 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.2.3
+
 ## 0.2.2
 
 - A game paced by a screen slower than the playfield (backglass at 50 or 60 Hz with a 120 Hz playfield) is no longer reported as "The table is sluggish": the diagnosis names the screen that limits the game and says how to raise its refresh rate. VPX 10.8.1 draws all its screens at the pace of the slowest one.
