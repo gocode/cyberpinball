@@ -199,6 +199,7 @@ export * from './friendlibrary';
 export * from './livegame';
 export * from './instantgames';
 export * from './chat';
+export * from './citations';
 export * from './groups';
 export * from './reactions';
 export * from './publicprofile';

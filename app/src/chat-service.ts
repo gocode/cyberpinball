@@ -32,6 +32,8 @@ import {
   toWire,
   verifyWire,
   writeLine,
+  quoteOf,
+  type QuoteRef,
   createTypingBoard,
   createTypingSender,
   type TypingSender,
@@ -63,8 +65,12 @@ export interface ChatServiceOptions {
 
 export interface ChatService {
   state(): ChatState;
-  /** Écrire à un ami : le message part s'il est relié, attend sinon ; false si le texte est vide ou trop long, ou si la messagerie est coupée. */
-  send(key: string, text: string): boolean;
+  /**
+   * Écrire à un ami : le message part s'il est relié, attend sinon ; false si le texte est vide ou trop
+   * long, ou si la messagerie est coupée. `reply` : l'identifiant du message auquel je réponds, encore
+   * dans la conversation (sa citation part avec, citations.ts).
+   */
+  send(key: string, text: string, reply?: string): boolean;
   /** Réagir à un message (son id) ; null : retirer ma réaction. */
   react(key: string, target: string, kind: ChatReaction | null): boolean;
   /** Supprimer mon message (son id) : ici, et chez l'ami dès que sa borne reçoit le retrait ; false si ce n'est pas un des miens. */
@@ -211,6 +217,16 @@ export function createChatService(opts: ChatServiceOptions): ChatService {
     }
   });
 
+  /** La citation d'un message de la conversation (le mien ou le sien) ; undefined s'il n'y est plus. */
+  function quoteFor(key: string, id: string): QuoteRef | undefined {
+    const original = state.conversations[key]?.lines.find((l) => l.id === id && l.text);
+    if (!original) return undefined;
+    const s = opts.net.state();
+    const by = original.out ? s.key.publicKey : key;
+    const name = original.out ? s.name : (s.friends.find((f) => f.key === key)?.name ?? '');
+    return quoteOf({ id: original.id, by, name, text: original.text! });
+  }
+
   function write(key: string, content: Parameters<typeof writeLine>[3]): boolean {
     if (!state.enabled || !isFriend(key)) return false;
     const r = writeLine(state, me(), key, content, now());
@@ -222,7 +238,10 @@ export function createChatService(opts: ChatServiceOptions): ChatService {
 
   return {
     state: () => state,
-    send: (key, text) => write(key, { text }),
+    send: (key, text, reply) => {
+      const quote = reply ? quoteFor(key, reply) : undefined;
+      return write(key, quote ? { text, reply: quote } : { text });
+    },
     react: (key, target, kind) => write(key, { react: { target, kind } }),
     remove: (key, target) => {
       const r = deleteMine(state, me(), key, target, now());

@@ -480,9 +480,11 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
         if (table) brunoGroups.setWeek(g, presenceTable(table));
         const [kikoG, ressortG, doraG] = memberGroups;
         await until('le groupe chez Kiko et Ressort', () => !!kikoG!.view(g)?.week && !!ressortG!.view(g)?.week); // i18n-ignore : journal
-        kikoG!.send(g, 'Qui bat mon 48 M ce soir ?'); // i18n-ignore : message d'un joueur fictif
+        kikoG!.send(g, 'Qui bat mon 48 M ce soir ?\nJ’ai enfin tenu le multibille jusqu’au bout, la rampe de gauche m’a sauvé trois fois.\nÀ vous de jouer.'); // i18n-ignore : message d'un joueur fictif
         await sleep(3200);
-        ressortG!.send(g, 'Partie à trois à 22 h ? Je lance la table'); // i18n-ignore : message d'un joueur fictif
+        // Ressort répond à Kiko en le citant, et mentionne Bruno (citations.ts).
+        const kikoFirst = ressortG!.view(g)?.messages.find((l) => l.by === kiko!.state().key.publicKey);
+        ressortG!.send(g, '@Bruno partie à trois à 22 h ? Je lance la table', kikoFirst?.id); // i18n-ignore : message d'un joueur fictif
         await sleep(3200);
         const kikoLine = brunoGroups.view(g)?.messages.find((l) => l.by === kiko!.state().key.publicKey);
         if (kikoLine) brunoGroups.react(g, kikoLine.id, 'haha');
@@ -513,8 +515,11 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
         }
         // La borne arrivée : Bruno lui souhaite la bienvenue.
         await until('arrivée de la borne', () => !!brunoGroups.view(g)?.members.some((m) => m.key === me.key), 180_000); // i18n-ignore : journal
-        await sleep(1500);
-        brunoGroups.send(g, `Bienvenue ${me.name} ! On se fait la table de la semaine ce soir ?`); // i18n-ignore : message d'un joueur fictif
+        // Le temps que la borne quitte le groupe (sa notification de mention se voit alors) ; Bruno lui
+        // souhaite la bienvenue en la mentionnant, en réponse à Ressort.
+        await sleep(env.CYBERPINBALL_DEMO_MENTION_MS ? Number(env.CYBERPINBALL_DEMO_MENTION_MS) : 1500);
+        const ressortLast = brunoGroups.view(g)?.messages.filter((l) => l.by === ressort!.state().key.publicKey).at(-1);
+        brunoGroups.send(g, `Bienvenue @${me.name} ! On se fait la table de la semaine ce soir ?`, ressortLast?.id); // i18n-ignore : message d'un joueur fictif
       } catch (error) {
         log(`Réseau simulé : scénario des groupes interrompu (${(error as Error).message}).`); // i18n-ignore : journal
       }

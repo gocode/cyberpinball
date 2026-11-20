@@ -74,12 +74,12 @@ export type ActivityAct =
   | { type: 'room'; id: string };
 
 /** Les messages : une ligne par conversation et par jour (repeatKey), lue avec sa conversation (markThreadRead). */
-export const ACTIVITY_MESSAGE_KINDS: ReadonlySet<ActivityKind> = new Set<ActivityKind>(['friend-message', 'group-message', 'room-mention']);
+export const ACTIVITY_MESSAGE_KINDS: ReadonlySet<ActivityKind> = new Set<ActivityKind>(['friend-message', 'group-message', 'group-mention', 'room-mention']);
 
 /** La conversation d'une ligne de messages : la clé de l'ami, l'identifiant du groupe ou du salon. */
 export function activityThread(e: Pick<ActivityFacts, 'player' | 'thread' | 'subject' | 'key'> & { kind: ActivityKind }): string | undefined {
   if (e.kind === 'friend-message') return e.player;
-  if (e.kind === 'group-message' || e.kind === 'room-mention') return e.thread;
+  if (e.kind === 'group-message' || e.kind === 'group-mention' || e.kind === 'room-mention') return e.thread;
   return undefined;
 }
 
@@ -144,6 +144,7 @@ function repeatKey(kind: ActivityKind, f: ActivityFacts): string | undefined {
     case 'friend-message':
       return f.player ?? f.who ?? f.key;
     case 'group-message':
+    case 'group-mention':
     case 'room-mention':
       return f.thread ?? (typeof f.subject === 'string' ? f.subject : JSON.stringify(f.subject ?? f.key));
     default:
@@ -277,8 +278,10 @@ export function markActivityRead(log: ActivityLog, ids?: readonly string[]): boo
  */
 export function markThreadRead(log: ActivityLog, kind: 'friend-message' | 'group-message' | 'room-mention', thread: string): boolean {
   let changed = false;
+  // Lire la discussion d'un groupe lit aussi ses mentions.
+  const kinds: readonly ActivityKind[] = kind === 'group-message' ? ['group-message', 'group-mention'] : [kind];
   for (const e of log.entries) {
-    if (e.read || e.kind !== kind || activityThread(e) !== thread) continue;
+    if (e.read || !kinds.includes(e.kind) || activityThread(e) !== thread) continue;
     e.read = true;
     changed = true;
   }
@@ -333,6 +336,7 @@ export function activityText(e: ActivityEntry): { title: string; detail?: string
       if (kind === 'friend-message') return { title: tn(e.count, '{n} message de {name}', '{n} messages de {name}', { name }), ...(last ? { detail: last } : {}) };
       if (kind === 'group-message') return { title: tn(e.count, '{n} message · {group}', '{n} messages · {group}', { group: place }), ...(last ? { detail: t('{name} : {text}', { name, text: last }) } : {}) };
       if (kind === 'room-mention') return { title: tn(e.count, '{n} mention · {room}', '{n} mentions · {room}', { room: place }), ...(last ? { detail: t('{name} : {text}', { name, text: last }) } : {}) };
+      if (kind === 'group-mention') return { title: tn(e.count, '{n} mention · {group}', '{n} mentions · {group}', { group: place }), ...(last ? { detail: t('{name} : {text}', { name, text: last }) } : {}) };
     }
     return text;
   }
@@ -376,6 +380,7 @@ export function activityAct(e: ActivityEntry): ActivityAct | undefined {
     case 'friend-message':
       return e.player ? { type: 'chat', key: e.player } : e.item ? { type: 'system', item: e.item } : undefined;
     case 'group-message':
+    case 'group-mention':
       return e.thread ? { type: 'group', id: e.thread } : e.item ? { type: 'system', item: e.item } : undefined;
     case 'room-mention':
       return e.thread ? { type: 'room', id: e.thread } : e.item ? { type: 'system', item: e.item } : undefined;

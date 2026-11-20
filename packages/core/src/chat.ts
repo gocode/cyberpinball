@@ -23,6 +23,7 @@ import { writeFileAtomic } from './atomicwrite';
 import { signText, verifyText, type PlayerKey } from './sharing';
 import { t } from './i18n';
 import { isReaction, REACTION_EMOJI, REACTIONS, reactionText, type Reaction } from './reactions';
+import { parseExtras, quoteView, signExtras, verifyExtras, type MessageExtras, type QuoteRef, type QuoteView } from './citations';
 
 /** Longueur d'un message, en caractères (émojis compris : un émoji compte pour un). */
 export const CHAT_TEXT_MAX = 500;
@@ -95,6 +96,13 @@ export interface ChatLine {
   delivery?: ChatDelivery;
   /** Signature de l'auteur, gardée telle quelle pour pouvoir renvoyer le message. */
   sig?: string;
+  /**
+   * Réponse en citant (citations.ts, 20/11/2026) : le message cité. Porté par une extension signée à
+   * part (`xs`) : une borne d'avant l'ignore et affiche le texte seul.
+   */
+  reply?: QuoteRef;
+  /** Signature de l'extension, gardée pour renvoyer le message. */
+  xs?: string;
 }
 
 export interface Conversation {
@@ -152,7 +160,9 @@ function parseLine(raw: unknown): ChatLine | undefined {
   if ([text, react, del].filter(Boolean).length !== 1) return undefined;
   const delivery = r.delivery === 'pending' || r.delivery === 'received' || r.delivery === 'expired' ? r.delivery : undefined;
   const sig = typeof r.sig === 'string' && r.sig.length <= 200 ? r.sig : undefined;
-  return { id: r.id, at: r.at, out: r.out, ...(text ? { text } : {}), ...(react ? { react } : {}), ...(del ? { del } : {}), ...(r.out && delivery ? { delivery } : {}), ...(sig ? { sig } : {}) };
+  // La citation, gardée avec sa signature (vérifiée à l'arrivée) ; seulement sur un message.
+  const reply = text && typeof r.xs === 'string' && r.xs.length <= 200 ? parseExtras({ reply: r.reply })?.reply : undefined;
+  return { id: r.id, at: r.at, out: r.out, ...(text ? { text } : {}), ...(react ? { react } : {}), ...(del ? { del } : {}), ...(r.out && delivery ? { delivery } : {}), ...(sig ? { sig } : {}), ...(reply ? { reply, xs: r.xs as string } : {}) };
 }
 
 export function loadChat(dataDir: string): ChatState {
@@ -203,6 +213,9 @@ export interface ChatWire {
   react?: { target: string; kind: ChatReaction | null };
   del?: string;
   sig: string;
+  /** Extension (citations.ts) et sa signature : la citation ; ignorées par une borne d'avant. */
+  x?: MessageExtras;
+  xs?: string;
 }
 
 /** Messages de la messagerie entre deux bornes amies. */
@@ -230,7 +243,9 @@ export function parseChatMessage(m: Record<string, unknown>): ChatMessage | unde
         const react = re && typeof re === 'object' && isChatId(re.target) && (re.kind === null || isChatReaction(re.kind)) ? { target: re.target, kind: re.kind as ChatReaction | null } : undefined;
         const del = isChatId(r.del) ? r.del : undefined;
         if ([text, react, del].filter(Boolean).length !== 1) continue;
-        lines.push({ id: r.id, at: r.at, ...(text ? { text } : {}), ...(react ? { react } : {}), ...(del ? { del } : {}), sig: r.sig });
+        // L'extension n'est gardée que sur un message, avec sa signature (vérifiée par verifyWire).
+        const x = text && typeof r.xs === 'string' && r.xs.length <= 200 ? parseExtras(r.x) : undefined;
+        lines.push({ id: r.id, at: r.at, ...(text ? { text } : {}), ...(react ? { react } : {}), ...(del ? { del } : {}), sig: r.sig, ...(x ? { x, xs: r.xs as string } : {}) });
       }
       return lines.length ? { t: 'chat', m: lines } : undefined;
     }
@@ -247,15 +262,27 @@ export function parseChatMessage(m: Record<string, unknown>): ChatMessage | unde
 
 /** La ligne prête à partir vers `to`. */
 export function toWire(line: ChatLine): ChatWire {
-  return { id: line.id, at: line.at, ...(line.text ? { text: line.text } : {}), ...(line.react ? { react: line.react } : {}), ...(line.del ? { del: line.del } : {}), sig: line.sig ?? '' };
+  return {
+    id: line.id,
+    at: line.at,
+    ...(line.text ? { text: line.text } : {}),
+    ...(line.react ? { react: line.react } : {}),
+    ...(line.del ? { del: line.del } : {}),
+    sig: line.sig ?? '',
+    ...(line.reply && line.xs ? { x: { reply: line.reply }, xs: line.xs } : {}),
+  };
 }
 
-/** Une ligne reçue de `from` (vérifiée par la clé de la connexion) ; undefined : signature fausse. */
+/**
+ * Une ligne reçue de `from` (vérifiée par la clé de la connexion) ; undefined : signature fausse. Une
+ * citation mal signée tombe seule : le message reste.
+ */
 export function verifyWire(wire: ChatWire, from: string, me: string, now = new Date()): ChatLine | undefined {
   if (!verifyText(lineText(from, me, wire), wire.sig, from)) return undefined;
   // Une date dans le futur passerait devant tout le fil : ramenée à maintenant.
   const at = Date.parse(wire.at) > now.getTime() + 10 * 60_000 ? now.toISOString() : wire.at;
-  return { id: wire.id, at, out: false, ...(wire.text ? { text: wire.text } : {}), ...(wire.react ? { react: wire.react } : {}), ...(wire.del ? { del: wire.del } : {}), sig: wire.sig };
+  const reply = wire.text && wire.x ? verifyExtras({ kind: 'chat', from, to: me }, wire.id, wire.x, wire.xs)?.reply : undefined;
+  return { id: wire.id, at, out: false, ...(wire.text ? { text: wire.text } : {}), ...(wire.react ? { react: wire.react } : {}), ...(wire.del ? { del: wire.del } : {}), sig: wire.sig, ...(reply ? { reply, xs: wire.xs! } : {}) };
 }
 
 // ---------------------------------------------------------------------------
@@ -265,12 +292,17 @@ const conv = (s: ChatState, key: string): Conversation => s.conversations[key] ?
 const withConv = (s: ChatState, key: string, c: Conversation): ChatState => ({ ...s, conversations: { ...s.conversations, [key]: c } });
 const newId = () => randomBytes(8).toString('hex');
 
-/** J'écris à `to` : la ligne signée, en attente jusqu'à l'accusé de sa borne. */
-export function writeLine(s: ChatState, me: PlayerKey, to: string, content: { text: string } | { react: { target: string; kind: ChatReaction | null } } | { del: string }, now = new Date()): { state: ChatState; line?: ChatLine } {
+/**
+ * J'écris à `to` : la ligne signée, en attente jusqu'à l'accusé de sa borne. `reply` : la citation du
+ * message auquel je réponds (quoteOf), signée à part (citations.ts).
+ */
+export function writeLine(s: ChatState, me: PlayerKey, to: string, content: { text: string; reply?: QuoteRef } | { react: { target: string; kind: ChatReaction | null } } | { del: string }, now = new Date()): { state: ChatState; line?: ChatLine } {
   const text = 'text' in content ? cleanChatText(content.text) : undefined;
   if ('text' in content && !text) return { state: s };
   const base = { id: newId(), at: now.toISOString(), ...(text ? { text } : {}), ...('react' in content ? { react: content.react } : {}), ...('del' in content ? { del: content.del } : {}) };
-  const line: ChatLine = { ...base, out: true, delivery: 'pending', sig: signText(lineText(me.publicKey, to, base), me) };
+  const reply = 'text' in content && content.reply ? parseExtras({ reply: content.reply })?.reply : undefined;
+  const extras = reply ? { reply, xs: signExtras({ kind: 'chat', from: me.publicKey, to }, base.id, { reply }, me) } : {};
+  const line: ChatLine = { ...base, out: true, delivery: 'pending', sig: signText(lineText(me.publicKey, to, base), me), ...extras };
   const c = conv(s, to);
   return { state: withConv(s, to, { ...c, lines: [...c.lines, line].slice(-CHAT_LINES_MAX) }), line };
 }
@@ -407,6 +439,17 @@ export function reactionsOf(c: Conversation): Map<string, { mine?: ChatReaction;
 /** Les messages du fil (les réactions sont portées par le message qu'elles visent). */
 export function threadLines(c: Conversation): ChatLine[] {
   return c.lines.filter((l) => l.text);
+}
+
+/**
+ * La citation d'un message du fil, telle qu'elle s'affiche (citations.ts, quoteView) : l'original encore
+ * dans la conversation fait foi ; supprimé (son retrait est resté), ou plus là, l'extrait gardé.
+ * `nameOf` : le pseudo à montrer pour un message à moi (`out`) ou à l'ami.
+ */
+export function chatQuoteView(c: Conversation, reply: QuoteRef, nameOf: (out: boolean) => string): QuoteView {
+  const original = c.lines.find((l) => l.id === reply.id && l.text);
+  const deleted = c.lines.some((l) => l.del === reply.id);
+  return quoteView(reply, original ? { name: nameOf(original.out), text: original.text! } : undefined, deleted);
 }
 
 export function unreadTotal(s: ChatState): number {

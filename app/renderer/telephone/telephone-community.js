@@ -793,7 +793,20 @@ function renderThread() {
       }
       const bubble = document.createElement('div');
       bubble.className = 'th-bubble';
-      bubble.textContent = it.text;
+      // Une réponse : la citation en tête de la bulle (l'auteur cité, l'extrait ; disparu, la mention discrète).
+      if (it.quote) {
+        const q = document.createElement('div');
+        q.className = `th-quote${it.quote.missing ? ' missing' : ''}`;
+        for (const [cls, text] of [['th-quote-name', it.quote.name], ['th-quote-text', it.quote.text], ['th-quote-missing', it.quote.missing]]) {
+          if (!text) continue;
+          const d = document.createElement('div');
+          d.className = cls;
+          d.textContent = text;
+          q.append(d);
+        }
+        bubble.append(q);
+      }
+      bubble.append(document.createTextNode(it.text));
       const meta = document.createElement('div');
       meta.className = 'th-meta';
       meta.textContent = it.meta;

@@ -299,7 +299,8 @@ function renderLibrary(v) {
   // Les actions montrées en cartes (un média, une page, un fichier) ou en lignes à choisir
   // (un fichier de la table, un élément de la liste d'attente) ne sont pas répétées dans la liste.
   const carded = new Set(
-    [...(v.media?.cards ?? []), ...v.sections.flatMap((s) => s.rows.filter((r) => r.pick)), ...(v.health?.groups.flatMap((g) => g.lines) ?? []), ...(v.scoreboard?.tabs ?? []), ...(v.scoreboard?.scopes ?? []), ...(v.tabs ?? [])].map((c) => c.action).filter((a) => a !== undefined),
+    // La citation d'une bulle est un arrêt à elle (messages-citations.ts) : jamais une action en bas.
+    [...(v.media?.cards ?? []), ...v.sections.flatMap((s) => s.rows.filter((r) => r.pick)), ...v.sections.flatMap((s) => s.rows.filter((r) => r.quote?.action !== undefined).map((r) => r.quote)), ...(v.health?.groups.flatMap((g) => g.lines) ?? []), ...(v.scoreboard?.tabs ?? []), ...(v.scoreboard?.scopes ?? []), ...(v.tabs ?? [])].map((c) => c.action).filter((a) => a !== undefined),
   );
   v.actions.forEach((a, i) => {
     if (carded.has(i)) return;
@@ -660,10 +661,20 @@ function renderHealth(h, cursor) {
 function chatBubble(row, cursor) {
   if (row.bubble === 'day') return libEl('li', 'chat-day', row.text);
   const li = libEl('li', `chat-line chat-${row.bubble}`);
+  // Une réponse : sa citation en tête, au-dessus de la bulle (l'auteur cité, l'extrait). Quand elle se
+  // choisit, elle vient avant la bulle dans la page comme pour les flippers (data-nav-order suit l'ordre
+  // de l'affichage) : l'action de la bulle passe alors sur le bloc qui la suit, pas sur toute la ligne.
+  const quoted = row.quote?.action !== undefined;
+  if (row.quote) {
+    li.classList.add('with-quote');
+    li.append(chatQuote(row.quote, cursor));
+  }
+  const hit = quoted ? libEl('div', 'chat-hit') : li;
+  if (quoted) li.append(hit);
   if (row.action !== undefined) {
     li.classList.add('pick');
     if (row.action === cursor) li.classList.add('selected');
-    actOn(li, { type: 'activate', index: row.action });
+    actOn(hit, { type: 'activate', index: row.action });
   }
   if (row.bubble === 'card') {
     if (row.icon) li.append(cyberIcon(row.icon, 'chat-card-icon'));
@@ -673,14 +684,41 @@ function chatBubble(row, cursor) {
     li.append(text);
     return li;
   }
-  li.append(libEl('div', 'chat-bubble', row.text));
+  const bubble = libEl('div', 'chat-bubble');
+  // Les mentions mises en évidence (messages-citations.ts) ; la mienne plus fort.
+  if (row.pieces?.length) {
+    for (const p of row.pieces) bubble.append(p.mention ? libEl('span', `chat-mention${p.mention === 'me' ? ' me' : ''}`, p.text) : document.createTextNode(p.text));
+    if (row.pieces.some((p) => p.mention === 'me')) li.classList.add('mentions-me');
+  } else bubble.textContent = row.text;
+  hit.append(bubble);
   if (row.badges?.length) {
     const chips = libEl('div', 'chat-reactions');
     for (const b of row.badges) chips.append(libEl('span', 'chat-reaction', b));
-    li.append(chips);
+    hit.append(chips);
   }
-  if (row.detail) li.append(libEl('div', 'chat-meta', row.detail));
+  if (row.detail) hit.append(libEl('div', 'chat-meta', row.detail));
   return li;
+}
+
+/**
+ * La citation d'une bulle qui répond (Row.quote) : l'auteur cité, l'extrait sur deux lignes au plus.
+ * Le message cité encore affiché : elle se choisit (curseur, clic) et ramène à lui, sans ouvrir la bulle ;
+ * disparu : sa mention discrète (« message supprimé »).
+ */
+function chatQuote(quote, cursor) {
+  const box = libEl('div', 'chat-quote');
+  box.append(libEl('div', 'chat-quote-name', quote.name), libEl('div', 'chat-quote-text', quote.text));
+  if (quote.missing) {
+    box.classList.add('missing');
+    box.append(libEl('div', 'chat-quote-missing', quote.missing));
+  }
+  if (quote.action !== undefined) {
+    box.classList.add('pick');
+    if (quote.action === cursor) box.classList.add('selected');
+    // Le clic sur la citation va au message cité.
+    actOn(box, { type: 'activate', index: quote.action });
+  }
+  return box;
 }
 
 // ---------- En train d'écrire ----------

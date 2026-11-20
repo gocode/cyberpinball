@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Friend messages and groups: pick a message, then reply (with a ready-made phrase or the keyboard) to quote it. The quote, with its author and first two lines, shows above the reply, in the front-end and on the phone; with the flippers or the mouse, picking it takes you back to the quoted message. A quoted message deleted later keeps its excerpt, marked "message deleted".
+- Groups: "Mention a member…" picks a member from the list and writes "@nickname"; an "@nickname" typed on the keyboard or the phone counts too. The mentioned player gets a notification of its own ("Bruno mentioned you in …"), even with the group muted, and the mention is highlighted in the bubble, more strongly when it is you.
+- A cabinet that is not up to date yet still receives these messages and shows their text.
 - Cabinet sound: a jack is only called "plugged in" when it can sense a cable (Windows tells, jack by jack). A card whose jacks sense nothing is still offered for SSF, but "to be checked by ear", after the stereo suggestions.
 - Cabinet sound: a cable is sensed in the exciters' jack but nothing vibrated during the check: the summary suggests looking at the exciters' amplifier (on, volume), instead of mentioning a three-jack card.
 - Pinball FX3: since version 0.2.2-essai.10, the game starts on the playfield screen as Windows orients it. On a cabinet where Cyber Pinball turns that screen for Visual Pinball, the orientation set earlier in FX3's cabinet mode gives an upside-down picture. Before the next FX3 game, Cyber Pinball says so once, with the old and the new value to enter (for example "change Orientation from 270° to 90°"); Start opens the game to change it, Exit goes back to the menu. The message only shows if Cyber Pinball has already started FX3 on this cabinet and if the value really changes.

@@ -228,7 +228,9 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
     for (const e of log.entries) {
       if (e.read || !ACTIVITY_MESSAGE_KINDS.has(e.kind)) continue;
       const thread = activityThread(e);
-      if (thread !== undefined && host.threads.pending(e.kind as MessageKind, thread) === 0) changed = markThreadRead(log, e.kind as MessageKind, thread) || changed;
+      // Une mention dans un groupe se lit avec la discussion du groupe.
+      const kind = (e.kind === 'group-mention' ? 'group-message' : e.kind) as MessageKind;
+      if (thread !== undefined && host.threads.pending(kind, thread) === 0) changed = markThreadRead(log, kind, thread) || changed;
     }
     if (changed) save();
   }
@@ -322,7 +324,7 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
         ...(detail ? { detail } : {}),
         icon: look.icon,
         // Un groupe, un salon : plusieurs auteurs sur la ligne, son icône plutôt que la pastille du dernier.
-        ...(e.player && host.friends.avatar && e.kind !== 'group-message' && e.kind !== 'room-mention' ? { avatar: host.friends.avatar(e.player, e.who ?? '?') } : {}),
+        ...(e.player && host.friends.avatar && e.kind !== 'group-message' && e.kind !== 'group-mention' && e.kind !== 'room-mention' ? { avatar: host.friends.avatar(e.player, e.who ?? '?') } : {}),
         tone: r.gone ? 'quiet' : look.tone,
         badges: [time(e.at), ...(r.status ? [r.status] : []), ...(unread ? [t('Non lu')] : [])],
         ...(unread ? { unread: true } : {}),

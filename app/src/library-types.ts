@@ -375,6 +375,14 @@ export interface Row {
    */
   bubble?: 'in' | 'out' | 'pending' | 'expired' | 'card' | 'day';
   /**
+   * Bulle qui répond à un message (messages-citations.ts) : la citation au-dessus de son texte, l'auteur
+   * cité et l'extrait. `missing` : la mention discrète d'un original disparu ; `action` : la citation est un
+   * arrêt du curseur à elle, Start (ou un clic) ramène au message cité.
+   */
+  quote?: { name: string; text: string; missing?: string; action?: number };
+  /** Le texte d'une bulle en morceaux : les mentions mises en évidence (`me` : c'est moi qu'on cite, plus fort). */
+  pieces?: { text: string; mention?: 'me' | 'other' }[];
+  /**
    * Ligne d'un salon (rooms-menu.ts), à l'ancienne : l'heure, le drapeau, « <pseudo> » à la teinte de
    * sa clé, le texte. `kind` : une ligne, une action (/me), une ligne qui me cite, la mienne, ou une
    * ligne de service (arrivée, départ) plus discrète. `reactions` : ses pastilles de réactions

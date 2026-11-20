@@ -2547,6 +2547,11 @@ const groupService = createGroupService({
     if (guest.active || groupsMenu.shown() === view.id) return;
     menuNotices.push(lines.map((l) => ({ kind: 'group-message' as const, key: l.id, at: Date.now(), who: l.name, player: l.by, thread: view.id, subject: view.name, extra: (l.body.k === 'msg' ? l.body.text : '').replace(/\s*\n\s*/g, ' ') })));
   },
+  // Un membre me mentionne (citations.ts) : sa notification à elle, même groupe en sourdine.
+  onMention: (view, lines) => {
+    if (guest.active || groupsMenu.shown() === view.id) return;
+    menuNotices.push(lines.map((l) => ({ kind: 'group-mention' as const, key: l.id, at: Date.now(), who: l.name, player: l.by, thread: view.id, subject: view.name, extra: (l.body.k === 'msg' ? l.body.text : '').replace(/\s*\n\s*/g, ' ') })));
+  },
   onInvite: (invitation, view) => {
     if (guest.active) return;
     const who = socialNet.state().friends.find((f) => f.key === invitation.from)?.name ?? invitation.from.slice(0, 8);

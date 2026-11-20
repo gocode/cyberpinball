@@ -24,6 +24,10 @@ import {
   declineInvitation,
   dropOutbox,
   forgetInGroups,
+  groupLineMentions,
+  quoteOf,
+  resolveMentions,
+  type MessageExtras,
   GROUP_BATCH,
   GROUP_HAVE_MAX,
   GROUP_MEMBERS_MAX,
@@ -85,8 +89,16 @@ export interface GroupServiceOptions {
   now?: () => Date;
   /** Quelque chose a changé : redessiner. */
   onChange?: () => void;
-  /** Des messages nouveaux d'autres membres (pas les réactions), dans un groupe qui n'est pas en sourdine. */
+  /**
+   * Des messages nouveaux d'autres membres (pas les réactions), dans un groupe qui n'est pas en sourdine ;
+   * jamais ceux qui me mentionnent (onMention les annonce).
+   */
   onArrive?: (view: GroupView, lines: GroupLine[]) => void;
+  /**
+   * Des messages qui me mentionnent (citations.ts), même dans un groupe en sourdine : chacun une seule
+   * fois, à son arrivée (ou quand sa mention arrive, s'il était venu sans par une borne d'avant).
+   */
+  onMention?: (view: GroupView, lines: GroupLine[]) => void;
   /** Une invitation reçue d'un ami. */
   onInvite?: (invitation: GroupInvitation, view: GroupView) => void;
   /** J'ai écrit un message dans un groupe (niveau : présence au salon). */
@@ -120,7 +132,11 @@ export interface GroupService {
   askDirectory(): void;
   /** Inviter des amis dans un groupe dont je suis membre ; rend le nombre d'invitations écrites. */
   invite(g: string, friends: readonly { key: string; name: string }[]): number;
-  send(g: string, text: string): GroupSendResult;
+  /**
+   * Écrire au groupe. `reply` : l'identifiant du message auquel je réponds (sa citation part avec) ; les
+   * « @pseudo » de membres du texte deviennent des mentions.
+   */
+  send(g: string, text: string, reply?: string): GroupSendResult;
   /**
    * « En train d'écrire » (typing.ts) : mon champ pour ce groupe a changé (`active` : il reste du texte).
    * Le signal part aux membres joignables, au plus toutes les 3 s ; jamais gardé ni relayé.
@@ -313,27 +329,37 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
       byGroup.set(l.g, list);
     }
     let next = state;
-    const spreads: { g: string; lines: GroupLine[] }[] = [];
+    const spreads: { g: string; lines: GroupLine[]; enriched: GroupLine[] }[] = [];
     for (const [g, lines] of byGroup) {
       const v = viewOf(g);
       // Dans un groupe public, n'importe qui arrive : sa ligne d'arrivée (de lui) suffit à l'accepter.
       const arriving = v?.access === 'public' && lines.some((l) => l.by === from && l.body.k === 'join');
       if (!v || !(mayWrite(v, from) || arriving)) continue;
       const merged = mergeGroupLines(next, g, lines, myKey(), now());
-      if (!merged.fresh.length) continue;
+      if (!merged.fresh.length && !merged.enriched.length) continue;
       next = merged.state;
-      spreads.push({ g, lines: merged.fresh });
+      spreads.push({ g, lines: merged.fresh, enriched: merged.enriched });
     }
     if (next === state) return;
     commit(next);
     for (const s of spreads) {
-      spread(s.g, s.lines, from);
+      // L'extension reçue part aussi chez les autres : ils ont peut-être eu la ligne sans elle.
+      spread(s.g, [...s.lines, ...s.enriched], from);
       const e = state.groups[s.g];
       const v = viewOf(s.g);
-      const texts = s.lines.filter((l) => l.body.k === 'msg' && l.by !== myKey());
-      if (v && e && !e.muted && !e.gone && texts.length) opts.onArrive?.(v, texts);
+      if (!v || !e || e.gone) continue;
+      // Une mention de moi : sa notification à elle, même groupe en sourdine, une seule fois par message.
+      const forMe = (l: GroupLine) => l.body.k === 'msg' && l.by !== myKey() && groupLineMentions(v, l).includes(myKey()) && !mentioned.has(l.id);
+      const mentions = [...s.lines, ...s.enriched].filter(forMe);
+      for (const l of mentions) mentioned.add(l.id);
+      if (mentioned.size > 2000) for (const id of [...mentioned].slice(0, 1000)) mentioned.delete(id);
+      const texts = s.lines.filter((l) => l.body.k === 'msg' && l.by !== myKey() && !mentions.includes(l));
+      if (mentions.length) opts.onMention?.(v, mentions);
+      if (!e.muted && texts.length) opts.onArrive?.(v, texts);
     }
   }
+  /** Messages dont la mention de moi est déjà annoncée (en mémoire : une ligne déjà connue n'est jamais nouvelle). */
+  const mentioned = new Set<string>();
 
   // « En train d'écrire » : qui écrit dans chaque groupe (en mémoire), et mon signal pour chacun.
   const typingBoard = createTypingBoard(() => opts.onChange?.());
@@ -416,8 +442,12 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
     }
   });
 
-  /** J'écris une ligne dans un groupe dont je suis membre : gardée, partie vers les membres joignables. */
-  function write(g: string, body: GroupBody): GroupSendResult {
+  /**
+   * J'écris une ligne dans un groupe dont je suis membre : gardée, partie vers les membres joignables.
+   * Un message porte la citation de `reply` (un message du groupe encore là) et mentionne les membres
+   * dont il dit « @pseudo » (citations.ts) : jamais un non-membre.
+   */
+  function write(g: string, body: GroupBody, reply?: string): GroupSendResult {
     if (!opts.net.state().enabled) return { reason: 'disabled' };
     const v = viewOf(g);
     if (!v || !isMember(v, myKey())) return { reason: 'member' };
@@ -425,7 +455,14 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
       const limit = groupSendLimit(sent);
       if (limit) return { reason: limit };
     }
-    const line = signGroupLine(me(), g, body, now());
+    let extras: MessageExtras | undefined;
+    if (body.k === 'msg') {
+      const original = reply ? v.messages.find((l) => l.id === reply) : undefined;
+      const quote = original && original.body.k === 'msg' ? quoteOf({ id: original.id, by: original.by, name: original.name, text: original.body.text }) : undefined;
+      const mentions = resolveMentions(body.text, v.members, myKey());
+      if (quote || mentions.length) extras = { ...(quote ? { reply: quote } : {}), ...(mentions.length ? { mentions } : {}) };
+    }
+    const line = signGroupLine(me(), g, body, now(), undefined, extras);
     if (!line) return { reason: 'text' };
     if (body.k === 'msg') {
       sent.push(Date.now());
@@ -484,8 +521,8 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
       tick(true);
       return lines.length;
     },
-    send: (g, text) => {
-      const r = write(g, { k: 'msg', text });
+    send: (g, text, reply) => {
+      const r = write(g, { k: 'msg', text }, reply);
       if ('line' in r) opts.onOwnLine?.();
       return r;
     },

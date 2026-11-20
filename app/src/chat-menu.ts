@@ -19,6 +19,8 @@ import {
   CHAT_KEEP_CHOICES,
   CHAT_REACTIONS,
   chatPhrases,
+  chatQuoteView,
+  quoteExcerpt,
   eventText,
   lastLine,
   locale,
@@ -42,6 +44,7 @@ import {
   type AvatarView,
 } from '@cyberpinball/core';
 import { lastLineAt } from './chat-cursor';
+import { lineAt, missingText, quoteRow } from './messages-citations';
 import type { ChatService } from './chat-service';
 import type { RemoteChat, RemoteCommunity, RemoteThread } from './phone-remote';
 import { onGesture } from './gesture-flash';
@@ -274,6 +277,23 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     lib.openCustom(threadBuild(key), lastLineAt(threadBuild(key)()) ?? 0);
   }
 
+  /** La citation d'une réponse, pour le fil du téléphone (sans arrêt du curseur). */
+  function phoneQuote(key: string, line: ChatLine): { quote?: { name: string; text: string; missing?: string } } {
+    if (!line.reply) return {};
+    const plain = friendOf(key)?.name ?? knownName(key);
+    const qv = chatQuoteView(convOf(key) ?? { lines: [], unread: 0 }, line.reply, (out) => (out ? t('Vous') : plain));
+    const missing = missingText(qv.missing);
+    return { quote: { name: qv.name, text: qv.text, ...(missing ? { missing } : {}) } };
+  }
+
+  /** Le fil ouvert sur un de ses messages (une citation choisie ramène au message cité). */
+  function goToLine(key: string, id: string): void {
+    const build = threadBuild(key);
+    const at = lineAt(build(), id);
+    if (at === undefined) return openThread(key);
+    lib.openCustom(build, at);
+  }
+
   /** Les conversations dans l'ordre de la liste : MagnaSave passe à la voisine. */
   function neighbours(): string[] {
     const list = buildListKeys();
@@ -364,6 +384,11 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
         continue;
       }
       const { line, meta, chips } = item;
+      // La citation (un arrêt à elle, avant la bulle, si le message cité est encore affiché), puis la bulle.
+      const quoted = line.reply?.id;
+      const quote = line.reply
+        ? quoteRow(chatQuoteView(c, line.reply, (out) => (out ? t('Vous') : plain)), line.reply.id, actions, items.some((it) => it.kind === 'line' && it.line.id === quoted) ? () => goToLine(key, quoted!) : undefined)
+        : undefined;
       const index = actions.push({
         label: line.text!,
         key: `line:${line.id}`,
@@ -375,6 +400,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
         text: line.text!,
         detail: meta,
         bubble: item.bubble,
+        ...(quote ? { quote } : {}),
         ...(chips.length ? { badges: chips } : {}),
         action: index,
         pick: true,
@@ -420,19 +446,23 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     };
   }
 
-  function compose(key: string, value = ''): void {
+  /** Le clavier ; `reply` : le message cité par la réponse (citations.ts). */
+  function compose(key: string, value = '', reply?: string): void {
     const plain = friendOf(key)?.name ?? knownName(key);
+    const quoted = reply ? convOf(key)?.lines.find((l) => l.id === reply && l.text) : undefined;
     lib.openPrompt(
-      t('Message à {name}', { name: plain }),
+      quoted ? t('Répondre à {name}', { name: plain }) : t('Message à {name}', { name: plain }),
       t('Votre message'),
       value,
       (text) => {
         if (text !== undefined && text.trim()) {
-          if (!chat.send(key, text)) flash = { text: t('Message trop long : 500 caractères au plus'), tone: 'warning' };
+          if (!chat.send(key, text, quoted?.id)) flash = { text: t('Message trop long : 500 caractères au plus'), tone: 'warning' };
         }
         openThread(key);
       },
-      t('Le clavier à l’écran, ou votre téléphone appairé : son texte s’écrit ici en direct. 500 caractères au plus.'),
+      quoted
+        ? t('Votre réponse cite « {text} ». Le clavier à l’écran, ou votre téléphone appairé. 500 caractères au plus.', { text: oneLine(quoteExcerpt(quoted.text!)) })
+        : t('Le clavier à l’écran, ou votre téléphone appairé : son texte s’écrit ici en direct. 500 caractères au plus.'),
       // Tant qu'il reste du texte : « en train d'écrire » chez l'ami (typing.ts).
       { onInput: (active) => chat.typing(key, active) },
     );
@@ -460,12 +490,17 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
       });
       sections.push({ title: t('Réagir à « {text} »', { text: oneLine(targetLine.text ?? '').slice(0, 60) }), kind: 'reactions', rows });
     }
+    // Répondre à un message : phrases et clavier le citent (citations.ts).
+    const reply = targetLine?.text ? targetLine.id : undefined;
     const phrases: Row[] = chatPhrases().map((p) => {
-      const index = actions.push({ label: p, key: `phrase:${p}`, icon: 'message', run: () => { chat.send(key, p); back(); } }) - 1;
+      const index = actions.push({ label: p, key: `phrase:${p}`, icon: 'message', run: () => { chat.send(key, p, reply); back(); } }) - 1;
       return { text: p, action: index, pick: true };
     });
-    sections.push({ title: t('Phrases'), kind: 'phrases', rows: phrases });
-    actions.push({ label: t('Écrire un message…'), icon: 'keyboard', detail: t('Clavier à l’écran, ou votre téléphone appairé'), run: () => compose(key) });
+    sections.push({ title: reply ? t('Répondre d’une phrase') : t('Phrases'), kind: 'phrases', rows: phrases });
+    actions.push({ label: t('Écrire un message…'), icon: 'keyboard', detail: reply ? t('Votre réponse cite son message') : t('Clavier à l’écran, ou votre téléphone appairé'), run: () => compose(key, '', reply) });
+    // Le message cité par celui-ci : y aller (la citation est aussi un arrêt dans le fil).
+    const cited = targetLine?.reply?.id;
+    if (cited && threadLines(c).some((l) => l.id === cited)) actions.push({ label: t('Voir le message cité'), icon: 'history', detail: t('Le fil, sur le message auquel il répond'), run: () => goToLine(key, cited) });
     // Mon message : je peux le supprimer, ici et chez l'ami (confirmé d'abord : rien ne le rétablit).
     if (targetLine?.out && targetLine.text) {
       const quoted = oneLine(targetLine.text).slice(0, 60);
@@ -647,7 +682,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
           ...(chat.typingOf(open) ? { typing: [plain] } : {}),
           items: threadItems(open)
             .slice(-THREAD_PHONE)
-            .map((it) => (it.kind === 'line' ? { kind: 'line' as const, id: it.line.id, text: it.line.text!, out: it.line.out, meta: it.meta, bubble: it.bubble, ...(it.chips.length ? { chips: it.chips } : {}) } : it.kind === 'event' ? { kind: 'event' as const, text: it.text, time: it.time } : { kind: 'day' as const, text: it.text })),
+            .map((it) => (it.kind === 'line' ? { kind: 'line' as const, id: it.line.id, text: it.line.text!, out: it.line.out, meta: it.meta, bubble: it.bubble, ...(it.chips.length ? { chips: it.chips } : {}), ...phoneQuote(open, it.line) } : it.kind === 'event' ? { kind: 'event' as const, text: it.text, time: it.time } : { kind: 'day' as const, text: it.text })),
           reactions: CHAT_REACTIONS.map((r) => ({ id: r, label: reactionLabel(r) })),
           phrases: chatPhrases(),
         };

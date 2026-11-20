@@ -269,8 +269,12 @@ export interface RemoteThread {
   blocked?: string;
   /** « En train d'écrire » (typing.ts) : les pseudos de qui écrit en ce moment. */
   typing?: string[];
-  /** Chaque ligne ; dans un groupe, `author` : le pseudo de l'auteur d'un message reçu, au-dessus de sa bulle. */
-  items: ({ kind: 'day'; text: string } | { kind: 'event'; text: string; time: string } | { kind: 'line'; id: string; text: string; out: boolean; meta: string; bubble: 'in' | 'out' | 'pending' | 'expired'; chips?: string[]; author?: string })[];
+  /**
+   * Chaque ligne ; dans un groupe, `author` : le pseudo de l'auteur d'un message reçu, au-dessus de sa bulle.
+   * `quote` : la citation d'une réponse, en tête de la bulle (messages-citations.ts) ; `missing`, la mention
+   * discrète d'un original disparu.
+   */
+  items: ({ kind: 'day'; text: string } | { kind: 'event'; text: string; time: string } | { kind: 'line'; id: string; text: string; out: boolean; meta: string; bubble: 'in' | 'out' | 'pending' | 'expired'; chips?: string[]; author?: string; quote?: { name: string; text: string; missing?: string } })[];
   reactions: { id: string; label: string }[];
   phrases: string[];
   /** Un groupe : sa table de la semaine et son classement en tête du fil, et son menu ⋮ (groups-menu.ts). */

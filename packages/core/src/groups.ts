@@ -33,6 +33,7 @@ import { writeFileAtomic } from './atomicwrite';
 import { isPlayerPublicKey, signText, verifyText, type PlayerKey } from './sharing';
 import { normalizeName, type PresenceTable } from './social';
 import { isReaction, type Reaction } from './reactions';
+import { quoteView, signExtras, verifyExtras, validMentions, type MessageExtras, type QuoteView } from './citations';
 
 /** Nom d'un groupe, en caractères. */
 export const GROUP_NAME_MAX = 32;
@@ -92,6 +93,13 @@ export interface GroupLine {
   at: string;
   body: GroupBody;
   sig: string;
+  /**
+   * Extension d'un message (citations.ts, 20/11/2026) : citation et membres mentionnés, signée à part
+   * (`xs`) pour qu'une borne d'avant garde le message (elle ignore ces deux champs, et les retire en le
+   * relayant : la version complète, arrivée ensuite par un autre membre, enrichit la ligne connue).
+   */
+  x?: MessageExtras;
+  xs?: string;
 }
 
 export const isGroupId = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{16}$/.test(v);
@@ -169,8 +177,11 @@ function lineText(l: Omit<GroupLine, 'sig'>): string {
   return JSON.stringify({ app: 'cyberpinball', kind: 'group', id: l.id, g: l.g, by: l.by, name: l.name, country: l.country ?? null, at: l.at, body: l.body });
 }
 
-/** Ma ligne, signée. Le texte ou le nom est nettoyé d'abord ; undefined s'il est refusé (vide, trop long). */
-export function signGroupLine(me: { key: PlayerKey; name: string; country?: string }, g: string, body: GroupBody, now = new Date(), id = newId()): GroupLine | undefined {
+/**
+ * Ma ligne, signée. Le texte ou le nom est nettoyé d'abord ; undefined s'il est refusé (vide, trop long).
+ * `extras` (un message seulement) : la citation et les mentions, signées à part (citations.ts).
+ */
+export function signGroupLine(me: { key: PlayerKey; name: string; country?: string }, g: string, body: GroupBody, now = new Date(), id = newId(), extras?: MessageExtras): GroupLine | undefined {
   let clean: GroupBody | undefined = body;
   if (body.k === 'msg') {
     const text = cleanGroupText(body.text);
@@ -181,7 +192,9 @@ export function signGroupLine(me: { key: PlayerKey; name: string; country?: stri
   }
   if (!clean) return undefined;
   const base: Omit<GroupLine, 'sig'> = { id, g, by: me.key.publicKey, name: me.name, ...(me.country ? { country: me.country } : {}), at: now.toISOString(), body: clean };
-  return { ...base, sig: signText(lineText(base), me.key) };
+  const x = clean.k === 'msg' && extras && (extras.reply || extras.mentions?.length) ? { ...(extras.reply ? { reply: extras.reply } : {}), ...(extras.mentions?.length ? { mentions: [...new Set(extras.mentions)] } : {}) } : undefined;
+  const line: GroupLine = { ...base, sig: signText(lineText(base), me.key) };
+  return x ? { ...line, x, xs: signExtras({ kind: 'group', g, by: me.key.publicKey }, id, x, me.key) } : line;
 }
 
 /** Ligne reçue : forme et signature vérifiées ; une date dans le futur est refusée. */
@@ -195,7 +208,10 @@ export function verifyGroupLine(raw: unknown, now = new Date()): GroupLine | und
   if (Date.parse(r.at) > now.getTime() + FUTURE_MS) return undefined;
   const line: GroupLine = { id: r.id, g: r.g, by: r.by, name, ...(r.country ? { country: r.country as string } : {}), at: r.at, body, sig: r.sig };
   const { sig, ...base } = line;
-  return verifyText(lineText(base), sig, line.by) ? line : undefined;
+  if (!verifyText(lineText(base), sig, line.by)) return undefined;
+  // L'extension d'un message, vérifiée à part : mal signée ou mal formée, elle tombe et le message reste.
+  const x = body.k === 'msg' && r.x !== undefined ? verifyExtras({ kind: 'group', g: line.g, by: line.by }, line.id, r.x, r.xs) : undefined;
+  return x ? { ...line, x, xs: r.xs as string } : line;
 }
 
 // ---------------------------------------------------------------------------
@@ -642,20 +658,33 @@ export function saveGroups(dataDir: string, s: GroupsState): void {
 
 const withGroup = (s: GroupsState, g: string, e: GroupEntry): GroupsState => ({ ...s, groups: { ...s.groups, [g]: e } });
 
-/** Garder des lignes d'un groupe connu ; rend les nouvelles. Un message d'un autre, nouveau et compté, est non lu. */
-export function mergeGroupLines(s: GroupsState, g: string, incoming: readonly GroupLine[], me: string, now = new Date()): { state: GroupsState; fresh: GroupLine[] } {
+/**
+ * Garder des lignes d'un groupe connu ; rend les nouvelles. Un message d'un autre, nouveau et compté, est
+ * non lu. `enriched` : des messages déjà là sans leur extension (relayés par une borne d'avant, qui la
+ * retire) et qui la reçoivent maintenant ; ils ne comptent pas comme nouveaux, mais leur mention, si elle
+ * me vise, reste à annoncer.
+ */
+export function mergeGroupLines(s: GroupsState, g: string, incoming: readonly GroupLine[], me: string, now = new Date()): { state: GroupsState; fresh: GroupLine[]; enriched: GroupLine[] } {
   const e = s.groups[g];
-  if (!e) return { state: s, fresh: [] };
-  const known = new Set(e.lines.map((l) => l.id));
+  if (!e) return { state: s, fresh: [], enriched: [] };
+  const byId = new Map(e.lines.map((l) => [l.id, l]));
+  const known = new Set(byId.keys());
   const fresh = incoming.filter((l) => l.g === g && !known.has(l.id) && (known.add(l.id), true));
-  if (!fresh.length) return { state: s, fresh };
-  const lines = [...e.lines, ...fresh].sort(byDate);
+  // Même message (même signature), cette fois avec son extension : elle s'ajoute à la ligne gardée.
+  const upgrades = new Map<string, GroupLine>();
+  for (const l of incoming) {
+    const had = byId.get(l.id);
+    if (had && l.g === g && l.x && !had.x && had.sig === l.sig) upgrades.set(l.id, l);
+  }
+  if (!fresh.length && !upgrades.size) return { state: s, fresh, enriched: [] };
+  const lines = [...e.lines.map((l) => upgrades.get(l.id) ?? l), ...fresh].sort(byDate);
   const v = groupView(lines, now);
   const counted = v ? fresh.filter((l) => v.valid.has(l.id)) : [];
+  const enriched = v ? [...upgrades.values()].filter((l) => v.valid.has(l.id)) : [];
   const unread = e.unread + counted.filter((l) => l.body.k === 'msg' && l.by !== me).length;
   // Retiré du groupe par son créateur : il reste lisible un temps, puis s'efface.
   const out = v && !isMember(v, me) && !e.gone ? { gone: now.toISOString() } : {};
-  return { state: withGroup(s, g, { ...e, lines: capLines(lines), unread, ...out }), fresh: counted };
+  return { state: withGroup(s, g, { ...e, lines: capLines(lines), unread, ...out }), fresh: counted, enriched };
 }
 
 /** Les messages au-delà de GROUP_LINES_MAX partent, les plus anciens d'abord ; les lignes d'appartenance restent toujours. */
@@ -783,6 +812,23 @@ export function myGroups(s: GroupsState, me: string, now = new Date()): { entry:
     out.push({ entry, view, last });
   }
   return out.sort((a, b) => b.last - a.last).map(({ entry, view }) => ({ entry, view }));
+}
+
+/**
+ * La citation d'un message du groupe, telle qu'elle s'affiche (citations.ts, quoteView) : l'original
+ * encore dans la discussion fait foi ; retiré par son auteur, ou plus gardé, l'extrait de la réponse.
+ */
+export function groupQuoteView(lines: readonly GroupLine[], v: GroupView, line: GroupLine): QuoteView | undefined {
+  const reply = line.x?.reply;
+  if (!reply) return undefined;
+  const original = v.messages.find((l) => l.id === reply.id);
+  const deleted = lines.some((l) => l.body.k === 'del' && l.body.target === reply.id && v.valid.has(l.id));
+  return quoteView(reply, original && original.body.k === 'msg' ? { name: original.name, text: original.body.text } : undefined, deleted);
+}
+
+/** Les membres que ce message mentionne vraiment (citations.ts, validMentions) : membres du groupe, jamais son auteur. */
+export function groupLineMentions(v: GroupView, line: GroupLine): string[] {
+  return line.body.k === 'msg' ? validMentions(line.x, line.by, v.members) : [];
 }
 
 /** Fin de la table de la semaine choisie maintenant : le dimanche 23:59 qui vient, à au moins deux jours ; heure locale. */

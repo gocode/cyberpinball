@@ -1018,6 +1018,33 @@ body:not([data-mode='browser'])[data-view='thread'] .thread {
   border-color: var(--warning);
 }
 
+/* Une réponse : la citation en tête de la bulle, filet bleu méta à gauche, deux lignes au plus. */
+.th-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 6px;
+  padding: 4px 8px;
+  border-left: 3px solid var(--meta);
+  border-radius: 6px;
+  background: rgba(95, 180, 207, 0.1);
+  white-space: normal;
+}
+.th-quote-name { color: var(--meta); font-size: 13px; font-weight: 600; line-height: 18px; }
+.th-quote-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 19px;
+  white-space: pre-wrap;
+}
+.th-quote-missing { color: var(--ink-muted); font-size: 12px; font-style: italic; }
+.th-quote.missing { border-left-color: var(--line-strong); }
+.th-quote.missing .th-quote-name { color: var(--ink-muted); }
+
 /* En train d'écrire (typing.ts) : sous le dernier message, une pastille comme une bulle reçue, les
    pseudos puis trois points en bleu méta qui s'allument l'un après l'autre. */
 .phone-typing {

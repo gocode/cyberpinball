@@ -50,6 +50,7 @@ export type NoticeKind =
   | 'room-line'
   | 'room-report'
   | 'group-message'
+  | 'group-mention'
   | 'group-invite'
   | 'friend-request' | 'friend-accepted' | 'download-failed' | 'download-done' | 'friend-online' | 'friend-playing' | 'friend-record' | 'friend-badge';
 
@@ -157,6 +158,9 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   'room-line': { priority: 14, ttlMs: 2 * MIN, quietMs: MIN, icon: 'globe', tone: 'info', act: { type: 'rooms' }, holdMs: 2 * MIN, journal: false },
   // Un message dans un de mes groupes (groups.ts) : partout, par-dessus VPX compris, comme la messagerie.
   'group-message': { priority: 9, ttlMs: 60 * MIN, quietMs: MIN, icon: 'group', tone: 'info', act: { type: 'groups' }, away: true, sound: 'news' },
+  // Un membre me mentionne dans un groupe (citations.ts, 20/11/2026) : avant un message ordinaire, partout,
+  // même groupe en sourdine ; elle remplace la notification ordinaire de ce message.
+  'group-mention': { priority: 8, ttlMs: 60 * MIN, quietMs: MIN, icon: 'group', tone: 'info', act: { type: 'groups' }, away: true, sound: 'news' },
   // Une invitation dans un groupe : dans le front-end, comme une demande d'ami.
   'group-invite': { priority: 10, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friend-request', tone: 'warning', act: { type: 'groups' }, sound: 'news' },
   // Un signalement reçu par un modérateur : au menu, regroupés.
@@ -411,6 +415,14 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
       const title = groups.length === 1 ? tn(n, '{n} nouveau message · {group}', '{n} nouveaux messages · {group}', { group: groups[0]! }) : tn(n, '{n} nouveau message dans vos groupes', '{n} nouveaux messages dans vos groupes');
       return fit({ title, detail: last.extra ? `${who(last)} : ${last.extra}` : names() });
     }
+    case 'group-mention': {
+      // `subject` : le groupe ; `extra` : le message ; `who` : qui me mentionne.
+      const last = events[events.length - 1]!;
+      const groups = [...new Set(events.map((e) => e.subject ?? ''))];
+      if (one) return fit({ title: t('{name} vous a mentionné dans {group}', { name: who(one), group: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
+      const title = groups.length === 1 ? tn(n, '{n} mention · {group}', '{n} mentions · {group}', { group: groups[0]! }) : tn(n, '{n} mention dans vos groupes', '{n} mentions dans vos groupes');
+      return fit({ title, detail: last.extra ? `${who(last)} : ${last.extra}` : names() });
+    }
     case 'group-invite':
       // `subject` : le groupe.
       return fit(one ? { title: t('{name} vous invite dans « {group} »', { name: who(one), group: one.subject ?? '' }), detail: t('Communauté › Groupes') } : { title: tn(n, '{n} invitation dans un groupe', '{n} invitations dans des groupes'), detail: names() });
@@ -492,6 +504,8 @@ function digestPart(kind: NoticeKind, n: number): string {
       return tn(n, '{n} signalement', '{n} signalements');
     case 'group-message':
       return tn(n, '{n} message de groupe', '{n} messages de groupe');
+    case 'group-mention':
+      return tn(n, '{n} mention dans un groupe', '{n} mentions dans un groupe');
     case 'group-invite':
       return tn(n, '{n} invitation dans un groupe', '{n} invitations dans des groupes');
     case 'friend-online':

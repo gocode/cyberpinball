@@ -4829,6 +4829,58 @@ body.mouse button.lib-command:hover .lib-command-text {
   border-style: solid;
   box-shadow: inset 0 0 0 0.2cqmin var(--signal), 0 0 2.2cqmin var(--signal-haze);
 }
+/* Une réponse : la citation en tête, juste au-dessus de sa bulle (messages-citations.ts), filet bleu méta
+   à gauche, deux lignes au plus ; elle se choisit à part (Start : le message cité). */
+.chat-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5cqmin;
+  align-items: inherit;
+  max-width: 100%;
+  min-width: 0;
+}
+.chat-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2cqmin;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0.7cqmin 1.6cqmin;
+  border: 1px solid var(--line);
+  border-left: 0.4cqmin solid var(--meta);
+  border-radius: 1.2cqmin 1.2cqmin 0.4cqmin 0.4cqmin;
+  background: color-mix(in srgb, var(--meta) 9%, #050c0b);
+}
+.chat-quote.pick { cursor: pointer; }
+.chat-quote-name { color: var(--meta); font-size: 1.9cqmin; font-weight: 600; }
+.chat-quote-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 2.05cqmin;
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+.chat-quote-missing { color: var(--ink-muted); font-size: 1.9cqmin; font-style: italic; }
+.chat-quote.missing { border-left-color: var(--line-strong); }
+.chat-quote.missing .chat-quote-name { color: var(--ink-muted); }
+.chat-quote.selected {
+  border-color: var(--signal);
+  border-left-color: var(--signal);
+  box-shadow: inset 0 0 0 0.15cqmin var(--signal);
+}
+/* Mentions : @pseudo en bleu méta ; la mienne en capsule, et la bulle marquée d'un filet. */
+.chat-mention { color: var(--meta); font-weight: 600; }
+.chat-mention.me {
+  padding: 0 0.5cqmin;
+  border-radius: 0.5cqmin;
+  background: color-mix(in srgb, var(--meta) 32%, transparent);
+  color: var(--ink);
+}
+.chat-line.mentions-me .chat-bubble { box-shadow: inset 0.4cqmin 0 0 var(--meta); }
+.chat-line.mentions-me.selected .chat-bubble { box-shadow: inset 0.4cqmin 0 0 var(--meta), inset 0 0 0 0.2cqmin var(--signal), 0 0 2.2cqmin var(--signal-haze); }
 .chat-reactions { display: flex; flex-wrap: wrap; gap: 0.6cqmin; }
 .chat-reaction {
   padding: 0.3cqmin 1.2cqmin;

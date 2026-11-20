@@ -26,7 +26,8 @@ export type ZoneName = 'list' | 'actions';
 
 /** Ce qu'il faut d'un écran décrit (library.ts, Built) pour reconnaître sa liste de contenu. */
 export interface ZoneSource {
-  sections: readonly { options?: boolean; title?: string; side?: boolean; rows: readonly { action?: number; pick?: boolean }[] }[];
+  /** `quote` : la citation d'une bulle qui répond (Row.quote), un arrêt à elle juste avant sa bulle. */
+  sections: readonly { options?: boolean; title?: string; side?: boolean; rows: readonly { action?: number; pick?: boolean; quote?: { action?: number } }[] }[];
   media?: { cards: readonly { action?: number }[] };
   health?: { groups: readonly { lines: readonly { action?: number }[] }[] };
   /** Tableau des scores (son rendu à part) : portées, puis onglets, au-dessus des actions. */
@@ -50,7 +51,11 @@ function listGroups(source: ZoneSource, count: number): Map<number, number> {
   let group = 0;
   const add = (a: number | undefined) => a !== undefined && Number.isInteger(a) && a >= 0 && a < count && !found.has(a) && found.set(a, group);
   for (const s of source.sections) {
-    if (!s.options) for (const r of s.rows) if (r.pick) add(r.action);
+    if (!s.options)
+      for (const r of s.rows) {
+        add(r.quote?.action);
+        if (r.pick) add(r.action);
+      }
     group++;
   }
   for (const c of source.media?.cards ?? []) add(c.action);
@@ -83,7 +88,12 @@ export function visualOrder(source: ZoneSource, count: number, landscape = false
     out.push(a);
   };
   const rows = (list: ZoneSource['sections']) => {
-    for (const s of list) for (const r of s.rows) if (r.pick) add(r.action);
+    for (const s of list)
+      for (const r of s.rows) {
+        // La citation d'une bulle est au-dessus d'elle : son arrêt vient juste avant.
+        add(r.quote?.action);
+        if (r.pick) add(r.action);
+      }
   };
   if (source.health) for (const g of source.health.groups) for (const l of g.lines) add(l.action);
   else if (source.scoreboard) for (const c of [...(source.scoreboard.scopes ?? []), ...(source.scoreboard.tabs ?? [])]) add(c.action);

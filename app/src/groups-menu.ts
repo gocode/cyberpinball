@@ -22,6 +22,9 @@ import {
   formatNumber,
   GROUP_MEMBERS_MAX,
   GROUP_NAME_MAX,
+  groupLineMentions,
+  groupQuoteView,
+  quoteExcerpt,
   isHidden,
   isMember,
   locale,
@@ -50,6 +53,7 @@ import {
   type TableEntry,
 } from '@cyberpinball/core';
 import { lastLineAt } from './chat-cursor';
+import { bubblePieces, buildMentionPicker, lineAt, missingText, quoteRow } from './messages-citations';
 import type { GroupService } from './group-service';
 import { onGesture } from './gesture-flash';
 import type { Action, Built, Row, Section } from './library';
@@ -463,6 +467,14 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
     lib.openCustom(groupBuild(g), lastLineAt(groupBuild(g)()) ?? 0);
   }
 
+  /** Le groupe ouvert sur un de ses messages (une citation choisie ramène au message cité). */
+  function goToLine(g: string, id: string): void {
+    const build = groupBuild(g);
+    const at = lineAt(build(), id);
+    if (at === undefined) return openGroup(g);
+    lib.openCustom(build, at);
+  }
+
   const dayOf = (iso: string) => new Date(iso).toDateString();
   function dayLabel(iso: string): string {
     const d = new Date(iso);
@@ -506,7 +518,9 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
     // La discussion, les plus récents en bas.
     const chat: Row[] = [];
     let day: string | undefined;
-    for (const line of v.messages.slice(-THREAD_SHOWN)) {
+    const shownLines = v.messages.slice(-THREAD_SHOWN);
+    const allLines = groups.entry(g)?.lines ?? [];
+    for (const line of shownLines) {
       if (line.body.k !== 'msg') continue;
       if (dayOf(line.at) !== day) {
         day = dayOf(line.at);
@@ -514,9 +528,15 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       }
       const mine = line.by === myKey();
       const text = shownText(line.body.text);
+      // La citation (un arrêt à elle, avant la bulle, si le message cité est encore affiché), puis la bulle.
+      const qv = groupQuoteView(allLines, v, line);
+      const quotedId = line.x?.reply?.id;
+      const quote = qv && quotedId ? quoteRow({ ...qv, text: shownText(qv.text) }, quotedId, actions, shownLines.some((l) => l.id === quotedId) ? () => goToLine(g, quotedId) : undefined) : undefined;
       const index = actions.push({ label: oneLine(text).slice(0, 80), key: `line:${line.id}`, icon: 'message', ...(problem ? { tone: 'quiet' as const } : {}), run: () => (problem ? undefined : openReply(g, line.id)) }) - 1;
       const c = chips(v, line);
-      chat.push({ text, detail: `${mine ? t('Vous') : line.name} · ${time(line.at)}`, bubble: mine ? 'out' : 'in', ...(c.length ? { badges: c } : {}), action: index, pick: true });
+      const named = groupLineMentions(v, line).map((key) => ({ name: v.members.find((m) => m.key === key)!.name, me: key === myKey() }));
+      const pieces = bubblePieces(text, named);
+      chat.push({ text, detail: `${mine ? t('Vous') : line.name} · ${time(line.at)}`, bubble: mine ? 'out' : 'in', ...(quote ? { quote } : {}), ...(pieces ? { pieces } : {}), ...(c.length ? { badges: c } : {}), action: index, pick: true });
     }
     // Les membres qui écrivent en ce moment : leurs badges et les trois points, sous le dernier message (typing.ts).
     const typers = groups.typers(g);
@@ -605,19 +625,40 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
             : { text: t('Message pas envoyé : vous n’êtes plus membre, ou le partage est coupé'), tone: 'warning' };
   }
 
-  function compose(g: string): void {
+  /** Le clavier : `value`, le texte déjà écrit (« @pseudo » d'une mention) ; `reply`, le message cité. */
+  function compose(g: string, value = '', reply?: string): void {
     const v = groups.view(g);
+    const quoted = reply ? v?.messages.find((l) => l.id === reply) : undefined;
     lib.openPrompt(
-      t('Message à {group}', { group: v?.name ?? '' }),
+      quoted ? t('Répondre à {name}', { name: quoted.name }) : t('Message à {group}', { group: v?.name ?? '' }),
       t('Votre message'),
-      '',
+      value,
       (text) => {
-        if (text !== undefined && text.trim()) sendResult(groups.send(g, text));
+        if (text !== undefined && text.trim()) sendResult(groups.send(g, text, quoted?.id));
         openGroup(g);
       },
-      t('Le clavier à l’écran, ou votre téléphone appairé : son texte s’écrit ici en direct. 500 caractères au plus.'),
+      quoted && quoted.body.k === 'msg'
+        ? t('Votre réponse cite « {text} ». Le clavier à l’écran, ou votre téléphone appairé. 500 caractères au plus.', { text: oneLine(shownText(quoteExcerpt(quoted.body.text))) })
+        : t('Le clavier à l’écran, ou votre téléphone appairé : son texte s’écrit ici en direct. 500 caractères au plus.'),
       // Tant qu'il reste du texte : « en train d'écrire » chez les membres (typing.ts).
       { onInput: (active) => groups.typing(g, active) },
+    );
+  }
+
+  /** « Mentionner un membre » : la liste des membres, puis le clavier avec « @pseudo » (messages-citations.ts). */
+  function openMention(g: string, reply?: string): void {
+    const v = groups.view(g);
+    if (!v) return openGroup(g);
+    const others = v.members.filter((m) => m.key !== myKey()).sort((a, b) => a.name.localeCompare(b.name, locale()));
+    lib.openCustom(
+      () =>
+        buildMentionPicker({
+          group: v.name,
+          members: others.map((m) => ({ key: m.key, name: m.name, avatar: avatar(m.key, m.name), online: net.online(m.key) })),
+          pick: (m) => compose(g, `@${m.name} `, reply),
+          back: () => openReply(g, reply),
+        }),
+      0,
     );
   }
 
@@ -628,6 +669,8 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
     const mine = line ? v?.reactions.get(line.id)?.get(myKey()) : undefined;
     const actions: Action[] = [];
     const sections: Section[] = [];
+    // Répondre à un message : phrases et clavier le citent (citations.ts).
+    const reply = line && line.body.k === 'msg' ? line.id : undefined;
     if (line && line.body.k === 'msg') {
       const rows: Row[] = REACTIONS.map((r: Reaction) => {
         const on = mine === r;
@@ -637,11 +680,20 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       sections.push({ title: t('Réagir à « {text} »', { text: oneLine(shownText(line.body.text)).slice(0, 60) }), kind: 'reactions', rows });
     }
     const phrases: Row[] = chatPhrases().map((p) => {
-      const index = actions.push({ label: p, key: `phrase:${p}`, icon: 'message', run: () => (sendResult(groups.send(g, p)), back()) }) - 1;
+      const index = actions.push({ label: p, key: `phrase:${p}`, icon: 'message', run: () => (sendResult(groups.send(g, p, reply)), back()) }) - 1;
       return { text: p, action: index, pick: true };
     });
-    sections.push({ title: t('Phrases'), kind: 'phrases', rows: phrases });
-    actions.push({ label: t('Écrire un message…'), icon: 'keyboard', detail: t('Clavier à l’écran, ou votre téléphone appairé'), run: () => compose(g) });
+    sections.push({ title: reply ? t('Répondre d’une phrase') : t('Phrases'), kind: 'phrases', rows: phrases });
+    actions.push({ label: t('Écrire un message…'), icon: 'keyboard', detail: reply ? t('Votre réponse cite son message') : t('Clavier à l’écran, ou votre téléphone appairé'), run: () => compose(g, '', reply) });
+    const others = v ? v.members.filter((m) => m.key !== myKey()) : [];
+    actions.push(
+      others.length
+        ? { label: t('Mentionner un membre…'), icon: 'friends', detail: t('Il reçoit une notification, même groupe en sourdine'), run: () => openMention(g, reply) }
+        : { label: t('Mentionner un membre…'), icon: 'friends', tone: 'quiet', detail: t('Indisponible : personne d’autre dans ce groupe'), run: () => undefined },
+    );
+    // Le message cité par celui-ci : y aller (aux flippers, la citation est aussi un arrêt dans le fil).
+    const cited = line?.x?.reply?.id;
+    if (cited && v?.messages.some((l) => l.id === cited)) actions.push({ label: t('Voir le message cité'), icon: 'history', detail: t('Le fil, sur le message auquel il répond'), run: () => goToLine(g, cited) });
     if (line && line.body.k === 'msg' && line.by === myKey()) {
       const quoted = oneLine(line.body.text).slice(0, 60);
       actions.push({
@@ -1077,7 +1129,10 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
         const out = line.by === myKey();
         const c = chips(v, line);
         // Plusieurs auteurs dans un groupe : le pseudo de chacun au-dessus de sa bulle ; l'heure dessous.
-        items.push({ kind: 'line', id: line.id, text: shownText(line.body.text), out, meta: time(line.at), bubble: out ? 'out' : 'in', ...(out ? {} : { author: line.name }), ...(c.length ? { chips: c } : {}) });
+        const qv = groupQuoteView(groups.entry(g)?.lines ?? [], v, line);
+        const missing = qv ? missingText(qv.missing) : undefined;
+        const quote = qv ? { name: qv.name, text: shownText(qv.text), ...(missing ? { missing } : {}) } : undefined;
+        items.push({ kind: 'line', id: line.id, text: shownText(line.body.text), out, meta: time(line.at), bubble: out ? 'out' : 'in', ...(out ? {} : { author: line.name }), ...(c.length ? { chips: c } : {}), ...(quote ? { quote } : {}) });
       }
       const on = onlineCount(v);
       return {
