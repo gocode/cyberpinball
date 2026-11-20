@@ -23,7 +23,7 @@ Clés écrites (`vpxSettingsFor` et `vpxPluginDefaults` dans `packages/core/src/
 | `[Plugin.B2S] ScoreViewDMDOverlay`, `ScoreViewDMDAutoPos` | 1 et 1 si le rôle DMD existe et n'est pas un DMD seul. Le FullDMD d'un .directb2s passe devant ScoreView : sans incrustation, on ne verrait que son cadre. La position du DMD est cherchée dans l'image | non, proposées si la clé est vide |
 | `[Plugin.DMDUtil] Enable`, et `ZeDMD`, `PIN2DMD` ou `Pixelcade` | 1 pour le DMD réel reconnu ou réglé sur « oui », 0 pour un modèle réglé sur « non » ; rien sans DMD réel ni choix | oui |
 | `[Plugin.DMDUtil] ZeDMDWiFiEnabled`, `ZeDMDWiFiAddr` | le ZeDMD en wifi de « DMD réel » : 1 et son adresse, ou 0 une fois coupé ; rien tant qu'il n'a jamais été réglé | oui |
-| `[Plugin.DMDUtil] DMDServer`, `DMDServerAddr`, `DMDServerPort` | « Image du front-end » : 1, `127.0.0.1` et `6789` quand le serveur du DMD tient l'afficheur, avec `ZeDMD`, `PIN2DMD`, `Pixelcade` et `ZeDMDWiFiEnabled` à 0 (le serveur seul ouvre le matériel) ; 0 sinon, et VPX ouvre le DMD lui-même ; rien tant que l'image du front-end n'a jamais été réglée | oui |
+| `[Plugin.DMDUtil] DMDServer`, `DMDServerAddr`, `DMDServerPort` | 1, `127.0.0.1` et `6789` quand le serveur du DMD tient l'afficheur (« Image du front-end », ou un PIN2DMD allumé), avec `ZeDMD`, `PIN2DMD`, `Pixelcade` et `ZeDMDWiFiEnabled` à 0 (le serveur seul ouvre le matériel) ; 0 sinon, et VPX ouvre le DMD lui-même ; rien tant que l'image du front-end n'a jamais été réglée et qu'aucun PIN2DMD n'est allumé | oui |
 | `[Plugin.PinMAME] PinMAMEPath` | `<racine>\pinmame`, s'il contient `roms` | non, proposée si la clé est vide |
 | `[Plugin.PinMAME] Cheat` | 1 si le plugin PinMAME est activé. Sans lui, une ROM WPC (Williams et Bally, 1990-1999) refait son test de mémoire, « TESTING… », avant chaque partie ; activé, PinMAME saute ce contrôle (`wpc.c`, `MACHINE_INIT`). Règles et scores inchangés. Réglage « Démarrage rapide des ROM » de l'onglet « Essentiels » | non, proposée si la clé est vide |
 | `[Plugin.Serum] SerumPath`, `[Plugin.VNI] VniPath` | `<racine>\pinmame\altcolor`, s'il contient un `<rom>\<rom>.cRZ` ou `.cROMc` (Serum), `.pal` ou `.vni` (VNI) | non, proposées si la clé est vide |
@@ -65,47 +65,60 @@ La prise en charge reste en bêta tant que des bornes équipées ne l'ont pas co
   Le PIN2DMD passe par libusb, qui demande un pilote générique (WinUSB, libusbK ou libusb0) ; un autre pilote, ou aucun, est signalé avec l'outil du PIN2DMD ou Zadig.
   libusb n'ouvre libusb0 (le libusb-win32 des anciens outils du PIN2DMD) et libusbK que par `libusbK.dll`, chargée depuis `System32` seulement (`windows_winusb.c`, `winusbx_init`) : sans elle, le pilote est signalé avec le conseil de passer à WinUSB par Zadig (`libusbKDll`, relevé par `packages/win-displays/src/usb.ts`).
   Un ZeDMD ou un Pixelcade sans port COM manque du pilote de sa puce (CH340/CH343 de WCH, CP210x de Silicon Labs).
-- **Sonde du PIN2DMD** : libdmdutil abandonne en silence quand `libusb_open` ou `libusb_claim_interface` échoue (`PIN2DMD.cpp`, `PIN2DMDInit`) ; le journal de VPX ne dit rien et le DMD reste noir.
-  La sonde (`app/src/sonde-pin2dmd.ts`, l'exécutable en mode Node, sans fenêtre) fait les mêmes étapes avec la `libusb64-1.0.dll` de VPX, puis relâche tout.
-  Elle va jusqu'au bout de `PIN2DMDInit`, comme VPX : elle lit le nom de la carte (`iProduct`), que le module DMD de VPX compare à trois noms seulement, « PIN2DMD », « PIN2DMD XL » et « PIN2DMD HD ».
-  Une carte qui ne donne pas son nom, ou un autre nom, n'est jamais pilotée par VPX et le DMD reste noir : l'écran « DMD réel » et la Santé le disent avec le nom lu (« PIN2DMD : la carte se présente sous le nom « … » »), et proposent d'envoyer un rapport, car Cyber Pinball ne peut pas le contourner.
+- **Sonde du PIN2DMD** : le PIN2DMD est ouvert par le serveur du DMD (voir « PIN2DMD : piloté par le serveur du DMD », plus bas), qui dit au journal pourquoi il ne s'ouvre pas ; la sonde le dit aussi à l'écran, avant même que le serveur ne tourne.
+  La sonde (`app/src/sonde-pin2dmd.ts`, l'exécutable en mode Node, sans fenêtre) fait les mêmes étapes (`libusb_open`, `libusb_claim_interface`) avec la `libusb64-1.0.dll` de VPX, puis relâche tout.
+  Elle lit aussi le nom de la carte (`iProduct`) : seuls trois noms sont pilotés, « PIN2DMD », « PIN2DMD XL » et « PIN2DMD HD », ceux que connaît libdmdutil.
+  Une carte qui ne donne pas son nom, ou un autre nom, n'est pas pilotée et le DMD reste noir : l'écran « DMD réel » et la Santé le disent avec le nom lu (« PIN2DMD : la carte se présente sous le nom « … » »), et proposent d'envoyer un rapport.
   Elle tourne au démarrage du front-end, au retour d'une partie, après un choix de « DMD réel » (`applyMenuDmdServer`) et après l'arrêt d'un serveur du DMD qui ne trouve pas l'afficheur, jamais pendant une partie ni quand le serveur du DMD tient la carte.
   Son verdict est joint au PIN2DMD (`libusbProbe`) : carte déjà ouverte par un autre programme (codes `-3` et `-6`, avec les programmes ouverts reconnus), pilote que libusb ne sait pas utiliser (`-12`), carte introuvable, autre erreur.
-  L'écran, la Santé et les points à vérifier avant la partie le disent ; ouverte puis relâchée, la ligne dit « VPX pourra l'allumer ».
+  L'écran, la Santé et les points à vérifier avant la partie le disent ; ouverte puis relâchée, la ligne dit « le serveur du DMD pourra l'allumer ».
 - **Programmes qui gardent un DMD réel** (`DMD_HOLDER_PROGRAMS`, `dmd.ts`) : dmdext, PinUP Popper, PinballX, PinballY, un autre VPX, Future Pinball.
   Ouverts au moment de la synchronisation, ils sont signalés avant la partie pour tous les modèles : un seul programme à la fois tient un PIN2DMD ou un port série.
 - **Taille du PIN2DMD** : le nom que la carte donne à l'USB, lu par Windows au branchement (`DEVPKEY_Device_BusReportedDeviceDesc`) : « PIN2DMD » 128 × 32, « PIN2DMD XL » 192 × 64, « PIN2DMD HD » 256 × 64, comme libdmdutil (`PIN2DMD.cpp`).
   Le ZeDMD donne sa taille à la connexion seulement.
 
 Les choix sont gardés avec la configuration de la borne (`cabinet.json`, `hardwareDmd`) et repris par la synchronisation qui précède chaque partie.
-La santé de la borne a un contrôle « DMD réel » : prêt, ou un point à vérifier (pilote à installer, PIN2DMD que VPX n'ouvrira pas, serveur du DMD qui ne trouve pas l'afficheur, pont USB-série qui n'a pas répondu comme un ZeDMD).
+La santé de la borne a un contrôle « DMD réel » : prêt, ou un point à vérifier (pilote à installer, PIN2DMD qui ne s'ouvrira pas, serveur du DMD qui ne trouve pas l'afficheur, pont USB-série qui n'a pas répondu comme un ZeDMD).
 Prêt sans « Image du front-end », il dit que ce choix fait aussi montrer le front-end au DMD réel.
 
 **Image du front-end (bêta).**
 Réglage « Image du front-end » de « DMD réel », non par défaut : le DMD réel montre aussi le DMD du front-end entre les parties, pas seulement pendant celles-ci.
-Un seul programme peut tenir l'afficheur : c'est le serveur de libdmdutil, `dmdserver`, lancé caché par Cyber Pinball.
+Un seul programme peut tenir l'afficheur : c'est le serveur du DMD de Cyber Pinball, lancé caché.
 Le front-end et VPX lui envoient leurs images tour à tour (`app/src/dmd-server.ts`, protocole dans `packages/core/src/dmdserver.ts`).
 
-- **Le serveur** : `cyberpinball-dmdserver.exe` (`packages/dmdserver`, livré dans `natif\dmdserver`), le `server.cpp` de libdmdutil construit sur le `dmdutil64.dll` que VPX installe lui-même dans `plugins\dmdutil`.
-  C'est exactement la version de libdmdutil de VPX 10.8.1 (commit 3485e2e), qui gère ZeDMD, ZeDMD en wifi, PIN2DMD et Pixelcade.
+- **Le serveur** : `cyberpinball-dmdserver.exe` (`packages/dmdserver`, livré dans `natif\dmdserver`), tiré du `server.cpp` de libdmdutil et construit sur le `dmdutil64.dll` que VPX installe lui-même dans `plugins\dmdutil`.
+  C'est exactement la version de libdmdutil de VPX 10.8.1 (commit 3485e2e) qui ouvre le ZeDMD, le ZeDMD en wifi et le Pixelcade ; le PIN2DMD, que cette version ne pilote pas, l'est par le serveur lui-même (voir « PIN2DMD : piloté par le serveur du DMD », plus bas).
+  Le serveur réseau est aussi celui de Cyber Pinball ([packages/dmdserver/src/serveur-tcp.h](../../packages/dmdserver/src/serveur-tcp.h)), au même protocole : celui de cette DLL coupait chaque connexion sous Windows (il prenait l'attente ordinaire de Winsock pour une erreur) et tournait à vide en remplissant le journal, si bien qu'aucune image n'arrivait au DMD réel, quel que soit le modèle.
   Rien n'est téléchargé, aucune DLL n'est copiée.
   Les archives Windows publiées par libdmdutil ne conviennent pas : celle de la 0.11.0 n'a pas les DLL dont dépend `dmdserver.exe`, et la 0.10.0 ne connaît pas le PIN2DMD.
   Avant tout chargement, l'empreinte SHA-256 de la DLL est comparée à celles de `packages/dmdserver/src/empreintes.h` : une DLL inconnue n'est jamais chargée et arrête le serveur avec le code 6.
   Le serveur appelle les classes C++ de la DLL, et une autre version de libdmdutil peut changer leur disposition en mémoire sans changer ses fonctions : seule l'empreinte le dit sûrement.
   La DLL reconnue est ensuite chargée à la demande depuis le dossier passé par `-d`, et toutes ses fonctions sont liées avant de chercher un DMD : une DLL absente arrête le serveur avec le code 3, une fonction manquante avec le code 4, sans fenêtre d'erreur de Windows.
   `--verifier` fait ces contrôles seuls et donne l'empreinte (`node scripts/dmdserver.mjs --verifier --vpx <dossier de VPX>`).
-- **Lancement** : au démarrage du front-end, après un choix de « DMD réel » et au retour d'une partie, s'il y a au moins un DMD allumé (reconnu, réglé sur « oui », ou ZeDMD en wifi).
+- **Lancement** : au démarrage du front-end, après un choix de « DMD réel » et au retour d'une partie, avec « Image du front-end : oui » et au moins un DMD allumé (reconnu, réglé sur « oui », ou ZeDMD en wifi) ; et toujours pour un PIN2DMD allumé, même sans l'image du front-end.
   `dmdserver.ini` (dossier des données) reprend les choix par modèle : Serum et PuP restent éteints (`AltColor = 0`, `PUPCapture = 0`), car VPX envoie ses images déjà colorées.
   `-w` : le serveur attend le DMD plutôt que de s'arrêter, mais 20 secondes au plus (`FIND_TIMEOUT_MS`).
-  Sans afficheur trouvé dans ce délai, il est arrêté et ne se relance pas de lui-même : libdmdutil garde ouvert un PIN2DMD dont il refuse le nom, et VPX, qui ouvre alors le DMD lui-même, le trouverait pris.
-  L'écran « DMD réel » et la Santé le disent (« Le serveur du DMD ne trouve pas l'afficheur (aucune réponse en 20 s) »), avec la cause trouvée par la sonde du PIN2DMD, sinon le conseil d'envoyer un rapport ; VPX reprend le DMD lui-même pendant les parties.
+  Sans afficheur trouvé dans ce délai, il est arrêté et ne se relance pas de lui-même : VPX ouvre alors le DMD lui-même, et ne doit pas le trouver pris par un serveur qui cherche encore.
+  L'écran « DMD réel » et la Santé le disent (« Le serveur du DMD ne trouve pas l'afficheur (aucune réponse en 20 s) »), avec la cause trouvée par la sonde du PIN2DMD, sinon le conseil d'envoyer un rapport ; VPX reprend le DMD lui-même pendant les parties, sauf un PIN2DMD, qui reste noir.
   Avant une partie que VPX pilote lui-même (`DMDServer = 0`), le serveur est toujours arrêté et sa fin attendue (`handDmdToVpx`) : le système rend la carte à sa sortie.
   S'il s'arrête (DMD débranché, plantage), il est relancé 2 s plus tard.
   Après un code 3 ou 4, il ne l'est plus : la raison est affichée dans « DMD réel » et dans la santé de la borne.
 - **Images** : le DMD du front-end, vivant ou classique, en RGB24 128 × 32, dans la couleur réglée (un point éteint est noir sur le DMD réel).
   Pendant une partie, le front-end se déconnecte avant que VPX ne se connecte, puis se reconnecte et renvoie sa dernière image au retour.
 - **VPX** : la synchronisation écrit `DMDServer = 1` seulement quand le serveur tient l'afficheur et que le front-end y est connecté.
-  Sinon (serveur absent, en attente du DMD, arrêté), elle écrit `DMDServer = 0` et les clés par modèle, et VPX ouvre le DMD lui-même comme sans l'image du front-end.
+  Sinon (serveur absent, en attente du DMD, arrêté), elle écrit `DMDServer = 0` et les clés par modèle, et VPX ouvre le DMD lui-même comme sans l'image du front-end ; un PIN2DMD reste alors noir.
+
+**PIN2DMD : piloté par le serveur du DMD.**
+Le module DMD de VPX 10.8.1 (`dmdutil64.dll`, libdmdutil 3485e2e) ne sait pas piloter un PIN2DMD : sa prise en charge n'y a pas été compilée, et `[Plugin.DMDUtil] PIN2DMD = 1` n'y change rien.
+Le serveur du DMD le pilote donc lui-même, avec la `libusb64-1.0.dll` de VPX ([packages/dmdserver/src/pin2dmd.h](../../packages/dmdserver/src/pin2dmd.h)).
+Il envoie ses images à la carte au format qu'emploient les autres front-ends ; l'ordre des couleurs des dalles, et celui des modules d'un PIN2DMD HD, est lu dans la configuration de la carte (l'ordre par défaut si elle ne répond pas).
+Pour un PIN2DMD allumé (reconnu en « automatique », ou réglé sur « oui »), le serveur tourne même avec « Image du front-end : non » : il n'ouvre alors que le PIN2DMD, VPX lui envoie ses images pendant les parties (`DMDServer = 1`), et le PIN2DMD reste noir entre les parties.
+Avec « Image du front-end : oui », il montre aussi le front-end entre les parties.
+L'écran « DMD réel » le dit sur la ligne « Serveur du DMD » : « Pilote le PIN2DMD ; VPX lui envoie ses images pendant les parties », ou « Démarre, ou attend que le PIN2DMD réponde ».
+Sans serveur (programme absent, autre version de VPX, aucun afficheur trouvé en 20 s), le PIN2DMD reste noir, en partie aussi : la ligne et la Santé le disent (« … ; le PIN2DMD restera noir : le module DMD de VPX ne sait pas le piloter seul »).
+Une ouverture qui échoue relâche tout, et le serveur réessaie une seconde plus tard.
+Le journal du front-end dit pourquoi, avec le code de libusb, sur une ligne « dmdserver : PIN2DMD : … », écrite de nouveau seulement quand la cause change : aucune carte 0314:E457 vue, ouverture refusée, interface 0 déjà prise ou refusée, nom de carte inconnu (avec le nom lu) ou illisible.
+Une carte ouverte y est notée avec son nom, sa taille et l'ordre des couleurs lu, puis la première image envoyée.
 
 ### Plusieurs rôles sur un écran : zones
 

@@ -15,6 +15,7 @@ Indexes (`vpsdb.json`, `vpinmdb.json`…), records, site thumbnails and download
   It shows where you are, with the flippers (choose), Start (open a folder, tick a file, or take it when only one is expected), Exit (parent folder, then cancel), the mouse (click, drag a file onto the window) and the keyboard (Tab, Enter, Esc).
   **Places**: Cyber Pinball's downloads (opened by default when they have what is wanted, with each file's origin and use), Windows Downloads, the import folder, the Desktop, then USB drives and disks (`Get-CimInstance Win32_LogicalDisk`, read again every 15 seconds: a plugged-in drive appears at the next opening).
   The content is **filtered** on what the screen expects ("Filtre : Fronton (.mp4, .png…)"); other files are counted, and "Afficher tous les fichiers" (Show all files) shows them, marked "Ne convient pas" (Does not fit).
+  It opens **sorted by name**, like Windows File Explorer (`DEFAULT_PICKER_SORT`): folders first, then files, ignoring upper and lower case, numbers in their order ("Table 2" before "Table 10"); the "Trier par date" (Sort by date) move puts the newest first, and "Trier par nom" (Sort by name) goes back.
   Several files can be ticked across folders ("Prendre les 2 fichiers choisis", Take the 2 chosen files); "Prendre ce dossier entier" (Take this whole folder) takes the open folder.
   Distinct states: empty folder, no fitting file, drive removed or access denied ("Réessayer", Try again).
   A file reused from the downloads area is noted in the log.

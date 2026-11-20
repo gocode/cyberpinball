@@ -51,7 +51,7 @@ The desktop comes back at the next sign-in; the features are fully removed at th
 - **From the administrator account, without Cyber Pinball**: in PowerShell started as administrator, the rescue script puts the previous state back, like "Turn off", and prints its result; the next time the "Borne dédiée" screen opens, Cyber Pinball reads it, checks it and forgets the activation.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "D:\CyberPinball\data\borne-dediee\desactiver.ps1"
+powershell -ExecutionPolicy RemoteSigned -File "D:\CyberPinball\data\borne-dediee\desactiver.ps1"
 ```
 
 - **Cyber Pinball keeps restarting** (it crashes at startup, Shell Launcher restarts it): Ctrl+Alt+Del, "Sign out", administrator account, the script above, then restart; the cause is written to `<data>\logs\erreurs.txt`.
@@ -91,7 +91,7 @@ A write that fails midway puts the previous state back by itself.
 The rescue script `retablir-reglages.ps1` does the same outside Cyber Pinball; the screen then reads its result and forgets the activation:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "D:\CyberPinball\data\borne-dediee\retablir-reglages.ps1"
+powershell -ExecutionPolicy RemoteSigned -File "D:\CyberPinball\data\borne-dediee\retablir-reglages.ps1"
 ```
 
 On a stuck cabinet: Ctrl+Alt+Del, "Task Manager", File > Run new task, this command, ticking "Create this task with administrative privileges" if the desktop is replaced.

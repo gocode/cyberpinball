@@ -5,6 +5,7 @@
 Le joueur gagne des points d'expérience (XP) en jouant, en progressant, aux classements de la semaine, avec ses badges et dans la vie entre joueurs.
 Ils font monter un niveau qui ne baisse jamais.
 Le niveau se voit en permanence en haut de l'écran des tables et des écrans pleins, sur le profil public et dans les tableaux de scores.
+Sur une borne qui joue en local (Menu système > Communauté > Jouer en local), rien de tout cela ne s'affiche : ni carte du joueur, ni Mon niveau, ni Mes badges, ni moments ; les XP continuent de se compter en silence, et ce qui a été gagné entre-temps revient avec la communauté, sans son moment.
 Règles : [packages/core/src/levels.ts](../../packages/core/src/levels.ts) ; badges : [packages/core/src/badges.ts](../../packages/core/src/badges.ts) ; suivi dans l'application : [app/src/level-tracker.ts](../../app/src/level-tracker.ts).
 
 ### Courbe et paliers
@@ -119,7 +120,8 @@ Le voile se pose une fois, à l'ouverture du moment, et reste d'un badge à l'au
 Au bureau, le badge et le texte tiennent dans une colonne 9:16 au milieu de l'écran ; le fond couvre tout l'écran.
 Ses étoiles et ses poussières se répartissent sur toute la largeur, de part et d'autre du badge, et l'essaim se centre sur la colonne (test : [moment-fond.test.ts](../../packages/core/src/test/moment-fond.test.ts), pour chaque fond).
 
-Deux musiques synthétisées l'accompagnent (sons de l'interface, voir [Médias des jeux](medias-des-jeux.md#sons-de-linterface)) : « Tintement » pour un badge commun, « Fanfare » pour un rare, un épique ou un légendaire, et « Passage de niveau » quand le niveau monte.
+Deux musiques synthétisées l'accompagnent (sons de l'interface, voir [Médias des jeux](medias-des-jeux.md#sons-de-linterface)) : « Tintement » pour un badge commun, « Fanfare » pour un rare, un épique ou un légendaire, et « Passage de niveau », une fanfare de quatre secondes, quand le niveau monte.
+Le temps du moment, la musique de la table choisie sur la roue et le son de la vidéo du plateau se taisent en fondu, pour que la musique du moment s'entende seule ; ensuite, la musique de la table reprend où elle en était (`hushForMoment`, [packages/core/src/menumoments.ts](../../packages/core/src/menumoments.ts)).
 
 ### Fichiers et tests
 

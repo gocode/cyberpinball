@@ -201,7 +201,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Clavier et joystick mélangés** : encodeurs clavier, encodeurs en mode manette, Pinscape KL25Z, VirtuaPin. Le relevé dit quel joystick il lit (« Joystick lu : … »).
 - **Relevé sûr** : doublons, touche Windows et touches que VPX ne lit pas sont refusés.
 - **Après chaque partie**, si VPX n'a pas vu le joystick relevé, le front-end le dit et rouvre l'étape « Boutons ».
-- **Touches par défaut des encodeurs** en recours, en un geste, même sans aucun bouton.
+- **Touches par défaut des encodeurs** en recours pour une borne aux boutons de clavier, après confirmation, le relevé remplacé toujours rétablissable ; même sans aucun bouton.
 - **Bouton Pause** facultatif : un appui met la partie en pause, un autre la reprend.
 
 <p align="center">

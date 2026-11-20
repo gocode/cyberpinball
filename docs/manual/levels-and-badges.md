@@ -5,6 +5,7 @@
 Players earn experience points (XP) by playing, by improving, in the weekly rankings, with their badges and through life between players.
 XP raises a level that never goes down.
 The level is always visible at the top of the tables screen and of full-screen pages, on the public profile and in the score tables.
+On a cabinet that plays locally (System menu > Community > Local play), none of this shows: no player card, no My level, no My badges, no moments; XP keeps counting quietly, and what was earned meanwhile comes back with the community, without its moment.
 Rules: [packages/core/src/levels.ts](../../packages/core/src/levels.ts); badges: [packages/core/src/badges.ts](../../packages/core/src/badges.ts); tracking in the app: [app/src/level-tracker.ts](../../app/src/level-tracker.ts).
 
 ### Curve and tiers
@@ -119,7 +120,8 @@ The veil is laid once, when the moment opens, and stays from one badge to the ne
 On a desktop, the badge and text sit in a 9:16 column in the middle of the screen; the background covers the whole screen.
 Its stars and dust spread over the whole width, on both sides of the badge, and the swarm centres on the column (test: [moment-fond.test.ts](../../packages/core/src/test/moment-fond.test.ts), for each background).
 
-Two synthesized tunes go with it (interface sounds, see [Game media](game-media.md#interface-sounds)): "Chime" for a common badge, "Fanfare" for a rare, epic or legendary one, and "Level up" when the level rises.
+Two synthesized tunes go with it (interface sounds, see [Game media](game-media.md#interface-sounds)): "Chime" for a common badge, "Fanfare" for a rare, epic or legendary one, and "Level up", a four-second fanfare, when the level rises.
+For the length of the moment, the music of the table chosen on the wheel and the sound of the playfield video fade to silence, so that the moment's music is heard alone; afterwards, the table's music resumes where it left off (`hushForMoment`, [packages/core/src/menumoments.ts](../../packages/core/src/menumoments.ts)).
 
 ### Files and tests
 

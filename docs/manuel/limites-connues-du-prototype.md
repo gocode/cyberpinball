@@ -13,10 +13,12 @@
   Pas de réalité virtuelle, de réglage de l'affichage en partie, de partie entre amis, de Vision 3D, de réglages de VPX de Cyber Pinball ni de préparation des PuP-Packs pour les tables jouées ainsi.
 - Image du front-end sur le DMD réel : le serveur du DMD n'accepte que le `dmdutil64.dll` de VPX 10.8.1, reconnu à son empreinte.
   Avec toute autre version de VPX, plus récente ou plus ancienne, « Image du front-end » est grisé avec sa raison et VPX garde le DMD en partie.
-  Passer à une autre version demande de recopier les en-têtes, de refaire `packages/dmdserver/dmdutil64.def` et d'ajouter l'empreinte (`vendor/PROVENANCE.txt`) ; un test l'exige pour la version de VPX installée.
+  Passer à une autre version demande de recopier les en-têtes, de refaire `packages/dmdserver/dmdutil64.def`, d'ajouter l'empreinte et de relever si cette DLL pilote elle-même le PIN2DMD (`vendor/PROVENANCE.txt`) ; un test l'exige pour la version de VPX installée.
+  Le PIN2DMD dépend de ce serveur : le module DMD de VPX 10.8.1 ne le pilote pas, et sans le serveur il reste noir, en partie aussi.
   Bêta, comme tout le DMD réel, jusqu'à confirmation sur des bornes équipées.
 - Journal de VPX pour diagnostiquer : `%APPDATA%\VPinballX\10.8\vpinball.log` (lignes « The selected display … is not available »).
 - Exécutable et installeurs non signés tant qu'aucun certificat n'est fourni (configuration prête, voir [Signature](installation-et-organisation-des-fichiers.md#signature)) : SmartScreen avertit au lancement de l'installeur.
+  Les binaires livrés avec l'application (plugins de VPX, couche OpenXR, compagnon du casque, serveur du DMD) ne le sont pas non plus, et certains antivirus peuvent bloquer un programme non signé.
 - Mise à jour à la demande seulement (menu système, voir [Mise à jour depuis la borne](installation-et-organisation-des-fichiers.md#mise-à-jour-depuis-la-borne)) : pas de recherche en arrière-plan.
   Pendant l'installation (une minute environ), le bureau Windows et la page de progression de l'installeur se voient sur l'écran principal.
   Le retour à l'ancienne version en cas d'échec de l'installeur n'a pas encore été provoqué en essai.

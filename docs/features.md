@@ -201,7 +201,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **Keyboard and joystick mixed freely**: keyboard encoders, encoders in gamepad mode, Pinscape KL25Z, VirtuaPin. The step says which joystick it reads ("Joystick read: …").
 - **Safe learning**: duplicates, the Windows key and keys VPX can't read are refused.
 - **After every game**, if VPX didn't see the learned joystick, the menu says so and reopens the "Buttons" step.
-- **The encoders' default keys** as a fallback, in one move, even with no button at all.
+- **The encoders' default keys** as a fallback for a cabinet with keyboard buttons, after confirmation, the replaced mapping can always be restored; even with no button at all.
 - **An optional Pause button**: one press pauses the game, another resumes it.
 
 <p align="center">

@@ -14,7 +14,10 @@ Code : [packages/core/src/coexistence.ts](../../packages/core/src/coexistence.ts
   Le dossier de DOF (`%APPDATA%\VPinballX\10.8\directoutputconfig`) est commun à tout VPX 10.8 du PC : Cyber Pinball n'y écrit qu'à la demande (import du configtool, ancienne configuration sauvegardée ; LED adressables décrites), et jamais à la place d'un `Cabinet.xml` ou d'un GlobalConfig écrit à la main (voir [LED et retours (DOF)](led-et-retours-dof.md#led-et-retours-dof)).
   Le DOF classique de l'autre front-end (`C:\DirectOutput`, `C:\vPinball\DirectOutput`…) garde sa configuration du configtool dans son propre dossier, que le plugin DOF de VPX ne lit pas.
   Quand le dossier de DOF de VPX est vide, l'écran « LED et retours (DOF) » et la Santé de la borne montrent cette ancienne configuration, et « Reprendre la configuration de l'ancien DOF » copie ses ini et tablemappings sans toucher au dossier d'origine ; son GlobalConfig n'est jamais repris, son Cabinet.xml seulement s'il est cohérent et que ses ports sont branchés.
-- Les fichiers de l'autre front-end ne sont jamais déplacés : « Reprendre les médias de PinUP Popper / PinballX » les copie, une table choisie hors de `import\` est copiée.
+- Les fichiers de l'autre front-end ne sont jamais déplacés ni modifiés : « Reprendre les médias de PinUP Popper / PinballX » les copie, une table choisie hors de `import\` est copiée.
+  Les tables reprises de son installation (Ajouter une table > « Depuis une autre installation… », en bêta) ne sont pas dupliquées quand elle est sur le même disque que Cyber Pinball : leurs gros fichiers (tables, frontons, vidéos, images, sons, ROM) deviennent des liens physiques NTFS, sans place en plus, et seuls les petits fichiers que VPX, PinMAME ou le PuP-Pack peuvent réécrire sont copiés (voir [Ajouter une table](ajouter-une-table-l-entonnoir-le-catalogue.md#ajouter-une-table--lentonnoir-le-catalogue--récupérer--liste-dattente)).
+  Avant d'écrire dans un fichier lié, Cyber Pinball coupe son lien : le fichier de l'autre front-end garde ses octets et sa date.
+  Sur un autre disque, tout est copié, et l'écran de reprise le dit.
 - ROM et NVRAM sont rangées à part : records et réglages des jeux ne sont pas partagés.
 
 **Ce qui est commun : quelques réglages de Windows.**
@@ -29,7 +32,7 @@ Le test refuse un appel déclaré ailleurs que dans son fichier, et tout appel q
 | Raccourci Ctrl+Maj+D | en mode bureau | Rendu au retour au front-end. |
 | Lancement à l'ouverture de session, bureau remplacé ou masqué | option de l'installeur, et Menu système > « Borne » > « Borne dédiée » ou « Lancement au démarrage », désactivés par défaut | Autre front-end installé : l'écran le signale avant d'activer (s'il démarre aussi avec Windows, les deux se disputeraient les écrans). Chaque réglage de Windows est relevé avant d'être écrit et remis tel quel à la désactivation (`Sys-Set`, `windowssettings.ts`). |
 | Entrée de « Programmes et fonctionnalités » | installation (`HKCU`) | Retirée à la désinstallation. |
-| Tâche planifiée « Cyber Pinball pare-feu » | « Autoriser dans le pare-feu de Windows », sous la même autorisation | Sans déclencheur : lancée par Cyber Pinball seulement, quand une de ses règles du pare-feu manque, pour la reposer (voir « Pare-feu après une mise à jour »). Ne touche à rien d'autre ; retirée à la désinstallation. |
+| Tâche planifiée « Cyber Pinball pare-feu » | « Autoriser dans le pare-feu de Windows », sous la même autorisation | Sans déclencheur : lancée par Cyber Pinball seulement, quand une de ses règles du pare-feu manque, pour la reposer (voir « Pare-feu après une mise à jour »). Ne touche à rien d'autre ; retirée à la désinstallation. Son script, lisible, est dans `ProgramData\CyberPinball`, retiré avec elle. |
 
 **Autre front-end déjà ouvert.**
 Les deux front-ends se disputeraient les écrans, l'afficheur DMD et les boutons de la borne.

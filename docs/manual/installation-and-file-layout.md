@@ -111,8 +111,9 @@ In the executable, koffi is reduced to the JavaScript loaded at run time and the
 
 ### Code signing
 
-Nothing is signed without a certificate: the build carries on without asking anything.
+Nothing is signed without a certificate: the build carries on without asking anything, and each release reminds that the executables go out unsigned.
 With a code signing certificate (Authenticode), `CyberPinball.exe`, the uninstaller and both installers are signed and timestamped by `signtool` (the uninstaller is written and signed before being embedded).
+Every binary Cyber Pinball ships itself in `natif\` (VPX plugins, OpenXR layer, headset companion, DMD server) is signed too, before the update package that embeds them (`signAll`): a single unsigned binary is enough for some antivirus products to block the application.
 The certificate is designated through environment variables, never in the repository ([scripts/signature.mjs](../../scripts/signature.mjs)):
 
 | Variable | Role |
@@ -133,6 +134,12 @@ Get-AuthenticodeSignature release\CyberPinball-Setup.exe, release\win-unpacked\C
 ```
 
 An OV certificate gives a valid signature, but SmartScreen keeps warning until the publisher's reputation is established; an EV certificate or Azure Trusted Signing establishes it right away.
+
+**PowerShell and antivirus.**
+Antivirus products that watch program behaviour had mistaken Cyber Pinball for a Trojan and quarantined it at startup: an unsigned executable started PowerShell without a window, with an encoded script and Windows' execution policy bypassed, and collected the list of the PC's antivirus products.
+Since then, every Cyber Pinball PowerShell script longer than one line runs from a readable `.ps1` file, never encoded, started by the Windows PowerShell in `System32` with the `RemoteSigned` policy, never `Bypass` ([packages/core/src/powershell.ts](../../packages/core/src/powershell.ts)).
+A temporary script is removed after use, or replaced at the next launch (fixed name); none collects the installed antivirus products.
+The `powershell-propre.test.ts` test refuses the return of these signs in the shipped code.
 
 ### Updating from the cabinet
 

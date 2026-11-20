@@ -8,7 +8,7 @@ La page montre six blocs, chacun avec son état écrit (« ✓ OK », « ! À v�
 | Bloc | Ce qu'il montre | Ce qu'il propose |
 | --- | --- | --- |
 | PC | Disques d'abord (modèle, NVMe, SSD ou disque dur, place libre), puis processeur, mémoire (barrettes, fréquence, part utilisée), carte graphique et la version de son pilote (celle de NVIDIA, « 566.36 », pas celle de Windows), carte mère et BIOS, réseau, démarrage de Windows | Téléchargements (faire de la place) |
-| Windows | Édition et build, redémarrage en attente, mode d'alimentation et délais d'écran et de veille, mode Jeu, planification GPU, notifications, Visual C++, antivirus, langue et clavier | Redémarrer la borne (s'il y a une mise à jour en attente), Borne dédiée |
+| Windows | Édition et build, redémarrage en attente, mode d'alimentation et délais d'écran et de veille, mode Jeu, planification GPU, notifications, Visual C++, langue et clavier | Redémarrer la borne (s'il y a une mise à jour en attente), Borne dédiée |
 | Écrans | Chaque écran branché, par son rôle dans la configuration retenue : modèle, diagonale, définition, fréquence, connexion (HDMI, DisplayPort…), fréquence la plus haute annoncée quand il en a une, échelle de Windows, rotation ; puis la configuration retenue et ses écrans trouvés | Configuration de la borne |
 | Contrôleurs | Boutons (Pinscape, clavier ou encodeur, nombre de boutons configurés), lanceur, accéléromètre, contrôleurs DOF | Commandes de la borne, LED et retours (DOF) |
 | Logiciels | VPX et la version que Cyber Pinball connaît (« facultative » : une information, pas une panne), les plugins de VPX trouvés dans son dossier `plugins` et leur état dans `VPinballX.ini` (PinMAME, B2S, DOF, FlexDMD, PUP, Serum, AltSound, DMDUtil d'abord), les tables avec un PuP-Pack ; les fichiers de VPX remplacés hors de Cyber Pinball, nommés avec leur version (« Fichiers de VPX : 1 modifié », « SDL364.dll 3.2.18.0 ») | Installer la version connue de VPX, Réglages de VPX, Santé de la borne (« Remettre les fichiers d'origine ») |
@@ -16,6 +16,7 @@ La page montre six blocs, chacun avec son état écrit (« ✓ OK », « ! À v�
 
 **Relevé.**
 Un script PowerShell sans fenêtre ni autorisation (`TECH_PROBE_SCRIPT`, [app/src/tech-facts.ts](../../app/src/tech-facts.ts)) lit le PC et Windows (CIM, registre, `powercfg`, `Get-Disk`, `Get-NetAdapter`) ; il dure quelques secondes à vingt secondes et tourne à part, sans bloquer le front-end.
+Il passe par un fichier `.ps1` lisible, jamais encodé, avec la politique d'exécution `RemoteSigned`, et ne relève pas les antivirus installés : les deux ensemble faisaient prendre Cyber Pinball pour un cheval de Troie (voir « PowerShell et antivirus » dans [Installation et organisation des fichiers](installation-et-organisation-des-fichiers.md#signature)).
 Chaque partie est dans son propre `try` : ce qui échoue reste absent et la ligne dit « Non relevé », rien n'est affirmé.
 `probeDisplayLinks` ([win-displays](../../packages/win-displays/src/index.ts)) donne la connexion de chaque écran (`DISPLAYCONFIG_PATH_TARGET_INFO.outputTechnology`), sa fréquence, la plus haute que Windows propose à sa définition (`EnumDisplaySettingsExW`, `displayRefresh`) et celle que l'écran annonce dans son EDID (descripteur « limites de balayage », `edidMaxRefresh`).
 Le rôle de chaque écran vient de son empreinte, comme pour la santé (`techDisplays`).

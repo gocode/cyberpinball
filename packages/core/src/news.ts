@@ -56,7 +56,7 @@ export const NEWS: readonly NewsItem[] = [
   {
     // Demandé par un joueur sur Facebook (19/11/2026) : premier niveau, sans BAM.
     id: 'future-pinball',
-    date: '2026-11-19',
+    date: '2026-11-20',
     version: '0.2.1',
     get title() { return t('Future Pinball sur la roue'); },
     get detail() { return t('Vos tables Future Pinball (.fpt) à côté de vos tables VPX, lancées en un appui.'); },
@@ -74,7 +74,7 @@ export const NEWS: readonly NewsItem[] = [
     // Reprise d'une autre installation par liens physiques NTFS (0.2.1-essai.15), retenue pour la
     // 0.2.1 en bêta (19/11/2026), à la place de la traduction des propositions.
     id: 'reprise-sans-duplication',
-    date: '2026-11-19',
+    date: '2026-11-20',
     version: '0.2.1',
     get title() { return t('Reprendre vos tables sans les dupliquer'); },
     get detail() { return t('Les tables de PinUP Popper, PinballX ou PinballY rejoignent la roue sans être dupliquées sur le disque.'); },

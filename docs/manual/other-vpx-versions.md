@@ -4,13 +4,14 @@
 
 A table can be played with a VPX already installed on the PC (10.8.0, 10.7…), for instance a table taken over from another installation that runs better with it.
 Cyber Pinball never installs it: it is the player's installation, with its own settings, and VPinMAME and B2S Server, which these versions need, are registered in Windows.
-As long as no other VPX is added, none of what follows shows, neither on a table's sheet nor in the installation plan.
+As long as no other VPX is added, none of what follows shows, neither on a table's sheet nor in the installation plan, except the warning about a table saved by a newer VPX (below).
 
 **The list.**
 System menu > "Borne" (Cabinet) > "Autres versions de VPX" (Other VPX versions); its detail names the VPX added, otherwise "Aucune : toutes les tables sont jouées avec le VPX de Cyber Pinball" (None: all tables are played with Cyber Pinball's VPX).
 On opening, Cyber Pinball looks for the VPX of the PC's other installations (standalone VPX folder, PinUP Popper emulators) and offers each one with a Start ("Ajouter VPX 10.8.0" (Add VPX 10.8.0), "Trouvé sur ce PC : …" (Found on this PC: …)); a version already in the list is not offered again.
 "Ajouter un autre VPX…" (Add another VPX…) has it chosen by its executable, in the file picker.
 Only a VPX 10 `VPinballX*.exe` is accepted, recognised by its file version (`checkOtherVpx`); the version Cyber Pinball already uses is refused, since its tables would only lose Cyber Pinball's features.
+A VPX is named by its first three numbers ("VPX 10.8.0"), except a 10.9 prerelease, numbered 10.8.1 but reading 10.9 tables: it keeps its revision ("VPX 10.8.1.6012", `vpxVersionName`), so it is not mistaken for 10.8.1.
 Start on an added VPX removes it, after a confirmation that says how many tables chose it: they go back to Cyber Pinball's VPX and will get it back if it is added again; nothing is deleted from the PC.
 The list is kept in `<data>\autres-vpx.json`.
 
@@ -29,4 +30,14 @@ The sheet says so ("Pas de réalité virtuelle, réglage de l'affichage en parti
 A game with friends on such a table is refused before the launch ("Partie entre amis impossible avec VPX 10.8.0" (Game with friends not available with VPX 10.8.0)), as is an executable moved or uninstalled ("VPX 10.8.0 introuvable" (VPX 10.8.0 not found)), with the way back to Cyber Pinball's VPX.
 The log notes each game ("Partie (…) avec un autre VPX : VPX 10.8.0, …, ses propres réglages.").
 
-Code: [packages/core/src/autres-vpx.ts](../../packages/core/src/autres-vpx.ts) (list, a table's choice, executable check, takeover from another installation), [app/src/autres-vpx-menu.ts](../../app/src/autres-vpx-menu.ts) (screens); tests `autres-vpx.test.ts`.
+**Table saved by a newer VPX.**
+Each table keeps the format version of the VPX that saved it (`readVpxFileVersion`); an older VPX shows an error window and loads it badly.
+That is the case of a table saved by a 10.9 prerelease (revision 5963 and later) and played by Cyber Pinball's VPX 10.8.1 (`packages/core/src/vpx-format.ts`).
+Cyber Pinball compares that format with the one read by the VPX that would play the table, its own or the one chosen in "Jouée avec" (Played with) (`tableTooNew`).
+- **The Diagnosis and the Cabinet health** report it ("Table enregistrée par VPX 10.9", Table saved with VPX 10.9); if a recent enough VPX is in the list, the fix "La jouer avec VPX 10.8.1.6012" (Play it with VPX 10.8.1.6012) chooses it for the table.
+- **The installation plan** says so in orange ("VPX 10.8.1 de Cyber Pinball ne sait pas ouvrir une table enregistrée par VPX 10.9 : la partie échouerait.", Cyber Pinball's VPX 10.8.1 cannot open a table saved with VPX 10.9: the game would fail.), and picks by default the first VPX in the list that can open it, the newest first; "Changer le VPX" (Change the VPX) is still possible.
+- **The game** is refused before VPX is launched: "VPX 10.8.1 de Cyber Pinball ne peut pas ouvrir cette table" (Cyber Pinball's VPX 10.8.1 cannot open this table), "Elle a été enregistrée par VPX 10.9, plus récent." (It was saved with VPX 10.9, a newer version.), then what to do, and Start or Exit goes back to the front-end; the log says "Partie (…) refusée : enregistrée par VPX 10.9, plus récent que …".
+- **What to do**: when a VPX in the list can open it, "VPX 10.8.1.6012 sait la jouer : Gérer la table, puis « Jouée avec », pour le choisir." (VPX 10.8.1.6012 can play it: Manage table, then "Played with", to choose it.); otherwise, "Ajoutez un VPX 10.9 ou plus récent (Menu système > Borne > Autres versions de VPX), puis choisissez-le dans Gérer la table, « Jouée avec »." (Add a VPX 10.9 or newer (System menu > Cabinet > Other VPX versions), then choose it in Manage table, "Played with".).
+- **The script** of such a table is read straight from the `.vpx`, without launching a VPX that cannot open it and would stay stuck on its error window (`app/src/vbs.ts`).
+
+Code: [packages/core/src/autres-vpx.ts](../../packages/core/src/autres-vpx.ts) (list, a table's choice, executable check, takeover from another installation, table too new), [packages/core/src/vpx-format.ts](../../packages/core/src/vpx-format.ts) (format read by each version), [app/src/autres-vpx-menu.ts](../../app/src/autres-vpx-menu.ts) (screens); tests `autres-vpx.test.ts` and `vpx-format.test.ts`.

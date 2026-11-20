@@ -13,10 +13,27 @@ import { isPupFolderName, PUP_FOLDER, isDisabledPupFolderName } from './pupdisab
 import { isJunkName } from './puppack';
 import { historicAlias, loadedRoms } from './romalias';
 import { romFile, sameRomFile, storedRom } from './romlibrary';
+import type { CompatFix } from './scriptcompat';
 import { readScriptPatchFile } from './scriptpatch';
 import { classifyDir, classifyFile, companion, type FileKind } from './tablefiles';
 
 export type TableFileState = 'ok' | 'info' | 'warning' | 'error' | 'quiet';
+
+/**
+ * Ce que dit la fiche de chaque correctif de script (« script de la table adapté par Cyber Pinball : … ») :
+ * un Record, pour qu'un correctif ajouté sans son libellé ne compile pas (b2sArgs et tablesDirectoryDmd
+ * étaient arrivés sans, et la fiche disait « adapté par Cyber Pinball : » suivi de rien).
+ */
+const COMPAT_FIX_LABELS: Record<CompatFix, () => string> = {
+  vpmInitOnce: () => t('vpmInit exécuté une seule fois'),
+  vrRoomOnScreens: () => t('pièce VR réservée au casque'),
+  executeGlobalOnce: () => t('clignotements sans analyse de l’antivirus'),
+  timerTextOnce: () => t('minuteries sans analyse de l’antivirus'),
+  tablesDirectoryDmd: () => t('dossier du DMD cherché dans celui de la table'),
+  b2sArgs: () => t('appels au fronton B2S convertis en nombres'),
+};
+
+export const compatFixLabel = (fix: CompatFix): string => COMPAT_FIX_LABELS[fix]();
 
 export interface TableFileEntry {
   kind: FileKind;
@@ -125,10 +142,7 @@ export function tableContents(tableFile: string, opts: TableContentsOptions): Ta
         if (patch) {
           const what = [
             ...(patch.switches.length || patch.loader || patch.capture ? [t('PuP-Pack allumé')] : []),
-            ...(patch.compat?.includes('vpmInitOnce') ? [t('vpmInit exécuté une seule fois')] : []),
-            ...(patch.compat?.includes('vrRoomOnScreens') ? [t('pièce VR réservée au casque')] : []),
-            ...(patch.compat?.includes('executeGlobalOnce') ? [t('clignotements sans analyse de l’antivirus')] : []),
-            ...(patch.compat?.includes('timerTextOnce') ? [t('minuteries sans analyse de l’antivirus')] : []),
+            ...(patch.compat ?? []).map(compatFixLabel),
             ...(patch.prewarm ? [t('images du DMD chargées d’avance')] : []),
           ];
           fileEntry(name, 'scriptOverride', 'ok', t('script de la table adapté par Cyber Pinball : {what}', { what: what.join(', ') }));

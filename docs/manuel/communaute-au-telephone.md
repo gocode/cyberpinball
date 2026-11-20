@@ -26,6 +26,9 @@ La Communauté y est la même qu'à la borne (Menu système > Communauté) : la 
   **En train d'écrire** : sous le dernier message, qui écrit en ce moment, l'ami ou les membres d'un groupe (les pseudos, trois au plus puis « +2 », et trois points qui s'allument l'un après l'autre) ; de même sous le salon et la messagerie de la partie (voir « En train d'écrire » dans [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#messagerie)).
   Le champ du téléphone l'envoie à son tour (`typing`, une fois par seconde au plus tant qu'il reste du texte, la borne n'en relayant qu'un toutes les 3 s) et l'arrête quand il est vidé, le message envoyé ou le fil quitté ; la borne vérifie l'ami, le groupe ou le salon.
   Ouvert au téléphone, le fil est lu, comme à la borne.
+  Il s'ouvre en bas, sur les derniers messages, et y revient quand on le retrouve après un autre onglet ou un profil.
+  Il y reste quand un message arrive, que le clavier s'ouvre ou que l'écran tourne, sauf si l'on est remonté lire les anciens ; revenu en bas, il suit de nouveau.
+  Le fil d'un groupe, le salon et la messagerie de la partie font de même (`telephone-bas.js`).
 - **Le fil d'un groupe** : en tête, sa table de la semaine (« Jouer » la lance à la borne ; grisée avec sa raison si elle n'est pas dans votre borne) et son classement (les cinq premiers, votre ligne marquée).
   Le pseudo de l'auteur est au-dessus de chaque message.
   Le menu ⋮ de la barre du haut donne les membres (un toucher ouvre leur profil), « Inviter des amis » (grisé avec sa raison quand personne ne peut l'être), « Notifications du groupe » (activées ou coupées) et « Quitter le groupe », après une confirmation.
@@ -57,6 +60,7 @@ La Communauté y est la même qu'à la borne (Menu système > Communauté) : la 
   Le champ, 500 caractères au plus, part par la borne, qui vérifie l'ami, le texte et la réaction (`chat-send`, `chat-react`).
   Impossible d'écrire (partage coupé, messagerie désactivée, ancien ami) : le champ est grisé et la raison s'affiche à la place de la ligne d'état.
 - **Indisponible** : partage coupé ou messagerie désactivée, Messages et Joueurs le disent (« Messagerie indisponible », avec la raison de la borne) ; en mode invité, la messagerie est fermée au téléphone (« Fermée en mode invité. »), comme à la borne.
+  Sur une borne qui joue en local, la Communauté du téléphone est retirée (« Retirée : la borne joue en local (Menu système › Communauté › Jouer en local). »).
 - **Ce qui part au téléphone** : seulement ce qui s'affiche : noms, présence, textes, moments déjà mis en forme, et la clé publique de chaque ami (celle qui sert à lui écrire, comme pour le fil de la partie).
   Les pastilles sous jeton (`/images/<jeton>`).
   Le téléphone n'envoie que la clé du fil ouvert (`chat-open`, 64 caractères hexadécimaux, ou rien pour la liste), le texte et la réaction.

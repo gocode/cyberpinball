@@ -3,7 +3,7 @@
 ## Tilt
 
 Ce qui fait tilter la borne se décide à l'étape « Tilt » de l'assistant ([app/src/tilt-step.ts](../../app/src/tilt-step.ts), [packages/core/src/tilt.ts](../../packages/core/src/tilt.ts)).
-Elle suit l'étape « Lanceur » dans l'assistant complet, qui la passe sans rien écrire sur une borne sans accéléromètre, sans balancier relevé ni tilt enregistré (VPX garde alors son balancier simulé) ; seule : menu système > « Borne » > « Configuration de la borne » > « Tilt » (`npm run assistant -- --tilt`, action `tilt` du lanceur).
+Elle suit l'étape « Lanceur » dans l'assistant complet, qui la passe sans rien écrire sur une borne sans accéléromètre réglé ni Pinscape branché (ou dont l'accéléromètre a été éteint), sans balancier relevé ni tilt enregistré (VPX garde alors son balancier simulé) ; seule : menu système > « Borne » > « Configuration de la borne » > « Tilt » (`npm run assistant -- --tilt`, action `tilt` du lanceur).
 
 **Ce que VPX en fait** (VPX 10.8.1, commit `af26b2d93`) :
 
@@ -36,6 +36,12 @@ Le « Slam tilt » suit, facultatif lui aussi.
 - **Proposition** : un balancier relevé l'emporte (« Balancier de la borne », balancier simulé éteint) ; sans lui, ce que VPX fait aujourd'hui (« Réglage actuel de VPX : balancier simulé par VPX, contact à 1,00° »).
   Une borne dont l'étape est faite s'ouvre sur son réglage.
   Ligne « Tilt » : Start (ou clic) passe d'un mode à l'autre : « Balancier de la borne » et « Balancier simulé par VPX » avec un balancier relevé, sinon « Balancier simulé par VPX » et « Pas de tilt ».
+- **Accéléromètre** : la ligne « Accéléromètre » choisit la carte dont l'accéléromètre fait trembler la table quand on bouscule la borne, sans lien avec le lanceur (lanceur à bouton, ou lanceur branché sur une autre carte que le KL25Z).
+  Proposé d'office : celui réglé à l'étape « Lanceur », sinon le premier Pinscape lu (axes X et Y, force ×2), tant qu'il n'a pas été éteint (`proposedNudge`, [plunger.ts](../../packages/core/src/plunger.ts)).
+  La valeur dit les axes et la carte (« Axes X et Y · mjrnet Pinscape Controller »).
+  Start (ou clic) passe à la carte suivante parmi celles qui ont au moins deux axes, les Pinscape d'abord, puis à « Aucun », qui tient : le Pinscape n'est plus proposé, ni ici ni à l'étape « Lanceur ».
+  La carte d'arrivée garde ses axes, sa force et ses sens ; une autre prend X et Y.
+  L'accéléromètre choisi est enregistré avec le tilt (`[Input] Mapping.Nudge0.X` et `.Y`) ; quand l'étape est refaite seule, ses autres clés (`NudgeSensorCount`, `Mapping.Nudge0.Type`) suivent à la synchronisation suivante du front-end, comme toute clé hors de l'étape.
 - **Angle du contact** (balancier simulé) : Start puis flippers, par pas de 0,05°, de 0,15° à 4° ; Start pour finir.
   Plus petit, tilt plus facile : 4° est le plus dur.
 - **Force des secousses** (avec un accéléromètre) : l'échelle des axes X et Y de l'accéléromètre (`[Input] Mapping.Nudge0.X` et `.Y`, `NUDGE_GAIN` dans [plunger.ts](../../packages/core/src/plunger.ts)), de ×0,50 à ×6, par pas de 0,25 ; Start puis flippers.
@@ -49,7 +55,7 @@ Le « Slam tilt » suit, facultatif lui aussi.
 - **Essai** : l'anneau du contact vu de dessus.
   En balancier simulé, le point suit le balancier calculé comme VPX le calculera, pas à pas d'une milliseconde, d'après les axes de l'accéléromètre lus par la bibliothèque SDL de VPX (même mise en forme des axes, même `Mapping.Nudge0.Strength`, même amortissement) : chaque contact allume l'anneau, « TILT » dessous, et compte comme un appui sur Tilt (le balancier rebondit sur l'anneau : une secousse franche en fait souvent plusieurs, comme dans VPX) ; le pied d'écran dit la part du contact atteinte et la secousse en g.
   Avec le balancier de la borne, l'anneau s'allume à chaque contact réel (« Contacts du balancier : n »).
-  Sans accéléromètre réglé (étape « Lanceur »), l'étape le dit : seuls les boutons de tremblement feront bouger le balancier simulé.
+  Sans accéléromètre (« Aucun », ou aucune carte à deux axes), l'étape le dit : seuls les boutons de tremblement feront bouger le balancier simulé, et l'essai ne le montre pas.
 - **Clés** : `[Player] SimulatedPlumb` et `PlumbThresholdAngle` (`vpxTiltSettings`, `isTiltKey`), seulement après l'étape (migration douce : sans elle, `[Player]` reste tel quel).
   L'amortissement reste à VPX (F12 > « Nudge Settings »).
   Comme les autres clés gérées, un angle changé ensuite en partie est signalé, gardé ou remis au choix.

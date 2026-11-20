@@ -5,6 +5,16 @@
 L'assistant (`app/src/wizard.ts`, écrans `app/renderer/screen.*`) enchaîne au premier démarrage, ou par « Assistant complet » : **boutons** (relevé de chaque bouton), **lanceur analogique** (plunger à capteur, accéléromètre), **tilt** (balancier de la borne ou balancier simulé par VPX), **écrans et rôles** (playfield, backglass, DMD, topper), **orientation et taille du playfield** (bord des flippers, retournement de l'écran dans Windows si VPX en a besoin, diagonale), **disposition des écrans** (zones), **son** (sorties audio, test des haut-parleurs), puis le récapitulatif et l'écriture de `cabinet.json` et de `VPinballX.ini`.
 La liste des étapes, ce que chacune décide et ses clés sont dans [packages/core/src/wizardsteps.ts](../../packages/core/src/wizardsteps.ts) (`WIZARD_PHASES`, `WIZARD_STEPS`), testés dans [wizardsteps.test.ts](../../packages/core/src/test/wizardsteps.test.ts).
 
+**Frise des étapes** : en haut de chaque écran, entre la marque et « Quitter sans enregistrer », une pastille numérotée par étape de l'assistant complet (boutons de l'interface, boutons du jeu, lanceur, tilt, écrans, disposition, son, récapitulatif) ([app/src/wizard-progress.ts](../../app/src/wizard-progress.ts)).
+Les étapes faites et à venir ne montrent que leur numéro ; celle en cours, en vert, porte son nom et où l'on en est : « Boutons de l'interface · Bouton 1 sur 4 », « Boutons de l'interface · Bouton facultatif 2 sur 4 », « Écrans · Rôle 2 sur 4 », « Son · Sortie 1 sur 3 », « Son · Haut-parleurs 1 sur 3 ».
+Une étape refaite seule n'a qu'une pastille, à son nom ; l'écran de fin n'en a pas.
+
+**Au clavier et à la souris** : chaque étape a ses commandes à l'écran, cliquables, avec sous chacune les touches qui font la même chose ([app/src/wizard-controls.ts](../../app/src/wizard-controls.ts)) : « Revenir » (Retour arrière), les deux choix des flippers (et des flèches), l'action qui fait avancer, en évidence (Start ou Entrée), et la réponse d'Exit (Échap) quand l'étape en a une.
+Par exemple « ◀ Tourner », « Tourner ▶ » et « Valider » au bord des flippers ; « − Moins », « Plus + » et « Valider » à la diagonale ; « ◀ Écran précédent », « Écran suivant ▶ », « Valider » (ou « Ouvrir l'éditeur ») et « Aucun écran » pour chaque rôle ; « Dans le fronton », « Sur le plateau », « Les deux » et « Aucun » pour chaque sortie du son ; « Plateau, près de vous », « Plateau, côté fronton », « Dans le fronton » et « Rien entendu » au test des haut-parleurs ; « Enregistrer » et « Recommencer » au récapitulatif ; « Continuer vers les tables » à la fin.
+Les étapes « Lanceur » et « Tilt » ont « Revenir » en plus de leurs propres lignes, cliquables elles aussi.
+Un clic passe par le même traitement que l'appui du bouton de la borne, sous un code qu'aucun clavier ni joystick ne peut envoyer : il fait exactement la même chose.
+Toute la première configuration se fait ainsi depuis un PC, en bureau à distance compris ; seul le relevé des boutons demande d'appuyer sur les vrais boutons de la borne.
+
 **Menu système (Exit, Tab ou ⚙) > « Borne » > « Configuration de la borne »** regroupe tout ce qui règle la borne.
 Chaque étape s'y refait seule et revient à l'écran des tables, enregistrée ou non :
 
@@ -13,14 +23,15 @@ Chaque étape s'y refait seule et revient à l'écran des tables, enregistrée o
 | Boutons du jeu | `--boutons` | relevé des boutons du jeu et essai | `[Input]` |
 | Boutons de l'interface | `--interface` | relevé des boutons qui pilotent Cyber Pinball et essai | aucune |
 | Lanceur analogique | `--lanceur` | détection du lanceur à capteur, sens, zone morte, vitesse, accéléromètre, essai | `[Input]` des capteurs |
-| Tilt | `--tilt` | balancier de la borne ou balancier simulé par VPX, angle du contact, essai aux secousses | `[Player] SimulatedPlumb`, `PlumbThresholdAngle` |
+| Tilt | `--tilt` | balancier de la borne ou balancier simulé par VPX, angle du contact, accéléromètre et force des secousses, essai aux secousses | `[Player] SimulatedPlumb`, `PlumbThresholdAngle`, `[Input] Mapping.Nudge0.X` et `.Y` |
 | Écrans et rôles | `--ecrans` | l'écran de chaque rôle ; bord des flippers et diagonale seulement si le playfield change d'écran | fenêtres de VPX et cadrage |
 | Orientation et taille du playfield | `--playfield` | bord des flippers, retournement de l'écran, diagonale | fenêtres de VPX et cadrage |
 | Disposition des écrans | `--disposition` | zone de chaque rôle sur son écran | fenêtres de VPX et cadrage |
 | Son de la borne | `--son` | sorties du fronton et du plateau, test des haut-parleurs | `SoundDevice`, `SoundDeviceBG`, `Sound3D` |
 | Assistant complet | | toutes les étapes à la suite | toutes les clés gérées |
-| Touches par défaut des encodeurs | | remise immédiate des deux jeux de boutons, sans assistant | `[Input]` |
 | Configurations de la borne | | choix, renommage, corbeille, nouvelle configuration | |
+| Rétablir les boutons d'avant | | seulement après une remise aux touches par défaut : le relevé remplacé, remis | `[Input]` |
+| Touches par défaut des encodeurs | | après confirmation, les deux jeux de boutons aux touches des encodeurs, sans assistant ; grisée sur une borne aux boutons de joystick (voir [Boutons de la borne](boutons-de-la-borne.md#boutons-de-la-borne)) | `[Input]` |
 
 Une étape seule part du modèle enregistré (rôles, écrans, bord des flippers), ne change que ses champs de `cabinet.json` (`stepCabinet`) et n'écrit que ses clés de `VPinballX.ini` (option `only` de la synchronisation), même changées à la main ; les autres restent telles quelles jusqu'à la synchronisation suivante du front-end.
 Le récapitulatif ne montre que ces clés ; Exit y recommence l'étape, Retour arrière revient à la dernière question.

@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.1
 
+- Ajouter une table : l'entrée « Depuis une autre installation… » porte le badge « BÊTA », comme la reprise sans duplication qu'elle propose.
+- Fiche d'une table, section Fichiers : un script adapté pour le fronton B2S ou pour le dossier du DMD dit maintenant ce qui a été changé, au lieu de « adapté par Cyber Pinball : » suivi de rien.
 - Pinball FX3 sur une borne dont les boutons sont ceux d'un joystick (Pinscape, encodeur en mode manette) : les flippers parcourent maintenant les menus du jeu. Ces menus se déplacent aux flèches gauche et droite, que les flippers n'envoyaient pas ; chaque flipper envoie désormais aussi la flèche de son côté. On peut ainsi atteindre l'icône de borne et activer le mode borne sans clavier. En partie, les flippers lèvent toujours les batteurs.
 - Jeux de Zen : à la fin de chaque partie, le journal compte les appuis de bouton envoyés au jeu et ceux gardés parce que le jeu n'était pas au premier plan.
 - Assistant de configuration, boutons : un MagnaSave (ou tout autre bouton) choisi pour l'aide-mémoire, les réglages de VPX, le bureau Windows ou « Quitter sans enregistrer » garde sa touche dans le jeu. Sur une carte en mode clavier comme la CSD PinOne, le MagnaSave mis sur un de ces boutons du menu se retrouvait sans touche aux boutons du jeu, sa ligne vide, et ne faisait plus rien en partie.

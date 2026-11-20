@@ -4,7 +4,7 @@ export const messages: Record<string, string> = {
   // Menu système > Mon compte
   'Mon compte': 'My account',
   'Protéger et transférer mon compte, pseudo, avatar, pays, niveau et badges, profil public': 'Protect and transfer my account, nickname, avatar, country, level and badges, public profile',
-  'Joueurs en ligne, messages, mes amis, historique des parties, trouver un joueur, demandes, salons, partage et réseau, jouer en local': 'Players online, messages, my friends, game history, find a player, requests, rooms, sharing and network, play offline',
+  'Joueurs en ligne, messages, mes amis, historique des parties, trouver un joueur, demandes, salons, partage et réseau, jouer en local': 'Players online, messages, my friends, game history, find a player, requests, rooms, sharing and network, local play',
   'Protéger et transférer mon compte': 'Protect and transfer my account',
   'Mon pseudo': 'My nickname',
   'Ce que voient les autres': 'What others see',

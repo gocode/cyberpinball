@@ -14,7 +14,10 @@ Code: [packages/core/src/coexistence.ts](../../packages/core/src/coexistence.ts)
   The DOF folder (`%APPDATA%\VPinballX\10.8\directoutputconfig`) is shared by every VPX 10.8 on the PC: Cyber Pinball only writes there on request (configtool import, previous configuration backed up; addressable LEDs described), and never in place of a hand-written `Cabinet.xml` or GlobalConfig (see [LED and feedback (DOF)](led-and-feedback-dof.md#led-and-feedback-dof)).
   The other frontend's classic DOF (`C:\DirectOutput`, `C:\vPinball\DirectOutput`…) keeps its configtool configuration in its own folder, which the VPX DOF plugin does not read.
   When VPX's DOF folder is empty, the "LED et retours (DOF)" (LED and feedback) screen and the Cabinet health show that old configuration, and "Reprendre la configuration de l'ancien DOF" (Reuse the old DOF configuration) copies its ini and tablemappings files without touching the original folder; its GlobalConfig is never reused, its Cabinet.xml only if it is consistent and its ports are plugged in.
-- The other frontend's files are never moved: "Reprendre les médias de PinUP Popper / PinballX" (Import media from PinUP Popper / PinballX) copies them, and a table picked outside `import\` is copied.
+- The other frontend's files are never moved or changed: "Reprendre les médias de PinUP Popper / PinballX" (Import media from PinUP Popper / PinballX) copies them, and a table picked outside `import\` is copied.
+  Tables brought in from its installation (Add a table > "Depuis une autre installation…" (From another installation…), in beta) are not duplicated when it is on the same drive as Cyber Pinball: their big files (tables, backglasses, videos, images, sounds, ROMs) become NTFS hard links, taking no extra space, and only the small files VPX, PinMAME or the PuP-Pack may rewrite are copied (see [Adding a table](adding-a-table-the-funnel-the-catalog-recuperer.md#adding-a-table-the-funnel-the-catalog-récupérer-waiting-list)).
+  Before writing to a linked file, Cyber Pinball breaks its link: the other frontend's file keeps its bytes and its date.
+  On another drive, everything is copied, and the takeover screen says so.
 - ROMs and NVRAM are stored separately: high scores and game settings are not shared.
 
 **What is shared: a few Windows settings.**
@@ -29,7 +32,7 @@ The test rejects a declared call made outside its file, and any call that would 
 | Ctrl+Shift+D shortcut | in desktop mode | Released on return to the menu. |
 | Start at sign-in, desktop replaced or hidden | installer option, and System menu > "Borne" > "Borne dédiée" (Dedicated cabinet) or "Lancement au démarrage" (Launch at startup), off by default | Another frontend installed: the screen flags it before turning anything on (if it also starts with Windows, the two would fight over the screens). Each Windows setting is recorded before being written and put back as it was when turned off (`Sys-Set`, `windowssettings.ts`). |
 | "Programs and Features" entry | installation (`HKCU`) | Removed on uninstall. |
-| "Cyber Pinball pare-feu" scheduled task | "Autoriser dans le pare-feu de Windows" (Allow in Windows Firewall), under the same permission | No trigger: started by Cyber Pinball only, when one of its firewall rules is missing, to add it again (see "Firewall after an update"). Touches nothing else; removed on uninstall. |
+| "Cyber Pinball pare-feu" scheduled task | "Autoriser dans le pare-feu de Windows" (Allow in Windows Firewall), under the same permission | No trigger: started by Cyber Pinball only, when one of its firewall rules is missing, to add it again (see "Firewall after an update"). Touches nothing else; removed on uninstall. Its readable script is in `ProgramData\CyberPinball`, removed with it. |
 
 **Another frontend already running.**
 The two frontends would fight over the screens, the DMD display and the cabinet buttons.

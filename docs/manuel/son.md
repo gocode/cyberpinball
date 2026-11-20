@@ -129,3 +129,21 @@ Code : [romvolume.ts](../../packages/core/src/romvolume.ts) (état, conseil, cho
 - **Machine qui ne garde pas son volume en mémoire** (ou carte pas encore connue, dossier de PinMAME introuvable) : la ligne dit « Réglé à la machine », en lecture seule ; Start dit pourquoi Cyber Pinball ne peut pas le régler et rappelle le geste avec les touches de la borne (« pendant la partie, ouvrir la porte du monnayeur (Fin), puis − (8) ou + (9) », `romVolumeGesture`).
   Sans ces boutons relevés, il rappelle que le volume de VPX (« Volume du backglass ») monte aussi la musique et les voix de la ROM.
 - Tests : [volume-des-rom.test.ts](../../packages/core/src/test/volume-des-rom.test.ts), sur des mémoires réelles mesurées au banc libpinmame (WPC, Stern SAM, Data East), et le piège `lowRomVolume` de [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).
+
+### Musique et son d'une table
+
+Une table peut se jouer muette sans rien dire à l'écran : VPX passe sans un mot une musique qu'il ne trouve pas, et un réglage propre à la table peut couper son son.
+Après chaque partie, le journal de la borne dit quelles sorties du son VPX a ouvertes, celles qu'il n'a pas trouvées et la musique qu'il n'a pas trouvée (« Son de la partie (…) », voir « Son, DMD et erreurs du script au journal de la borne » dans [Lancement d'une partie](lancement-d-une-partie.md#lancement-dune-partie)).
+
+- **Son coupé pour cette table** (`tableAudioMuted`, `mutedAudioSettings`) : le `.ini` propre à la table règle à 0, dans `[Player]`, le volume du fronton (`MusicVolume` : la musique et les sons joués au fronton), celui du plateau (`SoundVolume`), ou les anciens interrupteurs `PlayMusic` et `PlaySound` ; c'est souvent un `.ini` repris d'une autre installation.
+  Le diagnostic de la table le signale en avertissement (« Son coupé pour cette table » : « ….ini règle MusicVolume à 0 pour cette table seulement : elle se joue sans ce son. »), avec « Rendre le son à cette table ».
+  La correction retire ces seules clés, et met le `.ini` à la corbeille s'il ne contenait qu'elles : la table suit alors le réglage général.
+- **Musique introuvable** (`musicMissing`) : VPX cherche la musique que joue le script (`PlayMusic`) dans le dossier `music` de la table, puis dans celui de VPX, et écrit « Failed to stream music: … » dans `vpinball.log` quand il ne la trouve pas.
+  Le diagnostic lit la dernière partie de la table dans ce journal et le signale en avertissement : « Musique introuvable » (« À la dernière partie, VPX n'a pas trouvé « … » : il cherche la musique de la table dans « …\music ». »), avec le rappel qu'elle est fournie avec la table d'origine, à mettre dans le dossier d'import avant « Ajouter une table ».
+  Le constat disparaît après une partie où VPX trouve la musique.
+- **Musique lue dans le script** : Cyber Pinball reconnaît la musique que joue le script, que son nom soit écrit en clair (`PlayMusic "Akira\track.mp3"`), tenu par une variable (`PlayMusic MusicDir & "theme.mp3"`, avec `MusicDir = "Goldorak\"`) ou passé à une procédure du script qui la joue (`Sub PlaySong(s) : PlayMusic s : End Sub`, puis `PlaySong "theme.mp3"`).
+  Un nom qui ne se lit pas en entier dans le texte n'est jamais deviné.
+  À la reprise des tables d'une autre installation, cette musique suit la table ; si elle n'est ni dans le dossier Music de l'installation ni dans celui de la table, l'écran de la reprise la dit absente (« absent de l'installation : musique « … » »).
+- **Musique portée par le PuP-Pack** : une table dont la musique passe par son PuP-Pack (une playlist nommée « Music », « Audio », « Sound »…) est muette tant que cette playlist est vide.
+  Le diagnostic signale alors « Playlist du PuP-Pack vide » en avertissement, et non plus en simple information : « La musique de la table passe par ce pack (« Music ») : sans elle, la table est muette. », avec le conseil de reprendre le pack en entier, ses vidéos et sa musique étant souvent un téléchargement à part (voir [PuP-Packs](pup-packs.md#pup-packs)).
+- Tests : [son-et-dmd.test.ts](../../packages/core/src/test/son-et-dmd.test.ts) (journal, constats, musique nommée par une variable ou une procédure) et les pièges `tableAudioMuted` et `musicMissing` de [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).

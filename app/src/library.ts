@@ -3558,7 +3558,8 @@ export function createLibrary(host: LibraryHost) {
       zenAction('pinballfx'),
       zenAction('pinballfx3'),
       futurePinballUi.action(),
-      { label: t('Depuis une autre installation…'), detail: t('PinUP Popper, PinballX : les tables une à une, avec leur PuP-Pack, leur ROM et leurs médias'), icon: 'layers', run: () => installationImport.open() },
+      // Bêta : la reprise sans duplication (liens physiques NTFS, 0.2.1), comme sa ligne des Nouveautés.
+      { label: t('Depuis une autre installation…'), detail: t('PinUP Popper, PinballX : les tables une à une, avec leur PuP-Pack, leur ROM et leurs médias'), icon: 'layers', badge: 'beta', run: () => installationImport.open() },
       ...(addFromFriend ? [{ label: t('Depuis un ami…'), detail: addFromFriend.detail(), icon: 'friend-list' as const, run: () => addFromFriend!.open(() => openAdd()) }] : []),
       { label: t('Récupérés et attendus'), detail: kept('attendus', () => catalogUi.summary()), icon: 'inbox', run: () => catalogUi.openWaitList(() => openAdd()) },
       { label: t('Mises à jour des tables'), detail: t('Nouvelles versions des tables installées'), icon: 'refresh', run: () => catalogUi.openUpdates() },

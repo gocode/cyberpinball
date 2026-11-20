@@ -15,7 +15,13 @@ What differs from one game to the other is described here.
   The **cabinet code** that had to be requested from Zen no longer exists since update 1.0.26.1 of November 4, 2024: cabinet mode unlocks for everyone (commercial use still needs Zen's approval).
   It still has to be **turned on once** in the game: cabinet icon next to the profile, then "Activate".
   Without cabinet mode, or without the table on the Steam account, the game opens on its home screen instead of the table.
+  Only **Fish Tales** and **Sorcerer's Lair** are free, on every account; the other tables only open if they are bought on the Steam account, and Cyber Pinball's messages remind you of it for them only.
   The "Pinball FX3 tables" screen says so at the top, with the address of Zen's help (`pinballfx.com/?page_id=7754`); a table's page has a "Cabinet mode" line.
+- **The game's first opening on this PC**: as long as Pinball FX3 has never been opened on this PC (no `SystemConfigCache.dat` in its folder), its cabinet mode isn't turned on there and it would open on its home screen, in landscape.
+  Before starting the table, Cyber Pinball then shows "First time Pinball FX3 opens on this PC": what to do in the game (cabinet icon next to the profile, "Activate", then the playfield rotation and the backglass and DMD screens), then close the game by holding Exit and start the table again; for a paid table, the purchase reminder.
+  Start opens the game anyway, to set it up; Exit goes back to the front-end.
+  The game encrypts these settings (`.dat` files in its folder and its Steam profile): Cyber Pinball can neither read nor write them, unlike Pinball FX's rotation.
+  Once the game has been opened on this PC, nothing tells any more whether its cabinet mode is on: the message doesn't come back.
 - **Adding tables**: System menu > Tables > Add a table > **"Pinball FX3 tables"**.
   The list is made of the **table files installed with the game** (`data\steam\*.pxp`), read again at each opening, without the game's own files (`gui`, `sfx`, `txt`, `preview`, `PTSData`, `game_cfg`, `*_cfg`, `*_sfx`, `*Assets`).
   Steam installs **all** tables, bought or not (they are used for in-game trials): nothing on disk says which ones the player owns, and Cyber Pinball doesn't guess.
@@ -36,15 +42,20 @@ What differs from one game to the other is described here.
   The game is recognized by its window: **"Pinball FX Classic"** since April 2026, "Pinball FX3" before; never a Steam page naming it.
   A Pinball FX3 left open is closed before the game (Steam would only show it, without opening the table).
 - **Table stuck on the game's home screen**: the window is the same on the home screen and on a table, Cyber Pinball can't see it.
-  A game shorter than 45 s shows on return **"Did Pinball FX3 stay on its home screen?"** with the possible causes, in the conditional: table not on this Steam account, cabinet mode not turned on, and for "Mars" the game's known bug that opens "Attack from Mars" when the account has both tables.
+  A game shorter than 45 s shows on return **"Did Pinball FX3 stay on its home screen?"** with the possible causes, in the conditional: table not on this Steam account (never for Fish Tales or Sorcerer's Lair, which are free), cabinet mode not turned on, and for "Mars" the game's known bug that opens "Attack from Mars" when the account has both tables.
   A window that never shows up (120 s) fails with its explanation, as for Pinball FX.
 - **Quitting**: as for Pinball FX, **holding Exit** (2 s) closes the game and returns to the wheel; the loading card says so with the game's name.
+- **Buttons and screens on a cabinet**: as for Pinball FX, the joystick buttons of a cabinet send the game the keys of its Controls > Keyboard screen, and the screens the game draws on are left to it (see [Pinball FX tables](pinball-fx-tables.md)).
+  Pinball FX3's menus are browsed with the left and right arrows, on which Shift does nothing: each flipper therefore also sends the arrow on its side (`PINBALLFX3_EXTRA_KEYS`), which lets you reach the cabinet icon and turn on cabinet mode without a keyboard; in a game, the flippers still raise the flippers on the table.
+  The image rotation is set in the game's cabinet mode: Cyber Pinball doesn't write it.
+  Pinball FX3 in 1080p full screen on a 4K playfield changes the screen's resolution, and Windows rearranges the others: the front-end's windows each follow their role's screen, with no rotated playfield on the DMD screen and no DMD on the backglass.
 - **DMD**: the game's own, on the cabinet's DMD screen (cabinet mode, "Dot Matrix" repositioned).
   A **real DMD** (ZeDMD, PIN2DMD, PinDMD) only gets FX3's image through `dmdext mirror --source=pinballfx3` from dmd-extensions, which **reads the game's memory**: no official Zen interface (unlike Pinball FX and its `DmdDevice64.dll`), and a game update can break it (the April 2026 rename caused trouble).
   Cyber Pinball doesn't start `dmdext` for now; "DMD on the wheel" stays greyed out with its reason.
 - **What Pinball FX3 doesn't provide**: no ROM or NVRAM (no scoreboard or ranking), no VR, no in-game settings, no games with friends or live games; all of these stay in place on the page, greyed out, with the reason, as for Pinball FX.
   "Delete the table" removes it from the menu; it stays in Pinball FX3.
-- **Code**: catalog, detection, installed tables, command and short-game message in [packages/core/src/pinballfx3.ts](../../packages/core/src/pinballfx3.ts); shared Steam reading in [packages/core/src/steam.ts](../../packages/core/src/steam.ts); what both games share in [packages/core/src/zen.ts](../../packages/core/src/zen.ts) (`ZEN_GAMES`, `ZenTable`, `zenTableOfEntry`); entry in `addZenTable` ([packages/core/src/tables.ts](../../packages/core/src/tables.ts)); window in `isPinballFx3Window` and `ZEN_LAUNCH_GAMES` ([app/src/pinballfx-launcher.ts](../../app/src/pinballfx-launcher.ts)); installation in `pinballFx3Setup` ([app/src/pinballfx-install.ts](../../app/src/pinballfx-install.ts)).
-  Tests: `pinballfx3.test.ts`, `pinballfx-launcher.test.ts` (simulated system).
-- **Not yet tried on a real installation** (development PC without FX3): direct launch of a table, `-class`, "Pinball FX Classic" window title, closing by holding Exit, short-game message.
+- **Code**: catalog, detection, installed tables, command and short-game message in [packages/core/src/pinballfx3.ts](../../packages/core/src/pinballfx3.ts); first opening and free tables in [packages/core/src/pinballfx3-cabinet.ts](../../packages/core/src/pinballfx3-cabinet.ts) (`pinballFx3FirstRunMessage`, `PINBALLFX3_FREE_TABLES`); shared Steam reading in [packages/core/src/steam.ts](../../packages/core/src/steam.ts); what both games share in [packages/core/src/zen.ts](../../packages/core/src/zen.ts) (`ZEN_GAMES`, `ZenTable`, `zenTableOfEntry`); entry in `addZenTable` ([packages/core/src/tables.ts](../../packages/core/src/tables.ts)); window in `isPinballFx3Window` and `ZEN_LAUNCH_GAMES` ([app/src/pinballfx-launcher.ts](../../app/src/pinballfx-launcher.ts)); installation in `pinballFx3Setup` ([app/src/pinballfx-install.ts](../../app/src/pinballfx-install.ts)).
+  Tests: `pinballfx3.test.ts`, `pinballfx3-cabinet.test.ts`, `pinballfx-launcher.test.ts` (simulated system).
+- **Observed on a real cabinet**: the encrypted settings, the first opening on the home screen in landscape, the 1080p full screen that changes the playfield's resolution.
+  **Not yet checked**: direct launch of a table, `-class`, "Pinball FX Classic" window title, closing by holding Exit, short-game message.
   File names come from the published Steam manifest, not from a folder read on a cabinet.

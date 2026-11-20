@@ -13,10 +13,12 @@
   No virtual reality, in-game display adjustment, games with friends, 3D vision, Cyber Pinball's VPX settings or PuP-Pack preparation for the tables played that way.
 - Menu image on the real DMD: the DMD server only accepts the `dmdutil64.dll` of VPX 10.8.1, recognised by its fingerprint.
   With any other VPX version, newer or older, "Image du menu" (Menu image) is greyed out with its reason and VPX keeps the DMD during games.
-  Moving to another version requires copying the headers again, redoing `packages/dmdserver/dmdutil64.def` and adding the fingerprint (`vendor/PROVENANCE.txt`); a test requires it for the installed VPX version.
+  Moving to another version requires copying the headers again, redoing `packages/dmdserver/dmdutil64.def`, adding the fingerprint and checking whether that DLL drives the PIN2DMD itself (`vendor/PROVENANCE.txt`); a test requires it for the installed VPX version.
+  The PIN2DMD depends on this server: VPX 10.8.1's DMD module does not drive it, and without the server it stays dark, in games too.
   Beta, like all of the real DMD, until confirmed on equipped cabinets.
 - VPX log for diagnostics: `%APPDATA%\VPinballX\10.8\vpinball.log` ("The selected display … is not available" lines).
 - Executable and installers unsigned as long as no certificate is provided (configuration ready, see [Code signing](installation-and-file-layout.md#code-signing)): SmartScreen warns when the installer is launched.
+  The binaries shipped with the application (VPX plugins, OpenXR layer, headset companion, DMD server) are not signed either, and some antivirus products can block an unsigned program.
 - Updates on request only (system menu, see [Updating from the cabinet](installation-and-file-layout.md#updating-from-the-cabinet)): no background check.
   During installation (about a minute), the Windows desktop and the installer's progress page are visible on the main screen.
   Rolling back to the previous version when the installer fails has not yet been triggered in a test.

@@ -111,8 +111,9 @@ Dans l'exécutable, koffi est réduit au JavaScript chargé à l'exécution et a
 
 ### Signature
 
-Rien n'est signé sans certificat : la fabrication continue sans rien demander.
+Rien n'est signé sans certificat : la fabrication continue sans rien demander, et chaque publication rappelle que les exécutables partent non signés.
 Avec un certificat de signature de code (Authenticode), `CyberPinball.exe`, le désinstalleur et les deux installeurs sont signés et horodatés par `signtool` (le désinstalleur est écrit et signé avant d'être embarqué).
+Tous les binaires que Cyber Pinball livre lui-même dans `natif\` (plugins de VPX, couche OpenXR, compagnon du casque, serveur du DMD) le sont aussi, avant le paquet de mise à jour qui les embarque (`signAll`) : un seul binaire non signé suffit à faire bloquer l'application par certains antivirus.
 Le certificat se désigne par variables d'environnement, jamais dans le dépôt ([scripts/signature.mjs](../../scripts/signature.mjs)) :
 
 | Variable | Rôle |
@@ -133,6 +134,12 @@ Get-AuthenticodeSignature release\CyberPinball-Setup.exe, release\win-unpacked\C
 ```
 
 Un certificat OV donne une signature valide, mais SmartScreen avertit encore tant que la réputation de l'éditeur n'est pas établie ; un certificat EV ou Azure Trusted Signing l'établit d'emblée.
+
+**PowerShell et antivirus.**
+Les antivirus qui surveillent le comportement des programmes avaient pris Cyber Pinball pour un cheval de Troie et l'avaient mis en quarantaine au démarrage : un exécutable non signé lançait PowerShell sans fenêtre, avec un script encodé et la politique d'exécution de Windows contournée, et relevait la liste des antivirus du poste.
+Depuis, tout script PowerShell de Cyber Pinball de plus d'une ligne passe par un fichier `.ps1` lisible, jamais encodé, lancé par le Windows PowerShell de `System32` avec la politique `RemoteSigned`, jamais `Bypass` ([packages/core/src/powershell.ts](../../packages/core/src/powershell.ts)).
+Un script temporaire est retiré après usage, ou remplacé au lancement suivant (nom fixe) ; aucun ne relève les antivirus installés.
+Le test `powershell-propre.test.ts` refuse le retour de ces signes dans le code livré.
 
 ### Mise à jour depuis la borne
 

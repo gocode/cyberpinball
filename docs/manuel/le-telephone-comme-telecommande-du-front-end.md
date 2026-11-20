@@ -20,6 +20,11 @@ Ce que pilote le téléphone suit ce que la borne montre (`RemoteMode`) : la pag
   Un flipper tenu se répète après 0,4 s, toutes les 70 ms (`isAutoRepeat`) : le front-end accélère comme sous un vrai bouton, le bouton du téléphone dit « Défilement rapide ».
   Un bouton tenu est relâché quand le doigt se lève ou sort du bouton, quand la page passe en arrière-plan, quand la liaison se coupe, après 20 s au plus.
   Tête de la page : l'écran affiché et ce qui y est choisi.
+- **Le bouton Retour du téléphone** (Android, ou le geste retour) remonte les écrans de la télécommande au lieu de la fermer, comme les retours de la page.
+  Il ferme une feuille ouverte (menu ⋮, réactions…), revient d'un fil, d'un profil, d'une page plein écran ou du lecteur du Juke-box, remonte d'une rubrique dans Menus ou d'une playlist dans le Juke-box, et ramène les autres onglets à l'Écran.
+  Sur l'Écran, il fait le retour de l'écran ouvert à la borne, comme si on le touchait ; quand le navigateur de la borne est ouvert, il revient à sa page précédente.
+  À l'écran de départ, il n'y a plus où revenir : il quitte la page, comme avant.
+  En plein écran, le premier Retour en fait sortir, le suivant remonte les écrans (`telephone-retour.js` ; test : `telephone-retour.test.ts`).
 - **Saisie** : quand le front-end ouvre son clavier à l'écran (recherche d'un titre, nom du joueur, nom d'une configuration, adresse d'un nœud Art-Net, nombre de LED…), le téléphone ouvre son panneau de clavier **avec le texte de la borne** (ce n'est jamais un mot de passe : le front-end n'en demande pas) ; ce qu'on tape remplace ce texte (`library.ts`, `remoteSet`), un nombre garde ses chiffres.
   « Valider » est Entrée, « Annuler » est Exit.
   Si le texte change à la borne pendant ce temps, le téléphone le reprend.

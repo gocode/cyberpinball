@@ -51,7 +51,7 @@ Le bureau revient à la prochaine ouverture de session ; les fonctions sont reti
 - **Depuis le compte administrateur, sans Cyber Pinball** : dans PowerShell lancé en administrateur, le script de secours remet l'état d'avant, comme « Désactiver », et affiche son résultat ; à la prochaine ouverture de l'écran « Borne dédiée », Cyber Pinball le relit, le vérifie et oublie l'activation.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "D:\CyberPinball\data\borne-dediee\desactiver.ps1"
+powershell -ExecutionPolicy RemoteSigned -File "D:\CyberPinball\data\borne-dediee\desactiver.ps1"
 ```
 
 - **Cyber Pinball redémarre en boucle** (il plante au démarrage, Shell Launcher le relance) : Ctrl+Alt+Suppr, « Se déconnecter », compte administrateur, le script ci-dessus, puis redémarrer ; la cause est notée dans `<données>\logs\erreurs.txt`.
@@ -91,7 +91,7 @@ Une écriture qui échoue en route remet l'état d'avant d'elle-même.
 Le script de secours `retablir-reglages.ps1` fait la même remise hors de Cyber Pinball ; l'écran relit ensuite son résultat et oublie l'activation :
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "D:\CyberPinball\data\borne-dediee\retablir-reglages.ps1"
+powershell -ExecutionPolicy RemoteSigned -File "D:\CyberPinball\data\borne-dediee\retablir-reglages.ps1"
 ```
 
 Sur la borne bloquée : Ctrl+Alt+Suppr, « Gestionnaire des tâches », Fichier > Exécuter une nouvelle tâche, cette commande, en cochant « Créer cette tâche avec des privilèges d'administration » si le bureau est remplacé.

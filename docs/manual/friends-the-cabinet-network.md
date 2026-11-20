@@ -15,6 +15,17 @@ What is yours (nickname, avatar, country, badges, public profile, what others se
 | Demandes d'amis (Friend requests) | Received (to answer, red dot up to the gear) and sent ("En attente : remise dès que sa borne sera en ligne", Waiting: delivered as soon as their cabinet is online). |
 | Partage et réseau (Sharing and network) | The network only: sharing on or off, local network, library shared or not, download speed, Windows Firewall, live state of Stern SAM tables, the reminder of what others see, blocked players. The nickname, the avatar, the country, the settings of what others see and deleting the account are in My account. The selection opens on "Retour" (Back): a stray Start does not turn sharing off. |
 | Masquer les notifications pendant les parties (Hide notifications during games) | Off by default: a friend coming online, a request to join a game, the news of a game with friends also show during games, with their sound (see "Everywhere, even in a game" in [Tables menu notifications](tables-menu-notifications.md#tables-menu-notifications)). Start toggles; on, nothing shows or rings during a game, everything waits for the menu. |
+| Jouer en local (Local play) | For a cabinet that only plays locally: a single setting removes the whole social side, levels included. Start opens a screen saying what is removed and what stays, the cursor on "Annuler" (Cancel); "Jouer en local" confirms. Once on, the entry says "Jouer en local : activé" (Local play: on) and is the only one left in the section; Start offers "Remettre la communauté" (Bring the community back), the cursor on "Rester en local" (Stay local) (see "Local play" below). |
+
+**Local play.**
+System menu > Community > "Jouer en local" (Local play) turns sharing off and stops the cabinet network.
+Then the levels, XP and badges on screen (the player card, the badge and level moments), friends, players online and friend requests, messages and their badge, rooms, groups, instant games, online rankings, the Community medallion on the wheel, "Jouer avec un ami" (Play with a friend) and "Partie instantanée" (Instant game) on the table sheets, and the Community on the phone all disappear.
+A table's scoreboard keeps only this cabinet's scores, with no scope tabs.
+In My account, My badges, My public profile and What others see are removed too.
+All the tables and their scores on this cabinet, the Juke-box, Cyber Pinball updates, What's new, Feedback and ideas stay.
+Nothing is deleted: friends, XP and badges are kept as they are, and XP keeps counting quietly.
+"Remettre la communauté" (Bring the community back) turns sharing and the network back on: everything comes back, XP included.
+The choice is kept in `<data>\social.json`; code: [localplay.ts](../../packages/core/src/localplay.ts) and `app/src/local-play.ts`; test: [jouer-en-local.test.ts](../../packages/core/src/test/jouer-en-local.test.ts).
 
 **Identity.**
 Each cabinet has an Ed25519 key, created on first start and kept in `<data>\social.json` (with friends, requests, directory, events and badges; never shared).
@@ -113,11 +124,14 @@ And the VPX rule, new in 0.1.5, is added by no update: the light update does not
 The path of `CyberPinball.exe`, for its part, never changes (`<root>\app`, replaced in place).
 Since then: rules are read **by program** (any inbound rule targeting the executable, whatever its name), through PowerShell, whose values do not depend on Windows' language (`firewallReadScript`, `appFirewallState`): "blocked" (a blocking rule), "allowed on some networks only", "missing", "allowed" on all networks.
 Adding the rule first removes any inbound rule on the executable, then adds ours for all profiles; for VPX, inbound blocked for each version folder and for the `current` junction.
-The same Windows permission registers the "Cyber Pinball pare-feu" scheduled task (`firewallSetupScript`): no trigger, started by the application only, outside the session (S4U, administrator rights, no window), on a fixed script encoded in its arguments, which only adds these two rules again.
+The same Windows permission registers the "Cyber Pinball pare-feu" scheduled task (`firewallSetupScript`): no trigger, started by the application only, outside the session (S4U, administrator rights, no window), on a readable script, `C:\ProgramData\CyberPinball\reparer-pare-feu.ps1`, which only adds these two rules again.
+Its folder is protected when it is created: owner Administrators, full control for the system and administrators, read-only for users, who therefore cannot change what the task runs with its elevated rights.
+The task starts Windows PowerShell with the `RemoteSigned` policy, never an encoded script or `Bypass`: that pattern had got Cyber Pinball quarantined by an antivirus.
+A task registered before 0.2.1 (script encoded in its arguments) does not have this file: it counts as missing, and Windows asks for permission once more, the next time a rule needs to be restored.
 At every startup, and at the one following a full or light update, `app/src/firewall-guard.ts` reads the rules, writes their state to the log ("Pare-feu (après la mise à jour 0.1.5 → 0.1.6) : Cyber Pinball blocked, VPX missing, réparation automatique prête."), and, if one is missing or no longer matches, starts the task: nothing to confirm, even without a mouse.
 Without the task (never allowed on this machine), or if the repair was not enough, the state stays visible with its reason: "Partage et réseau" (each rule, and "Réparation automatique du pare-feu : prête" or "pas encore autorisée"), "Mes amis" ("Réseau des bornes bloqué par le pare-feu de Windows", friends "Bloqué par le pare-feu" instead of "Hors ligne"), and, at the startup following an update, the "Pare-feu de Windows" screen, opened on the table menu with "Autoriser dans le pare-feu de Windows" selected: a single Windows prompt, never in the middle of a game.
 Otherwise, a notice at the top of the menu.
-The installer also removes any inbound rule on the executable before adding its own, and uninstalling removes the task under the same prompt.
+The installer also removes any inbound rule on the executable before adding its own, and uninstalling removes the task and the `ProgramData\CyberPinball` folder under the same prompt.
 The tests (`pare-feu-maj.test.ts`) simulate PowerShell, netsh and schtasks: never the machine's real firewall.
 
 **Shared library.**
@@ -418,6 +432,7 @@ You write **between friends only**, without a server: messages go straight from 
 
 **A friend's conversation.**
 Their messages on the left, yours on the right, and in the middle the events of the friendship drawn by the cabinet (a high score, a badge).
+The conversation opens at the bottom, on the latest messages, the cursor on the most recent; a group and a room open the same way (`app/src/chat-cursor.ts`).
 The flippers choose a message, Start opens "Répondre" (Reply), MagnaSave goes to the previous or next friend, Exit leaves the conversation for its actions: "Écrire un message…" (Write a message…), "Réponse rapide…" (Quick reply…), "Options de la conversation" (Conversation options), "Voir son profil" (See their profile).
 
 **Replying with the buttons.**
@@ -682,6 +697,7 @@ Only a friend can be invited, by any member.
 At the top, the table of the week: chosen by a member ("Choisir la table de la semaine", Choose the table of the week), for everyone, until the coming Sunday 23:59 (at least two days away); Start launches it.
 A member who does not have it sees it greyed out, "pas dans votre borne" (not on your cabinet).
 Then the chat, in bubbles like messaging (yours on the right, the author and time below, reactions as chips), and the group leaderboard: each member's best score on the table of the week since it was chosen, taken from the scores the leaderboards already relay (a score a member publishes counts by itself), "Record du groupe" (Group record) on the first.
+The group opens at the bottom, on its latest messages; with no message yet, on the table of the week.
 The actions: "Écrire au groupe" (Write to the group: ready-made phrases, or the on-screen keyboard and the phone), "Choisir la table de la semaine", "Inviter des amis" (Invite friends, greyed out when all your friends are members or invited, or at 20 members), "Membres" (Members), "Quitter le groupe" (Leave the group).
 
 **Messages.**
@@ -739,6 +755,7 @@ An action ("/me starts Star Courier") is written in italics; a line that mention
 Those present, with badge and flag, are in the side column (below on a cabinet); their number only shows (there, on the room door, the medallion poster, the room list and the phone) above five, so that a nearly empty room does not put anyone off.
 A room you leave keeps you present for one more minute (`ROOM_LINGER_MS`): whoever comes by sees that someone was just there, and the "Écrire" (Write) screen does not make you vanish while you type a line.
 Under each line, its reactions as chips ("👍 3", yours circled in blue).
+The room opens at the bottom, on its latest lines, the cursor on the most recent.
 The flippers browse the lines, Start opens the options of the chosen line: "Réagir" (React), the seven emoji reactions as tiles (👍 Like, ❤️ Love, 🥰 Care, 😆 Haha, 😮 Wow, 😢 Sad, 😡 Angry; one per player and per line, another one replaces it, Start on yours removes it), reply (your line starts with `@name`), see their profile, send a friend request, ignore this player in the rooms (their lines disappear, they are not told), block.
 "Signaler ce message" (Report this message) sends it to the moderators (see "Room moderation").
 

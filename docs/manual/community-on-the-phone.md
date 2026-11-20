@@ -26,6 +26,9 @@ The Community there is the same as at the cabinet (System menu > Community): the
   **Typing**: under the last message, who is writing right now, the friend or the members of a group (the nicknames, three at most then "+2", and three dots lighting up one after the other); the same under the room and the in-game chat (see "Typing" in [Community: the cabinet network](friends-the-cabinet-network.md#messaging)).
   The phone's field sends it in turn (`typing`, once a second at most while text remains, the cabinet relaying only one every 3 s) and stops it when it is emptied, the message sent or the thread left; the cabinet checks the friend, the group or the room.
   Opened on the phone, the conversation is read, as at the cabinet.
+  It opens at the bottom, on the latest messages, and goes back there when you return to it from another tab or a profile.
+  It stays there when a message arrives, the keyboard opens or the screen turns, unless you have scrolled up to read older ones; back at the bottom, it follows again.
+  A group's thread, the room and the in-game messaging do the same (`telephone-bas.js`).
 - **A group's thread**: at the top, its table of the week ("Jouer" (Play) launches it on the cabinet; greyed out with its reason if it is not in your cabinet) and its ranking (the top five, your line marked).
   The author's nickname is above each message.
   The ⋮ menu of the top bar gives the members (a tap opens their profile), "Inviter des amis" (Invite friends; greyed out with its reason when no one can be invited), "Notifications du groupe" (Group notifications, on or muted) and "Quitter le groupe" (Leave the group), after a confirmation.
@@ -57,6 +60,7 @@ The Community there is the same as at the cabinet (System menu > Community): the
   The field, 500 characters at most, goes through the cabinet, which checks the friend, the text and the reaction (`chat-send`, `chat-react`).
   Unable to write (sharing off, messaging disabled, former friend): the field is greyed out and the reason shows in place of the status line.
 - **Unavailable**: sharing off or messaging disabled, Messages and Players say so ("Messagerie indisponible", Messaging unavailable, with the cabinet's reason); in guest mode, messaging is closed on the phone ("Fermée en mode invité.", Closed in guest mode), as at the cabinet.
+  On a cabinet that plays locally, the Community on the phone is removed ("Removed: this cabinet plays locally (System menu › Community › Local play).").
 - **What goes to the phone**: only what is displayed: names, presence, texts, times already formatted, and each friend's public key (the one used to write to them, as for the in-game conversation).
   Avatars under a token (`/images/<token>`).
   The phone only sends the key of the open conversation (`chat-open`, 64 hexadecimal characters, or nothing for the list), the text and the reaction.

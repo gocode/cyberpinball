@@ -15,6 +15,17 @@ Ce qui est à vous (pseudo, avatar, pays, badges, profil public, ce que voient l
 | Demandes d'amis | Reçues (à valider, pastille rouge jusqu'à la roue dentée) et envoyées (« En attente : remise dès que sa borne sera en ligne »). |
 | Partage et réseau | Le réseau seul : partage activé ou non, réseau local, bibliothèque partagée ou non, débit des téléchargements, pare-feu de Windows, état en direct des tables Stern SAM, le rappel de ce que voient les autres, joueurs bloqués. Le pseudo, l'avatar, le pays, les réglages de ce que voient les autres et la suppression du compte sont dans Mon compte. La sélection s'ouvre sur « Retour » : un Start par mégarde ne coupe pas le partage. |
 | Masquer les notifications pendant les parties | Désactivé par défaut : la connexion d'un ami, une demande de rejoindre une partie, les nouvelles de la partie entre amis s'affichent aussi pendant les parties, avec leur son (voir « Partout, même en partie » dans [Notifications de l'écran des tables](notifications-de-l-ecran-des-tables.md#notifications-de-lécran-des-tables)). Start bascule ; activé, rien ne s'affiche ni ne sonne pendant une partie, tout attend le front-end. |
+| Jouer en local | Pour une borne qui ne joue qu'en local : un seul réglage retire toute la partie sociale, niveaux compris. Start ouvre un écran qui dit ce qui est retiré et ce qui reste, le curseur sur « Annuler » ; « Jouer en local » confirme. Activé, l'entrée dit « Jouer en local : activé » et reste seule dans la rubrique ; Start propose « Remettre la communauté », le curseur sur « Rester en local » (voir « Jouer en local » plus bas). |
+
+**Jouer en local.**
+Menu système > Communauté > « Jouer en local » coupe le partage et arrête le réseau des bornes.
+Disparaissent alors les niveaux, les XP et les badges à l'écran (la carte du joueur, les moments de badge et de niveau), les amis, les joueurs en ligne et les demandes d'amis, les messages et leur pastille, les salons, les groupes, les parties instantanées, les classements en ligne, le médaillon Communauté de la roue, « Jouer avec un ami » et « Partie instantanée » sur la fiche des tables, et la Communauté au téléphone.
+Le tableau des scores d'une table ne garde que ceux de cette borne, sans onglets de portée.
+Dans Mon compte, Mes badges, Mon profil public et Ce que voient les autres sont retirés aussi.
+Restent toutes les tables et leurs scores sur cette borne, le Juke-box, la mise à jour de Cyber Pinball, les Nouveautés, Retours et propositions.
+Rien n'est effacé : les amis, les XP et les badges sont gardés tels quels, et les XP continuent de se compter en silence.
+« Remettre la communauté » rallume le partage et le réseau : tout revient, XP compris.
+Le choix est gardé dans `<données>\social.json` ; code : [localplay.ts](../../packages/core/src/localplay.ts) et `app/src/local-play.ts` ; test : [jouer-en-local.test.ts](../../packages/core/src/test/jouer-en-local.test.ts).
 
 **Identité.**
 Chaque borne a une clé Ed25519, créée au premier démarrage et gardée dans `<données>\social.json` (avec les amis, les demandes, l'annuaire, les évènements et les badges ; jamais partagé).
@@ -113,11 +124,14 @@ Et la règle de VPX, arrivée avec la 0.1.5, n'est posée par aucune mise à jou
 Le chemin de `CyberPinball.exe`, lui, ne change jamais (`<racine>\app`, remplacé sur place).
 Depuis : la lecture se fait **par programme** (toute règle d'entrée qui vise l'exécutable, quel que soit son nom), par PowerShell, dont les valeurs ne dépendent pas de la langue de Windows (`firewallReadScript`, `appFirewallState`) : « bloqué » (une règle bloquante), « autorisé sur certains réseaux seulement », « absent », « autorisé » sur tous les réseaux.
 La pose retire d'abord toute règle d'entrée sur l'exécutable, puis pose la sienne pour tous les profils ; pour VPX, l'entrée bloquée pour chaque dossier de version et pour la jonction `current`.
-La même autorisation de Windows enregistre la tâche planifiée « Cyber Pinball pare-feu » (`firewallSetupScript`) : sans déclencheur, lancée par l'application seulement, hors de la session (S4U, droits d'administrateur, aucune fenêtre), sur un script figé encodé dans ses arguments, qui ne fait que reposer ces deux règles.
+La même autorisation de Windows enregistre la tâche planifiée « Cyber Pinball pare-feu » (`firewallSetupScript`) : sans déclencheur, lancée par l'application seulement, hors de la session (S4U, droits d'administrateur, aucune fenêtre), sur un script lisible, `C:\ProgramData\CyberPinball\reparer-pare-feu.ps1`, qui ne fait que reposer ces deux règles.
+Son dossier est protégé à la pose : propriétaire Administrateurs, contrôle total au système et aux administrateurs, lecture seule aux utilisateurs, qui ne peuvent donc pas changer ce que la tâche exécute avec ses droits élevés.
+La tâche lance le PowerShell de Windows avec la politique `RemoteSigned`, jamais un script encodé ni `Bypass` : ce modèle-là avait fait mettre Cyber Pinball en quarantaine par un antivirus.
+Une tâche enregistrée avant la 0.2.1 (script encodé dans ses arguments) n'a pas ce fichier : elle compte comme absente, et Windows redemande l'autorisation une seule fois, la prochaine fois qu'une règle est à reposer.
 À chaque démarrage, et à celui qui suit une mise à jour complète ou légère, `app/src/firewall-guard.ts` lit les règles, écrit leur état au journal (« Pare-feu (après la mise à jour 0.1.5 → 0.1.6) : Cyber Pinball blocked, VPX missing, réparation automatique prête. »), et, si l'une manque ou ne correspond plus, lance la tâche : rien à valider, même sans souris.
 Sans tâche (jamais autorisée sur ce poste) ou si la réparation n'a pas suffi, l'état reste visible avec sa raison : « Partage et réseau » (chaque règle, et « Réparation automatique du pare-feu : prête » ou « pas encore autorisée »), « Mes amis » (« Réseau des bornes bloqué par le pare-feu de Windows », les amis « Bloqué par le pare-feu » au lieu de « Hors ligne »), et, au démarrage qui suit une mise à jour, l'écran « Pare-feu de Windows », ouvert à l'écran des tables avec « Autoriser dans le pare-feu de Windows » sélectionné : une seule demande de Windows, jamais au milieu d'une partie.
 Sinon, un constat en haut du front-end.
-L'installeur retire lui aussi toute règle d'entrée sur l'exécutable avant de poser la sienne, et la désinstallation retire la tâche sous la même demande.
+L'installeur retire lui aussi toute règle d'entrée sur l'exécutable avant de poser la sienne, et la désinstallation retire la tâche et le dossier `ProgramData\CyberPinball` sous la même demande.
 Les tests (`pare-feu-maj.test.ts`) simulent PowerShell, netsh et schtasks : jamais le vrai pare-feu du poste.
 
 **Bibliothèque partagée.**
@@ -418,6 +432,7 @@ On écrit **entre amis seulement**, sans serveur : les messages passent directem
 
 **Le fil d'un ami.**
 Ses messages à gauche, les vôtres à droite, et au centre les évènements de l'amitié dessinés par la borne (un record, un badge).
+Le fil s'ouvre en bas, sur les derniers messages, le curseur sur le plus récent ; un groupe et un salon s'ouvrent de même (`app/src/chat-cursor.ts`).
 Les flippers choisissent un message, Start ouvre « Répondre », MagnaSave passe à l'ami précédent ou suivant, Exit sort du fil vers ses actions : « Écrire un message… », « Réponse rapide… », « Options de la conversation », « Voir son profil ».
 
 **Répondre aux boutons.**
@@ -682,6 +697,7 @@ Seul un ami peut être invité, par n'importe quel membre.
 En tête, la table de la semaine : choisie par un membre (« Choisir la table de la semaine »), pour tous, jusqu'au dimanche 23:59 qui vient (au moins deux jours) ; Start la lance.
 Un membre qui ne l'a pas la voit grisée, « pas dans votre borne ».
 Puis la discussion, en bulles comme la messagerie (les vôtres à droite, l'auteur et l'heure dessous, les réactions en pastilles), et le classement du groupe : le meilleur score de chaque membre sur la table de la semaine depuis qu'elle est choisie, tiré des scores déjà relayés par les classements (un score publié par un membre compte de lui-même), « Record du groupe » sur le premier.
+Le groupe s'ouvre en bas, sur ses derniers messages ; sans message, sur la table de la semaine.
 Les actions : « Écrire au groupe » (phrases prêtes, ou clavier à l'écran et téléphone), « Choisir la table de la semaine », « Inviter des amis » (grisé quand tous vos amis sont membres ou invités, ou à 20 membres), « Membres », « Quitter le groupe ».
 
 **Messages.**
@@ -739,6 +755,7 @@ Une action (« /me lance Star Courier ») s'écrit en italique ; une ligne qui v
 Les présents, avec pastille et drapeau, sont dans la colonne latérale (dessous en borne) ; leur nombre ne s'affiche (là, sur la porte du salon, l'affiche du médaillon, la liste des salons et le téléphone) qu'au-delà de cinq, pour qu'un salon presque vide ne décourage pas d'entrer.
 Un salon quitté vous garde présent encore une minute (`ROOM_LINGER_MS`) : qui passe voit que quelqu'un vient d'y être, et l'écran « Écrire » ne vous fait pas disparaître le temps d'une ligne.
 Sous chaque ligne, ses réactions en pastilles (« 👍 3 », la vôtre cerclée de bleu).
+Le salon s'ouvre en bas, sur ses dernières lignes, le curseur sur la plus récente.
 Les flippers parcourent les lignes, Start ouvre les options de la ligne choisie : « Réagir », les sept réactions par emoji en tuiles (👍 J'aime, ❤️ J'adore, 🥰 Solidaire, 😆 Haha, 😮 Waouh, 😢 Triste, 😡 Grrr ; une par joueur et par ligne, une autre la remplace, Start sur la sienne la retire), répondre (votre ligne commence par `@pseudo`), voir son profil, envoyer une demande d'ami, ignorer ce joueur dans les salons (ses lignes disparaissent, il n'est pas prévenu), bloquer.
 « Signaler ce message » l'envoie aux modérateurs (voir « Modération des salons »).
 

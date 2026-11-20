@@ -23,7 +23,7 @@ Keys written (`vpxSettingsFor` and `vpxPluginDefaults` in `packages/core/src/vpx
 | `[Plugin.B2S] ScoreViewDMDOverlay`, `ScoreViewDMDAutoPos` | 1 and 1 if the DMD role exists and is not a DMD only. The FullDMD of a .directb2s goes in front of ScoreView: without the overlay, only its frame would be visible. The DMD's position is searched for in the image | no, offered if the key is empty |
 | `[Plugin.DMDUtil] Enable`, and `ZeDMD`, `PIN2DMD` or `Pixelcade` | 1 for the recognized real DMD or one set to "oui" (yes), 0 for a model set to "non" (no); nothing without a real DMD or a choice | yes |
 | `[Plugin.DMDUtil] ZeDMDWiFiEnabled`, `ZeDMDWiFiAddr` | the ZeDMD over Wi-Fi of "DMD réel" (Real DMD): 1 and its address, or 0 once turned off; nothing as long as it has never been set | yes |
-| `[Plugin.DMDUtil] DMDServer`, `DMDServerAddr`, `DMDServerPort` | "Image du menu" (Menu image): 1, `127.0.0.1` and `6789` when the DMD server holds the display, with `ZeDMD`, `PIN2DMD`, `Pixelcade` and `ZeDMDWiFiEnabled` at 0 (only the server opens the hardware); 0 otherwise, and VPX opens the DMD itself; nothing as long as the menu image has never been set | yes |
+| `[Plugin.DMDUtil] DMDServer`, `DMDServerAddr`, `DMDServerPort` | 1, `127.0.0.1` and `6789` when the DMD server holds the display ("Image du menu" (Menu image), or a PIN2DMD that is on), with `ZeDMD`, `PIN2DMD`, `Pixelcade` and `ZeDMDWiFiEnabled` at 0 (only the server opens the hardware); 0 otherwise, and VPX opens the DMD itself; nothing as long as the menu image has never been set and no PIN2DMD is on | yes |
 | `[Plugin.PinMAME] PinMAMEPath` | `<racine>\pinmame`, if it contains `roms` | no, offered if the key is empty |
 | `[Plugin.PinMAME] Cheat` | 1 if the PinMAME plugin is enabled. Without it, a WPC ROM (Williams and Bally, 1990-1999) runs its memory test, “TESTING…”, before every game; when on, PinMAME skips that check (`wpc.c`, `MACHINE_INIT`). Rules and scores unchanged. Setting « Démarrage rapide des ROM » (Fast ROM startup) in the « Essentiels » (Essentials) tab | no, offered if the key is empty |
 | `[Plugin.Serum] SerumPath`, `[Plugin.VNI] VniPath` | `<racine>\pinmame\altcolor`, if it contains a `<rom>\<rom>.cRZ` or `.cROMc` (Serum), `.pal` or `.vni` (VNI) | no, offered if the key is empty |
@@ -65,47 +65,60 @@ Support stays in beta until equipped cabinets have confirmed it: the "BÊTA" (BE
   The PIN2DMD goes through libusb, which needs a generic driver (WinUSB, libusbK or libusb0); another driver, or none, is reported with the PIN2DMD tool or Zadig.
   libusb only opens libusb0 (the libusb-win32 of older PIN2DMD tools) and libusbK through `libusbK.dll`, loaded from `System32` only (`windows_winusb.c`, `winusbx_init`): without it, the driver is reported with the advice to switch to WinUSB with Zadig (`libusbKDll`, read by `packages/win-displays/src/usb.ts`).
   A ZeDMD or a Pixelcade without a COM port lacks its chip's driver (WCH CH340/CH343, Silicon Labs CP210x).
-- **PIN2DMD probe**: libdmdutil gives up silently when `libusb_open` or `libusb_claim_interface` fails (`PIN2DMD.cpp`, `PIN2DMDInit`); the VPX log says nothing and the DMD stays dark.
-  The probe (`app/src/sonde-pin2dmd.ts`, the executable in Node mode, with no window) takes the same steps with VPX's `libusb64-1.0.dll`, then releases everything.
-  It goes all the way through `PIN2DMDInit`, as VPX does: it reads the board's name (`iProduct`), which VPX's DMD module compares with three names only, "PIN2DMD", "PIN2DMD XL" and "PIN2DMD HD".
-  A board that does not give its name, or gives another name, is never driven by VPX and the DMD stays dark: the "DMD réel" (Real DMD) screen and the Health say so with the name read ("PIN2DMD : la carte se présente sous le nom « … »", PIN2DMD: the board calls itself "…"), and suggest sending a report, since Cyber Pinball cannot work around it.
+- **PIN2DMD probe**: the PIN2DMD is opened by the DMD server (see "PIN2DMD: driven by the DMD server", below), which writes in the log why it does not open; the probe also says it on screen, even before the server runs.
+  The probe (`app/src/sonde-pin2dmd.ts`, the executable in Node mode, with no window) takes the same steps (`libusb_open`, `libusb_claim_interface`) with VPX's `libusb64-1.0.dll`, then releases everything.
+  It also reads the board's name (`iProduct`): only three names are driven, "PIN2DMD", "PIN2DMD XL" and "PIN2DMD HD", the ones libdmdutil knows.
+  A board that does not give its name, or gives another name, is not driven and the DMD stays dark: the "DMD réel" (Real DMD) screen and the Health say so with the name read ("PIN2DMD : la carte se présente sous le nom « … »", PIN2DMD: the board calls itself "…"), and suggest sending a report.
   It runs when the front-end starts, after a game, after a "Real DMD" choice (`applyMenuDmdServer`) and after a DMD server that cannot find the display is stopped, never during a game nor while the DMD server holds the board.
   Its verdict is attached to the PIN2DMD (`libusbProbe`): board already opened by another program (codes `-3` and `-6`, with the open programs recognised), driver libusb cannot use (`-12`), board not found, other error.
-  The page, cabinet health and the points to check before the game say it; opened then released, the row says "VPX will be able to light it".
+  The page, cabinet health and the points to check before the game say it; opened then released, the row says "the DMD server will be able to light it".
 - **Programs that hold a real DMD** (`DMD_HOLDER_PROGRAMS`, `dmd.ts`): dmdext, PinUP Popper, PinballX, PinballY, another VPX, Future Pinball.
   Open at synchronization time, they are reported before the game for every model: only one program at a time holds a PIN2DMD or a serial port.
 - **PIN2DMD size**: the name the board gives to USB, read by Windows when it is plugged in (`DEVPKEY_Device_BusReportedDeviceDesc`): "PIN2DMD" 128 × 32, "PIN2DMD XL" 192 × 64, "PIN2DMD HD" 256 × 64, as libdmdutil does (`PIN2DMD.cpp`).
   The ZeDMD gives its size only when connected.
 
 The choices are kept with the cabinet configuration (`cabinet.json`, `hardwareDmd`) and picked up by the synchronization that precedes each game.
-Cabinet health has a "DMD réel" (Real DMD) check: ready, or a point to check (driver to install, PIN2DMD that VPX will not open, DMD server that cannot find the display, USB-serial bridge that did not answer like a ZeDMD).
+Cabinet health has a "DMD réel" (Real DMD) check: ready, or a point to check (driver to install, PIN2DMD that will not open, DMD server that cannot find the display, USB-serial bridge that did not answer like a ZeDMD).
 Ready without "Menu image", it says that this choice makes the real DMD show the menu too.
 
 **Menu image (beta).**
 The "Image du menu" (Menu image) setting of "DMD réel" (Real DMD), off by default: the real DMD also shows the menu DMD between games, not only during them.
-Only one program can hold the display: libdmdutil's server, `dmdserver`, started hidden by Cyber Pinball.
+Only one program can hold the display: Cyber Pinball's DMD server, started hidden.
 The menu and VPX send it their frames in turn (`app/src/dmd-server.ts`, protocol in `packages/core/src/dmdserver.ts`).
 
-- **The server**: `cyberpinball-dmdserver.exe` (`packages/dmdserver`, shipped in `natif\dmdserver`), libdmdutil's `server.cpp` built on the `dmdutil64.dll` that VPX itself installs in `plugins\dmdutil`.
-  It is exactly the libdmdutil version of VPX 10.8.1 (commit 3485e2e), which handles ZeDMD, ZeDMD over Wi-Fi, PIN2DMD and Pixelcade.
+- **The server**: `cyberpinball-dmdserver.exe` (`packages/dmdserver`, shipped in `natif\dmdserver`), derived from libdmdutil's `server.cpp` and built on the `dmdutil64.dll` that VPX itself installs in `plugins\dmdutil`.
+  It is exactly the libdmdutil version of VPX 10.8.1 (commit 3485e2e) that opens the ZeDMD, the ZeDMD over Wi-Fi and the Pixelcade; the PIN2DMD, which this version does not drive, is driven by the server itself (see "PIN2DMD: driven by the DMD server", below).
+  The network server is Cyber Pinball's own too ([packages/dmdserver/src/serveur-tcp.h](../../packages/dmdserver/src/serveur-tcp.h)), with the same protocol: the one in that DLL dropped every connection on Windows (it took Winsock's ordinary wait for an error) and spun idle while flooding the log, so no frame ever reached the real DMD, whatever the model.
   Nothing is downloaded, no DLL is copied.
   The Windows archives published by libdmdutil do not fit: the 0.11.0 one lacks the DLLs `dmdserver.exe` depends on, and 0.10.0 does not know the PIN2DMD.
   Before any loading, the DLL's SHA-256 fingerprint is compared with those in `packages/dmdserver/src/empreintes.h`: an unknown DLL is never loaded and stops the server with code 6.
   The server calls the DLL's C++ classes, and another libdmdutil version can change their memory layout without changing its functions: only the fingerprint tells reliably.
   The recognised DLL is then loaded on demand from the folder passed with `-d`, and all its functions are bound before looking for a DMD: a missing DLL stops the server with code 3, a missing function with code 4, without any Windows error window.
   `--verifier` runs these checks alone and gives the fingerprint (`node scripts/dmdserver.mjs --verifier --vpx <VPX folder>`).
-- **Start**: when the menu starts, after a "DMD réel" choice and when returning from a game, if at least one DMD is on (recognized, set to "oui" (yes), or ZeDMD over Wi-Fi).
+- **Start**: when the menu starts, after a "DMD réel" choice and when returning from a game, with "Menu image: yes" and at least one DMD on (recognized, set to "oui" (yes), or ZeDMD over Wi-Fi); and always for a PIN2DMD that is on, even without the menu image.
   `dmdserver.ini` (data folder) takes the per-model choices: Serum and PuP stay off (`AltColor = 0`, `PUPCapture = 0`), because VPX sends frames that are already coloured.
   `-w`: the server waits for the DMD instead of stopping, but 20 seconds at most (`FIND_TIMEOUT_MS`).
-  With no display found within that time, it is stopped and does not restart on its own: libdmdutil keeps open a PIN2DMD whose name it refuses, and VPX, which then opens the DMD itself, would find it taken.
-  The "DMD réel" (Real DMD) screen and the Health say so ("Le serveur du DMD ne trouve pas l'afficheur (aucune réponse en 20 s)", The DMD server cannot find the display (no answer within 20 s)), with the cause found by the PIN2DMD probe, otherwise the advice to send a report; VPX takes the DMD back itself during games.
+  With no display found within that time, it is stopped and does not restart on its own: VPX then opens the DMD itself, and must not find it taken by a server that is still searching.
+  The "DMD réel" (Real DMD) screen and the Health say so ("Le serveur du DMD ne trouve pas l'afficheur (aucune réponse en 20 s)", The DMD server cannot find the display (no answer within 20 s)), with the cause found by the PIN2DMD probe, otherwise the advice to send a report; VPX takes the DMD back itself during games, except a PIN2DMD, which stays dark.
   Before a game that VPX drives itself (`DMDServer = 0`), the server is always stopped and its exit awaited (`handDmdToVpx`): the system releases the board when it exits.
   If it stops (DMD unplugged, crash), it is restarted 2 s later.
   After code 3 or 4 it is not: the reason is shown in "DMD réel" and in cabinet health.
 - **Frames**: the menu DMD, live or classic, in RGB24 128 × 32, in the chosen colour (an off dot is black on the real DMD).
   During a game, the menu disconnects before VPX connects, then reconnects and sends its last frame again on return.
 - **VPX**: the synchronization writes `DMDServer = 1` only when the server holds the display and the menu is connected to it.
-  Otherwise (server missing, waiting for the DMD, stopped), it writes `DMDServer = 0` and the per-model keys, and VPX opens the DMD itself as without the menu image.
+  Otherwise (server missing, waiting for the DMD, stopped), it writes `DMDServer = 0` and the per-model keys, and VPX opens the DMD itself as without the menu image; a PIN2DMD then stays dark.
+
+**PIN2DMD: driven by the DMD server.**
+VPX 10.8.1's DMD module (`dmdutil64.dll`, libdmdutil 3485e2e) cannot drive a PIN2DMD: its support was not compiled in, and `[Plugin.DMDUtil] PIN2DMD = 1` changes nothing.
+So the DMD server drives it itself, with VPX's `libusb64-1.0.dll` ([packages/dmdserver/src/pin2dmd.h](../../packages/dmdserver/src/pin2dmd.h)).
+It sends its frames to the board in the format other frontends use; the colour order of the panels, and the module order of a PIN2DMD HD, is read from the board's configuration (the default order if it does not answer).
+For a PIN2DMD that is on (recognized in "automatique" (automatic), or set to "oui" (yes)), the server runs even with "Menu image: no": it then opens only the PIN2DMD, VPX sends it its frames during games (`DMDServer = 1`), and the PIN2DMD stays dark between games.
+With "Menu image: yes", it also shows the menu between games.
+The "DMD réel" (Real DMD) screen says so on the "Serveur du DMD" (DMD server) row: "Drives the PIN2DMD; VPX sends it its frames during games", or "Starting, or waiting for the PIN2DMD to answer".
+Without the server (program missing, another VPX version, no display found within 20 s), the PIN2DMD stays dark, in games too: the row and the Health say so ("…; the PIN2DMD will stay dark: VPX's DMD module cannot drive it on its own").
+An opening that fails releases everything, and the server tries again a second later.
+The menu log says why, with the libusb code, on a "dmdserver : PIN2DMD : …" line, written again only when the cause changes: no 0314:E457 board seen, opening refused, interface 0 already taken or refused, unknown board name (with the name read) or unreadable name.
+An opened board is logged there with its name, its size and the colour order read, then the first frame sent.
 
 ### Several roles on one screen: zones
 

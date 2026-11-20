@@ -22,6 +22,8 @@ Une seule règle couvre tous les moments, le **gardien des écrans** (`app/src/s
 - **écran débranché puis rebranché par Windows**, même pendant une partie (une carte graphique qui redétecte ses sorties peut le faire toutes les vingt secondes ; vu pendant une partie dans le casque) : Windows chasse les fenêtres de l'écran qui disparaît vers l'écran principal, et l'écran revient avec un autre identifiant.
   Son voile neuf passe aussitôt sous les fenêtres de Cyber Pinball (`tuckVeil`), jamais devant celle du rôle de l'écran ; les noms des écrans dans les constats suivent leur place, pas leur identifiant.
   Hors lancement et hors partie, une fois les écrans posés, chaque fenêtre du front-end chassée de son écran le reprend (`recoverScreens`, `recoverCovered` dans `app/src/cover-display.ts`) ; pendant un lancement ou une partie, rien ne bouge (le premier plan va à VPX), et la reprise a lieu au retour, aussitôt puis 1,5 s plus tard.
+  Un jeu qui change la définition d'un écran pendant la partie (Pinball FX3 en plein écran 1080p sur un playfield 4K, par exemple) ne déplace pas les fenêtres du front-end : chacune suit l'écran de son rôle, reconnu à son identité et non à ses anciennes coordonnées, pendant la partie comme hors partie.
+  Une fenêtre trouvée sur l'écran d'un autre rôle est notée dans le journal et reposée sur le sien (`followDisplays`, `misplacedWindows` dans `packages/core/src/gamescreens.ts`).
   Un écran de la borne resté noir sous son voile (`veiledScreens`, `packages/core/src/screencover.ts`) est signalé (« Écran « FullDMD » : resté noir sous son voile (retour d’une partie) ; la fenêtre du front-end repasse devant. »), compté dans le bilan d'endurance et noté au journal des écrans ;
 - **relance sans trou** (`relaunchCovered`, seule façon de relancer l'application : front-end → assistant, assistant → front-end, réglages → assistant) : le nouveau processus ouvre ses voiles et ses fenêtres par-dessus celles de l'ancien, qui ne se ferme que 400 ms après que le nouveau lui a signalé ses fenêtres peintes (fichier témoin `CYBERPINBALL_RELEVE`, créé par `paintedOnScreen` de `app/src/offscreen.ts` ; au plus 15 s d'attente) : visibles pour Windows ne suffit pas, une fenêtre étant transparente jusqu'à sa première image ;
 - **jamais d'écran clair** : au moment où une fenêtre apparaît, Windows 11 la peint en clair avant d'y afficher sa page, même déjà peinte (`ready-to-show`) et malgré `backgroundColor`.
@@ -93,10 +95,15 @@ Chaque autre fenêtre visible de VPX est classée (`classifyVpxWindow`, `package
   Personne ne peut y répondre sur une borne sans souris : Cyber Pinball presse son OK (`pressDialogButton`, `WM_COMMAND` posté), comme un clic, et la partie continue avec les choix déjà enregistrés par la table.
   Si la boîte est encore là 3 s après, la partie s'arrête comme pour une erreur.
   Avant le 12/11/2026, elle arrêtait la partie, et la table reposait la question à chaque lancement : elle ne se jouait jamais ;
+- **message du script à un seul bouton OK** : boîte ouverte par le script de la table (MsgBox, titre « VBScript » ou celui que lui donne le script) qui n'a qu'un bouton, nommé OK, sans case à cocher, bouton radio ni champ de saisie.
+  Il n'y a rien à décider : Cyber Pinball presse OK comme pour le formulaire d'options, et la partie continue (*Goldorak* : « UltraDMD userfiles directory … does not exist », qui arrêtait la partie comme une erreur).
+  Le message reste au journal de la borne : « Message du script de la table validé par OK, la partie continue : « … » ».
+  Si la boîte est encore là 3 s après, la partie s'arrête comme pour une erreur.
+  Une question (Oui / Non, Annuler) et les boîtes de VPX lui-même (titre « Visual Pinball ») arrêtent toujours la partie ;
 - **fenêtre de l'éditeur**, si une autre version de VPX en ouvrait une : l'éditeur (classe `VPinball`), l'éditeur de script (`CVFrame`), « Preparing Table » et le débogueur sont masqués (les fermer quitterait VPX ou poserait une question), l'audit de la table (boîte « Dialog » dont le texte commence par « Table audit: » ou « This table contains error(s) ») est fermé ; la partie continue, le jeu reprend le premier plan ;
 - **fenêtre inconnue** : laissée à l'écran.
 
-Le formulaire d'options et les deux derniers cas laissent un constat d'une phrase (`LaunchResult.notices`) : écrit dans la console à la fin de la partie, ajouté au message d'une partie échouée et au bilan du test d'endurance (« autres fenêtres de VPX »).
+Le formulaire d'options, le message du script et les deux derniers cas laissent un constat d'une phrase (`LaunchResult.notices`) : écrit dans la console à la fin de la partie, ajouté au message d'une partie échouée et au bilan du test d'endurance (« autres fenêtres de VPX »).
 
 **VPX arrêté en démarrant.**
 Un `vpinball.log` que ce lancement n'a pas écrit (plus ancien que lui, `logWrittenSince`) n'est jamais lu comme le sien : sa fin ne paraît pas à l'écran d'échec.
@@ -118,7 +125,7 @@ Les anciens core.vbs le laissaient faire (un second `vpmInit` ne refait rien : �
 Les scripts que VPX fournit aux tables refusent ainsi des maladresses d'anciennes tables : chaque cas connu est une règle de [scriptcompat.ts](../../packages/core/src/scriptcompat.ts), qui le repère dans le texte du script (sans VPX), le corrige sans déplacer une ligne et reconnaît le message par lequel VPX s'arrête.
 Pour `vpmInit` : à partir de deux appels dans le code (commentaires, chaînes, `objet.vpmInit` et un `vpmInit` défini par le script écartés), le `.vbs` de Cyber Pinball (`scriptpatch.ts`, comme pour les PuP-Packs) remplace chaque appel par `CyberPinball_VpmInit`, défini après la dernière ligne, qui n'appelle `vpmInit` que la première fois ; sa dernière ligne garde `"compat": ["vpmInitOnce"]`, que les autres réparations du `.vbs` (PuP-Pack, table mise à jour) conservent.
 La table n'est pas modifiée ; un `.vbs` venu d'ailleurs est corrigé lui-même.
-Constat du diagnostic « Script écrit pour un ancien core.vbs » (`scriptCoreCompat`), réparé dès l'installation et avant chaque partie (`PUP_PLAY_REPAIRS`) ; les lectures de script passent en version 8, si bien que les tables déjà installées sont relues.
+Constat du diagnostic « Script écrit pour un ancien core.vbs » (`scriptCoreCompat`), réparé dès l'installation et avant chaque partie (`PUP_PLAY_REPAIRS`) ; les tables déjà installées en profitent sans rien faire (voir « Scripts relus quand un correctif arrive », plus bas).
 Quand le texte ne montre rien (un seul `vpmInit`, dans une Sub appelée deux fois), la partie arrêtée par ce message fait corriger le `.vbs` aussitôt (`repairScriptAfterStop`), et l'écran d'échec dit « Cyber Pinball a corrigé le script de la table (…) : relancez-la. ».
 **Procédure redéfinie à chaque clignotement** (`executeGlobalOnce`) : des tables s'arrêtaient un instant à chaque clignotement d'une lumière (*Daredevil*, *Hellboy*, et les nombreuses tables qui recopient la routine `FlashForMs` ou `SetFlash`).
 Leur script redéfinit la Sub `<lumière>_Timer` par `ExecuteGlobal` à chaque appel, et Windows fait analyser par son antivirus (AMSI, Microsoft Defender par défaut) chaque texte que VBScript compile pendant la partie, le fil des images de VPX attendant la fin de l'analyse : sur une borne, *Daredevil* faisait 155 arrêts de 100 à 1 000 ms en trois minutes.
@@ -126,6 +133,33 @@ La règle repère un `ExecuteGlobal` qui définit une procédure depuis une Sub 
 La table n'est pas modifiée ; un `.vbs` venu d'ailleurs est corrigé lui-même.
 Le diagnostic le dit dans la fiche de la table (« Script qui arrête la partie à chaque clignotement », action « Ne redéfinir une procédure que si elle change ») et le répare avant chaque partie ; un script protégé ne se corrige pas.
 Tests : `code-dynamique.test.ts` (repérage, lignes à leur place, exécution par `cscript`, diagnostic).
+**Minuterie décrite par un texte** (`timerTextOnce`) : des tables s'arrêtaient un instant chaque fois qu'une minuterie de leur script arrivait à échéance (*Guardians of the Galaxy*, *Game of Thrones*).
+Leur script donne à `vpmTimer` (`AddTimer`, `PulseSwitch`) un texte à exécuter plutôt qu'une procédure (`GetRef`) : le core.vbs compile ce texte par `Execute` à chaque échéance, et l'antivirus de Windows l'analyse chaque fois, comme pour les clignotements.
+Le `.vbs` de Cyber Pinball fait passer les scripts de VPX que la table charge (`GetTextFile` : le core.vbs et les scripts de système) par `CyberPinball_TextFile`, qui les corrige au chargement : avant cet `Execute`, `CyberPinball_TimerCall` fait d'un texte déjà vu une Sub compilée une seule fois.
+Un texte vu une seule fois, ou qui se sert des variables internes de la minuterie, reste exécuté comme avant.
+Ni la table ni les scripts de VPX sur le disque ne sont modifiés.
+Le diagnostic le dit dans la fiche de la table (« Script qui arrête la partie à chaque minuterie », ou « … à chaque clignotement et à chaque minuterie », action « Ne compiler chaque texte qu'une fois ») et le répare avant chaque partie ; les fichiers de la table nomment alors le `.vbs` « minuteries sans analyse de l'antivirus ».
+Tests : `minuteries-texte.test.ts` (repérage, lignes à leur place, même résultat avec et sans correctif par `cscript`, core.vbs installé, diagnostic).
+**Appel refusé par le fronton B2S de VPX** (`b2sArgs`) : le plugin B2S de VPX 10.8.1, qui tient lieu de B2S Server, n'accepte que des nombres à certaines places de ses fonctions (`B2SSetData`, `B2SSetScore`, `B2SSetLED`…).
+Un nombre écrit en texte (« "1" ») passe ; tout autre texte est refusé (« Failed to convert a parameter in call to B2S_Server.B2SSetData » dans `vpinball.log`), et la procédure du script qui faisait l'appel s'arrête, alors que B2S Server l'acceptait.
+*Champions League 2023* s'arrêtait ainsi pendant son initialisation, avant de créer son DMD : « Objet requis: 'UltraDMD' » sur tout le plateau, à chaque tour.
+Le `.vbs` de Cyber Pinball fait passer ces appels par des procédures (`CyberPinball_B2S…`) qui convertissent en nombre un texte numérique, aux seules places qui n'acceptent qu'un nombre, et qui laissent le script continuer si le fronton refuse encore : un élément du fronton qui ne s'allume pas plutôt qu'une table arrêtée.
+Quand le texte du script montre à coup sûr un tel appel (texte écrit en clair qui n'est pas un nombre, ou texte assemblé par `&` ou `CStr`), la copie corrigée est jouée dès la première partie.
+Un texte venu d'une variable ne se voit qu'en partie : le refus que VPX écrit dans son journal réclame alors le correctif, appliqué avant la partie suivante.
+La table n'est pas modifiée.
+Le diagnostic le dit dans la fiche de la table (« Script arrêté par le fronton B2S de VPX », action « Adapter les appels au fronton B2S ») et le répare avant chaque partie.
+Tests : `b2s-arguments.test.ts`.
+**Dossier du DMD cherché dans TablesDirectory** (`tablesDirectoryDmd`) : UltraDMD et FlexDMD chargent leurs images d'un dossier livré avec la table (« Table.UltraDMD »).
+La plupart des scripts le cherchent dans le dossier courant, que VPX 10.8 place sur celui de la table ; d'autres passent par `TablesDirectory`, où VPX met son propre dossier « Tables » (à côté de son exécutable, sinon un dossier « tables » dans celui de la table), jamais le dossier de la table : avec une table par dossier, ce DMD restait vide.
+Le `.vbs` de Cyber Pinball remplace `TablesDirectory` par le dossier de la table (`CyberPinball_TableDir`, relevé au chargement du script), sur les seules lignes qui mènent au dossier du DMD.
+La table n'est pas modifiée.
+Le diagnostic le dit dans la fiche de la table (« DMD cherché hors du dossier de la table », action « Chercher le DMD dans le dossier de la table ») et le répare avant chaque partie.
+Tests : `dossier-ultradmd.test.ts`.
+**Scripts relus quand un correctif arrive.**
+Cyber Pinball garde ce qu'il a lu du script de chaque table (`<données>\cache\scripts.json`), et le diagnostic s'y fie sans relire le script.
+Chaque lecture note les correctifs de script que la version savait repérer (`COMPAT_FIXES`) : une lecture faite avant l'arrivée d'un correctif est refaite dans le `.vpx` lui-même, sans lancer VPX, dès que la santé de la borne, le diagnostic ou la préparation d'une partie la demande.
+Avant cela, un correctif publié ne s'appliquait jamais sur une borne dont les tables avaient déjà été lues (*Daredevil* et *Hellboy* s'arrêtaient encore à chaque clignotement).
+Tests : `scripts-cache.test.ts`.
 **Pièce VR dessinée hors du casque** (`vrRoomOnScreens`) : une version VR de table allume sa pièce (meuble, salle, fronton en 3D) par un interrupteur du script ; une table hybride le garde pour le casque (« If RenderingMode = 2 or VRTest = 1 »), mais une version faite pour le casque seul l'allume d'office (« Const VR_Room = 1 »), et un interrupteur d'essai laissé à 1 (`VRTest`, `LiveViewVRSim`) l'allume même dans une table hybride.
 Sur les écrans, VPX dessine alors toute la pièce à chaque image alors qu'elle ne sert que dans le casque.
 La règle repère ces interrupteurs allumés hors de toute Sub (`VR_FLAG`), et le `.vbs` de Cyber Pinball multiplie leur valeur par `Abs(RenderingMode = 2)`, qui vaut 1 en VR et 0 sur les écrans, sur la même ligne (une `Const` devient une variable).
@@ -162,6 +196,20 @@ Le plugin VPX « CyberPinballDmd », activé dans toutes les parties (voir [Posi
 - **Relevé par table** (`recordGameCadence`) : chaque partie jugée va dans `<données>\logs\cadence-parties.json` (les 3 dernières par table, 400 tables au plus, celles jouées le plus récemment ; écriture atomique), une partie dans le casque marquée comme telle.
   Le diagnostic le lit pour dire qu'une table rame sur cette borne (voir [Santé de la borne](sante-de-la-borne.md#santé-de-la-borne)).
 - **Banc et tests** : `scripts/banc-cadence.ps1` (le vrai VPX sur le bureau caché, la même table jouée avec des fenêtres du fronton et du DMD de plusieurs tailles), `packages/vpx-vision3d/test/banc-cadence.cpp` (le compteur seul), [cadence-partie.test.ts](../../packages/core/src/test/cadence-partie.test.ts) (bilan relu champ par champ, même forme écrite par le plugin et lue par Cyber Pinball, cadence visée, verdict, ligne du journal) et le piège `slowTable` de [doctor-traps.test.ts](../../packages/core/src/test/doctor-traps.test.ts).
+
+**Son, DMD et erreurs du script au journal de la borne.**
+Une table sans son, un DMD qui ne montre pas ses images ou une erreur du script répétée ne laissent rien à l'écran.
+Après chaque partie, Cyber Pinball relit donc ce que VPX a écrit dans `vpinball.log` pendant cette partie (`noteGameCadence`, [vpxgamelog.ts](../../packages/core/src/vpxgamelog.ts), [vpxfailure.ts](../../packages/core/src/vpxfailure.ts)) et en tire, avant la ligne de la cadence, jusqu'à trois lignes du journal de la borne :
+
+- **Erreurs du script** (`scriptErrorsJournal`) : chaque erreur une seule fois, avec la ligne du script, son message et le nombre de fois, la plus fréquente d'abord, cinq au plus : « Erreur du script répétée en boucle pendant la partie (…) : ligne … : « Objet requis: 'UltraDMD' », 540 fois. ».
+  Sans erreur répétée au moins trois fois, la ligne commence par « Erreur du script pendant la partie ».
+  Une erreur dans une procédure appelée à chaque tour d'une minuterie revient à chaque tour : elle se perdait parmi des centaines de lignes identiques.
+- **Son de la partie** (`vpxAudioJournal`) : les sorties du son que VPX a ouvertes, celles qu'il n'a pas trouvées avec la sortie prise à leur place, ses erreurs de son, et la musique qu'il n'a pas trouvée : « Son de la partie (…) : sorties « … » ; sortie absente, remplacée : … ; musique introuvable (cherchée dans le dossier « music » de la table, puis celui de VPX) : « … ». ».
+- **Images du DMD de la partie** (`flexAssetsJournal`, tables UltraDMD et FlexDMD) : le dossier d'images que le DMD a utilisé, le nombre d'images chargées, et celles qui sont introuvables, non chargées ou d'un format non pris en charge, cinq au plus de chaque : « Images du DMD de la partie (…) : dossier « … » ; 12 images chargées ; introuvables : black.jpg. ».
+  Un DMD UltraDMD orange est normal tant qu'il n'affiche que des textes : le plugin FlexDMD de VPX les dessine dans cette couleur.
+
+Le diagnostic de la table lit aussi la dernière partie de la table dans `vpinball.log` : musique introuvable (voir [Musique et son d'une table](son.md#musique-et-son-dune-table)), images du DMD absentes ou illisibles (voir « Contenu du DMD » dans [Ce qu'il manque pour jouer](ce-qu-il-manque-pour-jouer-parcours-guide.md#ce-quil-manque-pour-jouer--parcours-guidé)).
+Tests : `message-du-script.test.ts` (erreurs regroupées), `son-et-dmd.test.ts` (lignes du journal et constats).
 
 ### Réalité virtuelle
 

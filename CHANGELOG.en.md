@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.1
 
+- Add a table: the "From another installation…" entry carries the "BETA" badge, like the duplication-free import it offers.
+- Table page, Files section: a script adapted for the B2S backglass or for the DMD folder now says what was changed, instead of "adapted by Cyber Pinball:" followed by nothing.
 - Pinball FX3 on a cabinet whose buttons are joystick buttons (Pinscape, encoder in gamepad mode): the flippers now move through the game's menus. Those menus use the left and right arrow keys, which the flippers didn't send; each flipper now also sends the arrow on its side. You can reach the cabinet icon and turn on cabinet mode without a keyboard. In a game, the flippers still flip.
 - Zen games: at the end of each game, the log counts the button presses sent to the game and those held back because the game wasn't in front.
 - Setup wizard, buttons: a MagnaSave (or any other button) chosen for the quick reference, the VPX settings, the Windows desktop or "Quit without saving" keeps its key in the game. On a board in keyboard mode such as the CSD PinOne, a MagnaSave set on one of these menu buttons ended up with no key in the game buttons, its line empty, and did nothing during a game.

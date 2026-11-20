@@ -8,7 +8,7 @@ The page shows six blocks, each with its state written out ("✓ OK", "! À vér
 | Block | What it shows | What it offers |
 | --- | --- | --- |
 | PC | Drives first (model, NVMe, SSD or hard drive, free space), then processor, memory (modules, speed, share in use), graphics card and its driver version (NVIDIA's, "566.36", not Windows'), motherboard and BIOS, network, Windows start | Downloads (free up space) |
-| Windows | Edition and build, restart pending, power plan and screen and sleep timeouts, Game Mode, GPU scheduling, notifications, Visual C++, antivirus, language and keyboard | Restart the cabinet (when an update is pending), Dedicated cabinet |
+| Windows | Edition and build, restart pending, power plan and screen and sleep timeouts, Game Mode, GPU scheduling, notifications, Visual C++, language and keyboard | Restart the cabinet (when an update is pending), Dedicated cabinet |
 | Screens | Each connected screen, by its role in the setup in use: model, diagonal, resolution, refresh rate, connection (HDMI, DisplayPort…), highest advertised refresh rate when it has one, Windows scale, rotation; then the setup in use and its screens found | Cabinet configuration |
 | Controllers | Buttons (Pinscape, keyboard or encoder, number of buttons set up), plunger, accelerometer, DOF controllers | Cabinet controls, LEDs and feedback (DOF) |
 | Software | VPX and the version Cyber Pinball knows ("facultative", optional: information, not a fault), the VPX plugins found in its `plugins` folder and their state in `VPinballX.ini` (PinMAME, B2S, DOF, FlexDMD, PUP, Serum, AltSound, DMDUtil first), the tables with a PuP-Pack; the VPX files replaced outside Cyber Pinball, named with their version ("Fichiers de VPX : 1 modifié" (VPX files: 1 changed), "SDL364.dll 3.2.18.0") | Install the known VPX version, VPX settings, Cabinet health ("Remettre les fichiers d'origine" (Put the original files back)) |
@@ -16,6 +16,7 @@ The page shows six blocks, each with its state written out ("✓ OK", "! À vér
 
 **Reading.**
 A PowerShell script with no window and no elevation (`TECH_PROBE_SCRIPT`, [app/src/tech-facts.ts](../../app/src/tech-facts.ts)) reads the PC and Windows (CIM, registry, `powercfg`, `Get-Disk`, `Get-NetAdapter`); it takes a few seconds to twenty seconds and runs on its own, without blocking the menu.
+It runs from a readable `.ps1` file, never encoded, with the `RemoteSigned` execution policy, and does not collect the installed antivirus products: both together got Cyber Pinball mistaken for a Trojan (see "PowerShell and antivirus" in [Installation and file layout](installation-and-file-layout.md#code-signing)).
 Each part is in its own `try`: what fails stays absent and the line says "Non relevé" (Not read), nothing is asserted.
 `probeDisplayLinks` ([win-displays](../../packages/win-displays/src/index.ts)) gives each screen's connection (`DISPLAYCONFIG_PATH_TARGET_INFO.outputTechnology`), its refresh rate, the highest one Windows offers at its resolution (`EnumDisplaySettingsExW`, `displayRefresh`) and the one the screen advertises in its EDID ("range limits" descriptor, `edidMaxRefresh`).
 Each screen's role comes from its fingerprint, as for the health page (`techDisplays`).

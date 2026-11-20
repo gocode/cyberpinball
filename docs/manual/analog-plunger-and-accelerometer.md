@@ -4,16 +4,19 @@
 
 An **analog plunger** (potentiometer or sensor plunger, read by a Pinscape on KL25Z or another controller in joystick mode) is not a button: it is a joystick **axis**, whose value follows the plunger's travel.
 The wizard's "Lanceur" (Plunger) step assigns and sets it, along with the Pinscape's accelerometer for nudging ([app/src/plunger-step.ts](../../app/src/plunger-step.ts), [packages/core/src/plunger.ts](../../packages/core/src/plunger.ts)).
-It follows the interface buttons in the full wizard; on its own: system menu > "Borne" (Cabinet) > "Configuration de la borne" (Cabinet configuration) > "Lanceur analogique" (Analog plunger) (`npm run assistant -- --lanceur`, `plunger` action of the launcher).
+It follows the game buttons in the full wizard; on its own: system menu > "Borne" (Cabinet) > "Configuration de la borne" (Cabinet configuration) > "Lanceur analogique" (Analog plunger) (`npm run assistant -- --lanceur`, `plunger` action of the launcher).
 
 - **Detection**: "Tirez le lanceur à fond, puis lâchez-le" (Pull the plunger all the way, then let go).
   Cyber Pinball reads every axis of every joystick through VPX's SDL library (the same numbers as VPX); the axis that moved the most, and came back to rest, becomes the plunger, with its direction (pulling raises or lowers the value).
   The first readings of a freshly opened joystick don't count, and an axis that jumped without coming back (a gamepad trigger) gives way to the plunger.
   Meanwhile a gauge shows the axis that is moving.
-- **Proposed setting**: a dead zone just above the noise measured at rest; on a six-axis Pinscape ("X/Y/Z + RX/RY/RZ" in its config tool) whose plunger is on Z, the **speed measured by the board** on RZ, more accurate than the one VPX computes; the same Pinscape's **accelerometer** on X and Y.
+- **Proposed setting**: a dead zone just above the noise measured at rest; on a six-axis Pinscape ("X/Y/Z + RX/RY/RZ" in its config tool) whose plunger is on Z, the **speed measured by the board** on RZ, more accurate than the one VPX computes; the **accelerometer** on X and Y of the first Pinscape read, whether the plunger is on that Pinscape or on another board (a button encoder, for example).
+  An accelerometer already set, or turned off, stays as it is when the detection is redone: it does not depend on the plunger.
 - **Test**: the gauge shows the position as VPX will compute it (dead zone, direction), from forward to fully pulled, with the furthest pull; each shot (plunger released) shows its strength.
-  Lines: sensor (detect again), direction, dead zone (0 to 30 %, with the flippers), speed, accelerometer; then "Enregistrer" (Save) ("Continuer" (Continue) in the full wizard) or "Pas de lanceur analogique" (No analog plunger).
+  Lines: sensor (detect again), direction, dead zone (0 to 30 %, with the flippers), speed, accelerometer ("Oui, axes X et Y" (Yes, axes X and Y), or "Axes X et Y · " (Axes X and Y · ) followed by the board's name when it is not the plunger's; Start turns it on or off); then "Enregistrer" (Save) ("Continuer" (Continue) in the full wizard) or "Pas de lanceur analogique" (No analog plunger).
   Everything also works with the mouse.
+- **No analog plunger**: this choice only removes the plunger; the accelerometer that is set stays, and VPX still reads nudging (`NudgeSensorCount` at 1): a cabinet with a button plunger can have its accelerometer on a KL25Z.
+  Without an analog plunger, the accelerometer is chosen at the "Tilt" step (see [Tilt](tilt.md#tilt)).
 - **Rest far from 0**: VPX has no offset, the plunger would look pulled all the time.
   The step says so: the rest position is set on the board (Pinscape calibration).
 - **Already set**: a cabinet where the step was done opens on its setting; otherwise, a plunger already assigned in VPX (its menu, or its accepted Pinscape layout) is taken as is ("Réglage trouvé dans VPX", Setting found in VPX).

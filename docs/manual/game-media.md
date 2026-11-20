@@ -226,7 +226,7 @@ The registry, what triggers each sound and the rule deciding whether it plays ar
 | Opening breath (`intro`) | the startup opening (and "Voir l'ouverture", See the opening), when its animations start; not when an opening music has been chosen, which has the floor | WebAudio synthesis (a filtered breath rising with the spark, from 400 to 5,200 Hz in 1.25 s, then at ignition a soft glassy chord, A, E, B, C sharp, over a falling bass; 3.1 s, no reverb); dated by the main process (`hitAt` = start of the animations + `INTRO_TIMELINE.ignition`), it starts 1.25 s before the ignition, counted on the animations' clock rather than when the message arrives, once the output is awake and its latency subtracted: the chord lands on the playfield's flash; same licence |
 | Badge chime (`badge`) | a common badge earned, back on the tables screen, timed to its animation (see [Levels and badges](levels-and-badges.md#levels-and-badges)) | WebAudio synthesis (a short breath, then as the badge arrives an arpeggio of FM bells, C, E, G, C, over a soft pad; small ticks while the XP count up; 4.2 s, with reverb); same licence |
 | Badge fanfare (`badge-rare`) | a rare, epic or legendary badge earned, back on the tables screen, timed to its animation | WebAudio synthesis (a rising breath, a deep impact as the badge arrives, an arpeggio, then F, G, C chords under the text; ticks while the XP count up; 5.6 s, with reverb); same licence |
-| Level up (`level-up`) | the level rises, during a badge moment or on its own | WebAudio synthesis (two bell notes rising a fourth, G then C; 1.6 s, with reverb); same licence |
+| Level up (`level-up`) | the level rises, during a badge moment or on its own; the table's music and the playfield video's sound go quiet for the length of the moment | WebAudio synthesis (a fanfare: a low impact and a C chord with a rising arpeggio, a G chord as a call, then the big held C chord, its bass and its bells; 4 s, with reverb); same licence |
 
 - **Settings**: **System menu > Médias (Media) > "Médias, son et attente" (Media, sound and attract mode)**: "Sons de l'interface" (Interface sounds; on by default; Start turns them off or back on, and plays the click) and "Volume des sons de l'interface" (Interface sound volume; 50% by default; choosing plays the coin).
   Saved in `<données>\medias.json` (`uiSounds`, `uiSoundsVolume`).
@@ -440,6 +440,17 @@ The DMD spectrum then reads the graph's analyser.
 The main process sends the plan with each state of the clip (`jukeboxRoutes`); for the YouTube player, the same engine is replayed in its page and laid on its video at each probe (`onlineRoutesScript`), redone if YouTube changes the element; one video only, no copy possible: the other outputs receive its stream (`captureStream`), each in its context placed on its card ("stream" mode).
 With the headset in use, everything follows the headset as before; the cabinet outputs wait.
 The log notes the real output of each song ("Juke-box : t4 joue sur …"), an output that cannot be found ("(introuvable)"), and the YouTube player's routing.
+
+**Playing local songs.**
+Sounds and videos played from disk (added files, songs downloaded on the cabinet) no longer go through the main process, which runs the whole menu.
+A heavy video (4K, with sound and picture stored far apart in the file) makes Chromium restart several reads of the file per second: each one waited for the main process, and the song froze, sound included, every few seconds whenever the menu was busy.
+A small server, in a separate process (Electron's `utilityProcess`, "Cyber Pinball - Juke-box"), now serves them ([app/src/jukebox-media-server.ts](../../app/src/jukebox-media-server.ts), [app/src/jukebox-media-worker.ts](../../app/src/jukebox-media-worker.ts)).
+It only listens on the cabinet itself (`127.0.0.1`, port chosen by the system), each address carries a token drawn at random when it starts, and it only serves, read-only, the files the menu allows it one by one, without listing anything.
+Until it is ready, or if it stops (restarted three times at most), the player falls back to the `cyber-media://` protocol: playback always works, and the log says so ("Juke-box : serveur des fichiers … ; lecture par le protocole des médias").
+This server is a script built separately, shipped next to the application (`jukebox-media-worker.js`, the build's `builtApart` list): a test checks that every script the application loads by name is in it.
+Every interruption longer than a quarter of a second while a local song plays is written to the log, with its cause: waiting for data, frozen picture or frozen sound ([app/renderer/jukebox-stalls.js](../../app/renderer/jukebox-stalls.js)).
+The line also says how much was loaded ahead and the main process's worst delay over the last ten seconds ("Juke-box : [avertissement] t4 s'est arrêté 1.2 s à 95 s (attente de données, 0.3 s chargées d'avance ; processus principal en retard de … ms au plus sur les 10 dernières secondes) ; coupure n° 1.").
+The initial loading, a deliberate pause and a seek do not count; after the first five interruptions of a song, one line every ten.
 
 Tests: [jukebox-audio.test.ts](../../packages/core/src/test/jukebox-audio.test.ts) (factory setting, adding, last output, filters, damaged file), [jukebox-reglages.test.ts](../../packages/core/src/test/jukebox-reglages.test.ts) (screens, buttons, return to the line), and [jukebox-sorties-chromium.test.ts](../../packages/core/src/test/jukebox-sorties-chromium.test.ts), in a real off-screen and muted Chromium: a 440 Hz tone goes through the graph, two branches with their filters, a new plan without stopping the song, the test excerpt.
 
@@ -773,7 +784,7 @@ It stays silent when the cabinet has no backglass screen, or when one of the tab
 Every fix is safe: rename, move into `medias\`, or move to the trash (`trash\`); nothing is converted or deleted.
 "Tout réparer" (Repair all) chains the fixes without any two of them targeting the same file; anything that depends on a rename (the type of a misnamed display, for example) is checked at the next analysis.
 
-Each finding can also be ignored for this table ("Ignorer « … »" (Ignore "…"), or the finding itself when it has no fix): kept by its code in the table's `.info` (`CyberPinball.doctor.ignored`, `setFindingIgnored`), it no longer counts anywhere, neither in the cabinet health nor in "Ce qu'il manque pour jouer" (What is missing to play) (`splitIgnoredFindings`).
+Each finding can also be ignored for this table ("Ignorer « … »" (Ignore "…"), or the finding itself when it has no fix): kept by its code in the table's `.info` (`CyberPinball.diagnosis.ignored`, `setFindingIgnored`), it no longer counts anywhere, neither in the cabinet health nor in "Ce qu'il manque pour jouer" (What is missing to play) (`splitIgnoredFindings`).
 The diagnosis keeps it under "Ignorés" (Ignored), where "Ne plus ignorer « … »" (Stop ignoring "…") brings it back.
 All findings with the same code go together.
 

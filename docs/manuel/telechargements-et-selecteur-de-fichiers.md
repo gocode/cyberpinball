@@ -15,6 +15,7 @@ Les index (`vpsdb.json`, `vpinmdb.json`…), les relevés, les aperçus des site
   Il s'affiche là où l'on est, aux flippers (choisir), Start (ouvrir un dossier, cocher un fichier, ou le prendre quand on n'en attend qu'un), Exit (dossier parent, puis annuler), à la souris (clic, glisser un fichier sur la fenêtre) et au clavier (Tab, Entrée, Échap).
   **Emplacements** : les téléchargements de Cyber Pinball (ouverts d'office quand ils ont ce qu'on cherche, avec la provenance et l'usage de chaque fichier), Téléchargements de Windows, dossier d'import, Bureau, puis les clés USB et les disques (`Get-CimInstance Win32_LogicalDisk`, relu toutes les 15 secondes : une clé branchée apparaît à l'ouverture suivante).
   Le contenu est **filtré** sur ce que l'écran attend (« Filtre : Fronton (.mp4, .png…) ») ; les autres fichiers sont comptés, et « Afficher tous les fichiers » les montre, marqués « Ne convient pas ».
+  Il s'ouvre **trié par nom**, comme l'Explorateur de Windows (`DEFAULT_PICKER_SORT`) : les dossiers d'abord, puis les fichiers, sans tenir compte des majuscules, les nombres dans leur ordre (« Table 2 » avant « Table 10 ») ; le geste « Trier par date » met les plus récents d'abord, et « Trier par nom » y revient.
   Plusieurs fichiers se cochent d'un dossier à l'autre (« Prendre les 2 fichiers choisis ») ; « Prendre ce dossier entier » prend le dossier ouvert.
   États distincts : dossier vide, aucun fichier qui convienne, clé retirée ou accès refusé (« Réessayer »).
   Un fichier repris dans la zone de téléchargements est noté dans le journal.

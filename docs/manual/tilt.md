@@ -3,7 +3,7 @@
 ## Tilt
 
 What makes the cabinet tilt is decided at the wizard's "Tilt" step ([app/src/tilt-step.ts](../../app/src/tilt-step.ts), [packages/core/src/tilt.ts](../../packages/core/src/tilt.ts)).
-It follows the "Lanceur" (Plunger) step in the full wizard, which skips it without writing anything on a cabinet with no accelerometer, no captured tilt bob and no saved tilt (VPX then keeps its simulated tilt bob); on its own: system menu > "Borne" (Cabinet) > "Configuration de la borne" (Cabinet configuration) > "Tilt" (`npm run assistant -- --tilt`, `tilt` action of the launcher).
+It follows the "Lanceur" (Plunger) step in the full wizard, which skips it without writing anything on a cabinet with no accelerometer set and no Pinscape plugged in (or whose accelerometer was turned off), no captured tilt bob and no saved tilt (VPX then keeps its simulated tilt bob); on its own: system menu > "Borne" (Cabinet) > "Configuration de la borne" (Cabinet configuration) > "Tilt" (`npm run assistant -- --tilt`, `tilt` action of the launcher).
 
 **What VPX does with it** (VPX 10.8.1, commit `af26b2d93`):
 
@@ -36,6 +36,12 @@ A contact bounces, and a swinging tilt bob touches its ring again: the key just 
 - **Proposal**: a captured tilt bob wins ("Balancier de la borne", simulated tilt bob off); without one, what VPX does today ("Réglage actuel de VPX : balancier simulé par VPX, contact à 1,00°", Current VPX setting: tilt bob simulated by VPX, contact at 1.00°).
   A cabinet whose step is done opens on its setting.
   "Tilt" line: Start (or a click) switches modes: "Balancier de la borne" and "Balancier simulé par VPX" with a captured tilt bob, otherwise "Balancier simulé par VPX" and "Pas de tilt".
+- **Accelerometer**: the "Accéléromètre" (Accelerometer) line chooses the board whose accelerometer shakes the table when the cabinet is nudged, regardless of the plunger (button plunger, or plunger wired to another board than the KL25Z).
+  Proposed by default: the one set at the "Lanceur" step, otherwise the first Pinscape read (axes X and Y, strength ×2), as long as it has not been turned off (`proposedNudge`, [plunger.ts](../../packages/core/src/plunger.ts)).
+  The value gives the axes and the board ("Axes X et Y · mjrnet Pinscape Controller", Axes X and Y · mjrnet Pinscape Controller).
+  Start (or a click) moves to the next board among those with at least two axes, Pinscapes first, then to "Aucun" (None), which holds: the Pinscape is no longer proposed, neither here nor at the "Lanceur" step.
+  The board you started with keeps its axes, strength and directions; another one takes X and Y.
+  The chosen accelerometer is saved with the tilt (`[Input] Mapping.Nudge0.X` and `.Y`); when the step is redone on its own, its other keys (`NudgeSensorCount`, `Mapping.Nudge0.Type`) follow at the next synchronization of the front-end, like any key outside the step.
 - **Contact angle** (simulated tilt bob): Start, then the flippers, in 0.05° steps, from 0.15° to 4°; Start to finish.
   Smaller, easier tilt: 4° is the hardest.
 - **Nudge strength** (with an accelerometer): the scale of the accelerometer's X and Y axes (`[Input] Mapping.Nudge0.X` and `.Y`, `NUDGE_GAIN` in [plunger.ts](../../packages/core/src/plunger.ts)), from ×0.50 to ×6, in 0.25 steps; Start, then the flippers.
@@ -49,7 +55,7 @@ A contact bounces, and a swinging tilt bob touches its ring again: the key just 
 - **Test**: the contact ring seen from above.
   With the simulated tilt bob, the dot follows the tilt bob computed as VPX will compute it, one millisecond at a time, from the accelerometer axes read by VPX's SDL library (same axis shaping, same `Mapping.Nudge0.Strength`, same damping): each contact lights the ring, "TILT" under it, and counts as a Tilt press (the tilt bob bounces on the ring: a hard nudge often makes several, as in VPX); the footer gives the share of the contact reached and the nudge in g.
   With the cabinet tilt bob, the ring lights at each real contact ("Contacts du balancier : n", Tilt bob contacts: n).
-  Without an accelerometer set ("Lanceur" step), the step says so: only the nudge buttons will move the simulated tilt bob.
+  Without an accelerometer ("Aucun", or no board with two axes), the step says so: only the nudge buttons will move the simulated tilt bob, and the test does not show it.
 - **Keys**: `[Player] SimulatedPlumb` and `PlumbThresholdAngle` (`vpxTiltSettings`, `isTiltKey`), only after the step (smooth migration: without it, `[Player]` stays as it is).
   Damping is left to VPX (F12 > "Nudge Settings").
   Like the other managed keys, an angle changed later in a game is reported, kept or reset as you choose.

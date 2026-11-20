@@ -7,10 +7,10 @@ Ce n'est pas la liste des corrections : celle-ci reste dans les notes de chaque 
 
 - **Une chronologie** : la plus récente en haut, la date et la version dites une seule fois pour les nouveautés du même jour.
   Chaque ligne a son titre, une phrase qui dit ce qu'elle apporte et, si elle en a un, un petit aperçu ; « Nouveau » marque celles qu'on n'avait pas encore vues, « BÊTA » celles qui sont encore en essai.
-  Sous le texte de chaque ligne, comme sous un message, les réactions des joueurs en bref : les trois plus choisies et leur total (« 👍❤️😮 23 »), repérées en bleu quand vous avez réagi.
+  Les réactions des joueurs en bref passent toujours à la ligne, au début de la nouveauté, sous l'aperçu et le texte, comme sous un message : les trois plus choisies et leur total (« 👍❤️😮 23 »), repérées en bleu quand vous avez réagi.
 - **Une nouveauté en grand** : Start sur une ligne l'agrandit, avec son grand aperçu, son texte entier et où la trouver (« Où : Communauté › Parties instantanées »).
   « Essayer » mène directement à la fonction ; son « Retour » ramène à la nouveauté.
-  Quand elle ne peut pas servir maintenant, « Essayer » reste visible, grisé, avec sa raison (mode invité, partage désactivé, aucune table choisie sur la roue).
+  Quand elle ne peut pas servir maintenant, « Essayer » reste visible, grisé, avec sa raison (mode invité, partage désactivé, borne qui joue en local pour ce qui touche aux autres joueurs et aux niveaux, aucune table choisie sur la roue).
   « ‹ Précédente » et « Suivante › » passent d'une nouveauté à l'autre sans revenir à la liste.
 - **Réagir** : sous le texte d'une nouveauté agrandie, les sept réactions des messages (👍 ❤️ 🥰 😆 😮 😢 😡) en tuiles, chacune avec le nombre de joueurs qui l'ont choisie, partout dans le monde, la vôtre repérée.
   Start pose une réaction, ou en change ; Start sur la sienne la retire (« Votre réaction : … · Start sur elle la retire »).

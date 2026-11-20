@@ -5,6 +5,16 @@
 The setup wizard (`app/src/wizard.ts`, screens `app/renderer/screen.*`) runs at first start, or through "Assistant complet" (Full setup wizard), and goes through: **buttons** (capturing each button), **analog plunger** (sensor plunger, accelerometer), **tilt** (cabinet tilt bob or tilt bob simulated by VPX), **screens and roles** (playfield, backglass, DMD, topper), **playfield orientation and size** (flipper edge, flipping the screen in Windows if VPX needs it, diagonal), **screen layout** (zones), **sound** (audio outputs, speaker test), then the summary and the writing of `cabinet.json` and `VPinballX.ini`.
 The list of steps, what each one decides and its keys are in [packages/core/src/wizardsteps.ts](../../packages/core/src/wizardsteps.ts) (`WIZARD_PHASES`, `WIZARD_STEPS`), tested in [wizardsteps.test.ts](../../packages/core/src/test/wizardsteps.test.ts).
 
+**Step bar**: at the top of every screen, between the logo and "Quitter sans enregistrer" (Leave without saving), one numbered dot per step of the full wizard (interface buttons, game buttons, plunger, tilt, screens, layout, sound, summary) ([app/src/wizard-progress.ts](../../app/src/wizard-progress.ts)).
+Steps done and to come only show their number; the current one, in green, shows its name and progress: "Boutons de l'interface · Bouton 1 sur 4" (Interface buttons · Button 1 of 4), "Boutons de l'interface · Bouton facultatif 2 sur 4" (Interface buttons · Optional button 2 of 4), "Écrans · Rôle 2 sur 4" (Screens · Role 2 of 4), "Son · Sortie 1 sur 3" (Sound · Output 1 of 3), "Son · Haut-parleurs 1 sur 3" (Sound · Speakers 1 of 3).
+A step redone on its own has a single dot, with its name; the end screen has none.
+
+**With keyboard and mouse**: every step has its on-screen commands, clickable, each showing below it the keys that do the same thing ([app/src/wizard-controls.ts](../../app/src/wizard-controls.ts)): "Revenir" (Back; Backspace), the two flipper choices (and the arrows), the action that moves on, highlighted (Start or Enter), and Exit's answer (Esc) when the step has one.
+For example "◀ Tourner" (◀ Rotate), "Tourner ▶" (Rotate ▶) and "Valider" (Confirm) at the flipper edge; "− Moins" (− Smaller), "Plus +" (Larger +) and "Valider" at the diagonal; "◀ Écran précédent" (◀ Previous screen), "Écran suivant ▶" (Next screen ▶), "Valider" (or "Ouvrir l'éditeur", Open the editor) and "Aucun écran" (No screen) for each role; "Dans le fronton" (In the backbox), "Sur le plateau" (On the playfield), "Les deux" (Both) and "Aucun" (None) for each sound output; "Plateau, près de vous" (Playfield, near you), "Plateau, côté fronton" (Playfield, backbox side), "Dans le fronton" and "Rien entendu" (Nothing heard) at the speaker test; "Enregistrer" (Save) and "Recommencer" (Start over) on the summary; "Continuer vers les tables" (Continue to the tables) at the end.
+The "Lanceur" (Plunger) and "Tilt" steps have "Revenir" in addition to their own lines, which are clickable too.
+A click goes through the same handling as a press of the cabinet button, under a code no keyboard or joystick can send: it does exactly the same thing.
+The whole first setup can thus be done from a PC, remote desktop included; only button mapping needs the real cabinet buttons to be pressed.
+
 **System menu (Exit, Tab or ⚙) > "Borne" (Cabinet) > "Configuration de la borne" (Cabinet configuration)** gathers everything that sets up the cabinet.
 Each step can be redone there on its own and returns to the table menu, saved or not:
 
@@ -13,14 +23,15 @@ Each step can be redone there on its own and returns to the table menu, saved or
 | "Boutons du jeu" (Game buttons) | `--boutons` | game button capture and test | `[Input]` |
 | "Boutons de l'interface" (Interface buttons) | `--interface` | capture and test of the buttons that drive Cyber Pinball | none |
 | "Lanceur analogique" (Analog plunger) | `--lanceur` | sensor plunger detection, direction, dead zone, speed, accelerometer, test | sensor `[Input]` keys |
-| "Tilt" | `--tilt` | cabinet tilt bob or tilt bob simulated by VPX, contact angle, nudge test | `[Player] SimulatedPlumb`, `PlumbThresholdAngle` |
+| "Tilt" | `--tilt` | cabinet tilt bob or tilt bob simulated by VPX, contact angle, accelerometer and nudge strength, nudge test | `[Player] SimulatedPlumb`, `PlumbThresholdAngle`, `[Input] Mapping.Nudge0.X` and `.Y` |
 | "Écrans et rôles" (Screens and roles) | `--ecrans` | the screen of each role; flipper edge and diagonal only if the playfield moves to another screen | VPX windows and framing |
 | "Orientation et taille du playfield" (Playfield orientation and size) | `--playfield` | flipper edge, screen flip, diagonal | VPX windows and framing |
 | "Disposition des écrans" (Screen layout) | `--disposition` | zone of each role on its screen | VPX windows and framing |
 | "Son de la borne" (Cabinet sound) | `--son` | backglass and playfield outputs, speaker test | `SoundDevice`, `SoundDeviceBG`, `Sound3D` |
 | "Assistant complet" | | all the steps in a row | all managed keys |
-| "Touches par défaut des encodeurs" (Default encoder keys) | | immediate reset of both button sets, no wizard | `[Input]` |
 | "Configurations de la borne" (Cabinet configurations) | | choose, rename, trash, new configuration | |
+| "Rétablir les boutons d'avant" (Restore the previous buttons) | | only after a reset to the default keys: the replaced mapping, put back | `[Input]` |
+| "Touches par défaut des encodeurs" (Encoder default keys) | | after confirmation, both button sets back to the encoders' keys, no wizard; greyed out on a cabinet with joystick buttons (see [Cabinet buttons](cabinet-buttons.md#cabinet-buttons)) | `[Input]` |
 
 A single step starts from the saved model (roles, screens, flipper edge), changes only its own fields in `cabinet.json` (`stepCabinet`) and writes only its own `VPinballX.ini` keys (the `only` option of the sync), even ones changed by hand; the other keys stay as they are until the next sync from the menu.
 The summary shows only those keys; Exit there restarts the step, Backspace goes back to the last question.

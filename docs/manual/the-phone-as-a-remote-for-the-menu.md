@@ -20,6 +20,11 @@ What the phone drives follows what the cabinet shows (`RemoteMode`): the site pa
   A held flipper repeats after 0.4 s, every 70 ms (`isAutoRepeat`): the menu speeds up as under a real button, the phone's button says "Défilement rapide" (Fast scroll).
   A held button is released when the finger lifts or leaves the button, when the page goes to the background, when the link is cut, after 20 s at most.
   Top of the page: the screen shown and what is selected on it.
+- **The phone's Back button** (Android, or the back gesture) steps back through the remote's screens instead of closing it, like the page's own back buttons.
+  It closes an open sheet (⋮ menu, reactions…), leaves a conversation, a profile, a full-screen page or the Juke-box player, goes up a section in Menus or out of a playlist in the Juke-box, and brings the other tabs back to Screen.
+  On Screen, it goes back on the screen open on the cabinet, as if you touched its back button; when the cabinet's browser is open, it returns to its previous page.
+  On the starting screen, there is nowhere left to go back to: it leaves the page, as before.
+  In full screen, the first Back leaves full screen, the next one steps back through the screens (`telephone-retour.js`; test: `telephone-retour.test.ts`).
 - **Typing**: when the menu opens its on-screen keyboard (title search, player name, configuration name, Art-Net node address, LED count…), the phone opens its keyboard panel **with the cabinet's text** (never a password: the menu asks for none); what is typed replaces that text (`library.ts`, `remoteSet`), a number keeps its digits.
   "Valider" (Confirm) is Enter, "Annuler" (Cancel) is Exit.
   If the text changes at the cabinet meanwhile, the phone takes it over.
