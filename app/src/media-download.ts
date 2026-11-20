@@ -922,7 +922,10 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     const games = new Map<string, MediaDbGameOffer>();
     for (const id of new Set(ids)) {
       const entry = found.entries.get(id);
-      if (entry) games.set(id, { offers: mediaDbOffers(entry, quality).map((o) => o.variants[0]!), bytes: 0, unknown: 0 });
+      if (entry) {
+        const proposals = mediaDbOffers(entry, quality);
+        games.set(id, { offers: proposals.map((o) => o.variants[0]!), variants: proposals.flatMap((o) => o.variants), bytes: 0, unknown: 0 });
+      }
     }
     if (!games.size) return { games };
     const sizes = await ctx.search.sizes([...games.values()].flatMap((g) => g.offers.map((o) => o.file)));
@@ -944,7 +947,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
    * de la base VPS (les tables sont reconnues à leur identifiant VPS) ; le suivi reste dans les
    * téléchargements (tables de Pinball FX ajoutées au menu).
    */
-  async function fillMissing(files: string[], opts: { quiet?: boolean; types?: readonly MediaType[] } = {}): Promise<{ installed: number; bytes: number; tables: number; failed: string[] }> {
+  async function fillMissing(files: string[], opts: { quiet?: boolean; types?: readonly MediaType[]; variants?: readonly string[] } = {}): Promise<{ installed: number; bytes: number; tables: number; failed: string[] }> {
     const out = { installed: 0, bytes: 0, tables: 0, failed: [] as string[] };
     const { db: found, problem } = await ctx.search.index(opts);
     if (!found) {
@@ -959,6 +962,11 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
       const match = matchMediaDb(found, table, vps);
       if (match.how !== 'vps-id') continue;
       const o = prepare(table, match, 0, true);
+      // La variante choisie sur la fiche d'ajout (vidéo plutôt qu'image…), reconnue à l'adresse de son fichier.
+      for (const p of o.proposals) {
+        const i = p.variants.findIndex((v) => opts.variants?.includes(v.file.url));
+        if (i >= 0) o.chosen.set(p.type, i);
+      }
       // Les types choisis seulement (fiche d'ajout d'une table de Pinball FX), sinon tous ceux qui manquent.
       const choices = choicesOf(o).filter((c) => !opts.types || opts.types.includes(c.offer.type));
       if (!choices.length) continue;
@@ -997,7 +1005,10 @@ export function otherGameRows(table: TableEntry | undefined, game: VpsGame | und
 
 /** Ce que VPinMediaDB a pour un jeu, pour le plan d'ajout : un fichier par média, et le poids total. */
 export interface MediaDbGameOffer {
+  /** La variante par défaut de chaque média. */
   offers: MediaDbOffer[];
+  /** Toutes les variantes de chaque média (image, vidéo…) : les autres choix d'une fiche d'ajout. */
+  variants: MediaDbOffer[];
   bytes: number;
   /** Fichiers dont le poids n'a pas pu être lu. */
   unknown: number;

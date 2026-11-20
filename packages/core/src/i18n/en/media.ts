@@ -398,6 +398,8 @@ export const messages: Record<string, string> = {
   'Cyber Pinball télécharge ce fichier pour le média : sa progression s’affiche dans le bandeau, inutile de cliquer dans la page.':
     'Cyber Pinball is downloading this file for the media item: its progress shows in the banner, no need to click on the page.',
   'À faire vous-même : {reason}. Le fichier téléchargé revient aux propositions du média.': 'For you to do: {reason}. The downloaded file goes back to the media suggestions.',
+  'page fermée sans téléchargement': 'page closed without a download',
+  'rien téléchargé depuis la page': 'nothing downloaded from the page',
   '{got} sur {total}': '{got} of {total}',
   '{got} sur environ {total}': '{got} of about {total}',
   '{got} reçus, taille non annoncée': '{got} received, size not announced',

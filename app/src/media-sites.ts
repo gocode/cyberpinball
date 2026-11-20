@@ -136,6 +136,8 @@ interface Cached {
 const SEARCH_TTL_MS = 30 * 60 * 1000;
 /** Attente imposée par un site qu'on accepte avant de recommencer une recherche, en secondes. */
 const MAX_FLOOD_WAIT_S = 150;
+/** Au plus, attente d'un téléchargement lancé à la main depuis la page affichée (fiche sans téléchargement direct). */
+const HANDED_MAX_MS = 20 * 60_000;
 
 export const jobKey = siteHitKey;
 
@@ -382,7 +384,10 @@ export function createMediaSites(ctx: MediaSitesContext) {
       if (job.cancelled) {
         jobs.delete(job.key);
         if (dir) fs.rmSync(folder, { recursive: true, force: true });
-      } else Object.assign(job, { state: 'failed', error, seconds: undefined }, extra);
+      } else {
+        Object.assign(job, { state: 'failed', error, seconds: undefined }, extra);
+        console.log(`Médias des sites : ${mediaSite(job.hit.site).name}, « ${job.hit.title} » non reçu (${error}).`); // i18n-ignore : journal
+      }
       ctx.changed();
     };
     const folder = path.join(dir ?? '', `${job.hit.site}-${job.hit.id}`);
@@ -410,6 +415,25 @@ export function createMediaSites(ctx: MediaSitesContext) {
     fs.rmSync(folder, { recursive: true, force: true });
     let resolveDone!: (r: { file: string } | { error: string }) => void;
     const done = new Promise<{ file: string } | { error: string }>((r) => (resolveDone = r));
+    /** Le fichier a commencé d'arriver (vue cachée ou page affichée). */
+    let begun = false;
+    const claimProgress = (p: TransferProgress) => {
+      begun = true;
+      Object.assign(job, {
+        state: 'downloading',
+        seconds: undefined,
+        ...progressOf(p),
+      });
+      ctx.changed();
+    };
+    const claimDone = (r: { file: string } | { error: string }) =>
+      resolveDone(
+        'error' in r
+          ? {
+              error: r.error === 'cancelled' ? t('téléchargement annulé') : t('téléchargement interrompu'),
+            }
+          : { file: r.file },
+      );
     job.state = mediaSite(job.hit.site).wait ? 'waiting' : 'downloading';
     ctx.changed();
     const result = await ctx.acquirer.direct(job.hit.url, source, 60_000, {
@@ -423,33 +447,30 @@ export function createMediaSites(ctx: MediaSitesContext) {
         dir: incoming,
         title: t('{type} : {title}', { type: mediaTypeInfo(job.type).label, title: job.hit.title }),
         signal: stop.signal,
-        progress: (p) => {
-          Object.assign(job, {
-            state: 'downloading',
-            seconds: undefined,
-            ...progressOf(p),
-          });
-          ctx.changed();
-        },
-        done: (r) =>
-          resolveDone(
-            'error' in r
-              ? {
-                  error: r.error === 'cancelled' ? t('téléchargement annulé') : t('téléchargement interrompu'),
-                }
-              : { file: r.file },
-          ),
+        progress: claimProgress,
+        done: claimDone,
       },
     });
+    // Sans téléchargement direct (page d'attente, choix entre fichiers, vérification), la page reste
+    // affichée : ce que l'utilisateur y télécharge revient à ce média (20/11/2026 : le fronton de
+    // VPForums tombait dans les téléchargements généraux, jamais rangé, la table restait sans lui).
+    let handed = false;
     if (!result.ok) {
       // Plafond du compte : inutile d'essayer les suivants de ce site aujourd'hui.
       if (result.quota)
         for (const other of jobs.values())
           if (other !== job && other.hit.site === job.hit.site && other.state === 'queued') Object.assign(other, { state: 'failed', error: result.reason });
-      return fail(result.reason, { login: result.login });
+      if (result.login || result.quota || job.cancelled || stop.signal.aborted) return fail(result.reason, { login: result.login });
+      console.log(`Médias des sites : ${source.label}, « ${job.hit.title} » : pas de téléchargement direct (${result.reason}) ; la page affichée le rendra au média.`); // i18n-ignore : journal
+      const status = t('À faire vous-même : {reason}. Le fichier téléchargé revient aux propositions du média.', { reason: result.reason });
+      const claim = { dir: incoming, title: t('{type} : {title}', { type: mediaTypeInfo(job.type).label, title: job.hit.title }), signal: stop.signal, progress: claimProgress, done: claimDone };
+      if (!ctx.acquirer.adopt(job.hit.url, claim, status))
+        ctx.acquirer.show({ url: job.hit.url, game: job.hit.title, expected: t('Média : {title}', { title: job.hit.title }), host: t('{site} · votre propre compte', { site: source.label }), status, claim });
+      handed = true;
     }
     job.state = 'downloading';
     ctx.changed();
+    let watch: ReturnType<typeof setInterval> | undefined;
     const got = await Promise.race([
       done,
       new Promise<{ error: string }>((r) =>
@@ -457,7 +478,22 @@ export function createMediaSites(ctx: MediaSitesContext) {
           once: true,
         }),
       ),
+      // Page rendue à l'utilisateur : fermée sans rien télécharger, ou laissée ouverte sans suite, le
+      // fichier n'arrivera pas ; la file de ce site passe au suivant.
+      ...(handed
+        ? [
+            new Promise<{ error: string }>((r) => {
+              const end = Date.now() + HANDED_MAX_MS;
+              watch = setInterval(() => {
+                if (begun) return;
+                if (!ctx.acquirer.isOpen()) r({ error: t('page fermée sans téléchargement') });
+                else if (Date.now() > end) r({ error: t('rien téléchargé depuis la page') });
+              }, 1000);
+            }),
+          ]
+        : []),
     ]);
+    if (watch) clearInterval(watch);
     if ('error' in got) {
       fs.rmSync(folder, { recursive: true, force: true });
       return fail(got.error);

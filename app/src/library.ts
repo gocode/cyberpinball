@@ -87,6 +87,7 @@ import {
   vpsSiteHits,
   mediaSite,
   lowerFirst,
+  mediaDbOfferLabel,
   scanTableMedias,
   type MediaType,
   type MediaDbOffer,
@@ -588,6 +589,8 @@ export function createLibrary(host: LibraryHost) {
     setup: () => zenSetup('pinballfx3', host.dataDir),
     pickFolder: async () => (await pickPaths({ title: t('Dossier de {game}', { game: 'Pinball FX3' }), icon: 'folder', purpose: tLater('Dossier de Pinball FX3'), mode: 'folder', start: 'desktop' }))?.[0],
     reopen: (stay) => openZen('pinballfx3', undefined, stay ? cursor : undefined),
+    broadcast: () => host.broadcast(),
+    downloads: () => downloads,
   });
   const mediaImport = createMediaImport({
     tablesDir: () => layout()?.tables,
@@ -1617,6 +1620,7 @@ export function createLibrary(host: LibraryHost) {
     tablesDir,
     find,
     show: (build, at, table) => openCustom(build, at, table),
+    showing: () => (screen?.kind === 'custom' ? (screen as Extract<Screen, { kind: 'custom' }>).build : undefined),
     cursor: () => cursor,
     sheet: (table, flash) => openSheet(table, flash),
     leave: () => leave(),
@@ -3859,33 +3863,47 @@ export function createLibrary(host: LibraryHost) {
    * téléchargements : ceux de VPinMediaDB qui lui manquent (logo, fronton, DMD, vidéos), puis, sans
    * image du plateau, la capture de la table que donne VPS. Rien n'est remplacé.
    */
-  async function fetchPinballFxMedias(fx: ZenTable, file: string, flash: string, types?: readonly MediaType[]): Promise<void> {
+  async function fetchPinballFxMedias(fx: ZenTable, file: string, flash: string, types?: readonly MediaType[], picks?: ReadonlyMap<MediaType, FxElement>): Promise<void> {
     const ui = zenUi[fx.game];
     let installed = 0;
     let placed = false;
     let sites: SiteFill = { placed: [], missing: [], login: [] };
     const failed: string[] = [];
+    // Choix de la fiche d'ajout : chaque type vient de la source choisie, et d'elle seule (un fronton
+    // pris sur VPForums n'est pas pris de VPinMediaDB avant). Sans choix : toutes, dans l'ordre.
+    const from = (source: FxElement['source']): readonly MediaType[] | undefined => (types && picks ? types.filter((type) => picks.get(type)?.source === source) : types);
     // L'image que le joueur a rangée à côté de la table (zen-media.ts) d'abord : rien à télécharger,
     // et la table a son image même sans jeu VPS.
-    const localPlaced = placeZenLocalImage(fx, file, types);
+    const localPlaced = placeZenLocalImage(fx, file, from('local'));
     const vps = fx.vps;
     if (vps) {
       try {
-        const got = await mediaDownload.fillMissing([file], { quiet: true, ...(types ? { types } : {}) });
+        const dbTypes = from('mediadb');
+        const variants = picks ? [...picks.values()].flatMap((e) => (e.offer ? [e.offer.file.url] : [])) : undefined;
+        const got = dbTypes?.length === 0 ? { installed: 0, failed: [] } : await mediaDownload.fillMissing([file], { quiet: true, ...(dbTypes ? { types: dbTypes } : {}), ...(variants ? { variants } : {}) });
         installed = got.installed;
         failed.push(...got.failed);
         const table = find(file);
-        const url = !types || types.includes('Playfield') ? zenVpsImage(fx) : undefined;
+        const url = (from('vps') ?? ['Playfield']).includes('Playfield') ? zenVpsImage(fx) : undefined;
         if (table && url) {
           await mediaSearch.stagePreviews([{ url }], pinballFxThumbs, t('Vignettes'), { quiet: true });
           const staged = pinballFxThumbs.get(url);
           if (staged) allowPreview(staged);
           if (staged && fs.existsSync(staged)) placed = Boolean(placeMissingMedia(table, infoFileFor(table, tablesDir()), 'Playfield', staged, { origin: 'VPS', url, vpsId: vps }));
         }
+        // Ceux de VPinMediaDB et de VPS sont là : montrés tout de suite si les médias de la table sont
+        // ouverts ; ceux des sites (attente, page à valider) suivent.
+        const early = (localPlaced ? 1 : 0) + installed + (placed ? 1 : 0);
+        if (early) {
+          reloadTables(file);
+          medias.refresh(file, { text: tn(early, '{n} média arrivé ; les autres sont en route (Téléchargements).', '{n} médias arrivés ; les autres sont en route (Téléchargements).'), tone: 'info' });
+        }
         // Ce que VPinMediaDB n'a pas (une table propre à Zen, « Back to the Future Pinball ») : les
         // fiches que la base VPS rattache au jeu, comme « Médias du jeu » les propose.
         const now = find(file);
-        if (now) sites = await fillFromVpsSites(now, vps, fx.title, types);
+        const siteTypes = from('site');
+        const hits = picks ? new Map([...picks].flatMap(([type, e]) => (e.hit ? [[type, jobKey(e.hit)] as const] : []))) : undefined;
+        if (now && siteTypes?.length !== 0) sites = await fillFromVpsSites(now, vps, fx.title, siteTypes, hits);
       } catch (error) {
         failed.push((error as Error).message);
       }
@@ -3893,9 +3911,22 @@ export function createLibrary(host: LibraryHost) {
     reloadTables(file);
     const siteNote = sites.placed.length ? `, ${sites.placed.join(', ')} des sites` : ''; // i18n-ignore : journal
     const loginNote = sites.login.length ? ` ; compte à connecter : ${sites.login.join(', ')}` : ''; // i18n-ignore : journal
-    console.log(`${ZEN_GAMES[fx.game].name} : médias de « ${fx.title} » : ${localPlaced ? `${localPlaced} du dossier du jeu, ` : ''}${installed} de VPinMediaDB${placed ? ', image du plateau de VPS' : ''}${siteNote}${loginNote}${vps ? '' : ' (pas de jeu VPS)'}${failed.length ? ` ; non reçus : ${failed.join(' ; ')}` : ''}.`); // i18n-ignore : journal
-    if (ui.flash !== flash) return;
+    // Ce qui reste sans fichier, dit au journal (20/11/2026 : un fronton choisi, jamais rangé, sans trace).
+    const missingNote = sites.missing.length ? ` ; sans fichier : ${sites.missing.join(', ')}` : ''; // i18n-ignore : journal
+    console.log(`${ZEN_GAMES[fx.game].name} : médias de « ${fx.title} » : ${localPlaced ? `${localPlaced} du dossier du jeu, ` : ''}${installed} de VPinMediaDB${placed ? ', image du plateau de VPS' : ''}${siteNote}${loginNote}${missingNote}${vps ? '' : ' (pas de jeu VPS)'}${failed.length ? ` ; non reçus : ${failed.join(' ; ')}` : ''}.`); // i18n-ignore : journal
     const n = (localPlaced ? 1 : 0) + installed + (placed ? 1 : 0) + sites.placed.length;
+    // Les médias de la table ouverts (ouverts par l'ajout) : relus, avec le bilan et ce qu'il reste à faire là.
+    const what = sites.missing.map((type) => lowerFirst(mediaTypeInfo(type).label)).join(', ');
+    const arrived = tn(n, '{n} média arrivé.', '{n} médias arrivés.');
+    medias.refresh(file, {
+      text: sites.login.length
+        ? `${arrived} ${t('Pour le reste ({missing}) : connectez votre compte {site} (Ajouter une table > Comptes des sites), ou choisissez ce média pour en prendre un autre.', { missing: what, site: sites.login.join(', ') })}`
+        : sites.missing.length || failed.length
+          ? `${arrived} ${t('Sans fichier : {missing}. Choisissez ce média pour en prendre un autre : sites, web ou fichier de ce PC.', { missing: what || failed.join(' ; ') })}`
+          : arrived,
+      tone: sites.missing.length || failed.length || sites.login.length ? 'warning' : 'ok',
+    });
+    if (ui.flash !== flash) return;
     const got = n
       ? tn(n, '« {title} » ajoutée au front-end, avec {n} média.', '« {title} » ajoutée au front-end, avec {n} médias.', { title: fx.title })
       : t('« {title} » ajoutée au front-end.', { title: fx.title });
@@ -3947,8 +3978,12 @@ export function createLibrary(host: LibraryHost) {
     preview?: { url: string; md5?: string };
   }
 
-  /** Fiche d'ajout ouverte : la table, ses médias, ceux qu'on prend (cochés par défaut quand ils viennent sans compte). */
-  let pinballFxDetail: { fx: ZenTable; elements: FxElement[]; chosen: Set<MediaType>; bytes: number; unknown: number; previews: Map<string, string> } | undefined;
+  /**
+   * Fiche d'ajout ouverte : la table, le média retenu pour chaque type, ceux qu'on prend (cochés par
+   * défaut quand ils viennent sans compte), et tous les choix possibles de chaque type (20/11/2026 :
+   * Start sur une carte les montre, pour prendre une autre variante ou une autre fiche).
+   */
+  let pinballFxDetail: { fx: ZenTable; elements: FxElement[]; options: Map<MediaType, FxElement[]>; chosen: Set<MediaType>; bytes: number; unknown: number; previews: Map<string, string> } | undefined;
 
   /**
    * Choisir une table d'un jeu de Zen (17/11/2026), comme une table VPX : sa fiche d'abord, avec
@@ -3967,56 +4002,54 @@ export function createLibrary(host: LibraryHost) {
       const local = zenLocalImage(fx);
       const localType = local ? zenLocalImageType(local) : undefined;
       const elements: FxElement[] = [];
+      const options = new Map<MediaType, FxElement[]>();
+      const target = zenTarget(fx, [fx.title, ...(game ? [game.name] : [])]);
+      const connected = new Map<string, boolean>();
       for (const type of PINBALLFX_DETAIL_TYPES) {
-        const offer = offers?.offers.find((o) => o.type === type);
-        if (offer) {
+        // Tous les choix d'un type, le retenu d'office en tête : VPinMediaDB (chaque variante : image,
+        // vidéo…), l'image rangée par le joueur, la capture de VPS, puis les fiches des sites.
+        const list: FxElement[] = [];
+        for (const offer of (offers?.variants ?? offers?.offers ?? []).filter((o) => o.type === type)) {
           const preview = offer.preview ?? (offer.kind === 'image' ? offer.file : undefined);
-          elements.push({ type, source: 'mediadb', offer, ...(preview ? { preview } : {}) });
-          continue;
+          list.push({ type, source: 'mediadb', offer, ...(preview ? { preview } : {}) });
         }
-        if (local && type === localType) {
-          elements.push({ type, source: 'local', file: local });
-          continue;
-        }
-        if (type === 'Playfield' && capture) {
-          elements.push({ type, source: 'vps', preview: { url: capture } });
-          continue;
-        }
-        // Fiches des sites (17/11/2026) : une déjà reçue qui a le fichier de la table d'abord (rien à
-        // télécharger, aperçu réel) ; une reçue sans lui est écartée ; sinon la première à télécharger.
-        const target = zenTarget(fx, [fx.title, ...(game ? [game.name] : [])]);
-        let site: FxElement | undefined;
+        if (local && type === localType) list.push({ type, source: 'local', file: local });
+        if (type === 'Playfield' && capture) list.push({ type, source: 'vps', preview: { url: capture } });
+        // Fiches des sites (17/11/2026) : celles déjà reçues qui ont le fichier de la table d'abord (rien
+        // à télécharger, aperçu réel) ; une reçue sans lui est écartée ; puis celles à télécharger.
+        const received: FxElement[] = [];
+        const toFetch: FxElement[] = [];
         for (const hit of SITE_FILL_TYPES.includes(type) ? hits.filter((h) => h.vps!.types.includes(type)) : []) {
           const receipt = mediaSites.receipt(jobKey(hit));
           if (receipt) {
             const named = pickNamedMedia(receipt.files, type, target);
             if (!named) continue;
             allowPreview(named.file);
-            site = { type, source: 'site', hit, received: named.file, shared: sharedBy(hit) };
-            break;
+            received.push({ type, source: 'site', hit, received: named.file, shared: sharedBy(hit) });
+            continue;
           }
-          if (!site) {
-            const ready = (await mediaSites.state(hit.site)).connected;
-            site = { type, source: 'site', hit, shared: sharedBy(hit), ...(ready ? {} : { login: mediaSite(hit.site).name }) };
-          }
+          if (!connected.has(hit.site)) connected.set(hit.site, (await mediaSites.state(hit.site)).connected);
+          toFetch.push({ type, source: 'site', hit, shared: sharedBy(hit), ...(connected.get(hit.site) ? {} : { login: mediaSite(hit.site).name }) });
         }
-        if (site) {
-          elements.push(site);
-          continue;
+        list.push(...received, ...toFetch);
+        if (list.length) {
+          options.set(type, list);
+          elements.push(list[0]!);
         }
         // Ceux de la roue restent montrés, introuvables : on sait ce qui manquera.
-        if (type === 'Wheel' || type === 'Backglass' || type === 'Playfield') elements.push({ type });
+        else if (type === 'Wheel' || type === 'Backglass' || type === 'Playfield') elements.push({ type });
       }
+      const all = [...options.values()].flat();
       const previews = new Map<string, string>();
-      const wanted = elements.flatMap((e) => (e.preview ? [e.preview] : []));
-      if (wanted.length) await mediaSearch.stagePreviews(wanted, previews, t('Vignettes'), { quiet: true }).catch(() => undefined);
-      for (const f of previews.values()) allowPreview(f);
+      const wanted = all.flatMap((e) => (e.preview ? [e.preview] : []));
+      if (wanted.length) await mediaSearch.stagePreviews(wanted, previews, t('Vignettes'), { quiet: true, atOnce: 4 }).catch(() => undefined);
       // Fiches à télécharger propres à la table : leur page est lue (capture de l'auteur, taille),
       // l'écran se redessine à son arrivée. Un pack commun à plusieurs tables n'a pas d'aperçu trompeur.
-      void mediaSites.stageThumbs(elements.flatMap((e) => (e.hit && !e.received ? [e.hit] : []))).catch(() => undefined);
+      void mediaSites.stageThumbs(all.flatMap((e) => (e.hit && !e.received ? [e.hit] : []))).catch(() => undefined);
       pinballFxDetail = {
         fx,
         elements,
+        options,
         // Pris d'office : ce qui ne télécharge rien d'un site (VPinMediaDB, capture VPS, fichier déjà
         // reçu). Une fiche à télécharger ouvre la page du site et compte dans son quota : on la choisit.
         chosen: new Set(elements.filter((e) => e.source && (e.source !== 'site' || e.received)).map((e) => e.type)),
@@ -4122,31 +4155,16 @@ export function createLibrary(host: LibraryHost) {
     for (const e of d.elements.filter((x) => x.source)) {
       const label = mediaTypeInfo(e.type).label;
       const on = d.chosen.has(e.type);
-      const kind = e.offer ? (e.offer.kind === 'video' ? t('vidéo') : e.offer.kind === 'audio' ? t('son') : t('image')) : undefined;
-      const card: MediaCard = {
-        title: label,
-        code: `(${e.type})`,
-        state: on
-            ? { label: t('Pris'), tone: 'ok' }
-            : e.login
-              ? { label: t('Compte {site} nécessaire', { site: e.login }), tone: 'warning' }
-              : { label: t('Laissé'), tone: 'quiet' },
-        facts:
-          e.source === 'mediadb'
-            ? t('VPinMediaDB · {kind}', { kind: kind! })
-            : e.source === 'vps'
-              ? t('Capture de la table, base VPS')
-              : e.source === 'local'
-                ? t('Image du dossier du jeu : « {file} »', { file: path.basename(e.file!) })
-                : t('{site} : {title}', { site: mediaSite(e.hit!.site).name, title: e.hit!.title }),
-        ...(e.source === 'site' ? { extra: siteExtra(e) } : {}),
-        thumb: e.source === 'site' ? siteThumb(e, label) : thumbOf(e, label),
-      };
+      const others = (d.options.get(e.type)?.length ?? 1) - 1;
+      const card = fxMediaCard(d, e, on ? { label: t('Pris'), tone: 'ok' } : e.login ? { label: t('Compte {site} nécessaire', { site: e.login }), tone: 'warning' } : { label: t('Laissé'), tone: 'quiet' });
+      if (others) card.extra = [...(card.extra ?? []), tn(others, 'Start : {n} autre choix pour ce média', 'Start : {n} autres choix pour ce média')];
       card.action = actions.length;
       actions.push({
-        label: on ? t('{type} : laisser', { type: label }) : t('{type} : prendre', { type: label }),
+        // Plusieurs choix : Start les montre (prendre celui-ci, un autre, ou laisser). Un seul : prendre ou laisser.
+        label: others ? t('{type} : choisir', { type: label }) : on ? t('{type} : laisser', { type: label }) : t('{type} : prendre', { type: label }),
         key: `${fx.game}:media:${e.type}`,
         run: () => {
+          if (others) return openCustom(() => buildPinballFxChoice(e.type), 0);
           if (on) d.chosen.delete(e.type);
           else d.chosen.add(e.type);
           host.broadcast();
@@ -4159,7 +4177,89 @@ export function createLibrary(host: LibraryHost) {
       heading: fx.title,
       icon: 'pinball-app',
       subheading: [fx.manufacturer, fx.year, t('{game} (bêta)', { game: name })].filter(Boolean).join(' · '),
-      lead: t('Start sur un média : le prendre ou le laisser. « Ajouter au front-end » ajoute la table ; ses médias arrivent ensuite en arrière-plan (Téléchargements). Rien n’est écrit avant.'),
+      lead: t('Start sur un média : le prendre, le laisser ou en choisir un autre. « Ajouter au front-end » ajoute la table ; ses médias arrivent ensuite en arrière-plan (Téléchargements). Rien n’est écrit avant.'),
+      sections: [],
+      actions,
+      back,
+      media: { cards },
+    };
+  }
+
+  /** Carte d'un média de la fiche d'ajout, ou d'un de ses choix : d'où il vient, son aperçu ; l'état est donné. */
+  function fxMediaCard(d: NonNullable<typeof pinballFxDetail>, e: FxElement, state: MediaCard['state']): MediaCard {
+    const label = mediaTypeInfo(e.type).label;
+    const local = e.file ?? (e.preview ? d.previews.get(e.preview.url) : undefined);
+    return {
+      title: label,
+      code: `(${e.type})`,
+      state,
+      facts:
+        e.source === 'mediadb'
+          ? t('VPinMediaDB · {kind}', { kind: mediaDbOfferLabel(e.offer!) })
+          : e.source === 'vps'
+            ? t('Capture de la table, base VPS')
+            : e.source === 'local'
+              ? t('Image du dossier du jeu : « {file} »', { file: path.basename(e.file!) })
+              : t('{site} : {title}', { site: mediaSite(e.hit!.site).name, title: e.hit!.title }),
+      ...(e.source === 'site' ? { extra: siteExtra(e) } : {}),
+      thumb: e.source === 'site' ? siteThumb(e, label) : local ? { kind: 'image', url: mediaUrl(local), rotation: 0 } : { kind: 'fallback', rotation: 0, text: label },
+    };
+  }
+
+  /**
+   * Les choix d'un média de la fiche d'ajout (20/11/2026) : chaque variante de VPinMediaDB, l'image
+   * du dossier du jeu, la capture de VPS, chaque fiche des sites. Start en prend un : il remplace
+   * celui de la fiche, qui le prend ; « Laisser ce média » l'écarte. Rien n'est écrit ici.
+   */
+  function buildPinballFxChoice(type: MediaType): Built {
+    const d = pinballFxDetail!;
+    const label = mediaTypeInfo(type).label;
+    const list = d.options.get(type) ?? [];
+    const current = d.elements.find((e) => e.type === type);
+    const on = d.chosen.has(type);
+    // Retour sur la carte de ce média dans la fiche (l'action 0 est « Ajouter au front-end »).
+    const back = () => openCustom(buildPinballFxDetail, 1 + Math.max(0, d.elements.filter((x) => x.source).findIndex((x) => x.type === type)));
+    const actions: Action[] = [];
+    const cards: MediaCard[] = list.map((e, i) => {
+      const card = fxMediaCard(
+        d,
+        e,
+        e === current
+          ? on
+            ? { label: t('Pris'), tone: 'ok' }
+            : { label: t('Laissé'), tone: 'quiet' }
+          : e.login
+            ? { label: t('Compte {site} nécessaire', { site: e.login }), tone: 'warning' }
+            : { label: t('Autre choix'), tone: 'quiet' },
+      );
+      card.action = actions.length;
+      actions.push({
+        label: e === current && on ? t('Garder celui-ci') : t('Prendre celui-ci'),
+        key: `${d.fx.game}:choice:${type}:${i}`,
+        run: () => {
+          d.elements = d.elements.map((x) => (x.type === type ? e : x));
+          d.chosen.add(type);
+          back();
+        },
+      });
+      return card;
+    });
+    if (on)
+      actions.push({
+        label: t('Laisser ce média'),
+        detail: t('La table sera ajoutée sans {type}', { type: lowerFirst(label) }),
+        key: `${d.fx.game}:choice:${type}:leave`,
+        run: () => {
+          d.chosen.delete(type);
+          back();
+        },
+      });
+    actions.push({ label: t('Retour à la fiche'), icon: 'back', key: 'back', run: back });
+    return {
+      heading: t('{type} : choisir', { type: label }),
+      icon: 'pinball-app',
+      subheading: [d.fx.title, tn(list.length, '{n} choix possible', '{n} choix possibles')].join(' · '),
+      lead: t('Start sur un choix : il remplace celui de la fiche. Les autres médias ne changent pas, rien n’est écrit avant « Ajouter au front-end ».'),
       sections: [],
       actions,
       back,
@@ -4171,12 +4271,25 @@ export function createLibrary(host: LibraryHost) {
   function addPinballFx(fx: ZenTable, types: MediaType[]): void {
     const ui = zenUi[fx.game];
     const added = addZenTable(tablesDir(), fx);
-    console.log(`${ZEN_GAMES[fx.game].name} : table ${fx.key} (${fx.title}) ajoutée au front-end, ${added.id} ; médias choisis : ${types.join(', ') || 'aucun'}.`); // i18n-ignore : journal
+    // Le choix fait pour chaque type (variante de VPinMediaDB, fiche d'un site…), pas celui par défaut.
+    const picks = new Map((pinballFxDetail?.fx === fx ? pinballFxDetail.elements : []).filter((e) => e.source && types.includes(e.type)).map((e) => [e.type, e] as const));
+    console.log(`${ZEN_GAMES[fx.game].name} : table ${fx.key} (${fx.title}) ajoutée au front-end, ${added.id} ; médias choisis : ${types.map((type) => `${type}${picks.get(type)?.source ? ` (${picks.get(type)!.source})` : ''}`).join(', ') || 'aucun'}.`); // i18n-ignore : journal
     ui.flash = (fx.vps || zenLocalImage(fx)) && types.length ? t('« {title} » ajoutée au front-end : ses médias arrivent (Téléchargements).', { title: fx.title }) : t('« {title} » ajoutée au front-end.', { title: fx.title });
     reloadTables(added.file);
-    if (types.length) void fetchPinballFxMedias(fx, added.file, ui.flash, types);
+    if (types.length) void fetchPinballFxMedias(fx, added.file, ui.flash, types, picks);
     pinballFxDetail = undefined;
-    openZen(fx.game, fx.key);
+    // Comme une table VPX (20/11/2026) : ses médias s'ouvrent aussitôt, écran par écran. Ceux choisis s'y
+    // affichent à leur arrivée ; chacun se remplace (VPinMediaDB, sites, web, fichier de ce PC), se
+    // règle et s'enregistre là. Avant, l'ajout revenait à la liste sans rien montrer de ce qui était rangé.
+    const table = find(added.file);
+    if (!table) return openZen(fx.game, fx.key);
+    sheetReturn = () => openZen(fx.game, fx.key);
+    medias.open(table, {
+      text: types.length
+        ? t('« {title} » ajoutée au front-end. Ses médias choisis arrivent en arrière-plan et s’affichent ici à leur arrivée. Choisissez un média pour en prendre un autre ou le régler.', { title: fx.title })
+        : t('« {title} » ajoutée au front-end, sans média. Choisissez un média pour en prendre un : VPinMediaDB, sites, web ou fichier de ce PC.', { title: fx.title }),
+      tone: 'ok',
+    });
   }
 
   /**
@@ -4244,7 +4357,7 @@ export function createLibrary(host: LibraryHost) {
    * logos reçu une fois sert à toutes les tables : le fichier au nom de la table y est pris
    * (pickNamedMedia), jamais un fichier deviné. Rien n'est remplacé (placeMissingMedia).
    */
-  async function fillFromVpsSites(table: TableEntry, vpsId: string, title: string, types?: readonly MediaType[]): Promise<SiteFill> {
+  async function fillFromVpsSites(table: TableEntry, vpsId: string, title: string, types?: readonly MediaType[], chosen?: ReadonlyMap<MediaType, string>): Promise<SiteFill> {
     const out: SiteFill = { placed: [], missing: [], login: [] };
     const game = vpsDb?.games.find((g) => g.id === vpsId);
     const have = new Set(scanTableMedias(table).map((m) => m.type));
@@ -4254,8 +4367,10 @@ export function createLibrary(host: LibraryHost) {
     const zen = zenTableOfEntry(table);
     for (const type of wanted) {
       const offers = hits.filter((h) => h.vps!.types.includes(type));
-      // Une fiche déjà reçue d'abord (un pack de logos de Zen sert à toutes les tables).
-      const hit = offers.find((h) => mediaSites.receipt(jobKey(h))) ?? offers[0];
+      // La fiche choisie sur la fiche d'ajout ; sinon une déjà reçue d'abord (un pack de logos de Zen
+      // sert à toutes les tables).
+      const key = chosen?.get(type);
+      const hit = (key ? offers.find((h) => jobKey(h) === key) : undefined) ?? offers.find((h) => mediaSites.receipt(jobKey(h))) ?? offers[0];
       if (!hit) {
         out.missing.push(type);
         continue;

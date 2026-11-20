@@ -4,10 +4,24 @@
 // l'écran viennent alors de lui. Les parties se lancent par son exécutable (pinballfx3-folder.ts).
 // Sans dossier choisi, rien ne change : le jeu de Steam. Branché dans library.ts (buildZen).
 
-import { checkPinballFx3Folder, pinballFx3FolderProblemReason, pinballFx3FolderProblemText, pinballFx3InstalledTables, samePath, t, tn, writePinballFx3Folder, type PinballFx3Install } from '@cyberpinball/core';
+import {
+  checkPinballFx3Folder,
+  PINBALLFX3_BACKGLASS_PAGE,
+  PINBALLFX3_BACKGLASS_TITLE,
+  pinballFx3FolderProblemReason,
+  pinballFx3FolderProblemText,
+  pinballFx3InstalledTables,
+  samePath,
+  t,
+  tn,
+  writePinballFx3Folder,
+  type DownloadManager,
+  type PinballFx3Install,
+} from '@cyberpinball/core';
 import * as path from 'node:path';
 import type { Action, Row } from './library-types';
 import { onGesture } from './gesture-flash';
+import { installPinballFx3Backglasses } from './pinballfx3-backglass';
 import type { ZenSetup } from './pinballfx-install';
 
 const GAME = 'Pinball FX3';
@@ -19,12 +33,19 @@ export interface PinballFx3FolderUiHost {
   pickFolder(): Promise<string | undefined>;
   /** L'écran des tables de Pinball FX3, relu (tables du nouveau dossier) et redessiné ; `stay` : rien n'a changé, le curseur reste où il est. */
   reopen(stay?: boolean): void;
+  /** Redessine l'écran affiché, sans y aller (avancée d'un téléchargement). */
+  broadcast(): void;
+  /** Gestionnaire de téléchargements, où le lot des frontons est suivi. */
+  downloads?(): DownloadManager;
 }
 
 export function createPinballFx3FolderUi(host: PinballFx3FolderUiHost) {
   /** Ce que le dernier choix a donné ; effacé au geste suivant. */
   let notice: string | undefined;
   onGesture(() => (notice = undefined));
+  /** Frontons (pinballfx3-backglass.ts) : avancée, puis bilan, montrés sous l'entrée ; vrai pendant le téléchargement. */
+  let backglass: string | undefined;
+  let fetching = false;
 
   /** Section « Pinball FX3 » de l'écran : où est le jeu, et le dossier choisi s'il ne convient plus. */
   function rows(setup: ZenSetup): Row[] {
@@ -60,6 +81,22 @@ export function createPinballFx3FolderUi(host: PinballFx3FolderUiHost) {
         run: () => void choose(),
       },
     ];
+    // Frontons : l'image que FX3 affiche sur l'écran du fronton, en mode borne (pinballfx3-backglass.ts).
+    const tablesDir = setup.install?.tablesDir;
+    if (tablesDir)
+      out.push({
+        label: t('Télécharger les frontons des tables'),
+        detail:
+          backglass ??
+          t('« {title} » ({url}), images faites par des joueurs : le fronton de chaque table qui n’en a pas, déposé à côté de son fichier .pxp, où {game} le cherche. Aucune image déjà là n’est remplacée.', {
+            title: PINBALLFX3_BACKGLASS_TITLE,
+            url: PINBALLFX3_BACKGLASS_PAGE.replace(/^https:\/\//, ''),
+            game: GAME,
+          }),
+        icon: 'image-download',
+        key: 'pinballfx3:backglass',
+        run: () => void fetchBackglasses({ tablesDir }),
+      });
     if (setup.chosen)
       out.push({
         label: t('Oublier ce dossier'),
@@ -74,6 +111,40 @@ export function createPinballFx3FolderUi(host: PinballFx3FolderUiHost) {
         },
       });
     return out;
+  }
+
+  /** Télécharge les frontons manquants ; l'avancée et le bilan s'affichent sous l'entrée. */
+  async function fetchBackglasses(install: Pick<PinballFx3Install, 'tablesDir'>): Promise<void> {
+    if (fetching) return;
+    fetching = true;
+    backglass = t('Liste du catalogue en cours de lecture…');
+    host.broadcast();
+    try {
+      const report = await installPinballFx3Backglasses(install, {
+        workDir: path.join(host.dataDir(), 'pinballfx3-frontons'),
+        ...(host.downloads ? { downloads: host.downloads() } : {}),
+        onProgress: (done, total) => {
+          backglass = t('Téléchargement des frontons : {done} sur {total}…', { done, total });
+          host.broadcast();
+        },
+      });
+      const parts = [
+        tn(report.placed.length, '{n} fronton déposé', '{n} frontons déposés'),
+        report.present.length ? tn(report.present.length, '{n} déjà là, gardé', '{n} déjà là, gardés') : undefined,
+        report.missing.length ? tn(report.missing.length, '{n} absent du catalogue', '{n} absents du catalogue') : undefined,
+        report.failed.length ? tn(report.failed.length, '{n} en échec : réessayez, le téléchargement reprendra', '{n} en échec : réessayez, le téléchargement reprendra') : undefined,
+      ].filter(Boolean);
+      backglass = parts.join(' · ');
+      console.log(
+        `${GAME} : frontons, ${report.placed.length} déposé(s) dans ${install.tablesDir}, ${report.present.length} déjà là, absents du catalogue : ${report.missing.join(', ') || 'aucun'}${report.failed.length ? `, en échec : ${report.failed.map((f) => `${f.target} (${f.reason})`).join(', ')}` : ''}.`, // i18n-ignore : journal
+      );
+    } catch (error) {
+      backglass = t('Catalogue des frontons injoignable : vérifiez la connexion, puis réessayez.');
+      console.log(`${GAME} : catalogue des frontons injoignable (${(error as Error).message}).`); // i18n-ignore : journal
+    } finally {
+      fetching = false;
+      host.broadcast();
+    }
   }
 
   async function choose(): Promise<void> {

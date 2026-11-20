@@ -54,6 +54,7 @@ const CALLERS: Record<string, { count: number; how: string }> = {
   'app/src/vision3d.ts': { count: 1, how: 'pilote de la Kinect, chez Microsoft : manager.track' },
   'app/src/vpx-essai-menu.ts': { count: 1, how: 'VPX d’essai : installComponent avec l’archive déjà sur le disque (findLocalArchive), aucun téléchargement' },
   'app/src/vc-runtime.ts': { count: 1, how: 'runtime Visual C++ de VPX, chez Microsoft : manager.track' },
+  'app/src/pinballfx3-backglass.ts': { count: 1, how: 'frontons de Pinball FX3, chez archive.org : manager.track' },
   'app/src/updates-menu.ts': { count: 2, how: 'mise à jour (installeur ou paquet léger) : manager.track' },
   'app/src/ytdlp-tool.ts': { count: 1, how: 'yt-dlp lui-même, dans la récupération suivie (trackGrab)' },
 };

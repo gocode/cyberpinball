@@ -1642,6 +1642,21 @@ export function createAcquirer(events: AcquireEvents) {
     }
   }
 
+  /**
+   * La fenêtre ouverte sur la page de départ `url` (fiche d'un site dont le téléchargement direct a
+   * échoué) : ce que l'utilisateur y télécharge revient désormais à `claim`, et le bandeau dit quoi
+   * faire, sans recharger la page. Faux si la fenêtre est fermée ou montre une autre demande.
+   */
+  function adopt(url: string, claim: DownloadClaim, status: string): boolean {
+    if (!open || open.win.isDestroyed() || open.request.url !== url) return false;
+    claimFor(open.view.webContents.id, claim);
+    open.request = { ...open.request, claim, status, info: false };
+    open.status = status;
+    open.warn = true;
+    sendBar();
+    return true;
+  }
+
   function close(): void {
     if (open && !open.win.isDestroyed()) open.win.close();
   }
@@ -1676,6 +1691,7 @@ export function createAcquirer(events: AcquireEvents) {
 
   return {
     show,
+    adopt,
     close,
     siteCookies,
     signOut,

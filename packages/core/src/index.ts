@@ -23,6 +23,7 @@ export * from './locations';
 export * from './tables';
 export * from './pinballfx';
 export * from './pinballfx3';
+export * from './pinballfx3-backglass';
 export * from './pinballfx3-cabinet';
 export * from './pinballfx3-folder';
 export * from './zen-media';

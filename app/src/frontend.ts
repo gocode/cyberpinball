@@ -108,6 +108,7 @@ import {
   pinballFx3OrientationChange,
   takePinballFx3OrientationNotice,
   playsOnWindowsOrientation,
+  resolveMedia,
   pinballFx3LaunchCommand,
   pinballFx3ShortGameMessage,
   isZenEmulator,
@@ -311,6 +312,8 @@ import {
   writeAccountBundle,
   type AccountCopy,
   applyPinballFxRotation,
+  applyPinballFxCabinet,
+  pinballFxCabinetLayout,
   formatDateTime,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
@@ -330,6 +333,7 @@ import { restoreVpxFiles, vpxChangedFiles, vpxFilesStatus } from './vpx-integrit
 import { launchPinballFx, runningPinballFx, ZEN_LAUNCH_GAMES } from './pinballfx-launcher';
 import { detectPinballFx, detectPinballFx3 } from './pinballfx-install';
 import { bridgeZenKeys } from './zen-keys';
+import { placePinballFxBackglass } from './pinballfx-backglass';
 import { watchGameLoad, type GameLoadWatch } from './game-load';
 import { createLibrary, type ActionShortcut, type SystemItem, type UiAction } from './library';
 import { createFeedbackService } from './feedback-service';
@@ -4836,6 +4840,28 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     } catch (error) {
       console.log(`${zenName} (${table.id}) : rotation pas écrite (${(error as Error).message}) ; la partie se lance quand même.`); // i18n-ignore : journal
     }
+  }
+  // Pinball FX : son mode borne activé, fenêtres du DMD et du fronton posées sur les écrans de la borne (pinballfx-cabinet.ts).
+  if (simulated === undefined && zenKey === 'pinballfx' && fx) {
+    const rectOf = (role: RoleId) => roleRects.find((r) => r.role === role)?.rect;
+    const dmdRect = rectOf('dmd');
+    const backglassRect = rectOf('backglass');
+    const cabinetModel = loadCabinet(loc.dataDir);
+    const layout = pinballFxCabinetLayout({ ...(dmdRect ? { dmd: dmdRect } : {}), ...(backglassRect ? { backglass: backglassRect } : {}) }, cabinetModel ? dmdKindOf(cabinetModel) : undefined);
+    try {
+      const written = applyPinballFxCabinet(fx.cabinetDir, layout);
+      if (written) console.log(`${zenName} (${table.id}) : mode borne écrit dans ${written} (DMD ${JSON.stringify(layout.dmd ?? null)}, fronton ${JSON.stringify(layout.backglass ?? null)}).`); // i18n-ignore : journal
+    } catch (error) {
+      console.log(`${zenName} (${table.id}) : mode borne pas écrit (${(error as Error).message}) ; la partie se lance quand même.`); // i18n-ignore : journal
+    }
+  }
+  // Pinball FX : le fronton de la table pour la fenêtre du fronton du jeu, s'il n'en a pas (pinballfx-backglass.ts).
+  if (simulated === undefined && zenKey === 'pinballfx' && fx && table.pinballFxTable !== undefined && loc.root) {
+    const own = resolveMedia(table, loc.root, 'Backglass');
+    const source = own.source !== 'default' && own.source !== 'fallback' ? own.file : undefined;
+    const placed = placePinballFxBackglass(fx, table.pinballFxTable, source);
+    if (placed.result === 'placed') console.log(`${zenName} (${table.id}) : fronton déposé pour le jeu, ${placed.target} (depuis ${source}).`); // i18n-ignore : journal
+    else if (placed.result === 'failed') console.log(`${zenName} (${table.id}) : fronton pas déposé (${placed.reason}) ; la partie se lance quand même.`); // i18n-ignore : journal
   }
 
   // Pinball FX3 : le playfield retrouve l'orientation de Windows, le bureau qu'il a avec un autre front-end

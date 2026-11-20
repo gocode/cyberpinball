@@ -27,13 +27,110 @@
 // Sur une borne au clavier (encodeur clavier, clavier), la touche du flipper arrive seule au jeu : bonne
 // en partie, sans effet dans les menus (retour d'un joueur, 20/11/2026). Cyber Pinball lit alors ces
 // touches pendant la partie et envoie la flèche en plus (zenKeyboardEchoes, app/src/zen-keys.ts).
+//
+// Mode borne (20/11/2026) : en clair dans <jeu>\PinballFX\Mods\Cabinet\Settings.ini, relevé sur un
+// PinCab : [General] CabinetEnabled, [DotMatrixWindow] et [BackglassWindow] (Enabled, MonitorNumber,
+// PositionX, PositionY, Width, Height…). FAQ du mode borne de Zen (pinballfx.com/?page_id=7754) : les
+// positions se comptent en pixels depuis le coin haut gauche de l'écran principal (le bureau de
+// Windows, des valeurs négatives sont possibles), le jeu reste sur l'écran principal, et « Reload
+// Configuration » relit le fichier. Cyber Pinball y écrit, avant chaque partie, l'activation et la place
+// des fenêtres du DMD et du fronton d'après ses propres écrans ; il ne touche à rien d'autre
+// (MonitorNumber, dont rien ne documente le sens, ExternalDevice, Padding, taille des points…).
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import { buttonKeys, windowsVk, type ButtonsSource } from './buttons';
-import type { ButtonId, Rotation } from './model';
+import { centeredDmdBand } from './dmdscreen';
+import { IniDocument } from './ini';
+import type { ButtonId, DmdKind, Rotation } from './model';
 import type { ZenGameKey } from './zen';
+import { zoneRect } from './zones';
+
+/** Fichier du mode borne de Pinball FX, dans son dossier du mode borne (PinballFxInstall.cabinetDir). */
+export const PINBALLFX_CABINET_SETTINGS = 'Settings.ini';
+
+/** Rectangle en pixels physiques, dans le repère du bureau de Windows (origine : écran principal). */
+export interface DesktopRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Place des fenêtres du mode borne de Pinball FX : celle du DMD et celle du fronton, si la borne a leur écran. */
+export interface PinballFxCabinetLayout {
+  dmd?: DesktopRect;
+  backglass?: DesktopRect;
+}
+
+/**
+ * Place des fenêtres du jeu d'après la zone de chaque rôle chez Cyber Pinball. Sur un FullDMD
+ * (écran 16:9), le DMD du jeu (points en 4:1) prend la bande 4:1 centrée de sa zone, comme le DMD
+ * de VPX ; sur un DMD seul, toute sa zone.
+ */
+export function pinballFxCabinetLayout(roles: { dmd?: DesktopRect; backglass?: DesktopRect }, dmdKind: DmdKind | undefined): PinballFxCabinetLayout {
+  const out: PinballFxCabinetLayout = {};
+  if (roles.dmd) {
+    const d = roles.dmd;
+    if (dmdKind === 'fulldmd') {
+      const band = zoneRect(centeredDmdBand(d), d);
+      out.dmd = { x: d.x + band.x, y: d.y + band.y, width: band.width, height: band.height };
+    } else out.dmd = { ...d };
+  }
+  if (roles.backglass) out.backglass = { ...roles.backglass };
+  return out;
+}
+
+/**
+ * Texte de Settings.ini avec le mode borne activé et les fenêtres du DMD et du fronton à leur place ;
+ * undefined si rien ne change. Le reste du fichier est gardé tel quel (IniDocument).
+ */
+export function pinballFxSettingsWithCabinet(text: string, layout: PinballFxCabinetLayout): string | undefined {
+  if (!layout.dmd && !layout.backglass) return undefined;
+  const doc = IniDocument.parse(text);
+  const set = (section: string, key: string, value: string) => {
+    if (doc.get(section, key) !== value) doc.set(section, key, value);
+  };
+  set('General', 'CabinetEnabled', 'True');
+  for (const [section, rect] of [
+    ['DotMatrixWindow', layout.dmd],
+    ['BackglassWindow', layout.backglass],
+  ] as const) {
+    if (!rect) continue;
+    set(section, 'Enabled', 'True');
+    set(section, 'PositionX', String(Math.round(rect.x)));
+    set(section, 'PositionY', String(Math.round(rect.y)));
+    set(section, 'Width', String(Math.max(1, Math.round(rect.width))));
+    set(section, 'Height', String(Math.max(1, Math.round(rect.height))));
+  }
+  const next = doc.toString();
+  return next === text ? undefined : next;
+}
+
+/**
+ * Écrit le mode borne dans Settings.ini avant la partie. Rend le fichier changé, ou undefined (rien à
+ * changer, ou pas de fichier : le jeu le crée quand le joueur ouvre une fois « Cabinet Support » ; on
+ * ne l'invente pas). Un fichier en UTF-16 (BOM FF FE) reste en UTF-16.
+ */
+export function applyPinballFxCabinet(cabinetDir: string, layout: PinballFxCabinetLayout): string | undefined {
+  const file = path.join(cabinetDir, PINBALLFX_CABINET_SETTINGS);
+  let raw: Buffer;
+  try {
+    // lecture entière : réglages du mode borne écrits par le jeu, quelques centaines d'octets
+    raw = fs.readFileSync(file);
+  } catch {
+    return undefined;
+  }
+  const utf16 = raw.length >= 2 && raw[0] === 0xff && raw[1] === 0xfe;
+  const utf8Bom = raw.length >= 3 && raw[0] === 0xef && raw[1] === 0xbb && raw[2] === 0xbf;
+  const text = utf16 ? raw.subarray(2).toString('utf16le') : raw.subarray(utf8Bom ? 3 : 0).toString('utf8');
+  const next = pinballFxSettingsWithCabinet(text, layout);
+  if (next === undefined) return undefined;
+  const body = utf16 ? Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(next, 'utf16le')]) : Buffer.concat([utf8Bom ? Buffer.from([0xef, 0xbb, 0xbf]) : Buffer.alloc(0), Buffer.from(next, 'utf8')]);
+  writeFileAtomic(file, body);
+  return file;
+}
 
 /** Valeur de forcedDisplayRotation pour une rotation horaire de l'image ; undefined : image droite, rien à forcer. */
 export function pinballFxRotationValue(rotation: Rotation): string | undefined {

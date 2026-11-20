@@ -74,8 +74,34 @@ export const messages: Record<string, string> = {
   '{type} : laisser': '{type}: leave out',
   '{type} : prendre': '{type}: take',
   '{game} (bêta)': '{game} (beta)',
-  'Start sur un média : le prendre ou le laisser. « Ajouter au front-end » ajoute la table ; ses médias arrivent ensuite en arrière-plan (Téléchargements). Rien n’est écrit avant.':
-    'Start on a media file: take it or leave it out. "Add to the menu" adds the table; its media then arrive in the background (Downloads). Nothing is written before.',
+  'Start sur un média : le prendre, le laisser ou en choisir un autre. « Ajouter au front-end » ajoute la table ; ses médias arrivent ensuite en arrière-plan (Téléchargements). Rien n’est écrit avant.':
+    'Start on a media file: take it, leave it out or choose another one. "Add to the menu" adds the table; its media then arrive in the background (Downloads). Nothing is written before.',
+  // app/src/library.ts : après l'ajout, les médias de la table ouverts et relus à l'arrivée des fichiers
+  '« {title} » ajoutée au front-end. Ses médias choisis arrivent en arrière-plan et s’affichent ici à leur arrivée. Choisissez un média pour en prendre un autre ou le régler.':
+    '"{title}" added to the menu. Its chosen media arrive in the background and show here as they arrive. Choose a media to take another one or adjust it.',
+  '« {title} » ajoutée au front-end, sans média. Choisissez un média pour en prendre un : VPinMediaDB, sites, web ou fichier de ce PC.':
+    '"{title}" added to the menu, without media. Choose a media to get one: VPinMediaDB, sites, web or a file from this PC.',
+  '{n} média arrivé ; les autres sont en route (Téléchargements).': '{n} media file arrived; the others are on their way (Downloads).',
+  '{n} médias arrivés ; les autres sont en route (Téléchargements).': '{n} media files arrived; the others are on their way (Downloads).',
+  '{n} média arrivé.': '{n} media file arrived.',
+  '{n} médias arrivés.': '{n} media files arrived.',
+  'Pour le reste ({missing}) : connectez votre compte {site} (Ajouter une table > Comptes des sites), ou choisissez ce média pour en prendre un autre.':
+    'For the rest ({missing}): sign in to your {site} account (Add a table > Site accounts), or choose that media to take another one.',
+  'Sans fichier : {missing}. Choisissez ce média pour en prendre un autre : sites, web ou fichier de ce PC.':
+    'No file: {missing}. Choose that media to take another one: sites, web or a file from this PC.',
+  // app/src/library.ts : choix d'un média de la fiche d'ajout
+  'Start : {n} autre choix pour ce média': 'Start: {n} other choice for this media',
+  'Start : {n} autres choix pour ce média': 'Start: {n} other choices for this media',
+  '{type} : choisir': '{type}: choose',
+  'Autre choix': 'Other choice',
+  'Garder celui-ci': 'Keep this one',
+  'Prendre celui-ci': 'Take this one',
+  'Laisser ce média': 'Leave this media out',
+  'La table sera ajoutée sans {type}': 'The table will be added without {type}',
+  '{n} choix possible': '{n} possible choice',
+  '{n} choix possibles': '{n} possible choices',
+  'Start sur un choix : il remplace celui de la fiche. Les autres médias ne changent pas, rien n’est écrit avant « Ajouter au front-end ».':
+    'Start on a choice: it replaces the one on the page. The other media don’t change, nothing is written before "Add to the menu".',
   // app/src/library.ts : « Chercher les médias manquants » (tables de Pinball FX déjà dans le front-end)
   'Chercher les médias manquants': 'Find missing media',
   'Logo, fronton, topper, vidéos… des tables de {game} déjà dans le front-end': 'Logo, backglass, topper, videos… of the {game} tables already in the menu',
@@ -122,4 +148,19 @@ export const messages: Record<string, string> = {
   'Depuis cette version, {game} démarre sur l’écran du playfield tel que Windows l’oriente, comme avec un autre front-end. Son orientation réglée avec Cyber Pinball ne vaut plus : l’image serait à l’envers.':
     'Since this version, {game} starts on the playfield screen as Windows orients it, as with another front-end. The orientation you set with Cyber Pinball no longer fits: the picture would be upside down.',
   'Dans {game}, mode borne : passez Orientation de {before}° à {after}°.': 'In {game}, cabinet mode: change Orientation from {before}° to {after}°.',
+  // Frontons de Pinball FX3 téléchargés (app/src/pinballfx3-folder-ui.ts, 20/11/2026)
+  'Télécharger les frontons des tables': 'Download the tables’ backglasses',
+  'Frontons de Pinball FX3': 'Pinball FX3 backglasses',
+  '« {title} » ({url}), images faites par des joueurs : le fronton de chaque table qui n’en a pas, déposé à côté de son fichier .pxp, où {game} le cherche. Aucune image déjà là n’est remplacée.':
+    '"{title}" ({url}), pictures made by players: the backglass of each table that has none, placed next to its .pxp file, where {game} looks for it. No picture already there is replaced.',
+  'Liste du catalogue en cours de lecture…': 'Reading the catalog…',
+  'Téléchargement des frontons : {done} sur {total}…': 'Downloading backglasses: {done} of {total}…',
+  '{n} fronton déposé': '{n} backglass placed',
+  '{n} frontons déposés': '{n} backglasses placed',
+  '{n} déjà là, gardé': '{n} already there, kept',
+  '{n} déjà là, gardés': '{n} already there, kept',
+  '{n} absent du catalogue': '{n} not in the catalog',
+  '{n} absents du catalogue': '{n} not in the catalog',
+  '{n} en échec : réessayez, le téléchargement reprendra': '{n} failed: try again, the download will resume',
+  'Catalogue des frontons injoignable : vérifiez la connexion, puis réessayez.': 'Backglass catalog unreachable: check the connection, then try again.',
 };

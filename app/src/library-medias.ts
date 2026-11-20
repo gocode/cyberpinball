@@ -92,6 +92,8 @@ export interface MediasContext {
   find(file: string): TableEntry | undefined;
   /** Affiche un écran décrit (openCustom de library.ts), le curseur sur l'action `at` ; `table` : la table dont il parle. */
   show(build: () => Built, at?: number, table?: string): void;
+  /** Construction de l'écran affiché (écran décrit), pour ne relire que celui qu'on regarde. */
+  showing?(): (() => Built) | undefined;
   cursor(): number;
   sheet(table: TableEntry, flash?: string): void;
   /** Retour au menu des tables. */
@@ -266,6 +268,8 @@ interface Session {
   notice?: { text: string; tone: Tone };
   /** Message pour l'écran qui va s'ouvrir (après un choix, un dépôt, l'enregistrement). */
   next?: { text: string; tone: Tone };
+  /** Écran de la session affiché en dernier : relu quand des médias arrivent d'ailleurs (refresh). */
+  shown?: () => Built;
   b2s?: B2sImages;
   /** Extraction des images du .directb2s, lancée à la première vue d'ensemble. */
   b2sDone?: Promise<B2sImages | undefined>;
@@ -419,11 +423,26 @@ export function createMedias(ctx: MediasContext) {
 
   // ---------- Ouverture ----------
 
-  function open(table: TableEntry, at?: number): void {
-    session = { file: table.file, draft: emptyMediaDraft() };
+  function open(table: TableEntry, at?: number, notice?: { text: string; tone: Tone }): void {
+    session = { file: table.file, draft: emptyMediaDraft(), ...(notice ? { next: notice } : {}) };
     proposals?.reset();
     web?.stop();
-    ctx.show(() => buildOverview(session!), at, table.file);
+    const s = session;
+    nav(s, () => buildOverview(s), at);
+  }
+
+  /**
+   * Des médias de cette table sont arrivés d'ailleurs (téléchargés en arrière-plan après l'ajout d'une
+   * table de Zen, 20/11/2026) : l'écran ouvert de ses médias est relu, brouillon gardé, curseur en place,
+   * avec ce message. Faux si ses médias ne sont pas ouverts.
+   */
+  function refresh(file: string, notice?: { text: string; tone: Tone }): boolean {
+    const s = session;
+    // Seulement l'écran qu'on regarde : parti ailleurs (roue, partie, autre menu), on n'y est pas ramené.
+    if (!s || s.file !== file || !s.shown || ctx.showing?.() !== s.shown) return false;
+    if (notice) s.next = notice;
+    nav(s, s.shown, ctx.cursor());
+    return true;
   }
 
   /**
@@ -515,6 +534,7 @@ export function createMedias(ctx: MediasContext) {
   function nav(s: Session, build: () => Built, at?: number): void {
     s.notice = s.next;
     s.next = undefined;
+    s.shown = build;
     ctx.show(build, at, s.file);
   }
 
@@ -1279,7 +1299,7 @@ export function createMedias(ctx: MediasContext) {
     toOverview(s, MANAGED_MEDIA_TYPES[0]);
   }
 
-  return { open: (table: TableEntry) => open(table), openWith, isOpen: () => session !== undefined };
+  return { open: (table: TableEntry, notice?: { text: string; tone: Tone }) => open(table, undefined, notice), openWith, refresh, isOpen: () => session !== undefined };
 }
 
 /** Nom montré d'une page : le fichier, ou d'où vient un fichier téléchargé (reçu sous son empreinte MD5). */

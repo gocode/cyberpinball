@@ -46,6 +46,7 @@ import {
   type MediaType,
 } from '@cyberpinball/core';
 import type { LibraryHost } from './library';
+import { allowPreview } from './media-protocol';
 import { cachedScript, readScript } from './vbs';
 
 export interface MediaSearchContext {
@@ -250,7 +251,12 @@ export function createMediaSearch(ctx: MediaSearchContext) {
         const file = wanted[next++]!;
         if (!opts.quiet) ctx.progress(t('{label} : {n} sur {total}…', { label, n: ++n, total: wanted.length }));
         try {
-          into.set(file.url, (await stageMediaDbFile(staging(), file)).path);
+          const staged = (await stageMediaDbFile(staging(), file)).path;
+          // Lisible avant d'entrer dans la table : un écran redessiné entre-temps (touche, notification)
+          // demandait l'image avant son autorisation, refusée, et le rendu gardait ce refus (302 vignettes
+          // de VPinMediaDB refusées au journal d'un PinCab, liste des tables de Zen, 19-20/11/2026).
+          allowPreview(staged);
+          into.set(file.url, staged);
         } catch {
           // Aperçu indisponible (réseau) : la carte le dit.
         }
