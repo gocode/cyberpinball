@@ -25,6 +25,7 @@ export * from './pinballfx';
 export * from './pinballfx3';
 export * from './pinballfx3-cabinet';
 export * from './pinballfx3-folder';
+export * from './zen-media';
 export * from './pinballfx-cabinet';
 export * from './buttons-backup';
 export * from './zen';

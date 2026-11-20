@@ -54,13 +54,16 @@ const ZEN = 'Zen Studios';
 // qui est la même (titre, fabricant, année, jeu VPS repris de pinballfx.ts) ; sinon son titre.
 // Correspondances des noms peu parlants (« Citadel », « SpaceBear1 »…) : listes des front-ends
 // (PinUP Popper, PinballX), recoupées avec l'ordre alphabétique des fichiers.
-const TABLES: [string, number | string][] = [
-  ['Alien_Isolation', 'Aliens vs. Pinball: Alien: Isolation'],
-  ['Alien_vs_Predator', 'Aliens vs. Pinball: Alien vs. Predator'],
-  ['Aliens', 'Aliens vs. Pinball: Aliens'],
-  ['AmericanDad', "American Dad! Pinball"],
+// Tables propres à FX3 : leur titre et leur jeu VPS (format FX3, relevés le 20/11/2026) ; sans lui,
+// ni capture ni médias (un joueur l'a vu : Aliens, Archer, American Dad sans image). Toute table du
+// catalogue a son jeu VPS (test) ; Zen Studios est le fabricant.
+const TABLES: [string, number | string | { title: string; vps: string }][] = [
+  ['Alien_Isolation', { title: 'Aliens vs. Pinball: Alien: Isolation', vps: 'sO_RrYyX' }],
+  ['Alien_vs_Predator', { title: 'Aliens vs. Pinball: Alien vs. Predator', vps: 'nocBs6Iu' }],
+  ['Aliens', { title: 'Aliens vs. Pinball: Aliens', vps: 'GNXfb2HW' }],
+  ['AmericanDad', { title: "American Dad! Pinball", vps: 'wc2QMFRD' }],
   ['Amusement_Park', 29], // Adventure Land
-  ['Archer', 'Archer Pinball'],
+  ['Archer', { title: 'Archer Pinball', vps: 'kyx3Helo' }],
   ['Atlantis', 66], // Secrets of the Deep
   ['BALLY_Attack_from_Mars', 119],
   ['BALLY_BlackRose', 118],
@@ -75,13 +78,13 @@ const TABLES: [string, number | string][] = [
   ['BETHESDA_Fallout', 90],
   ['BETHESDA_Skyrim', 91],
   ['BioLab', 27],
-  ['BobsBurgers', "Bob's Burgers Pinball"],
+  ['BobsBurgers', { title: "Bob's Burgers Pinball", vps: 'nJT6s8UJ' }],
   ['CastleStorm', 40],
   ['Citadel', 33], // Sorcerer's Lair
-  ['EarthDefense', 'Earth Defense'],
-  ['Eldorado', 'El Dorado'],
+  ['EarthDefense', { title: 'Earth Defense', vps: 'dDRlUWW0' }],
+  ['Eldorado', { title: 'El Dorado', vps: '2kGICARX' }],
   ['Excalibur', 20],
-  ['FamilyGuy', 'Family Guy Pinball'],
+  ['FamilyGuy', { title: 'Family Guy Pinball', vps: 'U1lV4AjF' }],
   ['Hercules', 80], // Son of Zeus
   ['Looter', 67], // Epic Quest
   ['MARVEL_Age_of_Ultron', 78],
@@ -107,10 +110,10 @@ const TABLES: [string, number | string][] = [
   ['MARVEL_WWH', 56],
   ['MARVEL_Wolverine', 71],
   ['MARVEL_XMen', 59],
-  ['Mars', 'Mars'],
-  ['Paranormal', 'Paranormal'],
+  ['Mars', { title: 'Mars', vps: 'lzQr2axU' }],
+  ['Paranormal', { title: 'Paranormal', vps: 'MfPacfn9' }],
   ['Pasha', 23],
-  ['Portal', 'Portal Pinball'],
+  ['Portal', { title: 'Portal Pinball', vps: 'SQ0gMY8e' }],
   ['RedCup1', 105], // Star Wars Pinball: Solo
   ['RedCup2', 106], // Calrissian Chronicles
   ['RedCup3', 107], // Battle of Mimban
@@ -129,18 +132,18 @@ const TABLES: [string, number | string][] = [
   ['STARWARS_Light_VS_Dark', 2], // Masters of the Force
   ['STARWARS_Rebels', 77],
   ['STARWARS_SFA', 6], // Starfighter Assault
-  ['Shaman', 'Shaman'],
+  ['Shaman', { title: 'Shaman', vps: 'Nlr4_9mD' }],
   ['SpaceBear1', 103], // The Last Jedi
   ['SpaceBear2', 104], // Ahch-To Island
-  ['Tesla', 'Tesla'],
-  ['TheWalkingDead', 'The Walking Dead Pinball'],
+  ['Tesla', { title: 'Tesla', vps: 'wyotFFE4' }],
+  ['TheWalkingDead', { title: 'The Walking Dead Pinball', vps: 'vGWzIhsr' }],
   ['UNIVERSAL_BTTF', 97],
   ['UNIVERSAL_ET', 96],
   ['UNIVERSAL_Jaws', 95],
   ['UNIVERSAL_Jurassic_Park', 100],
   ['UNIVERSAL_Jurassic_Theme_Park', 102], // Jurassic Park Pinball Mayhem
   ['UNIVERSAL_Jurassic_World', 101],
-  ['V12', 'V12'],
+  ['V12', { title: 'V12', vps: 'kK0wZBYn' }],
   ['WMS_Fish_Tales', 108],
   ['WMS_Funhouse', 134],
   ['WMS_Getaway', 111],
@@ -168,8 +171,10 @@ export function isWilliamsPinballFx3(name: string): boolean {
   return /^(WMS|BALLY)_/i.test(name);
 }
 
-function describe(name: string, ref: number | string | undefined): PinballFx3Table {
+function describe(name: string, ref: number | string | { title: string; vps: string } | undefined): PinballFx3Table {
   const williams = isWilliamsPinballFx3(name);
+  // Table propre à FX3 que la base VPS connaît (format FX3) : son jeu VPS donne capture et médias.
+  if (typeof ref === 'object') return { name, title: ref.title, manufacturer: ZEN, vps: ref.vps, williams, known: true };
   if (typeof ref === 'number') {
     const fx = pinballFxTable(ref);
     if (fx) return { name, title: fx.title, manufacturer: fx.manufacturer, ...(fx.year ? { year: fx.year } : {}), ...(fx.vps ? { vps: fx.vps } : {}), williams, known: true };

@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.2
 
+- Tables de Pinball FX3 : les tables propres à Zen (Aliens, Archer, American Dad, Portal, The Walking Dead…) sont reliées à leur jeu de la base VPS. Elles ont désormais leur vignette et leurs médias, y compris celles déjà ajoutées (« Chercher les médias manquants »). Une table de Pinball FX ou FX3 que le catalogue ne relie pas est reconnue à son titre exact.
+- Une image rangée à côté d'une table dans le dossier du jeu (« Archer.png » à côté de « Archer.pxp ») sert de vignette dans la liste, et elle est rangée avec la table à son ajout : comme logo si elle est à peu près carrée, sinon comme image de la table.
 - Son de la borne : l'étape propose d'abord des configurations, d'après ce que la borne détecte (prises branchées sur la carte son de la carte mère, haut-parleurs des écrans, ampli HDMI, réglages déjà enregistrés), la plus probable en tête, avec un schéma de la borne qui montre où chaque son doit jouer. Essayer une configuration la vérifie paire par paire ("l'entendez-vous là ?") ; une carte réglée en stéréo passe d'abord par le panneau Son de Windows. "Régler pas à pas" reste le dernier choix.
 - Son de la borne : les prises ne sont lues que sur une carte de la carte mère, qui les décrit ; une carte USB ou une sortie HDMI est vérifiée par le son, jamais par une couleur de prise supposée.
 - Ajouter une table : un dossier de Pinball FX3 choisi par « Choisir un dossier… » (ou glissé sur la fenêtre) n'aboutit plus à « Rien à installer ». Il est reconnu, gardé comme dossier du jeu, et l'écran « Tables de Pinball FX3 » s'ouvre avec ses tables. Le reste de la sélection suit l'ajout habituel.

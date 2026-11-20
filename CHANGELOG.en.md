@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Pinball FX3 tables: Zen's own tables (Aliens, Archer, American Dad, Portal, The Walking Dead…) are linked to their VPS database game. They now have their thumbnail and media, including those already added ("Search for missing media"). A Pinball FX or FX3 table that the catalog doesn't link is recognized by its exact title.
+- An image kept next to a table in the game folder ("Archer.png" next to "Archer.pxp") is used as its thumbnail in the list, and is stored with the table when it is added: as its logo if roughly square, otherwise as its table image.
 - Cabinet sound: the step first suggests setups, from what the cabinet detects (jacks plugged into the motherboard sound card, screen speakers, HDMI amplifier, settings already saved), the most likely first, with a drawing of the cabinet showing where each sound should play. Trying a setup checks it pair by pair ("do you hear it there?"); a card set to stereo goes through the Windows Sound panel first. "Step by step" remains the last choice.
 - Cabinet sound: jacks are only read on a motherboard card, which describes them; a USB card or an HDMI output is checked by ear, never by an assumed jack colour.
 - Add a table: a Pinball FX3 folder chosen with "Choose a folder…" (or dropped on the window) no longer ends in "Nothing to install". It is recognized, kept as the game folder, and the "Pinball FX3 tables" screen opens with its tables. The rest of the selection follows the usual add.

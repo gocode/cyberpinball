@@ -21,6 +21,7 @@ export const messages: Record<string, string> = {
   'Aucune table à lister': 'No table to list',
   'Installez {game} avec Steam, ou choisissez le dossier du jeu : ses tables apparaissent ici.': 'Install {game} with Steam, or choose the game folder: its tables show up here.',
   'Le dossier des tables du dossier choisi est vide ou illisible : {dir}.': 'The chosen folder’s table folder is empty or unreadable: {dir}.',
+  'Image du dossier du jeu : « {file} »': 'Image from the game folder: "{file}"',
   // app/src/pinballfx3-folder-ui.ts
   'Dossier choisi à la main · les parties se lancent par son exécutable, sans passer par Steam': 'Folder chosen by hand · games start from its executable, without going through Steam',
   'Installé par Steam (c’est aussi le dossier choisi) · les parties passent par Steam': 'Installed by Steam (also the chosen folder) · games go through Steam',

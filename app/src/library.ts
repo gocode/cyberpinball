@@ -69,6 +69,9 @@ import {
   PINBALLFX_TABLES,
   PINBALLFX3_CABINET_HELP_URL,
   pinballFx3GameIn,
+  withZenVps,
+  zenLocalImages,
+  zenLocalImageType,
   pinballFx3InstalledTables,
   ZEN_GAMES,
   zenEntryKey,
@@ -3612,6 +3615,8 @@ export function createLibrary(host: LibraryHost) {
     images?: { db: VpsDb | undefined; map: Map<string, string> };
     /** Où en est « Chercher les médias manquants » ; undefined : jamais lancé. */
     hunt?: string;
+    /** FX3 : images rangées à côté des tables dans data\steam (zen-media.ts), lues à l'ouverture. */
+    local?: Map<string, string>;
   }
   const zenUi: Record<ZenGameKey, ZenUi> = { pinballfx: { storeOpened: false }, pinballfx3: { storeOpened: false } };
 
@@ -3738,8 +3743,16 @@ export function createLibrary(host: LibraryHost) {
       const tablesDir = (ui.now = zenSetup(game, host.dataDir)).install?.tablesDir;
       ui.list = tablesDir ? pinballFx3InstalledTables({ tablesDir }).map(zenFromPinballFx3) : [];
       ui.images = undefined;
+      ui.local = zenLocalImages(tablesDir);
+      for (const file of ui.local.values()) allowPreview(file);
     }
     const show = () => {
+      // Tables que le catalogue ne relie pas à la base VPS : reconnues à leur titre exact (zen-media.ts).
+      const db = vpsDb;
+      if (db && zenList(game).some((fx) => !fx.vps)) {
+        ui.list = zenList(game).map((fx) => withZenVps(db, fx));
+        ui.images = undefined;
+      }
       // Liste triée et captures de VPS calculées ici, à l'ouverture, pas au premier dessin.
       zenImageMap(game);
       const list = zenList(game);
@@ -3784,6 +3797,11 @@ export function createLibrary(host: LibraryHost) {
     return local ? kept(`vignette:${local}`, () => mediaUrl(local)) : 'pinball-app';
   }
 
+  /** Image rangée par le joueur à côté de la table (FX3, data\steam), lue à l'ouverture de l'écran. */
+  function zenLocalImage(fx: Pick<ZenTable, 'game' | 'key'>): string | undefined {
+    return zenUi[fx.game].local?.get(fx.key.toLowerCase());
+  }
+
   /** Capture de VPS d'une table, la version du même jeu d'abord (FX pour Pinball FX, FX3 pour FX3). */
   function zenVpsImage(fx: ZenTable): string | undefined {
     return vpsDb ? pinballFxVpsImage(vpsDb, fx, ZEN_GAMES[fx.game].vpsFormats) : undefined;
@@ -3812,37 +3830,42 @@ export function createLibrary(host: LibraryHost) {
    * image du plateau, la capture de la table que donne VPS. Rien n'est remplacé.
    */
   async function fetchPinballFxMedias(fx: ZenTable, file: string, flash: string, types?: readonly MediaType[]): Promise<void> {
-    if (!fx.vps) return;
     const ui = zenUi[fx.game];
     let installed = 0;
     let placed = false;
     let sites: SiteFill = { placed: [], missing: [], login: [] };
     const failed: string[] = [];
-    try {
-      const got = await mediaDownload.fillMissing([file], { quiet: true, ...(types ? { types } : {}) });
-      installed = got.installed;
-      failed.push(...got.failed);
-      const table = find(file);
-      const url = !types || types.includes('Playfield') ? zenVpsImage(fx) : undefined;
-      if (table && url) {
-        await mediaSearch.stagePreviews([{ url }], pinballFxThumbs, t('Vignettes'), { quiet: true });
-        const staged = pinballFxThumbs.get(url);
-        if (staged) allowPreview(staged);
-        if (staged && fs.existsSync(staged)) placed = Boolean(placeMissingMedia(table, infoFileFor(table, tablesDir()), 'Playfield', staged, { origin: 'VPS', url, vpsId: fx.vps }));
+    // L'image que le joueur a rangée à côté de la table (zen-media.ts) d'abord : rien à télécharger,
+    // et la table a son image même sans jeu VPS.
+    const localPlaced = placeZenLocalImage(fx, file, types);
+    const vps = fx.vps;
+    if (vps) {
+      try {
+        const got = await mediaDownload.fillMissing([file], { quiet: true, ...(types ? { types } : {}) });
+        installed = got.installed;
+        failed.push(...got.failed);
+        const table = find(file);
+        const url = !types || types.includes('Playfield') ? zenVpsImage(fx) : undefined;
+        if (table && url) {
+          await mediaSearch.stagePreviews([{ url }], pinballFxThumbs, t('Vignettes'), { quiet: true });
+          const staged = pinballFxThumbs.get(url);
+          if (staged) allowPreview(staged);
+          if (staged && fs.existsSync(staged)) placed = Boolean(placeMissingMedia(table, infoFileFor(table, tablesDir()), 'Playfield', staged, { origin: 'VPS', url, vpsId: vps }));
+        }
+        // Ce que VPinMediaDB n'a pas (une table propre à Zen, « Back to the Future Pinball ») : les
+        // fiches que la base VPS rattache au jeu, comme « Médias du jeu » les propose.
+        const now = find(file);
+        if (now) sites = await fillFromVpsSites(now, vps, fx.title, types);
+      } catch (error) {
+        failed.push((error as Error).message);
       }
-      // Ce que VPinMediaDB n'a pas (une table propre à Zen, « Back to the Future Pinball ») : les
-      // fiches que la base VPS rattache au jeu, comme « Médias du jeu » les propose.
-      const now = find(file);
-      if (now) sites = await fillFromVpsSites(now, fx.vps, fx.title, types);
-    } catch (error) {
-      failed.push((error as Error).message);
     }
     reloadTables(file);
     const siteNote = sites.placed.length ? `, ${sites.placed.join(', ')} des sites` : ''; // i18n-ignore : journal
     const loginNote = sites.login.length ? ` ; compte à connecter : ${sites.login.join(', ')}` : ''; // i18n-ignore : journal
-    console.log(`${ZEN_GAMES[fx.game].name} : médias de « ${fx.title} » : ${installed} de VPinMediaDB${placed ? ', image du plateau de VPS' : ''}${siteNote}${loginNote}${failed.length ? ` ; non reçus : ${failed.join(' ; ')}` : ''}.`); // i18n-ignore : journal
+    console.log(`${ZEN_GAMES[fx.game].name} : médias de « ${fx.title} » : ${localPlaced ? `${localPlaced} du dossier du jeu, ` : ''}${installed} de VPinMediaDB${placed ? ', image du plateau de VPS' : ''}${siteNote}${loginNote}${vps ? '' : ' (pas de jeu VPS)'}${failed.length ? ` ; non reçus : ${failed.join(' ; ')}` : ''}.`); // i18n-ignore : journal
     if (ui.flash !== flash) return;
-    const n = installed + (placed ? 1 : 0) + sites.placed.length;
+    const n = (localPlaced ? 1 : 0) + installed + (placed ? 1 : 0) + sites.placed.length;
     const got = n
       ? tn(n, '« {title} » ajoutée au front-end, avec {n} média.', '« {title} » ajoutée au front-end, avec {n} médias.', { title: fx.title })
       : t('« {title} » ajoutée au front-end.', { title: fx.title });
@@ -3855,13 +3878,33 @@ export function createLibrary(host: LibraryHost) {
     host.broadcast();
   }
 
+  /**
+   * Range l'image que le joueur a posée à côté de la table (FX3, data\steam) comme son logo ou son image
+   * de la table, si la table ne l'a pas encore et si ce type est voulu. Rend le type rangé.
+   */
+  function placeZenLocalImage(fx: ZenTable, file: string, types?: readonly MediaType[]): MediaType | undefined {
+    const local = zenLocalImage(fx);
+    const type = local ? zenLocalImageType(local) : undefined;
+    const table = find(file);
+    if (!local || !type || !table || (types && !types.includes(type))) return undefined;
+    try {
+      const done = placeMissingMedia(table, infoFileFor(table, tablesDir()), type, local, { origin: ZEN_GAMES[fx.game].name, url: local, ...(fx.vps ? { vpsId: fx.vps } : {}) });
+      return done ? type : undefined;
+    } catch (error) {
+      console.log(`${ZEN_GAMES[fx.game].name} : image de « ${fx.title} » pas rangée (${(error as Error).message}).`); // i18n-ignore : journal
+      return undefined;
+    }
+  }
+
   /** Médias de la fiche d'ajout d'une table de Zen, ceux de la roue d'abord. */
   const PINBALLFX_DETAIL_TYPES: MediaType[] = ['Wheel', 'Backglass', 'Playfield', 'DMD', 'FullDMD', 'Topper', 'Loading', 'GameHelp', 'GameInfo', 'Audio', 'AudioLaunch'];
 
   /** Un média de la fiche d'ajout : d'où il viendrait (rien : introuvable), et le site où se connecter. */
   interface FxElement {
     type: MediaType;
-    source?: 'mediadb' | 'site' | 'vps';
+    source?: 'mediadb' | 'site' | 'vps' | 'local';
+    /** Image rangée par le joueur à côté de la table (source 'local'). */
+    file?: string;
     offer?: MediaDbOffer;
     hit?: SiteHit;
     /** Fiche d'un site sans compte connecté : son nom. */
@@ -3890,12 +3933,19 @@ export function createLibrary(host: LibraryHost) {
       const game = fx.vps ? vpsDb?.games.find((g) => g.id === fx.vps) : undefined;
       const hits = game ? vpsSiteHits([game]).filter((h) => h.vps && !h.vps.pack) : [];
       const capture = zenVpsImage(fx);
+      // L'image que le joueur a rangée à côté de la table : son logo ou une image de la table (zen-media.ts).
+      const local = zenLocalImage(fx);
+      const localType = local ? zenLocalImageType(local) : undefined;
       const elements: FxElement[] = [];
       for (const type of PINBALLFX_DETAIL_TYPES) {
         const offer = offers?.offers.find((o) => o.type === type);
         if (offer) {
           const preview = offer.preview ?? (offer.kind === 'image' ? offer.file : undefined);
           elements.push({ type, source: 'mediadb', offer, ...(preview ? { preview } : {}) });
+          continue;
+        }
+        if (local && type === localType) {
+          elements.push({ type, source: 'local', file: local });
           continue;
         }
         if (type === 'Playfield' && capture) {
@@ -4000,7 +4050,7 @@ export function createLibrary(host: LibraryHost) {
     const name = ZEN_GAMES[fx.game].name;
     const back = () => openZen(fx.game, fx.key);
     const thumbOf = (e: FxElement | undefined, text: string): MediaThumb => {
-      const local = e?.preview ? d.previews.get(e.preview.url) : undefined;
+      const local = e?.file ?? (e?.preview ? d.previews.get(e.preview.url) : undefined);
       return local ? { kind: 'image', url: mediaUrl(local), rotation: 0 } : { kind: 'fallback', rotation: 0, text };
     };
     const actions: Action[] = [];
@@ -4025,7 +4075,7 @@ export function createLibrary(host: LibraryHost) {
           t('Jouée par {game} : elle s’achète dans le jeu, Cyber Pinball ne peut pas vérifier que vous l’avez.', { game: name }),
           ...(fx.williams ? [t('Lancée dans son mode classique : les règles de la machine, sans les améliorations de Zen.')] : []),
         ],
-        thumb: thumbOf(d.elements.find((e) => e.source === 'vps') ?? d.elements.find((e) => e.type === 'Playfield'), fx.title),
+        thumb: thumbOf(d.elements.find((e) => e.source === 'local') ?? d.elements.find((e) => e.source === 'vps') ?? d.elements.find((e) => e.type === 'Playfield'), fx.title),
       },
     ];
     // Les introuvables sur une seule carte, en haut sous la table : rien à y choisir, elle doit se
@@ -4056,7 +4106,9 @@ export function createLibrary(host: LibraryHost) {
             ? t('VPinMediaDB · {kind}', { kind: kind! })
             : e.source === 'vps'
               ? t('Capture de la table, base VPS')
-              : t('{site} : {title}', { site: mediaSite(e.hit!.site).name, title: e.hit!.title }),
+              : e.source === 'local'
+                ? t('Image du dossier du jeu : « {file} »', { file: path.basename(e.file!) })
+                : t('{site} : {title}', { site: mediaSite(e.hit!.site).name, title: e.hit!.title }),
         ...(e.source === 'site' ? { extra: siteExtra(e) } : {}),
         thumb: e.source === 'site' ? siteThumb(e, label) : thumbOf(e, label),
       };
@@ -4090,7 +4142,7 @@ export function createLibrary(host: LibraryHost) {
     const ui = zenUi[fx.game];
     const added = addZenTable(tablesDir(), fx);
     console.log(`${ZEN_GAMES[fx.game].name} : table ${fx.key} (${fx.title}) ajoutée au front-end, ${added.id} ; médias choisis : ${types.join(', ') || 'aucun'}.`); // i18n-ignore : journal
-    ui.flash = fx.vps && types.length ? t('« {title} » ajoutée au front-end : ses médias arrivent (Téléchargements).', { title: fx.title }) : t('« {title} » ajoutée au front-end.', { title: fx.title });
+    ui.flash = (fx.vps || zenLocalImage(fx)) && types.length ? t('« {title} » ajoutée au front-end : ses médias arrivent (Téléchargements).', { title: fx.title }) : t('« {title} » ajoutée au front-end.', { title: fx.title });
     reloadTables(added.file);
     if (types.length) void fetchPinballFxMedias(fx, added.file, ui.flash, types);
     pinballFxDetail = undefined;
@@ -4112,7 +4164,14 @@ export function createLibrary(host: LibraryHost) {
     const missing = new Set<MediaType>();
     for (const entry of entries) {
       const fx = zenTableOfEntry(entry);
-      if (!fx?.vps) continue;
+      if (!fx) continue;
+      // L'image rangée à côté de la table d'abord ; une table ajoutée avant que son jeu VPS soit connu
+      // (catalogue complété le 20/11/2026) reçoit ensuite les médias de VPS.
+      if (placeZenLocalImage(fx, entry.file)) count++;
+      if (!fx.vps) {
+        reloadTables(entry.file);
+        continue;
+      }
       try {
         count += (await mediaDownload.fillMissing([entry.file], { quiet: true })).installed;
         const table = find(entry.file);
@@ -4243,7 +4302,8 @@ export function createLibrary(host: LibraryHost) {
         detail: [fx.manufacturer, fx.year, ...(game === 'pinballfx3' && fx.unknown ? [fx.key] : [])].filter(Boolean).join(' · '),
         badges: entry ? [t('Dans le front-end')] : [],
         tone: entry ? 'ok' : undefined,
-        thumb: pinballFxThumb(images.get(fx.key)),
+        // L'image rangée par le joueur à côté de la table d'abord, sinon la capture de VPS.
+        thumb: zenLocalImage(fx) ? kept(`vignette:${zenLocalImage(fx)}`, () => mediaUrl(zenLocalImage(fx)!)) : pinballFxThumb(images.get(fx.key)),
         thumbIcon: 'pinball-app',
         action,
         pick: true,

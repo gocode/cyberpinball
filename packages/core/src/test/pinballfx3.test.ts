@@ -42,8 +42,8 @@ test('catalogue : noms de fichiers uniques et valables, titres non vides, Willia
   assert.equal(pinballFx3Table('Citadel')?.title, 'Sorcerer\'s Lair');
   assert.equal(pinballFx3Table('SpaceBear1')?.title, 'Star Wars Pinball: The Last Jedi');
   assert.equal(pinballFx3Table('STARWARS_Light_VS_Dark')?.title, 'Star Wars Pinball: Masters of the Force');
-  // Table propre à FX3 (pas dans Pinball FX) : son titre, Zen Studios.
-  assert.deepEqual(pinballFx3Table('FamilyGuy'), { name: 'FamilyGuy', title: 'Family Guy Pinball', manufacturer: 'Zen Studios', williams: false, known: true });
+  // Table propre à FX3 (pas dans Pinball FX) : son titre, Zen Studios, son jeu VPS (format FX3).
+  assert.deepEqual(pinballFx3Table('FamilyGuy'), { name: 'FamilyGuy', title: 'Family Guy Pinball', manufacturer: 'Zen Studios', vps: 'U1lV4AjF', williams: false, known: true });
   // Insensible à la casse ; « Mars » n'est pas « Attack from Mars ».
   assert.equal(pinballFx3Table('wms_fish_tales')?.title, 'Fish Tales');
   assert.equal(pinballFx3Table('Mars')?.title, 'Mars');
