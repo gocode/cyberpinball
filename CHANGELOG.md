@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.2
 
+- Archives RAR que le tar de Windows ne sait pas lire (RAR5 à grand dictionnaire : « Declared dictionary size is not supported », par exemple la table Ghostbusters pour Future Pinball) : Cyber Pinball les lit maintenant avec le décompresseur officiel de RARLAB (node-unrar-js, en WebAssembly, rien à installer). Avant, la table restait « Rien à installer ».
+- Archive d'une table Future Pinball : une bibliothèque de script (.vbs) va dans le dossier Scripts du jeu, et les réglages de physique de BAM de la table (.xml du même nom) à côté d'elle ; ils la suivent quand elle est ajoutée au front-end.
 - Menu système > Ma borne : la rubrique s'appelle « Réalité virtuelle et vision 3D » ; sa ligne ne montre plus l'état de la VR ni le badge BÊTA, qui se lisent en entrant, sur chaque entrée.
 - Médias d'une table absente de VPinMediaDB (Ghostbusters Limited Edition, par exemple) : l'image du fronton (aperçu de son .directb2s le plus récent) et celle du plateau que donne la base VPS sont prévues dans « Ce qu'il faut », puis rangées à l'installation, au lieu du seul habillage dessiné. Rien n'est remplacé, la source est notée.
 - « Ce qu'il faut » d'une version Future Pinball : le fronton animé (.directb2s) n'est plus dit « inconnu de VPS » ; l'écran explique qu'il sert à VPX et que Future Pinball dessine son propre fronton.

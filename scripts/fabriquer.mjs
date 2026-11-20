@@ -77,6 +77,9 @@ for (const name of fs.readdirSync(path.join(repo, 'app', 'dist')).filter(builtAp
 // Script préchargé du bloqueur de publicités (app/src/ad-blocker.ts), injecté par la session
 // dans les pages du navigateur intégré : déjà regroupé par Ghostery, il ne requiert qu'electron.
 fs.copyFileSync(require.resolve('@ghostery/adblocker-electron-preload'), path.join(stage, 'dist', 'adblock-preload.js'));
+// Décompresseur RAR de node-unrar-js (app/src/archives.ts, RAR que le tar de Windows refuse) : du
+// WebAssembly que le regroupement n'embarque pas, lu à côté du code (dist\unrar.wasm).
+fs.copyFileSync(require.resolve('node-unrar-js/dist/js/unrar.wasm'), path.join(stage, 'dist', 'unrar.wasm'));
 
 step('Fichiers de l’application');
 // Mêmes chemins relatifs qu'en développement : dist\..\renderer, dist\..\components.json.

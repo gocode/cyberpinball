@@ -15,7 +15,8 @@ import { isFuturePinballTable } from './futurepinball';
 const GAME_FOLDERS = ['Tables', 'Libraries', 'Music', 'Scripts', 'BAM'] as const;
 type GameFolder = (typeof GAME_FOLDERS)[number];
 
-export type FuturePinballFileKind = 'table' | 'library' | 'music' | 'script' | 'bam';
+/** « table-extra » : fichier qui accompagne une table à côté d'elle (réglages de physique de BAM, .xml). */
+export type FuturePinballFileKind = 'table' | 'table-extra' | 'library' | 'music' | 'script' | 'bam';
 
 const KIND_OF: Record<GameFolder, FuturePinballFileKind> = { Tables: 'table', Libraries: 'library', Music: 'music', Scripts: 'script', BAM: 'bam' };
 
@@ -65,6 +66,9 @@ export function planFuturePinballArchive(root: string, gameDir: string): FutureP
   walk(root, all);
   const plan: FuturePinballArchivePlan = { files: [], ignored: [] };
   const base = path.resolve(gameDir);
+  const stem = (f: string) => path.basename(f, path.extname(f)).toLowerCase();
+  // Noms des tables de l'archive : un .xml du même nom est leur réglage de physique (BAM).
+  const tableStems = new Set(all.filter((f) => isFuturePinballTable(f)).map(stem));
   for (const from of all.sort()) {
     const parts = path.relative(root, from).split(/[\\/]+/);
     const at = parts.findIndex((p, i) => i < parts.length - 1 && GAME_FOLDERS.some((g) => g.toLowerCase() === p.toLowerCase()));
@@ -80,6 +84,15 @@ export function planFuturePinballArchive(root: string, gameDir: string): FutureP
     } else if (path.extname(from).toLowerCase() === '.fpl') {
       to = path.join(base, 'Libraries', path.basename(from));
       kind = 'library';
+    } else if (path.extname(from).toLowerCase() === '.vbs') {
+      // Bibliothèque de script (« ZBRrollingballsoundslib.vbs » de Ghostbusters, 20/11/2026) : le script de
+      // la table la charge depuis le dossier Scripts du jeu.
+      to = path.join(base, 'Scripts', path.basename(from));
+      kind = 'script';
+    } else if (path.extname(from).toLowerCase() === '.xml' && tableStems.has(stem(from))) {
+      // Réglages de physique de BAM d'une table (« ghostbusters.XML ») : à côté de son .fpt.
+      to = path.join(base, 'Tables', path.basename(from));
+      kind = 'table-extra';
     }
     // Jamais hors du dossier du jeu (nom d'archive piégé).
     if (!to || !kind || path.relative(base, to).startsWith('..') || path.isAbsolute(path.relative(base, to))) {

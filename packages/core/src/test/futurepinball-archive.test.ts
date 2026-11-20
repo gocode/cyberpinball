@@ -183,6 +183,31 @@ test('rangement d’une archive : chaque fichier à sa place dans le jeu, à par
   assert.deepEqual(plan.ignored.map((f) => path.basename(f)).sort(), ['Lisez-moi.txt', 'capture.png']);
 });
 
+test('archive de Ghostbusters (RAR, 20/11/2026) : script .vbs dans Scripts, réglages BAM .xml à côté de la table, et suivis à l’ajout', async () => {
+  const root = tmp();
+  const archive = path.join(root, 'extrait');
+  const game = path.join(root, 'Future Pinball');
+  write(path.join(archive, 'ghostbusters', 'ghostbusters.fpt'), 'FPT');
+  write(path.join(archive, 'ghostbusters', 'ghostbusters.XML'), '<document/>');
+  write(path.join(archive, 'ghostbusters', 'ZBRrollingballsoundslib.fpl'), 'FPL');
+  write(path.join(archive, 'ghostbusters', 'ZBRrollingballsoundslibGB.vbs'), 'VBS');
+  write(path.join(archive, 'ghostbusters', 'ZBRrollingballsoundslib.txt'), 'lisez-moi');
+  write(path.join(archive, 'ghostbusters', 'autre.xml'), '<x/>');
+  const placed = Object.fromEntries(planFuturePinballArchive(archive, game).files.map((f) => [path.relative(game, f.to), f.kind]));
+  assert.deepEqual(placed, {
+    [path.join('Libraries', 'ZBRrollingballsoundslib.fpl')]: 'library',
+    [path.join('Scripts', 'ZBRrollingballsoundslibGB.vbs')]: 'script',
+    [path.join('Tables', 'ghostbusters.XML')]: 'table-extra',
+    [path.join('Tables', 'ghostbusters.fpt')]: 'table',
+  });
+  const r = await installFuturePinballArchive(archive, game);
+  // Ajoutée au front-end : son .xml la suit dans son dossier.
+  const tablesDir = path.join(root, 'tables');
+  fs.mkdirSync(tablesDir);
+  const added = await addFuturePinballTable(tablesDir, r.tables[0]!, {});
+  assert.ok(fs.existsSync(path.join(path.dirname(added.entry.file), 'ghostbusters.XML')));
+});
+
 test('rangement : rien d’écrasé ; une table du même nom mais différente prend un autre nom, l’identique compte comme présente', async () => {
   const root = tmp();
   const archive = path.join(root, 'extrait');

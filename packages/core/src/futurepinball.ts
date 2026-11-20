@@ -329,6 +329,25 @@ export async function addFuturePinballTable(tablesDir: string, source: string, o
     }
   }
   if (!linked) await fs.promises.copyFile(source, target);
+  // Les réglages de physique de BAM de la table (« Titre.xml » à côté du .fpt, 20/11/2026) : BAM les
+  // cherche à côté du .fpt ouvert, celui du front-end. Liés comme lui, ou copiés.
+  const stem = path.basename(source, path.extname(source)).toLowerCase();
+  let siblings: string[] = [];
+  try {
+    siblings = fs.readdirSync(path.dirname(source)).filter((f) => path.extname(f).toLowerCase() === '.xml' && path.basename(f, path.extname(f)).toLowerCase() === stem);
+  } catch {
+    // Dossier illisible : la table seule.
+  }
+  for (const name of siblings) {
+    const from = path.join(path.dirname(source), name);
+    const to = path.join(folder, name);
+    if (fs.existsSync(to)) continue;
+    try {
+      fs.linkSync(from, to);
+    } catch {
+      await fs.promises.copyFile(from, to).catch(() => undefined);
+    }
+  }
 
   // Le .info du dossier (partagé par les versions), comme à l'import d'une table VPX.
   const infoFile = path.join(folder, `${path.basename(folder)}.info`);
