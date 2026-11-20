@@ -89,6 +89,8 @@ export const messages: Record<string, string> = {
     'For the rest ({missing}): sign in to your {site} account (Add a table > Site accounts), or choose that media to take another one.',
   'Sans fichier : {missing}. Choisissez ce média pour en prendre un autre : sites, web ou fichier de ce PC.':
     'No file: {missing}. Choose that media to take another one: sites, web or a file from this PC.',
+  'Catalogue « {title} » (archive.org), créé par des joueurs': 'Catalog "{title}" (archive.org), made by players',
+  'fronton du catalogue pas reçu': 'backglass from the catalog not received',
   // app/src/library.ts : choix d'un média de la fiche d'ajout
   'Start : {n} autre choix pour ce média': 'Start: {n} other choice for this media',
   'Start : {n} autres choix pour ce média': 'Start: {n} other choices for this media',

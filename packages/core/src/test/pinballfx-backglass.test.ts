@@ -1,5 +1,6 @@
-// Fronton d'une table de Pinball FX (2023) déposé avant la partie (app/src/pinballfx-backglass.ts) :
-// « Table_<numéro>.png » du dossier du mode borne, en PNG, jamais à la place d'une image existante.
+// Frontons des jeux de Zen autour de la partie (app/src/frontend.ts, playPinballFx) : mode borne de Pinball FX
+// (Settings.ini), DMD virtuel de dmdext, image de la table de FX3. Pinball FX ne reçoit plus d'image de fronton
+// (décision du 20/11/2026 : sa fenêtre du fronton est fermée, celle de Cyber Pinball montre le média de la table).
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -7,49 +8,6 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { applyPinballFxCabinet, IniDocument, PINBALLFX_CABINET_SETTINGS, pinballFxCabinetLayout, pinballFxSettingsWithCabinet } from '..';
 import { REPO_ROOT } from './i18n-scan';
-
-interface BackglassModule {
-  placePinballFxBackglass(
-    install: { cabinetDir: string },
-    tableId: number,
-    source: string | undefined,
-    toPng?: (file: string) => Buffer,
-  ): { result: 'placed' | 'present' | 'no-media' | 'failed'; target: string; reason?: string };
-}
-
-test('fronton de Pinball FX : Table_<numéro>.png déposé, converti en PNG, jamais remplacé', () => {
-  const app = require(path.join(REPO_ROOT, 'app', 'dist', 'pinballfx-backglass.js')) as BackglassModule;
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-pfx-fronton-'));
-  const cabinetDir = path.join(root, 'PinballFX', 'Mods', 'Cabinet');
-  const medias = path.join(root, 'medias');
-  fs.mkdirSync(medias, { recursive: true });
-  fs.writeFileSync(path.join(medias, '(Backglass) AFM.png'), 'PNG-AFM');
-  fs.writeFileSync(path.join(medias, '(Backglass) BTTF.jpg'), 'JPG-BTTF');
-  fs.writeFileSync(path.join(medias, '(Backglass) Video.mp4'), 'MP4');
-  const converted: string[] = [];
-  const toPng = (file: string) => (converted.push(file), Buffer.from('PNG-CONVERTI'));
-
-  // Image PNG de la table : copiée telle quelle, dossier du mode borne créé.
-  const afm = app.placePinballFxBackglass({ cabinetDir }, 119, path.join(medias, '(Backglass) AFM.png'), toPng);
-  assert.deepEqual([afm.result, path.basename(afm.target)], ['placed', 'Table_119.png']);
-  assert.equal(fs.readFileSync(afm.target, 'utf8'), 'PNG-AFM');
-  // Autre format : converti en PNG (le jeu ne lit que le PNG).
-  const bttf = app.placePinballFxBackglass({ cabinetDir }, 97, path.join(medias, '(Backglass) BTTF.jpg'), toPng);
-  assert.equal(bttf.result, 'placed');
-  assert.equal(fs.readFileSync(bttf.target, 'utf8'), 'PNG-CONVERTI');
-  assert.deepEqual(converted.map((f) => path.basename(f)), ['(Backglass) BTTF.jpg']);
-  // Déjà là (le joueur, un pack, une partie précédente) : gardée.
-  fs.writeFileSync(afm.target, 'IMAGE-DU-JOUEUR');
-  assert.equal(app.placePinballFxBackglass({ cabinetDir }, 119, path.join(medias, '(Backglass) AFM.png'), toPng).result, 'present');
-  assert.equal(fs.readFileSync(afm.target, 'utf8'), 'IMAGE-DU-JOUEUR');
-  // Pas d'image de fronton dans Cyber Pinball, ou une vidéo : rien.
-  assert.equal(app.placePinballFxBackglass({ cabinetDir }, 5, undefined, toPng).result, 'no-media');
-  assert.equal(app.placePinballFxBackglass({ cabinetDir }, 6, path.join(medias, '(Backglass) Video.mp4'), toPng).result, 'no-media');
-  assert.ok(!fs.existsSync(path.join(cabinetDir, 'Table_6.png')));
-  // Conversion impossible : rien d'écrit.
-  assert.equal(app.placePinballFxBackglass({ cabinetDir }, 7, path.join(medias, '(Backglass) BTTF.jpg'), () => Buffer.alloc(0)).result, 'failed');
-  assert.ok(!fs.existsSync(path.join(cabinetDir, 'Table_7.png')));
-});
 
 // Settings.ini relevé sur un PinCab le 20/11/2026 (mode borne jamais réglé : désactivé, fenêtres par défaut).
 const SETTINGS = [
@@ -129,29 +87,6 @@ test('DMD virtuel de dmdext chargé par Pinball FX : posé sur l’écran DMD, r
   assert.deepEqual(moved, []);
 });
 
-test('fronton des menus de Pinball FX (PFX.png) : défaut de la borne, sinon noir, jamais remplacé', () => {
-  const app = require(path.join(REPO_ROOT, 'app', 'dist', 'pinballfx-backglass.js')) as {
-    placePinballFxHomeBackglass(install: { cabinetDir: string }, source: string | undefined, toPng?: (f: string) => Buffer, blank?: () => Buffer): { result: string; target: string };
-  };
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-pfx-menus-'));
-  const cabinetDir = path.join(root, 'PinballFX', 'Mods', 'Cabinet');
-  const black = () => Buffer.from('PNG-NOIR');
-  // Rien dans Cyber Pinball : une image noire plutôt que le chemin cherché.
-  const first = app.placePinballFxHomeBackglass({ cabinetDir }, undefined, undefined, black);
-  assert.deepEqual([first.result, path.basename(first.target)], ['placed', 'PFX.png']);
-  assert.equal(fs.readFileSync(first.target, 'utf8'), 'PNG-NOIR');
-  // Déjà là (le joueur, une partie précédente) : gardée.
-  fs.writeFileSync(first.target, 'IMAGE-DU-JOUEUR');
-  assert.equal(app.placePinballFxHomeBackglass({ cabinetDir }, undefined, undefined, black).result, 'present');
-  assert.equal(fs.readFileSync(first.target, 'utf8'), 'IMAGE-DU-JOUEUR');
-  // Fronton par défaut de la borne : copié.
-  fs.rmSync(first.target);
-  const def = path.join(root, '(Backglass).png');
-  fs.writeFileSync(def, 'PNG-DEFAUT');
-  app.placePinballFxHomeBackglass({ cabinetDir }, def, undefined, black);
-  assert.equal(fs.readFileSync(first.target, 'utf8'), 'PNG-DEFAUT');
-});
-
 test('mode borne de Pinball FX : fichier écrit seulement s’il existe, UTF-16 gardé', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-pfx-ini-'));
   const layout = { backglass: { x: 1920, y: 0, width: 1920, height: 1080 } };
@@ -193,11 +128,10 @@ test('frontend.ts : l’image de la table de FX3 est posée avant le lancement, 
   assert.match(body.slice(all, all + 200), /downloads: library\.downloads\.manager/, 'suivi dans les téléchargements');
 });
 
-test('frontend.ts : le fronton de Pinball FX est déposé avant le lancement, d’après le média de la table, pas l’affichage par défaut', () => {
+test('Pinball FX : plus d’image de fronton déposée pour le jeu (Table_<n>.png, PFX.png), celle de Cyber Pinball reste', () => {
+  // 20/11/2026 : une table choisie dans le jeu restait sans image et le jeu écrivait le chemin cherché.
   const src = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
-  const body = src.slice(src.indexOf('async function playPinballFx('));
-  const at = body.indexOf('placePinballFxBackglass(');
-  assert.ok(at > 0 && at < body.indexOf('launchPinballFx('));
-  assert.match(body.slice(at - 400, at), /resolveMedia\(table, loc\.root, 'Backglass'\)/);
-  assert.match(body.slice(at - 400, at), /source !== 'default'/);
+  assert.ok(!/placePinballFx(Home)?Backglass\(/.test(src));
+  const mod = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'pinballfx-backglass.ts'), 'utf8');
+  assert.ok(!/Table_|PFX\.png['"]/.test(mod.replace(/^\/\/.*$/gm, '')), 'plus de nom de fichier de Pinball FX hors des commentaires');
 });

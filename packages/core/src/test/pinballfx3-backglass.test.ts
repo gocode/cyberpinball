@@ -12,8 +12,11 @@ import {
   parseBackglassMetadata,
   PINBALLFX3_BACKGLASS_ALIASES,
   PINBALLFX3_HOME_IMAGE,
+  PINBALLFX3_TABLES,
   pinballFx3BackglassImage,
   pinballFx3BackglassPlan,
+  pinballFx3CatalogImage,
+  zenCatalogName,
 } from '..';
 import { REPO_ROOT } from './i18n-scan';
 
@@ -62,6 +65,18 @@ test('plan : image au nom du .pxp, deux noms du catalogue rapprochés, accueil c
   assert.equal(PINBALLFX3_BACKGLASS_ALIASES['STARWARS_Episode7'], 'STARWARS_Episode_7');
   assert.equal(pinballFx3BackglassImage(dir, 'aliens'), path.join(dir, 'Aliens.JPG'));
   assert.equal(pinballFx3BackglassImage(dir, 'Looter'), undefined, 'le .pxp n’est pas une image');
+});
+
+test('image du catalogue pour une table de Zen : le .pxp pour FX3, la table FX3 du même jeu VPS pour Pinball FX', () => {
+  const files = parseBackglassMetadata(METADATA);
+  assert.equal(pinballFx3CatalogImage(files, 'Alien_Isolation')?.name, 'FX3 Backglass art/Alien_Isolation.png');
+  assert.equal(pinballFx3CatalogImage(files, 'STARWARS_Episode7')?.name, 'FX3 Backglass art/STARWARS_Episode_7.png', 'alias');
+  assert.equal(pinballFx3CatalogImage(files, 'Looter'), undefined);
+  assert.equal(zenCatalogName({ game: 'pinballfx3', key: 'WMS_Fish_Tales' }), 'WMS_Fish_Tales');
+  // Pinball FX : par le jeu VPS commun à une table du catalogue de FX3 ; sans jeu VPS, rien de deviné.
+  const fx3 = PINBALLFX3_TABLES.find((x) => x.vps)!;
+  assert.equal(zenCatalogName({ game: 'pinballfx', key: '108', vps: fx3.vps! }), fx3.name);
+  assert.equal(zenCatalogName({ game: 'pinballfx', key: '108' }), undefined);
 });
 
 interface BackglassModule {

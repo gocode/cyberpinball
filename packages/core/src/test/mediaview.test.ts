@@ -184,7 +184,7 @@ test('média du playfield aux dimensions illisibles : le rendu recalcule la rota
   assert.deepEqual(view.orient, { edge: 'left', halfTurn: false });
 });
 
-test('écrans annexes : contain, jamais tournés ; DMD ou FullDMD selon les proportions de son écran', () => {
+test('écrans annexes : jamais tournés, le fronton étiré à son écran ; DMD ou FullDMD selon les proportions de son écran', () => {
   const b = borne();
   const alpha = b.tables[0]!;
   fs.writeFileSync(path.join(b.medias(alpha), '(Backglass) Alpha (Williams 1991).mp4'), Buffer.alloc(16));
@@ -192,7 +192,9 @@ test('écrans annexes : contain, jamais tournés ; DMD ou FullDMD selon les prop
   fs.writeFileSync(path.join(b.medias(alpha), '(FullDMD) Alpha (Williams 1991).png'), png(1920, 1080));
   const wide = new MenuMedias({ root: b.root, dataDir: b.dataDir, rotation: 90, cabinet: cabinet([1920, 1080]), b2s: false });
   const back = wide.roleMedia(alpha, 'backglass');
-  assert.deepEqual([back.kind, back.fit, back.rotation, back.source], ['video', 'contain', 0, 'vpx-name']);
+  // Le fronton remplit son écran comme le jeu le dessine (20/11/2026) ; le DMD reste entier (contain).
+  assert.deepEqual([back.kind, back.fit, back.rotation, back.source], ['video', 'fill', 0, 'vpx-name']);
+  assert.equal(wide.roleMedia(alpha, 'dmd').fit, 'contain');
   assert.equal(wide.roleMedia(alpha, 'dmd').type, 'FullDMD');
   const narrow = new MenuMedias({ root: b.root, dataDir: b.dataDir, rotation: 0, cabinet: cabinet([1024, 256]), b2s: false });
   assert.equal(narrow.roleMedia(alpha, 'dmd').type, 'DMD');

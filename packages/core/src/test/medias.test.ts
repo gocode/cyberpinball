@@ -274,7 +274,8 @@ test('ordre de recherche : .vpx, dossier, VPinFE, .directb2s, média commun de l
     assert.equal(r.file, file);
     assert.deepEqual(r.files, [file]);
     assert.equal(r.kind, 'image');
-    assert.equal(r.fit, 'contain');
+    // Étiré à son écran, comme le jeu dessine son fronton (20/11/2026 : bandes noires sur la roue).
+    assert.equal(r.fit, 'fill');
     if (source !== 'b2s') fs.rmSync(file);
     else fs.renameSync(path.join(f.medias, 'b2s-cache.png'), path.join(f.root, 'ailleurs.png'));
   }

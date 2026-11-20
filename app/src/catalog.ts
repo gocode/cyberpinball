@@ -73,6 +73,9 @@ import {
   reassignFile,
   recommendVersion,
   versionForText,
+  catalogLines,
+  gameEditions,
+  type CatalogLine,
   removeGame,
   removeItem,
   requirements,
@@ -702,6 +705,11 @@ export function createCatalog(ctx: CatalogContext) {
     return imageOf(game) ?? tableVersions(game).map(imageOf).find(Boolean) ?? (game.b2sFiles ?? []).map(imageOf).find(Boolean);
   }
 
+  /** Vignette d'une ligne du catalogue : celle de la version d'une édition, sinon celle du jeu. */
+  function entryImage(entry: CatalogLine): MediaDbFile | undefined {
+    return (entry.version && imageOf(entry.version)) || gameImage(entry.game);
+  }
+
   function thumbOf(file: MediaDbFile | undefined, text: string): MediaThumb {
     const local = file && thumbs.get(file.url);
     if (!local || !fs.existsSync(local)) return { kind: 'fallback', rotation: 0, text };
@@ -801,11 +809,13 @@ export function createCatalog(ctx: CatalogContext) {
       if (!db) return ctx.openNotice(t('Base VPS indisponible'), [t('La base VPS n’a jamais été téléchargée, et GitHub ne répond pas. Réessayez quand la borne est reliée à Internet.')], () => ctx.home());
       await needMediaIds();
       const found = games(db);
-      filter.page = Math.min(filter.page, Math.max(0, Math.ceil(found.length / PAGE) - 1));
+      // Pendant une recherche, chaque jeu suivi de ses éditions (catalogLines) : une ligne chacune.
+      const entries = catalogLines(found, filter.text, shownVersions);
+      filter.page = Math.min(filter.page, Math.max(0, Math.ceil(entries.length / PAGE) - 1));
       const page = filter.page;
-      ctx.show(() => buildCatalog(db, found), at);
+      ctx.show(() => buildCatalog(db, found, entries), at);
       // Les vignettes de la page, puis celles de la suivante : « Page suivante » s'affiche aussitôt garnie.
-      loadThumbs(found.slice(page * PAGE, (page + 1) * PAGE).map(gameImage), () => found.slice((page + 1) * PAGE, (page + 2) * PAGE).map(gameImage));
+      loadThumbs(entries.slice(page * PAGE, (page + 1) * PAGE).map(entryImage), () => entries.slice((page + 1) * PAGE, (page + 2) * PAGE).map(entryImage));
     });
   }
 
@@ -818,11 +828,42 @@ export function createCatalog(ctx: CatalogContext) {
     ].filter((x): x is string => Boolean(x));
   }
 
-  function buildCatalog(db: VpsDb, found: VpsGame[]): Built {
+  /** « JP's Space Cadet: Galaxy Edition » : le nom que lui donnent les sites. */
+  const editionTitle = (game: VpsGame, version: VpsTableFile) => `${game.name}: ${version.edition!.trim()}`;
+
+  /**
+   * Carte d'une édition dans la liste (« JP's Space Cadet: Galaxy Edition ») : Start mène droit à
+   * « Ce qu'il faut » pour cette version, comme depuis la galerie du jeu.
+   */
+  function editionCard(game: VpsGame, version: VpsTableFile, action: number): MediaCard {
+    const mine = installedVersion(game);
+    const included = (version.features ?? []).filter((f) => /^incl\./i.test(f)).map((f) => f.replace(/^incl\.\s*/i, ''));
+    return {
+      action,
+      title: editionTitle(game, version),
+      state: mine.source === version.id ? { label: t('Installée'), tone: 'ok' } : !liveLinks(version).length ? { label: t('Aucun lien'), tone: 'error' } : undefined,
+      tags: [versionSoftware(version)],
+      facts: [t('Édition de {game}', { game: vpsLabel(game) }), versionLabel({ ...version, edition: undefined })].join(' · '),
+      extra: [
+        [version.updatedAt ? t('Version du {date}', { date: formatDay(version.updatedAt) }) : undefined, included.length ? t('fournit {items}', { items: included.join(', ') }) : undefined]
+          .filter(Boolean)
+          .join(' · '),
+      ].filter(Boolean),
+      thumb: thumbOf(entryImage({ game, version }), version.edition!.trim()),
+    };
+  }
+
+  function buildCatalog(db: VpsDb, found: VpsGame[], entries: CatalogLine[] = catalogLines(found, filter.text, shownVersions)): Built {
     const here = installed();
-    const shown = found.slice(filter.page * PAGE, (filter.page + 1) * PAGE);
-    const actions: Action[] = shown.map((g) => ({ label: vpsLabel(g), key: `game:${g.id}`, run: () => openGame(g.id) }));
+    const page = entries.slice(filter.page * PAGE, (filter.page + 1) * PAGE);
+    // Éditions qui ont leur propre ligne : la carte du jeu ne cite que les autres.
+    const ownLine = new Set(entries.filter((e) => e.version).map((e) => e.version!.id));
+    const actions: Action[] = page.map(({ game: g, version: v }) =>
+      v ? { label: editionTitle(g, v), key: `game:${g.id}:${v.id}`, run: () => openNeeds(g.id, v.id) } : { label: vpsLabel(g), key: `game:${g.id}`, run: () => openGame(g.id) },
+    );
+    const shown = page.map((e) => e.game);
     const cards: MediaCard[] = shown.map((g, i) => {
+      if (page[i]!.version) return editionCard(g, page[i]!.version!, i);
       // Filtré « pour Future Pinball » : ses versions seulement, et ni ROM ni version VPX (PinCab, 20/11/2026).
       const fpOnly = filter.kind === 'futurepinball';
       const versions = shownVersions(g);
@@ -834,6 +875,10 @@ export function createCatalog(ctx: CatalogContext) {
         vpx ? tn(vpx, '{n} version VPX', '{n} versions VPX') : undefined,
         fp ? tn(fp, '{n} version Future Pinball', '{n} versions Future Pinball') : undefined,
         fpOnly ? undefined : roms.length ? `ROM ${roms.slice(0, 2).join(', ')}` : versions.some((v) => versionWithoutRom(g, v)) ? t('sans ROM') : undefined].filter(Boolean).join(' · ');
+      // Éditions sans ligne à elles (pas de recherche, ou au-delà des trois montrées) : nommées sur la carte du jeu.
+      const editions = gameEditions(g, versions);
+      const unnamed = editions.filter((e) => !ownLine.has(e.version.id)).map((e) => e.edition);
+      const names = unnamed.slice(0, 3).join(', ') + (unnamed.length > 3 ? ` ${tn(unnamed.length - 3, '+ {n} autre', '+ {n} autres')}` : '');
       return {
         action: i,
         title: vpsLabel(g),
@@ -845,17 +890,18 @@ export function createCatalog(ctx: CatalogContext) {
           versions[0]!.updatedAt
             ? t('Dernière version : {version}, le {date}', { version: versionLabel(versions[0]!), date: formatDay(versions[0]!.updatedAt) })
             : t('Dernière version : {version}', { version: versionLabel(versions[0]!) }),
-        ],
+          unnamed.length ? (unnamed.length < editions.length ? t('Autres éditions : {list}', { list: names }) : t('Éditions : {list}', { list: names })) : undefined,
+        ].filter((x): x is string => Boolean(x)),
         thumb: thumbOf(gameImage(g), g.name),
       };
     });
-    const pages = Math.max(1, Math.ceil(found.length / PAGE));
+    const pages = Math.max(1, Math.ceil(entries.length / PAGE));
     // Les deux lignes de pages toujours là, à la même place (grisées quand il n'y a rien de ce côté) :
     // en borne, les actions ne bougent pas d'une page à l'autre.
     if (pages > 1) {
       const last = filter.page + 1 >= pages;
-      const range = { from: (filter.page + 1) * PAGE + 1, to: Math.min(found.length, (filter.page + 2) * PAGE), total: found.length };
-      const before = { from: (filter.page - 1) * PAGE + 1, to: filter.page * PAGE, total: found.length };
+      const range = { from: (filter.page + 1) * PAGE + 1, to: Math.min(entries.length, (filter.page + 2) * PAGE), total: entries.length };
+      const before = { from: (filter.page - 1) * PAGE + 1, to: filter.page * PAGE, total: entries.length };
       actions.push(
         last
           ? { label: t('Page suivante'), key: 'page:next', detail: t('Dernière page'), tone: 'quiet', run: () => undefined }
@@ -900,7 +946,9 @@ export function createCatalog(ctx: CatalogContext) {
     }
     return {
       heading: t('Trouver une table'),
-      subheading: [tn(found.length, '{n} jeu', '{n} jeux'), [...active, state].join(', '), pages > 1 ? t('page {page} sur {pages}', { page: filter.page + 1, pages }) : undefined]
+      subheading: [
+        tn(found.length, '{n} jeu', '{n} jeux') + (entries.length > found.length ? `, ${tn(entries.length - found.length, '{n} édition', '{n} éditions')}` : ''),
+        [...active, state].join(', '), pages > 1 ? t('page {page} sur {pages}', { page: filter.page + 1, pages }) : undefined]
         .filter(Boolean)
         .join(' · '),
       lead: db.updatedAt

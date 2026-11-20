@@ -116,6 +116,8 @@ interface IndexedGame {
   acronyms: Set<string>;
   /** Mots du titre principal, sans les petits mots (recherche approfondie). */
   words: string[];
+  /** Éditions de ses versions VPX et Future Pinball (« Galaxy Edition »), sans doublon. */
+  editions: string[];
 }
 
 export interface VpsDb {
@@ -176,7 +178,42 @@ function indexGame(game: VpsGame): IndexedGame {
     vpxFiles,
     acronyms: acronymsOf(name),
     words: vpsWords(name.replace(/\s*\([^)]*\)\s*$/, '')).filter((w) => !WORD_STOP.has(w)),
+    editions: [
+      ...new Set(
+        (game.tableFiles ?? [])
+          .filter((f) => f && EDITION_FORMATS.has((f.tableFormat ?? 'VPX').toUpperCase()))
+          .map((f) => f.edition?.trim())
+          .filter((e): e is string => Boolean(e)),
+      ),
+    ],
   };
+}
+
+/** Formats dont les versions sont au catalogue (VPX, Future Pinball) : leurs éditions s'y cherchent. */
+const EDITION_FORMATS = new Set(['VPX', 'FP']);
+
+/**
+ * Mesure dans quelle part un texte saisi nomme l'édition d'une version de ce jeu : 0 si rien,
+ * sinon de 0,7 à 1. Chaque mot du texte est dans l'édition ou dans le titre du jeu (« edition »
+ * et les petits mots ne comptent pas), et au moins un mot propre à l'édition est cité :
+ * « galaxy edition », « galaxy » ou « space cadet galaxy » nomment la Galaxy Edition de JP's Space
+ * Cadet ; « space cadet » seul n'en nomme aucune. 1 : titre et édition entière ; 0,85 : l'édition
+ * entière sans le titre ; moins quand il manque des mots de l'édition.
+ */
+export function editionMatch(gameName: string, edition: string, text: string): number {
+  const title = new Set(vpsWords(gameName));
+  const all = new Set(vpsWords(edition));
+  // Un petit mot ne compte que s'il est dans l'édition : « LE » (Limited Edition) de JP's Deadpool.
+  const typed = [...new Set(vpsWords(text).filter((w) => !STOP_WORDS.has(w) || all.has(w)))];
+  if (!typed.length) return 0;
+  const mine = [...all].filter((w) => !title.has(w) && w !== 'edition');
+  const own = mine.some((w) => !STOP_WORDS.has(w)) ? mine.filter((w) => !STOP_WORDS.has(w)) : mine;
+  const hits = own.filter((w) => typed.includes(w)).length;
+  if (!hits) return 0;
+  if (!typed.every((w) => all.has(w) || title.has(w) || w === 'edition')) return 0;
+  const whole = hits === own.length;
+  const titled = typed.some((w) => title.has(w) && !all.has(w));
+  return titled ? (whole ? 1 : 0.9) : whole ? 0.85 : 0.7;
 }
 
 /** Petits mots, anglais et français, sans valeur pour reconnaître un titre. */
@@ -452,15 +489,30 @@ export function matchVps(db: VpsDb, input: VpsMatchInput, opts: VpsMatchOptions 
 
 /**
  * Jeux de la base VPS qui ressemblent à un texte saisi par l'utilisateur : titre,
- * initiales, mots approchés, nom de ROM.
+ * initiales, mots approchés, nom de ROM, ou édition d'une de leurs versions (« galaxy
+ * edition » trouve JP's Space Cadet, dont la Galaxy Edition n'a pas de jeu à elle chez VPS :
+ * PinCab, 20/11/2026).
  */
 export function searchVps(db: VpsDb, text: string, max = 15): VpsCandidate[] {
   const query = text.trim();
   if (!query) return [];
   const found = matchVps(db, { names: [query], roms: /^[a-z0-9]+_[a-z0-9]+$/i.test(query) ? [query] : undefined }, { deep: true, max }).candidates;
+  const byGame = new Map(found.map((c) => [c.game.id, c]));
+  for (const entry of db.index) {
+    if (!entry.editions.length) continue;
+    const score = Math.max(...entry.editions.map((e) => editionMatch(entry.game.name, e, query)));
+    if (!score) continue;
+    const known = byGame.get(entry.game.id);
+    if (known) known.score = Math.max(known.score, score);
+    else {
+      const candidate: VpsCandidate = { game: entry.game, score, how: 'words' };
+      byGame.set(entry.game.id, candidate);
+      found.push(candidate);
+    }
+  }
   // Un mot saisi en désigne souvent plusieurs (« medieval ») : à score voisin, le jeu le plus recréé d'abord.
   const weight = (c: VpsCandidate) => c.score + 0.02 * Math.min(5, (c.game.tableFiles ?? []).filter((f) => (f.tableFormat ?? 'VPX').toUpperCase() === 'VPX').length);
-  return found.sort((a, b) => weight(b) - weight(a));
+  return found.sort((a, b) => weight(b) - weight(a)).slice(0, max);
 }
 
 /**

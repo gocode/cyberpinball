@@ -52,6 +52,17 @@ test('ajout d’une table de Zen : ses médias s’ouvrent aussitôt, comme une 
   assert.match(body(m, 'function nav('), /s\.shown = build/);
 });
 
+test('fiche d’ajout de Zen : le fronton du catalogue de FX3 proposé en dernier, jamais pris d’office, et rangé s’il est choisi', () => {
+  const lib = src('library.ts');
+  const open = body(lib, 'function openPinballFxDetail(');
+  assert.match(open, /source: 'catalog'/);
+  assert.ok(open.indexOf("source: 'catalog'") > open.indexOf('list.push(...received, ...toFetch)'), 'après toutes les autres sources');
+  assert.match(open, /e\.source !== 'catalog'/, 'pas coché d’office');
+  const fetch = body(lib, 'async function fetchPinballFxMedias(');
+  assert.match(fetch, /catalog\?\.source === 'catalog'/);
+  assert.match(fetch, /placeMissingMedia\(table, [^;]*'Backglass', staged/);
+});
+
 test('ajout d’une table de Zen : le choix fait pour chaque média est celui qui arrive', () => {
   const lib = src('library.ts');
   const add = body(lib, 'function addPinballFx(');

@@ -171,8 +171,8 @@ export interface MediaView {
   /** Absent : affichage par défaut. */
   url?: string;
   kind?: 'image' | 'video';
-  /** `cover` pour le fond du playfield, `contain` sur fond noir ailleurs. */
-  fit: 'cover' | 'contain';
+  /** `cover` pour le fond du playfield, `fill` (étiré) pour le fronton, `contain` sur fond noir ailleurs. */
+  fit: 'cover' | 'contain' | 'fill';
   /** Rotation horaire dans le repère de l'écran (fenêtre non pivotée). */
   rotation: Rotation;
   /**

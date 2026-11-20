@@ -17,6 +17,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { PINBALLFX3_TABLES } from './pinballfx3';
 
 /** Item d'archive.org du catalogue. */
 export const PINBALLFX3_BACKGLASS_ITEM = 'FX3_202201';
@@ -69,6 +70,21 @@ export function backglassDownloadUrl(file: Pick<BackglassFile, 'name'>): string 
 /** Nom sans extension, en minuscules : la clé de rapprochement (Windows ne distingue pas la casse). */
 function key(name: string): string {
   return path.posix.basename(name.replace(/\\/g, '/')).replace(/\.[^.]+$/, '').toLowerCase();
+}
+
+/**
+ * Nom FX3 sous lequel chercher une table de Zen dans le catalogue : son .pxp pour FX3 ; pour Pinball FX,
+ * celui de la table FX3 du même jeu VPS (même table, autre version du jeu). undefined : aucune.
+ */
+export function zenCatalogName(fx: { game: 'pinballfx' | 'pinballfx3'; key: string; vps?: string }): string | undefined {
+  if (fx.game === 'pinballfx3') return fx.key;
+  return fx.vps ? PINBALLFX3_TABLES.find((t) => t.vps === fx.vps)?.name : undefined;
+}
+
+/** Image du catalogue pour la table FX3 `name` (nom du .pxp, alias compris) ; undefined si le catalogue n'en a pas. */
+export function pinballFx3CatalogImage(catalog: readonly BackglassFile[], name: string): BackglassFile | undefined {
+  const want = key(PINBALLFX3_BACKGLASS_ALIASES[name] ?? name);
+  return catalog.find((f) => key(f.name) === want);
 }
 
 /** Image déjà dans le dossier des tables pour `name` (table ou accueil), quelle qu'en soit l'extension ; undefined sinon. */

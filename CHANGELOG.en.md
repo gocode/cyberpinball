@@ -9,6 +9,12 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Backglass: on the table screen, the backglass picture fills its whole screen, as during the game (Visual Pinball's B2S, Pinball FX3). A picture narrower than the screen (4:3 on a 16:9 screen) no longer has black bars around it.
+- Pinball FX: Cyber Pinball no longer places backglass pictures in the game's cabinet-mode folder (Table_<number>.png, PFX.png): the cabinet's backglass stays Cyber Pinball's, the table's media.
+- Adding a Pinball FX or Pinball FX3 table: the picture from FX3's backglass catalog (archive.org) is one of the backglass choices, without being taken by default.
+- Find a table online: a game's editions now have their own line in the results. Searching "Space Cadet" shows "JP's Space Cadet: Galaxy Edition" and "JP's Space Cadet: Family Edition" right below their game, with their picture; one press leads straight to what is needed to install that edition. They used to stay hidden among the game's versions, and you could install another version without knowing.
+- An edition's name alone finds its game: "galaxy edition", "galaxy" or "space cadet galaxy" find JP's Space Cadet and put the Galaxy Edition first; likewise "seahawks" for the NFL editions, "LE" for JP's Deadpool's. Outside a search, a game's card names its editions.
+- Quick install of a table for which the VPS database knows no ROM (many original creations, JP's Space Cadet among them): it is no longer refused for "ROM not found". Once installed, the table's script tells whether one is needed, and "What's missing to play" takes care of it.
 - Pinball FX on a cabinet: a single image on the backglass, the one chosen when the table was added, shown by Cyber Pinball as before cabinet mode. Pinball FX's own backglass window is turned off in its cabinet mode: it sat on top and showed a file path when its image was missing (game menus, table chosen inside the game). The game's DMD keeps its place on the DMD screen.
 - Pinball FX3: after a game, the backglass pictures of all installed tables arrive in the background (archive.org catalog, once per start, shown in Downloads). FX3 also shows other tables' pictures during its transitions: no more file path shown instead.
 - Pinball FX: when the game sends its DMD to dmdext (the "external device" option of its cabinet mode: colorization, PuP-Packs), dmdext's virtual DMD is placed on the cabinet's DMD screen during the game, like Future Pinball's DMD. Before, it opened where DmdDevice.ini put it, sometimes over the backglass.

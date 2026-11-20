@@ -88,8 +88,12 @@ export interface MediaTypeInfo {
   pages: boolean;
   /** Média du playfield tourné d'après playfield.flipperEdge. */
   orientable: boolean;
-  /** Remplissage de l'écran ; on ne déforme jamais une image. */
-  fit?: 'cover' | 'contain';
+  /**
+   * Remplissage de l'écran. On ne déforme pas une image, sauf le fronton : étiré à son écran comme les
+   * jeux le dessinent (B2S de VPX, Pinball FX3), pour que la roue montre ce que la partie montrera
+   * (essai sur une borne, 20/11/2026 : fronton 4:3 entre deux bandes noires sur la roue, plein écran en partie).
+   */
+  fit?: 'cover' | 'contain' | 'fill';
   fallback: MediaFallback;
   /** Ce que montre le repli, pour le gestionnaire. */
   fallbackLabel: string;
@@ -177,7 +181,7 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
     formats: SCREEN_FORMATS,
     pages: false,
     orientable: false,
-    fit: 'contain',
+    fit: 'fill',
     fallback: 'backglass-card',
     get fallbackLabel() {
       return t('Carte générée : titre, fabricant, année');
@@ -604,7 +608,7 @@ export interface ResolvedMedia {
   kind?: MediaKind;
   /** Affichage par défaut à dessiner quand files est vide. */
   fallback?: MediaFallback;
-  fit?: 'cover' | 'contain';
+  fit?: 'cover' | 'contain' | 'fill';
   /**
    * Rotation horaire à appliquer au média pour qu'il soit droit vu du joueur.
    * Toujours 0 hors des médias orientables (Playfield, Loading).

@@ -19,7 +19,7 @@ import { dmdMediaType } from './medias';
 import { requiredForPlay } from './playable';
 import { romContent } from './romzip';
 import type { TableInfoFile } from './tables';
-import { matchVps, searchVps, vpsKey, vpsWords, type VpsDb, type VpsGame, type VpsLink, type VpsTableFile } from './vps';
+import { editionMatch, matchVps, searchVps, vpsKey, vpsWords, type VpsDb, type VpsGame, type VpsLink, type VpsTableFile } from './vps';
 
 // ---------------------------------------------------------------------------
 // Hôtes des liens
@@ -534,16 +534,68 @@ export function versionLabel(file: { authors?: string[]; version?: string; editi
 }
 
 /**
- * Version d'un jeu que désigne un texte cherché par son édition (« Space Cadet Galaxy Edition ») :
- * tous les mots de l'édition, hors ceux du titre du jeu, sont dans le texte. undefined sinon.
+ * Version d'un jeu que désigne un texte cherché par son édition (« Space Cadet Galaxy Edition »,
+ * « galaxy ») : celle dont l'édition répond le mieux (editionMatch), la plus récente à égalité.
+ * undefined si le texte ne nomme aucune édition.
  */
-export function versionForText(game: VpsGame, text: string): VpsTableFile | undefined {
-  const typed = new Set(vpsWords(text));
-  const title = new Set(vpsWords(game.name));
-  return tableVersions(game).find((f) => {
-    const words = vpsWords(f.edition ?? '').filter((w) => !title.has(w) && w.length >= 3 && w !== 'edition');
-    return words.length > 0 && words.every((w) => typed.has(w));
+export function versionForText(game: VpsGame, text: string, versions: VpsTableFile[] = tableVersions(game)): VpsTableFile | undefined {
+  let best: { file: VpsTableFile; score: number } | undefined;
+  for (const file of versions) {
+    const score = file.edition?.trim() ? editionMatch(game.name, file.edition, text) : 0;
+    if (score > (best?.score ?? 0)) best = { file, score };
+  }
+  return best?.file;
+}
+
+/** Une ligne de la liste du catalogue : un jeu, ou une édition d'une de ses versions. */
+export interface CatalogLine {
+  game: VpsGame;
+  /** Version qui porte l'édition (la plus récente de celles qui la portent). */
+  version?: VpsTableFile;
+}
+
+/**
+ * Éditions des versions d'un jeu (« Galaxy Edition », « Family Edition »), une version par
+ * édition (la plus récente), celles que nomme `text` d'abord.
+ */
+export function gameEditions(game: VpsGame, versions: VpsTableFile[], text?: string): { edition: string; version: VpsTableFile; score: number }[] {
+  const byEdition = new Map<string, VpsTableFile>();
+  for (const v of versions) {
+    const edition = v.edition?.trim();
+    if (!edition) continue;
+    const known = byEdition.get(edition.toLowerCase());
+    if (!known || (v.updatedAt ?? 0) > (known.updatedAt ?? 0)) byEdition.set(edition.toLowerCase(), v);
+  }
+  return [...byEdition.values()]
+    .map((version, i) => ({ edition: version.edition!.trim(), version, score: text ? editionMatch(game.name, version.edition!, text) : 0, i }))
+    .sort((a, b) => b.score - a.score || a.i - b.i)
+    .map(({ edition, version, score }) => ({ edition, version, score }));
+}
+
+/**
+ * Lignes de la liste du catalogue pendant une recherche : chaque jeu, suivi de ses éditions,
+ * une ligne chacune. Celles que nomme la recherche toujours ; toutes les autres quand la
+ * recherche désigne le jeu lui-même : tous ses mots sont dans le titre, ou c'est le premier
+ * résultat (« taf »). Un jeu trouvé autrement (mots approchés) cite ses éditions sur sa carte.
+ * Avant le 20/11/2026, une édition (la Galaxy Edition de JP's Space Cadet,
+ * une version du jeu chez VPS) restait cachée dans la galerie de son jeu : « Space Cadet » ne
+ * la montrait pas, et le joueur a installé une autre version sans le savoir. Sans recherche,
+ * les jeux seuls.
+ */
+export function catalogLines(games: VpsGame[], text: string | undefined, versions: (game: VpsGame) => VpsTableFile[] = tableVersions): CatalogLine[] {
+  const query = text?.trim();
+  if (!query) return games.map((game) => ({ game }));
+  const typed = vpsWords(query);
+  const out: CatalogLine[] = [];
+  games.forEach((game, rank) => {
+    out.push({ game });
+    const editions = gameEditions(game, versions(game), query);
+    const title = new Set(vpsWords(game.name));
+    const designated = rank === 0 || typed.every((w) => title.has(w));
+    const others = designated ? editions.filter((x) => !x.score) : [];
+    for (const e of [...editions.filter((x) => x.score > 0), ...others]) out.push({ game, version: e.version });
   });
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -672,7 +724,11 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
       const files = withLinks(game.romFiles).map((r) => ({ ...r, id: r.id ?? `rom:${r.version}` }) as VpsTableFile).sort(recent);
       needs.push({
         kind: 'rom',
-        required: requiredForPlay('rom'),
+        // Aucune ROM connue de VPS (527 versions de créations originales, dont JP's Space Cadet, qui
+        // n'en demande aucune) : on ne sait pas s'il en faut une, le script le dira une fois la table
+        // installée (« Ce qu'il manque pour jouer »). Indispensable, elle bloquait l'installation
+        // rapide de la Galaxy Edition (PinCab, 20/11/2026).
+        required: roms.length > 0 && requiredForPlay('rom'),
         state: files.length ? 'todo' : 'unavailable',
         detail: roms.length ? t('{roms} : à récupérer, si vous y avez droit', { roms: formatList(roms, 'or') }) : t('nom inconnu de VPS : le script de la table le dira une fois installée'),
         files,

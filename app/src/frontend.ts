@@ -337,7 +337,6 @@ import { restoreVpxFiles, vpxChangedFiles, vpxFilesStatus } from './vpx-integrit
 import { launchPinballFx, runningPinballFx, ZEN_LAUNCH_GAMES } from './pinballfx-launcher';
 import { detectPinballFx, detectPinballFx3 } from './pinballfx-install';
 import { bridgeZenKeys } from './zen-keys';
-import { placePinballFxBackglass, placePinballFxHomeBackglass } from './pinballfx-backglass';
 import { fetchAllPinballFx3Backglasses, preparePinballFx3Backglass } from './pinballfx3-backglass';
 import { watchGameLoad, type GameLoadWatch } from './game-load';
 import { createLibrary, type ActionShortcut, type SystemItem, type UiAction } from './library';
@@ -4918,24 +4917,8 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
       console.log(`${zenName} (${table.id}) : mode borne pas écrit (${(error as Error).message}) ; la partie se lance quand même.`); // i18n-ignore : journal
     }
   }
-  // Pinball FX : le fronton de la table pour la fenêtre du fronton du jeu, s'il n'en a pas (pinballfx-backglass.ts).
-  if (simulated === undefined && zenKey === 'pinballfx' && fx && table.pinballFxTable !== undefined && loc.root) {
-    const own = resolveMedia(table, loc.root, 'Backglass');
-    const source = own.source !== 'default' && own.source !== 'fallback' ? own.file : undefined;
-    const placed = placePinballFxBackglass(fx, table.pinballFxTable, source);
-    if (placed.result === 'placed') console.log(`${zenName} (${table.id}) : fronton déposé pour le jeu, ${placed.target} (depuis ${source}).`); // i18n-ignore : journal
-    else if (placed.result === 'failed') console.log(`${zenName} (${table.id}) : fronton pas déposé (${placed.reason}) ; la partie se lance quand même.`); // i18n-ignore : journal
-    // Et celui de ses menus (PFX.png) : le fronton par défaut de la borne, sinon du noir, jamais le chemin cherché.
-    let defaults: string[] = [];
-    try {
-      defaults = fs.readdirSync(layoutOf(loc.root).media).filter((f) => /^\(Backglass\)/i.test(f) && mediaKind(f) === 'image');
-    } catch {
-      defaults = [];
-    }
-    const home = placePinballFxHomeBackglass(fx, defaults[0] ? path.join(layoutOf(loc.root).media, defaults[0]) : undefined);
-    if (home.result === 'placed') console.log(`${zenName} : fronton des menus déposé, ${home.target}${defaults[0] ? ` (depuis ${defaults[0]})` : ' (image noire)'}.`); // i18n-ignore : journal
-    else if (home.result === 'failed') console.log(`${zenName} : fronton des menus pas déposé (${home.reason}).`); // i18n-ignore : journal
-  }
+  // Pinball FX : pas d'image de fronton déposée pour le jeu. Sa fenêtre du fronton est fermée dans son mode borne
+  // (décision du 20/11/2026) : le fronton de la borne reste celui de Cyber Pinball, le média de la table.
   // Pinball FX3 : l'image de la table pour sa fenêtre du fronton (data\steam\<table>.*), si elle n'en a pas ;
   // sans elle, FX3 y écrit le chemin qu'il cherche (essai du 20/11/2026). Le fronton de la table dans
   // Cyber Pinball d'abord, sinon le catalogue d'archive.org (pinballfx3-backglass.ts). Et l'inverse : une

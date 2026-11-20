@@ -147,6 +147,7 @@ function unrarBinary(): ArrayBuffer {
   if (unrarWasm) return unrarWasm;
   const beside = path.join(__dirname, 'unrar.wasm');
   const file = fs.existsSync(beside) ? beside : require.resolve('node-unrar-js/dist/js/unrar.wasm');
+  // lecture entière : unrar.wasm livré avec l'application (taille fixe, moins de 1 Mo), jamais un fichier de l'utilisateur.
   const bytes = fs.readFileSync(file);
   unrarWasm = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   return unrarWasm;

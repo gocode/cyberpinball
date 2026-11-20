@@ -89,6 +89,12 @@ import {
   mediaSite,
   lowerFirst,
   mediaDbOfferLabel,
+  backglassDownloadUrl,
+  pinballFx3CatalogImage,
+  zenCatalogName,
+  PINBALLFX3_BACKGLASS_PAGE,
+  PINBALLFX3_BACKGLASS_TITLE,
+  type BackglassFile,
   scanTableMedias,
   type MediaType,
   type MediaDbOffer,
@@ -318,6 +324,7 @@ import { createMediaImport } from './media-import';
 import { createInstallationImport } from './installation-import';
 import { createFuturePinballUi } from './futurepinball-ui';
 import { createPinballFx3FolderUi } from './pinballfx3-folder-ui';
+import { fetchBackglassCatalog } from './pinballfx3-backglass';
 import { detectFuturePinball } from './futurepinball-play';
 import { userGesture } from './gesture-flash';
 import { createMedias, markAnimated, playsSoundPreview, type MediaCard, type MediaThumb } from './library-medias';
@@ -3975,6 +3982,20 @@ export function createLibrary(host: LibraryHost) {
     // L'image que le joueur a rangée à côté de la table (zen-media.ts) d'abord : rien à télécharger,
     // et la table a son image même sans jeu VPS.
     const localPlaced = placeZenLocalImage(fx, file, from('local'));
+    // Le fronton du catalogue d'archive.org, quand c'est lui qui a été choisi sur la fiche d'ajout.
+    let catalogPlaced = false;
+    const catalog = picks?.get('Backglass');
+    if (catalog?.source === 'catalog' && catalog.preview) {
+      try {
+        await mediaSearch.stagePreviews([catalog.preview], pinballFxThumbs, t('Vignettes'), { quiet: true });
+        const staged = pinballFxThumbs.get(catalog.preview.url);
+        const table = find(file);
+        if (table && staged && fs.existsSync(staged)) catalogPlaced = Boolean(placeMissingMedia(table, infoFileFor(table, tablesDir()), 'Backglass', staged, { origin: PINBALLFX3_BACKGLASS_TITLE, url: PINBALLFX3_BACKGLASS_PAGE, ...(fx.vps ? { vpsId: fx.vps } : {}) }));
+        if (!catalogPlaced) failed.push(t('fronton du catalogue pas reçu'));
+      } catch (error) {
+        failed.push((error as Error).message);
+      }
+    }
     const vps = fx.vps;
     if (vps) {
       try {
@@ -3993,7 +4014,7 @@ export function createLibrary(host: LibraryHost) {
         }
         // Ceux de VPinMediaDB et de VPS sont là : montrés tout de suite si les médias de la table sont
         // ouverts ; ceux des sites (attente, page à valider) suivent.
-        const early = (localPlaced ? 1 : 0) + installed + (placed ? 1 : 0);
+        const early = (localPlaced ? 1 : 0) + (catalogPlaced ? 1 : 0) + installed + (placed ? 1 : 0);
         if (early) {
           reloadTables(file);
           medias.refresh(file, { text: tn(early, '{n} média arrivé ; les autres sont en route (Téléchargements).', '{n} médias arrivés ; les autres sont en route (Téléchargements).'), tone: 'info' });
@@ -4013,8 +4034,8 @@ export function createLibrary(host: LibraryHost) {
     const loginNote = sites.login.length ? ` ; compte à connecter : ${sites.login.join(', ')}` : ''; // i18n-ignore : journal
     // Ce qui reste sans fichier, dit au journal (20/11/2026 : un fronton choisi, jamais rangé, sans trace).
     const missingNote = sites.missing.length ? ` ; sans fichier : ${sites.missing.join(', ')}` : ''; // i18n-ignore : journal
-    console.log(`${ZEN_GAMES[fx.game].name} : médias de « ${fx.title} » : ${localPlaced ? `${localPlaced} du dossier du jeu, ` : ''}${installed} de VPinMediaDB${placed ? ', image du plateau de VPS' : ''}${siteNote}${loginNote}${missingNote}${vps ? '' : ' (pas de jeu VPS)'}${failed.length ? ` ; non reçus : ${failed.join(' ; ')}` : ''}.`); // i18n-ignore : journal
-    const n = (localPlaced ? 1 : 0) + installed + (placed ? 1 : 0) + sites.placed.length;
+    console.log(`${ZEN_GAMES[fx.game].name} : médias de « ${fx.title} » : ${localPlaced ? `${localPlaced} du dossier du jeu, ` : ''}${catalogPlaced ? 'fronton du catalogue de FX3, ' : ''}${installed} de VPinMediaDB${placed ? ', image du plateau de VPS' : ''}${siteNote}${loginNote}${missingNote}${vps ? '' : ' (pas de jeu VPS)'}${failed.length ? ` ; non reçus : ${failed.join(' ; ')}` : ''}.`); // i18n-ignore : journal
+    const n = (localPlaced ? 1 : 0) + (catalogPlaced ? 1 : 0) + installed + (placed ? 1 : 0) + sites.placed.length;
     // Les médias de la table ouverts (ouverts par l'ajout) : relus, avec le bilan et ce qu'il reste à faire là.
     const what = sites.missing.map((type) => lowerFirst(mediaTypeInfo(type).label)).join(', ');
     const arrived = tn(n, '{n} média arrivé.', '{n} médias arrivés.');
@@ -4063,7 +4084,8 @@ export function createLibrary(host: LibraryHost) {
   /** Un média de la fiche d'ajout : d'où il viendrait (rien : introuvable), et le site où se connecter. */
   interface FxElement {
     type: MediaType;
-    source?: 'mediadb' | 'site' | 'vps' | 'local';
+    /** catalog : image du catalogue de frontons de FX3 (archive.org), proposée sans s'imposer (20/11/2026). */
+    source?: 'mediadb' | 'site' | 'vps' | 'local' | 'catalog';
     /** Image rangée par le joueur à côté de la table (source 'local'). */
     file?: string;
     offer?: MediaDbOffer;
@@ -4085,6 +4107,16 @@ export function createLibrary(host: LibraryHost) {
    */
   let pinballFxDetail: { fx: ZenTable; elements: FxElement[]; options: Map<MediaType, FxElement[]>; chosen: Set<MediaType>; bytes: number; unknown: number; previews: Map<string, string> } | undefined;
 
+  /** Catalogue des frontons de FX3 (archive.org), lu une fois par démarrage ; vide si le réseau ne répond pas (réessayé ensuite). */
+  let fx3Catalog: Promise<BackglassFile[]> | undefined;
+  function fx3BackglassCatalog(): Promise<BackglassFile[]> {
+    fx3Catalog ??= fetchBackglassCatalog().catch(() => {
+      fx3Catalog = undefined;
+      return [];
+    });
+    return fx3Catalog;
+  }
+
   /**
    * Choisir une table d'un jeu de Zen (17/11/2026), comme une table VPX : sa fiche d'abord, avec
    * ses médias et leur provenance (VPinMediaDB, fiche d'un site rattachée par VPS, capture de
@@ -4103,6 +4135,9 @@ export function createLibrary(host: LibraryHost) {
       const localType = local ? zenLocalImageType(local) : undefined;
       const elements: FxElement[] = [];
       const options = new Map<MediaType, FxElement[]>();
+      // Catalogue des frontons de FX3, lu une fois (réseau) ; la table FX3 du même jeu pour Pinball FX.
+      const catalogName = zenCatalogName(fx);
+      const catalogFile = catalogName ? pinballFx3CatalogImage(await fx3BackglassCatalog(), catalogName) : undefined;
       const target = zenTarget(fx, [fx.title, ...(game ? [game.name] : [])]);
       const connected = new Map<string, boolean>();
       for (const type of PINBALLFX_DETAIL_TYPES) {
@@ -4132,6 +4167,8 @@ export function createLibrary(host: LibraryHost) {
           toFetch.push({ type, source: 'site', hit, shared: sharedBy(hit), ...(connected.get(hit.site) ? {} : { login: mediaSite(hit.site).name }) });
         }
         list.push(...received, ...toFetch);
+        // Le fronton du catalogue d'archive.org, en dernier : un choix de plus, jamais pris d'office.
+        if (type === 'Backglass' && catalogFile) list.push({ type, source: 'catalog', preview: { url: backglassDownloadUrl(catalogFile), ...(catalogFile.md5 ? { md5: catalogFile.md5 } : {}) } });
         if (list.length) {
           options.set(type, list);
           elements.push(list[0]!);
@@ -4152,7 +4189,7 @@ export function createLibrary(host: LibraryHost) {
         options,
         // Pris d'office : ce qui ne télécharge rien d'un site (VPinMediaDB, capture VPS, fichier déjà
         // reçu). Une fiche à télécharger ouvre la page du site et compte dans son quota : on la choisit.
-        chosen: new Set(elements.filter((e) => e.source && (e.source !== 'site' || e.received)).map((e) => e.type)),
+        chosen: new Set(elements.filter((e) => e.source && e.source !== 'catalog' && (e.source !== 'site' || e.received)).map((e) => e.type)),
         bytes: offers?.bytes ?? 0,
         unknown: offers?.unknown ?? 0,
         previews,
@@ -4300,7 +4337,9 @@ export function createLibrary(host: LibraryHost) {
             ? t('Capture de la table, base VPS')
             : e.source === 'local'
               ? t('Image du dossier du jeu : « {file} »', { file: path.basename(e.file!) })
-              : t('{site} : {title}', { site: mediaSite(e.hit!.site).name, title: e.hit!.title }),
+              : e.source === 'catalog'
+                ? t('Catalogue « {title} » (archive.org), créé par des joueurs', { title: PINBALLFX3_BACKGLASS_TITLE })
+                : t('{site} : {title}', { site: mediaSite(e.hit!.site).name, title: e.hit!.title }),
       ...(e.source === 'site' ? { extra: siteExtra(e) } : {}),
       thumb: e.source === 'site' ? siteThumb(e, label) : local ? { kind: 'image', url: mediaUrl(local), rotation: 0 } : { kind: 'fallback', rotation: 0, text: label },
     };
