@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Pinball FX on a cabinet: a single image on the backglass, the one chosen when the table was added, shown by Cyber Pinball as before cabinet mode. Pinball FX's own backglass window is turned off in its cabinet mode: it sat on top and showed a file path when its image was missing (game menus, table chosen inside the game). The game's DMD keeps its place on the DMD screen.
 - Pinball FX3: after a game, the backglass pictures of all installed tables arrive in the background (archive.org catalog, once per start, shown in Downloads). FX3 also shows other tables' pictures during its transitions: no more file path shown instead.
 - Pinball FX: when the game sends its DMD to dmdext (the "external device" option of its cabinet mode: colorization, PuP-Packs), dmdext's virtual DMD is placed on the cabinet's DMD screen during the game, like Future Pinball's DMD. Before, it opened where DmdDevice.ini put it, sometimes over the backglass.
 - Pinball FX: in the game's menus, the backglass window shows the cabinet's shared backglass (or black) instead of the path of the picture the game was looking for. A picture the player already set is never replaced.

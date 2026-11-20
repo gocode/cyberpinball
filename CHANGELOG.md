@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.2
 
+- Pinball FX sur une borne : une seule image sur le fronton, celle choisie à l'ajout de la table, affichée par Cyber Pinball comme avant le mode borne. La fenêtre du fronton de Pinball FX est éteinte dans son mode borne : elle se posait par-dessus et montrait le chemin d'un fichier quand son image manquait (menus du jeu, table choisie dans le jeu). Le DMD du jeu garde sa place sur l'écran du DMD.
 - Pinball FX3 : après une partie, les images de fronton de toutes les tables installées arrivent en arrière-plan (catalogue d'archive.org, une fois par démarrage, suivies dans les Téléchargements). FX3 en montre aussi d'autres que celle de la table jouée pendant ses transitions : plus de chemin de fichier affiché à la place.
 - Pinball FX : quand le jeu envoie son DMD à dmdext (option « appareil externe » de son mode borne : colorisation, PuP-Packs), le DMD virtuel de dmdext est posé sur l'écran DMD de la borne pendant la partie, comme le DMD de Future Pinball. Avant, il s'ouvrait là où DmdDevice.ini le plaçait, parfois par-dessus le fronton.
 - Pinball FX : dans les menus du jeu, la fenêtre du fronton montre le fronton commun de la borne (ou du noir), au lieu du chemin de l'image que le jeu cherchait. Une image déjà mise par le joueur n'est jamais remplacée.

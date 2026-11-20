@@ -82,7 +82,7 @@ const SETTINGS = [
   '',
 ].join('\r\n');
 
-test('mode borne de Pinball FX : activé, DMD sur la bande 4:1 du FullDMD, fronton sur son écran, le reste gardé', () => {
+test('mode borne de Pinball FX : activé, DMD sur la bande 4:1 du FullDMD, fronton du jeu éteint, le reste gardé', () => {
   // Borne de l'essai : FullDMD 1920 × 1080 en (3840, 90), fronton en (5760, 101).
   const layout = pinballFxCabinetLayout({ dmd: { x: 3840, y: 90, width: 1920, height: 1080 }, backglass: { x: 5760, y: 101, width: 1920, height: 1080 } }, 'fulldmd');
   assert.deepEqual(layout.dmd, { x: 3840, y: 390, width: 1920, height: 480 }, 'les valeurs validées sur le PinCab pour FX3');
@@ -94,7 +94,11 @@ test('mode borne de Pinball FX : activé, DMD sur la bande 4:1 du FullDMD, front
   const doc = IniDocument.parse(next);
   assert.equal(doc.get('General', 'CabinetEnabled'), 'True');
   assert.deepEqual(['PositionX', 'PositionY', 'Width', 'Height'].map((k) => doc.get('DotMatrixWindow', k)), ['3840', '390', '1920', '480']);
-  assert.deepEqual(['PositionX', 'PositionY', 'Width', 'Height'].map((k) => doc.get('BackglassWindow', k)), ['5760', '101', '1920', '1080']);
+  // Une seule image sur le fronton, le média choisi à l'ajout de la table (retour d'un joueur, 20/11/2026) :
+  // la fenêtre du fronton du jeu ne se superpose plus à celle de Cyber Pinball.
+  assert.equal(doc.get('BackglassWindow', 'Enabled'), 'False');
+  assert.equal(pinballFxSettingsWithCabinet(SETTINGS, { backglass: layout.backglass! })?.includes('[BackglassWindow]'), true);
+  assert.equal(IniDocument.parse(pinballFxSettingsWithCabinet(SETTINGS, { backglass: layout.backglass! })!).get('BackglassWindow', 'Enabled'), 'False', 'même sans DMD');
   // Rien d'autre ne bouge : numéro d'écran, DMD externe, marges, mise en forme, fins de ligne.
   assert.equal(doc.get('DotMatrixWindow', 'MonitorNumber'), '0');
   assert.equal(doc.get('DotMatrixWindow', 'ExternalDevice'), 'True');
@@ -158,7 +162,7 @@ test('mode borne de Pinball FX : fichier écrit seulement s’il existe, UTF-16 
   assert.equal(applyPinballFxCabinet(dir, layout), file);
   const raw = fs.readFileSync(file);
   assert.deepEqual([...raw.subarray(0, 2)], [0xff, 0xfe]);
-  assert.match(raw.subarray(2).toString('utf16le'), /\[BackglassWindow\][\s\S]*PositionX=1920/);
+  assert.match(raw.subarray(2).toString('utf16le'), /\[BackglassWindow\]\r\nEnabled=False\r\n/);
   assert.equal(applyPinballFxCabinet(dir, layout), undefined);
 });
 
