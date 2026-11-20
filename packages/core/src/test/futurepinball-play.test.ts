@@ -28,6 +28,7 @@ interface LaunchResultLike {
 
 const launcher = require(path.join(REPO_ROOT, 'app', 'dist', 'pinballfx-launcher.js')) as {
   FUTURE_PINBALL_LAUNCH_GAME: { name: string; ownProcess?: boolean };
+  FUTURE_PINBALL_BAM_LAUNCH_GAME: { name: string; processName?: string };
   launchPinballFx(opts: {
     command: { file: string; args: string[]; cwd?: string };
     game?: unknown;
@@ -41,8 +42,8 @@ const launcher = require(path.join(REPO_ROOT, 'app', 'dist', 'pinballfx-launcher
 const play = require(path.join(REPO_ROOT, 'app', 'dist', 'futurepinball-play.js')) as {
   futurePinballPlan(
     table: { file: string },
-    opts: { simulated?: string; mode?: 'display'; install?: { exe: string; gameDir: string; tablesDir: string; source: string }; exists?: (p: string) => boolean },
-  ): { name: string; why?: string; command?: { file: string; args: string[]; cwd: string }; failureHint: string };
+    opts: { simulated?: string; mode?: 'display'; install?: { exe: string; gameDir: string; tablesDir: string; source: string; loader?: string }; exists?: (p: string) => boolean },
+  ): { name: string; why?: string; command?: { file: string; args: string[]; cwd: string; bam?: true }; launchGame: unknown; failureHint: string };
   placeFuturePinballWindow(w: FakeWindow, playfield: FakeWindow['rect'] | undefined, displays: FakeWindow['rect'][], set: (w: FakeWindow, r: FakeWindow['rect']) => boolean): FakeWindow['rect'] | undefined;
 };
 
@@ -60,13 +61,20 @@ function fakeSystem(childPid = 777) {
     shown: [] as FakeWindow[],
     living: new Set<number>([childPid]),
     fronted: [] as number[],
+    killed: [] as number[],
+    /** Processus de « Future Pinball.exe » ouverts (jeu lancé par FPLoader). */
+    games: [] as number[],
+    processIds: (exe: string) => (exe.toLowerCase() === 'future pinball.exe' ? sys.games.filter((p) => sys.living.has(p)) : []),
     launch(file: string, args: string[], cwd?: string) {
       sys.spawned.push({ file, args, ...(cwd ? { cwd } : {}) });
       return { pid: childPid, on: () => undefined };
     },
     windows: () => sys.shown,
     alive: (pid: number) => sys.living.has(pid),
-    kill: (pid: number) => sys.living.delete(pid),
+    kill: (pid: number) => {
+      sys.killed.push(pid);
+      sys.living.delete(pid);
+    },
     close: () => undefined,
     front: (w: FakeWindow) => sys.fronted.push(w.pid),
     foregroundPid: () => undefined,
@@ -130,6 +138,78 @@ test('jeu fermé sans ouvrir de fenêtre : échec dit aussitôt', async () => {
   assert.equal(result.ok, false);
   assert.equal(result.failure, 'crash');
   assert.match(result.message ?? '', /Future Pinball s’est fermé sans ouvrir la table/);
+});
+
+const LOADER = 'C:\\Games\\Future Pinball\\BAM\\FPLoader.exe';
+const BAM_ARGS = ['/open', TABLE, '/play', '/exit', '/arcaderender', '/STAYINRAM'];
+
+test('plan avec BAM : FPLoader depuis le dossier BAM, le jeu reconnu à son exécutable', () => {
+  const plan = play.futurePinballPlan({ file: TABLE }, { install: { ...INSTALL, loader: LOADER } as never, exists: () => true });
+  assert.deepEqual(plan.command, { file: LOADER, args: BAM_ARGS, cwd: 'C:\\Games\\Future Pinball\\BAM', bam: true });
+  assert.equal(plan.launchGame, launcher.FUTURE_PINBALL_BAM_LAUNCH_GAME);
+  assert.match(plan.failureHint, /FPLoader/);
+  // Sans BAM : le jeu seul, reconnu à son propre processus.
+  assert.equal(play.futurePinballPlan({ file: TABLE }, { install: INSTALL as never, exists: () => true }).launchGame, launcher.FUTURE_PINBALL_LAUNCH_GAME);
+});
+
+test('partie par BAM : le Future Pinball apparu après le lancement fait la partie, pas celui déjà ouvert ; FPLoader fermé à la fin', async () => {
+  const sys = fakeSystem(500);
+  // Un Future Pinball déjà ouvert avant (éditeur, partie d'un autre lanceur) : pas cette partie.
+  sys.games.push(400);
+  sys.living.add(400);
+  sys.shown.push(win(400, 'Future Pinball - Editor'));
+  let playing = 0;
+  const command = { file: LOADER, args: BAM_ARGS, cwd: 'C:\\Games\\Future Pinball\\BAM' };
+  const game = launcher.launchPinballFx({ command, game: launcher.FUTURE_PINBALL_BAM_LAUNCH_GAME, system: sys, onPlaying: () => playing++ });
+  assert.deepEqual(sys.spawned, [command]);
+  await tick();
+  assert.equal(playing, 0, 'la fenêtre du Future Pinball déjà ouvert ne compte pas');
+  // FPLoader ouvre le jeu : sa fenêtre, cachée puis visible.
+  sys.games.push(900);
+  sys.living.add(900);
+  sys.shown.push(win(900, '', false));
+  await tick();
+  assert.equal(playing, 0);
+  sys.shown.push(win(900, 'Future Pinball'));
+  await tick();
+  assert.equal(playing, 1);
+  assert.equal(game.pid, 900);
+  sys.advance(30_000);
+  // On quitte la table : le jeu se ferme ; FPLoader (/STAYINRAM) resté ouvert est fermé, l'autre Future Pinball non.
+  sys.living.delete(900);
+  const result = await game.done;
+  assert.equal(result.ok, true);
+  assert.equal(result.seconds, 30);
+  assert.deepEqual(sys.killed, [500]);
+  assert.ok(sys.living.has(400));
+});
+
+test('partie par BAM : le jeu fermé sans fenêtre, ou FPLoader arrêté sans ouvrir le jeu, est un échec dit', async () => {
+  const closed = fakeSystem(500);
+  const first = launcher.launchPinballFx({ command: { file: LOADER, args: BAM_ARGS }, game: launcher.FUTURE_PINBALL_BAM_LAUNCH_GAME, system: closed });
+  closed.games.push(901);
+  closed.living.add(901);
+  await tick();
+  closed.living.delete(901);
+  const r1 = await first.done;
+  assert.equal(r1.failure, 'crash');
+  assert.match(r1.message ?? '', /Future Pinball s’est fermé sans ouvrir la table/);
+  assert.deepEqual(closed.killed, [500], 'FPLoader fermé aussi');
+
+  const loaderGone = fakeSystem(500);
+  const second = launcher.launchPinballFx({ command: { file: LOADER, args: BAM_ARGS }, game: launcher.FUTURE_PINBALL_BAM_LAUNCH_GAME, system: loaderGone });
+  loaderGone.living.delete(500);
+  await tick();
+  loaderGone.advance(5000);
+  await tick();
+  let settled = false;
+  void second.done.then(() => (settled = true));
+  await tick();
+  assert.equal(settled, false, 'le jeu peut encore paraître juste après l’arrêt de FPLoader');
+  loaderGone.advance(11_000);
+  const r2 = await second.done;
+  assert.equal(r2.failure, 'crash');
+  assert.match(r2.message ?? '', /lanceur \(BAM\)/);
 });
 
 test('placement : une fenêtre ouverte ailleurs est posée sur le playfield ; le plein écran n’est pas touché', () => {

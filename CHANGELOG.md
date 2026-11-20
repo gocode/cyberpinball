@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.2
 
+- Future Pinball : quand BAM est installé (dossier BAM du jeu avec FPLoader.exe), la partie passe par lui, comme avec les autres front-ends ; les tables récentes (physique FizX) se jouent enfin comme prévu. La fiche de la table dit si BAM est là.
+- Future Pinball par BAM : le jeu est reconnu même si FPLoader le lance à part, un Future Pinball déjà ouvert n'est pas pris pour la partie, et FPLoader est refermé à la fin.
 - Messages entre amis et groupes : choisir un message puis répondre (d'une phrase prête ou au clavier) le cite. La citation, avec son auteur et ses deux premières lignes, s'affiche au-dessus de la réponse, au front-end comme au téléphone ; aux flippers ou à la souris, la choisir ramène au message cité. Un message cité puis supprimé garde son extrait, avec la mention « message supprimé ».
 - Groupes : « Mentionner un membre… » choisit un membre dans la liste et écrit « @pseudo » ; un « @pseudo » tapé au clavier ou au téléphone compte aussi. La personne mentionnée reçoit une notification à part (« Bruno vous a mentionné dans … »), même si le groupe est en sourdine, et la mention est mise en évidence dans la bulle, plus fortement quand c'est vous.
 - Une borne qui n'est pas encore à jour reçoit toujours ces messages et en affiche le texte.

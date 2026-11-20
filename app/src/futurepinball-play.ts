@@ -1,13 +1,13 @@
-// Partie d'une table de Future Pinball (19/11/2026, premier niveau, sans BAM). La partie elle-même suit
-// celle des jeux de Zen (playPinballFx, frontend.ts) : chargement, barres des tâches, autres front-ends,
-// appui long sur Exit, statistiques, retour à la roue. Ici ce qui est propre à Future Pinball : où est le
-// jeu, la commande (`"Future Pinball.exe" /open "<table>.fpt" /play /exit`, le jeu se ferme quand on
-// quitte la table), ce qui empêche de jouer, et la place de sa fenêtre sur le playfield.
+// Partie d'une table de Future Pinball (19/11/2026 ; par BAM quand il est installé, 20/11/2026). La partie
+// elle-même suit celle des jeux de Zen (playPinballFx, frontend.ts) : chargement, barres des tâches, autres
+// front-ends, appui long sur Exit, statistiques, retour à la roue. Ici ce qui est propre à Future Pinball :
+// où est le jeu, la commande (`/open "<table>.fpt" /play /exit`, par FPLoader de BAM s'il est là ; le jeu
+// se ferme quand on quitte la table), ce qui empêche de jouer, et la place de sa fenêtre sur le playfield.
 
 import * as fs from 'node:fs';
 import { findFuturePinball, FUTURE_PINBALL_NAME, futurePinballCommand, futurePinballPlacement, t, type FuturePinballCommand, type FuturePinballInstall, type Rect, type TableEntry } from '@cyberpinball/core';
 import type { WindowInfo } from '@cyberpinball/win-displays';
-import { FUTURE_PINBALL_LAUNCH_GAME, type ZenLaunchGame } from './pinballfx-launcher';
+import { FUTURE_PINBALL_BAM_LAUNCH_GAME, FUTURE_PINBALL_LAUNCH_GAME, type ZenLaunchGame } from './pinballfx-launcher';
 
 /** Hors écran, les démonstrations donnent un faux Future Pinball (dossier contenant « Future Pinball.exe »). */
 export const FUTURE_PINBALL_SIMULATED_ENV = 'CYBERPINBALL_FUTURE_PINBALL_SIMULE';
@@ -60,8 +60,10 @@ export function futurePinballPlan(table: Pick<TableEntry, 'file'>, opts: FutureP
     name,
     ...(why ? { why } : {}),
     ...(command && opts.simulated === undefined ? { command } : {}),
-    launchGame: FUTURE_PINBALL_LAUNCH_GAME,
-    failureHint: t('Vérifiez que la table s’ouvre dans {game} lui-même : ses bibliothèques (.fpl) et sa version du jeu.', { game: name }),
+    launchGame: command?.bam ? FUTURE_PINBALL_BAM_LAUNCH_GAME : FUTURE_PINBALL_LAUNCH_GAME,
+    failureHint: command?.bam
+      ? t('Vérifiez que la table s’ouvre en lançant BAM\\FPLoader.exe vous-même : ses bibliothèques (.fpl), sa version de BAM.')
+      : t('Vérifiez que la table s’ouvre dans {game} lui-même : ses bibliothèques (.fpl) et sa version du jeu.', { game: name }),
   };
 }
 

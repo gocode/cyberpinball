@@ -13,6 +13,7 @@ const INVALID_HANDLE_VALUE = -1;
 
 // PROCESSENTRY32W (tlhelp32.h) en 64 bits : th32DefaultHeapID (ULONG_PTR) aligné sur 8.
 const ENTRY_SIZE = 568;
+const OFFSET_PROCESS_ID = 8;
 const OFFSET_EXE_FILE = 44;
 const MAX_PATH = 260;
 
@@ -63,23 +64,42 @@ export function processCpuMs(pid: number): number | undefined {
   }
 }
 
-/** Noms des exécutables en cours (« PinUpMenu.exe »), une fois chacun. */
-export function runningProcessNames(): string[] {
-  if (process.platform !== 'win32') return [];
+/** Chaque processus ouvert : son numéro et le nom de son exécutable. */
+function eachProcess(visit: (pid: number, name: string) => void): void {
+  if (process.platform !== 'win32') return;
   const w = loadApi();
   const snapshot = Number(w.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0));
-  if (snapshot === INVALID_HANDLE_VALUE) return [];
-  const names = new Set<string>();
+  if (snapshot === INVALID_HANDLE_VALUE) return;
   try {
     const entry = Buffer.alloc(ENTRY_SIZE);
     entry.writeUInt32LE(ENTRY_SIZE, 0);
     for (let ok = w.Process32FirstW(snapshot, entry); ok; ok = w.Process32NextW(snapshot, entry)) {
       const raw = entry.toString('utf16le', OFFSET_EXE_FILE, OFFSET_EXE_FILE + MAX_PATH * 2);
       const end = raw.indexOf('\0');
-      names.add(end < 0 ? raw : raw.slice(0, end));
+      visit(entry.readUInt32LE(OFFSET_PROCESS_ID), end < 0 ? raw : raw.slice(0, end));
     }
   } finally {
     w.CloseHandle(snapshot);
   }
+}
+
+/** Noms des exécutables en cours (« PinUpMenu.exe »), une fois chacun. */
+export function runningProcessNames(): string[] {
+  const names = new Set<string>();
+  eachProcess((_pid, name) => names.add(name));
   return [...names];
+}
+
+/**
+ * Numéros des processus d'un exécutable (« Future Pinball.exe », sans tenir compte de la casse) : le jeu
+ * qu'un lanceur a ouvert (FPLoader de BAM) se reconnaît à son exécutable, jamais à sa parenté (les
+ * numéros des processus partis sont réutilisés).
+ */
+export function processIdsByName(exe: string): number[] {
+  const want = exe.toLowerCase();
+  const pids: number[] = [];
+  eachProcess((pid, name) => {
+    if (name.toLowerCase() === want) pids.push(pid);
+  });
+  return pids;
 }

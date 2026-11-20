@@ -2417,7 +2417,9 @@ export function createLibrary(host: LibraryHost) {
       fpInstall
         ? { text: zenName, detail: fpInstall.gameDir, tone: 'ok', badges: [menuBadgeLabel('beta')] }
         : { text: zenName, detail: t('Introuvable sur ce PC : Ajouter une table > « Tables de {game} » pour choisir son dossier', { game: zenName }), tone: 'error', badges: [menuBadgeLabel('beta')] },
-      { text: t('BAM'), detail: t('Pas encore : la table se joue sans suivi de la tête ni réglages de BAM'), tone: 'quiet' },
+      fpInstall?.loader
+        ? { text: t('BAM'), detail: t('Installé : la partie passe par FPLoader ; ses réglages dans son menu en jeu'), tone: 'ok' }
+        : { text: t('BAM'), detail: t('Pas installé : la table se joue sans BAM (les tables FizX en ont besoin)'), tone: 'quiet' },
       mediaRow(table),
     ];
     const fxFiles: Row[] = fp ? fpFiles : [

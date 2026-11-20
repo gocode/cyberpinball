@@ -1,4 +1,4 @@
-// « Tables de Future Pinball » (Ajouter une table, 19/11/2026, premier niveau sans BAM) : le jeu trouvé
+// « Tables de Future Pinball » (Ajouter une table, 19/11/2026 ; parties par BAM s'il est là, 20/11/2026) : le jeu trouvé
 // sur ce PC (ou son dossier choisi à la main, gardé dans le dossier des données), les tables de son
 // dossier Tables, et des .fpt choisis ailleurs (clé USB, Téléchargements). Start sur une table l'ajoute au
 // front-end : son dossier « Titre (Fabricant Année) », le .fpt lié ou copié, son .info (nom tiré de la base
@@ -153,7 +153,7 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
       subheading: [t('Bêta : {game} est en phase de test dans Cyber Pinball', { game: FUTURE_PINBALL_NAME }), inMenu ? tn(inMenu, '{n} table dans le front-end', '{n} tables dans le front-end') : undefined].filter(Boolean).join(' · '),
       lead:
         notice ??
-        t('Start : ajouter une table au front-end. Elle y garde son dossier, ses médias et ses statistiques ; l’original reste dans Future Pinball, intact. La partie se lance dans Future Pinball, sans BAM pour l’instant ; ses écrans se règlent dans ses préférences (Vidéo).'),
+        t('Start : ajouter une table au front-end. Elle y garde son dossier, ses médias et ses statistiques ; l’original reste dans Future Pinball, intact. La partie se lance dans Future Pinball, par BAM s’il est installé ; ses écrans se règlent dans ses préférences (Vidéo).'),
       sections: [
         { title: FUTURE_PINBALL_NAME, rows: [game] },
         {

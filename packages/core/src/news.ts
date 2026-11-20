@@ -79,7 +79,7 @@ export const NEWS: readonly NewsItem[] = [
     get more() {
       return [
         t('Cyber Pinball trouve Future Pinball sur ce PC (ou dans le dossier que vous lui montrez) et liste les tables de son dossier Tables ; Start en ajoute une, avec son nom et ses médias. Un fichier .fpt choisi ailleurs marche aussi.'),
-        t('La partie se lance dans Future Pinball et revient à la roue quand vous quittez la table ; un appui long sur Exit le ferme. BAM et les scores du jeu viendront ensuite.'),
+        t('La partie se lance dans Future Pinball, par BAM s’il est installé, et revient à la roue quand vous quittez la table ; un appui long sur Exit le ferme. Les scores du jeu viendront ensuite.'),
       ];
     },
     get where() { return t('Menu système › Tables › Ajouter une table › Tables de Future Pinball'); },

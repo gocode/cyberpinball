@@ -9,10 +9,12 @@
 //
 // Sert aussi à Future Pinball (19/11/2026, FUTURE_PINBALL_LAUNCH_GAME) : lancé directement, sans
 // boutique, le processus lancé est le jeu ; sa fenêtre est la première fenêtre visible de ce processus.
+// Avec BAM (20/11/2026, FUTURE_PINBALL_BAM_LAUNCH_GAME), le processus lancé est FPLoader : le jeu est le
+// « Future Pinball.exe » apparu après le lancement, et FPLoader, s'il reste ouvert, est fermé à la fin.
 
 import { spawn } from 'node:child_process';
-import { FUTURE_PINBALL_NAME, HoldDetector, isPinballFx3WindowTitle, PINBALLFX_WINDOW_TITLE, t, ZEN_GAMES, type ZenGameKey } from '@cyberpinball/core';
-import { allowAnyForeground, bringToFront, closeWindow, foregroundWindow, listWindows, type WindowInfo } from '@cyberpinball/win-displays';
+import { FUTURE_PINBALL_EXE, FUTURE_PINBALL_NAME, HoldDetector, isPinballFx3WindowTitle, PINBALLFX_WINDOW_TITLE, t, ZEN_GAMES, type ZenGameKey } from '@cyberpinball/core';
+import { allowAnyForeground, bringToFront, closeWindow, foregroundWindow, listWindows, processIdsByName, type WindowInfo } from '@cyberpinball/win-displays';
 import type { LaunchResult, RunningGame } from './launcher';
 
 const POLL_MS = 250;
@@ -33,6 +35,8 @@ export interface PinballFxSystem {
   front(w: WindowInfo): void;
   foregroundPid(): number | undefined;
   now(): number;
+  /** Numéros des processus d'un exécutable (jeu ouvert par un lanceur, ZenLaunchGame.processName). */
+  processIds?(exe: string): number[];
 }
 
 /** Le jeu de Zen lancé : son nom (messages) et sa fenêtre de jeu. */
@@ -51,6 +55,13 @@ export interface ZenLaunchGame {
    * au bout du délai entier.
    */
   direct?: boolean;
+  /**
+   * Le processus lancé est un lanceur (FPLoader de BAM) qui ouvre le jeu : le jeu est un processus de cet
+   * exécutable apparu après le lancement (ceux déjà ouverts avant ne comptent pas), et sa première fenêtre
+   * visible fait la partie. Échec aussitôt si le jeu se ferme sans fenêtre, ou si le lanceur s'arrête sans
+   * l'avoir ouvert (après DIRECT_GRACE_MS). Le lanceur encore ouvert à la fin de la partie est fermé.
+   */
+  processName?: string;
 }
 
 /** Lancement direct : délai laissé à une fenêtre de jeu après l'arrêt du processus lancé. */
@@ -96,6 +107,9 @@ export const ZEN_LAUNCH_GAMES: Readonly<Record<ZenGameKey, ZenLaunchGame>> = {
  */
 export const FUTURE_PINBALL_LAUNCH_GAME: ZenLaunchGame = { name: FUTURE_PINBALL_NAME, isWindow: () => false, ownProcess: true };
 
+/** Future Pinball lancé par FPLoader (BAM) : le jeu reconnu à son exécutable. */
+export const FUTURE_PINBALL_BAM_LAUNCH_GAME: ZenLaunchGame = { name: FUTURE_PINBALL_NAME, isWindow: () => false, processName: FUTURE_PINBALL_EXE };
+
 function pidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -122,6 +136,7 @@ export const realPinballFxSystem: PinballFxSystem = {
   front: (w) => void bringToFront(w),
   foregroundPid: () => foregroundWindow()?.pid,
   now: () => Date.now(),
+  processIds: processIdsByName,
 };
 
 /** Jeu de Zen déjà ouvert (partie précédente mal fermée) : son processus, s'il y en a un. */
@@ -150,6 +165,11 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
   const hold = new HoldDetector(PINBALLFX_EXIT_HOLD_MS);
   // Exit encore tenu depuis le menu (le joueur l'a pressé pour autre chose) : il faut le relâcher d'abord.
   hold.waitRelease();
+  // Jeu ouvert par un lanceur (BAM) : ses processus déjà ouverts avant ne sont pas cette partie.
+  const before = zen.processName ? new Set(sys.processIds?.(zen.processName) ?? []) : undefined;
+  const gameProcs = new Set<number>();
+  /** Le lanceur (FPLoader) : fermé à la fin s'il est resté ouvert. */
+  let loaderPid: number | undefined;
 
   let finish: (r: LaunchResult) => void = () => undefined;
   const done = new Promise<LaunchResult>((resolve) => (finish = resolve));
@@ -161,6 +181,10 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
     finished = true;
     if (poll) clearInterval(poll);
     if (killTimer) clearTimeout(killTimer);
+    // FPLoader lancé avec /STAYINRAM peut rester ouvert après le jeu : c'est le processus lancé ici, fermé.
+    if (loaderPid !== undefined && sys.alive(loaderPid)) sys.kill(loaderPid);
+    // Arrêté pendant le chargement : le jeu que le lanceur a déjà ouvert, sans fenêtre encore, ne reste pas.
+    if (stopAsked) for (const pid of gameProcs) if (sys.alive(pid)) sys.kill(pid);
     const now = sys.now();
     finish({
       ok: !failure,
@@ -199,6 +223,7 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
     queueMicrotask(end);
     return { pid: undefined, stop, done };
   }
+  if (zen.processName) loaderPid = child.pid;
   child.on('error', (error) => {
     failure = 'spawn';
     message = t('Impossible de lancer {game} : {error}', { game: zen.name, error: error.message });
@@ -209,7 +234,8 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
     if (finished) return;
     if (gamePid === undefined) {
       const own = zen.ownProcess ? child.pid : undefined;
-      const w = sys.windows().find((x) => zen.isWindow(x) || (own !== undefined && x.pid === own && x.visible));
+      if (zen.processName && before) for (const pid of sys.processIds?.(zen.processName) ?? []) if (!before.has(pid)) gameProcs.add(pid);
+      const w = sys.windows().find((x) => zen.isWindow(x) || (own !== undefined && x.pid === own && x.visible) || (x.visible && gameProcs.has(x.pid)));
       if (w) {
         gamePid = w.pid;
         gameWindow = w;
@@ -221,10 +247,15 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
         opts.onWindow?.(w);
         if (sys.foregroundPid() !== w.pid) sys.front(w);
         opts.onPlaying?.();
-      } else if (own !== undefined && !sys.alive(own)) {
+      } else if ((own !== undefined && !sys.alive(own)) || (gameProcs.size > 0 && [...gameProcs].every((pid) => !sys.alive(pid)))) {
         // Le jeu s'est fermé sans ouvrir de fenêtre : table illisible, ou refusée par le jeu.
         failure = 'crash';
         message = t('{game} s’est fermé sans ouvrir la table.', { game: zen.name });
+        end();
+      } else if (zen.processName && gameProcs.size === 0 && loaderPid !== undefined && !sys.alive(loaderPid) && sys.now() - (directGoneAt ??= sys.now()) > DIRECT_GRACE_MS) {
+        // Le lanceur s'est arrêté sans que le jeu paraisse : BAM n'a pas pu l'ouvrir.
+        failure = 'crash';
+        message = t('{game} ne s’est pas ouvert : son lanceur (BAM) s’est arrêté avant.', { game: zen.name });
         end();
       } else if (zen.direct && child.pid !== undefined && !sys.alive(child.pid) && sys.now() - (directGoneAt ??= sys.now()) > DIRECT_GRACE_MS) {
         failure = 'crash';

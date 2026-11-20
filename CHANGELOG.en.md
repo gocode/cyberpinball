@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Future Pinball: when BAM is installed (the game's BAM folder with FPLoader.exe), the game starts through it, as with other front-ends; recent tables (FizX physics) finally play as intended. The table's sheet says whether BAM is there.
+- Future Pinball through BAM: the game is recognised even though FPLoader starts it separately, a Future Pinball already open isn't taken for the game, and FPLoader is closed at the end.
 - Friend messages and groups: pick a message, then reply (with a ready-made phrase or the keyboard) to quote it. The quote, with its author and first two lines, shows above the reply, in the front-end and on the phone; with the flippers or the mouse, picking it takes you back to the quoted message. A quoted message deleted later keeps its excerpt, marked "message deleted".
 - Groups: "Mention a member…" picks a member from the list and writes "@nickname"; an "@nickname" typed on the keyboard or the phone counts too. The mentioned player gets a notification of its own ("Bruno mentioned you in …"), even with the group muted, and the mention is highlighted in the bubble, more strongly when it is you.
 - A cabinet that is not up to date yet still receives these messages and shows their text.

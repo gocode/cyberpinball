@@ -11,8 +11,10 @@ export const messages: Record<string, string> = {
   'Le fichier de la table est introuvable : {file}.': 'The table file can’t be found: {file}.',
   'Ce chemin ne peut pas être donné à {game} : {file}.': 'This path can’t be passed to {game}: {file}.',
   'Vérifiez que la table s’ouvre dans {game} lui-même : ses bibliothèques (.fpl) et sa version du jeu.': 'Check that the table opens in {game} itself: its libraries (.fpl) and its game version.',
+  'Vérifiez que la table s’ouvre en lançant BAM\\FPLoader.exe vous-même : ses bibliothèques (.fpl), sa version de BAM.': 'Check that the table opens when you start BAM\\FPLoader.exe yourself: its libraries (.fpl), its BAM version.',
   // app/src/pinballfx-launcher.ts
   '{game} s’est fermé sans ouvrir la table.': '{game} closed without opening the table.',
+  '{game} ne s’est pas ouvert : son lanceur (BAM) s’est arrêté avant.': '{game} didn’t open: its launcher (BAM) stopped first.',
   // app/src/futurepinball-ui.ts
   'Introuvable aux emplacements habituels : choisir son dossier, ou des fichiers .fpt': 'Not in the usual places: choose its folder, or .fpt files',
   '{n} table dans le front-end · ajouter celles de son dossier Tables': '{n} table in the menu · add the ones from its Tables folder',
@@ -29,8 +31,8 @@ export const messages: Record<string, string> = {
   'Dossier choisi à la main': 'Folder chosen by hand',
   'Trouvé sur ce PC': 'Found on this PC',
   'Ni dans C:\\Games, ni à la racine de C:, D: ou E:, ni dans Program Files. « Choisir le dossier de {game}… » : celui de son exécutable.': 'Not in C:\\Games, at the root of C:, D: or E:, or in Program Files. "Choose the {game} folder…": the one with its executable.',
-  'Start : ajouter une table au front-end. Elle y garde son dossier, ses médias et ses statistiques ; l’original reste dans Future Pinball, intact. La partie se lance dans Future Pinball, sans BAM pour l’instant ; ses écrans se règlent dans ses préférences (Vidéo).':
-    'Start: add a table to the menu. It gets its own folder, media and statistics there; the original stays in Future Pinball, untouched. The game runs in Future Pinball, without BAM for now; its screens are set in its preferences (Video).',
+  'Start : ajouter une table au front-end. Elle y garde son dossier, ses médias et ses statistiques ; l’original reste dans Future Pinball, intact. La partie se lance dans Future Pinball, par BAM s’il est installé ; ses écrans se règlent dans ses préférences (Vidéo).':
+    'Start: add a table to the menu. It gets its own folder, media and statistics there; the original stays in Future Pinball, untouched. The game runs in Future Pinball, through BAM when it’s installed; its screens are set in its preferences (Video).',
   'Aucune table dans son dossier Tables': 'No table in its Tables folder',
   'Aucune table à lister': 'No table to list',
   '« Choisir des fichiers .fpt… » marche aussi sans le dossier du jeu.': '"Choose .fpt files…" also works without the game folder.',
@@ -50,7 +52,8 @@ export const messages: Record<string, string> = {
   'Ajout d’une table de Future Pinball': 'Adding a Future Pinball table',
   'Introuvable sur ce PC : Ajouter une table > « Tables de {game} » pour choisir son dossier': 'Not found on this PC: Add a table > "{game} tables" to choose its folder',
   BAM: 'BAM',
-  'Pas encore : la table se joue sans suivi de la tête ni réglages de BAM': 'Not yet: the table plays without head tracking or BAM settings',
+  'Installé : la partie passe par FPLoader ; ses réglages dans son menu en jeu': 'Installed: the game starts through FPLoader; its settings are in its in-game menu',
+  'Pas installé : la table se joue sans BAM (les tables FizX en ont besoin)': 'Not installed: the table plays without BAM (FizX tables need it)',
   'Une table de {game} tient dans son fichier .fpt : rien à ajouter': 'A {game} table fits in its .fpt file: nothing to add',
   'Une table de {game} est un seul fichier .fpt': 'A {game} table is a single .fpt file',
   'Écrans et cadrage : dans les préférences de {game} (Vidéo)': 'Screens and framing: in {game}’s preferences (Video)',

@@ -106,6 +106,23 @@ test('ligne de commande exacte : "Future Pinball.exe" /open "<table>.fpt" /play 
   assert.equal(futurePinballCommand(install, 'D:\\table.vpx'), undefined);
 });
 
+test('BAM installé : la partie passe par BAM\\FPLoader.exe, avec la ligne des autres front-ends, depuis le dossier BAM', () => {
+  const root = tmp();
+  const game = fakeGame(root);
+  // Sans dossier BAM : pas de lanceur, le jeu seul.
+  assert.equal(futurePinballAt(game)?.loader, undefined);
+  fs.mkdirSync(path.join(game, 'BAM'));
+  fs.writeFileSync(path.join(game, 'BAM', 'FPLoader.exe'), '');
+  const install = futurePinballAt(game)!;
+  assert.equal(install.loader, path.join(game, 'BAM', 'FPLoader.exe'));
+  assert.equal(findFuturePinball({ candidates: [game] })?.loader, install.loader);
+  const table = 'D:\\Cyber Pinball\\Tables\\Retroflair (Original 2012)\\Retroflair - BAM Edition.fpt';
+  const command = futurePinballCommand(install, table);
+  assert.deepEqual(command, { file: install.loader, args: ['/open', table, '/play', '/exit', '/arcaderender', '/STAYINRAM'], cwd: path.join(game, 'BAM'), bam: true });
+  assert.equal(futurePinballCommandLine(command!), `"${install.loader}" /open "${table}" /play /exit /arcaderender /STAYINRAM`);
+  assert.equal(futurePinballCommand(install, 'D:\\a"b.fpt'), undefined);
+});
+
 test('inventaire : un .fpt est une table de Future Pinball, avec son nom de logiciel', () => {
   assert.equal(tableFileEmulator('Medieval Madness.fpt'), 'futurepinball');
   assert.equal(tableFileEmulator('ALIEN.FPT'), 'futurepinball');

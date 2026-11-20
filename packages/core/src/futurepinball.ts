@@ -1,5 +1,5 @@
 // Future Pinball (Black Sheep Studios, 2005), premier niveau (19/11/2026) : ses tables (.fpt) dans la
-// roue, lancées en un appui comme celles de Pinball FX, sans BAM. Ici le cœur : où est le jeu sur ce
+// roue, lancées en un appui comme celles de Pinball FX. Ici le cœur : où est le jeu sur ce
 // PC, ses tables, la commande d'une partie, l'ajout d'une table à l'inventaire, la place de sa fenêtre.
 //
 // Une table de Future Pinball est un fichier .fpt, comme un .vpx : elle a son dossier « Titre
@@ -8,8 +8,11 @@
 // Pinball, n'est jamais modifié. Rien de ce qui est propre à VPX (script, ROM, PuP-Pack, diagnostic)
 // ne s'y applique.
 //
-// Hors de ce premier niveau : BAM (FPLoader, suivi de la tête, réglages), les scores du jeu,
-// le téléchargement des tables.
+// BAM (20/11/2026) : quand le jeu a son dossier BAM avec FPLoader.exe, la partie passe par lui, comme
+// chez les autres front-ends ; les tables récentes (physique FizX, objet xBAM de leur script) en ont
+// besoin. Sans BAM, le jeu est lancé seul. Les réglages de BAM restent les siens (son menu en jeu).
+//
+// Hors de ce niveau : les scores du jeu, le téléchargement des tables.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -30,6 +33,9 @@ export const FUTURE_PINBALL_EXT = '.fpt';
 export const FUTURE_PINBALL_VPS_FORMAT = 'FP';
 /** Dossier choisi à la main, dans le dossier des données (Future Pinball pas aux emplacements habituels). */
 export const FUTURE_PINBALL_CONFIG_FILE = 'future-pinball.json';
+/** BAM (Better Arcade Mode) : son dossier dans celui du jeu, et le lanceur qui l'injecte dans le jeu. */
+export const FUTURE_PINBALL_BAM_DIR = 'BAM';
+export const FUTURE_PINBALL_LOADER = 'FPLoader.exe';
 
 const EXE_NAME = /^future pinball\.exe$/i;
 
@@ -42,6 +48,8 @@ export interface FuturePinballInstall {
   tablesDir: string;
   /** Trouvé aux emplacements habituels, ou choisi à la main (configuration). */
   source: 'found' | 'chosen';
+  /** BAM installé : chemin de son FPLoader.exe (dossier BAM du jeu). */
+  loader?: string;
 }
 
 /** Emplacements habituels, sur C:, D: et E: (installateur d'origine, paquets de la communauté, Program Files). */
@@ -56,7 +64,10 @@ export function futurePinballCandidates(drives: readonly string[] = ['C:', 'D:',
  */
 export function futurePinballAt(chosen: string, exists: (p: string) => boolean = fs.existsSync, source: FuturePinballInstall['source'] = 'chosen'): FuturePinballInstall | undefined {
   const at = path.resolve(chosen);
-  const install = (gameDir: string): FuturePinballInstall => ({ exe: path.join(gameDir, FUTURE_PINBALL_EXE), gameDir, tablesDir: path.join(gameDir, 'Tables'), source });
+  const install = (gameDir: string): FuturePinballInstall => {
+    const loader = path.join(gameDir, FUTURE_PINBALL_BAM_DIR, FUTURE_PINBALL_LOADER);
+    return { exe: path.join(gameDir, FUTURE_PINBALL_EXE), gameDir, tablesDir: path.join(gameDir, 'Tables'), source, ...(exists(loader) ? { loader } : {}) };
+  };
   if (EXE_NAME.test(path.basename(at))) return exists(at) ? { ...install(path.dirname(at)), exe: at } : undefined;
   if (exists(path.join(at, FUTURE_PINBALL_EXE))) return install(at);
   // Le dossier Tables choisi : le jeu est juste au-dessus.
@@ -136,15 +147,23 @@ export interface FuturePinballCommand {
   file: string;
   args: string[];
   cwd: string;
+  /**
+   * Lancé par FPLoader (BAM) : le processus lancé n'est pas le jeu, qui est reconnu à son exécutable
+   * (« Future Pinball.exe »). Absent : le processus lancé est le jeu.
+   */
+  bam?: true;
 }
 
 /**
- * `"Future Pinball.exe" /open "<table>.fpt" /play /exit` : arguments de la ligne de commande du jeu,
- * ceux que lancent les autres front-ends. Le dossier courant est celui du jeu (ses bibliothèques .fpl).
- * undefined : un chemin que la ligne de commande ne saurait passer (guillemet, retour à la ligne).
+ * Sans BAM : `"Future Pinball.exe" /open "<table>.fpt" /play /exit`, depuis le dossier du jeu (ses
+ * bibliothèques .fpl). Avec BAM : `"BAM\FPLoader.exe" /open "<table>.fpt" /play /exit /arcaderender
+ * /STAYINRAM`, depuis le dossier BAM, la ligne des autres front-ends (PinUP Popper, PinballX) : sans
+ * /STAYINRAM, BAM ne charge pas ses réglages. undefined : un chemin que la ligne de commande ne saurait
+ * passer (guillemet, retour à la ligne).
  */
-export function futurePinballCommand(install: Pick<FuturePinballInstall, 'exe' | 'gameDir'>, table: string): FuturePinballCommand | undefined {
+export function futurePinballCommand(install: Pick<FuturePinballInstall, 'exe' | 'gameDir' | 'loader'>, table: string): FuturePinballCommand | undefined {
   if (/["\r\n\0]/.test(table) || !isFuturePinballTable(table)) return undefined;
+  if (install.loader) return { file: install.loader, args: ['/open', table, '/play', '/exit', '/arcaderender', '/STAYINRAM'], cwd: path.dirname(install.loader), bam: true };
   return { file: install.exe, args: ['/open', table, '/play', '/exit'], cwd: install.gameDir };
 }
 
