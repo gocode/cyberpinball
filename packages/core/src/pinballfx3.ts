@@ -194,10 +194,11 @@ export function pinballFx3Table(name: string): PinballFx3Table | undefined {
 // ---------------------------------------------------------------------------
 
 export interface PinballFx3Install {
-  store: 'steam';
+  /** 'folder' : dossier du jeu choisi à la main, lancé par son exécutable (pinballfx3-folder.ts). */
+  store: 'steam' | 'folder';
   /** Dossier du jeu (…\steamapps\common\Pinball FX3). */
   gameDir: string;
-  /** steam.exe : le jeu se lance par Steam. */
+  /** steam.exe : le jeu se lance par Steam ; dossier choisi : l'exécutable du jeu. */
   launcher: string;
   /** Dossier des tables (data\steam). */
   tablesDir: string;

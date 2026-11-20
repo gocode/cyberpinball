@@ -44,7 +44,17 @@ export interface ZenLaunchGame {
    * et s'il s'arrête avant d'en ouvrir une, le lancement a échoué. Sinon (Steam), le jeu est reconnu à sa fenêtre.
    */
   ownProcess?: boolean;
+  /**
+   * Lancé directement par son exécutable (Pinball FX3 depuis un dossier choisi) : le jeu reste reconnu
+   * à sa fenêtre, comme par Steam. Si le processus lancé s'arrête sans qu'aucune fenêtre de jeu ne
+   * paraisse dans les DIRECT_GRACE_MS qui suivent, le jeu a refusé de s'ouvrir : échec aussitôt, pas
+   * au bout du délai entier.
+   */
+  direct?: boolean;
 }
+
+/** Lancement direct : délai laissé à une fenêtre de jeu après l'arrêt du processus lancé. */
+export const DIRECT_GRACE_MS = 10_000;
 
 export interface PinballFxLaunchOptions {
   command: { file: string; args: string[]; cwd?: string };
@@ -133,6 +143,8 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
   let failure: LaunchResult['failure'];
   let message: string | undefined;
   let stopAsked = false;
+  /** Lancement direct : le processus lancé s'est arrêté à cet instant, sans fenêtre de jeu. */
+  let directGoneAt: number | undefined;
   let killTimer: NodeJS.Timeout | undefined;
   const notices: string[] = [];
   const hold = new HoldDetector(PINBALLFX_EXIT_HOLD_MS);
@@ -211,6 +223,10 @@ export function launchPinballFx(opts: PinballFxLaunchOptions): RunningGame {
         opts.onPlaying?.();
       } else if (own !== undefined && !sys.alive(own)) {
         // Le jeu s'est fermé sans ouvrir de fenêtre : table illisible, ou refusée par le jeu.
+        failure = 'crash';
+        message = t('{game} s’est fermé sans ouvrir la table.', { game: zen.name });
+        end();
+      } else if (zen.direct && child.pid !== undefined && !sys.alive(child.pid) && sys.now() - (directGoneAt ??= sys.now()) > DIRECT_GRACE_MS) {
         failure = 'crash';
         message = t('{game} s’est fermé sans ouvrir la table.', { game: zen.name });
         end();

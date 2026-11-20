@@ -307,6 +307,7 @@ import { createMediaSites, jobKey } from './media-sites';
 import { createMediaImport } from './media-import';
 import { createInstallationImport } from './installation-import';
 import { createFuturePinballUi } from './futurepinball-ui';
+import { createPinballFx3FolderUi } from './pinballfx3-folder-ui';
 import { detectFuturePinball } from './futurepinball-play';
 import { userGesture } from './gesture-flash';
 import { createMedias, markAnimated, playsSoundPreview, type MediaCard, type MediaThumb } from './library-medias';
@@ -572,6 +573,13 @@ export function createLibrary(host: LibraryHost) {
     },
     back: () => openAdd(),
   });
+  // Pinball FX3 depuis un dossier du jeu choisi à la main (19/11/2026) : pinballfx3-folder-ui.ts, branché dans buildZen.
+  const pinballFx3Folder = createPinballFx3FolderUi({
+    dataDir: () => host.dataDir,
+    setup: () => zenSetup('pinballfx3', host.dataDir),
+    pickFolder: async () => (await pickPaths({ title: t('Dossier de {game}', { game: 'Pinball FX3' }), icon: 'folder', purpose: tLater('Dossier de Pinball FX3'), mode: 'folder', start: 'desktop' }))?.[0],
+    reopen: (stay) => openZen('pinballfx3', undefined, stay ? cursor : undefined),
+  });
   const mediaImport = createMediaImport({
     tablesDir: () => layout()?.tables,
     trashRoot: () => layout()?.trash,
@@ -811,7 +819,7 @@ export function createLibrary(host: LibraryHost) {
   /** La fiche de la table ; « Gérer la table… » quand c'est de là qu'on revient (sheetManage). */
   function openSheet(table: TableEntry, flash?: string): void {
     // Fiche d'une table d'un jeu de Zen : le jeu installé ou non, relu ici, une fois.
-    if (isZenEmulator(table.emulator)) zenUi[table.emulator].now = zenSetup(table.emulator);
+    if (isZenEmulator(table.emulator)) zenUi[table.emulator].now = zenSetup(table.emulator, host.dataDir);
     go({ kind: 'sheet', file: table.file, flash, ...(sheetManage && samePath(sheetManage, table.file) ? { manage: true } : {}) });
   }
 
@@ -1864,7 +1872,7 @@ export function createLibrary(host: LibraryHost) {
     // La base VPS se met à jour pendant qu'on choisit les fichiers.
     void refreshVps();
     // Jeux de Zen installés ou non : relus ici, une fois, pas à chaque dessin de l'entonnoir.
-    for (const game of Object.keys(zenUi) as ZenGameKey[]) zenUi[game].now = zenSetup(game);
+    for (const game of Object.keys(zenUi) as ZenGameKey[]) zenUi[game].now = zenSetup(game, host.dataDir);
     futurePinballUi.refresh();
     go({ kind: 'addSource' });
   }
@@ -3607,7 +3615,7 @@ export function createLibrary(host: LibraryHost) {
   const zenUi: Record<ZenGameKey, ZenUi> = { pinballfx: { storeOpened: false }, pinballfx3: { storeOpened: false } };
 
   function zenNow(game: ZenGameKey): ZenSetup {
-    return (zenUi[game].now ??= zenSetup(game));
+    return (zenUi[game].now ??= zenSetup(game, host.dataDir));
   }
 
   function zenAction(game: ZenGameKey): Action {
@@ -3623,6 +3631,17 @@ export function createLibrary(host: LibraryHost) {
     const base = { label: t('Tables de {game}', { game: name }), icon, badge: 'beta' as const };
     if (!install) {
       if (setup.downloading) return { ...base, detail: t('Téléchargement en cours dans Steam : la liste des tables s’ouvre une fois le jeu installé'), tone: 'quiet', run: () => undefined };
+      // FX3 introuvable : son écran, qui propose Steam et le choix du dossier du jeu (pinballfx3-folder-ui.ts).
+      if (game === 'pinballfx3')
+        return {
+          ...base,
+          detail: ui.storeOpened
+            ? t('Ouvert dans {store} : installez-le là-bas, ses tables apparaissent ici ensuite', { store: 'Steam' })
+            : setup.getter
+              ? t('Introuvable sur ce PC : l’installer avec Steam, ou choisir le dossier du jeu')
+              : t('Steam absent de ce PC : choisir le dossier du jeu, ou installer Steam puis {game}', { game: name }),
+          run: () => openZen(game),
+        };
       const getter = setup.getter;
       if (!getter)
         return {
@@ -3639,12 +3658,7 @@ export function createLibrary(host: LibraryHost) {
         detail: ui.storeOpened
           ? t('Ouvert dans {store} : installez-le là-bas, ses tables apparaissent ici ensuite', { store })
           : t('Ouvre {store} sur son installation ; vous y achetez le jeu et ses tables', { store }),
-        run: () => {
-          if (!openPinballFxStore(getter)) return;
-          ui.storeOpened = true;
-          watchZenInstall(game);
-          host.broadcast();
-        },
+        run: () => openZenStore(game, getter),
       };
     }
     return {
@@ -3656,6 +3670,14 @@ export function createLibrary(host: LibraryHost) {
     };
   }
 
+  /** « Installer … » : la boutique ouverte sur le jeu, puis l'installation guettée. */
+  function openZenStore(game: ZenGameKey, getter: NonNullable<ZenSetup['getter']>): void {
+    if (!openPinballFxStore(getter)) return;
+    zenUi[game].storeOpened = true;
+    watchZenInstall(game);
+    host.broadcast();
+  }
+
   /**
    * Après « Installer … » : l'état du jeu relu toutes les 5 s (deux heures au plus) ; l'entonnoir,
    * s'il est affiché, se redessine à chaque changement (téléchargement, puis installé).
@@ -3664,7 +3686,7 @@ export function createLibrary(host: LibraryHost) {
     const ui = zenUi[game];
     if (ui.watch) clearInterval(ui.watch);
     const state = () => {
-      const s = (ui.now = zenSetup(game));
+      const s = (ui.now = zenSetup(game, host.dataDir));
       return s.install ? 'installed' : s.downloading ? 'downloading' : 'absent';
     };
     let last = state();
@@ -3701,7 +3723,7 @@ export function createLibrary(host: LibraryHost) {
    * fiche si elle y est. Vignettes et médias viennent de la base VPS : téléchargée une fois (8 Mo),
    * gardée ensuite.
    */
-  function openZen(game: ZenGameKey, focus?: string): void {
+  function openZen(game: ZenGameKey, focus?: string, at?: number): void {
     const ui = zenUi[game];
     // Vignettes rangées ou nettoyées depuis (dossier de réception) : redemandées. Le disque est lu
     // ici, à l'ouverture, jamais en dessinant l'écran (refait à chaque touche).
@@ -3712,7 +3734,7 @@ export function createLibrary(host: LibraryHost) {
     }
     // FX3 : les fichiers du jeu relus à chaque ouverture (une mise à jour peut en ajouter).
     if (game === 'pinballfx3') {
-      const tablesDir = (ui.now = zenSetup(game)).install?.tablesDir;
+      const tablesDir = (ui.now = zenSetup(game, host.dataDir)).install?.tablesDir;
       ui.list = tablesDir ? pinballFx3InstalledTables({ tablesDir }).map(zenFromPinballFx3) : [];
       ui.images = undefined;
     }
@@ -3720,7 +3742,7 @@ export function createLibrary(host: LibraryHost) {
       // Liste triée et captures de VPS calculées ici, à l'ouverture, pas au premier dessin.
       zenImageMap(game);
       const list = zenList(game);
-      openCustom(zenListBuilders[game], focus === undefined ? undefined : Math.max(0, list.findIndex((x) => x.key === focus)));
+      openCustom(zenListBuilders[game], focus === undefined ? at : Math.max(0, list.findIndex((x) => x.key === focus)));
     };
     if ((vpsLoaded && vpsDb) || pinballFxVpsTried || !layout()) return show();
     pinballFxVpsTried = true;
@@ -4236,6 +4258,19 @@ export function createLibrary(host: LibraryHost) {
         key: `${game}:missing`,
         run: () => void huntPinballFxMedias(game, [...present.values()]),
       });
+    // FX3 : l'installer par Steam s'il manque, et le dossier du jeu choisi à la main (pinballfx3-folder-ui.ts).
+    const fx3Setup = game === 'pinballfx3' ? zenNow(game) : undefined;
+    if (fx3Setup && !fx3Setup.install && !fx3Setup.downloading && fx3Setup.getter) {
+      const getter = fx3Setup.getter;
+      actions.push({
+        label: t('Installer {game}', { game: name }),
+        detail: ui.storeOpened ? t('Ouvert dans {store} : installez-le là-bas, ses tables apparaissent ici ensuite', { store: 'Steam' }) : t('Ouvre {store} sur son installation ; vous y achetez le jeu et ses tables', { store: 'Steam' }),
+        icon: 'download',
+        key: `${game}:install`,
+        run: () => openZenStore(game, getter),
+      });
+    }
+    if (fx3Setup) actions.push(...pinballFx3Folder.actions(fx3Setup));
     actions.push({ label: t('Retour'), icon: 'back', key: 'back', run: back });
     const inMenu = present.size;
     // FX3 : toutes les tables sont installées, achetées ou non ; le lancement direct demande le mode
@@ -4248,13 +4283,20 @@ export function createLibrary(host: LibraryHost) {
       heading: t('Tables de {game}', { game: name }),
       icon: 'table-add',
       subheading: [t('Bêta : {game} est en phase de test dans Cyber Pinball', { game: name }), inMenu ? tn(inMenu, '{n} table dans le front-end', '{n} tables dans le front-end') : undefined].filter(Boolean).join(' · '),
-      lead: ui.flash ?? lead,
+      lead: ui.flash ?? pinballFx3Folder.notice() ?? lead,
       sections: [
+        ...(fx3Setup ? [{ title: name, rows: pinballFx3Folder.rows(fx3Setup) }] : []),
         {
           title: tn(rows.length, '{n} table', '{n} tables'),
           rows: rows.length
             ? rows
-            : [{ text: t('Aucune table trouvée'), detail: t('Le dossier des tables de {game} est vide ou illisible : vérifiez le jeu dans Steam (Propriétés > Fichiers installés > Vérifier).', { game: name }), tone: 'quiet' }],
+            : [
+                fx3Setup && !fx3Setup.install
+                  ? { text: t('Aucune table à lister'), detail: t('Installez {game} avec Steam, ou choisissez le dossier du jeu : ses tables apparaissent ici.', { game: name }), tone: 'quiet' }
+                  : fx3Setup?.install?.store === 'folder'
+                    ? { text: t('Aucune table trouvée'), detail: t('Le dossier des tables du dossier choisi est vide ou illisible : {dir}.', { dir: fx3Setup.install.tablesDir ?? '' }), tone: 'quiet' }
+                    : { text: t('Aucune table trouvée'), detail: t('Le dossier des tables de {game} est vide ou illisible : vérifiez le jeu dans Steam (Propriétés > Fichiers installés > Vérifier).', { game: name }), tone: 'quiet' },
+              ],
         },
       ],
       actions,

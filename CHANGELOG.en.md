@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Pinball FX3 from a game folder chosen by hand: System menu > Tables > Add a table > "Pinball FX3 tables" > "Choose the game folder…", for tables kept outside the Steam library. The folder is checked ("Pinball FX Classic.exe" or "Pinball FX3.exe", tables in data\steam), kept, and the screen's tables come from it; "Forget this folder" goes back to Steam.
+- With a chosen folder, games start from the game executable (`-offline`, `-class` for Williams and Bally, `-table_<name>`), without going through Steam. Cyber Pinball writes nothing in the game folder: if the game requires Steam, the game refuses to open, and the message says so right away. The Steam folder chosen by hand still goes through Steam; with no chosen folder, nothing changes.
+- "Pinball FX3 tables" also opens when the game isn't found: install it with Steam, or choose its folder. The screen shows where the game is (Steam or chosen folder) and why a chosen folder is no longer used (drive unplugged, executable missing).
 - My account: the recovery code is checked with the flippers, without a keyboard. Among six suggested words, you pick the code's first three in order; each chosen word gets its number in its box (the word under the cursor shows in advance the number it would get), the last one can be picked again to remove it, and the screen offers "Start over" or "Quit".
 
 ## 0.2.1

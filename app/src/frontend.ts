@@ -103,8 +103,9 @@ import {
   joystickButtonsUnrecorded,
   playfieldOrientation,
   pinballFxCommand,
-  pinballFx3Command,
+  pinballFx3DirectFailureHint,
   pinballFx3FirstRunMessage,
+  pinballFx3LaunchCommand,
   pinballFx3ShortGameMessage,
   isZenEmulator,
   futurePinballCommandLine,
@@ -4735,7 +4736,8 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   const zenName = fp ? fp.name : ZEN_GAMES[zenKey!].name;
   const launchGame = fp ? fp.launchGame : ZEN_LAUNCH_GAMES[zenKey!];
   const fx = simulated === undefined && zenKey === 'pinballfx' ? detectPinballFx() : undefined;
-  const fx3 = simulated === undefined && zenKey === 'pinballfx3' ? detectPinballFx3() : undefined;
+  // FX3 : le dossier du jeu choisi à la main passe avant Steam (pinballfx3-folder.ts).
+  const fx3 = simulated === undefined && zenKey === 'pinballfx3' ? detectPinballFx3(loc.dataDir) : undefined;
   const tableKey = zenKey === 'pinballfx' ? table.pinballFxTable : table.pinballFx3Table;
   const why = fp
     ? fp.why
@@ -4744,7 +4746,9 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
       : tableKey === undefined
         ? t('La fiche de cette table ne dit pas quelle table de {game} ouvrir.', { game: zenName })
         : simulated === undefined && !fx && !fx3
-          ? t('{game} n’est pas installé sur ce PC. Menu système > Tables > Ajouter une table > « Installer {game} ».', { game: zenName })
+          ? zenKey === 'pinballfx3'
+            ? t('{game} est introuvable sur ce PC. Menu système > Tables > Ajouter une table > « Tables de {game} » : l’installer avec Steam, ou choisir le dossier du jeu.', { game: zenName })
+            : t('{game} n’est pas installé sur ce PC. Menu système > Tables > Ajouter une table > « Installer {game} ».', { game: zenName })
           : undefined;
   if (why) {
     state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible'), lines: [why, t('Start ou Exit : revenir au front-end.')] } };
@@ -4832,7 +4836,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     : fx && table.pinballFxTable !== undefined
       ? pinballFxCommand(fx, table.pinballFxTable)
       : fx3 && table.pinballFx3Table !== undefined
-        ? pinballFx3Command(fx3, table.pinballFx3Table)
+        ? pinballFx3LaunchCommand(fx3, table.pinballFx3Table)
         : undefined;
   console.log(`Lancement : ${zenName} (${table.id}) lancé ${Date.now() - pressedAt} ms après le Start${command ? ` : ${futurePinballCommandLine(command)}` : ' (partie simulée)'}.`); // i18n-ignore : journal
   // Future Pinball ouvert en fenêtre ailleurs : posé sur le playfield (le plein écran reste où le jeu l'a mis).
@@ -4845,7 +4849,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   const game =
     simulated !== undefined || !command
       ? simulateVpx({ onPlaying, onForeground })
-      : launchPinballFx({ command, game: launchGame, exitHeld: vrFront.exitHeldNow, onPlaying, onForeground, ...(onWindow ? { onWindow } : {}) });
+      : launchPinballFx({ command, game: fx3?.store === 'folder' ? { ...launchGame, direct: true } : launchGame, exitHeld: vrFront.exitHeldNow, onPlaying, onForeground, ...(onWindow ? { onWindow } : {}) });
   // Pinscape et encodeurs en mode manette : leurs boutons rendus au jeu de Zen comme des touches (zen-keys.ts).
   const stopZenKeys = simulated === undefined && command && zenKey ? bridgeZenKeys({ buttons, navigation }, () => game.pid, undefined, zenKey) : () => undefined;
   if (launch) {
@@ -4912,6 +4916,8 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
           ...(result.message ? [result.message] : []),
           fp
             ? fp.failureHint
+            : fx3?.store === 'folder'
+            ? pinballFx3DirectFailureHint(fx3.gameDir)
             : zenKey === 'pinballfx3'
             ? t('Vérifiez que Steam est connecté, que la table est sur ce compte Steam et que le mode borne est activé dans {game}.', { game: zenName })
             : t('Vérifiez que la table est achetée dans Pinball FX et que Steam (ou Epic) est connecté.'),
