@@ -21,6 +21,7 @@ import { say } from '../i18n';
 import {
   legacyOrientation,
   ORIENTATION_FILE,
+  playsOnWindowsOrientation,
   readOrientationRecord,
   readSimulatedOrientations,
   rotateSimulated,
@@ -208,6 +209,42 @@ for (const [name, exit] of Object.entries(EXITS)) {
     }
   });
 }
+
+// Relevé sur un PinCab le 20/11/2026 : FX3 lancé par Cyber Pinball démarrait sur le playfield retourné
+// pour la session ; ses réglages de mode borne, saisis à la main, ne valaient plus avec un autre front-end.
+test('Pinball FX3 démarre sur l’orientation de Windows, comme lancé par un autre front-end ; VPX garde celle de jeu', () => {
+  assert.equal(playsOnWindowsOrientation('pinballfx3'), true);
+  assert.equal(playsOnWindowsOrientation('vpx'), false, 'VPX : l’orientation de jeu est faite pour lui');
+  assert.equal(playsOnWindowsOrientation(undefined), false);
+  for (const [fixtureName, b] of bornes()) {
+    const session = b.launch();
+    session.suspend(); // orientationForGame, avant le lancement
+    assert.deepEqual(b.windows.desktop(), b.origin, `${fixtureName} : FX3 voit le bureau de Windows`);
+    // FX3 passe en plein écran exclusif : Windows remet son réglage ; rien ne doit retourner l'écran en pleine partie.
+    b.windows.session.clear();
+    session.check();
+    assert.deepEqual(b.windows.desktop(), b.origin, `${fixtureName} : changement d’écrans pendant la partie, pas de retournement`);
+    session.resume(); // orientationAfterGame
+    assert.equal(b.windows.rotation(b.playfield.gdiName), b.playing, `${fixtureName} : retour au menu, orientation de jeu`);
+    // Plantage pendant une partie de FX3 : le lancement suivant reprend le fichier, la sortie rend l'origine.
+    session.suspend();
+    b.launch().end();
+    assert.deepEqual(b.windows.desktop(), b.origin);
+    assert.equal(b.windows.persisted, 0, `${fixtureName} : le réglage de Windows n’a pas été touché`);
+  }
+});
+
+test('frontend.ts : la partie d’un jeu de Zen rend l’orientation de Windows avant le lancement et la reprend après', () => {
+  const src = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const body = src.slice(src.indexOf('async function playPinballFx('));
+  const forGame = body.indexOf('orientationForGame(');
+  const launch = body.indexOf('launchPinballFx(');
+  const done = body.indexOf('await game.done');
+  const after = body.indexOf('orientationAfterGame(');
+  assert.ok(forGame > 0 && forGame < launch, 'orientation de Windows rendue avant de lancer le jeu');
+  assert.ok(after > done, 'orientation de jeu reprise une fois la partie finie');
+  assert.match(body.slice(0, forGame), /playsOnWindowsOrientation\(zenKey\)/);
+});
 
 test('orientation : l’origine est notée dans le fichier avant de tourner l’écran', () => {
   const [, b] = bornes()[0]!;

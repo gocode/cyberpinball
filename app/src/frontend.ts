@@ -105,6 +105,7 @@ import {
   pinballFxCommand,
   pinballFx3DirectFailureHint,
   pinballFx3FirstRunMessage,
+  playsOnWindowsOrientation,
   pinballFx3LaunchCommand,
   pinballFx3ShortGameMessage,
   isZenEmulator,
@@ -348,7 +349,7 @@ import { activeVpxIni, audioOutputs, syncConfiguration } from './vpx-ini';
 import { createConfigurationsMenu } from './configurations-menu';
 import { coverDisplay, coverReport, hideCovered, minimizeCovered, recoverExact } from './cover-display';
 import { DesktopMode } from './desktop-mode';
-import { answerLegacy, legacyDesktopTurned, orientationForDesktop, orientationFromDesktop, takeOrientationProblems } from './display-orientation';
+import { answerLegacy, legacyDesktopTurned, orientationAfterGame, orientationForDesktop, orientationForGame, orientationFromDesktop, takeOrientationProblems } from './display-orientation';
 import { acceptFrontends, otherFrontendsOnThisPc, unacceptedFrontends } from './frontend-gate';
 import { hideTaskbars, isVeil, nameScreen, onScreensSettled, recoverScreens, relaunchCovered, restoreTaskbars, setDesktopMode, setScreensBusy, settleScreens, takeCoverIncidents } from './screen-guard';
 import { followScreens, watchGameWindows } from './game-screens';
@@ -4809,6 +4810,10 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     }
   }
 
+  // Pinball FX3 : le playfield retrouve l'orientation de Windows, le bureau qu'il a avec un autre front-end
+  // (sessionorientation.ts, GAMES_ON_WINDOWS_ORIENTATION) ; ses réglages saisis à la main restent justes.
+  const windowsOrientation = simulated === undefined && playsOnWindowsOrientation(zenKey);
+  if (windowsOrientation) orientationForGame(zenName);
   closeTopmostWindows();
   playing = table;
   realign = undefined;
@@ -4859,6 +4864,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   }
   if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
   const result = await game.done;
+  if (windowsOrientation) orientationAfterGame(zenName);
   stopZenKeys();
   stopJoystick();
   const stoppedLoading = launch?.stopped === true;

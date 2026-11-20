@@ -29,6 +29,22 @@ import { edgeAfterRotation, rotatedDisplay, rotationDelta } from './layout';
 import type { Cabinet, ObservedDisplay, Rotation } from './model';
 import { vpxOrientationFix } from './vpx';
 
+/**
+ * Jeux lancés sur l'orientation de Windows, pas sur celle de la session. Pinball FX3 : ses réglages
+ * du mode borne (orientation, positions et tailles de l'afficheur et du fronton) se saisissent à la
+ * main dans le jeu et doivent rester justes d'un front-end à l'autre. Les autres front-ends (PinUP
+ * Popper, PinballX) ne tournent pas l'écran du playfield : relevé sur un PinCab le 20/11/2026, FX3
+ * lancé par Cyber Pinball démarrait sur un playfield retourné à 180° pour la session, et son
+ * passage en plein écran exclusif remettait l'écran à 0° en pleine partie. VPX garde l'orientation
+ * de jeu : c'est pour lui qu'elle existe (vpxOrientationFix).
+ */
+export const GAMES_ON_WINDOWS_ORIENTATION: readonly string[] = ['pinballfx3'];
+
+/** Vrai si le jeu `emulator` doit démarrer sur l'orientation de Windows (GAMES_ON_WINDOWS_ORIENTATION). */
+export function playsOnWindowsOrientation(emulator: string | undefined): boolean {
+  return emulator !== undefined && GAMES_ON_WINDOWS_ORIENTATION.includes(emulator);
+}
+
 /** Fichier des orientations d'origine, dans le dossier des données. */
 export const ORIENTATION_FILE = 'orientation-ecrans.json';
 

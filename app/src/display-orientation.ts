@@ -122,6 +122,20 @@ export function orientationFromDesktop(): boolean {
   return report.turned.some((turn) => (turn.to - turn.from) % 180 !== 0);
 }
 
+/**
+ * Partie d'un jeu qui démarre sur l'orientation de Windows (playsOnWindowsOrientation : Pinball
+ * FX3) : l'écran la retrouve avant le lancement, comme au mode bureau, pour que le jeu voie le même
+ * bureau qu'avec un autre front-end. Un changement d'écrans pendant la partie ne le retourne pas.
+ */
+export function orientationForGame(game: string): void {
+  log(`partie de ${game}`, orientation.suspend()); // i18n-ignore : journal
+}
+
+/** Fin de cette partie : l'orientation de jeu revient. */
+export function orientationAfterGame(game: string): void {
+  log(`retour de ${game}`, orientation.resume()); // i18n-ignore : journal
+}
+
 /** Relance : le processus suivant reprend l'orientation telle quelle. */
 export function handOverOrientation(): void {
   orientation.handOver();

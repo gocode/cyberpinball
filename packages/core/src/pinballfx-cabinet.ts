@@ -24,11 +24,14 @@
 // en partie, flippers, Start et MagnaSave répondent), mais ses menus se parcourent aux flèches gauche
 // et droite, sur lesquelles Maj ne fait rien. Sans elles, impossible d'atteindre l'icône de borne pour
 // activer son mode borne. Ses flippers envoient donc aussi la flèche de leur côté (PINBALLFX3_EXTRA_KEYS).
+// Sur une borne au clavier (encodeur clavier, clavier), la touche du flipper arrive seule au jeu : bonne
+// en partie, sans effet dans les menus (retour d'un joueur, 20/11/2026). Cyber Pinball lit alors ces
+// touches pendant la partie et envoie la flèche en plus (zenKeyboardEchoes, app/src/zen-keys.ts).
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
-import { buttonKeys, type ButtonsSource } from './buttons';
+import { buttonKeys, windowsVk, type ButtonsSource } from './buttons';
 import type { ButtonId, Rotation } from './model';
 import type { ZenGameKey } from './zen';
 
@@ -158,6 +161,24 @@ export function zenJoystickKeys(source: ButtonsSource, zenGame?: ZenGameKey): Ma
   for (const [id, keys] of Object.entries(zenGameKeys(zenGame)) as [ButtonId, string[]][]) {
     const code = game[id];
     if (isJoystickCode(code)) map.set(code, [...new Set([...(map.get(code) ?? []), ...keys])]);
+  }
+  return map;
+}
+
+/**
+ * Borne au clavier dans Pinball FX3 : pour chaque flipper relevé au clavier (KeyboardEvent.code), les
+ * touches à envoyer en plus de la sienne, qui arrive déjà au jeu (la flèche de son côté, pour les
+ * menus). Vide pour un autre jeu, pour un flipper de joystick (zenJoystickKeys envoie déjà les deux)
+ * et pour une touche sans code de Windows ou qui est déjà cette flèche.
+ */
+export function zenKeyboardEchoes(source: ButtonsSource, zenGame?: ZenGameKey): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  if (zenGame !== 'pinballfx3') return map;
+  const game = buttonKeys(source?.buttons);
+  for (const [id, extra] of Object.entries(PINBALLFX3_EXTRA_KEYS) as [ButtonId, string][]) {
+    const code = game[id];
+    if (!code || isJoystickCode(code) || code === extra || windowsVk(code) === undefined) continue;
+    map.set(code, [...new Set([...(map.get(code) ?? []), extra])]);
   }
   return map;
 }
