@@ -16,6 +16,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { localDate } from './date-locale.mjs';
 import { changelogSections, fragmentFiles, fragmentNotes } from './traductions.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -60,7 +61,7 @@ export function markRevised(root = repo) {
   const { section, notes } = currentNotes(root);
   const keep = before?.section === section ? before.revues ?? [] : [];
   const revues = [...new Set([...keep, ...notes.map(fingerprint)])];
-  const text = `${JSON.stringify({ section: section ?? null, date: new Date().toISOString().slice(0, 10), revues }, null, 2)}\n`;
+  const text = `${JSON.stringify({ section: section ?? null, date: localDate(), revues }, null, 2)}\n`;
   fs.writeFileSync(file, fs.existsSync(file) && fs.readFileSync(file, 'utf8').includes('\r\n') ? text.replace(/\n/g, '\r\n') : text);
   return { section, count: revues.length };
 }

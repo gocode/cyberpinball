@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.2
 
+- Publication : la date de sortie et celle de la révision des manuels sont prises à l'heure du poste, et non plus en UTC : une version publiée juste après minuit n'est plus datée de la veille.
 - Pinball FX3 depuis un dossier du jeu choisi à la main : Menu système > Tables > Ajouter une table > « Tables de Pinball FX3 » > « Choisir le dossier du jeu… », pour des tables rangées hors de la bibliothèque de Steam. Le dossier est vérifié (« Pinball FX Classic.exe » ou « Pinball FX3.exe », tables dans data\steam), gardé, et les tables de l'écran viennent de lui ; « Oublier ce dossier » revient à Steam.
 - Avec un dossier choisi, les parties se lancent par l'exécutable du jeu (`-offline`, `-class` pour Williams et Bally, `-table_<nom>`), sans passer par Steam. Cyber Pinball n'écrit rien dans le dossier du jeu : si le jeu exige Steam, c'est lui qui refuse de s'ouvrir, et le message le dit aussitôt. Le dossier de Steam choisi à la main passe toujours par Steam ; sans dossier choisi, rien ne change.
 - « Tables de Pinball FX3 » s'ouvre aussi quand le jeu n'est pas trouvé : l'installer avec Steam, ou choisir son dossier. L'écran dit où est le jeu (Steam ou dossier choisi) et pourquoi un dossier choisi n'est plus utilisé (disque débranché, exécutable absent).

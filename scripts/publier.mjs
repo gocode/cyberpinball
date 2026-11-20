@@ -53,6 +53,7 @@ import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { auditRepository } from './audit-publication.mjs';
+import { localDate } from './date-locale.mjs';
 import { loadPrivateKey } from './cle-publication.mjs';
 import { lockBuild, zipProblems } from './paquet-application.mjs';
 import { describeRepository } from './decrire-github.mjs';
@@ -207,7 +208,7 @@ if (!signatureConfigured()) {
   const base = version.replace(/-.*$/, '');
   const own = news.NEWS.filter((n) => n.version === base);
   if (!prerelease) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDate();
     for (const n of own) if (n.date !== today) console.log(`Nouveautés : « ${n.title} » (${base}) est datée du ${n.date} ; sa date est celle de la sortie (${today}), dans packages/core/src/news.ts.`);
   }
   const latest = news.NEWS[0];
