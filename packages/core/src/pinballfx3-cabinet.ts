@@ -25,7 +25,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { t } from './i18n';
+import { edgeAfterRotation, rotationDelta } from './layout';
+import { edgeRotation, type FlipperEdge, type Rotation } from './model';
 
 /** Réglages du jeu sur ce PC, écrits à sa première ouverture (chiffrés). */
 export const PINBALLFX3_SYSTEM_CONFIG = 'SystemConfigCache.dat';
@@ -75,6 +78,67 @@ export function pinballFx3FirstRunMessage(gameDir: string, name: string): { titl
       t('{game} n’a encore jamais été ouvert ici : son mode borne n’y est pas activé. Sans lui, le jeu s’ouvre sur son écran d’accueil, en paysage, et pas sur la table.', { game }),
       t('Dans le jeu : icône de borne à côté du profil, « Activer », puis la rotation du plateau et les écrans du fronton et du DMD. Cyber Pinball ne peut pas le faire à sa place : ces réglages sont chiffrés. Fermez ensuite le jeu (Exit tenu) et relancez la table.'),
       ...(purchase ? [purchase] : []),
+      t('Start : ouvrir {game} · Exit : revenir au front-end', { game }),
+    ],
+  };
+}
+
+/**
+ * Orientation à saisir dans le mode borne de FX3 pour un joueur au bord `edge` de l'image de Windows :
+ * le quart de tour horaire qui y met les flippers (edgeRotation). Essai sur un PinCab le 20/11/2026 :
+ * flippers au bord gauche, 90° juste, 270° à l'envers.
+ */
+export function pinballFx3Orientation(edge: FlipperEdge): Rotation {
+  return edgeRotation(edge);
+}
+
+export interface PinballFx3OrientationChange {
+  /** Valeur juste avant 0.2.2-essai.10, quand FX3 démarrait sur l'orientation de la session. */
+  before: Rotation;
+  /** Valeur juste depuis, FX3 démarrant sur l'orientation de Windows. */
+  after: Rotation;
+}
+
+/**
+ * Jusqu'à 0.2.2-essai.10, FX3 démarrait sur l'orientation que Cyber Pinball donne au playfield pour
+ * la session (`windowsRotation`, pour VPX) ; depuis, sur celle de Windows (`origin`), comme avec un
+ * autre front-end (sessionorientation.ts, GAMES_ON_WINDOWS_ORIENTATION). L'orientation saisie dans FX3
+ * avant ce changement ne vaut plus. `flipperEdge` : bord enregistré, pour l'image de la session.
+ * undefined si les deux orientations sont les mêmes (rien n'a changé pour FX3).
+ */
+export function pinballFx3OrientationChange(flipperEdge: FlipperEdge, windowsRotation: Rotation | undefined, origin: Rotation | undefined): PinballFx3OrientationChange | undefined {
+  if (windowsRotation === undefined || origin === undefined || windowsRotation === origin) return undefined;
+  const before = pinballFx3Orientation(flipperEdge);
+  const after = pinballFx3Orientation(edgeAfterRotation(flipperEdge, rotationDelta(origin, windowsRotation)));
+  return before === after ? undefined : { before, after };
+}
+
+/** Témoin, dans le dossier des données : l'avertissement du changement d'orientation de FX3 est passé. */
+export const PINBALLFX3_ORIENTATION_NOTICE_FILE = 'pinballfx3-orientation-prevenu';
+
+/**
+ * Avant la prochaine partie de FX3, une fois par borne : le message du changement d'orientation,
+ * si FX3 a déjà été lancé par Cyber Pinball (`playedBefore` : une table de FX3 a des parties dans ses
+ * statistiques) et si l'orientation à saisir a changé. Le témoin est posé dans tous les cas : une
+ * borne qui n'avait rien à apprendre ne sera pas prévenue plus tard, et le message ne revient pas.
+ * Témoin illisible ou impossible à poser : rien n'est montré (pas de message à chaque partie).
+ */
+export function takePinballFx3OrientationNotice(dataDir: string, playedBefore: boolean, change: PinballFx3OrientationChange | undefined): { title: string; lines: string[] } | undefined {
+  const marker = path.join(dataDir, PINBALLFX3_ORIENTATION_NOTICE_FILE);
+  try {
+    if (fs.existsSync(marker)) return undefined;
+    fs.mkdirSync(dataDir, { recursive: true });
+    writeFileAtomic(marker, new Date().toISOString() + '\n');
+  } catch {
+    return undefined;
+  }
+  if (!playedBefore || !change) return undefined;
+  const game = 'Pinball FX3';
+  return {
+    title: t('{game} : orientation à changer', { game }),
+    lines: [
+      t('Depuis cette version, {game} démarre sur l’écran du playfield tel que Windows l’oriente, comme avec un autre front-end. Son orientation réglée avec Cyber Pinball ne vaut plus : l’image serait à l’envers.', { game }),
+      t('Dans {game}, mode borne : passez Orientation de {before}° à {after}°.', { game, before: change.before, after: change.after }),
       t('Start : ouvrir {game} · Exit : revenir au front-end', { game }),
     ],
   };

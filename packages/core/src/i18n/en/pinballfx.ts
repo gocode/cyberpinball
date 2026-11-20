@@ -117,4 +117,9 @@ export const messages: Record<string, string> = {
   'Seules Fish Tales et Sorcerer’s Lair sont gratuites : les autres tables ne s’ouvrent que si elles sont achetées sur ce compte Steam, sinon le jeu reste sur son écran d’accueil.':
     'Only Fish Tales and Sorcerer’s Lair are free: the other tables only open if they are bought on this Steam account, otherwise the game stays on its home screen.',
   'Start : ouvrir {game} · Exit : revenir au front-end': 'Start: open {game} · Exit: back to the menu',
+  // Orientation de FX3 à changer après 0.2.2-essai.10 (packages/core/src/pinballfx3-cabinet.ts, 20/11/2026)
+  '{game} : orientation à changer': '{game}: orientation to change',
+  'Depuis cette version, {game} démarre sur l’écran du playfield tel que Windows l’oriente, comme avec un autre front-end. Son orientation réglée avec Cyber Pinball ne vaut plus : l’image serait à l’envers.':
+    'Since this version, {game} starts on the playfield screen as Windows orients it, as with another front-end. The orientation you set with Cyber Pinball no longer fits: the picture would be upside down.',
+  'Dans {game}, mode borne : passez Orientation de {before}° à {after}°.': 'In {game}, cabinet mode: change Orientation from {before}° to {after}°.',
 };

@@ -9,11 +9,16 @@ import { pinballFx3ShortGameMessage, pinballFx3Table } from '../pinballfx3';
 import {
   isFreePinballFx3Table,
   PINBALLFX3_FREE_TABLES,
+  PINBALLFX3_ORIENTATION_NOTICE_FILE,
   PINBALLFX3_SYSTEM_CONFIG,
   pinballFx3FirstRunMessage,
   pinballFx3NeverOpened,
+  pinballFx3Orientation,
+  pinballFx3OrientationChange,
   pinballFx3PurchaseLine,
+  takePinballFx3OrientationNotice,
 } from '../pinballfx3-cabinet';
+import { REPO_ROOT } from './i18n-scan';
 
 function gameDir(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-fx3-borne-'));
@@ -57,6 +62,50 @@ test('tables gratuites : des fichiers du catalogue, Fish Tales et Sorcerer’s L
   assert.equal(isFreePinballFx3Table('UNIVERSAL_BTTF'), false);
   assert.equal(pinballFx3PurchaseLine('Citadel'), undefined);
   assert.ok(pinballFx3PurchaseLine('UNIVERSAL_BTTF'));
+});
+
+// Essai sur un PinCab le 20/11/2026 : flippers au bord droit de l'image retournée à 180° pour VPX
+// (Windows à 0°). Avant 0.2.2-essai.10, FX3 voulait 270° ; depuis, 270° est à l'envers et 90° juste.
+test('orientation de FX3 : quart de tour vers le bord des flippers ; avant/après le retour à l’orientation de Windows', () => {
+  assert.equal(pinballFx3Orientation('left'), 90);
+  assert.equal(pinballFx3Orientation('right'), 270);
+  assert.equal(pinballFx3Orientation('bottom'), 0);
+  assert.deepEqual(pinballFx3OrientationChange('right', 180, 0), { before: 270, after: 90 }, 'le PinCab de l’essai');
+  assert.equal(pinballFx3OrientationChange('right', undefined, 0), undefined, 'écran jamais tourné pour VPX : rien n’a changé');
+  assert.equal(pinballFx3OrientationChange('right', 180, undefined), undefined, 'Windows a déjà l’orientation de jeu : rien n’a changé');
+  assert.equal(pinballFx3OrientationChange('right', 90, 90), undefined);
+  // Quart de tour : la valeur change aussi, d'un quart de tour.
+  const quarter = pinballFx3OrientationChange('bottom', 90, 0)!;
+  assert.ok(quarter && quarter.before === 0 && (quarter.after === 90 || quarter.after === 270), JSON.stringify(quarter));
+});
+
+test('avertissement du changement d’orientation : une seule fois, et seulement si FX3 a déjà été lancé par Cyber Pinball', () => {
+  const change = { before: 270, after: 90 } as const;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-fx3-orientation-'));
+  const notice = takePinballFx3OrientationNotice(dir, true, change);
+  assert.ok(notice);
+  assert.match(notice.title, /Pinball FX3 : orientation à changer/);
+  assert.match(notice.lines.join('\n'), /passez Orientation de 270° à 90°/);
+  assert.match(notice.lines.at(-1)!, /^Start : ouvrir Pinball FX3 · Exit : revenir au front-end$/);
+  assert.ok(fs.existsSync(path.join(dir, PINBALLFX3_ORIENTATION_NOTICE_FILE)));
+  assert.equal(takePinballFx3OrientationNotice(dir, true, change), undefined, 'montré une fois');
+  // Borne qui n'avait jamais lancé FX3 : rien à dire, ni maintenant ni plus tard.
+  const fresh = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-fx3-orientation-'));
+  assert.equal(takePinballFx3OrientationNotice(fresh, false, change), undefined);
+  assert.equal(takePinballFx3OrientationNotice(fresh, true, change), undefined, 'témoin posé à la première partie');
+  // Orientation inchangée : rien, et témoin posé.
+  const same = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-fx3-orientation-'));
+  assert.equal(takePinballFx3OrientationNotice(same, true, undefined), undefined);
+  assert.ok(fs.existsSync(path.join(same, PINBALLFX3_ORIENTATION_NOTICE_FILE)));
+});
+
+test('frontend.ts : l’avertissement d’orientation passe avant le lancement de FX3, avec Start pour ouvrir le jeu', () => {
+  const src = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const body = src.slice(src.indexOf('async function playPinballFx('));
+  const notice = body.indexOf('takePinballFx3OrientationNotice(');
+  assert.ok(notice > 0 && notice < body.indexOf('launchPinballFx('));
+  assert.match(body.slice(notice, notice + 600), /StartCount/);
+  assert.match(body.slice(notice), /action: 'zenFirstRun'/);
 });
 
 test('partie trop courte : une table gratuite ne fait pas soupçonner un achat manquant', () => {

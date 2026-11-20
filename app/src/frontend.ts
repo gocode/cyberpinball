@@ -105,6 +105,8 @@ import {
   pinballFxCommand,
   pinballFx3DirectFailureHint,
   pinballFx3FirstRunMessage,
+  pinballFx3OrientationChange,
+  takePinballFx3OrientationNotice,
   playsOnWindowsOrientation,
   pinballFx3LaunchCommand,
   pinballFx3ShortGameMessage,
@@ -349,7 +351,7 @@ import { activeVpxIni, audioOutputs, syncConfiguration } from './vpx-ini';
 import { createConfigurationsMenu } from './configurations-menu';
 import { coverDisplay, coverReport, hideCovered, minimizeCovered, recoverExact } from './cover-display';
 import { DesktopMode } from './desktop-mode';
-import { answerLegacy, legacyDesktopTurned, orientationAfterGame, orientationForDesktop, orientationForGame, orientationFromDesktop, takeOrientationProblems } from './display-orientation';
+import { answerLegacy, legacyDesktopTurned, orientationAfterGame, orientationForDesktop, orientationForGame, orientationFromDesktop, playfieldOrigin, takeOrientationProblems } from './display-orientation';
 import { acceptFrontends, otherFrontendsOnThisPc, unacceptedFrontends } from './frontend-gate';
 import { hideTaskbars, isVeil, nameScreen, onScreensSettled, recoverScreens, relaunchCovered, restoreTaskbars, setDesktopMode, setScreensBusy, settleScreens, takeCoverIncidents } from './screen-guard';
 import { followScreens, watchGameWindows } from './game-screens';
@@ -4759,10 +4761,25 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   // Pinball FX3 jamais ouvert sur ce PC : son mode borne n'y est pas activé, il s'ouvrirait sur son
   // écran d'accueil. Dit avant de lancer (ses réglages sont chiffrés : rien à écrire, pinballfx3-cabinet.ts).
   const firstRun = fx3 && table.pinballFx3Table !== undefined && !firstRunSeen && !autoStopAfterMs ? pinballFx3FirstRunMessage(fx3.gameDir, table.pinballFx3Table) : undefined;
-  if (firstRun) {
-    console.log(`${zenName} (${table.id}) : jamais ouvert sur ce PC (${fx3!.gameDir} sans réglages), mode borne à activer dans le jeu ; Start l'ouvre quand même.`); // i18n-ignore : journal
+  // FX3 déjà lancé par Cyber Pinball quand il démarrait sur l'orientation de la session (avant
+  // 0.2.2-essai.10) : une fois par borne, l'ancienne et la nouvelle orientation à saisir. Le témoin
+  // est posé dès la première partie de FX3, même sans rien à dire (jeu jamais ouvert compris).
+  const fx3Cabinet = fx3 && !firstRunSeen && !autoStopAfterMs ? loadCabinet(loc.dataDir) : undefined;
+  const fx3Edge = fx3Cabinet?.playfield?.flipperEdge;
+  const orientationNotice =
+    fx3 && !firstRunSeen && !autoStopAfterMs
+      ? takePinballFx3OrientationNotice(
+          loc.dataDir,
+          !firstRun && tables.some((x) => x.emulator === 'pinballfx3' && (x.info.User?.StartCount ?? 0) > 0),
+          fx3Edge ? pinballFx3OrientationChange(fx3Edge, fx3Cabinet?.playfield?.windowsRotation, playfieldOrigin()) : undefined,
+        )
+      : undefined;
+  const beforeLaunch = firstRun ?? orientationNotice;
+  if (beforeLaunch) {
+    if (firstRun) console.log(`${zenName} (${table.id}) : jamais ouvert sur ce PC (${fx3!.gameDir} sans réglages), mode borne à activer dans le jeu ; Start l'ouvre quand même.`); // i18n-ignore : journal
+    else console.log(`${zenName} (${table.id}) : orientation du mode borne à changer depuis 0.2.2-essai.10 (${beforeLaunch.lines[1]}) ; message montré une fois.`); // i18n-ignore : journal
     pendingPlay = { frontends: [], play: () => playPinballFx(table, autoStopAfterMs, mode, simulated, true) };
-    state = { ...state, phase: 'message', help: false, message: { ...firstRun, action: 'zenFirstRun' } };
+    state = { ...state, phase: 'message', help: false, message: { ...beforeLaunch, action: 'zenFirstRun' } };
     broadcast();
     return undefined;
   }

@@ -136,6 +136,15 @@ export function orientationAfterGame(game: string): void {
   log(`retour de ${game}`, orientation.resume()); // i18n-ignore : journal
 }
 
+/**
+ * Orientation de Windows (d'origine) de l'écran du playfield, notée par la session avant de le
+ * tourner ; undefined si Cyber Pinball ne l'a pas tourné (Windows a déjà l'orientation de jeu).
+ */
+export function playfieldOrigin(): Rotation | undefined {
+  const fp = loadCabinet(loc.dataDir)?.roles.playfield;
+  return fp ? orientation.recorded.find((r) => r.fingerprint === fp)?.origin : undefined;
+}
+
 /** Relance : le processus suivant reprend l'orientation telle quelle. */
 export function handOverOrientation(): void {
   orientation.handOver();
