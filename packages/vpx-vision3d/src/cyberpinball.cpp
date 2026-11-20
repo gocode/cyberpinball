@@ -12,7 +12,8 @@
 //   « Reprendre » / « Quitter » (joystick ou flippers pour choisir, Valider pour confirmer, le rappel des
 //   touches dessous) ; appui tenu 1,5 s, la partie quitte, une jauge circulaire se remplit (pause.h).
 // - Jamais avalés : Pause, Échap (ExitGame), le menu de VPX, une action inconnue ; plugin passif si la
-//   table des actions ne correspond pas à VPX (pause.h, essai du 10 novembre 2026).
+//   table des actions ne correspond pas à VPX (pause.h, essai du 10 novembre 2026). Tables connues : VPX 10.8.1 et
+//   10.9.0, chacune pour la DLL construite sur ses en-têtes (vpx-compat.h).
 // - Quitter est garanti : ExitGame, puis la fermeture de la fenêtre de VPX si la partie tourne encore.
 // - Fronton cadré : le rendu suivant (PuP, B2S) appelé à travers un contexte qui garde ses proportions.
 // - Son des vidéos de PuP : les fenêtres que VPX ne dessine pas en VR (ScoreView, topper) sont dessinées
@@ -45,6 +46,7 @@
 
 #include "MsgPlugin.h"
 #include "VPXPlugin.h"
+#include "vpx-compat.h"
 #include "pause.h"
 #include "minuterie.h"
 
@@ -510,7 +512,8 @@ void MSGPIAPI cadreSegments(VPXRenderContext2D*, VPXSegDisplayRenderStyle style,
 
 /**
  * Une chaîne de rendus d'une fenêtre annexe, dans l'ordre écrit par Cyber Pinball (fronton : « PUP,B2S » ;
- * DMD : « PUP,ScoreView,B2S »), relue à chaque changement de l'ordre.
+ * DMD : « PUP,ScoreView,B2S »), relue à chaque changement de l'ordre. Le rendu des scores de VPX y est reconnu
+ * sous ses deux noms, « ScoreView » (10.8.1) et « Nixie » (10.9.0) : vpx::memeRendu.
  */
 struct Suivant
 {
@@ -558,7 +561,7 @@ void chercher(Chaine& c, const char* ordre, double t)
    msgApi->BroadcastMsg(endpointId, getAuxRendererId, &m);
    for (Suivant& s : c.suivants)
       for (unsigned int i = 0; i < m.count && i < 16; i++)
-         if (entrees[i].id && s.id == entrees[i].id && entrees[i].Render)
+         if (vpx::memeRendu(s.id.c_str(), entrees[i].id) && entrees[i].Render)
          {
             s.def = entrees[i];
             s.trouve = true;
@@ -810,7 +813,7 @@ Rect dessinerScores(VPXRenderContext2D* ctx, const Rect& r, Reglage g, double t)
    relireScores(t);
    if (!scores.ok || r.l <= 0.f || r.h <= 0.f || !vpxApi)
       return {};
-   const DisplayFrame f = scores.src.GetRenderFrame(scores.src.id);
+   const DisplayFrame f = vpx::imageDe(scores.src);
    if (!f.frame)
       return {};
    VPXTextureFormat format;
@@ -1019,7 +1022,7 @@ void redessinerSalle(double t)
 }
 
 /** Image du DMD de la pièce demandée par VPX (flasher en mode DMD) : redessinée au plus 30 fois par seconde. */
-DisplayFrame MSGPIAPI imageSalle(const CtlResId)
+DisplayFrame MSGPIAPI imageSalle(vpx::ArgImage)
 {
    const double t = maintenant();
    // Seulement depuis le fil de VPX, hors d'un autre rendu (le cadre du fronton est global) : sinon la dernière.
@@ -1044,7 +1047,7 @@ void MSGPIAPI onGetDisplays(const unsigned int, void*, void* data)
       e = DisplaySrcId {};
       e.id.endpointId = endpointId;
       e.id.resId = 0;
-      e.groupId = e.id;
+      vpx::completerSource(e);
       e.width = static_cast<unsigned int>(salle.l);
       e.height = static_cast<unsigned int>(salle.h);
       e.hardware = CTLPI_DISPLAY_HARDWARE_LCD_DISPLAY;
@@ -1064,22 +1067,32 @@ void publierSalle(bool active)
    ecrire(std::string("salle source=") + (active ? salleDmd_Val : "retiree"));
 }
 
-/** La table des actions (commandeVpx1081) vaut pour VPX 10.8.1 ; une autre version : plugin passif. */
-bool versionConnue()
+/** La version du VPX de la partie (versionDeVpx) : elle choisit la table des actions de pause.h (commandeVpx). */
+VersionVpx versionPartie = VersionVpx::Inconnue;
+
+/**
+ * La version du VPX qui a chargé le plugin, d'après son exécutable, si le plugin en connaît la table des actions
+ * (pause.h) et a été construit pour son API (vpx-compat.h) ; sinon Inconnue, et le plugin reste passif.
+ */
+VersionVpx versionDeVpx()
 {
    wchar_t exe[MAX_PATH] {};
    if (!GetModuleFileNameW(nullptr, exe, MAX_PATH))
-      return false;
+      return VersionVpx::Inconnue;
    DWORD h = 0;
    const DWORD n = GetFileVersionInfoSizeW(exe, &h);
    if (!n)
-      return false;
+      return VersionVpx::Inconnue;
    std::vector<uint8_t> info(n);
    VS_FIXEDFILEINFO* v = nullptr;
    UINT l = 0;
    if (!GetFileVersionInfoW(exe, 0, n, info.data()) || !VerQueryValueW(info.data(), L"\\", reinterpret_cast<void**>(&v), &l) || !v)
-      return false;
-   return HIWORD(v->dwFileVersionMS) == 10 && LOWORD(v->dwFileVersionMS) == 8 && HIWORD(v->dwFileVersionLS) == 1;
+      return VersionVpx::Inconnue;
+   const int majeure = HIWORD(v->dwFileVersionMS), mineure = LOWORD(v->dwFileVersionMS), correctif = HIWORD(v->dwFileVersionLS);
+   // Une DLL construite pour une autre API que celle de ce VPX : rien ne dit que ses actions sont celles de la table.
+   if (majeure != vpx::API_MAJEURE || mineure != vpx::API_MINEURE)
+      return VersionVpx::Inconnue;
+   return versionVpx(majeure, mineure, correctif);
 }
 
 void injecter(int action, bool presse)
@@ -1569,7 +1582,8 @@ void avancerCalage()
 
 /**
  * Les actions de VPX déjà vues pendant la partie : la première de chacune est écrite au journal (« action-vue »),
- * pour savoir sur la borne si les manettes du casque atteignent le plugin (gâchettes : 0 à 3, clics : 52 et 53).
+ * pour savoir sur la borne si les manettes du casque atteignent le plugin (gâchettes : 0 à 3, clics : 52 et 53 en
+ * 10.8.1 comme en 10.9.0, Custom1 et Custom2 : pause.h).
  */
 unsigned long long actionsVues[2] = { 0, 0 };
 
@@ -1587,7 +1601,7 @@ void MSGPIAPI onAction(const unsigned int, void*, void* data)
    }
    // OnActionChanged donne le numéro interne de l'action (InputManager), pas une VPXAction.
    int liee = -1;
-   const Commande c = commandeVpx1081(static_cast<int>(ev->action), liee);
+   const Commande c = commandeVpx(versionPartie, static_cast<int>(ev->action), liee);
    // Table vérifiée à chaque action que VPX lie à l'API : en désaccord, le plugin devient passif.
    if (pause.estFiable() && liee >= 0 && vpxApi)
    {
@@ -1680,7 +1694,8 @@ void MSGPIAPI onGameStart(const unsigned int, void*, void*)
    calageVpx = CalageEnCours {};
    calageRate = false;
    actionsVues[0] = actionsVues[1] = 0;
-   if (!versionConnue())
+   versionPartie = versionDeVpx();
+   if (versionPartie == VersionVpx::Inconnue)
    {
       pause.passif();
       ecrire("passif raison=version");

@@ -75,7 +75,8 @@ test('sortie garantie : le plugin traduit le numéro interne des actions et n’
   const h = read('packages', 'vpx-vision3d', 'src', 'pause.h');
   // OnActionChanged donne le numéro interne (InputManager) : jamais comparé à l'énumération VPXAction.
   assert.doesNotMatch(cpp, /ev->action\s*==/);
-  assert.match(cpp, /commandeVpx1081\(static_cast<int>\(ev->action\), liee\)/);
+  // La table de la version du VPX de la partie (pause.h : par nom, ramenée à celle de 10.8.1).
+  assert.match(cpp, /commandeVpx\(versionPartie, static_cast<int>\(ev->action\), liee\)/);
   // Une seule façon d'avaler une action : la règle de pause.h.
   assert.equal(cpp.match(/enableVPXProcessing\s*=\s*0/g)?.length, 1);
   assert.match(cpp, /if \(pause\.avaler\(c\)\)\s*ev->enableVPXProcessing = 0;/);
@@ -88,8 +89,9 @@ test('sortie garantie : le plugin traduit le numéro interne des actions et n’
   assert.match(h, /\{ Commande::Interface, api::OpenInGameUI \},\s*\/\/ 25 InGameUI/);
   // Quitter : ExitGame, puis la fermeture de la fenêtre de VPX si la partie tourne encore.
   assert.match(cpp, /PostMessageW\(w, WM_CLOSE, 0, 0\)/);
-  // Autre version de VPX : la table ne vaut plus, le plugin est passif.
-  assert.match(cpp, /if \(!versionConnue\(\)\)\s*\{?\s*pause\.passif\(\);/);
+  // Version de VPX sans table connue (ni 10.8.1 ni 10.9.0), ou d'une autre API que la DLL : le plugin est passif.
+  assert.match(cpp, /versionPartie = versionDeVpx\(\);\s*if \(versionPartie == VersionVpx::Inconnue\)\s*\{?\s*pause\.passif\(\);/);
+  assert.match(cpp, /if \(majeure != vpx::API_MAJEURE \|\| mineure != vpx::API_MINEURE\)\s*return VersionVpx::Inconnue;/);
 });
 
 test('réglage des manettes à l’envers (A et B croisés) : dit, réglage par défaut proposé, sauf s’il a été gardé sciemment', () => {

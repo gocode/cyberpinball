@@ -472,6 +472,32 @@ export const VPX_OPENXR = {
  */
 export const VPX_CALIBRATION_KEYS = { VRControllerCalibration: 104, VRUp: 105, VRDown: 106 } as const;
 
+/** Numéros internes (InputManager::CreateInputActions) des porteurs de la combinaison du calage dans VPX. */
+export interface VpxCalibrationActions {
+  Custom1: number;
+  Custom2: number;
+}
+
+/**
+ * Par version de VPX : les mêmes que la table du plugin « CyberPinball » (pause.h, ACTIONS_VPX_1081 et
+ * ACTIONS_VPX_1090, vérifié par vision3d-versions.test.ts). 10.9.0 (28919b5df) garde les rangs de 10.8.1 (révision
+ * 5436) : VRLeft et VRRight y existaient déjà (sous les noms VRFront et VRBack), MouseLeft et MouseRight viennent après.
+ */
+const VPX_CALIBRATION_ACTIONS: Readonly<Record<string, VpxCalibrationActions>> = {
+  '10.8.1': { Custom1: 52, Custom2: 53 },
+  '10.9.0': { Custom1: 52, Custom2: 53 },
+};
+
+/**
+ * Les numéros de Custom1 et Custom2 dans cette version de VPX (« 10.8.1-5436 », « 10.9.0.6948 »…), ceux que le
+ * journal du plugin donne (« action-vue id=… ») ; undefined pour une version dont le plugin ne connaît pas les
+ * actions (il y reste passif). Sans version : VPX 10.8.1, celui que Cyber Pinball installe.
+ */
+export function vpxCalibrationActions(vpxVersion = '10.8.1'): VpxCalibrationActions | undefined {
+  const m = /^\s*v?(\d+\.\d+\.\d+)/i.exec(vpxVersion);
+  return m ? VPX_CALIBRATION_ACTIONS[m[1]!] : undefined;
+}
+
 /** Une entrée « OpenXR;<rang>[;o|x;<seuil>] » comme VPX l'écrit (InputAction::GetMappingString). */
 function xr(element: number, threshold?: number): string {
   return threshold === undefined ? `OpenXR;${element}` : `OpenXR;${element};${threshold < 0 ? 'x' : 'o'};${threshold.toFixed(6)}`;
@@ -496,7 +522,8 @@ function vpxButton(element: ControllerElement, staged = false): string {
  * la partie en pause et la reprend (Pause ; décision du 10 novembre 2026). Le clic du joystick gauche n'aligne jamais la table sur les manettes
  * (VRControllerCalibration, liaison par défaut de VPX) : elle ne bouge que sur demande, par le plugin, au calage
  * (touche F13, VPX_CALIBRATION_KEYS). Les boutons de la combinaison du calage sont liés à Custom1 et Custom2, sans
- * autre rôle : le plugin les reconnaît (numéros 52 et 53 de VPX 10.8.1) et ne les laisse jamais à la table.
+ * autre rôle : le plugin les reconnaît (numéros 52 et 53 de VPX 10.8.1 et 10.9.0 : vpxCalibrationActions) et ne les
+ * laisse jamais à la table.
  */
 export function vpxMappingsFor(setting: ControllerSetting): Record<string, string[]> {
   const f = setting.functions;

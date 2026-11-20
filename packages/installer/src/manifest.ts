@@ -28,6 +28,11 @@ export interface Component {
   homepage: string;
   version: string;
   channel: string;
+  /**
+   * Version d'essai (VPX : préversion jouée en « mode d'essai », vpx-essai.ts) : jamais installée
+   * ni proposée d'office, ignorée par findComponent ; la version ordinaire du même id reste en tête.
+   */
+  trial?: boolean;
   platform: string;
   variant?: string;
   /** Chemin relatif à la racine, séparé par des « / ». */
@@ -89,7 +94,7 @@ export function loadManifest(file = MANIFEST_FILE): Component[] {
 }
 
 export function findComponent(id: string, file = MANIFEST_FILE): Component {
-  const component = loadManifest(file).find((c) => c.id === id);
+  const component = loadManifest(file).find((c) => c.id === id && !c.trial);
   if (!component) throw new Error(t('Composant inconnu dans le manifeste : {id}', { id }));
   return component;
 }

@@ -61,7 +61,35 @@ const RENDERER_WINDOWS: Record<string, AncillaryWindow[]> = {
   B2SLegacyDMD: ['ScoreView'], // idem
   PUP: ['Backglass', 'ScoreView', 'Topper'], // plugins/pup/PUPManager.cpp, PUPManager::OnGetRenderer
   ScoreView: ['ScoreView'], // plugins/scoreview/ScoreViewPlugin.cpp, OnGetRenderer
+  Nixie: ['ScoreView'], // 10.9.0 : ScoreView renommé, plugins/nixie (commit 28919b5df)
 };
+
+/** Moteurs de rendu propres à certaines versions : depuis (since) ou jusqu'avant (before) une version. */
+const RENDERER_VERSIONS: Record<string, { since?: string; before?: string }> = {
+  B2SLegacy: { before: '10.9.0' }, // plugin retiré en 10.9.0
+  B2SLegacyDMD: { before: '10.9.0' },
+  ScoreView: { before: '10.9.0' }, // renommé Nixie
+  Nixie: { since: '10.9.0' },
+};
+
+/** Numéro de version comparable : « 10.8.1-5436 » -> [10, 8, 1]. */
+function versionNumbers(version: string): number[] {
+  return version.split(/[-.]/).slice(0, 3).map(Number);
+}
+
+function versionBefore(a: string, b: string): boolean {
+  const [x, y] = [versionNumbers(a), versionNumbers(b)];
+  for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) < (y[i] ?? 0);
+  return false;
+}
+
+/** Le moteur de rendu doit-il exister dans le code de cette version de VPX ? */
+function rendererExpected(id: string, version: string): boolean {
+  const range = RENDERER_VERSIONS[id];
+  if (range?.since && versionBefore(version, range.since)) return false;
+  if (range?.before && !versionBefore(version, range.before)) return false;
+  return true;
+}
 
 /** VPX s'inscrit lui-même comme plugin « vpx » et reçoit donc [Plugin.vpx] Enable (src/core/VPXPluginAPIImpl.cpp). */
 const CORE_PLUGIN: PluginInfo = { id: 'vpx', name: 'VPX' };
@@ -160,7 +188,7 @@ async function fetchAll(commit: string, files: string[]): Promise<SourceFile[]> 
  * Réglages enregistrés à l'exécution : Enable de chaque plugin (sauf ceux déjà dans
  * Settings_properties.inl), réglages des plugins, puis Priority.<moteur> de chaque fenêtre.
  */
-async function pluginSettings(commit: string, known: Set<string>): Promise<VpxSettingDef[]> {
+async function pluginSettings(commit: string, version: string, known: Set<string>): Promise<VpxSettingDef[]> {
   const files = await listPluginFiles(commit);
   const dirs = files.map((f) => /^plugins\/([^/]+)\/plugin\.cfg$/.exec(f)?.[1]).filter((d): d is string => d !== undefined);
   const wanted = files.filter((f) => dirs.some((d) => f.startsWith(`${PLUGINS_DIR}/${d}/`)) && /(\.cpp|\.h|\/plugin\.cfg)$/.test(f));
@@ -193,7 +221,7 @@ async function pluginSettings(commit: string, known: Set<string>): Promise<VpxSe
   // Les plugins livrés par Cyber Pinball lui-même (vpx-own-plugins.ts), après ceux de VPX.
   for (const def of ownPluginSettings(path.join(__dirname, '..', '..'))) add(def);
   const found = new Set([...byWindow.values()].flat().map((r) => r.id));
-  const stale = Object.keys(RENDERER_WINDOWS).filter((id) => !found.has(id));
+  const stale = Object.keys(RENDERER_WINDOWS).filter((id) => !found.has(id) && rendererExpected(id, version));
   if (stale.length) throw new Error(`Moteurs de rendu de RENDERER_WINDOWS absents du code : ${stale.join(', ')}`);
   for (const window of ['Backglass', 'ScoreView', 'Topper'] as const) {
     for (const renderer of byWindow.get(window) ?? []) add(rendererPrioritySetting(window, renderer));
@@ -210,7 +238,7 @@ async function buildSchema(component: Component, commit: string): Promise<VpxSet
     constants: extractConstants(headers, DESKTOP_FLAGS),
     strings: { VP_VERSION_STRING_DIGITS: versionDigits(component.version) },
   });
-  settings.push(...(await pluginSettings(commit, new Set(settings.map((s) => `${s.section}/${s.key}`.toLowerCase())))));
+  settings.push(...(await pluginSettings(commit, component.version, new Set(settings.map((s) => `${s.section}/${s.key}`.toLowerCase())))));
   return {
     vpx: component.version,
     variant: component.variant,
@@ -240,6 +268,8 @@ function checkSchema(schema: VpxSettingsSchema): void {
   }
   for (const [window, renderers] of Object.entries(VPX_RENDERER_PRIORITIES)) {
     for (const id of Object.keys(renderers)) {
+      // Seulement les moteurs de cette version : ScoreView avant 10.9.0, Nixie depuis (rendererPriorities ne garde que ceux du profil).
+      if (!rendererExpected(id, schema.vpx)) continue;
       const id2 = `${window}/Priority.${id}`;
       if (!known.has(id2.toLowerCase())) missing.push(id2);
     }

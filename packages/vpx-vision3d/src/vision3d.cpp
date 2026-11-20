@@ -28,6 +28,7 @@
 
 #include "MsgPlugin.h"
 #include "VPXPlugin.h"
+#include "vpx-compat.h"
 #include "vue.h"
 
 using namespace vision3d;

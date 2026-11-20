@@ -52,6 +52,11 @@ export interface VpxProfile {
   displayIdFormat: VpxDisplayIdFormat;
   /** Plugins enabled by Cyber Pinball ([Plugin.<id>] Enable = 1); VPX disables them all by default. */
   enabledPlugins: string[];
+  /**
+   * Plugins this version no longer ships (10.9.0: B2SLegacy removed, ScoreView renamed Nixie):
+   * never written, not even to turn them off (VPX_PLUGIN_CONFLICTS).
+   */
+  retiredPlugins?: string[];
 }
 
 export const DEFAULT_VPX_PROFILE: VpxProfile = { displayIdFormat: 'name-position', enabledPlugins: [] };
@@ -75,14 +80,15 @@ export type VpxAncillarySection = 'Backglass' | 'ScoreView' | 'Topper';
  * - PUP first: a PuP pack only draws when it has a video to show, the
  *   backglass of the .directb2s stays shown the rest of the time;
  * - B2S next: backglass and FullDMD of the .directb2s;
- * - ScoreView last: generic display of the DMD and the scores.
- * The renderer bears the name of its plugin (PUPManager.cpp, B2SServer.cpp, ScoreViewPlugin.cpp).
+ * - ScoreView last: generic display of the DMD and the scores (plugin renamed Nixie in 10.9.0:
+ *   both are listed, only the one the version enables is written, rendererPriorities).
+ * The renderer bears the name of its plugin (PUPManager.cpp, B2SServer.cpp, ScoreViewPlugin.cpp, NixiePlugin.cpp).
  * DMD-only screen (4:1 strip): B2S goes to 0 there (DMD_ONLY_PRIORITIES), its FullDMD image
  * has no business in the strip; the DMD of the ROM is drawn there by ScoreView.
  */
 export const VPX_RENDERER_PRIORITIES: Record<VpxAncillarySection, Record<string, number>> = {
   Backglass: { PUP: 100, B2S: 50 },
-  ScoreView: { PUP: 100, B2S: 50, ScoreView: 10 },
+  ScoreView: { PUP: 100, B2S: 50, ScoreView: 10, Nixie: 10 },
   Topper: { PUP: 100 },
 };
 
@@ -193,7 +199,7 @@ export const PINMAME_FAST_BOOT: VpxSetting = { section: 'Plugin.PinMAME', key: '
 /** Plugins that Cyber Pinball turns off because an enabled plugin does the same job (VPX_PLUGIN_CONFLICTS). */
 export function disabledPlugins(profile: VpxProfile): string[] {
   const off = profile.enabledPlugins.flatMap((p) => VPX_PLUGIN_CONFLICTS[p] ?? []);
-  return [...new Set(off)].filter((p) => !profile.enabledPlugins.includes(p));
+  return [...new Set(off)].filter((p) => !profile.enabledPlugins.includes(p) && !profile.retiredPlugins?.includes(p));
 }
 
 /** Priorities written for a window: only those of the enabled plugins. */
@@ -221,7 +227,8 @@ export function rendererPriorities(section: string, profile: VpxProfile, dmdKind
 export function vpxPluginDefaults(assignments: Partial<Record<RoleId, ObservedDisplay>>, profile: VpxProfile, dmdKind?: DmdKind): VpxSetting[] {
   const defaults: VpxSetting[] = [];
   if (profile.enabledPlugins.includes('PinMAME')) defaults.push(PINMAME_FAST_BOOT);
-  if (assignments.dmd && dmdKind !== 'dmd' && profile.enabledPlugins.includes('B2S')) {
+  // L'incrustation du DMD dans l'image FullDMD n'existe plus dans le plugin B2S de 10.9.0 (avec ScoreView, devenu Nixie).
+  if (assignments.dmd && dmdKind !== 'dmd' && profile.enabledPlugins.includes('B2S') && profile.enabledPlugins.includes('ScoreView')) {
     defaults.push({ section: 'Plugin.B2S', key: 'ScoreViewDMDOverlay', value: '1' });
     defaults.push({ section: 'Plugin.B2S', key: 'ScoreViewDMDAutoPos', value: '1' });
   }

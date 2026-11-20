@@ -119,7 +119,7 @@ for (const name of fs.readdirSync(installerDir)) {
 // avec les mêmes outils que le compagnon du casque ; sans eux, l'entrée « Vision 3D » dit qu'il
 // manque), MediaPipe pour la webcam (le seul script classique et son WebAssembly) et le modèle du visage.
 {
-  const { buildVision3d, VISION3D_SOURCE } = await import('./vision3d.mjs');
+  const { buildVision3d, VISION3D_SOURCE, VPX_PLUGIN_BUILDS } = await import('./vision3d.mjs');
   const dll = buildVision3d({ quiet: true });
   if (dll) {
     const dir = path.join(stage, 'natif', 'vision3d');
@@ -144,6 +144,19 @@ for (const name of fs.readdirSync(installerDir)) {
       fs.copyFileSync(dmdDll, path.join(dmdDir, path.basename(dmdDll)));
       fs.copyFileSync(path.join(VISION3D_SOURCE, 'cyberpinball-dmd.cfg'), path.join(dmdDir, 'plugin.cfg'));
       console.log(`Plugin du DMD : ${path.join('natif', 'cyberpinball-dmd', path.basename(dmdDll))}`);
+    }
+    // Les mêmes plugins construits pour les autres API de VPX (10.9.0) : natif\<dossier>\vpx-<version>, à côté du
+    // plugin.cfg commun ; chaque VPX reçoit le jeu de sa version (app/src/vpx-plugins.ts, vpxPluginSet).
+    for (const [version, built] of Object.entries(VPX_PLUGIN_BUILDS)) {
+      if (version === '10.8.1') continue;
+      for (const [folder, name] of [['vision3d', 'plugin-vision3d64.dll'], ['cyberpinball', 'plugin-cyberpinball64.dll'], ['cyberpinball-dmd', 'plugin-cyberpinballdmd64.dll']]) {
+        const from = path.join(built, name);
+        if (!fs.existsSync(from) || !fs.existsSync(path.join(stage, 'natif', folder, 'plugin.cfg'))) continue;
+        const to = path.join(stage, 'natif', folder, `vpx-${version}`);
+        fs.mkdirSync(to, { recursive: true });
+        fs.copyFileSync(from, path.join(to, name));
+        console.log(`Plugin ${folder} pour VPX ${version} : ${path.join('natif', folder, `vpx-${version}`, name)}`);
+      }
     }
   }
   const mediapipe = path.dirname(require.resolve('@mediapipe/tasks-vision', { paths: [path.join(repo, 'app')] }));

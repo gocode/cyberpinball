@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Getting ready for VPX 10.9: Cyber Pinball can describe the next VPX version alongside its own (settings, renamed plugins, screens named with their position), and have it tried on a development cabinet without reinstalling or touching the VPX 10.8.1 settings. Scores made with this trial version stay on the cabinet.
 - Future Pinball: the game keeps the session's playfield orientation; started on Windows' own (previous prerelease), the table showed upside down.
 - Future Pinball: the DMD copied by dmdext is placed by Cyber Pinball on the DMD screen as it is during the game. The game's full screen makes Windows move screens, and the position written in DmdDevice.ini ended up off every screen. A DMD the player already placed on the DMD screen stays where it is.
 - Catalog: "Games: for Future Pinball" filter, showing only games that have a Future Pinball version, with those versions first and recommended. The "Future Pinball tables" screen has its own "Find a table online" entry, which opens the catalog filtered that way.

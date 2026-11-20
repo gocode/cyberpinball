@@ -3,28 +3,45 @@ import {
   DEFAULT_VPX_PROFILE,
   readRootPointer,
   resolveLocations,
+  withVpxIniFolder,
   writeRootPointer,
   type Locations,
   type VpxProfile,
 } from '@cyberpinball/core';
-import { activeComponent, componentStatus, loadManifest } from '@cyberpinball/installer';
+import { componentStatus, loadManifest } from '@cyberpinball/installer';
+import { seedTrialIni, trialVpxAllowed, vpxInUse, type VpxInUse } from './vpx-essai';
 
-/** Exécutable de la version active de VPX, atteint par la jonction « current ». */
-export function vpxInstall(loc: Locations): { exe: string; version: string } | undefined {
+/** Mode d'essai de VPX permis ici : lancé depuis les sources, ou canal d'essai privé (vpx-essai.ts). */
+export function trialVpxAllowedHere(): boolean {
+  return trialVpxAllowed({ installed: Boolean(installedRoot()) });
+}
+
+/** La version de VPX que les parties lancent : la version d'essai choisie, sinon la version active. */
+export function vpxCurrent(loc: Locations): VpxInUse | undefined {
+  return vpxInUse(loc, { allowed: trialVpxAllowedHere() });
+}
+
+/**
+ * Exécutable de la version de VPX des parties : la version active (jonction « current »), ou la
+ * version d'essai choisie (son propre dossier).
+ */
+export function vpxInstall(loc: Locations): { exe: string; version: string; trial?: boolean } | undefined {
   if (!loc.root) return undefined;
-  const active = activeComponent(loc.root, 'vpx');
-  if (!active) return undefined;
-  const component = active.entry ?? loadManifest().find((c) => c.id === 'vpx');
+  const used = vpxCurrent(loc);
+  if (!used) return undefined;
+  const component = used.entry ?? loadManifest().find((c) => c.id === 'vpx' && !c.trial);
   if (!component) return undefined;
-  const status = componentStatus(loc.root, { ...component, version: active.version });
+  const status = componentStatus(loc.root, { ...component, version: used.version });
   if (!status.executable) return undefined;
-  return { exe: path.join(status.paths.current, path.basename(status.executable)), version: active.version };
+  const dir = used.trial ? status.paths.version : status.paths.current;
+  return { exe: path.join(dir, path.basename(status.executable)), version: used.version, ...(used.trial && { trial: true }) };
 }
 
 /**
  * Emplacements effectifs. Installé, l'exécutable se trouve dans <racine>\app\ :
  * il prend le dossier parent comme racine, sans rien demander. Lancé depuis les
  * sources, il utilise la racine mémorisée, ou le bac à sable tant qu'il n'y en a pas.
+ * En mode d'essai de VPX, les VPinballX.ini sont ceux de la version d'essai (vpx-essai.ts).
  */
 export function locations(): Locations {
   const self = installedRoot();
@@ -33,7 +50,8 @@ export function locations(): Locations {
   if (self && !process.env.CYBERPINBALL_HOME && readRootPointer(loc.pointerFile) !== self) {
     writeRootPointer(loc.pointerFile, self);
   }
-  return loc;
+  const used = vpxCurrent(loc);
+  return used?.trial ? withVpxIniFolder(loc, (baseIni) => seedTrialIni(baseIni, used.version)) : loc;
 }
 
 /** Racine d'une installation : le dossier qui contient app\CyberPinball.exe. */
@@ -51,8 +69,8 @@ export function backupDir(dataDir: string): string {
  * que Cyber Pinball installerait. Une version inconnue du manifeste garde le profil par défaut.
  */
 export function vpxProfile(loc: Locations): { profile: VpxProfile; source: string } {
-  const active = loc.root ? activeComponent(loc.root, 'vpx') : undefined;
-  const entry = active ? active.entry : loadManifest().find((c) => c.id === 'vpx');
+  const active = loc.root ? vpxCurrent(loc) : undefined;
+  const entry = active ? active.entry : loadManifest().find((c) => c.id === 'vpx' && !c.trial);
   if (active && !active.entry) {
     return { profile: DEFAULT_VPX_PROFILE, source: `VPX ${active.version}, absent du manifeste : profil par défaut` }; // i18n-ignore : sortie console de npm run sync
   }

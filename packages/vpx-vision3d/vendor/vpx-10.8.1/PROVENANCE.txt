@@ -1,0 +1,7 @@
+En-têtes de l'API des plugins de Visual Pinball X (GPLv3+), copiés sans modification depuis
+https://github.com/vpinball/vpinball, étiquette v10.8.1-5436-af26b2d93, dossier plugins/plugins/ :
+MsgPlugin.h, VPXPlugin.h, ControllerPlugin.h, LoggingPlugin.h.
+C'est la version de VPX installée par Cyber Pinball (packages/installer/components.json). Nos plugins sont
+construits une fois par jeu d'en-têtes (vendor/vpx-<version>, CMakeLists.txt, src/vpx-compat.h) : ce jeu-ci
+donne les DLL de build\vision3d\Release, copiées dans les VPX 10.8.x (app/src/vpx-plugins.ts, vpxPluginSet).
+Un changement de version de VPX demande de recopier ces en-têtes et de relancer le banc d'essai.

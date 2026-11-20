@@ -7,7 +7,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { componentPaths, layoutOf, peFileVersion, t, tLater, type DownloadManager, type Locations } from '@cyberpinball/core';
-import { activeComponent, checkComponentFiles, restoreComponentFiles, type ChangedComponentFile } from '@cyberpinball/installer';
+import { checkComponentFiles, restoreComponentFiles, type ChangedComponentFile } from '@cyberpinball/installer';
+import { vpxCurrent } from './paths';
 
 export interface VpxFilesStatus {
   /** Dossier de la version active. */
@@ -39,8 +40,9 @@ function fileVersion(file: string): string | undefined {
 /** L'état des fichiers de la version active de VPX ; undefined : VPX absent, ou version que le manifeste ne décrit pas. */
 export function vpxFilesStatus(loc: Locations): VpxFilesStatus | undefined {
   if (!loc.root) return undefined;
-  const active = activeComponent(loc.root, 'vpx');
-  if (!active?.entry) return undefined;
+  const active = vpxCurrent(loc);
+  // Une version d'essai n'a pas d'archive téléchargeable à vérifier ni à remettre (distribution manuelle).
+  if (!active?.entry || active.entry.distribution === 'manual') return undefined;
   const dir = componentPaths(loc.root, active.entry.installDir, active.version).version;
   const check = checkComponentFiles(dir, active.entry);
   if (!check) return undefined;
@@ -84,7 +86,7 @@ export function vpxChangedFiles(loc: Locations): string[] {
 export async function restoreVpxFiles(loc: Locations, onProgress: (received: number, total: number) => void, downloads?: DownloadManager): Promise<number> {
   const status = vpxFilesStatus(loc);
   if (!status || !loc.root || !status.changed.length) return 0;
-  const entry = activeComponent(loc.root, 'vpx')!.entry!;
+  const entry = vpxCurrent(loc)!.entry!;
   const files = status.changed.map((c) => c.file);
   const archive = path.join(layoutOf(loc.root).downloads, path.basename(new URL(entry.url).pathname));
   const job = downloads?.track({

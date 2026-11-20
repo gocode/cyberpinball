@@ -19,7 +19,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
-import { DMDSERVER_ADDR, DMDSERVER_PORT, dmdServerFrame, dmdServerIni, dmdServerNotFoundProblem, dmdServerWanted, loadCabinet, t, type DmdColors, type DmdDots } from '@cyberpinball/core';
+import { DMDSERVER_ADDR, DMDSERVER_PORT, DMDSERVER_VPX_VERSIONS, dmdServerFrame, dmdServerIni, dmdServerNotFoundProblem, dmdServerWanted, loadCabinet, t, type DmdColors, type DmdDots } from '@cyberpinball/core';
 import { locations, vpxInstall } from './paths';
 import { clearPin2dmdProbe, refreshPin2dmdProbe } from './pin2dmd-probe';
 import { usbDevices } from './vpx-ini';
@@ -74,7 +74,7 @@ export function dmdServerArgs(program: DmdServerProgram, iniPath: string): strin
 export function dmdServerExitProblem(code: number | null): string | undefined {
   if (code === 3) return t('Le module DMD de VPX ne se charge pas (Visual C++ 2015-2022 x64 manquant ?)');
   // 4 : une fonction manque ; 6 : empreinte inconnue (packages/dmdserver/src/empreintes.h), DLL jamais chargée.
-  if (code === 4 || code === 6) return t('Version de VPX non prise en charge par le serveur du DMD (VPX 10.8.1 attendu)');
+  if (code === 4 || code === 6) return t('Version de VPX non prise en charge par le serveur du DMD (prévu pour {versions})', { versions: DMDSERVER_VPX_VERSIONS.map((v) => `VPX ${v}`).join(', ') });
   if (code === 5) return t('Serveur du DMD lancé avec de mauvais arguments');
   return undefined;
 }

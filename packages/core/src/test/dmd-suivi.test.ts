@@ -30,6 +30,9 @@ test('plugin du DMD : la taille donnée à SDL, la diffusion, et rien d’autre 
   assert.match(cpp, /L"Visual Pinball Score View"/);
   // Aucun rendu annexe hors de la sonde : sans Probe, rien n'est ajouté à la liste de VPX.
   assert.match(cpp, /if \(!msg \|\| !sondeActive_Val \|\| msg->window != VPXWINDOW_ScoreView\)\s*return;/);
+  // La sonde laisse dessiner le rendu des scores de VPX sous ses deux noms : ScoreView (10.8.1), Nixie (10.9.0).
+  assert.match(cpp, /if \(vpx::estRenduScores\(entrees\[i\]\.id\) && entrees\[i\]\.Render\)/);
+  assert.doesNotMatch(cpp, /strcmp\([^)]*"ScoreView"\)/);
   assert.match(cpp, /MSGPI_INT_VAL_SETTING\(sondeActive, "Probe", [^;]*, 0, 1, 0\);/);
   for (const absent of ['VPXPI_EVT_ON_ACTION_CHANGED', 'timeBeginPeriod', 'PushNotification']) assert.ok(!cpp.includes(absent), absent);
   // La taille posée de l'extérieur, donnée à SDL (sa zone cliente ne suit pas seule : WM_NCCALCSIZE d'une fenêtre sans

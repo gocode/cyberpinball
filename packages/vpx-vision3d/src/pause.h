@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -132,6 +133,87 @@ inline Commande commandeVpx1081(int id, int& lieeA)
    }
    lieeA = table[id].api;
    return table[id].c;
+}
+
+/** Les versions de VPX dont le plugin connaît les numéros internes des actions ; une autre : plugin passif. */
+enum class VersionVpx
+{
+   Inconnue,
+   V10_8_1, // révision 5436 (af26b2d93), celle que Cyber Pinball installe
+   V10_9_0, // commit 28919b5df (10.9.0-6948), mode d'essai
+};
+
+/** La version de VPX d'après le numéro de fichier de son exécutable (VS_FIXEDFILEINFO : majeure, mineure, correctif). */
+inline VersionVpx versionVpx(int majeure, int mineure, int correctif)
+{
+   if (majeure == 10 && mineure == 8 && correctif == 1)
+      return VersionVpx::V10_8_1;
+   if (majeure == 10 && mineure == 9 && correctif == 0)
+      return VersionVpx::V10_9_0;
+   return VersionVpx::Inconnue;
+}
+
+/**
+ * Les actions de VPX par numéro interne : le nom de réglage de chacune (« Mapping.<nom> » de l'INI), dans l'ordre de
+ * InputManager::CreateInputActions (VPX pour Windows, avec ENABLE_XR). 10.8.1 : 45 et 46 (vers la gauche, vers la
+ * droite) portent par erreur les noms de 43 et 44 ; 10.9.0 les nomme VRLeft et VRRight, au même rang, et ajoute
+ * MouseLeft et MouseRight à la fin. Chaque table de version se ramène à celle de 10.8.1 (commandeVpx1081) par le nom.
+ */
+inline constexpr const char* ACTIONS_VPX_1081[] = {
+   "LeftFlipper", "RightFlipper", "LeftStagedFlipper", "RightStagedFlipper", "LeftMagna", "RightMagna", "UIUp", "UIDown", "UILeft", "UIRight", // 0-9
+   "LaunchBall", "LeftNudge", "RightNudge", "CenterNudge", "Tilt", "Credit1", "Credit2", "Credit3", "Credit4", "Start",                    // 10-19
+   "ExtraBall", "Lockbar", "Pause", "PerfOverlay", "ExitGame", "InGameUI", "VolumeDown", "VolumeUp", "ShowRules", "SlamTilt",              // 20-29
+   "CoinDoor", "Reset", "Service1", "Service2", "Service3", "Service4", "Service5", "Service6", "Service7", "Service8",                   // 30-39
+   "VRCenter", "VRUp", "VRDown", "VRFront", "VRBack", "VRFront", "VRBack", "VRControllerCalibration", "GenTournament", "DebugBalls",       // 40-49
+   "Debugger", "ToggleStereo", "Custom1", "Custom2", "Custom3", "Custom4",                                                                // 50-55
+};
+inline constexpr const char* ACTIONS_VPX_1090[] = {
+   "LeftFlipper", "RightFlipper", "LeftStagedFlipper", "RightStagedFlipper", "LeftMagna", "RightMagna", "UIUp", "UIDown", "UILeft", "UIRight", // 0-9
+   "LaunchBall", "LeftNudge", "RightNudge", "CenterNudge", "Tilt", "Credit1", "Credit2", "Credit3", "Credit4", "Start",                    // 10-19
+   "ExtraBall", "Lockbar", "Pause", "PerfOverlay", "ExitGame", "InGameUI", "VolumeDown", "VolumeUp", "ShowRules", "SlamTilt",              // 20-29
+   "CoinDoor", "Reset", "Service1", "Service2", "Service3", "Service4", "Service5", "Service6", "Service7", "Service8",                   // 30-39
+   "VRCenter", "VRUp", "VRDown", "VRFront", "VRBack", "VRLeft", "VRRight", "VRControllerCalibration", "GenTournament", "DebugBalls",       // 40-49
+   "Debugger", "ToggleStereo", "Custom1", "Custom2", "Custom3", "Custom4", "MouseLeft", "MouseRight",                                     // 50-57
+};
+
+/** La table des actions d'une version (nombre dans `n`), ou nullptr pour une version inconnue. */
+inline const char* const* actionsVpx(VersionVpx v, int& n)
+{
+   switch (v)
+   {
+   case VersionVpx::V10_8_1: n = static_cast<int>(std::size(ACTIONS_VPX_1081)); return ACTIONS_VPX_1081;
+   case VersionVpx::V10_9_0: n = static_cast<int>(std::size(ACTIONS_VPX_1090)); return ACTIONS_VPX_1090;
+   default: n = 0; return nullptr;
+   }
+}
+
+/** Le numéro interne de l'action `nom` dans cette version (le premier, s'il y en a deux), ou -1. */
+inline int numeroActionVpx(VersionVpx v, const char* nom)
+{
+   int n = 0;
+   const char* const* noms = actionsVpx(v, n);
+   for (int i = 0; noms && nom && i < n; i++)
+      if (std::string(noms[i]) == nom)
+         return i;
+   return -1;
+}
+
+/**
+ * Une action de cette version de VPX par son numéro interne : son nom, puis la règle de 10.8.1 (commandeVpx1081)
+ * pour ce nom (son premier numéro en 10.8.1). Version inconnue, numéro hors table, nom absent de 10.8.1 : Inconnue,
+ * jamais avalée.
+ */
+inline Commande commandeVpx(VersionVpx v, int id, int& lieeA)
+{
+   lieeA = -1;
+   int n = 0;
+   const char* const* noms = actionsVpx(v, n);
+   if (!noms || id < 0 || id >= n)
+      return Commande::Inconnue;
+   const int en1081 = numeroActionVpx(VersionVpx::V10_8_1, noms[id]);
+   if (en1081 < 0)
+      return Commande::Inconnue;
+   return commandeVpx1081(en1081, lieeA);
 }
 
 /**

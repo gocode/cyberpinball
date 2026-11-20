@@ -1,6 +1,8 @@
-// Construit le plugin VPX « Vision3D » (packages/vpx-vision3d) et son banc d'essai :
-//   node scripts/vision3d.mjs          -> build\vision3d\Release\plugin-vision3d64.dll
-//   node scripts/vision3d.mjs --banc   -> construit, puis lance le banc (sans VPX ni écran)
+// Construit les plugins VPX de Cyber Pinball (packages/vpx-vision3d) et leurs bancs d'essai, pour chaque API de
+// plugins de VPX (un jeu de DLL par version, même source : packages/vpx-vision3d/CMakeLists.txt) :
+//   node scripts/vision3d.mjs          -> build\vision3d\Release\plugin-*.dll (VPX 10.8.1)
+//                                         build\vision3d\Release\vpx-10.9.0\plugin-*.dll (VPX 10.9.0)
+//   node scripts/vision3d.mjs --banc   -> construit, puis lance le banc de Vision3D de chaque jeu (sans VPX ni écran)
 // Demande CMake et les outils C++ de Visual Studio (Build Tools 2022), comme le compagnon du
 // casque. Sans eux : un message, code de sortie 2 ; l'application part sans le plugin et
 // l'entrée « Vision 3D » le dit.
@@ -16,6 +18,11 @@ export const VISION3D_SOURCE = path.join(repo, 'packages', 'vpx-vision3d');
 const build = path.join(repo, 'build', 'vision3d');
 export const VISION3D_DLL = path.join(build, 'Release', 'plugin-vision3d64.dll');
 export const VISION3D_BANC = path.join(build, 'Release', 'banc-vision3d.exe');
+/**
+ * Dossier de chaque jeu de DLL des plugins, par API de plugins de VPX (app/src/vpx-plugins.ts, vpxPluginSetDir) :
+ * 10.8.1 dans Release, les autres dans Release\vpx-<version>. Mêmes noms de fichiers partout.
+ */
+export const VPX_PLUGIN_BUILDS = { '10.8.1': path.join(build, 'Release'), '10.9.0': path.join(build, 'Release', 'vpx-10.9.0') };
 /** Fausse Kinect10.dll des essais (CYBERPINBALL_KINECT_DLL). */
 export const KINECT_FACTICE = path.join(build, 'Release', 'kinect-factice.dll');
 
@@ -48,7 +55,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (!dll) process.exit(2);
   console.log(`Plugin Vision 3D : ${dll}`);
   if (process.argv.includes('--banc')) {
-    const banc = spawnSync(VISION3D_BANC, [dll], { stdio: 'inherit', windowsHide: true });
-    process.exit(banc.status ?? 1);
+    let status = 0;
+    for (const [version, dir] of Object.entries(VPX_PLUGIN_BUILDS)) {
+      console.log(`Banc de Vision3D, API de VPX ${version} :`);
+      const banc = spawnSync(path.join(dir, 'banc-vision3d.exe'), [path.join(dir, 'plugin-vision3d64.dll')], { stdio: 'inherit', windowsHide: true });
+      if (banc.status !== 0) status = banc.status ?? 1;
+    }
+    process.exit(status);
   }
 }

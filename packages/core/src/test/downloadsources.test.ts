@@ -52,6 +52,7 @@ const CALLERS: Record<string, { count: number; how: string }> = {
   'app/src/media-download.ts': { count: 3, how: 'plans de VPinMediaDB (une table, toutes les tables, après l’ajout) : trackInstall' },
   'app/src/media-search.ts': { count: 2, how: 'stage : un média demandé, suivi (track) ; stagePreviews : aperçus du plan, pas un téléchargement demandé' },
   'app/src/vision3d.ts': { count: 1, how: 'pilote de la Kinect, chez Microsoft : manager.track' },
+  'app/src/vpx-essai-menu.ts': { count: 1, how: 'VPX d’essai : installComponent avec l’archive déjà sur le disque (findLocalArchive), aucun téléchargement' },
   'app/src/vc-runtime.ts': { count: 1, how: 'runtime Visual C++ de VPX, chez Microsoft : manager.track' },
   'app/src/updates-menu.ts': { count: 2, how: 'mise à jour (installeur ou paquet léger) : manager.track' },
   'app/src/ytdlp-tool.ts': { count: 1, how: 'yt-dlp lui-même, dans la récupération suivie (trackGrab)' },
@@ -121,7 +122,8 @@ test('chaque appel de l’application à un téléchargement est suivi dans la f
     'Un appel nouveau à un téléchargement : le suivre dans la file (manager.track, ou un transport), puis l’inscrire dans CALLERS.',
   );
   for (const file of Object.keys(CALLERS)) {
-    if (file === 'app/src/friend-content.ts' || file === 'app/src/ytdlp-tool.ts') continue;
+    // VPX d'essai : l'archive est déjà sur le disque, installComponent ne télécharge rien (opts.archive).
+    if (file === 'app/src/friend-content.ts' || file === 'app/src/ytdlp-tool.ts' || file === 'app/src/vpx-essai-menu.ts') continue;
     assert.match(fs.readFileSync(path.join(REPO_ROOT, file), 'utf8'), TRACKED, `${file} : son téléchargement entre dans la file`);
   }
   // Chaque plan de VPinMediaDB a son suivi.

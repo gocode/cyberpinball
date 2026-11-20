@@ -59,6 +59,7 @@
 #include "VPXPlugin.h"
 #include "ControllerPlugin.h"
 #include "LoggingPlugin.h"
+#include "vpx-compat.h"
 #include "suivi-dmd.h"
 #include "cadence.h"
 #include "arrets.h"
@@ -445,7 +446,7 @@ int MSGPIAPI rendreSonde(VPXRenderContext2D* ctx, void*)
       GetAncillaryRendererMsg m { VPXWINDOW_ScoreView, 16, 0, entrees };
       msgApi->BroadcastMsg(endpointId, getAuxRendererId, &m);
       for (unsigned int i = 0; i < m.count && i < 16; i++)
-         if (entrees[i].id && std::strcmp(entrees[i].id, "ScoreView") == 0 && entrees[i].Render)
+         if (vpx::estRenduScores(entrees[i].id) && entrees[i].Render) // « ScoreView » en 10.8.1, « Nixie » en 10.9.0
          {
             sonde.scoreView = entrees[i];
             sonde.trouve = true;

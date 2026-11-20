@@ -57,6 +57,16 @@ export function componentPaths(root: string, installDir: string, version: string
   return { base, version: path.join(base, version), current: path.join(base, 'current') };
 }
 
+/**
+ * Les mêmes emplacements, avec les VPinballX.ini dans un autre dossier (mode d'essai de VPX,
+ * app/src/vpx-essai.ts : les .ini de la version d'essai, à côté de ceux de la version habituelle).
+ * `folder` reçoit le VPinballX.ini habituel et rend le dossier de remplacement ; les configurations
+ * suivent, leur .ini étant résolu à côté de celui-ci (configIniPath).
+ */
+export function withVpxIniFolder(loc: Locations, folder: (baseIni: string) => string): Locations {
+  return { ...loc, vpxIni: path.join(folder(loc.vpxIni), path.basename(loc.vpxIni)) };
+}
+
 /** Problèmes qui empêchent d'utiliser ce dossier comme racine. */
 export function checkRoot(root: string, env: NodeJS.ProcessEnv = process.env): string[] {
   const problems: string[] = [];

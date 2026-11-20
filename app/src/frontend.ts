@@ -345,7 +345,8 @@ import { createConverter } from './media-convert';
 import { RomMusic } from './rom-music';
 import { onKeyInput } from './key-input';
 import { onJoystickInput, retryJoysticks, watchJoystickButtons } from './joystick-input';
-import { locations, vpxInstall, vpxProfile } from './paths';
+import { locations, trialVpxAllowedHere, vpxInstall, vpxProfile } from './paths';
+import { createVpxTrialMenu } from './vpx-essai-menu';
 import { loadPlugins } from './plugins';
 import { activeVpxIni, audioOutputs, syncConfiguration } from './vpx-ini';
 import { createConfigurationsMenu } from './configurations-menu';
@@ -2288,6 +2289,10 @@ function jukeboxOutputPlace(name: string): string | undefined {
 }
 // Langue de l'interface : le choix relance le menu, comme un changement de configuration.
 library.provideSystemItem('language', createLanguageMenu({ library, relaunch: () => relaunchMenu() }));
+// VPX d'essai (vpx-essai.ts) : lancé depuis les sources ou avec le canal d'essai privé, sinon l'entrée n'existe pas.
+if (trialVpxAllowedHere()) {
+  library.provideSystemItem('vpx-trial', createVpxTrialMenu({ library, root: () => loc.root, dataDir: () => loc.dataDir, relaunch: () => relaunchMenu() }).item);
+}
 // Conditions d'utilisation : à accepter au démarrage tant que la version en cours ne l'est pas, à relire ici.
 const termsMenu = createTermsMenu({ library, dataDir: loc.dataDir, quit: () => void quit() });
 library.provideSystemItem('terms', termsMenu.systemItem);
@@ -5607,6 +5612,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
 async function publishScores(table: TableEntry, kept: readonly PlayedScore[], multi: boolean): Promise<void> {
   const solo = kept.filter((p) => !p.of);
   if (guest.active || multi || !solo.length) return;
+  // VPX d'essai (vpx-essai.ts) : autre physique (secousses, lanceur), les scores restent sur la borne.
+  if (vpxInstall(loc)?.trial) return void console.log(`Classements (${table.id}) : non publiés, partie jouée avec le VPX d'essai.`); // i18n-ignore : journal
   const board = boardKey(await liveGames.versionOf(table));
   if (!board) return;
   const balls = (await ballCounts.of(table))?.balls;

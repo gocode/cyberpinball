@@ -16,11 +16,15 @@ Le serveur n'accepte que les dmdutil64.dll dont l'empreinte SHA-256 est dans src
 sinon, DLL jamais chargée) : une autre version de libdmdutil peut changer la disposition de ses classes
 sans changer ses fonctions.
 
-Un changement de version de VPX, plus récente ou plus ancienne, demande de recopier ces en-têtes au commit
-de libdmdutil qu'il épingle, de refaire dmdutil64.def, d'ajouter à src/empreintes.h l'empreinte que donne
-« node scripts/dmdserver.mjs --verifier --vpx <VPX> » (code 6 tant qu'elle manque), puis de relancer cette
-même commande. packages/core/src/test/dmdserver.test.ts échoue tant que la version de VPX de
-packages/installer/components.json n'a pas sa ligne dans src/empreintes.h.
+Une autre version de VPX demande sa ligne dans src/empreintes.h : l'empreinte que donne
+« node scripts/dmdserver.mjs --verifier --vpx <VPX> » (code 6 tant qu'elle manque) et le commit de libdmdutil
+qu'elle épingle (LIBDMDUTIL_SHA de platforms/config.sh de VPX). Le serveur n'accepte que les DLL du commit de ces
+en-têtes (kVendorLibdmdutil, 3485e2e) : pour un autre commit, recopier ces en-têtes à ce commit, refaire
+dmdutil64.def, changer kVendorLibdmdutil, puis relancer cette même commande. VPX 10.9.0 (28919b5df, mode d'essai)
+épingle libdmdutil 6b8f711, dont Config.h, DMD.h et DMDServer.h diffèrent de 3485e2e : sa ligne attend son
+empreinte, et sa DLL reste refusée tant que le serveur n'est pas construit aussi sur ces en-têtes-là.
+packages/core/src/test/dmdserver.test.ts échoue tant que la version de VPX de packages/installer/components.json
+n'a pas sa ligne avec son empreinte dans src/empreintes.h.
 
 src/pin2dmd.h : la sortie PIN2DMD du serveur, écrite pour Cyber Pinball : la DLL de VPX 10.8.1-5436 n'en
 contient pas le code (DMDUTIL_ENABLE_PIN2DMD jamais défini à ce commit ; corrigé en amont par libdmdutil

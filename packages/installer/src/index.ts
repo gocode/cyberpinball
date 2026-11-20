@@ -14,7 +14,7 @@ import {
   type Locations,
 } from '@cyberpinball/core';
 import { downloadComponent, type Progress } from './download';
-import { extractZip, findExecutable, flattenSingleFolder, freeBytes, isLink, pointJunction } from './fsutil';
+import { extractZip, findExecutable, flattenSingleFolder, freeBytes, isLink, pointJunction, sha256OfFile } from './fsutil';
 import { loadManifest, type Component } from './manifest';
 
 export * from './manifest';
@@ -114,25 +114,26 @@ export function componentStatus(root: string, component: Component) {
  * Installe une version à côté des autres, puis la rend active. Chaque version
  * reste dans son propre dossier : revenir en arrière revient à repointer « current ».
  */
-export async function installComponent(root: string, component: Component, onProgress?: Progress): Promise<InstalledComponent> {
+export async function installComponent(root: string, component: Component, onProgress?: Progress, opts: InstallOptions = {}): Promise<InstalledComponent> {
   // Pilote ou runtime : un installateur de son éditeur, lancé avec l'accord de Windows, jamais une archive à extraire.
   if (component.kind === 'driver' || component.kind === 'runtime') throw new Error(t('{name} s’installe par l’installateur de son éditeur, pas par extraction.', { name: component.name }));
   const layout = layoutOf(root);
   const status = componentStatus(root, component);
   const { paths } = status;
 
-  if (!status.installed && component.distribution === 'manual') {
+  if (!status.installed && component.distribution === 'manual' && !opts.archive) {
     throw new Error(
       t('{name} ne peut pas être redistribué : téléchargez-le depuis {homepage} et décompressez-le dans {folder}.', { name: component.name, homepage: component.homepage, folder: paths.version }),
     );
   }
 
   if (!status.installed) {
-    const archive = await downloadComponent(component, layout.downloads, onProgress);
+    const archive = opts.archive ? await verifiedArchive(component, opts.archive) : await downloadComponent(component, layout.downloads, onProgress);
     const staging = `${paths.version}.extraction`;
     fs.rmSync(staging, { recursive: true, force: true });
     extractZip(archive, staging);
     flattenSingleFolder(staging);
+    unwrapInnerZip(staging, component);
     if (!findExecutable(staging, component.executablePattern, component.executable)) {
       fs.rmSync(staging, { recursive: true, force: true });
       throw new Error(t("Aucun exécutable correspondant à {pattern} dans l'archive de {name}.", { pattern: component.executablePattern, name: component.name }));
@@ -146,7 +147,71 @@ export async function installComponent(root: string, component: Component, onPro
     renameWithRetry(staging, paths.version);
   }
 
+  // Une version d'essai s'installe à côté sans devenir active : « current » reste sur l'habituelle.
+  if (opts.activate === false) {
+    const executable = findExecutable(paths.version, component.executablePattern, component.executable)!;
+    return { component, dir: paths.version, current: paths.current, executable, alreadyInstalled: status.installed };
+  }
   pointJunction(paths.current, paths.version);
   const executable = findExecutable(paths.current, component.executablePattern, component.executable)!;
   return { component, dir: paths.version, current: paths.current, executable, alreadyInstalled: status.installed };
+}
+
+export interface InstallOptions {
+  /** false : installer à côté sans repointer « current » (version d'essai). Vrai par défaut. */
+  activate?: boolean;
+  /** Archive déjà sur le disque (composant à distribution manuelle) : vérifiée par son SHA-256. */
+  archive?: string;
+}
+
+/**
+ * Un artefact de la CI de GitHub est une archive qui peut n'en contenir qu'une autre : sans
+ * exécutable mais avec un seul .zip, celui-ci est décompressé à sa place.
+ */
+function unwrapInnerZip(staging: string, component: Component): void {
+  if (findExecutable(staging, component.executablePattern, component.executable)) return;
+  const entries = fs.readdirSync(staging);
+  if (entries.length !== 1 || !/\.zip$/i.test(entries[0]!)) return;
+  const inner = path.join(staging, entries[0]!);
+  const unpacked = `${staging}.interieur`;
+  fs.rmSync(unpacked, { recursive: true, force: true });
+  extractZip(inner, unpacked);
+  flattenSingleFolder(unpacked);
+  fs.rmSync(staging, { recursive: true, force: true });
+  renameWithRetry(unpacked, staging);
+}
+
+/** L'archive fournie, si son empreinte est celle du manifeste ; sinon une erreur, et rien n'est installé. */
+async function verifiedArchive(component: Component, archive: string): Promise<string> {
+  const actual = await sha256OfFile(archive);
+  if (actual !== component.sha256) {
+    throw new Error(t('Empreinte SHA-256 incorrecte pour {name} : attendu {expected}, obtenu {actual}.', { name: component.name, expected: component.sha256, actual }));
+  }
+  return archive;
+}
+
+/**
+ * Cherche dans des dossiers (Téléchargements…) l'archive d'un composant à distribution manuelle :
+ * la bonne taille, puis la bonne empreinte, quel que soit son nom (« … (1).zip »).
+ */
+export async function findLocalArchive(component: Component, dirs: string[]): Promise<string | undefined> {
+  for (const dir of dirs) {
+    let names: string[];
+    try {
+      names = fs.readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      if (!/\.zip$/i.test(name)) continue;
+      const file = path.join(dir, name);
+      try {
+        if (fs.statSync(file).size !== component.size) continue;
+      } catch {
+        continue;
+      }
+      if ((await sha256OfFile(file)) === component.sha256) return file;
+    }
+  }
+  return undefined;
 }

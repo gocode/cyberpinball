@@ -87,7 +87,7 @@ test('plugin du DMD : la cadence écrite dans vpinball.log (API de journal de VP
   assert.match(cpp, /direBilan\("end"\);/);
   // La mémoire de VPX à chaque bilan (« fuite de mémoire » d'un rapport du 17/11/2026).
   assert.match(cpp, /" mem=%dMB", memoireMo\(\)/);
-  assert.match(read('packages', 'vpx-vision3d', 'vendor', 'vpx', 'PROVENANCE.txt'), /LoggingPlugin\.h/);
+  for (const set of ['vpx-10.8.1', 'vpx-10.9.0']) assert.match(read('packages', 'vpx-vision3d', 'vendor', set, 'PROVENANCE.txt'), /LoggingPlugin\.h/);
 });
 
 test('à-coups : chacun dit où était le fil des images (relevé pendant l’attente, sans verrou pendant la suspension)', () => {

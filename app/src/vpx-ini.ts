@@ -63,6 +63,8 @@ export function syncVpxIni(
 /**
  * Mises en page de ScoreView qui remplissent la fenêtre du DMD (scoreviewlayouts.ts), tirées de
  * celles de la version de VPX installée ; undefined sans VPX ou en cas d'échec (ScoreView garde les siennes).
+ * VPX 10.9.0 : ScoreView devenu Nixie, mises en page .nix dans plugins\nixie\layouts, d'un autre format ;
+ * plugins\scoreview\layouts n'existe plus, rien n'est préparé et Nixie garde les siennes.
  */
 function scoreViewLayouts(loc: ReturnType<typeof locations>, dataDir: string): string | undefined {
   const exe = vpxInstall(loc)?.exe;

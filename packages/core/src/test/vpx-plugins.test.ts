@@ -25,7 +25,7 @@ import type { Cabinet, ObservedUsbDevice } from '../model';
 import { keepManualEdits, planVpxSync } from '../sync';
 import { parseAncillaryRenderers, parsePluginConfig, parsePluginSettings } from '../vpx-plugin-settings';
 import { isOwned, vpxOwnedKeys, type VpxSettingsSchema } from '../vpx-settings';
-import { vpxSettingsFor, type VpxProfile } from '../vpx';
+import { DEFAULT_VPX_PROFILE, vpxSettingsFor, type VpxProfile } from '../vpx';
 import { devPcDisplays, emptyCabinet } from './fixtures';
 
 const INSTALLER = path.join(__dirname, '..', '..', '..', 'installer');
@@ -348,22 +348,31 @@ test('démarrage rapide des ROM : Cheat proposé quand la clé est vide, jamais 
   assert.equal(get(planVpxSync(cabinet(), devPcDisplays(), '', noPinmame).nextIni, 'Plugin.PinMAME', 'Cheat'), undefined);
 });
 
-test('chaque clé écrite pour VPX 10.8.1-5436 existe dans son schéma', () => {
+// Chaque version de VPX du manifeste, version d'essai comprise (mode d'essai, vpx-essai.ts) : son profil et son schéma.
+const VPX_ENTRIES = (JSON.parse(fs.readFileSync(path.join(INSTALLER, 'components.json'), 'utf8')) as { components: { id: string; version: string; adapterSettings: Partial<VpxProfile> }[] }).components.filter((c) => c.id === 'vpx');
+
+test('le manifeste décrit VPX 10.8.1-5436 en tête, puis la version d’essai 10.9.0', () => {
+  assert.deepEqual(VPX_ENTRIES.map((c) => c.version.split('-')[0]), ['10.8.1', '10.9.0']);
+});
+
+for (const entry of VPX_ENTRIES) test(`chaque clé écrite pour VPX ${entry.version} existe dans son schéma`, () => {
+  const schema = JSON.parse(fs.readFileSync(path.join(INSTALLER, 'vpx-settings', `${entry.version}.json`), 'utf8')) as VpxSettingsSchema;
+  const profile = { ...DEFAULT_VPX_PROFILE, ...entry.adapterSettings } as VpxProfile;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-dmd-'));
   fs.mkdirSync(path.join(root, 'pinmame', 'roms'), { recursive: true });
   fs.mkdirSync(path.join(root, 'pinmame', 'altcolor', 'afm'), { recursive: true });
   fs.writeFileSync(path.join(root, 'pinmame', 'altcolor', 'afm', 'afm.pal'), '');
   const devices = [...ZEDMD_S3, usb('USB\\VID_0314&PID_E457\\1'), usb('USB\\VID_1B4F&PID_0008\\2')];
-  const plan = planVpxSync(cabinet(true), devPcDisplays(), '', PROFILE, { usb: devices, folders: findGlobalDmdFolders(root) });
-  const known = new Set(SCHEMA.settings.map((s) => `${s.section}/${s.key}`.toLowerCase()));
+  const plan = planVpxSync(cabinet(true), devPcDisplays(), '', profile, { usb: devices, folders: { ...findGlobalDmdFolders(root), scoreview: root } });
+  const known = new Set(schema.settings.map((s) => `${s.section}/${s.key}`.toLowerCase()));
   const written = IniDocument.parse(plan.nextIni!).entries();
   assert.ok(written.length > 40);
   // [Input] Mapping.<action> : déclarées par VPX au démarrage (InputAction::LoadMapping), absentes du schéma.
   const action = (e: { section: string; key: string }) => (e.section === 'Input' ? /^Mapping\.(\w+)$/.exec(e.key)?.[1] : undefined);
   for (const e of written) assert.ok(known.has(`${e.section}/${e.key}`.toLowerCase()) || (action(e) ?? '') in VPX_INPUT_DEFAULTS, `[${e.section}] ${e.key}`);
   // Et l'écran des réglages les montre toutes comme gérées, sauf les valeurs proposées.
-  const owned = vpxOwnedKeys(PROFILE, [], false, { roles: ['playfield', 'backglass', 'dmd', 'topper'], dmdKeys: ['Enable', 'ZeDMD', 'PIN2DMD', 'Pixelcade', 'DMDServer'], inputKeys: Object.keys(plan.memory).filter((id) => id.startsWith('Input.')).map((id) => id.slice('Input.'.length)) });
-  const proposed = ['CabinetAutofitMode', 'ScoreViewDMDOverlay', 'ScoreViewDMDAutoPos', 'PinMAMEPath', 'VniPath', 'Cheat'];
+  const owned = vpxOwnedKeys(profile, [], false, { roles: ['playfield', 'backglass', 'dmd', 'topper'], dmdKeys: ['Enable', 'ZeDMD', 'PIN2DMD', 'Pixelcade', 'DMDServer'], inputKeys: Object.keys(plan.memory).filter((id) => id.startsWith('Input.')).map((id) => id.slice('Input.'.length)) });
+  const proposed = ['CabinetAutofitMode', 'ScoreViewDMDOverlay', 'ScoreViewDMDAutoPos', 'PinMAMEPath', 'VniPath', 'LayoutFolder', 'Cheat'];
   for (const e of written) if (!proposed.includes(e.key)) assert.ok(isOwned(owned, e.section, e.key), `[${e.section}] ${e.key}`);
 });
 

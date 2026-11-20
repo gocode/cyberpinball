@@ -52,7 +52,7 @@ enum Exit : int
   kDllMissing = 3,   // dmdutil64.dll introuvable ou impossible à charger (dossier, Visual C++)
   kDllMismatch = 4,  // dmdutil64.dll d'une autre version : une fonction manque
   kUsage = 5,
-  kDllUnknown = 6,   // dmdutil64.dll dont l'empreinte n'est pas dans src/empreintes.h : jamais chargé
+  kDllUnknown = 6,   // dmdutil64.dll dont l'empreinte n'est pas dans src/empreintes.h, ou d'un autre libdmdutil : jamais chargé
 };
 
 volatile std::sig_atomic_t running = 1;
@@ -162,11 +162,11 @@ std::string Sha256(const std::wstring& file)
   return hex;
 }
 
-/** La ligne de src/empreintes.h de cette empreinte, ou nullptr si elle n'y est pas. */
+/** La ligne de src/empreintes.h de cette empreinte, ou nullptr si elle n'y est pas (lignes sans empreinte ignorées). */
 const KnownDmdUtil* KnownVpx(const std::string& sha256)
 {
   for (const KnownDmdUtil& known : kKnownDmdUtil)
-    if (sha256 == known.sha256) return &known;
+    if (known.sha256[0] && sha256 == known.sha256) return &known;
   return nullptr;
 }
 
@@ -194,6 +194,14 @@ int LoadDmdUtil(const std::wstring& dir, const KnownDmdUtil** vpx)
   if (!*vpx)
   {
     fprintf(stderr, "dmdutil64.dll d'une version de VPX non prise en charge (empreinte %s).\n", sha256.c_str());
+    return kDllUnknown;
+  }
+  // Connue, mais d'un autre libdmdutil que les en-têtes de ce serveur : ses classes n'ont peut-être plus la même forme.
+  if (strcmp((*vpx)->libdmdutil, kVendorLibdmdutil) != 0)
+  {
+    fprintf(stderr, "dmdutil64.dll de %s (libdmdutil %s) non prise en charge : serveur construit pour libdmdutil %s (empreinte %s).\n", (*vpx)->vpx,
+            (*vpx)->libdmdutil, kVendorLibdmdutil, sha256.c_str());
+    *vpx = nullptr;
     return kDllUnknown;
   }
   if (!LoadLibraryExW(dll.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH))

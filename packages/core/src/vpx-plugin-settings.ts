@@ -81,16 +81,28 @@ export function rendererPrioritySetting(window: AncillaryWindow, renderer: Ancil
 // ---------------------------------------------------------------------------
 // Macros MSGPI_*_SETTING
 
-type MacroKind = 'FLOAT' | 'INT' | 'ENUM' | 'BOOL' | 'STRING';
+type MacroKind = 'FLOAT' | 'INT' | 'ENUM' | 'BOOL' | 'STRING' | 'FOLDER' | 'FILE';
 
-/** Arguments après (variable, id, libellé, description, modifiable) ; les variantes sans _VAL ajoutent getter et setter. */
+/**
+ * Arguments après (variable, id, libellé, description, modifiable) ; les variantes sans _VAL ajoutent
+ * getter et setter. FOLDER et FILE (10.9.0) sont des chaînes ; MSGPI_FILE_SETTING, sans _VAL, n'a pas
+ * de taille de tampon (MsgPlugin.h).
+ */
 const MACRO_ARGS: Record<MacroKind, string[]> = {
   FLOAT: ['min', 'max', 'step', 'def'],
   INT: ['min', 'max', 'def'],
   ENUM: ['min', 'count', 'values', 'def'],
   BOOL: ['def'],
   STRING: ['def', 'size'],
+  FOLDER: ['def', 'size'],
+  FILE: ['def', 'filter', 'size'],
 };
+
+/** Nombre d'arguments d'une macro MSGPI_<kind>[_VAL]_SETTING. */
+function macroArity(kind: MacroKind, val: boolean): number {
+  if (kind === 'FILE' && !val) return 5 + 2 + 2;
+  return 5 + MACRO_ARGS[kind].length + (val ? 0 : 2);
+}
 
 interface Declaration {
   variable: string;
@@ -138,7 +150,7 @@ function* macroDeclarations(
   arrays: Map<string, string[]>,
   file: string,
 ): Generator<Declaration> {
-  const re = /\bMSGPI_(FLOAT|INT|ENUM|BOOL|STRING)(_VAL)?_SETTING\s*\(/g;
+  const re = /\bMSGPI_(FLOAT|INT|ENUM|BOOL|STRING|FOLDER|FILE)(_VAL)?_SETTING\s*\(/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(code))) {
     const lineStart = code.lastIndexOf('\n', m.index) + 1;
@@ -148,7 +160,7 @@ function* macroDeclarations(
     re.lastIndex = end;
     const kind = m[1] as MacroKind;
     const names = MACRO_ARGS[kind];
-    const expected = 5 + names.length + (m[2] ? 0 : 2);
+    const expected = macroArity(kind, Boolean(m[2]));
     if (args.length !== expected) {
       throw new SettingsParseError(`${file} : ${m[0]}…) a ${args.length} arguments au lieu de ${expected}`, line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
     }
@@ -194,6 +206,8 @@ function* macroDeclarations(
         break;
       }
       case 'STRING':
+      case 'FOLDER':
+      case 'FILE':
         def.default = parseString(named.def!, line);
         break;
     }

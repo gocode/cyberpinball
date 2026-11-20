@@ -1,0 +1,15 @@
+En-têtes de l'API des plugins de Visual Pinball X (GPLv3+), copiés sans modification depuis
+https://github.com/vpinball/vpinball, commit 28919b5dfa0b1543338264fa89f9e8abe70ed6ec (branche master,
+version 10.9.0, construction 10.9.0-6948), dossier plugins/plugins/ :
+MsgPlugin.h, VPXPlugin.h, ControllerPlugin.h, LoggingPlugin.h.
+C'est la version de VPX du mode d'essai de Cyber Pinball. Ce jeu d'en-têtes donne les DLL de
+build\vision3d\Release\vpx-10.9.0, copiées dans les VPX 10.9.x (app/src/vpx-plugins.ts, vpxPluginSet).
+
+Différences avec vendor/vpx-10.8.1 qui touchent nos plugins (le reste passe par les en-têtes eux-mêmes) :
+- noms des messages suffixés d'une version (« OnGameStart:1 », « GetDisplays:1 »…) ;
+- MsgPluginAPI, VPXPluginAPI et LoggingPluginAPI commencent par « int version » (1) ;
+- DisplaySrcId : plus de groupId, un callContext passé à GetRenderFrame (src/vpx-compat.h) ;
+- le rendu des scores de VPX s'appelle « Nixie » (plugin ScoreView renommé, src/vpx-compat.h) ;
+- VPXWINDOW_VRPreview retiré ; VPXInfo et VPXTableInfo en chemins natifs étroits (nos plugins n'en lisent pas).
+Les numéros internes des actions (src/pause.h, ACTIONS_VPX_1090) sont relevés dans src/input/InputManager.cpp
+au même commit.

@@ -12,7 +12,7 @@ import * as path from 'node:path';
 import { formatList, t, tn } from './i18n';
 import type { LibusbProbe, ObservedUsbDevice } from './model';
 import type { SyncFinding } from './sync';
-import type { VpxSetting } from './vpx';
+import type { VpxProfile, VpxSetting } from './vpx';
 import { dmdServerDrivesPin2dmd, vpxDmdServerSettings } from './dmdserver';
 
 export type HardwareDmdModel = 'ZeDMD' | 'PIN2DMD' | 'Pixelcade';
@@ -534,14 +534,22 @@ export function findGlobalDmdFolders(root: string): GlobalDmdFolders {
   return folders;
 }
 
-/** Chemins proposés, écrits seulement quand la clé est vide : l'utilisateur peut en choisir d'autres. */
-export function vpxFolderDefaults(folders: GlobalDmdFolders): VpxSetting[] {
+/**
+ * Chemins proposés, écrits seulement quand la clé est vide : l'utilisateur peut en choisir d'autres.
+ * Les mises en page vont au plugin d'affichage des scores de la version : ScoreView, renommé Nixie en 10.9.0.
+ */
+export function vpxFolderDefaults(folders: GlobalDmdFolders, profile?: Pick<VpxProfile, 'enabledPlugins'>): VpxSetting[] {
   const defaults: VpxSetting[] = [];
   if (folders.pinmame) defaults.push({ section: 'Plugin.PinMAME', key: 'PinMAMEPath', value: folders.pinmame });
   if (folders.serum) defaults.push({ section: 'Plugin.Serum', key: 'SerumPath', value: folders.serum });
   if (folders.vni) defaults.push({ section: 'Plugin.VNI', key: 'VniPath', value: folders.vni });
-  if (folders.scoreview) defaults.push({ section: 'Plugin.ScoreView', key: 'LayoutFolder', value: folders.scoreview });
+  if (folders.scoreview) defaults.push({ section: `Plugin.${scoreViewPlugin(profile)}`, key: 'LayoutFolder', value: folders.scoreview });
   return defaults;
+}
+
+/** Le plugin qui affiche le DMD et les scores dans la fenêtre ScoreView : ScoreView, ou Nixie depuis 10.9.0. */
+export function scoreViewPlugin(profile?: Pick<VpxProfile, 'enabledPlugins'>): 'ScoreView' | 'Nixie' {
+  return profile?.enabledPlugins.includes('Nixie') ? 'Nixie' : 'ScoreView';
 }
 
 function isDir(p: string): boolean {

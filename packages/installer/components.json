@@ -103,6 +103,34 @@
       "sourceCommit": "af26b2d93"
     },
     {
+      "id": "vpx",
+      "kind": "emulator",
+      "distribution": "manual",
+      "trial": true,
+      "name": "Visual Pinball X (essai)",
+      "homepage": "https://github.com/vpinball/vpinball/actions/runs/44702562246",
+      "version": "10.9.0-6948",
+      "channel": "essai",
+      "platform": "windows-x64",
+      "variant": "BGFX",
+      "installDir": "emulators/vpx",
+      "url": "https://api.github.com/repos/vpinball/vpinball/actions/artifacts/14615530447/zip",
+      "sha256": "83a396565492f90ff3c8d74a9674fa0fe310db5f7c1cd12be96073ac3d874e01",
+      "size": 130887763,
+      "executablePattern": "^VPinballX.*64\\.exe$",
+      "executable": "VPinballX_BGFX64.exe",
+      "vcRuntime": "14.51",
+      "requires": ["vc-redist-x64"],
+      "adapterSettings": {
+        "displayIdFormat": "name-position",
+        "enabledPlugins": ["PinMAME", "AlphaDMD", "B2S", "Nixie", "PUP", "AltSound", "Serum", "VNI", "FlexDMD", "WMP", "Vision3D", "CyberPinballDmd"],
+        "retiredPlugins": ["B2SLegacy", "ScoreView"]
+      },
+      "license": "GPLv3+ pour la majorité des fichiers, licence dérivée de MAME pour le reste : redistribution gratuite, sans usage commercial, avec la licence jointe.",
+      "source": "https://github.com/vpinball/vpinball/tree/28919b5df",
+      "sourceCommit": "28919b5df"
+    },
+    {
       "id": "kinect-sdk-1.8",
       "kind": "driver",
       "distribution": "on-demand",

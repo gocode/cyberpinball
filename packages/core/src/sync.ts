@@ -240,7 +240,7 @@ export function planVpxSync(
   applyOwned(vpxSettingsFor(assignments, profile, cabinetZones(cabinet), dmdKind, confusableRoles(assignments, observed, profile.displayIdFormat)));
   findings.push(...zoneFindings(cabinet, assignments), ...dmdKindFindings(cabinet));
   applyOwned([...VPX_PLAY_SETTINGS]);
-  changes.push(...applyVpxDefaults(doc, [...vpxPluginDefaults(assignments, profile, dmdKind), ...vpxFolderDefaults(options.folders ?? {})].filter((s) => !outside(s))));
+  changes.push(...applyVpxDefaults(doc, [...vpxPluginDefaults(assignments, profile, dmdKind), ...vpxFolderDefaults(options.folders ?? {}, profile)].filter((s) => !outside(s))));
 
   // Cadrage : seulement une fois le bord des flippers indiqué dans l'assistant.
   // Le bord suit l'orientation actuelle de l'écran, même changée hors de l'assistant.

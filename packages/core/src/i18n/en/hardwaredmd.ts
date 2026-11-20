@@ -89,7 +89,7 @@ export const messages: Record<string, string> = {
   'ne s’ouvre pas : voir « À vérifier »': 'does not open: see “To check”',
   // Image du menu : le serveur du DMD (app/src/dmd-server.ts, packages/core/src/dmdserver.ts)
   'Le module DMD de VPX ne se charge pas (Visual C++ 2015-2022 x64 manquant ?)': 'The VPX DMD module does not load (Visual C++ 2015-2022 x64 missing?)',
-  'Version de VPX non prise en charge par le serveur du DMD (VPX 10.8.1 attendu)': 'VPX version not supported by the DMD server (VPX 10.8.1 expected)',
+  'Version de VPX non prise en charge par le serveur du DMD (prévu pour {versions})': 'VPX version not supported by the DMD server (made for {versions})',
   'Serveur du DMD lancé avec de mauvais arguments': 'DMD server started with wrong arguments',
   'Serveur du DMD absent de cette version de Cyber Pinball': 'DMD server missing from this version of Cyber Pinball',
   'VPX n’est pas installé : le serveur du DMD s’appuie sur ses fichiers': 'VPX is not installed: the DMD server relies on its files',

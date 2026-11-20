@@ -19,6 +19,7 @@ import {
   dmdServerNotFoundProblem,
   dmdServerWanted,
   dmdStreamHeader,
+  DMDSERVER_VPX_VERSIONS,
   parseDmdStreamHeader,
   PIN2DMD_ONLY_THROUGH_SERVER,
 } from '../dmdserver';
@@ -236,16 +237,49 @@ test('serveur du DMD : arguments, et codes de sortie qui ne se règlent pas en r
   for (const code of [4, 6]) assert.ok(dmdServerExitProblem(code)!.includes(`VPX ${vpxVersion}`), `code ${code} : VPX ${vpxVersion} attendu`);
 });
 
-// Invariant : la version de VPX que Cyber Pinball installe a l'empreinte de son dmdutil64.dll dans
-// packages/dmdserver/src/empreintes.h. Sans elle, « Image du menu » serait indisponible pour tous.
-test('serveur du DMD : empreinte connue pour la version de VPX installée', () => {
+/** Les lignes de packages/dmdserver/src/empreintes.h (empreinte vide : pas encore relevée) et le libdmdutil de ses en-têtes. */
+function knownDmdUtil(): { vendor: string; rows: { sha256: string; vpx: string; libdmdutil: string; pin2dmd: boolean }[] } {
   const known = fs.readFileSync(path.join(REPO_ROOT, 'packages', 'dmdserver', 'src', 'empreintes.h'), 'utf8');
-  const rows = [...known.matchAll(/\{"([0-9a-f]{64})", "VPX ([^"]+)", (true|false)\}/g)].map((m) => ({ vpx: m[2]!, pin2dmd: m[3] === 'true' }));
-  const row = rows.find((r) => r.vpx === vpxComponent().version);
-  assert.ok(row, `empreintes.h : aucune ligne pour VPX ${vpxComponent().version} (${rows.map((r) => r.vpx).join(', ') || 'aucune'}) ; voir packages/dmdserver/vendor/PROVENANCE.txt`);
+  const vendor = /constexpr const char\* kVendorLibdmdutil = "([0-9a-f]{7})";/.exec(known)?.[1] ?? '';
+  const rows = [...known.matchAll(/\{"([0-9a-f]{64}|)", "VPX ([^"]+)", "([0-9a-f]{7})", (true|false)\}/g)].map((m) => ({ sha256: m[1]!, vpx: m[2]!, libdmdutil: m[3]!, pin2dmd: m[4] === 'true' }));
+  return { vendor, rows };
+}
+
+// Invariant : la version de VPX que Cyber Pinball installe a l'empreinte de son dmdutil64.dll dans
+// packages/dmdserver/src/empreintes.h, du libdmdutil des en-têtes du serveur. Sans elle, « Image du menu »
+// serait indisponible pour tous.
+test('serveur du DMD : empreinte connue pour la version de VPX installée', () => {
+  const { vendor, rows } = knownDmdUtil();
+  const row = rows.find((r) => r.vpx === vpxComponent().version && r.sha256);
+  assert.ok(row, `empreintes.h : aucune empreinte pour VPX ${vpxComponent().version} (${rows.filter((r) => r.sha256).map((r) => r.vpx).join(', ') || 'aucune'}) ; voir packages/dmdserver/vendor/PROVENANCE.txt`);
+  assert.equal(row.libdmdutil, vendor, `VPX ${row.vpx} : libdmdutil ${row.libdmdutil}, serveur construit sur ${vendor} (kVendorLibdmdutil)`);
   // Le cœur et le serveur disent la même chose du PIN2DMD de cette version de VPX.
   assert.equal(PIN2DMD_ONLY_THROUGH_SERVER, !row.pin2dmd, 'PIN2DMD_ONLY_THROUGH_SERVER (dmdserver.ts) et la colonne pin2dmd de empreintes.h divergent');
 });
+
+test('serveur du DMD : en-têtes de vendor/ du libdmdutil que dit empreintes.h ; versions de VPX acceptées dites au joueur', () => {
+  const { vendor, rows } = knownDmdUtil();
+  assert.match(fs.readFileSync(path.join(REPO_ROOT, 'packages', 'dmdserver', 'vendor', 'PROVENANCE.txt'), 'utf8'), new RegExp(`commit ${vendor} \\(celui de VPX`));
+  // Une ligne par DLL : jamais deux fois la même empreinte.
+  const shas = rows.filter((r) => r.sha256).map((r) => r.sha256);
+  assert.equal(new Set(shas).size, shas.length);
+  // Le message d'une DLL refusée (app/src/dmd-server.ts) cite exactement les versions acceptées.
+  const accepted = [...new Set(rows.filter((r) => r.sha256 && r.libdmdutil === vendor).map((r) => r.vpx.split('-')[0]!))];
+  assert.deepEqual([...DMDSERVER_VPX_VERSIONS], accepted);
+});
+
+// Les versions de VPX dont la ligne attend encore son empreinte (VPX 10.9.0-6948, mode d'essai : zip pas encore
+// téléchargé) : test sauté tant qu'elle manque ; il exige ensuite que le serveur accepte cette DLL.
+for (const row of knownDmdUtil().rows.filter((r) => r.vpx !== vpxComponent().version)) {
+  test(
+    `serveur du DMD : empreinte de VPX ${row.vpx}`,
+    { skip: !row.sha256 && `TODO : empreinte du dmdutil64.dll de VPX ${row.vpx} à relever (packages/dmdserver/src/empreintes.h)` },
+    () => {
+      const { vendor } = knownDmdUtil();
+      assert.equal(row.libdmdutil, vendor, `VPX ${row.vpx} : libdmdutil ${row.libdmdutil} ; le serveur, construit sur ${vendor}, refuserait sa DLL (second jeu d'en-têtes à faire)`);
+    },
+  );
+}
 
 // Le vrai serveur sur le vrai dmdutil64.dll de VPX, avec une carte simulée (--pin2dmd-essai) : une image
 // du front-end, puis une de VPX (son client réseau, --client-essai), reçues par notre serveur réseau,
@@ -382,7 +416,7 @@ test('cyberpinball-dmdserver : aide, DLL de VPX absente (code 3) ou inconnue (co
 
 test('santé : « Image du menu » demandée mais serveur impossible, dit avec sa raison', () => {
   setLanguage('fr');
-  const problem = 'Version de VPX non prise en charge par le serveur du DMD (VPX 10.8.1 attendu)';
+  const problem = 'Version de VPX non prise en charge par le serveur du DMD (prévu pour VPX 10.8.1)';
   assert.deepEqual(hardwareDmdFacts([PIN2DMD], { menu: true }, problem).problems, [`Image du front-end sur le DMD réel : ${problem}`]);
   assert.deepEqual(hardwareDmdFacts([ZEDMD], undefined, problem).problems, [], 'image du menu non demandée : rien à dire pour un ZeDMD, que VPX pilote seul');
   assert.deepEqual(hardwareDmdFacts([PIN2DMD], undefined, problem).problems, [`PIN2DMD : ${problem}`], 'un PIN2DMD ne s’allume que par le serveur');

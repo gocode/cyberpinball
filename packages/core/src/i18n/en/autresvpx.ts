@@ -79,4 +79,29 @@ export const messages: Record<string, string> = {
   'Cyber Pinball le lance avec ses propres réglages ; la réalité virtuelle, le réglage de l’affichage et les parties entre amis restent avec le VPX de Cyber Pinball.':
     'Cyber Pinball launches it with its own settings; virtual reality, display adjustment and games with friends stay with Cyber Pinball’s VPX.',
   'Menu système › Borne › Autres versions de VPX': 'System menu › Cabinet › Other VPX versions',
+  // Menu système > Borne > VPX d'essai (vpx-essai-menu.ts)
+  'VPX d’essai': 'Trial VPX',
+  'VPX {number} (essai {build})': 'VPX {number} (trial {build})',
+  'VPX {number} (essai)': 'VPX {number} (trial)',
+  'VPX {number} de Cyber Pinball': 'Cyber Pinball’s VPX {number}',
+  'Mode d’essai : {vpx}': 'Trial mode: {vpx}',
+  'Retour à {vpx}': 'Back to {vpx}',
+  'Cyber Pinball redémarre pour lancer les parties avec cette version.': 'Cyber Pinball restarts to launch games with this version.',
+  'Pas de racine Cyber Pinball : rien à installer.': 'No Cyber Pinball root folder: nothing to install.',
+  'Archive de {vpx} introuvable': '{vpx} archive not found',
+  'Téléchargez-la depuis GitHub, connecté à un compte : {url}': 'Download it from GitHub, signed in to an account: {url}',
+  'Puis posez-la dans les Téléchargements, sans la décompresser ({size} Mo).': 'Then put it in Downloads, without unzipping it ({size} MB).',
+  'Toutes les fonctions de Cyber Pinball, réglages habituels': 'All Cyber Pinball features, usual settings',
+  'Toutes les fonctions de Cyber Pinball · choix actuel': 'All Cyber Pinball features · current choice',
+  'Réglages de VPX à part · choix actuel': 'Separate VPX settings · current choice',
+  'Installé à côté · réglages de VPX à part': 'Installed alongside · separate VPX settings',
+  'À installer depuis son archive (Téléchargements)': 'To install from its archive (Downloads)',
+  'Installation de {vpx}…': 'Installing {vpx}…',
+  '{vpx} non installé': '{vpx} not installed',
+  'La préversion suivante de VPX, sur cette installation, pour l’essayer avant qu’elle ne devienne celle de Cyber Pinball.':
+    'The next VPX pre-release, on this installation, to try it before it becomes Cyber Pinball’s.',
+  'Elle a ses propres réglages de VPX ; tables, médias et ROM restent partagés. Les scores faits avec elle restent sur la borne.':
+    'It has its own VPX settings; tables, media and ROMs stay shared. Scores made with it stay on the cabinet.',
+  'Parties lancées avec {vpx}': 'Games launched with {vpx}',
+  'Empreinte SHA-256 incorrecte pour {name} : attendu {expected}, obtenu {actual}.': 'Wrong SHA-256 checksum for {name}: expected {expected}, got {actual}.',
 };

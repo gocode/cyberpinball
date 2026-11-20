@@ -10,7 +10,7 @@ using namespace cyberpinball;
 static int echecs = 0;
 #define VERIFIE(c) do { if (!(c)) { std::printf("ECHEC ligne %d : %s\n", __LINE__, #c); echecs++; } } while (0)
 
-// Numéros internes des actions dans VPX 10.8.1 (InputManager::CreateInputActions).
+// Numéros internes des actions dans VPX 10.8.1 et 10.9.0 (InputManager::CreateInputActions).
 enum : int { FLIPPER_G = 0, FLIPPER_D = 1, MAGNA_G = 4, MAGNA_D = 5, UI_HAUT = 6, UI_BAS = 7, UI_GAUCHE = 8, LANCER = 10, CREDIT = 15, START = 19, PAUSE = 22, SORTIE = 24, MENU_VPX = 25, VR_CENTRER = 40, VR_MANETTES = 47, CUSTOM1 = 52, CUSTOM2 = 53 };
 
 static Commande cmd(int id)
@@ -46,6 +46,34 @@ int main(int argc, char** argv)
    VERIFIE(commandeVpx1081(START, liee) == Commande::Valider && liee == api::StartGame);
    VERIFIE(cmd(MENU_VPX) == Commande::Interface && cmd(UI_HAUT) == Commande::Haut && cmd(UI_BAS) == Commande::Bas);
    VERIFIE(cmd(-1) == Commande::Inconnue && cmd(26) == Commande::Inconnue && cmd(400) == Commande::Inconnue);
+
+   // Versions de VPX : 10.8.1 et 10.9.0 connues ; toute autre, le plugin reste passif.
+   VERIFIE(versionVpx(10, 8, 1) == VersionVpx::V10_8_1 && versionVpx(10, 9, 0) == VersionVpx::V10_9_0);
+   VERIFIE(versionVpx(10, 8, 0) == VersionVpx::Inconnue && versionVpx(10, 9, 1) == VersionVpx::Inconnue && versionVpx(10, 10, 0) == VersionVpx::Inconnue);
+   for (int id = -1; id < 70; id++)
+   {
+      int a = 0, b = 0;
+      // 10.8.1 par le nom : exactement la table d'origine.
+      VERIFIE(commandeVpx(VersionVpx::V10_8_1, id, a) == commandeVpx1081(id, b) && a == b);
+      // 10.9.0 (28919b5df) : les mêmes numéros jusqu'à Custom4 ; VRLeft et VRRight (45, 46) existaient déjà sous
+      // d'autres noms ; MouseLeft et MouseRight (56, 57) ajoutées à la fin, inconnues (jamais avalées).
+      VERIFIE(commandeVpx(VersionVpx::V10_9_0, id, a) == (id <= 55 ? commandeVpx1081(id, b) : Commande::Inconnue) && (id > 55 || a == b));
+      // Version inconnue : rien n'est reconnu, donc rien n'est avalé.
+      VERIFIE(commandeVpx(VersionVpx::Inconnue, id, a) == Commande::Inconnue && a == -1);
+   }
+   // Les porteurs du calage et les actions jamais avalées : mêmes numéros dans les deux versions.
+   for (VersionVpx v : { VersionVpx::V10_8_1, VersionVpx::V10_9_0 })
+   {
+      VERIFIE(numeroActionVpx(v, "Custom1") == CUSTOM1 && numeroActionVpx(v, "Custom2") == CUSTOM2);
+      VERIFIE(numeroActionVpx(v, "Pause") == PAUSE && numeroActionVpx(v, "ExitGame") == SORTIE && numeroActionVpx(v, "InGameUI") == MENU_VPX);
+      VERIFIE(numeroActionVpx(v, "VRCenter") == VR_CENTRER && numeroActionVpx(v, "VRControllerCalibration") == VR_MANETTES);
+      VERIFIE(commandeVpx(v, CUSTOM1, liee) == Commande::CalageG && commandeVpx(v, CUSTOM2, liee) == Commande::CalageD);
+      VERIFIE(commandeVpx(v, PAUSE, liee) == Commande::Pause && commandeVpx(v, SORTIE, liee) == Commande::Sortie && commandeVpx(v, MENU_VPX, liee) == Commande::Interface);
+      VERIFIE(numeroActionVpx(v, "Aucune") == -1 && numeroActionVpx(v, nullptr) == -1);
+   }
+   VERIFIE(numeroActionVpx(VersionVpx::V10_9_0, "VRLeft") == 45 && numeroActionVpx(VersionVpx::V10_8_1, "VRLeft") == -1);
+   VERIFIE(numeroActionVpx(VersionVpx::V10_9_0, "MouseLeft") == 56 && numeroActionVpx(VersionVpx::V10_9_0, "MouseRight") == 57);
+   VERIFIE(numeroActionVpx(VersionVpx::Inconnue, "Custom1") == -1);
 
    // Partie qui tourne : aucun menu, rien n'est avalé.
    Pause p;

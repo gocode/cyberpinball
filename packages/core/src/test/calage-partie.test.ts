@@ -227,7 +227,7 @@ test('invariant : la même combinaison, la même durée et les mêmes touches da
   const pause = read('packages', 'vpx-vision3d', 'src', 'pause.h');
   const plugin = read('packages', 'vpx-vision3d', 'src', 'cyberpinball.cpp');
   assert.match(pause, new RegExp(`constexpr double CALAGE_HOLD_S = ${CALIBRATION_HOLD_S.toFixed(1)};`));
-  // VPX 10.8.1 (révision 5436) : Custom1 et Custom2 sont les actions 52 et 53.
+  // VPX 10.8.1 (révision 5436) et 10.9.0 (28919b5df) : Custom1 et Custom2 sont les actions 52 et 53 (vision3d-versions.test.ts).
   assert.match(pause, /\{ Commande::CalageG, -1 \},\s+\/\/ 52 Custom1/);
   assert.match(pause, /\{ Commande::CalageD, -1 \},\s+\/\/ 53 Custom2/);
   // F13, F14, F15 : codes de balayage 0x64, 0x65, 0x66, codes SDL 104, 105, 106.

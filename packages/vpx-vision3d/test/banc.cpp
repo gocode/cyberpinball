@@ -21,6 +21,7 @@
 
 #include "MsgPlugin.h"
 #include "VPXPlugin.h"
+#include "vpx-compat.h"
 #include "vue.h"
 
 using namespace vision3d;
@@ -172,6 +173,8 @@ int main(int argc, char** argv)
    if (!charger || !decharger) return 1;
 
    MsgPluginAPI msg{};
+   cyberpinball::vpx::marquerVersion(msg);
+   cyberpinball::vpx::marquerVersion(vpx);
    msg.GetMsgID = getMsgID;
    msg.SubscribeMsg = subscribeMsg;
    msg.UnsubscribeMsg = unsubscribeMsg;

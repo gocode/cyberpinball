@@ -152,15 +152,25 @@ interface Branch {
   active: boolean;
 }
 
-/** Garde les lignes des branches actives ; les directives et les lignes écartées deviennent vides. */
+/**
+ * Garde les lignes des branches actives ; les directives et les lignes écartées deviennent vides.
+ * Les macros sans paramètre (#define NOM valeur, 10.9.0 : VPX_NAV_ALT_DEFAULT) sont remplacées
+ * dans les lignes qui suivent ; #undef les retire.
+ */
 export function preprocess(text: string, defines: Set<string>): string {
   const lines = text.split('\n');
   const stack: Branch[] = [];
+  const macros = new Map<string, string>();
   const active = () => stack.every((b) => b.active);
+  const expand = (raw: string) => {
+    let out = raw;
+    for (const [name, value] of macros) out = out.replace(new RegExp(`\\b${name}\\b(?!\\s*\\()`, 'g'), value);
+    return out;
+  };
   return lines
     .map((raw, index) => {
       const m = /^\s*#\s*(\w+)\s*(.*?)\s*$/.exec(raw);
-      if (!m) return active() ? raw : '';
+      if (!m) return active() ? expand(raw) : '';
       const [, directive, rest] = m as unknown as [string, string, string];
       const line = index + 1;
       switch (directive) {
@@ -190,6 +200,19 @@ export function preprocess(text: string, defines: Set<string>): string {
         }
         case 'endif':
           if (!stack.pop()) throw new SettingsParseError('#endif sans #if', line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
+          break;
+        case 'define': {
+          if (!active()) break;
+          const def = /^(\w+)(\s+(.*))?$/.exec(rest);
+          if (!def) throw new SettingsParseError(`#define non géré : ${rest}`, line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
+          defines.add(def[1]!);
+          macros.set(def[1]!, expand(def[3] ?? ''));
+          break;
+        }
+        case 'undef':
+          if (!active()) break;
+          defines.delete(rest);
+          macros.delete(rest);
           break;
         default:
           if (active()) throw new SettingsParseError(`directive non gérée #${directive}`, line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur

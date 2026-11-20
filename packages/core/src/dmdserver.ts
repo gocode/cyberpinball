@@ -97,6 +97,13 @@ export function dmdServerFrame(dots: DmdDots, color: string, colors?: DmdColors)
  */
 export const PIN2DMD_ONLY_THROUGH_SERVER = true;
 
+/**
+ * Les versions de VPX dont cyberpinball-dmdserver accepte le dmdutil64.dll : celles de
+ * packages/dmdserver/src/empreintes.h qui ont une empreinte et le libdmdutil des en-têtes du serveur
+ * (vérifié par dmdserver.test.ts). Dites dans le message d'une DLL refusée (app/src/dmd-server.ts).
+ */
+export const DMDSERVER_VPX_VERSIONS: readonly string[] = ['10.8.1'];
+
 function modelOn(devices: ObservedUsbDevice[], setup: HardwareDmdSetup | undefined, model: 'ZeDMD' | 'PIN2DMD' | 'Pixelcade'): boolean {
   const choice = hardwareDmdChoice(setup, model);
   return choice === 'on' || (choice === 'auto' && detectHardwareDmds(devices).some((d) => d.model === model));
