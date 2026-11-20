@@ -22,7 +22,7 @@ interface Entry {
 }
 const essai = require(path.join(REPO_ROOT, 'app', 'dist', 'vpx-essai.js')) as {
   trialVpxEntries(manifest?: Entry[]): Entry[];
-  trialVpxAllowed(opts: { installed: boolean; privateChannel?: boolean }): boolean;
+  trialVpxAllowed(devKey: { nom: string } | undefined): boolean;
   readTrialChoice(dataDir: string): string | undefined;
   writeTrialChoice(dataDir: string, version: string | undefined): void;
   trialIniDir(baseIni: string, version: string): string;
@@ -45,10 +45,12 @@ test('le manifeste : la version d’essai existe, findComponent garde le VPX de 
   assert.equal(installer.loadManifest().find((c) => c.id === 'vpx')!.trial, undefined, 'le VPX de Cyber Pinball reste en tête du manifeste');
 });
 
-test('permis seulement depuis les sources ou avec le canal d’essai privé', () => {
-  assert.equal(essai.trialVpxAllowed({ installed: false }), true);
-  assert.equal(essai.trialVpxAllowed({ installed: true, privateChannel: false }), false);
-  assert.equal(essai.trialVpxAllowed({ installed: true, privateChannel: true }), true);
+test('permis seulement avec la clé développeur de la machine, jamais par le seul lancement depuis les sources', () => {
+  assert.equal(essai.trialVpxAllowed({ nom: 'PinCab' }), true);
+  assert.equal(essai.trialVpxAllowed(undefined), false);
+  const paths = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'paths.ts'), 'utf8');
+  assert.match(paths, /return trialVpxAllowed\(devKeyHere\(\)\);/);
+  assert.doesNotMatch(fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'vpx-essai.ts'), 'utf8'), /loadPrivateChannel|installed/, 'ni le canal d’essai, ni le lancement depuis les sources');
 });
 
 test('le choix : écrit, relu, retiré', () => {

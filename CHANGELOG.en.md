@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Development-only features (trial VPX) now only open on a machine that has its developer key, signed by Cyber Pinball's publishing key and tied to that machine: it cannot be forged or copied to another PC, even when running Cyber Pinball from its sources.
 - "Follow us": the Facebook page (French-speaking or English-speaking, depending on the interface language), the video tutorials on YouTube, and GitHub, in one list. The QR code of the selected line opens it on your phone; Start opens the page in the built-in browser. A discreet line leads there from Feedback and ideas, after sending feedback or a report, and from a table's diagnosis.
 - Phone remote: "Follow us" in the phone's ⋮ menu, with links that open straight on the phone, no QR code needed.
 - Setup wizard: the "Quit without saving?" question also shows the QR code of the step-by-step video tutorials.

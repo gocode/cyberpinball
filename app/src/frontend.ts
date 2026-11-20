@@ -2289,7 +2289,7 @@ function jukeboxOutputPlace(name: string): string | undefined {
 }
 // Langue de l'interface : le choix relance le menu, comme un changement de configuration.
 library.provideSystemItem('language', createLanguageMenu({ library, relaunch: () => relaunchMenu() }));
-// VPX d'essai (vpx-essai.ts) : lancé depuis les sources ou avec le canal d'essai privé, sinon l'entrée n'existe pas.
+// VPX d'essai (vpx-essai.ts) : seulement avec la clé développeur de cette machine, sinon l'entrée n'existe pas.
 if (trialVpxAllowedHere()) {
   library.provideSystemItem('vpx-trial', createVpxTrialMenu({ library, root: () => loc.root, dataDir: () => loc.dataDir, relaunch: () => relaunchMenu() }).item);
 }

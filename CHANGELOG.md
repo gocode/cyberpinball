@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.2
 
+- Les fonctions réservées au développement (VPX d'essai) ne s'ouvrent plus que sur une machine qui a sa clé développeur, signée par la clé de publication de Cyber Pinball et liée à cette machine : impossible à fabriquer ou à recopier sur un autre PC, même en lançant Cyber Pinball depuis ses sources.
 - « Nous suivre » : la page Facebook (francophone ou anglophone selon la langue de l'interface), les tutoriels vidéo sur YouTube et GitHub, en une liste. Le QR code de la ligne choisie s'ouvre sur le téléphone, Start ouvre la page dans le navigateur intégré. Une ligne discrète y mène depuis Retours et propositions, après l'envoi d'un retour ou d'un rapport, et depuis le diagnostic d'une table.
 - Télécommande : « Nous suivre » dans le menu ⋮ du téléphone, avec des liens qui s'ouvrent directement sur le téléphone, sans QR code.
 - Assistant : la question « Quitter sans enregistrer ? » montre aussi le QR code des tutoriels vidéo, pas à pas.

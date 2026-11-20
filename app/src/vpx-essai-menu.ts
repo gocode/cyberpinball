@@ -1,6 +1,6 @@
 // Menu système > Borne > VPX d'essai (vpx-essai.ts) : basculer entre le VPX de Cyber Pinball et une préversion de
-// VPX décrite dans le manifeste, sur la même installation. Fournie seulement quand le mode est permis (lancé depuis
-// les sources, ou canal d'essai privé) : ailleurs, l'entrée n'existe pas.
+// VPX décrite dans le manifeste, sur la même installation. Fournie seulement quand le mode est permis (clé
+// développeur signée de la machine, cle-developpeur.ts) : ailleurs, l'entrée n'existe pas.
 //
 // La préversion vient d'un artefact de la CI de VPX, que GitHub ne laisse télécharger qu'à un compte connecté :
 // l'archive est cherchée dans les Téléchargements et dans downloads\ de la racine, reconnue à sa taille et à son

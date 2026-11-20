@@ -10,11 +10,11 @@
 //   VPinballX.ini habituel), créés d'après ceux du VPX de Cyber Pinball au premier passage : elle
 //   ne réécrit jamais ceux de l'autre version. Les tables, médias, ROM et réglages du front-end
 //   restent partagés.
-// - Réservé à qui maintient Cyber Pinball : lancé depuis les sources, ou sur un poste qui suit le
-//   canal d'essai privé (canal-essai.json). Ailleurs, le fichier de choix est ignoré.
+// - Réservé à qui maintient Cyber Pinball : seulement sur une machine qui a sa clé développeur signée
+//   (devkey.ts, cle-developpeur.ts). Ailleurs, même lancé depuis les sources, le fichier de choix est ignoré.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { componentPaths, loadPrivateChannel, readJsonFile, renameWithRetry, writeFileAtomic, type Locations } from '@cyberpinball/core';
+import { componentPaths, readJsonFile, renameWithRetry, writeFileAtomic, type Locations } from '@cyberpinball/core';
 import { activeComponent, loadManifest, type Component } from '@cyberpinball/installer';
 
 export const TRIAL_CHOICE_FILE = 'vpx-essai.json';
@@ -25,12 +25,11 @@ export function trialVpxEntries(manifest: Component[] = loadManifest()): Compone
 }
 
 /**
- * Le mode d'essai est-il permis sur ce poste ? Lancé depuis les sources (pas d'installation), ou
- * canal d'essai privé configuré. Jamais chez un joueur ordinaire.
+ * Le mode d'essai est-il permis sur ce poste ? Seulement avec une clé développeur valable pour cette
+ * machine (signée par la clé de publication) ; jamais chez un joueur, même lancé depuis les sources.
  */
-export function trialVpxAllowed(opts: { installed: boolean; privateChannel?: boolean } = { installed: true }): boolean {
-  if (!opts.installed) return true;
-  return opts.privateChannel ?? loadPrivateChannel() !== undefined;
+export function trialVpxAllowed(devKey: { nom: string } | undefined): boolean {
+  return devKey !== undefined;
 }
 
 /** La version d'essai choisie dans le fichier de choix, ou undefined (mode habituel). */

@@ -265,7 +265,7 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   // Un VPX déjà installé sur le PC (10.8.0…), pour les tables qui le choisissent (autres-vpx.ts).
   'other-vpx': { icon: 'layers', get label() { return t('Autres versions de VPX'); } },
   // Mode d'essai de VPX (app/src/vpx-essai.ts) : la préversion suivante de VPX sur la même installation. Seulement
-  // lancé depuis les sources ou avec le canal d'essai privé : absente ailleurs (entrée non fournie).
+  // avec la clé développeur signée de la machine (devkey.ts) : absente ailleurs (entrée non fournie).
   'vpx-trial': { icon: 'flask', get label() { return t('VPX d’essai'); } },
   // Jouer dans un casque (vr.ts) : désactivée, ou dans le casque quand il est prêt.
   // L'activation, en tête de la rubrique Réalité virtuelle (qui porte l'icône du casque).

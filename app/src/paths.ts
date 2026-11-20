@@ -9,11 +9,12 @@ import {
   type VpxProfile,
 } from '@cyberpinball/core';
 import { componentStatus, loadManifest } from '@cyberpinball/installer';
+import { devKeyHere } from './cle-developpeur';
 import { seedTrialIni, trialVpxAllowed, vpxInUse, type VpxInUse } from './vpx-essai';
 
-/** Mode d'essai de VPX permis ici : lancé depuis les sources, ou canal d'essai privé (vpx-essai.ts). */
+/** Mode d'essai de VPX permis ici : clé développeur signée et valable pour cette machine (cle-developpeur.ts). */
 export function trialVpxAllowedHere(): boolean {
-  return trialVpxAllowed({ installed: Boolean(installedRoot()) });
+  return trialVpxAllowed(devKeyHere());
 }
 
 /** La version de VPX que les parties lancent : la version d'essai choisie, sinon la version active. */
