@@ -17,7 +17,7 @@ import { accountSummary, copyToOffer, listAccountCopies, parseAccountBundle, rea
 import { avatarPath } from '../avatar';
 import { partOf } from '../backup';
 import { LEVELS_FILE, emptyLevels } from '../levels';
-import { normalizeRecoveryWord, parseRecoveryText, playerKeyFromSeed, recoveryCheckPositions, recoveryWords, seedFromWords, suggestRecoveryWords } from '../recovery';
+import { normalizeRecoveryWord, parseRecoveryText, playerKeyFromSeed, RECOVERY_CHECK_COUNT, recoveryCheckChoices, recoveryWords, seedFromWords, suggestRecoveryWords } from '../recovery';
 import { RECOVERY_WORDS } from '../recoverywords';
 import { createPlayerKey, type PlayerKey } from '../sharing';
 import { hasDefaultName, newSocialState, playerSeed, saveSocial, type SocialState } from '../social';
@@ -78,10 +78,25 @@ test('le texte du QR, une liste numérotée recopiée, des majuscules et des acc
   assert.equal(normalizeRecoveryWord('Éléphant'), 'elephant');
   assert.ok(suggestRecoveryWords('hu').every((w) => w.startsWith('hu')));
   assert.deepEqual(suggestRecoveryWords('h'), []);
+});
+
+test('vérification du code : ses trois premiers mots et trois autres de ses mots, mélangés, tous différents', () => {
   for (let i = 0; i < 50; i++) {
-    const [a, b] = recoveryCheckPositions();
-    assert.ok(a >= 1 && b <= 24 && a < b);
+    const words = recoveryWords(playerSeed(createPlayerKey()));
+    const choices = recoveryCheckChoices(words);
+    assert.equal(choices.length, 6);
+    const rest = [...choices];
+    for (const w of words.slice(0, RECOVERY_CHECK_COUNT)) rest.splice(rest.indexOf(w), 1);
+    assert.equal(rest.length, 3, 'les trois premiers mots sont proposés');
+    assert.equal(new Set(rest).size, 3, 'trois autres mots, différents');
+    assert.ok(rest.every((w) => !words.slice(0, RECOVERY_CHECK_COUNT).includes(w) && words.includes(w)), 'pris plus loin dans le code');
   }
+  // Un mot répété parmi les trois premiers est proposé deux fois ; un code sans assez d'autres mots se complète de la liste.
+  const odd = ['orage', 'orage', 'pivot', ...Array(21).fill('orage')];
+  const choices = recoveryCheckChoices(odd);
+  assert.equal(choices.length, 6);
+  assert.equal(choices.filter((w) => w === 'orage').length, 2);
+  assert.equal(new Set(choices).size, 5);
 });
 
 // ---------------------------------------------------------------------------
@@ -293,12 +308,12 @@ test('le service refuse un coffre non signé par sa clé, ou plus ancien que cel
 // L'écran (app/src/account-menu.ts), sur une fausse bibliothèque
 
 interface MenuAction { label: string; tone?: string; qr?: { url: string; hint?: string }; run(): void | Promise<void> }
-interface MenuBuilt { heading: string; actions: MenuAction[]; sections: { rows: { text: string }[] }[] }
+interface MenuBuilt { heading: string; actions: MenuAction[]; sections: { title?: string; rows: { text: string; action?: number; check?: string; checkRank?: number }[] }[] }
 interface AccountMenuModule {
   createAccountMenu(host: object): { items: Record<string, { detail?: string; attention?: boolean; run(): void }>; openCopy(copy: unknown, back: () => void): void; attention(): boolean };
 }
 
-test('écran : le code se vérifie par deux mots ; une copie se reprend après confirmation, curseur sur Annuler', async () => {
+test('écran : le code se vérifie par ses trois premiers mots choisis dans l’ordre ; une copie se reprend après confirmation, curseur sur Annuler', async () => {
   const { borne } = await bench();
   const kiko = borne('Kiko', 3);
   saveProtection(kiko.dir, { v: 1 });
@@ -329,13 +344,35 @@ test('écran : le code se vérifie par deux mots ; une copie se reprend après c
   assert.equal(code.sections[0]!.rows.length, 6, '24 mots en six lignes');
   assert.equal(code.actions[0]!.qr?.url, svc.words().join(' '), 'le QR : les mots en texte');
   await act('Je l’ai noté').run();
+  // Aux flippers, sans clavier : les trois premiers mots choisis dans l'ordre parmi six.
+  assert.equal(prompts.length, 0, 'aucune saisie au clavier');
   const words = svc.words();
-  for (const p of [prompts.shift()!, null]) {
-    const ask = p ?? prompts.shift()!;
-    const n = Number(/\d+/.exec(ask.label)![0]);
-    ask.done(words[n - 1]!.toUpperCase());
-  }
-  assert.ok(svc.protection().codeNotedAt, 'code noté après deux mots justes');
+  const offered = () => screen!.build().sections.find((s) => s.title === 'Mots proposés')!.rows;
+  const choose = (n: number) => {
+    const row = offered().find((r) => r.text === words[n] && r.check === 'off')!;
+    return screen!.build().actions[row.action!]!.run();
+  };
+  assert.equal(offered().length, 6);
+  assert.ok(offered().every((r) => r.check === 'off' && r.checkRank === 1), 'cases vides, chacune prête à prendre le n° 1');
+  await choose(0);
+  const first = offered().find((r) => r.check === 'on')!;
+  assert.equal(first.text, words[0]);
+  assert.equal(first.checkRank, 1, 'le n° 1 dans la case du mot choisi');
+  assert.ok(offered().filter((r) => r.check === 'off').every((r) => r.checkRank === 2), 'les autres prendraient le n° 2');
+  // Le dernier mot choisi se rechoisit pour l'enlever.
+  await screen!.build().actions[first.action!]!.run();
+  assert.ok(offered().every((r) => r.check === 'off'));
+  // Un mot faux en n° 3 : rien n'est noté, tout est décoché, l'erreur est dite sans dire quel mot.
+  await choose(0);
+  await choose(1);
+  const decoy = offered().find((r) => !words.slice(0, 3).includes(r.text))!;
+  await screen!.build().actions[decoy.action!]!.run();
+  assert.equal(svc.protection().codeNotedAt, undefined, 'mot faux : pas noté');
+  assert.ok(offered().every((r) => r.check === 'off'), 'mot faux : on recommence');
+  assert.match(screen!.build().sections[0]!.rows[0]!.text, /pas les trois premiers mots/);
+  assert.ok(act('Recommencer') && act('Quitter'), 'Recommencer et Quitter');
+  for (const n of [0, 1, 2]) await choose(n);
+  assert.ok(svc.protection().codeNotedAt, 'code noté après les trois premiers mots dans l’ordre');
   assert.equal(menu.attention(), false);
   // Une copie d'un autre compte : confirmation, curseur sur « Annuler », puis le paquet part à l'application.
   const other = borne('Léa', 1);

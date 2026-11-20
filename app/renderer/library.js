@@ -240,14 +240,14 @@ function renderLibrary(v) {
           li.classList.add('with-avatar');
           // Une case (inviter des amis dans un groupe) devant la pastille, une valeur à droite : elles
           // restent, comme sur une ligne en colonnes ; sans elles, une case cochée ne se voyait pas.
-          if (row.check) li.append(rowCheck(row.check));
+          if (row.check) li.append(rowCheck(row.check, row.checkRank));
           li.append(avatarNode(row.avatar, 'lib-row-avatar'), main);
           if (row.aside) li.append(rowAside(row));
         }
         if (parts && !row.figure && !row.avatar) {
           li.classList.add('with-parts');
           if (row.label) li.append(libEl('span', 'lib-row-label', row.label));
-          if (row.check) li.append(rowCheck(row.check));
+          if (row.check) li.append(rowCheck(row.check, row.checkRank));
           if (row.thumb) li.append(rowThumb(row.thumb, row.thumbIcon));
           if (row.medal) li.append(rowMedal(row.medal));
           li.append(main);
@@ -1445,10 +1445,15 @@ function appCommands(commands) {
   return bar;
 }
 
-/** Case d'une ligne (Juke-box) : cochée (coche), vide, ou barrée (croix : sautée, refusée). */
-function rowCheck(state) {
+/**
+ * Case d'une ligne (Juke-box) : cochée (coche), vide, ou barrée (croix : sautée, refusée). Avec un
+ * numéro (vérification du code) : le numéro à la place de la coche ; vide, celui qu'elle prendrait,
+ * montré par le style quand la ligne est sous le curseur.
+ */
+function rowCheck(state, rank) {
   const box = libEl('span', `lib-check state-${state}`);
-  if (state === 'on') box.append(cyberIcon('check', 'lib-check-icon'));
+  if (rank !== undefined && state !== 'skip') box.append(libEl('span', 'lib-check-rank', String(rank)));
+  else if (state === 'on') box.append(cyberIcon('check', 'lib-check-icon'));
   if (state === 'skip') box.append(cyberIcon('close', 'lib-check-icon'));
   return box;
 }

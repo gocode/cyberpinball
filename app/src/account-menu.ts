@@ -2,7 +2,7 @@
 // ailleurs. Un joueur avait perdu son niveau et ses XP en réinstallant Cyber Pinball : le compte
 // n'existait que dans le dossier de la borne. Entrées de la rubrique fournies ici :
 // - « Protéger et transférer mon compte » : copie de secours sur ce PC (toujours), code de
-//   récupération (24 mots et leur QR, vérifié par deux mots), mot de passe facultatif (le pseudo sert
+//   récupération (24 mots et leur QR, vérifié par ses trois premiers mots choisis dans l'ordre), mot de passe facultatif (le pseudo sert
 //   d'identifiant), copie chiffrée sur le serveur, et « Reprendre un compte sur cette borne » ;
 // - « Mon pseudo », « Mon pays », « Ce que voient les autres » (profil public, scores publiés,
 //   présence), « Supprimer mon compte » (l'écran de friends-menu.ts) ;
@@ -26,10 +26,10 @@ import {
   passwordProblem,
   passwordStrength,
   playerId,
-  recoveryCheckPositions,
+  recoveryCheckChoices,
   recoveryQrText,
+  RECOVERY_CHECK_COUNT,
   RECOVERY_WORD_COUNT,
-  normalizeRecoveryWord,
   t,
   tn,
   type AccountBundle,
@@ -200,7 +200,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
           { rows: [{ text: t('Le code ne quitte jamais cette borne'), detail: t('Cyber Pinball ne peut pas le retrouver pour vous : gardez-le à l’abri'), icon: 'info' }] },
         ],
         actions: [
-          { label: t('Je l’ai noté'), detail: t('Deux mots vous seront demandés pour le vérifier'), icon: 'check', tone: 'ok', qr, run: () => verifyCode() },
+          { label: t('Je l’ai noté'), detail: t('Vous choisirez ses trois premiers mots, dans l’ordre'), icon: 'check', tone: 'ok', qr, run: () => verifyCode() },
           { label: t('Plus tard'), detail: t('Mon compte le rappellera'), icon: 'clock', qr, run: () => reopenProtect() },
         ],
         back: toProtect,
@@ -209,26 +209,58 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
     );
   }
 
-  /** Deux mots au hasard, l'un après l'autre ; justes, le code est noté et le coffre part. */
+  /**
+   * Les trois premiers mots, choisis aux flippers dans l'ordre parmi six (19/11/2026 : deux mots au
+   * hasard à taper demandaient le clavier). Chaque mot choisi prend son numéro dans sa case ; le
+   * troisième choisi, tout est jugé d'un coup : juste, le code est noté et le coffre part ; faux, on
+   * recommence, sans dire quel mot était faux (sinon on trouverait l'ordre à tâtons).
+   */
   function verifyCode(): void {
     const words = svc.words();
-    const [a, b] = recoveryCheckPositions();
-    const ask = (position: number, then: () => void) =>
-      host.library.openPrompt(t('Vérifier le code'), t('Mot n° {n}', { n: position }), '', (value) => {
-        if (value === undefined) return openCode();
-        if (normalizeRecoveryWord(value) !== words[position - 1]) {
-          flash = { text: t('Ce n’est pas le mot n° {n} : revoyez le code', { n: position }), tone: 'error' };
-          return reopenProtect();
-        }
-        then();
-      }, t('Tapez le mot n° {n} de votre code, tel que vous l’avez noté.', { n: position }));
-    ask(a, () =>
-      ask(b, () => {
+    const choices = recoveryCheckChoices(words);
+    let picked: number[] = [];
+    const restart = (error?: Row) => {
+      picked = [];
+      flash = error;
+      host.library.openCustom(build, 0);
+    };
+    const pick = (i: number) => {
+      // Le dernier mot choisi se rechoisit pour l'enlever ; les autres restent à leur place.
+      if (picked.at(-1) === i) picked.pop();
+      else if (!picked.includes(i)) picked.push(i);
+      if (picked.length < RECOVERY_CHECK_COUNT) return host.library.openCustom(build);
+      if (picked.every((c, n) => choices[c] === words[n])) {
         svc.noteCode();
         flash = { text: t('Code de récupération noté : votre compte est protégé'), tone: 'ok' };
-        reopenProtect();
-      }),
-    );
+        return reopenProtect();
+      }
+      restart({ text: t('Ce ne sont pas les trois premiers mots dans l’ordre : revoyez le code et recommencez'), tone: 'error' });
+    };
+    // Exit et « Quitter » sont la même fonction : le bouton de retour en tête le dit aussi.
+    const quit = () => openCode();
+    const build = (): Built => {
+      const next = picked.length + 1;
+      const actions: Action[] = choices.map((w, i) => ({ label: w, key: `word-${i}`, run: () => pick(i) }));
+      const rows: Row[] = choices.map((w, i) => {
+        const rank = picked.indexOf(i) + 1;
+        return { text: w, action: i, pick: true, check: rank ? 'on' : 'off', checkRank: rank || next, ...(rank ? { current: true } : {}) };
+      });
+      actions.push(
+        { label: t('Recommencer'), detail: t('Tous les mots décochés'), icon: 'restore', key: 'restart', ...(picked.length ? {} : { tone: 'quiet' as const }), run: () => restart() },
+        { label: t('Quitter'), detail: t('Revoir le code'), icon: 'back', key: 'quit', run: quit },
+      );
+      return {
+        heading: t('Vérifier le code'),
+        icon: 'lock',
+        subheading: t('Mot n° {n} sur {count}', { n: Math.min(next, RECOVERY_CHECK_COUNT), count: RECOVERY_CHECK_COUNT }),
+        lead: t('Choisissez les trois premiers mots de votre code, dans l’ordre : le mot n° 1, puis le 2, puis le 3. Son numéro s’inscrit dans la case.'),
+        sections: [...flashSections(), { title: t('Mots proposés'), options: true, rows }],
+        actions,
+        back: quit,
+      };
+    };
+    flash = undefined;
+    host.library.openCustom(build, 0);
   }
 
   // ---------- Mot de passe ----------

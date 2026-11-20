@@ -96,10 +96,37 @@ export function playerKeyFromSeed(seed: Uint8Array): PlayerKey {
 /** Le texte du QR : les 24 mots séparés par une espace. */
 export const recoveryQrText = (words: readonly string[]): string => words.join(' ');
 
-/** Les deux positions demandées pour vérifier qu'un code est bien noté (1 à 24, distinctes). */
-export function recoveryCheckPositions(random: () => number = Math.random): [number, number] {
-  const a = 1 + Math.floor(random() * RECOVERY_WORD_COUNT);
-  let b = 1 + Math.floor(random() * (RECOVERY_WORD_COUNT - 1));
-  if (b >= a) b++;
-  return a < b ? [a, b] : [b, a];
+/** Mots à retrouver pour vérifier qu'un code est bien noté : les premiers, dans l'ordre. */
+export const RECOVERY_CHECK_COUNT = 3;
+/** Mots proposés en plus, pris plus loin dans le code : il faut lire les numéros notés, pas seulement les mots. */
+const RECOVERY_CHECK_DECOYS = 3;
+
+/**
+ * Les mots proposés pour vérifier le code (19/11/2026) : ses trois premiers et trois autres de ses
+ * mots, mélangés. Le joueur les choisit aux flippers dans l'ordre, sans clavier : taper deux mots
+ * tirés au hasard demandait le clavier à l'écran. Un mot présent deux fois parmi les trois premiers
+ * est proposé deux fois ; les autres sont tous différents de ceux-là.
+ */
+export function recoveryCheckChoices(words: readonly string[], random: () => number = Math.random): string[] {
+  const targets = words.slice(0, RECOVERY_CHECK_COUNT);
+  const taken = new Set(targets);
+  const decoys: string[] = [];
+  // Le reste du code d'abord, dans le désordre ; la liste complète seulement s'il n'y a pas assez de mots différents.
+  for (const word of [...shuffle(words.slice(RECOVERY_CHECK_COUNT), random), ...RECOVERY_WORDS]) {
+    if (decoys.length >= RECOVERY_CHECK_DECOYS) break;
+    if (taken.has(word)) continue;
+    taken.add(word);
+    decoys.push(word);
+  }
+  return shuffle([...targets, ...decoys], random);
+}
+
+/** Mélange de Fisher-Yates, sur une copie. */
+function shuffle<T>(items: readonly T[], random: () => number): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return out;
 }

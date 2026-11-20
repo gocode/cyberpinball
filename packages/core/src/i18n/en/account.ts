@@ -81,12 +81,17 @@ export const messages: Record<string, string> = {
   'Le code ne quitte jamais cette borne': 'The code never leaves this cabinet',
   'Cyber Pinball ne peut pas le retrouver pour vous : gardez-le à l’abri': 'Cyber Pinball cannot find it for you: keep it safe',
   'Je l’ai noté': 'I wrote it down',
-  'Deux mots vous seront demandés pour le vérifier': 'You will be asked for two words to check it',
+  'Vous choisirez ses trois premiers mots, dans l’ordre': 'You will pick its first three words, in order',
   'Mon compte le rappellera': 'My account will remind you',
   'Vérifier le code': 'Check the code',
-  'Mot n° {n}': 'Word {n}',
-  'Ce n’est pas le mot n° {n} : revoyez le code': 'That is not word {n}: look at the code again',
-  'Tapez le mot n° {n} de votre code, tel que vous l’avez noté.': 'Type word {n} of your code, as you wrote it down.',
+  'Mot n° {n} sur {count}': 'Word {n} of {count}',
+  'Choisissez les trois premiers mots de votre code, dans l’ordre : le mot n° 1, puis le 2, puis le 3. Son numéro s’inscrit dans la case.':
+    'Pick the first three words of your code, in order: word 1, then 2, then 3. Its number appears in the box.',
+  'Mots proposés': 'Suggested words',
+  'Recommencer': 'Start over',
+  'Tous les mots décochés': 'All words unchecked',
+  'Revoir le code': 'See the code again',
+  'Ce ne sont pas les trois premiers mots dans l’ordre : revoyez le code et recommencez': 'These are not the first three words in order: look at the code again and start over',
   'Code de récupération noté : votre compte est protégé': 'Recovery code written down: your account is protected',
 
   // Mot de passe

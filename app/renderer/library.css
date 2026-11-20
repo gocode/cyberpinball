@@ -4192,6 +4192,23 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   stroke-width: 2.4;
 }
 
+/* Numéro dans la case (vérification du code) : plein une fois choisi ; pâle sur la ligne sous le curseur, absent ailleurs. */
+.lib-check-rank {
+  font-size: 2.2cqmin;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.lib-check.state-off .lib-check-rank {
+  visibility: hidden;
+}
+
+li.selected .lib-check.state-off .lib-check-rank {
+  visibility: visible;
+  opacity: 0.5;
+}
+
 /* Vignette : l'image, ou l'icône sur un fond sombre ; jamais un aplat clair. */
 .lib-thumb {
   flex: none;

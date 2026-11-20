@@ -7,6 +7,10 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.2.2
+
+- My account: the recovery code is checked with the flippers, without a keyboard. Among six suggested words, you pick the code's first three in order; each chosen word gets its number in its box (the word under the cursor shows in advance the number it would get), the last one can be picked again to remove it, and the screen offers "Start over" or "Quit".
+
 ## 0.2.1
 
 - Add a table: the "From another installation…" entry carries the "BETA" badge, like the duplication-free import it offers.

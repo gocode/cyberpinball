@@ -9,6 +9,10 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.2.2
+
+- Mon compte : le code de récupération se vérifie aux flippers, sans clavier. Parmi six mots proposés, on choisit les trois premiers du code dans l'ordre ; chaque mot choisi prend son numéro dans sa case (le mot sous le curseur montre d'avance le numéro qu'il prendrait), le dernier se rechoisit pour l'enlever, et l'écran propose « Recommencer » ou « Quitter ».
+
 ## 0.2.1
 
 - Ajouter une table : l'entrée « Depuis une autre installation… » porte le badge « BÊTA », comme la reprise sans duplication qu'elle propose.

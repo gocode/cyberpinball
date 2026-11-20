@@ -363,6 +363,12 @@ export interface Row {
   /** Case devant la ligne : cochée, vide, ou barrée (sautée, refusée : on ne peut pas la cocher). */
   check?: 'on' | 'off' | 'skip';
   /**
+   * Numéro dans la case (vérification du code de récupération : l'ordre des mots choisis). Cochée,
+   * le numéro à la place de la coche ; vide, le numéro que la ligne prendrait, montré en pâle tant
+   * qu'elle est sous le curseur : on voit d'avance que ce mot deviendra le n° 2.
+   */
+  checkRank?: number;
+  /**
    * Fil de la messagerie (chat-menu.ts, section `kind: 'chat'`) : bulle reçue (à gauche), envoyée (à
    * droite), en attente (pointillés) ou non remise, carte d'un évènement de la borne (au centre), ou
    * séparateur de jour. Les badges sont les réactions posées sur le message, sous la bulle.
