@@ -134,6 +134,61 @@ export function needsChannelTest(output: Pick<ObservedAudioOutput, 'channels' | 
   return output.channels >= 6 && speakerPairsOf(output).length >= 2;
 }
 
+/** EndpointFormFactor des prises analogiques d'une carte son (Speakers, LineLevel) : celles qu'on règle en 5.1 ou 7.1. */
+const ANALOG_FORM_FACTORS = new Set([1, 2]);
+/** EndpointFormFactor d'une sortie HDMI ou DisplayPort (DigitalAudioDisplayDevice). */
+const DISPLAY_FORM_FACTOR = 9;
+
+/** Prises analogiques d'une carte son, qu'on peut passer en 5.1 ou 7.1. */
+export function isAnalogOutput(output: Pick<ObservedAudioOutput, 'formFactor'>): boolean {
+  return ANALOG_FORM_FACTORS.has(output.formFactor);
+}
+
+/**
+ * Sortie HDMI qui n'appartient à aucun écran branché : un ampli audio-vidéo (celui qui alimente
+ * souvent les exciters), qui se règle en 7.1 comme une carte son.
+ */
+export function isHdmiAmplifier(output: Pick<ObservedAudioOutput, 'formFactor' | 'containerId'>, displays: readonly ObservedDisplay[]): boolean {
+  return output.formFactor === DISPLAY_FORM_FACTOR && Boolean(normalizeContainerId(output.containerId)) && !audioScreen(output, [...displays]);
+}
+
+/**
+ * Carte son (ou ampli HDMI) réglée en stéréo dans Windows, quand aucune sortie n'annonce 6 canaux
+ * ou plus : sans ce réglage, le test des haut-parleurs (donc le SSF et le surround) n'est jamais
+ * proposé, alors que la plupart des cartes intégrées savent faire du 7.1 (rapport du 20/11/2026 :
+ * exciters branchés, Realtek laissée en stéréo, rien pour les régler). D'abord la sortie qui a un
+ * rôle (plateau, puis fronton), puis une carte de la carte mère (HDAUDIO), puis les autres cartes,
+ * puis un ampli HDMI. Le haut-parleur d'un écran de la borne n'est jamais proposé.
+ */
+export function stereoSurroundCandidate(
+  outputs: readonly ObservedAudioOutput[],
+  roles: Partial<Record<AudioRole, string>>,
+  displays: readonly ObservedDisplay[] = [],
+): ObservedAudioOutput | undefined {
+  if (outputs.some((o) => o.channels >= 6)) return undefined;
+  const stereo = outputs.filter((o) => o.channels > 0 && o.channels < 6);
+  const cards = stereo.filter(isAnalogOutput);
+  const able = [...cards, ...stereo.filter((o) => isHdmiAmplifier(o, displays))];
+  return (
+    able.find((o) => o.endpointId === roles.playfield) ??
+    able.find((o) => o.endpointId === roles.backglass) ??
+    cards.find((o) => o.bus.toUpperCase() === 'HDAUDIO') ??
+    able[0]
+  );
+}
+
+/**
+ * Paire arrière ou latérale muette au test, sur la carte de la carte mère : le cas des cartes à
+ * trois prises (verte, bleue, rose), où le 7.1 passe par une prise réaffectée dans la console du
+ * fabricant ou par la prise casque en façade. Windows annonce bien le 7.1, rien ne sort.
+ */
+export function silentPairNotices(output: Pick<ObservedAudioOutput, 'formFactor' | 'bus'>, places: Partial<Record<SpeakerPair, SpeakerPlace>>): string[] {
+  if (!isAnalogOutput(output) || output.bus.toUpperCase() !== 'HDAUDIO') return [];
+  // Une seule paire muette : souvent deux exciters seulement (playfieldModeFromTest le dit).
+  if (places.rear !== 'none' || (places.side !== undefined && places.side !== 'none')) return [];
+  return [t('Rien entendu sur l’arrière ou les côtés : sur une carte mère à trois prises, réaffectez la prise bleue ou rose dans la console audio du fabricant (Realtek Audio Console), ou branchez sur la prise casque en façade ; vérifiez aussi les câbles des prises noire et grise.')];
+}
+
 // ---------------------------------------------------------------------------
 // Sorties proposées dans l'assistant
 
@@ -279,6 +334,14 @@ export function playfieldModeFromTest(places: Partial<Record<SpeakerPair, Speake
       notices.push(t('Haut-parleurs arrière près du fronton et latéraux côté joueur : en SSF, VPX les attend dans l’autre sens. Échangez les prises « arrière » et « côté » de la carte son.'));
     }
     if (places.front === 'none') notices.push(t('Rien entendu sur l’avant : en SSF, VPX y envoie seulement le son du fronton si la même carte le joue.'));
+    // SoundPlayer.cpp de VPX 10.8.1 : en 7.1, le SSF partage chaque son entre la paire arrière et
+    // celle des côtés selon sa place sur le plateau ; en 5.1, il l'envoie entier, en stéréo, sur la
+    // seule paire arrière. Deux exciters seulement : le 5.1 leur donne tout le son.
+    if (places.side === 'none' && onPlayfield('rear')) {
+      notices.push(t('Deux exciters seulement, sur la prise arrière : réglez la carte en 5.1 dans Windows. En 7.1, VPX garde une part de chaque son pour la prise des côtés, muette ici.'));
+    } else if (places.rear === 'none' && onPlayfield('side')) {
+      notices.push(t('Deux exciters seulement, sur la prise des côtés : branchez-les sur la prise arrière et réglez la carte en 5.1 dans Windows. En 7.1, VPX garde une part de chaque son pour la prise arrière, muette ici.'));
+    }
     return { playfieldMode: 'ssf', notices };
   }
   if (onPlayfield('front') && back) {
@@ -365,7 +428,13 @@ export function vpxAudioSettings(audio: CabinetAudio, observed: ObservedAudioOut
     const sound3D = vpxSound3D(audio, channels);
     put('Sound3D', String(sound3D));
     const needed = channelsNeeded(sound3D);
-    if (playfield && channels > 0 && channels < needed) {
+    if (playfield && audio.playfieldMode === 'ssf' && channels >= 6 && channels < 8) {
+      // SoundPlayer.cpp de VPX 10.8.1 : le SSF en 5.1 joue le plateau en stéréo sur la paire arrière.
+      findings.push({
+        severity: 'info',
+        message: t('Son du plateau : SSF en 5.1 sur « {name} ». VPX joue le plateau en stéréo sur la paire arrière : parfait pour deux exciters ; pour quatre, réglez la carte en 7.1 (Panneau de configuration > Son > Configurer).', { name: playfield.friendlyName }),
+      });
+    } else if (playfield && channels > 0 && channels < needed) {
       findings.push({
         severity: 'warning',
         message: t('Son du plateau : mixage {mode}, mais « {name} » est réglée en {channels} dans Windows. VPX retombera en stéréo : réglez-la en {needed} (Panneau de configuration > Son > Configurer).', {

@@ -158,7 +158,7 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
     flag: '--son',
     icon: 'sound',
     get label() { return t('Son de la borne'); },
-    get detail() { return t('Sortie audio du fronton et du plateau, test des haut-parleurs'); },
+    get detail() { return t('Fronton, plateau, SSF et exciters : sorties audio et test des haut-parleurs'); },
     get saved() { return t('Son enregistré'); },
     phases: ['sound', 'channels', 'summary'],
     fields: ['audio'],

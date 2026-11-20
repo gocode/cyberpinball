@@ -127,6 +127,27 @@ export const messages: Record<string, string> = {
   'Electron n’a ouvert que {n} canaux sur cette sortie : ces haut-parleurs ne peuvent pas être testés. Exit : rien entendu.':
     'Electron only opened {n} channels on this output: these speakers can’t be tested. Exit: nothing heard.',
   'Le son n’a pas pu être joué ({detail}).': 'The sound couldn’t be played ({detail}).',
+  'Exciters ou haut-parleurs sur le plateau (SSF, surround) ? Cette carte est réglée en {channels} dans Windows : pour les piloter, elle doit passer en 7.1.':
+    'Exciters or speakers on the playfield (SSF, surround)? This card is set to {channels} in Windows: to drive them, it must switch to 7.1.',
+  'Dans le panneau Son de Windows : « {name} », Configurer, 7.1 Surround, puis Suivant jusqu’au bout. Le test des haut-parleurs démarre dès que Windows annonce le 5.1 ou le 7.1. Le 5.1 suffit pour deux exciters, quatre demandent le 7.1. Ni l’un ni l’autre : cette sortie reste en stéréo, il faut une carte son 7.1.':
+    'In the Windows Sound panel: “{name}”, Configure, 7.1 Surround, then Next to the end. The speaker test starts as soon as Windows reports 5.1 or 7.1. 5.1 is enough for two exciters, four need 7.1. Neither: this output stays stereo, you need a 7.1 sound card.',
+  'Deux exciters seulement, sur la prise arrière : réglez la carte en 5.1 dans Windows. En 7.1, VPX garde une part de chaque son pour la prise des côtés, muette ici.':
+    'Only two exciters, on the rear jack: set the card to 5.1 in Windows. In 7.1, VPX keeps part of each sound for the side jack, silent here.',
+  'Deux exciters seulement, sur la prise des côtés : branchez-les sur la prise arrière et réglez la carte en 5.1 dans Windows. En 7.1, VPX garde une part de chaque son pour la prise arrière, muette ici.':
+    'Only two exciters, on the side jack: plug them into the rear jack and set the card to 5.1 in Windows. In 7.1, VPX keeps part of each sound for the rear jack, silent here.',
+  'Son du plateau : SSF en 5.1 sur « {name} ». VPX joue le plateau en stéréo sur la paire arrière : parfait pour deux exciters ; pour quatre, réglez la carte en 7.1 (Panneau de configuration > Son > Configurer).':
+    'Playfield sound: SSF in 5.1 on “{name}”. VPX plays the playfield in stereo on the rear pair: perfect for two exciters; for four, set the card to 7.1 (Control Panel > Sound > Configure).',
+  'Rien entendu sur l’arrière ou les côtés : sur une carte mère à trois prises, réaffectez la prise bleue ou rose dans la console audio du fabricant (Realtek Audio Console), ou branchez sur la prise casque en façade ; vérifiez aussi les câbles des prises noire et grise.':
+    'Nothing heard on the rear or sides: on a motherboard with three jacks, reassign the blue or pink jack in the maker’s audio console (Realtek Audio Console), or plug into the front headphone jack; also check the cables of the black and grey jacks.',
+  'Start : oui, passer cette carte en 7.1 · Exit : non, rester en stéréo · Retour arrière : revenir': 'Start: yes, switch this card to 7.1 · Exit: no, stay in stereo · Back: go back',
+  'Start : rouvrir le panneau Son · Exit : rester en stéréo · Retour arrière : revenir': 'Start: reopen the Sound panel · Exit: stay in stereo · Back: go back',
+  'Oui, passer en 7.1': 'Yes, switch to 7.1',
+  'Rouvrir le panneau Son': 'Reopen the Sound panel',
+  'Non, stéréo': 'No, stereo',
+  'Rester en stéréo': 'Stay in stereo',
+  'Le panneau Son de Windows': 'The Windows Sound panel',
+  'Le panneau Son ne s’ouvre que sous Windows.': 'The Sound panel only opens on Windows.',
+  'Le panneau Son n’a pas pu s’ouvrir ({detail}).': 'The Sound panel couldn’t open ({detail}).',
   'fronton et plateau': 'backbox and playfield',
   fronton: 'backbox',
   plateau: 'playfield',
@@ -473,7 +494,7 @@ export const messages: Record<string, string> = {
   'Place et taille du playfield, du backglass, du DMD et du topper sur chaque écran': 'Position and size of the playfield, backglass, DMD and topper on each screen',
   'Disposition enregistrée': 'Screen layout saved',
   'Son de la borne': 'Cabinet sound',
-  'Sortie audio du fronton et du plateau, test des haut-parleurs': 'Backbox and playfield audio output, speaker test',
+  'Fronton, plateau, SSF et exciters : sorties audio et test des haut-parleurs': 'Backbox, playfield, SSF and exciters: audio outputs and speaker test',
   'Son enregistré': 'Sound saved',
   'Retour à l’écran des tables, configuration enregistrée inchangée.': 'Back to the table menu, saved configuration unchanged.',
   'Aucune borne n’est encore configurée : Cyber Pinball se ferme, l’assistant reprendra au prochain démarrage.':

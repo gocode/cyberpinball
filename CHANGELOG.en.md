@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Cabinet sound: when a sound card (or an amplifier connected over HDMI) is set to stereo in Windows, the wizard asks whether there are exciters or speakers on the playfield (SSF, surround). On a yes, it opens the Windows Sound panel, explains the 5.1 or 7.1 setting and starts the speaker test as soon as the card reports it. Before, SSF was never offered on a card left in stereo, without a word.
+- Cabinet sound: setups with only two exciters are recognized. SSF in 5.1 sends them the whole playfield sound, and the wizard recommends this setting over 7.1, where part of each sound went to a silent jack. The summary no longer reports SSF in 5.1 as an error.
+- Cabinet sound: nothing heard on the rear or sides of a motherboard card: the wizard explains the case of three-jack cards (jack to reassign in the maker's audio console, or the front headphone jack).
+- System menu > Cabinet > Cabinet setup: the "Cabinet sound" entry now mentions SSF and exciters.
 - My account: checking the recovery code now only offers its first three words, shuffled, to put back in order with the flippers (no extra decoy words any more).
 - Publishing: the release date and the manuals review date use the computer's local time instead of UTC, so a version published just after midnight is no longer dated the day before.
 - Pinball FX3 from a game folder chosen by hand: System menu > Tables > Add a table > "Pinball FX3 tables" > "Choose the game folder…", for tables kept outside the Steam library. The folder is checked ("Pinball FX Classic.exe" or "Pinball FX3.exe", tables in data\steam), kept, and the screen's tables come from it; "Forget this folder" goes back to Steam.

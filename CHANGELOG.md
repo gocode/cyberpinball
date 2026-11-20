@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.2
 
+- Son de la borne : quand une carte son (ou un ampli branché en HDMI) est réglée en stéréo dans Windows, l'assistant demande s'il y a des exciters ou des haut-parleurs sur le plateau (SSF, surround). Sur un oui, il ouvre le panneau Son de Windows, explique le réglage en 5.1 ou 7.1 et lance le test des haut-parleurs dès que la carte l'annonce. Auparavant, le SSF n'était jamais proposé sur une carte laissée en stéréo, sans un mot.
+- Son de la borne : deux exciters seulement sont reconnus. Le SSF en 5.1 leur envoie tout le son du plateau, et l'assistant conseille ce réglage plutôt que le 7.1, où une part de chaque son partait vers une prise muette. Le récapitulatif ne présente plus le SSF en 5.1 comme une erreur.
+- Son de la borne : rien entendu sur l'arrière ni sur les côtés d'une carte de carte mère : l'assistant explique le cas des cartes à trois prises (prise à réaffecter dans la console audio du fabricant, ou prise casque en façade).
+- Menu système > Borne > Configuration de la borne : l'entrée "Son de la borne" mentionne désormais le SSF et les exciters.
 - Mon compte : la vérification du code de récupération ne propose plus que ses trois premiers mots, mélangés, à remettre dans l'ordre aux flippers (plus de mots pièges en plus).
 - Publication : la date de sortie et celle de la révision des manuels sont prises à l'heure du poste, et non plus en UTC : une version publiée juste après minuit n'est plus datée de la veille.
 - Pinball FX3 depuis un dossier du jeu choisi à la main : Menu système > Tables > Ajouter une table > « Tables de Pinball FX3 » > « Choisir le dossier du jeu… », pour des tables rangées hors de la bibliothèque de Steam. Le dossier est vérifié (« Pinball FX Classic.exe » ou « Pinball FX3.exe », tables dans data\steam), gardé, et les tables de l'écran viennent de lui ; « Oublier ce dossier » revient à Steam.

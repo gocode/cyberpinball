@@ -90,6 +90,8 @@ import {
   isCabinetCandidate,
   matchAudioOutputs,
   needsChannelTest,
+  stereoSurroundCandidate,
+  silentPairNotices,
   PLAYFIELD_MODE_LABELS,
   playfieldModeFromTest,
   SPEAKER_PLACE_LABELS,
@@ -169,6 +171,7 @@ import { quitWithWindow } from './app-lifetime';
 import { otherFrontendsOnThisPc } from './frontend-gate';
 import { controlActions, controlCode, isControlRole, pressedIn, type ControlAction, type ControlSpec } from './wizard-controls';
 import { progressView } from './wizard-progress';
+import { openSoundPanel } from './sound-panel';
 
 const COLORS = ['#ff3d7f', '#22d3ee', '#facc15', '#a3e635', '#c084fc', '#fb923c'];
 
@@ -313,6 +316,14 @@ interface SoundStep {
   places: Partial<Record<SpeakerPair, SpeakerPlace>>;
   /** Résultat du test, pour la sortie testée. */
   test?: { endpointId: string; result: ChannelTestResult };
+  /**
+   * Carte son analogique réglée en stéréo dans Windows (stereoSurroundCandidate) : « Exciters ou
+   * haut-parleurs sur le plateau ? », puis l'attente de son réglage en 7.1. Pendant ce temps, la
+   * phase est « channels » sans test en cours.
+   */
+  stereoCard?: { endpointId: string; state: 'ask' | 'windows'; notice?: string };
+  /** Réponse « non » à cette question : elle n'est plus reposée dans cet assistant. */
+  stereoDeclined?: boolean;
 }
 
 /** Compte rendu de la fenêtre qui joue les sons (renderer/sound.js). */
@@ -571,6 +582,9 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
     const wait = /^Attendre(\d+)$/.exec(code);
     if (wait) await delay(Number(wait[1]) * 1000);
     else if (code === 'SansBoutons') buttonsTimeout();
+    // « Sorties:<fichier> » : les sorties audio relues ensuite viennent de ce fichier, comme si le
+    // joueur avait changé un réglage du panneau Son de Windows (carte passée en 7.1).
+    else if (code.startsWith('Sorties:')) process.env.CYBERPINBALL_AUDIO_OUTPUTS = code.slice(8);
     // « click:<sélecteur> » : clic de souris sur le premier écran qui montre cet élément (les
     // commandes d'une étape sont sur l'écran que le joueur regarde, souvent celui du playfield).
     else if (code.startsWith('click:')) {
@@ -2373,14 +2387,100 @@ function handleSoundKey(is: (group: string[]) => boolean): boolean {
   return true;
 }
 
-/** Toutes les sorties ont répondu : test des canaux si la sortie du plateau en annonce assez. */
+/**
+ * Toutes les sorties ont répondu : test des canaux si la sortie du plateau en annonce assez ;
+ * sinon, une carte son réglée en stéréo dans Windows fait demander s'il y a des exciters (SSF).
+ */
 function finishOutputs(): void {
   const output = playfieldAudio();
   const sound = wizard.sound!;
   sound.pairIndex = 0;
   sound.places = {};
   sound.test = undefined;
-  wizard.phase = output && needsChannelTest(output) ? 'channels' : 'summary';
+  if (output && needsChannelTest(output)) {
+    wizard.phase = 'channels';
+    return;
+  }
+  const card = sound.stereoDeclined ? undefined : stereoSurroundCandidate(sound.outputs, sound.roles, displays);
+  if (card) sound.stereoCard = { endpointId: card.endpointId, state: 'ask' };
+  wizard.phase = card ? 'channels' : 'summary';
+}
+
+/** Relecture des sorties pendant que le joueur règle sa carte en 7.1 dans le panneau Son. */
+let stereoWatch: NodeJS.Timeout | undefined;
+const STEREO_WATCH_MS = 1500;
+
+function startStereoWatch(): void {
+  stopStereoWatch();
+  stereoWatch = setInterval(() => {
+    if (checkStereoCard()) broadcast();
+  }, STEREO_WATCH_MS);
+}
+
+function stopStereoWatch(): void {
+  if (stereoWatch) clearInterval(stereoWatch);
+  stereoWatch = undefined;
+}
+
+/**
+ * La carte attendue annonce-t-elle maintenant ses haut-parleurs ? Elle prend alors le plateau
+ * (le fronton reste où il était : sur l'avant de la même carte, c'est le SSF à une carte) et le
+ * test des haut-parleurs commence.
+ */
+function checkStereoCard(): boolean {
+  const sound = wizard.sound;
+  const card = sound?.stereoCard;
+  if (!sound || !card || card.state !== 'windows' || wizard.phase !== 'channels') {
+    stopStereoWatch();
+    return false;
+  }
+  const output = loadAudioOutputs().find((o) => o.endpointId === card.endpointId);
+  if (!output || !needsChannelTest(output)) return false;
+  const fresh = (o: ObservedAudioOutput) => (o.endpointId === output.endpointId ? output : o);
+  audio = audio.map(fresh);
+  sound.outputs = sound.outputs.map(fresh);
+  sound.roles.playfield = output.endpointId;
+  sound.stereoCard = undefined;
+  sound.pairIndex = 0;
+  sound.places = {};
+  sound.test = undefined;
+  stopStereoWatch();
+  return true;
+}
+
+/**
+ * Question sur une carte réglée en stéréo. Start : oui, le panneau Son s'ouvre et l'assistant
+ * attend le 7.1 (Start de nouveau : le rouvrir) ; Exit : non, rester en stéréo ; Retour arrière :
+ * revenir à la question, ou aux sorties.
+ */
+function handleStereoCardKey(is: (group: string[]) => boolean): boolean {
+  const sound = wizard.sound!;
+  const card = sound.stereoCard!;
+  if (is(KEYS.back)) {
+    stopStereoWatch();
+    if (card.state === 'windows') {
+      card.state = 'ask';
+      card.notice = undefined;
+    } else {
+      sound.stereoCard = undefined;
+      sound.index = sound.outputs.length - 1;
+      wizard.phase = 'sound';
+    }
+    return true;
+  }
+  if (is(KEYS.exit)) {
+    stopStereoWatch();
+    sound.stereoCard = undefined;
+    sound.stereoDeclined = true;
+    wizard.phase = 'summary';
+    return true;
+  }
+  if (!is(KEYS.confirm)) return false;
+  card.state = 'windows';
+  card.notice = openSoundPanel();
+  // Déjà en 7.1 (réglé avant d'appuyer) : le test commence aussitôt.
+  if (!checkStereoCard()) startStereoWatch();
+  return true;
 }
 
 /**
@@ -2389,6 +2489,7 @@ function finishOutputs(): void {
  */
 function handleChannelKey(is: (group: string[]) => boolean): boolean {
   const sound = wizard.sound!;
+  if (sound.stereoCard) return handleStereoCardKey(is);
   const output = playfieldAudio()!;
   const pairs = speakerPairsOf(output);
   if (is(KEYS.back)) {
@@ -2426,8 +2527,14 @@ function backFromSummary(): void {
   const sound = wizard.sound;
   if (!sound) return isOnly('son') ? askQuit() : startArrangeStep();
   const output = playfieldAudio();
+  const card = output && needsChannelTest(output) ? undefined : stereoSurroundCandidate(sound.outputs, sound.roles, displays);
   if (output && needsChannelTest(output)) {
     sound.pairIndex = speakerPairsOf(output).length - 1;
+    wizard.phase = 'channels';
+  } else if (card) {
+    // « Non, stéréo » répondu : Retour arrière ramène à la question.
+    sound.stereoDeclined = false;
+    sound.stereoCard = { endpointId: card.endpointId, state: 'ask' };
     wizard.phase = 'channels';
   } else {
     sound.index = sound.outputs.length - 1;
@@ -2451,7 +2558,10 @@ function channelTest(): ChannelTestResult | undefined {
 
 /** Remarques de câblage du test des canaux, affichées avec les points à vérifier. */
 function channelNotices(): SyncFinding[] {
-  return (channelTest()?.notices ?? []).map((message) => ({ severity: 'warning', message }));
+  const test = channelTest();
+  const output = playfieldAudio();
+  const silent = test && output ? silentPairNotices(output, wizard.sound!.places) : [];
+  return [...(test?.notices ?? []), ...silent].map((message) => ({ severity: 'warning', message }));
 }
 
 /** Modèle audio issu de l'étape « Son » ; celui d'avant si elle n'a rien eu à proposer. */
@@ -2478,7 +2588,7 @@ function wantedSound(): { kind: string; key: string; [field: string]: unknown } 
     return { kind: 'output', key: `sortie:${output.endpointId}`, friendlyName: output.friendlyName, beeps: sound.index + 1 };
   }
   const output = playfieldAudio();
-  if (wizard.phase === 'channels' && sound && output) {
+  if (wizard.phase === 'channels' && sound && output && !sound.stereoCard) {
     const pair = speakerPairsOf(output)[sound.pairIndex]!;
     return {
       kind: 'channel',
@@ -3362,7 +3472,8 @@ function stepSummary(rolesLines: string[], playfieldLines: string[]): string[] {
  */
 function soundView(index: number, base: { notice?: string } & Record<string, unknown>, assignedRole: RoleId | undefined) {
   const sound = wizard.sound!;
-  const output = wizard.phase === 'sound' ? sound.outputs[sound.index]! : playfieldAudio()!;
+  const card = wizard.phase === 'channels' ? sound.stereoCard : undefined;
+  const output = wizard.phase === 'sound' ? sound.outputs[sound.index]! : card ? audioById(card.endpointId)! : playfieldAudio()!;
   const speaker = audioScreen(output, displays);
   if (assignedRole !== 'playfield') {
     const isSpeaker = speaker === displays[index];
@@ -3396,6 +3507,30 @@ function soundView(index: number, base: { notice?: string } & Record<string, unk
         { role: 'next', label: t('Sur le plateau') },
         { role: 'confirm', label: t('Les deux') },
         { role: 'exit', label: t('Aucun') },
+      ]),
+    };
+  }
+
+  if (card) {
+    const asking = card.state === 'ask';
+    return {
+      ...base,
+      highlight: true,
+      measure: 'SSF',
+      prompt: output.friendlyName,
+      name: '',
+      details,
+      notice: card.notice ?? notice,
+      step: asking
+        ? t('Exciters ou haut-parleurs sur le plateau (SSF, surround) ? Cette carte est réglée en {channels} dans Windows : pour les piloter, elle doit passer en 7.1.', { channels: channelsLabel(output.channels) })
+        : t('Dans le panneau Son de Windows : « {name} », Configurer, 7.1 Surround, puis Suivant jusqu’au bout. Le test des haut-parleurs démarre dès que Windows annonce le 5.1 ou le 7.1. Le 5.1 suffit pour deux exciters, quatre demandent le 7.1. Ni l’un ni l’autre : cette sortie reste en stéréo, il faut une carte son 7.1.', { name: output.friendlyName }),
+      hint: asking
+        ? t('Start : oui, passer cette carte en 7.1 · Exit : non, rester en stéréo · Retour arrière : revenir')
+        : t('Start : rouvrir le panneau Son · Exit : rester en stéréo · Retour arrière : revenir'),
+      actions: controls([
+        { role: 'back', label: t('Revenir') },
+        { role: 'confirm', label: asking ? t('Oui, passer en 7.1') : t('Rouvrir le panneau Son'), primary: true },
+        { role: 'exit', label: asking ? t('Non, stéréo') : t('Rester en stéréo') },
       ]),
     };
   }
@@ -3454,7 +3589,7 @@ function progressCount(): string | undefined {
   if (wizard.phase === 'assign' && ROLES[wizard.roleIndex]) return t('Rôle {n} sur {total}', { n: wizard.roleIndex + 1, total: ROLES.length });
   const sound = wizard.sound;
   if (wizard.phase === 'sound' && sound) return t('Sortie {n} sur {total}', { n: sound.index + 1, total: sound.outputs.length });
-  const output = wizard.phase === 'channels' && sound ? playfieldAudio() : undefined;
+  const output = wizard.phase === 'channels' && sound && !sound.stereoCard ? playfieldAudio() : undefined;
   if (output) return t('Haut-parleurs {n} sur {total}', { n: sound!.pairIndex + 1, total: speakerPairsOf(output).length });
   return undefined;
 }

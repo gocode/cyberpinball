@@ -9,8 +9,11 @@ import {
   matchAudioOutputs,
   needsChannelTest,
   playfieldModeFromTest,
+  silentPairNotices,
   speakerPairsOf,
+  stereoSurroundCandidate,
   toAudioOutput,
+  vpxAudioSettings,
   vpxSound3D,
 } from '../audio';
 import { toPhysicalScreen } from '../fingerprint';
@@ -109,6 +112,58 @@ test('haut-parleurs d’une sortie : rang de chaque canal selon le masque Window
   assert.ok(needsChannelTest({ channels: 8, channelMask: 0x63f }));
   assert.ok(needsChannelTest({ channels: 6, channelMask: 0x3f }));
   assert.ok(!needsChannelTest({ channels: 2, channelMask: 0x3 }));
+});
+
+// Rapport du 20/11/2026 : exciters branchés sur une Realtek laissée en stéréo dans Windows ; sans
+// 6 canaux, le test des haut-parleurs n'était jamais proposé et le SSF restait introuvable.
+test('carte son en stéréo : l’assistant demande s’il y a des exciters (SSF), sauf si une sortie annonce déjà 6 canaux', () => {
+  const [usb, realtek, , hdmi, card71] = devPcAudio();
+  const borne = [hdmi!, realtek!, usb!];
+  assert.equal(stereoSurroundCandidate(borne, {})?.endpointId, realtek!.endpointId, 'la carte de la carte mère d’abord');
+  assert.equal(stereoSurroundCandidate(borne, { backglass: usb!.endpointId })?.endpointId, usb!.endpointId, 'la sortie qui a un rôle d’abord');
+  assert.equal(stereoSurroundCandidate(borne, { backglass: usb!.endpointId, playfield: realtek!.endpointId })?.endpointId, realtek!.endpointId, 'le plateau avant le fronton');
+  assert.equal(stereoSurroundCandidate([hdmi!], { playfield: hdmi!.endpointId }, displaysWithContainers()), undefined, 'le haut-parleur d’un écran ne passe pas en 7.1');
+  assert.equal(stereoSurroundCandidate([...borne, card71!], {}), undefined, 'une carte déjà en 7.1 a son propre test');
+  assert.equal(stereoSurroundCandidate([{ ...realtek!, formFactor: 3 }], {}), undefined, 'un casque n’a pas d’exciters');
+});
+
+test('ampli HDMI : une sortie HDMI d’aucun écran de la borne passe en 7.1 comme une carte son', () => {
+  const displays = displaysWithContainers();
+  const [, , , screenSpeaker] = devPcAudio();
+  const amp = output('aaaaaaaa-0000-0000-0000-0000000000a1', 'DENON-AVR', 'NVIDIA High Definition Audio', {
+    bus: 'HDAUDIO',
+    formFactor: 9,
+    containerId: '{11111111-2222-3333-4444-555555555555}',
+  });
+  assert.equal(stereoSurroundCandidate([screenSpeaker!, amp], {}, displays)?.endpointId, amp.endpointId);
+  assert.equal(stereoSurroundCandidate([screenSpeaker!], {}, displays), undefined, 'le haut-parleur de l’écran du fronton n’en est pas un');
+  assert.equal(stereoSurroundCandidate([{ ...amp, containerId: undefined }], {}, displays), undefined, 'sans ContainerId, rien ne dit que ce n’est pas un écran');
+});
+
+test('paire muette au test sur la carte de la carte mère : aide pour les cartes à trois prises', () => {
+  const realtek = devPcAudio()[1]!;
+  assert.equal(silentPairNotices(realtek, { front: 'backglass', rear: 'lockbar', side: 'top' }).length, 0);
+  assert.equal(silentPairNotices(realtek, { front: 'backglass', rear: 'none', side: 'none' }).length, 1);
+  assert.equal(silentPairNotices(realtek, { front: 'backglass', rear: 'none' }).length, 1, '5.1 : la seule paire arrière muette');
+  assert.equal(silentPairNotices(realtek, { front: 'backglass', rear: 'none', side: 'top' }).length, 0, 'une paire muette sur deux : deux exciters, pas trois prises');
+  assert.equal(silentPairNotices({ ...realtek, bus: 'USB' }, { rear: 'none' }).length, 0, 'une carte USB n’a pas de prises à réaffecter');
+});
+
+// SoundPlayer.cpp de VPX 10.8.1 : en 7.1, le SSF partage chaque son entre l'arrière et les côtés ;
+// en 5.1, il l'envoie entier sur la paire arrière.
+test('deux exciters seulement : le 5.1 conseillé, et le SSF en 5.1 n’est plus un défaut', () => {
+  const rearOnly = playfieldModeFromTest({ front: 'backglass', rear: 'lockbar', side: 'none' });
+  assert.equal(rearOnly.playfieldMode, 'ssf');
+  assert.ok(rearOnly.notices.some((n) => n.includes('5.1') && n.includes('prise arrière')));
+  const sideOnly = playfieldModeFromTest({ front: 'backglass', rear: 'none', side: 'top' });
+  assert.ok(sideOnly.notices.some((n) => n.includes('branchez-les sur la prise arrière')));
+  assert.equal(playfieldModeFromTest({ front: 'backglass', rear: 'lockbar', side: 'top' }).notices.length, 0, 'quatre exciters : rien à dire');
+
+  const observed = devPcAudio();
+  observed[4] = { ...observed[4]!, channels: 6, channelMask: 0x3f };
+  const plan = vpxAudioSettings(cabinetWithAudio().audio!, observed);
+  assert.ok(!plan.findings.some((f) => f.severity === 'warning' && f.message.includes('Son du plateau')), 'pas d’avertissement en 5.1');
+  assert.ok(plan.findings.some((f) => f.severity === 'info' && f.message.includes('deux exciters')));
 });
 
 test('une sortie HDMI se rattache à son écran par le ContainerId, jamais par le conteneur de l’ordinateur', () => {
