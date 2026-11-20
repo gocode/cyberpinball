@@ -4,7 +4,7 @@
 // l'écran viennent alors de lui. Les parties se lancent par son exécutable (pinballfx3-folder.ts).
 // Sans dossier choisi, rien ne change : le jeu de Steam. Branché dans library.ts (buildZen).
 
-import { checkPinballFx3Folder, pinballFx3FolderProblemReason, pinballFx3FolderProblemText, pinballFx3InstalledTables, samePath, t, tn, writePinballFx3Folder } from '@cyberpinball/core';
+import { checkPinballFx3Folder, pinballFx3FolderProblemReason, pinballFx3FolderProblemText, pinballFx3InstalledTables, samePath, t, tn, writePinballFx3Folder, type PinballFx3Install } from '@cyberpinball/core';
 import * as path from 'node:path';
 import type { Action, Row } from './library-types';
 import { onGesture } from './gesture-flash';
@@ -86,20 +86,30 @@ export function createPinballFx3FolderUi(host: PinballFx3FolderUiHost) {
       console.log(`${GAME} : dossier refusé, ${check.dir} (${check.problem}).`); // i18n-ignore : journal
       return host.reopen(true);
     }
-    const install = check.install;
+    use(check.install);
+  }
+
+  /**
+   * Garde ce jeu comme dossier de Pinball FX3 et ouvre son écran. Aussi depuis l'ajout général
+   * (« Choisir un dossier… », glisser-déposer) : un dossier de FX3 n'y est pas une table VPX, il était
+   * listé en « Non importé » (retour d'un joueur, 20/11/2026). `via` : il vient de l'ajout général.
+   */
+  function use(install: PinballFx3Install, opts: { via?: 'import'; show?: boolean } = {}): void {
     const steamDir = host.setup().steamDir;
+    const recognized = opts.via === 'import' ? `${t('Dossier de {game} reconnu dans votre sélection : ses tables ne s’installent pas comme des tables VPX, elles se choisissent ici.', { game: GAME })} ` : '';
     if (steamDir && samePath(steamDir, install.gameDir)) {
       // Le dossier de Steam lancé directement : Steam demanderait une confirmation à chaque partie.
       writePinballFx3Folder(host.dataDir(), undefined);
-      notice = t('C’est le dossier du jeu de Steam : rien à changer, les parties passent par Steam.');
-      return host.reopen();
+      notice = `${recognized}${t('C’est le dossier du jeu de Steam : rien à changer, les parties passent par Steam.')}`;
+      if (opts.show !== false) host.reopen();
+      return;
     }
     writePinballFx3Folder(host.dataDir(), install.gameDir);
     const n = pinballFx3InstalledTables(install).length;
-    console.log(`${GAME} : dossier choisi ${install.gameDir}, ${n} table(s), lancé par ${install.launcher}.`); // i18n-ignore : journal
-    notice = `${t('Dossier gardé : {dir}.', { dir: install.gameDir })} ${tn(n, '{n} table trouvée.', '{n} tables trouvées.')} ${t('Les parties se lancent par « {exe} », sans passer par Steam ; si le jeu exige Steam, c’est lui qui refusera de s’ouvrir.', { exe: path.basename(install.launcher) })}`;
-    host.reopen();
+    console.log(`${GAME} : dossier ${opts.via === 'import' ? 'reconnu dans l’ajout' : 'choisi'} ${install.gameDir}, ${n} table(s), lancé par ${install.launcher}.`); // i18n-ignore : journal
+    notice = `${recognized}${t('Dossier gardé : {dir}.', { dir: install.gameDir })} ${tn(n, '{n} table trouvée.', '{n} tables trouvées.')} ${t('Les parties se lancent par « {exe} », sans passer par Steam ; si le jeu exige Steam, c’est lui qui refusera de s’ouvrir.', { exe: path.basename(install.launcher) })}`;
+    if (opts.show !== false) host.reopen();
   }
 
-  return { rows, actions, notice: () => notice };
+  return { rows, actions, use, notice: () => notice };
 }

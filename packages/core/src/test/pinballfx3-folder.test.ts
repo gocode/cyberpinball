@@ -16,6 +16,7 @@ import {
   pinballFx3DirectCommand,
   pinballFx3DirectFailureHint,
   pinballFx3FolderProblemReason,
+  pinballFx3GameIn,
   pinballFx3FolderProblemText,
   pinballFx3LaunchCommand,
   readPinballFx3Folder,
@@ -88,6 +89,35 @@ test('dossier choisi refusé : introuvable, sans exécutable, sans tables ; deux
   fakeGame(path.join(root, 'Deux', 'A'));
   fakeGame(path.join(root, 'Deux', 'B'));
   assert.equal((checkPinballFx3Folder(path.join(root, 'Deux')) as { problem: string }).problem, 'no-exe');
+  fs.rmSync(root, { recursive: true });
+});
+
+test('ajout général : le dossier du jeu ou ses fichiers reconnus comme Pinball FX3, jamais un dossier de tables VPX qui le contiendrait', () => {
+  const root = tempDir();
+  const game = fakeGame(path.join(root, 'Pinball FX3 Williams Pinball Volume 6'), 'Pinball FX3.exe');
+  // Fichiers du jeu sans rapport avec une table (quels qu'ils soient) : sans effet sur la reconnaissance.
+  fs.writeFileSync(path.join(game, 'autre.dll'), '');
+  fs.writeFileSync(path.join(game, 'data', 'steam', 'Aliens.jpg'), '');
+  // Le dossier du jeu choisi.
+  const whole = pinballFx3GameIn([game]);
+  assert.equal(whole?.install.gameDir, game);
+  assert.deepEqual(whole?.used, [game]);
+  // Son dossier data\steam, ou des tables .pxp choisies une à une.
+  assert.equal(pinballFx3GameIn([path.join(game, 'data', 'steam')])?.install.gameDir, game);
+  const pxp = [path.join(game, 'data', 'steam', 'WMS_Fish_Tales.pxp'), path.join(game, 'data', 'steam', 'Citadel.pxp')];
+  assert.deepEqual(pinballFx3GameIn(pxp)?.used, pxp);
+  // Avec une table VPX d'ailleurs : elle reste à l'ajout habituel.
+  const vpx = path.join(root, 'Ailleurs', 'Table.vpx');
+  fs.mkdirSync(path.dirname(vpx));
+  fs.writeFileSync(vpx, '');
+  assert.deepEqual(pinballFx3GameIn([vpx, game])?.used, [game]);
+  assert.equal(pinballFx3GameIn([vpx]), undefined);
+  // Un dossier qui contient le jeu parmi d'autres choses : pas deviné, l'ajout habituel le prend.
+  assert.equal(pinballFx3GameIn([root]), undefined);
+  // Un fichier posé à côté du jeu, hors de son dossier : pas au jeu.
+  const beside = path.join(root, 'Table posée là.vpx');
+  fs.writeFileSync(beside, '');
+  assert.equal(pinballFx3GameIn([beside]), undefined);
   fs.rmSync(root, { recursive: true });
 });
 

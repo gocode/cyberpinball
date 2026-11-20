@@ -68,6 +68,7 @@ import {
   withVpxChoice,
   PINBALLFX_TABLES,
   PINBALLFX3_CABINET_HELP_URL,
+  pinballFx3GameIn,
   pinballFx3InstalledTables,
   ZEN_GAMES,
   zenEntryKey,
@@ -4358,6 +4359,15 @@ export function createLibrary(host: LibraryHost) {
       paths = paths.filter((p) => !fpt.includes(p));
       void futurePinballUi.add(fpt, { show: !paths.length });
       if (!paths.length) return;
+    }
+    // Le dossier de Pinball FX3 (ou ses fichiers) choisi ici : gardé comme dossier du jeu, son écran
+    // s'ouvre avec ses tables (pinballfx3-folder-ui.ts). Ce n'est pas une table VPX.
+    const fx3 = pinballFx3GameIn(paths);
+    if (fx3) {
+      paths = paths.filter((p) => !fx3.used.includes(p));
+      if (!paths.length) return pinballFx3Folder.use(fx3.install, { via: 'import' });
+      // Avec d'autres fichiers : le dossier est gardé aussi, le plan d'ajout s'ouvre pour le reste.
+      pinballFx3Folder.use(fx3.install, { via: 'import', show: false });
     }
     const s: AddPlan = { kind: 'addPlan', mode, scripts: new Map(), existing: [], vpsChoices: new Map(), pupChoices: new Map(), romChoices: new Map(), cabinet: pupCabinet(loadCabinet(host.dataDir)), acquisition, journey, fromHub, target, back, vpxChoices: new Map(), ...(vpxHints?.size ? { vpxHints } : {}) };
     go(s);

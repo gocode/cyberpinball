@@ -67,7 +67,7 @@ function exeIn(dir: string): string | undefined {
  * dossier data ou data\steam, ou le dossier qui contient le jeu (un seul sous-dossier avec
  * l'exécutable, comme « Games\PinballFX3\<nom du jeu> »).
  */
-function gameDirOf(chosen: string): string | undefined {
+function gameDirOf(chosen: string, lookInside = true): string | undefined {
   const at = path.resolve(chosen);
   if (isExeName(path.basename(at))) return exeIn(path.dirname(at)) ? path.dirname(at) : undefined;
   if (exeIn(at)) return at;
@@ -75,6 +75,7 @@ function gameDirOf(chosen: string): string | undefined {
   const parent = path.dirname(at);
   if (base === 'data' && exeIn(parent)) return parent;
   if (base === 'steam' && path.basename(parent).toLowerCase() === 'data' && exeIn(path.dirname(parent))) return path.dirname(parent);
+  if (!lookInside) return undefined;
   let children: string[];
   try {
     children = fs.readdirSync(at, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => path.join(at, d.name));
@@ -89,15 +90,38 @@ function gameDirOf(chosen: string): string | undefined {
  * Vérifie un dossier choisi : l'exécutable du jeu, et des tables dans data\steam. Rien n'est écrit,
  * ni ici ni dans le dossier du jeu.
  */
-export function checkPinballFx3Folder(chosen: string): PinballFx3FolderCheck {
+export function checkPinballFx3Folder(chosen: string, opts: { lookInside?: boolean } = {}): PinballFx3FolderCheck {
   const dir = path.resolve(chosen);
   if (!fs.existsSync(dir)) return { ok: false, problem: 'absent', dir };
-  const gameDir = gameDirOf(dir);
+  const gameDir = gameDirOf(dir, opts.lookInside ?? true);
   const exe = gameDir ? exeIn(gameDir) : undefined;
   if (!gameDir || !exe) return { ok: false, problem: 'no-exe', dir };
   const tablesDir = path.join(gameDir, 'data', 'steam');
   if (!isDir(tablesDir) || pinballFx3InstalledTables({ tablesDir }).length === 0) return { ok: false, problem: 'no-tables', dir: gameDir };
   return { ok: true, install: { store: 'folder', gameDir, launcher: exe, tablesDir } };
+}
+
+/**
+ * Un jeu Pinball FX3 dans une sélection de l'ajout général (« Choisir un dossier… », glisser-déposer) :
+ * le dossier du jeu, ou un fichier qu'il contient (exécutable, table .pxp). Rend le jeu et les chemins
+ * de la sélection qui lui appartiennent (ils ne sont pas des tables VPX) ; undefined : aucun.
+ */
+export function pinballFx3GameIn(paths: readonly string[]): { install: PinballFx3Install; used: string[] } | undefined {
+  for (const p of paths) {
+    const dir = isDir(p);
+    // Pas de recherche dans les sous-dossiers : un dossier de tables VPX qui contiendrait aussi le jeu reste un import VPX.
+    const check = checkPinballFx3Folder(dir ? p : path.dirname(p), { lookInside: false });
+    if (!check.ok) continue;
+    const game = check.install.gameDir;
+    const inside = (x: string) => {
+      const rel = path.relative(game, path.resolve(x));
+      return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+    };
+    // Un fichier n'en est que s'il est dans le jeu (une table .vpx posée à côté reste une table VPX).
+    if (!dir && !inside(p)) continue;
+    return { install: check.install, used: paths.filter(inside) };
+  }
+  return undefined;
 }
 
 /** Dossier du jeu gardé, s'il y en a un (fichier absent ou illisible : aucun). */

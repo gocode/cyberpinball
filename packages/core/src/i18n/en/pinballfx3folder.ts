@@ -38,6 +38,7 @@ export const messages: Record<string, string> = {
   'Dossier oublié.': 'Folder forgotten.',
   'C’est le dossier du jeu de Steam : rien à changer, les parties passent par Steam.': 'That’s the Steam game folder: nothing to change, games go through Steam.',
   'Dossier gardé : {dir}.': 'Folder kept: {dir}.',
+  'Dossier de {game} reconnu dans votre sélection : ses tables ne s’installent pas comme des tables VPX, elles se choisissent ici.': '{game} folder recognized in your selection: its tables aren’t installed like VPX tables, you choose them here.',
   '{n} table trouvée.': '{n} table found.',
   '{n} tables trouvées.': '{n} tables found.',
   'Les parties se lancent par « {exe} », sans passer par Steam ; si le jeu exige Steam, c’est lui qui refusera de s’ouvrir.': 'Games start from "{exe}", without going through Steam; if the game requires Steam, it’s the game that will refuse to open.',
