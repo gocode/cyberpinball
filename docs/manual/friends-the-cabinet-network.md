@@ -4,16 +4,27 @@
 
 System menu > "Communauté" (Community) links cabinets together **with no server**: each finds the others and talks to them directly, over the Internet or on the local network.
 Sharing is **on by default**; "Partage et réseau" (Sharing and network) turns it off.
-What is yours (nickname, avatar, country, badges, public profile, what others see, deleting the account) is in System menu > "Communauté" (Community) > "Mon profil" (My profile) > "Mon compte" (My account) (see [My account](my-account.md#my-account)).
+The system menu's Community is the same screen as the wheel's Community medallion (see "The Community medallion" below): at the top, the number of players online and what others see, then eight entries.
+What is yours (level, badges, game history, nickname, avatar, country, public profile, what others see, deleting the account) is in System menu > "Communauté" (Community) > "Mon profil" (My profile) (see [My account](my-account.md#my-account)).
 
 | Entry | What it shows |
 | --- | --- |
+| Mon profil (My profile) | My level, My badges, Game history, then Edit my profile (nickname, avatar, country), Privacy (public profile, what others see) and My account (protect it, transfer it, delete it). The game history: the games with friends finished on this cabinet, newest first, by day, the table, the time, and below it the players with their rank and score; a game opens to review its details (see "Game history" below). |
+| Joueurs en ligne (Players online) | Every player your cabinet has come across, friends or not, those online first (see "Community and players online" below). |
+| Partie instantanée (Instant game) | A live game open to everyone, friends or not; the label says whether one is open (see "Instant games" below). |
+| Mes amis (My friends) | Online, then offline. For each: playing and which table (in real time), in the menu, or seen how long ago; their latest event ("Nouveau meilleur score sur …", New high score on; "Badge reçu : …", Badge earned; "A joué à …", Played). Start opens their profile, the one screen of a player (see "Public profile and likes" below): their presence, their library, their level, their badges, a single activity list, "Inviter à une partie en direct" (Invite to a live game; greyed out, "Hors ligne", Offline, when they are not), "Voir sa bibliothèque" (See their library), "Écrire un message" (Write a message), "Retirer de mes amis" (Remove from my friends), "Bloquer …" (Block …). At the top, an invitation received or the live game in progress. "Trouver un joueur" (Find a player) and friend requests are there too (below). |
 | Messages | Conversations with your friends, the most recent first, then the friends you have not written to yet. The red dot and "non lus" (unread) mark what is waiting. Start opens a friend's conversation (see "Messaging" below). |
-| Mes amis (My friends) | Online, then offline. For each: playing and which table (in real time), in the menu, or seen how long ago; their latest event ("Nouveau meilleur score sur …", New high score on; "Badge reçu : …", Badge earned; "A joué à …", Played). Start opens their profile, the one screen of a player (see "Public profile and likes" below): their presence, their library, their level, their badges, a single activity list, "Inviter à une partie en direct" (Invite to a live game; greyed out, "Hors ligne", Offline, when they are not), "Voir sa bibliothèque" (See their library), "Écrire un message" (Write a message), "Retirer de mes amis" (Remove from my friends), "Bloquer …" (Block …). At the top, an invitation received or the live game in progress. |
-| Historique des parties (Game history) | The games with friends finished on this cabinet, newest first, by day: the table, the time, and below it the players with their rank and score. A game opens to review its details (see "Game history" below). |
+| Groupes et salons (Groups and rooms) | Groups, public or private, and the country rooms (see "Groups" and "Rooms by country" below). |
+| Classements (Leaderboards) | Players and tables, in the Friends, National and World scopes (see "Community and players online" below). |
+| Réglages de la communauté (Community settings) | Presence and rooms, Sharing and network, Friends' scores during the game, Hide notifications during games, Moderation (moderators' cabinets only), Local play (below). |
+
+In My friends and in Community settings:
+
+| Entry | What it shows |
+| --- | --- |
 | Trouver un joueur (Find a player) | The directory: "Chercher un nom…" (Search for a name, ignoring accents and case; or the ID shown on a player's profile, whole or its first four characters), cabinets "À proximité (réseau local)" (Nearby, local network) and "Vus récemment" (Seen recently). Start on a player opens their profile: "Envoyer une demande d'ami" (Send a friend request), or cancel, accept, decline, and "Bloquer …" (Block …). |
 | Demandes d'amis (Friend requests) | Received (to answer, red dot up to the gear) and sent ("En attente : remise dès que sa borne sera en ligne", Waiting: delivered as soon as their cabinet is online). |
-| Partage et réseau (Sharing and network) | The network only: sharing on or off, local network, library shared or not, download speed, Windows Firewall, live state of Stern SAM tables, the reminder of what others see, blocked players. The nickname, the avatar, the country, the settings of what others see and deleting the account are in My account. The selection opens on "Retour" (Back): a stray Start does not turn sharing off. |
+| Partage et réseau (Sharing and network) | The network only: sharing on or off, local network, library shared or not, download speed, Windows Firewall, live state of Stern SAM tables, the reminder of what others see, blocked players. The nickname, the avatar, the country, the settings of what others see and deleting the account are in My profile. The selection opens on "Retour" (Back): a stray Start does not turn sharing off. |
 | Masquer les notifications pendant les parties (Hide notifications during games) | Off by default: a friend coming online, a request to join a game, the news of a game with friends also show during games, with their sound (see "Everywhere, even in a game" in [Tables menu notifications](tables-menu-notifications.md#tables-menu-notifications)). Start toggles; on, nothing shows or rings during a game, everything waits for the menu. |
 | Jouer en local (Local play) | For a cabinet that only plays locally: a single setting removes the whole social side, levels included. Start opens a screen saying what is removed and what stays, the cursor on "Annuler" (Cancel); "Jouer en local" confirms. Once on, the entry says "Jouer en local : activé" (Local play: on) and is the only one left in the section; Start offers "Remettre la communauté" (Bring the community back), the cursor on "Rester en local" (Stay local) (see "Local play" below). |
 
@@ -21,7 +32,7 @@ What is yours (nickname, avatar, country, badges, public profile, what others se
 System menu > Community > "Réglages de la communauté" (Community settings) > "Jouer en local" (Local play) turns sharing off and stops the cabinet network.
 Then the levels, XP and badges on screen (the player card, the badge and level moments), friends, players online and friend requests, messages and their badge, rooms, groups, instant games, online rankings, the Community medallion on the wheel, "Jouer avec un ami" (Play with a friend) and "Partie instantanée" (Instant game) on the table sheets, and the Community on the phone all disappear.
 A table's scoreboard keeps only this cabinet's scores, with no scope tabs.
-In My account, My badges, My public profile and What others see are removed too.
+In My profile only Edit my profile (nickname, avatar, country) and My account remain: My level, My badges, the game history and Privacy are removed too.
 All the tables and their scores on this cabinet, the Juke-box, Cyber Pinball updates, What's new, Feedback and ideas stay.
 Nothing is deleted: friends, XP and badges are kept as they are, and XP keeps counting quietly.
 "Remettre la communauté" (Bring the community back) turns sharing and the network back on: everything comes back, XP included.
@@ -191,7 +202,7 @@ Code: [packages/core/src/ratelimit.ts](../../packages/core/src/ratelimit.ts), `s
 Two entries.
 A friend's profile > "Inviter à une partie en direct" (Invite to a live game): choose a table (those they have in the same version first, see "Choosing the table of a live game" below).
 A table's page > "Jouer avec un ami" (Play with a friend), right under "Jouer" (Play): choose the friend (online ones first, those who have the table in the same version at the top, offline friends greyed out below).
-Both stay visible when you cannot invite, greyed out with their reason: "Hors ligne : invitez-le quand il sera connecté" (Offline: invite them once they are connected), "Aucun ami en ligne pour l'instant" (No friend online right now), "Pas encore d'ami : Menu système > Communauté > Trouver un joueur" (No friend yet: System menu > Community > My friends > Find a player); a friend in a game can be invited too ("En partie : il recevra une notification discrète sur sa table", In a game: they will get a discreet notification on their table).
+Both stay visible when you cannot invite, greyed out with their reason: "Hors ligne : invitez-le quand il sera connecté" (Offline: invite them once they are connected), "Aucun ami en ligne pour l'instant" (No friend online right now), "Pas encore d'ami : Menu système > Communauté > « Mes amis » > « Trouver un joueur »" (No friend yet: System menu > Community > My friends > Find a player); a friend in a game can be invited too ("En partie : il recevra une notification discrète sur sa table", In a game: they will get a discreet notification on their table).
 A room opens, the invitation leaves; up to four players ("Inviter un autre ami", Invite another friend).
 On the friend's side, the invitation chime rings and "Invitation de …" (Invitation from) opens by itself over the table menu, in the system menu and on the help (over the open screen, which "Répondre plus tard" gives back as it was), the cursor on "Répondre plus tard" (Answer later, with the time left): a button already pressed neither accepts nor declines; otherwise it waits at the top of "Mes amis", two minutes at most.
 The cabinet checks there that it has the same version as the host, mandatorily (a score to compete on, and tournaments later): the same `.vpx` (SHA-256 fingerprint, kept in `<data>\amis\empreintes.json`) and the same script played.
@@ -439,6 +450,14 @@ The flippers choose a message, Start opens "Répondre" (Reply), MagnaSave goes t
 "Répondre" offers seven emoji reactions placed on the chosen message (👍 Like, ❤️ Love, 🥰 Care, 😆 Haha, 😮 Wow, 😢 Sad, 😡 Angry, the same as in the rooms; Start again on yours removes it; an older reaction, Bravo or TILT!, still shows), six ready-made sentences, and "Écrire un message…": the on-screen keyboard, or the paired phone, whose text appears in the field as you type. 500 characters at most.
 On a desktop, the real keyboard types directly.
 
+**Quoting a message.**
+Choosing a message then replying, with a ready-made sentence or the keyboard ("Répondre à Bruno", Reply to Bruno), quotes it.
+The quote, with its author and its first two lines, shows above the reply, in the front-end as on the phone.
+As long as the quoted message is still on display, the quote is a cursor stop, just before its bubble: choosing it, with the flippers or the mouse, takes you back to the quoted message.
+A message quoted then deleted keeps its excerpt, marked "message supprimé" (message deleted); a message no longer shown here, "message plus affiché ici" (message no longer shown here).
+The quote travels in a separately signed extension: a cabinet not yet up to date still receives the message and shows its text, and an up-to-date cabinet that finds the extension wrong drops it, never the message.
+Code: [citations.ts](../../packages/core/src/citations.ts) and `app/src/messages-citations.ts`; tests: [citations.test.ts](../../packages/core/src/test/citations.test.ts).
+
 **On-screen keyboard: position and emoji.**
 The text has an insertion point: the ◀ ▶ keys of the on-screen keyboard move it, as do a real keyboard's left and right arrows, Home and End (unless those arrows are the cabinet's buttons); a letter, Effacer (Backspace) and Delete act there.
 An emoji counts as one character.
@@ -576,7 +595,7 @@ Tests: [invitations.test.ts](../../packages/core/src/test/invitations.test.ts).
 **The Community medallion.**
 On the wheel, right after the Juke-box and before the Collections medallion and the tables of each collection, a medallion on the shared chrome ring opens the community: its name in green, the number of players online and friends online below.
 Everywhere (medallion, poster, System menu, "Joueurs en ligne" (Players online) tabs, phone), the number of players online, and that of your country, only shows above five, like the people present in a room: a nearly empty network, in figures, would put people off; players stay named, and your online friends are always counted.
-Start opens the **home screen**, six doors: "Joueurs en ligne" (Players online), "Parties instantanées" (Instant games, see below), "Mes amis" (My friends, with the badge of received requests), "Messages" (messaging between friends), your country's room (see "Rooms by country" below) and "Classements" (Leaderboards), which opens on two doors, "Joueurs" (Players) and "Tables".
+Start opens the **home screen**, the same screen as System menu > Community, its "Retour" (Back) returning to the wheel: at the top, the number of players online and what others see, then "Mon profil" (My profile), "Joueurs en ligne" (Players online), "Partie instantanée" (Instant game, see below), "Mes amis" (My friends, with the badge of received requests), "Messages" (messaging between friends), "Groupes et salons" (Groups and rooms, see "Groups" and "Rooms by country" below), "Classements" (Leaderboards), which opens on two doors, "Joueurs" (Players) and "Tables", and "Réglages de la communauté" (Community settings).
 "Joueurs" (Players) ranks players by their XP, in Friends, National and Worldwide tabs (Start or MagnaSave goes from one to the next), for the week (XP earned since Monday, back to zero every Monday) or of all time (the flippers switch between them).
 It opens on National · This week (Worldwide without a chosen country): the week first, where everyone has a chance.
 Each line gives the rank, the flag, the player's avatar with their level and presence, their nickname and their XP, the other period in small print ("12 400 XP au total" (12,400 XP in total), "+850 cette semaine" (+850 this week)); tied players share the same rank.
@@ -584,7 +603,7 @@ It counts the players whose public card the cabinet has received, which carries,
 Your line, "(vous)" (you), always stays visible, set apart beyond the first fifty; under the board, your place ("National · Cette semaine : votre place, 37 sur 120 joueurs" (your place, 37 of 120 players)).
 A total impossible for anyone (beyond everything that could be earned since levels arrived, allowing for the XP brought by invited people), or a week beyond what a week allows, is not ranked: it is counted under the board ("1 joueur écarté (XP impossibles)" (1 player set aside, impossible XP)).
 A total that is only unexpected for how long the player has been known to this cabinet is ranked, their level shown as "?".
-With sharing off, the door is greyed with its reason; without a country, National says "Pays non choisi : Mon compte > Mon pays" (Country not chosen); without friends, Friends says "Aucun ami pour l'instant" (No friend yet).
+With sharing off, the door is greyed with its reason; without a country, National says "Pays non choisi : Mon profil > Modifier mon profil > Mon pays" (Country not chosen: My profile > Edit my profile > My country); without friends, Friends says "Aucun ami pour l'instant" (No friend yet).
 Exit returns to the two doors, where the "Joueurs" (Players) door sums up your place: "Vous : niveau 14 · 37ᵉ au monde cette semaine · 3ᵉ dans votre pays" (You: level 14 · 37th worldwide this week · 3rd in your country).
 "Tables" shows all your tables, the five most recently played first ("Jouées récemment" (Played recently), with "hier" (yesterday), "il y a 3 j" (3 d ago)), then all the others from A to Z, in This cabinet, Friends, National and Worldwide tabs, each counting its ranked tables ("3 sur 42", 3 of 42), over the chosen period ("Période": All time, This year, This week, Today; Start goes to the next).
 It opens on Worldwide · All time (This cabinet when sharing is off), the cursor on the search.
@@ -602,7 +621,7 @@ The playfield one also shows your level (its tier and bar), your place in the wo
 Your country's room, with those present and its last line, only appears on the backglass poster.
 
 **Players online.**
-Also at the top of System menu > Community.
+Also in System menu > Community, right after My profile.
 Every player your cabinet has come across, friends or not (the network directory, your friends, the players from the leaderboards), **those online first**: your **friends online**, then the players from **your country**, then the others; in each group, those playing first, then by name.
 Then, under "Hors ligne" (Offline), all the others: your friends first, then the most recently seen ("Vu il y a 3 j", Seen 3 days ago).
 Each line carries the player's badge, their flag before their name (the Cyber Pinball flag, a comet ball, for a player who has not given their country; the same in the leaderboards and chat rooms), a green ring around the badge when they are connected, and below it what they are doing ("En partie", Playing, with the table between friends; "En ligne", Online; "Vu il y a 3 j", Seen 3 days ago) and what you have in common ("6 tables en commun", 6 tables in common; "Sur votre réseau local", On your local network); "Ami" (Friend, outside the friends section) or "Demande envoyée" (Request sent) on the same line.
@@ -613,7 +632,7 @@ Start on a player, friend or not, opens their profile (a friend's presence and l
 
 **Appear online to everyone.**
 On by default.
-Turned off (at the bottom of "Joueurs en ligne", or in My account > "Ce que voient les autres", What others see), you no longer appear to players who are not your friends; your friends still see your status, and you still see the list.
+Turned off (at the bottom of "Joueurs en ligne", or in My profile > Privacy > "Ce que voient les autres", What others see), you no longer appear to players who are not your friends; your friends still see your status, and you still see the list.
 On the phone, the Community tab has a "Joueurs" (Players) tab: the same list, with the requests received, the filters as chips and each player's profile (see [Community on the phone](community-on-the-phone.md#community-on-the-phone)).
 
 **Without a server.**
@@ -634,7 +653,7 @@ A player opens it, chooses the number of players, and it shows up in the Communi
 The game itself is the one played between friends (see "Community: the cabinet network"): each player plays on their own cabinet, the same version of the table, with the host's settings, a common start and everyone's results.
 
 **Opening a game.**
-Community > Parties instantanées (Instant games) > "Ouvrir une partie instantanée" (Open an instant game): the table (your VPX tables), then the number of players, yourself included (2, 3 or 4).
+Community > Partie instantanée (Instant game) > "Ouvrir une partie instantanée" (Open an instant game): the table (your VPX tables), then the number of players, yourself included (2, 3 or 4).
 Also from a table's sheet: "Partie instantanée" (Instant game), right after "Jouer avec un ami" (Play with a friend).
 The waiting room opens: "Waiting for 2 players", the players already there and the free seats.
 Each arrival brings a notification ("Tiltman joined your game") and a line at the top of the room ("1 more player and it starts").
@@ -644,7 +663,7 @@ One game at a time: opening another one closes the previous one.
 On the phone, Community > Players shows the open games and "Ouvrir une partie instantanée" (Open an instant game) (see Community on the phone).
 
 **Joining.**
-Community > Parties instantanées: the games opened by others, most recent first.
+Community > Partie instantanée: the games opened by others, most recent first.
 Each line shows the host's badge and flag, the table, how long it has been open, how many players are there, the seats left, and what you have of the table: "Same version", otherwise the line is greyed out with its reason ("You have another version of this table", "You don't have this table").
 Start on a playable game: the table is checked on your cabinet, then you enter the host's room ("Connecting to Kiko's cabinet…" while the two cabinets reach each other).
 "Quitter la partie" (Leave the game) frees your seat.
@@ -670,7 +689,7 @@ The module is [instantgames.ts](../../packages/core/src/instantgames.ts), the sc
 ### Groups
 
 Circles of your own, public or private: a chat, a table of the week and the group leaderboard, seen by its members only.
-You enter through the "Groupes" (Groups) door of the Community home screen, between Messages and your country's room; it gives the number of groups and the latest news (or how many public groups are waiting), and carries the red dot when a message is waiting or an invitation has arrived.
+You enter through Community > "Groupes et salons" (Groups and rooms) > "Groupes" (Groups); the door gives the number of groups and the latest news (or how many public groups are waiting), and carries the red dot when a message is waiting or an invitation has arrived.
 
 **Public or private.**
 A private group (the default choice) appears nowhere: you only get in by invitation.
@@ -704,6 +723,14 @@ The actions: "Écrire au groupe" (Write to the group: ready-made phrases, or the
 Start on a message: the seven emoji reactions, the phrases, "Écrire un message…" (Write a message…); on yours, "Supprimer ce message…" (Delete this message…, for everyone, after confirmation); on someone else's, "Signaler ce message…" (Report this message…).
 500 characters at most, one line every 3 seconds and 20 in 10 minutes, as in the rooms; the rooms' word filter applies on display, and to the names of public groups.
 A message that arrives in a group that is not on screen is announced by a notification ("Kiko · Les flippeurs du jeudi", the message below), everywhere, over VPX included; "Notifications du groupe" (Group notifications, in Members) turns it off for that group.
+You quote a message there as between friends (see "Quoting a message" in "Messaging").
+
+**Mentioning a member.**
+"Mentionner un membre…" (Mention a member…), among the ways to write, picks a member from the list (no free typing) and opens the keyboard with "@nickname" already written; an "@nickname" typed on the keyboard or the phone counts too.
+Only the group's members can be mentioned, never yourself; a nickname picked then erased before sending no longer counts.
+When nobody else is in the group, the entry stays visible, greyed with its reason.
+The person mentioned gets a notification of their own ("Bruno vous a mentionné dans Les flippeurs du jeudi", Bruno mentioned you in Les flippeurs du jeudi, the message below), even if the group is muted, and a line in [Recent activity](recent-activity.md#recent-activity).
+The mention is highlighted in the bubble, more strongly when it is you.
 
 **Members.**
 Each with their avatar, their flag, "Créateur" (Creator), and their presence (online, in a game, offline).
@@ -747,7 +774,7 @@ Off-screen demonstration: fictional cabinets in `groupes` mode (Bruno creates a 
 ### Rooms by country
 
 One public chat room per declared country, plus "Monde" (World, preferably in English).
-You enter through the room door on the Community home screen (your country's room, or the one chosen as the default room), then "Autres salons…" (Other rooms…) for World, the active rooms of other countries, and every country by name.
+You enter through Community > "Groupes et salons" (Groups and rooms) > "Salons par pays" (Rooms by country), which names the room (your country's room, or the one chosen as the default room), then "Autres salons…" (Other rooms…) for World, the active rooms of other countries, and every country by name.
 
 **The log.**
 Old-school, one line per message: the time, the flag, `<name>` in the hue of their key (the same as their badge) and the text, which wraps under it.

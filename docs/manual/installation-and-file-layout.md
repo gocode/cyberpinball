@@ -143,7 +143,7 @@ The `powershell-propre.test.ts` test refuses the return of these signs in the sh
 
 ### Updating from the cabinet
 
-An installed cabinet updates itself from the system menu, entry **"Mise à jour de Cyber Pinball" (Cyber Pinball update)** (details: installed version, and available version once checked).
+An installed cabinet updates itself from System menu > Help and info > **"Cyber Pinball update"** (details: installed version, and available version once checked).
 Nothing is installed on its own: a quiet check runs right at start-up, then every 6 hours while Cyber Pinball keeps running (every 5 minutes while it fails, for instance when the network is not ready yet as the cabinet boots), without downloading anything or showing anything if it fails; an error from a manual check does not stop it; an available version, or an update that did not go through (found on restart, until the entry is opened), puts a **red dot** on the menu's gear (⚙) and on the "Mise à jour de Cyber Pinball" (Cyber Pinball update) entry of the system menu (`attention` on system menu entries, carried by the gear as soon as one entry has it).
 Once opened, the entry shows straight away the release notes of every version missed since the cabinet's own (the feed's `history`), and "Mettre à jour maintenant" (Update now), selected by default: installing takes one button press.
 A result older than 10 minutes is checked again.
@@ -152,6 +152,10 @@ Code: [packages/core/src/update.ts](../../packages/core/src/update.ts) (feed, ve
 
 - **Where**: the releases of the public repository [github.com/gocode/cyberpinball](https://github.com/gocode/cyberpinball).
   The cabinet reads `https://github.com/gocode/cyberpinball/releases/latest/download/cyberpinball-maj.json` (a GitHub redirect, free of its API's rate limit; pre-releases are not listed there).
+  **Slow connection**: the check succeeds even at a low speed.
+  It only stops when the site stays completely silent for 20 s (connection, first byte, then each chunk received restart the count), never after a total duration; a passing drop, a silent site or a 429 or 5xx response is retried twice, with a wait that doubles (`fetchTextPatiently`, [packages/core/src/patientfetch.ts](../../packages/core/src/patientfetch.ts)).
+  The list of releases read for pre-releases is limited to the last ten (`PUBLIC_RELEASES_LISTED`), about three times lighter.
+  The same patient read is used for the table database (VPS), the media index (VPinMediaDB), the table rules, the ROM memory maps and the pages of the download sites; the files themselves download with resume after a drop.
   The repository is written in a single place (`UPDATE_REPOSITORY`), equal to `repository` in `package.json` (checked by the tests); the installer derives from it the website shown in "Programmes et fonctionnalités" (Programs and Features).
 - **Signed feed**: `cyberpinball-maj.json` contains the manifest (version, date, release notes in French and, when `CHANGELOG.en.md` has the version's section, in English (`notesByLanguage.en`): the cabinet shows those in its language, otherwise the French ones; light installer: release address, size, SHA-256) and its Ed25519 signature.
   The cabinet only reads a feed signed by the publishing key, whose public half ships with the application ([update-key.ts](../../packages/core/src/update-key.ts)): a compromised GitHub account is not enough to get a program installed on the cabinets.

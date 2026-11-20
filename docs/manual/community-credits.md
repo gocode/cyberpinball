@@ -13,7 +13,7 @@ Cyber Pinball names their authors without cluttering the game ([packages/core/sr
   **Start opens it directly** in the built-in browser ("Récupérer" (Fetch) window, without a claim: a downloaded file goes to the waiting list as from a VPS page); the banner gives the table, the role and all its authors, and reminds you that a thank-you is welcome.
   Close (Esc) returns to the credits.
 - **A line without a page but with more than four authors**: Start opens all its authors and what they made elsewhere on the cabinet.
-- **The community**: System menu > "Aide et infos" (Help and info) > "Crédits" (Credits) (also from the Credits page): the cabinet's authors, from most to least present ("HauntFreaks · 8 frontons · 4 tables"; 40 at most, then "… and N more"), each with their tables; then the software and sites without which nothing works (VPX, PinMAME, B2S, Serum, PinUP Player, DOF; VPS, VPinMediaDB, VPUniverse, VPForums, IPDB, The Pinball Primer).
+- **The cabinet's credits**: System menu > "Aide et infos" (Help and info) > "Crédits" (Credits) (also from the Credits page): the cabinet's authors, from most to least present ("HauntFreaks · 8 frontons · 4 tables"; 40 at most, then "… and N more"), each with their tables; then the software and sites without which nothing works (VPX, PinMAME, B2S, Serum, PinUP Player, DOF; VPS, VPinMediaDB, VPUniverse, VPForums, IPDB, The Pinball Primer).
   This ranking only reads the `.info` files (not the tables themselves), rebuilt at most every 30 s.
 - **Attract mode**: the discreet line described in [Attract mode](game-media.md#attract-mode).
 
@@ -27,6 +27,6 @@ Where names come from, from most to least reliable (`tableAuthors`):
   Reinstalling it from the catalogue (details screen > Gérer la table… (Manage table…) > Parties du jeu (Game parts)) records it.
 
 Guest mode: the Credits page can be read (door `sheet.credits`); the built-in browser stays closed to guests (door `sheet.credits-web`: one can sign in and download there), so Start on a line with a page opens its authors and its QR code instead (the phone remote's QR block, with its own wording: it pairs nothing).
-The community is in the system menu, closed to guests.
+The cabinet's credits are in the system menu, closed to guests.
 
 Tests: [credits.test.ts](../../packages/core/src/test/credits.test.ts) (source read and written without touching the rest of the `.info`, authors from most to least reliable, no guessed name, page groups, summary, attract mode line, community ranking), [uisounds.test.ts](../../packages/core/src/test/uisounds.test.ts) ("Mode attente" screen: each line comes back to itself).

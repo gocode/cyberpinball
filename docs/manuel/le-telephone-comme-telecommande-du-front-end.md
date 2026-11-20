@@ -6,7 +6,7 @@ Deuxième jalon : la liaison du navigateur intégré sert à tout le front-end.
 Le téléphone tient les boutons de la borne, tape à la place du clavier à l'écran et envoie un fichier dans le dossier d'import.
 Ce que pilote le téléphone suit ce que la borne montre (`RemoteMode`) : la page du site quand « Récupérer » est ouvert (pavé tactile, section précédente), **le front-end** sinon, rien pendant une partie.
 
-- **Où vit le QR code** : **Menu système > Ma borne > Télécommande du téléphone**, à la racine du menu système et dans la rubrique Borne (`app/src/phone-remote-menu.ts`), un panneau avec le QR à gauche et l'état à droite (« Connecter un téléphone », puis le code de quatre chiffres et « Comparez les codes », puis « Téléphone connecté » et « Déconnecter le téléphone ») ; **sous le clavier à l'écran**, une bande « Taper au téléphone » avec un petit QR, puis le code, puis « Le téléphone connecté tape ici » (sa hauteur ne change pas d'un état à l'autre : les touches ne bougent pas) ; le bandeau de « Récupérer », comme avant.
+- **Où vit le QR code** : **Menu système > Ma borne > Télécommande du téléphone** (`app/src/phone-remote-menu.ts`), un panneau avec le QR à gauche et l'état à droite (« Connecter un téléphone », puis le code de quatre chiffres et « Comparez les codes », puis « Téléphone connecté » et « Déconnecter le téléphone ») ; **sous le clavier à l'écran**, une bande « Taper au téléphone » avec un petit QR, puis le code, puis « Le téléphone connecté tape ici » (sa hauteur ne change pas d'un état à l'autre : les touches ne bougent pas) ; le bandeau de « Récupérer », comme avant.
   Le même appairage partout : QR de trois minutes à usage unique, code des deux côtés, **Start accepte, Exit refuse**.
   Sur ces écrans, tant qu'un téléphone attend, Start et Exit sont à lui, jamais à l'écran derrière (Start ne tape pas de touche au clavier à l'écran).
   Quand l'écran qui montrait le code se ferme, le téléphone qui attendait est refusé.
@@ -25,6 +25,8 @@ Ce que pilote le téléphone suit ce que la borne montre (`RemoteMode`) : la pag
   Sur l'Écran, il fait le retour de l'écran ouvert à la borne, comme si on le touchait ; quand le navigateur de la borne est ouvert, il revient à sa page précédente.
   À l'écran de départ, il n'y a plus où revenir : il quitte la page, comme avant.
   En plein écran, le premier Retour en fait sortir, le suivant remonte les écrans (`telephone-retour.js` ; test : `telephone-retour.test.ts`).
+- **Le menu ⋮ de la barre du haut** : le clavier quand la borne attend une saisie, « Retours et propositions » (ouvert à la borne), « Nous suivre », l'envoi d'un fichier, l'écran d'accueil, le plein écran sur Android, puis « Déconnecter ce téléphone ».
+  « Nous suivre » y est une liste de liens (la page Facebook dans la langue de la borne, les tutoriels vidéo sur YouTube, GitHub) que le téléphone ouvre lui-même, sans QR code : on est déjà sur le téléphone (voir « Nous suivre » dans [Retours et propositions](retours-et-propositions.md#retours-et-propositions)).
 - **Saisie** : quand le front-end ouvre son clavier à l'écran (recherche d'un titre, nom du joueur, nom d'une configuration, adresse d'un nœud Art-Net, nombre de LED…), le téléphone ouvre son panneau de clavier **avec le texte de la borne** (ce n'est jamais un mot de passe : le front-end n'en demande pas) ; ce qu'on tape remplace ce texte (`library.ts`, `remoteSet`), un nombre garde ses chiffres.
   « Valider » est Entrée, « Annuler » est Exit.
   Si le texte change à la borne pendant ce temps, le téléphone le reprend.

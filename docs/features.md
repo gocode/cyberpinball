@@ -73,7 +73,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 - **Scores on the DMD** during quiet moments, only when it shows the table's score screen; setting "Scores on the DMD", on by default.
 - **Setting "Friends' scores during the game"**: Automatic, On the backglass, On the topper, At the bottom of the playfield, On the side of the playfield. A place your cabinet can't offer is greyed out with its reason.
 - **One-line notifications**, at the top of the playfield and over VPX, without taking control from it: a friend coming online, an invitation, a guest accepting or declining (with the reason), a finished game with the winner and your place. Each has its own little sound. "Hide notifications during games" keeps them for when you are back at the menu.
-- **"Recent activity" to read back what you missed**, at the top of the system menu: every notification in full, by day, the time, repeats grouped ("Chloé: 3 sign-ins"), and Start does what it announces (the friend's profile, the invitation while it holds, the results, the downloads, the update). What no longer holds stays, greyed with its reason ("Invitation expired"). Unread is marked there without a red dot (everything that waits has its own where you answer it); the last 50 kept from one start to the next.
+- **"Recent activity" to read back what you missed**, at the root of the system menu: every notification in full, by day, the time, repeats grouped ("Chloé: 3 sign-ins"), and Start does what it announces (the friend's profile, the invitation while it holds, the results, the downloads, the update). What no longer holds stays, greyed with its reason ("Invitation expired"). Unread is marked there without a red dot (everything that waits has its own where you answer it); the last 50 kept from one start to the next.
 - **A table with no live reading** is labelled "Manual start, no live score", with the reason: its score counts if it makes the table's high-score board.
 - **A cabinet still on an old version** is flagged in the lobby, the invitation and the strip, instead of looking broken.
 
@@ -94,16 +94,18 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 - **Between friends, with no server**: System menu > Community > "Messages", or "Write" on a friend's page. Messages go straight from one cabinet to the other, encrypted, and stay on both cabinets.
 - **A thread like on a phone**: the friend's messages on the left, yours on the right, and in between the friendship's events (a high score, a badge). MagnaSave goes to the previous or next friend; the backglass shows the friend's card while their thread is open.
 - **Reply from the buttons**: seven emoji reactions placed on a message (👍 Like, ❤️ Love, 🥰 Care, 😆 Haha, 😮 Wow, 😢 Sad, 😡 Angry), the same as in the rooms, six ready-made phrases, or "Write a message…" with the on-screen keyboard or the phone, whose text appears as you type. At a desk, the real keyboard.
+- **Quote a message**: choosing a message then replying, with a ready-made phrase or the keyboard, quotes it. The quote, with its author and its first two lines, shows above the reply, at the cabinet as on the phone; choosing it takes you back to the quoted message. A message quoted then deleted keeps its excerpt, marked "message deleted".
 - **A friend offline**: the message waits, "Waiting", and leaves by itself as soon as both cabinets are on at the same time, then turns to "Received".
 - **During a game**, the buttons stay with VPX: the paired phone shows the most recent thread, with reactions, phrases and a field to write. An incoming message is announced by a notification, and in the menu by the DMD too.
 - **Options**: mute a friend's notifications, clear a conversation, block; turn messaging off, mute its sound, keep messages 30 days, a year or forever.
 
 ### Groups
 
-- **Circles of your own, public or private**: Community > "Groups". A name, friends to invite, and the group exists; every member can invite their friends.
+- **Circles of your own, public or private**: Community > "Groups and rooms" > "Groups". A name, friends to invite, and the group exists; every member can invite their friends.
 - **Private, it appears nowhere**: you only get in by invitation. **Public, it appears in the public group list** of every cabinet, and any player joins it with one press. The creator changes the access whenever they like.
 - **A table of the week**, chosen by a member for everyone, until Sunday night: Start launches it. The group leaderboard on that table fills itself with the scores the members publish.
-- **A group chat** in bubbles, with the seven reactions, the ready-made phrases, the on-screen keyboard or the phone. An incoming message is announced by a notification, even during a game.
+- **A group chat** in bubbles, with the seven reactions, the ready-made phrases, the on-screen keyboard or the phone, and quotes as between friends. An incoming message is announced by a notification, even during a game.
+- **Mention a member**: "Mention a member…" picks them from the list and writes "@nickname"; an "@nickname" typed on the keyboard or the phone counts too. They get a notification of their own ("Bruno mentioned you in …"), even if the group is muted, and the mention is highlighted in the bubble.
 - **Between the members' cabinets only**, with no server: an absent member receives the messages when they come back, from any other member. An invitation never shows the messages before it is accepted.
 
 ### Public profile and likes
@@ -144,7 +146,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 - **A fair comparison**: players only compare on the same exact table version and the same number of balls.
 - **No server**: each score leaves signed by the player's key and travels from cabinet to cabinet. Only scores read by Cyber Pinball leave, never in guest mode; a dubious score can be hidden on the cabinet.
 - **Every player recognisable**: their country's flag (all 256 present-day countries and territories have one), their avatar (attached to their scores, even if they are not your friend) and their presence, as a mark on the avatar like in a messaging app: green dot online, green dot and ring in game, hollow dot offline (a legend under the table recalls it; with the mouse, the status in words, "Seen 2 h ago").
-- **Your country** comes from the Windows region and can be changed in "Sharing and network", where you can also stop publishing your scores.
+- **Your country** comes from the Windows region and can be changed in Community > "My profile" > "Edit my profile" > "My country"; "What others see" also lets you stop publishing your scores.
 - **On the phone too**: the Scores view shows the same rankings, even during a game (see [The phone as a remote](#the-phone-as-a-remote)).
 
 ## Install and update
@@ -155,7 +157,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 - **Full installer** (about 280 MiB): the official VPX archive included, for a cabinet without Internet access.
 - **No administrator rights**: installed for the current user, with an entry in "Programs and Features".
 - **Options**: a desktop shortcut, start with Windows; silent install from the command line.
-- **Terms of use** shown by the installer, then by the menu until they are accepted, and available again in System menu > Cyber Pinball > Terms of use.
+- **Terms of use** shown by the installer, then by the menu until they are accepted, and available again in System menu > Help and info > Terms of use.
 - **Uninstalling removes the application only**: tables, media, configuration and data stay, and reinstalling into the same folder finds them.
 
 ### A single root folder
@@ -167,19 +169,20 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 
 ### Signed updates
 
-- **From the cabinet**: System menu > "Cyber Pinball" > "Cyber Pinball update". Nothing is installed automatically.
+- **From the cabinet**: System menu > "Help and info" > "Cyber Pinball update". Nothing is installed automatically.
 - **A red dot** on the gear when a release is out; Cyber Pinball checks at start-up and then every 6 hours.
 - **What's new in every version you missed**, in the cabinet's language, then "Update now" in one press.
 - **Signed**: the cabinet only reads a feed signed (Ed25519) by the publishing key, and only runs the installer if its size and SHA-256 match.
 - **Light updates**: when only the application changes, a package of about 1.5 MiB installs in a few seconds, with no installer.
 - **Roll-back**: the previous version is set aside during the install and put back if it fails. At the next start, a banner says which version is installed.
 - **Versions received**: final versions (the default) or pre-releases too; for whoever maintains Cyber Pinball, tests from a private channel that only their own cabinets see.
+- **"Follow us"** (System menu > Help and info): the Facebook page, in French or English depending on the cabinet's language, the video tutorials on YouTube, and GitHub. The QR code of the chosen line opens it on the phone, Start in the built-in browser.
 
 <p align="center"><img src="images/en/update.webp?v=fa0c1e19dd" width="360" alt="An update is available: Cyber Pinball 0.2.0, its release date, what's new, the size of the signed installer, and the Update now and Later buttons."></p>
 
 ## Set up the cabinet
 
-On first start, the wizard runs through every step. Afterwards, System menu > "Cabinet" > "Cabinet setup" runs each one on its own: it only changes its own settings.
+On first start, the wizard runs through every step. Afterwards, System menu > "My cabinet" > "Cabinet setup" runs each one on its own: it only changes its own settings.
 
 <p align="center"><img src="images/en/wizard.webp?v=61a3eb8d13" width="900" alt="The setup wizard, Screens and roles step: each screen shows its number, and the playfield asks “Playfield?” with the flipper and Start hints."></p>
 
@@ -192,7 +195,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 - **Steps**: "Game buttons", "Interface buttons", "Analog plunger", "Tilt", "Screens and roles", "Playfield orientation and size", "Screen layout", "Cabinet sound", then a summary.
 - **Every question shows on every screen**, so you see it from wherever you stand.
-- **"Quit without saving?"** at any time (hold Exit for 2 s): the question says what would be lost, and nothing is written if you confirm.
+- **"Quit without saving?"** at any time (hold Exit for 2 s): the question says what would be lost, and nothing is written if you confirm. Stuck? It also shows the QR code of the step-by-step video tutorials, to open on the phone.
 - **The button summary is a test**: each newly learned button must be pressed before it is accepted.
 
 ### Buttons, joysticks and Pinscape
@@ -239,7 +242,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **"DMD screen"**: say once whether it is a FullDMD (16:9 screen, the game's DMD inset) or a DMD only (4:1 strip). The menu, VPX and PuP-Packs follow it; an ambiguous case is flagged "To check".
 - **FullDMD frame during the game**: the table's FullDMD image stays on screen and the game's DMD sits in its frame, found on its own in the image or video.
 - **Real DMDs recognised** without opening a port (ZeDMD, PIN2DMD, Pixelcade): the plugin that drives them is switched on for you.
-- **Real DMD (beta)**, in System menu > Cabinet > DMD > "Real DMD": one choice per model (automatic, yes, no), the ZeDMD over Wi-Fi, the missing driver shown on screen. "Menu image: yes" makes it show the menu's DMD between games too; VPX takes it back during a game.
+- **Real DMD (beta)**, in System menu > My cabinet > DMD and LEDs > "Real DMD": one choice per model (automatic, yes, no), the ZeDMD over Wi-Fi, the missing driver shown on screen. "Menu image: yes" makes it show the menu's DMD between games too; VPX takes it back during a game.
 
 <p align="center"><img src="images/en/features/dmd-screen.webp?v=d12e559721" width="360" alt="DMD screen: “It's a FullDMD” or “It's a DMD only”, each with its diagram."></p>
 
@@ -320,7 +323,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **A fixed marker** on the title cartouche ("☆ FAVOURITES │ 3 / 12"): the collection and the table's place, which never move when you change table. Each collection keeps its table.
 - **Favourites**: "Add to favourites" on the table page, a white star before the title; a favourite from another installation is taken as it is.
 - **My collections**: personal collections with your own names ("Party nights", "For the kids"…), filled from each table's page, renamed or deleted at will.
-- **Collection buttons** of your choice: any free cabinet button; **System menu > Collections** too, with no button at all.
+- **Collection buttons** of your choice: any free cabinet button; **System menu > Tables > Collections** too, with no button at all.
 - **Guest mode restricted to a collection** (favourites, a manufacturer…), and **attract mode** within the collection shown.
 
 <p align="center">
@@ -363,7 +366,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 ### The player
 
-- **A medallion at the head of the table wheel** plays your playlists. Start: the disc leaves the playfield and takes the stage on all three screens (a button interrupts it). The backglass plays the music video, the playfield the list of tracks, the DMD a spectrum in dots; the medallion can be hidden in System menu > Media.
+- **A medallion at the head of the table wheel** plays your playlists. Start: the disc leaves the playfield and takes the stage on all three screens (a button interrupts it). The backglass plays the music video, the playfield the list of tracks, the DMD a spectrum in dots; the medallion can be hidden in System menu > Tables > Wheel.
 - **All your playlists at the entrance**, in large rows: cover, number of tracks, length, sources, the one playing marked. Start opens one; Exit goes back up to the playlists without stopping the music, then back to the wheel.
 - **The wheel's buttons**: flippers to choose a track (held, they move forward or back through the track in steps of 5, 10 then 30 s), Start to play or pause, MagnaSave for the neighbouring playlist, Exit to go back.
 - **Playback modes** remembered by each playlist: "Play all", "Shuffle" (each track once before any plays again), "Repeat: playlist / track / off". Start held on a playlist plays it shuffled.
@@ -382,7 +385,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 ## Everything from the buttons
 
 - **Flippers, Start and Exit** are enough everywhere: choose, confirm, go back. The gear ⚙ and Tab open the system menu with the mouse or the keyboard.
-- **A system menu in six sections**: My account, Community, Tables, Media, Cabinet and Cyber Pinball, with What's new, Recent activity, Collections, Jukebox, Downloads and Phone remote as shortcuts. A red dot climbs up to the gear when an entry is waiting for you, and the menu opens on it.
+- **A system menu in eight lines**, in order of use: Tables, My cabinet, Downloads, Recent activity, Community, Jukebox, Help and info, Quit or shut down. Never more than eight lines per screen, and each entry in a single place. It opens on the last section chosen, even after a restart. A red dot climbs up to the gear when an entry is waiting for you.
 - **An action's message stays** ("Name changed", "Avatar saved"…) until the next action, instead of vanishing at once.
 - **The flippers follow the screen's order**, from top to bottom, on every management screen; they only wrap around at the two ends.
 - **Always a way out**: Exit closes "Get" even when Windows has taken the foreground, and held for two seconds it forces it closed. Before every Windows permission prompt, a screen warns that you will have to answer with the keyboard or the mouse.
@@ -402,10 +405,10 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 <p align="center"><img src="images/en/phone.webp?v=e0e7c35344" width="760" alt="The phone page, served by the cabinet: the Menus view that opens any menu directly, the jukebox player, and a table's World ranking in the Community tab."></p>
 
-- **Nothing to install**: System menu > Phone remote shows a large QR code (the on-screen keyboard and the built-in browser's banner show a small one). Scan it with your phone, on the same Wi-Fi as the cabinet: the page comes from the cabinet.
+- **Nothing to install**: System menu > My cabinet > Phone remote shows a large QR code (the on-screen keyboard and the built-in browser's banner show a small one). Scan it with your phone, on the same Wi-Fi as the cabinet: the page comes from the cabinet.
 - **You accept the phone at the cabinet**: the same four-digit code on both sides, Start (or Enter, with "Accept" selected by default) to accept, Exit to refuse. One phone at a time; the QR changes every three minutes and serves only once.
-- **Accepted once, the phone is kept**: it then comes back without a QR code or acceptance, from a shortcut on its Home screen (Android and iPhone alike, with the Cyber Pinball icon, still with nothing to install); it reconnects by itself when Cyber Pinball restarts or updates, and finds the cabinet when the router has given it another address: by its name on the local network (iPhone), or through a shortcut that follows the cabinet over the Internet (Android), with nothing readable leaving the house. Cabinet off or another Wi-Fi: the page keeps retrying and picks up as soon as the cabinet answers. Kept phones are listed in System menu > Phone remote, where "Forget this phone" removes one of them.
-- **Five slim tabs at the bottom**: Screen, Menus, Jukebox, Community and Buttons; at the top, a single slim bar, with "Keyboard" when the cabinet is waiting for input and the ⋮ menu (send a file, full screen on Android, disconnect).
+- **Accepted once, the phone is kept**: it then comes back without a QR code or acceptance, from a shortcut on its Home screen (Android and iPhone alike, with the Cyber Pinball icon, still with nothing to install); it reconnects by itself when Cyber Pinball restarts or updates, and finds the cabinet when the router has given it another address: by its name on the local network (iPhone), or through a shortcut that follows the cabinet over the Internet (Android), with nothing readable leaving the house. Cabinet off or another Wi-Fi: the page keeps retrying and picks up as soon as the cabinet answers. Kept phones are listed in System menu > My cabinet > Phone remote, where "Forget this phone" removes one of them.
+- **Five slim tabs at the bottom**: Screen, Menus, Jukebox, Community and Buttons; at the top, a single slim bar, with "Keyboard" when the cabinet is waiting for input and the ⋮ menu (send a file, full screen on Android, "Follow us" with its links opened straight on the phone, disconnect).
 - **Every menu in one tap**: the Screen view shows the entries of the screen open at the cabinet, which you tap directly; the Menus view arranges every menu like the system menu and directly opens the one you tap; the Buttons view holds **the cabinet's buttons** (Start, flippers, Exit, MagnaSave; a held flipper scrolls fast). During a game, only the in-game settings open from the phone. An unavailable menu is greyed out with its reason.
 - **Tables in pictures**: the table menu shows each table's medallion, or as a grid its backglass image (tap to choose, again for Start); a table added has its own straight away. A button at the top changes collection, like MagnaSave at the cabinet.
 - **The Jukebox in your hand**: playlists with their covers, tracks, play and pause, previous and next, shuffle and repeat, moving through a track. A mini player follows the current track above the tabs; "Manage" neatly arranges the additions, the YouTube account and the playlists.
@@ -593,14 +596,14 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 ### Record a game for the wheel
 
-- **"Play and record"**: Cyber Pinball films the game (the playfield, and optionally the backglass and the display), from the chosen moment (0 to 60 s) for the chosen length (15 to 90 s), with sound. The playfield is filmed in 4K by default (1440p, 1080p or 720p if you prefer, also in System > "Media, sound and attract mode").
+- **"Play and record"**: Cyber Pinball films the game (the playfield, and optionally the backglass and the display), from the chosen moment (0 to 60 s) for the chosen length (15 to 90 s), with sound. The playfield is filmed in 4K by default (1440p, 1080p or 720p if you prefer, also in System menu > Tables > "Sound and attract mode").
 - **A discreet indicator**, left out of the video: "Recording in 7 s", "REC 0:12 / 0:30".
 - **Back in the menu**: "Use for the wheel", "Keep aside", "Play and record again" or "Discard the recording".
 
 ### Media diagnosis and import from another frontend
 
 - **The media diagnosis** flags an unreadable format, a wrongly named or misplaced item, proportions that don't fit the screen, a very heavy file, duplicates. Its fixes are always safe (rename, move, bin); "Fix all" runs them in a row.
-- **"Import media"** from another installed frontend (System menu > "Cyber Pinball" > "Migration"): a plan table by table, the original install is not modified.
+- **"Import media"** from another installed frontend (System menu > "Tables" > "Migration"): a plan table by table, the original install is not modified.
 
 ## During a game
 
@@ -616,7 +619,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 ## Virtual reality and 3D vision
 
-Two features in beta ("BETA" badge in System menu > Cabinet): without the hardware, the entry stays visible, greyed out with its reason.
+Two features in beta ("BETA" badge on their entry, in System menu > My cabinet > Virtual reality and 3D vision): without the hardware, the entry stays visible, greyed out with its reason.
 
 ### Virtual reality
 
@@ -647,7 +650,7 @@ Two features in beta ("BETA" badge in System menu > Cabinet): without the hardwa
 
 ### Tech sheet and report
 
-- **System menu > Cabinet > "Tech sheet"**: the PC, Windows, the screens, the controllers, the software and Cyber Pinball on one page, six blocks each with its state in words; Start opens the details and the menu entries that fix things.
+- **System menu > My cabinet > Health and backups > "Tech sheet"**: the PC, Windows, the screens, the controllers, the software and Cyber Pinball on one page, six blocks each with its state in words; Start opens the details and the menu entries that fix things.
 - **What you see at a glance**: the disks and their free space, the graphics card and its driver version, each screen with its role, resolution, connection and refresh rate, the buttons and DOF controllers, the VPX plugins and their state.
 - **Points to check, explained**: a screen set below the refresh rate it accepts (a 4K at 60 Hz that accepts 144 Hz), a pending Windows restart, "Power saver" mode, an old graphics driver, little memory. They also show up in the cabinet health, in the "PC and Windows" group.
 - **Send a report** with no e-mail software: to the connected phone (download, prepare an e-mail, copy the summary), to a USB stick, as a summary to a friend through messaging, or into a folder on the cabinet. "Describe the problem" adds your own words, and "See what the report contains" shows each file.
@@ -687,19 +690,19 @@ Two features in beta ("BETA" badge in System menu > Cabinet): without the hardwa
 - **"Dedicated cabinet"** (off by default): the Windows session opens straight on Cyber Pinball, with no desktop or taskbar, and a watchdog restarts it if it closes. On Windows Pro and Home as on Enterprise and IoT.
 - **"Launch at startup"**: Cyber Pinball opens with Windows, the desktop hidden behind it.
 - **Taskbars hidden for the whole session** on a cabinet launched at startup; they come back on the Windows desktop (Ctrl+Shift+D) and when quitting, and by themselves after an abrupt stop.
-- **Relaunch with Start**: when Start is a joystick button (Pinscape, encoder in gamepad mode), a 2-second long press reopens Cyber Pinball from Windows, or brings the menu back from the Windows desktop. A small windowless process keeps watch, set in System menu > Cabinet > Relaunch with Start.
+- **Relaunch with Start**: when Start is a joystick button (Pinscape, encoder in gamepad mode), a 2-second long press reopens Cyber Pinball from Windows, or brings the menu back from the Windows desktop. A small windowless process keeps watch, set in System menu > My cabinet > Startup and access > Relaunch with Start.
 - **Every Windows setting backed up** before writing; turning it off puts it back as it was and checks it, and a rescue script does the same outside Cyber Pinball.
 
 <p align="center"><img src="images/en/features/dedicated.webp?v=d9f78b1d3a" width="360" alt="Dedicated cabinet: off, what's needed before turning it on, two ways to choose from (replace the desktop, launch at Windows startup), and the rescue to reach Windows."></p>
 
 ### Shut down, sleep, restart
 
-- **From the "Cyber Pinball" section**: a confirmation, then the settings are saved and every screen turns black, never showing the desktop. On waking, the menu comes back as it was.
+- **From the "Quit or shut down" section**: a confirmation, then the settings are saved and every screen turns black, never showing the desktop. On waking, the menu comes back as it was.
 - **"Restart Cyber Pinball"** restarts the software alone, without restarting the PC: after a setting changed outside the menu, a screen or a controller plugged back in.
 
 ### Language
 
-- **English or French**, everything included (menus, wizard, VPX settings, browser, messages), with dates and numbers to match: System menu > "Cyber Pinball" > "Language / Langue".
+- **English or French**, everything included (menus, wizard, VPX settings, browser, messages), with dates and numbers to match: System menu > "My cabinet" > "Cabinet setup" > "Language / Langue".
 
 <p align="center"><img src="images/en/features/language.webp?v=7f8e62676a" width="360" alt="Language / Langue: Français or English, each language in its own words."></p>
 

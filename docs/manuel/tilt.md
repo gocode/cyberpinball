@@ -69,4 +69,8 @@ Sur une borne, c'est la vraie caisse qui bouge : la table reste immobile à l'é
 Clé gérée comme les autres : remise à la main dans VPX, elle est signalée au lieu d'être écrasée.
 Le `.ini` d'une table peut encore la remplacer pour cette table.
 
+**Secousses dans Future Pinball** : le jeu ne lit pas l'accéléromètre d'un Pinscape (son réglage de manette ne marche que sous un Windows en anglais).
+Pendant une partie de Future Pinball, Cyber Pinball suit l'accéléromètre choisi à cette étape, lu comme VPX le lit (axes, force et sens), et frappe au jeu sa touche de secousse du bon côté à chaque à-coup franc : gauche, droite ou vers l'avant, d'après les préférences du jeu.
+Une courte pause suit chaque secousse, pour que le rebond de la caisse ne compte pas deux fois ; rien ne part quand le jeu n'est pas au premier plan, ni avec « Aucun » (voir [Tables de Future Pinball](tables-de-future-pinball.md)).
+
 **Aide-mémoire « Pendant une partie »** : une seule ligne « Tilt » (l'aide-mémoire remplit déjà l'écran) : la touche ou le bouton du balancier, « secousse trop forte » quand le balancier simulé est choisi, et « slam tilt » avec sa touche s'il en a une (`gameKeys`).

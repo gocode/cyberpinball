@@ -143,7 +143,7 @@ Le test `powershell-propre.test.ts` refuse le retour de ces signes dans le code 
 
 ### Mise à jour depuis la borne
 
-Une borne installée se met à jour depuis le menu système, entrée **« Mise à jour de Cyber Pinball »** (détail : version installée, et version disponible une fois cherchée).
+Une borne installée se met à jour depuis Menu système > Aide et infos > **« Mise à jour de Cyber Pinball »** (détail : version installée, et version disponible une fois cherchée).
 Rien ne s'installe d'office : une recherche discrète part dès le démarrage, puis toutes les 6 h tant que Cyber Pinball tourne (toutes les 5 min tant qu'elle échoue, par exemple quand le réseau n'est pas encore prêt au démarrage de la borne), sans rien télécharger ni rien afficher en cas d'échec ; une erreur d'une recherche faite à la main ne l'arrête pas ; une version disponible, ou une mise à jour qui n'a pas abouti (constatée au redémarrage, jusqu'à ce qu'on ouvre l'entrée), met une **pastille rouge** sur la roue dentée du front-end (⚙) et sur l'entrée « Mise à jour de Cyber Pinball » du menu système (`attention` des entrées du menu système, repris par la roue dentée dès qu'une entrée en porte une).
 Ouverte, l'entrée montre aussitôt les nouveautés de chaque version manquée depuis celle de la borne (`history` du flux), et « Mettre à jour maintenant », choisi d'office : l'installation est à un bouton.
 Un résultat de plus de 10 minutes est recherché à nouveau.
@@ -152,6 +152,10 @@ Code : [packages/core/src/update.ts](../../packages/core/src/update.ts) (flux, v
 
 - **Où** : les releases du dépôt public [github.com/gocode/cyberpinball](https://github.com/gocode/cyberpinball).
   La borne lit `https://github.com/gocode/cyberpinball/releases/latest/download/cyberpinball-maj.json` (redirection de GitHub, sans la limite de débit de son API ; les préversions n'y figurent pas).
+  **Connexion lente** : la recherche aboutit même à faible débit.
+  Elle ne s'arrête que si le site ne répond plus du tout pendant 20 s (connexion, premier octet, puis chaque morceau reçu relancent le compte), jamais au bout d'une durée totale ; une coupure passagère, un site muet ou une réponse 429 ou 5xx sont réessayés deux fois, avec une attente qui double (`fetchTextPatiently`, [packages/core/src/patientfetch.ts](../../packages/core/src/patientfetch.ts)).
+  La liste des publications lue pour les préversions se limite aux dix dernières (`PUBLIC_RELEASES_LISTED`), environ trois fois plus légère.
+  La même lecture patiente sert à la base des tables (VPS), à l'index des médias (VPinMediaDB), aux règles des tables, aux cartes mémoire des ROM et aux fiches des sites de téléchargement ; les fichiers eux-mêmes se téléchargent avec reprise après coupure.
   Le dépôt est écrit à un seul endroit (`UPDATE_REPOSITORY`), égal à `repository` du `package.json` (vérifié par les tests) ; l'installeur en tire le site de « Programmes et fonctionnalités ».
 - **Flux signé** : `cyberpinball-maj.json` contient le manifeste (version, date, nouveautés en français et, si `CHANGELOG.en.md` a la section de la version, en anglais (`notesByLanguage.en`) : la borne affiche celles de sa langue, sinon les françaises ; installeur léger : adresse de la release, taille, SHA-256) et sa signature Ed25519.
   La borne ne lit qu'un flux signé par la clé de publication, dont la moitié publique est livrée dans l'application ([update-key.ts](../../packages/core/src/update-key.ts)) : un compte GitHub compromis ne suffit pas à faire installer un programme sur les bornes.

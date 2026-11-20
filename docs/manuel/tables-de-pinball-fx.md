@@ -13,10 +13,15 @@ Chacune a dans le dossier des tables un dossier « Titre (Fabricant Année) » a
   Comme pour une table VPX, Start ouvre d'abord sa **fiche d'ajout** : la table (numéro, capture de VPS), puis une carte par média avec son aperçu et sa provenance (VPinMediaDB, fiche d'un site rattachée par VPS avec « Compte … nécessaire » sans compte connecté, capture de VPS pour le plateau), et une carte « Introuvable » pour ceux qui n'ont aucune source ; Start sur une carte prend ou laisse le média.
   Sont pris d'office ceux qui ne téléchargent rien sur un site (VPinMediaDB, capture de VPS, fichier d'une fiche déjà reçue) ; une fiche de site à télécharger est à choisir, et sa carte dit ce qui se passera : sa taille (lue sur sa page), « Pack commun à N tables » quand la base VPS la range sous plusieurs jeux (Cyber Pinball n'y prend que le fichier de la table ; pas d'aperçu, il montrerait une autre table), sinon la capture de l'auteur, et la page du site ouverte le temps de son attente, comptée dans le quota du jour.
   Dans un pack reçu, le fichier de la table est celui qui porte son numéro dans Pinball FX (« Table_97.png », convention des packs de la communauté), sinon son titre ; jamais une vignette du pack (`pthumbs`).
+  Un média qui a plusieurs sources le dit sur sa carte (« Start : 2 autres choix pour ce média »), et Start les montre tous : chaque version de VPinMediaDB, image ou vidéo, l'image rangée dans le dossier du jeu, la capture de VPS, chaque fiche de VPForums ou de VPUniverse.
+  Pour le fronton s'y ajoute en dernier l'image du catalogue « FX3 Backglass art » d'archive.org (images faites par des joueurs), un choix de plus, jamais pris d'office.
+  Start sur un choix remplace celui de la fiche, et c'est lui qui arrive après l'ajout ; « Laisser ce média » l'écarte ; les autres médias ne changent pas.
   Rien n'est écrit avant **« Ajouter au front-end »**, en tête, qui ajoute la table puis télécharge en arrière-plan les seuls médias pris.
+  Les médias de la table s'ouvrent aussitôt après l'ajout, comme pour une table VPX : on y voit chaque média arriver, et chacun s'y remplace (VPinMediaDB, sites, web, fichier de ce PC), se règle et s'enregistre.
   Une table déjà dans le front-end porte « Dans le front-end » et Start ouvre sa fiche.
   Cyber Pinball ne sait pas lire quelles tables le joueur possède : il choisit lui-même.
 - **Images et médias** : chaque table du catalogue porte son jeu de la base VPS (`vps`, 133 tables sur 146 le 16/11/2026 : celui qui a une version « FX », sinon, pour une machine Williams ou Bally, le jeu de la machine).
+  Une table que le catalogue ne relie à aucun jeu, souvent une table propre à Zen, est reconnue à son titre exact parmi les jeux de la base VPS qui ont une table de Zen (titre comparé sans casse, accents, ponctuation ni le mot « Pinball » ; deux jeux au même titre : aucun, jamais deviné).
   La liste montre en vignette la capture de la table que donne VPS (téléchargée sans bloquer l’écran, par paquets).
   La fiche reçoit cet identifiant en mémoire tant que son `.info` n’en donne pas d’autre : « Trouver les médias manquants » et « Médias du jeu » la reconnaissent, tables déjà ajoutées comprises.
   À l’ajout, en arrière-plan et suivis dans les téléchargements : les médias de VPinMediaDB qui manquent (`fillMissing` en mode `quiet`), puis, sans image du plateau, la capture de VPS (`placeMissingMedia`, source notée dans le `.info`).
@@ -46,6 +51,15 @@ Chacune a dans le dossier des tables un dossier « Titre (Fabricant Année) » a
   Un PC dont l'écran du playfield est droit garde le réglage du joueur.
   Un jeu jamais ouvert sur ce PC n'a pas encore ce fichier : la rotation est écrite avant la partie suivante.
   Pinball FX3 n'a pas d'équivalent : ses réglages sont chiffrés (voir [Tables de Pinball FX3](tables-de-pinball-fx3.md)).
+- **Mode borne réglé par Cyber Pinball** : rien à régler dans le menu « Cabinet Support » du jeu.
+  Avant chaque partie, Cyber Pinball active le mode borne et pose la fenêtre du DMD du jeu sur l'écran DMD de la borne, d'après sa propre configuration des écrans ; sur un FullDMD, le DMD prend la bande centrale au format 4:1, comme celui de Visual Pinball.
+  La fenêtre du fronton du jeu est éteinte : une seule image sur le fronton, celle choisie à l'ajout de la table, affichée par Cyber Pinball comme hors du mode borne.
+  Allumée, elle se posait par-dessus et, son image absente (menus du jeu, table choisie dans le jeu), montrait le chemin du fichier qu'elle cherchait ; aucune image n'est déposée dans le dossier du mode borne du jeu.
+  Seules l'activation, la place et la taille du DMD et l'extinction du fronton sont écrites dans `<jeu>\PinballFX\Mods\Cabinet\Settings.ini` ; le reste (DMD externe, marges, taille des points, numéro d'écran) est laissé tel quel, et un fichier en UTF-16 le reste.
+  Ce fichier n'existe qu'une fois « Cabinet Support » ouvert une fois dans le jeu : sans lui, rien n'est écrit, et la partie se lance quand même.
+- **DMD envoyé à dmdext** : avec l'option « appareil externe » de son mode borne (`DmdDevice64.dll` de dmd-extensions : colorisation, PuP-Packs), le jeu ouvre le DMD virtuel de dmdext, là où `DmdDevice.ini` le place, parfois par-dessus le fronton.
+  Pendant la partie, Cyber Pinball le pose sur l'écran DMD de la borne tel qu'il est, comme le DMD de Future Pinball : toute la largeur de l'écran, au format 4:1, au milieu.
+  Un DMD virtuel déjà entier sur l'écran DMD reste où il est.
 - **Boutons d'une borne à joystick** (Pinscape, encodeur en mode manette) : Pinball FX et Pinball FX3 ne lisent que le clavier et les manettes Xbox, pas un joystick.
   Pendant la partie, chaque bouton de joystick relevé par l'assistant envoie au jeu la touche que son écran Options > Contrôles > Clavier attend pour son rôle.
   Flippers sur Maj gauche et Maj droite, lanceur et Start sur Entrée (lancer, valider), Exit et Pause sur Échap (retour, pause), MagnaSave gauche et droit sur les flèches haut et bas, tremblements gauche, droit et avant sur Alt gauche, Alt droite et Espace.
@@ -53,20 +67,24 @@ Chacune a dans le dossier des tables un dossier « Titre (Fabricant Année) » a
   En partie, les flèches haut et bas sont aussi la vue du fronton et le tir droit de Judge Dredd.
   Crédit, porte du monnayeur et tilt n'ont pas de commande dans le jeu ; les boutons de volume restent à Cyber Pinball (son de Windows).
   Les touches ne partent que quand le jeu est au premier plan, jamais en double vers le front-end ; celles encore tenues sont relâchées à la fin de la partie.
-  À la fin de chaque partie, le journal compte les appuis envoyés au jeu et ceux gardés parce que le jeu n'était pas au premier plan.
+  En mode borne, le jeu ouvre plusieurs fenêtres (table, fronton, DMD), et le clavier pouvait aller à celle du fronton ou du DMD, que la table n'écoute pas.
+  Avant chaque appui, et deux fois par seconde, la fenêtre de la table (la plus grande du jeu) reprend donc le premier plan quand une autre fenêtre du jeu l'a ; le journal nomme la première fenêtre ainsi corrigée.
+  À la fin de chaque partie, le journal compte les appuis envoyés au jeu, ceux gardés parce que le jeu n'était pas au premier plan, et les reprises du premier plan par la table.
   Les boutons d'un encodeur clavier envoient leurs propres touches, que le jeu reçoit telles quelles : Cyber Pinball n'y touche pas.
   Rien à installer (ni x360ce ni JoyToKey).
 - **Écrans pendant la partie** : le front-end relève les écrans où le jeu dessine lui-même (fronton, DMD ou topper de son mode borne), d'après les seules fenêtres du jeu, jamais celles de Windows ni d'un autre programme.
   Il leur laisse la place : sa fenêtre passe derrière celle du jeu, sans lui prendre le premier plan, et son fond y reste figé.
+  Une fenêtre du front-end passe derrière dès qu'elle couvre la moitié de l'écran que le jeu occupe : au passage du jeu en plein écran, Windows déplace des écrans, et une fenêtre décalée de quelques pixels n'était plus reconnue comme cachant le jeu (l'image du chargement restait devant le fronton de Future Pinball toute la partie).
+  Une petite fenêtre, comme une notification, reste devant.
   Les autres écrans montrent leur média selon « Médias pendant la partie » (voir [Médias des jeux](medias-des-jeux.md)).
   Un jeu qui change la définition d'un écran pendant la partie ne déplace pas les fenêtres du front-end : chacune suit l'écran de son rôle, reconnu à son identité et non à ses anciennes coordonnées.
   Une fenêtre trouvée sur l'écran d'un autre rôle est notée dans le journal et reposée sur le sien.
 - **Ce que Pinball FX ne donne pas** : pas de ROM ni de NVRAM, donc ni tableau des scores ni classement ; pas de VR, pas de réglages en partie, pas de DMD lu par Cyber Pinball.
-  Ses écrans, son DMD externe (`DmdDevice64.dll` de dmd-extensions) et l'image de fronton par table (`PinballFX\Mods\Cabinet\Table_<numéro>.png`) se règlent dans le **mode borne** du jeu ; seule la rotation de son image est écrite par Cyber Pinball.
+  Son DMD externe (`DmdDevice64.dll` de dmd-extensions), ses marges et la taille de ses points se règlent dans le **mode borne** du jeu ; Cyber Pinball n'y écrit que la rotation de l'image, l'activation, la place du DMD et l'extinction du fronton.
   Sur la fiche, ce qui ne s'applique pas reste à sa place, grisé, avec la raison : « Parties du jeu », « Fichiers de la table », « Réglages de cette table », « Régler l'affichage en partie », « DMD sur la roue », « Jouer et enregistrer », « Diagnostiquer et réparer », « Jouer avec un ami », « Tableau des scores ».
   « Supprimer la table » retire la table du front-end ; elle reste dans Pinball FX.
 - **Code** : catalogue, détection et commande dans [packages/core/src/pinballfx.ts](../../packages/core/src/pinballfx.ts) ; fiches dans [packages/core/src/tables.ts](../../packages/core/src/tables.ts) (`addPinballFxTable`, `tableFileEmulator`) ; lanceur dans [app/src/pinballfx-launcher.ts](../../app/src/pinballfx-launcher.ts), installation dans [app/src/pinballfx-install.ts](../../app/src/pinballfx-install.ts), partie dans `playPinballFx` (`app/src/frontend.ts`), écrans dans `app/src/library.ts`.
-  Rotation et touches des boutons dans [packages/core/src/pinballfx-cabinet.ts](../../packages/core/src/pinballfx-cabinet.ts) (`applyPinballFxRotation`, `ZEN_GAME_KEYS`), envoi des touches dans [app/src/zen-keys.ts](../../app/src/zen-keys.ts) ; écrans pendant la partie dans [packages/core/src/gamescreens.ts](../../packages/core/src/gamescreens.ts) (`followDisplays`, `misplacedWindows`, `gameScreens`) et [app/src/game-screens.ts](../../app/src/game-screens.ts).
+  Rotation, mode borne et touches des boutons dans [packages/core/src/pinballfx-cabinet.ts](../../packages/core/src/pinballfx-cabinet.ts) (`applyPinballFxRotation`, `applyPinballFxCabinet`, `ZEN_GAME_KEYS`), envoi des touches et reprise du premier plan dans [app/src/zen-keys.ts](../../app/src/zen-keys.ts), DMD virtuel de dmdext dans `placeVirtualDmd` ([app/src/futurepinball-play.ts](../../app/src/futurepinball-play.ts)) ; médias de l'ajout dans [packages/core/src/zen-media.ts](../../packages/core/src/zen-media.ts) ; écrans pendant la partie dans [packages/core/src/gamescreens.ts](../../packages/core/src/gamescreens.ts) (`followDisplays`, `misplacedWindows`, `gameScreens`) et [app/src/game-screens.ts](../../app/src/game-screens.ts).
   Le script d'une table n'est lu que dans un `.vpx` (`app/src/vbs.ts`) : une fiche n'a ni ROM ni PuP-Pack.
   Tests : `pinballfx.test.ts`, `pinballfx-launcher.test.ts` (système simulé), `pinballfx-cabinet.test.ts`, `gamescreens.test.ts`.
   Démonstration interne hors écran avec un faux Steam (`CYBERPINBALL_STEAM_SIMULE`).

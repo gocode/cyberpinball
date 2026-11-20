@@ -34,6 +34,15 @@ They are never public: with attached files, a private report is always sent, eve
 For a reported problem, the private sending is highlighted; for an idea, publishing, so that other players can vote.
 The title and description are public; the technical report and the attached files never are.
 
+**Follow us.**
+System menu > Help and info > "Follow us" gathers, in one list, the places where Cyber Pinball can be found: the Facebook page (French-speaking or English-speaking depending on the interface language), the video tutorials on YouTube, and GitHub, each with what you find there.
+While a line is chosen, its QR code is under the actions, to aim the phone at; Start opens the page in the built-in browser.
+In guest mode, with no browser, Start shows the QR code large.
+A discreet "Nous suivre" (Follow us) line also leads there from Feedback and ideas, after sending feedback or a report, and from a table's diagnosis; its "Retour" (Back) goes back to where you came from.
+On the phone, "Follow us" is in the ⋮ menu, and its links open straight on the phone, with no QR code.
+The wizard also shows the QR code of the video tutorials under the "Quitter sans enregistrer ?" (Quit without saving?) question (see [Setup wizard and configuration menu](setup-wizard-and-configuration-menu.md#setup-wizard-and-configuration-menu)).
+Code: [packages/core/src/follow.ts](../../packages/core/src/follow.ts) (the addresses), [app/src/follow-menu.ts](../../app/src/follow-menu.ts) (the screen); test: [follow.test.ts](../../packages/core/src/test/follow.test.ts).
+
 **Private reports.**
 The technical report is the [tech sheet](tech-sheet.md#tech-sheet) ZIP, anonymised the same way, with an envelope (kind, text, table, version, language, random cabinet identifier).
 Attached files go into it under `pieces-jointes/`, with their name only, never their location on the disk; if they do not fit with the technical report, the latter is dropped and the envelope tells the team.

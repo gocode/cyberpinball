@@ -15,23 +15,26 @@ The "Lanceur" (Plunger) and "Tilt" steps have "Revenir" in addition to their own
 A click goes through the same handling as a press of the cabinet button, under a code no keyboard or joystick can send: it does exactly the same thing.
 The whole first setup can thus be done from a PC, remote desktop included; only button mapping needs the real cabinet buttons to be pressed.
 
-**System menu (Exit, Tab or ⚙) > "Ma borne" (My cabinet) > "Configuration de la borne" (Cabinet setup)** gathers everything that sets up the cabinet.
-Each step can be redone there on its own and returns to the table menu, saved or not:
+**System menu (Exit, Tab or ⚙) > "Ma borne" (My cabinet) > "Configuration de la borne" (Cabinet setup)** gathers everything that sets up the cabinet, in six lines: "Boutons" (Buttons), "Écrans" (Screens), "Son de la borne" (Cabinet sound), "Langue / Language", "Configurations de la borne" (Cabinet configurations) and "Assistant complet" (Full wizard).
+"Boutons" and "Écrans" open on their steps, and their "Retour" (Back) returns to the setup; a step that waits for the user puts its red dot on its line.
+Each step can be redone there on its own and returns to the tables screen, saved or not:
 
 | Entry | Option | What is redone | `VPinballX.ini` keys written |
 | --- | --- | --- | --- |
-| "Boutons du jeu" (Game buttons) | `--boutons` | game button capture and test | `[Input]` |
-| "Boutons de l'interface" (Interface buttons) | `--interface` | capture and test of the buttons that drive Cyber Pinball | none |
-| "Lanceur analogique" (Analog plunger) | `--lanceur` | sensor plunger detection, direction, dead zone, speed, accelerometer, test | sensor `[Input]` keys |
-| "Tilt" | `--tilt` | cabinet tilt bob or tilt bob simulated by VPX, contact angle, accelerometer and nudge strength, nudge test | `[Player] SimulatedPlumb`, `PlumbThresholdAngle`, `[Input] Mapping.Nudge0.X` and `.Y` |
-| "Écrans et rôles" (Screens and roles) | `--ecrans` | the screen of each role; flipper edge and diagonal only if the playfield moves to another screen | VPX windows and framing |
-| "Orientation et taille du playfield" (Playfield orientation and size) | `--playfield` | flipper edge, screen flip, diagonal | VPX windows and framing |
-| "Disposition des écrans" (Screen layout) | `--disposition` | zone of each role on its screen | VPX windows and framing |
+| Boutons > "Boutons du jeu" (Buttons > Game buttons) | `--boutons` | game button capture and test | `[Input]` |
+| Boutons > "Boutons de l'interface" (Buttons > Interface buttons) | `--interface` | capture and test of the buttons that drive Cyber Pinball | none |
+| Boutons > "Lanceur analogique" (Buttons > Analog plunger) | `--lanceur` | sensor plunger detection, direction, dead zone, speed, accelerometer, test | sensor `[Input]` keys |
+| Boutons > "Tilt" (Buttons > Tilt) | `--tilt` | cabinet tilt bob or tilt bob simulated by VPX, contact angle, accelerometer and nudge strength, nudge test | `[Player] SimulatedPlumb`, `PlumbThresholdAngle`, `[Input] Mapping.Nudge0.X` and `.Y` |
+| Boutons > "Rétablir les boutons d'avant" (Buttons > Restore the previous buttons) | | only after a reset to the default keys: the replaced mapping, put back | `[Input]` |
+| Boutons > "Touches par défaut des encodeurs" (Buttons > Encoder default keys) | | after confirmation, both button sets back to the encoders' keys, no wizard; greyed out on a cabinet with joystick buttons (see [Cabinet buttons](cabinet-buttons.md#cabinet-buttons)) | `[Input]` |
+| Écrans > "Écrans et rôles" (Screens > Screens and roles) | `--ecrans` | the screen of each role; flipper edge and diagonal only if the playfield moves to another screen | VPX windows and framing |
+| Écrans > "Orientation et taille du playfield" (Screens > Playfield orientation and size) | `--playfield` | flipper edge, screen flip, diagonal | VPX windows and framing |
+| Écrans > "Disposition des écrans" (Screens > Screen layout) | `--disposition` | zone of each role on its screen | VPX windows and framing |
+| Écrans > "Écran du DMD" (Screens > DMD screen) | | FullDMD or DMD only, on a cabinet with a DMD screen (also in My cabinet > DMD and LEDs) | |
 | "Son de la borne" (Cabinet sound) | `--son` | backglass and playfield outputs, speaker test | `SoundDevice`, `SoundDeviceBG`, `Sound3D` |
-| "Assistant complet" | | all the steps in a row | all managed keys |
+| "Langue / Language" | | the interface language (see [Interface language](interface-language.md#interface-language)) | |
 | "Configurations de la borne" (Cabinet configurations) | | choose, rename, trash, new configuration | |
-| "Rétablir les boutons d'avant" (Restore the previous buttons) | | only after a reset to the default keys: the replaced mapping, put back | `[Input]` |
-| "Touches par défaut des encodeurs" (Encoder default keys) | | after confirmation, both button sets back to the encoders' keys, no wizard; greyed out on a cabinet with joystick buttons (see [Cabinet buttons](cabinet-buttons.md#cabinet-buttons)) | `[Input]` |
+| "Assistant complet" (Full wizard) | | all the steps in a row | all managed keys |
 
 A single step starts from the saved model (roles, screens, flipper edge), changes only its own fields in `cabinet.json` (`stepCabinet`) and writes only its own `VPinballX.ini` keys (the `only` option of the sync), even ones changed by hand; the other keys stay as they are until the next sync from the menu.
 The summary shows only those keys; Exit there restarts the step, Backspace goes back to the last question.
@@ -53,6 +56,7 @@ Windows and framing: `[Player] Playfield*`, `[Backglass]`, `[ScoreView]`, `[Topp
 - **Exit (or Backspace) on the first question** of a step, when there is nothing before it: the playfield in the full wizard, the flipper edge in orientation alone, the first output in sound alone, the editor in layout alone.
 
 The question says what would be lost ("Boutons : Flipper gauche sur A" (Buttons: Left flipper on A), "DMD : …", "Flippers à gauche de l'image" (Flippers on the left of the image), "Son…" (Sound…), "Écran du playfield : remis dans son orientation d'origine" (Playfield screen: restored to its original orientation), or "Rien n'a été changé" (Nothing was changed)) and where you will end up.
+Someone who wants to leave is often stuck: at the bottom of the question, discreet, a small QR code leads to the step-by-step video tutorials ("Bloqué ? Les tutoriels vidéo, pas à pas", Stuck? Step-by-step video tutorials, with their short address), to aim the phone at while answering (see "Follow us" in [Feedback and ideas](feedback-and-ideas.md#feedback-and-ideas)).
 **Start (or Enter): yes** · **Exit, Esc or Backspace: no** · the same gesture again (a key held again): yes · with no answer within 20 s, the wizard resumes.
 During button capture, the Start and Exit already captured also answer.
 Yes: nothing is written, neither `cabinet.json` nor `VPinballX.ini`; an unconfirmed screen orientation is restored; back to the table menu or, on first start without a model (the menu cannot open), Cyber Pinball closes, as announced on screen ("l'assistant reprendra au prochain démarrage" (the wizard will resume at next start)).

@@ -34,6 +34,15 @@ Ils ne sont jamais publics : avec des fichiers joints, un rapport privé part to
 Pour un problème signalé, c'est l'envoi privé qui est mis en avant ; pour une idée, la publication, pour que les autres joueurs votent.
 Le titre et la description sont publics ; le rapport technique et les fichiers joints, eux, ne le sont jamais.
 
+**Nous suivre.**
+Menu système > Aide et infos > « Nous suivre » réunit, en une liste, les endroits où l'on retrouve Cyber Pinball : la page Facebook (francophone ou anglophone selon la langue de l'interface), les tutoriels vidéo sur YouTube, et GitHub, chacun avec ce qu'on y trouve.
+Tant qu'une ligne est choisie, son QR code est sous les actions, à viser au téléphone ; Start ouvre la page dans le navigateur intégré.
+En mode invité, sans navigateur, Start montre le QR code en grand.
+Une ligne discrète « Nous suivre » y mène aussi depuis Retours et propositions, après l'envoi d'un retour ou d'un rapport, et depuis le diagnostic d'une table ; son « Retour » ramène d'où l'on vient.
+Au téléphone, « Nous suivre » est dans le menu ⋮, et ses liens s'ouvrent directement sur le téléphone, sans QR code.
+L'assistant montre aussi le QR code des tutoriels vidéo sous la question « Quitter sans enregistrer ? » (voir [Assistant et menu de configuration](assistant-et-menu-de-configuration.md#assistant-et-menu-de-configuration)).
+Code : [packages/core/src/follow.ts](../../packages/core/src/follow.ts) (les adresses), [app/src/follow-menu.ts](../../app/src/follow-menu.ts) (l'écran) ; test : [follow.test.ts](../../packages/core/src/test/follow.test.ts).
+
 **Les rapports privés.**
 Le rapport technique est le ZIP de la [fiche technique](fiche-technique.md#fiche-technique), anonymisé de la même façon, avec une enveloppe (nature, texte, table, version, langue, identifiant de borne tiré au hasard).
 Les fichiers joints y entrent sous `pieces-jointes/`, avec leur seul nom, jamais leur emplacement sur le disque ; s'ils ne tiennent pas avec le rapport technique, celui-ci est retiré et l'enveloppe le dit à l'équipe.

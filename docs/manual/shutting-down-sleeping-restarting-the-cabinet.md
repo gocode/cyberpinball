@@ -2,7 +2,7 @@
 
 ## Shutting down, sleeping, restarting the cabinet
 
-In the system menu's Cyber Pinball section, after "Quitter Cyber Pinball" (Quit Cyber Pinball) and "Redémarrer Cyber Pinball" (Restart Cyber Pinball; the ways out together, from the lightest to the heaviest): "Mettre en veille" (Sleep), "Redémarrer la borne" (Restart the cabinet), "Éteindre la borne" (Shut down the cabinet).
+In the system menu's Quitter ou éteindre (Quit or shut down) section, the last one of the root, after "Bureau Windows" (Windows desktop), "Quitter Cyber Pinball" (Quit Cyber Pinball) and "Redémarrer Cyber Pinball" (Restart Cyber Pinball; all the ways out together, from the lightest to the heaviest): "Mettre en veille" (Sleep), "Redémarrer la borne" (Restart the cabinet), "Éteindre la borne" (Shut down the cabinet).
 Each opens a confirmation screen that says what is going to happen; Start confirms (the action is preselected, in green like any current choice: going through the confirmation is caution enough), Exit or "Annuler" (Cancel) returns to the section, with the selection on the entry.
 The module is [app/src/power.ts](../../app/src/power.ts); the method, the simulation and the scheduled action are in [packages/core/src/power.ts](../../packages/core/src/power.ts), the sleep call in [packages/win-displays/src/power.ts](../../packages/win-displays/src/power.ts).
 

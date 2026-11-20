@@ -22,7 +22,7 @@ Ce n'est pas la liste des corrections : celle-ci reste dans les notes de chaque 
   Une borne neuve, ou mise à jour depuis une version qui n'avait pas cet écran, voit comme nouvelles celles de la dernière date seulement.
   Ce qui a été vu est gardé d'un démarrage à l'autre (`<données>\nouveautes.json`) ; un fichier illisible repart de l'état de départ.
   Une ligne ajoutée après coup rallume la pastille rouge, même sur une borne qui avait déjà tout vu : ainsi les **niveaux**, sortis avec la 0.1.14 sans leur ligne, l'ont reçue ensuite, avec le moment d'un badge en aperçu ; leur « Essayer » ouvre « Mon niveau » (voir [Niveaux et badges](niveaux-et-badges.md#niveaux-et-badges)).
-- **Sa place** : en tête du menu système tant qu'une nouveauté n'est pas vue ou que la dernière a moins de trois semaines ; ensuite, seulement dans la rubrique Cyber Pinball, après « Mise à jour de Cyber Pinball ».
+- **Sa place** : dans la rubrique Aide et infos, juste après « Commandes de la borne » ; la pastille rouge d'une nouveauté pas vue passe par la ligne Aide et infos.
 - **Ce qui y entre** : une ligne par vraie capacité nouvelle, jamais une correction, un gain de vitesse ou un réglage.
   Une fonction améliorée sur plusieurs versions n'a qu'une ligne, à la date de son arrivée.
   On n'en ajoute pas à chaque version, seulement quand une fonction le mérite : jamais plus de quatre le même jour, ni plus de vingt-quatre en tout (les plus anciennes partent).

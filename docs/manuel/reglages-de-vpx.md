@@ -2,7 +2,7 @@
 
 ## Réglages de VPX
 
-Écran des tables, touche R (ou Exit puis « Réglages de VPX ») ; seul : `npx electron app --reglages [--table=<morceau du nom>]`, action « reglages » du lanceur.
+Écran des tables, touche R (ou Menu système > Ma borne > VPX > « Réglages de VPX ») ; seul : `npx electron app --reglages [--table=<morceau du nom>]`, action « reglages » du lanceur.
 
 - La liste des réglages n'est pas codée à la main : `npm run vpx-schema` lit `src/core/Settings_properties.inl` du code source de VPX au commit de la version installée (`sourceCommit` du manifeste) et écrit `packages/installer/vpx-settings/<version>.json`.
   Il y ajoute les réglages que les plugins déclarent à leur chargement, lus dans le dossier `plugins/` du même commit (`packages/core/src/vpx-plugin-settings.ts`) : `[Plugin.<id>] Enable` de chaque plugin (`plugin.cfg`), les macros `MSGPI_*_SETTING` réellement enregistrées (`RegisterSetting`), et `[Backglass|ScoreView|Topper] Priority.<moteur>` pour chaque moteur de rendu des fenêtres annexes.

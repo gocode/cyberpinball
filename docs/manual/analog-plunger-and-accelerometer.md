@@ -17,6 +17,7 @@ It follows the game buttons in the full wizard; on its own: system menu > "Ma bo
   Everything also works with the mouse.
 - **No analog plunger**: this choice only removes the plunger; the accelerometer that is set stays, and VPX still reads nudging (`NudgeSensorCount` at 1): a cabinet with a button plunger can have its accelerometer on a KL25Z.
   Without an analog plunger, the accelerometer is chosen at the "Tilt" step (see [Tilt](tilt.md#tilt)).
+  The same accelerometer also nudges Future Pinball tables, which don't read it: Cyber Pinball taps the game's nudge keys for it (see [Future Pinball tables](future-pinball-tables.md)).
 - **Rest far from 0**: VPX has no offset, the plunger would look pulled all the time.
   The step says so: the rest position is set on the board (Pinscape calibration).
 - **Already set**: a cabinet where the step was done opens on its setting; otherwise, a plunger already assigned in VPX (its menu, or its accepted Pinscape layout) is taken as is ("Réglage trouvé dans VPX", Setting found in VPX).

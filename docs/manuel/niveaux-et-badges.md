@@ -92,7 +92,7 @@ Les rivets et les étoiles brillent à la couleur de la rareté.
   En mode invité, la carte dit « Invité · Parties sans XP ».
   La carte et la pastille des badges restent aussi en haut des écrans pleins (Menu système et ses écrans, Mes badges, aide…), sur la ligne de la marque, à la hauteur des autres pastilles (`--pill-height`, [app/renderer/niveau.css](../../app/renderer/niveau.css)) ; jamais en mode attente ni au Juke-box.
   Là, « +85 XP » ne s'affiche pas (il tomberait sur le titre de l'écran), et en borne la carte cède sa place le temps d'une notification.
-  La roue dentée du Menu système, à leur droite, est une pastille ronde du même gabarit (voir [Menu système](menu-systeme-cinq-rubriques.md#menu-système--six-rubriques)).
+  La roue dentée du Menu système, à leur droite, est une pastille ronde du même gabarit (voir [Menu système](menu-systeme-cinq-rubriques.md#menu-système--huit-rubriques)).
 - **Mon niveau**, en tête de l'accueil Communauté : la barre et les XP restants, les XP de la semaine, les quatre derniers gains, les classements de la semaine en cours avec les XP prévus, les deux badges les plus proches ; puis « Mes badges », « Comment gagner des XP » et « Mon profil public ».
 - **Mes badges** : chaque ligne porte le dessin du badge, dans sa forme et sa rareté ([app/src/level-menu.ts](../../app/src/level-menu.ts), `Row.medal`).
   Un badge reçu brille, avec un halo à la couleur de sa rareté et un reflet qui passe ; un badge pas encore reçu reste gris et éteint, sans reflet ; un secret pas encore reçu ne montre que son cadenas.

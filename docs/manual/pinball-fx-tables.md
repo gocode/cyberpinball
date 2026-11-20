@@ -13,10 +13,15 @@ Each one gets a "Title (Manufacturer Year)" folder in the tables folder with an 
   As for a VPX table, Start first opens its **add page**: the table (number, VPS capture), then one card per media file with its preview and source (VPinMediaDB, a site entry linked by VPS with "Compte … nécessaire" (… account needed) when no account is signed in, the VPS capture for the playfield), and one "Introuvable" (Not found) card for those with no source; Start on a card takes or leaves out the media file.
   Taken by default are those that download nothing from a site (VPinMediaDB, VPS capture, file from an entry already received); a site entry to download has to be chosen, and its card says what will happen: its size (read on its page), "Pack commun à N tables" (Pack shared by N tables) when the VPS database files it under several games (Cyber Pinball only takes the table's file from it; no preview, it would show another table), otherwise the author's screenshot, and the site page opened for its waiting time, counted in the daily quota.
   In a received pack, the table's file is the one carrying its Pinball FX number ("Table_97.png", the community packs' convention), otherwise its title; never a pack thumbnail (`pthumbs`).
+  A media file with several sources says so on its card ("Start: 2 other choices for this media"), and Start shows them all: each VPinMediaDB version, image or video, the picture stored in the game folder, the VPS capture, each VPForums or VPUniverse entry.
+  For the backglass, the picture from archive.org's "FX3 Backglass art" catalogue (pictures made by players) is added last, one more choice, never taken by default.
+  Start on a choice replaces the one on the add page, and that's the one that arrives after adding; "Leave this media out" drops it; the other media don't change.
   Nothing is written before **"Ajouter au front-end"** (Add to the menu), at the top, which adds the table then downloads only the taken media in the background.
+  The table's media open right after adding, as for a VPX table: you see each media file arrive there, and each one can be replaced there (VPinMediaDB, sites, web, file from this PC), adjusted and saved.
   A table already in the menu shows "In the menu" and Start opens its page.
   Cyber Pinball can't read which tables the player owns: the player chooses.
 - **Images and media**: each catalogue table carries its VPS database game (`vps`, 133 tables out of 146 on 16/11/2026: the one with an "FX" version, otherwise, for a Williams or Bally machine, the machine's game).
+  A table the catalogue links to no game, often a Zen original, is recognised by its exact title among the VPS database games that have a Zen table (title compared without case, accents, punctuation or the word "Pinball"; two games with the same title: none, never guessed).
   The list shows as a thumbnail the table capture VPS provides (downloaded without blocking the screen, in batches).
   The entry file gets that ID in memory as long as its `.info` gives no other: "Find missing media" and "Game media" recognise it, tables added earlier included.
   On adding, in the background and tracked in downloads: the missing VPinMediaDB media (`fillMissing` in `quiet` mode), then, without a playfield image, the VPS capture (`placeMissingMedia`, source noted in the `.info`).
@@ -46,6 +51,15 @@ Each one gets a "Title (Manufacturer Year)" folder in the tables folder with an 
   A PC whose playfield screen is upright keeps the player's setting.
   A game never opened on this PC doesn't have this file yet: the rotation is written before the next game.
   Pinball FX3 has no equivalent: its settings are encrypted (see [Pinball FX3 tables](pinball-fx3-tables.md)).
+- **Cabinet mode set by Cyber Pinball**: nothing to set in the game's "Cabinet Support" menu.
+  Before each game, Cyber Pinball turns cabinet mode on and places the game's DMD window on the cabinet's DMD screen, from its own screen setup; on a FullDMD, the DMD takes the central band in 4:1 shape, like Visual Pinball's.
+  The game's backglass window is turned off: a single picture on the backglass, the one chosen when the table was added, shown by Cyber Pinball as outside cabinet mode.
+  Turned on, it sat on top and, when its picture was missing (the game's menus, a table chosen in the game), showed the path of the file it was looking for; no picture is put in the game's cabinet mode folder.
+  Only the activation, the DMD's place and size and the backglass being turned off are written to `<game>\PinballFX\Mods\Cabinet\Settings.ini`; the rest (external DMD, padding, dot size, monitor number) is left as it is, and a UTF-16 file stays UTF-16.
+  This file only exists once "Cabinet Support" has been opened once in the game: without it, nothing is written, and the game starts anyway.
+- **DMD sent to dmdext**: with its cabinet mode's "external device" option (`DmdDevice64.dll` from dmd-extensions: colorisation, PuP-Packs), the game opens dmdext's virtual DMD where `DmdDevice.ini` puts it, sometimes on top of the backglass.
+  During the game, Cyber Pinball places it on the cabinet's DMD screen as it is, like Future Pinball's DMD: the full width of the screen, in 4:1 shape, in the middle.
+  A virtual DMD already entirely on the DMD screen stays where it is.
 - **Buttons of a joystick cabinet** (Pinscape, encoder in gamepad mode): Pinball FX and Pinball FX3 only read the keyboard and Xbox controllers, not a joystick.
   During the game, each joystick button recorded by the wizard sends the game the key its Options > Controls > Keyboard screen expects for its role.
   Flippers on Left Shift and Right Shift, plunger and Start on Enter (launch, confirm), Exit and Pause on Esc (back, pause), left and right MagnaSave on the Up and Down arrows, left, right and forward nudges on Left Alt, Right Alt and Space.
@@ -53,20 +67,24 @@ Each one gets a "Title (Manufacturer Year)" folder in the tables folder with an 
   During play, the Up and Down arrows are also the backglass view and Judge Dredd's right shot.
   Credit, coin door and tilt have no command in the game; the volume buttons stay with Cyber Pinball (Windows sound).
   The keys are only sent while the game is in the foreground, never twice to the front-end; any still held are released at the end of the game.
-  At the end of each game, the log counts the presses sent to the game and those held back because the game was not in the foreground.
+  In cabinet mode, the game opens several windows (table, backglass, DMD), and the keyboard could go to the backglass or DMD one, which the table doesn't listen to.
+  Before each press, and twice a second, the table's window (the game's largest) therefore takes the foreground back when another game window has it; the log names the first window corrected this way.
+  At the end of each game, the log counts the presses sent to the game, those held back because the game was not in the foreground, and the times the table took the foreground back.
   The buttons of a keyboard encoder send their own keys, which the game receives as they are: Cyber Pinball doesn't touch them.
   Nothing to install (neither x360ce nor JoyToKey).
 - **Screens during the game**: the front-end detects the screens the game draws on itself (backglass, DMD or topper of its cabinet mode), from the game's own windows only, never those of Windows or another program.
   It leaves them to the game: its window goes behind the game's, without taking the foreground from it, and its background stays still there.
+  A front-end window goes behind as soon as it covers half of the screen the game uses: when the game goes full screen, Windows moves screens, and a window shifted by a few pixels was no longer recognised as hiding the game (the loading picture stayed in front of Future Pinball's backglass the whole game).
+  A small window, like a notification, stays in front.
   The other screens show their media according to "Médias pendant la partie" (Media during play) (see [Game media](game-media.md)).
   A game that changes a screen's resolution during play doesn't shift the front-end's windows: each one follows its role's screen, recognised by its identity and not by its old coordinates.
   A window found on another role's screen is logged and put back on its own.
 - **What Pinball FX doesn't provide**: no ROM or NVRAM, so no score board or ranking; no VR, no in-game settings, no DMD read by Cyber Pinball.
-  Its screens, its external DMD (`DmdDevice64.dll` from dmd-extensions) and the per-table backglass image (`PinballFX\Mods\Cabinet\Table_<number>.png`) are set in the game's **cabinet mode**; only its image rotation is written by Cyber Pinball.
+  Its external DMD (`DmdDevice64.dll` from dmd-extensions), its padding and its dot size are set in the game's **cabinet mode**; Cyber Pinball only writes the image rotation, the activation, the DMD's place and the backglass being turned off.
   On the table page, what doesn't apply stays in place, greyed out, with the reason: "Game parts", "Table files", "Settings for this table", "Adjust display in game", "DMD on the wheel", "Play and record", "Diagnose and fix", "Play with a friend", "Scoreboard".
   "Remove table" removes it from the menu; it stays in Pinball FX.
 - **Code**: catalogue, detection and command in [packages/core/src/pinballfx.ts](../../packages/core/src/pinballfx.ts); entry files in [packages/core/src/tables.ts](../../packages/core/src/tables.ts) (`addPinballFxTable`, `tableFileEmulator`); launcher in [app/src/pinballfx-launcher.ts](../../app/src/pinballfx-launcher.ts), installation in [app/src/pinballfx-install.ts](../../app/src/pinballfx-install.ts), game in `playPinballFx` (`app/src/frontend.ts`), screens in `app/src/library.ts`.
-  Rotation and button keys in [packages/core/src/pinballfx-cabinet.ts](../../packages/core/src/pinballfx-cabinet.ts) (`applyPinballFxRotation`, `ZEN_GAME_KEYS`), sending the keys in [app/src/zen-keys.ts](../../app/src/zen-keys.ts); screens during the game in [packages/core/src/gamescreens.ts](../../packages/core/src/gamescreens.ts) (`followDisplays`, `misplacedWindows`, `gameScreens`) and [app/src/game-screens.ts](../../app/src/game-screens.ts).
+  Rotation, cabinet mode and button keys in [packages/core/src/pinballfx-cabinet.ts](../../packages/core/src/pinballfx-cabinet.ts) (`applyPinballFxRotation`, `applyPinballFxCabinet`, `ZEN_GAME_KEYS`), sending the keys and taking the foreground back in [app/src/zen-keys.ts](../../app/src/zen-keys.ts), dmdext's virtual DMD in `placeVirtualDmd` ([app/src/futurepinball-play.ts](../../app/src/futurepinball-play.ts)); media when adding in [packages/core/src/zen-media.ts](../../packages/core/src/zen-media.ts); screens during the game in [packages/core/src/gamescreens.ts](../../packages/core/src/gamescreens.ts) (`followDisplays`, `misplacedWindows`, `gameScreens`) and [app/src/game-screens.ts](../../app/src/game-screens.ts).
   A table's script is only read from a `.vpx` (`app/src/vbs.ts`): an entry file has no ROM or PuP-Pack.
   Tests: `pinballfx.test.ts`, `pinballfx-launcher.test.ts` (simulated system), `pinballfx-cabinet.test.ts`, `gamescreens.test.ts`.
   Internal off-screen demonstration with a fake Steam (`CYBERPINBALL_STEAM_SIMULE`).

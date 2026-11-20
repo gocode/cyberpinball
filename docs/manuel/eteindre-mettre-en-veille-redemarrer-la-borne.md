@@ -2,7 +2,7 @@
 
 ## Éteindre, mettre en veille, redémarrer la borne
 
-Dans la rubrique Cyber Pinball du menu système, après « Quitter Cyber Pinball » et « Redémarrer Cyber Pinball » (les sorties ensemble, de la plus légère à la plus lourde) : « Mettre en veille », « Redémarrer la borne », « Éteindre la borne ».
+Dans la rubrique Quitter ou éteindre du menu système, la dernière de la racine, après « Bureau Windows », « Quitter Cyber Pinball » et « Redémarrer Cyber Pinball » (toutes les sorties ensemble, de la plus légère à la plus lourde) : « Mettre en veille », « Redémarrer la borne », « Éteindre la borne ».
 Chacune ouvre un écran de confirmation qui dit ce qui va se passer ; Start confirme (l'action est choisie d'office, en vert comme tout choix courant : le passage par la confirmation suffit à la prudence), Exit ou « Annuler » ramène à la rubrique, la sélection sur l'entrée.
 Le module est [app/src/power.ts](../../app/src/power.ts) ; la méthode, la simulation et l'action programmée sont dans [packages/core/src/power.ts](../../packages/core/src/power.ts), l'appel de la veille dans [packages/win-displays/src/power.ts](../../packages/win-displays/src/power.ts).
 

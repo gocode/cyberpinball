@@ -1,8 +1,13 @@
 [Français](../manuel/menu-systeme-cinq-rubriques.md) · English · [Manual contents](../manual.md)
 
-## System menu: six sections
+## System menu: eight sections
 
-The system menu (Exit, Tab or ⚙ from the table menu) shows six sections, Mon compte (My account), Communauté (Community), Tables, Médias (Media), Borne (Cabinet) and Cyber Pinball, with a few shortcuts among them (What's new while it is recent, Recent activity, Collections, Juke-box, Downloads, Phone remote), then "Retour aux tables" (Back to tables).
+The system menu (Exit, Tab or ⚙ from the tables screen) fits in eight lines, in order of use: Tables, Ma borne (My cabinet), Téléchargements (Downloads), Activité récente (Recent activity), Communauté (Community), Juke-box, Aide et infos (Help and info), Quitter ou éteindre (Quit or shut down), then "Retour aux tables" (Back to tables).
+Downloads, Recent activity and Juke-box open their screen directly; the other five open on their entries.
+No screen of the menu has more than eight lines, "Retour" (Back) not included: the list reads at a glance.
+Each entry has a single place, and the root has no shortcut that duplicates a section.
+A section's line says what it holds, never the state or the BETA badge of one of its entries: they are read once inside, on the entry they concern.
+The menu opens with the cursor on the last line chosen at its root, even after a restart (kept in `<data>\menu-systeme.json`); someone who mostly opens it to shut down finds the cursor on "Quitter ou éteindre" (Quit or shut down).
 Each section opens on its entries; Exit (or "Retour", Back) goes up one level, with the selection on the section being left.
 A screen opened from an entry returns, through its "Retour", to the section it came from, with the selection on that entry; the gear always reopens the sections.
 
@@ -14,14 +19,18 @@ Test: [entete-homogene.test.ts](../../packages/core/src/test/entete-homogene.tes
 
 | Section | Entries |
 | --- | --- |
-| Mon compte (My account) | Protect and transfer my account, My nickname, My avatar, My country, My badges, My public profile, What others see, Delete my account (see [My account](my-account.md#my-account)) |
-| Communauté (Community) | Players online, Messages, My friends, Game history, Find a player, Friend requests, Community settings, Moderation (moderators' cabinets only), Sharing and network, Friends' scores during the game, Hide notifications during games, Local play (the only entry left once it is on) (see [Community: the cabinet network](friends-the-cabinet-network.md#community-the-cabinet-network)) |
-| Tables | All tables, Collections, Roue (Wheel, see [Wheel: its settings](game-media.md#wheel-its-settings)), Add a table, Downloads, ROM library |
-| Médias (Media) | Find missing media (on VPinMediaDB); Media, sound and attract mode; Juke-box; Juke-box settings |
-| Borne (Cabinet) | Cabinet health, Tech sheet, Cabinet setup, VPX settings, Other VPX versions, 3D vision, Virtual reality (Virtual reality, Align the cabinet, Headset controllers, Mirror on the playfield), Cabinet controls, Phone remote, DMD (DMD screen, Menu DMD, DMD colour, Real DMD), LED and feedback (DOF), Windows desktop (Open Windows Explorer on a [dedicated cabinet](dedicated-cabinet.md#dedicated-cabinet)), Dedicated cabinet, Launch at startup, Relaunch with Start (see [Relaunch with Start](relaunch-with-start.md#relaunch-with-start)), Guest mode |
-| Cyber Pinball | Langue / Language, Cyber Pinball update, What's new (see [What's new](whats-new.md#whats-new)), Feedback and ideas (see [Feedback and ideas](feedback-and-ideas.md#feedback-and-ideas)), Recent activity (see [Recent activity](recent-activity.md#recent-activity)), Backups (see [Backups](backups.md#backups)), Migration, Terms of use, The community (see [Community credits](community-credits.md#community-credits)), Quit Cyber Pinball, Restart Cyber Pinball, Sleep, Restart the cabinet, Shut down the cabinet |
+| Tables | All tables, Collections (see [Collections and favourites](game-media.md#collections-and-favourites)), Roue (Wheel, see [Wheel: its settings](game-media.md#wheel-its-settings)), Add a table, Find missing media (on VPinMediaDB), ROM library, Sound and attract mode, Migration (Import media, Gather ROMs) |
+| Ma borne (My cabinet) | Cabinet setup (Buttons, Screens, Cabinet sound, Langue / Language, Cabinet configurations, Full wizard: see [Setup wizard and configuration menu](setup-wizard-and-configuration-menu.md#setup-wizard-and-configuration-menu)), VPX (VPX settings, Other VPX versions, and Trial VPX on a development machine: see [Other VPX versions](other-vpx-versions.md#other-vpx-versions)), DMD and LEDs (DMD screen, Menu DMD, DMD colour, Real DMD, LED and feedback (DOF)), Virtual reality and 3D vision (Virtual reality, Align the cabinet, Headset controllers, Mirror on the playfield, 3D vision), Phone remote, Startup and access (Dedicated cabinet, Launch at startup, Relaunch with Start: see [Relaunch with Start](relaunch-with-start.md#relaunch-with-start), Guest mode), Health and backups (Cabinet health, Tech sheet, Backups: see [Backups](backups.md#backups)) |
+| Téléchargements (Downloads) | The downloads screen (see [Downloads and file picker](downloads-and-file-picker.md#downloads-and-file-picker)) |
+| Activité récente (Recent activity) | The notifications of the last few days, in full (see [Recent activity](recent-activity.md#recent-activity)) |
+| Communauté (Community) | The same screen as the wheel's Community medallion: My profile (My level, My badges, Game history, Edit my profile, Privacy, My account: see [My account](my-account.md#my-account)), Players online, Instant game, My friends, Messages, Groups and rooms (Groups, Rooms by country), Leaderboards, Community settings (Presence and rooms, Sharing and network, Friends' scores during the game, Hide notifications during games, Moderation on moderators' cabinets, Local play) (see [Community: the cabinet network](friends-the-cabinet-network.md#community-the-cabinet-network)) |
+| Juke-box | The Juke-box screen, which also opens its settings (see [Juke-box settings](game-media.md#juke-box-settings)) |
+| Aide et infos (Help and info) | Cabinet controls, What's new (see [What's new](whats-new.md#whats-new)), Cyber Pinball update, Feedback and ideas (see [Feedback and ideas](feedback-and-ideas.md#feedback-and-ideas)), Follow us, Terms of use, Credits (see [Community credits](community-credits.md#community-credits)) |
+| Quitter ou éteindre (Quit or shut down) | Windows desktop (Open Windows Explorer on a [dedicated cabinet](dedicated-cabinet.md#dedicated-cabinet)), Quit Cyber Pinball, Restart Cyber Pinball, Sleep, Restart the cabinet, Shut down the cabinet (see [Shutting down, sleeping, restarting the cabinet](shutting-down-sleeping-restarting-the-cabinet.md#shutting-down-sleeping-restarting-the-cabinet)) |
 
-"Migration" (in Cyber Pinball) gathers what is only used once, when coming from another frontend: "Reprendre les médias" (Import media, from PinUP Popper or PinballX) and "Regrouper les ROM" (Gather ROMs) in the library.
+My cabinet receives what would change if Cyber Pinball were installed on another cabinet: the hardware, the screens, VPX, Windows, the cabinet's language.
+"Migration" (in Tables) gathers what is only used once, when coming from another front-end: "Reprendre les médias" (Import media, from PinUP Popper or PinballX) and "Regrouper les ROM" (Gather ROMs) in the library.
+A section with nothing left on this cabinet (local play, missing entries) is not shown.
 
 **Menu système > Tables > « Toutes les tables »** (System menu > Tables > All tables): the list of every table on the cabinet, by title (manufacturer · year · version, and "Jouée 12 fois", Played 12 times, or "Jamais jouée", Never played).
 Start on a table opens **its page, the same as from the wheel** (Play, Play with a friend, Edit information, Game media, Game parts, Table files, settings, diagnosis, removal…); its "Retour à la liste des tables" (Back to the table list, or Exit) goes back to the list, on that table, and every screen opened from the page comes back to it as usual.
@@ -29,11 +38,11 @@ Start on a table opens **its page, the same as from the wheel** (Play, Play with
 A table removed from the list goes back to it.
 Code: `openAllTables` and `sheetReturn` in `app/src/library.ts`.
 
-An entry's red dot (received files to install, update available, DMD screen to check, recovery code to write down…) goes up to its section, then to the gear; on opening, the selection goes to the first one that carries one.
+An entry's red dot (received files to install, update available, DMD screen to check, recovery code to write down…) goes up to its section, then to the gear; when a section opens, the selection goes to the first one that carries one (at the root, to the last line chosen, if there is one).
 
-The tree (sections, order, name and icon of each entry) is in [packages/core/src/systemmenu.ts](../../packages/core/src/systemmenu.ts) (`SYSTEM_ROOT`, `SYSTEM_GROUPS`, `SYSTEM_ITEMS`).
+The tree (sections, order, name and icon of each entry) is in [packages/core/src/systemmenu.ts](../../packages/core/src/systemmenu.ts) (`SYSTEM_ROOT_ENTRIES`, `SYSTEM_GROUPS`, `SYSTEM_ITEMS`); the memory of the last line chosen, in [packages/core/src/systemmemory.ts](../../packages/core/src/systemmemory.ts).
 The application provides what each entry does through its identifier (`library.provideSystemItem`, `app/src/library.ts` and `frontend.ts`); a new entry is placed by adding its identifier to a section, without touching the others.
-[systemmenu.test.ts](../../packages/core/src/test/systemmenu.test.ts) pins the invariants: each entry placed once, one icon per entry within a section (and not the section's own), every entry provided by the application, and **every "System menu > …" path** written in this manual, its translation, the manual tests, the READMEs and the interface texts names entries that exist, in that order.
+[systemmenu.test.ts](../../packages/core/src/test/systemmenu.test.ts) pins the invariants: at most eight lines per screen (`MAX_SYSTEM_ENTRIES`), each entry placed once, one icon per entry within a section (and not the section's own), every entry provided by the application, and **every "System menu > …" path** written in this manual, its translation, the manual tests, the READMEs and the interface texts names entries that exist, in that order.
 Demonstrations name an entry (`action:…`): from the system menu, the autopilot finds it in its section.
 
 **A screen is built without reading the disk.**

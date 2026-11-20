@@ -12,11 +12,13 @@ Les champs déjà présents dans un `.info` existant ou apporté par l'archive s
 - **Mise à jour** : au plus toutes les 12 heures, en arrière-plan, quand on ouvre « Ajouter une table » ; `lastUpdated.json` (quelques octets) dit si la base a changé.
   Sans réseau, le cache sert tel quel ; sans cache ni réseau, les noms sont déduits des fichiers, comme avant.
   Une réponse invalide ne remplace jamais le cache.
+  Sur une connexion lente, la lecture n'est abandonnée que si GitHub ne répond plus du tout pendant 20 s, jamais au bout d'une durée totale, et une coupure passagère est réessayée deux fois (voir « Mise à jour depuis la borne » dans [Installation et organisation des fichiers](installation-et-organisation-des-fichiers.md#installation-et-organisation-des-fichiers)).
 - **Rapprochement** ([packages/core/src/vps.ts](../../packages/core/src/vps.ts)) : d'après le nom des `.vpx`, du `.directb2s` du même paquet, de l'archive et des dossiers, et d'après la ROM lue dans le script.
   Préfixe numérique de VPUniverse ignoré, titre comparé sans casse, accents ni ponctuation, avec ou sans article (« Addams Family » pour « The Addams Family »), titre principal (« Terminator 2 » pour « Terminator 2 - Judgment Day »), « Dr. » pour « Doctor » ; fabricant et année départagent les homonymes ; auteurs (« VPW », « g5k », « Bigus ») et numéro de version désignent la version de la table.
   Résultat : une liste de jeux avec un score entre 0 et 1.
+  Un titre saisi au clavier (recherche du catalogue, « Chercher un autre titre… ») trouve aussi un jeu par l'édition d'une de ses versions (la « Galaxy Edition » de JP's Space Cadet est une version du jeu chez VPS, pas un jeu) : le nom de l'édition, même seul (« galaxy »), suffit (`searchVps`, `editionMatch`).
 - **Confiance** : à partir de 0,85 avec 0,08 d'avance sur le suivant, le jeu est retenu sans question.
   Sinon, l'écran « Quel jeu est-ce ? » propose jusqu'à cinq jeux, plus « Garder » le nom déduit des fichiers (jeu absent de la base) ; jeu absent sans proposition : nom des fichiers, sans question.
   Depuis le plan, « Choisir le jeu » ou « Changer le jeu » rouvre l'écran pour chaque table.
   Rien ne bouge avant « Installer ».
-- Mesure sur la base entière (nom fabriqué « Nom (Fabricant Année).vpx » pour chacun des 2 366 jeux qui ont une table VPX) : 99,7 % reconnus en premier, aucune certitude erronée ; les autres sont des doublons de la base.
+- Mesure sur la base entière (nom fabriqué « Nom (Fabricant Année).vpx » pour chacun des 2 366 jeux qui ont une table VPX ; la base a aussi plus de 500 versions pour Future Pinball, marquées `FP`, que le catalogue propose à côté des versions VPX) : 99,7 % reconnus en premier, aucune certitude erronée ; les autres sont des doublons de la base.

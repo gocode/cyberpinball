@@ -2,7 +2,7 @@
 
 ## Gestionnaire de téléchargements
 
-Un seul endroit où suivre tout ce qui arrive, d'un site ou d'un ami, à la manière d'une console de jeu : **Menu système > Téléchargements** (à la racine, entre Médias et Borne : depuis l'écran des tables, Exit, trois fois le flipper droit, puis Start), aussi rangé dans **Menu système > Téléchargements**.
+Un seul endroit où suivre tout ce qui arrive, d'un site ou d'un ami, à la manière d'une console de jeu : **Menu système > Téléchargements** (à la racine, troisième ligne, après Tables et Ma borne : depuis l'écran des tables, Exit ouvre le Menu système sur la dernière rubrique choisie, et Téléchargements y reste une fois choisi).
 À l'écran des tables, une **pastille** à gauche de la roue dentée le résume (« 2 en cours · 45 % », « En attente », « 1 bloqué », « 1 prêt », un seul texte à la fois, par priorité ; « bloqué » et « prêt » sont des nouvelles, qui partent dès que la liste est ouverte) ; un clic l'ouvre, Exit y ramène.
 
 - **La liste** : « En cours et en attente », puis « Terminés et bloqués », dans l'ordre où ils ont été demandés.

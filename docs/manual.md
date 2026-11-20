@@ -55,7 +55,7 @@ A new section gets its heading below, in its place, and its translation in [manu
 ## [Structure](manual/structure.md)
 ## [VPX settings](manual/vpx-settings.md)
 ## [Other VPX versions](manual/other-vpx-versions.md)
-## [System menu: six sections](manual/system-menu-five-sections.md)
+## [System menu: eight sections](manual/system-menu-five-sections.md)
 ## [Cabinet health](manual/cabinet-health.md)
 ## [Tech sheet](manual/tech-sheet.md)
 ## [Feedback and ideas](manual/feedback-and-ideas.md)

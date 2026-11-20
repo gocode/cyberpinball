@@ -17,6 +17,7 @@ Elle suit les boutons du jeu dans l'assistant complet ; seule : menu système > 
   Tout se fait aussi à la souris.
 - **Pas de lanceur analogique** : ce choix ne retire que le lanceur ; l'accéléromètre réglé reste, et VPX lit toujours les secousses (`NudgeSensorCount` à 1) : une borne au lanceur à bouton peut avoir son accéléromètre sur un KL25Z.
   Sans lanceur analogique, l'accéléromètre se choisit à l'étape « Tilt » (voir [Tilt](tilt.md#tilt)).
+  Le même accéléromètre secoue aussi les tables de Future Pinball, qui ne le lit pas : Cyber Pinball lui frappe ses touches de secousse (voir [Tables de Future Pinball](tables-de-future-pinball.md)).
 - **Repos loin de 0** : VPX n'a pas de décalage, le lanceur lui paraîtrait tiré en permanence.
   L'étape le signale : le repos se règle sur la carte (calibration du Pinscape).
 - **Déjà réglé** : une borne dont l'étape a été faite s'ouvre sur son réglage ; sinon, un lanceur déjà affecté dans VPX (son menu, ou sa disposition du Pinscape acceptée) est repris tel quel (« Réglage trouvé dans VPX »).

@@ -99,7 +99,7 @@ La recherche suit cet ordre (`resolveMedia`, [packages/core/src/medias.ts](../..
 | --- | --- | --- |
 | playfield, en fond du front-end | `(Playfield)` | `cover`, assombri sous la liste ; tourné pour que les flippers du média tombent au bord des flippers de la borne (un fichier en portrait a les flippers en bas, un fichier en paysage à droite, comme chez Popper et dans VPinMediaDB) |
 | liste du front-end | `(Wheel)` | logo au-dessus du titre de la table choisie et dans une case de taille fixe devant chaque titre de la liste (l'initiale du titre sans logo) ; dans la roue, le médaillon de chaque table. Sans logo, le médaillon du centre écrit le titre (trois lignes au plus) et les autres portent l'initiale du jeu en grand : réduit à la place d'un voisin, un nom passait sous le plancher de 20 px (13,6 px en borne). Nom et initiale ne se voient jamais ensemble : quand un médaillon quitte le centre, le nom s'éteint en 60 ms, avant d'être réduit sous 20 px, puis l'initiale s'allume (`fillWheelItem` et `placeWheelItem`, `app/renderer/frontend.js` ; `.wheel-initial`, `frontend.css`) |
-| backglass | `(Backglass)`, sinon l'image allumée du `.directb2s` | `contain` sur fond noir |
+| backglass | `(Backglass)`, sinon l'image allumée du `.directb2s` | `fill` : étiré à tout son écran, comme pendant la partie (B2S de VPX, Pinball FX3) ; une image 4:3 sur un écran 16:9 n'est pas entourée de bandes noires |
 | DMD | `(FullDMD)` sur un écran FullDMD, `(DMD)` sur un DMD seul ([Écran du DMD](plugins-de-vpx-backglass-pup-et-dmd.md#écran-du-dmd--fulldmd-ou-dmd-seul) ; sans réponse, selon les proportions de sa zone), l'autre sinon | `contain` sur fond noir ; autour d'une bande, du noir |
 | topper | `(Topper)` | `contain` sur fond noir |
 
@@ -487,7 +487,7 @@ Code : [packages/core/src/collections.ts](../../packages/core/src/collections.ts
 - **Changer de collection** : **MagnaSave gauche ou droit** sur la roue, collection précédente ou suivante, appliquée aussitôt, en boucle ; une collection vide est sautée.
   Seul le repère change : aucune liste ne paraît plus par-dessus la roue (retirée le 13/11/2026, le médaillon Collections la remplace).
   À la souris : un clic sur le repère passe à la suivante.
-  Pour voir toutes les collections : le **médaillon Collections** (ci-dessous) ou **Menu système > Tables > Collections** (en tête du menu système, et dans Tables), la même liste aux flippers et à Start.
+  Pour voir toutes les collections : le **médaillon Collections** (ci-dessous) ou **Menu système > Tables > Collections**, la même liste aux flippers et à Start.
 - **Le médaillon Collections** (13/11/2026) : dans la roue, après le Juke-box et la Communauté, le dernier des médaillons de tête, juste avant la première table.
   Son nom en vert, dessous le nombre de collections et celle que la roue montre.
   Start (ou un clic au centre de la roue, ou une touche sur le téléphone) ouvre la **liste des collections**, la même que Menu système > Tables > Collections, le curseur sur la collection montrée : Start sur une collection l'affiche sur la roue, sur la table qu'elle retient ; Exit revient au médaillon.
@@ -754,14 +754,16 @@ Un média du même type déjà présent dans la table (autre extension ou autres
 **Jamais rangés, toujours signalés dans le plan** : les formats que le front-end ne lit pas (`flv`, `f4v`, `avi`, `mov`, vérifié sur Electron 44.5.1 : à convertir en mp4 ou webm), un format non prévu pour le type (une vidéo en guise de logo, par exemple), les médias d'un autre émulateur que Visual Pinball (`POPMedia\Future Pinball\…`).
 En mode déplacement (dossier d'import), ils restent dans `import\`.
 
-**Reprendre les médias de PinUP Popper / PinballX** (menu système, Exit dans le front-end) : propose les installations trouvées aux emplacements habituels (`C:\vPinball\PinUPSystem\POPMedia`, `C:\PinballX\Media`…) ou un dossier choisi (`PinUPSystem`, `POPMedia`, le dossier d'un émulateur ou d'un type, le dossier de PinballX ou son `Media`).
+**Reprendre les médias de PinUP Popper / PinballX** (Menu système > Tables > Migration > Reprendre les médias) : propose les installations trouvées aux emplacements habituels (`C:\vPinball\PinUPSystem\POPMedia`, `C:\PinballX\Media`…) ou un dossier choisi (`PinUPSystem`, `POPMedia`, le dossier d'un émulateur ou d'un type, le dossier de PinballX ou son `Media`).
 Chaque média est rapproché d'une table installée, sans jamais deviner : un nom qui désigne plusieurs tables (« Fathom » pour deux versions rangées dans deux dossiers) n'est pas copié.
-Le plan donne, table par table, les types reçus, leur taille, comment la table a été reconnue et ce qui est remplacé ; puis les formats illisibles, les jeux sans table et les autres émulateurs.
+La **base de l'installation** (celle de Popper : `GameName`, `GameFileName` ; celle de PinballX : description et nom de chaque jeu) relie chaque jeu à son fichier `.vpx` (`installationGameFiles`, `packages/core/src/installation.ts`) : les médias d'une table reprise sous le nom de son `.vpx`, autre que celui de ses médias (« AC-DC Premium » pour « AC-DC LUCI Premium (Stern 2013).vpx »), trouvent leur table, reconnue par « base de l'installation ».
+Un jeu dont la table est dans l'installation mais pas encore dans Cyber Pinball a sa section, « Pas encore dans Cyber Pinball : <n> tables », et l'action **« Reprendre aussi ces tables »** ouvre « Depuis une autre installation… » avec ces tables déjà cochées, pour les ajouter avec leur VPX et leurs médias (voir « Reprendre une table d'une autre installation » dans [Ajouter une table](ajouter-une-table-l-entonnoir-le-catalogue.md#ajouter-une-table--lentonnoir-le-catalogue--récupérer--liste-dattente)).
+Le plan donne, table par table, les types reçus, leur taille, comment la table a été reconnue et ce qui est remplacé ; puis les formats illisibles, les tables pas encore dans Cyber Pinball, les jeux sans table et les autres émulateurs.
 La place libre est vérifiée avant.
 « Copier » **copie** : l'installation d'origine n'est jamais modifiée.
 Les PuP-Packs (`PUPVideos`) et les médias par défaut de Popper (`System`, `Default`) ne sont pas repris.
 
-**Cas non reconnus** : le champ `MediaSearch` de Popper (un média partagé par plusieurs tables, avec joker) et `MediaWildCard` (plusieurs fichiers tirés au hasard : un seul est gardé) ; les médias nommés autrement que le jeu dans la base de Popper ou de PinballX, quand ce nom ne ressemble ni au `.vpx`, ni au dossier, ni au titre, ni à un jeu VPS (ils sont listés « Sans table ») ; `Table Images Desktop` et `Table Videos Desktop` de PinballX (vues de bureau) ; `Wheelbar` et les thèmes de Popper ; les sous-dossiers d'un dossier de type autres que les prospectus de PinballX.
+**Cas non reconnus** : le champ `MediaSearch` de Popper (un média partagé par plusieurs tables, avec joker) et `MediaWildCard` (plusieurs fichiers tirés au hasard : un seul est gardé) ; les médias d'un jeu dont la base de Popper ou de PinballX ne donne pas le `.vpx`, quand leur nom ne ressemble ni au `.vpx`, ni au dossier, ni au titre, ni à un jeu VPS (ils sont listés « Sans table ») ; `Table Images Desktop` et `Table Videos Desktop` de PinballX (vues de bureau) ; `Wheelbar` et les thèmes de Popper ; les sous-dossiers d'un dossier de type autres que les prospectus de PinballX.
 
 ### Le diagnostic des médias
 
@@ -847,6 +849,7 @@ Cyber Pinball les télécharge **à la demande seulement**, jamais d'office.
 
   Non repris : `cab.png` (photo du meuble), `fss.png` (plateau et fronton pour un seul écran), `realdmd*.png` (DMD physique, que Cyber Pinball ne gère pas).
   VPinMediaDB n'a jamais d'afficheur 4:1, de topper, de vidéo de chargement, de son de lancement ni de règles.
+  Pour un jeu que VPinMediaDB n'a pas du tout, la base VPS donne encore l'image du fronton (aperçu de son `.directb2s` le plus récent) et celle du plateau : prévues à l'ajout par le catalogue et rangées à l'installation quand l'écran n'a pas de média, la source notée (voir « Ce qu'il faut » dans [Ajouter une table](ajouter-une-table-l-entonnoir-le-catalogue.md#ajouter-une-table--lentonnoir-le-catalogue--récupérer--liste-dattente)).
 - **1k ou 4k** : seule l'image du plateau existe en 4k.
   Le réglage « Qualité téléchargée (VPinMediaDB) » se trouve dans menu système > « Tables » > « Son et mode attente » :
   - automatique : 4k si la zone du plateau, dans la configuration active, dépasse 2 560 points de côté ;
@@ -856,6 +859,7 @@ Cyber Pinball les télécharge **à la demande seulement**, jamais d'office.
 - **Plan à valider** : une carte par média.
   - Chaque carte montre l'aperçu (l'image 1k du même média, reçue et vérifiée, qui sert ensuite au téléchargement), le poids (requête HEAD, gardé par MD5 dans `downloads\vpinmdb.sizes.json`), ce qui est remplacé et le nom sous lequel le média sera rangé.
   - Start sur une carte passe à la variante suivante : vidéo, image, ou rien.
+  - Chaque aperçu reçu est autorisé au protocole `cyber-media://` avant d'être montré (`stagePreviews`) : toutes les vignettes s'affichent, même quand l'écran se redessine pendant leur arrivée (la liste des tables de Pinball FX en reçoit des centaines), au lieu de rester des cases grises.
   - Sont retenus d'office : les médias qui manquent, et la nouvelle version d'un fichier déjà venu de VPinMediaDB.
     Un média mis par l'utilisateur reste « Gardé » ; pour le remplacer, il faut le demander (« Remplace l'actuel », l'ancien part à la corbeille).
 - **Téléchargement** : un fichier à la fois, reçu sous `downloads\vpinmediadb\<md5>.ext.part`.
@@ -868,6 +872,7 @@ Cyber Pinball les télécharge **à la demande seulement**, jamais d'office.
 - **Index** : `vpinmdb.json` (1,7 Mo), téléchargé au premier usage depuis `https://raw.githubusercontent.com/superhac/vpinmediadb/main/vpinmdb.json` et gardé dans `<racine>\downloads`.
   - Il est revérifié au plus toutes les 12 heures, en arrière-plan ; GitHub répond 304 (ETag) s'il n'a pas changé.
   - Sans réseau, le cache sert, et une réponse invalide ne le remplace jamais.
+  - Sur une connexion lente, la lecture n'est abandonnée que si GitHub ne répond plus du tout pendant 20 s (connexion, premier octet, puis chaque morceau relancent le compte), jamais au bout d'une durée totale ; une coupure passagère est réessayée deux fois, avec une attente qui double (`fetchTextPatiently`, `packages/core/src/patientfetch.ts`).
   - Seules les adresses du dépôt `superhac/vpinmediadb` sont acceptées.
     L'entrée `bg_thumbs`, vide, est ignorée.
 - **Volumes mesurés** (21 octobre 2026, requêtes HEAD) :
@@ -1061,7 +1066,10 @@ Les propositions de chaque média y cherchent, dans la session de la fenêtre «
   Le téléchargement se fait dans une vue cachée, et la page du fichier s'ouvre en même temps dans la fenêtre « Récupérer » (bandeau : « Cyber Pinball télécharge ce fichier pour le média… », en vert : une information, pas un avertissement ; la progression y a sa ligne) ; le **minuteur de VPUniverse se déroule dans la page**, comme pour un membre qui clique : la page demande l'attente au serveur, décompte, puis lance le fichier, et la carte montre les secondes restantes (« Attente du site · 31 s »).
   Cyber Pinball attend, ne raccourcit rien.
   Start sur une carte en file l'en retire ; « Arrêter la file » arrête tout.
-  Un plafond de téléchargements arrête la file de ce site ; une page qui demande quelque chose (plusieurs fichiers au choix, conditions, vérification) s'ouvre dans la fenêtre visible, et le fichier qu'on y télécharge revient au média.
+  Un plafond de téléchargements ou une connexion demandée arrêtent la file de ce site.
+  **Fiche qui ne se télécharge pas d'elle-même** (page d'attente, clic demandé, plusieurs fichiers au choix, conditions, vérification) : sa page reste affichée dans la fenêtre « Récupérer », sans être rechargée, et le bandeau dit, en orange, ce qu'il reste à faire (« À faire vous-même : … Le fichier téléchargé revient aux propositions du média. »).
+  Ce qu'on y télécharge est rangé pour ce média, comme un fichier de la file, et non dans les téléchargements généraux : le fronton choisi sur VPForums à l'ajout d'une table de Pinball FX3, par exemple, arrive bien dans les médias de la table.
+  Page fermée sans téléchargement, ou laissée 20 minutes sans suite : la carte le dit (« page fermée sans téléchargement »), et la file de ce site passe au fichier suivant ; le journal note chaque fiche non reçue et sa raison.
 - **Réception** : le fichier est rangé dans `<téléchargements>\sites\<site>-<fiche>\fichiers`, l'archive déballée ; un pack rangé à la manière de Popper ou de PinballX dit le type de chaque fichier par son dossier.
   Les fichiers reçus sont notés dans `<téléchargements>\sites\recus.json` et proposés aux visites suivantes, pour ce média comme pour les autres écrans d'un pack (« Reçu de VPForums »).
   Le fichier attendu par la dernière carte choisie pour un média passe de lui-même dans le brouillon ; un autre choix fait entre-temps n'est jamais remplacé.

@@ -153,6 +153,10 @@ Lecture par sondage, 100 fois par seconde, dans le processus principal (`package
   Remède : un identifiant USB différent sur chaque carte quand son outil le permet, sinon tous les boutons sur une seule.
 - **Hors du relevé** : le lanceur analogique et l'accéléromètre du Pinscape sont des axes, affectés à l'étape « Lanceur » (voir [Lanceur analogique et accéléromètre](lanceur-analogique-et-accelerometre.md#lanceur-analogique-et-accéléromètre)).
   Les chapeaux et les axes affectés à une action dans VPX restent à côté des boutons, comme une manette.
+- **Jeux qui ne lisent que le clavier** (Pinball FX, Pinball FX3, Future Pinball) : ils ignorent un joystick DirectInput.
+  Pendant leur partie, Cyber Pinball rend chaque bouton de joystick relevé ici sous la touche que le jeu attend pour son rôle : celles de l'écran Contrôles des jeux de Zen, celles des préférences de Future Pinball (voir [Tables de Pinball FX](tables-de-pinball-fx.md) et [Tables de Future Pinball](tables-de-future-pinball.md)).
+  Les touches ne partent que vers le jeu au premier plan, jamais en double vers le front-end, et celles encore tenues sont relâchées à la fin ; les boutons d'un encodeur clavier arrivent au jeu tels quels.
+  Dans Pinball FX3, les flippers envoient aussi la flèche de leur côté, qui parcourt ses menus, au joystick comme au clavier.
 - **Sans VPX installé**, ou si la bibliothèque SDL manque, les joysticks ne sont pas lus (l'étape le dit) : le clavier, les touches par défaut des encodeurs et la souris restent.
   **Au premier lancement**, l'assistant installe donc VPX lui-même dès son ouverture, en arrière-plan et sans rien demander (`wizardInstallsVpx`, [packages/core/src/first-run.ts](../../packages/core/src/first-run.ts)) : pour l'assistant complet et les étapes qui lisent un joystick (boutons, interface, lanceur, tilt), quand VPX manque à une installation, jamais pendant un essai sans opérateur (sauf `CYBERPINBALL_VPX_ASSISTANT=1`).
   La progression s'affiche sous chaque écran, et le premier écran des boutons ajoute que les joysticks seront lus à la fin et que le clavier marche tout de suite.

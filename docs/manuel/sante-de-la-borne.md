@@ -23,6 +23,8 @@ Le bilan en tête compte les lignes de chaque état et dit quand le relevé date
 Chaque partie est mesurée (voir « Cadence de chaque partie » dans [Lancement d'une partie](lancement-d-une-partie.md#lancement-dune-partie)) et rangée dans `<données>\logs\cadence-parties.json`.
 Le diagnostic lit la dernière partie jugée de chaque table (`slowTableFinding`, [slowtable.ts](../../packages/core/src/slowtable.ts)) : si elle a ramé, constat « La table rame sur cette borne » ; si elle a seulement saccadé, « La table saccade sur cette borne » (`slowTable`).
 Son détail donne les chiffres de cette partie : « À la dernière partie (date), VPX a tenu … images par seconde pour … visées. », le pire moment (pire fenêtre de 10 s) quand il est plus bas, et le nombre d'arrêts de l'image d'au moins un dixième de seconde avec le plus long.
+Quand la partie a tenu exactement la fréquence d'un autre écran plus lent que le playfield (un fronton à 60 Hz pour un playfield à 120 Hz), la table n'y est pour rien : VPX 10.8.1 cale toute la partie sur l'écran le plus lent.
+Le constat devient alors « Partie limitée à … images par seconde par l'écran « … » », nomme cet écran et conseille de choisir sa fréquence la plus haute dans les paramètres d'affichage de Windows (`vpxcadence.ts`).
 Un autre programme de borne ouvert pendant cette partie (PinUP Popper, PinUP Player, dmdext, serveur B2S) y est rappelé : « PinUP Popper était ouvert pendant la partie : il peut prendre le processeur, le disque ou le DMD réel par moments », avec le conseil de le fermer ou de le retirer du démarrage de Windows (voir [Cohabitation](cohabitation-avec-un-autre-front-end-de-borne.md#cohabitation-avec-un-autre-front-end-de-borne)).
 Le constat compte « À vérifier » dans la ligne « Tables » et paraît dans le diagnostic de la table, donc sur sa fiche (« Diagnostiquer et réparer ») ; il disparaît dès qu'une partie tient la cadence, la dernière faisant foi, et le détail le rappelle.
 Il n'a pas de correction : la cause (PC, réglages de VPX, PuP-Pack, table) reste à chercher, et le journal de VPX de cette partie, joint à chaque rapport, garde l'heure de chaque à-coup.
@@ -55,7 +57,7 @@ La fenêtre du playfield, celle du rendu, n'est jamais déplacée : quand le pla
 Code pur : `vpxWindowMoves` ([vpxwindows.ts](../../packages/core/src/vpxwindows.ts)), fixé par [vpxplacement.test.ts](../../packages/core/src/test/vpxplacement.test.ts) ; le journal du front-end note chaque fenêtre ramenée (« Partie : « Visual Pinball Score View » ramenée sur l'écran du rôle dmd… »).
 
 **Pastille.**
-Un point Bloquant au dernier relevé met la pastille rouge sur « Santé de la borne », sur la rubrique Borne et sur la roue dentée ; le détail de l'entrée dit combien de points sont bloquants ou à vérifier.
+Un point Bloquant au dernier relevé met la pastille rouge sur « Santé de la borne », sur les rubriques Santé et sauvegardes et Ma borne, et sur la roue dentée ; le détail de l'entrée dit combien de points sont bloquants ou à vérifier.
 
 Code : les lignes et leurs états dans [packages/core/src/health.ts](../../packages/core/src/health.ts), le relevé, le cache et la page dans `app/src/health.ts`, le rendu dans `app/renderer/library.js` (`renderHealth`).
 [health.test.ts](../../packages/core/src/test/health.test.ts) fixe chaque état de chaque contrôle et que **chaque ligne mène à un écran réel** : une entrée du menu système rangée dans l'arbre et fournie par l'application, le diagnostic d'une table, la liste des tables à revoir ou l'installation de VPX.

@@ -153,6 +153,10 @@ Polled 100 times a second in the main process (`packages/win-displays/src/joysti
   Remedy: a different USB ID on each board when its tool allows it, otherwise all the buttons on just one.
 - **Outside the capture**: the Pinscape's analog plunger and accelerometer are axes, assigned by the "Lanceur" (Plunger) step (see [Analog plunger and accelerometer](analog-plunger-and-accelerometer.md#analog-plunger-and-accelerometer)).
   Hats and axes assigned to an action in VPX stay alongside the buttons, like a gamepad's.
+- **Games that only read the keyboard** (Pinball FX, Pinball FX3, Future Pinball): they ignore a DirectInput joystick.
+  During their game, Cyber Pinball turns each joystick button recorded here into the key the game expects for its role: those of the Zen games' Controls screen, those of Future Pinball's preferences (see [Pinball FX tables](pinball-fx-tables.md) and [Future Pinball tables](future-pinball-tables.md)).
+  The keys only go to the game in the foreground, never twice to the front-end, and those still held are released at the end; the buttons of a keyboard encoder reach the game as they are.
+  In Pinball FX3, the flippers also send the arrow on their side, which browses its menus, with a joystick as with a keyboard.
 - **Without VPX installed**, or if the SDL library is missing, joysticks are not read (the step says so): the keyboard, the encoders' default keys and the mouse remain.
   **On first launch**, the wizard therefore installs VPX itself as soon as it opens, in the background and without asking anything (`wizardInstallsVpx`, [packages/core/src/first-run.ts](../../packages/core/src/first-run.ts)): for the full wizard and the steps that read a joystick (buttons, interface, plunger, tilt), when an installation lacks VPX, never during an unattended test (unless `CYBERPINBALL_VPX_ASSISTANT=1`).
   Progress shows under each screen, and the first buttons screen adds that joysticks will be read at the end and that the keyboard works right away.

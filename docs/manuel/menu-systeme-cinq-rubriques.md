@@ -1,8 +1,13 @@
 [English](../manual/system-menu-five-sections.md) · Français · [Sommaire du manuel](../manuel.md)
 
-## Menu système : six rubriques
+## Menu système : huit rubriques
 
-Le menu système (Exit, Tab ou ⚙ depuis l'écran des tables) montre six rubriques, Mon compte, Communauté, Tables, Médias, Borne et Cyber Pinball, avec quelques raccourcis parmi elles (Nouveautés tant qu'elles sont récentes, Activité récente, Collections, Juke-box, Téléchargements, Télécommande du téléphone), puis « Retour aux tables ».
+Le menu système (Exit, Tab ou ⚙ depuis l'écran des tables) tient en huit lignes, dans l'ordre de l'usage : Tables, Ma borne, Téléchargements, Activité récente, Communauté, Juke-box, Aide et infos, Quitter ou éteindre, puis « Retour aux tables ».
+Téléchargements, Activité récente et Juke-box ouvrent directement leur écran ; les cinq autres s'ouvrent sur leurs entrées.
+Aucun écran du menu n'a plus de huit lignes, « Retour » non compris : la liste se lit d'un coup d'œil.
+Chaque entrée n'a qu'une place, et la racine n'a pas de raccourci qui double une rubrique.
+La ligne d'une rubrique dit ce qu'elle contient, jamais l'état ni le badge BÊTA d'une de ses entrées : ils se lisent en entrant, sur l'entrée qu'ils concernent.
+Le menu s'ouvre le curseur sur la dernière ligne choisie à sa racine, même après un redémarrage (gardée dans `<données>\menu-systeme.json`) ; celui qui l'ouvre surtout pour éteindre retrouve son curseur sur « Quitter ou éteindre ».
 Chaque rubrique s'ouvre sur ses entrées ; Exit (ou « Retour ») remonte d'un cran, la sélection sur la rubrique qu'on quitte.
 Un écran ouvert depuis une entrée revient, par son « Retour », à la rubrique d'où l'on venait, la sélection sur cette entrée ; la roue dentée rouvre toujours les rubriques.
 
@@ -14,14 +19,18 @@ Test : [entete-homogene.test.ts](../../packages/core/src/test/entete-homogene.te
 
 | Rubrique | Entrées |
 | --- | --- |
-| Mon compte | Protéger et transférer mon compte, Mon pseudo, Mon avatar, Mon pays, Mes badges, Mon profil public, Ce que voient les autres, Supprimer mon compte (voir [Mon compte](mon-compte.md#mon-compte)) |
-| Communauté | Joueurs en ligne, Messages, Mes amis, Historique des parties, Trouver un joueur, Demandes d’amis, Réglages de la communauté, Modération (bornes des modérateurs seulement), Partage et réseau, Scores des amis pendant la partie, Masquer les notifications pendant les parties, Jouer en local (seule entrée qui reste quand il est activé) (voir [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#communauté--le-réseau-des-bornes)) |
-| Tables | Toutes les tables, Collections, Roue (voir [Roue : ses réglages](medias-des-jeux.md#roue--ses-réglages)), Ajouter une table, Téléchargements, Bibliothèque de ROM |
-| Médias | Trouver les médias manquants (sur VPinMediaDB) ; Médias, son et attente ; Juke-box ; Réglages du Juke-box |
-| Borne | Santé de la borne, Fiche technique, Configuration de la borne, Réglages de VPX, Autres versions de VPX, Vision 3D, Réalité virtuelle (Réalité virtuelle, Caler la borne, Manettes du casque, Recopie sur le playfield), Commandes de la borne, Télécommande du téléphone, DMD (Écran du DMD, DMD du front-end, Couleur du DMD, DMD réel), LED et retours (DOF), Bureau Windows (Ouvrir l’Explorateur Windows en [borne dédiée](borne-dediee.md#borne-dédiée)), Borne dédiée, Lancement au démarrage, Relance par Start (voir [Relance par Start](relance-par-start.md#relance-par-start)), Mode invité |
-| Cyber Pinball | Langue / Language, Mise à jour de Cyber Pinball, Nouveautés (voir [Nouveautés](nouveautes.md#nouveautés)), Retours et propositions (voir [Retours et propositions](retours-et-propositions.md#retours-et-propositions)), Activité récente (voir [Activité récente](activite-recente.md#activité-récente)), Sauvegardes (voir [Sauvegardes](sauvegardes.md#sauvegardes)), Migration, Conditions d’utilisation, La communauté (voir [Crédits de la communauté](credits-de-la-communaute.md#crédits-de-la-communauté)), Quitter Cyber Pinball, Redémarrer Cyber Pinball, Mettre en veille, Redémarrer la borne, Éteindre la borne |
+| Tables | Toutes les tables, Collections (voir [Collections et favoris](medias-des-jeux.md#collections-et-favoris)), Roue (voir [Roue : ses réglages](medias-des-jeux.md#roue--ses-réglages)), Ajouter une table, Trouver les médias manquants (sur VPinMediaDB), Bibliothèque de ROM, Son et mode attente, Migration (Reprendre les médias, Regrouper les ROM) |
+| Ma borne | Configuration de la borne (Boutons, Écrans, Son de la borne, Langue / Language, Configurations de la borne, Assistant complet : voir [Assistant et menu de configuration](assistant-et-menu-de-configuration.md#assistant-et-menu-de-configuration)), VPX (Réglages de VPX, Autres versions de VPX, et VPX d’essai sur une machine de développement : voir [Autres versions de VPX](autres-versions-de-vpx.md#autres-versions-de-vpx)), DMD et LED (Écran du DMD, DMD du front-end, Couleur du DMD, DMD réel, LED et retours (DOF)), Réalité virtuelle et vision 3D (Réalité virtuelle, Caler la borne, Manettes du casque, Recopie sur le playfield, Vision 3D), Télécommande du téléphone, Démarrage et accès (Borne dédiée, Lancement au démarrage, Relance par Start : voir [Relance par Start](relance-par-start.md#relance-par-start), Mode invité), Santé et sauvegardes (Santé de la borne, Fiche technique, Sauvegardes : voir [Sauvegardes](sauvegardes.md#sauvegardes)) |
+| Téléchargements | L'écran des téléchargements (voir [Téléchargements et sélecteur de fichiers](telechargements-et-selecteur-de-fichiers.md#téléchargements-et-sélecteur-de-fichiers)) |
+| Activité récente | Les notifications des derniers jours, en entier (voir [Activité récente](activite-recente.md#activité-récente)) |
+| Communauté | Le même écran que le médaillon Communauté de la roue : Mon profil (Mon niveau, Mes badges, Historique des parties, Modifier mon profil, Confidentialité, Mon compte : voir [Mon compte](mon-compte.md#mon-compte)), Joueurs en ligne, Partie instantanée, Mes amis, Messages, Groupes et salons (Groupes, Salons par pays), Classements, Réglages de la communauté (Présence et salons, Partage et réseau, Scores des amis pendant la partie, Masquer les notifications pendant les parties, Modération sur les bornes des modérateurs, Jouer en local) (voir [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#communauté--le-réseau-des-bornes)) |
+| Juke-box | L'écran du Juke-box, d'où s'ouvrent aussi ses réglages (voir [Réglages du Juke-box](medias-des-jeux.md#réglages-du-juke-box)) |
+| Aide et infos | Commandes de la borne, Nouveautés (voir [Nouveautés](nouveautes.md#nouveautés)), Mise à jour de Cyber Pinball, Retours et propositions (voir [Retours et propositions](retours-et-propositions.md#retours-et-propositions)), Nous suivre, Conditions d’utilisation, Crédits (voir [Crédits de la communauté](credits-de-la-communaute.md#crédits-de-la-communauté)) |
+| Quitter ou éteindre | Bureau Windows (Ouvrir l’Explorateur Windows en [borne dédiée](borne-dediee.md#borne-dédiée)), Quitter Cyber Pinball, Redémarrer Cyber Pinball, Mettre en veille, Redémarrer la borne, Éteindre la borne (voir [Éteindre, mettre en veille, redémarrer la borne](eteindre-mettre-en-veille-redemarrer-la-borne.md#éteindre-mettre-en-veille-redémarrer-la-borne)) |
 
-« Migration » (dans Cyber Pinball) regroupe ce qui ne sert qu'une fois, en venant d'un autre frontend : « Reprendre les médias » (de PinUP Popper ou PinballX) et « Regrouper les ROM » dans la bibliothèque.
+Ma borne reçoit ce qui changerait si l'on installait Cyber Pinball sur une autre borne : le matériel, les écrans, VPX, Windows, la langue de la borne.
+« Migration » (dans Tables) regroupe ce qui ne sert qu'une fois, en venant d'un autre front-end : « Reprendre les médias » (de PinUP Popper ou PinballX) et « Regrouper les ROM » dans la bibliothèque.
+Une rubrique dont il ne reste rien sur cette borne (jeu local, entrées absentes) n'est pas montrée.
 
 **Menu système > Tables > « Toutes les tables »** : la liste de toutes les tables de la borne, par titre (fabricant · année · version, et « Jouée 12 fois » ou « Jamais jouée »).
 Start sur une table ouvre **sa fiche, la même que depuis la roue** (Jouer, Jouer avec un ami, Modifier les informations, Médias du jeu, Parties du jeu, Fichiers de la table, réglages, diagnostic, suppression…) ; son « Retour à la liste des tables » (ou Exit) ramène à la liste, sur cette table, et tout écran ouvert depuis la fiche y revient comme d'habitude.
@@ -29,11 +38,11 @@ Start sur une table ouvre **sa fiche, la même que depuis la roue** (Jouer, Joue
 Une table supprimée depuis la liste y ramène.
 Code : `openAllTables` et `sheetReturn` dans `app/src/library.ts`.
 
-La pastille rouge d'une entrée (fichiers reçus à installer, mise à jour disponible, écran du DMD à vérifier, code de récupération à noter…) remonte à sa rubrique, puis à la roue dentée ; à l'ouverture, la sélection va sur la première qui en porte une.
+La pastille rouge d'une entrée (fichiers reçus à installer, mise à jour disponible, écran du DMD à vérifier, code de récupération à noter…) remonte à sa rubrique, puis à la roue dentée ; à l'ouverture d'une rubrique, la sélection va sur la première qui en porte une (à la racine, sur la dernière ligne choisie, s'il y en a une).
 
-L'arbre (rubriques, ordre, nom et icône de chaque entrée) est dans [packages/core/src/systemmenu.ts](../../packages/core/src/systemmenu.ts) (`SYSTEM_ROOT`, `SYSTEM_GROUPS`, `SYSTEM_ITEMS`).
+L'arbre (rubriques, ordre, nom et icône de chaque entrée) est dans [packages/core/src/systemmenu.ts](../../packages/core/src/systemmenu.ts) (`SYSTEM_ROOT_ENTRIES`, `SYSTEM_GROUPS`, `SYSTEM_ITEMS`) ; la mémoire de la dernière ligne choisie, dans [packages/core/src/systemmemory.ts](../../packages/core/src/systemmemory.ts).
 L'application fournit ce que fait chaque entrée par son identifiant (`library.provideSystemItem`, `app/src/library.ts` et `frontend.ts`) ; une nouvelle entrée se range en ajoutant son identifiant à une rubrique, sans toucher aux autres.
-[systemmenu.test.ts](../../packages/core/src/test/systemmenu.test.ts) fixe les invariants : chaque entrée rangée une seule fois, une icône par entrée dans une rubrique (et pas celle de la rubrique), chaque entrée fournie par l'application, et **chaque chemin « Menu système > … »** écrit dans ce manuel, sa traduction, les tests manuels, les README et les textes de l'interface nomme des entrées qui existent, dans cet ordre.
+[systemmenu.test.ts](../../packages/core/src/test/systemmenu.test.ts) fixe les invariants : huit lignes au plus par écran (`MAX_SYSTEM_ENTRIES`), chaque entrée rangée une seule fois, une icône par entrée dans une rubrique (et pas celle de la rubrique), chaque entrée fournie par l'application, et **chaque chemin « Menu système > … »** écrit dans ce manuel, sa traduction, les tests manuels, les README et les textes de l'interface nomme des entrées qui existent, dans cet ordre.
 Les démonstrations désignent une entrée par son nom (`action:…`) : depuis le menu système, l'autopilote va la chercher dans sa rubrique.
 
 **Un écran se construit sans lire le disque.**

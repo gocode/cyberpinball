@@ -3,8 +3,8 @@
 ## Recent activity
 
 A notification stays only a few seconds, is shortened to fit its line, waits for the end of a game ("Masquer les notifications pendant les parties" (Hide notifications during games)) or melts into a summary ("4 nouveautés" (4 new notifications)): seen too late, it was lost.
-**Menu système (System menu) > Activité récente (Recent activity)**, at the system menu root (right after "Nouveautés" (What's new) when it is there), keeps them all, in full.
-It is also filed in the Cyber Pinball section, since it covers everything, not only friends.
+**Menu système (System menu) > Activité récente (Recent activity)**, at the system menu root, right after Téléchargements (Downloads), keeps them all, in full.
+It is filed in no section, since it covers everything, not only friends.
 
 - **What goes in**: every notification event, as soon as it arrives, whether it showed or not (a friend coming online or starting a game, their record, their badge, a friend request received or accepted, an invitation and its end, a guest accepting, declining or leaving, a game with friends finished or cancelled, a download finished or blocked); a newer version of Cyber Pinball found in the background (once per version), the update done or failed at startup; the startup notices that name a screen (backup restored, cabinet configuration recognized, DMD screen to check, Windows firewall).
   The immediate answer to a gesture (orientation handed back, simulated sleep) does not go in.
@@ -14,8 +14,9 @@ It is also filed in the Cyber Pinball section, since it covers everything, not o
   A blocked download has the red cross of blocking states.
   "Retour" (Back) returns to the screen you came from; back from an action, the line you left is chosen.
 - **Grouped**: what repeats during the day is a single line: "Chloé : 3 connexions" (Chloé: 3 sign-ins), with the times ("À 21:31, 19:02 et 14:10" (At 21:31, 19:02 and 14:10)), "Bruno : 2 parties lancées" (Bruno: 2 games started) on the same table, "Téléchargement bloqué 2 fois" (Download blocked 2 times).
-- **Messages, one line per conversation**: a message from a friend, a group message or a mention in a room never gets a line of its own.
-  The messages of one conversation are grouped on one line per day, which says how many and shows the last one: "3 messages de Nova" (3 messages from Nova), "4 messages · Les Flippeurs du Nord", "2 mentions · Salon France".
+- **Messages, one line per conversation**: a message from a friend, a group message, a mention in a group or in a room never gets a line of its own.
+  The messages of one conversation are grouped on one line per day, which says how many and shows the last one: "3 messages de Nova" (3 messages from Nova), "4 messages · Les Flippeurs du Nord", "1 mention · Les Flippeurs du Nord", "2 mentions · Salon France".
+  Reading a group's chat also reads its mentions.
   Start opens the conversation ("lire la conversation" (read the conversation), "ouvrir la discussion du groupe" (open the group chat), "ouvrir le salon" (open the room)); the line says what still waits there ("3 en attente" (3 pending)), and becomes read by itself once the conversation is read where it lives.
   A conversation read elsewhere (in Messages, the group, the room or from "Messages en attente" (Waiting messages)) also reads its lines here, without going through this screen.
   No longer a friend, group left, room closed: the line stays, greyed with its reason ("N'est plus dans vos amis" (No longer among your friends), "Vous n'êtes plus dans ce groupe" (You are no longer in this group), "Salon fermé" (Room closed)).

@@ -15,23 +15,26 @@ Les étapes « Lanceur » et « Tilt » ont « Revenir » en plus de leurs propr
 Un clic passe par le même traitement que l'appui du bouton de la borne, sous un code qu'aucun clavier ni joystick ne peut envoyer : il fait exactement la même chose.
 Toute la première configuration se fait ainsi depuis un PC, en bureau à distance compris ; seul le relevé des boutons demande d'appuyer sur les vrais boutons de la borne.
 
-**Menu système (Exit, Tab ou ⚙) > « Ma borne » > « Configuration de la borne »** regroupe tout ce qui règle la borne.
+**Menu système (Exit, Tab ou ⚙) > « Ma borne » > « Configuration de la borne »** regroupe tout ce qui règle la borne, en six lignes : « Boutons », « Écrans », « Son de la borne », « Langue / Language », « Configurations de la borne » et « Assistant complet ».
+« Boutons » et « Écrans » s'ouvrent sur leurs étapes, et leur « Retour » ramène à la configuration ; une étape qui attend l'utilisateur met sa pastille rouge sur sa ligne.
 Chaque étape s'y refait seule et revient à l'écran des tables, enregistrée ou non :
 
 | Entrée | Option | Ce qui est refait | Clés de `VPinballX.ini` écrites |
 | --- | --- | --- | --- |
-| Boutons du jeu | `--boutons` | relevé des boutons du jeu et essai | `[Input]` |
-| Boutons de l'interface | `--interface` | relevé des boutons qui pilotent Cyber Pinball et essai | aucune |
-| Lanceur analogique | `--lanceur` | détection du lanceur à capteur, sens, zone morte, vitesse, accéléromètre, essai | `[Input]` des capteurs |
-| Tilt | `--tilt` | balancier de la borne ou balancier simulé par VPX, angle du contact, accéléromètre et force des secousses, essai aux secousses | `[Player] SimulatedPlumb`, `PlumbThresholdAngle`, `[Input] Mapping.Nudge0.X` et `.Y` |
-| Écrans et rôles | `--ecrans` | l'écran de chaque rôle ; bord des flippers et diagonale seulement si le playfield change d'écran | fenêtres de VPX et cadrage |
-| Orientation et taille du playfield | `--playfield` | bord des flippers, retournement de l'écran, diagonale | fenêtres de VPX et cadrage |
-| Disposition des écrans | `--disposition` | zone de chaque rôle sur son écran | fenêtres de VPX et cadrage |
+| Boutons > Boutons du jeu | `--boutons` | relevé des boutons du jeu et essai | `[Input]` |
+| Boutons > Boutons de l'interface | `--interface` | relevé des boutons qui pilotent Cyber Pinball et essai | aucune |
+| Boutons > Lanceur analogique | `--lanceur` | détection du lanceur à capteur, sens, zone morte, vitesse, accéléromètre, essai | `[Input]` des capteurs |
+| Boutons > Tilt | `--tilt` | balancier de la borne ou balancier simulé par VPX, angle du contact, accéléromètre et force des secousses, essai aux secousses | `[Player] SimulatedPlumb`, `PlumbThresholdAngle`, `[Input] Mapping.Nudge0.X` et `.Y` |
+| Boutons > Rétablir les boutons d'avant | | seulement après une remise aux touches par défaut : le relevé remplacé, remis | `[Input]` |
+| Boutons > Touches par défaut des encodeurs | | après confirmation, les deux jeux de boutons aux touches des encodeurs, sans assistant ; grisée sur une borne aux boutons de joystick (voir [Boutons de la borne](boutons-de-la-borne.md#boutons-de-la-borne)) | `[Input]` |
+| Écrans > Écrans et rôles | `--ecrans` | l'écran de chaque rôle ; bord des flippers et diagonale seulement si le playfield change d'écran | fenêtres de VPX et cadrage |
+| Écrans > Orientation et taille du playfield | `--playfield` | bord des flippers, retournement de l'écran, diagonale | fenêtres de VPX et cadrage |
+| Écrans > Disposition des écrans | `--disposition` | zone de chaque rôle sur son écran | fenêtres de VPX et cadrage |
+| Écrans > Écran du DMD | | FullDMD ou DMD seul, sur une borne qui a un écran de DMD (aussi dans Ma borne > DMD et LED) | |
 | Son de la borne | `--son` | sorties du fronton et du plateau, test des haut-parleurs | `SoundDevice`, `SoundDeviceBG`, `Sound3D` |
-| Assistant complet | | toutes les étapes à la suite | toutes les clés gérées |
+| Langue / Language | | la langue de l'interface (voir [Langue de l'interface](langue-de-l-interface.md#langue-de-linterface)) | |
 | Configurations de la borne | | choix, renommage, corbeille, nouvelle configuration | |
-| Rétablir les boutons d'avant | | seulement après une remise aux touches par défaut : le relevé remplacé, remis | `[Input]` |
-| Touches par défaut des encodeurs | | après confirmation, les deux jeux de boutons aux touches des encodeurs, sans assistant ; grisée sur une borne aux boutons de joystick (voir [Boutons de la borne](boutons-de-la-borne.md#boutons-de-la-borne)) | `[Input]` |
+| Assistant complet | | toutes les étapes à la suite | toutes les clés gérées |
 
 Une étape seule part du modèle enregistré (rôles, écrans, bord des flippers), ne change que ses champs de `cabinet.json` (`stepCabinet`) et n'écrit que ses clés de `VPinballX.ini` (option `only` de la synchronisation), même changées à la main ; les autres restent telles quelles jusqu'à la synchronisation suivante du front-end.
 Le récapitulatif ne montre que ces clés ; Exit y recommence l'étape, Retour arrière revient à la dernière question.
@@ -53,6 +56,7 @@ Fenêtres et cadrage : `[Player] Playfield*`, `[Backglass]`, `[ScoreView]`, `[To
 - **Exit (ou Retour arrière) à la première question** d'une étape, quand il n'y a rien avant : le playfield de l'assistant complet, le bord des flippers de l'orientation seule, la première sortie du son seul, l'éditeur de la disposition seule.
 
 La question dit ce qui serait perdu (« Boutons : Flipper gauche sur A », « DMD : … », « Flippers à gauche de l'image », « Son… », « Écran du playfield : remis dans son orientation d'origine », ou « Rien n'a été changé ») et où l'on va.
+Qui veut quitter est souvent bloqué : en bas de la question, discret, un petit QR code mène aux tutoriels vidéo pas à pas (« Bloqué ? Les tutoriels vidéo, pas à pas », avec leur adresse courte), à viser au téléphone le temps de répondre (voir « Nous suivre » dans [Retours et propositions](retours-et-propositions.md#retours-et-propositions)).
 **Start (ou Entrée) : oui** · **Exit, Échap ou Retour arrière : non** · le même geste encore (une touche maintenue de nouveau) : oui · sans réponse en 20 s, l'assistant reprend.
 Pendant le relevé, le Start et l'Exit déjà relevés répondent aussi.
 Oui : rien n'est écrit, ni `cabinet.json` ni `VPinballX.ini` ; une orientation d'écran non confirmée est remise ; retour à l'écran des tables, ou, au premier démarrage sans modèle (le front-end ne peut pas s'ouvrir), fermeture de Cyber Pinball annoncée à l'écran (« l'assistant reprendra au prochain démarrage »).

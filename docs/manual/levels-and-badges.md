@@ -92,7 +92,7 @@ Rivets and stars glow in the rarity colour.
   In guest mode, the card says "Guest · Games without XP".
   The card and the badges pill also stay at the top of full-screen pages (System menu and its screens, My badges, help…), on the brand line, at the height of the other pills (`--pill-height`, [app/renderer/niveau.css](../../app/renderer/niveau.css)); never in attract mode nor in the Juke-box.
   There, "+85 XP" does not show (it would fall on the screen's title), and on a cabinet the card gives way while a notification is shown.
-  The System menu gear, on their right, is a round pill of the same size (see [System menu](system-menu-five-sections.md#system-menu-six-sections)).
+  The System menu gear, on their right, is a round pill of the same size (see [System menu](system-menu-five-sections.md#system-menu-eight-sections)).
 - **My level**, first in the Community home: the bar and XP to go, this week's XP, the four latest gains, the current week's rankings with the expected XP, the two closest badges; then "My badges", "How to earn XP" and "My public profile".
 - **My badges**: each row carries the badge's drawing, in its shape and rarity ([app/src/level-menu.ts](../../app/src/level-menu.ts), `Row.medal`).
   An earned badge shines, with a halo in its rarity colour and a passing gleam; a badge not earned yet stays grey and unlit, without a gleam; a secret not earned yet shows only its padlock.

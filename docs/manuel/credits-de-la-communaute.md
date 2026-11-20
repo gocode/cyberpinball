@@ -13,7 +13,7 @@ Cyber Pinball cite leurs auteurs sans encombrer le jeu ([packages/core/src/credi
   **Start l'ouvre directement** dans le navigateur intégré (fenêtre « Récupérer », sans destinataire : un fichier téléchargé va à la liste d'attente comme depuis une fiche de VPS) ; le bandeau dit la table, le rôle et tous ses auteurs, et rappelle qu'un merci fait plaisir.
   Fermer (Échap) revient aux crédits.
 - **Une ligne sans page mais avec plus de quatre auteurs** : Start ouvre tous ses auteurs et ce qu'ils ont fait d'autre sur la borne.
-- **La communauté** : Menu système > « Aide et infos » > « Crédits » (aussi depuis la page Crédits) : les auteurs de la borne, des plus présents aux moins présents (« HauntFreaks · 8 frontons · 4 tables » ; 40 au plus, puis « … et N autres »), chacun avec ses tables ; puis les logiciels et les sites sans lesquels rien ne marche (VPX, PinMAME, B2S, Serum, PinUP Player, DOF ; VPS, VPinMediaDB, VPUniverse, VPForums, IPDB, The Pinball Primer).
+- **Les crédits de la borne** : Menu système > « Aide et infos » > « Crédits » (aussi depuis la page Crédits) : les auteurs de la borne, des plus présents aux moins présents (« HauntFreaks · 8 frontons · 4 tables » ; 40 au plus, puis « … et N autres »), chacun avec ses tables ; puis les logiciels et les sites sans lesquels rien ne marche (VPX, PinMAME, B2S, Serum, PinUP Player, DOF ; VPS, VPinMediaDB, VPUniverse, VPForums, IPDB, The Pinball Primer).
   Ce classement ne lit que les `.info` (pas les tables elles-mêmes), refait au plus toutes les 30 s.
 - **Le mode attente** : la ligne discrète décrite dans [Mode attente](medias-des-jeux.md#mode-attente).
 
@@ -27,6 +27,6 @@ D'où viennent les noms, du plus sûr au moins sûr (`tableAuthors`) :
   La réinstaller depuis le catalogue (fiche > Gérer la table… > Parties du jeu) la note.
 
 Mode invité : la page Crédits se lit (porte `sheet.credits`) ; le navigateur intégré reste fermé à l'invité (porte `sheet.credits-web` : on peut s'y connecter, y télécharger), Start sur une ligne qui a une page ouvre alors ses auteurs et son QR code (le bloc du QR de la télécommande, avec ses propres phrases : il n'appaire rien).
-La communauté est au menu système, fermé à l'invité.
+Les crédits de la borne sont au menu système, fermé à l'invité.
 
 Tests : [credits.test.ts](../../packages/core/src/test/credits.test.ts) (provenance lue et écrite sans toucher au reste du `.info`, auteurs du plus sûr au moins sûr, aucun nom deviné, groupes de la page, résumé, ligne du mode attente, classement de la communauté), [uisounds.test.ts](../../packages/core/src/test/uisounds.test.ts) (écran « Mode attente » : chaque ligne revient sur elle-même).

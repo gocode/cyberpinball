@@ -12,11 +12,13 @@ Fields already present in an existing `.info`, or in one shipped with the archiv
 - **Updates**: at most every 12 hours, in the background, when "Ajouter une table" (Add a table) is opened; `lastUpdated.json` (a few bytes) tells whether the database has changed.
   Without a network, the cache is used as is; with neither cache nor network, names are derived from the files, as before.
   An invalid response never replaces the cache.
+  On a slow connection, the read is only given up when GitHub stays completely silent for 20 s, never after a total duration, and a passing drop is retried twice (see "Updating from the cabinet" in [Installation and file layout](installation-and-file-layout.md#installation-and-file-layout)).
 - **Matching** ([packages/core/src/vps.ts](../../packages/core/src/vps.ts)): based on the names of the `.vpx` files, of the `.directb2s` in the same package, of the archive and of the folders, and on the ROM read from the script.
   The VPUniverse numeric prefix is ignored; titles are compared regardless of case, accents and punctuation, with or without the article ("Addams Family" for "The Addams Family"), by main title ("Terminator 2" for "Terminator 2 - Judgment Day"), and "Dr." for "Doctor"; manufacturer and year break ties between games with the same name; authors ("VPW", "g5k", "Bigus") and version number identify the table version.
   The result is a list of games, each with a score between 0 and 1.
+  A title typed on the keyboard (catalog search, "Chercher un autre titre…" (Search another title…)) also finds a game by the edition of one of its versions (JP's Space Cadet's "Galaxy Edition" is a version of the game in VPS, not a game): the edition's name, even alone ("galaxy"), is enough (`searchVps`, `editionMatch`).
 - **Confidence**: at 0.85 or more, with a lead of 0.08 over the next one, the game is picked without asking.
   Otherwise, the "Quel jeu est-ce ?" (Which game is it?) screen offers up to five games, plus "Garder" (Keep) for the name derived from the files (game not in the database); a game not in the database with no candidate gets the file name, without asking.
   From the plan, "Choisir le jeu" (Choose the game) or "Changer le jeu" (Change the game) reopens the screen for each table.
   Nothing moves until "Installer" (Install).
-- Measured on the whole database (a made-up name "Name (Manufacturer Year).vpx" for each of the 2,366 games that have a VPX table): 99.7% identified first, no wrong certainty; the others are duplicates within the database.
+- Measured on the whole database (a made-up name "Name (Manufacturer Year).vpx" for each of the 2,366 games that have a VPX table; the database also has over 500 versions for Future Pinball, marked `FP`, which the catalog offers next to the VPX versions): 99.7% identified first, no wrong certainty; the others are duplicates within the database.

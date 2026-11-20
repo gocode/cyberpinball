@@ -11,9 +11,45 @@ Pour chacune : identifiant MMDevice (`{0.0.0.00000000}.{guid}`), nom attendu par
 Une sortie HDMI se rattache à son écran par le ContainerId du moniteur PnP (`ObservedDisplay.containerId`) ; le conteneur commun à tout ce qui est intégré au PC (`{00000000-0000-0000-FFFF-FFFFFFFFFFFF}`) ne rattache rien.
 `npm run probe` affiche tout cela.
 
-**Étape « Son » de l'assistant**, après les écrans, ou seule (menu système > « Ma borne » > « Configuration de la borne » > « Son de la borne », `--assistant --son` : seules `SoundDevice`, `SoundDeviceBG` et `Sound3D` sont écrites).
+**Étape « Son » de l'assistant**, après les écrans, ou seule (Menu système > Ma borne > Configuration de la borne > « Son de la borne », dont la ligne dit « Fronton, plateau, SSF et exciters », `--assistant --son` : seules `SoundDevice`, `SoundDeviceBG` et `Sound3D` sont écrites).
 Les sorties virtuelles (Steam, Oculus : bus `ROOT`) et Bluetooth sont écartées, sauf si elles avaient déjà un rôle.
-Chaque sortie joue sur elle-même un son généré par oscillateur (aucun fichier), n bips pour la sortie n, en boucle : `AudioContext.setSinkId` dans une fenêtre de l'assistant, la sortie étant trouvée par `enumerateDevices` sous son nom Windows (Chromium ajoute « (vid:pid) » au nom des sorties USB, ignoré pour la comparaison).
+
+**Configurations proposées** (`proposeAudioSetups`, `packages/core/src/audio-setups.ts` ; liste, schéma et vérification dans `app/src/sound-setups.ts`) : avant toute question, l'étape regarde ce que la borne a et propose au plus trois configurations, la plus sûre en tête, sous une phrase qui dit ce qu'elle a détecté (« Détecté : Realtek, prise verte, prise noire branchées, réglée en stéréo dans Windows ; haut-parleurs de … (fronton). », `describeDetected`).
+Elle tient compte des prises de la carte son de la carte mère, des haut-parleurs des écrans du fronton et du playfield, d'un ampli branché en HDMI (une sortie HDMI qui n'appartient à aucun écran), des canaux réglés dans Windows et des réglages déjà enregistrés.
+
+- **Garder les réglages actuels** : en tête quand les réglages enregistrés retrouvent leurs sorties.
+- **SSF** : les bruits du jeu font vibrer la caisse, deux ou quatre exciters sur la carte (« SSF sur la carte son », « SSF avec deux exciters ») ; le fronton sur la prise verte, ou sur les haut-parleurs de son écran quand rien n'est branché sur l'avant de la carte (« SSF : <écran> + <carte> »).
+- **Stéréo** : chaque écran joue son son ; le fronton sur la carte et le plateau sur l'écran du playfield ; tout sur la carte (les exciters restent alors muets) ; ou tout sur l'écran du playfield.
+- **« Aucune ne correspond : régler pas à pas »**, toujours en dernier (Exit y mène aussi) : le réglage sortie par sortie décrit plus bas.
+
+Les prises ne sont lues que sur une carte de la carte mère (bus `HDAUDIO`, sortie analogique), dont le pilote décrit chacune ; les prises en façade, souvent un casque, ne comptent pas quand le panneau arrière en a.
+Une prise n'est dite branchée que si elle sait détecter un câble (Windows le dit prise par prise) ; une carte USB ou une sortie HDMI est vérifiée par le son, jamais par une couleur de prise supposée.
+Les couleurs sont celles de la norme des cartes son : verte à l'avant, noire à l'arrière, grise sur les côtés.
+Le SSF passe en tête (« À essayer en premier ») quand un câble est détecté dans la prise arrière ou des côtés ; une carte déjà réglée en 5.1 ou 7.1 dans Windows le propose aussi avant la stéréo, mais « à vérifier par le son ».
+Une carte dont les prises ne détectent rien, ou laissée en stéréo, reste proposée en SSF, mais « à vérifier par le son », après les propositions en stéréo (troisième au plus, jamais retirée) : une carte de bureau a presque toujours des prises arrière, rarement des exciters.
+Chaque proposition a son **schéma de la borne** vue de dessus : le fronton, le plateau près du fronton et le plateau près du joueur (« VOUS »), avec ce qui doit y jouer (« prise noire », les haut-parleurs d'un écran) ou « non branchée ».
+Tests : [audio-setups.test.ts](../../packages/core/src/test/audio-setups.test.ts).
+
+Start essaie la configuration choisie.
+En stéréo, ou pour garder les réglages, le récapitulatif suit.
+En SSF, une **vérification paire par paire** fait sonner chaque paire attendue, à gauche puis à droite, et demande si on l'entend là où la configuration l'attend (« l'entendez-vous dans le fronton, des deux côtés ? », « vibrent-ils sous le plateau, près de vous ? ») ; le schéma allume la paire en cours et coche celles déjà vérifiées.
+Start : oui ; Exit : aucun son ; un flipper : entendu ailleurs, et la paire reçoit la question du pas à pas ; Retour arrière revient à la paire précédente, puis à la liste.
+
+**Carte réglée en stéréo** : une configuration SSF dont la carte annonce moins de canaux qu'il n'en faut (6 pour deux exciters, 8 pour quatre) passe d'abord par le **panneau Son de Windows**.
+L'assistant l'ouvre (`mmsys.cpl`, `app/src/sound-panel.ts`) et dit quoi faire (« « <carte> », Configurer, 5.1 Surround, puis Suivant jusqu'au bout ») ; il relit les sorties toutes les 1,5 s et lance la vérification dès que Windows annonce le 5.1 ou le 7.1.
+Start rouvre le panneau, Exit reste en stéréo.
+Le pas à pas fait de même : quand aucune sortie n'annonce 6 canaux ou plus et qu'une carte son (ou un ampli HDMI) est en stéréo, il demande « Exciters ou haut-parleurs sur le plateau (SSF, surround) ? » (`stereoSurroundCandidate` : la sortie qui a un rôle, puis la carte de la carte mère, puis les autres cartes, puis l'ampli HDMI ; jamais le haut-parleur d'un écran).
+« Oui, passer en 7.1 » ouvre le panneau et lance le test des haut-parleurs dès que la carte l'annonce ; « Non, stéréo » garde la stéréo.
+Hors écran, le panneau ne s'ouvre pas.
+
+**Deux exciters** : le SSF en 5.1 leur envoie tout le son du plateau (VPX 10.8.1 le joue alors en stéréo sur la paire arrière) ; en 7.1, une part de chaque son partirait vers la prise des côtés, muette.
+L'assistant conseille donc le 5.1 (badge de la proposition, consigne du panneau Son, remarque du test), et le récapitulatif présente le SSF en 5.1 comme un réglage, pas comme une erreur.
+Deux exciters sur la prise des côtés : il conseille de les brancher sur la prise arrière.
+
+**Rien entendu** sur l'arrière ni sur les côtés d'une carte de la carte mère : le récapitulatif explique le cas des cartes à trois prises (verte, bleue, rose) : réaffecter la prise bleue ou rose dans la console audio du fabricant (Realtek Audio Console), ou brancher sur la prise casque en façade.
+Un câble est détecté dans la prise des exciters mais rien n'a vibré : il conseille plutôt de regarder l'ampli des exciters, allumé et volume monté (`pluggedButSilentNotices`).
+
+**Pas à pas** : chaque sortie joue sur elle-même un son généré par oscillateur (aucun fichier), n bips pour la sortie n, en boucle : `AudioContext.setSinkId` dans une fenêtre de l'assistant, la sortie étant trouvée par `enumerateDevices` sous son nom Windows (Chromium ajoute « (vid:pid) » au nom des sorties USB, ignoré pour la comparaison).
 Le joueur répond aux boutons :
 
 | Bouton | Sortie jouée | Test des haut-parleurs |
@@ -46,8 +82,9 @@ Clés écrites dans `VPinballX.ini` (`vpxAudioSettings`), gérées comme les aut
 | `[Player] Sound3D` | stéréo : 0, ou 1 sur une sortie 7.1 (le mode 0 y annule les gains) ; surround : 3 (avant côté lockbar) ou 2 (arrière côté lockbar) ; SSF : 5 |
 
 Un modèle sans étape « Son » (enregistré avant elle, ou sans aucune sortie à proposer) n'écrit aucune de ces clés, et l'écran de réglages les laisse modifiables.
-Points à vérifier signalés par la synchronisation et l'assistant : sortie introuvable (la clé reste telle quelle, VPX jouera sur la sortie par défaut), deux sorties actives du même nom (VPX prend la dernière), `Sound3D` trop ambitieux pour les canaux réglés dans Windows (surround avec moins de 4 canaux, SSF avec moins de 8 : VPX retombe en stéréo, il faut régler la sortie en 5.1 ou 7.1 dans le panneau Son).
-Cyber Pinball ne change jamais lui-même la sortie par défaut de Windows ni le format d'une sortie ; seuls les boutons de volume de la borne règlent le volume de Windows (voir [Volume de la borne](#volume-de-la-borne)).
+Points à vérifier signalés par la synchronisation et l'assistant : sortie introuvable (la clé reste telle quelle, VPX jouera sur la sortie par défaut), deux sorties actives du même nom (VPX prend la dernière), `Sound3D` trop ambitieux pour les canaux réglés dans Windows (surround avec moins de 4 canaux, SSF avec moins de 6 : VPX retombe en stéréo, il faut régler la sortie en 5.1 ou 7.1 dans le panneau Son).
+Le SSF en 5.1 est dit en simple information : parfait pour deux exciters ; quatre demandent le 7.1.
+Cyber Pinball ne change jamais lui-même la sortie par défaut de Windows ni le format d'une sortie (pour le 5.1 ou le 7.1, il ouvre le panneau Son et c'est le joueur qui règle) ; seuls les boutons de volume de la borne règlent le volume de Windows (voir [Volume de la borne](#volume-de-la-borne)).
 Les volumes de VPX (`MusicVolume`, `SoundVolume`) restent des réglages du joueur.
 
 À confirmer sur une vraie borne : le rendu des modes 2, 3 et 5 de `Sound3D`, le sens attendu des paires arrière et côté en SSF (guide Pinscape : arrière côté joueur), les canaux qu'ouvre réellement Chromium sur une carte 7.1, le ContainerId d'une sortie HDMI après changement de port, et la disparition de la sortie HDMI d'un écran en veille.

@@ -22,7 +22,7 @@ It is not the list of fixes: that one stays in each version's notes ("Mise à jo
   A new cabinet, or one updated from a version that did not have this screen, sees only those of the latest date as new.
   What has been seen is kept from one startup to the next (`<data>\nouveautes.json`); an unreadable file starts again from the initial state.
   A line added afterwards lights the red dot again, even on a cabinet that had seen everything: so **levels**, released with 0.1.14 without their line, got it later, with a badge moment as the preview; their "Try it" opens "My level" (see [Levels and badges](levels-and-badges.md#levels-and-badges)).
-- **Its place**: at the top of the system menu as long as a new thing has not been seen or the latest is less than three weeks old; after that, only in the Cyber Pinball section, after "Mise à jour de Cyber Pinball" (Cyber Pinball update).
+- **Its place**: in the Aide et infos (Help and info) section, right after "Commandes de la borne" (Cabinet controls); the red dot of an unseen new thing goes through the Help and info line.
 - **What goes in**: one line per real new capability, never a fix, a speed gain or a setting.
   A feature improved over several versions has a single line, dated when it arrived.
   Lines are not added with every version, only when a feature deserves it: never more than four on the same day, nor more than twenty-four in all (the oldest go).

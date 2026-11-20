@@ -15,6 +15,11 @@ A VPX is named by its first three numbers ("VPX 10.8.0"), except a 10.9 prerelea
 Start on an added VPX removes it, after a confirmation that says how many tables chose it: they go back to Cyber Pinball's VPX and will get it back if it is added again; nothing is deleted from the PC.
 The list is kept in `<data>\autres-vpx.json`.
 
+**Trial VPX (development).**
+On a machine that has its developer key, signed by Cyber Pinball's release key and tied to that machine, the VPX section also has "VPX d’essai" (Trial VPX): the next version of VPX, installed next to Cyber Pinball's, without reinstalling or touching the VPX 10.8.1 settings (it has its own `VPinballX.ini`).
+Switching versions restarts Cyber Pinball; tables, media and ROMs stay shared, and the scores made with the trial version stay on the cabinet.
+Elsewhere, the entry does not exist, even when Cyber Pinball is run from its sources: the key cannot be made or copied to another PC ([packages/core/src/devkey.ts](../../packages/core/src/devkey.ts), `app/src/vpx-essai.ts`).
+
 **A table's choice.**
 On the sheet, "Gérer la table…" (Manage table…) then has the line "Jouée avec VPX 10.8.1 de Cyber Pinball" (Played with Cyber Pinball's VPX 10.8.1) (or "Jouée avec VPX 10.8.0"), after "Réglages de cette table" (This table's settings); Start opens "VPX de cette table" (This table's VPX), the cursor on the current choice.
 The choice is written to the table's `.info` (`CyberPinball.vpx`), where it follows the table; a choice whose VPX is no longer in the list no longer counts.

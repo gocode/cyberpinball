@@ -23,6 +23,8 @@ The summary at the top counts the lines in each state and says how old the check
 Every game is measured (see "Frame rate of every game" in [Launching a game](launching-a-game.md#launching-a-game)) and stored in `<données>\logs\cadence-parties.json`.
 The diagnosis reads each table's last judged game (`slowTableFinding`, [slowtable.ts](../../packages/core/src/slowtable.ts)): if it was sluggish, finding "La table rame sur cette borne" (The table is sluggish on this cabinet); if it only stuttered, "La table saccade sur cette borne" (The table stutters on this cabinet) (`slowTable`).
 Its details give that game's figures: "À la dernière partie (date), VPX a tenu … images par seconde pour … visées." (In the last game (date), VPX held … frames per second for a target of ….), the worst moment (worst 10 s window) when it is lower, and the number of picture freezes of at least a tenth of a second with the longest.
+When the game held exactly the refresh rate of another screen slower than the playfield (a backglass at 60 Hz for a playfield at 120 Hz), the table is not to blame: VPX 10.8.1 paces the whole game on the slowest screen.
+The finding then becomes "Partie limitée à … images par seconde par l'écran « … »" (Game limited to … frames per second by the "…" screen), names that screen and advises choosing its highest refresh rate in Windows display settings (`vpxcadence.ts`).
 Another cabinet program open during that game (PinUP Popper, PinUP Player, dmdext, B2S server) is mentioned there: "PinUP Popper was open during the game: it may take the processor, the disk or the real DMD at times", with the advice to close it or remove it from Windows startup (see [Coexisting](coexisting-with-another-cabinet-frontend.md#coexisting-with-another-cabinet-frontend)).
 The finding counts as "To check" in the "Tables" line and shows in the table's diagnosis, hence on its page ("Diagnostiquer et réparer", Diagnose and repair); it goes away as soon as a game keeps up, the last one being what counts, and the details say so.
 It has no fix: the cause (PC, VPX settings, PuP-Pack, table) remains to be found, and VPX's log of that game, attached to every report, keeps the time of each stall.
@@ -55,7 +57,7 @@ The playfield window, the rendering one, is never moved: when the playfield is o
 Pure code: `vpxWindowMoves` ([vpxwindows.ts](../../packages/core/src/vpxwindows.ts)), pinned by [vpxplacement.test.ts](../../packages/core/src/test/vpxplacement.test.ts); the menu log notes each window moved back ("Partie : « Visual Pinball Score View » ramenée sur l'écran du rôle dmd…").
 
 **Badge.**
-A Blocking line in the last check puts the red dot on "Santé de la borne", on the Borne section and on the gear; the entry's details say how many issues are blocking or to check.
+A Blocking line in the last check puts the red dot on "Santé de la borne", on the Santé et sauvegardes (Health and backups) and Ma borne (My cabinet) sections, and on the gear; the entry's details say how many issues are blocking or to check.
 
 Code: the lines and their states in [packages/core/src/health.ts](../../packages/core/src/health.ts), the check, the cache and the page in `app/src/health.ts`, the rendering in `app/renderer/library.js` (`renderHealth`).
 [health.test.ts](../../packages/core/src/test/health.test.ts) pins every state of every check and that **every line leads to a real screen**: a system menu entry placed in the tree and provided by the application, a table's diagnosis, the list of tables to review or the VPX installation.

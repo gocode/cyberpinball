@@ -55,7 +55,7 @@ Une nouvelle rubrique prend son titre ci-dessous, à sa place, et sa traduction 
 ## [Structure](manuel/structure.md)
 ## [Réglages de VPX](manuel/reglages-de-vpx.md)
 ## [Autres versions de VPX](manuel/autres-versions-de-vpx.md)
-## [Menu système : six rubriques](manuel/menu-systeme-cinq-rubriques.md)
+## [Menu système : huit rubriques](manuel/menu-systeme-cinq-rubriques.md)
 ## [Santé de la borne](manuel/sante-de-la-borne.md)
 ## [Fiche technique](manuel/fiche-technique.md)
 ## [Retours et propositions](manuel/retours-et-propositions.md)

@@ -69,4 +69,8 @@ On a cabinet, the real cabinet is what moves: the table stays still on screen an
 A managed key like the others: set back by hand in VPX, it is reported instead of being overwritten.
 A table's `.ini` can still override it for that table.
 
+**Nudging in Future Pinball**: the game doesn't read a Pinscape's accelerometer (its gamepad setting only works on an English Windows).
+During a Future Pinball game, Cyber Pinball follows the accelerometer chosen at this step, read the way VPX reads it (axes, strength and direction), and taps the game's nudge key on the right side at each clear jolt: left, right or forward, according to the game's preferences.
+A short pause follows each nudge, so that the cabinet's rebound doesn't count twice; nothing is sent while the game isn't in the foreground, nor with "None" (see [Future Pinball tables](future-pinball-tables.md)).
+
 **"Pendant une partie" (During a game) reminder**: a single "Tilt" line (the reminder already fills the screen): the tilt bob's key or button, "secousse trop forte" (nudging too hard) when the simulated tilt bob is chosen, and "slam tilt" with its key if it has one (`gameKeys`).

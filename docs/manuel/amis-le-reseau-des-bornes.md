@@ -4,16 +4,27 @@
 
 Menu système > « Communauté » relie les bornes entre elles **sans serveur** : chacune trouve les autres et leur parle directement, par Internet ou sur le réseau local.
 Le partage est **activé par défaut** ; « Partage et réseau » le coupe.
-Ce qui est à vous (pseudo, avatar, pays, badges, profil public, ce que voient les autres, suppression du compte) est dans Menu système > « Communauté » > « Mon profil » > « Mon compte » (voir [Mon compte](mon-compte.md#mon-compte)).
+La Communauté du Menu système est le même écran que le médaillon Communauté de la roue (voir « Le médaillon Communauté » plus bas) : en tête, le nombre de joueurs en ligne et ce que voient les autres, puis huit entrées.
+Ce qui est à vous (niveau, badges, historique des parties, pseudo, avatar, pays, profil public, ce que voient les autres, suppression du compte) est dans Menu système > « Communauté » > « Mon profil » (voir [Mon compte](mon-compte.md#mon-compte)).
 
 | Entrée | Ce qu'elle montre |
 | --- | --- |
+| Mon profil | Mon niveau, Mes badges, Historique des parties, puis Modifier mon profil (pseudo, avatar, pays), Confidentialité (profil public, ce que voient les autres) et Mon compte (le protéger, le transférer, le supprimer). L'historique des parties : les parties entre amis finies sur cette borne, de la plus récente à la plus ancienne, par jour, la table, l'heure, et dessous les joueurs avec leur rang et leur score ; une partie s'ouvre pour revoir son détail (voir « Historique des parties » plus bas). |
+| Joueurs en ligne | Tous les joueurs que votre borne a croisés, amis ou non, ceux en ligne d'abord (voir « Communauté et joueurs en ligne » plus bas). |
+| Partie instantanée | Une partie en direct ouverte à tous, amis ou non ; le libellé dit s'il y en a une ouverte (voir « Parties instantanées » plus bas). |
+| Mes amis | En ligne, puis hors ligne. Pour chacun : en partie et sur quelle table (en temps réel), dans le front-end, ou vu il y a combien de temps ; son dernier évènement (« Nouveau meilleur score sur … », « Badge reçu : … », « A joué à … »). Start ouvre son profil, le seul écran d'un joueur (voir « Profil public et « J'aime » » plus bas) : sa présence, sa bibliothèque, son niveau, ses badges, une seule liste d'activité, « Inviter à une partie en direct » (grisée, « Hors ligne », quand il ne l'est pas), « Voir sa bibliothèque », « Écrire un message », « Retirer de mes amis », « Bloquer … ». En tête, une invitation reçue ou la partie en direct en cours. On y trouve aussi « Trouver un joueur » et les demandes d'amis (ci-dessous). |
 | Messages | Les conversations avec vos amis, la plus récente d'abord, puis les amis à qui vous n'avez pas encore écrit. La pastille rouge et « non lus » marquent ce qui attend. Start ouvre le fil d'un ami (voir « Messagerie » plus bas). |
-| Mes amis | En ligne, puis hors ligne. Pour chacun : en partie et sur quelle table (en temps réel), dans le front-end, ou vu il y a combien de temps ; son dernier évènement (« Nouveau meilleur score sur … », « Badge reçu : … », « A joué à … »). Start ouvre son profil, le seul écran d'un joueur (voir « Profil public et « J'aime » » plus bas) : sa présence, sa bibliothèque, son niveau, ses badges, une seule liste d'activité, « Inviter à une partie en direct » (grisée, « Hors ligne », quand il ne l'est pas), « Voir sa bibliothèque », « Écrire un message », « Retirer de mes amis », « Bloquer … ». En tête, une invitation reçue ou la partie en direct en cours. |
-| Historique des parties | Les parties entre amis finies sur cette borne, de la plus récente à la plus ancienne, par jour : la table, l'heure, et dessous les joueurs avec leur rang et leur score. Une partie s'ouvre pour revoir son détail (voir « Historique des parties » plus bas). |
+| Groupes et salons | Les groupes, publics ou privés, et les salons des pays (voir « Groupes » et « Salons par pays » plus bas). |
+| Classements | Les joueurs et les tables, aux portées Amis, National et Mondial (voir « Communauté et joueurs en ligne » plus bas). |
+| Réglages de la communauté | Présence et salons, Partage et réseau, Scores des amis pendant la partie, Masquer les notifications pendant les parties, Modération (bornes des modérateurs seulement), Jouer en local (ci-dessous). |
+
+Dans Mes amis et dans Réglages de la communauté :
+
+| Entrée | Ce qu'elle montre |
+| --- | --- |
 | Trouver un joueur | L'annuaire : « Chercher un nom… » (sans accents ni casse ; ou l'identifiant vu sur le profil d'un joueur, entier ou ses quatre premiers caractères), les bornes « À proximité (réseau local) » et celles « Vus récemment ». Start sur un joueur ouvre son profil : « Envoyer une demande d'ami », ou « Annuler la demande », « Accepter », « Refuser », et « Bloquer … ». |
 | Demandes d'amis | Reçues (à valider, pastille rouge jusqu'à la roue dentée) et envoyées (« En attente : remise dès que sa borne sera en ligne »). |
-| Partage et réseau | Le réseau seul : partage activé ou non, réseau local, bibliothèque partagée ou non, débit des téléchargements, pare-feu de Windows, état en direct des tables Stern SAM, le rappel de ce que voient les autres, joueurs bloqués. Le pseudo, l'avatar, le pays, les réglages de ce que voient les autres et la suppression du compte sont dans Mon compte. La sélection s'ouvre sur « Retour » : un Start par mégarde ne coupe pas le partage. |
+| Partage et réseau | Le réseau seul : partage activé ou non, réseau local, bibliothèque partagée ou non, débit des téléchargements, pare-feu de Windows, état en direct des tables Stern SAM, le rappel de ce que voient les autres, joueurs bloqués. Le pseudo, l'avatar, le pays, les réglages de ce que voient les autres et la suppression du compte sont dans Mon profil. La sélection s'ouvre sur « Retour » : un Start par mégarde ne coupe pas le partage. |
 | Masquer les notifications pendant les parties | Désactivé par défaut : la connexion d'un ami, une demande de rejoindre une partie, les nouvelles de la partie entre amis s'affichent aussi pendant les parties, avec leur son (voir « Partout, même en partie » dans [Notifications de l'écran des tables](notifications-de-l-ecran-des-tables.md#notifications-de-lécran-des-tables)). Start bascule ; activé, rien ne s'affiche ni ne sonne pendant une partie, tout attend le front-end. |
 | Jouer en local | Pour une borne qui ne joue qu'en local : un seul réglage retire toute la partie sociale, niveaux compris. Start ouvre un écran qui dit ce qui est retiré et ce qui reste, le curseur sur « Annuler » ; « Jouer en local » confirme. Activé, l'entrée dit « Jouer en local : activé » et reste seule dans la rubrique ; Start propose « Remettre la communauté », le curseur sur « Rester en local » (voir « Jouer en local » plus bas). |
 
@@ -21,7 +32,7 @@ Ce qui est à vous (pseudo, avatar, pays, badges, profil public, ce que voient l
 Menu système > Communauté > « Réglages de la communauté » > « Jouer en local » coupe le partage et arrête le réseau des bornes.
 Disparaissent alors les niveaux, les XP et les badges à l'écran (la carte du joueur, les moments de badge et de niveau), les amis, les joueurs en ligne et les demandes d'amis, les messages et leur pastille, les salons, les groupes, les parties instantanées, les classements en ligne, le médaillon Communauté de la roue, « Jouer avec un ami » et « Partie instantanée » sur la fiche des tables, et la Communauté au téléphone.
 Le tableau des scores d'une table ne garde que ceux de cette borne, sans onglets de portée.
-Dans Mon compte, Mes badges, Mon profil public et Ce que voient les autres sont retirés aussi.
+Dans Mon profil ne restent que Modifier mon profil (pseudo, avatar, pays) et Mon compte : Mon niveau, Mes badges, l'historique des parties et la Confidentialité sont retirés aussi.
 Restent toutes les tables et leurs scores sur cette borne, le Juke-box, la mise à jour de Cyber Pinball, les Nouveautés, Retours et propositions.
 Rien n'est effacé : les amis, les XP et les badges sont gardés tels quels, et les XP continuent de se compter en silence.
 « Remettre la communauté » rallume le partage et le réseau : tout revient, XP compris.
@@ -191,7 +202,7 @@ Code : [packages/core/src/ratelimit.ts](../../packages/core/src/ratelimit.ts), `
 Deux entrées.
 Profil d'un ami > « Inviter à une partie en direct » : choisir une table (celles qu'il a dans la même version d'abord, voir « Choisir la table d'une partie en direct » plus bas).
 Fiche d'une table > « Jouer avec un ami », juste sous « Jouer » : choisir l'ami (en ligne en tête, ceux qui ont la table dans la même version d'abord, les amis hors ligne grisés dessous).
-Les deux restent visibles quand on ne peut pas inviter, grisées avec leur raison : « Hors ligne : invitez-le quand il sera connecté », « Aucun ami en ligne pour l'instant », « Pas encore d'ami : Menu système > Communauté > Trouver un joueur » ; un ami en partie s'invite aussi (« En partie : il recevra une notification discrète sur sa table »).
+Les deux restent visibles quand on ne peut pas inviter, grisées avec leur raison : « Hors ligne : invitez-le quand il sera connecté », « Aucun ami en ligne pour l'instant », « Pas encore d'ami : Menu système > Communauté > « Mes amis » > « Trouver un joueur » » ; un ami en partie s'invite aussi (« En partie : il recevra une notification discrète sur sa table »).
 Un salon s'ouvre, l'invitation part ; jusqu'à quatre joueurs (« Inviter un autre ami »).
 Chez l'ami, le carillon d'invitation sonne et « Invitation de … » s'ouvre d'elle-même sur l'écran des tables, dans le menu système et sur l'aide (par-dessus l'écran ouvert, que « Répondre plus tard » rend tel qu'il était), le curseur sur « Répondre plus tard » (avec le temps restant) : un bouton déjà appuyé n'accepte ni ne refuse ; sinon elle attend en tête de « Mes amis », deux minutes au plus.
 La borne y vérifie qu'elle a la même version que celui qui invite, obligatoirement (un score sur lequel se défier, et plus tard des tournois) : le même `.vpx` (empreinte SHA-256, gardée dans `<données>\amis\empreintes.json`) et le même script joué.
@@ -439,6 +450,14 @@ Les flippers choisissent un message, Start ouvre « Répondre », MagnaSave pass
 « Répondre » propose sept réactions par emoji posées sur le message choisi (👍 J'aime, ❤️ J'adore, 🥰 Solidaire, 😆 Haha, 😮 Waouh, 😢 Triste, 😡 Grrr, les mêmes que dans les salons ; Start de nouveau sur la sienne la retire ; une réaction d'avant, Bravo ou TILT !, reste affichée), six phrases toutes prêtes, et « Écrire un message… » : le clavier à l'écran, ou le téléphone appairé, dont le texte s'écrit en direct dans le champ. 500 caractères au plus.
 Au bureau, le vrai clavier écrit directement.
 
+**Citer un message.**
+Choisir un message puis répondre, d'une phrase prête ou au clavier (« Répondre à Bruno »), le cite.
+La citation, avec son auteur et ses deux premières lignes, s'affiche au-dessus de la réponse, au front-end comme au téléphone.
+Tant que le message cité est encore affiché, la citation est un arrêt du curseur, juste avant sa bulle : la choisir, aux flippers ou à la souris, ramène au message cité.
+Un message cité puis supprimé garde son extrait, avec la mention « message supprimé » ; un message qui n'est plus affiché ici, avec « message plus affiché ici ».
+La citation part dans une extension signée à part : une borne qui n'est pas encore à jour reçoit toujours le message et en affiche le texte, et une borne à jour qui trouve l'extension fausse la laisse tomber, jamais le message.
+Code : [citations.ts](../../packages/core/src/citations.ts) et `app/src/messages-citations.ts` ; essais : [citations.test.ts](../../packages/core/src/test/citations.test.ts).
+
 **Clavier à l'écran : position et emojis.**
 Le texte a un point d'insertion : les touches ◀ ▶ du clavier à l'écran le déplacent, comme les flèches gauche et droite, Début et Fin d'un vrai clavier (sauf si ces flèches sont les boutons de la borne) ; une lettre, Effacer et Suppr agissent là.
 Un emoji compte pour un caractère.
@@ -576,7 +595,7 @@ Tests : [invitations.test.ts](../../packages/core/src/test/invitations.test.ts).
 **Le médaillon Communauté.**
 Dans la roue, juste après le Juke-box et avant le médaillon Collections et les tables de chaque collection, un médaillon sur l'anneau chromé commun ouvre la communauté : son nom en vert, le nombre de joueurs en ligne et d'amis en ligne dessous.
 Partout (médaillon, affiche, Menu système, onglets de « Joueurs en ligne », téléphone), le nombre de joueurs en ligne, et celui de votre pays, ne s'affiche qu'au-delà de cinq, comme les présents d'un salon : un réseau presque vide, chiffré, découragerait ; les joueurs restent nommés, et vos amis en ligne se comptent toujours.
-Start ouvre l'**accueil**, six portes : « Joueurs en ligne », « Parties instantanées » (voir ci-dessous), « Mes amis » (avec la pastille des demandes reçues), « Messages » (la messagerie entre amis), le salon de votre pays (voir « Salons par pays » ci-dessous) et « Classements », qui ouvre sur deux portes, « Joueurs » et « Tables ».
+Start ouvre l'**accueil**, le même écran que Menu système > Communauté, son « Retour » ramenant à la roue : en tête, le nombre de joueurs en ligne et ce que voient les autres, puis « Mon profil », « Joueurs en ligne », « Partie instantanée » (voir ci-dessous), « Mes amis » (avec la pastille des demandes reçues), « Messages » (la messagerie entre amis), « Groupes et salons » (voir « Groupes » et « Salons par pays » ci-dessous), « Classements », qui ouvre sur deux portes, « Joueurs » et « Tables », et « Réglages de la communauté ».
 « Joueurs » classe les joueurs par leurs XP, en onglets Amis, National et Mondial (Start ou MagnaSave passe de l'un à l'autre), de la semaine (les XP gagnés depuis lundi, à zéro chaque lundi) ou de tout temps (les flippers passent de l'une à l'autre).
 Il s'ouvre sur National · Cette semaine (Mondial sans pays choisi) : la semaine d'abord, où chacun a sa chance.
 Chaque ligne donne le rang, le drapeau, la pastille du joueur avec son niveau et sa présence, son pseudo et ses XP, l'autre période en petit (« 12 400 XP au total », « +850 cette semaine ») ; à égalité, le même rang.
@@ -584,7 +603,7 @@ Il compte les joueurs dont la borne a reçu la carte publique, qui porte, signé
 Votre ligne, « (vous) », reste toujours visible, à part au-delà des cinquante premiers ; sous le tableau, votre place (« National · Cette semaine : votre place, 37 sur 120 joueurs »).
 Un total impossible pour quiconque (au-delà de tout ce qui a pu se gagner depuis l'arrivée des niveaux, compte tenu des XP que rapportent les personnes invitées), ou une semaine au-delà de ce qu'une semaine permet, ne se classe pas : il est compté sous le tableau (« 1 joueur écarté (XP impossibles) »).
 Un total seulement inattendu pour l'ancienneté du joueur sur cette borne se classe, son niveau montré « ? ».
-Partage désactivé, la porte est grisée avec sa raison ; sans pays, National dit « Pays non choisi : Mon compte > Mon pays » ; sans ami, Amis dit « Aucun ami pour l'instant ».
+Partage désactivé, la porte est grisée avec sa raison ; sans pays, National dit « Pays non choisi : Mon profil > Modifier mon profil > Mon pays » ; sans ami, Amis dit « Aucun ami pour l'instant ».
 Exit revient aux deux portes, dont la porte « Joueurs » résume votre place : « Vous : niveau 14 · 37ᵉ au monde cette semaine · 3ᵉ dans votre pays ».
 « Tables » montre toutes vos tables, les cinq dernières jouées d'abord (« Jouées récemment », avec « hier », « il y a 3 j »), puis toutes les autres de A à Z, en onglets Cette borne, Amis, National et Mondial, chacun comptant ses tables classées (« 3 sur 42 »), sur la période choisie (« Période » : Tout temps, Cette année, Cette semaine, Aujourd'hui ; Start passe à la suivante).
 Il s'ouvre sur Mondial · Tout temps (Cette borne quand le partage est désactivé), le curseur sur la recherche.
@@ -602,7 +621,7 @@ Celle du plateau montre en plus votre niveau (son palier et sa barre), votre pla
 Le salon de votre pays, avec ses présents et sa dernière ligne, ne paraît que sur l'affiche du fronton.
 
 **Joueurs en ligne.**
-Aussi en tête de Menu système > Communauté.
+Aussi dans Menu système > Communauté, juste après Mon profil.
 Tous les joueurs que votre borne a croisés, amis ou non (l'annuaire du réseau, vos amis, les joueurs des classements), **ceux en ligne d'abord** : vos **amis en ligne**, puis les joueurs de **votre pays**, puis les autres ; dans chaque groupe, ceux qui sont en partie d'abord, puis par nom.
 Viennent ensuite, dans « Hors ligne », tous les autres : vos amis d'abord, puis le plus récemment vu (« Vu il y a 3 j »).
 Chaque ligne porte la pastille du joueur, son drapeau devant son nom (le drapeau Cyber Pinball, une bille comète, pour un joueur qui n'a pas dit son pays ; de même dans les classements et les salons), un anneau vert autour de la pastille quand il est connecté, et dessous ce qu'il fait (« En partie », sur quelle table entre amis, « En ligne », « Vu il y a 3 j ») et ce qui vous rapproche (« 6 tables en commun », « Sur votre réseau local ») ; « Ami » (hors de la section des amis) ou « Demande envoyée » dans la même ligne.
@@ -613,7 +632,7 @@ Start sur un joueur, ami ou non, ouvre son profil (présence et bibliothèque d'
 
 **Apparaître en ligne pour tous.**
 Activé par défaut.
-Coupé (en bas de « Joueurs en ligne », ou dans Mon compte > « Ce que voient les autres »), vous n'apparaissez plus chez les joueurs qui ne sont pas vos amis ; vos amis voient toujours votre présence, et vous voyez toujours la liste.
+Coupé (en bas de « Joueurs en ligne », ou dans Mon profil > Confidentialité > « Ce que voient les autres »), vous n'apparaissez plus chez les joueurs qui ne sont pas vos amis ; vos amis voient toujours votre présence, et vous voyez toujours la liste.
 Au téléphone, l'onglet Communauté a un onglet « Joueurs » : la même liste, avec les demandes reçues, les filtres en badges et le profil de chaque joueur (voir [Communauté au téléphone](communaute-au-telephone.md#communauté-au-téléphone)).
 
 **Sans serveur.**
@@ -634,7 +653,7 @@ Un joueur l'ouvre, choisit le nombre de joueurs, et elle s'affiche dans la Commu
 La partie elle-même est celle des amis (voir « Communauté : le réseau des bornes ») : chacun joue sur sa borne, la même version de la table, avec les réglages de l'hôte, un départ commun et les résultats de chacun.
 
 **Ouvrir une partie.**
-Communauté > Parties instantanées > « Ouvrir une partie instantanée » : la table (vos tables VPX), puis le nombre de joueurs, vous compris (2, 3 ou 4).
+Communauté > Partie instantanée > « Ouvrir une partie instantanée » : la table (vos tables VPX), puis le nombre de joueurs, vous compris (2, 3 ou 4).
 Aussi depuis la fiche d'une table : « Partie instantanée », juste après « Jouer avec un ami ».
 Le salon d'attente s'ouvre : « En attente de 2 joueurs », les joueurs déjà là et les places libres.
 À chaque arrivée, une notification (« Tiltman a rejoint votre partie ») et une ligne en tête du salon (« Encore 1 joueur et elle part »).
@@ -644,7 +663,7 @@ Une seule partie à la fois : en ouvrir une autre ferme la précédente.
 Au téléphone, Communauté > Joueurs montre les parties ouvertes et « Ouvrir une partie instantanée » (voir Communauté au téléphone).
 
 **Rejoindre.**
-Communauté > Parties instantanées : les parties ouvertes par les autres, la plus récente d'abord.
+Communauté > Partie instantanée : les parties ouvertes par les autres, la plus récente d'abord.
 Chaque ligne porte la pastille et le drapeau de l'hôte, la table, depuis quand elle est ouverte, combien de joueurs sont là, les places restantes, et ce que vous avez de la table : « Même version », sinon la ligne est grisée avec sa raison (« Autre version de cette table chez vous », « Vous n'avez pas cette table »).
 Start sur une partie jouable : la table est vérifiée sur votre borne, puis vous entrez dans le salon de l'hôte (« Connexion à la borne de Kiko… » le temps que les deux bornes se rejoignent).
 « Quitter la partie » libère votre place.
@@ -670,7 +689,7 @@ Le module est [instantgames.ts](../../packages/core/src/instantgames.ts), les é
 ### Groupes
 
 Des cercles à soi, publics ou privés : une discussion, une table de la semaine et le classement du groupe, que seuls ses membres voient.
-On y entre par la porte « Groupes » de l'accueil Communauté, entre Messages et le salon du pays ; elle dit le nombre de groupes et la dernière nouveauté (ou combien de groupes publics attendent), et porte la pastille rouge quand un message attend ou qu'une invitation est arrivée.
+On y entre par Communauté > « Groupes et salons » > « Groupes » ; la porte dit le nombre de groupes et la dernière nouveauté (ou combien de groupes publics attendent), et porte la pastille rouge quand un message attend ou qu'une invitation est arrivée.
 
 **Public ou privé.**
 Un groupe privé (le choix par défaut) n'apparaît nulle part : on y entre seulement sur invitation.
@@ -704,6 +723,14 @@ Les actions : « Écrire au groupe » (phrases prêtes, ou clavier à l'écran e
 Start sur un message : les sept réactions par emoji, les phrases, « Écrire un message… » ; sur le vôtre, « Supprimer ce message… » (pour tous, après confirmation) ; sur celui d'un autre, « Signaler ce message… ».
 500 caractères au plus, une ligne toutes les 3 secondes et 20 en 10 minutes, comme dans les salons ; le filtre de mots des salons s'applique à l'affichage, et aux noms des groupes publics.
 Un message arrivé dans un groupe qui n'est pas à l'écran s'annonce par une notification (« Kiko · Les flippeurs du jeudi », le message dessous), partout, par-dessus VPX compris ; « Notifications du groupe » (dans Membres) la coupe pour ce groupe.
+On y cite un message comme entre amis (voir « Citer un message » dans « Messagerie »).
+
+**Mentionner un membre.**
+« Mentionner un membre… », parmi les façons d'écrire, choisit un membre dans la liste (pas de saisie libre) et ouvre le clavier avec « @pseudo » déjà écrit ; un « @pseudo » tapé au clavier ou au téléphone compte aussi.
+Seuls les membres du groupe se mentionnent, jamais vous-même ; un pseudo choisi puis effacé avant l'envoi ne compte plus.
+Quand personne d'autre n'est dans le groupe, l'entrée reste visible, grisée avec sa raison.
+La personne mentionnée reçoit une notification à part (« Bruno vous a mentionné dans Les flippeurs du jeudi », le message dessous), même si le groupe est en sourdine, et une ligne dans [Activité récente](activite-recente.md#activité-récente).
+La mention est mise en évidence dans la bulle, plus fortement quand c'est vous.
 
 **Membres.**
 Chacun avec son avatar, son drapeau, « Créateur », et sa présence (en ligne, en partie, hors ligne).
@@ -747,7 +774,7 @@ Démonstration hors écran : bornes fictives en mode `groupes` (Bruno crée un g
 ### Salons par pays
 
 Un salon de discussion public par pays déclaré, plus « Monde » (en anglais de préférence).
-On y entre par la porte du salon dans l'accueil Communauté (celui de votre pays, ou celui choisi comme salon par défaut), puis « Autres salons… » pour Monde, les salons actifs des autres pays, et tous les pays par leur nom.
+On y entre par Communauté > « Groupes et salons » > « Salons par pays », qui nomme le salon (celui de votre pays, ou celui choisi comme salon par défaut), puis « Autres salons… » pour Monde, les salons actifs des autres pays, et tous les pays par leur nom.
 
 **Le journal.**
 À l'ancienne, une ligne par message : l'heure, le drapeau, `<pseudo>` à la teinte de sa clé (la même que sa pastille) et le texte, qui revient à la ligne sous lui.

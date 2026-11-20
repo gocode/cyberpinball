@@ -3,8 +3,8 @@
 ## Activité récente
 
 Une notification ne reste que quelques secondes, se raccourcit pour tenir sur sa ligne, attend la fin d'une partie (« Masquer les notifications pendant les parties ») ou se fond dans un résumé (« 4 nouveautés ») : vue trop tard, elle était perdue.
-**Menu système > Activité récente**, à la racine du menu système (juste après « Nouveautés » quand elles y sont), les garde toutes, en entier.
-Elle est aussi rangée dans la rubrique Cyber Pinball, puisqu'elle parle de tout, pas que des amis.
+**Menu système > Activité récente**, à la racine du menu système, juste après Téléchargements, les garde toutes, en entier.
+Elle n'est rangée dans aucune rubrique, puisqu'elle parle de tout, pas que des amis.
 
 - **Ce qui y entre** : chaque évènement des notifications, dès son arrivée, qu'il se soit montré ou non (un ami qui se connecte ou lance une partie, son record, son badge, une demande d'ami reçue ou acceptée, une invitation et sa fin, un invité qui accepte, décline ou quitte, une partie entre amis finie ou annulée, un téléchargement fini ou bloqué) ; une version plus récente de Cyber Pinball trouvée en arrière-plan (une fois par version), la mise à jour faite ou manquée au démarrage ; les constats du démarrage qui nomment un écran (sauvegarde restaurée, configuration de la borne reconnue, écran du DMD à vérifier, pare-feu de Windows).
   La réponse immédiate à un geste (orientation rendue, veille simulée) n'y entre pas.
@@ -14,8 +14,9 @@ Elle est aussi rangée dans la rubrique Cyber Pinball, puisqu'elle parle de tout
   Un téléchargement bloqué a la croix rouge des états bloquants.
   « Retour » ramène à l'écran d'où l'on vient ; revenu d'une action, la ligne quittée est choisie.
 - **Regroupé** : ce qui se répète dans la journée ne fait qu'une ligne : « Chloé : 3 connexions », avec les heures (« À 21:31, 19:02 et 14:10 »), « Bruno : 2 parties lancées » sur une même table, « Téléchargement bloqué 2 fois ».
-- **Messages, une ligne par conversation** : un message d'ami, un message de groupe ou une mention dans un salon n'a jamais sa ligne à lui seul.
-  Les messages d'une même conversation se regroupent sur une ligne du jour, qui dit combien et le dernier : « 3 messages de Nova » (« Tu montes sur Comet Chaser ce soir ? »), « 4 messages · Les Flippeurs du Nord » (« Bruno : Table de la semaine choisie »), « 2 mentions · Salon France ».
+- **Messages, une ligne par conversation** : un message d'ami, un message de groupe, une mention dans un groupe ou dans un salon n'a jamais sa ligne à lui seul.
+  Les messages d'une même conversation se regroupent sur une ligne du jour, qui dit combien et le dernier : « 3 messages de Nova » (« Tu montes sur Comet Chaser ce soir ? »), « 4 messages · Les Flippeurs du Nord » (« Bruno : Table de la semaine choisie »), « 1 mention · Les Flippeurs du Nord », « 2 mentions · Salon France ».
+  Lire la discussion d'un groupe lit aussi ses mentions.
   Start ouvre la conversation (« lire la conversation », « ouvrir la discussion du groupe », « ouvrir le salon ») ; la ligne dit ce qui y attend encore (« 3 en attente »), et se lit d'elle-même quand la conversation est lue là où elle se tient.
   Une conversation lue ailleurs (dans Messages, le groupe, le salon ou depuis « Messages en attente ») lit aussi ses lignes ici, sans repasser par cet écran.
   Plus ami, groupe quitté, salon fermé : la ligne reste, grisée avec sa raison (« N'est plus dans vos amis », « Vous n'êtes plus dans ce groupe », « Salon fermé »).

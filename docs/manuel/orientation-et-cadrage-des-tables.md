@@ -77,6 +77,10 @@ Désormais, Windows garde son orientation, et Cyber Pinball ne tourne l'écran q
   Cette relance, comme celles de la langue, du type de DMD ou d'une configuration, reprend la place du front-end (`packages/core/src/menu-resume.ts`, argument `--reprendre-menu=`) : la table sélectionnée sur la roue, et la rubrique du menu système ouverte, la sélection sur l'entrée choisie, sans la relancer.
   « Redémarrer Cyber Pinball » repart de zéro, ouverture comprise.
   Une rubrique inconnue, le mode invité ou des écrans du premier démarrage (conditions, profil) laissent le front-end sur la roue.
+- **Jeux d'autres logiciels** : **Pinball FX3** démarre sur l'écran du playfield tel que Windows l'oriente, comme avec un autre front-end (`GAMES_ON_WINDOWS_ORIENTATION`), pour que l'orientation saisie dans son mode borne vaille d'un front-end à l'autre.
+  L'orientation de Windows revient juste avant son lancement, ne bouge plus pendant la partie, et l'orientation de jeu reprend au retour à la roue ; une orientation saisie dans FX3 sur l'ancienne base est signalée une fois, avec la valeur à saisir (voir [Tables de Pinball FX3](tables-de-pinball-fx3.md)).
+  **Future Pinball** garde l'orientation de jeu de la session : lancée sur celle de Windows, sa table s'affichait à l'envers.
+  **Pinball FX** aussi, et tourne son image comme les fenêtres du front-end (voir [Tables de Pinball FX](tables-de-pinball-fx.md)).
 - **Avertissement** : une orientation que Windows refuse de rendre est notée dans le journal (« Orientation : … n'a pas repris son orientation d'origine (0°) : … Paramètres > Affichage > Orientation de l'écran la rétablit. ») et dans le fichier ; le démarrage suivant réessaie et la redit en bandeau (« À la dernière fermeture de Cyber Pinball : … »).
 - **Bornes configurées par une version plus ancienne** (`legacyOrientation`) : modèle sans `windowsRotation`, orientation enregistrée (`lastSeen.rotation`) différente de 0° et telle que l'assistant l'aurait choisie en partant de 0° (`vpxOrientationFix`).
   Si Windows l'a perdue (redémarrage), le front-end note l'orientation de jeu et la reprend sans question.

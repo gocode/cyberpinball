@@ -2,22 +2,23 @@
 
 ## Mon compte
 
-Menu système > « Communauté » > « Mon profil » > « Mon compte », en tête des rubriques, rassemble ce qui est à vous : de quoi retrouver votre compte sur un autre PC, votre pseudo, votre avatar, votre pays, vos badges, votre profil public, ce que voient les autres et la suppression du compte.
+Ce qui est à vous est dans Menu système > « Communauté » > « Mon profil », en tête de la Communauté (le même écran que le médaillon Communauté de la roue) : « Mon niveau », « Mes badges », « Historique des parties », puis trois rubriques.
+« Modifier mon profil » réunit votre pseudo, votre avatar et votre pays ; « Confidentialité », votre profil public et ce que voient les autres ; « Mon compte », de quoi retrouver votre compte sur un autre PC et sa suppression.
 Le compte, c'est la clé du joueur de la borne (voir « Identité » dans [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#communauté--le-réseau-des-bornes)), avec son pseudo, son pays, ses amis, ses badges, son niveau et son avatar.
 Il vit dans le dossier des données de Cyber Pinball ; la copie de secours, le code de récupération et le mot de passe le gardent aussi ailleurs, pour une réinstallation ou un autre PC.
-En mode invité, la rubrique est fermée, comme tout le menu système.
-Sur une borne qui joue en local (Menu système > Communauté > Réglages de la communauté > Jouer en local), Mes badges, Mon profil public et Ce que voient les autres sont retirés ; les autres entrées restent, et tout revient avec la communauté (voir « Jouer en local » dans [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#communauté--le-réseau-des-bornes)).
+En mode invité, ces écrans sont fermés, comme tout le menu système.
+Sur une borne qui joue en local (Menu système > Communauté > Réglages de la communauté > Jouer en local), Mon niveau, Mes badges, Historique des parties et Confidentialité (Mon profil public, Ce que voient les autres) sont retirés ; Modifier mon profil et Mon compte restent, et tout revient avec la communauté (voir « Jouer en local » dans [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#communauté--le-réseau-des-bornes)).
 
-| Entrée | Ce qu'elle fait |
+| Entrée (dans Mon profil) | Ce qu'elle fait |
 | --- | --- |
-| Protéger et transférer mon compte | La copie de secours de ce PC, le code de récupération, le mot de passe, la copie chiffrée sur le serveur, et « Reprendre un compte sur cette borne… » (voir ci-dessous). Tant que ni le code ni un mot de passe ne protègent le compte, l'entrée dit « Code de récupération à noter », avec la pastille rouge jusqu'à la roue dentée ; ensuite, « Protégé · copie de secours, code, mot de passe ». |
-| Mon pseudo | Le pseudo et l'identifiant du joueur (« Alexis · identifiant A1B2-C3D4-E5F6-7890 ») ; Start le change au clavier à l'écran (2 à 24 caractères), et vos amis et l'annuaire reçoivent le nouveau. |
-| Mon avatar | La photo ou l'image que tous les joueurs voient à côté de votre pseudo : « Choisir une image sur ce PC… », « Chercher une image sur le web… », « Recadrer mon avatar », « Retirer mon avatar » (voir [Avatar des joueurs](amis-le-reseau-des-bornes.md#avatar-des-joueurs)). Sans avatar, vos initiales sur une teinte tirée de votre clé. |
-| Mon pays | « D'après la région de Windows », puis tous les pays par ordre alphabétique, le choix actuel repéré. Il accompagne vos scores : il vous place au classement national et se voit, en drapeau, devant votre pseudo. |
+| Mon compte > Protéger et transférer mon compte | La copie de secours de ce PC, le code de récupération, le mot de passe, la copie chiffrée sur le serveur, et « Reprendre un compte sur cette borne… » (voir ci-dessous). Tant que ni le code ni un mot de passe ne protègent le compte, l'entrée dit « Code de récupération à noter », avec la pastille rouge jusqu'à la roue dentée ; ensuite, « Protégé · copie de secours, code, mot de passe ». |
+| Modifier mon profil > Mon pseudo | Le pseudo et l'identifiant du joueur (« Alexis · identifiant A1B2-C3D4-E5F6-7890 ») ; Start le change au clavier à l'écran (2 à 24 caractères), et vos amis et l'annuaire reçoivent le nouveau. |
+| Modifier mon profil > Mon avatar | La photo ou l'image que tous les joueurs voient à côté de votre pseudo : « Choisir une image sur ce PC… », « Chercher une image sur le web… », « Recadrer mon avatar », « Retirer mon avatar » (voir [Avatar des joueurs](amis-le-reseau-des-bornes.md#avatar-des-joueurs)). Sans avatar, vos initiales sur une teinte tirée de votre clé. |
+| Modifier mon profil > Mon pays | « D'après la région de Windows », puis tous les pays par ordre alphabétique, le choix actuel repéré. Il accompagne vos scores : il vous place au classement national et se voit, en drapeau, devant votre pseudo. |
 | Mes badges | Les 56 badges, par famille, obtenus (avec leur date) ou à obtenir (avec leur progression) ; les badges secrets ne montrent que leur indice (voir [Niveaux et badges](niveaux-et-badges.md#niveaux-et-badges)). |
-| Mon profil public | Ce que voient les joueurs qui ne sont pas vos amis (niveau, badges, pays, amis, records, personnes invitées, groupes publics, activité récente), et qui a aimé chacun de vos records et badges. Pendant le premier mois, « Qui vous a fait découvrir Cyber Pinball ? » (voir [Profil public et « J'aime »](amis-le-reseau-des-bornes.md#profil-public-et--jaime-)). |
-| Ce que voient les autres | Le profil public, les scores publiés aux classements et la présence en ligne pour tous, chacun activé par défaut et coupé ici (voir plus bas). |
-| Supprimer mon compte | Ce qui part et ce qui reste, puis « Supprimer définitivement mon compte », le curseur sur « Annuler » ; la copie chiffrée sur le serveur et le mot de passe partent avec le compte (voir « Supprimer son compte (RGPD) » dans [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#communauté--le-réseau-des-bornes)). |
+| Confidentialité > Mon profil public | Ce que voient les joueurs qui ne sont pas vos amis (niveau, badges, pays, amis, records, personnes invitées, groupes publics, activité récente), et qui a aimé chacun de vos records et badges. Pendant le premier mois, « Qui vous a fait découvrir Cyber Pinball ? » (voir [Profil public et « J'aime »](amis-le-reseau-des-bornes.md#profil-public-et--jaime-)). |
+| Confidentialité > Ce que voient les autres | Le profil public, les scores publiés aux classements et la présence en ligne pour tous, chacun activé par défaut et coupé ici (voir plus bas). |
+| Mon compte > Supprimer mon compte | Ce qui part et ce qui reste, puis « Supprimer définitivement mon compte », le curseur sur « Annuler » ; la copie chiffrée sur le serveur et le mot de passe partent avec le compte (voir « Supprimer son compte (RGPD) » dans [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#communauté--le-réseau-des-bornes)). |
 
 ### Copie de secours sur ce PC
 
@@ -38,7 +39,10 @@ Sans copie trouvée, l'écran « Votre profil de joueur » propose « J'ai déj�
 La clé du joueur s'écrit en 24 mots, qui la redonnent sur n'importe quel PC, même hors ligne, sans aucun serveur ([recovery.ts](../../packages/core/src/recovery.ts)).
 « Noter mon code de récupération… » les affiche numérotés, quatre par ligne, avec leur QR, qui ne contient que les mots en texte, jamais une adresse.
 Notez-les sur papier, ou photographiez le QR avec votre téléphone ; quiconque les a peut prendre votre compte, et Cyber Pinball ne peut pas les retrouver pour vous.
-« Je l'ai noté » demande deux mots tirés au hasard, l'un après l'autre (« Mot n° 7 ») ; justes, le code est noté (« Code de récupération noté : votre compte est protégé ») ; un mot faux ramène à l'écran précédent avec « Ce n'est pas le mot n° 7 : revoyez le code ».
+« Je l'ai noté » se vérifie aux flippers, sans clavier : les trois premiers mots du code sont proposés, mélangés, et on les choisit dans l'ordre, le mot n° 1, puis le 2, puis le 3 (« Mot n° 2 sur 3 »).
+Chaque mot choisi prend son numéro dans sa case, et le mot sous le curseur montre d'avance celui qu'il prendrait ; le dernier mot choisi se rechoisit pour l'enlever.
+Le troisième choisi, tout est jugé d'un coup : justes, le code est noté (« Code de récupération noté : votre compte est protégé ») ; sinon, « Ce ne sont pas les trois premiers mots dans l'ordre : revoyez le code et recommencez », sans dire quel mot était faux.
+« Recommencer » décoche tous les mots ; « Quitter » (ou Exit) revient au code.
 « Plus tard » laisse l'entrée rappeler le code ; une fois noté, « Revoir mon code de récupération… » le remontre.
 Les mots se tapent sans accent ni majuscule, et le code porte son propre contrôle : un mot mal recopié ou deux mots inversés sont refusés.
 
