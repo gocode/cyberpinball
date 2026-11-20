@@ -2114,14 +2114,16 @@ function cabinetSetupItems(): SystemItem[] {
     { label: t('Écrans'), detail: t('Écrans, playfield, disposition, écran du DMD'), icon: 'screens', attention: screensPart.some((i) => i.attention), run: () => openCabinetPart('screens') },
     wizardStepItem('son'),
     { label: languageItem.label ?? t('Langue / Language'), detail: languageItem.detail, icon: 'language', run: () => languageItem.run() },
-    configurations.systemItem,
+    // Copiée : ses accesseurs (la configuration active, lue sur le disque) sont lus une fois, ici.
+    { ...configurations.systemItem },
     { label: t('Assistant complet'), detail: t('Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son'), icon: 'wizard', run: () => relaunchWizard() },
   ];
 }
 
 /** Boutons ou Écrans de la Configuration de la borne ; « Retour » ramène à la configuration, sur ce groupe. */
 function openCabinetPart(part: 'buttons' | 'screens'): void {
-  const items = () => (part === 'buttons' ? buttonSetupItems() : screenSetupItems());
+  // Lu à l'ouverture de l'écran (relevés, écrans, VPX) et gardé pour les touches qui suivent (library.kept).
+  const items = () => library.kept(`cabinet:${part}`, () => (part === 'buttons' ? buttonSetupItems() : screenSetupItems()));
   const up = () => openCabinetSetup(part === 'buttons' ? 0 : 1);
   library.openCustom(
     () => ({
@@ -2239,7 +2241,8 @@ function openCabinetSetup(at?: number): void {
     icon: SYSTEM_ITEMS.cabinet.icon,
     lead: t('Chaque étape se refait seule, puis revient à l’écran des tables. Exit maintenu 2 s (ou le bouton « Quitter sans enregistrer » des boutons de l’interface) en sort sans rien changer, à toute étape.'),
     sections: [],
-    actions: [...cabinetSetupItems().map((i) => ({ label: i.label, detail: i.detail, icon: i.icon, attention: i.attention, ...(i.tone ? { tone: i.tone } : {}), run: i.run })), { label: t('Retour'), icon: 'back', run: () => library.openSystem() }],
+    // Lu à l'ouverture (relevés, écrans, VPX) et gardé pour les touches qui suivent (library.kept).
+    actions: [...library.kept('cabinet:setup', cabinetSetupItems).map((i) => ({ label: i.label, detail: i.detail, icon: i.icon, attention: i.attention, ...(i.tone ? { tone: i.tone } : {}), run: i.run })), { label: t('Retour'), icon: 'back', run: () => library.openSystem() }],
     back: () => library.openSystem(),
     // La sélection va d'office sur l'entrée qui attend l'utilisateur (pastille rouge), sinon sur celle d'où l'on revient.
   }), at ?? Math.max(0, cabinetSetupItems().findIndex((i) => i.attention)));
