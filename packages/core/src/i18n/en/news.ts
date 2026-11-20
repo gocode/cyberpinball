@@ -5,6 +5,12 @@ export const messages: Record<string, string> = {
   // packages/core/src/systemmenu.ts
 
   // packages/core/src/news.ts : les nouveautés
+  'Le Menu système, plus court': 'A shorter System menu',
+  'Huit lignes au plus par écran, rangées dans l’ordre où l’on s’en sert.': 'Eight lines at most per screen, in the order you use them.',
+  'Huit rubriques dans l’ordre de l’usage : Tables, Ma borne, Téléchargements, Activité récente, Communauté, Juke-box, Aide et infos, Quitter ou éteindre. Aucun écran n’a plus de huit lignes.':
+    'Eight sections in the order you use them: Tables, My cabinet, Downloads, Recent activity, Community, Jukebox, Help and info, Quit or shut down. No screen has more than eight lines.',
+  'Ma borne réunit ce qui dépend de la borne : écrans, boutons, son, VPX, DMD et LED, VR. La Communauté est celle de la roue, et le Menu système rouvre la dernière rubrique choisie.':
+    'My cabinet gathers what depends on the cabinet: screens, buttons, sound, VPX, DMD and LEDs, VR. Community is the same as on the wheel, and the System menu reopens the last section you chose.',
   'Le son de la borne se règle presque seul': 'Cabinet sound almost sets itself up',
   'Cyber Pinball regarde ce qui est branché, propose la configuration du son et la vérifie avec vous.':
     'Cyber Pinball looks at what is plugged in, suggests the sound setup and checks it with you.',
@@ -160,14 +166,6 @@ export const messages: Record<string, string> = {
     'Copy your settings and scores, and your tables too if you like, to another drive or a USB stick. An automatic backup can do it every day or every week.',
   'Pour restaurer, un plan dit d’abord, partie par partie, ce qui sera remplacé, remis ou gardé.': 'To restore, a plan first says, part by part, what will be replaced, put back or kept.',
   'Menu système › Ma borne › Santé et sauvegardes › Sauvegardes': 'System menu › My cabinet › Health and backups › Backups',
-
-  'Amis, de borne à borne': 'Friends, cabinet to cabinet',
-  'Jouer en direct jusqu’à quatre bornes, échanger des tables, sans serveur ni compte.': 'Play live with up to four cabinets, swap tables, with no server or account.',
-  'Invitez jusqu’à trois amis sur une table : un compte à rebours commun lance la partie partout en même temps, et les scores de chacun s’affichent en direct.':
-    'Invite up to three friends to a table: a shared countdown starts the game everywhere at once, and everyone’s scores show live.',
-  'Parcourez la bibliothèque d’un ami pour récupérer une table ou les médias qui vous manquent. Vos bornes se relient directement, par Internet ou sur le réseau local.':
-    'Browse a friend’s library to get a table or the media you are missing. Your cabinets link up directly, over the Internet or the local network.',
-  'Menu système › Communauté': 'System menu › Community',
 
   // app/src/news-menu.ts : l'écran
   'Les grandes nouveautés de Cyber Pinball, une ligne chacune': 'The big new things in Cyber Pinball, one line each',

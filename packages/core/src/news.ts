@@ -54,6 +54,23 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Refonte du Menu système (0.2.2-essai), retenue pour les Nouveautés de la 0.2.2 (20/11/2026) ;
+    // la ligne « Amis, de borne à borne » (0.1.4) sort de la liste pour la garder à 24.
+    id: 'menu-systeme',
+    date: '2026-11-20',
+    version: '0.2.2',
+    get title() { return t('Le Menu système, plus court'); },
+    get detail() { return t('Huit lignes au plus par écran, rangées dans l’ordre où l’on s’en sert.'); },
+    get more() {
+      return [
+        t('Huit rubriques dans l’ordre de l’usage : Tables, Ma borne, Téléchargements, Activité récente, Communauté, Juke-box, Aide et infos, Quitter ou éteindre. Aucun écran n’a plus de huit lignes.'),
+        t('Ma borne réunit ce qui dépend de la borne : écrans, boutons, son, VPX, DMD et LED, VR. La Communauté est celle de la roue, et le Menu système rouvre la dernière rubrique choisie.'),
+      ];
+    },
+    get where() { return t('Menu système'); },
+    reach: { kind: 'system', id: 'borne' },
+  },
+  {
     // Rapport du 20/11/2026 (SSF introuvable) : la borne propose sa configuration du son.
     id: 'son-propose',
     date: '2026-11-20',
@@ -424,22 +441,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Menu système › Ma borne › Santé et sauvegardes › Sauvegardes'); },
     reach: { kind: 'system', id: 'backups' },
-    preview: true,
-  },
-  {
-    id: 'amis',
-    date: '2026-10-29',
-    version: '0.1.4',
-    get title() { return t('Amis, de borne à borne'); },
-    get detail() { return t('Jouer en direct jusqu’à quatre bornes, échanger des tables, sans serveur ni compte.'); },
-    get more() {
-      return [
-        t('Invitez jusqu’à trois amis sur une table : un compte à rebours commun lance la partie partout en même temps, et les scores de chacun s’affichent en direct.'),
-        t('Parcourez la bibliothèque d’un ami pour récupérer une table ou les médias qui vous manquent. Vos bornes se relient directement, par Internet ou sur le réseau local.'),
-      ];
-    },
-    get where() { return t('Menu système › Communauté'); },
-    reach: { kind: 'system', id: 'amis' },
     preview: true,
   },
 ];
