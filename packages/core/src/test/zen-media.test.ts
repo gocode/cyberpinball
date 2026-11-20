@@ -81,8 +81,11 @@ test('images rangées à côté des tables : nommées comme le fichier de la tab
   assert.equal(images.get('archer'), path.join(dir, 'Archer.png'));
   assert.equal(images.get('aliens'), path.join(dir, 'Aliens.jpg'));
   assert.equal(images.has('notes'), false);
-  // Capture large : une image de la table ; à peu près carrée : un logo ; illisible : rien.
-  assert.equal(zenLocalImageType(path.join(dir, 'Archer.png')), 'Playfield');
+  // En largeur : le fronton (FX3 l'affiche dans sa fenêtre du fronton) ; en hauteur : une image de la
+  // table ; à peu près carrée : un logo ; illisible : rien.
+  assert.equal(zenLocalImageType(path.join(dir, 'Archer.png')), 'Backglass');
+  fs.writeFileSync(path.join(dir, 'Debout.png'), png(1080, 1920));
+  assert.equal(zenLocalImageType(path.join(dir, 'Debout.png')), 'Playfield');
   assert.equal(zenLocalImageType(path.join(dir, 'Logo.png')), 'Wheel');
   assert.equal(zenLocalImageType(path.join(dir, 'Aliens.jpg')), 'Wheel'); // 256 × 256
   assert.equal(zenLocalImageType(path.join(dir, 'Bandeau.webp')), undefined);

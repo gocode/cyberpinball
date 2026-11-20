@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Pinball FX3: before each game, the table gets its backglass picture if it has none: its backglass in Cyber Pinball, otherwise the one from the archive.org catalog (along with the game's home picture). FX3's backglass window then shows the table's picture instead of the path of the file it was looking for. A picture already there is never replaced. A table without a backglass in Cyber Pinball takes that picture, and the wheel shows it.
+- Pinball FX and FX3: a landscape picture stored next to a table counts as its backglass (that is where FX3 shows it), no longer as a playfield picture.
 - Adding a Pinball FX or Pinball FX3 table: a media with several choices says so on its card, and Start shows them all (each VPinMediaDB version, picture or video, the picture from the game's folder, the VPS capture, each VPForums or VPUniverse file page). The one you take replaces the suggested one, and it is the one that arrives after adding. "Leave this media out" drops it.
 - After "Add to the menu", the table's media open right away, as for a VPX table: each media shows as it arrives, and each one can be replaced (VPinMediaDB, sites, web, a file from this PC), adjusted and saved there. Before, adding went back to the list without showing what had been stored.
 - VPinMediaDB thumbnails: they all show, even when the screen redraws while they arrive. Before, some stayed grey boxes (the Pinball FX table list, notably).

@@ -117,3 +117,63 @@ test('téléchargement : MD5 vérifié, rien de remplacé, échec repris à l’
   // Aucune adresse hors du catalogue.
   assert.ok(asked.every((u) => u.startsWith('https://archive.org/')));
 });
+
+interface PrepareModule {
+  preparePinballFx3Backglass(
+    install: { tablesDir: string },
+    name: string,
+    opts: { own?: string; workDir: string; fetch?: typeof fetch; waitMs?: number; toPng?: (file: string) => Buffer },
+  ): Promise<{ image?: string; from?: string; pending?: boolean; reason?: string }>;
+}
+
+test('avant une partie de FX3 : l’image de la table posée (son fronton dans Cyber Pinball, sinon le catalogue), jamais remplacée', async () => {
+  // Essai du 20/11/2026 : sans image, FX3 écrit dans sa fenêtre du fronton le chemin qu'il cherche.
+  const app = require(path.join(REPO_ROOT, 'app', 'dist', 'pinballfx3-backglass.js')) as PrepareModule;
+  const png = Buffer.from('PNG-CITADEL');
+  const home = Buffer.from('PNG-ACCUEIL');
+  const meta = {
+    files: [
+      { name: 'FX3 Backglass art/Citadel.png', size: String(png.length), md5: createHash('md5').update(png).digest('hex') },
+      { name: 'FX3 Backglass art/pinballfx3.png', size: String(home.length), md5: createHash('md5').update(home).digest('hex') },
+    ],
+  };
+  const asked: string[] = [];
+  const fakeFetch = (async (url: string | URL) => {
+    const u = String(url);
+    asked.push(u);
+    if (u.endsWith('/metadata/FX3_202201')) return new Response(JSON.stringify(meta), { status: 200 });
+    if (u.endsWith('/Citadel.png')) return new Response(png, { status: 200 });
+    if (u.endsWith('/pinballfx3.png')) return new Response(home, { status: 200 });
+    return new Response('', { status: 404 });
+  }) as typeof fetch;
+  const work = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-fx3-partie-')), 'parts');
+
+  // Pas de fronton dans Cyber Pinball : celui du catalogue, et l'image de l'accueil.
+  const dir = tablesDir(['Citadel.pxp']);
+  const got = await app.preparePinballFx3Backglass({ tablesDir: dir }, 'Citadel', { workDir: work(), fetch: fakeFetch });
+  assert.deepEqual([got.from, got.image && path.basename(got.image)], ['catalog', 'Citadel.png']);
+  assert.deepEqual(fs.readFileSync(path.join(dir, 'Citadel.png')), png);
+  assert.deepEqual(fs.readFileSync(path.join(dir, 'PinballFX3.png')), home);
+  // Partie suivante : déjà là, rien de redemandé.
+  asked.length = 0;
+  assert.equal((await app.preparePinballFx3Backglass({ tablesDir: dir }, 'Citadel', { workDir: work(), fetch: fakeFetch })).from, 'present');
+  assert.deepEqual(asked, []);
+
+  // Le fronton de la table dans Cyber Pinball d'abord : un JPEG copié tel quel (FX3 le lit), un WebP converti.
+  const medias = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-fx3-medias-'));
+  fs.writeFileSync(path.join(medias, '(Backglass) Citadel.jpg'), 'JPG-DU-JOUEUR');
+  fs.writeFileSync(path.join(medias, '(Backglass) Archer.webp'), 'WEBP');
+  const dir2 = tablesDir(['Citadel.pxp', 'Archer.pxp', 'PinballFX3.png']);
+  const own = await app.preparePinballFx3Backglass({ tablesDir: dir2 }, 'Citadel', { own: path.join(medias, '(Backglass) Citadel.jpg'), workDir: work(), fetch: fakeFetch });
+  assert.deepEqual([own.from, own.image && path.basename(own.image)], ['media', 'Citadel.jpg']);
+  assert.equal(fs.readFileSync(path.join(dir2, 'Citadel.jpg'), 'utf8'), 'JPG-DU-JOUEUR');
+  const webp = await app.preparePinballFx3Backglass({ tablesDir: dir2 }, 'Archer', { own: path.join(medias, '(Backglass) Archer.webp'), workDir: work(), fetch: fakeFetch, toPng: () => Buffer.from('PNG-CONVERTI') });
+  assert.equal(webp.image && path.basename(webp.image), 'Archer.png');
+  assert.equal(fs.readFileSync(path.join(dir2, 'Archer.png'), 'utf8'), 'PNG-CONVERTI');
+
+  // Réseau muet : la partie n'attend que `waitMs`, rien de déposé, le catalogue continue.
+  const silent = (() => new Promise<Response>(() => undefined)) as typeof fetch;
+  const dir3 = tablesDir(['Citadel.pxp']);
+  const late = await app.preparePinballFx3Backglass({ tablesDir: dir3 }, 'Citadel', { workDir: work(), fetch: silent, waitMs: 50 });
+  assert.deepEqual([late.image, late.pending], [undefined, true]);
+});

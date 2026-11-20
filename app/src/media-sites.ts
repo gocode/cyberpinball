@@ -236,6 +236,8 @@ export function createMediaSites(ctx: MediaSitesContext) {
     if (cached && Date.now() - cached.at < SEARCH_TTL_MS) return cached.result;
     const flood = await searchPage(site, query, undefined, 1, urlOf(1));
     if (flood.kind === 'show' && flood.reason === 'flood' && flood.wait <= MAX_FLOOD_WAIT_S) {
+      // Au journal : une recherche « très longue » (20/11/2026, logos de VPUniverse sans compte) se lit là.
+      console.log(`Médias des sites : ${mediaSite(site).name} impose ${flood.wait} s d'attente avant la recherche « ${query} »${(await state(site)).connected ? '' : ' (pas de compte connecté)'}.`); // i18n-ignore : journal
       onWait?.(flood.wait);
       await new Promise((r) => setTimeout(r, (flood.wait + 2) * 1000));
     } else if (flood.kind !== 'hits' || !flood.hits.length) {

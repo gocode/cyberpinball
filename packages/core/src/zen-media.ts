@@ -7,7 +7,8 @@
 // - Image du dossier du jeu : des joueurs rangent une image par table à côté de son fichier .pxp
 //   (« Archer.png », « Aliens.jpg » dans data\steam), nommée comme lui. Elle sert de vignette et se
 //   prend comme média de la table. Son type vient de ses proportions, lues dans son en-tête : à peu
-//   près carrée ou petite, un logo (Wheel) ; sinon une image de la table (Playfield).
+//   près carrée ou petite, un logo (Wheel) ; en largeur, le fronton (Backglass : c'est là que FX3
+//   l'affiche) ; en hauteur, une image de la table (Playfield).
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -74,8 +75,13 @@ export function zenLocalImages(dir: string | undefined): Map<string, string> {
   return out;
 }
 
-/** Ce qu'est une image rangée à côté d'une table : son logo, ou une image de la table. undefined : illisible. */
-export function zenLocalImageType(file: string): 'Wheel' | 'Playfield' | undefined {
+/**
+ * Ce qu'est une image rangée à côté d'une table : à peu près carrée ou petite, son logo ; en largeur,
+ * son fronton (FX3 montre data\steam\<table>.* dans sa fenêtre du fronton, et le catalogue des frontons
+ * en est fait : 20/11/2026, ces images passaient pour des images du plateau) ; en hauteur, une image de
+ * la table. undefined : illisible.
+ */
+export function zenLocalImageType(file: string): 'Wheel' | 'Backglass' | 'Playfield' | undefined {
   let bytes: Buffer;
   try {
     const fd = fs.openSync(file, 'r');
@@ -93,5 +99,6 @@ export function zenLocalImageType(file: string): 'Wheel' | 'Playfield' | undefin
   const size = ext ? imageDimensions(bytes, ext) : undefined;
   if (!size || !size.width || !size.height) return undefined;
   const ratio = size.width / size.height;
-  return (ratio >= 0.8 && ratio <= 1.25) || Math.max(size.width, size.height) <= 640 ? 'Wheel' : 'Playfield';
+  if ((ratio >= 0.8 && ratio <= 1.25) || Math.max(size.width, size.height) <= 640) return 'Wheel';
+  return ratio > 1.25 ? 'Backglass' : 'Playfield';
 }

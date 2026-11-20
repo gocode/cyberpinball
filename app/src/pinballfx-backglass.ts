@@ -12,7 +12,7 @@ import * as path from 'node:path';
 export type BackglassPlacement = 'placed' | 'present' | 'no-media' | 'failed';
 
 /** Image PNG d'un fichier image (Electron : nativeImage) ; vide si illisible. */
-function electronPng(file: string): Buffer {
+export function electronPng(file: string): Buffer {
   // Chargé à l'usage : les essais, sans Electron, passent leur propre conversion.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { nativeImage } = require('electron') as typeof import('electron');

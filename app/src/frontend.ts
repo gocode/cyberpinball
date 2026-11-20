@@ -120,6 +120,9 @@ import {
   TABLE_ENGINES,
   setFavorite,
   infoFileFor,
+  placeMissingMedia,
+  PINBALLFX3_BACKGLASS_PAGE,
+  PINBALLFX3_BACKGLASS_TITLE,
   buttonKeys,
   readTextIfExists,
   IniDocument,
@@ -334,6 +337,7 @@ import { launchPinballFx, runningPinballFx, ZEN_LAUNCH_GAMES } from './pinballfx
 import { detectPinballFx, detectPinballFx3 } from './pinballfx-install';
 import { bridgeZenKeys } from './zen-keys';
 import { placePinballFxBackglass } from './pinballfx-backglass';
+import { preparePinballFx3Backglass } from './pinballfx3-backglass';
 import { watchGameLoad, type GameLoadWatch } from './game-load';
 import { createLibrary, type ActionShortcut, type SystemItem, type UiAction } from './library';
 import { createFeedbackService } from './feedback-service';
@@ -4862,6 +4866,28 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     const placed = placePinballFxBackglass(fx, table.pinballFxTable, source);
     if (placed.result === 'placed') console.log(`${zenName} (${table.id}) : fronton déposé pour le jeu, ${placed.target} (depuis ${source}).`); // i18n-ignore : journal
     else if (placed.result === 'failed') console.log(`${zenName} (${table.id}) : fronton pas déposé (${placed.reason}) ; la partie se lance quand même.`); // i18n-ignore : journal
+  }
+  // Pinball FX3 : l'image de la table pour sa fenêtre du fronton (data\steam\<table>.*), si elle n'en a pas ;
+  // sans elle, FX3 y écrit le chemin qu'il cherche (essai du 20/11/2026). Le fronton de la table dans
+  // Cyber Pinball d'abord, sinon le catalogue d'archive.org (pinballfx3-backglass.ts). Et l'inverse : une
+  // table sans fronton dans Cyber Pinball prend cette image, la roue la montre.
+  if (simulated === undefined && fx3 && table.pinballFx3Table !== undefined && loc.root) {
+    const own = resolveMedia(table, loc.root, 'Backglass');
+    const source = own.source !== 'default' && own.source !== 'fallback' ? own.file : undefined;
+    const ready = await preparePinballFx3Backglass(fx3, table.pinballFx3Table, { ...(source ? { own: source } : {}), workDir: path.join(loc.dataDir, 'pinballfx3-fronton-partie') });
+    if (ready.image) {
+      if (ready.from !== 'present') console.log(`${zenName} (${table.id}) : fronton déposé pour le jeu, ${ready.image} (${ready.from === 'media' ? `depuis ${source}` : 'catalogue d’archive.org'}).`); // i18n-ignore : journal
+      try {
+        const kept = placeMissingMedia(table, infoFileFor(table, layoutOf(loc.root).tables), 'Backglass', ready.image, { origin: ready.from === 'catalog' ? PINBALLFX3_BACKGLASS_TITLE : zenName, url: ready.from === 'catalog' ? PINBALLFX3_BACKGLASS_PAGE : ready.image });
+        if (kept) {
+          console.log(`${zenName} (${table.id}) : fronton du jeu rangé comme fronton de la table, ${kept}.`); // i18n-ignore : journal
+          // La roue relit ses médias au retour de la partie (sans relire les tables pendant le lancement).
+          medias?.invalidate();
+        }
+      } catch (error) {
+        console.log(`${zenName} (${table.id}) : fronton du jeu pas rangé dans la table (${(error as Error).message}).`); // i18n-ignore : journal
+      }
+    } else console.log(`${zenName} (${table.id}) : pas d'image de fronton pour le jeu (${ready.pending ? 'catalogue encore en route, pour la partie suivante' : (ready.reason ?? 'aucune source')}) ; la partie se lance quand même.`); // i18n-ignore : journal
   }
 
   // Pinball FX3 : le playfield retrouve l'orientation de Windows, le bureau qu'il a avec un autre front-end

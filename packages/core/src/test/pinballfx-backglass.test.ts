@@ -127,6 +127,15 @@ test('frontend.ts : le mode borne de Pinball FX est écrit avant le lancement, d
   assert.match(body.slice(at - 600, at), /roleRects\.find/);
 });
 
+test('frontend.ts : l’image de la table de FX3 est posée avant le lancement, et devient le fronton de la table s’il lui manque', () => {
+  const src = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const body = src.slice(src.indexOf('async function playPinballFx('));
+  const at = body.indexOf('preparePinballFx3Backglass(');
+  assert.ok(at > 0 && at < body.indexOf('launchPinballFx('), 'avant le lancement');
+  assert.match(body.slice(at - 400, at), /resolveMedia\(table, loc\.root, 'Backglass'\)/);
+  assert.match(body.slice(at, at + 1500), /placeMissingMedia\(table, .*'Backglass', ready\.image/);
+});
+
 test('frontend.ts : le fronton de Pinball FX est déposé avant le lancement, d’après le média de la table, pas l’affichage par défaut', () => {
   const src = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
   const body = src.slice(src.indexOf('async function playPinballFx('));
