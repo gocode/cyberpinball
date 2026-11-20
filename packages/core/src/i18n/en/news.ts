@@ -118,14 +118,14 @@ export const messages: Record<string, string> = {
     'With a headset (Meta Quest through Link or Virtual Desktop, SteamVR), the front-end shows up in a decorated cabinet, and each table plays full size in front of you.',
   '« Caler la borne » pose la borne du casque exactement sur la vraie : vous jouez avec les boutons de votre borne, sous vos mains.':
     '“Line up the cabinet” sets the headset’s cabinet exactly on the real one: you play with your cabinet’s buttons, under your hands.',
-  'Menu système › Ma borne › VR et vision 3D': 'System menu › My cabinet › VR and 3D vision',
+  'Menu système › Ma borne › Réalité virtuelle et vision 3D': 'System menu › My cabinet › Virtual reality and 3D vision',
 
   'La perspective de la table suit votre tête, avec une webcam ou une Kinect.': 'The table’s perspective follows your head, with a webcam or a Kinect.',
   'La table se voit comme par une fenêtre : penchez-vous, elle change de perspective, sans casque ni lunettes.':
     'You see the table as through a window: lean over, its perspective changes, with no headset or glasses.',
   'Une webcam suffit ; une Kinect de Xbox 360 ou de Xbox One marche aussi, et son pilote s’installe en un clic.':
     'A webcam is enough; an Xbox 360 or Xbox One Kinect works too, and its driver installs in one click.',
-  'Menu système › Ma borne › VR et vision 3D › Vision 3D': 'System menu › My cabinet › VR and 3D vision › 3D vision',
+  'Menu système › Ma borne › Réalité virtuelle et vision 3D › Vision 3D': 'System menu › My cabinet › Virtual reality and 3D vision › 3D vision',
 
   'Collections et favoris': 'Collections and favourites',
   'Favoris, récentes, fabricants, décennies, les vôtres : la roue montre celle de votre choix.': 'Favourites, recent, manufacturers, decades, your own: the wheel shows the one you choose.',

@@ -27,16 +27,14 @@ import { loadSystemMemory, saveSystemMemory, SYSTEM_MEMORY_FILE } from '../syste
 const REPO = path.join(__dirname, '..', '..', '..', '..');
 const APP = path.join(REPO, 'app', 'src');
 
-test('menu système : une rubrique qui s’allume montre son état et son badge sur sa propre ligne (Réalité virtuelle)', () => {
-  // 13/11/2026 : regroupés sous « Réalité virtuelle », les réglages du casque cachaient l'état de la VR et son
-  // badge Bêta tant qu'on n'entrait pas dans la rubrique. L'entrée de tête les remonte sur la ligne de la rubrique.
-  assert.equal(SYSTEM_GROUPS['realite-virtuelle'].lead, 'vr');
-  for (const id of SYSTEM_GROUP_IDS) {
-    const lead = SYSTEM_GROUPS[id].lead;
-    if (lead) assert.ok(SYSTEM_GROUPS[id].entries.includes(lead), `${id} : son entrée de tête est dedans`);
-  }
+test('menu système : la ligne d’une rubrique dit son nom, jamais l’état ni le badge d’une de ses entrées (Réalité virtuelle et vision 3D)', () => {
+  // 20/11/2026 : la ligne parente affichait « Réalité virtuelle : désactivée BÊTA » (l'entrée de tête, décidée le
+  // 13/11/2026) alors que la rubrique contient aussi la vision 3D. L'état et le BÊTA se lisent en entrant, sur l'entrée.
+  setLanguage('fr');
+  assert.equal(SYSTEM_GROUPS['realite-virtuelle'].label, 'Réalité virtuelle et vision 3D');
+  for (const id of SYSTEM_GROUP_IDS) assert.ok(!('lead' in SYSTEM_GROUPS[id]), `${id} : plus d’entrée de tête`);
   const library = fs.readFileSync(path.join(APP, 'library.ts'), 'utf8');
-  assert.match(library, /const lead = isSystemGroup\(id\) && SYSTEM_GROUPS\[id\]\.lead \? systemItems\.get\(SYSTEM_GROUPS\[id\]\.lead!\) : undefined;\s*const item = isSystemGroup\(id\) \? lead : systemItems\.get\(id\);/);
+  assert.match(library, /const item = isSystemGroup\(id\) \? undefined : systemItems\.get\(id\);/);
   // Ce que dit l'entrée (son badge compris) est lu à l'ouverture de la rubrique et gardé (kept, 17/11/2026).
   assert.match(library, /\s+badge: item\?\.badge,\s/);
   assert.match(library, /\.\.\.\(shown\.badge && \{ badge: shown\.badge \}\),/);

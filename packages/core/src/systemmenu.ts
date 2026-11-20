@@ -134,13 +134,12 @@ export interface SystemGroup extends SystemEntry {
   readonly id: SystemGroupId;
   /** Ce qu'on y trouve, sous le nom de la rubrique. */
   readonly detail: string;
-  readonly entries: readonly SystemEntryId[];
   /**
-   * L'entrée de tête de la rubrique, celle qui l'allume ou l'éteint : la ligne de la rubrique en prend le
-   * libellé (avec l'état), le ton et le badge, pour qu'on les voie avant d'entrer (13/11/2026 : « Réalité
-   * virtuelle » ne disait plus si la VR était activée, ni son badge Bêta, une fois ses réglages regroupés).
+   * Ses entrées. La ligne d'une rubrique ne dit jamais l'état ni le badge (BÊTA) d'une de ses entrées : ils
+   * se lisent en entrant, sur l'entrée qu'ils concernent (20/11/2026 : « Réalité virtuelle : désactivée
+   * BÊTA » sur la ligne parente laissait croire que la rubrique n'était que la VR, vision 3D comprise).
    */
-  readonly lead?: SystemItemId;
+  readonly entries: readonly SystemEntryId[];
 }
 
 /**
@@ -200,14 +199,14 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     entries: ['dmd-screen', 'menu-dmd', 'dmd-color', 'hardware-dmd', 'dof'],
   },
   // Tous les réglages du casque ensemble, l'activation en tête (12/11/2026 : « les options VR doivent être
-  // dans VR »), et la vision 3D, l'autre façon de voir la table en relief (20/11/2026).
+  // dans VR »), et la vision 3D, l'autre façon de voir la table en relief (20/11/2026). Le nom dit les deux ;
+  // l'état de chacune et son badge BÊTA sont sur son entrée, à l'intérieur.
   'realite-virtuelle': {
     id: 'realite-virtuelle',
     icon: 'vr',
-    get label() { return t('VR et vision 3D'); },
+    get label() { return t('Réalité virtuelle et vision 3D'); },
     get detail() { return t('Activer le casque, caler la borne, manettes du casque, recopie sur le playfield, vision 3D'); },
     entries: ['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror', 'vision3d'],
-    lead: 'vr',
   },
   // Comment la borne démarre, et qui a le droit de faire quoi.
   demarrage: {
@@ -355,7 +354,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   // avec la clé développeur signée de la machine (devkey.ts) : absente ailleurs (entrée non fournie).
   'vpx-trial': { icon: 'flask', get label() { return t('VPX d’essai'); } },
   // Jouer dans un casque (vr.ts) : désactivée, ou dans le casque quand il est prêt.
-  // L'activation, en tête de la rubrique VR et vision 3D (qui porte l'icône du casque).
+  // L'activation, en tête de la rubrique Réalité virtuelle et vision 3D (qui porte l'icône du casque) ; son état et
+  // son badge BÊTA se lisent ici, pas sur la ligne de la rubrique.
   vr: { icon: 'power', get label() { return t('Réalité virtuelle'); } },
   // Caler la borne du casque et les tables de VPX sur la vraie barre avant, aux manettes (calage.ts).
   'vr-calibrate': { icon: 'layout', get label() { return t('Caler la borne'); } },

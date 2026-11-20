@@ -326,7 +326,7 @@ export const NEWS: readonly NewsItem[] = [
         t('« Caler la borne » pose la borne du casque exactement sur la vraie : vous jouez avec les boutons de votre borne, sous vos mains.'),
       ];
     },
-    get where() { return t('Menu système › Ma borne › VR et vision 3D'); },
+    get where() { return t('Menu système › Ma borne › Réalité virtuelle et vision 3D'); },
     reach: { kind: 'system', id: 'realite-virtuelle' },
     beta: true,
     preview: true,
@@ -343,7 +343,7 @@ export const NEWS: readonly NewsItem[] = [
         t('Une webcam suffit ; une Kinect de Xbox 360 ou de Xbox One marche aussi, et son pilote s’installe en un clic.'),
       ];
     },
-    get where() { return t('Menu système › Ma borne › VR et vision 3D › Vision 3D'); },
+    get where() { return t('Menu système › Ma borne › Réalité virtuelle et vision 3D › Vision 3D'); },
     reach: { kind: 'system', id: 'vision3d' },
     beta: true,
   },

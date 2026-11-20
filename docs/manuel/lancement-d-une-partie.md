@@ -213,7 +213,7 @@ Tests : `message-du-script.test.ts` (erreurs regroupées), `son-et-dmd.test.ts` 
 
 ### Réalité virtuelle
 
-Menu système > Ma borne > VR et vision 3D > « Réalité virtuelle » (`app/src/vr.ts`, règles dans `packages/core/src/vr.ts`) : désactivée par défaut, Start bascule.
+Menu système > Ma borne > Réalité virtuelle et vision 3D > « Réalité virtuelle » (`app/src/vr.ts`, règles dans `packages/core/src/vr.ts`) : désactivée par défaut, Start bascule.
 L'entrée porte un badge « BÊTA » dans tous ses états, car la fonction est en plein essai : une pastille après le libellé (`badge: 'beta'`, type `MenuBadge` de `app/src/library.ts`, réutilisable par toute entrée de menu ; composant `LigneMenu` du design system).
 L'entrée lit le runtime OpenXR actif sans réveiller le casque : la variable `XR_RUNTIME_JSON`, sinon `HKLM\SOFTWARE\Khronos\OpenXR\1`, valeur `ActiveRuntime` (`packages/win-displays/src/openxr.ts`), qu'écrivent Meta Quest Link, SteamVR ou Virtual Desktop.
 Son détail nomme le runtime ; sans runtime, ou si son manifeste a disparu, l'entrée reste visible, grisée, avec la raison.
@@ -447,7 +447,7 @@ Pour vérifier sans casque, le plugin rend en logiciel ce qu'il dessine sur le f
 Une pièce VR à elle (*City Hunter*) garde son fronton et son DMD, alimentés par son script : Cyber Pinball ne peut pas les remplir.
 Au journal, à chaque partie : « sources dans le casque : fronton …, DMD … » (« VR : pas de source DMD ni de fronton pour cette table » quand il en manque) ; au relevé du démarrage, « N table(s) sans source de fronton ou de DMD dans le casque » ; la santé de la borne, contrôle « Casque » : « VR : pas de source DMD ou fronton pour N tables », vers Médias manquants ; après la partie, « Casque, sources dessinées : fronton …, DMD … » (ce que le plugin a vraiment dessiné).
 **Casque non détecté** : option VR cochée mais casque éteint ou non relié (le compagnon ne le trouve pas, état autre que « shown »), la partie démarre en mode normal, sans attente ni écran de Link, avec un message bref (« Casque non détecté : partie en mode normal ») ; l'option reste cochée.
-**Recopie sur le playfield** (Menu système > Ma borne > VR et vision 3D, entrée `vr-mirror`) : la vue d'un œil du casque sur l'écran du plateau pendant la partie.
+**Recopie sur le playfield** (Menu système > Ma borne > Réalité virtuelle et vision 3D, entrée `vr-mirror`) : la vue d'un œil du casque sur l'écran du plateau pendant la partie.
 Éteinte par défaut : VPX ne sait pas la tourner en portrait (`[Player] VRPreview` n'a que aucun, œil gauche, œil droit, deux yeux), et la copier en 4K plein écran à chaque image coûte à la carte graphique pour une image que les spectateurs voient couchée ; éteinte, l'aperçu n'est plus dessiné (`VRPreview = 0`) et sa fenêtre se réduit à un timbre de 320 × 180 dans le coin du plateau (`VR_NO_MIRROR`), l'écran gardant celui de Cyber Pinball.
 **Réseau du casque** (`packages/core/src/vr-reseau.ts`, diagnostic du 11 novembre 2026 sur la borne : VPX tenait 68 à 72 images/s pour 72 Hz et le rendu du PC 4 ms par image, mais Link perdait 7 à 37 % des images en Air Link, débit tombé à 15-33 Mbit/s, aller-retour réseau jusqu'à 1,9 s ; le PC était lui-même en Wi-Fi, signal 49 %, câble Ethernet débranché : deux sauts sans fil).
 Le transport de Link vient de la dernière minute du journal de performance d'Oculus (`linkTransport` : Air Link relève le Wi-Fi du casque, `wifi_rssi`, le câble non) ; la carte réseau du PC, de la route par défaut (`PC_NETWORK_COMMAND`, PowerShell sans fenêtre : `Get-NetRoute` puis `Get-NetAdapter`), reconnue sans fil par son support physique (« Native 802.11 », `NdisPhysicalMedium` 1 ou 9), quelle que soit sa marque.
@@ -470,7 +470,7 @@ Banc : `build\vision3d\Release\banc-pause.exe` (construit par `node scripts/visi
 
 **Casque pas sur la tête au lancement** (`vrWearHint` de `app/src/frontend.ts`, `vrWearCard` de `app/renderer/frontend.js`, figé par [chargement.test.ts](../../packages/core/src/test/chargement.test.ts)).
 VPX attend le casque pour démarrer la table : tant que personne ne le porte, il reste sur sa première image du casque, sans rien écrire dans son journal (12/11/2026, The Addams Family lancée depuis la borne : plus de 3 minutes de chargement, crues bloquées).
-Quand une partie part dans le casque alors qu'il n'est pas sur la tête (le compagnon le dit, ou il ne tourne pas), le playfield et le fronton de la borne affichent en grand « Partie dans le casque · Mettez le casque : la table démarre quand il est sur la tête », avec, une consigne par ligne, l'arrêt (« Exit : arrêter », et au clavier Ctrl+Maj+K ou Échap) et le chemin pour jouer sur les écrans (Menu système > Ma borne > VR et vision 3D).
+Quand une partie part dans le casque alors qu'il n'est pas sur la tête (le compagnon le dit, ou il ne tourne pas), le playfield et le fronton de la borne affichent en grand « Partie dans le casque · Mettez le casque : la table démarre quand il est sur la tête », avec, une consigne par ligne, l'arrêt (« Exit : arrêter », et au clavier Ctrl+Maj+K ou Échap) et le chemin pour jouer sur les écrans (Menu système > Ma borne > Réalité virtuelle et vision 3D).
 Pendant cette attente, VPX a le premier plan mais ne lit encore aucun bouton : Exit de la borne (touche du clavier ou bouton du joystick) est lu par Cyber Pinball quelle que soit la fenêtre au premier plan (`watchExitWhileWaiting` : touches par `GetAsyncKeyState`, boutons du joystick par SDL, toutes les 50 ms, tant que la consigne est là et le casque pas sur la tête) ; un appui arrête la partie (VPX compris) et ramène à la roue (essai.30 : Exit ne faisait rien, le joueur restait bloqué).
 Échap et Ctrl+Maj+K sont des raccourcis globaux de toute partie dans le casque.
 À l'écran, l'espace avant « : ; ! ? » et dans les guillemets est insécable (`typo`, frontend.js) : une ligne ne se coupe jamais juste avant « : ».
@@ -484,7 +484,7 @@ Pour toute table dont la pièce VR capte PuP sans flasher du fronton en rendu ex
 Diagnostic au journal, une minute après le lancement (`auditVrBackglass`) : « Réalité virtuelle : N table(s) au fronton vide dans le casque sans correctif … ».
 Une fonction après l'autre (flippers, valider et Start, retour, menu du casque, crédit, quitter, MagnaSave, lancer la bille, lanceur, déplacer la sélection), « appuyez sur le bouton voulu » ; un bouton déjà pris est refusé avec la fonction qu'il tient ; le bouton de retour, une fois choisi, passe une fonction facultative ou revient à l'étape précédente ; au résumé, valider garde.
 Le réglage est gardé par casque et par configuration (`<données>\vr\manettes-<configuration>-<profil>.json`, `readControllerSetting` : un fichier incohérent redonne le défaut) et sert dans le front-end (`menuActionOf`) comme à l'INI de chaque partie (`vpxHeadsetInput` : boutons, lanceur et secousses sur leurs axes).
-Rouvrable par ≡ > « Manettes » et par Menu système > Ma borne > VR et vision 3D > « Manettes du casque ».
+Rouvrable par ≡ > « Manettes » et par Menu système > Ma borne > Réalité virtuelle et vision 3D > « Manettes du casque ».
 Dans le menu de VPX, un joystick incliné à 0,6 déplace la sélection (VPX demandait 0,9 : le joystick poussé à fond).
 **Le menu de VPX en VR** est une image plate attachée à la tête, dessinée directement dans l'image de chaque œil (`vs_imgui.sc` : position en z = 0, `LiveUI.cpp`), avec un décalage croisé fixe de 15 % de la largeur d'un œil pour simuler la profondeur (`LiveUI.cpp`, ligne 440) et une échelle fixe (ligne 208) : il paraît collé aux yeux, et aucun réglage de l'INI ne le recule ni ne le place.
 
@@ -497,7 +497,7 @@ Pendant une partie dans le casque, il veille (voir la relève) : VPX 10.8.1 ne f
 Un casque seulement retiré de la tête ne bascule rien : une fois porté, le front-end reste au casque (`HeadsetMenu.inUse`), les écrans du PC sur « Dans le casque » ; seul ce qui est dessiné pour le casque s'arrête jusqu'à ce qu'on le remette.
 
 **Caler la borne.**
-Menu système > Ma borne > VR et vision 3D > « Caler la borne » (juste après l'activation), ou dans le casque ≡ de la manette gauche > « Caler la borne ».
+Menu système > Ma borne > Réalité virtuelle et vision 3D > « Caler la borne » (juste après l'activation), ou dans le casque ≡ de la manette gauche > « Caler la borne ».
 Le calage guide pas à pas, en peu de mots (« Étape 1 sur 3 : coin gauche »…) : le joueur touche la vraie barre avant du bout de la manette (un petit cube vert y est dessiné), gâchette appuyée, coin gauche (un plot vert le marque) puis coin droit ; la borne du casque vient aussitôt dessus, deux plots verts sur les coins de sa barre avant et un troisième au milieu, le point à toucher pour vérifier : l'écran dit à combien de centimètres du milieu calé il tombe.
 **Un seul bouton** (demande du 10 novembre 2026) : les gâchettes placent et replacent la borne autant de fois qu'on veut, et elle vient aussitôt dessus ; A valide et sort en gardant ce calage (`applyCalibration`, puis `closeCalibration`) ; B sort sans rien changer.
 Consigne : « Gâchette : placer · A : valider ».
@@ -590,7 +590,7 @@ Deux mesures sur ces repères physiques : en fin de partie, la médiane des têt
 Le journal dit « pièce gardée (… : écart X cm et Y°) » ou « pièce déplacée de X cm et Y° (…) ».
 La tête au port n'est plus qu'un relevé indicatif, mesuré lui aussi sur la tête au calage.
 La place relue de `casque.json` garde aussi `free` : une borne posée au bureau était relue comme calée sur une vraie barre.
-**Recalage automatique, option retirée** (même jour) : l'option « Recalage automatique » (Menu système > Ma borne > VR et vision 3D : les manettes posées sur la barre avant, immobiles une seconde, recalaient la borne, après l'apprentissage de leur position de repos) a été retirée le jour même, à la demande du joueur, au profit de l'ancrage sur la limite du Quest (plus bas), qui n'a pas d'option : toujours actif quand la limite de pièce le permet.
+**Recalage automatique, option retirée** (même jour) : l'option « Recalage automatique » (Menu système > Ma borne > Réalité virtuelle et vision 3D : les manettes posées sur la barre avant, immobiles une seconde, recalaient la borne, après l'apprentissage de leur position de repos) a été retirée le jour même, à la demande du joueur, au profit de l'ancrage sur la limite du Quest (plus bas), qui n'a pas d'option : toujours actif quand la limite de pièce le permet.
 Un réglage `autoRecal` déjà écrit est ignoré, puis effacé à la prochaine écriture d'un réglage de la VR ; un champ `rest` dans `casque.json` est ignoré, puis oublié à la prochaine place écrite ; le compagnon ne relève plus les manettes au repos.
 **Dans le front-end seulement** : en partie, VPX a le casque, et OpenXR ne donne les actions des manettes qu'à l'application qui a le regard (session sans focus : actions inactives) ; le texte de l'option le dit.
 Seuils figés par [calage-partie.test.ts](../../packages/core/src/test/calage-partie.test.ts), relevés du compagnon par le banc.
@@ -697,7 +697,7 @@ Tests : `packages/core/src/test/casque.test.ts`, `packages/core/src/test/casque-
 
 ### Vision 3D
 
-Menu système > Ma borne > « VR et vision 3D » > « Vision 3D » (`app/src/vision3d.ts`, règles dans `packages/core/src/vision3d.ts`) : la perspective de la table suit la tête du joueur, comme une fenêtre ouverte sur le plateau (« head tracking »).
+Menu système > Ma borne > « Réalité virtuelle et vision 3D » > « Vision 3D » (`app/src/vision3d.ts`, règles dans `packages/core/src/vision3d.ts`) : la perspective de la table suit la tête du joueur, comme une fenêtre ouverte sur le plateau (« head tracking »).
 Désactivée par défaut, Start bascule ; badge « BÊTA ».
 Le réglage est gardé dans `<données>\vision3d\reglage.json`, avec la position de jeu de la tête par configuration de borne.
 

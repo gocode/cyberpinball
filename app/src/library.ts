@@ -2267,9 +2267,9 @@ export function createLibrary(host: LibraryHost) {
   function buildSystem(group: SystemGroupId | undefined): Built {
     const actions: Action[] = systemEntries(group).map((id) => {
       const entry = systemEntry(id);
-      // Une rubrique qui a une entrée de tête (l'activation) montre son état et son badge sur sa propre ligne.
-      const lead = isSystemGroup(id) && SYSTEM_GROUPS[id].lead ? systemItems.get(SYSTEM_GROUPS[id].lead!) : undefined;
-      const item = isSystemGroup(id) ? lead : systemItems.get(id);
+      // Une rubrique se montre par son nom et ce qu'elle contient, jamais par l'état ou le badge d'une
+      // de ses entrées (20/11/2026) ; seule sa pastille rouge remonte (systemAttention).
+      const item = isSystemGroup(id) ? undefined : systemItems.get(id);
       // Ce que dit chaque entrée (ses accesseurs lisent souvent le disque : sauvegardes, versions,
       // réglages) : lu à l'ouverture de la rubrique, gardé pour les touches qui suivent.
       const shown = kept(`entry:${id}`, () => ({

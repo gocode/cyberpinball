@@ -194,7 +194,7 @@ test('chargement : le garde-fou de mise en page contrôle les deux compositions 
 const WEAR = {
   status: 'Partie dans le casque',
   text: 'Mettez le casque : la table démarre quand il est sur la tête',
-  keys: ['Exit : arrêter (au clavier : Ctrl+Maj+K ou Échap)', 'Pour jouer sur les écrans : Menu système > Ma borne > VR et vision 3D'],
+  keys: ['Exit : arrêter (au clavier : Ctrl+Maj+K ou Échap)', 'Pour jouer sur les écrans : Menu système > Ma borne > Réalité virtuelle et vision 3D'],
 };
 /** Ce qu'affiche l'écran : les espaces avant « : » sont insécables (typo, frontend.js). */
 const shown = (text: string) => text.replace(/ ([:;!?»])/g, '\u00a0$1');

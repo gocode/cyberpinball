@@ -1,6 +1,6 @@
 // Catalogue anglais : settings. Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
-  // packages/core/src/vr.ts, systemmenu.ts : Menu système > Ma borne > VR et vision 3D
+  // packages/core/src/vr.ts, systemmenu.ts : Menu système > Ma borne > Réalité virtuelle et vision 3D
   'Réalité virtuelle': 'Virtual reality',
   // app/src/frontend.ts : la pause dans le casque, « Ajuster les écrans » (plugin CyberPinball)
   'Ajuster les écrans': 'Adjust screens',
@@ -62,7 +62,7 @@ export const messages: Record<string, string> = {
   'Partie dans le casque': 'Game in the headset',
   'Mettez le casque : la table démarre quand il est sur la tête': 'Put the headset on: the table starts once it’s on your head',
   'Exit : arrêter (au clavier : {keys} ou Échap)': 'Exit: stop (on the keyboard: {keys} or Esc)',
-  'Pour jouer sur les écrans : Menu système > Ma borne > VR et vision 3D': 'To play on the screens: System menu > My cabinet > VR and 3D vision',
+  'Pour jouer sur les écrans : Menu système > Ma borne > Réalité virtuelle et vision 3D': 'To play on the screens: System menu > My cabinet > Virtual reality and 3D vision',
   // app/src/frontend.ts : menu du casque (≡ de la manette gauche)
   'Menu du casque': 'Headset menu',
   'Les mêmes boutons partout : A valide, B revient, les joysticks déplacent la sélection.': 'The same buttons everywhere: A confirms, B goes back, the thumbsticks move the selection.',
@@ -424,7 +424,7 @@ export const messages: Record<string, string> = {
   'Cette table a sa propre valeur ; la retirer lui rend le réglage général.': 'This table has its own value; removing it gives the table the general setting back.',
   'Retirer la valeur de cette table': 'Remove this table’s value',
   'En partie': 'In game',
-  // packages/core/src/vision3d.ts, systemmenu.ts, app/src/frontend.ts : Menu système > Ma borne > VR et vision 3D > Vision 3D
+  // packages/core/src/vision3d.ts, systemmenu.ts, app/src/frontend.ts : Menu système > Ma borne > Réalité virtuelle et vision 3D > Vision 3D
   'Vision 3D': '3D vision',
   Webcam: 'Webcam',
   'Kinect pour Xbox 360': 'Kinect for Xbox 360',

@@ -5391,7 +5391,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
           status: t('Partie dans le casque'),
           text: t('Mettez le casque : la table démarre quand il est sur la tête'),
           // Une consigne par ligne (essai.30 : les deux sur une ligne, coupée avant « : », illisible).
-          keys: [t('Exit : arrêter (au clavier : {keys} ou Échap)', { keys: shortcutLabel(SHORTCUTS.forceStop) }), t('Pour jouer sur les écrans : Menu système > Ma borne > VR et vision 3D')],
+          keys: [t('Exit : arrêter (au clavier : {keys} ou Échap)', { keys: shortcutLabel(SHORTCUTS.forceStop) }), t('Pour jouer sur les écrans : Menu système > Ma borne > Réalité virtuelle et vision 3D')],
         }
       : undefined;
   if (vrFront.vrWearHint) console.log(`Réalité virtuelle (${played.id}) : casque pas sur la tête au lancement ; la borne dit de le mettre.`); // i18n-ignore : journal

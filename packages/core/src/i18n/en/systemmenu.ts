@@ -9,7 +9,7 @@ export const messages: Record<string, string> = {
   'Réglages de VPX pour toutes les tables, autres versions installées': 'VPX settings for every table, other installed versions',
   'DMD et LED': 'DMD and LEDs',
   'Écran du DMD, DMD du front-end et sa couleur, DMD réel, LED et retours (DOF)': 'DMD screen, menu DMD and its colour, real DMD, LEDs and feedback (DOF)',
-  'VR et vision 3D': 'VR and 3D vision',
+  'Réalité virtuelle et vision 3D': 'Virtual reality and 3D vision',
   'Activer le casque, caler la borne, manettes du casque, recopie sur le playfield, vision 3D': 'Turn the headset on, align the cabinet, headset controllers, playfield mirror, 3D vision',
   'Démarrage et accès': 'Startup and access',
   'Borne dédiée, lancement au démarrage, relance par Start, mode invité': 'Dedicated cabinet, launch at startup, relaunch with Start, guest mode',
